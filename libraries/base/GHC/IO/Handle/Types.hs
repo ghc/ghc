@@ -121,17 +121,17 @@ instance Eq Handle where
  _ == _ = False 
 
 data Handle__
-  = forall dev . (IODevice dev, BufferedIO dev, Typeable dev) =>
+  = forall dev enc_state dec_state . (IODevice dev, BufferedIO dev, Typeable dev) =>
     Handle__ {
       haDevice      :: !dev,
       haType        :: HandleType,           -- type (read/write/append etc.)
       haByteBuffer  :: !(IORef (Buffer Word8)),
       haBufferMode  :: BufferMode,
-      haLastDecode  :: !(IORef (Buffer Word8)),
+      haLastDecode  :: !(IORef (dec_state, Buffer Word8)),
       haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- the current buffer
       haBuffers     :: !(IORef (BufferList CharBufElem)),  -- spare buffers
-      haEncoder     :: Maybe TextEncoder,
-      haDecoder     :: Maybe TextDecoder,
+      haEncoder     :: Maybe (TextEncoder enc_state),
+      haDecoder     :: Maybe (TextDecoder dec_state),
       haInputNL     :: Newline,
       haOutputNL    :: Newline,
       haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 

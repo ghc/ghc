@@ -42,18 +42,36 @@ latin1 :: TextEncoding
 latin1 = TextEncoding { mkTextDecoder = latin1_DF,
                         mkTextEncoder = latin1_EF }
 
-latin1_DF :: IO TextDecoder
-latin1_DF = return (BufferCodec latin1_decode (return ()))
+latin1_DF :: IO (TextDecoder ())
+latin1_DF =
+  return (BufferCodec {
+             encode   = latin1_decode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
-latin1_EF :: IO TextEncoder
-latin1_EF = return (BufferCodec latin1_encode (return ()))
+latin1_EF :: IO (TextEncoder ())
+latin1_EF =
+  return (BufferCodec {
+             encode   = latin1_encode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
 latin1_checked :: TextEncoding
 latin1_checked = TextEncoding { mkTextDecoder = latin1_DF,
                                 mkTextEncoder = latin1_checked_EF }
 
-latin1_checked_EF :: IO TextEncoder
-latin1_checked_EF = return (BufferCodec latin1_checked_encode (return ()))
+latin1_checked_EF :: IO (TextEncoder ())
+latin1_checked_EF =
+  return (BufferCodec {
+             encode   = latin1_checked_encode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
 
 latin1_decode :: DecodeBuffer

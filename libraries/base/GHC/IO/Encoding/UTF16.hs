@@ -62,15 +62,25 @@ utf16  :: TextEncoding
 utf16 = TextEncoding { mkTextDecoder = utf16_DF,
  	               mkTextEncoder = utf16_EF }
 
-utf16_DF :: IO TextDecoder
+utf16_DF :: IO (TextDecoder (Maybe DecodeBuffer))
 utf16_DF = do
   seen_bom <- newIORef Nothing
-  return (BufferCodec (utf16_decode seen_bom) (return ()))
+  return (BufferCodec {
+             encode   = utf16_decode seen_bom,
+             close    = return (),
+             getState = readIORef seen_bom,
+             setState = writeIORef seen_bom
+          })
 
-utf16_EF :: IO TextEncoder
+utf16_EF :: IO (TextEncoder Bool)
 utf16_EF = do
   done_bom <- newIORef False
-  return (BufferCodec (utf16_encode done_bom) (return ()))
+  return (BufferCodec {
+             encode   = utf16_encode done_bom,
+             close    = return (),
+             getState = readIORef done_bom,
+             setState = writeIORef done_bom
+          })
 
 utf16_encode :: IORef Bool -> EncodeBuffer
 utf16_encode done_bom input
@@ -131,23 +141,45 @@ utf16be :: TextEncoding
 utf16be = TextEncoding { mkTextDecoder = utf16be_DF,
  	                 mkTextEncoder = utf16be_EF }
 
-utf16be_DF :: IO TextDecoder
-utf16be_DF = return (BufferCodec utf16be_decode (return ()))
+utf16be_DF :: IO (TextDecoder ())
+utf16be_DF =
+  return (BufferCodec {
+             encode   = utf16be_decode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
-utf16be_EF :: IO TextEncoder
-utf16be_EF = return (BufferCodec utf16be_encode (return ()))
-
+utf16be_EF :: IO (TextEncoder ())
+utf16be_EF =
+  return (BufferCodec {
+             encode   = utf16be_encode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
 utf16le :: TextEncoding
 utf16le = TextEncoding { mkTextDecoder = utf16le_DF,
  	                 mkTextEncoder = utf16le_EF }
 
-utf16le_DF :: IO TextDecoder
-utf16le_DF = return (BufferCodec utf16le_decode (return ()))
+utf16le_DF :: IO (TextDecoder ())
+utf16le_DF =
+  return (BufferCodec {
+             encode   = utf16le_decode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
-utf16le_EF :: IO TextEncoder
-utf16le_EF = return (BufferCodec utf16le_encode (return ()))
-
+utf16le_EF :: IO (TextEncoder ())
+utf16le_EF =
+  return (BufferCodec {
+             encode   = utf16le_encode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
 
 utf16be_decode :: DecodeBuffer

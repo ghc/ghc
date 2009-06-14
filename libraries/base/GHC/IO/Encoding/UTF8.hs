@@ -39,11 +39,23 @@ utf8 :: TextEncoding
 utf8 = TextEncoding { mkTextDecoder = utf8_DF,
  	              mkTextEncoder = utf8_EF }
 
-utf8_DF :: IO TextDecoder
-utf8_DF = return (BufferCodec utf8_decode (return ()))
+utf8_DF :: IO (TextDecoder ())
+utf8_DF =
+  return (BufferCodec {
+             encode   = utf8_decode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
-utf8_EF :: IO TextEncoder
-utf8_EF = return (BufferCodec utf8_encode (return ()))
+utf8_EF :: IO (TextEncoder ())
+utf8_EF =
+  return (BufferCodec {
+             encode   = utf8_encode,
+             close    = return (),
+             getState = return (),
+             setState = const $ return ()
+          })
 
 utf8_decode :: DecodeBuffer
 utf8_decode 

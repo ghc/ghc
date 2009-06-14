@@ -28,7 +28,7 @@ import GHC.IO.Buffer
 -- -----------------------------------------------------------------------------
 -- Text encoders/decoders
 
-data BufferCodec from to = BufferCodec {
+data BufferCodec from to state = BufferCodec {
   encode :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
    -- ^ The @encode@ function translates elements of the buffer @from@
    -- to the buffer @to@.  It should translate as many elements as possible
@@ -45,10 +45,27 @@ data BufferCodec from to = BufferCodec {
    -- library in order to report translation errors at the point they
    -- actually occur, rather than when the buffer is translated.
    --
-  close  :: IO ()
+  close  :: IO (),
    -- ^ Resources associated with the encoding may now be released.
    -- The @encode@ function may not be called again after calling
    -- @close@.
+
+  getState :: IO state,
+   -- ^ Return the current state of the codec.
+   --
+   -- Many codecs are not stateful, and in these case the state can be
+   -- represented as '()'.  Other codecs maintain a state.  For
+   -- example, UTF-16 recognises a BOM (byte-order-mark) character at
+   -- the beginning of the input, and remembers thereafter whether to
+   -- use big-endian or little-endian mode.  In this case, the state
+   -- of the codec would include two pieces of information: whether we
+   -- are at the beginning of the stream (the BOM only occurs at the
+   -- beginning), and if not, whether to use the big or little-endian
+   -- encoding.
+
+  setState :: state -> IO()
+   -- restore the state of the codec using the state from a previous
+   -- call to 'getState'.
  }
 
 type DecodeBuffer = Buffer Word8 -> Buffer Char
@@ -57,16 +74,16 @@ type DecodeBuffer = Buffer Word8 -> Buffer Char
 type EncodeBuffer = Buffer Char -> Buffer Word8
                   -> IO (Buffer Char, Buffer Word8)
 
-type TextDecoder = BufferCodec Word8 CharBufElem
-type TextEncoder = BufferCodec CharBufElem Word8
+type TextDecoder state = BufferCodec Word8 CharBufElem state
+type TextEncoder state = BufferCodec CharBufElem Word8 state
 
 -- | A 'TextEncoding' is a specification of a conversion scheme
 -- between sequences of bytes and sequences of Unicode characters.
 --
 -- For example, UTF-8 is an encoding of Unicode characters into a sequence
--- of bytes.  The 'TextEncoding' for UTF-8 is 'utf_8'.
+-- of bytes.  The 'TextEncoding' for UTF-8 is 'utf8'.
 data TextEncoding
-  = TextEncoding  {
-	mkTextDecoder :: IO TextDecoder,
-	mkTextEncoder :: IO TextEncoder
+  = forall dstate estate . TextEncoding  {
+	mkTextDecoder :: IO (TextDecoder dstate),
+	mkTextEncoder :: IO (TextEncoder estate)
   }

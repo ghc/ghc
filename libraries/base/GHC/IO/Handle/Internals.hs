@@ -31,7 +31,7 @@ module GHC.IO.Handle.Internals (
   wantSeekableHandle,
 
   mkHandle, mkFileHandle, mkDuplexHandle,
-  getEncoding, initBufferState,
+  openTextEncoding, initBufferState,
   dEFAULT_CHAR_BUFFER_SIZE,
 
   flushBuffer, flushWriteBuffer, flushWriteBuffer_, flushCharReadBuffer,
@@ -432,7 +432,7 @@ flushCharReadBuffer Handle__{..} = do
   -- haLastDecode is the byte buffer just before we did our last batch of
   -- decoding.  We're going to re-decode the bytes up to the current char,
   -- to find out where we should revert the byte buffer to.
-  bbuf0 <- readIORef haLastDecode
+  (codec_state, bbuf0) <- readIORef haLastDecode
 
   cbuf0 <- readIORef haCharBuffer
   writeIORef haCharBuffer cbuf0{ bufL=0, bufR=0 }
@@ -453,24 +453,17 @@ flushCharReadBuffer Handle__{..} = do
     Just decoder -> do
       debugIO ("flushCharReadBuffer re-decode, bbuf=" ++ summaryBuffer bbuf0 ++
                " cbuf=" ++ summaryBuffer cbuf0)
+
+      -- restore the codec state
+      setState decoder codec_state
     
       (bbuf1,cbuf1) <- (encode decoder) bbuf0
                                cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
     
-      -- tricky case: if the decoded string starts with e BOM, then it was
-      -- probably ignored last time we decoded these bytes, and we should
-      -- therefore decode another char.
-      (c,_) <- readCharBuf (bufRaw cbuf1) (bufL cbuf1)
-      (bbuf2,_) <- if (c == '\xfeff')
-                      then do debugIO "found BOM, decoding another char"
-                              (encode decoder) bbuf1
-                                      cbuf0{ bufL=0, bufR=0, bufSize = 1 }
-                      else return (bbuf1,cbuf1)
-    
       debugIO ("finished, bbuf=" ++ summaryBuffer bbuf1 ++
                " cbuf=" ++ summaryBuffer cbuf1)
 
-      writeIORef haByteBuffer bbuf2
+      writeIORef haByteBuffer bbuf1
 
 
 -- When flushing the byte read buffer, we seek backwards by the number
@@ -508,12 +501,12 @@ mkHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
             -> IO Handle
 
 mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
+   openTextEncoding mb_codec ha_type $ \ mb_encoder mb_decoder -> do
+
    let buf_state = initBufferState ha_type
    bbuf <- Buffered.newBuffer dev buf_state
    bbufref <- newIORef bbuf
-   last_decode <- newIORef bbuf
-
-   (mb_encoder, mb_decoder) <- getEncoding mb_codec ha_type
+   last_decode <- newIORef (error "codec_state", bbuf)
 
    (cbufref,bmode) <- 
          if buffered then getCharBuffer dev buf_state
@@ -585,23 +578,25 @@ initBufferState :: HandleType -> BufferState
 initBufferState ReadHandle = ReadBuffer
 initBufferState _          = WriteBuffer
 
-getEncoding :: Maybe TextEncoding -> HandleType
-            -> IO (Maybe TextEncoder, 
-                   Maybe TextDecoder)
+openTextEncoding
+   :: Maybe TextEncoding
+   -> HandleType
+   -> (forall es ds . Maybe (TextEncoder es) -> Maybe (TextDecoder ds) -> IO a)
+   -> IO a
 
-getEncoding Nothing   ha_type = return (Nothing, Nothing)
-getEncoding (Just te) ha_type = do
+openTextEncoding Nothing   ha_type cont = cont Nothing Nothing
+openTextEncoding (Just TextEncoding{..}) ha_type cont = do
     mb_decoder <- if isReadableHandleType ha_type then do
-                     decoder <- mkTextDecoder te
+                     decoder <- mkTextDecoder
                      return (Just decoder)
                   else
                      return Nothing
     mb_encoder <- if isWritableHandleType ha_type then do
-                     encoder <- mkTextEncoder te
+                     encoder <- mkTextEncoder
                      return (Just encoder)
                   else 
                      return Nothing
-    return (mb_encoder, mb_decoder)
+    cont mb_encoder mb_decoder
 
 -- ---------------------------------------------------------------------------
 -- closing Handles
@@ -737,10 +732,15 @@ readTextDevice h_@Handle__{..} cbuf = do
 
   debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf1)
 
-  writeIORef haLastDecode bbuf1
-  (bbuf2,cbuf') <- case haDecoder of
-                     Nothing      -> latin1_decode bbuf1 cbuf
-                     Just decoder -> (encode decoder) bbuf1 cbuf
+  (bbuf2,cbuf') <- 
+      case haDecoder of
+          Nothing      -> do
+               writeIORef haLastDecode (error "codec_state", bbuf1)
+               latin1_decode bbuf1 cbuf
+          Just decoder -> do
+               state <- getState decoder
+               writeIORef haLastDecode (state, bbuf1)
+               (encode decoder) bbuf1 cbuf
 
   debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
         " bbuf=" ++ summaryBuffer bbuf2)
@@ -766,10 +766,15 @@ readTextDevice' h_@Handle__{..} bbuf0 cbuf = do
 
   debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf2)
 
-  writeIORef haLastDecode bbuf2
-  (bbuf3,cbuf') <- case haDecoder of
-                     Nothing      -> latin1_decode bbuf2 cbuf
-                     Just decoder -> (encode decoder) bbuf2 cbuf
+  (bbuf3,cbuf') <- 
+      case haDecoder of
+          Nothing      -> do
+               writeIORef haLastDecode (error "codec_state", bbuf2)
+               latin1_decode bbuf2 cbuf
+          Just decoder -> do
+               state <- getState decoder
+               writeIORef haLastDecode (state, bbuf2)
+               (encode decoder) bbuf2 cbuf
 
   debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
         " bbuf=" ++ summaryBuffer bbuf3)

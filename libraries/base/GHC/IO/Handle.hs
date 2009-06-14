@@ -259,8 +259,10 @@ hSetEncoding :: Handle -> TextEncoding -> IO ()
 hSetEncoding hdl encoding = do
   withHandle "hSetEncoding" hdl $ \h_@Handle__{..} -> do
     flushCharBuffer h_
-    (mb_encoder,mb_decoder) <- getEncoding (Just encoding) haType
-    return (Handle__{ haDecoder = mb_decoder, haEncoder = mb_encoder, .. },
+    openTextEncoding (Just encoding) haType $ \ mb_encoder mb_decoder -> do
+    bbuf <- readIORef haByteBuffer
+    ref <- newIORef (error "last_decode")
+    return (Handle__{ haLastDecode = ref, haDecoder = mb_decoder, haEncoder = mb_encoder, .. },
             ())
 
 -- -----------------------------------------------------------------------------
@@ -513,15 +515,21 @@ hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ h_@Handle__{..} ->
     do 
          flushBuffer h_
+
          let mb_te | bin       = Nothing
                    | otherwise = Just localeEncoding
+
+         openTextEncoding mb_te haType $ \ mb_encoder mb_decoder -> do
 
          -- should match the default newline mode, whatever that is
          let nl    | bin       = noNewlineTranslation
                    | otherwise = nativeNewlineMode
 
-         (mb_encoder, mb_decoder) <- getEncoding mb_te haType
-         return Handle__{ haEncoder  = mb_encoder, 
+         bbuf <- readIORef haByteBuffer
+         ref <- newIORef (error "codec_state", bbuf)
+
+         return Handle__{ haLastDecode = ref,
+                          haEncoder  = mb_encoder, 
                           haDecoder  = mb_decoder,
                           haInputNL  = inputNL nl,
                           haOutputNL = outputNL nl, .. }

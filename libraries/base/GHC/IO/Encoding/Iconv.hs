@@ -135,7 +135,7 @@ mkTextEncoding charset = do
 
 newIConv :: String -> String
    -> (IConv -> Buffer a -> Buffer b -> IO (Buffer a, Buffer b))
-   -> IO (BufferCodec a b)
+   -> IO (BufferCodec a b ())
 newIConv from to fn =
   withCString from $ \ from_str ->
   withCString to   $ \ to_str -> do
@@ -144,7 +144,10 @@ newIConv from to fn =
                     return ()
     return BufferCodec{
                 encode = fn iconvt,
-                close  = iclose
+                close  = iclose,
+                -- iconv doesn't supply a way to save/restore the state
+                getState = return (),
+                setState = const $ return ()
                 }
 
 iconvDecode :: IConv -> Buffer Word8 -> Buffer CharBufElem
