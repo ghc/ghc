@@ -564,6 +564,10 @@ $(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS +=
 # out the ones it thinks aren't supported.
 libraries/base3-compat_dist-install_HC_OPTS += -XPackageImports
 
+# A useful pseudo-target
+.PHONY: stage1_libs
+stage1_libs : $(ALL_STAGE1_LIBS)
+
 # -----------------------------------------------------------------------------
 # Bootstrapping libraries
 
