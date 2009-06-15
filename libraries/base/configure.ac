@@ -13,9 +13,6 @@ AC_PROG_CC()
 # do we have long longs?
 AC_CHECK_TYPES([long long])
 
-dnl ** determine whether or not const works
-AC_C_CONST
-
 dnl ** check for full ANSI header (.h) files
 AC_HEADER_STDC
 
