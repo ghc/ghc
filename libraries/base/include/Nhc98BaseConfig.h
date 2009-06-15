@@ -42,3 +42,4 @@
 #define CONST_O_BINARY		0
 #define READDIR_ERRNO_EOF	0
 
+#define INLINE	/* to avoid inlining... */

@@ -56,6 +56,7 @@ import GHC.IO.Device
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 import Hugs.IO (IOMode(..))
 #elif __NHC__
+import GHC.IO.Device	-- yes, I know, but its portable, really!
 import System.IO
 import Control.Exception
 import DIOError

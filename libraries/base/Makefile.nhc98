@@ -9,7 +9,7 @@ DIRS	= \
 	Data Debug Control Control/Monad System System/IO System/Console \
 	Text Text/Html Text/Show Text/ParserCombinators Text/Regex \
 	Foreign Foreign/Marshal Foreign/C NHC Unsafe System/Posix \
-	Control/Exception
+	Control/Exception GHC GHC/IO
 
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
@@ -41,6 +41,7 @@ SRCS	= \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Unsafe/Coerce.hs \
 	WCsubst.c dirUtils.c \
+	GHC/IO/Device.hs \
 	System/Posix/Types.hs System/Posix/Internals.hs \
 
 #	Data/String.hs
