@@ -128,6 +128,9 @@ WARNING: You seem to have things set in mk/validate.mk. Please check
 that it is OK before pushing.
 EOF
         fi
+        cat <<EOF
+-------------------------------------------------------------------
+EOF
     else
         cat <<EOF
 I didn't find any problems, but this wasn't a complete validate run,
