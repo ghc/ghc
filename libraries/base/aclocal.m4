@@ -145,7 +145,7 @@ int main(void) {
   if (((testing)((int)((testing)1.4))) == ((testing)1.4)) {
     fprintf(f, "%s%d\n",
            ((testing)(-1) < (testing)0) ? "Int" : "Word",
-           sizeof(testing)*8);
+           (int)(sizeof(testing)*8));
   } else {
     fprintf(f,"%s\n",
            (sizeof(testing) >  sizeof(double)) ? "LDouble" :
@@ -179,6 +179,8 @@ AC_DEFUN([FP_READDIR_EOF_ERRNO],
 [AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <dirent.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/stat.h>
+
 int
 main(argc, argv)
 int argc;
