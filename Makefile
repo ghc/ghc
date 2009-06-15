@@ -32,6 +32,11 @@ else
 default : all
 	@:
 
+# For help, type 'make help'
+.PHONY: help
+help :
+	@cat MAKEHELP
+
 ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 -include mk/config.mk
 else
@@ -44,7 +49,7 @@ endif
 include mk/custom-settings.mk
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show,$(MAKECMDGOALS))
+REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
 
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
