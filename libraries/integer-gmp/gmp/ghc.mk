@@ -39,6 +39,12 @@ ifneq "$(HaveFrameworkGMP)" "YES"
 GMP_LIB = libraries/integer-gmp/gmp/libgmp.a
 OTHER_LIBS += $(GMP_LIB)
 
+SRC_CC_OPTS += -I$(TOP)/libraries/integer-gmp/gmp
+SRC_LD_OPTS += -L$(TOP)/libraries/integer-gmp/gmp
+libraries/integer-gmp_dist-install_CONFIGURE_OPTS += --extra-lib-dirs=$(TOP)/libraries/integer-gmp/gmp
+
+libraries/integer-gmp/dist-install/package-data.mk: libraries/integer-gmp/gmp/gmp.h
+
 INSTALL_LIBS += libraries/integer-gmp/gmp/libgmp.a
 INSTALL_HEADERS += libraries/integer-gmp/gmp/gmp.h
 

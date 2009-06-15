@@ -81,7 +81,7 @@ dnl * Generate the header cbits/GmpDerivedConstants.h
 dnl--------------------------------------------------------------------
 
 AC_MSG_NOTICE([generating GmpDerivedConstants.h])
-${CC} cbits/mkGmpDerivedConstants.c -o cbits/mkGmpDerivedConstants
+${CC} $CFLAGS cbits/mkGmpDerivedConstants.c -o cbits/mkGmpDerivedConstants
 cbits/mkGmpDerivedConstants > cbits/GmpDerivedConstants.h
 rm cbits/mkGmpDerivedConstants
 

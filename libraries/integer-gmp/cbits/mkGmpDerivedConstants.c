@@ -19,13 +19,6 @@
 
 #define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
 
-#ifdef mingw32_HOST_OS
-#define SIZET_FMT "d"
-#else
-#define SIZET_FMT "zd"
-#endif
-
-
 /* struct_size(TYPE)
  *
  */
@@ -41,7 +34,7 @@
  *
  */
 #define def_offset(str, offset) \
-    printf("#define OFFSET_" str " %" SIZET_FMT "\n", offset);
+    printf("#define OFFSET_" str " %d\n", (int)(offset));
 
 #define field_offset_(str, s_type, field) \
     def_offset(str, OFFSET(s_type,field));
