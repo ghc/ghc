@@ -16,6 +16,10 @@ TOPMAKE = $(MAKE) -C $(TOP)
 
 default: all
 
+fast :
+	+$(TOPMAKE) all_$(dir) $(dir)_dist-install_NO_BUILD_DEPS=YES \
+	   OMIT_PHASE_1=YES OMIT_PHASE_2=YES OMIT_PHASE_3=YES
+
 # We must not execute multiple recursive invocations of make in parallel.
 .NOTPARALLEL:
 
@@ -26,7 +30,7 @@ STD_TARGETS = all clean distclean maintainer_clean install html ps pdf
 $(STD_TARGETS): 
 	+$(TOPMAKE) $@_$(dir)
 
-OTHERTARGETS=$(filter-out $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
+OTHERTARGETS=$(filter-out fast $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
 .PHONY: $(OTHERTARGETS)
 $(OTHERTARGETS):
 	+$(TOPMAKE) $(dir)/$@
