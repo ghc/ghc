@@ -62,8 +62,6 @@ foreign import ccall unsafe "hs_uncheckedIShiftL64"  uncheckedIShiftL64#  :: Int
 foreign import ccall unsafe "hs_uncheckedIShiftRA64" uncheckedIShiftRA64# :: Int64# -> Int# -> Int64#
 foreign import ccall unsafe "hs_uncheckedIShiftRL64" uncheckedIShiftRL64# :: Int64# -> Int# -> Int64#
 
-foreign import ccall unsafe "hs_integerToWord64" integerToWord64# :: Int# -> ByteArray# -> Word64#
-foreign import ccall unsafe "hs_integerToInt64"  integerToInt64#  :: Int# -> ByteArray# -> Int64#
 foreign import ccall unsafe "hs_int64ToWord64"   int64ToWord64#   :: Int64# -> Word64#
 foreign import ccall unsafe "hs_word64ToInt64"   word64ToInt64#   :: Word64# -> Int64#
 foreign import ccall unsafe "hs_intToInt64"      intToInt64#      :: Int# -> Int64#

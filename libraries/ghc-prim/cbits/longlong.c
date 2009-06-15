@@ -79,8 +79,6 @@ HsInt64  hs_uncheckedIShiftRL64 (HsInt64 a,  HsInt b)
                                     {return (HsInt64) ((HsWord64) a >> b);}
 
 /* Casting between longs and longer longs.
-   (the primops that cast from long longs to Integers
-   expressed as macros, since these may cause some heap allocation).
 */
 
 HsInt64  hs_intToInt64    (HsInt    i) {return (HsInt64)  i;}
@@ -89,41 +87,5 @@ HsWord64 hs_int64ToWord64 (HsInt64  i) {return (HsWord64) i;}
 HsWord64 hs_wordToWord64  (HsWord   w) {return (HsWord64) w;}
 HsWord   hs_word64ToWord  (HsWord64 w) {return (HsWord)   w;}
 HsInt64  hs_word64ToInt64 (HsWord64 w) {return (HsInt64)  w;}
-
-HsWord64 hs_integerToWord64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da)
-{ 
-  mp_limb_t* d;
-  HsInt s;
-  HsWord64 res;
-  d = (mp_limb_t *)da;
-  s = sa;
-  switch (s) {
-    case  0: res = 0;     break;
-    case  1: res = d[0];  break;
-    case -1: res = -(HsWord64)d[0]; break;
-    default:
-      res = (HsWord64)d[0] + ((HsWord64)d[1] << (BITS_IN (mp_limb_t)));
-      if (s < 0) res = -res;
-  }
-  return res;
-}
-
-HsInt64 hs_integerToInt64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da)
-{ 
-  mp_limb_t* d;
-  HsInt s;
-  HsInt64 res;
-  d = (mp_limb_t *)da;
-  s = (sa);
-  switch (s) {
-    case  0: res = 0;     break;
-    case  1: res = d[0];  break;
-    case -1: res = -(HsInt64)d[0]; break;
-    default:
-      res = (HsInt64)d[0] + ((HsWord64)d[1] << (BITS_IN (mp_limb_t)));
-      if (s < 0) res = -res;
-  }
-  return res;
-}
 
 #endif /* SUPPORT_LONG_LONGS */
