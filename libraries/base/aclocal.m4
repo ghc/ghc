@@ -135,9 +135,11 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <stdio.h>
 # include <sys/resource.h>
 #endif
 
+#include <stdlib.h>
+
 typedef $1 testing;
 
-main() {
+int main(void) {
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
   if (((testing)((int)((testing)1.4))) == ((testing)1.4)) {
