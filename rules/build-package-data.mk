@@ -20,6 +20,9 @@ ifeq "$(HSCOLOUR_SRCS)" "YES"
 $1_$2_CONFIGURE_OPTS += --with-hscolour="$$(HSCOLOUR)"
 endif
 
+$1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$(SRC_CC_OPTS) $$($1_CC_OPTS) $$($1_$2_CC_OPTS)"
+$1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
+
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in
 # the build tree.
