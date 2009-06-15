@@ -68,15 +68,16 @@ import GHC.Integer.Internals (
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
 #if WORD_SIZE_IN_BITS < 64
-    int64ToInteger#, word64ToInteger#,
+    int64ToInteger#,  integerToInt64#,
+    word64ToInteger#, integerToWord64#,
 #endif
  )
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64 (
             Int64#, Word64#,
-            int64ToWord64#, intToInt64#, integerToWord64#,
-            int64ToInt#, word64ToInt64#, integerToInt64#,
+            int64ToWord64#, intToInt64#,
+            int64ToInt#, word64ToInt64#,
             geInt64#, leInt64#, leWord64#,
        )
 #endif

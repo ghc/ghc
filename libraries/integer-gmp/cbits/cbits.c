@@ -1,5 +1,5 @@
 
-/* We combine the two C files here.
+/* We combine the C files here.
  *
  * There is actually a good reason for this, really!
  * The alloc file contains a __attribute__((constructor)) function. We must
@@ -11,3 +11,4 @@
 
 #include "alloc.c"
 #include "float.c"
+#include "longlong.c"

@@ -38,8 +38,8 @@ module GHC.Integer.Internals (
     complementInteger#,
 
 #if WORD_SIZE_IN_BITS < 64
-    int64ToInteger#,
-    word64ToInteger#,
+    int64ToInteger#,  integerToInt64#,
+    word64ToInteger#, integerToWord64#,
 #endif
 
 #ifndef WORD_SIZE_IN_BITS
@@ -190,4 +190,10 @@ foreign import prim "integer_cmm_int64ToIntegerzh" int64ToInteger#
 
 foreign import prim "integer_cmm_word64ToIntegerzh" word64ToInteger#
   :: Word64# -> (# Int#, ByteArray# #)
+
+foreign import ccall unsafe "hs_integerToInt64"
+    integerToInt64#  :: Int# -> ByteArray# -> Int64#
+
+foreign import ccall unsafe "hs_integerToWord64"
+    integerToWord64# :: Int# -> ByteArray# -> Word64#
 #endif
