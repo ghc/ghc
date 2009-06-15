@@ -20,7 +20,10 @@ ifeq "$(HSCOLOUR_SRCS)" "YES"
 $1_$2_CONFIGURE_OPTS += --with-hscolour="$$(HSCOLOUR)"
 endif
 
-$1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$(SRC_CC_OPTS) $$($1_CC_OPTS) $$($1_$2_CC_OPTS)"
+# We filter out -Werror from SRC_CC_OPTS, because when configure tests
+# for a feature it may not generate warning-free C code, and thus may
+# think that the feature doesn't exist if -Werror is on.
+$1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$(filter-out -Werror,$$(SRC_CC_OPTS)) $$($1_CC_OPTS) $$($1_$2_CC_OPTS)"
 $1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
 
 # This rule configures the package, generates the package-data.mk file
