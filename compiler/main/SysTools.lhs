@@ -420,12 +420,13 @@ copyWithHeader :: DynFlags -> String -> Maybe String -> FilePath -> FilePath
 copyWithHeader dflags purpose maybe_header from to = do
   showPass dflags purpose
 
-  h <- openFile to WriteMode
-  ls <- readFile from -- inefficient, but it'll do for now.
-                      -- ToDo: speed up via slurping.
-  maybe (return ()) (hPutStr h) maybe_header
-  hPutStr h ls
-  hClose h
+  hout <- openBinaryFile to   WriteMode
+  hin  <- openBinaryFile from ReadMode
+  ls <- hGetContents hin -- inefficient, but it'll do for now. ToDo: speed up
+  maybe (return ()) (hPutStr hout) maybe_header
+  hPutStr hout ls
+  hClose hout
+  hClose hin
 
 getExtraViaCOpts :: DynFlags -> IO [String]
 getExtraViaCOpts dflags = do
