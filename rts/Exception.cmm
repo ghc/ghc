@@ -124,12 +124,24 @@ unblockAsyncExceptionszh_fast
     CInt r;
 
     /* Args: R1 :: IO a */
-    STK_CHK_GEN( WDS(2), R1_PTR, unblockAsyncExceptionszh_fast);
+    STK_CHK_GEN( WDS(4), R1_PTR, unblockAsyncExceptionszh_fast);
+    /* 4 words: one for the unblock frame, 3 for setting up the
+     * stack to call maybePerformBlockedException() below.
+     */
 
+    /* If exceptions are already unblocked, there's nothing to do */
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
 
 	StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
 	   ~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+
+	/* avoid growing the stack unnecessarily */
+	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
+	    Sp_adj(1);
+	} else {
+	    Sp_adj(-1);
+	    Sp(0) = stg_blockAsyncExceptionszh_ret_info;
+	}
 
         /* Eagerly raise a blocked exception, if there is one */
         if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
@@ -137,7 +149,18 @@ unblockAsyncExceptionszh_fast
              * We have to be very careful here, as in killThread#, since
              * we are about to raise an async exception in the current
              * thread, which might result in the thread being killed.
+             *
+             * Now, if we are to raise an exception in the current
+             * thread, there might be an update frame above us on the
+             * stack due to unsafePerformIO.  Hence, the stack must
+             * make sense, because it is about to be snapshotted into
+             * an AP_STACK.
              */
+            Sp_adj(-3);
+            Sp(2) = stg_ap_v_info;
+            Sp(1) = R1;
+            Sp(0) = stg_enter_info;
+
             SAVE_THREAD_STATE();
             (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
 						      CurrentTSO "ptr") [R1];
@@ -150,16 +173,12 @@ unblockAsyncExceptionszh_fast
 	            ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
 	            jump %ENTRY_CODE(Sp(0));
 	        }
+            } else {
+                /* we'll just call R1 directly, below */
+                Sp_adj(3);
             }
         }
 
-	/* avoid growing the stack unnecessarily */
-	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
-	    Sp_adj(1);
-	} else {
-	    Sp_adj(-1);
-	    Sp(0) = stg_blockAsyncExceptionszh_ret_info;
-	}
     }
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
@@ -202,6 +221,14 @@ killThreadzh_fast
         goto loop;
     }
     if (target == CurrentTSO) {
+        /*
+         * So what should happen if a thread calls "throwTo self" inside
+         * unsafePerformIO, and later the closure is evaluated by another
+         * thread?  Presumably it should behave as if throwTo just returned,
+         * and then continue from there.  See #3279, #3288.  This is what
+         * happens: on resumption, we will just jump to the next frame on
+         * the stack, which is the return point for killThreadzh_fast.
+         */
 	SAVE_THREAD_STATE();
 	/* ToDo: what if the current thread is blocking exceptions? */
 	foreign "C" throwToSingleThreaded(MyCapability() "ptr", 
