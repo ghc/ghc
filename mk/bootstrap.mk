@@ -77,13 +77,8 @@ else
 UNDERSCORE=
 endif
 
-ifeq "$(HaveLibGmp)" "NO"
-DASH_L_GHC_RTS_GMP_DIR=-L$(FPTOOLS_TOP_ABS)/$(GHC_RTS_DIR_REL)/gmp
-endif
-
 HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/$(GHC_RTS_DIR_REL)	\
-   $(DASH_L_GHC_RTS_GMP_DIR)                    \
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
    -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\
    -L$(FPTOOLS_TOP_ABS)/libraries/haskell98	\

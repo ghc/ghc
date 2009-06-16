@@ -58,25 +58,6 @@ if test x"$srcdir" != 'x.' ; then
     exit 1
 fi
 
-dnl--------------------------------------------------------------------
-dnl * Deal with arguments telling us gmp is somewhere odd
-dnl--------------------------------------------------------------------
-
-FP_ARG_GMP
-
-GMP_INCLUDE_DIRS=
-GMP_LIB_DIRS=
-if test "x$gmp_libraries" != "xNONE"; then
-  LDFLAGS="-L$gmp_libraries $LDFLAGS"
-  GMP_LIB_DIRS=$gmp_libraries
-fi
-if test "x$gmp_includes" != "xNONE"; then
-  CPPFLAGS="-I$gmp_includes $CPPFLAGS"
-  GMP_INCLUDE_DIRS=$gmp_includes
-fi
-AC_SUBST(GMP_INCLUDE_DIRS)
-AC_SUBST(GMP_LIB_DIRS)
-
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
 dnl --------------------------------------------------------------
@@ -759,36 +740,6 @@ AC_CHECK_DECLS([ctime_r], , ,
 #define _POSIX_C_SOURCE 199506L
 #include <time.h>])
 
-dnl ** For ghc/rts/gmp:
-AC_CHECK_FUNCS([getpagesize])
-
-dnl ** check whether this machine has gmp3 installed
-AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
-  AC_CHECK_LIB(gmp3, __gmpz_fdiv_qr,  HaveLibGmp=YES; LibGmp=gmp3,
-    HaveLibGmp=NO; LibGmp=not-installed))
-  if test $HaveLibGmp = YES; then
-    AC_DEFINE([HAVE_LIB_GMP], [1], [Define to 1 if GMP library is installed.])
-  fi;
-AC_SUBST(HaveLibGmp)
-AC_SUBST(LibGmp)
-
-dnl ** (Mac OS X only: check for GMP.framework)
-HaveFrameworkGMP=NO
-case $HostPlatform in
-*-apple-darwin)
-    AC_MSG_CHECKING([for GMP.framework])
-    save_libs="$LIBS"
-    LIBS="-framework GMP"
-    AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkGMP=YES,)
-    if test $HaveFrameworkGMP = YES; then
-      AC_DEFINE([HAVE_FRAMEWORK_GMP], [1], [Define to 1 if GMP.framework is installed (Mac OS X only).])
-    fi;
-    LIBS="$save_libs"
-    AC_MSG_RESULT([$HaveFrameworkGMP])
-    ;;
-esac
-AC_SUBST(HaveFrameworkGMP)
-
 dnl ** check for mingwex library
 AC_CHECK_LIB(mingwex, closedir, HaveLibMingwEx=YES, HaveLibMingwEx=NO)
 AC_SUBST(HaveLibMingwEx)
@@ -796,12 +747,6 @@ AC_SUBST(HaveLibMingwEx)
 if test $HaveLibMingwEx = YES ; then
   AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
 fi
-
-if test "$HaveLibGmp" = "NO"; then
-if test "$HostArch_CPP" = "ia64" -o "$HostArch_CPP" = "mipseb" ; then
-AC_MSG_ERROR([You need to install libgmp (the in-tree version does not work on IA64 or mips64).])
-fi;
-fi;
 
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
 dnl    the order of these tests matters: bfd needs liberty
