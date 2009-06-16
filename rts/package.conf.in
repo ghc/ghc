@@ -52,6 +52,7 @@ extra-libraries:		"m"		/* for ldexp() */
 include-dirs:		INCLUDE_DIR PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:		TOP"/includes"
+#endif
 
 includes:		Stg.h
 depends:	 	ffi-1.0
