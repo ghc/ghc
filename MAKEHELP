@@ -21,15 +21,9 @@ Common commands:
 
      Builds everything in the given directory.
 
-  cd compiler; make 2
+  cd <dir>; make help
 
-     Make just the stage2 compiler, ignoring dependencies.  Also "make 1" to
-     build just the stage1 compiler.
-
-  cd libraries; make 1
-
-     Build just those libraries that are built by stage1 (omit the "1" to build
-     all libraries, but that will also update the stage2 compiler).
+     Shows the targets available in <dir>
 
   make html
   make pdf
