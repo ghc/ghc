@@ -33,12 +33,12 @@ dnl * Check whether this machine has gmp/gmp3 installed
 dnl--------------------------------------------------------------------
 
 AC_CHECK_LIB([gmp],  [__gmpz_fdiv_qr],
-             [HAVE_GMP=YES; GMP_LIBS=gmp],
-             [HAVE_GMP=NO;  GMP_LIBS=])
-if test "$HAVE_GMP" = "NO"; then
+             [HaveLibGmp=YES; GMP_LIBS=gmp],
+             [HaveLibGmp=NO;  GMP_LIBS=])
+if test "$HaveLibGmp" = "NO"; then
 AC_CHECK_LIB([gmp3], [__gmpz_fdiv_qr],
-             [HAVE_GMP=YES; GMP_LIBS=gmp3],
-             [HAVE_GMP=NO;  GMP_LIBS=])
+             [HaveLibGmp=YES; GMP_LIBS=gmp3],
+             [HaveLibGmp=NO;  GMP_LIBS=])
 fi
 
 dnl--------------------------------------------------------------------
@@ -51,10 +51,10 @@ case $target_os in
     save_libs="$LIBS"
     LIBS="-framework GMP"
     AC_TRY_LINK_FUNC(__gmpz_fdiv_qr,
-      [HAVE_GMP_FRAMEWORK=yes; GMP_FRAMEWORK=GMP; GMP_LIBS=; HAVE_GMP=YES],
-      [HAVE_GMP_FRAMEWORK=no])
+      [HaveFrameworkGMP=yes; GMP_FRAMEWORK=GMP; GMP_LIBS=],
+      [HaveFrameworkGMP=no])
     LIBS="$save_libs"
-    AC_MSG_RESULT([$HAVE_GMP_FRAMEWORK])
+    AC_MSG_RESULT([$HaveFrameworkGMP])
     ;;
 esac
 
@@ -62,19 +62,14 @@ dnl--------------------------------------------------------------------
 dnl * Make sure we got some form of gmp
 dnl--------------------------------------------------------------------
 
-if test "$HAVE_GMP" = "NO"; then
-  AC_MSG_ERROR([cannot find the gmp library on the system.]
-    [If you have gmp installed in a non-standard location re-run ./configure]
-    [and specify the flags --with-gmp-includes= and/or --with-gmp-libraries=])
-fi
-
-
 AC_SUBST(GMP_INCLUDE_DIRS)
 AC_SUBST(GMP_LIBS)
 AC_SUBST(GMP_LIB_DIRS)
 AC_SUBST(GMP_FRAMEWORK)
+AC_SUBST(HaveLibGmp)
+AC_SUBST(HaveFrameworkGMP)
 
-AC_CONFIG_FILES([integer.buildinfo])
+AC_CONFIG_FILES([integer.buildinfo gmp/config.mk])
 
 dnl--------------------------------------------------------------------
 dnl * Generate the header cbits/GmpDerivedConstants.h

@@ -10,6 +10,9 @@
 #
 # -----------------------------------------------------------------------------
 
+ifneq "$(phase)" "0"
+
+include libraries/integer-gmp/gmp/config.mk
 
 # Compile GMP only if we don't have it already
 #
@@ -146,4 +149,6 @@ endif
 #	$(RM) -rf gmpbuild
 #	$(RM) -rf gmpbuild-shared
 #endif
+
+endif
 

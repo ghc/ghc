@@ -1,0 +1,4 @@
+
+HaveLibGmp = @HaveLibGmp@
+HaveFrameworkGMP = @HaveFrameworkGMP@
+
