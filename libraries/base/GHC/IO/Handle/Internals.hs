@@ -503,7 +503,7 @@ mkHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
             -> Bool                     -- buffered?
             -> Maybe TextEncoding
             -> NewlineMode
-            -> (Maybe HandleFinalizer)
+            -> Maybe HandleFinalizer
             -> Maybe (MVar Handle__)
             -> IO Handle
 
@@ -606,17 +606,26 @@ getEncoding (Just te) ha_type = do
 -- ---------------------------------------------------------------------------
 -- closing Handles
 
--- hClose_help is also called by lazyRead (in PrelIO) when EOF is read
--- or an IO error occurs on a lazy stream.  The semi-closed Handle is
--- then closed immediately.  We have to be careful with DuplexHandles
--- though: we have to leave the closing to the finalizer in that case,
--- because the write side may still be in use.
+-- hClose_help is also called by lazyRead (in GHC.IO.Handle.Text) when
+-- EOF is read or an IO error occurs on a lazy stream.  The
+-- semi-closed Handle is then closed immediately.  We have to be
+-- careful with DuplexHandles though: we have to leave the closing to
+-- the finalizer in that case, because the write side may still be in
+-- use.
 hClose_help :: Handle__ -> IO (Handle__, Maybe SomeException)
 hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return (handle_,Nothing)
-      _ -> do flushWriteBuffer handle_ -- interruptible
-              hClose_handle_ handle_
+      _ -> do mb_exc1 <- trymaybe $ flushWriteBuffer handle_ -- interruptible
+                    -- it is important that hClose doesn't fail and
+                    -- leave the Handle open (#3128), so we catch
+                    -- exceptions when flushing the buffer.
+              (h_, mb_exc2) <- hClose_handle_ handle_
+              return (h_, if isJust mb_exc1 then mb_exc1 else mb_exc2)
+
+
+trymaybe :: IO () -> IO (Maybe SomeException)
+trymaybe io = (do io; return Nothing) `catchException` \e -> return (Just e)
 
 hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeException)
 hClose_handle_ Handle__{..} = do
@@ -629,9 +638,7 @@ hClose_handle_ Handle__{..} = do
     -- raise it if necessary.
     maybe_exception <- 
       case haOtherSide of
-        Nothing -> (do IODevice.close haDevice; return Nothing)
-                     `catchException` \e -> return (Just e)
-
+        Nothing -> trymaybe $ IODevice.close haDevice
         Just _  -> return Nothing
 
     -- free the spare buffers
