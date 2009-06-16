@@ -46,6 +46,8 @@ test('hSetBuffering003', compose(omit_ways(['ghci']),
 				 set_stdin('hSetBuffering003.hs')), 
 	compile_and_run, [''])
 
+test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
+
 test('ioeGetErrorString001', normal, compile_and_run, ['-cpp'])
 test('ioeGetFileName001',    normal, compile_and_run, ['-cpp'])
 test('ioeGetHandle001',      normal, compile_and_run, ['-cpp'])
