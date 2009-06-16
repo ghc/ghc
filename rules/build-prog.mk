@@ -137,7 +137,7 @@ $(call all-target,$1_$2,$$($1_$2_INPLACE))
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 # INPLACE_BIN might be empty if we're distcleaning
-ifneq "$$(INPLACE_BIN)" ""
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) $$(MKDIRHIER)
 	"$$(MKDIRHIER)" $$(dir $$@)
 	"$$(CP)" -p $$< $$@

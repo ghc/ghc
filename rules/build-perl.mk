@@ -34,6 +34,8 @@ $(call clean-target,$1,$2,$1/$2 $$($1_$2_INPLACE))
 .PHONY: clean_$1
 clean_$1 : clean_$1_$2
 
+# INPLACE_BIN etc. might be empty if we're cleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$(BINDIST)" "YES"
 $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$(UNLIT)
 	"$$(MKDIRHIER)" $1/$2
@@ -52,6 +54,7 @@ $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(CP)" $$< $$@
 	$$(EXECUTABLE_FILE) $$@
+endif
 endif
 
 endef
