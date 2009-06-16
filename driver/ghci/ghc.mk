@@ -20,7 +20,7 @@ install_driver_ghci:
 	"$(MKDIRHIER)" $(DESTDIR)$(bindir)
 	"$(RM)" $(RM_OPTS)                                 $(WRAPPER)
 	echo '#!$(SHELL)'                               >> $(WRAPPER)
-	echo 'exec $(bindir)/ghc-$(ProjectVersion) --interactive ${1+"$@"}' >> $(WRAPPER)
+	echo 'exec $(bindir)/ghc-$(ProjectVersion) --interactive $${1+"$$@"}' >> $(WRAPPER)
 	$(EXECUTABLE_FILE)                                 $(WRAPPER)
 	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghci
 	$(LN_S) ghci-$(ProjectVersion) $(DESTDIR)$(bindir)/ghci
