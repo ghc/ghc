@@ -26,3 +26,12 @@ include $(TOP)/mk/sub-makefile.mk
 3:
 	+$(TOPMAKE) stage=3 all_ghc_stage3 compiler_stage3_NO_BUILD_DEPS=YES
 
+.PHONY: extra-help
+help : extra-help
+extra-help :
+	@echo "  make 1"
+	@echo "  make 2"
+	@echo "  make 3"
+	@echo
+	@echo "     Build the stage 1, 2 or 3 GHC respectively, omitting dependencies"
+	@echo "     and initial phases for speed."

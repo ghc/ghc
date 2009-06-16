@@ -30,7 +30,16 @@ STD_TARGETS = all clean distclean maintainer_clean install html ps pdf
 $(STD_TARGETS): 
 	+$(TOPMAKE) $@_$(dir)
 
-OTHERTARGETS=$(filter-out fast $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
+OTHERTARGETS=$(filter-out fast help $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
 .PHONY: $(OTHERTARGETS)
 $(OTHERTARGETS):
 	+$(TOPMAKE) $(dir)/$@
+
+.PHONY: help
+help : sub-help
+
+.PHONY: sub-help
+sub-help :
+	@echo "You are in subdirectory \"$(dir)\"."
+	@echo "Useful targets in this directory:"
+	@cat $(TOP)/SUBMAKEHELP
