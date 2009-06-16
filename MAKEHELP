@@ -31,6 +31,12 @@ Common commands:
      Build just those libraries that are built by stage1 (omit the "1" to build
      all libraries, but that will also update the stage2 compiler).
 
+  make html
+  make pdf
+  make ps
+
+     Make documentation
+
   make install
 
      Installs GHC, libraries and tools under $(prefix)
