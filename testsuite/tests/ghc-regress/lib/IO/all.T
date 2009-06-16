@@ -10,6 +10,7 @@ test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001',       extra_clean(['hClose001.tmp']), compile_and_run, [''])
 test('hClose002',       extra_clean(['hClose002.tmp']), compile_and_run, [''])
+test('hClose003',       reqlib('unix'), compile_and_run, ['-package unix'])
 test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002',
      [omit_ways(['ghci']),
