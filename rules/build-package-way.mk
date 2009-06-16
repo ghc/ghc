@@ -40,23 +40,23 @@ endif
 
 ifeq "$3" "dyn"
 # Link a dynamic library
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS) $$($1_$2_EXTRA_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$($1_$2_HC)" $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
-         `$$($1_$2_$3_MKSTUBOBJS)` \
+         `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS) \
          -shared -dynamic -dynload deploy \
          -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
          -o $$@
 else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_EXTRA_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	(echo $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
+	(echo $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS); find $$(patsubst %.$$($3_osuf),%_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
 else
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_EXTRA_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
+	echo $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@ || "$$(RM)" $$(RM_OPTS) $$@
 endif
 endif
 
@@ -76,9 +76,9 @@ $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
 ifneq "$4" "0"
 BINDIST_LIBS += $$($1_$2_GHCI_LIB)
 endif
-$$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS)
+$$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_EXTRA_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	"$$(LD)" -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`
+	"$$(LD)" -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_v_CMM_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS)
 
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
 endif
