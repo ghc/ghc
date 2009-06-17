@@ -1,5 +1,6 @@
 dir = libraries
 TOP = ..
+SPEC_TARGETS = 1
 include $(TOP)/mk/sub-makefile.mk
 
 .PHONY: 1
