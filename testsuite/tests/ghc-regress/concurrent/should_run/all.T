@@ -23,6 +23,7 @@ test('conc070', only_ways(threaded_ways), compile_and_run, [''])
 
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
+test('3279', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
@@ -151,4 +152,3 @@ test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
 test('conc067', ignore_output, compile_and_run, [''])
 test('conc068', exit_code(1), compile_and_run, [''])
-
