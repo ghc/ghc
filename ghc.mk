@@ -457,7 +457,6 @@ BUILD_DIRS += \
 endif
 
 BUILD_DIRS += \
-   libraries/integer-gmp/gmp \
    docs/users_guide \
    libraries/Cabal/doc \
    $(GHC_UNLIT_DIR) \
@@ -502,6 +501,7 @@ endif
 endif
 
 BUILD_DIRS += \
+   libraries/integer-gmp/gmp \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
