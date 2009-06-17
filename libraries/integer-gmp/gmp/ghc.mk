@@ -14,6 +14,12 @@ ifneq "$(phase)" "0"
 
 include libraries/integer-gmp/gmp/config.mk
 
+libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/cbits/mkGmpDerivedConstants.c
+	"$(CC)" $(SRC_CC_OPTS) $(libraries/integer-gmp_CC_OPTS) $< -o $@
+
+libraries/integer-gmp/cbits/GmpDerivedConstants.h: libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext)
+	$< > $@
+
 # Compile GMP only if we don't have it already
 #
 # We use GMP's own configuration stuff, because it's all rather hairy
@@ -39,23 +45,22 @@ endif
 
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
-GMP_LIB = libraries/integer-gmp/gmp/libgmp.a
-OTHER_LIBS += $(GMP_LIB)
+libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/gmp/gmp.h
+$(libraries/integer-gmp_dist-install_v_CMM_OBJS): libraries/integer-gmp/cbits/GmpDerivedConstants.h
+$(libraries/integer-gmp_dist-install_v_C_OBJS):   libraries/integer-gmp/cbits/GmpDerivedConstants.h
 
-SRC_CC_OPTS += -I$(TOP)/libraries/integer-gmp/gmp
-SRC_LD_OPTS += -L$(TOP)/libraries/integer-gmp/gmp
-libraries/integer-gmp_dist-install_CONFIGURE_OPTS += --extra-lib-dirs=$(TOP)/libraries/integer-gmp/gmp
+libraries/integer-gmp_CC_OPTS += -I$(TOP)/libraries/integer-gmp/gmp
 
-libraries/integer-gmp/dist-install/package-data.mk: libraries/integer-gmp/gmp/gmp.h
+libraries/integer-gmp_dist-install_EXTRA_OBJS += libraries/integer-gmp/gmp/objs/*.o
 
-INSTALL_LIBS += libraries/integer-gmp/gmp/libgmp.a
-INSTALL_HEADERS += libraries/integer-gmp/gmp/gmp.h
-
-$(eval $(call all-target,gmp_dynamic,libraries/integer-gmp/gmp/libgmp.a))
-
-ifeq "$(BUILD_SHARED)" "yes"
-$(eval $(call all-target,gmp_dynamic,libraries/integer-gmp/gmp/libgmp.dll.a libraries/integer-gmp/gmp/libgmp-3.dll))
-endif
+#INSTALL_LIBS += libraries/integer-gmp/gmp/libgmp.a
+#INSTALL_HEADERS += libraries/integer-gmp/gmp/gmp.h
+#
+#$(eval $(call all-target,gmp_dynamic,libraries/integer-gmp/gmp/libgmp.a))
+#
+#ifeq "$(BUILD_SHARED)" "yes"
+#$(eval $(call all-target,gmp_dynamic,libraries/integer-gmp/gmp/libgmp.dll.a libraries/integer-gmp/gmp/libgmp-3.dll))
+#endif
 
 endif
 endif
@@ -91,7 +96,7 @@ GMP_TARBALL := $(wildcard libraries/integer-gmp/gmp/tarball/gmp*.tar.bz2)
 GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc.tar.bz2,%,$(GMP_TARBALL))
 
 libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
-	$(RM) -rf $(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
+	$(RM) -rf $(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild libraries/integer-gmp/gmp/objs
 	cd libraries/integer-gmp/gmp && $(TAR) -jxf ../../../$(GMP_TARBALL)
 	mv libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
 	chmod +x libraries/integer-gmp/gmp/ln
@@ -104,6 +109,10 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp/gmp/
+	$(MKDIRHIER) libraries/integer-gmp/gmp/objs
+# XXX This should be $(AR), except that has the creation options baked in,
+# so we use ar for now instead
+	cd libraries/integer-gmp/gmp/objs && ar x ../libgmp.a
 	$(RANLIB) libraries/integer-gmp/gmp/libgmp.a
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
