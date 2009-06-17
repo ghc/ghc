@@ -948,3 +948,5 @@ bootstrapping-files: includes/ghcautoconf.h
 bootstrapping-files: includes/DerivedConstants.h
 bootstrapping-files: includes/GHCConstants.h
 
+.DELETE_ON_ERROR:
+
