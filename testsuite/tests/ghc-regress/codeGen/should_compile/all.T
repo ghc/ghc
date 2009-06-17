@@ -8,3 +8,4 @@ test('cg007', normal, compile, [''])
 
 test('1916', normal, compile, [''])
 test('2388', normal, compile, [''])
+test('3132', normal, compile, ['-dcmm-lint'])
