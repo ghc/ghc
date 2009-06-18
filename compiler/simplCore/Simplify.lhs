@@ -871,8 +871,8 @@ simplCast env body co0 cont0
          | (_l1, t1) <- coercionKind co2
 		-- 	e |> (g1 :: S1~L) |> (g2 :: L~T1)
                 -- ==>
-                --      e,                       if T1=T2
-                --      e |> (g1 . g2 :: T1~T2)  otherwise
+                --      e,                       if S1=T1
+                --      e |> (g1 . g2 :: S1~T1)  otherwise
                 --
                 -- For example, in the initial form of a worker
                 -- we may find  (coerce T (coerce S (\x.e))) y
