@@ -168,7 +168,6 @@ import Data.Bits
 import Data.List
 import Data.Maybe
 import Foreign.C.Error
-import Foreign.C.String
 import Foreign.C.Types
 import System.Posix.Internals
 #endif
@@ -474,7 +473,7 @@ openTempFile' loc tmp_dir template binary = do
                         return (filepath, h)
 #else
     findTempName x = do
-      fd <- withCString filepath $ \ f ->
+      fd <- withFilePath filepath $ \ f ->
               c_open f oflags 0o600
       if fd < 0
        then do

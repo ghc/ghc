@@ -130,7 +130,7 @@ writeBuf' fd buf = do
 -- into non-blocking mode on Unix systems.
 openFile :: FilePath -> IOMode -> IO (FD,IODeviceType)
 openFile filepath iomode =
-  withCString filepath $ \ f ->
+  withFilePath filepath $ \ f ->
 
     let 
       oflags1 = case iomode of

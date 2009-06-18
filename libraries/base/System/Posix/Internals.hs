@@ -104,7 +104,7 @@ fdFileSize fd =
 fileType :: FilePath -> IO IODeviceType
 fileType file =
   allocaBytes sizeof_stat $ \ p_stat -> do
-  withCString file $ \p_file -> do
+  withFilePath file $ \p_file -> do
     throwErrnoIfMinus1Retry "fileType" $
       c_stat p_file p_stat
     statGetType p_stat
@@ -171,6 +171,14 @@ fdGetMode fd = do
          | otherwise = ReadMode
           
     return mode
+
+#ifdef mingw32_HOST_OS
+withFilePath :: FilePath -> (CWString -> IO a) -> IO a
+withFilePath = withCWString 
+#else
+withFilePath :: FilePath -> (CString -> IO a) -> IO a
+withFilePath = withCString
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
@@ -338,6 +346,12 @@ setCloseOnExec fd = do
 -- -----------------------------------------------------------------------------
 -- foreign imports
 
+#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+type CFilePath = CString
+#else
+type CFilePath = CWString
+#endif
+
 foreign import ccall unsafe "HsBase.h access"
    c_access :: CString -> CInt -> IO CInt
 
@@ -374,10 +388,10 @@ foreign import ccall unsafe "HsBase.h __hscore_lseek"
 #endif
 
 foreign import ccall unsafe "HsBase.h __hscore_lstat"
-   lstat :: CString -> Ptr CStat -> IO CInt
+   lstat :: CFilePath -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_open"
-   c_open :: CString -> CInt -> CMode -> IO CInt
+foreign import ccall unsafe "__hscore_open"
+   c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h opendir" 
    c_opendir :: CString  -> IO (Ptr CDir)
@@ -391,8 +405,8 @@ foreign import ccall unsafe "HsBase.h read"
 foreign import ccall unsafe "HsBase.h rewinddir"
    c_rewinddir :: Ptr CDir -> IO ()
 
-foreign import ccall unsafe "HsBase.h __hscore_stat"
-   c_stat :: CString -> Ptr CStat -> IO CInt
+foreign import ccall unsafe "__hscore_stat"
+   c_stat :: CFilePath -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode

@@ -456,16 +456,6 @@ __hscore_mkdir( char *pathName, int mode )
 #endif
 }
 
-INLINE int
-__hscore_lstat( const char *fname, struct stat *st )
-{
-#if HAVE_LSTAT
-  return lstat(fname, st);
-#else
-  return stat(fname, st);
-#endif
-}
-
 INLINE char *
 __hscore_d_name( struct dirent* d )
 {
@@ -491,8 +481,6 @@ __hscore_free_dirent(struct dirent *dEnt)
 // and you have to ask for those explicitly.  Unfortunately there
 // doesn't seem to be a 64-bit version of truncate/ftruncate, so while
 // hFileSize and hSeek will work with large files, hSetFileSize will not.
-#define stat(file,buf)       _stati64(file,buf)
-#define fstat(fd,buf)        _fstati64(fd,buf)
 typedef struct _stati64 struct_stat;
 typedef off64_t stsize_t;
 #else
@@ -512,6 +500,37 @@ INLINE stsize_t __hscore_st_size  ( struct_stat* st ) { return st->st_size; }
 INLINE mode_t __hscore_st_mode  ( struct_stat* st ) { return st->st_mode; }
 INLINE dev_t  __hscore_st_dev  ( struct_stat* st ) { return st->st_dev; }
 INLINE ino_t  __hscore_st_ino  ( struct_stat* st ) { return st->st_ino; }
+#endif
+
+#if defined(__MINGW32__)
+INLINE int __hscore_stat(wchar_t *file, struct_stat *buf) {
+	return _wstati64(file,buf);
+}
+
+INLINE int __hscore_fstat(int fd, struct_stat *buf) {
+	return _fstati64(fd,buf);
+}
+INLINE int __hscore_lstat(wchar_t *fname, struct_stat *buf )
+{
+	return _wstati64(fname,buf);
+}
+#else
+INLINE int __hscore_stat(char *file, struct_stat *buf) {
+	return stat(file,buf);
+}
+
+INLINE int __hscore_fstat(int fd, struct_stat *buf) {
+	return fstat(fd,buf);
+}
+
+INLINE int __hscore_lstat( const char *fname, struct stat *buf )
+{
+#if HAVE_LSTAT
+  return lstat(fname, buf);
+#else
+  return stat(fname, buf);
+#endif
+}
 #endif
 
 #if HAVE_TERMIOS_H
@@ -673,18 +692,20 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 
-INLINE int __hscore_open(char *file, int how, mode_t mode) {
 #ifdef __MINGW32__
+INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
-	  return _sopen(file,how | _O_NOINHERIT,_SH_DENYRW,mode);
+	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYRW,mode);
           // _O_NOINHERIT: see #2650
 	else
-	  return _sopen(file,how | _O_NOINHERIT,_SH_DENYWR,mode);
+	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYWR,mode);
           // _O_NOINHERIT: see #2650
-#else
-	return open(file,how,mode);
-#endif
 }
+#else
+INLINE int __hscore_open(char *file, int how, mode_t mode) {
+	return open(file,how,mode);
+}
+#endif
 
 // These are wrapped because on some OSs (eg. Linux) they are
 // macros which redirect to the 64-bit-off_t versions when large file
@@ -699,14 +720,6 @@ INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
 	return (lseek(fd,off,whence));
 }
 #endif
-
-INLINE int __hscore_stat(char *file, struct_stat *buf) {
-	return (stat(file,buf));
-}
-
-INLINE int __hscore_fstat(int fd, struct_stat *buf) {
-	return (fstat(fd,buf));
-}
 
 // select-related stuff
 
