@@ -37,9 +37,12 @@ import ForeignCall
 import VarSet
 import CoreSyn
 import PrimOp
+import Type
 import TyCon
 import Util
 import Outputable
+
+import Control.Monad (when)
 \end{code}
 
 \begin{code}
@@ -120,15 +123,38 @@ eliminate a heap check altogether.
 \begin{code}
 cgCase (StgApp v []) _live_in_whole_case _live_in_alts bndr
        alt_type@(PrimAlt _) alts
-  = do	{ -- Careful! we can't just bind the default binder to the same thing
+  -- Note [ticket #3132]: we might be looking at a case of a lifted Id
+  -- that was cast to an unlifted type.  The Id will always be bottom,
+  -- but we don't want the code generator to fall over here.  If we
+  -- just emit an assignment here, the assignment will be
+  -- type-incorrect Cmm.  Hence we check that the types match, and if
+  -- they don't we'll fall through and emit the usual enter/return
+  -- code.  Test case: codeGen/should_compile/3132.hs
+  | isUnLiftedType (idType v)
+
+  -- However, we also want to allow an assignment to be generated
+  -- in the case when the types are compatible, because this allows
+  -- some slightly-dodgy but occasionally-useful casts to be used,
+  -- such as in RtClosureInspect where we cast an HValue to a MutVar#
+  -- so we can print out the contents of the MutVar#.  If we generate
+  -- code that enters the HValue, then we'll get a runtime panic, because
+  -- the HValue really is a MutVar#.  The types are compatible though,
+  -- so we can just generate an assignment.
+  || reps_compatible
+  =
+     do	{ -- Careful! we can't just bind the default binder to the same thing
 	  -- as the scrutinee, since it might be a stack location, and having
 	  -- two bindings pointing at the same stack locn doesn't work (it
 	  -- confuses nukeDeadBindings).  Hence, use a new temp.
-	  v_info <- getCgIdInfo v
+          when (not reps_compatible) $
+            panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
+	; v_info <- getCgIdInfo v
 	; amode <- idInfoToAmode v_info
 	; tmp_reg <- bindNewToTemp bndr
 	; stmtC (CmmAssign (CmmLocal tmp_reg) amode)
 	; cgPrimAlts NoGC alt_type (CmmLocal tmp_reg) alts }
+  where
+    reps_compatible = idCgRep v == idCgRep bndr
 \end{code}
 
 Special case #3: inline PrimOps and foreign calls.
