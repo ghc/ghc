@@ -257,6 +257,7 @@ __hscore_sigismember( sigset_t * set, int s )
 { return sigismember(set,s); }
 #endif
 
+// This is used by dph:Data.Array.Parallel.Arr.BUArr, and shouldn't be
 INLINE void *
 __hscore_memcpy_dst_off( char *dst, int dst_off, char *src, size_t sz )
 { return memcpy(dst+dst_off, src, sz); }
