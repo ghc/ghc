@@ -145,9 +145,7 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 
 ------------------------------------------------------------------------
 -- Show instances for Ptr and FunPtr
--- I have absolutely no idea why the WORD_SIZE_IN_BITS stuff is here
 
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 instance Show (Ptr a) where
    showsPrec _ (Ptr a) rs = pad_out (showHex (wordToInteger(int2Word#(addr2Int# a))) "")
      where
@@ -157,6 +155,5 @@ instance Show (Ptr a) where
 
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr
-#endif
 \end{code}
 
