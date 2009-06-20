@@ -679,22 +679,11 @@ mkFE_ = ptext (sLit "FE_") -- function code end
 
 -- from includes/Stg.h
 --
-mkC_,mkW_,mkP_,mkPP_,mkI_,mkA_,mkD_,mkF_,mkB_,mkL_,mkLI_,mkLW_ :: SDoc
+mkC_,mkW_,mkP_ :: SDoc
 
 mkC_  = ptext (sLit "(C_)")        -- StgChar
 mkW_  = ptext (sLit "(W_)")        -- StgWord
 mkP_  = ptext (sLit "(P_)")        -- StgWord*
-mkPP_ = ptext (sLit "(PP_)")       -- P_*
-mkI_  = ptext (sLit "(I_)")        -- StgInt
-mkA_  = ptext (sLit "(A_)")        -- StgAddr
-mkD_  = ptext (sLit "(D_)")        -- const StgWord*
-mkF_  = ptext (sLit "(F_)")        -- StgFunPtr
-mkB_  = ptext (sLit "(B_)")        -- StgByteArray
-mkL_  = ptext (sLit "(L_)")        -- StgClosurePtr
-
-mkLI_ = ptext (sLit "(LI_)")       -- StgInt64
-mkLW_ = ptext (sLit "(LW_)")       -- StgWord64
-
 
 -- ---------------------------------------------------------------------
 --
