@@ -40,7 +40,6 @@ import Foreign.Ptr              ( Ptr, nullPtr, FunPtr )
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.ForeignPtr       ( FinalizerPtr )
-import GHC.IO
 import GHC.IO.Exception
 import GHC.Real
 import GHC.Ptr

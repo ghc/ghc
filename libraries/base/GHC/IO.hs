@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -63,21 +64,6 @@ Libraries - parts of hslibs/lang.
 
 --SDM
 -}
-
-{-|
-A value of type @'IO' a@ is a computation which, when performed,
-does some I\/O before returning a value of type @a@.  
-
-There is really only one way to \"perform\" an I\/O action: bind it to
-@Main.main@ in your program.  When your program is run, the I\/O will
-be performed.  It isn't possible to perform I\/O from an arbitrary
-function, unless that function is itself in the 'IO' monad and called
-at some point, directly or indirectly, from @Main.main@.
-
-'IO' is a monad, so 'IO' actions can be combined using either the do-notation
-or the '>>' and '>>=' operations from the 'Monad' class.
--}
-newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a

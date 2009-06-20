@@ -53,7 +53,6 @@ import Foreign.C.Types          ( CSize )
 import Foreign.Marshal.Alloc    ( malloc, alloca )
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IO
 import GHC.Real                 ( fromIntegral )
 import GHC.Num
 import GHC.Base
