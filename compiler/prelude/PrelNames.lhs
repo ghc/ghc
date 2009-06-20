@@ -739,8 +739,8 @@ appPName          = varQual gHC_PARR (fsLit "+:+")               appPIdKey
 -- IO things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
     failIOName :: Name
-ioTyConName	  = tcQual  gHC_IO (fsLit "IO") ioTyConKey
-ioDataConName     = conName gHC_IO (fsLit "IO") ioDataConKey
+ioTyConName	  = tcQual  gHC_TYPES (fsLit "IO") ioTyConKey
+ioDataConName     = conName gHC_TYPES (fsLit "IO") ioDataConKey
 thenIOName	  = varQual gHC_IO (fsLit "thenIO") thenIOIdKey
 bindIOName	  = varQual gHC_IO (fsLit "bindIO") bindIOIdKey
 returnIOName	  = varQual gHC_IO (fsLit "returnIO") returnIOIdKey
