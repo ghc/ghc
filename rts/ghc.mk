@@ -152,6 +152,8 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
+rts_dist_$1_CC_OPTS += -DRtsWay=$$(DQ)rts_$1$$(DQ)
+
 ifneq "$$(findstring dyn, $1)" ""
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
@@ -264,7 +266,6 @@ RtsMain_HC_OPTS += -optc-O0
 
 RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
-RtsUtils_CC_OPTS += -DRtsWay=$(DQ)rts$(_way)$(DQ)
 #
 RtsUtils_CC_OPTS += -DHostPlatform=$(DQ)$(HOSTPLATFORM)$(DQ)
 RtsUtils_CC_OPTS += -DHostArch=$(DQ)$(HostArch_CPP)$(DQ)
