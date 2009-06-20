@@ -23,6 +23,7 @@ Library {
     build-depends: rts
     exposed-modules:
         GHC.Bool
+        GHC.Debug
         GHC.Generics
         GHC.Ordering
         GHC.PrimopWrappers
@@ -37,6 +38,7 @@ Library {
     }
 
     c-sources:
+        cbits/debug.c
         cbits/longlong.c
     extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes,
                 UnboxedTuples, EmptyDataDecls, NoImplicitPrelude
