@@ -1,0 +1,25 @@
+diff -ur before/memory.c after/memory.c
+--- before/memory.c	2007-08-30 19:31:40.000000000 +0100
++++ after/memory.c	2009-06-21 19:12:39.000000000 +0100
+@@ -24,10 +24,21 @@
+ #include "gmp-impl.h"
+ 
+ 
++void * stgAllocForGMP   (size_t size_in_bytes);
++void * stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
++void   stgDeallocForGMP (void *ptr, size_t size);
++
++void *  (*__gmp_allocate_func) _PROTO ((size_t)) = stgAllocForGMP;
++void *  (*__gmp_reallocate_func) _PROTO ((void *, size_t, size_t))
++     = stgReallocForGMP;
++void    (*__gmp_free_func) _PROTO ((void *, size_t)) = stgDeallocForGMP;
++
++/*
+ void *	(*__gmp_allocate_func) _PROTO ((size_t)) = __gmp_default_allocate;
+ void *	(*__gmp_reallocate_func) _PROTO ((void *, size_t, size_t))
+      = __gmp_default_reallocate;
+ void	(*__gmp_free_func) _PROTO ((void *, size_t)) = __gmp_default_free;
++*/
+ 
+ 
+ /* Default allocation functions.  In case of failure to allocate/reallocate

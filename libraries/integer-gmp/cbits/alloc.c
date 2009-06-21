@@ -10,9 +10,9 @@
 
 #include "gmp.h"
 
-static void * stgAllocForGMP   (size_t size_in_bytes);
-static void * stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
-static void   stgDeallocForGMP (void *ptr STG_UNUSED, size_t size STG_UNUSED);
+void * stgAllocForGMP   (size_t size_in_bytes);
+void * stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
+void   stgDeallocForGMP (void *ptr STG_UNUSED, size_t size STG_UNUSED);
 
 static void initAllocForGMP( void ) __attribute__((constructor));
 
@@ -62,7 +62,7 @@ static void initAllocForGMP( void )
    only allocate() style allocation.
    -------------------------------------------------------------------------- */
 
-static void *
+void *
 stgAllocForGMP (size_t size_in_bytes)
 {
   StgArrWords* arr;
@@ -80,7 +80,7 @@ stgAllocForGMP (size_t size_in_bytes)
   return arr->payload;
 }
 
-static void *
+void *
 stgReallocForGMP (void *ptr, size_t old_size, size_t new_size)
 {
     size_t min_size;
@@ -98,7 +98,7 @@ stgReallocForGMP (void *ptr, size_t old_size, size_t new_size)
     return(new_stuff_ptr);
 }
 
-static void
+void
 stgDeallocForGMP (void *ptr STG_UNUSED, size_t size STG_UNUSED)
 {
     /* easy for us: the garbage collector does the dealloc'n */
