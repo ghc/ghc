@@ -34,7 +34,30 @@ import CPUTime ( getCPUTime, cpuTimePrecision )
 import Foreign
 import Foreign.C
 
-#include "HsBase.h"
+#include "HsBaseConfig.h"
+
+-- For _SC_CLK_TCK
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+-- For struct rusage
+#if !defined(mingw32_HOST_OS) && !defined(irix_HOST_OS)
+# if HAVE_SYS_RESOURCE_H
+#  include <sys/resource.h>
+# endif
+#endif
+
+-- For FILETIME etc. on Windows
+#if HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+
+-- for CLK_TCK
+#if HAVE_TIME_H
+#include <time.h>
+#endif
+
 #endif
 
 #if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
