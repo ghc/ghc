@@ -1342,8 +1342,12 @@ openNewFile dir template = do
 
     oflags = rw_flags .|. o_EXCL
 
+#if __GLASGOW_HASKELL__ < 611
+    withFilePath = withCString
+#endif
+
     findTempName x = do
-      fd <- withCString filepath $ \ f ->
+      fd <- withFilePath filepath $ \ f ->
               c_open f oflags 0o666
       if fd < 0
        then do
