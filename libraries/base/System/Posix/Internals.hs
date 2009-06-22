@@ -400,7 +400,10 @@ foreign import ccall unsafe "HsBase.h __hscore_mkdir"
    mkdir :: CString -> CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h read" 
-   c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
+   c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+foreign import ccall safe "read"
+   c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h rewinddir"
    c_rewinddir :: Ptr CDir -> IO ()
@@ -412,7 +415,10 @@ foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode
 
 foreign import ccall unsafe "HsBase.h write" 
-   c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
+   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+foreign import ccall safe "write"
+   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
    c_ftruncate :: CInt -> COff -> IO CInt

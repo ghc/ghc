@@ -417,33 +417,6 @@ __hscore_setmode( int fd, HsBool toBin )
 
 #if __GLASGOW_HASKELL__
 
-INLINE int
-__hscore_PrelHandle_write( int fd, void *ptr, HsInt off, int sz )
-{
-  return write(fd,(char *)ptr + off, sz);
-}
-
-INLINE int
-__hscore_PrelHandle_read( int fd, void *ptr, HsInt off, int sz )
-{
-  return read(fd,(char *)ptr + off, sz);
-
-}
-
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
-INLINE int
-__hscore_PrelHandle_send( int fd, void *ptr, HsInt off, int sz )
-{
-    return send(fd,(char *)ptr + off, sz, 0);
-}
-
-INLINE int
-__hscore_PrelHandle_recv( int fd, void *ptr, HsInt off, int sz )
-{
-    return recv(fd,(char *)ptr + off, sz, 0);
-}
-#endif
-
 #endif /* __GLASGOW_HASKELL__ */
 
 INLINE int

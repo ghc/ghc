@@ -1054,7 +1054,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   service_loop wakeup readfds writefds ptimeval reqs' delays'
 
-io_MANAGER_WAKEUP, io_MANAGER_DIE, io_MANAGER_SYNC :: CChar
+io_MANAGER_WAKEUP, io_MANAGER_DIE, io_MANAGER_SYNC :: Word8
 io_MANAGER_WAKEUP = 0xff
 io_MANAGER_DIE    = 0xfe
 io_MANAGER_SYNC   = 0xfd

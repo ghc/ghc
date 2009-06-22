@@ -447,7 +447,7 @@ indicates that there's no data, we call threadWaitRead.
 
 -}
 
-readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtr loc !fd buf off len
   | isNonBlocking fd = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc 
@@ -456,14 +456,15 @@ readRawBufferPtr loc !fd buf off len
                         then read
                         else do threadWaitRead (fromIntegral (fdFD fd)); read
   where
-    do_read call = throwErrnoIfMinus1RetryMayBlock loc call 
+    do_read call = fromIntegral `fmap`
+                      throwErrnoIfMinus1RetryMayBlock loc call
                             (threadWaitRead (fromIntegral (fdFD fd)))
     read        = if threaded then safe_read else unsafe_read
-    unsafe_read = do_read (read_off (fdFD fd) buf off len)
-    safe_read   = do_read (safe_read_off (fdFD fd) buf off len)
+    unsafe_read = do_read (c_read (fdFD fd) (buf `plusPtr` off) len)
+    safe_read   = do_read (c_safe_read (fdFD fd) (buf `plusPtr` off) len)
 
 -- return: -1 indicates EOF, >=0 is bytes read
-readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtrNoBlock loc !fd buf off len
   | isNonBlocking fd  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- unsafe_fdReady (fdFD fd) 0 0 0
@@ -475,11 +476,11 @@ readRawBufferPtrNoBlock loc !fd buf off len
                      case r of
                        (-1) -> return 0
                        0    -> return (-1)
-                       n    -> return n
-   unsafe_read  = do_read (read_off (fdFD fd) buf off len)
-   safe_read    = do_read (safe_read_off (fdFD fd) buf off len)
+                       n    -> return (fromIntegral n)
+   unsafe_read  = do_read (c_read (fdFD fd) (buf `plusPtr` off) len)
+   safe_read    = do_read (c_safe_read (fdFD fd) (buf `plusPtr` off) len)
 
-writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd buf off len
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
@@ -487,13 +488,14 @@ writeRawBufferPtr loc !fd buf off len
                         then write
                         else do threadWaitWrite (fromIntegral (fdFD fd)); write
   where
-    do_write call = throwErrnoIfMinus1RetryMayBlock loc call
+    do_write call = fromIntegral `fmap`
+                      throwErrnoIfMinus1RetryMayBlock loc call
                         (threadWaitWrite (fromIntegral (fdFD fd)))
     write         = if threaded then safe_write else unsafe_write
-    unsafe_write  = do_write (write_off (fdFD fd) buf off len)
-    safe_write    = do_write (safe_write_off (fdFD fd) buf off len)
+    unsafe_write  = do_write (c_write (fdFD fd) (buf `plusPtr` off) len)
+    safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
 
-writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtrNoBlock loc !fd buf off len
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
@@ -503,44 +505,38 @@ writeRawBufferPtrNoBlock loc !fd buf off len
     do_write call = do r <- throwErrnoIfMinus1RetryOnBlock loc call (return (-1))
                        case r of
                          (-1) -> return 0
-                         n    -> return n
+                         n    -> return (fromIntegral n)
     write         = if threaded then safe_write else unsafe_write
-    unsafe_write  = do_write (write_off (fdFD fd) buf off len)
-    safe_write    = do_write (safe_write_off (fdFD fd) buf off len)
+    unsafe_write  = do_write (c_write (fdFD fd) (buf `plusPtr` off) len)
+    safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
 
 isNonBlocking :: FD -> Bool
 isNonBlocking fd = fdIsNonBlocking fd /= 0
-
-foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_off :: CInt -> Ptr Word8 -> Int -> CInt -> IO CInt
-
-foreign import ccall unsafe "__hscore_PrelHandle_write"
-   write_off :: CInt -> Ptr Word8 -> Int -> CInt -> IO CInt
 
 foreign import ccall unsafe "fdReady"
   unsafe_fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
 
 #else /* mingw32_HOST_OS.... */
 
-readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 readRawBufferPtr loc !fd buf off len
   | threaded  = blockingReadRawBufferPtr loc fd buf off len
   | otherwise = asyncReadRawBufferPtr    loc fd buf off len
 
-writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd buf off len
   | threaded  = blockingWriteRawBufferPtr loc fd buf off len
   | otherwise = asyncWriteRawBufferPtr    loc fd buf off len
 
-readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 readRawBufferPtrNoBlock = readRawBufferPtr
 
-writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtrNoBlock = writeRawBufferPtr
 
 -- Async versions of the read/write primitives, for the non-threaded RTS
 
-asyncReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+asyncReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 asyncReadRawBufferPtr loc !fd buf off len = do
     (l, rc) <- asyncRead (fromIntegral (fdFD fd)) (fdIsSocket_ fd) 
                         (fromIntegral len) (buf `plusPtr` off)
@@ -549,7 +545,7 @@ asyncReadRawBufferPtr loc !fd buf off len = do
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
       else return (fromIntegral l)
 
-asyncWriteRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+asyncWriteRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 asyncWriteRawBufferPtr loc !fd buf off len = do
     (l, rc) <- asyncWrite (fromIntegral (fdFD fd)) (fdIsSocket_ fd)
                   (fromIntegral len) (buf `plusPtr` off)
@@ -560,48 +556,42 @@ asyncWriteRawBufferPtr loc !fd buf off len = do
 
 -- Blocking versions of the read/write primitives, for the threaded RTS
 
-blockingReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CInt -> IO CInt
+blockingReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 blockingReadRawBufferPtr loc fd buf off len
-  = throwErrnoIfMinus1Retry loc $
+  = fmap fromIntegral $ throwErrnoIfMinus1Retry loc $
         if fdIsSocket fd
-           then safe_recv_off (fdFD fd) buf off len
-           else safe_read_off (fdFD fd) buf off len
+           then c_safe_recv (fdFD fd) (buf `plusPtr` off) len 0
+           else c_safe_read (fdFD fd) (buf `plusPtr` off) len
 
-blockingWriteRawBufferPtr :: String -> FD -> Ptr Word8-> Int -> CInt -> IO CInt
+blockingWriteRawBufferPtr :: String -> FD -> Ptr Word8-> Int -> CSize -> IO CInt
 blockingWriteRawBufferPtr loc fd buf off len 
-  = throwErrnoIfMinus1Retry loc $
+  = fmap fromIntegral $ throwErrnoIfMinus1Retry loc $
         if fdIsSocket fd
-           then safe_send_off  (fdFD fd) buf off len
-           else safe_write_off (fdFD fd) buf off len
+           then c_safe_send  (fdFD fd) (buf `plusPtr` off) len 0
+           else c_safe_write (fdFD fd) (buf `plusPtr` off) len
 
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.
 
-foreign import ccall safe "__hscore_PrelHandle_recv"
-   safe_recv_off :: CInt -> Ptr Word8 -> Int -> CInt -> IO CInt
+foreign import stdcall safe "recv"
+   c_safe_recv :: CInt -> Ptr Word8 -> CSize -> CInt{-flags-} -> IO CSsize
 
-foreign import ccall safe "__hscore_PrelHandle_send"
-   safe_send_off :: CInt -> Ptr Word8 -> Int -> CInt -> IO CInt
+foreign import stdcall safe "send"
+   c_safe_send :: CInt -> Ptr Word8 -> CSize -> CInt{-flags-} -> IO CSsize
 
 #endif
 
 foreign import ccall "rtsSupportsBoundThreads" threaded :: Bool
 
-foreign import ccall safe "__hscore_PrelHandle_read"
-   safe_read_off :: CInt -> Ptr Word8 -> Int -> CInt -> IO CInt
-
-foreign import ccall safe "__hscore_PrelHandle_write"
-   safe_write_off :: CInt -> Ptr Word8 -> Int -> CInt -> IO CInt
-
 -- -----------------------------------------------------------------------------
 -- utils
 
 #ifndef mingw32_HOST_OS
-throwErrnoIfMinus1RetryOnBlock  :: String -> IO CInt -> IO CInt -> IO CInt
+throwErrnoIfMinus1RetryOnBlock  :: String -> IO CSsize -> IO CSsize -> IO CSsize
 throwErrnoIfMinus1RetryOnBlock loc f on_block  = 
   do
     res <- f
-    if (res :: CInt) == -1
+    if (res :: CSsize) == -1
       then do
         err <- getErrno
         if err == eINTR
