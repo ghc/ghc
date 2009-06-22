@@ -235,7 +235,7 @@ pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_CLASSES, gHC_BASE, gHC_ENUM,
-    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_INTERNALS, gHC_LIST, gHC_PARR,
+    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_LIST, gHC_PARR,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -255,7 +255,6 @@ gHC_SHOW	= mkBaseModule (fsLit "GHC.Show")
 gHC_READ	= mkBaseModule (fsLit "GHC.Read")
 gHC_NUM		= mkBaseModule (fsLit "GHC.Num")
 gHC_INTEGER	= mkIntegerModule (fsLit "GHC.Integer")
-gHC_INTEGER_INTERNALS = mkIntegerModule (fsLit "GHC.Integer.Internals")
 gHC_LIST	= mkBaseModule (fsLit "GHC.List")
 gHC_PARR	= mkBaseModule (fsLit "GHC.PArr")
 gHC_TUPLE	= mkPrimModule (fsLit "GHC.Tuple")
@@ -641,7 +640,7 @@ minusName	  = methName gHC_NUM (fsLit "-") minusClassOpKey
 negateName	  = methName gHC_NUM (fsLit "negate") negateClassOpKey
 plusIntegerName   = varQual  gHC_INTEGER (fsLit "plusInteger") plusIntegerIdKey
 timesIntegerName  = varQual  gHC_INTEGER (fsLit "timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual   gHC_INTEGER_INTERNALS (fsLit "Integer") integerTyConKey
+integerTyConName  = tcQual   gHC_INTEGER (fsLit "Integer") integerTyConKey
 smallIntegerName = varQual gHC_INTEGER (fsLit "smallInteger") smallIntegerIdKey
 
 -- PrelReal types and classes
