@@ -381,6 +381,8 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(iscntrl)                           \
       SymI_NeedsProto(isalpha)                           \
       SymI_NeedsProto(isalnum)                           \
+      SymI_NeedsProto(isascii)                           \
+      SymI_HasProto(__mingw_vfprintf)                    \
       SymI_HasProto(strcmp)                              \
       SymI_HasProto(memmove)                             \
       SymI_HasProto(realloc)                             \
