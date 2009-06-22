@@ -289,6 +289,7 @@ include rules/bindist.mk
 PACKAGES = \
 	ghc-prim \
 	integer-gmp \
+	integer \
 	base \
 	filepath \
 	array \
