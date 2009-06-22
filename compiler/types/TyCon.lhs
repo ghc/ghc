@@ -495,7 +495,7 @@ Then
 %************************************************************************
 
 A PrimRep is somewhat similar to a CgRep (see codeGen/SMRep) and a
-MachRep (see cmm/MachOp), although each of these types has a distinct
+MachRep (see cmm/CmmExpr), although each of these types has a distinct
 and clearly defined purpose:
 
   - A PrimRep is a CgRep + information about signedness + information
