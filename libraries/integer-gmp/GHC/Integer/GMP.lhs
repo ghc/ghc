@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Integer
+-- Module      :  GHC.Integer.GMP
 -- Copyright   :  (c) The University of Glasgow 1994-2008
 -- License     :  see libraries/integer-gmp/LICENSE
 --
@@ -25,7 +25,7 @@
 #error Unknown SIZEOF_HSWORD; can't define INT_MINBOUND and NEG_INT_MINBOUND
 #endif
 
-module GHC.Integer (
+module GHC.Integer.GMP (
     Integer,
     smallInteger, wordToInteger, integerToWord, toInt#,
 #if WORD_SIZE_IN_BITS < 64
@@ -56,7 +56,7 @@ import GHC.Prim (
     indexIntArray#,
  )
 
-import GHC.Integer.Internals (
+import GHC.Integer.GMP.Internals (
     Integer(..),
 
     -- GMP-related primitives

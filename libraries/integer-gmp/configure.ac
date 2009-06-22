@@ -69,7 +69,7 @@ AC_SUBST(GMP_FRAMEWORK)
 AC_SUBST(HaveLibGmp)
 AC_SUBST(HaveFrameworkGMP)
 
-AC_CONFIG_FILES([integer.buildinfo gmp/config.mk])
+AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk])
 
 dnl--------------------------------------------------------------------
 dnl * Generate the header cbits/GmpDerivedConstants.h

@@ -4,7 +4,7 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 #include "MachDeps.h"
-module GHC.Integer.Internals (
+module GHC.Integer.GMP.Internals (
     Integer(..),
 
     cmpInteger#,

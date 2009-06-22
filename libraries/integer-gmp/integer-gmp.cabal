@@ -1,4 +1,4 @@
-name:           integer
+name:           integer-gmp
 version:        0.1.0.0
 license:        BSD3
 license-file:   LICENSE
@@ -21,12 +21,9 @@ source-repository head
 
 Library {
     build-depends: ghc-prim
-    exposed-modules: GHC.Integer
-                     GHC.Integer.Internals
+    exposed-modules: GHC.Integer.GMP
+                     GHC.Integer.GMP.Internals
     extensions: CPP, MagicHash, UnboxedTuples,
                 ForeignFunctionInterface, UnliftedFFITypes
-    -- We need to set the package name to integer (without a version number)
-    -- as it's magic.
-    ghc-options: -package-name integer
     c-sources: cbits/cbits.c
 }
