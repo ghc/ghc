@@ -111,7 +111,7 @@ basicKnownKeyNames
 	stringTyConName,
 	ratioDataConName,
 	ratioTyConName,
-	integerTyConName, smallIntegerName,
+	integerTyConName, smallIntegerName, integerDataConName,
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
@@ -633,7 +633,8 @@ sndName		  = varQual dATA_TUPLE (fsLit "snd") sndIdKey
 
 -- Module PrelNum
 numClassName, fromIntegerName, minusName, negateName, plusIntegerName,
-    timesIntegerName, integerTyConName, smallIntegerName :: Name
+    timesIntegerName,
+    integerTyConName, integerDataConName, smallIntegerName :: Name
 numClassName	  = clsQual  gHC_NUM (fsLit "Num") numClassKey
 fromIntegerName   = methName gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName	  = methName gHC_NUM (fsLit "-") minusClassOpKey
@@ -641,6 +642,7 @@ negateName	  = methName gHC_NUM (fsLit "negate") negateClassOpKey
 plusIntegerName   = varQual  gHC_INTEGER (fsLit "plusInteger") plusIntegerIdKey
 timesIntegerName  = varQual  gHC_INTEGER (fsLit "timesInteger") timesIntegerIdKey
 integerTyConName  = tcQual   gHC_INTEGER (fsLit "Integer") integerTyConKey
+integerDataConName  = conName gHC_INTEGER (fsLit "Integer") integerDataConKey
 smallIntegerName = varQual gHC_INTEGER (fsLit "smallInteger") smallIntegerIdKey
 
 -- PrelReal types and classes
@@ -1062,7 +1064,7 @@ unitTyConKey = mkTupleTyConUnique Boxed 0
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
     stableNameDataConKey, trueDataConKey, wordDataConKey,
-    ioDataConKey :: Unique
+    ioDataConKey, integerDataConKey :: Unique
 charDataConKey				= mkPreludeDataConUnique  1
 consDataConKey				= mkPreludeDataConUnique  2
 doubleDataConKey			= mkPreludeDataConUnique  3
@@ -1075,6 +1077,7 @@ stableNameDataConKey			= mkPreludeDataConUnique 14
 trueDataConKey				= mkPreludeDataConUnique 15
 wordDataConKey				= mkPreludeDataConUnique 16
 ioDataConKey				= mkPreludeDataConUnique 17
+integerDataConKey			= mkPreludeDataConUnique 18
 
 -- Generic data constructors
 crossDataConKey, inlDataConKey, inrDataConKey, genUnitDataConKey :: Unique

@@ -382,12 +382,14 @@ ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
 ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 
-pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t} 
+pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t}
   | Just (tc,_) <- tcSplitTyConApp_maybe ty
   , ASSERT(isNewTyCon tc) True
   , Just new_dc <- tyConSingleDataCon_maybe tc = do 
-         real_term <- y max_prec t
-         return$ cparen (p >= app_prec) (ppr new_dc <+> real_term)
+         if integerDataConName == dataConName new_dc
+             then return $ text $ show $ (unsafeCoerce# $ val t :: Integer)
+             else do real_term <- y max_prec t
+                     return$ cparen (p >= app_prec) (ppr new_dc <+> real_term)
 pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 
 -------------------------------------------------------
@@ -432,15 +434,10 @@ cPprTermBase y =
   , ifTerm (isTyCon charTyCon   . ty) (coerceShow$ \(a::Char)->a)
   , ifTerm (isTyCon floatTyCon  . ty) (coerceShow$ \(a::Float)->a)
   , ifTerm (isTyCon doubleTyCon . ty) (coerceShow$ \(a::Double)->a)
-  , ifTerm (isIntegerTy         . ty) (coerceShow$ \(a::Integer)->a)
   ]
      where ifTerm pred f prec t@Term{}
                | pred t    = Just `liftM` f prec t
            ifTerm _ _ _ _  = return Nothing
-
-           isIntegerTy ty  = fromMaybe False $ do
-             (tc,_) <- tcSplitTyConApp_maybe ty 
-             return (tyConName tc == integerTyConName)
 
            isTupleTy ty    = fromMaybe False $ do 
              (tc,_) <- tcSplitTyConApp_maybe ty 
