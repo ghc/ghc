@@ -398,7 +398,7 @@ fdWrite fd ptr bytes = do
   res <- writeRawBufferPtr "GHC.IO.FD.fdWrite" fd ptr 0 (fromIntegral bytes)
   let res' = fromIntegral res
   if res' < bytes 
-     then fdWrite fd (ptr `plusPtr` bytes) (bytes - res')
+     then fdWrite fd (ptr `plusPtr` res') (bytes - res')
      else return ()
 
 -- XXX ToDo: this isn't non-blocking
