@@ -96,6 +96,7 @@ import GHC.Exts		( unsafeCoerce# )
 
 #if __GLASGOW_HASKELL__ >= 611
 import GHC.IO.Exception	( IOErrorType(InvalidArgument) )
+import GHC.IO.Handle    ( hFlushAll )
 #else
 import GHC.IOBase	( IOErrorType(InvalidArgument) )
 #endif
@@ -636,7 +637,16 @@ runStmt stmt step
  | null (filter (not.isSpace) stmt) = return False
  | ["import", mod] <- words stmt    = keepGoing' setContext ('+':mod)
  | otherwise
- = do result <- GhciMonad.runStmt stmt step
+ = do
+#if __GLASGOW_HASKELL__ >= 611
+      -- In the new IO library, read handles buffer data even if the Handle
+      -- is set to NoBuffering.  This causes problems for GHCi where there
+      -- are really two stdin Handles.  So we flush any bufferred data in
+      -- GHCi's stdin Handle here (only relevant if stdin is attached to
+      -- a file, otherwise the read buffer can't be flushed).
+      liftIO $ IO.try $ hFlushAll stdin
+#endif
+      result <- GhciMonad.runStmt stmt step
       afterRunStmt (const True) result
 
 --afterRunStmt :: GHC.RunResult -> GHCi Bool
