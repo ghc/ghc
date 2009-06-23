@@ -12,7 +12,9 @@
 
 ifneq "$(phase)" "0"
 
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp/gmp/config.mk
+endif
 
 libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/cbits/mkGmpDerivedConstants.c
 	"$(CC)" $(SRC_CC_OPTS) $(libraries/integer-gmp_CC_OPTS) $< -o $@
