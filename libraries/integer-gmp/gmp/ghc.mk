@@ -45,11 +45,12 @@ HaveFrameworkGMP = NO
 endif
 endif
 
+$(libraries/integer-gmp_dist-install_v_CMM_OBJS): libraries/integer-gmp/cbits/GmpDerivedConstants.h
+$(libraries/integer-gmp_dist-install_v_C_OBJS):   libraries/integer-gmp/cbits/GmpDerivedConstants.h
+
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/gmp/gmp.h
-$(libraries/integer-gmp_dist-install_v_CMM_OBJS): libraries/integer-gmp/cbits/GmpDerivedConstants.h
-$(libraries/integer-gmp_dist-install_v_C_OBJS):   libraries/integer-gmp/cbits/GmpDerivedConstants.h
 
 libraries/integer-gmp_CC_OPTS += -I$(TOP)/libraries/integer-gmp/gmp
 
