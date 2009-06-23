@@ -823,7 +823,8 @@ SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in ghc.spec extra-gcc-opts.in VERSION boot ghc.mk
+	ghc.spec.in ghc.spec extra-gcc-opts.in VERSION \
+	boot boot-pkgs packages ghc.mk
 
 SRC_DIST_TARBALL = $(SRC_DIST_NAME)-src.tar.bz2
 
