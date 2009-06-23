@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-implicit-prelude -#include "HsBase.h" #-}
+{-# OPTIONS_GHC -fno-implicit-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding.Iconv
@@ -24,6 +24,8 @@ module GHC.IO.Encoding.Iconv (
    localeEncoding
 #endif
  ) where
+
+#include "HsBaseConfig.h"
 
 #if !defined(mingw32_HOST_OS)
 
@@ -98,7 +100,15 @@ utf32be = unsafePerformIO (mkTextEncoding "UTF32BE")
 
 {-# NOINLINE localeEncoding #-}
 localeEncoding :: TextEncoding
-localeEncoding = unsafePerformIO (mkTextEncoding "")
+localeEncoding = unsafePerformIO $ do
+#if HAVE_LANGINFO_H
+   cstr <- c_localeEncoding -- use nl_langinfo(CODESET) to get the encoding
+                               -- if we have it
+   r <- peekCString cstr
+   mkTextEncoding r
+#else
+   mkTextEncoding "" -- GNU iconv accepts "" to mean the -- locale encoding.
+#endif
 
 -- We hope iconv_t is a storable type.  It should be, since it has at least the
 -- value -1, which is a possible return value from iconv_open.
@@ -113,6 +123,9 @@ foreign import ccall unsafe "iconv_close"
 foreign import ccall unsafe "iconv"
     iconv :: IConv -> Ptr CString -> Ptr CSize -> Ptr CString -> Ptr CSize
 	  -> IO CSize
+
+foreign import ccall unsafe "localeEncoding"
+    c_localeEncoding :: IO CString
 
 haskellChar :: String
 #ifdef WORDS_BIGENDIAN
