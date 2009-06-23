@@ -15,4 +15,4 @@ FAMILY INSTANCES
   type instance Elem (ListColl a) -- Defined at T3017.hs:13:8-11
 Tycons with generics:
 Dependent modules: []
-Dependent packages: [base, ghc-prim, integer]
+Dependent packages: [base, ghc-prim, integer, integer-impl]

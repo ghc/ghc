@@ -3,4 +3,4 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
 Tycons with generics:
 Dependent modules: []
-Dependent packages: [base, ghc-prim, integer]
+Dependent packages: [base, ghc-prim, integer, integer-impl]
