@@ -2,6 +2,7 @@
 
 import System.IO
 import Control.Exception
+import Data.Char
 
 import System.Posix
 import qualified GHC.IO.Device as IODevice
@@ -26,8 +27,12 @@ main = do
   hIsOpen hwrite >>= print
 
 showPossibleException :: IO () -> IO ()
-showPossibleException f = do e <- try f
-                             print (e :: Either SomeException ())
+showPossibleException f = do 
+  e <- try f
+  putStrLn (sanitise (show (e :: Either SomeException ())))
+ where
+  sanitise = map (\c -> if isDigit c then 'X' else c)
+  -- we don't care which file descriptor it is
 
 naughtyClose h = 
   withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} -> do
