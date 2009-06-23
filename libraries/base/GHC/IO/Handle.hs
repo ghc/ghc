@@ -23,7 +23,7 @@ module GHC.IO.Handle (
  
    hFileSize, hSetFileSize, hIsEOF, hLookAhead,
    hSetBuffering, hSetBinaryMode, hSetEncoding,
-   hFlush, hDuplicate, hDuplicateTo,
+   hFlush, hFlushAll, hDuplicate, hDuplicateTo,
  
    hClose, hClose_help,
  
@@ -281,6 +281,26 @@ hSetEncoding hdl encoding = do
 
 hFlush :: Handle -> IO () 
 hFlush handle = wantWritableHandle "hFlush" handle flushWriteBuffer
+
+-- | The action 'hFlushAll' @hdl@ flushes all buffered data in @hdl@,
+-- including any buffered read data.  Buffered read data is flushed
+-- by seeking the file position back to the point before the bufferred
+-- data was read, and hence only works if @hdl@ is seekable (see
+-- 'hIsSeekable').
+--
+-- This operation may fail with:
+--
+--  * 'isFullError' if the device is full;
+--
+--  * 'isPermissionError' if a system resource limit would be exceeded.
+--    It is unspecified whether the characters in the buffer are discarded
+--    or retained under these circumstances;
+--
+--  * 'isIllegalOperation' if @hdl@ has buffered read data, and is not
+--    seekable.
+
+hFlushAll :: Handle -> IO () 
+hFlushAll handle = withHandle_ "hFlushAll" handle flushBuffer
 
 -- -----------------------------------------------------------------------------
 -- Repositioning Handles
