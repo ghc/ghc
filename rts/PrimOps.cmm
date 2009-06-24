@@ -678,18 +678,20 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  P_ unused3, P_ unused4)
+  P_ code, P_ next_invariant_to_check, P_ result)
 {
   W_ frame, trec, valid, next_invariant, q, outer;
 
-  frame = Sp;
-  trec = StgTSO_trec(CurrentTSO);
+  frame  = Sp;
+  trec   = StgTSO_trec(CurrentTSO);
+  result = R1;
   ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
 
   if (outer == NO_TREC) {
     /* First time back at the atomically frame -- pick up invariants */
     ("ptr" q) = foreign "C" stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr") [];
     StgAtomicallyFrame_next_invariant_to_check(frame) = q;
+    StgAtomicallyFrame_result(frame) = result;
 
   } else {
     /* Second/subsequent time back at the atomically frame -- abort the
@@ -723,6 +725,7 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
     if (valid != 0) {
       /* Transaction was valid: commit succeeded */
       StgTSO_trec(CurrentTSO) = NO_TREC;
+      R1 = StgAtomicallyFrame_result(frame);
       Sp = Sp + SIZEOF_StgAtomicallyFrame;
       jump %ENTRY_CODE(Sp(SP_OFF));
     } else {
@@ -740,7 +743,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
 #if defined(PROFILING)
   W_ unused1, W_ unused2,
 #endif
-  P_ unused3, P_ unused4)
+  P_ code, P_ next_invariant_to_check, P_ result)
 {
   W_ frame, trec, valid;
 
@@ -825,6 +828,7 @@ atomicallyzh_fast
 
   SET_HDR(frame,stg_atomically_frame_info, W_[CCCS]);
   StgAtomicallyFrame_code(frame) = R1;
+  StgAtomicallyFrame_result(frame) = NO_TREC;
   StgAtomicallyFrame_next_invariant_to_check(frame) = END_INVARIANT_CHECK_QUEUE;
 
   /* Start the memory transcation */

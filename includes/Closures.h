@@ -398,6 +398,7 @@ typedef struct {
   StgHeader   header;
   StgClosure *code;
   StgTVarWatchQueue *next_invariant_to_check;
+  StgClosure *result;
 } StgAtomicallyFrame;
 
 typedef struct {

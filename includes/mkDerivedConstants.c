@@ -335,6 +335,7 @@ main(int argc, char *argv[])
     closure_size(StgAtomicallyFrame);
     closure_field(StgAtomicallyFrame, code);
     closure_field(StgAtomicallyFrame, next_invariant_to_check);
+    closure_field(StgAtomicallyFrame, result);
 
     closure_field(StgInvariantCheckQueue, invariant);
     closure_field(StgInvariantCheckQueue, my_execution);
