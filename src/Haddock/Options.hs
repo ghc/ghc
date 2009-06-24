@@ -15,7 +15,7 @@ module Haddock.Options (
 
 
 import Haddock.Utils
-import Haddock.Exception
+import Haddock.Types
 import System.Console.GetOpt 
 
 

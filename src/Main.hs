@@ -19,7 +19,6 @@ import Haddock.Interface
 import Haddock.Types
 import Haddock.Version
 import Haddock.InterfaceFile
-import Haddock.Exception
 import Haddock.Options
 import Haddock.Utils
 import Haddock.GhcUtils

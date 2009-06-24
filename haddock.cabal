@@ -110,7 +110,6 @@ executable haddock
     Haddock.Types
     Haddock.Version
     Haddock.InterfaceFile        
-    Haddock.Exception
     Haddock.Options
     Haddock.GhcUtils
    
@@ -130,7 +129,6 @@ library
   other-modules:
     Haddock.Types
     Haddock.InterfaceFile
-    Haddock.Exception
     Haddock.Utils
     Haddock.GhcUtils
   

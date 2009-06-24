@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 --
 -- Haddock - A Haskell Documentation Tool
@@ -10,6 +11,8 @@
 module Haddock.Types where
 
 
+import Control.Exception
+import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC hiding (NoLink)
@@ -233,3 +236,22 @@ instance Monad ErrMsgM where
 
 tell :: [ErrMsg] -> ErrMsgM ()
 tell w = Writer ((), w)
+
+
+-- Exceptions
+
+-- | Haddock's own exception type
+data HaddockException = HaddockException String deriving Typeable
+
+
+instance Show HaddockException where
+  show (HaddockException str) = str
+
+
+throwE :: String -> a
+#if __GLASGOW_HASKELL__ >= 609
+instance Exception HaddockException
+throwE str = throw (HaddockException str)
+#else
+throwE str = throwDyn (HaddockException str)
+#endif
