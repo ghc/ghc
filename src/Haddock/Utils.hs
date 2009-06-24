@@ -1,9 +1,15 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Utils
+-- Copyright   :  (c) The University of Glasgow 2001-2002,
+--                    Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
---
--- (c) The University of Glasgow 2001-2002
--- (c) Simon Marlow 2003
---
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+-----------------------------------------------------------------------------
 
 
 module Haddock.Utils (

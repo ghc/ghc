@@ -1,13 +1,18 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Interface
+-- Copyright   :  (c) Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
 --
--- (c) Simon Marlow 2003
---
-
--- Here we build the actual module interfaces. By interface we mean the 
--- information that is used to render a Haddock page for a module. Parts of 
--- this information is also stored in the interface files.
-
+-- Here we build the actual module interfaces. By interface we mean the
+-- information that is used to render a Haddock page for a module. Parts of
+-- this information is also stored in the .haddock files.
+-----------------------------------------------------------------------------
 
 module Haddock.Interface (
   createInterfaces

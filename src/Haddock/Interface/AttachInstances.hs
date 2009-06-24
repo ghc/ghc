@@ -1,12 +1,14 @@
---
--- Haddock - A Haskell Documentation Tool
---
--- (c) Simon Marlow 2003
---
-
-
 {-# LANGUAGE MagicHash #-}
-
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Interface.AttachInstances
+-- Copyright   :  (c) David Waern  2006-2009
+-- License     :  BSD-like
+--
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+-----------------------------------------------------------------------------
 
 module Haddock.Interface.AttachInstances (attachInstances) where
 

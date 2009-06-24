@@ -1,9 +1,14 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Interface.Create
+-- Copyright   :  (c) Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
---
--- (c) Simon Marlow 2003
---
-
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+-----------------------------------------------------------------------------
 
 module Haddock.Interface.Create (createInterface) where
 

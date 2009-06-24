@@ -1,8 +1,13 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Backends.HH
+-- Copyright   :  (c) Simon Marlow 2003
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
---
--- (c) Simon Marlow 2003
---
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+-----------------------------------------------------------------------------
 
 module Haddock.Backends.HH (ppHHContents, ppHHIndex, ppHHProject) where
 

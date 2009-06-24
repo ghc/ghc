@@ -1,12 +1,19 @@
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Types
+-- Copyright   :  (c) Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
+-- Maintainer  :  haddock@projects.haskellorg
+-- Stability   :  experimental
+-- Portability :  portable
 --
--- (c) Simon Marlow 2003
---
-
+-- Types that are commonly used through-out Haddock. Some of the most
+-- important types are defined here, like 'Interface' and 'DocName'.
+-----------------------------------------------------------------------------
 
 module Haddock.Types where
 

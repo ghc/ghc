@@ -1,9 +1,14 @@
-
--- Haddock - A Haskell Documentation Tool
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Backends.Html
+-- Copyright   :  (c) Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
 --
--- (c) Simon Marlow 2003
---
-
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+-----------------------------------------------------------------------------
 
 module Haddock.Backends.Html ( 
   ppHtml, copyHtmlBits, 

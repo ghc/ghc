@@ -1,11 +1,16 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.InterfaceFile
+-- Copyright   :  (c) David Waern 2006-2009
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
 --
--- (c) Simon Marlow 2003
---
-
+-- Reading and writing the .haddock interface file
+-----------------------------------------------------------------------------
 
 module Haddock.InterfaceFile (
   InterfaceFile(..),

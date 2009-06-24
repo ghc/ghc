@@ -1,14 +1,20 @@
 {-# OPTIONS_GHC -Wwarn #-}
 {-# LANGUAGE ForeignFunctionInterface, PatternSignatures #-}
-
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Main
+-- Copyright   :  (c) Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
+--
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
 --
 -- Haddock - A Haskell Documentation Tool
 --
--- (c) Simon Marlow 2003
---
--- Ported to use the GHC API by David Waern during "Summer of Code" 2006
---
-
+-- Program entry point and top-level code.
+-----------------------------------------------------------------------------
 
 module Main (main) where
 

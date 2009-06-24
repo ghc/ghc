@@ -1,11 +1,16 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Backends.Hoogle
+-- Copyright   :  (c) Neil Mitchell 2006-2008
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
 --
--- (c) Simon Marlow 2003
---
--- This file, (c) Neil Mitchell 2006-2008
 -- Write out Hoogle compatible documentation
 -- http://www.haskell.org/hoogle/
+-----------------------------------------------------------------------------
 
 module Haddock.Backends.Hoogle ( 
     ppHoogle

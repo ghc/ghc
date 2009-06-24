@@ -1,8 +1,16 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Options
+-- Copyright   :  (c) Simon Marlow 2003-2006,
+--                    David Waern  2006-2009
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
 --
--- (c) Simon Marlow 2003
---
+-- Definition of the command line interface of Haddock
+-----------------------------------------------------------------------------
 
 
 module Haddock.Options (

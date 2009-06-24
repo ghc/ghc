@@ -1,14 +1,18 @@
---
--- Haddock - A Haskell Documentation Tool
---
--- (c) Simon Marlow 2003
---
-
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
-
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.GhcUtils
+-- Copyright   :  (c) David Waern 2006-2009
+-- License     :  BSD-like
+--
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Utils for dealing with types from the GHC API
+-----------------------------------------------------------------------------
 
 module Haddock.GhcUtils where
 
