@@ -99,8 +99,22 @@ FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 # Check for idiosyncracies in some mingw impls of directory handling.
 FP_READDIR_EOF_ERRNO
 
-AC_CHECK_LIB(iconv, iconv_open,
-    [EXTRA_LIBS="$EXTRA_LIBS iconv"])
+# We can't just use AC_SEARCH_LIBS for this, as on OpenBSD the iconv.h
+# header needs to be included as iconv_open is #define'd to something
+# else. We therefore use our own FP_SEARCH_LIBS_PROTO, which allows us
+# to give prototype text.
+FP_SEARCH_LIBS_PROTO(iconv,
+                     [
+#include <stddef.h>
+#include <iconv.h>
+                      ],
+                     [iconv_t cd;
+                      cd = iconv_open("", "");
+                      iconv(cd,NULL,NULL,NULL,NULL);
+                      iconv_close(cd);],
+                     iconv,
+                     [EXTRA_LIBS="$EXTRA_LIBS $ac_lib"],
+                     [exit 1])
 
 AC_SUBST(EXTRA_LIBS)
 AC_CONFIG_FILES([base.buildinfo])
