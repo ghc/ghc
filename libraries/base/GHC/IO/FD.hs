@@ -343,8 +343,10 @@ dup2 fd fdto = do
     c_dup2 (fdFD fd) (fdFD fdto)
   return fd{ fdFD = fdFD fdto } -- original FD, with the new fdFD
 
-setNonBlockingMode :: FD -> IO ()
-setNonBlockingMode fd = setNonBlockingFD (fdFD fd)
+setNonBlockingMode :: FD -> Bool -> IO FD
+setNonBlockingMode fd set = do 
+  setNonBlockingFD (fdFD fd) set
+  return fd{ fdIsNonBlocking = fromEnum set }
 
 ready :: FD -> Bool -> Int -> IO Bool
 ready fd write msecs = do

@@ -172,13 +172,16 @@ mkHandleFromFD
    -> Maybe TextEncoding
    -> IO Handle
 
-mkHandleFromFD fd fd_type filepath iomode set_non_blocking mb_codec
+mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec
   = do
 #ifndef mingw32_HOST_OS
-    when set_non_blocking $ FD.setNonBlockingMode fd
     -- turn on non-blocking mode
+    fd <- if set_non_blocking 
+             then FD.setNonBlockingMode fd0 True
+             else return fd0
 #else
     let _ = set_non_blocking -- warning suppression
+    fd <- return fd0
 #endif
 
     let nl | isJust mb_codec = nativeNewlineMode

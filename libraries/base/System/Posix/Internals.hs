@@ -314,21 +314,23 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 -- ---------------------------------------------------------------------------
 -- Turning on non-blocking for a file descriptor
 
-setNonBlockingFD :: FD -> IO ()
+setNonBlockingFD :: FD -> Bool -> IO ()
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-setNonBlockingFD fd = do
+setNonBlockingFD fd set = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
                  (c_fcntl_read fd const_f_getfl)
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
-  unless (testBit flags (fromIntegral o_NONBLOCK)) $ do
-    c_fcntl_write fd const_f_setfl (fromIntegral (flags .|. o_NONBLOCK))
+  let flags' | set       = flags .|. o_NONBLOCK
+             | otherwise = flags .&. complement o_NONBLOCK
+  unless (flags == flags') $ do
+    c_fcntl_write fd const_f_setfl (fromIntegral flags')
     return ()
 #else
 
 -- bogus defns for win32
-setNonBlockingFD _ = return ()
+setNonBlockingFD _ _ = return ()
 
 #endif
 
