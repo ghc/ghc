@@ -828,6 +828,7 @@ eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && eqExpr (rnBndrs2 env vs1  vs2) r1
 eq_note :: RnEnv2 -> Note -> Note -> Bool
 eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
 eq_note _ (CoreNote s1) (CoreNote s2)  = s1 == s2
+eq_note _ (InlineMe)    (InlineMe)     = True
 eq_note _ _             _              = False
 \end{code}
 
