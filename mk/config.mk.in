@@ -918,7 +918,7 @@ endif
 #
 # The ways currently defined.
 #
-ALL_WAYS=v p t l s mp mg debug dyn thr thr_l debug_dyn thr_dyn thr_debug_dyn thr_p thr_debug thr_debug_l
+ALL_WAYS=v p t l s mp mg debug dyn thr thr_l debug_dyn thr_dyn thr_debug_dyn thr_p thr_debug thr_debug_l debug_p thr_debug_p
 USER_WAYS=a b c d e f g h j k l m n o A B
 
 #
