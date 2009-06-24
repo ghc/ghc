@@ -127,20 +127,22 @@ $1_$2_SplitObjs = NO
 endif
 endif
 
-# C and S files are built the "v" vanlilla way and possibly also the "dyn" way.
-$(call c-objs,$1,$2,v)
 $(call distdir-opts,$1,$2,$3)
-$(call c-suffix-rules,$1,$2,v,YES)
+
+# C and S files are possibly built the "dyn" way.
 ifeq "$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)
 $(call c-suffix-rules,$1,$2,dyn,YES)
 endif
 
-$(call cmm-objs,$1,$2,v)
-$(call cmm-suffix-rules,$1,$2,v)
-
 # Now generate all the build rules for each way in this directory:
-$$(foreach way,$$($1_$2_WAYS),$$(eval $$(call build-package-way,$1,$2,$$(way),$3)))
+$$(foreach way,$$($1_$2_WAYS),$$(eval \
+    $$(call c-objs,$1,$2,$$(way)) \
+	$$(call c-suffix-rules,$1,$2,$$(way),YES) \
+    $$(call cmm-objs,$1,$2,$$(way)) \
+    $$(call cmm-suffix-rules,$1,$2,$$(way)) \
+    $$(call build-package-way,$1,$2,$$(way),$3) \
+  ))
 
 $(call haddock,$1,$2)
 
