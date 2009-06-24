@@ -11,7 +11,7 @@
 --
 -- Here we build the actual module interfaces. By interface we mean the
 -- information that is used to render a Haddock page for a module. Parts of
--- this information is also stored in the .haddock files.
+-- this information are also stored in the .haddock files.
 -----------------------------------------------------------------------------
 
 module Haddock.Interface (
