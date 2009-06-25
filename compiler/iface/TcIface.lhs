@@ -19,7 +19,6 @@ import LoadIface
 import IfaceEnv
 import BuildTyCl
 import TcRnMonad
-import TcType		( tcSplitSigmaTy )
 import Type
 import TypeRep
 import HscTypes
@@ -418,7 +417,7 @@ tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
  	    		 	   ifIdDetails = details, ifIdInfo = info})
   = do	{ name <- lookupIfaceTop occ_name
 	; ty <- tcIfaceType iface_type
-	; details <- tcIdDetails ty details
+	; details <- tcIdDetails details
 	; info <- tcIdInfo ignore_prags name ty info
 	; return (AnId (mkGlobalId details name ty info)) }
 
@@ -966,16 +965,12 @@ do_one (IfaceRec pairs) thing_inside
 %************************************************************************
 
 \begin{code}
-tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
-tcIdDetails _  IfVanillaId = return VanillaId
-tcIdDetails _  IfDFunId    = return DFunId
-tcIdDetails ty (IfRecSelId naughty)
-  = return (RecSelId { sel_tycon = tc, sel_naughty = naughty })
-  where
-    (_, _, tau) = tcSplitSigmaTy ty
-    tc = tyConAppTyCon (funArgTy tau)
-    -- A bit fragile. Relies on the selector type looking like
-    --    forall abc. (stupid-context) => T a b c -> blah
+tcIdDetails :: IfaceIdDetails -> IfL IdDetails
+tcIdDetails IfVanillaId = return VanillaId
+tcIdDetails IfDFunId    = return DFunId
+tcIdDetails (IfRecSelId tc naughty)
+  = do { tc' <- tcIfaceTyCon tc
+       ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty }) }
 
 tcIdInfo :: Bool -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
 tcIdInfo ignore_prags name ty info 

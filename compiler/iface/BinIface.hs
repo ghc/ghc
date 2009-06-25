@@ -1110,15 +1110,16 @@ instance Binary IfaceBinding where
 		      return (IfaceRec ac)
 
 instance Binary IfaceIdDetails where
-    put_ bh IfVanillaId    = putByte bh 0
-    put_ bh (IfRecSelId b) = do { putByte bh 1; put_ bh b }
-    put_ bh IfDFunId       = putByte bh 2
+    put_ bh IfVanillaId      = putByte bh 0
+    put_ bh (IfRecSelId a b) = do { putByte bh 1; put_ bh a; put_ bh b }
+    put_ bh IfDFunId         = putByte bh 2
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> return IfVanillaId
 	      1 -> do a <- get bh
-		      return (IfRecSelId a)
+		      b <- get bh
+		      return (IfRecSelId a b)
 	      _ -> return IfDFunId
 
 instance Binary IfaceIdInfo where

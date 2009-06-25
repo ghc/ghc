@@ -457,11 +457,21 @@ field isn't part of the existential. For example, this should be ok.
   data T a where { MkT { f1::a, f2::b->b } :: T a }
   f :: T a -> b -> T b
   f t b = t { f1=b }
+
 The criterion we use is this:
 
   The types of the updated fields
   mention only the universally-quantified type variables
   of the data constructor
+
+NB: this is not (quite) the same as being a "naughty" record selector
+(See Note [Naughty record selectors]) in TcTyClsDecls), at least 
+in the case of GADTs. Consider
+   data T a where { MkT :: { f :: a } :: T [a] }
+Then f is not "naughty" because it has a well-typed record selector.
+But we don't allow updates for 'f'.  (One could consider trying to
+allow this, but it makes my head hurt.  Badly.  And no one has asked
+for it.)
 
 In principle one could go further, and allow
   g :: T a -> T a

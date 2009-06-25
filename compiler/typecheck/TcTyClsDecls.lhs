@@ -1239,7 +1239,7 @@ mkRecSelBind (tycon, sel_name)
     data_tvs   = tyVarsOfType data_ty
     is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tvs)  
     (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
-    sel_ty | is_naughty = unitTy
+    sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
            | otherwise  = mkForAllTys (varSetElems data_tvs ++ field_tvs) $ 
     	     	          mkPhiTy (dataConStupidTheta con1) $	-- Urgh!
     	     	          mkPhiTy field_theta               $	-- Urgh!
@@ -1302,10 +1302,12 @@ so that if the user tries to use 'x' as a selector we can bleat
 helpfully, rather than saying unhelpfully that 'x' is not in scope.
 Hence the sel_naughty flag, to identify record selectors that don't really exist.
 
-In general, a field is naughty if its type mentions a type variable that
-isn't in the result type of the constructor.
+In general, a field is "naughty" if its type mentions a type variable that
+isn't in the result type of the constructor.  Note that this *allows*
+GADT record selectors (Note [GADT record selectors]) whose types may look 
+like     sel :: T [a] -> a
 
-We make a dummy binding 
+For naughty selectors we make a dummy binding 
    sel = ()
 for naughty selectors, so that the later type-check will add them to the
 environment, and they'll be exported.  The function is never called, because

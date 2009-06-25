@@ -183,7 +183,7 @@ type IfaceAnnTarget = AnnTarget OccName
 
 data IfaceIdDetails
   = IfVanillaId
-  | IfRecSelId Bool
+  | IfRecSelId IfaceTyCon Bool
   | IfDFunId
 
 data IfaceIdInfo
@@ -649,8 +649,8 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId    = empty
-  ppr (IfRecSelId b) = ptext (sLit "RecSel")
-      		       <> if b then ptext (sLit "<naughty>") else empty
+  ppr (IfRecSelId tc b) = ptext (sLit "RecSel") <+> ppr tc
+      		          <+> if b then ptext (sLit "<naughty>") else empty
   ppr IfDFunId       = ptext (sLit "DFunId")
 
 instance Outputable IfaceIdInfo where
