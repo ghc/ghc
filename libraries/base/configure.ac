@@ -17,7 +17,7 @@ dnl ** check for full ANSI header (.h) files
 AC_HEADER_STDC
 
 # check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([ctype.h dirent.h errno.h fcntl.h inttypes.h limits.h signal.h sys/resource.h sys/select.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/wait.h termios.h time.h unistd.h utime.h windows.h winsock.h langinfo.h])
+AC_CHECK_HEADERS([ctype.h errno.h fcntl.h inttypes.h limits.h signal.h sys/resource.h sys/select.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/wait.h termios.h time.h unistd.h utime.h windows.h winsock.h langinfo.h])
 
 # Enable large file support. Do this before testing the types ino_t, off_t, and
 # rlim_t, because it will affect the result of that test.
@@ -28,7 +28,7 @@ dnl FreeBSD has an emtpy wctype.h, so test one of the affected
 dnl functions if it's really there.
 AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 
-AC_CHECK_FUNCS([lstat readdir_r])
+AC_CHECK_FUNCS([lstat])
 AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 
@@ -95,9 +95,6 @@ FP_CHECK_CONSTS([SIGINT], [
 
 dnl ** can we open files in binary mode?
 FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
-
-# Check for idiosyncracies in some mingw impls of directory handling.
-FP_READDIR_EOF_ERRNO
 
 # We can't just use AC_SEARCH_LIBS for this, as on OpenBSD the iconv.h
 # header needs to be included as iconv_open is #define'd to something

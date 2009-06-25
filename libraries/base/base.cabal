@@ -187,12 +187,11 @@ Library {
         cbits/WCsubst.c
         cbits/Win32Utils.c
         cbits/consUtils.c
-        cbits/dirUtils.c
         cbits/inputReady.c
         cbits/selectUtils.c
     include-dirs: include
     includes:    HsBase.h
-    install-includes:    HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h consUtils.h Typeable.h
+    install-includes:    HsBase.h HsBaseConfig.h WCsubst.h consUtils.h Typeable.h
     if os(windows) {
         extra-libraries: wsock32, user32, shell32
     }

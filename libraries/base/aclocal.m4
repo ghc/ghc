@@ -169,66 +169,6 @@ undefine([AC_CV_NAME_supported])dnl
 ])
 
 
-# FP_READDIR_EOF_ERRNO
-# --------------------
-# Defines READDIR_ERRNO_EOF to what readdir() sets 'errno' to upon reaching end
-# of directory (not set => 0); not setting it is the correct thing to do, but
-# MinGW based versions have set it to ENOENT until recently (summer 2004).
-AC_DEFUN([FP_READDIR_EOF_ERRNO],
-[AC_CACHE_CHECK([what readdir sets errno to upon EOF], [fptools_cv_readdir_eof_errno],
-[AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <dirent.h>
-#include <stdio.h>
-#include <errno.h>
-#include <sys/stat.h>
-
-int
-main(argc, argv)
-int argc;
-char **argv;
-{
-  FILE *f=fopen("conftestval", "w");
-#if defined(__MINGW32__)
-  int fd = mkdir("testdir");
-#else
-  int fd = mkdir("testdir", 0666);
-#endif
-  DIR* dp;
-  struct dirent* de;
-  int err = 0;
-
-  if (!f) return 1;
-  if (fd == -1) { 
-     fprintf(stderr,"unable to create directory; quitting.\n");
-     return 1;
-  }
-  close(fd);
-  dp = opendir("testdir");
-  if (!dp) { 
-     fprintf(stderr,"unable to browse directory; quitting.\n");
-     rmdir("testdir");
-     return 1;
-  }
-
-  /* the assumption here is that readdir() will only return NULL
-   * due to reaching the end of the directory.
-   */
-  while (de = readdir(dp)) {
-  	;
-  }
-  err = errno;
-  fprintf(f,"%d", err);
-  fclose(f);
-  closedir(dp);
-  rmdir("testdir");
-  return 0;
-}]])],
-[fptools_cv_readdir_eof_errno=`cat conftestval`],
-[AC_MSG_WARN([failed to determine the errno value])
- fptools_cv_readdir_eof_errno=0],
-[fptools_cv_readdir_eof_errno=0])])
-AC_DEFINE_UNQUOTED([READDIR_ERRNO_EOF], [$fptools_cv_readdir_eof_errno], [readdir() sets errno to this upon EOF])
-])# FP_READDIR_EOF_ERRNO
-
 # FP_SEARCH_LIBS_PROTO(WHAT, PROTOTYPE, FUNCTION, SEARCH-LIBS,
 #                [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND],
 #                [OTHER-LIBRARIES])
@@ -263,4 +203,3 @@ AS_IF([test "$ac_res" != no],
       [$6])dnl
 AS_VAR_POPDEF([ac_Search])dnl
 ])
-

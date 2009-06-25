@@ -63,14 +63,12 @@ import DIOError
 #endif
 
 #ifdef __HUGS__
-{-# CFILES cbits/PrelIOUtils.c cbits/dirUtils.c cbits/consUtils.c #-}
+{-# CFILES cbits/PrelIOUtils.c cbits/consUtils.c #-}
 #endif
 
 -- ---------------------------------------------------------------------------
 -- Types
 
-type CDir       = ()
-type CDirent    = ()
 type CFLock     = ()
 type CGroup     = ()
 type CLconv     = ()
@@ -363,9 +361,6 @@ foreign import ccall unsafe "HsBase.h chmod"
 foreign import ccall unsafe "HsBase.h close"
    c_close :: CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h closedir" 
-   c_closedir :: Ptr CDir -> IO CInt
-
 foreign import ccall unsafe "HsBase.h creat"
    c_creat :: CString -> CMode -> IO CInt
 
@@ -395,20 +390,11 @@ foreign import ccall unsafe "HsBase.h __hscore_lstat"
 foreign import ccall unsafe "__hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
-foreign import ccall unsafe "HsBase.h opendir" 
-   c_opendir :: CString  -> IO (Ptr CDir)
-
-foreign import ccall unsafe "HsBase.h __hscore_mkdir"
-   mkdir :: CString -> CInt -> IO CInt
-
 foreign import ccall unsafe "HsBase.h read" 
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall safe "read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
-foreign import ccall unsafe "HsBase.h rewinddir"
-   c_rewinddir :: Ptr CDir -> IO ()
 
 foreign import ccall unsafe "__hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
@@ -474,19 +460,6 @@ foreign import ccall unsafe "HsBase.h utime"
 foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
 #endif
-
--- traversing directories
-foreign import ccall unsafe "dirUtils.h __hscore_readdir"
-  readdir  :: Ptr CDir -> Ptr (Ptr CDirent) -> IO CInt
- 
-foreign import ccall unsafe "HsBase.h __hscore_free_dirent"
-  freeDirEnt  :: Ptr CDirent -> IO ()
- 
-foreign import ccall unsafe "HsBase.h __hscore_end_of_dir"
-  end_of_dir :: CInt
- 
-foreign import ccall unsafe "HsBase.h __hscore_d_name"
-  d_name :: Ptr CDirent -> IO CString
 
 -- POSIX flags only:
 foreign import ccall unsafe "HsBase.h __hscore_o_rdonly" o_RDONLY :: CInt

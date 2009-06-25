@@ -62,9 +62,6 @@
 #if HAVE_STRING_H
 #include <string.h>
 #endif
-#if HAVE_DIRENT_H
-#include <dirent.h>
-#endif
 #if HAVE_UTIME_H
 #include <utime.h>
 #endif
@@ -129,7 +126,6 @@
 #if HAVE_VFORK_H
 #include <vfork.h>
 #endif
-#include "dirUtils.h"
 #include "WCsubst.h"
 
 #if defined(__MINGW32__)
@@ -418,36 +414,6 @@ __hscore_setmode( int fd, HsBool toBin )
 #if __GLASGOW_HASKELL__
 
 #endif /* __GLASGOW_HASKELL__ */
-
-INLINE int
-__hscore_mkdir( char *pathName, int mode )
-{
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
-  return mkdir(pathName);
-#else
-  return mkdir(pathName,mode);
-#endif
-}
-
-INLINE char *
-__hscore_d_name( struct dirent* d )
-{
-  return (d->d_name);
-}
-
-INLINE int
-__hscore_end_of_dir( void )
-{
-  return READDIR_ERRNO_EOF;
-}
-
-INLINE void
-__hscore_free_dirent(struct dirent *dEnt)
-{
-#if HAVE_READDIR_R
-  free(dEnt);
-#endif
-}
 
 #if defined(__MINGW32__)
 // We want the versions of stat/fstat/lseek that use 64-bit offsets,
