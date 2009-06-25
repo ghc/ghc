@@ -138,7 +138,7 @@ data GhcModule = GhcModule {
 -- data needed during its creation.
 data Interface = Interface {
 
-  -- | The documented module
+  -- | The module represented by this interface
   ifaceMod             :: Module,
 
   -- | The original filename for this module
@@ -156,24 +156,33 @@ data Interface = Interface {
   -- | The Haddock options for this module (prune, ignore-exports, etc)
   ifaceOptions         :: ![DocOption],
 
+  -- | The declarations of the module.  Excludes declarations that don't
+  -- have names (instances and stand-alone documentation comments). Includes
+  -- subordinate names, but they are mapped to their parent declarations.
   ifaceDeclMap         :: Map Name DeclInfo,
+
+  -- | Everything declared in the module (including subordinates) that has docs
   ifaceRnDocMap        :: Map Name (HsDoc DocName),
+
   ifaceSubMap          :: Map Name [Name],
 
   ifaceExportItems     :: ![ExportItem Name],
   ifaceRnExportItems   :: [ExportItem DocName],
 
-  -- | All the names that are defined in this module
+  -- | All names defined in this module
   ifaceLocals          :: ![Name],
 
-  -- | All the names that are exported by this module
+  -- | All names exported by this module
   ifaceExports         :: ![Name],
 
   -- | All the visible names exported by this module
   -- For a name to be visible, it has to:
-  -- - be exported normally, and not via a full module re-exportation.
-  -- - have a declaration in this module or any of it's imports, with the    
-  --   exception that it can't be from another package.
+  --
+  --  * be exported normally, and not via a full module re-exportation.
+  --
+  --  * have a declaration in this module or any of it's imports, with the
+  --    exception that it can't be from another package.
+  --
   -- Basically, a visible name is a name that will show up in the documentation
   -- for this module.
   ifaceVisibleExports  :: ![Name],
@@ -186,12 +195,34 @@ data Interface = Interface {
 -- | A smaller version of 'Interface' that we can get from the Haddock
 -- interface files.
 data InstalledInterface = InstalledInterface {
+
+  -- | The module represented by this interface
   instMod            :: Module,
+
+  -- | Textual information about the module 
   instInfo           :: HaddockModInfo Name,
+
+  -- | Everything declared in the module (including subordinates) that has docs
   instDocMap         :: Map Name (HsDoc DocName),
+
+  -- | All names exported by this module
   instExports        :: [Name],
+
+  -- | All the visible names exported by this module
+  -- For a name to be visible, it has to:
+  --
+  --  * be exported normally, and not via a full module re-exportation.
+  --
+  --  * have a declaration in this module or any of it's imports, with the
+  --    exception that it can't be from another package.
+  --
+  -- Basically, a visible name is a name that will show up in the documentation
+  -- for this module.
   instVisibleExports :: [Name],
+
+  -- | The Haddock options for this module (prune, ignore-exports, etc)
   instOptions        :: [DocOption],
+
   instSubMap         :: Map Name [Name]
 }
 
