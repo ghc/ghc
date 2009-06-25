@@ -58,6 +58,8 @@ case $target_os in
     ;;
 esac
 
+AC_CHECK_HEADER([gmp.h], , [HaveFrameworkGMP=NO; HaveLibGmp=NO; GMP_LIBS=])
+
 dnl--------------------------------------------------------------------
 dnl * Make sure we got some form of gmp
 dnl--------------------------------------------------------------------
