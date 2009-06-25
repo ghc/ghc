@@ -114,7 +114,11 @@ FP_SEARCH_LIBS_PROTO(iconv,
                       iconv_close(cd);],
                      iconv,
                      [EXTRA_LIBS="$EXTRA_LIBS $ac_lib"],
-                     [exit 1])
+                     [case `uname -s` in
+                        MINGW*|CYGWIN*) exit 0;;
+                        *)
+                             AC_MSG_ERROR([iconv is required on non-Windows platforms]);;
+                      esac])
 
 AC_SUBST(EXTRA_LIBS)
 AC_CONFIG_FILES([base.buildinfo])
