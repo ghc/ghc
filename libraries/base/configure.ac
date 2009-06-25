@@ -115,7 +115,7 @@ FP_SEARCH_LIBS_PROTO(iconv,
                      iconv,
                      [EXTRA_LIBS="$EXTRA_LIBS $ac_lib"],
                      [case `uname -s` in
-                        MINGW*|CYGWIN*) exit 0;;
+                        MINGW*|CYGWIN*) ;;
                         *)
                              AC_MSG_ERROR([iconv is required on non-Windows platforms]);;
                       esac])
