@@ -51,8 +51,8 @@ case $target_os in
     save_libs="$LIBS"
     LIBS="-framework GMP"
     AC_TRY_LINK_FUNC(__gmpz_fdiv_qr,
-      [HaveFrameworkGMP=yes; GMP_FRAMEWORK=GMP; GMP_LIBS=],
-      [HaveFrameworkGMP=no])
+      [HaveFrameworkGMP=YES; GMP_FRAMEWORK=GMP; GMP_LIBS=],
+      [HaveFrameworkGMP=NO])
     LIBS="$save_libs"
     AC_MSG_RESULT([$HaveFrameworkGMP])
     ;;
