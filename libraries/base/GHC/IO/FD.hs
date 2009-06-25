@@ -346,7 +346,11 @@ dup2 fd fdto = do
 setNonBlockingMode :: FD -> Bool -> IO FD
 setNonBlockingMode fd set = do 
   setNonBlockingFD (fdFD fd) set
+#if defined(mingw32_HOST_OS)
+  return fd
+#else
   return fd{ fdIsNonBlocking = fromEnum set }
+#endif
 
 ready :: FD -> Bool -> Int -> IO Bool
 ready fd write msecs = do
