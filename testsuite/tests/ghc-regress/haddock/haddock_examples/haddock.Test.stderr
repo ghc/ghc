@@ -98,7 +98,7 @@ data R1
 <document comment>
 f :: (C a) => a -> Int
 <document comment>
-foreign import ccall safe "static header.h &g" g :: Int -> IO CInt
+foreign import ccall safe "static header.h g" g :: Int -> IO CInt
 <document comment>
 h :: Int
 h = 42
@@ -133,7 +133,7 @@ m :: R -> N1 () <document comment> -> IO Int <document comment>
 newn :: R <document comment> -> N1 () <document comment> -> IO Int
 newn = undefined
 <document comment>
-foreign import ccall unsafe "static header.h &o" o
+foreign import ccall unsafe "static header.h o" o
   :: Float <document comment> -> IO Float <document comment>
 <document comment>
 newp :: Int

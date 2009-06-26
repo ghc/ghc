@@ -2,5 +2,5 @@
 ccfail001.hs:10:0:
     Unacceptable result type in foreign declaration: State# RealWorld
     When checking declaration:
-	foreign import ccall safe "static  &foo" foo
-	  :: Int -> State# RealWorld
+        foreign import ccall safe "static foo" foo
+          :: Int -> State# RealWorld
