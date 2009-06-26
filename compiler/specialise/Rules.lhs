@@ -567,7 +567,7 @@ match menv subst (Cast e1 co1) (Cast e2 co2)
 	; match menv subst1 e1 e2 }
 
 -- Everything else fails
-match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr e1) $$ (text "e2:" <+> ppr e2)) $ 
+match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $ 
 			 Nothing
 
 ------------------------------------------
