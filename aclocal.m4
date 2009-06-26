@@ -558,20 +558,20 @@ fi
 if test "$fp_have_gcc" = "NO" -a -d $srcdir/ghc; then
   AC_MSG_ERROR([gcc is required])
 fi
-AC_CACHE_CHECK([version of gcc], [fp_gcc_version],
+AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [if test "$fp_have_gcc" = "YES"; then
-   fp_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
-   FP_COMPARE_VERSIONS([$fp_gcc_version], [-lt], [3.0],
+   fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
+   FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
      [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
    # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
    # isn't a very good reason for that, but for now just make configure
    # fail.
  else
-   fp_gcc_version="not-installed"
+   fp_cv_gcc_version="not-installed"
  fi
 ])
 AC_SUBST([HaveGcc], [$fp_have_gcc])
-AC_SUBST([GccVersion], [$fp_gcc_version])
+AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 ])# FP_HAVE_GCC
 
 AC_DEFUN([FP_MINGW_GCC],
@@ -970,23 +970,23 @@ AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_HAVE_GCC])
 AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
 [fp_cv_gcc_extra_opts=
- FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
+ FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
   [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fwrapv"],
   [])
  case $TargetPlatform in
   i386-*|x86_64-*) 
-     FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.2],
+     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.2],
       [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -mno-omit-leaf-frame-pointer"],
       [])
-    FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
-     [FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [4.2],
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
+     [FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.2],
        [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-toplevel-reorder"],
        [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-unit-at-a-time"]
      )],
      [])
   ;;
   sparc-*-solaris2) 
-    FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [4.2],
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.2],
       [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-toplevel-reorder"],
       [])
   ;;
