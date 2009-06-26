@@ -53,6 +53,7 @@ import qualified System.Posix.Internals as Posix
 stdin :: Handle
 stdin = unsafePerformIO $ do
    -- ToDo: acquire lock
+   setBinaryMode FD.stdin
    mkHandle FD.stdin "<stdin>" ReadHandle True (Just localeEncoding)
                 nativeNewlineMode{-translate newlines-}
                 (Just stdHandleFinalizer) Nothing
@@ -61,6 +62,7 @@ stdin = unsafePerformIO $ do
 stdout :: Handle
 stdout = unsafePerformIO $ do
    -- ToDo: acquire lock
+   setBinaryMode FD.stdout
    mkHandle FD.stdout "<stdout>" WriteHandle True (Just localeEncoding)
                 nativeNewlineMode{-translate newlines-}
                 (Just stdHandleFinalizer) Nothing
@@ -69,6 +71,7 @@ stdout = unsafePerformIO $ do
 stderr :: Handle
 stderr = unsafePerformIO $ do
     -- ToDo: acquire lock
+   setBinaryMode FD.stderr
    mkHandle FD.stderr "<stderr>" WriteHandle False{-stderr is unbuffered-} 
                 (Just localeEncoding)
                 nativeNewlineMode{-translate newlines-}
@@ -79,6 +82,20 @@ stdHandleFinalizer fp m = do
   h_ <- takeMVar m
   flushWriteBuffer h_
   putMVar m (ioe_finalizedHandle fp)
+
+-- We have to put the FDs into binary mode on Windows to avoid the newline
+-- translation that the CRT IO library does.
+setBinaryMode :: FD -> IO ()
+#ifdef mingw32_HOST_OS
+setBinaryMode fd = do setmode (fdFD fd) True; return ()
+#else
+setBinaryMode _ = return ()
+#endif
+
+#ifdef mingw32_HOST_OS
+foreign import ccall unsafe "__hscore_setmode"
+  setmode :: CInt -> Bool -> IO CInt
+#endif
 
 -- ---------------------------------------------------------------------------
 -- isEOF

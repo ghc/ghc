@@ -216,7 +216,8 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
                    _ -> True
 
 #ifdef mingw32_HOST_OS
-    let _ = (dev,ino,write,fd) -- warning suppression
+    setmode fd True -- unconditionally set binary mode
+    let _ = (dev,ino,write) -- warning suppression
 #endif
 
     case fd_type of
@@ -246,6 +247,11 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
 #endif
               },
             fd_type)
+
+#ifdef mingw32_HOST_OS
+foreign import ccall unsafe "__hscore_setmode"
+  setmode :: CInt -> Bool -> IO CInt
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Standard file descriptors
