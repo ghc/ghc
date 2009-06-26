@@ -124,7 +124,7 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
 	  -> ForeignImport
 	  -> DsM ([Binding], SDoc, SDoc)
-dsFImport id (CImport cconv safety _ _ spec) = do
+dsFImport id (CImport cconv safety _ spec) = do
     (ids, h, c) <- dsCImport id spec cconv safety
     return (ids, h, c)
 

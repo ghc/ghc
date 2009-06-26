@@ -904,7 +904,6 @@ data ForeignImport = -- import of a C entity
 		     CImport  CCallConv	      -- ccall or stdcall
 			      Safety	      -- safe or unsafe
 			      FastString      -- name of C header
-			      FastString      -- name of library object
 			      CImportSpec     -- details of the C entity
 
                      -- import of a .NET function
@@ -944,22 +943,19 @@ instance OutputableBndr name => Outputable (ForeignDecl name) where
 instance Outputable ForeignImport where
   ppr (DNImport			        spec) = 
     ptext (sLit "dotnet") <+> ppr spec
-  ppr (CImport  cconv safety header lib spec) =
+  ppr (CImport  cconv safety header spec) =
     ppr cconv <+> ppr safety <+> 
-    char '"' <> pprCEntity header lib spec <> char '"'
+    char '"' <> pprCEntity spec <> char '"'
     where
-      pprCEntity header lib (CLabel lbl) = 
-        ptext (sLit "static") <+> ftext header <+> char '&' <>
-	pprLib lib <> ppr lbl
-      pprCEntity header lib (CFunction (StaticTarget lbl)) = 
-        ptext (sLit "static") <+> ftext header <+> char '&' <>
-	pprLib lib <> ppr lbl
-      pprCEntity _      _   (CFunction (DynamicTarget)) =
+      pp_hdr = if nullFS header then empty else ftext header
+
+      pprCEntity (CLabel lbl) = 
+        ptext (sLit "static") <+> pp_hdr <+> char '&' <> ppr lbl
+      pprCEntity (CFunction (StaticTarget lbl)) = 
+        ptext (sLit "static") <+> pp_hdr <+> ppr lbl
+      pprCEntity (CFunction (DynamicTarget)) =
         ptext (sLit "dynamic")
-      pprCEntity _      _   (CWrapper) = ptext (sLit "wrapper")
-      --
-      pprLib lib | nullFS lib = empty
-		 | otherwise  = char '[' <> ppr lib <> char ']'
+      pprCEntity (CWrapper) = ptext (sLit "wrapper")
 
 instance Outputable ForeignExport where
   ppr (CExport  (CExportStatic lbl cconv)) = 

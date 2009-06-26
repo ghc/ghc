@@ -333,7 +333,7 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
    (tvs, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
-repForD (L loc (ForeignImport name typ (CImport cc s ch cn cis)))
+repForD (L loc (ForeignImport name typ (CImport cc s ch cis)))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repLTy typ
       MkC cc' <- repCCallConv cc
@@ -341,7 +341,6 @@ repForD (L loc (ForeignImport name typ (CImport cc s ch cn cis)))
       cis' <- conv_cimportspec cis
       MkC str <- coreStringLit $ static
                               ++ unpackFS ch ++ " "
-                              ++ unpackFS cn ++ " "
                               ++ cis'
       dec <- rep2 forImpDName [cc', s', str, name', typ']
       return (loc, dec)

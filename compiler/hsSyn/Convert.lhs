@@ -319,7 +319,7 @@ cvtForD (ImportF callconv safety from nm ty)
   | Just (c_header, cis) <- parse_ccall_impent (TH.nameBase nm) from
   = do	{ nm' <- vNameL nm
 	; ty' <- cvtType ty
-	; let i = CImport (cvt_conv callconv) safety' c_header nilFS cis
+	; let i = CImport (cvt_conv callconv) safety' c_header cis
 	; return $ ForeignImport nm' ty' i }
 
   | otherwise
@@ -349,26 +349,41 @@ parse_ccall_impent nm s
        Just ts -> parse_ccall_impent_static nm ts
        Nothing -> Nothing
 
+-- XXX we should be sharing code with RdrHsSyn.parseCImport
 parse_ccall_impent_static :: String
                           -> [String]
                           -> Maybe (FastString, CImportSpec)
 parse_ccall_impent_static nm ts
- = let ts' = case ts of
-                 [       "&", cid] -> [       cid]
-                 [fname, "&"     ] -> [fname     ]
-                 [fname, "&", cid] -> [fname, cid]
-                 _                 -> ts
-   in case ts' of
-          [       cid] | is_cid cid -> Just (nilFS,              mk_cid cid)
-          [fname, cid] | is_cid cid -> Just (mkFastString fname, mk_cid cid)
-          [          ]              -> Just (nilFS,              mk_cid nm)
-          [fname     ]              -> Just (mkFastString fname, mk_cid nm)
-          _                         -> Nothing
+ = case ts of
+     [               ] -> mkFun nilFS                 nm
+     [       "&", cid] -> mkLbl nilFS                 cid
+     [fname, "&"     ] -> mkLbl (mkFastString fname)  nm
+     [fname, "&", cid] -> mkLbl (mkFastString fname)  cid
+     [       "&"     ] -> mkLbl nilFS                 nm
+     [fname,      cid] -> mkFun (mkFastString fname)  cid
+     [            cid]
+          | is_cid cid -> mkFun nilFS                 cid
+          | otherwise  -> mkFun (mkFastString cid)    nm
+           -- tricky case when there's a single string: "foo.h" is a header,
+           -- but "foo" is a C identifier, and we tell the difference by
+           -- checking for a valid C identifier (see is_cid below).
+     _anything_else    -> Nothing
+
     where is_cid :: String -> Bool
           is_cid x = all (/= '.') x && (isAlpha (head x) || head x == '_')
-          mk_cid :: String -> CImportSpec
-          mk_cid  = CFunction . StaticTarget . mkFastString
 
+          mkLbl :: FastString -> String -> Maybe (FastString, CImportSpec)
+          mkLbl fname lbl  = Just (fname, CLabel (mkFastString lbl))
+
+          mkFun :: FastString -> String -> Maybe (FastString, CImportSpec)
+          mkFun fname lbl  = Just (fname, CFunction (StaticTarget (mkFastString lbl)))
+
+-- This code is tokenising something like "foo.h &bar", eg.
+--   ""           -> Just []
+--   "foo.h"      -> Just ["foo.h"]
+--   "foo.h &bar" -> Just ["foo.h","&","bar"]
+--   "&"          -> Just ["&"]
+-- Nothing is returned for a parse error.
 lex_ccall_impent :: String -> Maybe [String]
 lex_ccall_impent "" = Just []
 lex_ccall_impent ('&':xs) = fmap ("&":) $ lex_ccall_impent xs

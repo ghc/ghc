@@ -960,11 +960,11 @@ mkImport :: CallConv
 mkImport (CCall  cconv) safety (entity, v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget (unLoc entity))
-      importSpec = CImport PrimCallConv safety nilFS nilFS funcTarget
+      importSpec = CImport PrimCallConv safety nilFS funcTarget
   return (ForD (ForeignImport v ty importSpec))
-mkImport (CCall  cconv) safety (entity, v, ty) = do
-  importSpec <- parseCImport entity cconv safety v
-  return (ForD (ForeignImport v ty importSpec))
+  | otherwise = do
+    importSpec <- parseCImport entity cconv safety v
+    return (ForD (ForeignImport v ty importSpec))
 mkImport (DNCall      ) _      (entity, v, ty) = do
   spec <- parseDImport entity
   return $ ForD (ForeignImport v ty (DNImport spec))
@@ -980,9 +980,9 @@ parseCImport :: Located FastString
 parseCImport (L loc entity) cconv safety v
   -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
   | entity == fsLit "dynamic" = 
-    return $ CImport cconv safety nilFS nilFS (CFunction DynamicTarget)
+    return $ CImport cconv safety nilFS (CFunction DynamicTarget)
   | entity == fsLit "wrapper" =
-    return $ CImport cconv safety nilFS nilFS CWrapper
+    return $ CImport cconv safety nilFS CWrapper
   | otherwise		       = parse0 (unpackFS entity)
     where
       -- using the static keyword?
@@ -990,41 +990,35 @@ parseCImport (L loc entity) cconv safety v
       parse0 ('s':'t':'a':'t':'i':'c':rest) = parse1 rest
       parse0                          rest  = parse1 rest
       -- check for header file name
-      parse1     ""               = parse4 ""    nilFS        False nilFS
+      parse1     ""               = parse4 ""    nilFS        False
       parse1     (' ':rest)       = parse1 rest
       parse1 str@('&':_   )       = parse2 str   nilFS
-      parse1 str@('[':_   )       = parse3 str   nilFS        False
       parse1 str
 	| ".h" `isSuffixOf` first = parse2 rest  (mkFastString first)
-        | otherwise               = parse4 str   nilFS        False nilFS
+        | otherwise               = parse4 str   nilFS        False
         where
-	  (first, rest) = break (\c -> c == ' ' || c == '&' || c == '[') str
+	  (first, rest) = break (\c -> c == ' ' || c == '&') str
       -- check for address operator (indicating a label import)
-      parse2     ""         header = parse4 ""   header False nilFS
+      parse2     ""         header = parse4 ""   header False
       parse2     (' ':rest) header = parse2 rest header
-      parse2     ('&':rest) header = parse3 rest header True
-      parse2 str@('[':_   ) header = parse3 str	 header False
-      parse2 str	    header = parse4 str	 header False nilFS
-      -- check for library object name
-      parse3 (' ':rest) header isLbl = parse3 rest header isLbl
-      parse3 ('[':rest) header isLbl = 
-        case break (== ']') rest of 
-	  (lib, ']':rest)           -> parse4 rest header isLbl (mkFastString lib)
-	  _			    -> parseError loc "Missing ']' in entity"
-      parse3 str	header isLbl = parse4 str  header isLbl nilFS
+      parse2     ('&':rest) header = parse3 rest header
+      parse2 str	    header = parse4 str	 header False
+      -- eat spaces after '&'
+      parse3 (' ':rest) header = parse3 rest header 
+      parse3 str	header = parse4 str  header True
       -- check for name of C function
-      parse4 ""         header isLbl lib = build (mkExtName (unLoc v)) header isLbl lib
-      parse4 (' ':rest) header isLbl lib = parse4 rest         	       header isLbl lib
-      parse4 str	header isLbl lib
-        | all (== ' ') rest              = build (mkFastString first)  header isLbl lib
-	| otherwise			 = parseError loc "Malformed entity string"
+      parse4 ""         header isLbl = build (mkExtName (unLoc v)) header isLbl
+      parse4 (' ':rest) header isLbl = parse4 rest         	   header isLbl
+      parse4 str	header isLbl
+        | all (== ' ') rest = build (mkFastString first)  header isLbl
+	| otherwise         = parseError loc "Malformed entity string"
         where
 	  (first, rest) = break (== ' ') str
       --
-      build cid header False lib = return $
-        CImport cconv safety header lib (CFunction (StaticTarget cid))
-      build cid header True  lib = return $
-        CImport cconv safety header lib (CLabel                  cid )
+      build cid header False = return $
+        CImport cconv safety header (CFunction (StaticTarget cid))
+      build cid header True  = return $
+        CImport cconv safety header (CLabel                  cid )
 
 --
 -- Unravel a dotnet spec string.

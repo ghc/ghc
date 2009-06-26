@@ -108,7 +108,7 @@ tcCheckFIType _ arg_tys res_ty (DNImport spec) = do
        _ -> return ()
     return (DNImport (withDNTypes spec (map toDNType arg_tys) (toDNType res_ty)))
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CLabel _))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ (CLabel _))
   = ASSERT( null arg_tys )
     do { checkCg checkCOrAsm
        ; checkSafety safety
@@ -116,7 +116,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ _ (CLabel _))
        ; return idecl }	     -- NB check res_ty not sig_ty!
        	 	      	     --    In case sig_ty is (forall a. ForeignPtr a)
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ CWrapper) = do
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
    	-- Foreign wrapper (former f.e.d.)
    	-- The type must be of the form ft -> IO (FunPtr ft), where ft is a
    	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
@@ -135,7 +135,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ CWrapper) = 
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
     return idecl
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ _ (CFunction target))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction target))
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg checkCOrAsmOrInterp
       checkCConv cconv
