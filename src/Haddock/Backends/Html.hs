@@ -38,6 +38,7 @@ import Data.List             ( sortBy, groupBy )
 import Data.Maybe
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
+import System.Directory hiding ( copyFile )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import Data.Function
@@ -336,6 +337,7 @@ ppHtmlContents odir doctitle
 	    s15 </>
 	    footer
 	  )
+  createDirectoryIfMissing True odir
   writeFile (pathJoin [odir, contentsHtmlFile]) (renderHtml html)
 
   -- XXX: think of a better place for this?
@@ -452,6 +454,7 @@ ppHtmlContentsFrame odir doctitle ifaces = do
 	     (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << Html.p << (
             foldr (+++) noHtml (map (+++br) mods))
+  createDirectoryIfMissing True odir
   writeFile (pathJoin [odir, frameIndexHtmlFile]) (renderHtml html)
 
 -- ---------------------------------------------------------------------------
@@ -479,6 +482,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
         search_box </> index_html
            )
 
+  createDirectoryIfMissing True odir
   writeFile (pathJoin [odir, indexHtmlFile]) (renderHtml html)
   
     -- Generate index and contents page for Html Help if requested
@@ -588,6 +592,7 @@ ppHtmlModule odir doctitle
 	    ifaceToHtml maybe_source_url maybe_wiki_url iface unicode </> s15 </>
 	    footer
          )
+  createDirectoryIfMissing True odir
   writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderHtml html)
   ppHtmlModuleMiniSynopsis odir doctitle iface unicode
 
@@ -604,6 +609,7 @@ ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
            (thediv ! [theclass "mini-topbar"]
              << toHtml (moduleString mdl)) +++
            miniSynopsis mdl iface unicode)
+  createDirectoryIfMissing True odir
   writeFile (pathJoin [odir, "mini_" ++ moduleHtmlFile mdl]) (renderHtml html)
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> HtmlTable
