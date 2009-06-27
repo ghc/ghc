@@ -343,6 +343,12 @@ typedef struct _RtsSymbolVal {
 #define RTS_MINGW_GETTIMEOFDAY_SYM /**/
 #endif
 
+#if HAVE___MINGW_VFPRINTF
+#define RTS___MINGW_VFPRINTF_SYM SymI_HasProto(__mingw_vfprintf)
+#else
+#define RTS___MINGW_VFPRINTF_SYM /**/
+#endif
+
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                           \
@@ -382,7 +388,7 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(isalpha)                           \
       SymI_NeedsProto(isalnum)                           \
       SymI_NeedsProto(isascii)                           \
-      SymI_HasProto(__mingw_vfprintf)                    \
+      RTS___MINGW_VFPRINTF_SYM                           \
       SymI_HasProto(strcmp)                              \
       SymI_HasProto(memmove)                             \
       SymI_HasProto(realloc)                             \
