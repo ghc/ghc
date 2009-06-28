@@ -33,9 +33,6 @@ extra-libraries:		"m"		/* for ldexp() */
 #ifdef mingw32_HOST_OS
 			      ,"wsock32"	/* for the linker */
 #endif
-#ifdef WANT_DOTNET_SUPPORT
-			      , "oleaut32", "ole32", "uuid"
-#endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
 			      ,"bfd", "iberty"	/* for debugging */
 #endif
