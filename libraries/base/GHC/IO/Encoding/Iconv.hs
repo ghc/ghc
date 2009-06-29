@@ -114,14 +114,14 @@ localeEncoding = unsafePerformIO $ do
 -- value -1, which is a possible return value from iconv_open.
 type IConv = CLong -- ToDo: (#type iconv_t)
 
-foreign import ccall unsafe "iconv_open"
-    iconv_open :: CString -> CString -> IO IConv
+foreign import ccall unsafe "hs_iconv_open"
+    hs_iconv_open :: CString -> CString -> IO IConv
 
-foreign import ccall unsafe "iconv_close"
-    iconv_close :: IConv -> IO CInt
+foreign import ccall unsafe "hs_iconv_close"
+    hs_iconv_close :: IConv -> IO CInt
 
-foreign import ccall unsafe "iconv"
-    iconv :: IConv -> Ptr CString -> Ptr CSize -> Ptr CString -> Ptr CSize
+foreign import ccall unsafe "hs_iconv"
+    hs_iconv :: IConv -> Ptr CString -> Ptr CSize -> Ptr CString -> Ptr CSize
 	  -> IO CSize
 
 foreign import ccall unsafe "localeEncoding"
@@ -152,8 +152,8 @@ newIConv :: String -> String
 newIConv from to fn =
   withCString from $ \ from_str ->
   withCString to   $ \ to_str -> do
-    iconvt <- throwErrnoIfMinus1 "mkTextEncoding" $ iconv_open to_str from_str
-    let iclose = do throwErrnoIfMinus1 "Iconv.close" $ iconv_close iconvt
+    iconvt <- throwErrnoIfMinus1 "mkTextEncoding" $ hs_iconv_open to_str from_str
+    let iclose = do throwErrnoIfMinus1 "Iconv.close" $ hs_iconv_close iconvt
                     return ()
     return BufferCodec{
                 encode = fn iconvt,
@@ -185,7 +185,7 @@ iconvRecode iconv_t
     with (poraw `plusPtr` (ow `shiftL` oscale)) $ \ p_outbuf -> do
     with (fromIntegral ((iw-ir) `shiftL` iscale)) $ \ p_inleft -> do
     with (fromIntegral ((os-ow) `shiftL` oscale)) $ \ p_outleft -> do
-      res <- iconv iconv_t p_inbuf p_inleft p_outbuf p_outleft
+      res <- hs_iconv iconv_t p_inbuf p_inleft p_outbuf p_outleft
       new_inleft  <- peek p_inleft
       new_outleft <- peek p_outleft
       let 

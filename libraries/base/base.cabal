@@ -187,6 +187,7 @@ Library {
         cbits/WCsubst.c
         cbits/Win32Utils.c
         cbits/consUtils.c
+        cbits/iconv.c
         cbits/inputReady.c
         cbits/selectUtils.c
     include-dirs: include
