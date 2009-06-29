@@ -58,6 +58,11 @@ import Foreign.C
 #include <time.h>
 #endif
 
+-- for struct tms
+#if HAVE_SYS_TIMES_H
+#include <sys/times.h>
+#endif
+
 #endif
 
 #if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
