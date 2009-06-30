@@ -640,6 +640,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case WEAK:
     {
 	StgWeak *w = (StgWeak *)p;
+	thread(&w->cfinalizer);
 	thread(&w->key);
 	thread(&w->value);
 	thread(&w->finalizer);
