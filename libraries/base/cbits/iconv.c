@@ -13,7 +13,9 @@ size_t hs_iconv(iconv_t cd,
 		const char* * inbuf, size_t * inbytesleft,
 		char* * outbuf, size_t * outbytesleft)
 {
-	return iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
+    // (void*) cast avoids a warning.  Some iconvs use (const
+    // char**inbuf), other use (char **inbuf).
+    return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
 }
 
 int hs_iconv_close(iconv_t cd) {
