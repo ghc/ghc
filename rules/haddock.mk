@@ -24,8 +24,11 @@ endif
 haddock: $$($$($1_PACKAGE)_HADDOCK_FILE)
 
 ifeq "$$(HADDOCK_DOCS)" "YES"
-$(call all-target,$1_$2_haddock,$$($$($1_PACKAGE)_HADDOCK_FILE))
+$(call all-target,$1_$2_haddock,html_$1)
 endif
+
+.PHONY: html_$1
+html_$1 : $$($$($1_PACKAGE)_HADDOCK_FILE)
 
 $$($1_PACKAGE)_HADDOCK_DEPS = $$(foreach n,$$($1_$2_DEP_NAMES),$$($$n_HADDOCK_FILE))
 
