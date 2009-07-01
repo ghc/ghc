@@ -91,6 +91,8 @@ test('readwrite002',
       extra_clean(['readwrite002.inout'])],
      compile_and_run, ['-cpp'])
 
+test('readwrite003', extra_clean(['readwrite003.txt']), compile_and_run, [''])
+
 test('hGetBuf001', compose(only_compiler_types(['ghc']),
 		   compose(skip_if_fast,
 		     expect_fail_if_windows)), compile_and_run, ['-package unix'])
