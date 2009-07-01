@@ -1,0 +1,6 @@
+
+T3263-1.hs:25:2:
+    Warning: A do-notation statement threw away a result of a type which appears to contain something other than (), namely Int. You can suppress this warning by explicitly binding the result to _
+
+T3263-1.hs:35:2:
+    Warning: A do-notation statement threw away a result of a type which appears to contain something other than (), namely Int. You can suppress this warning by explicitly binding the result to _

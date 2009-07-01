@@ -1,0 +1,6 @@
+
+T3263-2.hs:25:2:
+    Warning: A do-notation statement threw away a result of a type that like a monadic action waiting to execute, namely m Int. You can suppress this warning by explicitly binding the result to _
+
+T3263-2.hs:37:2:
+    Warning: A do-notation statement threw away a result of a type that like a monadic action waiting to execute, namely m Int. You can suppress this warning by explicitly binding the result to _
