@@ -465,3 +465,13 @@ void printRtsInfo(void) {
     printf(" ]\n");
 }
 
+// Provides a way for Haskell programs to tell whether they're being
+// profiled or not.  GHCi uses it (see #2197).
+int rts_isProfiled(void)
+{
+#ifdef PROFILING
+    return 1;
+#else
+    return 0;
+#endif
+}

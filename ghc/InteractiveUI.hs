@@ -39,7 +39,6 @@ import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
 import Name
 import SrcLoc
-import ObjLink
 
 -- Other random utilities
 import CmdLineParser
@@ -54,11 +53,7 @@ import NameSet
 import Maybes		( orElse, expectJust )
 import FastString
 import Encoding
-
-#if __GLASGOW_HASKELL__ < 611
 import Foreign.C
-import Encoding
-#endif
 
 #ifndef mingw32_HOST_OS
 import System.Posix hiding (getEnv)
@@ -296,14 +291,16 @@ findEditor = do
         return ""
 #endif
 
+foreign import ccall unsafe "rts_isProfiled" isProfiled :: IO CInt
+
 interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI srcs maybe_exprs = do
    -- although GHCi compiles with -prof, it is not usable: the byte-code
    -- compiler and interpreter don't work with profiling.  So we check for
    -- this up front and emit a helpful error message (#2197)
-   m <- liftIO $ lookupSymbol "PushCostCentre"
-   when (isJust m) $ 
+   i <- liftIO $ isProfiled
+   when (i /= 0) $ 
      ghcError (InstallationError "GHCi cannot be used when compiled with -prof")
 
    -- HACK! If we happen to get into an infinite loop (eg the user

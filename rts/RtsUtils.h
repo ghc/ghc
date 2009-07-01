@@ -49,4 +49,6 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 
 void printRtsInfo(void);
 
+int rts_isProfiled(void);
+
 #endif /* RTSUTILS_H */
