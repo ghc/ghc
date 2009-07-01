@@ -311,9 +311,9 @@ interactiveUI srcs maybe_exprs = do
    -- it refers to might be finalized, including the standard Handles.
    -- This sounds like a bug, but we don't have a good solution right
    -- now.
-   liftIO $ newStablePtr stdin
-   liftIO $ newStablePtr stdout
-   liftIO $ newStablePtr stderr
+   _ <- liftIO $ newStablePtr stdin
+   _ <- liftIO $ newStablePtr stdout
+   _ <- liftIO $ newStablePtr stderr
 
     -- Initialise buffering for the *interpreted* I/O system
    initInterpBuffering
@@ -620,7 +620,7 @@ runOneCommand eh getCmd = do
     -- QUESTION: is userError the one to use here?
     collectError = userError "unterminated multiline command :{ .. :}"
     doCommand (':' : cmd) = specialCommand cmd
-    doCommand stmt        = do timeIt $ lift $ runStmt stmt GHC.RunToCompletion
+    doCommand stmt        = do _ <- timeIt $ lift $ runStmt stmt GHC.RunToCompletion
                                return False
 
 enqueueCommands :: [String] -> GHCi ()
@@ -641,7 +641,7 @@ runStmt stmt step
       -- are really two stdin Handles.  So we flush any bufferred data in
       -- GHCi's stdin Handle here (only relevant if stdin is attached to
       -- a file, otherwise the read buffer can't be flushed).
-      liftIO $ IO.try $ hFlushAll stdin
+      _ <- liftIO $ IO.try $ hFlushAll stdin
 #endif
       result <- GhciMonad.runStmt stmt step
       afterRunStmt (const True) result
@@ -875,7 +875,7 @@ changeDirectory dir = do
         outputStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
   prev_context <- GHC.getContext
   GHC.setTargets []
-  GHC.load LoadAllTargets
+  _ <- GHC.load LoadAllTargets
   lift $ setContextAfterLoad prev_context False []
   GHC.workingDirectoryChanged
   dir <- expandPath dir
@@ -894,7 +894,7 @@ editFile str =
      let cmd = editor st
      when (null cmd) 
        $ ghcError (CmdLineError "editor not set, use :set editor")
-     io $ system (cmd ++ ' ':file)
+     _ <- io $ system (cmd ++ ' ':file)
      return ()
 
 -- The user didn't specify a file so we pick one for them.
@@ -989,17 +989,17 @@ loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
 
 loadModule_ :: [FilePath] -> InputT GHCi ()
-loadModule_ fs = do loadModule (zip fs (repeat Nothing)); return ()
+loadModule_ fs = loadModule (zip fs (repeat Nothing)) >> return ()
 
 loadModule' :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule' files = do
   prev_context <- GHC.getContext
 
   -- unload first
-  GHC.abandonAll
+  _ <- GHC.abandonAll
   lift discardActiveBreakPoints
   GHC.setTargets []
-  GHC.load LoadAllTargets
+  _ <- GHC.load LoadAllTargets
 
   let (filenames, phases) = unzip files
   exp_filenames <- mapM expandPath filenames
@@ -1036,7 +1036,7 @@ checkModule m = do
 reloadModule :: String -> InputT GHCi ()
 reloadModule m = do
   prev_context <- GHC.getContext
-  doLoad True prev_context $
+  _ <- doLoad True prev_context $
         if null m then LoadAllTargets 
                   else LoadUpTo (GHC.mkModuleName m)
   return ()
@@ -1454,7 +1454,7 @@ newDynFlags minus_opts = do
       when (packageFlags dflags /= pkg_flags) $ do
         io $ hPutStrLn stderr "package flags have changed, resetting and loading new packages..."
         GHC.setTargets []
-        GHC.load LoadAllTargets
+        _ <- GHC.load LoadAllTargets
         io (linkPackages dflags new_pkgs)
         -- package flags changed, we can't re-use any of the old context
         setContextAfterLoad ([],[]) False []
@@ -1798,7 +1798,7 @@ pprintCommand bind force str = do
 
 stepCmd :: String -> GHCi ()
 stepCmd []         = doContinue (const True) GHC.SingleStep
-stepCmd expression = do runStmt expression GHC.SingleStep; return ()
+stepCmd expression = runStmt expression GHC.SingleStep >> return ()
 
 stepLocalCmd :: String -> GHCi ()
 stepLocalCmd  [] = do 
@@ -1836,7 +1836,7 @@ enclosingTickSpan mod src = do
 
 traceCmd :: String -> GHCi ()
 traceCmd []         = doContinue (const True) GHC.RunAndLogSteps
-traceCmd expression = do runStmt expression GHC.RunAndLogSteps; return ()
+traceCmd expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
 continueCmd :: String -> GHCi ()
 continueCmd = noArgs $ doContinue (const True) GHC.RunToCompletion
@@ -1845,7 +1845,7 @@ continueCmd = noArgs $ doContinue (const True) GHC.RunToCompletion
 doContinue :: (SrcSpan -> Bool) -> SingleStep -> GHCi ()
 doContinue pred step = do 
   runResult <- resume pred step
-  afterRunStmt pred runResult
+  _ <- afterRunStmt pred runResult
   return ()
 
 abandonCmd :: String -> GHCi ()
@@ -2231,7 +2231,7 @@ lookupModule modName
 discardActiveBreakPoints :: GHCi ()
 discardActiveBreakPoints = do
    st <- getGHCiState
-   mapM (turnOffBreak.snd) (breaks st)
+   mapM_ (turnOffBreak.snd) (breaks st)
    setGHCiState $ st { breaks = [] }
 
 deleteBreak :: Int -> GHCi ()
@@ -2243,7 +2243,7 @@ deleteBreak identity = do
       then printForUser (text "Breakpoint" <+> ppr identity <+>
                          text "does not exist")
       else do
-           mapM (turnOffBreak.snd) this
+           mapM_ (turnOffBreak.snd) this
            setGHCiState $ st { breaks = rest }
 
 turnOffBreak :: BreakLocation -> GHCi Bool

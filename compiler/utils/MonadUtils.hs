@@ -18,7 +18,7 @@ module MonadUtils
         , concatMapM
         , mapMaybeM
         , anyM, allM
-        , foldlM, foldrM
+        , foldlM, foldlM_, foldrM
         , maybeMapM
         ) where
 
@@ -145,6 +145,10 @@ allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
 -- | Monadic version of foldl
 foldlM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
 foldlM = foldM
+
+-- | Monadic version of foldl that discards its result
+foldlM_ :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+foldlM_ = foldM_
 
 -- | Monadic version of foldr
 foldrM        :: (Monad m) => (b -> a -> m a) -> a -> [b] -> m a

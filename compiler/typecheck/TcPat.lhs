@@ -181,7 +181,7 @@ tcPatBndr :: PatState -> Name -> BoxySigmaType -> TcM TcId
 tcPatBndr (PS { pat_ctxt = LetPat lookup_sig }) bndr_name pat_ty
   | Just mono_ty <- lookup_sig bndr_name
   = do	{ mono_name <- newLocalName bndr_name
-	; boxyUnify mono_ty pat_ty
+	; _ <- boxyUnify mono_ty pat_ty
 	; return (Id.mkLocalId mono_name mono_ty) }
 
   | otherwise
@@ -238,7 +238,7 @@ unBoxArgType ty pp_this
 		return ty'
 	  else do 	-- OpenTypeKind, so constrain it
 	{ ty2 <- newFlexiTyVarTy argTypeKind
-	; unifyType ty' ty2
+	; _ <- unifyType ty' ty2
 	; return ty' }}
   where
     msg = pp_this <+> ptext (sLit "cannot be bound to an unboxed tuple")
@@ -373,7 +373,7 @@ tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
 
 	-- Check that the pattern has a lifted type
 	; pat_tv <- newBoxyTyVar liftedTypeKind
-	; boxyUnify pat_ty (mkTyVarTy pat_tv)
+	; _ <- boxyUnify pat_ty (mkTyVarTy pat_tv)
 
 	; return (LazyPat pat', [], res) }
 

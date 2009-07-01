@@ -807,7 +807,7 @@ unifyCtxts :: [TcSigInfo] -> TcM [Inst]
 -- Post-condition: the returned Insts are full zonked
 unifyCtxts [] = panic "unifyCtxts []"
 unifyCtxts (sig1 : sigs)        -- Argument is always non-empty
-  = do  { mapM unify_ctxt sigs
+  = do  { mapM_ unify_ctxt sigs
         ; theta <- zonkTcThetaType (sig_theta sig1)
         ; newDictBndrs (sig_loc sig1) theta }
   where
@@ -866,7 +866,7 @@ checkDistinctTyVars :: [TcTyVar] -> TcM [TcTyVar]
 
 checkDistinctTyVars sig_tvs
   = do  { zonked_tvs <- mapM zonkSigTyVar sig_tvs
-        ; foldlM check_dup emptyVarEnv (sig_tvs `zip` zonked_tvs)
+        ; foldlM_ check_dup emptyVarEnv (sig_tvs `zip` zonked_tvs)
         ; return zonked_tvs }
   where
     check_dup :: TyVarEnv TcTyVar -> (TcTyVar, TcTyVar) -> TcM (TyVarEnv TcTyVar)

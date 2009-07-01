@@ -149,7 +149,7 @@ writeBinIface dflags hi_path mod_iface = do
         -- The version and way descriptor go next
   put_ bh (show opt_HiVersion)
   way_descr <- getWayDescr
-  put  bh way_descr
+  put_  bh way_descr
 
         -- Remember where the symbol table pointer will go
   symtab_p_p <- tellBin bh
@@ -681,7 +681,7 @@ instance (Binary name) => Binary (IPName name) where
 
 instance Binary DmdType where
 	-- Ignore DmdEnv when spitting out the DmdType
-  put bh (DmdType _ ds dr) = do p <- put bh ds; put bh dr; return (castBin p)
+  put bh (DmdType _ ds dr) = do p <- put bh ds; put_ bh dr; return (castBin p)
   get bh = do ds <- get bh; dr <- get bh; return (DmdType emptyVarEnv ds dr)
 
 instance Binary Demand where

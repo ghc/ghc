@@ -143,6 +143,7 @@ cprAnalyse dflags binds
         let { binds_plus_cpr = do_prog binds } ;
         endPass dflags "Constructed Product analysis"
                 Opt_D_dump_cpranal binds_plus_cpr
+        return binds_plus_cpr
     }
   where
     do_prog :: [CoreBind] -> [CoreBind]

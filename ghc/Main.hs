@@ -164,7 +164,7 @@ main =
   liftIO $ showBanner cli_mode dflags2
 
   -- we've finished manipulating the DynFlags, update the session
-  GHC.setSessionDynFlags dflags2
+  _ <- GHC.setSessionDynFlags dflags2
   dflags3 <- GHC.getSessionDynFlags
   hsc_env <- GHC.getSession
 

@@ -608,8 +608,8 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
   -- and run a loop piping the output from the compiler to the log_action in DynFlags
   hSetBuffering hStdOut LineBuffering
   hSetBuffering hStdErr LineBuffering
-  forkIO (readerProc chan hStdOut filter_fn)
-  forkIO (readerProc chan hStdErr filter_fn)
+  _ <- forkIO (readerProc chan hStdOut filter_fn)
+  _ <- forkIO (readerProc chan hStdErr filter_fn)
   -- we don't want to finish until 2 streams have been completed
   -- (stdout and stderr)
   -- nor until 1 exit code has been retrieved.

@@ -1175,6 +1175,20 @@
 	    <entry><option>-fno-warn-unused-matches</option></entry>
 	  </row>
 
+	  <row>
+	    <entry><option>-fwarn-unused-do-bind</option></entry>
+	    <entry>warn about do bindings that appear to throw away values of types other than <literal>()</literal></entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-unused-do-bind</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-wrong-do-bind</option></entry>
+	    <entry>warn about do bindings that appear to throw away monadic values that you should have bound instead</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-wrong-do-bind</option></entry>
+	  </row>
+
 	  </tbody>
 	</tgroup>
       </informaltable>

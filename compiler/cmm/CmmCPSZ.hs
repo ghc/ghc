@@ -124,17 +124,17 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
        dump Opt_D_dump_cmmz "procpoint map" procPointMap
        gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap
                                        (CmmProc h l args (stackInfo, g))
-       mapM (dump Opt_D_dump_cmmz "after splitting") gs
+       mapM_ (dump Opt_D_dump_cmmz "after splitting") gs
        let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
        gs <- liftM concat $ run $ foldM lowerSafeForeignCalls [] gs
-       mapM (dump Opt_D_dump_cmmz "after lowerSafeForeignCalls") gs
+       mapM_ (dump Opt_D_dump_cmmz "after lowerSafeForeignCalls") gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
        let gs' = map (setInfoTableStackMap slotEnv areaMap) gs
-       mapM (dump Opt_D_dump_cmmz "after setInfoTableStackMap") gs'
+       mapM_ (dump Opt_D_dump_cmmz "after setInfoTableStackMap") gs'
        let gs'' = map (bundleCAFs cafEnv) gs'
-       mapM (dump Opt_D_dump_cmmz "after bundleCAFs") gs''
+       mapM_ (dump Opt_D_dump_cmmz "after bundleCAFs") gs''
        return (localCAFs, gs'')
   where dflags = hsc_dflags hsc_env
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z

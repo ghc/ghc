@@ -56,7 +56,7 @@ dispatch (txt:args0) = do
               case getOpt Permute (options plugin []) args of
                 (_,_,errs) | not (null errs)
                      -> do putStrLn "hpc failed:"
-                	   sequence [ putStr ("  " ++ err)
+                	   sequence_ [ putStr ("  " ++ err)
           		 	    | err <- errs 
           			    ]
           	           putStrLn $ "\n"

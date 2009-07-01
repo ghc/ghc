@@ -167,8 +167,7 @@ instance Monad m => DataflowAnalysis (DFM' m) where
                                     text "changed from", nest 4 (ppr old_a), text "to",
                                     nest 4 (ppr new),
                                     text "after supposedly reaching fixed point;",
-                                    text "env is", pprFacts facts]) 
-                  ; setFact id a }
+                                    text "env is", pprFacts facts]) }
          }
     where pprFacts env = vcat (map pprFact (blockEnvToList env))
           pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)

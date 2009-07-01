@@ -198,25 +198,23 @@ allocPrimStack rep
 Allocate a chunk ON TOP OF the stack.  
 
 \begin{code}
-allocStackTop :: WordOff -> FCode VirtualSpOffset
+allocStackTop :: WordOff -> FCode ()
 allocStackTop size
   = do	{ stk_usg <- getStkUsage
 	; let push_virt_sp = virtSp stk_usg + size
 	; setStkUsage (stk_usg { virtSp = push_virt_sp,
-				 hwSp   = hwSp stk_usg `max` push_virt_sp })
-	; return push_virt_sp }
+				 hwSp   = hwSp stk_usg `max` push_virt_sp }) }
 \end{code}
 
 Pop some words from the current top of stack.  This is used for
 de-allocating the return address in a case alternative.
 
 \begin{code}
-deAllocStackTop :: WordOff -> FCode VirtualSpOffset
+deAllocStackTop :: WordOff -> FCode ()
 deAllocStackTop size
   = do	{ stk_usg <- getStkUsage
 	; let pop_virt_sp = virtSp stk_usg - size
-	; setStkUsage (stk_usg { virtSp = pop_virt_sp })
-	; return pop_virt_sp }
+	; setStkUsage (stk_usg { virtSp = pop_virt_sp }) }
 \end{code}
 
 \begin{code}
@@ -231,7 +229,7 @@ A knot-tying beast.
 \begin{code}
 getFinalStackHW :: (VirtualSpOffset -> Code) -> Code
 getFinalStackHW fcode
-  = do	{ fixC (\hw_sp -> do
+  = do	{ fixC_ (\hw_sp -> do
 		{ fcode hw_sp
 		; stk_usg <- getStkUsage
 		; return (hwSp stk_usg) })

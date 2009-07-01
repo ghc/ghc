@@ -168,7 +168,7 @@ cgLetNoEscapeClosure
 
 			-- Ignore the label that comes back from
 			-- mkRetDirectTarget.  It must be conjured up elswhere
-		    ; emitReturnTarget (idName bndr) abs_c
+		    ; _ <- emitReturnTarget (idName bndr) abs_c
 		    ; return () })
 
 	; returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info) }

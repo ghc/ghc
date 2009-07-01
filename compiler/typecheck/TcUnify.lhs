@@ -1039,8 +1039,8 @@ lists, when all the elts should be of the same type.
 unifyTypeList :: [TcTauType] -> TcM ()
 unifyTypeList []                 = return ()
 unifyTypeList [_]                = return ()
-unifyTypeList (ty1:tys@(ty2:_)) = do { unifyType ty1 ty2
-                                      ; unifyTypeList tys }
+unifyTypeList (ty1:tys@(ty2:_)) = do { _ <- unifyType ty1 ty2
+                                     ; unifyTypeList tys }
 \end{code}
 
 %************************************************************************
@@ -1681,7 +1681,7 @@ zapToMonotype :: BoxySigmaType -> TcM TcTauType
 -- with that type.
 zapToMonotype res_ty
   = do  { res_tau <- newFlexiTyVarTy liftedTypeKind
-        ; boxyUnify res_tau res_ty
+        ; _ <- boxyUnify res_tau res_ty
         ; return res_tau }
 
 unBox :: BoxyType -> TcM TcType

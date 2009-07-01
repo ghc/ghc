@@ -187,7 +187,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
                             -> return ([], ms_hs_date summary)
                           -- We're in --make mode: finish the compilation pipeline.
                           _other
-                            -> do runPipeline StopLn hsc_env' (output_fn,Nothing)
+                            -> do _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
                                               (Just basename)
                                               Persistent
                                               (Just location)
@@ -264,7 +264,7 @@ compileStub hsc_env mod location = do
 	let (stub_c,_,stub_o) = mkStubPaths (hsc_dflags hsc_env) 
                                    (moduleName mod) location
 
-	runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
+	_ <- runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
 	return stub_o
@@ -1234,7 +1234,7 @@ runPhase_MoveBinary dflags input_fn dep_packages
            pvm_executable_base = "=" ++ input_fn
            pvm_executable = pvm_root ++ "/bin/" ++ pvm_arch ++ "/" ++ pvm_executable_base
         -- nuke old binary; maybe use configur'ed names for cp and rm?
-        tryIO (removeFile pvm_executable)
+        _ <- tryIO (removeFile pvm_executable)
         -- move the newly created binary into PVM land
         copy dflags "copying PVM executable" input_fn pvm_executable
         -- generate a wrapper script for running a parallel prg under PVM

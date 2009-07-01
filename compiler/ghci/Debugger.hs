@@ -171,7 +171,7 @@ showTerm term = do
                       -- with the changed error handling and logging?
            let noop_log _ _ _ _ = return ()
                expr = "show " ++ showSDoc (ppr bname)
-           GHC.setSessionDynFlags dflags{log_action=noop_log}
+           _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
            txt_ <- withExtendedLinkEnv [(bname, val)]
                                          (GHC.compileExpr expr)
            let myprec = 10 -- application precedence. TODO Infix constructors

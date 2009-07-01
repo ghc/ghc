@@ -845,7 +845,8 @@ ghc -c Foo.hs</screen>
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>,
     <option>-fwarn-missing-methods</option>,
-    <option>-fwarn-lazy-unlifted-bindings</option>, and
+    <option>-fwarn-lazy-unlifted-bindings</option>,
+    <option>-fwarn-wrong-do-bind</option>, and
     <option>-fwarn-dodgy-foreign-imports</option>.  The following
     flags are
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
@@ -877,7 +878,8 @@ ghc -c Foo.hs</screen>
             <option>-fwarn-simple-patterns</option>,
             <option>-fwarn-tabs</option>,
             <option>-fwarn-incomplete-record-updates</option>,
-            <option>-fwarn-monomorphism-restriction</option>, and
+            <option>-fwarn-monomorphism-restriction</option>,
+            <option>-fwarn-unused-do-bind</option>, and
             <option>-fwarn-implicit-prelude</option>.</para>
 	</listitem>
       </varlistentry>
@@ -1360,6 +1362,56 @@ f "2"    = 2
           warning is suppressed if the variable name begins with an underscore, thus:
 	    <programlisting>
 	       f _x = True
+	    </programlisting>
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-unused-do-bind</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-unused-do-bind</option></primary></indexterm>
+	  <indexterm><primary>unused do binding, warning</primary></indexterm>
+	  <indexterm><primary>do binding, unused</primary></indexterm>
+
+	  <para>Report expressions occuring in <literal>do</literal> and <literal>mdo</literal> blocks
+	  that appear to silently throw information away.
+          For instance <literal>do { mapM popInt xs ; return 10 }</literal> would report
+          the first statement in the <literal>do</literal> block as suspicious,
+          as it has the type <literal>StackM [Int]</literal> and not <literal>StackM ()</literal>, but that
+          <literal>[Int]</literal> value is not bound to anything.  The warning is suppressed by
+          explicitly mentioning in the source code that your program is throwing something away:
+	    <programlisting>
+	       do { _ &lt;- mapM popInt xs ; return 10 }
+	    </programlisting>
+	  Of course, in this particular situation you can do even better:
+	    <programlisting>
+	       do { mapM_ popInt xs ; return 10 }
+	    </programlisting>
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-wrong-do-bind</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-wrong-do-bind</option></primary></indexterm>
+	  <indexterm><primary>apparently erroneous do binding, warning</primary></indexterm>
+	  <indexterm><primary>do binding, apparently erroneous</primary></indexterm>
+
+	  <para>Report expressions occuring in <literal>do</literal> and <literal>mdo</literal> blocks
+	  that appear to lack a binding.
+          For instance <literal>do { return (popInt 10) ; return 10 }</literal> would report
+          the first statement in the <literal>do</literal> block as suspicious,
+          as it has the type <literal>StackM (StackM Int)</literal> (which consists of two nested applications
+          of the same monad constructor), but which is not then &quot;unpacked&quot; by binding the result.
+          The warning is suppressed by explicitly mentioning in the source code that your program is throwing something away:
+	    <programlisting>
+	       do { _ &lt;- return (popInt 10) ; return 10 }
+	    </programlisting>
+	  For almost all sensible programs this will indicate a bug, and you probably intended to write:
+	    <programlisting>
+	       do { popInt 10 ; return 10 }
 	    </programlisting>
           </para>
 	</listitem>

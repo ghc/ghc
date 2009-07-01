@@ -113,7 +113,7 @@ cgTopBinding dflags (StgRec pairs, _srts)
   = do	{ let (bndrs, rhss) = unzip pairs
 	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
 	; let pairs' = zip bndrs' rhss
-	; fixC (\ new_binds -> do 
+	; fixC_(\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
 	; return () }
@@ -334,7 +334,7 @@ cgDataCon data_con
 
 	    mk_code ticky_code
 	      = 	-- NB: We don't set CC when entering data (WDP 94/06)
- 	        do { ticky_code
+ 	        do { _ <- ticky_code
 		   ; ldvEnter (CmmReg nodeReg)
 		   ; tickyReturnOldCon (length arg_things)
 		   ; emitReturn [cmmOffsetB (CmmReg nodeReg)

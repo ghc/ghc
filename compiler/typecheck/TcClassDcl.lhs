@@ -452,7 +452,7 @@ get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
 			      group `lengthExceeds` 1]
 	get_uniq (tc,_) = getUnique tc
 
-    mapM (addErrTc . dupGenericInsts) bad_groups
+    mapM_ (addErrTc . dupGenericInsts) bad_groups
 
 	-- Check that there is an InstInfo for each generic type constructor
     let

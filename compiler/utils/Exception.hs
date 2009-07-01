@@ -62,13 +62,13 @@ class Monad m => ExceptionMonad m where
     gblock (do
       a <- before
       r <- gunblock (thing a) `gonException` after a
-      after a
+      _ <- after a
       return r)
 
   a `gfinally` sequel =
     gblock (do
       r <- gunblock a `gonException` sequel
-      sequel
+      _ <- sequel
       return r)
 
 instance ExceptionMonad IO where
@@ -89,6 +89,6 @@ ghandle = flip gcatch
 -- second argument is executed and the exception is raised again.
 gonException :: (ExceptionMonad m) => m a -> m b -> m a
 gonException ioA cleanup = ioA `gcatch` \e ->
-                             do cleanup
+                             do _ <- cleanup
                                 throw (e :: SomeException)
 

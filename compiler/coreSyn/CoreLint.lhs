@@ -56,17 +56,17 @@ place for them.  They print out stuff before and after core passes,
 and do Core Lint when necessary.
 
 \begin{code}
-endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
 endPass = dumpAndLint dumpIfSet_core
 
-endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
 endPassIf cond = dumpAndLint (dumpIf_core cond)
 
-endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
 endIteration = dumpAndLint dumpIfSet_dyn
 
 dumpAndLint :: (DynFlags -> DynFlag -> String -> SDoc -> IO ())
-            -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+            -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
 dumpAndLint dump dflags pass_name dump_flag binds
   = do 
 	-- Report result size if required
@@ -79,8 +79,6 @@ dumpAndLint dump dflags pass_name dump_flag binds
 
 	-- Type check
 	lintCoreBindings dflags pass_name binds
-
-	return binds
 \end{code}
 
 
@@ -303,7 +301,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
 
 lintCoreExpr (Let (Rec pairs) body) 
   = lintAndScopeIds bndrs	$ \_ ->
-    do	{ mapM (lintSingleBinding NotTopLevel Recursive) pairs	
+    do	{ mapM_ (lintSingleBinding NotTopLevel Recursive) pairs	
 	; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
   where
     bndrs = map fst pairs
@@ -353,7 +351,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
                    else lintAndScopeId var
      ; scope $ \_ ->
        do { -- Check the alternatives
-            mapM (lintCoreAlt scrut_ty alt_ty) alts
+            mapM_ (lintCoreAlt scrut_ty alt_ty) alts
           ; checkCaseAlts e scrut_ty alts
           ; return alt_ty } }
   where
@@ -552,7 +550,7 @@ lintBinder var linterF
   | isTyVar var = lint_ty_bndr
   | otherwise   = lintIdBndr var linterF
   where
-    lint_ty_bndr = do { lintTy (tyVarKind var)
+    lint_ty_bndr = do { _ <- lintTy (tyVarKind var)
 		      ; subst <- getTvSubst
 		      ; let (subst', tv') = substTyVarBndr subst var
 		      ; updateTvSubst subst' (linterF tv') }
@@ -719,7 +717,7 @@ lookupIdInScope id
   = do	{ subst <- getTvSubst
 	; case lookupInScope (getTvInScope subst) id of
 		Just v  -> return v
-		Nothing -> do { addErrL out_of_scope
+		Nothing -> do { _ <- addErrL out_of_scope
 			      ; return id } }
   where
     out_of_scope = ppr id <+> ptext (sLit "is out of scope")

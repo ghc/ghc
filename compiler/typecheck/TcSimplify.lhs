@@ -1637,7 +1637,7 @@ this bracket again at its usage site.
 \begin{code}
 tcSimplifyBracket :: [Inst] -> TcM ()
 tcSimplifyBracket wanteds
-  = do	{ tryHardCheckLoop doc wanteds
+  = do	{ _ <- tryHardCheckLoop doc wanteds
 	; return () }
   where
     doc = text "tcSimplifyBracket"
@@ -2906,7 +2906,7 @@ disambigGroup default_tys dicts
   = do { mb_chosen_ty <- try_default default_tys
        ; case mb_chosen_ty of
             Nothing        -> return ()
-            Just chosen_ty -> do { unifyType chosen_ty (mkTyVarTy tyvar) 
+            Just chosen_ty -> do { _ <- unifyType chosen_ty (mkTyVarTy tyvar) 
 	    	 	         ; warnDefault dicts chosen_ty } }
   where
     (_,_,tyvar) = ASSERT(not (null dicts)) head dicts	-- Should be non-empty

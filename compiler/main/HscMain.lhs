@@ -773,7 +773,7 @@ hscCmmFile hsc_env filename = do
              parseCmmFile dflags filename
     cmms <- liftIO $ optionallyConvertAndOrCPS hsc_env [cmm]
     rawCmms <- liftIO $ cmmToRawCmm cmms
-    liftIO $ codeOutput dflags no_mod no_loc NoStubs [] rawCmms
+    _ <- liftIO $ codeOutput dflags no_mod no_loc NoStubs [] rawCmms
     return ()
   where
 	no_mod = panic "hscCmmFile: no_mod"

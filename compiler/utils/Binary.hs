@@ -146,11 +146,11 @@ class Binary a where
     -- define one of put_, put.  Use of put_ is recommended because it
     -- is more likely that tail-calls can kick in, and we rarely need the
     -- position return value.
-    put_ bh a = do put bh a; return ()
+    put_ bh a = do _ <- put bh a; return ()
     put bh a  = do p <- tellBin bh; put_ bh a; return p
 
 putAt  :: Binary a => BinHandle -> Bin a -> a -> IO ()
-putAt bh p x = do seekBin bh p; put bh x; return ()
+putAt bh p x = do seekBin bh p; put_ bh x; return ()
 
 getAt  :: Binary a => BinHandle -> Bin a -> IO a
 getAt bh p = do seekBin bh p; get bh

@@ -13,7 +13,7 @@ module CgMonad (
 	FCode,	-- type
 
 	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
-	returnFC, fixC, checkedAbsC, 
+	returnFC, fixC, fixC_, checkedAbsC, 
 	stmtC, stmtsC, labelC, emitStmts, nopC, whenC, newLabelC,
 	newUnique, newUniqSupply, 
 
@@ -443,6 +443,9 @@ fixC fcode = FCode (
 		in
 			result
 	)
+
+fixC_ :: (a -> FCode a) -> FCode ()
+fixC_ fcode = fixC fcode >> return ()
 \end{code}
 
 %************************************************************************

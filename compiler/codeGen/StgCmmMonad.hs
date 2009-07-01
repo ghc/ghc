@@ -10,7 +10,7 @@ module StgCmmMonad (
 	FCode,	-- type
 
 	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
-	returnFC, fixC, nopC, whenC, 
+	returnFC, fixC, fixC_, nopC, whenC, 
 	newUnique, newUniqSupply, 
 
 	emit, emitData, emitProc, emitProcWithConvention, emitSimpleProc,
@@ -149,6 +149,8 @@ fixC fcode = FCode (
 			result
 	)
 
+fixC_ :: (a -> FCode a) -> FCode ()
+fixC_ fcode = fixC fcode >> return ()
 
 --------------------------------------------------------
 --	The code generator environment

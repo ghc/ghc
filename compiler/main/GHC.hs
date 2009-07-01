@@ -784,7 +784,7 @@ load2 how_much mod_graph = do
 				(flattenSCCs mg2_with_srcimps)
 				stable_mods
 
-	liftIO $ evaluate pruned_hpt
+	_ <- liftIO $ evaluate pruned_hpt
 
         -- before we unload anything, make sure we don't leave an old
         -- interactive context around pointing to dead bindings.  Also,
@@ -1208,7 +1208,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
   (iface, changed, _details, cgguts)
       <- hscNormalIface guts Nothing
   hscWriteIface iface changed modSummary
-  hscGenHardCode cgguts modSummary
+  _ <- hscGenHardCode cgguts modSummary
   return ()
 
 -- Makes a "vanilla" ModGuts.
@@ -1242,7 +1242,7 @@ compileCore simplify fn = do
    -- First, set the target to the desired filename
    target <- guessTarget fn Nothing
    addTarget target
-   load LoadAllTargets
+   _ <- load LoadAllTargets
    -- Then find dependencies
    modGraph <- depanal [] True
    case find ((== fn) . msHsFilePath) modGraph of

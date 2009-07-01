@@ -73,7 +73,7 @@ doMkDependHS srcs = do
     -- and complaining about cycles
     hsc_env <- getSession
     root <- liftIO getCurrentDirectory
-    mapM (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
+    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
     liftIO $ dumpModCycles dflags mod_summaries

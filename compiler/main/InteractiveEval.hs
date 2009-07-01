@@ -308,7 +308,7 @@ traceRunStatus expr bindings final_ids
              let history' = mkHistory hsc_env apStack info `consBL` history
                 -- probably better make history strict here, otherwise
                 -- our BoundedList will be pointless.
-             liftIO $ evaluate history'
+             _ <- liftIO $ evaluate history'
              status <-
                  withBreakAction True (hsc_dflags hsc_env)
                                       breakMVar statusMVar $ do

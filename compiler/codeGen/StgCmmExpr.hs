@@ -296,7 +296,7 @@ cgCase scrut bndr srt alt_type alts
 	; restoreCurrentCostCentre mb_cc
 
   -- JD: We need Note: [Better Alt Heap Checks]
-	; bindArgsToRegs ret_bndrs
+	; _ <- bindArgsToRegs ret_bndrs
 	; cgAlts gc_plan (NonVoid bndr) alt_type alts }
 
 -----------------
@@ -408,7 +408,7 @@ cgAltRhss gc_plan bndr alts
     cg_alt (con, bndrs, _uses, rhs)
       = getCodeR		  $
 	maybeAltHeapCheck gc_plan $
-	do { bindConArgs con base_reg bndrs
+	do { _ <- bindConArgs con base_reg bndrs
 	   ; cgExpr rhs
 	   ; return con }
 

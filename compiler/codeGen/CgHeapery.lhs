@@ -78,7 +78,7 @@ initHeapUsage :: (VirtualHpOffset -> Code) -> Code
 initHeapUsage fcode
   = do	{ orig_hp_usage <- getHpUsage
 	; setHpUsage initHpUsage
-	; fixC (\heap_usage2 -> do
+	; fixC_(\heap_usage2 -> do
 		{ fcode (heapHWM heap_usage2)
 		; getHpUsage })
 	; setHpUsage orig_hp_usage }

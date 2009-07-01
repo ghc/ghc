@@ -61,6 +61,8 @@ import Util
 import Bag
 import Outputable
 import FastString
+
+import Control.Monad
 \end{code}
 
 
@@ -662,23 +664,27 @@ dsDo	:: [LStmt Id]
 	-> DsM CoreExpr
 
 dsDo stmts body _result_ty
-  = go (map unLoc stmts)
+  = goL stmts
   where
-    go [] = dsLExpr body
-    
-    go (ExprStmt rhs then_expr _ : stmts)
+    goL [] = dsLExpr body
+    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go stmt lstmts)
+  
+    go (ExprStmt rhs then_expr _) stmts
       = do { rhs2 <- dsLExpr rhs
-	   ; then_expr2 <- dsExpr then_expr
-	   ; rest <- go stmts
+           ; case tcSplitAppTy_maybe (exprType rhs2) of
+                Just (container_ty, returning_ty) -> warnDiscardedDoBindings container_ty returning_ty
+                _                                 -> return ()
+           ; then_expr2 <- dsExpr then_expr
+	   ; rest <- goL stmts
 	   ; return (mkApps then_expr2 [rhs2, rest]) }
     
-    go (LetStmt binds : stmts)
-      = do { rest <- go stmts
+    go (LetStmt binds) stmts
+      = do { rest <- goL stmts
 	   ; dsLocalBinds binds rest }
 
-    go (BindStmt pat rhs bind_op fail_op : stmts)
+    go (BindStmt pat rhs bind_op fail_op) stmts
       = 
-       do  { body     <- go stmts
+       do  { body     <- goL stmts
            ; rhs'     <- dsLExpr rhs
 	   ; bind_op' <- dsExpr bind_op
 	   ; var   <- selectSimpleMatchVarL pat
@@ -719,8 +725,11 @@ dsMDo	:: PostTcTable
 	-> DsM CoreExpr
 
 dsMDo tbl stmts body result_ty
-  = go (map unLoc stmts)
+  = goL stmts
   where
+    goL [] = dsLExpr body
+    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
+  
     (m_ty, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
     mfix_id   = lookupEvidence tbl mfixName
     return_id = lookupEvidence tbl returnMName
@@ -729,19 +738,18 @@ dsMDo tbl stmts body result_ty
     fail_id   = lookupEvidence tbl failMName
     ctxt      = MDoExpr tbl
 
-    go [] = dsLExpr body
-    
-    go (LetStmt binds : stmts)
-      = do { rest <- go stmts
+    go _ (LetStmt binds) stmts
+      = do { rest <- goL stmts
 	   ; dsLocalBinds binds rest }
 
-    go (ExprStmt rhs _ rhs_ty : stmts)
+    go _ (ExprStmt rhs _ rhs_ty) stmts
       = do { rhs2 <- dsLExpr rhs
-	   ; rest <- go stmts
+	   ; warnDiscardedDoBindings m_ty rhs_ty
+           ; rest <- goL stmts
 	   ; return (mkApps (Var then_id) [Type rhs_ty, Type b_ty, rhs2, rest]) }
     
-    go (BindStmt pat rhs _ _ : stmts)
-      = do { body  <- go stmts
+    go _ (BindStmt pat rhs _ _) stmts
+      = do { body  <- goL stmts
 	   ; var   <- selectSimpleMatchVarL pat
 	   ; match <- matchSinglePat (Var var) (StmtCtxt ctxt) pat
     				  result_ty (cantFailMatchResult body)
@@ -753,13 +761,13 @@ dsMDo tbl stmts body result_ty
 	   ; return (mkApps (Var bind_id) [Type (hsLPatType pat), Type b_ty, 
 					     rhs', Lam var match_code]) }
     
-    go (RecStmt rec_stmts later_ids rec_ids rec_rets binds : stmts)
+    go loc (RecStmt rec_stmts later_ids rec_ids rec_rets binds) stmts
       = ASSERT( length rec_ids > 0 )
         ASSERT( length rec_ids == length rec_rets )
-	go (new_bind_stmt : let_stmt : stmts)
+	goL (new_bind_stmt : let_stmt : stmts)
       where
-        new_bind_stmt = mkBindStmt (mk_tup_pat later_pats) mfix_app
-	let_stmt = LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)] []))
+        new_bind_stmt = L loc $ mkBindStmt (mk_tup_pat later_pats) mfix_app
+	let_stmt = L loc $ LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)] []))
 
 	
 		-- Remove the later_ids that appear (without fancy coercions) 
@@ -802,4 +810,38 @@ dsMDo tbl stmts body result_ty
 	mk_ret_tup :: [LHsExpr Id] -> LHsExpr Id
 	mk_ret_tup [r] = r
 	mk_ret_tup rs  = noLoc $ ExplicitTuple rs Boxed
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Errors and contexts}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- Warn about certain types of values discarded in monadic bindings (#3263)
+warnDiscardedDoBindings :: Type -> Type -> DsM ()
+warnDiscardedDoBindings container_ty returning_ty = do
+        -- Warn about discarding non-() things in 'monadic' binding
+        warn_unused <- doptDs Opt_WarnUnusedDoBind
+        when (warn_unused && not (returning_ty `tcEqType` unitTy)) $
+              warnDs (unusedMonadBind returning_ty)
+        
+        -- Warn about discarding m a things in 'monadic' binding of the same type
+        warn_wrong <- doptDs Opt_WarnWrongDoBind
+        case tcSplitAppTy_maybe returning_ty of
+                Just (returning_container_ty, _) -> when (warn_wrong && container_ty `tcEqType` returning_container_ty) $
+                                                          warnDs (wrongMonadBind returning_ty)
+                _ -> return ()
+
+unusedMonadBind :: Type -> SDoc
+unusedMonadBind returning_ty
+  = ptext (sLit "A do-notation statement threw away a result of a type which appears to contain something other than (), namely") <+> ppr returning_ty <>
+    ptext (sLit ". You can suppress this warning by explicitly binding the result to _")
+
+wrongMonadBind :: Type -> SDoc
+wrongMonadBind returning_ty
+  = ptext (sLit "A do-notation statement threw away a result of a type that like a monadic action waiting to execute, namely") <+> ppr returning_ty <>
+    ptext (sLit ". You can suppress this warning by explicitly binding the result to _")
 \end{code}

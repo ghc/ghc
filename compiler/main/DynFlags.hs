@@ -1,4 +1,3 @@
-
 -- |
 -- Dynamic flags
 --
@@ -192,6 +191,9 @@ data DynFlag
    | Opt_WarnUnrecognisedPragmas
    | Opt_WarnDodgyForeignImports
    | Opt_WarnLazyUnliftedBindings
+   | Opt_WarnUnusedDoBind
+   | Opt_WarnWrongDoBind
+
 
    -- language opts
    | Opt_OverlappingInstances
@@ -909,7 +911,8 @@ standardWarnings
         Opt_WarnMissingMethods,
         Opt_WarnDuplicateExports,
         Opt_WarnLazyUnliftedBindings,
-        Opt_WarnDodgyForeignImports
+        Opt_WarnDodgyForeignImports,
+        Opt_WarnWrongDoBind
       ]
 
 minusWOpts :: [DynFlag]
@@ -929,7 +932,8 @@ minusWallOpts
         Opt_WarnNameShadowing,
         Opt_WarnMissingSigs,
         Opt_WarnHiShadows,
-        Opt_WarnOrphans
+        Opt_WarnOrphans,
+        Opt_WarnUnusedDoBind
       ]
 
 -- minuswRemovesOpts should be every warning option
@@ -1664,6 +1668,8 @@ fFlags = [
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, const Supported ),
   ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings,
     const $ Deprecated "lazy unlifted bindings will be an error in GHC 6.14, and this flag will no longer exist"),
+  ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, const Supported ),
+  ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, const Supported ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, const Supported ),
   ( "strictness",                       Opt_Strictness, const Supported ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, const Supported ),

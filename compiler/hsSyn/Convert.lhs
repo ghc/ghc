@@ -83,8 +83,8 @@ instance Monad CvtM where
 initCvt :: SrcSpan -> CvtM a -> Either Message a
 initCvt loc (CvtM m) = m loc
 
-force :: a -> CvtM a
-force a = a `seq` return a
+force :: a -> CvtM ()
+force a = a `seq` return ()
 
 failWith :: Message -> CvtM a
 failWith m = CvtM (\_ -> Left full_msg)
@@ -817,9 +817,10 @@ tconName n = cvtName OccName.tcClsName n
 cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtName ctxt_ns (TH.Name occ flavour)
   | not (okOcc ctxt_ns occ_str) = failWith (badOcc ctxt_ns occ_str)
-  | otherwise 		        = force (thRdrName ctxt_ns occ_str flavour)
+  | otherwise 		        = force rdr_name >> return rdr_name
   where
     occ_str = TH.occString occ
+    rdr_name = thRdrName ctxt_ns occ_str flavour
 
 okOcc :: OccName.NameSpace -> String -> Bool
 okOcc _  []      = False

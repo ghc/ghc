@@ -569,7 +569,7 @@ rnBracket :: HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
 rnBracket (VarBr n) = do { name <- lookupOccRn n
 			 ; this_mod <- getModule
 			 ; checkM (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
-			   do { loadInterfaceForName msg name		-- home interface is loaded, and this is the
+			   do { _ <- loadInterfaceForName msg name	-- home interface is loaded, and this is the
 			      ; return () }				-- only way that is going to happen
 			 ; return (VarBr name, unitFV name) }
 		    where
@@ -794,7 +794,7 @@ rnParallelStmts ctxt segs thing_inside = do
             let (bndrs', dups) = removeDups cmpByOcc bndrs
                 inner_env = extendLocalRdrEnv orig_lcl_env bndrs'
             
-            mapM dupErr dups
+            mapM_ dupErr dups
             (thing, fvs) <- setLocalRdrEnv inner_env thing_inside
             return (([], thing), fvs)
 

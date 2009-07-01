@@ -360,7 +360,7 @@ parseGlobPackageId =
   parse
      +++
   (do n <- parse
-      string "-*"
+      _ <- string "-*"
       return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
 
 -- globVersion means "all versions"
@@ -506,7 +506,7 @@ readParseDatabase mb_user_conf filename
   | otherwise
   = do str <- readFile filename
        let packages = map convertPackageInfoIn $ read str
-       Exception.evaluate packages
+       _ <- Exception.evaluate packages
          `catchError` \e->
             die ("error while parsing " ++ filename ++ ": " ++ show e)
        return (filename,packages)
@@ -813,7 +813,7 @@ checkConsistency my_flags = do
             else do
               when (not simple_output) $ do
                   reportError ("There are problems in package " ++ display (package p) ++ ":")
-                  reportValidateErrors es "  " Nothing
+                  _ <- reportValidateErrors es "  " Nothing
                   return ()
               return [p]
 
@@ -1247,8 +1247,8 @@ installSignalHandlers = do
                                     (Exception.ErrorCall "interrupted")
   --
 #if !defined(mingw32_HOST_OS)
-  installHandler sigQUIT (Catch interrupt) Nothing
-  installHandler sigINT  (Catch interrupt) Nothing
+  _ <- installHandler sigQUIT (Catch interrupt) Nothing
+  _ <- installHandler sigINT  (Catch interrupt) Nothing
   return ()
 #elif __GLASGOW_HASKELL__ >= 603
   -- GHC 6.3+ has support for console events on Windows

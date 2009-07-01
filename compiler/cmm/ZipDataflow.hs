@@ -505,7 +505,7 @@ forward_sol check_maybe = forw
   forw rewrite name start_facts transfers rewrites =
    let anal_f :: DFM a b -> a -> Graph m l -> DFM a b
        anal_f finish in' g =
-           do { fwd_pure_anal name emptyBlockEnv transfers in' g; finish }
+           do { _ <- fwd_pure_anal name emptyBlockEnv transfers in' g; finish }
 
        solve :: DFM a b -> a -> Graph m l -> Fuel -> DFM a (b, Fuel)
        solve finish in_fact (Graph entry blockenv) fuel =
@@ -609,7 +609,7 @@ forward_rew check_maybe = forw
            in_fact `seq` g `seq`
             let Graph entry blockenv = g
                 blocks = G.postorder_dfs_from blockenv entry
-            in do { solve depth name start transfers rewrites in_fact g fuel
+            in do { _ <- solve depth name start transfers rewrites in_fact g fuel
                   ; eid <- freshBlockId "temporary entry id"
                   ; (rewritten, fuel) <-
                       rew_tail (ZFirst eid) in_fact entry emptyBlockEnv fuel
@@ -618,7 +618,7 @@ forward_rew check_maybe = forw
                   ; return (a, lgraphToGraph (LGraph eid rewritten), fuel)
                   }
           don't_rewrite facts finish in_fact g fuel =
-              do  { solve depth name facts transfers rewrites in_fact g fuel
+              do  { _ <- solve depth name facts transfers rewrites in_fact g fuel
                   ; a <- finish
                   ; return (a, g, fuel)
                   }
@@ -684,8 +684,8 @@ forward_rew check_maybe = forw
           either_last rewrites in' (LastOther l) = fr_last rewrites l in'
           check_facts in' (LastOther l) =
             let LastOutFacts last_outs = ft_last_outs transfers l in'
-            in mapM (uncurry checkFactMatch) last_outs
-          check_facts _ LastExit = return []
+            in mapM_ (uncurry checkFactMatch) last_outs
+          check_facts _ LastExit = return ()
       in  fixed_pt_and_fuel
 
 lastOutFacts :: DFM f (LastOutFacts f)
@@ -781,7 +781,7 @@ backward_sol check_maybe = back
                                      my_trace "analysis rewrites last node"
                                       (ppr l <+> pprGraph g') $
                                       subsolve g exit_fact fuel
-                    ; set_head_fact h a fuel
+                    ; _ <- set_head_fact h a fuel
                     ; return fuel }
 
          in do { fuel <- run "backward" name set_block_fact blocks fuel

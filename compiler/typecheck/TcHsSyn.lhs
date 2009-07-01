@@ -1071,7 +1071,7 @@ mkArbitraryType warn tv
   , isLiftedTypeKind res			--    Horrible hack to make less use 
   = return (mkTyConApp tup_tc [])		--    of mkAnyPrimTyCon
   | otherwise
-  = do	{ warn (getSrcSpan tv) msg
+  = do	{ _ <- warn (getSrcSpan tv) msg
 	; return (mkTyConApp (mkAnyPrimTyCon (getUnique tv) kind) []) }
 		-- Same name as the tyvar, apart from making it start with a colon (sigh)
 		-- I dread to think what will happen if this gets out into an 

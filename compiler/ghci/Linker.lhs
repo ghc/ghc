@@ -744,7 +744,7 @@ dynLinkObjs dflags objs
 	    pls1 		     = pls { objs_loaded = objs_loaded' }
 	    unlinkeds 		     = concatMap linkableUnlinked new_objs
 
-	mapM loadObj (map nameOfObject unlinkeds)
+	mapM_ loadObj (map nameOfObject unlinkeds)
 
 	-- Link the all together
 	ok <- resolveObjs

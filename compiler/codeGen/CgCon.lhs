@@ -439,7 +439,7 @@ cgDataCon data_con
 		= do { code_blks <- getCgStmts the_code
 		     ; emitClosureCodeAndInfoTable cl_info [] code_blks }
 		where
-		  the_code = do	{ ticky_code
+		  the_code = do	{ _ <- ticky_code
 				; ldvEnter (CmmReg nodeReg)
 				; body_code }
 

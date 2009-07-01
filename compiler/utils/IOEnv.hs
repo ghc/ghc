@@ -66,7 +66,7 @@ thenM (IOEnv m) f = IOEnv (\ env -> do { r <- m env ;
                                          unIOEnv (f r) env })
 
 thenM_ :: IOEnv env a -> IOEnv env b -> IOEnv env b
-thenM_ (IOEnv m) f = IOEnv (\ env -> do { m env ; unIOEnv f env })
+thenM_ (IOEnv m) f = IOEnv (\ env -> do { _ <- m env ; unIOEnv f env })
 
 failM :: IOEnv env a
 failM = IOEnv (\ _ -> throwIO IOEnvFailure)

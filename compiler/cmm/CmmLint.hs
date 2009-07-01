@@ -69,7 +69,7 @@ lintCmmBlock labels (BasicBlock id stmts)
 
 lintCmmExpr :: CmmExpr -> CmmLint CmmType
 lintCmmExpr (CmmLoad expr rep) = do
-  lintCmmExpr expr
+  _ <- lintCmmExpr expr
   when (widthInBytes (typeWidth rep) >= wORD_SIZE) $
      cmmCheckWordAddress expr
   return rep
@@ -126,8 +126,8 @@ lintCmmStmt labels = lint
                 then return ()
                 else cmmLintAssignErr stmt erep reg_ty
           lint (CmmStore l r) = do
-            lintCmmExpr l
-            lintCmmExpr r
+            _ <- lintCmmExpr l
+            _ <- lintCmmExpr r
             return ()
           lint (CmmCall target _res args _ _) =
               lintTarget target >> mapM_ (lintCmmExpr . hintlessCmm) args

@@ -262,7 +262,7 @@ setLogAction :: InputT GHCi ()
 setLogAction = do
     encoder <- getEncoder
     dflags <- GHC.getSessionDynFlags
-    GHC.setSessionDynFlags dflags {log_action = logAction encoder}
+    _ <- GHC.setSessionDynFlags dflags {log_action = logAction encoder}
     return ()
   where
     logAction encoder severity srcSpan style msg = case severity of
@@ -369,9 +369,8 @@ initInterpBuffering = do -- make sure these are linked
 
       let f ref (Just ptr) = writeIORef ref ptr
           f _   Nothing    = panic "interactiveUI:setBuffering2"
-      zipWithM f [stdin_ptr,stdout_ptr,stderr_ptr]
-                 [mb_stdin_ptr,mb_stdout_ptr,mb_stderr_ptr]
-      return ()
+      zipWithM_ f [stdin_ptr,stdout_ptr,stderr_ptr]
+                  [mb_stdin_ptr,mb_stdout_ptr,mb_stderr_ptr]
 
 flushInterpBuffers :: GHCi ()
 flushInterpBuffers

@@ -233,7 +233,7 @@ tcBracket brack res_ty
        ; tcSimplifyBracket lie
 
 	-- Make the expected type have the right shape
-       ; boxyUnify meta_ty res_ty
+       ; _ <- boxyUnify meta_ty res_ty
 
 	-- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
@@ -257,17 +257,17 @@ tc_bracket use_lvl (VarBr name) 	-- Note [Quoting names]
 
 tc_bracket _ (ExpBr expr) 
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
-	; tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
+	; _ <- tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
 	; tcMetaTy expQTyConName }
 	-- Result type is Expr (= Q Exp)
 
 tc_bracket _ (TypBr typ) 
-  = do	{ tcHsSigTypeNC ThBrackCtxt typ
+  = do	{ _ <- tcHsSigTypeNC ThBrackCtxt typ
 	; tcMetaTy typeQTyConName }
 	-- Result type is Type (= Q Typ)
 
 tc_bracket _ (DecBr decls)
-  = do	{  tcTopSrcDecls emptyModDetails decls
+  = do	{ _ <- tcTopSrcDecls emptyModDetails decls
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
 
@@ -312,7 +312,7 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-      unBox res_ty
+      _ <- unBox res_ty
       meta_exp_ty <- tcMetaTy expQTyConName
       expr' <- setStage (Splice next_level) (
                  setLIEVar lie_var    $

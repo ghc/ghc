@@ -131,7 +131,7 @@ loadInterfaceForName doc name
 loadWiredInHomeIface :: Name -> IfM lcl ()
 loadWiredInHomeIface name
   = ASSERT( isWiredInName name )
-    do loadSysInterface doc (nameModule name); return ()
+    do _ <- loadSysInterface doc (nameModule name); return ()
   where
     doc = ptext (sLit "Need home interface for wired-in thing") <+> ppr name
 

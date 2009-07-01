@@ -856,7 +856,7 @@ improveRTTIType hsc_env _ty rtti_ty = runTR_maybe hsc_env $ do
     (ty_tvs,  _, _)   <- tcInstType return ty
     (ty_tvs', _, ty') <- tcInstType (mapM tcInstTyVar) ty
     (_, _, rtti_ty')  <- tcInstType (mapM tcInstTyVar) (sigmaType rtti_ty)
-    getLIE(boxyUnify rtti_ty' ty')
+    _ <- getLIE(boxyUnify rtti_ty' ty')
     tvs1_contents     <- zonkTcTyVars ty_tvs'
     let subst = (uncurry zipTopTvSubst . unzip)
                  [(tv,ty) | (tv,ty) <- zip ty_tvs tvs1_contents
@@ -1096,7 +1096,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                         text " in presence of newtype evidence " <> ppr new_tycon)
                vars <- mapM (newVar . tyVarKind) (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon vars
-               liftTcM (boxyUnify ty (repType ty'))
+               _ <- liftTcM (boxyUnify ty (repType ty'))
         -- assumes that reptype doesn't ^^^^ touch tyconApp args 
                return ty'
 
