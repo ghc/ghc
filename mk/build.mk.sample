@@ -16,6 +16,9 @@
 # Fast build with optimised libraries:
 #BuildFlavour = quick
 
+# Profile the stage2 compiler:
+#BuildFlavour = prof
+
 # A development build, working on the stage 1 compiler:
 #BuildFlavour = devel1
 
@@ -70,6 +73,27 @@ BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 
 endif
+
+# -------- Profile the stage2 compiler ---------------------------------------
+
+ifeq "$(BuildFlavour)" "prof"
+
+SRC_HC_OPTS        = -H64m -O0 -fasm
+GhcStage1HcOpts    = -O -fasm
+GhcStage2HcOpts    = -O -fasm
+GhcLibHcOpts       = -O -fasm
+
+GhcLibWays         += p
+GhcProfiled        = YES
+
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+endif
+
 
 # -------- A Development build (stage 1) -------------------------------------
 

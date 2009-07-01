@@ -33,8 +33,9 @@ ghc_stage2_HC_OPTS += -threaded
 ghc_stage3_HC_OPTS += -threaded
 endif
 
-# XXX ToDp
-# ifeq "$(GhcProfiled)" "YES"
+ifeq "$(GhcProfiled)" "YES"
+ghc_stage2_HC_OPTS += -prof
+endif
 
 ghc_stage1_MODULES = Main
 
