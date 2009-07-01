@@ -39,7 +39,6 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$(BINDIST)" "YES"
 $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$(UNLIT)
 	"$$(MKDIRHIER)" $1/$2
-	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(UNLIT)" $$(UNLIT_OPTS) $$< $$@
 
 $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
@@ -51,7 +50,6 @@ $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
 
 $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG)
 	"$$(MKDIRHIER)" $$(dir $$@)
-	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(CP)" $$< $$@
 	$$(EXECUTABLE_FILE) $$@
 endif

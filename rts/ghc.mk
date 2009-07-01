@@ -63,7 +63,6 @@ endif
 rts_AUTO_APPLY_CMM = rts/dist/build/AutoApply.cmm
 
 $(rts_AUTO_APPLY_CMM): $(GENAPPLY_INPLACE)
-	"$(RM)" $(RM_OPTS) $@
 	"$(GENAPPLY_INPLACE)" >$@
 
 rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c
