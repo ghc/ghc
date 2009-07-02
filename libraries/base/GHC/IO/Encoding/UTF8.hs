@@ -83,7 +83,7 @@ utf8_decode
                            if not (validate3 c0 c1 c2) then invalid else do
                            writeCharBuf oraw ow (chr3 c0 c1 c2)
                            loop (ir+3) (ow+1)
-                  | otherwise ->
+                  | c0 >= 0xf0 ->
                            if iw - ir < 4 then done ir ow else do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
@@ -91,6 +91,8 @@ utf8_decode
                            if not (validate4 c0 c1 c2 c3) then invalid else do
                            writeCharBuf oraw ow (chr4 c0 c1 c2 c3)
                            loop (ir+4) (ow+1)
+                  | otherwise ->
+                           invalid
          where
            invalid = if ir > ir0 then done ir ow else ioe_decodingError
 
