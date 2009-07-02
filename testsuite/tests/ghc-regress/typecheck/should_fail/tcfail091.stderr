@@ -1,2 +1,6 @@
 
-tcfail091.hs:8:6: Malformed context in type or class declaration
+tcfail091.hs:8:0:
+    Illegal constraint ?imp::Int
+    In the context: (?imp::Int)
+    While checking the super-classes of class `C'
+    In the class declaration for `C'
