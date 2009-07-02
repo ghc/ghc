@@ -28,7 +28,7 @@ test('TyFamArity2', normal, compile_fail, [''])
 test('TyFamUndec', normal, compile_fail, [''])
 
 test('NotRelaxedExamples', normal, compile_fail, [''])
-test('NonLinearSigErr', normal, compile_fail, [''])
+test('NonLinearSigErr', normal, compile, [''])
 
 test('GADTwrong1', normal, compile_fail, [''])
 
