@@ -360,14 +360,48 @@ used for source code.
 
 Instances of type families
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Indexed data/newtype instances contain data constructors that we need to
-collect, too.  Moreover, we need to descend into the data/newtypes instances
-of associated families.
+Family instances contain data constructors that we need to collect and we also
+need to descend into the type instances of associated families in class
+instances. The type constructor of a family instance is a usage occurence.
+Hence, we don't return it as a subname in 'AvailInfo'; otherwise, we would get
+a duplicate declaration error.
 
-We need to be careful with the handling of the type constructor of each type
-instance as the family constructor is already defined, and we want to avoid
-raising a duplicate declaration error.  So, we make a new name for it, but
-don't return it in the 'AvailInfo'.
+Note [Looking up family names in family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  module M where
+    type family T a :: *
+    type instance M.T Int = Bool
+
+We might think that we can simply use 'lookupOccRn' when processing the type
+instance to look up 'M.T'.  Alas, we can't!  The type family declaration is in
+the *same* HsGroup as the type instance declaration.  Hence, as we are
+currently collecting the binders declared in that HsGroup, these binders will
+not have been added to the global environment yet. 
+
+In the case of type classes, this problem does not arise, as a class instance
+does not define any binders of it's own.  So, we simply don't attempt to look
+up the class names of class instances in 'get_local_binders' below.
+
+If we don't look up class instances, can't we get away without looking up type
+instances, too?  No, we can't.  Data type instances define data constructors
+and we need to
+
+  (1) collect those in 'get_local_binders' and
+  (2) we need to get their parent name in 'get_local_binders', too, to
+      produce an appropriate 'AvailTC'.
+
+This parent name is exactly the family name of the type instance that is so
+difficult to look up.
+
+We solve this problem as follows:
+
+  (a) We process all type declarations other than type instances first.
+  (b) Then, we compute a 'GlobalRdrEnv' from the result of the first step.
+  (c) Finally, we process all type instances (both those on the toplevel and 
+      those nested in class instances) and check for the family names in the
+      'GlobalRdrEnv' produced in the previous step before using 'lookupOccRn'.
 
 \begin{code}
 getLocalNonValBinders :: HsGroup RdrName -> RnM [AvailInfo]
@@ -389,10 +423,25 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
 				    hs_tyclds = tycl_decls, 
 				    hs_instds = inst_decls,
 				    hs_fords  = foreign_decls })
-  = do	{ tc_names_s <- mapM new_tc tycl_decls
-	; at_names_s <- mapM inst_ats inst_decls
-	; val_names  <- mapM new_simple val_bndrs
-	; return (val_names ++ tc_names_s ++ concat at_names_s) }
+  = do	{   -- separate out the family instance declarations
+          let (tyinst_decls1, tycl_decls_noinsts) 
+                           = partition (isFamInstDecl . unLoc) tycl_decls
+              tyinst_decls = tyinst_decls1 ++ 
+                             concatMap (instDeclATs . unLoc) inst_decls 
+
+            -- process all type/class decls except family instances
+        ; tc_names  <- mapM new_tc tycl_decls_noinsts
+
+            -- create a temporary rdr env of the type binders
+        ; let tc_gres     = gresFromAvails LocalDef tc_names
+              tc_name_env = foldl extendGlobalRdrEnv emptyGlobalRdrEnv tc_gres
+
+            -- process all family instances
+	; ti_names  <- mapM (new_ti tc_name_env) tyinst_decls
+
+            -- finish off with value binder in case of a hs-boot file
+	; val_names <- mapM new_simple val_bndrs
+	; return (val_names ++ tc_names ++ ti_names) }
   where
     mod        = tcg_mod gbl_env
     is_hs_boot = isHsBoot (tcg_src gbl_env) ;
@@ -411,21 +460,20 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
         nm <- newTopSrcBinder mod rdr_name
         return (Avail nm)
 
-    new_tc tc_decl 
-      | isFamInstDecl (unLoc tc_decl)
-	= do { main_name <- lookupFamInstDeclBndr mod main_rdr
-	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
-	     ; return (AvailTC main_name sub_names) }
-                	-- main_name is not bound here!
-      | otherwise
+    new_tc tc_decl              -- NOT for type/data instances
 	= do { main_name <- newTopSrcBinder mod main_rdr
 	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
 	     ; return (AvailTC main_name (main_name : sub_names)) }
       where
 	(main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
 
-    inst_ats inst_decl 
-	= mapM new_tc (instDeclATs (unLoc inst_decl))
+    new_ti tc_name_env ti_decl  -- ONLY for type/data instances
+	= do { main_name <- lookupFamInstDeclBndr tc_name_env main_rdr
+	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
+	     ; return (AvailTC main_name sub_names) }
+                	-- main_name is not bound here!
+      where
+	(main_rdr : sub_rdrs) = tyClDeclNames (unLoc ti_decl)
 
 get_local_binders _ g = pprPanic "get_local_binders" (ppr g)
 \end{code}

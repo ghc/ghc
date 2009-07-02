@@ -328,22 +328,18 @@ lookup_sub_bndr is_good doc rdr_name
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
 
--- Looking up family names in type instances is a subtle affair.  The family
--- may be imported, in which case we need to lookup the occurence of a global
--- name.  Alternatively, the family may be in the same binding group (and in
--- fact in a declaration processed later), and we need to create a new top
--- source binder.
+-- If the family is declared locally, it will not yet be in the main
+-- environment; hence, we pass in an extra one here, which we check first.
+-- See "Note [Looking up family names in family instances]" in 'RnNames'.
 --
--- So, also this is strictly speaking an occurence, we cannot raise an error
--- message yet for instances without a family declaration.  This will happen
--- during renaming the type instance declaration in RnSource.rnTyClDecl.
---
-lookupFamInstDeclBndr :: Module -> Located RdrName -> RnM Name
-lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
-  = do { mb_gre <- lookupGreRn_maybe rdr_name
-       ; case mb_gre of
-           Just gre -> returnM (gre_name gre)
-	   Nothing  -> newTopSrcBinder mod lrdr_name }
+lookupFamInstDeclBndr :: GlobalRdrEnv -> Located RdrName -> RnM Name
+lookupFamInstDeclBndr tyclGroupEnv (L loc rdr_name)
+  = setSrcSpan loc $
+      case lookupGRE_RdrName rdr_name tyclGroupEnv of
+        (gre:_) -> return $ gre_name gre
+          -- if there is more than one, an error will be raised elsewhere
+        []      -> lookupOccRn rdr_name
+
 
 --------------------------------------------------
 --		Occurrences
