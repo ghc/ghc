@@ -672,7 +672,7 @@ dsDo stmts body _result_ty
     go (ExprStmt rhs then_expr _) stmts
       = do { rhs2 <- dsLExpr rhs
            ; case tcSplitAppTy_maybe (exprType rhs2) of
-                Just (container_ty, returning_ty) -> warnDiscardedDoBindings container_ty returning_ty
+                Just (container_ty, returning_ty) -> warnDiscardedDoBindings rhs container_ty returning_ty
                 _                                 -> return ()
            ; then_expr2 <- dsExpr then_expr
 	   ; rest <- goL stmts
@@ -744,7 +744,7 @@ dsMDo tbl stmts body result_ty
 
     go _ (ExprStmt rhs _ rhs_ty) stmts
       = do { rhs2 <- dsLExpr rhs
-	   ; warnDiscardedDoBindings m_ty rhs_ty
+	   ; warnDiscardedDoBindings rhs m_ty rhs_ty
            ; rest <- goL stmts
 	   ; return (mkApps (Var then_id) [Type rhs_ty, Type b_ty, rhs2, rest]) }
     
@@ -821,27 +821,30 @@ dsMDo tbl stmts body result_ty
 
 \begin{code}
 -- Warn about certain types of values discarded in monadic bindings (#3263)
-warnDiscardedDoBindings :: Type -> Type -> DsM ()
-warnDiscardedDoBindings container_ty returning_ty = do
-        -- Warn about discarding non-() things in 'monadic' binding
-        warn_unused <- doptDs Opt_WarnUnusedDoBind
-        when (warn_unused && not (returning_ty `tcEqType` unitTy)) $
-              warnDs (unusedMonadBind returning_ty)
-        
-        -- Warn about discarding m a things in 'monadic' binding of the same type
-        warn_wrong <- doptDs Opt_WarnWrongDoBind
-        case tcSplitAppTy_maybe returning_ty of
-                Just (returning_container_ty, _) -> when (warn_wrong && container_ty `tcEqType` returning_container_ty) $
-                                                          warnDs (wrongMonadBind returning_ty)
-                _ -> return ()
+warnDiscardedDoBindings :: LHsExpr Id -> Type -> Type -> DsM ()
+warnDiscardedDoBindings rhs container_ty returning_ty = do {
+          -- Warn about discarding non-() things in 'monadic' binding
+        ; warn_unused <- doptDs Opt_WarnUnusedDoBind
+        ; if warn_unused && not (returning_ty `tcEqType` unitTy)
+           then warnDs (unusedMonadBind rhs returning_ty)
+           else do {
+          -- Warn about discarding m a things in 'monadic' binding of the same type,
+          -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
+        ; warn_wrong <- doptDs Opt_WarnWrongDoBind
+        ; case tcSplitAppTy_maybe returning_ty of
+                  Just (returning_container_ty, _) -> when (warn_wrong && container_ty `tcEqType` returning_container_ty) $
+                                                            warnDs (wrongMonadBind rhs returning_ty)
+                  _ -> return () } }
 
-unusedMonadBind :: Type -> SDoc
-unusedMonadBind returning_ty
-  = ptext (sLit "A do-notation statement threw away a result of a type which appears to contain something other than (), namely") <+> ppr returning_ty <>
-    ptext (sLit ". You can suppress this warning by explicitly binding the result to _")
+unusedMonadBind :: LHsExpr Id -> Type -> SDoc
+unusedMonadBind rhs returning_ty
+  = ptext (sLit "A do-notation statement discarded a result of type") <+> ppr returning_ty <> dot $$
+    ptext (sLit "Suppress this warning by saying \"_ <- ") <> ppr rhs <> ptext (sLit "\",") $$
+    ptext (sLit "or by using the flag -fno-warn-unused-do-bind")
 
-wrongMonadBind :: Type -> SDoc
-wrongMonadBind returning_ty
-  = ptext (sLit "A do-notation statement threw away a result of a type that like a monadic action waiting to execute, namely") <+> ppr returning_ty <>
-    ptext (sLit ". You can suppress this warning by explicitly binding the result to _")
+wrongMonadBind :: LHsExpr Id -> Type -> SDoc
+wrongMonadBind rhs returning_ty
+  = ptext (sLit "A do-notation statement discarded a result of type") <+> ppr returning_ty <> dot $$
+    ptext (sLit "Suppress this warning by saying \"_ <- ") <> ppr rhs <> ptext (sLit "\",") $$
+    ptext (sLit "or by using the flag -fno-warn-wrong-do-bind")
 \end{code}
