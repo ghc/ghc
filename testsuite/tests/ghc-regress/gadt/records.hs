@@ -5,9 +5,9 @@
 module Main where
 
 data T a where
-  T1 { x :: a, y :: b } :: T (a,b)
-  T2 { x :: a } :: T (a,b)
-  T3 { z :: Int } :: T Bool
+  T1 :: { x :: a, y :: b } -> T (a,b)
+  T2 :: { x :: a }   -> T (a,b)
+  T3 :: { z :: Int } -> T Bool
 
 f xv yv = T1 { x = xv, y = yv }
 
