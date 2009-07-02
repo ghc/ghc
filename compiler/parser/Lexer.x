@@ -1504,14 +1504,14 @@ data ParseResult a
 
 data PState = PState { 
 	buffer	   :: StringBuffer,
-    dflags     :: DynFlags,
-    messages   :: Messages,
+        dflags     :: DynFlags,
+        messages   :: Messages,
         last_loc   :: SrcSpan,	-- pos of previous token
         last_offs  :: !Int, 	-- offset of the previous token from the
 				-- beginning of  the current line.
 				-- \t is equal to 8 spaces.
 	last_len   :: !Int,	-- len of previous token
-  last_line_len :: !Int,
+        last_line_len :: !Int,
         loc        :: SrcLoc,   -- current loc (end of prev token + 1)
 	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
 	context	   :: [LayoutContext],
