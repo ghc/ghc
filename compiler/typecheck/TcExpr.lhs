@@ -539,7 +539,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	      con1_flds = dataConFieldLabels con1
 	      con1_res_ty = mkFamilyTyConApp tycon (mkTyVarTys con1_tvs)
    	      
-	-- STEP 2
+	-- Step 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
 	; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds)
