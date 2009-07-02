@@ -926,24 +926,16 @@ rnFamily :: TyClDecl RdrName
 rnFamily (tydecl@TyFamily {tcdFlavour = flavour, 
 			   tcdLName = tycon, tcdTyVars = tyvars}) 
         bindIdxVars =
-      do { checkM (isDataFlavour flavour                      -- for synonyms,
-		   || not (null tyvars)) $ addErr needOneIdx  -- no. of indexes >= 1
-	 ; bindIdxVars (family_doc tycon) tyvars $ \tyvars' -> do {
+      do { bindIdxVars (family_doc tycon) tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
 	 ; return (TyFamily {tcdFlavour = flavour, tcdLName = tycon', 
 			      tcdTyVars = tyvars', tcdKind = tcdKind tydecl}, 
 		    emptyFVs) 
          } }
-      where
-        isDataFlavour DataFamily = True
-	isDataFlavour _		 = False
 rnFamily d _ = pprPanic "rnFamily" (ppr d)
 
 family_doc :: Located RdrName -> SDoc
 family_doc tycon = text "In the family declaration for" <+> quotes (ppr tycon)
-
-needOneIdx :: SDoc
-needOneIdx = text "Type family declarations requires at least one type index"
 
 -- Rename associated type declarations (in classes)
 --

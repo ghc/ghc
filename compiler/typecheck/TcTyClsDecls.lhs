@@ -693,9 +693,6 @@ tcTyClDecl1 _calc_isrec
   ; idx_tys <- doptM Opt_TypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
-        -- Check for no type indices
-  ; checkTc (not (null tvs)) (noIndexTypes tc_name)
-
   ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) kind Nothing
   ; return [ATyCon tycon]
   }
@@ -713,9 +710,6 @@ tcTyClDecl1 _calc_isrec
 	-- Check that we don't use families without -XTypeFamilies
   ; idx_tys <- doptM Opt_TypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
-
-        -- Check for no type indices
-  ; checkTc (not (null tvs)) (noIndexTypes tc_name)
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
 	       mkOpenDataTyConRhs Recursive False True Nothing
@@ -1499,11 +1493,6 @@ badSigTyDecl tc_name
   = vcat [ ptext (sLit "Illegal kind signature") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XKindSignatures to allow kind signatures")) ]
-
-noIndexTypes :: Name -> SDoc
-noIndexTypes tc_name
-  = ptext (sLit "Type family constructor") <+> quotes (ppr tc_name)
-    <+> ptext (sLit "must have at least one type index parameter")
 
 badFamInstDecl :: Outputable a => a -> SDoc
 badFamInstDecl tc_name
