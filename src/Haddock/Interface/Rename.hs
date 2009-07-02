@@ -350,14 +350,16 @@ renameTyClD d = case d of
 
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con
-    renameCon (ConDecl lname expl ltyvars lcontext details restype mbldoc) = do
+    renameCon decl@(ConDecl { con_name = lname, con_qvars = ltyvars
+                            , con_cxt = lcontext, con_details = details
+                            , con_res = restype, con_doc = mbldoc }) = do
       lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- renameLContext lcontext
       details'  <- renameDetails details
       restype'  <- renameResType restype
       mbldoc'   <- mapM renameLDoc mbldoc
-      return (ConDecl lname' expl ltyvars' lcontext' details' restype' mbldoc')
+      return (ConDecl lname' expl ltyvars' lcontext' details' restype' mbldoc') 
 
     renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
