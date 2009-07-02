@@ -488,9 +488,10 @@ match menv subst (Var v1) e2
   | Just subst <- match_var menv subst v1 e2
   = Just subst
 
-match menv subst e1 (Note _ e2)
-  = match menv subst e1 e2
-	-- See Note [Notes in RULE matching]
+match menv subst (Note _ e1) e2 = match menv subst e1 e2
+match menv subst e1 (Note _ e2) = match menv subst e1 e2
+      -- Ignore notes in both template and thing to be matched
+      -- See Note [Notes in RULE matching]
 
 match menv subst e1 (Var v2)      -- Note [Expanding variables]
   | not (locallyBoundR rn_env v2) -- Note [Do not expand locally-bound variables]
@@ -684,11 +685,11 @@ Hence, (a) the guard (not (isLocallyBoundR v2))
 
 Note [Notes in RULE matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Look through Notes.  In particular, we don't want to
-be confused by InlineMe notes.  Maybe we should be more
-careful about profiling notes, but for now I'm just
-riding roughshod over them.  
-See Note [Notes in call patterns] in SpecConstr
+Look through Notes in both template and expression being matched.  In
+particular, we don't want to be confused by InlineMe notes.  Maybe we
+should be more careful about profiling notes, but for now I'm just
+riding roughshod over them.  cf Note [Notes in call patterns] in
+SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
