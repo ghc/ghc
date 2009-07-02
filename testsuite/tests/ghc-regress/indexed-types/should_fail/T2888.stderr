@@ -1,4 +1,0 @@
-
-T2888.hs:7:2:
-    Type family constructor `D' must have at least one type index parameter
-    In the class declaration for `C'
