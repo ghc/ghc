@@ -822,7 +822,8 @@ zonk_pat env (AsPat (L loc v) pat)
 zonk_pat env (ViewPat expr pat ty)
   = do	{ expr' <- zonkLExpr env expr
 	; (env', pat') <- zonkPat env pat
- 	; return (env', ViewPat expr' pat' ty) }
+ 	; ty' <- zonkTcTypeToType env ty
+	; return (env', ViewPat expr' pat' ty') }
 
 zonk_pat env (ListPat pats ty)
   = do	{ ty' <- zonkTcTypeToType env ty
