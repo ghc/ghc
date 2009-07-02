@@ -8,10 +8,11 @@ module RdrHsSyn (
 	extractHsTyRdrTyVars, 
 	extractHsRhoRdrTyVars, extractGenericPatTyVars,
  
-	mkHsOpApp, mkClassDecl,
+	mkHsOpApp, 
 	mkHsIntegral, mkHsFractional, mkHsIsString,
 	mkHsDo, mkHsSplice,
-        mkTyData, mkPrefixCon, mkRecCon, mkInlineSpec,	
+        mkClassDecl, mkTyData, mkTyFamily, mkTySynonym,
+        splitCon, mkInlineSpec,	
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
 
 	cvBindGroup,
@@ -29,16 +30,15 @@ module RdrHsSyn (
 			      -- -> P RdrNameHsDecl
 	mkExtName,           -- RdrName -> CLabelString
 	mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
+	mkSimpleConDecl, 
+	mkDeprecatedGadtRecordDecl,
 			      
 	-- Bunch of functions in the parser monad for 
 	-- checking and constructing values
 	checkPrecP, 	      -- Int -> P Int
 	checkContext,	      -- HsType -> P HsContext
 	checkPred,	      -- HsType -> P HsPred
-	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName
-                              -- -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkTyVars,          -- [LHsType RdrName] -> P ()
-	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
 	checkInstType,	      -- HsType -> P HsType
         checkDerivDecl,       -- LDerivDecl RdrName -> P (LDerivDecl RdrName)
@@ -76,7 +76,6 @@ import Outputable
 import FastString
 
 import List		( isSuffixOf, nubBy )
-import Monad		( unless )
 
 #include "HsVersions.h"
 \end{code}
@@ -95,6 +94,9 @@ It's used when making the for-alls explicit.
 extractHsTyRdrTyVars :: LHsType RdrName -> [Located RdrName]
 extractHsTyRdrTyVars ty = nubBy eqLocated (extract_lty ty [])
 
+extractHsTysRdrTyVars :: [LHsType RdrName] -> [Located RdrName]
+extractHsTysRdrTyVars ty = nubBy eqLocated (extract_ltys ty [])
+
 extractHsRhoRdrTyVars :: LHsContext RdrName -> LHsType RdrName -> [Located RdrName]
 -- This one takes the context and tau-part of a 
 -- sigma type and returns their free type variables
@@ -105,19 +107,23 @@ extract_lctxt :: Located [LHsPred RdrName] -> [Located RdrName] -> [Located RdrN
 extract_lctxt ctxt acc = foldr (extract_pred . unLoc) acc (unLoc ctxt)
 
 extract_pred :: HsPred RdrName -> [Located RdrName] -> [Located RdrName]
-extract_pred (HsClassP _   tys) acc = foldr extract_lty acc tys
+extract_pred (HsClassP _   tys) acc = extract_ltys tys acc
 extract_pred (HsEqualP ty1 ty2) acc = extract_lty ty1 (extract_lty ty2 acc)
 extract_pred (HsIParam _   ty ) acc = extract_lty ty acc
+
+extract_ltys :: [LHsType RdrName] -> [Located RdrName] -> [Located RdrName]
+extract_ltys tys acc = foldr extract_lty acc tys
 
 extract_lty :: LHsType RdrName -> [Located RdrName] -> [Located RdrName]
 extract_lty (L loc ty) acc 
   = case ty of
       HsTyVar tv 	        -> extract_tv loc tv acc
       HsBangTy _ ty            	-> extract_lty ty acc
+      HsRecTy flds            	-> foldr (extract_lty . cd_fld_type) acc flds
       HsAppTy ty1 ty2          	-> extract_lty ty1 (extract_lty ty2 acc)
       HsListTy ty              	-> extract_lty ty acc
       HsPArrTy ty              	-> extract_lty ty acc
-      HsTupleTy _ tys          	-> foldr extract_lty acc tys
+      HsTupleTy _ tys          	-> extract_ltys tys acc
       HsFunTy ty1 ty2          	-> extract_lty ty1 (extract_lty ty2 acc)
       HsPredTy p		-> extract_pred p acc
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
@@ -167,35 +173,57 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
 	*** See "THE NAMING STORY" in HsDecls ****
   
 \begin{code}
-mkClassDecl :: (LHsContext name, Located name, [LHsTyVarBndr name])
-            -> [Located (FunDep name)]
-            -> [LSig name]
-            -> LHsBinds name
-            -> [LTyClDecl name]
-            -> [LDocDecl name]
-            -> TyClDecl name
-mkClassDecl (cxt, cname, tyvars) fds sigs mbinds ats docs
-  = ClassDecl { tcdCtxt = cxt, tcdLName = cname, tcdTyVars = tyvars,
-		tcdFDs = fds,  
-		tcdSigs = sigs,
-		tcdMeths = mbinds,
-		tcdATs   = ats,
-		tcdDocs  = docs
-		}
+mkClassDecl :: SrcSpan
+            -> Located (LHsContext RdrName, LHsType RdrName) 
+            -> Located [Located (FunDep RdrName)]
+            -> Located (OrdList (LHsDecl RdrName))
+	    -> P (LTyClDecl RdrName)
 
-mkTyData :: NewOrData
-         -> (LHsContext name,
-             Located name,
-             [LHsTyVarBndr name],
-             Maybe [LHsType name])
+mkClassDecl loc (L _ (cxt, tycl_hdr)) fds where_cls
+  = do { let (binds, sigs, ats, docs) = cvBindsAndSigs (unLoc where_cls)
+       ; (cls, tparams) <- checkTyClHdr tycl_hdr
+       ; tyvars <- checkTyVars tparams      -- Only type vars allowed
+       ; checkKindSigs ats
+       ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
+		             	    tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
+			     	    tcdATs   = ats, tcdDocs  = docs })) }
+
+mkTyData :: SrcSpan
+         -> NewOrData
+	 -> Bool		-- True <=> data family instance
+         -> Located (LHsContext RdrName, LHsType RdrName)
          -> Maybe Kind
-         -> [LConDecl name]
-         -> Maybe [LHsType name]
-         -> TyClDecl name
-mkTyData new_or_data (context, tname, tyvars, typats) ksig data_cons maybe_deriv
-  = TyData { tcdND = new_or_data, tcdCtxt = context, tcdLName = tname,
-	     tcdTyVars = tyvars, tcdTyPats = typats, tcdCons = data_cons, 
-	     tcdKindSig = ksig, tcdDerivs = maybe_deriv }
+         -> [LConDecl RdrName]
+         -> Maybe [LHsType RdrName]
+         -> P (LTyClDecl RdrName)
+mkTyData loc new_or_data is_family (L _ (cxt, tycl_hdr)) ksig data_cons maybe_deriv
+  = do { (tc, tparams) <- checkTyClHdr tycl_hdr
+
+       ; (tyvars, typats) <- checkTParams is_family tparams
+       ; return (L loc (TyData { tcdND = new_or_data, tcdCtxt = cxt, tcdLName = tc,
+	                  	 tcdTyVars = tyvars, tcdTyPats = typats, 
+                                 tcdCons = data_cons, 
+	                  	 tcdKindSig = ksig, tcdDerivs = maybe_deriv })) }
+
+mkTySynonym :: SrcSpan 
+            -> Bool	        -- True <=> type family instances
+            -> LHsType RdrName  -- LHS
+            -> LHsType RdrName	-- RHS
+            -> P (LTyClDecl RdrName)
+mkTySynonym loc is_family lhs rhs
+  = do { (tc, tparams) <- checkTyClHdr lhs
+       ; (tyvars, typats) <- checkTParams is_family tparams
+       ; return (L loc (TySynonym tc tyvars typats rhs)) }
+
+mkTyFamily :: SrcSpan
+           -> FamilyFlavour
+	   -> LHsType RdrName   -- LHS
+	   -> Maybe Kind        -- Optional kind signature
+           -> P (LTyClDecl RdrName)
+mkTyFamily loc flavour lhs ksig
+  = do { (tc, tparams) <- checkTyClHdr lhs
+       ; tyvars <- checkTyVars tparams
+       ; return (L loc (TyFamily flavour tc tyvars ksig)) }
 \end{code}
 
 %************************************************************************
@@ -376,29 +404,88 @@ add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
 
 \begin{code}
 -----------------------------------------------------------------------------
--- mkPrefixCon
+-- splitCon
 
 -- When parsing data declarations, we sometimes inadvertently parse
 -- a constructor application as a type (eg. in data T a b = C a b `D` E a b)
 -- This function splits up the type application, adds any pending
 -- arguments, and converts the type constructor back into a data constructor.
 
-mkPrefixCon :: LHsType RdrName -> [LBangType RdrName]
-	    -> P (Located RdrName, HsConDeclDetails RdrName)
-mkPrefixCon ty tys
- = split ty tys
+splitCon :: LHsType RdrName
+      -> P (Located RdrName, HsConDeclDetails RdrName)
+-- This gets given a "type" that should look like
+--      C Int Bool
+-- or   C { x::Int, y::Bool }
+-- and returns the pieces
+splitCon ty
+ = split ty []
  where
    split (L _ (HsAppTy t u)) ts = split t (u : ts)
    split (L l (HsTyVar tc))  ts = do data_con <- tyConToDataCon l tc
-				     return (data_con, PrefixCon ts)
-   split (L l _) _ 		= parseError l "parse error in data/newtype declaration"
+ 				     return (data_con, mk_rest ts)
+   split (L l _) _ 	        = parseError l "parse error in data/newtype declaration"
 
-mkRecCon :: Located RdrName -> 
-            [([Located RdrName], LBangType RdrName, Maybe (LHsDoc RdrName))] ->
-            P (Located RdrName, HsConDeclDetails RdrName)
-mkRecCon (L loc con) fields
-  = do data_con <- tyConToDataCon loc con
-       return (data_con, RecCon [ ConDeclField l t d | (ls, t, d) <- fields, l <- ls ])
+   mk_rest [L _ (HsRecTy flds)] = RecCon flds
+   mk_rest ts                   = PrefixCon ts
+
+mkDeprecatedGadtRecordDecl :: SrcSpan 
+		     	   -> Located RdrName
+		     	   -> [ConDeclField RdrName]
+			   -> LHsType RdrName
+		     	   ->  P (LConDecl  RdrName)
+-- This one uses the deprecated syntax
+--    C { x,y ::Int } :: T a b
+-- We give it a RecCon details right away
+mkDeprecatedGadtRecordDecl loc (L con_loc con) flds res_ty
+  = do { data_con <- tyConToDataCon con_loc con
+       ; return (L loc (ConDecl { con_old_rec  = True
+                                , con_name     = data_con
+	    	 		, con_explicit = Implicit
+	    	 		, con_qvars    = []
+	    	 		, con_cxt      = noLoc []
+	    	 		, con_details  = RecCon flds
+	    	 		, con_res      = ResTyGADT res_ty
+            	 		, con_doc      = Nothing })) }
+
+mkSimpleConDecl :: Located RdrName -> [LHsTyVarBndr RdrName]
+		-> LHsContext RdrName -> HsConDeclDetails RdrName
+		-> ConDecl RdrName
+
+mkSimpleConDecl name qvars cxt details
+  = ConDecl { con_old_rec  = False
+            , con_name     = name
+	    , con_explicit = Explicit
+	    , con_qvars    = qvars
+	    , con_cxt      = cxt
+	    , con_details  = details
+	    , con_res      = ResTyH98
+            , con_doc      = Nothing }
+
+mkGadtDecl :: [Located RdrName]
+           -> LHsType RdrName     -- Always a HsForAllTy
+           -> [ConDecl RdrName]
+-- We allow C,D :: ty
+-- and expand it as if it had been 
+--    C :: ty; D :: ty
+-- (Just like type signatures in general.)
+mkGadtDecl names (L _ (HsForAllTy imp qvars cxt tau))
+  = [mk_gadt_con name | name <- names]
+  where
+    (details, res_ty)		-- See Note [Sorting out the result type]
+      = case tau of
+    	  L _ (HsFunTy (L _ (HsRecTy flds)) res_ty) -> (RecCon flds,  res_ty)
+	  _other                                    -> (PrefixCon [], tau)
+
+    mk_gadt_con name
+       = ConDecl { con_old_rec  = False
+                 , con_name     = name
+	    	 , con_explicit = imp
+	    	 , con_qvars    = qvars
+	    	 , con_cxt      = cxt
+	    	 , con_details  = details
+	    	 , con_res      = ResTyGADT res_ty
+            	 , con_doc      = Nothing }
+mkGadtDecl _ other_ty = pprPanic "mkGadtDecl" (ppr other_ty)
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 tyConToDataCon loc tc
@@ -411,7 +498,26 @@ tyConToDataCon loc tc
     extra | tc == forall_tv_RDR
 	  = text "Perhaps you intended to use -XExistentialQuantification"
 	  | otherwise = empty
+\end{code}
 
+Note [Sorting out the result type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a GADT declaration which is not a record, we put the whole constr
+type into the ResTyGADT for now; the renamer will unravel it once it
+has sorted out operator fixities. Consider for example
+     C :: a :*: b -> a :*: b -> a :+: b
+Initially this type will parse as
+      a :*: (b -> (a :*: (b -> (a :+: b))))
+
+so it's hard to split up the arguments until we've done the precedence
+resolution (in the renamer) On the other hand, for a record
+	{ x,y :: Int } -> a :*: b
+there is no doubt.  AND we need to sort records out so that
+we can bring x,y into scope.  So:
+   * For PrefixCon we keep all the args in the ResTyGADT
+   * For RecCon we do not
+
+\begin{code}
 ----------------------------------------------------------------------------
 -- Various Syntactic Checks
 
@@ -436,128 +542,69 @@ checkDictTy (L spn ty) = check ty []
   check (HsParTy t)   args = check (unLoc t) args
   check _ _ = parseError spn "Malformed instance header"
 
+checkTParams :: Bool	  -- Type/data family
+	     -> [LHsType RdrName]
+	     -> P ([LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
+-- checkTParams checks the type parameters of a data/newtype declaration
+-- There are two cases:
+--
+--  a) Vanilla data/newtype decl. In that case 
+--        - the type parameters should all be type variables
+--        - they may have a kind annotation
+--
+--  b) Family data/newtype decl.  In that case
+--        - The type parameters may be arbitrary types
+--        - We find the type-varaible binders by find the 
+--          free type vars of those types
+--        - We make them all kind-sig-free binders (UserTyVar)
+--          If there are kind sigs in the type parameters, they
+--          will fix the binder's kind when we kind-check the 
+--          type parameters
+checkTParams is_family tparams
+  | not is_family        -- Vanilla case (a)
+  = do { tyvars <- checkTyVars tparams
+       ; return (tyvars, Nothing) }
+  | otherwise		 -- Family case (b)
+  = do { let tyvars = [L l (UserTyVar tv) 
+                      | L l tv <- extractHsTysRdrTyVars tparams]
+       ; return (tyvars, Just tparams) }
+
+checkTyVars :: [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
 -- Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).  If the second argument is `False',
 -- only type variables are allowed and we raise an error on encountering a
 -- non-variable; otherwise, we allow non-variable arguments and return the
 -- entire list of parameters.
---
-checkTyVars :: [LHsType RdrName] -> P ()
-checkTyVars tparms = mapM_ chk tparms
+checkTyVars tparms = mapM chk tparms
   where
 	-- Check that the name space is correct!
-    chk (L _ (HsKindSig (L _ (HsTyVar tv)) _))
-	| isRdrTyVar tv    = return ()
-    chk (L _ (HsTyVar tv))
-        | isRdrTyVar tv    = return ()
+    chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
+	| isRdrTyVar tv    = return (L l (KindedTyVar tv k))
+    chk (L l (HsTyVar tv))
+        | isRdrTyVar tv    = return (L l (UserTyVar tv))
     chk (L l _)            =
 	  parseError l "Type found where type variable expected"
 
--- Check whether the type arguments in a type synonym head are simply
--- variables.  If not, we have a type family instance and return all patterns.
--- If yes, we return 'Nothing' as the third component to indicate a vanilla
--- type synonym. 
---
-checkSynHdr :: LHsType RdrName 
-	    -> Bool                             -- is type instance?
-	    -> P (Located RdrName,		-- head symbol
-	          [LHsTyVarBndr RdrName],	-- parameters
-		  [LHsType RdrName])	        -- type patterns
-checkSynHdr ty isTyInst = 
-  do { (_, tc, tvs, tparms) <- checkTyClHdr (noLoc []) ty
-     ; unless isTyInst $ checkTyVars tparms
-     ; return (tc, tvs, tparms) }
-
-
+checkTyClHdr :: LHsType RdrName
+             -> P (Located RdrName,	     -- the head symbol (type or class name)
+	           [LHsType RdrName])        -- parameters of head symbol
 -- Well-formedness check and decomposition of type and class heads.
---
-checkTyClHdr :: LHsContext RdrName -> LHsType RdrName
-  -> P (LHsContext RdrName,	     -- the type context
-        Located RdrName,	     -- the head symbol (type or class name)
-	[LHsTyVarBndr RdrName],	     -- free variables of the non-context part
-	[LHsType RdrName])           -- parameters of head symbol
--- The header of a type or class decl should look like
---	(C a, D b) => T a b
--- or	T a b
--- or	a + b
--- etc
--- With associated types, we can also have non-variable parameters; ie,
---      T Int [a]
--- or   Int :++: [a]
--- The unaltered parameter list is returned in the fourth component of the
--- result.  Eg, for
---      T Int [a]
--- we return
---      ('()', 'T', ['a'], ['Int', '[a]'])
-checkTyClHdr (L l cxt) ty
-  = do (tc, tvs, parms) <- gol ty []
-       mapM_ chk_pred cxt
-       return (L l cxt, tc, tvs, parms)
+-- Decomposes   T ty1 .. tyn   into    (T, [ty1, ..., tyn])
+-- 		Int :*: Bool   into    (:*:, [Int, Bool])
+-- returning the pieces
+checkTyClHdr ty
+  = goL ty []
   where
-    gol (L l ty) acc = go l ty acc
+    goL (L l ty) acc = go l ty acc
 
     go l (HsTyVar tc) acc 
-	| isRdrTc tc 		= do tvs <- extractTyVars acc
-				     return (L l tc, tvs, acc)
+	| isRdrTc tc 	     = return (L l tc, acc)
+				     
     go _ (HsOpTy t1 ltc@(L _ tc) t2) acc
-	| isRdrTc tc		= do tvs <- extractTyVars (t1:t2:acc)
-				     return (ltc, tvs, t1:t2:acc)
-    go _ (HsParTy ty)    acc    = gol ty acc
-    go _ (HsAppTy t1 t2) acc    = gol t1 (t2:acc)
-    go l _               _      =
-      parseError l "Malformed head of type or class declaration"
-
-	-- The predicates in a type or class decl must be class predicates or 
-	-- equational constraints.  They need not all have variable-only
-	-- arguments, even in Haskell 98.  
-	-- E.g. class (Monad m, Monad (t m)) => MonadT t m
-    chk_pred (L _ (HsClassP _ _)) = return ()
-    chk_pred (L _ (HsEqualP _ _)) = return ()
-    chk_pred (L l _)
-       = parseError l "Malformed context in type or class declaration"
-
--- Extract the type variables of a list of type parameters.
---
--- * Type arguments can be complex type terms (needed for associated type
---   declarations).
---
-extractTyVars :: [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
-extractTyVars tvs = collects tvs []
-  where
-        -- Collect all variables (2nd arg serves as an accumulator)
-    collect :: LHsType RdrName -> [LHsTyVarBndr RdrName]
-                               -> P [LHsTyVarBndr RdrName]
-    collect (L l (HsForAllTy _ _ _ _)) =
-      const $ parseError l "Forall type not allowed as type parameter"
-    collect (L l (HsTyVar tv))
-      | isRdrTyVar tv                  = return . (L l (UserTyVar tv) :)
-      | otherwise                      = return
-    collect (L l (HsBangTy _ _      )) =
-      const $ parseError l "Bang-style type annotations not allowed as type parameter"
-    collect (L _ (HsAppTy t1 t2     )) = collect t2 >=> collect t1
-    collect (L _ (HsFunTy t1 t2     )) = collect t2 >=> collect t1
-    collect (L _ (HsListTy t        )) = collect t
-    collect (L _ (HsPArrTy t        )) = collect t
-    collect (L _ (HsTupleTy _ ts    )) = collects ts
-    collect (L _ (HsOpTy t1 _ t2    )) = collect t2 >=> collect t1
-    collect (L _ (HsParTy t         )) = collect t
-    collect (L _ (HsNumTy _         )) = return
-    collect (L l (HsPredTy _        )) = 
-      const $ parseError l "Predicate not allowed as type parameter"
-    collect (L l (HsKindSig (L _ ty) k))
-	| HsTyVar tv <- ty, isRdrTyVar tv
-	= return . (L l (KindedTyVar tv k) :)
-	| otherwise
-	= const $ parseError l "Kind signature only allowed for type variables"
-    collect (L l (HsSpliceTy _      )) = 
-      const $ parseError l "Splice not allowed as type parameter"
-    collect (L _ (HsDocTy t _       )) = collect t
-
-        -- Collect all variables of a list of types
-    collects []     = return
-    collects (t:ts) = collects ts >=> collect t
-
-    (f >=> g) x = f x >>= g
+	| isRdrTc tc	     = return (ltc, t1:t2:acc)
+    go _ (HsParTy ty)    acc = goL ty acc
+    go _ (HsAppTy t1 t2) acc = goL t1 (t2:acc)
+    go l _               _   = parseError l "Malformed head of type or class declaration"
 
 -- Check that associated type declarations of a class are all kind signatures.
 --
@@ -812,41 +859,10 @@ checkValSig (L l (HsVar v)) ty
   = return (TypeSig (L l v) ty)
 checkValSig (L l _)         _
   = parseError l "Invalid type signature"
-
-mkGadtDecl :: [Located RdrName]
-           -> LHsType RdrName -- assuming HsType
-           -> [ConDecl RdrName]
--- We allow C,D :: ty
--- and expand it as if it had been 
---    C :: ty; D :: ty
--- (Just like type signatures in general.)
-mkGadtDecl names ty
-  = [mk_gadt_con name qvars cxt tau | name <- names]
-  where
-    (qvars,cxt,tau) = case ty of
-    		        L _ (HsForAllTy _ qvars cxt tau) -> (qvars, cxt,      tau)
-			_ 	     	                 -> ([],    noLoc [], ty)
-
-mk_gadt_con :: Located RdrName
-            -> [LHsTyVarBndr RdrName]
-            -> LHsContext RdrName
-            -> LHsType RdrName
-            -> ConDecl RdrName
-mk_gadt_con name qvars cxt ty
-  = ConDecl { con_name     = name
-	    , con_explicit = Implicit
-	    , con_qvars    = qvars
-	    , con_cxt      = cxt
-	    , con_details  = PrefixCon []
-	    , con_res      = ResTyGADT ty
-            , con_doc      = Nothing }
-  -- NB: we put the whole constr type into the ResTyGADT for now; 
-  -- the renamer will unravel it once it has sorted out
-  -- operator fixities
-
--- A variable binding is parsed as a FunBind.
+\end{code}
 
 
+\begin{code}
 	-- The parser left-associates, so there should 
 	-- not be any OpApps inside the e's
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
@@ -861,6 +877,7 @@ splitBang _ = Nothing
 
 isFunLhs :: LHsExpr RdrName 
 	 -> P (Maybe (Located RdrName, Bool, [LHsExpr RdrName]))
+-- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 --
 -- The whole LHS is parsed as a single expression.  

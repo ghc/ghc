@@ -46,6 +46,7 @@ import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 import Module
 import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
+import Class		( FunDep )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..), RuleMatchInfo(..), defaultInlineSpec )
 import DynFlags
@@ -576,15 +577,7 @@ topdecl :: { OrdList (LHsDecl RdrName) }
 -- Type classes
 --
 cl_decl :: { LTyClDecl RdrName }
-	: 'class' tycl_hdr fds where_cls
-		{% do { let { (binds, sigs, ats, docs)           = 
-			        cvBindsAndSigs (unLoc $4)
-		            ; (ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms      -- only type vars allowed
-		      ; checkKindSigs ats
-		      ; return $ L (comb4 $1 $2 $3 $4) 
-				   (mkClassDecl (ctxt, tc, tvs) 
-					        (unLoc $3) sigs binds ats docs) } }
+	: 'class' tycl_hdr fds where_cls	{% mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 $4 }
 
 -- Type declarations (toplevel)
 --
@@ -598,87 +591,53 @@ ty_decl :: { LTyClDecl RdrName }
 	        --
 		-- Note the use of type for the head; this allows
 		-- infix type constructors to be declared 
- 		{% do { (tc, tvs, _) <- checkSynHdr $2 False
-		      ; return (L (comb2 $1 $4) 
-				  (TySynonym tc tvs Nothing $4))
-                      } }
+ 		{% mkTySynonym (comb2 $1 $4) False $2 $4 }
 
            -- type family declarations
         | 'type' 'family' type opt_kind_sig 
 		-- Note the use of type for the head; this allows
 		-- infix type constructors to be declared
-		--
- 		{% do { (tc, tvs, _) <- checkSynHdr $3 False
-		      ; return (L (comb3 $1 $3 $4) 
-				  (TyFamily TypeFamily tc tvs (unLoc $4)))
-		      } }
+ 		{% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
            -- type instance declarations
         | 'type' 'instance' type '=' ctype
 		-- Note the use of type for the head; this allows
 		-- infix type constructors and type patterns
-		--
- 		{% do { (tc, tvs, typats) <- checkSynHdr $3 True
-		      ; return (L (comb2 $1 $5) 
-				  (TySynonym tc tvs (Just typats) $5)) 
-                      } }
+ 		{% mkTySynonym (comb2 $1 $5) True $3 $5 }
 
           -- ordinary data type or newtype declaration
 	| data_or_newtype tycl_hdr constrs deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms    -- no type pattern
-		      ; return $!
-			  sL (comb4 $1 $2 $3 $4)
+		{% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) False $2 
+                            Nothing (reverse (unLoc $3)) (unLoc $4) }
 			           -- We need the location on tycl_hdr in case 
 				   -- constrs and deriving are both empty
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			       Nothing (reverse (unLoc $3)) (unLoc $4)) } }
 
           -- ordinary GADT declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms    -- can have type pats
-		      ; return $!
-			  sL (comb4 $1 $2 $4 $5)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			      (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
+		{% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) False $2 
+                            (unLoc $3) (reverse (unLoc $5)) (unLoc $6) }
+			           -- We need the location on tycl_hdr in case 
+				   -- constrs and deriving are both empty
 
           -- data/newtype family
-        | 'data' 'family' tycl_hdr opt_kind_sig
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
-                      ; checkTyVars tparms            -- no type pattern
-		      ; unless (null (unLoc ctxt)) $  -- and no context
-			  parseError (getLoc ctxt) 
-			    "A family declaration cannot have a context"
-		      ; return $
-			  L (comb3 $1 $2 $4)
-			    (TyFamily DataFamily tc tvs (unLoc $4)) } }
+        | 'data' 'family' type opt_kind_sig
+		{% mkTyFamily (comb3 $1 $2 $4) DataFamily $3 (unLoc $4) }
 
           -- data/newtype instance declaration
 	| data_or_newtype 'instance' tycl_hdr constrs deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
-                                             -- can have type pats
-		      ; return $
-			  L (comb4 $1 $3 $4 $5)
-			           -- We need the location on tycl_hdr in case 
-				   -- constrs and deriving are both empty
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
-			      Nothing (reverse (unLoc $4)) (unLoc $5)) } }
+		{% mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
+			    Nothing (reverse (unLoc $4)) (unLoc $5) }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
-                                             -- can have type pats
-		      ; return $
-			  L (comb4 $1 $3 $6 $7)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
-			       (unLoc $4) (reverse (unLoc $6)) (unLoc $7)) } }
+		{% mkTyData (comb4 $1 $3 $6 $7) (unLoc $1) True $3
+			    (unLoc $4) (reverse (unLoc $6)) (unLoc $7) }
 
--- Associate type family declarations
+-- Associated type family declarations
 --
 -- * They have a different syntax than on the toplevel (no family special
 --   identifier).
@@ -692,68 +651,38 @@ at_decl_cls :: { LTyClDecl RdrName }
         : 'type' type opt_kind_sig
 		-- Note the use of type for the head; this allows
 		-- infix type constructors to be declared
-		--
- 		{% do { (tc, tvs, _) <- checkSynHdr $2 False
-		      ; return (L (comb3 $1 $2 $3) 
-				  (TyFamily TypeFamily tc tvs (unLoc $3)))
-		      } }
+ 		{% mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3) }
 
            -- default type instance
         | 'type' type '=' ctype
 		-- Note the use of type for the head; this allows
 		-- infix type constructors and type patterns
-		--
- 		{% do { (tc, tvs, typats) <- checkSynHdr $2 True
-		      ; return (L (comb2 $1 $4) 
-				  (TySynonym tc tvs (Just typats) $4)) 
-                      } }
+ 		{% mkTySynonym (comb2 $1 $4) True $2 $4 }
 
           -- data/newtype family declaration
-        | 'data' tycl_hdr opt_kind_sig
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms            -- no type pattern
-		      ; unless (null (unLoc ctxt)) $  -- and no context
-			  parseError (getLoc ctxt) 
-			    "A family declaration cannot have a context"
-		      ; return $
-			  L (comb3 $1 $2 $3)
-			    (TyFamily DataFamily tc tvs (unLoc $3)) 
-                      } }
+        | 'data' type opt_kind_sig
+		{% mkTyFamily (comb3 $1 $2 $3) DataFamily $2 (unLoc $3) }
 
--- Associate type instances
+-- Associated type instances
 --
 at_decl_inst :: { LTyClDecl RdrName }
            -- type instance declarations
         : 'type' type '=' ctype
 		-- Note the use of type for the head; this allows
 		-- infix type constructors and type patterns
-		--
- 		{% do { (tc, tvs, typats) <- checkSynHdr $2 True
-		      ; return (L (comb2 $1 $4) 
-				  (TySynonym tc tvs (Just typats) $4)) 
-                      } }
+ 		{% mkTySynonym (comb2 $1 $4) True $2 $4 }
 
         -- data/newtype instance declaration
 	| data_or_newtype tycl_hdr constrs deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                                             -- can have type pats
-		      ; return $
-			  L (comb4 $1 $2 $3 $4)
-			           -- We need the location on tycl_hdr in case 
-				   -- constrs and deriving are both empty
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
-			      Nothing (reverse (unLoc $3)) (unLoc $4)) } }
+		{% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) True $2 
+                            Nothing (reverse (unLoc $3)) (unLoc $4) }
 
         -- GADT instance declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                                             -- can have type pats
-		      ; return $
-			  L (comb4 $1 $2 $5 $6)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
-			     (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
+		{% mkTyData (comb4 $1 $2 $5 $6) (unLoc $1) True $2 
+		   	    (unLoc $3) (reverse (unLoc $5)) (unLoc $6) }
 
 data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
@@ -770,12 +699,9 @@ opt_kind_sig :: { Located (Maybe Kind) }
 --	(Eq a, Ord b) => T a b
 --      T Int [a]			-- for associated types
 -- Rather a lot of inlining here, else we get reduce/reduce errors
-tycl_hdr :: { Located (LHsContext RdrName, 
-		       Located RdrName, 
-		       [LHsTyVarBndr RdrName],
-		       [LHsType RdrName]) }
-	: context '=>' type		{% checkTyClHdr $1         $3 >>= return.LL }
-	| type                          {% checkTyClHdr (noLoc []) $1 >>= return.L1 }
+tycl_hdr :: { Located (LHsContext RdrName, LHsType RdrName) }
+	: context '=>' type		{ LL ($1, $3) }
+	| type                          { L1 (noLoc [], $1) }
 
 -----------------------------------------------------------------------------
 -- Stand-alone deriving
@@ -979,21 +905,22 @@ opt_asig :: { Maybe (LHsType RdrName) }
 	: {- empty -}			{ Nothing }
 	| '::' atype			{ Just $2 }
 
-sigtypes1 :: { [LHsType RdrName] }
-	: sigtype			{ [ $1 ] }
-	| sigtype ',' sigtypes1		{ $1 : $3 }
-
-sigtype :: { LHsType RdrName }
+sigtype :: { LHsType RdrName }		-- Always a HsForAllTy,
+                                        -- to tell the renamer where to generalise
 	: ctype				{ L1 (mkImplicitHsForAllTy (noLoc []) $1) }
 	-- Wrap an Implicit forall if there isn't one there already
 
-sigtypedoc :: { LHsType RdrName }
+sigtypedoc :: { LHsType RdrName }       -- Always a HsForAllTy
 	: ctypedoc			{ L1 (mkImplicitHsForAllTy (noLoc []) $1) }
 	-- Wrap an Implicit forall if there isn't one there already
 
 sig_vars :: { Located [Located RdrName] }
 	 : sig_vars ',' var		{ LL ($3 : unLoc $1) }
 	 | var				{ L1 [$1] }
+
+sigtypes1 :: { [LHsType RdrName] }	-- Always HsForAllTys
+	: sigtype			{ [ $1 ] }
+	| sigtype ',' sigtypes1		{ $1 : $3 }
 
 -----------------------------------------------------------------------------
 -- Types
@@ -1073,7 +1000,8 @@ btype :: { LHsType RdrName }
 atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
 	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
-	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }
+	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
+	| '{' fielddecls '}'		{ LL $ HsRecTy $2 }              -- Constructor sigs only
 	| '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy Boxed  ($2:$4) }
 	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy Unboxed $2     }
 	| '[' ctype ']'			{ LL $ HsListTy  $2 }
@@ -1115,15 +1043,15 @@ tv_bndr :: { LHsTyVarBndr RdrName }
 	| '(' tyvar '::' kind ')'	{ LL (KindedTyVar (unLoc $2) 
 							  (unLoc $4)) }
 
-fds :: { Located [Located ([RdrName], [RdrName])] }
+fds :: { Located [Located (FunDep RdrName)] }
 	: {- empty -}			{ noLoc [] }
 	| '|' fds1			{ LL (reverse (unLoc $2)) }
 
-fds1 :: { Located [Located ([RdrName], [RdrName])] }
+fds1 :: { Located [Located (FunDep RdrName)] }
 	: fds1 ',' fd			{ LL ($3 : unLoc $1) }
 	| fd				{ L1 [$1] }
 
-fd :: { Located ([RdrName], [RdrName]) }
+fd :: { Located (FunDep RdrName) }
 	: varids0 '->' varids0		{ L (comb3 $1 $2 $3)
 					   (reverse (unLoc $1), reverse (unLoc $3)) }
 
@@ -1165,21 +1093,11 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 gadt_constr :: { [LConDecl RdrName] }
         : con_list '::' sigtype
                 { map (sL (comb2 $1 $3)) (mkGadtDecl (unLoc $1) $3) } 
-        -- Syntax: Maybe merge the record stuff with the single-case above?
-        --         (to kill the mostly harmless reduce/reduce error)
-        -- XXX revisit audreyt
-	| constr_stuff_record '::' sigtype
-		{ let (con,details) = unLoc $1 in 
-		  [LL (ConDecl con Implicit [] (noLoc []) details (ResTyGADT $3) Nothing)] }
-{-
-	| forall context '=>' constr_stuff_record '::' sigtype
-		{ let (con,details) = unLoc $4 in 
-		  LL (ConDecl con Implicit (unLoc $1) $2 details (ResTyGADT $6) Nothing ) }
-	| forall constr_stuff_record '::' sigtype
-		{ let (con,details) = unLoc $2 in 
-		  LL (ConDecl con Implicit (unLoc $1) (noLoc []) details (ResTyGADT $4) Nothing) }
--}
 
+		-- Deprecated syntax for GADT record declarations
+	| oqtycon '{' fielddecls '}' '::' sigtype
+		{% do { cd <- mkDeprecatedGadtRecordDecl (comb2 $1 $6) $1 $3 $6
+                      ; return [cd] } }
 
 constrs :: { Located [LConDecl RdrName] }
         : {- empty; a GHC extension -}  { noLoc [] }
@@ -1192,10 +1110,12 @@ constrs1 :: { Located [LConDecl RdrName] }
 constr :: { LConDecl RdrName }
 	: maybe_docnext forall context '=>' constr_stuff maybe_docprev	
 		{ let (con,details) = unLoc $5 in 
-		  L (comb4 $2 $3 $4 $5) (ConDecl con Explicit (unLoc $2) $3 details ResTyH98 ($1 `mplus` $6)) }
+		  addConDoc (L (comb4 $2 $3 $4 $5) (mkSimpleConDecl con (unLoc $2) $3 details))
+                            ($1 `mplus` $6) }
 	| maybe_docnext forall constr_stuff maybe_docprev
 		{ let (con,details) = unLoc $3 in 
-		  L (comb2 $2 $3) (ConDecl con Explicit (unLoc $2) (noLoc []) details ResTyH98 ($1 `mplus` $4)) }
+		  addConDoc (L (comb2 $2 $3) (mkSimpleConDecl con (unLoc $2) (noLoc []) details))
+                            ($1 `mplus` $4) }
 
 forall :: { Located [LHsTyVarBndr RdrName] }
 	: 'forall' tv_bndrs '.'		{ LL $2 }
@@ -1209,21 +1129,22 @@ constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
 --	C t1 t2 %: D Int
 -- in which case C really would be a type constructor.  We can't resolve this
 -- ambiguity till we come across the constructor oprerator :% (or not, more usually)
-	: btype				{% mkPrefixCon $1 [] >>= return.LL }
-	| oqtycon '{' '}' 		{% mkRecCon $1 [] >>= return.LL }
-	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.LL }
-	| btype conop btype		{ LL ($2, InfixCon $1 $3) }
+	: btype				{% splitCon $1 >>= return.LL }
+	| btype conop btype		{  LL ($2, InfixCon $1 $3) }
 
-constr_stuff_record :: { Located (Located RdrName, HsConDeclDetails RdrName) }
-	: oqtycon '{' '}' 		{% mkRecCon $1 [] >>= return.sL (comb2 $1 $>) }
-	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.sL (comb2 $1 $>) }
+fielddecls :: { [ConDeclField RdrName] }
+        : {- empty -}     { [] }
+        | fielddecls1     { $1 }
 
-fielddecls :: { [([Located RdrName], LBangType RdrName, Maybe (LHsDoc RdrName))] }
-	: fielddecl maybe_docnext ',' maybe_docprev fielddecls { addFieldDoc (unLoc $1) $4 : addFieldDocs $5 $2 }
-	| fielddecl			                       { [unLoc $1] }
+fielddecls1 :: { [ConDeclField RdrName] }
+	: fielddecl maybe_docnext ',' maybe_docprev fielddecls1
+                      { [ addFieldDoc f $4 | f <- $1 ] ++ addFieldDocs $5 $2 }
+                             -- This adds the doc $4 to each field separately
+	| fielddecl   { $1 }
 
-fielddecl :: { Located ([Located RdrName], LBangType RdrName, Maybe (LHsDoc RdrName)) }
-	: maybe_docnext sig_vars '::' ctype maybe_docprev      { L (comb3 $2 $3 $4) (reverse (unLoc $2), $4, $1 `mplus` $5) }
+fielddecl :: { [ConDeclField RdrName] }    -- A list because of   f,g :: Int
+	: maybe_docnext sig_vars '::' ctype maybe_docprev      { [ ConDeclField fld $4 ($1 `mplus` $5) 
+                                                                 | fld <- reverse (unLoc $2) ] }
 
 -- We allow the odd-looking 'inst_type' in a deriving clause, so that
 -- we can do deriving( forall a. C [a] ) in a newtype (GHC extension).

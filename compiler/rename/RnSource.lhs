@@ -16,7 +16,7 @@ import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, rdrNameOcc )
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
-import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
+import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext, rnConDeclFields )
 import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSigTvFn,
                                 makeMiniFixityEnv)
 import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
@@ -647,15 +647,15 @@ rnTyClDecl (tydecl@TyFamily {}) =
   rnFamily tydecl bindTyVarsRn
 
 -- "data", "newtype", "data instance, and "newtype instance" declarations
-rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context, 
+rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context, 
 			   tcdLName = tycon, tcdTyVars = tyvars, 
 			   tcdTyPats = typatsMaybe, tcdCons = condecls, 
-			   tcdKindSig = sig, tcdDerivs = derivs})
+			   tcdKindSig = sig, tcdDerivs = derivs}
   | is_vanilla	          -- Normal Haskell data type decl
   = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
-				-- data type is syntactically illegal
-    do  { tyvars <- pruneTyVars tydecl
-        ; bindTyVarsRn data_doc tyvars                  $ \ tyvars' -> do
+				-- data type is syntactically illegal 
+    ASSERT( distinctTyVarBndrs tyvars )   -- Tyvars should be distinct	
+    do  { bindTyVarsRn data_doc tyvars                  $ \ tyvars' -> do
     	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
@@ -719,10 +719,10 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			  return (Just ds', extractHsTyNames_s ds')
 
 -- "type" and "type instance" declarations
-rnTyClDecl tydecl@(TySynonym {tcdLName = name,
+rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
-  = do { tyvars <- pruneTyVars tydecl
-       ; bindTyVarsRn syn_doc tyvars                    $ \ tyvars' -> do
+  = ASSERT( distinctTyVarBndrs tyvars )   -- Tyvars should be distinct	
+    do { bindTyVarsRn syn_doc tyvars                    $ \ tyvars' -> do
        { name' <- if isFamInstDecl tydecl
 		  then lookupLocatedOccRn     name -- may be imported family
 		  else lookupLocatedTopBndrRn name
@@ -801,6 +801,13 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
     sig_doc  = text "In the signatures for class"  	<+> ppr cname
 
+distinctTyVarBndrs :: [LHsTyVarBndr RdrName] -> Bool
+-- The tyvar binders should have distinct names
+distinctTyVarBndrs tvs 
+  = null (findDupsEq eq tvs)
+  where
+    eq (L _ v1) (L _ v2) = hsTyVarName v1 == hsTyVarName v2
+
 badGadtStupidTheta :: Located RdrName -> SDoc
 badGadtStupidTheta _
   = vcat [ptext (sLit "No context is allowed on a GADT-style data declaration"),
@@ -815,37 +822,6 @@ badGadtStupidTheta _
 %*********************************************************
 
 \begin{code}
--- Remove any duplicate type variables in family instances may have non-linear
--- left-hand sides.  Complain if any, but the first occurence of a type
--- variable has a user-supplied kind signature.
---
-pruneTyVars :: TyClDecl RdrName -> RnM [LHsTyVarBndr RdrName]
-pruneTyVars tydecl
-  | isFamInstDecl tydecl
-  = do { let pruned_tyvars = nubBy eqLTyVar tyvars
-       ; assertNoSigsInRepeats tyvars
-       ; return pruned_tyvars
-       }
-  | otherwise 
-  = return tyvars
-  where
-    tyvars = tcdTyVars tydecl
-
-    assertNoSigsInRepeats []       = return ()
-    assertNoSigsInRepeats (tv:tvs)
-      = do { let offending_tvs = [ tv' | tv'@(L _ (KindedTyVar _ _)) <- tvs
-                                       , tv' `eqLTyVar` tv]
-           ; checkErr (null offending_tvs) $
-               illegalKindSig (head offending_tvs)
-           ; assertNoSigsInRepeats tvs
-           }
-
-    illegalKindSig tv
-      = hsep [ptext (sLit "Repeat variable occurrence may not have a"), 
-              ptext (sLit "kind signature:"), quotes (ppr tv)]
-
-    tv1 `eqLTyVar` tv2 = hsLTyVarLocName tv1 `eqLocated` hsLTyVarLocName tv2
-
 -- Although, we are processing type patterns here, all type variables will
 -- already be in scope (they are the same as in the 'tcdTyVars' field of the
 -- type declaration to which these patterns belong)
@@ -859,8 +835,12 @@ rnConDecls _tycon condecls
   = mapM (wrapLocM rnConDecl) condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
-rnConDecl (ConDecl name expl tvs cxt details res_ty mb_doc)
+rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
+                   	, con_cxt = cxt, con_details = details
+                   	, con_res = res_ty, con_doc = mb_doc
+                   	, con_old_rec = old_rec, con_explicit = expl })
   = do	{ addLocM checkConName name
+    	; when old_rec (addWarn (deprecRecSyntax decl))
 
 	; new_name <- lookupLocatedTopBndrRn name
 	; name_env <- getLocalRdrEnv
@@ -871,20 +851,21 @@ rnConDecl (ConDecl name expl tvs cxt details res_ty mb_doc)
 	; let not_in_scope  = not . (`elemLocalRdrEnv` name_env) . unLoc
 	      arg_tys       = hsConDeclArgTys details
 	      implicit_tvs  = case res_ty of
-	      	    		ResTyH98 -> filter not_in_scope $
+	      	    		ResTyH98     -> filter not_in_scope $
 						get_rdr_tvs arg_tys
 	      	    		ResTyGADT ty -> get_rdr_tvs (ty : arg_tys)
-	      tvs' = case expl of
-	        	Explicit -> tvs
-		    	Implicit -> userHsTyVarBndrs implicit_tvs
+	      new_tvs = case expl of
+	        	  Explicit -> tvs
+		    	  Implicit -> userHsTyVarBndrs implicit_tvs
 
-	; mb_doc' <- rnMbLHsDoc mb_doc 
+        ; mb_doc' <- rnMbLHsDoc mb_doc 
 
-	; bindTyVarsRn doc tvs' $ \new_tyvars -> do
+        ; bindTyVarsRn doc new_tvs $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
-        ; new_details <- rnConDeclDetails doc details
+	; new_details <- rnConDeclDetails doc details
         ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
-        ; return (ConDecl new_name expl new_tyvars new_context new_details' new_res_ty mb_doc') }}
+        ; return (decl { con_name = new_name, con_qvars = new_tyvars, con_cxt = new_context 
+                       , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' }) }}
  where
     doc = text "In the definition of data constructor" <+> quotes (ppr name)
     get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy Boxed tys))
@@ -895,15 +876,22 @@ rnConResult :: SDoc
             -> RnM (HsConDetails (LHsType Name) [ConDeclField Name],
                     ResType Name)
 rnConResult _ details ResTyH98 = return (details, ResTyH98)
+rnConResult doc details (ResTyGADT ty)
+  = do { ty' <- rnLHsType doc ty
+       ; let (arg_tys, res_ty) = splitHsFunType ty'
+          	-- We can finally split it up, 
+		-- now the renamer has dealt with fixities
+	        -- See Note [Sorting out the result type] in RdrHsSyn
 
-rnConResult doc details (ResTyGADT ty) = do
-    ty' <- rnHsSigType doc ty
-    let (arg_tys, res_ty) = splitHsFunType ty'
-	-- We can split it up, now the renamer has dealt with fixities
-    case details of
-	PrefixCon _xs -> ASSERT( null _xs ) return (PrefixCon arg_tys, ResTyGADT res_ty)
-	RecCon _ -> return (details, ResTyGADT ty')
-	InfixCon {}   -> panic "rnConResult"
+             details' = case details of
+       	     	           RecCon {}    -> details
+			   PrefixCon {} -> PrefixCon arg_tys
+			   InfixCon {}  -> pprPanic "rnConResult" (ppr ty)
+			  -- See Note [Sorting out the result type] in RdrHsSyn
+		
+       ; when (not (null arg_tys) && case details of { RecCon {} -> True; _ -> False })
+              (addErr (badRecResTy doc))
+       ; return (details', ResTyGADT res_ty) }
 
 rnConDeclDetails :: SDoc
                  -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
@@ -918,17 +906,10 @@ rnConDeclDetails doc (InfixCon ty1 ty2)
     return (InfixCon new_ty1 new_ty2)
 
 rnConDeclDetails doc (RecCon fields)
-  = do	{ new_fields <- mapM (rnField doc) fields
+  = do	{ new_fields <- rnConDeclFields doc fields
 		-- No need to check for duplicate fields
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 	; return (RecCon new_fields) }
-
-rnField :: SDoc -> ConDeclField RdrName -> RnM (ConDeclField Name)
-rnField doc (ConDeclField name ty haddock_doc)
-  = lookupLocatedTopBndrRn name	`thenM` \ new_name ->
-    rnLHsType doc ty		`thenM` \ new_ty ->
-    rnMbLHsDoc haddock_doc      `thenM` \ new_haddock_doc ->
-    return (ConDeclField new_name new_ty new_haddock_doc) 
 
 -- Rename family declarations
 --
@@ -1004,6 +985,16 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
     rdrName `ltvElem` (L _ tv:ltvs)
       | rdrName == hsTyVarName tv = True
       | otherwise		  = rdrName `ltvElem` ltvs
+
+deprecRecSyntax :: ConDecl RdrName -> SDoc
+deprecRecSyntax decl 
+  = vcat [ ptext (sLit "Declaration of") <+> quotes (ppr (con_name decl))
+    	 	 <+> ptext (sLit "uses deprecated syntax")
+         , ptext (sLit "Instead, use the form")
+         , nest 2 (ppr decl) ]	 -- Pretty printer uses new form
+
+badRecResTy :: SDoc -> SDoc
+badRecResTy doc = ptext (sLit "Malformed constructor signature") $$ doc
 
 noPatterns :: SDoc
 noPatterns = text "Default definition for an associated synonym cannot have"

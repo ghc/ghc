@@ -372,14 +372,14 @@ ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 -------------------------------------------------------
 
 repC :: LConDecl Name -> DsM (Core TH.ConQ)
-repC (L _ (ConDecl con _ [] (L _ []) details ResTyH98 _))
+repC (L _ (ConDecl { con_name = con, con_qvars = [], con_cxt = L _ []
+     	           , con_details = details, con_res = ResTyH98 }))
   = do { con1 <- lookupLOcc con 	-- See note [Binders and occurrences] 
        ; repConstr con1 details 
        }
-repC (L loc (ConDecl con expl tvs (L cloc ctxt) details ResTyH98 doc))
+repC (L loc con_decl@(ConDecl { con_qvars = tvs, con_cxt = L cloc ctxt, con_res = ResTyH98 }))
   = addTyVarBinds tvs $ \bndrs -> 
-      do { c' <- repC (L loc (ConDecl con expl [] (L cloc []) details 
-                                      ResTyH98 doc))
+      do { c' <- repC (L loc (con_decl { con_qvars = [], con_cxt = L cloc [] }))
          ; ctxt' <- repContext ctxt
          ; bndrs' <- coreList tyVarBndrTyConName bndrs
          ; rep2 forallCName [unC bndrs', unC ctxt', unC c']

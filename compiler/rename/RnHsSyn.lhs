@@ -65,6 +65,7 @@ extractHsTyNames ty
     get (HsOpTy ty1 op ty2)    = getl ty1 `unionNameSets` getl ty2 `unionNameSets` unitNameSet (unLoc op)
     get (HsParTy ty)           = getl ty
     get (HsBangTy _ ty)        = getl ty
+    get (HsRecTy flds)         = extractHsTyNames_s (map cd_fld_type flds)
     get (HsNumTy _)            = emptyNameSet
     get (HsTyVar tv)           = unitNameSet tv
     get (HsSpliceTy _)         = emptyNameSet   -- Type splices mention no type variables

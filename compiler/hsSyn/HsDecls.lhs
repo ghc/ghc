@@ -41,7 +41,7 @@ module HsDecls (
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
   CImportSpec(..), FoType(..),
   -- ** Data-constructor declarations
-  ConDecl(..), LConDecl, ResType(..), ConDeclField(..),
+  ConDecl(..), LConDecl, ResType(..), 
   HsConDeclDetails, hsConDeclArgTys, hsConDeclsNames,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -704,9 +704,8 @@ data ConDecl name
         -- ^ Type variables.  Depending on 'con_res' this describes the
 	-- follewing entities
         --
-        --  - ResTyH98: the constructor's existential type variables
-        --
-        --  - ResTyGADT: all the constructor's quantified type variables
+        --  - ResTyH98:  the constructor's *existential* type variables
+        --  - ResTyGADT: *all* the constructor's quantified type variables
 
     , con_cxt       :: LHsContext name
         -- ^ The context.  This /does not/ include the \"stupid theta\" which
@@ -720,6 +719,12 @@ data ConDecl name
 
     , con_doc       :: Maybe (LHsDoc name)
         -- ^ A possible Haddock comment.
+
+    , con_old_rec :: Bool   
+        -- ^ TEMPORARY field; True <=> user has employed now-deprecated syntax for
+	--   	       	               GADT-style record decl   C { blah } :: T a b
+	-- Remove this when we no longer parse this stuff, and hence do not
+	-- need to report decprecated use
     }
 
 type HsConDeclDetails name = HsConDetails (LBangType name) [ConDeclField name]
@@ -729,15 +734,15 @@ hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map cd_fld_type flds
 
-data ConDeclField name	-- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_name :: Located name,
-		   cd_fld_type :: LBangType name, 
-		   cd_fld_doc  :: Maybe (LHsDoc name) }
-
 data ResType name
    = ResTyH98		-- Constructor was declared using Haskell 98 syntax
    | ResTyGADT (LHsType name)	-- Constructor was declared using GADT-style syntax,
 				--	and here is its result type
+
+instance OutputableBndr name => Outputable (ResType name) where
+	 -- Debugging only
+   ppr ResTyH98 = ptext (sLit "ResTyH98")
+   ppr (ResTyGADT ty) = ptext (sLit "ResTyGADT") <+> pprParendHsType (unLoc ty)
 \end{code}
 
 \begin{code}
@@ -764,33 +769,31 @@ instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
 pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
-pprConDecl (ConDecl con expl tvs cxt details ResTyH98 doc)
+pprConDecl (ConDecl { con_name =con, con_explicit = expl, con_qvars = tvs
+                    , con_cxt = cxt, con_details = details
+                    , con_res = ResTyH98, con_doc = doc })
   = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details con details]
   where
     ppr_details con (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
     ppr_details con (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
-    ppr_details con (RecCon fields)  = ppr con <+> ppr_fields fields
+    ppr_details con (RecCon fields)  = ppr con <+> pprConDeclFields fields
 
-pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty) _)
+pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
+                    , con_cxt = cxt, con_details = PrefixCon arg_tys
+                    , con_res = ResTyGADT res_ty })
   = ppr con <+> dcolon <+> 
     sep [pprHsForAll expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
   where
     mk_fun_ty a b = noLoc (HsFunTy a b)
 
-pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty) _)
-  = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr_fields fields <+> dcolon <+> ppr res_ty]
+pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
+                    , con_cxt = cxt, con_details = RecCon fields, con_res = ResTyGADT res_ty })
+  = sep [ppr con <+> dcolon <+> pprHsForAll expl tvs cxt, 
+         pprConDeclFields fields <+> arrow <+> ppr res_ty]
 
-pprConDecl (ConDecl con _expl _tvs _cxt (InfixCon _ _) (ResTyGADT _res_ty) _)
+pprConDecl (ConDecl {con_name = con, con_details = InfixCon {}, con_res = ResTyGADT {} })
   = pprPanic "pprConDecl" (ppr con)
 	-- In GADT syntax we don't allow infix constructors
-
-
-ppr_fields :: OutputableBndr name => [ConDeclField name] -> SDoc
-ppr_fields fields = braces (sep (punctuate comma (map ppr_fld fields)))
-  where
-    ppr_fld (ConDeclField { cd_fld_name = n, cd_fld_type = ty, 
-			    cd_fld_doc = doc })
-  	= ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
 \end{code}
 
 %************************************************************************

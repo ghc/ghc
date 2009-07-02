@@ -2364,14 +2364,34 @@ In this example we give a single signature for <literal>T1</literal> and <litera
 <listitem><para>
 The type signature of
 each constructor is independent, and is implicitly universally quantified as usual. 
-Different constructors may have different universally-quantified type variables
-and different type-class constraints.  
-For example, this is fine:
+In particular, the type variable(s) in the "<literal>data T a where</literal>" header 
+have no scope, and different constructors may have different universally-quantified type variables:
+<programlisting>
+  data T a where        -- The 'a' has no scope
+    T1,T2 :: b -> T b   -- Means forall b. b -> T b
+    T3 :: T a           -- Means forall a. T a
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+A constructor signature may mention type class constraints, which can differ for
+different constructors.  For example, this is fine:
 <programlisting>
   data T a where
-    T1 :: Eq b => b -> T b
+    T1 :: Eq b => b -> b -> T b
     T2 :: (Show c, Ix c) => c -> [c] -> T c
 </programlisting>
+When patten matching, these constraints are made available to discharge constraints
+in the body of the match. For example:
+<programlisting>
+  f :: T a -> String
+  f (T1 x y) | x==y      = "yes"
+             | otherwise = "no"
+  f (T2 a b)             = show a
+</programlisting>
+Note that <literal>f</literal> is not overloaded; the <literal>Eq</literal> constraint arising
+from the use of <literal>==</literal> is discharged by the pattern match on <literal>T1</literal>
+and similarly the <literal>Show</literal> constraint arising from the use of <literal>show</literal>.
 </para></listitem>
 
 <listitem><para>
@@ -2383,12 +2403,12 @@ have no scope.  Indeed, one can write a kind signature instead:
 </programlisting>
 or even a mixture of the two:
 <programlisting>
-  data Foo a :: (* -> *) -> * where ...
+  data Bar a :: (* -> *) -> * where ...
 </programlisting>
 The type variables (if given) may be explicitly kinded, so we could also write the header for <literal>Foo</literal>
 like this:
 <programlisting>
-  data Foo a (b :: * -> *) where ...
+  data Bar a (b :: * -> *) where ...
 </programlisting>
 </para></listitem>
 
@@ -2419,27 +2439,48 @@ declaration.   For example, these two declarations are equivalent
 </para></listitem>
 
 <listitem><para>
+The type signature may have quantified type variables that do not appear
+in the result type:
+<programlisting>
+  data Foo where
+     MkFoo :: a -> (a->Bool) -> Foo
+     Nil   :: Foo
+</programlisting>
+Here the type variable <literal>a</literal> does not appear in the result type
+of either constructor.  
+Although it is universally quantified in the type of the constructor, such
+a type variable is often called "existential".  
+Indeed, the above declaration declares precisely the same type as 
+the <literal>data Foo</literal> in <xref linkend="existential-quantification"/>.
+</para><para>
+The type may contain a class context too, of course:
+<programlisting>
+  data Showable where
+    MkShowable :: Show a => a -> Showable
+</programlisting>
+</para></listitem>
+
+<listitem><para>
 You can use record syntax on a GADT-style data type declaration:
 
 <programlisting>
   data Person where
-      Adult { name :: String, children :: [Person] } :: Person
-      Child { name :: String } :: Person
+      Adult :: { name :: String, children :: [Person] } -> Person
+      Child :: Show a => { name :: !String, funny :: a } -> Person
 </programlisting>
 As usual, for every constructor that has a field <literal>f</literal>, the type of
 field <literal>f</literal> must be the same (modulo alpha conversion).
-</para>
-<para>
-At the moment, record updates are not yet possible with GADT-style declarations, 
-so support is limited to record construction, selection and pattern matching.
-For example
-<programlisting>
-  aPerson = Adult { name = "Fred", children = [] }
+The <literal>Child</literal> constructor above shows that the signature
+may have a context, existentially-quantified variables, and strictness annotations, 
+just as in the non-record case.  (NB: the "type" that follows the double-colon
+is not really a type, because of the record syntax and strictness annotations.
+A "type" of this form can appear only in a constructor signature.)
+</para></listitem>
 
-  shortName :: Person -> Bool
-  hasChildren (Adult { children = kids }) = not (null kids)
-  hasChildren (Child {})                  = False
-</programlisting>
+<listitem><para> 
+Record updates are allowed with GADT-style declarations, 
+only fields that have the following property: the type of the field
+mentions no existential type variables.
 </para></listitem>
 
 <listitem><para> 

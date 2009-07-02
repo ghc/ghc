@@ -124,18 +124,18 @@ tdefs	:: { [TyClDecl RdrName] }
 
 tdef	:: { TyClDecl RdrName }
 	: '%data' q_tc_name tv_bndrs '=' '{' cons '}' ';'
-                { mkTyData DataType ( noLoc []
-				    , noLoc (ifaceExtRdrName $2)
-				    , map toHsTvBndr $3
-				    , Nothing
-				    ) Nothing $6 Nothing }
+	{ TyData { tcdND = DataType, tcdCtxt = noLoc [] 
+	         , tcdLName = noLoc (ifaceExtRdrName $2)
+	         , tcdTyVars = map toHsTvBndr $3
+	         , tcdTyPats = Nothing, tcdKindSig = Nothing
+	         , tcdCons = $6, tcdDerivs = Nothing } }
 	| '%newtype' q_tc_name tv_bndrs trep ';'
 		{ let tc_rdr = ifaceExtRdrName $2 in
-                  mkTyData NewType ( noLoc []
-				   , noLoc tc_rdr
-				   , map toHsTvBndr $3
-				   , Nothing
-				   ) Nothing ($4 (rdrNameOcc tc_rdr)) Nothing }
+		    TyData { tcdND = NewType, tcdCtxt = noLoc []
+			     , tcdLName = noLoc tc_rdr
+			     , tcdTyVars = map toHsTvBndr $3
+			     , tcdTyPats = Nothing, tcdKindSig = Nothing
+			     , tcdCons = $4 (rdrNameOcc tc_rdr), tcdDerivs = Nothing } }
 
 -- For a newtype we have to invent a fake data constructor name
 -- It doesn't matter what it is, because it won't be used
@@ -143,8 +143,8 @@ trep    :: { OccName -> [LConDecl RdrName] }
         : {- empty -}   { (\ tc_occ -> []) }
         | '=' ty        { (\ tc_occ -> let { dc_name  = mkRdrUnqual (setOccNameSpace dataName tc_occ) ;
 			                     con_info = PrefixCon [toHsType $2] }
-			                in [noLoc $ ConDecl (noLoc dc_name) Explicit []
-					   (noLoc []) con_info ResTyH98 Nothing]) }
+			                in [noLoc $ mkSimpleConDecl (noLoc dc_name) []
+					               (noLoc []) con_info]) }
 
 cons	:: { [LConDecl RdrName] }
 	: {- empty -}	{ [] } -- 20060420 Empty data types allowed. jds
@@ -153,15 +153,8 @@ cons	:: { [LConDecl RdrName] }
 
 con	:: { LConDecl RdrName }
 	: d_pat_occ attv_bndrs hs_atys 
-		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) Explicit $2 (noLoc []) (PrefixCon $3) ResTyH98 Nothing }
-        | d_pat_occ '::' ty
-                -- XXX - audreyt - $3 needs to be split into argument and return types!
-                -- also not sure whether the [] below (quantified vars) appears.
-                -- also the "PrefixCon []" is wrong.
-                -- also we want to munge $3 somehow.
-                -- extractWhatEver to unpack ty into the parts to ConDecl
-                -- XXX - define it somewhere in RdrHsSyn
-		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) Explicit [] (noLoc []) (PrefixCon []) (undefined $3) Nothing }
+		{ noLoc $ mkSimpleConDecl (noLoc (mkRdrUnqual $1)) $2 (noLoc []) (PrefixCon $3) }
+-- ToDo: parse record-style declarations
 
 attv_bndrs :: { [LHsTyVarBndr RdrName] }
 	: {- empty -} 	         { [] }

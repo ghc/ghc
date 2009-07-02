@@ -7,7 +7,7 @@
 module RnTypes ( 
 	-- Type related stuff
 	rnHsType, rnLHsType, rnLHsTypes, rnContext,
-	rnHsSigType, rnHsTypeFVs,
+	rnHsSigType, rnHsTypeFVs, rnConDeclFields,
 
 	-- Precence related stuff
 	mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -23,7 +23,7 @@ import DynFlags
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn		( extractHsTyNames )
-import RnHsDoc          ( rnLHsDoc )
+import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import TcRnMonad
 import RdrName
@@ -128,9 +128,13 @@ rnHsType doc (HsParTy ty) = do
     ty' <- rnLHsType doc ty
     return (HsParTy ty')
 
-rnHsType doc (HsBangTy b ty) = do
-    ty' <- rnLHsType doc ty
-    return (HsBangTy b ty')
+rnHsType doc (HsBangTy b ty)
+  = do { ty' <- rnLHsType doc ty
+       ; return (HsBangTy b ty') }
+
+rnHsType doc (HsRecTy flds)
+  = do { flds' <- rnConDeclFields doc flds
+       ; return (HsRecTy flds') }
 
 rnHsType _ (HsNumTy i)
   | i == 1    = return (HsNumTy i)
@@ -213,6 +217,16 @@ rnForAll doc exp forall_tyvars ctxt ty
     return (HsForAllTy exp new_tyvars new_ctxt new_ty)
 	-- Retain the same implicit/explicit flag as before
 	-- so that we can later print it correctly
+
+rnConDeclFields :: SDoc -> [ConDeclField RdrName] -> RnM [ConDeclField Name]
+rnConDeclFields doc fields = mapM (rnField doc) fields
+
+rnField :: SDoc -> ConDeclField RdrName -> RnM (ConDeclField Name)
+rnField doc (ConDeclField name ty haddock_doc)
+  = do { new_name <- lookupLocatedTopBndrRn name
+       ; new_ty <- rnLHsType doc ty
+       ; new_haddock_doc <- rnMbLHsDoc haddock_doc
+       ; return (ConDeclField new_name new_ty new_haddock_doc) }
 \end{code}
 
 %*********************************************************

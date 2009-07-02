@@ -404,9 +404,14 @@ kc_hs_type (HsForAllTy exp tv_names context ty)
 
   	; return (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind) }
 
-kc_hs_type (HsBangTy b ty) = do
-    (ty', kind) <- kc_lhs_type ty
-    return (HsBangTy b ty', kind)
+kc_hs_type (HsBangTy b ty)
+  = do { (ty', kind) <- kc_lhs_type ty
+       ; return (HsBangTy b ty', kind) }
+
+kc_hs_type ty@(HsRecTy _)
+  = failWithTc (ptext (sLit "Unexpected record type") <+> ppr ty)
+      -- Record types (which only show up temporarily in constructor signatures) 
+      -- should have been removed by now
 
 #ifdef GHCI	/* Only if bootstrapped */
 kc_hs_type (HsSpliceTy sp) = kcSpliceType sp
@@ -554,8 +559,11 @@ ds_type ty@(HsTyVar _)
 ds_type (HsParTy ty)		-- Remove the parentheses markers
   = dsHsType ty
 
-ds_type ty@(HsBangTy _ _)	-- No bangs should be here
+ds_type ty@(HsBangTy {})    -- No bangs should be here
   = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
+
+ds_type ty@(HsRecTy {})	    -- No bangs should be here
+  = failWithTc (ptext (sLit "Unexpected record type:") <+> ppr ty)
 
 ds_type (HsKindSig ty _)
   = dsHsType ty	-- Kind checking done already

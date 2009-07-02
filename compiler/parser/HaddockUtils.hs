@@ -151,17 +151,16 @@ parseKey key toParse0 =
 -- -----------------------------------------------------------------------------
 -- Adding documentation to record fields (used in parsing).
 
-type Field a = ([Located a], LBangType a, Maybe (LHsDoc a))
+addFieldDoc :: ConDeclField a -> Maybe (LHsDoc a) -> ConDeclField a
+addFieldDoc fld doc = fld { cd_fld_doc = cd_fld_doc fld `mplus` doc }
 
-addFieldDoc :: Field a -> Maybe (LHsDoc a) -> Field a
-addFieldDoc (a, b, c) doc = (a, b, c `mplus` doc)
-
-addFieldDocs :: [Field a] -> Maybe (LHsDoc a) -> [Field a]
+addFieldDocs :: [ConDeclField a] -> Maybe (LHsDoc a) -> [ConDeclField a]
 addFieldDocs [] _ = []
 addFieldDocs (x:xs) doc = addFieldDoc x doc : xs
 
 addConDoc :: LConDecl a -> Maybe (LHsDoc a) -> LConDecl a
-addConDoc (L p c) doc = L p ( c { con_doc = con_doc c `mplus` doc } )
+addConDoc decl    Nothing = decl
+addConDoc (L p c) doc     = L p ( c { con_doc = con_doc c `mplus` doc } )
 
 addConDocs :: [LConDecl a] -> Maybe (LHsDoc a) -> [LConDecl a]
 addConDocs [] _ = []

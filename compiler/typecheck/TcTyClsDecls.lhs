@@ -590,7 +590,8 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	; return (decl {tcdTyVars = tvs, tcdCtxt = ctxt', tcdCons = cons'}) }
   where
     -- doc comments are typechecked to Nothing here
-    kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res _) 
+    kc_con_decl con_decl@(ConDecl { con_name = name, con_qvars = ex_tvs
+                                  , con_cxt = ex_ctxt, con_details = details, con_res = res })
       = addErrCtxt (dataConCtxt name)	$ 
         kcHsTyVars ex_tvs $ \ex_tvs' -> do
         do { ex_ctxt' <- kcHsContext ex_ctxt
@@ -598,7 +599,8 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
            ; res'     <- case res of
                 ResTyH98 -> return ResTyH98
                 ResTyGADT ty -> do { ty' <- kcHsSigType ty; return (ResTyGADT ty') }
-           ; return (ConDecl name expl ex_tvs' ex_ctxt' details' res' Nothing) }
+           ; return (con_decl { con_qvars = ex_tvs', con_cxt = ex_ctxt'
+                              , con_details = details', con_res = res' }) }
 
     kc_con_details (PrefixCon btys) 
 	= do { btys' <- mapM kc_larg_ty btys 
@@ -829,7 +831,8 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> TcM DataCon
 
 tcConDecl unbox_strict existential_ok rep_tycon res_tmpl 	-- Data types
-	  (ConDecl name _ tvs ctxt details res_ty _)
+	  (ConDecl {con_name =name, con_qvars = tvs, con_cxt = ctxt
+                   , con_details = details, con_res = res_ty })
   = addErrCtxt (dataConCtxt name)	$ 
     tcTyVarBndrs tvs			$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt

@@ -115,31 +115,37 @@ cvtTop (TH.SigD nm typ)
 	; returnL $ Hs.SigD (TypeSig nm' ty') }
 
 cvtTop (TySynD tc tvs rhs)
-  = do	{ (_, tc', tvs', _) <- cvt_tycl_hdr [] tc tvs
+  = do	{ (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
 	; rhs' <- cvtType rhs
 	; returnL $ TyClD (TySynonym tc' tvs' Nothing rhs') }
 
 cvtTop (DataD ctxt tc tvs constrs derivs)
-  = do	{ stuff <- cvt_tycl_hdr ctxt tc tvs
+  = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
 	; cons' <- mapM cvtConstr constrs
 	; derivs' <- cvtDerivs derivs
-	; returnL $ TyClD (mkTyData DataType stuff Nothing cons' derivs') }
+	; returnL $ TyClD (TyData { tcdND = DataType, tcdLName = tc', tcdCtxt = ctxt'
+                                  , tcdTyVars = tvs', tcdTyPats = Nothing, tcdKindSig = Nothing
+                                  , tcdCons = cons', tcdDerivs = derivs' }) }
 
 cvtTop (NewtypeD ctxt tc tvs constr derivs)
-  = do	{ stuff <- cvt_tycl_hdr ctxt tc tvs
+  = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
 	; con' <- cvtConstr constr
 	; derivs' <- cvtDerivs derivs
-	; returnL $ TyClD (mkTyData NewType stuff Nothing [con'] derivs') }
+	; returnL $ TyClD (TyData { tcdND = NewType, tcdLName = tc', tcdCtxt = ctxt'
+	  	    	  	  , tcdTyVars = tvs', tcdTyPats = Nothing, tcdKindSig = Nothing
+                                  , tcdCons = [con'], tcdDerivs = derivs'}) }
 
 cvtTop (ClassD ctxt cl tvs fds decs)
-  = do	{ (cxt', tc', tvs', _) <- cvt_tycl_hdr ctxt cl tvs
+  = do	{ (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
 	; fds'  <- mapM cvt_fundep fds
         ; let (ats, bind_sig_decs) = partition isFamilyD decs
 	; (binds', sigs') <- cvtBindsAndSigs bind_sig_decs
         ; ats' <- mapM cvtTop ats
         ; let ats'' = map unTyClD ats'
 	; returnL $ 
-            TyClD $ mkClassDecl (cxt', tc', tvs') fds' sigs' binds' ats'' []
+            TyClD $ ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
+	    	              , tcdFDs = fds', tcdSigs = sigs', tcdMeths = binds'
+			      , tcdATs = ats'', tcdDocs = [] }
 						        -- no docs in TH ^^
 	}
   where
@@ -174,7 +180,7 @@ cvtTop (PragmaD prag)
        }
 
 cvtTop (FamilyD flav tc tvs kind)
-  = do { (_, tc', tvs', _) <- cvt_tycl_hdr [] tc tvs
+  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
        ; let kind' = fmap cvtKind kind
        ; returnL $ TyClD (TyFamily (cvtFamFlavour flav) tc' tvs' kind')
        }
@@ -183,17 +189,21 @@ cvtTop (FamilyD flav tc tvs kind)
     cvtFamFlavour DataFam = DataFamily
 
 cvtTop (DataInstD ctxt tc tys constrs derivs)
-  = do { stuff <- cvt_tyinst_hdr ctxt tc tys
+  = do { (ctxt', tc', tvs', typats') <- cvt_tyinst_hdr ctxt tc tys
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
-       ; returnL $ TyClD (mkTyData DataType stuff Nothing cons' derivs') 
+       ; returnL $ TyClD (TyData { tcdND = DataType, tcdLName = tc', tcdCtxt = ctxt'
+                                  , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
+                                  , tcdCons = cons', tcdDerivs = derivs' })
        }
 
 cvtTop (NewtypeInstD ctxt tc tys constr derivs)
-  = do { stuff <- cvt_tyinst_hdr ctxt tc tys
+  = do { (ctxt', tc', tvs', typats') <- cvt_tyinst_hdr ctxt tc tys
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
-       ; returnL $ TyClD (mkTyData NewType stuff Nothing [con'] derivs') 
+       ; returnL $ TyClD (TyData { tcdND = NewType, tcdLName = tc', tcdCtxt = ctxt'
+                                  , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
+                                  , tcdCons = [con'], tcdDerivs = derivs' })
        }
 
 cvtTop (TySynInstD tc tys rhs)
@@ -210,13 +220,12 @@ unTyClD _               = panic "Convert.unTyClD: internal error"
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
              -> CvtM ( LHsContext RdrName
                      , Located RdrName
-                     , [LHsTyVarBndr RdrName]
-                     , Maybe [LHsType RdrName])
+                     , [LHsTyVarBndr RdrName])
 cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext cxt
        ; tc'  <- tconNameL tc
        ; tvs' <- cvtTvs tvs
-       ; return (cxt', tc', tvs', Nothing) 
+       ; return (cxt', tc', tvs') 
        }
 
 cvt_tyinst_hdr :: TH.Cxt -> TH.Name -> [TH.Type]
@@ -259,20 +268,20 @@ cvtConstr (NormalC c strtys)
   = do	{ c'   <- cNameL c 
 	; cxt' <- returnL []
 	; tys' <- mapM cvt_arg strtys
-	; returnL $ ConDecl c' Explicit noExistentials cxt' (PrefixCon tys') ResTyH98 Nothing }
+	; returnL $ mkSimpleConDecl c' noExistentials cxt' (PrefixCon tys') }
 
 cvtConstr (RecC c varstrtys)
   = do 	{ c'    <- cNameL c 
 	; cxt'  <- returnL []
 	; args' <- mapM cvt_id_arg varstrtys
-	; returnL $ ConDecl c' Explicit noExistentials cxt' (RecCon args') ResTyH98 Nothing }
+	; returnL $ mkSimpleConDecl c' noExistentials cxt' (RecCon args') }
 
 cvtConstr (InfixC st1 c st2)
   = do 	{ c' <- cNameL c 
 	; cxt' <- returnL []
 	; st1' <- cvt_arg st1
 	; st2' <- cvt_arg st2
-	; returnL $ ConDecl c' Explicit noExistentials cxt' (InfixCon st1' st2') ResTyH98 Nothing }
+	; returnL $ mkSimpleConDecl c' noExistentials cxt' (InfixCon st1' st2') }
 
 cvtConstr (ForallC tvs ctxt (ForallC tvs' ctxt' con'))
   = cvtConstr (ForallC (tvs ++ tvs') (ctxt ++ ctxt') con')
@@ -282,8 +291,8 @@ cvtConstr (ForallC tvs ctxt con)
 	; tvs'  <- cvtTvs tvs
 	; ctxt' <- cvtContext ctxt
 	; case con' of
-	    ConDecl l _ [] (L _ []) x ResTyH98 _
-	      -> returnL $ ConDecl l Explicit tvs' ctxt' x ResTyH98 Nothing
+	    ConDecl { con_qvars = [], con_cxt = L _ [] }
+	      -> returnL $ con' { con_qvars = tvs', con_cxt = ctxt' }
 	    _ -> panic "ForallC: Can't happen" }
 
 cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
