@@ -905,11 +905,19 @@ clean_files :
 	"$(RM)" $(RM_OPTS) $(CLEAN_FILES)
 
 .PHONY: clean_libraries
+clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES) $(PACKAGES_STAGE2))
+clean_libraries: $(patsubst %,clean_libraries/%_dist-boot,$(BOOT_PKGS))
+
 clean_libraries:
 	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist-install, $(PACKAGES) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist-boot, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/*.buildinfo, $(PACKAGES) $(PACKAGES_STAGE2))
+
+# We have to define a clean target for each library manually, because the
+# libraries/*/ghc.mk files are not included when we're cleaning.
+ifeq "$(CLEANING)" "YES"
+$(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),\
+  $(eval $(call clean-target,libraries/$(lib),dist-install,libraries/$(lib)/dist-install)))
+endif
 
 distclean : clean
 	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
@@ -921,6 +929,7 @@ distclean : clean
 	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h
 	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h
 	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h
+
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES) $(PACKAGES_STAGE2))
