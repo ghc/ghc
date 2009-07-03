@@ -16,9 +16,21 @@ TOPMAKE = $(MAKE) -C $(TOP)
 
 default: all
 
-fast :
-	+$(TOPMAKE) all_$(dir) $(dir)_dist-install_NO_BUILD_DEPS=YES \
-	   OMIT_PHASE_1=YES OMIT_PHASE_2=YES OMIT_PHASE_3=YES
+fast: all
+
+FAST_MAKE_OPTS =\
+  $(dir)_dist_NO_BUILD_DEPS=YES \
+  $(dir)_dist-boot_NO_BUILD_DEPS=YES \
+  $(dir)_dist-install_NO_BUILD_DEPS=YES \
+  OMIT_PHASE_1=YES OMIT_PHASE_2=YES OMIT_PHASE_3=YES
+
+ifneq "$(filter fast,$(MAKECMDGOALS))" ""
+EXTRA_MAKE_OPTS += $(FAST_MAKE_OPTS)
+else
+ifeq "$(FAST)" "YES"
+EXTRA_MAKE_OPTS += $(FAST_MAKE_OPTS)
+endif
+endif
 
 # We must not execute multiple recursive invocations of make in parallel.
 .NOTPARALLEL:
@@ -28,12 +40,12 @@ STD_TARGETS = all clean distclean maintainer_clean install html ps pdf
 # The + tells make that we're recursively invoking make, otherwise 'make -j2'
 # goes wrong.
 $(STD_TARGETS): 
-	+$(TOPMAKE) $@_$(dir)
+	+$(TOPMAKE) $@_$(dir) $(EXTRA_MAKE_OPTS)
 
 OTHERTARGETS=$(filter-out fast help $(STD_TARGETS) $(SPEC_TARGETS),$(MAKECMDGOALS))
 .PHONY: $(OTHERTARGETS)
 $(OTHERTARGETS):
-	+$(TOPMAKE) $(dir)/$@
+	+$(TOPMAKE) $(dir)/$@ $(EXTRA_MAKE_OPTS)
 
 .PHONY: help
 help : sub-help
