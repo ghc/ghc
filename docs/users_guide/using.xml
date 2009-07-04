@@ -1795,7 +1795,9 @@ f "2"    = 2
   </sect1>
   
   &phases;  
-  
+
+  &shared_libs;
+
   <sect1 id="using-concurrent">
     <title>Using Concurrent Haskell</title>
     <indexterm><primary>Concurrent Haskell</primary><secondary>using</secondary></indexterm>

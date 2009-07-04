@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="using-shared-libs">
+  <title>Using shared libraries</title>
+  <indexterm><primary>Shared libraries</primary><secondary>using</secondary></indexterm>
+  <indexterm><primary>Dynamic libraries</primary><secondary>using</secondary></indexterm>
+
+  <para>
+    On some platforms GHC supports building Haskell code into shared
+    libraries. Shared libraries are also sometimes known as dynamic
+    libraries, in particular on Windows they are referred to as dynamic link
+    libraries (DLLs).
+  </para>
+
+  <para>
+    Shared libraries allow a single instance of some pre-compiled code to be
+    shared between several programs. In contrast, with static linking the
+    code is copied into each program. Using shared libraries can thus save
+    disk space. They also allow a single copy of code to be shared in memory
+    between several programs that use it. Shared libraires are often used as
+    a way of structuring large projects, especially where different parts are
+    written in different programming languages. Shared libraries are also
+    commonly used as a plugin mechanism by various applications. This is
+    particularly common on Windows using COM.
+  </para>
+
+  <para>
+    In GHC version 6.12 building shared libraries is supported for Linux on
+    x86 and x86-64 architectures and there is partial support on Windows (see
+    <xref linkend="win32-dlls"/>). The crucial difference in support on
+    Windows is that it is not currently possible to build each Haskell
+    package as a separate DLL, it is only possible to link an entire Haskell
+    program as one massive DLL.
+  </para>
+
+  <para>
+    Building and using shared libraries is slightly more complicated than
+    building and using static libraries. When using Cabal much of the detail
+    is hidden, just use <literal>--enable-shared</literal> when configuring a
+    package to build it into a shared library, or to link it against other
+    packages built as shared libraries. The additional complexity when
+    building code is to distinguish whether the code will be used in a shared
+    library or will use shared library versions of other packages it depends
+    on. There is additional complexity when installing and distributing
+    shared libraries or programs that use shared libraries, to ensure that
+    all shared libraries that are required at runtime are present in suitable
+    locations.
+  </para>
+
+  <sect2>
+    <title>Building programs that use shared libraries</title>
+    <para>
+      To build a simple program and have it use shared libraries for the
+      runtime system and the base libraries use the
+      <literal>-dynamic</literal> flag:
+<programlisting>
+ghc --make -dynamic Main.hs
+</programlisting>
+      This has two effects. The first is to compile the code in such a way
+      that it can be linked against shared library versions of Haskell
+      packages (such as base). The second is when linking, to link against
+      the shared versions of the packages' libraries rather than the static
+      versions. Obviously this requires that the packages were build with
+      shared libraries. On supported platforms GHC comes with shared
+      libraries for all the core packages, but if you install extra packages
+      (e.g. with Cabal) then they would also have to be built with shared
+      libraries (<literal>--enable-shared</literal> for Cabal).
+    </para>
+  </sect2>
+
+  <sect2>
+    <title>Building shared libraries</title>
+    <para>
+      To build some Haskell modules into a shared library use the
+      <literal>-dynamic</literal>, <literal>-fPIC</literal> and
+      <literal>-shared</literal> flags:
+<programlisting>
+ghc --make -dynamic -shared -fPIC Foo.hs -o libfoo.so
+</programlisting>
+      As before, the <literal>-dynamic</literal> flag specifies that this
+      library links against the shared library versions of the rts and base
+      package. The <literal>-fPIC</literal> flag is required for all code
+      that will end up in a shared library. The <literal>-shared</literal>
+      flag specifies to make a shared library rather than a program. To make
+      this clearer we can break this down into separate compliation and link
+      steps:
+<programlisting>
+ghc -dynamic -fPIC -c Foo.hs
+ghc -dynamic -shared Foo.o -o libfoo.so
+</programlisting>
+      In principle you can use <literal>-shared</literal> without
+      <literal>-dynamic</literal> in the link step. That means to
+      statically link the rts all the base libraries into your new shared
+      library. This would make a very big, but standalone shared library.
+      Indeed this is exactly what we must currently do on Windows where
+      -dynamic is not yet supported (see <xref linkend="win32-dlls"/>).
+      On most platforms however that would require all the static libraries
+      to have been built with <literal>-fPIC</literal> so that the code is
+      suitable to include into a shared library and we do not do that at the
+      moment.
+    </para>
+  </sect2>
+
+  <sect2>
+    <title>Shared libraries that export a C API</title>
+    <para>
+      Building Haskell code into a shared library is a good way to include
+      Haskell code in a larger mixed-language project. While with static
+      linking it is recommended to use GHC to perform the final link step,
+      with shared libaries a Haskell library can be treated just like any
+      other shared libary. The linking can be done using the normal system C
+      compiler or linker.
+    </para>
+    <para>
+      It is possible to load shared libraries generated by GHC in other
+      programs not written in Haskell, so they are suitable for using as
+      plugins. Of course to construct a plugin you will have to use the FFI
+      to export C functions and follow the rules about initialising the RTS.
+      See <xref linkend="ffi-library"/>. In particular you will probably want
+      to export a C function from your shared library to initialise the
+      plugin before any Haskell functions are called.
+    </para>
+  </sect2>
+
+  <sect2>
+    <title>Shared libraries for Haskell packages</title>
+    <para>
+      When building Haskell packages as shared libraries to be used by other
+      Haskell programs there are certain conventions that must be followed.
+      These are handled by Cabal but for the details see <xref
+      linkend="building-packages"/>.
+   </para>
+  </sect2>
+
+  <sect2 id="finding-shared-libs">
+    <title>Finding shared libraries at runtime</title>
+    <para>
+      The primary difficulty with managing shared libraries is arranging
+      things such that programs can find the libraries they need at runtime.
+      The details of how this works varies between platforms, in particular
+      the three major systems: Unix ELF platforms, Windows and Mac OS X.
+    </para>
+    <para>
+      On Unix there are two mechanisms. Shared libraries can be installed
+      into standard locations that the dynamic linker knows about. For
+      example <literal>/usr/lib</literal> or
+      <literal>/usr/local/lib</literal> on most systems. The other mechanism
+      is to use a "runtime path" or "rpath" embedded into programs and
+      libraries themselves. These paths can either be absolute paths or on at
+      least Linux and Solaris they can be paths relative to the program or
+      libary itself. In principle this makes it possible to construct fully
+      relocatable sets of programs and libraries.
+    </para>
+    <para>
+      GHC has a <literal>-dynload</literal> linking flag to select the method
+      that is used to find shared libraries at runtime. There are currently
+      three modes:
+      <variablelist>
+	<varlistentry>
+	  <term>sysdep</term>
+	  <listitem>
+	    <para>
+	      A system-dependent mode. This is also the default mode. On Unix
+	      ELF systems this embeds rpaths into the shared library or
+	      executable. In particular it uses absolute paths to where the
+	      shared libraries for the rts and each package can be found.
+	      This means the program can immediately be run and it will be
+	      able to find the libraries it needs. However it may not be
+	      suitable for deployment if the libraries are installed in a
+	      different location on another machine.
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term>deploy</term>
+	  <listitem>
+	    <para>
+	      This does not embed any runtime paths. It relies on the shared
+	      libraries being available in a standard location or in a
+	      directory given by the <literal>LD_LIBRARY_PATH</literal>
+	      environment variable.
+	    </para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term>wrapped</term>
+	  <listitem>
+	    <para>
+	      This mode generates a wrapper program which in turn calls the
+	      real program (in the same directory but with a .dyn extension)
+	      in such a way that it can find the shared libraries that it
+	      needs. At the current time this mode is somewhat experimental.
+	    </para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+      To use relative paths for dependent libraries on Linux and Solaris you
+      can use the <literal>deploy</literal> mode and pass suitable a -rpath
+      flag to the linker:
+<programlisting>
+ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
+</programlisting>
+      This assumes that the library <literal>libfoo.so</literal> is in the
+      current directory and will be able to be found in the same directory as
+      the executable <literal>main</literal> once the program is deployed.
+      Similarly it would be possible to use a subdirectory relative to the
+      executable e.g. <literal>-optl-Wl,-rpath,'$ORIGIN/lib'</literal>.
+    </para>
+  </sect2>
+
+</sect1>
