@@ -1721,6 +1721,12 @@
 	  </thead>
 	  <tbody>
 	    <row>
+  	      <entry><option>-shared</option></entry>
+	      <entry>Generate a shared library (as opposed to an executable)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-fPIC</option></entry>
 	      <entry>Generate position-independent code (where available)</entry>
 	      <entry>static</entry>
@@ -1729,6 +1735,13 @@
 	    <row>
 	      <entry><option>-dynamic</option></entry>
 	      <entry>Use dynamic Haskell libraries (if available)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dynload</option></entry>
+	      <entry>Selects one of a number of modes for finding shared
+	        libraries at runtime.</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

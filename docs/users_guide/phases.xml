@@ -863,6 +863,19 @@ $ cat foo.hspp</screen>
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term>
+          <option>-dynload</option>
+          <indexterm><primary><option>-dynload</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+	    This flag selects one of a number of modes for finding shared
+	    libraries at runtime. See <xref linkend="finding-shared-libs"/> for
+	    a description of each mode.
+          </para>
+        </listitem>
+      </varlistentry>
 
       <varlistentry>
         <term>
