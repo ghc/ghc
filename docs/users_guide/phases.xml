@@ -642,12 +642,10 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Generate position-independent code (code that can be put into
-          shared libraries). This currently works on Mac OS X; it works on
-          PowerPC Linux when using the native code generator (-fasm).
-          It is not quite ready to be used yet for x86 Linux.
-          On Windows, position-independent code is never used,
-          and on PowerPC64 Linux, position-independent code is always used,
-          so the flag is a no-op on those platforms.</para>
+          shared libraries). This currently works on Linux x86 and x86-64 when
+          using the native code generator (-fasm).
+          On Windows, position-independent code is never used
+          so the flag is a no-op on that platform.</para>
         </listitem>
       </varlistentry>
 
@@ -659,8 +657,8 @@ $ cat foo.hspp</screen>
           <para>When generating code, assume that entities imported from a
           different package will reside in a different shared library or
           binary.</para>
-          <para>Note that this option also causes GHC to use shared libraries
-          when linking.</para>
+          <para>Note that using this option when linking causes GHC to link
+	  against shared libraries.</para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -825,8 +823,10 @@ $ cat foo.hspp</screen>
           <indexterm><primary><option>-dynamic</option></primary></indexterm>
         </term>
         <listitem>
-          <para>This flag switches to shared Haskell libraries for
-          linking. See <xref linkend="building-packages" /> on how to
+          <para>This flag tells GHC to link against shared Haskell libraries.
+	  This flag only affects the selection of dependent libraries, not
+	  the form of the current target (see -shared).
+	  See <xref linkend="using-shared-libs" /> on how to
           create them.</para>
 
           <para>Note that this option also has an effect on

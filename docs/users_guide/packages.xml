@@ -393,8 +393,9 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
 	  <literal>&ndash;all_load</literal> on MacOS X)</para>
       </listitem>
       <listitem>
-	<para>When building the package as shared object, GHC wraps
-	  out the underlying linker so that the user gets a common
+	<para>When building the package as shared library, GHC can be used to
+	  perform the link step. This hides some of the details
+	  out the underlying linker and provides a common
 	  interface to all shared object variants that are supported
 	  by GHC (DLLs, ELF DSOs, and Mac OS dylibs). The shared
 	  object must be named in specific way for two reasons: (1)

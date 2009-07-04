@@ -210,7 +210,8 @@ make-sessions running under cygwin.
 
 <para>
 <emphasis>Making Haskell libraries into DLLs doesn't work on Windows at the
-moment; we hope to re-instate this facility in the future.  Note that
+moment; we hope to re-instate this facility in the future
+(see <xref linkend="using-shared-libs"/>).  Note that
 building an entire Haskell application as a single DLL is still supported: it's
 	just multi-DLL Haskell programs that don't work.  The Windows
 	distribution of GHC contains static libraries only.</emphasis></para>
