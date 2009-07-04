@@ -63,6 +63,21 @@ OK:
 </programlisting>
 </para>
       </sect2>
+
+      <sect2>
+        <title>Primitive imports</title>
+	<para>
+	  GHC extends the FFI with an additional calling convention
+	  <literal>prim</literal>, e.g.:
+<programlisting>
+   foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
+</programlisting>
+	  This is used to import functions written in Cmm code that follow an
+	  internal GHC calling convention. This feature is not intended for
+	  use outside of the core libraries that come with GHC. For more
+	  details see the GHC developer wiki.
+	</para>
+      </sect2>
   </sect1>
 
   <sect1 id="ffi-ghc">
