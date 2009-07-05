@@ -27,7 +27,6 @@
 #     * docs/man/Makefile
 #     * docs/storage-mgmt/Makefile
 #     * docs/vh/Makefile
-#     * driver/Makefile
 #     * rts/dotnet/Makefile
 #     * utils/Makefile
 #   * GhcProfiled
