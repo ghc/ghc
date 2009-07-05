@@ -11,16 +11,18 @@
 
 module Haddock.Backends.HH2 (ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection) where
 
+import Haddock.Types
 
-ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection :: a
+ppHH2Files :: FilePath -> Maybe String -> [Interface] -> [FilePath] -> IO ()
+ppHH2Files = error "not yet"
+
+ppHH2Contents, ppHH2Index, ppHH2Collection :: a
 ppHH2Contents = error "not yet"
 ppHH2Index = error "not yet"
-ppHH2Files = error "not yet"
 ppHH2Collection = error "not yet"
 
 {-
 import HaddockModuleTree
-import HaddockTypes
 import HaddockUtil
 import HsSyn2 hiding(Doc)
 import qualified Map

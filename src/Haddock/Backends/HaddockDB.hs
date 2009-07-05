@@ -22,6 +22,7 @@ import Text.PrettyPrint
 -----------------------------------------------------------------------------
 -- Printing the results in DocBook format
 
+ppDocBook :: a
 ppDocBook = error "not working"
 {-
 ppDocBook :: FilePath -> [(Module, Interface)] -> String

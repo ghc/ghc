@@ -22,7 +22,11 @@ import GlaExts
 import PrelIOBase
 #else
 import GHC.Base
+#if __GLASGOW_HASKELL__ < 611
 import GHC.IOBase
+#else
+import GHC.IO
+#endif
 #endif
 
 #if __GLASGOW_HASKELL__ < 411

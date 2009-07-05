@@ -379,6 +379,7 @@ mkNode ss (Node s leaf pkg short ts) depth id_ = htmlNode
 
     mod_width = 50::Int {-em-}
 
+    td_pad_w :: Double -> Int -> Html -> HtmlTable
     td_pad_w pad depth_ = 
 	tda [thestyle ("padding-left: " ++ show pad ++ "em;" ++
 		       "width: " ++ show (mod_width - depth_*2) ++ "em")]
@@ -543,6 +544,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 	    tda [ theclass "indexentry" ] << toHtml str </> 
 		aboves (map doAnnotatedEntity (zip [1..] many_entities))
 
+  doAnnotatedEntity :: (Integer, (Name, [(Module, Bool)])) -> HtmlTable
   doAnnotatedEntity (j,(nm,entries))
 	= tda [ theclass "indexannot" ] << 
 		toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
@@ -1540,6 +1542,7 @@ ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP 
 ppr_mono_ty _         (HsPredTy p)        u = parens (ppPred u p)
 ppr_mono_ty _         (HsNumTy n)         _ = toHtml (show n) -- generics only
 ppr_mono_ty _         (HsSpliceTy _)      _ = error "ppr_mono_ty-haddock"
+ppr_mono_ty _         (HsRecTy _)         _ = error "ppr_mono_ty HsRecTy"
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode 
   = maybeParen ctxt_prec pREC_CON $

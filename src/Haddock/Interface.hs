@@ -102,7 +102,7 @@ createInterfaces' verbosity modules flags instIfaceMap = do
   modgraph' <- if needsTemplateHaskell modgraph
        then do
          dflags <- getSessionDynFlags
-         setSessionDynFlags dflags { hscTarget = HscC } 
+         _ <- setSessionDynFlags dflags { hscTarget = HscC } 
          -- we need to set HscC on all the ModSummaries as well
          let addHscC m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = HscC } }  
          return (map addHscC modgraph)
@@ -186,8 +186,8 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       out verbosity verbose "Creating interface..."
       let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
       liftIO $ mapM_ putStrLn msg
-      liftIO $ evaluate interface
-      return (Just interface)
+      interface' <- liftIO $ evaluate interface
+      return (Just interface')
     else
       return Nothing
 #else
