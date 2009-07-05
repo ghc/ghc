@@ -21,8 +21,6 @@
 #   * need to fix Cabal for new Windows layout, see
 #     Distribution/Simple/GHC.configureToolchain.
 #   * remove old Makefiles, add new stubs for building in subdirs
-#     * utils/hsc2hs/Makefile
-#     * utils/haddock/Makefile
 #     * docs/Makefile
 #     * docs/docbook-cheat-sheet/Makefile
 #     * docs/ext-core/Makefile
