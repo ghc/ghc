@@ -9,16 +9,14 @@ import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
-import Distribution.Simple.Utils (defaultPackageDesc)
+import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic)
 import Distribution.Simple.Build (writeAutogenFiles)
-import Distribution.Simple.Register (writeInstalledConfig)
+import Distribution.Simple.Register
 import Distribution.Simple.PackageIndex
 import Distribution.Text
 import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
-         ( InstalledPackageInfo_(..) )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
-         ( topologicalOrder, lookupPackageName, insert )
 
 import Control.Monad
 import Data.Maybe
@@ -182,9 +180,15 @@ generate config_args distdir directory
       writeAutogenFiles verbosity pd lbi
 
       -- generate inplace-pkg-config
-      when (isJust $ library pd) $
-          writeInstalledConfig distdir pd lbi True
-                               (distdir </> "inplace-pkg-config")
+      case (library pd, libraryConfig lbi) of
+          (Nothing, Nothing) -> return ()
+          (Just lib, Just clbi) -> do
+              cwd <- getCurrentDirectory
+              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
+                                         pd lib lbi clbi
+                  content = Installed.showInstalledPackageInfo installedPkgInfo ++ "\n"
+              writeFileAtomic (distdir </> "inplace-pkg-config") content
+          _ -> error "Inconsistent lib components; can't happen?"
 
       let
           libBiModules lib = (libBuildInfo lib, libModules lib)
