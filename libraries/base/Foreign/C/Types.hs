@@ -50,7 +50,11 @@ module Foreign.C.Types
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
           -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
           -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
-        , CFloat,  CDouble, CLDouble
+        , CFloat,  CDouble
+-- GHC doesn't support CLDouble yet
+#ifndef __GLASGOW_HASKELL__
+        , CLDouble
+#endif
 #else
           -- Exported non-abstractly in nhc98 to fix an interface file problem.
           CChar(..),    CSChar(..),  CUChar(..)
@@ -151,19 +155,24 @@ INTEGRAL_TYPE(CULLong,tyConCULLong,"CULLong",HTYPE_UNSIGNED_LONG_LONG)
 FLOATING_TYPE(CFloat,tyConCFloat,"CFloat",HTYPE_FLOAT)
 -- | Haskell type representing the C @double@ type.
 FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
+-- GHC doesn't support CLDouble yet
+#ifndef __GLASGOW_HASKELL__
 -- HACK: Currently no long double in the FFI, so we simply re-use double
 -- | Haskell type representing the C @long double@ type.
 FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
+#endif
 
 {-# RULES
 "realToFrac/a->CFloat"    realToFrac = \x -> CFloat   (realToFrac x)
 "realToFrac/a->CDouble"   realToFrac = \x -> CDouble  (realToFrac x)
-"realToFrac/a->CLDouble"  realToFrac = \x -> CLDouble (realToFrac x)
 
 "realToFrac/CFloat->a"    realToFrac = \(CFloat   x) -> realToFrac x
 "realToFrac/CDouble->a"   realToFrac = \(CDouble  x) -> realToFrac x
-"realToFrac/CLDouble->a"  realToFrac = \(CLDouble x) -> realToFrac x
  #-}
+
+-- GHC doesn't support CLDouble yet
+-- "realToFrac/a->CLDouble"  realToFrac = \x -> CLDouble (realToFrac x)
+-- "realToFrac/CLDouble->a"  realToFrac = \(CLDouble x) -> realToFrac x
 
 -- | Haskell type representing the C @ptrdiff_t@ type.
 INTEGRAL_TYPE(CPtrdiff,tyConCPtrdiff,"CPtrdiff",HTYPE_PTRDIFF_T)
