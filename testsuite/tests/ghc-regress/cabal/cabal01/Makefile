@@ -38,7 +38,7 @@ cabal01:
 	ls -1 install
 	./setup sdist -v0
 	echo dist:
-	ls dist
+	ls -1 dist
 	$(GHC_PKG) unregister test
 	if [ "$(CLEANUP)" != "" ]; then $(MAKE) clean; fi
 

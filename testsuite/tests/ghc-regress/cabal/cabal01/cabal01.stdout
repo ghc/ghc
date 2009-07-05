@@ -6,8 +6,6 @@ bin
 lib
 dist:
 build
-inplace-pkg-config
-installed-pkg-config
 package.conf.inplace
 setup-config
 src
