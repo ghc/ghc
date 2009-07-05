@@ -359,7 +359,8 @@ renameTyClD d = case d of
       details'  <- renameDetails details
       restype'  <- renameResType restype
       mbldoc'   <- mapM renameLDoc mbldoc
-      return (ConDecl lname' expl ltyvars' lcontext' details' restype' mbldoc') 
+      return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
+                   , con_details = details', con_res = restype', con_doc = mbldoc' })
 
     renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
