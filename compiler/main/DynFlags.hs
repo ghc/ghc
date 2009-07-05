@@ -309,6 +309,7 @@ data DynFlag
    | Opt_PrintBindContents
    | Opt_GenManifest
    | Opt_EmbedManifest
+   | Opt_EmitExternalCore
 
 	-- temporary flags
    | Opt_RunCPS
@@ -1740,6 +1741,7 @@ fFlags = [
     deprecatedForLanguage "IncoherentInstances" ),
   ( "gen-manifest",                     Opt_GenManifest, const Supported ),
   ( "embed-manifest",                   Opt_EmbedManifest, const Supported ),
+  ( "ext-core",                         Opt_EmitExternalCore, const Supported ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, const Supported )
   ]
 

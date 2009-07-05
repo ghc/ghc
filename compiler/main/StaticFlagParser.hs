@@ -167,7 +167,6 @@ isStaticFlag f =
     "static",
     "fhardwire-lib-paths",
     "funregisterised",
-    "fext-core",
     "fcpr-off",
     "ferror-spans",
     "fPIC",

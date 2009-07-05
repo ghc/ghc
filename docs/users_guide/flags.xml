@@ -2054,7 +2054,7 @@
 	    <row>
 	      <entry><option>-fext-core</option></entry>
 	      <entry>Generate <filename>.hcr</filename> external Core files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>

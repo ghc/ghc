@@ -26,7 +26,6 @@ import Outputable
 import Encoding
 import ForeignCall
 import DynFlags
-import StaticFlags
 import FastString
 
 import IO
@@ -34,7 +33,7 @@ import Data.Char
 
 emitExternalCore :: DynFlags -> CgGuts -> IO ()
 emitExternalCore dflags cg_guts
- | opt_EmitExternalCore 
+ | dopt Opt_EmitExternalCore dflags
  = (do handle <- openFile corename WriteMode
        hPutStrLn handle (show (mkExternalCore cg_guts))      
        hClose handle)

@@ -68,7 +68,6 @@ module StaticFlags (
 	opt_HistorySize,
 	opt_OmitBlackHoling,
 	opt_Unregisterised,
-	opt_EmitExternalCore,
 	v_Ld_inputs,
 	tablesNextToCode,
         opt_StubDeadValues,
@@ -280,9 +279,6 @@ opt_Unregisterised		= lookUp  (fsLit "-funregisterised")
 tablesNextToCode :: Bool
 tablesNextToCode 		= not opt_Unregisterised
 		 		  && cGhcEnableTablesNextToCode == "YES"
-
-opt_EmitExternalCore :: Bool
-opt_EmitExternalCore		= lookUp  (fsLit "-fext-core")
 
 -- Include full span info in error messages, instead of just the start position.
 opt_ErrorSpans :: Bool
