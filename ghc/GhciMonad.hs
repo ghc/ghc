@@ -30,13 +30,13 @@ import qualified MonadUtils
 import qualified ErrUtils
 
 import Exception
-import Data.Maybe
+-- import Data.Maybe
 import Numeric
 import Data.Array
-import Data.Char
+-- import Data.Char
 import Data.Int         ( Int64 )
 import Data.IORef
-import Data.List
+-- import Data.List
 import System.CPUTime
 import System.Environment
 import System.IO

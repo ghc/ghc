@@ -49,8 +49,7 @@ module TysPrim(
 import Var		( TyVar, mkTyVar )
 import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
 import OccName		( mkTyVarOccFS, mkTcOccFS )
-import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon,
-			  PrimRep(..) )
+import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon )
 import Type
 import SrcLoc
 import Unique		( mkAlphaTyVarUnique, pprUnique )

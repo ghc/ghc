@@ -11,7 +11,7 @@ import Outputable
 
 import Data.Word
 import Data.Bits
-import Data.List
+-- import Data.List
 
 -- The PowerPC has 32 integer and 32 floating point registers.
 -- This is 32bit PowerPC, so Word64 is inefficient - two Word32s are much

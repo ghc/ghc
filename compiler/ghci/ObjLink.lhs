@@ -28,7 +28,7 @@ import Config		( cLeadingUnderscore )
 import Control.Monad    ( when )
 import Foreign.C
 import Foreign		( nullPtr )
-import GHC.Exts         ( Ptr(..), unsafeCoerce# )
+import GHC.Exts         ( Ptr(..) )
 
 
 

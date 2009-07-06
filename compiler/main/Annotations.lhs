@@ -22,7 +22,6 @@ import LazyUniqFM
 import Serialized
 import Unique
 
-import Control.Monad
 import Data.Typeable
 import Data.Maybe
 import Data.Word        ( Word8 )

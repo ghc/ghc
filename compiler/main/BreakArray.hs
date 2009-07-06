@@ -31,7 +31,6 @@ import GHC.IO ( IO(..) )
 #else
 import GHC.IOBase ( IO(..) )
 #endif
-import GHC.Word
 import Constants
 
 data BreakArray = BA (MutableByteArray# RealWorld)

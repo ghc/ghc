@@ -82,7 +82,7 @@ import Data.Array
 import Exception
 import Control.Concurrent
 import Data.List (sortBy)
-import Foreign.StablePtr
+-- import Foreign.StablePtr
 import System.IO
 
 -- -----------------------------------------------------------------------------

@@ -13,7 +13,7 @@ import FastBool
 
 import Data.Word
 import Data.Bits
-import Data.List
+-- import Data.List
 
 
 --------------------------------------------------------------------------------

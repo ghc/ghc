@@ -65,7 +65,6 @@ import Cmm
 import CLabel           ( CLabel )
 import Pretty
 import Outputable	( panic )
-import qualified Outputable
 import FastTypes
 import FastBool
 

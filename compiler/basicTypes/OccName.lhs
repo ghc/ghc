@@ -102,8 +102,6 @@ import FastString
 import FastTypes
 import Outputable
 import Binary
-
-import GHC.Exts
 import Data.Char
 \end{code}
 

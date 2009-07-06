@@ -74,8 +74,6 @@ import Maybes
 import Util
 import Data.Word
 import Data.Bits
-
-import GHC.Exts		-- For `xori` 
 \end{code}
 
 

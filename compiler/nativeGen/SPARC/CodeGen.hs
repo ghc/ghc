@@ -42,7 +42,6 @@ import CLabel
 -- The rest:
 import StaticFlags	( opt_PIC )
 import OrdList
-import qualified Outputable as O
 import Outputable
 
 import Control.Monad	( mapAndUnzipM )

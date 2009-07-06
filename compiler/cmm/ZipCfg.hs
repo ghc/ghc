@@ -44,7 +44,6 @@ import CmmExpr ( UserOfLocalRegs(..) )
 import PprCmm()
 
 import Outputable hiding (empty)
-import Panic
 
 import Maybe
 import Prelude hiding (zip, unzip, last)

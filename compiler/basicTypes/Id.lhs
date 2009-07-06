@@ -126,7 +126,6 @@ import Module
 import Class
 import PrimOp
 import ForeignCall
-import OccName
 import Maybes
 import SrcLoc
 import Outputable

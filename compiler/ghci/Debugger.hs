@@ -20,18 +20,18 @@ import Id
 import Name
 import Var hiding ( varName )
 import VarSet
-import Name 
+-- import Name 
 import UniqSupply
 import TcType
 import GHC
-import DynFlags
+-- import DynFlags
 import InteractiveEval
 import Outputable
-import SrcLoc
+-- import SrcLoc
 import PprTyThing
 import MonadUtils
 
-import Exception
+-- import Exception
 import Control.Monad
 import Data.List
 import Data.Maybe

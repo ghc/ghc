@@ -42,7 +42,6 @@ import Name
 import HscTypes
 import PrelInfo
 import PrelNames
-import MkId
 import PrimOp
 import SrcLoc
 import TyCon
@@ -58,9 +57,7 @@ import Util
 import MonadUtils
 import Outputable
 import FastString
-import OccName
 import Bag
-
 import Data.List	( partition, intersperse )
 \end{code}
 

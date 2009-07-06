@@ -51,7 +51,6 @@ import Outputable
 import Unique
 import ListSetOps
 import Util
-import Maybes
 import FastString
 import Module
 

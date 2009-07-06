@@ -23,14 +23,14 @@ import Debugger
 -- The GHC interface
 import qualified GHC hiding (resume, runStmt)
 import GHC              ( LoadHowMuch(..), Target(..),  TargetId(..),
-                          Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, SrcSpan, Resume, SingleStep,
+                          TyThing(..), Phase,
+                          BreakIndex, Resume, SingleStep,
                           Ghc, handleSourceError )
 import PprTyThing
 import DynFlags
 
 import Packages
-import PackageConfig
+-- import PackageConfig
 import UniqFM
 
 import HscTypes ( implicitTyThings, handleFlagWarnings )
@@ -68,7 +68,6 @@ import Control.Monad.Trans
 --import SystemExts
 
 import Exception hiding (catch, block, unblock)
-import qualified Exception
 
 -- import Control.Concurrent
 

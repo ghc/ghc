@@ -37,13 +37,13 @@ module Outputable (
 	printForC, printForAsm, printForUser, printForUserPartWay,
 	pprCode, mkCodeStyle,
 	showSDoc, showSDocOneLine,
-    showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
-    showPpr,
+        showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
+        showPpr,
 	showSDocUnqual, showsPrecSDoc,
 
 	pprInfixVar, pprPrefixVar,
 	pprHsChar, pprHsString, pprHsInfix, pprHsVar,
-    pprFastFilePath,
+        pprFastFilePath,
 
         -- * Controlling the style in which output is printed
 	BindingSite(..),

@@ -27,7 +27,6 @@ import Name
 import TysWiredIn
 import VarSet 
 import TysPrim
-import Type
 
 import SrcLoc
 import Outputable

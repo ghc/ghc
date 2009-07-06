@@ -53,7 +53,6 @@ import {-# SOURCE #-} DataCon( DataCon, dataConName )
 -- friends:
 import Var
 import Name
-import OccName
 import BasicTypes
 import TyCon
 import Class

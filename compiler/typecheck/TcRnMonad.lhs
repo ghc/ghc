@@ -45,6 +45,7 @@ import Util
 
 import System.IO
 import Data.IORef
+import qualified Data.Set as Set
 import Control.Monad
 \end{code}
 

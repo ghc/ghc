@@ -29,7 +29,6 @@ import TcSimplify
 import Type
 import Coercion
 import TyCon
-import TypeRep
 import DataCon
 import Class
 import Var

@@ -12,9 +12,9 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC		( DynFlags(..), HscTarget(..),
-                          GhcMode(..), GhcLink(..),
-			  LoadHowMuch(..), dopt, DynFlag(..),
+import GHC		( -- DynFlags(..), HscTarget(..),
+                          -- GhcMode(..), GhcLink(..),
+			  LoadHowMuch(..), -- dopt, DynFlag(..),
                           defaultCallbacks )
 import CmdLineParser
 
@@ -43,7 +43,7 @@ import Outputable
 import SrcLoc
 import Util
 import Panic
-import MonadUtils       ( liftIO )
+-- import MonadUtils       ( liftIO )
 
 -- Standard Haskell libraries
 import System.IO

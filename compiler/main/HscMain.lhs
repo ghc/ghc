@@ -112,10 +112,10 @@ import LazyUniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag		( unitBag )
 import Exception
-import MonadUtils
+-- import MonadUtils
 
 import Control.Monad
-import System.IO
+-- import System.IO
 import Data.IORef
 \end{code}
 #include "HsVersions.h"

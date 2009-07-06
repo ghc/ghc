@@ -54,7 +54,7 @@ import TysWiredIn
 import DynFlags
 import Outputable
 import FastString
-import Panic
+-- import Panic
 
 import Constants        ( wORD_SIZE )
 
@@ -76,9 +76,8 @@ import qualified Data.Sequence as Seq
 import Data.Monoid
 import Data.Sequence hiding (null, length, index, take, drop, splitAt, reverse)
 import Foreign
-import System.IO.Unsafe
+-- import System.IO.Unsafe
 
-import System.IO
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
 ---------------------------------------------

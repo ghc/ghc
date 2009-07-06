@@ -16,7 +16,7 @@ import Maybes
 import Panic
 import UniqSet
 
-import Data.List
+-- import Data.List
 
 fold_edge_facts_b ::
   LastNode l => (DualLive -> a -> a) -> BackwardTransfers m l DualLive -> LGraph m l

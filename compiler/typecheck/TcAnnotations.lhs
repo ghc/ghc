@@ -20,8 +20,6 @@ import TcExpr
 import {-# SOURCE #-} TcSplice ( runAnnotation )
 import FastString
 #endif
-
-import Control.Monad
 \end{code}
 
 \begin{code}

@@ -265,10 +265,10 @@ import Var
 import TysPrim		( alphaTyVars )
 import TyCon
 import Class
-import FunDeps
+-- import FunDeps
 import DataCon
 import Name             hiding ( varName )
-import OccName		( parenSymOcc )
+-- import OccName		( parenSymOcc )
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr,
                           emptyInstEnv )
 import FamInstEnv       ( emptyFamInstEnv )
@@ -276,7 +276,7 @@ import SrcLoc
 --import CoreSyn
 import TidyPgm
 import DriverPipeline
-import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
+import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo
 import Finder
 import HscMain

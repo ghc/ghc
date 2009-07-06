@@ -71,9 +71,6 @@ import BasicTypes
 
 import Foreign
 import Data.Array
-import Data.Bits
-import Data.Int
-import Data.Word
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Typeable
@@ -84,7 +81,6 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Exts
 import GHC.Word                 ( Word8(..) )
-import System.IO                ( openBinaryFile )
 
 #if __GLASGOW_HASKELL__ >= 611
 import GHC.IO ( IO(..) )

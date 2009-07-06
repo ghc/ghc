@@ -5,7 +5,6 @@ module CmmProcPointZ
     )
 where
 
-import qualified Prelude as P
 import Prelude hiding (zip, unzip, last)
 
 import BlockId

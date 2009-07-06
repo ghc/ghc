@@ -31,9 +31,9 @@ import CoreFVs
 import Type
 import DataCon
 import TyCon
-import Type
+-- import Type
 import Util
-import DataCon
+-- import DataCon
 import Var
 import VarSet
 import TysPrim
@@ -51,7 +51,7 @@ import Data.List
 import Foreign
 import Foreign.C
 
-import GHC.Exts		( Int(..), ByteArray# )
+-- import GHC.Exts		( Int(..) )
 
 import Control.Monad	( when )
 import Data.Char

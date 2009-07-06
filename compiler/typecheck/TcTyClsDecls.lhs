@@ -13,7 +13,6 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn
-import HsTypes
 import HscTypes
 import BuildTyCl
 import TcUnify
@@ -36,7 +35,6 @@ import IdInfo
 import Var
 import VarSet
 import Name
-import OccName
 import Outputable
 import Maybes
 import Monad
@@ -52,7 +50,6 @@ import BasicTypes
 
 import Bag
 import Data.List
-import Control.Monad    ( mplus )
 \end{code}
 
 

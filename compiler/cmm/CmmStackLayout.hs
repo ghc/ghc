@@ -5,7 +5,6 @@ module CmmStackLayout
 where
 
 import Constants
-import qualified Prelude as P
 import Prelude hiding (zip, unzip, last)
 
 import BlockId

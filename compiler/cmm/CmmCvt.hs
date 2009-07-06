@@ -8,7 +8,6 @@ import BlockId
 import Cmm
 import CmmExpr
 import MkZipCfgCmm hiding (CmmGraph)
-import ZipCfg       -- imported for reverse conversion
 import ZipCfgCmmRep -- imported for reverse conversion
 import CmmZipUtil
 import PprCmm()

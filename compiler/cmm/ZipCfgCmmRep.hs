@@ -29,7 +29,6 @@ import CmmTx
 import CLabel
 import FastString
 import ForeignCall
-import qualified ZipCfg as Z
 import qualified ZipDataflow as DF
 import ZipCfg 
 import MkZipCfg
@@ -40,7 +39,6 @@ import Maybes
 import Monad
 import Outputable
 import Prelude hiding (zip, unzip, last)
-import qualified Data.List as L
 import SMRep (ByteOff)
 import UniqSupply
 

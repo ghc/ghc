@@ -153,7 +153,6 @@ import DynFlags
 import Name
 import NameSet
 import VarEnv
-import OccName
 import PrelNames
 import TysWiredIn
 import BasicTypes
@@ -163,7 +162,6 @@ import ListSetOps
 import Outputable
 import FastString
 
-import Data.List
 import Data.IORef
 \end{code}
 

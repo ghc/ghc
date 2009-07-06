@@ -13,14 +13,6 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-unused-imports #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
--- The kludge is only needed in this module because of trac #2267.
-
 module DsMeta( dsBracket, 
 	       templateHaskellNames, qTyConName, nameTyConName,
 	       liftName, liftStringName, expQTyConName, patQTyConName, decQTyConName, typeQTyConName,

@@ -48,12 +48,12 @@ import Maybes		( expectJust )
 import ParserCoreUtils	( getCoreModuleName )
 import SrcLoc
 import FastString
-import MonadUtils
+-- import MonadUtils
 
-import Data.Either
+-- import Data.Either
 import Exception
 import Data.IORef	( readIORef )
-import GHC.Exts		( Int(..) )
+-- import GHC.Exts		( Int(..) )
 import System.Directory
 import System.FilePath
 import System.IO

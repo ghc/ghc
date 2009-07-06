@@ -41,9 +41,6 @@ import Outputable
 import FastString
 import Module
 
-import Data.List
-import Data.Maybe
-
 infixl 3 &&&
 \end{code}
 

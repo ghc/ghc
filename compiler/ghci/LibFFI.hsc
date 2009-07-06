@@ -16,7 +16,7 @@ module LibFFI (
 import TyCon
 import ForeignCall
 import Panic
-import Outputable
+-- import Outputable
 import Constants
 
 import Foreign

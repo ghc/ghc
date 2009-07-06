@@ -72,7 +72,6 @@ import Id
 import IdInfo
 import DataCon
 import Name
-import OccName
 import Type
 import TypeRep
 import TcType

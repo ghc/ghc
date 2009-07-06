@@ -49,10 +49,7 @@ import CLabel
 import Constants
 import FastString
 import FiniteMap
-import Maybes
-import Monad
 import Outputable
-import Panic
 import Unique
 import UniqSet
 

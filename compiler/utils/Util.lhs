@@ -84,9 +84,8 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef       ( readIORef, writeIORef )
 import Data.List        hiding (group)
 
-import qualified Data.List as List ( elem )
 #ifdef DEBUG
-import qualified Data.List as List ( notElem )
+import qualified Data.List as List ( elem, notElem )
 import FastTypes
 #endif
 

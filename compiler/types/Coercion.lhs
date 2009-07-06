@@ -63,10 +63,8 @@ import TyCon
 import Class
 import Var
 import Name
-import OccName
 import PrelNames
 import Util
-import Unique
 import BasicTypes
 import Outputable
 import FastString

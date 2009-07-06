@@ -35,7 +35,6 @@ import Type
 import SMRep
 #endif
 import Name
-import OccName
 import TcType
 import DynFlags
 import Outputable

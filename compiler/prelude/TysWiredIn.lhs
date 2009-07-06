@@ -69,8 +69,6 @@ import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
 import RdrName
 import Name
-import OccName		( mkTcOccFS, mkDataOccFS, mkTupleOcc, mkDataConWorkerOcc,
-			  tcName, dataName )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var
 import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
