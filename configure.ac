@@ -33,6 +33,17 @@ fi
 
 AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
+dnl ----------------------------------------------------------
+dnl ** Find unixy sort and find commands, 
+dnl ** which are needed by FP_SETUP_PROJECT_VERSION
+
+dnl ** Find find command (for Win32's benefit)
+FP_PROG_FIND
+
+dnl ** Find sort command (for the benefit of Win32 environs)
+FP_PROG_SORT
+
+dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
 
 # Hmmm, we fix the RPM release number to 1 here... Is this convenient?
@@ -551,12 +562,6 @@ AC_SUBST(SRC_LD_OPTS)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF
-
-dnl ** Find find command (for Win32's benefit)
-FP_PROG_FIND
-
-dnl ** Find sort command (for the benefit of Win32 environs)
-FP_PROG_SORT
 
 dnl Let's make sure install-sh is executable here.  If we got it from
 dnl a darcs repo, it might not be (see bug #978).

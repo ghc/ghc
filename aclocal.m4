@@ -1017,7 +1017,7 @@ if test "$RELEASE" = "NO"; then
     elif test -d _darcs; then
         # TODO: Remove this branch after conversion to Git
         changequote(, )dnl
-        ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
+        ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | ${SortCmd} -n | tail -1`
         if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
         changequote([, ])dnl
                 AC_MSG_ERROR([failed to detect version date: check that darcs is in your path])
