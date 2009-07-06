@@ -35,6 +35,7 @@ module Text.ParserCombinators.ReadP
   
   -- * Other operations
   pfail,      -- :: ReadP a
+  eof,        -- :: ReadP ()
   satisfy,    -- :: (Char -> Bool) -> ReadP Char
   char,       -- :: Char -> ReadP Char
   string,     -- :: String -> ReadP String
@@ -76,7 +77,7 @@ import Control.Monad( MonadPlus(..), sequence, liftM2 )
 #ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode ( isSpace  )
 #endif
-import GHC.List ( replicate )
+import GHC.List ( replicate, null )
 import GHC.Base
 #else
 import Data.Char( isSpace )
@@ -275,6 +276,12 @@ char :: Char -> ReadP Char
 -- ^ Parses and returns the specified character.
 char c = satisfy (c ==)
 
+eof :: ReadP ()
+-- ^ Succeeds iff we are at the end of input
+eof = do { s <- look 
+         ; if null s then return () 
+                     else pfail }
+
 string :: String -> ReadP String
 -- ^ Parses and returns the specified string.
 string this = do s <- look; scan this s
@@ -285,6 +292,8 @@ string this = do s <- look; scan this s
 
 munch :: (Char -> Bool) -> ReadP String
 -- ^ Parses the first zero or more characters satisfying the predicate.
+--   Always succeds, exactly once having consumed all the characters
+--   Hence NOT the same as (many (satisfy p))
 munch p =
   do s <- look
      scan s
@@ -294,6 +303,8 @@ munch p =
 
 munch1 :: (Char -> Bool) -> ReadP String
 -- ^ Parses the first one or more characters satisfying the predicate.
+--   Fails if none, else succeeds exactly once having consumed all the characters
+--   Hence NOT the same as (many1 (satisfy p))
 munch1 p =
   do c <- get
      if p c then do s <- munch p; return (c:s) else pfail
