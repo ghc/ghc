@@ -1,4 +1,8 @@
 
-HaveLibGmp = @HaveLibGmp@
-HaveFrameworkGMP = @HaveFrameworkGMP@
+ifeq ($(HaveLibGmp),"")
+ HaveLibGmp = @HaveLibGmp@
+endif
 
+ifeq ($(HaveFrameworkGMP),"")
+ HaveFrameworkGMP = @HaveFrameworkGMP@
+endif
