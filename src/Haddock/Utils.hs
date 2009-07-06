@@ -19,7 +19,6 @@ module Haddock.Utils (
   toDescription, toInstalledDescription,
 
   -- * Filename utilities
-  basename, dirname, splitFilename3, 
   moduleHtmlFile, nameHtmlRef,
   contentsHtmlFile, indexHtmlFile,
   frameIndexHtmlFile,
@@ -76,6 +75,7 @@ import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
 import System.IO.Unsafe	 ( unsafePerformIO )
+import System.FilePath
 import Distribution.Verbosity
 import Distribution.ReadE
 
@@ -168,48 +168,6 @@ restrictATs names ats = [ at | at <- ats , tcdName (unL at) `elem` names ]
 
 -- -----------------------------------------------------------------------------
 -- Filename mangling functions stolen from s main/DriverUtil.lhs.
-
-type Suffix = String
-
-splitFilename :: String -> (String,Suffix)
-splitFilename f = split_longest_prefix f (=='.')
-
-basename :: String -> String
-basename f = base where (_dir, base, _suff) = splitFilename3 f
-
-dirname :: String -> String
-dirname f = dir where (dir, _base, _suff) = splitFilename3 f
-
--- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
-splitFilename3 :: String -> (String,String,Suffix)
-splitFilename3 str
-   = let (dir, rest) = split_longest_prefix str isPathSeparator
-	 (name, ext) = splitFilename rest
-	 real_dir | null dir  = "."
-		  | otherwise = dir
-     in  (real_dir, name, ext)
-
-split_longest_prefix :: String -> (Char -> Bool) -> (String,String)
-split_longest_prefix s pred0
-  = case pre0 of
-	[]      -> ([], reverse suf)
-	(_:pre) -> (reverse pre, reverse suf)
-  where (suf,pre0) = break pred0 (reverse s)
-
-pathSeparator :: Char
-#ifdef __WIN32__
-pathSeparator = '\\'
-#else
-pathSeparator = '/'
-#endif
-
-isPathSeparator :: Char -> Bool
-isPathSeparator ch =
-#ifdef mingw32_TARGET_OS
-  ch == '/' || ch == '\\'
-#else
-  ch == '/'
-#endif
 
 moduleHtmlFile :: Module -> FilePath
 moduleHtmlFile mdl =
