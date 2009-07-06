@@ -15,7 +15,7 @@ module RnEnv (
 	lookupInstDeclBndr, lookupRecordBndr, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, 
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
-	getLookupOccRn,
+	getLookupOccRn, addUsedRdrNames,
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV, 
@@ -68,6 +68,7 @@ import List		( nubBy )
 import DynFlags
 import FastString
 import Control.Monad
+import qualified Data.Set as Set
 \end{code}
 
 \begin{code}
@@ -307,6 +308,7 @@ lookup_sub_bndr :: (GlobalRdrElt -> Bool) -> SDoc -> RdrName -> RnM Name
 lookup_sub_bndr is_good doc rdr_name
   | isUnqual rdr_name	-- Find all the things the rdr-name maps to
   = do	{		-- and pick the one with the right parent name
+        ; addUsedRdrName rdr_name
 	; env <- getGlobalRdrEnv
 	; case filter is_good (lookupGlobalRdrEnv env (rdrNameOcc rdr_name)) of
 		-- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
@@ -420,7 +422,27 @@ unboundName rdr_name
 lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Just look up the RdrName in the GlobalRdrEnv
 lookupGreRn_maybe rdr_name 
-  = lookupGreRn_help rdr_name (lookupGRE_RdrName rdr_name)
+  = do { mGre <- lookupGreRn_help rdr_name (lookupGRE_RdrName rdr_name)
+       ; case mGre of
+           Just gre ->
+               case gre_prov gre of
+               LocalDef   -> return ()
+               Imported _ -> addUsedRdrName rdr_name
+           Nothing ->
+               return ()
+       ; return mGre }
+
+addUsedRdrName :: RdrName -> RnM ()
+addUsedRdrName rdr
+  = do { env <- getGblEnv
+       ; updMutVar (tcg_used_rdrnames env)
+	 	   (\s -> Set.insert rdr s) }
+
+addUsedRdrNames :: [RdrName] -> RnM ()
+addUsedRdrNames rdrs
+  = do { env <- getGblEnv
+       ; updMutVar (tcg_used_rdrnames env)
+	 	   (\s -> foldr Set.insert s rdrs) }
 
 lookupGreRn :: RdrName -> RnM GlobalRdrElt
 -- If not found, add error message, and return a fake GRE

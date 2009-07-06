@@ -73,6 +73,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
       	tvs_var      <- newIORef emptyVarSet ;
 	dfuns_var    <- newIORef emptyNameSet ;
 	keep_var     <- newIORef emptyNameSet ;
+    used_rdrnames_var <- newIORef Set.empty ;
 	th_var	     <- newIORef False ;
 	dfun_n_var   <- newIORef 1 ;
 	type_env_var <- case hsc_type_env_var hsc_env of {
@@ -98,9 +99,10 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_th_used   = th_var,
 		tcg_exports  = [],
 		tcg_imports  = emptyImportAvails,
+        tcg_used_rdrnames = used_rdrnames_var,
 		tcg_dus      = emptyDUs,
 
-                tcg_rn_imports = maybe_rn_syntax [],
+                tcg_rn_imports = [],
                 tcg_rn_exports = maybe_rn_syntax [],
 		tcg_rn_decls   = maybe_rn_syntax emptyRnGroup,
 

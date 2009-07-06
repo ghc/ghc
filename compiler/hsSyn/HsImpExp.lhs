@@ -59,16 +59,17 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 	pp_qual True	= ptext (sLit "qualified")
 
 	pp_as Nothing   = empty
-	pp_as (Just a)  = ptext (sLit "as ") <+> ppr a
+	pp_as (Just a)  = ptext (sLit "as") <+> ppr a
 
 	ppr_imp True  = ptext (sLit "{-# SOURCE #-}")
 	ppr_imp False = empty
 
-	pp_spec Nothing = empty
-	pp_spec (Just (False, spec))
-			= parens (interpp'SP spec)
-	pp_spec (Just (True, spec))
-			= ptext (sLit "hiding") <+> parens (interpp'SP spec)
+	pp_spec Nothing             = empty
+	pp_spec (Just (False, ies)) = ppr_ies ies
+	pp_spec (Just (True,  ies)) = ptext (sLit "hiding") <+> ppr_ies ies
+
+	ppr_ies []  = ptext (sLit "()")
+	ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
 \end{code}
 
 %************************************************************************

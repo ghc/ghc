@@ -229,12 +229,13 @@ hscTypecheckRename mod_summary rdr_module = do
           <- {-# SCC "Typecheck-Rename" #-}
              ioMsgMaybe $ tcRnModule hsc_env (ms_hsc_src mod_summary) True rdr_module
 
-    let rn_info = do decl <- tcg_rn_decls tc_result
-                     imports <- tcg_rn_imports tc_result
-                     let exports = tcg_rn_exports tc_result
-                     let doc = tcg_doc tc_result
-        	     let hmi = tcg_hmi tc_result
-                     return (decl,imports,exports,doc,hmi)
+    let -- This 'do' is in the Maybe monad!
+        rn_info = do { decl <- tcg_rn_decls tc_result
+                     ; let imports = tcg_rn_imports tc_result
+                           exports = tcg_rn_exports tc_result
+                           doc 	   = tcg_doc tc_result
+        	           hmi 	   = tcg_hmi tc_result
+                     ; return (decl,imports,exports,doc,hmi) }
 
     return (tc_result, rn_info)
 

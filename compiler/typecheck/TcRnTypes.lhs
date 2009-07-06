@@ -70,6 +70,7 @@ import FastString
 
 import Data.Maybe
 import Data.List
+import Data.Set (Set)
 \end{code}
 
 
@@ -236,8 +237,11 @@ data TcGblEnv
 	-- The binds, rules and foreign-decl fiels are collected
 	-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-        tcg_rn_imports :: Maybe [LImportDecl Name],
         tcg_rn_exports :: Maybe [Located (IE Name)],
+        tcg_rn_imports :: [LImportDecl Name],
+		-- Keep the renamed imports regardless.  They are not 
+		-- voluminous and are needed if you want to report unused imports
+        tcg_used_rdrnames :: TcRef (Set RdrName),
 	tcg_rn_decls :: Maybe (HsGroup Name),
           -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
           -- decls.

@@ -236,7 +236,7 @@ tcRnImports hsc_env this_mod import_decls
 	    gbl { 
               tcg_rdr_env      = plusOccEnv (tcg_rdr_env gbl) rdr_env,
 	      tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
-              tcg_rn_imports   = fmap (const rn_imports) (tcg_rn_imports gbl),
+              tcg_rn_imports   = rn_imports,
 	      tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
 	      tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl) 
                                                       home_fam_insts,

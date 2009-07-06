@@ -26,7 +26,6 @@ import Module
 import Name
 import NameEnv
 import NameSet
-import OccName
 import HscTypes
 import RdrName
 import Outputable
@@ -34,12 +33,11 @@ import Maybes
 import SrcLoc
 import FiniteMap
 import ErrUtils
-import BasicTypes	( WarningTxt(..) )
-import DriverPhases	( isHsBoot )
 import Util
 import FastString
 import ListSetOps
-import Data.List        ( partition, concatMap, (\\), delete )
+import Data.List        ( partition, (\\), delete )
+import qualified Data.Set as Set
 import IO		( openFile, IOMode(..) )
 import Monad		( when, mplus )
 \end{code}
@@ -122,8 +120,7 @@ rnImportDecl  :: Module
 
 rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
                                          qual_only as_mod imp_details))
-  = 
-    setSrcSpan loc $ do
+  = setSrcSpan loc $ do
 
     when (isJust mb_pkg) $ do
         pkg_imports <- doptM Opt_PackageImports
@@ -745,6 +742,7 @@ type AvailEnv = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains 
 emptyAvailEnv :: AvailEnv
 emptyAvailEnv = emptyNameEnv
 
+{- Dead code
 unitAvailEnv :: AvailInfo -> AvailEnv
 unitAvailEnv a = unitNameEnv (availName a) a
 
@@ -753,6 +751,7 @@ plusAvailEnv = plusNameEnv_C plusAvail
 
 availEnvElts :: AvailEnv -> [AvailInfo]
 availEnvElts = nameEnvElts
+-}
 
 addAvail :: AvailEnv -> AvailInfo -> AvailEnv
 addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
@@ -852,7 +851,6 @@ rnExports explicit_mod exports
 			    tcg_dus = tcg_dus tcg_env `plusDU` 
 				      usesOnly (availsToNameSet final_avails) }) }
 
-
 exports_from_avail :: Maybe [LIE RdrName]
                          -- Nothing => no explicit export list
                    -> GlobalRdrEnv
@@ -895,16 +893,22 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
 	| otherwise
 	= do { implicit_prelude <- doptM Opt_ImplicitPrelude
-         ; let { exportValid = (mod `elem` imported_modules)
+             ; let { exportValid = (mod `elem` imported_modules)
                             || (moduleName this_mod == mod)
-               ; gres = filter (isModuleExported implicit_prelude mod)
-                               (globalRdrEnvElts rdr_env)
-               }
+                   ; gres = filter (isModuleExported implicit_prelude mod)
+                                   (globalRdrEnvElts rdr_env)
+		   ; names = map gre_name gres
+                   }
 
-         ; checkErr exportValid (moduleNotImported mod)
+             ; checkErr exportValid (moduleNotImported mod)
 	     ; warnIf (exportValid && null gres) (nullModuleExport mod)
 
-	     ; occs' <- check_occs ie occs (map gre_name gres)
+	     ; addUsedRdrNames (concat [ [mkRdrQual mod occ, mkRdrUnqual occ]
+                                       | occ <- map nameOccName names ])
+			-- The qualified and unqualified version of all of
+			-- these names are, in effect, used by this export
+
+	     ; occs' <- check_occs ie occs names
                       -- This check_occs not only finds conflicts
                       -- between this item and others, but also
                       -- internally within this item.  That is, if
@@ -1137,13 +1141,10 @@ this is, after all, wired-in stuff.
 \begin{code}
 reportUnusedNames :: Maybe [LIE RdrName] 	-- Export list
 		  -> TcGblEnv -> RnM ()
-reportUnusedNames export_decls gbl_env 
+reportUnusedNames _export_decls gbl_env 
   = do	{ traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
-	; warnUnusedTopBinds   unused_locals
-	; warnUnusedModules    unused_imp_mods
-	; warnUnusedImports    unused_imports	
-	; warnDuplicateImports defined_and_used
-	; printMinimalImports  minimal_imports }
+        ; warnUnusedImportDecls gbl_env
+	; warnUnusedTopBinds   unused_locals }
   where
     used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
@@ -1157,8 +1158,8 @@ reportUnusedNames export_decls gbl_env
 	-- Note that defined_and_used, defined_but_not_used
 	-- are both [GRE]; that's why we need defined_and_used
 	-- rather than just used_names
-    defined_and_used, defined_but_not_used :: [GlobalRdrElt]
-    (defined_and_used, defined_but_not_used) 
+    _defined_and_used, defined_but_not_used :: [GlobalRdrElt]
+    (_defined_and_used, defined_but_not_used) 
 	= partition (gre_is_used used_names) defined_names
     
     kids_env = mkChildEnv defined_names
@@ -1179,220 +1180,174 @@ reportUnusedNames export_decls gbl_env
     unused_locals = filter is_unused_local defined_but_not_used
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
-    
-    unused_imports :: [GlobalRdrElt]	
-    unused_imports = mapCatMaybes unused_imp defined_but_not_used
-    unused_imp :: GlobalRdrElt -> Maybe GlobalRdrElt	-- Result has trimmed Imported provenances
-    unused_imp (GRE {gre_prov = LocalDef}) = Nothing
-    unused_imp gre@(GRE {gre_prov = Imported imp_specs}) 
-	| null trimmed_specs = Nothing
-	| otherwise	     = Just (gre {gre_prov = Imported trimmed_specs})
-	where
-	  trimmed_specs = filter report_if_unused imp_specs
-    
-    -- To figure out the minimal set of imports, start with the things
-    -- that are in scope (i.e. in gbl_env).  Then just combine them
-    -- into a bunch of avails, so they are properly grouped
-    --
-    -- BUG WARNING: this does not deal properly with qualified imports!
-    minimal_imports :: FiniteMap ModuleName AvailEnv
-    minimal_imports0 = foldr add_expall   emptyFM 	   expall_mods
-    minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
-    minimal_imports  = foldr add_inst_mod minimal_imports1 direct_import_mods
- 	-- The last line makes sure that we retain all direct imports
-    	-- even if we import nothing explicitly.
-    	-- It's not necessarily redundant to import such modules. Consider 
-    	--	      module This
-    	--		import M ()
-    	--
-    	-- The import M() is not *necessarily* redundant, even if
-    	-- we suck in no instance decls from M (e.g. it contains 
-    	-- no instance decls, or This contains no code).  It may be 
-    	-- that we import M solely to ensure that M's orphan instance 
-    	-- decls (or those in its imports) are visible to people who 
-    	-- import This.  Sigh. 
-    	-- There's really no good way to detect this, so the error message 
-    	-- in RnEnv.warnUnusedModules is weakened instead
-    
-	-- We've carefully preserved the provenance so that we can
-	-- construct minimal imports that import the name by (one of)
-	-- the same route(s) as the programmer originally did.
-    add_name gre@(GRE {gre_prov = Imported (imp_spec:_)}) acc 
-	= addToFM_C plusAvailEnv acc 
-		    (importSpecModule imp_spec) (unitAvailEnv (greAvail gre))
-    add_name _ acc = acc	-- Local
+\end{code}
 
-	-- Modules mentioned as 'module M' in the export list
-    expall_mods = case export_decls of
-		    Nothing -> []
-		    Just es -> [m | L _ (IEModuleContents m) <- es]
+%*********************************************************
+%*						 	 *
+		Unused imports
+%*							 *
+%*********************************************************
 
-	-- This is really bogus.  The idea is that if we see 'module M' in 
-	-- the export list we must retain the import decls that drive it
-	-- If we aren't careful we might see
-	--	module A( module M ) where
-	--	  import M
-	--	  import N
-	-- and suppose that N exports everything that M does.  Then we 
-	-- must not drop the import of M even though N brings it all into
-	-- scope.
-	--
-	-- BUG WARNING: 'module M' exports aside, what if M.x is mentioned?!
-	--
-	-- The reason that add_expall is bogus is that it doesn't take
-	-- qualified imports into account.  But it's an improvement.
-    add_expall mod acc = addToFM_C plusAvailEnv acc mod emptyAvailEnv
+This code finds which import declarations are unused.  The 
+specification and implementation notes are here:
+  http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/UnusedImports
 
-    add_inst_mod (mod, _) acc 
-      | mod_name `elemFM` acc = acc	-- We import something already
-      | otherwise	      = addToFM acc mod_name emptyAvailEnv
-      where
-	mod_name = moduleName mod
-    	-- Add an empty collection of imports for a module
-    	-- from which we have sucked only instance decls
-   
-    imports = tcg_imports gbl_env
+\begin{code}
+type ImportDeclUsage 
+   = ( LImportDecl Name	  -- The import declaration
+     , [AvailInfo] 	  -- What *is* used (normalised)
+     , [Name] )           -- What is imported but *not* used
+\end{code}
 
-    direct_import_mods :: [(Module, [(ModuleName, Bool, SrcSpan)])]
-	-- See the type of the imp_mods for this triple
-    direct_import_mods = fmToList (imp_mods imports)
+\begin{code}
+warnUnusedImportDecls :: TcGblEnv -> RnM ()
+warnUnusedImportDecls gbl_env
+  = do { uses <- readMutVar (tcg_used_rdrnames gbl_env)
+       ; let imports = filter explicit_import (tcg_rn_imports gbl_env)
+	     rdr_env = tcg_rdr_env gbl_env
 
-    -- unused_imp_mods are the directly-imported modules 
-    -- that are not mentioned in minimal_imports1
-    -- [Note: not 'minimal_imports', because that includes directly-imported
-    --	      modules even if we use nothing from them; see notes above]
-    --
-    -- BUG WARNING: this code is generally buggy
-    unused_imp_mods :: [(ModuleName, SrcSpan)]
-    unused_imp_mods = [(mod_name,loc)
-                    | (mod, xs) <- direct_import_mods,
-                      (_, no_imp, loc) <- xs,
-		       let mod_name = moduleName mod,
-    		       not (mod_name `elemFM` minimal_imports1),
-    		       moduleName mod /= pRELUDE_NAME,
-                             -- XXX not really correct, but we don't want
-                             -- to generate warnings when compiling against
-                             -- a compat version of base.
-		       not no_imp]
-	-- The not no_imp part is not to complain about
-	-- import M (), which is an idiom for importing
-	-- instance declarations
-    
-    module_unused :: ModuleName -> Bool
-    module_unused mod = any (((==) mod) . fst) unused_imp_mods
+       ; let usage :: [ImportDeclUsage]
+             usage = findImportUsage imports rdr_env (Set.elems uses)
 
-    report_if_unused :: ImportSpec -> Bool
-	-- Do we want to report this as an unused import?  
-    report_if_unused (ImpSpec {is_decl = d, is_item = i})
-	= not (module_unused (is_mod d)) -- Not if we've already said entire import is unused
-	  && isExplicitItem i		 -- Only if the import was explicit
-			
----------------------
-warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
--- Given the GREs for names that are used, figure out which imports 
--- could be omitted without changing the top-level environment.
---
--- NB: Given import Foo( T )
---     	     import qualified Foo
--- we do not report a duplicate import, even though Foo.T is brought
--- into scope by both, because there's nothing you can *omit* without
--- changing the top-level environment.  So we complain only if it's
--- explicitly named in both imports or neither.
---
--- Furthermore, we complain about Foo.T only if 
--- there is no complaint about (unqualified) T
+       ; ifOptM Opt_WarnUnusedImports $
+         mapM_ warnUnusedImport usage
 
-warnDuplicateImports gres
-  = ifOptM Opt_WarnUnusedImports $ 
-    sequence_	[ warn name pr
-		| GRE { gre_name = name, gre_prov = Imported imps } <- gres
-		, pr <- redundants imps ]
+       ; ifOptM Opt_D_dump_minimal_imports $
+         printMinimalImports usage }
   where
-    warn name (red_imp, cov_imp)
-	= addWarnAt (importSpecLoc red_imp)
-	    (vcat [ptext (sLit "Redundant import of:") <+> quotes pp_name,
-	           ptext (sLit "It is also") <+> ppr cov_imp])
-	where
-	  pp_name | is_qual red_decl = ppr (is_as red_decl) <> dot <> ppr occ
-		  | otherwise	    = ppr occ
-	  occ = nameOccName name
-	  red_decl = is_decl red_imp
-    
-    redundants :: [ImportSpec] -> [(ImportSpec,ImportSpec)]
-	-- The returned pair is (redundant-import, covering-import)
-    redundants imps 
-	= [ (red_imp, cov_imp) 
-	  | red_imp <- imps
-	  , isExplicitItem (is_item red_imp)
-		-- Complain only about redundant imports
-		-- mentioned explicitly by the user				
-	  , cov_imp <- take 1 (filter (covers red_imp) imps) ]
-			-- The 'take 1' picks the first offending group
-			-- for this particular name
+    explicit_import (L loc _) = isGoodSrcSpan loc
+	-- Filter out the implicit Prelude import
+	-- which we do not want to bleat about
+\end{code}
 
-	-- "red_imp" is a putative redundant import
-	-- "cov_imp" potentially covers it
-	-- This test decides whether red_imp could be dropped 
-	--
-	-- NOTE: currently the test does not warn about
-	--		import M( x )
-	--		import N( x )
-	-- even if the same underlying 'x' is involved, because dropping
-	-- either import would change the qualified names in scope (M.x, N.x)
-	-- But if the qualified names aren't used, the import is indeed redundant
-	-- Sadly we don't know that.  Oh well.
-    covers red_imp@(ImpSpec { is_decl = red_decl }) 
-	   cov_imp@(ImpSpec { is_decl = cov_decl, is_item = cov_item })
-	| red_loc == cov_loc
-  	= False		-- Ignore diagonal elements
-	| not (is_as red_decl == is_as cov_decl)
-	= False		-- They bring into scope different qualified names
-	| not (is_qual red_decl) && is_qual cov_decl
-	= False		-- Covering one doesn't bring unqualified name into scope
-	| otherwise
-	= not (isExplicitItem cov_item) -- Redundant one is selective and covering one isn't
-	  || red_later			-- or both are explicit; tie-break using red_later
-{-
-	| red_selective
-	= not cov_selective 	-- Redundant one is selective and covering one isn't
-	  || red_later		-- Both are explicit; tie-break using red_later
-	| otherwise		
-	= not cov_selective 	-- Neither import is selective
-	  && (is_mod red_decl == is_mod cov_decl)	-- They import the same module
-	  && red_later 		-- Tie-break
--}
-	where
-	  red_loc   = importSpecLoc red_imp
-	  cov_loc   = importSpecLoc cov_imp
-	  red_later = red_loc > cov_loc
+\begin{code}
+findImportUsage :: [LImportDecl Name]
+		-> GlobalRdrEnv
+		-> [RdrName]
+                -> [ImportDeclUsage]
 
--- ToDo: deal with original imports with 'qualified' and 'as M' clauses
-printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
-		    -> RnM ()
-printMinimalImports imps
- = ifOptM Opt_D_dump_minimal_imports $ do {
+type ImportMap = FiniteMap SrcLoc [AvailInfo]
+  -- The intermediate data struture records, for each import 
+  -- declaration, what stuff brought into scope by that 
+  -- declaration is actually used in the module.
+  --
+  -- The SrcLoc is the location of the start 
+  -- of a particular 'import' declaration
+  -- 
+  -- The AvailInfos are the things imported from that decl
+  -- (just a list, not normalised)
 
-   mod_ies  <-  initIfaceTcRn $ mapM to_ies (fmToList imps) ;
-   this_mod <- getModule ;
-   rdr_env  <- getGlobalRdrEnv ;
-   dflags   <- getDOpts ;
-   liftIO $ do h <- openFile (mkFilename this_mod) WriteMode
-               printForUser h (mkPrintUnqualified dflags rdr_env)
-                              (vcat (map ppr_mod_ie mod_ies))
-   }
+findImportUsage imports rdr_env rdrs
+  = map unused_decl imports
+  where
+    import_usage :: ImportMap
+    import_usage = foldr add_rdr emptyFM rdrs
+
+    unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
+      = (decl, nubAvails used_avails, unused_imps)
+      where
+        used_avails = lookupFM import_usage (srcSpanStart loc) `orElse` []
+	used_names = availsToNameSet used_avails
+				      
+	unused_imps = case imps of
+			Just (False, imp_ies) -> nameSetToList unused_imps
+			  where
+			    imp_names = mkNameSet (concatMap (ieNames . unLoc) imp_ies)
+			    unused_imps = imp_names `minusNameSet` used_names
+			    
+		        _other -> []	-- No explicit import list => no unused-name list
+			
+    add_rdr :: RdrName -> ImportMap -> ImportMap
+    add_rdr rdr iu 
+      = case lookupGRE_RdrName rdr rdr_env of
+	  [gre]   | Imported imps <- gre_prov gre
+                  -> add_imp gre (bestImport imps) iu
+          _other  -> iu
+
+    add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
+    add_imp gre (ImpSpec { is_decl = imp_decl_spec }) iu
+      = addToFM_C add iu decl_loc [avail]
+      where
+	add avails _ = avail : avails
+        decl_loc = srcSpanStart (is_dloc imp_decl_spec)
+	name     = gre_name gre
+	avail    = case gre_par gre of
+		      ParentIs p                  -> AvailTC p [p,name]
+		      NoParent | isTyConName name -> AvailTC name [name]
+		               | otherwise        -> Avail name
+		-- If you use (+) from Num, then for this purpose we want
+		-- to say that Num is used as well.  That is why in the
+		-- ParentIs case we have [p,name] in the ParentIs case
+
+bestImport :: [ImportSpec] -> ImportSpec
+bestImport iss
+  = case partition isImpAll iss of
+      ([], imp_somes) -> textuallyFirst imp_somes
+      (imp_alls, _)   -> textuallyFirst imp_alls
+
+textuallyFirst :: [ImportSpec] -> ImportSpec
+textuallyFirst iss = case sortWith (is_dloc . is_decl) iss of
+			[]     -> pprPanic "textuallyFirst" (ppr iss)
+			(is:_) -> is
+
+isImpAll :: ImportSpec -> Bool
+isImpAll (ImpSpec { is_item = ImpAll }) = True
+isImpAll _other				= False
+\end{code}
+
+\begin{code}
+warnUnusedImport :: ImportDeclUsage -> RnM ()
+warnUnusedImport (L loc decl, used, unused) 
+  | Just (False,[]) <- ideclHiding decl 
+		= return ()	       -- Do not warn for 'import M()'
+  | null used   = addWarnAt loc msg1   -- Nothing used; drop entire decl
+  | null unused = return () 	       -- Everything imported is used; nop
+  | otherwise   = addWarnAt loc msg2   -- Some imports are unused
+  where
+    msg1 = vcat [pp_herald <+> quotes pp_mod <+> pp_not_used,
+		 nest 2 (ptext (sLit "except perhaps to import instances from")
+				   <+> quotes pp_mod),
+		 ptext (sLit "To import instances alone, use:") 
+				   <+> ptext (sLit "import") <+> pp_mod <> parens empty ]
+    msg2 = sep [pp_herald <+> quotes (pprWithCommas ppr unused),
+		    text "from module" <+> quotes pp_mod <+> pp_not_used]
+    pp_herald   = text "The import of"
+    pp_mod      = ppr (unLoc (ideclName decl))
+    pp_not_used = text "is redundant"
+\end{code}
+
+To print the minimal imports we walk over the user-supplied import
+decls, and simply trim their import lists.  NB that
+
+  * We do *not* change the 'qualified' or 'as' parts!
+
+  * We do not disard a decl altogether; we might need instances
+    from it.  Instead we just trim to an empty import list
+
+\begin{code}
+printMinimalImports :: [ImportDeclUsage] -> RnM ()
+printMinimalImports imports_w_usage
+  = do { imports' <- mapM mk_minimal imports_w_usage
+       ; this_mod <- getModule
+       ; liftIO $ 
+         do { h <- openFile (mkFilename this_mod) WriteMode
+            ; printForUser h neverQualify (vcat (map ppr imports')) }
+		-- The neverQualify is important.  We are printing Names
+		-- but they are in the context of an 'import' decl, and
+		-- we never qualify things inside there
+		-- E.g.   import Blag( f, b )
+		-- not	  import Blag( Blag.f, Blag.g )!
+       }
   where
     mkFilename this_mod = moduleNameString (moduleName this_mod) ++ ".imports"
-    ppr_mod_ie (mod_name, ies) 
-	| mod_name == moduleName pRELUDE
-	= empty
-	| null ies	-- Nothing except instances comes from here
-	= ptext (sLit "import") <+> ppr mod_name <> ptext (sLit "()    -- Instances only")
-	| otherwise
-	= ptext (sLit "import") <+> ppr mod_name <> 
-		    parens (fsep (punctuate comma (map ppr ies)))
 
-    to_ies (mod, avail_env) = do ies <- mapM to_ie (availEnvElts avail_env)
-                                 return (mod, ies)
+    mk_minimal (L l decl, used, unused)
+      | null unused
+      , Just (False, _) <- ideclHiding decl
+      = return (L l decl)
+      | otherwise
+      = do { ies <- initIfaceTcRn $ mapM to_ie used
+	   ; return (L l (decl { ideclHiding = Just (False, map (L l) ies)  })) }
 
     to_ie :: AvailInfo -> IfG (IE Name)
 	-- The main trick here is that if we're importing all the constructors
@@ -1416,7 +1371,6 @@ printMinimalImports imps
 	  doc = text "Compute minimal imports from" <+> ppr n
 	  n_mod = ASSERT( isExternalName n ) nameModule n
 \end{code}
-
 
 %************************************************************************
 %*									*
