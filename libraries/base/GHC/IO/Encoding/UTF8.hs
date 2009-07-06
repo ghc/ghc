@@ -68,29 +68,29 @@ utf8_decode
               c0 <- readWord8Buf iraw ir
               case c0 of
                 _ | c0 <= 0x7f -> do 
-                           writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
-                           loop (ir+1) (ow+1)
+                           ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
+                           loop (ir+1) ow'
                   | c0 >= 0xc0 && c0 <= 0xdf ->
                            if iw - ir < 2 then done ir ow else do
                            c1 <- readWord8Buf iraw (ir+1)
                            if (c1 < 0x80 || c1 >= 0xc0) then invalid else do
-                           writeCharBuf oraw ow (chr2 c0 c1)
-                           loop (ir+2) (ow+1)
+                           ow' <- writeCharBuf oraw ow (chr2 c0 c1)
+                           loop (ir+2) ow'
                   | c0 >= 0xe0 && c0 <= 0xef ->
                            if iw - ir < 3 then done ir ow else do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
                            if not (validate3 c0 c1 c2) then invalid else do
-                           writeCharBuf oraw ow (chr3 c0 c1 c2)
-                           loop (ir+3) (ow+1)
+                           ow' <- writeCharBuf oraw ow (chr3 c0 c1 c2)
+                           loop (ir+3) ow'
                   | c0 >= 0xf0 ->
                            if iw - ir < 4 then done ir ow else do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
                            c3 <- readWord8Buf iraw (ir+3)
                            if not (validate4 c0 c1 c2 c3) then invalid else do
-                           writeCharBuf oraw ow (chr4 c0 c1 c2 c3)
-                           loop (ir+4) (ow+1)
+                           ow' <- writeCharBuf oraw ow (chr4 c0 c1 c2 c3)
+                           loop (ir+4) ow'
                   | otherwise ->
                            invalid
          where

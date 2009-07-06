@@ -195,15 +195,15 @@ utf16be_decode
               c1 <- readWord8Buf iraw (ir+1)
               let x1 = fromIntegral c0 `shiftL` 8 + fromIntegral c1
               if validate1 x1
-                 then do writeCharBuf oraw ow (unsafeChr (fromIntegral x1))
-                         loop (ir+2) (ow+1)
+                 then do ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral x1))
+                         loop (ir+2) ow'
                  else if iw - ir < 4 then done ir ow else do
                       c2 <- readWord8Buf iraw (ir+2)
                       c3 <- readWord8Buf iraw (ir+3)
                       let x2 = fromIntegral c2 `shiftL` 8 + fromIntegral c3
                       if not (validate2 x1 x2) then invalid else do
-                      writeCharBuf oraw ow (chr2 x1 x2)
-                      loop (ir+4) (ow+1)
+                      ow' <- writeCharBuf oraw ow (chr2 x1 x2)
+                      loop (ir+4) ow'
          where
            invalid = if ir > ir0 then done ir ow else ioe_decodingError
 
@@ -227,15 +227,15 @@ utf16le_decode
               c1 <- readWord8Buf iraw (ir+1)
               let x1 = fromIntegral c1 `shiftL` 8 + fromIntegral c0
               if validate1 x1
-                 then do writeCharBuf oraw ow (unsafeChr (fromIntegral x1))
-                         loop (ir+2) (ow+1)
+                 then do ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral x1))
+                         loop (ir+2) ow'
                  else if iw - ir < 4 then done ir ow else do
                       c2 <- readWord8Buf iraw (ir+2)
                       c3 <- readWord8Buf iraw (ir+3)
                       let x2 = fromIntegral c3 `shiftL` 8 + fromIntegral c2
                       if not (validate2 x1 x2) then invalid else do
-                      writeCharBuf oraw ow (chr2 x1 x2)
-                      loop (ir+4) (ow+1)
+                      ow' <- writeCharBuf oraw ow (chr2 x1 x2)
+                      loop (ir+4) ow'
          where
            invalid = if ir > ir0 then done ir ow else ioe_decodingError
 

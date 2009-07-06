@@ -189,8 +189,8 @@ utf32be_decode
               c3 <- readWord8Buf iraw (ir+3)
               let x1 = chr4 c0 c1 c2 c3
               if not (validate x1) then invalid else do
-              writeCharBuf oraw ow x1
-              loop (ir+4) (ow+1)
+              ow' <- writeCharBuf oraw ow x1
+              loop (ir+4) ow'
          where
            invalid = if ir > ir0 then done ir ow else ioe_decodingError
 
@@ -215,8 +215,8 @@ utf32le_decode
               c3 <- readWord8Buf iraw (ir+3)
               let x1 = chr4 c3 c2 c1 c0
               if not (validate x1) then invalid else do
-              writeCharBuf oraw ow x1
-              loop (ir+4) (ow+1)
+              ow' <- writeCharBuf oraw ow x1
+              loop (ir+4) ow'
          where
            invalid = if ir > ir0 then done ir ow else ioe_decodingError
 
