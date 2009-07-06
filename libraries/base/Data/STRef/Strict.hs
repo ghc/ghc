@@ -16,5 +16,4 @@ module Data.STRef.Strict (
         module Data.STRef
   ) where
 
-import Prelude
 import Data.STRef

@@ -35,7 +35,6 @@ module GHC.Pack
         where
 
 import GHC.Base
-import GHC.Err ( error )
 import GHC.List ( length )
 import GHC.ST
 import GHC.Num

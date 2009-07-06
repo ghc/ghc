@@ -25,12 +25,12 @@ import GHC.Num
 import GHC.Real
 import GHC.Show
 import Data.Maybe
-import Control.Monad
+-- import Control.Monad
 import Foreign.C.Types
 import GHC.MVar
 import GHC.IO
 import GHC.IO.Encoding
-import GHC.IO.Exception
+-- import GHC.IO.Exception
 import GHC.IO.Device as IODevice
 import GHC.IO.Exception
 import GHC.IO.IOMode

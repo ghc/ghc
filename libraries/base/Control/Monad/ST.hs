@@ -32,8 +32,6 @@ module Control.Monad.ST
         unsafeSTToIO            -- :: ST s a -> IO a
       ) where
 
-import Prelude
-
 import Control.Monad.Fix
 
 #include "Typeable.h"

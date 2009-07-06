@@ -155,15 +155,15 @@ import Data.Tuple
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IO
-import GHC.IO.Exception
+-- import GHC.IO
+-- import GHC.IO.Exception
 import Text.Read
 import GHC.Enum
 import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.Show
-import GHC.Err   ( error, undefined )
+import GHC.Err   ( undefined )
 #endif
 
 #ifdef __HUGS__

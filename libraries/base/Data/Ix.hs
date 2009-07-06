@@ -60,7 +60,7 @@ module Data.Ix
 
     ) where
 
-import Prelude
+-- import Prelude
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Arr

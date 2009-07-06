@@ -20,7 +20,7 @@ module GHC.Weak where
 
 import GHC.Base
 import Data.Maybe
-import GHC.IO          ( IO(..), unIO )
+import GHC.IO          ( unIO )
 import Data.Typeable
 
 {-|

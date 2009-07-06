@@ -42,7 +42,7 @@ import Data.Typeable
 import GHC.Show
 import GHC.List         ( null )
 import GHC.Base
-import GHC.IO
+-- import GHC.IO
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )

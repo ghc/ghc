@@ -29,7 +29,7 @@ module GHC.MVar (
   ) where
 
 import GHC.Base
-import GHC.IO
+import GHC.IO()   -- instance Monad IO
 import Data.Maybe
 
 data MVar a = MVar (MVar# RealWorld a)

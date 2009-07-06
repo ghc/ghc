@@ -36,13 +36,11 @@ import Prelude
 
 import Control.Monad.Fix
 
-import Control.Monad.ST (RealWorld)
 import qualified Control.Monad.ST as ST
 
 #ifdef __GLASGOW_HASKELL__
 import qualified GHC.ST
 import GHC.Base
-import Control.Monad
 #endif
 
 #ifdef __HUGS__

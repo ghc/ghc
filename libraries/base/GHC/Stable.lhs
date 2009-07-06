@@ -27,7 +27,7 @@ module GHC.Stable
 
 import GHC.Ptr
 import GHC.Base
-import GHC.IO
+-- import GHC.IO
 
 -----------------------------------------------------------------------------
 -- Stable Pointers

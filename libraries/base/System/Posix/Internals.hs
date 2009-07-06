@@ -37,7 +37,7 @@ import System.Posix.Types
 import Foreign
 import Foreign.C
 
-import Data.Bits
+-- import Data.Bits
 import Data.Maybe
 
 #if !defined(HTYPE_TCFLAG_T)

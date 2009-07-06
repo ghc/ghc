@@ -110,7 +110,7 @@ import GHC.IO hiding (finally,onException)
 import GHC.IO.Exception
 import GHC.Exception
 import GHC.Show
-import GHC.Exception hiding ( Exception )
+-- import GHC.Exception hiding ( Exception )
 import GHC.Conc
 #endif
 

@@ -114,7 +114,6 @@ import Data.Maybe
 import Control.Monad
 
 -- Imports for the instances
-import Data.Typeable
 import Data.Int              -- So we can give Data instance for Int8, ...
 import Data.Word             -- So we can give Data instance for Word8, ...
 #ifdef __GLASGOW_HASKELL__

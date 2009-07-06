@@ -18,7 +18,6 @@ module GHC.Desugar ((>>>), AnnotationWrapper(..), toAnnotationWrapper) where
 import Control.Arrow    (Arrow(..))
 import Control.Category ((.))
 import Data.Data        (Data)
-import Prelude hiding ((.))
 
 -- A version of Control.Category.>>> overloaded on Arrow
 #ifndef __HADDOCK__

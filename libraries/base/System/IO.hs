@@ -180,7 +180,7 @@ import GHC.IO.Handle.FD
 import GHC.IO.Handle
 import GHC.IORef
 import GHC.IO.Exception ( userError )
-import GHC.Exception
+-- import GHC.Exception
 import GHC.Num
 import Text.Read
 import GHC.Show

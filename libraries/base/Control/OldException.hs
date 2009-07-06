@@ -134,7 +134,7 @@ module Control.OldException (
 import GHC.Base
 import GHC.Num
 import GHC.Show
-import GHC.IO ( IO )
+-- import GHC.IO ( IO )
 import GHC.IO.Handle.FD ( stdout )
 import qualified GHC.IO as New
 import qualified GHC.IO.Exception as New

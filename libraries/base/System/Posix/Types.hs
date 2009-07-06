@@ -111,14 +111,14 @@ import Foreign.C
 import Foreign
 import Foreign.C
 import Data.Typeable
-import Data.Bits
+-- import Data.Bits
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Enum
 import GHC.Num
 import GHC.Real
-import GHC.Prim
+-- import GHC.Prim
 import GHC.Read
 import GHC.Show
 #else

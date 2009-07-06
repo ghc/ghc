@@ -27,7 +27,7 @@ module GHC.IO.Encoding.UTF8 (
 import GHC.Base
 import GHC.Real
 import GHC.Num
-import GHC.IO
+-- import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Types

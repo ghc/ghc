@@ -12,7 +12,6 @@
 
 module Control.Category where
 
-import Prelude hiding (id,(.))
 import qualified Prelude
 
 infixr 9 .

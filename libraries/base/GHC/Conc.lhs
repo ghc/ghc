@@ -126,7 +126,7 @@ import GHC.Arr          ( inRange )
 #endif
 #ifdef mingw32_HOST_OS
 import GHC.Real         ( div )
-import GHC.Ptr          ( plusPtr, FunPtr(..) )
+import GHC.Ptr          ( FunPtr(..) )
 #endif
 #ifdef mingw32_HOST_OS
 import GHC.Read         ( Read )

@@ -25,7 +25,7 @@ import Data.Word
 import GHC.Num
 import GHC.Real
 import Data.Maybe
-import GHC.IO
+-- import GHC.IO
 import GHC.IO.Device as IODevice
 import GHC.IO.Device as RawIO
 import GHC.IO.Buffer

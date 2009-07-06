@@ -30,7 +30,7 @@ import GHC.Real
 import GHC.Show
 import GHC.Enum
 import Data.Maybe
-import Control.Monad
+-- import Control.Monad
 import Data.Typeable
 
 import GHC.IO
@@ -47,7 +47,7 @@ import Foreign.C
 import qualified System.Posix.Internals
 import System.Posix.Internals hiding (FD, setEcho, getEcho)
 import System.Posix.Types
-import GHC.Ptr
+-- import GHC.Ptr
 
 -- -----------------------------------------------------------------------------
 -- The file-descriptor IO device

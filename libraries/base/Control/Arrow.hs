@@ -39,7 +39,6 @@ module Control.Arrow (
         ) where
 
 import Prelude hiding (id,(.))
-import qualified Prelude
 
 import Control.Monad
 import Control.Monad.Fix

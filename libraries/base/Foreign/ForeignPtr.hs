@@ -78,7 +78,7 @@ import Foreign.Storable ( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IO
+-- import GHC.IO
 import GHC.Num
 import GHC.Err          ( undefined )
 import GHC.ForeignPtr

@@ -42,6 +42,7 @@ import Control.Monad            ( liftM )
 #ifdef __GLASGOW_HASKELL__
 import GHC.Storable
 import GHC.Stable       ( StablePtr )
+import GHC.IO()		-- Instance Monad IO
 import GHC.Num
 import GHC.Int
 import GHC.Word

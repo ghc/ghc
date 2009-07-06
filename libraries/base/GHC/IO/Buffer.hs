@@ -60,7 +60,7 @@ module GHC.IO.Buffer (
  ) where
 
 import GHC.Base
-import GHC.IO
+-- import GHC.IO
 import GHC.Num
 import GHC.Ptr
 import GHC.Word

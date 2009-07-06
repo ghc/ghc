@@ -16,5 +16,4 @@ module Control.Monad.ST.Strict (
         module Control.Monad.ST
   ) where
 
-import Prelude
 import Control.Monad.ST

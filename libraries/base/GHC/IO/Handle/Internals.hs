@@ -63,7 +63,6 @@ import qualified GHC.IO.BufferedIO as Buffered
 
 import GHC.Real
 import GHC.Base
-import GHC.List
 import GHC.Exception
 import GHC.Num          ( Num(..) )
 import GHC.Show
@@ -73,9 +72,8 @@ import Data.Typeable
 import Control.Monad
 import Data.Maybe
 import Foreign
-import System.IO.Error
+-- import System.IO.Error
 import System.Posix.Internals hiding (FD)
-import qualified System.Posix.Internals as Posix
 
 #ifdef DEBUG_DUMP
 import Foreign.C

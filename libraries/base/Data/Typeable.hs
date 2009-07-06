@@ -96,7 +96,7 @@ import GHC.Err          (undefined)
 import GHC.Num          (Integer, fromInteger, (+))
 import GHC.Real         ( rem, Ratio )
 import GHC.IORef        (IORef,newIORef)
-import GHC.IO           (IO, unsafePerformIO,block)
+import GHC.IO           (unsafePerformIO,block)
 
 -- These imports are so we can define Typeable instances
 -- It'd be better to give Typeable instances in the modules themselves
