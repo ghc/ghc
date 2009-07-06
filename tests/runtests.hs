@@ -16,16 +16,17 @@ main = do
   putStrLn "All tests passed!"
 
 
-haddockEq file1 file2 = (stripLinks file1) == (stripLinks file2)
+haddockEq file1 file2 = stripLinks file1 == stripLinks file2
   where
     stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
+
 
 check modules strict = do
   forM_ modules $ \mod -> do
     let outfile = "output" </> (dropExtension mod ++ ".html")
     let reffile = "tests" </> dropExtension mod ++ ".html.ref"
     b <- doesFileExist reffile
-    if b 
+    if b
       then do
         copyFile reffile ("output" </> takeFileName reffile)
         out <- readFile outfile
@@ -39,7 +40,7 @@ check modules strict = do
             putStrLn $ "Pass: " ++ mod
       else do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
- 
+
 
 test = do
   contents <- getDirectoryContents "tests"
@@ -51,7 +52,6 @@ test = do
   runProcess "../dist/build/haddock/haddock" ["--ghc-version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w"] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   code <- waitForProcess handle
-
 --  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
   when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
