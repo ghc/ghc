@@ -11,7 +11,6 @@ import Text.Regex
 
 
 main = do
-  putStrLn "Running tests..."
   test
   putStrLn "All tests passed!"
 
@@ -48,10 +47,17 @@ test = do
   let mods = filter ((==) ".hs" . takeExtension) contents
   let outdir = "output"
   let mods' = map ("tests" </>) mods
-  runProcess "../dist/build/haddock/haddock" ["--version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
-  runProcess "../dist/build/haddock/haddock" ["--ghc-version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  putStrLn ""
+  putStrLn "Haddock version: "
+  h1 <- runProcess "../dist/build/haddock/haddock" ["--version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  waitForProcess h1
+  putStrLn ""
+  putStrLn "GHC version: "
+  h2 <- runProcess "../dist/build/haddock/haddock" ["--ghc-version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  waitForProcess h2
+  putStrLn ""
+  putStrLn "Running tests..."
   handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w"] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   code <- waitForProcess handle
---  code <- system $ printf "haddock -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" outdir (unwords mods')
   when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
