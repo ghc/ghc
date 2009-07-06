@@ -1364,20 +1364,7 @@ scavenge_one(StgPtr p)
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
     case IND_STATIC:
-    {
-	/* Careful here: a THUNK can be on the mutable list because
-	 * it contains pointers to young gen objects.  If such a thunk
-	 * is updated, the IND_OLDGEN will be added to the mutable
-	 * list again, and we'll scavenge it twice.  evacuate()
-	 * doesn't check whether the object has already been
-	 * evacuated, so we perform that check here.
-	 */
-	StgClosure *q = ((StgInd *)p)->indirectee;
-	if (HEAP_ALLOCED_GC(q) && Bdescr((StgPtr)q)->flags & BF_EVACUATED) {
-	    break;
-	}
 	evacuate(&((StgInd *)p)->indirectee);
-    }
 
 #if 0 && defined(DEBUG)
       if (RtsFlags.DebugFlags.gc) 
