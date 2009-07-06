@@ -77,27 +77,16 @@ iNSTRUMENTED = False
 
 readHTArray  :: HTArray a -> Int32 -> IO a
 writeMutArray :: MutArray a -> Int32 -> a -> IO ()
-freezeArray  :: MutArray a -> IO (HTArray a)
-thawArray    :: HTArray a -> IO (MutArray a)
 newMutArray   :: (Int32, Int32) -> a -> IO (MutArray a)
-#if defined(DEBUG) || defined(__NHC__)
+newMutArray = newIOArray
 type MutArray a = IOArray Int32 a
 type HTArray a = MutArray a
-newMutArray = newIOArray
+#if defined(DEBUG) || defined(__NHC__)
 readHTArray  = readIOArray
 writeMutArray = writeIOArray
-freezeArray = return
-thawArray = return
 #else
-type MutArray a = IOArray Int32 a
-type HTArray a = MutArray a -- Array Int32 a
-newMutArray = newIOArray
-readHTArray arr i = readMutArray arr i -- return $! (unsafeAt arr (fromIntegral i))
-readMutArray  :: MutArray a -> Int32 -> IO a
-readMutArray arr i = unsafeReadIOArray arr (fromIntegral i)
+readHTArray arr i = unsafeReadIOArray arr (fromIntegral i)
 writeMutArray arr i x = unsafeWriteIOArray arr (fromIntegral i) x
-freezeArray = return -- unsafeFreeze
-thawArray = return -- unsafeThaw
 #endif
 
 data HashTable key val = HashTable {
@@ -285,8 +274,7 @@ new cmpr hash = do
   recordNew
   -- make a new hash table with a single, empty, segment
   let mask = tABLE_MIN-1
-  bkts'  <- newMutArray (0,mask) []
-  bkts   <- freezeArray bkts'
+  bkts <- newMutArray (0,mask) []
 
   let
     kcnt = 0
@@ -369,9 +357,7 @@ updatingBucket canEnlarge bucketFn
   (bckt', inserts, result) <- return $ bucketFn bckt
   let k' = k + inserts
       table1 = table { kcount=k' }
-  bkts' <- thawArray bkts
-  writeMutArray bkts' indx bckt'
-  freezeArray bkts'
+  writeMutArray bkts indx bckt'
   table2 <- if canEnlarge == CanInsert && inserts > 0 then do
                recordIns inserts k' bckt'
                if tooBig k' b
@@ -392,18 +378,16 @@ expandHashTable hash table@HT{ buckets=bkts, bmask=mask } = do
       then return table
       else do
    --
-    newbkts' <- newMutArray (0,newmask) []
+    newbkts <- newMutArray (0,newmask) []
 
     let
      splitBucket oldindex = do
        bucket <- readHTArray bkts oldindex
        let (oldb,newb) =
               partition ((oldindex==). bucketIndex newmask . hash . fst) bucket
-       writeMutArray newbkts' oldindex oldb
-       writeMutArray newbkts' (oldindex + oldsize) newb
+       writeMutArray newbkts oldindex oldb
+       writeMutArray newbkts (oldindex + oldsize) newb
     mapM_ splitBucket [0..mask]
-
-    newbkts <- freezeArray newbkts'
 
     return ( table{ buckets=newbkts, bmask=newmask } )
 
