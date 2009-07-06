@@ -325,3 +325,8 @@ test('mod179', extra_clean(['Mod179_A.hi', 'Mod179_A.o']),
 
 test('mod180', extra_clean(['Mod180_A.hi', 'Mod180_A.o', 'Mod180_B.hi', 'Mod180_B.o']),
      multimod_compile_fail, ['mod180', '-v0'])
+
+test('T1148', normal, compile, [''])
+test('T1074', normal, compile, [''])
+test('T1074a', normal, compile, [''])
+test('T2267', normal, compile, [''])

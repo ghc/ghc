@@ -1,5 +1,5 @@
 
 rn037.hs:3:0:
-    Warning: Module `Time' is imported, but nothing from it is used,
-	       except perhaps instances visible in `Time'
-	     To suppress this warning, use: import Time()
+    Warning: The import of `Time' is redundant
+               except perhaps to import instances from `Time'
+             To import instances alone, use: import Time()

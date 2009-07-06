@@ -1,7 +1,8 @@
 
 rn046.hs:2:0:
-    Warning: Module `List' is imported, but nothing from it is used,
-	       except perhaps instances visible in `List'
-	     To suppress this warning, use: import List()
+    Warning: The import of `List' is redundant
+               except perhaps to import instances from `List'
+             To import instances alone, use: import List()
 
-rn046.hs:3:13: Warning: Imported from `Char' but not used: `ord'
+rn046.hs:3:0:
+    Warning: The import of `ord' from module `Char' is redundant
