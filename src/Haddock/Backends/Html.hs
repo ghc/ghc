@@ -1316,7 +1316,7 @@ ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Bool -> Html
 ppConstrHdr forall tvs ctxt unicode
  = (if null tvs then noHtml else ppForall)
    +++
-   (if null ctxt then noHtml else ppContextNoArrow ctxt unicode <+> darrow unicode <+> toHtml " ")
+   (if null ctxt then noHtml else ppContextNoArrow ctxt unicode <+> darrow unicode +++ toHtml " ")
   where
     ppForall = case forall of 
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
