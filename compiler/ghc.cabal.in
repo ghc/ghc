@@ -491,10 +491,10 @@ Library
             SPARC.Regs
             SPARC.RegPlate
             SPARC.Imm
-            SPARC.AddrMode	    
+            SPARC.AddrMode
             SPARC.Cond
             SPARC.Instr
-            SPARC.Stack	   
+            SPARC.Stack
             SPARC.ShortcutJump
             SPARC.Ppr
             SPARC.CodeGen
