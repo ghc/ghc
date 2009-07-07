@@ -23,8 +23,6 @@
 module Main (main) where
 
 import Control.Exception
-import Data.Char
-import Data.List
 import Data.Monoid
 import System.Cmd
 import System.Directory
