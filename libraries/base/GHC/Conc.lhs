@@ -133,9 +133,7 @@ import GHC.Read         ( Read )
 import GHC.Enum         ( Enum )
 #endif
 import GHC.Pack         ( packCString# )
-import GHC.Ptr          ( Ptr(..) )
 import GHC.Show         ( Show(..), showString )
-import Data.Typeable
 import GHC.Err
 
 infixr 0 `par`, `pseq`

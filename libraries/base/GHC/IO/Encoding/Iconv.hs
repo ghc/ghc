@@ -35,8 +35,6 @@ import Foreign
 import Foreign.C
 import Data.Maybe
 import GHC.Base
-import GHC.Word
-import GHC.IO
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Types
 import GHC.Num

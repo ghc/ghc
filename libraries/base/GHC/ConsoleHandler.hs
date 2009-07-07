@@ -18,7 +18,6 @@
 module GHC.ConsoleHandler
 #if !defined(mingw32_HOST_OS) && !defined(__HADDOCK__)
         where
-import Prelude -- necessary to get dependencies right
 #else /* whole file */
         ( Handler(..)
         , installHandler
@@ -29,8 +28,6 @@ import Prelude -- necessary to get dependencies right
 {-
 #include "Signals.h"
 -}
-
-import Prelude -- necessary to get dependencies right
 
 import Foreign
 import Foreign.C

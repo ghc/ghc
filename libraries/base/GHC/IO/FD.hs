@@ -30,7 +30,9 @@ import GHC.Real
 import GHC.Show
 import GHC.Enum
 import Data.Maybe
--- import Control.Monad
+#ifndef mingw32_HOST_OS
+import Control.Monad
+#endif
 import Data.Typeable
 
 import GHC.IO
