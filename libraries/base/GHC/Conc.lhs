@@ -104,6 +104,10 @@ import System.Posix.Internals
 import Foreign
 import Foreign.C
 
+#ifdef mingw32_HOST_OS
+import Data.Typeable
+#endif
+
 #ifndef mingw32_HOST_OS
 import Data.Dynamic
 import Control.Monad
@@ -126,7 +130,7 @@ import GHC.Arr          ( inRange )
 #endif
 #ifdef mingw32_HOST_OS
 import GHC.Real         ( div )
-import GHC.Ptr          ( FunPtr(..) )
+import GHC.Ptr
 #endif
 #ifdef mingw32_HOST_OS
 import GHC.Read         ( Read )
