@@ -922,8 +922,10 @@ endif
 distclean : clean
 	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
 	"$(RM)" $(RM_OPTS) mk/config.mk mk/are-validating.mk mk/project.mk
+	"$(RM)" $(RM_OPTS) mk/config.mk.old mk/project.mk.old
 	"$(RM)" $(RM_OPTS) extra-gcc-opts docs/users_guide/ug-book.xml
-	"$(RM)" $(RM_OPTS) compiler/ghc.cabal ghc/ghc-bin.cabal
+	"$(RM)" $(RM_OPTS) compiler/ghc.cabal compiler/ghc.cabal.old
+	"$(RM)" $(RM_OPTS) ghc/ghc-bin.cabal
 	"$(RM)" $(RM_OPTS) libraries/base/include/HsBaseConfig.h
 	"$(RM)" $(RM_OPTS) libraries/directory/include/HsDirectoryConfig.h
 	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h

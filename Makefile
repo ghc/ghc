@@ -51,10 +51,39 @@ include mk/custom-settings.mk
 # No need to update makefiles for these targets:
 REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
 
+# configure touches certain files even if they haven't changed.  This
+# can mean a lot of unnecessary recompilation after a re-configure, so
+# here we cache the old versions of these files so we can restore the
+# timestamps.
+#
+define check-configure-file
+# $1 = file
+if ! test -f $1.old; then \
+  echo "backing up $1"; \
+  cp $1 $1.old; \
+  touch -r $1 $1.old; \
+else \
+  if test $1 -nt $1.old; then \
+    if cmp $1 $1.old; then \
+       echo "$1 has been touched, but has not changed"; \
+       touch -r $1.old $1; \
+    else \
+       echo "$1 has changed"; \
+       cp $1 $1.old; \
+       touch -r $1 $1.old; \
+    fi \
+  fi \
+fi
+endef
+
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
 .PHONY: $(REALGOALS)
 $(REALGOALS) all:
+	@$(call check-configure-file,mk/config.mk)
+	@$(call check-configure-file,mk/project.mk)
+	@$(call check-configure-file,compiler/ghc.cabal)
+
 	@echo "===--- updating makefiles phase 0"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 just-makefiles
 ifneq "$(OMIT_PHASE_1)" "YES"
