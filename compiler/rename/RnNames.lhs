@@ -951,6 +951,10 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_ie ie@(IEThingAll rdr) 
         = do name <- lookupGlobalOccRn rdr
 	     let kids = findChildren kids_env name
+                 mkKidRdrName = case isQual_maybe rdr of
+                                Nothing -> mkRdrUnqual
+                                Just (modName, _) -> mkRdrQual modName
+             addUsedRdrNames $ map (mkKidRdrName . nameOccName) kids
 	     when (null kids)
 		  (if (isTyConName name) then addWarn (dodgyExportWarn name)
 				-- This occurs when you export T(..), but
