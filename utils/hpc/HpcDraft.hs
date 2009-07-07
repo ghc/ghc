@@ -6,7 +6,6 @@ import Trace.Hpc.Util
 
 import HpcFlags
 
-import Control.Monad
 import qualified HpcSet as Set
 import qualified HpcMap as Map
 import HpcUtils
