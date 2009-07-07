@@ -50,7 +50,6 @@ import StgCmmMonad
 import StgCmmClosure
 import BlockId
 import Cmm
-import CmmExpr
 import MkZipCfgCmm
 import CLabel
 import CmmUtils

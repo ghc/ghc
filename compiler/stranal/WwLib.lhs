@@ -23,7 +23,7 @@ import TysWiredIn	( tupleCon )
 import Type
 import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
-import Var              ( Var, isId )
+import Var              ( Var )
 import UniqSupply
 import Unique
 import Util		( zipWithEqual )

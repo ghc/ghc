@@ -33,7 +33,6 @@ import Name
 import NameSet
 import IfaceEnv
 import NameEnv
-import OccName
 import TcType
 import DataCon
 import TyCon
@@ -46,7 +45,6 @@ import Outputable
 import FastBool hiding ( fastOr )
 
 import Data.List	( partition )
-import Data.Maybe	( isJust )
 import Data.IORef	( IORef, readIORef, writeIORef )
 \end{code}
 

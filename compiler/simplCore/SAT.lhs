@@ -56,10 +56,8 @@ import Var
 import CoreSyn
 import CoreUtils
 import Type
-import TcType
 import Id
 import Name
-import OccName
 import VarEnv
 import UniqSupply
 import Util

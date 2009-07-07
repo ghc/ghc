@@ -55,7 +55,6 @@ import System.IO
 import System.IO.Error as IO
 import System.Directory
 import Data.Char
-import Data.Maybe
 import Data.List
 
 #ifndef mingw32_HOST_OS

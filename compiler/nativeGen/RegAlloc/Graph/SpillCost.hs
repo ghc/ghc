@@ -33,7 +33,6 @@ import State
 
 import Data.List	(nub, minimumBy)
 import Data.Maybe
-import Control.Monad
 
 type SpillCostRecord
  = 	( VirtualReg	-- register name

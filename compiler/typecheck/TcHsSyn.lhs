@@ -48,7 +48,6 @@ import VarEnv
 import Literal
 import BasicTypes
 import Maybes
-import Unique
 import SrcLoc
 import Util
 import Bag

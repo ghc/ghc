@@ -245,7 +245,6 @@ import qualified Linker
 import Linker           ( HValue )
 import ByteCodeInstr
 import BreakArray
-import NameSet
 import InteractiveEval
 import TcRnDriver
 #endif

@@ -23,7 +23,6 @@ import HsSyn
 import DsBinds
 import DataCon
 import TcType
-import Type
 import CoreSyn
 import MkCore
 import DsMonad

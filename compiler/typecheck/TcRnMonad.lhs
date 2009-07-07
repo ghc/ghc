@@ -31,7 +31,6 @@ import ErrUtils
 import SrcLoc
 import NameEnv
 import NameSet
-import OccName
 import Bag
 import Outputable
 import UniqSupply

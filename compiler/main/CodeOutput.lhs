@@ -33,7 +33,6 @@ import Outputable
 import Module
 import Maybes		( firstJust )
 
-import Distribution.Text
 import Directory	( doesFileExist )
 import Monad		( when )
 import IO

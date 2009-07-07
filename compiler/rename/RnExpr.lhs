@@ -50,7 +50,6 @@ import SrcLoc
 import FastString
 
 import List		( unzip4 )
-import Control.Monad
 \end{code}
 
 

@@ -20,7 +20,7 @@ import Name             ( getSrcLoc )
 import ErrUtils         ( Message, mkLocMessage )
 import TypeRep
 import Type             ( mkFunTys, splitFunTys, splitTyConApp_maybe,
-                          isUnLiftedType, isTyVarTy, dropForAlls, Type
+                          isUnLiftedType, isTyVarTy, dropForAlls
                         )
 import TyCon            ( isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util             ( zipEqual, equalLength )

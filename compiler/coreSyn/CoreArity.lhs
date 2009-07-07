@@ -34,9 +34,6 @@ import Outputable
 import DynFlags
 import StaticFlags	( opt_NoStateHack )
 import FastString
-import Maybes
-
-import GHC.Exts		-- For `xori` 
 \end{code}
 
 %************************************************************************

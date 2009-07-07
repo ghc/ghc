@@ -2,7 +2,6 @@
 module RnHsDoc ( rnHaddock, rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
 import TcRnTypes
-import TcRnMonad   ( RnM )
 import RnEnv       ( dataTcOccs, lookupGreRn_maybe )
 import HsSyn
 

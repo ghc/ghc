@@ -46,7 +46,6 @@ import Maybe            ( isNothing )
 import BasicTypes       ( Boxity(..) )
 
 import ListSetOps    (findDupsEq)
-import List
 
 import Control.Monad
 \end{code}

@@ -50,7 +50,6 @@ import TysWiredIn
 import PrelNames
 
 import Type
-import TypeRep
 import TysPrim          ( alphaTyVar )
 import DataCon          ( DataCon, dataConWorkId )
 

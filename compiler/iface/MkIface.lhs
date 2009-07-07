@@ -51,7 +51,6 @@ Basic idea:
 #include "HsVersions.h"
 
 import IfaceSyn
-import IfaceType
 import LoadIface
 import Id
 import IdInfo
@@ -77,7 +76,6 @@ import Name
 import RdrName
 import NameEnv
 import NameSet
-import OccName
 import Module
 import BinIface
 import ErrUtils
@@ -95,7 +93,6 @@ import ListSetOps
 import Binary
 import Fingerprint
 import Bag
-import Panic
 
 import Control.Monad
 import Data.List

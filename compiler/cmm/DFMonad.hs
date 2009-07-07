@@ -16,7 +16,6 @@ import CmmTx
 import PprCmm()
 import OptimizationFuel
 
-import Control.Monad
 import Maybes
 import Outputable
 import UniqSupply

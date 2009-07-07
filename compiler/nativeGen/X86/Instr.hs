@@ -28,7 +28,6 @@ import Outputable
 import Constants	(rESERVED_C_STACK_BYTES)
 
 import CLabel
-import Panic
 
 -- Size of a PPC memory address, in bytes.
 --

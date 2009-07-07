@@ -10,7 +10,6 @@ import Panic
 
 import Data.Word
 import Data.Bits
-import Data.List
 
 type FreeRegs 
 	= Word32

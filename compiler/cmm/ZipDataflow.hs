@@ -29,10 +29,8 @@ import qualified ZipCfg as G
 
 import Maybes
 import Outputable
-import Panic
 
 import Control.Monad
-import Maybe
 
 {- 
 

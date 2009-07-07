@@ -70,11 +70,9 @@ import TypeRep
 import Class
 import Name
 import NameEnv
-import OccName
 import HscTypes
 import SrcLoc
 import Outputable
-import Maybes
 import Unique
 import FastString
 \end{code}

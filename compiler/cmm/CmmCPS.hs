@@ -32,8 +32,6 @@ import UniqSet
 import Unique
 
 import Monad
-import IO
-import Data.List
 
 -----------------------------------------------------------------------------
 -- |Top level driver for the CPS pass

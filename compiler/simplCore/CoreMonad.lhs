@@ -55,7 +55,6 @@ import TcRnMonad        ( TcM, initTc )
 
 import Outputable
 import qualified ErrUtils as Err
-import MonadUtils
 import Maybes
 import UniqSupply
 
@@ -63,7 +62,6 @@ import Data.Dynamic
 import Data.IORef
 import Data.Word
 import Control.Monad
-import Control.Applicative
 
 import Prelude hiding   ( read )
 

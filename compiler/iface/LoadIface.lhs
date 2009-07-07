@@ -28,7 +28,6 @@ import HscTypes
 
 import BasicTypes hiding (SuccessFlag(..))
 import TcRnMonad
-import Type
 
 import PrelNames
 import PrelInfo
@@ -39,9 +38,7 @@ import InstEnv
 import FamInstEnv
 import Name
 import NameEnv
-import MkId
 import Module
-import OccName
 import Maybes
 import ErrUtils
 import Finder
@@ -55,8 +52,6 @@ import FastString
 import Fingerprint
 
 import Control.Monad
-import Data.List
-import Data.Maybe
 \end{code}
 
 

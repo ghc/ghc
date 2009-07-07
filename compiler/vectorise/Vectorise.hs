@@ -13,7 +13,7 @@ import Module               ( PackageId )
 import CoreSyn
 import CoreUtils
 import CoreFVs
-import CoreMonad            ( CoreM, getHscEnv, liftIO )
+import CoreMonad            ( CoreM, getHscEnv )
 import DataCon
 import TyCon
 import Type
@@ -23,8 +23,6 @@ import VarEnv
 import VarSet
 import Id
 import OccName
-
-import DsMonad
 
 import Literal              ( Literal, mkMachInt )
 import TysWiredIn

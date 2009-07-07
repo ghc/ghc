@@ -11,7 +11,6 @@ import BlockId
 import CLabel
 import Cmm hiding (blockId)
 import CmmContFlowOpt
-import CmmExpr
 import CmmInfo
 import CmmLiveZ
 import CmmTx
@@ -23,7 +22,6 @@ import MkZipCfg
 import MkZipCfgCmm hiding (CmmBlock, CmmGraph, CmmTopZ)
 import Monad
 import Outputable
-import Panic
 import UniqSet
 import UniqSupply
 import ZipCfg

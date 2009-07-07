@@ -27,7 +27,6 @@ import FiniteMap
 
 import Data.Array
 import Data.Maybe
-import System.IO   (FilePath)
 import System.Directory ( createDirectoryIfMissing )
 
 import Trace.Hpc.Mix

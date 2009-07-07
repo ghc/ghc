@@ -43,7 +43,6 @@ import Coercion
 import TyCon
 import Class
 import Name
-import OccName
 import NameSet
 import PrelNames
 import TysWiredIn
@@ -52,8 +51,6 @@ import SrcLoc
 import UniqSupply
 import Outputable
 import FastString
-
-import Control.Monad
 \end{code}
 
 

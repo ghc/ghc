@@ -68,8 +68,6 @@ import Outputable
 import ListSetOps
 import FastString
 
-import Data.Maybe
-import Data.List
 import Data.Set (Set)
 \end{code}
 

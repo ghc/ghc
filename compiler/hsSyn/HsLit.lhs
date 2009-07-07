@@ -14,7 +14,6 @@ import HsTypes (PostTcType)
 import Type	( Type )
 import Outputable
 import FastString
-import Ratio	( Rational )
 \end{code}
 
 

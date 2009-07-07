@@ -51,7 +51,6 @@ import VarEnv
 import Id
 import Name
 import NameEnv
-import IOEnv         ( liftIO )
 
 import DsMonad
 

@@ -29,7 +29,6 @@ import Name
 import NameEnv
 
 #ifdef GHCI
-import PrelNames
 	-- Template Haskell stuff iff bootstrapped
 import DsMeta
 #endif

@@ -41,7 +41,6 @@ import FastString
 import PprCmm		( {- instance Outputable -} )
 import Id
 import VarEnv
-import Maybes
 import Monad
 import Name
 import StgSyn

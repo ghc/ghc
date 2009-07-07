@@ -27,8 +27,6 @@ import Bitmap
 
 import Outputable
 
-import List
-
 import Util
 \end{code}
 

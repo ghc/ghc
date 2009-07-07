@@ -57,7 +57,7 @@ import Module		( Module, ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, 
 			  consDataConKey, hasKey, forall_tv_RDR )
 import UniqSupply
-import BasicTypes	( IPName, mapIPName, Fixity )
+import BasicTypes
 import ErrUtils		( Message )
 import SrcLoc
 import Outputable

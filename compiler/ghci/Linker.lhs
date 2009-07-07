@@ -50,12 +50,10 @@ import ListSetOps
 import DynFlags
 import BasicTypes
 import Outputable
-import PackageConfig
 import Panic
 import Util
 import StaticFlags
 import ErrUtils
-import DriverPhases
 import SrcLoc
 import qualified Maybes
 import UniqSet

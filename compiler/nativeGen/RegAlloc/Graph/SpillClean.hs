@@ -42,7 +42,6 @@ import State
 import Outputable
 import Util
 
-import Data.Maybe
 import Data.List        ( find, nub )
 
 --

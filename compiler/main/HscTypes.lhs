@@ -117,8 +117,6 @@ import RdrName
 import Name
 import NameEnv
 import NameSet	
-import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv, 
-			  extendOccEnv )
 import Module
 import InstEnv		( InstEnv, Instance )
 import FamInstEnv	( FamInstEnv, FamInst )
@@ -139,7 +137,7 @@ import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
                           DynFlag(..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
-import BasicTypes	( IPName, Fixity, defaultFixity, WarningTxt(..) )
+import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
 import IfaceSyn
 import FiniteMap	( FiniteMap )

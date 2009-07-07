@@ -6,7 +6,6 @@ where
 
 import BlockId
 import Cmm
-import CmmExpr
 import PprCmm
 import Outputable
 import qualified ZipCfgCmmRep as G

@@ -2,16 +2,13 @@
 module HaddockUtils where
 
 import HsSyn
-import HsDoc
 import {-# SOURCE #-} HaddockLex
 import HaddockParse
 import SrcLoc
 import RdrName
 
 import Control.Monad
-import Data.Maybe
 import Data.Char
-import Data.Either
 
 -- -----------------------------------------------------------------------------
 -- Parsing module headers

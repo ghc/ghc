@@ -32,7 +32,6 @@ import Var
 import VarEnv
 import VarSet
 import Name
-import OccName		( mkSpecOcc )
 import DynFlags		( DynFlags(..) )
 import StaticFlags	( opt_PprStyle_Debug )
 import StaticFlags	( opt_SpecInlineJoinPoints )

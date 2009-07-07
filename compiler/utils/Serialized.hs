@@ -29,7 +29,6 @@ import Data.Data
 #else
 import Data.Generics
 #endif
-import Data.Typeable
 
 
 -- | Represents a serialized value of a particular type. Attempts can be made to deserialize it at certain types

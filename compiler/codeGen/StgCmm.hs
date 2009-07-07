@@ -41,7 +41,6 @@ import IdInfo
 import Type
 import DataCon
 import Name
-import OccName
 import TyCon
 import Module
 import ErrUtils

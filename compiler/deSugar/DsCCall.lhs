@@ -24,7 +24,6 @@ import DsMonad
 import CoreUtils
 import MkCore
 import Var
-import Id
 import MkId
 import Maybes
 import ForeignCall

@@ -11,10 +11,7 @@ import CoreUnfold	( certainlyWillInline )
 import CoreUtils	( exprType, exprIsHNF, mkInlineMe )
 import CoreArity	( exprArity )
 import Var
-import Id		( Id, idType, isOneShotLambda, idUnfolding,
-			  setIdNewStrictness, mkWorkerId,
-			  setIdWorkerInfo, setInlineActivation,
-			  setIdArity, idInfo )
+import Id
 import Type		( Type )
 import IdInfo
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 

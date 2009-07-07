@@ -27,10 +27,8 @@ import TyCon
 import DataCon
 import TcHsSyn	( shortCutLit )
 import TcType
-import Type
 import PrelNames
 import TysWiredIn
-import Unique
 import Literal
 import SrcLoc
 import Ratio

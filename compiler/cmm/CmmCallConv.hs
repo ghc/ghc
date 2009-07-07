@@ -15,7 +15,6 @@ import ZipCfgCmmRep (Convention(..))
 import Constants
 import StaticFlags (opt_Unregisterised)
 import Outputable
-import Panic
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.

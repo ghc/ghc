@@ -47,8 +47,6 @@ import Outputable
 import FastString
 import Maybes
 
-import Data.List
-
 ------------------------------------------------------------------------
 --		Top-level bindings
 ------------------------------------------------------------------------

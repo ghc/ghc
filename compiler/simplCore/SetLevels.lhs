@@ -60,7 +60,7 @@ import CoreUtils	( exprType, exprIsTrivial, mkPiTypes )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendIdSubst,
 			  cloneIdBndr, cloneRecIdBndrs )
-import Id		( Id, idType, mkSysLocal, isOneShotLambda,
+import Id		( idType, mkSysLocal, isOneShotLambda,
 			  zapDemandIdInfo, transferPolyIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)

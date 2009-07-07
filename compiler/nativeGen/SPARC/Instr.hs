@@ -43,8 +43,6 @@ import FastString
 import FastBool
 import Outputable
 
-import GHC.Exts
-
 
 -- | Register or immediate
 data RI 

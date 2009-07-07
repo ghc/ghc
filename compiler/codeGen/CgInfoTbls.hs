@@ -39,7 +39,6 @@ import DataCon
 import Unique
 import StaticFlags
 
-import Maybes
 import Constants
 import Util
 import Outputable

@@ -22,9 +22,7 @@ import Annotations
 import IfaceSyn
 import Module
 import Name
-import OccName
 import VarEnv
-import InstEnv
 import Class
 import DynFlags
 import UniqFM

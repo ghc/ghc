@@ -30,7 +30,6 @@ import VarSet
 import TcUnify
 import TcHsType
 import TysWiredIn
-import Type
 import Coercion
 import StaticFlags
 import TyCon
@@ -41,7 +40,6 @@ import DynFlags	( DynFlag( Opt_GADTs ) )
 import SrcLoc
 import ErrUtils
 import Util
-import Maybes
 import Outputable
 import FastString
 import Monad

@@ -18,7 +18,6 @@ import MkZipCfg
 import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
 import Monad
 import Outputable
-import Panic
 import SMRep (ByteOff)
 import ZipCfg
 import ZipCfg as Z

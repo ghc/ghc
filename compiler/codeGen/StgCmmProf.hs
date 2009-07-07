@@ -52,7 +52,6 @@ import FastString
 import Constants	-- Lots of field offsets
 import Outputable
 
-import Data.Maybe
 import Data.Char
 import Control.Monad
 

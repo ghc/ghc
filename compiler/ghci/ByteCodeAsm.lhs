@@ -30,7 +30,6 @@ import PrimOp
 import Constants
 import FastString
 import SMRep
-import FiniteMap
 import Outputable
 
 import Control.Monad	( foldM )
@@ -41,18 +40,9 @@ import Data.Array.Unboxed ( listArray )
 import Data.Array.Base	( UArray(..) )
 import Data.Array.ST	( castSTUArray )
 import Foreign
-import Data.Bits
-import Data.Int		( Int64 )
 import Data.Char	( ord )
 
 import GHC.Base		( ByteArray#, MutableByteArray#, RealWorld )
-import GHC.Ptr		( Ptr(..) )
-
-#if __GLASGOW_HASKELL__ >= 611
-import GHC.IO ( IO(..) )
-#else
-import GHC.IOBase ( IO(..) )
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs

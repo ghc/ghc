@@ -42,7 +42,6 @@ import CostCentre
 import Outputable
 import FastString( LitString, mkFastString, sLit )
 import Constants
-import Data.List
 
 
 -----------------------------------------------------------

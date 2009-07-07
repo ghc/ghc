@@ -42,7 +42,6 @@ import qualified Var
 import VarEnv
 import Name
 import NameEnv
-import OccName
 import Module
 import LazyUniqFM
 import UniqSupply
@@ -57,7 +56,6 @@ import BasicTypes (Arity)
 
 import Control.Monad
 import Data.List
-import Data.Maybe
 \end{code}
 
 This module takes

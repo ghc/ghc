@@ -22,7 +22,6 @@ import Var
 import VarEnv
 import UniqFM
 import Name hiding (tidyNameOcc)
-import OccName
 import SrcLoc
 import Maybes
 

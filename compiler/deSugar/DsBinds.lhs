@@ -41,7 +41,6 @@ import Var	( Var, TyVar )
 import VarSet
 import Rules
 import VarEnv
-import Type
 import Outputable
 import SrcLoc
 import Maybes

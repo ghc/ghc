@@ -18,7 +18,6 @@ import CmmTx
 import CmmLiveZ
 import DFMonad
 import MkZipCfg
-import OptimizationFuel
 import PprCmm()
 import ZipCfg
 import ZipCfgCmmRep
@@ -27,7 +26,6 @@ import ZipDataflow
 import Monad
 import Outputable hiding (empty)
 import qualified Outputable as PP
-import Panic
 import UniqSet
 
 import Maybe

@@ -29,7 +29,6 @@ where
 
 import Outputable
 import Unique
-import Panic
 import RegClass
 import Data.List
 

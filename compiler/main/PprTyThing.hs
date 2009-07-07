@@ -20,7 +20,6 @@ import qualified GHC
 
 import GHC ( TyThing(..) )
 import TyCon
-import Type ( TyThing(..), tidyTopType, pprTypeApp )
 import TcType
 import Var
 import Name

@@ -41,7 +41,6 @@ import HscTypes
 import CostCentre
 import Id
 import Name
-import OccName
 import TyCon
 import Module
 import ErrUtils

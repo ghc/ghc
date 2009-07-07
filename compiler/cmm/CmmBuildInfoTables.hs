@@ -18,7 +18,6 @@ import BlockId
 import Bitmap
 import CLabel
 import Cmm hiding (blockId)
-import CmmExpr
 import CmmInfo
 import CmmProcPointZ
 import CmmStackLayout
@@ -35,7 +34,6 @@ import MkZipCfgCmm hiding (CmmAGraph, CmmBlock, CmmTopZ, CmmZ, CmmGraph)
 import Monad
 import Name
 import Outputable
-import Panic
 import SMRep
 import StgCmmClosure
 import StgCmmForeign

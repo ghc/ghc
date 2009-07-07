@@ -26,7 +26,6 @@ import TcHsType
 import TcPat
 import TcMType
 import TcType
-import {- Kind parts of -} Type
 import Coercion
 import VarEnv
 import TysPrim
@@ -41,7 +40,6 @@ import Bag
 import ErrUtils
 import Digraph
 import Maybes
-import List
 import Util
 import BasicTypes
 import Outputable

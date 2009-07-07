@@ -26,7 +26,6 @@ import TyCon
 import DataCon
 import Var
 import Name
-import OccName
 import PrelNames
 import Module
 import LazyUniqFM

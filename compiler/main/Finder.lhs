@@ -40,10 +40,8 @@ import Maybes		( expectJust )
 
 import Distribution.Package hiding (PackageId)
 import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
-import Data.List
 import System.Directory
 import System.FilePath
-import System.IO
 import Control.Monad
 import System.Time	( ClockTime )
 

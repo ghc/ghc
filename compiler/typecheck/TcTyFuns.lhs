@@ -38,7 +38,6 @@ import Bag
 import Outputable
 import SrcLoc	( Located(..) )
 import Maybes
-import MonadUtils
 import FastString
 
 -- standard

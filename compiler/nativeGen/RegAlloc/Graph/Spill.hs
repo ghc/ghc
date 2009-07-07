@@ -22,7 +22,6 @@ import UniqSupply
 import Outputable
 
 import Data.List
-import Data.Maybe
 
 
 -- | Spill all these virtual regs to memory

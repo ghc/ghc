@@ -59,7 +59,6 @@ import StaticFlags
 import Bitmap
 import Data.Bits
 
-import Maybes
 import Constants
 import Util
 import Data.List

@@ -18,7 +18,6 @@ import UniqFM
 import UniqSet
 import UniqSupply
 
-import Control.Monad
 import Data.List
 
 -- | Do register coalescing on this top level thing

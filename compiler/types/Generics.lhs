@@ -18,13 +18,11 @@ module Generics ( canDoGenerics, mkTyConGenericBinds,
 
 import HsSyn
 import Type
-import TcHsSyn
 import TcType
 import DataCon
 
 import TyCon
 import Name
-import OccName
 import RdrName
 import BasicTypes
 import Var

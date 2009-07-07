@@ -50,7 +50,6 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
-import TypeRep
 import Coercion
 import TcType
 import CoreUtils	( exprType, mkCoerce )
@@ -60,7 +59,6 @@ import TyCon
 import Class
 import VarSet
 import Name
-import OccName
 import PrimOp
 import ForeignCall
 import DataCon
@@ -70,7 +68,6 @@ import IdInfo
 import NewDemand
 import CoreSyn
 import Unique
-import Maybes
 import PrelNames
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util

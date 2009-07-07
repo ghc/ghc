@@ -45,7 +45,6 @@ import Class
 import FunDeps
 import PrelInfo
 import PrelNames
-import Type
 import TysWiredIn
 import ErrUtils
 import BasicTypes
@@ -54,7 +53,6 @@ import VarEnv
 import FiniteMap
 import Bag
 import Outputable
-import Maybes
 import ListSetOps
 import Util
 import SrcLoc

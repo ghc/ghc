@@ -48,8 +48,6 @@ import ListSetOps
 import Util
 import FastString
 import StaticFlags
-
-import Control.Monad
 \end{code}
 
 

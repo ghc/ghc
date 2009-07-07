@@ -53,10 +53,8 @@ import Type
 import UniqSupply
 import Name
 import NameEnv
-import OccName
 import DynFlags
 import ErrUtils
-import MonadUtils
 import FastString
 
 import Data.IORef

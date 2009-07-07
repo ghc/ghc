@@ -6,7 +6,6 @@ where
 
 import BlockId
 import Cmm
-import CmmExpr
 import MkZipCfgCmm hiding (CmmGraph)
 import ZipCfgCmmRep -- imported for reverse conversion
 import CmmZipUtil
@@ -16,10 +15,7 @@ import qualified ZipCfg as G
 import FastString
 import Monad
 import Outputable
-import Panic
 import UniqSupply
-
-import Maybe
 
 cmmToZgraph :: GenCmm d h (ListGraph CmmStmt) -> UniqSM (GenCmm d h (CmmStackInfo, CmmGraph))
 cmmOfZgraph :: GenCmm d h (CmmStackInfo, CmmGraph)          ->         GenCmm d h (ListGraph CmmStmt)

@@ -20,7 +20,6 @@ import Var
 import VarSet
 import BasicTypes
 import Name
-import OccName
 import MkId
 import Class
 import TyCon
@@ -30,8 +29,6 @@ import Coercion
 import TcRnMonad
 import Util		( count )
 import Outputable
-
-import Data.List
 \end{code}
 	
 
