@@ -893,6 +893,10 @@ fi
 AC_SUBST(BUILD_DOCBOOK_PS)
 AC_SUBST(BUILD_DOCBOOK_PDF)
 
+if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
+   AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
+fi
+
 AC_CONFIG_FILES([mk/config.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml distrib/ghc.iss])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
