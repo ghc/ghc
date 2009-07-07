@@ -77,8 +77,16 @@ import Foreign.Storable
 --   * a Char buffer consists of *valid* UTF-16 or UTF-32
 --   * only whole characters: no partial surrogate pairs
 
--- #define CHARBUF_UTF16
 #define CHARBUF_UTF32
+
+-- #define CHARBUF_UTF16
+--
+-- NB. it won't work to just change this to CHARBUF_UTF16.  Some of
+-- the code to make this work is there, and it has been tested with
+-- the Iconv codec, but there are some pieces that are known to be
+-- broken.  In particular, the built-in codecs
+-- e.g. GHC.IO.Encoding.UTF{8,16,32} need to use isFullCharBuffer or
+-- similar in place of the ow >= os comparisions.
 
 -- ---------------------------------------------------------------------------
 -- Raw blocks of data
