@@ -21,7 +21,6 @@ import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils hiding (out)
 import GHC
-import SrcLoc
 import Outputable
 
 import Control.Monad

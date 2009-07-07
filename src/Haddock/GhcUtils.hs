@@ -17,7 +17,6 @@
 module Haddock.GhcUtils where
 
 
-import Data.Char
 import Data.Version
 import qualified Data.Map as Map
 import Control.Arrow

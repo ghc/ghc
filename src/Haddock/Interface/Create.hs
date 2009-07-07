@@ -22,15 +22,11 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
-import Data.Char
 import Data.Ord
 import Control.Monad
 
 import GHC hiding (flags)
-import SrcLoc
 import Name
-import Module
-import InstEnv
 import Bag
 
 

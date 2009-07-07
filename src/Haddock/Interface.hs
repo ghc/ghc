@@ -36,7 +36,6 @@ import Control.Exception ( evaluate )
 import Distribution.Verbosity
 
 import GHC hiding (verbosity, flags)
-import Name
 import Digraph
 import HscTypes
 

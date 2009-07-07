@@ -29,7 +29,6 @@ import Haddock.Utils
 import Haddock.Utils.Html hiding ( name, title, p )
 import qualified Haddock.Utils.Html as Html
 import Haddock.GhcUtils
-import qualified Haddock.Utils.Html as Html
 
 import Control.Exception     ( bracket )
 import Control.Monad         ( when, unless, join )
@@ -52,7 +51,6 @@ import GHC hiding ( NoLink )
 import Name
 import Module
 import RdrName hiding ( Qual, is_explicit )
-import SrcLoc   
 import FastString            ( unpackFS )
 import BasicTypes            ( IPName(..), Boxity(..) )
 import Outputable            ( ppr, showSDoc, Outputable )

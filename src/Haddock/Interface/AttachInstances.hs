@@ -21,7 +21,6 @@ import Data.List
 
 import GHC
 import Name
-import SrcLoc
 import InstEnv
 import Class
 
@@ -34,7 +33,6 @@ import TypeRep
 import Var hiding (varName)
 import TyCon
 import PrelNames
-import HscTypes
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
 

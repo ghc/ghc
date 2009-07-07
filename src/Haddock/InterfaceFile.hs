@@ -27,20 +27,15 @@ import Data.Word
 import Data.Array
 import Data.IORef
 import qualified Data.Map as Map
-import System.IO
-import Control.Monad
 
 import GHC hiding (NoLink)
-import SrcLoc   (noSrcSpan) -- tmp, GHC now exports this
 import Binary
 import Name
 import UniqSupply
 import UniqFM
 import IfaceEnv
-import Module
 import HscTypes
 import FastMutInt
-import HsDoc
 #if __GLASGOW_HASKELL__ >= 609 
 import FastString
 import Unique

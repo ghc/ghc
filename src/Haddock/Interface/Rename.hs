@@ -19,7 +19,6 @@ import Haddock.GhcUtils
 import GHC hiding (NoLink)
 import Name
 import BasicTypes
-import SrcLoc
 import Bag (emptyBag)
 
 import Data.List

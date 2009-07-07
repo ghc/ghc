@@ -55,11 +55,8 @@ import Haddock.Types
 import Haddock.GhcUtils
 
 import GHC
-import SrcLoc
 import Name
-import OccName
 import Binary
-import Module
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, ord, chr )
