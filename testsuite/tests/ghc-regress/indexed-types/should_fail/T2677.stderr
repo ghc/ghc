@@ -1,0 +1,5 @@
+
+T2677.hs:6:14:
+    Conflicting family instance declarations:
+      type instance A a -- Defined at T2677.hs:6:14
+      type instance A Int -- Defined at T2677.hs:7:14
