@@ -22,7 +22,6 @@ import Outputable
 import Foreign
 import Foreign.C
 import Text.Printf
-import Data.Word
 import Numeric          ( readHex )
 
 -- Using 128-bit MD5 fingerprints for now.
