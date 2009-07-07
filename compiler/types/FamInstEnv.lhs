@@ -228,7 +228,7 @@ lookupFamInstEnv
     -> [FamInstMatch] 	        -- Successful matches
 
 lookupFamInstEnv
-   = lookup_fam_inst_env match
+   = lookup_fam_inst_env match True
    where
      match _ tpl_tvs tpl_tys tys = tcMatchTys tpl_tvs tpl_tys tys
 
@@ -245,7 +245,7 @@ lookupFamInstEnvConflicts
 -- unique supply to hand
 
 lookupFamInstEnvConflicts envs fam_inst skol_tvs
-  = lookup_fam_inst_env my_unify envs fam tys'
+  = lookup_fam_inst_env my_unify False envs fam tys'
   where
     inst_tycon = famInstTyCon fam_inst
     (fam, tys) = expectJust "FamInstEnv.lookuFamInstEnvConflicts"
@@ -275,12 +275,13 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
       | otherwise      = not (old_rhs `tcEqType` new_rhs)
       where
         old_tycon = famInstTyCon old_fam_inst
-        old_rhs   = mkTyConApp old_tycon (substTyVars subst (tyConTyVars old_tycon))
+        old_tvs   = tyConTyVars old_tycon
+        old_rhs   = mkTyConApp old_tycon  (substTyVars subst old_tvs)
         new_rhs   = mkTyConApp inst_tycon (substTyVars subst skol_tvs)
 \end{code}
 
 While @lookupFamInstEnv@ uses a one-way match, the next function
-@lookupFamInstEnvUnify@ uses two-way matching (ie, unification).  This is
+@lookupFamInstEnvConflicts@ uses two-way matching (ie, unification).  This is
 needed to check for overlapping instances.
 
 For class instances, these two variants of lookup are combined into one
@@ -297,12 +298,16 @@ type MatchFun =  FamInst		-- The FamInst template
 	      -> [Type]			-- Target to match against
 	      -> Maybe TvSubst
 
+type OneSidedMatch = Bool     -- Are optimisations that are only valid for
+                              -- one sided matches allowed?
+
 lookup_fam_inst_env 	      -- The worker, local to this module
     :: MatchFun
+    -> OneSidedMatch
     -> FamInstEnvs
     -> TyCon -> [Type]		-- What we are looking for
     -> [FamInstMatch] 	        -- Successful matches
-lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
+lookup_fam_inst_env match_fun one_sided (pkg_ie, home_ie) fam tys
   | not (isOpenTyCon fam) 
   = []
   | otherwise
@@ -323,7 +328,7 @@ lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
 
     --------------
     rough_tcs = roughMatchTcs match_tys
-    all_tvs   = all isNothing rough_tcs
+    all_tvs   = all isNothing rough_tcs && one_sided
 
     --------------
     lookup env = case lookupUFM env fam of
