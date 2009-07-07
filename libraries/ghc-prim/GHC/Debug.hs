@@ -3,7 +3,7 @@ module GHC.Debug (debugLn) where
 
 import GHC.Prim
 import GHC.Types
-import GHC.Unit
+import GHC.Unit ()
 
 debugLn :: [Char] -> IO ()
 debugLn xs = IO (\s0 ->
