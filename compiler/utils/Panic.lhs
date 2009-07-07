@@ -203,7 +203,7 @@ installSignalHandlers = do
       sig_handler Break    = interrupt
       sig_handler _        = return ()
 
-  installHandler (Catch sig_handler)
+  _ <- installHandler (Catch sig_handler)
   return ()
 #endif
 
