@@ -134,7 +134,7 @@ lookUp     sw = sw `elem` packed_static_opts
 -- (lookup_str "foo") looks for the flag -foo=X or -fooX, 
 -- and returns the string X
 lookup_str sw 
-   = case firstJust (map (maybePrefixMatch sw) staticFlags) of
+   = case firstJust (map (stripPrefix sw) staticFlags) of
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
 	Nothing		 -> Nothing	

@@ -65,7 +65,7 @@ import SrcLoc
 import UniqFM
 import DynFlags
 import Ctype
-import Util		( maybePrefixMatch, readRational )
+import Util		( readRational )
 
 import Control.Monad
 import Data.Bits
@@ -1323,7 +1323,7 @@ lex_escape = do
 		Just (c3,i3) -> 
 		   let str = [c1,c2,c3] in
 		   case [ (c,rest) | (p,c) <- silly_escape_chars,
-			      	     Just rest <- [maybePrefixMatch p str] ] of
+			      	     Just rest <- [stripPrefix p str] ] of
 			  (escape_char,[]):_ -> do
 				setInput i3
 				return escape_char

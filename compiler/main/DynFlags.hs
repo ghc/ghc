@@ -92,7 +92,7 @@ import Data.IORef
 import Control.Monad    ( when )
 
 import Data.Char
-import Data.List        ( intersperse )
+import Data.List
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -826,7 +826,7 @@ addDepSuffix s d = d { depSuffixes = deOptDep s : depSuffixes d }
 -- We used to use "-optdep-flag -optdeparg", so for legacy applications
 -- we need to strip the "-optdep" off of the arg
 deOptDep :: String -> String
-deOptDep x = case maybePrefixMatch "-optdep" x of
+deOptDep x = case stripPrefix "-optdep" x of
              Just rest -> rest
              Nothing -> x
 

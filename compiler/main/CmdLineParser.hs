@@ -23,6 +23,8 @@ import Outputable
 import Panic
 import SrcLoc
 
+import Data.List
+
 data Flag m = Flag
     {
         flagName :: String,           -- flag, without the leading -
@@ -118,7 +120,7 @@ findArg spec arg
   = case [ (removeSpaces rest, optKind, flagDeprecated flag)
          | flag <- spec,
            let optKind = flagOptKind flag,
-           Just rest <- [maybePrefixMatch (flagName flag) arg],
+           Just rest <- [stripPrefix (flagName flag) arg],
            arg_ok optKind rest arg ]
     of
         []      -> Nothing
