@@ -90,7 +90,7 @@ type FD = CInt
 fdFileSize :: FD -> IO Integer
 fdFileSize fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
-    throwErrnoIfMinus1Retry "fileSize" $
+    throwErrnoIfMinus1Retry_ "fileSize" $
         c_fstat fd p_stat
     c_mode <- st_mode p_stat :: IO CMode 
     if not (s_isreg c_mode)
@@ -103,7 +103,7 @@ fileType :: FilePath -> IO IODeviceType
 fileType file =
   allocaBytes sizeof_stat $ \ p_stat -> do
   withFilePath file $ \p_file -> do
-    throwErrnoIfMinus1Retry "fileType" $
+    throwErrnoIfMinus1Retry_ "fileType" $
       c_stat p_file p_stat
     statGetType p_stat
 
@@ -112,7 +112,7 @@ fileType file =
 fdStat :: FD -> IO (IODeviceType, CDev, CIno)
 fdStat fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
-    throwErrnoIfMinus1Retry "fdType" $
+    throwErrnoIfMinus1Retry_ "fdType" $
         c_fstat fd p_stat
     ty <- statGetType p_stat
     dev <- st_dev p_stat
@@ -219,7 +219,7 @@ setCooked fd cooked =
 tcSetAttr :: FD -> (Ptr CTermios -> IO a) -> IO a
 tcSetAttr fd fun = do
      allocaBytes sizeof_termios  $ \p_tios -> do
-        throwErrnoIfMinus1Retry "tcSetAttr"
+        throwErrnoIfMinus1Retry_ "tcSetAttr"
            (c_tcgetattr fd p_tios)
 
 #ifdef __GLASGOW_HASKELL__
@@ -240,13 +240,17 @@ tcSetAttr fd fun = do
         -- transparent.
         allocaBytes sizeof_sigset_t $ \ p_sigset -> do
           allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
-             c_sigemptyset p_sigset
-             c_sigaddset   p_sigset const_sigttou
-             c_sigprocmask const_sig_block p_sigset p_old_sigset
+             throwErrnoIfMinus1_ "sigemptyset" $
+                 c_sigemptyset p_sigset
+             throwErrnoIfMinus1_ "sigaddset" $
+                 c_sigaddset   p_sigset const_sigttou
+             throwErrnoIfMinus1_ "sigprocmask" $
+                 c_sigprocmask const_sig_block p_sigset p_old_sigset
              r <- fun p_tios  -- do the business
              throwErrnoIfMinus1Retry_ "tcSetAttr" $
                  c_tcsetattr fd const_tcsanow p_tios
-             c_sigprocmask const_sig_setmask p_old_sigset nullPtr
+             throwErrnoIfMinus1_ "sigprocmask" $
+                 c_sigprocmask const_sig_setmask p_old_sigset nullPtr
              return r
 
 #ifdef __GLASGOW_HASKELL__
@@ -323,8 +327,8 @@ setNonBlockingFD fd set = do
   let flags' | set       = flags .|. o_NONBLOCK
              | otherwise = flags .&. complement o_NONBLOCK
   unless (flags == flags') $ do
-    c_fcntl_write fd const_f_setfl (fromIntegral flags')
-    return ()
+    throwErrnoIfMinus1Retry_ "fcntl_write" $
+        c_fcntl_write fd const_f_setfl (fromIntegral flags')
 #else
 
 -- bogus defns for win32
@@ -338,9 +342,8 @@ setNonBlockingFD _ _ = return ()
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 setCloseOnExec :: FD -> IO ()
 setCloseOnExec fd = do
-  throwErrnoIfMinus1 "setCloseOnExec" $
+  throwErrnoIfMinus1_ "setCloseOnExec" $
     c_fcntl_write fd const_f_setfd const_fd_cloexec
-  return ()
 #endif
 
 -- -----------------------------------------------------------------------------
