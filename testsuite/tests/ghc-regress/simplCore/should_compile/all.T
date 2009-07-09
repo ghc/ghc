@@ -37,5 +37,7 @@ test('rule1', normal, compile, [''])
 
 test('strict-float', normal, compile, [''])
 test('T3118', normal, compile, [''])
-test('T3016', normal, compile, [''])
 
+# With -prof -fvia-C, this test makes gcc go out to lunch, and the
+# testsuite driver times out.
+test('T3016', omit_ways(['profc']), compile, [''])
