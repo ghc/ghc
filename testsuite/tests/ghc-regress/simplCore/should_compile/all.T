@@ -40,4 +40,4 @@ test('T3118', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
 # testsuite driver times out.
-test('T3016', omit_ways(['profc']), compile, [''])
+test('T3016', [ skip_if_fast, omit_ways(['optc','profc']) ], compile, [''])
