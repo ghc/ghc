@@ -143,7 +143,7 @@ pooledRealloc = pr undefined
 pooledReallocBytes :: Pool -> Ptr a -> Int -> IO (Ptr a)
 pooledReallocBytes (Pool pool) ptr size = do
    let cPtr = castPtr ptr
-   throwIf (not . (cPtr `elem`)) (\_ -> "pointer not in pool") (readIORef pool)
+   _ <- throwIf (not . (cPtr `elem`)) (\_ -> "pointer not in pool") (readIORef pool)
    newPtr <- reallocBytes cPtr size
    ptrs <- readIORef pool
    writeIORef pool (newPtr : delete cPtr ptrs)

@@ -338,7 +338,7 @@ blocked = IO $ \s -> case asyncExceptionsBlocked# s of
                         (# s', i #) -> (# s', i /=# 0# #)
 
 onException :: IO a -> IO b -> IO a
-onException io what = io `catchException` \e -> do what
+onException io what = io `catchException` \e -> do _ <- what
                                                    throw (e :: SomeException)
 
 finally :: IO a         -- ^ computation to run first
@@ -348,7 +348,7 @@ finally :: IO a         -- ^ computation to run first
 a `finally` sequel =
   block (do
     r <- unblock a `onException` sequel
-    sequel
+    _ <- sequel
     return r
   )
 

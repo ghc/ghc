@@ -151,10 +151,10 @@ notANumber = 0 :% 0
 
 lexLitChar :: ReadP Lexeme
 lexLitChar =
-  do char '\''
+  do _ <- char '\''
      (c,esc) <- lexCharE
      guard (esc || c /= '\'')   -- Eliminate '' possibility
-     char '\''
+     _ <- char '\''
      return (Char c)
 
 lexChar :: ReadP Char
@@ -195,7 +195,7 @@ lexCharE =
        return (chr (fromInteger n))
 
   lexCntrlChar =
-    do char '^'
+    do _ <- char '^'
        c <- get
        case c of
          '@'  -> return '\^@'
@@ -279,7 +279,7 @@ lexCharE =
 
 lexString :: ReadP Lexeme
 lexString =
-  do char '"'
+  do _ <- char '"'
      body id
  where
   body f =
@@ -293,11 +293,11 @@ lexString =
                +++ lexCharE
   
   lexEmpty =
-    do char '\\'
+    do _ <- char '\\'
        c <- get
        case c of
          '&'           -> do return ()
-         _ | isSpace c -> do skipSpaces; char '\\'; return ()
+         _ | isSpace c -> do skipSpaces; _ <- char '\\'; return ()
          _             -> do pfail
 
 -- ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ lexNumber
                 
 lexHexOct :: ReadP Lexeme
 lexHexOct
-  = do  char '0'
+  = do  _ <- char '0'
         base <- lexBaseChar
         digits <- lexDigits base
         return (Int (val (fromIntegral base) 0 digits))
@@ -359,12 +359,12 @@ lexDecNumber =
 lexFrac :: ReadP (Maybe Digits)
 -- Read the fractional part; fail if it doesn't
 -- start ".d" where d is a digit
-lexFrac = do char '.'
+lexFrac = do _ <- char '.'
              fraction <- lexDigits 10
              return (Just fraction)
 
 lexExp :: ReadP (Maybe Integer)
-lexExp = do char 'e' +++ char 'E'
+lexExp = do _ <- char 'e' +++ char 'E'
             exp <- signedExp +++ lexInteger 10
             return (Just exp)
  where
@@ -382,7 +382,7 @@ lexDigits base =
      return xs
  where
   scan (c:cs) f = case valDig base c of
-                    Just n  -> do get; scan cs (f.(n:))
+                    Just n  -> do _ <- get; scan cs (f.(n:))
                     Nothing -> do return (f [])
   scan []     f = do return (f [])
 

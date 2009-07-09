@@ -287,7 +287,7 @@ string :: String -> ReadP String
 string this = do s <- look; scan this s
  where
   scan []     _               = do return this
-  scan (x:xs) (y:ys) | x == y = do get; scan xs ys
+  scan (x:xs) (y:ys) | x == y = do _ <- get; scan xs ys
   scan _      _               = do pfail
 
 munch :: (Char -> Bool) -> ReadP String
@@ -298,7 +298,7 @@ munch p =
   do s <- look
      scan s
  where
-  scan (c:cs) | p c = do get; s <- scan cs; return (c:s)
+  scan (c:cs) | p c = do _ <- get; s <- scan cs; return (c:s)
   scan _            = do return ""
 
 munch1 :: (Char -> Bool) -> ReadP String
@@ -321,7 +321,7 @@ skipSpaces =
   do s <- look
      skip s
  where
-  skip (c:s) | isSpace c = do get; skip s
+  skip (c:s) | isSpace c = do _ <- get; skip s
   skip _                 = do return ()
 
 count :: Int -> ReadP a -> ReadP [a]
@@ -332,9 +332,9 @@ count n p = sequence (replicate n p)
 between :: ReadP open -> ReadP close -> ReadP a -> ReadP a
 -- ^ @between open close p@ parses @open@, followed by @p@ and finally
 --   @close@. Only the value of @p@ is returned.
-between open close p = do open
+between open close p = do _ <- open
                           x <- p
-                          close
+                          _ <- close
                           return x
 
 option :: a -> ReadP a -> ReadP a
@@ -375,12 +375,12 @@ sepBy1 p sep = liftM2 (:) p (many (sep >> p))
 endBy :: ReadP a -> ReadP sep -> ReadP [a]
 -- ^ @endBy p sep@ parses zero or more occurrences of @p@, separated and ended
 --   by @sep@.
-endBy p sep = many (do x <- p ; sep ; return x)
+endBy p sep = many (do x <- p ; _ <- sep ; return x)
 
 endBy1 :: ReadP a -> ReadP sep -> ReadP [a]
 -- ^ @endBy p sep@ parses one or more occurrences of @p@, separated and ended
 --   by @sep@.
-endBy1 p sep = many1 (do x <- p ; sep ; return x)
+endBy1 p sep = many1 (do x <- p ; _ <- sep ; return x)
 
 chainr :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
 -- ^ @chainr p op x@ parses zero or more occurrences of @p@, separated by @op@.

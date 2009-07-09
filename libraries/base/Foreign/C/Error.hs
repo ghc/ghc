@@ -378,7 +378,8 @@ throwErrnoIfRetryMayBlock pred loc f on_block  =
         if err == eINTR
           then throwErrnoIfRetryMayBlock pred loc f on_block
           else if err == eWOULDBLOCK || err == eAGAIN
-                 then do on_block; throwErrnoIfRetryMayBlock pred loc f on_block
+                 then do _ <- on_block
+                         throwErrnoIfRetryMayBlock pred loc f on_block
                  else throwErrno loc
       else return res
 

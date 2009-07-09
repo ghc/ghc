@@ -243,7 +243,9 @@ newBuffer bytes sz state = do
 slideContents :: Buffer Word8 -> IO (Buffer Word8)
 slideContents buf@Buffer{ bufL=l, bufR=r, bufRaw=raw } = do
   let elems = r - l
-  withRawBuffer raw $ \p -> memcpy p (p `plusPtr` l) (fromIntegral elems)
+  withRawBuffer raw $ \p ->
+      do _ <- memcpy p (p `plusPtr` l) (fromIntegral elems)
+         return ()
   return buf{ bufL=0, bufR=elems }
 
 foreign import ccall unsafe "memcpy"
