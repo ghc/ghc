@@ -193,7 +193,7 @@ if test "$build" = ""
 then
     if test "${WithGhc}" != ""
     then
-        build=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//'`
+        build=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
         echo "Build platform inferred as: $build"
     else
         echo "Can't work out build platform"
@@ -205,7 +205,7 @@ if test "$host" = ""
 then
     if test "${WithGhc}" != ""
     then
-        host=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//'`
+        host=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
         echo "Host platform inferred as: $host"
     else
         echo "Can't work out host platform"
@@ -217,7 +217,7 @@ if test "$target" = ""
 then
     if test "${WithGhc}" != ""
     then
-        target=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//'`
+        target=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
         echo "Target platform inferred as: $target"
     else
         echo "Can't work out target platform"
@@ -274,7 +274,7 @@ checkOS() {
     linux|freebsd|netbsd|openbsd|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
         ;;
     *)
-        echo "Unknown OS $1"
+        echo "Unknown OS '$1'"
         exit 1
         ;;
     esac
