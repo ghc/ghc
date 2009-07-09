@@ -7,9 +7,6 @@ HADDOCK_DOCS    = YES
 SRC_CC_OPTS     += -Wall $(WERROR)
 SRC_HC_OPTS     += -Wall $(WERROR) -H64m -O0 -fasm
 
-# Temporary hack until we fix the libraries. See #3263 for details.
-GhcLibHcOpts    += -fno-warn-unused-do-bind
-
 GhcStage1HcOpts += -O -fasm
 
 GhcStage2HcOpts += -O -fasm
