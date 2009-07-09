@@ -57,6 +57,7 @@ module Lexer (
 
 import Bag
 import ErrUtils
+import Maybe
 import Outputable
 import StringBuffer
 import FastString
@@ -69,6 +70,9 @@ import Util		( maybePrefixMatch, readRational )
 import Control.Monad
 import Data.Bits
 import Data.Char
+import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Ratio
 }
 
@@ -103,6 +107,8 @@ $hexit     = [$decdigit A-F a-f]
 $symchar   = [$symbol \:]
 $nl        = [\n\r]
 $idchar    = [$small $large $digit \']
+
+$pragmachar = [$small $large $digit]
 
 $docsym    = [\| \^ \* \$]
 
@@ -236,69 +242,31 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
    -- with older versions of GHC which generated these.
 
 <0,option_prags> {
-  "{-#" $whitechar* (RULES|rules)  / { notFollowedByPragmaChar } { rulePrag }
-  "{-#" $whitechar* (INLINE|inline)	 / { notFollowedByPragmaChar }
-                    { token (ITinline_prag True) }
-  "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline) / { notFollowedByPragmaChar }
-  					{ token (ITinline_prag False) }
-  "{-#" $whitechar* (INLINE|inline)
-        $whitechar+ (CONLIKE|conlike) / { notFollowedByPragmaChar }
-                                        { token (ITinline_conlike_prag True) }
-  "{-#" $whitechar* (NO(T)?INLINE|no(t?)inline)
-        $whitechar+ (CONLIKE|constructorlike) / { notFollowedByPragmaChar }
-                                        { token (ITinline_conlike_prag False) }
-  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e) / { notFollowedByPragmaChar }
-  					{ token ITspec_prag }
-  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
-	$whitechar+ (INLINE|inline) / { notFollowedByPragmaChar }
-                    { token (ITspec_inline_prag True) }
-  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
-	$whitechar+ (NO(T?)INLINE|no(t?)inline) / { notFollowedByPragmaChar }
-					{ token (ITspec_inline_prag False) }
-  "{-#" $whitechar* (SOURCE|source) / { notFollowedByPragmaChar }
-                    { token ITsource_prag }
-  "{-#" $whitechar* (WARNING|warning) / { notFollowedByPragmaChar }
-  					{ token ITwarning_prag }
-  "{-#" $whitechar* (DEPRECATED|deprecated) / { notFollowedByPragmaChar }
-  					{ token ITdeprecated_prag }
-  "{-#" $whitechar* (SCC|scc)  / { notFollowedByPragmaChar }
-                    { token ITscc_prag }
-  "{-#" $whitechar* (GENERATED|generated) / { notFollowedByPragmaChar }
-  					{ token ITgenerated_prag }
-  "{-#" $whitechar* (CORE|core) / { notFollowedByPragmaChar }
-                    { token ITcore_prag }
-  "{-#" $whitechar* (UNPACK|unpack) / { notFollowedByPragmaChar }
-                    { token ITunpack_prag }
-  "{-#" $whitechar* (ANN|ann) / { notFollowedByPragmaChar }
-                    { token ITann_prag }
+  "{-#" $whitechar* $pragmachar+ 
+        $whitechar+ $pragmachar+ / { known_pragma twoWordPrags }
+                                 { dispatch_pragmas twoWordPrags }
+
+  "{-#" $whitechar* $pragmachar+ / { known_pragma oneWordPrags }
+                                 { dispatch_pragmas oneWordPrags }
 
   -- We ignore all these pragmas, but don't generate a warning for them
-  -- CFILES is a hugs-only thing.
-  "{-#" $whitechar* (OPTIONS_(HUGS|hugs|NHC98|nhc98|JHC|jhc|YHC|yhc|CATCH|catch|DERIVE|derive)|CFILES|cfiles|CONTRACT|contract) / { notFollowedByPragmaChar }
-                    { nested_comment lexToken }
+  "{-#" $whitechar* $pragmachar+ / { known_pragma ignoredPrags }
+                                 { dispatch_pragmas ignoredPrags }
 
   -- ToDo: should only be valid inside a pragma:
   "#-}" 				{ endPrag }
 }
 
 <option_prags> {
-  "{-#"  $whitechar* (OPTIONS|options) / { notFollowedByPragmaChar }
-                                        { lex_string_prag IToptions_prag }
-  "{-#"  $whitechar* (OPTIONS_GHC|options_ghc) / { notFollowedByPragmaChar }
-                                        { lex_string_prag IToptions_prag }
-  "{-#"  $whitechar* (OPTIONS_HADDOCK|options_haddock)
-                   / { notFollowedByPragmaChar }
-                                         { lex_string_prag ITdocOptions }
+  "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
+                                   { dispatch_pragmas fileHeaderPrags }
+
   "-- #"                                 { multiline_doc_comment }
-  "{-#"  $whitechar* (LANGUAGE|language) / { notFollowedByPragmaChar }
-                                         { token ITlanguage_prag }
-  "{-#"  $whitechar* (INCLUDE|include) / { notFollowedByPragmaChar }
-                                         { lex_string_prag ITinclude_prag }
 }
 
 <0> {
   -- In the "0" mode we ignore these pragmas
-  "{-#"  $whitechar* (OPTIONS|options|OPTIONS_GHC|options_ghc|OPTIONS_HADDOCK|options_haddock|LANGUAGE|language|INCLUDE|include) / { notFollowedByPragmaChar }
+  "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
                      { nested_comment lexToken }
 }
 
@@ -1600,7 +1568,7 @@ alexGetChar (AI loc ofs s)
 	  | c <= '\x06' = non_graphic
 	  | c <= '\x7f' = c
           -- Alex doesn't handle Unicode, so when Unicode
-          -- character is encoutered we output these values
+          -- character is encountered we output these values
           -- with the actual character value hidden in the state.
 	  | otherwise = 
 		case generalCategory c of
@@ -1938,4 +1906,57 @@ lexTokenStream buf loc dflags = unP go initState
             case ltok of
               L _ ITeof -> return []
               _ -> liftM (ltok:) go
+
+fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
+                                 ("options_ghc", lex_string_prag IToptions_prag),
+                                 ("options_haddock", lex_string_prag ITdocOptions),
+                                 ("language", token ITlanguage_prag),
+                                 ("include", lex_string_prag ITinclude_prag)])
+
+ignoredPrags = Map.fromList (map ignored pragmas)
+               where ignored opt = (opt, nested_comment lexToken)
+                     impls = ["hugs", "nhc98", "jhc", "yhc", "catch", "derive"]
+                     options_pragmas = map ("options_" ++) impls
+                     -- CFILES is a hugs-only thing.
+                     pragmas = options_pragmas ++ ["cfiles", "contract"]
+
+oneWordPrags = Map.fromList([("rules", rulePrag),
+                           ("inline", token (ITinline_prag True)),
+                           ("notinline", token (ITinline_prag False)),
+                           ("specialize", token ITspec_prag),
+                           ("source", token ITsource_prag),
+                           ("warning", token ITwarning_prag),
+                           ("deprecated", token ITdeprecated_prag),
+                           ("scc", token ITscc_prag),
+                           ("generated", token ITgenerated_prag),
+                           ("core", token ITcore_prag),
+                           ("unpack", token ITunpack_prag),
+                           ("ann", token ITann_prag)])
+
+twoWordPrags = Map.fromList([("inline conlike", token (ITinline_conlike_prag True)),
+                             ("notinline conlike", token (ITinline_conlike_prag False)),
+                             ("specialize inline", token (ITspec_inline_prag True)),
+                             ("specialize notinline", token (ITspec_inline_prag False))])
+
+
+dispatch_pragmas :: Map String Action -> Action
+dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToString buf len)) prags of
+                                       Just found -> found span buf len
+                                       Nothing -> lexError "unknown pragma"
+
+known_pragma :: Map String Action -> AlexAccPred Int
+known_pragma prags q r len (AI s t buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
+                                          && (notFollowedByPragmaChar q r len (AI s t buf))
+
+clean_pragma :: String -> String
+clean_pragma prag = canon_ws (map toLower (unprefix prag))
+                    where unprefix prag' = (case stripPrefix "{-#" prag' of
+                                              Just rest -> rest
+                                              Nothing -> prag')
+                          canonical prag' = case prag' of
+                                              "noinline" -> "notinline"
+                                              "specialise" -> "specialize"
+                                              "constructorlike" -> "conlike"
+                                              otherwise -> prag'
+                          canon_ws s = unwords (map canonical (words s))
 }
