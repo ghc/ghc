@@ -1269,8 +1269,8 @@ foreign import ccall unsafe "sizeof_fd_set"
 
 #endif
 
-reportStackOverflow :: IO a
-reportStackOverflow = do callStackOverflowHook; return undefined
+reportStackOverflow :: IO ()
+reportStackOverflow = callStackOverflowHook
 
 reportError :: SomeException -> IO ()
 reportError ex = do
