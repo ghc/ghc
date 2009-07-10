@@ -83,8 +83,8 @@ latin1_decode
          | ow >= os || ir >= iw =  done ir ow
          | otherwise = do
               c0 <- readWord8Buf iraw ir
-              writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
-              loop (ir+1) (ow+1)
+              ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
+              loop (ir+1) ow'
 
        -- lambda-lifted, to avoid thunks being built in the inner-loop:
        done !ir !ow = return (if ir == iw then input{ bufL=0, bufR=0 }
