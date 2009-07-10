@@ -171,9 +171,13 @@ tcLookupLocatedTyCon = addLocM tcLookupTyCon
 
 -- Look up the instance tycon of a family instance.
 --
--- The match must be unique - ie, match exactly one instance - but the 
--- type arguments used for matching may be more specific than those of 
--- the family instance declaration.
+-- The match may be ambiguous (as we know that overlapping instances have
+-- identical right-hand sides under overlapping substitutions - see
+-- 'FamInstEnv.lookupFamInstEnvConflicts').  However, the type arguments used
+-- for matching must be equal to or be more specific than those of the family
+-- instance declaration.  We pick one of the matches in case of ambiguity; as
+-- the right-hand sides are identical under the match substitution, the choice
+-- does not matter.
 --
 -- Return the instance tycon and its type instance.  For example, if we have
 --
@@ -194,9 +198,9 @@ tcLookupFamInst tycon tys
        ; eps <- getEps
        ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
        ; case lookupFamInstEnv instEnv tycon tys of
-	   [(fam_inst, rep_tys)] -> return $ Just (famInstTyCon fam_inst, 
-                                                   rep_tys)
-	   _                     -> return Nothing
+	   []                      -> return Nothing
+	   ((fam_inst, rep_tys):_) 
+             -> return $ Just (famInstTyCon fam_inst, rep_tys)
        }
 \end{code}
 
