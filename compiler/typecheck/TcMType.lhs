@@ -1892,8 +1892,16 @@ sizeType (ForAllTy _ ty)   = sizeType ty
 sizeTypes :: [Type] -> Int
 sizeTypes xs               = sum (map sizeType xs)
 
+-- Size of a predicate
+--
+-- Equalities are a special case.  The equality itself doesn't contribute to the
+-- size and as we do not count class predicates, we have to start with one less.
+-- This is easy to see considering that, given
+--   class C a b | a -> b
+--   type family F a
+-- constraints (C a b) and (F a ~ b) are equivalent in size.
 sizePred :: PredType -> Int
 sizePred (ClassP _ tys')   = sizeTypes tys'
 sizePred (IParam _ ty)     = sizeType ty
-sizePred (EqPred ty1 ty2)  = sizeType ty1 + sizeType ty2
+sizePred (EqPred ty1 ty2)  = sizeType ty1 + sizeType ty2 - 1
 \end{code}
