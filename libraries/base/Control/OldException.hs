@@ -456,8 +456,8 @@ bracket before after thing =
     a <- before 
     r <- catch 
            (unblock (thing a))
-           (\e -> do { after a; throw e })
-    after a
+           (\e -> do { _ <- after a; throw e })
+    _ <- after a
     return r
  )
 #endif
@@ -473,8 +473,8 @@ a `finally` sequel =
   block (do
     r <- catch 
              (unblock a)
-             (\e -> do { sequel; throw e })
-    sequel
+             (\e -> do { _ <- sequel; throw e })
+    _ <- sequel
     return r
   )
 
@@ -495,7 +495,7 @@ bracketOnError before after thing =
     a <- before 
     catch 
         (unblock (thing a))
-        (\e -> do { after a; throw e })
+        (\e -> do { _ <- after a; throw e })
  )
 
 -- -----------------------------------------------------------------------------

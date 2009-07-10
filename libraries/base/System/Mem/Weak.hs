@@ -104,7 +104,7 @@ mkWeakPtr key finalizer = mkWeak key key finalizer
 -}
 addFinalizer :: key -> IO () -> IO ()
 addFinalizer key finalizer = do
-   mkWeakPtr key (Just finalizer)	-- throw it away
+   _ <- mkWeakPtr key (Just finalizer) -- throw it away
    return ()
 
 -- | A specialised version of 'mkWeak' where the value is actually a pair

@@ -507,7 +507,7 @@ dpermuteP is es dft
   | isLen /= esLen = error "GHC.PArr: arguments must be of the same length"
   | otherwise      = runST (do
                        marr <- newArray dftLen noElem
-                       trans 0 (isLen - 1) marr dft copyOne noAL
+                       _ <- trans 0 (isLen - 1) marr dft copyOne noAL
                        permute marr is es
                        mkPArr dftLen marr)
   where

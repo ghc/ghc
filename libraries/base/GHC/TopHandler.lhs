@@ -83,8 +83,8 @@ install_interrupt_handler handler = do
 -- isn't available here.
 install_interrupt_handler handler = do
    let sig = CONST_SIGINT :: CInt
-   setHandler sig (Just (const handler, toDyn handler))
-   stg_sig_install sig STG_SIG_RST nullPtr
+   _ <- setHandler sig (Just (const handler, toDyn handler))
+   _ <- stg_sig_install sig STG_SIG_RST nullPtr
      -- STG_SIG_RST: the second ^C kills us for real, just in case the
      -- RTS or program is unresponsive.
    return ()
