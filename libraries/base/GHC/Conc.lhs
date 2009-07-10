@@ -115,6 +115,7 @@ import Control.Monad
 import Data.Maybe
 
 import GHC.Base
+import GHC.Debug
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
 import GHC.IO
@@ -540,7 +541,7 @@ checkInv (STM m) = STM (\s -> (check# m) s)
 -- of those points then the transaction violating it is aborted
 -- and the exception raised by the invariant is propagated.
 alwaysSucceeds :: STM a -> STM ()
-alwaysSucceeds i = do ( do i ; retry ) `orElse` ( return () ) 
+alwaysSucceeds i = do ( i >> retry ) `orElse` ( return () ) 
                       checkInv i
 
 -- | always is a variant of alwaysSucceeds in which the invariant is
@@ -954,7 +955,7 @@ foreign import stdcall "WaitForSingleObject"
 startIOManagerThread :: IO ()
 startIOManagerThread = do
         allocaArray 2 $ \fds -> do
-        throwErrnoIfMinus1 "startIOManagerThread" (c_pipe fds)
+        throwErrnoIfMinus1_ "startIOManagerThread" (c_pipe fds)
         rd_end <- peekElemOff fds 0
         wr_end <- peekElemOff fds 1
         setNonBlockingFD wr_end True -- writes happen in a signal handler, we
@@ -963,7 +964,7 @@ startIOManagerThread = do
         setCloseOnExec wr_end
         writeIORef stick (fromIntegral wr_end)
         c_setIOManagerPipe wr_end
-        forkIO $ do
+        _ <- forkIO $ do
             allocaBytes sizeofFdSet   $ \readfds -> do
             allocaBytes sizeofFdSet   $ \writefds -> do 
             allocaBytes sizeofTimeVal $ \timeval -> do
@@ -1028,7 +1029,8 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
         if b == 0 
           then return False
           else alloca $ \p -> do 
-                 c_read (fromIntegral wakeup) p 1
+                 warnErrnoIfMinus1_ "service_loop" $
+                     c_read (fromIntegral wakeup) p 1
                  s <- peek p            
                  case s of
                   _ | s == io_MANAGER_WAKEUP -> return False
@@ -1049,7 +1051,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   if exit then return () else do
 
-  atomicModifyIORef prodding (\_ -> (False,False))
+  atomicModifyIORef prodding (\_ -> (False, ()))
 
   reqs' <- if wakeup_all then do wakeupAll reqs; return []
                          else completeRequests reqs readfds writefds []
@@ -1077,14 +1079,14 @@ syncIOManager = do
   atomicModifyIORef sync (\old -> (m:old,()))
   fd <- readIORef stick
   with io_MANAGER_SYNC $ \pbuf -> do 
-    c_write (fromIntegral fd) pbuf 1; return ()
+    warnErrnoIfMinus1_ "syncIOManager" $ c_write (fromIntegral fd) pbuf 1
   takeMVar m
 
 wakeupIOManager :: IO ()
 wakeupIOManager = do
   fd <- readIORef stick
   with io_MANAGER_WAKEUP $ \pbuf -> do 
-    c_write (fromIntegral fd) pbuf 1; return ()
+    warnErrnoIfMinus1_ "wakeupIOManager" $ c_write (fromIntegral fd) pbuf 1
 
 -- For the non-threaded RTS
 runHandlers :: Ptr Word8 -> Int -> IO ()
@@ -1104,7 +1106,8 @@ runHandlers' p_info sig = do
          else do handler <- unsafeReadIOArray arr int
                  case handler of
                     Nothing -> return ()
-                    Just (f,_)  -> do forkIO (f p_info); return ()
+                    Just (f,_)  -> do _ <- forkIO (f p_info)
+                                      return ()
 
 foreign import ccall "setIOManagerPipe"
   c_setIOManagerPipe :: CInt -> IO ()
@@ -1308,4 +1311,16 @@ setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
 getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
+
+warnErrnoIfMinus1_ :: Num a => String -> IO a -> IO ()
+warnErrnoIfMinus1_ what io
+    = do r <- io
+         when (r == -1) $ do
+             errno <- getErrno
+             str <- strerror errno >>= peekCString
+             when (r == -1) $
+                 debugErrLn ("Warning: " ++ what ++ " failed: " ++ str)
+
+foreign import ccall unsafe "string.h" strerror :: Errno -> IO (Ptr CChar)
+
 \end{code}
