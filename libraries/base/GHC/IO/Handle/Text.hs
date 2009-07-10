@@ -90,10 +90,10 @@ hWaitForInput h msecs = do
                 return True
         else do r <- IODevice.ready haDevice False{-read-} msecs
                 if r then do -- Call hLookAhead' to throw an EOF
-                                  -- exception if appropriate
-                                  hLookAhead_ handle_
-                                  return True
-                          else return False
+                             -- exception if appropriate
+                             _ <- hLookAhead_ handle_
+                             return True
+                     else return False
 
 -- ---------------------------------------------------------------------------
 -- hGetChar
@@ -394,7 +394,7 @@ getSomeCharacters handle_@Handle__{..} buf@Buffer{..} =
                  -- if we're about to call readTextDevice, otherwise it
                  -- would mess up flushCharBuffer.
                  -- See [note Buffer Flushing], GHC.IO.Handle.Types
-                 writeCharBuf bufRaw 0 '\r'
+                 _ <- writeCharBuf bufRaw 0 '\r'
                  let buf' = buf{ bufL=0, bufR=1 }
                  readTextDevice handle_ buf'
          else do
@@ -527,7 +527,7 @@ writeBlocks hdl line_buffered nl
   let
    shoveString :: Int -> [Char] -> IO ()
    shoveString !n [] = do
-        commitBuffer hdl raw len n False{-no flush-} True{-release-}
+        _ <- commitBuffer hdl raw len n False{-no flush-} True{-release-}
         return ()
    shoveString !n (c:cs)
      -- n+1 so we have enough room to write '\r\n' if necessary
@@ -646,7 +646,9 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release
                         -- otherwise, we have to flush the new data too,
                         -- and start with a fresh buffer
                         else do
-                          flushWriteBuffer_ handle_ this_buf
+                          -- We're aren't going to use this buffer again
+                          -- so we ignore the result of flushWriteBuffer_
+                          _ <- flushWriteBuffer_ handle_ this_buf
                           writeIORef ref flushed_buf
                             -- if the sizes were different, then allocate
                             -- a new buffer of the correct size.
@@ -689,7 +691,8 @@ hPutBuf :: Handle                       -- handle to write to
         -> Ptr a                        -- address of buffer
         -> Int                          -- number of bytes of data in buffer
         -> IO ()
-hPutBuf h ptr count = do hPutBuf' h ptr count True; return ()
+hPutBuf h ptr count = do _ <- hPutBuf' h ptr count True
+                         return ()
 
 hPutBufNonBlocking
         :: Handle                       -- handle to write to
@@ -936,16 +939,16 @@ readChunkNonBlocking h_@Handle__{..} ptr bytes
 -- memcpy wrappers
 
 copyToRawBuffer :: RawBuffer e -> Int -> Ptr e -> Int -> IO ()
-copyToRawBuffer raw off ptr bytes = do
+copyToRawBuffer raw off ptr bytes =
  withRawBuffer raw $ \praw ->
-   memcpy (praw `plusPtr` off) ptr (fromIntegral bytes)
- return ()
+   do _ <- memcpy (praw `plusPtr` off) ptr (fromIntegral bytes)
+      return ()
 
 copyFromRawBuffer :: Ptr e -> RawBuffer e -> Int -> Int -> IO ()
-copyFromRawBuffer ptr raw off bytes = do
+copyFromRawBuffer ptr raw off bytes =
  withRawBuffer raw $ \praw ->
-   memcpy ptr (praw `plusPtr` off) (fromIntegral bytes)
- return ()
+   do _ <- memcpy ptr (praw `plusPtr` off) (fromIntegral bytes)
+      return ()
 
 foreign import ccall unsafe "memcpy"
    memcpy :: Ptr a -> Ptr a -> CSize -> IO (Ptr ())
