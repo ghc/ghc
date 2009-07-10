@@ -61,8 +61,7 @@ newEmptySampleVar = do
 -- |Build a 'SampleVar' with an initial value.
 newSampleVar :: a -> IO (SampleVar a)
 newSampleVar a = do
-   v <- newEmptyMVar
-   putMVar v a
+   v <- newMVar a
    newMVar (1,v)
 
 -- |If the SampleVar is full, leave it empty.  Otherwise, do nothing.
