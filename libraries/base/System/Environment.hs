@@ -155,7 +155,8 @@ withArgv new_args act = do
   pName <- System.Environment.getProgName
   existing_args <- System.Environment.getArgs
   bracket (setArgs new_args)
-          (\argv -> do setArgs (pName:existing_args); freeArgv argv)
+          (\argv -> do _ <- setArgs (pName:existing_args)
+                       freeArgv argv)
           (const act)
 
 freeArgv :: Ptr CString -> IO ()

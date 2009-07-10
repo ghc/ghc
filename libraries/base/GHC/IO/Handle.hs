@@ -147,7 +147,7 @@ hSetFileSize handle size =
 hIsEOF :: Handle -> IO Bool
 hIsEOF handle =
   catch
-     (do hLookAhead handle; return False)
+     (hLookAhead handle >> return False)
      (\e -> if isEOFError e then return True else ioError e)
 
 -- ---------------------------------------------------------------------------
@@ -668,7 +668,7 @@ dupHandleTo filepath h other_side
   case cast devTo of
     Nothing   -> ioe_dupHandlesNotCompatible h
     Just dev' -> do 
-      IODevice.dup2 dev dev'
+      _ <- IODevice.dup2 dev dev'
       FileHandle _ m <- dupHandle_ dev' filepath other_side h_ mb_finalizer
       takeMVar m
 

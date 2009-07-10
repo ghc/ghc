@@ -69,7 +69,7 @@ emptySampleVar :: SampleVar a -> IO ()
 emptySampleVar v = do
    (readers, var) <- takeMVar v
    if readers > 0 then do
-     takeMVar var
+     _ <- takeMVar var
      putMVar v (0,var)
     else
      putMVar v (readers,var)

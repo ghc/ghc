@@ -430,7 +430,7 @@ runInUnboundThread action = do
     if bound
         then do
             mv <- newEmptyMVar
-            forkIO (Exception.try action >>= putMVar mv)
+            _ <- forkIO (Exception.try action >>= putMVar mv)
             takeMVar mv >>= \ei -> case ei of
                 Left exception -> Exception.throw (exception :: SomeException)
                 Right result -> return result
