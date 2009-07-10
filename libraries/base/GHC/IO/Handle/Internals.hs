@@ -334,7 +334,7 @@ handleFinalizer fp m = do
       _ -> do flushWriteBuffer handle_ `catchAny` \_ -> return ()
                 -- ignore errors and async exceptions, and close the
                 -- descriptor anyway...
-              hClose_handle_ handle_
+              _ <- hClose_handle_ handle_
               return ()
   putMVar m (ioe_finalizedHandle fp)
 

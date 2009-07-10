@@ -474,7 +474,7 @@ tryJust p a = do
 -- | Like 'finally', but only performs the final action if there was an
 -- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
-onException io what = io `catch` \e -> do what
+onException io what = io `catch` \e -> do _ <- what
                                           throw (e :: SomeException)
 
 -----------------------------------------------------------------------------
@@ -509,7 +509,7 @@ bracket before after thing =
   block (do
     a <- before
     r <- unblock (thing a) `onException` after a
-    after a
+    _ <- after a
     return r
  )
 #endif
@@ -524,7 +524,7 @@ finally :: IO a         -- ^ computation to run first
 a `finally` sequel =
   block (do
     r <- unblock a `onException` sequel
-    sequel
+    _ <- sequel
     return r
   )
 

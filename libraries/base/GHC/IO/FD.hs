@@ -165,7 +165,8 @@ openFile filepath iomode =
     (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                             False{-not a socket-} 
                             True{-is non-blocking-}
-            `catchAny` \e -> do c_close fd; throwIO e
+            `catchAny` \e -> do _ <- c_close fd
+                                throwIO e
 
 #ifndef mingw32_HOST_OS
         -- we want to truncate() if this is an open in WriteMode, but only
@@ -292,12 +293,12 @@ close fd =
        c_close (fdFD fd)
 
 release :: FD -> IO ()
-release fd = do
-#ifndef mingw32_HOST_OS
-   unlockFile (fdFD fd)
+#ifdef mingw32_HOST_OS
+release _ = return ()
+#else
+release fd = do _ <- unlockFile (fdFD fd)
+                return ()
 #endif
-   let _ = fd -- warning suppression
-   return ()
 
 #ifdef mingw32_HOST_OS
 foreign import stdcall unsafe "HsBase.h closesocket"
@@ -311,9 +312,8 @@ isSeekable fd = do
 
 seek :: FD -> SeekMode -> Integer -> IO ()
 seek fd mode off = do
-  throwErrnoIfMinus1Retry "seek" $
+  throwErrnoIfMinus1Retry_ "seek" $
      c_lseek (fdFD fd) (fromIntegral off) seektype
-  return ()
  where
     seektype :: CInt
     seektype = case mode of
@@ -332,9 +332,8 @@ getSize fd = fdFileSize (fdFD fd)
 
 setSize :: FD -> Integer -> IO () 
 setSize fd size = do
-  throwErrnoIf (/=0) "GHC.IO.FD.setSize"  $
+  throwErrnoIf_ (/=0) "GHC.IO.FD.setSize"  $
      c_ftruncate (fdFD fd) (fromIntegral size)
-  return ()
 
 devType :: FD -> IO IODeviceType
 devType fd = do (ty,_,_) <- fdStat (fdFD fd); return ty
@@ -347,7 +346,7 @@ dup fd = do
 dup2 :: FD -> FD -> IO FD
 dup2 fd fdto = do
   -- Windows' dup2 does not return the new descriptor, unlike Unix
-  throwErrnoIfMinus1 "GHC.IO.FD.dup2" $ 
+  throwErrnoIfMinus1_ "GHC.IO.FD.dup2" $
     c_dup2 (fdFD fd) (fdFD fdto)
   return fd{ fdFD = fdFD fdto } -- original FD, with the new fdFD
 

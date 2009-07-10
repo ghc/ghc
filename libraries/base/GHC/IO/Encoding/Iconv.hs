@@ -151,8 +151,7 @@ newIConv from to fn =
   withCString from $ \ from_str ->
   withCString to   $ \ to_str -> do
     iconvt <- throwErrnoIfMinus1 "mkTextEncoding" $ hs_iconv_open to_str from_str
-    let iclose = do throwErrnoIfMinus1 "Iconv.close" $ hs_iconv_close iconvt
-                    return ()
+    let iclose = throwErrnoIfMinus1_ "Iconv.close" $ hs_iconv_close iconvt
     return BufferCodec{
                 encode = fn iconvt,
                 close  = iclose,
