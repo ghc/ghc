@@ -848,9 +848,7 @@ service_loop wakeup old_delays = do
                 _ | r2 == io_MANAGER_DIE    -> return True
                 0 -> return False -- spurious wakeup
                 _ -> do start_console_handler (r2 `shiftR` 1); return False
-        if exit
-          then return ()
-          else service_cont wakeup delays'
+        unless exit $ service_cont wakeup delays'
 
     _other -> service_cont wakeup delays' -- probably timeout        
 
@@ -1049,7 +1047,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
                        runHandlers' fp (fromIntegral s)
                        return False
 
-  if exit then return () else do
+  unless exit $ do
 
   atomicModifyIORef prodding (\_ -> (False, ()))
 
