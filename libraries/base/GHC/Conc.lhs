@@ -139,7 +139,6 @@ import GHC.Enum         ( Enum )
 #endif
 import GHC.Pack         ( packCString# )
 import GHC.Show         ( Show(..), showString )
-import GHC.Err
 
 infixr 0 `par`, `pseq`
 \end{code}
