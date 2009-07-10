@@ -91,7 +91,7 @@ getCPUTime = do
 --
 #if defined(HAVE_GETRUSAGE) && ! irix_HOST_OS && ! solaris2_HOST_OS
     allocaBytes (#const sizeof(struct rusage)) $ \ p_rusage -> do
-    getrusage (#const RUSAGE_SELF) p_rusage
+    throwErrnoIfMinus1_ "getrusage" $ getrusage (#const RUSAGE_SELF) p_rusage
 
     let ru_utime = (#ptr struct rusage, ru_utime) p_rusage
     let ru_stime = (#ptr struct rusage, ru_stime) p_rusage
