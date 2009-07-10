@@ -1272,11 +1272,10 @@ foreign import ccall unsafe "sizeof_fd_set"
 reportStackOverflow :: IO a
 reportStackOverflow = do callStackOverflowHook; return undefined
 
-reportError :: SomeException -> IO a
+reportError :: SomeException -> IO ()
 reportError ex = do
    handler <- getUncaughtExceptionHandler
    handler ex
-   return undefined
 
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.
