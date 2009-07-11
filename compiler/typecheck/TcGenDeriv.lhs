@@ -1475,7 +1475,7 @@ gen_Foldable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    foldr_bind = L loc $ mkFunBind (L loc foldr_RDR) (map foldr_eqn data_cons)
+    foldr_bind = L loc $ mkFunBind (L loc foldable_foldr_RDR) (map foldr_eqn data_cons)
     foldr_eqn con = evalState (match_for_con z_Expr [f_Pat,z_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_foldr con
