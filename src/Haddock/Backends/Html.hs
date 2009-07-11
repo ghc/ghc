@@ -32,7 +32,7 @@ import Haddock.GhcUtils
 import qualified Haddock.Utils.Html as Html
 
 import Control.Exception     ( bracket )
-import Control.Monad         ( when, join )
+import Control.Monad         ( when, unless, join )
 import Data.Char             ( toUpper )
 import Data.List             ( sortBy, groupBy )
 import Data.Maybe
@@ -480,10 +480,14 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
         body << vanillaTable << (
             simpleHeader doctitle maybe_contents_url Nothing
                          maybe_source_url maybe_wiki_url </>
-        search_box </> index_html
+        index_html
            )
 
   createDirectoryIfMissing True odir
+
+  when split_indices $
+    mapM_ (do_sub_index index) initialChars
+
   writeFile (pathJoin [odir, indexHtmlFile]) (renderHtml html)
   
     -- Generate index and contents page for Html Help if requested
@@ -494,19 +498,22 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
  where
-  -- colspan 2, marginheight 5
-  search_box :: HtmlTable
-  search_box = tda [colspan 2, thestyle "padding-top:5px;"] << search
-    where
-      search :: Html
-      search = form ! [strAttr "onsubmit" "full_search(); return false;", action ""] << (
-                    "Search: "
-                    +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"]
-                    +++ " " +++ input ! [value "Search", thetype "submit"]
-                    +++ " " +++ thespan ! [identifier "searchmsg"] << " ")
 
-  index_html = td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
-          aboves (map indexElt index))
+  index_html
+    | split_indices = 
+	tda [theclass "section1"] << 
+	      	toHtml ("Index") </>
+	indexInitialLetterLinks
+    | otherwise =
+	td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
+	  aboves (map indexElt index))
+
+  -- an arbitrary heuristic:
+  -- too large, and a single-page will be slow to load
+  -- too small, and we'll have lots of letter-indexes with only one
+  --   or two members in them, which seems inefficient or
+  --   unnecessarily hard to use.
+  split_indices = length index > 150
 
   setTrClass :: Html -> Html
   setTrClass (Html xs) = Html $ map f xs
@@ -515,6 +522,40 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
                | map toUpper name == "TR" = HtmlTag name (theclass "indexrow":attrs) inner
                | otherwise = HtmlTag name attrs (setTrClass inner)
           f x = x
+ 	
+  indexInitialLetterLinks = 
+	td << setTrClass (table ! [cellpadding 0, cellspacing 5] <<
+	    besides [ td << anchor ! [href (subIndexHtmlFile c)] <<
+			 toHtml [c]
+		    | c <- initialChars
+                    , any ((==c) . toUpper . head . fst) index ])
+
+  -- todo: what about names/operators that start with Unicode
+  -- characters?
+  -- Exports beginning with '_' can be listed near the end,
+  -- presumably they're not as important... but would be listed
+  -- with non-split index!
+  initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~" ++ "_"
+
+  do_sub_index this_ix c
+    = unless (null index_part) $
+        writeFile (pathJoin [odir, subIndexHtmlFile c]) (renderHtml html)
+    where 
+      html = header (documentCharacterEncoding +++
+		thetitle (toHtml (doctitle ++ " (Index)")) +++
+		styleSheet) +++
+             body << vanillaTable << (
+	        simpleHeader doctitle maybe_contents_url Nothing
+                             maybe_source_url maybe_wiki_url </>
+		indexInitialLetterLinks </>
+	        tda [theclass "section1"] << 
+	      	toHtml ("Index (" ++ c:")") </>
+	        td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
+	      	  aboves (map indexElt index_part) )
+	       )
+
+      index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
+
 
   index :: [(String, Map GHC.Name [(Module,Bool)])]
   index = sortBy cmp (Map.toAscList full_index)
