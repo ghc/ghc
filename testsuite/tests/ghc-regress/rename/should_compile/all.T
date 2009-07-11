@@ -122,3 +122,7 @@ test('T3262', normal, compile, [''])
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
 test('timing003', normal, compile, [''])
+
+test('T1792_imports', extra_clean(['T1792_imports.imports']), run_command,
+     ['$MAKE -s --no-print-directory T1792_imports'])
+
