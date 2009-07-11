@@ -110,12 +110,14 @@ import Data.Typeable
 
 #ifndef mingw32_HOST_OS
 import Data.Dynamic
-import Control.Monad
 #endif
+import Control.Monad
 import Data.Maybe
 
 import GHC.Base
+#ifndef mingw32_HOST_OS
 import GHC.Debug
+#endif
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
 import GHC.IO
@@ -821,7 +823,7 @@ prodServiceThread = do
 startIOManagerThread :: IO ()
 startIOManagerThread = do
   wakeup <- c_getIOManagerEvent
-  forkIO $ service_loop wakeup []
+  _ <- forkIO $ service_loop wakeup []
   return ()
 
 service_loop :: HANDLE          -- read end of pipe
@@ -875,7 +877,7 @@ start_console_handler :: Word32 -> IO ()
 start_console_handler r =
   case toWin32ConsoleEvent r of
      Just x  -> withMVar win32ConsoleHandler $ \handler -> do
-                    forkIO (handler x)
+                    _ <- forkIO (handler x)
                     return ()
      Nothing -> return ()
 
@@ -1106,6 +1108,17 @@ runHandlers' p_info sig = do
                     Just (f,_)  -> do _ <- forkIO (f p_info)
                                       return ()
 
+warnErrnoIfMinus1_ :: Num a => String -> IO a -> IO ()
+warnErrnoIfMinus1_ what io
+    = do r <- io
+         when (r == -1) $ do
+             errno <- getErrno
+             str <- strerror errno >>= peekCString
+             when (r == -1) $
+                 debugErrLn ("Warning: " ++ what ++ " failed: " ++ str)
+
+foreign import ccall unsafe "string.h" strerror :: Errno -> IO (Ptr CChar)
+
 foreign import ccall "setIOManagerPipe"
   c_setIOManagerPipe :: CInt -> IO ()
 
@@ -1307,16 +1320,5 @@ setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
 getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
-
-warnErrnoIfMinus1_ :: Num a => String -> IO a -> IO ()
-warnErrnoIfMinus1_ what io
-    = do r <- io
-         when (r == -1) $ do
-             errno <- getErrno
-             str <- strerror errno >>= peekCString
-             when (r == -1) $
-                 debugErrLn ("Warning: " ++ what ++ " failed: " ++ str)
-
-foreign import ccall unsafe "string.h" strerror :: Errno -> IO (Ptr CChar)
 
 \end{code}

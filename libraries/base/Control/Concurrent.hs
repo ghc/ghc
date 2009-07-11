@@ -453,7 +453,8 @@ threadWaitRead fd
   -- and this only works with -threaded.
   | threaded  = withThread (waitFd fd 0)
   | otherwise = case fd of
-                  0 -> do hWaitForInput stdin (-1); return ()
+                  0 -> do _ <- hWaitForInput stdin (-1)
+                          return ()
                         -- hWaitForInput does work properly, but we can only
                         -- do this for stdin since we know its FD.
                   _ -> error "threadWaitRead requires -threaded on Windows, or use System.IO.hWaitForInput"
@@ -478,7 +479,7 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 withThread :: IO a -> IO a
 withThread io = do
   m <- newEmptyMVar
-  forkIO $ try io >>= putMVar m
+  _ <- forkIO $ try io >>= putMVar m
   x <- takeMVar m
   case x of
     Right a -> return a
@@ -486,9 +487,8 @@ withThread io = do
 
 waitFd :: Fd -> CInt -> IO ()
 waitFd fd write = do
-   throwErrnoIfMinus1 "fdReady" $
+   throwErrnoIfMinus1_ "fdReady" $
         fdReady (fromIntegral fd) write (fromIntegral iNFINITE) 0
-   return ()
 
 iNFINITE :: CInt
 iNFINITE = 0xFFFFFFFF -- urgh

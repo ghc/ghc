@@ -219,7 +219,7 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
                    _ -> True
 
 #ifdef mingw32_HOST_OS
-    setmode fd True -- unconditionally set binary mode
+    _ <- setmode fd True -- unconditionally set binary mode
     let _ = (dev,ino,write) -- warning suppression
 #endif
 

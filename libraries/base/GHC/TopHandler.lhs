@@ -69,7 +69,7 @@ runMainIO main =
 install_interrupt_handler :: IO () -> IO ()
 #ifdef mingw32_HOST_OS
 install_interrupt_handler handler = do
-  GHC.ConsoleHandler.installHandler $
+  _ <- GHC.ConsoleHandler.installHandler $
      Catch $ \event -> 
         case event of
            ControlC -> handler
