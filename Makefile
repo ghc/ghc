@@ -60,35 +60,15 @@ TEST=$(if $(wildcard /usr/bin/test),/usr/bin/test,test)
 # can mean a lot of unnecessary recompilation after a re-configure, so
 # here we cache the old versions of these files so we can restore the
 # timestamps.
-#
-define check-configure-file
-# $1 = file
-if $(TEST) ! -f $1.old; then \
-  echo "backing up $1"; \
-  cp $1 $1.old; \
-  touch -r $1 $1.old; \
-else \
-  if $(TEST) $1 -nt $1.old; then \
-    if cmp $1 $1.old; then \
-       echo "$1 has been touched, but has not changed"; \
-       touch -r $1.old $1; \
-    else \
-       echo "$1 has changed"; \
-       cp $1 $1.old; \
-       touch -r $1 $1.old; \
-    fi \
-  fi \
-fi
-endef
+%.old:  %
+	@set -x && [ -f $@ ] && cmp -s $< $@ || cp -p $< $@
+	touch -r $@ $<
+
 
 # NB. not the same as saying '%: ...', which doesn't do the right thing:
 # it does nothing if we specify a target that already exists.
 .PHONY: $(REALGOALS)
-$(REALGOALS) all:
-	@$(call check-configure-file,mk/config.mk)
-	@$(call check-configure-file,mk/project.mk)
-	@$(call check-configure-file,compiler/ghc.cabal)
-
+$(REALGOALS) all: mk/config.mk.old mk/project.mk.old compiler/ghc.cabal.old
 	@echo "===--- updating makefiles phase 0"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 just-makefiles
 ifneq "$(OMIT_PHASE_1)" "YES"
