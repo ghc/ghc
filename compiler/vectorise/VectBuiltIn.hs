@@ -1,6 +1,7 @@
 module VectBuiltIn (
-  Builtins(..), sumTyCon, prodTyCon,
-  combinePAVar, scalarZip, closureCtrFun,
+  Builtins(..), sumTyCon, prodTyCon, prodDataCon,
+  selTy, selReplicate, selPick, selElements,
+  combinePDVar, scalarZip, closureCtrFun,
   initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
   initBuiltinBoxedTyCons, initBuiltinScalars,
@@ -15,6 +16,7 @@ import Module
 import DataCon         ( DataCon, dataConName, dataConWorkId )
 import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Class           ( Class )
+import CoreSyn         ( CoreExpr, Expr(..) )
 import Var             ( Var )
 import Id              ( mkSysLocal )
 import Name            ( Name, getOccString )
@@ -44,7 +46,7 @@ mAX_DPH_PROD :: Int
 mAX_DPH_PROD = 5
 
 mAX_DPH_SUM :: Int
-mAX_DPH_SUM = 3
+mAX_DPH_SUM = 2
 
 mAX_DPH_COMBINE :: Int
 mAX_DPH_COMBINE = 2
@@ -60,6 +62,7 @@ data Modules = Modules {
                  , dph_Instances :: Module
                  , dph_Combinators :: Module
                  , dph_Scalar :: Module
+                 , dph_Selector :: Module
                  , dph_Prelude_PArr :: Module
                  , dph_Prelude_Int :: Module
                  , dph_Prelude_Word8 :: Module
@@ -77,6 +80,7 @@ dph_Modules pkg = Modules {
   , dph_Instances      = mk (fsLit "Data.Array.Parallel.Lifted.Instances")
   , dph_Combinators    = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
   , dph_Scalar         = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
+  , dph_Selector       = mk (fsLit "Data.Array.Parallel.Lifted.Selector")
 
   , dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
   , dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
@@ -92,42 +96,61 @@ dph_Modules pkg = Modules {
 data Builtins = Builtins {
                   dphModules       :: Modules
                 , parrayTyCon      :: TyCon
+                , parrayDataCon    :: DataCon
+                , pdataTyCon       :: TyCon
                 , paTyCon          :: TyCon
                 , paDataCon        :: DataCon
                 , preprTyCon       :: TyCon
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
-                , intPrimArrayTy   :: Type
                 , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
-                , enumerationTyCon :: TyCon
+                , selTys           :: Array Int Type
+                , selReplicates    :: Array Int CoreExpr
+                , selPicks         :: Array Int CoreExpr
+                , selEls           :: Array (Int, Int) CoreExpr
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
                 , voidVar          :: Var
+                , pvoidVar         :: Var
+                , punitVar         :: Var
                 , mkPRVar          :: Var
-                , mkClosureVar     :: Var
-                , applyClosureVar  :: Var
-                , mkClosurePVar    :: Var
-                , applyClosurePVar :: Var
-                , replicatePAIntPrimVar :: Var
-                , upToPAIntPrimVar :: Var
-                , selectPAIntPrimVar :: Var
-                , truesPABoolPrimVar :: Var
-                , lengthPAVar      :: Var
-                , replicatePAVar   :: Var
-                , emptyPAVar       :: Var
-                , packPAVar        :: Var
-                , combinePAVars    :: Array Int Var
+                , closureVar       :: Var
+                , applyVar         :: Var
+                , liftedClosureVar :: Var
+                , liftedApplyVar   :: Var
+                , replicatePDVar   :: Var
+                , emptyPDVar       :: Var
+                , packPDVar        :: Var
+                , combinePDVars    :: Array Int Var
                 , scalarClass      :: Class
                 , scalarZips       :: Array Int Var
                 , closureCtrFuns   :: Array Int Var
                 , liftingContext   :: Var
                 }
 
+indexBuiltin :: (Ix i, Outputable i) => String -> (Builtins -> Array i a)
+                                        -> i -> Builtins -> a
+indexBuiltin fn f i bi
+  | inRange (bounds xs) i = xs ! i
+  | otherwise = pprPanic fn (ppr i)
+  where
+    xs = f bi
+
+selTy :: Int -> Builtins -> Type
+selTy = indexBuiltin "selTy" selTys
+
+selReplicate :: Int -> Builtins -> CoreExpr
+selReplicate = indexBuiltin "selReplicate" selReplicates 
+
+selPick :: Int -> Builtins -> CoreExpr
+selPick = indexBuiltin "selPick" selPicks
+
+selElements :: Int -> Int -> Builtins -> CoreExpr
+selElements i j = indexBuiltin "selElements" selEls (i,j)
+
 sumTyCon :: Int -> Builtins -> TyCon
-sumTyCon n bi
-  | n >= 2 && n <= mAX_DPH_SUM = sumTyCons bi ! n
-  | otherwise = pprPanic "sumTyCon" (ppr n)
+sumTyCon = indexBuiltin "sumTyCon" sumTyCons
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n bi
@@ -135,72 +158,77 @@ prodTyCon n bi
   | n >= 0 && n <= mAX_DPH_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
-combinePAVar :: Int -> Builtins -> Var
-combinePAVar n bi
-  | n >= 2 && n <= mAX_DPH_COMBINE = combinePAVars bi ! n
-  | otherwise = pprPanic "combinePAVar" (ppr n)
+prodDataCon :: Int -> Builtins -> DataCon
+prodDataCon n bi = case tyConDataCons (prodTyCon n bi) of
+                     [con] -> con
+
+combinePDVar :: Int -> Builtins -> Var
+combinePDVar = indexBuiltin "combinePDVar" combinePDVars
 
 scalarZip :: Int -> Builtins -> Var
-scalarZip n bi
-  | n >= 1 && n <= mAX_DPH_SCALAR_ARGS = scalarZips bi ! n
-  | otherwise = pprPanic "scalarZip" (ppr n)
+scalarZip = indexBuiltin "scalarZip" scalarZips
 
 closureCtrFun :: Int -> Builtins -> Var
-closureCtrFun n bi
-  | n >= 1 && n <= mAX_DPH_SCALAR_ARGS = closureCtrFuns bi ! n
-  | otherwise = pprPanic "closureCtrFun" (ppr n)
+closureCtrFun = indexBuiltin "closureCtrFun" closureCtrFuns
 
 initBuiltins :: PackageId -> DsM Builtins
 initBuiltins pkg
   = do
       parrayTyCon  <- externalTyCon dph_PArray (fsLit "PArray")
+      let [parrayDataCon] = tyConDataCons parrayTyCon
+      pdataTyCon   <- externalTyCon dph_PArray (fsLit "PData")
       paTyCon      <- externalTyCon dph_PArray (fsLit "PA")
       let [paDataCon] = tyConDataCons paTyCon
       preprTyCon   <- externalTyCon dph_PArray (fsLit "PRepr")
       prTyCon      <- externalTyCon dph_PArray (fsLit "PR")
       let [prDataCon] = tyConDataCons prTyCon
-      intPrimArrayTy <- externalType dph_Unboxed (fsLit "PArray_Int#")
       closureTyCon <- externalTyCon dph_Closure (fsLit ":->")
 
       voidTyCon    <- externalTyCon dph_Repr (fsLit "Void")
       wrapTyCon    <- externalTyCon dph_Repr (fsLit "Wrap")
-      enumerationTyCon <- externalTyCon dph_Repr (fsLit "Enumeration")
-      sum_tcs <- mapM (externalTyCon dph_Repr)
-                      [mkFastString ("Sum" ++ show i) | i <- [2..mAX_DPH_SUM]]
+      sel_tys      <- mapM (externalType dph_Selector)
+                           (numbered "Sel" 2 mAX_DPH_SUM)
+      sel_replicates <- mapM (externalFun dph_Selector)
+                             (numbered "replicate" 2 mAX_DPH_SUM)
+      sel_picks    <- mapM (externalFun dph_Selector)
+                           (numbered "pick" 2 mAX_DPH_SUM)
+      sel_els      <- mapM mk_elements
+                           [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
+      sum_tcs      <- mapM (externalTyCon dph_Repr)
+                           (numbered "Sum" 2 mAX_DPH_SUM)
 
-      let sumTyCons = listArray (2, mAX_DPH_SUM) sum_tcs
+      let selTys        = listArray (2, mAX_DPH_SUM) sel_tys
+          selReplicates = listArray (2, mAX_DPH_SUM) sel_replicates
+          selPicks      = listArray (2, mAX_DPH_SUM) sel_picks
+          selEls        = array ((2,0), (mAX_DPH_SUM, mAX_DPH_SUM)) sel_els
+          sumTyCons     = listArray (2, mAX_DPH_SUM) sum_tcs
 
       voidVar          <- externalVar dph_Repr (fsLit "void")
+      pvoidVar         <- externalVar dph_Repr (fsLit "pvoid")
+      punitVar         <- externalVar dph_Repr (fsLit "punit")
       mkPRVar          <- externalVar dph_PArray (fsLit "mkPR")
-      mkClosureVar     <- externalVar dph_Closure (fsLit "mkClosure")
-      applyClosureVar  <- externalVar dph_Closure (fsLit "$:")
-      mkClosurePVar    <- externalVar dph_Closure (fsLit "mkClosureP")
-      applyClosurePVar <- externalVar dph_Closure (fsLit "$:^")
-      replicatePAIntPrimVar <- externalVar dph_Unboxed (fsLit "replicatePA_Int#")
-      upToPAIntPrimVar <- externalVar dph_Unboxed (fsLit "upToPA_Int#")
-      selectPAIntPrimVar <- externalVar dph_Unboxed (fsLit "selectPA_Int#")
-      truesPABoolPrimVar <- externalVar dph_Unboxed (fsLit "truesPA_Bool#")
-      lengthPAVar      <- externalVar dph_PArray (fsLit "lengthPA#")
-      replicatePAVar   <- externalVar dph_PArray (fsLit "replicatePA#")
-      emptyPAVar       <- externalVar dph_PArray (fsLit "emptyPA")
-      packPAVar        <- externalVar dph_PArray (fsLit "packPA#")
+      closureVar       <- externalVar dph_Closure (fsLit "closure")
+      applyVar         <- externalVar dph_Closure (fsLit "$:")
+      liftedClosureVar <- externalVar dph_Closure (fsLit "liftedClosure")
+      liftedApplyVar   <- externalVar dph_Closure (fsLit "liftedApply")
+      replicatePDVar   <- externalVar dph_PArray (fsLit "replicatePD")
+      emptyPDVar       <- externalVar dph_PArray (fsLit "emptyPD")
+      packPDVar        <- externalVar dph_PArray (fsLit "packPD")
 
       combines <- mapM (externalVar dph_PArray)
-                       [mkFastString ("combine" ++ show i ++ "PA#")
+                       [mkFastString ("combine" ++ show i ++ "PD")
                           | i <- [2..mAX_DPH_COMBINE]]
-      let combinePAVars = listArray (2, mAX_DPH_COMBINE) combines
+      let combinePDVars = listArray (2, mAX_DPH_COMBINE) combines
 
       scalarClass <- externalClass dph_Scalar (fsLit "Scalar")
       scalar_map <- externalVar dph_Scalar (fsLit "scalar_map")
       scalar_zip2 <- externalVar dph_Scalar (fsLit "scalar_zipWith")
       scalar_zips <- mapM (externalVar dph_Scalar)
-                          [mkFastString ("scalar_zipWith" ++ show i)
-                             | i <- [3 .. mAX_DPH_SCALAR_ARGS]]
+                          (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
       let scalarZips = listArray (1, mAX_DPH_SCALAR_ARGS)
                                  (scalar_map : scalar_zip2 : scalar_zips)
       closures <- mapM (externalVar dph_Closure)
-                       [mkFastString ("closure" ++ show i)
-                          | i <- [1 .. mAX_DPH_SCALAR_ARGS]]
+                       (numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
       let closureCtrFuns = listArray (1, mAX_DPH_COMBINE) closures
 
       liftingContext <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy)
@@ -209,32 +237,33 @@ initBuiltins pkg
       return $ Builtins {
                  dphModules       = modules
                , parrayTyCon      = parrayTyCon
+               , parrayDataCon    = parrayDataCon
+               , pdataTyCon       = pdataTyCon
                , paTyCon          = paTyCon
                , paDataCon        = paDataCon
                , preprTyCon       = preprTyCon
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
-               , intPrimArrayTy   = intPrimArrayTy
                , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
-               , enumerationTyCon = enumerationTyCon
+               , selTys           = selTys
+               , selReplicates    = selReplicates
+               , selPicks         = selPicks
+               , selEls           = selEls
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
                , voidVar          = voidVar
+               , pvoidVar         = pvoidVar
+               , punitVar         = punitVar
                , mkPRVar          = mkPRVar
-               , mkClosureVar     = mkClosureVar
-               , applyClosureVar  = applyClosureVar
-               , mkClosurePVar    = mkClosurePVar
-               , applyClosurePVar = applyClosurePVar
-               , replicatePAIntPrimVar = replicatePAIntPrimVar
-               , upToPAIntPrimVar = upToPAIntPrimVar
-               , selectPAIntPrimVar = selectPAIntPrimVar
-               , truesPABoolPrimVar = truesPABoolPrimVar
-               , lengthPAVar      = lengthPAVar
-               , replicatePAVar   = replicatePAVar
-               , emptyPAVar       = emptyPAVar
-               , packPAVar        = packPAVar
-               , combinePAVars    = combinePAVars
+               , closureVar       = closureVar
+               , applyVar         = applyVar
+               , liftedClosureVar = liftedClosureVar
+               , liftedApplyVar   = liftedApplyVar
+               , replicatePDVar   = replicatePDVar
+               , emptyPDVar       = emptyPDVar
+               , packPDVar        = packPDVar
+               , combinePDVars    = combinePDVars
                , scalarClass      = scalarClass
                , scalarZips       = scalarZips
                , closureCtrFuns   = closureCtrFuns
@@ -245,10 +274,21 @@ initBuiltins pkg
                dph_PArray         = dph_PArray
              , dph_Repr           = dph_Repr
              , dph_Closure        = dph_Closure
+             , dph_Selector       = dph_Selector
              , dph_Unboxed        = dph_Unboxed
              , dph_Scalar         = dph_Scalar
              })
       = dph_Modules pkg
+
+    numbered :: String -> Int -> Int -> [FastString]
+    numbered pfx m n = [mkFastString (pfx ++ show i) | i <- [m..n]]
+
+    mk_elements :: (Int, Int) -> DsM ((Int, Int), CoreExpr)
+    mk_elements (i,j)
+      = do
+          v <- externalVar dph_Selector
+             $ mkFastString ("elementsSel" ++ show i ++ "_" ++ show j ++ "#")
+          return ((i,j), Var v)
 
 
 initBuiltinVars :: Builtins -> DsM [(Var, Var)]
@@ -302,7 +342,7 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk' dph_Prelude_Int "mod"  "modV"
     , mk' dph_Prelude_Int "sqrt" "sqrtV"
     , mk' dph_Prelude_Int "enumFromToP" "enumFromToPA"
-    , mk' dph_Prelude_Int "upToP" "upToPA"
+    -- , mk' dph_Prelude_Int "upToP" "upToPA"
     ]
     ++ vars_Ord dph_Prelude_Int
     ++ vars_Num dph_Prelude_Int
@@ -456,7 +496,6 @@ builtinPRs bi@(Builtins { dphModules = mods }) =
     mk (tyConName   unitTyCon)           (dph_Repr mods)    (fsLit "dPR_Unit")
   , mk (tyConName $ voidTyCon        bi) (dph_Repr mods)    (fsLit "dPR_Void")
   , mk (tyConName $ wrapTyCon        bi) (dph_Repr mods)    (fsLit "dPR_Wrap")
-  , mk (tyConName $ enumerationTyCon bi) (dph_Repr mods)    (fsLit "dPR_Enumeration")
   , mk (tyConName $ closureTyCon     bi) (dph_Closure mods) (fsLit "dPR_Clo")
 
     -- temporary
@@ -571,6 +610,12 @@ preludeScalars (Modules { dph_Prelude_Int    = dph_Prelude_Int
 externalVar :: Module -> FastString -> DsM Var
 externalVar mod fs
   = dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
+
+externalFun :: Module -> FastString -> DsM CoreExpr
+externalFun mod fs
+  = do
+      var <- externalVar mod fs
+      return $ Var var
 
 externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs

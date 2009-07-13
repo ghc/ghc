@@ -7,10 +7,11 @@ module VectMonad (
   initV, cantVectorise, maybeCantVectorise, maybeCantVectoriseM,
   liftDs,
   cloneName, cloneId, cloneVar,
-  newExportedVar, newLocalVar, newDummyVar, newTyVar,
+  newExportedVar, newLocalVar, newLocalVars, newDummyVar, newTyVar,
   
-  Builtins(..), sumTyCon, prodTyCon,
-  combinePAVar, scalarZip, closureCtrFun,
+  Builtins(..), sumTyCon, prodTyCon, prodDataCon,
+  selTy, selReplicate, selPick, selElements,
+  combinePDVar, scalarZip, closureCtrFun,
   builtin, builtins,
 
   GlobalEnv(..),
@@ -373,6 +374,9 @@ newLocalVar fs ty
   = do
       u <- liftDs newUnique
       return $ mkSysLocal fs u ty
+
+newLocalVars :: FastString -> [Type] -> VM [Var]
+newLocalVars fs = mapM (newLocalVar fs)
 
 newDummyVar :: Type -> VM Var
 newDummyVar = newLocalVar (fsLit "vv")

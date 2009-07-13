@@ -5,13 +5,15 @@ module VectUtils (
 
   newLocalVVar,
 
-  mkBuiltinCo,
-  mkPADictType, mkPArrayType, mkPReprType,
+  mkBuiltinCo, voidType,
+  mkPADictType, mkPArrayType, mkPDataType, mkPReprType, mkPArray,
 
-  parrayReprTyCon, parrayReprDataCon, mkVScrut,
+  pdataReprTyCon, pdataReprDataCon, mkVScrut,
   prDFunOfTyCon,
   paDictArgType, paDictOfType, paDFunType,
-  paMethod, mkPR, lengthPA, replicatePA, emptyPA, packPA, combinePA, liftPA,
+  paMethod, mkPR, replicatePD, emptyPD, packPD,
+  combinePD,
+  liftPD,
   zipScalars, scalarClosure,
   polyAbstract, polyApply, polyVApply,
   hoistBinding, hoistExpr, hoistPolyVExpr, takeHoisted,
@@ -95,21 +97,8 @@ mkBuiltinTyConApps get_tc tys ty
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
-{-
-mkBuiltinTyConApps1 :: (Builtins -> TyCon) -> Type -> [Type] -> VM Type
-mkBuiltinTyConApps1 _      dft [] = return dft
-mkBuiltinTyConApps1 get_tc _   tys
-  = do
-      tc <- builtin get_tc
-      case tys of
-        [] -> pprPanic "mkBuiltinTyConApps1" (ppr tc)
-        _  -> return $ foldr1 (mk tc) tys
-  where
-    mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
-
-mkClosureType :: Type -> Type -> VM Type
-mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
--}
+voidType :: VM Type
+voidType = mkBuiltinTyConApp voidTyCon []
 
 mkClosureTypes :: [Type] -> Type -> VM Type
 mkClosureTypes = mkBuiltinTyConApps closureTyCon
@@ -130,27 +119,38 @@ mkPArrayType ty
         Nothing  -> cantVectorise "Primitive tycon not vectorised" (ppr tycon)
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
+mkPDataType :: Type -> VM Type
+mkPDataType ty = mkBuiltinTyConApp pdataTyCon [ty]
+
+mkPArray :: Type -> CoreExpr -> CoreExpr -> VM CoreExpr
+mkPArray ty len dat = do
+                        tc <- builtin parrayTyCon
+                        let [dc] = tyConDataCons tc
+                        return $ mkConApp dc [Type ty, len, dat]
+
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
 mkBuiltinCo get_tc
   = do
       tc <- builtin get_tc
       return $ mkTyConApp tc []
 
-parrayReprTyCon :: Type -> VM (TyCon, [Type])
-parrayReprTyCon ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
+pdataReprTyCon :: Type -> VM (TyCon, [Type])
+pdataReprTyCon ty = builtin pdataTyCon >>= (`lookupFamInst` [ty])
 
-parrayReprDataCon :: Type -> VM (DataCon, [Type])
-parrayReprDataCon ty
+pdataReprDataCon :: Type -> VM (DataCon, [Type])
+pdataReprDataCon ty
   = do
-      (tc, arg_tys) <- parrayReprTyCon ty
+      (tc, arg_tys) <- pdataReprTyCon ty
       let [dc] = tyConDataCons tc
       return (dc, arg_tys)
 
-mkVScrut :: VExpr -> VM (VExpr, TyCon, [Type])
+mkVScrut :: VExpr -> VM (CoreExpr, CoreExpr, TyCon, [Type])
 mkVScrut (ve, le)
   = do
-      (tc, arg_tys) <- parrayReprTyCon (exprType ve)
-      return ((ve, unwrapFamInstScrut tc arg_tys le), tc, arg_tys)
+      (tc, arg_tys) <- pdataReprTyCon ty
+      return (ve, unwrapFamInstScrut tc arg_tys le, tc, arg_tys)
+  where
+    ty = exprType ve
 
 prDFunOfTyCon :: TyCon -> VM CoreExpr
 prDFunOfTyCon tycon
@@ -217,20 +217,14 @@ paDFunApply dfun tys
 
 type PAMethod = (Builtins -> Var, String)
 
-pa_length, pa_replicate, pa_empty, pa_pack :: (Builtins -> Var, String)
-pa_length    = (lengthPAVar,    "lengthPA")
-pa_replicate = (replicatePAVar, "replicatePA")
-pa_empty     = (emptyPAVar,     "emptyPA")
-pa_pack      = (packPAVar,      "packPA")
-
-paMethod :: PAMethod -> Type -> VM CoreExpr
-paMethod (_method, name) ty
+paMethod :: (Builtins -> Var) -> String -> Type -> VM CoreExpr
+paMethod _ name ty
   | Just tycon <- splitPrimTyCon ty
   = liftM Var
   . maybeCantVectoriseM "No PA method" (text name <+> text "for" <+> ppr tycon)
   $ lookupPrimMethod tycon name
 
-paMethod (method, _name) ty
+paMethod method _ ty
   = do
       fn   <- builtin method
       dict <- paDictOfType ty
@@ -243,33 +237,30 @@ mkPR ty
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
 
-lengthPA :: Type -> CoreExpr -> VM CoreExpr
-lengthPA ty x = liftM (`App` x) (paMethod pa_length ty)
+replicatePD :: CoreExpr -> CoreExpr -> VM CoreExpr
+replicatePD len x = liftM (`mkApps` [len,x])
+                          (paMethod replicatePDVar "replicatePD" (exprType x))
 
-replicatePA :: CoreExpr -> CoreExpr -> VM CoreExpr
-replicatePA len x = liftM (`mkApps` [len,x])
-                          (paMethod pa_replicate (exprType x))
+emptyPD :: Type -> VM CoreExpr
+emptyPD = paMethod emptyPDVar "emptyPD"
 
-emptyPA :: Type -> VM CoreExpr
-emptyPA = paMethod pa_empty
+packPD :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> VM CoreExpr
+packPD ty xs len sel = liftM (`mkApps` [xs, len, sel])
+                             (paMethod packPDVar "packPD" ty)
 
-packPA :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> VM CoreExpr
-packPA ty xs len sel = liftM (`mkApps` [xs, len, sel])
-                             (paMethod pa_pack ty)
-
-combinePA :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> [CoreExpr]
+combinePD :: Type -> CoreExpr -> CoreExpr -> [CoreExpr]
           -> VM CoreExpr
-combinePA ty len sel is xs
-  = liftM (`mkApps` (len : sel : is : xs))
-          (paMethod (combinePAVar n, "combine" ++ show n ++ "PA") ty)
+combinePD ty len sel xs
+  = liftM (`mkApps` (len : sel : xs))
+          (paMethod (combinePDVar n) ("combine" ++ show n ++ "PD") ty)
   where
     n = length xs
 
-liftPA :: CoreExpr -> VM CoreExpr
-liftPA x
+liftPD :: CoreExpr -> VM CoreExpr
+liftPD x
   = do
       lc <- builtin liftingContext
-      replicatePA (Var lc) x
+      replicatePD (Var lc) x
 
 zipScalars :: [Type] -> Type -> VM CoreExpr
 zipScalars arg_tys res_ty
@@ -292,7 +283,7 @@ scalarClosure arg_tys res_ty scalar_fun array_fun
 newLocalVVar :: FastString -> Type -> VM VVar
 newLocalVVar fs vty
   = do
-      lty <- mkPArrayType vty
+      lty <- mkPDataType vty
       vv  <- newLocalVar fs vty
       lv  <- newLocalVar fs lty
       return (vv,lv)
@@ -377,18 +368,19 @@ mkClosure :: Type -> Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
   = do
       dict <- paDictOfType env_ty
-      mkv  <- builtin mkClosureVar
-      mkl  <- builtin mkClosurePVar
+      mkv  <- builtin closureVar
+      mkl  <- builtin liftedClosureVar
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
 
 mkClosureApp :: Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
   = do
-      vapply <- builtin applyClosureVar
-      lapply <- builtin applyClosurePVar
+      vapply <- builtin applyVar
+      lapply <- builtin liftedApplyVar
+      lc     <- builtin liftingContext
       return (Var vapply `mkTyApps` [arg_ty, res_ty] `mkApps` [vclo, varg],
-              Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [lclo, larg])
+              Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [Var lc, lclo, larg])
 
 buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
 buildClosures _   _    [] _ mk_body
@@ -423,69 +415,51 @@ buildClosure tvs vars arg_ty res_ty mk_body
           $ do
               lc    <- builtin liftingContext
               body  <- mk_body
-              body' <- bind (vVar env_bndr)
+              return . vInlineMe
+                     . vLams lc [env_bndr, arg_bndr]
+                     $ bind (vVar env_bndr)
                             (vVarApps lc body (vars ++ [arg_bndr]))
-              return . vInlineMe $ vLamsWithoutLC [env_bndr, arg_bndr] body'
 
       mkClosure arg_ty res_ty env_ty fn env
 
-buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VM VExpr)
-buildEnv vvs
+buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VExpr)
+buildEnv [] = do
+             ty    <- voidType
+             void  <- builtin voidVar
+             pvoid <- builtin pvoidVar
+             return (ty, vVar (void, pvoid), \_ body -> body)
+
+buildEnv [v] = return (vVarType v, vVar v,
+                    \env body -> vLet (vNonRec v env) body)
+
+buildEnv vs
   = do
-      lc <- builtin liftingContext
-      let (ty, venv, vbind) = mkVectEnv tys vs
-      (lenv, lbind) <- mkLiftEnv lc tys ls
-      return (ty, (venv, lenv),
-              \(venv,lenv) (vbody,lbody) ->
-              do
-                let vbody' = vbind venv vbody
-                lbody' <- lbind lenv lbody
-                return (vbody', lbody'))
+      
+      (lenv_tc, lenv_tyargs) <- pdataReprTyCon ty
+
+      let venv_con   = tupleCon Boxed (length vs) 
+          [lenv_con] = tyConDataCons lenv_tc
+
+          venv       = mkCoreTup (map Var vvs)
+          lenv       = Var (dataConWrapId lenv_con)
+                       `mkTyApps` lenv_tyargs
+                       `mkApps`   map Var lvs
+
+          vbind env body = mkWildCase venv ty (exprType body)
+                             [(DataAlt venv_con, vvs, body)]
+
+          lbind env body =
+            let scrut = unwrapFamInstScrut lenv_tc lenv_tyargs lenv
+            in
+            mkWildCase scrut (exprType scrut) (exprType body)
+              [(DataAlt lenv_con, lvs, body)]
+
+          bind (venv, lenv) (vbody, lbody) = (vbind venv vbody,
+                                              lbind lenv lbody)
+
+      return (ty, (venv, lenv), bind)
   where
-    (vs,ls) = unzip vvs
-    tys     = map varType vs
-
-mkVectEnv :: [Type] -> [Var] -> (Type, CoreExpr, CoreExpr -> CoreExpr -> CoreExpr)
-mkVectEnv []   []  = (unitTy, Var unitDataConId, \_ body -> body)
-mkVectEnv [ty] [v] = (ty, Var v, \env body -> Let (NonRec v env) body)
-mkVectEnv tys  vs  = (ty, mkCoreTup (map Var vs),
-                        \env body -> mkWildCase env ty (exprType body)
-                                       [(DataAlt (tupleCon Boxed (length vs)), vs, body)])
-  where
-    ty = mkCoreTupTy tys
-
-mkLiftEnv :: Var -> [Type] -> [Var] -> VM (CoreExpr, CoreExpr -> CoreExpr -> VM CoreExpr)
-mkLiftEnv lc [ty] [v]
-  = return (Var v, \env body ->
-                   do
-                     len <- lengthPA ty (Var v)
-                     return . Let (NonRec v env)
-                            $ Case len lc (exprType body) [(DEFAULT, [], body)])
-
--- NOTE: this transparently deals with empty environments
-mkLiftEnv lc tys vs
-  = do
-      (env_tc, env_tyargs) <- parrayReprTyCon vty
-
-      bndrs <- if null vs then do
-                                 v <- newDummyVar unitTy
-                                 return [v]
-                          else return vs
-      let [env_con] = tyConDataCons env_tc
-          
-          env = Var (dataConWrapId env_con)
-                `mkTyApps`  env_tyargs
-                `mkApps`    (Var lc : args)
-
-          bind env body = let scrut = unwrapFamInstScrut env_tc env_tyargs env
-                          in
-                          return $ mkWildCase scrut (exprType scrut)
-                                        (exprType body)
-                                        [(DataAlt env_con, lc : bndrs, body)]
-      return (env, bind)
-  where
-    vty = mkCoreTupTy tys
-
-    args  | null vs   = [Var unitDataConId]
-          | otherwise = map Var vs
+    (vvs, lvs) = unzip vs
+    tys        = map vVarType vs
+    ty         = mkCoreTupTy tys
 

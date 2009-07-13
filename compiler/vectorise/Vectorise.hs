@@ -12,6 +12,7 @@ import HscTypes hiding      ( MonadThings(..) )
 import Module               ( PackageId )
 import CoreSyn
 import CoreUtils
+import MkCore               ( mkWildCase )
 import CoreFVs
 import CoreMonad            ( CoreM, getHscEnv )
 import DataCon
@@ -163,7 +164,7 @@ vectVar v
         Local (vv,lv) -> return (Var vv, Var lv)
         Global vv     -> do
                            let vexpr = Var vv
-                           lexpr <- liftPA vexpr
+                           lexpr <- liftPD vexpr
                            return (vexpr, lexpr)
 
 vectPolyVar :: Var -> [Type] -> VM VExpr
@@ -176,13 +177,13 @@ vectPolyVar v tys
                                      (polyApply (Var lv) vtys)
         Global poly    -> do
                             vexpr <- polyApply (Var poly) vtys
-                            lexpr <- liftPA vexpr
+                            lexpr <- liftPD vexpr
                             return (vexpr, lexpr)
 
 vectLiteral :: Literal -> VM VExpr
 vectLiteral lit
   = do
-      lexpr <- liftPA (Lit lit)
+      lexpr <- liftPD (Lit lit)
       return (Lit lit, lexpr)
 
 vectPolyExpr :: CoreExprWithFVs -> VM VExpr
@@ -218,7 +219,7 @@ vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
   , is_special_con con
   = do
       let vexpr = App (Var v) (Lit lit)
-      lexpr <- liftPA vexpr
+      lexpr <- liftPD vexpr
       return (vexpr, lexpr)
   where
     is_special_con con = con `elem` [intDataCon, floatDataCon, doubleDataCon]
@@ -294,7 +295,7 @@ vectScalarLam args body
             clo <- scalarClosure arg_tys res_ty (Var fn_var)
                                                 (zipf `App` Var fn_var)
             clo_var <- hoistExpr (fsLit "clo") clo
-            lclo <- liftPA (Var clo_var)
+            lclo <- liftPD (Var clo_var)
             return (Var clo_var, lclo)
   where
     arg_tys = map idType args
@@ -375,47 +376,55 @@ vectAlgCase tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
       vect_tc    <- maybeV (lookupTyCon tycon)
       (vty, lty) <- vectAndLiftType ty
       vexpr      <- vectExpr scrut
-      (vbndr, (vbndrs, vbody)) <- vect_scrut_bndr
-                                . vectBndrsIn bndrs
-                                $ vectExpr body
-
-      (vscrut, arr_tc, _arg_tys) <- mkVScrut (vVar vbndr)
+      (vbndr, (vbndrs, (vect_body, lift_body)))
+         <- vect_scrut_bndr
+          . vectBndrsIn bndrs
+          $ vectExpr body
+      let (vect_bndrs, lift_bndrs) = unzip vbndrs
+      (vscrut, lscrut, pdata_tc, _arg_tys) <- mkVScrut (vVar vbndr)
       vect_dc <- maybeV (lookupDataCon dc)
-      let [arr_dc] = tyConDataCons arr_tc
-      repr <- mkRepr vect_tc
-      shape_bndrs <- arrShapeVars repr
-      return . vLet (vNonRec vbndr vexpr)
-             $ vCaseProd vscrut vty lty vect_dc arr_dc shape_bndrs vbndrs vbody
+      let [pdata_dc] = tyConDataCons pdata_tc
+
+      let vcase = mk_wild_case vscrut vty vect_dc  vect_bndrs vect_body
+          lcase = mk_wild_case lscrut lty pdata_dc lift_bndrs lift_body
+
+      return $ vLet (vNonRec vbndr vexpr) (vcase, lcase)
   where
     vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr (fsLit "scrut")
                     | otherwise         = vectBndrIn bndr
+
+    mk_wild_case expr ty dc bndrs body
+      = mkWildCase expr (exprType expr) ty [(DataAlt dc, bndrs, body)]
 
 vectAlgCase tycon _ty_args scrut bndr ty alts
   = do
       vect_tc     <- maybeV (lookupTyCon tycon)
       (vty, lty)  <- vectAndLiftType ty
-      repr        <- mkRepr vect_tc
-      shape_bndrs <- arrShapeVars repr
-      (len, sel, indices) <- arrSelector repr (map Var shape_bndrs)
 
-      (vbndr, valts) <- vect_scrut_bndr $ mapM (proc_alt sel vty lty) alts'
+      let arity = length (tyConDataCons vect_tc)
+      sel_ty <- builtin (selTy arity)
+      sel_bndr <- newLocalVar (fsLit "sel") sel_ty
+      let sel = Var sel_bndr
+
+      (vbndr, valts) <- vect_scrut_bndr
+                      $ mapM (proc_alt arity sel vty lty) alts'
       let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts
 
       vexpr <- vectExpr scrut
-      (vscrut, arr_tc, _arg_tys) <- mkVScrut (vVar vbndr)
-      let [arr_dc] = tyConDataCons arr_tc
+      (vect_scrut, lift_scrut, pdata_tc, _arg_tys) <- mkVScrut (vVar vbndr)
+      let [pdata_dc] = tyConDataCons pdata_tc
 
-      let (vect_scrut,  lift_scrut)  = vscrut
-          (vect_bodies, lift_bodies) = unzip vbodies
+      let (vect_bodies, lift_bodies) = unzip vbodies
 
       vdummy <- newDummyVar (exprType vect_scrut)
       ldummy <- newDummyVar (exprType lift_scrut)
       let vect_case = Case vect_scrut vdummy vty
                            (zipWith3 mk_vect_alt vect_dcs vect_bndrss vect_bodies)
 
-      lbody <- combinePA vty len sel indices lift_bodies
+      lc <- builtin liftingContext
+      lbody <- combinePD vty (Var lc) sel lift_bodies
       let lift_case = Case lift_scrut ldummy lty
-                           [(DataAlt arr_dc, shape_bndrs ++ concat lift_bndrss,
+                           [(DataAlt pdata_dc, sel_bndr : concat lift_bndrss,
                              lbody)]
 
       return . vLet (vNonRec vbndr vexpr)
@@ -432,75 +441,50 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
     cmp _             DEFAULT       = GT
     cmp _             _             = panic "vectAlgCase/cmp"
 
-    proc_alt sel vty lty (DataAlt dc, bndrs, body)
+    proc_alt arity sel vty lty (DataAlt dc, bndrs, body)
       = do
           vect_dc <- maybeV (lookupDataCon dc)
-          let tag = mkDataConTag vect_dc
-              fvs = freeVarsOf body `delVarSetList` bndrs
-          (vect_bndrs, lift_bndrs, vbody)
-            <- vect_alt_bndrs bndrs
-             $ \len -> packLiftingContext len sel tag fvs vty lty
-             $ vectExpr body
+          let ntag = dataConTagZ vect_dc
+              tag  = mkDataConTag vect_dc
+              fvs  = freeVarsOf body `delVarSetList` bndrs
 
+          pick <- builtin (selPick arity)
+          let flags_expr = mkApps pick [sel, tag]
+          flags_var <- newLocalVar (fsLit "flags") (exprType flags_expr)
+          lc        <- builtin liftingContext
+          elems     <- builtin (selElements arity ntag)
+
+          (vbndrs, vbody)
+            <- vectBndrsIn bndrs
+             . localV
+             $ do
+                 binds    <- mapM (pack_var (Var lc) (Var flags_var))
+                           . filter isLocalId
+                           $ varSetElems fvs
+                 (ve, le) <- vectExpr body
+                 empty    <- emptyPD vty
+                 return (ve, Case (elems `App` sel) lc lty
+                               [(DEFAULT, [], Let (NonRec flags_var flags_expr)
+                                              $ mkLets (concat binds) le),
+                                (LitAlt (mkMachInt 0), [], empty)])
+          let (vect_bndrs, lift_bndrs) = unzip vbndrs
           return (vect_dc, vect_bndrs, lift_bndrs, vbody)
-    proc_alt _ _ _ _ = panic "vectAlgCase/proc_alt"
 
-    vect_alt_bndrs [] p
-      = do
-          void_tc <- builtin voidTyCon
-          let void_ty = mkTyConApp void_tc []
-          arr_ty <- mkPArrayType void_ty
-          bndr   <- newLocalVar (fsLit "voids") arr_ty
-          len    <- lengthPA void_ty (Var bndr)
-          e      <- p len
-          return ([], [bndr], e)
-
-    vect_alt_bndrs bndrs p
-       = localV
-       $ do
-           vbndrs <- mapM vectBndr bndrs
-           let (vect_bndrs, lift_bndrs) = unzip vbndrs
-               vv : _ = vect_bndrs
-               lv : _ = lift_bndrs
-           len <- lengthPA (idType vv) (Var lv)
-           e   <- p len
-           return (vect_bndrs, lift_bndrs, e)
+    proc_alt _ _ _ _ _ = panic "vectAlgCase/proc_alt"
 
     mk_vect_alt vect_dc bndrs body = (DataAlt vect_dc, bndrs, body)
 
-packLiftingContext :: CoreExpr -> CoreExpr -> CoreExpr -> VarSet
-                   -> Type -> Type -> VM VExpr -> VM VExpr
-packLiftingContext len shape tag fvs vty lty p
-  = do
-      select <- builtin selectPAIntPrimVar
-      let sel_expr = mkApps (Var select) [shape, tag]
-      sel_var <- newLocalVar (fsLit "sel#") (exprType sel_expr)
-      lc_var <- builtin liftingContext
-      localV $
-        do
-          bnds <- mapM (packFreeVar (Var lc_var) (Var sel_var))
-                . filter isLocalId
-                $ varSetElems fvs
-          (vexpr, lexpr) <- p
-          empty <- emptyPA vty
-          return (vexpr, Let (NonRec sel_var sel_expr)
-                         $ Case len lc_var lty
-                             [(DEFAULT, [], mkLets (concat bnds) lexpr),
-                              (LitAlt (mkMachInt 0), [], empty)])
+    pack_var len flags v
+      = do
+          r <- lookupVar v
+          case r of
+            Local (vv, lv) ->
+              do
+                lv'  <- cloneVar lv
+                expr <- packPD (idType vv) (Var lv) len flags
+                updLEnv (\env -> env { local_vars = extendVarEnv
+                                                (local_vars env) v (vv, lv') })
+                return [(NonRec lv' expr)]
 
-packFreeVar :: CoreExpr -> CoreExpr -> Var -> VM [CoreBind]
-packFreeVar len sel v
-  = do
-      r <- lookupVar v
-      case r of
-        Local (vv,lv) ->
-          do
-            lv' <- cloneVar lv
-            expr <- packPA (idType vv) (Var lv) len sel
-            updLEnv (upd vv lv')
-            return [(NonRec lv' expr)]
-
-        _  -> return []
-  where
-    upd vv lv' env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv') }
+            _ -> return []
 
