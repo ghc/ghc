@@ -51,17 +51,12 @@ include mk/custom-settings.mk
 # No need to update makefiles for these targets:
 REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
 
-# On Solaris, the builtin test doesn't support -nt, you have to use
-# /usr/bin/test.  On MSYS, however, /usr/bin/test does not exist.  How
-# nice.
-TEST=$(if $(wildcard /usr/bin/test),/usr/bin/test,test)
-
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
 # here we cache the old versions of these files so we can restore the
 # timestamps.
 %.old:  %
-	@set -x && [ -f $@ ] && cmp -s $< $@ || cp -p $< $@
+	@set -x && test -f $@ && cmp -s $< $@ || cp -p $< $@
 	touch -r $@ $<
 
 
