@@ -25,8 +25,6 @@ import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
 import Var               ( Var, TyVar )
 import Name              ( Name, getOccName )
 import NameEnv
-import TysWiredIn
-import TysPrim           ( intPrimTy )
 
 import Unique
 import UniqFM
@@ -36,7 +34,6 @@ import Digraph           ( SCC(..), stronglyConnCompFromEdgedVertices )
 
 import Outputable
 import FastString
-import MonadUtils        ( mapAndUnzip3M )
 
 import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_, mapAndUnzipM )
 import Data.List      ( inits, tails, zipWith4, zipWith5 )
@@ -233,11 +230,11 @@ buildPReprTyCon orig_tc vect_tc
 buildPReprType :: TyCon -> VM Type
 buildPReprType vect_tc = sum_type . map dataConRepArgTys $ tyConDataCons vect_tc
   where
-    sum_type [] = voidType
+    sum_type []    = voidType
     sum_type [tys] = prod_type tys
-    sum_type tys  = do
-                      (sum_tc, _, _, args) <- reprSumTyCons vect_tc
-                      return $ mkTyConApp sum_tc args
+    sum_type _     = do
+                       (sum_tc, _, _, args) <- reprSumTyCons vect_tc
+                       return $ mkTyConApp sum_tc args
 
     prod_type []   = voidType
     prod_type [ty] = return ty
@@ -276,7 +273,7 @@ buildToPRepr vect_tc repr_tc _
 
     wrap = wrapFamInstBody repr_tc ty_args
 
-    to_sum arg arg_ty res_ty []
+    to_sum _ _ _ []
       = do
           void <- builtin voidVar
           return $ wrap (Var void)
@@ -296,8 +293,6 @@ buildToPRepr vect_tc repr_tc _
           return . mkWildCase arg arg_ty res_ty
                  $ zipWith4 mk_alt cons vars sum_cons prods
       where
-        arity = length cons
-
         mk_alt con vars sum_con expr
           = (DataAlt con, vars, wrap $ sum_con `App` expr)
 
@@ -314,9 +309,6 @@ buildToPRepr vect_tc repr_tc _
           prod_con <- builtin (prodDataCon (length tys))
           vars <- newLocalVars (fsLit "x") tys
           return (mkConApp prod_con (map Type tys ++ map Var vars), vars)
-      where
-        arity = length tys
-
 
 buildFromPRepr :: TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr vect_tc repr_tc _
@@ -331,7 +323,7 @@ buildFromPRepr vect_tc repr_tc _
     ty_args = mkTyVarTys (tyConTyVars vect_tc)
     res_ty  = mkTyConApp vect_tc ty_args
 
-    from_sum expr []    = pprPanic "buildFromPRepr" (ppr vect_tc)
+    from_sum _    []    = pprPanic "buildFromPRepr" (ppr vect_tc)
     from_sum expr [con] = from_prod expr con
     from_sum expr cons
       = do
@@ -342,14 +334,12 @@ buildFromPRepr vect_tc repr_tc _
           return . mkWildCase expr (exprType expr) res_ty
                  $ zipWith3 mk_alt sum_cons vars prods
       where
-        arity = length cons
-
         mk_alt con var expr = (DataAlt con, [var], expr)
 
     from_prod expr con
       = case dataConRepArgTys con of
           []   -> return $ apply_con []
-          [ty] -> return $ apply_con [expr]
+          [_]  -> return $ apply_con [expr]
           tys  -> do
                     prod_con <- builtin (prodDataCon (length tys))
                     vars <- newLocalVars (fsLit "y") tys
@@ -452,7 +442,6 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc
     from_sum res_ty expr cons
       = do
           (_, pdata_tc, sel_ty, arg_tys) <- reprSumTyCons vect_tc
-          prod_tys <- mapM mkPDataType arg_tys
           sel  <- newLocalVar (fsLit "sel") sel_ty
           vars <- newLocalVars (fsLit "xs") arg_tys
           rs   <- zipWithM (from_prod res_ty) (map Var vars) cons
@@ -466,8 +455,8 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc
 
 
     from_prod res_ty expr con
-      | []   <- tys = return ([], id)
-      | [ty] <- tys = return ([expr], id)
+      | []  <- tys = return ([], id)
+      | [_] <- tys = return ([expr], id)
       | otherwise
         = do
             prod_tc <- builtin (prodTyCon (length tys))

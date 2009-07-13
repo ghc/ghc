@@ -17,9 +17,6 @@ module VectCore (
 
 import CoreSyn
 import CoreUtils      ( mkInlineMe )
-import MkCore	      ( mkWildCase )
-import CoreUtils      ( exprType )
-import DataCon        ( DataCon )
 import Type           ( Type )
 import Var
 

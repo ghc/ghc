@@ -215,8 +215,6 @@ paDFunApply dfun tys
       dicts <- mapM paDictOfType tys
       return $ mkApps (mkTyApps dfun tys) dicts
 
-type PAMethod = (Builtins -> Var, String)
-
 paMethod :: (Builtins -> Var) -> String -> Type -> VM CoreExpr
 paMethod _ name ty
   | Just tycon <- splitPrimTyCon ty
@@ -445,11 +443,11 @@ buildEnv vs
                        `mkTyApps` lenv_tyargs
                        `mkApps`   map Var lvs
 
-          vbind env body = mkWildCase venv ty (exprType body)
-                             [(DataAlt venv_con, vvs, body)]
+          vbind env body = mkWildCase env ty (exprType body)
+                           [(DataAlt venv_con, vvs, body)]
 
           lbind env body =
-            let scrut = unwrapFamInstScrut lenv_tc lenv_tyargs lenv
+            let scrut = unwrapFamInstScrut lenv_tc lenv_tyargs env
             in
             mkWildCase scrut (exprType scrut) (exprType body)
               [(DataAlt lenv_con, lvs, body)]

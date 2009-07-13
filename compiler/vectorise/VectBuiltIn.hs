@@ -161,6 +161,7 @@ prodTyCon n bi
 prodDataCon :: Int -> Builtins -> DataCon
 prodDataCon n bi = case tyConDataCons (prodTyCon n bi) of
                      [con] -> con
+                     _     -> pprPanic "prodDataCon" (ppr n)
 
 combinePDVar :: Int -> Builtins -> Var
 combinePDVar = indexBuiltin "combinePDVar" combinePDVars
@@ -275,7 +276,6 @@ initBuiltins pkg
              , dph_Repr           = dph_Repr
              , dph_Closure        = dph_Closure
              , dph_Selector       = dph_Selector
-             , dph_Unboxed        = dph_Unboxed
              , dph_Scalar         = dph_Scalar
              })
       = dph_Modules pkg
