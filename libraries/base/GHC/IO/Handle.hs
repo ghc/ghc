@@ -246,14 +246,16 @@ hSetBuffering handle mode =
 -- hSetEncoding
 
 -- | The action 'hSetEncoding' @hdl@ @encoding@ changes the text encoding
--- for the handle @hdl@ to @encoding@.  Encodings are available from the
--- module "GHC.IO.Encoding".  The default encoding when a 'Handle' is
+-- for the handle @hdl@ to @encoding@.  The default encoding when a 'Handle' is
 -- created is 'localeEncoding', namely the default encoding for the current
 -- locale.
 --
 -- To create a 'Handle' with no encoding at all, use 'openBinaryFile'.  To
 -- stop further encoding or decoding on an existing 'Handle', use
 -- 'hSetBinaryMode'.
+--
+-- 'hSetEncoding' may need to flush buffered data in order to change
+-- the encoding.
 --
 hSetEncoding :: Handle -> TextEncoding -> IO ()
 hSetEncoding hdl encoding = do

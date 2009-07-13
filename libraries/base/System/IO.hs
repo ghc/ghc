@@ -159,6 +159,62 @@ module System.IO (
 
     openTempFile,
     openBinaryTempFile,
+
+#if !defined(__NHC__) && !defined(__HUGS__)
+    -- * Unicode encoding\/decoding
+
+    -- | A text-mode 'Handle' has an associated 'TextEncoding', which
+    -- is used to decode bytes into Unicode characters when reading,
+    -- and encode Unicode characters into bytes when writing.
+    --
+    -- The default 'TextEncoding' is the same as the default encoding
+    -- on your system, which is also available as 'localeEncoding'.
+    -- (GHC note: on Windows, currently 'localeEncoding' is always
+    -- 'latin1'; there is no support for encoding and decoding using
+    -- the ANSI code page).
+    --
+    -- Encoding and decoding errors are always detected and reported,
+    -- except during lazy I/O ('hGetContents', 'getContents', and
+    -- 'readFile'), where a decoding error merely results in
+    -- termination of the character stream, as with other I/O errors.
+
+    hSetEncoding, 
+
+    -- ** Unicode encodings
+    TextEncoding, 
+    latin1,
+    utf8, 
+    utf16, utf16le, utf16be,
+    utf32, utf32le, utf32be, 
+    localeEncoding,
+    mkTextEncoding,
+#endif
+
+#if !defined(__NHC__) && !defined(__HUGS__)
+    -- * Newline conversion
+    
+    -- | In Haskell, a newline is always represented by the character
+    -- '\n'.  However, in files and external character streams, a
+    -- newline may be represented by another character sequence, such
+    -- as '\r\n'.
+    --
+    -- A text-mode 'Handle' has an associated 'NewlineMode' that
+    -- specifies how to transate newline characters.  The
+    -- 'NewlineMode' specifies the input and output translation
+    -- separately, so that for instance you can translate '\r\n'
+    -- to '\n' on input, but leave newlines as '\n' on output.
+    --
+    -- The default 'NewlineMode' for a 'Handle' is
+    -- 'nativeNewlineMode', which does no translation on Unix systems,
+    -- but translates '\r\n' to '\n' and back on Windows.
+    --
+    -- Binary-mode 'Handle's do no newline translation at all.
+    --
+    hSetNewlineMode, 
+    Newline(..), nativeNewline, 
+    NewlineMode(..), 
+    noNewlineTranslation, universalNewlineMode, nativeNewlineMode,
+#endif
   ) where
 
 import Control.Exception.Base
@@ -180,7 +236,8 @@ import GHC.IO.Handle.FD
 import GHC.IO.Handle
 import GHC.IORef
 import GHC.IO.Exception ( userError )
--- import GHC.Exception
+import GHC.IO.Encoding
+import GHC.Exception
 import GHC.Num
 import Text.Read
 import GHC.Show

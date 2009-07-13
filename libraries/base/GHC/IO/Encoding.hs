@@ -43,45 +43,57 @@ import GHC.IO.Exception
 
 -- -----------------------------------------------------------------------------
 
-latin1, utf8, utf16, utf16le, utf16be, utf32, utf32le, utf32be, localeEncoding
-  :: TextEncoding
-
 -- | The Latin1 (ISO8859-1) encoding.  This encoding maps bytes
 -- directly to the first 256 Unicode code points, and is thus not a
--- complete Unicode encoding.
+-- complete Unicode encoding.  An attempt to write a character greater than
+-- '\255' to a 'Handle' using the 'latin1' encoding will result in an error.
+latin1  :: TextEncoding
 latin1 = Latin1.latin1_checked
 
--- | The UTF-8 unicode encoding
+-- | The UTF-8 Unicode encoding
+utf8  :: TextEncoding
 utf8 = UTF8.utf8
 
--- | The UTF-16 unicode encoding (a byte-order-mark should be used to
+-- | The UTF-16 Unicode encoding (a byte-order-mark should be used to
 -- indicate endianness).
+utf16  :: TextEncoding
 utf16 = UTF16.utf16
 
--- | The UTF-16 unicode encoding (litte-endian)
+-- | The UTF-16 Unicode encoding (litte-endian)
+utf16le  :: TextEncoding
 utf16le = UTF16.utf16le
 
--- | The UTF-16 unicode encoding (big-endian)
+-- | The UTF-16 Unicode encoding (big-endian)
+utf16be  :: TextEncoding
 utf16be = UTF16.utf16be
 
--- | The UTF-32 unicode encoding (a byte-order-mark should be used to
+-- | The UTF-32 Unicode encoding (a byte-order-mark should be used to
 -- indicate endianness).
+utf32  :: TextEncoding
 utf32 = UTF32.utf32
 
--- | The UTF-32 unicode encoding (litte-endian)
+-- | The UTF-32 Unicode encoding (litte-endian)
+utf32le  :: TextEncoding
 utf32le = UTF32.utf32le
 
--- | The UTF-32 unicode encoding (big-endian)
+-- | The UTF-32 Unicode encoding (big-endian)
+utf32be  :: TextEncoding
 utf32be = UTF32.utf32be
 
--- | The text encoding of the current locale
+-- | The Unicode encoding of the current locale
+localeEncoding  :: TextEncoding
 #if !defined(mingw32_HOST_OS)
 localeEncoding = Iconv.localeEncoding
 #else
 localeEncoding = Latin1.latin1
 #endif
 
--- | Acquire the named text encoding
+-- | Look up the named Unicode encoding.  May fail with 
+--
+--  * 'isDoesNotExistError' if the encoding is unknown
+--
+-- The set of known encodings is system-dependent.
+--
 mkTextEncoding :: String -> IO TextEncoding
 #if !defined(mingw32_HOST_OS)
 mkTextEncoding = Iconv.mkTextEncoding
@@ -94,7 +106,7 @@ mkTextEncoding "UTF-32"   = return utf32
 mkTextEncoding "UTF-32LE" = return utf32le
 mkTextEncoding "UTF-32BE" = return utf32be
 mkTextEncoding e = ioException
-     (IOError Nothing InvalidArgument "mkTextEncoding"
+     (IOError Nothing NoSuchThing "mkTextEncoding"
           ("unknown encoding:" ++ e)  Nothing Nothing)
 #endif
 

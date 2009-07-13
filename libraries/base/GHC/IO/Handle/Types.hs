@@ -322,8 +322,8 @@ and hence it is only possible on a seekable Handle.
 -- Newline translation
 
 -- | The representation of a newline in the external file or stream.
-data Newline = LF    -- ^ "\n"
-             | CRLF  -- ^ "\r\n"
+data Newline = LF    -- ^ '\n'
+             | CRLF  -- ^ '\r\n'
              deriving Eq
 
 -- | Specifies the translation, if any, of newline characters between
@@ -339,7 +339,8 @@ data NewlineMode
                  }
              deriving Eq
 
--- | The native newline representation for the current platform
+-- | The native newline representation for the current platform: 'LF'
+-- on Unix systems, 'CRLF' on Windows.
 nativeNewline :: Newline
 #ifdef mingw32_HOST_OS
 nativeNewline = CRLF
@@ -347,7 +348,7 @@ nativeNewline = CRLF
 nativeNewline = LF
 #endif
 
--- | Map "\r\n" into "\n" on input, and "\n" to the native newline
+-- | Map '\r\n' into '\n' on input, and '\n' to the native newline
 -- represetnation on output.  This mode can be used on any platform, and
 -- works with text files using any newline convention.  The downside is
 -- that @readFile >>= writeFile@ might yield a different file.

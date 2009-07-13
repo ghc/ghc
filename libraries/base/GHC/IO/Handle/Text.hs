@@ -680,6 +680,9 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release
 -- 'hPutBuf' ignores any text encoding that applies to the 'Handle',
 -- writing the bytes directly to the underlying file or device.
 --
+-- 'hPutBuf' ignores the prevailing 'TextEncoding' and
+-- 'NewlineMode' on the 'Handle', and writes bytes directly.
+--
 -- This operation may fail with:
 --
 --  * 'ResourceVanished' if the handle is a pipe or socket, and the
@@ -784,6 +787,8 @@ writeChunkNonBlocking h_@Handle__{..} ptr bytes
 -- If the handle is a pipe or socket, and the writing end
 -- is closed, 'hGetBuf' will behave as if EOF was reached.
 --
+-- 'hGetBuf' ignores the prevailing 'TextEncoding' and 'NewlineMode'
+-- on the 'Handle', and reads bytes directly.
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
 hGetBuf h ptr count
@@ -868,6 +873,9 @@ readChunk h_@Handle__{..} ptr bytes
 -- If the handle is a pipe or socket, and the writing end
 -- is closed, 'hGetBufNonBlocking' will behave as if EOF was reached.
 --
+-- 'hGetBufNonBlocking' ignores the prevailing 'TextEncoding' and
+-- 'NewlineMode' on the 'Handle', and reads bytes directly.
+
 hGetBufNonBlocking :: Handle -> Ptr a -> Int -> IO Int
 hGetBufNonBlocking h ptr count
   | count == 0 = return 0
