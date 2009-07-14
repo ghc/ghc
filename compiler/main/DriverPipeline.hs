@@ -1590,7 +1590,9 @@ linkDynLib dflags o_files dep_packages = do
 	  , SysTools.Option "-o"
 	  , SysTools.FileOption "" output_fn
 	  , SysTools.Option "-shared"
-	  , SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
+	  ] ++
+	  [ SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
+	  | dopt Opt_SharedImplib dflags
 	  ]
 	 ++ map (SysTools.FileOption "") o_files
 	 ++ map SysTools.Option (

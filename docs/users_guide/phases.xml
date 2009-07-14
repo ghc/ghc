@@ -1052,6 +1052,28 @@ $ cat foo.hspp</screen>
               />).</para>
         </listitem>
       </varlistentry>
+          
+      <varlistentry>
+        <term>
+          <option>-fno-shared-implib</option>
+          <indexterm><primary><option>-fno-shared-implib</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>DLLs on Windows are typically linked to by linking to a corresponding
+            <literal>.lib</literal> or <literal>.dll.a</literal> - the so-called import library.
+            GHC will typically generate such a file for every DLL you create by compiling in
+            <literal>-shared</literal> mode. However, sometimes you don't want to pay the
+            disk-space cost of creating this import library, which can be substantial - it
+            might require as much space as the code itself, as Haskell DLLs tend to export
+            lots of symbols.</para>
+            
+          <para>As long as you are happy to only be able to link to the DLL using
+            <literal>GetProcAddress</literal> and friends, you can supply the
+            <option>-fno-shared-implib</option> flag to disable the creation of the import
+            library entirely.</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 

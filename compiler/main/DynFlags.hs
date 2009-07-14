@@ -310,6 +310,7 @@ data DynFlag
    | Opt_GenManifest
    | Opt_EmbedManifest
    | Opt_EmitExternalCore
+   | Opt_SharedImplib
 
 	-- temporary flags
    | Opt_RunCPS
@@ -693,6 +694,8 @@ defaultDynFlags =
             Opt_MethodSharing,
 
             Opt_DoAsmMangling,
+
+            Opt_SharedImplib,
 
             Opt_GenManifest,
             Opt_EmbedManifest,
@@ -1742,6 +1745,7 @@ fFlags = [
   ( "gen-manifest",                     Opt_GenManifest, const Supported ),
   ( "embed-manifest",                   Opt_EmbedManifest, const Supported ),
   ( "ext-core",                         Opt_EmitExternalCore, const Supported ),
+  ( "shared-implib",                    Opt_SharedImplib, const Supported ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, const Supported )
   ]
 

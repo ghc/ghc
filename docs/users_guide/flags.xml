@@ -1833,6 +1833,12 @@
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-no-shared-implib</option></entry>
+	      <entry>Don't generate an import library for a DLL (Windows only)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
