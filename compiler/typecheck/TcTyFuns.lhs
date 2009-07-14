@@ -794,18 +794,19 @@ flattenType inst ty = go ty
                      thisRewriteFam : concat args_eqss)
            }
 
-      -- data constructor application => flatten subtypes
+      -- datatype constructor application => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
     go ty@(TyConApp con args)
       | not (isOpenSynTyCon con)   -- don't match oversaturated family apps
       = do { (args', cargs, args_eqss) <- mapAndUnzip3M go args
-           ; if null args_eqss
+           ; let args_eqs = concat args_eqss
+           ; if null args_eqs
              then     -- unchanged, keep the old type with folded synonyms
                return (ty, ty, [])
              else 
                return (mkTyConApp con args', 
                        mkTyConApp con cargs,
-                       concat args_eqss)
+                       args_eqs)
            }
 
       -- function type => flatten subtypes
@@ -848,9 +849,32 @@ flattenType inst ty = go ty
       | otherwise
       = panic "TcTyFuns.flattenType: synonym family in a rank-n type"
 
-      -- we should never see a predicate type
-    go (PredTy _)
-      = panic "TcTyFuns.flattenType: unexpected PredType"
+      -- predicate type => handle like a datatype constructor application
+    go (PredTy (ClassP cls tys))
+      = do { (tys', ctys, tys_eqss) <- mapAndUnzip3M go tys
+           ; let tys_eqs = concat tys_eqss
+           ; if null tys_eqs
+             then     -- unchanged, keep the old type with folded synonyms
+               return (ty, ty, [])
+             else 
+               return (PredTy (ClassP cls tys'), 
+                       PredTy (ClassP cls ctys),
+                       tys_eqs)
+           }
+
+      -- implicit parameter => flatten subtype
+    go ty@(PredTy (IParam ipn ity))
+      = do { (ity', co, eqs) <- go ity
+           ; if null eqs 
+             then return (ty, ty, []) 
+             else return (PredTy (IParam ipn ity'),
+                          PredTy (IParam ipn co),
+                          eqs)
+           }
+
+      -- we should never see a equality
+    go (PredTy (EqPred _ _))
+      = panic "TcTyFuns.flattenType: malformed type"
 
     go _ = panic "TcTyFuns: suppress bogus warning"
 
