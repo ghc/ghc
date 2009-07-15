@@ -238,7 +238,6 @@ import GHC.IO.Handle
 import GHC.IORef
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
-import GHC.Exception
 import GHC.Num
 import Text.Read
 import GHC.Show
