@@ -20,13 +20,13 @@
 
 module GHC.IO.Encoding.UTF8 (
   utf8,
-  utf8_decode,
-  utf8_encode,
+  utf8_bom,
   ) where
 
 import GHC.Base
 import GHC.Real
 import GHC.Num
+import GHC.IORef
 -- import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Buffer
@@ -56,6 +56,73 @@ utf8_EF =
              getState = return (),
              setState = const $ return ()
           })
+
+utf8_bom :: TextEncoding
+utf8_bom = TextEncoding { mkTextDecoder = utf8_bom_DF,
+                          mkTextEncoder = utf8_bom_EF }
+
+utf8_bom_DF :: IO (TextDecoder Bool)
+utf8_bom_DF = do
+   ref <- newIORef True
+   return (BufferCodec {
+             encode   = utf8_bom_decode ref,
+             close    = return (),
+             getState = readIORef ref,
+             setState = writeIORef ref
+          })
+
+utf8_bom_EF :: IO (TextEncoder Bool)
+utf8_bom_EF = do
+   ref <- newIORef True
+   return (BufferCodec {
+             encode   = utf8_bom_encode ref,
+             close    = return (),
+             getState = readIORef ref,
+             setState = writeIORef ref
+          })
+
+utf8_bom_decode :: IORef Bool -> DecodeBuffer
+utf8_bom_decode ref
+  input@Buffer{  bufRaw=iraw, bufL=ir, bufR=iw,  bufSize=_  }
+  output
+ = do
+   first <- readIORef ref
+   if not first
+      then utf8_decode input output
+      else do
+       let no_bom = do writeIORef ref False; utf8_decode input output
+       if iw - ir < 1 then return (input,output) else do
+       c0 <- readWord8Buf iraw ir
+       if (c0 /= bom0) then no_bom else do
+       if iw - ir < 2 then return (input,output) else do
+       c1 <- readWord8Buf iraw (ir+1)
+       if (c1 /= bom1) then no_bom else do
+       if iw - ir < 3 then return (input,output) else do
+       c2 <- readWord8Buf iraw (ir+2)
+       if (c2 /= bom2) then no_bom else do
+       -- found a BOM, ignore it and carry on
+       writeIORef ref False
+       utf8_decode input{ bufL = ir + 3 } output
+
+utf8_bom_encode :: IORef Bool -> EncodeBuffer
+utf8_bom_encode ref input
+  output@Buffer{ bufRaw=oraw, bufL=_, bufR=ow, bufSize=os }
+ = do
+  b <- readIORef ref
+  if not b then utf8_encode input output
+           else if os - ow < 3
+                  then return (input,output)
+                  else do
+                    writeIORef ref False
+                    writeWord8Buf oraw ow     bom0
+                    writeWord8Buf oraw (ow+1) bom1
+                    writeWord8Buf oraw (ow+2) bom2
+                    utf8_encode input output{ bufR = ow+3 }
+
+bom0, bom1, bom2 :: Word8
+bom0 = 0xef
+bom1 = 0xbb
+bom2 = 0xbf
 
 utf8_decode :: DecodeBuffer
 utf8_decode 

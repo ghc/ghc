@@ -16,7 +16,7 @@
 module GHC.IO.Encoding (
   BufferCodec(..), TextEncoding(..), TextEncoder, TextDecoder,
   latin1, latin1_encode, latin1_decode,
-  utf8, 
+  utf8, utf8_bom,
   utf16, utf16le, utf16be,
   utf32, utf32le, utf32be, 
   localeEncoding,
@@ -53,6 +53,17 @@ latin1 = Latin1.latin1_checked
 -- | The UTF-8 Unicode encoding
 utf8  :: TextEncoding
 utf8 = UTF8.utf8
+
+-- | The UTF-8 Unicode encoding, with a byte-order-mark (BOM; the byte
+-- sequence 0xEF 0xBB 0xBF).  This encoding behaves like 'utf8',
+-- except that on input, the BOM sequence is ignored at the beginning
+-- of the stream, and on output, the BOM sequence is prepended.
+--
+-- The byte-order-mark is strictly unnecessary in UTF-8, but is
+-- sometimes used to identify the encoding of a file.
+--
+utf8_bom  :: TextEncoding
+utf8_bom = UTF8.utf8_bom
 
 -- | The UTF-16 Unicode encoding (a byte-order-mark should be used to
 -- indicate endianness).
