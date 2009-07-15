@@ -103,7 +103,24 @@ localeEncoding = Latin1.latin1
 --
 --  * 'isDoesNotExistError' if the encoding is unknown
 --
--- The set of known encodings is system-dependent.
+-- The set of known encodings is system-dependent, but includes at least:
+--
+--  * @UTF-8@
+--
+--  * @UTF-16@, @UTF-16BE@, @UTF-16LE@
+--
+--  * @UTF-32@, @UTF-32BE@, @UTF-32LE@
+--
+-- On systems using GNU iconv (e.g. Linux), there is additional
+-- notation for specifying how illegal characters are handled:
+--
+--  * a suffix of @\/\/IGNORE@, e.g. @UTF-8\/\/IGNORE@, will cause 
+--    all illegal sequences on input to be ignored, and on output
+--    will drop all code points that have no representation in the
+--    target encoding.
+--
+--  * a suffix of @\/\/TRANSLIT@ will choose a replacement character
+--    for illegal sequences or code points.
 --
 mkTextEncoding :: String -> IO TextEncoding
 #if !defined(mingw32_HOST_OS)
