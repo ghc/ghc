@@ -22,7 +22,7 @@ module GHC.IO.Handle (
    mkFileHandle, mkDuplexHandle,
  
    hFileSize, hSetFileSize, hIsEOF, hLookAhead,
-   hSetBuffering, hSetBinaryMode, hSetEncoding,
+   hSetBuffering, hSetBinaryMode, hSetEncoding, hGetEncoding,
    hFlush, hFlushAll, hDuplicate, hDuplicateTo,
  
    hClose, hClose_help,
@@ -264,8 +264,24 @@ hSetEncoding hdl encoding = do
     openTextEncoding (Just encoding) haType $ \ mb_encoder mb_decoder -> do
     bbuf <- readIORef haByteBuffer
     ref <- newIORef (error "last_decode")
-    return (Handle__{ haLastDecode = ref, haDecoder = mb_decoder, haEncoder = mb_encoder, .. },
+    return (Handle__{ haLastDecode = ref, 
+                      haDecoder = mb_decoder, 
+                      haEncoder = mb_encoder,
+                      haCodec   = Just encoding, .. },
             ())
+
+-- | Return the current 'TextEncoding' for the specified 'Handle', or
+-- 'Nothing' if the 'Handle' is in binary mode.
+--
+-- Note that the 'TextEncoding' remembers nothing about the state of
+-- the encoder/decoder in use on this 'Handle'.  For example, if the
+-- encoding in use is UTF-16, then using 'hGetEncoding' and
+-- 'hSetEncoding' to save and restore the encoding may result in an
+-- extra byte-order-mark being written to the file.
+--
+hGetEncoding :: Handle -> IO (Maybe TextEncoding)
+hGetEncoding hdl =
+  withHandle_ "hGetEncoding" hdl $ \h_@Handle__{..} -> return haCodec
 
 -- -----------------------------------------------------------------------------
 -- hFlush
@@ -553,6 +569,7 @@ hSetBinaryMode handle bin =
          return Handle__{ haLastDecode = ref,
                           haEncoder  = mb_encoder, 
                           haDecoder  = mb_decoder,
+                          haCodec    = mb_te,
                           haInputNL  = inputNL nl,
                           haOutputNL = outputNL nl, .. }
   

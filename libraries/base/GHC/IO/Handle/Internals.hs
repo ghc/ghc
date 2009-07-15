@@ -521,6 +521,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
                         haBuffers = spares,
                         haEncoder = mb_encoder,
                         haDecoder = mb_decoder,
+                        haCodec = mb_codec,
                         haInputNL = inputNL nl,
                         haOutputNL = outputNL nl,
                         haOtherSide = other_side

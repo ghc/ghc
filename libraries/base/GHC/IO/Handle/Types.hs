@@ -132,6 +132,7 @@ data Handle__
       haBuffers     :: !(IORef (BufferList CharBufElem)),  -- spare buffers
       haEncoder     :: Maybe (TextEncoder enc_state),
       haDecoder     :: Maybe (TextDecoder dec_state),
+      haCodec       :: Maybe TextEncoding,
       haInputNL     :: Newline,
       haOutputNL    :: Newline,
       haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 

@@ -179,6 +179,7 @@ module System.IO (
     -- termination of the character stream, as with other I/O errors.
 
     hSetEncoding, 
+    hGetEncoding,
 
     -- ** Unicode encodings
     TextEncoding, 
