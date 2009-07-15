@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
+{-# OPTIONS_GHC  -XNoImplicitPrelude -funbox-strict-fields #-}
 {-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |

@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
-{-# OPTIONS_GHC -XRecordWildCards #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -XRecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 -----------------------------------------------------------------------------
 -- |

@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
