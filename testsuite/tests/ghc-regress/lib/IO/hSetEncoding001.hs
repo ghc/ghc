@@ -39,6 +39,9 @@ test file buf = do
   hSetEncoding h utf32be
   putStrLn "UTF32BE:"
   getUntilX h
+  hSetEncoding h utf8_bom
+  putStrLn "UTF8-BOM:"
+  getUntilX h
   hIsEOF h >>= print
 
 getUntilX h = do

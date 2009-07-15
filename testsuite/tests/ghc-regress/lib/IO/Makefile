@@ -29,5 +29,8 @@ utf32le-test: utf8-test
 utf32be-test: utf8-test
 	iconv -f UTF8 -t UTF32BE <utf8-test >utf32be-test
 
-hSetEncoding001.in : latin1 utf8-test utf16le-test utf16be-test utf16-test utf32le-test utf32be-test utf32-test
-	cat >$@ latin1 utf8-test utf16le-test utf16be-test utf16-test utf32-test utf32le-test utf32be-test 
+utf8-bom-test: utf16-test
+	iconv -f UTF16LE -t UTF8 <utf16-test >utf8-bom-test
+
+hSetEncoding001.in : latin1 utf8-test utf16le-test utf16be-test utf16-test utf32le-test utf32be-test utf32-test utf8-bom-test
+	cat >$@ latin1 utf8-test utf16le-test utf16be-test utf16-test utf32-test utf32le-test utf32be-test utf8-bom-test
