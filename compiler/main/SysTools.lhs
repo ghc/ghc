@@ -711,10 +711,6 @@ data BuildMessage
   | BuildError !SrcLoc !SDoc
   | EOF
 
-showOpt :: Option -> String
-showOpt (FileOption pre f) = pre ++ f
-showOpt (Option s)  = s
-
 traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- a) trace the command (at two levels of verbosity)
 -- b) don't do it at all if dry-run is set

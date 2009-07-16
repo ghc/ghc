@@ -17,7 +17,7 @@ module DynFlags (
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..),
-        Option(..),
+        Option(..), showOpt,
         DynLibLoader(..),
         fFlags, xFlags,
         dphPackage,
@@ -853,6 +853,10 @@ data Option
                       -- transformed (e.g., "/out=")
               String  -- the filepath/filename portion
  | Option     String
+
+showOpt :: Option -> String
+showOpt (FileOption pre f) = pre ++ f
+showOpt (Option s)  = s
 
 -----------------------------------------------------------------------------
 -- Setting the optimisation level
