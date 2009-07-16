@@ -923,11 +923,14 @@ mkIfaceAnnotation (Annotation { ann_target = target, ann_value = serialized }) =
 \begin{code}
 mkIfaceExports :: [AvailInfo]
                -> [(Module, [GenAvailInfo OccName])]
-  -- Group by module and sort by occurrence
-  -- This keeps the list in canonical order
+                  -- Group by module and sort by occurrence
 mkIfaceExports exports
   = [ (mod, eltsFM avails)
-    | (mod, avails) <- fmToList groupFM
+    | (mod, avails) <- sortBy (stableModuleCmp `on` fst) (fmToList groupFM)
+                       -- NB. the fmToList is in a random order,
+                       -- because Ord Module is not a predictable
+                       -- ordering.  Hence we perform a final sort
+                       -- using the stable Module ordering.
     ]
   where
 	-- Group by the module where the exported entities are defined
