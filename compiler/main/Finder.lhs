@@ -180,10 +180,10 @@ findExposedPackageModule hsc_env mod_name mb_pkg
   | null found_exposed = return (NotFound [] Nothing mod_hiddens pkg_hiddens)
         -- found in just one exposed package:
   | [(pkg_conf, _)] <- found_exposed
-        = let pkgid = mkPackageId (package pkg_conf) in      
+        = let pkgid = packageConfigId pkg_conf in
           findPackageModule_ hsc_env (mkModule pkgid mod_name) pkg_conf
   | otherwise
-        = return (FoundMultiple (map (mkPackageId.package.fst) found_exposed))
+        = return (FoundMultiple (map (packageConfigId.fst) found_exposed))
   where
 	dflags = hsc_dflags hsc_env
         found = lookupModuleInAllPackages dflags mod_name
@@ -196,10 +196,10 @@ findExposedPackageModule hsc_env mod_name mb_pkg
 
         is_exposed (pkg_conf,exposed_mod) = exposed pkg_conf && exposed_mod
 
-        mod_hiddens = [ mkPackageId (package pkg_conf)
+        mod_hiddens = [ packageConfigId pkg_conf
                       | (pkg_conf,False) <- found ]
 
-        pkg_hiddens = [ mkPackageId (package pkg_conf)
+        pkg_hiddens = [ packageConfigId pkg_conf
                       | (pkg_conf,_) <- found, not (exposed pkg_conf) ]
 
         _pkg_conf `matches` Nothing  = True

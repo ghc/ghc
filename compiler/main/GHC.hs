@@ -2533,7 +2533,7 @@ packageDbModules only_exposed = do
    return $
      [ mkModule pid modname | p <- pkgs
                             , not only_exposed || exposed p
-                            , pid <- [mkPackageId (package p)]
+                            , let pid = packageConfigId p
                             , modname <- exposedModules p ]
 
 -- -----------------------------------------------------------------------------
