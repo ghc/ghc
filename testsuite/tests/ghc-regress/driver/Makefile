@@ -463,8 +463,8 @@ mode001:
 	$(TEST_HC) --help --make        | sed '2,$$d'
 	$(TEST_HC) --interactive --help | sed '2,$$d'
 	$(TEST_HC) --help --interactive | sed '2,$$d'
-	$(TEST_HC) --version --help     | sed '2,$$d'
-	$(TEST_HC) --help --version        | sed "s/, version.*//"
+	$(TEST_HC) --version --help     | sed "s/, version.*//"
+	$(TEST_HC) --help --version        | sed '2,$$d'
 	$(TEST_HC) --interactive --version | sed "s/, version.*//"
 	$(TEST_HC) --version --interactive | sed "s/, version.*//"
 
