@@ -57,6 +57,7 @@ import GHC.Paths
 #endif
 
 import GHC hiding (flags, verbosity)
+import Config
 import DynFlags hiding (flags, verbosity)
 #if __GLASGOW_HASKELL__ >= 609
 import Panic (handleGhcException)
@@ -449,8 +450,7 @@ handleEasyFlags flags = do
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
       ++ "Ported to use the GHC API by David Waern 2006-2008\n"
 
-    byeGhcVersion = bye $
-      (fromJust $ lookup "Project version" $ compilerInfo) ++ "\n"
+    byeGhcVersion = bye (cProjectVersion ++ "\n")
 
 
 updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()
