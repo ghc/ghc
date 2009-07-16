@@ -51,6 +51,7 @@ import System.Environment
 import System.Exit
 import System.FilePath
 import Control.Monad
+import Data.Char
 import Data.List
 import Data.Maybe
 
@@ -68,100 +69,102 @@ import Data.Maybe
 
 main :: IO ()
 main =
-  
-  GHC.defaultErrorHandler defaultDynFlags $ do
-  -- 1. extract the -B flag from the args
-  argv0 <- getArgs
+    GHC.defaultErrorHandler defaultDynFlags $ do
+    -- 1. extract the -B flag from the args
+    argv0 <- getArgs
 
-  let
-        (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
+    let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
-  let argv1' = map (mkGeneralLocated "on the commandline") argv1
-  (argv2, staticFlagWarnings) <- parseStaticFlags argv1'
+    let argv1' = map (mkGeneralLocated "on the commandline") argv1
+    (argv2, staticFlagWarnings) <- parseStaticFlags argv1'
 
-  -- 2. Parse the "mode" flags (--make, --interactive etc.)
-  (m_uber_mode, cli_mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
+    -- 2. Parse the "mode" flags (--make, --interactive etc.)
+    (mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
 
-  -- If all we want to do is to show the version number then do it
-  -- now, before we start a GHC session etc.
-  -- If we do it later then bootstrapping gets confused as it tries
-  -- to find out what version of GHC it's using before package.conf
-  -- exists, so starting the session fails.
-  case m_uber_mode of
-    -- ShowUsage currently has to be handled specially, as it needs to
-    -- actually start up GHC so that it can find the usage.txt files
-    -- in the libdir. It would be nice to embed the text in the
-    -- executable so that we don't have to do that, and things are more
-    -- uniform here.
-    Just ShowUsage -> return ()
-    Just um ->
-        do case um of
-               ShowInfo                -> showInfo
-               ShowSupportedLanguages  -> showSupportedLanguages
-               ShowVersion             -> showVersion
-               ShowNumVersion          -> putStrLn cProjectVersion
-           exitWith ExitSuccess
-    Nothing -> return ()
+    let flagWarnings = staticFlagWarnings ++ modeFlagWarnings
 
-  -- start our GHC session
-  GHC.runGhc mbMinusB $ do
+    -- If all we want to do is something like showing the version number
+    -- then do it now, before we start a GHC session etc. This makes
+    -- getting basic information much more resilient.
 
-  dflags0 <- GHC.getSessionDynFlags
+    -- In particular, if we wait until later before giving the version
+    -- number then bootstrapping gets confused, as it tries to find out
+    -- what version of GHC it's using before package.conf exists, so
+    -- starting the session fails.
+    case mode of
+        Left preStartupMode ->
+            do case preStartupMode of
+                   ShowSupportedLanguages  -> showSupportedLanguages
+                   ShowVersion             -> showVersion
+                   ShowNumVersion          -> putStrLn cProjectVersion
+                   Print str               -> putStrLn str
+        Right postStartupMode ->
+            -- start our GHC session
+            GHC.runGhc mbMinusB $ do
 
+            dflags <- GHC.getSessionDynFlags
+
+            case postStartupMode of
+                Left preLoadMode ->
+                    liftIO $ do
+                        case preLoadMode of
+                            ShowInfo               -> showInfo dflags
+                            ShowGhcUsage           -> showGhcUsage  dflags
+                            ShowGhciUsage          -> showGhciUsage dflags
+                            PrintWithDynFlags f    -> putStrLn (f dflags)
+                Right postLoadMode ->
+                    main' postLoadMode dflags argv3 flagWarnings
+
+main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
+      -> Ghc ()
+main' postLoadMode dflags0 args flagWarnings = do
   -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
   -- can be further adjusted on a module by module basis, using only
   -- the -fvia-C and -fasm flags.  If the default HscTarget is not
   -- HscC or HscAsm, -fvia-C and -fasm have no effect.
   let dflt_target = hscTarget dflags0
       (mode, lang, link)
-         = case cli_mode of
-        	DoInteractive	-> (CompManager, HscInterpreted, LinkInMemory)
-        	DoEval _	-> (CompManager, HscInterpreted, LinkInMemory)
-        	DoMake		-> (CompManager, dflt_target,    LinkBinary)
-        	DoMkDependHS	-> (MkDepend,    dflt_target,    LinkBinary)
-        	_		-> (OneShot,     dflt_target,    LinkBinary)
+         = case postLoadMode of
+               DoInteractive   -> (CompManager, HscInterpreted, LinkInMemory)
+               DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
+               DoMake          -> (CompManager, dflt_target,    LinkBinary)
+               DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
+               _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
-                  	 hscTarget = lang,
+                         hscTarget = lang,
                          ghcLink   = link,
-        		 -- leave out hscOutName for now
+                         -- leave out hscOutName for now
                          hscOutName = panic "Main.main:hscOutName not set",
-        	  	 verbosity = case cli_mode of
-        			 	 DoEval _ -> 0
-        			 	 _other   -> 1
-        		}
+                         verbosity = case postLoadMode of
+                                         DoEval _ -> 0
+                                         _other   -> 1
+                        }
 
       -- turn on -fimplicit-import-qualified for GHCi now, so that it
       -- can be overriden from the command-line
-      dflags1a | DoInteractive <- cli_mode = imp_qual_enabled
-               | DoEval _      <- cli_mode = imp_qual_enabled
+      dflags1a | DoInteractive <- postLoadMode = imp_qual_enabled
+               | DoEval _      <- postLoadMode = imp_qual_enabled
                | otherwise                 = dflags1
         where imp_qual_enabled = dflags1 `dopt_set` Opt_ImplicitImportQualified
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
-  (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a argv3
+  (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a args
 
-  -- As noted earlier, currently we hvae to handle ShowUsage down here
-  case m_uber_mode of
-      Just ShowUsage -> liftIO $ showGhcUsage dflags2 cli_mode
-      _              -> return ()
-
-  let flagWarnings = staticFlagWarnings
-                  ++ modeFlagWarnings
-                  ++ dynamicFlagWarnings
+  let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
   handleSourceError (\e -> do
        GHC.printExceptionAndWarnings e
        liftIO $ exitWith (ExitFailure 1)) $
-    handleFlagWarnings dflags2 flagWarnings
+    handleFlagWarnings dflags2 flagWarnings'
 
         -- make sure we clean up after ourselves
   GHC.defaultCleanupHandler dflags2 $ do
 
-  liftIO $ showBanner cli_mode dflags2
+  liftIO $ showBanner postLoadMode dflags2
 
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags2
@@ -187,14 +190,13 @@ main =
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
         ---------------- Final sanity checking -----------
-  liftIO $ checkOptions cli_mode dflags3 srcs objs
+  liftIO $ checkOptions postLoadMode dflags3 srcs objs
 
   ---------------- Do the business -----------
   handleSourceError (\e -> do
        GHC.printExceptionAndWarnings e
        liftIO $ exitWith (ExitFailure 1)) $ do
-    case cli_mode of
-       PrintLibdir            -> liftIO $ putStrLn (topDir dflags3)
+    case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags3 f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
@@ -203,7 +205,6 @@ main =
        DoEval exprs           -> interactiveUI srcs $ Just $ reverse exprs
 
   liftIO $ dumpFinalStats dflags3
-  liftIO $ exitWith ExitSuccess
 
 #ifndef GHCI
 interactiveUI :: b -> c -> Ghc ()
@@ -258,42 +259,42 @@ looks_like_an_input m =  isSourceFilename m
 -- | Ensure sanity of options.
 --
 -- Throws 'UsageError' or 'CmdLineError' if not.
-checkOptions :: CmdLineMode -> DynFlags -> [(String,Maybe Phase)] -> [String] -> IO ()
+checkOptions :: PostLoadMode -> DynFlags -> [(String,Maybe Phase)] -> [String] -> IO ()
      -- Final sanity checking before kicking off a compilation (pipeline).
-checkOptions cli_mode dflags srcs objs = do
+checkOptions mode dflags srcs objs = do
      -- Complain about any unknown flags
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
    when (notNull (filter isRTSWay (wayNames dflags))
-         && isInterpretiveMode cli_mode) $
+         && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
 	-- -prof and --interactive are not a good combination
    when (notNull (filter (not . isRTSWay) (wayNames dflags))
-         && isInterpretiveMode cli_mode) $
+         && isInterpretiveMode mode) $
       do ghcError (UsageError 
                    "--interactive can't be used with -prof or -unreg.")
 	-- -ohi sanity check
    if (isJust (outputHi dflags) && 
-      (isCompManagerMode cli_mode || srcs `lengthExceeds` 1))
+      (isCompManagerMode mode || srcs `lengthExceeds` 1))
 	then ghcError (UsageError "-ohi can only be used when compiling a single source file")
 	else do
 
 	-- -o sanity checking
    if (srcs `lengthExceeds` 1 && isJust (outputFile dflags)
-	 && not (isLinkMode cli_mode))
+	 && not (isLinkMode mode))
 	then ghcError (UsageError "can't apply -o to multiple source files")
 	else do
 
-   let not_linking = not (isLinkMode cli_mode) || isNoLink (ghcLink dflags)
+   let not_linking = not (isLinkMode mode) || isNoLink (ghcLink dflags)
 
    when (not_linking && not (null objs)) $
         hPutStrLn stderr ("Warning: the following files would be used as linker inputs, but linking is not being done: " ++ unwords objs)
 
 	-- Check that there are some input files
 	-- (except in the interactive case)
-   if null srcs && (null objs || not_linking) && needsInputsMode cli_mode
+   if null srcs && (null objs || not_linking) && needsInputsMode mode
 	then ghcError (UsageError "no input files")
 	else do
 
@@ -332,38 +333,102 @@ verifyOutputFiles dflags = do
 -----------------------------------------------------------------------------
 -- GHC modes of operation
 
-data UberMode
-  = ShowUsage               -- ghc -?
-  | ShowVersion             -- ghc -V/--version
+type Mode = Either PreStartupMode PostStartupMode
+type PostStartupMode = Either PreLoadMode PostLoadMode
+
+data PreStartupMode
+  = ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
   | ShowSupportedLanguages  -- ghc --supported-languages
-  | ShowInfo                -- ghc --info
-  deriving (Show)
+  | Print String            -- ghc --print-foo
 
-data CmdLineMode
-  = PrintLibdir             -- ghc --print-libdir
-  | ShowInterface String    -- ghc --show-iface
+showVersionMode, showNumVersionMode, showSupportedLanguagesMode :: Mode
+showVersionMode            = mkPreStartupMode ShowVersion
+showNumVersionMode         = mkPreStartupMode ShowNumVersion
+showSupportedLanguagesMode = mkPreStartupMode ShowSupportedLanguages
+
+printMode :: String -> Mode
+printMode str              = mkPreStartupMode (Print str)
+
+mkPreStartupMode :: PreStartupMode -> Mode
+mkPreStartupMode = Left
+
+isShowVersionMode :: Mode -> Bool
+isShowVersionMode (Left ShowVersion) = True
+isShowVersionMode _ = False
+
+isShowNumVersionMode :: Mode -> Bool
+isShowNumVersionMode (Left ShowNumVersion) = True
+isShowNumVersionMode _ = False
+
+data PreLoadMode
+  = ShowGhcUsage                           -- ghc -?
+  | ShowGhciUsage                          -- ghci -?
+  | ShowInfo                               -- ghc --info
+  | PrintWithDynFlags (DynFlags -> String) -- ghc --print-foo
+
+showGhcUsageMode, showGhciUsageMode, showInfoMode :: Mode
+showGhcUsageMode = mkPreLoadMode ShowGhcUsage
+showGhciUsageMode = mkPreLoadMode ShowGhciUsage
+showInfoMode = mkPreLoadMode ShowInfo
+
+printWithDynFlagsMode :: (DynFlags -> String) -> Mode
+printWithDynFlagsMode f = mkPreLoadMode (PrintWithDynFlags f)
+
+mkPreLoadMode :: PreLoadMode -> Mode
+mkPreLoadMode = Right . Left
+
+isShowGhcUsageMode :: Mode -> Bool
+isShowGhcUsageMode (Right (Left ShowGhcUsage)) = True
+isShowGhcUsageMode _ = False
+
+isShowGhciUsageMode :: Mode -> Bool
+isShowGhciUsageMode (Right (Left ShowGhciUsage)) = True
+isShowGhciUsageMode _ = False
+
+data PostLoadMode
+  = ShowInterface FilePath  -- ghc --show-iface
   | DoMkDependHS            -- ghc -M
   | StopBefore Phase        -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
-  deriving (Show)
+
+doMkDependHSMode, doMakeMode, doInteractiveMode :: Mode
+doMkDependHSMode = mkPostLoadMode DoMkDependHS
+doMakeMode = mkPostLoadMode DoMake
+doInteractiveMode = mkPostLoadMode DoInteractive
+
+showInterfaceMode :: FilePath -> Mode
+showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
+
+stopBeforeMode :: Phase -> Mode
+stopBeforeMode phase = mkPostLoadMode (StopBefore phase)
+
+doEvalMode :: String -> Mode
+doEvalMode str = mkPostLoadMode (DoEval [str])
+
+mkPostLoadMode :: PostLoadMode -> Mode
+mkPostLoadMode = Right . Right
+
+isDoInteractiveMode :: Mode -> Bool
+isDoInteractiveMode (Right (Right DoInteractive)) = True
+isDoInteractiveMode _ = False
 
 #ifdef GHCI
-isInteractiveMode :: CmdLineMode -> Bool
+isInteractiveMode :: PostLoadMode -> Bool
 isInteractiveMode DoInteractive = True
 isInteractiveMode _		= False
 #endif
 
 -- isInterpretiveMode: byte-code compiler involved
-isInterpretiveMode :: CmdLineMode -> Bool
+isInterpretiveMode :: PostLoadMode -> Bool
 isInterpretiveMode DoInteractive = True
 isInterpretiveMode (DoEval _)    = True
 isInterpretiveMode _             = False
 
-needsInputsMode :: CmdLineMode -> Bool
+needsInputsMode :: PostLoadMode -> Bool
 needsInputsMode DoMkDependHS	= True
 needsInputsMode (StopBefore _)	= True
 needsInputsMode DoMake		= True
@@ -371,14 +436,14 @@ needsInputsMode _		= False
 
 -- True if we are going to attempt to link in this mode.
 -- (we might not actually link, depending on the GhcLink flag)
-isLinkMode :: CmdLineMode -> Bool
+isLinkMode :: PostLoadMode -> Bool
 isLinkMode (StopBefore StopLn) = True
 isLinkMode DoMake	       = True
 isLinkMode DoInteractive       = True
 isLinkMode (DoEval _)          = True
 isLinkMode _   		       = False
 
-isCompManagerMode :: CmdLineMode -> Bool
+isCompManagerMode :: PostLoadMode -> Bool
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
@@ -389,96 +454,125 @@ isCompManagerMode _             = False
 -- Parsing the mode flag
 
 parseModeFlags :: [Located String]
-               -> IO (Maybe UberMode,
-                      CmdLineMode,
+               -> IO (Mode,
                       [Located String],
                       [Located String])
 parseModeFlags args = do
-  let ((leftover, errs, warns), (mUberMode, mode, _, flags')) =
+  let ((leftover, errs1, warns), (mModeFlag, errs2, flags')) =
           runCmdLine (processArgs mode_flags args)
-                     (Nothing, StopBefore StopLn, "", [])
+                     (Nothing, [], [])
+      mode = case mModeFlag of
+             Nothing -> stopBeforeMode StopLn
+             Just (m, _) -> m
+      errs = errs1 ++ map (mkGeneralLocated "on the commandline") errs2
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
-  return (mUberMode, mode, flags' ++ leftover, warns)
+  return (mode, flags' ++ leftover, warns)
 
-type ModeM = CmdLineP (Maybe UberMode, CmdLineMode, String, [Located String])
+type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
   -- mode flags sometimes give rise to new DynFlags (eg. -C, see below)
   -- so we collect the new ones and return them.
 
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    Flag "?"                    (NoArg (setUberMode ShowUsage))
+    Flag "?"                    (PassFlag (setMode showGhcUsageMode))
          Supported
-  , Flag "-help"                (NoArg (setUberMode ShowUsage))
+  , Flag "-help"                (PassFlag (setMode showGhcUsageMode))
          Supported
-  , Flag "V"                    (NoArg (setUberMode ShowVersion))
+  , Flag "V"                    (PassFlag (setMode showVersionMode))
          Supported
-  , Flag "-version"             (NoArg (setUberMode ShowVersion))
+  , Flag "-version"             (PassFlag (setMode showVersionMode))
          Supported
-  , Flag "-numeric-version"     (NoArg (setUberMode ShowNumVersion))
+  , Flag "-numeric-version"     (PassFlag (setMode showNumVersionMode))
          Supported
-  , Flag "-info"                (NoArg (setUberMode ShowInfo))
+  , Flag "-info"                (PassFlag (setMode showInfoMode))
          Supported
-  , Flag "-supported-languages" (NoArg (setUberMode ShowSupportedLanguages))
+  , Flag "-supported-languages" (PassFlag (setMode showSupportedLanguagesMode))
          Supported
-  , Flag "-print-libdir"        (PassFlag (setMode PrintLibdir))
+  ] ++
+  [ Flag k'                     (PassFlag (setMode mode))
          Supported
-
+  | (k, v) <- compilerInfo,
+    let k' = "-print-" ++ map (replaceSpace . toLower) k
+        replaceSpace ' ' = '-'
+        replaceSpace c   = c
+        mode = case v of
+               String str -> printMode str
+               FromDynFlags f -> printWithDynFlagsMode f
+  ] ++
       ------- interfaces ----------------------------------------------------
-  , Flag "-show-iface"  (HasArg (\f -> setMode (ShowInterface f)
+  [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
          Supported
 
       ------- primary modes ------------------------------------------------
-  , Flag "M"            (PassFlag (setMode DoMkDependHS))
+  , Flag "M"            (PassFlag (setMode doMkDependHSMode))
          Supported
-  , Flag "E"            (PassFlag (setMode (StopBefore anyHsc)))
+  , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
          Supported
-  , Flag "C"            (PassFlag (\f -> do setMode (StopBefore HCc) f
-                                            addFlag "-fvia-C"))
+  , Flag "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
+                                            addFlag "-fvia-C" f))
          Supported
-  , Flag "S"            (PassFlag (setMode (StopBefore As)))
+  , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
          Supported
-  , Flag "-make"        (PassFlag (setMode DoMake))
+  , Flag "-make"        (PassFlag (setMode doMakeMode))
          Supported
-  , Flag "-interactive" (PassFlag (setMode DoInteractive))
+  , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
          Supported
-  , Flag "e"            (HasArg   (\s -> updateMode (updateDoEval s) "-e"))
+  , Flag "e"            (HasArg   (\s -> setMode (doEvalMode s) "-e"))
          Supported
 
        -- -fno-code says to stop after Hsc but don't generate any code.
-  , Flag "fno-code"     (PassFlag (\f -> do setMode (StopBefore HCc) f
-                                            addFlag "-fno-code"
-                                            addFlag "-fforce-recomp"))
+  , Flag "fno-code"     (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
+                                            addFlag "-fno-code" f
+                                            addFlag "-fforce-recomp" f))
          Supported
   ]
 
-setUberMode :: UberMode -> ModeM ()
-setUberMode m = do
-    (_, cmdLineMode, flag, flags') <- getCmdLineState
-    putCmdLineState (Just m, cmdLineMode, flag, flags')
+setMode :: Mode -> String -> ModeM ()
+setMode newMode newFlag = do
+    (mModeFlag, errs, flags') <- getCmdLineState
+    let (modeFlag', errs') =
+            case mModeFlag of
+            Nothing -> ((newMode, newFlag), errs)
+            Just (oldMode, oldFlag) ->
+                case (oldMode, newMode) of
+                    -- If we have both --help and --interactive then we
+                    -- want showGhciUsage
+                    _ | isShowGhcUsageMode oldMode &&
+                        isDoInteractiveMode newMode ->
+                            ((showGhciUsageMode, oldFlag), [])
+                      | isShowGhcUsageMode newMode &&
+                        isDoInteractiveMode oldMode ->
+                            ((showGhciUsageMode, newFlag), [])
+                    -- Otherwise, --help/--version/--numeric-version always win
+                      | isDominantFlag oldMode -> ((oldMode, oldFlag), [])
+                      | isDominantFlag newMode -> ((newMode, newFlag), [])
+                    -- We need to accumulate eval flags like "-e foo -e bar"
+                    (Right (Right (DoEval esOld)),
+                     Right (Right (DoEval [eNew]))) ->
+                        ((Right (Right (DoEval (eNew : esOld))), oldFlag),
+                         errs)
+                    -- Saying e.g. --interactive --interactive is OK
+                    _ | oldFlag == newFlag -> ((oldMode, oldFlag), errs)
+                    -- Otherwise, complain
+                    _ -> let err = flagMismatchErr oldFlag newFlag
+                         in ((oldMode, oldFlag), err : errs)
+    putCmdLineState (Just modeFlag', errs', flags')
+  where isDominantFlag f = isShowGhcUsageMode   f ||
+                           isShowGhciUsageMode  f ||
+                           isShowVersionMode    f ||
+                           isShowNumVersionMode f
 
-setMode :: CmdLineMode -> String -> ModeM ()
-setMode m flag = updateMode (\_ -> m) flag
+flagMismatchErr :: String -> String -> String
+flagMismatchErr oldFlag newFlag
+    = "cannot use `" ++ oldFlag ++  "' with `" ++ newFlag ++ "'"
 
-updateDoEval :: String -> CmdLineMode -> CmdLineMode
-updateDoEval expr (DoEval exprs) = DoEval (expr : exprs)
-updateDoEval expr _              = DoEval [expr]
-
-updateMode :: (CmdLineMode -> CmdLineMode) -> String -> ModeM ()
-updateMode f flag = do
-  (m_uber_mode, old_mode, old_flag, flags') <- getCmdLineState
-  if null old_flag || flag == old_flag
-      then putCmdLineState (m_uber_mode, f old_mode, flag, flags')
-      else ghcError (UsageError
-               ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
-
-addFlag :: String -> ModeM ()
-addFlag s = do
-  (u, m, f, flags') <- getCmdLineState
-  -- XXX Can we get a useful Loc?
-  putCmdLineState (u, m, f, mkGeneralLocated "addFlag" s : flags')
-
+addFlag :: String -> String -> ModeM ()
+addFlag s flag = do
+  (m, e, flags') <- getCmdLineState
+  putCmdLineState (m, e, mkGeneralLocated loc s : flags')
+    where loc = "addFlag by " ++ flag ++ " on the commandline"
 
 -- ----------------------------------------------------------------------------
 -- Run --make mode
@@ -520,13 +614,13 @@ doShowIface dflags file = do
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
 
-showBanner :: CmdLineMode -> DynFlags -> IO ()
-showBanner _cli_mode dflags = do
+showBanner :: PostLoadMode -> DynFlags -> IO ()
+showBanner _postLoadMode dflags = do
    let verb = verbosity dflags
 
 #ifdef GHCI
    -- Show the GHCi banner
-   when (isInteractiveMode _cli_mode && verb >= 1) $ putStrLn ghciWelcomeMsg
+   when (isInteractiveMode _postLoadMode && verb >= 1) $ putStrLn ghciWelcomeMsg
 #endif
 
    -- Display details of the configuration in verbose mode
@@ -540,33 +634,35 @@ showBanner _cli_mode dflags = do
 
 -- We print out a Read-friendly string, but a prettier one than the
 -- Show instance gives us
-showInfo :: IO ()
-showInfo = do
-    let sq x = " [" ++ x ++ "\n ]"
-    putStrLn $ sq $ concat $ intersperse "\n ," $ map show compilerInfo
-    exitWith ExitSuccess
+showInfo :: DynFlags -> IO ()
+showInfo dflags = do
+        let sq x = " [" ++ x ++ "\n ]"
+        putStrLn $ sq $ concat $ intersperse "\n ," $ map (show . flatten) compilerInfo
+    where flatten (k, String v)       = (k, v)
+          flatten (k, FromDynFlags f) = (k, f dflags)
 
 showSupportedLanguages :: IO ()
-showSupportedLanguages = do mapM_ putStrLn supportedLanguages
-                            exitWith ExitSuccess
+showSupportedLanguages = mapM_ putStrLn supportedLanguages
 
 showVersion :: IO ()
-showVersion = do
-  putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
-  exitWith ExitSuccess
+showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
 
-showGhcUsage :: DynFlags -> CmdLineMode -> IO ()
-showGhcUsage dflags cli_mode = do 
-  let usage_path 
-	| DoInteractive <- cli_mode = ghciUsagePath dflags
-	| otherwise		    = ghcUsagePath dflags
+showGhcUsage :: DynFlags -> IO ()
+showGhcUsage = showUsage False
+
+showGhciUsage :: DynFlags -> IO ()
+showGhciUsage = showUsage True
+
+showUsage :: Bool -> DynFlags -> IO ()
+showUsage ghci dflags = do
+  let usage_path = if ghci then ghciUsagePath dflags
+                           else ghcUsagePath dflags
   usage <- readFile usage_path
   dump usage
-  exitWith ExitSuccess
   where
-     dump ""	      = return ()
+     dump ""          = return ()
      dump ('$':'$':s) = putStr progName >> dump s
-     dump (c:s)	      = putChar c >> dump s
+     dump (c:s)       = putChar c >> dump s
 
 dumpFinalStats :: DynFlags -> IO ()
 dumpFinalStats dflags = 

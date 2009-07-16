@@ -57,6 +57,7 @@ module DynFlags (
         getStgToDo,
 
         -- * Compiler configuration suitable for display to the user
+        Printable(..),
         compilerInfo
   ) where
 
@@ -2350,21 +2351,25 @@ can_split = cSplitObjs == "YES"
 -- -----------------------------------------------------------------------------
 -- Compiler Info
 
-compilerInfo :: [(String, String)]
-compilerInfo = [("Project name",                cProjectName),
-                ("Project version",             cProjectVersion),
-                ("Booter version",              cBooterVersion),
-                ("Stage",                       cStage),
-                ("Interface file version",      cHscIfaceFileVersion),
-                ("Have interpreter",            cGhcWithInterpreter),
-                ("Object splitting",            cSplitObjs),
-                ("Have native code generator",  cGhcWithNativeCodeGen),
-                ("Support SMP",                 cGhcWithSMP),
-                ("Unregisterised",              cGhcUnregisterised),
-                ("Tables next to code",         cGhcEnableTablesNextToCode),
-                ("Win32 DLLs",                  cEnableWin32DLLs),
-                ("RTS ways",                    cGhcRTSWays),
-                ("Leading underscore",          cLeadingUnderscore),
-                ("Debug on",                    show debugIsOn)
+data Printable = String String
+               | FromDynFlags (DynFlags -> String)
+
+compilerInfo :: [(String, Printable)]
+compilerInfo = [("Project name",                String cProjectName),
+                ("Project version",             String cProjectVersion),
+                ("Booter version",              String cBooterVersion),
+                ("Stage",                       String cStage),
+                ("Interface file version",      String cHscIfaceFileVersion),
+                ("Have interpreter",            String cGhcWithInterpreter),
+                ("Object splitting",            String cSplitObjs),
+                ("Have native code generator",  String cGhcWithNativeCodeGen),
+                ("Support SMP",                 String cGhcWithSMP),
+                ("Unregisterised",              String cGhcUnregisterised),
+                ("Tables next to code",         String cGhcEnableTablesNextToCode),
+                ("Win32 DLLs",                  String cEnableWin32DLLs),
+                ("RTS ways",                    String cGhcRTSWays),
+                ("Leading underscore",          String cLeadingUnderscore),
+                ("Debug on",                    String (show debugIsOn)),
+                ("LibDir",                      FromDynFlags topDir)
                ]
 
