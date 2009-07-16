@@ -5,5 +5,5 @@ TH_exn1.hs:1:0:
 
       Code: let
               return = return
-              $dMonad = Language.Haskell.TH.Syntax.$f22
+              $dMonad = Language.Haskell.TH.Syntax.$fMonadQ
             in case reverse "no" of { [] -> return (GHC.Types.[]) }
