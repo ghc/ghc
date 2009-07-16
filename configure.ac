@@ -175,6 +175,9 @@ then
 fi
 AC_SUBST([WithGhc])
 
+dnl ** Without optimization some INLINE trickery fails for GHCi
+SRC_CC_OPTS="-O"
+
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
@@ -244,6 +247,8 @@ x86_64-apple-darwin)
     soext='.dylib'
     CFLAGS="$CFLAGS -m64"
     LDFLAGS="$LDFLAGS -m64"
+    SRC_CC_OPTS="$SRC_CC_OPTS -m64"
+    SRC_LD_OPTS="$SRC_LD_OPTS -m64"
     ;;
 esac
 
@@ -550,12 +555,6 @@ FP_GCC_EXTRA_FLAGS
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
-
-dnl ** Without optimization some INLINE trickery fails for GHCi
-SRC_CC_OPTS="-O"
-
-SRC_CC_OPTS="$SRC_CC_OPTS $CFLAGS"
-SRC_LD_OPTS="$SRC_LD_OPTS $LDFLAGS"
 
 AC_SUBST(SRC_CC_OPTS)
 AC_SUBST(SRC_LD_OPTS)
