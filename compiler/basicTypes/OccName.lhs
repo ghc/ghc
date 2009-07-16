@@ -95,7 +95,6 @@ module OccName (
 import Util
 import Unique
 import BasicTypes
-import StaticFlags
 import UniqFM
 import UniqSet
 import FastString
@@ -601,31 +600,41 @@ mkLocalOcc uniq occ
 \begin{code}
 -- | Derive a name for the representation type constructor of a
 -- @data@\/@newtype@ instance.
-mkInstTyTcOcc :: Int			-- ^ DFun Index
-	      -> OccName		-- ^ Family name, e.g. @Map@
-	      -> OccName		-- ^ Nice unique version, e.g. @:R23Map@
-mkInstTyTcOcc index occ
-   = mk_deriv tcName ("R" ++ show index ++ ":") (occNameString occ)
+mkInstTyTcOcc :: String 		-- ^ Family name, e.g. @Map@
+              -> OccSet                 -- ^ avoid these Occs
+	      -> OccName		-- ^ @R:Map@
+mkInstTyTcOcc str set =
+  chooseUniqueOcc tcName ('R' : ':' : str) set
 \end{code}
 
 \begin{code}
 mkDFunOcc :: String		-- ^ Typically the class and type glommed together e.g. @OrdMaybe@.
 				-- Only used in debug mode, for extra clarity
 	  -> Bool		-- ^ Is this a hs-boot instance DFun?
-	  -> Int		-- ^ Unique index
+          -> OccSet             -- ^ avoid these Occs
 	  -> OccName		-- ^ E.g. @$f3OrdMaybe@
 
 -- In hs-boot files we make dict funs like $fx7ClsTy, which get bound to the real
 -- thing when we compile the mother module. Reason: we don't know exactly
 -- what the  mother module will call it.
 
-mkDFunOcc info_str is_boot index 
-  = mk_deriv VarName prefix string
+mkDFunOcc info_str is_boot set
+  = chooseUniqueOcc VarName (prefix ++ info_str) set
   where
     prefix | is_boot   = "$fx"
 	   | otherwise = "$f"
-    string | opt_PprStyle_Debug = show index ++ info_str
-	   | otherwise		= show index
+\end{code}
+
+Sometimes we need to pick an OccName that has not already been used,
+given a set of in-use OccNames.
+
+\begin{code}
+chooseUniqueOcc :: NameSpace -> String -> OccSet -> OccName
+chooseUniqueOcc ns str set = loop (mkOccName ns str) (0::Int)
+  where
+  loop occ n
+   | occ `elemOccSet` set = loop (mkOccName ns (str ++ show n)) (n+1)
+   | otherwise            = occ
 \end{code}
 
 We used to add a '$m' to indicate a method, but that gives rise to bad

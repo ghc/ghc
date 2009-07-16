@@ -74,7 +74,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 	keep_var     <- newIORef emptyNameSet ;
     used_rdrnames_var <- newIORef Set.empty ;
 	th_var	     <- newIORef False ;
-	dfun_n_var   <- newIORef 1 ;
+	dfun_n_var   <- newIORef emptyOccSet ;
 	type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
                            Nothing             -> newIORef emptyNameEnv } ;
@@ -836,12 +836,15 @@ debugTc thing
 %************************************************************************
 
 \begin{code}
-nextDFunIndex :: TcM Int	-- Get the next dfun index
-nextDFunIndex = do { env <- getGblEnv
-		   ; let dfun_n_var = tcg_dfun_n env
-		   ; n <- readMutVar dfun_n_var
-		   ; writeMutVar dfun_n_var (n+1)
-		   ; return n }
+chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
+chooseUniqueOccTc fn =
+  do { env <- getGblEnv
+     ; let dfun_n_var = tcg_dfun_n env
+     ; set <- readMutVar dfun_n_var
+     ; let occ = fn set
+     ; writeMutVar dfun_n_var (extendOccSet set occ)
+     ; return occ
+     }
 
 getLIEVar :: TcM (TcRef LIE)
 getLIEVar = do { env <- getLclEnv; return (tcl_lie env) }

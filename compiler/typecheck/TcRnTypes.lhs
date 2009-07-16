@@ -222,14 +222,8 @@ data TcGblEnv
           -- reference is implicit rather than explicit, so we have to zap a
           -- mutable variable.
 
-	tcg_dfun_n  :: TcRef Int,
-          -- ^ Allows us to number off the names of DFuns.
-          --
-          -- It's convenient to allocate an External Name for a DFun, with
-          -- a permanently-fixed unique, just like other top-level functions
-          -- defined in this module.  But that means we need a canonical
-          -- occurrence name, distinct from all other dfuns in this module,
-          -- and this name supply serves that purpose (df1, df2, etc).
+	tcg_dfun_n  :: TcRef OccSet,
+          -- ^ Allows us to choose unique DFun names.
 
 	-- The next fields accumulate the payload of the module
 	-- The binds, rules and foreign-decl fiels are collected

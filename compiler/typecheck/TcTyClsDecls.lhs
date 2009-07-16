@@ -290,7 +290,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; checkValidTypeInst t_typats t_rhs
 
          -- (4) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName tc_name loc
+       ; rep_tc_name <- newFamInstTyConName tc_name t_typats loc
        ; buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
                        (typeKind t_rhs) (Just (family, t_typats))
        }}
@@ -334,7 +334,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	         newtypeConError tc_name (length k_cons)
 
          -- (4) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName tc_name loc
+       ; rep_tc_name <- newFamInstTyConName tc_name t_typats loc
        ; let ex_ok = True	-- Existentials ok for type families!
        ; fixM (\ rep_tycon -> do 
 	     { let orig_res_ty = mkTyConApp fam_tycon t_typats

@@ -677,17 +677,13 @@ name, like otber top-level names, and hence must be made with newGlobalBinder.
 
 \begin{code}
 newDFunName :: Class -> [Type] -> SrcSpan -> TcM Name
-newDFunName clas (ty:_) loc
-  = do	{ index   <- nextDFunIndex
-	; is_boot <- tcIsHsBoot
+newDFunName clas tys loc
+  = do	{ is_boot <- tcIsHsBoot
 	; mod     <- getModule
 	; let info_string = occNameString (getOccName clas) ++ 
-			    occNameString (getDFunTyKey ty)
-	      dfun_occ = mkDFunOcc info_string is_boot index
-
+			    concatMap (occNameString.getDFunTyKey) tys
+        ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
 	; newGlobalBinder mod dfun_occ loc }
-
-newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \end{code}
 
 Make a name for the representation tycon of a family instance.  It's an
@@ -695,12 +691,13 @@ Make a name for the representation tycon of a family instance.  It's an
 newGlobalBinder.
 
 \begin{code}
-newFamInstTyConName :: Name -> SrcSpan -> TcM Name
-newFamInstTyConName tc_name loc
-  = do	{ index <- nextDFunIndex
-	; mod   <- getModule
-	; let occ = nameOccName tc_name
-	; newGlobalBinder mod (mkInstTyTcOcc index occ) loc }
+newFamInstTyConName :: Name -> [Type] -> SrcSpan -> TcM Name
+newFamInstTyConName tc_name tys loc
+  = do	{ mod   <- getModule
+	; let info_string = occNameString (getOccName tc_name) ++ 
+			    concatMap (occNameString.getDFunTyKey) tys
+        ; occ   <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
+	; newGlobalBinder mod occ loc }
 \end{code}
 
 Stable names used for foreign exports and annotations.
