@@ -64,7 +64,7 @@ test('tcrun038',
 
 test('tcrun039', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun040', normal, compile_and_run, [''])
-test('tcrun041', if_compiler_lt('ghc', '6.11', expect_fail), compile_and_run, [''])
+test('tcrun041', compose(omit_ways(['ghci']), if_compiler_lt('ghc', '6.11', expect_fail)), compile_and_run, [''])
 test('tcrun042', if_compiler_lt('ghc', '6.11', expect_fail), compile_and_run, [''])
 
 test('church', normal, compile_and_run, [''])

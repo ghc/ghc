@@ -21,6 +21,11 @@ g = (# , True || False #)
 
 h = (# ,1, #)
 
+
+unchanged :: a -> (# Int #)
+unchanged _binding = (# #) 1
+
+
 main = do
     print (a 1, b False, c "Hello", c 1337, d "Yeah" "Baby")
     case e 1 of { (# x1, x2 #) ->
