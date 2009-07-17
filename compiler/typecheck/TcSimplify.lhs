@@ -1587,13 +1587,23 @@ Simpler, maybe, but alas not simple (see Trac #2494)
 tcSimplifyRuleLhs :: [Inst] -> TcM ([Inst], TcDictBinds)
 tcSimplifyRuleLhs wanteds
   = do	{ wanteds' <- zonkInsts wanteds
-	; (irreds, binds) <- go [] emptyBag wanteds'
+    	
+		-- Simplify equalities  
+		-- It's important to do this: Trac #3346 for example
+        ; (_, wanteds'', tybinds, binds1) <- tcReduceEqs [] wanteds'
+        ; execTcTyVarBinds tybinds
+
+	  	-- Simplify other constraints
+	; (irreds, binds2) <- go [] emptyBag wanteds''
+
+	  	-- Report anything that is left
 	; let (dicts, bad_irreds) = partition isDict irreds
 	; traceTc (text "tcSimplifyrulelhs" <+> pprInsts bad_irreds)
 	; addNoInstanceErrs (nub bad_irreds)
 		-- The nub removes duplicates, which has
 		-- not happened otherwise (see notes above)
-	; return (dicts, binds) }
+
+	; return (dicts, binds1 `unionBags` binds2) }
   where
     go :: [Inst] -> TcDictBinds -> [Inst] -> TcM ([Inst], TcDictBinds)
     go irreds binds []
