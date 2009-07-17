@@ -224,8 +224,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 <0,option_prags> \n				{ begin bol }
 
-"{-#" $whitechar* (line|LINE) / { notFollowedByPragmaChar }
-                            { begin line_prag2 }
+"{-#" $whitechar* $pragmachar+ / { known_pragma linePrags }
+                                { dispatch_pragmas linePrags }
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
@@ -758,10 +758,6 @@ notFollowedBySymbol :: AlexAccPred Int
 notFollowedBySymbol _ _ _ (AI _ _ buf)
   = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
 
-notFollowedByPragmaChar :: AlexAccPred Int
-notFollowedByPragmaChar _ _ _ (AI _ _ buf)
-  = nextCharIs buf (\c -> not (isAlphaNum c || c == '_'))
-
 -- We must reject doc comments as being ordinary comments everywhere.
 -- In some cases the doc comment will be selected as the lexeme due to
 -- maximal munch, but not always, because the nested comment rule is
@@ -1223,7 +1219,7 @@ lex_char_tok :: Action
 -- Here we are basically parsing character literals, such as 'x' or '\n'
 -- but, when Template Haskell is on, we additionally spot
 -- 'x and ''T, returning ITvarQuote and ITtyQuote respectively, 
--- but WIHTOUT CONSUMING the x or T part  (the parser does that).
+-- but WITHOUT CONSUMING the x or T part  (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
 lex_char_tok span _buf _len = do	-- We've seen '
@@ -1907,6 +1903,8 @@ lexTokenStream buf loc dflags = unP go initState
               L _ ITeof -> return []
               _ -> liftM (ltok:) go
 
+linePrags = Map.singleton "line" (begin line_prag2)
+
 fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("options_ghc", lex_string_prag IToptions_prag),
                                  ("options_haddock", lex_string_prag ITdocOptions),
@@ -1945,14 +1943,14 @@ dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToStr
                                        Nothing -> lexError "unknown pragma"
 
 known_pragma :: Map String Action -> AlexAccPred Int
-known_pragma prags q r len (AI s t buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
-                                          && (notFollowedByPragmaChar q r len (AI s t buf))
+known_pragma prags _ _ len (AI _ _ buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
+                                          && (nextCharIs buf (\c -> not (isAlphaNum c || c == '_')))
 
 clean_pragma :: String -> String
 clean_pragma prag = canon_ws (map toLower (unprefix prag))
-                    where unprefix prag' = (case stripPrefix "{-#" prag' of
-                                              Just rest -> rest
-                                              Nothing -> prag')
+                    where unprefix prag' = case stripPrefix "{-#" prag' of
+                                             Just rest -> rest
+                                             Nothing -> prag'
                           canonical prag' = case prag' of
                                               "noinline" -> "notinline"
                                               "specialise" -> "specialize"
