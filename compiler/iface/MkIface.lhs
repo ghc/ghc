@@ -185,26 +185,15 @@ mkDependencies
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency 
                 --  check.)
 
-                -- Modules don't compare lexicographically usually, 
-                -- but we want them to do so here.
-        le_mod :: Module -> Module -> Bool         
-        le_mod m1 m2 = moduleNameFS (moduleName m1) 
-                           <= moduleNameFS (moduleName m2)
-
-        le_dep_mod :: (ModuleName, IsBootInterface)
-                    -> (ModuleName, IsBootInterface) -> Bool         
-        le_dep_mod (m1,_) (m2,_) = moduleNameFS m1 <= moduleNameFS m2
-
-        
         pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
              | otherwise = imp_dep_pkgs imports
 
-      return Deps { dep_mods   = sortLe le_dep_mod dep_mods,
-                    dep_pkgs   = sortLe (<=)   pkgs,        
-                    dep_orphs  = sortLe le_mod (imp_orphs  imports),
-                    dep_finsts = sortLe le_mod (imp_finsts imports) }
+      return Deps { dep_mods   = sortBy (stableModuleNameCmp `on` fst) dep_mods,
+                    dep_pkgs   = sortBy stablePackageIdCmp pkgs,
+                    dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
+                    dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
                 -- sort to get into canonical order
-
+                -- NB. remember to use lexicographic ordering
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
          -> NameSet -> Dependencies -> GlobalRdrEnv
