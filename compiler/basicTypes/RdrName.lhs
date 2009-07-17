@@ -616,7 +616,7 @@ data ImpDeclSpec
                                    -- should be a Maybe PackageId here too.
 	is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
 	is_qual     :: Bool,	   -- ^ Was this import qualified?
-	is_dloc     :: SrcSpan	   -- ^ The location of the import declaration
+	is_dloc     :: SrcSpan	   -- ^ The location of the entire import declaration
     }
 
 -- | Describes import info a particular Name
