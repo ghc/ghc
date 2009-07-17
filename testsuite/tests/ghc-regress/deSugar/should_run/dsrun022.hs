@@ -12,7 +12,7 @@ employees = [ ("Simon", "MS", 80)
             , ("Gordon", "Ed", 45)
             , ("Paul", "Yale", 60) ]
 
-main = putStrLn (show output)
+main = putStrLn (show can_still_use_group_function) >> putStrLn (show output)
   where
     output = [ (the dept, map sum salary, (show x) ++ " and " ++ (show y)) 
              | (name, dept, salary) <- employees
@@ -22,3 +22,5 @@ main = putStrLn (show output)
              , then sortWith by sum salary
              , then take 4
              , then group using replicate 2 ]
+    group = const "my group function called!"
+    can_still_use_group_function = group "Mississippi"
