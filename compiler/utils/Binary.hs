@@ -388,17 +388,14 @@ instance Binary Int64 where
 instance Binary () where
     put_ _ () = return ()
     get  _    = return ()
---    getF bh p  = case getBitsF bh 0 p of (_,b) -> ((),b)
 
 instance Binary Bool where
     put_ bh b = putByte bh (fromIntegral (fromEnum b))
     get  bh   = do x <- getWord8 bh; return $! (toEnum (fromIntegral x))
---    getF bh p = case getBitsF bh 1 p of (x,b) -> (toEnum x,b)
 
 instance Binary Char where
     put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
     get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
---    getF bh p = case getBitsF bh 8 p of (x,b) -> (toEnum x,b)
 
 instance Binary Int where
 #if SIZEOF_HSINT == 4
@@ -414,7 +411,6 @@ instance Binary Int where
 #else
 #error "unsupported sizeof(HsInt)"
 #endif
---    getF bh   = getBitsF bh 32
 
 instance Binary a => Binary [a] where
     put_ bh l = do
