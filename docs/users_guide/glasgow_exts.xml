@@ -109,7 +109,7 @@ While you really can use this stuff to write fast code,
 
 <para>All these primitive data types and operations are exported by the 
 library <literal>GHC.Prim</literal>, for which there is 
-<ulink url="../libraries/base/GHC.Prim.html">detailed online documentation</ulink>.
+<ulink url="../libraries/ghc-prim/GHC-Prim.html">detailed online documentation</ulink>.
 (This documentation is generated from the file <filename>compiler/prelude/primops.txt.pp</filename>.)
 </para>
 <para>
@@ -874,7 +874,7 @@ As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [1,1
 </para>
 
 <para>
-The Control.Monad.Fix library introduces the <literal>MonadFix</literal> class. It's definition is:
+The Control.Monad.Fix library introduces the <literal>MonadFix</literal> class.  Its definition is:
 </para>
 <programlisting>
 class Monad m => MonadFix m where
@@ -1001,7 +1001,7 @@ This name is not supported by GHC.
 
 
     <para>Generalised list comprehensions are a further enhancement to the
-    list comprehension syntatic sugar to allow operations such as sorting
+    list comprehension syntactic sugar to allow operations such as sorting
     and grouping which are familiar from SQL.   They are fully described in the
 	paper <ulink url="http://research.microsoft.com/~simonpj/papers/list-comp">
 	  Comprehensive comprehensions: comprehensions with "order by" and "group by"</ulink>,
@@ -1042,7 +1042,7 @@ then f
 </programlisting>
 
     This statement requires that <literal>f</literal> have the type <literal>
-    forall a. [a] -> [a]</literal>. You can see an example of it's use in the
+    forall a. [a] -> [a]</literal>. You can see an example of its use in the
     motivating example, as this form is used to apply <literal>take 5</literal>.
     
     </listitem>
@@ -2579,7 +2579,7 @@ constructor).
 </para></listitem>
 
 <listitem><para>
-It's is permitted to declare an ordinary algebraic data type using GADT-style syntax.
+It is permitted to declare an ordinary algebraic data type using GADT-style syntax.
 What makes a GADT into a GADT is not the syntax, but rather the presence of data constructors
 whose result type is not just <literal>T a b</literal>.
 </para></listitem>
@@ -4298,7 +4298,7 @@ type family Elem c
       example, consider the following declaration: 
 <programlisting>
 type family F a b :: * -> *   -- F's arity is 2, 
-                              -- although it's overall kind is * -> * -> * -> *
+                              -- although its overall kind is * -> * -> * -> *
 </programlisting>
       Given this declaration the following are examples of well-formed and
       malformed types: 
