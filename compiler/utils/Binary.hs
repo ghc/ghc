@@ -398,19 +398,10 @@ instance Binary Char where
     get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
 
 instance Binary Int where
-#if SIZEOF_HSINT == 4
-    put_ bh i = put_ bh (fromIntegral i :: Int32)
-    get  bh = do
-        x <- get bh
-        return $! (fromIntegral (x :: Int32))
-#elif SIZEOF_HSINT == 8
     put_ bh i = put_ bh (fromIntegral i :: Int64)
     get  bh = do
         x <- get bh
         return $! (fromIntegral (x :: Int64))
-#else
-#error "unsupported sizeof(HsInt)"
-#endif
 
 instance Binary a => Binary [a] where
     put_ bh l = do
