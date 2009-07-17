@@ -1488,8 +1488,18 @@ transformquals1 :: { Located [LStmt RdrName] }
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
     : 'then' exp                { LL $ \leftStmts -> (mkTransformStmt (reverse leftStmts) $2) }
+    -- >>>
     | 'then' exp 'by' exp       { LL $ \leftStmts -> (mkTransformByStmt (reverse leftStmts) $2 $4) }
     | 'then' 'group' 'by' exp              { LL $ \leftStmts -> (mkGroupByStmt (reverse leftStmts) $4) }
+    -- <<<
+    -- These two productions deliberately have a shift-reduce conflict. I have made 'group' into a special_id,
+    -- which means you can enable TransformListComp while still using Data.List.group. However, this makes the two
+    -- productions ambiguous. I've set things up so that Happy chooses to resolve the conflict in that case by
+    -- choosing the "group by" variant, which is what we want.
+    --
+    -- This is rather dubious: the user might be confused as to how to parse this statement. However, it is a good
+    -- practical choice. NB: Data.List.group :: [a] -> [[a]], so using the first production would not even type check
+    -- if /that/ is the group function we conflict with.
     | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt (reverse leftStmts) $4) }
     | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt (reverse leftStmts) $4 $6) }
 
@@ -1841,6 +1851,7 @@ special_id
 	| 'stdcall'             { L1 (fsLit "stdcall") }
 	| 'ccall'               { L1 (fsLit "ccall") }
 	| 'prim'                { L1 (fsLit "prim") }
+	| 'group'               { L1 (fsLit "group") }
 
 special_sym :: { Located FastString }
 special_sym : '!'	{ L1 (fsLit "!") }
