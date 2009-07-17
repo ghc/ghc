@@ -1,2 +1,4 @@
 
-rnfail056.hs:5:6: Illegal tuple section: use -XTupleSections
+rnfail056.hs:6:6: Illegal tuple section: use -XTupleSections
+
+rnfail056.hs:8:6: Illegal tuple section: use -XTupleSections
