@@ -1,0 +1,24 @@
+
+tcfail206.hs:5:4:
+    Couldn't match expected type `Int' against inferred type `Bool'
+      Expected type: Bool -> (Int, Bool)
+      Inferred type: Bool -> (Bool, Bool)
+    In the expression: (, True)
+    In the definition of `a': a = (, True)
+
+tcfail206.hs:8:4:
+    Couldn't match expected type `Bool -> (Int, Bool)'
+           against inferred type `(t, Int)'
+      Expected type: Int -> Bool -> (Int, Bool)
+      Inferred type: Int -> (t, Int)
+    In the expression: (1,)
+    In the definition of `b': b = (1,)
+
+tcfail206.hs:11:4:
+    Couldn't match expected type `a' against inferred type `Bool'
+      `a' is a rigid type variable bound by
+          the type signature for `c' at tcfail206.hs:10:5
+      Expected type: a -> (a, Bool)
+      Inferred type: a -> (Bool, a)
+    In the expression: (True || False,)
+    In the definition of `c': c = (True || False,)

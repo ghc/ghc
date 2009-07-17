@@ -1,0 +1,2 @@
+
+rnfail056.hs:5:6: Illegal tuple section: use -XTupleSections
