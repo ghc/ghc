@@ -41,3 +41,10 @@ test('T3118', normal, compile, [''])
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
 # testsuite driver times out.
 test('T3016', [ skip_if_fast, omit_ways(['optc','profc']) ], compile, [''])
+
+test('T3055',
+     [extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
+      if_compiler_lt('ghc', '6.11', expect_fail)],
+     run_command,
+     ['$MAKE -s --no-print-directory T3055'])
+
