@@ -101,6 +101,7 @@ import GHC.Classes
 import GHC.Generics
 import GHC.Ordering
 import GHC.Prim
+import {-# SOURCE #-} GHC.Show
 import {-# SOURCE #-} GHC.Err
 
 -- These two are not strictly speaking required by this module, but they are
@@ -535,8 +536,10 @@ instance Ord Char where
 
 -- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.
 chr :: Int -> Char
-chr (I# i#) | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
-            | otherwise                                  = error "Prelude.chr: bad argument"
+chr i@(I# i#)
+ | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
+ | otherwise
+    = error ("Prelude.chr: bad argument: " ++ showSignedInt (I# 9#) i "")
 
 unsafeChr :: Int -> Char
 unsafeChr (I# i#) = C# (chr# i#)
