@@ -282,46 +282,52 @@ include rules/bindist.mk
 # -----------------------------------------------------------------------------
 # Building libraries
 
-# XXX generate from $(TOP)/packages
-PACKAGES = \
-	ghc-prim \
-	integer-gmp \
-	integer \
-	base \
-	filepath \
-	array \
-	bytestring \
-	containers
+define addPackage # args: $1 = package, $2 = condition
+    ifneq "$2" ""
+        ifeq "$$(CLEANING)" "YES"
+            PACKAGES += $1
+        else
+            ifeq $2
+                PACKAGES += $1
+            endif
+        endif
+    else
+        PACKAGES += $1
+    endif
+endef
 
-ifeq "$(Windows)" "YES"
-PACKAGES += Win32
-else
-PACKAGES += unix
-endif
+$(eval $(call addPackage,ghc-prim))
+$(eval $(call addPackage,integer-gmp))
+$(eval $(call addPackage,integer))
+$(eval $(call addPackage,base))
+$(eval $(call addPackage,filepath))
+$(eval $(call addPackage,array))
+$(eval $(call addPackage,bytestring))
+$(eval $(call addPackage,containers))
 
-PACKAGES += \
-	old-locale \
-	old-time \
-	time \
-	directory \
-	process \
-	random \
-	extensible-exceptions \
-	haskell98 \
-	hpc \
-	pretty \
-	syb \
-	template-haskell \
-	base3-compat \
-	Cabal \
-	mtl \
-	utf8-string
+$(eval $(call addPackage,Win32,($$(Windows),YES)))
+$(eval $(call addPackage,unix,($$(Windows),NO)))
 
-ifneq "$(Windows)" "YES"
-PACKAGES += terminfo
-endif
+$(eval $(call addPackage,old-locale))
+$(eval $(call addPackage,old-time))
+$(eval $(call addPackage,time))
+$(eval $(call addPackage,directory))
+$(eval $(call addPackage,process))
+$(eval $(call addPackage,random))
+$(eval $(call addPackage,extensible-exceptions))
+$(eval $(call addPackage,haskell98))
+$(eval $(call addPackage,hpc))
+$(eval $(call addPackage,pretty))
+$(eval $(call addPackage,syb))
+$(eval $(call addPackage,template-haskell))
+$(eval $(call addPackage,base3-compat))
+$(eval $(call addPackage,Cabal))
+$(eval $(call addPackage,mtl))
+$(eval $(call addPackage,utf8-string))
 
-PACKAGES += haskeline
+$(eval $(call addPackage,terminfo,($$(Windows),YES)))
+
+$(eval $(call addPackage,haskeline))
 
 ifneq "$(BootingFromHc)" "YES"
 PACKAGES_STAGE2 += \
