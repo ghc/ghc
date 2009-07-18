@@ -66,7 +66,8 @@ $1_$2_BUILD_HC_OPTS = \
  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
  $$(if $$(findstring YES,$$($1_$2_SplitObjs)),-split-objs,) \
- $$($1_$2_HC_OPTS)
+ $$($1_$2_HC_OPTS) \
+ $$($1_$2_EXTRA_HC_OPTS)
 
 endef
 

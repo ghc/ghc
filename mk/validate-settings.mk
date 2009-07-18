@@ -28,3 +28,6 @@ GhcStage2HcOpts += -XGenerics -DDEBUG
 GhcLibHcOpts    += -XGenerics
 endif
 
+# Temporarily turn off unused-do-bind warnings for the time package
+libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
+
