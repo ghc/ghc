@@ -1,6 +1,9 @@
 #! /bin/sh
 set -e
 
+# Create libraries/*/{ghc.mk,GNUmakefile}
+sh boot-pkgs
+
 # Check that we have all boot packages.
 for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"`
 do
@@ -30,6 +33,3 @@ do
         chmod +x $f
     fi
 done
-
-# Create libraries/*/{ghc.mk,GNUmakefile}
-sh boot-pkgs

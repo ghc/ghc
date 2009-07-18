@@ -302,6 +302,7 @@ endif
 PACKAGES += \
 	old-locale \
 	old-time \
+	time \
 	directory \
 	process \
 	random \

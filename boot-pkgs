@@ -3,6 +3,33 @@ set -e
 
 libraries=
 
+tarred="time"
+
+for p in $tarred
+do
+    libraries="$libraries libraries/$p"
+    if [ -d "libraries/$p/_darcs" ]
+    then
+        echo Ignoring libraries/$p as it looks like a darcs checkout
+    else
+        tarball=libraries/tarballs/$p-*.tar.gz
+        stamp="libraries/stamp/$p"
+        if [ ! -d "libraries/$p" ] ||
+           [ ! -f "$stamp" ] ||
+           [ "libraries/stamp/$p" -ot $tarball ]
+        then
+            rm -rf "libraries/$p"
+            mkdir "libraries/$p"
+            (
+                cd "libraries/$p"
+                tar -zxf ../../$tarball
+                mv */* .
+            )
+            touch "$stamp"
+        fi
+    fi
+done
+
 for f in libraries/*; do
   pkgs=$f/ghc-packages
   if test -f $pkgs; then
