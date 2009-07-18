@@ -1141,8 +1141,8 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
         output_fn <- get_output_fn dflags StopLn maybe_loc
 
         let base_o = dropExtension output_fn
-            split_odir  = base_o ++ "_split"
             osuf = objectSuf dflags
+            split_odir  = base_o ++ "_" ++ osuf ++ "_split"
 
         createDirectoryHierarchy split_odir
 
