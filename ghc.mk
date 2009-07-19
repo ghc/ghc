@@ -325,7 +325,7 @@ $(eval $(call addPackage,Cabal))
 $(eval $(call addPackage,mtl))
 $(eval $(call addPackage,utf8-string))
 
-$(eval $(call addPackage,terminfo,($$(Windows),YES)))
+$(eval $(call addPackage,terminfo,($$(Windows),NO)))
 
 $(eval $(call addPackage,haskeline))
 
