@@ -186,6 +186,7 @@ data DynFlag
    | Opt_WarnUnusedMatches
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
+   | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
    | Opt_WarnTabs
@@ -931,6 +932,7 @@ minusWOpts
         Opt_WarnUnusedMatches,
         Opt_WarnUnusedImports,
         Opt_WarnIncompletePatterns,
+        Opt_WarnDodgyExports,
         Opt_WarnDodgyImports
       ]
 
@@ -1652,6 +1654,7 @@ useInstead flag turn_on
 fFlags :: [(String, DynFlag, Bool -> Deprecated)]
 fFlags = [
   ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, const Supported ),
+  ( "warn-dodgy-exports",               Opt_WarnDodgyExports, const Supported ),
   ( "warn-dodgy-imports",               Opt_WarnDodgyImports, const Supported ),
   ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, const Supported ),
   ( "warn-hi-shadowing",                Opt_WarnHiShadows, const Supported ),

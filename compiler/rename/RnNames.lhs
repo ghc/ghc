@@ -893,6 +893,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
 	| otherwise
 	= do { implicit_prelude <- doptM Opt_ImplicitPrelude
+             ; warnDodgyExports <- doptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
                             || (moduleName this_mod == mod)
                    ; gres = filter (isModuleExported implicit_prelude mod)
@@ -901,7 +902,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                    }
 
              ; checkErr exportValid (moduleNotImported mod)
-	     ; warnIf (exportValid && null gres) (nullModuleExport mod)
+	     ; warnIf (warnDodgyExports && exportValid && null gres) (nullModuleExport mod)
 
 	     ; addUsedRdrNames (concat [ [mkRdrQual mod occ, mkRdrUnqual occ]
                                        | occ <- map nameOccName names ])
@@ -955,12 +956,14 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                                 Nothing -> mkRdrUnqual
                                 Just (modName, _) -> mkRdrQual modName
              addUsedRdrNames $ map (mkKidRdrName . nameOccName) kids
-	     when (null kids)
-		  (if (isTyConName name) then addWarn (dodgyExportWarn name)
-				-- This occurs when you export T(..), but
-				-- only import T abstractly, or T is a synonym.  
-		   else addErr (exportItemErr ie))
-			
+             warnDodgyExports <- doptM Opt_WarnDodgyExports
+             when (null kids) $
+                  if isTyConName name
+                  then when warnDodgyExports $ addWarn (dodgyExportWarn name)
+                  else -- This occurs when you export T(..), but
+                       -- only import T abstractly, or T is a synonym.  
+                       addErr (exportItemErr ie)
+
              return (IEThingAll name, AvailTC name (name:kids))
 
     lookup_ie ie@(IEThingWith rdr sub_rdrs)

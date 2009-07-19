@@ -860,6 +860,7 @@ ghc -c Foo.hs</screen>
 	  <indexterm><primary>-W option</primary></indexterm>
 	  <para>Provides the standard warnings plus
 	  <option>-fwarn-incomplete-patterns</option>,
+	  <option>-fwarn-dodgy-exports</option>,
 	  <option>-fwarn-dodgy-imports</option>,
 	  <option>-fwarn-unused-matches</option>,
 	  <option>-fwarn-unused-imports</option>, and
@@ -987,6 +988,20 @@ foreign import "&amp;f" f :: FunPtr t
           declaration is usually a mistake, and one that is hard to
           debug because it results in a crash, hence this
           warning.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-dodgy-exports</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-dodgy-exports</option></primary>
+	  </indexterm>
+	  <para>Causes a warning to be emitted when a datatype
+      <literal>T</literal> is exported
+      with all constructors, i.e. <literal>T(..)</literal>, but is it
+      just a type synonym.</para>
+	  <para>Also causes a warning to be emitted when a module is
+      re-exported, but that module exports nothing.</para>
 	</listitem>
       </varlistentry>
 
