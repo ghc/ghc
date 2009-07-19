@@ -435,10 +435,11 @@ safeRangeSize (l,u) = let r = rangeSize (l, u)
 
 {-# INLINE safeIndex #-}
 safeIndex :: Ix i => (i, i) -> Int -> i -> Int
-safeIndex (l,u) n i = let i' = unsafeIndex (l,u) i
+safeIndex (l,u) n i = let i' = index (l,u) i
                       in if (0 <= i') && (i' < n)
                          then i'
-                         else error "Error in array index"
+                         else error ("Error in array index; " ++ show i' ++
+                                     " not in range [0.." ++ show n ++ ")")
 
 {-# INLINE unsafeAt #-}
 unsafeAt :: Ix i => Array i e -> Int -> e
