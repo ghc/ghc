@@ -75,30 +75,30 @@ $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	@echo "cMKDLL                = \"$(BLD_DLL)\"" >> $@
 	@echo "cLdIsGNULd            :: String" >> $@
 	@echo "cLdIsGNULd            = \"$(LdIsGNULd)\"" >> $@
-	@echo "cLD_X		     :: String" >> $@
-	@echo "cLD_X		     = \"$(LD_X)\"" >> $@
-	@echo "cGHC_DRIVER_DIR   :: String" >> $@
-	@echo "cGHC_DRIVER_DIR   = \"$(GHC_DRIVER_DIR)\"" >> $@
+	@echo "cLD_X                 :: String" >> $@
+	@echo "cLD_X                 = \"$(LD_X)\"" >> $@
+	@echo "cGHC_DRIVER_DIR       :: String" >> $@
+	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $@
 	@echo "cGHC_TOUCHY_PGM       :: String" >> $@
 	@echo "cGHC_TOUCHY_PGM       = \"$(GHC_TOUCHY_PGM)\"" >> $@
-	@echo "cGHC_TOUCHY_DIR   :: String" >> $@
-	@echo "cGHC_TOUCHY_DIR   = \"$(GHC_TOUCHY_DIR)\"" >> $@
+	@echo "cGHC_TOUCHY_DIR       :: String" >> $@
+	@echo "cGHC_TOUCHY_DIR       = \"$(GHC_TOUCHY_DIR)\"" >> $@
 	@echo "cGHC_UNLIT_PGM        :: String" >> $@
 	@echo "cGHC_UNLIT_PGM        = \"$(GHC_UNLIT_PGM)\"" >> $@
-	@echo "cGHC_UNLIT_DIR    :: String" >> $@
-	@echo "cGHC_UNLIT_DIR    = \"$(GHC_UNLIT_DIR)\"" >> $@
+	@echo "cGHC_UNLIT_DIR        :: String" >> $@
+	@echo "cGHC_UNLIT_DIR        = \"$(GHC_UNLIT_DIR)\"" >> $@
 	@echo "cGHC_MANGLER_PGM      :: String" >> $@
 	@echo "cGHC_MANGLER_PGM      = \"$(GHC_MANGLER_PGM)\"" >> $@
-	@echo "cGHC_MANGLER_DIR  :: String" >> $@
-	@echo "cGHC_MANGLER_DIR  = \"$(GHC_MANGLER_DIR)\"" >> $@
+	@echo "cGHC_MANGLER_DIR      :: String" >> $@
+	@echo "cGHC_MANGLER_DIR      = \"$(GHC_MANGLER_DIR)\"" >> $@
 	@echo "cGHC_SPLIT_PGM        :: String" >> $@
 	@echo "cGHC_SPLIT_PGM        = \"$(GHC_SPLIT_PGM)\"" >> $@
-	@echo "cGHC_SPLIT_DIR    :: String" >> $@
-	@echo "cGHC_SPLIT_DIR    = \"$(GHC_SPLIT_DIR)\"" >> $@
+	@echo "cGHC_SPLIT_DIR        :: String" >> $@
+	@echo "cGHC_SPLIT_DIR        = \"$(GHC_SPLIT_DIR)\"" >> $@
 	@echo "cGHC_SYSMAN_PGM       :: String" >> $@
 	@echo "cGHC_SYSMAN_PGM       = \"$(GHC_SYSMAN)\"" >> $@
-	@echo "cGHC_SYSMAN_DIR   :: String" >> $@
-	@echo "cGHC_SYSMAN_DIR   = \"$(GHC_SYSMAN_DIR)\"" >> $@
+	@echo "cGHC_SYSMAN_DIR       :: String" >> $@
+	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $@
 	@echo "cGHC_CP               :: String" >> $@
 	@echo "cGHC_CP               = \"$(GHC_CP)\"" >> $@
 	@echo "cGHC_PERL             :: String" >> $@
