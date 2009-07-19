@@ -48,3 +48,5 @@ test('T3055',
      run_command,
      ['$MAKE -s --no-print-directory T3055'])
 
+test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
+
