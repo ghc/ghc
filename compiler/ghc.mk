@@ -51,8 +51,6 @@ $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $@
 	@echo "cStage                :: String" >> $@
 	@echo "cStage                = show (STAGE :: Int)" >> $@
-	@echo "cHscIfaceFileVersion  :: String" >> $@
-	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $@
 	@echo "cSplitObjs            :: String" >> $@
 	@echo "cSplitObjs            = \"$(SupportsSplitObjs)\"" >> $@
 	@echo "cGhcWithInterpreter   :: String" >> $@
