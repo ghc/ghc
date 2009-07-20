@@ -43,8 +43,9 @@ import ErrUtils
 import UniqSupply
 import Outputable
 import FastBool hiding ( fastOr )
+import Util
 
-import Data.List	( partition )
+import Data.List	( sortBy )
 import Data.IORef	( IORef, readIORef, writeIORef )
 \end{code}
 
@@ -204,17 +205,40 @@ Plan B: include pragmas, make interfaces
 
 Step 1: Figure out external Ids
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [choosing external names]
+
 First we figure out which Ids are "external" Ids.  An
 "external" Id is one that is visible from outside the compilation
 unit.  These are
 	a) the user exported ones
 	b) ones mentioned in the unfoldings, workers, 
 	   or rules of externally-visible ones 
-This exercise takes a sweep of the bindings bottom to top.  Actually,
-in Step 2 we're also going to need to know which Ids should be
-exported with their unfoldings, so we produce not an IdSet but an
-IdEnv Bool
 
+While figuring out which Ids are external, we pick a "tidy" OccName
+for each one.  That is, we make its OccName distinct from the other
+external OccNames in this module, so that in interface files and
+object code we can refer to it unambiguously by its OccName.  The
+OccName for each binder is prefixed by the name of the exported Id
+that references it; e.g. if "f" references "x" in its unfolding, then
+"x" is renamed to "f_x".  This helps distinguish the different "x"s
+from each other, and means that if "f" is later removed, things that
+depend on the other "x"s will not need to be recompiled.  Of course,
+if there are multiple "f_x"s, then we have to disambiguate somehow; we
+use "f_x0", "f_x1" etc.
+
+As far as possible we should assign names in a deterministic fashion.
+Each time this module is compiled with the same options, we should end
+up with the same set of external names with the same types.  That is,
+the ABI hash in the interface should not change.  This turns out to be
+quite tricky, since the order of the bindings going into the tidy
+phase is already non-deterministic, as it is based on the ordering of
+Uniques, which are assigned unpredictably.
+
+To name things in a stable way, we do a depth-first-search of the
+bindings, starting from the exports sorted by name.  This way, as long
+as the bindings themselves are deterministic (they sometimes aren't!),
+the order in which they are presented to the tidying phase does not
+affect the names we assign.
 
 Step 2: Tidy the program
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -235,17 +259,13 @@ binder
     For external Ids, use the original-name cache in the NameCache
     to ensure that the unique assigned is the same as the Id had 
     in any previous compilation run.
-  
- 3. If it's an external Id, make it have a External Name, otherwise
-    make it have an Internal Name.
-    This is used by the code generator to decide whether
-    to make the label externally visible
 
- 4. Give external Ids a "tidy" OccName.  This means
-    we can print them in interface files without confusing 
-    "x" (unique 5) with "x" (unique 10).
-  
- 5. Give it its UTTERLY FINAL IdInfo; in ptic, 
+ 3. Rename top-level Ids according to the names we chose in step 1.
+    If it's an external Id, make it have a External Name, otherwise
+    make it have an Internal Name.  This is used by the code generator
+    to decide whether to make the label externally visible
+
+ 4. Give it its UTTERLY FINAL IdInfo; in ptic, 
   	* its unfolding, if it should have one
 	
 	* its arity, computed from the number of visible lambdas
@@ -277,10 +297,14 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 
 	; let { omit_prags = dopt Opt_OmitInterfacePragmas dflags
 	      ; th	   = dopt Opt_TemplateHaskell      dflags
-	      ; ext_ids = findExternalIds omit_prags binds
-	      ; ext_rules 
+              }
+
+        ; (unfold_env, tidy_occ_env)
+              <- chooseExternalIds hsc_env type_env mod omit_prags binds
+
+        ; let { ext_rules 
 		   | omit_prags = []
-		   | otherwise  = findExternalRules binds imp_rules ext_ids
+		   | otherwise  = findExternalRules binds imp_rules unfold_env
 		-- findExternalRules filters imp_rules to avoid binders that 
 		-- aren't externally visible; but the externally-visible binders 
 		-- are computed (by findExternalIds) assuming that all orphan
@@ -289,8 +313,8 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		-- (It's a sort of mutual recursion.)
   	}
 
-	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod type_env ext_ids 
-						 binds
+	; let { (tidy_env, tidy_binds)
+                 = tidyTopBinds hsc_env unfold_env tidy_occ_env binds }
 
 	; let { export_set = availsToNameSet exports
 	      ; final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
@@ -510,53 +534,106 @@ getImplicitBinds type_env
 %*				 					* 
 %************************************************************************
 
+Sete Note [choosing external names].
+
 \begin{code}
-findExternalIds :: Bool
-		-> [CoreBind]
-		-> IdEnv Bool	-- In domain => external
-				-- Range = True <=> show unfolding
+type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
+
+chooseExternalIds :: HscEnv
+                  -> TypeEnv
+                  -> Module
+                  -> Bool
+		  -> [CoreBind]
+                  -> IO (UnfoldEnv, TidyOccEnv)
+                     -- maps top-level Ids to new, renamed, Ids.
+                     -- If the new Id is external, it will be visible
+                     -- in the interface file. 
+                     -- Bool => expose unfolding or not.
 	-- Step 1 from the notes above
-findExternalIds omit_prags binds
-  | omit_prags
-  = mkVarEnv [ (id,False) | id <- bindersOfBinds binds, isExportedId id ]
 
-  | otherwise
-  = foldr find emptyVarEnv binds
+chooseExternalIds hsc_env type_env mod omit_prags binds 
+  = do
+    (unfold_env1,occ_env1) 
+        <- search (zip sorted_exports sorted_exports) emptyVarEnv init_occ_env
+    let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
+    tidy_internal internal_ids unfold_env1 occ_env1
+ where
+  nc_var = hsc_NC hsc_env 
+
+  -- the exports, sorted by OccName.  This is a deterministic list of
+  -- Ids (i.e. it's the same list every time this module is compiled),
+  -- in contrast to the bindings, which are ordered
+  -- non-deterministically.
+  --
+  -- This list will serve as a starting point for finding a
+  -- deterministic, tidy, renaming for all external Ids in this
+  -- module.
+  sorted_exports = sortBy (compare `on` getOccName) $
+                     filter isExportedId binders
+
+  binders = bindersOfBinds binds
+
+  bind_env :: IdEnv CoreExpr
+  bind_env = mkVarEnv (flattenBinds binds)
+
+  avoids   = [getOccName name | bndr <- typeEnvIds type_env,
+                                let name = idName bndr,
+                                isExternalName name]
+		-- In computing our "avoids" list, we must include
+		--	all implicit Ids
+		--	all things with global names (assigned once and for
+		--					all by the renamer)
+		-- since their names are "taken".
+		-- The type environment is a convenient source of such things.
+
+	-- We also make sure to avoid any exported binders.  Consider
+	--	f{-u1-} = 1	-- Local decl
+	--	...
+	--	f{-u2-} = 2	-- Exported decl
+	--
+	-- The second exported decl must 'get' the name 'f', so we
+	-- have to put 'f' in the avoids list before we get to the first
+	-- decl.  tidyTopId then does a no-op on exported binders.
+  init_occ_env = initTidyOccEnv avoids
+
+
+  search :: [(Id,Id)]    -- (external id, referrring id)
+         -> UnfoldEnv    -- id -> (new Name, show_unfold)
+         -> TidyOccEnv   -- occ env for choosing new Names
+         -> IO (UnfoldEnv, TidyOccEnv)
+
+  search [] unfold_env occ_env = return (unfold_env, occ_env)
+
+  search ((id,referrer) : rest) unfold_env occ_env
+    | id `elemVarEnv` unfold_env = search rest unfold_env occ_env
+    | otherwise = do
+      (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env id
+      let 
+          rhs = expectJust "chooseExternalIds" $ lookupVarEnv bind_env id
+          (new_ids, show_unfold)
+                | omit_prags = ([], False)
+                | otherwise  = addExternal id rhs
+          unfold_env' = extendVarEnv unfold_env id (name',show_unfold)
+          referrer' | isExportedId id = id
+                    | otherwise       = referrer
+      --
+      search (zip new_ids (repeat referrer') ++ rest) unfold_env' occ_env'
+
+  tidy_internal :: [Id] -> UnfoldEnv -> TidyOccEnv
+                -> IO (UnfoldEnv, TidyOccEnv)
+  tidy_internal []       unfold_env occ_env = return (unfold_env,occ_env)
+  tidy_internal (id:ids) unfold_env occ_env = do
+      (occ_env', name') <- tidyTopName mod nc_var Nothing occ_env id
+      let unfold_env' = extendVarEnv unfold_env id (name',False)
+      tidy_internal ids unfold_env' occ_env'
+
+addExternal :: Id -> CoreExpr -> ([Id],Bool)
+addExternal id rhs = (new_needed_ids, show_unfold)
   where
-    find (NonRec id rhs) needed
-	| need_id needed id = addExternal (id,rhs) needed
-	| otherwise 	    = needed
-    find (Rec prs) needed   = find_prs prs needed
-
-	-- For a recursive group we have to look for a fixed point
-    find_prs prs needed	
-	| null needed_prs = needed
-	| otherwise	  = find_prs other_prs new_needed
-	where
-	  (needed_prs, other_prs) = partition (need_pr needed) prs
-	  new_needed = foldr addExternal needed needed_prs
-
-	-- The 'needed' set contains the Ids that are needed by earlier
-	-- interface file emissions.  If the Id isn't in this set, and isn't
-	-- exported, there's no need to emit anything
-    need_id needed_set id       = id `elemVarEnv` needed_set || isExportedId id 
-    need_pr needed_set (id,_)	= need_id needed_set id
-
-addExternal :: (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
--- The Id is needed; extend the needed set
--- with it and its dependents (free vars etc)
-addExternal (id,rhs) needed
-  = extendVarEnv (foldVarSet add_occ needed new_needed_ids)
-		 id show_unfold
-  where
-    add_occ id needed | id `elemVarEnv` needed = needed
-		      | otherwise	       = extendVarEnv needed id False
-	-- "False" because we don't know we need the Id's unfolding
-	-- Don't override existing bindings; we might have already set it to True
-
-    new_needed_ids = worker_ids	`unionVarSet`
-		     unfold_ids	`unionVarSet`
-		     spec_ids
+    new_needed_ids = unfold_ids ++
+                     filter (not . (`elemVarSet` unfold_set)) 
+                       (varSetElems worker_ids ++ 
+                        varSetElems spec_ids) -- XXX non-det ordering
 
     idinfo	   = idInfo id
     dont_inline	   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
@@ -580,138 +657,62 @@ addExternal (id,rhs) needed
 		  not loop_breaker	 &&
 		  rhs_is_small		 	-- Small enough
 
-    unfold_ids | show_unfold = exprSomeFreeVars isLocalId rhs
-	       | otherwise   = emptyVarSet
+    (unfold_set, unfold_ids)
+               | show_unfold = freeVarsInDepthFirstOrder rhs
+	       | otherwise   = (emptyVarSet, [])
 
     worker_ids = case worker_info of
 		   HasWorker work_id _ -> unitVarSet work_id
 		   _otherwise          -> emptyVarSet
+
+
+-- We want a deterministic free-variable list.  exprFreeVars gives us
+-- a VarSet, which is in a non-deterministic order when converted to a
+-- list.  Hence, here we define a free-variable finder that returns
+-- the free variables in the order that they are encountered.
+--
+-- Note [choosing external names]
+
+freeVarsInDepthFirstOrder :: CoreExpr -> (VarSet, [Id])
+freeVarsInDepthFirstOrder e = 
+  case dffvExpr e of
+    DFFV m -> case m emptyVarSet [] of
+                (set,ids,_) -> (set,ids)
+
+newtype DFFV a = DFFV (VarSet -> [Var] -> (VarSet,[Var],a))
+
+instance Monad DFFV where
+  return a = DFFV $ \set ids -> (set, ids, a)
+  (DFFV m) >>= k = DFFV $ \set ids ->
+    case m set ids of
+       (set',ids',a) -> case k a of
+                          DFFV f -> f set' ids' 
+
+insert :: Var -> DFFV ()
+insert v = DFFV $ \ set ids  -> case () of 
+ _ | v `elemVarSet` set -> (set,ids,())
+   | otherwise          -> (extendVarSet set v, v:ids, ())
+
+dffvExpr :: CoreExpr -> DFFV ()
+dffvExpr e = go emptyVarSet e
+  where
+    go scope e = case e of
+      Var v | isLocalId v && not (v `elemVarSet` scope) -> insert v
+      App e1 e2          -> do go scope e1; go scope e2
+      Lam v e            -> go (extendVarSet scope v) e
+      Note _ e           -> go scope e
+      Cast e _           -> go scope e
+      Let (NonRec x r) e -> do go scope r; go (extendVarSet scope x) e
+      Let (Rec prs) e    -> do let scope' = extendVarSetList scope (map fst prs)
+                               mapM_ (go scope') (map snd prs)
+                               go scope' e
+      Case e b _ as      -> do go scope e
+                               mapM_ (go_alt (extendVarSet scope b)) as
+      _other             -> return ()
+
+    go_alt scope (_,xs,r) = go (extendVarSetList scope xs) r
 \end{code}
 
-
-\begin{code}
-findExternalRules :: [CoreBind]
-		  -> [CoreRule]	-- Non-local rules (i.e. ones for imported fns)
-	          -> IdEnv a	-- Ids that are exported, so we need their rules
-	          -> [CoreRule]
-  -- The complete rules are gotten by combining
-  --	a) the non-local rules
-  --	b) rules embedded in the top-level Ids
-findExternalRules binds non_local_rules ext_ids
-  = filter (not . internal_rule) (non_local_rules ++ local_rules)
-  where
-    local_rules  = [ rule
- 		   | id <- bindersOfBinds binds,
-		     id `elemVarEnv` ext_ids,
-		     rule <- idCoreRules id
-		   ]
-
-    internal_rule rule
-	=  any internal_id (varSetElems (ruleLhsFreeIds rule))
-		-- Don't export a rule whose LHS mentions a locally-defined
-		--  Id that is completely internal (i.e. not visible to an
-		-- importing module)
-
-    internal_id id = not (id `elemVarEnv` ext_ids)
-\end{code}
-
-
-
-%************************************************************************
-%*									*
-\subsection{Step 2: top-level tidying}
-%*									*
-%************************************************************************
-
-
-\begin{code}
--- TopTidyEnv: when tidying we need to know
---   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.  
---	  These may have arisen because the
---	  renamer read in an interface file mentioning M.$wf, say,
---	  and assigned it unique r77.  If, on this compilation, we've
---	  invented an Id whose name is $wf (but with a different unique)
---	  we want to rename it to have unique r77, so that we can do easy
---	  comparisons with stuff from the interface file
---
---   * occ_env: The TidyOccEnv, which tells us which local occurrences 
---     are 'used'
---
---   * subst_env: A Var->Var mapping that substitutes the new Var for the old
-
-tidyTopBinds :: HscEnv
-	     -> Module
-	     -> TypeEnv
-	     -> IdEnv Bool	-- Domain = Ids that should be external
-				-- True <=> their unfolding is external too
-	     -> [CoreBind]
-	     -> IO (TidyEnv, [CoreBind])
-
-tidyTopBinds hsc_env mod type_env ext_ids binds
-  = tidy init_env binds
-  where
-    nc_var = hsc_NC hsc_env 
-
-	-- We also make sure to avoid any exported binders.  Consider
-	--	f{-u1-} = 1	-- Local decl
-	--	...
-	--	f{-u2-} = 2	-- Exported decl
-	--
-	-- The second exported decl must 'get' the name 'f', so we
-	-- have to put 'f' in the avoids list before we get to the first
-	-- decl.  tidyTopId then does a no-op on exported binders.
-    init_env = (initTidyOccEnv avoids, emptyVarEnv)
-    avoids   = [getOccName name | bndr <- typeEnvIds type_env,
-				  let name = idName bndr,
-				  isExternalName name]
-		-- In computing our "avoids" list, we must include
-		--	all implicit Ids
-		--	all things with global names (assigned once and for
-		--					all by the renamer)
-		-- since their names are "taken".
-		-- The type environment is a convenient source of such things.
-
-    this_pkg = thisPackage (hsc_dflags hsc_env)
-
-    tidy env []     = return (env, [])
-    tidy env (b:bs) = do { (env1, b')  <- tidyTopBind this_pkg mod nc_var ext_ids env b
-			 ; (env2, bs') <- tidy env1 bs
-			 ; return (env2, b':bs') }
-
-------------------------
-tidyTopBind  :: PackageId
-	     -> Module
-	     -> IORef NameCache	-- For allocating new unique names
-	     -> IdEnv Bool	-- Domain = Ids that should be external
-				-- True <=> their unfolding is external too
-	     -> TidyEnv -> CoreBind
-	     -> IO (TidyEnv, CoreBind)
-
-tidyTopBind this_pkg mod nc_var ext_ids (occ_env1,subst1) (NonRec bndr rhs)
-  = do	{ (occ_env2, name') <- tidyTopName mod nc_var ext_ids occ_env1 bndr
-	; let	{ (bndr', rhs') = tidyTopPair ext_ids tidy_env2 caf_info name' (bndr, rhs)
-		; subst2        = extendVarEnv subst1 bndr bndr'
-		; tidy_env2     = (occ_env2, subst2) }
-	; return (tidy_env2, NonRec bndr' rhs') }
-  where
-    caf_info = hasCafRefs this_pkg subst1 (idArity bndr) rhs
-
-tidyTopBind this_pkg mod nc_var ext_ids (occ_env1,subst1) (Rec prs)
-  = do	{ (occ_env2, names') <- tidyTopNames mod nc_var ext_ids occ_env1 bndrs
-	; let	{ prs'      = zipWith (tidyTopPair ext_ids tidy_env2 caf_info)
-				      names' prs
-		; subst2    = extendVarEnvList subst1 (bndrs `zip` map fst prs')
-		; tidy_env2 = (occ_env2, subst2) }
-	; return (tidy_env2, Rec prs') }
-  where
-    bndrs = map fst prs
-
-	-- the CafInfo for a recursive group says whether *any* rhs in
-	-- the group may refer indirectly to a CAF (because then, they all do).
-    caf_info 
-	| or [ mayHaveCafRefs (hasCafRefs this_pkg subst1 (idArity bndr) rhs)
-	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
-	| otherwise 		   = NoCafRefs
 
 --------------------------------------------------------------------
 --		tidyTopName
@@ -719,17 +720,11 @@ tidyTopBind this_pkg mod nc_var ext_ids (occ_env1,subst1) (Rec prs)
 -- externally visible (see comment at the top of this module).  If the name
 -- was previously local, we have to give it a unique occurrence name if
 -- we intend to externalise it.
-tidyTopNames :: Module -> IORef NameCache -> VarEnv Bool -> TidyOccEnv
-             -> [Id] -> IO (TidyOccEnv, [Name])
-tidyTopNames _mod _nc_var _ext_ids occ_env [] = return (occ_env, [])
-tidyTopNames mod nc_var ext_ids occ_env (id:ids)
-  = do	{ (occ_env1, name)  <- tidyTopName  mod nc_var ext_ids occ_env id
-  	; (occ_env2, names) <- tidyTopNames mod nc_var ext_ids occ_env1 ids
-	; return (occ_env2, name:names) }
 
-tidyTopName :: Module -> IORef NameCache -> VarEnv Bool -> TidyOccEnv
+\begin{code}
+tidyTopName :: Module -> IORef NameCache -> Maybe Id -> TidyOccEnv
 	    -> Id -> IO (TidyOccEnv, Name)
-tidyTopName mod nc_var ext_ids occ_env id
+tidyTopName mod nc_var maybe_ref occ_env id
   | global && internal = return (occ_env, localiseName name)
 
   | global && external = return (occ_env, name)
@@ -758,13 +753,20 @@ tidyTopName mod nc_var ext_ids occ_env id
   | otherwise = panic "tidyTopName"
   where
     name	= idName id
-    external    = id `elemVarEnv` ext_ids
+    external    = isJust maybe_ref
     global	= isExternalName name
     local	= not global
     internal	= not external
     loc		= nameSrcSpan name
 
-    (occ_env', occ') = tidyOccName occ_env (nameOccName name)
+    old_occ     = nameOccName name
+    new_occ
+      | Just ref <- maybe_ref, ref /= id = 
+          mkOccName (occNameSpace old_occ) $
+             occNameString (getOccName ref) ++ '_' : occNameString old_occ
+      | otherwise = old_occ
+
+    (occ_env', occ') = tidyOccName occ_env new_occ
 
     mk_new_local nc = (nc { nsUniqs = us2 }, mkInternalName uniq occ' loc)
  		    where
@@ -778,10 +780,118 @@ tidyTopName mod nc_var ext_ids occ_env id
 	-- All this is done by allcoateGlobalBinder.
 	-- This is needed when *re*-compiling a module in GHCi; we must
 	-- use the same name for externally-visible things as we did before.
+\end{code}
 
+\begin{code}
+findExternalRules :: [CoreBind]
+		  -> [CoreRule]	-- Non-local rules (i.e. ones for imported fns)
+	          -> UnfoldEnv	-- Ids that are exported, so we need their rules
+	          -> [CoreRule]
+  -- The complete rules are gotten by combining
+  --	a) the non-local rules
+  --	b) rules embedded in the top-level Ids
+findExternalRules binds non_local_rules unfold_env
+  = filter (not . internal_rule) (non_local_rules ++ local_rules)
+  where
+    local_rules  = [ rule
+ 		   | id <- bindersOfBinds binds,
+                     external_id id,
+		     rule <- idCoreRules id
+		   ]
+
+    internal_rule rule
+	=  any (not . external_id) (varSetElems (ruleLhsFreeIds rule))
+		-- Don't export a rule whose LHS mentions a locally-defined
+		--  Id that is completely internal (i.e. not visible to an
+		-- importing module)
+
+    external_id id
+      | Just (name,_) <- lookupVarEnv unfold_env id = isExternalName name
+      | otherwise = False
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{Step 2: top-level tidying}
+%*									*
+%************************************************************************
+
+
+\begin{code}
+-- TopTidyEnv: when tidying we need to know
+--   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.  
+--	  These may have arisen because the
+--	  renamer read in an interface file mentioning M.$wf, say,
+--	  and assigned it unique r77.  If, on this compilation, we've
+--	  invented an Id whose name is $wf (but with a different unique)
+--	  we want to rename it to have unique r77, so that we can do easy
+--	  comparisons with stuff from the interface file
+--
+--   * occ_env: The TidyOccEnv, which tells us which local occurrences 
+--     are 'used'
+--
+--   * subst_env: A Var->Var mapping that substitutes the new Var for the old
+
+tidyTopBinds :: HscEnv
+	     -> UnfoldEnv
+             -> TidyOccEnv
+	     -> [CoreBind]
+	     -> (TidyEnv, [CoreBind])
+
+tidyTopBinds hsc_env unfold_env init_occ_env binds
+  = tidy init_env binds
+  where
+    init_env = (init_occ_env, emptyVarEnv)
+
+    this_pkg = thisPackage (hsc_dflags hsc_env)
+
+    tidy env []     = (env, [])
+    tidy env (b:bs) = let (env1, b')  = tidyTopBind this_pkg unfold_env env b
+			  (env2, bs') = tidy env1 bs
+                      in
+			  (env2, b':bs')
+
+------------------------
+tidyTopBind  :: PackageId
+             -> UnfoldEnv
+	     -> TidyEnv
+             -> CoreBind
+	     -> (TidyEnv, CoreBind)
+
+tidyTopBind this_pkg unfold_env (occ_env1,subst1) (NonRec bndr rhs)
+  = (tidy_env2,  NonRec bndr' rhs')
+  where
+    Just (name',show_unfold) = lookupVarEnv unfold_env bndr
+    caf_info      = hasCafRefs this_pkg subst1 (idArity bndr) rhs
+    (bndr', rhs') = tidyTopPair show_unfold tidy_env2 caf_info name' (bndr, rhs)
+    subst2        = extendVarEnv subst1 bndr bndr'
+    tidy_env2     = (occ_env1, subst2)
+
+tidyTopBind this_pkg unfold_env (occ_env1,subst1) (Rec prs)
+  = (tidy_env2, Rec prs')
+  where
+    prs' = [ tidyTopPair show_unfold tidy_env2 caf_info name' (id,rhs)
+           | (id,rhs) <- prs,
+             let (name',show_unfold) = 
+                    expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
+           ]
+
+    subst2    = extendVarEnvList subst1 (bndrs `zip` map fst prs')
+    tidy_env2 = (occ_env1, subst2)
+
+    bndrs = map fst prs
+
+	-- the CafInfo for a recursive group says whether *any* rhs in
+	-- the group may refer indirectly to a CAF (because then, they all do).
+    caf_info 
+	| or [ mayHaveCafRefs (hasCafRefs this_pkg subst1 (idArity bndr) rhs)
+	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
+	| otherwise 		   = NoCafRefs
 
 -----------------------------------------------------------
-tidyTopPair :: VarEnv Bool
+tidyTopPair :: Bool  -- show unfolding
 	    -> TidyEnv 	-- The TidyEnv is used to tidy the IdInfo
 			-- It is knot-tied: don't look at it!
 	    -> CafInfo
@@ -794,7 +904,7 @@ tidyTopPair :: VarEnv Bool
 	-- group, a variable late in the group might be mentioned
 	-- in the IdInfo of one early in the group
 
-tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
+tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
   = (bndr', rhs')
   where
     bndr' = mkGlobalId details name' ty' idinfo'
@@ -802,15 +912,10 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
     ty'	    = tidyTopType (idType bndr)
     rhs'    = tidyExpr rhs_tidy_env rhs
     idinfo  = idInfo bndr
-    idinfo' = tidyTopIdInfo (isJust maybe_external)
+    idinfo' = tidyTopIdInfo (isExternalName name')
 			    idinfo unfold_info worker_info
 			    arity caf_info
 
-    -- Expose an unfolding if ext_ids tells us to
-    -- Remember that ext_ids maps an Id to a Bool: 
-    --	True to show the unfolding, False to hide it
-    maybe_external = lookupVarEnv ext_ids bndr
-    show_unfold = maybe_external `orElse` False
     unfold_info | show_unfold = mkTopUnfolding rhs'
 		| otherwise   = noUnfolding
     worker_info = tidyWorker rhs_tidy_env show_unfold (workerInfo idinfo)
