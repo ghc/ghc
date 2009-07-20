@@ -1330,16 +1330,27 @@ ppShortConstr summary con unicode = case con_res con of
   ResTyH98 -> case con_details con of 
     PrefixCon args -> header_ unicode +++ hsep (ppBinder summary occ : map (ppLParendType unicode) args)
     RecCon fields -> header_ unicode +++ ppBinder summary occ <+>
-      braces (vanillaTable << aboves (map (ppShortField summary unicode) fields))
+                                              doRecordFields fields
     InfixCon arg1 arg2 -> header_ unicode +++ 
       hsep [ppLParendType unicode arg1, ppBinder summary occ, ppLParendType unicode arg2]    
 
   ResTyGADT resTy -> case con_details con of 
+    -- prefix & infix could use hsConDeclArgTys if it seemed to
+    -- simplify the code.
     PrefixCon args -> doGADTCon args resTy
-    RecCon _ -> error "GADT records not suported"
+    -- display GADT records with the new syntax,
+    -- Constr :: (Context) => { field :: a, field2 :: b } -> Ty (a, b)
+    -- (except each field gets its own line in docs, to match
+    -- non-GADT records)
+    RecCon fields -> ppBinder summary occ <+> dcolon unicode <+> hsep [
+                            ppForAll forall ltvs lcontext unicode,
+                            doRecordFields fields,
+                            arrow unicode <+> ppLType unicode resTy ]
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
     
   where
+    doRecordFields fields = braces (vanillaTable <<
+                        aboves (map (ppShortField summary unicode) fields))
     doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
                              ppForAll forall ltvs lcontext unicode,
                              ppLType unicode (foldr mkFunTy resTy args) ]
@@ -1353,6 +1364,7 @@ ppShortConstr summary con unicode = case con_res con of
     forall   = con_explicit con
     mkFunTy a b = noLoc (HsFunTy a b)
 
+-- ppConstrHdr is for (non-GADT) existentials constructors' syntax
 ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Bool -> Html
 ppConstrHdr forall tvs ctxt unicode
  = (if null tvs then noHtml else ppForall)
@@ -1374,20 +1386,26 @@ ppSideBySideConstr unicode (L _ con) = case con_res con of
 
     RecCon fields -> 
       argBox (header_ unicode +++ ppBinder False occ) <->
-      maybeRDocBox mbLDoc </>
-      (tda [theclass "body"] << spacedTable1 <<
-      aboves (map (ppSideBySideField unicode) fields))
+      maybeRDocBox mbLDoc
+      </>
+      doRecordFields fields
 
     InfixCon arg1 arg2 -> 
       argBox (hsep [header_ unicode+++ppLParendType unicode arg1, ppBinder False occ, ppLParendType unicode arg2])
       <-> maybeRDocBox mbLDoc
  
   ResTyGADT resTy -> case con_details con of
+    -- prefix & infix could also use hsConDeclArgTys if it seemed to
+    -- simplify the code.
     PrefixCon args -> doGADTCon args resTy
-    RecCon _ -> error "GADT records not supported"
+    cd@(RecCon fields) -> doGADTCon (hsConDeclArgTys cd) resTy
+                                          </> doRecordFields fields
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
 
  where 
+    doRecordFields fields =
+        (tda [theclass "body"] << spacedTable1 <<
+        aboves (map (ppSideBySideField unicode) fields))
     doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon unicode <+> hsep [
                                ppForAll forall ltvs (con_cxt con) unicode,
                                ppLType unicode (foldr mkFunTy resTy args) ]
