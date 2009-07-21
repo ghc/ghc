@@ -16,4 +16,4 @@ TYPE CONSTRUCTORS
         FamilyInstance: none
 Tycons with generics:
 Dependent modules: []
-Dependent packages: [base, ghc-prim, integer, integer-impl]
+Dependent packages: [base, ghc-prim, integer-impl]

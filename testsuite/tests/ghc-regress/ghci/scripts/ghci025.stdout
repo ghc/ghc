@@ -1,7 +1,7 @@
 -- test :browse! functionality
 :browse! *T
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: T.Integer
 class N a
 class S a
 class C a b where
@@ -53,10 +53,13 @@ class Eq a where
 -- imported via Prelude, T
 Prelude.length :: [a] -> GHC.Types.Int
 -- imported via T
+data T.Integer
+  = integer-gmp:GHC.Integer.Type.S# GHC.Prim.Int#
+  | integer-gmp:GHC.Integer.Type.J# GHC.Prim.Int# GHC.Prim.ByteArray#
 T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: T.Integer
 class N a
 class S a
 class C a b where
@@ -70,7 +73,7 @@ c3 :: (C a b) => a1 -> b
 c4 :: (C a b) => a1 -> b
 :browse! T -- with -fglasgow-exts
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: T.Integer
 class N a
 class S a
 class C a b where

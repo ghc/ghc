@@ -4,12 +4,13 @@
 
 module T where
 
-import qualified Prelude as T(length,Monad)
+import qualified Prelude as T(length,Monad,Integer)
 import qualified Data.ByteString as T(length)
 import Prelude(length,(+),(=<<),Monad(..),Maybe(..),Eq)
 import Data.Maybe
 import Control.Monad(Monad(..),MonadPlus(..))
 
+length :: T.Integer
 length = 0
 
 class N a
