@@ -49,6 +49,7 @@ module GHC.Integer.GMP.Internals (
   ) where
 
 import GHC.Prim (Int#, Word#, Double#, ByteArray#)
+import GHC.Integer.Type
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.Prim (Int64#, Word64#)
@@ -56,18 +57,6 @@ import GHC.Prim (Int64#, Word64#)
 
 -- Double isn't available yet, and we shouldn't be using defaults anyway:
 default ()
-
--- | Arbitrary-precision integers.
-data Integer
-   = S# Int#                            -- small integers
-#ifndef ILX
-   | J# Int# ByteArray#                 -- large integers
-#else
-   | J# Void BigInteger                 -- .NET big ints
-
-foreign type dotnet "BigInteger" BigInteger
-#endif
-
 
 -- | Returns -1,0,1 according as first argument is less than, equal to, or greater than second argument.
 --

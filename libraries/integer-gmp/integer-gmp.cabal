@@ -21,9 +21,13 @@ source-repository head
 
 Library {
     build-depends: ghc-prim
-    exposed-modules: GHC.Integer.GMP
+    exposed-modules: GHC.Integer
                      GHC.Integer.GMP.Internals
-    extensions: CPP, MagicHash, UnboxedTuples,
+    other-modules: GHC.Integer.Type
+    extensions: CPP, MagicHash, UnboxedTuples, NoImplicitPrelude,
                 ForeignFunctionInterface, UnliftedFFITypes
     c-sources: cbits/cbits.c
+    -- We need to set the package name to integer-gmp
+    -- (without a version number) as it's magic.
+    ghc-options: -package-name integer-gmp
 }
