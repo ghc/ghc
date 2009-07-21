@@ -60,7 +60,7 @@ integer_cmm_int2Integerzh
 {
    /* arguments: R1 = Int# */
 
-   W_ val, s, p;	/* to avoid aliasing */
+   W_ val, s, p; /* to avoid aliasing */
 
    val = R1;
    ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, integer_cmm_int2Integerzh );
@@ -71,20 +71,20 @@ integer_cmm_int2Integerzh
 
    /* mpz_set_si is inlined here, makes things simpler */
    if (%lt(val,0)) {
-	s  = -1;
-	Hp(0) = -val;
+        s  = -1;
+        Hp(0) = -val;
    } else {
      if (%gt(val,0)) {
-	s = 1;
-	Hp(0) = val;
+        s = 1;
+        Hp(0) = val;
      } else {
-	s = 0;
+        s = 0;
      }
   }
 
    /* returns (# size  :: Int#,
-		 data  :: ByteArray#
-	       #)
+                 data  :: ByteArray#
+               #)
    */
    RET_NP(s,p);
 }
@@ -93,7 +93,7 @@ integer_cmm_word2Integerzh
 {
    /* arguments: R1 = Word# */
 
-   W_ val, s, p;	/* to avoid aliasing */
+   W_ val, s, p; /* to avoid aliasing */
 
    val = R1;
 
@@ -104,14 +104,14 @@ integer_cmm_word2Integerzh
    StgArrWords_words(p) = 1;
 
    if (val != 0) {
-	s = 1;
-	W_[Hp] = val;
+        s = 1;
+        W_[Hp] = val;
    } else {
-	s = 0;
+        s = 0;
    }
 
    /* returns (# size  :: Int#,
-		 data  :: ByteArray# #)
+                 data  :: ByteArray# #)
    */
    RET_NP(s,p);
 }
@@ -166,18 +166,18 @@ integer_cmm_int64ToIntegerzh
       Hp(0) = hi;
    } else {
        if ( lo != 0 ) {
-	   s = 1;
-	   Hp(0) = lo;
+           s = 1;
+           Hp(0) = lo;
        } else /* val==0 */  {
-	   s = 0;
+           s = 0;
        }
    }
    if ( neg != 0 ) {
-	s = -s;
+        s = -s;
    }
 
    /* returns (# size  :: Int#,
-		 data  :: ByteArray# #)
+                 data  :: ByteArray# #)
    */
    RET_NP(s,p);
 }
@@ -219,7 +219,7 @@ integer_cmm_word64ToIntegerzh
   }
 
    /* returns (# size  :: Int#,
-		 data  :: ByteArray# #)
+                 data  :: ByteArray# #)
    */
    RET_NP(s,p);
 }
@@ -252,12 +252,12 @@ name                                                                    \
   mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                  \
   MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(StgArrWords_words(d1));          \
   MP_INT__mp_size(mp_tmp1)  = (s1);                                     \
-  MP_INT__mp_d(mp_tmp1)	    = BYTE_ARR_CTS(d1);                         \
+  MP_INT__mp_d(mp_tmp1)     = BYTE_ARR_CTS(d1);                         \
   MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(StgArrWords_words(d2));          \
   MP_INT__mp_size(mp_tmp2)  = (s2);                                     \
-  MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);                         \
+  MP_INT__mp_d(mp_tmp2)     = BYTE_ARR_CTS(d2);                         \
                                                                         \
-  foreign "C" __gmpz_init(mp_result1 "ptr") [];                            \
+  foreign "C" __gmpz_init(mp_result1 "ptr") [];                         \
                                                                         \
   /* Perform the operation */                                           \
   foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr") []; \
@@ -284,11 +284,11 @@ name                                                                    \
                                                                         \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
   mp_result1 = Sp - 2 * SIZEOF_MP_INT;                                  \
-  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));      \
-  MP_INT__mp_size(mp_tmp1)	= (s1);                                 \
-  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                     \
+  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(StgArrWords_words(d1));      \
+  MP_INT__mp_size(mp_tmp1)      = (s1);                                 \
+  MP_INT__mp_d(mp_tmp1)         = BYTE_ARR_CTS(d1);                     \
                                                                         \
-  foreign "C" __gmpz_init(mp_result1 "ptr") [];                            \
+  foreign "C" __gmpz_init(mp_result1 "ptr") [];                         \
                                                                         \
   /* Perform the operation */                                           \
   foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1 "ptr") [];                \
@@ -321,22 +321,22 @@ name                                                                            
   mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                                  \
   mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                                  \
   mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                                  \
-  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));                      \
-  MP_INT__mp_size(mp_tmp1)	= (s1);                                                 \
-  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                                     \
-  MP_INT__mp_alloc(mp_tmp2)	= W_TO_INT(StgArrWords_words(d2));                      \
-  MP_INT__mp_size(mp_tmp2)	= (s2);                                                 \
-  MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);                                     \
+  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(StgArrWords_words(d1));                      \
+  MP_INT__mp_size(mp_tmp1)      = (s1);                                                 \
+  MP_INT__mp_d(mp_tmp1)         = BYTE_ARR_CTS(d1);                                     \
+  MP_INT__mp_alloc(mp_tmp2)     = W_TO_INT(StgArrWords_words(d2));                      \
+  MP_INT__mp_size(mp_tmp2)      = (s2);                                                 \
+  MP_INT__mp_d(mp_tmp2)         = BYTE_ARR_CTS(d2);                                     \
                                                                                         \
-  foreign "C" __gmpz_init(mp_result1 "ptr") [];                                               \
-  foreign "C" __gmpz_init(mp_result2 "ptr") [];                                               \
+  foreign "C" __gmpz_init(mp_result1 "ptr") [];                                         \
+  foreign "C" __gmpz_init(mp_result2 "ptr") [];                                         \
                                                                                         \
   /* Perform the operation */                                                           \
-  foreign "C" mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr") [];    \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr") []; \
                                                                                         \
   RET_NPNP(TO_W_(MP_INT__mp_size(mp_result1)),                                          \
            MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords,                               \
-	   TO_W_(MP_INT__mp_size(mp_result2)),                                          \
+           TO_W_(MP_INT__mp_size(mp_result2)),                                          \
            MP_INT__mp_d(mp_result2) - SIZEOF_StgArrWords);                              \
 }
 
@@ -397,35 +397,35 @@ integer_cmm_cmpIntegerIntzh
 
     // paraphrased from __gmpz_cmp_si() in the GMP sources
     if (%gt(v_digit,0)) {
-	vsize = 1;
+        vsize = 1;
     } else {
-	if (%lt(v_digit,0)) {
-	    vsize = -1;
-	    v_digit = -v_digit;
-	}
+        if (%lt(v_digit,0)) {
+            vsize = -1;
+            v_digit = -v_digit;
+        }
     }
 
     if (usize != vsize) {
-	R1 = usize - vsize;
-	jump %ENTRY_CODE(Sp(0));
+        R1 = usize - vsize;
+        jump %ENTRY_CODE(Sp(0));
     }
 
     if (usize == 0) {
-	R1 = 0;
-	jump %ENTRY_CODE(Sp(0));
+        R1 = 0;
+        jump %ENTRY_CODE(Sp(0));
     }
 
     u_digit = W_[BYTE_ARR_CTS(R2)];
 
     if (u_digit == v_digit) {
-	R1 = 0;
-	jump %ENTRY_CODE(Sp(0));
+        R1 = 0;
+        jump %ENTRY_CODE(Sp(0));
     }
 
     if (%gtu(u_digit,v_digit)) { // NB. unsigned: these are mp_limb_t's
-	R1 = usize;
+        R1 = usize;
     } else {
-	R1 = -usize;
+        R1 = -usize;
     }
 
     jump %ENTRY_CODE(Sp(0));
@@ -442,19 +442,19 @@ integer_cmm_cmpIntegerzh
     vsize = R3;
 
     if (usize != vsize) {
-	R1 = usize - vsize;
-	jump %ENTRY_CODE(Sp(0));
+        R1 = usize - vsize;
+        jump %ENTRY_CODE(Sp(0));
     }
 
     if (usize == 0) {
-	R1 = 0;
-	jump %ENTRY_CODE(Sp(0));
+        R1 = 0;
+        jump %ENTRY_CODE(Sp(0));
     }
 
     if (%lt(usize,0)) { // NB. not <, which is unsigned
-	size = -usize;
+        size = -usize;
     } else {
-	size = usize;
+        size = usize;
     }
 
     up = BYTE_ARR_CTS(R2);
@@ -463,14 +463,14 @@ integer_cmm_cmpIntegerzh
     (cmp) = foreign "C" __gmpn_cmp(up "ptr", vp "ptr", size) [];
 
     if (cmp == 0 :: CInt) {
-	R1 = 0;
-	jump %ENTRY_CODE(Sp(0));
+        R1 = 0;
+        jump %ENTRY_CODE(Sp(0));
     }
 
     if (%lt(cmp,0 :: CInt) == %lt(usize,0)) {
-	R1 = 1;
+        R1 = 1;
     } else {
-	R1 = (-1);
+        R1 = (-1);
     }
     /* Result parked in R1, return via info-pointer at TOS */
     jump %ENTRY_CODE(Sp(0));
@@ -483,12 +483,12 @@ integer_cmm_integer2Intzh
 
     s = R1;
     if (s == 0) {
-	r = 0;
+        r = 0;
     } else {
-	r = W_[R2 + SIZEOF_StgArrWords];
-	if (%lt(s,0)) {
-	    r = -r;
-	}
+        r = W_[R2 + SIZEOF_StgArrWords];
+        if (%lt(s,0)) {
+            r = -r;
+        }
     }
     /* Result parked in R1, return via info-pointer at TOS */
     R1 = r;
@@ -506,7 +506,7 @@ integer_cmm_integer2Wordzh
   } else {
     r = W_[R2 + SIZEOF_StgArrWords];
     if (%lt(s,0)) {
-	r = -r;
+        r = -r;
     }
   }
   /* Result parked in R1, return via info-pointer at TOS */
