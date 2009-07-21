@@ -25,7 +25,8 @@ source-repository head
 
 Library {
     if impl(ghc) {
-        build-depends: rts, ghc-prim, integer
+        build-depends: integer-gmp
+        build-depends: rts, ghc-prim
         exposed-modules:
             Foreign.Concurrent,
             GHC.Arr,
