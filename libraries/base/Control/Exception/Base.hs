@@ -691,8 +691,6 @@ instance Exception NestedAtomically
 
 -----
 
-instance Exception Dynamic
-
 #endif /* __GLASGOW_HASKELL__ || __HUGS__ */
 
 #ifdef __GLASGOW_HASKELL__

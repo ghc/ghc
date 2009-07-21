@@ -48,6 +48,7 @@ import Unsafe.Coerce
 import GHC.Base
 import GHC.Show
 import GHC.Num
+import GHC.Exception
 #endif
 
 #ifdef __HUGS__
@@ -91,6 +92,11 @@ instance Show Dynamic where
           showString "<<" . 
           showsPrec 0 t   . 
           showString ">>"
+
+#ifdef __GLASGOW_HASKELL__
+-- here so that it isn't an orphan:
+instance Exception Dynamic
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 type Obj = Any
