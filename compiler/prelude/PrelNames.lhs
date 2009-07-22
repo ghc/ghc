@@ -742,9 +742,9 @@ ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
     failIOName :: Name
 ioTyConName	  = tcQual  gHC_TYPES (fsLit "IO") ioTyConKey
 ioDataConName     = conName gHC_TYPES (fsLit "IO") ioDataConKey
-thenIOName	  = varQual gHC_IO (fsLit "thenIO") thenIOIdKey
-bindIOName	  = varQual gHC_IO (fsLit "bindIO") bindIOIdKey
-returnIOName	  = varQual gHC_IO (fsLit "returnIO") returnIOIdKey
+thenIOName	  = varQual gHC_BASE (fsLit "thenIO") thenIOIdKey
+bindIOName	  = varQual gHC_BASE (fsLit "bindIO") bindIOIdKey
+returnIOName	  = varQual gHC_BASE (fsLit "returnIO") returnIOIdKey
 failIOName	  = varQual gHC_IO (fsLit "failIO") failIOIdKey
 
 -- IO things
