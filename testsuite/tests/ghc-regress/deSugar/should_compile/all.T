@@ -70,3 +70,5 @@ test('ds062', normal, compile, [''])
 test('T2409', normal, compile, [''])
 test('T3263-1', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-fwarn-unused-do-bind -XRecursiveDo'])
 test('T3263-2', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-fwarn-wrong-do-bind -XScopedTypeVariables -XRecursiveDo'])
+
+test('GadtOverlap', normal, compile, ['-Wall'])
