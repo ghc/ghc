@@ -17,7 +17,7 @@
 
 -- #hide
 module GHC.IO (
-    IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO, 
+    IO(..), unIO, failIO, liftIO,
     unsafePerformIO, unsafeInterleaveIO,
     unsafeDupablePerformIO, unsafeDupableInterleaveIO,
     noDuplicate,
@@ -65,39 +65,8 @@ Libraries - parts of hslibs/lang.
 --SDM
 -}
 
-unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
-unIO (IO a) = a
-
-instance  Functor IO where
-   fmap f x = x >>= (return . f)
-
-instance  Monad IO  where
-    {-# INLINE return #-}
-    {-# INLINE (>>)   #-}
-    {-# INLINE (>>=)  #-}
-    m >> k      =  m >>= \ _ -> k
-    return x    = returnIO x
-
-    m >>= k     = bindIO m k
-    fail s      = failIO s
-
 liftIO :: IO a -> State# RealWorld -> STret RealWorld a
 liftIO (IO m) = \s -> case m s of (# s', r #) -> STret s' r
-
-bindIO :: IO a -> (a -> IO b) -> IO b
-bindIO (IO m) k = IO ( \ s ->
-  case m s of 
-    (# new_s, a #) -> unIO (k a) new_s
-  )
-
-thenIO :: IO a -> IO b -> IO b
-thenIO (IO m) k = IO ( \ s ->
-  case m s of 
-    (# new_s, _ #) -> unIO k new_s
-  )
-
-returnIO :: a -> IO a
-returnIO x = IO (\ s -> (# s, x #))
 
 failIO :: String -> IO a
 failIO s = IO (raiseIO# (toException (userError s)))

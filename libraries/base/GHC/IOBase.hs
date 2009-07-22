@@ -50,6 +50,7 @@ module GHC.IOBase {-# DEPRECATED "use GHC.IO instead" #-} (
     blockedOnDeadMVar, blockedIndefinitely
   ) where
 
+import GHC.Base
 import GHC.Exception
 import GHC.IO
 import GHC.IO.Handle.Types

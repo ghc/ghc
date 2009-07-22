@@ -103,6 +103,7 @@ import GHC.Ordering
 import GHC.Prim
 import {-# SOURCE #-} GHC.Show
 import {-# SOURCE #-} GHC.Err
+import {-# SOURCE #-} GHC.IO (failIO)
 
 -- These two are not strictly speaking required by this module, but they are
 -- implicit dependencies whenever () or tuples are mentioned, so adding them
@@ -706,6 +707,38 @@ until p f x | p x       =  x
 -- (which is usually overloaded) to have the same type as the second.
 asTypeOf                :: a -> a -> a
 asTypeOf                =  const
+\end{code}
+
+%*********************************************************
+%*                                                      *
+\subsection{@Functor@ and @Monad@ instances for @IO@}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+instance  Functor IO where
+   fmap f x = x >>= (return . f)
+
+instance  Monad IO  where
+    {-# INLINE return #-}
+    {-# INLINE (>>)   #-}
+    {-# INLINE (>>=)  #-}
+    m >> k    = m >>= \ _ -> k
+    return    = returnIO
+    (>>=)     = bindIO
+    fail s    = GHC.IO.failIO s
+
+returnIO :: a -> IO a
+returnIO x = IO $ \ s -> (# s, x #)
+
+bindIO :: IO a -> (a -> IO b) -> IO b
+bindIO (IO m) k = IO $ \ s -> case m s of (# new_s, a #) -> unIO (k a) new_s
+
+thenIO :: IO a -> IO b -> IO b
+thenIO (IO m) k = IO $ \ s -> case m s of (# new_s, _ #) -> unIO k new_s
+
+unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
+unIO (IO a) = a
 \end{code}
 
 %*********************************************************
