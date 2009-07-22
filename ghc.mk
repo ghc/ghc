@@ -535,14 +535,16 @@ ifneq "$(findstring $(phase),0 1 2)" ""
 ghc_stage1_DISABLE = YES
 endif
 
+ifneq "$(CLEANING)" "YES"
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 libraries/base_dist-install_CONFIGURE_OPTS += --flags=-integer-simple
 else
     ifeq "$(INTEGER_LIBRARY)" "integer-simple"
 	libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
     else
-	$(error Unknown integer library: $(INTEGER_LIBRARY))
+$(error Unknown integer library: $(INTEGER_LIBRARY))
     endif
+endif
 endif
 
 ifneq "$(findstring $(phase),0 1 2 3)" ""
