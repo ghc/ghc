@@ -40,6 +40,7 @@ module GHC.Integer (
     encodeDoubleInteger, decodeDoubleInteger, doubleFromInteger,
     gcdInteger, lcmInteger,
     andInteger, orInteger, xorInteger, complementInteger,
+    shiftLInteger, shiftRInteger,
     hashInteger,
  ) where
 
@@ -67,6 +68,7 @@ import GHC.Integer.GMP.Internals (
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
+    mul2ExpInteger#, fdivQ2ExpInteger#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -515,6 +517,16 @@ complementInteger (S# x)
     = S# (word2Int# (int2Word# x `xor#` int2Word# (0# -# 1#)))
 complementInteger (J# s d)
     = case complementInteger# s d of (# s', d' #) -> J# s' d'
+
+shiftLInteger :: Integer -> Int# -> Integer
+shiftLInteger j@(S# _) i = shiftLInteger (toBig j) i
+shiftLInteger (J# s d) i = case mul2ExpInteger# s d i of
+                           (# s', d' #) -> J# s' d'
+
+shiftRInteger :: Integer -> Int# -> Integer
+shiftRInteger j@(S# _) i = shiftRInteger (toBig j) i
+shiftRInteger (J# s d) i = case fdivQ2ExpInteger# s d i of
+                           (# s', d' #) -> J# s' d'
 \end{code}
 
 %*********************************************************

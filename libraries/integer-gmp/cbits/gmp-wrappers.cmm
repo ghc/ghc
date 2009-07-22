@@ -264,6 +264,39 @@ name                                                                    \
          MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);                \
 }
 
+#define GMP_TAKE1_UL1_RET1(name,mp_fun)                                 \
+name                                                                    \
+{                                                                       \
+  CInt s1;                                                              \
+  W_ d1;                                                                \
+  CLong ul;                                                             \
+  W_ mp_tmp;                                                            \
+  W_ mp_result;                                                         \
+                                                                        \
+  /* call doYouWantToGC() */                                            \
+  MAYBE_GC(R2_PTR & R4_PTR, name);                                      \
+                                                                        \
+  STK_CHK_GEN( 2 * SIZEOF_MP_INT, R2_PTR, name );                       \
+                                                                        \
+  s1 = W_TO_INT(R1);                                                    \
+  d1 = R2;                                                              \
+  ul = R3;                                                              \
+                                                                        \
+  mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                                  \
+  mp_result  = Sp - 2 * SIZEOF_MP_INT;                                  \
+  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(StgArrWords_words(d1));           \
+  MP_INT__mp_size(mp_tmp)  = (s1);                                      \
+  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                          \
+                                                                        \
+  foreign "C" __gmpz_init(mp_result "ptr") [];                          \
+                                                                        \
+  /* Perform the operation */                                           \
+  foreign "C" mp_fun(mp_result "ptr",mp_tmp "ptr", ul) [];              \
+                                                                        \
+  RET_NP(TO_W_(MP_INT__mp_size(mp_result)),                             \
+         MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);                 \
+}
+
 #define GMP_TAKE1_RET1(name,mp_fun)                                     \
 name                                                                    \
 {                                                                       \
@@ -348,6 +381,8 @@ GMP_TAKE2_RET1(integer_cmm_divExactIntegerzh, __gmpz_divexact)
 GMP_TAKE2_RET1(integer_cmm_andIntegerzh,      __gmpz_and)
 GMP_TAKE2_RET1(integer_cmm_orIntegerzh,       __gmpz_ior)
 GMP_TAKE2_RET1(integer_cmm_xorIntegerzh,      __gmpz_xor)
+GMP_TAKE1_UL1_RET1(integer_cmm_mul2ExpIntegerzh, __gmpz_mul_2exp)
+GMP_TAKE1_UL1_RET1(integer_cmm_fdivQ2ExpIntegerzh, __gmpz_fdiv_q_2exp)
 GMP_TAKE1_RET1(integer_cmm_complementIntegerzh, __gmpz_com)
 
 GMP_TAKE2_RET2(integer_cmm_quotRemIntegerzh, __gmpz_tdiv_qr)

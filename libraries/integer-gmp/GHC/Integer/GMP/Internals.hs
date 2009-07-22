@@ -37,6 +37,9 @@ module GHC.Integer.GMP.Internals (
     xorInteger#,
     complementInteger#,
 
+    mul2ExpInteger#,
+    fdivQ2ExpInteger#,
+
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -167,6 +170,16 @@ foreign import prim "integer_cmm_orIntegerzh" orInteger#
 --
 foreign import prim "integer_cmm_xorIntegerzh" xorInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_mul2ExpIntegerzh" mul2ExpInteger#
+  :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_fdivQ2ExpIntegerzh" fdivQ2ExpInteger#
+  :: Int# -> ByteArray# -> Int# -> (# Int#, ByteArray# #)
 
 -- |
 --
