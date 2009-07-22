@@ -449,6 +449,7 @@ lcm _ 0         =  0
 lcm 0 _         =  0
 lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 
+#ifdef OPTIMISE_INTEGER_GCD_LCM
 {-# RULES
 "gcd/Int->Int->Int"             gcd = gcdInt
 "gcd/Integer->Integer->Integer" gcd = gcdInteger'
@@ -465,6 +466,7 @@ gcdInteger' a b = gcdInteger a b
 gcdInt :: Int -> Int -> Int
 gcdInt 0 0 = error "GHC.Real.gcdInt: gcd 0 0 is undefined"
 gcdInt a b = fromIntegral (gcdInteger (fromIntegral a) (fromIntegral b))
+#endif
 
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
 integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]
