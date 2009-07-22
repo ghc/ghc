@@ -67,6 +67,7 @@ typedef struct {
 } StgAsyncIOResult;
 #endif
 
+/* Reason for thread being blocked. See comment above struct StgTso_. */
 typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
