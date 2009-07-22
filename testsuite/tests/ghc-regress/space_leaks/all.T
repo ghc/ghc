@@ -47,12 +47,12 @@ test('T1969',
                                    # expected value: 12918232 (amd64/Linux)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
-                                                      230000000)),
+                                                      250000000)),
                                     # expected value: 215582916 (x86/Windows)
                                     #                 221667908 (x86/OS X)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 440000000,
-                                                      480000000)),
+                                                      500000000)),
                                     # expected value: 451976088 (amd64/Linux)
       only_ways(['normal'])
       ],
