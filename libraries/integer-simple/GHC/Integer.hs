@@ -43,6 +43,7 @@ import GHC.Integer.Type
 import GHC.Bool
 import GHC.Ordering
 import GHC.Prim
+import GHC.Unit ()
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
@@ -406,27 +407,24 @@ hashInteger (!_) = 42#
 -------------------------------------------------------------------
 -- The hard work is done on positive numbers
 
--- XXX Could move () above us
-data Unit = Unit
-
 onePositive :: Positive
 onePositive = Some 1## None
 
-halfBoundUp, fullBound :: Unit -> Digit
-lowHalfMask :: Unit -> Digit
-highHalfShift :: Unit -> Int#
+halfBoundUp, fullBound :: () -> Digit
+lowHalfMask :: () -> Digit
+highHalfShift :: () -> Int#
 twoToTheThirtytwoPositive :: Positive
 #if WORD_SIZE_IN_BITS == 64
-halfBoundUp   Unit = 0x8000000000000000##
-fullBound     Unit = 0xFFFFFFFFFFFFFFFF##
-lowHalfMask   Unit = 0xFFFFFFFF##
-highHalfShift Unit = 32#
+halfBoundUp   () = 0x8000000000000000##
+fullBound     () = 0xFFFFFFFFFFFFFFFF##
+lowHalfMask   () = 0xFFFFFFFF##
+highHalfShift () = 32#
 twoToTheThirtytwoPositive = Some 0x100000000## None
 #elif WORD_SIZE_IN_BITS == 32
-halfBoundUp   Unit = 0x80000000##
-fullBound     Unit = 0xFFFFFFFF##
-lowHalfMask   Unit = 0xFFFF##
-highHalfShift Unit = 16#
+halfBoundUp   () = 0x80000000##
+fullBound     () = 0xFFFFFFFF##
+lowHalfMask   () = 0xFFFF##
+highHalfShift () = 16#
 twoToTheThirtytwoPositive = Some 0## (Some 1## None)
 #else
 #error Unhandled WORD_SIZE_IN_BITS
@@ -487,26 +485,26 @@ plusPositive x0 y0 = addWithCarry 0## x0 y0
        addWithCarry c xs@(Some x xs') ys@(Some y ys')
         = if x `ltWord#` y then addWithCarry c ys xs
           -- Now x >= y
-          else if y `geWord#` halfBoundUp Unit
+          else if y `geWord#` halfBoundUp ()
                -- So they are both at least halfBoundUp, so we subtract
                -- halfBoundUp from each and thus carry 1
-               then case x `minusWord#` halfBoundUp Unit of
+               then case x `minusWord#` halfBoundUp () of
                     x' ->
-                     case y `minusWord#` halfBoundUp Unit of
+                     case y `minusWord#` halfBoundUp () of
                      y' ->
                       case x' `plusWord#` y' `plusWord#` c of
                       this ->
                        Some this withCarry
-          else if x `geWord#` halfBoundUp Unit
-               then case x `minusWord#` halfBoundUp Unit of
+          else if x `geWord#` halfBoundUp ()
+               then case x `minusWord#` halfBoundUp () of
                     x' ->
                      case x' `plusWord#` y `plusWord#` c of
                      z ->
                       -- We've taken off halfBoundUp, so now we need to
                       -- add it back on
-                      if z `ltWord#` halfBoundUp Unit
-                       then Some (z `plusWord#`  halfBoundUp Unit) withoutCarry
-                       else Some (z `minusWord#` halfBoundUp Unit) withCarry
+                      if z `ltWord#` halfBoundUp ()
+                       then Some (z `plusWord#`  halfBoundUp ()) withoutCarry
+                       else Some (z `minusWord#` halfBoundUp ()) withCarry
           else Some (x `plusWord#` y `plusWord#` c) withoutCarry
            where withCarry    = addWithCarry 1## xs' ys'
                  withoutCarry = addWithCarry 0## xs' ys'
@@ -520,7 +518,7 @@ plusPositive x0 y0 = addWithCarry 0## x0 y0
 -- digit `elem` [0, 1]
 succPositive :: Positive -> Positive
 succPositive None = Some 1## None
-succPositive (Some w ws) = if w `eqWord#` fullBound Unit
+succPositive (Some w ws) = if w `eqWord#` fullBound ()
                            then Some 0## (succPositive ws)
                            else Some (w `plusWord#` 1##) ws
 
@@ -534,7 +532,7 @@ Some x xs `minusPositive` Some y ys
         s -> Some 0## s
    else if x `gtWord#` y then
         Some (x `minusWord#` y) (xs `minusPositive` ys)
-   else case (fullBound Unit `minusWord#` y) `plusWord#` 1## of
+   else case (fullBound () `minusWord#` y) `plusWord#` 1## of
         z -> -- z = 2^n - y, calculated without overflow
          case z `plusWord#` x of
          z' -> -- z = 2^n + (x - y), calculated without overflow
@@ -584,11 +582,11 @@ timesDigit (!x) (!y)
      xhyh ->
       case splitHalves (xh `timesWord#` yl) of
       (# xhylh, xhyll #) ->
-       case xhyll `uncheckedShiftL#` highHalfShift Unit of
+       case xhyll `uncheckedShiftL#` highHalfShift () of
        xhyll' ->
         case splitHalves (xl `timesWord#` yh) of
         (# xlyhh, xlyhl #) ->
-         case xlyhl `uncheckedShiftL#` highHalfShift Unit of
+         case xlyhl `uncheckedShiftL#` highHalfShift () of
          xlyhl' ->
           case xl `timesWord#` yl of
           xlyl ->
@@ -611,8 +609,8 @@ timesDigit (!x) (!y)
                else Some 0## (Some high None) `plusPositive` low
 
 splitHalves :: Digit -> (# {- High -} Digit, {- Low -} Digit #)
-splitHalves (!x) = (# x `uncheckedShiftRL#` highHalfShift Unit,
-                      x `and#` lowHalfMask Unit #)
+splitHalves (!x) = (# x `uncheckedShiftRL#` highHalfShift (),
+                      x `and#` lowHalfMask () #)
 
 -- Assumes 0 <= i
 shiftLPositive :: Positive -> Int# -> Positive
@@ -731,7 +729,7 @@ doubleFromPositive (Some w ds)
       (# h, l #) ->
        (doubleFromPositive ds *## (2.0## **## WORD_SIZE_IN_BITS.0##))
        +## (int2Double# (word2Int# h) *##
-              (2.0## **## int2Double# (highHalfShift Unit)))
+              (2.0## **## int2Double# (highHalfShift ())))
        +## int2Double# (word2Int# l)
 
 -- XXX We'd really like word2Float# for this
@@ -742,7 +740,7 @@ floatFromPositive (Some w ds)
       (# h, l #) ->
        (floatFromPositive ds `timesFloat#` (2.0# `powerFloat#` WORD_SIZE_IN_BITS.0#))
        `plusFloat#` (int2Float# (word2Int# h) `timesFloat#`
-             (2.0# `powerFloat#` int2Float# (highHalfShift Unit)))
+             (2.0# `powerFloat#` int2Float# (highHalfShift ())))
        `plusFloat#` int2Float# (word2Int# l)
 
 #endif
