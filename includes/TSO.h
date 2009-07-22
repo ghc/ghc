@@ -85,7 +85,7 @@ typedef union {
  * storage manager, and won't be copied during garbage collection.
  */
 
-/* 
+/*
  * Threads may be blocked for several reasons.  A blocked thread will
  * have the reason in the why_blocked field of the TSO, and some
  * further info (such as the closure the thread is blocked on, or the
@@ -123,7 +123,7 @@ typedef struct StgTSO_ {
     struct Capability_*     cap;
     struct StgTRecHeader_ * trec;       /* STM transaction record */
 
-    /* 
+    /*
        A list of threads blocked on this TSO waiting to throw
        exceptions.  In order to access this field, the TSO must be
        locked using lockClosure/unlockClosure (see SMP.h).
@@ -204,7 +204,7 @@ extern void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
 
    The 2 cases BlockedOnGA and BlockedOnGA_NoSend are needed in a GUM
    setup only. They mark a TSO that has entered a FETCH_ME or
-   FETCH_ME_BQ closure, respectively; only the first TSO hitting the 
+   FETCH_ME_BQ closure, respectively; only the first TSO hitting the
    closure will send a Fetch message.
    Currently we have no separate code for blocking on an RBH; we use the
    BlockedOnBlackHole case for that.   -- HWL
