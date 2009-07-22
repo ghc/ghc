@@ -35,6 +35,7 @@ libraries/haskell98                     packages/haskell98              darcs
 libraries/hpc                           packages/hpc                    darcs
 libraries/integer                       packages/integer                darcs
 libraries/integer-gmp                   packages/integer-gmp            darcs
+libraries/integer-simple                packages/integer-simple         darcs
 libraries/mtl                           packages/mtl                    darcs
 libraries/old-locale                    packages/old-locale             darcs
 libraries/old-time                      packages/old-time               darcs

@@ -535,6 +535,16 @@ ifneq "$(findstring $(phase),0 1 2)" ""
 ghc_stage1_DISABLE = YES
 endif
 
+ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
+libraries/base_dist-install_CONFIGURE_OPTS += --flags=-integer-simple
+else
+    ifeq "$(INTEGER_LIBRARY)" "integer-simple"
+	libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
+    else
+	$(error Unknown integer library: $(INTEGER_LIBRARY))
+    endif
+endif
+
 ifneq "$(findstring $(phase),0 1 2 3)" ""
 # In phases 0-3, we disable stage2-3, the full libraries and haddock
 utils/haddock_dist_DISABLE = YES
