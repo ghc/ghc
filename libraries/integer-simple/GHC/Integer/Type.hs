@@ -25,6 +25,7 @@ module GHC.Integer.Type (
  ) where
 
 import GHC.Prim
+import GHC.Types ()
 
 #if !defined(__HADDOCK__)
 
