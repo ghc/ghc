@@ -4,7 +4,7 @@ TH_runIO.hs:12:8:
       user error (hi)
       Code: let
               fail = fail
-              $dMonad = GHC.IO.$fMonadIO
+              $dMonad = GHC.Base.$fMonadIO
             in runIO (fail "hi")
     In the expression: $(runIO (fail "hi"))
     In the definition of `foo': foo = $(runIO (fail "hi"))
