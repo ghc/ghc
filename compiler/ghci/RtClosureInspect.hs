@@ -385,10 +385,8 @@ pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t}
   | Just (tc,_) <- tcSplitTyConApp_maybe ty
   , ASSERT(isNewTyCon tc) True
   , Just new_dc <- tyConSingleDataCon_maybe tc = do 
-         if integerDataConName == dataConName new_dc
-             then return $ text $ show $ (unsafeCoerce# $ val t :: Integer)
-             else do real_term <- y max_prec t
-                     return$ cparen (p >= app_prec) (ppr new_dc <+> real_term)
+             real_term <- y max_prec t
+             return $ cparen (p >= app_prec) (ppr new_dc <+> real_term)
 pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 
 -------------------------------------------------------
@@ -433,6 +431,7 @@ cPprTermBase y =
   , ifTerm (isTyCon charTyCon   . ty) (coerceShow$ \(a::Char)->a)
   , ifTerm (isTyCon floatTyCon  . ty) (coerceShow$ \(a::Float)->a)
   , ifTerm (isTyCon doubleTyCon . ty) (coerceShow$ \(a::Double)->a)
+  , ifTerm (isIntegerTy         . ty) (coerceShow$ \(a::Integer)->a)
   ]
      where ifTerm pred f prec t@Term{}
                | pred t    = Just `liftM` f prec t
@@ -445,6 +444,10 @@ cPprTermBase y =
            isTyCon a_tc ty = fromMaybe False $ do 
              (tc,_) <- tcSplitTyConApp_maybe ty
              return (a_tc == tc)
+
+           isIntegerTy ty = fromMaybe False $ do
+             (tc,_) <- tcSplitTyConApp_maybe ty
+             return (tyConName tc == integerTyConName)
 
            coerceShow f _p = return . text . show . f . unsafeCoerce# . val
 

@@ -33,7 +33,6 @@ libraries/ghc-prim                      packages/ghc-prim               darcs
 libraries/haskeline                     packages/haskeline              darcs
 libraries/haskell98                     packages/haskell98              darcs
 libraries/hpc                           packages/hpc                    darcs
-libraries/integer                       packages/integer                darcs
 libraries/integer-gmp                   packages/integer-gmp            darcs
 libraries/integer-simple                packages/integer-simple         darcs
 libraries/mtl                           packages/mtl                    darcs

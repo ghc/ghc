@@ -297,8 +297,7 @@ define addPackage # args: $1 = package, $2 = condition
 endef
 
 $(eval $(call addPackage,ghc-prim))
-$(eval $(call addPackage,integer-gmp))
-$(eval $(call addPackage,integer))
+$(eval $(call addPackage,$(INTEGER_LIBRARY)))
 $(eval $(call addPackage,base))
 $(eval $(call addPackage,filepath))
 $(eval $(call addPackage,array))
@@ -505,8 +504,11 @@ BUILD_DIRS += \
 endif
 endif
 
+ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
+BUILD_DIRS += libraries/integer-gmp/gmp
+endif
+
 BUILD_DIRS += \
-   libraries/integer-gmp/gmp \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \

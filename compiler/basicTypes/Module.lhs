@@ -69,6 +69,7 @@ module Module
 	emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
 
+import Config
 import Outputable
 import qualified Pretty
 import Unique
@@ -319,7 +320,7 @@ integerPackageId, primPackageId,
   thPackageId, dphSeqPackageId, dphParPackageId,
   mainPackageId  :: PackageId
 primPackageId      = fsToPackageId (fsLit "ghc-prim")
-integerPackageId   = fsToPackageId (fsLit "integer")
+integerPackageId   = fsToPackageId (fsLit cIntegerLibrary)
 basePackageId      = fsToPackageId (fsLit "base")
 rtsPackageId	   = fsToPackageId (fsLit "rts")
 haskell98PackageId = fsToPackageId (fsLit "haskell98")
