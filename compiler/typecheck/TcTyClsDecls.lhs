@@ -1257,10 +1257,17 @@ mkRecSelBind (tycon, sel_name)
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
-    deflt | length cons_w_field == length all_cons = []
+    deflt | not (any is_unused all_cons) = []
 	  | otherwise = [mkSimpleMatch [nlWildPat] 
 	    	      	    (nlHsApp (nlHsVar (getName rEC_SEL_ERROR_ID))
     	      		    	     (nlHsLit msg_lit))]
+
+	-- Do not add a default case unless there are unmatched
+	-- constructors.  We must take account of GADTs, else we
+	-- get overlap warning messages from the pattern-match checker
+    is_unused con = not (con `elem` cons_w_field 
+			 || dataConCannotMatch inst_tys con)
+    inst_tys = tyConAppArgs data_ty
 
     unit_rhs = L loc $ ExplicitTuple [] Boxed
     msg_lit = HsStringPrim $ mkFastString $ 

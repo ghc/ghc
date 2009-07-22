@@ -26,6 +26,8 @@ import Name
 import TysWiredIn
 import PrelNames
 import TyCon
+import Type
+import Unify( dataConCannotMatch )
 import SrcLoc
 import UniqSet
 import Util
@@ -446,12 +448,13 @@ mb_neg (Just _) v = -v
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = ASSERT( not (null used_cons) ) unused_cons
      where
-       (ConPatOut { pat_con = l_con }) = head used_cons
-       ty_con 	       = dataConTyCon (unLoc l_con)	-- Newtype observable
-       all_cons        = tyConDataCons ty_con
-       used_cons_as_id = map (\ (ConPatOut{ pat_con = L _ d}) -> d) used_cons
-       unused_cons     = uniqSetToList
-			 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
+       used_set :: UniqSet DataCon
+       used_set = mkUniqSet [d | ConPatOut{ pat_con = L _ d} <- used_cons]
+       (ConPatOut { pat_ty = ty }) = head used_cons
+       Just (ty_con, inst_tys) = splitTyConApp_maybe ty
+       unused_cons = filterOut is_used (tyConDataCons ty_con)
+       is_used con = con `elementOfUniqSet` used_set
+		     || dataConCannotMatch inst_tys con
 
 all_vars :: [Pat Id] -> Bool
 all_vars []             = True
