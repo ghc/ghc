@@ -15,7 +15,8 @@ Library {
                      GHC.Integer.Simple.Internals
     other-modules: GHC.Integer.Type
     extensions: CPP, MagicHash, BangPatterns, UnboxedTuples,
-                ForeignFunctionInterface, UnliftedFFITypes
+                ForeignFunctionInterface, UnliftedFFITypes,
+                NoImplicitPrelude
     -- We need to set the package name to integer-simple
     -- (without a version number) as it's magic.
     ghc-options: -package-name integer-simple -Wall -Werror
