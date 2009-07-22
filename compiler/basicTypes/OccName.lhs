@@ -9,7 +9,7 @@
 -- GHC uses several kinds of name internally:
 --
 -- * 'OccName.OccName' represents names as strings with just a little more information:
---   the "namespace" that the name came from, e.g. the namespace of value, type constructors or
+--   the \"namespace\" that the name came from, e.g. the namespace of value, type constructors or
 --   data constructors
 --
 -- * 'RdrName.RdrName': see "RdrName#name_types"

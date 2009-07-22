@@ -1,3 +1,9 @@
+-- | Optimisation fuel is used to control the amount of work the optimiser does.
+--
+-- Every optimisation step consumes a certain amount of fuel and stops when
+-- it runs out of fuel.  This can be used e.g. to debug optimiser bugs: Run
+-- the optimiser with varying amount of fuel to find out the exact number of
+-- steps where a bug is introduced in the output.
 module OptimizationFuel
     ( OptimizationFuel,  canRewriteWithFuel, maybeRewriteWithFuel, oneLessFuel
     , OptFuelState, initOptFuelState --, setTotalFuel
