@@ -1,10 +1,12 @@
 
-{-# LANGUAGE NoImplicitPrelude, BangPatterns #-}
+{-# LANGUAGE CPP, MagicHash, ForeignFunctionInterface,
+             NoImplicitPrelude, BangPatterns, UnboxedTuples,
+             UnliftedFFITypes #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Integer
--- Copyright   :  (c) Ian Lnyagh 2007-2008
+-- Copyright   :  (c) Ian Lynagh 2007-2008
 -- License     :  BSD3
 --
 -- Maintainer  :  igloo@earth.li
@@ -32,8 +34,11 @@ module GHC.Integer (
     encodeDoubleInteger, decodeDoubleInteger, doubleFromInteger,
     -- gcdInteger, lcmInteger, -- XXX
     andInteger, orInteger, xorInteger, complementInteger,
+    shiftLInteger, shiftRInteger,
     hashInteger,
  ) where
+
+import GHC.Integer.Type
 
 import GHC.Bool
 import GHC.Ordering
@@ -49,8 +54,6 @@ errorInteger = Positive errorPositive
 
 errorPositive :: Positive
 errorPositive = Some 47## None -- Random number
-
-data Integer = Positive !Positive | Negative !Positive | Naught
 
 smallInteger :: Int# -> Integer
 smallInteger i = if i >=# 0# then wordToInteger (int2Word# i)
@@ -268,6 +271,17 @@ Negative x `xorInteger` Negative y = let x' = x `minusPositive` onePositive
 complementInteger :: Integer -> Integer
 complementInteger x = negativeOneInteger `minusInteger` x
 
+shiftLInteger :: Integer -> Int# -> Integer
+shiftLInteger (Positive p) i = Positive (shiftLPositive p i)
+shiftLInteger (Negative n) i = Negative (shiftLPositive n i)
+shiftLInteger Naught       _ = Naught
+
+shiftRInteger :: Integer -> Int# -> Integer
+shiftRInteger (Positive p)   i = shiftRPositive p i
+shiftRInteger j@(Negative _) i
+    = complementInteger (shiftRInteger (complementInteger j) i)
+shiftRInteger Naught         _ = Naught
+
 twosComplementPositive :: Positive -> DigitsOnes
 twosComplementPositive p = flipBits (p `minusPositive` onePositive)
 
@@ -392,22 +406,8 @@ hashInteger (!_) = 42#
 -------------------------------------------------------------------
 -- The hard work is done on positive numbers
 
--- Least significant bit is first
-
--- Positive's have the property that they contain at least one Bit,
--- and their last Bit is One.
-type Positive = Digits
-type Positives = List Positive
-
-data Digits = Some !Digit !Digits
-            | None
-type Digit = Word#
-
 -- XXX Could move () above us
 data Unit = Unit
-
--- XXX Could move [] above us
-data List a = Nil | Cons a (List a)
 
 onePositive :: Positive
 onePositive = Some 1## None
@@ -614,10 +614,17 @@ splitHalves :: Digit -> (# {- High -} Digit, {- Low -} Digit #)
 splitHalves (!x) = (# x `uncheckedShiftRL#` highHalfShift Unit,
                       x `and#` lowHalfMask Unit #)
 
--- Assumes 0 <= i <= 31
+-- Assumes 0 <= i
 shiftLPositive :: Positive -> Int# -> Positive
-shiftLPositive None (!_) = None -- XXX Can't happen
-shiftLPositive (!p) (!i) =
+shiftLPositive p i
+    = if i >=# WORD_SIZE_IN_BITS#
+      then shiftLPositive (Some 0## p) (i -# WORD_SIZE_IN_BITS#)
+      else smallShiftLPositive p i
+
+-- Assumes 0 <= i < WORD_SIZE_IN_BITS#
+smallShiftLPositive :: Positive -> Int# -> Positive
+smallShiftLPositive (!p) 0# = p
+smallShiftLPositive (!p) (!i) =
     case WORD_SIZE_IN_BITS# -# i of
     j -> let f carry None = if carry `eqWord#` 0##
                             then None
@@ -628,6 +635,23 @@ shiftLPositive (!p) (!i) =
                                     me ->
                                      Some (me `or#` carry) (f carry' ws)
          in f 0## p
+
+-- Assumes 0 <= i
+shiftRPositive :: Positive -> Int# -> Integer
+shiftRPositive None _ = Naught
+shiftRPositive p@(Some _ q) i
+    = if i >=# WORD_SIZE_IN_BITS#
+      then shiftRPositive q (i -# WORD_SIZE_IN_BITS#)
+      else smallShiftRPositive p i
+
+-- Assumes 0 <= i < WORD_SIZE_IN_BITS#
+smallShiftRPositive :: Positive -> Int# -> Integer
+smallShiftRPositive (!p) (!i) =
+    if i ==# 0#
+    then Positive p
+    else case smallShiftLPositive p (WORD_SIZE_IN_BITS# -# i) of
+         Some _ p'@(Some _ _) -> Positive p'
+         _                    -> Naught
 
 -- Long division
 quotRemPositive :: Positive -> Positive -> (# Integer, Integer #)
@@ -641,7 +665,7 @@ quotRemPositive :: Positive -> Positive -> (# Integer, Integer #)
 
           mkSubtractors (!n) = if n ==# 0#
                                then Cons ys Nil
-                               else Cons (ys `shiftLPositive` n)
+                               else Cons (ys `smallShiftLPositive` n)
                                          (mkSubtractors (n -# 1#))
 
           -- The main function. Go the the end of xs, then walk
