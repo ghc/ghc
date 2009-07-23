@@ -22,7 +22,6 @@ import Type
 import TysWiredIn
 import BasicTypes as Hs
 import ForeignCall
-import Char
 import List
 import Unique
 import MonadUtils
@@ -325,15 +324,15 @@ noExistentials = []
 
 cvtForD :: Foreign -> CvtM (ForeignDecl RdrName)
 cvtForD (ImportF callconv safety from nm ty)
-  | Just (c_header, cis) <- parse_ccall_impent (TH.nameBase nm) from
-  = do	{ nm' <- vNameL nm
-	; ty' <- cvtType ty
-	; let i = CImport (cvt_conv callconv) safety' c_header cis
-	; return $ ForeignImport nm' ty' i }
-
+  | Just impspec <- parseCImport (cvt_conv callconv) safety' 
+                                 (mkFastString (TH.nameBase nm)) from
+  = do { nm' <- vNameL nm
+       ; ty' <- cvtType ty
+       ; return (ForeignImport nm' ty' impspec)
+       }
   | otherwise
-  = failWith $ text (show from)<+> ptext (sLit "is not a valid ccall impent")
-  where 
+  = failWith $ text (show from) <+> ptext (sLit "is not a valid ccall impent")
+  where
     safety' = case safety of
                      Unsafe     -> PlayRisky
                      Safe       -> PlaySafe False
@@ -348,61 +347,6 @@ cvtForD (ExportF callconv as nm ty)
 cvt_conv :: TH.Callconv -> CCallConv
 cvt_conv TH.CCall   = CCallConv
 cvt_conv TH.StdCall = StdCallConv
-
-parse_ccall_impent :: String -> String -> Maybe (FastString, CImportSpec)
-parse_ccall_impent nm s
- = case lex_ccall_impent s of
-       Just ["dynamic"] -> Just (nilFS, CFunction DynamicTarget)
-       Just ["wrapper"] -> Just (nilFS, CWrapper)
-       Just ("static":ts) -> parse_ccall_impent_static nm ts
-       Just ts -> parse_ccall_impent_static nm ts
-       Nothing -> Nothing
-
--- XXX we should be sharing code with RdrHsSyn.parseCImport
-parse_ccall_impent_static :: String
-                          -> [String]
-                          -> Maybe (FastString, CImportSpec)
-parse_ccall_impent_static nm ts
- = case ts of
-     [               ] -> mkFun nilFS                 nm
-     [       "&", cid] -> mkLbl nilFS                 cid
-     [fname, "&"     ] -> mkLbl (mkFastString fname)  nm
-     [fname, "&", cid] -> mkLbl (mkFastString fname)  cid
-     [       "&"     ] -> mkLbl nilFS                 nm
-     [fname,      cid] -> mkFun (mkFastString fname)  cid
-     [            cid]
-          | is_cid cid -> mkFun nilFS                 cid
-          | otherwise  -> mkFun (mkFastString cid)    nm
-           -- tricky case when there's a single string: "foo.h" is a header,
-           -- but "foo" is a C identifier, and we tell the difference by
-           -- checking for a valid C identifier (see is_cid below).
-     _anything_else    -> Nothing
-
-    where is_cid :: String -> Bool
-          is_cid x = all (/= '.') x && (isAlpha (head x) || head x == '_')
-
-          mkLbl :: FastString -> String -> Maybe (FastString, CImportSpec)
-          mkLbl fname lbl  = Just (fname, CLabel (mkFastString lbl))
-
-          mkFun :: FastString -> String -> Maybe (FastString, CImportSpec)
-          mkFun fname lbl  = Just (fname, CFunction (StaticTarget (mkFastString lbl)))
-
--- This code is tokenising something like "foo.h &bar", eg.
---   ""           -> Just []
---   "foo.h"      -> Just ["foo.h"]
---   "foo.h &bar" -> Just ["foo.h","&","bar"]
---   "&"          -> Just ["&"]
--- Nothing is returned for a parse error.
-lex_ccall_impent :: String -> Maybe [String]
-lex_ccall_impent "" = Just []
-lex_ccall_impent ('&':xs) = fmap ("&":) $ lex_ccall_impent xs
-lex_ccall_impent (' ':xs) = lex_ccall_impent xs
-lex_ccall_impent ('\t':xs) = lex_ccall_impent xs
-lex_ccall_impent xs = case span is_valid xs of
-                          ("", _) -> Nothing
-                          (t, xs') -> fmap (t:) $ lex_ccall_impent xs'
-    where is_valid :: Char -> Bool
-          is_valid c = isAscii c && (isAlphaNum c || c `elem` "._")
 
 ------------------------------------------
 --              Pragmas

@@ -25,6 +25,7 @@ module RdrHsSyn (
 	mkImport,            -- CallConv -> Safety 
 			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> P RdrNameHsDecl
+        parseCImport,
 	mkExport,            -- CallConv
 			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> P RdrNameHsDecl
@@ -32,7 +33,7 @@ module RdrHsSyn (
 	mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
 	mkSimpleConDecl, 
 	mkDeprecatedGadtRecordDecl,
-			      
+
 	-- Bunch of functions in the parser monad for 
 	-- checking and constructing values
 	checkPrecP, 	      -- Int -> P Int
@@ -74,8 +75,12 @@ import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
 import Outputable
 import FastString
+import Maybes
 
-import List		( isSuffixOf, nubBy )
+import Control.Applicative ((<$>))       
+import Text.ParserCombinators.ReadP as ReadP
+import Data.List        ( nubBy )
+import Data.Char        ( isAscii, isAlphaNum, isAlpha )
 
 #include "HsVersions.h"
 \end{code}
@@ -975,68 +980,49 @@ mkImport :: CallConv
 	 -> Safety 
 	 -> (Located FastString, Located RdrName, LHsType RdrName) 
 	 -> P (HsDecl RdrName)
-mkImport (CCall  cconv) safety (entity, v, ty)
+mkImport (CCall  cconv) safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (StaticTarget (unLoc entity))
+  let funcTarget = CFunction (StaticTarget entity)
       importSpec = CImport PrimCallConv safety nilFS funcTarget
   return (ForD (ForeignImport v ty importSpec))
   | otherwise = do
-    importSpec <- parseCImport entity cconv safety v
-    return (ForD (ForeignImport v ty importSpec))
+    case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
+      Nothing         -> parseError loc "Malformed entity string"
+      Just importSpec -> return (ForD (ForeignImport v ty importSpec))
 mkImport (DNCall      ) _      (entity, v, ty) = do
   spec <- parseDImport entity
   return $ ForD (ForeignImport v ty (DNImport spec))
 
--- parse the entity string of a foreign import declaration for the `ccall' or
--- `stdcall' calling convention'
---
-parseCImport :: Located FastString
-	     -> CCallConv 
-	     -> Safety 
-	     -> Located RdrName
-	     -> P ForeignImport
-parseCImport (L loc entity) cconv safety v
-  -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
-  | entity == fsLit "dynamic" = 
-    return $ CImport cconv safety nilFS (CFunction DynamicTarget)
-  | entity == fsLit "wrapper" =
-    return $ CImport cconv safety nilFS CWrapper
-  | otherwise		       = parse0 (unpackFS entity)
-    where
-      -- using the static keyword?
-      parse0 (' ':                    rest) = parse0 rest
-      parse0 ('s':'t':'a':'t':'i':'c':rest) = parse1 rest
-      parse0                          rest  = parse1 rest
-      -- check for header file name
-      parse1     ""               = parse4 ""    nilFS        False
-      parse1     (' ':rest)       = parse1 rest
-      parse1 str@('&':_   )       = parse2 str   nilFS
-      parse1 str
-	| ".h" `isSuffixOf` first = parse2 rest  (mkFastString first)
-        | otherwise               = parse4 str   nilFS        False
-        where
-	  (first, rest) = break (\c -> c == ' ' || c == '&') str
-      -- check for address operator (indicating a label import)
-      parse2     ""         header = parse4 ""   header False
-      parse2     (' ':rest) header = parse2 rest header
-      parse2     ('&':rest) header = parse3 rest header
-      parse2 str	    header = parse4 str	 header False
-      -- eat spaces after '&'
-      parse3 (' ':rest) header = parse3 rest header 
-      parse3 str	header = parse4 str  header True
-      -- check for name of C function
-      parse4 ""         header isLbl = build (mkExtName (unLoc v)) header isLbl
-      parse4 (' ':rest) header isLbl = parse4 rest         	   header isLbl
-      parse4 str	header isLbl
-        | all (== ' ') rest = build (mkFastString first)  header isLbl
-	| otherwise         = parseError loc "Malformed entity string"
-        where
-	  (first, rest) = break (== ' ') str
-      --
-      build cid header False = return $
-        CImport cconv safety header (CFunction (StaticTarget cid))
-      build cid header True  = return $
-        CImport cconv safety header (CLabel                  cid )
+-- the string "foo" is ambigous: either a header or a C identifier.  The
+-- C identifier case comes first in the alternatives below, so we pick
+-- that one.
+parseCImport :: CCallConv -> Safety -> FastString -> String
+             -> Maybe ForeignImport
+parseCImport cconv safety nm str =
+ listToMaybe $ map fst $ filter (null.snd) $ 
+     readP_to_S parse str
+ where
+   parse = choice [
+          string "dynamic" >> return (mk nilFS (CFunction DynamicTarget)),
+          string "wrapper" >> return (mk nilFS CWrapper),
+          optional (string "static" >> skipSpaces) >> 
+           (mk nilFS <$> cimp nm) +++
+           (do h <- munch1 hdr_char; skipSpaces; mk (mkFastString h) <$> cimp nm)
+       ]
+
+   mk = CImport cconv safety
+
+   hdr_char c = isAscii c && (isAlphaNum c || c `elem` "._")
+   id_char  c = isAlphaNum c || c == '_'
+
+   cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
+             +++ ((CFunction . StaticTarget) <$> cid)
+          where 
+            cid = return nm +++
+                  (do c  <- satisfy (\c -> isAlpha c || c == '_')
+                      cs <-  many (satisfy id_char)
+                      return (mkFastString (c:cs)))
+
 
 --
 -- Unravel a dotnet spec string.
