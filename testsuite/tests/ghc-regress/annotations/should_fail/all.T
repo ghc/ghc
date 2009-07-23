@@ -15,7 +15,7 @@ test('annfail08', normal, compile_fail, [''])
 test('annfail09', normal, compile_fail, [''])
 test('annfail10', normal, compile_fail, [''])
 test('annfail11', normal, compile_fail, [''])
-test('annfail12', normal, compile_fail, [''])
+test('annfail12', normal, compile_fail, ['-v0'])
 test('annfail13', normal, compile_fail, [''])
 
 """"
