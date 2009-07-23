@@ -121,6 +121,10 @@ data HsExpr id
   | SectionR    (LHsExpr id)    -- operator
                 (LHsExpr id)    -- operand
 
+  | ExplicitTuple		-- Used for explicit tuples and sections thereof
+        [HsTupArg id] 
+        Boxity
+
   | HsCase      (LHsExpr id)
                 (MatchGroup id)
 
@@ -146,14 +150,6 @@ data HsExpr id
   | ExplicitPArr                -- syntactic parallel array: [:e1, ..., en:]
                 PostTcType      -- type of elements of the parallel array
                 [LHsExpr id]
-
-  | ExplicitTuple               -- tuple
-                [LHsExpr id]
-                                -- NB: Unit is ExplicitTuple []
-                                -- for tuples, we can get the types
-                                -- direct from the components
-                Boxity
-
 
   -- Record construction
   | RecordCon   (Located id)       -- The constructor.  After type checking
@@ -280,6 +276,17 @@ data HsExpr id
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
 
+-- HsTupArg is used for tuple sections
+--  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
+--  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
+data HsTupArg id
+  = Present (LHsExpr id)	-- The argument
+  | Missing PostTcType		-- The argument is missing, but this is its type
+
+tupArgPresent :: HsTupArg id -> Bool
+tupArgPresent (Present {}) = True
+tupArgPresent (Missing {}) = False
+
 type PendingSplice = (Name, LHsExpr Id) -- Typechecked splices, waiting to be
                                         -- pasted back in by the desugarer
 \end{code}
@@ -380,6 +387,17 @@ ppr_expr (SectionR op expr)
     pp_infixly v
       = (sep [pprHsInfix v, pp_expr])
 
+ppr_expr (ExplicitTuple exprs boxity)
+  = tupleParens boxity (fcat (ppr_tup_args exprs))
+  where
+    ppr_tup_args []               = []
+    ppr_tup_args (Present e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es
+    ppr_tup_args (Missing _ : es) = comma : ppr_tup_args es
+
+    punc (Present {} : _) = comma <> space
+    punc (Missing {} : _) = comma
+    punc []               = empty
+
 --avoid using PatternSignatures for stage1 code portability
 ppr_expr exprType@(HsLam matches)
   = pprMatches (LambdaExpr `asTypeOf` idType exprType) matches
@@ -412,9 +430,6 @@ ppr_expr (ExplicitList _ exprs)
 
 ppr_expr (ExplicitPArr _ exprs)
   = pa_brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
-
-ppr_expr (ExplicitTuple exprs boxity)
-  = tupleParens boxity (sep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
@@ -529,18 +544,18 @@ pprParendExpr expr
         -- I think that is usually (always?) right
     in
     case unLoc expr of
-      ArithSeq{}           -> pp_as_was
-      PArrSeq{}            -> pp_as_was
-      HsLit _              -> pp_as_was
-      HsOverLit _          -> pp_as_was
-      HsVar _              -> pp_as_was
-      HsIPVar _            -> pp_as_was
-      ExplicitList _ _     -> pp_as_was
-      ExplicitPArr _ _     -> pp_as_was
-      ExplicitTuple _ _    -> pp_as_was
-      HsPar _              -> pp_as_was
-      HsBracket _          -> pp_as_was
-      HsBracketOut _ []    -> pp_as_was
+      ArithSeq {}       -> pp_as_was
+      PArrSeq {}        -> pp_as_was
+      HsLit {}          -> pp_as_was
+      HsOverLit {}      -> pp_as_was
+      HsVar {}          -> pp_as_was
+      HsIPVar {}        -> pp_as_was
+      ExplicitTuple {}  -> pp_as_was
+      ExplicitList {}   -> pp_as_was
+      ExplicitPArr {}   -> pp_as_was
+      HsPar {}          -> pp_as_was
+      HsBracket {}      -> pp_as_was
+      HsBracketOut _ [] -> pp_as_was
       HsDo sc _ _ _
        | isListCompExpr sc -> pp_as_was
       _                    -> parens pp_as_was

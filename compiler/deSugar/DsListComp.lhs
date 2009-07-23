@@ -642,7 +642,7 @@ dePArrParComp qss body = do
       -- empty parallel statement lists have no source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
     deParStmt ((qs, xs):qss) = do        -- first statement
-      let res_expr = mkLHsVarTup xs
+      let res_expr = mkLHsVarTuple xs
       cqs <- dsPArrComp (map unLoc qs) res_expr undefined
       parStmts qss (mkLHsVarPatTup xs) cqs
     ---
@@ -651,7 +651,7 @@ dePArrParComp qss body = do
       zipP <- dsLookupGlobalId zipPName
       let pa'      = mkLHsPatTup [pa, mkLHsVarPatTup xs]
           ty'cea   = parrElemType cea
-          res_expr = mkLHsVarTup xs
+          res_expr = mkLHsVarTuple xs
       cqs <- dsPArrComp (map unLoc qs) res_expr undefined
       let ty'cqs = parrElemType cqs
           cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]

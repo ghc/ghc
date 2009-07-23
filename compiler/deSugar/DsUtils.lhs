@@ -27,7 +27,7 @@ module DsUtils (
         seqVar,
 
         -- LHs tuples
-        mkLHsVarTup, mkLHsTup, mkLHsVarPatTup, mkLHsPatTup,
+        mkLHsVarPatTup, mkLHsPatTup, mkVanillaTuplePat,
         mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
         mkSelectorBinds,
@@ -583,37 +583,31 @@ mkSelectorBinds pat val_expr
 
 \end{code}
 
-Creating tuples and their types for full Haskell expressions
+Creating big tuples and their types for full Haskell expressions.
+They work over *Ids*, and create tuples replete with their types,
+which is whey they are not in HsUtils.
 
 \begin{code}
-
--- Smart constructors for source tuple expressions
-mkLHsVarTup :: [Id] -> LHsExpr Id
-mkLHsVarTup ids  = mkLHsTup (map nlHsVar ids)
-
-mkLHsTup :: [LHsExpr Id] -> LHsExpr Id
-mkLHsTup []     = nlHsVar unitDataConId
-mkLHsTup [lexp] = lexp
-mkLHsTup lexps  = L (getLoc (head lexps)) $ 
-		  ExplicitTuple lexps Boxed
-
--- Smart constructors for source tuple patterns
-mkLHsVarPatTup :: [Id] -> LPat Id
-mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
-
 mkLHsPatTup :: [LPat Id] -> LPat Id
 mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $ 
 		     mkVanillaTuplePat lpats Boxed
 
+mkLHsVarPatTup :: [Id] -> LPat Id
+mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
+
+mkVanillaTuplePat :: [OutPat Id] -> Boxity -> Pat Id
+-- A vanilla tuple pattern simply gets its type from its sub-patterns
+mkVanillaTuplePat pats box 
+  = TuplePat pats box (mkTupleTy box (length pats) (map hsLPatType pats))
+
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: [Id] -> LHsExpr Id
 mkBigLHsVarTup ids = mkBigLHsTup (map nlHsVar ids)
 
 mkBigLHsTup :: [LHsExpr Id] -> LHsExpr Id
-mkBigLHsTup = mkChunkified mkLHsTup
-
+mkBigLHsTup = mkChunkified mkLHsTupleExpr
 
 -- The Big equivalents for the source tuple patterns
 mkBigLHsVarPatTup :: [Id] -> LPat Id

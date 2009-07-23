@@ -841,12 +841,12 @@ sameGroup (PgView e1 t1) (PgView e2 t2) = viewLExprEq (e1,t1) (e2,t2)
        -- are "equal"---conservatively, we use syntactic equality
 sameGroup _          _          = False
 
--- an approximation of syntactic equality used for determining when view
+-- An approximation of syntactic equality used for determining when view
 -- exprs are in the same group.
--- this function can always safely return false;
+-- This function can always safely return false;
 -- but doing so will result in the application of the view function being repeated.
 --
--- currently: compare applications of literals and variables
+-- Currently: compare applications of literals and variables
 --            and anything else that we can do without involving other
 --            HsSyn types in the recursion
 --
@@ -859,12 +859,11 @@ viewLExprEq (e1,_) (e2,_) =
         -- short name for recursive call on unLoc
         lexp e e' = exp (unLoc e) (unLoc e')
 
-        -- check that two lists have the same length
-        -- and that they match up pairwise
-        lexps [] [] = True
-        lexps [] (_:_) = False
-        lexps (_:_) [] = False
-        lexps (x:xs) (y:ys) = lexp x y && lexps xs ys
+	eq_list :: (a->a->Bool) -> [a] -> [a] -> Bool
+        eq_list _  []     []     = True
+        eq_list _  []     (_:_)  = False
+        eq_list _  (_:_)  []     = False
+        eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
         -- conservative, in that it demands that wrappers be
         -- syntactically identical and doesn't look under binders
@@ -893,15 +892,13 @@ viewLExprEq (e1,_) (e2,_) =
         -- above does
         exp (HsIPVar i) (HsIPVar i') = i == i' 
         exp (HsOverLit l) (HsOverLit l') = 
-            -- overloaded lits are equal if they have the same type
+            -- Overloaded lits are equal if they have the same type
             -- and the data is the same.
             -- this is coarser than comparing the SyntaxExpr's in l and l',
             -- which resolve the overloading (e.g., fromInteger 1),
             -- because these expressions get written as a bunch of different variables
             -- (presumably to improve sharing)
             tcEqType (overLitType l) (overLitType l') && l == l'
-        -- comparing the constants seems right
-        exp (HsLit l) (HsLit l') = l == l'
         exp (HsApp e1 e2) (HsApp e1' e2') = lexp e1 e1' && lexp e2 e2'
         -- the fixities have been straightened out by now, so it's safe
         -- to ignore them?
@@ -912,14 +909,20 @@ viewLExprEq (e1,_) (e2,_) =
             lexp e1 e1' && lexp e2 e2'
         exp (SectionR e1 e2) (SectionR e1' e2') = 
             lexp e1 e1' && lexp e2 e2'
+        exp (ExplicitTuple es1 _) (ExplicitTuple es2 _) =
+            eq_list tup_arg es1 es2
         exp (HsIf e e1 e2) (HsIf e' e1' e2') =
             lexp e e' && lexp e1 e1' && lexp e2 e2'
-        exp (ExplicitList _ ls) (ExplicitList _ ls') = lexps ls ls'
-        exp (ExplicitPArr _ ls) (ExplicitPArr _ ls') = lexps ls ls'
-        exp (ExplicitTuple ls _) (ExplicitTuple ls' _) = lexps ls ls'
+
         -- Enhancement: could implement equality for more expressions
         --   if it seems useful
+	-- But no need for HsLit, ExplicitList, ExplicitTuple, 
+	-- because they cannot be functions
         exp _ _  = False
+
+        tup_arg (Present e1) (Present e2) = lexp e1 e2
+        tup_arg (Missing t1) (Missing t2) = tcEqType t1 t2
+        tup_arg _ _ = False
     in
       lexp e1 e2
 

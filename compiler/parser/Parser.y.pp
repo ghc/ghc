@@ -1332,13 +1332,17 @@ aexp2	:: { LHsExpr RdrName }
 --	| STRING			{ sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRING $1) placeHolderType) }
 	| INTEGER			{ sL (getLoc $1) (HsOverLit $! mkHsIntegral (getINTEGER $1) placeHolderType) }
 	| RATIONAL			{ sL (getLoc $1) (HsOverLit $! mkHsFractional (getRATIONAL $1) placeHolderType) }
+
         -- N.B.: sections get parsed by these next two productions.
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't correct Haskell98
         -- (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
 	| '(' texp ')'			{ LL (HsPar $2) }
-	| '(' texp ',' texps ')'	{ LL $ ExplicitTuple ($2 : reverse $4) Boxed }
-	| '(#' texps '#)'		{ LL $ ExplicitTuple (reverse $2)      Unboxed }
+	| '(' tup_exprs ')'             { LL (ExplicitTuple $2 Boxed) }
+
+	| '(#' texp '#)'		{ LL (ExplicitTuple [Present $2] Unboxed) }
+	| '(#' tup_exprs '#)'		{ LL (ExplicitTuple $2 Unboxed) }
+
 	| '[' list ']'                  { LL (unLoc $2) }
 	| '[:' parr ':]'                { LL (unLoc $2) }
 	| '_'				{ L1 EWildPat }
@@ -1383,6 +1387,9 @@ cvtopdecls0 :: { [LHsDecl RdrName] }
 	: {- empty -}		{ [] }
 	| cvtopdecls		{ $1 }
 
+-----------------------------------------------------------------------------
+-- Tuple expressions
+
 -- "texp" is short for tuple expressions: 
 -- things that can appear unparenthesized as long as they're
 -- inside parens or delimitted by commas
@@ -1406,10 +1413,20 @@ texp :: { LHsExpr RdrName }
        -- View patterns get parenthesized above
 	| exp '->' exp   { LL $ EViewPat $1 $3 }
 
-texps :: { [LHsExpr RdrName] }
-	: texps ',' texp		{ $3 : $1 }
-	| texp				{ [$1] }
+-- Always at least one comma
+tup_exprs :: { [HsTupArg RdrName] }
+           : texp commas_tup_tail  { Present $1 : $2 }
+           | commas tup_tail	   { replicate $1 missingTupArg ++ $2 }
 
+-- Always starts with commas; always follows an expr
+commas_tup_tail :: { [HsTupArg RdrName] }
+commas_tup_tail : commas tup_tail  { replicate ($1-1) missingTupArg ++ $2 }
+
+-- Always follows a comma
+tup_tail :: { [HsTupArg RdrName] }
+          : texp commas_tup_tail	{ Present $1 : $2 }
+	  | texp			{ [Present $1] }
+          | {- empty -}		        { [missingTupArg] }
 
 -----------------------------------------------------------------------------
 -- List expressions
@@ -1657,9 +1674,9 @@ con_list : con                  { L1 [$1] }
 
 sysdcon	:: { Located DataCon }	-- Wired in data constructors
 	: '(' ')'		{ LL unitDataCon }
-	| '(' commas ')'	{ LL $ tupleCon Boxed $2 }
+	| '(' commas ')'	{ LL $ tupleCon Boxed ($2 + 1) }
 	| '(#' '#)'		{ LL $ unboxedSingletonDataCon }
-	| '(#' commas '#)'	{ LL $ tupleCon Unboxed $2 }
+	| '(#' commas '#)'	{ LL $ tupleCon Unboxed ($2 + 1) }
 	| '[' ']'		{ LL nilDataCon }
 
 conop :: { Located RdrName }
@@ -1676,9 +1693,9 @@ qconop :: { Located RdrName }
 gtycon 	:: { Located RdrName }	-- A "general" qualified tycon
 	: oqtycon			{ $1 }
 	| '(' ')'			{ LL $ getRdrName unitTyCon }
-	| '(' commas ')'		{ LL $ getRdrName (tupleTyCon Boxed $2) }
+	| '(' commas ')'		{ LL $ getRdrName (tupleTyCon Boxed ($2 + 1)) }
 	| '(#' '#)'			{ LL $ getRdrName unboxedSingletonTyCon }
-	| '(#' commas '#)'		{ LL $ getRdrName (tupleTyCon Unboxed $2) }
+	| '(#' commas '#)'		{ LL $ getRdrName (tupleTyCon Unboxed ($2 + 1)) }
 	| '(' '->' ')'			{ LL $ getRdrName funTyCon }
 	| '[' ']'			{ LL $ listTyCon_RDR }
 	| '[:' ':]'			{ LL $ parrTyCon_RDR }
@@ -1887,7 +1904,7 @@ modid 	:: { Located ModuleName }
 
 commas :: { Int }
 	: commas ','			{ $1 + 1 }
-	| ','				{ 2 }
+	| ','				{ 1 }
 
 -----------------------------------------------------------------------------
 -- Documentation comments

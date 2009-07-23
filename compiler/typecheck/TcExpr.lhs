@@ -280,6 +280,33 @@ tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
 	     ; qtys' <- mapM refineBox qtys	-- c.f. tcArgs 
 	     ; return (qtys', arg2') }
     tc_args arg1_ty' _ _ _ = panic "tcExpr SectionR"
+
+-- For tuples, take care to preserve rigidity
+-- E.g. 	case (x,y) of ....
+-- 	   The scrutinee should have a rigid type if x,y do
+-- The general scheme is the same as in tcIdApp
+tcExpr in_expr@(ExplicitTuple tup_args boxity) res_ty
+  = do { let kind = case boxity of { Boxed   -> liftedTypeKind
+                                   ; Unboxed -> argTypeKind }
+             arity = length tup_args
+             tup_tc = tupleTyCon boxity arity
+             mk_tup_res_ty arg_tys 
+                 = mkFunTys [ty | (ty, Missing _) <- arg_tys `zip` tup_args]
+                            (mkTyConApp tup_tc arg_tys)
+
+       ; checkWiredInTyCon tup_tc       -- Ensure instances are available
+       ; tvs <- newBoxyTyVars (replicate arity kind)
+       ; let arg_tys1 = map mkTyVarTy tvs
+       ; arg_tys2 <- preSubType tvs (mkVarSet tvs) (mk_tup_res_ty arg_tys1) res_ty
+       
+       ; let go (Missing _,    arg_ty) = return (Missing arg_ty)
+             go (Present expr, arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
+			                    ; return (Present expr') }
+       ; tup_args' <- mapM go (tup_args `zip` arg_tys2)
+       
+       ; arg_tys3 <- mapM refineBox arg_tys2
+       ; co_fn <- tcSubExp TupleOrigin (mk_tup_res_ty arg_tys3) res_ty
+       ; return (mkHsWrap co_fn (ExplicitTuple tup_args' boxity)) }
 \end{code}
 
 \begin{code}
@@ -343,23 +370,6 @@ tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
 	; return $ mkHsWrapCoI coi (ExplicitPArr elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
-
--- For tuples, take care to preserve rigidity
--- E.g. 	case (x,y) of ....
--- 	   The scrutinee should have a rigid type if x,y do
--- The general scheme is the same as in tcIdApp
-tcExpr (ExplicitTuple exprs boxity) res_ty
-  = do	{ let kind = case boxity of { Boxed   -> liftedTypeKind
-				    ; Unboxed -> argTypeKind }
-	; tvs <- newBoxyTyVars [kind | e <- exprs]
-	; let tup_tc     = tupleTyCon boxity (length exprs)
-	      tup_res_ty = mkTyConApp tup_tc (mkTyVarTys tvs)
-	; checkWiredInTyCon tup_tc	-- Ensure instances are available
-	; arg_tys  <- preSubType tvs (mkVarSet tvs) tup_res_ty res_ty
-	; exprs'   <- tcPolyExprs exprs arg_tys
-	; arg_tys' <- mapM refineBox arg_tys
-	; co_fn    <- tcSubExp TupleOrigin (mkTyConApp tup_tc arg_tys') res_ty
-	; return (mkHsWrap co_fn (ExplicitTuple exprs' boxity)) }
 
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty

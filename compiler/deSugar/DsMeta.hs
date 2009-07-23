@@ -712,8 +712,10 @@ repE e@(HsDo _ _ _ _) = notHandled "mdo and [: :]" (ppr e)
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple es boxed) 
-  | isBoxed boxed         = do { xs <- repLEs es; repTup xs }
-  | otherwise		  = notHandled "Unboxed tuples" (ppr e)
+  | not (isBoxed boxed)        = notHandled "Unboxed tuples" (ppr e)
+  | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
+  | otherwise                  = do { xs <- repLEs [e | Present e <- es]; repTup xs }
+
 repE (RecordCon c _ flds)
  = do { x <- lookupLOcc c;
         fs <- repFields flds;

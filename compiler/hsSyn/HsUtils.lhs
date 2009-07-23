@@ -245,9 +245,6 @@ nlWildConPat :: DataCon -> LPat RdrName
 nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
 				   (PrefixCon (nOfThem (dataConSourceArity con) nlWildPat)))
 
-nlTuplePat :: [LPat id] -> Boxity -> LPat id
-nlTuplePat pats box = noLoc (TuplePat pats box placeHolderType)
-
 nlWildPat :: LPat id
 nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
@@ -261,14 +258,12 @@ nlHsLam  :: LMatch id -> LHsExpr id
 nlHsPar  :: LHsExpr id -> LHsExpr id
 nlHsIf   :: LHsExpr id -> LHsExpr id -> LHsExpr id -> LHsExpr id
 nlHsCase :: LHsExpr id -> [LMatch id] -> LHsExpr id
-nlTuple  :: [LHsExpr id] -> Boxity -> LHsExpr id
 nlList   :: [LHsExpr id] -> LHsExpr id
 
 nlHsLam	match		= noLoc (HsLam (mkMatchGroup [match]))
 nlHsPar e		= noLoc (HsPar e)
 nlHsIf cond true false	= noLoc (HsIf cond true false)
 nlHsCase expr matches	= noLoc (HsCase expr (mkMatchGroup matches))
-nlTuple exprs box	= noLoc (ExplicitTuple exprs box)
 nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
 
 nlHsAppTy :: LHsType name -> LHsType name -> LHsType name
@@ -283,7 +278,24 @@ nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
 \end{code}
 
+Tuples.  All these functions are *pre-typechecker* because they lack
+types on the tuple.
 
+\begin{code}
+mkLHsTupleExpr :: [LHsExpr a] -> LHsExpr a
+-- Makes a pre-typechecker boxed tuple, deals with 1 case
+mkLHsTupleExpr [e] = e
+mkLHsTupleExpr es  = noLoc $ ExplicitTuple (map Present es) Boxed
+
+mkLHsVarTuple :: [a] -> LHsExpr a
+mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
+
+nlTuplePat :: [LPat id] -> Boxity -> LPat id
+nlTuplePat pats box = noLoc (TuplePat pats box placeHolderType)
+
+missingTupArg :: HsTupArg a
+missingTupArg = Missing placeHolderType
+\end{code}
 
 %************************************************************************
 %*									*

@@ -1269,6 +1269,44 @@ definitions; you must define such a function in prefix form.</para>
 
 </sect2>
 
+<sect2 id="tuple-sections">
+<title>Tuple sections</title>
+
+<para>
+  The <option>-XTupleSections</option> flag enables Python-style partially applied
+  tuple constructors. For example, the following program
+<programlisting>
+  (, True)
+</programlisting>
+  is considered to be an alternative notation for the more unwieldy alternative
+<programlisting>
+  \x -> (x, True)
+</programlisting>
+You can omit any combination of arguments to the tuple, as in the following
+<programlisting>
+  (, "I", , , "Love", , 1337)
+</programlisting>
+which translates to
+<programlisting>
+  \a b c d -> (a, "I", b, c, "Love", d, 1337)
+</programlisting>
+</para>
+
+<para>
+  If you have <link linkend="unboxed-tuples">unboxed tuples</link> enabled, tuple sections
+  will also be available for them, like so
+<programlisting>
+  (# , True #)
+</programlisting>
+Because there is no unboxed unit tuple, the following expression
+<programlisting>
+  (# #)
+</programlisting>
+continues to stand for the unboxed singleton tuple data constructor.
+</para>
+
+</sect2>
+
 <sect2 id="disambiguate-fields">
 <title>Record field disambiguation</title>
 <para>

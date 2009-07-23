@@ -598,7 +598,6 @@ validRuleLhs foralls lhs
     check_e (HsApp e1 e2)      	 = checkl_e e1 `mplus` checkl_e e2
     check_e (NegApp e _)       	 = checkl_e e
     check_e (ExplicitList _ es)	 = checkl_es es
-    check_e (ExplicitTuple es _) = checkl_es es
     check_e other		 = Just other	-- Fails
 
     checkl_es es = foldr (mplus . checkl_e) Nothing es

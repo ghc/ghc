@@ -24,9 +24,9 @@ import HscTypes
 import StaticFlags
 import TyCon
 import FiniteMap
+import Maybes
 
 import Data.Array
-import Data.Maybe
 import System.Directory ( createDirectoryIfMissing )
 
 import Trace.Hpc.Mix
@@ -278,6 +278,10 @@ addTickHsExpr (SectionR e1 e2) =
 	liftM2 SectionR
 		(addTickLHsExpr e1)
 		(addTickLHsExpr e2)
+addTickHsExpr (ExplicitTuple es boxity) =
+        liftM2 ExplicitTuple
+                (mapM addTickTupArg es)
+                (return boxity)
 addTickHsExpr (HsCase e mgs) = 
 	liftM2 HsCase
 		(addTickLHsExpr e) 
@@ -301,17 +305,13 @@ addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
 		    ListComp -> Just $ BinBox QualBinBox
 		    _        -> Nothing
 addTickHsExpr (ExplicitList ty es) = 
-	liftM2 ExplicitList 
+	liftM2 ExplicitList
 		(return ty)
 		(mapM (addTickLHsExpr) es)
 addTickHsExpr (ExplicitPArr ty es) =
 	liftM2 ExplicitPArr
 		(return ty)
 		(mapM (addTickLHsExpr) es)
-addTickHsExpr (ExplicitTuple es box) =
-	liftM2 ExplicitTuple
-		(mapM (addTickLHsExpr) es)
-		(return box)
 addTickHsExpr (RecordCon id ty rec_binds) = 
 	liftM3 RecordCon
 		(return id)
@@ -376,6 +376,10 @@ addTickHsExpr e@(HsType _) = return e
 
 -- Others dhould never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
+
+addTickTupArg :: HsTupArg Id -> TM (HsTupArg Id)
+addTickTupArg (Present e)  = do { e' <- addTickLHsExpr e; return (Present e') }
+addTickTupArg (Missing ty) = return (Missing ty)
 
 addTickMatchGroup :: MatchGroup Id -> TM (MatchGroup Id)
 addTickMatchGroup (MatchGroup matches ty) = do

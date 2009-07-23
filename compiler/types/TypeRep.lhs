@@ -432,6 +432,7 @@ pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
 pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext (sLit "~")), ppr ty2]
+
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = ppr_type_app TopPrec (getName clas) tys
 

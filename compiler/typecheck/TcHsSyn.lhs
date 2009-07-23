@@ -13,7 +13,7 @@ module TcHsSyn (
 	mkHsConApp, mkHsDictLet, mkHsApp,
 	hsLitType, hsLPatType, hsPatType, 
 	mkHsAppTy, mkSimpleHsAlt,
-	nlHsIntLit, mkVanillaTuplePat, 
+	nlHsIntLit, 
 	shortCutLit, hsOverLitName,
 	
 	mkArbitraryType,	-- Put this elsewhere?
@@ -80,11 +80,6 @@ mappM = mapM
 Note: If @hsLPatType@ doesn't bear a strong resemblance to @exprType@,
 then something is wrong.
 \begin{code}
-mkVanillaTuplePat :: [OutPat Id] -> Boxity -> Pat Id
--- A vanilla tuple pattern simply gets its type from its sub-patterns
-mkVanillaTuplePat pats box 
-  = TuplePat pats box (mkTupleTy box (length pats) (map hsLPatType pats))
-
 hsLPatType :: OutPat Id -> Type
 hsLPatType (L _ pat) = hsPatType pat
 
@@ -490,6 +485,13 @@ zonkExpr env (SectionR op expr)
     zonkLExpr env expr		`thenM` \ new_expr ->
     returnM (SectionR new_op new_expr)
 
+zonkExpr env (ExplicitTuple tup_args boxed)
+  = do { new_tup_args <- mapM zonk_tup_arg tup_args
+       ; return (ExplicitTuple new_tup_args boxed) }
+  where
+    zonk_tup_arg (Present e) = do { e' <- zonkLExpr env e; return (Present e') }
+    zonk_tup_arg (Missing t) = do { t' <- zonkTcTypeToType env t; return (Missing t') }
+
 zonkExpr env (HsCase expr ms)
   = zonkLExpr env expr    	`thenM` \ new_expr ->
     zonkMatchGroup env ms	`thenM` \ new_ms ->
@@ -522,10 +524,6 @@ zonkExpr env (ExplicitPArr ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
     zonkLExprs env exprs	`thenM` \ new_exprs ->
     returnM (ExplicitPArr new_ty new_exprs)
-
-zonkExpr env (ExplicitTuple exprs boxed)
-  = zonkLExprs env exprs  	`thenM` \ new_exprs ->
-    returnM (ExplicitTuple new_exprs boxed)
 
 zonkExpr env (RecordCon data_con con_expr rbinds)
   = do	{ new_con_expr <- zonkExpr env con_expr

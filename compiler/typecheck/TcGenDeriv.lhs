@@ -718,7 +718,7 @@ gen_Ix_binds loc tycon
 
 	mk_qual a b c = noLoc $ mkBindStmt (nlVarPat c)
 				 (nlHsApp (nlHsVar range_RDR) 
-					(nlTuple [nlHsVar a, nlHsVar b] Boxed))
+					  (mkLHsVarTuple [a,b]))
 
     ----------------
     single_con_index
@@ -740,11 +740,11 @@ gen_Ix_binds loc tycon
 	    ) plus_RDR (
 		genOpApp (
 		    (nlHsApp (nlHsVar unsafeRangeSize_RDR) 
-			   (nlTuple [nlHsVar l, nlHsVar u] Boxed))
+			     (mkLHsVarTuple [l,u]))
 		) times_RDR (mk_index rest)
 	   )
 	mk_one l u i
-	  = nlHsApps unsafeIndex_RDR [nlTuple [nlHsVar l, nlHsVar u] Boxed, nlHsVar i]
+	  = nlHsApps unsafeIndex_RDR [mkLHsVarTuple [l,u], nlHsVar i]
 
     ------------------
     single_con_inRange
@@ -753,8 +753,7 @@ gen_Ix_binds loc tycon
 		 con_pat cs_needed] $
 	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed)
       where
-    	in_range a b c = nlHsApps inRange_RDR [nlTuple [nlHsVar a, nlHsVar b] Boxed,
-					       nlHsVar c]
+    	in_range a b c = nlHsApps inRange_RDR [mkLHsVarTuple [a,b], nlHsVar c]
 \end{code}
 
 %************************************************************************
@@ -832,9 +831,8 @@ gen_Read_binds get_fixity loc tycon
             _     -> [nlHsApp (nlHsVar choose_RDR) 
     		   	      (nlList (map mk_pair nullary_cons))]
     
-    mk_pair con = nlTuple [nlHsLit (mkHsString (data_con_str con)), 
-			   result_expr con []]
-			  Boxed
+    mk_pair con = mkLHsTupleExpr [nlHsLit (mkHsString (data_con_str con)), 
+			          result_expr con []]
     
     read_non_nullary_con data_con
       | is_infix  = mk_parser infix_prec  infix_stmts  body

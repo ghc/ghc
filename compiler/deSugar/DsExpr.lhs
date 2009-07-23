@@ -261,6 +261,25 @@ dsExpr (SectionR op expr) = do
     return (bindNonRec y_id y_core $
             Lam x_id (mkCoreAppsDs core_op [Var x_id, Var y_id]))
 
+dsExpr (ExplicitTuple tup_args boxity)
+  = do { let go (lam_vars, args) (Missing ty)
+                    -- For every missing expression, we need
+		    -- another lambda in the desugaring.
+               = do { lam_var <- newSysLocalDs ty
+                    ; return (lam_var : lam_vars, Var lam_var : args) }
+	     go (lam_vars, args) (Present expr)
+     	            -- Expressions that are present don't generate
+                    -- lambdas, just arguments.
+               = do { core_expr <- dsLExpr expr
+                    ; return (lam_vars, core_expr : args) }
+
+       ; (lam_vars, args) <- foldM go ([], []) (reverse tup_args)
+		-- The reverse is because foldM goes left-to-right
+
+       ; return $ mkCoreLams lam_vars $ 
+                  mkConApp (tupleCon boxity (length tup_args))
+                           (map (Type . exprType) args ++ args) }
+
 dsExpr (HsSCC cc expr) = do
     mod_name <- getModuleDs
     Note (SCC (mkUserCC cc mod_name)) <$> dsLExpr expr
@@ -334,11 +353,6 @@ dsExpr (ExplicitPArr ty xs) = do
   where
     unary  fn x   = mkApps (Var fn) [Type ty, x]
     binary fn x y = mkApps (Var fn) [Type ty, x, y]
-
-dsExpr (ExplicitTuple expr_list boxity) = do
-    core_exprs <- mapM dsLExpr expr_list
-    return (mkConApp (tupleCon boxity (length expr_list))
-                  (map (Type .  exprType) core_exprs ++ core_exprs))
 
 dsExpr (ArithSeq expr (From from))
   = App <$> dsExpr expr <*> dsLExpr from
@@ -793,7 +807,7 @@ dsMDo tbl stmts body result_ty
 		  -- mkCoreTupTy deals with singleton case
 
 	return_app  = nlHsApp (nlHsTyApp return_id [tup_ty]) 
-			      (mk_ret_tup rets)
+			      (mkLHsTupleExpr rets)
 
 	mk_wild_pat :: Id -> LPat Id 
    	mk_wild_pat v = noLoc $ WildPat $ idType v
@@ -805,10 +819,6 @@ dsMDo tbl stmts body result_ty
  	mk_tup_pat :: [LPat Id] -> LPat Id
   	mk_tup_pat [p] = p
 	mk_tup_pat ps  = noLoc $ mkVanillaTuplePat ps Boxed
-
-	mk_ret_tup :: [LHsExpr Id] -> LHsExpr Id
-	mk_ret_tup [r] = r
-	mk_ret_tup rs  = noLoc $ ExplicitTuple rs Boxed
 \end{code}
 
 

@@ -239,10 +239,14 @@ rnExpr (ExplicitPArr _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
     return  (ExplicitPArr placeHolderType exps', fvs)
 
-rnExpr (ExplicitTuple exps boxity)
-  = checkTupSize (length exps)			`thenM_`
-    rnExprs exps	 			`thenM` \ (exps', fvs) ->
-    return (ExplicitTuple exps' boxity, fvs)
+rnExpr (ExplicitTuple tup_args boxity)
+  = do { checkTupleSection tup_args
+       ; checkTupSize (length tup_args)
+       ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
+       ; return (ExplicitTuple tup_args' boxity, plusFVs fvs) }
+  where
+    rnTupArg (Present e) = do { (e',fvs) <- rnLExpr e; return (Present e', fvs) }
+    rnTupArg (Missing _) = return (Missing placeHolderType, emptyFVs)
 
 rnExpr (RecordCon con_id _ rbinds)
   = do	{ conname <- lookupLocatedOccRn con_id
@@ -1193,7 +1197,15 @@ checkTransformStmt (TransformStmtCtxt ctxt) = checkTransformStmt ctxt	-- Ok to n
 checkTransformStmt ctxt = addErr msg
   where
     msg = ptext (sLit "Illegal transform or grouping in") <+> pprStmtContext ctxt
-    
+
+---------
+checkTupleSection :: [HsTupArg RdrName] -> RnM ()
+checkTupleSection args
+  = do	{ tuple_section <- doptM Opt_TupleSections
+	; checkErr (all tupArgPresent args || tuple_section) msg }
+  where
+    msg = ptext (sLit "Illegal tuple section: use -XTupleSections")
+
 ---------
 sectionErr :: HsExpr RdrName -> SDoc
 sectionErr expr

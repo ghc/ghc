@@ -1269,7 +1269,7 @@ mkRecSelBind (tycon, sel_name)
 			 || dataConCannotMatch inst_tys con)
     inst_tys = tyConAppArgs data_ty
 
-    unit_rhs = L loc $ ExplicitTuple [] Boxed
+    unit_rhs = mkLHsTupleExpr []
     msg_lit = HsStringPrim $ mkFastString $ 
               occNameString (getOccName sel_name)
 

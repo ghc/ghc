@@ -777,8 +777,10 @@ checkAPat loc e = case e of
    ExplicitPArr _ es  -> do ps <- mapM checkLPat es
                             return (PArrPat ps placeHolderType)
    
-   ExplicitTuple es b -> do ps <- mapM checkLPat es
-                            return (TuplePat ps b placeHolderType)
+   ExplicitTuple es b 
+     | all tupArgPresent es  -> do ps <- mapM checkLPat [e | Present e <- es]
+                                   return (TuplePat ps b placeHolderType)
+     | otherwise -> parseError loc "Illegal tuple section in pattern"
    
    RecordCon c _ (HsRecFields fs dd)
                       -> do fs <- mapM checkPatField fs
@@ -958,7 +960,6 @@ mkInlineSpec Nothing    match_info True  = alwaysInlineSpec match_info
 mkInlineSpec Nothing 	match_info False = neverInlineSpec  match_info
                                                                 -- NOINLINE
 mkInlineSpec (Just act) match_info inl   = Inline (InlinePragma act match_info) inl
-
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations
