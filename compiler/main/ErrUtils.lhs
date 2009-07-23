@@ -9,8 +9,7 @@ module ErrUtils (
 	Severity(..),
 
 	ErrMsg, WarnMsg,
-    ErrorMessages, WarningMessages,
-	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
+        ErrorMessages, WarningMessages,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
@@ -77,8 +76,6 @@ data ErrMsg = ErrMsg {
 	errMsgExtraInfo :: Message
 	}
 	-- The SrcSpan is used for sorting errors into line-number order
-	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
-	-- whether to qualify an External Name) at the error occurrence
 
 instance Show ErrMsg where
     show em = showSDoc (errMsgShortDoc em)
@@ -89,18 +86,21 @@ type WarnMsg = ErrMsg
 -- to qualify names in the message or not.
 mkErrMsg :: SrcSpan -> PrintUnqualified -> Message -> ErrMsg
 mkErrMsg locn print_unqual msg
-  = ErrMsg [locn] print_unqual msg empty
+  = ErrMsg { errMsgSpans = [locn], errMsgContext = print_unqual
+           , errMsgShortDoc = msg, errMsgExtraInfo = empty }
 
 -- Variant that doesn't care about qualified/unqualified names
 mkPlainErrMsg :: SrcSpan -> Message -> ErrMsg
 mkPlainErrMsg locn msg
-  = ErrMsg [locn] alwaysQualify msg empty
+  = ErrMsg { errMsgSpans = [locn], errMsgContext = alwaysQualify
+           , errMsgShortDoc = msg, errMsgExtraInfo = empty }
 
 -- A long (multi-line) error message, with context to tell us whether
 -- to qualify names in the message or not.
 mkLongErrMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> ErrMsg
 mkLongErrMsg locn print_unqual msg extra 
- = ErrMsg [locn] print_unqual msg extra
+ = ErrMsg { errMsgSpans = [locn], errMsgContext = print_unqual
+          , errMsgShortDoc = msg, errMsgExtraInfo = extra }
 
 mkWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> WarnMsg
 mkWarnMsg = mkErrMsg
