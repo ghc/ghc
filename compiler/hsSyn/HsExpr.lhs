@@ -939,11 +939,18 @@ pprGroupByClause (GroupBySomething eitherUsingExpr byExpr) = hsep [ptext (sLit "
   where usingExprDoc = either (\usingExpr -> hsep [ptext (sLit "using"), ppr usingExpr]) (const empty) eitherUsingExpr
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
-pprDo DoExpr      stmts body = ptext (sLit "do")  <+> pprDeeperList vcat (map ppr stmts ++ [ppr body])
-pprDo (MDoExpr _) stmts body = ptext (sLit "mdo") <+> pprDeeperList vcat (map ppr stmts ++ [ppr body])
+pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
+pprDo (MDoExpr _) stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
 pprDo ListComp    stmts body = pprComp brackets    stmts body
 pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
 pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
+
+ppr_do_stmts :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
+-- Print a bunch of do stmts, with explicit braces and semicolons,
+-- so that we are not vulnerable to layout bugs
+ppr_do_stmts stmts body
+  = lbrace <+> pprDeeperList vcat ([ ppr s <> semi | s <- stmts] ++ [ppr body])
+           <+> rbrace
 
 pprComp :: OutputableBndr id => (SDoc -> SDoc) -> [LStmt id] -> LHsExpr id -> SDoc
 pprComp brack quals body
