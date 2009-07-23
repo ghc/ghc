@@ -296,7 +296,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
 		 -- Generate the generic to/from functions from each type declaration
-	; gen_binds <- mkGenericBinds is_boot
+	; gen_binds <- mkGenericBinds is_boot tycl_decls
 	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
 
 	; dflags <- getDOpts
@@ -366,15 +366,15 @@ renameDeriv is_boot gen_binds insts
 	  clas_nm  	    = className clas
 
 -----------------------------------------
-mkGenericBinds :: Bool -> TcM (LHsBinds RdrName)
-mkGenericBinds is_boot
+mkGenericBinds :: Bool -> [LTyClDecl Name] -> TcM (LHsBinds RdrName)
+mkGenericBinds is_boot tycl_decls
   | is_boot 
   = return emptyBag
   | otherwise
-  = do	{ gbl_env <- getGblEnv
-	; let tcs = typeEnvTyCons (tcg_type_env gbl_env)
-	; return (unionManyBags [ mkTyConGenericBinds tc | 
-				  tc <- tcs, tyConHasGenerics tc ]) }
+  = do	{ tcs <- mapM tcLookupTyCon [ tcdName d 
+    	      	      		    | L _ d <- tycl_decls, isDataDecl d ]
+	; return (unionManyBags [ mkTyConGenericBinds tc
+				| tc <- tcs, tyConHasGenerics tc ]) }
 		-- We are only interested in the data type declarations,
 		-- and then only in the ones whose 'has-generics' flag is on
 		-- The predicate tyConHasGenerics finds both of these
