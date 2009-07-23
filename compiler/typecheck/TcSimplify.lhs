@@ -3107,7 +3107,7 @@ groupErrs report_err (inst:insts)
    (friends, others) = partition is_friend insts
    loc_msg	     = showSDoc (pprInstLoc (instLoc inst))
    is_friend friend  = showSDoc (pprInstLoc (instLoc friend)) == loc_msg
-   do_one insts = addInstCtxt (instLoc (head insts)) (report_err insts)
+   do_one insts = setInstCtxt (instLoc (head insts)) (report_err insts)
 		-- Add location and context information derived from the Insts
 
 -- Add the "arising from..." part to a message about bunch of dicts
@@ -3316,7 +3316,7 @@ monomorphism_fix dflags
 warnDefault :: [(Inst, Class, Var)] -> Type -> TcM ()
 warnDefault ups default_ty = do
     warn_flag <- doptM Opt_WarnTypeDefaults
-    addInstCtxt (instLoc (head (dicts))) (warnTc warn_flag warn_msg)
+    setInstCtxt (instLoc (head (dicts))) (warnTc warn_flag warn_msg)
   where
     dicts = [d | (d,_,_) <- ups]
 

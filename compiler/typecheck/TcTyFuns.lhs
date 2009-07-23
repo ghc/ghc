@@ -1599,10 +1599,9 @@ somethingdifferent message.
 eqInstMisMatch :: Inst -> TcM a
 eqInstMisMatch inst
   = ASSERT( isEqInst inst )
-    setErrCtxt ctxt $ failWithMisMatch ty_act ty_exp
+    setInstCtxt (instLoc inst) $ failWithMisMatch ty_act ty_exp
   where
     (ty_act, ty_exp) = eqInstTys inst
-    InstLoc _ _ ctxt = instLoc   inst
 
 -----------------------
 failWithMisMatch :: TcType -> TcType -> TcM a

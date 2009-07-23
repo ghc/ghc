@@ -711,11 +711,11 @@ getInstLoc origin
   = do { loc <- getSrcSpanM ; env <- getLclEnv ;
 	 return (InstLoc origin loc (tcl_ctxt env)) }
 
-addInstCtxt :: InstLoc -> TcM a -> TcM a
+setInstCtxt :: InstLoc -> TcM a -> TcM a
 -- Add the SrcSpan and context from the first Inst in the list
 -- 	(they all have similar locations)
-addInstCtxt (InstLoc _ src_loc ctxt) thing_inside
-  = setSrcSpan src_loc (updCtxt (\_ -> ctxt) thing_inside)
+setInstCtxt (InstLoc _ src_loc ctxt) thing_inside
+  = setSrcSpan src_loc (setErrCtxt ctxt thing_inside)
 \end{code}
 
     The addErrTc functions add an error message, but do not cause failure.
