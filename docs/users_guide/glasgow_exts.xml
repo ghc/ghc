@@ -2729,16 +2729,22 @@ GHC now allows stand-alone <literal>deriving</literal> declarations, enabled by 
 </programlisting>
 The syntax is identical to that of an ordinary instance declaration apart from (a) the keyword
 <literal>deriving</literal>, and (b) the absence of the <literal>where</literal> part.
-You must supply a context (in the example the context is <literal>(Eq a)</literal>), 
+Note the following points:
+<itemizedlist>
+<listitem><para>
+You must supply an explicit context (in the example the context is <literal>(Eq a)</literal>), 
 exactly as you would in an ordinary instance declaration.
-(In contrast the context is inferred in a <literal>deriving</literal> clause 
-attached to a data type declaration.) 
+(In contrast, in a <literal>deriving</literal> clause 
+attached to a data type declaration, the context is inferred.) 
+</para></listitem>
 
+<listitem><para>
 A <literal>deriving instance</literal> declaration
 must obey the same rules concerning form and termination as ordinary instance declarations,
 controlled by the same flags; see <xref linkend="instance-decls"/>.
-</para>
-<para>
+</para></listitem>
+
+<listitem><para>
 Unlike a <literal>deriving</literal>
 declaration attached to a <literal>data</literal> declaration, the instance can be more specific
 than the data type (assuming you also use 
@@ -2752,8 +2758,31 @@ for example
 </programlisting>
 This will generate a derived instance for <literal>(Foo [a])</literal> and <literal>(Foo (Maybe a))</literal>,
 but other types such as <literal>(Foo (Int,Bool))</literal> will not be an instance of <literal>Eq</literal>.
-</para>
+</para></listitem>
 
+<listitem><para>
+Unlike a <literal>deriving</literal>
+declaration attached to a <literal>data</literal> declaration, 
+GHC does not restrict the form of the data type.  Instead, GHC simply generates the appropriate
+boilerplate code for the specified class, and typechecks it. If there is a type error, it is
+your problem. (GHC will show you the offending code if it has a type error.) 
+The merit of this is that you can derive instances for GADTs and other exotic
+data types, providing only that the boilerplate code does indeed typecheck.  For example:
+<programlisting>
+  data T a where
+     T1 :: T Int
+     T2 :: T Bool
+
+  deriving instance Show (T a)
+</programlisting>
+In this example, you cannot say <literal>... deriving( Show )</literal> on the 
+data type declaration for <literal>T</literal>, 
+because <literal>T</literal> is a GADT, but you <emphasis>can</emphasis> generate
+the instance declaration using stand-alone deriving.
+</para>
+</listitem>
+
+<listitem>
 <para>The stand-alone syntax is generalised for newtypes in exactly the same
 way that ordinary <literal>deriving</literal> clauses are generalised (<xref linkend="newtype-deriving"/>).
 For example:
@@ -2764,7 +2793,8 @@ For example:
 </programlisting>
 GHC always treats the <emphasis>last</emphasis> parameter of the instance
 (<literal>Foo</literal> in this example) as the type whose instance is being derived.
-</para>
+</para></listitem>
+</itemizedlist></para>
 
 </sect2>
 
