@@ -640,6 +640,7 @@ data InstBindings a
 	(LHsBinds a)		-- Bindings for the instance methods
 	[LSig a]		-- User pragmas recorded for generating 
 				-- specialised instances
+	Bool			-- True <=> This code came from a standalone deriving clause
 
   | NewTypeDerived              -- Used for deriving instances of newtypes, where the
 	CoercionI		-- witness dictionary is identical to the argument 
@@ -655,8 +656,8 @@ pprInstInfo info = vcat [ptext (sLit "InstInfo:") <+> ppr (idType (iDFunId info)
 pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
-    details (VanillaInst b _)  = pprLHsBinds b
-    details (NewTypeDerived _) = text "Derived from the representation type"
+    details (VanillaInst b _ _) = pprLHsBinds b
+    details (NewTypeDerived _)  = text "Derived from the representation type"
 
 simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of

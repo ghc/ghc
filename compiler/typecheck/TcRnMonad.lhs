@@ -363,8 +363,8 @@ traceOptTcRn flag doc = ifOptM flag $ do
 			{ ctxt <- getErrCtxt
 			; loc  <- getSrcSpanM
 			; env0 <- tcInitTidyEnv
-			; ctxt_msgs <- do_ctxt env0 ctxt 
-			; let real_doc = mkLocMessage loc (vcat (doc : ctxt_to_use ctxt_msgs))
+			; err_info <- mkErrInfo env0 ctxt 
+			; let real_doc = mkLocMessage loc (doc $$ err_info)
 			; dumpTcRn real_doc }
 
 dumpTcRn :: SDoc -> TcRn ()
@@ -681,20 +681,23 @@ failIfErrsM = ifErrsM failM (return ())
 %************************************************************************
 
 \begin{code}
-getErrCtxt :: TcM ErrCtxt
+getErrCtxt :: TcM [ErrCtxt]
 getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
 
-setErrCtxt :: ErrCtxt -> TcM a -> TcM a
+setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
 setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
 addErrCtxt :: Message -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, Message)) -> TcM a -> TcM a
-addErrCtxtM msg = updCtxt (\ msgs -> msg : msgs)
+addErrCtxtM ctxt = updCtxt (\ ctxts -> (False, ctxt) : ctxts)
+
+addLandmarkErrCtxt :: Message -> TcM a -> TcM a
+addLandmarkErrCtxt msg = updCtxt (\ctxts -> (True, \env -> return (env,msg)) : ctxts)
 
 -- Helper function for the above
-updCtxt :: (ErrCtxt -> ErrCtxt) -> TcM a -> TcM a
+updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) -> 
 			   env { tcl_ctxt = upd ctxt })
 
@@ -763,8 +766,8 @@ addWarnTc msg = do { env0 <- tcInitTidyEnv
 addWarnTcM :: (TidyEnv, Message) -> TcM ()
 addWarnTcM (env0, msg)
  = do { ctxt <- getErrCtxt ;
-	ctxt_msgs <- do_ctxt env0 ctxt ;
-	addReport (vcat (ptext (sLit "Warning:") <+> msg : ctxt_to_use ctxt_msgs)) }
+	err_info <- mkErrInfo env0 ctxt ;
+	addReport (vcat [ptext (sLit "Warning:") <+> msg, err_info]) }
 
 warnTc :: Bool -> Message -> TcM ()
 warnTc warn_if_true warn_msg
@@ -801,23 +804,30 @@ tcInitTidyEnv
 
 \begin{code}
 add_err_tcm :: TidyEnv -> Message -> SrcSpan
-            -> [TidyEnv -> TcM (TidyEnv, SDoc)]
+            -> [ErrCtxt]
             -> TcM ()
 add_err_tcm tidy_env err_msg loc ctxt
- = do { ctxt_msgs <- do_ctxt tidy_env ctxt ;
-	addLongErrAt loc err_msg (vcat (ctxt_to_use ctxt_msgs)) }
+ = do { err_info <- mkErrInfo tidy_env ctxt ;
+	addLongErrAt loc err_msg err_info }
 
-do_ctxt :: TidyEnv -> [TidyEnv -> TcM (TidyEnv, SDoc)] -> TcM [SDoc]
-do_ctxt _ []
- = return []
-do_ctxt tidy_env (c:cs)
- = do {	(tidy_env', m) <- c tidy_env  ;
-	ms	       <- do_ctxt tidy_env' cs  ;
-	return (m:ms) }
+mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
+-- Tidy the error info, trimming excessive contexts
+mkErrInfo env ctxts
+ = go 0 env ctxts
+ where
+   go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
+   go _ _   [] = return empty
+   go n env ((is_landmark, ctxt) : ctxts)
+     | is_landmark || opt_PprStyle_Debug || n < mAX_CONTEXTS
+     = do { (env', msg) <- ctxt env
+	  ; let n' = if is_landmark then n else n+1
+          ; rest <- go n' env' ctxts
+	  ; return (msg $$ rest) }
+     | otherwise
+     = go n env ctxts
 
-ctxt_to_use :: [SDoc] -> [SDoc]
-ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
-		 | otherwise	      = take 3 ctxt
+mAX_CONTEXTS :: Int	-- No more than this number of non-landmark contexts
+mAX_CONTEXTS = 3
 \end{code}
 
 debugTc is useful for monadic debugging code

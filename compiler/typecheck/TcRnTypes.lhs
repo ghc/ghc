@@ -333,7 +333,7 @@ data TcLclEnv		-- Changes as we move inside an expression
 			-- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
 	tcl_loc  :: SrcSpan,		-- Source span
-	tcl_ctxt :: ErrCtxt,		-- Error context
+	tcl_ctxt :: [ErrCtxt],		-- Error context, innermost on top
 	tcl_errs :: TcRef Messages,	-- Place to accumulate errors
 
 	tcl_th_ctxt    :: ThStage,	      -- Template Haskell context
@@ -516,10 +516,13 @@ instance Outputable RefinementVisibility where
 \end{code}
 
 \begin{code}
-type ErrCtxt = [TidyEnv -> TcM (TidyEnv, Message)]	
-			-- Innermost first.  Monadic so that we have a chance
-			-- to deal with bound type variables just before error
-			-- message construction
+type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, Message))
+	-- Monadic so that we have a chance
+	-- to deal with bound type variables just before error
+	-- message construction
+
+	-- Bool:  True <=> this is a landmark context; do not
+	--		   discard it when trimming for display
 \end{code}
 
 
@@ -876,7 +879,7 @@ functions that deal with it.
 
 \begin{code}
 -------------------------------------------
-data InstLoc = InstLoc InstOrigin SrcSpan ErrCtxt
+data InstLoc = InstLoc InstOrigin SrcSpan [ErrCtxt]
 
 instLoc :: Inst -> InstLoc
 instLoc inst = tci_loc inst

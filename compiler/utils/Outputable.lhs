@@ -229,9 +229,9 @@ pprDeeperList f ds (PprUser q (PartWay n))
 pprDeeperList f ds other_sty
   = f ds other_sty
 
-pprSetDepth :: Int -> SDoc -> SDoc
-pprSetDepth  n d (PprUser q _) = d (PprUser q (PartWay n))
-pprSetDepth _n d other_sty     = d other_sty
+pprSetDepth :: Depth -> SDoc -> SDoc
+pprSetDepth depth  doc (PprUser q _) = doc (PprUser q depth)
+pprSetDepth _depth doc other_sty     = doc other_sty
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df sty = df sty sty

@@ -110,7 +110,8 @@ tcMatchLambda match res_ty
   where
     n_pats = matchGroupArity match
     doc = sep [ ptext (sLit "The lambda expression")
-		 <+> quotes (pprSetDepth 1 $ pprMatches (LambdaExpr :: HsMatchContext Name) match),
+		 <+> quotes (pprSetDepth (PartWay 1) $ 
+                             pprMatches (LambdaExpr :: HsMatchContext Name) match),
 			-- The pprSetDepth makes the abstraction print briefly
 		ptext (sLit "has") <+> speakNOf n_pats (ptext (sLit "argument"))]
     match_ctxt = MC { mc_what = LambdaExpr,

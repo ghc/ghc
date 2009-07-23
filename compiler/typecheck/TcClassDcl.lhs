@@ -533,7 +533,7 @@ mkGenericInstance clas (hs_ty, binds) = do
 	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]
 	ispec	   = mkLocalInstance dfun_id overlap_flag
 
-    return (InstInfo { iSpec = ispec, iBinds = VanillaInst binds [] })
+    return (InstInfo { iSpec = ispec, iBinds = VanillaInst binds [] False })
 \end{code}
 
 

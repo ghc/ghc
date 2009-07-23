@@ -432,7 +432,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
               ispec          = mkLocalInstance dfun overlap_flag
 
         ; return (InstInfo { iSpec  = ispec,
-                              iBinds = VanillaInst binds uprags },
+                             iBinds = VanillaInst binds uprags False },
                   idx_tycons)
         }
   where
@@ -698,7 +698,7 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
 ------------------------
 -- Ordinary instances
 
-tc_inst_decl2 dfun_id (VanillaInst monobinds uprags)
+tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
   = do { let rigid_info = InstSkol
              inst_ty    = idType dfun_id
 
@@ -730,8 +730,8 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags)
 	     dfun_lam_vars = map instToVar dfun_dicts	-- Includes equalities
 	     prag_fn	= mkPragFun uprags 
              loc        = getSrcSpan dfun_id
-	     tc_meth    = tcInstanceMethod loc clas inst_tyvars'
-	     		  	 dfun_dicts
+	     tc_meth    = tcInstanceMethod loc standalone_deriv 
+                                 clas inst_tyvars' dfun_dicts
                         	 dfun_theta' inst_tys'
 	     			 this_dict dfun_id
                              	 prag_fn monobinds
@@ -814,7 +814,7 @@ tcInstanceMethod
 - Use tcValBinds to do the checking
 
 \begin{code}
-tcInstanceMethod :: SrcSpan -> Class -> [TcTyVar] -> [Inst]
+tcInstanceMethod :: SrcSpan -> Bool -> Class -> [TcTyVar] -> [Inst]
 	 	 -> TcThetaType -> [TcType]
 		 -> Inst -> Id
           	 -> TcPragFun -> LHsBinds Name 
@@ -823,7 +823,7 @@ tcInstanceMethod :: SrcSpan -> Class -> [TcTyVar] -> [Inst]
 	-- The returned inst_meth_ids all have types starting
 	--	forall tvs. theta => ...
 
-tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys 
+tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts theta inst_tys 
 		 this_dict dfun_id prag_fn binds_in (sel_id, dm_info)
   = do	{ cloned_this <- cloneDict this_dict
 		-- Need to clone the dict in case it is floated out, and
@@ -838,12 +838,14 @@ tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys
 		-- involved; otherwise overlap is not possible
 		-- See Note [Subtle interaction of recursion and overlap]	
 
-	      tc_body rn_bind = do { (meth_id, tc_binds) <- tcInstanceMethodBody 
+	      tc_body rn_bind 
+                = add_meth_ctxt rn_bind $
+                  do { (meth_id, tc_binds) <- tcInstanceMethodBody 
 						InstSkol clas tyvars dfun_dicts theta inst_tys
 						mb_this_bind sel_id 
 						local_meth_name
 						meth_sig_fn meth_prag_fn rn_bind
-				   ; return (wrapId meth_wrapper meth_id, tc_binds) }
+		     ; return (wrapId meth_wrapper meth_id, tc_binds) }
 
 	; case (findMethodBind sel_name local_meth_name binds_in, dm_info) of
 		-- There is a user-supplied method binding, so use it
@@ -901,9 +903,21 @@ tcInstanceMethod loc clas tyvars dfun_dicts theta inst_tys
     dfun_lam_vars = map instToVar dfun_dicts
     meth_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys tyvars)
 
+	-- For instance decls that come from standalone deriving clauses
+	-- we want to print out the full source code if there's an error
+	-- because otherwise the user won't see the code at all
+    add_meth_ctxt rn_bind thing 
+      | standalone_deriv = addLandmarkErrCtxt (derivBindCtxt clas inst_tys rn_bind) thing
+      | otherwise        = thing
 
 wrapId :: HsWrapper -> id -> HsExpr id
 wrapId wrapper id = mkHsWrap wrapper (HsVar id)
+
+derivBindCtxt :: Class -> [Type ] -> LHsBind Name -> SDoc
+derivBindCtxt clas tys bind
+   = vcat [ ptext (sLit "When typechecking a standalone-derived method for")
+	    <+> quotes (pprClassPred clas tys) <> colon
+	  , nest 2 $ pprSetDepth AllTheWay $ ppr bind ]
 \end{code}
 
 Note [Default methods in instances]

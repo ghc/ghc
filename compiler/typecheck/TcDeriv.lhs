@@ -288,12 +288,12 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; overlap_flag <- getOverlapFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
-	; insts1 <- mapM (genInst overlap_flag) given_specs
+	; insts1 <- mapM (genInst True overlap_flag) given_specs
 
 	; final_specs <- extendLocalInstEnv (map (iSpec . fst) insts1) $
 			 inferInstanceContexts overlap_flag infer_specs
 
-	; insts2 <- mapM (genInst overlap_flag) final_specs
+	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
 		 -- Generate the generic to/from functions from each type declaration
 	; gen_binds <- mkGenericBinds is_boot
@@ -353,13 +353,14 @@ renameDeriv is_boot gen_binds insts
     rn_inst_info (InstInfo { iSpec = inst, iBinds = NewTypeDerived co })
 	= return (InstInfo { iSpec = inst, iBinds = NewTypeDerived co }, emptyFVs)
 
-    rn_inst_info (InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs })
+    rn_inst_info (InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs standalone_deriv })
 	= 	-- Bring the right type variables into 
 		-- scope (yuk), and rename the method binds
 	   ASSERT( null sigs )
 	   bindLocalNames (map Var.varName tyvars) $
  	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
-	      ; return (InstInfo { iSpec = inst, iBinds = VanillaInst rn_binds [] }, fvs) }
+	      ; let binds' = VanillaInst rn_binds [] standalone_deriv
+	      ; return (InstInfo { iSpec = inst, iBinds = binds' }, fvs) }
 	where
 	  (tyvars,_,clas,_) = instanceHead inst
 	  clas_nm  	    = className clas
@@ -651,12 +652,14 @@ mkDataTypeEqn :: InstOrigin
 
 mkDataTypeEqn orig dflags tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
-  = case checkSideConditions dflags cls cls_tys rep_tc of
-	-- NB: pass the *representation* tycon to checkSideConditions
-	CanDerive -> mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
-	NonDerivableClass	-> bale_out (nonStdErr cls)
-	DerivableClassError msg -> bale_out msg
+  | isJust mtheta = go_for_it	-- Do not test side conditions for standalone deriving
+  | otherwise     = case checkSideConditions dflags cls cls_tys rep_tc of
+		      -- NB: pass the *representation* tycon to checkSideConditions
+		      CanDerive               -> go_for_it
+		      NonDerivableClass	      -> bale_out (nonStdErr cls)
+		      DerivableClassError msg -> bale_out msg
   where
+    go_for_it    = mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
     bale_out msg = failWithTc (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) msg)
 
 mk_data_eqn, mk_typeable_eqn
@@ -1022,18 +1025,18 @@ mkNewTypeEqn orig dflags tvs
 	; return (if isJust mtheta then Right spec
 				   else Left spec) }
 
+  | isJust mtheta = go_for_it	-- Do not check side conditions for standalone deriving
   | otherwise
-  = case check_conditions of
-      CanDerive -> mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
-      		   	       	-- Use the standard H98 method
-      DerivableClassError msg -> bale_out msg		   -- Error with standard class
+  = case checkSideConditions dflags cls cls_tys rep_tycon of
+      CanDerive               -> go_for_it 	-- Use the standard H98 method
+      DerivableClassError msg -> bale_out msg	-- Error with standard class
       NonDerivableClass 	-- Must use newtype deriving
       	| newtype_deriving    -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
       	| otherwise           -> bale_out non_std_err      -- Try newtype deriving!
   where
         newtype_deriving = dopt Opt_GeneralizedNewtypeDeriving dflags
-	check_conditions = checkSideConditions dflags cls cls_tys rep_tycon
-	bale_out msg = failWithTc (derivingThingErr cls cls_tys inst_ty msg)
+        go_for_it        = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
+	bale_out msg     = failWithTc (derivingThingErr cls cls_tys inst_ty msg)
 
 	non_std_err = nonStdErr cls $$
 		      ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
@@ -1347,26 +1350,25 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: OverlapFlag -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
-genInst oflag spec
+genInst :: Bool 	-- True <=> standalone deriving
+	-> OverlapFlag
+        -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
+genInst standalone_deriv oflag spec
   | ds_newtype spec
   = return (InstInfo { iSpec  = mkInstance oflag (ds_theta spec) spec
 		     , iBinds = NewTypeDerived co }, [])
 
   | otherwise
-  = do	{ let loc	 = getSrcSpan (ds_name spec)
-	      inst	 = mkInstance oflag (ds_theta spec) spec
-   	      clas       = ds_cls spec
+  = do	{ let loc  = getSrcSpan (ds_name spec)
+	      inst = mkInstance oflag (ds_theta spec) spec
+   	      clas = ds_cls spec
 
           -- In case of a family instance, we need to use the representation
           -- tycon (after all, it has the data constructors)
 	; fix_env <- getFixityEnv
 	; let (meth_binds, aux_binds) = genDerivBinds loc fix_env clas rep_tycon
-
-	-- Build the InstInfo
-	; return (InstInfo { iSpec = inst, 
-		  	     iBinds = VanillaInst meth_binds [] },
-		  aux_binds)
+	      binds = VanillaInst meth_binds [] standalone_deriv
+	; return (InstInfo { iSpec = inst, iBinds = binds }, aux_binds)
         }
   where
     rep_tycon   = ds_tc spec
