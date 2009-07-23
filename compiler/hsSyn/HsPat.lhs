@@ -23,7 +23,7 @@ module HsPat (
 
 	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat, mkCoPatCoI,
 
-	isBangHsBind,	
+	isBangHsBind, hsPatNeedsParens,
 	patsAreAllCons, isConPat, isSigPat, isWildPat,
 	patsAreAllLits,	isLitPat, isIrrefutableHsPat
     ) where
@@ -175,7 +175,7 @@ However HsRecFields is used only for patterns and expressions
 \begin{code}
 data HsRecFields id arg 	-- A bunch of record fields
 				--	{ x = 3, y = True }
-	-- Used for both expressiona and patterns
+	-- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [HsRecField id arg],
 		  rec_dotdot :: Maybe Int }
 	-- Nothing => the normal case
@@ -248,8 +248,8 @@ pprPat (WildPat _)	  = char '_'
 pprPat (LazyPat pat)      = char '~' <> ppr pat
 pprPat (BangPat pat)      = char '!' <> ppr pat
 pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
-pprPat (ViewPat expr pat _)   = parens (hcat [pprLExpr expr, text " -> ", ppr pat])
-pprPat (ParPat pat)	  = parens (ppr pat)
+pprPat (ViewPat expr pat _) = parens (hcat [pprLExpr expr, text " -> ", ppr pat])
+pprPat (ParPat pat)	    = parens (ppr pat)
 pprPat (ListPat pats _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
 pprPat (TuplePat pats bx _) = tupleParens bx (interpp'SP pats)
@@ -417,12 +417,12 @@ isIrrefutableHsPat :: OutputableBndr id => LPat id -> Bool
 isIrrefutableHsPat pat
   = go pat
   where
-    go (L _ pat)	 = go1 pat
+    go (L _ pat) = go1 pat
 
-    go1 (WildPat _)         = True
-    go1 (VarPat _)          = True
-    go1 (VarPatOut _ _)     = True
-    go1 (LazyPat _)         = True
+    go1 (WildPat {})        = True
+    go1 (VarPat {})         = True
+    go1 (VarPatOut {})      = True
+    go1 (LazyPat {})        = True
     go1 (BangPat pat)       = go pat
     go1 (CoPat _ pat _)     = go1 pat
     go1 (ParPat pat)        = go pat
@@ -431,22 +431,50 @@ isIrrefutableHsPat pat
     go1 (SigPatIn pat _)    = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
-    go1 (ListPat _ _)       = False
-    go1 (PArrPat _ _)       = False	-- ?
+    go1 (ListPat {})        = False
+    go1 (PArrPat {})        = False	-- ?
 
-    go1 (ConPatIn _ _) = False	-- Conservative
+    go1 (ConPatIn {})       = False	-- Conservative
     go1 (ConPatOut{ pat_con = L _ con, pat_args = details }) 
 	=  isProductTyCon (dataConTyCon con)
 	&& all go (hsConPatArgs details)
 
-    go1 (LitPat _) 	   = False
-    go1 (NPat _ _ _)	   = False
-    go1 (NPlusKPat _ _ _ _) = False
+    go1 (LitPat {})    = False
+    go1 (NPat {})      = False
+    go1 (NPlusKPat {}) = False
 
     go1 (QuasiQuotePat {}) = urk pat	-- Gotten rid of by renamer, before
 					-- isIrrefutablePat is called
     go1 (TypePat {})       = urk pat
 
     urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
+
+hsPatNeedsParens :: Pat a -> Bool
+hsPatNeedsParens (WildPat {})        = False
+hsPatNeedsParens (VarPat {})         = False
+hsPatNeedsParens (VarPatOut {})      = True
+hsPatNeedsParens (LazyPat {})        = False
+hsPatNeedsParens (BangPat {})        = False
+hsPatNeedsParens (CoPat {})          = True
+hsPatNeedsParens (ParPat {})         = False
+hsPatNeedsParens (AsPat {})          = False
+hsPatNeedsParens (ViewPat {})        = True
+hsPatNeedsParens (SigPatIn {})       = True
+hsPatNeedsParens (SigPatOut {})      = True
+hsPatNeedsParens (TuplePat {})       = False
+hsPatNeedsParens (ListPat {})        = False
+hsPatNeedsParens (PArrPat {})        = False	
+hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
+hsPatNeedsParens (ConPatOut {})      = True
+hsPatNeedsParens (LitPat {})   	     = False
+hsPatNeedsParens (NPat {})	     = False
+hsPatNeedsParens (NPlusKPat {})      = True
+hsPatNeedsParens (QuasiQuotePat {})  = True
+hsPatNeedsParens (TypePat {})        = False
+
+conPatNeedsParens :: HsConDetails a b -> Bool
+conPatNeedsParens (PrefixCon args) = not (null args)
+conPatNeedsParens (InfixCon {})    = False
+conPatNeedsParens (RecCon {})      = False
 \end{code}
 

@@ -338,9 +338,8 @@ mkMatch pats expr binds
   = noLoc (Match (map paren pats) Nothing 
 		 (GRHSs (unguardedRHS expr) binds))
   where
-    paren p = case p of
-		L _ (VarPat _) -> p
-		L l _	       -> L l (ParPat p)
+    paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp) 
+		     | otherwise          = lp
 \end{code}
 
 
