@@ -538,6 +538,11 @@ Sete Note [choosing external names].
 
 \begin{code}
 type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
+  -- maps each top-level Id to its new Name (the Id is tidied in step 2)
+  -- The Unique is unchanged.  If the new Id is external, it will be
+  -- visible in the interface file.  
+  --
+  -- Bool => expose unfolding or not.
 
 chooseExternalIds :: HscEnv
                   -> TypeEnv
@@ -545,10 +550,6 @@ chooseExternalIds :: HscEnv
                   -> Bool
 		  -> [CoreBind]
                   -> IO (UnfoldEnv, TidyOccEnv)
-                     -- maps top-level Ids to new, renamed, Ids.
-                     -- If the new Id is external, it will be visible
-                     -- in the interface file. 
-                     -- Bool => expose unfolding or not.
 	-- Step 1 from the notes above
 
 chooseExternalIds hsc_env type_env mod omit_prags binds 
@@ -860,16 +861,16 @@ tidyTopBind  :: PackageId
              -> CoreBind
 	     -> (TidyEnv, CoreBind)
 
-tidyTopBind this_pkg unfold_env (occ_env1,subst1) (NonRec bndr rhs)
+tidyTopBind this_pkg unfold_env (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
     caf_info      = hasCafRefs this_pkg subst1 (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
-    tidy_env2     = (occ_env1, subst2)
+    tidy_env2     = (occ_env, subst2)
 
-tidyTopBind this_pkg unfold_env (occ_env1,subst1) (Rec prs)
+tidyTopBind this_pkg unfold_env (occ_env,subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
     prs' = [ tidyTopPair show_unfold tidy_env2 caf_info name' (id,rhs)
@@ -879,7 +880,7 @@ tidyTopBind this_pkg unfold_env (occ_env1,subst1) (Rec prs)
            ]
 
     subst2    = extendVarEnvList subst1 (bndrs `zip` map fst prs')
-    tidy_env2 = (occ_env1, subst2)
+    tidy_env2 = (occ_env, subst2)
 
     bndrs = map fst prs
 
