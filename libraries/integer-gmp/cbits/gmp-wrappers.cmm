@@ -274,7 +274,7 @@ name                                                                    \
   W_ mp_result;                                                         \
                                                                         \
   /* call doYouWantToGC() */                                            \
-  MAYBE_GC(R2_PTR & R4_PTR, name);                                      \
+  MAYBE_GC(R2_PTR, name);                                               \
                                                                         \
   STK_CHK_GEN( 2 * SIZEOF_MP_INT, R2_PTR, name );                       \
                                                                         \
