@@ -328,6 +328,12 @@ interactiveUI srcs maybe_exprs = do
         -- We don't want the cmd line to buffer any input that might be
         -- intended for the program, so unbuffer stdin.
         hSetBuffering stdin NoBuffering
+#if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 611
+        -- On Unix, stdin will use the locale encoding.  The IO library
+        -- doesn't do this on Windows (yet), so for now we use UTF-8,
+        -- for consistency with GHC 6.10 and to make the tests work.
+        hSetEncoding stdin utf8
+#endif
 
    -- initial context is just the Prelude
    prel_mod <- GHC.lookupModule (GHC.mkModuleName "Prelude") Nothing
