@@ -8,14 +8,14 @@ rebindable6.hs:106:2:
       or add an instance declaration for (HasSeq (IO a -> t -> IO b))
     In a stmt of a 'do' expression: f
     In the expression:
-        do f
-           Just (b :: b) <- g
-           return b
+        do { f;
+             Just (b :: b) <- g;
+             return b }
     In the definition of `test_do':
         test_do f g
-                  = do f
-                       Just (b :: b) <- g
-                       return b
+                  = do { f;
+                         Just (b :: b) <- g;
+                         return b }
 
 rebindable6.hs:107:2:
     No instance for (HasFail ([Prelude.Char] -> t1))
@@ -24,14 +24,14 @@ rebindable6.hs:107:2:
       add an instance declaration for (HasFail ([Prelude.Char] -> t1))
     In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
-        do f
-           Just (b :: b) <- g
-           return b
+        do { f;
+             Just (b :: b) <- g;
+             return b }
     In the definition of `test_do':
         test_do f g
-                  = do f
-                       Just (b :: b) <- g
-                       return b
+                  = do { f;
+                         Just (b :: b) <- g;
+                         return b }
 
 rebindable6.hs:107:2:
     Could not deduce (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
@@ -45,14 +45,14 @@ rebindable6.hs:107:2:
          (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
     In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
-        do f
-           Just (b :: b) <- g
-           return b
+        do { f;
+             Just (b :: b) <- g;
+             return b }
     In the definition of `test_do':
         test_do f g
-                  = do f
-                       Just (b :: b) <- g
-                       return b
+                  = do { f;
+                         Just (b :: b) <- g;
+                         return b }
 
 rebindable6.hs:108:2:
     Could not deduce (HasReturn (b -> t1)) from the context ()
@@ -63,11 +63,11 @@ rebindable6.hs:108:2:
       or add an instance declaration for (HasReturn (b -> t1))
     In the expression: return b
     In the expression:
-        do f
-           Just (b :: b) <- g
-           return b
+        do { f;
+             Just (b :: b) <- g;
+             return b }
     In the definition of `test_do':
         test_do f g
-                  = do f
-                       Just (b :: b) <- g
-                       return b
+                  = do { f;
+                         Just (b :: b) <- g;
+                         return b }

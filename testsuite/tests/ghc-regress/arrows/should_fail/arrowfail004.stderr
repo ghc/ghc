@@ -3,6 +3,6 @@ arrowfail004.hs:12:14:
     Illegal constructor `T' in a 'proc' pattern
       Proc patterns cannot use existentials or GADTs
     In the pattern: T x
-    In the expression: proc (T x) -> do returnA -< T x
+    In the expression: proc (T x) -> do { returnA -< T x }
     In the definition of `panic':
-        panic = proc (T x) -> do returnA -< T x
+        panic = proc (T x) -> do { returnA -< T x }

@@ -7,13 +7,13 @@ tcfail128.hs:18:8:
       (Data.Array.Base.MArray b FlatVector IO)
     In a stmt of a 'do' expression: v <- thaw tmp
     In the expression:
-        do let sL = ...
-               dim = length sL
-               ....
-           v <- thaw tmp
-           return ()
+        do { let sL = ...
+                 dim = length sL
+                 ....;
+             v <- thaw tmp;
+             return () }
     In the definition of `main':
-        main = do let sL = ...
-                      ....
-                  v <- thaw tmp
-                  return ()
+        main = do { let sL = ...
+                        ....;
+                    v <- thaw tmp;
+                    return () }

@@ -8,5 +8,5 @@ TH_exn2.hs:1:0:
               return = return
               ....
             in
-              do ds <- [d| |]
-                 return (tail ds)
+              do { ds <- [d| |];
+                   return (tail ds) }
