@@ -38,7 +38,7 @@ test('T1969',
                                              # expected value: 32 (amd64/Linux)
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 6600000,
-                                                     6800000)),
+                                                     7000000)),
                                    # expected value: 6707308 (x86/OS X)
                                    #                 6694144 (x86/Windows)
       if_wordsize(64,
