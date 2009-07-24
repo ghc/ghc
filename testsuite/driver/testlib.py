@@ -1256,7 +1256,7 @@ def if_verbose( n, str ):
 # Guess flags suitable for the compiler.
 def guess_compiler_flags():
    if config.compiler_type == 'ghc':
-       return ['-fforce-recomp', '-dcore-lint']
+       return ['-fforce-recomp', '-dcore-lint', '-no-user-package-conf']
    elif config.compiler_type == 'nhc':
        return ['-an-nhc-specific-flag']
    else:

@@ -8,7 +8,7 @@ import re
 #
 config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
-config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint']
+config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-no-user-package-conf']
 
 config.hp2ps		     = 'hp2ps'
 config.hpc		     = 'hpc'
@@ -62,7 +62,7 @@ config.way_flags = {
 	'extcore'    : ['-fext-core'],
 	'optextcore' : ['-O -fext-core'],
 	'threaded1'  : ['-threaded', '-debug'],
-	'threaded2'  : ['-O', '-threaded'],
+	'threaded2'  : ['-O', '-threaded', '-eventlog'],
 	'hpc'	     : ['-O', '-fhpc' ],
         'prof_hc_hb' : ['-O -prof -auto-all'],
         'prof_hb'    : ['-O -prof -auto-all'],
@@ -83,7 +83,7 @@ config.way_rts_flags = {
 	'extcore'    : [],
 	'optextcore' : [],
 	'threaded1'  : [],
-	'threaded2'  : ['-N2'],
+	'threaded2'  : ['-N2 -l'],
 	'hpc'	     : [],
         'prof_hc_hb' : ['-hc -hbvoid'],
         'prof_hb'    : ['-hb'],
