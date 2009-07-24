@@ -52,6 +52,24 @@ EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
  */
 EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 
+/*
+ * Atomic increment
+ *
+ * atomic_inc(p) {
+ *   return ++(*p);
+ * }
+ */
+EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p);
+
+/*
+ * Atomic decrement
+ *
+ * atomic_dec(p) {
+ *   return --(*p);
+ * }
+ */
+EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p);
+
 #endif // !IN_STG_CODE
 
 /*
@@ -164,6 +182,48 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #endif
 }
 
+EXTERN_INLINE StgWord
+atomic_inc(StgVolatilePtr p)
+{
+#if 0 // defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+    StgWord r;
+    r = 1;
+    __asm__ __volatile__ (
+        "lock\nxadd %0,%1":
+            "+r" (r), "+m" (*p):
+    );
+    return r;
+#else
+    StgWord old, new;
+    do {
+        old = *p;
+        new = old + 1;
+    } while (cas(p, old, new) != old);
+    return new;
+#endif
+}
+
+EXTERN_INLINE StgWord
+atomic_dec(StgVolatilePtr p)
+{
+#if 0 //defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+    StgWord r;
+    r = (StgWord)-1;
+    __asm__ __volatile__ (
+        "lock\nxadd %0,%1":
+            "+r" (r), "+m" (*p):
+    );
+    return r;
+#else
+    StgWord old, new;
+    do {
+        old = *p;
+        new = old - 1;
+    } while (cas(p, old, new) != old);
+    return new;
+#endif
+}
+
 #endif // !IN_STG_CODE
 
 /*
@@ -247,6 +307,18 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         *p = n;
     }
     return result;
+}
+
+INLINE_HEADER StgWord
+atomic_inc(StgVolatilePtr p)
+{
+    return ++(*p);
+}
+
+INLINE_HEADER StgWord
+atomic_dec(StgVolatilePtr p)
+{
+    return --(*p);
 }
 
 #endif /* !THREADED_RTS */

@@ -147,8 +147,8 @@ static void resize_generations      (void);
 static void resize_nursery          (void);
 static void start_gc_threads        (void);
 static void scavenge_until_all_done (void);
-static nat  inc_running             (void);
-static nat  dec_running             (void);
+static StgWord inc_running          (void);
+static StgWord dec_running          (void);
 static void wakeup_gc_threads       (nat n_threads, nat me);
 static void shutdown_gc_threads     (nat n_threads, nat me);
 
@@ -941,32 +941,22 @@ initGcThreads (void)
    Start GC threads
    ------------------------------------------------------------------------- */
 
-static nat gc_running_threads;
+static volatile StgWord gc_running_threads;
 
-#if defined(THREADED_RTS)
-static Mutex gc_running_mutex;
-#endif
-
-static nat
+static StgWord
 inc_running (void)
 {
-    nat n_running;
-    ACQUIRE_LOCK(&gc_running_mutex);
-    n_running = ++gc_running_threads;
-    RELEASE_LOCK(&gc_running_mutex);
-    ASSERT(n_running <= n_gc_threads);
-    return n_running;
+    StgWord new;
+    new = atomic_inc(&gc_running_threads);
+    ASSERT(new <= n_gc_threads);
+    return new;
 }
 
-static nat
+static StgWord
 dec_running (void)
 {
-    nat n_running;
-    ACQUIRE_LOCK(&gc_running_mutex);
-    ASSERT(n_gc_threads != 0);
-    n_running = --gc_running_threads;
-    RELEASE_LOCK(&gc_running_mutex);
-    return n_running;
+    ASSERT(gc_running_threads != 0);
+    return atomic_dec(&gc_running_threads);
 }
 
 static rtsBool
@@ -1142,7 +1132,6 @@ start_gc_threads (void)
 {
 #if defined(THREADED_RTS)
     gc_running_threads = 0;
-    initMutex(&gc_running_mutex);
 #endif
 }
 
