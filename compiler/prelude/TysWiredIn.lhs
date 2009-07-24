@@ -86,7 +86,7 @@ import Coercion         ( unsafeCoercionTyCon, symCoercionTyCon,
 import TypeRep          ( mkArrowKinds, liftedTypeKind, ubxTupleKind )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
-import Array
+import Data.Array
 import FastString
 import Outputable
 

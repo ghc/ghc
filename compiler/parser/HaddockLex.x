@@ -26,7 +26,7 @@ import RdrName
 import SrcLoc
 import DynFlags
 
-import Char
+import Data.Char
 import Numeric
 import System.IO.Unsafe
 }

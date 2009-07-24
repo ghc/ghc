@@ -19,13 +19,13 @@ module CmmLint (
 import BlockId
 import Cmm
 import CLabel
-import Maybe
 import Outputable
 import PprCmm
 import Constants
 import FastString
 
 import Control.Monad
+import Data.Maybe
 
 -- -----------------------------------------------------------------------------
 -- Exported entry points:

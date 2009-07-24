@@ -25,9 +25,10 @@ module ForeignCall (
     ) where
 
 import FastString
-import Char		( isAlphaNum )
 import Binary
 import Outputable
+
+import Data.Char
 \end{code}
 
 

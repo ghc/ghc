@@ -72,7 +72,7 @@ Library
                        array      >= 0.1 && < 0.3
 
     Build-Depends: filepath >= 1 && < 1.2
-    Build-Depends: haskell98, Cabal, hpc
+    Build-Depends: Cabal, hpc
     if os(windows)
         Build-Depends: Win32
     else

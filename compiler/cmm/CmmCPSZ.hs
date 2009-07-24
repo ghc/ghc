@@ -20,8 +20,8 @@ import DynFlags
 import ErrUtils
 import FiniteMap
 import HscTypes
-import Maybe
-import Monad
+import Data.Maybe
+import Control.Monad
 import Outputable
 import StaticFlags
 

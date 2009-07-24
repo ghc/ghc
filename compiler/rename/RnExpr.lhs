@@ -41,15 +41,13 @@ import NameSet
 import RdrName
 import LoadIface	( loadInterfaceForName )
 import UniqSet
-import List		( nub )
+import Data.List
 import Util		( isSingleton )
 import ListSetOps	( removeDups )
 import Maybes		( expectJust )
 import Outputable
 import SrcLoc
 import FastString
-
-import List		( unzip4 )
 \end{code}
 
 

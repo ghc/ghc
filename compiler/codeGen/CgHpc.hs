@@ -20,9 +20,9 @@ import ClosureInfo
 import FastString
 import HscTypes
 import Panic
-import Char
 import BasicTypes
 
+import Data.Char
 import Data.Word
 
 cgTickBox :: Module -> Int -> Code

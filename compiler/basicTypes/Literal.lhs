@@ -49,9 +49,9 @@ import FastTypes
 import FastString
 import BasicTypes
 import Binary
-import Ratio
 
 import Data.Int
+import Data.Ratio
 import Data.Word
 import Data.Char
 \end{code}

@@ -52,7 +52,7 @@ import MonadUtils
 import Outputable
 import FastString
 
-import List( nub )
+import Data.List
 \end{code}
 
 

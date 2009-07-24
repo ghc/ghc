@@ -27,11 +27,11 @@ import FastString
 import FiniteMap
 import ForeignCall
 import IdInfo
-import List (sortBy)
+import Data.List
 import Maybes
 import MkZipCfg
 import MkZipCfgCmm hiding (CmmAGraph, CmmBlock, CmmTopZ, CmmZ, CmmGraph)
-import Monad
+import Control.Monad
 import Name
 import Outputable
 import SMRep

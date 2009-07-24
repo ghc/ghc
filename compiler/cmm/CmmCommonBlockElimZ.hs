@@ -11,10 +11,10 @@ import ZipCfg
 import ZipCfgCmmRep
 
 import Data.Bits
+import qualified Data.List as List
 import Data.Word
 import FastString
-import List hiding (iterate)
-import Monad
+import Control.Monad
 import Outputable
 import UniqFM
 import Unique
@@ -56,7 +56,7 @@ type State  = (UniqFM [CmmBlock], BidMap)
 common_block :: (Outputable h, Uniquable h) =>  State -> (h, CmmBlock) -> (Bool, State)
 common_block (bmap, subst) (hash, b) =
   case lookupUFM bmap hash of
-    Just bs -> case (find (eqBlockBodyWith (eqBid subst) b) bs,
+    Just bs -> case (List.find (eqBlockBodyWith (eqBid subst) b) bs,
                      lookupBlockEnv subst bid) of
                  (Just b', Nothing)                      -> addSubst b'
                  (Just b', Just b'') | blockId b' /= b'' -> addSubst b'

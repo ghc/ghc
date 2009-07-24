@@ -38,8 +38,8 @@ import FastString
 import ListSetOps
 import Data.List        ( partition, (\\), delete )
 import qualified Data.Set as Set
-import IO		( openFile, IOMode(..) )
-import Monad		( when, mplus )
+import System.IO
+import Control.Monad
 \end{code}
 
 

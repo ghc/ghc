@@ -32,7 +32,7 @@ import BasicTypes
 import SrcLoc
 import Outputable
 import Util ( isSingleton )
-import List ( partition )
+import Data.List
 \end{code}
 
 

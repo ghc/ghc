@@ -61,7 +61,7 @@ import Data.List
 import qualified System.Posix.Internals
 #else /* Must be Win32 */
 import Foreign
-import CString          ( CString, peekCString )
+import Foreign.C.String
 #endif
 
 import System.Process   ( runInteractiveProcess, getProcessExitCode )

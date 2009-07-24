@@ -16,7 +16,7 @@ import FiniteMap
 import Maybes
 import MkZipCfg
 import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
-import Monad
+import Control.Monad
 import Outputable
 import SMRep (ByteOff)
 import ZipCfg

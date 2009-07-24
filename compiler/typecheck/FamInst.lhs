@@ -20,7 +20,7 @@ import FiniteMap
 import FastString
 
 import Maybes
-import Monad
+import Control.Monad
 \end{code}
 
 

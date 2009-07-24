@@ -81,7 +81,6 @@ import State
 import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
-import List		( groupBy, sortBy )
 import DynFlags
 #if powerpc_TARGET_ARCH
 import StaticFlags	( opt_Static, opt_PIC )

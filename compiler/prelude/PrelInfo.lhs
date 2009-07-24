@@ -38,7 +38,7 @@ import Type		( funTyCon )
 import TyCon		( tyConName )
 import Util		( isIn )
 
-import Array		( Array, array, (!) )
+import Data.Array
 \end{code}
 
 %************************************************************************

@@ -38,13 +38,13 @@ import StaticFlags	( opt_SpecInlineJoinPoints )
 import BasicTypes	( Activation(..) )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
 import Util
-import List		( nubBy, partition )
 import UniqSupply
 import Outputable
 import FastString
 import UniqFM
 import MonadUtils
 import Control.Monad	( zipWithM )
+import Data.List
 \end{code}
 
 -----------------------------------------------------

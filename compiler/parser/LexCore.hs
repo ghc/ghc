@@ -3,7 +3,7 @@ module LexCore where
 
 import ParserCoreUtils
 import Panic
-import Char
+import Data.Char
 import Numeric
 
 isNameChar :: Char -> Bool

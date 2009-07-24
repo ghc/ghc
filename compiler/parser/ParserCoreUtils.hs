@@ -1,6 +1,6 @@
 module ParserCoreUtils where
 
-import IO 
+import System.IO
 
 data ParseResult a = OkP a | FailP String
 type P a = String -> Int -> ParseResult a

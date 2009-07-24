@@ -61,10 +61,10 @@ import FastString
 import Util
 
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
-import IO		( hPutStr, stderr )
 import Outputable
 import Control.Monad
-import List		( partition, intersperse )
+import Data.List
+import System.IO
 import Maybes
 \end{code}
 

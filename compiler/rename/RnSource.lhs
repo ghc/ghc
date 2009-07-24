@@ -42,12 +42,12 @@ import Bag
 import FastString
 import SrcLoc
 import DynFlags	( DynFlag(..) )
-import Maybe            ( isNothing )
 import BasicTypes       ( Boxity(..) )
 
 import ListSetOps    (findDupsEq)
 
 import Control.Monad
+import Data.Maybe
 \end{code}
 
 \begin{code}

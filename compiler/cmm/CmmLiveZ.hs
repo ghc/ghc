@@ -11,7 +11,7 @@ import BlockId
 import CmmExpr
 import CmmTx
 import DFMonad
-import Monad
+import Control.Monad
 import PprCmm()
 import PprCmmZ()
 import ZipCfg

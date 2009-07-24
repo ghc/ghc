@@ -41,7 +41,7 @@ import FastString
 import PprCmm		( {- instance Outputable -} )
 import Id
 import VarEnv
-import Monad
+import Control.Monad
 import Name
 import StgSyn
 import Outputable

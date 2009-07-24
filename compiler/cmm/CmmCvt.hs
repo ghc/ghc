@@ -13,7 +13,7 @@ import PprCmm()
 import qualified ZipCfg as G
 
 import FastString
-import Monad
+import Control.Monad
 import Outputable
 import UniqSupply
 

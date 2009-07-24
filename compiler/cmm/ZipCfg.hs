@@ -45,7 +45,7 @@ import PprCmm()
 
 import Outputable hiding (empty)
 
-import Maybe
+import Data.Maybe
 import Prelude hiding (zip, unzip, last)
 
 -------------------------------------------------------------------------

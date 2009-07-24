@@ -31,7 +31,7 @@ import UniqSupply
 import UniqSet
 import Unique
 
-import Monad
+import Control.Monad
 
 -----------------------------------------------------------------------------
 -- |Top level driver for the CPS pass

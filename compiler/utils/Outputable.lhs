@@ -71,12 +71,11 @@ import FastString
 import FastTypes
 import qualified Pretty
 import Pretty		( Doc, Mode(..) )
-import Char		( isAlpha )
 import Panic
 
+import Data.Char
 import Data.Word	( Word32 )
 import System.IO	( Handle, stderr, stdout, hFlush )
-import Data.Char        ( ord )
 import System.FilePath
 \end{code}
 

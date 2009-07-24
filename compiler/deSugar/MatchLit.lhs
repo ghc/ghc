@@ -31,7 +31,7 @@ import PrelNames
 import TysWiredIn
 import Literal
 import SrcLoc
-import Ratio
+import Data.Ratio
 import Outputable
 import Util
 import FastString

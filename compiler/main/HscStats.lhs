@@ -11,10 +11,11 @@ module HscStats ( ppSourceStats ) where
 import HsSyn
 import Outputable
 import SrcLoc
-import Char
 import Bag
 import Util
 import RdrName
+
+import Data.Char
 \end{code}
 
 %************************************************************************

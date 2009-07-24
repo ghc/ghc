@@ -16,11 +16,11 @@ import CmmLiveZ
 import CmmTx
 import DFMonad
 import FiniteMap
-import List (sortBy)
+import Data.List (sortBy)
 import Maybes
 import MkZipCfg
 import MkZipCfgCmm hiding (CmmBlock, CmmGraph, CmmTopZ)
-import Monad
+import Control.Monad
 import Outputable
 import UniqSet
 import UniqSupply

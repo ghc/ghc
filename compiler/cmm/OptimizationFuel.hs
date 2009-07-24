@@ -17,7 +17,7 @@ import ZipCfg
 --import GHC.Exts (State#)
 import Panic
 import Data.IORef
-import Monad
+import Control.Monad
 import StaticFlags (opt_Fuel)
 import UniqSupply
 

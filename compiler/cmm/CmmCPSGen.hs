@@ -23,7 +23,7 @@ import ForeignCall
 import Constants
 import StaticFlags
 import Unique
-import Maybe
+import Data.Maybe
 import FastString
 
 import Panic

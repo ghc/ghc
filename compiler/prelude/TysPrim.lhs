@@ -58,7 +58,7 @@ import StaticFlags
 import FastString
 import Outputable
 
-import Char 		( ord, chr )
+import Data.Char
 \end{code}
 
 %************************************************************************

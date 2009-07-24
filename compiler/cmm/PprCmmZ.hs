@@ -12,7 +12,7 @@ import qualified ZipCfgCmmRep as G
 import qualified ZipCfg as Z
 import CmmZipUtil
 
-import Maybe
+import Data.Maybe
 import FastString
 
 ----------------------------------------------------------------

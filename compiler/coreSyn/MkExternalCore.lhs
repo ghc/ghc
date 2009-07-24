@@ -28,8 +28,8 @@ import ForeignCall
 import DynFlags
 import FastString
 
-import IO
 import Data.Char
+import System.IO
 
 emitExternalCore :: DynFlags -> CgGuts -> IO ()
 emitExternalCore dflags cg_guts

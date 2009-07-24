@@ -23,12 +23,12 @@ import ZipCfg
 import ZipCfgCmmRep
 import ZipDataflow
 
-import Monad
+import Control.Monad
 import Outputable hiding (empty)
 import qualified Outputable as PP
 import UniqSet
 
-import Maybe
+import Data.Maybe
 import Prelude hiding (zip)
 
 -- The point of this module is to insert spills and reloads to

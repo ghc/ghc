@@ -29,7 +29,7 @@ import TysPrim( wordPrimTyCon, intPrimTyCon, charPrimTyCon,
 import TyCon ( TyCon, tyConName )
 import FastString
 import Outputable
-import Char
+import Data.Char
 import Unique
 
 #include "../HsVersions.h"

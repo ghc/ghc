@@ -45,12 +45,12 @@ import Util
 import ListSetOps
 import SrcLoc
 import Maybes
-import List
 import BasicTypes
 import Bag
 import FastString
 
 import Control.Monad
+import Data.List
 \end{code}
 
 

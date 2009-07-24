@@ -42,7 +42,7 @@ import ErrUtils
 import Util
 import Outputable
 import FastString
-import Monad
+import Control.Monad
 \end{code}
 
 

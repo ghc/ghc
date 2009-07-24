@@ -22,7 +22,7 @@ import Type
 import TysWiredIn
 import BasicTypes as Hs
 import ForeignCall
-import List
+import Data.List
 import Unique
 import MonadUtils
 import ErrUtils

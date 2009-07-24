@@ -64,7 +64,7 @@ import ErrUtils
 import SrcLoc
 import Outputable
 import Unique
-import Maybe
+import Data.Maybe
 import BasicTypes
 import Panic
 import FastString

@@ -57,7 +57,6 @@ module Lexer (
 
 import Bag
 import ErrUtils
-import Maybe
 import Outputable
 import StringBuffer
 import FastString
@@ -71,6 +70,7 @@ import Control.Monad
 import Data.Bits
 import Data.Char
 import Data.List
+import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ratio

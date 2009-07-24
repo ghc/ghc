@@ -37,7 +37,6 @@ import VarSet
 import Name
 import Outputable
 import Maybes
-import Monad
 import Unify
 import Util
 import SrcLoc
@@ -49,6 +48,7 @@ import Unique		( mkBuiltinUnique )
 import BasicTypes
 
 import Bag
+import Control.Monad
 import Data.List
 \end{code}
 

@@ -25,7 +25,7 @@ module TcRnDriver (
 	tcRnExtCore
     ) where
 
-import IO
+import System.IO
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 #endif

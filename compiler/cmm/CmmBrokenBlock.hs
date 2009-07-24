@@ -23,7 +23,7 @@ import CgUtils (callerSaveVolatileRegs)
 import ClosureInfo
 
 import Maybes
-import List
+import Data.List
 import Panic
 import Unique
 

@@ -38,7 +38,7 @@ import Literal
 import PrelInfo
 import Outputable
 import Util             ( lengthIs )
-import Char		( ord )
+import Data.Char
 
 
 ---------------------------------------------------------------

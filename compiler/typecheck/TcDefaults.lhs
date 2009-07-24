@@ -18,7 +18,7 @@ import TcType
 import PrelNames
 import DynFlags
 import SrcLoc
-import Maybe
+import Data.Maybe
 import Outputable
 import FastString
 \end{code}

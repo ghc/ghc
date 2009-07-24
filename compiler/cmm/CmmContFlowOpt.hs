@@ -14,7 +14,7 @@ import ZipCfg
 import ZipCfgCmmRep
 
 import Maybes
-import Monad
+import Control.Monad
 import Outputable
 import Prelude hiding (unzip, zip)
 import Util

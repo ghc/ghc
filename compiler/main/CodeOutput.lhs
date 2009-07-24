@@ -33,10 +33,11 @@ import Outputable
 import Module
 import Maybes		( firstJust )
 
-import Directory	( doesFileExist )
-import Monad		( when )
-import IO
+import Control.Exception
+import Control.Monad
+import System.Directory
 import System.FilePath
+import System.IO
 \end{code}
 
 %************************************************************************

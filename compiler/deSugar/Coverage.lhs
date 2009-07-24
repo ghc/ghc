@@ -11,7 +11,7 @@ import HsSyn
 import Module
 import Outputable
 import DynFlags
-import Monad		
+import Control.Monad
 import SrcLoc
 import ErrUtils
 import Name

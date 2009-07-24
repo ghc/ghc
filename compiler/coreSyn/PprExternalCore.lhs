@@ -9,7 +9,7 @@ import Encoding
 import ExternalCore
 
 import Pretty
-import Char
+import Data.Char
 
 instance Show Module where
   showsPrec _ m = shows (pmodule m)

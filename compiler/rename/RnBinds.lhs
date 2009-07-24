@@ -42,7 +42,7 @@ import Outputable
 import FastString
 import Data.List	( partition )
 import Maybes		( orElse )
-import Monad		( foldM, unless )
+import Control.Monad
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper

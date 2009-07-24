@@ -36,7 +36,7 @@ import Util
 
 import BasicTypes
 import Maybes
-import Monad
+import Control.Monad
 import Outputable
 import Prelude hiding (zip, unzip, last)
 import SMRep (ByteOff)

@@ -36,7 +36,7 @@ import CLabel
 import StgSyn
 import CostCentre	
 import Id
-import Monad (foldM, liftM)
+import Control.Monad
 import Name
 import Module
 import ListSetOps

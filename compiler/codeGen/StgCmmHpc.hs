@@ -19,7 +19,7 @@ import Module
 import CmmUtils
 import FastString
 import HscTypes
-import Char
+import Data.Char
 import StaticFlags
 import BasicTypes
 

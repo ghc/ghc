@@ -19,7 +19,7 @@ import Type		( isUnLiftedType )
 import SetLevels	( Level(..), LevelledExpr, LevelledBind,
 			  setLevels, ltMajLvl, ltLvl, isTopLvl )
 import UniqSupply       ( UniqSupply )
-import List		( partition )
+import Data.List
 import Outputable
 import FastString
 \end{code}

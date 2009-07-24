@@ -64,10 +64,10 @@ import Outputable
 import Util
 import Maybes
 import ListSetOps	( removeDups )
-import List		( nubBy )
 import DynFlags
 import FastString
 import Control.Monad
+import Data.List
 import qualified Data.Set as Set
 \end{code}
 
