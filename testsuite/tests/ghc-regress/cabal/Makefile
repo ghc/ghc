@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 PKGCONF01=local01.package.conf
-LOCAL_GHC_PKG01 = $(GHC_PKG) -f $(PKGCONF01)
+LOCAL_GHC_PKG01 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF01)
 
 # a bunch of tests for ghc-pkg
 ghcpkg01 :
@@ -47,7 +47,7 @@ ghcpkg01 :
 	if $(LOCAL_GHC_PKG01) register test3.pkg; then false; else true; fi
 
 PKGCONF03=local03.package.conf
-LOCAL_GHC_PKG03 = $(GHC_PKG) -f $(PKGCONF03)
+LOCAL_GHC_PKG03 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF03)
 
 ghcpkg03 :
 	@rm -f $(PKGCONF03)
@@ -65,7 +65,7 @@ ghcpkg03 :
 	$(LOCAL_GHC_PKG03) update --force test.pkg
 
 PKGCONF04=local04.package.conf
-LOCAL_GHC_PKG04 = $(GHC_PKG) -f $(PKGCONF04)
+LOCAL_GHC_PKG04 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF04)
 
 # Test that importing a module exposed by two packages reports a conflict
 ghcpkg04 :
@@ -80,8 +80,8 @@ ghcpkg04 :
 # Test stacking of package.confs (also #2441)
 PKGCONF05a=local05a.package.conf
 PKGCONF05b=local05b.package.conf
-LOCAL_GHC_PKG05a = $(GHC_PKG) -f $(PKGCONF05a)
-LOCAL_GHC_PKG05b = $(GHC_PKG) -f $(PKGCONF05a) -f $(PKGCONF05b)
+LOCAL_GHC_PKG05a = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF05a)
+LOCAL_GHC_PKG05b = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF05a) -f $(PKGCONF05b)
 
 ghcpkg05 :
 	rm -f $(PKGCONF05a) $(PKGCONF05b)
@@ -99,7 +99,7 @@ ghcpkg05 :
 
 # Test for #2330: reject duplicate dependencies
 PKGCONF06=local06.package.conf
-LOCAL_GHC_PKG06 = $(GHC_PKG) -f $(PKGCONF06)
+LOCAL_GHC_PKG06 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF06)
 
 ghcpkg06 :
 	rm -f $(PKGCONF06)
@@ -109,14 +109,14 @@ ghcpkg06 :
 	$(LOCAL_GHC_PKG06) register --force testdup.pkg
 
 PKGCONF1750=local1750.package.conf
-LOCAL_GHC_PKG1750 = $(GHC_PKG) -f $(PKGCONF1750)
+LOCAL_GHC_PKG1750 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF1750)
 
 1750:
 	rm -f $(PKGCONF1750) 1750.hs 1750.o 1750.hi 1750.out
 	echo "[]" >$(PKGCONF1750)
 	$(LOCAL_GHC_PKG1750) register --force 1750A.pkg >1750.out 2>&1
 	$(LOCAL_GHC_PKG1750) register --force 1750B.pkg >1750.out 2>&1
-	GHC_PACKAGE_PATH=$(PKGCONF1750) $(GHC_PKG) list
+	GHC_PACKAGE_PATH=$(PKGCONF1750) $(GHC_PKG) --no-user-package-conf list
 # GHC_PACKAGE_PATH trick is to make this work with 6.8.2 which doesn't have
 # the patch "Change the command-line semantics for query commands" to
 # ghc-pkg
@@ -129,14 +129,14 @@ LOCAL_GHC_PKG1750 = $(GHC_PKG) -f $(PKGCONF1750)
 # of InstalledPackageInfo.
 
 COPY_PACKAGE_CONF = package.conf.copy
-GHC_PKG_COPY = $(GHC_PKG) --global-conf=$(COPY_PACKAGE_CONF)
+GHC_PKG_COPY = $(GHC_PKG) --no-user-package-conf --global-conf=$(COPY_PACKAGE_CONF)
 
 # Hack: the testsuite is separate from the build tree now, we don't
 # have a good way to do this.
 INPLACE_DATA_DIR = $(TOP)/../inplace/lib
 
 ghcpkg02:
-	cp $(INPLACE_DATA_DIR)/package.conf $(COPY_PACKAGE_CONF)
+	cp -r $(INPLACE_DATA_DIR)/package.conf $(COPY_PACKAGE_CONF)
 	set -e; \
 	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \
 		echo Updating $$i; \
