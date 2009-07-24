@@ -44,6 +44,7 @@ extern StgWord64 whitehole_spin;
 
 void gcWorkerThread (Capability *cap);
 void initGcThreads (void);
+void freeGcThreads (void);
 void waitForGcThreads (Capability *cap);
 void releaseGCThreads (Capability *cap);
 

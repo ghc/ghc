@@ -284,6 +284,7 @@ freeStorage (void)
     closeMutex(&sm_mutex);
 #endif
     stgFree(nurseries);
+    freeGcThreads();
 }
 
 /* -----------------------------------------------------------------------------

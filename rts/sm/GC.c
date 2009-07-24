@@ -937,6 +937,23 @@ initGcThreads (void)
     }
 }
 
+void
+freeGcThreads (void)
+{
+    if (gc_threads != NULL) {
+#if defined(THREADED_RTS)
+        nat i;
+	for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+            stgFree (gc_threads[i]);
+	}
+        stgFree (gc_threads);
+#else
+        stgFree (gc_threads);
+#endif
+        gc_threads = NULL;
+    }
+}
+
 /* ----------------------------------------------------------------------------
    Start GC threads
    ------------------------------------------------------------------------- */
