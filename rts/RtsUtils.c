@@ -111,7 +111,7 @@ shutdownAllocator(void)
         if (a == NULL) return;
         IF_DEBUG(sanity,
                  debugBelch("Warning: %ld bytes at %p still allocated at shutdown\n",
-                            a->len, a->addr);)
+                            (long)a->len, a->addr);)
         prev = a;
     }
 }
