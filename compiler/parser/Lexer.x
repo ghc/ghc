@@ -46,6 +46,7 @@
 module Lexer (
    Token(..), lexer, pragState, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc, 
+   getPState,
    failLocMsgP, failSpanMsgP, srcParseFail,
    getMessages,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
@@ -1514,6 +1515,9 @@ failLocMsgP loc1 loc2 str = P $ \_ -> PFailed (mkSrcSpan loc1 loc2) (text str)
 
 failSpanMsgP :: SrcSpan -> SDoc -> P a
 failSpanMsgP span msg = P $ \_ -> PFailed span msg
+
+getPState :: P PState
+getPState = P $ \s -> POk s s
 
 extension :: (Int -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)

@@ -706,6 +706,12 @@
 	      <entry><option>-XMonomorphismRrestriction</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XNoNPlusKPatterns</option></entry>
+	      <entry>Disable support for <literal>n+k</literal> patterns</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNPlusKPatterns</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XNoMonoPatBinds</option></entry>
 	      <entry>Make <link linkend="monomorphism">pattern bindings polymorphic</link></entry>
 	      <entry>dynamic</entry>

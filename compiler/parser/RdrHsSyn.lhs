@@ -63,13 +63,14 @@ import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
 import BasicTypes	( maxPrecedence, Activation, RuleMatchInfo,
                           InlinePragma(..),  InlineSpec(..),
                           alwaysInlineSpec, neverInlineSpec )
-import Lexer		( P, failSpanMsgP, extension, standaloneDerivingEnabled, bangPatEnabled )
+import Lexer
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv(..), Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameString )
 import PrelNames	( forall_tv_RDR )
+import DynFlags
 import SrcLoc
 import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
@@ -725,12 +726,14 @@ checkPat loc e args 	-- OK to let this happen even if bang-patterns
 checkPat loc (L _ (HsApp f x)) args
   = do { x <- checkLPat x; checkPat loc f (x:args) }
 checkPat loc (L _ e) []
-  = do { p <- checkAPat loc e; return (L loc p) }
+  = do { pState <- getPState
+       ; p <- checkAPat (dflags pState) loc e
+       ; return (L loc p) }
 checkPat loc _ _
   = patFail loc
 
-checkAPat :: SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
-checkAPat loc e = case e of
+checkAPat :: DynFlags -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
+checkAPat dynflags loc e = case e of
    EWildPat	       -> return (WildPat placeHolderType)
    HsVar x | isQual x  -> parseError loc ("Qualified variable in pattern: "
 					 ++ showRdrName x)
@@ -766,7 +769,7 @@ checkAPat loc e = case e of
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _ 
 	 (L _ (HsOverLit lit@(OverLit {ol_val = HsIntegral {}})))
-   		      | plus == plus_RDR
+   		      | dopt Opt_NPlusKPatterns dynflags && (plus == plus_RDR)
    		      -> return (mkNPlusKPat (L nloc n) lit)
    
    OpApp l op _fix r  -> do l <- checkLPat l

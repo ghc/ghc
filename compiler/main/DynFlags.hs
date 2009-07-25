@@ -226,6 +226,7 @@ data DynFlag
    | Opt_ViewPatterns
    | Opt_GADTs
    | Opt_RelaxedPolyRec
+   | Opt_NPlusKPatterns
 
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
@@ -693,6 +694,7 @@ defaultDynFlags =
 
             Opt_ImplicitPrelude,
             Opt_MonomorphismRestriction,
+            Opt_NPlusKPatterns,
 
             Opt_MethodSharing,
 
@@ -1808,6 +1810,8 @@ xFlags = [
   ( "BangPatterns",                     Opt_BangPatterns, const Supported ),
   -- On by default:
   ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, const Supported ),
+  -- On by default:
+  ( "NPlusKPatterns",                   Opt_NPlusKPatterns, const Supported ),
   -- On by default (which is not strictly H98):
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
