@@ -315,6 +315,7 @@ data DynFlag
    | Opt_EmbedManifest
    | Opt_EmitExternalCore
    | Opt_SharedImplib
+   | Opt_BuildingCabalPackage
 
 	-- temporary flags
    | Opt_RunCPS
@@ -1757,6 +1758,7 @@ fFlags = [
   ( "embed-manifest",                   Opt_EmbedManifest, const Supported ),
   ( "ext-core",                         Opt_EmitExternalCore, const Supported ),
   ( "shared-implib",                    Opt_SharedImplib, const Supported ),
+  ( "building-cabal-package",           Opt_BuildingCabalPackage, const Supported ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, const Supported )
   ]
 
