@@ -32,12 +32,13 @@ import Packages
 import FastString
 import Util
 import PrelNames        ( gHC_PRIM )
-import DynFlags		( DynFlags(..), isOneShot, GhcMode(..) )
+import DynFlags
 import Outputable
 import FiniteMap
 import LazyUniqFM
 import Maybes		( expectJust )
 
+import Distribution.Text
 import Distribution.Package hiding (PackageId)
 import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
 import System.Directory
@@ -599,7 +600,17 @@ cantFindErr cannot_find _ dflags mod_name find_result
                hang (ptext (sLit "locations searched:")) 2 $ vcat (map text files)
         
     pkg_hidden pkg =
-        ptext (sLit "it is a member of the hidden package") <+> quotes (ppr pkg)
+        ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkg)
+        <> dot $$ cabal_pkg_hidden_hint pkg
+    cabal_pkg_hidden_hint pkg
+     | dopt Opt_BuildingCabalPackage dflags
+        = case simpleParse (packageIdString pkg) of
+          Just pid ->
+              ptext (sLit "Perhaps you need to add") <+>
+              quotes (text (display (pkgName pid))) <+>
+              ptext (sLit "to the build-depends in your .cabal file.")
+          Nothing -> empty
+     | otherwise = empty
 
     mod_hidden pkg =
         ptext (sLit "it is a hidden module in the package") <+> quotes (ppr pkg)
