@@ -29,9 +29,7 @@
 #     * docs/vh/Makefile
 #     * rts/dotnet/Makefile
 #     * utils/Makefile
-#   * GhcProfiled
 #   * optionally install stage3?
-#   * shared libraries, way dyn
 #   * add Makefiles for the rest of the utils/ programs that aren't built
 #     by default (need to exclude them from 'make all' too)
 #
