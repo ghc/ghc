@@ -74,44 +74,14 @@ rts_mkInt32 (Capability *cap, HsInt32 i)
   return p;
 }
 
-
-#ifdef sparc_HOST_ARCH
-/* The closures returned by allocateLocal are only guaranteed to be 32 bit
-   aligned, because that's the size of pointers. SPARC v9 can't do
-   misaligned loads/stores, so we have to write the 64bit word in chunks         */
-
-HaskellObj
-rts_mkInt64 (Capability *cap, HsInt64 i_)
-{
-  StgInt64 i   = (StgInt64)i_;
-  StgInt32 *tmp;
-
-  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
-  SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
-
-  tmp    = (StgInt32*)&(p->payload[0]);
-
-  tmp[0] = (StgInt32)((StgInt64)i >> 32);
-  tmp[1] = (StgInt32)i;		/* truncate high 32 bits */
-
-  return p;
-}
-
-#else
-
 HaskellObj
 rts_mkInt64 (Capability *cap, HsInt64 i)
 {
-  llong *tmp;
   StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
   SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
-  tmp  = (llong*)&(p->payload[0]);
-  *tmp = (StgInt64)i;
+  ASSIGN_Int64((P_)&(p->payload[0]), i);
   return p;
 }
-
-#endif /* sparc_HOST_ARCH */
-
 
 HaskellObj
 rts_mkWord (Capability *cap, HsWord i)
@@ -152,45 +122,15 @@ rts_mkWord32 (Capability *cap, HsWord32 w)
   return p;
 }
 
-
-#ifdef sparc_HOST_ARCH
-/* The closures returned by allocateLocal are only guaranteed to be 32 bit
-   aligned, because that's the size of pointers. SPARC v9 can't do
-   misaligned loads/stores, so we have to write the 64bit word in chunks         */
-
-HaskellObj
-rts_mkWord64 (Capability *cap, HsWord64 w_)
-{
-  StgWord64 w = (StgWord64)w_;
-  StgWord32 *tmp;
-
-  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
-  /* see mk_Int8 comment */
-  SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
-  
-  tmp    = (StgWord32*)&(p->payload[0]);
-
-  tmp[0] = (StgWord32)((StgWord64)w >> 32);
-  tmp[1] = (StgWord32)w;	/* truncate high 32 bits */
-  return p;
-}
-
-#else
-
 HaskellObj
 rts_mkWord64 (Capability *cap, HsWord64 w)
 {
-  ullong *tmp;
-
   StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
-  tmp  = (ullong*)&(p->payload[0]);
-  *tmp = (StgWord64)w;
+  ASSIGN_Word64((P_)&(p->payload[0]), w);
   return p;
 }
-
-#endif
 
 
 HaskellObj
@@ -320,40 +260,14 @@ rts_getInt32 (HaskellObj p)
   return (HsInt32)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
-
-#ifdef sparc_HOST_ARCH
-/* The closures returned by allocateLocal are only guaranteed to be 32 bit
-   aligned, because that's the size of pointers. SPARC v9 can't do
-   misaligned loads/stores, so we have to read the 64bit word in chunks         */
-
 HsInt64
 rts_getInt64 (HaskellObj p)
 {
-    HsInt32* tmp;
     // See comment above:
     // ASSERT(p->header.info == I64zh_con_info ||
     //        p->header.info == I64zh_static_info);
-    tmp = (HsInt32*)&(UNTAG_CLOSURE(p)->payload[0]);
-
-    HsInt64 i	= (HsInt64)((HsInt64)(tmp[0]) << 32) | (HsInt64)tmp[1];
-    return i;
+    return PK_Int64((P_)&(UNTAG_CLOSURE(p)->payload[0]));
 }
-
-#else
-
-HsInt64
-rts_getInt64 (HaskellObj p)
-{
-    HsInt64* tmp;
-    // See comment above:
-    // ASSERT(p->header.info == I64zh_con_info ||
-    //        p->header.info == I64zh_static_info);
-    tmp = (HsInt64*)&(UNTAG_CLOSURE(p)->payload[0]);
-    return *tmp;
-}
-
-#endif /* sparc_HOST_ARCH */
-
 
 HsWord
 rts_getWord (HaskellObj p)
@@ -391,40 +305,14 @@ rts_getWord32 (HaskellObj p)
     return (HsWord32)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
-
-#ifdef sparc_HOST_ARCH
-/* The closures returned by allocateLocal are only guaranteed to be 32 bit
-   aligned, because that's the size of pointers. SPARC v9 can't do
-   misaligned loads/stores, so we have to write the 64bit word in chunks         */
-
 HsWord64
 rts_getWord64 (HaskellObj p)
 {
-    HsInt32* tmp;
-    // See comment above:
-    // ASSERT(p->header.info == I64zh_con_info ||
-    //        p->header.info == I64zh_static_info);
-    tmp = (HsInt32*)&(UNTAG_CLOSURE(p)->payload[0]);
-
-    HsInt64 i	= (HsWord64)((HsWord64)(tmp[0]) << 32) | (HsWord64)tmp[1];
-    return i;
-}
-
-#else
-
-HsWord64
-rts_getWord64 (HaskellObj p)
-{
-    HsWord64* tmp;
     // See comment above:
     // ASSERT(p->header.info == W64zh_con_info ||
     //        p->header.info == W64zh_static_info);
-    tmp = (HsWord64*)&(UNTAG_CLOSURE(p)->payload[0]);
-    return *tmp;
+    return PK_Word64((P_)&(UNTAG_CLOSURE(p)->payload[0]));
 }
-
-#endif
-
 
 HsFloat
 rts_getFloat (HaskellObj p)
