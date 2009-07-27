@@ -57,4 +57,4 @@ test('1914',
      ['1914.script'])
 
 test('2976', normal, ghci_script, ['2976.script'])
-test('2816', normal, ghci_script, ['2816.script'])
+test('2816', if_platform('i386-unknown-mingw32',expect_broken(3398)), ghci_script, ['2816.script'])
