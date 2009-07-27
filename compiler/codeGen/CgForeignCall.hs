@@ -94,9 +94,6 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 	-- ToDo: this might not be correct for 64-bit API
       arg_size rep = max (widthInBytes (typeWidth rep)) wORD_SIZE
 
-emitForeignCall _ (DNCall _) _ _
-  = panic "emitForeignCall: DNCall"
-
 
 -- alternative entry point, used by CmmParse
 emitForeignCall'

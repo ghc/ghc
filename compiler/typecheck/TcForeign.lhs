@@ -91,21 +91,6 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 ------------ Checking types for foreign import ----------------------
 \begin{code}
 tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
-tcCheckFIType _ arg_tys res_ty (DNImport spec) = do
-    checkCg checkDotnet
-    dflags <- getDOpts
-    checkForeignArgs (isFFIDotnetTy dflags) arg_tys
-    checkForeignRes nonIOok (isFFIDotnetTy dflags) res_ty
-    let (DNCallSpec isStatic kind _ _ _ _) = spec
-    case kind of
-       DNMethod | not isStatic ->
-         case arg_tys of
-	   [] -> addErrTc illegalDNMethodSig
-	   _  
-	    | not (isFFIDotnetObjTy (last arg_tys)) -> addErrTc illegalDNMethodSig
-	    | otherwise -> return ()
-       _ -> return ()
-    return (DNImport (withDNTypes spec (map toDNType arg_tys) (toDNType res_ty)))
 
 tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ (CLabel _))
   = ASSERT( null arg_tys )
@@ -268,7 +253,6 @@ tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
       -- the structure of the foreign type.
     (_, t_ty) = tcSplitForAllTys sig_ty
     (arg_tys, res_ty) = tcSplitFunTys t_ty
-tcCheckFEType _ d = pprPanic "tcCheckFEType" (ppr d)
 \end{code}
 
 
@@ -309,14 +293,6 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 \end{code}
 
 \begin{code}
-checkDotnet :: HscTarget -> Maybe SDoc
-#if defined(mingw32_TARGET_OS)
-checkDotnet HscC   = Nothing
-checkDotnet _      = Just (text "requires C code generation (-fvia-C)")
-#else
-checkDotnet _      = Just (text "requires .NET support (-filx or win32)")
-#endif
-
 checkCOrAsm :: HscTarget -> Maybe SDoc
 checkCOrAsm HscC   = Nothing
 checkCOrAsm HscAsm = Nothing
@@ -397,10 +373,5 @@ foreignDeclCtxt :: ForeignDecl Name -> SDoc
 foreignDeclCtxt fo
   = hang (ptext (sLit "When checking declaration:"))
          4 (ppr fo)
-
-illegalDNMethodSig :: SDoc
-illegalDNMethodSig
-  = ptext (sLit "'This pointer' expected as last argument")
-
 \end{code}
 

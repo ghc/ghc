@@ -39,7 +39,7 @@ module HsDecls (
   SpliceDecl(..),
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
-  CImportSpec(..), FoType(..),
+  CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl, ResType(..), 
   HsConDeclDetails, hsConDeclArgTys, hsConDeclsNames,
@@ -401,8 +401,7 @@ type LTyClDecl name = Located (TyClDecl name)
 data TyClDecl name
   = ForeignType { 
 		tcdLName    :: Located name,
-		tcdExtName  :: Maybe FastString,
-		tcdFoType   :: FoType
+		tcdExtName  :: Maybe FastString
     }
 
 
@@ -909,10 +908,6 @@ data ForeignImport = -- import of a C entity
 			      FastString      -- name of C header
 			      CImportSpec     -- details of the C entity
 
-                     -- import of a .NET function
-		     --
-		   | DNImport DNCallSpec
-
 -- details of an external C entity
 --
 data CImportSpec = CLabel    CLabelString     -- import address of a C label
@@ -924,13 +919,6 @@ data CImportSpec = CLabel    CLabelString     -- import address of a C label
 -- convention
 --
 data ForeignExport = CExport  CExportSpec    -- contains the calling convention
-		   | DNExport		     -- presently unused
-
--- abstract type imported from .NET
---
-data FoType = DNType 		-- In due course we'll add subtype stuff
-	    deriving (Eq)	-- Used for equality instance for TyClDecl
-
 
 -- pretty printing of foreign declarations
 --
@@ -944,8 +932,6 @@ instance OutputableBndr name => Outputable (ForeignDecl name) where
        2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
-  ppr (DNImport			        spec) = 
-    ptext (sLit "dotnet") <+> ppr spec
   ppr (CImport  cconv safety header spec) =
     ppr cconv <+> ppr safety <+> 
     char '"' <> pprCEntity spec <> char '"'
@@ -963,11 +949,6 @@ instance Outputable ForeignImport where
 instance Outputable ForeignExport where
   ppr (CExport  (CExportStatic lbl cconv)) = 
     ppr cconv <+> char '"' <> ppr lbl <> char '"'
-  ppr (DNExport                          ) = 
-    ptext (sLit "dotnet") <+> ptext (sLit "\"<unused>\"")
-
-instance Outputable FoType where
-  ppr DNType = ptext (sLit "type dotnet")
 \end{code}
 
 

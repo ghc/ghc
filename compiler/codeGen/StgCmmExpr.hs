@@ -320,7 +320,6 @@ isSimpleScrut _		       _           = False
 isSimpleOp :: StgOp -> Bool
 -- True iff the op cannot block or allocate
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) = not (playSafe safe)
-isSimpleOp (StgFCallOp (DNCall _) _)                   = False         -- Safe!
 isSimpleOp (StgPrimOp op)      			       = not (primOpOutOfLine op)
 isSimpleOp (StgPrimCallOp _)                           = False
 

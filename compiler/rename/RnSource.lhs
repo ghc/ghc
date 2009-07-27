@@ -634,9 +634,9 @@ However, we can also do some scoping checks at the same time.
 
 \begin{code}
 rnTyClDecl :: TyClDecl RdrName -> RnM (TyClDecl Name, FreeVars)
-rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_name})
+rnTyClDecl (ForeignType {tcdLName = name, tcdExtName = ext_name})
   = lookupLocatedTopBndrRn name		`thenM` \ name' ->
-    return (ForeignType {tcdLName = name', tcdFoType = fo_type, tcdExtName = ext_name},
+    return (ForeignType {tcdLName = name', tcdExtName = ext_name},
 	     emptyFVs)
 
 -- all flavours of type family declarations ("type family", "newtype fanily",

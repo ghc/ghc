@@ -454,7 +454,6 @@ data Token
   | ITstdcallconv
   | ITccallconv
   | ITprimcallconv
-  | ITdotnet
   | ITmdo
   | ITfamily
   | ITgroup
@@ -664,7 +663,6 @@ reservedWordsFM = listToUFM $
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
 	( "prim",       ITprimcallconv,	 bit ffiBit),
-	( "dotnet",     ITdotnet,	 bit ffiBit),
 
 	( "rec",	ITrec,		 bit arrowsBit),
 	( "proc",	ITproc,		 bit arrowsBit)

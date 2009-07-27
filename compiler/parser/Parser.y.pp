@@ -248,7 +248,6 @@ incorrect.
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
  'prim'         { L _ ITprimcallconv }
- 'dotnet'       { L _ ITdotnet }
  'proc'		{ L _ ITproc }		-- for arrow notation extension
  'rec'		{ L _ ITrec }		-- for arrow notation extension
  'group'    { L _ ITgroup }     -- for list transform extension
@@ -876,11 +875,10 @@ fdecl : 'import' callconv safety fspec
       | 'export' callconv fspec
 		{% mkExport $2 (unLoc $3) >>= return.LL }
 
-callconv :: { CallConv }
-	  : 'stdcall'			{ CCall  StdCallConv }
-	  | 'ccall'			{ CCall  CCallConv   }
-	  | 'prim'			{ CCall  PrimCallConv}
-	  | 'dotnet'			{ DNCall	     }
+callconv :: { CCallConv }
+	  : 'stdcall'			{ StdCallConv }
+	  | 'ccall'			{ CCallConv   }
+	  | 'prim'			{ PrimCallConv}
 
 safety :: { Safety }
 	: 'unsafe'			{ PlayRisky }

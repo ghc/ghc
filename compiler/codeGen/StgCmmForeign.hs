@@ -82,9 +82,6 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
 	-- ToDo: this might not be correct for 64-bit API
       arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType arg) wORD_SIZE
 
-cgForeignCall _ _ (DNCall _) _
-  = panic "cgForeignCall: DNCall"
-
 emitCCall :: [(CmmFormal,ForeignHint)]
 	  -> CmmExpr 
 	  -> [(CmmActual,ForeignHint)]

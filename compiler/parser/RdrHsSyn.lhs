@@ -21,14 +21,9 @@ module RdrHsSyn (
 	findSplice, checkDecBrGroup,
 
 	-- Stuff to do with Foreign declarations
-	CallConv(..),
-	mkImport,            -- CallConv -> Safety 
-			      -- -> (FastString, RdrName, RdrNameHsType)
-			      -- -> P RdrNameHsDecl
+	mkImport,
         parseCImport,
-	mkExport,            -- CallConv
-			      -- -> (FastString, RdrName, RdrNameHsType)
-			      -- -> P RdrNameHsDecl
+	mkExport,
 	mkExtName,           -- RdrName -> CLabelString
 	mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
 	mkSimpleConDecl, 
@@ -65,8 +60,7 @@ import BasicTypes	( maxPrecedence, Activation, RuleMatchInfo,
                           alwaysInlineSpec, neverInlineSpec )
 import Lexer
 import TysWiredIn	( unitTyCon ) 
-import ForeignCall	( CCallConv(..), Safety, CCallTarget(..), CExportSpec(..),
-			  DNCallSpec(..), DNKind(..), CLabelString )
+import ForeignCall
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameString )
 import PrelNames	( forall_tv_RDR )
@@ -972,18 +966,13 @@ mkInlineSpec (Just act) match_info inl   = Inline (InlinePragma act match_info) 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations
 
--- supported calling conventions
---
-data CallConv = CCall  CCallConv	-- ccall or stdcall
-	      | DNCall			-- .NET
-
 -- construct a foreign import declaration
 --
-mkImport :: CallConv 
+mkImport :: CCallConv
 	 -> Safety 
 	 -> (Located FastString, Located RdrName, LHsType RdrName) 
 	 -> P (HsDecl RdrName)
-mkImport (CCall  cconv) safety (L loc entity, v, ty)
+mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget entity)
       importSpec = CImport PrimCallConv safety nilFS funcTarget
@@ -992,9 +981,6 @@ mkImport (CCall  cconv) safety (L loc entity, v, ty)
     case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
       Nothing         -> parseError loc "Malformed entity string"
       Just importSpec -> return (ForD (ForeignImport v ty importSpec))
-mkImport (DNCall      ) _      (entity, v, ty) = do
-  spec <- parseDImport entity
-  return $ ForD (ForeignImport v ty (DNImport spec))
 
 -- the string "foo" is ambigous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
@@ -1027,56 +1013,16 @@ parseCImport cconv safety nm str =
                       return (mkFastString (c:cs)))
 
 
---
--- Unravel a dotnet spec string.
---
-parseDImport :: Located FastString -> P DNCallSpec
-parseDImport (L loc entity) = parse0 comps
- where
-  comps = words (unpackFS entity)
-
-  parse0 [] = d'oh
-  parse0 (x : xs) 
-    | x == "static" = parse1 True xs
-    | otherwise     = parse1 False (x:xs)
-
-  parse1 _ [] = d'oh
-  parse1 isStatic (x:xs)
-    | x == "method" = parse2 isStatic DNMethod xs
-    | x == "field"  = parse2 isStatic DNField xs
-    | x == "ctor"   = parse2 isStatic DNConstructor xs
-  parse1 isStatic xs = parse2 isStatic DNMethod xs
-
-  parse2 _ _ [] = d'oh
-  parse2 isStatic kind (('[':x):xs) =
-     case x of
-        [] -> d'oh
-        vs | last vs == ']' -> parse3 isStatic kind (init vs) xs
-        _ -> d'oh
-  parse2 isStatic kind xs = parse3 isStatic kind "" xs
-
-  parse3 isStatic kind assem [x] = 
-    return (DNCallSpec isStatic kind assem x 
-    			  -- these will be filled in once known.
-                        (error "FFI-dotnet-args")
-                        (error "FFI-dotnet-result"))
-  parse3 _ _ _ _ = d'oh
-
-  d'oh = parseError loc "Malformed entity string"
-  
 -- construct a foreign export declaration
 --
-mkExport :: CallConv
+mkExport :: CCallConv
          -> (Located FastString, Located RdrName, LHsType RdrName) 
 	 -> P (HsDecl RdrName)
-mkExport (CCall  cconv) (L _ entity, v, ty) = return $
+mkExport cconv (L _ entity, v, ty) = return $
   ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)))
   where
     entity' | nullFS entity = mkExtName (unLoc v)
 	    | otherwise     = entity
-mkExport DNCall (L _ _, v, _) =
-  parseError (getLoc v){-TODO: not quite right-}
-	"Foreign export is not yet supported for .NET"
 
 -- Supplying the ext_name in a foreign decl is optional; if it
 -- isn't there, the Haskell name is assumed. Note that no transformation

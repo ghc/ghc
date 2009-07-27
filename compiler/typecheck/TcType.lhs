@@ -92,7 +92,6 @@ module TcType (
   isFFITy,	       -- :: Type -> Bool
   isFunPtrTy,          -- :: Type -> Bool
   tcSplitIOType_maybe, -- :: Type -> Maybe Type  
-  toDNType,            -- :: Type -> DNType
 
   --------------------------------
   -- Rexported from Type
@@ -1257,39 +1256,6 @@ isFFIDotnetObjTy ty
 
 isFunPtrTy :: Type -> Bool
 isFunPtrTy = checkRepTyConKey [funPtrTyConKey]
-
-toDNType :: Type -> DNType
-toDNType ty
-  | isStringTy ty = DNString
-  | isFFIDotnetObjTy ty = DNObject
-  | Just (tc,argTys) <- tcSplitTyConApp_maybe ty 
-  =  case lookup (getUnique tc) dn_assoc of
-       Just x  -> x
-       Nothing 
-         | tc `hasKey` ioTyConKey -> toDNType (head argTys)
-	 | otherwise -> pprPanic ("toDNType: unsupported .NET type") 
-			  (pprType ty <+> parens (hcat (map pprType argTys)) <+> ppr tc)
-  | otherwise = panic "toDNType"	-- Is this right?
-    where
-      dn_assoc :: [ (Unique, DNType) ]
-      dn_assoc = [ (unitTyConKey,   DNUnit)
-      		 , (intTyConKey,    DNInt)
-      	         , (int8TyConKey,   DNInt8)
-		 , (int16TyConKey,  DNInt16)
-		 , (int32TyConKey,  DNInt32)
-		 , (int64TyConKey,  DNInt64)
-		 , (wordTyConKey,   DNInt)
-		 , (word8TyConKey,  DNWord8)
-		 , (word16TyConKey, DNWord16)
-		 , (word32TyConKey, DNWord32)
-		 , (word64TyConKey, DNWord64)
-		 , (floatTyConKey,  DNFloat)
-		 , (doubleTyConKey, DNDouble)
-		 , (ptrTyConKey,    DNPtr)
-		 , (funPtrTyConKey, DNPtr)
-		 , (charTyConKey,   DNChar)
-		 , (boolTyConKey,   DNBool)
-		 ]
 
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 -- Look through newtypes, but *not* foralls

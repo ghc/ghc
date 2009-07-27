@@ -128,13 +128,6 @@ dsFImport id (CImport cconv safety _ spec) = do
     (ids, h, c) <- dsCImport id spec cconv safety
     return (ids, h, c)
 
-  -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
-  --	    routines that are external to the .NET runtime, but GHC doesn't
-  --	    support such calls yet; if `nullFastString lib', the value was not given
-dsFImport id (DNImport spec) = do
-    (ids, h, c) <- dsFCall id (DNCall spec)
-    return (ids, h, c)
-
 dsCImport :: Id
 	  -> CImportSpec
 	  -> CCallConv
@@ -200,30 +193,7 @@ dsFCall fn_id fcall = do
     let
         work_arg_ids  = [v | Var v <- val_args] -- All guaranteed to be vars
 
-        forDotnet =
-         case fcall of
-           DNCall{} -> True
-           _        -> False
-
-        topConDs
-          | forDotnet = Just <$> dsLookupGlobalId checkDotnetResName
-          | otherwise = return Nothing
-
-        augmentResultDs
-          | forDotnet = do
-                return (\ (mb_res_ty, resWrap) ->
-                              case mb_res_ty of
-                                Nothing -> (Just (mkTyConApp (tupleTyCon Unboxed 1)
-                                                             [ addrPrimTy ]),
-                                                 resWrap)
-                                Just x  -> (Just (mkTyConApp (tupleTyCon Unboxed 2)
-                                                             [ x, addrPrimTy ]),
-                                                 resWrap))
-          | otherwise = return id
-
-    augment <- augmentResultDs
-    topCon <- topConDs
-    (ccall_result_ty, res_wrapper) <- boxResult augment topCon io_res_ty
+    (ccall_result_ty, res_wrapper) <- boxResult io_res_ty
 
     ccall_uniq <- newUnique
     work_uniq  <- newUnique
