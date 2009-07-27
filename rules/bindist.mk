@@ -23,6 +23,6 @@ define bindist
 bindist: bindist_$1
 
 bindist_$1:
-	for f in $$(addprefix $1/,$2); do echo $(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done
+	for f in $2; do echo $1/$(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done
 endef
 
