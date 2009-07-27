@@ -49,7 +49,7 @@ endif
 include mk/custom-settings.mk
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
+REALGOALS=$(filter-out binary-dist bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
