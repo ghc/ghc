@@ -304,7 +304,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
               }
 
         ; (unfold_env, tidy_occ_env)
-              <- chooseExternalIds hsc_env type_env mod omit_prags binds
+              <- chooseExternalIds hsc_env mod omit_prags binds
 
         ; let { ext_rules 
 		   | omit_prags = []
@@ -549,14 +549,13 @@ type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
   -- Bool => expose unfolding or not.
 
 chooseExternalIds :: HscEnv
-                  -> TypeEnv
                   -> Module
                   -> Bool
 		  -> [CoreBind]
                   -> IO (UnfoldEnv, TidyOccEnv)
 	-- Step 1 from the notes above
 
-chooseExternalIds hsc_env type_env mod omit_prags binds 
+chooseExternalIds hsc_env mod omit_prags binds
   = do
     (unfold_env1,occ_env1) 
         <- search (zip sorted_exports sorted_exports) emptyVarEnv init_occ_env
@@ -581,9 +580,9 @@ chooseExternalIds hsc_env type_env mod omit_prags binds
   bind_env :: IdEnv CoreExpr
   bind_env = mkVarEnv (flattenBinds binds)
 
-  avoids   = [getOccName name | bndr <- typeEnvIds type_env,
+  avoids   = [getOccName name | bndr <- binders,
                                 let name = idName bndr,
-                                isExternalName name]
+                                isExternalName name ]
 		-- In computing our "avoids" list, we must include
 		--	all implicit Ids
 		--	all things with global names (assigned once and for
@@ -768,7 +767,21 @@ tidyTopName mod nc_var maybe_ref occ_env id
     new_occ
       | Just ref <- maybe_ref, ref /= id = 
           mkOccName (occNameSpace old_occ) $
-             occNameString (getOccName ref) ++ '_' : occNameString old_occ
+             let
+                 ref_str = occNameString (getOccName ref)
+                 occ_str = occNameString old_occ
+             in
+             case occ_str of
+               '$':'w':_ -> occ_str
+                  -- workers: the worker for a function already
+                  -- includes the occname for its parent, so there's
+                  -- no need to prepend the referrer.
+               _other | isSystemName name -> ref_str
+                      | otherwise         -> ref_str ++ '_' : occ_str
+                  -- If this name was system-generated, then don't bother
+                  -- to retain its OccName, just use the referrer.  These
+                  -- system-generated names will become "f1", "f2", etc. for
+                  -- a referrer "f".
       | otherwise = old_occ
 
     (occ_env', occ') = tidyOccName occ_env new_occ
