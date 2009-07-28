@@ -74,7 +74,7 @@ import Pretty		( Doc, Mode(..) )
 import Panic
 
 import Data.Char
-import Data.Word	( Word32 )
+import Data.Word
 import System.IO	( Handle, stderr, stdout, hFlush )
 import System.FilePath
 \end{code}
@@ -494,6 +494,9 @@ instance Outputable Bool where
 
 instance Outputable Int where
    ppr n = int n
+
+instance Outputable Word16 where
+   ppr n = integer $ fromIntegral n
 
 instance Outputable Word32 where
    ppr n = integer $ fromIntegral n
