@@ -91,8 +91,6 @@ dsForeigns fos = do
    do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv))) = do
       (h, c, _, _) <- dsFExport id (idType id) ext_nm cconv False
       return (h, c, [id], [])
-
-   do_decl d = pprPanic "dsForeigns/do_decl" (ppr d)
 \end{code}
 
 
