@@ -312,9 +312,15 @@ renameLTyClD (L loc d) = return . L loc =<< renameTyClD d
 
 renameTyClD :: TyClDecl Name -> RnM (TyClDecl DocName)
 renameTyClD d = case d of
+#if __GLASGOW_HASKELL__ >= 611
+  ForeignType lname b -> do
+    lname' <- renameL lname
+    return (ForeignType lname' b)
+#else
   ForeignType lname a b -> do
     lname' <- renameL lname
     return (ForeignType lname' a b)
+#endif
 
   TyFamily flav lname ltyvars kind -> do
     lname'   <- renameL lname
