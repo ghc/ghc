@@ -133,9 +133,6 @@ make_exp (Var v) = do
            -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (varType v))
        FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
            -> C.DynExternal            (showSDoc (ppr callconv)) (make_ty (varType v))
-       FCallId _ 
-           -> pprPanic "MkExternalCore died: can't handle non-{static,dynamic}-C foreign call"
-                    (ppr v)
        -- Constructors are always exported, so make sure to declare them
        -- with qualified names
        DataConWorkId _ -> C.Var (make_var_qid False vName)
