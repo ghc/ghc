@@ -7,13 +7,13 @@ ByteCodeLink: Bytecode assembler and linker
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-module ByteCodeAsm (  
-	assembleBCOs, assembleBCO,
+module ByteCodeAsm (
+        assembleBCOs, assembleBCO,
 
-	CompiledByteCode(..), 
-	UnlinkedBCO(..), BCOPtr(..), BCONPtr(..), bcoFreeNames,
-	SizedSeq, sizeSS, ssElts,
-	iNTERP_STACK_CHECK_THRESH
+        CompiledByteCode(..),
+        UnlinkedBCO(..), BCOPtr(..), BCONPtr(..), bcoFreeNames,
+        SizedSeq, sizeSS, ssElts,
+        iNTERP_STACK_CHECK_THRESH
   ) where
 
 #include "HsVersions.h"
@@ -32,27 +32,27 @@ import FastString
 import SMRep
 import Outputable
 
-import Control.Monad	( foldM )
-import Control.Monad.ST	( runST )
+import Control.Monad    ( foldM )
+import Control.Monad.ST ( runST )
 
 import Data.Array.MArray
 import Data.Array.Unboxed ( listArray )
-import Data.Array.Base	( UArray(..) )
-import Data.Array.ST	( castSTUArray )
+import Data.Array.Base  ( UArray(..) )
+import Data.Array.ST    ( castSTUArray )
 import Foreign
-import Data.Char	( ord )
+import Data.Char        ( ord )
 
-import GHC.Base		( ByteArray#, MutableByteArray#, RealWorld )
+import GHC.Base         ( ByteArray#, MutableByteArray#, RealWorld )
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
 
--- CompiledByteCode represents the result of byte-code 
+-- CompiledByteCode represents the result of byte-code
 -- compiling a bunch of functions and data types
 
-data CompiledByteCode 
+data CompiledByteCode
   = ByteCode [UnlinkedBCO] -- Bunch of interpretable bindings
-	     ItblEnv       -- A mapping from DataCons to their itbls
+             ItblEnv       -- A mapping from DataCons to their itbls
 
 instance Outputable CompiledByteCode where
   ppr (ByteCode bcos _) = ppr bcos
@@ -60,12 +60,12 @@ instance Outputable CompiledByteCode where
 
 data UnlinkedBCO
    = UnlinkedBCO {
-	unlinkedBCOName   :: Name,
-	unlinkedBCOArity  :: Int,
-	unlinkedBCOInstrs :: ByteArray#,		 -- insns
-	unlinkedBCOBitmap :: ByteArray#,		 -- bitmap
+        unlinkedBCOName   :: Name,
+        unlinkedBCOArity  :: Int,
+        unlinkedBCOInstrs :: ByteArray#,                 -- insns
+        unlinkedBCOBitmap :: ByteArray#,                 -- bitmap
         unlinkedBCOLits   :: (SizedSeq BCONPtr),        -- non-ptrs
-        unlinkedBCOPtrs   :: (SizedSeq BCOPtr)   	-- ptrs
+        unlinkedBCOPtrs   :: (SizedSeq BCOPtr)          -- ptrs
    }
 
 data BCOPtr
@@ -87,15 +87,15 @@ bcoFreeNames bco
   = bco_refs bco `minusNameSet` mkNameSet [unlinkedBCOName bco]
   where
     bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
-	= unionManyNameSets (
-	     mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
-	     mkNameSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
-	     map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
-	  )
+        = unionManyNameSets (
+             mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
+             mkNameSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
+             map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
+          )
 
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
-      = sep [text "BCO", ppr nm, text "with", 
+      = sep [text "BCO", ppr nm, text "with",
              int (sizeSS lits), text "lits",
              int (sizeSS ptrs), text "ptrs" ]
 
@@ -112,8 +112,8 @@ instance Outputable UnlinkedBCO where
 -- Top level assembler fn.
 assembleBCOs :: [ProtoBCO Name] -> [TyCon] -> IO CompiledByteCode
 assembleBCOs proto_bcos tycons
-  = do	itblenv <- mkITbls tycons
-	bcos    <- mapM assembleBCO proto_bcos
+  = do  itblenv <- mkITbls tycons
+        bcos    <- mapM assembleBCO proto_bcos
         return (ByteCode bcos itblenv)
 
 assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
@@ -126,7 +126,7 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
 
          mkLabelEnv env _ [] = env
          mkLabelEnv env i_offset (i:is)
-            = let new_env 
+            = let new_env
                      = case i of LABEL n -> addToFM env n i_offset ; _ -> env
               in  mkLabelEnv new_env (i_offset + instrSize16s i) is
 
@@ -140,21 +140,21 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
          lits  <- return emptySS :: IO (SizedSeq BCONPtr)
          ptrs  <- return emptySS :: IO (SizedSeq BCOPtr)
          let init_asm_state = (insns,lits,ptrs)
-         (final_insns, final_lits, final_ptrs) 
+         (final_insns, final_lits, final_ptrs)
             <- mkBits findLabel init_asm_state instrs
 
-	 let asm_insns = ssElts final_insns
-	     n_insns   = sizeSS final_insns
+         let asm_insns = ssElts final_insns
+             n_insns   = sizeSS final_insns
 
              insns_arr
-		 | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
+                 | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
                  | otherwise = mkInstrArray n_insns asm_insns
              !insns_barr = case insns_arr of UArray _lo _hi _n barr -> barr
 
-	     bitmap_arr = mkBitmapArray bsize bitmap
+             bitmap_arr = mkBitmapArray bsize bitmap
              !bitmap_barr = case bitmap_arr of UArray _lo _hi _n barr -> barr
 
-         let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs 
+         let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
 
          -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
          -- objects, since they might get run too early.  Disable this until
@@ -170,12 +170,12 @@ mkBitmapArray :: Int -> [StgWord] -> UArray Int StgWord
 mkBitmapArray bsize bitmap
   = listArray (0, length bitmap) (fromIntegral bsize : bitmap)
 
-mkInstrArray :: Int -> [Word16]	-> UArray Int Word16
+mkInstrArray :: Int -> [Word16] -> UArray Int Word16
 mkInstrArray n_insns asm_insns
   = listArray (0, n_insns) (fromIntegral n_insns : asm_insns)
 
 -- instrs nonptrs ptrs
-type AsmState = (SizedSeq Word16, 
+type AsmState = (SizedSeq Word16,
                  SizedSeq BCONPtr,
                  SizedSeq BCOPtr)
 
@@ -187,7 +187,7 @@ emptySS = SizedSeq 0 []
 addToSS :: SizedSeq a -> a -> IO (SizedSeq a)
 addToSS (SizedSeq n r_xs) x = return (SizedSeq (n+1) (x:r_xs))
 addListToSS :: SizedSeq a -> [a] -> IO (SizedSeq a)
-addListToSS (SizedSeq n r_xs) xs 
+addListToSS (SizedSeq n r_xs) xs
    = return (SizedSeq (n + length xs) (reverse xs ++ r_xs))
 
 ssElts :: SizedSeq a -> [a]
@@ -215,9 +215,9 @@ largeArg i
  | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
 
 -- This is where all the action is (pass 2 of the assembler)
-mkBits :: (Int -> Int) 			-- label finder
+mkBits :: (Int -> Int)                  -- label finder
        -> AsmState
-       -> [BCInstr]			-- instructions (in)
+       -> [BCInstr]                     -- instructions (in)
        -> IO AsmState
 
 mkBits findLabel st proto_insns
@@ -238,33 +238,33 @@ mkBits findLabel st proto_insns
                PUSH_PRIMOP op     -> do (p, st2) <- ptr st (BCOPtrPrimOp op)
                                         instr2 st2 bci_PUSH_G p
                PUSH_BCO proto     -> do ul_bco <- assembleBCO proto
- 					(p, st2) <- ptr st (BCOPtrBCO ul_bco)
+                                        (p, st2) <- ptr st (BCOPtrBCO ul_bco)
                                         instr2 st2 bci_PUSH_G p
                PUSH_ALTS proto    -> do ul_bco <- assembleBCO proto
- 					(p, st2) <- ptr st (BCOPtrBCO ul_bco)
+                                        (p, st2) <- ptr st (BCOPtrBCO ul_bco)
                                         instr2 st2 bci_PUSH_ALTS p
-               PUSH_ALTS_UNLIFTED proto pk -> do 
-					ul_bco <- assembleBCO proto
- 					(p, st2) <- ptr st (BCOPtrBCO ul_bco)
+               PUSH_ALTS_UNLIFTED proto pk -> do
+                                        ul_bco <- assembleBCO proto
+                                        (p, st2) <- ptr st (BCOPtrBCO ul_bco)
                                         instr2 st2 (push_alts pk) p
-               PUSH_UBX  (Left lit) nws  
+               PUSH_UBX  (Left lit) nws
                                   -> do (np, st2) <- literal st lit
                                         instr3 st2 bci_PUSH_UBX np nws
-               PUSH_UBX  (Right aa) nws  
+               PUSH_UBX  (Right aa) nws
                                   -> do (np, st2) <- addr st aa
                                         instr3 st2 bci_PUSH_UBX np nws
 
-	       PUSH_APPLY_N	    -> do instr1 st bci_PUSH_APPLY_N
-	       PUSH_APPLY_V	    -> do instr1 st bci_PUSH_APPLY_V
-	       PUSH_APPLY_F	    -> do instr1 st bci_PUSH_APPLY_F
-	       PUSH_APPLY_D	    -> do instr1 st bci_PUSH_APPLY_D
-	       PUSH_APPLY_L	    -> do instr1 st bci_PUSH_APPLY_L
-	       PUSH_APPLY_P	    -> do instr1 st bci_PUSH_APPLY_P
-	       PUSH_APPLY_PP	    -> do instr1 st bci_PUSH_APPLY_PP
-	       PUSH_APPLY_PPP	    -> do instr1 st bci_PUSH_APPLY_PPP
-	       PUSH_APPLY_PPPP	    -> do instr1 st bci_PUSH_APPLY_PPPP
-	       PUSH_APPLY_PPPPP	    -> do instr1 st bci_PUSH_APPLY_PPPPP
-	       PUSH_APPLY_PPPPPP    -> do instr1 st bci_PUSH_APPLY_PPPPPP
+               PUSH_APPLY_N         -> do instr1 st bci_PUSH_APPLY_N
+               PUSH_APPLY_V         -> do instr1 st bci_PUSH_APPLY_V
+               PUSH_APPLY_F         -> do instr1 st bci_PUSH_APPLY_F
+               PUSH_APPLY_D         -> do instr1 st bci_PUSH_APPLY_D
+               PUSH_APPLY_L         -> do instr1 st bci_PUSH_APPLY_L
+               PUSH_APPLY_P         -> do instr1 st bci_PUSH_APPLY_P
+               PUSH_APPLY_PP        -> do instr1 st bci_PUSH_APPLY_PP
+               PUSH_APPLY_PPP       -> do instr1 st bci_PUSH_APPLY_PPP
+               PUSH_APPLY_PPPP      -> do instr1 st bci_PUSH_APPLY_PPPP
+               PUSH_APPLY_PPPPP     -> do instr1 st bci_PUSH_APPLY_PPPPP
+               PUSH_APPLY_PPPPPP    -> do instr1 st bci_PUSH_APPLY_PPPPPP
 
                SLIDE     n by     -> instr3 st bci_SLIDE n by
                ALLOC_AP  n        -> instr2 st bci_ALLOC_AP n
@@ -298,8 +298,8 @@ mkBits findLabel st proto_insns
                RETURN_UBX rep     -> instr1 st (return_ubx rep)
                CCALL off m_addr   -> do (np, st2) <- addr st m_addr
                                         instr3 st2 bci_CCALL off np
-               BRK_FUN array index info -> do 
-                  (p1, st2) <- ptr st  (BCOPtrArray array) 
+               BRK_FUN array index info -> do
+                  (p1, st2) <- ptr st  (BCOPtrArray array)
                   (p2, st3) <- ptr st2 (BCOPtrBreakInfo info)
                   instr4 st3 bci_BRK_FUN p1 index p2
 
@@ -374,7 +374,7 @@ mkBits findLabel st proto_insns
 #ifdef mingw32_TARGET_OS
        literal st (MachLabel fs (Just sz) _)
             = litlabel st (appendFS fs (mkFastString ('@':show sz)))
-        -- On Windows, stdcall labels have a suffix indicating the no. of 
+        -- On Windows, stdcall labels have a suffix indicating the no. of
         -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
 #endif
        literal st (MachLabel fs _ _) = litlabel st fs
@@ -410,52 +410,52 @@ return_ubx PtrArg    = bci_RETURN_P
 instrSize16s :: BCInstr -> Int
 instrSize16s instr
    = case instr of
-        STKCHECK{}		-> 2
-        PUSH_L{}		-> 2
-        PUSH_LL{}		-> 3
-        PUSH_LLL{}		-> 4
-        PUSH_G{}		-> 2
-        PUSH_PRIMOP{}		-> 2
-        PUSH_BCO{}		-> 2
-        PUSH_ALTS{}		-> 2
-        PUSH_ALTS_UNLIFTED{}	-> 2
-	PUSH_UBX{}		-> 3
-	PUSH_APPLY_N{}		-> 1
-	PUSH_APPLY_V{}		-> 1
-	PUSH_APPLY_F{}		-> 1
-	PUSH_APPLY_D{}		-> 1
-	PUSH_APPLY_L{}		-> 1
-	PUSH_APPLY_P{}		-> 1
-	PUSH_APPLY_PP{}		-> 1
-	PUSH_APPLY_PPP{}	-> 1
-	PUSH_APPLY_PPPP{}	-> 1
-	PUSH_APPLY_PPPPP{}	-> 1
-	PUSH_APPLY_PPPPPP{}	-> 1
-        SLIDE{}			-> 3
-        ALLOC_AP{}		-> 2
-        ALLOC_AP_NOUPD{}	-> 2
-        ALLOC_PAP{}		-> 3
-        MKAP{}			-> 3
-        MKPAP{}			-> 3
-        UNPACK{}		-> 2
-        PACK{}			-> 3
-        LABEL{}			-> 0	-- !!
-        TESTLT_I{}		-> 3
-        TESTEQ_I{}		-> 3
-        TESTLT_F{}		-> 3
-        TESTEQ_F{}		-> 3
-        TESTLT_D{}		-> 3
-        TESTEQ_D{}		-> 3
-        TESTLT_P{}		-> 3
-        TESTEQ_P{}		-> 3
-        JMP{}			-> 2
-        CASEFAIL{}		-> 1
-        ENTER{}			-> 1
-        RETURN{}		-> 1
-        RETURN_UBX{}		-> 1
-	CCALL{}			-> 3
-        SWIZZLE{}		-> 3
-        BRK_FUN{}               -> 4 
+        STKCHECK{}              -> 2
+        PUSH_L{}                -> 2
+        PUSH_LL{}               -> 3
+        PUSH_LLL{}              -> 4
+        PUSH_G{}                -> 2
+        PUSH_PRIMOP{}           -> 2
+        PUSH_BCO{}              -> 2
+        PUSH_ALTS{}             -> 2
+        PUSH_ALTS_UNLIFTED{}    -> 2
+        PUSH_UBX{}              -> 3
+        PUSH_APPLY_N{}          -> 1
+        PUSH_APPLY_V{}          -> 1
+        PUSH_APPLY_F{}          -> 1
+        PUSH_APPLY_D{}          -> 1
+        PUSH_APPLY_L{}          -> 1
+        PUSH_APPLY_P{}          -> 1
+        PUSH_APPLY_PP{}         -> 1
+        PUSH_APPLY_PPP{}        -> 1
+        PUSH_APPLY_PPPP{}       -> 1
+        PUSH_APPLY_PPPPP{}      -> 1
+        PUSH_APPLY_PPPPPP{}     -> 1
+        SLIDE{}                 -> 3
+        ALLOC_AP{}              -> 2
+        ALLOC_AP_NOUPD{}        -> 2
+        ALLOC_PAP{}             -> 3
+        MKAP{}                  -> 3
+        MKPAP{}                 -> 3
+        UNPACK{}                -> 2
+        PACK{}                  -> 3
+        LABEL{}                 -> 0    -- !!
+        TESTLT_I{}              -> 3
+        TESTEQ_I{}              -> 3
+        TESTLT_F{}              -> 3
+        TESTEQ_F{}              -> 3
+        TESTLT_D{}              -> 3
+        TESTEQ_D{}              -> 3
+        TESTLT_P{}              -> 3
+        TESTEQ_P{}              -> 3
+        JMP{}                   -> 2
+        CASEFAIL{}              -> 1
+        ENTER{}                 -> 1
+        RETURN{}                -> 1
+        RETURN_UBX{}            -> 1
+        CCALL{}                 -> 3
+        SWIZZLE{}               -> 3
+        BRK_FUN{}               -> 4
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
