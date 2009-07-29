@@ -185,14 +185,14 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p)
 {
-#if 0 // defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     StgWord r;
     r = 1;
     __asm__ __volatile__ (
         "lock\nxadd %0,%1":
             "+r" (r), "+m" (*p):
     );
-    return r;
+    return r+1;
 #else
     StgWord old, new;
     do {
@@ -206,14 +206,14 @@ atomic_inc(StgVolatilePtr p)
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p)
 {
-#if 0 //defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     StgWord r;
     r = (StgWord)-1;
     __asm__ __volatile__ (
         "lock\nxadd %0,%1":
             "+r" (r), "+m" (*p):
     );
-    return r;
+    return r-1;
 #else
     StgWord old, new;
     do {
