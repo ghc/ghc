@@ -70,19 +70,23 @@ extern "C" {
 
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery
-   -------------------------------------------------------------------------- */
 
-#ifndef DEBUG
-#define ASSERT(predicate) /* nothing */
-#else
+   CHECK(p)   evaluates p and terminates with an error if p is false
+   ASSERT(p)  like CHECK(p) if DEBUG is on, otherwise a no-op
+   -------------------------------------------------------------------------- */
 
 extern void _assertFail (const char *, unsigned int);
 
-#define ASSERT(predicate)			\
+#define CHECK(predicate)			\
 	if (predicate)				\
 	    /*null*/;				\
 	else					\
 	    _assertFail(__FILE__, __LINE__)
+
+#ifndef DEBUG
+#define ASSERT(predicate) /* nothing */
+#else
+#define ASSERT(predicate) CHECK(predicate)
 #endif /* DEBUG */
 
 /* 
