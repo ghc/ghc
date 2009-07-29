@@ -586,7 +586,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- has been accidentally evaluated, or something else has gone wrong.
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
-   mb_hValues <- mapM (getIdValFromApStack apStack) offsets
+   mb_hValues <- mapM (getIdValFromApStack apStack) (map fromIntegral offsets)
    let filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_dflags hsc_env) 1 $

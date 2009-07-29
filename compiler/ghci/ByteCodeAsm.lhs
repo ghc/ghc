@@ -41,6 +41,7 @@ import Data.Array.Base  ( UArray(..) )
 import Data.Array.ST    ( castSTUArray )
 import Foreign
 import Data.Char        ( ord )
+import Data.List
 
 import GHC.Base         ( ByteArray#, MutableByteArray#, RealWorld )
 
@@ -96,8 +97,8 @@ bcoFreeNames bco
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
-             int (sizeSS lits), text "lits",
-             int (sizeSS ptrs), text "ptrs" ]
+             ppr (sizeSS lits), text "lits",
+             ppr (sizeSS ptrs), text "ptrs" ]
 
 -- -----------------------------------------------------------------------------
 -- The bytecode assembler
@@ -130,10 +131,11 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
                      = case i of LABEL n -> addToFM env n i_offset ; _ -> env
               in  mkLabelEnv new_env (i_offset + instrSize16s i) is
 
+         findLabel :: Word16 -> Word16
          findLabel lab
             = case lookupFM label_env lab of
                  Just bco_offset -> bco_offset
-                 Nothing -> pprPanic "assembleBCO.findLabel" (int lab)
+                 Nothing -> pprPanic "assembleBCO.findLabel" (ppr lab)
      in
      do  -- pass 2: generate the instruction, ptr and nonptr bits
          insns <- return emptySS :: IO (SizedSeq Word16)
@@ -166,11 +168,11 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
      --     zonk ptr = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
      --                      free ptr
 
-mkBitmapArray :: Int -> [StgWord] -> UArray Int StgWord
+mkBitmapArray :: Word16 -> [StgWord] -> UArray Int StgWord
 mkBitmapArray bsize bitmap
   = listArray (0, length bitmap) (fromIntegral bsize : bitmap)
 
-mkInstrArray :: Int -> [Word16] -> UArray Int Word16
+mkInstrArray :: Word16 -> [Word16] -> UArray Word16 Word16
 mkInstrArray n_insns asm_insns
   = listArray (0, n_insns) (fromIntegral n_insns : asm_insns)
 
@@ -179,7 +181,7 @@ type AsmState = (SizedSeq Word16,
                  SizedSeq BCONPtr,
                  SizedSeq BCOPtr)
 
-data SizedSeq a = SizedSeq !Int [a]
+data SizedSeq a = SizedSeq !Word16 [a]
 emptySS :: SizedSeq a
 emptySS = SizedSeq 0 []
 
@@ -188,34 +190,34 @@ addToSS :: SizedSeq a -> a -> IO (SizedSeq a)
 addToSS (SizedSeq n r_xs) x = return (SizedSeq (n+1) (x:r_xs))
 addListToSS :: SizedSeq a -> [a] -> IO (SizedSeq a)
 addListToSS (SizedSeq n r_xs) xs
-   = return (SizedSeq (n + length xs) (reverse xs ++ r_xs))
+   = return (SizedSeq (n + genericLength xs) (reverse xs ++ r_xs))
 
 ssElts :: SizedSeq a -> [a]
 ssElts (SizedSeq _ r_xs) = reverse r_xs
 
-sizeSS :: SizedSeq a -> Int
+sizeSS :: SizedSeq a -> Word16
 sizeSS (SizedSeq n _) = n
 
 -- Bring in all the bci_ bytecode constants.
 #include "Bytecodes.h"
 
-largeArgInstr :: Int -> Int
+largeArgInstr :: Word16 -> Word16
 largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci
 
-largeArg :: Int -> [Int]
-largeArg i
+largeArg :: Word -> [Word16]
+largeArg w
  | wORD_SIZE_IN_BITS == 64
-           = [(i .&. 0xFFFF000000000000) `shiftR` 48,
-              (i .&. 0x0000FFFF00000000) `shiftR` 32,
-              (i .&. 0x00000000FFFF0000) `shiftR` 16,
-              (i .&. 0x000000000000FFFF)]
+           = [fromIntegral (w `shiftR` 48),
+              fromIntegral (w `shiftR` 32),
+              fromIntegral (w `shiftR` 16),
+              fromIntegral w]
  | wORD_SIZE_IN_BITS == 32
-           = [(i .&. 0xFFFF0000) `shiftR` 16,
-              (i .&. 0x0000FFFF)]
+           = [fromIntegral (w `shiftR` 16),
+              fromIntegral w]
  | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
 
 -- This is where all the action is (pass 2 of the assembler)
-mkBits :: (Int -> Int)                  -- label finder
+mkBits :: (Word16 -> Word16)            -- label finder
        -> AsmState
        -> [BCInstr]                     -- instructions (in)
        -> IO AsmState
@@ -229,7 +231,7 @@ mkBits findLabel st proto_insns
                STKCHECK  n
                 | n > 65535 ->
                        instrn st (largeArgInstr bci_STKCHECK : largeArg n)
-                | otherwise -> instr2 st bci_STKCHECK n
+                | otherwise -> instr2 st bci_STKCHECK (fromIntegral n)
                PUSH_L    o1       -> instr2 st bci_PUSH_L o1
                PUSH_LL   o1 o2    -> instr3 st bci_PUSH_LL o1 o2
                PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
@@ -303,35 +305,32 @@ mkBits findLabel st proto_insns
                   (p2, st3) <- ptr st2 (BCOPtrBreakInfo info)
                   instr4 st3 bci_BRK_FUN p1 index p2
 
-       i2s :: Int -> Word16
-       i2s = fromIntegral
-
-       instrn :: AsmState -> [Int] -> IO AsmState
+       instrn :: AsmState -> [Word16] -> IO AsmState
        instrn st [] = return st
        instrn (st_i, st_l, st_p) (i:is)
-          = do st_i' <- addToSS st_i (i2s i)
+          = do st_i' <- addToSS st_i i
                instrn (st_i', st_l, st_p) is
 
        instr1 (st_i0,st_l0,st_p0) i1
           = do st_i1 <- addToSS st_i0 i1
                return (st_i1,st_l0,st_p0)
 
-       instr2 (st_i0,st_l0,st_p0) i1 i2
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               st_i2 <- addToSS st_i1 (i2s i2)
+       instr2 (st_i0,st_l0,st_p0) w1 w2
+          = do st_i1 <- addToSS st_i0 w1
+               st_i2 <- addToSS st_i1 w2
                return (st_i2,st_l0,st_p0)
 
-       instr3 (st_i0,st_l0,st_p0) i1 i2 i3
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               st_i2 <- addToSS st_i1 (i2s i2)
-               st_i3 <- addToSS st_i2 (i2s i3)
+       instr3 (st_i0,st_l0,st_p0) w1 w2 w3
+          = do st_i1 <- addToSS st_i0 w1
+               st_i2 <- addToSS st_i1 w2
+               st_i3 <- addToSS st_i2 w3
                return (st_i3,st_l0,st_p0)
 
-       instr4 (st_i0,st_l0,st_p0) i1 i2 i3 i4
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               st_i2 <- addToSS st_i1 (i2s i2)
-               st_i3 <- addToSS st_i2 (i2s i3)
-               st_i4 <- addToSS st_i3 (i2s i4)
+       instr4 (st_i0,st_l0,st_p0) w1 w2 w3 w4
+          = do st_i1 <- addToSS st_i0 w1
+               st_i2 <- addToSS st_i1 w2
+               st_i3 <- addToSS st_i2 w3
+               st_i4 <- addToSS st_i3 w4
                return (st_i4,st_l0,st_p0)
 
        float (st_i0,st_l0,st_p0) f
@@ -389,7 +388,7 @@ mkBits findLabel st proto_insns
        literal _  other            = pprPanic "ByteCodeAsm.literal" (ppr other)
 
 
-push_alts :: CgRep -> Int
+push_alts :: CgRep -> Word16
 push_alts NonPtrArg = bci_PUSH_ALTS_N
 push_alts FloatArg  = bci_PUSH_ALTS_F
 push_alts DoubleArg = bci_PUSH_ALTS_D
@@ -407,7 +406,7 @@ return_ubx PtrArg    = bci_RETURN_P
 
 
 -- The size in 16-bit entities of an instruction.
-instrSize16s :: BCInstr -> Int
+instrSize16s :: BCInstr -> Word16
 instrSize16s instr
    = case instr of
         STKCHECK{}              -> 2

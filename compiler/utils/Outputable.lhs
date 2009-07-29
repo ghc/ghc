@@ -501,6 +501,9 @@ instance Outputable Word16 where
 instance Outputable Word32 where
    ppr n = integer $ fromIntegral n
 
+instance Outputable Word where
+   ppr n = integer $ fromIntegral n
+
 instance Outputable () where
    ppr _ = text "()"
 

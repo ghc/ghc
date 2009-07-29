@@ -123,11 +123,11 @@ coreExprToBCOs dflags expr
 
 type BCInstrList = OrdList BCInstr
 
-type Sequel = Int	-- back off to this depth before ENTER
+type Sequel = Word16 -- back off to this depth before ENTER
 
 -- Maps Ids to the offset from the stack _base_ so we don't have
 -- to mess with it after each push/pop.
-type BCEnv = FiniteMap Id Int	-- To find vars on the stack
+type BCEnv = FiniteMap Id Word16 -- To find vars on the stack
 
 {-
 ppBCEnv :: BCEnv -> SDoc
@@ -147,7 +147,7 @@ mkProtoBCO
    -> BCInstrList
    -> Either  [AnnAlt Id VarSet] (AnnExpr Id VarSet)
    -> Int
-   -> Int
+   -> Word16
    -> [StgWord]
    -> Bool   	-- True <=> is a return point, rather than a function
    -> [BcPtr]
@@ -171,13 +171,13 @@ mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap is_ret mallocd_bloc
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
-	   | is_ret && stack_usage < aP_STACK_SPLIM = peep_d
+	   | is_ret && stack_usage < fromIntegral aP_STACK_SPLIM = peep_d
 		-- don't do stack checks at return points,
 		-- everything is aggregated up to the top BCO
 		-- (which must be a function).
                 -- That is, unless the stack usage is >= AP_STACK_SPLIM,
                 -- see bug #1466.
-           | stack_usage >= iNTERP_STACK_CHECK_THRESH
+           | stack_usage >= fromIntegral iNTERP_STACK_CHECK_THRESH
            = STKCHECK stack_usage : peep_d
            | otherwise
            = peep_d	-- the supposedly common case
@@ -275,13 +275,13 @@ schemeR_wrk fvs nm original_body (args, body)
 	 -- \fv1..fvn x1..xn -> e 
 	 -- i.e. the fvs come first
 
-         szsw_args = map idSizeW all_args
+         szsw_args = map (fromIntegral . idSizeW) all_args
          szw_args  = sum szsw_args
          p_init    = listToFM (zip all_args (mkStackOffsets 0 szsw_args))
 
 	 -- make the arg bitmap
 	 bits = argBits (reverse (map idCgRep all_args))
-	 bitmap_size = length bits
+	 bitmap_size = genericLength bits
 	 bitmap = mkBitmap bits
      in do
      body_code <- schemeER_wrk szw_args p_init body   
@@ -290,12 +290,12 @@ schemeR_wrk fvs nm original_body (args, body)
 		arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
-schemeER_wrk :: Int -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
+schemeER_wrk :: Word16 -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
 schemeER_wrk d p rhs
    | Just (tickInfo, (_annot, newRhs)) <- isTickedExp' rhs = do 
         code <- schemeE d 0 p newRhs 
         arr <- getBreakArray 
-        let idOffSets = getVarOffSets d p tickInfo 
+        let idOffSets = getVarOffSets (fromIntegral d) p tickInfo 
         let tickNumber = tickInfo_number tickInfo
         let breakInfo = BreakInfo 
                         { breakInfo_module = tickInfo_module tickInfo
@@ -303,14 +303,16 @@ schemeER_wrk d p rhs
                         , breakInfo_vars = idOffSets
                         , breakInfo_resty = exprType (deAnnotate' newRhs)
                         }
-        let breakInstr = case arr of (BA arr#) -> BRK_FUN arr# tickNumber breakInfo 
+        let breakInstr = case arr of
+                         BA arr# ->
+                             BRK_FUN arr# (fromIntegral tickNumber) breakInfo
         return $ breakInstr `consOL` code
    | otherwise = schemeE d 0 p rhs 
 
-getVarOffSets :: Int -> BCEnv -> TickInfo -> [(Id, Int)]
+getVarOffSets :: Word16 -> BCEnv -> TickInfo -> [(Id, Word16)]
 getVarOffSets d p = catMaybes . map (getOffSet d p) . tickInfo_locals 
 
-getOffSet :: Int -> BCEnv -> Id -> Maybe (Id, Int)
+getOffSet :: Word16 -> BCEnv -> Id -> Maybe (Id, Word16)
 getOffSet d env id 
    = case lookupBCEnv_maybe env id of
         Nothing     -> Nothing 
@@ -346,7 +348,7 @@ instance Outputable TickInfo where
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
-schemeE :: Int -> Sequel -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
+schemeE :: Word16 -> Sequel -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
 
 schemeE d s p e
    | Just e' <- bcView e
@@ -366,7 +368,7 @@ schemeE d s p e@(AnnVar v)
         -- Heave it on the stack, SLIDE, and RETURN.
         (push, szw) <- pushAtom d p (AnnVar v)
         return (push 			-- value onto stack
-                  `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
+                  `appOL`  mkSLIDE szw (d-s) -- clear to sequel
                   `snocOL` RETURN_UBX v_rep)	-- go
    where
       v_type = idType v
@@ -395,21 +397,21 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
 schemeE d s p (AnnLet binds (_,body))
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
-         n_binds = length xs
+         n_binds = genericLength xs
 
          fvss  = map (fvsToEnv p' . fst) rhss
 
          -- Sizes of free vars
-         sizes = map (\rhs_fvs -> sum (map idSizeW rhs_fvs)) fvss
+         sizes = map (\rhs_fvs -> sum (map (fromIntegral . idSizeW) rhs_fvs)) fvss
 
 	 -- the arity of each rhs
-	 arities = map (length . fst . collect) rhss
+	 arities = map (genericLength . fst . collect) rhss
 
          -- This p', d' defn is safe because all the items being pushed
          -- are ptrs, so all have size 1.  d' and p' reflect the stack
          -- after the closures have been allocated in the heap (but not
          -- filled in), and pointers to them parked on the stack.
-         p'    = addListToFM p (zipE xs (mkStackOffsets d (nOfThem n_binds 1)))
+         p'    = addListToFM p (zipE xs (mkStackOffsets d (genericReplicate n_binds 1)))
          d'    = d + n_binds
          zipE  = zipEqual "schemeE"
 
@@ -436,7 +438,7 @@ schemeE d s p (AnnLet binds (_,body))
 
 	 compile_bind d' fvs x rhs size arity off = do
 		bco <- schemeR fvs (x,rhs)
-		build_thunk d' fvs size bco off arity
+		build_thunk (fromIntegral d') fvs size bco off arity
 
 	 compile_binds = 
 	    [ compile_bind d' fvs x rhs size arity n
@@ -584,7 +586,7 @@ isTickedExp' _ = Nothing
 -- 4.  Otherwise, it must be a function call.  Push the args
 --     right to left, SLIDE and ENTER.
 
-schemeT :: Int 		-- Stack depth
+schemeT :: Word16       -- Stack depth
         -> Sequel 	-- Sequel depth
         -> BCEnv 	-- stack env
         -> AnnExpr' Id VarSet 
@@ -667,7 +669,7 @@ schemeT d s p app
 -- Generate code to build a constructor application, 
 -- leaving it on top of the stack
 
-mkConAppCode :: Int -> Sequel -> BCEnv
+mkConAppCode :: Word16 -> Sequel -> BCEnv
 	     -> DataCon 		-- The data constructor
 	     -> [AnnExpr' Id VarSet] 	-- Args, in *reverse* order
 	     -> BcM BCInstrList
@@ -704,7 +706,7 @@ mkConAppCode orig_d _ p con args_r_to_l
 -- returned, even if it is a pointed type.  We always just return.
 
 unboxedTupleReturn
-	:: Int -> Sequel -> BCEnv
+	:: Word16 -> Sequel -> BCEnv
 	-> AnnExpr' Id VarSet -> BcM BCInstrList
 unboxedTupleReturn d s p arg = do
   (push, sz) <- pushAtom d p arg
@@ -716,7 +718,7 @@ unboxedTupleReturn d s p arg = do
 -- Generate code for a tail-call
 
 doTailCall
-	:: Int -> Sequel -> BCEnv
+	:: Word16 -> Sequel -> BCEnv
 	-> Id -> [AnnExpr' Id VarSet]
 	-> BcM BCInstrList
 doTailCall init_d s p fn args
@@ -773,7 +775,7 @@ findPushSeq _
 -- -----------------------------------------------------------------------------
 -- Case expressions
 
-doCase  :: Int -> Sequel -> BCEnv
+doCase  :: Word16 -> Sequel -> BCEnv
 	-> AnnExpr Id VarSet -> Id -> [AnnAlt Id VarSet]
 	-> Bool  -- True <=> is an unboxed tuple case, don't enter the result
 	-> BcM BCInstrList
@@ -791,7 +793,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 	  		    | otherwise = 1
 
 	-- depth of stack after the return value has been pushed
-	d_bndr = d + ret_frame_sizeW + idSizeW bndr
+	d_bndr = d + ret_frame_sizeW + fromIntegral (idSizeW bndr)
 
 	-- depth of stack after the extra info table for an unboxed return
 	-- has been pushed, if any.  This is the stack depth at the
@@ -819,8 +821,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            | otherwise =
              let
 		 (ptrs,nptrs) = partition (isFollowableArg.idCgRep) real_bndrs
-		 ptr_sizes    = map idSizeW ptrs
-		 nptrs_sizes  = map idSizeW nptrs
+		 ptr_sizes    = map (fromIntegral . idSizeW) ptrs
+		 nptrs_sizes  = map (fromIntegral . idSizeW) nptrs
 		 bind_sizes   = ptr_sizes ++ nptrs_sizes
 		 size         = sum ptr_sizes + sum nptrs_sizes
 		 -- the UNPACK instruction unpacks in reverse order...
@@ -839,7 +841,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            | isUnboxedTupleCon dc
            = unboxedTupleException
            | otherwise
-           = DiscrP (dataConTag dc - fIRST_TAG)
+           = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
         my_discr (LitAlt l, _, _)
            = case l of MachInt i     -> DiscrI (fromInteger i)
                        MachFloat r   -> DiscrF (fromRational r)
@@ -869,11 +871,13 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         -- case-of-case expressions, which is the only time we can be compiling a
         -- case expression with s /= 0.
         bitmap_size = d-s
-	bitmap = intsToReverseBitmap bitmap_size{-size-} 
-                        (sortLe (<=) (filter (< bitmap_size) rel_slots))
+        bitmap_size' :: Int
+        bitmap_size' = fromIntegral bitmap_size
+	bitmap = intsToReverseBitmap bitmap_size'{-size-}
+                        (sortLe (<=) (filter (< bitmap_size') rel_slots))
 	  where
 	  binds = fmToList p
-	  rel_slots = concat (map spread binds)
+	  rel_slots = map fromIntegral $ concat (map spread binds)
 	  spread (id, offset)
 		| isFollowableArg (idCgRep id) = [ rel_offset ]
 		| otherwise = []
@@ -907,7 +911,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 -- (machine) code for the ccall, and create bytecodes to call that and
 -- then return in the right way.  
 
-generateCCall :: Int -> Sequel 		-- stack and sequel depths
+generateCCall :: Word16 -> Sequel 		-- stack and sequel depths
               -> BCEnv
               -> CCallSpec		-- where to call
               -> Id 			-- of target, for type info
@@ -917,7 +921,8 @@ generateCCall :: Int -> Sequel 		-- stack and sequel depths
 generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
    = let 
          -- useful constants
-         addr_sizeW = cgRepSizeW NonPtrArg
+         addr_sizeW :: Word16
+         addr_sizeW = fromIntegral (cgRepSizeW NonPtrArg)
 
          -- Get the args on the stack, with tags and suitably
          -- dereferenced for the CCall.  For each arg, return the
@@ -934,12 +939,12 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
 		    Just (t, _)
 		     | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
                        -> do rest <- pargs (d + addr_sizeW) az
-                             code <- parg_ArrayishRep arrPtrsHdrSize d p a
+                             code <- parg_ArrayishRep (fromIntegral arrPtrsHdrSize) d p a
                              return ((code,AddrRep):rest)
 
 		     | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
                        -> do rest <- pargs (d + addr_sizeW) az
-                             code <- parg_ArrayishRep arrWordsHdrSize d p a
+                             code <- parg_ArrayishRep (fromIntegral arrWordsHdrSize) d p a
                              return ((code,AddrRep):rest)
 
                     -- Default case: push taggedly, but otherwise intact.
@@ -951,6 +956,8 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
          -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
          -- the stack but then advance it over the headers, so as to
          -- point to the payload.
+         parg_ArrayishRep :: Word16 -> Word16 -> BCEnv -> AnnExpr' Id VarSet
+                          -> BcM BCInstrList
          parg_ArrayishRep hdrSize d p a
             = do (push_fo, _) <- pushAtom d p a
                  -- The ptr points at the header.  Advance it over the
@@ -961,7 +968,7 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
      code_n_reps <- pargs d0 args_r_to_l
      let
          (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
-         a_reps_sizeW = sum (map primRepSizeW a_reps_pushed_r_to_l)
+         a_reps_sizeW = fromIntegral (sum (map primRepSizeW a_reps_pushed_r_to_l))
 
          push_args    = concatOL pushs_arg
          d_after_args = d0 + a_reps_sizeW
@@ -1054,7 +1061,7 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
 
          -- Push the return placeholder.  For a call returning nothing,
          -- this is a VoidArg (tag).
-         r_sizeW   = primRepSizeW r_rep
+         r_sizeW   = fromIntegral (primRepSizeW r_rep)
          d_after_r = d_after_Addr + r_sizeW
          r_lit     = mkDummyLiteral r_rep
          push_r    = (if   returns_void 
@@ -1149,7 +1156,7 @@ maybe_getCCallReturnRep fn_ty
 implement_tagToId :: [Name] -> BcM BCInstrList
 implement_tagToId names
    = ASSERT( notNull names )
-     do labels <- getLabelsBc (length names)
+     do labels <- getLabelsBc (genericLength names)
         label_fail <- getLabelBc
         label_exit <- getLabelBc
         let infos = zip4 labels (tail labels ++ [label_fail])
@@ -1179,7 +1186,7 @@ implement_tagToId names
 -- to 5 and not to 4.  Stack locations are numbered from zero, so a
 -- depth 6 stack has valid words 0 .. 5.
 
-pushAtom :: Int -> BCEnv -> AnnExpr' Id VarSet -> BcM (BCInstrList, Int)
+pushAtom :: Word16 -> BCEnv -> AnnExpr' Id VarSet -> BcM (BCInstrList, Word16)
 
 pushAtom d p e 
    | Just e' <- bcView e 
@@ -1196,7 +1203,8 @@ pushAtom d p (AnnVar v)
    = return (unitOL (PUSH_PRIMOP primop), 1)
 
    | Just d_v <- lookupBCEnv_maybe p v  -- v is a local variable
-   = return (toOL (nOfThem sz (PUSH_L (d-d_v+sz-2))), sz)
+   = let l = d - fromIntegral d_v + sz - 2
+     in return (toOL (genericReplicate sz (PUSH_L l)), sz)
 	 -- d - d_v 		    the number of words between the TOS 
 	 --			    and the 1st slot of the object
 	 --
@@ -1213,7 +1221,8 @@ pushAtom d p (AnnVar v)
       return (unitOL (PUSH_G (getName v)), sz)
 
     where
-         sz = idSizeW v
+         sz :: Word16
+         sz = fromIntegral (idSizeW v)
 
 
 pushAtom _ _ (AnnLit lit)
@@ -1229,7 +1238,7 @@ pushAtom _ _ (AnnLit lit)
         l             -> pprPanic "pushAtom" (ppr l)
      where
         code rep
-           = let size_host_words = cgRepSizeW rep
+           = let size_host_words = fromIntegral (cgRepSizeW rep)
              in  return (unitOL (PUSH_UBX (Left lit) size_host_words), 
                            size_host_words)
 
@@ -1342,7 +1351,8 @@ mkMultiBranch maybe_ncons raw_ways
 
          (algMinBound, algMaxBound)
             = case maybe_ncons of
-                 Just n  -> (0, n - 1)
+                 -- XXX What happens when n == 0?
+                 Just n  -> (0, fromIntegral n - 1)
                  Nothing -> (minBound, maxBound)
 
          (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
@@ -1386,18 +1396,18 @@ data Discr
    = DiscrI Int
    | DiscrF Float
    | DiscrD Double
-   | DiscrP Int
+   | DiscrP Word16
    | NoDiscr
 
 instance Outputable Discr where
    ppr (DiscrI i) = int i
    ppr (DiscrF f) = text (show f)
    ppr (DiscrD d) = text (show d)
-   ppr (DiscrP i) = int i
+   ppr (DiscrP i) = ppr i
    ppr NoDiscr    = text "DEF"
 
 
-lookupBCEnv_maybe :: BCEnv -> Id -> Maybe Int
+lookupBCEnv_maybe :: BCEnv -> Id -> Maybe Word16
 lookupBCEnv_maybe = lookupFM
 
 idSizeW :: Id -> Int
@@ -1413,7 +1423,7 @@ unboxedTupleException
             "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
 
-mkSLIDE :: Int -> Int -> OrdList BCInstr
+mkSLIDE :: Word16 -> Word16 -> OrdList BCInstr
 mkSLIDE n d = if d == 0 then nilOL else unitOL (SLIDE n d)
 
 splitApp :: AnnExpr' Var ann -> (AnnExpr' Var ann, [AnnExpr' Var ann])
@@ -1458,7 +1468,7 @@ isPtrAtom e = atomRep e == PtrArg
 -- Let szsw be the sizes in words of some items pushed onto the stack,
 -- which has initial depth d'.  Return the values which the stack environment
 -- should map these items to.
-mkStackOffsets :: Int -> [Int] -> [Int]
+mkStackOffsets :: Word16 -> [Word16] -> [Word16]
 mkStackOffsets original_depth szsw
    = map (subtract 1) (tail (scanl (+) original_depth szsw))
 
@@ -1470,7 +1480,7 @@ type BcPtr = Either ItblPtr (Ptr ())
 data BcM_State 
    = BcM_State { 
         uniqSupply :: UniqSupply,       -- for generating fresh variable names
-	nextlabel :: Int,		-- for generating local labels
+	nextlabel :: Word16,		-- for generating local labels
 	malloced  :: [BcPtr],		-- thunks malloced for current BCO
 					-- Should be free()d when it is GCd
         breakArray :: BreakArray        -- array of breakpoint flags 
@@ -1522,11 +1532,11 @@ recordItblMallocBc :: ItblPtr -> BcM ()
 recordItblMallocBc a
   = BcM $ \st -> return (st{malloced = Left a : malloced st}, ())
 
-getLabelBc :: BcM Int
+getLabelBc :: BcM Word16
 getLabelBc
   = BcM $ \st -> return (st{nextlabel = 1 + nextlabel st}, nextlabel st)
 
-getLabelsBc :: Int -> BcM [Int]
+getLabelsBc :: Word16 -> BcM [Word16]
 getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st 
 		 in return (st{nextlabel = ctr+n}, [ctr .. ctr+n-1])

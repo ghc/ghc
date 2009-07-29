@@ -50,6 +50,8 @@ import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..), castPtr )
 import GHC.Base		( writeArray#, RealWorld, Int(..), Word# )  
+
+import Data.Word
 \end{code}
 
 
@@ -123,7 +125,7 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
             !ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
 
             literals_arr = listArray (0, n_literals-1) linked_literals
-                           :: UArray Int Word
+                           :: UArray Word16 Word
             !literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
 
 	    !(I# arity#)  = arity
@@ -132,7 +134,7 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
 
 
 -- we recursively link any sub-BCOs while making the ptrs array
-mkPtrsArray :: ItblEnv -> ClosureEnv -> Int -> [BCOPtr] -> IO (Array Int HValue)
+mkPtrsArray :: ItblEnv -> ClosureEnv -> Word16 -> [BCOPtr] -> IO (Array Word16 HValue)
 mkPtrsArray ie ce n_ptrs ptrs = do
   marr <- newArray_ (0, n_ptrs-1)
   let 
@@ -165,7 +167,7 @@ instance MArray IOArray e IO where
     unsafeWrite (IOArray marr) i e = stToIO (unsafeWrite marr i e)
 
 -- XXX HACK: we should really have a new writeArray# primop that takes a BCO#.
-writeArrayBCO :: IOArray Int a -> Int -> BCO# -> IO ()
+writeArrayBCO :: IOArray Word16 a -> Int -> BCO# -> IO ()
 writeArrayBCO (IOArray (STArray _ _ _ marr#)) (I# i#) bco# = IO $ \s# ->
   case (unsafeCoerce# writeArray#) marr# i# bco# s# of { s# ->
   (# s#, () #) }
