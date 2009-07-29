@@ -51,3 +51,5 @@ test('3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_a
 
 test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
+
+test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
