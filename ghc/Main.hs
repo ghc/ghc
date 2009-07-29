@@ -27,6 +27,7 @@ import DriverMkDepend	( doMkDependHS )
 import InteractiveUI	( interactiveUI, ghciWelcomeMsg )
 #endif
 
+
 -- Various other random stuff that we need
 import Config
 import HscTypes
@@ -44,6 +45,14 @@ import SrcLoc
 import Util
 import Panic
 -- import MonadUtils       ( liftIO )
+
+-- Imports for --abi-hash
+import HscTypes            ( ModIface(mi_mod_hash) )
+import LoadIface           ( loadUserInterface )
+import Module              ( mkModuleName )
+import Finder              ( findImportedModule, cannotFindInterface )
+import TcRnMonad           ( initIfaceCheck )
+import Binary              ( openBinMem, put_, fingerprintBinMem )
 
 -- Standard Haskell libraries
 import System.IO
@@ -131,6 +140,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
+               DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
@@ -203,6 +213,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        StopBefore p           -> oneShot hsc_env p srcs >> GHC.printWarnings
        DoInteractive          -> interactiveUI srcs Nothing
        DoEval exprs           -> interactiveUI srcs $ Just $ reverse exprs
+       DoAbiHash              -> abiHash srcs
 
   liftIO $ dumpFinalStats dflags3
 
@@ -394,11 +405,13 @@ data PostLoadMode
   | DoMake                  -- ghc --make
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
+  | DoAbiHash               -- ghc --abi-hash
 
 doMkDependHSMode, doMakeMode, doInteractiveMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
+doAbiHashMode = mkPostLoadMode DoAbiHash
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -518,6 +531,8 @@ mode_flags =
   , Flag "-make"        (PassFlag (setMode doMakeMode))
          Supported
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
+         Supported
+  , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
          Supported
   , Flag "e"            (HasArg   (\s -> setMode (doEvalMode s) "-e"))
          Supported
@@ -699,6 +714,48 @@ countFS entries longest is_z has_z (b:bs) =
 	has_zs = length (filter hasZEncoding b)
   in
 	countFS entries' longest' (is_z + is_zs) (has_z + has_zs) bs
+
+-- -----------------------------------------------------------------------------
+-- ABI hash support
+
+{-
+        ghc --abi-hash Data.Foo System.Bar
+
+Generates a combined hash of the ABI for modules Data.Foo and
+System.Bar.  The modules must already be compiled, and appropriate -i
+options may be necessary in order to find the .hi files.
+
+This is used by Cabal for generating the InstalledPackageId for a
+package.  The InstalledPackageId must change when the visible ABI of
+the package chagnes, so during registration Cabal calls ghc --abi-hash
+to get a hash of the package's ABI.
+-}
+
+abiHash :: [(String, Maybe Phase)] -> Ghc ()
+abiHash strs = do
+  hsc_env <- getSession
+  let dflags = hsc_dflags hsc_env
+
+  liftIO $ do
+
+  let find_it str = do
+         let modname = mkModuleName str
+         r <- findImportedModule hsc_env modname Nothing
+         case r of
+           Found _ m -> return m
+           _error    -> ghcError $ CmdLineError $ showSDoc $
+                          cannotFindInterface dflags modname r
+
+  mods <- mapM find_it (map fst strs)
+
+  let get_iface mod = loadUserInterface False (text "abiHash") mod
+  ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
+
+  bh <- openBinMem (3*1024) -- just less than a block
+  mapM_ (put_ bh . mi_mod_hash) ifaces
+  f <- fingerprintBinMem bh
+
+  putStrLn (showSDoc (ppr f))
 
 -- -----------------------------------------------------------------------------
 -- Util
