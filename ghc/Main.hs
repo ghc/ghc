@@ -47,7 +47,6 @@ import Panic
 -- import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
-import HscTypes            ( ModIface(mi_mod_hash) )
 import LoadIface           ( loadUserInterface )
 import Module              ( mkModuleName )
 import Finder              ( findImportedModule, cannotFindInterface )
@@ -407,7 +406,7 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
 
-doMkDependHSMode, doMakeMode, doInteractiveMode :: Mode
+doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
@@ -748,7 +747,7 @@ abiHash strs = do
 
   mods <- mapM find_it (map fst strs)
 
-  let get_iface mod = loadUserInterface False (text "abiHash") mod
+  let get_iface modl = loadUserInterface False (text "abiHash") modl
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
 
   bh <- openBinMem (3*1024) -- just less than a block
