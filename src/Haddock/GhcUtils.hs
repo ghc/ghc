@@ -22,6 +22,10 @@ import qualified Data.Map as Map
 import Control.Arrow
 import Data.Foldable hiding (concatMap)
 import Data.Traversable
+#if __GLASGOW_HASKELL__ >= 611
+import Distribution.Compat.ReadP
+import Distribution.Text
+#endif
 
 import Outputable
 import Name
@@ -49,6 +53,19 @@ modulePackageInfo modu = case unpackPackageId pkg of
                           Just x -> (display $ pkgName x, showVersion (pkgVersion x))
   where pkg = modulePackageId modu
 
+#if __GLASGOW_HASKELL__ >= 611
+-- This was removed from GHC 6.11
+-- XXX we shouldn't be using it, probably
+
+-- | Try and interpret a GHC 'PackageId' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
+-- we could not parse it as such an object.
+unpackPackageId :: PackageId -> Maybe PackageIdentifier
+unpackPackageId p
+  = case [ pid | (pid,"") <- readP_to_S parse str ] of
+        []      -> Nothing
+        (pid:_) -> Just pid
+  where str = packageIdString p
+#endif
 
 mkModuleNoPackage :: String -> Module
 mkModuleNoPackage str = mkModule (stringToPackageId "") (mkModuleName str)
