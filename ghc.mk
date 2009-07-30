@@ -295,7 +295,12 @@ define addPackage # args: $1 = package, $2 = condition
 endef
 
 $(eval $(call addPackage,ghc-prim))
+ifeq "$(CLEANING)" "YES"
+$(eval $(call addPackage,integer-gmp))
+$(eval $(call addPackage,integer-simple))
+else
 $(eval $(call addPackage,$(INTEGER_LIBRARY)))
+endif
 $(eval $(call addPackage,base))
 $(eval $(call addPackage,filepath))
 $(eval $(call addPackage,array))
