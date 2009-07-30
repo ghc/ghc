@@ -8,7 +8,6 @@ module Main where
 import Parser
 import Syntax
 
-import Monad
 import Char
 import List
 import System ( getArgs )

@@ -12,13 +12,11 @@ import Distribution.Simple.Program
 import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
-import Distribution.Simple.PackageIndex
 import Distribution.Text
 import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 
-import Control.Monad
 import Data.Maybe
 import System.IO
 import System.Directory
