@@ -174,7 +174,7 @@ mkBitmapArray bsize bitmap
 
 mkInstrArray :: Word16 -> [Word16] -> UArray Word16 Word16
 mkInstrArray n_insns asm_insns
-  = listArray (0, n_insns) (fromIntegral n_insns : asm_insns)
+  = listArray (0, n_insns) (n_insns : asm_insns)
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,

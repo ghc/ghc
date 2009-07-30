@@ -438,7 +438,7 @@ schemeE d s p (AnnLet binds (_,body))
 
 	 compile_bind d' fvs x rhs size arity off = do
 		bco <- schemeR fvs (x,rhs)
-		build_thunk (fromIntegral d') fvs size bco off arity
+		build_thunk d' fvs size bco off arity
 
 	 compile_binds = 
 	    [ compile_bind d' fvs x rhs size arity n
@@ -1203,7 +1203,7 @@ pushAtom d p (AnnVar v)
    = return (unitOL (PUSH_PRIMOP primop), 1)
 
    | Just d_v <- lookupBCEnv_maybe p v  -- v is a local variable
-   = let l = d - fromIntegral d_v + sz - 2
+   = let l = d - d_v + sz - 2
      in return (toOL (genericReplicate sz (PUSH_L l)), sz)
 	 -- d - d_v 		    the number of words between the TOS 
 	 --			    and the 1st slot of the object
