@@ -124,7 +124,9 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
         let 
             !ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
 
-            literals_arr = listArray (0, n_literals-1) linked_literals
+            litRange = if n_literals > 0 then (0, n_literals-1)
+                                         else (1, 0)
+            literals_arr = listArray litRange linked_literals
                            :: UArray Word16 Word
             !literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
 
@@ -136,7 +138,8 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
 -- we recursively link any sub-BCOs while making the ptrs array
 mkPtrsArray :: ItblEnv -> ClosureEnv -> Word16 -> [BCOPtr] -> IO (Array Word16 HValue)
 mkPtrsArray ie ce n_ptrs ptrs = do
-  marr <- newArray_ (0, n_ptrs-1)
+  let ptrRange = if n_ptrs > 0 then (0, n_ptrs-1) else (1, 0)
+  marr <- newArray_ ptrRange
   let 
     fill (BCOPtrName n)     i = do
 	ptr <- lookupName ce n
