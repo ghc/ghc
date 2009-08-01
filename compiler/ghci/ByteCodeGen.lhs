@@ -1534,7 +1534,10 @@ recordItblMallocBc a
 
 getLabelBc :: BcM Word16
 getLabelBc
-  = BcM $ \st -> return (st{nextlabel = 1 + nextlabel st}, nextlabel st)
+  = BcM $ \st -> do let nl = nextlabel st
+                    when (nl == maxBound) $
+                        panic "getLabelBc: Ran out of labels"
+                    return (st{nextlabel = nl + 1}, nl)
 
 getLabelsBc :: Word16 -> BcM [Word16]
 getLabelsBc n
