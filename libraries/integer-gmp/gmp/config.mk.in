@@ -1,8 +1,7 @@
-
-ifeq ($(HaveLibGmp),"")
+ifeq "$(HaveLibGmp)" ""
  HaveLibGmp = @HaveLibGmp@
 endif
 
-ifeq ($(HaveFrameworkGMP),"")
+ifeq "$(HaveFrameworkGMP)" ""
  HaveFrameworkGMP = @HaveFrameworkGMP@
 endif
