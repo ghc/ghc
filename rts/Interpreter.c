@@ -763,19 +763,22 @@ run_BCO_fun:
 run_BCO:
     INTERP_TICK(it_BCO_entries);
     {
-	register int       bciPtr     = 1; /* instruction pointer */
+	register int       bciPtr = 0; /* instruction pointer */
         register StgWord16 bci;
 	register StgBCO*   bco        = (StgBCO*)obj;
 	register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
 	register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
 	register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
+	int bcoSize;
+    bcoSize = BCO_NEXT_WORD;
+	IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
 
 #ifdef INTERP_STATS
 	it_lastopc = 0; /* no opcode */
 #endif
 
     nextInsn:
-	ASSERT(bciPtr <= instrs[0]);
+	ASSERT(bciPtr < bcoSize);
 	IF_DEBUG(interpreter,
 		 //if (do_print_stack) {
 		 //debugBelch("\n-- BEGIN stack\n");
@@ -1186,7 +1189,7 @@ run_BCO:
 
 	case bci_TESTLT_P: {
 	    unsigned int discr  = BCO_NEXT;
-	    int failto = BCO_NEXT;
+	    int failto = BCO_GET_LARGE_ARG;
 	    StgClosure* con = (StgClosure*)Sp[0];
 	    if (GET_TAG(con) >= discr) {
 		bciPtr = failto;
@@ -1196,7 +1199,7 @@ run_BCO:
 
 	case bci_TESTEQ_P: {
 	    unsigned int discr  = BCO_NEXT;
-	    int failto = BCO_NEXT;
+	    int failto = BCO_GET_LARGE_ARG;
 	    StgClosure* con = (StgClosure*)Sp[0];
 	    if (GET_TAG(con) != discr) {
 		bciPtr = failto;
@@ -1207,7 +1210,7 @@ run_BCO:
 	case bci_TESTLT_I: {
 	    // There should be an Int at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;
-	    int failto  = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
 	    I_ stackInt = (I_)Sp[1];
 	    if (stackInt >= (I_)BCO_LIT(discr))
 		bciPtr = failto;
@@ -1217,7 +1220,7 @@ run_BCO:
 	case bci_TESTEQ_I: {
 	    // There should be an Int at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;
-	    int failto  = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
 	    I_ stackInt = (I_)Sp[1];
 	    if (stackInt != (I_)BCO_LIT(discr)) {
 		bciPtr = failto;
@@ -1228,7 +1231,7 @@ run_BCO:
 	case bci_TESTLT_D: {
 	    // There should be a Double at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;
-	    int failto  = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
 	    StgDouble stackDbl, discrDbl;
 	    stackDbl = PK_DBL( & Sp[1] );
 	    discrDbl = PK_DBL( & BCO_LIT(discr) );
@@ -1241,7 +1244,7 @@ run_BCO:
 	case bci_TESTEQ_D: {
 	    // There should be a Double at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;
-	    int failto  = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
 	    StgDouble stackDbl, discrDbl;
 	    stackDbl = PK_DBL( & Sp[1] );
 	    discrDbl = PK_DBL( & BCO_LIT(discr) );
@@ -1254,7 +1257,7 @@ run_BCO:
 	case bci_TESTLT_F: {
 	    // There should be a Float at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;
-	    int failto  = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
 	    StgFloat stackFlt, discrFlt;
 	    stackFlt = PK_FLT( & Sp[1] );
 	    discrFlt = PK_FLT( & BCO_LIT(discr) );
@@ -1267,7 +1270,7 @@ run_BCO:
 	case bci_TESTEQ_F: {
 	    // There should be a Float at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;
-	    int failto  = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
 	    StgFloat stackFlt, discrFlt;
 	    stackFlt = PK_FLT( & Sp[1] );
 	    discrFlt = PK_FLT( & BCO_LIT(discr) );
@@ -1451,7 +1454,7 @@ run_BCO:
 
 	case bci_JMP: {
 	    /* BCO_NEXT modifies bciPtr, so be conservative. */
-	    int nextpc = BCO_NEXT;
+	    int nextpc = BCO_GET_LARGE_ARG;
 	    bciPtr     = nextpc;
 	    goto nextInsn;
 	}

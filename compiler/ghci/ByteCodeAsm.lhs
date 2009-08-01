@@ -121,17 +121,24 @@ assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
 assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
    = let
          -- pass 1: collect up the offsets of the local labels.
-         -- Remember that the first insn starts at offset 1 since offset 0
-         -- (eventually) will hold the total # of insns.
-         label_env = mkLabelEnv emptyFM 1 instrs
+         -- Remember that the first insn starts at offset
+         --     sizeOf Word / sizeOf Word16
+         -- since offset 0 (eventually) will hold the total # of insns.
+         lableInitialOffset
+          | wORD_SIZE_IN_BITS == 64 = 4
+          | wORD_SIZE_IN_BITS == 32 = 2
+          | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
+         label_env = mkLabelEnv emptyFM lableInitialOffset instrs
 
+         mkLabelEnv :: FiniteMap Word16 Word -> Word -> [BCInstr]
+                    -> FiniteMap Word16 Word
          mkLabelEnv env _ [] = env
          mkLabelEnv env i_offset (i:is)
             = let new_env
                      = case i of LABEL n -> addToFM env n i_offset ; _ -> env
               in  mkLabelEnv new_env (i_offset + instrSize16s i) is
 
-         findLabel :: Word16 -> Word16
+         findLabel :: Word16 -> Word
          findLabel lab
             = case lookupFM label_env lab of
                  Just bco_offset -> bco_offset
@@ -148,9 +155,7 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
          let asm_insns = ssElts final_insns
              n_insns   = sizeSS final_insns
 
-             insns_arr
-                 | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
-                 | otherwise = mkInstrArray (fromIntegral n_insns) asm_insns
+             insns_arr = mkInstrArray lableInitialOffset n_insns asm_insns
              !insns_barr = case insns_arr of UArray _lo _hi _n barr -> barr
 
              bitmap_arr = mkBitmapArray bsize bitmap
@@ -172,9 +177,10 @@ mkBitmapArray :: Word16 -> [StgWord] -> UArray Int StgWord
 mkBitmapArray bsize bitmap
   = listArray (0, length bitmap) (fromIntegral bsize : bitmap)
 
-mkInstrArray :: Word16 -> [Word16] -> UArray Word16 Word16
-mkInstrArray n_insns asm_insns
-  = listArray (0, n_insns) (n_insns : asm_insns)
+mkInstrArray :: Word -> Word -> [Word16] -> UArray Word Word16
+mkInstrArray lableInitialOffset n_insns asm_insns
+  = let size = lableInitialOffset + n_insns
+    in listArray (0, size - 1) (largeArg size ++ asm_insns)
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,
@@ -220,7 +226,7 @@ largeArg w
  | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
 
 -- This is where all the action is (pass 2 of the assembler)
-mkBits :: (Word16 -> Word16)            -- label finder
+mkBits :: (Word16 -> Word)              -- label finder
        -> AsmState
        -> [BCInstr]                     -- instructions (in)
        -> IO AsmState
@@ -231,10 +237,7 @@ mkBits findLabel st proto_insns
        doInstr :: AsmState -> BCInstr -> IO AsmState
        doInstr st i
           = case i of
-               STKCHECK  n
-                | n > 65535 ->
-                       instrn st (largeArgInstr bci_STKCHECK : largeArg n)
-                | otherwise -> instr2 st bci_STKCHECK (fromIntegral n)
+               STKCHECK  n -> instr1Large st bci_STKCHECK n
                PUSH_L    o1       -> instr2 st bci_PUSH_L o1
                PUSH_LL   o1 o2    -> instr3 st bci_PUSH_LL o1 o2
                PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
@@ -282,22 +285,22 @@ mkBits findLabel st proto_insns
                                         instr3 st2 bci_PACK itbl_no sz
                LABEL     _        -> return st
                TESTLT_I  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 bci_TESTLT_I np (findLabel l)
+                                        instr2Large st2 bci_TESTLT_I np (findLabel l)
                TESTEQ_I  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 bci_TESTEQ_I np (findLabel l)
+                                        instr2Large st2 bci_TESTEQ_I np (findLabel l)
                TESTLT_F  f l      -> do (np, st2) <- float st f
-                                        instr3 st2 bci_TESTLT_F np (findLabel l)
+                                        instr2Large st2 bci_TESTLT_F np (findLabel l)
                TESTEQ_F  f l      -> do (np, st2) <- float st f
-                                        instr3 st2 bci_TESTEQ_F np (findLabel l)
+                                        instr2Large st2 bci_TESTEQ_F np (findLabel l)
                TESTLT_D  d l      -> do (np, st2) <- double st d
-                                        instr3 st2 bci_TESTLT_D np (findLabel l)
+                                        instr2Large st2 bci_TESTLT_D np (findLabel l)
                TESTEQ_D  d l      -> do (np, st2) <- double st d
-                                        instr3 st2 bci_TESTEQ_D np (findLabel l)
-               TESTLT_P  i l      -> instr3 st bci_TESTLT_P i (findLabel l)
-               TESTEQ_P  i l      -> instr3 st bci_TESTEQ_P i (findLabel l)
+                                        instr2Large st2 bci_TESTEQ_D np (findLabel l)
+               TESTLT_P  i l      -> instr2Large st bci_TESTLT_P i (findLabel l)
+               TESTEQ_P  i l      -> instr2Large st bci_TESTEQ_P i (findLabel l)
                CASEFAIL           -> instr1 st bci_CASEFAIL
                SWIZZLE   stkoff n -> instr3 st bci_SWIZZLE stkoff n
-               JMP       l        -> instr2 st bci_JMP (findLabel l)
+               JMP       l        -> instr1Large st bci_JMP (findLabel l)
                ENTER              -> instr1 st bci_ENTER
                RETURN             -> instr1 st bci_RETURN
                RETURN_UBX rep     -> instr1 st (return_ubx rep)
@@ -313,6 +316,14 @@ mkBits findLabel st proto_insns
        instrn (st_i, st_l, st_p) (i:is)
           = do st_i' <- addToSS st_i i
                instrn (st_i', st_l, st_p) is
+
+       instr1Large st i1 large
+        | large > 65535 = instrn st (largeArgInstr i1 : largeArg large)
+        | otherwise = instr2 st i1 (fromIntegral large)
+
+       instr2Large st i1 i2 large
+        | large > 65535 = instrn st (largeArgInstr i1 : i2 : largeArg large)
+        | otherwise = instr3 st i1 i2 (fromIntegral large)
 
        instr1 (st_i0,st_l0,st_p0) i1
           = do st_i1 <- addToSS st_i0 i1
@@ -409,7 +420,7 @@ return_ubx PtrArg    = bci_RETURN_P
 
 
 -- The size in 16-bit entities of an instruction.
-instrSize16s :: BCInstr -> Word16
+instrSize16s :: BCInstr -> Word
 instrSize16s instr
    = case instr of
         STKCHECK{}              -> 2
