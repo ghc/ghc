@@ -198,6 +198,7 @@ Library {
         cbits/iconv.c
         cbits/inputReady.c
         cbits/selectUtils.c
+        cbits/primFloat.c
     include-dirs: include
     includes:    HsBase.h
     install-includes:    HsBase.h HsBaseConfig.h WCsubst.h consUtils.h Typeable.h

@@ -78,7 +78,7 @@ install_interrupt_handler handler = do
            _ -> return ()
   return ()
 #else
-#include "Signals.h"
+#include "rts/Signals.h"
 -- specialised version of System.Posix.Signals.installHandler, which
 -- isn't available here.
 install_interrupt_handler handler = do

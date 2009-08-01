@@ -152,56 +152,6 @@ extern int fdReady(int fd, int write, int msecs, int isSock);
 extern HsInt nocldstop;
 
 /* -----------------------------------------------------------------------------
-   64-bit operations, defined in longlong.c
-   -------------------------------------------------------------------------- */
-
-#ifdef SUPPORT_LONG_LONGS
-
-HsBool hs_gtWord64 (HsWord64, HsWord64);
-HsBool hs_geWord64 (HsWord64, HsWord64);
-HsBool hs_eqWord64 (HsWord64, HsWord64);
-HsBool hs_neWord64 (HsWord64, HsWord64);
-HsBool hs_ltWord64 (HsWord64, HsWord64);
-HsBool hs_leWord64 (HsWord64, HsWord64);
-
-HsBool hs_gtInt64 (HsInt64, HsInt64);
-HsBool hs_geInt64 (HsInt64, HsInt64);
-HsBool hs_eqInt64 (HsInt64, HsInt64);
-HsBool hs_neInt64 (HsInt64, HsInt64);
-HsBool hs_ltInt64 (HsInt64, HsInt64);
-HsBool hs_leInt64 (HsInt64, HsInt64);
-
-HsWord64 hs_remWord64  (HsWord64, HsWord64);
-HsWord64 hs_quotWord64 (HsWord64, HsWord64);
-
-HsInt64 hs_remInt64    (HsInt64, HsInt64);
-HsInt64 hs_quotInt64   (HsInt64, HsInt64);
-HsInt64 hs_negateInt64 (HsInt64);
-HsInt64 hs_plusInt64   (HsInt64, HsInt64);
-HsInt64 hs_minusInt64  (HsInt64, HsInt64);
-HsInt64 hs_timesInt64  (HsInt64, HsInt64);
-
-HsWord64 hs_and64  (HsWord64, HsWord64);
-HsWord64 hs_or64   (HsWord64, HsWord64);
-HsWord64 hs_xor64  (HsWord64, HsWord64);
-HsWord64 hs_not64  (HsWord64);
-
-HsWord64 hs_uncheckedShiftL64   (HsWord64, HsInt);
-HsWord64 hs_uncheckedShiftRL64  (HsWord64, HsInt);
-HsInt64  hs_uncheckedIShiftL64  (HsInt64, HsInt);
-HsInt64  hs_uncheckedIShiftRA64 (HsInt64, HsInt);
-HsInt64  hs_uncheckedIShiftRL64 (HsInt64, HsInt);
-
-HsInt64  hs_intToInt64    (HsInt);
-HsInt    hs_int64ToInt    (HsInt64);
-HsWord64 hs_int64ToWord64 (HsInt64);
-HsWord64 hs_wordToWord64  (HsWord);
-HsWord   hs_word64ToWord  (HsWord64);
-HsInt64  hs_word64ToInt64 (HsWord64);
-
-#endif /* SUPPORT_LONG_LONGS */
-
-/* -----------------------------------------------------------------------------
    INLINE functions.
 
    These functions are given as inlines here for when compiling via C,
