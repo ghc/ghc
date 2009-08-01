@@ -1633,33 +1633,6 @@
     </sect2>
 
     <sect2>
-      <title>C compiler options</title>
-
-      <para><xref linkend="options-C-compiler"/></para>
-      <informaltable>
-	<tgroup cols="4" align="left" colsep="1" rowsep="1">
-	  <thead>
-	    <row>
-	      <entry>Flag</entry>
-	      <entry>Description</entry>
-	      <entry>Static/Dynamic</entry>
-	      <entry>Reverse</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry><option>-#include</option> <replaceable>file</replaceable></entry>
-	      <entry>Include <replaceable>file</replaceable> when
-	      compiling the <filename>.hc</filename> file</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	  </tbody>
-	</tgroup>
-      </informaltable>
-    </sect2>
-
-    <sect2>
       <title>Code generation options</title>
 
       <para><xref linkend="options-codegen"/></para>
