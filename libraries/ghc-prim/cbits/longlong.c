@@ -28,7 +28,7 @@ The exceptions to the rule are primops that cast to and from
 
 #include "Rts.h"
 
-#ifdef SUPPORT_LONG_LONGS
+#if WORD_SIZE_IN_BITS < 64
 
 /* Relational operators */
 
