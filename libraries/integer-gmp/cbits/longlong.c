@@ -25,7 +25,7 @@ expect intensive use of either Int64 or Word64 types.
 
 #include "Rts.h"
 
-#ifdef SUPPORT_LONG_LONGS
+#if WORD_SIZE_IN_BITS < 64
 
 HsWord64 hs_integerToWord64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da)
 {
@@ -63,4 +63,4 @@ HsInt64 hs_integerToInt64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da)
   return res;
 }
 
-#endif /* SUPPORT_LONG_LONGS */
+#endif /* WORD_SIZE_IN_BITS < 64 */

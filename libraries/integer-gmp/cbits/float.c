@@ -14,6 +14,8 @@
 
 #include <math.h>
 
+#define IEEE_FLOATING_POINT 1
+
 /*
  * Encoding and decoding Doubles.  Code based on the HBC code
  * (lib/fltcode.c).

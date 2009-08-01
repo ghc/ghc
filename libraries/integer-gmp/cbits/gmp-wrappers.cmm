@@ -121,7 +121,7 @@ integer_cmm_word2Integerzh
  * 'long long' primops for converting to/from Integers.
  */
 
-#ifdef SUPPORT_LONG_LONGS
+#if WORD_SIZE_IN_BITS < 64
 
 integer_cmm_int64ToIntegerzh
 {
@@ -224,7 +224,7 @@ integer_cmm_word64ToIntegerzh
    RET_NP(s,p);
 }
 
-#endif /* SUPPORT_LONG_LONGS */
+#endif /* WORD_SIZE_IN_BITS < 64 */
 
 #define GMP_TAKE2_RET1(name,mp_fun)                                     \
 name                                                                    \
