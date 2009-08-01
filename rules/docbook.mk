@@ -39,6 +39,8 @@ $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	               $$(XSLTPROC_HTML_STYLESHEET) \
 	               $1/$2.xml
 	cp mk/fptools.css $$(dir $$@)
+
+INSTALL_HTML_DOC_DIRS += $1/$2
 else
 html_$1 :
 	@echo "*** HTML documentation is disabled; BUILD_DOCBOOK_HTML = NO"
@@ -53,6 +55,8 @@ ps_$1 : $1/$2.ps
 
 $1/$2.ps: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --ps -o $$@
+
+INSTALL_DOCS += $1/$2.ps
 else
 ps_$1 :
 	@echo "*** PS documentation is disabled; BUILD_DOCBOOK_PS = NO"
@@ -67,6 +71,8 @@ pdf_$1 : $1/$2.pdf
 
 $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --pdf -o $$@
+
+INSTALL_DOCS += $1/$2.pdf
 else
 pdf_$1 :
 	@echo "*** PDF documentation is disabled; BUILD_DOCBOOK_PDF = NO"

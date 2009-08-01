@@ -679,7 +679,7 @@ libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
 # Installation
 
 install: install_packages install_libs install_libexecs install_headers \
-	 install_libexec_scripts install_bins
+         install_libexec_scripts install_bins install_docs
 
 install_bins: $(INSTALL_BINS)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
@@ -725,6 +725,17 @@ install_headers: $(INSTALL_HEADERS)
 	$(INSTALL_DIR) $(DESTDIR)$(headerdir)
 	for i in $(INSTALL_HEADERS); do \
 		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i $(DESTDIR)$(headerdir); \
+	done
+
+install_docs: $(INSTALL_HEADERS)
+	$(INSTALL_DIR) $(DESTDIR)$(docdir)
+	for i in $(INSTALL_DOCS); do \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir); \
+	done
+	$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html; \
+	for i in $(INSTALL_HTML_DOC_DIRS); do \
+		$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html/`basename $$i`; \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* $(DESTDIR)$(docdir)/html/`basename $$i`; \
 	done
 
 INSTALLED_PACKAGE_CONF=$(DESTDIR)$(libdir)/package.conf
