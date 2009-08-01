@@ -7,3 +7,8 @@ include mk/validate-settings.mk
 else
 -include mk/build.mk
 endif
+
+ifeq "$(BINDIST)" "YES"
+-include bindist.mk
+endif
+
