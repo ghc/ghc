@@ -833,6 +833,10 @@ ifeq "$(mingw32_TARGET_OS)" "1"
 	$(call nTimes,10,$(PublishCp) $(WINDOWS_INSTALLER) $(PublishLocation)/dist)
 endif
 
+.PHONY: publish-docs
+publish-docs:
+	$(call nTimes,10,$(PublishCp) -r bindisttest/installed/share/doc/ghc/* $(PublishLocation)/docs)
+
 # -----------------------------------------------------------------------------
 # Source distributions
 
