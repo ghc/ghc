@@ -119,15 +119,19 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
         let n_literals = sizeSS literalsSS
             n_ptrs     = sizeSS ptrsSS
 
-	ptrs_arr <- mkPtrsArray ie ce n_ptrs ptrs
+        ptrs_arr <- if n_ptrs > 65535
+                    then panic "linkBCO: >= 64k ptrs"
+                    else mkPtrsArray ie ce (fromIntegral n_ptrs) ptrs
 
         let 
             !ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
 
-            litRange = if n_literals > 0 then (0, n_literals-1)
-                                         else (1, 0)
+            litRange
+             | n_literals > 65535 = panic "linkBCO: >= 64k literals"
+             | n_literals > 0     = (0, fromIntegral n_literals - 1)
+             | otherwise          = (1, 0)
+            literals_arr :: UArray Word16 Word
             literals_arr = listArray litRange linked_literals
-                           :: UArray Word16 Word
             !literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
 
 	    !(I# arity#)  = arity

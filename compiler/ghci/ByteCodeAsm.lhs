@@ -150,7 +150,7 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
 
              insns_arr
                  | n_insns > 65535 = panic "linkBCO: >= 64k insns in BCO"
-                 | otherwise = mkInstrArray n_insns asm_insns
+                 | otherwise = mkInstrArray (fromIntegral n_insns) asm_insns
              !insns_barr = case insns_arr of UArray _lo _hi _n barr -> barr
 
              bitmap_arr = mkBitmapArray bsize bitmap
@@ -181,7 +181,7 @@ type AsmState = (SizedSeq Word16,
                  SizedSeq BCONPtr,
                  SizedSeq BCOPtr)
 
-data SizedSeq a = SizedSeq !Word16 [a]
+data SizedSeq a = SizedSeq !Word [a]
 emptySS :: SizedSeq a
 emptySS = SizedSeq 0 []
 
@@ -195,8 +195,11 @@ addListToSS (SizedSeq n r_xs) xs
 ssElts :: SizedSeq a -> [a]
 ssElts (SizedSeq _ r_xs) = reverse r_xs
 
-sizeSS :: SizedSeq a -> Word16
+sizeSS :: SizedSeq a -> Word
 sizeSS (SizedSeq n _) = n
+
+sizeSS16 :: SizedSeq a -> Word16
+sizeSS16 (SizedSeq n _) = fromIntegral n
 
 -- Bring in all the bci_ bytecode constants.
 #include "Bytecodes.h"
@@ -336,39 +339,39 @@ mkBits findLabel st proto_insns
        float (st_i0,st_l0,st_p0) f
           = do let ws = mkLitF f
                st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
        double (st_i0,st_l0,st_p0) d
           = do let ws = mkLitD d
                st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
        int (st_i0,st_l0,st_p0) i
           = do let ws = mkLitI i
                st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
        int64 (st_i0,st_l0,st_p0) i
           = do let ws = mkLitI64 i
                st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
        addr (st_i0,st_l0,st_p0) a
           = do let ws = mkLitPtr a
                st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
        litlabel (st_i0,st_l0,st_p0) fs
           = do st_l1 <- addListToSS st_l0 [BCONPtrLbl fs]
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
        ptr (st_i0,st_l0,st_p0) p
           = do st_p1 <- addToSS st_p0 p
-               return (sizeSS st_p0, (st_i0,st_l0,st_p1))
+               return (sizeSS16 st_p0, (st_i0,st_l0,st_p1))
 
        itbl (st_i0,st_l0,st_p0) dcon
           = do st_l1 <- addToSS st_l0 (BCONPtrItbl (getName dcon))
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
 #ifdef mingw32_TARGET_OS
        literal st (MachLabel fs (Just sz) _)
