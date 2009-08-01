@@ -19,13 +19,9 @@ default:
 	@echo 'Run "make install" to install'
 	@false
 
-.PHONY: install
-install:
-	$(MAKE) -r --no-print-directory -f ghc.mk install BINDIST=YES NO_INCLUDE_DEPS=YES
-
-.PHONY: show
-show:
-	$(MAKE) -r --no-print-directory -f ghc.mk $@
+.PHONY: install show
+install show:
+	$(MAKE) -r --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
 
 else
 
