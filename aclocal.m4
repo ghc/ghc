@@ -247,7 +247,7 @@ changequote([, ])dnl
 if test ! -f compiler/parser/Parser.hs || test ! -f compiler/main/ParsePkgConf.hs || test ! -f compiler/cmm/CmmParse.hs || test ! -f compiler/parser/ParserCore.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.15],
-      [AC_MSG_ERROR([Happy version 1.15 or later is required to compile GHC.])])[]dnl
+      [AC_MSG_ERROR([Happy version 1.15 or later is required to compile GHC.])])[]
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
@@ -282,7 +282,7 @@ changequote([, ])dnl
 if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.1.0],
-      [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]dnl
+      [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]
 fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
@@ -322,8 +322,8 @@ then
         changequote([, ])dnl
     ])
     FP_COMPARE_VERSIONS([$fptools_cv_windres_version],[-eq],[2.17.50],
-      [AC_MSG_ERROR([Your windres version isn't compatible with GHC. 2.15.91 and 2.18.50 are known to work.])])[]dnl
-    indResVersion=$fptools_cv_windres_version;
+      [AC_MSG_ERROR([Your windres version isn't compatible with GHC. 2.15.91 and 2.18.50 are known to work.])])[]
+    WindResVersion=$fptools_cv_windres_version;
     AC_SUBST(WindResVersion)
 fi
 ])
