@@ -237,8 +237,8 @@ fi
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
 [if test x"$HappyCmd" != x; then
-   fptools_cv_happy_version="`$HappyCmd -v |
-			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'`" ;
+   fptools_cv_happy_version=`"$HappyCmd" -v |
+			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'` ;
 else
    fptools_cv_happy_version="";
 fi;
@@ -272,8 +272,8 @@ fi
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
 [if test x"$AlexCmd" != x; then
-   fptools_cv_alex_version="`$AlexCmd -v |
-			  grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'`" ;
+   fptools_cv_alex_version=`"$AlexCmd" -v |
+			  grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'` ;
 else
    fptools_cv_alex_version="";
 fi;
