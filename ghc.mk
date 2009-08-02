@@ -956,12 +956,20 @@ CLEAN_FILES += utils/ghc-pwd/ghc-pwd.exe
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.hi
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.o
 CLEAN_FILES += libraries/bootstrapping.conf
+CLEAN_FILES += libraries/integer-gmp/gmp/gmp.h
+CLEAN_FILES += libraries/integer-gmp/gmp/libgmp.a
+CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
+CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
-clean : clean_files clean_libraries
+clean : clean_files clean_libraries clean_gmp
 
 .PHONY: clean_files
 clean_files :
 	"$(RM)" $(RM_OPTS) $(CLEAN_FILES)
+
+clean_gmp:
+	"$(RM)" $(RM_OPTS) -r libraries/integer-gmp/gmp/objs
+	"$(RM)" $(RM_OPTS) -r libraries/integer-gmp/gmp/gmpbuild
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES) $(PACKAGES_STAGE2))
