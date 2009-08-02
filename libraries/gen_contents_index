@@ -7,12 +7,9 @@ NAMES=
 
 case $* in
 --inplace)
-    HADDOCK=../utils/haddock/install-inplace/bin/haddock
-    HADDOCK_FILES=`ls -1 */dist/doc/html/*/*.haddock | sort`
-    if [ -d dph ]
-    then
-        HADDOCK_FILES="$HADDOCK_FILES `ls -1 dph/*/dist/doc/html/*/*.haddock | sort`"
-    fi
+    HADDOCK=../inplace/bin/haddock
+    HADDOCK_FILES=`ls -1 */dist-install/doc/html/*/*.haddock | sort`
+    HADDOCK_FILES="$HADDOCK_FILES `ls -1 dph/*/dist-install/doc/html/*/*.haddock | sort`"
     ;;
 *)
     HADDOCK=../../../../bin/haddock

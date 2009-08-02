@@ -13,7 +13,6 @@
 # ToDo List.
 #
 #   * finish installation
-#     * create doc index and contents
 #     * Windows: should we have ghc-pkg-<version>?
 #     * should we be stripping things?
 #     * install libgmp.a, gmp.h
@@ -590,6 +589,11 @@ libraries/base3-compat_dist-install_HC_OPTS += -XPackageImports
 .PHONY: stage1_libs
 stage1_libs : $(ALL_STAGE1_LIBS)
 
+libraries/index.html: $(ALL_HADDOCK_FILES)
+	cd libraries && sh gen_contents_index --inplace
+$(eval $(call all-target,library_doc_index,libraries/index.html))
+INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
+
 # -----------------------------------------------------------------------------
 # Bootstrapping libraries
 
@@ -732,6 +736,9 @@ install_docs: $(INSTALL_HEADERS)
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir); \
 	done
 	$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html; \
+	for i in $(INSTALL_LIBRARY_DOCS); do \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir)/libraries/; \
+	done
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html/`basename $$i`; \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* $(DESTDIR)$(docdir)/html/`basename $$i`; \
@@ -786,7 +793,9 @@ $(eval $(call bindist,.,\
     $(INSTALL_LIBEXEC_SCRIPTS) \
     $(INSTALL_BINS) \
     $(INSTALL_DOCS) \
+    $(INSTALL_LIBRARY_DOCS) \
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
+	$(wildcard libraries/*/dist-install/doc/) \
     $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
     $(filter-out %/project.mk,$(filter-out mk/config.mk,$(MAKEFILE_LIST))) \
 	mk/fix_install_names.sh \

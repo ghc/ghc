@@ -17,6 +17,7 @@ ifneq "$$($1_$2_DO_HADDOCK)" "NO"
 
 ifeq "$$($$($1_PACKAGE)_HADDOCK_FILE)" ""
 $$($1_PACKAGE)_HADDOCK_FILE = $1/$2/doc/html/$$($1_PACKAGE)/$$($1_PACKAGE).haddock
+ALL_HADDOCK_FILES += $$($$($1_PACKAGE)_HADDOCK_FILE)
 else
 $$(error Already got a haddock file for $$($1_PACKAGE))
 endif

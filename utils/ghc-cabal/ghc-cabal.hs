@@ -124,7 +124,7 @@ doInstall ghcpkg ghcpkgconf directory distDir myDestDir myPrefix myLibdir myDocd
                     idts' = idts { prefix    = toPathTemplate myPrefix,
                                    libdir    = toPathTemplate myLibdir,
                                    libsubdir = toPathTemplate "$pkgid",
-                                   docdir    = toPathTemplate (myDocdir </> "$pkgid"),
+                                   docdir    = toPathTemplate (myDocdir </> "$pkg"),
                                    htmldir   = toPathTemplate "$docdir" }
                     progs = withPrograms lbi
                     prog = ConfiguredProgram {
