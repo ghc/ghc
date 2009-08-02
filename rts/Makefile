@@ -14,3 +14,4 @@ dir = rts
 TOP = ..
 include $(TOP)/mk/sub-makefile.mk
 
+FAST_MAKE_OPTS += stage=none
