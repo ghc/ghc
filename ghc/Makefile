@@ -15,7 +15,12 @@ TOP = ..
 SPEC_TARGETS = 1 2 3
 include $(TOP)/mk/sub-makefile.mk
 
-FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES compiler_stage2_NO_BUILD_DEPS=YES compiler_stage3_NO_BUILD_DEPS=YES
+FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES \
+                  compiler_stage2_NO_BUILD_DEPS=YES \
+                  compiler_stage3_NO_BUILD_DEPS=YES \
+                  ghc_stage1_NO_BUILD_DEPS=YES \
+                  ghc_stage2_NO_BUILD_DEPS=YES \
+                  ghc_stage3_NO_BUILD_DEPS=YES
 
 .PHONY: 1 2 3
 
