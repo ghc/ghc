@@ -9,8 +9,6 @@
 Primarily, this module consists of an interface to the C-land dynamic linker.
 
 \begin{code}
-{-# OPTIONS -#include "Linker.h" #-}
-
 module ObjLink ( 
    initObjLinker,	 -- :: IO ()
    loadDLL,		 -- :: String -> IO (Maybe String)

@@ -12,8 +12,6 @@ necessary.
 
 
 \begin{code}
-{-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
-
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
