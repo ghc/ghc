@@ -9,15 +9,15 @@
 
 #ifdef PROFILING
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
 #include "Stats.h"
 #include "RtsUtils.h"
 #include "RetainerSet.h"
 #include "Arena.h"
 #include "Profiling.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 #define HASH_TABLE_SIZE 255

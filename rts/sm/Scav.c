@@ -11,10 +11,10 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
 #include "Storage.h"
-#include "MBlock.h"
 #include "GC.h"
 #include "GCThread.h"
 #include "GCUtils.h"
@@ -23,7 +23,6 @@
 #include "Scav.h"
 #include "Apply.h"
 #include "Trace.h"
-#include "LdvProfile.h"
 #include "Sanity.h"
 #include "Capability.h"
 

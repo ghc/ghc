@@ -16,13 +16,14 @@
 #define INLINE inline
 #endif
 
+#include "PosixSource.h"
 #include "Rts.h"
+
 #include "RtsUtils.h"
 #include "RetainerProfile.h"
 #include "RetainerSet.h"
 #include "Schedule.h"
 #include "Printer.h"
-#include "RtsFlags.h"
 #include "Weak.h"
 #include "Sanity.h"
 #include "Profiling.h"

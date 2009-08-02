@@ -6,8 +6,11 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "HsFFI.h"
 #include "Rts.h"
+
+#include "Stable.h"
 
 // hs_init and hs_exit are defined in RtsStartup.c
 

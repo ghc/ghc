@@ -246,7 +246,7 @@ data SMRep
   | BlackHoleRep
 
 data ClosureType	-- Corresponds 1-1 with the varieties of closures
-			-- implemented by the RTS.  Compare with ghc/includes/ClosureTypes.h
+			-- implemented by the RTS.  Compare with includes/rts/storage/ClosureTypes.h
     = Constr
     | ConstrNoCaf
     | Fun
@@ -284,7 +284,7 @@ isStaticRep BlackHoleRep	         = False
 \end{code}
 
 \begin{code}
-#include "../includes/ClosureTypes.h"
+#include "../includes/rts/storage/ClosureTypes.h"
 -- Defines CONSTR, CONSTR_1_0 etc
 
 -- krc: only called by tickyDynAlloc in CgTicky; return

@@ -20,26 +20,14 @@
    Task, and OS threads that enter the Haskell RTS for the purposes of
    making a call-in are also Tasks.
    
-   The relationship between the number of tasks and capabilities, and
-   the runtime build (-threaded, -smp etc.) is summarised by the
-   following table:
+   In the THREADED_RTS build, multiple Tasks may all be running
+   Haskell code simultaneously. A task relinquishes its Capability
+   when it is asked to evaluate an external (C) call.
 
-     build        Tasks   Capabilities
-     ---------------------------------
-     normal         1          1
-     -threaded      N          N
-
-   The non-threaded build has a single Task and a single global
-   Capability.
-   
-   The THREADED_RTS build allows multiple tasks and mulitple Capabilities.
-   Multiple Tasks may all be running Haskell code simultaneously. A task
-   relinquishes its Capability when it is asked to evaluate an external
-   (C) call.
-
-   In general, there may be multiple Tasks for an OS thread.  This
-   happens if one Task makes a foreign call from Haskell, and
-   subsequently calls back in to create a new bound thread.
+   In general, there may be multiple Tasks associated with a given OS
+   thread.  A second Task is created when one Task makes a foreign
+   call from Haskell, and subsequently calls back in to Haskell,
+   creating a new bound thread.
 
    A particular Task structure can belong to more than one OS thread
    over its lifetime.  This is to avoid creating an unbounded number
@@ -190,7 +178,10 @@ INLINE_HEADER void taskEnter (Task *task);
 // mainly for stats-gathering purposes.
 // Requires: sched_mutex.
 //
+#if defined(THREADED_RTS)
+// In the non-threaded RTS, tasks never stop.
 void workerTaskStop (Task *task);
+#endif
 
 // Record the time spent in this Task.
 // This is called by workerTaskStop() but not by boundTaskExiting(),
@@ -206,12 +197,6 @@ void discardTask (Task *task);
 // Get the Task associated with the current OS thread (or NULL if none).
 //
 INLINE_HEADER Task *myTask (void);
-
-// After a fork, the tasks are not carried into the child process, so
-// we must tell the task manager.
-// Requires: sched_mutex.
-//
-void resetTaskManagerAfterFork (void);
 
 #if defined(THREADED_RTS)
 

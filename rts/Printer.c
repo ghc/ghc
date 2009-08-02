@@ -8,18 +8,16 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "rts/Bytecodes.h"  /* for InstrPtr */
+
 #include "Printer.h"
 #include "RtsUtils.h"
 
 #ifdef DEBUG
 
-#include "RtsFlags.h"
-#include "MBlock.h"
-#include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
 #include "Apply.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 /* --------------------------------------------------------------------------
@@ -37,7 +35,6 @@ static rtsBool lookup_name   ( char *name, StgWord *result );
 static void    enZcode       ( char *in, char *out );
 #endif
 static char    unZcode       ( char ch );
-const char *   lookupGHCName ( void *addr );
 static void    printZcoded   ( const char *raw );
 
 /* --------------------------------------------------------------------------
@@ -186,7 +183,7 @@ printClosure( StgClosure *obj )
 
     case AP:
         {
-	    StgAP* ap = stgCast(StgAP*,obj);
+	    StgAP* ap = (StgAP*)obj;
             StgWord i;
             debugBelch("AP("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->n_args; ++i) {
@@ -199,7 +196,7 @@ printClosure( StgClosure *obj )
 
     case PAP:
         {
-	    StgPAP* pap = stgCast(StgPAP*,obj);
+	    StgPAP* pap = (StgPAP*)obj;
             StgWord i;
             debugBelch("PAP/%d(",pap->arity); 
 	    printPtr((StgPtr)pap->fun);
@@ -213,7 +210,7 @@ printClosure( StgClosure *obj )
 
     case AP_STACK:
         {
-	    StgAP_STACK* ap = stgCast(StgAP_STACK*,obj);
+	    StgAP_STACK* ap = (StgAP_STACK*)obj;
             StgWord i;
             debugBelch("AP_STACK("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->size; ++i) {
@@ -226,31 +223,31 @@ printClosure( StgClosure *obj )
 
     case IND:
             debugBelch("IND("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
             debugBelch(")\n"); 
             break;
 
     case IND_OLDGEN:
             debugBelch("IND_OLDGEN("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
             debugBelch(")\n"); 
             break;
 
     case IND_PERM:
             debugBelch("IND("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
             debugBelch(")\n"); 
             break;
 
     case IND_OLDGEN_PERM:
             debugBelch("IND_OLDGEN_PERM("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
             debugBelch(")\n"); 
             break;
 
     case IND_STATIC:
             debugBelch("IND_STATIC("); 
-            printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
             debugBelch(")\n"); 
             break;
 
@@ -264,7 +261,7 @@ printClosure( StgClosure *obj )
 
     case UPDATE_FRAME:
         {
-            StgUpdateFrame* u = stgCast(StgUpdateFrame*,obj);
+            StgUpdateFrame* u = (StgUpdateFrame*)obj;
             debugBelch("UPDATE_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
             debugBelch(",");
@@ -275,7 +272,7 @@ printClosure( StgClosure *obj )
 
     case CATCH_FRAME:
         {
-            StgCatchFrame* u = stgCast(StgCatchFrame*,obj);
+            StgCatchFrame* u = (StgCatchFrame*)obj;
             debugBelch("CATCH_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
             debugBelch(",");
@@ -286,7 +283,7 @@ printClosure( StgClosure *obj )
 
     case STOP_FRAME:
         {
-            StgStopFrame* u = stgCast(StgStopFrame*,obj);
+            StgStopFrame* u = (StgStopFrame*)obj;
             debugBelch("STOP_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
             debugBelch(")\n"); 

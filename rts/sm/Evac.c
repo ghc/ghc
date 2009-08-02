@@ -11,16 +11,16 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "Storage.h"
-#include "MBlock.h"
+
 #include "Evac.h"
+#include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"
 #include "GCUtils.h"
 #include "Compact.h"
 #include "Prelude.h"
-#include "LdvProfile.h"
 #include "Trace.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)

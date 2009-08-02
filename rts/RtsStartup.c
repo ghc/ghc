@@ -7,41 +7,37 @@
  * ---------------------------------------------------------------------------*/
 
 // PAPI uses caddr_t, which is not POSIX
-// #include "PosixSource.h"
+#ifndef USE_PAPI
+#include "PosixSource.h"
+#endif
 
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "HsFFI.h"
+
+#include "sm/Storage.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"  
-#include "OSThreads.h"
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "STM.h"        /* initSTM */
-#include "Signals.h"
 #include "RtsSignals.h"
-#include "ThrIOManager.h"
-#include "Timer.h"      /* startTimer, stopTimer */
 #include "Weak.h"
 #include "Ticky.h"
 #include "StgRun.h"
 #include "Prelude.h"		/* fixupRTStoPreludeRefs */
-#include "HsFFI.h"
-#include "Linker.h"
 #include "ThreadLabels.h"
-#include "BlockAlloc.h"
+#include "sm/BlockAlloc.h"
 #include "Trace.h"
-#include "RtsGlobals.h"
 #include "Stable.h"
-#include "Hpc.h"
-#include "FileLock.h"
-#include "EventLog.h"
+#include "eventlog/EventLog.h"
 #include "Hash.h"
+#include "Profiling.h"
+#include "Timer.h"
+#include "Globals.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
-
-# include "Profiling.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
@@ -52,14 +48,11 @@
 #include "win32/AsyncIO.h"
 #endif
 
-#include <stdlib.h>
+#if !defined(mingw32_HOST_OS)
+#include "posix/TTY.h"
+#include "posix/FileLock.h"
+#endif
 
-#ifdef HAVE_TERMIOS_H
-#include <termios.h>
-#endif
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -73,26 +66,6 @@
 
 // Count of how many outstanding hs_init()s there have been.
 static int hs_init_count = 0;
-
-// Here we save the terminal settings on the standard file
-// descriptors, if we need to change them (eg. to support NoBuffering
-// input).
-static void *saved_termios[3] = {NULL,NULL,NULL};
-
-void*
-__hscore_get_saved_termios(int fd)
-{
-  return (0 <= fd && fd < (int)(sizeof(saved_termios) / sizeof(*saved_termios))) ?
-    saved_termios[fd] : NULL;
-}
-
-void
-__hscore_set_saved_termios(int fd, void* ts)
-{
-  if (0 <= fd && fd < (int)(sizeof(saved_termios) / sizeof(*saved_termios))) {
-    saved_termios[fd] = ts;
-  }
-}
 
 /* -----------------------------------------------------------------------------
    Initialise floating point unit on x86 (currently disabled. why?)
@@ -292,7 +265,7 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 /* The init functions use an explicit stack... 
  */
 #define INIT_STACK_BLOCKS  4
-static F_ *init_stack = NULL;
+static StgFunPtr *init_stack = NULL;
 
 void
 hs_add_root(void (*init_root)(void))
@@ -311,10 +284,10 @@ hs_add_root(void (*init_root)(void))
        to the last occupied word */
     init_sp = INIT_STACK_BLOCKS*BLOCK_SIZE_W;
     bd = allocGroup_lock(INIT_STACK_BLOCKS);
-    init_stack = (F_ *)bd->start;
-    init_stack[--init_sp] = (F_)stg_init_finish;
+    init_stack = (StgFunPtr *)bd->start;
+    init_stack[--init_sp] = (StgFunPtr)stg_init_finish;
     if (init_root != NULL) {
-	init_stack[--init_sp] = (F_)init_root;
+	init_stack[--init_sp] = (StgFunPtr)init_root;
     }
     
     cap->r.rSp = (P_)(init_stack + init_sp);
@@ -391,30 +364,9 @@ hs_exit_(rtsBool wait_foreign)
     stopTimer();
     exitTimer();
 
-    /* reset the standard file descriptors to blocking mode */
-    resetNonBlockingFd(0);
-    resetNonBlockingFd(1);
-    resetNonBlockingFd(2);
-
-#if HAVE_TERMIOS_H
-    // Reset the terminal settings on the standard file descriptors,
-    // if we changed them.  See System.Posix.Internals.tcSetAttr for
-    // more details, including the reason we termporarily disable
-    // SIGTTOU here.
-    { 
-	int fd;
-	sigset_t sigset, old_sigset;
-	sigemptyset(&sigset);
-	sigaddset(&sigset, SIGTTOU);
-	sigprocmask(SIG_BLOCK, &sigset, &old_sigset);
-	for (fd = 0; fd <= 2; fd++) {
-	    struct termios* ts = (struct termios*)__hscore_get_saved_termios(fd);
-	    if (ts != NULL) {
-		tcsetattr(fd,TCSANOW,ts);
-	    }
-	}
-	sigprocmask(SIG_SETMASK, &old_sigset, NULL);
-    }
+    // set the terminal settings back to what they were
+#if !defined(mingw32_HOST_OS)    
+    resetTerminalSettings();
 #endif
 
     // uninstall signal handlers

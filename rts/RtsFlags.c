@@ -9,7 +9,7 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
 #include "RtsUtils.h"
 #include "Profiling.h"
 
@@ -17,7 +17,6 @@
 #include <ctype.h>
 #endif
 
-#include <stdlib.h>
 #include <string.h>
 
 // Flag Structure
@@ -1272,7 +1271,7 @@ decode(const char *s)
     return (I_)m;
 }
 
-static void
+static void GNU_ATTRIBUTE(__noreturn__)
 bad_option(const char *s)
 {
   errorBelch("bad RTS option: %s", s);

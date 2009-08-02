@@ -23,11 +23,16 @@
 #ifndef STG_H
 #define STG_H
 
-
-/* If we include "Stg.h" directly, we're in STG code, and we therefore
- * get all the global register variables, macros etc. that go along
- * with that.  If "Stg.h" is included via "Rts.h", we're assumed to
- * be in vanilla C.
+/*
+ * If we are compiling a .hc file, then we want all the register
+ * variables.  This is the what happens if you #include "Stg.h" first:
+ * we assume this is a .hc file, and set IN_STG_CODE==1, which later
+ * causes the register variables to be enabled in stg/Regs.h.
+ *
+ * If instead "Rts.h" is included first, then we are compiling a
+ * vanilla C file.  Everything from Stg.h is provided, except that
+ * IN_STG_CODE is not defined, and the register variables will not be
+ * active.
  */
 #ifndef IN_STG_CODE
 # define IN_STG_CODE 1
@@ -47,7 +52,6 @@
 
 /* Configuration */
 #include "ghcconfig.h"
-#include "RtsConfig.h"
 
 /* The code generator calls the math functions directly in .hc code.
    NB. after configuration stuff above, because this sets #defines
@@ -59,7 +63,7 @@
    -------------------------------------------------------------------------- */
 
 /*
- * The C backend like to refer to labels by just mentioning their
+ * The C backend likes to refer to labels by just mentioning their
  * names.  Howevver, when a symbol is declared as a variable in C, the
  * C compiler will implicitly dereference it when it occurs in source.
  * So we must subvert this behaviour for .hc files by declaring
@@ -165,7 +169,7 @@
    -------------------------------------------------------------------------- */
 
 #include "MachDeps.h"
-#include "StgTypes.h"
+#include "stg/Types.h"
 
 /* -----------------------------------------------------------------------------
    Shorthand forms
@@ -174,24 +178,14 @@
 typedef StgChar		C_;
 typedef StgWord		W_;
 typedef StgWord*	P_;
-typedef P_*		PP_;
 typedef StgInt		I_;
-typedef StgAddr	        A_;
-typedef const StgWord*  D_;
-typedef StgFunPtr       F_;
-typedef StgByteArray    B_;
-typedef StgClosurePtr   L_;
-
-typedef StgInt64        LI_;
-typedef StgWord64       LW_;
-
-#define IF_(f)		static F_ GNUC3_ATTRIBUTE(used) f(void) 
-#define FN_(f)		F_ f(void)
-#define EF_(f)		extern F_ f(void)
-
 typedef StgWord StgWordArray[];
+
 #define EI_(X)          extern StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 #define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+#define IF_(f)		static StgFunPtr GNUC3_ATTRIBUTE(used) f(void) 
+#define FN_(f)		StgFunPtr f(void)
+#define EF_(f)		extern StgFunPtr f(void)
 
 /* -----------------------------------------------------------------------------
    Tail calls
@@ -200,27 +194,26 @@ typedef StgWord StgWordArray[];
    to be before all procedures (inline & out-of-line).
    -------------------------------------------------------------------------- */
 
-#include "TailCalls.h"
+#include "stg/TailCalls.h"
 
 /* -----------------------------------------------------------------------------
    Other Stg stuff...
    -------------------------------------------------------------------------- */
 
-#include "StgDLL.h"
-#include "MachRegs.h"
-#include "Regs.h"
-
-#include "TickyCounters.h"
+#include "stg/DLL.h"
+#include "stg/MachRegs.h"
+#include "stg/Regs.h"
+#include "stg/Ticky.h"
 
 #if IN_STG_CODE
 /*
  * This is included later for RTS sources, after definitions of
  * StgInfoTable, StgClosure and so on. 
  */
-#include "StgMiscClosures.h"
+#include "stg/MiscClosures.h"
 #endif
 
-#include "SMP.h" // write_barrier() inline is required 
+#include "stg/SMP.h" // write_barrier() inline is required 
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles
@@ -342,7 +335,7 @@ INLINE_HEADER StgDouble PK_DBL(W_ p_src[])
    In both cases the memory location might not be 64-bit aligned.
    -------------------------------------------------------------------------- */
 
-#ifdef SUPPORT_LONG_LONGS
+#if SIZEOF_HSWORD == 4
 
 typedef struct
   { StgWord dhi;
@@ -413,7 +406,7 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
     return p_src[0];
 }
 
-#endif
+#endif /* SIZEOF_HSWORD == 4 */
 
 /* -----------------------------------------------------------------------------
    Split markers

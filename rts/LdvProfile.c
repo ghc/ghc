@@ -9,9 +9,9 @@
 
 #ifdef PROFILING
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "LdvProfile.h"
-#include "RtsFlags.h"
+
 #include "Profiling.h"
 #include "Stats.h"
 #include "RtsUtils.h"

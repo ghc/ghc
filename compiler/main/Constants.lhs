@@ -14,8 +14,8 @@ import Data.Bits (shiftL)
 -- be in trouble.
 
 #include "HsVersions.h"
-#include "../includes/MachRegs.h"
-#include "../includes/Constants.h"
+#include "../includes/stg/MachRegs.h"
+#include "../includes/rts/Constants.h"
 #include "../includes/MachDeps.h"
 #include "../includes/DerivedConstants.h"
 

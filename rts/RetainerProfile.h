@@ -20,7 +20,7 @@ extern void  printRetainer         ( FILE *, retainer );
 extern void  retainerProfile       ( void );
 extern void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
 
-extern StgWord RTS_VAR(flip);
+extern StgWord flip;
 
 // extract the retainer set field from c
 #define RSET(c)   ((c)->header.prof.hp.rs)

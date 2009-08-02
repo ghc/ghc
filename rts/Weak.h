@@ -12,10 +12,12 @@
 #include "Capability.h"
 
 extern rtsBool running_finalizers;
+extern StgWeak * weak_ptr_list;
 
-void runCFinalizer(StgVoid *fn, StgVoid *ptr, StgVoid *env, StgWord flag);
+void runCFinalizer(void *fn, void *ptr, void *env, StgWord flag);
 void runAllCFinalizers(StgWeak *w);
 void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
 
-#endif
+#endif /* WEAK_H */
+

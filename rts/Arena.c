@@ -18,11 +18,11 @@
    which most allocations are small.
    -------------------------------------------------------------------------- */
 
+#include "PosixSource.h"
 #include "Rts.h"
+
 #include "RtsUtils.h"
 #include "Arena.h"
-
-#include <stdlib.h>
 
 // Each arena struct is allocated using malloc().
 struct _Arena {

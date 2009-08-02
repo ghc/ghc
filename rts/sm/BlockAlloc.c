@@ -17,11 +17,10 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
+#include "Storage.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
-#include "MBlock.h"
-#include "Storage.h"
 
 #include <string.h>
 
@@ -284,7 +283,7 @@ alloc_mega_group (nat mblocks)
     {
         // we take our chunk off the end here.
         nat best_mblocks  = BLOCKS_TO_MBLOCKS(best->blocks);
-        bd = FIRST_BDESCR(MBLOCK_ROUND_DOWN(best) + 
+        bd = FIRST_BDESCR((StgWord8*)MBLOCK_ROUND_DOWN(best) + 
                           (best_mblocks-mblocks)*MBLOCK_SIZE);
 
         best->blocks = MBLOCK_GROUP_BLOCKS(best_mblocks - mblocks);
@@ -415,7 +414,8 @@ coalesce_mblocks (bdescr *p)
     q = p->link;
     if (q != NULL && 
         MBLOCK_ROUND_DOWN(q) == 
-        MBLOCK_ROUND_DOWN(p) + BLOCKS_TO_MBLOCKS(p->blocks) * MBLOCK_SIZE) {
+        (StgWord8*)MBLOCK_ROUND_DOWN(p) + 
+        BLOCKS_TO_MBLOCKS(p->blocks) * MBLOCK_SIZE) {
         // can coalesce
         p->blocks  = MBLOCK_GROUP_BLOCKS(BLOCKS_TO_MBLOCKS(p->blocks) +
                                          BLOCKS_TO_MBLOCKS(q->blocks));
@@ -610,20 +610,21 @@ splitBlockGroup (bdescr *bd, nat blocks)
 static void
 initMBlock(void *mblock)
 {
-  bdescr *bd;
-  void *block;
+    bdescr *bd;
+    StgWord8 *block;
 
-  /* the first few Bdescr's in a block are unused, so we don't want to
-   * put them all on the free list.
-   */
-  block = FIRST_BLOCK(mblock);
-  bd    = FIRST_BDESCR(mblock);
-
-  /* Initialise the start field of each block descriptor
-   */
-  for (; block <= LAST_BLOCK(mblock); bd += 1, block += BLOCK_SIZE) {
-    bd->start = block;
-  }
+    /* the first few Bdescr's in a block are unused, so we don't want to
+     * put them all on the free list.
+     */
+    block = FIRST_BLOCK(mblock);
+    bd    = FIRST_BDESCR(mblock);
+    
+    /* Initialise the start field of each block descriptor
+     */
+    for (; block <= (StgWord8*)LAST_BLOCK(mblock); bd += 1, 
+             block += BLOCK_SIZE) {
+        bd->start = (void*)block;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -708,7 +709,7 @@ checkFreeListSanity(void)
         if (bd->link != NULL)
         {
             ASSERT (MBLOCK_ROUND_DOWN(bd->link) != 
-                    MBLOCK_ROUND_DOWN(bd) + 
+                    (StgWord8*)MBLOCK_ROUND_DOWN(bd) + 
                     BLOCKS_TO_MBLOCKS(bd->blocks) * MBLOCK_SIZE);
         }
     }
@@ -758,7 +759,8 @@ reportUnmarkedBlocks (void)
                 debugBelch("  %p\n",bd);
             }
             if (bd->blocks >= BLOCKS_PER_MBLOCK) {
-                mblock += (BLOCKS_TO_MBLOCKS(bd->blocks) - 1) * MBLOCK_SIZE;
+                mblock = (StgWord8*)mblock +
+                    (BLOCKS_TO_MBLOCKS(bd->blocks) - 1) * MBLOCK_SIZE;
                 break;
             } else {
                 bd += bd->blocks;

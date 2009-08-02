@@ -24,9 +24,9 @@ module CgProf (
   ) where
 
 #include "HsVersions.h"
-#include "MachDeps.h"
+#include "../includes/MachDeps.h"
  -- For WORD_SIZE_IN_BITS only.
-#include "../includes/Constants.h"
+#include "../includes/rts/Constants.h"
 	-- For LDV_CREATE_MASK, LDV_STATE_USE
 	-- which are StgWords
 #include "../includes/DerivedConstants.h"

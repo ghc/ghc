@@ -7,8 +7,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef __THREADLABELS_H__
-#define __THREADLABELS_H__
+#ifndef THREADLABELS_H
+#define THREADLABELS_H
 
 #if defined(DEBUG)
 void    initThreadLabelTable (void);
@@ -19,4 +19,4 @@ void    removeThreadLabel    (StgWord key);
 void    labelThread          (StgPtr tso, char *label);
 #endif
 
-#endif /* __THREADLABELS_H__ */
+#endif /* THREADLABELS_H */

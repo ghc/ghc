@@ -5,8 +5,9 @@
  * (c) sof, 2002-2003
  *
  */
-#ifndef __WORKQUEUE_H__
-#define __WORKQUEUE_H__
+
+#ifndef WIN32_WORKQUEUE_H
+#define WIN32_WORKQUEUE_H
 #include <windows.h>
 
 /* This is a fixed-size queue. */
@@ -34,4 +35,4 @@ extern BOOL       GetWork            ( WorkQueue* pq, void** ppw );
 extern BOOL       FetchWork          ( WorkQueue* pq, void** ppw );
 extern int        SubmitWork         ( WorkQueue* pq, void*   pw );
 
-#endif /* __WORKQUEUE_H__ */
+#endif /* WIN32_WORKQUEUE_H */

@@ -8,8 +8,8 @@
 module Main(main) where
 
 #include "../../includes/ghcconfig.h"
-#include "../../includes/MachRegs.h"
-#include "../../includes/Constants.h"
+#include "../../includes/stg/MachRegs.h"
+#include "../../includes/rts/Constants.h"
 
 -- Needed for TAG_BITS
 #include "../../includes/MachDeps.h"

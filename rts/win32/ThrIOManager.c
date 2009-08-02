@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
-#include "ThrIOManager.h"
+#include "IOManager.h"
 #include "Prelude.h"
 #include <windows.h>
 

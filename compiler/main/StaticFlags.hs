@@ -275,7 +275,7 @@ opt_Unregisterised		= lookUp  (fsLit "-funregisterised")
 -- Derived, not a real option.  Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
 -- indirection to the entry code.  See TABLES_NEXT_TO_CODE in 
--- includes/InfoTables.h.
+-- includes/rts/storage/InfoTables.h.
 tablesNextToCode :: Bool
 tablesNextToCode 		= not opt_Unregisterised
 		 		  && cGhcEnableTablesNextToCode == "YES"

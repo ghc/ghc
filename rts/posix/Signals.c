@@ -6,18 +6,15 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* This is non-Posix-compliant.
-   #include "PosixSource.h" 
-*/
+#include "PosixSource.h" 
 #include "Rts.h"
-#include "SchedAPI.h"
+
 #include "Schedule.h"
 #include "RtsSignals.h"
-#include "posix/Signals.h"
+#include "Signals.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
 #include "Prelude.h"
-#include "ThrIOManager.h"
+#include "Stable.h"
 
 #ifdef alpha_HOST_ARCH
 # if defined(linux_HOST_OS)

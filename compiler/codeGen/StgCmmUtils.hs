@@ -44,7 +44,7 @@ module StgCmmUtils (
   ) where
 
 #include "HsVersions.h"
-#include "MachRegs.h"
+#include "../includes/stg/MachRegs.h"
 
 import StgCmmMonad
 import StgCmmClosure

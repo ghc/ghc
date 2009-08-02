@@ -8,10 +8,12 @@
 
 #ifdef DEBUG
 
+// external headers
 #include "Rts.h"
-#include "OSThreads.h"
+#include "rts/Flags.h"
+
+// internal headers
 #include "Trace.h"
-#include "RtsFlags.h"
 #include "GetTime.h"
 #include "Stats.h"
 

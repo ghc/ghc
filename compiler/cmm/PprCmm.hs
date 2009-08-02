@@ -56,7 +56,7 @@ import Data.Maybe
 -- Temp Jan08
 import SMRep
 import ClosureInfo
-#include "../includes/StgFun.h"
+#include "../includes/rts/storage/FunTypes.h"
 
 
 pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatic info g] -> SDoc

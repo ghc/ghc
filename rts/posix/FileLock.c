@@ -6,11 +6,12 @@
  *
  * ---------------------------------------------------------------------------*/
  
+#include "PosixSource.h"
 #include "Rts.h"
-#include "Hash.h"
+
 #include "FileLock.h"
+#include "Hash.h"
 #include "RtsUtils.h"
-#include "OSThreads.h"
 
 #include <unistd.h>
 #include <sys/stat.h>

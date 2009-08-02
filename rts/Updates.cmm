@@ -12,8 +12,9 @@
 
 
 #include "Cmm.h"
+#include "rts/prof/LDV.h"
+
 #include "Updates.h"
-#include "StgLdvProf.h"
 
 /* on entry to the update code
    (1) R1 points to the closure being returned

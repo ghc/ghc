@@ -4,8 +4,10 @@
  *
  * (c) sof, 2002-2003.
  */
-#ifndef __ASYNCHIO_H__
-#define __ASYNCHIO_H__
+
+#ifndef WIN32_ASYNCHIO_H
+#define WIN32_ASYNCHIO_H
+
 extern unsigned int
 addIORequest(int   fd,
 	     int   forWriting,
@@ -22,4 +24,4 @@ extern int awaitRequests(rtsBool wait);
 extern void abandonRequestWait(void);
 extern void resetAbandonRequestWait(void);
 
-#endif /* __ASYNCHIO_H__ */
+#endif /* WIN32_ASYNCHIO_H */

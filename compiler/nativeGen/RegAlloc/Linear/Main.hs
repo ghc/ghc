@@ -115,7 +115,7 @@ import Data.Maybe
 import Data.List
 import Control.Monad
 
-#include "../includes/MachRegs.h"
+#include "../includes/stg/MachRegs.h"
 
 
 -- -----------------------------------------------------------------------------

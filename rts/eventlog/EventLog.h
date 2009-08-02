@@ -9,8 +9,8 @@
 #ifndef EVENTLOG_H
 #define EVENTLOG_H
 
+#include "rts/EventLogFormat.h"
 #include "Capability.h"
-#include "EventLogFormat.h"
 
 #ifdef EVENTLOG
 

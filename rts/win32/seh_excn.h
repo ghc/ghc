@@ -1,5 +1,6 @@
-#ifndef __SEH_EXCN_H__
-#define __SEH_EXCN_H__
+#ifndef WIN32_SEH_EXCN_H
+#define WIN32_SEH_EXCN_H
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -87,5 +88,5 @@ catchDivZero(struct _EXCEPTION_RECORD*,
 #error Don't know what sort of Windows system this is
 #endif
 
-#endif /* __SEH_EXCN_H__ */
+#endif /* WIN32_SEH_EXCN_H */
 

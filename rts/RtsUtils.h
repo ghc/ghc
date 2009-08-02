@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2005
+ * (c) The GHC Team, 1998-2009
  *
  * General utility functions used in the RTS.
  *
@@ -13,41 +13,43 @@
  * (Checked) dynamic allocation
  * -------------------------------------------------------------------------- */
 
-extern void initAllocator(void);
-extern void shutdownAllocator(void);
+void initAllocator(void);
+void shutdownAllocator(void);
 
-extern void *stgMallocBytes(int n, char *msg)
+void *stgMallocBytes(int n, char *msg)
     GNUC3_ATTRIBUTE(__malloc__);
 
-extern void *stgReallocBytes(void *p, int n, char *msg);
+void *stgReallocBytes(void *p, int n, char *msg);
 
-extern void *stgCallocBytes(int n, int m, char *msg)
+void *stgCallocBytes(int n, int m, char *msg)
      GNUC3_ATTRIBUTE(__malloc__);
 
-extern void stgFree(void* p);
+void stgFree(void* p);
 
 /* -----------------------------------------------------------------------------
  * Misc other utilities
  * -------------------------------------------------------------------------- */
 
-extern void heapOverflow(void);
+void heapOverflow(void);
 
-extern void setNonBlockingFd(int fd);
-extern void resetNonBlockingFd(int fd);
-
-extern nat stg_strlen(char *str);
-
-extern char *time_str(void);
-extern char *ullong_format_string(ullong, char *, rtsBool);
+char *time_str(void);
+char *ullong_format_string(ullong, char *, rtsBool);
 
 #ifdef DEBUG
-extern void heapCheckFail( void );
+void heapCheckFail( void );
 #endif
 
-extern void* __hscore_get_saved_termios(int fd);
-extern void __hscore_set_saved_termios(int fd, void* ts);
+// XXX shouldn't be here
+void* __hscore_get_saved_termios(int fd);
+void  __hscore_set_saved_termios(int fd, void* ts);
 
 void printRtsInfo(void);
+
+HsInt genSymZh(void);
+HsInt resetGenSymZh(void);
+
+/* Alternate to raise(3) for threaded rts, for OpenBSD */
+int genericRaise(int sig);
 
 int rts_isProfiled(void);
 

@@ -8,17 +8,11 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "Storage.h"
+
 #include "Schedule.h"
-#include "SchedAPI.h"
-#include "RtsFlags.h"
 #include "RtsUtils.h"
-#include "ParTicky.h"
 #include "Trace.h"
 #include "Prelude.h"
-
-#include "SMP.h" // for cas
-
 #include "Sparks.h"
 
 #if defined(THREADED_RTS)
@@ -127,8 +121,6 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
     nat n, pruned_sparks; // stats only
     StgWord botInd,oldBotInd,currInd; // indices in array (always < size)
     const StgInfoTable *info;
-    
-    PAR_TICKY_MARK_SPARK_QUEUE_START();
     
     n = 0;
     pruned_sparks = 0;
@@ -246,8 +238,6 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
     pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size); 
     // first free place we did not use (corrected by wraparound)
 
-    PAR_TICKY_MARK_SPARK_QUEUE_END(n);
-
     debugTrace(DEBUG_sched, "pruned %d sparks", pruned_sparks);
     
     debugTrace(DEBUG_sched,
@@ -296,7 +286,8 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
  *
  * Could be called after GC, before Cap. release, from scheduler. 
  * -------------------------------------------------------------------------- */
-void balanceSparkPoolsCaps(nat n_caps, Capability caps[]);
+void balanceSparkPoolsCaps(nat n_caps, Capability caps[])
+   GNUC3_ATTRIBUTE(__noreturn__);
 
 void balanceSparkPoolsCaps(nat n_caps STG_UNUSED, 
                            Capability caps[] STG_UNUSED) {

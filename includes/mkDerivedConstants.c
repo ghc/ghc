@@ -21,10 +21,8 @@
 #define THREADED_RTS
 
 #include "Rts.h"
-#include "RtsFlags.h"
-#include "Storage.h"
+
 #include "Stable.h"
-#include "OSThreads.h"
 #include "Capability.h"
 
 #include <stdio.h>

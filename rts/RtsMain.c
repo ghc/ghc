@@ -11,8 +11,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
-#include "SchedAPI.h"
-#include "RtsFlags.h"
+
 #include "RtsUtils.h"
 #include "RtsMain.h"
 #include "Prelude.h"
@@ -20,7 +19,6 @@
 #if defined(mingw32_HOST_OS)
 #include "win32/seh_excn.h"
 #endif
-#include <stdlib.h>
 
 #ifdef DEBUG
 # include "Printer.h"   /* for printing        */

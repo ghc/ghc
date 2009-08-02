@@ -9,10 +9,9 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
-
 #include "Rts.h"
+
 #include "RtsUtils.h"
-#include "MBlock.h"
 #include "BlockAlloc.h"
 #include "Trace.h"
 #include "OSMem.h"
@@ -235,7 +234,7 @@ getMBlocks(nat n)
     
     // fill in the table
     for (i = 0; i < n; i++) {
-        markHeapAlloced( ret + i * MBLOCK_SIZE );
+        markHeapAlloced( (StgWord8*)ret + i * MBLOCK_SIZE );
     }
     
     mblocks_allocated += n;

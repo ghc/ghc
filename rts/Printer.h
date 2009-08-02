@@ -15,8 +15,8 @@ extern void   	   printObj        ( StgClosure *obj );
 #ifdef DEBUG
 extern void        prettyPrintClosure (StgClosure *obj);
 extern void   	   printClosure    ( StgClosure *obj );
-extern StgStackPtr printStackObj   ( StgStackPtr sp );
-extern void        printStackChunk ( StgStackPtr sp, StgStackPtr spLim );
+extern StgPtr      printStackObj   ( StgPtr sp );
+extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
 extern void        printTSO        ( StgTSO *tso );
 
 void   	           info_hdr_type   ( StgClosure *closure, char *res );

@@ -66,7 +66,6 @@
 #define CMINUSMINUS 1
 
 #include "ghcconfig.h"
-#include "RtsConfig.h"
 
 /* -----------------------------------------------------------------------------
    Types 
@@ -143,6 +142,18 @@
   section "rodata" {				\
 	name : bits8[] str;			\
   }						\
+
+#ifdef TABLES_NEXT_TO_CODE
+#define RET_LBL(f) f##_info
+#else
+#define RET_LBL(f) f##_ret
+#endif
+
+#ifdef TABLES_NEXT_TO_CODE
+#define ENTRY_LBL(f) f##_info
+#else
+#define ENTRY_LBL(f) f##_entry
+#endif
 
 /* -----------------------------------------------------------------------------
    Byte/word macros
@@ -320,26 +331,26 @@
    Constants.
    -------------------------------------------------------------------------- */
 
-#include "Constants.h"
+#include "rts/Constants.h"
 #include "DerivedConstants.h"
-#include "ClosureTypes.h"
-#include "StgFun.h"
-#include "OSThreads.h"
-#include "SMPClosureOps.h"
+#include "rts/storage/ClosureTypes.h"
+#include "rts/storage/FunTypes.h"
+#include "rts/storage/SMPClosureOps.h"
+#include "rts/OSThreads.h"
 
 /*
  * Need MachRegs, because some of the RTS code is conditionally
  * compiled based on REG_R1, REG_R2, etc.
  */
 #define STOLEN_X86_REGS 4
-#include "MachRegs.h"
+#include "stg/MachRegs.h"
 
-#include "Liveness.h"
-#include "StgLdvProf.h"
+#include "rts/storage/Liveness.h"
+#include "rts/prof/LDV.h"
 
 #undef BLOCK_SIZE
 #undef MBLOCK_SIZE
-#include "Block.h"  /* For Bdescr() */
+#include "rts/storage/Block.h"  /* For Bdescr() */
 
 
 #define MyCapability()  (BaseReg - OFFSET_Capability_r)

@@ -16,15 +16,15 @@
  * Hence, we use the old-fashioned @setitimer@ that just about everyone seems
  * to support.  So much for standards.
  */
+
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
-#include "Timer.h"
+
 #include "Ticker.h"
-#include "posix/Itimer.h"
+#include "Itimer.h"
 #include "Proftimer.h"
-#include "Storage.h"
 #include "Schedule.h"
-#include "posix/Select.h"
+#include "Select.h"
 
 /* As recommended in the autoconf manual */
 # ifdef TIME_WITH_SYS_TIME
@@ -228,31 +228,6 @@ exitTicker(void)
     // ignore errors - we don't really care if it fails.
 #endif
 }
-
-#if 0
-/* Currently unused */
-void
-block_vtalrm_signal(void)
-{
-    sigset_t signals;
-    
-    sigemptyset(&signals);
-    sigaddset(&signals, ITIMER_SIGNAL);
-
-    (void) sigprocmask(SIG_BLOCK, &signals, NULL);
-}
-
-void
-unblock_vtalrm_signal(void)
-{
-    sigset_t signals;
-    
-    sigemptyset(&signals);
-    sigaddset(&signals, ITIMER_SIGNAL);
-
-    (void) sigprocmask(SIG_UNBLOCK, &signals, NULL);
-}
-#endif
 
 /* gettimeofday() takes around 1us on our 500MHz PIII.  Since we're
  * only calling it 50 times/s, it shouldn't have any great impact.

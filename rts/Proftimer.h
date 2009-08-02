@@ -12,8 +12,11 @@
 extern void initProfTimer      ( void );
 extern void handleProfTick     ( void );
 
+#ifdef PROFILING
 extern void stopProfTimer      ( void );
 extern void startProfTimer     ( void );
+#endif
+
 extern void stopHeapProfTimer  ( void );
 extern void startHeapProfTimer ( void );
 

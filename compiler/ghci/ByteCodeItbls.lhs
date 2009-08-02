@@ -84,7 +84,7 @@ mkITbl tc
         dcs = tyConDataCons tc
         n   = tyConFamilySize tc
 
-#include "../includes/ClosureTypes.h"
+#include "../includes/rts/storage/ClosureTypes.h"
 cONSTR :: Int	-- Defined in ClosureTypes.h
 cONSTR = CONSTR 
 
@@ -151,7 +151,7 @@ ptrToInt (Ptr a#) = I# (addr2Int# a#)
 #if sparc_TARGET_ARCH
 -- After some consideration, we'll try this, where
 -- 0x55555555 stands in for the address to jump to.
--- According to ghc/includes/MachRegs.h, %g3 is very
+-- According to includes/rts/MachRegs.h, %g3 is very
 -- likely indeed to be baggable.
 --
 --   0000 07155555              sethi   %hi(0x55555555), %g3

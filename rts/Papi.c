@@ -16,12 +16,12 @@
 
 #include <papi.h>
 
-#include "Papi.h"
+#include "PosixSource.h"
 #include "Rts.h"
+
 #include "RtsUtils.h"
 #include "Stats.h"
-#include "RtsFlags.h"
-#include "OSThreads.h"
+#include "Papi.h"
 
 // used to protect the aggregated counters
 #ifdef THREADED_RTS

@@ -11,10 +11,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef GCTHREAD_H
-#define GCTHREAD_H
+#ifndef SM_GCTHREAD_H
+#define SM_GCTHREAD_H
 
-#include "OSThreads.h"
 #include "WSDeque.h"
 
 /* -----------------------------------------------------------------------------
@@ -271,5 +270,5 @@ extern StgWord8 the_gc_thread[];
 
 #endif
 
-#endif // GCTHREAD_H
+#endif // SM_GCTHREAD_H
 

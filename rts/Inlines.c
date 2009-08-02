@@ -2,4 +2,5 @@
 // compiled for real here, just in case the definition was not inlined
 // at some call site:
 #define KEEP_INLINES
+#include "PosixSource.h"
 #include "Rts.h"

@@ -6,21 +6,12 @@
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef SELECT_H
-#define SELECT_H
+#ifndef POSIX_SELECT_H
+#define POSIX_SELECT_H
 
 #if !defined(THREADED_RTS)
 /* In Select.c */
-extern lnat RTS_VAR(timestamp);
-
-/* awaitEvent(rtsBool wait)
- *
- * Checks for blocked threads that need to be woken.
- *
- * Called from STG :  NO
- * Locks assumed   :  sched_mutex
- */
-void awaitEvent(rtsBool wait);  /* In Select.c */
+extern lnat timestamp;
 #endif
 
-#endif /* SELECT_H */
+#endif /* POSIX_SELECT_H */

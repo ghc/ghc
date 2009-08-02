@@ -12,11 +12,10 @@
 /* #include "PosixSource.h" */
 
 #include "Rts.h"
+
 #include "RtsUtils.h"
-#include "MBlock.h"
 #include "FrontPanel.h"
 #include "Stats.h"
-#include "RtsFlags.h"
 #include "Schedule.h"
 
 #include <gtk/gtk.h>

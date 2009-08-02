@@ -19,7 +19,7 @@ module FastMutInt(
 
 #ifdef __GLASGOW_HASKELL__
 
-#include "MachDeps.h"
+#include "../includes/MachDeps.h"
 #ifndef SIZEOF_HSINT
 #define SIZEOF_HSINT  INT_SIZE_IN_BYTES
 #endif

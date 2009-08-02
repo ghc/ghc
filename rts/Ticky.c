@@ -11,8 +11,8 @@
 #define TICKY_C			/* define those variables */
 #include "PosixSource.h"
 #include "Rts.h"
+
 #include "TickyCounters.h"
-#include "RtsFlags.h"
 #include "Ticky.h"
 
 /* -----------------------------------------------------------------------------

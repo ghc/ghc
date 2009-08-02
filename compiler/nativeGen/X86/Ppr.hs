@@ -466,7 +466,7 @@ pprDataItem lit
 	-- all such offsets will fit into 32 bits, so we have to stick
 	-- to 32-bit offset fields and modify the RTS appropriately
         --
-        -- See Note [x86-64-relative] in includes/InfoTables.h
+        -- See Note [x86-64-relative] in includes/rts/storage/InfoTables.h
 	-- 
 	ppr_item II64  x 
 	   | isRelativeReloc x =

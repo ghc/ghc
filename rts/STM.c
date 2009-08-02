@@ -74,25 +74,24 @@
  * (d) release the locks on the TVars, writing updates to them in the case of a 
  * commit, (e) unlock the STM.
  *
- * Queues of waiting threads hang off the first_watch_queue_entry field of each
- * TVar.  This may only be manipulated when holding that TVar's lock.  In
- * particular, when a thread is putting itself to sleep, it mustn't release
- * the TVar's lock until it has added itself to the wait queue and marked its
- * TSO as BlockedOnSTM -- this makes sure that other threads will know to wake it.
+ * Queues of waiting threads hang off the first_watch_queue_entry
+ * field of each TVar.  This may only be manipulated when holding that
+ * TVar's lock.  In particular, when a thread is putting itself to
+ * sleep, it mustn't release the TVar's lock until it has added itself
+ * to the wait queue and marked its TSO as BlockedOnSTM -- this makes
+ * sure that other threads will know to wake it.
  *
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
 #include "RtsUtils.h"
-#include "Storage.h"
 #include "Schedule.h"
-#include "SMP.h"
 #include "STM.h"
 #include "Trace.h"
+#include "Threads.h"
 
-#include <stdlib.h>
 #include <stdio.h>
 
 #define TRUE 1

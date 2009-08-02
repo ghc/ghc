@@ -11,8 +11,15 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef GC_H
-#define GC_H
+#ifndef SM_GC_H
+#define SM_GC_H
+
+void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap);
+
+typedef void (*evac_fn)(void *user, StgClosure **root);
+
+StgClosure * isAlive      ( StgClosure *p );
+void         markCAFs     ( evac_fn evac, void *user );
 
 extern nat N;
 extern rtsBool major_gc;
@@ -45,9 +52,12 @@ extern StgWord64 whitehole_spin;
 void gcWorkerThread (Capability *cap);
 void initGcThreads (void);
 void freeGcThreads (void);
+
+#if defined(THREADED_RTS)
 void waitForGcThreads (Capability *cap);
 void releaseGCThreads (Capability *cap);
+#endif
 
 #define WORK_UNIT_WORDS 128
 
-#endif /* GC_H */
+#endif /* SM_GC_H */

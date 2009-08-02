@@ -11,28 +11,23 @@
  *
  * ---------------------------------------------------------------------------*/
 
-// #include "PosixSource.h"
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+#include "HsFFI.h"
+
+#include "Storage.h"
 #include "RtsUtils.h"
 #include "Apply.h"
-#include "OSThreads.h"
-#include "LdvProfile.h"
 #include "Updates.h"
 #include "Stats.h"
 #include "Schedule.h"
 #include "Sanity.h"
 #include "BlockAlloc.h"
-#include "MBlock.h"
 #include "ProfHeap.h"
-#include "SchedAPI.h"
 #include "Weak.h"
 #include "Prelude.h"
-#include "ParTicky.h"		// ToDo: move into Rts.h
 #include "RtsSignals.h"
 #include "STM.h"
-#include "HsFFI.h"
-#include "Linker.h"
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
@@ -40,6 +35,7 @@
 #include "RetainerProfile.h"
 #include "RaiseAsync.h"
 #include "Papi.h"
+#include "Stable.h"
 
 #include "GC.h"
 #include "GCThread.h"
@@ -1112,10 +1108,11 @@ gcWorkerThread (Capability *cap)
 
 #endif
 
+#if defined(THREADED_RTS)
+
 void
 waitForGcThreads (Capability *cap USED_IF_THREADS)
 {
-#if defined(THREADED_RTS)
     nat n_threads = RtsFlags.ParFlags.nNodes;
     nat me = cap->no;
     nat i, j;
@@ -1141,8 +1138,9 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
             if (!retry) break;
         }
     }
-#endif
 }
+
+#endif // THREADED_RTS
 
 static void
 start_gc_threads (void)
@@ -1185,10 +1183,10 @@ shutdown_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
 #endif
 }
 
+#if defined(THREADED_RTS)
 void
 releaseGCThreads (Capability *cap USED_IF_THREADS)
 {
-#if defined(THREADED_RTS)
     nat n_threads = RtsFlags.ParFlags.nNodes;
     nat me = cap->no;
     nat i;
@@ -1201,8 +1199,8 @@ releaseGCThreads (Capability *cap USED_IF_THREADS)
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->gc_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->mut_spin);
     }
-#endif
 }
+#endif
 
 /* ----------------------------------------------------------------------------
    Initialise a generation that is to be collected 

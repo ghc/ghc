@@ -313,7 +313,7 @@ mkVirtHeapOffsets is_thunk things
 -------------------------------------------------------------------------
 
 -- bring in ARG_P, ARG_N, etc.
-#include "../includes/StgFun.h"
+#include "../includes/rts/storage/FunTypes.h"
 
 -------------------------
 -- argDescrType :: ArgDescr -> StgHalfWord

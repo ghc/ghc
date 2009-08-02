@@ -6,8 +6,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_SIGNALS_H
-#define RTS_SIGNALS_H
+#ifndef RTSSIGNALS_H
+#define RTSSIGNALS_H
 
 #if !defined(mingw32_HOST_OS)
 
@@ -17,12 +17,11 @@
 
 #include "win32/ConsoleHandler.h"
 
-#else /* PAR */
+#else
 
 #define signals_pending() (rtsFalse)
 
-#endif /* PAR */
-
+#endif
 
 #if RTS_USER_SIGNALS
 
@@ -78,4 +77,4 @@ extern void markSignalHandlers (evac_fn evac, void *user);
 
 #endif /* RTS_USER_SIGNALS */
 
-#endif /* RTS_SIGNALS_H */
+#endif /* RTSSIGNALS_H */

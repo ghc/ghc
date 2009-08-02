@@ -7,10 +7,9 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
-
 #include "Rts.h"
 #include "RtsAPI.h"
-#include "RtsFlags.h"
+
 #include "RtsUtils.h"
 #include "Ticky.h"
 #include "Schedule.h"
@@ -284,22 +283,6 @@ heapOverflow(void)
 }
 
 /* -----------------------------------------------------------------------------
-   Out-of-line strlen.
-
-   Used in addr2Integer because the C compiler on x86 chokes on
-   strlen, trying to inline it with not enough registers available.
-   -------------------------------------------------------------------------- */
-
-nat stg_strlen(char *s)
-{
-   char *p = s;
-
-   while (*p) p++;
-   return p-s;
-}
-
-
-/* -----------------------------------------------------------------------------
    genSym stuff, used by GHC itself for its splitting unique supply.
 
    ToDo: put this somewhere sensible.
@@ -341,44 +324,6 @@ time_str(void)
     }
     return nowstr;
 }
-
-/* -----------------------------------------------------------------------------
- * Reset a file handle to blocking mode.  We do this for the standard
- * file descriptors before exiting, because the shell doesn't always
- * clean up for us.
- * -------------------------------------------------------------------------- */
-
-#if !defined(mingw32_HOST_OS)
-void
-resetNonBlockingFd(int fd)
-{
-  long fd_flags;
-
-  /* clear the non-blocking flag on this file descriptor */
-  fd_flags = fcntl(fd, F_GETFL);
-  if (fd_flags & O_NONBLOCK) {
-    fcntl(fd, F_SETFL, fd_flags & ~O_NONBLOCK);
-  }
-}
-
-void
-setNonBlockingFd(int fd)
-{
-  long fd_flags;
-
-  /* clear the non-blocking flag on this file descriptor */
-  fd_flags = fcntl(fd, F_GETFL);
-  if (!(fd_flags & O_NONBLOCK)) {
-    fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK);
-  }
-}
-#else
-/* Stub defns -- async / non-blocking IO is not done 
- * via O_NONBLOCK and select() under Win32. 
- */
-void resetNonBlockingFd(int fd STG_UNUSED) {}
-void setNonBlockingFd(int fd STG_UNUSED) {}
-#endif
 
 /* -----------------------------------------------------------------------------
    Print large numbers, with punctuation.

@@ -4,7 +4,9 @@ places in the GHC library.
 */
 
 #include "Rts.h"
+#if __GLASGOW_HASKELL__ <= 610
 #include "RtsFlags.h"
+#endif
 
 #include "HsFFI.h"
 
@@ -20,19 +22,19 @@ and causes gcc to require too many registers on x84
 */
 
 HsInt
-ghc_strlen( HsAddr a )
+ghc_strlen( HsPtr a )
 {
     return (strlen((char *)a));
 }
 
 HsInt
-ghc_memcmp( HsAddr a1, HsAddr a2, HsInt len )
+ghc_memcmp( HsPtr a1, HsPtr a2, HsInt len )
 {
     return (memcmp((char *)a1, a2, len));
 }
 
 HsInt
-ghc_memcmp_off( HsAddr a1, HsInt i, HsAddr a2, HsInt len )
+ghc_memcmp_off( HsPtr a1, HsInt i, HsPtr a2, HsInt len )
 {
     return (memcmp((char *)a1 + i, a2, len));
 }

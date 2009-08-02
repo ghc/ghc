@@ -4,6 +4,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
 
 /* Note: by the time this hook has been called, Haskell land

@@ -6,12 +6,12 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* This is non-posix compliant. */
-/* #include "PosixSource.h" */
+// This is non-posix compliant.
+// #include "PosixSource.h"
 
 #include "Rts.h"
-#include "OSMem.h"
-#include "RtsFlags.h"
+
+#include "sm/OSMem.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -138,7 +138,7 @@ static void *
 gen_map_mblocks (lnat size)
 {
     int slop;
-    void *ret;
+    StgWord8 *ret;
 
     // Try to map a larger block, and take the aligned portion from
     // it (unmap the rest).

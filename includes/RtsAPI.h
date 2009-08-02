@@ -26,7 +26,7 @@ typedef enum {
     HeapExhausted /* out of memory */
 } SchedulerStatus;
 
-typedef StgClosure *HaskellObj;
+typedef struct StgClosure_ *HaskellObj;
 
 /*
  * An abstract type representing the token returned by rts_lock() and

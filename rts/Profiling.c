@@ -10,15 +10,13 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
 #include "RtsUtils.h"
-#include "RtsFlags.h"
 #include "Profiling.h"
 #include "Proftimer.h"
-#include "Timer.h"
 #include "ProfHeap.h"
 #include "Arena.h"
 #include "RetainerProfile.h"
-#include "LdvProfile.h"
 
 #include <string.h>
 

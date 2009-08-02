@@ -13,9 +13,10 @@
 #define _GNU_SOURCE
 #endif
 
+#include "PosixSource.h"
 #include "Rts.h"
+
 #if defined(THREADED_RTS)
-#include "OSThreads.h"
 #include "RtsUtils.h"
 #include "Task.h"
 

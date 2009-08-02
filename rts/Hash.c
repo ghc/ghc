@@ -10,10 +10,10 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
 #include "Hash.h"
 #include "RtsUtils.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 #define HSEGSIZE    1024    /* Size of a single hash table segment */

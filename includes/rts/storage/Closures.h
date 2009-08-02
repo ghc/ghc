@@ -1,0 +1,417 @@
+/* ----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Closures
+ *
+ * -------------------------------------------------------------------------- */
+
+#ifndef RTS_STORAGE_CLOSURES_H
+#define RTS_STORAGE_CLOSURES_H
+
+/*
+ * The Layout of a closure header depends on which kind of system we're
+ * compiling for: profiling, parallel, ticky, etc.
+ */
+
+/* -----------------------------------------------------------------------------
+   The profiling header
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+  CostCentreStack *ccs;
+  union {
+    struct _RetainerSet *rs;  /* Retainer Set */
+    StgWord ldvw;             /* Lag/Drag/Void Word */
+  } hp;
+} StgProfHeader;
+
+/* -----------------------------------------------------------------------------
+   The SMP header
+   
+   A thunk has a padding word to take the updated value.  This is so
+   that the update doesn't overwrite the payload, so we can avoid
+   needing to lock the thunk during entry and update.
+   
+   Note: this doesn't apply to THUNK_STATICs, which have no payload.
+
+   Note: we leave this padding word in all ways, rather than just SMP,
+   so that we don't have to recompile all our libraries for SMP.
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+    StgWord pad;
+} StgSMPThunkHeader;
+
+/* -----------------------------------------------------------------------------
+   The full fixed-size closure header
+
+   The size of the fixed header is the sum of the optional parts plus a single
+   word for the entry code pointer.
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+    const StgInfoTable* info;
+#ifdef PROFILING
+    StgProfHeader         prof;
+#endif
+} StgHeader;
+
+typedef struct {
+    const StgInfoTable* info;
+#ifdef PROFILING
+    StgProfHeader         prof;
+#endif
+    StgSMPThunkHeader     smp;
+} StgThunkHeader;
+
+#define THUNK_EXTRA_HEADER_W (sizeofW(StgThunkHeader)-sizeofW(StgHeader))
+
+/* -----------------------------------------------------------------------------
+   Closure Types
+
+   For any given closure type (defined in InfoTables.h), there is a
+   corresponding structure defined below.  The name of the structure
+   is obtained by concatenating the closure type with '_closure'
+   -------------------------------------------------------------------------- */
+
+/* All closures follow the generic format */
+
+typedef struct StgClosure_ {
+    StgHeader   header;
+    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
+} *StgClosurePtr; // StgClosure defined in Rts.h
+
+typedef struct {
+    StgThunkHeader  header;
+    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
+} StgThunk;
+
+typedef struct {
+    StgThunkHeader   header;
+    StgClosure *selectee;
+} StgSelector;
+
+typedef struct {
+    StgHeader   header;
+    StgHalfWord arity;		/* zero if it is an AP */
+    StgHalfWord n_args;
+    StgClosure *fun;		/* really points to a fun */
+    StgClosure *payload[FLEXIBLE_ARRAY];
+} StgPAP;
+
+typedef struct {
+    StgThunkHeader   header;
+    StgHalfWord arity;		/* zero if it is an AP */
+    StgHalfWord n_args;
+    StgClosure *fun;		/* really points to a fun */
+    StgClosure *payload[FLEXIBLE_ARRAY];
+} StgAP;
+
+typedef struct {
+    StgThunkHeader   header;
+    StgWord     size;                    /* number of words in payload */
+    StgClosure *fun;
+    StgClosure *payload[FLEXIBLE_ARRAY]; /* contains a chunk of *stack* */
+} StgAP_STACK;
+
+typedef struct {
+    StgHeader   header;
+    StgClosure *indirectee;
+} StgInd;
+
+typedef struct {
+    StgHeader     header;
+    StgClosure   *indirectee;
+    StgClosure   *static_link;
+    StgInfoTable *saved_info;
+} StgIndStatic;
+
+typedef struct {
+    StgHeader  header;
+    StgWord    words;
+    StgWord    payload[FLEXIBLE_ARRAY];
+} StgArrWords;
+
+typedef struct {
+    StgHeader   header;
+    StgWord     ptrs;
+    StgClosure *payload[FLEXIBLE_ARRAY];
+} StgMutArrPtrs;
+
+typedef struct {
+    StgHeader   header;
+    StgClosure *var;
+} StgMutVar;
+
+typedef struct _StgUpdateFrame {
+    StgHeader  header;
+    StgClosure *updatee;
+} StgUpdateFrame;
+
+typedef struct {
+    StgHeader  header;
+    StgInt      exceptions_blocked;
+    StgClosure *handler;
+} StgCatchFrame;
+
+typedef struct {
+    StgHeader  header;
+} StgStopFrame;  
+
+typedef struct {
+  StgHeader header;
+  StgWord data;
+} StgIntCharlikeClosure;
+
+/* statically allocated */
+typedef struct {
+  StgHeader  header;
+} StgRetry;
+
+typedef struct _StgStableName {
+  StgHeader      header;
+  StgWord        sn;
+} StgStableName;
+
+typedef struct _StgWeak {	/* Weak v */
+  StgHeader header;
+  StgClosure *cfinalizer;
+  StgClosure *key;
+  StgClosure *value;		/* v */
+  StgClosure *finalizer;
+  struct _StgWeak *link;
+} StgWeak;
+
+typedef struct _StgDeadWeak {	/* Weak v */
+  StgHeader header;
+  struct _StgWeak *link;
+} StgDeadWeak;
+
+/* Byte code objects.  These are fixed size objects with pointers to
+ * four arrays, designed so that a BCO can be easily "re-linked" to
+ * other BCOs, to facilitate GHC's intelligent recompilation.  The
+ * array of instructions is static and not re-generated when the BCO
+ * is re-linked, but the other 3 arrays will be regenerated.
+ *
+ * A BCO represents either a function or a stack frame.  In each case,
+ * it needs a bitmap to describe to the garbage collector the
+ * pointerhood of its arguments/free variables respectively, and in
+ * the case of a function it also needs an arity.  These are stored
+ * directly in the BCO, rather than in the instrs array, for two
+ * reasons:
+ * (a) speed: we need to get at the bitmap info quickly when
+ *     the GC is examining APs and PAPs that point to this BCO
+ * (b) a subtle interaction with the compacting GC.  In compacting
+ *     GC, the info that describes the size/layout of a closure
+ *     cannot be in an object more than one level of indirection
+ *     away from the current object, because of the order in
+ *     which pointers are updated to point to their new locations.
+ */
+
+typedef struct {
+    StgHeader      header;
+    StgArrWords   *instrs;	/* a pointer to an ArrWords */
+    StgArrWords   *literals;	/* a pointer to an ArrWords */
+    StgMutArrPtrs *ptrs;	/* a pointer to a  MutArrPtrs */
+    StgHalfWord   arity;        /* arity of this BCO */
+    StgHalfWord   size;         /* size of this BCO (in words) */
+    StgWord       bitmap[FLEXIBLE_ARRAY];  /* an StgLargeBitmap */
+} StgBCO;
+
+#define BCO_BITMAP(bco)      ((StgLargeBitmap *)((StgBCO *)(bco))->bitmap)
+#define BCO_BITMAP_SIZE(bco) (BCO_BITMAP(bco)->size)
+#define BCO_BITMAP_BITS(bco) (BCO_BITMAP(bco)->bitmap)
+#define BCO_BITMAP_SIZEW(bco) ((BCO_BITMAP_SIZE(bco) + BITS_IN(StgWord) - 1) \
+			        / BITS_IN(StgWord))
+
+/* -----------------------------------------------------------------------------
+   Dynamic stack frames for generic heap checks.
+
+   These generic heap checks are slow, but have the advantage of being
+   usable in a variety of situations.
+
+   The one restriction is that any relevant SRTs must already be pointed
+   to from the stack.  The return address doesn't need to have an info
+   table attached: hence it can be any old code pointer.
+
+   The liveness mask contains a 1 at bit n, if register Rn contains a
+   non-pointer.  The contents of all 8 vanilla registers are always saved
+   on the stack; the liveness mask tells the GC which ones contain
+   pointers.
+
+   Good places to use a generic heap check: 
+
+        - case alternatives (the return address with an SRT is already
+	  on the stack).
+
+	- primitives (no SRT required).
+
+   The stack frame layout for a RET_DYN is like this:
+
+          some pointers         |-- RET_DYN_PTRS(liveness) words
+          some nonpointers      |-- RET_DYN_NONPTRS(liveness) words
+			       
+	  L1                    \
+          D1-2                  |-- RET_DYN_NONPTR_REGS_SIZE words
+	  F1-4                  /
+			       
+	  R1-8                  |-- RET_DYN_BITMAP_SIZE words
+			       
+	  return address        \
+	  liveness mask         |-- StgRetDyn structure
+	  stg_gen_chk_info      /
+
+   we assume that the size of a double is always 2 pointers (wasting a
+   word when it is only one pointer, but avoiding lots of #ifdefs).
+
+   See Liveness.h for the macros (RET_DYN_PTRS() etc.).
+
+   NOTE: if you change the layout of RET_DYN stack frames, then you
+   might also need to adjust the value of RESERVED_STACK_WORDS in
+   Constants.h.
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+    const StgInfoTable* info;
+    StgWord        liveness;
+    StgWord        ret_addr;
+    StgClosure *   payload[FLEXIBLE_ARRAY];
+} StgRetDyn;
+
+/* A function return stack frame: used when saving the state for a
+ * garbage collection at a function entry point.  The function
+ * arguments are on the stack, and we also save the function (its
+ * info table describes the pointerhood of the arguments).
+ *
+ * The stack frame size is also cached in the frame for convenience.
+ */
+typedef struct {
+    const StgInfoTable* info;
+    StgWord        size;
+    StgClosure *   fun;
+    StgClosure *   payload[FLEXIBLE_ARRAY];
+} StgRetFun;
+
+/* Concurrent communication objects */
+
+typedef struct {
+  StgHeader       header;
+  struct StgTSO_ *head;
+  struct StgTSO_ *tail;
+  StgClosure*     value;
+} StgMVar;
+
+
+/* STM data structures
+ *
+ *  StgTVar defines the only type that can be updated through the STM
+ *  interface.
+ * 
+ *  Note that various optimisations may be possible in order to use less
+ *  space for these data structures at the cost of more complexity in the
+ *  implementation:
+ *
+ *   - In StgTVar, current_value and first_watch_queue_entry could be held in
+ *     the same field: if any thread is waiting then its expected_value for
+ *     the tvar is the current value.  
+ *
+ *   - In StgTRecHeader, it might be worthwhile having separate chunks
+ *     of read-only and read-write locations.  This would save a
+ *     new_value field in the read-only locations.
+ *
+ *   - In StgAtomicallyFrame, we could combine the waiting bit into
+ *     the header (maybe a different info tbl for a waiting transaction).
+ *     This means we can specialise the code for the atomically frame
+ *     (it immediately switches on frame->waiting anyway).
+ */
+
+typedef struct StgTRecHeader_ StgTRecHeader;
+
+typedef struct StgTVarWatchQueue_ {
+  StgHeader                  header;
+  StgClosure                *closure; // StgTSO or StgAtomicInvariant
+  struct StgTVarWatchQueue_ *next_queue_entry;
+  struct StgTVarWatchQueue_ *prev_queue_entry;
+} StgTVarWatchQueue;
+
+typedef struct {
+  StgHeader                  header;
+  StgClosure                *volatile current_value;
+  StgTVarWatchQueue         *volatile first_watch_queue_entry;
+#if defined(THREADED_RTS)
+  StgInt                     volatile num_updates;
+#endif
+} StgTVar;
+
+typedef struct {
+  StgHeader      header;
+  StgClosure    *code;
+  StgTRecHeader *last_execution;
+  StgWord        lock;
+} StgAtomicInvariant;
+
+/* new_value == expected_value for read-only accesses */
+/* new_value is a StgTVarWatchQueue entry when trec in state TREC_WAITING */
+typedef struct {
+  StgTVar                   *tvar;
+  StgClosure                *expected_value;
+  StgClosure                *new_value; 
+#if defined(THREADED_RTS)
+  StgInt                     num_updates;
+#endif
+} TRecEntry;
+
+#define TREC_CHUNK_NUM_ENTRIES 16
+
+typedef struct StgTRecChunk_ {
+  StgHeader                  header;
+  struct StgTRecChunk_      *prev_chunk;
+  StgWord                    next_entry_idx;
+  TRecEntry                  entries[TREC_CHUNK_NUM_ENTRIES];
+} StgTRecChunk;
+
+typedef enum { 
+  TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
+  TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
+  TREC_COMMITTED,     /* Transaction has committed, now updating tvars */
+  TREC_ABORTED,       /* Transaction has aborted, now reverting tvars */
+  TREC_WAITING,       /* Transaction currently waiting */
+} TRecState;
+
+typedef struct StgInvariantCheckQueue_ {
+  StgHeader                       header;
+  StgAtomicInvariant             *invariant;
+  StgTRecHeader                  *my_execution;
+  struct StgInvariantCheckQueue_ *next_queue_entry;
+} StgInvariantCheckQueue;
+
+struct StgTRecHeader_ {
+  StgHeader                  header;
+  TRecState                  state;
+  struct StgTRecHeader_     *enclosing_trec;
+  StgTRecChunk              *current_chunk;
+  StgInvariantCheckQueue    *invariants_to_check;
+};
+
+typedef struct {
+  StgHeader   header;
+  StgClosure *code;
+  StgTVarWatchQueue *next_invariant_to_check;
+  StgClosure *result;
+} StgAtomicallyFrame;
+
+typedef struct {
+  StgHeader   header;
+  StgClosure *code;
+  StgClosure *handler;
+} StgCatchSTMFrame;
+
+typedef struct {
+  StgHeader      header;
+  StgBool        running_alt_code;
+  StgClosure    *first_code;
+  StgClosure    *alt_code;
+} StgCatchRetryFrame;
+
+#endif /* RTS_STORAGE_CLOSURES_H */

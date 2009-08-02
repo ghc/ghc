@@ -8,13 +8,12 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "RtsAPI.h"
+
 #include "RtsUtils.h"
-#include "SchedAPI.h"
-#include "RtsFlags.h"
 #include "Weak.h"
 #include "Schedule.h"
 #include "Prelude.h"
-#include "RtsAPI.h"
 #include "Trace.h"
 
 // ForeignPtrs with C finalizers rely on weak pointers inside weak_ptr_list
@@ -26,7 +25,7 @@ StgWeak *weak_ptr_list;
 rtsBool running_finalizers = rtsFalse;
 
 void
-runCFinalizer(StgVoid *fn, StgVoid *ptr, StgVoid *env, StgWord flag)
+runCFinalizer(void *fn, void *ptr, void *env, StgWord flag)
 {
     if (flag)
 	((void (*)(void *, void *))fn)(env, ptr);
@@ -47,9 +46,9 @@ runAllCFinalizers(StgWeak *list)
 	farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
 
 	if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-	    runCFinalizer((StgVoid *)farr->payload[0],
-	                  (StgVoid *)farr->payload[1],
-	                  (StgVoid *)farr->payload[2],
+	    runCFinalizer((void *)farr->payload[0],
+	                  (void *)farr->payload[1],
+	                  (void *)farr->payload[2],
 	                  farr->payload[3]);
     }
 
@@ -97,9 +96,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 	farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
 
 	if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-	    runCFinalizer((StgVoid *)farr->payload[0],
-	                  (StgVoid *)farr->payload[1],
-	                  (StgVoid *)farr->payload[2],
+	    runCFinalizer((void *)farr->payload[0],
+	                  (void *)farr->payload[1],
+	                  (void *)farr->payload[2],
 	                  farr->payload[3]);
 
 #ifdef PROFILING

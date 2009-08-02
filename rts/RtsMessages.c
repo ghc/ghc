@@ -128,7 +128,7 @@ isGUIApp(void)
 #define xstr(s) str(s)
 #define str(s) #s
 
-void
+void GNU_ATTRIBUTE(__noreturn__)
 rtsFatalInternalErrorFn(const char *s, va_list ap)
 {
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)

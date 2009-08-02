@@ -50,7 +50,7 @@ module CgUtils (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/MachRegs.h"
+#include "../includes/stg/MachRegs.h"
 
 import BlockId
 import CgMonad

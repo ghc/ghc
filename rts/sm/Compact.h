@@ -11,8 +11,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef GCCOMPACT_H
-#define GCCOMPACT_H
+#ifndef SM_COMPACT_H
+#define SM_COMPACT_H
 
 INLINE_HEADER rtsBool
 mark_stack_empty(void)
@@ -76,4 +76,4 @@ is_marked(StgPtr p, bdescr *bd)
 
 extern void compact (StgClosure *static_objects);
 
-#endif /* GCCOMPACT_H */
+#endif /* SM_COMPACT_H */

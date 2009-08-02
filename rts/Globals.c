@@ -9,8 +9,11 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsGlobals.h"
+
+#include "Globals.h"
+#include "Stable.h"
 
 static StgStablePtr typeableStore      = 0;
 static StgStablePtr signalHandlerStore = 0;

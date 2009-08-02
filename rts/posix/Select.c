@@ -6,19 +6,16 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* we're outside the realms of POSIX here... */
-/* #include "PosixSource.h" */
-
+#include "PosixSource.h"
 #include "Rts.h"
-#include "Storage.h"
+
+#include "Signals.h"
 #include "Schedule.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
-#include "Timer.h"
 #include "Itimer.h"
-#include "Signals.h"
 #include "Capability.h"
-#include "posix/Select.h"
+#include "Select.h"
+#include "AwaitEvent.h"
 
 # ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>

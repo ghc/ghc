@@ -8,10 +8,8 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "SchedAPI.h"
-#include "Storage.h"
+
 #include "Threads.h"
-#include "RtsFlags.h"
 #include "STM.h"
 #include "Schedule.h"
 #include "Trace.h"

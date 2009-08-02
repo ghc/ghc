@@ -34,7 +34,6 @@
 
 #include "PosixSource.h"
 
-
 /*
  * We define the following (unused) global register variables, because for
  * some reason gcc generates sub-optimal code for StgRun() on the Alpha
@@ -70,9 +69,8 @@ register double fake_f9 __asm__("$f9");
 #define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
+
 #include "StgRun.h"
-#include "RtsFlags.h"
-#include "OSThreads.h"
 #include "Capability.h"
 
 #ifdef DEBUG

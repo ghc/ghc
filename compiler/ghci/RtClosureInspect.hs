@@ -165,7 +165,7 @@ data Closure = Closure { tipe         :: ClosureType
 instance Outputable ClosureType where
   ppr = text . show 
 
-#include "../includes/ClosureTypes.h"
+#include "../includes/rts/storage/ClosureTypes.h"
 
 aP_CODE, pAP_CODE :: Int
 aP_CODE = AP

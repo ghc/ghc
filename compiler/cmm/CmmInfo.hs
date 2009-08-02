@@ -58,7 +58,7 @@ cmmToRawCmm cmm = do
 --	<normal forward rest of StgInfoTable>
 --	<forward variable part>
 --
---	See includes/InfoTables.h
+--	See includes/rts/storage/InfoTables.h
 --
 -- For return-points these are as follows
 --

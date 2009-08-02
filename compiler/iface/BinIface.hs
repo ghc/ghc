@@ -206,7 +206,7 @@ initBinMemSize :: Int
 initBinMemSize = 1024 * 1024
 
 -- The *host* architecture version:
-#include "MachDeps.h"
+#include "../includes/MachDeps.h"
 
 binaryInterfaceMagic :: Word32
 #if   WORD_SIZE_IN_BITS == 32

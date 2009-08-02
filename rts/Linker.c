@@ -18,17 +18,19 @@
 #endif
 
 #include "Rts.h"
-#include "RtsFlags.h"
 #include "HsFFI.h"
+
+#include "sm/Storage.h"
 #include "Hash.h"
-#include "Linker.h"
 #include "LinkerInternals.h"
 #include "RtsUtils.h"
-#include "Schedule.h"
-#include "Sparks.h"
-#include "RtsGlobals.h"
-#include "Timer.h"
 #include "Trace.h"
+#include "StgPrimFloat.h" // for __int_encodeFloat etc.
+#include "Stable.h"
+
+#if !defined(mingw32_HOST_OS)
+#include "posix/Signals.h"
+#endif
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -230,8 +232,8 @@ typedef struct _RtsSymbolVal {
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
       SymI_HasProto(shutdownHaskellAndSignal)	\
-      SymI_NeedsProto(lockFile)                 \
-      SymI_NeedsProto(unlockFile)               \
+      SymI_HasProto(lockFile)                   \
+      SymI_HasProto(unlockFile)                 \
       SymI_HasProto(signal_handlers)		\
       SymI_HasProto(stg_sig_install)		\
       SymI_NeedsProto(nocldstop)
@@ -613,7 +615,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(forkProcess)			\
       SymI_HasProto(forkOS_createThread)		\
       SymI_HasProto(freeHaskellFunctionPtr)		\
-      SymI_HasProto(freeStablePtr)		        \
       SymI_HasProto(getOrSetTypeableStore)		\
       SymI_HasProto(getOrSetSignalHandlerStore)		\
       SymI_HasProto(genSymZh)				\
@@ -635,15 +636,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(getApStackValzh_fast)               \
       SymI_HasProto(getSparkzh_fast)                    \
       SymI_HasProto(isCurrentThreadBoundzh_fast)	\
-      SymI_HasProto(isDoubleDenormalized)		\
-      SymI_HasProto(isDoubleInfinite)			\
-      SymI_HasProto(isDoubleNaN)			\
-      SymI_HasProto(isDoubleNegativeZero)		\
       SymI_HasProto(isEmptyMVarzh_fast)			\
-      SymI_HasProto(isFloatDenormalized)		\
-      SymI_HasProto(isFloatInfinite)			\
-      SymI_HasProto(isFloatNaN)				\
-      SymI_HasProto(isFloatNegativeZero)		\
       SymI_HasProto(killThreadzh_fast)			\
       SymI_HasProto(loadObj)          			\
       SymI_HasProto(insertStableSymbol) 		\
@@ -674,7 +667,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(raiseIOzh_fast)			\
       SymI_HasProto(readTVarzh_fast)			\
       SymI_HasProto(readTVarIOzh_fast)			\
-      SymI_HasProto(resetNonBlockingFd)			\
       SymI_HasProto(resumeThread)			\
       SymI_HasProto(resolveObjs)                        \
       SymI_HasProto(retryzh_fast)                       \
@@ -735,7 +727,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stackOverflow)			\
       SymI_HasProto(stg_CAF_BLACKHOLE_info)		\
       SymI_HasProto(__stg_EAGER_BLACKHOLE_info)		\
-      SymI_HasProto(awakenBlockedQueue)			\
       SymI_HasProto(startTimer)                         \
       SymI_HasProto(stg_CHARLIKE_closure)		\
       SymI_HasProto(stg_MVAR_CLEAN_info)		\

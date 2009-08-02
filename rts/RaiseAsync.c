@@ -8,17 +8,17 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
+#include "sm/Storage.h"
 #include "Threads.h"
 #include "Trace.h"
 #include "RaiseAsync.h"
-#include "SMP.h"
 #include "Schedule.h"
-#include "LdvProfile.h"
 #include "Updates.h"
 #include "STM.h"
 #include "Sanity.h"
 #include "Profiling.h"
-#include "EventLog.h"
+#include "eventlog/EventLog.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
 #endif

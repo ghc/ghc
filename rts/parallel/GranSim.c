@@ -1,5 +1,5 @@
 /* 
-   Time-stamp: <2006-10-19 15:12:58 simonmar>
+   Time-stamp: <2009-07-06 21:48:36 simonmar>
 
    Variables and functions specific to GranSim the parallelism simulator
    for GPH.
@@ -40,6 +40,8 @@
 //@node Includes, Prototypes and externs, GranSim specific code, GranSim specific code
 //@subsection Includes
 
+#if defined(GRAN)
+
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
@@ -57,8 +59,6 @@
 
 //@node Prototypes and externs, Constants and Variables, Includes, GranSim specific code
 //@subsection Prototypes and externs
-
-#if defined(GRAN)
 
 /* Prototypes */
 static inline PEs      ga_to_proc(StgWord);

@@ -2,15 +2,15 @@
  * (c)2006 Galois Connections, Inc.
  */ 
 
+#include "PosixSource.h"
+#include "Rts.h"
+
+#include "Trace.h"
+
 #include <stdio.h>
 #include <ctype.h>
-#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
-#include "Rts.h"
-#include "Hpc.h"
-#include "Trace.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -49,7 +49,8 @@ int totalTixes = 0;		// total number of tix boxes.
 
 static char *tixFilename;
 
-static void failure(char *msg) {
+static void GNU_ATTRIBUTE(__noreturn__)
+failure(char *msg) {
   debugTrace(DEBUG_hpc,"hpc failure: %s\n",msg);
   fprintf(stderr,"Hpc failure: %s\n",msg);
   if (tixFilename) {

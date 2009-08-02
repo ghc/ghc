@@ -6,4 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-extern void PrintTickyInfo(void);
+#ifndef TICKY_H
+#define TICKY_H
+
+void PrintTickyInfo(void);
+
+#endif /* TICKY_H */

@@ -6,17 +6,16 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
 #include "RtsUtils.h"
-#include "MBlock.h"
-#include "Storage.h"
 #include "Schedule.h"
 #include "Stats.h"
-#include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
 #include "GetTime.h"
-#include "GC.h"
+#include "sm/Storage.h"
+#include "sm/GC.h" // gc_alloc_block_sync, whitehole_spin
 
 #if USE_PAPI
 #include "Papi.h"
@@ -506,20 +505,10 @@ stat_endHeapCensus(void)
    -------------------------------------------------------------------------- */
 
 #ifdef DEBUG
-#define TICK_VAR(arity) \
-  extern StgInt SLOW_CALLS_##arity; \
-  extern StgInt RIGHT_ARITY_##arity; \
-  extern StgInt TAGGED_PTR_##arity;
-
 #define TICK_VAR_INI(arity) \
   StgInt SLOW_CALLS_##arity = 1; \
   StgInt RIGHT_ARITY_##arity = 1; \
   StgInt TAGGED_PTR_##arity = 0;
-
-extern StgInt TOTAL_CALLS;
-
-TICK_VAR(1)
-TICK_VAR(2)
 
 TICK_VAR_INI(1)
 TICK_VAR_INI(2)

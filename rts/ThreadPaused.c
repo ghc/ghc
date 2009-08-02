@@ -6,13 +6,14 @@
  *
  * ---------------------------------------------------------------------------*/
 
+// #include "PosixSource.h"
 #include "Rts.h"
-#include "Storage.h"
-#include "LdvProfile.h"
+
+#include "ThreadPaused.h"
+#include "sm/Storage.h"
 #include "Updates.h"
 #include "RaiseAsync.h"
 #include "Trace.h"
-#include "RtsFlags.h"
 
 #include <string.h> // for memmove()
 
@@ -141,23 +142,23 @@ stackSqueeze(StgTSO *tso, StgPtr bottom)
     // <empty> indicates unused
     //
     {
-	void *sp;
-	void *gap_start, *next_gap_start, *gap_end;
+	StgWord8 *sp;
+	StgWord8 *gap_start, *next_gap_start, *gap_end;
 	nat chunk_size;
 
-	next_gap_start = (void *)((unsigned char*)gap + sizeof(StgUpdateFrame));
+	next_gap_start = (StgWord8*)gap + sizeof(StgUpdateFrame);
 	sp = next_gap_start;
 
 	while ((StgPtr)gap > tso->sp) {
 
 	    // we're working in *bytes* now...
 	    gap_start = next_gap_start;
-	    gap_end = (void*) ((unsigned char*)gap_start - gap->gap_size * sizeof(W_));
+	    gap_end = gap_start - gap->gap_size * sizeof(W_);
 
 	    gap = gap->next_gap;
-	    next_gap_start = (void *)((unsigned char*)gap + sizeof(StgUpdateFrame));
+	    next_gap_start = (StgWord8*)gap + sizeof(StgUpdateFrame);
 
-	    chunk_size = (unsigned char*)gap_end - (unsigned char*)next_gap_start;
+	    chunk_size = gap_end - next_gap_start;
 	    sp -= chunk_size;
 	    memmove(sp, next_gap_start, chunk_size);
 	}

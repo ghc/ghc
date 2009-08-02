@@ -8,12 +8,15 @@
 
 #ifdef EVENTLOG
 
+#include "PosixSource.h"
 #include "Rts.h"
+
 #include "EventLog.h"
 #include "Capability.h"
 #include "Trace.h"
 #include "RtsUtils.h"
 #include "Stats.h"
+
 #include <string.h> 
 #include <stdio.h>
 

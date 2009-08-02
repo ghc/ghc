@@ -7,14 +7,15 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
-
 #include "Rts.h"
-#include "Profiling.h"
-#include "Timer.h"
-#include "Proftimer.h"
-#include "RtsFlags.h"
 
+#include "Profiling.h"
+#include "Proftimer.h"
+
+#ifdef PROFILING
 static rtsBool do_prof_ticks = rtsFalse;       // enable profiling ticks
+#endif
+
 static rtsBool do_heap_prof_ticks = rtsFalse;  // enable heap profiling ticks
 
 // Number of ticks until next heap census
@@ -22,6 +23,8 @@ static int ticks_to_heap_profile;
 
 // Time for a heap profile on the next context switch
 rtsBool performHeapProfile;
+
+#ifdef PROFILING
 
 void
 stopProfTimer( void )
@@ -34,6 +37,8 @@ startProfTimer( void )
 {
     do_prof_ticks = rtsTrue;
 }
+
+#endif
 
 void
 stopHeapProfTimer( void )

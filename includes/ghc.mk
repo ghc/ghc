@@ -33,7 +33,7 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 includes_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
-includes_CC_OPTS += -Iincludes -Irts -Irts/parallel
+includes_CC_OPTS += -Iincludes -Irts
 
 ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP
@@ -129,7 +129,7 @@ includes_dist-derivedconstants_PROG   = mkDerivedConstants$(exeext)
 
 $(eval $(call build-prog,includes,dist-derivedconstants,0))
 
-$(includes_dist-derivedconstants_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM)
+$(includes_dist-derivedconstants_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(wildcard includes/*.h) $(wildcard rts/*.h)
 includes/dist-derivedconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 
 ifneq "$(BINDIST)" "YES"
@@ -159,7 +159,7 @@ includes_dist-ghcconstants_CC_OPTS = -DGEN_HASKELL
 $(eval $(call build-prog,includes,dist-ghcconstants,0))
 
 ifneq "$(BINDIST)" "YES"
-$(includes_dist-ghcconstants_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM)
+$(includes_dist-ghcconstants_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(wildcard includes/*.h) $(wildcard rts/*.h)
 
 includes/dist-ghcconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 

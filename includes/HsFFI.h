@@ -18,8 +18,7 @@ extern "C" {
 
 /* get types from GHC's runtime system */
 #include "ghcconfig.h"
-#include "RtsConfig.h"
-#include "StgTypes.h"
+#include "stg/Types.h"
 
 /* get limits for integral types */
 #ifdef HAVE_STDINT_H
@@ -84,10 +83,7 @@ typedef StgDouble		HsDouble;
 typedef StgInt			HsBool;
 typedef void*			HsPtr;          /* this should better match StgAddr */
 typedef void			(*HsFunPtr)(void); /* this should better match StgAddr */
-typedef void*			HsForeignPtr;   /* ... and this StgForeignPtr       */
 typedef void*			HsStablePtr;
-typedef void*			HsAddr;         /* DEPRECATED */
-typedef void*			HsForeignObj;   /* DEPRECATED */
 
 /* this should correspond to the type of StgChar in StgTypes.h */
 #define HS_CHAR_MIN		0

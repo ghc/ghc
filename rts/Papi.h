@@ -5,6 +5,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#ifndef PAPI_H
+#define PAPI_H
+
 /* Check the error value of a PAPI call, reporting an error, if needed */
 extern int papi_error;
 
@@ -25,3 +28,5 @@ void papi_stop_gc1_count(void);
 // events and aggregate them into the main GC counters.
 void papi_thread_start_gc1_count(int event_set);
 void papi_thread_stop_gc1_count(int event_set);
+
+#endif /* PAPI_H */

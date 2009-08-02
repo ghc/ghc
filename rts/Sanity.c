@@ -18,14 +18,13 @@
 
 #ifdef DEBUG                                                   /* whole file */
 
-#include "RtsFlags.h"
 #include "RtsUtils.h"
-#include "BlockAlloc.h"
+#include "sm/Storage.h"
+#include "sm/BlockAlloc.h"
 #include "Sanity.h"
-#include "MBlock.h"
-#include "Storage.h"
 #include "Schedule.h"
 #include "Apply.h"
+#include "Printer.h"
 
 /* -----------------------------------------------------------------------------
    Forward decls.

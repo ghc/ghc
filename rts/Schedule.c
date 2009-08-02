@@ -9,34 +9,25 @@
 #include "PosixSource.h"
 #define KEEP_LOCKCLOSURE
 #include "Rts.h"
-#include "SchedAPI.h"
+
+#include "sm/Storage.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
-#include "OSThreads.h"
-#include "Storage.h"
 #include "StgRun.h"
-#include "Hooks.h"
 #include "Schedule.h"
-#include "StgMiscClosures.h"
 #include "Interpreter.h"
 #include "Printer.h"
 #include "RtsSignals.h"
 #include "Sanity.h"
 #include "Stats.h"
 #include "STM.h"
-#include "Timer.h"
 #include "Prelude.h"
 #include "ThreadLabels.h"
-#include "LdvProfile.h"
 #include "Updates.h"
 #include "Proftimer.h"
 #include "ProfHeap.h"
-#include "GC.h"
 #include "Weak.h"
-#include "EventLog.h"
-
-/* PARALLEL_HASKELL includes go here */
-
+#include "eventlog/EventLog.h"
+#include "sm/GC.h" // waitForGcThreads, releaseGCThreads, N
 #include "Sparks.h"
 #include "Capability.h"
 #include "Task.h"
@@ -47,7 +38,8 @@
 #include "Trace.h"
 #include "RaiseAsync.h"
 #include "Threads.h"
-#include "ThrIOManager.h"
+#include "Timer.h"
+#include "ThreadPaused.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -62,12 +54,6 @@
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
-#endif
-
-// Turn off inlining when debugging - it obfuscates things
-#ifdef DEBUG
-# undef  STATIC_INLINE
-# define STATIC_INLINE static
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -2383,7 +2369,9 @@ interruptStgRts(void)
 {
     sched_state = SCHED_INTERRUPTING;
     setContextSwitches();
+#if defined(THREADED_RTS)
     wakeUpRts();
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -2399,16 +2387,15 @@ interruptStgRts(void)
    will have interrupted any blocking system call in progress anyway.
    -------------------------------------------------------------------------- */
 
-void
-wakeUpRts(void)
-{
 #if defined(THREADED_RTS)
+void wakeUpRts(void)
+{
     // This forces the IO Manager thread to wakeup, which will
     // in turn ensure that some OS thread wakes up and runs the
     // scheduler loop, which will cause a GC and deadlock check.
     ioManagerWakeup();
-#endif
 }
+#endif
 
 /* -----------------------------------------------------------------------------
  * checkBlackHoles()

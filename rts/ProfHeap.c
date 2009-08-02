@@ -8,20 +8,17 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
 #include "RtsUtils.h"
-#include "RtsFlags.h"
 #include "Profiling.h"
 #include "ProfHeap.h"
 #include "Stats.h"
 #include "Hash.h"
 #include "RetainerProfile.h"
-#include "LdvProfile.h"
 #include "Arena.h"
 #include "Printer.h"
 
 #include <string.h>
-#include <stdlib.h>
-#include <math.h>
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
@@ -94,6 +91,8 @@ static void aggregateCensusInfo( void );
 #endif
 
 static void dumpCensus( Census *census );
+
+static rtsBool closureSatisfiesConstraints( StgClosure* p );
 
 /* ----------------------------------------------------------------------------
    Closure Type Profiling;
@@ -615,7 +614,6 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
     }
     fprintf(fp, "%s", buf);
 }
-#endif /* PROFILING */
 
 rtsBool
 strMatchesSelector( char* str, char* sel )
@@ -641,11 +639,13 @@ strMatchesSelector( char* str, char* sel )
    }
 }
 
+#endif /* PROFILING */
+
 /* -----------------------------------------------------------------------------
  * Figure out whether a closure should be counted in this census, by
  * testing against all the specified constraints.
  * -------------------------------------------------------------------------- */
-rtsBool
+static rtsBool
 closureSatisfiesConstraints( StgClosure* p )
 {
 #if !defined(PROFILING)
@@ -1012,7 +1012,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		
 	    case ARR_WORDS:
 		prim = rtsTrue;
-		size = arr_words_sizeW(stgCast(StgArrWords*,p));
+		size = arr_words_sizeW((StgArrWords*)p);
 		break;
 		
 	    case MUT_ARR_PTRS_CLEAN:

@@ -59,7 +59,7 @@ module Binary
 #include "HsVersions.h"
 
 -- The *host* architecture version:
-#include "MachDeps.h"
+#include "../includes/MachDeps.h"
 
 import {-# SOURCE #-} Name (Name)
 import FastString

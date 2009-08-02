@@ -7,6 +7,7 @@
  * ---------------------------------------------------------------------------*/
 
 #ifndef SANITY_H
+#define SANITY_H
 
 #ifdef DEBUG
 
@@ -39,4 +40,3 @@ extern rtsBool isBlackhole( StgTSO* tso, StgClosure* p );
 #endif /* DEBUG */
  
 #endif /* SANITY_H */
-

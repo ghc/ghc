@@ -21,7 +21,7 @@ where
 {-
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
-#include "../includes/MachRegs.h"
+#include "../includes/stg/MachRegs.h"
 
 import RegsBase
 

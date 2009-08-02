@@ -2,8 +2,8 @@
  * Console control handler support.
  *
  */
-#ifndef __CONSOLEHANDLER_H__
-#define __CONSOLEHANDLER_H__
+#ifndef WIN32_CONSOLEHANDLER_H
+#define WIN32_CONSOLEHANDLER_H
 
 /*
  * Console control handlers lets an application handle Ctrl+C, Ctrl+Break etc.
@@ -52,14 +52,6 @@ extern StgInt stg_pending_events;
 extern void startSignalHandlers(Capability *cap);
 
 /*
- * Function: handleSignalsInThisThread()
- * 
- * Have current (OS) thread assume responsibility of handling console events/signals.
- * Currently not used (by the console event handling code.)
- */
-extern void handleSignalsInThisThread(void);
-
-/*
  * Function: rts_waitConsoleHandlerCompletion()
  *
  * Esoteric entry point used by worker thread that got woken
@@ -69,4 +61,4 @@ extern int rts_waitConsoleHandlerCompletion(void);
 
 #endif /* THREADED_RTS */
 
-#endif /* __CONSOLEHANDLER_H__ */
+#endif /* Win32_CONSOLEHANDLER_H */

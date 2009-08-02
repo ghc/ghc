@@ -54,7 +54,7 @@ where
 -- HACK: go for the max
 #endif
 
-#include "../includes/MachRegs.h"
+#include "../includes/stg/MachRegs.h"
 
 import Reg
 import RegClass

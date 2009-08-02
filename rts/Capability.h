@@ -4,26 +4,21 @@
  *
  * Capabilities
  *
- * The notion of a capability is used when operating in multi-threaded
- * environments (which the THREADED_RTS build of the RTS does), to
- * hold all the state an OS thread/task needs to run Haskell code:
- * its STG registers, a pointer to its  TSO, a nursery etc. During
- * STG execution, a pointer to the capabilitity is kept in a 
- * register (BaseReg).
+ * A Capability holds all the state an OS thread/task needs to run
+ * Haskell code: its STG registers, a pointer to its TSO, a nursery
+ * etc. During STG execution, a pointer to the Capabilitity is kept in
+ * a register (BaseReg).
  *
- * Only in an THREADED_RTS build will there be multiple capabilities,
- * in the non-threaded builds there is one global capability, namely
+ * Only in a THREADED_RTS build will there be multiple capabilities,
+ * in the non-threaded RTS there is one global capability, called
  * MainCapability.
  *
- * This header file contains the functions for working with capabilities.
- * (the main, and only, consumer of this interface is the scheduler).
- * 
  * --------------------------------------------------------------------------*/
 
 #ifndef CAPABILITY_H
 #define CAPABILITY_H
 
-#include "RtsFlags.h"
+#include "sm/GC.h" // for evac_fn
 #include "Task.h"
 #include "Sparks.h"
 
@@ -174,14 +169,14 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
                                        rtsBool always_wakeup STG_UNUSED) {};
 #endif
 
-#if !IN_STG_CODE
-// one global capability
-extern Capability MainCapability; 
-#endif
+// declared in includes/rts/Threads.h:
+// extern Capability MainCapability; 
+
+// declared in includes/rts/Threads.h:
+// extern nat n_capabilities;
 
 // Array of all the capabilities
 //
-extern nat n_capabilities;
 extern Capability *capabilities;
 
 // The Capability that was last free.  Used as a good guess for where
@@ -281,7 +276,7 @@ INLINE_HEADER void contextSwitchCapability(Capability *cap);
 // Free all capabilities
 void freeCapabilities (void);
 
-// FOr the GC:
+// For the GC:
 void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
                            rtsBool prune_sparks);
 void markCapabilities (evac_fn evac, void *user);

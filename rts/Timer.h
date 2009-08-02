@@ -9,9 +9,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-extern void initTimer(void);
-extern void startTimer(void);
-extern void stopTimer(void);
-extern void exitTimer(void);
+void initTimer (void);
+void exitTimer (void);
 
 #endif /* TIMER_H */

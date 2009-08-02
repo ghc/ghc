@@ -18,28 +18,27 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "RtsUtils.h"
-#include "RtsFlags.h"
-#include "STM.h"
-#include "OSThreads.h"
+
 #include "Capability.h"
 #include "Schedule.h"
 #include "Sparks.h"
 #include "Trace.h"
-#include "GC.h"
+#include "sm/GC.h" // for gcWorkerThread()
+#include "STM.h"
+#include "RtsUtils.h"
 
 // one global capability, this is the Capability for non-threaded
 // builds, and for +RTS -N1
 Capability MainCapability;
 
-nat n_capabilities;
+nat n_capabilities = 0;
 Capability *capabilities = NULL;
 
 // Holds the Capability which last became free.  This is used so that
 // an in-call has a chance of quickly finding a free Capability.
 // Maintaining a global free list of Capabilities would require global
 // locking, so we don't do that.
-Capability *last_free_capability;
+Capability *last_free_capability = NULL;
 
 /* GC indicator, in scope for the scheduler, init'ed to false */
 volatile StgWord waiting_for_gc = 0;
@@ -235,8 +234,8 @@ initCapability( Capability *cap, nat i )
 #endif
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
-    cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
-    cap->f.stgGCFun        = (F_)__stg_gc_fun;
+    cap->f.stgGCEnter1     = (StgFunPtr)__stg_gc_enter_1;
+    cap->f.stgGCFun        = (StgFunPtr)__stg_gc_fun;
 
     cap->mut_lists  = stgMallocBytes(sizeof(bdescr *) *
 				     RtsFlags.GcFlags.generations,

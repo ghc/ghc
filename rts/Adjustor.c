@@ -38,9 +38,9 @@ Haskell side.
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "RtsExternal.h"
+
 #include "RtsUtils.h"
-#include <stdlib.h>
+#include "Stable.h"
 
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
 

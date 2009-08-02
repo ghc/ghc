@@ -25,13 +25,6 @@ void printThreadBlockage (StgTSO *tso);
 void printThreadStatus (StgTSO *t);
 void printAllThreads (void);
 void printThreadQueue (StgTSO *t);
-# if defined(PARALLEL_HASKELL)
-void print_bq (StgClosure *node);
-void print_bqe (StgBlockingQueueElement *bqe);
-nat  run_queue_len (void);
-# elif defined(GRAN)
-void print_bq (StgClosure *node);
-# endif
 #endif
 
 #endif /* THREADS_H */

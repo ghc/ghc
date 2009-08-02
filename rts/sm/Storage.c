@@ -13,18 +13,15 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
+#include "Storage.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
 #include "Stats.h"
-#include "Hooks.h"
 #include "BlockAlloc.h"
-#include "MBlock.h"
 #include "Weak.h"
 #include "Sanity.h"
 #include "Arena.h"
-#include "OSThreads.h"
 #include "Capability.h"
-#include "Storage.h"
 #include "Schedule.h"
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 #include "OSMem.h"
@@ -32,7 +29,6 @@
 #include "GC.h"
 #include "Evac.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 #include "ffi.h"
@@ -71,6 +67,7 @@ step *nurseries         = NULL; /* array of nurseries, >1 only if THREADED_RTS *
 Mutex sm_mutex;
 #endif
 
+static void allocNurseries ( void );
 
 static void
 initStep (step *stp, int g, int s)
@@ -440,7 +437,7 @@ assignNurseriesToCapabilities (void)
 #endif
 }
 
-void
+static void
 allocNurseries( void )
 { 
     nat i;

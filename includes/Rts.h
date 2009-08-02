@@ -1,8 +1,9 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2009
  *
- * Top-level include file for the RTS itself
+ * RTS external APIs.  This file declares everything that the GHC RTS
+ * exposes externally.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -18,8 +19,8 @@ extern "C" {
 #endif
 #include "Stg.h"
 
-// ToDo: move RtsExternal stuff elsewhere
-#include "RtsExternal.h"
+#include "HsFFI.h"
+#include "RtsAPI.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #ifdef DEBUG
@@ -27,7 +28,7 @@ extern "C" {
 # define STATIC_INLINE static
 #endif
 
-#include "RtsTypes.h"
+#include "rts/Types.h"
 
 #if __GNUC__ >= 3
 /* Assume that a flexible array member at the end of a struct
@@ -63,11 +64,6 @@ extern "C" {
 
 #define sizeofW(t) ROUNDUP_BYTES_TO_WDS(sizeof(t))
 
-/* 
- * It's nice to be able to grep for casts
- */
-#define stgCast(ty,e) ((ty)(e))
-
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery
 
@@ -75,7 +71,8 @@ extern "C" {
    ASSERT(p)  like CHECK(p) if DEBUG is on, otherwise a no-op
    -------------------------------------------------------------------------- */
 
-extern void _assertFail (const char *, unsigned int);
+void _assertFail(const char *filename, unsigned int linenum)
+   GNUC3_ATTRIBUTE(__noreturn__);
 
 #define CHECK(predicate)			\
 	if (predicate)				\
@@ -124,29 +121,6 @@ extern void _assertFail (const char *, unsigned int);
 #define FMT_Int64  "lld"
 #endif
 
-/*
- * Macros for untagging and retagging closure pointers
- * For more information look at the comments in Cmm.h
- */
-
-static inline StgWord
-GET_CLOSURE_TAG(StgClosure * p)
-{
-    return (StgWord)p & TAG_MASK;
-}
-
-static inline StgClosure *
-UNTAG_CLOSURE(StgClosure * p)
-{
-    return (StgClosure*)((StgWord)p & ~TAG_MASK);
-}
-
-static inline StgClosure *
-TAG_CLOSURE(StgWord tag,StgClosure * p)
-{
-    return (StgClosure*)((StgWord)p | tag);
-}
-
 /* -----------------------------------------------------------------------------
    Include everything STG-ish
    -------------------------------------------------------------------------- */
@@ -158,59 +132,62 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
  */
 #include <stdlib.h>
 
+#include "rts/Config.h"
+
 /* Global constaints */
-#include "Constants.h"
+#include "rts/Constants.h"
 
 /* Profiling information */
-#include "StgProf.h"
-#include "StgLdvProf.h"
-
-/* Storage format definitions */
-#include "StgFun.h"
-#include "Closures.h"
-#include "Liveness.h"
-#include "ClosureTypes.h"
-#include "InfoTables.h"
-#include "TSO.h"
-
-/* Info tables, closures & code fragments defined in the RTS */
-#include "StgMiscClosures.h"
+#include "rts/prof/CCS.h"
+#include "rts/prof/LDV.h"
 
 /* Parallel information */
-#include "OSThreads.h"
-#include "SMPClosureOps.h"
-#include "SpinLock.h"
+#include "rts/OSThreads.h"
+#include "rts/SpinLock.h"
 
-/* Macros for STG/C code */
-#include "Block.h"
-#include "ClosureMacros.h"
+#include "rts/Messages.h"
 
-/* Runtime-system hooks */
-#include "Hooks.h"
-#include "RtsMessages.h"
+/* Storage format definitions */
+#include "rts/storage/FunTypes.h"
+#include "rts/storage/InfoTables.h"
+#include "rts/storage/Closures.h"
+#include "rts/storage/Liveness.h"
+#include "rts/storage/ClosureTypes.h"
+#include "rts/storage/TSO.h"
+#include "stg/MiscClosures.h" /* InfoTables, closures etc. defined in the RTS */
+#include "rts/storage/SMPClosureOps.h"
+#include "rts/storage/Block.h"
+#include "rts/storage/ClosureMacros.h"
+#include "rts/storage/MBlock.h"
+#include "rts/storage/GC.h"
 
-/* for StablePtr/getStablePtr/deRefStablePtr */
-#include "Storage.h"
-#include "Stable.h"
-
-#include "ieee-flpt.h"
-
-#include "Signals.h"
+/* Other RTS external APIs */
+#include "rts/Parallel.h"
+#include "rts/Hooks.h"
+#include "rts/Signals.h"
+#include "rts/Hpc.h"
+#include "rts/Flags.h"
+#include "rts/Adjustor.h"
+#include "rts/FileLock.h"
+#include "rts/Globals.h"
+#include "rts/IOManager.h"
+#include "rts/Linker.h"
+#include "rts/Threads.h"
+#include "rts/Timer.h"
+#include "rts/Stable.h"
 
 /* Misc stuff without a home */
 DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */
 DLL_IMPORT_RTS extern int    prog_argc;
 DLL_IMPORT_RTS extern char  *prog_name;
 
-extern void stackOverflow(void);
+void stackOverflow(void);
 
-extern void      __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble dbl);
-extern void      __decodeFloat_Int (I_ *man, I_ *exp, StgFloat flt);
+void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
-/* Initialising the whole adjustor thunk machinery. */
-extern void initAdjustor(void);
-
-extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
+#ifndef mingw32_HOST_OS
+int stg_sig_install (int, int, void *);
+#endif
 
 /* -----------------------------------------------------------------------------
    RTS Exit codes
@@ -236,11 +213,6 @@ extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
   extern StgInt RIGHT_ARITY_##arity; \
   extern StgInt TAGGED_PTR_##arity;
 
-#define TICK_VAR_INI(arity) \
-  StgInt SLOW_CALLS_##arity = 1; \
-  StgInt RIGHT_ARITY_##arity = 1; \
-  StgInt TAGGED_PTR_##arity = 0;
-
 extern StgInt TOTAL_CALLS;
 
 TICK_VAR(1)
@@ -252,10 +224,6 @@ TICK_VAR(2)
    -------------------------------------------------------------------------- */
 
 #define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; }
-
-/* -----------------------------------------------------------------------------
-   Assertions and Debuggery
-   -------------------------------------------------------------------------- */
 
 #ifdef DEBUG
 #if IN_STG_CODE

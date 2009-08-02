@@ -8,14 +8,13 @@
  * 
  * -------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
+
 #include "RtsUtils.h"
-#include "OSThreads.h"
 #include "Task.h"
 #include "Capability.h"
 #include "Stats.h"
-#include "RtsFlags.h"
-#include "Storage.h"
 #include "Schedule.h"
 #include "Hash.h"
 #include "Trace.h"
@@ -258,15 +257,15 @@ taskTimeStamp (Task *task USED_IF_THREADS)
 #endif
 }
 
+#if defined(THREADED_RTS)
+
 void
 workerTaskStop (Task *task)
 {
-#if defined(THREADED_RTS)
     OSThreadId id;
     id = osThreadId();
     ASSERT(task->id == id);
     ASSERT(myTask() == task);
-#endif
 
     task->cap = NULL;
     taskTimeStamp(task);
@@ -280,12 +279,7 @@ workerTaskStop (Task *task)
     RELEASE_LOCK(&sched_mutex);
 }
 
-void
-resetTaskManagerAfterFork (void)
-{
-    // TODO!
-    taskCount = 0;
-}
+#endif
 
 #if defined(THREADED_RTS)
 

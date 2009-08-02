@@ -11,14 +11,16 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "Storage.h"
+
 #include "MarkWeak.h"
 #include "GC.h"
 #include "GCThread.h"
 #include "Evac.h"
 #include "Trace.h"
 #include "Schedule.h"
+#include "Weak.h"
 
 /* -----------------------------------------------------------------------------
    Weak Pointers

@@ -7,21 +7,20 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "rts/Bytecodes.h"
+
+// internal headers
+#include "sm/Storage.h"
 #include "RtsUtils.h"
-#include "Closures.h"
-#include "TSO.h"
 #include "Schedule.h"
-#include "RtsFlags.h"
-#include "LdvProfile.h"
 #include "Updates.h"
 #include "Sanity.h"
-#include "Liveness.h"
 #include "Prelude.h"
-
-#include "Bytecodes.h"
+#include "Stable.h"
 #include "Printer.h"
 #include "Disassembler.h"
 #include "Interpreter.h"
+#include "ThreadPaused.h"
 
 #include <string.h>     /* for memcpy */
 #ifdef HAVE_ERRNO_H

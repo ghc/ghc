@@ -11,7 +11,8 @@
  *
  * --------------------------------------------------------------------------*/
 
-#include "SMP.h"
+#ifndef SM_GCUTILS_H
+#define SM_GCUTILS_H
 
 bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
@@ -21,7 +22,9 @@ StgPtr  todo_block_full      (nat size, step_workspace *ws);
 StgPtr  alloc_todo_block     (step_workspace *ws, nat size);
 
 bdescr *grab_local_todo_block  (step_workspace *ws);
+#if defined(THREADED_RTS)
 bdescr *steal_todo_block       (nat s);
+#endif
 
 // Returns true if a block is partially full.  This predicate is used to try
 // to re-use partial blocks wherever possible, and to reduce wastage.
@@ -55,3 +58,5 @@ recordMutableGen_GC (StgClosure *p, nat gen_no)
     }
     *bd->free++ = (StgWord)p;
 }
+
+#endif /* SM_GCUTILS_H */

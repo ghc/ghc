@@ -11,8 +11,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "PosixSource.h"
 #include "Rts.h"
-#include "RtsFlags.h"
+
 #include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"
@@ -101,6 +102,7 @@ grab_local_todo_block (step_workspace *ws)
     return NULL;
 }
 
+#if defined(THREADED_RTS)
 bdescr *
 steal_todo_block (nat s)
 {
@@ -117,6 +119,7 @@ steal_todo_block (nat s)
     }
     return NULL;
 }
+#endif
 
 void
 push_scanned_block (bdescr *bd, step_workspace *ws)

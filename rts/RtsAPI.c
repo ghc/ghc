@@ -8,17 +8,14 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
-#include "OSThreads.h"
 #include "RtsAPI.h"
-#include "SchedAPI.h"
-#include "RtsFlags.h"
+#include "HsFFI.h"
+
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Schedule.h"
 #include "Capability.h"
 #include "Stable.h"
-
-#include <stdlib.h>
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.

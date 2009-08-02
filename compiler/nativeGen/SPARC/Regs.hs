@@ -54,7 +54,7 @@ import FastBool
 	prepared for any eventuality.
 
 	The whole fp-register pairing thing on sparcs is a huge nuisance.  See
-	fptools/ghc/includes/MachRegs.h for a description of what's going on
+	includes/stg/MachRegs.h for a description of what's going on
 	here.
 -}
 
@@ -290,11 +290,13 @@ regDotColor reg
 
 -- Hard coded freeReg / globalRegMaybe -----------------------------------------
 -- This isn't being used at the moment because we're generating
---	these functions from the information in includes/MachRegs.hs via RegPlate.hs
+--	these functions from the information in
+--	includes/stg/MachRegs.hs via RegPlate.hs
 	
 -- | Check whether a machine register is free for allocation.
---	This needs to match the info in includes/MachRegs.h otherwise modules
---	compiled with the NCG won't be compatible with via-C ones.
+--	This needs to match the info in includes/stg/MachRegs.h
+--	otherwise modules compiled with the NCG won't be compatible
+--	with via-C ones.
 --
 {-
 freeReg :: RegNo -> FastBool

@@ -13,16 +13,18 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+
+#include "Storage.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
-#include "OSThreads.h"
 #include "BlockAlloc.h"
-#include "MBlock.h"
 #include "GC.h"
 #include "Compact.h"
 #include "Schedule.h"
 #include "Apply.h"
 #include "Trace.h"
+#include "Weak.h"
+#include "MarkWeak.h"
+#include "Stable.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #ifdef DEBUG
@@ -166,7 +168,7 @@ loop:
     case 1:
     {
         StgWord r = *(StgPtr)(q-1);
-        ASSERT(LOOKS_LIKE_INFO_PTR(UNTAG_CLOSURE((StgClosure *)r)));
+        ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)UNTAG_CLOSURE((StgClosure *)r)));
         return r;
     }
     case 2:
@@ -929,7 +931,7 @@ update_bkwd_compact( step *stp )
 
             iptr = get_threaded_info(p);
 	    unthread(p, (StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
-	    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)p)->header.info));
+	    ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)((StgClosure *)p)->header.info));
 	    info = get_itbl((StgClosure *)p);
 	    size = closure_sizeW_((StgClosure *)p,info);
 

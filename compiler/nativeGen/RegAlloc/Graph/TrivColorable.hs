@@ -43,7 +43,7 @@ import FastTypes
 -- 	There is an allocatableRegsInClass :: RegClass -> Int, but doing the unboxing
 -- 	is too slow for us here.
 --
--- 	Look at includes/MachRegs.h to get these numbers.
+-- 	Look at includes/stg/MachRegs.h to get these numbers.
 --
 
 #if i386_TARGET_ARCH

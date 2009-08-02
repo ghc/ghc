@@ -72,7 +72,7 @@ rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c
 	"$(MKDIRHIER)" $(dir $@)
 	cp $< $@
 
-rts_H_FILES = $(wildcard $(GHC_INCLUDE_DIR)/*.h) $(wildcard rts/*.h)
+rts_H_FILES = $(wildcard includes/*.h) $(wildcard rts/*.h)
 
 # collect the -l flags that we need to link the rts dyn lib.
 rts/libs.depend : $(GHC_PKG_INPLACE)
@@ -130,27 +130,26 @@ $(foreach way,$(rts_WAYS),$(eval $(call build-rts-way,$(way))))
 #-----------------------------------------------------------------------------
 # Flags for compiling every file
 
-# gcc provides lots of useful warnings if you ask it.
-# This is a pretty good list to start with - use a # to comment out
-# any you don't like.
-WARNING_OPTS += -Wall
-WARNING_OPTS += -W
+# We like plenty of warnings.
+WARNING_OPTS += -Wall -Wextra
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
 WARNING_OPTS += -Wmissing-declarations
 WARNING_OPTS += -Winline
 WARNING_OPTS += -Waggregate-return
-#WARNING_OPTS += -Wpointer-arith
+WARNING_OPTS += -Wpointer-arith
+WARNING_OPTS += -Wmissing-noreturn
+WARNING_OPTS += -Wcast-align
+WARNING_OPTS += -Wnested-externs
+WARNING_OPTS += -Wredundant-decls 
+
+# These ones are hard to avoid:
+#WARNING_OPTS += -Wconversion
 #WARNING_OPTS += -Wbad-function-cast
-#WARNING_OPTS += -Wcast-align
-#WARNING_OPTS += -Wnested-externs
 #WARNING_OPTS += -Wshadow
 #WARNING_OPTS += -Wcast-qual
-#WARNING_OPTS += -Wno-unused 
-#WARNING_OPTS += -Wredundant-decls 
-#WARNING_OPTS += -Wconversion
 
-STANDARD_OPTS += -I$(GHC_INCLUDE_DIR) -I$(GHC_RTS_DIR) -Irts/parallel -Irts/sm -Irts/eventlog
+STANDARD_OPTS += -Iincludes -Irts
 # COMPILING_RTS is only used when building Win32 DLL support.
 STANDARD_OPTS += -DCOMPILING_RTS
 
@@ -205,6 +204,8 @@ rts_HC_OPTS += -dcmm-lint
 # upd_evacee() assigments get moved before the object copy.
 rts_CC_OPTS += -fno-strict-aliasing
 
+rts_CC_OPTS += -fno-common
+
 ifeq "$(BeConservative)" "YES"
 rts_CC_OPTS += -DBE_CONSERVATIVE
 endif
@@ -244,14 +245,14 @@ RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode
 
 # ffi.h triggers prototype warnings, so disable them here:
 Interpreter_CC_OPTS += -Wno-strict-prototypes
-Adjustor_CC_OPTS += -Wno-strict-prototypes
-sm/Storage_CC_OPTS += -Wno-strict-prototypes
+Adjustor_CC_OPTS    += -Wno-strict-prototypes
+sm/Storage_CC_OPTS  += -Wno-strict-prototypes
 
-StgCRun_CC_OPTS += -w
-Typeable_CC_OPTS += -w
+# inlining warnings happen in Compact
+sm/Compact_CC_OPTS += -Wno-inline
+
 RetainerProfile_CC_OPTS += -w
 RetainerSet_CC_OPTS += -Wno-format
-sm/Compact_CC_OPTS += -w
 # On Windows:
 win32/ConsoleHandler_CC_OPTS += -w
 win32/ThrIOManager_CC_OPTS += -w
@@ -271,8 +272,8 @@ sm/Evac_thr_HC_OPTS += -optc-funroll-loops
 
 # These files are just copies of sm/Evac.c and sm/Scav.c respectively,
 # but compiled with -DPARALLEL_GC.
-sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC
-sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC
+sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
+sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
 
 #-----------------------------------------------------------------------------
 # Add PAPI library if needed
