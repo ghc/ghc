@@ -1367,8 +1367,8 @@ module A where
 
 	<varlistentry>
 	  <term>
-	    <indexterm><primary><literal>not-home</literal></primary>
-	    </indexterm>
+	    <indexterm><primary><literal>not-home</literal></primary></indexterm>
+      <literal>not-home</literal>
 	  </term>
 	  <listitem>
 	    <para>Indicates that the current module should not be considered to
