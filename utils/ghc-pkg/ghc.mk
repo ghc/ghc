@@ -95,7 +95,7 @@ install: install_utils/ghc-pkg_link
 
 .PNONY: install_utils/ghc-pkg_link
 install_utils/ghc-pkg_link: 
-	"$(MKDIRHIER)" $(DESTDIR)$(bindir)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghc-pkg
 	$(LN_S) ghc-pkg-$(ProjectVersion) $(DESTDIR)$(bindir)/ghc-pkg
 endif

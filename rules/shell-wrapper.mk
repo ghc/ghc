@@ -57,8 +57,9 @@ install: install_$1_$2_wrapper
 .PHONY: install_$1_$2_wrapper
 install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
-	"$$(MKDIRHIER)" $$(DESTDIR)$$(bindir)
+	$$(INSTALL_DIR) $$(DESTDIR)$$(bindir)
 	"$$(RM)" $$(RM_OPTS)                           $$(WRAPPER)
+	$$(CREATE_SCRIPT)                              $$(WRAPPER)
 	echo '#!$$(SHELL)'                          >> $$(WRAPPER)
 	echo 'executablename=$$(libexecdir)/$$($1_$2_PROG)' >> $$(WRAPPER)
 	echo 'datadir=$$(datadir)'                  >> $$(WRAPPER)

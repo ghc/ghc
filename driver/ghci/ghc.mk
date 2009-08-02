@@ -17,8 +17,9 @@ install: install_driver_ghci
 .PHONY: install_driver_ghci
 install_driver_ghci: WRAPPER=$(DESTDIR)$(bindir)/ghci-$(ProjectVersion)
 install_driver_ghci:
-	"$(MKDIRHIER)" $(DESTDIR)$(bindir)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	"$(RM)" $(RM_OPTS)                                 $(WRAPPER)
+	$(CREATE_SCRIPT)                                   $(WRAPPER)
 	echo '#!$(SHELL)'                               >> $(WRAPPER)
 	echo 'exec $(bindir)/ghc-$(ProjectVersion) --interactive $${1+"$$@"}' >> $(WRAPPER)
 	$(EXECUTABLE_FILE)                                 $(WRAPPER)

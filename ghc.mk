@@ -713,13 +713,13 @@ install_libs: $(INSTALL_LIBS)
 	done
 
 install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
-	"$(MKDIRHIER)" $(DESTDIR)$(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(libexecdir); \
 	done
 
 install_libexecs:  $(INSTALL_LIBEXECS)
-	"$(MKDIRHIER)" $(DESTDIR)$(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(libexecdir); \
 	done
@@ -756,8 +756,10 @@ endif
 
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
-	"$(MKDIRHIER)" $(DESTDIR)$(libdir)
-	echo "[]" > $(INSTALLED_PACKAGE_CONF)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
+	"$(RM)" $(RM_OPTS) $(INSTALLED_PACKAGE_CONF)
+	$(CREATE_DATA)     $(INSTALLED_PACKAGE_CONF)
+	echo "[]"       >> $(INSTALLED_PACKAGE_CONF)
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
 	$(foreach p, $(PACKAGES) $(PACKAGES_STAGE2),\

@@ -368,8 +368,8 @@ install : install_rts
 
 .PHONY: install_rts
 install_rts:
-	"$(MKDIRHIER)" $(DESTDIR)$(libdir)
-	"$(MKDIRHIER)" $(DESTDIR)$(libdir)/include
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)/include
 	"$(CP)" $(ALL_RTS_LIBS) $(DESTDIR)$(libdir)
 
 # -----------------------------------------------------------------------------
