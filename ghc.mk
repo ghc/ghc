@@ -13,7 +13,6 @@
 # ToDo List.
 #
 #   * finish installation
-#     * other documentation
 #     * create doc index and contents
 #     * Windows: should we have ghc-pkg-<version>?
 #     * should we be stripping things?
