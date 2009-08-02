@@ -1241,7 +1241,8 @@ dynamic_flags = [
     Flag "n"              (NoArg  (setDynFlag Opt_DryRun)) Supported
   , Flag "cpp"            (NoArg  (setDynFlag Opt_Cpp)) Supported
   , Flag "F"              (NoArg  (setDynFlag Opt_Pp)) Supported
-  , Flag "#include"       (HasArg (addCmdlineHCInclude)) Supported
+  , Flag "#include"       (HasArg (addCmdlineHCInclude))
+                             (Deprecated "No longer has any effect")
   , Flag "v"              (OptIntSuffix setVerbosity) Supported
 
         ------- Specific phases  --------------------------------------------
