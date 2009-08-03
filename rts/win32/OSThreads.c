@@ -11,7 +11,6 @@
 
 #include "Rts.h"
 #if defined(THREADED_RTS)
-#include "OSThreads.h"
 #include "RtsUtils.h"
 #include <windows.h>
 
@@ -95,6 +94,7 @@ void
 shutdownThread()
 {
   _endthreadex(0);
+  barf("_endthreadex returned"); // avoid gcc warning
 }
 
 int
