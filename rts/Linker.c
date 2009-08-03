@@ -231,6 +231,8 @@ typedef struct _RtsSymbolVal {
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
+      SymI_HasProto(__hscore_get_saved_termios)	\
+      SymI_HasProto(__hscore_set_saved_termios)	\
       SymI_HasProto(shutdownHaskellAndSignal)	\
       SymI_HasProto(lockFile)                   \
       SymI_HasProto(unlockFile)                 \
@@ -717,8 +719,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_unlock)				\
       SymI_HasProto(rts_unsafeGetMyCapability)          \
       SymI_HasProto(rtsSupportsBoundThreads)		\
-      SymI_HasProto(__hscore_get_saved_termios)		\
-      SymI_HasProto(__hscore_set_saved_termios)		\
       SymI_HasProto(setProgArgv)			\
       SymI_HasProto(startupHaskell)			\
       SymI_HasProto(shutdownHaskell)			\
