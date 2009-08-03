@@ -613,7 +613,7 @@ chooseExternalIds hsc_env mod omit_prags binds
     | otherwise = do
       (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env id
       let 
-          rhs = expectJust "chooseExternalIds" $ lookupVarEnv bind_env id
+          rhs = expectJust (showSDoc (text "chooseExternalIds: " <> ppr id)) $ lookupVarEnv bind_env id
           (new_ids, show_unfold)
                 | omit_prags = ([], False)
                 | otherwise  = addExternal id rhs
@@ -635,7 +635,8 @@ addExternal :: Id -> CoreExpr -> ([Id],Bool)
 addExternal id rhs = (new_needed_ids, show_unfold)
   where
     new_needed_ids = unfold_ids ++
-                     filter (not . (`elemVarSet` unfold_set)) 
+                     filter (\id -> isLocalId id &&
+                                    not (id `elemVarSet` unfold_set))
                        (varSetElems worker_ids ++ 
                         varSetElems spec_ids) -- XXX non-det ordering
 
