@@ -143,6 +143,10 @@ typedef struct {
 
 extern lnat mpc_misses;
 
+#ifdef THREADED_RTS
+extern SpinLock gc_alloc_block_sync;
+#endif
+
 StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p);
 
 INLINE_HEADER
