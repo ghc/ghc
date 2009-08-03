@@ -41,10 +41,6 @@ extern rtsBool work_stealing;
 extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
 #endif
 
-#ifdef THREADED_RTS
-extern SpinLock gc_alloc_block_sync;
-#endif
-
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
 extern StgWord64 whitehole_spin;
 #endif
