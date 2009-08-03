@@ -26,7 +26,7 @@ module GHC.ConsoleHandler
         ) where
 
 {-
-#include "Signals.h"
+#include "rts/Signals.h"
 -}
 
 import Foreign
