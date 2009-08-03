@@ -7,7 +7,7 @@ import Control.Monad.ST
 import Data.Word
 import Data.Array.ST
 
-#include "config.h"
+#include "ghcconfig.h"
 
 reverse_if_bigendian :: [a] -> [a]
 #ifdef WORDS_BIGENDIAN

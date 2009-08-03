@@ -1,9 +1,7 @@
 #define THREADED_RTS
 
 #include "Rts.h"
-#include "RtsMessages.h"
 #include "WSDeque.h"
-#include "OSThreads.h"
 #include <stdio.h>
 
 #define SCRATCH_SIZE (1024*1024)
