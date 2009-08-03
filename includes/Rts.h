@@ -176,6 +176,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Ticky.h"
 #include "rts/Timer.h"
 #include "rts/Stable.h"
+#include "rts/TTY.h"
 
 /* Misc stuff without a home */
 DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */

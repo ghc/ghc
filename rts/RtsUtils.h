@@ -39,10 +39,6 @@ char *ullong_format_string(ullong, char *, rtsBool);
 void heapCheckFail( void );
 #endif
 
-// XXX shouldn't be here
-void* __hscore_get_saved_termios(int fd);
-void  __hscore_set_saved_termios(int fd, void* ts);
-
 void printRtsInfo(void);
 
 HsInt genSymZh(void);
