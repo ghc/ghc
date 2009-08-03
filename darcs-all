@@ -4,16 +4,14 @@ use strict;
 
 # Usage:
 #
-# ./darcs-all [-q] [-s] [-i] [-r repo] [--nofib] [--testsuite] get [darcs get flags]
+# ./darcs-all [-q] [-s] [--nofib] [--testsuite] get [darcs get flags]
 #   This gets the GHC core repos, if they do not already exist.
 #   -q says to be quite, and -s to be silent.
-#   -i says to ignore darcs errors and move on to the next repository
-#   -r repo says to use repo as the location of package repositories
 #   --nofib, --testsuite also get the nofib and testsuite repos respectively
 #   The darcs get flag you are most likely to want is --complete. By
 #   default we pass darcs the --partial flag.
 #
-# ./darcs-all [-q] [-s] [-i] [-r repo] cmd [darcs cmd flags]
+# ./darcs-all [-q] [-s] cmd [darcs cmd flags]
 #   This runs the darcs "cmd" command, with any flags you give, in all
 #   of the repos you have checked out. e.g.
 #       ./darcs-all pull
@@ -22,54 +20,35 @@ use strict;
 
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
-my $defaultrepo;
+# Figure out where to get the other repositories from,
+# based on where this GHC repo came from.
+my $defaultrepo = `cat _darcs/prefs/defaultrepo`;
+chomp $defaultrepo;
+my $defaultrepo_base;
+my $checked_out_tree;
+
+if ($defaultrepo =~ /^...*:/) {
+    # HTTP or SSH
+    # Above regex says "at least two chars before the :", to avoid
+    # catching Win32 drives ("C:\").
+    $defaultrepo_base = $defaultrepo;
+    $defaultrepo_base =~ s#/[^/]+/?$##;
+    $checked_out_tree = 0;
+}
+elsif ($defaultrepo =~ /^\/|\.\.\/|.:(\/|\\)/) {
+    # Local filesystem, either absolute or relative path
+    # (assumes a checked-out tree):
+    $defaultrepo_base = $defaultrepo;
+    $checked_out_tree = 1;
+}
+else {
+    die "Couldn't work out defaultrepo";
+}
 
 my $verbose = 2;
 my $ignore_failure = 0;
 
 my %tags;
-
-# Figure out where to get the other repositories from.
-sub getrepo {
-    my $basedir = ".";
-    my $repo = $defaultrepo || `cat $basedir/_darcs/prefs/defaultrepo`;
-    chomp $repo;
-
-    my $repo_base;
-    my $checked_out_tree;
-
-    if ($repo =~ /^...*:/) {
-        # HTTP or SSH
-        # Above regex says "at least two chars before the :", to avoid
-        # catching Win32 drives ("C:\").
-        $repo_base = $repo;
-        $checked_out_tree = 0;
-
-        # Don't drop the last part of the path if specified with -r, as
-        # it expects repos of the form:
-        #
-        #   http://darcs.haskell.org
-        #
-        # rather than
-        #   
-        #   http://darcs.haskell.org/ghc
-        #
-        if (!$defaultrepo) {
-            $repo_base =~ s#/[^/]+/?$##;
-        }
-    }
-    elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
-        # Local filesystem, either absolute or relative path
-        # (assumes a checked-out tree):
-        $repo_base = $repo;
-        $checked_out_tree = 1;
-    }
-    else {
-        die "Couldn't work out repo";
-    }
-
-    return $repo_base, $checked_out_tree;
-}
 
 sub message {
     if ($verbose >= 2) {
@@ -86,45 +65,28 @@ sub warning {
 sub darcs {
     message "== running darcs @_";
     system ("darcs", @_) == 0
-       or $ignore_failure
-       or die "darcs failed: $?";
+        or $ignore_failure
+        or die "darcs failed: $?";
 }
 
 sub darcsall {
     my $localpath;
-    my $remotepath;
     my $path;
     my $tag;
     my @repos;
-
-    my ($repo_base, $checked_out_tree) = getrepo();
 
     open IN, "< packages" or die "Can't open packages file";
     @repos = <IN>;
     close IN;
 
-    REPO: foreach (@repos) {
+    foreach (@repos) {
         chomp;
         if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = defined($2) ? $2 : "";
-            $remotepath = $3;
-
-            if ($checked_out_tree) {
-                $path = "$repo_base/$localpath";
-            }
-            else {
-                if ($remotepath =~ /^http:/) {
-                    message "Ignoring $localpath; remote is http URL";
-                    next REPO;
-                }
-                else {
-                    $path = "$repo_base/$remotepath";
-                }
-            }
 
             if (-d "$localpath/_darcs") {
-                darcs (@_, "--repodir", $localpath, $path);
+                darcs (@_, "--repodir", $localpath);
             }
             elsif ($tag eq "") {
                 message "== Required repo $localpath is missing! Skipping";
@@ -147,8 +109,6 @@ sub darcsget {
     my $tag;
     my @repos;
 
-    my ($repo_base, $checked_out_tree) = getrepo();
-
     if (! grep /(?:--complete|--partial)/, @_) {
         warning("adding --partial, to override use --complete");
         $r_flags = [@_, "--partial"];
@@ -169,14 +129,14 @@ sub darcsget {
             $remotepath = $3;
 
             if ($checked_out_tree) {
-                $path = "$repo_base/$localpath";
+                $path = "$defaultrepo_base/$localpath";
             }
             else {
                 if ($remotepath =~ /^http:/) {
                     $path = $remotepath;
                 }
                 else {
-                    $path = "$repo_base/$remotepath";
+                    $path = "$defaultrepo_base/$remotepath";
                 }
             }
 
@@ -196,7 +156,7 @@ sub darcsget {
 }
 
 sub main {
-    if (! -d "compiler") {
+    if (! -d "_darcs" || ! -d "compiler") {
         die "error: darcs-all must be run from the top level of the ghc tree."
     }
 
@@ -209,12 +169,6 @@ sub main {
         }
         elsif ($arg eq "-s") {
             $verbose = 0;
-        }
-        elsif ($arg eq "-r") {
-            $defaultrepo = shift;
-        }
-        elsif ($arg eq "-i") {
-            $ignore_failure = 1;
         }
         # --nofib tells get to also grab the nofib repo.
         # It has no effect on the other commands.
