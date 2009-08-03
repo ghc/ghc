@@ -13,12 +13,12 @@
 #include "Printer.h"
 #include "RtsUtils.h"
 
+#include <string.h>
+
 #ifdef DEBUG
 
 #include "Disassembler.h"
 #include "Apply.h"
-
-#include <string.h>
 
 /* --------------------------------------------------------------------------
  * local function decls
@@ -583,103 +583,6 @@ void printTSO( StgTSO *tso )
     printStackChunk( tso->sp, tso->stack+tso->stack_size);
 }
 
-/* -----------------------------------------------------------------------------
-   Closure types
-   
-   NOTE: must be kept in sync with the closure types in includes/ClosureTypes.h
-   -------------------------------------------------------------------------- */
-
-static char *closure_type_names[] = {
-    "INVALID_OBJECT",
-    "CONSTR",
-    "CONSTR_1",
-    "CONSTR_0",
-    "CONSTR_2",
-    "CONSTR_1",
-    "CONSTR_0",
-    "CONSTR_STATIC",
-    "CONSTR_NOCAF_STATIC",
-    "FUN",
-    "FUN_1_0",
-    "FUN_0_1",
-    "FUN_2_0",
-    "FUN_1_1",
-    "FUN_0",
-    "FUN_STATIC",
-    "THUNK",
-    "THUNK_1_0",
-    "THUNK_0_1",
-    "THUNK_2_0",
-    "THUNK_1_1",
-    "THUNK_0",
-    "THUNK_STATIC",
-    "THUNK_SELECTOR",
-    "BCO",
-    "AP_UPD",
-    "PAP",
-    "AP_STACK",
-    "IND",
-    "IND_OLDGEN",
-    "IND_PERM",
-    "IND_OLDGEN_PERM",
-    "IND_STATIC",
-    "RET_BCO",
-    "RET_SMALL",
-    "RET_BIG",
-    "RET_DYN",
-    "RET_FUN",
-    "UPDATE_FRAME",
-    "CATCH_FRAME",
-    "STOP_FRAME",
-    "CAF_BLACKHOLE",
-    "BLACKHOLE",
-    "BLACKHOLE_BQ",
-    "SE_BLACKHOLE",
-    "SE_CAF_BLACKHOLE",
-    "MVAR",
-    "ARR_WORDS",
-    "MUT_ARR_PTRS_CLEAN",
-    "MUT_ARR_PTRS_DIRTY",
-    "MUT_ARR_PTRS_FROZEN",
-    "MUT_VAR_CLEAN",
-    "MUT_VAR_DIRTY",
-    "MUT_CONS",
-    "WEAK",
-    "FOREIGN",
-    "STABLE_NAME",
-    "TSO",
-    "BLOCKED_FETCH",
-    "FETCH_ME",
-    "FETCH_ME_BQ",
-    "RBH",
-    "EVACUATED",
-    "REMOTE_REF",
-    "TVAR_WATCH_QUEUE",
-    "INVARIANT_CHECK_QUEUE",
-    "ATOMIC_INVARIANT",
-    "TVAR",
-    "TREC_CHUNK",
-    "TREC_HEADER",
-    "ATOMICALLY_FRAME",
-    "CATCH_RETRY_FRAME"
-};
-
-
-char *
-info_type(StgClosure *closure){ 
-  return closure_type_names[get_itbl(closure)->type];
-}
-
-char *
-info_type_by_ip(StgInfoTable *ip){ 
-  return closure_type_names[ip->type];
-}
-
-void
-info_hdr_type(StgClosure *closure, char *res){ 
-  strcpy(res,closure_type_names[get_itbl(closure)->type]);
-}
-
 /* --------------------------------------------------------------------------
  * Address printing code
  *
@@ -1161,3 +1064,93 @@ void printObj( StgClosure *obj )
 
 
 #endif /* DEBUG */
+
+/* -----------------------------------------------------------------------------
+   Closure types
+   
+   NOTE: must be kept in sync with the closure types in includes/ClosureTypes.h
+   -------------------------------------------------------------------------- */
+
+char *closure_type_names[] = {
+ [INVALID_OBJECT]        = "INVALID_OBJECT",
+ [CONSTR]                = "CONSTR",
+ [CONSTR_1_0]            = "CONSTR_1_0",
+ [CONSTR_0_1]            = "CONSTR_0_1",
+ [CONSTR_2_0]            = "CONSTR_2_0",
+ [CONSTR_1_1]            = "CONSTR_1_1",
+ [CONSTR_0_2]            = "CONSTR_0_2",
+ [CONSTR_STATIC]         = "CONSTR_STATIC",
+ [CONSTR_NOCAF_STATIC]   = "CONSTR_NOCAF_STATIC",
+ [FUN]                   = "FUN",
+ [FUN_1_0]               = "FUN_1_0",
+ [FUN_0_1]               = "FUN_0_1",
+ [FUN_2_0]               = "FUN_2_0",
+ [FUN_1_1]               = "FUN_1_1",
+ [FUN_0_2]               = "FUN_0_2",
+ [FUN_STATIC]            = "FUN_STATIC",
+ [THUNK]                 = "THUNK",
+ [THUNK_1_0]             = "THUNK_1_0",
+ [THUNK_0_1]             = "THUNK_0_1",
+ [THUNK_2_0]             = "THUNK_2_0",
+ [THUNK_1_1]             = "THUNK_1_1",
+ [THUNK_0_2]             = "THUNK_0_2",
+ [THUNK_STATIC]          = "THUNK_STATIC",
+ [THUNK_SELECTOR]        = "THUNK_SELECTOR",
+ [BCO]                   = "BCO",
+ [AP]                    = "AP",
+ [PAP]                   = "PAP",
+ [AP_STACK]              = "AP_STACK",
+ [IND]                   = "IND",
+ [IND_OLDGEN]            = "IND_OLDGEN",
+ [IND_PERM]              = "IND_PERM",
+ [IND_OLDGEN_PERM]       = "IND_OLDGEN_PERM",
+ [IND_STATIC]            = "IND_STATIC",
+ [RET_BCO]               = "RET_BCO",
+ [RET_SMALL]             = "RET_SMALL",
+ [RET_BIG]               = "RET_BIG",
+ [RET_DYN]               = "RET_DYN",
+ [RET_FUN]               = "RET_FUN",
+ [UPDATE_FRAME]          = "UPDATE_FRAME",
+ [CATCH_FRAME]           = "CATCH_FRAME",
+ [STOP_FRAME]            = "STOP_FRAME",
+ [CAF_BLACKHOLE]         = "CAF_BLACKHOLE",
+ [BLACKHOLE]             = "BLACKHOLE",
+ [MVAR_CLEAN]            = "MVAR_CLEAN",
+ [MVAR_DIRTY]            = "MVAR_DIRTY",
+ [ARR_WORDS]             = "ARR_WORDS",
+ [MUT_ARR_PTRS_CLEAN]    = "MUT_ARR_PTRS_CLEAN",
+ [MUT_ARR_PTRS_DIRTY]    = "MUT_ARR_PTRS_DIRTY",
+ [MUT_ARR_PTRS_FROZEN0]  = "MUT_ARR_PTRS_FROZEN0",
+ [MUT_ARR_PTRS_FROZEN]   = "MUT_ARR_PTRS_FROZEN",
+ [MUT_VAR_CLEAN]         = "MUT_VAR_CLEAN",
+ [MUT_VAR_DIRTY]         = "MUT_VAR_DIRTY",
+ [WEAK]                  = "WEAK",
+ [STABLE_NAME]           = "STABLE_NAME",
+ [TSO]                   = "TSO",
+ [TVAR_WATCH_QUEUE]      = "TVAR_WATCH_QUEUE",
+ [INVARIANT_CHECK_QUEUE] = "INVARIANT_CHECK_QUEUE",
+ [ATOMIC_INVARIANT]      = "ATOMIC_INVARIANT",
+ [TVAR]                  = "TVAR",
+ [TREC_CHUNK]            = "TREC_CHUNK",
+ [TREC_HEADER]           = "TREC_HEADER",
+ [ATOMICALLY_FRAME]      = "ATOMICALLY_FRAME",
+ [CATCH_RETRY_FRAME]     = "CATCH_RETRY_FRAME",
+ [CATCH_STM_FRAME]       = "CATCH_STM_FRAME",
+ [WHITEHOLE]             = "WHITEHOLE"
+};
+
+char *
+info_type(StgClosure *closure){ 
+  return closure_type_names[get_itbl(closure)->type];
+}
+
+char *
+info_type_by_ip(StgInfoTable *ip){ 
+  return closure_type_names[ip->type];
+}
+
+void
+info_hdr_type(StgClosure *closure, char *res){ 
+  strcpy(res,closure_type_names[get_itbl(closure)->type]);
+}
+

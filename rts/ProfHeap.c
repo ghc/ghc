@@ -95,86 +95,6 @@ static void dumpCensus( Census *census );
 static rtsBool closureSatisfiesConstraints( StgClosure* p );
 
 /* ----------------------------------------------------------------------------
-   Closure Type Profiling;
-   ------------------------------------------------------------------------- */
-
-#ifndef PROFILING
-static char *type_names[] = {
-    "INVALID_OBJECT",
-    "CONSTR",
-    "CONSTR_1_0",
-    "CONSTR_0_1",
-    "CONSTR_2_0",
-    "CONSTR_1_1",
-    "CONSTR_0_2",
-    "CONSTR_STATIC",
-    "CONSTR_NOCAF_STATIC",
-    "FUN",
-    "FUN_1_0",
-    "FUN_0_1",
-    "FUN_2_0",
-    "FUN_1_1",
-    "FUN_0_2",
-    "FUN_STATIC",
-    "THUNK",
-    "THUNK_1_0",
-    "THUNK_0_1",
-    "THUNK_2_0",
-    "THUNK_1_1",
-    "THUNK_0_2",
-    "THUNK_STATIC",
-    "THUNK_SELECTOR",
-    "BCO",
-    "AP",
-    "PAP",
-    "AP_STACK",
-    "IND",
-    "IND_OLDGEN",
-    "IND_PERM",
-    "IND_OLDGEN_PERM",
-    "IND_STATIC",
-    "RET_BCO",
-    "RET_SMALL",
-    "RET_BIG",
-    "RET_DYN",
-    "RET_FUN",
-    "UPDATE_FRAME",
-    "CATCH_FRAME",
-    "STOP_FRAME",
-    "CAF_BLACKHOLE",
-    "BLACKHOLE",
-    "MVAR_CLEAN",
-    "MVAR_DIRTY",
-    "ARR_WORDS",
-    "MUT_ARR_PTRS_CLEAN",
-    "MUT_ARR_PTRS_DIRTY",
-    "MUT_ARR_PTRS_FROZEN0",
-    "MUT_ARR_PTRS_FROZEN",
-    "MUT_VAR_CLEAN",
-    "MUT_VAR_DIRTY",
-    "WEAK",
-    "STABLE_NAME",
-    "TSO",
-    "BLOCKED_FETCH",
-    "FETCH_ME",
-    "FETCH_ME_BQ",
-    "RBH",
-    "REMOTE_REF",
-    "TVAR_WATCH_QUEUE",
-    "INVARIANT_CHECK_QUEUE",
-    "ATOMIC_INVARIANT",
-    "TVAR",
-    "TREC_CHUNK",
-    "TREC_HEADER",
-    "ATOMICALLY_FRAME",
-    "CATCH_RETRY_FRAME",
-    "CATCH_STM_FRAME",
-    "WHITEHOLE",
-    "N_CLOSURE_TYPES"
-  };
-#endif
-
-/* ----------------------------------------------------------------------------
  * Find the "closure identity", which is a unique pointer reresenting
  * the band to which this closure's heap space is attributed in the
  * heap profile.
@@ -217,7 +137,7 @@ closureIdentity( StgClosure *p )
         case CONSTR_NOCAF_STATIC:
             return GET_CON_DESC(itbl_to_con_itbl(info));
         default:
-            return type_names[info->type];
+            return closure_type_names[info->type];
         }
     }
 

@@ -12,16 +12,18 @@
 extern void   	   printPtr        ( StgPtr p );
 extern void   	   printObj        ( StgClosure *obj );
 
+extern char *      closure_type_names[];
+
+void   	           info_hdr_type   ( StgClosure *closure, char *res );
+char  *	           info_type       ( StgClosure *closure );
+char  *	           info_type_by_ip ( StgInfoTable *ip );
+
 #ifdef DEBUG
 extern void        prettyPrintClosure (StgClosure *obj);
 extern void   	   printClosure    ( StgClosure *obj );
 extern StgPtr      printStackObj   ( StgPtr sp );
 extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
 extern void        printTSO        ( StgTSO *tso );
-
-void   	           info_hdr_type   ( StgClosure *closure, char *res );
-char  *	           info_type       ( StgClosure *closure );
-char  *	           info_type_by_ip ( StgInfoTable *ip );
 
 extern void DEBUG_LoadSymbols( char *name );
 
