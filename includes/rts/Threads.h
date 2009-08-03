@@ -34,7 +34,14 @@ StgRegTable * resumeThread  (void *);
 //
 int    cmp_thread      (StgPtr tso1, StgPtr tso2);
 int    rts_getThreadId (StgPtr tso);
+
+#if !defined(mingw32_HOST_OS)
 pid_t  forkProcess     (HsStablePtr *entry);
+#else
+pid_t  forkProcess     (HsStablePtr *entry)
+    GNU_ATTRIBUTE(__noreturn__);
+#endif
+
 HsBool rtsSupportsBoundThreads (void);
 
 // The number of Capabilities

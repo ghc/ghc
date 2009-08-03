@@ -1717,7 +1717,6 @@ forkProcess(HsStablePtr *entry
     }
 #else /* !FORKPROCESS_PRIMOP_SUPPORTED */
     barf("forkProcess#: primop not supported on this platform, sorry!\n");
-    return -1;
 #endif
 }
 

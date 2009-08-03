@@ -3,12 +3,10 @@
  * 
  */
 #include "Rts.h"
-#include "Timer.h"
 #include "Ticker.h"
 #include <windows.h>
 #include <stdio.h>
 #include <process.h>
-#include "OSThreads.h"
 
 /*
  * Provide a timer service for the RTS, periodically

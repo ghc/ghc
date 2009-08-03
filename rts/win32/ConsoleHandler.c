@@ -5,10 +5,8 @@
 #include "Rts.h"
 #include <windows.h>
 #include "ConsoleHandler.h"
-#include "SchedAPI.h"
 #include "Schedule.h"
 #include "RtsUtils.h"
-#include "RtsFlags.h"
 #include "AsyncIO.h"
 #include "RtsSignals.h"
 

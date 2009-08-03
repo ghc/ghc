@@ -7,9 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
-#include "OSMem.h"
+#include "sm/OSMem.h"
 #include "RtsUtils.h"
-#include "RtsMessages.h"
 
 #if HAVE_WINDOWS_H
 #include <windows.h>
