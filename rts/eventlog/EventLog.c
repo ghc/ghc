@@ -39,22 +39,22 @@ typedef struct _EventsBuf {
 EventsBuf *eventsBuf;
 
 char *EventDesc[] = {
-  "Create thread",
-  "Run thread",
-  "Stop thread",
-  "Thread runnable",
-  "Migrate thread",
-  "Run spark",
-  "Steal spark",
-  "Shutdown",
-  "Wakeup thread",
-  "Starting GC",
-  "Finished GC",
-  "Request sequential GC",
-  "Request parallel GC",
-  "Create spark",
-  "Spark to thread", /* DEPRECATED! */
-  "Create spark thread"
+  [EVENT_CREATE_THREAD]       = "Create thread",
+  [EVENT_RUN_THREAD]          = "Run thread",
+  [EVENT_STOP_THREAD]         = "Stop thread",
+  [EVENT_THREAD_RUNNABLE]     = "Thread runnable",
+  [EVENT_MIGRATE_THREAD]      = "Migrate thread",
+  [EVENT_RUN_SPARK]           = "Run spark",
+  [EVENT_STEAL_SPARK]         = "Steal spark",
+  [EVENT_SHUTDOWN]            = "Shutdown",
+  [EVENT_THREAD_WAKEUP]       = "Wakeup thread",
+  [EVENT_GC_START]            = "Starting GC",
+  [EVENT_GC_END]              = "Finished GC",
+  [EVENT_REQUEST_SEQ_GC]      = "Request sequential GC",
+  [EVENT_REQUEST_PAR_GC]      = "Request parallel GC",
+  [EVENT_CREATE_SPARK]        = "Create spark",
+  [EVENT_SPARK_TO_THREAD]     = "Spark to thread", /* DEPRECATED! */
+  [EVENT_CREATE_SPARK_THREAD] = "Create spark thread"
 };
 
 // Event type. 
