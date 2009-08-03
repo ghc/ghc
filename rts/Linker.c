@@ -1292,7 +1292,7 @@ mmap_again:
 #if defined(x86_64_HOST_ARCH)
    if (mmap_32bit_base != 0) {
        if (result == map_addr) {
-           mmap_32bit_base = map_addr + size;
+           mmap_32bit_base = (StgWord8*)map_addr + size;
        } else {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
@@ -1310,7 +1310,7 @@ mmap_again:
                // hmm, we were given memory somewhere else, but it's
                // still under 2Gb so we can use it.  Next time, ask
                // for memory right after the place we just got some
-               mmap_32bit_base = (void*)result + size;
+               mmap_32bit_base = (StgWord8*)result + size;
            }
        }
    } else {

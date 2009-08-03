@@ -251,6 +251,9 @@ sm/Storage_CC_OPTS  += -Wno-strict-prototypes
 # inlining warnings happen in Compact
 sm/Compact_CC_OPTS += -Wno-inline
 
+# emits warnings about call-clobbered registers on x86_64
+StgCRun_CC_OPTS += -w
+
 RetainerProfile_CC_OPTS += -w
 RetainerSet_CC_OPTS += -Wno-format
 # On Windows:

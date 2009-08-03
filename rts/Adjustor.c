@@ -509,6 +509,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
     {  
 	int i = 0;
 	char *c;
+	StgWord8 *adj_code;
 
 	// determine whether we have 6 or more integer arguments,
 	// and therefore need to flush one to the stack.
@@ -519,34 +520,36 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
 	if (i < 6) {
 	    adjustor = allocateExec(0x30,&code);
+            adj_code = (StgWord8*)adjustor;
 
-	    *(StgInt32 *)adjustor        = 0x49c1894d;
-	    *(StgInt32 *)(adjustor+0x4)  = 0x8948c889;
-	    *(StgInt32 *)(adjustor+0x8)  = 0xf28948d1;
-	    *(StgInt32 *)(adjustor+0xc)  = 0x48fe8948;
-	    *(StgInt32 *)(adjustor+0x10) = 0x000a3d8b;
-	    *(StgInt32 *)(adjustor+0x14) = 0x25ff0000;
-	    *(StgInt32 *)(adjustor+0x18) = 0x0000000c;
-	    *(StgInt64 *)(adjustor+0x20) = (StgInt64)hptr;
-	    *(StgInt64 *)(adjustor+0x28) = (StgInt64)wptr;
+	    *(StgInt32 *)adj_code        = 0x49c1894d;
+	    *(StgInt32 *)(adj_code+0x4)  = 0x8948c889;
+	    *(StgInt32 *)(adj_code+0x8)  = 0xf28948d1;
+	    *(StgInt32 *)(adj_code+0xc)  = 0x48fe8948;
+	    *(StgInt32 *)(adj_code+0x10) = 0x000a3d8b;
+	    *(StgInt32 *)(adj_code+0x14) = 0x25ff0000;
+	    *(StgInt32 *)(adj_code+0x18) = 0x0000000c;
+	    *(StgInt64 *)(adj_code+0x20) = (StgInt64)hptr;
+	    *(StgInt64 *)(adj_code+0x28) = (StgInt64)wptr;
 	}
 	else
 	{
 	    adjustor = allocateExec(0x40,&code);
+            adj_code = (StgWord8*)adjustor;
 
-	    *(StgInt32 *)adjustor        = 0x35ff5141;
-	    *(StgInt32 *)(adjustor+0x4)  = 0x00000020;
-	    *(StgInt32 *)(adjustor+0x8)  = 0x49c1894d;
-	    *(StgInt32 *)(adjustor+0xc)  = 0x8948c889;
-	    *(StgInt32 *)(adjustor+0x10) = 0xf28948d1;
-	    *(StgInt32 *)(adjustor+0x14) = 0x48fe8948;
-	    *(StgInt32 *)(adjustor+0x18) = 0x00123d8b;
-	    *(StgInt32 *)(adjustor+0x1c) = 0x25ff0000;
-	    *(StgInt32 *)(adjustor+0x20) = 0x00000014;
+	    *(StgInt32 *)adj_code        = 0x35ff5141;
+	    *(StgInt32 *)(adj_code+0x4)  = 0x00000020;
+	    *(StgInt32 *)(adj_code+0x8)  = 0x49c1894d;
+	    *(StgInt32 *)(adj_code+0xc)  = 0x8948c889;
+	    *(StgInt32 *)(adj_code+0x10) = 0xf28948d1;
+	    *(StgInt32 *)(adj_code+0x14) = 0x48fe8948;
+	    *(StgInt32 *)(adj_code+0x18) = 0x00123d8b;
+	    *(StgInt32 *)(adj_code+0x1c) = 0x25ff0000;
+	    *(StgInt32 *)(adj_code+0x20) = 0x00000014;
 	    
-	    *(StgInt64 *)(adjustor+0x28) = (StgInt64)obscure_ccall_ret_code;
-	    *(StgInt64 *)(adjustor+0x30) = (StgInt64)hptr;
-	    *(StgInt64 *)(adjustor+0x38) = (StgInt64)wptr;
+	    *(StgInt64 *)(adj_code+0x28) = (StgInt64)obscure_ccall_ret_code;
+	    *(StgInt64 *)(adj_code+0x30) = (StgInt64)hptr;
+	    *(StgInt64 *)(adj_code+0x38) = (StgInt64)wptr;
 	}
     }
 #elif defined(sparc_HOST_ARCH)
@@ -1121,9 +1124,9 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
  freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #elif defined(x86_64_HOST_ARCH)
  if ( *(StgWord16 *)ptr == 0x894d ) {
-     freeStablePtr(*(StgStablePtr*)(ptr+0x20));
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x20));
  } else if ( *(StgWord16 *)ptr == 0x5141 ) {
-     freeStablePtr(*(StgStablePtr*)(ptr+0x30));
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x30));
  } else {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
