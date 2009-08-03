@@ -1034,7 +1034,7 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
                       stdcall_adj_target
 #ifdef mingw32_TARGET_OS
                           | StdCallConv <- cconv
-                          = let size = a_reps_sizeW * wORD_SIZE in
+                          = let size = fromIntegral a_reps_sizeW * wORD_SIZE in
                             mkFastString (unpackFS target ++ '@':show size)
 #endif
                           | otherwise
