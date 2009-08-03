@@ -76,21 +76,16 @@
 #define WEAK		        52
 #define STABLE_NAME	        53
 #define TSO		        54
-#define BLOCKED_FETCH	        55
-#define FETCH_ME                56
-#define FETCH_ME_BQ             57
-#define RBH                     58
-#define REMOTE_REF              59
-#define TVAR_WATCH_QUEUE        60
-#define INVARIANT_CHECK_QUEUE   61
-#define ATOMIC_INVARIANT        62
-#define TVAR                    63
-#define TREC_CHUNK              64
-#define TREC_HEADER             65
-#define ATOMICALLY_FRAME        66
-#define CATCH_RETRY_FRAME       67
-#define CATCH_STM_FRAME         68
-#define WHITEHOLE               69
-#define N_CLOSURE_TYPES         70
+#define TVAR_WATCH_QUEUE        55
+#define INVARIANT_CHECK_QUEUE   56
+#define ATOMIC_INVARIANT        57
+#define TVAR                    58
+#define TREC_CHUNK              59
+#define TREC_HEADER             60
+#define ATOMICALLY_FRAME        61
+#define CATCH_RETRY_FRAME       62
+#define CATCH_STM_FRAME         63
+#define WHITEHOLE               64
+#define N_CLOSURE_TYPES         65
 
 #endif /* RTS_STORAGE_CLOSURETYPES_H */

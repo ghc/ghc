@@ -179,11 +179,6 @@ processHeapClosureForDead( StgClosure *c )
     case RET_SMALL:
     case RET_BIG:
 	// others
-    case BLOCKED_FETCH:
-    case FETCH_ME:
-    case FETCH_ME_BQ:
-    case RBH:
-    case REMOTE_REF:
     case INVALID_OBJECT:
     default:
 	barf("Invalid object in processHeapClosureForDead(): %d", info->type);

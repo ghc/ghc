@@ -76,11 +76,6 @@ StgWord16 closure_flags[] = {
  [WEAK]		   	=  (_HNF|     _NS|              _UPT           ),
  [STABLE_NAME]	   	=  (_HNF|     _NS|              _UPT           ),
  [TSO]                 	=  (_HNF|     _NS|         _MUT|_UPT           ),
- [BLOCKED_FETCH]	=  (_HNF|     _NS|         _MUT|_UPT           ),
- [FETCH_ME]		=  (_HNF|     _NS|         _MUT|_UPT           ),
- [FETCH_ME_BQ]          =  ( 	      _NS|         _MUT|_UPT           ),
- [RBH]                  =  ( 	      _NS|         _MUT|_UPT           ),
- [REMOTE_REF]		=  (_HNF|     _NS|              _UPT           ),
  [TVAR_WATCH_QUEUE]     =  (          _NS|         _MUT|_UPT           ),
  [INVARIANT_CHECK_QUEUE]=  (          _NS|         _MUT|_UPT           ),
  [ATOMIC_INVARIANT]     =  (          _NS|         _MUT|_UPT           ),
@@ -93,6 +88,6 @@ StgWord16 closure_flags[] = {
  [WHITEHOLE]		=  ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 70
+#if N_CLOSURE_TYPES != 65
 #error Closure types changed: update ClosureFlags.c!
 #endif
