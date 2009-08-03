@@ -549,7 +549,7 @@ INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, P_ unused )
 {
     R1 = Sp(1);
     Sp_adj(2);
-    jump takeMVarzh_fast;
+    jump stg_takeMVarzh;
 }
 
 // code fragment executed just before we return to the scheduler
@@ -577,7 +577,7 @@ INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, P_ unused1, P_ unused2 )
     R2 = Sp(2);
     R1 = Sp(1);
     Sp_adj(3);
-    jump putMVarzh_fast;
+    jump stg_putMVarzh;
 }
 
 // code fragment executed just before we return to the scheduler
@@ -626,7 +626,7 @@ INFO_TABLE_RET( stg_block_throwto, RET_SMALL, P_ unused, P_ unused )
     R2 = Sp(2);
     R1 = Sp(1);
     Sp_adj(3);
-    jump killThreadzh_fast;
+    jump stg_killThreadzh;
 }
 
 stg_block_throwto_finally

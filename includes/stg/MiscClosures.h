@@ -486,113 +486,113 @@ RTS_FUN(StgReturn);
    PrimOps
    -------------------------------------------------------------------------- */
 
-RTS_FUN(plusIntegerzh_fast);
-RTS_FUN(minusIntegerzh_fast);
-RTS_FUN(timesIntegerzh_fast);
-RTS_FUN(gcdIntegerzh_fast);
-RTS_FUN(quotRemIntegerzh_fast);
-RTS_FUN(quotIntegerzh_fast);
-RTS_FUN(remIntegerzh_fast);
-RTS_FUN(divExactIntegerzh_fast);
-RTS_FUN(divModIntegerzh_fast);
+RTS_FUN(stg_plusIntegerzh);
+RTS_FUN(stg_minusIntegerzh);
+RTS_FUN(stg_timesIntegerzh);
+RTS_FUN(stg_gcdIntegerzh);
+RTS_FUN(stg_quotRemIntegerzh);
+RTS_FUN(stg_quotIntegerzh);
+RTS_FUN(stg_remIntegerzh);
+RTS_FUN(stg_divExactIntegerzh);
+RTS_FUN(stg_divModIntegerzh);
 
-RTS_FUN(cmpIntegerIntzh_fast);
-RTS_FUN(cmpIntegerzh_fast);
-RTS_FUN(integer2Intzh_fast);
-RTS_FUN(integer2Wordzh_fast);
-RTS_FUN(gcdIntegerIntzh_fast);
-RTS_FUN(gcdIntzh_fast);
+RTS_FUN(stg_cmpIntegerIntzh);
+RTS_FUN(stg_cmpIntegerzh);
+RTS_FUN(stg_integer2Intzh);
+RTS_FUN(stg_integer2Wordzh);
+RTS_FUN(stg_gcdIntegerIntzh);
+RTS_FUN(stg_gcdIntzh);
 
-RTS_FUN(int2Integerzh_fast);
-RTS_FUN(word2Integerzh_fast);
+RTS_FUN(stg_int2Integerzh);
+RTS_FUN(stg_word2Integerzh);
 
-RTS_FUN(decodeFloatzuIntzh_fast);
-RTS_FUN(decodeDoublezh_fast);
-RTS_FUN(decodeDoublezu2Intzh_fast);
+RTS_FUN(stg_decodeFloatzuIntzh);
+RTS_FUN(stg_decodeDoublezh);
+RTS_FUN(stg_decodeDoublezu2Intzh);
 
-RTS_FUN(andIntegerzh_fast);
-RTS_FUN(orIntegerzh_fast);
-RTS_FUN(xorIntegerzh_fast);
-RTS_FUN(complementIntegerzh_fast);
+RTS_FUN(stg_andIntegerzh);
+RTS_FUN(stg_orIntegerzh);
+RTS_FUN(stg_xorIntegerzh);
+RTS_FUN(stg_complementIntegerzh);
 
 #if SIZEOF_HSINT == 4
 
-RTS_FUN(int64ToIntegerzh_fast);
-RTS_FUN(word64ToIntegerzh_fast);
+RTS_FUN(stg_int64ToIntegerzh);
+RTS_FUN(stg_word64ToIntegerzh);
 
 #endif
 
-RTS_FUN(unsafeThawArrayzh_fast);
-RTS_FUN(newByteArrayzh_fast);
-RTS_FUN(newPinnedByteArrayzh_fast);
-RTS_FUN(newAlignedPinnedByteArrayzh_fast);
-RTS_FUN(newArrayzh_fast);
+RTS_FUN(stg_unsafeThawArrayzh);
+RTS_FUN(stg_newByteArrayzh);
+RTS_FUN(stg_newPinnedByteArrayzh);
+RTS_FUN(stg_newAlignedPinnedByteArrayzh);
+RTS_FUN(stg_newArrayzh);
 
-RTS_FUN(newMutVarzh_fast);
-RTS_FUN(atomicModifyMutVarzh_fast);
+RTS_FUN(stg_newMutVarzh);
+RTS_FUN(stg_atomicModifyMutVarzh);
 
-RTS_FUN(isEmptyMVarzh_fast);
-RTS_FUN(newMVarzh_fast);
-RTS_FUN(takeMVarzh_fast);
-RTS_FUN(putMVarzh_fast);
-RTS_FUN(tryTakeMVarzh_fast);
-RTS_FUN(tryPutMVarzh_fast);
+RTS_FUN(stg_isEmptyMVarzh);
+RTS_FUN(stg_newMVarzh);
+RTS_FUN(stg_takeMVarzh);
+RTS_FUN(stg_putMVarzh);
+RTS_FUN(stg_tryTakeMVarzh);
+RTS_FUN(stg_tryPutMVarzh);
 
-RTS_FUN(waitReadzh_fast);
-RTS_FUN(waitWritezh_fast);
-RTS_FUN(delayzh_fast);
+RTS_FUN(stg_waitReadzh);
+RTS_FUN(stg_waitWritezh);
+RTS_FUN(stg_delayzh);
 #ifdef mingw32_HOST_OS
-RTS_FUN(asyncReadzh_fast);
-RTS_FUN(asyncWritezh_fast);
-RTS_FUN(asyncDoProczh_fast);
+RTS_FUN(stg_asyncReadzh);
+RTS_FUN(stg_asyncWritezh);
+RTS_FUN(stg_asyncDoProczh);
 #endif
 
-RTS_FUN(catchzh_fast);
-RTS_FUN(raisezh_fast);
-RTS_FUN(raiseIOzh_fast);
+RTS_FUN(stg_catchzh);
+RTS_FUN(stg_raisezh);
+RTS_FUN(stg_raiseIOzh);
 
-RTS_FUN(makeStableNamezh_fast);
-RTS_FUN(makeStablePtrzh_fast);
-RTS_FUN(deRefStablePtrzh_fast);
+RTS_FUN(stg_makeStableNamezh);
+RTS_FUN(stg_makeStablePtrzh);
+RTS_FUN(stg_deRefStablePtrzh);
 
-RTS_FUN(forkzh_fast);
-RTS_FUN(forkOnzh_fast);
-RTS_FUN(yieldzh_fast);
-RTS_FUN(killThreadzh_fast);
-RTS_FUN(asyncExceptionsBlockedzh_fast);
-RTS_FUN(blockAsyncExceptionszh_fast);
-RTS_FUN(unblockAsyncExceptionszh_fast);
-RTS_FUN(myThreadIdzh_fast);
-RTS_FUN(labelThreadzh_fast);
-RTS_FUN(isCurrentThreadBoundzh_fast);
-RTS_FUN(threadStatuszh_fast);
+RTS_FUN(stg_forkzh);
+RTS_FUN(stg_forkOnzh);
+RTS_FUN(stg_yieldzh);
+RTS_FUN(stg_killThreadzh);
+RTS_FUN(stg_asyncExceptionsBlockedzh);
+RTS_FUN(stg_blockAsyncExceptionszh);
+RTS_FUN(stg_unblockAsyncExceptionszh);
+RTS_FUN(stg_myThreadIdzh);
+RTS_FUN(stg_labelThreadzh);
+RTS_FUN(stg_isCurrentThreadBoundzh);
+RTS_FUN(stg_threadStatuszh);
 
-RTS_FUN(mkWeakzh_fast);
-RTS_FUN(mkWeakForeignzh_fast);
-RTS_FUN(mkWeakForeignEnvzh_fast);
-RTS_FUN(finalizzeWeakzh_fast);
-RTS_FUN(deRefWeakzh_fast);
+RTS_FUN(stg_mkWeakzh);
+RTS_FUN(stg_mkWeakForeignzh);
+RTS_FUN(stg_mkWeakForeignEnvzh);
+RTS_FUN(stg_finalizzeWeakzh);
+RTS_FUN(stg_deRefWeakzh);
 
-RTS_FUN(newBCOzh_fast);
-RTS_FUN(mkApUpd0zh_fast);
+RTS_FUN(stg_newBCOzh);
+RTS_FUN(stg_mkApUpd0zh);
 
-RTS_FUN(retryzh_fast);
-RTS_FUN(catchRetryzh_fast);
-RTS_FUN(catchSTMzh_fast);
-RTS_FUN(atomicallyzh_fast);
-RTS_FUN(newTVarzh_fast);
-RTS_FUN(readTVarzh_fast);
-RTS_FUN(readTVarIOzh_fast);
-RTS_FUN(writeTVarzh_fast);
-RTS_FUN(checkzh_fast);
+RTS_FUN(stg_retryzh);
+RTS_FUN(stg_catchRetryzh);
+RTS_FUN(stg_catchSTMzh);
+RTS_FUN(stg_atomicallyzh);
+RTS_FUN(stg_newTVarzh);
+RTS_FUN(stg_readTVarzh);
+RTS_FUN(stg_readTVarIOzh);
+RTS_FUN(stg_writeTVarzh);
+RTS_FUN(stg_checkzh);
 
-RTS_FUN(unpackClosurezh_fast);
-RTS_FUN(getApStackValzh_fast);
-RTS_FUN(getSparkzh_fast);
+RTS_FUN(stg_unpackClosurezh);
+RTS_FUN(stg_getApStackValzh);
+RTS_FUN(stg_getSparkzh);
 
-RTS_FUN(noDuplicatezh_fast);
+RTS_FUN(stg_noDuplicatezh);
 
-RTS_FUN(traceCcszh_fast);
+RTS_FUN(stg_traceCcszh);
 
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes

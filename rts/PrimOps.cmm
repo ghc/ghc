@@ -51,10 +51,10 @@ import ghczmprim_GHCziBool_False_closure;
  * round up to the nearest word for the size of the array.
  */
 
-newByteArrayzh_fast
+stg_newByteArrayzh
 {
     W_ words, payload_words, n, p;
-    MAYBE_GC(NO_PTRS,newByteArrayzh_fast);
+    MAYBE_GC(NO_PTRS,stg_newByteArrayzh);
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
@@ -68,11 +68,11 @@ newByteArrayzh_fast
 #define BA_ALIGN 16
 #define BA_MASK  (BA_ALIGN-1)
 
-newPinnedByteArrayzh_fast
+stg_newPinnedByteArrayzh
 {
     W_ words, bytes, payload_words, p;
 
-    MAYBE_GC(NO_PTRS,newPinnedByteArrayzh_fast);
+    MAYBE_GC(NO_PTRS,stg_newPinnedByteArrayzh);
     bytes = R1;
     /* payload_words is what we will tell the profiler we had to allocate */
     payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
@@ -97,11 +97,11 @@ newPinnedByteArrayzh_fast
     RET_P(p);
 }
 
-newAlignedPinnedByteArrayzh_fast
+stg_newAlignedPinnedByteArrayzh
 {
     W_ words, bytes, payload_words, p, alignment;
 
-    MAYBE_GC(NO_PTRS,newAlignedPinnedByteArrayzh_fast);
+    MAYBE_GC(NO_PTRS,stg_newAlignedPinnedByteArrayzh);
     bytes = R1;
     alignment = R2;
 
@@ -130,13 +130,13 @@ newAlignedPinnedByteArrayzh_fast
     RET_P(p);
 }
 
-newArrayzh_fast
+stg_newArrayzh
 {
     W_ words, n, init, arr, p;
     /* Args: R1 = words, R2 = initialisation value */
 
     n = R1;
-    MAYBE_GC(R2_PTR,newArrayzh_fast);
+    MAYBE_GC(R2_PTR,stg_newArrayzh);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
     ("ptr" arr) = foreign "C" allocateLocal(MyCapability() "ptr",words) [R2];
@@ -158,7 +158,7 @@ newArrayzh_fast
     RET_P(arr);
 }
 
-unsafeThawArrayzh_fast
+stg_unsafeThawArrayzh
 {
   // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
   //
@@ -193,12 +193,12 @@ unsafeThawArrayzh_fast
    MutVar primitives
    -------------------------------------------------------------------------- */
 
-newMutVarzh_fast
+stg_newMutVarzh
 {
     W_ mv;
     /* Args: R1 = initialisation value */
 
-    ALLOC_PRIM( SIZEOF_StgMutVar, R1_PTR, newMutVarzh_fast);
+    ALLOC_PRIM( SIZEOF_StgMutVar, R1_PTR, stg_newMutVarzh);
 
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
     SET_HDR(mv,stg_MUT_VAR_DIRTY_info,W_[CCCS]);
@@ -207,7 +207,7 @@ newMutVarzh_fast
     RET_P(mv);
 }
 
-atomicModifyMutVarzh_fast
+stg_atomicModifyMutVarzh
 {
     W_ mv, f, z, x, y, r, h;
     /* Args: R1 :: MutVar#,  R2 :: a -> (a,b) */
@@ -246,7 +246,7 @@ atomicModifyMutVarzh_fast
 
 #define SIZE (THUNK_2_SIZE + THUNK_1_SIZE + THUNK_1_SIZE)
 
-   HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
+   HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, stg_atomicModifyMutVarzh);
 
    mv = R1;
    f = R2;
@@ -295,7 +295,7 @@ atomicModifyMutVarzh_fast
 
 STRING(stg_weak_msg,"New weak pointer at %p\n")
 
-mkWeakzh_fast
+stg_mkWeakzh
 {
   /* R1 = key
      R2 = value
@@ -307,7 +307,7 @@ mkWeakzh_fast
     R3 = stg_NO_FINALIZER_closure;
   }
 
-  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, mkWeakzh_fast );
+  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, stg_mkWeakzh );
 
   w = Hp - SIZEOF_StgWeak + WDS(1);
   SET_HDR(w, stg_WEAK_info, W_[CCCS]);
@@ -329,7 +329,7 @@ mkWeakzh_fast
   RET_P(w);
 }
 
-mkWeakForeignEnvzh_fast
+stg_mkWeakForeignEnvzh
 {
   /* R1 = key
      R2 = value
@@ -349,7 +349,7 @@ mkWeakForeignEnvzh_fast
   flag = R5;
   eptr = R6;
 
-  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR, mkWeakForeignEnvzh_fast );
+  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR, stg_mkWeakForeignEnvzh );
 
   w = Hp - SIZEOF_StgWeak + WDS(1);
   SET_HDR(w, stg_WEAK_info, W_[CCCS]);
@@ -383,7 +383,7 @@ mkWeakForeignEnvzh_fast
   RET_P(w);
 }
 
-finalizzeWeakzh_fast
+stg_finalizzeWeakzh
 {
   /* R1 = weak ptr
    */
@@ -435,7 +435,7 @@ finalizzeWeakzh_fast
   }
 }
 
-deRefWeakzh_fast
+stg_deRefWeakzh
 {
   /* R1 = weak ptr */
   W_ w, code, val;
@@ -455,14 +455,14 @@ deRefWeakzh_fast
    Floating point operations.
    -------------------------------------------------------------------------- */
 
-decodeFloatzuIntzh_fast
+stg_decodeFloatzuIntzh
 { 
     W_ p;
     F_ arg;
     W_ mp_tmp1;
     W_ mp_tmp_w;
 
-    STK_CHK_GEN( WDS(2), NO_PTRS, decodeFloatzuIntzh_fast );
+    STK_CHK_GEN( WDS(2), NO_PTRS, stg_decodeFloatzuIntzh );
 
     mp_tmp1  = Sp - WDS(1);
     mp_tmp_w = Sp - WDS(2);
@@ -477,7 +477,7 @@ decodeFloatzuIntzh_fast
     RET_NN(W_[mp_tmp1], W_[mp_tmp_w]);
 }
 
-decodeDoublezu2Intzh_fast
+stg_decodeDoublezu2Intzh
 { 
     D_ arg;
     W_ p;
@@ -486,7 +486,7 @@ decodeDoublezu2Intzh_fast
     W_ mp_result1;
     W_ mp_result2;
 
-    STK_CHK_GEN( WDS(4), NO_PTRS, decodeDoublezu2Intzh_fast );
+    STK_CHK_GEN( WDS(4), NO_PTRS, stg_decodeDoublezu2Intzh );
 
     mp_tmp1    = Sp - WDS(1);
     mp_tmp2    = Sp - WDS(2);
@@ -510,11 +510,11 @@ decodeDoublezu2Intzh_fast
  * Concurrency primitives
  * -------------------------------------------------------------------------- */
 
-forkzh_fast
+stg_forkzh
 {
   /* args: R1 = closure to spark */
 
-  MAYBE_GC(R1_PTR, forkzh_fast);
+  MAYBE_GC(R1_PTR, stg_forkzh);
 
   W_ closure;
   W_ threadid;
@@ -538,11 +538,11 @@ forkzh_fast
   RET_P(threadid);
 }
 
-forkOnzh_fast
+stg_forkOnzh
 {
   /* args: R1 = cpu, R2 = closure to spark */
 
-  MAYBE_GC(R2_PTR, forkOnzh_fast);
+  MAYBE_GC(R2_PTR, stg_forkOnzh);
 
   W_ cpu;
   W_ closure;
@@ -568,18 +568,18 @@ forkOnzh_fast
   RET_P(threadid);
 }
 
-yieldzh_fast
+stg_yieldzh
 {
   jump stg_yield_noregs;
 }
 
-myThreadIdzh_fast
+stg_myThreadIdzh
 {
   /* no args. */
   RET_P(CurrentTSO);
 }
 
-labelThreadzh_fast
+stg_labelThreadzh
 {
   /* args: 
 	R1 = ThreadId#
@@ -590,7 +590,7 @@ labelThreadzh_fast
   jump %ENTRY_CODE(Sp(0));
 }
 
-isCurrentThreadBoundzh_fast
+stg_isCurrentThreadBoundzh
 {
   /* no args */
   W_ r;
@@ -598,7 +598,7 @@ isCurrentThreadBoundzh_fast
   RET_N(r);
 }
 
-threadStatuszh_fast
+stg_threadStatuszh
 {
     /* args: R1 :: ThreadId# */
     W_ tso;
@@ -802,24 +802,24 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
 
 // Primop definition ------------------------------------------------------------
 
-atomicallyzh_fast
+stg_atomicallyzh
 {
   W_ frame;
   W_ old_trec;
   W_ new_trec;
   
   // stmStartTransaction may allocate
-  MAYBE_GC (R1_PTR, atomicallyzh_fast); 
+  MAYBE_GC (R1_PTR, stg_atomicallyzh); 
 
   /* Args: R1 = m :: STM a */
-  STK_CHK_GEN(SIZEOF_StgAtomicallyFrame + WDS(1), R1_PTR, atomicallyzh_fast);
+  STK_CHK_GEN(SIZEOF_StgAtomicallyFrame + WDS(1), R1_PTR, stg_atomicallyzh);
 
   old_trec = StgTSO_trec(CurrentTSO);
 
   /* Nested transactions are not allowed; raise an exception */
   if (old_trec != NO_TREC) {
      R1 = base_ControlziExceptionziBase_nestedAtomically_closure;
-     jump raisezh_fast;
+     jump stg_raisezh;
   }
 
   /* Set up the atomically frame */
@@ -840,13 +840,13 @@ atomicallyzh_fast
 }
 
 
-catchSTMzh_fast
+stg_catchSTMzh
 {
   W_ frame;
   
   /* Args: R1 :: STM a */
   /* Args: R2 :: Exception -> STM a */
-  STK_CHK_GEN(SIZEOF_StgCatchSTMFrame + WDS(1), R1_PTR & R2_PTR, catchSTMzh_fast);
+  STK_CHK_GEN(SIZEOF_StgCatchSTMFrame + WDS(1), R1_PTR & R2_PTR, stg_catchSTMzh);
 
   /* Set up the catch frame */
   Sp = Sp - SIZEOF_StgCatchSTMFrame;
@@ -868,18 +868,18 @@ catchSTMzh_fast
 }
 
 
-catchRetryzh_fast
+stg_catchRetryzh
 {
   W_ frame;
   W_ new_trec;
   W_ trec;
 
   // stmStartTransaction may allocate
-  MAYBE_GC (R1_PTR & R2_PTR, catchRetryzh_fast); 
+  MAYBE_GC (R1_PTR & R2_PTR, stg_catchRetryzh); 
 
   /* Args: R1 :: STM a */
   /* Args: R2 :: STM a */
-  STK_CHK_GEN(SIZEOF_StgCatchRetryFrame + WDS(1), R1_PTR & R2_PTR, catchRetryzh_fast);
+  STK_CHK_GEN(SIZEOF_StgCatchRetryFrame + WDS(1), R1_PTR & R2_PTR, stg_catchRetryzh);
 
   /* Start a nested transaction within which to run the first code */
   trec = StgTSO_trec(CurrentTSO);
@@ -900,7 +900,7 @@ catchRetryzh_fast
 }
 
 
-retryzh_fast
+stg_retryzh
 {
   W_ frame_type;
   W_ frame;
@@ -908,7 +908,7 @@ retryzh_fast
   W_ outer;
   W_ r;
 
-  MAYBE_GC (NO_PTRS, retryzh_fast); // STM operations may allocate
+  MAYBE_GC (NO_PTRS, stg_retryzh); // STM operations may allocate
 
   // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
 retry_pop_stack:
@@ -973,12 +973,12 @@ retry_pop_stack:
 }
 
 
-checkzh_fast
+stg_checkzh
 {
   W_ trec, closure;
 
   /* Args: R1 = invariant closure */
-  MAYBE_GC (R1_PTR, checkzh_fast); 
+  MAYBE_GC (R1_PTR, stg_checkzh); 
 
   trec = StgTSO_trec(CurrentTSO);
   closure = R1;
@@ -990,21 +990,21 @@ checkzh_fast
 }
 
 
-newTVarzh_fast
+stg_newTVarzh
 {
   W_ tv;
   W_ new_value;
 
   /* Args: R1 = initialisation value */
 
-  MAYBE_GC (R1_PTR, newTVarzh_fast); 
+  MAYBE_GC (R1_PTR, stg_newTVarzh); 
   new_value = R1;
   ("ptr" tv) = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr") [];
   RET_P(tv);
 }
 
 
-readTVarzh_fast
+stg_readTVarzh
 {
   W_ trec;
   W_ tvar;
@@ -1012,7 +1012,7 @@ readTVarzh_fast
 
   /* Args: R1 = TVar closure */
 
-  MAYBE_GC (R1_PTR, readTVarzh_fast); // Call to stmReadTVar may allocate
+  MAYBE_GC (R1_PTR, stg_readTVarzh); // Call to stmReadTVar may allocate
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
   ("ptr" result) = foreign "C" stmReadTVar(MyCapability() "ptr", trec "ptr", tvar "ptr") [];
@@ -1020,7 +1020,7 @@ readTVarzh_fast
   RET_P(result);
 }
 
-readTVarIOzh_fast
+stg_readTVarIOzh
 {
     W_ result;
 
@@ -1032,7 +1032,7 @@ again:
     RET_P(result);
 }
 
-writeTVarzh_fast
+stg_writeTVarzh
 {
   W_ trec;
   W_ tvar;
@@ -1041,7 +1041,7 @@ writeTVarzh_fast
   /* Args: R1 = TVar closure */
   /*       R2 = New value    */
 
-  MAYBE_GC (R1_PTR & R2_PTR, writeTVarzh_fast); // Call to stmWriteTVar may allocate
+  MAYBE_GC (R1_PTR & R2_PTR, stg_writeTVarzh); // Call to stmWriteTVar may allocate
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
   new_value = R2;
@@ -1083,7 +1083,7 @@ writeTVarzh_fast
  *
  * -------------------------------------------------------------------------- */
 
-isEmptyMVarzh_fast
+stg_isEmptyMVarzh
 {
     /* args: R1 = MVar closure */
 
@@ -1094,12 +1094,12 @@ isEmptyMVarzh_fast
     }
 }
 
-newMVarzh_fast
+stg_newMVarzh
 {
     /* args: none */
     W_ mvar;
 
-    ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, newMVarzh_fast );
+    ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, stg_newMVarzh );
   
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
     SET_HDR(mvar,stg_MVAR_DIRTY_info,W_[CCCS]);
@@ -1119,7 +1119,7 @@ newMVarzh_fast
     StgTSO_sp(tso) = StgTSO_sp(tso) + WDS(3);	\
     lval = W_[StgTSO_sp(tso) - WDS(1)];
 
-takeMVarzh_fast
+stg_takeMVarzh
 {
     W_ mvar, val, info, tso;
 
@@ -1208,7 +1208,7 @@ takeMVarzh_fast
 }
 
 
-tryTakeMVarzh_fast
+stg_tryTakeMVarzh
 {
     W_ mvar, val, info, tso;
 
@@ -1281,7 +1281,7 @@ tryTakeMVarzh_fast
 }
 
 
-putMVarzh_fast
+stg_putMVarzh
 {
     W_ mvar, val, info, tso;
 
@@ -1365,7 +1365,7 @@ putMVarzh_fast
 }
 
 
-tryPutMVarzh_fast
+stg_tryPutMVarzh
 {
     W_ mvar, info, tso;
 
@@ -1437,11 +1437,11 @@ tryPutMVarzh_fast
    Stable pointer primitives
    -------------------------------------------------------------------------  */
 
-makeStableNamezh_fast
+stg_makeStableNamezh
 {
     W_ index, sn_obj;
 
-    ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, makeStableNamezh_fast );
+    ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, stg_makeStableNamezh );
   
     (index) = foreign "C" lookupStableName(R1 "ptr") [];
 
@@ -1461,16 +1461,16 @@ makeStableNamezh_fast
 }
 
 
-makeStablePtrzh_fast
+stg_makeStablePtrzh
 {
     /* Args: R1 = a */
     W_ sp;
-    MAYBE_GC(R1_PTR, makeStablePtrzh_fast);
+    MAYBE_GC(R1_PTR, stg_makeStablePtrzh);
     ("ptr" sp) = foreign "C" getStablePtr(R1 "ptr") [];
     RET_N(sp);
 }
 
-deRefStablePtrzh_fast
+stg_deRefStablePtrzh
 {
     /* Args: R1 = the stable ptr */
     W_ r, sp;
@@ -1483,7 +1483,7 @@ deRefStablePtrzh_fast
    Bytecode object primitives
    -------------------------------------------------------------------------  */
 
-newBCOzh_fast
+stg_newBCOzh
 {
     /* R1 = instrs
        R2 = literals
@@ -1498,7 +1498,7 @@ newBCOzh_fast
     words = BYTES_TO_WDS(SIZEOF_StgBCO) + StgArrWords_words(bitmap_arr);
     bytes = WDS(words);
 
-    ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R5_PTR, newBCOzh_fast );
+    ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R5_PTR, stg_newBCOzh );
 
     bco = Hp - bytes + WDS(1);
     SET_HDR(bco, stg_BCO_info, W_[CCCS]);
@@ -1523,7 +1523,7 @@ for:
 }
 
 
-mkApUpd0zh_fast
+stg_mkApUpd0zh
 {
     // R1 = the BCO# for the AP
     //	
@@ -1535,7 +1535,7 @@ mkApUpd0zh_fast
     ASSERT(%INFO_TYPE(%GET_STD_INFO(R1)) == HALF_W_(BCO) &&
 	   StgBCO_arity(R1) == HALF_W_(0));
 
-    HP_CHK_GEN_TICKY(SIZEOF_StgAP, R1_PTR, mkApUpd0zh_fast);
+    HP_CHK_GEN_TICKY(SIZEOF_StgAP, R1_PTR, stg_mkApUpd0zh);
     TICK_ALLOC_UP_THK(0, 0);
     CCCS_ALLOC(SIZEOF_StgAP);
 
@@ -1548,7 +1548,7 @@ mkApUpd0zh_fast
     RET_P(ap);
 }
 
-unpackClosurezh_fast
+stg_unpackClosurezh
 {
 /* args: R1 = closure to analyze */
 // TODO: Consider the absence of ptrs or nonptrs as a special case ?
@@ -1582,7 +1582,7 @@ out:
     nptrs_arr_sz = SIZEOF_StgArrWords   + WDS(nptrs);
     ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs);
 
-    ALLOC_PRIM (ptrs_arr_sz + nptrs_arr_sz, R1_PTR, unpackClosurezh_fast);
+    ALLOC_PRIM (ptrs_arr_sz + nptrs_arr_sz, R1_PTR, stg_unpackClosurezh);
 
     W_ clos;
     clos = UNTAG(R1);
@@ -1628,7 +1628,7 @@ for2:
     }							\
     W_[blocked_queue_tl] = tso;
 
-waitReadzh_fast
+stg_waitReadzh
 {
     /* args: R1 */
 #ifdef THREADED_RTS
@@ -1645,7 +1645,7 @@ waitReadzh_fast
 #endif
 }
 
-waitWritezh_fast
+stg_waitWritezh
 {
     /* args: R1 */
 #ifdef THREADED_RTS
@@ -1663,8 +1663,8 @@ waitWritezh_fast
 }
 
 
-STRING(stg_delayzh_malloc_str, "delayzh_fast")
-delayzh_fast
+STRING(stg_delayzh_malloc_str, "stg_delayzh")
+stg_delayzh
 {
 #ifdef mingw32_HOST_OS
     W_ ares;
@@ -1737,8 +1737,8 @@ while:
 
 
 #ifdef mingw32_HOST_OS
-STRING(stg_asyncReadzh_malloc_str, "asyncReadzh_fast")
-asyncReadzh_fast
+STRING(stg_asyncReadzh_malloc_str, "stg_asyncReadzh")
+stg_asyncReadzh
 {
     W_ ares;
     CInt reqID;
@@ -1765,8 +1765,8 @@ asyncReadzh_fast
 #endif
 }
 
-STRING(stg_asyncWritezh_malloc_str, "asyncWritezh_fast")
-asyncWritezh_fast
+STRING(stg_asyncWritezh_malloc_str, "stg_asyncWritezh")
+stg_asyncWritezh
 {
     W_ ares;
     CInt reqID;
@@ -1793,8 +1793,8 @@ asyncWritezh_fast
 #endif
 }
 
-STRING(stg_asyncDoProczh_malloc_str, "asyncDoProczh_fast")
-asyncDoProczh_fast
+STRING(stg_asyncDoProczh_malloc_str, "stg_asyncDoProczh")
+stg_asyncDoProczh
 {
     W_ ares;
     CInt reqID;
@@ -1826,7 +1826,7 @@ asyncDoProczh_fast
 // evaluation by the current thread are also under evaluation by
 // another thread.  It relies on *both* threads doing noDuplicate#;
 // the second one will get blocked if they are duplicating some work.
-noDuplicatezh_fast
+stg_noDuplicatezh
 {
     SAVE_THREAD_STATE();
     ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
@@ -1841,7 +1841,7 @@ noDuplicatezh_fast
     }
 }
 
-getApStackValzh_fast
+stg_getApStackValzh
 {
    W_ ap_stack, offset, val, ok;
 
@@ -1866,7 +1866,7 @@ getApStackValzh_fast
 // Write the cost center stack of the first argument on stderr; return
 // the second.  Possibly only makes sense for already evaluated
 // things?
-traceCcszh_fast
+stg_traceCcszh
 {
     W_ ccs;
 
@@ -1879,7 +1879,7 @@ traceCcszh_fast
     ENTER();
 }
 
-getSparkzh_fast
+stg_getSparkzh
 {
    W_ spark;
 

@@ -96,10 +96,10 @@ INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret, RET_SMALL )
     jump %ENTRY_CODE(Sp(0));
 }
 
-blockAsyncExceptionszh_fast
+stg_blockAsyncExceptionszh
 {
     /* Args: R1 :: IO a */
-    STK_CHK_GEN( WDS(2)/* worst case */, R1_PTR, blockAsyncExceptionszh_fast);
+    STK_CHK_GEN( WDS(2)/* worst case */, R1_PTR, stg_blockAsyncExceptionszh);
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
 	
@@ -119,12 +119,12 @@ blockAsyncExceptionszh_fast
     jump stg_ap_v_fast;
 }
 
-unblockAsyncExceptionszh_fast
+stg_unblockAsyncExceptionszh
 {
     CInt r;
 
     /* Args: R1 :: IO a */
-    STK_CHK_GEN( WDS(4), R1_PTR, unblockAsyncExceptionszh_fast);
+    STK_CHK_GEN( WDS(4), R1_PTR, stg_unblockAsyncExceptionszh);
     /* 4 words: one for the unblock frame, 3 for setting up the
      * stack to call maybePerformBlockedException() below.
      */
@@ -185,7 +185,7 @@ unblockAsyncExceptionszh_fast
     jump stg_ap_v_fast;
 }
 
-asyncExceptionsBlockedzh_fast
+stg_asyncExceptionsBlockedzh
 {
     /* args: none */
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
@@ -195,7 +195,7 @@ asyncExceptionsBlockedzh_fast
     }
 }
 
-killThreadzh_fast
+stg_killThreadzh
 {
     /* args: R1 = TSO to kill, R2 = Exception */
 
@@ -207,7 +207,7 @@ killThreadzh_fast
     exception = R2;
     
     /* Needs 3 words because throwToSingleThreaded uses some stack */
-    STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, killThreadzh_fast);
+    STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, stg_killThreadzh);
 
     /* 
      * We might have killed ourselves.  In which case, better be *very*
@@ -227,7 +227,7 @@ killThreadzh_fast
          * thread?  Presumably it should behave as if throwTo just returned,
          * and then continue from there.  See #3279, #3288.  This is what
          * happens: on resumption, we will just jump to the next frame on
-         * the stack, which is the return point for killThreadzh_fast.
+         * the stack, which is the return point for stg_killThreadzh.
          */
 	SAVE_THREAD_STATE();
 	/* ToDo: what if the current thread is blocking exceptions? */
@@ -301,13 +301,13 @@ INFO_TABLE(stg_catch,2,0,FUN,"catch","catch")
 {
   R2 = StgClosure_payload(R1,1); /* h */
   R1 = StgClosure_payload(R1,0); /* x */
-  jump catchzh_fast;
+  jump stg_catchzh;
 }
 
-catchzh_fast
+stg_catchzh
 {
     /* args: R1 = m :: IO a, R2 = handler :: Exception -> IO a */
-    STK_CHK_GEN(SIZEOF_StgCatchFrame + WDS(1), R1_PTR & R2_PTR, catchzh_fast);
+    STK_CHK_GEN(SIZEOF_StgCatchFrame + WDS(1), R1_PTR & R2_PTR, stg_catchzh);
   
     /* Set up the catch frame */
     Sp = Sp - SIZEOF_StgCatchFrame;
@@ -330,13 +330,13 @@ catchzh_fast
  *
  *   raise = {err} \n {} -> raise#{err}
  *
- * It is used in raisezh_fast to update thunks on the update list
+ * It is used in stg_raisezh to update thunks on the update list
  * -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_raise,1,0,THUNK_1_0,"raise","raise")
 {
   R1 = StgThunk_payload(R1,0);
-  jump raisezh_fast;
+  jump stg_raisezh;
 }
 
 section "data" {
@@ -348,10 +348,10 @@ INFO_TABLE_RET(stg_raise_ret, RET_SMALL, P_ arg1)
   R1 = Sp(1);
   Sp = Sp + WDS(2);
   W_[no_break_on_exception] = 1;  
-  jump raisezh_fast;
+  jump stg_raisezh;
 }
 
-raisezh_fast
+stg_raisezh
 {
     W_ handler;
     W_ frame_type;
@@ -512,8 +512,8 @@ retry_pop_stack:
     jump RET_LBL(stg_ap_pv);
 }
 
-raiseIOzh_fast
+stg_raiseIOzh
 {
   /* Args :: R1 :: Exception */
-  jump raisezh_fast;
+  jump stg_raisezh;
 }

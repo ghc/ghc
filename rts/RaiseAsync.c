@@ -728,7 +728,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 #if defined(PROFILING)
     /* 
      * Debugging tool: on raising an  exception, show where we are.
-     * See also Exception.cmm:raisezh_fast.
+     * See also Exception.cmm:stg_raisezh.
      * This wasn't done for asynchronous exceptions originally; see #1450 
      */
     if (RtsFlags.ProfFlags.showCCSOnException)

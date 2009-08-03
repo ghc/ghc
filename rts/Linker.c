@@ -224,10 +224,10 @@ typedef struct _RtsSymbolVal {
     void   *addr;
 } RtsSymbolVal;
 
-#define Maybe_Stable_Names      SymI_HasProto(mkWeakzh_fast)			\
-      				SymI_HasProto(mkWeakForeignEnvzh_fast)		\
-      				SymI_HasProto(makeStableNamezh_fast)		\
-      				SymI_HasProto(finalizzeWeakzh_fast)
+#define Maybe_Stable_Names      SymI_HasProto(stg_mkWeakzh)			\
+      				SymI_HasProto(stg_mkWeakForeignEnvzh)		\
+      				SymI_HasProto(stg_makeStableNamezh)		\
+      				SymI_HasProto(stg_finalizzeWeakzh)
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
@@ -356,9 +356,9 @@ typedef struct _RtsSymbolVal {
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                           \
-      SymI_HasProto(asyncReadzh_fast)			 \
-      SymI_HasProto(asyncWritezh_fast)			 \
-      SymI_HasProto(asyncDoProczh_fast)			 \
+      SymI_HasProto(stg_asyncReadzh)			 \
+      SymI_HasProto(stg_asyncWritezh)			 \
+      SymI_HasProto(stg_asyncDoProczh)			 \
       SymI_HasProto(memset)                              \
       SymI_HasProto(inet_ntoa)                           \
       SymI_HasProto(inet_addr)                           \
@@ -591,29 +591,29 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(__2Int_encodeDouble)		\
       SymI_HasProto(__int_encodeFloat)			\
       SymI_HasProto(__word_encodeFloat)			\
-      SymI_HasProto(atomicallyzh_fast)			\
+      SymI_HasProto(stg_atomicallyzh)			\
       SymI_HasProto(barf)				\
       SymI_HasProto(debugBelch)				\
       SymI_HasProto(errorBelch)				\
       SymI_HasProto(sysErrorBelch)                      \
-      SymI_HasProto(asyncExceptionsBlockedzh_fast)	\
-      SymI_HasProto(blockAsyncExceptionszh_fast)	\
-      SymI_HasProto(catchzh_fast)			\
-      SymI_HasProto(catchRetryzh_fast)			\
-      SymI_HasProto(catchSTMzh_fast)			\
-      SymI_HasProto(checkzh_fast)                       \
+      SymI_HasProto(stg_asyncExceptionsBlockedzh)	\
+      SymI_HasProto(stg_blockAsyncExceptionszh)	        \
+      SymI_HasProto(stg_catchzh)			\
+      SymI_HasProto(stg_catchRetryzh)			\
+      SymI_HasProto(stg_catchSTMzh)			\
+      SymI_HasProto(stg_checkzh)                        \
       SymI_HasProto(closure_flags)                      \
       SymI_HasProto(cmp_thread)				\
       SymI_HasProto(createAdjustor)			\
-      SymI_HasProto(decodeDoublezu2Intzh_fast)		\
-      SymI_HasProto(decodeFloatzuIntzh_fast)		\
+      SymI_HasProto(stg_decodeDoublezu2Intzh)		\
+      SymI_HasProto(stg_decodeFloatzuIntzh)		\
       SymI_HasProto(defaultsHook)			\
-      SymI_HasProto(delayzh_fast)			\
-      SymI_HasProto(deRefWeakzh_fast)			\
-      SymI_HasProto(deRefStablePtrzh_fast)		\
+      SymI_HasProto(stg_delayzh)			\
+      SymI_HasProto(stg_deRefWeakzh)			\
+      SymI_HasProto(stg_deRefStablePtrzh)		\
       SymI_HasProto(dirty_MUT_VAR)			\
-      SymI_HasProto(forkzh_fast)			\
-      SymI_HasProto(forkOnzh_fast)			\
+      SymI_HasProto(stg_forkzh)			        \
+      SymI_HasProto(stg_forkOnzh)			\
       SymI_HasProto(forkProcess)			\
       SymI_HasProto(forkOS_createThread)		\
       SymI_HasProto(freeHaskellFunctionPtr)		\
@@ -634,44 +634,44 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(hs_hpc_rootModule)		        \
       SymI_HasProto(hs_hpc_module)		        \
       SymI_HasProto(initLinker)				\
-      SymI_HasProto(unpackClosurezh_fast)               \
-      SymI_HasProto(getApStackValzh_fast)               \
-      SymI_HasProto(getSparkzh_fast)                    \
-      SymI_HasProto(isCurrentThreadBoundzh_fast)	\
-      SymI_HasProto(isEmptyMVarzh_fast)			\
-      SymI_HasProto(killThreadzh_fast)			\
+      SymI_HasProto(stg_unpackClosurezh)                \
+      SymI_HasProto(stg_getApStackValzh)                \
+      SymI_HasProto(stg_getSparkzh)                     \
+      SymI_HasProto(stg_isCurrentThreadBoundzh)	        \
+      SymI_HasProto(stg_isEmptyMVarzh)			\
+      SymI_HasProto(stg_killThreadzh)			\
       SymI_HasProto(loadObj)          			\
       SymI_HasProto(insertStableSymbol) 		\
       SymI_HasProto(insertSymbol)     			\
       SymI_HasProto(lookupSymbol)     			\
-      SymI_HasProto(makeStablePtrzh_fast)		\
-      SymI_HasProto(mkApUpd0zh_fast)			\
-      SymI_HasProto(myThreadIdzh_fast)			\
-      SymI_HasProto(labelThreadzh_fast)                 \
-      SymI_HasProto(newArrayzh_fast)			\
-      SymI_HasProto(newBCOzh_fast)			\
-      SymI_HasProto(newByteArrayzh_fast)		\
+      SymI_HasProto(stg_makeStablePtrzh)		\
+      SymI_HasProto(stg_mkApUpd0zh)			\
+      SymI_HasProto(stg_myThreadIdzh)			\
+      SymI_HasProto(stg_labelThreadzh)                  \
+      SymI_HasProto(stg_newArrayzh)			\
+      SymI_HasProto(stg_newBCOzh)			\
+      SymI_HasProto(stg_newByteArrayzh)  		\
       SymI_HasProto_redirect(newCAF, newDynCAF)		\
-      SymI_HasProto(newMVarzh_fast)			\
-      SymI_HasProto(newMutVarzh_fast)			\
-      SymI_HasProto(newTVarzh_fast)			\
-      SymI_HasProto(noDuplicatezh_fast)			\
-      SymI_HasProto(atomicModifyMutVarzh_fast)		\
-      SymI_HasProto(newPinnedByteArrayzh_fast)		\
-      SymI_HasProto(newAlignedPinnedByteArrayzh_fast)	\
+      SymI_HasProto(stg_newMVarzh)			\
+      SymI_HasProto(stg_newMutVarzh)			\
+      SymI_HasProto(stg_newTVarzh)			\
+      SymI_HasProto(stg_noDuplicatezh)			\
+      SymI_HasProto(stg_atomicModifyMutVarzh)		\
+      SymI_HasProto(stg_newPinnedByteArrayzh)		\
+      SymI_HasProto(stg_newAlignedPinnedByteArrayzh)	\
       SymI_HasProto(newSpark)				\
       SymI_HasProto(performGC)				\
       SymI_HasProto(performMajorGC)			\
       SymI_HasProto(prog_argc)				\
       SymI_HasProto(prog_argv)				\
-      SymI_HasProto(putMVarzh_fast)			\
-      SymI_HasProto(raisezh_fast)			\
-      SymI_HasProto(raiseIOzh_fast)			\
-      SymI_HasProto(readTVarzh_fast)			\
-      SymI_HasProto(readTVarIOzh_fast)			\
+      SymI_HasProto(stg_putMVarzh)			\
+      SymI_HasProto(stg_raisezh)			\
+      SymI_HasProto(stg_raiseIOzh)			\
+      SymI_HasProto(stg_readTVarzh)			\
+      SymI_HasProto(stg_readTVarIOzh)			\
       SymI_HasProto(resumeThread)			\
       SymI_HasProto(resolveObjs)                        \
-      SymI_HasProto(retryzh_fast)                       \
+      SymI_HasProto(stg_retryzh)                        \
       SymI_HasProto(rts_apply)				\
       SymI_HasProto(rts_checkSchedStatus)		\
       SymI_HasProto(rts_eval)				\
@@ -793,17 +793,17 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_sel_9_upd_info)			\
       SymI_HasProto(stg_upd_frame_info)			\
       SymI_HasProto(suspendThread)			\
-      SymI_HasProto(takeMVarzh_fast)			\
-      SymI_HasProto(threadStatuszh_fast)		\
-      SymI_HasProto(tryPutMVarzh_fast)			\
-      SymI_HasProto(tryTakeMVarzh_fast)			\
-      SymI_HasProto(unblockAsyncExceptionszh_fast)	\
+      SymI_HasProto(stg_takeMVarzh)			\
+      SymI_HasProto(stg_threadStatuszh)		        \
+      SymI_HasProto(stg_tryPutMVarzh)			\
+      SymI_HasProto(stg_tryTakeMVarzh)			\
+      SymI_HasProto(stg_unblockAsyncExceptionszh)	\
       SymI_HasProto(unloadObj)                          \
-      SymI_HasProto(unsafeThawArrayzh_fast)		\
-      SymI_HasProto(waitReadzh_fast)			\
-      SymI_HasProto(waitWritezh_fast)			\
-      SymI_HasProto(writeTVarzh_fast)			\
-      SymI_HasProto(yieldzh_fast)                       \
+      SymI_HasProto(stg_unsafeThawArrayzh)		\
+      SymI_HasProto(stg_waitReadzh)			\
+      SymI_HasProto(stg_waitWritezh)			\
+      SymI_HasProto(stg_writeTVarzh)			\
+      SymI_HasProto(stg_yieldzh)                        \
       SymI_NeedsProto(stg_interp_constr_entry)          \
       SymI_HasProto(alloc_blocks)                       \
       SymI_HasProto(alloc_blocks_lim)                   \
@@ -818,7 +818,7 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(rts_stop_on_exception)		\
       SymI_HasProto(stopTimer)				\
       SymI_HasProto(n_capabilities)			\
-      SymI_HasProto(traceCcszh_fast)                    \
+      SymI_HasProto(stg_traceCcszh)                     \
       RTS_USER_SIGNALS_SYMBOLS
 
 

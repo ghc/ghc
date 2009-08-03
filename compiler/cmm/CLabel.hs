@@ -897,7 +897,7 @@ pprCLbl (RtsLabel (RtsRetFS fs))
   = ftext fs <> ptext (sLit "_ret")
 
 pprCLbl (RtsLabel (RtsPrimOp primop)) 
-  = ppr primop <> ptext (sLit "_fast")
+  = ptext (sLit "stg_") <> ppr primop
 
 pprCLbl (RtsLabel (RtsSlowTickyCtr pat)) 
   = ptext (sLit "SLOW_CALL_") <> text pat <> ptext (sLit "_ctr")
