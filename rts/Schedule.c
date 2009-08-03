@@ -174,12 +174,12 @@ static void deleteThread_(Capability *cap, StgTSO *tso);
 
 #ifdef DEBUG
 static char *whatNext_strs[] = {
-  "(unknown)",
-  "ThreadRunGHC",
-  "ThreadInterpret",
-  "ThreadKilled",
-  "ThreadRelocated",
-  "ThreadComplete"
+  [0]               = "(unknown)",
+  [ThreadRunGHC]    = "ThreadRunGHC",
+  [ThreadInterpret] = "ThreadInterpret",
+  [ThreadKilled]    = "ThreadKilled",
+  [ThreadRelocated] = "ThreadRelocated",
+  [ThreadComplete]  = "ThreadComplete"
 };
 #endif
 
