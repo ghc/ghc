@@ -428,7 +428,7 @@ retry_pop_stack:
             // deadlock if an exception is raised in InteractiveUI,
             // for exmplae.  Perhaps the stop_on_exception flag should
             // be per-thread.
-            W_[rts_stop_on_exception] = 0;
+            CInt[rts_stop_on_exception] = 0;
             ("ptr" ioAction) = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
             Sp = Sp - WDS(7);
             Sp(6) = exception;
