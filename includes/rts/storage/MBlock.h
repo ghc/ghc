@@ -24,6 +24,11 @@ extern void *getFirstMBlock(void);
 extern void *getNextMBlock(void *mblock);
 #endif
 
+#ifdef THREADED_RTS
+// needed for HEAP_ALLOCED below
+extern SpinLock gc_alloc_block_sync;
+#endif
+
 /* -----------------------------------------------------------------------------
    The HEAP_ALLOCED() test.
 
@@ -142,10 +147,6 @@ typedef struct {
 } MBlockMap;
 
 extern lnat mpc_misses;
-
-#ifdef THREADED_RTS
-extern SpinLock gc_alloc_block_sync;
-#endif
 
 StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p);
 
