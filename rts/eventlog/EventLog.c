@@ -139,7 +139,7 @@ initEventLogging(void)
 
     debugTrace(DEBUG_eventlog, "intiEventLog: start");
 
-    event_log_filename = stgMallocBytes(strlen(prog_name) + 9, 
+    event_log_filename = stgMallocBytes(strlen(prog_name) + 10,
                                         "initEventLogging");
 
     if (sizeof(EventDesc) / sizeof(char*) != NUM_EVENT_TAGS) {
@@ -399,7 +399,7 @@ printAndClearEventLog(Capability *cap)
 
 void initEventsBuf(EventsBuf* eb, StgWord64 size)
 {
-    eb->begin = eb->pos = malloc(size);
+    eb->begin = eb->pos = stgMallocBytes(size, "initEventsBuf");
     eb->size = size;
 }
 
