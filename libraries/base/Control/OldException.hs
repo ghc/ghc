@@ -29,7 +29,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Control.OldException (
+module Control.OldException {-# DEPRECATED "Future versions of base will not support the old exceptions style. Please switch to extensible exceptions." #-} (
 
         -- * The Exception type
         Exception(..),          -- instance Eq, Ord, Show, Typeable
