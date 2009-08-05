@@ -1,5 +1,4 @@
 #include "Rts.h"
-#include "Storage.h"
 
 // This file is only included when GhcBuildDylibs is set in mk/build.mk.
 // It contains an __attribute__((constructor)) function (run prior to main())
