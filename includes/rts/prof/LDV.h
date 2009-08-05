@@ -23,17 +23,22 @@
  * because retainer profiling also expects LDVW(c) to be initialised
  * to zero.
  */
-#ifndef CMINUSMINUS
-#define LDV_RECORD_CREATE(c)   \
-  LDVW((c)) = ((StgWord)RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE
-#endif
 
 #ifdef CMINUSMINUS
+
 #define LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(c) \
   foreign "C" LDV_recordDead_FILL_SLOP_DYNAMIC(c "ptr")
+
 #else
+
+#define LDV_RECORD_CREATE(c)   \
+  LDVW((c)) = ((StgWord)RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE
+
+void LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p );
+
 #define LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(c) \
   LDV_recordDead_FILL_SLOP_DYNAMIC(c)
+
 #endif
 
 #else  /* !PROFILING */

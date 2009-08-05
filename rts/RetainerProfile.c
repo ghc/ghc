@@ -30,6 +30,7 @@
 #include "Stats.h"
 #include "ProfHeap.h"
 #include "Apply.h"
+#include "sm/Storage.h" // for END_OF_STATIC_LIST
 
 /*
   Note: what to change in order to plug-in a new retainer profiling scheme?

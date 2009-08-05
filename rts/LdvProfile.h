@@ -14,7 +14,6 @@
 
 #include "ProfHeap.h"
 
-extern void LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p );
 extern void LdvCensusForDead ( nat );
 extern void LdvCensusKillAll ( void );
 

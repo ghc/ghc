@@ -176,7 +176,6 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         /* registered CCS list */
 
 #define REGISTER_CC(cc)					\
 	do {						\
-	extern CostCentre cc[];				\
 	if ((cc)->link == (CostCentre *)0) {		\
 	    (cc)->link = CC_LIST;			\
 	    CC_LIST = (cc);				\
@@ -185,7 +184,6 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         /* registered CCS list */
 
 #define REGISTER_CCS(ccs)				\
 	do {						\
-	extern CostCentreStack ccs[];			\
         if ((ccs)->prevStack == (CostCentreStack *)0) {	\
 	  (ccs)->prevStack = CCS_LIST;			\
 	  CCS_LIST = (ccs);				\

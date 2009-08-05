@@ -13,6 +13,7 @@
 #include "Rts.h"
 
 #include "Profiling.h"
+#include "LdvProfile.h"
 #include "Stats.h"
 #include "RtsUtils.h"
 #include "Schedule.h"

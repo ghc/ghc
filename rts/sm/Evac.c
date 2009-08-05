@@ -22,6 +22,7 @@
 #include "Compact.h"
 #include "Prelude.h"
 #include "Trace.h"
+#include "LdvProfile.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
 StgWord64 whitehole_spin = 0;

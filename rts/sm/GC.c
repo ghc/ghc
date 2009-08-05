@@ -33,6 +33,7 @@
 #endif
 #include "Trace.h"
 #include "RetainerProfile.h"
+#include "LdvProfile.h"
 #include "RaiseAsync.h"
 #include "Papi.h"
 #include "Stable.h"

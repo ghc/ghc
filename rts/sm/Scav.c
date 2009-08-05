@@ -25,6 +25,7 @@
 #include "Trace.h"
 #include "Sanity.h"
 #include "Capability.h"
+#include "LdvProfile.h"
 
 static void scavenge_stack (StgPtr p, StgPtr stack_end);
 
