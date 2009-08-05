@@ -52,8 +52,21 @@ class BufferedIO dev where
   -- buffer.
   fillReadBuffer0   :: dev -> Buffer Word8 -> IO (Maybe Int, Buffer Word8)
 
-  -- | Flush all the data from the supplied write buffer out to the device
-  flushWriteBuffer  :: dev -> Buffer Word8 -> IO ()
+  -- | Prepares an empty write buffer.  This lets the device decide
+  -- how to set up a write buffer: the buffer may need to point to a
+  -- specific location in memory, for example.  This is typically used
+  -- by the client when switching from reading to writing on a
+  -- buffered read/write device.
+  --
+  -- There is no corresponding operation for read buffers, because before
+  -- reading the client will always call 'fillReadBuffer'.
+  emptyWriteBuffer  :: dev -> Buffer Word8 -> IO (Buffer Word8)
+  emptyWriteBuffer _dev buf 
+    = return buf{ bufL=0, bufR=0, bufState = WriteBuffer }
+
+  -- | Flush all the data from the supplied write buffer out to the device.
+  -- The returned buffer should be empty, and ready for writing.
+  flushWriteBuffer  :: dev -> Buffer Word8 -> IO (Buffer Word8)
 
   -- | Flush data from the supplied write buffer out to the device
   -- without blocking.  Returns the number of bytes written and the
@@ -65,8 +78,8 @@ class BufferedIO dev where
 
 -- for a memory-mapped file, the buffer will be the whole file in
 -- memory.  fillReadBuffer sets the pointers to encompass the whole
--- file, and flushWriteBuffer will do nothing.  A memory-mapped file
--- has to maintain its own file pointer.
+-- file, and flushWriteBuffer needs to do no I/O.  A memory-mapped
+-- file has to maintain its own file pointer.
 
 -- for a bytestring, again the buffer should match the bytestring in
 -- memory.
@@ -98,11 +111,12 @@ readBufNonBlocking dev bbuf = do
      Nothing -> return (Nothing, bbuf)
      Just n  -> return (Just n, bbuf{ bufR = bufR bbuf + fromIntegral n })
 
-writeBuf :: RawIO dev => dev -> Buffer Word8 -> IO ()
+writeBuf :: RawIO dev => dev -> Buffer Word8 -> IO (Buffer Word8)
 writeBuf dev bbuf = do
   let bytes = bufferElems bbuf
   withBuffer bbuf $ \ptr ->
       IODevice.write dev (ptr `plusPtr` bufL bbuf) (fromIntegral bytes)
+  return bbuf{ bufL=0, bufR=0 }
 
 -- XXX ToDo
 writeBufNonBlocking :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8)
@@ -111,5 +125,4 @@ writeBufNonBlocking dev bbuf = do
   res <- withBuffer bbuf $ \ptr ->
             IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf)
                                       (fromIntegral bytes)
-  return (res, bbuf{ bufL = bufL bbuf + res })
-
+  return (res, bufferAdjustL res bbuf)

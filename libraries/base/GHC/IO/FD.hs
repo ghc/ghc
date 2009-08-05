@@ -117,7 +117,7 @@ readBuf' fd buf = do
 #endif
   return (r,buf')
 
-writeBuf' :: FD -> Buffer Word8 -> IO ()
+writeBuf' :: FD -> Buffer Word8 -> IO (Buffer Word8)
 writeBuf' fd buf = do
 #ifdef DEBUG_DUMP
   puts ("writeBuf fd=" ++ show fd ++ " " ++ summaryBuffer buf ++ "\n")

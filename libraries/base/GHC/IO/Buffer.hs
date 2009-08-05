@@ -160,19 +160,21 @@ charSize = 4
 -- ---------------------------------------------------------------------------
 -- Buffers
 
--- The buffer is represented by a mutable variable containing a
--- record, where the record contains the raw buffer and the start/end
--- points of the filled portion.  We use a mutable variable so that
--- the common operation of writing (or reading) some data from (to)
--- the buffer doesn't need to modify, and hence copy, the handle
--- itself, it just updates the buffer.  
-
--- There will be some allocation involved in a simple hPutChar in
--- order to create the new Buffer structure (below), but this is
--- relatively small, and this only has to be done once per write
--- operation.
-
 -- | A mutable array of bytes that can be passed to foreign functions.
+--
+-- The buffer is represented by a record, where the record contains
+-- the raw buffer and the start/end points of the filled portion.  The
+-- buffer contents itself is mutable, but the rest of the record is
+-- immutable.  This is a slightly odd mix, but it turns out to be
+-- quite practical: by making all the buffer metadata immutable, we
+-- can have operations on buffer metadata outside of the IO monad.
+--
+-- The "live" elements of the buffer are those between the 'bufL' and
+-- 'bufR' offsets.  In an empty buffer, 'bufL' is equal to 'bufR', but
+-- they might not be zero: for exmaple, the buffer might correspond to
+-- a memory-mapped file and in which case 'bufL' will point to the
+-- next location to be written, which is not necessarily the beginning
+-- of the file.
 data Buffer e
   = Buffer {
 	bufRaw   :: !(RawBuffer e),
@@ -197,7 +199,7 @@ withRawBuffer :: RawBuffer e -> (Ptr e -> IO a) -> IO a
 withRawBuffer raw f = withForeignPtr (castForeignPtr raw) f
 
 isEmptyBuffer :: Buffer e -> Bool
-isEmptyBuffer Buffer{ bufR=w } = w == 0
+isEmptyBuffer Buffer{ bufL=l, bufR=r } = l == r
 
 isFullBuffer :: Buffer e -> Bool
 isFullBuffer Buffer{ bufR=w, bufSize=s } = s == w
@@ -264,8 +266,7 @@ summaryBuffer buf = "buf" ++ show (bufSize buf) ++ "(" ++ show (bufL buf) ++ "-"
 
 -- INVARIANTS on Buffers:
 --   * r <= w
---   * if r == w, then r == 0 && w == 0
---   * if state == WriteBuffer, then r == 0
+--   * if r == w, and the buffer is for reading, then r == 0 && w == 0
 --   * a write buffer is never full.  If an operation
 --     fills up the buffer, it will always flush it before 
 --     returning.
@@ -278,8 +279,7 @@ checkBuffer buf@Buffer{ bufState = state, bufL=r, bufR=w, bufSize=size } = do
       	size > 0
       	&& r <= w
       	&& w <= size
-      	&& ( r /= w || (r == 0 && w == 0) )
-        && ( state /= WriteBuffer || r == 0 )
+      	&& ( r /= w || state == WriteBuffer || (r == 0 && w == 0) )
         && ( state /= WriteBuffer || w < size ) -- write buffer is never full
       )
 

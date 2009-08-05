@@ -748,9 +748,9 @@ bufWrite h_@Handle__{..} ptr count can_block =
 
         -- else, we have to flush
         else do debugIO "hPutBuf: flushing first"
-                Buffered.flushWriteBuffer haDevice old_buf
+                old_buf' <- Buffered.flushWriteBuffer haDevice old_buf
                         -- TODO: we should do a non-blocking flush here
-                writeIORef haByteBuffer old_buf{bufL=0,bufR=0}
+                writeIORef haByteBuffer old_buf'
                 -- if we can fit in the buffer, then just loop  
                 if count < size
                    then bufWrite h_ ptr count can_block

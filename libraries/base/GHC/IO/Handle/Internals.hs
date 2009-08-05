@@ -205,7 +205,8 @@ checkWritableHandle act h_@Handle__{..}
            buf <- readIORef haCharBuffer
            writeIORef haCharBuffer buf{ bufState = WriteBuffer }
            buf <- readIORef haByteBuffer
-           writeIORef haByteBuffer buf{ bufState = WriteBuffer }
+           buf' <- Buffered.emptyWriteBuffer haDevice buf
+           writeIORef haByteBuffer buf'
         act h_
       _other               -> act h_
 
@@ -705,8 +706,8 @@ writeTextDevice h_@Handle__{..} cbuf = do
   debugIO ("writeTextDevice after encoding: cbuf=" ++ summaryBuffer cbuf' ++ 
         " bbuf=" ++ summaryBuffer bbuf')
 
-  Buffered.flushWriteBuffer haDevice bbuf'
-  writeIORef haByteBuffer bbuf{bufL=0,bufR=0}
+  bbuf' <- Buffered.flushWriteBuffer haDevice bbuf'
+  writeIORef haByteBuffer bbuf'
   if not (isEmptyBuffer cbuf')
      then writeTextDevice h_ cbuf'
      else return ()
