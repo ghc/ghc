@@ -15,6 +15,7 @@
 #include "Stats.h"
 #include "Hash.h"
 #include "RetainerProfile.h"
+#include "LdvProfile.h"
 #include "Arena.h"
 #include "Printer.h"
 
