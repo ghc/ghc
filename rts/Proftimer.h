@@ -9,17 +9,21 @@
 #ifndef PROFTIMER_H
 #define PROFTIMER_H
 
-extern void initProfTimer      ( void );
-extern void handleProfTick     ( void );
+#pragma GCC visibility push(hidden)
+
+void initProfTimer      ( void );
+void handleProfTick     ( void );
 
 #ifdef PROFILING
-extern void stopProfTimer      ( void );
-extern void startProfTimer     ( void );
+void stopProfTimer      ( void );
+void startProfTimer     ( void );
 #endif
 
-extern void stopHeapProfTimer  ( void );
-extern void startHeapProfTimer ( void );
+void stopHeapProfTimer  ( void );
+void startHeapProfTimer ( void );
 
 extern rtsBool performHeapProfile;
+
+#pragma GCC visibility pop
 
 #endif /* PROFTIMER_H */

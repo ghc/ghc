@@ -14,6 +14,8 @@
 #include "Capability.h"
 #include "eventlog/EventLog.h"
 
+#pragma GCC visibility push(hidden)
+
 /* initScheduler(), exitScheduler()
  * Called from STG :  no
  * Locks assumed   :  none
@@ -238,6 +240,8 @@ emptyThreadQueues(Capability *cap)
 }
 
 #endif /* !IN_STG_CODE */
+
+#pragma GCC visibility pop
 
 #endif /* SCHEDULE_H */
 

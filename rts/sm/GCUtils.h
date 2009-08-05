@@ -14,6 +14,8 @@
 #ifndef SM_GCUTILS_H
 #define SM_GCUTILS_H
 
+#pragma GCC visibility push(hidden)
+
 bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
 
@@ -58,5 +60,7 @@ recordMutableGen_GC (StgClosure *p, nat gen_no)
     }
     *bd->free++ = (StgWord)p;
 }
+
+#pragma GCC visibility pop
 
 #endif /* SM_GCUTILS_H */

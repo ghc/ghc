@@ -11,6 +11,8 @@
 
 #include "Capability.h"
 
+#pragma GCC visibility push(hidden)
+
 extern rtsBool running_finalizers;
 extern StgWeak * weak_ptr_list;
 
@@ -18,6 +20,8 @@ void runCFinalizer(void *fn, void *ptr, void *env, StgWord flag);
 void runAllCFinalizers(StgWeak *w);
 void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
+
+#pragma GCC visibility pop
 
 #endif /* WEAK_H */
 

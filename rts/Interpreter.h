@@ -9,6 +9,6 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 
-extern Capability *interpretBCO (Capability* cap);
+RTS_PRIVATE Capability *interpretBCO (Capability* cap);
 
 #endif /* INTERPRETER_H */

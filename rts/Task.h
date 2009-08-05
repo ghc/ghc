@@ -11,6 +11,8 @@
 
 #include "GetTime.h"
 
+#pragma GCC visibility push(hidden)
+
 /* 
    Definition of a Task
    --------------------
@@ -258,5 +260,7 @@ taskEnter (Task *task)
     task->prev_stack = myTask();
     setMyTask(task);
 }
+
+#pragma GCC visibility pop
 
 #endif /* TASK_H */

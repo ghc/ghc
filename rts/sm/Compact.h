@@ -14,6 +14,8 @@
 #ifndef SM_COMPACT_H
 #define SM_COMPACT_H
 
+#pragma GCC visibility push(hidden)
+
 INLINE_HEADER rtsBool
 mark_stack_empty(void)
 {
@@ -74,6 +76,8 @@ is_marked(StgPtr p, bdescr *bd)
     return (*bitmap_word & bit_mask);
 }
 
-extern void compact (StgClosure *static_objects);
+void compact (StgClosure *static_objects);
+
+#pragma GCC visibility pop
 
 #endif /* SM_COMPACT_H */

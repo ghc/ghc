@@ -40,9 +40,7 @@
 #define STM_UNIPROC
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#pragma GCC visibility push(hidden)
 
 /*----------------------------------------------------------------------
 
@@ -50,7 +48,7 @@ extern "C" {
    --------------
 */
 
-extern void stmPreGCHook(void);
+void stmPreGCHook(void);
 
 /*----------------------------------------------------------------------
 
@@ -61,8 +59,8 @@ extern void stmPreGCHook(void);
 
 /* Create and enter a new transaction context */
 
-extern StgTRecHeader *stmStartTransaction(Capability *cap, StgTRecHeader *outer);
-extern StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *outer
+StgTRecHeader *stmStartTransaction(Capability *cap, StgTRecHeader *outer);
+StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *outer
 );
 
 /*
@@ -71,8 +69,8 @@ extern StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *
  * to that read set could change whether or not the tx should abort.
  */
 
-extern void stmAbortTransaction(Capability *cap, StgTRecHeader *trec);
-extern void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
+void stmAbortTransaction(Capability *cap, StgTRecHeader *trec);
+void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Ensure that a subsequent commit / validation will fail.  We use this 
@@ -83,14 +81,14 @@ extern void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
  * in case other threads' updates make it valid in the mean time.
  */
 
-extern void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
+void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Return the trec within which the specified trec was created (not
  * valid if trec==NO_TREC).
  */
 
-extern StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
+StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
 
 /*----------------------------------------------------------------------
 
@@ -106,7 +104,7 @@ extern StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
   threads at GC (in case they are stuck looping)
 */
 
-extern StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
+StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
 
 /*----------------------------------------------------------------------
 
@@ -152,12 +150,12 @@ extern StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
  * transaction.  
  */
 
-extern StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, 
-						       StgTRecHeader *trec);
+StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, 
+                                                StgTRecHeader *trec);
 
-extern void stmAddInvariantToCheck(Capability *cap, 
-				   StgTRecHeader *trec,
-				   StgClosure *code);
+void stmAddInvariantToCheck(Capability *cap, 
+                            StgTRecHeader *trec,
+                            StgClosure *code);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -166,8 +164,8 @@ extern void stmAddInvariantToCheck(Capability *cap,
  * been committed to.
  */
 
-extern StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec);
-extern StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec);
+StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec);
+StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -176,11 +174,9 @@ extern StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec);
  * if the thread is already waiting.  
  */
 
-extern StgBool stmWait(Capability *cap,
-                       StgTSO *tso, 
-                       StgTRecHeader *trec);
+StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec);
 
-extern void stmWaitUnlock(Capability *cap, StgTRecHeader *trec);
+void stmWaitUnlock(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -190,7 +186,7 @@ extern void stmWaitUnlock(Capability *cap, StgTRecHeader *trec);
  * thread is not waiting.
  */
 
-extern StgBool stmReWait(Capability *cap, StgTSO *tso);
+StgBool stmReWait(Capability *cap, StgTSO *tso);
 
 /*----------------------------------------------------------------------
 
@@ -198,8 +194,7 @@ extern StgBool stmReWait(Capability *cap, StgTSO *tso);
    --------------------------
 */
 
-extern StgTVar *stmNewTVar(Capability *cap,
-                           StgClosure *new_value);
+StgTVar *stmNewTVar(Capability *cap, StgClosure *new_value);
 
 /*----------------------------------------------------------------------
 
@@ -212,18 +207,18 @@ extern StgTVar *stmNewTVar(Capability *cap,
  * thread's current transaction.
  */
 
-extern StgClosure *stmReadTVar(Capability *cap,
-                               StgTRecHeader *trec, 
-			       StgTVar *tvar);
+StgClosure *stmReadTVar(Capability *cap,
+                        StgTRecHeader *trec, 
+                        StgTVar *tvar);
 
 /* Update the logical contents of 'tvar' within the context of the
  * thread's current transaction.
  */
 
-extern void stmWriteTVar(Capability *cap,
-                         StgTRecHeader *trec,
-			 StgTVar *tvar, 
-			 StgClosure *new_value);
+void stmWriteTVar(Capability *cap,
+                  StgTRecHeader *trec,
+                  StgTVar *tvar, 
+                  StgClosure *new_value);
 
 /*----------------------------------------------------------------------*/
 
@@ -237,9 +232,7 @@ extern void stmWriteTVar(Capability *cap,
 
 /*----------------------------------------------------------------------*/
 
-#ifdef __cplusplus
-}
-#endif
+#pragma GCC visibility pop
 
 #endif /* STM_H */
 

@@ -9,6 +9,6 @@
 #ifndef STGRUN_H
 #define STGRUN_H
 
-extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
+RTS_PRIVATE StgRegTable * StgRun (StgFunPtr f, StgRegTable *basereg);
 
 #endif /* STGRUN_H */

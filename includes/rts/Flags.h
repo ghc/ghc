@@ -208,9 +208,9 @@ extern RTS_FLAGS RtsFlags;
 
 /* Routines that operate-on/to-do-with RTS flags: */
 
-extern void initRtsFlagsDefaults(void);
-extern void setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[]);
-extern void setProgName(char *argv[]);
+void initRtsFlagsDefaults(void);
+void setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[]);
+void setProgName(char *argv[]);
 
 
 /*

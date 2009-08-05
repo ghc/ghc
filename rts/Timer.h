@@ -9,7 +9,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-void initTimer (void);
-void exitTimer (void);
+RTS_PRIVATE void initTimer (void);
+RTS_PRIVATE void exitTimer (void);
 
 #endif /* TIMER_H */

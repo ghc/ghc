@@ -9,6 +9,8 @@
 #ifndef PRINTER_H
 #define PRINTER_H
 
+#pragma GCC visibility push(hidden)
+
 extern void   	   printPtr        ( StgPtr p );
 extern void   	   printObj        ( StgClosure *obj );
 
@@ -29,6 +31,8 @@ extern void DEBUG_LoadSymbols( char *name );
 
 extern const char *lookupGHCName( void *addr );
 #endif
+
+#pragma GCC visibility pop
 
 #endif /* PRINTER_H */
 

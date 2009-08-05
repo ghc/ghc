@@ -13,7 +13,9 @@
 # include <signal.h>
 #endif
 
-extern rtsBool anyUserHandlers(void);
+#pragma GCC visibility push(hidden)
+
+rtsBool anyUserHandlers(void);
 
 #if !defined(THREADED_RTS)
 extern siginfo_t pending_handler_buf[];
@@ -23,6 +25,8 @@ void startSignalHandlers(Capability *cap);
 #endif
 
 extern StgInt *signal_handlers;
+
+#pragma GCC visibility pop
 
 #endif /* POSIX_SIGNALS_H */
 

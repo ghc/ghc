@@ -22,6 +22,8 @@
 #include "Task.h"
 #include "Sparks.h"
 
+#pragma GCC visibility push(hidden)
+
 struct Capability_ {
     // State required by the STG virtual machine when running Haskell
     // code.  During STG execution, the BaseReg register always points
@@ -329,5 +331,7 @@ contextSwitchCapability (Capability *cap)
     // context-switch flag too:
     cap->context_switch = 1;
 }
+
+#pragma GCC visibility pop
 
 #endif /* CAPABILITY_H */

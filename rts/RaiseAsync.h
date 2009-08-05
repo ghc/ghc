@@ -9,6 +9,8 @@
 #ifndef RAISEASYNC_H
 #define RAISEASYNC_H
 
+#pragma GCC visibility push(hidden)
+
 #define THROWTO_SUCCESS   0
 #define THROWTO_BLOCKED   1
 
@@ -65,6 +67,8 @@ interruptible(StgTSO *t)
 }
 
 #endif /* CMINUSMINUS */
+
+#pragma GCC visibility pop
 
 #endif /* RAISEASYNC_H */
 

@@ -14,6 +14,8 @@
 #ifndef SM_GC_H
 #define SM_GC_H
 
+#pragma GCC visibility push(hidden)
+
 void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
@@ -55,5 +57,7 @@ void releaseGCThreads (Capability *cap);
 #endif
 
 #define WORK_UNIT_WORDS 128
+
+#pragma GCC visibility pop
 
 #endif /* SM_GC_H */

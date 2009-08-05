@@ -16,6 +16,8 @@
 #ifndef TRACE_H
 #define TRACE_H
 
+#pragma GCC visibility push(hidden)
+
 // -----------------------------------------------------------------------------
 // Tracing functions
 // -----------------------------------------------------------------------------
@@ -87,5 +89,7 @@ INLINE_HEADER rtsBool
 traceClass (StgWord32 class) { return (classes_enabled & class); }
 
 // -----------------------------------------------------------------------------
+
+#pragma GCC visibility pop
 
 #endif /* TRACE_H */

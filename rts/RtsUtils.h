@@ -9,6 +9,8 @@
 #ifndef RTSUTILS_H
 #define RTSUTILS_H
 
+#pragma GCC visibility push(hidden)
+
 /* -----------------------------------------------------------------------------
  * (Checked) dynamic allocation
  * -------------------------------------------------------------------------- */
@@ -48,5 +50,7 @@ HsInt resetGenSymZh(void);
 int genericRaise(int sig);
 
 int rts_isProfiled(void);
+
+#pragma GCC visibility pop
 
 #endif /* RTSUTILS_H */

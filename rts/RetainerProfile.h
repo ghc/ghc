@@ -14,10 +14,12 @@
 
 #include "RetainerSet.h"
 
-extern void  initRetainerProfiling ( void );
-extern void  endRetainerProfiling  ( void );
-extern void  retainerProfile       ( void );
-extern void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
+#pragma GCC visibility push(hidden)
+
+void initRetainerProfiling ( void );
+void endRetainerProfiling  ( void );
+void retainerProfile       ( void );
+void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
 
 extern StgWord flip;
 
@@ -40,6 +42,8 @@ retainerSetOf( StgClosure *c )
 #ifdef DEBUG
 extern lnat retainerStackBlocks ( void );
 #endif
+
+#pragma GCC visibility pop
 
 #endif /* PROFILING */
 

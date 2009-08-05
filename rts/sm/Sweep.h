@@ -14,6 +14,6 @@
 #ifndef SM_SWEEP_H
 #define SM_SWEEP_H
 
-void sweep(step *gen);
+RTS_PRIVATE void sweep(step *gen);
 
 #endif /* SM_SWEEP_H */

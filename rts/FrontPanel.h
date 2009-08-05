@@ -9,6 +9,8 @@
 #ifndef FRONTPANEL_H
 #define FRONTPANEL_H
 
+#pragma GCC visibility push(hidden)
+
 #ifdef RTS_GTK_FRONTPANEL
 
 #include "Rts.h"  /* needed because this file gets included by
@@ -30,6 +32,8 @@ extern UpdateMode update_mode;
 extern gboolean continue_now, stop_now, quit;
 
 #endif /* RTS_GTK_FRONTPANEL */
+
+#pragma GCC visibility pop
 
 #endif /* FRONTPANEL_H */
 

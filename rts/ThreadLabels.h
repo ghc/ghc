@@ -10,6 +10,8 @@
 #ifndef THREADLABELS_H
 #define THREADLABELS_H
 
+#pragma GCC visibility push(hidden)
+
 #if defined(DEBUG)
 void    initThreadLabelTable (void);
 void    freeThreadLabelTable (void);
@@ -18,5 +20,7 @@ void *  lookupThreadLabel    (StgWord key);
 void    removeThreadLabel    (StgWord key);
 void    labelThread          (StgPtr tso, char *label);
 #endif
+
+#pragma GCC visibility pop
 
 #endif /* THREADLABELS_H */

@@ -11,15 +11,15 @@
 typedef struct _Arena Arena;
 
 // Start a new arena
-extern Arena * newArena   ( void );
+RTS_PRIVATE Arena * newArena   ( void );
 
 // Allocate memory in an arena
-extern void  * arenaAlloc ( Arena *, size_t );
+RTS_PRIVATE void  * arenaAlloc ( Arena *, size_t );
 
 // Free an entire arena
-extern void    arenaFree  ( Arena * );
+RTS_PRIVATE void arenaFree  ( Arena * );
 
 // For internal use only:
-extern unsigned long arenaBlocks( void );
+RTS_PRIVATE unsigned long arenaBlocks( void );
 
 #endif /* ARENA_H */

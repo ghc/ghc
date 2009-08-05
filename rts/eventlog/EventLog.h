@@ -12,6 +12,8 @@
 #include "rts/EventLogFormat.h"
 #include "Capability.h"
 
+#pragma GCC visibility push(hidden)
+
 #ifdef EVENTLOG
 
 /*
@@ -48,5 +50,7 @@ INLINE_HEADER void postEvent(Capability *cap  STG_UNUSED,
 }
 
 #endif
+
+#pragma GCC visibility pop
 
 #endif /* EVENTLOG_H */

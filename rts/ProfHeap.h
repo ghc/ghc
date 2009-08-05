@@ -9,10 +9,14 @@
 #ifndef PROFHEAP_H
 #define PROFHEAP_H
 
-extern void    heapCensus( void );
-extern nat     initHeapProfiling( void );
-extern void    endHeapProfiling( void );
-extern void    LDV_recordDead( StgClosure *c, nat size );
-extern rtsBool strMatchesSelector( char* str, char* sel );
+#pragma GCC visibility push(hidden)
+
+void    heapCensus         (void);
+nat     initHeapProfiling  (void);
+void    endHeapProfiling   (void);
+void    LDV_recordDead     (StgClosure *c, nat size);
+rtsBool strMatchesSelector (char* str, char* sel);
+
+#pragma GCC visibility pop
 
 #endif /* PROFHEAP_H */

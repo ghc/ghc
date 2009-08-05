@@ -9,6 +9,8 @@
 #ifndef SM_STORAGE_H
 #define SM_STORAGE_H
 
+#pragma GCC visibility push(hidden)
+
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation
    -------------------------------------------------------------------------- */
@@ -165,5 +167,7 @@ void move_TSO  (StgTSO *src, StgTSO *dest);
 
 extern StgClosure * caf_list;
 extern StgClosure * revertible_caf_list;
+
+#pragma GCC visibility pop
 
 #endif /* SM_STORAGE_H */

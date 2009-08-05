@@ -11,6 +11,8 @@
 
 #include "WSDeque.h"
 
+#pragma GCC visibility push(hidden)
+
 /* typedef for SparkPool in RtsTypes.h */
 
 #if defined(THREADED_RTS)
@@ -62,5 +64,7 @@ INLINE_HEADER void discardSparks (SparkPool *pool)
 }
 
 #endif // THREADED_RTS
+
+#pragma GCC visibility pop
 
 #endif /* SPARKS_H */

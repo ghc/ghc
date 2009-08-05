@@ -9,6 +9,6 @@
 #ifndef TICKY_H
 #define TICKY_H
 
-void PrintTickyInfo(void);
+RTS_PRIVATE void PrintTickyInfo(void);
 
 #endif /* TICKY_H */

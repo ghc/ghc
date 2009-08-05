@@ -14,6 +14,8 @@
 
 #ifdef PROFILING
 
+#pragma GCC visibility push(hidden)
+
 /*
   Type 'retainer' defines the retainer identity.
 
@@ -196,6 +198,8 @@ void outputAllRetainerSet(FILE *);
 // Note: This function is not part of retainerSet interface, but this is
 //       the best place to define it.
 void printRetainer(FILE *, retainer);
+
+#pragma GCC visibility pop
 
 #endif /* PROFILING */
 #endif /* RETAINERSET_H */

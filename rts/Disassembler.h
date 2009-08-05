@@ -11,8 +11,8 @@
 
 #ifdef DEBUG
 
-extern int  disInstr   ( StgBCO *bco, int pc );
-extern void disassemble( StgBCO *bco );
+RTS_PRIVATE int  disInstr   ( StgBCO *bco, int pc );
+RTS_PRIVATE void disassemble( StgBCO *bco );
 
 #endif
 

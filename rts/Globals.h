@@ -12,8 +12,8 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
-void initGlobalStore(void);
-void exitGlobalStore(void);
+RTS_PRIVATE void initGlobalStore(void);
+RTS_PRIVATE void exitGlobalStore(void);
 
 #endif
 

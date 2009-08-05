@@ -9,6 +9,6 @@
 #ifndef THREADPAUSED_H
 #define THREADPAUSED_H
 
-void threadPaused ( Capability *cap, StgTSO * );
+RTS_PRIVATE void threadPaused ( Capability *cap, StgTSO * );
 
 #endif /* THREADPAUSED_H */

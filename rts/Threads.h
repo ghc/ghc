@@ -9,6 +9,8 @@
 #ifndef THREADS_H
 #define THREADS_H
 
+#pragma GCC visibility push(hidden)
+
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
 
@@ -26,5 +28,7 @@ void printThreadStatus (StgTSO *t);
 void printAllThreads (void);
 void printThreadQueue (StgTSO *t);
 #endif
+
+#pragma GCC visibility pop
 
 #endif /* THREADS_H */

@@ -17,8 +17,8 @@
  * Called from STG :  NO
  * Locks assumed   :  sched_mutex
  */
-void awaitEvent(rtsBool wait);  /* In posix/Select.c or
-				 * win32/AwaitEvent.c */
+RTS_PRIVATE void awaitEvent(rtsBool wait);  /* In posix/Select.c or
+                                             * win32/AwaitEvent.c */
 #endif
 
 #endif /* AWAITEVENT_H */

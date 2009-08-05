@@ -25,12 +25,14 @@
 
 #if RTS_USER_SIGNALS
 
+#pragma GCC visibility push(hidden)
+
 /*
  * Function: initUserSignals()
  *
  * Initialize the console handling substrate.
  */
-extern void initUserSignals(void);
+void initUserSignals(void);
 
 /*
  * Function: initDefaultHandlers()
@@ -38,10 +40,10 @@ extern void initUserSignals(void);
  * Install any default signal/console handlers. Currently we install a
  * Ctrl+C handler that shuts down the RTS in an orderly manner.
  */
-extern void initDefaultHandlers(void);
-extern void resetDefaultHandlers(void);
+void initDefaultHandlers(void);
+void resetDefaultHandlers(void);
 
-extern void freeSignalHandlers(void);
+void freeSignalHandlers(void);
 
 /*
  * Function: blockUserSignals()
@@ -51,21 +53,21 @@ extern void freeSignalHandlers(void);
  * when emptying the queue by running the handlers.
  * 
  */
-extern void blockUserSignals(void);
+void blockUserSignals(void);
 
 /*
  * Function: unblockUserSignals()
  *
  * The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
-extern void unblockUserSignals(void);
+void unblockUserSignals(void);
 
 /*
  * Function: awaitUserSignals()
  *
  * Wait for the next console event. Currently a NOP (returns immediately.)
  */
-extern void awaitUserSignals(void);
+void awaitUserSignals(void);
 
 /*
  * Function: markSignalHandlers()
@@ -73,7 +75,9 @@ extern void awaitUserSignals(void);
  * Evacuate the handler queue. _Assumes_ that console event delivery
  * has already been blocked.
  */
-extern void markSignalHandlers (evac_fn evac, void *user);
+void markSignalHandlers (evac_fn evac, void *user);
+
+#pragma GCC visibility pop
 
 #endif /* RTS_USER_SIGNALS */
 
