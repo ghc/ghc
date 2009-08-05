@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -#include "cc009_inc.h" #-}
 -- !!! cc009 -- foreign label returning newtype of Addr
 module ShouldCompile where
 
