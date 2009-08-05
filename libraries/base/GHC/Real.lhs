@@ -4,7 +4,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Real
--- Copyright   :  (c) The FFI Task Force, 1994-2002
+-- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
 -- 
 -- Maintainer  :  cvs-ghc@haskell.org
