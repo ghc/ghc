@@ -82,7 +82,7 @@ libffi_DYNAMIC_PROG = $(libffi_HS_DYN_LIB).a
 libffi_DYNAMIC_LIBS = $(libffi_HS_DYN_LIB)
 else
 libffi_DYNAMIC_PROG =
-libffi_DYNAMIC_LIBS = libffi/libffi.so libffi/libffi.so.5 libffi/libffi.so.5.0.7
+libffi_DYNAMIC_LIBS = libffi/libffi.so libffi/libffi.so.5 libffi/libffi.so.5.0.9
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
