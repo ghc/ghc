@@ -12,7 +12,6 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#include "TickyCounters.h"
 #include "Ticky.h"
 
 /* -----------------------------------------------------------------------------
