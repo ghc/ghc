@@ -226,6 +226,7 @@ msum = foldr mplus mzero
 
 -- | List of elements of a structure.
 toList :: Foldable t => t a -> [a]
+{-# INLINE toList #-}
 #ifdef __GLASGOW_HASKELL__
 toList t = build (\ c n -> foldr c n t)
 #else
