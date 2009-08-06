@@ -107,7 +107,12 @@ GhcDebugged=NO
 GhcLibProfiled=$(if $(filter p,$(GhcLibWays)),YES,NO)
 
 # Build shared and/or static libs?
-BuildSharedLibs=@BuildSharedLibs@
+PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),i386-unknown-linux x86_64-unknown-linux),YES,NO)
+ifeq "$(PlatformSupportsSharedLibs)" "YES"
+BuildSharedLibs = YES
+else
+BuildSharedLibs = NO
+endif
 # ToDo later:
 # BuildStaticLibs=@BuildStaticLibs@
 
