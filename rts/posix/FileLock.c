@@ -13,8 +13,9 @@
 #include "Hash.h"
 #include "RtsUtils.h"
 
-#include <unistd.h>
+#include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <errno.h>
 
 typedef struct {
