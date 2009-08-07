@@ -109,8 +109,12 @@ type EqnSet = UniqSet EqnNo
 
 check :: [EquationInfo] -> ([ExhaustivePat], [EquationInfo])
 	-- Second result is the shadowed equations
-check qs = (untidy_warns, shadowed_eqns)
+  -- if there are view patterns, just give up - don't know what the function is
+check qs | has_view_pattern = ([],[])
+         | otherwise = (untidy_warns, shadowed_eqns)
       where
+        is_view x = hasViewPat x
+        has_view_pattern = any (\(EqnInfo p _) -> any is_view p) qs
 	(warns, used_nos) = check' ([1..] `zip` map simplify_eqn qs)
 	untidy_warns = map untidy_exhaustive warns 
 	shadowed_eqns = [eqn | (eqn,i) <- qs `zip` [1..], 
@@ -218,8 +222,6 @@ check' qs
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
--- FIXME: hack to get view patterns through for now
-   | otherwise    = ([([],[])],emptyUniqSet)
 -- pprPanic "Check.check': Not implemented :-(" (ppr first_pats)
   where
      -- Note: RecPats will have been simplified to ConPats
