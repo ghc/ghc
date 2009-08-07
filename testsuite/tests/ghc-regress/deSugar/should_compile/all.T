@@ -66,6 +66,7 @@ test('ds059', normal, compile, ['-W'])
 test('ds060', expect_broken(322), compile, [''])
 test('ds061', expect_broken(851), compile, [''])
 test('ds062', normal, compile, [''])
+test('ds063', normal, compile, [''])
 
 test('T2409', normal, compile, [''])
 test('T3263-1', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-fwarn-unused-do-bind -XRecursiveDo'])
