@@ -15,7 +15,7 @@ GhcStage2HcOpts += -O -fasm
 # running of the tests, and faster building of the utils to be installed
 
 GhcLibHcOpts    += -O -fasm -dcore-lint
-GhcLibWays      = v
+GhcLibWays     := $(filter v dyn,$(GhcLibWays))
 SplitObjs       = NO
 NoFibWays       =
 STRIP           = :
