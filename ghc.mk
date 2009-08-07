@@ -140,6 +140,9 @@ endif
 include rules/all-target.mk
 include rules/clean-target.mk
 
+# Helper macro
+include rules/mkdep.mk
+
 # -----------------------------------------------------------------------------
 # The inplace tree
 
