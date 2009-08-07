@@ -201,6 +201,10 @@ __hscore_sigdelset( sigset_t * set, int s )
 INLINE int
 __hscore_sigismember( sigset_t * set, int s )
 { return sigismember(set,s); }
+
+INLINE int
+__hscore_utime( const char *file, const struct utimbuf *timep )
+{ return utime(file,timep); }
 #endif
 
 // This is used by dph:Data.Array.Parallel.Arr.BUArr, and shouldn't be
@@ -619,6 +623,11 @@ INLINE void hsFD_SET(int fd, fd_set *fds) { FD_SET(fd, fds); }
 INLINE HsInt sizeof_fd_set(void) { return sizeof(fd_set); }
 extern void hsFD_ZERO(fd_set *fds);
 #endif
+
+INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
+                           fd_set *exceptfds, struct timeval *timeout) {
+	return (select(nfds,readfds,writefds,exceptfds,timeout));
+}
 
 // gettimeofday()-related
 

@@ -457,7 +457,7 @@ foreign import ccall unsafe "HsBase.h tcgetattr"
 foreign import ccall unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "HsBase.h utime"
+foreign import ccall unsafe "HsBase.h __hscore_utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
 foreign import ccall unsafe "HsBase.h waitpid"

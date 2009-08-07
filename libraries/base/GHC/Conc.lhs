@@ -1251,7 +1251,7 @@ foreign import ccall unsafe "setTimevalTicks"
 
 data CFdSet
 
-foreign import ccall safe "select"
+foreign import ccall safe "__hscore_select"
   c_select :: CInt -> Ptr CFdSet -> Ptr CFdSet -> Ptr CFdSet -> Ptr CTimeVal
            -> IO CInt
 
