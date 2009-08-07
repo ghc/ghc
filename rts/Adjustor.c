@@ -43,10 +43,20 @@ Haskell side.
 #include "Stable.h"
 
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
-
 #include "ffi.h"
 #include <string.h>
+#endif
 
+#if defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+extern void adjustorCode(void);
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+// from AdjustorAsm.s
+// not declared as a function so that AIX-style
+// fundescs can never get in the way.
+extern void *adjustorCode;
+#endif
+
+#if defined(USE_LIBFFI_FOR_ADJUSTORS)
 void
 freeHaskellFunctionPtr(void* ptr)
 {
@@ -423,7 +433,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         AdjustorStub *adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
         adjustor = adjustorStub;
 
-        extern void adjustorCode(void);
         int sz = totalArgumentSize(typeString);
         
         adjustorStub->call[0] = 0xe8;
@@ -915,11 +924,6 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         AdjustorStub *adjustorStub;
         int sz = 0, extra_sz, total_sz;
 
-            // from AdjustorAsm.s
-            // not declared as a function so that AIX-style
-            // fundescs can never get in the way.
-        extern void *adjustorCode;
-        
 #ifdef FUNDESCS
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
@@ -1154,7 +1158,6 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
  }
  freeStablePtr(((StgStablePtr*)ptr)[1]);
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
- extern void* adjustorCode;
  if ( ((AdjustorStub*)ptr)->code != (StgFunPtr) &adjustorCode ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
