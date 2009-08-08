@@ -781,7 +781,8 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 # -----------------------------------------------------------------------------
 # Binary distributions
 
-$(eval $(call bindist,.,\
+# This is split in 2 because of the shell argument limit
+$(eval $(call bindist,root1,\
     LICENSE \
     configure config.sub config.guess install-sh \
     extra-gcc-opts.in \
@@ -800,6 +801,8 @@ $(eval $(call bindist,.,\
     $(INSTALL_BINS) \
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
+ ))
+$(eval $(call bindist,root2,\
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
 	docs/index.html \
 	$(wildcard libraries/*/dist-install/doc/) \

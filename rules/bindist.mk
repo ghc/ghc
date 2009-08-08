@@ -16,13 +16,13 @@
 # $(eval $(call bindist,utils/genapply,ghc.mk))
 
 define bindist
-# $1 = dir
+# $1 = name
 # $2 = files
 
 .PHONY: bindist_$1
 bindist: bindist_$1
 
 bindist_$1:
-	for f in $2; do echo $1/$(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done
+	for f in $2; do echo $(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done
 endef
 
