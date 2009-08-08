@@ -242,6 +242,10 @@ case $host in
     ;;
 i386-apple-darwin|powerpc-apple-darwin)
     soext='.dylib'
+    CFLAGS="$CFLAGS -m32"
+    LDFLAGS="$LDFLAGS -m32"
+    SRC_CC_OPTS="$SRC_CC_OPTS -m32"
+    SRC_LD_OPTS="$SRC_LD_OPTS -m32"
     ;;
 x86_64-apple-darwin)
     soext='.dylib'
