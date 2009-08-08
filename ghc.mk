@@ -739,6 +739,7 @@ install_docs: $(INSTALL_HEADERS)
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir); \
 	done
 	$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html; \
+	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html $(DESTDIR)$(docdir)/html; \
 	for i in $(INSTALL_LIBRARY_DOCS); do \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir)/libraries/; \
 	done
@@ -800,6 +801,7 @@ $(eval $(call bindist,.,\
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
+	docs/index.html \
 	$(wildcard libraries/*/dist-install/doc/) \
     $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
     $(filter-out %/project.mk,$(filter-out mk/config.mk,$(MAKEFILE_LIST))) \
