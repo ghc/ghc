@@ -741,7 +741,7 @@ install_docs: $(INSTALL_HEADERS)
 	$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html; \
 	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html $(DESTDIR)$(docdir)/html; \
 	for i in $(INSTALL_LIBRARY_DOCS); do \
-		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir)/libraries/; \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir)/html/libraries/; \
 	done
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html/`basename $$i`; \
@@ -771,12 +771,12 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 		 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \
 		 libraries/$p dist-install \
-		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/libraries' &&) true
+		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/html/libraries' &&) true
 	"$(GHC_CABAL_INPLACE)" install \
 	 	 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \
 		 compiler stage2 \
-		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/libraries'
+		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/html/libraries'
 
 # -----------------------------------------------------------------------------
 # Binary distributions
