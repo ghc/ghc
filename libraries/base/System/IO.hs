@@ -159,6 +159,8 @@ module System.IO (
 
     openTempFile,
     openBinaryTempFile,
+    openTempFileWithDefaultPermissions,
+    openBinaryTempFileWithDefaultPermissions,
 
 #if !defined(__NHC__) && !defined(__HUGS__)
     -- * Unicode encoding\/decoding
@@ -227,6 +229,7 @@ import Data.Maybe
 import Foreign.C.Error
 import Foreign.C.Types
 import System.Posix.Internals
+import System.Posix.Types
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -487,14 +490,29 @@ openTempFile :: FilePath   -- ^ Directory in which to create the file
                            -- the created file will be \"fooXXX.ext\" where XXX is some
                            -- random number.
              -> IO (FilePath, Handle)
-openTempFile tmp_dir template = openTempFile' "openTempFile" tmp_dir template False
+openTempFile tmp_dir template
+    = openTempFile' "openTempFile" tmp_dir template False 0o600
 
 -- | Like 'openTempFile', but opens the file in binary mode. See 'openBinaryFile' for more comments.
 openBinaryTempFile :: FilePath -> String -> IO (FilePath, Handle)
-openBinaryTempFile tmp_dir template = openTempFile' "openBinaryTempFile" tmp_dir template True
+openBinaryTempFile tmp_dir template
+    = openTempFile' "openBinaryTempFile" tmp_dir template True 0o600
 
-openTempFile' :: String -> FilePath -> String -> Bool -> IO (FilePath, Handle)
-openTempFile' loc tmp_dir template binary = do
+-- | Like 'openTempFile', but uses the default file permissions
+openTempFileWithDefaultPermissions :: FilePath -> String
+                                   -> IO (FilePath, Handle)
+openTempFileWithDefaultPermissions tmp_dir template
+    = openTempFile' "openBinaryTempFile" tmp_dir template False 0o666
+
+-- | Like 'openBinaryTempFile', but uses the default file permissions
+openBinaryTempFileWithDefaultPermissions :: FilePath -> String
+                                         -> IO (FilePath, Handle)
+openBinaryTempFileWithDefaultPermissions tmp_dir template
+    = openTempFile' "openBinaryTempFile" tmp_dir template True 0o666
+
+openTempFile' :: String -> FilePath -> String -> Bool -> CMode
+              -> IO (FilePath, Handle)
+openTempFile' loc tmp_dir template binary mode = do
   pid <- c_getpid
   findTempName pid
   where
@@ -531,7 +549,7 @@ openTempFile' loc tmp_dir template binary = do
 #else
     findTempName x = do
       fd <- withFilePath filepath $ \ f ->
-              c_open f oflags 0o600
+              c_open f oflags mode
       if fd < 0
        then do
          errno <- getErrno
