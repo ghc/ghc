@@ -41,6 +41,7 @@ Library {
             GHC.Classes,
             GHC.Conc,
             GHC.ConsoleHandler,
+            GHC.Constants,
             GHC.Desugar,
             GHC.Enum,
             GHC.Environment,
