@@ -113,8 +113,8 @@ check :: [EquationInfo] -> ([ExhaustivePat], [EquationInfo])
 check qs | has_view_pattern = ([],[])
          | otherwise = (untidy_warns, shadowed_eqns)
       where
-        is_view x = hasViewPat x
-        has_view_pattern = any (\(EqnInfo p _) -> any is_view p) qs
+        eqnInfo_has_view_pattern (EqnInfo ps _) = any (hasViewPat . noLoc) ps
+        has_view_pattern = any eqnInfo_has_view_pattern qs
 	(warns, used_nos) = check' ([1..] `zip` map simplify_eqn qs)
 	untidy_warns = map untidy_exhaustive warns 
 	shadowed_eqns = [eqn | (eqn,i) <- qs `zip` [1..], 
