@@ -73,3 +73,4 @@ test('T3263-1', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-fwarn-un
 test('T3263-2', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-fwarn-wrong-do-bind -XScopedTypeVariables -XRecursiveDo'])
 
 test('GadtOverlap', normal, compile, ['-Wall'])
+test('T2395', normal, compile, [''])
