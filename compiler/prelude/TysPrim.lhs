@@ -130,7 +130,7 @@ bcoPrimTyConName 	      = mkPrimTc (fsLit "BCO#") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName  	      = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName  	      = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 anyPrimTyConName	      = mkPrimTc (fsLit "Any") anyPrimTyConKey anyPrimTyCon
-anyPrimTyCon1Name	      = mkPrimTc (fsLit "Any1") anyPrimTyCon1Key anyPrimTyCon
+anyPrimTyCon1Name	      = mkPrimTc (fsLit "Any1") anyPrimTyCon1Key anyPrimTyCon1
 \end{code}
 
 %************************************************************************
