@@ -25,7 +25,7 @@ module HsPat (
 
 	isBangHsBind, hsPatNeedsParens,
 	patsAreAllCons, isConPat, isSigPat, isWildPat,
-	patsAreAllLits,	isLitPat, isIrrefutableHsPat, hasViewPat
+	patsAreAllLits,	isLitPat, isIrrefutableHsPat
     ) where
 
 import {-# SOURCE #-} HsExpr		(SyntaxExpr, LHsExpr, pprLExpr)
@@ -369,34 +369,6 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
-hasViewPat :: LPat id -> Bool
-hasViewPat (L _ p) = go p where
-  go (WildPat _)             = False
-  go (VarPat _)              = False
-  go (VarPatOut _ _)         = False
-  go (LazyPat p)             = hasViewPat p
-  go (AsPat _ p)             = hasViewPat p
-  go (ParPat p)              = hasViewPat p
-  go (BangPat p)             = hasViewPat p
-  go (ListPat p _)           = any hasViewPat p
-  go (TuplePat p _ _)        = any hasViewPat p
-  go (PArrPat p _)           = any hasViewPat p
-  go (ConPatIn _ p)          = go' p
-  go (ConPatOut _ _ _ _ p _) = go' p
-  go (ViewPat _ _ _)         = True
-  go (QuasiQuotePat _)       = False
-  go (LitPat _)              = False
-  go (NPat _ _ _)            = False
-  go (NPlusKPat _ _ _ _)     = False
-  go (TypePat _)             = False
-  go (SigPatIn p _)          = hasViewPat p
-  go (SigPatOut p _)         = hasViewPat p
-  go (CoPat _ _ _)           = False
-  go' p = case p of
-    PrefixCon ps              -> any hasViewPat ps
-    RecCon (HsRecFields fs _) -> any (hasViewPat . hsRecFieldArg) fs
-    InfixCon p1 p2            -> hasViewPat p1 || hasViewPat p2
-
 isWildPat :: Pat id -> Bool
 isWildPat (WildPat _) = True
 isWildPat _           = False

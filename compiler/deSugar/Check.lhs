@@ -78,7 +78,7 @@ then all the constructors are equal:
   f (: x (: y []))   = ....
   f (: x xs)         = .....
 \end{verbatim}
-(more about that in @simplify_eqns@)
+(more about that in @tidy_eqns@)
 
 We would prefer to have a @WarningPat@ of type @String@, but Strings and the 
 Pretty Printer are not friends.
@@ -108,14 +108,11 @@ type EqnSet = UniqSet EqnNo
 
 
 check :: [EquationInfo] -> ([ExhaustivePat], [EquationInfo])
-	-- Second result is the shadowed equations
+  -- Second result is the shadowed equations
   -- if there are view patterns, just give up - don't know what the function is
-check qs | has_view_pattern = ([],[])
-         | otherwise = (untidy_warns, shadowed_eqns)
+check qs = (untidy_warns, shadowed_eqns)
       where
-        eqnInfo_has_view_pattern (EqnInfo ps _) = any (hasViewPat . noLoc) ps
-        has_view_pattern = any eqnInfo_has_view_pattern qs
-	(warns, used_nos) = check' ([1..] `zip` map simplify_eqn qs)
+	(warns, used_nos) = check' ([1..] `zip` map tidy_eqn qs)
 	untidy_warns = map untidy_exhaustive warns 
 	shadowed_eqns = [eqn | (eqn,i) <- qs `zip` [1..], 
 				not (i `elementOfUniqSet` used_nos)]
@@ -130,7 +127,7 @@ untidy_message :: (Name, [HsLit]) -> (Name, [HsLit])
 untidy_message (string, lits) = (string, map untidy_lit lits)
 \end{code}
 
-The function @untidy@ does the reverse work of the @simplify_pat@ funcion.
+The function @untidy@ does the reverse work of the @tidy_pat@ funcion.
 
 \begin{code}
 
@@ -219,17 +216,18 @@ check' ((n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult can_fail _ }) : rs)
     (pats,indexs) = check' rs
 
 check' qs
-   | literals     = split_by_literals qs
-   | constructors = split_by_constructor qs
-   | only_vars    = first_column_only_vars qs
--- pprPanic "Check.check': Not implemented :-(" (ppr first_pats)
+   | some_literals     = split_by_literals qs
+   | some_constructors = split_by_constructor qs
+   | only_vars         = first_column_only_vars qs
+   | otherwise = pprPanic "Check.check': Not implemented :-(" (ppr first_pats)
+     	         -- Shouldn't happen
   where
      -- Note: RecPats will have been simplified to ConPats
      --       at this stage.
-    first_pats   = ASSERT2( okGroup qs, pprGroup qs ) map firstPatN qs
-    constructors = any is_con first_pats
-    literals     = any is_lit first_pats
-    only_vars    = all is_var first_pats
+    first_pats        = ASSERT2( okGroup qs, pprGroup qs ) map firstPatN qs
+    some_constructors = any is_con first_pats
+    some_literals     = any is_lit first_pats
+    only_vars         = all is_var first_pats
 \end{code}
 
 Here begins the code to deal with literals, we need to split the matrix
@@ -539,7 +537,7 @@ print the messsage, we are searching only for things like: @[1,2,3]@,
 not @x:xs@ ....
 
 In @reconstruct_pat@ we want to ``undo'' the work
-that we have done in @simplify_pat@.
+that we have done in @tidy_pat@.
 In particular:
 \begin{tabular}{lll}
 	@((,) x y)@   & returns to be & @(x, y)@
@@ -600,106 +598,124 @@ make_whole_con con | isInfixCon con = nlInfixConPat name nlWildPat nlWildPat
                   pats   = [nlWildPat | _ <- dataConOrigArgTys con]
 \end{code}
 
-This equation makes the same thing as @tidy@ in @Match.lhs@, the
-difference is that here we can do all the tidy in one place and in the
-@Match@ tidy it must be done one column each time due to bookkeeping 
-constraints.
+------------------------------------------------------------------------
+                   Tidying equations
+------------------------------------------------------------------------
+
+tidy_eqn does more or less the same thing as @tidy@ in @Match.lhs@;
+that is, it removes syntactic sugar, reducing the number of cases that
+must be handled by the main checking algorithm.  One difference is
+that here we can do *all* the tidying at once (recursively), rather 
+than doing it incrementally.
 
 \begin{code}
-
-simplify_eqn :: EquationInfo -> EquationInfo
-simplify_eqn eqn = eqn { eqn_pats = map simplify_pat (eqn_pats eqn), 
-		         eqn_rhs  = simplify_rhs (eqn_rhs eqn) }
+tidy_eqn :: EquationInfo -> EquationInfo
+tidy_eqn eqn = eqn { eqn_pats = map tidy_pat (eqn_pats eqn), 
+		     eqn_rhs  = tidy_rhs (eqn_rhs eqn) }
   where
-	-- Horrible hack.  The simplify_pat stuff converts NPlusK pats to WildPats
-	-- which of course loses the info that they can fail to match.  So we 
-	-- stick in a CanFail as if it were a guard.
-	-- The Right Thing to do is for the whole system to treat NPlusK pats properly
-    simplify_rhs (MatchResult can_fail body)
-	| any has_nplusk_pat (eqn_pats eqn) = MatchResult CanFail body
+	-- Horrible hack.  The tidy_pat stuff converts "might-fail" patterns to 
+        -- WildPats which of course loses the info that they can fail to match. 
+	-- So we stick in a CanFail as if it were a guard.
+    tidy_rhs (MatchResult can_fail body)
+	| any might_fail_pat (eqn_pats eqn) = MatchResult CanFail body
 	| otherwise			    = MatchResult can_fail body
 
-has_nplusk_lpat :: LPat Id -> Bool
-has_nplusk_lpat (L _ p) = has_nplusk_pat p
+--------------
+might_fail_pat :: Pat Id -> Bool
+-- Returns True of patterns that might fail (i.e. fall through) in a way 
+-- that is not covered by the checking algorithm.  Specifically:
+-- 	   NPlusKPat 
+--	   ViewPat (if refutable)
 
-has_nplusk_pat :: Pat Id -> Bool
-has_nplusk_pat (NPlusKPat _ _ _ _) 	     = True
-has_nplusk_pat (ParPat p)  	   	     = has_nplusk_lpat p
-has_nplusk_pat (AsPat _ p) 	   	     = has_nplusk_lpat p
-has_nplusk_pat (ViewPat _ p _)               = has_nplusk_lpat p
-has_nplusk_pat (SigPatOut p _ )    	     = has_nplusk_lpat p
-has_nplusk_pat (ListPat ps _)  	   	     = any has_nplusk_lpat ps
-has_nplusk_pat (TuplePat ps _ _)   	     = any has_nplusk_lpat ps
-has_nplusk_pat (PArrPat ps _)  	   	     = any has_nplusk_lpat ps
-has_nplusk_pat (LazyPat _)                   = False    -- Why?
-has_nplusk_pat (BangPat p)     	   	     = has_nplusk_lpat p	-- I think
-has_nplusk_pat (ConPatOut { pat_args = ps }) = any has_nplusk_lpat (hsConPatArgs ps)
-has_nplusk_pat _                             = False -- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
+-- First the two special cases
+might_fail_pat (NPlusKPat {}) 	     	     = True
+might_fail_pat (ViewPat _ p _) 	     	     = not (isIrrefutableHsPat p)
 
-simplify_lpat :: LPat Id -> LPat Id  
-simplify_lpat p = fmap simplify_pat p
+-- Now the recursive stuff
+might_fail_pat (ParPat p)  	   	     = might_fail_lpat p
+might_fail_pat (AsPat _ p) 	   	     = might_fail_lpat p
+might_fail_pat (SigPatOut p _ )    	     = might_fail_lpat p
+might_fail_pat (ListPat ps _)  	   	     = any might_fail_lpat ps
+might_fail_pat (TuplePat ps _ _)   	     = any might_fail_lpat ps
+might_fail_pat (PArrPat ps _)  	   	     = any might_fail_lpat ps
+might_fail_pat (BangPat p)     	   	     = might_fail_lpat p
+might_fail_pat (ConPatOut { pat_args = ps }) = any might_fail_lpat (hsConPatArgs ps)
 
-simplify_pat :: Pat Id -> Pat Id
-simplify_pat pat@(WildPat _)  = pat
-simplify_pat (VarPat id)      = WildPat (idType id) 
-simplify_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
-simplify_pat (ParPat p)       = unLoc (simplify_lpat p)
-simplify_pat (LazyPat p)      = WildPat (hsLPatType p)	-- For overlap and exhaustiveness checking
+-- Finally the ones that are sure to succeed, or which are covered by the checking algorithm
+might_fail_pat (LazyPat _)                   = False -- Always succeeds
+might_fail_pat _                             = False -- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
+
+--------------
+might_fail_lpat :: LPat Id -> Bool
+might_fail_lpat (L _ p) = might_fail_pat p
+
+--------------
+tidy_lpat :: LPat Id -> LPat Id  
+tidy_lpat p = fmap tidy_pat p
+
+--------------
+tidy_pat :: Pat Id -> Pat Id
+tidy_pat pat@(WildPat _)  = pat
+tidy_pat (VarPat id)      = WildPat (idType id) 
+tidy_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
+tidy_pat (ParPat p)       = tidy_pat (unLoc p)
+tidy_pat (LazyPat p)      = WildPat (hsLPatType p)	-- For overlap and exhaustiveness checking
 							-- purposes, a ~pat is like a wildcard
-simplify_pat (BangPat p)      = unLoc (simplify_lpat p)
-simplify_pat (AsPat _ p)      = unLoc (simplify_lpat p)
+tidy_pat (BangPat p)      = tidy_pat (unLoc p)
+tidy_pat (AsPat _ p)      = tidy_pat (unLoc p)
+tidy_pat (SigPatOut p _)  = tidy_pat (unLoc p)
+tidy_pat (CoPat _ pat _)  = tidy_pat pat
 
-simplify_pat (ViewPat expr p ty)     = ViewPat expr (simplify_lpat p) ty
+-- These two are might_fail patterns, so we map them to
+-- WildPats.  The might_fail_pat stuff arranges that the
+-- guard says "this equation might fall through".
+tidy_pat (NPlusKPat id _ _ _) = WildPat (idType (unLoc id))
+tidy_pat (ViewPat _ _ ty)     = WildPat ty
 
-simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
+tidy_pat (NPat lit mb_neg eq) = tidyNPat lit mb_neg eq
 
-simplify_pat pat@(ConPatOut { pat_con = L _ id, pat_args = ps })
-  = pat { pat_args = simplify_con id ps }
+tidy_pat pat@(ConPatOut { pat_con = L _ id, pat_args = ps })
+  = pat { pat_args = tidy_con id ps }
 
-simplify_pat (ListPat ps ty) = 
-  unLoc $ foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
+tidy_pat (ListPat ps ty) 
+  = unLoc $ foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
 	                          (mkNilPat list_ty)
-	                          (map simplify_lpat ps)
-         where list_ty = mkListTy ty
+	                          (map tidy_lpat ps)
+  where list_ty = mkListTy ty
 
 -- introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
 --
-simplify_pat (PArrPat ps ty)
+tidy_pat (PArrPat ps ty)
   = unLoc $ mkPrefixConPat (parrFakeCon (length ps))
-			   (map simplify_lpat ps) 
+			   (map tidy_lpat ps) 
 			   (mkPArrTy ty)
 
-simplify_pat (TuplePat ps boxity ty)
+tidy_pat (TuplePat ps boxity ty)
   = unLoc $ mkPrefixConPat (tupleCon boxity arity)
-		           (map simplify_lpat ps) ty
+		           (map tidy_lpat ps) ty
   where
     arity = length ps
 
--- unpack string patterns fully, so we can see when they overlap with
+-- Unpack string patterns fully, so we can see when they overlap with
 -- each other, or even explicit lists of Chars.
-simplify_pat (LitPat (HsString s)) =
-   unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mk_char_lit c, pat] stringTy)
-		 (mkPrefixConPat nilDataCon [] stringTy) (unpackFS s)
+tidy_pat (LitPat lit)
+  | HsString s <- lit
+  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mk_char_lit c, pat] stringTy)
+		  (mkPrefixConPat nilDataCon [] stringTy) (unpackFS s)
+  | otherwise
+  = tidyLitPat lit 
   where
     mk_char_lit c = mkPrefixConPat charDataCon [nlLitPat (HsCharPrim c)] charTy
 
-simplify_pat (LitPat lit)		 = tidyLitPat lit 
-simplify_pat (NPat lit mb_neg eq) = tidyNPat lit mb_neg eq
-
-simplify_pat (NPlusKPat id _ _ _)
-   = WildPat (idType (unLoc id))
-
-simplify_pat (CoPat _ pat _) = simplify_pat pat
-
 -----------------
-simplify_con :: DataCon -> HsConPatDetails Id -> HsConPatDetails Id
-simplify_con _   (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
-simplify_con _   (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
-simplify_con con (RecCon (HsRecFields fs _))      
+tidy_con :: DataCon -> HsConPatDetails Id -> HsConPatDetails Id
+tidy_con _   (PrefixCon ps)   = PrefixCon (map tidy_lpat ps)
+tidy_con _   (InfixCon p1 p2) = PrefixCon [tidy_lpat p1, tidy_lpat p2]
+tidy_con con (RecCon (HsRecFields fs _))      
   | null fs   = PrefixCon [nlWildPat | _ <- dataConOrigArgTys con]
 		-- Special case for null patterns; maybe not a record at all
-  | otherwise = PrefixCon (map (simplify_lpat.snd) all_pats)
+  | otherwise = PrefixCon (map (tidy_lpat.snd) all_pats)
   where
      -- pad out all the missing fields with WildPats.
     field_pats = map (\ f -> (f, nlWildPat)) (dataConFieldLabels con)
