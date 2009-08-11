@@ -1,3 +1,18 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Types
+-- Copyright   :  (c) The University of Glasgow 2009
+-- License     :  see libraries/ghc-prim/LICENSE
+--
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC Extensions)
+--
+-- GHC type definitions.
+-- Use GHC.Exts from the base package instead of importing this
+-- module directly.
+--
+-----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
