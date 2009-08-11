@@ -32,7 +32,7 @@ Library {
             build-depends: integer-simple
         else
             build-depends: integer-gmp
-            ghc-options: -DOPTIMISE_INTEGER_GCD_LCM
+            cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
         build-depends: rts, ghc-prim
         exposed-modules:
             Foreign.Concurrent,
