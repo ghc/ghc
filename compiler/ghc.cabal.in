@@ -18,7 +18,7 @@ Description:
     through this package.
 Category: Development
 Build-Type: Simple
-Cabal-Version: >= 1.2
+Cabal-Version: >= 1.2.3
 
 Flag base4
     Description: Choose the even newer, even smaller, split-up base package.
