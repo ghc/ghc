@@ -124,6 +124,8 @@ gen_hs_source (Info defaults entries) =
 	++ "-- Portability :  non-portable (GHC extensions)\n"
 	++ "--\n"
 	++ "-- GHC\'s primitive types and operations.\n"
+	++ "-- Use GHC.Exts from the base package instead of importing this\n"
+	++ "-- module directly.\n"
 	++ "--\n" 
 	++ "-----------------------------------------------------------------------------\n"
 	++ "module GHC.Prim (\n"
