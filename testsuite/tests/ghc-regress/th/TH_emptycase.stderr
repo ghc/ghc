@@ -1,7 +1,6 @@
 
 TH_emptycase.hs:10:6:
     Case expression with no alternatives
-    When splicing generated code into the program
-    When splicing TH expression: CaseE (LitE (CharL 'a')) []
+    When splicing a TH expression: case 'a' of
     In the expression: $(caseE (litE $ CharL 'a') [])
     In the definition of `f': f = $(caseE (litE $ CharL 'a') [])

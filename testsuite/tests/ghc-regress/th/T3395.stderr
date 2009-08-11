@@ -3,7 +3,7 @@ T3395.hs:6:8:
     Illegal last statement of a list comprehension:
       r1 <- undefined
     (It should be an expression.)
-    When splicing TH expression: [r1 <- undefined | undefined]
+    When splicing a TH expression: [r1 <- undefined | undefined]
     In the expression:
         $(return
         $ CompE
