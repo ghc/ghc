@@ -568,6 +568,14 @@ $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
   libraries/$(lib)_dist-install_DISABLE = YES))
 endif
 
+# These packages don't pass the Cabal checks because hs-source-dirs
+# points outside the source directory. This isn't a real problem in
+# these cases, so we just skip checking them.
+CHECKED_libraries/dph/dph-seq = YES
+CHECKED_libraries/dph/dph-par = YES
+# In compiler's case, include-dirs points outside of the source tree
+CHECKED_compiler = YES
+
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
