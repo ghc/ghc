@@ -325,6 +325,8 @@ DotnetSupport=NO
 #
 GhcLibsWithUnix=@GhcLibsWithUnix@
 
+CHECK_PACKAGES = NO
+
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
 

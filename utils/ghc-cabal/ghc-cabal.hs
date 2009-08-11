@@ -3,6 +3,7 @@ module Main (main) where
 
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.PackageDescription
+import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
 import Distribution.PackageDescription.Parse
 import Distribution.Simple
@@ -17,6 +18,7 @@ import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 
+import Data.List
 import Data.Maybe
 import System.IO
 import System.Directory
@@ -29,6 +31,8 @@ main = do args <- getArgs
           case args of
               "haddock" : distDir : dir : args' ->
                   runHaddock distDir dir args'
+              "check" : dir : [] ->
+                  doCheck dir
               "install" : ghcpkg : ghcpkgconfig : directory : distDir
                         : myDestDir : myPrefix : myLibdir : myDocdir : args' ->
                   doInstall ghcpkg ghcpkgconfig directory distDir
@@ -63,6 +67,20 @@ withCurrentDirectory directory io
 -- ends up in it.
 userHooks :: UserHooks
 userHooks = autoconfUserHooks
+
+doCheck :: FilePath -> IO ()
+doCheck directory
+ = withCurrentDirectory directory
+ $ do let verbosity = normal
+      gpdFile <- defaultPackageDesc verbosity
+      gpd <- readPackageDescription verbosity gpdFile
+      case partition isFailure $ checkPackage gpd Nothing of
+          ([],   [])       -> return ()
+          ([],   warnings) -> mapM_ print warnings
+          (errs, _)        -> do mapM_ print errs
+                                 exitWith (ExitFailure 1)
+    where isFailure (PackageDistSuspicious {}) = False
+          isFailure _ = True
 
 runHaddock :: FilePath -> FilePath -> [String] -> IO ()
 runHaddock distdir directory args

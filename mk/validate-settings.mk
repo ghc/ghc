@@ -20,6 +20,8 @@ SplitObjs       = NO
 NoFibWays       =
 STRIP           = :
 
+CHECK_PACKAGES = YES
+
 ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif

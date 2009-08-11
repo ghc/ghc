@@ -597,6 +597,10 @@ libraries/index.html: $(ALL_HADDOCK_FILES)
 $(eval $(call all-target,library_doc_index,libraries/index.html))
 INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
 
+ifeq "$(CHECK_PACKAGES)" "YES"
+all: check_packages
+endif
+
 # -----------------------------------------------------------------------------
 # Bootstrapping libraries
 
