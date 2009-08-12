@@ -119,13 +119,14 @@ initialVersion = 1
 
 \begin{code}
 -- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt = WarningTxt FastString
-                | DeprecatedTxt FastString
+data WarningTxt = WarningTxt [FastString]
+                | DeprecatedTxt [FastString]
     deriving Eq
 
 instance Outputable WarningTxt where
-    ppr (WarningTxt    w) =                        doubleQuotes (ftext w)
-    ppr (DeprecatedTxt d) = text "Deprecated:" <+> doubleQuotes (ftext d)
+    ppr (WarningTxt    ws) = doubleQuotes (vcat (map ftext ws))
+    ppr (DeprecatedTxt ds) = text "Deprecated:" <+>
+                             doubleQuotes (vcat (map ftext ds))
 \end{code}
 
 %************************************************************************

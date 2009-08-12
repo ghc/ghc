@@ -399,8 +399,8 @@ missing_module_keyword :: { () }
 	: {- empty -}				{% pushCurrentContext }
 
 maybemodwarning :: { Maybe WarningTxt }
-    : '{-# DEPRECATED' STRING '#-}' { Just (DeprecatedTxt (getSTRING $2)) }
-    | '{-# WARNING' STRING '#-}'    { Just (WarningTxt (getSTRING $2)) }
+    : '{-# DEPRECATED' strings '#-}' { Just (DeprecatedTxt $ unLoc $2) }
+    | '{-# WARNING' strings '#-}'    { Just (WarningTxt $ unLoc $2) }
     |  {- empty -}                  { Nothing }
 
 body 	:: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
@@ -839,8 +839,8 @@ warnings :: { OrdList (LHsDecl RdrName) }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LHsDecl RdrName) }
-	: namelist STRING
-		{ toOL [ LL $ WarningD (Warning n (WarningTxt (getSTRING $2)))
+	: namelist strings
+		{ toOL [ LL $ WarningD (Warning n (WarningTxt $ unLoc $2))
 		       | n <- unLoc $1 ] }
 
 deprecations :: { OrdList (LHsDecl RdrName) }
@@ -851,9 +851,17 @@ deprecations :: { OrdList (LHsDecl RdrName) }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LHsDecl RdrName) }
-	: namelist STRING
-		{ toOL [ LL $ WarningD (Warning n (DeprecatedTxt (getSTRING $2)))
+	: namelist strings
+		{ toOL [ LL $ WarningD (Warning n (DeprecatedTxt $ unLoc $2))
 		       | n <- unLoc $1 ] }
+
+strings :: { Located [FastString] }
+    : STRING { L1 [getSTRING $1] }
+    | '[' stringlist ']' { LL $ fromOL (unLoc $2) }
+
+stringlist :: { Located (OrdList FastString) }
+    : stringlist ',' STRING { LL (unLoc $1 `snocOL` getSTRING $3) }
+    | STRING                { LL (unitOL (getSTRING $1)) }
 
 -----------------------------------------------------------------------------
 -- Annotations
