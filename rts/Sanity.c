@@ -236,7 +236,7 @@ checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
 	break;
     }
 
-    ASSERT(fun_info->f.arity > TAG_MASK ? GET_CLOSURE_TAG(tagged_fun) == 1
+    ASSERT(fun_info->f.arity > TAG_MASK ? GET_CLOSURE_TAG(tagged_fun) == 0
            : GET_CLOSURE_TAG(tagged_fun) == fun_info->f.arity);
 }
 
