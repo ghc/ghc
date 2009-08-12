@@ -292,3 +292,46 @@ throwE str = throw (HaddockException str)
 #else
 throwE str = throwDyn (HaddockException str)
 #endif
+
+-- In "Haddock.Interface.Create", we need to gather
+-- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
+-- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
+-- transformed monad to be MonadIO.
+newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: (Ghc (a, [ErrMsg])) }
+--instance MonadIO ErrMsgGhc where
+--  liftIO = WriterGhc . fmap (\a->(a,[])) liftIO
+--er, implementing GhcMonad involves annoying ExceptionMonad and
+--WarnLogMonad classes, so don't bother.
+liftGhcToErrMsgGhc :: Ghc a -> ErrMsgGhc a
+liftGhcToErrMsgGhc = WriterGhc . fmap (\a->(a,[]))
+liftErrMsg :: ErrMsgM a -> ErrMsgGhc a
+liftErrMsg = WriterGhc . return . runWriter
+--  for now, use (liftErrMsg . tell) for this
+--tell :: [ErrMsg] -> ErrMsgGhc ()
+--tell msgs = WriterGhc $ return ( (), msgs )
+instance Functor ErrMsgGhc where
+  fmap f (WriterGhc x) = WriterGhc (fmap (\(a,msgs)->(f a,msgs)) x)
+instance Monad ErrMsgGhc where
+  return a = WriterGhc (return (a, []))
+  m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
+               fmap (\ (b, msgs2) -> (b, msgs1 ++ msgs2)) (runWriterGhc (k a))
+
+-- When HsDoc syntax is part of the Haddock codebase, we'll just
+-- declare a Functor instance.
+fmapHsDoc :: (a->b) -> HsDoc a -> HsDoc b
+fmapHsDoc _ DocEmpty = DocEmpty
+fmapHsDoc f (DocAppend a b) = DocAppend (fmapHsDoc f a) (fmapHsDoc f b)
+fmapHsDoc _ (DocString s) = DocString s
+fmapHsDoc _ (DocModule s) = DocModule s
+fmapHsDoc _ (DocURL s) = DocURL s
+fmapHsDoc _ (DocPic s) = DocPic s
+fmapHsDoc _ (DocAName s) = DocAName s
+fmapHsDoc f (DocParagraph a) = DocParagraph (fmapHsDoc f a)
+fmapHsDoc f (DocEmphasis a) = DocEmphasis (fmapHsDoc f a)
+fmapHsDoc f (DocMonospaced a) = DocMonospaced (fmapHsDoc f a)
+fmapHsDoc f (DocCodeBlock a) = DocMonospaced (fmapHsDoc f a)
+fmapHsDoc f (DocIdentifier a) = DocIdentifier (map f a)
+fmapHsDoc f (DocOrderedList a) = DocOrderedList (map (fmapHsDoc f) a)
+fmapHsDoc f (DocUnorderedList a) = DocUnorderedList (map (fmapHsDoc f) a)
+fmapHsDoc f (DocDefList a) = DocDefList (map (\(b,c)->(fmapHsDoc f b, fmapHsDoc f c)) a)
+

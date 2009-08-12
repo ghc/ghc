@@ -108,6 +108,7 @@ executable haddock
     Haddock.InterfaceFile        
     Haddock.Options
     Haddock.GhcUtils
+    Haddock.Convert
    
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.10.1)

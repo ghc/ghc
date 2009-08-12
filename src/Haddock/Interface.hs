@@ -183,7 +183,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
                              moduleInfo tc_mod))
                             dynflags
       out verbosity verbose "Creating interface..."
-      let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
+      (interface, msg) <- runWriterGhc $ createInterface ghcMod flags modMap instIfaceMap
       liftIO $ mapM_ putStrLn msg
       interface' <- liftIO $ evaluate interface
       return (Just interface')
@@ -201,7 +201,7 @@ processModule verbosity session modsum flags modMap instIfaceMap = do
         Just (CheckedModule a (Just b) (Just c) (Just d) _)
           -> return $ mkGhcModule (ms_mod modsum, filename, (a,b,c,d)) (ms_hspp_opts modsum)
         _ -> throwE ("Failed to check module: " ++ (moduleString $ ms_mod modsum))
-      let (interface, msg) = runWriter $ createInterface ghcMod flags modMap instIfaceMap
+      (interface, msg) <- runWriterGhc $ createInterface ghcMod flags modMap instIfaceMap
       mapM_ putStrLn msg
       return (Just interface)
     else

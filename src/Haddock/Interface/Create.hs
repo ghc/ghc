@@ -17,6 +17,7 @@ import Haddock.Types
 import Haddock.Options
 import Haddock.GhcUtils
 import Haddock.Utils
+import Haddock.Convert
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -34,12 +35,12 @@ import Bag
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the module map.
 createInterface :: GhcModule -> [Flag] -> ModuleMap -> InstIfaceMap
-                -> ErrMsgM Interface
+                -> ErrMsgGhc Interface
 createInterface ghcMod flags modMap instIfaceMap = do
 
   let mdl = ghcModule ghcMod
 
-  opts0 <- mkDocOpts (ghcMbDocOpts ghcMod) flags mdl
+  opts0 <- liftErrMsg $ mkDocOpts (ghcMbDocOpts ghcMod) flags mdl
   let opts
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
@@ -54,7 +55,7 @@ createInterface ghcMod flags modMap instIfaceMap = do
       exportedNames = ghcExportedNames ghcMod
       instances     = ghcInstances ghcMod
 
-  warnAboutFilteredDecls mdl decls0
+  liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
   exportItems <- mkExportItems modMap mdl (ghcExportedNames ghcMod) decls declMap
                                opts exports ignoreExps instances instIfaceMap
@@ -343,7 +344,7 @@ mkExportItems
   -> Bool				-- --ignore-all-exports flag
   -> [Instance]
   -> InstIfaceMap
-  -> ErrMsgM [ExportItem Name]
+  -> ErrMsgGhc [ExportItem Name]
 
 mkExportItems modMap this_mod exported_names decls declMap
               opts maybe_exps ignore_all_exports _ instIfaceMap
@@ -373,12 +374,12 @@ mkExportItems modMap this_mod exported_names decls declMap
     lookupExport (IEGroup lev doc)     = return [ ExportGroup lev "" doc ]
     lookupExport (IEDoc doc)           = return [ ExportDoc doc ] 
     lookupExport (IEDocNamed str) = do
-      r <- findNamedDoc str [ unL d | (d,_,_) <- decls ]
+      r <- liftErrMsg $ findNamedDoc str [ unL d | (d,_,_) <- decls ]
       case r of
         Nothing -> return []
         Just found -> return [ ExportDoc found ]
 
-    declWith :: Name -> ErrMsgM [ ExportItem Name ]
+    declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
     declWith t =
       case findDecl t of
         Just x@(decl,_,_) ->
@@ -397,7 +398,7 @@ mkExportItems modMap this_mod exported_names decls declMap
               -- parents is also exported. See note [1].
               | t /= declName_,
                 Just p <- find isExported (parents t $ unL decl) ->
-                do tell [ 
+                do liftErrMsg $ tell [
                      "Warning: " ++ moduleString this_mod ++ ": " ++
                      pretty (nameOccName t) ++ " is exported separately but " ++
                      "will be documented under " ++ pretty (nameOccName p) ++
@@ -412,12 +413,41 @@ mkExportItems modMap this_mod exported_names decls declMap
           -- We return just the name of the declaration and try to get the subs
           -- from the installed interface of that package.
           case Map.lookup (nameModule t) instIfaceMap of
+            -- It's Nothing in the cases where Haddock has already warned
+            -- the user: "Warning: The documentation for the following
+            -- packages are not installed. No links will be generated to
+            -- these packages: ..."
             Nothing -> return [ ExportNoDecl t [] ]
             Just iface ->
               let subs = case Map.lookup t (instSubMap iface) of
                            Nothing -> []
                            Just x -> x
-              in return [ ExportNoDecl t subs ]
+              in
+              -- If we couldn't find out the decl, we would have to
+              -- return [ ExportNoDecl t subs ]
+              -- .  But we can find out the decl, because we have the
+              -- Name and the imported module's .hi files for
+              -- reference!
+              do
+               mbTyThing <- liftGhcToErrMsgGhc $ lookupName t
+               case mbTyThing of
+                 Nothing -> do
+                   liftErrMsg (tell ["Why was no tything found for " ++ pretty (nameOccName t) ++ "? We found its module's docs. Is this a Haddock bug?"])
+                   return [ ExportNoDecl t subs ]
+                 Just tyThing -> do
+                   let hsdecl = tyThingToHsSynSig tyThing
+                   return [ mkExportDecl t
+                     ( hsdecl
+                     , fmap (fmapHsDoc getName) $
+                         Map.lookup t (instDocMap iface)
+                     , map (\subt ->
+                              ( subt
+                              , fmap (fmapHsDoc getName) $
+                                    Map.lookup subt (instDocMap iface)
+                              )
+                           )
+                           subs
+                     )]
 
     mkExportDecl :: Name -> DeclInfo -> ExportItem Name
     mkExportDecl n (decl, doc, subs) = decl'
@@ -443,7 +473,8 @@ mkExportItems modMap this_mod exported_names decls declMap
                case Map.lookup modname (Map.mapKeys moduleName instIfaceMap) of
                  Just iface -> return [ ExportModule (instMod iface) ]
                  Nothing -> do
-                   tell ["Warning: " ++ pretty this_mod ++ ": Could not find " ++
+                   liftErrMsg $
+                     tell ["Warning: " ++ pretty this_mod ++ ": Could not find " ++
                          "documentation for exported module: " ++ pretty modname]
                    return []
       where
