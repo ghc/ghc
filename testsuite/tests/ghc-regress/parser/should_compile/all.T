@@ -81,4 +81,6 @@ test('read066', if_compiler_le('ghc', '6.10.1', expect_fail), compile, [''])
 test('read067', normal, compile, [''])
 test('read068', normal, compile, [''])
 test('read_1821', normal, compile, [''])
+test('T3303', extra_clean(['T3303A.hi', 'T3303A.o']),
+     multimod_compile, ['T3303', '-v0'])
 

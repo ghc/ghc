@@ -1,0 +1,7 @@
+
+T3303.hs:4:0:
+    Warning: In the use of `foo'
+             (imported from T3303A):
+             Deprecated: "This is a multi-line
+                          deprecation message
+                          for foo"
