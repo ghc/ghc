@@ -65,25 +65,21 @@ flag in-ghc-tree
 
 executable haddock
   build-depends:
+    base >= 4.0.0.0 && < 4.2.0.0,
     haskell98,
-    ghc >= 6.8.2 && < 6.13,
     filepath,
     directory,
     pretty,
     containers,
-    array
+    array,
+    Cabal >= 1.5,
+    ghc >= 6.10.1 && < 6.13
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
     extensions: ForeignFunctionInterface
   else
     build-depends: ghc-paths
-
-  if impl(ghc >= 6.9)
-    build-depends: Cabal >= 1.5
-    build-depends: base >= 4.0.0.0 && < 4.2.0.0
-  else
-    build-depends: base < 4.0.0.0
 
   main-is:              Main.hs
   hs-source-dirs:       src
@@ -116,9 +112,7 @@ executable haddock
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.10.1)
     cpp-options: -D__GHC_PATCHLEVEL__=1
-  if impl(ghc == 6.8.3)
-    cpp-options: -D__GHC_PATCHLEVEL__=3
-  if impl(ghc == 6.8.2) || impl(ghc >= 6.10.1.20090223)
+  if impl(ghc >= 6.10.1.20090223)
     cpp-options: -D__GHC_PATCHLEVEL__=2
 
 library
@@ -135,9 +129,7 @@ library
   -- Cabal doesn't define __GHC_PATCHLEVEL__
   if impl(ghc == 6.10.1)
     cpp-options: -D__GHC_PATCHLEVEL__=1
-  if impl(ghc == 6.8.3)
-    cpp-options: -D__GHC_PATCHLEVEL__=3
-  if impl(ghc == 6.8.2) || impl(ghc >= 6.10.1.20090223)
+  if impl(ghc >= 6.10.1.20090223)
     cpp-options: -D__GHC_PATCHLEVEL__=2
 
   if flag(in-ghc-tree)
