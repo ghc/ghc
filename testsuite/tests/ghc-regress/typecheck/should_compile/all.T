@@ -299,6 +299,7 @@ test('T3219', normal, compile, [''])
 test('T3342', normal, compile, [''])
 test('T3346', normal, compile, [''])
 test('T3391', normal, compile, [''])
+test('T3409', normal, compile, [''])
 
 test('T2412',
      extra_clean(['T2412.hi-boot', 'T2412.o-boot',
