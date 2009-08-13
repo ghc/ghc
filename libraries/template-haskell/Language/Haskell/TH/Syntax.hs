@@ -660,6 +660,11 @@ data Clause = Clause [Pat] Body [Dec]
                                     -- f { p1 p2 = body where decs }
     deriving( Show, Eq, Data, Typeable )
  
+-- | The 'CompE' constructor represents a list comprehension, and 
+-- takes a ['Stmt'].  The result expression of the comprehension is
+-- the *last* of these, and should be a 'NoBindS'.
+-- E.g. [ f x | x <- xs ] is represented by
+--   CompE [BindS (VarP x) (VarE xs), NoBindS (AppE (VarE f) (VarE x))]
 data Exp 
   = VarE Name                          -- { x }
   | ConE Name                          -- data T1 = C1 t1 t2; p = {C1} e1 e2  
