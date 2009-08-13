@@ -1,0 +1,7 @@
+Name:    A
+Version: 0
+
+Library
+    Exposed-Modules: A
+    Other-Modules:   Internal
+    Extensions: NoImplicitPrelude
