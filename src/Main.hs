@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wwarn #-}
-{-# LANGUAGE ForeignFunctionInterface, PatternSignatures #-}
+{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Main
