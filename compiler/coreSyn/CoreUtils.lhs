@@ -51,6 +51,7 @@ import PprCore
 import Var
 import SrcLoc
 import VarEnv
+import VarSet
 import Name
 import Module
 #if mingw32_TARGET_OS
@@ -103,13 +104,43 @@ exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side
-coreAltType (_,_,rhs) = exprType rhs
+coreAltType (_,bs,rhs) 
+  | any bad_binder bs = expandTypeSynonyms ty
+  | otherwise         = ty    -- Note [Existential variables and silly type synonyms]
+  where
+    ty           = exprType rhs
+    free_tvs     = tyVarsOfType ty
+    bad_binder b = isTyVar b && b `elemVarSet` free_tvs
 
 coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []	     = panic "corAltsType"
 \end{code}
+
+Note [Existential variables and silly type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	data T = forall a. T (Funny a)
+	type Funny a = Bool
+	f :: T -> Bool
+	f (T x) = x
+
+Now, the type of 'x' is (Funny a), where 'a' is existentially quantified.
+That means that 'exprType' and 'coreAltsType' may give a result that *appears*
+to mention an out-of-scope type variable.  See Trac #3409 for a more real-world
+example.
+
+Various possibilities suggest themselves:
+
+ - Ignore the problem, and make Lint not complain about such variables
+
+ - Expand all type synonyms (or at least all those that discard arguments)
+      This is tricky, because at least for top-level things we want to
+      retain the type the user originally specified.
+
+ - Expand synonyms on the fly, when the problem arises. That is what
+   we are doing here.  It's not too expensive, I think.
 
 \begin{code}
 mkPiType  :: Var   -> Type -> Type

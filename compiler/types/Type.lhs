@@ -87,7 +87,7 @@ module Type (
 
 	-- * Type free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-	typeKind,
+	typeKind, expandTypeSynonyms,
 
 	-- * Tidying type related things up for printing
 	tidyType,      tidyTypes,
@@ -279,6 +279,29 @@ tcView :: Type -> Maybe Type
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
 			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 tcView _                 = Nothing
+
+-----------------------------------------------
+expandTypeSynonyms :: Type -> Type
+-- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
+-- just the ones that discard type variables (e.g.  type Funny a = Int)
+-- But we don't know which those are currently, so we just expand all.
+expandTypeSynonyms ty 
+  = go ty
+  where
+    go (TyConApp tc tys)
+      | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
+      = go (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+      | otherwise
+      = TyConApp tc (map go tys)
+    go (TyVarTy tv)    = TyVarTy tv
+    go (AppTy t1 t2)   = AppTy (go t1) (go t2)
+    go (FunTy t1 t2)   = FunTy (go t1) (go t2)
+    go (ForAllTy tv t) = ForAllTy tv (go t)
+    go (PredTy p)      = PredTy (go_pred p)
+
+    go_pred (ClassP c ts)  = ClassP c (map go ts)
+    go_pred (IParam ip t)  = IParam ip (go t)
+    go_pred (EqPred t1 t2) = EqPred (go t1) (go t2)
 
 -----------------------------------------------
 {-# INLINE kindView #-}
