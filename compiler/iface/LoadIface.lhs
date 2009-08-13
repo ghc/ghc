@@ -191,9 +191,11 @@ loadInterface doc_str mod from
 			-- if an earlier import had a before we got to real imports.   I think.
 	    _ -> do {
 
-          let { hi_boot_file = case from of
-				ImportByUser usr_boot -> usr_boot
-				ImportBySystem        -> sys_boot
+          let { hi_boot_file = if thisPackage dflags == modulePackageId mod
+                               then case from of
+                                    ImportByUser usr_boot -> usr_boot
+                                    ImportBySystem        -> sys_boot
+                               else False
 
 	      ; mb_dep   = lookupUFM (eps_is_boot eps) (moduleName mod)
 	      ; sys_boot = case mb_dep of
