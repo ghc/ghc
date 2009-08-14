@@ -1,3 +1,23 @@
+Changed in version 2.5.0:
+
+  * Drop support for GHC 6.8.*
+
+  * Add support for GHC 6.10.3 and 6.10.4
+
+  * Revert to the old multi-page index for large packages (#106)
+
+  * Show GADT records in the generated documentation
+
+  * Create output directory if it doesn't exist (#104)
+
+  * Use the native codegen instead of compiling via C for TH modules
+
+  * Add --use-unicode flag for displaying prettier versions of common symbols
+
+  * Mutiple verbosity levels: remove --verbose and add --verbosity=n
+
+-----------------------------------------------------------------------------
+
 Changed in version 2.4.2:
 
   * Support GHC 6.10.2
