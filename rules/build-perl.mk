@@ -22,8 +22,8 @@ define build-perl
 # $1 = dir
 # $2 = distdir
 
-ifeq "$$($1_$2_LIBEXEC)" "YES"
-$1_$2_INPLACE = $(INPLACE_LIB)/$$($1_$2_PROG)
+ifeq "$$($1_$2_TOPDIR)" "YES"
+$1_$2_INPLACE = $(INPLACE_TOPDIR)/$$($1_$2_PROG)
 else
 $1_$2_INPLACE = $(INPLACE_BIN)/$$($1_$2_PROG)
 endif

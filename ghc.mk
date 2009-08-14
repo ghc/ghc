@@ -697,52 +697,58 @@ libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
 # Installation
 
 install: install_packages install_libs install_libexecs install_headers \
-         install_libexec_scripts install_bins install_docs
+         install_libexec_scripts install_bins install_docs install_topdirs
 
 install_bins: $(INSTALL_BINS)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	for i in $(INSTALL_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(bindir) ;  \
                 if test "$(darwin_TARGET_OS)" = "1"; then \
-                   sh mk/fix_install_names.sh $(libdir) $(DESTDIR)$(bindir)/$$i ; \
+                   sh mk/fix_install_names.sh $(ghclibdir) $(DESTDIR)$(bindir)/$$i ; \
                 fi ; \
 	done
 
 install_libs: $(INSTALL_LIBS)
-	$(INSTALL_DIR) $(DESTDIR)$(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(ghclibdir)
 	for i in $(INSTALL_LIBS); do \
 		case $$i in \
 		  *.a) \
-		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
-		    $(RANLIB) $(DESTDIR)$(libdir)/`basename $$i` ;; \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibdir); \
+		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
 		  *.dll) \
-		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir) ;; \
+		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibdir) ;; \
 		  *.so) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir) ;; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibdir) ;; \
 		  *.dylib) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
-		    install_name_tool -id $(DESTDIR)$(libdir)/`basename $$i` $(DESTDIR)$(libdir)/`basename $$i` ;; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibdir); \
+		    install_name_tool -id $(DESTDIR)$(ghclibdir)/`basename $$i` $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
 		  *) \
-		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibdir); \
 		esac; \
 	done
 
 install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
-	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(ghclibexecdir)
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(libexecdir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibexecdir); \
 	done
 
 install_libexecs:  $(INSTALL_LIBEXECS)
-	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(ghclibexecdir)
 	for i in $(INSTALL_LIBEXECS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(libexecdir); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(ghclibexecdir); \
+	done
+
+install_topdirs: $(INSTALL_TOPDIRS)
+	$(INSTALL_DIR) $(DESTDIR)$(topdir)
+	for i in $(INSTALL_TOPDIRS); do \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(topdir); \
 	done
 
 install_headers: $(INSTALL_HEADERS)
-	$(INSTALL_DIR) $(DESTDIR)$(headerdir)
+	$(INSTALL_DIR) $(DESTDIR)$(ghcheaderdir)
 	for i in $(INSTALL_HEADERS); do \
-		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i $(DESTDIR)$(headerdir); \
+		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghcheaderdir); \
 	done
 
 install_docs: $(INSTALL_HEADERS)
@@ -760,19 +766,19 @@ install_docs: $(INSTALL_HEADERS)
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* $(DESTDIR)$(docdir)/html/`basename $$i`; \
 	done
 
-INSTALLED_PACKAGE_CONF=$(DESTDIR)$(libdir)/package.conf
+INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf
 
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
 ifeq "$(Windows)" "NO"
-INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(libexecdir)/ghc-pkg
+INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-pkg
 else
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
-	$(INSTALL_DIR) $(DESTDIR)$(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(topdir)
 	"$(RM)" $(RM_OPTS) $(INSTALLED_PACKAGE_CONF)
 	$(CREATE_DATA)     $(INSTALLED_PACKAGE_CONF)
 	echo "[]"       >> $(INSTALLED_PACKAGE_CONF)
@@ -783,12 +789,12 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 		 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \
 		 libraries/$p dist-install \
-		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/html/libraries' &&) true
+		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' &&) true
 	"$(GHC_CABAL_INPLACE)" install \
 	 	 $(INSTALLED_GHC_PKG_REAL) \
 		 $(INSTALLED_PACKAGE_CONF) \
 		 compiler stage2 \
-		 '$(DESTDIR)' '$(prefix)' '$(libdir)' '$(docdir)/html/libraries'
+		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries'
 
 # -----------------------------------------------------------------------------
 # Binary distributions
@@ -810,6 +816,7 @@ $(eval $(call bindist,root1,\
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
+    $(INSTALL_TOPDIRS) \
     $(INSTALL_BINS) \
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
@@ -819,9 +826,10 @@ $(eval $(call bindist,root2,\
 	docs/index.html \
 	$(wildcard libraries/*/dist-install/doc/) \
     $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
-    $(filter-out %/project.mk,$(filter-out mk/config.mk,$(MAKEFILE_LIST))) \
+    $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
 	mk/fix_install_names.sh \
 	mk/project.mk \
+	mk/install.mk.in \
 	bindist.mk \
 	libraries/dph/LICENSE \
  ))

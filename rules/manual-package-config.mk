@@ -29,8 +29,8 @@ $1/package.conf.inplace : $1/package.conf.in $(GHC_PKG_INPLACE)
 $1/package.conf.install:
 	$$(CPP) $$(RAWCPP_FLAGS) -P \
 		-DINSTALLING \
-		-DLIB_DIR='"$$(libdir)"' \
-		-DINCLUDE_DIR='"$$(libdir)/include"' \
+		-DLIB_DIR='"$$(ghclibdir)"' \
+		-DINCLUDE_DIR='"$$(ghclibdir)/include"' \
 		$$($1_PACKAGE_CPP_OPTS) \
 		-x c -I$$(GHC_INCLUDE_DIR) $1/package.conf.in | \
 	grep -v '^#pragma GCC' | \

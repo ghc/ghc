@@ -41,10 +41,11 @@ GHC_MANGLER_DIR         = $(GHC_DRIVER_DIR)/mangler
 GHC_SPLIT_DIR           = $(GHC_DRIVER_DIR)/split
 GHC_SYSMAN_DIR          = $(GHC_RTS_DIR)/parallel
 
-INPLACE			= inplace
-INPLACE_BIN		= $(INPLACE)/bin
-INPLACE_LIB		= $(INPLACE)/lib
-INPLACE_MINGW		= $(INPLACE)/mingw
+INPLACE                 = inplace
+INPLACE_BIN             = $(INPLACE)/bin
+INPLACE_LIB             = $(INPLACE)/lib
+INPLACE_TOPDIR          = $(INPLACE)/lib
+INPLACE_MINGW           = $(INPLACE)/mingw
 
 # These are here, rather than in config.mk, as they need to exist in an
 # unconfigured tree so that the various clean targets can be used

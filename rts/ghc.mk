@@ -372,9 +372,9 @@ install : install_rts
 
 .PHONY: install_rts
 install_rts:
-	$(INSTALL_DIR) $(DESTDIR)$(libdir)
-	$(INSTALL_DIR) $(DESTDIR)$(libdir)/include
-	"$(CP)" $(ALL_RTS_LIBS) $(DESTDIR)$(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(ghclibdir)
+	$(INSTALL_DIR) $(DESTDIR)$(ghclibdir)/include
+	"$(CP)" $(ALL_RTS_LIBS) $(DESTDIR)$(ghclibdir)
 
 # -----------------------------------------------------------------------------
 # cleaning

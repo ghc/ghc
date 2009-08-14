@@ -7,30 +7,7 @@ FPTOOLS_TOP_ABS  = @hardtop@
 # rather than ghc-pkg.exe.
 GHC_PKG_PROG = $(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg.bin
 
-# Where the different pieces of the bundle should go:
-bindir      = @bindir@
-libdir      = @libdir@/$(package)-$(version)
-libexecdir  = $(libdir)
-datarootdir = @datarootdir@
-# datadir is set to libdir here as GHC needs package.conf and unlit
-# to be in the same place (and things like ghc-pkg need to agree on
-# where package.conf is, so we just set it globally).
-datadir     = $(libdir)
-
 platform    = @TargetPlatform@
-prefix      = @prefix@
-exec_prefix = @exec_prefix@
-
-mandir      = $(datarootdir)/man
-
-headerdir   = $(libdir)/include
-
-# default
-docdir      = @datadir@/doc/ghc
-htmldir     = $(docdir)
-psdir       = $(docdir)
-pdfdir      = $(docdir)
-
 
 PERL        = @PerlCmd@
 SH	    = /bin/sh
@@ -55,36 +32,6 @@ RANLIB      = @RANLIB@
 CPP         = @CPP@
 
 RAWCPP_FLAGS            = -undef -traditional
-
-#----------end of user-serviceable parts------------
-#
-#
-# How to install the different pieces
-# 
-INSTALL_DIR     = $(bindist_abs_root)/utils/mkdirhier/mkdirhier
-INSTALL_BIN     = $(INSTALL) $(INSTALL_BIN_OPTS)
-INSTALL_LIB     = $(INSTALL) $(INSTALL_LIB_OPTS)
-INSTALL_DATA    = $(INSTALL) $(INSTALL_DATA_OPTS)
-INSTALL_SCRIPT  = $(INSTALL) $(INSTALL_SCRIPT_OPTS)
-INSTALL_PROGRAM = $(INSTALL) $(INSTALL_PROGRAM_OPTS)
-INSTALL_HEADER  = $(INSTALL) $(INSTALL_HEADER_OPTS)
-INSTALL_SHLIB   = $(INSTALL) $(INSTALL_SHLIB_OPTS)
-INSTALL_MAN     = $(INSTALL) $(INSTALL_MAN_OPTS)
-
-# What's common to all installs
-INSTALL_OPTS= $(EXTRA_INSTALL_OPTS)
-
-BIN_PERMS = 755
-LIB_PERMS = 644
-
-INSTALL_BIN_OPTS     = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_BIN_OPTS)
-INSTALL_LIB_OPTS     = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_LIB_OPTS)
-INSTALL_DATA_OPTS    = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_DATA_OPTS)
-INSTALL_SCRIPT_OPTS  = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_SCRIPT_OPTS)
-INSTALL_PROGRAM_OPTS = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_PROGRAM_OPTS)
-INSTALL_HEADER_OPTS  = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_HEADER_OPTS)
-INSTALL_SHLIB_OPTS   = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_SHLIB_OPTS)
-INSTALL_MAN_OPTS     = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_MAN_OPTS)
 
 EXECUTABLE_FILE = chmod $(BIN_PERMS)
 

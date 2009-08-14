@@ -167,7 +167,7 @@ dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_EXTRA_FLAGS
 
 #
-AC_CONFIG_FILES(extra-gcc-opts mk/config.mk)
+AC_CONFIG_FILES(extra-gcc-opts mk/config.mk mk/install.mk)
 AC_OUTPUT
 
 echo "****************************************************"

@@ -126,8 +126,8 @@ else
 ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
 $1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
 else
-ifeq "$$($1_$2_LIBEXEC)" "YES"
-$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
+ifeq "$$($1_$2_TOPDIR)" "YES"
+$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
 else
 $1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
 endif
@@ -150,8 +150,8 @@ endif
 $(call shell-wrapper,$1,$2)
 
 ifeq "$$($1_$2_INSTALL)" "YES"
-ifeq "$$($1_$2_LIBEXEC)" "YES"
-INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
+ifeq "$$($1_$2_TOPDIR)" "YES"
+INSTALL_TOPDIRS += $1/$2/build/tmp/$$($1_$2_PROG)
 else
 INSTALL_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
 endif
