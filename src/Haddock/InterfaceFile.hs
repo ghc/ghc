@@ -58,17 +58,17 @@ binaryInterfaceMagic = 0xD0Cface
 -- Instead of adding one, we add five to all version numbers
 -- when one of our own (stored) datatypes is changed. 
 binaryInterfaceVersion :: Word16
-#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
-binaryInterfaceVersion = 9
-#endif         
-#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 3
-binaryInterfaceVersion = 10
-#endif           
 #if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 1
 binaryInterfaceVersion = 11
 #endif
 #if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 2
 binaryInterfaceVersion = 12
+#endif
+#if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 3
+binaryInterfaceVersion = 14
+#endif
+#if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 4
+binaryInterfaceVersion = 15
 #endif
 #if __GLASGOW_HASKELL__ == 611
 binaryInterfaceVersion = 13
