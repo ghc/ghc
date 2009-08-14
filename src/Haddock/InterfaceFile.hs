@@ -51,26 +51,13 @@ binaryInterfaceMagic :: Word32
 binaryInterfaceMagic = 0xD0Cface
 
 
--- Since datatypes in GHC might change between patchlevel versions,
--- and because we store GHC datatypes in our interface files,
--- we need to make sure we version our interface files accordingly.
---
--- Instead of adding one, we add five to all version numbers
--- when one of our own (stored) datatypes is changed. 
+-- Since datatypes in the GHC API might change between major versions, and
+-- because we store GHC datatypes in our interface files, we need to make sure
+-- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
-#if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 1
-binaryInterfaceVersion = 11
-#endif
-#if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 2
+#if __GLASGOW_HASKELL__ == 610
 binaryInterfaceVersion = 12
-#endif
-#if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 3
-binaryInterfaceVersion = 14
-#endif
-#if __GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ == 4
-binaryInterfaceVersion = 15
-#endif
-#if __GLASGOW_HASKELL__ == 611
+#elif __GLASGOW_HASKELL__ == 611
 binaryInterfaceVersion = 13
 #endif
 
