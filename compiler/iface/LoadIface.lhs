@@ -191,21 +191,10 @@ loadInterface doc_str mod from
 			-- if an earlier import had a before we got to real imports.   I think.
 	    _ -> do {
 
-          let { hi_boot_file = if thisPackage dflags == modulePackageId mod
-                               then case from of
-                                    ImportByUser usr_boot -> usr_boot
-                                    ImportBySystem        -> sys_boot
-                               else False
-
-	      ; mb_dep   = lookupUFM (eps_is_boot eps) (moduleName mod)
-	      ; sys_boot = case mb_dep of
-				Just (_, is_boot) -> is_boot
-				Nothing		  -> False
-			-- The boot-ness of the requested interface, 
-	      }		-- based on the dependencies in directly-imported modules
-
 	-- READ THE MODULE IN
-	; read_result <- findAndReadIface doc_str mod hi_boot_file
+	; read_result <- case (wantHiBootFile dflags eps mod from) of
+                           Failed err             -> return (Failed err)
+                           Succeeded hi_boot_file -> findAndReadIface doc_str mod hi_boot_file
 	; case read_result of {
 	    Failed err -> do
 	  	{ let fake_iface = emptyModIface mod
@@ -298,6 +287,38 @@ loadInterface doc_str mod from
 	; return (Succeeded final_iface)
     }}}}
 
+wantHiBootFile :: DynFlags -> ExternalPackageState -> Module -> WhereFrom
+	       -> MaybeErr Message IsBootInterface
+-- Figure out whether we want Foo.hi or Foo.hi-boot
+wantHiBootFile dflags eps mod from
+  = case from of
+       ImportByUser usr_boot 
+          | usr_boot && not this_package
+          -> Failed (badSourceImport mod)
+          | otherwise -> Succeeded usr_boot
+
+       ImportBySystem
+          | not this_package   -- If the module to be imported is not from this package
+          -> Succeeded False   -- don't look it up in eps_is_boot, because that is keyed
+                               -- on the ModuleName of *home-package* modules only. 
+                               -- We never import boot modules from other packages!
+
+          | otherwise
+          -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
+		Just (_, is_boot) -> Succeeded is_boot
+                Nothing	          -> Succeeded False
+		     -- The boot-ness of the requested interface, 
+	      	     -- based on the dependencies in directly-imported modules
+  where
+    this_package = thisPackage dflags == modulePackageId mod
+
+badSourceImport :: Module -> SDoc
+badSourceImport mod
+  = hang (ptext (sLit "You cannot {-# SOURCE #-} import a module from another package"))
+       2 (ptext (sLit "but") <+> quotes (ppr mod) <+> ptext (sLit "is from package")
+          <+> quotes (ppr (modulePackageId mod)))
+\end{code}
+
 {-
 Used to be used for the loadInterface sanity check on system imports. That has been removed, but I'm leaving this in pending
 review of this decision by SPJ - MCB 10/2008
@@ -309,6 +330,7 @@ badDepMsg mod
 	       ptext (sLit "but is not listed in the dependencies of the interfaces directly imported by the module being compiled")])
 -}
 
+\begin{code}
 -----------------------------------------------------
 --	Loading type/class/value decls
 -- We pass the full Module name here, replete with
