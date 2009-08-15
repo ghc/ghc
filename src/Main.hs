@@ -433,9 +433,13 @@ handleEasyFlags :: [Flag] -> IO ()
 handleEasyFlags flags = do
   usage <- getUsage
 
-  when (Flag_Help       `elem` flags) (bye usage)
-  when (Flag_Version    `elem` flags) byeVersion
-  when (Flag_GhcVersion `elem` flags) byeGhcVersion
+  when (Flag_Help           `elem` flags) (bye usage)
+  when (Flag_Version        `elem` flags) byeVersion
+  when (Flag_GhcVersion     `elem` flags) byeGhcVersion
+
+  when (Flag_PrintGhcLibDir `elem` flags) $ do
+    dir <- getGhcLibDir flags
+    bye $ dir ++ "\n"
 
   when (Flag_UseUnicode `elem` flags && not (Flag_Html `elem` flags)) $
   	throwE ("Unicode can only be enabled for HTML output.")

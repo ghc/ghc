@@ -91,6 +91,7 @@ data Flag
   | Flag_OptGhc String
   | Flag_GhcLibDir String
   | Flag_GhcVersion
+  | Flag_PrintGhcLibDir
   | Flag_NoWarnings
   | Flag_UseUnicode
   deriving (Eq)
@@ -161,5 +162,7 @@ options backwardsCompat =
  	"option to be forwarded to GHC",
     Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)
 	"output GHC version in numeric format",
+    Option []  ["print-ghc-libdir"]  (NoArg Flag_PrintGhcLibDir)
+	"output GHC lib dir",
     Option ['w'] ["no-warnings"] (NoArg Flag_NoWarnings) "turn off all warnings"
    ]
