@@ -155,21 +155,7 @@ main = handleTopExceptions $ do
   if not (null fileArgs)
     then do
 
-      libDir <- case getGhcLibDir flags of
-                Just dir -> return dir
-                Nothing ->
-#ifdef IN_GHC_TREE
-                    do m <- getExecDir
-                       case m of
-                           Nothing -> error "No GhcLibDir found"
-#ifdef NEW_GHC_LAYOUT
-                           Just d -> return (d </> ".." </> "lib")
-#else
-                           Just d -> return (d </> "..")
-#endif
-#else
-                    return libdir -- from GHC.Paths
-#endif
+      libDir <- getGhcLibDir flags
 
 #if __GLASGOW_HASKELL__ >= 609
       -- We have one global error handler for all GHC source errors.  Other kinds
@@ -415,11 +401,23 @@ startGhc libDir flags = do
 -------------------------------------------------------------------------------
 
 
-getGhcLibDir :: [Flag] -> Maybe String
-getGhcLibDir flags =
+getGhcLibDir :: [Flag] -> IO String
+getGhcLibDir flags = do
   case [ dir | Flag_GhcLibDir dir <- flags ] of
-    [] -> Nothing
-    xs -> Just $ last xs
+    [] ->
+#ifdef IN_GHC_TREE
+      do m <- getExecDir
+         case m of
+             Nothing -> error "No GhcLibDir found"
+#ifdef NEW_GHC_LAYOUT
+             Just d -> return (d </> ".." </> "lib")
+#else
+             Just d -> return (d </> "..")
+#endif
+#else
+      return libdir -- from GHC.Paths
+#endif
+    xs -> return $ last xs
 
 
 getVerbosity :: Monad m => [Flag] -> m Verbosity
