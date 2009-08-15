@@ -1,55 +1,43 @@
 --------------------------------------------
--- Haddock 2.4.2
+-- Haddock 2.5.0
 --------------------------------------------
 
 A new version of Haddock, the Haskell documentation tool, is out!
 
-This is a bug fix release only, and it's the same version that will ship with
-GHC 6.10.2, unless any important problems are discovered before the GHC
-release.
-
-Because the .haddock file format has changed, links to previously installed
-documentation will not work when generating documentation using this version.
+If you're using GHC 6.10.2 and Haddock 2.4.2, you should be able to upgrade to
+this version without any problem. If you're using something else, you should
+re-install any documentation that you want to link to after upgrading.
 
 Please use the bug tracker to submit bug reports or feature requests.
 
 --------------------------------------------
--- Changes in version 2.4.2
+-- Changes in version 2.5.0
 --------------------------------------------
 
-  * Support GHC 6.10.2
+  * Drop support for GHC 6.8.*
 
-  * Haddock no longer crashes on Template Haskell modules (#68)
-    (only with GHC 6.10.2 or above)
+  * Add support for GHC 6.10.3 and 6.10.4
 
-  * Fix problem with Template Haskell-generated declarations disappearing (#59)
+  * Revert to the old multi-page index for large packages (#106)
 
-  * Generate two anchors for each link for compatibility between IE and Opera
-    (#45)
+  * Show GADT records in the generated documentation
 
-  * Improved error messages
+  * Create the output directory if it doesn't exist (#104)
 
-  * Show re-exports from external packages again (GHC ticket #2746)
+  * Use the native codegen instead of compiling via C for TH modules
 
-  * Store hidden modules in .haddock files again (needed by the haddock
-    library)
+  * Add --use-unicode flag for displaying prettier versions of common symbols
 
-  * Avoid processing boot modules
+  * Mutiple verbosity levels: remove --verbose and add --verbosity=n
 
-  * Pragmas may exist between document comments and declarations
+  * Simpler versioning of .haddock files
 
-  * Do not indicate that a constructor argument is unboxed
+To avoid slow search, Haddock switches from the searchable index to the old
+multi-page index for large packages (containing over 150 items). This, and
+support for GADT records in the generated documentation was implemented by
+Isaac Dupree as part of his Summer of Code project.
 
-  * Fix problem with with non-working links to ghc-prim
-
-  * Allow referring to a specific section within a module in a module link
-    (#65)
-
-  * Fixes to the Hoogle backend
-  
-  * Improvements to the haddock library
-
-  * Many other fixes (including #67, #69, #58, #57)
+The --use-unicode flag was contributed by George Porges.
 
 --------------------------------------------
 -- Links
@@ -59,7 +47,7 @@ Homepage:
  http://www.haskell.org/haddock
 
 Hackage page:
- http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.4.2
+ http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.5.0
 
 Bugtracker and wiki:
  http://trac.haskell.org/haddock
@@ -76,19 +64,35 @@ Code repository:
 
 The following people contributed patches to this release:
 
- Joachim Breitner
- Roman Cheplyaka
+ Isaac Dupree
  Ian Lynagh
- Neil Mitchell
+ Simon Marlow
  Simon Peyton-Jones
- Thomas Schilling
+ George Porges
  David Waern
+
+--------------------------------------------
+-- Future Plans
+--------------------------------------------
+
+Here are the top priority tickets right now:
+
+ * Cross-package documentation (#24)
+ * Good warning messages when encountering unexpected Haddock comments (#94)
+ * Comments on instance declarations (#29)
+
+Isaac Dupree has been working on the first item as part of his SoC project and
+it is near completion.
+
+If you have any input on what we should prioritize, add yourself to the CC list
+of the ticket(s) that you are interested in.
 
 --------------------------------------------
 -- Get Involved
 --------------------------------------------
 
-We welcome new contributors. To get involved, start by grabbing the code:
+We would be very happy to get more contributors. To get involved, start by
+grabbing the code:
 
  http://code.haskell.org/haddock
 
