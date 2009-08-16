@@ -22,13 +22,15 @@ module IOEnv (
         tryM, tryAllM, tryMostM, fixM,
 
         -- I/O operations
-        IORef, newMutVar, readMutVar, writeMutVar, updMutVar
+        IORef, newMutVar, readMutVar, writeMutVar, updMutVar,
+        atomicUpdMutVar, atomicUpdMutVar'
   ) where
 
 import Exception
 import Panic
 
-import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
+                          atomicModifyIORef )
 import Data.Typeable
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
@@ -162,6 +164,17 @@ readMutVar var = liftIO (readIORef var)
 updMutVar :: IORef a -> (a -> a) -> IOEnv env ()
 updMutVar var upd = liftIO (modifyIORef var upd)
 
+-- | Atomically update the reference.  Does not force the evaluation of the
+-- new variable contents.  For strict update, use 'atomicUpdMutVar''.
+atomicUpdMutVar :: IORef a -> (a -> (a, b)) -> IOEnv env b
+atomicUpdMutVar var upd = liftIO (atomicModifyIORef var upd)
+
+-- | Strict variant of 'atomicUpdMutVar'.
+atomicUpdMutVar' :: IORef a -> (a -> (a, b)) -> IOEnv env b
+atomicUpdMutVar' var upd = do
+  r <- atomicUpdMutVar var upd
+  _ <- liftIO . evaluate =<< readMutVar var
+  return r
 
 ----------------------------------------------------------------------
 -- Accessing the environment

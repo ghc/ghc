@@ -257,29 +257,28 @@ getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
 getEps :: TcRnIf gbl lcl ExternalPackageState
 getEps = do { env <- getTopEnv; readMutVar (hsc_EPS env) }
 
--- Updating the EPS.  This should be an atomic operation.
--- Note the delicate 'seq' which forces the EPS before putting it in the
--- variable.  Otherwise what happens is that we get
---	write eps_var (....(unsafeRead eps_var)....)
--- and if the .... is strict, that's obviously bottom.  By forcing it beforehand
--- we make the unsafeRead happen before we update the variable.
-
+-- | Update the external package state.  Returns the second result of the
+-- modifier function.
+--
+-- This is an atomic operation and forces evaluation of the modified EPS in
+-- order to avoid space leaks.
 updateEps :: (ExternalPackageState -> (ExternalPackageState, a))
 	  -> TcRnIf gbl lcl a
-updateEps upd_fn = do	{ traceIf (text "updating EPS")
-			; eps_var <- getEpsVar
-			; eps <- readMutVar eps_var
-			; let { (eps', val) = upd_fn eps }
-			; seq eps' (writeMutVar eps_var eps')
-			; return val }
+updateEps upd_fn = do
+  traceIf (text "updating EPS")
+  eps_var <- getEpsVar
+  atomicUpdMutVar' eps_var upd_fn
 
+-- | Update the external package state.
+--
+-- This is an atomic operation and forces evaluation of the modified EPS in
+-- order to avoid space leaks.
 updateEps_ :: (ExternalPackageState -> ExternalPackageState)
 	   -> TcRnIf gbl lcl ()
-updateEps_ upd_fn = do	{ traceIf (text "updating EPS_")
-			; eps_var <- getEpsVar
-			; eps <- readMutVar eps_var
-			; let { eps' = upd_fn eps }
-			; seq eps' (writeMutVar eps_var eps') }
+updateEps_ upd_fn = do
+  traceIf (text "updating EPS_")
+  eps_var <- getEpsVar
+  atomicUpdMutVar' eps_var (\eps -> (upd_fn eps, ()))
 
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
