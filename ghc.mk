@@ -824,6 +824,7 @@ $(eval $(call bindist,root1,\
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
     $(INSTALL_TOPDIRS) \
+    $(INSTALL_TOPDIR_SCRIPTS) \
     $(INSTALL_BINS) \
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
