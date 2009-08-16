@@ -2342,8 +2342,11 @@ cyclicModuleErr ms
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
 -- its cache of module locations, since it may no longer be valid.
--- Note: if you change the working directory, you should also unload
--- the current program (set targets to empty, followed by load).
+-- 
+-- Note: Before changing the working directory make sure all threads running
+-- in the same session have stopped.  If you change the working directory,
+-- you should also unload the current program (set targets to empty,
+-- followed by load).
 workingDirectoryChanged :: GhcMonad m => m ()
 workingDirectoryChanged = withSession $ (liftIO . flushFinderCaches)
 

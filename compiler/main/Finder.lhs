@@ -37,10 +37,11 @@ import Outputable
 import FiniteMap
 import LazyUniqFM
 import Maybes		( expectJust )
+import Exception        ( evaluate )
 
 import Distribution.Text
 import Distribution.Package hiding (PackageId)
-import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
+import Data.IORef	( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath
 import Control.Monad
@@ -67,6 +68,7 @@ type BaseName = String	-- Basename of file
 -- assumed to not move around during a session.
 flushFinderCaches :: HscEnv -> IO ()
 flushFinderCaches hsc_env = do
+  -- Ideally the update to both caches be a single atomic operation.
   writeIORef fc_ref emptyUFM
   flushModLocationCache this_pkg mlc_ref
  where
@@ -76,23 +78,27 @@ flushFinderCaches hsc_env = do
 
 flushModLocationCache :: PackageId -> IORef ModLocationCache -> IO ()
 flushModLocationCache this_pkg ref = do
-  fm <- readIORef ref
-  writeIORef ref $! filterFM is_ext fm
+  atomicModifyIORef ref $ \fm -> (filterFM is_ext fm, ())
+  _ <- evaluate =<< readIORef ref
   return ()
   where is_ext mod _ | modulePackageId mod /= this_pkg = True
 		     | otherwise = False
 
 addToFinderCache :: IORef FinderCache -> ModuleName -> FindResult -> IO ()
-addToFinderCache       ref key val = modifyIORef ref $ \c -> addToUFM c key val
+addToFinderCache ref key val =
+  atomicModifyIORef ref $ \c -> (addToUFM c key val, ())
 
 addToModLocationCache :: IORef ModLocationCache -> Module -> ModLocation -> IO ()
-addToModLocationCache  ref key val = modifyIORef ref $ \c -> addToFM c key val
+addToModLocationCache ref key val =
+  atomicModifyIORef ref $ \c -> (addToFM c key val, ())
 
 removeFromFinderCache :: IORef FinderCache -> ModuleName -> IO ()
-removeFromFinderCache      ref key = modifyIORef ref $ \c -> delFromUFM c key
+removeFromFinderCache ref key =
+  atomicModifyIORef ref $ \c -> (delFromUFM c key, ())
 
 removeFromModLocationCache :: IORef ModLocationCache -> Module -> IO ()
-removeFromModLocationCache ref key = modifyIORef ref $ \c -> delFromFM c key
+removeFromModLocationCache ref key =
+  atomicModifyIORef ref $ \c -> (delFromFM c key, ())
 
 lookupFinderCache :: IORef FinderCache -> ModuleName -> IO (Maybe FindResult)
 lookupFinderCache ref key = do 
