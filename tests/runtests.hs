@@ -8,6 +8,8 @@ import Data.List
 import Control.Monad
 import Text.Printf
 import Text.Regex
+import Distribution.Simple.Utils
+import Distribution.Verbosity
 
 
 main = do
@@ -56,8 +58,13 @@ test = do
   h2 <- runProcess "../dist/build/haddock/haddock" ["--ghc-version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   waitForProcess h2
   putStrLn ""
+
+  libdir <- rawSystemStdout normal "../dist/build/haddock/haddock" ["--print-ghc-libdir"]
+  let basepath = init libdir ++ "/../../share/doc/ghc/libraries/base/"
+  let option = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
+
   putStrLn "Running tests..."
-  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w"] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w", option] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   code <- waitForProcess handle
   when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
