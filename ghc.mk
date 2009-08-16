@@ -697,7 +697,8 @@ libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
 # Installation
 
 install: install_packages install_libs install_libexecs install_headers \
-         install_libexec_scripts install_bins install_docs install_topdirs
+         install_libexec_scripts install_bins install_docs \
+		 install_topdirs install_topdir_scripts
 
 install_bins: $(INSTALL_BINS)
 	$(INSTALL_DIR) $(DESTDIR)$(bindir)
@@ -737,6 +738,12 @@ install_libexecs:  $(INSTALL_LIBEXECS)
 	$(INSTALL_DIR) $(DESTDIR)$(ghclibexecdir)
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(ghclibexecdir); \
+	done
+
+install_topdir_scripts: $(INSTALL_TOPDIR_SCRIPTS)
+	$(INSTALL_DIR) $(DESTDIR)$(topdir)
+	for i in $(INSTALL_TOPDIR_SCRIPTS); do \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(topdir); \
 	done
 
 install_topdirs: $(INSTALL_TOPDIRS)
