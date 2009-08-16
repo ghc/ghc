@@ -61,10 +61,12 @@ test = do
 
   libdir <- rawSystemStdout normal "../dist/build/haddock/haddock" ["--print-ghc-libdir"]
   let basepath = init libdir ++ "/../../share/doc/ghc/libraries/base/"
-  let option = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
+  let base = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
+  let processpath = init libdir ++ "/../../share/doc/ghc/libraries/process/"
+  let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
 
   putStrLn "Running tests..."
-  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w", option] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w", base, process] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   code <- waitForProcess handle
   when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
