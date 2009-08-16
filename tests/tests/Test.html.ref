@@ -221,7 +221,9 @@
 ><TD CLASS="decl"
 >= <A HREF="#v%3AA"
 >A</A
-> Int (Maybe Float)</TD
+> Int (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
+>Maybe</A
+> Float)</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
@@ -686,7 +688,9 @@
 ><TD CLASS="decl"
 ><A HREF="#v%3Aa"
 >a</A
-> :: IO a</TD
+> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
@@ -789,7 +793,9 @@
 ><TD CLASS="decl"
 ><A HREF="#v%3Ag"
 >g</A
-> :: Int -&gt; IO CInt</TD
+> :: Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> CInt</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -889,7 +895,9 @@
 >T4</A
 > Float Float) -&gt; <A HREF="Test.html#t%3AT5"
 >T5</A
-> () () -&gt; IO ()</TD
+> () () -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> ()</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -913,7 +921,9 @@
 >R</A
 > -&gt; <A HREF="Test.html#t%3AN1"
 >N1</A
-> () -&gt; IO Int</TD
+> () -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> Int</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -923,7 +933,9 @@
 ><TD CLASS="decl"
 ><A HREF="#v%3Ao"
 >o</A
-> :: Float -&gt; IO Float</TD
+> :: Float -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> Float</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -1010,7 +1022,9 @@
 ></A
 ><B
 >A</B
-> Int (Maybe Float)</TD
+> Int (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
+>Maybe</A
+> Float)</TD
 ><TD CLASS="rdoc"
 >This comment describes the <TT
 ><A HREF="Test.html#v%3AA"
@@ -2183,7 +2197,9 @@
 ></A
 ><B
 >a</B
-> :: IO a</TD
+> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> a</TD
 ></TR
 ><TR
 ><TD CLASS="doc"
@@ -2498,7 +2514,9 @@ using double quotes: <A HREF="Foo.html"
 ></A
 ><B
 >g</B
-> :: Int -&gt; IO CInt</TD
+> :: Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> CInt</TD
 ></TR
 ><TR
 ><TD CLASS="doc"
@@ -2950,7 +2968,9 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; IO ()</TD
+>-&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> ()</TD
 ><TD CLASS="rdoc"
 >This is the result type
 </TD
@@ -3035,7 +3055,9 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; IO Int</TD
+>-&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> Int</TD
 ><TD CLASS="rdoc"
 >and the return value
 </TD
@@ -3074,7 +3096,9 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; IO Float</TD
+>-&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> Float</TD
 ><TD CLASS="rdoc"
 >The output float
 </TD

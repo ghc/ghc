@@ -96,7 +96,9 @@
 ></A
 ><B
 >Type</B
-> (String, [<A HREF="Bug8.html#t%3ATyp"
+> (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Char.html#t%3AString"
+>String</A
+>, [<A HREF="Bug8.html#t%3ATyp"
 >Typ</A
 >])</TD
 ><TD CLASS="rdoc"
@@ -110,7 +112,11 @@
 ></A
 ><B
 >TFree</B
-> (String, [String])</TD
+> (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Char.html#t%3AString"
+>String</A
+>, [<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Char.html#t%3AString"
+>String</A
+>])</TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR

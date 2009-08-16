@@ -93,7 +93,9 @@
 ><TD CLASS="decl"
 ><A HREF="#v%3AC2"
 >C2</A
-> :: Ord a =&gt; [a] -&gt; <A HREF="GADTRecords.html#t%3AH1"
+> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Ord.html#t%3AOrd"
+>Ord</A
+> a =&gt; [a] -&gt; <A HREF="GADTRecords.html#t%3AH1"
 >H1</A
 > a a</TD
 ></TR
@@ -201,7 +203,9 @@
 ></A
 ><B
 >C2</B
-> :: Ord a =&gt; [a] -&gt; <A HREF="GADTRecords.html#t%3AH1"
+> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Ord.html#t%3AOrd"
+>Ord</A
+> a =&gt; [a] -&gt; <A HREF="GADTRecords.html#t%3AH1"
 >H1</A
 > a a</TD
 ><TD CLASS="rdoc"

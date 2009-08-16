@@ -138,9 +138,13 @@
 ><TD CLASS="decl"
 ><A HREF="#v%3Anew"
 >new</A
-> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
+>Eq</A
+> key, <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> key) =&gt; Int -&gt; IO (<A HREF="Hash.html#t%3AHashTable"
+> key) =&gt; Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> (<A HREF="Hash.html#t%3AHashTable"
 >HashTable</A
 > key val)</TD
 ></TR
@@ -152,9 +156,13 @@
 ><TD CLASS="decl"
 ><A HREF="#v%3Ainsert"
 >insert</A
-> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
+>Eq</A
+> key, <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> key) =&gt; key -&gt; val -&gt; IO ()</TD
+> key) =&gt; key -&gt; val -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> ()</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -166,7 +174,11 @@
 >lookup</A
 > :: <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> key =&gt; key -&gt; IO (Maybe val)</TD
+> key =&gt; key -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
+>Maybe</A
+> val)</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -245,7 +257,9 @@
  The type <TT
 >key</TT
 > should be an instance of <TT
->Eq</TT
+><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
+>Eq</A
+></TT
 >.
 </TD
 ></TR
@@ -279,9 +293,13 @@
 ></A
 ><B
 >new</B
-> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
+>Eq</A
+> key, <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> key) =&gt; Int -&gt; IO (<A HREF="Hash.html#t%3AHashTable"
+> key) =&gt; Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> (<A HREF="Hash.html#t%3AHashTable"
 >HashTable</A
 > key val)</TD
 ></TR
@@ -302,9 +320,13 @@
 ></A
 ><B
 >insert</B
-> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
+>Eq</A
+> key, <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> key) =&gt; key -&gt; val -&gt; IO ()</TD
+> key) =&gt; key -&gt; val -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> ()</TD
 ></TR
 ><TR
 ><TD CLASS="doc"
@@ -325,17 +347,25 @@
 >lookup</B
 > :: <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> key =&gt; key -&gt; IO (Maybe val)</TD
+> key =&gt; key -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
+>IO</A
+> (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
+>Maybe</A
+> val)</TD
 ></TR
 ><TR
 ><TD CLASS="doc"
 >Looks up a key in the hash table, returns <TT
 ><TT
->Just</TT
+><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#v%3AJust"
+>Just</A
+></TT
 > val</TT
 > if the key
  was found, or <TT
->Nothing</TT
+><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#v%3ANothing"
+>Nothing</A
+></TT
 > otherwise.
 </TD
 ></TR
