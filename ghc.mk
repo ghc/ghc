@@ -24,8 +24,9 @@ utils/haddock_dist_MODULES += Paths_haddock
 install: install_utils/haddock_html
 .PHONY: install_utils/haddock_html
 install_utils/haddock_html:
-	"$(RM)" $(RM_OPTS) -r $(DESTDIR)$(datadir)/html
-	"$(CP)" -R utils/haddock/html $(DESTDIR)$(datadir)/html
+	"$(RM)" $(RM_OPTS) -r $(DESTDIR)$(docdir)/html
+	$(INSTALL_DIR) $(DESTDIR)$(docdir)/html
+	"$(CP)" -R utils/haddock/html $(DESTDIR)$(docdir)/html
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/,html/*)
 
