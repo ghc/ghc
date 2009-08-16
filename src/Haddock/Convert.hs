@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 
 -- This functionality may be moved into GHC at some point, and then
 -- we can use the GHC version (#if GHC version is new enough).
@@ -17,6 +18,7 @@ import DataCon
 import Id
 import BasicTypes
 import TysPrim ( alphaTyVars )
+import TysWiredIn ( listTyConName )
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc )
 import Maybe
@@ -239,12 +241,11 @@ synifyType _ (PredTy{}) = --should never happen.
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
-  | isTupleTyCon tc && tyConArity tc == length tys =
-     let sTys = map (synifyType WithinType) tys
-     in noLoc $
-        HsTupleTy (tupleTyConBoxity tc) sTys
-  -- We could do the same for list types if we knew how to determine
-  -- whether the constructor was the list-constructor....
+  | isTupleTyCon tc, tyConArity tc == length tys =
+     noLoc $ HsTupleTy (tupleTyConBoxity tc) (map (synifyType WithinType) tys)
+  -- ditto for lists
+  | getName tc == listTyConName, [ty] <- tys =
+     noLoc $ HsListTy (synifyType WithinType ty)
   -- Most TyCons:
   | otherwise =
     foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
