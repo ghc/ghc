@@ -42,7 +42,6 @@ import HscTypes
 
 -- | Turn a topologically sorted list of module names/filenames into interfaces. Also
 -- return the home link environment created in the process.
-#if __GLASGOW_HASKELL__ >= 609
 createInterfaces :: Verbosity -> [String] -> [Flag] -> [InterfaceFile]
                  -> Ghc ([Interface], LinkEnv)
 createInterfaces verbosity modules flags extIfaces = do
@@ -51,16 +50,7 @@ createInterfaces verbosity modules flags extIfaces = do
                                    , iface <- ifInstalledIfaces ext ]
   out verbosity verbose "Creating interfaces..."
   interfaces <- createInterfaces' verbosity modules flags instIfaceMap
-#else
-createInterfaces :: Verbosity -> Session -> [String] -> [Flag]
-                 -> [InterfaceFile] -> IO ([Interface], LinkEnv)
-createInterfaces verbosity session modules flags extIfaces = do
-  -- part 1, create interfaces
-  let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
-                                   , iface <- ifInstalledIfaces ext ]
-  out verbosity verbose "Creating interfaces..."
-  interfaces <- createInterfaces' verbosity session modules flags instIfaceMap
-#endif
+
   -- part 2, build link environment
   out verbosity verbose "Building link environment..."
       -- combine the link envs of the external packages into one
@@ -83,7 +73,6 @@ createInterfaces verbosity session modules flags extIfaces = do
   return (interfaces'', homeLinks)  
 
 
-#if __GLASGOW_HASKELL__ >= 609
 createInterfaces' :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc [Interface]
 createInterfaces' verbosity modules flags instIfaceMap = do
   targets <- mapM (\f -> guessTarget f Nothing) modules
@@ -112,19 +101,6 @@ createInterfaces' verbosity modules flags instIfaceMap = do
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph' Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
     x <- processModule verbosity modsum flags modMap instIfaceMap
-#else
-createInterfaces' :: Verbosity -> Session -> [String] -> [Flag] -> InstIfaceMap -> IO [Interface]
-createInterfaces' verbosity session modules flags instIfaceMap = do
-  targets <- mapM (\f -> guessTarget f Nothing) modules
-  setTargets session targets
-  mbGraph <- depanal session [] False
-  modgraph <- case mbGraph of
-    Just graph -> return graph
-    Nothing -> throwE "Failed to create dependency graph"
-  let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
-  (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
-    x <- processModule verbosity session modsum flags modMap instIfaceMap
-#endif
     case x of
       Just interface ->
         return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
@@ -164,7 +140,6 @@ ppExportItem (ExportModule mod) = pretty mod
 ppModInfo (HaddockModInfo a b c d) = show (fmap pretty a) ++ show b ++ show c ++ show d 
 -}
 
-#if __GLASGOW_HASKELL__ >= 609
 processModule :: Verbosity -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc (Maybe Interface)
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
@@ -188,24 +163,6 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       return (Just interface')
     else
       return Nothing
-#else
-processModule :: Verbosity -> Session -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> IO (Maybe Interface)
-processModule verbosity session modsum flags modMap instIfaceMap = do
-  out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
-  let filename = msHsFilePath modsum
-  mbMod <- checkAndLoadModule session modsum False
-  if not $ isBootSummary modsum
-    then do
-      ghcMod <- case mbMod of
-        Just (CheckedModule a (Just b) (Just c) (Just d) _)
-          -> return $ mkGhcModule (ms_mod modsum, filename, (a,b,c,d)) (ms_hspp_opts modsum)
-        _ -> throwE ("Failed to check module: " ++ (moduleString $ ms_mod modsum))
-      (interface, msg) <- runWriterGhc $ createInterface ghcMod flags modMap instIfaceMap
-      mapM_ putStrLn msg
-      return (Just interface)
-    else
-      return Nothing
-#endif
 
 
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
@@ -233,11 +190,7 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
   ghcInstances      = modInfoInstances modInfo
 }
   where
-#if __GLASGOW_HASKELL__ == 608 && __GHC_PATCHLEVEL__ == 2
-    HsModule _ _ _ _ _ mbOpts _ _ = unLoc parsed
-#else
     mbOpts = haddockOptions dynflags
-#endif
     (group_, _, mbExports, mbDoc, info) = renamed
     (_, renamed, _, modInfo) = checkedMod
 
