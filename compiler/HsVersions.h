@@ -30,11 +30,20 @@ you will screw up the layout where they are used in case expressions!
 {-# NOINLINE name #-};             \
 name :: IORef (ty);                \
 name = Util.global (value);
+
+#define GLOBAL_MVAR(name,value,ty) \
+{-# NOINLINE name #-};             \
+name :: MVar (ty);                 \
+name = Util.globalMVar (value);
 #endif
 #else /* __HADDOCK__ */
 #define GLOBAL_VAR(name,value,ty)  \
 name :: IORef (ty);                \
 name = Util.global (value);
+
+#define GLOBAL_MVAR(name,value,ty) \
+name :: MVar (ty);                 \
+name = Util.globalMVar (value);
 #endif
 
 #define COMMA ,

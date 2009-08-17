@@ -65,7 +65,7 @@ module Util (
         doesDirNameExist,
         modificationTimeIfExists,
 
-        global, consIORef,
+        global, consIORef, globalMVar, globalEmptyMVar,
 
         -- * Filenames and paths
         Suffix,
@@ -83,6 +83,7 @@ import Data.IORef       ( IORef, newIORef )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef       ( readIORef, writeIORef )
 import Data.List        hiding (group)
+import Control.Concurrent.MVar ( MVar, newMVar, newEmptyMVar )
 
 #ifdef DEBUG
 import qualified Data.List as List ( elem, notElem )
@@ -697,6 +698,14 @@ consIORef :: IORef [a] -> a -> IO ()
 consIORef var x = do
   xs <- readIORef var
   writeIORef var (x:xs)
+\end{code}
+
+\begin{code}
+globalMVar :: a -> MVar a
+globalMVar a = unsafePerformIO (newMVar a)
+
+globalEmptyMVar :: MVar a
+globalEmptyMVar = unsafePerformIO newEmptyMVar
 \end{code}
 
 Module names:
