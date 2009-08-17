@@ -7,7 +7,11 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-module GhciTags (createCTagsFileCmd, createETagsFileCmd) where
+module GhciTags (
+  createCTagsWithLineNumbersCmd,
+  createCTagsWithRegExesCmd,
+  createETagsFileCmd
+) where
 
 import GHC
 import GhciMonad
@@ -30,15 +34,23 @@ import System.IO.Error as IO
 -----------------------------------------------------------------------------
 -- create tags file for currently loaded modules.
 
-createETagsFileCmd, createCTagsFileCmd :: String -> GHCi ()
+createCTagsWithLineNumbersCmd, createCTagsWithRegExesCmd,
+  createETagsFileCmd :: String -> GHCi ()
 
-createCTagsFileCmd ""   = ghciCreateTagsFile CTags "tags"
-createCTagsFileCmd file = ghciCreateTagsFile CTags file
+createCTagsWithLineNumbersCmd ""   =
+  ghciCreateTagsFile CTagsWithLineNumbers "tags"
+createCTagsWithLineNumbersCmd file =
+  ghciCreateTagsFile CTagsWithLineNumbers file
+
+createCTagsWithRegExesCmd ""   =
+  ghciCreateTagsFile CTagsWithRegExes "tags"
+createCTagsWithRegExesCmd file =
+  ghciCreateTagsFile CTagsWithRegExes file
 
 createETagsFileCmd ""    = ghciCreateTagsFile ETags "TAGS"
 createETagsFileCmd file  = ghciCreateTagsFile ETags file
 
-data TagsKind = ETags | CTags
+data TagsKind = ETags | CTagsWithLineNumbers | CTagsWithRegExes
 
 ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
 ghciCreateTagsFile kind file = do
@@ -53,89 +65,138 @@ ghciCreateTagsFile kind file = do
 --	  (probably need to fix first problem before this is useful).
 --
 createTagsFile :: TagsKind -> FilePath -> GHCi ()
-createTagsFile tagskind tagFile = do
+createTagsFile tagskind tagsFile = do
   graph <- GHC.getModuleGraph
-  let ms = map GHC.ms_mod graph
-      tagModule m = do 
-        is_interpreted <- GHC.moduleIsInterpreted m
-        -- should we just skip these?
-        when (not is_interpreted) $
-          ghcError (CmdLineError ("module '" 
-                                ++ GHC.moduleNameString (GHC.moduleName m)
-                                ++ "' is not interpreted"))
-        mbModInfo <- GHC.getModuleInfo m
-        unqual <-
-          case mbModInfo of
-             Just minf -> do
-                mb_print_unqual <- GHC.mkPrintUnqualifiedForModule minf
-                return (fromMaybe GHC.alwaysQualify mb_print_unqual)
-             Nothing ->
-                return GHC.alwaysQualify
-        case mbModInfo of 
-          Just modInfo -> return $! listTags unqual modInfo 
-          _            -> return []
-
-  mtags <- mapM tagModule ms
-  either_res <- liftIO $ collateAndWriteTags tagskind tagFile $ concat mtags
+  mtags <- mapM listModuleTags (map GHC.ms_mod graph)
+  either_res <- liftIO $ collateAndWriteTags tagskind tagsFile $ concat mtags
   case either_res of
     Left e  -> liftIO $ hPutStrLn stderr $ ioeGetErrorString e
     Right _ -> return ()
 
-listTags :: PrintUnqualified -> GHC.ModuleInfo -> [TagInfo]
-listTags unqual modInfo =
-	   [ tagInfo unqual name loc 
-           | name <- GHC.modInfoExports modInfo
-           , let loc = srcSpanStart (nameSrcSpan name)
-           , isGoodSrcLoc loc
-           ]
 
-type TagInfo = (String -- tag name
-               ,String -- file name
-               ,Int    -- line number
-               ,Int    -- column number
-               )
+listModuleTags :: GHC.Module -> GHCi [TagInfo]
+listModuleTags m = do
+  is_interpreted <- GHC.moduleIsInterpreted m
+  -- should we just skip these?
+  when (not is_interpreted) $
+    let mName = GHC.moduleNameString (GHC.moduleName m) in
+    ghcError (CmdLineError ("module '" ++ mName ++ "' is not interpreted"))
+  mbModInfo <- GHC.getModuleInfo m
+  case mbModInfo of
+    Nothing -> return []
+    Just mInfo -> do
+       mb_print_unqual <- GHC.mkPrintUnqualifiedForModule mInfo
+       let unqual = fromMaybe GHC.alwaysQualify mb_print_unqual
+       let names = fromMaybe [] $GHC.modInfoTopLevelScope mInfo
+       let localNames = filter ((m==) . nameModule) names
+       mbTyThings <- mapM GHC.lookupName localNames
+       return $! [ tagInfo unqual exported kind name loc
+                     | tyThing <- catMaybes mbTyThings
+                     , let name = getName tyThing
+                     , let exported = GHC.modInfoIsExportedName mInfo name
+                     , let kind = tyThing2TagKind tyThing
+                     , let loc = srcSpanStart (nameSrcSpan name)
+                     , isGoodSrcLoc loc
+                     ]
+
+  where
+    tyThing2TagKind (AnId _) = 'v'
+    tyThing2TagKind (ADataCon _) = 'd'
+    tyThing2TagKind (ATyCon _) = 't'
+    tyThing2TagKind (AClass _) = 'c'
+
+
+data TagInfo = TagInfo
+  { tagExported :: Bool -- is tag exported
+  , tagKind :: Char   -- tag kind
+  , tagName :: String -- tag name
+  , tagFile :: String -- file name
+  , tagLine :: Int    -- line number
+  , tagCol :: Int     -- column number
+  , tagSrcInfo :: Maybe (String,Integer)  -- source code line and char offset
+  }
+
 
 -- get tag info, for later translation into Vim or Emacs style
-tagInfo :: PrintUnqualified -> Name -> SrcLoc -> TagInfo
-tagInfo unqual name loc
-    = ( showSDocForUser unqual $ pprOccName (nameOccName name)
-      , showSDocForUser unqual $ ftext (srcLocFile loc)
-      , srcLocLine loc
-      , srcLocCol loc
-      )
+tagInfo :: PrintUnqualified -> Bool -> Char -> Name -> SrcLoc -> TagInfo
+tagInfo unqual exported kind name loc
+    = TagInfo exported kind
+        (showSDocForUser unqual $ pprOccName (nameOccName name))
+        (showSDocForUser unqual $ ftext (srcLocFile loc))
+        (srcLocLine loc) (srcLocCol loc) Nothing
+
 
 collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError ())
-collateAndWriteTags CTags file tagInfos = do -- ctags style, Vim et al
-  let tags = unlines $ sortLe (<=) $ nub $ map showTag tagInfos
+-- ctags style with the Ex exresion being just the line number, Vim et al
+collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
+  let tags = unlines $ sortLe (<=) $ map showCTag tagInfos
   IO.try (writeFile file tags)
+
+-- ctags style with the Ex exresion being a regex searching the line, Vim et al
+collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
+  tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
+  let tags = unlines $ sortLe (<=) $ map showCTag $concat tagInfoGroups
+  IO.try (writeFile file tags)
+
 collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
-  let byFile op (_,f1,_,_) (_,f2,_,_) = f1 `op` f2
-      groups = groupBy (byFile (==)) $ sortLe (byFile (<=)) tagInfos
-  tagGroups <- mapM tagFileGroup groups 
+  tagInfoGroups <- makeTagGroupsWithSrcInfo $filter tagExported tagInfos
+  let tagGroups = map processGroup tagInfoGroups
   IO.try (writeFile file $ concat tagGroups)
+
   where
-    tagFileGroup [] = ghcError (CmdLineError "empty tag file group??")
-    tagFileGroup group@((_,fileName,_,_):_) = do
-      file <- readFile fileName -- need to get additional info from sources..
-      let byLine (_,_,l1,_) (_,_,l2,_) = l1 <= l2
+    processGroup [] = ghcError (CmdLineError "empty tag file group??")
+    processGroup group@(tagInfo:_) =
+      let tags = unlines $ map showETag group in
+      "\x0c\n" ++ tagFile tagInfo ++ "," ++ show (length tags) ++ "\n" ++ tags
+
+
+makeTagGroupsWithSrcInfo :: [TagInfo] -> IO [[TagInfo]]
+makeTagGroupsWithSrcInfo tagInfos = do
+  let byFile op ti0 ti1 = tagFile ti0 `op` tagFile ti1
+      groups = groupBy (byFile (==)) $ sortLe (byFile (<=)) tagInfos
+  mapM addTagSrcInfo groups
+
+  where
+    addTagSrcInfo [] = ghcError (CmdLineError "empty tag file group??")
+    addTagSrcInfo group@(tagInfo:_) = do
+      file <- readFile $tagFile tagInfo
+      let byLine ti0 ti1 = tagLine ti0 <= tagLine ti1
           sortedGroup = sortLe byLine group
-          tags = unlines $ perFile sortedGroup 1 0 $ lines file
-      return $ "\x0c\n" ++ fileName ++ "," ++ show (length tags) ++ "\n" ++ tags
-    perFile (tagInfo@(_tag, _file, lNo, _colNo):tags) count pos lines@(line:lines')
-     | lNo >  count = perFile (tagInfo:tags) (count+1) (pos+length line) lines'
-     | lNo == count = showETag tagInfo line pos : perFile tags count pos lines
+      return $ perFile sortedGroup 1 0 $ lines file
+
+    perFile allTags@(tag:tags) cnt pos allLs@(l:ls)
+     | tagLine tag > cnt =
+         perFile allTags (cnt+1) (pos+fromIntegral(length l)) ls
+     | tagLine tag == cnt =
+         tag{ tagSrcInfo = Just(l,pos) } : perFile tags cnt pos allLs
     perFile _ _ _ _ = []
 
--- simple ctags format, for Vim et al
-showTag :: TagInfo -> String
-showTag (tag, file, lineNo, _colNo)
-    =  tag ++ "\t" ++ file ++ "\t" ++ show lineNo
+
+-- ctags format, for Vim et al
+showCTag :: TagInfo -> String
+showCTag ti =
+  tagName ti ++ "\t" ++ tagFile ti ++ "\t" ++ tagCmd ++ ";\"\t" ++
+    tagKind ti : ( if tagExported ti then "" else "\tfile:" )
+
+  where
+    tagCmd =
+      case tagSrcInfo ti of
+        Nothing -> show $tagLine ti
+        Just (srcLine,_) -> "/^"++ foldr escapeSlashes [] srcLine ++"$/"
+
+      where
+        escapeSlashes '/' r = '\\' : '/' : r
+        escapeSlashes '\\' r = '\\' : '\\' : r
+        escapeSlashes c r = c : r
+
 
 -- etags format, for Emacs/XEmacs
-showETag :: TagInfo -> String -> Int -> String
-showETag (tag, _file, lineNo, colNo) line charPos
-    =  take colNo line ++ tag
+showETag :: TagInfo -> String
+showETag TagInfo{ tagName = tag, tagLine = lineNo, tagCol = colNo,
+                  tagSrcInfo = Just (srcLine,charPos) }
+    =  take colNo srcLine ++ tag
     ++ "\x7f" ++ tag
     ++ "\x01" ++ show lineNo
     ++ "," ++ show charPos
+showETag _ = ghcError (CmdLineError "missing source file info in showETag")
 

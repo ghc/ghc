@@ -123,7 +123,8 @@ builtin_commands = [
   ("check",     keepGoing' checkModule,         completeHomeModule),
   ("continue",  keepGoing continueCmd,          noCompletion),
   ("cmd",       keepGoing cmdCmd,               completeExpression),
-  ("ctags",     keepGoing createCTagsFileCmd,   completeFilename),
+  ("ctags",     keepGoing createCTagsWithLineNumbersCmd, completeFilename),
+  ("ctags!",    keepGoing createCTagsWithRegExesCmd, completeFilename),
   ("def",       keepGoing (defineMacro False),  completeExpression),
   ("def!",      keepGoing (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
@@ -202,7 +203,8 @@ helpText =
  "                               (!: more details; *: all top-level names)\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
  "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
- "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
+ "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
+ "                               (!: use regex instead of line number)\n" ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
  "   :edit <file>                edit file\n" ++
  "   :edit                       edit last module\n" ++
