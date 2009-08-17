@@ -25,7 +25,7 @@ import Class
 import HscTypes (withSession, ioMsg)
 import TcRnDriver (tcRnGetInfo)
 
-#if __GLASGOW_HASKELL__ >= 610 && __GHC_PATCHLEVEL__ >= 2
+#if __GLASGOW_HASKELL__ > 610 || (__GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ >= 2)
 import TypeRep hiding (funTyConName)
 #else
 import TypeRep
