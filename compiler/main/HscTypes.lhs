@@ -164,6 +164,7 @@ import Data.Array       ( Array, array )
 import Data.List
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
+import Control.Concurrent.MVar ( MVar )
 \end{code}
 
 
@@ -543,6 +544,9 @@ data HscEnv
 		-- ^ As with 'hsc_EPS', this is side-effected by compiling to
 		-- reflect sucking in interface files.  They cache the state of
 		-- external interface files, in effect.
+
+        hsc_NC_lock :: !(MVar ()),
+                -- ^ A lock used for updating the name cache.
 
 	hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
 	        -- ^ The cached result of performing finding in the file system

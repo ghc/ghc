@@ -57,11 +57,8 @@ data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
 readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
-  nc <- getNameCache
-  (new_nc, iface) <- liftIO $
+  lockedUpdNameCache $ \nc ->
     readBinIface_ checkHiWay traceBinIFaceReading hi_path nc
-  setNameCache new_nc
-  return iface
 
 readBinIface_ :: CheckHiWay -> TraceBinIFaceReading -> FilePath -> NameCache
               -> IO (NameCache, ModIface)

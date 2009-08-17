@@ -115,6 +115,7 @@ import Exception
 -- import MonadUtils
 
 import Control.Monad
+import Control.Concurrent.MVar ( newMVar )
 -- import System.IO
 import Data.IORef
 \end{code}
@@ -133,6 +134,7 @@ newHscEnv callbacks dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
 	; us      <- mkSplitUniqSupply 'r'
 	; nc_var  <- newIORef (initNameCache us knownKeyNames)
+        ; nc_lock <- newMVar ()
 	; fc_var  <- newIORef emptyUFM
 	; mlc_var <- newIORef emptyModuleEnv
         ; optFuel <- initOptFuelState
@@ -144,6 +146,7 @@ newHscEnv callbacks dflags
 			   hsc_HPT     = emptyHomePackageTable,
 			   hsc_EPS     = eps_var,
 			   hsc_NC      = nc_var,
+			   hsc_NC_lock = nc_lock,
 			   hsc_FC      = fc_var,
 			   hsc_MLC     = mlc_var,
 			   hsc_OptFuel = optFuel,

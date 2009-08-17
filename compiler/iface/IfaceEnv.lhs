@@ -14,7 +14,7 @@ module IfaceEnv (
 
 	-- Name-cache stuff
 	allocateGlobalBinder, initNameCache, 
-        getNameCache, setNameCache
+        getNameCache, lockedUpdNameCache,
    ) where
 
 #include "HsVersions.h"
@@ -37,6 +37,9 @@ import SrcLoc
 import MkId
 
 import Outputable
+import Exception     ( onException )
+
+import Control.Concurrent.MVar ( tryTakeMVar, takeMVar, putMVar )
 \end{code}
 
 
@@ -56,14 +59,10 @@ newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- moment when we know its Module and SrcLoc in their full glory
 
 newGlobalBinder mod occ loc
-  = do	{ mod `seq` occ `seq` return ()	-- See notes with lookupOrig_help
---	; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
-    	; name_supply <- getNameCache
-	; let (name_supply', name) = allocateGlobalBinder 
-					name_supply mod occ
-					loc
-	; setNameCache name_supply'
-	; return name }
+  = do mod `seq` occ `seq` return ()	-- See notes with lookupOrig
+--     traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
+       updNameCache $ \name_cache ->
+         allocateGlobalBinder name_cache mod occ loc
 
 allocateGlobalBinder
   :: NameCache 
@@ -155,10 +154,10 @@ lookupOrig mod occ
 		-- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
 	  mod `seq` occ `seq` return ()	
 --	; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
-    
-	; name_cache <- getNameCache
-    	; case lookupOrigNameCache (nsNames name_cache) mod occ of {
-	      Just name -> return name;
+
+        ; updNameCache $ \name_cache ->
+            case lookupOrigNameCache (nsNames name_cache) mod occ of {
+	      Just name -> (name_cache, name);
 	      Nothing   ->
               let
                 us        = nsUniqs name_cache
@@ -167,27 +166,25 @@ lookupOrig mod occ
                 new_cache = extendNameCache (nsNames name_cache) mod occ name
               in
               case splitUniqSupply us of { (us',_) -> do
-                setNameCache name_cache{ nsUniqs = us', nsNames = new_cache }
-                return name
+                (name_cache{ nsUniqs = us', nsNames = new_cache }, name)
     }}}
 
 newIPName :: IPName OccName -> TcRnIf m n (IPName Name)
-newIPName occ_name_ip = do
-    name_supply <- getNameCache
+newIPName occ_name_ip =
+  updNameCache $ \name_cache ->
     let
-	ipcache = nsIPs name_supply
+	ipcache = nsIPs name_cache
+        key = occ_name_ip  -- Ensures that ?x and %x get distinct Names
+    in
     case lookupFM ipcache key of
-	Just name_ip -> return name_ip
-	Nothing      -> do setNameCache new_ns
-		           return name_ip
-		  where
-		     (us', us1)  = splitUniqSupply (nsUniqs name_supply)
-		     uniq   	 = uniqFromSupply us1
-		     name_ip	 = mapIPName (mkIPName uniq) occ_name_ip
-		     new_ipcache = addToFM ipcache key name_ip
-		     new_ns	 = name_supply {nsUniqs = us', nsIPs = new_ipcache}
-    where 
-	key = occ_name_ip	-- Ensures that ?x and %x get distinct Names
+      Just name_ip -> (name_cache, name_ip)
+      Nothing      -> (new_ns, name_ip)
+	  where
+	    (us', us1)  = splitUniqSupply (nsUniqs name_cache)
+	    uniq        = uniqFromSupply us1
+	    name_ip     = mapIPName (mkIPName uniq) occ_name_ip
+	    new_ipcache = addToFM ipcache key name_ip
+	    new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
 \end{code}
 
 %************************************************************************
@@ -231,9 +228,36 @@ getNameCache :: TcRnIf a b NameCache
 getNameCache = do { HscEnv { hsc_NC = nc_var } <- getTopEnv; 
 		    readMutVar nc_var }
 
-setNameCache :: NameCache -> TcRnIf a b ()
-setNameCache nc = do { HscEnv { hsc_NC = nc_var } <- getTopEnv; 
-		       writeMutVar nc_var nc }
+updNameCache :: (NameCache -> (NameCache, c)) -> TcRnIf a b c
+updNameCache upd_fn = do
+  HscEnv { hsc_NC = nc_var } <- getTopEnv
+  atomicUpdMutVar' nc_var upd_fn
+
+-- | Update the name cache, but takes a lock while the update function is
+-- running.  If the update function throws an exception the lock is released
+-- and the exception propagated.
+lockedUpdNameCache :: (NameCache -> IO (NameCache, c)) -> TcRnIf a b c
+lockedUpdNameCache upd_fn = do
+  lock <- hsc_NC_lock `fmap` getTopEnv
+  -- Non-blocking "takeMVar" so we can show diagnostics if we didn't get the
+  -- lock.
+  mb_ok <- liftIO $ tryTakeMVar lock
+  case mb_ok of
+    Nothing -> do
+      traceIf (text "lockedUpdNameCache: failed to take lock.  blocking..")
+      _ <- liftIO $ takeMVar lock
+      traceIf (text "lockedUpdNameCache: got lock")
+    Just _ -> return ()
+
+  name_cache <- getNameCache
+  (name_cache', rslt) <- liftIO (upd_fn name_cache
+                                   `onException` putMVar lock ())
+
+  nc_var <- hsc_NC `fmap` getTopEnv
+  writeMutVar nc_var $! name_cache'
+
+  liftIO (putMVar lock ())
+  return rslt
 \end{code}
 
 
