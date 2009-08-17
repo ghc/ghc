@@ -940,9 +940,7 @@ fi
 echo ["\
    Building DocBook HTML documentation : $BUILD_DOCBOOK_HTML
    Building DocBook PS documentation   : $BUILD_DOCBOOK_PS
-   Building DocBook PDF documentation  : $BUILD_DOCBOOK_PDF
-
-   Building shared libraries           : $BuildSharedLibs"]
+   Building DocBook PDF documentation  : $BUILD_DOCBOOK_PDF"]
 
 echo ["----------------------------------------------------------------------
 "]
