@@ -16,14 +16,14 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 import Haddock.Types
 import Haddock.Convert
 
-import qualified Data.Map as Map
-import Data.Map (Map)
 import Data.List
 
 import GHC
 import Name
 import InstEnv
 import Class
+import HscTypes (withSession, ioMsg)
+import TcRnDriver (tcRnGetInfo)
 
 #if __GLASGOW_HASKELL__ >= 610 && __GHC_PATCHLEVEL__ >= 2
 import TypeRep hiding (funTyConName)
@@ -38,24 +38,26 @@ import FastString
 #define FSLIT(x) (mkFastString# (x#))
 
 
-attachInstances :: [Interface] -> [Name] -> [Interface]
-attachInstances ifaces filterNames = map attach ifaces
+attachInstances :: [Interface] -> Ghc [Interface]
+attachInstances = mapM attach
   where
-    instMap =
-      fmap (map toHsInstHead . sortImage instHead) $
-      collectInstances ifaces filterNames
+    attach iface = do
+      newItems <- mapM attachExport $ ifaceExportItems iface
+      return $ iface { ifaceExportItems = newItems }
+    attachExport (ExportDecl decl@(L _ (TyClD d)) doc subs _) = do
+       mb_info <- getAllInfo (unLoc (tcdLName d))
+       return $ ExportDecl decl doc subs $ case mb_info of
+         Just (_, _, instances) ->
+           map toHsInstHead . sortImage instHead . map instanceHead $ instances
+         Nothing ->
+           []
+    attachExport export = return export
 
-    attach iface = iface { ifaceExportItems = newItems }
-      where
-        newItems = map attachExport (ifaceExportItems iface)
 
-        attachExport (ExportDecl decl@(L _ (TyClD d)) doc subs _)
-          | isClassDecl d || isDataDecl d || isFamilyDecl d =
-             ExportDecl decl doc subs (case Map.lookup (tcdName d) instMap of
-                                    Nothing -> []
-                                    Just instheads -> instheads)
-        attachExport export = export
-
+-- | Like GHC's getInfo but doesn't cut things out depending on the
+-- interative context, which we don't set sufficiently anyway.
+getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[Instance]))
+getAllInfo name = withSession $ \hsc_env -> ioMsg $ tcRnGetInfo hsc_env name
 
 --------------------------------------------------------------------------------
 -- Collecting and sorting instances
@@ -64,26 +66,9 @@ attachInstances ifaces filterNames = map attach ifaces
 
 -- | Simplified type for sorting types, ignoring qualification (not visible
 -- in Haddock output) and unifying special tycons with normal ones.
+-- For the benefit of the user (looks nice and predictable) and the
+-- tests (which prefer output to be deterministic).
 data SimpleType = SimpleType Name [SimpleType] deriving (Eq,Ord)
-
-
-collectInstances
-   :: [Interface]
-   -> [Name]
-   -> Map Name [([TyVar], [PredType], Class, [Type])]  -- maps class/type names to instances
-
-collectInstances ifaces _ -- filterNames
-  = Map.fromListWith (flip (++)) tyInstPairs `Map.union`
-    Map.fromListWith (flip (++)) classInstPairs
-  where
-    allInstances = concatMap ifaceInstances ifaces
-    classInstPairs = [ (is_cls inst, [instanceHead inst]) | 
-                       inst <- allInstances ]
-                    -- unfinished filtering of internal instances
-                    -- Just n <- nub (is_tcs inst) ]
-                    --   n `elem` filterNames ]
-    tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 
-                    Just tycon <- nub (is_tcs inst) ]    
 
 
 -- TODO: should we support PredTy here?

@@ -68,11 +68,10 @@ createInterfaces verbosity session modules flags extIfaces = do
       homeLinks = buildHomeLinks interfaces -- build the environment for the home
                                             -- package
       links     = homeLinks `Map.union` extLinks
-      allNames  = Map.keys links
 
   -- part 3, attach instances
   out verbosity verbose "Attaching instances..."
-  let interfaces' = attachInstances interfaces allNames
+  interfaces' <- attachInstances interfaces
 
   -- part 4, rename interfaces
   out verbosity verbose "Renaming interfaces..."
