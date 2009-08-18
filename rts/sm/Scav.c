@@ -89,10 +89,10 @@ scavengeTSO (StgTSO *tso)
     scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
 
     if (gct->failed_to_evac) {
-        tso->flags |= TSO_DIRTY;
+        tso->dirty = 1;
         scavenge_TSO_link(tso);
     } else {
-        tso->flags &= ~TSO_DIRTY;
+        tso->dirty = 0;
         scavenge_TSO_link(tso);
         if (gct->failed_to_evac) {
             tso->flags |= TSO_LINK_DIRTY;
@@ -1454,7 +1454,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 		continue;
 	    case TSO: {
 		StgTSO *tso = (StgTSO *)p;
-		if ((tso->flags & TSO_DIRTY) == 0) {
+		if (tso->dirty == 0) {
                     // Must be on the mutable list because its link
                     // field is dirty.
                     ASSERT(tso->flags & TSO_LINK_DIRTY);

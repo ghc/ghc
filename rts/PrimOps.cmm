@@ -1173,7 +1173,7 @@ stg_takeMVarzh
       tso = StgMVar_head(mvar);
       PerformPut(tso,StgMVar_value(mvar));
 
-      if (TO_W_(StgTSO_flags(tso)) & TSO_DIRTY == 0) {
+      if (TO_W_(StgTSO_dirty(tso)) == 0) {
           foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
       }
 
@@ -1249,7 +1249,7 @@ stg_tryTakeMVarzh
 	/* actually perform the putMVar for the thread that we just woke up */
 	tso = StgMVar_head(mvar);
 	PerformPut(tso,StgMVar_value(mvar));
-        if (TO_W_(StgTSO_flags(tso)) & TSO_DIRTY == 0) {
+        if (TO_W_(StgTSO_dirty(tso)) == 0) {
             foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
 
@@ -1329,7 +1329,7 @@ stg_putMVarzh
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, val);
-        if (TO_W_(StgTSO_flags(tso)) & TSO_DIRTY == 0) {
+        if (TO_W_(StgTSO_dirty(tso)) == 0) {
             foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
       
@@ -1398,7 +1398,7 @@ stg_tryPutMVarzh
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
-        if (TO_W_(StgTSO_flags(tso)) & TSO_DIRTY == 0) {
+        if (TO_W_(StgTSO_dirty(tso)) == 0) {
             foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
         }
       

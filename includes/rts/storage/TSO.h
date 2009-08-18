@@ -25,7 +25,6 @@ typedef struct {
  */
 typedef StgWord32 StgThreadID;
 
-#define tsoDirty(tso)  ((tso)->flags & TSO_DIRTY)
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
 /*
@@ -90,6 +89,25 @@ typedef struct StgTSO_ {
 
     struct StgTSO_*         global_link;    /* Links all threads together */
     
+    StgWord                 dirty;          /* non-zero => dirty */
+    /*
+     * The tso->dirty flag indicates that this TSO's stack should be
+     * scanned during garbage collection.  It also indicates that this
+     * TSO is on the mutable list.
+     *
+     * NB. The dirty flag gets a word to itself, so that it can be set
+     * safely by multiple threads simultaneously (the flags field is
+     * not safe for this purpose; see #3429).  It is harmless for the
+     * TSO to be on the mutable list multiple times.
+     *
+     * tso->dirty is set by dirty_TSO(), and unset by the garbage
+     * collector (only).
+     *
+     * The link field has a separate dirty bit of its own, namely the
+     * bit TSO_LINK_DIRTY in the tso->flags field, set by
+     * setTSOLink().
+     */
+
     StgWord16               what_next;      /* Values defined in Constants.h */
     StgWord16               why_blocked;    /* Values defined in Constants.h */
     StgWord32               flags;

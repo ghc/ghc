@@ -293,6 +293,7 @@ main(int argc, char *argv[])
     closure_field(StgTSO, saved_errno);
     closure_field(StgTSO, trec);
     closure_field(StgTSO, flags);
+    closure_field(StgTSO, dirty);
     closure_field_("StgTSO_CCCS", StgTSO, prof.CCCS);
     tso_field(StgTSO, sp);
     tso_field_offset(StgTSO, stack);

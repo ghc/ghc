@@ -75,7 +75,8 @@ createThread(Capability *cap, nat size)
 
     tso->why_blocked  = NotBlocked;
     tso->blocked_exceptions = END_TSO_QUEUE;
-    tso->flags = TSO_DIRTY;
+    tso->flags = 0;
+    tso->dirty = 1;
     
     tso->saved_errno = 0;
     tso->bound = NULL;
@@ -377,7 +378,7 @@ printThreadStatus(StgTSO *t)
 	default:
 	    printThreadBlockage(t);
 	}
-        if (t->flags & TSO_DIRTY) {
+        if (t->dirty) {
             debugBelch(" (TSO_DIRTY)");
         } else if (t->flags & TSO_LINK_DIRTY) {
             debugBelch(" (TSO_LINK_DIRTY)");

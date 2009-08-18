@@ -230,19 +230,7 @@
 
 /* 
  * Flags for the tso->flags field.
- *
- * The TSO_DIRTY flag indicates that this TSO's stack should be
- * scanned during garbage collection.  The link field of a TSO is
- * always scanned, so we don't have to dirty a TSO just for linking
- * it on a different list.
- *
- * TSO_DIRTY is set by 
- *    - schedule(), just before running a thread,
- *    - raiseAsync(), because it modifies a thread's stack
- *    - resumeThread(), just before running the thread again
- * and unset by the garbage collector (only).
  */
-#define TSO_DIRTY   1
 
 /*
  * TSO_LOCKED is set when a TSO is locked to a particular Capability.

@@ -49,6 +49,8 @@ import ghczmprim_GHCziBool_True_closure;
 
    -------------------------------------------------------------------------- */
 
+STRING(stg_unblockAsync_err_str, "unblockAsyncExceptions#_ret")
+
 INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
 {
     CInt r;
@@ -80,6 +82,14 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
                 ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
                 jump %ENTRY_CODE(Sp(0));
             }
+        }
+        else {
+            /*
+               the thread might have been removed from the
+               blocked_exception list by someone else in the meantime.
+               Just restore the stack pointer and continue.  
+            */   
+            Sp_adj(2);
         }
     }
 
