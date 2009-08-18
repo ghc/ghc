@@ -25,6 +25,9 @@ test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
 test('3279', normal, compile_and_run, [''])
 
+# This test takes a long time with the default context switch interval
+test('3429', extra_run_opts('+RTS -i0.001 -RTS'), compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
