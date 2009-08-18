@@ -186,6 +186,9 @@ synifyDataCon use_gadt_syntax dc = noLoc $
  -- finally we get synifyDataCon's result!
  in ConDecl name Implicit{-we don't know nor care-}
       qvars ctx tys res_ty Nothing
+#if __GLASGOW_HASKELL__ >= 611
+      False --we don't want any "deprecated GADT syntax" warnings!
+#endif
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName n = noLoc (getName n)
