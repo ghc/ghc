@@ -58,7 +58,8 @@ module Module
 	extendModuleEnvList_C, plusModuleEnv_C,
 	delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv,
 	lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
-	moduleEnvKeys, moduleEnvElts, unitModuleEnv, isEmptyModuleEnv,
+	moduleEnvKeys, moduleEnvElts, moduleEnvToList,
+        unitModuleEnv, isEmptyModuleEnv,
         foldModuleEnv, extendModuleEnv_C, filterModuleEnv,
 
 	-- * ModuleName mappings
@@ -342,51 +343,71 @@ mainPackageId	   = fsToPackageId (fsLit "main")
 
 \begin{code}
 -- | A map keyed off of 'Module's
-type ModuleEnv elt = FiniteMap Module elt
+newtype ModuleEnv elt = ModuleEnv (FiniteMap Module elt)
 
-emptyModuleEnv       :: ModuleEnv a
-mkModuleEnv          :: [(Module, a)] -> ModuleEnv a
-unitModuleEnv        :: Module -> a -> ModuleEnv a
-extendModuleEnv      :: ModuleEnv a -> Module -> a -> ModuleEnv a
-extendModuleEnv_C    :: (a->a->a) -> ModuleEnv a -> Module -> a -> ModuleEnv a
-plusModuleEnv        :: ModuleEnv a -> ModuleEnv a -> ModuleEnv a
-extendModuleEnvList  :: ModuleEnv a -> [(Module, a)] -> ModuleEnv a
-extendModuleEnvList_C  :: (a->a->a) -> ModuleEnv a -> [(Module, a)] -> ModuleEnv a
-                  
-delModuleEnvList     :: ModuleEnv a -> [Module] -> ModuleEnv a
-delModuleEnv         :: ModuleEnv a -> Module -> ModuleEnv a
-plusModuleEnv_C      :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
-mapModuleEnv         :: (a -> b) -> ModuleEnv a -> ModuleEnv b
-moduleEnvKeys        :: ModuleEnv a -> [Module]
-moduleEnvElts        :: ModuleEnv a -> [a]
-                  
-isEmptyModuleEnv     :: ModuleEnv a -> Bool
-lookupModuleEnv      :: ModuleEnv a -> Module     -> Maybe a
+filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a
+filterModuleEnv f (ModuleEnv e) = ModuleEnv (filterFM f e)
+
+elemModuleEnv :: Module -> ModuleEnv a -> Bool
+elemModuleEnv m (ModuleEnv e) = elemFM m e
+
+extendModuleEnv :: ModuleEnv a -> Module -> a -> ModuleEnv a
+extendModuleEnv (ModuleEnv e) m x = ModuleEnv (addToFM e m x)
+
+extendModuleEnv_C :: (a -> a -> a) -> ModuleEnv a -> Module -> a -> ModuleEnv a
+extendModuleEnv_C f (ModuleEnv e) m x = ModuleEnv (addToFM_C f e m x)
+
+extendModuleEnvList :: ModuleEnv a -> [(Module, a)] -> ModuleEnv a
+extendModuleEnvList (ModuleEnv e) xs = ModuleEnv (addListToFM e xs)
+
+extendModuleEnvList_C :: (a -> a -> a) -> ModuleEnv a -> [(Module, a)]
+                      -> ModuleEnv a
+extendModuleEnvList_C f (ModuleEnv e) xs = ModuleEnv (addListToFM_C f e xs)
+
+plusModuleEnv_C :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
+plusModuleEnv_C f (ModuleEnv e1) (ModuleEnv e2) = ModuleEnv (plusFM_C f e1 e2)
+
+delModuleEnvList :: ModuleEnv a -> [Module] -> ModuleEnv a
+delModuleEnvList (ModuleEnv e) ms = ModuleEnv (delListFromFM e ms)
+
+delModuleEnv :: ModuleEnv a -> Module -> ModuleEnv a
+delModuleEnv (ModuleEnv e) m = ModuleEnv (delFromFM e m)
+
+plusModuleEnv :: ModuleEnv a -> ModuleEnv a -> ModuleEnv a
+plusModuleEnv (ModuleEnv e1) (ModuleEnv e2) = ModuleEnv (plusFM e1 e2)
+
+lookupModuleEnv :: ModuleEnv a -> Module -> Maybe a
+lookupModuleEnv (ModuleEnv e) m = lookupFM e m
+
 lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
-elemModuleEnv        :: Module -> ModuleEnv a -> Bool
-foldModuleEnv        :: (a -> b -> b) -> b -> ModuleEnv a -> b
-filterModuleEnv      :: (a -> Bool) -> ModuleEnv a -> ModuleEnv a
+lookupWithDefaultModuleEnv (ModuleEnv e) x m = lookupWithDefaultFM e x m
 
-filterModuleEnv f   = filterFM (\_ v -> f v)
-elemModuleEnv       = elemFM
-extendModuleEnv     = addToFM
-extendModuleEnv_C   = addToFM_C
-extendModuleEnvList = addListToFM
-extendModuleEnvList_C = addListToFM_C
-plusModuleEnv_C     = plusFM_C
-delModuleEnvList    = delListFromFM
-delModuleEnv        = delFromFM
-plusModuleEnv       = plusFM
-lookupModuleEnv     = lookupFM
-lookupWithDefaultModuleEnv = lookupWithDefaultFM
-mapModuleEnv f      = mapFM (\_ v -> f v)
-mkModuleEnv         = listToFM
-emptyModuleEnv      = emptyFM
-moduleEnvKeys       = keysFM
-moduleEnvElts       = eltsFM
-unitModuleEnv       = unitFM
-isEmptyModuleEnv    = isEmptyFM
-foldModuleEnv f     = foldFM (\_ v -> f v)
+mapModuleEnv :: (a -> b) -> ModuleEnv a -> ModuleEnv b
+mapModuleEnv f (ModuleEnv e) = ModuleEnv (mapFM (\_ v -> f v) e)
+
+mkModuleEnv :: [(Module, a)] -> ModuleEnv a
+mkModuleEnv xs = ModuleEnv (listToFM xs)
+
+emptyModuleEnv :: ModuleEnv a
+emptyModuleEnv = ModuleEnv emptyFM
+
+moduleEnvKeys :: ModuleEnv a -> [Module]
+moduleEnvKeys (ModuleEnv e) = keysFM e
+
+moduleEnvElts :: ModuleEnv a -> [a]
+moduleEnvElts (ModuleEnv e) = eltsFM e
+
+moduleEnvToList :: ModuleEnv a -> [(Module, a)]
+moduleEnvToList (ModuleEnv e) = fmToList e
+
+unitModuleEnv :: Module -> a -> ModuleEnv a
+unitModuleEnv m x = ModuleEnv (unitFM m x)
+
+isEmptyModuleEnv :: ModuleEnv a -> Bool
+isEmptyModuleEnv (ModuleEnv e) = isEmptyFM e
+
+foldModuleEnv :: (a -> b -> b) -> b -> ModuleEnv a -> b
+foldModuleEnv f x (ModuleEnv e) = foldFM (\_ v -> f v) x e
 \end{code}
 
 \begin{code}

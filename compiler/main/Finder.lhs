@@ -78,7 +78,7 @@ flushFinderCaches hsc_env = do
 
 flushModLocationCache :: PackageId -> IORef ModLocationCache -> IO ()
 flushModLocationCache this_pkg ref = do
-  atomicModifyIORef ref $ \fm -> (filterFM is_ext fm, ())
+  atomicModifyIORef ref $ \fm -> (filterModuleEnv is_ext fm, ())
   _ <- evaluate =<< readIORef ref
   return ()
   where is_ext mod _ | modulePackageId mod /= this_pkg = True
@@ -90,7 +90,7 @@ addToFinderCache ref key val =
 
 addToModLocationCache :: IORef ModLocationCache -> Module -> ModLocation -> IO ()
 addToModLocationCache ref key val =
-  atomicModifyIORef ref $ \c -> (addToFM c key val, ())
+  atomicModifyIORef ref $ \c -> (extendModuleEnv c key val, ())
 
 removeFromFinderCache :: IORef FinderCache -> ModuleName -> IO ()
 removeFromFinderCache ref key =
@@ -98,7 +98,7 @@ removeFromFinderCache ref key =
 
 removeFromModLocationCache :: IORef ModLocationCache -> Module -> IO ()
 removeFromModLocationCache ref key =
-  atomicModifyIORef ref $ \c -> (delFromFM c key, ())
+  atomicModifyIORef ref $ \c -> (delModuleEnv c key, ())
 
 lookupFinderCache :: IORef FinderCache -> ModuleName -> IO (Maybe FindResult)
 lookupFinderCache ref key = do 
@@ -109,7 +109,7 @@ lookupModLocationCache :: IORef ModLocationCache -> Module
                        -> IO (Maybe ModLocation)
 lookupModLocationCache ref key = do
    c <- readIORef ref
-   return $! lookupFM c key
+   return $! lookupModuleEnv c key
 
 -- -----------------------------------------------------------------------------
 -- The two external entry points

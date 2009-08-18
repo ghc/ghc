@@ -915,7 +915,8 @@ mkIfaceExports :: [AvailInfo]
                   -- Group by module and sort by occurrence
 mkIfaceExports exports
   = [ (mod, eltsFM avails)
-    | (mod, avails) <- sortBy (stableModuleCmp `on` fst) (fmToList groupFM)
+    | (mod, avails) <- sortBy (stableModuleCmp `on` fst)
+                              (moduleEnvToList groupFM)
                        -- NB. the fmToList is in a random order,
                        -- because Ord Module is not a predictable
                        -- ordering.  Hence we perform a final sort
