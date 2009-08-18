@@ -14,6 +14,7 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 
 
 import Haddock.Types
+import Haddock.Convert
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -121,41 +122,9 @@ funTyConName = mkWiredInName gHC_PRIM
 
 
 toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
-toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsType ts) 
+toHsInstHead (_, preds, cls, ts) =
+        ( map (unLoc . synifyPred) preds
+        , getName cls
+        , map (unLoc . synifyType WithinType) ts
+        )
 
-
---------------------------------------------------------------------------------
--- Type -> HsType conversion
---------------------------------------------------------------------------------
-
-
-toHsPred :: PredType -> HsPred Name
-toHsPred (ClassP cls ts) = HsClassP (className cls) (map toLHsType ts)
-toHsPred (IParam n t) = HsIParam n (toLHsType t)
-toHsPred (EqPred t1 t2) = HsEqualP (toLHsType t1) (toLHsType t2)
-
-
-toLHsType :: Type -> Located (HsType Name)
-toLHsType = noLoc . toHsType
-
- 
-toHsType :: Type -> HsType Name
-toHsType t = case t of 
-  TyVarTy v -> HsTyVar (tyVarName v) 
-  AppTy a b -> HsAppTy (toLHsType a) (toLHsType b)
-
-  TyConApp tc ts -> case ts of 
-    t1:t2:rest
-      | isSymOcc . nameOccName . tyConName $ tc ->
-          app (HsOpTy (toLHsType t1) (noLoc . tyConName $ tc) (toLHsType t2)) rest
-    _ -> app (tycon tc) ts
-
-  FunTy a b -> HsFunTy (toLHsType a) (toLHsType b)
-  ForAllTy v ty -> cvForAll [v] ty 
-  PredTy p -> HsPredTy (toHsPred p) 
-  where
-    tycon = HsTyVar . tyConName
-    app tc = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc . map toHsType
-    cvForAll vs (ForAllTy v ty) = cvForAll (v:vs) ty
-    cvForAll vs ty = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType ty)
-    tyvarbinders = map (noLoc . UserTyVar . tyVarName)

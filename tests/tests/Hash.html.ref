@@ -476,7 +476,7 @@
 >Hash</A
 > b) =&gt; <A HREF="Hash.html#t%3AHash"
 >Hash</A
-> ((,) a b)</TD
+> (a, b)</TD
 ></TR
 ></TABLE
 ></DIV
