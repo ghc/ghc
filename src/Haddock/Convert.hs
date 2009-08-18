@@ -2,7 +2,11 @@
 
 -- This functionality may be moved into GHC at some point, and then
 -- we can use the GHC version (#if GHC version is new enough).
-module Haddock.Convert ( tyThingToHsSynSig {- :: TyThing -> LHsDecl Name -} )
+
+-- Some other functions turned out to be useful for converting
+-- instance heads, which aren't TyThings, so just export everything.
+module Haddock.Convert
+--    ( tyThingToHsSynSig {- :: TyThing -> LHsDecl Name -} )
   where
 
 import HsSyn
@@ -191,19 +195,19 @@ synifyIdSig s i = TypeSig (synifyName i) (synifyType s (varType i))
 
 
 synifyCtx :: [PredType] -> LHsContext Name
-synifyCtx ps = (\ps' -> noLoc ps') $
-    map synifyPred ps
-  where
-  synifyPred (ClassP cls tys) =
+synifyCtx ps = noLoc (map synifyPred ps)
+
+synifyPred :: PredType -> LHsPred Name
+synifyPred (ClassP cls tys) =
     let sTys = map (synifyType WithinType) tys
     in noLoc $
         HsClassP (getName cls) sTys
-  synifyPred (IParam ip ty) =
+synifyPred (IParam ip ty) =
     let sTy = synifyType WithinType ty
     -- IPName should be in class NamedThing...
     in noLoc $
       HsIParam ip sTy
-  synifyPred (EqPred ty1 ty2) =
+synifyPred (EqPred ty1 ty2) =
     let
      s1 = synifyType WithinType ty1
      s2 = synifyType WithinType ty2
