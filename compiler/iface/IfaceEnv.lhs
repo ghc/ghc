@@ -14,7 +14,7 @@ module IfaceEnv (
 
 	-- Name-cache stuff
 	allocateGlobalBinder, initNameCache, 
-        getNameCache, lockedUpdNameCache,
+        getNameCache, mkNameCacheUpdater, NameCacheUpdater
    ) where
 
 #include "HsVersions.h"
@@ -37,9 +37,9 @@ import SrcLoc
 import MkId
 
 import Outputable
-import Exception     ( onException )
+import Exception     ( evaluate )
 
-import Control.Concurrent.MVar ( tryTakeMVar, takeMVar, putMVar )
+import Data.IORef    ( atomicModifyIORef, readIORef )
 \end{code}
 
 
@@ -233,31 +233,19 @@ updNameCache upd_fn = do
   HscEnv { hsc_NC = nc_var } <- getTopEnv
   atomicUpdMutVar' nc_var upd_fn
 
--- | Update the name cache, but takes a lock while the update function is
--- running.  If the update function throws an exception the lock is released
--- and the exception propagated.
-lockedUpdNameCache :: (NameCache -> IO (NameCache, c)) -> TcRnIf a b c
-lockedUpdNameCache upd_fn = do
-  lock <- hsc_NC_lock `fmap` getTopEnv
-  -- Non-blocking "takeMVar" so we can show diagnostics if we didn't get the
-  -- lock.
-  mb_ok <- liftIO $ tryTakeMVar lock
-  case mb_ok of
-    Nothing -> do
-      traceIf (text "lockedUpdNameCache: failed to take lock.  blocking..")
-      _ <- liftIO $ takeMVar lock
-      traceIf (text "lockedUpdNameCache: got lock")
-    Just _ -> return ()
+-- | A function that atomically updates the name cache given a modifier
+-- function.  The second result of the modifier function will be the result
+-- of the IO action.
+type NameCacheUpdater c = (NameCache -> (NameCache, c)) -> IO c
 
-  name_cache <- getNameCache
-  (name_cache', rslt) <- liftIO (upd_fn name_cache
-                                   `onException` putMVar lock ())
-
+-- | Return a function to atomically update the name cache.
+mkNameCacheUpdater :: TcRnIf a b (NameCacheUpdater c)
+mkNameCacheUpdater = do
   nc_var <- hsc_NC `fmap` getTopEnv
-  writeMutVar nc_var $! name_cache'
-
-  liftIO (putMVar lock ())
-  return rslt
+  let update_nc f = do r <- atomicModifyIORef nc_var f
+                       _ <- evaluate =<< readIORef nc_var
+                       return r
+  return update_nc
 \end{code}
 
 

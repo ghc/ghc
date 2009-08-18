@@ -57,12 +57,13 @@ data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
 readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
-  lockedUpdNameCache $ \nc ->
-    readBinIface_ checkHiWay traceBinIFaceReading hi_path nc
+  update_nc <- mkNameCacheUpdater
+  liftIO $ readBinIface_ checkHiWay traceBinIFaceReading hi_path update_nc
 
-readBinIface_ :: CheckHiWay -> TraceBinIFaceReading -> FilePath -> NameCache
-              -> IO (NameCache, ModIface)
-readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
+readBinIface_ :: CheckHiWay -> TraceBinIFaceReading -> FilePath
+              -> NameCacheUpdater (Array Int Name)
+              -> IO ModIface
+readBinIface_ checkHiWay traceBinIFaceReading hi_path update_nc = do
   let printer :: SDoc -> IO ()
       printer = case traceBinIFaceReading of
                 TraceBinIFaceReading -> \sd -> printSDoc sd defaultDumpStyle
@@ -124,12 +125,12 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
   symtab_p <- Binary.get bh     -- Get the symtab ptr
   data_p <- tellBin bh          -- Remember where we are now
   seekBin bh symtab_p
-  (nc', symtab) <- getSymbolTable bh nc
+  symtab <- getSymbolTable bh update_nc
   seekBin bh data_p             -- Back to where we were before
   let ud = getUserData bh
   bh <- return $! setUserData bh ud{ud_symtab = symtab}
   iface <- get bh
-  return (nc', iface)
+  return iface
 
 
 writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -221,16 +222,17 @@ putSymbolTable bh next_off symtab = do
   let names = elems (array (0,next_off-1) (eltsUFM symtab))
   mapM_ (\n -> serialiseName bh n symtab) names
 
-getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
-getSymbolTable bh namecache = do
+getSymbolTable :: BinHandle -> NameCacheUpdater (Array Int Name)
+               -> IO (Array Int Name)
+getSymbolTable bh update_namecache = do
   sz <- get bh
   od_names <- sequence (replicate sz (get bh))
-  let 
+  update_namecache $ \namecache ->
+    let
         arr = listArray (0,sz-1) names
         (namecache', names) =    
                 mapAccumR (fromOnDiskName arr) namecache od_names
-  --
-  return (namecache', arr)
+    in (namecache', arr)
 
 type OnDiskName = (PackageId, ModuleName, OccName)
 
