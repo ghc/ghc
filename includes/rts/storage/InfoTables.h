@@ -214,6 +214,10 @@ typedef union {
  */
 typedef struct StgInfoTable_ {
 
+#ifndef TABLES_NEXT_TO_CODE
+    StgFunPtr       entry;	/* pointer to the entry code */
+#endif
+
 #ifdef PROFILING
     StgProfInfo     prof;
 #endif
