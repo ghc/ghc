@@ -252,14 +252,6 @@ schedule (Capability *initialCapability, Task *task)
 	      "### NEW SCHEDULER LOOP (task: %p, cap: %p)",
 	      task, initialCapability);
 
-  if (running_finalizers) {
-      errorBelch("error: a C finalizer called back into Haskell.\n"
-                 "   This was previously allowed, but is disallowed in GHC 6.10.2 and later.\n"
-                 "   To create finalizers that may call back into Haskll, use\n"
-                 "   Foreign.Concurrent.newForeignPtr instead of Foreign.newForeignPtr.");
-      stg_exit(EXIT_FAILURE);
-  }
-
   schedulePreLoop();
 
   // -----------------------------------------------------------
