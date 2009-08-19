@@ -46,16 +46,6 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS
          -shared -dynamic -dynload deploy \
          -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
          -o $$@
-
-# This is a kludge. The .dyn_hi files currently depend on the .dyn_hi
-# files of modules that they import. But they actually want the .hi
-# files of modules from another package.This we make the .dyn_hi files
-# depend on the .hi files so we are sure that they exist and are
-# up-to-date.
-$$(foreach m,$$(addprefix $1/$2/build/,$$($1_$2_SLASH_MODS)),\
-$$(eval $$(call mkdep,$$m.$$($3_hisuf),$$m.hi)) \
-)
-
 else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
