@@ -25,7 +25,7 @@
 #include "LdvProfile.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
-StgWord64 whitehole_spin = 0;
+StgWord64 evac_collision = 0;
 #endif
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
@@ -115,7 +115,10 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
         new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info,
                                              (W_)info, MK_FORWARDING_PTR(to));
         if (new_info != info) {
-            return evacuate(p); // does the failed_to_evac stuff
+#if defined(PROF_SPIN)
+            evac_collision++;
+#endif
+            evacuate(p); // does the failed_to_evac stuff
         } else {
             *p = TAG_CLOSURE(tag,(StgClosure*)to);
         }
@@ -191,6 +194,9 @@ copyPart(StgClosure **p, const StgInfoTable *info, StgClosure *src,
         new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, 
                                              (W_)info, MK_FORWARDING_PTR(to));
         if (new_info != info) {
+#if defined(PROF_SPIN)
+            evac_collision++;
+#endif
             evacuate(p); // does the failed_to_evac stuff
             return rtsFalse;
         } else {
