@@ -136,7 +136,7 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 static void schedulePreLoop (void);
 static void scheduleFindWork (Capability *cap);
 #if defined(THREADED_RTS)
-static void scheduleYield (Capability **pcap, Task *task);
+static void scheduleYield (Capability **pcap, Task *task, rtsBool);
 #endif
 static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
@@ -241,6 +241,7 @@ schedule (Capability *initialCapability, Task *task)
 #if defined(THREADED_RTS)
   rtsBool first = rtsTrue;
 #endif
+  rtsBool force_yield = rtsFalse;
   
   cap = initialCapability;
 
@@ -366,7 +367,9 @@ schedule (Capability *initialCapability, Task *task)
     }
 
   yield:
-    scheduleYield(&cap,task);
+    scheduleYield(&cap,task,force_yield);
+    force_yield = rtsFalse;
+
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
 
@@ -545,6 +548,7 @@ run_thread:
 	debugTrace(DEBUG_sched,
 		   "--<< thread %lu (%s) stopped: blocked",
 		   (unsigned long)t->id, whatNext_strs[t->what_next]);
+        force_yield = rtsTrue;
         goto yield;
     }
 #endif
@@ -667,12 +671,23 @@ shouldYieldCapability (Capability *cap, Task *task)
 // and also check the benchmarks in nofib/parallel for regressions.
 
 static void
-scheduleYield (Capability **pcap, Task *task)
+scheduleYield (Capability **pcap, Task *task, rtsBool force_yield)
 {
     Capability *cap = *pcap;
 
     // if we have work, and we don't need to give up the Capability, continue.
-    if (!shouldYieldCapability(cap,task) && 
+    //
+    // The force_yield flag is used when a bound thread blocks.  This
+    // is a particularly tricky situation: the current Task does not
+    // own the TSO any more, since it is on some queue somewhere, and
+    // might be woken up or manipulated by another thread at any time.
+    // The TSO and Task might be migrated to another Capability.
+    // Certain invariants might be in doubt, such as task->bound->cap
+    // == cap.  We have to yield the current Capability immediately,
+    // no messing around.
+    //
+    if (!force_yield &&
+        !shouldYieldCapability(cap,task) && 
         (!emptyRunQueue(cap) ||
          !emptyWakeupQueue(cap) ||
          blackholes_need_checking ||
