@@ -852,7 +852,6 @@ WAY_thr_debug_l_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG -eventlog
 # Way 'dyn': build dynamic shared libraries
 WAY_dyn_NAME=dyn
 WAY_dyn_HC_OPTS=-fPIC -dynamic
-WAY_dyn_LIB_TARGET=libHSrts-gcc661.so
 
 # Way 'thr_dyn':
 WAY_thr_dyn_NAME=thr_dyn
