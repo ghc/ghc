@@ -24,7 +24,9 @@ config.run_ways		     = ['normal', 'optc', 'hpc']
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways            = ['extcore','optextcore',
                                 'prof_hc_hb','prof_hb',
-                                'prof_hd','prof_hy','prof_hr', 'dyn']
+                                'prof_hd','prof_hy','prof_hr',
+                                'dyn',
+                                'threaded2_qw']
 
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
@@ -63,6 +65,7 @@ config.way_flags = {
 	'optextcore' : ['-O -fext-core'],
 	'threaded1'  : ['-threaded', '-debug'],
 	'threaded2'  : ['-O', '-threaded', '-eventlog'],
+	'threaded2_qw'  : ['-O', '-threaded'],
 	'hpc'	     : ['-O', '-fhpc' ],
         'prof_hc_hb' : ['-O -prof -auto-all'],
         'prof_hb'    : ['-O -prof -auto-all'],
@@ -84,6 +87,7 @@ config.way_rts_flags = {
 	'optextcore' : [],
 	'threaded1'  : [],
 	'threaded2'  : ['-N2 -l'],
+	'threaded2_qw'  : ['-N2', '-qw'],
 	'hpc'	     : [],
         'prof_hc_hb' : ['-hc -hbvoid'],
         'prof_hb'    : ['-hb'],

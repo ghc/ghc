@@ -4,7 +4,7 @@
 # hence -O0:
 
 test('concprog002',
-     [only_ways(['threaded2']), 
+     [only_ways(['threaded2','threaded2_qw']),
       exit_code(1), 
       skip_if_fast,
       extra_clean(['Event.hi',     'Event.o',
