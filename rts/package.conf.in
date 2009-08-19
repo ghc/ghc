@@ -1,7 +1,7 @@
 /* The RTS is just another package! */
 
 #include "ghcconfig.h"
-#include "RtsConfig.h"
+#include "rts/Config.h"
 
 name:		rts
 version:	1.0
