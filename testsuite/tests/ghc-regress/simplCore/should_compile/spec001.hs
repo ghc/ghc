@@ -83,7 +83,7 @@ import Prelude hiding (
  )
 
 import GHC.Exts
-import GHC.IOBase (IO(..))
+import GHC.IO (IO(..))
 import Foreign
 import Data.Typeable
 import Data.Char
