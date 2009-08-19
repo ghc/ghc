@@ -186,9 +186,6 @@ RTS_ENTRY(stg_catch_retry_frame_ret);
 RTS_ENTRY(stg_atomically_frame_ret);
 RTS_ENTRY(stg_atomically_waiting_frame_ret);
 RTS_ENTRY(stg_catch_stm_frame_ret);
-RTS_ENTRY(stg_catch_frame_ret);
-RTS_ENTRY(stg_catch_entry);
-RTS_ENTRY(stg_raise_entry);
 
 /* closures */
 
@@ -234,7 +231,6 @@ RTS_ENTRY(stg_sel_ret_4_upd_ret);
 RTS_ENTRY(stg_sel_ret_5_upd_ret);
 RTS_ENTRY(stg_sel_ret_6_upd_ret);
 RTS_ENTRY(stg_sel_ret_7_upd_ret);
-RTS_ENTRY(stg_sel_ret_8_upd_ret);
 RTS_ENTRY(stg_sel_ret_8_upd_ret);
 RTS_ENTRY(stg_sel_ret_9_upd_ret);
 RTS_ENTRY(stg_sel_ret_10_upd_ret);
@@ -286,7 +282,6 @@ RTS_ENTRY(stg_sel_ret_4_noupd_ret);
 RTS_ENTRY(stg_sel_ret_5_noupd_ret);
 RTS_ENTRY(stg_sel_ret_6_noupd_ret);
 RTS_ENTRY(stg_sel_ret_7_noupd_ret);
-RTS_ENTRY(stg_sel_ret_8_noupd_ret);
 RTS_ENTRY(stg_sel_ret_8_noupd_ret);
 RTS_ENTRY(stg_sel_ret_9_noupd_ret);
 RTS_ENTRY(stg_sel_ret_10_noupd_ret);
