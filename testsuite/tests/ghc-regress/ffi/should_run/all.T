@@ -137,3 +137,5 @@ test('fptrfail01', [ compose(omit_ways(['ghci']), exit_code(1)),
 
 test('2917a', normal, compile_and_run, [''])
 
+test('ffi020', exit_code(1), compile_and_run, [''])
+
