@@ -12,6 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# Language CPP #-}
+
 module Text.Printf(
    printf, hPrintf,
    PrintfType, HPrintfType, PrintfArg, IsChar
@@ -215,12 +217,12 @@ fmt cs us =
 	    u:us'' ->
 		(case c of
 		'c' -> adjust  ("", [toEnum (toint u)])
-		'd' -> adjust' (fmti u)
-		'i' -> adjust' (fmti u)
-		'x' -> adjust  ("", fmtu 16 u)
-		'X' -> adjust  ("", map toUpper $ fmtu 16 u)
-		'o' -> adjust  ("", fmtu 8  u)
-		'u' -> adjust  ("", fmtu 10 u)
+		'd' -> adjust' (fmti prec u)
+		'i' -> adjust' (fmti prec u)
+		'x' -> adjust  ("", fmtu 16 prec u)
+		'X' -> adjust  ("", map toUpper $ fmtu 16 prec u)
+		'o' -> adjust  ("", fmtu 8  prec u)
+		'u' -> adjust  ("", fmtu 10 prec u)
 		'e' -> adjust' (dfmt' c prec u)
 		'E' -> adjust' (dfmt' c prec u)
 		'f' -> adjust' (dfmt' c prec u)
@@ -230,15 +232,18 @@ fmt cs us =
 		_   -> perror ("bad formatting char " ++ [c])
 		 ) ++ uprintf cs'' us''
 
-fmti :: UPrintf -> (String, String)
-fmti (UInteger _ i) = if i < 0 then ("-", show (-i)) else ("", show i)
-fmti (UChar c)      = fmti (uInteger (fromEnum c))
-fmti _		    = baderr
+fmti :: Int -> UPrintf -> (String, String)
+fmti prec (UInteger _ i) = if i < 0 then ("-", integral_prec prec (show (-i))) else ("", integral_prec prec (show i))
+fmti _ (UChar c)         = fmti 0 (uInteger (fromEnum c))
+fmti _ _                 = baderr
 
-fmtu :: Integer -> UPrintf -> String
-fmtu b (UInteger l i) = itosb b (if i < 0 then -2*l + i else i)
-fmtu b (UChar c)      = itosb b (toInteger (fromEnum c))
-fmtu _ _              = baderr
+fmtu :: Integer -> Int -> UPrintf -> String
+fmtu b prec (UInteger l i) = integral_prec prec (itosb b (if i < 0 then -2*l + i else i))
+fmtu b _    (UChar c)      = itosb b (toInteger (fromEnum c))
+fmtu _ _ _                 = baderr
+
+integral_prec :: Int -> String -> String
+integral_prec prec integral = (replicate (prec - (length integral)) '0') ++ integral
 
 toint :: UPrintf -> Int
 toint (UInteger _ i) = fromInteger i
