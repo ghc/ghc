@@ -7,6 +7,5 @@ main = do
    printf "%.3s\n" "foobar"
    -- (expected: "foo")
 
-   -- Still wrong:
-   -- printf "%10.5d\n" (4::Int)
+   printf "%10.5d\n" (4::Int)
    -- (expected: "     00004")
