@@ -1361,6 +1361,10 @@ scavenge_one(StgPtr p)
       break;
     }
 
+    case IND:
+        // IND can happen, for example, when the interpreter allocates
+        // a gigantic AP closure (more than one block), which ends up
+        // on the large-object list and then gets updated.  See #3424.
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
     case IND_STATIC:
