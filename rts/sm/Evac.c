@@ -25,7 +25,7 @@
 #include "LdvProfile.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
-StgWord64 evac_collision = 0;
+StgWord64 whitehole_spin = 0;
 #endif
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
@@ -112,13 +112,9 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #if defined(PARALLEL_GC)
     {
         const StgInfoTable *new_info;
-        new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info,
-                                             (W_)info, MK_FORWARDING_PTR(to));
+        new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, (W_)info, MK_FORWARDING_PTR(to));
         if (new_info != info) {
-#if defined(PROF_SPIN)
-            evac_collision++;
-#endif
-            evacuate(p); // does the failed_to_evac stuff
+            return evacuate(p); // does the failed_to_evac stuff
         } else {
             *p = TAG_CLOSURE(tag,(StgClosure*)to);
         }
@@ -172,42 +168,46 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
  * used to optimise evacuation of BLACKHOLEs.
  */
 static rtsBool
-copyPart(StgClosure **p, const StgInfoTable *info, StgClosure *src, 
-         nat size_to_reserve, nat size_to_copy, step *stp)
+copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
     StgPtr to, from;
     nat i;
+    StgWord info;
     
+#if defined(PARALLEL_GC)
+spin:
+	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
+	if (info == (W_)&stg_WHITEHOLE_info) {
+#ifdef PROF_SPIN
+	    whitehole_spin++;
+#endif
+	    goto spin;
+	}
+    if (IS_FORWARDING_PTR(info)) {
+	src->header.info = (const StgInfoTable *)info;
+	evacuate(p); // does the failed_to_evac stuff
+	return rtsFalse;
+    }
+#else
+    info = (W_)src->header.info;
+#endif
+
     to = alloc_for_copy(size_to_reserve, stp);
+    *p = (StgClosure *)to;
 
     TICK_GC_WORDS_COPIED(size_to_copy);
 
     from = (StgPtr)src;
-    to[0] = (W_)info;
+    to[0] = info;
     for (i = 1; i < size_to_copy; i++) { // unroll for small i
 	to[i] = from[i];
     }
     
 #if defined(PARALLEL_GC)
-    {
-        const StgInfoTable *new_info;
-        new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, 
-                                             (W_)info, MK_FORWARDING_PTR(to));
-        if (new_info != info) {
-#if defined(PROF_SPIN)
-            evac_collision++;
+    write_barrier();
 #endif
-            evacuate(p); // does the failed_to_evac stuff
-            return rtsFalse;
-        } else {
-            *p = (StgClosure*)to;
-        }
-    }
-#else
-    src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
-    *p = (StgClosure*)to;
-#endif
-
+    src->header.info = (const StgInfoTable*)MK_FORWARDING_PTR(to);
+    
 #ifdef PROFILING
     // We store the size of the just evacuated object in the LDV word so that
     // the profiler can guess the position of the next object later.
@@ -639,7 +639,7 @@ loop:
 
   case CAF_BLACKHOLE:
   case BLACKHOLE:
-      copyPart(p,info,q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
+      copyPart(p,q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
       return;
 
   case THUNK_SELECTOR:
@@ -711,7 +711,7 @@ loop:
 	  StgPtr r, s;
           rtsBool mine;
 
-	  mine = copyPart(p,info,(StgClosure *)tso, tso_sizeW(tso), 
+	  mine = copyPart(p,(StgClosure *)tso, tso_sizeW(tso), 
                           sizeofW(StgTSO), stp);
           if (mine) {
               new_tso = (StgTSO *)*p;

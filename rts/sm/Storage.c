@@ -253,7 +253,7 @@ initStorage( void )
 
 #ifdef THREADED_RTS
   initSpinLock(&gc_alloc_block_sync);
-  evac_collision = 0;
+  whitehole_spin = 0;
 #endif
 
   N = 0;

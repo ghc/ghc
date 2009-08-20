@@ -15,7 +15,7 @@
 #include "Profiling.h"
 #include "GetTime.h"
 #include "sm/Storage.h"
-#include "sm/GC.h" // gc_alloc_block_sync, evac_collision
+#include "sm/GC.h" // gc_alloc_block_sync, whitehole_spin
 
 #if USE_PAPI
 #include "Papi.h"
@@ -704,7 +704,7 @@ stat_exit(int alloc)
                 nat g, s;
                 
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-                statsPrintf("evac_collision: %"FMT_Word64"\n", evac_collision);
+                statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
                     for (s = 0; s < generations[g].n_steps; s++) {
                         statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);

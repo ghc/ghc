@@ -42,7 +42,7 @@ extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
 #endif
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
-extern StgWord64 evac_collision;
+extern StgWord64 whitehole_spin;
 #endif
 
 void gcWorkerThread (Capability *cap);
