@@ -53,3 +53,7 @@ test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
 
 test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
+
+test('3424', # it's slow:
+             [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
+             compile_and_run, [''])
