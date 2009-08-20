@@ -80,9 +80,9 @@
 
 
 STATIC_INLINE StgPtr
-allocate_NONUPD (int n_words)
+allocate_NONUPD (Capability *cap, int n_words)
 {
-    return allocate(stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
+    return allocateLocal(cap, stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
 int rts_stop_next_breakpoint = 0;
@@ -597,7 +597,7 @@ do_apply:
 	    else /* arity > n */ {
 		// build a new PAP and return it.
 		StgPAP *new_pap;
-		new_pap = (StgPAP *)allocate(PAP_sizeW(pap->n_args + m));
+		new_pap = (StgPAP *)allocateLocal(cap, PAP_sizeW(pap->n_args + m));
 		SET_HDR(new_pap,&stg_PAP_info,CCCS);
 		new_pap->arity = pap->arity - n;
 		new_pap->n_args = pap->n_args + m;
@@ -642,7 +642,7 @@ do_apply:
 		// build a PAP and return it.
 		StgPAP *pap;
 		nat i;
-		pap = (StgPAP *)allocate(PAP_sizeW(m));
+		pap = (StgPAP *)allocateLocal(cap, PAP_sizeW(m));
 		SET_HDR(pap, &stg_PAP_info,CCCS);
 		pap->arity = arity - n;
 		pap->fun = obj;
@@ -856,7 +856,7 @@ run_BCO:
                   // stg_apply_interp_info pointer and a pointer to
                   // the BCO
                   size_words = BCO_BITMAP_SIZE(obj) + 2;
-                  new_aps = (StgAP_STACK *) allocate (AP_STACK_sizeW(size_words));
+                  new_aps = (StgAP_STACK *) allocateLocal(cap, AP_STACK_sizeW(size_words));
                   SET_HDR(new_aps,&stg_AP_STACK_info,CCS_SYSTEM); 
                   new_aps->size = size_words;
                   new_aps->fun = &stg_dummy_ret_closure; 
@@ -1075,7 +1075,7 @@ run_BCO:
 	case bci_ALLOC_AP: {
 	    StgAP* ap; 
 	    int n_payload = BCO_NEXT;
-	    ap = (StgAP*)allocate(AP_sizeW(n_payload));
+	    ap = (StgAP*)allocateLocal(cap, AP_sizeW(n_payload));
 	    Sp[-1] = (W_)ap;
 	    ap->n_args = n_payload;
 	    SET_HDR(ap, &stg_AP_info, CCS_SYSTEM/*ToDo*/)
@@ -1086,7 +1086,7 @@ run_BCO:
 	case bci_ALLOC_AP_NOUPD: {
 	    StgAP* ap; 
 	    int n_payload = BCO_NEXT;
-	    ap = (StgAP*)allocate(AP_sizeW(n_payload));
+	    ap = (StgAP*)allocateLocal(cap, AP_sizeW(n_payload));
 	    Sp[-1] = (W_)ap;
 	    ap->n_args = n_payload;
 	    SET_HDR(ap, &stg_AP_NOUPD_info, CCS_SYSTEM/*ToDo*/)
@@ -1098,7 +1098,7 @@ run_BCO:
 	    StgPAP* pap; 
 	    int arity = BCO_NEXT;
 	    int n_payload = BCO_NEXT;
-	    pap = (StgPAP*)allocate(PAP_sizeW(n_payload));
+	    pap = (StgPAP*)allocateLocal(cap, PAP_sizeW(n_payload));
 	    Sp[-1] = (W_)pap;
 	    pap->n_args = n_payload;
 	    pap->arity = arity;
@@ -1170,7 +1170,7 @@ run_BCO:
 	    StgInfoTable* itbl = INFO_PTR_TO_STRUCT(BCO_LIT(o_itbl));
 	    int request        = CONSTR_sizeW( itbl->layout.payload.ptrs, 
 					       itbl->layout.payload.nptrs );
-	    StgClosure* con = (StgClosure*)allocate_NONUPD(request);
+	    StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
 	    ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
 	    SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), CCS_SYSTEM/*ToDo*/);
 	    for (i = 0; i < n_words; i++) {
