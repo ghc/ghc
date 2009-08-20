@@ -12,7 +12,11 @@
 
 define build-package-data # args: $1 = dir, $2 = distdir
 
-ifeq "$$(BuildSharedLibs)" "YES"
+ifeq "$$(filter p,$$(GhcLibWays))" "p"
+$1_$2_CONFIGURE_OPTS += --enable-library-profiling
+endif
+
+ifeq "$$(filter dyn,$$(GhcLibWays))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
 endif
 
