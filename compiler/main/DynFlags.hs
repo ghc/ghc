@@ -2058,13 +2058,7 @@ ignorePackage p =
   upd (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
 
 setPackageName :: String -> DynFlags -> DynFlags
-setPackageName p
-  | Nothing <- unpackPackageId pid
-  = ghcError (CmdLineError ("cannot parse \'" ++ p ++ "\' as a package identifier"))
-  | otherwise
-  = \s -> s{ thisPackage = pid }
-  where
-        pid = stringToPackageId p
+setPackageName p s =  s{ thisPackage = stringToPackageId p }
 
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).

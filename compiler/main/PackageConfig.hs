@@ -7,7 +7,7 @@ module PackageConfig (
     -- $package_naming
     
 	-- * PackageId
-	mkPackageId, packageConfigId, unpackPackageId,
+	mkPackageId, packageConfigId,
 	
 	-- * The PackageConfig type: information about a package
 	PackageConfig,
@@ -28,7 +28,6 @@ import Distribution.ModuleName
 import Distribution.Package hiding (PackageId)
 import Distribution.Text
 import Distribution.Version
-import Distribution.Compat.ReadP
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is just InstalledPackageInfo from Cabal.  Later we
@@ -61,15 +60,6 @@ mkPackageId = stringToPackageId . display
 -- | Get the GHC 'PackageId' right out of a Cabalish 'PackageConfig'
 packageConfigId :: PackageConfig -> PackageId
 packageConfigId = mkPackageId . package
-
--- | Try and interpret a GHC 'PackageId' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
--- we could not parse it as such an object.
-unpackPackageId :: PackageId -> Maybe PackageIdentifier
-unpackPackageId p
-  = case [ pid | (pid,"") <- readP_to_S parse str ] of
-        []      -> Nothing
-        (pid:_) -> Just pid
-  where str = packageIdString p
 
 -- | Turn a 'PackageConfig', which contains GHC 'Module.ModuleName's into a Cabal specific
 -- 'InstalledPackageInfo' which contains Cabal 'Distribution.ModuleName.ModuleName's

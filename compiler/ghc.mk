@@ -464,6 +464,7 @@ $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 ifneq "$(ProjectPatchLevel)" "0"
 compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
 	sed -e 's/^\(version: .*\)\.$(ProjectPatchLevel)$$/\1/' \
+	    -e 's/^\(id: .*\)\.$(ProjectPatchLevel)$$/\1/' \
 	    -e 's/^\(hs-libraries: HSghc-.*\)\.$(ProjectPatchLevel)$$/\1/' \
 	  < $< > $@
 	"$(compiler_stage1_GHC_PKG)" update --force $(compiler_stage1_GHC_PKG_OPTS) $@

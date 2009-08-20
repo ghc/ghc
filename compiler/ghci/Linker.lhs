@@ -51,6 +51,7 @@ import ErrUtils
 import SrcLoc
 import qualified Maybes
 import UniqSet
+import FiniteMap
 import Constants
 import FastString
 import Config		( cProjectVersion )
@@ -973,23 +974,25 @@ linkPackages dflags new_pkgs = do
 linkPackages' :: DynFlags -> [PackageId] -> PersistentLinkerState
              -> IO PersistentLinkerState
 linkPackages' dflags new_pks pls = do
-    let pkg_map = pkgIdMap (pkgState dflags)
-
-    pkgs' <- link pkg_map (pkgs_loaded pls) new_pks
-
+    pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     link :: PackageConfigMap -> [PackageId] -> [PackageId] -> IO [PackageId]
-     link pkg_map pkgs new_pkgs =
-         foldM (link_one pkg_map) pkgs new_pkgs
+     pkg_map = pkgIdMap (pkgState dflags)
+     ipid_map = installedPackageIdMap (pkgState dflags)
 
-     link_one pkg_map pkgs new_pkg
+     link :: [PackageId] -> [PackageId] -> IO [PackageId]
+     link pkgs new_pkgs =
+         foldM link_one pkgs new_pkgs
+
+     link_one pkgs new_pkg
 	| new_pkg `elem` pkgs	-- Already linked
 	= return pkgs
 
 	| Just pkg_cfg <- lookupPackage pkg_map new_pkg
 	= do { 	-- Link dependents first
-	       pkgs' <- link pkg_map pkgs (map mkPackageId (depends pkg_cfg))
+               pkgs' <- link pkgs [ Maybes.expectJust "link_one" $
+                                    lookupFM ipid_map ipid
+                                  | ipid <- depends pkg_cfg ]
 		-- Now link the package itself
 	     ; linkPackage dflags pkg_cfg
 	     ; return (new_pkg : pkgs') }

@@ -1,26 +1,21 @@
 {-# OPTIONS -fglasgow-exts -cpp #-}
 -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow 2004.
+-- (c) The University of Glasgow 2004-2009.
 --
 -- Package management tool
 --
 -----------------------------------------------------------------------------
 
--- TODO:
--- * validate modules
--- * expanding of variables in new-style package conf
--- * version manipulation (checking whether old version exists,
---   hiding old version?)
-
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
+import qualified Distribution.Simple.PackageIndex as PackageIndex
 import Distribution.ModuleName hiding (main)
-import Distribution.InstalledPackageInfo hiding (depends)
+import Distribution.InstalledPackageInfo
 import Distribution.Compat.ReadP
 import Distribution.ParseUtils
-import Distribution.Package
+import Distribution.Package hiding (depends)
 import Distribution.Text
 import Distribution.Version
 import System.FilePath
@@ -192,6 +187,11 @@ usageHeader prog = substProg prog $
   "    all the registered versions will be listed in ascending order.\n" ++
   "    Accepts the --simple-output flag.\n" ++
   "\n" ++
+  "  $p dot\n" ++
+  "    Generate a graph of the package dependencies in a form suitable\n" ++
+  "    for input for the graphviz tools.  For example, to generate a PDF" ++
+  "    of the dependency graph: ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf" ++
+  "\n" ++
   "  $p find-module {module}\n" ++
   "    List registered packages exposing module {module} in the global\n" ++
   "    database, and also the user database if --user is given.\n" ++
@@ -230,7 +230,7 @@ usageHeader prog = substProg prog $
   "  entirely. When multiple of these options are given, the rightmost\n"++
   "  one is used as the database to act upon.\n"++
   "\n"++
-  "  Commands that query the package database (list, latest, describe,\n"++
+  "  Commands that query the package database (list, tree, latest, describe,\n"++
   "  field) operate on the list of databases specified by the flags\n"++
   "  --user, --global, and --package-conf.  If none of these flags are\n"++
   "  given, the default is --global --user.\n"++
@@ -310,15 +310,17 @@ runit verbosity cli nonopts = do
         pkgid <- readGlobPkgId pkgid_str
         hidePackage pkgid verbosity cli force
     ["list"] -> do
-        listPackages cli Nothing Nothing
+        listPackages verbosity cli Nothing Nothing
     ["list", pkgid_str] ->
         case substringCheck pkgid_str of
           Nothing -> do pkgid <- readGlobPkgId pkgid_str
-                        listPackages cli (Just (Id pkgid)) Nothing
-          Just m -> listPackages cli (Just (Substring pkgid_str m)) Nothing
+                        listPackages verbosity cli (Just (Id pkgid)) Nothing
+          Just m -> listPackages verbosity cli (Just (Substring pkgid_str m)) Nothing
+    ["dot"] -> do
+        showPackageDot verbosity cli
     ["find-module", moduleName] -> do
         let match = maybe (==moduleName) id (substringCheck moduleName)
-        listPackages cli Nothing (Just match)
+        listPackages verbosity cli Nothing (Just match)
     ["latest", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         latestPackage cli pkgid
@@ -544,11 +546,6 @@ registerPackage input verbosity my_flags auto_ghci_libs update force = do
   when (verbosity >= Normal) $
       putStrLn "done."
 
-  let unversioned_deps = filter (not . realVersion) (depends pkg)
-  unless (null unversioned_deps) $
-      die ("Unversioned dependencies found: " ++
-           unwords (map display unversioned_deps))
-
   let truncated_stack = dropWhile ((/= to_modify).fst) db_stack
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
@@ -616,8 +613,10 @@ modifyPackage fn pkgid verbosity my_flags force = do
 -- -----------------------------------------------------------------------------
 -- Listing packages
 
-listPackages ::  [Flag] -> Maybe PackageArg -> Maybe (String->Bool) -> IO ()
-listPackages my_flags mPackageName mModuleName = do
+listPackages ::  Verbosity -> [Flag] -> Maybe PackageArg
+             -> Maybe (String->Bool)
+             -> IO ()
+listPackages verbosity my_flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` my_flags
   (db_stack, _) <- getPkgDatabases False my_flags
   let db_stack_filtered -- if a package is given, filter out all other packages
@@ -642,23 +641,35 @@ listPackages my_flags mPackageName mModuleName = do
       match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
       pkg_map = allPackagesInStack db_stack
-      show_func = if simple_output then show_simple else mapM_ (show_normal pkg_map)
+      broken = map package (brokenPackages pkg_map)
 
-  show_func (reverse db_stack_sorted)
+      show_func = if simple_output then show_simple else mapM_ show_normal
 
-  where show_normal pkg_map (db_name,pkg_confs) =
+      show_normal (db_name,pkg_confs) =
           hPutStrLn stdout (render $
                 text db_name <> colon $$ nest 4 packages
                 )
-           where packages = fsep (punctuate comma (map pp_pkg pkg_confs))
-                 broken = map package (brokenPackages pkg_map)
+           where packages
+                    | verbosity >= Verbose = vcat (map pp_pkg pkg_confs)
+                    | otherwise = fsep (punctuate comma (map pp_pkg pkg_confs))
                  pp_pkg p
                    | package p `elem` broken = braces doc
                    | exposed p = doc
                    | otherwise = parens doc
-                   where doc = text (display (package p))
+                   where doc | verbosity >= Verbose = pkg <+> parens ipid
+                             | otherwise            = pkg
+                          where
+                          InstalledPackageId ipid_str = installedPackageId p
+                          ipid = text ipid_str
+                          pkg = text (display (package p))
 
-        show_simple = simplePackageList my_flags . allPackagesInStack
+      show_simple = simplePackageList my_flags . allPackagesInStack
+
+  when (not (null broken) && verbosity /= Silent) $ do
+     prog <- getProgramName
+     putStrLn ("WARNING: there are broken packages.  Run '" ++ prog ++ " check' for more details.")
+
+  show_func (reverse db_stack_sorted)
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
@@ -667,6 +678,23 @@ simplePackageList my_flags pkgs = do
        strs = map showPkg $ sortBy compPkgIdVer $ map package pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
+
+showPackageDot :: Verbosity -> [Flag] -> IO ()
+showPackageDot _verbosity myflags = do
+  (db_stack, _) <- getPkgDatabases False myflags
+  let all_pkgs = allPackagesInStack db_stack
+      ipix  = PackageIndex.listToInstalledPackageIndex all_pkgs
+
+  putStrLn "digraph {"
+  let quote s = '"':s ++ "\""
+  mapM_ putStrLn [ quote from ++ " -> " ++ quote to
+                 | p <- all_pkgs,
+                   let from = display (package p),
+                   depid <- depends p,
+                   Just dep <- [PackageIndex.lookupInstalledPackage ipix depid],
+                   let to = display (package dep)
+                 ]
+  putStrLn "}"
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
@@ -719,6 +747,10 @@ matches :: PackageIdentifier -> PackageIdentifier -> Bool
 pid `matches` pid'
   = (pkgName pid == pkgName pid')
     && (pkgVersion pid == pkgVersion pid' || not (realVersion pid))
+
+realVersion :: PackageIdentifier -> Bool
+realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
+  -- when versionBranch == [], this is a glob
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` package pkg
@@ -851,7 +883,7 @@ closure pkgs db_stack = go pkgs db_stack
                  -> Bool
    depsAvailable pkgs_ok pkg = null dangling
         where dangling = filter (`notElem` pids) (depends pkg)
-              pids = map package pkgs_ok
+              pids = map installedPackageId pkgs_ok
 
         -- we want mutually recursive groups of package to show up
         -- as broken. (#1750)
@@ -954,6 +986,7 @@ checkPackageConfig :: InstalledPackageInfo
                       -> Bool   -- update, or check
                       -> Validate ()
 checkPackageConfig pkg db_stack auto_ghci_libs update = do
+  checkInstalledPackageId pkg db_stack update
   checkPackageId pkg
   checkDuplicates db_stack pkg update
   mapM_ (checkDep db_stack) (depends pkg)
@@ -966,6 +999,18 @@ checkPackageConfig pkg db_stack auto_ghci_libs update = do
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
   --    c_includes      :: [String],
+
+checkInstalledPackageId :: InstalledPackageInfo -> PackageDBStack -> Bool 
+                        -> Validate ()
+checkInstalledPackageId ipi db_stack update = do
+  let ipid@(InstalledPackageId str) = installedPackageId ipi
+  when (null str) $ verror CannotForce "missing id field"
+  let dups = [ p | p <- allPackagesInStack db_stack, 
+                   installedPackageId p == ipid ]
+  when (not update && not (null dups)) $
+    verror CannotForce $
+        "package(s) with this id already exist: " ++ 
+         unwords (map (display.packageId) dups)
 
 -- When the package name and version are put together, sometimes we can
 -- end up with a package id that cannot be parsed.  This will lead to
@@ -1011,32 +1056,22 @@ checkDir thisfield d
    when (not there) $
        verror ForceFiles (thisfield ++ ": " ++ d ++ " doesn't exist or isn't a directory")
 
-checkDep :: PackageDBStack -> PackageIdentifier -> Validate ()
+checkDep :: PackageDBStack -> InstalledPackageId -> Validate ()
 checkDep db_stack pkgid
-  | pkgid `elem` pkgids || (not real_version && name_exists) = return ()
-  | otherwise = verror ForceAll ("dependency " ++ display pkgid
-                                 ++ " doesn't exist")
+  | pkgid `elem` pkgids = return ()
+  | otherwise = verror ForceAll ("dependency \"" ++ display pkgid
+                                 ++ "\" doesn't exist")
   where
-        -- for backwards compat, we treat 0.0 as a special version,
-        -- and don't check that it actually exists.
-        real_version = realVersion pkgid
-
-        name_exists = any (\p -> pkgName (package p) == name) all_pkgs
-        name = pkgName pkgid
-
         all_pkgs = allPackagesInStack db_stack
-        pkgids = map package all_pkgs
+        pkgids = map installedPackageId all_pkgs
 
-checkDuplicateDepends :: [PackageIdentifier] -> Validate ()
+checkDuplicateDepends :: [InstalledPackageId] -> Validate ()
 checkDuplicateDepends deps
   | null dups = return ()
   | otherwise = verror ForceAll ("package has duplicate dependencies: " ++
                                      unwords (map display dups))
   where
        dups = [ p | (p:_:_) <- group (sort deps) ]
-
-realVersion :: PackageIdentifier -> Bool
-realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 
 checkHSLib :: [String] -> Bool -> String -> Validate ()
 checkHSLib dirs auto_ghci_libs lib = do

@@ -42,15 +42,16 @@ import StaticFlags
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import UniqFM
+import FiniteMap
 import Module
 import Util
-import Maybes		( expectJust, MaybeErr(..) )
 import Panic
 import Outputable
+import Maybes
 
 import System.Environment ( getEnv )
-import Distribution.InstalledPackageInfo hiding (depends)
-import Distribution.Package hiding (depends, PackageId)
+import Distribution.InstalledPackageInfo
+import Distribution.Package hiding (PackageId,depends)
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
 import Exception
@@ -59,7 +60,7 @@ import System.Directory
 import System.FilePath
 import Data.Maybe
 import Control.Monad
-import Data.List
+import Data.List as List
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -113,11 +114,13 @@ data PackageState = PackageState {
 	-- should be in reverse dependency order; that is, a package
 	-- is always mentioned before the packages it depends on.
 
-  moduleToPkgConfAll 	:: UniqFM [(PackageConfig,Bool)] -- ModuleEnv mapping
+  moduleToPkgConfAll 	:: UniqFM [(PackageConfig,Bool)], -- ModuleEnv mapping
 	-- Derived from pkgIdMap.	
 	-- Maps Module to (pkgconf,exposed), where pkgconf is the
 	-- PackageConfig for the package containing the module, and
 	-- exposed is True if the package exposes that module.
+
+  installedPackageIdMap :: FiniteMap InstalledPackageId PackageId
   }
 
 -- | A PackageConfigMap maps a 'PackageId' to a 'PackageConfig'
@@ -370,32 +373,27 @@ hideOldPackages dflags pkgs = mapM maybe_hide pkgs
 findWiredInPackages
    :: DynFlags
    -> [PackageConfig]           -- database
-   -> [PackageIdentifier]       -- preload packages
-   -> PackageId 		-- this package
-   -> IO ([PackageConfig],
-          [PackageIdentifier],
-          PackageId)
+   -> IO [PackageConfig]
 
-findWiredInPackages dflags pkgs preload this_package = do
+findWiredInPackages dflags pkgs = do
   --
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base).
   --
   let
-        wired_in_pkgids :: [(PackageId, [String])]
-        wired_in_pkgids = [ (primPackageId, [""]),
-                            (integerPackageId, [""]),
-                            (basePackageId, [""]),
-                            (rtsPackageId, [""]),
-                            (haskell98PackageId, [""]),
-                            (thPackageId, [""]),
-                            (dphSeqPackageId, [""]),
-                            (dphParPackageId, [""])]
+        wired_in_pkgids :: [String]
+        wired_in_pkgids = map packageIdString
+                          [ primPackageId,
+                            integerPackageId,
+                            basePackageId,
+                            rtsPackageId,
+                            haskell98PackageId,
+                            thPackageId,
+                            dphSeqPackageId,
+                            dphParPackageId ]
 
-        matches :: PackageConfig -> (PackageId, [String]) -> Bool
-        pc `matches` (pid, suffixes)
-            = display (pkgName (package pc)) `elem`
-              (map (packageIdString pid ++) suffixes)
+        matches :: PackageConfig -> String -> Bool
+        pc `matches` pid = display (pkgName (package pc)) == pid
 
 	-- find which package corresponds to each wired-in package
 	-- delete any other packages with the same name
@@ -407,33 +405,29 @@ findWiredInPackages dflags pkgs preload this_package = do
         -- version.  To override the default choice, -hide-package
         -- could be used to hide newer versions.
         --
-	findWiredInPackage :: [PackageConfig] -> (PackageId, [String])
-			   -> IO (Maybe (PackageIdentifier, PackageId))
+	findWiredInPackage :: [PackageConfig] -> String
+			   -> IO (Maybe InstalledPackageId)
 	findWiredInPackage pkgs wired_pkg =
            let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ] in
 	   case all_ps of
 		[]   -> notfound
 		many -> pick (head (sortByVersion many))
           where
-                suffixes = snd wired_pkg
                 notfound = do
 			  debugTraceMsg dflags 2 $
 			    ptext (sLit "wired-in package ")
-				 <> ppr (fst wired_pkg)
-                                 <> (if null suffixes
-                                     then empty
-                                     else text (show suffixes))
+				 <> text wired_pkg
 				 <> ptext (sLit " not found.")
 			  return Nothing
 		pick :: InstalledPackageInfo_ ModuleName
-                     -> IO (Maybe (PackageIdentifier, PackageId))
+                     -> IO (Maybe InstalledPackageId)
                 pick pkg = do
                         debugTraceMsg dflags 2 $
 			    ptext (sLit "wired-in package ")
-				 <> ppr (fst wired_pkg)
+				 <> text wired_pkg
 				 <> ptext (sLit " mapped to ")
 				 <> text (display (package pkg))
-			return (Just (package pkg, fst wired_pkg))
+			return (Just (installedPackageId pkg))
 
 
   mb_wired_in_ids <- mapM (findWiredInPackage pkgs) wired_in_pkgids
@@ -454,26 +448,13 @@ findWiredInPackages dflags pkgs preload this_package = do
         -}
 
 	updateWiredInDependencies pkgs = map upd_pkg pkgs
-	  where upd_pkg p = p{ package = upd_pid (package p),
-			       depends = map upd_pid (depends p) }
+	  where upd_pkg p
+                  | installedPackageId p `elem` wired_in_ids
+                  = p { package = (package p){ pkgVersion = Version [] [] } }
+                  | otherwise
+                  = p
 
-	upd_pid pid = case filter ((== pid) . fst) wired_in_ids of
-				[] -> pid
-				((x, y):_) -> x{ pkgName = PackageName (packageIdString y),
-                                                 pkgVersion = Version [] [] }
-
-        -- pkgs1 = deleteOtherWiredInPackages pkgs
-
-        pkgs2 = updateWiredInDependencies pkgs
-
-        preload1 = map upd_pid preload
-
-        -- we must return an updated thisPackage, just in case we
-        -- are actually compiling one of the wired-in packages
-        Just old_this_pkg = unpackPackageId this_package
-        new_this_pkg = mkPackageId (upd_pid old_this_pkg)
-
-  return (pkgs2, preload1, new_this_pkg)
+  return $ updateWiredInDependencies pkgs
 
 -- ----------------------------------------------------------------------------
 --
@@ -499,12 +480,12 @@ elimDanglingDeps dflags pkgs ignored = go [] pkgs'
         (new_avail, not_avail) -> go (new_avail ++ avail) (map fst not_avail)
 
    depsAvailable :: [PackageConfig] -> PackageConfig
-                 -> Either PackageConfig (PackageConfig, [PackageIdentifier])
+                 -> Either PackageConfig (PackageConfig, [InstalledPackageId])
    depsAvailable pkgs_ok pkg 
         | null dangling = Left pkg
         | otherwise     = Right (pkg, dangling)
         where dangling = filter (`notElem` pids) (depends pkg)
-              pids = map package pkgs_ok
+              pids = map installedPackageId pkgs_ok
 
    reportElim (p, deps) = 
         debugTraceMsg dflags 2 $
@@ -542,15 +523,14 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
   -- should contain at least rts & base, which is why we pretend that
   -- the command line contains -package rts & -package base.
   --
-  let new_preload_packages = 
-        map package (pickPackages pkgs0 [ p | ExposePackage p <- flags ])
+  let preload1 = map installedPackageId $ 
+                 pickPackages pkgs0 [ p | ExposePackage p <- flags ]
 
   -- hide packages that are subsumed by later versions
   pkgs2 <- hideOldPackages dflags pkgs1
 
   -- sort out which packages are wired in
-  (pkgs3, preload1, new_this_pkg)
-        <- findWiredInPackages dflags pkgs2 new_preload_packages this_package
+  pkgs3 <- findWiredInPackages dflags pkgs2
 
   let ignored = map packageConfigId $
                    pickPackages pkgs0 [ p | IgnorePackage p <- flags ]
@@ -558,6 +538,16 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
 
   let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
 
+      ipid_map = listToFM [ (installedPackageId p, packageConfigId p)
+                          | p <- pkgs ]
+
+      lookupIPID ipid@(InstalledPackageId str)
+         | Just pid <- lookupFM ipid_map ipid = return pid
+         | otherwise                          = missingPackageErr str
+
+  preload2 <- mapM lookupIPID preload1
+
+  let
       -- add base & rts to the preload packages
       basicLinkedPackages
        | dopt Opt_AutoLinkPackages dflags
@@ -566,19 +556,20 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
       -- but in any case remove the current package from the set of
       -- preloaded packages so that base/rts does not end up in the
       -- set up preloaded package when we are just building it
-      preload2 = nub (filter (/= new_this_pkg)
-		             (basicLinkedPackages ++ map mkPackageId preload1))
+      preload3 = nub $ filter (/= this_package)
+                     $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
-  dep_preload <- closeDeps pkg_db (zip preload2 (repeat Nothing))
+  dep_preload <- closeDeps pkg_db ipid_map (zip preload3 (repeat Nothing))
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let pstate = PackageState{ preloadPackages     = dep_preload,
 		             pkgIdMap   	 = pkg_db,
-		             moduleToPkgConfAll  = mkModuleMap pkg_db
+		             moduleToPkgConfAll  = mkModuleMap pkg_db,
+                             installedPackageIdMap = ipid_map
 		           }
 
-  return (pstate, new_dep_preload, new_this_pkg)
+  return (pstate, new_dep_preload, this_package)
 
 
 -- -----------------------------------------------------------------------------
@@ -697,31 +688,39 @@ getPreloadPackagesAnd dflags pkgids =
   let 
       state   = pkgState dflags
       pkg_map = pkgIdMap state
+      ipid_map = installedPackageIdMap state
       preload = preloadPackages state
       pairs = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr (foldM (add_package pkg_map) preload pairs)
+  all_pkgs <- throwErr (foldM (add_package pkg_map ipid_map) preload pairs)
   return (map (getPackageDetails state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
-closeDeps :: PackageConfigMap -> [(PackageId, Maybe PackageId)]
-        -> IO [PackageId]
-closeDeps pkg_map ps = throwErr (closeDepsErr pkg_map ps)
+closeDeps :: PackageConfigMap
+          -> FiniteMap InstalledPackageId PackageId
+          -> [(PackageId, Maybe PackageId)]
+          -> IO [PackageId]
+closeDeps pkg_map ipid_map ps = throwErr (closeDepsErr pkg_map ipid_map ps)
 
 throwErr :: MaybeErr Message a -> IO a
 throwErr m = case m of
 		Failed e    -> ghcError (CmdLineError (showSDoc e))
 		Succeeded r -> return r
 
-closeDepsErr :: PackageConfigMap -> [(PackageId,Maybe PackageId)]
-	-> MaybeErr Message [PackageId]
-closeDepsErr pkg_map ps = foldM (add_package pkg_map) [] ps
+closeDepsErr :: PackageConfigMap
+             -> FiniteMap InstalledPackageId PackageId
+             -> [(PackageId,Maybe PackageId)]
+             -> MaybeErr Message [PackageId]
+closeDepsErr pkg_map ipid_map ps = foldM (add_package pkg_map ipid_map) [] ps
 
 -- internal helper
-add_package :: PackageConfigMap -> [PackageId] -> (PackageId,Maybe PackageId)
-	-> MaybeErr Message [PackageId]
-add_package pkg_db ps (p, mb_parent)
+add_package :: PackageConfigMap 
+            -> FiniteMap InstalledPackageId PackageId
+            -> [PackageId]
+            -> (PackageId,Maybe PackageId)
+            -> MaybeErr Message [PackageId]
+add_package pkg_db ipid_map ps (p, mb_parent)
   | p `elem` ps = return ps	-- Check if we've already added this package
   | otherwise =
       case lookupPackage pkg_db p of
@@ -729,11 +728,16 @@ add_package pkg_db ps (p, mb_parent)
                            missingDependencyMsg mb_parent)
         Just pkg -> do
     	   -- Add the package's dependents also
-	   let deps = map mkPackageId (depends pkg)
-    	   ps' <- foldM (add_package pkg_db) ps (zip deps (repeat (Just p)))
+    	   ps' <- foldM add_package_ipid ps (depends pkg)
     	   return (p : ps')
+          where
+            add_package_ipid ps ipid@(InstalledPackageId str)
+              | Just pid <- lookupFM ipid_map ipid
+              = add_package pkg_db ipid_map ps (pid, Just p)
+              | otherwise
+              = Failed (missingPackageMsg str <> missingDependencyMsg mb_parent)
 
-missingPackageErr :: String -> IO [PackageConfig]
+missingPackageErr :: String -> IO a
 missingPackageErr p = ghcError (CmdLineError (showSDoc (missingPackageMsg p)))
 
 missingPackageMsg :: String -> SDoc

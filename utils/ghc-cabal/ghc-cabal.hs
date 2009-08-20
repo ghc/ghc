@@ -25,6 +25,7 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
+import Data.Char
 
 main :: IO ()
 main = do args <- getArgs
@@ -208,9 +209,11 @@ generate config_args distdir directory
           (Nothing, Nothing) -> return ()
           (Just lib, Just clbi) -> do
               cwd <- getCurrentDirectory
+              let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
               let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                          pd lib lbi clbi
-                  content = Installed.showInstalledPackageInfo installedPkgInfo ++ "\n"
+                  final_ipi = installedPkgInfo{ Installed.installedPackageId = ipid }
+                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
               writeFileAtomic (distdir </> "inplace-pkg-config") content
           _ -> error "Inconsistent lib components; can't happen?"
 
@@ -242,16 +245,19 @@ generate config_args distdir directory
           -- stricter than gnu ld). Thus we remove the ldOptions for
           -- GHC's rts package:
           hackRtsPackage index =
-            case PackageIndex.lookupPackageName index (PackageName "rts") of
-              [rts] -> PackageIndex.insert rts { Installed.ldOptions = [] } index
+            case PackageIndex.lookupInstalledPackageByName index (PackageName "rts") of
+              [rts] -> PackageIndex.addToInstalledPackageIndex rts { Installed.ldOptions = [] } index
               _ -> error "No (or multiple) ghc rts package is registered!!"
+
+          dep_ids = map (packageId.getLocalPackageInfo lbi) $
+                       externalPackageDeps lbi
 
       let variablePrefix = directory ++ '_':distdir
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
-                variablePrefix ++ "_DEPS = " ++ unwords (map display (externalPackageDeps lbi)),
-                variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) (externalPackageDeps lbi)),
+                variablePrefix ++ "_DEPS = " ++ unwords (map display dep_ids),
+                variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) dep_ids),
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),

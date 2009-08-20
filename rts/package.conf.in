@@ -5,6 +5,7 @@
 
 name:		rts
 version:	1.0
+id:             builtin:rts
 license:	BSD3
 maintainer:	glasgow-haskell-users@haskell.org
 exposed:	True
@@ -55,7 +56,7 @@ include-dirs:		TOP"/includes"
 #endif
 
 includes:		Stg.h
-depends:	 	ffi-1.0
+depends:	 	builtin:ffi
 hugs-options:
 cc-options:
 

@@ -81,8 +81,12 @@ field	:: { PackageConfig -> PackageConfig }
 		   	_         -> happyError }
 		}
 
-	| VARID '=' CONID STRING	{ id }
-		-- another case of license
+	| VARID '=' CONID STRING
+		{ \p -> case unpackFS $1 of
+                          "installedPackageId" ->
+                              p{installedPackageId = InstalledPackageId (unpackFS $4)}
+			  _ -> p -- another case of license
+		}
 
 	| VARID '=' strlist		
 	{\p -> case unpackFS $1 of
@@ -107,7 +111,7 @@ field	:: { PackageConfig -> PackageConfig }
 		_ -> p
 	}
 
-	| VARID '=' pkgidlist
+	| VARID '=' ipidlist
 		{% case unpackFS $1 of
 		        "depends"     -> return (\p -> p{depends = $3})
 			_             -> happyError
@@ -129,13 +133,20 @@ version :: { Version }
 			{ Version{ versionBranch=$5, 
                                    versionTags=map unpackFS $9 } }
 
-pkgidlist :: { [PackageIdentifier] }
-	: '[' pkgids ']'		{ $2 }
+ipid    :: { InstalledPackageId }
+        : CONID STRING
+            {% case unpackFS $1 of
+               "InstalledPackageId" -> return (InstalledPackageId (unpackFS $2))
+               _ -> happyError
+            }
+
+ipidlist :: { [InstalledPackageId] }
+	: '[' ipids ']'		{ $2 }
 	-- empty list case is covered by strlist, to avoid conflicts
 
-pkgids	:: { [PackageIdentifier] }
-	: pkgid				{ [ $1 ] }
-	| pkgid ',' pkgids		{ $1 : $3 }
+ipids	:: { [InstalledPackageId] }
+	: ipid				{ [ $1 ] }
+	| ipid ',' ipids                { $1 : $3 }
 
 intlist :: { [Int] }
         : '[' ']'			{ [] }
