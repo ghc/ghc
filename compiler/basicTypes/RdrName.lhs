@@ -40,7 +40,7 @@ module RdrName (
 	showRdrName,
 
 	-- * Local mapping of 'RdrName' to 'Name.Name'
-	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv,
+	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
 	lookupLocalRdrEnv, lookupLocalRdrOcc, elemLocalRdrEnv,
 
 	-- * Global mapping of 'RdrName' to 'GlobalRdrElt's
@@ -48,7 +48,7 @@ module RdrName (
 	lookupGlobalRdrEnv, extendGlobalRdrEnv,
 	pprGlobalRdrEnv, globalRdrEnvElts,
 	lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
-        hideSomeUnquals, findLocalDupsRdrEnv,
+        hideSomeUnquals, findLocalDupsRdrEnv, pickGREs,
 
 	-- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
 	GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
@@ -316,8 +316,12 @@ type LocalRdrEnv = OccEnv Name
 emptyLocalRdrEnv :: LocalRdrEnv
 emptyLocalRdrEnv = emptyOccEnv
 
-extendLocalRdrEnv :: LocalRdrEnv -> [Name] -> LocalRdrEnv
-extendLocalRdrEnv env names
+extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
+extendLocalRdrEnv env name
+  = extendOccEnv env (nameOccName name) name
+
+extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendLocalRdrEnvList env names
   = extendOccEnvList env [(nameOccName n, n) | n <- names]
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
@@ -474,7 +478,7 @@ pickGREs rdr_name gres
     pick :: GlobalRdrElt -> Maybe GlobalRdrElt
     pick gre@(GRE {gre_prov = LocalDef, gre_name = n}) 	-- Local def
 	| rdr_is_unqual		 	   = Just gre
-	| Just (mod,_) <- rdr_is_qual 	      	-- Qualified name
+	| Just (mod,_) <- rdr_is_qual 	     -- Qualified name
 	, Just n_mod <- nameModule_maybe n   -- Binder is External
 	, mod == moduleName n_mod  	   = Just gre
 	| otherwise 			   = Nothing

@@ -628,7 +628,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
                                                    unwrap_ty res_pat
 
 	  -- Add the stupid theta
-	; addDataConStupidTheta data_con ctxt_res_tys
+	; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
 	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	
                      -- Get location from monad, not from ex_tvs

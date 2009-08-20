@@ -11,14 +11,13 @@ free variables.
 
 \begin{code}
 module RnPat (-- main entry points
-              rnPatsAndThen_LocalRightwards, rnBindPat,
+              rnPats, rnBindPat,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
                                              --   sometimes we want to make top (qualified) names.
 
-              rnHsRecFields_Con, rnHsRecFields_Update, --rename record fields in a constructor
-                                                       --and in an update
+              rnHsRecFields1, HsRecFieldContext(..),
 
 	      -- Literals
 	      rnLit, rnOverLit,     
@@ -49,446 +48,487 @@ import PrelNames
 import Constants	( mAX_TUPLE_SIZE )
 import Name
 import NameSet
+import Module
 import RdrName
 import ListSetOps	( removeDups, minusList )
 import Outputable
 import SrcLoc
 import FastString
 import Literal		( inCharRange )
+import Control.Monad	( when )
 \end{code}
 
 
 %*********************************************************
 %*							*
-\subsection{Patterns}
+	The CpsRn Monad
 %*							*
 %*********************************************************
 
+Note [CpsRn monad]
+~~~~~~~~~~~~~~~~~~
+The CpsRn monad uses continuation-passing style to support this
+style of programming:
+
+	do { ...
+           ; ns <- bindNames rs
+           ; ...blah... }
+
+   where rs::[RdrName], ns::[Name]
+
+The idea is that '...blah...' 
+  a) sees the bindings of ns
+  b) returns the free variables it mentions
+     so that bindNames can report unused ones
+
+In particular, 
+    mapM rnPatAndThen [p1, p2, p3]
+has a *left-to-right* scoping: it makes the binders in 
+p1 scope over p2,p3.
+
 \begin{code}
--- externally abstract type of name makers,
--- which is how you go from a RdrName to a Name
-data NameMaker = NM (forall a. Located RdrName -> (Name -> RnM (a, FreeVars))
-			                       -> RnM (a, FreeVars))
+newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
+                                            -> RnM (r, FreeVars) }
+	-- See Note [CpsRn monad]
+
+instance Monad CpsRn where
+  return x = CpsRn (\k -> k x)
+  (CpsRn m) >>= mk = CpsRn (\k -> m (\v -> unCpsRn (mk v) k))
+
+runCps :: CpsRn a -> RnM (a, FreeVars)
+runCps (CpsRn m) = m (\r -> return (r, emptyFVs))
+
+liftCps :: RnM a -> CpsRn a
+liftCps rn_thing = CpsRn (\k -> rn_thing >>= k)
+
+liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
+liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
+                                     ; (r,fvs2) <- k v
+                                     ; return (r, fvs1 `plusFV` fvs2) })
+
+wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
+-- Set the location, and also wrap it around the value returned
+wrapSrcSpanCps fn (L loc a)
+  = CpsRn (\k -> setSrcSpan loc $ 
+                 unCpsRn (fn a) $ \v -> 
+                 k (L loc v))
+
+lookupConCps :: Located RdrName -> CpsRn (Located Name)
+lookupConCps con_rdr 
+  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
+                    ; (r, fvs) <- k con_name
+                    ; return (r, fvs `plusFV` unitFV (unLoc con_name)) })
+\end{code}
+
+%*********************************************************
+%*							*
+	Name makers
+%*							*
+%*********************************************************
+
+Externally abstract type of name makers,
+which is how you go from a RdrName to a Name
+
+\begin{code}
+data NameMaker 
+  = LamMk 	-- Lambdas 
+      Bool	-- True <=> report unused bindings
+
+  | LetMk       -- Let bindings, incl top level
+		-- Do not check for unused bindings
+      (Maybe Module)   -- Just m  => top level of module m
+                       -- Nothing => not top level
+      MiniFixityEnv
+
+topRecNameMaker :: Module -> MiniFixityEnv -> NameMaker
+topRecNameMaker mod fix_env = LetMk (Just mod) fix_env
+
+localRecNameMaker :: MiniFixityEnv -> NameMaker
+localRecNameMaker fix_env = LetMk Nothing fix_env 
 
 matchNameMaker :: NameMaker
-matchNameMaker
-  = NM (\ rdr_name thing_inside -> 
-	do { names@[name] <- newLocalsRn [rdr_name]
-	   ; bindLocalNamesFV names $ do
-	   { (res, fvs) <- thing_inside name
-	   ; warnUnusedMatches names fvs
-	   ; return (res, fvs) }})
+matchNameMaker = LamMk True
+
+newName :: NameMaker -> Located RdrName -> CpsRn Name
+newName (LamMk report_unused) rdr_name
+  = CpsRn (\ thing_inside -> 
+	do { name <- newLocalBndrRn rdr_name
+	   ; (res, fvs) <- bindLocalName name (thing_inside name)
+	   ; when report_unused $ warnUnusedMatches [name] fvs
+	   ; return (res, name `delFV` fvs) })
+
+newName (LetMk mb_top fix_env) rdr_name
+  = CpsRn (\ thing_inside -> 
+        do { name <- case mb_top of
+                       Nothing  -> newLocalBndrRn rdr_name
+                       Just mod -> newTopSrcBinder mod rdr_name
+	   ; bindLocalNamesFV_WithFixities [name] fix_env $
+	     thing_inside name })
 			  
-topRecNameMaker, localRecNameMaker
-  :: MiniFixityEnv -> NameMaker
-
--- topNameMaker and localBindMaker do not check for unused binding
-localRecNameMaker fix_env
-  = NM (\ rdr_name thing_inside -> 
-	do { [name] <- newLocalsRn [rdr_name]
-	   ; bindLocalNamesFV_WithFixities [name] fix_env $
-	     thing_inside name })
-  
-topRecNameMaker fix_env
-  = NM (\rdr_name thing_inside -> 
-        do { mod <- getModule
-           ; name <- newTopSrcBinder mod rdr_name
-	   ; bindLocalNamesFV_WithFixities [name] fix_env $
-	     thing_inside name })
-	        -- Note: the bindLocalNamesFV_WithFixities is somewhat suspicious 
-        	--       because it binds a top-level name as a local name.
-	        --       however, this binding seems to work, and it only exists for
-	        --       the duration of the patterns and the continuation;
-	        --       then the top-level name is added to the global env
-	        --       before going on to the RHSes (see RnSource.lhs).
-
-applyNameMaker :: NameMaker -> Located RdrName
-	       -> (Name -> RnM (a,FreeVars)) -> RnM (a, FreeVars)
-applyNameMaker (NM f) = f
+    -- Note: the bindLocalNamesFV_WithFixities is somewhat suspicious 
+    --       because it binds a top-level name as a local name.
+    --       however, this binding seems to work, and it only exists for
+    --       the duration of the patterns and the continuation;
+    --       then the top-level name is added to the global env
+    --       before going on to the RHSes (see RnSource.lhs).
+\end{code}
 
 
--- There are various entry points to renaming patterns, depending on
---  (1) whether the names created should be top-level names or local names
---  (2) whether the scope of the names is entirely given in a continuation
---      (e.g., in a case or lambda, but not in a let or at the top-level,
---       because of the way mutually recursive bindings are handled)
---  (3) whether the a type signature in the pattern can bind 
---	lexically-scoped type variables (for unpacking existential 
---	type vars in data constructors)
---  (4) whether we do duplicate and unused variable checking
---  (5) whether there are fixity declarations associated with the names
---      bound by the patterns that need to be brought into scope with them.
---      
---  Rather than burdening the clients of this module with all of these choices,
---  we export the three points in this design space that we actually need:
+%*********************************************************
+%*							*
+	External entry points
+%*							*
+%*********************************************************
 
--- entry point 1:
--- binds local names; the scope of the bindings is entirely in the thing_inside
---   allows type sigs to bind type vars
---   local namemaker
---   unused and duplicate checking
---   no fixities
-rnPatsAndThen_LocalRightwards :: HsMatchContext Name -- for error messages
-                              -> [LPat RdrName] 
-                              -- the continuation gets:
-                              --    the list of renamed patterns
-                              --    the (overall) free vars of all of them
-                              -> ([LPat Name] -> RnM (a, FreeVars))
-                              -> RnM (a, FreeVars)
+There are various entry points to renaming patterns, depending on
+ (1) whether the names created should be top-level names or local names
+ (2) whether the scope of the names is entirely given in a continuation
+     (e.g., in a case or lambda, but not in a let or at the top-level,
+      because of the way mutually recursive bindings are handled)
+ (3) whether the a type signature in the pattern can bind 
+	lexically-scoped type variables (for unpacking existential 
+	type vars in data constructors)
+ (4) whether we do duplicate and unused variable checking
+ (5) whether there are fixity declarations associated with the names
+     bound by the patterns that need to be brought into scope with them.
+     
+ Rather than burdening the clients of this module with all of these choices,
+ we export the three points in this design space that we actually need:
 
-rnPatsAndThen_LocalRightwards ctxt pats thing_inside
+\begin{code}
+-- ----------- Entry point 1: rnPats -------------------
+-- Binds local names; the scope of the bindings is entirely in the thing_inside
+--   * allows type sigs to bind type vars
+--   * local namemaker
+--   * unused and duplicate checking
+--   * no fixities
+rnPats :: HsMatchContext Name -- for error messages
+       -> [LPat RdrName] 
+       -> ([LPat Name] -> RnM (a, FreeVars))
+       -> RnM (a, FreeVars)
+rnPats ctxt pats thing_inside
   = do	{ envs_before <- getRdrEnvs
 
 	  -- (0) bring into scope all of the type variables bound by the patterns
 	  -- (1) rename the patterns, bringing into scope all of the term variables
 	  -- (2) then do the thing inside.
 	; bindPatSigTyVarsFV (collectSigTysFromPats pats) $ 
-	  rnLPatsAndThen matchNameMaker pats	$ \ pats' ->
-            do { -- Check for duplicated and shadowed names 
+	  unCpsRn (rnLPatsAndThen matchNameMaker pats)	  $ \ pats' -> do
+        { -- Check for duplicated and shadowed names 
 	         -- Because we don't bind the vars all at once, we can't
 	         -- 	check incrementally for duplicates; 
 	         -- Nor can we check incrementally for shadowing, else we'll
 	         -- 	complain *twice* about duplicates e.g. f (x,x) = ...
-            ; let names = collectPatsBinders pats'
-            ; checkDupNames doc_pat names
-	    ; checkShadowedNames doc_pat envs_before
-				 [(nameSrcSpan name, nameOccName name) | name <- names]
-            ; thing_inside pats' } }
+        ; let names = collectPatsBinders pats'
+        ; checkDupNames doc_pat names
+	; checkShadowedNames doc_pat envs_before
+			     [(nameSrcSpan name, nameOccName name) | name <- names]
+        ; thing_inside pats' } }
   where
     doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt
 
 
--- entry point 2:
--- binds local names; in a recursive scope that involves other bound vars
+applyNameMaker :: NameMaker -> Located RdrName -> RnM Name
+applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newName mk rdr); return n }
+
+-- ----------- Entry point 2: rnBindPat -------------------
+-- Binds local names; in a recursive scope that involves other bound vars
 --	e.g let { (x, Just y) = e1; ... } in ...
---   does NOT allows type sig to bind type vars
---   local namemaker
---   no unused and duplicate checking
---   fixities might be coming in
+--   * does NOT allows type sig to bind type vars
+--   * local namemaker
+--   * no unused and duplicate checking
+--   * fixities might be coming in
 rnBindPat :: NameMaker
           -> LPat RdrName
-          -> RnM (LPat Name, 
-                       -- free variables of the pattern,
-                       -- but not including variables bound by this pattern 
-                   FreeVars)
+          -> RnM (LPat Name, FreeVars)
+   -- Returned FreeVars are the free variables of the pattern,
+   -- of course excluding variables bound by this pattern 
 
-rnBindPat name_maker pat
-  = rnLPatsAndThen name_maker [pat] $ \ [pat'] ->
-    return (pat', emptyFVs)
+rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
+\end{code}
 
 
--- general version: parametrized by how you make new names
--- invariant: what-to-do continuation only gets called with a list whose length is the same as
---            the part of the pattern we're currently renaming
-rnLPatsAndThen :: NameMaker -- how to make a new variable
-               -> [LPat RdrName]   -- part of pattern we're currently renaming
-               -> ([LPat Name] -> RnM (a, FreeVars)) -- what to do afterwards
-               -> RnM (a, FreeVars) -- renaming of the whole thing
-               
-rnLPatsAndThen var = mapFvRnCPS (rnLPatAndThen var)
+%*********************************************************
+%*							*
+	The main event
+%*							*
+%*********************************************************
 
+\begin{code}
+-- ----------- Entry point 3: rnLPatAndThen -------------------
+-- General version: parametrized by how you make new names
 
--- the workhorse
-rnLPatAndThen :: NameMaker
-              -> LPat RdrName   -- part of pattern we're currently renaming
-              -> (LPat Name -> RnM (a, FreeVars)) -- what to do afterwards
-              -> RnM (a, FreeVars) -- renaming of the whole thing
-rnLPatAndThen var@(NM varf) (L loc p) cont = 
-    setSrcSpan loc $ 
-      let reloc = L loc 
-          lcont = \ unlocated -> cont (reloc unlocated)
-      in
-       case p of
-         WildPat _   -> lcont (WildPat placeHolderType)
+rnLPatsAndThen :: NameMaker -> [LPat RdrName] -> CpsRn [LPat Name]
+rnLPatsAndThen mk = mapM (rnLPatAndThen mk)
+  -- Despite the map, the monad ensures that each pattern binds
+  -- variables that may be mentioned in subsequent patterns in the list
 
-         ParPat pat  -> rnLPatAndThen var pat $ \ pat' -> lcont (ParPat pat')
-         LazyPat pat -> rnLPatAndThen var pat $ \ pat' -> lcont (LazyPat pat')
-         BangPat pat -> rnLPatAndThen var pat $ \ pat' -> lcont (BangPat pat')
-         
-         VarPat name -> 
-	    varf (reloc name) $ \ newBoundName -> 
-	    lcont (VarPat newBoundName)
-               -- we need to bind pattern variables for view pattern expressions
-               -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
+--------------------
+-- The workhorse
+rnLPatAndThen :: NameMaker -> LPat RdrName -> CpsRn (LPat Name)
+rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
+
+rnPatAndThen :: NameMaker -> Pat RdrName -> CpsRn (Pat Name)
+rnPatAndThen _  (WildPat _)   = return (WildPat placeHolderType)
+rnPatAndThen mk (ParPat pat)  = do { pat' <- rnLPatAndThen mk pat; return (ParPat pat') }
+rnPatAndThen mk (LazyPat pat) = do { pat' <- rnLPatAndThen mk pat; return (LazyPat pat') }
+rnPatAndThen mk (BangPat pat) = do { pat' <- rnLPatAndThen mk pat; return (BangPat pat') }
+rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
+                                   ; name <- newName mk (L loc rdr)
+                                   ; return (VarPat name) }
+     -- we need to bind pattern variables for view pattern expressions
+     -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
                                      
-         SigPatIn pat ty -> do
-             patsigs <- doptM Opt_ScopedTypeVariables
-             if patsigs
-              then rnLPatAndThen var pat
-                      (\ pat' -> do { (ty', fvs1) <- rnHsTypeFVs tvdoc ty
-				    ; (res, fvs2) <- lcont (SigPatIn pat' ty')
-				    ; return (res, fvs1 `plusFV` fvs2) })
-              else do addErr (patSigErr ty)
-                      rnLPatAndThen var pat cont
-           where
-             tvdoc = text "In a pattern type-signature"
+rnPatAndThen mk (SigPatIn pat ty)
+  = do { patsigs <- liftCps (doptM Opt_ScopedTypeVariables)
+       ; if patsigs
+         then do { pat' <- rnLPatAndThen mk pat
+                 ; ty' <- liftCpsFV (rnHsTypeFVs tvdoc ty)
+		 ; return (SigPatIn pat' ty') }
+         else do { liftCps (addErr (patSigErr ty))
+                 ; rnPatAndThen mk (unLoc pat) } }
+  where
+    tvdoc = text "In a pattern type-signature"
        
-         LitPat lit@(HsString s) -> 
-             do ovlStr <- doptM Opt_OverloadedStrings
-                if ovlStr 
-                 then rnLPatAndThen var (reloc $ mkNPat (mkHsIsString s placeHolderType) Nothing) cont
-                 else do { rnLit lit; lcont (LitPat lit) }   -- Same as below
-      
-         LitPat lit -> do { rnLit lit; lcont (LitPat lit) }
+rnPatAndThen mk (LitPat lit)
+  | HsString s <- lit
+  = do { ovlStr <- liftCps (doptM Opt_OverloadedStrings)
+       ; if ovlStr 
+         then rnPatAndThen mk (mkNPat (mkHsIsString s placeHolderType) Nothing)
+         else normal_lit }
+  | otherwise = normal_lit
+  where
+    normal_lit = do { liftCps (rnLit lit); return (LitPat lit) }
 
-         NPat lit mb_neg _eq ->
-           do { (lit', fvs1) <- rnOverLit lit
-	      ;	(mb_neg', fvs2) <- case mb_neg of
-			             Nothing -> return (Nothing, emptyFVs)
-			             Just _  -> do { (neg, fvs) <- lookupSyntaxName negateName
-						   ; return (Just neg, fvs) }
-	      ; (eq', fvs3) <- lookupSyntaxName eqName
-	      ; (res, fvs4) <- lcont (NPat lit' mb_neg' eq')
-	      ; return (res, fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
-	       	-- Needed to find equality on pattern
+rnPatAndThen _ (NPat lit mb_neg _eq)
+  = do { lit'    <- liftCpsFV $ rnOverLit lit
+       ; mb_neg' <- liftCpsFV $ case mb_neg of
+		      Nothing -> return (Nothing, emptyFVs)
+		      Just _  -> do { (neg, fvs) <- lookupSyntaxName negateName
+				    ; return (Just neg, fvs) }
+       ; eq' <- liftCpsFV $ lookupSyntaxName eqName
+       ; return (NPat lit' mb_neg' eq') }
 
-         NPlusKPat name lit _ _ ->
-   	   varf name $ \ new_name ->
-	   do { (lit', fvs1) <- rnOverLit lit
-  	      ; (minus, fvs2) <- lookupSyntaxName minusName
-              ; (ge, fvs3) <- lookupSyntaxName geName
-              ; (res, fvs4) <- lcont (NPlusKPat (L (nameSrcSpan new_name) new_name) lit' ge minus)
-	      ; return (res, fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
+rnPatAndThen mk (NPlusKPat rdr lit _ _)
+  = do { new_name <- newName mk rdr
+       ; lit'  <- liftCpsFV $ rnOverLit lit
+       ; minus <- liftCpsFV $ lookupSyntaxName minusName
+       ; ge    <- liftCpsFV $ lookupSyntaxName geName
+       ; return (NPlusKPat (L (nameSrcSpan new_name) new_name) lit' ge minus) }
 	   	-- The Report says that n+k patterns must be in Integral
 
-         AsPat name pat ->
-   	   varf name $ \ new_name ->
-           rnLPatAndThen var pat $ \ pat' -> 
-           lcont (AsPat (L (nameSrcSpan new_name) new_name) pat')
+rnPatAndThen mk (AsPat rdr pat)
+  = do { new_name <- newName mk rdr
+       ; pat' <- rnLPatAndThen mk pat
+       ; return (AsPat (L (nameSrcSpan new_name) new_name) pat') }
 
-         ViewPat expr pat ty -> 
-	   do { vp_flag <- doptM Opt_ViewPatterns
-              ; checkErr vp_flag (badViewPat p)
-                -- because of the way we're arranging the recursive calls,
-                -- this will be in the right context 
-              ; (expr', fv_expr) <- rnLExpr expr 
-              ; (res, fvs_res) <- rnLPatAndThen var pat $ \ pat' ->
-		                  lcont (ViewPat expr' pat' ty)
-	      ; return (res, fvs_res `plusFV` fv_expr) }
+rnPatAndThen mk p@(ViewPat expr pat ty)
+  = do { liftCps $ do { vp_flag <- doptM Opt_ViewPatterns
+                      ; checkErr vp_flag (badViewPat p) }
+         -- Because of the way we're arranging the recursive calls,
+         -- this will be in the right context 
+       ; expr' <- liftCpsFV $ rnLExpr expr 
+       ; pat' <- rnLPatAndThen mk pat
+       ; return (ViewPat expr' pat' ty) }
+
+rnPatAndThen mk (ConPatIn con stuff)
+   -- rnConPatAndThen takes care of reconstructing the pattern
+  = rnConPatAndThen mk con stuff
+
+rnPatAndThen mk (ListPat pats _)
+  = do { pats' <- rnLPatsAndThen mk pats
+       ; return (ListPat pats' placeHolderType) }
+
+rnPatAndThen mk (PArrPat pats _)
+  = do { pats' <- rnLPatsAndThen mk pats
+       ; return (PArrPat pats' placeHolderType) }
+
+rnPatAndThen mk (TuplePat pats boxed _)
+  = do { liftCps $ checkTupSize (length pats)
+       ; pats' <- rnLPatsAndThen mk pats
+       ; return (TuplePat pats' boxed placeHolderType) }
+
+rnPatAndThen _ (TypePat ty)
+  = do { ty' <- liftCpsFV $ rnHsTypeFVs (text "In a type pattern") ty
+       ; return (TypePat ty') }
 
 #ifndef GHCI
-         (QuasiQuotePat _) -> pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
+rnPatAndThen _ p@(QuasiQuotePat {}) 
+  = pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
 #else
-         QuasiQuotePat qq -> do
-             (qq', _) <- rnQuasiQuote qq
-             pat' <- runQuasiQuotePat qq'
-             rnLPatAndThen var pat' $ \ (L _ pat'') ->
-                 lcont pat''
+rnPatAndThen mk (QuasiQuotePat qq)
+  = do { qq' <- liftCpsFV $ rnQuasiQuote qq
+       ; pat <- liftCps $ runQuasiQuotePat qq'
+       ; L _ pat' <- rnLPatAndThen mk pat
+       ; return pat' }
 #endif 	/* GHCI */
 
-         ConPatIn con stuff -> 
-             -- rnConPatAndThen takes care of reconstructing the pattern
-             rnConPatAndThen var con stuff cont
-
-         ListPat pats _ -> 
-           rnLPatsAndThen var pats $ \ patslist ->
-               lcont (ListPat patslist placeHolderType)
-
-         PArrPat pats _ -> 
-	   do { (res, res_fvs) <- rnLPatsAndThen var pats $ \ patslist ->
-			          lcont (PArrPat patslist placeHolderType)
-	      ; return (res, res_fvs `plusFV` implicit_fvs) }
-           where
-             implicit_fvs = mkFVs [lengthPName, indexPName]
-
-         TuplePat pats boxed _ -> 
-           do { checkTupSize (length pats)
-              ; rnLPatsAndThen var pats $ \ patslist ->
-                lcont (TuplePat patslist boxed placeHolderType) }
-
-         TypePat ty -> 
-           do { (ty', fvs1) <- rnHsTypeFVs (text "In a type pattern") ty
-	      ; (res, fvs2) <- lcont (TypePat ty')
-	      ; return (res, fvs1 `plusFV` fvs2) }
-
-         p -> pprPanic "rnLPatAndThen" (ppr p)
+rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 
 
--- helper for renaming constructor patterns
+--------------------
 rnConPatAndThen :: NameMaker
                 -> Located RdrName          -- the constructor
                 -> HsConPatDetails RdrName 
-                -> (LPat Name -> RnM (a, FreeVars)) -- what to do afterwards
-                -> RnM (a, FreeVars)
+                -> CpsRn (Pat Name)
 
-rnConPatAndThen var (con@(L loc _)) (PrefixCon pats) cont
-  = do	{ con' <- lookupLocatedOccRn con
-	; (res, res_fvs) <- rnLPatsAndThen var pats $ \ pats' ->
-		            cont (L loc $ ConPatIn con' (PrefixCon pats'))
-        ; return (res, res_fvs `addOneFV` unLoc con') }
+rnConPatAndThen mk con (PrefixCon pats)
+  = do	{ con' <- lookupConCps con
+	; pats' <- rnLPatsAndThen mk pats
+	; return (ConPatIn con' (PrefixCon pats')) }
 
-rnConPatAndThen var (con@(L loc _)) (InfixCon pat1 pat2) cont
-  = do	{ con' <- lookupLocatedOccRn con
-   	; (res, res_fvs) <- rnLPatAndThen var pat1 $ \ pat1' -> 
-			    rnLPatAndThen var pat2 $ \ pat2' ->
-			    do { fixity <- lookupFixityRn (unLoc con')
-		               ; pat' <- mkConOpPatRn con' fixity pat1' pat2'
-			       ; cont (L loc pat') }
-        ; return (res, res_fvs `addOneFV` unLoc con') }
+rnConPatAndThen mk con (InfixCon pat1 pat2)
+  = do	{ con' <- lookupConCps con
+   	; pat1' <- rnLPatAndThen mk pat1
+	; pat2' <- rnLPatAndThen mk pat2
+	; fixity <- liftCps $ lookupFixityRn (unLoc con')
+	; liftCps $ mkConOpPatRn con' fixity pat1' pat2' }
 
-rnConPatAndThen var (con@(L loc _)) (RecCon rpats) cont
-  = do	{ con' <- lookupLocatedOccRn con
-  	; (res, res_fvs) <- rnHsRecFieldsAndThen_Pattern con' var rpats $ \ rpats' -> 
-			    cont (L loc $ ConPatIn con' (RecCon rpats'))
-        ; return (res, res_fvs `addOneFV` unLoc con') }
+rnConPatAndThen mk con (RecCon rpats)
+  = do	{ con' <- lookupConCps con
+  	; rpats' <- rnHsRecPatsAndThen mk con' rpats
+	; return (ConPatIn con' (RecCon rpats')) }
 
--- what kind of record expression we're doing
--- the first two tell the name of the datatype constructor in question
--- and give a way of creating a variable to fill in a ..
-data RnHsRecFieldsChoice a = Constructor (Located Name) (RdrName -> a)
-                           | Pattern  (Located Name) (RdrName -> a)
-                           | Update
+--------------------
+rnHsRecPatsAndThen :: NameMaker
+                   -> Located Name	-- Constructor
+		   -> HsRecFields RdrName (LPat RdrName)
+		   -> CpsRn (HsRecFields Name (LPat Name))
+rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
+  = do { flds <- liftCpsFV $ rnHsRecFields1 (HsRecFieldPat con) VarPat hs_rec_fields
+       ; flds' <- mapM rn_field (flds `zip` [1..])
+       ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
+  where 
+    rn_field (fld, n') = do { arg' <- rnLPatAndThen (nested_mk dd mk n') 
+                                                    (hsRecFieldArg fld)
+                            ; return (fld { hsRecFieldArg = arg' }) }
 
-choiceToMessage :: RnHsRecFieldsChoice t -> String
-choiceToMessage (Constructor _ _) = "construction"
-choiceToMessage (Pattern _ _) = "pattern"
-choiceToMessage Update = "update"
-
-doDotDot :: RnHsRecFieldsChoice t -> Maybe (Located Name, RdrName -> t)
-doDotDot (Constructor a b) = Just (a,b)
-doDotDot (Pattern a b) = Just (a,b)
-doDotDot Update        = Nothing
-
-getChoiceName :: RnHsRecFieldsChoice field -> Maybe (Located Name)
-getChoiceName (Constructor n _) = Just n
-getChoiceName (Pattern n _) = Just n
-getChoiceName (Update) = Nothing
+	-- Suppress unused-match reporting for fields introduced by ".."
+    nested_mk Nothing  mk                    _  = mk
+    nested_mk (Just _) mk@(LetMk {})         _  = mk
+    nested_mk (Just n) (LamMk report_unused) n' = LamMk (report_unused && (n' <= n))
+\end{code}
 
 
+%************************************************************************
+%*									*
+	Record fields
+%*									*
+%************************************************************************
 
--- helper for renaming record patterns;
--- parameterized so that it can also be used for expressions
-rnHsRecFieldsAndThen :: RnHsRecFieldsChoice field
-                     -- how to rename the fields (CPSed)
-                     -> (Located field -> (Located field' -> RnM (c, FreeVars)) 
-                                       -> RnM (c, FreeVars)) 
-                     -- the actual fields 
-                     -> HsRecFields RdrName (Located field)  
-                     -- what to do in the scope of the field vars
-                     -> (HsRecFields Name (Located field') -> RnM (c, FreeVars)) 
-                     -> RnM (c, FreeVars)
--- Haddock comments for record fields are renamed to Nothing here
-rnHsRecFieldsAndThen choice rn_thing (HsRecFields fields dd) cont = 
-    let
+\begin{code}
+data HsRecFieldContext 
+  = HsRecFieldCon Name
+  | HsRecFieldPat Name
+  | HsRecFieldUpd
 
-        -- helper to collect and report duplicate record fields
-        reportDuplicateFields doingstr fields = 
-            let 
-                -- each list represents a RdrName that occurred more than once
-                -- (the list contains all occurrences)
-                -- invariant: each list in dup_fields is non-empty
-                dup_fields :: [[RdrName]]
-                (_, dup_fields) = removeDups compare
-                                                 (map (unLoc . hsRecFieldId) fields)
-                                             
-                -- duplicate field reporting function
-                field_dup_err dup_group = addErr (dupFieldErr doingstr (head dup_group))
-            in
-              mapM_ field_dup_err dup_fields
+rnHsRecFields1 
+    :: HsRecFieldContext
+    -> (RdrName -> arg) -- When punning, use this to build a new field
+    -> HsRecFields RdrName (Located arg)
+    -> RnM ([HsRecField Name (Located arg)], FreeVars)
 
-        -- helper to rename each field
-        rn_field pun_ok (HsRecField field inside pun) cont = do 
-          fieldname <- lookupRecordBndr (getChoiceName choice) field
-          checkErr (not pun || pun_ok) (badPun field)
-          (res, res_fvs) <- rn_thing inside $ \ inside' -> 
-		            cont (HsRecField fieldname inside' pun) 
-          return (res, res_fvs `addOneFV` unLoc fieldname)
+-- This supprisingly complicated pass
+--   a) looks up the field name (possibly using disambiguation)
+--   b) fills in puns and dot-dot stuff
+-- When we we've finished, we've renamed the LHS, but not the RHS,
+-- of each x=e binding
 
-        -- Compute the extra fields to be filled in by the dot-dot notation
-        dot_dot_fields fs con mk_field cont = do 
-            con_fields <- lookupConstructorFields (unLoc con)
-            let missing_fields = con_fields `minusList` fs
-            loc <- getSrcSpanM	-- Rather approximate
-            -- it's important that we make the RdrName fields that we morally wrote
-            -- and then rename them in the usual manner
-            -- (rather than trying to make the result of renaming directly)
-            -- because, for patterns, renaming can bind vars in the continuation
-            mapFvRnCPS rn_thing 
-             (map (L loc . mk_field . mkRdrUnqual . getOccName) missing_fields) $
-              \ rhss -> 
-                  let new_fs = [ HsRecField (L loc f) r False
-		                 | (f, r) <- missing_fields `zip` rhss ]
-                  in 
-                  cont new_fs
+rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
+  = do { pun_ok      <- doptM Opt_RecordPuns
+       ; disambig_ok <- doptM Opt_DisambiguateRecordFields
+       ; parent <- check_disambiguation disambig_ok mb_con
+       ; flds1 <- mapM (rn_fld pun_ok parent) flds
+       ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
+       ; flds2 <- rn_dotdot dotdot mb_con flds1
+       ; return (flds2, mkFVs (getFieldIds flds2)) }
+  where
+    mb_con = case ctxt of
+		HsRecFieldUpd     -> Nothing
+		HsRecFieldCon con -> Just con
+		HsRecFieldPat con -> Just con
+    doc = case mb_con of
+            Nothing  -> ptext (sLit "constructor field name")
+            Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
 
-   in do
-       -- report duplicate fields
-       let doingstr = choiceToMessage choice
-       reportDuplicateFields doingstr fields
+    name_to_arg (L loc n) = L loc (mk_arg (mkRdrUnqual (nameOccName n)))
 
-       -- rename the records as written
-       -- check whether punning (implicit x=x) is allowed
-       pun_flag <- doptM Opt_RecordPuns
-       -- rename the fields
-       mapFvRnCPS (rn_field pun_flag) fields $ \ fields1 ->
+    rn_fld pun_ok parent (HsRecField { hsRecFieldId = fld
+                       	      	     , hsRecFieldArg = arg
+                       	      	     , hsRecPun = pun })
+      = do { fld' <- lookupLocatedSubBndr parent doc fld
+           ; arg' <- if pun 
+                     then do { checkErr pun_ok (badPun fld)
+                             ; return (name_to_arg fld') }
+                     else return arg
+           ; return (HsRecField { hsRecFieldId = fld'
+                                , hsRecFieldArg = arg'
+                                , hsRecPun = pun }) }
 
-           -- handle ..
-           case dd of
-             Nothing -> cont (HsRecFields fields1 dd)
-             Just n  -> ASSERT( n == length fields ) do
-                          dd_flag <- doptM Opt_RecordWildCards
-                          checkErr dd_flag (needFlagDotDot doingstr)
-                          let fld_names1 = map (unLoc . hsRecFieldId) fields1
-                          case doDotDot choice of 
-                                Nothing -> do addErr (badDotDot doingstr)
-                                              -- we return a junk value here so that error reporting goes on
-                                              cont (HsRecFields fields1 dd)
-                                Just (con, mk_field) ->
-                                    dot_dot_fields fld_names1 con mk_field $
-                                      \ fields2 -> 
-                                          cont (HsRecFields (fields1 ++ fields2) dd)
+    rn_dotdot Nothing _mb_con flds     -- No ".." at all
+      = return flds
+    rn_dotdot (Just {}) Nothing flds   -- ".." on record update
+      = do { addErr (badDotDot ctxt); return flds }
+    rn_dotdot (Just n) (Just con) flds -- ".." on record con/pat
+      = ASSERT( n == length flds )
+        do { loc <- getSrcSpanM	-- Rather approximate
+           ; dd_flag <- doptM Opt_RecordWildCards
+           ; checkErr dd_flag (needFlagDotDot ctxt)
 
-needFlagDotDot :: String -> SDoc
-needFlagDotDot str = vcat [ptext (sLit "Illegal `..' in record") <+> text str,
-			  ptext (sLit "Use -XRecordWildCards to permit this")]
+           ; con_fields <- lookupConstructorFields con
+           ; let present_flds = getFieldIds flds
+                 absent_flds  = con_fields `minusList` present_flds
+                 extras = [ HsRecField
+                              { hsRecFieldId = L loc f
+                              , hsRecFieldArg = name_to_arg (L loc f)
+                              , hsRecPun = True }
+                          | f <- absent_flds ]
 
-badDotDot :: String -> SDoc
-badDotDot str = ptext (sLit "You cannot use `..' in record") <+> text str
+           ; return (flds ++ extras) }
+
+    check_disambiguation :: Bool -> Maybe Name -> RnM Parent
+    -- When disambiguation is on, return the parent *type constructor*
+    -- That is, the parent of the data constructor.  That's the parent
+    -- to use for looking up record fields.
+    check_disambiguation disambig_ok mb_con
+      | disambig_ok, Just con <- mb_con
+      = do { env <- getGlobalRdrEnv
+           ; return (case lookupGRE_Name env con of
+	       	       [gre] -> gre_par gre
+               	       gres  -> WARN( True, ppr con <+> ppr gres ) NoParent) }
+      | otherwise = return NoParent
+ 
+    dup_flds :: [[RdrName]]
+        -- Each list represents a RdrName that occurred more than once
+        -- (the list contains all occurrences)
+        -- Each list in dup_fields is non-empty
+    (_, dup_flds) = removeDups compare (getFieldIds flds)
+
+getFieldIds :: [HsRecField id arg] -> [id]
+getFieldIds flds = map (unLoc . hsRecFieldId) flds
+
+needFlagDotDot :: HsRecFieldContext -> SDoc
+needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,
+			    ptext (sLit "Use -XRecordWildCards to permit this")]
+
+badDotDot :: HsRecFieldContext -> SDoc
+badDotDot ctxt = ptext (sLit "You cannot use `..' in a record") <+> pprRFC ctxt
 
 badPun :: Located RdrName -> SDoc
 badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
 		   ptext (sLit "Use -XNamedFieldPuns to permit this")]
 
+dupFieldErr :: HsRecFieldContext -> [RdrName] -> SDoc
+dupFieldErr ctxt dups
+  = hsep [ptext (sLit "duplicate field name"), 
+          quotes (ppr (head dups)),
+	  ptext (sLit "in record"), pprRFC ctxt]
 
--- wrappers
-rnHsRecFieldsAndThen_Pattern :: Located Name
-                             -> NameMaker -- new name maker
-                             -> HsRecFields RdrName (LPat RdrName)  
-                             -> (HsRecFields Name (LPat Name) -> RnM (c, FreeVars)) 
-                             -> RnM (c, FreeVars)
-rnHsRecFieldsAndThen_Pattern n var
-  = rnHsRecFieldsAndThen (Pattern n VarPat) (rnLPatAndThen var)
-
-
--- wrapper to use rnLExpr in CPS style;
--- because it does not bind any vars going forward, it does not need
--- to be written that way
-rnLExprAndThen :: (LHsExpr RdrName -> RnM (LHsExpr Name, FreeVars))
-               -> LHsExpr RdrName 
-               -> (LHsExpr Name -> RnM (c, FreeVars)) 
-               -> RnM (c, FreeVars) 
-rnLExprAndThen f e cont = do { (x, fvs1) <- f e
-			     ; (res, fvs2) <- cont x
-			     ; return (res, fvs1 `plusFV` fvs2) }
-
-
--- non-CPSed because exprs don't leave anything bound
-rnHsRecFields_Con :: Located Name
-                  -> (LHsExpr RdrName -> RnM (LHsExpr Name, FreeVars))
-                  -> HsRecFields RdrName (LHsExpr RdrName)  
-                  -> RnM (HsRecFields Name (LHsExpr Name), FreeVars)
-rnHsRecFields_Con n rnLExpr fields = rnHsRecFieldsAndThen (Constructor n HsVar) 
-                                     (rnLExprAndThen rnLExpr) fields $ \ res ->
-				     return (res, emptyFVs)
-
-rnHsRecFields_Update :: (LHsExpr RdrName -> RnM (LHsExpr Name, FreeVars))
-                     -> HsRecFields RdrName (LHsExpr RdrName)  
-                     -> RnM (HsRecFields Name (LHsExpr Name), FreeVars)
-rnHsRecFields_Update rnLExpr fields = rnHsRecFieldsAndThen Update
-                                      (rnLExprAndThen rnLExpr) fields $ \ res -> 
-				      return (res, emptyFVs)
+pprRFC :: HsRecFieldContext -> SDoc
+pprRFC (HsRecFieldCon {}) = ptext (sLit "construction")
+pprRFC (HsRecFieldPat {}) = ptext (sLit "pattern")
+pprRFC (HsRecFieldUpd {}) = ptext (sLit "update")
 \end{code}
-
 
 
 %************************************************************************
@@ -517,29 +557,6 @@ rnOverLit lit@(OverLit {ol_val=val})
 		      , ol_rebindable = rebindable }, fvs) }
 \end{code}
 
-----------------------------------------------------------------
--- Old code returned extra free vars need in desugarer
--- but that is no longer necessary, I believe
---     if inIntRange i then
---        return (HsIntegral i from_integer_name placeHolderType, fvs)
---     else let
---	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
--- Big integer literals are built, using + and *, 
--- out of small integers (DsUtils.mkIntegerLit)
--- [NB: plusInteger, timesInteger aren't rebindable... 
---	they are used to construct the argument to fromInteger, 
---	which is the rebindable one.]
-
--- (HsFractional i _ _) = do
---	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
--- We have to make sure that the Ratio type is imported with
--- its constructor, because literals of type Ratio t are
--- built with that constructor.
--- The Rational type is needed too, but that will come in
--- as part of the type for fromRational.
--- The plus/times integer operations may be needed to construct the numerator
--- and denominator (see DsUtils.mkIntegerLit)
-
 %************************************************************************
 %*									*
 \subsubsection{Quasiquotation}
@@ -552,8 +569,8 @@ See Note [Quasi-quote overview] in TcSplice.
 rnQuasiQuote :: HsQuasiQuote RdrName -> RnM (HsQuasiQuote Name, FreeVars)
 rnQuasiQuote (HsQuasiQuote n quoter quoteSpan quote)
   = do	{ loc  <- getSrcSpanM
-   	; [n'] <- newLocalsRn [L loc n]
-   	; quoter' <-  (lookupOccRn quoter)
+   	; n' <- newLocalBndrRn (L loc n)
+   	; quoter' <- lookupOccRn quoter
 		-- If 'quoter' is not in scope, proceed no further
 		-- Otherwise lookupOcc adds an error messsage and returns 
 		-- an "unubound name", which makes the subsequent attempt to
@@ -582,12 +599,6 @@ patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
 	$$ nest 4 (ptext (sLit "Use -XScopedTypeVariables to permit it"))
 
-dupFieldErr :: String -> RdrName -> SDoc
-dupFieldErr str dup
-  = hsep [ptext (sLit "duplicate field name"), 
-          quotes (ppr dup),
-	  ptext (sLit "in record"), text str]
-
 bogusCharError :: Char -> SDoc
 bogusCharError c
   = ptext (sLit "character literal out of range: '\\") <> char c  <> char '\''
@@ -595,5 +606,4 @@ bogusCharError c
 badViewPat :: Pat RdrName -> SDoc
 badViewPat pat = vcat [ptext (sLit "Illegal view pattern: ") <+> ppr pat,
                        ptext (sLit "Use -XViewPatterns to enable view patterns")]
-
 \end{code}

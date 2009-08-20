@@ -53,8 +53,7 @@ import HsSyn		-- Lots of it
 import Class            ( FunDep )
 import TypeRep          ( Kind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
-			  isRdrDataCon, isUnqual, getRdrName, isQual,
-			  setRdrNameSpace, showRdrName )
+			  isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation, RuleMatchInfo,
                           InlinePragma(..),  InlineSpec(..),
                           alwaysInlineSpec, neverInlineSpec )
@@ -728,11 +727,9 @@ checkPat loc _ _
 
 checkAPat :: DynFlags -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
 checkAPat dynflags loc e = case e of
-   EWildPat	       -> return (WildPat placeHolderType)
-   HsVar x | isQual x  -> parseError loc ("Qualified variable in pattern: "
-					 ++ showRdrName x)
-   	   | otherwise -> return (VarPat x)
-   HsLit l 	       -> return (LitPat l)
+   EWildPat -> return (WildPat placeHolderType)
+   HsVar x  -> return (VarPat x)
+   HsLit l  -> return (LitPat l)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
@@ -831,10 +828,6 @@ checkFunBind :: SrcSpan
              -> Located (GRHSs RdrName)
              -> P (HsBind RdrName)
 checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
-  | isQual (unLoc fun)
-  = parseErrorSDoc (getLoc fun) 
-	(ptext (sLit "Qualified name in function definition:") <+> ppr (unLoc fun))
-  | otherwise
   = do	ps <- checkPatterns pats
 	let match_span = combineSrcSpans lhs_loc rhs_span
 	return (makeFunBind fun is_infix [L match_span (Match ps opt_sig grhss)])

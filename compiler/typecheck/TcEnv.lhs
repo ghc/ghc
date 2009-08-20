@@ -337,7 +337,7 @@ tcExtendTyVarEnv2 binds thing_inside = do
                    tcl_tyvars = gtvs,
                    tcl_rdr = rdr_env}) <- getLclEnv
     let
-	rdr_env'   = extendLocalRdrEnv rdr_env (map fst binds)
+	rdr_env'   = extendLocalRdrEnvList rdr_env (map fst binds)
 	new_tv_set = tcTyVarsOfTypes (map snd binds)
  	le'        = extendNameEnvList le [(name, ATyVar name ty) | (name, ty) <- binds]
 
@@ -408,7 +408,7 @@ tc_extend_local_id_env env th_lvl names_w_ids thing_inside
 						  _        -> Wobbly})
     		      | (name,id) <- names_w_ids, let id_ty = idType id]
     le'		    = extendNameEnvList (tcl_env env) extra_env
-    rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) [name | (name,_) <- names_w_ids]
+    rdr_env'	    = extendLocalRdrEnvList (tcl_rdr env) [name | (name,_) <- names_w_ids]
 \end{code}
 
 

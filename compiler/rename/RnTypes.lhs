@@ -159,7 +159,7 @@ rnHsType doc (HsListTy ty) = do
 
 rnHsType doc (HsKindSig ty k)
   = do { kind_sigs_ok <- doptM Opt_KindSignatures
-       ; checkM kind_sigs_ok (addErr (kindSigErr ty))
+       ; unless kind_sigs_ok (addErr (kindSigErr ty))
        ; ty' <- rnLHsType doc ty
        ; return (HsKindSig ty' k) }
 
@@ -610,7 +610,7 @@ rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
 rnSplice (HsSplice n expr)
   = do	{ checkTH expr "splice"
 	; loc  <- getSrcSpanM
-	; [n'] <- newLocalsRn [L loc n]
+	; n' <- newLocalBndrRn (L loc n)
 	; (expr', fvs) <- rnLExpr expr
 
 	-- Ugh!  See Note [Splices] above

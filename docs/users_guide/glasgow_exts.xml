@@ -1336,7 +1336,6 @@ module Foo where
   data T = MkT { x :: Int }
   
   ok1 (MkS { x = n }) = n+1   -- Unambiguous
-
   ok2 n = MkT { x = n+1 }     -- Unambiguous
 
   bad1 k = k { x = 3 }  -- Ambiguous
@@ -1361,6 +1360,37 @@ if there are other variables in scope with the same name.
 This reduces the clutter of qualified names when you import two
 records from different modules that use the same field name.
 </para>
+<para>
+Some details:
+<itemizedlist>
+<listitem><para>
+Field disambiguation can be combined with punning (see <xref linkend="record-puns"/>). For exampe:
+<programlisting>
+module Foo where
+  import M
+  x=True
+  ok3 (MkS { x }) = x+1   -- Uses both disambiguation and punning
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+With <option>-XDisambiguateRecordFields</option> you can use <emphasis>unqualifed</emphasis>
+field names even if the correponding selector is only in scope <emphasis>qualified</emphasis>
+For example, assuming the same module <literal>M</literal> as in our earlier example, this is legal:
+<programlisting>
+module Foo where
+  import qualified M    -- Note qualified
+
+  ok4 (M.MkS { x = n }) = n+1   -- Unambiguous
+</programlisting>
+Since the constructore <literal>MkS</literal> is only in scope qualified, you must
+name it <literal>M.MkS</literal>, but the field <literal>x</literal> does not need
+to be qualified even though <literal>M.x</literal> is in scope but <literal>x</literal>
+is not.  (In effect, it is qualified by the constructor.)
+</para></listitem>
+</itemizedlist>
+</para>
+
 </sect2>
 
     <!-- ===================== Record puns ===================  -->
@@ -1397,16 +1427,9 @@ a</literal> for the same name <literal>a</literal>.
 </para>
 
 <para>
-Note that puns and other patterns can be mixed in the same record:
-<programlisting>
-data C = C {a :: Int, b :: Int}
-f (C {a, b = 4}) = a
-</programlisting>
-and that puns can be used wherever record patterns occur (e.g. in
-<literal>let</literal> bindings or at the top-level).  
-</para>
-
-<para>
+Note that:
+<itemizedlist>
+<listitem><para>
 Record punning can also be used in an expression, writing, for example,
 <programlisting>
 let a = 1 in C {a}
@@ -1415,11 +1438,40 @@ instead of
 <programlisting>
 let a = 1 in C {a = a}
 </programlisting>
-
-Note that this expansion is purely syntactic, so the record pun
+The expansion is purely syntactic, so the expanded right-hand side
 expression refers to the nearest enclosing variable that is spelled the
 same as the field name.
+</para></listitem>
+
+<listitem><para>
+Puns and other patterns can be mixed in the same record:
+<programlisting>
+data C = C {a :: Int, b :: Int}
+f (C {a, b = 4}) = a
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+Puns can be used wherever record patterns occur (e.g. in
+<literal>let</literal> bindings or at the top-level).  
+</para></listitem>
+
+<listitem><para>
+A pun on a qualified field name is expanded by stripping off the module qualifier.
+For example:
+<programlisting>
+f (C {M.a}) = a
+</programlisting>
+means
+<programlisting>
+f (M.C {M.a = a}) = a
+</programlisting>
+(This is useful if the field selector <literal>a</literal> for constructor <literal>M.C</literal>
+is only in scope in qualified form.)
+</para></listitem>
+</itemizedlist>
 </para>
+
 
 </sect2>
 
@@ -1431,6 +1483,7 @@ same as the field name.
 
 <para>
 Record wildcards are enabled by the flag <literal>-XRecordWildCards</literal>.
+This flag implies <literal>-XDisambiguateRecordFields</literal>.
 </para>
 
 <para>
@@ -1443,7 +1496,7 @@ f (C {a = 1, b = b, c = c, d = d}) = b + c + d
 </para>
 
 <para>
-Record wildcard syntax permits a (<literal>..</literal>) in a record
+Record wildcard syntax permits a "<literal>..</literal>" in a record
 pattern, where each elided field <literal>f</literal> is replaced by the
 pattern <literal>f = f</literal>.  For example, the above pattern can be
 written as
@@ -1453,7 +1506,10 @@ f (C {a = 1, ..}) = b + c + d
 </para>
 
 <para>
-Note that wildcards can be mixed with other patterns, including puns
+More details:
+<itemizedlist>
+<listitem><para>
+Wildcards can be mixed with other patterns, including puns
 (<xref linkend="record-puns"/>); for example, in a pattern <literal>C {a
 = 1, b, ..})</literal>.  Additionally, record wildcards can be used
 wherever record patterns occur, including in <literal>let</literal>
@@ -1463,24 +1519,38 @@ C {a = 1, ..} = e
 </programlisting>
 defines <literal>b</literal>, <literal>c</literal>, and
 <literal>d</literal>.
-</para>
+</para></listitem>
 
-<para>
+<listitem><para>
 Record wildcards can also be used in expressions, writing, for example,
-
 <programlisting>
 let {a = 1; b = 2; c = 3; d = 4} in C {..}
 </programlisting>
-
 in place of
-
 <programlisting>
 let {a = 1; b = 2; c = 3; d = 4} in C {a=a, b=b, c=c, d=d}
 </programlisting>
-
-Note that this expansion is purely syntactic, so the record wildcard
+The expansion is purely syntactic, so the record wildcard
 expression refers to the nearest enclosing variables that are spelled
 the same as the omitted field names.
+</para></listitem>
+
+<listitem><para>
+The "<literal>..</literal>" expands to the missing 
+<emphasis>in-scope</emphasis> record fields, where "in scope"
+includes both unqualified and qualified-only.  
+Any fields that are not in scope are not filled in.  For example
+<programlisting>
+module M where
+  data R = R { a,b,c :: Int }
+module X where
+  import qualified M( R(a,b) )
+  f a b = R { .. }
+</programlisting>
+The <literal>{..}</literal> expands to <literal>{M.a=a,M.b=b}</literal>,
+omitting <literal>c</literal> since it is not in scope at all.
+</para></listitem>
+</itemizedlist>
 </para>
 
 </sect2>

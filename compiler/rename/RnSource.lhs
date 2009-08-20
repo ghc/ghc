@@ -21,11 +21,10 @@ import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSig
                                 makeMiniFixityEnv)
 import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
 			  lookupTopBndrRn, lookupLocatedTopBndrRn,
-			  lookupOccRn, newLocalsRn, 
+			  lookupOccRn, newLocalBndrsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
-			  bindLocalNames, checkDupRdrNames, mapFvRn,
-			  checkM
+			  bindLocalNames, checkDupRdrNames, mapFvRn
 			)
 import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn )
 import HscTypes      	( GenAvailInfo(..), availsToNameSet )
@@ -779,7 +778,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 		-- No need to check for duplicate method signatures
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 		-- and the methods are already in scope
-	    ; gen_tyvars <- newLocalsRn gen_rdr_tyvars_w_locs
+	    ; gen_tyvars <- newLocalBndrsRn gen_rdr_tyvars_w_locs
 	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
 
   -- Haddock docs 
@@ -945,7 +944,7 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
     rn_at (tydecl@TyFamily  {}) = rnFamily tydecl lookupIdxVars
     rn_at (tydecl@TySynonym {}) = 
       do
-        checkM (isNothing (tcdTyPats tydecl)) $ addErr noPatterns
+        unless (isNothing (tcdTyPats tydecl)) $ addErr noPatterns
         rnTyClDecl tydecl
     rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 

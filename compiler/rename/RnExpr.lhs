@@ -48,6 +48,7 @@ import Maybes		( expectJust )
 import Outputable
 import SrcLoc
 import FastString
+import Control.Monad
 \end{code}
 
 
@@ -248,13 +249,13 @@ rnExpr (ExplicitTuple tup_args boxity)
 
 rnExpr (RecordCon con_id _ rbinds)
   = do	{ conname <- lookupLocatedOccRn con_id
-	; (rbinds', fvRbinds) <- rnHsRecFields_Con conname rnLExpr rbinds
+	; (rbinds', fvRbinds) <- rnHsRecBinds (HsRecFieldCon (unLoc conname)) rbinds
 	; return (RecordCon conname noPostTcExpr rbinds', 
 		  fvRbinds `addOneFV` unLoc conname) }
 
 rnExpr (RecordUpd expr rbinds _ _ _)
   = do	{ (expr', fvExpr) <- rnLExpr expr
-	; (rbinds', fvRbinds) <- rnHsRecFields_Update rnLExpr rbinds
+	; (rbinds', fvRbinds) <- rnHsRecBinds HsRecFieldUpd rbinds
 	; return (RecordUpd expr' rbinds' [] [] [], 
 		  fvExpr `plusFV` fvRbinds) }
 
@@ -307,7 +308,7 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 \begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
-    rnPatsAndThen_LocalRightwards ProcExpr [pat] $ \ [pat'] ->
+    rnPats ProcExpr [pat] $ \ [pat'] ->
     rnCmdTop body	         `thenM` \ (body',fvBody) ->
     return (HsProc pat' body', fvBody)
 
@@ -361,6 +362,26 @@ rnSection section@(SectionL expr op)
 
 rnSection other = pprPanic "rnSection" (ppr other)
 \end{code}
+
+%************************************************************************
+%*									*
+	Records
+%*									*
+%************************************************************************
+
+\begin{code}
+rnHsRecBinds :: HsRecFieldContext -> HsRecordBinds RdrName
+             -> RnM (HsRecordBinds Name, FreeVars)
+rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
+  = do { (flds, fvs) <- rnHsRecFields1 ctxt HsVar rec_binds
+       ; (flds', fvss) <- mapAndUnzipM rn_field flds
+       ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }, 
+                 fvs `plusFV` plusFVs fvss) }
+  where 
+    rn_field fld = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
+                      ; return (fld { hsRecFieldArg = arg' }, fvs) }
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -569,7 +590,7 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
 rnBracket :: HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
 rnBracket (VarBr n) = do { name <- lookupOccRn n
 			 ; this_mod <- getModule
-			 ; checkM (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
+			 ; unless (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
 			   do { _ <- loadInterfaceForName msg name	-- home interface is loaded, and this is the
 			      ; return () }				-- only way that is going to happen
 			 ; return (VarBr name, unitFV name) }
@@ -644,7 +665,7 @@ rnStmt ctxt (BindStmt pat expr _ _) thing_inside
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
-	; rnPatsAndThen_LocalRightwards (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
+	; rnPats (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
 	{ (thing, fvs3) <- thing_inside
 	; return ((BindStmt pat' expr' bind_op fail_op, thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
@@ -793,7 +814,7 @@ rnParallelStmts ctxt segs thing_inside = do
     where
         go orig_lcl_env bndrs [] = do 
             let (bndrs', dups) = removeDups cmpByOcc bndrs
-                inner_env = extendLocalRdrEnv orig_lcl_env bndrs'
+                inner_env = extendLocalRdrEnvList orig_lcl_env bndrs'
             
             mapM_ dupErr dups
             (thing, fvs) <- setLocalRdrEnv inner_env thing_inside

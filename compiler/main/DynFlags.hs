@@ -1856,6 +1856,12 @@ impliedFlags
     , (Opt_ScopedTypeVariables, Opt_RelaxedPolyRec)  -- Ditto for scoped type variables; see
                                                      --      Note [Scoped tyvars] in TcBinds
     , (Opt_ImpredicativeTypes,  Opt_RankNTypes)
+
+	-- Record wild-cards implies field disambiguation
+	-- Otherwise if you write (C {..}) you may well get
+	-- stuff like " 'a' not in scope ", which is a bit silly
+ 	-- if the compiler has just filled in field 'a' of constructor 'C'
+    , (Opt_RecordWildCards,     Opt_DisambiguateRecordFields)
   ]
 
 glasgowExtsFlags :: [DynFlag]

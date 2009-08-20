@@ -23,7 +23,7 @@ import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnTypes        ( rnHsSigType, rnLHsType, checkPrecMatch)
-import RnPat          (rnPatsAndThen_LocalRightwards, rnBindPat,
+import RnPat          (rnPats, rnBindPat,
                        NameMaker, localRecNameMaker, topRecNameMaker, applyNameMaker
                       )
                       
@@ -157,8 +157,10 @@ it expects the global environment to contain bindings for the binders
 rnTopBindsLHS :: MiniFixityEnv
               -> HsValBinds RdrName 
               -> RnM (HsValBindsLR Name RdrName)
-rnTopBindsLHS fix_env binds = 
-    (uncurry $ rnValBindsLHSFromDoc (topRecNameMaker fix_env)) (bindersAndDoc binds) binds
+rnTopBindsLHS fix_env binds
+  = do { let (boundNames,doc) = bindersAndDoc binds 
+       ; mod <- getModule
+       ; rnValBindsLHSFromDoc (topRecNameMaker mod fix_env) boundNames doc binds }
 
 rnTopBindsRHS :: NameSet	-- Names bound by these binds
               -> HsValBindsLR Name RdrName 
@@ -461,8 +463,7 @@ rnBindLHS name_maker _ (L loc (FunBind { fun_id = name@(L nameLoc _),
                                          fun_tick = fun_tick
                                        }))
   = setSrcSpan loc $ 
-    do { (newname, _fvs) <- applyNameMaker name_maker name $ \ newname ->
-		 	    return (newname, emptyFVs) 
+    do { newname <- applyNameMaker name_maker name
        ; return (L loc (FunBind { fun_id = L nameLoc newname, 
                              	  fun_infix = inf, 
                              	  fun_matches = matches,
@@ -769,7 +770,7 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 
 	       -- Now the main event
 	       -- note that there are no local ficity decls for matches
-	; rnPatsAndThen_LocalRightwards ctxt pats	$ \ pats' -> do
+	; rnPats ctxt pats	$ \ pats' -> do
 	{ (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
 
 	; return (Match pats' Nothing grhss', grhss_fvs) }}
