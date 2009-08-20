@@ -240,8 +240,8 @@ schedule (Capability *initialCapability, Task *task)
   rtsBool ready_to_gc;
 #if defined(THREADED_RTS)
   rtsBool first = rtsTrue;
-#endif
   rtsBool force_yield = rtsFalse;
+#endif
   
   cap = initialCapability;
 
