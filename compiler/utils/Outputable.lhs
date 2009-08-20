@@ -29,7 +29,7 @@ module Outputable (
 	($$), ($+$), vcat,
 	sep, cat, 
 	fsep, fcat, 
-	hang, punctuate,
+	hang, punctuate, ppWhen, ppUnless,
 	speakNth, speakNTimes, speakN, speakNOf, plural,
 
         -- * Converting 'SDoc' into strings and outputing it
@@ -472,6 +472,13 @@ punctuate p (d:ds) = go d ds
 		   where
 		     go d [] = [d]
 		     go d (e:es) = (d <> p) : go e es
+
+ppWhen, ppUnless :: Bool -> SDoc -> SDoc
+ppWhen True  doc = doc
+ppWhen False _   = empty
+
+ppUnless True  _   = empty
+ppUnless False doc = doc
 \end{code}
 
 

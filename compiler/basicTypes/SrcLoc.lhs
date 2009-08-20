@@ -395,38 +395,35 @@ instance Outputable SrcSpan where
     ppr span
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-           pprUserSpan span
+           pprUserSpan True span
         else
            hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
                  char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
 
-pprUserSpan :: SrcSpan -> SDoc
-pprUserSpan (SrcSpanOneLine src_path line start_col end_col)
-  = hcat [ pprFastFilePath src_path, char ':', 
-	   int line,
-	   char ':', int start_col
-	 ]
-    <> if end_col - start_col <= 1 
-	  then empty 
-	    -- for single-character or point spans, we just output the starting
-	    -- column number
-	  else  char '-' <> int (end_col-1)
+pprUserSpan :: Bool -> SrcSpan -> SDoc
+pprUserSpan show_path (SrcSpanOneLine src_path line start_col end_col)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
+         , int line, char ':', int start_col
+         , ppUnless (end_col - start_col <= 1)
+                    (char '-' <> int (end_col-1)) 
+	    -- For single-character or point spans, we just 
+	    -- output the starting column number
+         ]
+	  
 
-pprUserSpan (SrcSpanMultiLine src_path sline scol eline ecol)
-  = hcat [ pprFastFilePath src_path, char ':', 
-		  parens (int sline <> char ',' <>  int scol),
-		  char '-',
-		  parens (int eline <> char ',' <>  
-			   if ecol == 0 then int ecol else int (ecol-1))
-		]
-
-pprUserSpan (SrcSpanPoint src_path line col)
-  = hcat [ pprFastFilePath src_path, char ':', 
-	   int line,
-	   char ':', int col
+pprUserSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
+	 , parens (int sline <> char ',' <>  int scol)
+	 , char '-'
+	 , parens (int eline <> char ',' <>  
+	   	   if ecol == 0 then int ecol else int (ecol-1))
 	 ]
 
-pprUserSpan (UnhelpfulSpan s)  = ftext s
+pprUserSpan show_path (SrcSpanPoint src_path line col)
+  = hcat [ ppWhen show_path $ (pprFastFilePath src_path <> colon)
+         , int line, char ':', int col ]
+
+pprUserSpan _ (UnhelpfulSpan s)  = ftext s
 
 pprDefnLoc :: SrcSpan -> SDoc
 -- ^ Pretty prints information about the 'SrcSpan' in the style "defined at ..."
@@ -480,8 +477,8 @@ instance Functor Located where
   fmap f (L l e) = L l (f e)
 
 instance Outputable e => Outputable (Located e) where
-  ppr (L _ e) =  ppr e
-	-- do we want to dump the span in debugSty mode?    
+  ppr (L l e) = ifPprDebug (braces (pprUserSpan False l)) <> ppr e
+		-- Print spans without the file name etc
 \end{code}
 
 %************************************************************************
