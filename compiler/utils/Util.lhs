@@ -523,7 +523,7 @@ sortWith get_key xs = sortLe le xs
   where
     x `le` y = get_key x < get_key y
 
-on :: (a -> a -> Ordering) -> (b -> a) -> b -> b -> Ordering
+on :: (a -> a -> c) -> (b -> a) -> b -> b -> c
 on cmp sel = \x y -> sel x `cmp` sel y
 
 \end{code}
