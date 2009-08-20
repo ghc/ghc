@@ -526,7 +526,7 @@ dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage span msg)))
 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO (Maybe String)
 checkNonStdWay dflags srcspan = do
-  tag <- readIORef v_Build_tag
+  let tag = buildTag dflags
   if null tag then return Nothing else do
   let default_osuf = phaseInputExt StopLn
   if objectSuf dflags == default_osuf

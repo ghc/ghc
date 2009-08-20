@@ -17,7 +17,7 @@ module StaticFlags (
         initStaticOpts,
 
 	-- Ways
-	WayName(..), v_Ways, v_Build_tag, v_RTS_Build_tag, isRTSWay,
+	WayName(..), Way(..), v_Ways, isRTSWay, mkBuildTag,
 
 	-- Output style options
 	opt_PprUserLength,
@@ -73,7 +73,7 @@ module StaticFlags (
         opt_StubDeadValues,
 
     -- For the parser
-    addOpt, removeOpt, addWay, findBuildTag, v_opt_C_ready
+    addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready
   ) where
 
 #include "HsVersions.h"
@@ -84,6 +84,7 @@ import Util
 import Maybes		( firstJust )
 import Panic
 
+import Data.Maybe       ( listToMaybe )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Data.List
@@ -98,7 +99,7 @@ addOpt :: String -> IO ()
 addOpt = consIORef v_opt_C
 
 addWay :: WayName -> IO ()
-addWay = consIORef v_Ways
+addWay = consIORef v_Ways . lkupWay
 
 removeOpt :: String -> IO ()
 removeOpt f = do
@@ -306,12 +307,6 @@ GLOBAL_VAR(v_Ld_inputs,	[],      [String])
 -- becomes the suffix used to find .hi files and libraries used in
 -- this compilation.
 
-GLOBAL_VAR(v_Build_tag, "", String)
-
--- The RTS has its own build tag, because there are some ways that
--- affect the RTS only.
-GLOBAL_VAR(v_RTS_Build_tag, "", String)
-
 data WayName
   = WayThreaded
   | WayDebug
@@ -321,26 +316,10 @@ data WayName
   | WayPar
   | WayGran
   | WayNDP
-  | WayUser_a
-  | WayUser_b
-  | WayUser_c
-  | WayUser_d
-  | WayUser_e
-  | WayUser_f
-  | WayUser_g
-  | WayUser_h
-  | WayUser_i
-  | WayUser_j
-  | WayUser_k
-  | WayUser_l
-  | WayUser_m
-  | WayUser_n
-  | WayUser_o
-  | WayUser_A
-  | WayUser_B
+  | WayDyn
   deriving (Eq,Ord)
 
-GLOBAL_VAR(v_Ways, [] ,[WayName])
+GLOBAL_VAR(v_Ways, [] ,[Way])
 
 allowed_combination :: [WayName] -> Bool
 allowed_combination way = and [ x `allowedWith` y 
@@ -349,6 +328,10 @@ allowed_combination way = and [ x `allowedWith` y
 	-- Note ordering in these tests: the left argument is
 	-- <= the right argument, according to the Ord instance
 	-- on Way above.
+
+	-- dyn is allowed with everything
+	_ `allowedWith` WayDyn  		= True
+	WayDyn `allowedWith` _		        = True
 
 	-- debug is allowed with everything
 	_ `allowedWith` WayDebug		= True
@@ -360,33 +343,27 @@ allowed_combination way = and [ x `allowedWith` y
 	_ `allowedWith` _ 			= False
 
 
-findBuildTag :: IO [String]  -- new options
-findBuildTag = do
-  way_names <- readIORef v_Ways
-  let ws = sort (nub way_names)
+getWayFlags :: IO [String]  -- new options
+getWayFlags = do
+  unsorted <- readIORef v_Ways
+  let ways = sortBy (compare `on` wayName) $
+             nubBy  ((==) `on` wayName) $ unsorted
+  writeIORef v_Ways ways
 
-  if not (allowed_combination ws)
+  if not (allowed_combination (map wayName ways))
       then ghcError (CmdLineError $
       		    "combination not supported: "  ++
       		    foldr1 (\a b -> a ++ '/':b) 
-      		    (map (wayName . lkupWay) ws))
-      else let ways    = map lkupWay ws
-      	       tag     = mkBuildTag (filter (not.wayRTSOnly) ways)
-      	       rts_tag = mkBuildTag ways
-      	       flags   = map wayOpts ways
-      	   in do
-      	   writeIORef v_Build_tag tag
-      	   writeIORef v_RTS_Build_tag rts_tag
-      	   return (concat flags)
-
-
+      		    (map wayDesc ways))
+      else
+      	   return (concatMap wayOpts ways)
 
 mkBuildTag :: [Way] -> String
 mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
 
 lkupWay :: WayName -> Way
 lkupWay w = 
-   case lookup w way_details of
+   case listToMaybe (filter ((==) w . wayName) way_details) of
 	Nothing -> error "findBuildTag"
 	Just details -> details
 
@@ -394,15 +371,16 @@ isRTSWay :: WayName -> Bool
 isRTSWay = wayRTSOnly . lkupWay 
 
 data Way = Way {
+  wayName    :: WayName,
   wayTag     :: String,
   wayRTSOnly :: Bool,
-  wayName    :: String,
+  wayDesc    :: String,
   wayOpts    :: [String]
   }
 
-way_details :: [ (WayName, Way) ]
+way_details :: [ Way ]
 way_details =
-  [ (WayThreaded, Way "thr" True "Threaded" [
+  [ Way WayThreaded "thr" True "Threaded" [
 #if defined(freebsd_TARGET_OS)
 --	  "-optc-pthread"
 --      , "-optl-pthread"
@@ -414,25 +392,28 @@ way_details =
 #elif defined(solaris2_TARGET_OS)
           "-optl-lrt"
 #endif
-	] ),
+	],
 
-    (WayDebug, Way "debug" True "Debug" [] ),
+    Way WayDebug "debug" True "Debug" [],
 
-    (WayProf, Way  "p" False "Profiling"
+    Way WayDyn "dyn" False "Dynamic"
+	[ "-DDYNAMIC"
+	, "-optc-DDYNAMIC" ],
+
+    Way WayProf "p" False "Profiling"
 	[ "-fscc-profiling"
 	, "-DPROFILING"
-	, "-optc-DPROFILING" ]),
+	, "-optc-DPROFILING" ],
 
-    (WayEventLog, Way  "l" True "RTS Event Logging"
+    Way WayEventLog "l" True "RTS Event Logging"
 	[ "-DEVENTLOG"
-	, "-optc-DEVENTLOG" ]),
+	, "-optc-DEVENTLOG" ],
 
-    (WayTicky, Way  "t" True "Ticky-ticky Profiling"  
+    Way WayTicky "t" True "Ticky-ticky Profiling"  
 	[ "-DTICKY_TICKY"
-	, "-optc-DTICKY_TICKY" ]),
+	, "-optc-DTICKY_TICKY" ],
 
-    -- optl's below to tell linker where to find the PVM library -- HWL
-    (WayPar, Way  "mp" False "Parallel" 
+    Way WayPar "mp" False "Parallel" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
@@ -440,10 +421,10 @@ way_details =
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]),
+        , "-optl-lgpvm3" ],
 
     -- at the moment we only change the RTS and could share compiler and libs!
-    (WayPar, Way  "mt" False "Parallel ticky profiling" 
+    Way WayPar "mt" False "Parallel ticky profiling" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
@@ -452,9 +433,9 @@ way_details =
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]),
+        , "-optl-lgpvm3" ],
 
-    (WayPar, Way  "md" False "Distributed" 
+    Way WayPar "md" False "Distributed" 
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-D__DISTRIBUTED_HASKELL__"
@@ -464,34 +445,15 @@ way_details =
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]),
+        , "-optl-lgpvm3" ],
 
-    (WayGran, Way  "mg" False "GranSim"
+    Way WayGran "mg" False "GranSim"
 	[ "-fgransim"
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"
-	, "-package concurrent" ]),
+	, "-package concurrent" ],
 
-    (WayNDP, Way  "ndp" False "Nested data parallelism"
+    Way WayNDP "ndp" False "Nested data parallelism"
 	[ "-XParr"
-	, "-fvectorise"]),
-
-    (WayUser_a,  Way  "a"  False "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	
-    (WayUser_b,  Way  "b"  False "User way 'b'"  ["$WAY_b_REAL_OPTS"]),	
-    (WayUser_c,  Way  "c"  False "User way 'c'"  ["$WAY_c_REAL_OPTS"]),	
-    (WayUser_d,  Way  "d"  False "User way 'd'"  ["$WAY_d_REAL_OPTS"]),	
-    (WayUser_e,  Way  "e"  False "User way 'e'"  ["$WAY_e_REAL_OPTS"]),	
-    (WayUser_f,  Way  "f"  False "User way 'f'"  ["$WAY_f_REAL_OPTS"]),	
-    (WayUser_g,  Way  "g"  False "User way 'g'"  ["$WAY_g_REAL_OPTS"]),	
-    (WayUser_h,  Way  "h"  False "User way 'h'"  ["$WAY_h_REAL_OPTS"]),	
-    (WayUser_i,  Way  "i"  False "User way 'i'"  ["$WAY_i_REAL_OPTS"]),	
-    (WayUser_j,  Way  "j"  False "User way 'j'"  ["$WAY_j_REAL_OPTS"]),	
-    (WayUser_k,  Way  "k"  False "User way 'k'"  ["$WAY_k_REAL_OPTS"]),	
-    (WayUser_l,  Way  "l"  False "User way 'l'"  ["$WAY_l_REAL_OPTS"]),	
-    (WayUser_m,  Way  "m"  False "User way 'm'"  ["$WAY_m_REAL_OPTS"]),	
-    (WayUser_n,  Way  "n"  False "User way 'n'"  ["$WAY_n_REAL_OPTS"]),	
-    (WayUser_o,  Way  "o"  False "User way 'o'"  ["$WAY_o_REAL_OPTS"]),	
-    (WayUser_A,  Way  "A"  False "User way 'A'"  ["$WAY_A_REAL_OPTS"]),	
-    (WayUser_B,  Way  "B"  False "User way 'B'"  ["$WAY_B_REAL_OPTS"]) 
+	, "-fvectorise"]
   ]
-

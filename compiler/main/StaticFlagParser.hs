@@ -53,7 +53,7 @@ parseStaticFlags args = do
 
     -- deal with the way flags: the way (eg. prof) gives rise to
     -- further flags, some of which might be static.
-  way_flags <- findBuildTag
+  way_flags <- getWayFlags
   let way_flags' = map (mkGeneralLocated "in way flags") way_flags
 
     -- if we're unregisterised, add some more flags
@@ -128,7 +128,7 @@ static_flags = [
 
         ----- Linker --------------------------------------------------------
   , Flag "static"         (PassFlag addOpt) Supported
-  , Flag "dynamic"        (NoArg (removeOpt "-static")) Supported
+  , Flag "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn)) Supported
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ())) Supported
 

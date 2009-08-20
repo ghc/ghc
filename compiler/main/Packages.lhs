@@ -38,7 +38,7 @@ where
 import PackageConfig	
 import ParsePkgConf	( loadPackageConfig )
 import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
-import StaticFlags	( opt_Static )
+import StaticFlags
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import UniqFM
@@ -644,8 +644,12 @@ collectLinkOpts dflags ps = concat (map all_opts ps)
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
-        tag = buildTag dflags
-        rts_tag = rtsBuildTag dflags
+        non_dyn_ways = filter ((/= WayDyn) . wayName) (ways dflags)
+        -- the name of a shared library is libHSfoo-ghc<version>.so
+        -- we leave out the _dyn, because it is superfluous
+
+        tag     = mkBuildTag (filter (not . wayRTSOnly) non_dyn_ways)
+        rts_tag = mkBuildTag non_dyn_ways
 
 	mkDynName | opt_Static = id
 		  | otherwise = (++ ("-ghc" ++ cProjectVersion))

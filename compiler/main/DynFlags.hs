@@ -21,6 +21,7 @@ module DynFlags (
         DynLibLoader(..),
         fFlags, xFlags,
         dphPackage,
+        wayNames,
 
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- DynFlags
@@ -69,11 +70,7 @@ import Platform
 import Module
 import PackageConfig
 import PrelNames        ( mAIN )
-#if defined(i386_TARGET_ARCH) || (!defined(mingw32_TARGET_OS) && !defined(darwin_TARGET_OS))
-import StaticFlags      ( opt_Static )
-#endif
-import StaticFlags      ( opt_PIC, WayName(..), v_Ways, v_Build_tag,
-                          v_RTS_Build_tag )
+import StaticFlags
 import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
@@ -371,7 +368,7 @@ data DynFlags = DynFlags {
   thisPackage           :: PackageId,   -- ^ name of package currently being compiled
 
   -- ways
-  wayNames              :: [WayName],   -- ^ Way flags from the command line
+  ways                  :: [Way],       -- ^ Way flags from the command line
   buildTag              :: String,      -- ^ The global \"way\" (e.g. \"p\" for prof)
   rtsBuildTag           :: String,      -- ^ The RTS \"way\"
 
@@ -470,6 +467,9 @@ data DynFlags = DynFlags {
 
   haddockOptions :: Maybe String
  }
+
+wayNames :: DynFlags -> [WayName]
+wayNames = map wayName . ways
 
 -- | The target code type of the compilation (if any).
 --
@@ -571,14 +571,12 @@ initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
  -- someday these will be dynamic flags
  ways <- readIORef v_Ways
- build_tag <- readIORef v_Build_tag
- rts_build_tag <- readIORef v_RTS_Build_tag
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef emptyFM
  return dflags{
-        wayNames        = ways,
-        buildTag        = build_tag,
-        rtsBuildTag     = rts_build_tag,
+        ways            = ways,
+        buildTag        = mkBuildTag (filter (not . wayRTSOnly) ways),
+        rtsBuildTag     = mkBuildTag ways,
         filesToClean    = refFilesToClean,
         dirsToClean     = refDirsToClean
         }
@@ -654,7 +652,7 @@ defaultDynFlags =
         packageFlags            = [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
-        wayNames                = panic "defaultDynFlags: No wayNames",
+        ways                    = panic "defaultDynFlags: No ways",
         buildTag                = panic "defaultDynFlags: No buildTag",
         rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
         splitInfo               = Nothing,

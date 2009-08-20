@@ -58,12 +58,13 @@ readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
   update_nc <- mkNameCacheUpdater
-  liftIO $ readBinIface_ checkHiWay traceBinIFaceReading hi_path update_nc
+  dflags <- getDOpts
+  liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path update_nc
 
-readBinIface_ :: CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
               -> NameCacheUpdater (Array Int Name)
               -> IO ModIface
-readBinIface_ checkHiWay traceBinIFaceReading hi_path update_nc = do
+readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path update_nc = do
   let printer :: SDoc -> IO ()
       printer = case traceBinIFaceReading of
                 TraceBinIFaceReading -> \sd -> printSDoc sd defaultDumpStyle
@@ -105,7 +106,7 @@ readBinIface_ checkHiWay traceBinIFaceReading hi_path update_nc = do
   errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
   check_way <- get bh
-  way_descr <- getWayDescr
+  let way_descr = getWayDescr dflags
   wantedGot "Way" way_descr check_way
   when (checkHiWay == CheckHiWay) $
        errorOnMismatch "mismatched interface file ways" way_descr check_way
@@ -144,7 +145,7 @@ writeBinIface dflags hi_path mod_iface = do
 
         -- The version and way descriptor go next
   put_ bh (show opt_HiVersion)
-  way_descr <- getWayDescr
+  let way_descr = getWayDescr dflags
   put_  bh way_descr
 
         -- Remember where the symbol table pointer will go
@@ -448,10 +449,11 @@ instance Binary ModIface where
 		 mi_fix_fn    = mkIfaceFixCache fixities,
 		 mi_hash_fn   = mkIfaceHashCache decls })
 
-getWayDescr :: IO String
-getWayDescr = do
-  tag <- readIORef v_Build_tag
-  if cGhcUnregisterised == "YES" then return ('u':tag) else return tag
+getWayDescr :: DynFlags -> String
+getWayDescr dflags
+  | cGhcUnregisterised == "YES" = 'u':tag
+  | otherwise                   = tag
+  where tag = buildTag dflags
 	-- if this is an unregisterised build, make sure our interfaces
 	-- can't be used by a registerised build.
 
