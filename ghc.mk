@@ -597,10 +597,12 @@ libraries/base3-compat_dist-install_HC_OPTS += -XPackageImports
 .PHONY: stage1_libs
 stage1_libs : $(ALL_STAGE1_LIBS)
 
+ifeq "$(HADDOCK_DOCS)" "YES"
 libraries/index.html: $(ALL_HADDOCK_FILES)
 	cd libraries && sh gen_contents_index --inplace
 $(eval $(call all-target,library_doc_index,libraries/index.html))
 INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
+endif
 
 ifeq "$(CHECK_PACKAGES)" "YES"
 all: check_packages
