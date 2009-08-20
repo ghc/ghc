@@ -1124,10 +1124,6 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    if (cap->r.rCurrentNursery->u.back != NULL) {
 		cap->r.rCurrentNursery->u.back->link = bd;
 	    } else {
-#if !defined(THREADED_RTS)
-		ASSERT(g0s0->blocks == cap->r.rCurrentNursery &&
-		       g0s0 == cap->r.rNursery);
-#endif
 		cap->r.rNursery->blocks = bd;
 	    }		  
 	    cap->r.rCurrentNursery->u.back = bd;
