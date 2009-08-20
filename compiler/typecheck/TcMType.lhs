@@ -415,7 +415,7 @@ occurCheckErr ty containingTy
 newCoVars :: [(TcType,TcType)] -> TcM [CoVar]
 newCoVars spec
   = do	{ us <- newUniqueSupply 
-	; return [ mkCoVar (mkSysTvName uniq (fsLit "co"))
+	; return [ mkCoVar (mkSysTvName uniq (fsLit "co_kv"))
 			   (mkCoKind ty1 ty2)
 		 | ((ty1,ty2), uniq) <- spec `zip` uniqsFromSupply us] }
 

@@ -262,22 +262,22 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 
 	; poly_tup_id <- newSysLocalDs (exprType poly_tup_expr)
 
-	; let dict_args = map Var dicts
-
-	      mk_bind ((tyvars, global, local, prags), n)	-- locals !! n == local
-	        = 	-- Need to make fresh locals to bind in the selector, because
-		      	-- some of the tyvars will be bound to 'Any'
+	; let mk_bind ((tyvars, global, local, prags), n)  -- locals!!n == local
+	        = 	-- Need to make fresh locals to bind in the selector,
+		      	-- because some of the tyvars will be bound to 'Any'
 		  do { ty_args <- mapM mk_ty_arg all_tyvars
 		     ; let substitute = substTyWith all_tyvars ty_args
 		     ; locals' <- newSysLocalsDs (map substitute local_tys)
 		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
-		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local core_bind) 
+		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global
+		 			 local core_bind) 
 				      	 prags
 		     ; let (spec_binds, rules) = unzip (catMaybes mb_specs)
 			   global' = addIdSpecialisations global rules
 	                   rhs = mkLams tyvars $ mkLams dicts $
 	      	     		 mkTupleSelector locals' (locals' !! n) tup_id $
-			         mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args
+			         mkVarApps (mkTyApps (Var poly_tup_id) ty_args)
+			 		   dicts
 		     ; return ((global', rhs) : spec_binds) }
 	        where
 	          mk_ty_arg all_tyvar

@@ -1173,7 +1173,7 @@ mkEqInst (EqPred ty1 ty2) co
 	     ; return inst
 	     }
 	where 
-          mkName uniq src_span = mkInternalName uniq (mkVarOcc "co") src_span
+          mkName uniq src_span = mkInternalName uniq (mkVarOcc "co_ei") src_span
 mkEqInst pred _ = pprPanic "mkEqInst" (ppr pred)
 
 mkWantedEqInst :: PredType -> TcM Inst

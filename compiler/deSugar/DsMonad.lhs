@@ -230,7 +230,7 @@ newPredVarDs :: PredType -> DsM Var
 newPredVarDs pred
  | isEqPred pred
  = do { uniq <- newUnique; 
-      ; let name = mkSystemName uniq (mkOccNameFS tcName (fsLit "co"))
+      ; let name = mkSystemName uniq (mkOccNameFS tcName (fsLit "co_pv"))
 	    kind = mkPredTy pred
       ; return (mkCoVar name kind) }
  | otherwise
