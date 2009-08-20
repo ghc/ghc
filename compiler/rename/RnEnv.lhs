@@ -12,7 +12,7 @@ module RnEnv (
 	lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 	lookupLocalDataTcNames, lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupLocatedSubBndr, lookupConstructorFields,
+	lookupInstDeclBndr, lookupSubBndr, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, 
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn, addUsedRdrNames,
@@ -215,7 +215,7 @@ lookupTopBndrRn_maybe rdr_name
 	      
 
 -----------------------------------------------
-lookupInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
+lookupInstDeclBndr :: Name -> RdrName -> RnM Name
 -- This is called on the method name on the left-hand side of an 
 -- instance declaration binding. eg.  instance Functor T where
 --                                       fmap = ...
@@ -227,7 +227,13 @@ lookupInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
 -- name is only in scope qualified.  I.e. even if method op is
 -- in scope as M.op, we still allow plain 'op' on the LHS of
 -- an instance decl
-lookupInstDeclBndr cls rdr = lookupLocatedSubBndr (ParentIs cls) doc rdr
+lookupInstDeclBndr cls rdr
+  = do { when (isQual rdr)
+       	      (addErr (badQualBndrErr rdr)) 
+	       	-- In an instance decl you aren't allowed
+      	     	-- to use a qualified name for the method
+		-- (Although it'd make perfect sense.)
+       ; lookupSubBndr (ParentIs cls) doc rdr }
   where
     doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
@@ -264,15 +270,11 @@ lookupConstructorFields con_name
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 
-lookupLocatedSubBndr :: Parent  -- NoParent   => just look it up as usual
-				   -- ParentIs p => use p to disambiguate
-			-> SDoc -> Located RdrName
-			-> RnM (Located Name)
-lookupLocatedSubBndr parent doc rdr_name
-  = wrapLocM (lookup_sub_bndr parent doc) rdr_name
-
-lookup_sub_bndr :: Parent -> SDoc -> RdrName -> RnM Name
-lookup_sub_bndr parent doc rdr_name
+lookupSubBndr :: Parent  -- NoParent   => just look it up as usual
+			 -- ParentIs p => use p to disambiguate
+              -> SDoc -> RdrName 
+              -> RnM Name
+lookupSubBndr parent doc rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
   = return n
 

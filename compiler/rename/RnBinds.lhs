@@ -639,7 +639,7 @@ rnMethodBind :: Name
 rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
 					             fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ do
-    sel_name <- lookupInstDeclBndr cls name
+    sel_name <- wrapLocM (lookupInstDeclBndr cls) name
     let plain_name = unLoc sel_name
         -- We use the selector name as the binder
 
