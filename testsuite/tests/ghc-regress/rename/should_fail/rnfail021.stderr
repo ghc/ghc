@@ -1,2 +1,2 @@
 
-rnfail021.hs:5:1: Qualified variable in pattern: Baz.f
+rnfail021.hs:5:1: Qualified name in binding position: Baz.f

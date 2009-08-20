@@ -1,2 +1,4 @@
 
-mod62.hs:3:8: Qualified name in function definition: M.y
+mod62.hs:3:8: Qualified name in binding position: M.y
+
+mod62.hs:3:21: Not in scope: `M.y'

@@ -1,2 +1,2 @@
 
-rnfail039.hs:11:14: Qualified name in function definition: P.==
+rnfail039.hs:11:14: Qualified name in binding position: P.==

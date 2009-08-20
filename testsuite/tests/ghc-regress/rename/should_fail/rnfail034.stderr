@@ -1,2 +1,4 @@
 
-rnfail034.hs:4:10: Qualified name in function definition: M.y
+rnfail034.hs:4:10: Qualified name in binding position: M.y
+
+rnfail034.hs:4:25: Not in scope: `M.y'
