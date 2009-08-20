@@ -89,6 +89,22 @@ AC_ARG_WITH([ghc],
   fi
   WithGhc="$GHC"])
 
+dnl ** Booting from .hc files?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(hc-boot,
+[AC_HELP_STRING([--enable-hc-boot],
+[Boot the Glasgow Haskell Compiler from intermediate .hc files.
+ (This option is mostly of interest to porters.) [default=no]])],
+[ if test x"$enableval" = x"yes"; then
+        BootingFromHc=YES
+  else
+        BootingFromHc=NO
+  fi
+],
+[BootingFromHc=NO]
+)
+AC_SUBST(BootingFromHc)
+
 dnl ** Booting from unregisterised .hc files?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot-unregisterised,
@@ -110,26 +126,6 @@ if test "$BootingFromHc" = "NO"; then
 if test "$BootingFromUnregisterisedHc" = "YES"; then
 AC_MSG_ERROR([--enable-hc-boot-unregisterised requires --enable-hc-boot.])
 fi;
-fi;
-
-dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
-  if test "$WithGhc" = ""; then
-     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
-  fi
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.8],
-    [AC_MSG_ERROR([GHC version 6.8 or later is required to compile GHC.])])dnl
-
-  if test `expr $GhcMinVersion % 2` = "1"; then
-     echo $EnableBootstrapWithDevelSnaphost
-     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
-        AC_MSG_ERROR([
-     $WithGhc is a development snapshot of GHC, version $GhcVersion.
-     Bootstrapping using this version of GHC is not supported, and may not
-     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
-     or --with-ghc to specify a different GHC to use.])
-     fi
-  fi
 fi;
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
@@ -155,6 +151,25 @@ if test "$WithGhc" != ""; then
   if test $GhcCanonVersion -ge 609; then ghc_ge_609=YES; else ghc_ge_609=NO; fi
   AC_SUBST(ghc_ge_609)dnl
 fi
+
+dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
+if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
+  if test "$WithGhc" = ""; then
+     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
+  fi
+  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.8],
+    [AC_MSG_ERROR([GHC version 6.8 or later is required to compile GHC.])])dnl
+
+  if test `expr $GhcMinVersion % 2` = "1"; then
+     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
+        AC_MSG_ERROR([
+     $WithGhc is a development snapshot of GHC, version $GhcVersion.
+     Bootstrapping using this version of GHC is not supported, and may not
+     work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
+     or --with-ghc to specify a different GHC to use.])
+     fi
+  fi
+fi;
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -399,22 +414,6 @@ AC_ARG_WITH(ld,
  ],
  [FP_PROG_LD()]
 )
-
-dnl ** Booting from .hc files?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(hc-boot,
-[AC_HELP_STRING([--enable-hc-boot],
-[Boot the Glasgow Haskell Compiler from intermediate .hc files.
- (This option is mostly of interest to porters.) [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        BootingFromHc=YES
-  else
-        BootingFromHc=NO
-  fi
-],
-[BootingFromHc=NO]
-)
-AC_SUBST(BootingFromHc)
 
 # This uses GHC, so put it after the "GHC is required" check above:
 FP_FIND_ROOT
