@@ -118,6 +118,7 @@ test('T2506', normal, compile, [''])
 test('T2914', normal, compile, [''])
 test('T3221', normal, compile, [''])
 test('T3262', normal, compile, [''])
+test('T3371', normal, compile, [''])
 test('T1074', normal, compile, ['-Wall'])
 
 test('timing001', normal, compile, [''])
