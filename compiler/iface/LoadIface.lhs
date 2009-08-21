@@ -257,6 +257,7 @@ loadInterface doc_str mod from
                }
 
 	; updateEps_  $ \ eps -> 
+           if elemModuleEnv mod (eps_PIT eps) then eps else
 	    eps { 
 	      eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
 	      eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
