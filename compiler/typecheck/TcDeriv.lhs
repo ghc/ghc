@@ -1387,6 +1387,7 @@ genInst standalone_deriv oflag spec
 -- When dealing with the deriving clause
 --    co1 : N [(b,b)] ~ R1:N (b,b)
 --    co2 : R1:N (b,b) ~ Tree (b,b)
+--    co  : N [(b,b)] ~ Tree (b,b)
 
 genDerivBinds :: SrcSpan -> FixityEnv -> Class -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 genDerivBinds loc fix_env clas tycon

@@ -600,9 +600,10 @@ tc_inst_decl2 :: Id -> InstBindings Name -> TcM (LHsBinds Id)
 -- see Note [Newtype deriving superclasses] in TcDeriv.lhs
 
 tc_inst_decl2 dfun_id (NewTypeDerived coi)
-  = do  { let rigid_info   = InstSkol
-              origin       = SigOrigin rigid_info
-              inst_ty      = idType dfun_id
+  = do  { let rigid_info = InstSkol
+              origin     = SigOrigin rigid_info
+              inst_ty    = idType dfun_id
+	      inst_tvs   = fst (tcSplitForAllTys inst_ty)
         ; (inst_tvs', theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
                 -- inst_head_ty is a PredType
 
@@ -615,7 +616,13 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
               (rep_ty, wrapper) 
 	         = case coi of
 	      	     IdCo   -> (last_ty, idHsWrapper)
-		     ACo co -> (snd (coercionKind co), WpCast (mk_full_coercion co))
+		     ACo co -> (snd (coercionKind co'), WpCast (mk_full_coercion co'))
+			    where
+			       co' = substTyWith inst_tvs (mkTyVarTys inst_tvs') co
+				-- NB: the free variable of coi are bound by the
+				-- universally quantified variables of the dfun_id
+				-- This is weird, and maybe we should make NewTypeDerived
+				-- carry a type-variable list too; but it works fine
 
 		 -----------------------
 		 --        mk_full_coercion
@@ -736,7 +743,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
 	     			 this_dict dfun_id
                              	 prag_fn monobinds
        ; (meth_exprs, meth_binds) <- tcExtendTyVarEnv inst_tyvars'  $
-				mapAndUnzipM tc_meth op_items 
+				     mapAndUnzipM tc_meth op_items 
 
          -- Figure out bindings for the superclass context
          -- Don't include this_dict in the 'givens', else
