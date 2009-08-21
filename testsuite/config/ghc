@@ -25,7 +25,6 @@ config.run_ways		     = ['normal', 'optc', 'hpc']
 config.other_ways            = ['extcore','optextcore',
                                 'prof_hc_hb','prof_hb',
                                 'prof_hd','prof_hy','prof_hr',
-                                'dyn',
                                 'threaded2_qw']
 
 if (ghc_with_native_codegen == 1):
@@ -49,6 +48,9 @@ if (ghc_with_threaded_rts == 1):
 	config.run_ways.append('threaded1')
 	if (ghc_with_smp == 1):
 		config.run_ways.append('threaded2')
+
+if (ghc_with_dynamic_rts == 1):
+	config.run_ways.append('dyn')
 
 if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
         config.run_ways.append('profthreaded')

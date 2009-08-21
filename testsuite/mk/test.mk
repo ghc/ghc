@@ -57,6 +57,12 @@ else
 RUNTEST_OPTS += -e ghc_with_threaded_rts=0
 endif
 
+ifeq "$(filter dyn, $(GhcRTSWays))" "dyn"
+RUNTEST_OPTS += -e ghc_with_dynamic_rts=1
+else
+RUNTEST_OPTS += -e ghc_with_dynamic_rts=0
+endif
+
 $(eval $(call get-ghc-feature-bool,GhcWithInterpreter,Have interpreter))
 ifeq "$(GhcWithInterpreter)" "YES"
 RUNTEST_OPTS += -e ghc_with_interpreter=1
