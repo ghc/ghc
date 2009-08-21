@@ -38,24 +38,27 @@ $1_$2_$3_MKSTUBOBJS = true
 $1_$2_$3_C_OBJS += $$(shell $$(FIND) $1/$2/build -name "*_stub.c" -print | sed 's/c$$$$/o/')
 endif
 
+$1_$2_$3_NON_HS_OBJS = $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS)  $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
+$1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
+
 ifeq "$3" "dyn"
 # Link a dynamic library
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS) $$($1_$2_EXTRA_OBJS)
-	"$$($1_$2_HC)" $$($1_$2_dyn_C_OBJS) $$($1_$2_dyn_S_OBJS) $$($1_$2_$3_HS_OBJS) \
-         `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS) \
+$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
+	"$$($1_$2_HC)" $$($1_$2_$3_ALL_OBJS) \
+         `$$($1_$2_$3_MKSTUBOBJS)` \
          -shared -dynamic -dynload deploy \
          -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
          -o $$@
 else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	(echo $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS); $$(FIND) $$(patsubst %.$$($3_osuf),%_$$($3_osuf)_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
+	(echo $$($1_$2_$3_NON_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; $$(FIND) $$(patsubst %.$$($3_osuf),%_$$($3_osuf)_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
 else
-$$($1_$2_$3_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
+$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_$3_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
+	echo $$($1_$2_$3_ALL_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
 endif
 endif
 
