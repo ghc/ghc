@@ -481,7 +481,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
                  extras = [ HsRecField
                               { hsRecFieldId = L loc f
                               , hsRecFieldArg = name_to_arg (L loc f)
-                              , hsRecPun = True }
+                              , hsRecPun = False }
                           | f <- absent_flds ]
 
            ; return (flds ++ extras) }
