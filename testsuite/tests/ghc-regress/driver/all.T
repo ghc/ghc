@@ -220,3 +220,6 @@ test('shared001', [ only_windows,
                     extra_clean(['Shared001.hi', 'Shared001.o', 'HSdll.dll.a', 'HSdll.dll', 'Shared001_stub.c', 'Shared001_stub.h', 'Shared001_stub.o'])
                  ], run_command,
      ['$MAKE -s --no-print-directory shared001'])
+
+test('dynHelloWorld', only_ways(['dyn']), compile_and_run, [''])
+
