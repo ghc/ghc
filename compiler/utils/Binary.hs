@@ -551,8 +551,8 @@ instance (Integral a, Binary a) => Binary (Ratio a) where
 #endif
 
 instance Binary (Bin a) where
-  put_ bh (BinPtr i) = put_ bh i
-  get bh = do i <- get bh; return (BinPtr i)
+  put_ bh (BinPtr i) = put_ bh (fromIntegral i :: Int32)
+  get bh = do i <- get bh; return (BinPtr (fromIntegral (i :: Int32)))
 
 -- -----------------------------------------------------------------------------
 -- Instances for Data.Typeable stuff
@@ -707,7 +707,7 @@ instance Binary FastString where
 
   get bh = do
         j <- get bh
-        return $! (ud_dict (getUserData bh) ! j)
+        return $! (ud_dict (getUserData bh) ! (fromIntegral (j :: Word32)))
 
 -- Here to avoid loop
 

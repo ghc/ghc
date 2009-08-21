@@ -83,6 +83,7 @@ import FastString
 import Outputable
 
 import Data.Array
+import Data.Word        ( Word32 )
 \end{code}
 
 %************************************************************************
@@ -368,7 +369,7 @@ instance Binary Name where
 
    get bh = do
         i <- get bh
-        return $! (ud_symtab (getUserData bh) ! i)
+        return $! (ud_symtab (getUserData bh) ! fromIntegral (i::Word32))
 \end{code}
 
 %************************************************************************
