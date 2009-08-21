@@ -177,13 +177,21 @@ data HsRecFields id arg 	-- A bunch of record fields
 				--	{ x = 3, y = True }
 	-- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [HsRecField id arg],
-		  rec_dotdot :: Maybe Int }
-	-- Nothing => the normal case
-	-- Just n  => the group uses ".." notation, 
-	--		and the first n elts of rec_flds
-	--		were the user-written ones
-	-- (In the latter case, the remaining elts of
-	--  rec_flds are the non-user-written ones)
+		  rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
+
+-- Note [DotDot fields]
+-- ~~~~~~~~~~~~~~~~~~~~
+-- The rec_dotdot field means this:
+--   Nothing => the normal case
+--   Just n  => the group uses ".." notation, 
+--
+-- In the latter case: 
+--
+--   *before* renamer: rec_flds are exactly the n user-written fields
+--
+--   *after* renamer:  rec_flds includes *all* fields, with 
+--   	     	       the first 'n' being the user-written ones
+--		       and the remainder being 'filled in' implicitly
 
 data HsRecField id arg = HsRecField {
 	hsRecFieldId  :: Located id,
@@ -196,9 +204,12 @@ data HsRecField id arg = HsRecField {
 -- If you write T { x, y = v+1 }, the HsRecFields will be
 --	HsRecField x x True ...
 --	HsRecField y (v+1) False ...
--- That is, for "punned" field x is immediately expanded to x=x
--- but with a punning flag so we can detect it later
+-- That is, for "punned" field x is expanded (in the renamer) 
+-- to x=x; but with a punning flag so we can detect it later
 -- (e.g. when pretty printing)
+--
+-- If the original field was qualified, we un-qualify it, thus
+--    T { A.x } means T { A.x = x }
 
 hsRecFields :: HsRecFields id arg -> [id]
 hsRecFields rbinds = map (unLoc . hsRecFieldId) (rec_flds rbinds)

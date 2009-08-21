@@ -19,6 +19,7 @@ module RdrHsSyn (
         cvBindsAndSigs,
 	cvTopDecls,
 	findSplice, checkDecBrGroup,
+        placeHolderPunRhs,
 
 	-- Stuff to do with Foreign declarations
 	mkImport,
@@ -789,9 +790,15 @@ checkAPat dynflags loc e = case e of
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
 
-plus_RDR, bang_RDR :: RdrName
+placeHolderPunRhs :: HsExpr RdrName
+-- The RHS of a punned record field will be filled in by the renamer
+-- It's better not to make it an error, in case we want to print it when debugging
+placeHolderPunRhs = HsVar pun_RDR
+
+plus_RDR, bang_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+")	-- Hack
 bang_RDR = mkUnqual varName (fsLit "!")	-- Hack
+pun_RDR  = mkUnqual varName (fsLit "pun-right-hand-side")
 
 checkPatField :: HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
 checkPatField fld = do	{ p <- checkLPat (hsRecFieldArg fld)
