@@ -38,6 +38,7 @@ import FastMutInt
 import Unique
 import Outputable
 import FastString
+import Constants
 
 import Data.List
 import Data.Word
@@ -92,12 +93,17 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path update_nc = do
   errorOnMismatch "magic number mismatch: old/corrupt interface file?"
       binaryInterfaceMagic magic
 
-        -- Get the dictionary pointer.  We won't attempt to actually
-        -- read the dictionary until we've done the version checks below,
-        -- just in case this isn't a valid interface.  In retrospect the
-        -- version should have come before the dictionary pointer, but this
-        -- is the way it was done originally, and we can't change it now.
-  dict_p <- Binary.get bh       -- Get the dictionary ptr
+        -- Note [dummy iface field]
+        -- read a dummy 32/64 bit value.  This field used to hold the
+        -- dictionary pointer in old interface file formats, but now
+        -- the dictionary pointer is after the version (where it
+        -- should be).  Also, the serialisation of value of type "Bin
+        -- a" used to depend on the word size of the machine, now they
+        -- are always 32 bits.
+        --
+  if wORD_SIZE == 4
+     then do Binary.get bh :: IO Word32; return ()
+     else do Binary.get bh :: IO Word64; return ()
 
         -- Check the interface file version and ways.
   check_ver  <- get bh
@@ -114,6 +120,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path update_nc = do
         -- Read the dictionary
         -- The next word in the file is a pointer to where the dictionary is
         -- (probably at the end of the file)
+  dict_p <- Binary.get bh
   data_p <- tellBin bh          -- Remember where we are now
   seekBin bh dict_p
   dict <- getDictionary bh
@@ -139,14 +146,21 @@ writeBinIface dflags hi_path mod_iface = do
   bh <- openBinMem initBinMemSize
   put_ bh binaryInterfaceMagic
 
-	-- Remember where the dictionary pointer will go
-  dict_p_p <- tellBin bh
-  put_ bh dict_p_p	-- Placeholder for ptr to dictionary
+       -- dummy 32/64-bit field before the version/way for
+       -- compatibility with older interface file formats.
+       -- See Note [dummy iface field] above.
+  if wORD_SIZE == 4
+     then Binary.put_ bh (0 :: Word32)
+     else Binary.put_ bh (0 :: Word64)
 
         -- The version and way descriptor go next
   put_ bh (show opt_HiVersion)
   let way_descr = getWayDescr dflags
   put_  bh way_descr
+
+	-- Remember where the dictionary pointer will go
+  dict_p_p <- tellBin bh
+  put_ bh dict_p_p	-- Placeholder for ptr to dictionary
 
         -- Remember where the symbol table pointer will go
   symtab_p_p <- tellBin bh
