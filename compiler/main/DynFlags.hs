@@ -1926,7 +1926,7 @@ parseDynamicNoPackageFlags dflags args = parseDynamicFlags_ dflags args False
 parseDynamicFlags_ :: Monad m =>
                       DynFlags -> [Located String] -> Bool
                   -> m (DynFlags, [Located String], [Located String])
-parseDynamicFlags_ dflags args pkg_flags = do
+parseDynamicFlags_ dflags0 args pkg_flags = do
   -- XXX Legacy support code
   -- We used to accept things like
   --     optdep-f  -optdepdepend
@@ -1943,10 +1943,23 @@ parseDynamicFlags_ dflags args pkg_flags = do
       flag_spec | pkg_flags = package_flags ++ dynamic_flags
                 | otherwise = dynamic_flags
 
-  let ((leftover, errs, warns), dflags')
-          = runCmdLine (processArgs flag_spec args') dflags
+  let ((leftover, errs, warns), dflags1)
+          = runCmdLine (processArgs flag_spec args') dflags0
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
-  return (dflags', leftover, warns)
+
+  -- Cannot use -fPIC with registerised -fvia-C, because the mangler
+  -- isn't up to the job.  We know that if hscTarget == HscC, then the
+  -- user has explicitly used -fvia-C, because -fasm is the default,
+  -- unless there is no NCG on this platform.  The latter case is
+  -- checked when the -fPIC flag is parsed.
+  --
+  let (pic_warns, dflags2) =
+        if opt_PIC && hscTarget dflags1 == HscC && cGhcUnregisterised == "NO"
+          then ([L noSrcSpan $ "Warning: -fvia-C is incompatible with -fPIC; ignoring -fvia-C"],
+                dflags1{ hscTarget = HscAsm })
+          else ([], dflags1)
+
+  return (dflags2, leftover, pic_warns ++ warns)
 
 type DynP = CmdLineP DynFlags
 

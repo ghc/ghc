@@ -138,6 +138,11 @@ static_flags = [
   , Flag "Rghc-timing"    (NoArg  (enableTimingStats)) Supported
 
         ------ Compiler flags -----------------------------------------------
+
+        -- -fPIC requires extra checking: only the NCG supports it.
+        -- See also DynFlags.parseDynamicFlags.
+  , Flag "fPIC" (PassFlag setPIC) Supported
+
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   , Flag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
@@ -146,6 +151,12 @@ static_flags = [
         -- Pass all remaining "-f<blah>" options to hsc
   , Flag "f" (AnySuffixPred isStaticFlag addOpt) Supported
   ]
+
+setPIC :: String -> IO ()
+setPIC | cGhcWithNativeCodeGen == "YES" || cGhcUnregisterised == "YES"
+       = addOpt
+       | otherwise
+       = ghcError $ CmdLineError "-fPIC is not supported on this platform"
 
 isStaticFlag :: String -> Bool
 isStaticFlag f =
