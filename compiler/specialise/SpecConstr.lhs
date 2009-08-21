@@ -37,6 +37,8 @@ import StaticFlags	( opt_PprStyle_Debug )
 import StaticFlags	( opt_SpecInlineJoinPoints )
 import BasicTypes	( Activation(..) )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
+import NewDemand
+import DmdAnal		( both )
 import Util
 import UniqSupply
 import Outputable
@@ -1110,11 +1112,36 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 	      spec_occ  = mkSpecOcc (nameOccName fn_name)
 	      rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
 	      spec_rhs  = mkLams spec_lam_args spec_body
+	      spec_str  = calcSpecStrictness fn spec_lam_args pats
 	      spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
+	      		    `setIdNewStrictness` spec_str    	-- See Note [Transfer strictness]
+			    `setIdArity` count isId spec_lam_args
 	      body_ty   = exprType spec_body
 	      rule_rhs  = mkVarApps (Var spec_id) spec_call_args
 	      rule      = mkLocalRule rule_name specConstrActivation fn_name qvars pats rule_rhs
 	; return (spec_usg, OS call_pat rule spec_id spec_rhs) }
+
+calcSpecStrictness :: Id 		     -- The original function
+                   -> [Var] -> [CoreExpr]    -- Call pattern
+		   -> StrictSig              -- Strictness of specialised thing
+-- See Note [Transfer strictness]
+calcSpecStrictness fn qvars pats
+  = StrictSig (mkTopDmdType spec_dmds TopRes)
+  where
+    spec_dmds = [ lookupVarEnv dmd_env qv `orElse` lazyDmd | qv <- qvars, isId qv ]
+    StrictSig (DmdType _ dmds _) = idNewStrictness fn
+
+    dmd_env = go emptyVarEnv dmds pats
+
+    go env ds (Type {} : pats) = go env ds pats
+    go env (d:ds) (pat : pats) = go (go_one env d pat) ds pats
+    go env _      _            = env
+
+    go_one env d   (Var v) = extendVarEnv_C both env v d
+    go_one env (Box d)   e = go_one env d e
+    go_one env (Eval (Prod ds)) e 
+    	   | (Var _, args) <- collectArgs e = go env ds args
+    go_one env _         _ = env
 
 -- In which phase should the specialise-constructor rules be active?
 -- Originally I made them always-active, but Manuel found that
@@ -1127,6 +1154,23 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 specConstrActivation :: Activation
 specConstrActivation = ActiveAfter 0	-- Baked in; see comments above
 \end{code}
+
+Note [Transfer strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must transfer strictness information from the original function to
+the specialised one.  Suppose, for example
+
+  f has strictness     SS
+        and a RULE     f (a:as) b = f_spec a as b
+
+Now we want f_spec to have strictess  LLS, otherwise we'll use call-by-need
+when calling f_spec instead of call-by-value.  And that can result in 
+unbounded worsening in space (cf the classic foldl vs foldl')
+
+See Trac #3437 for a good example.
+
+The function calcSpecStrictness performs the calculation.
+
 
 %************************************************************************
 %*									*
