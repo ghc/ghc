@@ -79,9 +79,8 @@ module Util (
 
 import Panic
 
-import Data.IORef       ( IORef, newIORef )
+import Data.IORef       ( IORef, newIORef, atomicModifyIORef )
 import System.IO.Unsafe ( unsafePerformIO )
-import Data.IORef       ( readIORef, writeIORef )
 import Data.List        hiding (group)
 import Control.Concurrent.MVar ( MVar, newMVar, newEmptyMVar )
 
@@ -696,8 +695,7 @@ global a = unsafePerformIO (newIORef a)
 \begin{code}
 consIORef :: IORef [a] -> a -> IO ()
 consIORef var x = do
-  xs <- readIORef var
-  writeIORef var (x:xs)
+  atomicModifyIORef var (\xs -> (x:xs,()))
 \end{code}
 
 \begin{code}
