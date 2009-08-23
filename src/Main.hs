@@ -30,7 +30,6 @@ import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
 import Haddock.GhcUtils
-import Paths_haddock
 
 import Control.Monad
 import Control.OldException
@@ -41,7 +40,6 @@ import qualified Data.Map as Map
 import System.IO
 import System.Exit
 import System.Environment
-import System.FilePath
 import Distribution.Verbosity
 
 #if defined(mingw32_HOST_OS)
@@ -50,15 +48,17 @@ import Foreign.C
 import Data.Int
 #endif
 
-#ifndef IN_GHC_TREE
+#ifdef IN_GHC_TREE
+import System.FilePath
+#else
 import GHC.Paths
+import Paths_haddock
 #endif
 
 import GHC hiding (flags, verbosity)
 import Config
 import DynFlags hiding (flags, verbosity)
 import Panic (handleGhcException)
-import MonadUtils ( MonadIO(..) )
 
 
 --------------------------------------------------------------------------------
@@ -325,7 +325,10 @@ startGhc libDir flags ghcActs = do
       }
     dynflags''' <- parseGhcFlags dynflags'' restFlags flags
     defaultCleanupHandler dynflags''' $ do
-        setSessionDynFlags dynflags'''
+        -- ignore the following return-value, which is a list of packages
+        -- that may need to be re-linked: Haddock doesn't do any
+        -- dynamic or static linking at all!
+        _ <- setSessionDynFlags dynflags'''
         ghcActs dynflags'''
   where
     parseGhcFlags :: Monad m => DynFlags -> [Located String]
@@ -417,6 +420,7 @@ getPrologue flags =
     _otherwise -> throwE "multiple -p/--prologue options"
 
 
+#ifdef IN_GHC_TREE
 getExecDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 getExecDir = allocaArray len $ \buf -> do
@@ -431,5 +435,6 @@ foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir = return Nothing
+#endif
 #endif
 
