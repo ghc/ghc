@@ -71,7 +71,7 @@ ppHtml	:: String
 	-> Maybe String				-- package
 	-> [Interface]
 	-> FilePath			-- destination directory
-	-> Maybe (GHC.HsDoc GHC.RdrName)    -- prologue text, maybe
+	-> Maybe (HsDoc GHC.RdrName)    -- prologue text, maybe
 	-> Maybe String		        -- the Html Help format (--html-help)
 	-> SourceURLs			-- the source URL (--source)
 	-> WikiURLs			-- the wiki URL (--wiki)
@@ -285,7 +285,7 @@ moduleInfo iface =
    let
       info = ifaceInfo iface
 
-      doOneEntry :: (String, (GHC.HaddockModInfo GHC.Name) -> Maybe String) -> Maybe HtmlTable
+      doOneEntry :: (String, (HaddockModInfo GHC.Name) -> Maybe String) -> Maybe HtmlTable
       doOneEntry (fieldName,field) = case field info of
          Nothing -> Nothing
          Just fieldValue -> 
@@ -294,9 +294,9 @@ moduleInfo iface =
      
       entries :: [HtmlTable]
       entries = mapMaybe doOneEntry [
-         ("Portability",GHC.hmi_portability),
-         ("Stability",GHC.hmi_stability),
-         ("Maintainer",GHC.hmi_maintainer)
+         ("Portability",hmi_portability),
+         ("Stability",hmi_stability),
+         ("Maintainer",hmi_maintainer)
          ]
    in
       case entries of
@@ -314,7 +314,7 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [InstalledInterface] -> Bool -> Maybe (GHC.HsDoc GHC.RdrName)
+   -> [InstalledInterface] -> Bool -> Maybe (HsDoc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
@@ -349,7 +349,7 @@ ppHtmlContents odir doctitle
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 
-ppPrologue :: String -> Maybe (GHC.HsDoc GHC.RdrName) -> HtmlTable
+ppPrologue :: String -> Maybe (HsDoc GHC.RdrName) -> HtmlTable
 ppPrologue _ Nothing = Html.emptyTable
 ppPrologue title (Just doc) = 
   (tda [theclass "section1"] << toHtml title) </>
@@ -1755,15 +1755,15 @@ rdrDocToHtml doc = markup htmlRdrMarkup (unParagraph (markup htmlCleanup doc))
 -- separate them.  So we catch the single paragraph case and transform it
 -- here.
 unParagraph :: HsDoc a -> HsDoc a
-unParagraph (GHC.DocParagraph d) = d
+unParagraph (DocParagraph d) = d
 --NO: This eliminates line breaks in the code block:  (SDM, 6/5/2003)
 --unParagraph (DocCodeBlock d) = (DocMonospaced d)
 unParagraph doc              = doc
 
-htmlCleanup :: DocMarkup a (GHC.HsDoc a)
+htmlCleanup :: DocMarkup a (HsDoc a)
 htmlCleanup = idMarkup { 
-  markupUnorderedList = GHC.DocUnorderedList . map unParagraph,
-  markupOrderedList   = GHC.DocOrderedList   . map unParagraph
+  markupUnorderedList = DocUnorderedList . map unParagraph,
+  markupOrderedList   = DocOrderedList   . map unParagraph
   } 
 
 -- -----------------------------------------------------------------------------
@@ -1895,7 +1895,7 @@ ndocBox html = tda [theclass "ndoc"] << html
 rdocBox :: Html -> HtmlTable
 rdocBox html = tda [theclass "rdoc"] << html
 
-maybeRDocBox :: Maybe (GHC.LHsDoc DocName) -> HtmlTable
+maybeRDocBox :: Maybe (LHsDoc DocName) -> HtmlTable
 maybeRDocBox Nothing = rdocBox (noHtml)
 maybeRDocBox (Just ldoc) = rdocBox (docToHtml (unLoc ldoc))
 
