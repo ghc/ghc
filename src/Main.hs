@@ -33,12 +33,8 @@ import Haddock.GhcUtils
 import Paths_haddock
 
 import Control.Monad
-#if __GLASGOW_HASKELL__ >= 609
 import Control.OldException
 import qualified Control.Exception as NewException
-#else
-import Control.Exception
-#endif
 import Data.Maybe
 import Data.IORef
 import qualified Data.Map as Map
@@ -61,12 +57,8 @@ import GHC.Paths
 import GHC hiding (flags, verbosity)
 import Config
 import DynFlags hiding (flags, verbosity)
-#if __GLASGOW_HASKELL__ >= 609
 import Panic (handleGhcException)
 import MonadUtils ( MonadIO(..) )
-#else
-import Util hiding (handle)
-#endif
 
 
 --------------------------------------------------------------------------------
@@ -96,11 +88,7 @@ handleNormalExceptions inner =
 
 handleHaddockExceptions :: IO a -> IO a
 handleHaddockExceptions inner =
-#if __GLASGOW_HASKELL__ >= 609
   NewException.catches inner [NewException.Handler handler]
-#else
-  handleDyn handler inner
-#endif
   where
     handler (e::HaddockException) = do
       putStrLn $ "haddock: " ++ (show e)
@@ -109,21 +97,8 @@ handleHaddockExceptions inner =
 
 handleGhcExceptions :: IO a -> IO a
 handleGhcExceptions inner =
-  -- compilation errors: messages with locations attached
-#if __GLASGOW_HASKELL__ < 609
- handleDyn (\e -> do
-    putStrLn "haddock: Compilation error(s):"
-    printBagOfErrors defaultDynFlags (unitBag e)
-    exitFailure
-  ) $
-#endif
-
   -- error messages propagated as exceptions
-#if __GLASGOW_HASKELL__ >= 609
   handleGhcException (\e -> do
-#else
-  handleDyn (\e -> do
-#endif
     hFlush stdout
     case e of
       PhaseFailed _ code -> exitWith code
@@ -159,7 +134,6 @@ main = handleTopExceptions $ do
 
       libDir <- getGhcLibDir flags
 
-#if __GLASGOW_HASKELL__ >= 609
       -- We have one global error handler for all GHC source errors.  Other kinds
       -- of exceptions will be propagated to the top-level error handler.
       let handleSrcErrors action = flip handleSourceError action $ \err -> do
@@ -183,23 +157,7 @@ main = handleTopExceptions $ do
 
           -- last but not least, dump the interface file
           dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
-#else
-      -- initialize GHC
-      (session, dynflags) <- startGhc libDir (ghcFlags flags)
 
-      -- get packages supplied with --read-interface
-      packages <- readInterfaceFiles (nameCacheFromGhc session) (ifacePairs flags)
-
-      -- create the interfaces -- this is the core part of Haddock
-      (interfaces, homeLinks) <- createInterfaces verbosity session fileArgs flags
-                                                  (map fst packages)
-
-      -- render the interfaces
-      renderStep packages interfaces
-
-      -- last but not least, dump the interface file
-      dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
-#endif
     else do
       -- get packages supplied with --read-interface
       packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
@@ -353,21 +311,12 @@ dumpInterfaceFile ifaces homeLinks flags =
 
 -- | Start a GHC session with the -haddock flag set. Also turn off
 -- compilation and linking.
-#if __GLASGOW_HASKELL__ >= 609
 startGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
 startGhc libDir flags ghcActs = do
   -- TODO: handle warnings?
   (restFlags, _) <- parseStaticFlags (map noLoc flags)
   runGhc (Just libDir) $ do
     dynflags  <- getSessionDynFlags
-#else
-startGhc :: String -> [String] -> IO (Session, DynFlags)
-startGhc libDir flags = do
-  restFlags <- parseStaticFlags flags
-  session <- newSession (Just libDir)
-  dynflags <- getSessionDynFlags session
-  do
-#endif
     let dynflags' = dopt_set dynflags Opt_Haddock
     let dynflags'' = dynflags' {
         hscTarget = HscNothing,
@@ -376,23 +325,14 @@ startGhc libDir flags = do
       }
     dynflags''' <- parseGhcFlags dynflags'' restFlags flags
     defaultCleanupHandler dynflags''' $ do
-#if __GLASGOW_HASKELL__ >= 609
         setSessionDynFlags dynflags'''
         ghcActs dynflags'''
-#else
-        setSessionDynFlags session dynflags'''
-        return (session, dynflags''')
-#endif
   where
     parseGhcFlags :: Monad m => DynFlags -> [Located String]
                   -> [String] -> m DynFlags
     parseGhcFlags dynflags flags_ origFlags = do
       -- TODO: handle warnings?
-#if __GLASGOW_HASKELL__ >= 609
       (dynflags', rest, _) <- parseDynamicFlags dynflags flags_
-#else
-      (dynflags', rest) <- parseDynamicFlags dynflags flags_
-#endif
       if not (null rest)
         then throwE ("Couldn't parse GHC options: " ++ (unwords origFlags))
         else return dynflags'
