@@ -76,13 +76,7 @@ import System.FilePath
 import Distribution.Verbosity
 import Distribution.ReadE
 
-#if __GLASGOW_HASKELL__ >= 609
 import MonadUtils ( MonadIO(..) )
-#else
-class Monad m => MonadIO m where
-    liftIO :: IO a -> m a                                              
-instance MonadIO IO where liftIO = id
-#endif
 
 
 -- -----------------------------------------------------------------------------
