@@ -23,7 +23,6 @@ import Haddock.Utils hiding (out)
 import GHC
 import Outputable
 
-import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -198,9 +197,6 @@ ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
 
 ---------------------------------------------------------------------
 -- DOCUMENTATION
-
-ldoc :: Outputable o => Maybe (LHsDoc o) -> [String]
-ldoc = doc . liftM unL
 
 doc :: Outputable o => Maybe (HsDoc o) -> [String]
 doc = docWith ""
