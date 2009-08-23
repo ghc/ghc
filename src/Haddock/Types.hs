@@ -360,12 +360,8 @@ instance Show HaddockException where
 
 
 throwE :: String -> a
-#if __GLASGOW_HASKELL__ >= 609
 instance Exception HaddockException
 throwE str = throw (HaddockException str)
-#else
-throwE str = throwDyn (HaddockException str)
-#endif
 
 -- In "Haddock.Interface.Create", we need to gather
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
