@@ -821,7 +821,7 @@ ppDecl :: Bool -> LinksInfo -> LHsDecl DocName ->
 ppDecl summ links (L loc decl) mbDoc instances docMap subdocs unicode = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d unicode
   TyClD d@(TyData {})
-    | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances loc mbDoc d unicode
+    | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances subdocs loc mbDoc d unicode
     | Just _  <- tcdTyPats d     -> ppDataInst summ links loc mbDoc d 
   TyClD d@(TySynonym {})
     | Nothing <- tcdTyPats d     -> ppTySyn summ links loc mbDoc d unicode
@@ -1257,9 +1257,10 @@ ppShortDataDecl summary links loc dataDecl unicode
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
 
-ppDataDecl :: Bool -> LinksInfo -> [InstHead DocName] -> 
+ppDataDecl :: Bool -> LinksInfo -> [InstHead DocName] ->
+              [(DocName, Maybe (HsDoc DocName))] ->
               SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> Bool -> HtmlTable
-ppDataDecl summary links instances loc mbDoc dataDecl unicode
+ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
   
   | summary = declWithDoc summary links loc docname mbDoc 
               (ppShortDataDecl summary links loc dataDecl unicode)
@@ -1299,7 +1300,7 @@ ppDataDecl summary links instances loc mbDoc dataDecl unicode
       | null cons = Html.emptyTable
       | otherwise = constrHdr </> ( 
           tda [theclass "body"] << constrTable << 
-	  aboves (map (ppSideBySideConstr unicode) cons)
+	  aboves (map (ppSideBySideConstr subdocs unicode) cons)
         )
 
     instId = collapseId (getName docname)
@@ -1374,8 +1375,8 @@ ppConstrHdr forall tvs ctxt unicode
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
       Implicit -> empty
 
-ppSideBySideConstr :: Bool -> LConDecl DocName -> HtmlTable
-ppSideBySideConstr unicode (L _ con) = case con_res con of 
+ppSideBySideConstr :: [(DocName, Maybe (HsDoc DocName))] -> Bool -> LConDecl DocName -> HtmlTable
+ppSideBySideConstr subdocs unicode (L _ con) = case con_res con of 
  
   ResTyH98 -> case con_details con of 
 
@@ -1404,7 +1405,7 @@ ppSideBySideConstr unicode (L _ con) = case con_res con of
  where 
     doRecordFields fields =
         (tda [theclass "body"] << spacedTable1 <<
-        aboves (map (ppSideBySideField unicode) fields))
+        aboves (map (ppSideBySideField subdocs unicode) fields))
     doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon unicode <+> hsep [
                                ppForAll forall ltvs (con_cxt con) unicode,
                                ppLType unicode (foldr mkFunTy resTy args) ]
@@ -1417,14 +1418,19 @@ ppSideBySideConstr unicode (L _ con) = case con_res con of
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
     forall  = con_explicit con
-    mbLDoc  = con_doc con
+    -- don't use "con_doc con", in case it's reconstructed from a .hi file,
+    -- or also because we want Haddock to do the doc-parsing, not GHC.
+    mbLDoc  = fmap noLoc $ join $ lookup (unLoc $ con_name con) subdocs
     mkFunTy a b = noLoc (HsFunTy a b)
 
-ppSideBySideField :: Bool -> ConDeclField DocName ->  HtmlTable
-ppSideBySideField unicode (ConDeclField (L _ name) ltype mbLDoc) =
+ppSideBySideField :: [(DocName, Maybe (HsDoc DocName))] -> Bool -> ConDeclField DocName ->  HtmlTable
+ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
   argBox (ppBinder False (docNameOcc name)
     <+> dcolon unicode <+> ppLType unicode ltype) <->
   maybeRDocBox mbLDoc
+  where
+    -- don't use cd_fld_doc for same reason we don't use con_doc above
+    mbLDoc = fmap noLoc $ join $ lookup name subdocs
 
 {-
 ppHsFullConstr :: HsConDecl -> Html

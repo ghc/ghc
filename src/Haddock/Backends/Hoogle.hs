@@ -109,9 +109,9 @@ operator x = x
 -- How to print each export
 
 ppExport :: ExportItem Name -> [String]
-ppExport (ExportDecl decl dc _ _) = doc dc ++ f (unL decl)
+ppExport (ExportDecl decl dc subdocs _) = doc dc ++ f (unL decl)
     where
-        f (TyClD d@TyData{}) = ppData d
+        f (TyClD d@TyData{}) = ppData d subdocs
         f (TyClD d@ClassDecl{}) = ppClass d
         f (TyClD d@TySynonym{}) = ppSynonym d
         f (ForD (ForeignImport name typ _)) = ppSig $ TypeSig name typ
@@ -156,9 +156,9 @@ ppInstance :: Instance -> [String]
 ppInstance x = [dropComment $ out x]
 
 
-ppData :: TyClDecl Name -> [String]
-ppData x = showData x{tcdCons=[],tcdDerivs=Nothing} :
-           concatMap (ppCtor x . unL) (tcdCons x)
+ppData :: TyClDecl Name -> [(Name, Maybe (HsDoc Name))] -> [String]
+ppData x subdocs = showData x{tcdCons=[],tcdDerivs=Nothing} :
+                   concatMap (ppCtor x subdocs . unL) (tcdCons x)
     where
         -- GHC gives out "data Bar =", we want to delete the equals
         -- also writes data : a b, when we want data (:) a b
@@ -168,14 +168,18 @@ ppData x = showData x{tcdCons=[],tcdDerivs=Nothing} :
                 nam = out $ tcdLName d
                 f w = if w == nam then operator nam else w
 
+-- | for constructors, and named-fields...
+lookupCon :: [(Name, Maybe (HsDoc Name))] -> Located Name -> Maybe (HsDoc Name)
+lookupCon subdocs (L _ name) = join{-Maybe-} $ lookup name subdocs
 
-ppCtor :: TyClDecl Name -> ConDecl Name -> [String]
-ppCtor dat con = ldoc (con_doc con) ++ f (con_details con)
+ppCtor :: TyClDecl Name -> [(Name, Maybe (HsDoc Name))] -> ConDecl Name -> [String]
+ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
+                         ++ f (con_details con)
     where
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
         f (RecCon recs) = f (PrefixCon $ map cd_fld_type recs) ++ concat
-                          [ldoc (cd_fld_doc r) ++
+                          [doc (lookupCon subdocs (cd_fld_name r)) ++
                            [out (unL $ cd_fld_name r) `typeSig` [resType, cd_fld_type r]]
                           | r <- recs]
 
