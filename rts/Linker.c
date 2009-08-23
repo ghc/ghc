@@ -834,14 +834,6 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(__ashrdi3)		       \
       SymI_NeedsProto(__lshrdi3)		       \
       SymI_NeedsProto(__eprintf)
-#elif defined(ia64_HOST_ARCH)
-#define RTS_LIBGCC_SYMBOLS			        \
-      SymI_NeedsProto(__divdi3)				\
-      SymI_NeedsProto(__udivdi3)                        \
-      SymI_NeedsProto(__moddi3)				\
-      SymI_NeedsProto(__umoddi3)			\
-      SymI_NeedsProto(__divsf3)				\
-      SymI_NeedsProto(__divdf3)
 #else
 #define RTS_LIBGCC_SYMBOLS
 #endif
@@ -1254,10 +1246,6 @@ void ghci_enquire ( char* addr )
 }
 #endif
 
-#ifdef ia64_HOST_ARCH
-static unsigned int PLTSize(void);
-#endif
-
 #ifdef USE_MMAP
 #define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
 
@@ -1413,28 +1401,7 @@ loadObj( char *path )
    if (fd == -1)
       barf("loadObj: can't open `%s'", path);
 
-#ifdef ia64_HOST_ARCH
-   /* The PLT needs to be right before the object */
-   {
-   int pagesize, n;
-   pagesize = getpagesize();
-   n = ROUND_UP(PLTSize(), pagesize);
-   oc->plt = mmap(NULL, n, PROT_EXEC|PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-   if (oc->plt == MAP_FAILED)
-      barf("loadObj: can't allocate PLT");
-
-   oc->pltIndex = 0;
-   map_addr = oc->plt + n;
-
-   n = ROUND_UP(oc->fileSize, pagesize);
-   oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE,
-		    MAP_PRIVATE|TRY_MAP_32BIT, fd, 0);
-   if (oc->image == MAP_FAILED)
-      barf("loadObj: can't map `%s'", path);
-   }
-#else
    oc->image = mmapForLinker(oc->fileSize, 0, fd);
-#endif
 
    close(fd);
 
@@ -2684,12 +2651,6 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #elif defined(x86_64_HOST_ARCH)
 #  define ELF_TARGET_X64_64
 #  define ELF_64BIT
-#elif defined (ia64_HOST_ARCH)
-#  define ELF_TARGET_IA64   /* Used inside <elf.h> */
-#  define ELF_64BIT
-#  define ELF_FUNCTION_DESC /* calling convention uses function descriptors */
-#  define ELF_NEED_GOT      /* needs Global Offset Table */
-#  define ELF_NEED_PLT      /* needs Procedure Linkage Tables */
 #endif
 
 #if !defined(openbsd_HOST_OS)
@@ -2819,30 +2780,6 @@ copyFunctionDesc(Elf_Addr target)
 #endif
 
 #ifdef ELF_NEED_PLT
-#ifdef ia64_HOST_ARCH
-static void ia64_reloc_gprel22(Elf_Addr target, Elf_Addr value);
-static void ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc);
-
-static unsigned char plt_code[] =
-{
-   /* taken from binutils bfd/elfxx-ia64.c */
-   0x0b, 0x78, 0x00, 0x02, 0x00, 0x24,  /*   [MMI]       addl r15=0,r1;;    */
-   0x00, 0x41, 0x3c, 0x30, 0x28, 0xc0,  /*               ld8 r16=[r15],8    */
-   0x01, 0x08, 0x00, 0x84,              /*               mov r14=r1;;       */
-   0x11, 0x08, 0x00, 0x1e, 0x18, 0x10,  /*   [MIB]       ld8 r1=[r15]       */
-   0x60, 0x80, 0x04, 0x80, 0x03, 0x00,  /*               mov b6=r16         */
-   0x60, 0x00, 0x80, 0x00               /*               br.few b6;;        */
-};
-
-/* If we can't get to the function descriptor via gp, take a local copy of it */
-#define PLT_RELOC(code, target) { \
-   Elf64_Sxword rel_value = target - gp_val; \
-   if ((rel_value > 0x1fffff) || (rel_value < -0x1fffff)) \
-      ia64_reloc_gprel22((Elf_Addr)code, copyFunctionDesc(target)); \
-   else \
-      ia64_reloc_gprel22((Elf_Addr)code, target); \
-   }
-#endif
 
 typedef struct {
    unsigned char code[sizeof(plt_code)];
@@ -2899,25 +2836,6 @@ findElfSection ( void* objImage, Elf_Word sh_type )
    }
    return ptr;
 }
-
-#if defined(ia64_HOST_ARCH)
-static Elf_Addr
-findElfSegment ( void* objImage, Elf_Addr vaddr )
-{
-   char* ehdrC = (char*)objImage;
-   Elf_Ehdr* ehdr = (Elf_Ehdr*)ehdrC;
-   Elf_Phdr* phdr = (Elf_Phdr*)(ehdrC + ehdr->e_phoff);
-   Elf_Addr segaddr = 0;
-   int i;
-
-   for (i = 0; i < ehdr->e_phnum; i++) {
-      segaddr = phdr[i].p_vaddr;
-      if ((vaddr >= segaddr) && (vaddr < segaddr + phdr[i].p_memsz))
-	      break;
-   }
-   return segaddr;
-}
-#endif
 
 static int
 ocVerifyImage_ELF ( ObjectCode* oc )
@@ -3412,9 +3330,6 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #     if defined(sparc_HOST_ARCH)
       Elf_Word* pP = (Elf_Word*)P;
       Elf_Word  w1, w2;
-#     elif defined(ia64_HOST_ARCH)
-      Elf64_Xword *pP = (Elf64_Xword *)P;
-      Elf_Addr addr;
 #     elif defined(powerpc_HOST_ARCH)
       Elf_Sword delta;
 #     endif
@@ -3515,34 +3430,6 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             w2 = (Elf_Word)value;
             *pP = w2;
             break;
-#        elif defined(ia64_HOST_ARCH)
-	 case R_IA64_DIR64LSB:
-	 case R_IA64_FPTR64LSB:
-	    *pP = value;
-	    break;
-	 case R_IA64_PCREL64LSB:
-	    *pP = value - P;
-	    break;
-	 case R_IA64_SEGREL64LSB:
-	    addr = findElfSegment(ehdrC, value);
-	    *pP = value - addr;
-	    break;
-	 case R_IA64_GPREL22:
-	    ia64_reloc_gprel22(P, value);
-	    break;
-	 case R_IA64_LTOFF22:
-	 case R_IA64_LTOFF22X:
-	 case R_IA64_LTOFF_FPTR22:
-	    addr = allocateGOTEntry(value);
-	    ia64_reloc_gprel22(P, addr);
-	    break;
-	 case R_IA64_PCREL21B:
-	    ia64_reloc_pcrel21(P, S, oc);
-	    break;
-	 case R_IA64_LDXMOV:
-	    /* This goes with R_IA64_LTOFF22X and points to the load to
-	     * convert into a move.  We don't implement relaxation. */
-	    break;
 #        elif defined(powerpc_HOST_ARCH)
          case R_PPC_ADDR16_LO:
             *(Elf32_Half*) P = value;
@@ -3716,98 +3603,6 @@ ocResolve_ELF ( ObjectCode* oc )
 
    return 1;
 }
-
-/*
- * IA64 specifics
- * Instructions are 41 bits long, packed into 128 bit bundles with a 5-bit template
- * at the front.  The following utility functions pack and unpack instructions, and
- * take care of the most common relocations.
- */
-
-#ifdef ia64_HOST_ARCH
-
-static Elf64_Xword
-ia64_extract_instruction(Elf64_Xword *target)
-{
-   Elf64_Xword w1, w2;
-   int slot = (Elf_Addr)target & 3;
-   target = (Elf_Addr)target & ~3;
-
-   w1 = *target;
-   w2 = *(target+1);
-
-   switch (slot)
-   {
-      case 0:
-         return ((w1 >> 5) & 0x1ffffffffff);
-      case 1:
-         return (w1 >> 46) | ((w2 & 0x7fffff) << 18);
-      case 2:
-         return (w2 >> 23);
-      default:
-         barf("ia64_extract_instruction: invalid slot %p", target);
-   }
-}
-
-static void
-ia64_deposit_instruction(Elf64_Xword *target, Elf64_Xword value)
-{
-   int slot = (Elf_Addr)target & 3;
-   target = (Elf_Addr)target & ~3;
-
-   switch (slot)
-   {
-      case 0:
-         *target |= value << 5;
-         break;
-      case 1:
-         *target |= value << 46;
-         *(target+1) |= value >> 18;
-         break;
-      case 2:
-         *(target+1) |= value << 23;
-         break;
-   }
-}
-
-static void
-ia64_reloc_gprel22(Elf_Addr target, Elf_Addr value)
-{
-   Elf64_Xword instruction;
-   Elf64_Sxword rel_value;
-
-   rel_value = value - gp_val;
-   if ((rel_value > 0x1fffff) || (rel_value < -0x1fffff))
-      barf("GP-relative data out of range (address = 0x%lx, gp = 0x%lx)", value, gp_val);
-
-   instruction = ia64_extract_instruction((Elf64_Xword *)target);
-   instruction |= (((rel_value >> 0) & 0x07f) << 13)		/* imm7b */
-		    | (((rel_value >> 7) & 0x1ff) << 27)	/* imm9d */
-		    | (((rel_value >> 16) & 0x01f) << 22)	/* imm5c */
-		    | ((Elf64_Xword)(rel_value < 0) << 36);	/* s */
-   ia64_deposit_instruction((Elf64_Xword *)target, instruction);
-}
-
-static void
-ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
-{
-   Elf64_Xword instruction;
-   Elf64_Sxword rel_value;
-   Elf_Addr entry;
-
-   entry = allocatePLTEntry(value, oc);
-
-   rel_value = (entry >> 4) - (target >> 4);
-   if ((rel_value > 0xfffff) || (rel_value < -0xfffff))
-      barf("PLT entry too far away (entry = 0x%lx, target = 0x%lx)", entry, target);
-
-   instruction = ia64_extract_instruction((Elf64_Xword *)target);
-   instruction |= ((rel_value & 0xfffff) << 13) 		/* imm20b */
-	    	    | ((Elf64_Xword)(rel_value < 0) << 36);	/* s */
-   ia64_deposit_instruction((Elf64_Xword *)target, instruction);
-}
-
-#endif /* ia64 */
 
 /*
  * PowerPC & X86_64 ELF specifics
