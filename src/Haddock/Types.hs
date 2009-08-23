@@ -30,6 +30,7 @@ module Haddock.Types (
 import Control.Exception
 import Data.Typeable
 import Data.Map (Map)
+import qualified Data.Map as Map
 import GHC hiding (NoLink)
 import Name
 
@@ -43,9 +44,15 @@ type HsDocString = HsDoc Name
 type LHsDocString = Located HsDocString
 #endif
 
+type FnArgsDoc name = Map Int (HsDoc name)
+type DocForDecl name = (Maybe (HsDoc name), FnArgsDoc name)
+
+noDocForDecl :: DocForDecl name
+noDocForDecl = (Nothing, Map.empty)
+
 -- | A declaration that may have documentation, including its subordinates,
 -- which may also have documentation
-type DeclInfo = (Decl, Maybe Doc, [(Name, Maybe Doc)])
+type DeclInfo = (Decl, DocForDecl Name, [(Name, DocForDecl Name)])
 
 
 -- | A 'DocName' is an identifier that may be documented. The 'Module'
@@ -81,11 +88,12 @@ data ExportItem name
       -- | A declaration
       expItemDecl :: LHsDecl name, 
 			       
-      -- | Maybe a doc comment
-      expItemMbDoc :: Maybe (HsDoc name),
+      -- | Maybe a doc comment, and possibly docs for arguments (if this
+      -- decl is a function or type-synonym)
+      expItemMbDoc :: DocForDecl name,
 
       -- | Subordinate names, possibly with documentation
-      expItemSubDocs :: [(name, Maybe (HsDoc name))],
+      expItemSubDocs :: [(name, DocForDecl name)],
 
       -- | Instances relevant to this declaration
       expItemInstances :: [InstHead name]
@@ -178,7 +186,7 @@ data Interface = Interface {
   ifaceDeclMap         :: Map Name DeclInfo,
 
   -- | Everything declared in the module (including subordinates) that has docs
-  ifaceRnDocMap        :: Map Name (HsDoc DocName),
+  ifaceRnDocMap        :: Map Name (DocForDecl DocName),
 
   ifaceSubMap          :: Map Name [Name],
 
@@ -248,7 +256,7 @@ toInstalledIface :: Interface -> InstalledInterface
 toInstalledIface interface = InstalledInterface {
   instMod            = ifaceMod            interface,
   instInfo           = ifaceInfo           interface,
-  instDocMap         = ifaceRnDocMap       interface,
+  instDocMap         = Map.mapMaybe fst $ ifaceRnDocMap       interface,--todo.
   instExports        = ifaceExports        interface,
   instVisibleExports = ifaceVisibleExports interface,
   instOptions        = ifaceOptions        interface,
@@ -319,6 +327,9 @@ emptyHaddockModInfo = HaddockModInfo {
 type ErrMsg = String
 
 newtype ErrMsgM a = Writer { runWriter :: (a, [ErrMsg]) }
+
+instance Functor ErrMsgM where
+        fmap f (Writer (a, msgs)) = Writer (f a, msgs)
 
 instance Monad ErrMsgM where
         return a = Writer (a, [])

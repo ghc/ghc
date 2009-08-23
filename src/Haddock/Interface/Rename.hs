@@ -38,8 +38,8 @@ renameInterface renamingEnv warnings iface =
         where fn env name = Map.insert name (ifaceMod iface) env
 
       docMap = Map.map (\(_,x,_) -> x) (ifaceDeclMap iface)
-      docs   = [ (n, doc) | (n, Just doc) <- Map.toList docMap ]
-      renameMapElem (k,d) = do d' <- renameDoc d; return (k, d')
+      docs   = Map.toList docMap
+      renameMapElem (k,d) = do d' <- renameDocForDecl d; return (k, d')
 
       -- rename names in the exported declarations to point to things that
       -- are closer to, or maybe even exported by, the current module.
@@ -141,6 +141,13 @@ renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
 renameExportItems = mapM renameExportItem
 
 
+renameDocForDecl :: (Maybe (HsDoc Name), FnArgsDoc Name) -> RnM (Maybe (HsDoc DocName), FnArgsDoc DocName)
+renameDocForDecl (mbDoc, fnArgsDoc) = do
+  mbDoc' <- renameMaybeDoc mbDoc
+  fnArgsDoc' <- renameFnArgsDoc fnArgsDoc
+  return (mbDoc', fnArgsDoc')
+
+
 renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
 renameMaybeDoc = mapM renameDoc
 
@@ -197,6 +204,10 @@ renameDoc d = case d of
   DocURL str -> return (DocURL str)
   DocPic str -> return (DocPic str)
   DocAName str -> return (DocAName str)
+
+
+renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)
+renameFnArgsDoc = mapM renameDoc
 
 
 renameLPred :: LHsPred Name -> RnM (LHsPred DocName)
@@ -434,7 +445,7 @@ renameExportItem item = case item of
     return (ExportGroup lev id_ doc')
   ExportDecl decl doc subs instances -> do
     decl' <- renameLDecl decl
-    doc'  <- mapM renameDoc doc
+    doc'  <- renameDocForDecl doc
     subs' <- mapM renameSub subs
     instances' <- mapM renameInstHead instances
     return (ExportDecl decl' doc' subs' instances')
@@ -447,8 +458,8 @@ renameExportItem item = case item of
     return (ExportDoc doc')
 
 
-renameSub :: (Name, Maybe (HsDoc Name)) -> RnM (DocName, Maybe (HsDoc DocName))
+renameSub :: (Name, DocForDecl Name) -> RnM (DocName, DocForDecl DocName)
 renameSub (n,doc) = do
   n' <- rename n
-  doc' <- mapM renameDoc doc
+  doc' <- renameDocForDecl doc
   return (n', doc')

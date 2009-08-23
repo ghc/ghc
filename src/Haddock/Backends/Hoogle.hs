@@ -109,7 +109,7 @@ operator x = x
 -- How to print each export
 
 ppExport :: ExportItem Name -> [String]
-ppExport (ExportDecl decl dc subdocs _) = doc dc ++ f (unL decl)
+ppExport (ExportDecl decl dc subdocs _) = doc (fst dc) ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d subdocs
         f (TyClD d@ClassDecl{}) = ppClass d
@@ -156,7 +156,7 @@ ppInstance :: Instance -> [String]
 ppInstance x = [dropComment $ out x]
 
 
-ppData :: TyClDecl Name -> [(Name, Maybe (HsDoc Name))] -> [String]
+ppData :: TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
 ppData x subdocs = showData x{tcdCons=[],tcdDerivs=Nothing} :
                    concatMap (ppCtor x subdocs . unL) (tcdCons x)
     where
@@ -169,10 +169,12 @@ ppData x subdocs = showData x{tcdCons=[],tcdDerivs=Nothing} :
                 f w = if w == nam then operator nam else w
 
 -- | for constructors, and named-fields...
-lookupCon :: [(Name, Maybe (HsDoc Name))] -> Located Name -> Maybe (HsDoc Name)
-lookupCon subdocs (L _ name) = join{-Maybe-} $ lookup name subdocs
+lookupCon :: [(Name, DocForDecl Name)] -> Located Name -> Maybe (HsDoc Name)
+lookupCon subdocs (L _ name) = case lookup name subdocs of
+  Just (d, _) -> d
+  _ -> Nothing
 
-ppCtor :: TyClDecl Name -> [(Name, Maybe (HsDoc Name))] -> ConDecl Name -> [String]
+ppCtor :: TyClDecl Name -> [(Name, DocForDecl Name)] -> ConDecl Name -> [String]
 ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
                          ++ f (con_details con)
     where

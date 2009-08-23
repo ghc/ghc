@@ -44,13 +44,14 @@ attachInstances = mapM attach
     attach iface = do
       newItems <- mapM attachExport $ ifaceExportItems iface
       return $ iface { ifaceExportItems = newItems }
-    attachExport (ExportDecl decl@(L _ (TyClD d)) doc subs _) = do
+    attachExport export@ExportDecl{expItemDecl = L _ (TyClD d)} = do
        mb_info <- getAllInfo (unLoc (tcdLName d))
-       return $ ExportDecl decl doc subs $ case mb_info of
+       return $ export { expItemInstances = case mb_info of
          Just (_, _, instances) ->
            map toHsInstHead . sortImage instHead . map instanceHead $ instances
          Nothing ->
            []
+        }
     attachExport export = return export
 
 

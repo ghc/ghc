@@ -91,6 +91,7 @@ executable haddock
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create
+    Haddock.Interface.ExtractFnArgDocs
     Haddock.Interface.AttachInstances
     Haddock.Interface.Lex
     Haddock.Interface.Parse

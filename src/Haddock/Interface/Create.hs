@@ -19,6 +19,7 @@ import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
 import Haddock.Interface.LexParseRn
+import Haddock.Interface.ExtractFnArgDocs
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -26,6 +27,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Control.Monad
+import qualified Data.Traversable as Traversable
 
 import GHC hiding (flags)
 import Name
@@ -151,34 +153,46 @@ declInfos gre decls =
   forM decls $ \(parent@(L _ d), mbDocString) -> do
             mbDoc <- lexParseRnHaddockCommentList NormalHaddockComment
                        gre mbDocString
+            fnArgsDoc <- fmap (Map.mapMaybe id) $
+                Traversable.forM (getDeclFnArgDocs d) $
+                \doc -> lexParseRnHaddockComment NormalHaddockComment gre doc
 
-            let subsStringy = subordinates d
-            subs <- forM subsStringy $ \(subName, mbSubDocString) -> do
+            let subs_ = subordinates d
+            subs <- forM subs_ $ \(subName, mbSubDocStr, subFnArgsDocStr) -> do
                 mbSubDoc <- lexParseRnHaddockCommentList NormalHaddockComment
-                              gre mbSubDocString
-                return (subName, mbSubDoc)
+                              gre mbSubDocStr
+                subFnArgsDoc <- fmap (Map.mapMaybe id) $
+                  Traversable.forM subFnArgsDocStr $
+                  \doc -> lexParseRnHaddockComment NormalHaddockComment gre doc
+                return (subName, (mbSubDoc, subFnArgsDoc))
 
-            return (parent, mbDoc, subs)
+            return (parent, (mbDoc, fnArgsDoc), subs)
 
 
-subordinates :: HsDecl Name -> [(Name, MaybeDocStrings)]
+subordinates :: HsDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
 subordinates (TyClD d) = classDataSubs d
 subordinates _ = []
 
 
-classDataSubs :: TyClDecl Name -> [(Name, MaybeDocStrings)]
+classDataSubs :: TyClDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
 classDataSubs decl
   | isClassDecl decl = classSubs
   | isDataDecl  decl = dataSubs
   | otherwise        = []
   where
-    classSubs = [ (declName d, doc) | (L _ d, doc) <- classDecls decl ]
+    classSubs = [ (declName d, doc, fnArgsDoc)
+                | (L _ d, doc) <- classDecls decl
+                , let fnArgsDoc = getDeclFnArgDocs d ]
     dataSubs  = constrs ++ fields   
       where
         cons    = map unL $ tcdCons decl
-        constrs = [ (unL $ con_name c, maybeToList $ fmap unL $ con_doc c)
+        -- should we use the type-signature of the constructor
+        -- and the docs of the fields to produce fnArgsDoc for the constr,
+        -- just in case someone exports it without exporting the type
+        -- and perhaps makes it look like a function?  I doubt it.
+        constrs = [ (unL $ con_name c, maybeToList $ fmap unL $ con_doc c, Map.empty)
                   | c <- cons ]
-        fields  = [ (unL n, maybeToList $ fmap unL doc)
+        fields  = [ (unL n, maybeToList $ fmap unL doc, Map.empty)
                   | RecCon flds <- map con_details cons
                   , ConDeclField n _ doc <- flds ]
 
@@ -495,12 +509,12 @@ mkExportItems modMap this_mod gre exported_names decls declMap
                    let hsdecl = tyThingToHsSynSig tyThing
                    return [ mkExportDecl t
                      ( hsdecl
-                     , fmap (fmapHsDoc getName) $
-                         Map.lookup t (instDocMap iface)
+                     , (fmap (fmapHsDoc getName) $
+                         Map.lookup t (instDocMap iface), Map.empty{-todo-})
                      , map (\subt ->
                               ( subt
-                              , fmap (fmapHsDoc getName) $
-                                    Map.lookup subt (instDocMap iface)
+                              , (fmap (fmapHsDoc getName) $
+                                    Map.lookup subt (instDocMap iface), Map.empty{-todo-})
                               )
                            )
                            subs
@@ -637,7 +651,7 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
 -- Pruning
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
 pruneExportItems items = filter hasDoc items
-  where hasDoc (ExportDecl _ d _ _) = isJust d
+  where hasDoc (ExportDecl{expItemMbDoc = (d, _)}) = isJust d
 	hasDoc _ = True
 
 
