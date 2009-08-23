@@ -32,8 +32,7 @@ import Haddock.Utils
 import Haddock.GhcUtils
 
 import Control.Monad
-import Control.OldException
-import qualified Control.Exception as NewException
+import Control.Exception
 import Data.Maybe
 import Data.IORef
 import qualified Data.Map as Map
@@ -70,25 +69,25 @@ handleTopExceptions :: IO a -> IO a
 handleTopExceptions =
   handleNormalExceptions . handleHaddockExceptions . handleGhcExceptions
 
-
+-- | Either returns normally or throws an ExitCode exception;
+-- all other exceptions are turned into exit exceptions.
 handleNormalExceptions :: IO a -> IO a
 handleNormalExceptions inner =
-  handle (\exception -> do
-    hFlush stdout
-    case exception of
-      AsyncException StackOverflow -> do
+  (inner `onException` hFlush stdout)
+  `catches`
+  [  Handler (\(code :: ExitCode) -> exitWith code)
+  ,  Handler (\(StackOverflow) -> do
         putStrLn "stack overflow: use -g +RTS -K<size> to increase it"
-        exitFailure
-      ExitException code -> exitWith code
-      _other -> do
-        putStrLn ("haddock: internal Haddock or GHC error: " ++ show exception)
-        exitFailure
-  ) inner
+        exitFailure)
+  ,  Handler (\(ex :: SomeException) -> do
+        putStrLn ("haddock: internal Haddock or GHC error: " ++ show ex)
+        exitFailure)
+  ]
 
 
 handleHaddockExceptions :: IO a -> IO a
 handleHaddockExceptions inner =
-  NewException.catches inner [NewException.Handler handler]
+  catches inner [Handler handler]
   where
     handler (e::HaddockException) = do
       putStrLn $ "haddock: " ++ (show e)
