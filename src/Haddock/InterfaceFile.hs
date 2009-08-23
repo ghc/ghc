@@ -27,6 +27,7 @@ import Data.Word
 import Data.Array
 import Data.IORef
 import qualified Data.Map as Map
+import Data.Map (Map)
 
 import GHC hiding (NoLink)
 import Binary
@@ -56,9 +57,9 @@ binaryInterfaceMagic = 0xD0Cface
 -- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
 #if __GLASGOW_HASKELL__ == 610
-binaryInterfaceVersion = 12
+binaryInterfaceVersion = 14
 #elif __GLASGOW_HASKELL__ == 611
-binaryInterfaceVersion = 13
+binaryInterfaceVersion = 15
 #endif
 
 
@@ -332,27 +333,33 @@ serialiseName bh name _ = do
 -- GhcBinary instances
 -------------------------------------------------------------------------------
 
+-- Hmm, why didn't we dare to make this instance already? It makes things
+-- much easier.
+instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
+  put_ bh m = put_ bh (Map.toAscList m)
+  get bh = fmap (Map.fromAscList) (get bh)
+
 
 instance Binary InterfaceFile where
   put_ bh (InterfaceFile env ifaces) = do
-    put_ bh (Map.toList env)
+    put_ bh env
     put_ bh ifaces
 
   get bh = do
     env    <- get bh
     ifaces <- get bh
-    return (InterfaceFile (Map.fromList env) ifaces)
+    return (InterfaceFile env ifaces)
 
 
 instance Binary InstalledInterface where
   put_ bh (InstalledInterface modu info docMap exps visExps opts subMap) = do
     put_ bh modu
     put_ bh info
-    put_ bh (Map.toList docMap)
+    put_ bh docMap
     put_ bh exps
     put_ bh visExps
     put_ bh opts
-    put_ bh (Map.toList subMap)
+    put_ bh subMap
 
   get bh = do
     modu    <- get bh
@@ -363,8 +370,8 @@ instance Binary InstalledInterface where
     opts    <- get bh
     subMap  <- get bh
     
-    return (InstalledInterface modu info (Map.fromList docMap)
-            exps visExps opts (Map.fromList subMap))
+    return (InstalledInterface modu info docMap
+            exps visExps opts subMap)
 
 
 instance Binary DocOption where

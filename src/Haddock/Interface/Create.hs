@@ -509,15 +509,14 @@ mkExportItems modMap this_mod gre exported_names decls declMap
                    let hsdecl = tyThingToHsSynSig tyThing
                    return [ mkExportDecl t
                      ( hsdecl
-                     , (fmap (fmapHsDoc getName) $
-                         Map.lookup t (instDocMap iface), Map.empty{-todo-})
+                     , fromMaybe noDocForDecl $
+                          Map.lookup t (instDocMap iface)
                      , map (\subt ->
-                              ( subt
-                              , (fmap (fmapHsDoc getName) $
-                                    Map.lookup subt (instDocMap iface), Map.empty{-todo-})
+                              ( subt ,
+                                fromMaybe noDocForDecl $
+                                   Map.lookup subt (instDocMap iface)
                               )
-                           )
-                           subs
+                           ) subs
                      )]
 
     mkExportDecl :: Name -> DeclInfo -> ExportItem Name

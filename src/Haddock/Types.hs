@@ -227,7 +227,7 @@ data InstalledInterface = InstalledInterface {
   instInfo           :: HaddockModInfo Name,
 
   -- | Everything declared in the module (including subordinates) that has docs
-  instDocMap         :: Map Name (HsDoc DocName),
+  instDocMap         :: Map Name (DocForDecl Name),
 
   -- | All names exported by this module
   instExports        :: [Name],
@@ -256,13 +256,18 @@ toInstalledIface :: Interface -> InstalledInterface
 toInstalledIface interface = InstalledInterface {
   instMod            = ifaceMod            interface,
   instInfo           = ifaceInfo           interface,
-  instDocMap         = Map.mapMaybe fst $ ifaceRnDocMap       interface,--todo.
+  instDocMap         = fmap unrenameDocForDecl $ ifaceRnDocMap interface,
   instExports        = ifaceExports        interface,
   instVisibleExports = ifaceVisibleExports interface,
   instOptions        = ifaceOptions        interface,
   instSubMap         = ifaceSubMap         interface
 }
 
+unrenameHsDoc :: HsDoc DocName -> HsDoc Name
+unrenameHsDoc = fmapHsDoc getName
+unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
+unrenameDocForDecl (mbDoc, fnArgsDoc) =
+    (fmap unrenameHsDoc mbDoc, fmap unrenameHsDoc fnArgsDoc)
 
 #if __GLASGOW_HASKELL__ >= 611
 data HsDoc id
