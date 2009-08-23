@@ -37,10 +37,8 @@ import UniqFM
 import IfaceEnv
 import HscTypes
 import FastMutInt
-#if __GLASGOW_HASKELL__ >= 609 
 import FastString
 import Unique
-#endif
 
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
@@ -82,7 +80,6 @@ writeInterfaceFile filename iface = do
   put_ bh0 symtab_p_p
 
   -- Make some intial state
-#if __GLASGOW_HASKELL__ >= 609
   symtab_next <- newFastMutInt
   writeFastMutInt symtab_next 0
   symtab_map <- newIORef emptyUFM
@@ -96,9 +93,6 @@ writeInterfaceFile filename iface = do
                       bin_dict_next = dict_next_ref,
                       bin_dict_map  = dict_map_ref }
   ud <- newWriteState (putName bin_symtab) (putFastString bin_dict)
-#else
-  ud <- newWriteState
-#endif
 
   -- put the main thing
   bh <- return $ setUserData bh0 ud
@@ -110,13 +104,8 @@ writeInterfaceFile filename iface = do
   seekBin bh symtab_p		
 
   -- write the symbol table itself
-#if __GLASGOW_HASKELL__ >= 609
   symtab_next' <- readFastMutInt symtab_next
   symtab_map'  <- readIORef symtab_map
-#else
-  symtab_next' <- readFastMutInt (ud_symtab_next ud)
-  symtab_map'  <- readIORef (ud_symtab_map ud)
-#endif
   putSymbolTable bh symtab_next' symtab_map'
 
   -- write the dictionary pointer at the fornt of the file
@@ -125,13 +114,8 @@ writeInterfaceFile filename iface = do
   seekBin bh dict_p
 
   -- write the dictionary itself
-#if __GLASGOW_HASKELL__ >= 609
   dict_next <- readFastMutInt dict_next_ref
   dict_map  <- readIORef dict_map_ref
-#else
-  dict_next <- readFastMutInt (ud_dict_next ud)
-  dict_map  <- readIORef (ud_dict_map ud)
-#endif
   putDictionary bh dict_next dict_map
 
   -- and send the result to the file
@@ -141,7 +125,6 @@ writeInterfaceFile filename iface = do
 type NameCacheAccessor m = (m NameCache, NameCache -> m ())
 
 
-#if __GLASGOW_HASKELL__ >= 609
 nameCacheFromGhc :: NameCacheAccessor Ghc
 nameCacheFromGhc = ( read_from_session , write_to_session )
   where
@@ -151,15 +134,6 @@ nameCacheFromGhc = ( read_from_session , write_to_session )
     write_to_session nc' = do
        ref <- withSession (return . hsc_NC)
        liftIO $ writeIORef ref nc'
-#else
-nameCacheFromGhc :: Session -> NameCacheAccessor IO
-nameCacheFromGhc session = ( read_from_session , write_to_session )
-  where
-    read_from_session = readIORef . hsc_NC =<< sessionHscEnv session
-    write_to_session nc' = do
-      ref <- liftM hsc_NC $ sessionHscEnv session
-      writeIORef ref nc'
-#endif
 
 
 freshNameCache :: NameCacheAccessor IO
@@ -234,7 +208,6 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
 -------------------------------------------------------------------------------
 
 
-#if __GLASGOW_HASKELL__ >= 609
 putName :: BinSymbolTable -> BinHandle -> Name -> IO ()
 putName BinSymbolTable{
             bin_symtab_map = symtab_map_ref,
@@ -278,7 +251,6 @@ data BinDictionary = BinDictionary {
         bin_dict_map  :: !(IORef (UniqFM (Int,FastString)))
                                 -- indexed by FastString
   }
-#endif
 
 
 putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
