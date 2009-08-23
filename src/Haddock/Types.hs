@@ -44,6 +44,8 @@ type HsDocString = HsDoc Name
 type LHsDocString = Located HsDocString
 #endif
 
+-- | Arguments and result are indexed by Int, zero-based from the left,
+-- because that's the easiest to use when recursing over types.
 type FnArgsDoc name = Map Int (HsDoc name)
 type DocForDecl name = (Maybe (HsDoc name), FnArgsDoc name)
 
