@@ -347,12 +347,23 @@ collect d doc_so_far (e:es) =
       Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) docStringEmpty es)
 
 
+-- This used to delete all DocD:s, unless doc was DocEmpty,
+-- which I suppose means you could kill a DocCommentNamed
+-- by:
+--
+-- > -- | killer
+-- >
+-- > -- $victim
+--
+-- Anyway I accidentally deleted the DocEmpty condition without
+-- realizing it was necessary for retaining some DocDs (at least
+-- DocCommentNamed), so I'm going to try just not testing any conditions
+-- and see if anything breaks.  It really shouldn't break anything
+-- to keep more doc decls around, IMHO.
+--
+-- -Isaac
 finishedDoc :: Decl -> MaybeDocStringsFast -> [(Decl, MaybeDocStrings)] -> [(Decl, MaybeDocStrings)]
-finishedDoc d doc rest | notDocDecl d = (d, docStringToList doc) : rest
-  where
-    notDocDecl (L _ (DocD _)) = False
-    notDocDecl _              = True
-finishedDoc _ _ rest = rest
+finishedDoc d doc rest = (d, docStringToList doc) : rest
 
 
 {-
