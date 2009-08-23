@@ -187,21 +187,7 @@ render flags ifaces installedIfaces = do
                       ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
                       ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
 
-  libDir <- case [str | Flag_Lib str <- flags] of
-    [] ->
-#ifdef IN_GHC_TREE
-                      do m <- getExecDir
-                         case m of
-                             Nothing -> error "No libdir found"
-#ifdef NEW_GHC_LAYOUT
-                             Just d -> return (d </> ".." </> "lib")
-#else
-                             Just d -> return (d </> "..")
-#endif
-#else
-                      getDataDir -- provided by Cabal
-#endif
-    fs -> return (last fs)
+  libDir <- getHaddockLibDir flags
   let unicode = Flag_UseUnicode `elem` flags
   let css_file = case [str | Flag_CSS str <- flags] of
                    [] -> Nothing
@@ -345,20 +331,23 @@ startGhc libDir flags ghcActs = do
 -- Misc
 -------------------------------------------------------------------------------
 
+getHaddockLibDir :: [Flag] -> IO String
+getHaddockLibDir flags = do
+  case [str | Flag_Lib str <- flags] of
+    [] ->
+#ifdef IN_GHC_TREE
+      getInTreeLibDir
+#else
+      getDataDir -- provided by Cabal
+#endif
+    fs -> return (last fs)
 
 getGhcLibDir :: [Flag] -> IO String
 getGhcLibDir flags = do
   case [ dir | Flag_GhcLibDir dir <- flags ] of
     [] ->
 #ifdef IN_GHC_TREE
-      do m <- getExecDir
-         case m of
-             Nothing -> error "No GhcLibDir found"
-#ifdef NEW_GHC_LAYOUT
-             Just d -> return (d </> ".." </> "lib")
-#else
-             Just d -> return (d </> "..")
-#endif
+      getInTreeLibDir
 #else
       return libdir -- from GHC.Paths
 #endif
@@ -421,6 +410,18 @@ getPrologue flags =
 
 
 #ifdef IN_GHC_TREE
+
+getInTreeLibDir :: IO String
+getInTreeLibDir =
+      do m <- getExecDir
+         case m of
+             Nothing -> error "No GhcLibDir found"
+#ifdef NEW_GHC_LAYOUT
+             Just d -> return (d </> ".." </> "lib")
+#else
+             Just d -> return (d </> "..")
+#endif
+
 getExecDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 getExecDir = allocaArray len $ \buf -> do
@@ -436,5 +437,6 @@ foreign import stdcall unsafe "GetModuleFileNameA"
 #else
 getExecDir = return Nothing
 #endif
+
 #endif
 
