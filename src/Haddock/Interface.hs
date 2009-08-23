@@ -180,8 +180,7 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
   ghcModule         = mdl,
   ghcFilename       = file,
   ghcMbDocOpts      = mbOpts,
-  ghcHaddockModInfo = info,
-  ghcMbDoc          = mbDoc,
+  ghcMbDocHdr       = mbDocHdr,
   ghcGroup          = group_,
   ghcMbExports      = mbExports,
   ghcExportedNames  = modInfoExports modInfo,
@@ -191,7 +190,12 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
 }
   where
     mbOpts = haddockOptions dynflags
+#if __GLASGOW_HASKELL__ >= 611
+    (group_, _, mbExports, mbDocHdr) = renamed
+#else
     (group_, _, mbExports, mbDoc, info) = renamed
+    mbDocHdr = (info, mbDoc)
+#endif
     (_, renamed, _, modInfo) = checkedMod
 
 

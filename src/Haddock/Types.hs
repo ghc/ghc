@@ -15,7 +15,16 @@
 -- important types are defined here, like 'Interface' and 'DocName'.
 -----------------------------------------------------------------------------
 
-module Haddock.Types where
+module Haddock.Types (
+  module Haddock.Types
+-- avoid duplicate-export warnings, use the conditional to only
+-- mention things not defined in this module:
+#if __GLASGOW_HASKELL__ >= 611
+  , HsDocString, LHsDocString
+#else
+  , HsDoc(..), LHsDoc, HaddockModInfo(..), emptyHaddockModInfo
+#endif
+ ) where
 
 
 import Control.Exception
@@ -29,6 +38,10 @@ import Name
 type Decl = LHsDecl Name
 type Doc  = HsDoc Name
 
+#if __GLASGOW_HASKELL__ <= 610
+type HsDocString = HsDoc Name
+type LHsDocString = Located HsDocString
+#endif
 
 -- | A declaration that may have documentation, including its subordinates,
 -- which may also have documentation
@@ -113,6 +126,11 @@ type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (HsDoc DocName)
 type LinkEnv       = Map Name Module
 
+#if __GLASGOW_HASKELL__ >= 611
+type GhcDocHdr = Maybe LHsDocString
+#else
+type GhcDocHdr = (HaddockModInfo Name, Maybe (HsDoc Name))
+#endif
 
 -- | This structure holds the module information we get from GHC's 
 -- type checking phase
@@ -120,8 +138,7 @@ data GhcModule = GhcModule {
    ghcModule         :: Module,
    ghcFilename       :: FilePath,
    ghcMbDocOpts      :: Maybe String,
-   ghcHaddockModInfo :: HaddockModInfo Name,
-   ghcMbDoc          :: Maybe (HsDoc Name),
+   ghcMbDocHdr       :: GhcDocHdr,
    ghcGroup          :: HsGroup Name,
    ghcMbExports      :: Maybe [LIE Name],
    ghcExportedNames  :: [Name],
@@ -239,6 +256,28 @@ toInstalledIface interface = InstalledInterface {
 }
 
 
+#if __GLASGOW_HASKELL__ >= 611
+data HsDoc id
+  = DocEmpty
+  | DocAppend (HsDoc id) (HsDoc id)
+  | DocString String
+  | DocParagraph (HsDoc id)
+  | DocIdentifier [id]
+  | DocModule String
+  | DocEmphasis (HsDoc id)
+  | DocMonospaced (HsDoc id)
+  | DocUnorderedList [HsDoc id]
+  | DocOrderedList [HsDoc id]
+  | DocDefList [(HsDoc id, HsDoc id)]
+  | DocCodeBlock (HsDoc id)
+  | DocURL String
+  | DocPic String
+  | DocAName String
+  deriving (Eq, Show)
+
+type LHsDoc id = Located (HsDoc id)
+#endif
+
 data DocMarkup id a = Markup {
   markupEmpty         :: a,
   markupString        :: String -> a,
@@ -256,6 +295,23 @@ data DocMarkup id a = Markup {
   markupAName         :: String -> a,
   markupPic           :: String -> a
 }
+
+#if __GLASGOW_HASKELL__ >= 611
+data HaddockModInfo name = HaddockModInfo {
+        hmi_description :: Maybe (HsDoc name),
+        hmi_portability :: Maybe String,
+        hmi_stability   :: Maybe String,
+        hmi_maintainer  :: Maybe String
+}
+
+emptyHaddockModInfo :: HaddockModInfo a
+emptyHaddockModInfo = HaddockModInfo {
+        hmi_description = Nothing,
+        hmi_portability = Nothing,
+        hmi_stability   = Nothing,
+        hmi_maintainer  = Nothing
+}
+#endif
 
 
 -- A monad which collects error messages, locally defined to avoid a dep on mtl

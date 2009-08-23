@@ -92,6 +92,11 @@ executable haddock
     Haddock.Interface.Rename
     Haddock.Interface.Create
     Haddock.Interface.AttachInstances
+    Haddock.Interface.Lex
+    Haddock.Interface.Parse
+    Haddock.Interface.Rn
+    Haddock.Interface.LexParseRn
+    Haddock.Interface.ParseModuleHeader
     Haddock.Utils.FastMutInt2
     Haddock.Utils.BlockTable
     Haddock.Utils.Html
@@ -104,6 +109,7 @@ executable haddock
     Haddock.Backends.Hoogle
     Haddock.ModuleTree
     Haddock.Types
+    Haddock.HsDoc
     Haddock.Version
     Haddock.InterfaceFile        
     Haddock.Options

@@ -144,6 +144,13 @@ renameExportItems = mapM renameExportItem
 renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
 renameMaybeDoc = mapM renameDoc
 
+#if __GLASGOW_HASKELL__ >= 611
+renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
+renameLDocHsSyn = return
+#else
+renameLDocHsSyn :: LHsDoc Name -> RnM (LHsDoc DocName)
+renameLDocHsSyn = renameLDoc
+#endif
 
 renameLDoc :: LHsDoc Name -> RnM (LHsDoc DocName)
 renameLDoc = mapM renameDoc
@@ -259,7 +266,7 @@ renameType t = case t of
 
   HsDocTy ty doc -> do
     ty' <- renameLType ty
-    doc' <- renameLDoc doc
+    doc' <- renameLDocHsSyn doc
     return (HsDocTy ty' doc')
 
   _ -> error "renameType"
@@ -363,7 +370,7 @@ renameTyClD d = case d of
       lcontext' <- renameLContext lcontext
       details'  <- renameDetails details
       restype'  <- renameResType restype
-      mbldoc'   <- mapM renameLDoc mbldoc
+      mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
                    , con_details = details', con_res = restype', con_doc = mbldoc' })
 
@@ -377,7 +384,7 @@ renameTyClD d = case d of
     renameField (ConDeclField name t doc) = do
       name' <- renameL name
       t'   <- renameLType t
-      doc' <- mapM renameLDoc doc
+      doc' <- mapM renameLDocHsSyn doc
       return (ConDeclField name' t' doc')
 
     renameResType (ResTyH98) = return ResTyH98

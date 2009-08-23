@@ -22,6 +22,8 @@ module Main (main) where
 import Haddock.Backends.Html
 import Haddock.Backends.Hoogle
 import Haddock.Interface
+import Haddock.Interface.Lex
+import Haddock.Interface.Parse
 import Haddock.Types
 import Haddock.Version
 import Haddock.InterfaceFile
@@ -469,9 +471,9 @@ getPrologue flags =
     [] -> return Nothing
     [filename] -> do
       str <- readFile filename
-      case parseHaddockComment str of
-        Left err -> throwE err
-        Right doc -> return (Just doc)
+      case parseHaddockParagraphs (tokenise str) of
+        Nothing -> throwE "parsing haddock prologue failed"
+        Just doc -> return (Just doc)
     _otherwise -> throwE "multiple -p/--prologue options"
 
 

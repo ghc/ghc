@@ -18,6 +18,7 @@ import Haddock.Options
 import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
+import Haddock.Interface.LexParseRn
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -29,6 +30,7 @@ import Control.Monad
 import GHC hiding (flags)
 import Name
 import Bag
+import RdrName (GlobalRdrEnv)
 
 
 -- | Process the data in the GhcModule to produce an interface.
@@ -40,24 +42,29 @@ createInterface ghcMod flags modMap instIfaceMap = do
 
   let mdl = ghcModule ghcMod
 
+  -- The pattern-match should not fail, because createInterface is only
+  -- done on loaded modules.
+  Just gre <- liftGhcToErrMsgGhc $ lookupLoadedHomeModuleGRE (moduleName mdl)
+
   opts0 <- liftErrMsg $ mkDocOpts (ghcMbDocOpts ghcMod) flags mdl
   let opts
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  let group_        = ghcGroup ghcMod
+  (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader
+                                       gre (ghcMbDocHdr ghcMod)
+  decls0           <- liftErrMsg $ declInfos gre (topDecls (ghcGroup ghcMod))
+  let decls         = filterOutInstances decls0
+      declMap       = mkDeclMap decls
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
       localNames    = ghcDefinedNames ghcMod
-      decls0        = declInfos . topDecls $ group_
-      decls         = filterOutInstances decls0
-      declMap       = mkDeclMap decls
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
       instances     = ghcInstances ghcMod
 
   liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
-  exportItems <- mkExportItems modMap mdl (ghcExportedNames ghcMod) decls declMap
+  exportItems <- mkExportItems modMap mdl gre (ghcExportedNames ghcMod) decls declMap
                                opts exports ignoreExps instances instIfaceMap
 
   let visibleNames = mkVisibleNames exportItems opts
@@ -72,8 +79,8 @@ createInterface ghcMod flags modMap instIfaceMap = do
   return Interface {
     ifaceMod             = mdl,
     ifaceOrigFilename    = ghcFilename ghcMod,
-    ifaceInfo            = ghcHaddockModInfo ghcMod,
-    ifaceDoc             = ghcMbDoc ghcMod,
+    ifaceInfo            = info,
+    ifaceDoc             = mbDoc,
     ifaceRnDoc           = Nothing,
     ifaceOptions         = opts,
     ifaceLocals          = localNames,
@@ -139,17 +146,27 @@ mkDeclMap decls = Map.fromList . concat $
   , not (isDocD d), not (isInstD d) ]
 
 
-declInfos :: [(Decl, Maybe Doc)] -> [DeclInfo]
-declInfos decls = [ (parent, doc, subordinates d)
-                  | (parent@(L _ d), doc) <- decls]
+declInfos :: GlobalRdrEnv -> [(Decl, MaybeDocStrings)] -> ErrMsgM [DeclInfo]
+declInfos gre decls =
+  forM decls $ \(parent@(L _ d), mbDocString) -> do
+            mbDoc <- lexParseRnHaddockCommentList NormalHaddockComment
+                       gre mbDocString
+
+            let subsStringy = subordinates d
+            subs <- forM subsStringy $ \(subName, mbSubDocString) -> do
+                mbSubDoc <- lexParseRnHaddockCommentList NormalHaddockComment
+                              gre mbSubDocString
+                return (subName, mbSubDoc)
+
+            return (parent, mbDoc, subs)
 
 
-subordinates :: HsDecl Name -> [(Name, Maybe Doc)]
+subordinates :: HsDecl Name -> [(Name, MaybeDocStrings)]
 subordinates (TyClD d) = classDataSubs d
 subordinates _ = []
 
 
-classDataSubs :: TyClDecl Name -> [(Name, Maybe Doc)]
+classDataSubs :: TyClDecl Name -> [(Name, MaybeDocStrings)]
 classDataSubs decl
   | isClassDecl decl = classSubs
   | isDataDecl  decl = dataSubs
@@ -159,15 +176,16 @@ classDataSubs decl
     dataSubs  = constrs ++ fields   
       where
         cons    = map unL $ tcdCons decl
-        constrs = [ (unL $ con_name c, fmap unL $ con_doc c) | c <- cons ]
-        fields  = [ (unL n, fmap unL doc)
+        constrs = [ (unL $ con_name c, maybeToList $ fmap unL $ con_doc c)
+                  | c <- cons ]
+        fields  = [ (unL n, maybeToList $ fmap unL doc)
                   | RecCon flds <- map con_details cons
                   , ConDeclField n _ doc <- flds ]
 
 
 -- All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists. 
-classDecls :: TyClDecl Name -> [(Decl, Maybe Doc)]
+classDecls :: TyClDecl Name -> [(Decl, MaybeDocStrings)]
 classDecls = filterDecls . collectDocs . sortByLoc . declsFromClass
 
 
@@ -190,7 +208,7 @@ declName _ = error "unexpected argument to declName"
 
 -- | The top-level declarations of a module that we care about, 
 -- ordered by source location, with documentation attached if it exists.
-topDecls :: HsGroup Name -> [(Decl, Maybe Doc)] 
+topDecls :: HsGroup Name -> [(Decl, MaybeDocStrings)] 
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
 
 
@@ -255,7 +273,7 @@ warnAboutFilteredDecls mdl decls = do
 
 
 -- | Filter out declarations that we don't handle in Haddock
-filterDecls :: [(Decl, Maybe Doc)] -> [(Decl, Maybe Doc)]
+filterDecls :: [(Decl, doc)] -> [(Decl, doc)]
 filterDecls decls = filter (isHandled . unL . fst) decls
   where
     isHandled (ForD (ForeignImport {})) = True
@@ -268,7 +286,7 @@ filterDecls decls = filter (isHandled . unL . fst) decls
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: [(Decl, Maybe Doc)] -> [(Decl, Maybe Doc)]
+filterClasses :: [(Decl, doc)] -> [(Decl, doc)]
 filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x 
                       | x@(L loc d, doc) <- decls ]
   where
@@ -285,12 +303,25 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 -- declaration.
 --------------------------------------------------------------------------------
 
+type MaybeDocStrings = [HsDocString]
+-- avoid [] because we're appending from the left (quadratic),
+-- and avoid adding another package dependency for haddock,
+-- so use the difference-list pattern
+type MaybeDocStringsFast = MaybeDocStrings -> MaybeDocStrings
+docStringEmpty :: MaybeDocStringsFast
+docStringEmpty = id
+docStringSingleton :: HsDocString -> MaybeDocStringsFast
+docStringSingleton = (:)
+docStringAppend :: MaybeDocStringsFast -> MaybeDocStringsFast -> MaybeDocStringsFast
+docStringAppend = (.)
+docStringToList :: MaybeDocStringsFast -> MaybeDocStrings
+docStringToList = ($ [])
 
 -- | Collect the docs and attach them to the right declaration.
-collectDocs :: [Decl] -> [(Decl, (Maybe Doc))]
-collectDocs = collect Nothing DocEmpty
+collectDocs :: [Decl] -> [(Decl, MaybeDocStrings)]
+collectDocs = collect Nothing docStringEmpty
 
-collect :: Maybe Decl -> Doc -> [Decl] -> [(Decl, (Maybe Doc))]
+collect :: Maybe Decl -> MaybeDocStringsFast -> [Decl] -> [(Decl, MaybeDocStrings)]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -300,19 +331,24 @@ collect d doc_so_far (e:es) =
   case e of
     L _ (DocD (DocCommentNext str)) ->
       case d of
-        Nothing -> collect d (docAppend doc_so_far str) es
-        Just d0 -> finishedDoc d0 doc_so_far (collect Nothing str es)
+        Nothing -> collect d
+                     (docStringAppend doc_so_far (docStringSingleton str))
+                     es
+        Just d0 -> finishedDoc d0 doc_so_far (collect Nothing
+                     (docStringSingleton str)
+                     es)
 
-    L _ (DocD (DocCommentPrev str)) -> collect d (docAppend doc_so_far str) es
+    L _ (DocD (DocCommentPrev str)) -> collect d
+                     (docStringAppend doc_so_far (docStringSingleton str))
+                     es
 
     _ -> case d of
       Nothing -> collect (Just e) doc_so_far es
-      Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
+      Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) docStringEmpty es)
 
 
-finishedDoc :: Decl -> Doc -> [(Decl, (Maybe Doc))] -> [(Decl, (Maybe Doc))]
-finishedDoc d DocEmpty rest = (d, Nothing) : rest
-finishedDoc d doc rest | notDocDecl d = (d, Just doc) : rest
+finishedDoc :: Decl -> MaybeDocStringsFast -> [(Decl, MaybeDocStrings)] -> [(Decl, MaybeDocStrings)]
+finishedDoc d doc rest | notDocDecl d = (d, docStringToList doc) : rest
   where
     notDocDecl (L _ (DocD _)) = False
     notDocDecl _              = True
@@ -336,6 +372,7 @@ attachATs exports =
 mkExportItems
   :: ModuleMap
   -> Module			-- this module
+  -> GlobalRdrEnv
   -> [Name]			-- exported names (orig)
   -> [DeclInfo]
   -> Map Name DeclInfo             -- maps local names to declarations
@@ -346,7 +383,7 @@ mkExportItems
   -> InstIfaceMap
   -> ErrMsgGhc [ExportItem Name]
 
-mkExportItems modMap this_mod exported_names decls declMap
+mkExportItems modMap this_mod gre exported_names decls declMap
               opts maybe_exps ignore_all_exports _ instIfaceMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
@@ -357,7 +394,7 @@ mkExportItems modMap this_mod exported_names decls declMap
 --    instances = [ d | d@(L _ decl, _, _) <- decls, isInstD decl ]
 
     everything_local_exported =  -- everything exported
-      return (fullContentsOfThisModule decls)
+      liftErrMsg $ fullContentsOfThisModule gre decls
    
 
     lookupExport (IEVar x) = declWith x
@@ -371,13 +408,22 @@ mkExportItems modMap this_mod exported_names decls declMap
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  = fullContentsOf m
-    lookupExport (IEGroup lev doc)     = return [ ExportGroup lev "" doc ]
-    lookupExport (IEDoc doc)           = return [ ExportDoc doc ] 
-    lookupExport (IEDocNamed str) = do
-      r <- liftErrMsg $ findNamedDoc str [ unL d | (d,_,_) <- decls ]
-      case r of
-        Nothing -> return []
-        Just found -> return [ ExportDoc found ]
+    lookupExport (IEGroup lev docStr)  = liftErrMsg $ do
+      ifDoc (lexParseRnHaddockComment DocSectionComment gre docStr)
+            (\doc -> return [ ExportGroup lev "" doc ])
+    lookupExport (IEDoc docStr)        = liftErrMsg $ do
+      ifDoc (lexParseRnHaddockComment NormalHaddockComment gre docStr)
+            (\doc -> return [ ExportDoc doc ])
+    lookupExport (IEDocNamed str) = liftErrMsg $ do
+      ifDoc (findNamedDoc str [ unL d | (d,_,_) <- decls ])
+            (\docStr ->
+            ifDoc (lexParseRnHaddockComment NormalHaddockComment gre docStr)
+                  (\doc -> return [ ExportDoc doc ]))
+
+    ifDoc :: (Monad m) => m (Maybe a) -> (a -> m [b]) -> m [b]
+    ifDoc parse finish = do
+      mbDoc <- parse
+      case mbDoc of Nothing -> return []; Just doc -> finish doc
 
     declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
     declWith t =
@@ -460,7 +506,7 @@ mkExportItems modMap this_mod exported_names decls declMap
     isExported n = n `elem` exported_names
 
     fullContentsOf modname
-	| m == this_mod = return (fullContentsOfThisModule decls)
+	| m == this_mod = liftErrMsg $ fullContentsOfThisModule gre decls
 	| otherwise = 
 	   case Map.lookup m modMap of
 	     Just iface
@@ -509,14 +555,16 @@ mkExportItems modMap this_mod exported_names decls declMap
 -- (For more information, see Trac #69)
 
 
-fullContentsOfThisModule :: [DeclInfo] -> [ExportItem Name]
-fullContentsOfThisModule decls = catMaybes (map mkExportItem decls)
+fullContentsOfThisModule :: GlobalRdrEnv -> [DeclInfo] -> ErrMsgM [ExportItem Name]
+fullContentsOfThisModule gre decls = liftM catMaybes $ mapM mkExportItem decls
   where
-    mkExportItem (L _ (DocD (DocGroup lev doc)), _, _) = Just $ ExportGroup lev "" doc
-    mkExportItem (L _ (DocD (DocCommentNamed _ doc)), _, _)   = Just $ ExportDoc doc
-    mkExportItem (decl, doc, subs) = Just $ ExportDecl decl doc subs []
-
---    mkExportItem _ = Nothing -- TODO: see if this is really needed
+    mkExportItem (L _ (DocD (DocGroup lev docStr)), _, _) = do
+        mbDoc <- lexParseRnHaddockComment DocSectionComment gre docStr
+        return $ fmap (\doc -> ExportGroup lev "" doc) mbDoc
+    mkExportItem (L _ (DocD (DocCommentNamed _ docStr)), _, _) = do
+        mbDoc <- lexParseRnHaddockComment NormalHaddockComment gre docStr
+        return $ fmap ExportDoc mbDoc
+    mkExportItem (decl, doc, subs) = return $ Just $ ExportDecl decl doc subs []
 
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
@@ -598,7 +646,7 @@ mkVisibleNames exports opts
 
 
 -- | Find a stand-alone documentation comment by its name
-findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe Doc)
+findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe HsDocString)
 findNamedDoc name decls = search decls
   where
     search [] = do

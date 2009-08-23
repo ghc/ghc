@@ -12,7 +12,9 @@
 
 module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 
-import GHC           ( HsDoc, Name )
+import Haddock.Types ( HsDoc )
+
+import GHC           ( Name )
 import Module        ( Module, moduleNameString, moduleName, modulePackageId )
 #if __GLASGOW_HASKELL__ >= 609
 import Module (packageIdString)
