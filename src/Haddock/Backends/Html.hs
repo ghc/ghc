@@ -657,8 +657,6 @@ ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> HtmlTable
 ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
   = abovesSep s15 (contents ++ description: synopsis: maybe_doc_hdr: bdy)
   where
-    docMap = ifaceRnDocMap iface
- 
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
     has_doc (ExportDecl _ doc _ _) = isJust doc
@@ -685,7 +683,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
       = (tda [theclass "section1"] << toHtml "Synopsis") </>
         s15 </>
             (tda [theclass "body"] << vanillaTable <<
-            abovesSep s8 (map (processExport True linksInfo docMap unicode)
+            abovesSep s8 (map (processExport True linksInfo unicode)
             (filter forSummary exports))
         )
 
@@ -697,7 +695,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
           ExportGroup _ _ _ : _ -> Html.emptyTable
           _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 
-    bdy  = map (processExport False linksInfo docMap unicode) exports
+    bdy  = map (processExport False linksInfo unicode) exports
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
 miniSynopsis :: Module -> Interface -> Bool -> Html
@@ -782,18 +780,18 @@ numberSectionHeadings exports = go 1 exports
 	go n (other:es)
 	  = other : go n es
 
-processExport :: Bool -> LinksInfo -> DocMap -> Bool -> (ExportItem DocName) -> HtmlTable
-processExport _ _ _ _ (ExportGroup lev id0 doc)
+processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> HtmlTable
+processExport _ _ _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
-processExport summary links docMap unicode (ExportDecl decl doc subdocs insts)
-  = ppDecl summary links decl doc insts docMap subdocs unicode
-processExport _ _ _ _ (ExportNoDecl y [])
+processExport summary links unicode (ExportDecl decl doc subdocs insts)
+  = ppDecl summary links decl doc insts subdocs unicode
+processExport _ _ _ (ExportNoDecl y [])
   = declBox (ppDocName y)
-processExport _ _ _ _ (ExportNoDecl y subs)
+processExport _ _ _ (ExportNoDecl y subs)
   = declBox (ppDocName y <+> parenList (map ppDocName subs))
-processExport _ _ _ _ (ExportDoc doc)
+processExport _ _ _ (ExportDoc doc)
   = docBox (docToHtml doc)
-processExport _ _ _ _ (ExportModule mdl)
+processExport _ _ _ (ExportModule mdl)
   = declBox (toHtml "module" <+> ppModule mdl "")
 
 forSummary :: (ExportItem DocName) -> Bool
@@ -817,8 +815,8 @@ declWithDoc False links loc nm (Just doc) html_decl =
 
 -- TODO: use DeclInfo DocName or something
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName -> 
-          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> [(DocName, Maybe (HsDoc DocName))] -> Bool -> HtmlTable
-ppDecl summ links (L loc decl) mbDoc instances docMap subdocs unicode = case decl of
+          Maybe (HsDoc DocName) -> [InstHead DocName] -> [(DocName, Maybe (HsDoc DocName))] -> Bool -> HtmlTable
+ppDecl summ links (L loc decl) mbDoc instances subdocs unicode = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d unicode
   TyClD d@(TyData {})
     | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances subdocs loc mbDoc d unicode
@@ -826,7 +824,7 @@ ppDecl summ links (L loc decl) mbDoc instances docMap subdocs unicode = case dec
   TyClD d@(TySynonym {})
     | Nothing <- tcdTyPats d     -> ppTySyn summ links loc mbDoc d unicode
     | Just _  <- tcdTyPats d     -> ppTyInst summ False links loc mbDoc d unicode
-  TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc docMap subdocs d unicode
+  TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc subdocs d unicode
   SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig summ links loc mbDoc n t unicode
   ForD d                         -> ppFor summ links loc mbDoc d unicode
   InstD _                        -> Html.emptyTable
@@ -1167,9 +1165,9 @@ ppShortClassDecl _ _ _ _ _ _ = error "declaration type not supported by ppShortC
 
 
 ppClassDecl :: Bool -> LinksInfo -> [InstHead DocName] -> SrcSpan
-            -> Maybe (HsDoc DocName) -> DocMap -> [(DocName, Maybe (HsDoc DocName))]
+            -> Maybe (HsDoc DocName) -> [(DocName, Maybe (HsDoc DocName))]
             -> TyClDecl DocName -> Bool -> HtmlTable
-ppClassDecl summary links instances loc mbDoc _ subdocs
+ppClassDecl summary links instances loc mbDoc subdocs
 	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
   | summary = ppShortClassDecl summary links decl loc subdocs unicode
   | otherwise = classheader </> bodyBox << (classdoc </> body_ </> instancesBit)
@@ -1210,7 +1208,7 @@ ppClassDecl summary links instances loc mbDoc _ subdocs
              spacedTable1 << (
                aboves (map (declBox . ppInstHead unicode) instances)
              ))
-ppClassDecl _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
+ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
 ppInstHead :: Bool -> InstHead DocName -> Html
