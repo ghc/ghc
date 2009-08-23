@@ -43,11 +43,7 @@ import qualified Data.Map as Map hiding ( Map )
 import Data.Function
 import Data.Ord              ( comparing )
 
-#if __GLASGOW_HASKELL__ >= 609
 import GHC hiding ( NoLink, moduleInfo )
-#else
-import GHC hiding ( NoLink )
-#endif
 import Name
 import Module
 import RdrName hiding ( Qual, is_explicit )
