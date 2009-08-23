@@ -46,11 +46,7 @@ modulePackageString = packageIdString . modulePackageId
 modulePackageInfo :: Module -> (String, [Char])
 modulePackageInfo modu = case unpackPackageId pkg of
                           Nothing -> (packageIdString pkg, "")
-#if __GLASGOW_HASKELL__ >= 609
                           Just x -> (display $ pkgName x, showVersion (pkgVersion x))
-#else
-                          Just x -> (pkgName x, showVersion (pkgVersion x))
-#endif
   where pkg = modulePackageId modu
 
 
