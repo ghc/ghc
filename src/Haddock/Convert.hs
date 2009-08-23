@@ -14,18 +14,15 @@ import TcType ( tcSplitSigmaTy )
 import TypeRep
 import Type ( splitKindFunTys )
 import Name
-import HscTypes
 import Var
 import Class
 import TyCon
 import DataCon
-import Id
 import BasicTypes
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName )
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc )
-import Maybe
 
 -- the main function here! yay!
 tyThingToHsSynSig :: TyThing -> LHsDecl Name
