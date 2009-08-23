@@ -479,34 +479,54 @@ mkExportItems modMap this_mod gre exported_names decls declMap
 
               -- normal case
               | otherwise                          -> return [ mkExportDecl t x ]
-        Nothing ->
-          -- If we can't find the declaration, it must belong to another package.
-          -- We return just the name of the declaration and try to get the subs
-          -- from the installed interface of that package.
-          case Map.lookup (nameModule t) instIfaceMap of
-            -- It's Nothing in the cases where Haddock has already warned
-            -- the user: "Warning: The documentation for the following
-            -- packages are not installed. No links will be generated to
-            -- these packages: ..."
-            Nothing -> return [ ExportNoDecl t [] ]
-            Just iface ->
-              let subs = case Map.lookup t (instSubMap iface) of
+        Nothing -> do
+          -- If we can't find the declaration, it must belong to
+          -- another package
+          mbTyThing <- liftGhcToErrMsgGhc $ lookupName t
+          -- show the name as exported as well as the name's
+          -- defining module (because the latter is where we
+          -- looked for the .hi/.haddock).  It's to help people
+          -- debugging after all, so good to show more info.
+          let exportInfoString =
+                         moduleString this_mod ++ "." ++ getOccString t
+                      ++ ": "
+                      ++ pretty (nameModule t) ++ "." ++ getOccString t
+
+          case mbTyThing of
+            Nothing -> do
+              liftErrMsg $ tell
+                 ["Warning: Couldn't find TyThing for exported "
+                 ++ exportInfoString ++ "; not documenting."]
+              -- Is getting to here a bug in Haddock?
+              -- Aren't the .hi files always present?
+              return [ ExportNoDecl t [] ]
+            Just tyThing -> let hsdecl = tyThingToHsSynSig tyThing in
+              -- We try to get the subs and docs
+              -- from the installed interface of that package.
+              case Map.lookup (nameModule t) instIfaceMap of
+                -- It's Nothing in the cases where I thought
+                -- Haddock has already warned the user: "Warning: The
+                -- documentation for the following packages are not
+                -- installed. No links will be generated to these packages:
+                -- ..."
+                -- But I guess it was Cabal creating that warning. Anyway,
+                -- this is more serious than links: it's exported decls where
+                -- we don't have the docs that they deserve!
+
+                -- We could use 'subordinates' to find the Names of the subs
+                -- (with no docs). Is that necessary? Yes it is, otherwise
+                -- e.g. classes will be shown without their exported subs.
+                Nothing -> do
+                   liftErrMsg $ tell
+                      ["Warning: Couldn't find .haddock for exported "
+                      ++ exportInfoString]
+                   let subs = map (\(n,_,_) -> (n, noDocForDecl))
+                                  (subordinates (unLoc hsdecl))
+                   return [ mkExportDecl t (hsdecl, noDocForDecl, subs) ]
+                Just iface -> do
+                   let subs = case Map.lookup t (instSubMap iface) of
                            Nothing -> []
                            Just x -> x
-              in
-              -- If we couldn't find out the decl, we would have to
-              -- return [ ExportNoDecl t subs ]
-              -- .  But we can find out the decl, because we have the
-              -- Name and the imported module's .hi files for
-              -- reference!
-              do
-               mbTyThing <- liftGhcToErrMsgGhc $ lookupName t
-               case mbTyThing of
-                 Nothing -> do
-                   liftErrMsg (tell ["Why was no tything found for " ++ pretty (nameOccName t) ++ "? We found its module's docs. Is this a Haddock bug?"])
-                   return [ ExportNoDecl t subs ]
-                 Just tyThing -> do
-                   let hsdecl = tyThingToHsSynSig tyThing
                    return [ mkExportDecl t
                      ( hsdecl
                      , fromMaybe noDocForDecl $
