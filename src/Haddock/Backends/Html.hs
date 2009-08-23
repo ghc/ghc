@@ -872,13 +872,14 @@ ppTypeOrFunSig summary links loc docname typ doc (pref1, pref2, sep) unicode
       = (argBox (leader <+> ppLContextNoArrow lctxt unicode)
           <-> rdocBox noHtml) </> 
           do_largs (darrow unicode) ltype
-    do_args leader (HsFunTy (L _ (HsDocTy lt ldoc)) r)
-      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (docToHtml (unLoc ldoc)))
-          </> do_largs (arrow unicode) r
+--hacl
+--    do_args leader (HsFunTy (L _ (HsDocTy lt ldoc)) r)
+--      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (docToHtml (unLoc ldoc)))
+--          </> do_largs (arrow unicode) r
     do_args leader (HsFunTy lt r)
       = (argBox (leader <+> ppLType unicode lt) <-> rdocBox noHtml) </> do_largs (arrow unicode) r
-    do_args leader (HsDocTy lt ldoc)
-      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (docToHtml (unLoc ldoc)))
+--    do_args leader (HsDocTy lt ldoc)
+--      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (docToHtml (unLoc ldoc)))
     do_args leader t
       = argBox (leader <+> ppType unicode t) <-> rdocBox (noHtml)
 
