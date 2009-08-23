@@ -157,10 +157,11 @@ renameLDocHsSyn = return
 #else
 renameLDocHsSyn :: LHsDoc Name -> RnM (LHsDoc DocName)
 renameLDocHsSyn = renameLDoc
-#endif
 
+-- This is inside the #if to avoid a defined-but-not-used warning.
 renameLDoc :: LHsDoc Name -> RnM (LHsDoc DocName)
 renameLDoc = mapM renameDoc
+#endif
 
 
 renameDoc :: HsDoc Name -> RnM (HsDoc DocName)
