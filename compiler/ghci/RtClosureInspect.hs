@@ -74,7 +74,7 @@ import Data.Ix
 import Data.List
 import qualified Data.Sequence as Seq
 import Data.Monoid
-import Data.Sequence hiding (null, length, index, take, drop, splitAt, reverse)
+import Data.Sequence (viewl, ViewL(..))
 import Foreign
 -- import System.IO.Unsafe
 
