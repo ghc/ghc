@@ -169,6 +169,19 @@ declInfos gre decls =
             return (parent, (mbDoc, fnArgsDoc), subs)
 
 
+-- | If you know the HsDecl can't contain any docs
+-- (e.g., it was loaded from a .hi file and you don't have a .haddock file
+-- to help you find out about the subs or docs)
+-- then you can use this to get its subs.
+subordinatesWithNoDocs :: HsDecl Name -> [(Name, DocForDecl Name)]
+subordinatesWithNoDocs decl = map noDocs (subordinates decl)
+  where
+    -- check the condition... or shouldn't we be checking?
+    noDocs (n, doc1, doc2) | null doc1, Map.null doc2
+        = (n, noDocForDecl)
+    noDocs _ = error ("no-docs thing has docs! " ++ pretty decl)
+
+
 subordinates :: HsDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
 subordinates (TyClD d) = classDataSubs d
 subordinates _ = []
@@ -520,8 +533,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
                    liftErrMsg $ tell
                       ["Warning: Couldn't find .haddock for exported "
                       ++ exportInfoString]
-                   let subs = map (\(n,_,_) -> (n, noDocForDecl))
-                                  (subordinates (unLoc hsdecl))
+                   let subs = subordinatesWithNoDocs (unLoc hsdecl)
                    return [ mkExportDecl t (hsdecl, noDocForDecl, subs) ]
                 Just iface -> do
                    let subs = case Map.lookup t (instSubMap iface) of
