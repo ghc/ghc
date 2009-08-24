@@ -102,8 +102,8 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path update_nc = do
         -- are always 32 bits.
         --
   if wORD_SIZE == 4
-     then do Binary.get bh :: IO Word32; return ()
-     else do Binary.get bh :: IO Word64; return ()
+     then do _ <- Binary.get bh :: IO Word32; return ()
+     else do _ <- Binary.get bh :: IO Word64; return ()
 
         -- Check the interface file version and ways.
   check_ver  <- get bh
