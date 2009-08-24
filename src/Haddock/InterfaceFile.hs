@@ -215,13 +215,13 @@ putName BinSymbolTable{
   = do
     symtab_map <- readIORef symtab_map_ref
     case lookupUFM symtab_map name of
-      Just (off,_) -> put_ bh off
+      Just (off,_) -> put_ bh (fromIntegral off :: Word32)
       Nothing -> do
          off <- readFastMutInt symtab_next
          writeFastMutInt symtab_next (off+1)
          writeIORef symtab_map_ref
              $! addToUFM symtab_map name (off,name)
-         put_ bh off
+         put_ bh (fromIntegral off :: Word32)
 
 
 data BinSymbolTable = BinSymbolTable {
@@ -238,10 +238,10 @@ putFastString BinDictionary { bin_dict_next = j_r,
     out <- readIORef out_r
     let unique = getUnique f
     case lookupUFM out unique of
-        Just (j, _)  -> put_ bh j
+        Just (j, _)  -> put_ bh (fromIntegral j :: Word32)
         Nothing -> do
            j <- readFastMutInt j_r
-           put_ bh j
+           put_ bh (fromIntegral j :: Word32)
            writeFastMutInt j_r (j + 1)
            writeIORef out_r $! addToUFM out unique (j, f)
 
