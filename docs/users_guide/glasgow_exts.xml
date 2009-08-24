@@ -3157,7 +3157,8 @@ All the extensions are enabled by the <option>-fglasgow-exts</option> flag.
 <sect3>
 <title>Multi-parameter type classes</title>
 <para>
-Multi-parameter type classes are permitted. For example:
+Multi-parameter type classes are permitted, with flag <option>-XMultiParamTypeClasses</option>. 
+For example:
 
 
 <programlisting>
@@ -3169,13 +3170,17 @@ Multi-parameter type classes are permitted. For example:
 </para>
 </sect3>
 
-<sect3>
+<sect3 id="superclass-rules">
 <title>The superclasses of a class declaration</title>
 
 <para>
-There are no restrictions on the context in a class declaration
-(which introduces superclasses), except that the class hierarchy must
-be acyclic.  So these class declarations are OK:
+In Haskell 98 the context of a class declaration (which introduces superclasses)
+must be simple; that is, each predicate must consist of a class applied to 
+type variables.  The flag <option>-XFlexibleContexts</option> 
+(<xref linkend="flexible-contexts"/>)
+lifts this restriction,
+so that the only restriction on the context in a class declaration is 
+that the class hierarchy must be acyclic.  So these class declarations are OK:
 
 
 <programlisting>
@@ -4723,7 +4728,11 @@ these type signatures are perfectly OK
   g :: Eq [a] => ...
   g :: Ord (T a ()) => ...
 </programlisting>
+The flag <option>-XFlexibleContexts</option> also lifts the corresponding
+restriction on class declarations (<xref linkend="superclass-rules"/>) and instance declarations
+(<xref linkend="instance-rules"/>).
 </para>
+
 <para>
 GHC imposes the following restrictions on the constraints in a type signature.
 Consider the type:
