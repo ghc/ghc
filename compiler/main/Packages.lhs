@@ -58,7 +58,6 @@ import Exception
 
 import System.Directory
 import System.FilePath
-import Data.Maybe
 import Control.Monad
 import Data.List as List
 
