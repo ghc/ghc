@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies, UndecidableInstances, StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module T3423 where
 
