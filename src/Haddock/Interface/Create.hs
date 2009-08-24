@@ -513,10 +513,57 @@ mkExportItems modMap this_mod gre exported_names decls declMap
               -- Is getting to here a bug in Haddock?
               -- Aren't the .hi files always present?
               return [ ExportNoDecl t [] ]
-            Just tyThing -> let hsdecl = tyThingToHsSynSig tyThing in
+            Just tyThing -> do
+              let hsdecl = tyThingToHsSynSig tyThing
+              -- This is not the ideal way to implement haddockumentation
+              -- for functions/values without explicit type signatures.
+              --
+              -- However I didn't find an easy way to implement it properly,
+              -- and as long as we're using lookupName it is going to find
+              -- the types of local inferenced binds.  If we don't check for
+              -- this at all, then we'll get the "warning: couldn't find
+              -- .haddock" which is wrong.
+              --
+              -- The reason this is not an ideal implementation
+              -- (besides that we take a trip to desugared syntax and back
+              -- unnecessarily)
+              -- is that Haddock won't be able to detect doc-strings being
+              -- attached to such a function, such as,
+              --
+              -- > -- | this is an identity function
+              -- > id a = a
+              --
+              -- . It's more difficult to say what it ought to mean in cases
+              -- where multiple exports are bound at once, like
+              --
+              -- > -- | comment...
+              -- > (a, b) = ...
+              --
+              -- especially since in the export-list they might not even
+              -- be next to each other.  But a proper implementation would
+              -- really need to find the type of *all* exports as well as
+              -- addressing all these issues.  This implementation works
+              -- adequately.  Do you see a way to improve the situation?
+              -- Please go ahead!  I got stuck trying to figure out how to
+              -- get the 'PostTcType's that we want for all the bindings
+              -- of an HsBind (you get 'LHsBinds' from 'GHC.typecheckedSource'
+              -- for example).
+              --
+              -- But I might be missing something obvious.  What's important
+              -- *here* is that we behave reasonably when we run into one of
+              -- those exported type-inferenced values.
+              isLocalAndTypeInferenced <- liftGhcToErrMsgGhc $
+                    isLoaded (moduleName (nameModule t))
+              if isLocalAndTypeInferenced
+               then do
+                   -- I don't think there can be any subs in this case,
+                   -- currently?  But better not to rely on it.
+                   let subs = subordinatesWithNoDocs (unLoc hsdecl)
+                   return [ mkExportDecl t (hsdecl, noDocForDecl, subs) ]
+               else
               -- We try to get the subs and docs
               -- from the installed interface of that package.
-              case Map.lookup (nameModule t) instIfaceMap of
+               case Map.lookup (nameModule t) instIfaceMap of
                 -- It's Nothing in the cases where I thought
                 -- Haddock has already warned the user: "Warning: The
                 -- documentation for the following packages are not
