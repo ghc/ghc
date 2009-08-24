@@ -127,7 +127,7 @@ outputC dflags filenm flat_absC packages
        	       _          -> "#include \""++h_file++"\""
 
        pkg_configs <- getPreloadPackagesAnd dflags packages
-       let pkg_names = map (display.package) pkg_configs
+       let pkg_names = map (display.sourcePackageId) pkg_configs
 
        doOutput filenm $ \ h -> do
 	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")

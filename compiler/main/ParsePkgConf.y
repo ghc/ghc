@@ -62,7 +62,7 @@ fields  :: { PackageConfig -> PackageConfig }
 field	:: { PackageConfig -> PackageConfig }
 	: VARID '=' pkgid
 		{% case unpackFS $1 of
-		        "package"     -> return (\p -> p{package = $3})
+		        "sourcePackageId" -> return (\p -> p{sourcePackageId = $3})
 			_             -> happyError
 		}
 

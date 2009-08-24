@@ -291,7 +291,7 @@ applyPackageFlag pkgs flag =
 		Just ([], _) -> panic "applyPackageFlag"
 		Just (p:ps,qs) -> return (p':ps')
 		  where p' = p {exposed=True}
-		        ps' = hideAll (pkgName (package p)) (ps++qs)
+		        ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
 
 	HidePackage str ->
            case matchingPackages str pkgs of
@@ -310,8 +310,9 @@ applyPackageFlag pkgs flag =
 	-- When a package is requested to be exposed, we hide all other
 	-- packages with the same name.
 	hideAll name ps = map maybe_hide ps
-	  where maybe_hide p | pkgName (package p) == name = p {exposed=False}
-			     | otherwise                   = p
+	  where maybe_hide p
+                   | pkgName (sourcePackageId p) == name = p {exposed=False}
+                   | otherwise                           = p
 
 
 matchingPackages :: String -> [PackageConfig]
@@ -325,15 +326,15 @@ matchingPackages str pkgs
 -- version, or just the name if it is unambiguous.
 packageMatches :: String -> PackageConfig -> Bool
 packageMatches str p
-	=  str == display (package p)
-	|| str == display (pkgName (package p))
+	=  str == display (sourcePackageId p)
+	|| str == display (pkgName (sourcePackageId p))
 
 pickPackages :: [PackageConfig] -> [String] -> [PackageConfig]
 pickPackages pkgs strs = 
   [ p | p <- strs, Just (p:_, _) <- [matchingPackages p pkgs] ]
 
 sortByVersion :: [InstalledPackageInfo_ m] -> [InstalledPackageInfo_ m]
-sortByVersion = sortBy (flip (comparing (pkgVersion.package)))
+sortByVersion = sortBy (flip (comparing (pkgVersion.sourcePackageId)))
 
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
@@ -354,15 +355,15 @@ hideOldPackages dflags pkgs = mapM maybe_hide pkgs
 	   | (p' : _) <- later_versions = do
 		debugTraceMsg dflags 2 $
 		   (ptext (sLit "hiding package") <+> 
-                    text (display (package p)) <+>
+                    text (display (sourcePackageId p)) <+>
 		    ptext (sLit "to avoid conflict with later version") <+>
-		    text (display (package p')))
+		    text (display (sourcePackageId p')))
 		return (p {exposed=False})
 	   | otherwise = return p
-	  where myname = pkgName (package p)
-		myversion = pkgVersion (package p)
+	  where myname = pkgName (sourcePackageId p)
+		myversion = pkgVersion (sourcePackageId p)
 		later_versions = [ p | p <- pkgs, exposed p,
-				    let pkg = package p,
+				    let pkg = sourcePackageId p,
 				    pkgName pkg == myname,
 				    pkgVersion pkg > myversion ]
 
@@ -392,7 +393,7 @@ findWiredInPackages dflags pkgs = do
                             dphParPackageId ]
 
         matches :: PackageConfig -> String -> Bool
-        pc `matches` pid = display (pkgName (package pc)) == pid
+        pc `matches` pid = display (pkgName (sourcePackageId pc)) == pid
 
 	-- find which package corresponds to each wired-in package
 	-- delete any other packages with the same name
@@ -425,7 +426,7 @@ findWiredInPackages dflags pkgs = do
 			    ptext (sLit "wired-in package ")
 				 <> text wired_pkg
 				 <> ptext (sLit " mapped to ")
-				 <> text (display (package pkg))
+				 <> text (display (sourcePackageId pkg))
 			return (Just (installedPackageId pkg))
 
 
@@ -449,7 +450,7 @@ findWiredInPackages dflags pkgs = do
 	updateWiredInDependencies pkgs = map upd_pkg pkgs
 	  where upd_pkg p
                   | installedPackageId p `elem` wired_in_ids
-                  = p { package = (package p){ pkgVersion = Version [] [] } }
+                  = p { sourcePackageId = (sourcePackageId p){ pkgVersion = Version [] [] } }
                   | otherwise
                   = p
 
@@ -591,7 +592,7 @@ mkModuleMap pkg_db = foldr extend_modmap emptyUFM pkgids
 	        hidden_mods  = hiddenModules pkg
 
 pprPkg :: PackageConfig -> SDoc
-pprPkg p = text (display (package p))
+pprPkg p = text (display (sourcePackageId p))
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope

@@ -551,7 +551,7 @@ registerPackage input verbosity my_flags auto_ghci_libs update force = do
   -- packages lower in the stack to refer to those higher up.
   validatePackageConfig pkg truncated_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
-      not_this p = package p /= package pkg
+      not_this p = sourcePackageId p /= sourcePackageId pkg
   writeNewConfig verbosity to_modify new_details
 
 parsePackageInfo
@@ -589,10 +589,10 @@ modifyPackage fn pkgid verbosity my_flags force = do
 --  let ((db_name, pkgs) : rest_of_stack) = db_stack
 --  ps <- findPackages [(db_name,pkgs)] (Id pkgid)
   let 
-      pids = map package ps
+      pids = map sourcePackageId ps
       modify pkg
-          | package pkg `elem` pids = fn pkg
-          | otherwise               = [pkg]
+          | sourcePackageId pkg `elem` pids = fn pkg
+          | otherwise                       = [pkg]
       new_config = concat (map modify pkgs)
 
   let
@@ -600,8 +600,8 @@ modifyPackage fn pkgid verbosity my_flags force = do
       rest_of_stack = [ (nm, mypkgs)
                       | (nm, mypkgs) <- db_stack, nm /= db_name ]
       new_stack = (db_name,new_config) : rest_of_stack
-      new_broken = map package (brokenPackages (allPackagesInStack new_stack))
-      newly_broken = filter (`notElem` map package old_broken) new_broken
+      new_broken = map sourcePackageId (brokenPackages (allPackagesInStack new_stack))
+      newly_broken = filter (`notElem` map sourcePackageId old_broken) new_broken
   --
   when (not (null newly_broken)) $
       dieOrForceAll force ("unregistering " ++ display pkgid ++
@@ -636,12 +636,12 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                         LT -> LT
                         GT -> GT
                         EQ -> pkgVersion p1 `compare` pkgVersion p2
-                   where (p1,p2) = (package pkg1, package pkg2)
+                   where (p1,p2) = (sourcePackageId pkg1, sourcePackageId pkg2)
 
       match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
       pkg_map = allPackagesInStack db_stack
-      broken = map package (brokenPackages pkg_map)
+      broken = map sourcePackageId (brokenPackages pkg_map)
 
       show_func = if simple_output then show_simple else mapM_ show_normal
 
@@ -653,7 +653,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                     | verbosity >= Verbose = vcat (map pp_pkg pkg_confs)
                     | otherwise = fsep (punctuate comma (map pp_pkg pkg_confs))
                  pp_pkg p
-                   | package p `elem` broken = braces doc
+                   | sourcePackageId p `elem` broken = braces doc
                    | exposed p = doc
                    | otherwise = parens doc
                    where doc | verbosity >= Verbose = pkg <+> parens ipid
@@ -661,7 +661,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                           where
                           InstalledPackageId ipid_str = installedPackageId p
                           ipid = text ipid_str
-                          pkg = text (display (package p))
+                          pkg = text (display (sourcePackageId p))
 
       show_simple = simplePackageList my_flags . allPackagesInStack
 
@@ -675,7 +675,7 @@ simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
    let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
                                                   else display
-       strs = map showPkg $ sortBy compPkgIdVer $ map package pkgs
+       strs = map showPkg $ sortBy compPkgIdVer $ map sourcePackageId pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
 
@@ -689,10 +689,10 @@ showPackageDot _verbosity myflags = do
   let quote s = '"':s ++ "\""
   mapM_ putStrLn [ quote from ++ " -> " ++ quote to
                  | p <- all_pkgs,
-                   let from = display (package p),
+                   let from = display (sourcePackageId p),
                    depid <- depends p,
                    Just dep <- [PackageIndex.lookupInstalledPackage ipix depid],
-                   let to = display (package dep)
+                   let to = display (sourcePackageId dep)
                  ]
   putStrLn "}"
 
@@ -703,7 +703,7 @@ latestPackage ::  [Flag] -> PackageIdentifier -> IO ()
 latestPackage my_flags pkgid = do
   (db_stack, _) <- getPkgDatabases False my_flags
   ps <- findPackages db_stack (Id pkgid)
-  show_pkg (sortBy compPkgIdVer (map package ps))
+  show_pkg (sortBy compPkgIdVer (map sourcePackageId ps))
   where
     show_pkg [] = die "no matches"
     show_pkg pids = hPutStrLn stdout (display (last pids))
@@ -753,8 +753,8 @@ realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
   -- when versionBranch == [], this is a glob
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
-(Id pid)        `matchesPkg` pkg = pid `matches` package pkg
-(Substring _ m) `matchesPkg` pkg = m (display (package pkg))
+(Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg
+(Substring _ m) `matchesPkg` pkg = m (display (sourcePackageId pkg))
 
 compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
 compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
@@ -844,7 +844,7 @@ checkConsistency my_flags = do
             then return []
             else do
               when (not simple_output) $ do
-                  reportError ("There are problems in package " ++ display (package p) ++ ":")
+                  reportError ("There are problems in package " ++ display (sourcePackageId p) ++ ":")
                   _ <- reportValidateErrors es "  " Nothing
                   return ()
               return [p]
@@ -852,8 +852,8 @@ checkConsistency my_flags = do
   broken_pkgs <- concat `fmap` mapM checkPackage pkgs
 
   let filterOut pkgs1 pkgs2 = filter not_in pkgs2
-        where not_in p = package p `notElem` all_ps
-              all_ps = map package pkgs1
+        where not_in p = sourcePackageId p `notElem` all_ps
+              all_ps = map sourcePackageId pkgs1
 
   let not_broken_pkgs = filterOut broken_pkgs pkgs
       (_, trans_broken_pkgs) = closure [] not_broken_pkgs
@@ -865,7 +865,7 @@ checkConsistency my_flags = do
       else do
        reportError ("\nThe following packages are broken, either because they have a problem\n"++
                 "listed above, or because they depend on a broken package.")
-       mapM_ (hPutStrLn stderr . display . package) all_broken_pkgs
+       mapM_ (hPutStrLn stderr . display . sourcePackageId) all_broken_pkgs
 
   when (not (null all_broken_pkgs)) $ exitWith (ExitFailure 1)
 
@@ -977,7 +977,7 @@ validatePackageConfig :: InstalledPackageInfo
                       -> IO ()
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
   (_,es) <- runValidate $ checkPackageConfig pkg db_stack auto_ghci_libs update
-  ok <- reportValidateErrors es (display (package pkg) ++ ": ") (Just force)
+  ok <- reportValidateErrors es (display (sourcePackageId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
 checkPackageConfig :: InstalledPackageInfo
@@ -1018,7 +1018,7 @@ checkInstalledPackageId ipi db_stack update = do
 -- we check that the package id can be parsed properly here.
 checkPackageId :: InstalledPackageInfo -> Validate ()
 checkPackageId ipi =
-  let str = display (package ipi) in
+  let str = display (sourcePackageId ipi) in
   case [ x :: PackageIdentifier | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
     [_] -> return ()
     []  -> verror CannotForce ("invalid package identifier: " ++ str)
@@ -1027,18 +1027,18 @@ checkPackageId ipi =
 checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Validate ()
 checkDuplicates db_stack pkg update = do
   let
-        pkgid = package pkg
+        pkgid = sourcePackageId pkg
         (_top_db_name, pkgs) : _  = db_stack
   --
   -- Check whether this package id already exists in this DB
   --
-  when (not update && (pkgid `elem` map package pkgs)) $
+  when (not update && (pkgid `elem` map sourcePackageId pkgs)) $
        verror CannotForce $
           "package " ++ display pkgid ++ " is already installed"
 
   let
         uncasep = map toLower . display
-        dups = filter ((== uncasep pkgid) . uncasep) (map package pkgs)
+        dups = filter ((== uncasep pkgid) . uncasep) (map sourcePackageId pkgs)
 
   when (not update && not (null dups)) $ verror ForceAll $
         "Package names may be treated case-insensitively in the future.\n"++

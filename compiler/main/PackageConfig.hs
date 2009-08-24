@@ -59,7 +59,7 @@ mkPackageId = stringToPackageId . display
 
 -- | Get the GHC 'PackageId' right out of a Cabalish 'PackageConfig'
 packageConfigId :: PackageConfig -> PackageId
-packageConfigId = mkPackageId . package
+packageConfigId = mkPackageId . sourcePackageId
 
 -- | Turn a 'PackageConfig', which contains GHC 'Module.ModuleName's into a Cabal specific
 -- 'InstalledPackageInfo' which contains Cabal 'Distribution.ModuleName.ModuleName's
