@@ -38,7 +38,6 @@ module RdrHsSyn (
 	checkTyVars,          -- [LHsType RdrName] -> P ()
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
 	checkInstType,	      -- HsType -> P HsType
-        checkDerivDecl,       -- LDerivDecl RdrName -> P (LDerivDecl RdrName)
 	checkPattern,	      -- HsExp -> P HsPat
 	bang_RDR,
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -657,15 +656,6 @@ checkPred (L spn ty)
     check _loc (HsParTy t)  	       args = checkl t args
     check loc _                        _    = parseError loc  
 					        "malformed class assertion"
-
----------------------------------------------------------------------------
--- Checking stand-alone deriving declarations
-
-checkDerivDecl :: LDerivDecl RdrName -> P (LDerivDecl RdrName)
-checkDerivDecl d@(L loc _) = 
-    do stDerivOn <- extension standaloneDerivingEnabled
-       if stDerivOn then return d
-	 else parseError loc "Illegal stand-alone deriving declaration (use -XStandaloneDeriving)"
 
 ---------------------------------------------------------------------------
 -- Checking statements in a do-expression

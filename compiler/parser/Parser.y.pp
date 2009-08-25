@@ -707,7 +707,7 @@ tycl_hdr :: { Located (LHsContext RdrName, LHsType RdrName) }
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl RdrName }
-  	: 'deriving' 'instance' inst_type {% checkDerivDecl (LL (DerivDecl $3)) }
+  	: 'deriving' 'instance' inst_type { LL (DerivDecl $3) }
 
 -----------------------------------------------------------------------------
 -- Nested declarations

@@ -499,9 +499,16 @@ extendTyVarEnvForMethodBinds tyvars thing_inside
 \begin{code}
 rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
 rnSrcDerivDecl (DerivDecl ty)
-  = do ty' <- rnLHsType (text "a deriving decl") ty
-       let fvs = extractHsTyNames ty'
-       return (DerivDecl ty', fvs)
+  = do { standalone_deriv_ok <- doptM Opt_StandaloneDeriving
+       ; unless standalone_deriv_ok (addErr standaloneDerivErr)
+       ; ty' <- rnLHsType (text "a deriving decl") ty
+       ; let fvs = extractHsTyNames ty'
+       ; return (DerivDecl ty', fvs) }
+
+standaloneDerivErr :: SDoc
+standaloneDerivErr 
+  = hang (ptext (sLit "Illegal standalone deriving declaration"))
+       2 (ptext (sLit "Use -XStandaloneDeriving to enable this extension"))
 \end{code}
 
 %*********************************************************
