@@ -39,6 +39,7 @@ import TcIface
 import TcType
 import {- Kind parts of -} Type
 import Var
+import VarSet
 import Coercion
 import TyCon
 import Class
@@ -48,6 +49,7 @@ import PrelNames
 import TysWiredIn
 import BasicTypes
 import SrcLoc
+import Util
 import UniqSupply
 import Outputable
 import FastString
@@ -891,6 +893,16 @@ tcPatSig ctxt sig res_ty
 	  	-- Check that pat_ty is rigid
 	; checkTc (isRigidTy res_ty) (wobblyPatSig sig_tvs)
 
+		-- Check that all newly-in-scope tyvars are in fact
+		-- constrained by the pattern.  This catches tiresome
+		-- cases like	
+		--	type T a = Int
+		--	f :: Int -> Int
+		-- 	f (x :: T a) = ...
+		-- Here 'a' doesn't get a binding.  Sigh
+	; let bad_tvs = filterOut (`elemVarSet` exactTyVarsOfType sig_ty) sig_tvs
+	; checkTc (null bad_tvs) (badPatSigTvs sig_ty bad_tvs)
+
 		-- Now match the pattern signature against res_ty
 		-- For convenience, and uniform-looking error messages
 		-- we do the matching by allocating meta type variables, 
@@ -1041,6 +1053,15 @@ wobblyPatSig sig_tvs
 		<+> pprQuotedList sig_tvs)
        2 (ptext (sLit "unless the pattern has a rigid type context"))
 		
+badPatSigTvs :: TcType -> [TyVar] -> SDoc
+badPatSigTvs sig_ty bad_tvs
+  = vcat [ fsep [ptext (sLit "The type variable") <> plural bad_tvs, 
+                 quotes (pprWithCommas ppr bad_tvs), 
+          	 ptext (sLit "should be bound by the pattern signature") <+> quotes (ppr sig_ty),
+	  	 ptext (sLit "but are actually discarded by a type synonym") ]
+         , ptext (sLit "To fix this, expand the type synonym") 
+         , ptext (sLit "[Note: I hope to lift this restriction in due course]") ]
+
 scopedNonVar :: Name -> Type -> SDoc
 scopedNonVar n ty
   = vcat [sep [ptext (sLit "The scoped type variable") <+> quotes (ppr n),
