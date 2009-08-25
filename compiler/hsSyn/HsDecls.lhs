@@ -840,7 +840,7 @@ data DerivDecl name = DerivDecl (LHsType name)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
     ppr (DerivDecl ty) 
-        = hsep [ptext (sLit "derived instance"), ppr ty]
+        = hsep [ptext (sLit "deriving instance"), ppr ty]
 \end{code}
 
 %************************************************************************
