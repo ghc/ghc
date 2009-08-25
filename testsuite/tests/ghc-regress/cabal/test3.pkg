@@ -1,5 +1,6 @@
 name: "testpkg"
 version: 3.0
+id: testpkg-3.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -15,4 +16,4 @@ hidden-modules:
 import-dirs:
 library-dirs:
 hs-libraries: 
-depends: testpkg-2.0
+depends: testpkg-2.0-XXX
