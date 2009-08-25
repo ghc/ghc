@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2009
  *
  * Declarations for various symbols exported by the RTS.
  *
@@ -9,6 +9,11 @@
  * for the RTS bits (it assumes all RTS symbols are external).
  *
  * See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+ *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * --------------------------------------------------------------------------*/
 

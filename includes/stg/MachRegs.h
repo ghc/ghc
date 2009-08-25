@@ -1,9 +1,14 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2009
  *
  * Registers used in STG code.  Might or might not correspond to
  * actual machine registers.
+ *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * ---------------------------------------------------------------------------*/
 

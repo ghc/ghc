@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2006-2008
+ * (c) The GHC Team, 2006-2009
  *
  * Spin locks
  *
@@ -11,6 +11,11 @@
  *
  * TODO: measure whether we really need these, or whether Mutexes
  * would do (and be a bit safer if a CPU becomes loaded).
+ *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * -------------------------------------------------------------------------- */
 

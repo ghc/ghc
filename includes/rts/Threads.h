@@ -5,6 +5,11 @@
  * External API for the scheduler.  For most uses, the functions in
  * RtsAPI.h should be enough.
  *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef RTS_THREADS_H

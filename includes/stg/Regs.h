@@ -1,9 +1,20 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2009
  *
  * Registers in the STG machine.
  *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
+ * ---------------------------------------------------------------------------*/
+
+#ifndef REGS_H
+#define REGS_H
+
+/*
  * The STG machine has a collection of "registers", each one of which
  * may or may not correspond to an actual machine register when
  * running code.  
@@ -17,10 +28,7 @@
  * BaseReg is not in a machine register, then the register table is
  * used from an absolute location (MainCapability).
  *
- * ---------------------------------------------------------------------------*/
-
-#ifndef REGS_H
-#define REGS_H
+ */
 
 typedef struct {
   StgWord        stgEagerBlackholeInfo;

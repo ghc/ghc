@@ -1,15 +1,12 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2009
  *
- * Top-level include file for everything STG-ish.  
- *
- * This file is included *automatically* by all .hc files.
- *
- * NOTE: always include Stg.h *before* any other headers, because we
- * define some register variables which must be done before any inline
- * functions are defined (some system headers have been known to
- * define the odd inline function).
+ * Top-level include file for everything required when compiling .hc
+ * code.  NOTE: in .hc files, Stg.h must be included *before* any
+ * other headers, because we define some register variables which must
+ * be done before any inline functions are defined (some system
+ * headers have been known to define the odd inline function).
  *
  * We generally try to keep as little visible as possible when
  * compiling .hc files.  So for example the definitions of the
@@ -17,6 +14,12 @@
  * visible here.  The compiler knows enough about the representations
  * of these types to generate code which manipulates them directly
  * with pointer arithmetic.
+ *
+ * In ordinary C code, do not #include this file directly: #include
+ * "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * ---------------------------------------------------------------------------*/
 

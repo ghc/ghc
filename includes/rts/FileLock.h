@@ -1,8 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2007
+ * (c) The GHC Team, 2007-2009
  *
  * File locking support as required by Haskell 98
+ *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * ---------------------------------------------------------------------------*/
 

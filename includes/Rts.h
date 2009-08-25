@@ -5,6 +5,9 @@
  * RTS external APIs.  This file declares everything that the GHC RTS
  * exposes externally.
  *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef RTS_H

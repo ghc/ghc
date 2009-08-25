@@ -5,6 +5,23 @@
  * Various C datatypes used in the run-time system.  This is the
  * lowest-level include file, after ghcconfig.h and RtsConfig.h.
  *
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
+ * NOTE: assumes #include "ghcconfig.h"
+ * 
+ * Works with or without _POSIX_SOURCE.
+ *
+ * WARNING: Keep this file, MachDeps.h, and HsFFI.h in synch!
+ *
+ * ---------------------------------------------------------------------------*/
+
+#ifndef STGTYPES_H
+#define STGTYPES_H
+
+/*
  * This module should define types *only*, all beginning with "Stg".
  *
  * Specifically:
@@ -22,17 +39,7 @@
 	StgBool, StgVoid, StgPtr, StgOffset, 
 	StgCode, StgStablePtr, StgFunPtr,
 	StgUnion.
-
- * WARNING: Keep this file, MachDeps.h, and HsFFI.h in synch!
- *
- * NOTE: assumes #include "ghcconfig.h"
- * 
- * Works with or without _POSIX_SOURCE.
- *
- * ---------------------------------------------------------------------------*/
-
-#ifndef STGTYPES_H
-#define STGTYPES_H
+ */
 
 /*
  * First, platform-dependent definitions of size-specific integers.

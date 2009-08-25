@@ -1,10 +1,15 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001-2005
+ * (c) The GHC Team, 2001-2009
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
  * manner. 
  * 
+ * Do not #include this file directly: #include "Rts.h" instead.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
  * --------------------------------------------------------------------------*/
 
 #ifndef RTS_OSTHREADS_H

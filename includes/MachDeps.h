@@ -7,6 +7,10 @@
  *
  * NB: Keep in sync with HsFFI.h and StgTypes.h.
  * NB: THIS FILE IS INCLUDED IN HASKELL SOURCE!
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef MACHDEPS_H

@@ -1,12 +1,16 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2009
  *
  * Rts settings.
  *
  * NOTE: assumes #include "ghcconfig.h"
  * 
  * NB: THIS FILE IS INCLUDED IN NON-C CODE AND DATA!  #defines only please.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef RTS_CONFIG_H

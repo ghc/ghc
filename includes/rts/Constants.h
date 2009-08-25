@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2002
+ * (c) The GHC Team, 1998-2009
  *
  * Constants
  *
@@ -11,6 +11,9 @@
  * Constants which are derived automatically from other definitions in
  * the system (eg. structure sizes) are generated into the file
  * DerivedConstants.h by a C program (mkDerivedConstantsHdr).
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * -------------------------------------------------------------------------- */
 
