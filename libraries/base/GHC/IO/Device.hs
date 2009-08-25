@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude -XBangPatterns #-}
-{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Device

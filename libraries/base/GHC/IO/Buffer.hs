@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC  -XNoImplicitPrelude -funbox-strict-fields #-}
-{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Buffer
