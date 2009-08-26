@@ -32,6 +32,25 @@ AC_CHECK_FUNCS([lstat])
 AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 
+dnl--------------------------------------------------------------------
+dnl * Deal with arguments telling us iconv is somewhere odd
+dnl--------------------------------------------------------------------
+
+AC_ARG_WITH([iconv-includes],
+  [AC_HELP_STRING([--with-iconv-includes],
+    [directory containing iconv.h])],
+    [ICONV_INCLUDE_DIRS=$withval; CPPFLAGS="-I$withval"],
+    [ICONV_INCLUDE_DIRS=])
+
+AC_ARG_WITH([iconv-libraries],
+  [AC_HELP_STRING([--with-iconv-libraries],
+    [directory containing iconv library])],
+    [ICONV_LIB_DIRS=$withval; LDFLAGS="-L$withval"],
+    [ICONV_LIB_DIRS=])
+
+AC_SUBST(ICONV_INCLUDE_DIRS)
+AC_SUBST(ICONV_LIB_DIRS)
+
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
 FPTOOLS_CHECK_HTYPE(signed char)
