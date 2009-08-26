@@ -84,7 +84,7 @@ class IODevice a where
   isSeekable :: a -> IO Bool
   isSeekable _ = return False
 
-  -- | seek to the specified positing in the data.
+  -- | seek to the specified position in the data.
   seek :: a -> SeekMode -> Integer -> IO ()
   seek _ _ _ = ioe_unsupportedOperation
 
