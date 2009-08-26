@@ -35,7 +35,8 @@ endif
 $1_$2_BUILD_CC_OPTS = \
  $$(SRC_CC_OPTS) \
  $$($1_CC_OPTS) \
- $$(foreach dir,$$($1_$2_INCLUDE_DIRS),-I$1/$$(dir)) \
+ $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
+ $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
  $$($1_$2_CC_OPTS) \
  $$($1_$2_CPP_OPTS) \
  $$(foreach dir,$$($1_$2_DEP_INCLUDE_DIRS),$$($1_$2_DEP_INCLUDE_DIRS_FLAG)$$(dir)) \
@@ -60,7 +61,8 @@ $1_$2_BUILD_HC_OPTS = \
  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
  -i$1/$2/build -i$1/$2/build/autogen \
  -I$1/$2/build -I$1/$2/build/autogen \
- $$(foreach dir,$$($1_$2_INCLUDE_DIRS),-I$1/$$(dir)) \
+ $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
+ $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
  $$(foreach inc,$$($1_$2_INCLUDE),-\#include "$$(inc)") \
  $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
