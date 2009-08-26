@@ -101,7 +101,7 @@ data HsDecl id
   | AnnD	(AnnDecl id)
   | RuleD	(RuleDecl id)
   | SpliceD	(SpliceDecl id)
-  | DocD	(DocDecl id)
+  | DocD	(DocDecl)
 
 
 -- NB: all top-level fixity decls are contained EITHER
@@ -136,7 +136,7 @@ data HsGroup id
 	hs_annds   :: [LAnnDecl id],
 	hs_ruleds :: [LRuleDecl id],
 
-	hs_docs   :: [LDocDecl id]
+	hs_docs   :: [LDocDecl]
   }
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
@@ -476,7 +476,7 @@ data TyClDecl name
 							--   only 'TyFamily' and
 							--   'TySynonym'; the
                                                         --   latter for defaults
-		tcdDocs    :: [LDocDecl name]		-- ^ Haddock docs
+		tcdDocs    :: [LDocDecl]		-- ^ Haddock docs
     }
 
 data NewOrData
@@ -716,7 +716,7 @@ data ConDecl name
     , con_res       :: ResType name
         -- ^ Result type of the constructor
 
-    , con_doc       :: Maybe (LHsDoc name)
+    , con_doc       :: Maybe LHsDocString
         -- ^ A possible Haddock comment.
 
     , con_old_rec :: Bool   
@@ -1000,19 +1000,19 @@ instance OutputableBndr name => Outputable (RuleBndr name) where
 
 \begin{code}
 
-type LDocDecl name = Located (DocDecl name)
+type LDocDecl = Located (DocDecl)
 
-data DocDecl name
-  = DocCommentNext (HsDoc name)
-  | DocCommentPrev (HsDoc name)
-  | DocCommentNamed String (HsDoc name)
-  | DocGroup Int (HsDoc name)
+data DocDecl
+  = DocCommentNext HsDocString
+  | DocCommentPrev HsDocString
+  | DocCommentNamed String HsDocString
+  | DocGroup Int HsDocString
  
 -- Okay, I need to reconstruct the document comments, but for now:
-instance Outputable (DocDecl name) where
+instance Outputable DocDecl where
   ppr _ = text "<document comment>"
 
-docDeclDoc :: DocDecl name -> HsDoc name
+docDeclDoc :: DocDecl -> HsDocString
 docDeclDoc (DocCommentNext d) = d
 docDeclDoc (DocCommentPrev d) = d
 docDeclDoc (DocCommentNamed _ d) = d

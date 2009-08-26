@@ -157,7 +157,7 @@ data HsType name
 
   | HsSpliceTy		(HsSplice name)
 
-  | HsDocTy             (LHsType name) (LHsDoc name) -- A documented type
+  | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
   | HsBangTy	HsBang (LHsType name)	-- Bang-style type annotations 
   | HsRecTy [ConDeclField name]	        -- Only in data type declarations
@@ -169,7 +169,7 @@ data HsExplicitForAll = Explicit | Implicit
 data ConDeclField name	-- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_name :: Located name,
 		   cd_fld_type :: LBangType name, 
-		   cd_fld_doc  :: Maybe (LHsDoc name) }
+		   cd_fld_doc  :: Maybe LHsDocString }
 
 
 -----------------------

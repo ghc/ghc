@@ -26,7 +26,7 @@ import Data.Char
 
 \begin{code}
 ppSourceStats :: Bool -> Located (HsModule RdrName) -> SDoc
-ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
+ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
  = (if short then hcat else vcat)
         (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list

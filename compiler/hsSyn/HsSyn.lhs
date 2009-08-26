@@ -22,9 +22,6 @@ module HsSyn (
 	Fixity,
 
 	HsModule(..), HsExtCore(..),
-
-	HaddockModInfo(..),
-	emptyHaddockModInfo,
 ) where
 
 -- friends:
@@ -71,26 +68,10 @@ data HsModule name
         -- ^ Type, class, value, and interface signature decls
       hsmodDeprecMessage :: Maybe WarningTxt,
         -- ^ reason\/explanation for warning/deprecation of this module
-      hsmodHaddockModInfo :: HaddockModInfo name,
-        -- ^ Haddock module info
-      hsmodHaddockModDescr :: Maybe (HsDoc name)
-        -- ^ Haddock module description
+      hsmodHaddockModHeader :: Maybe LHsDocString
+        -- ^ Haddock module info and description, unparsed
    }
 
-data HaddockModInfo name = HaddockModInfo { 
-	hmi_description :: Maybe (HsDoc name),
-	hmi_portability :: Maybe String,
-	hmi_stability   :: Maybe String,
-	hmi_maintainer  :: Maybe String
-}
-
-emptyHaddockModInfo :: HaddockModInfo a                                                  
-emptyHaddockModInfo = HaddockModInfo {                                                  
-	hmi_description = Nothing,
-	hmi_portability = Nothing,
-	hmi_stability   = Nothing,
-	hmi_maintainer  = Nothing
-}       
 
 data HsExtCore name	-- Read from Foo.hcr
   = HsExtCore
@@ -108,10 +89,10 @@ instance Outputable Char where
 instance (OutputableBndr name)
 	=> Outputable (HsModule name) where
 
-    ppr (HsModule Nothing _ imports decls _ _ mbDoc)
+    ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports $$ pp_nonnull decls
 
-    ppr (HsModule (Just name) exports imports decls deprec _ mbDoc)
+    ppr (HsModule (Just name) exports imports decls deprec mbDoc)
       = vcat [
 	    pp_mb mbDoc,
 	    case exports of

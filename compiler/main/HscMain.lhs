@@ -216,7 +216,7 @@ hscTypecheck mod_summary rdr_module = do
 -- exception/signal an error.
 type RenamedStuff = 
         (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
-                Maybe (HsDoc Name), HaddockModInfo Name))
+                Maybe LHsDocString))
 
 -- | Rename and typecheck a module, additionally returning the renamed syntax
 hscTypecheckRename ::
@@ -233,9 +233,8 @@ hscTypecheckRename mod_summary rdr_module = do
         rn_info = do { decl <- tcg_rn_decls tc_result
                      ; let imports = tcg_rn_imports tc_result
                            exports = tcg_rn_exports tc_result
-                           doc 	   = tcg_doc tc_result
-        	           hmi 	   = tcg_hmi tc_result
-                     ; return (decl,imports,exports,doc,hmi) }
+                           doc_hdr  = tcg_doc_hdr tc_result
+                     ; return (decl,imports,exports,doc_hdr) }
 
     return (tc_result, rn_info)
 

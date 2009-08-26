@@ -230,7 +230,7 @@ rnList f xs = mapFvRn (wrapLocFstM f) xs
 %*********************************************************
 
 \begin{code}
-rnDocDecl :: DocDecl RdrName -> RnM (DocDecl Name)
+rnDocDecl :: DocDecl -> RnM DocDecl
 rnDocDecl (DocCommentNext doc) = do 
   rn_doc <- rnHsDoc doc
   return (DocCommentNext rn_doc)

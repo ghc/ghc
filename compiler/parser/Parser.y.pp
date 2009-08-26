@@ -51,8 +51,6 @@ import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..), RuleMatchInfo(..), defaultInlineSpec )
 import DynFlags
 import OrdList
-import HaddockParse
-import {-# SOURCE #-} HaddockLex hiding ( Token )
 import HaddockUtils
 
 import FastString
@@ -382,18 +380,18 @@ identifier :: { Located RdrName }
 
 module 	:: { Located (HsModule RdrName) }
  	: maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
-		{% fileSrcSpan >>= \ loc -> case $1 of { (info, doc) ->
-		   return (L loc (HsModule (Just $3) $5 (fst $7) (snd $7) $4
-                          info doc) )}}
+		{% fileSrcSpan >>= \ loc ->
+		   return (L loc (HsModule (Just $3) $5 (fst $7) (snd $7) $4 $1
+                          ) )}
         | body2
 		{% fileSrcSpan >>= \ loc ->
 		   return (L loc (HsModule Nothing Nothing
-                          (fst $1) (snd $1) Nothing emptyHaddockModInfo
-                          Nothing)) }
+                          (fst $1) (snd $1) Nothing Nothing
+                          )) }
 
-maybedocheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }
+maybedocheader :: { Maybe LHsDocString }
         : moduleheader            { $1 }
-        | {- empty -}             { (emptyHaddockModInfo, Nothing) }
+        | {- empty -}             { Nothing }
 
 missing_module_keyword :: { () }
 	: {- empty -}				{% pushCurrentContext }
@@ -424,13 +422,13 @@ cvtopdecls :: { [LHsDecl RdrName] }
 
 header 	:: { Located (HsModule RdrName) }
  	: maybedocheader 'module' modid maybemodwarning maybeexports 'where' header_body
-		{% fileSrcSpan >>= \ loc -> case $1 of { (info, doc) ->
-		   return (L loc (HsModule (Just $3) $5 $7 [] $4
-                   info doc))}}
+		{% fileSrcSpan >>= \ loc ->
+		   return (L loc (HsModule (Just $3) $5 $7 [] $4 $1
+                          ))}
 	| missing_module_keyword importdecls
 		{% fileSrcSpan >>= \ loc ->
 		   return (L loc (HsModule Nothing Nothing $2 [] Nothing
-                   emptyHaddockModInfo Nothing)) }
+                          Nothing)) }
 
 header_body :: { [LImportDecl RdrName] }
 	:  '{'            importdecls		{ $2 }
@@ -1192,7 +1190,7 @@ deriving :: { Located (Maybe [LHsType RdrName]) }
 docdecl :: { LHsDecl RdrName }
         : docdecld { L1 (DocD (unLoc $1)) }
 
-docdecld :: { LDocDecl RdrName }
+docdecld :: { LDocDecl }
         : docnext                               { L1 (DocCommentNext (unLoc $1)) }
         | docprev                               { L1 (DocCommentPrev (unLoc $1)) }
         | docnamed                              { L1 (case (unLoc $1) of (n, doc) -> DocCommentNamed n doc) }
@@ -1926,46 +1924,31 @@ commas :: { Int }
 -----------------------------------------------------------------------------
 -- Documentation comments
 
-docnext :: { LHsDoc RdrName }
-  : DOCNEXT {% case parseHaddockParagraphs (tokenise (getDOCNEXT $1)) of {
-      MyLeft  err -> parseError (getLoc $1) err;
-      MyRight doc -> return (L1 doc) } }
+docnext :: { LHsDocString }
+  : DOCNEXT {% return (L1 (HsDocString (mkFastString (getDOCNEXT $1)))) }
 
-docprev :: { LHsDoc RdrName }
-  : DOCPREV {% case parseHaddockParagraphs (tokenise (getDOCPREV $1)) of {
-      MyLeft  err -> parseError (getLoc $1) err;
-      MyRight doc -> return (L1 doc) } }
+docprev :: { LHsDocString }
+  : DOCPREV {% return (L1 (HsDocString (mkFastString (getDOCPREV $1)))) }
 
-docnamed :: { Located (String, (HsDoc RdrName)) }
+docnamed :: { Located (String, HsDocString) }
   : DOCNAMED {%
       let string = getDOCNAMED $1 
           (name, rest) = break isSpace string
-      in case parseHaddockParagraphs (tokenise rest) of {
-        MyLeft  err -> parseError (getLoc $1) err;
-        MyRight doc -> return (L1 (name, doc)) } }
+      in return (L1 (name, HsDocString (mkFastString rest))) }
 
-docsection :: { Located (Int, HsDoc RdrName) }
+docsection :: { Located (Int, HsDocString) }
   : DOCSECTION {% let (n, doc) = getDOCSECTION $1 in
-        case parseHaddockString (tokenise doc) of {
-      MyLeft  err -> parseError (getLoc $1) err;
-      MyRight doc -> return (L1 (n, doc)) } }
+        return (L1 (n, HsDocString (mkFastString doc))) }
 
-moduleheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }                                    
+moduleheader :: { Maybe LHsDocString }
         : DOCNEXT {% let string = getDOCNEXT $1 in
-               case parseModuleHeader string of {                       
-                 Right (str, info) ->                                  
-                   case parseHaddockParagraphs (tokenise str) of {               
-                     MyLeft err -> parseError (getLoc $1) err;                    
-                     MyRight doc -> return (info, Just doc);          
-                   };                                             
-                 Left err -> parseError (getLoc $1) err
-            }  }                                                  
+                     return (Just (L1 (HsDocString (mkFastString string)))) }
 
-maybe_docprev :: { Maybe (LHsDoc RdrName) }
+maybe_docprev :: { Maybe LHsDocString }
 	: docprev                       { Just $1 }
 	| {- empty -}                   { Nothing }
 
-maybe_docnext :: { Maybe (LHsDoc RdrName) }
+maybe_docnext :: { Maybe LHsDocString }
 	: docnext                       { Just $1 }
 	| {- empty -}                   { Nothing }
 

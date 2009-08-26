@@ -111,8 +111,6 @@ import Data.Maybe	( isJust )
 #include "HsVersions.h"
 \end{code}
 
-
-
 %************************************************************************
 %*									*
 	Typecheck and rename a module
@@ -130,7 +128,7 @@ tcRnModule :: HscEnv
 tcRnModule hsc_env hsc_src save_rn_syntax
 	 (L loc (HsModule maybe_mod export_ies 
 			  import_decls local_decls mod_deprec
-			  module_info maybe_doc))
+			  maybe_doc_hdr))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
@@ -188,8 +186,9 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	-- because the latter might add new bindings for boot_dfuns, 
 	-- which may be mentioned in imported unfoldings
 
-		-- Rename the Haddock documentation 
-	tcg_env <- rnHaddock module_info maybe_doc tcg_env ;
+		-- Don't need to rename the Haddock documentation,
+		-- it's not parsed by GHC anymore.
+	tcg_env <- return (tcg_env { tcg_doc_hdr = maybe_doc_hdr }) ;
 
 		-- Report unused names
  	reportUnusedNames export_ies tcg_env ;

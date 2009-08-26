@@ -68,7 +68,7 @@ getImports dflags buf filename source_filename = do
         then liftIO $ throwIO $ mkSrcErr errs
         else
 	  case rdr_module of
-	    L _ (HsModule mb_mod _ imps _ _ _ _) ->
+	    L _ (HsModule mb_mod _ imps _ _ _) ->
 	      let
                 main_loc = mkSrcLoc (mkFastString source_filename) 1 0
 		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME

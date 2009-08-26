@@ -246,8 +246,7 @@ data TcGblEnv
 	tcg_rules     :: [LRuleDecl Id],    -- ...Rules
 	tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
 
-	tcg_doc :: Maybe (HsDoc Name), -- ^ Maybe Haddock documentation
-        tcg_hmi :: HaddockModInfo Name, -- ^ Haddock module information
+	tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
         tcg_hpc :: AnyHpcUsage -- ^ @True@ if any part of the prog uses hpc
                                -- instrumentation.
     }

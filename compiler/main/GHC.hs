@@ -58,9 +58,6 @@ module GHC (
         compileCoreToObj,
         getModSummary,
 
-	-- * Parsing Haddock comments
-	parseHaddockComment,
-
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..), ms_mod_name, ModLocation(..),
 	getModuleGraph,
@@ -300,8 +297,6 @@ import StringBuffer	( StringBuffer, hGetStringBuffer, nextChar )
 import Outputable
 import BasicTypes
 import Maybes		( expectJust, mapCatMaybes )
-import HaddockParse
-import HaddockLex       ( tokenise )
 import FastString
 import Lexer
 
@@ -624,15 +619,6 @@ setGlobalTypeScope :: GhcMonad m => [Id] -> m ()
 setGlobalTypeScope ids
     = modifySession $ \hscEnv ->
       hscEnv{ hsc_global_type_env = extendTypeEnvWithIds emptyTypeEnv ids }
-
--- -----------------------------------------------------------------------------
--- Parsing Haddock comments
-
-parseHaddockComment :: String -> Either String (HsDoc RdrName)
-parseHaddockComment string = 
-  case parseHaddockParagraphs (tokenise string) of
-    MyLeft x  -> Left x
-    MyRight x -> Right x
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -1035,7 +1021,7 @@ instance DesugaredMod DesugaredModule where
 
 type ParsedSource      = Located (HsModule RdrName)
 type RenamedSource     = (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
-                          Maybe (HsDoc Name), HaddockModInfo Name)
+                          Maybe LHsDocString)
 type TypecheckedSource = LHsBinds Id
 
 -- NOTE:

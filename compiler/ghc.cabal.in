@@ -324,8 +324,6 @@ Library
         SysTools
         TidyPgm
         Ctype
-        HaddockLex
-        HaddockParse
         HaddockUtils
         LexCore
         Lexer

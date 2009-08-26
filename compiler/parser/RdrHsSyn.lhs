@@ -255,7 +255,7 @@ cvBindGroup binding
       	    	  	         ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName], [LDocDecl RdrName])
+  -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName], [LDocDecl])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.

@@ -16,7 +16,7 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 module HsImpExp where
 
 import Module		( ModuleName )
-import HsDoc		( HsDoc )
+import HsDoc		( HsDocString )
 
 import Outputable
 import FastString
@@ -88,8 +88,8 @@ data IE name
   | IEThingAll          name		 -- ^ Class/Type plus all methods/constructors
   | IEThingWith         name [name]	 -- ^ Class/Type plus some methods/constructors
   | IEModuleContents    ModuleName	 -- ^ (Export Only)
-  | IEGroup             Int (HsDoc name) -- ^ Doc section heading
-  | IEDoc               (HsDoc name)     -- ^ Some documentation
+  | IEGroup             Int HsDocString  -- ^ Doc section heading
+  | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
 \end{code}
 
