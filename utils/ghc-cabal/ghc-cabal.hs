@@ -10,6 +10,7 @@ import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
+import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
@@ -140,37 +141,76 @@ doInstall ghc ghcpkg topdir directory distDir myDestDir myPrefix myLibdir myDocd
                      | otherwise = pd
                 in f pd' lbi us flags
       modHook f pd lbi us flags
-              = let idts = installDirTemplates lbi
-                    idts' = idts { prefix    = toPathTemplate myPrefix,
-                                   libdir    = toPathTemplate myLibdir,
-                                   libsubdir = toPathTemplate "$pkgid",
-                                   docdir    = toPathTemplate (myDocdir </> "$pkg"),
-                                   htmldir   = toPathTemplate "$docdir" }
-                    progs = withPrograms lbi
-                    ghcProg = ConfiguredProgram {
-                                  programId = programName ghcProgram,
-                                  programVersion = Nothing,
-                                  programArgs = ["-B" ++ topdir],
-                                  programLocation = UserSpecified ghc
-                              }
-                    ghcpkgconf = topdir </> "package.conf"
-                    ghcPkgProg = ConfiguredProgram {
-                                     programId = programName ghcPkgProgram,
-                                     programVersion = Nothing,
-                                     programArgs = ["--global-conf",
-                                                    ghcpkgconf]
-                                                   ++ if not (null myDestDir)
-                                                      then ["--force"]
-                                                      else [],
-                                     programLocation = UserSpecified ghcpkg
-                                 }
-                    progs' = updateProgram ghcProg
-                           $ updateProgram ghcPkgProg progs
-                    lbi' = lbi {
-                                   installDirTemplates = idts',
-                                   withPrograms = progs'
-                               }
-                in f pd lbi' us flags
+       = do let verbosity = normal
+                idts = installDirTemplates lbi
+                idts' = idts { prefix    = toPathTemplate myPrefix,
+                               libdir    = toPathTemplate myLibdir,
+                               libsubdir = toPathTemplate "$pkgid",
+                               docdir    = toPathTemplate (myDocdir </> "$pkg"),
+                               htmldir   = toPathTemplate "$docdir" }
+                progs = withPrograms lbi
+                ghcProg = ConfiguredProgram {
+                              programId = programName ghcProgram,
+                              programVersion = Nothing,
+                              programArgs = ["-B" ++ topdir],
+                              programLocation = UserSpecified ghc
+                          }
+                ghcpkgconf = topdir </> "package.conf"
+                ghcPkgProg = ConfiguredProgram {
+                                 programId = programName ghcPkgProgram,
+                                 programVersion = Nothing,
+                                 programArgs = ["--global-conf",
+                                                ghcpkgconf]
+                                               ++ if not (null myDestDir)
+                                                  then ["--force"]
+                                                  else [],
+                                 programLocation = UserSpecified ghcpkg
+                             }
+                progs' = updateProgram ghcProg
+                       $ updateProgram ghcPkgProg progs
+            instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
+            let installedPkgs' = PackageIndex.listToInstalledPackageIndex
+                                     instInfos
+            let mlc = libraryConfig lbi
+                mlc' = case mlc of
+                       Just lc ->
+                           let cipds = componentInstalledPackageDeps lc
+                               cipds' = map (fixupPackageId instInfos) cipds
+                           in Just $ lc {
+                                         componentInstalledPackageDeps = cipds'
+                                     }
+                       Nothing -> Nothing
+                lbi' = lbi {
+                               libraryConfig = mlc',
+                               installedPkgs = installedPkgs',
+                               installDirTemplates = idts',
+                               withPrograms = progs'
+                           }
+            f pd lbi' us flags
+
+-- The packages are built with the package ID ending in "-inplace", but
+-- when they're installed they get the package hash appended. We need to
+-- fix up the package deps so that they use the hash package IDs, not
+-- the inplace package IDs.
+fixupPackageId :: [Installed.InstalledPackageInfo]
+               -> InstalledPackageId
+               -> InstalledPackageId
+fixupPackageId _ x@(InstalledPackageId ipi)
+ | "builtin:" `isPrefixOf` ipi = x
+fixupPackageId ipinfos (InstalledPackageId ipi)
+ = case stripPrefix (reverse "-inplace") $ reverse ipi of
+   Nothing ->
+       error ("Installed package ID doesn't end in -inplace: " ++ show ipi)
+   Just x ->
+       let ipi' = reverse ('-' : x)
+           f (ipinfo : ipinfos') = case Installed.installedPackageId ipinfo of
+                                   y@(InstalledPackageId ipinfoid)
+                                    | ipi' `isPrefixOf` ipinfoid ->
+                                       y
+                                   _ ->
+                                       f ipinfos'
+           f [] = error ("Installed package ID not registered: " ++ show ipi)
+       in f ipinfos
 
 generate :: [String] -> FilePath -> FilePath -> IO ()
 generate config_args distdir directory
