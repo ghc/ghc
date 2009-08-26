@@ -537,6 +537,7 @@ HaveGcc 	= @HaveGcc@
 UseGcc  	= YES
 WhatGccIsCalled = @WhatGccIsCalled@
 GccVersion      = @GccVersion@
+GccLT34		= @GccLT34@
 ifeq "$(strip $(HaveGcc))" "YES"
 ifneq "$(strip $(UseGcc))"  "YES"
   CC	= cc

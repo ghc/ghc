@@ -131,7 +131,12 @@ $(foreach way,$(rts_WAYS),$(eval $(call build-rts-way,$(way))))
 # Flags for compiling every file
 
 # We like plenty of warnings.
-WARNING_OPTS += -Wall -Wextra
+WARNING_OPTS += -Wall
+ifeq "$(GccLT34)" "YES"
+WARNING_OPTS += -W
+else
+WARNING_OPTS += -Wextra
+endif
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
 WARNING_OPTS += -Wmissing-declarations
