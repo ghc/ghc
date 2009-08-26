@@ -1000,10 +1000,6 @@ spaces n | n <=# _ILIT(0) = ""
 pprCols :: Int
 pprCols = 100 -- could make configurable
 
--- NB. printDoc prints FastStrings in UTF-8: hPutFS below does no decoding.
--- This is what we usually want, because the IO library has no encoding
--- functionality, and we're assuming UTF-8 source code so we might as well
--- assume UTF-8 output too.
 printDoc :: Mode -> Handle -> Doc -> IO ()
 printDoc LeftMode hdl doc
   = do { printLeftRender hdl doc; hFlush hdl }
@@ -1013,7 +1009,9 @@ printDoc mode hdl doc
   where
     put (Chr c)  next = hPutChar hdl c >> next
     put (Str s)  next = hPutStr  hdl s >> next
-    put (PStr s) next = hPutFS   hdl s >> next
+    put (PStr s) next = hPutStr  hdl (unpackFS s) >> next
+                        -- NB. not hPutFS, we want this to go through
+                        -- the I/O library's encoding layer. (#3398)
     put (LStr s l) next = hPutLitString hdl s l >> next
 
     done = hPutChar hdl '\n'
