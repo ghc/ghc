@@ -34,9 +34,9 @@ main = do args <- getArgs
                   runHaddock distDir dir args'
               "check" : dir : [] ->
                   doCheck dir
-              "install" : ghcpkg : ghcpkgconfig : directory : distDir
+              "install" : ghc : ghcpkg : topdir : directory : distDir
                         : myDestDir : myPrefix : myLibdir : myDocdir : args' ->
-                  doInstall ghcpkg ghcpkgconfig directory distDir
+                  doInstall ghc ghcpkg topdir directory distDir
                             myDestDir myPrefix myLibdir myDocdir args'
               "configure" : args' -> case break (== "--") args' of
                    (config_args, "--" : distdir : directories) ->
@@ -111,8 +111,9 @@ runHaddock distdir directory args
           = f pd lbi us flags
 
 doInstall :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-          -> FilePath -> FilePath -> FilePath -> [String] -> IO ()
-doInstall ghcpkg ghcpkgconf directory distDir myDestDir myPrefix myLibdir myDocdir args
+          -> FilePath -> FilePath -> FilePath -> FilePath -> [String]
+          -> IO ()
+doInstall ghc ghcpkg topdir directory distDir myDestDir myPrefix myLibdir myDocdir args
  = withCurrentDirectory directory $ do
      defaultMainWithHooksArgs hooks (["copy", "--builddir", distDir]
                                      ++ (if null myDestDir then []
@@ -146,16 +147,25 @@ doInstall ghcpkg ghcpkgconf directory distDir myDestDir myPrefix myLibdir myDocd
                                    docdir    = toPathTemplate (myDocdir </> "$pkg"),
                                    htmldir   = toPathTemplate "$docdir" }
                     progs = withPrograms lbi
-                    prog = ConfiguredProgram {
-                               programId = programName ghcPkgProgram,
-                               programVersion = Nothing,
-                               programArgs = ["--global-conf", ghcpkgconf]
-                                             ++ if not (null myDestDir)
-                                                then ["--force"]
-                                                else [],
-                               programLocation = UserSpecified ghcpkg
-                           }
-                    progs' = updateProgram prog progs
+                    ghcProg = ConfiguredProgram {
+                                  programId = programName ghcProgram,
+                                  programVersion = Nothing,
+                                  programArgs = ["-B" ++ topdir],
+                                  programLocation = UserSpecified ghc
+                              }
+                    ghcpkgconf = topdir </> "package.conf"
+                    ghcPkgProg = ConfiguredProgram {
+                                     programId = programName ghcPkgProgram,
+                                     programVersion = Nothing,
+                                     programArgs = ["--global-conf",
+                                                    ghcpkgconf]
+                                                   ++ if not (null myDestDir)
+                                                      then ["--force"]
+                                                      else [],
+                                     programLocation = UserSpecified ghcpkg
+                                 }
+                    progs' = updateProgram ghcProg
+                           $ updateProgram ghcPkgProg progs
                     lbi' = lbi {
                                    installDirTemplates = idts',
                                    withPrograms = progs'

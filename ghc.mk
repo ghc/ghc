@@ -777,8 +777,10 @@ INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
 ifeq "$(Windows)" "NO"
+INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-stage2
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-pkg
 else
+INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc-stage2.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
@@ -792,13 +794,15 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
 	$(foreach p, $(PACKAGES) $(PACKAGES_STAGE2),\
 	    "$(GHC_CABAL_INPLACE)" install \
+		 $(INSTALLED_GHC_REAL) \
 		 $(INSTALLED_GHC_PKG_REAL) \
-		 $(INSTALLED_PACKAGE_CONF) \
+		 $(DESTDIR)$(topdir) \
 		 libraries/$p dist-install \
 		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' &&) true
 	"$(GHC_CABAL_INPLACE)" install \
+		 $(INSTALLED_GHC_REAL) \
 	 	 $(INSTALLED_GHC_PKG_REAL) \
-		 $(INSTALLED_PACKAGE_CONF) \
+		 $(DESTDIR)$(topdir) \
 		 compiler stage2 \
 		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries'
 
