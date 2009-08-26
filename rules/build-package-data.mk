@@ -30,6 +30,14 @@ endif
 $1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$(filter-out -Werror,$$(SRC_CC_OPTS)) $$($1_CC_OPTS) $$($1_$2_CC_OPTS)"
 $1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
 
+ifneq "$$(ICONV_INCLUDE_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-iconv-includes="$$(ICONV_INCLUDE_DIRS)"
+endif
+
+ifneq "$$(ICONV_LIB_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-iconv-libraries="$$(ICONV_LIB_DIRS)"
+endif
+
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in
 # the build tree.

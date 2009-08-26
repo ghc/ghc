@@ -193,6 +193,25 @@ AC_SUBST([WithGhc])
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
 
+dnl Allow to specify iconv options to the toplevel configure script
+dnl so they can be properly passed to sub-builds.
+dnl Note: ICONV_LIB_DIRS and ICONV_INCLUDE_DIRS are not predefined
+dnl to the empty string to allow them to be overridden from the
+dnl environment.
+
+AC_ARG_WITH([iconv-includes],
+  [AC_HELP_STRING([--with-iconv-includes],
+    [directory containing iconv.h])],
+    [ICONV_INCLUDE_DIRS=$withval])
+
+AC_ARG_WITH([iconv-libraries],
+  [AC_HELP_STRING([--with-iconv-libraries],
+    [directory containing iconv library])],
+    [ICONV_LIB_DIRS=$withval])
+
+AC_SUBST(ICONV_INCLUDE_DIRS)
+AC_SUBST(ICONV_LIB_DIRS)
+
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
