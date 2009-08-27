@@ -78,22 +78,32 @@ import GHC.List
 hWaitForInput :: Handle -> Int -> IO Bool
 hWaitForInput h msecs = do
   wantReadableHandle_ "hWaitForInput" h $ \ handle_@Handle__{..} -> do
-  buf <- readIORef haCharBuffer
+  cbuf <- readIORef haCharBuffer
 
-  if not (isEmptyBuffer buf)
-        then return True
-        else do
+  if not (isEmptyBuffer cbuf) then return True else do
 
   if msecs < 0 
-        then do buf' <- readTextDevice handle_ buf
-                writeIORef haCharBuffer buf'
+        then do cbuf' <- readTextDevice handle_ cbuf
+                writeIORef haCharBuffer cbuf'
                 return True
-        else do r <- IODevice.ready haDevice False{-read-} msecs
+        else do
+               -- there might be bytes in the byte buffer waiting to be decoded
+               cbuf' <- readTextDeviceNonBlocking handle_ cbuf
+               writeIORef haCharBuffer cbuf'
+
+               if not (isEmptyBuffer cbuf') then return True else do
+
+                r <- IODevice.ready haDevice False{-read-} msecs
                 if r then do -- Call hLookAhead' to throw an EOF
                              -- exception if appropriate
                              _ <- hLookAhead_ handle_
                              return True
                      else return False
+                -- XXX we should only return when there are full characters
+                -- not when there are only bytes.  That would mean looping
+                -- and re-running IODevice.ready if we don't have any full
+                -- characters; but we don't know how long we've waited
+                -- so far.
 
 -- ---------------------------------------------------------------------------
 -- hGetChar

@@ -793,13 +793,19 @@ readTextDeviceNonBlocking h_@Handle__{..} cbuf = do
   bbuf1 <- if not (isEmptyBuffer bbuf0)
               then return bbuf0
               else do
-                   (r,bbuf1) <- Buffered.fillReadBuffer haDevice bbuf0
-                   if r == 0 then ioe_EOF else do  -- raise EOF
+                   (r,bbuf1) <- Buffered.fillReadBuffer0 haDevice bbuf0
+                   if isNothing r then ioe_EOF else do  -- raise EOF
                    return bbuf1
 
-  (bbuf2,cbuf') <- case haDecoder of
-                     Nothing      -> latin1_decode bbuf1 cbuf
-                     Just decoder -> (encode decoder) bbuf1 cbuf
+  (bbuf2,cbuf') <-
+      case haDecoder of
+          Nothing      -> do
+               writeIORef haLastDecode (error "codec_state", bbuf1)
+               latin1_decode bbuf1 cbuf
+          Just decoder -> do
+               state <- getState decoder
+               writeIORef haLastDecode (state, bbuf1)
+               (encode decoder) bbuf1 cbuf
 
   writeIORef haByteBuffer bbuf2
   return cbuf'
