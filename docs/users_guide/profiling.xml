@@ -525,6 +525,11 @@ x = nfib 25
       </listitem>
     </orderedlist>
 
+    <para>You might also want to take a look
+      at <ulink url="http://www.haskell.org/haskellwiki/Hp2any">hp2any</ulink>,
+      a more advanced suite of tools (not distributed with GHC) for
+      displaying heap profiles.</para>
+
     <sect2 id="rts-options-heap-prof">
       <title>RTS options for heap profiling</title>
 
