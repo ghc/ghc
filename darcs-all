@@ -26,6 +26,7 @@ my $defaultrepo;
 
 my $verbose = 2;
 my $ignore_failure = 0;
+my $want_remote_repo = 0;
 
 my %tags;
 
@@ -114,17 +115,15 @@ sub darcsall {
                 $path = "$repo_base/$localpath";
             }
             else {
-                if ($remotepath =~ /^http:/) {
-                    message "Ignoring $localpath; remote is http URL";
-                    next REPO;
-                }
-                else {
-                    $path = "$repo_base/$remotepath";
-                }
+                $path = "$repo_base/$remotepath";
             }
 
             if (-d "$localpath/_darcs") {
-                darcs (@_, "--repodir", $localpath, $path);
+                if ($want_remote_repo) {
+                    darcs (@_, "--repodir", $localpath, $path);
+                } else {
+                    darcs (@_, "--repodir", $localpath);
+                }
             }
             elsif ($tag eq "") {
                 message "== Required repo $localpath is missing! Skipping";
@@ -172,12 +171,7 @@ sub darcsget {
                 $path = "$repo_base/$localpath";
             }
             else {
-                if ($remotepath =~ /^http:/) {
-                    $path = $remotepath;
-                }
-                else {
-                    $path = "$repo_base/$remotepath";
-                }
+                $path = "$repo_base/$remotepath";
             }
 
             if (($tag eq "") || defined($tags{$tag})) {
@@ -246,6 +240,9 @@ sub main {
         if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew)$/) {
             # Hack around whatsnew failing if there are no changes
             $ignore_failure = 1;
+        }
+        if ($command =~ /^(pul|pus|sen|put)/) {
+            $want_remote_repo = 1;
         }
         darcsall @_;
     }
