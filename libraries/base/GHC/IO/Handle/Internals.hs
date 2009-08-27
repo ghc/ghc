@@ -680,7 +680,7 @@ hLookAhead_ handle_@Handle__{..} = do
 debugIO :: String -> IO ()
 #if defined(DEBUG_DUMP)
 debugIO s = do 
-  withCStringLen (s++"\n") $ \(p,len) -> c_write 1 p (fromIntegral len)
+  withCStringLen (s++"\n") $ \(p,len) -> c_write 1 (castPtr p) (fromIntegral len)
   return ()
 #else
 debugIO s = return ()
