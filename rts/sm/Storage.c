@@ -330,6 +330,7 @@ newCAF(StgClosure* caf)
 {
   ACQUIRE_SM_LOCK;
 
+#ifdef DYNAMIC
   if(keepCAFs)
   {
     // HACK:
@@ -347,6 +348,7 @@ newCAF(StgClosure* caf)
     caf_list = caf;
   }
   else
+#endif
   {
     /* Put this CAF on the mutable list for the old generation.
     * This is a HACK - the IND_STATIC closure doesn't really have

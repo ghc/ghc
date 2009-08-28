@@ -6,9 +6,11 @@
 // This is required so that GHCi can use dynamic libraries instead of HSxyz.o
 // files.
 
+#ifdef DYNAMIC
 static void keepCAFsForGHCi() __attribute__((constructor));
 
 static void keepCAFsForGHCi()
 {
     keepCAFs = 1;
 }
+#endif
