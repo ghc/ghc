@@ -27,6 +27,12 @@
 #define USING_LIBBFD 1
 #endif
 
+/* DEBUG implies TRACING
+ */
+#if defined(DEBUG)
+#define TRACING
+#endif
+
 /* -----------------------------------------------------------------------------
    Signals - supported on non-PAR versions of the runtime.  See RtsSignals.h.
    -------------------------------------------------------------------------- */

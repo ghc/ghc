@@ -1051,6 +1051,15 @@ void prettyPrintClosure_ (StgClosure *obj)
     }
 }
 
+char *what_next_strs[] = {
+  [0]               = "(unknown)",
+  [ThreadRunGHC]    = "ThreadRunGHC",
+  [ThreadInterpret] = "ThreadInterpret",
+  [ThreadKilled]    = "ThreadKilled",
+  [ThreadRelocated] = "ThreadRelocated",
+  [ThreadComplete]  = "ThreadComplete"
+};
+
 #else /* DEBUG */
 void printPtr( StgPtr p )
 {

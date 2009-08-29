@@ -241,7 +241,6 @@ endif
 #   debug_t	: debugging ticky-ticky profiling
 #   l           : event logging
 #   thr_l       : threaded and event logging
-#   thr_debug_l	: threaded and debugging and event logging
 #
 GhcRTSWays=l
 
@@ -775,8 +774,7 @@ endif
 #
 # The ways currently defined.
 #
-ALL_WAYS=v p t l s mp mg debug dyn thr thr_l debug_dyn thr_dyn thr_debug_dyn thr_p thr_debug thr_debug_l debug_p thr_debug_p
-USER_WAYS=a b c d e f g h j k l m n o A B
+ALL_WAYS=v p t l s mp mg debug dyn thr thr_l debug_dyn thr_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p
 
 #
 # The following ways currently have treated specially, p t mg,
@@ -846,10 +844,6 @@ WAY_thr_debug_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG
 WAY_thr_debug_p_NAME=threaded debug profiling
 WAY_thr_debug_p_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG -prof
 
-# Way 'thr_debug_l':
-WAY_thr_debug_l_NAME=threaded debug event logging
-WAY_thr_debug_l_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG -eventlog
-
 # Way 'dyn': build dynamic shared libraries
 WAY_dyn_NAME=dyn
 WAY_dyn_HC_OPTS=-fPIC -dynamic
@@ -865,57 +859,6 @@ WAY_thr_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DTHREADED_RTS -optc-DDEBUG
 # Way 'debug_dyn':
 WAY_debug_dyn_NAME=thr_dyn
 WAY_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DDEBUG
-
-#
-# Add user-way configurations here:
-#
-WAY_A_NAME=
-WAY_A_HC_OPTS=
-
-WAY_B_NAME=
-WAY_B_HC_OPTS=
-
-WAY_a_NAME=
-WAY_a_HC_OPTS=
-
-WAY_b_NAME=
-WAY_b_HC_OPTS=
-
-WAY_c_NAME=
-WAY_c_HC_OPTS=
-
-WAY_d_NAME=
-WAY_d_HC_OPTS=
-
-WAY_e_NAME=
-WAY_e_HC_OPTS=
-
-WAY_f_NAME=
-WAY_f_HC_OPTS=
-
-WAY_g_NAME=
-WAY_g_HC_OPTS=
-
-WAY_h_NAME=
-WAY_h_HC_OPTS=
-
-WAY_j_NAME=
-WAY_j_HC_OPTS=
-
-WAY_k_NAME=
-WAY_k_HC_OPTS=
-
-WAY_l_NAME=
-WAY_l_HC_OPTS=
-
-WAY_m_NAME=
-WAY_m_HC_OPTS=
-
-WAY_n_NAME=
-WAY_n_HC_OPTS=
-
-WAY_o_NAME=
-WAY_o_HC_OPTS=
 
 ################################################################################
 #

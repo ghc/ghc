@@ -18,7 +18,6 @@
 #include "STM.h"
 #include "Sanity.h"
 #include "Profiling.h"
-#include "eventlog/EventLog.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
 #endif
@@ -162,11 +161,7 @@ throwTo (Capability *cap,	// the Capability we hold
 	       (unsigned long)source->id, (unsigned long)target->id);
 
 #ifdef DEBUG
-    if (traceClass(DEBUG_sched)) {
-	debugTraceBegin("throwTo: target");
-	printThreadStatus(target);
-	debugTraceEnd();
-    }
+    traceThreadStatus(DEBUG_sched, target);
 #endif
 
     goto check_target;

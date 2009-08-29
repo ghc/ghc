@@ -6,25 +6,18 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef DEBUG
-
 // external headers
 #include "Rts.h"
-#include "rts/Flags.h"
+
+#ifdef TRACING
 
 // internal headers
 #include "Trace.h"
 #include "GetTime.h"
 #include "Stats.h"
-
-/*
-  Features we want:
-    - multiple log message classes
-    - outpout thread ID & time on each message
-    - thread-safe
-    - trace source locations?
-    - break into the debugger?
-*/
+#include "eventlog/EventLog.h"
+#include "Threads.h"
+#include "Printer.h"
 
 StgWord32 classes_enabled; // not static due to inline funcs
 
@@ -32,8 +25,9 @@ StgWord32 classes_enabled; // not static due to inline funcs
 static Mutex trace_utx;
 #endif
 
-#define DEBUG_FLAG(name, class) \
-    if (RtsFlags.DebugFlags.name) classes_enabled |= class;
+/* ---------------------------------------------------------------------------
+   Starting up / shuttting down the tracing facilities
+ --------------------------------------------------------------------------- */
 
 void initTracing (void)
 {
@@ -41,7 +35,13 @@ void initTracing (void)
     initMutex(&trace_utx);
 #endif
 
+#ifdef DEBUG
+#define DEBUG_FLAG(name, class) \
+    if (RtsFlags.DebugFlags.name) classes_enabled |= class;
+
     DEBUG_FLAG(scheduler,    DEBUG_sched);
+    DEBUG_FLAG(scheduler,    TRACE_sched); // -Ds enabled all sched events
+
     DEBUG_FLAG(interpreter,  DEBUG_interp);
     DEBUG_FLAG(weak,         DEBUG_weak);
     DEBUG_FLAG(gccafs,       DEBUG_gccafs);
@@ -51,40 +51,204 @@ void initTracing (void)
     DEBUG_FLAG(stable,       DEBUG_stable);
     DEBUG_FLAG(stm,          DEBUG_stm);
     DEBUG_FLAG(prof,         DEBUG_prof);
-    DEBUG_FLAG(eventlog,     DEBUG_eventlog);
     DEBUG_FLAG(linker,       DEBUG_linker);
     DEBUG_FLAG(squeeze,      DEBUG_squeeze);
     DEBUG_FLAG(hpc,          DEBUG_hpc);
+    DEBUG_FLAG(sparks,       DEBUG_sparks);
+#endif
+
+#define TRACE_FLAG(name, class) \
+    if (RtsFlags.TraceFlags.name) classes_enabled |= class;
+
+    TRACE_FLAG(scheduler, TRACE_sched);
+
+    initEventLogging();
 }
 
+void endTracing (void)
+{
+    endEventLogging();
+}
+
+void freeTracing (void)
+{
+    freeEventLogging();
+}
+
+/* ---------------------------------------------------------------------------
+   Emitting trace messages/events
+ --------------------------------------------------------------------------- */
+
+#ifdef DEBUG
 static void tracePreface (void)
 {
 #ifdef THREADED_RTS
     debugBelch("%12lx: ", (unsigned long)osThreadId());
 #endif
-    if (RtsFlags.DebugFlags.timestamp) {
+    if (RtsFlags.TraceFlags.timestamp) {
 	debugBelch("%9" FMT_Word64 ": ", stat_getElapsedTime());
     }
 }
+#endif
 
-void trace (StgWord32 class, const char *str, ...)
+#ifdef DEBUG
+static char *thread_stop_reasons[] = {
+    [HeapOverflow] = "heap overflow",
+    [StackOverflow] = "stack overflow",
+    [ThreadYielding] = "yielding",
+    [ThreadBlocked] = "blocked",
+    [ThreadFinished] = "finished",
+    [THREAD_SUSPENDED_FOREIGN_CALL] = "suspended while making a foreign call"
+};
+#endif
+
+#ifdef DEBUG
+static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag, 
+                                    StgTSO *tso, 
+                                    StgWord64 other STG_UNUSED)
 {
-    va_list ap;
-    va_start(ap,str);
-
     ACQUIRE_LOCK(&trace_utx);
 
-    if ((classes_enabled & class) != 0) {
-	tracePreface();
-	vdebugBelch(str,ap);
-	debugBelch("\n");
+    tracePreface();
+    switch (tag) {
+    case EVENT_CREATE_THREAD:   // (cap, thread)
+        debugBelch("cap %d: created thread %ld\n", cap->no, tso->id);
+        break;
+    case EVENT_RUN_THREAD:      //  (cap, thread)
+        debugBelch("cap %d: running thread %ld (%s)\n", cap->no, 
+                   tso->id, what_next_strs[tso->what_next]);
+        break;
+    case EVENT_THREAD_RUNNABLE: // (cap, thread)
+        debugBelch("cap %d: thread %ld appended to run queue\n", 
+                   cap->no, tso->id);
+        break;
+    case EVENT_RUN_SPARK:       // (cap, thread)
+        debugBelch("cap %d: thread %ld running a spark\n", 
+                   cap->no, tso->id);
+        break;
+    case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
+        debugBelch("cap %d: creating spark thread %ld\n", 
+                   cap->no, (long)other);
+        break;
+    case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
+        debugBelch("cap %d: thread %ld migrating to cap %d\n", 
+                   cap->no, tso->id, (int)other);
+        break;
+    case EVENT_STEAL_SPARK:     // (cap, thread, victim_cap)
+        debugBelch("cap %d: thread %ld stealing a spark from cap %d\n", 
+                   cap->no, tso->id, (int)other);
+        break;
+    case EVENT_THREAD_WAKEUP:   // (cap, thread, other_cap)
+        debugBelch("cap %d: waking up thread %ld on cap %d\n", 
+                   cap->no, tso->id, (int)other);
+        break;
+        
+    case EVENT_STOP_THREAD:     // (cap, thread, status)
+        debugBelch("cap %d: thread %ld stopped (%s)\n", 
+                   cap->no, tso->id, thread_stop_reasons[other]);
+        break;
+    case EVENT_SHUTDOWN:        // (cap)
+        debugBelch("cap %d: shutting down\n", cap->no);
+        break;
+    case EVENT_REQUEST_SEQ_GC:  // (cap)
+        debugBelch("cap %d: requesting sequential GC\n", cap->no);
+        break;
+    case EVENT_REQUEST_PAR_GC:  // (cap)
+        debugBelch("cap %d: requesting parallel GC\n", cap->no);
+        break;
+    case EVENT_GC_START:        // (cap)
+        debugBelch("cap %d: starting GC\n", cap->no);
+        break;
+    case EVENT_GC_END:          // (cap)
+        debugBelch("cap %d: finished GC\n", cap->no);
+        break;
+    default:
+        debugBelch("cap %2d: thread %ld: event %d\n\n", cap->no, tso->id, tag);
+        break;
     }
 
     RELEASE_LOCK(&trace_utx);
+}
+#endif
 
-    va_end(ap);
+void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
+                      StgTSO *tso, StgWord64 other)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.trace_stderr) {
+        traceSchedEvent_stderr(cap, tag, tso, other);
+    } else
+#endif
+    {
+        postSchedEvent(cap,tag,tso ? tso->id : 0,other);
+    }
 }
 
+#ifdef DEBUG
+static void traceCap_stderr(Capability *cap, char *msg, va_list ap)
+{
+    ACQUIRE_LOCK(&trace_utx);
+
+    tracePreface();
+    debugBelch("cap %2d: ", cap->no);
+    vdebugBelch(msg,ap);
+    debugBelch("\n");
+
+    RELEASE_LOCK(&trace_utx);
+}
+#endif
+
+void traceCap_(Capability *cap, char *msg, va_list ap)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.trace_stderr) {
+        traceCap_stderr(cap, msg, ap);
+    } else
+#endif
+    {
+        postCapMsg(cap, msg, ap);
+    }
+}
+
+#ifdef DEBUG
+static void trace_stderr(char *msg, va_list ap)
+{
+    ACQUIRE_LOCK(&trace_utx);
+
+    tracePreface();
+    vdebugBelch(msg,ap);
+    debugBelch("\n");
+
+    RELEASE_LOCK(&trace_utx);
+}
+#endif
+
+void trace_(char *msg, va_list ap)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.trace_stderr) {
+        trace_stderr(msg, ap);
+    } else
+#endif
+    {
+        postMsg(msg, ap);
+    }
+}
+
+void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.trace_stderr) {
+        printThreadStatus(tso);
+    } else
+#endif
+    {
+        /* nothing - no event for this one yet */
+    }
+}
+
+
+#ifdef DEBUG
 void traceBegin (const char *str, ...)
 {
     va_list ap;
@@ -101,5 +265,6 @@ void traceEnd (void)
     debugBelch("\n");
     RELEASE_LOCK(&trace_utx);
 }
+#endif /* DEBUG */
 
-#endif
+#endif /* TRACING */

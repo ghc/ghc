@@ -12,7 +12,7 @@
 
 #include "rts/OSThreads.h"
 #include "Capability.h"
-#include "eventlog/EventLog.h"
+#include "Trace.h"
 
 #pragma GCC visibility push(hidden)
 
@@ -136,7 +136,7 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 	setTSOLink(cap, cap->run_queue_tl, tso);
     }
     cap->run_queue_tl = tso;
-    postEvent (cap, EVENT_THREAD_RUNNABLE, tso->id, 0);
+    traceSchedEvent (cap, EVENT_THREAD_RUNNABLE, tso, 0);
 }
 
 /* Push a thread on the beginning of the run queue.

@@ -30,6 +30,8 @@ extern void        printTSO        ( StgTSO *tso );
 extern void DEBUG_LoadSymbols( char *name );
 
 extern const char *lookupGHCName( void *addr );
+
+extern char *what_next_strs[];
 #endif
 
 #pragma GCC visibility pop

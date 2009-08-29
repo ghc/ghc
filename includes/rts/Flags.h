@@ -65,13 +65,12 @@ struct DEBUG_FLAGS {
     rtsBool sanity;         /* 'S'   warning: might be expensive! */
     rtsBool stable;         /* 't' */
     rtsBool prof;           /* 'p' */
-    rtsBool eventlog;       /* 'e' */
     rtsBool linker;         /* 'l'   the object linker */
     rtsBool apply;          /* 'a' */
     rtsBool stm;            /* 'm' */
     rtsBool squeeze;        /* 'z'  stack squeezing & lazy blackholing */
     rtsBool hpc; 	    /* 'c' coverage */
-    rtsBool timestamp;          /* add timestamps to traces */
+    rtsBool sparks; 	    /* 'r' */
 };
 
 struct COST_CENTRE_FLAGS {
@@ -118,11 +117,12 @@ struct PROFILING_FLAGS {
 
 };
 
-#ifdef EVENTLOG
-struct EVENTLOG_FLAGS {
-  rtsBool doEventLogging;
+struct TRACE_FLAGS {
+    rtsBool trace_stderr;
+    rtsBool timestamp;      /* show timestamp in stderr output */
+
+    rtsBool scheduler;      /* trace scheduler events */
 };
-#endif
 
 struct CONCURRENT_FLAGS {
     int ctxtSwitchTime;		/* in milliseconds */
@@ -184,9 +184,7 @@ typedef struct _RTS_FLAGS {
     struct DEBUG_FLAGS	     DebugFlags;
     struct COST_CENTRE_FLAGS CcFlags;
     struct PROFILING_FLAGS   ProfFlags;
-#ifdef EVENTLOG
-    struct EVENTLOG_FLAGS    EventLogFlags;
-#endif
+    struct TRACE_FLAGS       TraceFlags;
     struct TICKY_FLAGS	     TickyFlags;
 
 #if defined(THREADED_RTS)

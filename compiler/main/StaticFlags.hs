@@ -406,8 +406,8 @@ way_details =
 	, "-optc-DPROFILING" ],
 
     Way WayEventLog "l" True "RTS Event Logging"
-	[ "-DEVENTLOG"
-	, "-optc-DEVENTLOG" ],
+	[ "-DTRACING"
+	, "-optc-DTRACING" ],
 
     Way WayTicky "t" True "Ticky-ticky Profiling"  
 	[ "-DTICKY_TICKY"

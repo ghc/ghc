@@ -95,7 +95,7 @@ findSpark (Capability *cap)
       cap->sparks_converted++;
 
       // Post event for running a spark from capability's own pool.
-      postEvent(cap, EVENT_RUN_SPARK, cap->r.rCurrentTSO->id, 0);
+      traceSchedEvent(cap, EVENT_RUN_SPARK, cap->r.rCurrentTSO, 0);
 
       return spark;
   }
@@ -127,14 +127,10 @@ findSpark (Capability *cap)
           }
 
           if (spark != NULL) {
-              debugTrace(DEBUG_sched,
-		 "cap %d: Stole a spark from capability %d",
-                         cap->no, robbed->no);
               cap->sparks_converted++;
 
-              postEvent(cap, EVENT_STEAL_SPARK, 
-                        cap->r.rCurrentTSO->id, robbed->no);
-                        
+              traceSchedEvent(cap, EVENT_STEAL_SPARK, 
+                              cap->r.rCurrentTSO, robbed->no);
               
               return spark;
           }
@@ -580,10 +576,9 @@ yieldCapability (Capability** pCap, Task *task)
     Capability *cap = *pCap;
 
     if (waiting_for_gc == PENDING_GC_PAR) {
-	debugTrace(DEBUG_sched, "capability %d: becoming a GC thread", cap->no);
-        postEvent(cap, EVENT_GC_START, 0, 0);
+        traceSchedEvent(cap, EVENT_GC_START, 0, 0);
         gcWorkerThread(cap);
-        postEvent(cap, EVENT_GC_END, 0, 0);
+        traceSchedEvent(cap, EVENT_GC_END, 0, 0);
         return;
     }
 
@@ -790,8 +785,7 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
             continue;
         }
             
-        postEvent(cap, EVENT_SHUTDOWN, 0, 0);
-	debugTrace(DEBUG_sched, "capability %d is stopped.", cap->no);
+        traceSchedEvent(cap, EVENT_SHUTDOWN, 0, 0);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }
@@ -880,8 +874,6 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta,
 #endif
 	for (task = cap->suspended_ccalling_tasks; task != NULL; 
 	     task=task->next) {
-	    debugTrace(DEBUG_sched,
-		       "evac'ing suspended TSO %lu", (unsigned long)task->suspended_tso->id);
 	    evac(user, (StgClosure **)(void *)&task->suspended_tso);
 	}
 

@@ -112,11 +112,17 @@
 #define EVENT_GC_END              10 /* (cap)                       */
 #define EVENT_REQUEST_SEQ_GC      11 /* (cap)                       */
 #define EVENT_REQUEST_PAR_GC      12 /* (cap)                       */
-#define EVENT_CREATE_SPARK        13 /* (cap, thread)               */
-#define EVENT_SPARK_TO_THREAD     14 /* DEPRECATED! (cap, thread, spark_thread) */
 #define EVENT_CREATE_SPARK_THREAD 15 /* (cap, thread, spark_thread) */
+#define EVENT_LOG_CAP_MSG         16 /* (cap, message ...) */
+#define EVENT_LOG_MSG             17 /* (message ...) */
+#define EVENT_STARTUP             18 /* (num_capabilities) */
 
-#define NUM_EVENT_TAGS        16 
+#define NUM_EVENT_TAGS            19
+
+#if 0  /* DEPRECATED EVENTS: */
+#define EVENT_CREATE_SPARK        13 /* (cap, thread) */
+#define EVENT_SPARK_TO_THREAD     14 /* (cap, thread, spark_thread) */
+#endif
 
 /*
  * Status values for EVENT_STOP_THREAD
@@ -137,6 +143,7 @@ typedef StgWord16 EventTypeNum;
 typedef StgWord64 EventTimestamp; // in nanoseconds
 typedef StgWord64 EventThreadID;
 typedef StgWord16 EventCapNo;
+typedef StgWord16 EventPayloadSize; // variable-size events
 
 #endif
 

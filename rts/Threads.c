@@ -106,11 +106,9 @@ createThread(Capability *cap, nat size)
     g0s0->threads = tso;
     RELEASE_LOCK(&sched_mutex);
     
-    postEvent (cap, EVENT_CREATE_THREAD, tso->id, 0);
+    // ToDo: report the stack size in the event?
+    traceSchedEvent (cap, EVENT_CREATE_THREAD, tso, tso->stack_size);
 
-    debugTrace(DEBUG_sched,
-	       "created thread %ld, stack size = %lx words", 
-	       (long)tso->id, (long)tso->stack_size);
     return tso;
 }
 
@@ -256,10 +254,7 @@ unblockOne_ (Capability *cap, StgTSO *tso,
   cap->context_switch = 1;
 #endif
 
-  postEvent (cap, EVENT_THREAD_WAKEUP, tso->id, tso->cap->no);
-
-  debugTrace(DEBUG_sched, "waking up thread %ld on cap %d",
-	     (long)tso->id, tso->cap->no);
+  traceSchedEvent (cap, EVENT_THREAD_WAKEUP, tso, tso->cap->no);
 
   return next;
 }
@@ -356,6 +351,7 @@ printThreadBlockage(StgTSO *tso)
 	 tso->why_blocked, tso->id, tso);
   }
 }
+
 
 void
 printThreadStatus(StgTSO *t)

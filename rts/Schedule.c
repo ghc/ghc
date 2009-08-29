@@ -26,7 +26,6 @@
 #include "Proftimer.h"
 #include "ProfHeap.h"
 #include "Weak.h"
-#include "eventlog/EventLog.h"
 #include "sm/GC.h" // waitForGcThreads, releaseGCThreads, N
 #include "Sparks.h"
 #include "Capability.h"
@@ -172,17 +171,6 @@ static void deleteAllThreads (Capability *cap);
 static void deleteThread_(Capability *cap, StgTSO *tso);
 #endif
 
-#ifdef DEBUG
-static char *whatNext_strs[] = {
-  [0]               = "(unknown)",
-  [ThreadRunGHC]    = "ThreadRunGHC",
-  [ThreadInterpret] = "ThreadInterpret",
-  [ThreadKilled]    = "ThreadKilled",
-  [ThreadRelocated] = "ThreadRelocated",
-  [ThreadComplete]  = "ThreadComplete"
-};
-#endif
-
 /* -----------------------------------------------------------------------------
  * Putting a thread on the run queue: different scheduling policies
  * -------------------------------------------------------------------------- */
@@ -249,9 +237,7 @@ schedule (Capability *initialCapability, Task *task)
   // The sched_mutex is *NOT* held
   // NB. on return, we still hold a capability.
 
-  debugTrace (DEBUG_sched, 
-	      "### NEW SCHEDULER LOOP (task: %p, cap: %p)",
-	      task, initialCapability);
+  debugTrace (DEBUG_sched, "cap %d: schedule()", initialCapability->no);
 
   schedulePreLoop();
 
@@ -396,12 +382,11 @@ schedule (Capability *initialCapability, Task *task)
       
 	if (bound) {
 	    if (bound == task) {
-		debugTrace(DEBUG_sched,
-			   "### Running thread %lu in bound thread", (unsigned long)t->id);
 		// yes, the Haskell thread is bound to the current native thread
 	    } else {
 		debugTrace(DEBUG_sched,
-			   "### thread %lu bound to another OS thread", (unsigned long)t->id);
+			   "thread %lu bound to another OS thread",
+                           (unsigned long)t->id);
 		// no, bound to a different Haskell thread: pass to that thread
 		pushOnRunQueue(cap,t);
 		continue;
@@ -410,7 +395,8 @@ schedule (Capability *initialCapability, Task *task)
 	    // The thread we want to run is unbound.
 	    if (task->tso) { 
 		debugTrace(DEBUG_sched,
-			   "### this OS thread cannot run thread %lu", (unsigned long)t->id);
+			   "this OS thread cannot run thread %lu",
+                           (unsigned long)t->id);
 		// no, the current native thread is bound to a different
 		// Haskell thread, so pass it to any worker thread
 		pushOnRunQueue(cap,t);
@@ -444,9 +430,6 @@ run_thread:
     // loop back to run_thread, so make sure to set CurrentTSO after
     // that.
     cap->r.rCurrentTSO = t;
-
-    debugTrace(DEBUG_sched, "-->> running thread %ld %s ...", 
-			      (long)t->id, whatNext_strs[t->what_next]);
 
     startHeapProfTimer();
 
@@ -485,7 +468,7 @@ run_thread:
     }
 #endif
 
-    postEvent(cap, EVENT_RUN_THREAD, t->id, 0);
+    traceSchedEvent(cap, EVENT_RUN_THREAD, t, 0);
 
     switch (prev_what_next) {
 	
@@ -535,7 +518,7 @@ run_thread:
     t->saved_winerror = GetLastError();
 #endif
 
-    postEvent (cap, EVENT_STOP_THREAD, t->id, ret);
+    traceSchedEvent (cap, EVENT_STOP_THREAD, t, ret);
 
 #if defined(THREADED_RTS)
     // If ret is ThreadBlocked, and this Task is bound to the TSO that
@@ -545,9 +528,6 @@ run_thread:
     // that task->cap != cap.  We better yield this Capability
     // immediately and return to normaility.
     if (ret == ThreadBlocked) {
-	debugTrace(DEBUG_sched,
-		   "--<< thread %lu (%s) stopped: blocked",
-		   (unsigned long)t->id, whatNext_strs[t->what_next]);
         force_yield = rtsTrue;
         goto yield;
     }
@@ -798,7 +778,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
 		    appendToRunQueue(free_caps[i],t);
 
-        postEvent (cap, EVENT_MIGRATE_THREAD, t->id, free_caps[i]->no);
+                    traceSchedEvent (cap, EVENT_MIGRATE_THREAD, t, free_caps[i]->no);
 
 		    if (t->bound) { t->bound->cap = free_caps[i]; }
 		    t->cap = free_caps[i];
@@ -822,7 +802,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    if (spark != NULL) {
 			debugTrace(DEBUG_sched, "pushing spark %p to capability %d", spark, free_caps[i]->no);
 
-      postEvent(free_caps[i], EVENT_STEAL_SPARK, t->id, cap->no);
+      traceSchedEvent(free_caps[i], EVENT_STEAL_SPARK, t, cap->no);
 
 			newSpark(&(free_caps[i]->r), spark);
 		    }
@@ -1106,7 +1086,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	
 	debugTrace(DEBUG_sched,
 		   "--<< thread %ld (%s) stopped: requesting a large block (size %ld)\n", 
-		   (long)t->id, whatNext_strs[t->what_next], blocks);
+		   (long)t->id, what_next_strs[t->what_next], blocks);
     
 	// don't do this if the nursery is (nearly) full, we'll GC first.
 	if (cap->r.rCurrentNursery->link != NULL ||
@@ -1160,10 +1140,6 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	}
     }
     
-    debugTrace(DEBUG_sched,
-	       "--<< thread %ld (%s) stopped: HeapOverflow",
-	       (long)t->id, whatNext_strs[t->what_next]);
-
     if (cap->r.rHpLim == NULL || cap->context_switch) {
         // Sometimes we miss a context switch, e.g. when calling
         // primitives in a tight loop, MAYBE_GC() doesn't check the
@@ -1185,10 +1161,6 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 static void
 scheduleHandleStackOverflow (Capability *cap, Task *task, StgTSO *t)
 {
-    debugTrace (DEBUG_sched,
-		"--<< thread %ld (%s) stopped, StackOverflow", 
-		(long)t->id, whatNext_strs[t->what_next]);
-
     /* just adjust the stack for this thread, then pop it back
      * on the run queue.
      */
@@ -1230,11 +1202,7 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     if (t->what_next != prev_what_next) {
 	debugTrace(DEBUG_sched,
 		   "--<< thread %ld (%s) stopped to switch evaluators", 
-		   (long)t->id, whatNext_strs[t->what_next]);
-    } else {
-	debugTrace(DEBUG_sched,
-		   "--<< thread %ld (%s) stopped, yielding",
-		   (long)t->id, whatNext_strs[t->what_next]);
+		   (long)t->id, what_next_strs[t->what_next]);
     }
 #endif
     
@@ -1281,12 +1249,7 @@ scheduleHandleThreadBlocked( StgTSO *t
     //      exception, see maybePerformBlockedException().
 
 #ifdef DEBUG
-    if (traceClass(DEBUG_sched)) {
-	debugTraceBegin("--<< thread %lu (%s) stopped: ", 
-			(unsigned long)t->id, whatNext_strs[t->what_next]);
-	printThreadBlockage(t);
-	debugTraceEnd();
-    }
+    traceThreadStatus(DEBUG_sched, t);
 #endif
 }
 
@@ -1303,8 +1266,6 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
      * We also end up here if the thread kills itself with an
      * uncaught exception, see Exception.cmm.
      */
-    debugTrace(DEBUG_sched, "--++ thread %lu (%s) finished", 
-	       (unsigned long)t->id, whatNext_strs[t->what_next]);
 
     // blocked exceptions can now complete, even if the thread was in
     // blocked mode (see #2910).  This unconditionally calls
@@ -1456,7 +1417,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     
     if (gc_type == PENDING_GC_SEQ)
     {
-        postEvent(cap, EVENT_REQUEST_SEQ_GC, 0, 0);
+        traceSchedEvent(cap, EVENT_REQUEST_SEQ_GC, 0, 0);
         // single-threaded GC: grab all the capabilities
         for (i=0; i < n_capabilities; i++) {
             debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
@@ -1479,7 +1440,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     {
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
-        postEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
+        traceSchedEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
         debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
 
         waitForGcThreads(cap);
@@ -1505,8 +1466,7 @@ delete_threads_and_gc:
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
 #if defined(THREADED_RTS)
-    postEvent(cap, EVENT_GC_START, 0, 0);
-    debugTrace(DEBUG_sched, "doing GC");
+    traceSchedEvent(cap, EVENT_GC_START, 0, 0);
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     waiting_for_gc = 0;
@@ -1514,7 +1474,7 @@ delete_threads_and_gc:
 #else
     GarbageCollect(force_major || heap_census, 0, cap);
 #endif
-    postEvent(cap, EVENT_GC_END, 0, 0);
+    traceSchedEvent(cap, EVENT_GC_END, 0, 0);
 
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
     {
@@ -1829,10 +1789,7 @@ suspendThread (StgRegTable *reg)
   task = cap->running_task;
   tso = cap->r.rCurrentTSO;
 
-  postEvent(cap, EVENT_STOP_THREAD, tso->id, THREAD_SUSPENDED_FOREIGN_CALL);
-  debugTrace(DEBUG_sched, 
-	     "thread %lu did a safe foreign call", 
-	     (unsigned long)cap->r.rCurrentTSO->id);
+  traceSchedEvent(cap, EVENT_STOP_THREAD, tso, THREAD_SUSPENDED_FOREIGN_CALL);
 
   // XXX this might not be necessary --SDM
   tso->what_next = ThreadRunGHC;
@@ -1857,13 +1814,6 @@ suspendThread (StgRegTable *reg)
   releaseCapability_(cap,rtsFalse);
   
   RELEASE_LOCK(&cap->lock);
-
-#if defined(THREADED_RTS)
-  /* Preparing to leave the RTS, so ensure there's a native thread/task
-     waiting to take over.
-  */
-  debugTrace(DEBUG_sched, "thread %lu: leaving RTS", (unsigned long)tso->id);
-#endif
 
   errno = saved_errno;
 #if mingw32_HOST_OS
@@ -1902,8 +1852,7 @@ resumeThread (void *task_)
     task->suspended_tso = NULL;
     tso->_link = END_TSO_QUEUE; // no write barrier reqd
 
-    postEvent(cap, EVENT_RUN_THREAD, tso->id, 0);
-    debugTrace(DEBUG_sched, "thread %lu: re-entering RTS", (unsigned long)tso->id);
+    traceSchedEvent(cap, EVENT_RUN_THREAD, tso, tso->what_next);
     
     if (tso->why_blocked == BlockedOnCCall) {
         // avoid locking the TSO if we don't have to
@@ -1959,7 +1908,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
     } else {
-        postEvent (cap, EVENT_MIGRATE_THREAD, tso->id, capabilities[cpu].no);
+        traceSchedEvent (cap, EVENT_MIGRATE_THREAD, tso, capabilities[cpu].no);
 	wakeupThreadOnCapability(cap, &capabilities[cpu], tso);
     }
 #else

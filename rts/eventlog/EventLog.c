@@ -6,16 +6,17 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef EVENTLOG
-
 #include "PosixSource.h"
 #include "Rts.h"
 
-#include "EventLog.h"
+#ifdef TRACING
+
+#include "Trace.h"
 #include "Capability.h"
 #include "Trace.h"
 #include "RtsUtils.h"
 #include "Stats.h"
+#include "EventLog.h"
 
 #include <string.h> 
 #include <stdio.h>
@@ -36,7 +37,12 @@ typedef struct _EventsBuf {
   StgWord64 size;
 } EventsBuf;
 
-EventsBuf *eventsBuf;
+EventsBuf *capEventBuf; // one EventsBuf for each Capability
+
+EventsBuf eventBuf; // an EventsBuf not associated with any Capability
+#ifdef THREADED_RTS
+Mutex eventBufMutex; // protected by this mutex
+#endif
 
 char *EventDesc[] = {
   [EVENT_CREATE_THREAD]       = "Create thread",
@@ -52,9 +58,10 @@ char *EventDesc[] = {
   [EVENT_GC_END]              = "Finished GC",
   [EVENT_REQUEST_SEQ_GC]      = "Request sequential GC",
   [EVENT_REQUEST_PAR_GC]      = "Request parallel GC",
-  [EVENT_CREATE_SPARK]        = "Create spark",
-  [EVENT_SPARK_TO_THREAD]     = "Spark to thread", /* DEPRECATED! */
-  [EVENT_CREATE_SPARK_THREAD] = "Create spark thread"
+  [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
+  [EVENT_LOG_CAP_MSG]         = "Log Capability message",
+  [EVENT_LOG_MSG]             = "Log message",
+  [EVENT_STARTUP]             = "Startup"
 };
 
 // Event type. 
@@ -83,6 +90,7 @@ static void endEventTypes(EventsBuf *eb);
 static void postEventType(EventsBuf *eb, EventType *et);
 
 static StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum);
+static StgBool hasRoomForVariableEvent(EventsBuf *eb, nat payload_bytes);
 
 static inline void postWord8(EventsBuf *eb, StgWord8 i)
 {
@@ -107,6 +115,12 @@ static inline void postWord64(EventsBuf *eb, StgWord64 i)
     postWord32(eb, (StgWord32)i);
 }
 
+static inline void postBuf(EventsBuf *eb, StgWord8 *buf, nat size)
+{
+    memcpy(eb->pos, buf, size);
+    eb->pos += size;
+}
+
 static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
 { postWord16(eb, etNum); }
 
@@ -118,6 +132,9 @@ static inline void postThreadID(EventsBuf *eb, EventThreadID id)
 
 static inline void postCapNo(EventsBuf *eb, EventCapNo no)
 { postWord16(eb,no); }
+
+static inline void postPayloadSize(EventsBuf *eb, EventPayloadSize size)
+{ postWord16(eb,size); }
 
 static inline void postInt8(EventsBuf *eb, StgInt8 i)
 { postWord8(eb, (StgWord8)i); }
@@ -136,8 +153,7 @@ void
 initEventLogging(void)
 {
     StgWord8 t, c;
-
-    debugTrace(DEBUG_eventlog, "intiEventLog: start");
+    nat n_caps;
 
     event_log_filename = stgMallocBytes(strlen(prog_name) + 10,
                                         "initEventLogging");
@@ -164,18 +180,25 @@ initEventLogging(void)
      * Use a single buffer to store the header with event types, then flush 
      * the buffer so all buffers are empty for writing events.
      */
-    eventsBuf = stgMallocBytes(n_capabilities * sizeof(EventsBuf),"initEventLogging");
+#ifdef THREADED_RTS
+    // XXX n_capabilities hasn't been initislised yet
+    n_caps = RtsFlags.ParFlags.nNodes;
+#else
+    n_caps = 1;
+#endif
+    capEventBuf = stgMallocBytes(n_caps * sizeof(EventsBuf),"initEventLogging");
 
-    for (c = 0; c < n_capabilities; ++c) {
+    for (c = 0; c < n_caps; ++c) {
         // Init buffer for events.
-        initEventsBuf(&eventsBuf[c], EVENT_LOG_SIZE);
+        initEventsBuf(&capEventBuf[c], EVENT_LOG_SIZE);
     }
+    initEventsBuf(&eventBuf, EVENT_LOG_SIZE);
 
     // Write in buffer: the header begin marker.
-    beginHeader(&eventsBuf[0]);
+    beginHeader(&eventBuf);
 
     // Mark beginning of event types in the header.
-    beginEventTypes(&eventsBuf[0]);
+    beginEventTypes(&eventBuf);
     for (t = 0; t < NUM_EVENT_TAGS; ++t) {
 
         eventTypes[t].etNum = t;
@@ -185,7 +208,6 @@ initEventLogging(void)
         case EVENT_CREATE_THREAD:   // (cap, thread)
         case EVENT_RUN_THREAD:      // (cap, thread)
         case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        case EVENT_CREATE_SPARK:    // (cap, thread)
         case EVENT_RUN_SPARK:       // (cap, thread)
         case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
             eventTypes[t].size = sizeof(EventCapNo) + sizeof(EventThreadID);
@@ -210,29 +232,35 @@ initEventLogging(void)
         case EVENT_GC_END:          // (cap)
             eventTypes[t].size = sizeof(EventCapNo);
             break;
+
+        case EVENT_LOG_MSG:          // (msg)
+        case EVENT_LOG_CAP_MSG:      // (cap,msg)
+            eventTypes[t].size = 0xffff;
+            break;
+
+        default:
+            continue; /* ignore deprecated events */
         }
 
         // Write in buffer: the start event type.
-        postEventType(&eventsBuf[0], &eventTypes[t]);
+        postEventType(&eventBuf, &eventTypes[t]);
     }
 
     // Mark end of event types in the header.
-    endEventTypes(&eventsBuf[0]);
+    endEventTypes(&eventBuf);
     
     // Write in buffer: the header end marker.
-    endHeader(&eventsBuf[0]);
+    endHeader(&eventBuf);
     
     // Prepare event buffer for events (data).
-    beginData(&eventsBuf[0]);
+    beginData(&eventBuf);
     
-    // Flush eventsBuf with header.
+    // Flush capEventBuf with header.
     /*
      * Flush header and data begin marker to the file, thus preparing the
      * file to have events written to it.
      */
-    printAndClearEventBuf(&eventsBuf[0]);
-
-    debugTrace(DEBUG_eventlog, "initEventLog: finish"); 
+    printAndClearEventBuf(&eventBuf);
 }
 
 void
@@ -240,46 +268,39 @@ endEventLogging(void)
 {
     nat c;
 
-    debugTrace(DEBUG_eventlog,"endEventLog: start");
-    
     // Flush all events remaining in the buffers.
     for (c = 0; c < n_capabilities; ++c) {
-        printAndClearEventBuf(&eventsBuf[c]);
+        printAndClearEventBuf(&capEventBuf[c]);
     }
+    printAndClearEventBuf(&eventBuf);
 
     // Mark end of events (data).
-    endData(&eventsBuf[0]);
+    endData(&eventBuf);
 
     // Flush the end of data marker.
-    printAndClearEventBuf(&eventsBuf[0]);
+    printAndClearEventBuf(&eventBuf);
 
     if (event_log_file != NULL) {
         fclose(event_log_file);
     }
-    
-    debugTrace(DEBUG_eventlog,"endEventLog: finish");
 }
 
 void 
 freeEventLogging(void)
 {
     StgWord8 c;
-
-    debugTrace(DEBUG_eventlog,"freeEventLog: start"); 
     
     // Free events buffer.
     for (c = 0; c < n_capabilities; ++c) {
-        if (eventsBuf[c].begin != NULL) 
-            stgFree(eventsBuf[c].begin);
+        if (capEventBuf[c].begin != NULL) 
+            stgFree(capEventBuf[c].begin);
     }
-    if (eventsBuf != NULL)  {
-        stgFree(eventsBuf);
+    if (capEventBuf != NULL)  {
+        stgFree(capEventBuf);
     }
     if (event_log_filename != NULL) {
         stgFree(event_log_filename);
     }
-    
-    debugTrace(DEBUG_eventlog,"freeEventLog: finish"); 
 }
 
 /*
@@ -287,13 +308,14 @@ freeEventLogging(void)
  * If the buffer is full, prints out the buffer and clears it.
  */
 void
-postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, StgWord64 other)
+postSchedEvent (Capability *cap, 
+                EventTypeNum tag, 
+                StgThreadID thread, 
+                StgWord64 other)
 {
     EventsBuf *eb;
 
-    debugTrace(DEBUG_eventlog,"postEvent: start");
-    
-    eb = &eventsBuf[cap->no];
+    eb = &capEventBuf[cap->no];
 
     if (!hasRoomForEvent(eb, tag)) {
         // Flush event buffer to make room for new event.
@@ -308,7 +330,6 @@ postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, StgWord64 othe
     case EVENT_CREATE_THREAD:   // (cap, thread)
     case EVENT_RUN_THREAD:      // (cap, thread)
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-    case EVENT_CREATE_SPARK:    // (cap, thread)
     case EVENT_RUN_SPARK:       // (cap, thread)
     {
         postThreadID(eb,thread);
@@ -328,7 +349,7 @@ postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, StgWord64 othe
         postThreadID(eb,thread);
         postCapNo(eb,other /* new_cap | victim_cap | other_cap */);
         break;
-    }
+   }
 
     case EVENT_STOP_THREAD:     // (cap, thread, status)
     {
@@ -349,24 +370,73 @@ postEvent_(Capability *cap, EventTypeNum tag, StgThreadID thread, StgWord64 othe
     default:
         barf("postEvent: unknown event tag %d", tag);
     }
-
-    debugTrace(DEBUG_eventlog,"postEvent: finish");
 }
 
-static void printAndClearEventBuf (EventsBuf *eventsBuf)
+#define BUF 512
+
+void postMsg(char *msg, va_list ap)
+{
+    EventsBuf *eb;
+    char buf[BUF];
+    nat size;
+
+    size = vsnprintf(buf,BUF,msg,ap);
+    if (size > BUF) {
+        buf[BUF-1] = '\0';
+        size = BUF;
+    }
+
+    ACQUIRE_LOCK(&eventBufMutex);
+    eb = &eventBuf;
+
+    if (!hasRoomForVariableEvent(eb, size)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(eb);
+    }
+
+    postEventTypeNum(eb, EVENT_LOG_MSG);
+    postTimestamp(eb, stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND));
+    postPayloadSize(eb, size);
+    postBuf(eb,(StgWord8*)buf,size);
+
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postCapMsg(Capability *cap, char *msg, va_list ap)
+{
+    EventsBuf *eb;
+    char buf[BUF];
+    nat size;
+
+    size = vsnprintf(buf,BUF,msg,ap);
+    if (size > BUF) {
+        buf[BUF-1] = '\0';
+        size = BUF;
+    }
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForVariableEvent(eb, size)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(eb);
+    }
+
+    postEventTypeNum(eb, EVENT_LOG_MSG);
+    postTimestamp(eb, stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND));
+    postPayloadSize(eb, size + sizeof(EventCapNo));
+    postCapNo(eb, cap->no);
+    postBuf(eb,(StgWord8*)buf,size);
+}
+
+static void printAndClearEventBuf (EventsBuf *ebuf)
 {
     StgWord64 numBytes = 0, written = 0;
 
-    if (eventsBuf->begin != NULL && eventsBuf->pos != eventsBuf->begin)
+    if (ebuf->begin != NULL && ebuf->pos != ebuf->begin)
     {
-        numBytes = eventsBuf->pos - eventsBuf->begin;
+        numBytes = ebuf->pos - ebuf->begin;
         
-        debugTrace(DEBUG_eventlog, 
-                   "printAndEventLog: numbytes %" FMT_Word64
-                   " bytes to fwrite()",
-                   numBytes);
-        
-        written = fwrite(eventsBuf->begin, 1, numBytes, event_log_file);
+        written = fwrite(ebuf->begin, 1, numBytes, event_log_file);
         if (written != numBytes) {
             debugBelch(
                 "printAndClearEventLog: fwrite() failed, written=%" FMT_Word64
@@ -374,11 +444,7 @@ static void printAndClearEventBuf (EventsBuf *eventsBuf)
             return;
         }
         
-        debugTrace(DEBUG_eventlog,
-                   "printAndClearEventLog: fwrite(): %" FMT_Word64 
-                   " bytes written", written);
-        
-        resetEventsBuf(eventsBuf);
+        resetEventsBuf(ebuf);
         flushCount++;
     }
 }
@@ -386,11 +452,7 @@ static void printAndClearEventBuf (EventsBuf *eventsBuf)
 void
 printAndClearEventLog(Capability *cap)
 {
-    debugTrace(DEBUG_eventlog,"printAndClearEventLog: start");
-    
-    printAndClearEventBuf(&eventsBuf[cap->no]);
-    
-    debugTrace(DEBUG_eventlog,"printAndClearEventLog: finish");
+    printAndClearEventBuf(&capEventBuf[cap->no]);
 }
 
 /* -----------------------------------------------------------------------------
@@ -442,9 +504,9 @@ void endEventTypes(EventsBuf *eb)
 
 StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
 {
-  nat size = 0;
+  nat size;
 
-  size += sizeof(EventTypeNum) + sizeof(EventTimestamp) + eventTypes[eNum].size;
+  size = sizeof(EventTypeNum) + sizeof(EventTimestamp) + eventTypes[eNum].size;
 
   if (eb->pos + size > eb->begin + eb->size) {
       return 0; // Not enough space.
@@ -452,6 +514,20 @@ StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
       return 1; // Buf has enough space for the event.
   }
 }
+
+StgBool hasRoomForVariableEvent(EventsBuf *eb, nat payload_bytes)
+{
+  nat size;
+
+  size = sizeof(EventTypeNum) + sizeof(EventTimestamp) +
+      sizeof(EventPayloadSize) + payload_bytes;
+
+  if (eb->pos + size > eb->begin + eb->size) {
+      return 0; // Not enough space.
+  } else  {
+      return 1; // Buf has enough space for the event.
+  }
+}    
 
 static void postEventType(EventsBuf *eb, EventType *et)
 {
@@ -470,4 +546,4 @@ static void postEventType(EventsBuf *eb, EventType *et)
     postInt32(eb, EVENT_ET_END);
 }
 
-#endif /* EVENTLOG */
+#endif /* TRACING */

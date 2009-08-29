@@ -29,7 +29,6 @@
 #include "sm/BlockAlloc.h"
 #include "Trace.h"
 #include "Stable.h"
-#include "eventlog/EventLog.h"
 #include "Hash.h"
 #include "Profiling.h"
 #include "Timer.h"
@@ -146,7 +145,7 @@ hs_init(int *argc, char **argv[])
 #endif
 
     /* initTracing must be after setupRtsFlags() */
-#ifdef DEBUG
+#ifdef TRACING
     initTracing();
 #endif
 
@@ -189,12 +188,6 @@ hs_init(int *argc, char **argv[])
 #endif
 
     initProfiling1();
-
-#ifdef EVENTLOG
-    if (RtsFlags.EventLogFlags.doEventLogging) {
-        initEventLogging();
-    }
-#endif
 
     /* start the virtual timer 'subsystem'. */
     initTimer();
@@ -421,11 +414,9 @@ hs_exit_(rtsBool wait_foreign)
     if (prof_file != NULL) fclose(prof_file);
 #endif
 
-#ifdef EVENTLOG
-    if (RtsFlags.EventLogFlags.doEventLogging) {
-        endEventLogging();
-        freeEventLogging();
-    }
+#ifdef TRACING
+    endTracing();
+    freeTracing();
 #endif
 
 #if defined(TICKY_TICKY)

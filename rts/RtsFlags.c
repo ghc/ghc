@@ -106,12 +106,11 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.stable		= rtsFalse;
     RtsFlags.DebugFlags.stm             = rtsFalse;
     RtsFlags.DebugFlags.prof		= rtsFalse;
-    RtsFlags.DebugFlags.eventlog        = rtsFalse;
     RtsFlags.DebugFlags.apply		= rtsFalse;
     RtsFlags.DebugFlags.linker		= rtsFalse;
     RtsFlags.DebugFlags.squeeze		= rtsFalse;
     RtsFlags.DebugFlags.hpc		= rtsFalse;
-    RtsFlags.DebugFlags.timestamp	= rtsFalse;
+    RtsFlags.DebugFlags.sparks		= rtsFalse;
 #endif
 
 #if defined(PROFILING)
@@ -135,8 +134,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.bioSelector        = NULL;
 #endif
 
-#ifdef EVENTLOG
-    RtsFlags.EventLogFlags.doEventLogging = rtsFalse;
+#ifdef TRACING
+    RtsFlags.TraceFlags.trace_stderr  = rtsFalse;
+    RtsFlags.TraceFlags.timestamp     = rtsFalse;
+    RtsFlags.TraceFlags.scheduler     = rtsFalse;
 #endif
 
     RtsFlags.MiscFlags.tickInterval	= 20;  /* In milliseconds */
@@ -196,9 +197,11 @@ usage_text[] = {
 "  -m<n>    Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
 "  -T<n>    Number of steps in younger generations (default: 2)",
-"  -c<n>    Auto-enable compaction of the oldest generation when live data is",
-"           at least <n>% of the maximum heap size set with -M (default: 30%)",
-"  -c       Enable compaction for all major collections",
+"  -c<n>    Use in-place compaction instead of copying in the oldest generation",
+"           when live data is at least <n>% of the maximum heap size set with",
+"           -M (default: 30%)",
+"  -c       Use in-place compaction for all oldest generation collections",
+"           (the default is to use copying)",
 "  -w       Use mark-region for the oldest generation (experimental)",
 #if defined(THREADED_RTS)
 "  -I<sec>  Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
@@ -252,9 +255,13 @@ usage_text[] = {
 # endif
 #endif /* PROFILING or PAR */
 
-#ifdef EVENTLOG
+#ifdef TRACING
 "",
-"  -l       Log runtime events (generates binary trace file <program>.eventlog)",
+"  -v       Log events to stderr",
+"  -l       Log events in binary format to the file <program>.eventlog",
+"  -vt      Include time stamps when tracing events to stderr with -v",
+"",
+"  -ls      Log scheduler events",
 "",
 #endif
 
@@ -275,8 +282,6 @@ usage_text[] = {
 "            This sets the resolution for -C and the profile timer -i.",
 "            Default: 0.02 sec.",
 "",
-"  -vt       Time-stamp debug messages",
-"",
 #if defined(DEBUG)
 "  -Ds  DEBUG: scheduler",
 "  -Di  DEBUG: interpreter",
@@ -293,6 +298,10 @@ usage_text[] = {
 "  -Dm  DEBUG: stm",
 "  -Dz  DEBUG: stack squezing",
 "  -Dc  DEBUG: program coverage",
+"  -Dr  DEBUG: sparks",
+"",
+"     NOTE: all -D options also enable -v automatically.  Use -l to create a",
+"     binary event log file instead.",
 "",
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
@@ -472,10 +481,10 @@ errorBelch("not built for: -prof"); \
 error = rtsTrue;
 #endif
 
-#ifdef EVENTLOG
-# define EVENTLOG_BUILD_ONLY(x)   x
+#ifdef TRACING
+# define TRACING_BUILD_ONLY(x)   x
 #else
-# define EVENTLOG_BUILD_ONLY(x) \
+# define TRACING_BUILD_ONLY(x) \
 errorBelch("not built for: -par-prof"); \
 error = rtsTrue;
 #endif
@@ -617,9 +626,6 @@ error = rtsTrue;
 		      case 'p':
 			  RtsFlags.DebugFlags.prof = rtsTrue;
 			  break;
-		      case 'e':
-			  RtsFlags.DebugFlags.eventlog = rtsTrue;
-                          break;
 		      case 'l':
 			  RtsFlags.DebugFlags.linker = rtsTrue;
 			  break;
@@ -635,10 +641,16 @@ error = rtsTrue;
 		      case 'c':
 			  RtsFlags.DebugFlags.hpc = rtsTrue;
 			  break;
+		      case 'r':
+			  RtsFlags.DebugFlags.sparks = rtsTrue;
+			  break;
 		      default:
 			  bad_option( rts_argv[arg] );
 		      }
 		  }
+                  // -Dx also turns on -v.  Use -l to direct trace
+                  // events to the .eventlog file instead.
+                  RtsFlags.TraceFlags.trace_stderr = rtsTrue;
 		  break;
 	      }
 #endif
@@ -743,8 +755,19 @@ error = rtsTrue;
 	      /* =========== PROFILING ========================== */
 
               case 'l':
-#ifdef EVENTLOG
-                  RtsFlags.EventLogFlags.doEventLogging = rtsTrue;
+#ifdef TRACING
+                switch(rts_argv[arg][2]) {
+		case '\0':
+                  RtsFlags.TraceFlags.trace_stderr = rtsFalse;
+                  break;
+                case 's':
+                  RtsFlags.TraceFlags.scheduler = rtsTrue;
+                  break;
+		default:
+		    errorBelch("unknown RTS option: %s",rts_argv[arg]);
+		    error = rtsTrue;
+		    break;
+                }
 #else
                   errorBelch("not built for: -eventlog");
 #endif
@@ -1049,13 +1072,14 @@ error = rtsTrue;
 
 	      case 'v':
                 switch(rts_argv[arg][2]) {
-		case '\0':
-		    errorBelch("incomplete RTS option: %s",rts_argv[arg]);
-		    error = rtsTrue;
-		    break;
+#ifdef TRACING
+                case '\0':
+                    RtsFlags.TraceFlags.trace_stderr = rtsTrue;
+                    break;
 		case 't':
-		    RtsFlags.DebugFlags.timestamp = rtsTrue;
+		    RtsFlags.TraceFlags.timestamp = rtsTrue;
 		    break;
+#endif
 		case 's':
 		case 'g':
                     // ignored for backwards-compat

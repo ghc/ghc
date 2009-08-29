@@ -47,7 +47,7 @@ createSparkThread (Capability *cap)
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize, 
                           &base_GHCziConc_runSparks_closure);
 
-    postEvent(cap, EVENT_CREATE_SPARK_THREAD, 0, tso->id);
+    traceSchedEvent(cap, EVENT_CREATE_SPARK_THREAD, 0, tso->id);
 
     appendToRunQueue(cap,tso);
 }
@@ -74,8 +74,6 @@ newSpark (StgRegTable *reg, StgClosure *p)
     }	
 
     cap->sparks_created++;
-
-    postEvent(cap, EVENT_CREATE_SPARK, cap->r.rCurrentTSO->id, 0);
 
     return 1;
 }
@@ -140,7 +138,7 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
     pool->top     &= pool->moduloSize;
     pool->topBound = pool->top;
 
-    debugTrace(DEBUG_sched,
+    debugTrace(DEBUG_sparks,
                "markSparkQueue: current spark queue len=%ld; (hd=%ld; tl=%ld)",
                sparkPoolSize(pool), pool->bottom, pool->top);
 
@@ -238,9 +236,9 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
     pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size); 
     // first free place we did not use (corrected by wraparound)
 
-    debugTrace(DEBUG_sched, "pruned %d sparks", pruned_sparks);
+    debugTrace(DEBUG_sparks, "pruned %d sparks", pruned_sparks);
     
-    debugTrace(DEBUG_sched,
+    debugTrace(DEBUG_sparks,
                "new spark queue len=%ld; (hd=%ld; tl=%ld)",
                sparkPoolSize(pool), pool->bottom, pool->top);
 
@@ -274,7 +272,7 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
       top++;
     }
 
-    debugTrace(DEBUG_sched,
+    debugTrace(DEBUG_sparks,
                "traversed spark queue, len=%ld; (hd=%ld; tl=%ld)",
                sparkPoolSize(pool), pool->bottom, pool->top);
 }

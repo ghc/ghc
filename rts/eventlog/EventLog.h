@@ -14,7 +14,7 @@
 
 #pragma GCC visibility push(hidden)
 
-#ifdef EVENTLOG
+#ifdef TRACING
 
 /*
  * Descriptions of EventTags for events.
@@ -25,32 +25,37 @@ void initEventLogging(void);
 void endEventLogging(void);
 void freeEventLogging(void);
 
-void postEvent_(Capability *cap, EventTypeNum tag, StgThreadID id, StgWord64 other);
-
 /* 
  * Post an event to the capability's event buffer.
  */
-INLINE_HEADER void postEvent(Capability *cap, EventTypeNum tag, StgThreadID id, StgWord64 other)
-{
-    if (RtsFlags.EventLogFlags.doEventLogging) {
-        postEvent_(cap, tag, id, other);
-    }
-}
+void postSchedEvent(Capability *cap, EventTypeNum tag, 
+                    StgThreadID id, StgWord64 other);
+
+void postMsg(char *msg, va_list ap);
+
+void postCapMsg(Capability *cap, char *msg, va_list ap);
 
 void printAndClearEventLog(Capability *cap);
 
-#else /* !EVENTLOG */
+#else /* !TRACING */
 
-INLINE_HEADER void postEvent(Capability *cap  STG_UNUSED,
-                             EventTypeNum tag STG_UNUSED,
-                             StgThreadID id   STG_UNUSED,
-                             StgWord64 other  STG_UNUSED)
-{
-    /* nothing */
-}
+INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
+                                   EventTypeNum tag STG_UNUSED,
+                                   StgThreadID id   STG_UNUSED,
+                                   StgWord64 other  STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void postMsg (char *msg STG_UNUSED, 
+                            va_list ap STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void postCapMsg (Capability *cap,
+                               char *msg STG_UNUSED, 
+                               va_list ap STG_UNUSED)
+{ /* nothing */ }
 
 #endif
 
 #pragma GCC visibility pop
 
-#endif /* EVENTLOG_H */
+#endif /* TRACING_H */
