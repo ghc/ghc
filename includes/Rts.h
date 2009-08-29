@@ -48,6 +48,11 @@ extern "C" {
 #define ATTRIBUTE_ALIGNED(n) /*nothing*/
 #endif
 
+// Symbols that are extern, but private to the RTS, are declared
+// with visibility "hidden" to hide them outside the RTS shared
+// library.
+#define RTS_PRIVATE  GNUC3_ATTRIBUTE(visibility("hidden"))
+
 /* Fix for mingw stat problem (done here so it's early enough) */
 #ifdef mingw32_HOST_OS
 #define __MSVCRT__ 1
