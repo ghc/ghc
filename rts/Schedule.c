@@ -2710,7 +2710,11 @@ performPendingThrowTos (StgTSO *threads)
 {
     StgTSO *tso, *next;
     Capability *cap;
+    Task *task, *saved_task;;
     step *step;
+
+    task = myTask();
+    cap = task->cap;
 
     for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
 	next = tso->global_link;
@@ -2721,7 +2725,17 @@ performPendingThrowTos (StgTSO *threads)
 
 	debugTrace(DEBUG_sched, "performing blocked throwTo to thread %lu", (unsigned long)tso->id);
 	
-	cap = tso->cap;
-        maybePerformBlockedException(cap, tso);
+        // We must pretend this Capability belongs to the current Task
+        // for the time being, as invariants will be broken otherwise.
+        // In fact the current Task has exclusive access to the systme
+        // at this point, so this is just bookkeeping:
+	task->cap = tso->cap;
+        saved_task = tso->cap->running_task;
+        tso->cap->running_task = task;
+        maybePerformBlockedException(tso->cap, tso);
+        tso->cap->running_task = saved_task;
     }
+
+    // Restore our original Capability:
+    task->cap = cap;
 }
