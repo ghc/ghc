@@ -168,6 +168,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Parallel.h"
 #include "rts/Hooks.h"
 #include "rts/Signals.h"
+#include "rts/BlockSignals.h"
 #include "rts/Hpc.h"
 #include "rts/Flags.h"
 #include "rts/Adjustor.h"
@@ -180,6 +181,8 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Timer.h"
 #include "rts/Stable.h"
 #include "rts/TTY.h"
+#include "rts/Utils.h"
+#include "rts/PrimFloat.h"
 
 /* Misc stuff without a home */
 DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */

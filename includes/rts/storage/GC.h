@@ -182,6 +182,10 @@ lnat    allocatedBytes  ( void );
 void * allocateExec(unsigned int len, void **exec_addr);
 void   freeExec (void *p);
 
+// Used by GC checks in external .cmm code:
+extern nat alloc_blocks;
+extern nat alloc_blocks_lim;
+
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
    -------------------------------------------------------------------------- */
@@ -196,6 +200,15 @@ void performMajorGC(void);
 void newCAF     (StgClosure*);
 void newDynCAF  (StgClosure *);
 void revertCAFs (void);
+
+/* -----------------------------------------------------------------------------
+   This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
+   MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
+   is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
+   and is put on the mutable list.
+   -------------------------------------------------------------------------- */
+
+void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */

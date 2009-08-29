@@ -46,23 +46,6 @@ void resetDefaultHandlers(void);
 void freeSignalHandlers(void);
 
 /*
- * Function: blockUserSignals()
- *
- * Temporarily block the delivery of further console events. Needed to
- * avoid race conditions when GCing the queue of outstanding handlers or
- * when emptying the queue by running the handlers.
- * 
- */
-void blockUserSignals(void);
-
-/*
- * Function: unblockUserSignals()
- *
- * The inverse of blockUserSignals(); re-enable the deliver of console events.
- */
-void unblockUserSignals(void);
-
-/*
  * Function: awaitUserSignals()
  *
  * Wait for the next console event. Currently a NOP (returns immediately.)

@@ -25,9 +25,6 @@ void freeStorage(void);
 
 extern bdescr * pinned_object_block;
 
-extern nat alloc_blocks;
-extern nat alloc_blocks_lim;
-
 INLINE_HEADER rtsBool
 doYouWantToGC( void )
 {
@@ -114,16 +111,7 @@ recordMutableLock(StgClosure *p)
 }
 
 /* -----------------------------------------------------------------------------
-   This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
-   MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
-   is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
-   and is put on the mutable list.
-   -------------------------------------------------------------------------- */
-
-void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
-
-/* -----------------------------------------------------------------------------
-   Similarly, the write barrier for MVARs
+   The write barrier for MVARs
    -------------------------------------------------------------------------- */
 
 void dirty_MVAR(StgRegTable *reg, StgClosure *p);

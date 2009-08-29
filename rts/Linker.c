@@ -501,8 +501,8 @@ typedef struct _RtsSymbolVal {
 #if !defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS_SYMBOLS \
    SymI_HasProto(setIOManagerPipe) \
-   SymI_NeedsProto(blockUserSignals) \
-   SymI_NeedsProto(unblockUserSignals)
+   SymI_HasProto(blockUserSignals) \
+   SymI_HasProto(unblockUserSignals)
 #else
 #define RTS_USER_SIGNALS_SYMBOLS     \
    SymI_HasProto(sendIOManagerEvent) \
