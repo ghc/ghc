@@ -147,4 +147,4 @@ test('T3177a', normal, compile_fail, ['-v0'])
 
 test('T3319', normal, compile, ['-ddump-splices -v0'])
 test('T3395', normal, compile_fail, ['-v0'])
-
+test('T3467', normal, compile, [''])
