@@ -1,1 +1,1 @@
-caught: thread blocked indefinitely
+caught: thread blocked indefinitely in an MVar operation

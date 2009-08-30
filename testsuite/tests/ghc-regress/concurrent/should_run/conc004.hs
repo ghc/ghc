@@ -14,6 +14,6 @@ main = do
    	spawner c 0 = putMVar mvar ()
    	spawner c n = do { c (spawner c (n-1)); return ()}
 
-   spawner forkIO 1000000
+   spawner forkIO 100000
    takeMVar mvar
    putStr "done"

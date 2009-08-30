@@ -26,7 +26,7 @@ main = do
      putMVar th "child"
   threadDelay 500000
   yield -- another hack, just in case child yields right after "sleep 1"
-  putMVar th "main" `catch` (\BlockedOnDeadMVar -> return ())
+  putMVar th "main" `catch` (\BlockedIndefinitelyOnMVar -> return ())
 	-- tests that the other thread doing an unsafe call to 
 	-- sleep(3) has blocked this thread.  Not sure if this
 	-- is a useful test.
