@@ -144,14 +144,33 @@ utf8_decode
                            ow' <- writeCharBuf oraw ow (chr2 c0 c1)
                            loop (ir+2) ow'
                   | c0 >= 0xe0 && c0 <= 0xef ->
-                           if iw - ir < 3 then done ir ow else do
+                      case iw - ir of
+                        1 -> done ir ow
+                        2 -> do -- check for an error even when we don't have
+                                -- the full sequence yet (#3341)
+                           c1 <- readWord8Buf iraw (ir+1)
+                           if not (validate3 c0 c1 0x80) 
+                              then invalid else done ir ow
+                        _ -> do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
                            if not (validate3 c0 c1 c2) then invalid else do
                            ow' <- writeCharBuf oraw ow (chr3 c0 c1 c2)
                            loop (ir+3) ow'
                   | c0 >= 0xf0 ->
-                           if iw - ir < 4 then done ir ow else do
+                      case iw - ir of
+                        1 -> done ir ow
+                        2 -> do -- check for an error even when we don't have
+                                -- the full sequence yet (#3341)
+                           c1 <- readWord8Buf iraw (ir+1)
+                           if not (validate4 c0 c1 0x80 0x80)
+                              then invalid else done ir ow
+                        3 -> do
+                           c1 <- readWord8Buf iraw (ir+1)
+                           c2 <- readWord8Buf iraw (ir+2)
+                           if not (validate4 c0 c1 c2 0x80)
+                              then invalid else done ir ow
+                        _ -> do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
                            c3 <- readWord8Buf iraw (ir+3)
