@@ -25,6 +25,7 @@ module GHC.IO.Encoding.Iconv (
 #endif
  ) where
 
+#include "MachDeps.h"
 #include "HsBaseConfig.h"
 
 #if !defined(mingw32_HOST_OS)
@@ -51,8 +52,8 @@ iconv_trace :: String -> IO ()
 iconv_trace s = puts s
 
 puts :: String -> IO ()
-puts s = do withCStringLen (s++"\n") $ \(p,len) -> 
-                c_write 1 p (fromIntegral len)
+puts s = do withCStringLen (s++"\n") $ \(p, len) -> 
+                c_write 1 (castPtr p) (fromIntegral len)
             return ()
 
 #else
@@ -174,6 +175,7 @@ iconvRecode iconv_t
   input@Buffer{  bufRaw=iraw, bufL=ir, bufR=iw, bufSize=_  }  iscale
   output@Buffer{ bufRaw=oraw, bufL=_,  bufR=ow, bufSize=os }  oscale
   = do
+    iconv_trace ("haskelChar=" ++ show haskellChar)
     iconv_trace ("iconvRecode before, input=" ++ show (summaryBuffer input))
     iconv_trace ("iconvRecode before, output=" ++ show (summaryBuffer output))
     withRawBuffer iraw $ \ piraw -> do
