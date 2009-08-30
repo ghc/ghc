@@ -60,5 +60,32 @@ import GHC.IOArray
 import GHC.IORef
 import GHC.MVar
 import Foreign.C.Types
+import GHC.Show
+import Data.Typeable
 
 type FD = CInt
+
+-- Backwards compat: this was renamed to BlockedIndefinitelyOnMVar
+data BlockedOnDeadMVar = BlockedOnDeadMVar
+    deriving Typeable
+
+instance Exception BlockedOnDeadMVar
+
+instance Show BlockedOnDeadMVar where
+    showsPrec _ BlockedOnDeadMVar = showString "thread blocked indefinitely"
+
+blockedOnDeadMVar :: SomeException -- for the RTS
+blockedOnDeadMVar = toException BlockedOnDeadMVar
+
+
+-- Backwards compat: this was renamed to BlockedIndefinitelyOnSTM
+data BlockedIndefinitely = BlockedIndefinitely
+    deriving Typeable
+
+instance Exception BlockedIndefinitely
+
+instance Show BlockedIndefinitely where
+    showsPrec _ BlockedIndefinitely = showString "thread blocked indefinitely"
+
+blockedIndefinitely :: SomeException -- for the RTS
+blockedIndefinitely = toException BlockedIndefinitely

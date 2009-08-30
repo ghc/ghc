@@ -716,8 +716,8 @@ instance New.Exception Exception where
        Caster (\exc -> ArrayException exc),
        Caster (\(New.AssertionFailed err) -> AssertionFailed err),
        Caster (\exc -> AsyncException exc),
-       Caster (\New.BlockedOnDeadMVar -> BlockedOnDeadMVar),
-       Caster (\New.BlockedIndefinitely -> BlockedIndefinitely),
+       Caster (\New.BlockedIndefinitelyOnMVar -> BlockedOnDeadMVar),
+       Caster (\New.BlockedIndefinitelyOnSTM -> BlockedIndefinitely),
        Caster (\New.NestedAtomically -> NestedAtomically),
        Caster (\New.Deadlock -> Deadlock),
        Caster (\exc -> DynException exc),
@@ -741,8 +741,8 @@ instance New.Exception Exception where
   toException (ArrayException exc)   = toException exc
   toException (AssertionFailed err)  = toException (New.AssertionFailed err)
   toException (AsyncException exc)   = toException exc
-  toException BlockedOnDeadMVar      = toException New.BlockedOnDeadMVar
-  toException BlockedIndefinitely    = toException New.BlockedIndefinitely
+  toException BlockedOnDeadMVar      = toException New.BlockedIndefinitelyOnMVar
+  toException BlockedIndefinitely    = toException New.BlockedIndefinitelyOnSTM
   toException NestedAtomically       = toException New.NestedAtomically
   toException Deadlock               = toException New.Deadlock
   -- If a dynamic exception is a SomeException then resurrect it, so
@@ -776,8 +776,8 @@ instance Show Exception where
   showsPrec _ (AssertionFailed err)      = showString err
   showsPrec _ (DynException err)         = showString "exception :: " . showsTypeRep (dynTypeRep err)
   showsPrec _ (AsyncException e)         = shows e
-  showsPrec p BlockedOnDeadMVar          = showsPrec p New.BlockedOnDeadMVar
-  showsPrec p BlockedIndefinitely        = showsPrec p New.BlockedIndefinitely
+  showsPrec p BlockedOnDeadMVar          = showsPrec p New.BlockedIndefinitelyOnMVar
+  showsPrec p BlockedIndefinitely        = showsPrec p New.BlockedIndefinitelyOnSTM
   showsPrec p NestedAtomically           = showsPrec p New.NestedAtomically
   showsPrec p NonTermination             = showsPrec p New.NonTermination
   showsPrec p Deadlock                   = showsPrec p New.Deadlock

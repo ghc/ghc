@@ -37,8 +37,8 @@ module Control.Exception.Base (
         NestedAtomically(..),
 #endif
 
-        BlockedOnDeadMVar(..),
-        BlockedIndefinitely(..),
+        BlockedIndefinitelyOnMVar(..),
+        BlockedIndefinitelyOnSTM(..),
         Deadlock(..),
         NoMethodError(..),
         PatternMatchFail(..),
@@ -189,8 +189,8 @@ instance Show AssertionFailed
 instance Show PatternMatchFail
 instance Show NoMethodError
 instance Show Deadlock
-instance Show BlockedOnDeadMVar
-instance Show BlockedIndefinitely
+instance Show BlockedIndefinitelyOnMVar
+instance Show BlockedIndefinitelyOnSTM
 instance Show ErrorCall
 instance Show RecConError
 instance Show RecSelError
@@ -234,8 +234,8 @@ INSTANCE_TYPEABLE0(ExitCode,exitCodeTc,"ExitCode")
 INSTANCE_TYPEABLE0(ErrorCall,errorCallTc,"ErrorCall")
 INSTANCE_TYPEABLE0(AssertionFailed,assertionFailedTc,"AssertionFailed")
 INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
-INSTANCE_TYPEABLE0(BlockedOnDeadMVar,blockedOnDeadMVarTc,"BlockedOnDeadMVar")
-INSTANCE_TYPEABLE0(BlockedIndefinitely,blockedIndefinitelyTc,"BlockedIndefinitely")
+INSTANCE_TYPEABLE0(BlockedIndefinitelyOnMVar,blockedIndefinitelyOnMVarTc,"BlockedIndefinitelyOnMVar")
+INSTANCE_TYPEABLE0(BlockedIndefinitelyOnSTM,blockedIndefinitelyOnSTM,"BlockedIndefinitelyOnSTM")
 INSTANCE_TYPEABLE0(Deadlock,deadlockTc,"Deadlock")
 
 instance Exception SomeException where
@@ -272,8 +272,8 @@ instance Exception ErrorCall where
     fromException (Hugs.Exception.ErrorCall s) = Just (ErrorCall s)
     fromException _ = Nothing
 
-data BlockedOnDeadMVar = BlockedOnDeadMVar
-data BlockedIndefinitely = BlockedIndefinitely
+data BlockedIndefinitelyOnMVar = BlockedIndefinitelyOnMVar
+data BlockedIndefinitelyOnSTM = BlockedIndefinitelyOnSTM
 data Deadlock = Deadlock
 data AssertionFailed = AssertionFailed String
 data AsyncException
@@ -283,8 +283,8 @@ data AsyncException
   | UserInterrupt
   deriving (Eq, Ord)
 
-instance Show BlockedOnDeadMVar where
-    showsPrec _ BlockedOnDeadMVar = showString "thread blocked indefinitely"
+instance Show BlockedIndefinitelyOnMVar where
+    showsPrec _ BlockedIndefinitelyOnMVar = showString "thread blocked indefinitely"
 
 instance Show BlockedIndefinitely where
     showsPrec _ BlockedIndefinitely = showString "thread blocked indefinitely"

@@ -265,9 +265,9 @@ real_handler :: SomeException -> IO ()
 real_handler se@(SomeException ex) =
   -- ignore thread GC and killThread exceptions:
   case cast ex of
-  Just BlockedOnDeadMVar                -> return ()
+  Just BlockedIndefinitelyOnMVar        -> return ()
   _ -> case cast ex of
-       Just BlockedIndefinitely         -> return ()
+       Just BlockedIndefinitelyOnSTM    -> return ()
        _ -> case cast ex of
             Just ThreadKilled           -> return ()
             _ -> case cast ex of

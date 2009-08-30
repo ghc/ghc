@@ -15,8 +15,8 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.Exception (
-  BlockedOnDeadMVar(..),   blockedOnDeadMVar,
-  BlockedIndefinitely(..), blockedIndefinitely,
+  BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVar,
+  BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTM,
   Deadlock(..),
   AssertionFailed(..),
   AsyncException(..), stackOverflow, heapOverflow,
@@ -51,31 +51,31 @@ import Data.Typeable     ( Typeable )
 
 -- |The thread is blocked on an @MVar@, but there are no other references
 -- to the @MVar@ so it can't ever continue.
-data BlockedOnDeadMVar = BlockedOnDeadMVar
+data BlockedIndefinitelyOnMVar = BlockedIndefinitelyOnMVar
     deriving Typeable
 
-instance Exception BlockedOnDeadMVar
+instance Exception BlockedIndefinitelyOnMVar
 
-instance Show BlockedOnDeadMVar where
-    showsPrec _ BlockedOnDeadMVar = showString "thread blocked indefinitely"
+instance Show BlockedIndefinitelyOnMVar where
+    showsPrec _ BlockedIndefinitelyOnMVar = showString "thread blocked indefinitely in an MVar operation"
 
-blockedOnDeadMVar :: SomeException -- for the RTS
-blockedOnDeadMVar = toException BlockedOnDeadMVar
+blockedIndefinitelyOnMVar :: SomeException -- for the RTS
+blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
 
 -----
 
 -- |The thread is awiting to retry an STM transaction, but there are no
 -- other references to any @TVar@s involved, so it can't ever continue.
-data BlockedIndefinitely = BlockedIndefinitely
+data BlockedIndefinitelyOnSTM = BlockedIndefinitelyOnSTM
     deriving Typeable
 
-instance Exception BlockedIndefinitely
+instance Exception BlockedIndefinitelyOnSTM
 
-instance Show BlockedIndefinitely where
-    showsPrec _ BlockedIndefinitely = showString "thread blocked indefinitely"
+instance Show BlockedIndefinitelyOnSTM where
+    showsPrec _ BlockedIndefinitelyOnSTM = showString "thread blocked indefinitely in an STM transaction"
 
-blockedIndefinitely :: SomeException -- for the RTS
-blockedIndefinitely = toException BlockedIndefinitely
+blockedIndefinitelyOnSTM :: SomeException -- for the RTS
+blockedIndefinitelyOnSTM = toException BlockedIndefinitelyOnSTM
 
 -----
 

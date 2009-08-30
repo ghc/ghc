@@ -53,8 +53,8 @@ module Control.Exception (
         System.ExitCode(), -- instance Exception
 #endif
 
-        BlockedOnDeadMVar(..),
-        BlockedIndefinitely(..),
+        BlockedIndefinitelyOnMVar(..),
+        BlockedIndefinitelyOnSTM(..),
         Deadlock(..),
         NoMethodError(..),
         PatternMatchFail(..),
