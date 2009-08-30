@@ -2667,10 +2667,9 @@ resurrectThreads (StgTSO *threads)
 	
 	switch (tso->why_blocked) {
 	case BlockedOnMVar:
-	case BlockedOnException:
 	    /* Called by GC - sched_mutex lock is currently held. */
 	    throwToSingleThreaded(cap, tso,
-				  (StgClosure *)blockedOnDeadMVar_closure);
+				  (StgClosure *)blockedIndefinitelyOnMVar_closure);
 	    break;
 	case BlockedOnBlackHole:
 	    throwToSingleThreaded(cap, tso,
@@ -2678,7 +2677,7 @@ resurrectThreads (StgTSO *threads)
 	    break;
 	case BlockedOnSTM:
 	    throwToSingleThreaded(cap, tso,
-				  (StgClosure *)blockedIndefinitely_closure);
+				  (StgClosure *)blockedIndefinitelyOnSTM_closure);
 	    break;
 	case NotBlocked:
 	    /* This might happen if the thread was blocked on a black hole
@@ -2686,6 +2685,11 @@ resurrectThreads (StgTSO *threads)
 	     * can wake up threads, remember...).
 	     */
 	    continue;
+	case BlockedOnException:
+            // throwTo should never block indefinitely: if the target
+            // thread dies or completes, throwTo returns.
+	    barf("resurrectThreads: thread BlockedOnException");
+            break;
 	default:
 	    barf("resurrectThreads: thread blocked in a strange way");
 	}
