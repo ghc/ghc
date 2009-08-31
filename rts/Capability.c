@@ -500,7 +500,7 @@ waitForReturnCapability (Capability **pCap, Task *task)
     if (cap == NULL) {
 	// Try last_free_capability first
 	cap = last_free_capability;
-	if (!cap->running_task) {
+	if (cap->running_task) {
 	    nat i;
 	    // otherwise, search for a free capability
             cap = NULL;
