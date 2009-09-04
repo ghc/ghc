@@ -25,38 +25,37 @@ import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc )
 
 -- the main function here! yay!
-tyThingToHsSynSig :: TyThing -> LHsDecl Name
--- ids (functions and zero-argument a.k.a. CAFs) get a type signature.
--- Including built-in functions like seq.
--- foreign-imported functions could be represented with ForD
--- instead of SigD if we wanted...
-tyThingToHsSynSig (AnId i) = noLoc $
+tyThingToLHsDecl :: TyThing -> LHsDecl Name
+tyThingToLHsDecl t = noLoc $ case t of
+  -- ids (functions and zero-argument a.k.a. CAFs) get a type signature.
+  -- Including built-in functions like seq.
+  -- foreign-imported functions could be represented with ForD
+  -- instead of SigD if we wanted...
+  --
   -- in a future code version we could turn idVarDetails = foreign-call
   -- into a ForD instead of a SigD if we wanted.  Haddock doesn't
   -- need to care.
-  SigD (synifyIdSig ImplicitizeForAll i)
--- type-constructors (e.g. Maybe) are complicated, put the definition
--- later in the file (also it's used for class associated-types too.)
-tyThingToHsSynSig (ATyCon tc) = noLoc $
-  TyClD (synifyTyCon tc)
--- a data-constructor alone just gets rendered as a function:
-tyThingToHsSynSig (ADataCon dc) = noLoc $
-  SigD (TypeSig (synifyName dc)
-       (synifyType ImplicitizeForAll (dataConUserType dc)))
--- classes are just a little tedious
-tyThingToHsSynSig (AClass cl) = noLoc $
-  TyClD $ ClassDecl
-    (synifyCtx (classSCTheta cl))
-    (synifyName cl)
-    (synifyTyVars (classTyVars cl))
-    (map (\ (l,r) -> noLoc
-               (map getName l, map getName r) ) $
-       snd $ classTvsFds cl)
-    (map (\i -> noLoc $ synifyIdSig DeleteTopLevelQuantification i)
-         (classMethods cl))
-    emptyBag --ignore default method definitions, they don't affect signature
-    (map synifyClassAT (classATs cl))
-    [] --we don't have any docs at this point
+  AnId i -> SigD (synifyIdSig ImplicitizeForAll i)
+  -- type-constructors (e.g. Maybe) are complicated, put the definition
+  -- later in the file (also it's used for class associated-types too.)
+  ATyCon tc -> TyClD (synifyTyCon tc)
+  -- a data-constructor alone just gets rendered as a function:
+  ADataCon dc -> SigD (TypeSig (synifyName dc)
+    (synifyType ImplicitizeForAll (dataConUserType dc)))
+  -- classes are just a little tedious
+  AClass cl ->
+    TyClD $ ClassDecl
+      (synifyCtx (classSCTheta cl))
+      (synifyName cl)
+      (synifyTyVars (classTyVars cl))
+      (map (\ (l,r) -> noLoc
+                 (map getName l, map getName r) ) $
+         snd $ classTvsFds cl)
+      (map (\i -> noLoc $ synifyIdSig DeleteTopLevelQuantification i)
+           (classMethods cl))
+      emptyBag --ignore default method definitions, they don't affect signature
+      (map synifyClassAT (classATs cl))
+      [] --we don't have any docs at this point
 
 -- class associated-types are a subset of TyCon
 -- (mainly only type/data-families)
