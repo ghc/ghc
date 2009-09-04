@@ -5,9 +5,7 @@
 
 -- Some other functions turned out to be useful for converting
 -- instance heads, which aren't TyThings, so just export everything.
-module Haddock.Convert
---    ( tyThingToHsSynSig {- :: TyThing -> LHsDecl Name -} )
-  where
+module Haddock.Convert where
 
 import HsSyn
 import TcType ( tcSplitSigmaTy )
