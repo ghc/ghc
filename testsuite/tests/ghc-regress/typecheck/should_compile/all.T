@@ -265,6 +265,7 @@ test('tc245',
      run_command,
      ['$MAKE -s --no-print-directory tc245'])
 test('tc246', normal, compile, [''])
+test('tc247', normal, compile, [''])
 
 test('FD1', normal, compile_fail, [''])
 test('FD2', normal, compile_fail, [''])
