@@ -530,8 +530,6 @@ data Token
 
   | ITdupipvarid   FastString	-- GHC extension: implicit param: ?x
 
-  | ITpragma StringBuffer
-
   | ITchar       Char
   | ITstring     FastString
   | ITinteger    Integer
