@@ -2,7 +2,9 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.AttachInstances
--- Copyright   :  (c) David Waern  2006-2009
+-- Copyright   :  (c) Simon Marlow 2006,
+--                    David Waern  2006-2009,
+--                    Isaac Dupree 2009
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
