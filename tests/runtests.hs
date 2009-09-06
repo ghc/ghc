@@ -9,7 +9,9 @@ import Control.Monad
 import Text.Printf
 import Text.Regex
 import Distribution.Simple.Utils
+import Distribution.Simple.Program
 import Distribution.Verbosity
+import Data.Maybe
 
 
 main = do
@@ -20,6 +22,11 @@ main = do
 haddockEq file1 file2 = stripLinks file1 == stripLinks file2
   where
     stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
+
+
+programOnPath p = do
+  result <- findProgramOnPath p silent
+  return (isJust result)
 
 
 check modules strict = do
@@ -35,7 +42,10 @@ check modules strict = do
         if not $ haddockEq out ref
           then do
             putStrLn $ "Output for " ++ mod ++ " has changed! Exiting with diff:"
-            system $ "diff " ++ reffile ++ " " ++ outfile
+            b <- programOnPath "colordiff"
+            if b
+              then system $ "colordiff " ++ reffile ++ " " ++ outfile
+              else system $ "diff " ++ reffile ++ " " ++ outfile
             if strict then exitFailure else return ()
           else do
             putStrLn $ "Pass: " ++ mod
