@@ -46,6 +46,7 @@ attachInstances = mapM attach
     attach iface = do
       newItems <- mapM attachExport $ ifaceExportItems iface
       return $ iface { ifaceExportItems = newItems }
+
     attachExport export@ExportDecl{expItemDecl = L _ (TyClD d)} = do
        mb_info <- getAllInfo (unLoc (tcdLName d))
        return $ export { expItemInstances = case mb_info of
