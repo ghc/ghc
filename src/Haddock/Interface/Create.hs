@@ -514,7 +514,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
               -- Aren't the .hi files always present?
               return [ ExportNoDecl t [] ]
             Just tyThing -> do
-              let hsdecl = tyThingToHsSynSig tyThing
+              let hsdecl = tyThingToLHsDecl tyThing
               -- This is not the ideal way to implement haddockumentation
               -- for functions/values without explicit type signatures.
               --

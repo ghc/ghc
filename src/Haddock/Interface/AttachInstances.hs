@@ -51,7 +51,7 @@ attachInstances = mapM attach
        mb_info <- getAllInfo (unLoc (tcdLName d))
        return $ export { expItemInstances = case mb_info of
          Just (_, _, instances) ->
-           map toHsInstHead . sortImage instHead . map instanceHead $ instances
+           map synifyInstHead . sortImage instHead . map instanceHead $ instances
          Nothing ->
            []
         }
@@ -108,12 +108,3 @@ funTyConName = mkWiredInName gHC_PRIM
                         funTyConKey
                         (ATyCon funTyCon)       -- Relevant TyCon
                         BuiltInSyntax
-
-
-toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
-toHsInstHead (_, preds, cls, ts) =
-        ( map (unLoc . synifyPred) preds
-        , getName cls
-        , map (unLoc . synifyType WithinType) ts
-        )
-

@@ -20,7 +20,7 @@ import BasicTypes
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName )
 import Bag ( emptyBag )
-import SrcLoc ( Located, noLoc )
+import SrcLoc ( Located, noLoc, unLoc )
 
 -- the main function here! yay!
 tyThingToLHsDecl :: TyThing -> LHsDecl Name
@@ -275,3 +275,10 @@ synifyType s forallty@(ForAllTy _tv _ty) =
      in noLoc $
            HsForAllTy forallPlicitness sTvs sCtx sTau
 
+synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
+                  ([HsPred Name], Name, [HsType Name])
+synifyInstHead (_, preds, cls, ts) =
+  ( map (unLoc . synifyPred) preds
+  , getName cls
+  , map (unLoc . synifyType WithinType) ts
+  )
