@@ -1,0 +1,4 @@
+<command line>: cannot satisfy -package shadowdep: 
+    shadowdep-1-XXX is unusable due to missing or recursive dependencies:
+      shadow-1-XXX
+    (use -v for more information)

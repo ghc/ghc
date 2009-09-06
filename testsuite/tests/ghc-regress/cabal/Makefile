@@ -123,6 +123,29 @@ LOCAL_GHC_PKG1750 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF1750)
 	echo "main = return ()" >1750.hs
 	$(TEST_HC) -package-conf $(PKGCONF1750) -package 1750A 1750.hs || true
 
+PKGCONFSHADOW1=localshadow1.package.conf
+PKGCONFSHADOW2=localshadow2.package.conf
+LOCAL_GHC_PKGSHADOW1 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONFSHADOW1)
+LOCAL_GHC_PKGSHADOW2 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONFSHADOW2)
+LOCAL_GHC_PKGSHADOW3 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONFSHADOW1) -f $(PKGCONFSHADOW2)
+
+# Test package shadowing behaviour.
+#
+#     localshadow1.package.conf:  shadowdep-1-XXX <- shadow-1-XXX
+#     localshadow2.package.conf:                     shadow-1-YYY
+# 
+# shadow-1-XXX will be shadowed by shadow-1-YYY, thus invalidating
+# shadowdep-1-XXX.
+shadow:
+	rm -f $(PKGCONFSHADOW2) $(PKGCONFSHADOW2) shadow.hs shadow.o shadow.hi shadow.out
+	echo "[]" >$(PKGCONFSHADOW1)
+	echo "[]" >$(PKGCONFSHADOW2)
+	$(LOCAL_GHC_PKGSHADOW1) register --force shadow1.pkg >shadow1.out 2>&1
+	$(LOCAL_GHC_PKGSHADOW1) register --force shadow2.pkg >shadow2.out 2>&1
+	$(LOCAL_GHC_PKGSHADOW2) register --force shadow3.pkg >shadow3.out 2>&1
+	$(LOCAL_GHC_PKGSHADOW3) list
+	$(TEST_HC) -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package shadowdep || true
+
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
 # every package we know about.  This is for testing the pretty printing/parsing

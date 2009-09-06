@@ -46,3 +46,10 @@ test('1750',
                   'local1750.package.conf.old']),
      run_command, ['$MAKE -s --no-print-directory 1750'])
 
+test('shadow',
+     extra_clean(['shadow.out',
+                  'local1shadow1.package.conf',
+                  'local1shadow1.package.conf.old',
+                  'local1shadow2.package.conf',
+                  'local1shadow2.package.conf.old']),
+     run_command, ['$MAKE -s --no-print-directory shadow'])
