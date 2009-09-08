@@ -137,5 +137,8 @@ test('fptrfail01', [ compose(omit_ways(['ghci']), exit_code(1)),
 
 test('2917a', normal, compile_and_run, [''])
 
-test('ffi020', exit_code(1), compile_and_run, [''])
+# omit prof ways, because this test causes the RTS to exit (correctly)
+# without generating profiling information.
+test('ffi020', [ omit_ways(['profc','profasm','profthreaded']),
+                 exit_code(1) ], compile_and_run, [''])
 
