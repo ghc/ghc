@@ -112,40 +112,41 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     tracePreface();
     switch (tag) {
     case EVENT_CREATE_THREAD:   // (cap, thread)
-        debugBelch("cap %d: created thread %ld\n", cap->no, tso->id);
+        debugBelch("cap %d: created thread %lu\n", 
+                   cap->no, (lnat)tso->id);
         break;
     case EVENT_RUN_THREAD:      //  (cap, thread)
-        debugBelch("cap %d: running thread %ld (%s)\n", cap->no, 
-                   tso->id, what_next_strs[tso->what_next]);
+        debugBelch("cap %d: running thread %lu (%s)\n", 
+                   cap->no, (lnat)tso->id, what_next_strs[tso->what_next]);
         break;
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        debugBelch("cap %d: thread %ld appended to run queue\n", 
-                   cap->no, tso->id);
+        debugBelch("cap %d: thread %lu appended to run queue\n", 
+                   cap->no, (lnat)tso->id);
         break;
     case EVENT_RUN_SPARK:       // (cap, thread)
-        debugBelch("cap %d: thread %ld running a spark\n", 
-                   cap->no, tso->id);
+        debugBelch("cap %d: thread %lu running a spark\n", 
+                   cap->no, (lnat)tso->id);
         break;
     case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
-        debugBelch("cap %d: creating spark thread %ld\n", 
+        debugBelch("cap %d: creating spark thread %lu\n", 
                    cap->no, (long)other);
         break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        debugBelch("cap %d: thread %ld migrating to cap %d\n", 
-                   cap->no, tso->id, (int)other);
+        debugBelch("cap %d: thread %lu migrating to cap %d\n", 
+                   cap->no, (lnat)tso->id, (int)other);
         break;
     case EVENT_STEAL_SPARK:     // (cap, thread, victim_cap)
-        debugBelch("cap %d: thread %ld stealing a spark from cap %d\n", 
-                   cap->no, tso->id, (int)other);
+        debugBelch("cap %d: thread %lu stealing a spark from cap %d\n", 
+                   cap->no, (lnat)tso->id, (int)other);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, other_cap)
-        debugBelch("cap %d: waking up thread %ld on cap %d\n", 
-                   cap->no, tso->id, (int)other);
+        debugBelch("cap %d: waking up thread %lu on cap %d\n", 
+                   cap->no, (lnat)tso->id, (int)other);
         break;
         
     case EVENT_STOP_THREAD:     // (cap, thread, status)
-        debugBelch("cap %d: thread %ld stopped (%s)\n", 
-                   cap->no, tso->id, thread_stop_reasons[other]);
+        debugBelch("cap %d: thread %lu stopped (%s)\n", 
+                   cap->no, (lnat)tso->id, thread_stop_reasons[other]);
         break;
     case EVENT_SHUTDOWN:        // (cap)
         debugBelch("cap %d: shutting down\n", cap->no);
@@ -163,7 +164,8 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         debugBelch("cap %d: finished GC\n", cap->no);
         break;
     default:
-        debugBelch("cap %2d: thread %ld: event %d\n\n", cap->no, tso->id, tag);
+        debugBelch("cap %2d: thread %lu: event %d\n\n", 
+                   cap->no, (lnat)tso->id, tag);
         break;
     }
 
