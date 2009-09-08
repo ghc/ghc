@@ -3,12 +3,8 @@ module HaddockUtils where
 
 import HsSyn
 import SrcLoc
-import RdrName
-
-import FastString
 
 import Control.Monad
-import Data.Char
 
 -- -----------------------------------------------------------------------------
 -- Adding documentation to record fields (used in parsing).
