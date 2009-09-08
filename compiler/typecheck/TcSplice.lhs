@@ -119,7 +119,7 @@ setInteractiveContext :: HscEnv -> InteractiveContext -> TcRn a -> TcRn a
 setInteractiveContext hsc_env icxt thing_inside 
   = let -- Initialise the tcg_inst_env with instances from all home modules.  
         -- This mimics the more selective call to hptInstances in tcRnModule.
-	(home_insts, home_fam_insts) = hptInstances hsc_env (\mod -> True)
+	(home_insts, home_fam_insts) = hptInstances hsc_env (\_mod -> True)
     in
     updGblEnv (\env -> env { 
 	tcg_rdr_env      = ic_rn_gbl_env icxt,
