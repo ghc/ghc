@@ -644,6 +644,53 @@ checkBootDecl (AnId id1) (AnId id2)
     (idType id1 `tcEqType` idType id2)
 
 checkBootDecl (ATyCon tc1) (ATyCon tc2)
+  = checkBootTyCon tc1 tc2
+
+checkBootDecl (AClass c1)  (AClass c2)
+  = let 
+       (clas_tyvars1, clas_fds1, sc_theta1, _, ats1, op_stuff1) 
+          = classExtraBigSig c1
+       (clas_tyvars2, clas_fds2, sc_theta2, _, ats2, op_stuff2) 
+          = classExtraBigSig c2
+
+       env0 = mkRnEnv2 emptyInScopeSet
+       env = rnBndrs2 env0 clas_tyvars1 clas_tyvars2
+
+       eqSig (id1, def_meth1) (id2, def_meth2)
+         = idName id1 == idName id2 &&
+           tcEqTypeX env op_ty1 op_ty2
+         where
+	  (_, rho_ty1) = splitForAllTys (idType id1)
+	  op_ty1 = funResultTy rho_ty1
+	  (_, rho_ty2) = splitForAllTys (idType id2)
+          op_ty2 = funResultTy rho_ty2
+
+       eqFD (as1,bs1) (as2,bs2) = 
+         eqListBy (tcEqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
+         eqListBy (tcEqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
+
+       same_kind tv1 tv2 = eqKind (tyVarKind tv1) (tyVarKind tv2)
+    in
+       eqListBy same_kind clas_tyvars1 clas_tyvars2 &&
+       	     -- Checks kind of class
+       eqListBy eqFD clas_fds1 clas_fds2 &&
+       (null sc_theta1 && null op_stuff1 && null ats1
+        ||   -- Above tests for an "abstract" class
+        eqListBy (tcEqPredX env) sc_theta1 sc_theta2 &&
+        eqListBy eqSig op_stuff1 op_stuff2 &&
+        eqListBy checkBootTyCon ats1 ats2)
+
+checkBootDecl (ADataCon dc1) (ADataCon dc2)
+  = pprPanic "checkBootDecl" (ppr dc1)
+
+checkBootDecl _ _ = False -- probably shouldn't happen
+
+----------------
+checkBootTyCon :: TyCon -> TyCon -> Bool
+checkBootTyCon tc1 tc2
+  | not (eqKind (tyConKind tc1) (tyConKind tc2))
+  = False	-- First off, check the kind
+
   | isSynTyCon tc1 && isSynTyCon tc2
   = ASSERT(tc1 == tc2)
     let tvs1 = tyConTyVars tc1; tvs2 = tyConTyVars tc2
@@ -659,11 +706,13 @@ checkBootDecl (ATyCon tc1) (ATyCon tc2)
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   = ASSERT(tc1 == tc2)
-    eqListBy tcEqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2)
-    && eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
+    eqKind (tyConKind tc1) (tyConKind tc2) &&
+    eqListBy tcEqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
+    eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
   | isForeignTyCon tc1 && isForeignTyCon tc2
-  = tyConExtName tc1 == tyConExtName tc2
+  = eqKind (tyConKind tc1) (tyConKind tc2) &&
+    tyConExtName tc1 == tyConExtName tc2
   where 
         env0 = mkRnEnv2 emptyInScopeSet
 
@@ -691,41 +740,6 @@ checkBootDecl (ATyCon tc1) (ATyCon tc2)
               eqListBy (tcEqTypeX env)
                         (dataConOrigArgTys c1)
                         (dataConOrigArgTys c2)
-
-checkBootDecl (AClass c1)  (AClass c2)
-  = let 
-       (clas_tyvars1, clas_fds1, sc_theta1, _, _, op_stuff1) 
-          = classExtraBigSig c1
-       (clas_tyvars2, clas_fds2, sc_theta2, _, _, op_stuff2) 
-          = classExtraBigSig c2
-
-       env0 = mkRnEnv2 emptyInScopeSet
-       env = rnBndrs2 env0 clas_tyvars1 clas_tyvars2
-
-       eqSig (id1, def_meth1) (id2, def_meth2)
-         = idName id1 == idName id2 &&
-           tcEqTypeX env op_ty1 op_ty2
-         where
-	  (_, rho_ty1) = splitForAllTys (idType id1)
-	  op_ty1 = funResultTy rho_ty1
-	  (_, rho_ty2) = splitForAllTys (idType id2)
-          op_ty2 = funResultTy rho_ty2
-
-       eqFD (as1,bs1) (as2,bs2) = 
-         eqListBy (tcEqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
-         eqListBy (tcEqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
-    in
-       equalLength clas_tyvars1 clas_tyvars2 &&
-       eqListBy eqFD clas_fds1 clas_fds2 &&
-       (null sc_theta1 && null op_stuff1
-        ||
-        eqListBy (tcEqPredX env) sc_theta1 sc_theta2 &&
-        eqListBy eqSig op_stuff1 op_stuff2)
-
-checkBootDecl (ADataCon dc1) (ADataCon dc2)
-  = pprPanic "checkBootDecl" (ppr dc1)
-
-checkBootDecl _ _ = False -- probably shouldn't happen
 
 ----------------
 missingBootThing thing what
