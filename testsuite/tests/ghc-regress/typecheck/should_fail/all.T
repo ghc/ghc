@@ -217,3 +217,5 @@ test('T2806', normal, compile_fail, [''])
 test('T3323', normal, compile_fail, [''])
 test('T3406', normal, compile_fail, [''])
 
+test('T3468', extra_clean(['T3468.hi-boot']), 
+     multimod_compile_fail, ['T3468', '-v0'])
