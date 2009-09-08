@@ -978,7 +978,7 @@ publish-sdist :
 	$(call nTimes,10,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
 endif
 
-ifeq "$(BootingFromUnregisterisedHc)" "YES"
+ifeq "$(BootingFromHc)" "YES"
 SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 endif
 

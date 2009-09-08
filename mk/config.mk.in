@@ -35,11 +35,8 @@ include $(TOP)/mk/install.mk
 ################################################################################
 
 # BootingFromHc - build GHC and the libraries from .hc files?
+# (unregisterised only)
 BootingFromHc = @BootingFromHc@
-
-# BootingFromUnregisterisedHc - treat .hc files as containing unregisterised
-# rather than registerised code, i.e., disable the mangler?
-BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 
 NO_INCLUDE_DEPS = NO
 NO_INCLUDE_PKGDATA = NO

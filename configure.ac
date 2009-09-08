@@ -105,29 +105,6 @@ AC_ARG_ENABLE(hc-boot,
 )
 AC_SUBST(BootingFromHc)
 
-dnl ** Booting from unregisterised .hc files?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(hc-boot-unregisterised,
-[AC_HELP_STRING([--enable-hc-boot-unregisterised],
-[ With --enable-hc-boot, treat the intermediate .hc files as
- unregisterised rather than registerised code.
- (This option is mostly of interest to porters.) [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        BootingFromUnregisterisedHc=YES
-  else
-        BootingFromUnregisterisedHc=NO
-  fi
-],
-[BootingFromUnregisterisedHc=NO]
-)
-AC_SUBST(BootingFromUnregisterisedHc)
-
-if test "$BootingFromHc" = "NO"; then
-if test "$BootingFromUnregisterisedHc" = "YES"; then
-AC_MSG_ERROR([--enable-hc-boot-unregisterised requires --enable-hc-boot.])
-fi;
-fi;
-
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
                 [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
