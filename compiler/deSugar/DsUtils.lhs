@@ -674,22 +674,35 @@ Now @fail.33@ is a function, so it can be let-bound.
 \begin{code}
 mkFailurePair :: CoreExpr	-- Result type of the whole case expression
 	      -> DsM (CoreBind,	-- Binds the newly-created fail variable
-				-- to either the expression or \ _ -> expression
-		      CoreExpr)	-- Either the fail variable, or fail variable
-				-- applied to unit tuple
+				-- to \ _ -> expression
+		      CoreExpr)	-- Fail variable applied to realWorld#
+-- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  | isUnLiftedType ty = do
-     fail_fun_var <- newFailLocalDs (unitTy `mkFunTy` ty)
-     fail_fun_arg <- newSysLocalDs unitTy
-     return (NonRec fail_fun_var (Lam fail_fun_arg expr),
-             App (Var fail_fun_var) (Var unitDataConId))
-
-  | otherwise = do
-     fail_var <- newFailLocalDs ty
-     return (NonRec fail_var expr, Var fail_var)
+  = do { fail_fun_var <- newFailLocalDs (realWorldStatePrimTy `mkFunTy` ty)
+       ; fail_fun_arg <- newSysLocalDs realWorldStatePrimTy
+       ; return (NonRec fail_fun_var (Lam fail_fun_arg expr),
+                 App (Var fail_fun_var) (Var realWorldPrimId)) }
   where
     ty = exprType expr
 \end{code}
+
+Note [Failure thunks and CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we make a failure point we ensure that it
+does not look like a thunk. Example:
+
+   let fail = \rw -> error "urk"
+   in case x of 
+        [] -> fail realWorld#
+        (y:ys) -> case ys of
+                    [] -> fail realWorld#  
+                    (z:zs) -> (y,z)
+
+Reason: we know that a failure point is always a "join point" and is
+entered at most once.  Adding a dummy 'realWorld' token argument makes
+it clear that sharing is not an issue.  And that in turn makes it more
+CPR-friendly.  This matters a lot: if you don't get it right, you lose
+the tail call property.  For example, see Trac #3403.
 
 \begin{code}
 mkOptTickBox :: Maybe (Int,[Id]) -> CoreExpr -> DsM CoreExpr
