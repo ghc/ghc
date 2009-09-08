@@ -703,8 +703,7 @@ loop:
 	goto loop;
       }
 
-      /* To evacuate a small TSO, we need to relocate the update frame
-       * list it contains.  
+      /* To evacuate a small TSO, we need to adjust the stack pointer
        */
       {
 	  StgTSO *new_tso;
