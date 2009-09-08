@@ -1592,6 +1592,7 @@ showPackages = do
   where showFlag (ExposePackage p) = text $ "  -package " ++ p
         showFlag (HidePackage p)   = text $ "  -hide-package " ++ p
         showFlag (IgnorePackage p) = text $ "  -ignore-package " ++ p
+        showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
 
 showLanguages :: GHCi ()
 showLanguages = do

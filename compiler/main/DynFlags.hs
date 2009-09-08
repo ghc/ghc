@@ -77,7 +77,6 @@ import Config
 import CmdLineParser
 import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic
-import UniqFM           ( UniqFM )
 import Util
 import Maybes           ( orElse )
 import SrcLoc
@@ -450,7 +449,7 @@ data DynFlags = DynFlags {
   -- Package state
   -- NB. do not modify this field, it is calculated by
   -- Packages.initPackages and Packages.updatePackages.
-  pkgDatabase           :: Maybe (UniqFM PackageConfig),
+  pkgDatabase           :: Maybe [PackageConfig],
   pkgState              :: PackageState,
 
   -- Temporary files
@@ -546,6 +545,7 @@ doingTickyProfiling dflags = WayTicky `elem` wayNames dflags
 
 data PackageFlag
   = ExposePackage  String
+  | ExposePackageId String
   | HidePackage    String
   | IgnorePackage  String
   deriving Eq
@@ -1622,6 +1622,7 @@ package_flags = [
   , Flag "no-user-package-conf" (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
          Supported
   , Flag "package-name"   (HasArg (upd . setPackageName)) Supported
+  , Flag "package-id"     (HasArg exposePackageId) Supported
   , Flag "package"        (HasArg exposePackage) Supported
   , Flag "hide-package"   (HasArg hidePackage) Supported
   , Flag "hide-all-packages" (NoArg (setDynFlag Opt_HideAllPackages))
@@ -2049,9 +2050,11 @@ addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes 
 extraPkgConf_ :: FilePath -> DynP ()
 extraPkgConf_  p = upd (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
 
-exposePackage, hidePackage, ignorePackage :: String -> DynP ()
+exposePackage, exposePackageId, hidePackage, ignorePackage :: String -> DynP ()
 exposePackage p =
   upd (\s -> s{ packageFlags = ExposePackage p : packageFlags s })
+exposePackageId p =
+  upd (\s -> s{ packageFlags = ExposePackageId p : packageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
