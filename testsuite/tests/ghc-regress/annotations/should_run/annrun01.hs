@@ -12,6 +12,8 @@ import Config
 import Annrun01_Help
 
 import qualified Language.Haskell.TH as TH
+import Data.List
+import Data.Function
 
 main = defaultErrorHandler defaultDynFlags $ runGhc (Just cTop) $ do
     liftIO $ putStrLn "Initializing Package Database"
@@ -34,7 +36,7 @@ main = defaultErrorHandler defaultDynFlags $ runGhc (Just cTop) $ do
     liftIO $ putStrLn "Showing Details For Module"
     showTargetAnns (ModuleTarget mod)
     liftIO $ putStrLn "Showing Details For Exports"
-    mapM (showTargetAnns . NamedTarget) $ modInfoExports mod_info
+    mapM (showTargetAnns . NamedTarget) $ sortBy (compare `on` getOccName) $ modInfoExports mod_info
 
 showTargetAnns :: CoreAnnTarget -> Ghc ()
 showTargetAnns target = do
