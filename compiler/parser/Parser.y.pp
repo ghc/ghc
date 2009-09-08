@@ -611,10 +611,10 @@ ty_decl :: { LTyClDecl RdrName }
 
           -- ordinary GADT declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
-		 'where' gadt_constrlist
+		 gadt_constrlist
 		 deriving
 		{% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) False $2 
-                            (unLoc $3) (reverse (unLoc $5)) (unLoc $6) }
+                            (unLoc $3) (unLoc $4) (unLoc $5) }
 			           -- We need the location on tycl_hdr in case 
 				   -- constrs and deriving are both empty
 
@@ -629,10 +629,10 @@ ty_decl :: { LTyClDecl RdrName }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
-		 'where' gadt_constrlist
+	         gadt_constrlist
 		 deriving
-		{% mkTyData (comb4 $1 $3 $6 $7) (unLoc $1) True $3
-			    (unLoc $4) (reverse (unLoc $6)) (unLoc $7) }
+		{% mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
+			    (unLoc $4) (unLoc $5) (unLoc $6) }
 
 -- Associated type family declarations
 --
@@ -676,10 +676,10 @@ at_decl_inst :: { LTyClDecl RdrName }
 
         -- GADT instance declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
-		 'where' gadt_constrlist
+		 gadt_constrlist
 		 deriving
-		{% mkTyData (comb4 $1 $2 $5 $6) (unLoc $1) True $2 
-		   	    (unLoc $3) (reverse (unLoc $5)) (unLoc $6) }
+		{% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) True $2 
+		   	    (unLoc $3) (unLoc $4) (unLoc $5) }
 
 data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
@@ -1079,14 +1079,15 @@ akind	:: { Located Kind }
 -----------------------------------------------------------------------------
 -- Datatype declarations
 
-gadt_constrlist :: { Located [LConDecl RdrName] }
-	: '{'            gadt_constrs '}'	{ LL (unLoc $2) }
-	|     vocurly    gadt_constrs close	{ $2 }
+gadt_constrlist :: { Located [LConDecl RdrName] }	-- Returned in order
+	: 'where' '{'        gadt_constrs '}'      { L (comb2 $1 $3) (unLoc $3) }
+	| 'where' vocurly    gadt_constrs close	   { L (comb2 $1 $3) (unLoc $3) }
+	| {- empty -}                              { noLoc [] }
 
 gadt_constrs :: { Located [LConDecl RdrName] }
-        : gadt_constrs ';' gadt_constr  { sL (comb2 $1 (head $3)) ($3 ++ unLoc $1) }
-        | gadt_constrs ';' 		{ $1 }
-        | gadt_constr                   { sL (getLoc (head $1)) $1 } 
+        : gadt_constr ';' gadt_constrs  { L (comb2 (head $1) $3) ($1 ++ unLoc $3) }
+        | gadt_constr                   { L (getLoc (head $1)) $1 }
+        | {- empty -}	 		{ noLoc [] }
 
 -- We allow the following forms:
 --	C :: Eq a => a -> T a
@@ -1094,7 +1095,7 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 --	D { x,y :: a } :: T a
 --	forall a. Eq a => D { x,y :: a } :: T a
 
-gadt_constr :: { [LConDecl RdrName] }
+gadt_constr :: { [LConDecl RdrName] }	-- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
                 { map (sL (comb2 $1 $3)) (mkGadtDecl (unLoc $1) $3) } 
 
@@ -1104,8 +1105,7 @@ gadt_constr :: { [LConDecl RdrName] }
                       ; return [cd] } }
 
 constrs :: { Located [LConDecl RdrName] }
-        : {- empty; a GHC extension -}  { noLoc [] }
-        | maybe_docnext '=' constrs1    { L (comb2 $2 $3) (addConDocs (unLoc $3) $1) }
+        : maybe_docnext '=' constrs1    { L (comb2 $2 $3) (addConDocs (unLoc $3) $1) }
 
 constrs1 :: { Located [LConDecl RdrName] }
 	: constrs1 maybe_docnext '|' maybe_docprev constr { LL (addConDoc $5 $2 : addConDocFirst (unLoc $1) $4) }
