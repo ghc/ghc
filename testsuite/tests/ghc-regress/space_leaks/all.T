@@ -43,9 +43,9 @@ test('T1969',
                                    # expected value: 6707308 (x86/OS X)
                                    #                 6694144 (x86/Windows)
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 12000000,
-                                                     15000000)),
-                                   # expected value: 12918232 (amd64/Linux)
+          compiler_stats_num_field('max_bytes_used', 11000000,
+                                                     14000000)),
+                                   # expected value: 11404664 (amd64/Linux)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
                                                       250000000)),
