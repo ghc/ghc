@@ -298,7 +298,9 @@ test('T2799', normal, compile, [''])
 test('T3219', normal, compile, [''])
 test('T3342', normal, compile, [''])
 test('T3346', normal, compile, [''])
-test('T3391', normal, compile, [''])
+# This is a TH test, which would require extra magic to make it work with
+# profiling (see th/all.T).
+test('T3391', omit_ways(['profc','profasm']), compile, [''])
 test('T3409', normal, compile, [''])
 
 test('T2412',
