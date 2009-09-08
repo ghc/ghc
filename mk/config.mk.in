@@ -542,12 +542,13 @@ else
 endif
 endif
 
-# default C compiler and linker flags
-SRC_CC_OPTS = @SRC_CC_OPTS@
-SRC_LD_OPTS = @SRC_LD_OPTS@
+# C compiler and linker flags from configure (e.g. -m<blah> to select
+# correct C compiler backend).
+CONF_CC_OPTS = @CONF_CC_OPTS@
+CONF_LD_OPTS = @CONF_LD_OPTS@
 
 ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
-SRC_CC_OPTS += -G0
+CONF_CC_OPTS += -G0
 endif
 
 SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))

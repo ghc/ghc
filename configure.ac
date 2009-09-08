@@ -255,15 +255,15 @@ i386-apple-darwin|powerpc-apple-darwin)
     soext='.dylib'
     CFLAGS="$CFLAGS -m32"
     LDFLAGS="$LDFLAGS -m32"
-    SRC_CC_OPTS="$SRC_CC_OPTS -m32"
-    SRC_LD_OPTS="$SRC_LD_OPTS -m32"
+    CONF_CC_OPTS="$CONF_CC_OPTS -m32"
+    CONF_LD_OPTS="$CONF_LD_OPTS -m32"
     ;;
 x86_64-apple-darwin)
     soext='.dylib'
     CFLAGS="$CFLAGS -m64"
     LDFLAGS="$LDFLAGS -m64"
-    SRC_CC_OPTS="$SRC_CC_OPTS -m64"
-    SRC_LD_OPTS="$SRC_LD_OPTS -m64"
+    CONF_CC_OPTS="$CONF_CC_OPTS -m64"
+    CONF_LD_OPTS="$CONF_LD_OPTS -m64"
     ;;
 esac
 
@@ -525,8 +525,8 @@ FP_GCC_EXTRA_FLAGS
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
 
-AC_SUBST(SRC_CC_OPTS)
-AC_SUBST(SRC_LD_OPTS)
+AC_SUBST(CONF_CC_OPTS)
+AC_SUBST(CONF_LD_OPTS)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

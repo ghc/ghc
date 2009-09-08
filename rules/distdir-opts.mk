@@ -32,7 +32,8 @@ else
 $1_$2_DEP_INCLUDE_DIRS_FLAG = -I
 endif
 
-$1_$2_BUILD_CC_OPTS = \
+$1_$2_DIST_CC_OPTS = \
+ $$(CONF_CC_OPTS) \
  $$(SRC_CC_OPTS) \
  $$($1_CC_OPTS) \
  $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
@@ -42,7 +43,8 @@ $1_$2_BUILD_CC_OPTS = \
  $$(foreach dir,$$($1_$2_DEP_INCLUDE_DIRS),$$($1_$2_DEP_INCLUDE_DIRS_FLAG)$$(dir)) \
  $$($1_$2_DEP_CC_OPTS)
 
-$1_$2_BUILD_LD_OPTS = \
+$1_$2_DIST_LD_OPTS = \
+ $$(CONF_LD_OPTS) \
  $$(SRC_LD_OPTS) \
  $$($1_LD_OPTS) \
  $$($1_$2_LD_OPTS) \
@@ -51,7 +53,8 @@ $1_$2_BUILD_LD_OPTS = \
  $$($1_$2_DEP_LD_OPTS)
 
 # c.f. Cabal's Distribution.Simple.GHC.ghcOptions
-$1_$2_BUILD_HC_OPTS = \
+$1_$2_DIST_HC_OPTS = \
+ $$(CONF_HC_OPTS) \
  $$(SRC_HC_OPTS) \
  $$($1_HC_OPTS) \
  $$($1_$2_HC_PKGCONF) \
