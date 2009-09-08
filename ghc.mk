@@ -34,7 +34,6 @@
 # Tickets we can now close, or fix and close:
 #
 #   * 1693 make distclean
-#   * 3173 make install with DESTDIR
 
 # Possible cleanups:
 #
