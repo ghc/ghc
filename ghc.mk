@@ -184,7 +184,6 @@ $(foreach way,$(ALL_WAYS),\
 # -----------------------------------------------------------------------------
 # Compilation Flags
 
-include rules/distdir-opts.mk
 include rules/distdir-way-opts.mk
 
 # -----------------------------------------------------------------------------

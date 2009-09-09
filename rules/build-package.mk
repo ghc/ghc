@@ -135,8 +135,6 @@ $1_$2_SplitObjs = NO
 endif
 endif
 
-$(call distdir-opts,$1,$2,$3)
-
 # C and S files are possibly built the "dyn" way.
 ifeq "$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)

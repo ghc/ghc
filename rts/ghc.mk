@@ -23,9 +23,6 @@ ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf)
 	       rts/dist/build/libHSrtsmain.a
 all_rts : $(ALL_RTS_LIBS)
 
-# The per-dir options
-$(eval $(call distdir-opts,rts,dist))
-
 # -----------------------------------------------------------------------------
 # Defining the sources
 

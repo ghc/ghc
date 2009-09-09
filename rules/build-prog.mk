@@ -83,8 +83,6 @@ $(call build-dependencies,$1,$2)
 
 # --- IMPLICIT RULES
 
-$(call distdir-opts,$1,$2,$3)
-
 # Just the 'v' way for programs
 $(call distdir-way-opts,$1,$2,v)
 
