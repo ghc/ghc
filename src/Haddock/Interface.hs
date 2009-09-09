@@ -108,37 +108,6 @@ createInterfaces' verbosity modules flags instIfaceMap = do
     ) ([], Map.empty) orderedMods
   return (reverse ifaces)
 
-{-    liftIO $ do
-     putStrLn . ppModInfo $ ifaceInfo interface
-     putStrLn . show $ fmap pretty (ifaceDoc interface)
-     print (ifaceOptions interface)
-     mapM (putStrLn . pretty . fst) (Map.elems . ifaceDeclMap $ interface)
-     mapM (putStrLn . show . fmap pretty . snd) (Map.elems . ifaceDeclMap $ interface)
-     mapM (putStrLn . ppExportItem) (ifaceExportItems interface)
-     mapM (putStrLn . pretty) (ifaceLocals interface)
-     mapM (putStrLn . pretty) (ifaceExports interface)
-     mapM (putStrLn . pretty) (ifaceVisibleExports interface)
-     mapM (putStrLn . pretty) (ifaceInstances interface)
-     mapM (\(a,b) -> putStrLn $ pretty a ++ pretty b)  (Map.toList $ ifaceSubMap interface)
-     mapM (putStrLn . pretty) (ifaceInstances interface)-}
-
-{-
-
-ppInsts = concatMap ppInst 
-
-ppInst (a,b,c) = concatMap pretty a ++ pretty b ++ concatMap pretty c 
-
-
-ppExportItem (ExportDecl decl (Just doc) insts) = pretty decl ++ pretty doc ++ ppInsts insts
-ppExportItem (ExportDecl decl Nothing insts) = pretty decl ++ ppInsts insts
-ppExportItem (ExportNoDecl name name2 names) = pretty name ++ pretty name2 ++ pretty names
-ppExportItem (ExportGroup level id doc) = show level ++ show id ++ pretty doc
-ppExportItem (ExportDoc doc) = pretty doc
-ppExportItem (ExportModule mod) = pretty mod
-
-
-ppModInfo (HaddockModInfo a b c d) = show (fmap pretty a) ++ show b ++ show c ++ show d 
--}
 
 processModule :: Verbosity -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc (Maybe Interface)
 processModule verbosity modsum flags modMap instIfaceMap = do
