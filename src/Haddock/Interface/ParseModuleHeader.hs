@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.ParseModuleHeader
--- Copyright   :  (c) David Waern, Isaac Dupree 2009,
+-- Copyright   :  (c) Simon Marlow 2006, Isaac Dupree 2009
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
