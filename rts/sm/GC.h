@@ -14,7 +14,7 @@
 #ifndef SM_GC_H
 #define SM_GC_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap);
 
@@ -58,6 +58,6 @@ void releaseGCThreads (Capability *cap);
 
 #define WORK_UNIT_WORDS 128
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* SM_GC_H */

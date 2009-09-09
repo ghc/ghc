@@ -13,7 +13,7 @@
 # include <signal.h>
 #endif
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 rtsBool anyUserHandlers(void);
 
@@ -26,7 +26,7 @@ void startSignalHandlers(Capability *cap);
 
 extern StgInt *signal_handlers;
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* POSIX_SIGNALS_H */
 

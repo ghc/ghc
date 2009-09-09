@@ -14,7 +14,7 @@
 #ifndef SM_COMPACT_H
 #define SM_COMPACT_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 INLINE_HEADER rtsBool
 mark_stack_empty(void)
@@ -78,6 +78,6 @@ is_marked(StgPtr p, bdescr *bd)
 
 void compact (StgClosure *static_objects);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* SM_COMPACT_H */

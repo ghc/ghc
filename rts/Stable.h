@@ -17,7 +17,7 @@
 
 #include "sm/GC.h" // for evac_fn below
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void    freeStablePtr         ( StgStablePtr sp );
 
@@ -33,6 +33,6 @@ void    updateStablePtrTable  ( rtsBool full );
 void    stablePtrPreGC        ( void );
 void    stablePtrPostGC       ( void );
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* STABLE_H */

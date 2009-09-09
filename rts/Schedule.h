@@ -14,7 +14,7 @@
 #include "Capability.h"
 #include "Trace.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /* initScheduler(), exitScheduler()
  * Called from STG :  no
@@ -241,7 +241,7 @@ emptyThreadQueues(Capability *cap)
 
 #endif /* !IN_STG_CODE */
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* SCHEDULE_H */
 

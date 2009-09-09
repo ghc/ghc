@@ -9,7 +9,7 @@
 #ifndef TICKER_H
 #define TICKER_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 typedef void (*TickProc)(int);
 
@@ -18,6 +18,6 @@ void startTicker (void);
 void stopTicker  (void);
 void exitTicker  (void);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* TICKER_H */

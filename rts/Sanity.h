@@ -11,7 +11,7 @@
 
 #ifdef DEBUG
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 # if defined(PAR)
 # define PVM_PE_MASK    0xfffc0000
@@ -36,7 +36,7 @@ void checkMutableLists ( rtsBool checkTSOs );
 
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* DEBUG */
  

@@ -25,7 +25,7 @@
 
 #if RTS_USER_SIGNALS
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /*
  * Function: initUserSignals()
@@ -60,7 +60,7 @@ void awaitUserSignals(void);
  */
 void markSignalHandlers (evac_fn evac, void *user);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* RTS_USER_SIGNALS */
 

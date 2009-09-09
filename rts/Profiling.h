@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void initProfiling1 (void);
 void freeProfiling1 (void);
@@ -37,6 +37,6 @@ void debugCCS( CostCentreStack *ccs );
 
 #endif
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* PROFILING_H */

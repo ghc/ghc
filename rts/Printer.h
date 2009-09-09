@@ -9,7 +9,7 @@
 #ifndef PRINTER_H
 #define PRINTER_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 extern void   	   printPtr        ( StgPtr p );
 extern void   	   printObj        ( StgClosure *obj );
@@ -34,7 +34,7 @@ extern const char *lookupGHCName( void *addr );
 extern char *what_next_strs[];
 #endif
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* PRINTER_H */
 

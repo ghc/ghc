@@ -12,7 +12,7 @@
 #include "rts/EventLogFormat.h"
 #include "Capability.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 #ifdef TRACING
 
@@ -56,6 +56,6 @@ INLINE_HEADER void postCapMsg (Capability *cap,
 
 #endif
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* TRACING_H */

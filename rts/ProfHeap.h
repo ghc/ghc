@@ -9,7 +9,7 @@
 #ifndef PROFHEAP_H
 #define PROFHEAP_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void    heapCensus         (void);
 nat     initHeapProfiling  (void);
@@ -17,6 +17,6 @@ void    endHeapProfiling   (void);
 void    LDV_recordDead     (StgClosure *c, nat size);
 rtsBool strMatchesSelector (char* str, char* sel);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* PROFHEAP_H */

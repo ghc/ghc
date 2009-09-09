@@ -14,7 +14,7 @@
 #ifndef SM_MARKWEAK_H
 #define SM_MARKWEAK_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 extern StgWeak *old_weak_ptr_list;
 extern StgTSO *resurrected_threads;
@@ -25,6 +25,6 @@ rtsBool traverseWeakPtrList    ( void );
 void    markWeakPtrList        ( void );
 rtsBool traverseBlackholeQueue ( void );
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* SM_MARKWEAK_H */

@@ -16,7 +16,7 @@
 
 #include "WSDeque.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /* -----------------------------------------------------------------------------
    General scheme
@@ -272,7 +272,7 @@ extern StgWord8 the_gc_thread[];
 
 #endif
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif // SM_GCTHREAD_H
 

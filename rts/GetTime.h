@@ -9,7 +9,7 @@
 #ifndef GETTIME_H
 #define GETTIME_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 // We'll use a fixed resolution of usec for now.  The machine
 // dependent implementation may have a different resolution, but we'll
@@ -25,6 +25,6 @@ void  getProcessTimes       (Ticks *user, Ticks *elapsed);
 // Not strictly timing, but related
 nat   getPageFaults         (void);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* GETTIME_H */

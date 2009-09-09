@@ -40,7 +40,7 @@
 #define STM_UNIPROC
 #endif
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /*----------------------------------------------------------------------
 
@@ -232,7 +232,7 @@ void stmWriteTVar(Capability *cap,
 
 /*----------------------------------------------------------------------*/
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* STM_H */
 

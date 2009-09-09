@@ -51,7 +51,19 @@ extern "C" {
 // Symbols that are extern, but private to the RTS, are declared
 // with visibility "hidden" to hide them outside the RTS shared
 // library.
+#if !defined(mingw32_HOST_OS)
 #define RTS_PRIVATE  GNUC3_ATTRIBUTE(visibility("hidden"))
+#else
+#define RTS_PRIVATE  /* disabled: RTS_PRIVATE */
+#endif
+
+#if __GNUC__ > 4
+#define BEGIN_RTS_PRIVATE #pragma GCC visibility push(hidden)
+#define END_RTS_PRIVATE   #pragma GCC visibility pop
+#else
+#define BEGIN_RTS_PRIVATE /* disabled: BEGIN_RTS_PRIVATE */
+#define END_RTS_PRIVATE   /* disabled: END_RTS_PRIVATE */
+#endif
 
 /* Fix for mingw stat problem (done here so it's early enough) */
 #ifdef mingw32_HOST_OS

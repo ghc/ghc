@@ -9,7 +9,7 @@
 #ifndef HASH_H
 #define HASH_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 typedef struct hashtable HashTable; /* abstract */
 
@@ -47,7 +47,7 @@ void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
 
 void exitHashTable ( void );
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* HASH_H */
 

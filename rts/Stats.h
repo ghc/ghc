@@ -11,7 +11,7 @@
 
 #include "GetTime.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void      stat_startInit(void);
 void      stat_endInit(void);
@@ -61,6 +61,6 @@ Ticks stat_getElapsedTime(void);
 void statsPrintf( char *s, ... ) 
     GNUC3_ATTRIBUTE(format (printf, 1, 2));
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* STATS_H */

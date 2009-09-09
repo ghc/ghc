@@ -14,7 +14,7 @@
 #ifndef SM_SCAV_H
 #define SM_SCAV_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void    scavenge_loop (void);
 void    scavenge_mutable_list (bdescr *bd, generation *gen);
@@ -26,7 +26,7 @@ void    scavenge_mutable_list1 (bdescr *bd, generation *gen);
 void    scavenge_capability_mut_Lists1 (Capability *cap);
 #endif
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* SM_SCAV_H */
 

@@ -22,7 +22,7 @@
 #include "Task.h"
 #include "Sparks.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 struct Capability_ {
     // State required by the STG virtual machine when running Haskell
@@ -332,6 +332,6 @@ contextSwitchCapability (Capability *cap)
     cap->context_switch = 1;
 }
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* CAPABILITY_H */

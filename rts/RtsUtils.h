@@ -9,7 +9,7 @@
 #ifndef RTSUTILS_H
 #define RTSUTILS_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /* -----------------------------------------------------------------------------
  * (Checked) dynamic allocation
@@ -48,6 +48,6 @@ int genericRaise(int sig);
 
 int rts_isProfiled(void);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* RTSUTILS_H */

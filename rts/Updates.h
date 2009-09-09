@@ -9,7 +9,9 @@
 #ifndef UPDATES_H
 #define UPDATES_H
 
-#pragma GCC visibility push(hidden)
+#ifndef CMINUSMINUS
+BEGIN_RTS_PRIVATE
+#endif
 
 /* -----------------------------------------------------------------------------
    Updates
@@ -228,6 +230,8 @@ no_slop:
   }
 #endif /* CMINUSMINUS */
 
-#pragma GCC visibility pop
+#ifndef CMINUSMINUS
+END_RTS_PRIVATE
+#endif
 
 #endif /* UPDATES_H */

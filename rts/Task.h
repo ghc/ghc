@@ -11,7 +11,7 @@
 
 #include "GetTime.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /* 
    Definition of a Task
@@ -261,6 +261,6 @@ taskEnter (Task *task)
     setMyTask(task);
 }
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* TASK_H */

@@ -9,7 +9,7 @@
 #ifndef PROFTIMER_H
 #define PROFTIMER_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void initProfTimer      ( void );
 void handleProfTick     ( void );
@@ -24,6 +24,6 @@ void startHeapProfTimer ( void );
 
 extern rtsBool performHeapProfile;
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* PROFTIMER_H */

@@ -9,7 +9,7 @@
 #ifndef FRONTPANEL_H
 #define FRONTPANEL_H
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 #ifdef RTS_GTK_FRONTPANEL
 
@@ -33,7 +33,7 @@ extern gboolean continue_now, stop_now, quit;
 
 #endif /* RTS_GTK_FRONTPANEL */
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* FRONTPANEL_H */
 

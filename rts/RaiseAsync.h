@@ -9,12 +9,13 @@
 #ifndef RAISEASYNC_H
 #define RAISEASYNC_H
 
-#pragma GCC visibility push(hidden)
-
 #define THROWTO_SUCCESS   0
 #define THROWTO_BLOCKED   1
 
 #ifndef CMINUSMINUS
+
+BEGIN_RTS_PRIVATE
+
 void throwToSingleThreaded (Capability *cap,
 			    StgTSO *tso,
 			    StgClosure *exception);
@@ -66,9 +67,9 @@ interruptible(StgTSO *t)
   }
 }
 
-#endif /* CMINUSMINUS */
+END_RTS_PRIVATE
 
-#pragma GCC visibility pop
+#endif /* CMINUSMINUS */
 
 #endif /* RAISEASYNC_H */
 

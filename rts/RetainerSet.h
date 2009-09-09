@@ -14,7 +14,7 @@
 
 #ifdef PROFILING
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 /*
   Type 'retainer' defines the retainer identity.
@@ -199,7 +199,7 @@ void outputAllRetainerSet(FILE *);
 //       the best place to define it.
 void printRetainer(FILE *, retainer);
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* PROFILING */
 #endif /* RETAINERSET_H */

@@ -14,7 +14,7 @@
 
 #include "RetainerSet.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
@@ -43,7 +43,7 @@ retainerSetOf( StgClosure *c )
 extern lnat retainerStackBlocks ( void );
 #endif
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* PROFILING */
 

@@ -12,7 +12,7 @@
 #include "rts/EventLogFormat.h"
 #include "Capability.h"
 
-#pragma GCC visibility push(hidden)
+BEGIN_RTS_PRIVATE
 
 // -----------------------------------------------------------------------------
 // Posting events
@@ -186,6 +186,6 @@ INLINE_HEADER void traceThreadStatus (StgWord32 class STG_UNUSED,
 
 #endif /* TRACING */
 
-#pragma GCC visibility pop
+END_RTS_PRIVATE
 
 #endif /* TRACE_H */
