@@ -18,4 +18,5 @@ test('unicode001', normal, compile_and_run, [''])
 
 test('1744', normal, compile_and_run, [''])
 test('1103', normal, compile, [''])
-test('2302', only_ways(['normal']), compile_fail, [''])
+test('2302', [ if_platform('i386-unknown-mingw32',expect_broken(3498)),
+               only_ways(['normal']) ], compile_fail, [''])
