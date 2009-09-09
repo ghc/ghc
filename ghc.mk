@@ -807,6 +807,10 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 # -----------------------------------------------------------------------------
 # Binary distributions
 
+ifneq "$(CLEANING)" "YES"
+# This rule seems to hold some files open on Windows which prevents
+# cleaning, perhaps due to the $(wildcard).
+
 $(eval $(call bindist,.,\
     LICENSE \
     configure config.sub config.guess install-sh \
@@ -839,6 +843,7 @@ $(eval $(call bindist,.,\
 	bindist.mk \
 	libraries/dph/LICENSE \
  ))
+endif
 # mk/project.mk gets an absolute path, so we manually include it in
 # the bindist with a relative path
 
@@ -990,20 +995,25 @@ CLEAN_FILES += utils/ghc-pwd/ghc-pwd.exe
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.hi
 CLEAN_FILES += utils/ghc-pwd/ghc-pwd.o
 CLEAN_FILES += libraries/bootstrapping.conf
-CLEAN_FILES += libraries/integer-gmp/gmp/gmp.h
-CLEAN_FILES += libraries/integer-gmp/gmp/libgmp.a
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
-clean : clean_files clean_libraries clean_gmp
+clean : clean_files clean_libraries
 
 .PHONY: clean_files
 clean_files :
 	"$(RM)" $(RM_OPTS) $(CLEAN_FILES)
 
+ifneq "$(NO_CLEAN_GMP)" "YES"
+CLEAN_FILES += libraries/integer-gmp/gmp/gmp.h
+CLEAN_FILES += libraries/integer-gmp/gmp/libgmp.a
+
+clean : clean_gmp
+.PHONY: clean_gmp
 clean_gmp:
 	"$(RM)" $(RM_OPTS) -r libraries/integer-gmp/gmp/objs
 	"$(RM)" $(RM_OPTS) -r libraries/integer-gmp/gmp/gmpbuild
+endif
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES) $(PACKAGES_STAGE2))
