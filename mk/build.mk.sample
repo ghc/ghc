@@ -40,6 +40,10 @@ GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2 -XGenerics
 GhcLibWays     += p
 
+ifeq "$(PlatformSupportsSharedLibs)" "YES"
+GhcLibWays += dyn
+endif
+
 endif
 
 # -------- A Fast build ------------------------------------------------------
