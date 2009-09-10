@@ -1066,6 +1066,11 @@ loop:
 void
 gcWorkerThread (Capability *cap)
 {
+    gc_thread *saved_gct;
+
+    // necessary if we stole a callee-saves register for gct:
+    saved_gct = gct;
+
     cap->in_gc = rtsTrue;
 
     gct = gc_threads[cap->no];
@@ -1105,6 +1110,8 @@ gcWorkerThread (Capability *cap)
                gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
+
+    SET_GCT(saved_gct);
 }
 
 #endif
