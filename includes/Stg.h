@@ -183,6 +183,7 @@ typedef StgWord		W_;
 typedef StgWord*	P_;
 typedef StgInt		I_;
 typedef StgWord StgWordArray[];
+typedef StgFunPtr       F_;
 
 #define EI_(X)          extern StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 #define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
