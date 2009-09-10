@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards, TypeSynonymInstances, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Distribution.InstalledPackageInfo.Binary
@@ -14,7 +15,7 @@ module Distribution.InstalledPackageInfo.Binary (
   ) where
 
 import Distribution.Version
-import Distribution.Package
+import Distribution.Package hiding (depends)
 import Distribution.License
 import Distribution.InstalledPackageInfo as IPI
 import Data.Binary as Bin
@@ -123,7 +124,7 @@ instance Binary License where
       5 -> return PublicDomain
       6 -> return AllRightsReserved
       7 -> return OtherLicense
-      8 -> do str <- get; return (UnknownLicense str)
+      _ -> do str <- get; return (UnknownLicense str)
 
 instance Binary Version where
   put v = do put (versionBranch v); put (versionTags v)
