@@ -1,3 +1,5 @@
 WARNING: there are broken packages.  Run 'ghc-pkg check' for more details.
 local1750.package.conf:
-    {1750A-1}, {1750B-1}
+    {1750A-1}
+    {1750B-1}
+

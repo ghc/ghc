@@ -159,9 +159,10 @@ GHC_PKG_COPY = $(GHC_PKG) --no-user-package-conf --global-conf=$(COPY_PACKAGE_CO
 INPLACE_DATA_DIR = $(TOP)/../inplace/lib
 
 ghcpkg02:
-	cp -r $(INPLACE_DATA_DIR)/package.conf $(COPY_PACKAGE_CONF)
+	rm -rf $(COPY_PACKAGE_CONF)
+	cp -r $(INPLACE_DATA_DIR)/package.conf.d $(COPY_PACKAGE_CONF)
 	set -e; \
-	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \
+	for i in `$(GHC_PKG_COPY) list --global --simple-output -v0`; do \
 		echo Updating $$i; \
 		$(GHC_PKG_COPY) describe --global $$i | $(GHC_PKG_COPY) update --global --force -; \
 	done
