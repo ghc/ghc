@@ -20,7 +20,7 @@ includes_H_PLATFORM = includes/ghcplatform.h
 #
 # All header files
 #
-includes_H_FILES = $(filter-out $(includes_H_CONFIG) $(includes_H_PLATFORM),$(wildcard includes/*.h))
+includes_H_FILES = $(filter-out $(includes_H_CONFIG) $(includes_H_PLATFORM),$(wildcard includes/*.h includes/*/*.h includes/*/*/*.h))
 
 #
 # Options
@@ -172,8 +172,6 @@ endif
 # ---------------------------------------------------------------------------
 # Install all header files
 
-INSTALL_HEADERS += $(includes_H_FILES) $(includes_H_CONFIG) $(includes_H_PLATFORM)
-
 $(eval $(call clean-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
   $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS)))
@@ -182,3 +180,16 @@ $(eval $(call all-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
   $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS)))
 
+includes_subdirs = $(sort $(subst includes/,,$(foreach d,$(includes_H_FILES),$(dir $(d)))))
+
+install: install_includes
+
+.PHONY: install_includes
+install_includes :
+	$(INSTALL_DIR) $(DESTDIR)$(ghcheaderdir)
+	for d in $(includes_subdirs); do \
+		$(INSTALL_DIR) $(DESTDIR)$(ghcheaderdir)/$$d; \
+	done
+	for i in $(subst includes/,,$(includes_H_FILES) $(includes_H_CONFIG) $(includes_H_PLATFORM)); do \
+		$(INSTALL_HEADER) $(INSTALL_OPTS) includes/$$i $(DESTDIR)$(ghcheaderdir)/$$i; \
+	done
