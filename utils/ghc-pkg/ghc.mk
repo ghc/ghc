@@ -46,11 +46,12 @@ endif
 endif
 
 # depend on ghc-cabal, otherwise we build Cabal twice when building in parallel
+# The binary package is not warning-clean, so we need a few -fno-warns here.
 utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs $(GHC_CABAL_INPLACE) $(MKDIRHIER)
 	"$(MKDIRHIER)" bootstrapping
 	"$(MKDIRHIER)" utils/ghc-pkg/dist/build
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
-	       -Wall \
+	       -Wall -fno-warn-unused-imports \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \

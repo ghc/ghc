@@ -661,7 +661,7 @@ $(ghc_stage1_depfile) : $(compiler_stage1_v_LIB)
 #
 # If you miss any out here, then 'make -j8' will probably tell you.
 #
-libraries/bin-package-db/dist-boot/build/Distribution/InstalledPackageInfo/Binary.$(v_osuf) : libraries/binary/dist-boot/build/Data/Binary.$(v_hisuf)
+libraries/bin-package-db/dist-boot/build/Distribution/InstalledPackageInfo/Binary.$(v_osuf) : libraries/binary/dist-boot/build/Data/Binary.$(v_hisuf) libraries/Cabal/dist-boot/build/Distribution/InstalledPackageInfo.$(v_hisuf)
 
 $(foreach pkg,$(BOOT_PKGS),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
 
