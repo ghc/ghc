@@ -174,7 +174,9 @@ data ClosureTypeInfo
   | ThunkInfo  ClosureLayout C_SRT
   | ThunkSelectorInfo SelectorOffset C_SRT
   | ContInfo
-      [Maybe LocalReg]  -- stack layout
+      [Maybe LocalReg]  -- Stack layout: Just x, an item x
+                        --               Nothing: a 1-word gap
+			-- Start of list is the *young* end
       C_SRT
 
 data CmmReturnInfo = CmmMayReturn

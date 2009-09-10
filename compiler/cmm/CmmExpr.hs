@@ -95,9 +95,25 @@ data Area
   deriving (Eq, Ord)
 
 data AreaId
-  = Old -- entry parameters, jumps, and returns share one call area at old end of stack
+  = Old            -- See Note [Old Area]
   | Young BlockId
   deriving (Eq, Ord)
+
+{- Note [Old Area] 
+~~~~~~~~~~~~~~~~~~
+There is a single call area 'Old', allocated at the extreme old
+end of the stack frame (ie just younger than the return address)
+which holds:
+  * incoming (overflow) parameters, 
+  * outgoing (overflow) parameter to tail calls,
+  * outgoing (overflow) result values 
+  * the update frame (if any)
+
+Its size is the max of all these requirements.  On entry, the stack
+pointer will point to the youngest incoming parameter, which is not
+necessarily at the young end of the Old area.
+
+End of note -}
 
 type SubArea    = (Area, Int, Int) -- area, offset, width
 type SubAreaSet = FiniteMap Area [SubArea]

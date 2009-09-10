@@ -85,18 +85,31 @@ data Last
         --      one  -> second block etc
         -- Undefined outside range, and when there's a Nothing
   | LastCall {                   -- A call (native or safe foreign)
-        cml_target  :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
-        cml_cont    :: Maybe BlockId,
+        cml_target :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
+
+        cml_cont :: Maybe BlockId,
             -- BlockId of continuation (Nothing for return or tail call)
-        cml_args    :: ByteOff,  -- byte offset for youngest outgoing arg
-                                 -- (includes update frame, which must be younger)
-        cml_ret_args:: ByteOff,  -- byte offset for youngest incoming arg
-        cml_ret_off :: Maybe UpdFrameOffset}
-          -- stack offset for return (update frames);
+
+        cml_args :: ByteOff, 
+ 	    -- Byte offset, from the *old* end of the Area associated with
+            -- the BlockId (if cml_cont = Nothing, then Old area), of
+            -- youngest outgoing arg.  Set the stack pointer to this before
+	    -- transferring control.
+  	    -- (NB: an update frame might also have been stored in the Old
+	    --      area, but it'll be in an older part than the args.)
+
+        cml_ret_args :: ByteOff,  
+	    -- For calls *only*, the byte offset for youngest returned value
+	    -- This is really needed at the *return* point rather than here
+	    -- at the call, but in practice it's convenient to record it here.
+
+        cml_ret_off :: Maybe UpdFrameOffset
+          -- Stack offset for return (update frames);
           -- The return offset should be Nothing only if we have to create
           -- a new call, e.g. for a procpoint, in which case it's an invariant
           -- that the call does not stand for a return or a tail call,
           -- and the successor does not need an info table.
+	}
 
 data MidCallTarget	-- The target of a MidUnsafeCall
   = ForeignTarget 	-- A foreign procedure
