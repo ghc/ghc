@@ -16,7 +16,6 @@ TcSplice: Template Haskell splices
 
 module TcSplice( kcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  lookupThName_maybe,
-todoSession, todoTcM,
                  runQuasiQuoteExpr, runQuasiQuotePat, runAnnotation ) where
 
 #include "HsVersions.h"
@@ -83,65 +82,6 @@ import GHC.Desugar      ( AnnotationWrapper(..) )
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
 import System.IO.Error
-
-
---here for every bad reason :-)
-import InstEnv
-import FamInstEnv
---Session
-todoSession :: HscEnv -> Name -> IO (Messages, Maybe (LHsDecl RdrName))
-todoSession hsc_env name
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext hsc_env (hsc_IC hsc_env) $
-    todoTcM name
-
-
-todoTcM :: Name -> TcM (LHsDecl RdrName)
-todoTcM name = do
-  tcTyThing <- TcEnv.tcLookup name
-  thInfo <- TcSplice.reifyThing tcTyThing
-  let Just thDec = thGetDecFromInfo thInfo --BUG!
-  let Right [hsdecl] = Convert.convertToHsDecls
-        (error "srcspan of different package?")
-        [thDec]
-  return hsdecl
-
-thGetDecFromInfo :: TH.Info -> Maybe TH.Dec
-thGetDecFromInfo (TH.ClassI dec) = Just dec
-thGetDecFromInfo (TH.ClassOpI {}) = error "classop"
-thGetDecFromInfo (TH.TyConI dec) = Just dec
-thGetDecFromInfo (TH.PrimTyConI {}) = Nothing --error "sometimes we can invent a signature? or it's better not to?"
-thGetDecFromInfo (TH.DataConI {}) = error "datacon"
-thGetDecFromInfo (TH.VarI _name _type (Just dec) _fixity) = Just dec
-thGetDecFromInfo (TH.VarI _name _type Nothing _fixity) = error "vari"
-thGetDecFromInfo (TH.TyVarI {}) = Nothing --tyvars don't have decls? they kinda have a type though...
-
-setInteractiveContext :: HscEnv -> InteractiveContext -> TcRn a -> TcRn a
-setInteractiveContext hsc_env icxt thing_inside 
-  = let -- Initialise the tcg_inst_env with instances from all home modules.  
-        -- This mimics the more selective call to hptInstances in tcRnModule.
-	(home_insts, home_fam_insts) = hptInstances hsc_env (\_mod -> True)
-    in
-    updGblEnv (\env -> env { 
-	tcg_rdr_env      = ic_rn_gbl_env icxt,
-	tcg_inst_env     = extendInstEnvList    (tcg_inst_env env) home_insts,
-	tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env env) 
-                                                home_fam_insts 
-      }) $
-
-    tcExtendGhciEnv (ic_tmp_ids icxt) $
-        -- tcExtendGhciEnv does lots: 
-        --   - it extends the local type env (tcl_env) with the given Ids,
-        --   - it extends the local rdr env (tcl_rdr) with the Names from 
-        --     the given Ids
-        --   - it adds the free tyvars of the Ids to the tcl_tyvars
-        --     set.
-        --
-        -- later ids in ic_tmp_ids must shadow earlier ones with the same
-        -- OccName, and tcExtendIdEnv implements this behaviour.
-
-    do	{ traceTc (text "setIC" <+> ppr (ic_tmp_ids icxt))
- 	; thing_inside }
 \end{code}
 
 Note [How top-level splices are handled]
