@@ -217,6 +217,9 @@ extern gc_thread **gc_threads;
 // we have too few registers available.  In my tests it was worth
 // about 5% in GC performance, but of course that might change as gcc
 // improves. -- SDM 2009/04/03
+//
+// We ought to do the same on MacOS X, but __thread is not
+// supported there yet (gcc 4.0.1).
 
 extern __thread gc_thread* gct;
 #define DECLARE_GCT __thread gc_thread* gct;
