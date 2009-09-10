@@ -27,6 +27,11 @@ test('TH_spliceE5',
 
 test('TH_spliceE6', normal, compile, ['-v0'])
 
+test('TH_NestedSplices',
+     extra_clean(['TH_NestedSplices_Lib.hi', 'TH_NestedSplices_Lib.o']),
+     multimod_compile,
+     ['TH_NestedSplices.hs', '-v0'])
+
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
 # profiling (-osuf p_o) because this is necessary when mixing

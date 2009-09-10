@@ -2,5 +2,5 @@
 [2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
 [2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
 
-T1914A.hs:1:42: parse error on input `}'
+T1914A.hs:1:37: Not in scope: `oops'
 [2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
