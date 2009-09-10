@@ -103,12 +103,15 @@ data Last
 	    -- This is really needed at the *return* point rather than here
 	    -- at the call, but in practice it's convenient to record it here.
 
-        cml_ret_off :: Maybe UpdFrameOffset
-          -- Stack offset for return (update frames);
-          -- The return offset should be Nothing only if we have to create
-          -- a new call, e.g. for a procpoint, in which case it's an invariant
-          -- that the call does not stand for a return or a tail call,
-          -- and the successor does not need an info table.
+        cml_ret_off :: Maybe ByteOff
+          -- For calls *only*, the byte offset of the base of the frame that
+	  -- must be described by the info table for the return point.  
+ 	  -- The older words are an update frames, which have their own
+	  -- info-table and layout information
+
+	  -- From a liveness point of view, the stack words older than
+	  -- cml_ret_off are treated as live, even if the sequel of
+	  -- the call goes into a loop.
 	}
 
 data MidCallTarget	-- The target of a MidUnsafeCall

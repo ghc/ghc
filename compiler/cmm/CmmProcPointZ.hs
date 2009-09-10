@@ -127,18 +127,21 @@ forward = ForwardTransfers first middle last exit
 -- those that are induced by calls in the original graph
 -- and those that are introduced because they're reachable from multiple proc points.
 callProcPoints      :: CmmGraph -> ProcPointSet
-minimalProcPointSet :: ProcPointSet -> CmmGraph -> FuelMonad ProcPointSet
-
 callProcPoints g = fold_blocks add (unitBlockSet (lg_entry g)) g
   where add b set = case last $ unzip b of
                       LastOther (LastCall _ (Just k) _ _ _) -> extendBlockSet set k
                       _ -> set
 
+minimalProcPointSet :: ProcPointSet -> CmmGraph -> FuelMonad ProcPointSet
+-- Given the set of successors of calls (which must be proc-points)
+-- figure ou the minimal set of necessary proc-points
 minimalProcPointSet callProcPoints g = extendPPSet g (postorder_dfs g) callProcPoints
 
 type PPFix = FuelMonad (ForwardFixedPoint Middle Last Status ())
 
 procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelMonad (BlockEnv Status)
+-- Once you know what the proc-points are, figure out
+-- what proc-points each block is reachable from
 procPointAnalysis procPoints g =
   let addPP env id = extendBlockEnv env id ProcPoint
       initProcPoints = foldl addPP emptyBlockEnv (blockSetToList procPoints)

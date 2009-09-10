@@ -84,9 +84,13 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
        dump Opt_D_dump_cmmz "Pre common block elimination" g
        g <- return $ elimCommonBlocks g
        dump Opt_D_dump_cmmz "Post common block elimination" g
+
+       ----------- Proc points -------------------
        procPoints <- run $ minimalProcPointSet callPPs g
        g <- run $ addProcPointProtocols callPPs procPoints g
        dump Opt_D_dump_cmmz "Post Proc Points Added" g
+
+       ----------- Spills and reloads -------------------
        g     <- 
               -- pprTrace "pre Spills" (ppr g) $
                 dual_rewrite Opt_D_dump_cmmz "spills and reloads"
@@ -101,10 +105,15 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
                 dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
                                         (removeDeadAssignmentsAndReloads procPoints) g
                     -- Remove redundant reloads (and any other redundant asst)
+
+       ----------- Debug only: add code to put zero in dead stack slots----
        -- Debugging: stubbing slots on death can cause crashes early
        g <-  
            -- trace "post dead-assign elim" $
             if opt_StubDeadValues then run $ stubSlotsOnDeath g else return g
+
+
+       --------------- Stack layout ----------------
        slotEnv <- run $ liveSlotAnal g
        mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
        cafEnv <- 
@@ -116,15 +125,21 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
        mbpprTrace "slotEnv extended for safe foreign calls: " (ppr slotEnv) $ return ()
        let areaMap = layout procPoints slotEnv entry_off g
        mbpprTrace "areaMap" (ppr areaMap) $ return ()
+
+       ------------  Manifest the the stack pointer --------
        g  <- run $ manifestSP areaMap entry_off g
        dump Opt_D_dump_cmmz "after manifestSP" g
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...
+
+       ------------- Split into separate procedures ------------
        procPointMap  <- run $ procPointAnalysis procPoints g
        dump Opt_D_dump_cmmz "procpoint map" procPointMap
        gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap
                                        (CmmProc h l args (stackInfo, g))
        mapM_ (dump Opt_D_dump_cmmz "after splitting") gs
+
+       ------------- More CAFs and foreign calls ------------
        let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
        gs <- liftM concat $ run $ foldM lowerSafeForeignCalls [] gs

@@ -67,6 +67,8 @@ slotLattice = DataflowLattice "live slots" emptyFM add False
           in (c || changed, addToFM map a live)
 
 type SlotEnv   = BlockEnv SubAreaSet
+  -- The sub-areas live on entry to the block
+
 type SlotFix a = FuelMonad (BackwardFixedPoint Middle Last SubAreaSet a)
 
 liveSlotAnal :: LGraph Middle Last -> FuelMonad SlotEnv
@@ -218,6 +220,8 @@ igraph builder env g = foldr interfere emptyFM (postorder_dfs g)
 -- what's the highest offset (in bytes) used in each Area?
 -- We'll need to allocate that much space for each Area.
 getAreaSize :: ByteOff -> LGraph Middle Last -> AreaMap
+  -- The domain of the returned mapping consists only of Areas
+  -- used for (a) variable spill slots, and (b) parameter passing ares for calls
 getAreaSize entry_off g@(LGraph _ _) =
   fold_blocks (fold_fwd_block first add_regslots last)
               (unitFM (CallArea Old) entry_off) g
@@ -234,6 +238,9 @@ getAreaSize entry_off g@(LGraph _ _) =
           add z a $ widthInBytes $ typeWidth ty
         addSlot z _ = z
         add z a off = addToFM z a (max off (lookupWithDefaultFM z 0 a))
+	-- The 'max' is important.  Two calls, to f and g, might share a common
+	-- continuation (and hence a common CallArea), but their number of overflow
+	-- parameters might differ.
 
 
 -- Find the Stack slots occupied by the subarea's conflicts
@@ -275,19 +282,30 @@ allocSlotFrom ig areaSize from areaMap area =
 -- | Greedy stack layout.
 -- Compute liveness, build the interference graph, and allocate slots for the areas.
 -- We visit each basic block in a (generally) forward order.
+
 -- At each instruction that names a register subarea r, we immediately allocate
 -- any available slot on the stack by the following procedure:
---  1. Find the nodes N' that conflict with r
---  2. Find the stack slots used for N'
---  3. Choose a contiguous stack space s not in N' (s must be large enough to hold r)
+--  1. Find the sub-areas S that conflict with r
+--  2. Find the stack slots used for S
+--  3. Choose a contiguous stack space s not in S (s must be large enough to hold r)
+
 -- For a CallArea, we allocate the stack space only when we reach a function
 -- call that returns to the CallArea's blockId.
--- We use a similar procedure, with one exception: the stack space
--- must be allocated below the youngest stack slot that is live out.
+-- Then, we allocate the Area subject to the following constraints:
+--   a) It must be younger than all the sub-areas that are live on entry to the block
+--         This constraint is only necessary for the successor of a call
+--   b) It must not overlap with any already-allocated Area with which it conflicts
+--   	   (ie at some point, not necessarily now, is live at the same time)
+--   Part (b) is just the 1,2,3 part above
 
 -- Note: The stack pointer only has to be younger than the youngest live stack slot
 -- at proc points. Otherwise, the stack pointer can point anywhere.
+
 layout :: ProcPointSet -> SlotEnv -> ByteOff -> LGraph Middle Last -> AreaMap
+-- The domain of the returned map includes an Area for EVERY block
+-- including each block that is not the successor of a call (ie is not a proc-point)
+-- That's how we return the info of what the SP should be at the entry of every block
+
 layout procPoints env entry_off g =
   let ig = (igraph areaBuilder env g, areaBuilder)
       env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
@@ -296,14 +314,21 @@ layout procPoints env entry_off g =
       live_in (ZTail m l) = liveInSlots m (live_in l)
       live_in (ZLast (LastOther l)) = liveLastIn l env'
       live_in (ZLast LastExit) = emptyFM 
-      -- Find the youngest live stack slot
+
+      -- Find the youngest live stack slot that has already been allocated
+      youngest_live :: AreaMap 	   -- Already allocated
+                    -> SubAreaSet  -- Sub-areas live here
+		    -> ByteOff     -- Offset of the youngest byte of any 
+		       		   --    already-allocated, live sub-area
       youngest_live areaMap live = fold_subareas young_slot live 0
         where young_slot (a, o, _) z = case lookupFM areaMap a of
                                          Just top -> max z $ top + o
                                          Nothing  -> z
               fold_subareas f m z = foldFM (\_ s z -> foldr f z s) z m
+
       -- Allocate space for spill slots and call areas
       allocVarSlot = allocSlotFrom ig areaSize 0
+
       -- Update the successor's incoming SP.
       setSuccSPs inSp bid areaMap =
         case (lookupFM areaMap area, lookupBlockEnv (lg_blocks g) bid) of
@@ -319,19 +344,23 @@ layout procPoints env entry_off g =
             else addToFM areaMap area inSp
           (_, Nothing) -> panic "Block not found in cfg"
         where area = CallArea (Young bid)
+
       allocLast (Block id _) areaMap l =
         fold_succs (setSuccSPs inSp) l areaMap
         where inSp = expectJust "sp in" $ lookupFM areaMap (CallArea (Young id))
+
       allocMidCall m@(MidForeignCall (Safe bid _) _ _ _) t areaMap =
         let young     = youngest_live areaMap $ removeLiveSlotDefs (live_in t) m
             area      = CallArea (Young bid)
             areaSize' = addToFM areaSize area (widthInBytes (typeWidth gcWord))
         in  allocSlotFrom ig areaSize' young areaMap area
       allocMidCall _ _ areaMap = areaMap
+
       alloc m t areaMap =
           foldSlotsDefd alloc' (foldSlotsUsed alloc' (allocMidCall m t areaMap) m) m
         where alloc' areaMap (a@(RegSlot _), _, _) = allocVarSlot areaMap a
               alloc' areaMap _ = areaMap
+
       layoutAreas areaMap b@(Block _ t) = layout areaMap t
         where layout areaMap (ZTail m t) = layout (alloc m t areaMap) t
               layout areaMap (ZLast l)   = allocLast b areaMap l

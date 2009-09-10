@@ -117,7 +117,10 @@ End of note -}
 
 type SubArea    = (Area, Int, Int) -- area, offset, width
 type SubAreaSet = FiniteMap Area [SubArea]
+
 type AreaMap    = FiniteMap Area Int
+     -- Byte offset of the oldest byte of the Area, 
+     -- relative to the oldest byte of the Old Area
 
 data CmmLit
   = CmmInt Integer  Width
