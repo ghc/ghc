@@ -74,11 +74,9 @@ packageConfigToInstalledPackageInfo
 
 -- | Turn an 'InstalledPackageInfo', which contains Cabal 'Distribution.ModuleName.ModuleName's
 -- into a GHC specific 'PackageConfig' which contains GHC 'Module.ModuleName's
-installedPackageInfoToPackageConfig :: InstalledPackageInfo -> PackageConfig
+installedPackageInfoToPackageConfig :: InstalledPackageInfo_ String -> PackageConfig
 installedPackageInfoToPackageConfig
     (pkgconf@(InstalledPackageInfo { exposedModules = e,
                                      hiddenModules = h })) =
-        pkgconf{ exposedModules = map convert e,
-                 hiddenModules  = map convert h }
-    where convert :: Distribution.ModuleName.ModuleName -> Module.ModuleName
-          convert = mkModuleName . display
+        pkgconf{ exposedModules = map mkModuleName e,
+                 hiddenModules  = map mkModuleName h }

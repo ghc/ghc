@@ -51,6 +51,7 @@ import Maybes
 
 import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
+import Distribution.InstalledPackageInfo.Binary
 import Distribution.Package hiding (PackageId,depends)
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
@@ -204,44 +205,40 @@ getSystemPackageConfigs dflags = do
 	-- System one always comes first
    let system_pkgconf = systemPackageConfig dflags
 
-	-- allow package.conf.d to contain a bunch of .conf files
-	-- containing package specifications.  This is an easier way
-	-- to maintain the package database on systems with a package
-	-- management system, or systems that don't want to run ghc-pkg
-	-- to register or unregister packages.  Undocumented feature for now.
-   let system_pkgconf_dir = system_pkgconf <.> "d"
-   system_pkgconf_dir_exists <- doesDirectoryExist system_pkgconf_dir
-   system_pkgconfs <-
-     if system_pkgconf_dir_exists
-       then do files <- getDirectoryContents system_pkgconf_dir
-               return [ system_pkgconf_dir </> file
-                      | file <- files
-                      , takeExtension file == ".conf" ]
-       else return []
-
 	-- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
 	-- unless the -no-user-package-conf flag was given.
-	-- We only do this when getAppUserDataDirectory is available 
-	-- (GHC >= 6.3).
    user_pkgconf <- do
+      if not (dopt Opt_ReadUserPackageConf dflags) then return [] else do
       appdir <- getAppUserDataDirectory "ghc"
       let 
-     	 pkgconf = appdir
-		   </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
-		   </> "package.conf"
-      flg <- doesFileExist pkgconf
-      if (flg && dopt Opt_ReadUserPackageConf dflags)
-	then return [pkgconf]
-	else return []
+     	 dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+         pkgconf = dir </> "package.conf.d"
+      --
+      exist <- doesDirectoryExist pkgconf
+      if exist then return [pkgconf] else return []
     `catchIO` (\_ -> return [])
 
-   return (user_pkgconf ++ system_pkgconfs ++ [system_pkgconf])
-
+   return (user_pkgconf ++ [system_pkgconf])
 
 readPackageConfig :: DynFlags -> FilePath -> IO [PackageConfig]
 readPackageConfig dflags conf_file = do
-  debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
-  proto_pkg_configs <- loadPackageConfig dflags conf_file
+  isdir <- doesDirectoryExist conf_file
+
+  proto_pkg_configs <- 
+    if isdir
+       then do let filename = conf_file </> "package.cache"
+               debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
+               conf <- readBinPackageDB filename
+               return (map installedPackageInfoToPackageConfig conf)
+
+       else do 
+            isfile <- doesFileExist conf_file
+            when (not isfile) $
+              ghcError $ InstallationError $ 
+                "can't find a package database at " ++ conf_file
+            debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
+            loadPackageConfig dflags conf_file
+
   let
       top_dir = topDir dflags
       pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs

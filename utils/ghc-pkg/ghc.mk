@@ -31,8 +31,8 @@ endif
 else
 
 $(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext) $(MKDIRHIER)
-	"$(MKDIRHIER)" $(dir $(INPLACE_PACKAGE_CONF))
-	echo "[]" > $(INPLACE_PACKAGE_CONF)
+	"$(MKDIRHIER)" $(INPLACE_PACKAGE_CONF)
+	"$(RM)" $(RM_OPTS) $(INPLACE_PACKAGE_CONF)/*
 ifeq "$(Windows)" "YES"
 	cp $< $@
 else
@@ -59,7 +59,10 @@ utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main
 	       -ilibraries/Cabal \
 	       -ilibraries/filepath \
 	       -ilibraries/extensible-exceptions \
-	       -ilibraries/hpc
+	       -ilibraries/hpc \
+	       -ilibraries/binary/src \
+	       -ilibraries/bin-package-db \
+
 
 utils/ghc-pkg/Version.hs: mk/project.mk
 	"$(RM)" $(RM_OPTS) $@
@@ -78,7 +81,7 @@ $(eval $(call clean-target,utils/ghc-pkg,dist,\
 
 utils/ghc-pkg_dist-install_PROG = ghc-pkg
 utils/ghc-pkg_dist-install_MODULES = Main Version
-utils/ghc-pkg_dist-install_DEPS = Cabal
+utils/ghc-pkg_dist-install_DEPS = Cabal terminfo bin-package-db
 utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)

@@ -155,7 +155,7 @@ doInstall ghc ghcpkg topdir directory distDir myDestDir myPrefix myLibdir myDocd
                               programArgs = ["-B" ++ topdir],
                               programLocation = UserSpecified ghc
                           }
-                ghcpkgconf = topdir </> "package.conf"
+                ghcpkgconf = topdir </> "package.conf.d"
                 ghcPkgProg = ConfiguredProgram {
                                  programId = programName ghcPkgProgram,
                                  programVersion = Nothing,

@@ -171,6 +171,8 @@ libraries/hpc_dist-boot_DO_HADDOCK = NO
 libraries/Cabal_dist-boot_DO_HADDOCK = NO
 libraries/extensible-exceptions_dist-boot_DO_HADDOCK = NO
 libraries/filepath_dist-boot_DO_HADDOCK = NO
+libraries/binary_dist-boot_DO_HADDOCK = NO
+libraries/bin-package-db_dist-boot_DO_HADDOCK = NO
 
 # -----------------------------------------------------------------------------
 # Ways
@@ -320,6 +322,8 @@ $(eval $(call addPackage,syb))
 $(eval $(call addPackage,template-haskell))
 $(eval $(call addPackage,base3-compat))
 $(eval $(call addPackage,Cabal))
+$(eval $(call addPackage,binary))
+$(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,mtl))
 $(eval $(call addPackage,utf8-string))
 
@@ -337,7 +341,9 @@ PACKAGES_STAGE2 += \
 	dph/dph-par
 endif
 
-BOOT_PKGS = Cabal hpc extensible-exceptions
+# We assume that the stage0 compiler has a suitable bytestring package,
+# so we don't have to include it below.
+BOOT_PKGS = Cabal hpc extensible-exceptions binary bin-package-db
 
 # The actual .a and .so/.dll files: needed for dependencies.
 ALL_STAGE1_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_LIB))
@@ -628,6 +634,8 @@ $(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))
 $(eval $(call build-package,libraries/hpc,dist-boot,0))
 $(eval $(call build-package,libraries/extensible-exceptions,dist-boot,0))
 $(eval $(call build-package,libraries/Cabal,dist-boot,0))
+$(eval $(call build-package,libraries/binary,dist-boot,0))
+$(eval $(call build-package,libraries/bin-package-db,dist-boot,0))
 
 # register the boot packages in strict sequence, because running
 # multiple ghc-pkgs in parallel doesn't work (registrations may get
@@ -638,12 +646,22 @@ $(foreach pkg,$(BOOT_PKGS),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
 compiler/stage1/package-data.mk : \
     libraries/Cabal/dist-boot/package-data.mk \
     libraries/hpc/dist-boot/package-data.mk \
-    libraries/extensible-exceptions/dist-boot/package-data.mk
+    libraries/extensible-exceptions/dist-boot/package-data.mk \
+    libraries/bin-package-db/dist-boot/package-data.mk
 
 # These are necessary because the bootstrapping compiler may not know
 # about cross-package dependencies:
 $(compiler_stage1_depfile) : $(BOOT_LIBS)
 $(ghc_stage1_depfile) : $(compiler_stage1_v_LIB)
+
+# A few careful dependencies between bootstrapping packages.  When we
+# can rely on the stage 0 compiler being able to generate
+# cross-package dependencies with -M (fixed in GHC 6.12.1) we can drop
+# these, and also some of the phases.
+#
+# If you miss any out here, then 'make -j8' will probably tell you.
+#
+libraries/bin-package-db/dist-boot/build/Distribution/InstalledPackageInfo/Binary.$(v_osuf) : libraries/binary/dist-boot/build/Data/Binary.$(v_hisuf)
 
 $(foreach pkg,$(BOOT_PKGS),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
 
@@ -770,7 +788,7 @@ install_docs: $(INSTALL_HEADERS)
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* $(DESTDIR)$(docdir)/html/`basename $$i`; \
 	done
 
-INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf
+INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
@@ -785,9 +803,8 @@ endif
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) $(DESTDIR)$(topdir)
-	"$(RM)" $(RM_OPTS) $(INSTALLED_PACKAGE_CONF)
-	$(CREATE_DATA)     $(INSTALLED_PACKAGE_CONF)
-	echo "[]"       >> $(INSTALLED_PACKAGE_CONF)
+	"$(RM)" -r $(RM_OPTS) $(INSTALLED_PACKAGE_CONF)
+	$(INSTALL_DIR) $(INSTALLED_PACKAGE_CONF)
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
 	$(foreach p, $(PACKAGES) $(PACKAGES_STAGE2),\

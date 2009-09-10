@@ -500,7 +500,7 @@ INSTALL_GHC_STAGE=2
 
 BOOTSTRAPPING_CONF = libraries/bootstrapping.conf
 
-INPLACE_PACKAGE_CONF = $(INPLACE_LIB)/package.conf
+INPLACE_PACKAGE_CONF = $(INPLACE_LIB)/package.conf.d
 
 GhcVersion	= @GhcVersion@
 GhcPatchLevel	= @GhcPatchLevel@

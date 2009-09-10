@@ -10,6 +10,7 @@
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
+import Distribution.InstalledPackageInfo.Binary
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import Distribution.ModuleName hiding (main)
 import Distribution.InstalledPackageInfo
@@ -20,14 +21,15 @@ import Distribution.Text
 import Distribution.Version
 import System.FilePath
 import System.Cmd       ( rawSystem )
-import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing )
+import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
+                          getModificationTime )
+import Text.Printf
 
 import Prelude
 
 #include "../../includes/ghcconfig.h"
 
 import System.Console.GetOpt
-import Text.PrettyPrint
 #if __GLASGOW_HASKELL__ >= 609
 import qualified Control.Exception as Exception
 #else
@@ -65,6 +67,10 @@ import GHC.Handle (fdToHandle)
 #if defined(GLOB)
 import System.Process(runInteractiveCommand)
 import qualified System.Info(os)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 611
+import System.Console.Terminfo as Terminfo
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -323,23 +329,27 @@ runit verbosity cli nonopts = do
         listPackages verbosity cli Nothing (Just match)
     ["latest", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        latestPackage cli pkgid
+        latestPackage verbosity cli pkgid
     ["describe", pkgid_str] ->
         case substringCheck pkgid_str of
           Nothing -> do pkgid <- readGlobPkgId pkgid_str
-                        describePackage cli (Id pkgid)
-          Just m -> describePackage cli (Substring pkgid_str m)
+                        describePackage verbosity cli (Id pkgid)
+          Just m -> describePackage verbosity cli (Substring pkgid_str m)
     ["field", pkgid_str, fields] ->
         case substringCheck pkgid_str of
           Nothing -> do pkgid <- readGlobPkgId pkgid_str
-                        describeField cli (Id pkgid) (splitFields fields)
-          Just m -> describeField cli (Substring pkgid_str m)
+                        describeField verbosity cli (Id pkgid) 
+                                      (splitFields fields)
+          Just m -> describeField verbosity cli (Substring pkgid_str m)
                                       (splitFields fields)
     ["check"] -> do
-        checkConsistency cli
+        checkConsistency verbosity cli
 
     ["dump"] -> do
-        dumpPackages cli
+        dumpPackages verbosity cli
+
+    ["recache"] -> do
+        recache verbosity cli
 
     [] -> do
         die ("missing command\n" ++
@@ -381,19 +391,33 @@ globVersion = Version{ versionBranch=[], versionTags=["*"] }
 -- Some commands operate  on multiple databases, with overlapping semantics:
 --      list, describe, field
 
-type PackageDBName  = FilePath
-type PackageDB      = [InstalledPackageInfo]
+data PackageDB 
+  = PackageDB { location :: FilePath,
+                packages :: [InstalledPackageInfo] }
 
-type NamedPackageDB = (PackageDBName, PackageDB)
-type PackageDBStack = [NamedPackageDB]
+type PackageDBStack = [PackageDB]
         -- A stack of package databases.  Convention: head is the topmost
-        -- in the stack.  Earlier entries override later one.
+        -- in the stack.
 
 allPackagesInStack :: PackageDBStack -> [InstalledPackageInfo]
-allPackagesInStack = concatMap snd
+allPackagesInStack = concatMap packages
 
-getPkgDatabases :: Bool -> [Flag] -> IO (PackageDBStack, Maybe PackageDBName)
-getPkgDatabases modify my_flags = do
+getPkgDatabases :: Verbosity
+                -> Bool    -- we are modifying, not reading
+                -> Bool    -- read caches, if available
+                -> [Flag]
+                -> IO (PackageDBStack, 
+                          -- the real package DB stack: [global,user] ++ 
+                          -- DBs specified on the command line with -f.
+                       Maybe FilePath,
+                          -- which one to modify, if any
+                       PackageDBStack)
+                          -- the package DBs specified on the command
+                          -- line, or [global,user] otherwise.  This
+                          -- is used as the list of package DBs for
+                          -- commands that just read the DB, such as 'list'.
+
+getPkgDatabases verbosity modify use_cache my_flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-config flag by the
@@ -403,47 +427,38 @@ getPkgDatabases modify my_flags = do
      case [ f | FlagGlobalConfig f <- my_flags ] of
         [] -> do mb_dir <- getLibDir
                  case mb_dir of
-                        Nothing  -> die err_msg
-                        Just dir ->
-                            do let path = dir </> "package.conf"
-                               exists <- doesFileExist path
-                               unless exists $ die "Can't find package.conf"
-                               return path
+                   Nothing  -> die err_msg
+                   Just dir -> do
+                     r <- lookForPackageDBIn dir
+                     case r of
+                       Nothing -> die ("Can't find package database in " ++ dir)
+                       Just path -> return path
         fs -> return (last fs)
-
-  let global_conf_dir = global_conf ++ ".d"
-  global_conf_dir_exists <- doesDirectoryExist global_conf_dir
-  global_confs <-
-    if global_conf_dir_exists
-      then do files <- getDirectoryContents global_conf_dir
-              return [ global_conf_dir ++ '/' : file
-                     | file <- files
-                     , isSuffixOf ".conf" file]
-      else return []
 
   let no_user_db = FlagNoUserDb `elem` my_flags
 
   -- get the location of the user package database, and create it if necessary
   -- getAppUserDataDirectory can fail (e.g. if $HOME isn't set)
-  appdir <- try $ getAppUserDataDirectory "ghc"
+  e_appdir <- try $ getAppUserDataDirectory "ghc"
 
   mb_user_conf <-
      if no_user_db then return Nothing else
-     case appdir of
-       Right dir -> do
-               let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
-                   user_conf = dir </> subdir </> "package.conf"
-               user_exists <- doesFileExist user_conf
-               return (Just (user_conf,user_exists))
-       Left _ ->
-               return Nothing
+     case e_appdir of
+       Left _    -> return Nothing
+       Right appdir -> do
+         let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
+             dir = appdir </> subdir
+         r <- lookForPackageDBIn dir
+         case r of
+           Nothing -> return (Just (dir </> "package.conf.d", False))
+           Just f  -> return (Just (f, True))
 
   -- If the user database doesn't exist, and this command isn't a
   -- "modify" command, then we won't attempt to create or use it.
   let sys_databases
         | Just (user_conf,user_exists) <- mb_user_conf,
-          modify || user_exists = user_conf : global_confs ++ [global_conf]
-        | otherwise             = global_confs ++ [global_conf]
+          modify || user_exists = [user_conf, global_conf]
+        | otherwise             = [global_conf]
 
   e_pkg_path <- try (System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
@@ -466,52 +481,108 @@ getPkgDatabases modify my_flags = do
                is_db_flag (FlagConfig f) = Just f
                is_db_flag _              = Nothing
 
-  (final_stack, to_modify) <-
-     if not modify
-        then    -- For a "read" command, we use all the databases
-                -- specified on the command line.  If there are no
-                -- command-line flags specifying databases, the default
-                -- is to use all the ones we know about.
-             if null db_flags then return (env_stack, Nothing)
-                              else return (reverse (nub db_flags), Nothing)
-        else let
-                -- For a "modify" command, treat all the databases as
-                -- a stack, where we are modifying the top one, but it
-                -- can refer to packages in databases further down the
-                -- stack.
+  let flag_db_names | null db_flags = env_stack
+                    | otherwise     = reverse (nub db_flags)
 
-                -- -f flags on the command line add to the database
-                -- stack, unless any of them are present in the stack
-                -- already.
-                flag_stack = filter (`notElem` env_stack)
-                                [ f | FlagConfig f <- reverse my_flags ]
-                                ++ env_stack
+  -- For a "modify" command, treat all the databases as
+  -- a stack, where we are modifying the top one, but it
+  -- can refer to packages in databases further down the
+  -- stack.
 
-                -- the database we actually modify is the one mentioned
-                -- rightmost on the command-line.
-                to_modify = if null db_flags 
-                                then Just virt_global_conf
-                                else Just (last db_flags)
-             in
-                return (flag_stack, to_modify)
+  -- -f flags on the command line add to the database
+  -- stack, unless any of them are present in the stack
+  -- already.
+  let final_stack = filter (`notElem` env_stack)
+                     [ f | FlagConfig f <- reverse my_flags ]
+                     ++ env_stack
 
-  db_stack <- mapM (readParseDatabase mb_user_conf) final_stack
-  return (db_stack, to_modify)
+  -- the database we actually modify is the one mentioned
+  -- rightmost on the command-line.
+  let to_modify
+        | not modify    = Nothing
+        | null db_flags = Just virt_global_conf
+        | otherwise     = Just (last db_flags)
 
-readParseDatabase :: Maybe (PackageDBName,Bool)
-                  -> PackageDBName
-                  -> IO (PackageDBName,PackageDB)
-readParseDatabase mb_user_conf filename
+  db_stack <- mapM (readParseDatabase verbosity mb_user_conf use_cache) final_stack
+
+  let flag_db_stack = [ db | db_name <- flag_db_names,
+                        db <- db_stack, location db == db_name ]
+
+  return (db_stack, to_modify, flag_db_stack)
+
+
+lookForPackageDBIn :: FilePath -> IO (Maybe FilePath)
+lookForPackageDBIn dir = do
+  let path_dir = dir </> "package.conf.d"
+  exists_dir <- doesDirectoryExist path_dir
+  if exists_dir then return (Just path_dir) else do
+  let path_file = dir </> "package.conf"
+  exists_file <- doesFileExist path_file
+  if exists_file then return (Just path_file) else return Nothing
+
+readParseDatabase :: Verbosity
+                  -> Maybe (FilePath,Bool)
+                  -> Bool -- use cache
+                  -> FilePath
+                  -> IO PackageDB
+
+readParseDatabase verbosity mb_user_conf use_cache path
   -- the user database (only) is allowed to be non-existent
-  | Just (user_conf,False) <- mb_user_conf, filename == user_conf
-  = return (filename, [])
+  | Just (user_conf,False) <- mb_user_conf, path == user_conf
+  = return PackageDB { location = path, packages = [] }
   | otherwise
-  = do str <- readFile filename
-       let packages = map convertPackageInfoIn $ read str
-       _ <- Exception.evaluate packages
-         `catchError` \e->
-            die ("error while parsing " ++ filename ++ ": " ++ show e)
-       return (filename,packages)
+  = do e <- try $ getDirectoryContents path
+       case e of
+         Left _   -> do
+              pkgs <- parseMultiPackageConf verbosity path
+              return PackageDB{ location = path, packages = pkgs }              
+         Right fs
+           | not use_cache -> ignore_cache
+           | otherwise -> do
+              let cache = path </> cachefilename
+              tdir     <- getModificationTime path
+              e_tcache <- try $ getModificationTime cache
+              case e_tcache of
+                Left ex -> do
+                     when (verbosity > Normal) $
+                        putStrLn ("warning: cannot read cache file " ++ cache ++ ": " ++ show ex)
+                     ignore_cache
+                Right tcache
+                  | tcache >= tdir -> do
+                     when (verbosity > Normal) $
+                        putStrLn ("using cache: " ++ cache)
+                     pkgs <- readBinPackageDB cache
+                     let pkgs' = map convertPackageInfoIn pkgs
+                     return PackageDB { location = path, packages = pkgs' }
+                  | otherwise -> do
+                     when (verbosity >= Normal) $ do
+                        putStrLn ("WARNING: cache is out of date: " ++ cache)
+                        putStrLn "  use 'ghc-pkg recache' to fix."
+                     ignore_cache
+            where
+                 ignore_cache = do
+                     let confs = filter (".conf" `isSuffixOf`) fs
+                     pkgs <- mapM (parseSingletonPackageConf verbosity) $
+                                   map (path </>) confs
+                     return PackageDB { location = path, packages = pkgs }
+
+
+parseMultiPackageConf :: Verbosity -> FilePath -> IO [InstalledPackageInfo]
+parseMultiPackageConf verbosity file = do
+  when (verbosity > Normal) $ putStrLn ("reading package database: " ++ file)
+  str <- readFile file
+  let pkgs = map convertPackageInfoIn $ read str
+  Exception.evaluate pkgs
+    `catchError` \e->
+       die ("error while parsing " ++ file ++ ": " ++ show e)
+  
+parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
+parseSingletonPackageConf verbosity file = do
+  when (verbosity > Normal) $ putStrLn ("reading package config: " ++ file)
+  readFile file >>= parsePackageInfo
+
+cachefilename :: FilePath
+cachefilename = "package.cache"
 
 -- -----------------------------------------------------------------------------
 -- Registering
@@ -524,10 +595,12 @@ registerPackage :: FilePath
                 -> Force
                 -> IO ()
 registerPackage input verbosity my_flags auto_ghci_libs update force = do
-  (db_stack, Just to_modify) <- getPkgDatabases True my_flags
+  (db_stack, Just to_modify, _flag_dbs) <- 
+      getPkgDatabases verbosity True True my_flags
+
   let
         db_to_operate_on = my_head "register" $
-                           filter ((== to_modify).fst) db_stack
+                           filter ((== to_modify).location) db_stack
   --
   s <-
     case input of
@@ -546,13 +619,16 @@ registerPackage input verbosity my_flags auto_ghci_libs update force = do
   when (verbosity >= Normal) $
       putStrLn "done."
 
-  let truncated_stack = dropWhile ((/= to_modify).fst) db_stack
+  let truncated_stack = dropWhile ((/= to_modify).location) db_stack
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
   validatePackageConfig pkg truncated_stack auto_ghci_libs update force
-  let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
-      not_this p = sourcePackageId p /= sourcePackageId pkg
-  writeNewConfig verbosity to_modify new_details
+  let 
+     removes = [ RemovePackage p
+               | p <- packages db_to_operate_on,
+                 sourcePackageId p == sourcePackageId pkg ]
+  --
+  changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
 
 parsePackageInfo
         :: String
@@ -565,41 +641,95 @@ parsePackageInfo str =
                            (Just l, s) -> die (show l ++ ": " ++ s)
 
 -- -----------------------------------------------------------------------------
+-- Making changes to a package database
+
+data DBOp = RemovePackage InstalledPackageInfo
+          | AddPackage    InstalledPackageInfo
+          | ModifyPackage InstalledPackageInfo
+
+changeDB :: Verbosity -> [DBOp] -> PackageDB -> IO ()
+changeDB verbosity cmds db = do
+  let db' = updateInternalDB db cmds
+  isfile <- doesFileExist (location db)
+  if isfile
+     then writeNewConfig verbosity (location db') (packages db')
+     else do
+       createDirectoryIfMissing True (location db)
+       changeDBDir verbosity cmds db'
+
+updateInternalDB :: PackageDB -> [DBOp] -> PackageDB
+updateInternalDB db cmds = db{ packages = foldl do_cmd (packages db) cmds }
+ where
+  do_cmd pkgs (RemovePackage p) = 
+    filter ((/= installedPackageId p) . installedPackageId) pkgs
+  do_cmd pkgs (AddPackage p) = p : pkgs
+  do_cmd pkgs (ModifyPackage p) = 
+    do_cmd (do_cmd pkgs (RemovePackage p)) (AddPackage p)
+    
+
+changeDBDir :: Verbosity -> [DBOp] -> PackageDB -> IO ()
+changeDBDir verbosity cmds db = do
+  mapM_ do_cmd cmds
+  updateDBCache verbosity db
+ where
+  do_cmd (RemovePackage p) = do
+    let file = location db </> display (installedPackageId p) <.> "conf"
+    when (verbosity > Normal) $ putStrLn ("removing " ++ file)
+    removeFile file
+  do_cmd (AddPackage p) = do
+    let file = location db </> display (installedPackageId p) <.> "conf"
+    when (verbosity > Normal) $ putStrLn ("writing " ++ file)
+    writeFileAtomic file (showInstalledPackageInfo p)
+  do_cmd (ModifyPackage p) = 
+    do_cmd (AddPackage p)
+
+updateDBCache :: Verbosity -> PackageDB -> IO ()
+updateDBCache verbosity db = do
+  let filename = location db </> cachefilename
+  when (verbosity > Normal) $
+      putStrLn ("writing cache " ++ filename)
+  writeBinPackageDB filename (map convertPackageInfoOut (packages db))
+    `catch` \e ->
+      if isPermissionError e
+      then die (filename ++ ": you don't have permission to modify this file")
+      else ioError e
+
+-- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Unregistering are all similar
 
 exposePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
-exposePackage = modifyPackage (\p -> [p{exposed=True}])
+exposePackage = modifyPackage (\p -> ModifyPackage p{exposed=True})
 
 hidePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
-hidePackage = modifyPackage (\p -> [p{exposed=False}])
+hidePackage = modifyPackage (\p -> ModifyPackage p{exposed=False})
 
 unregisterPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
-unregisterPackage = modifyPackage (\_ -> [])
+unregisterPackage = modifyPackage RemovePackage
 
 modifyPackage
-  :: (InstalledPackageInfo -> [InstalledPackageInfo])
+  :: (InstalledPackageInfo -> DBOp)
   -> PackageIdentifier
   -> Verbosity
   -> [Flag]
   -> Force
   -> IO ()
 modifyPackage fn pkgid verbosity my_flags force = do
-  (db_stack, Just _to_modify) <- getPkgDatabases True{-modify-} my_flags
-  ((db_name, pkgs), ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
---  let ((db_name, pkgs) : rest_of_stack) = db_stack
---  ps <- findPackages [(db_name,pkgs)] (Id pkgid)
-  let 
-      pids = map sourcePackageId ps
-      modify pkg
-          | sourcePackageId pkg `elem` pids = fn pkg
-          | otherwise                       = [pkg]
-      new_config = concat (map modify pkgs)
+  (db_stack, Just _to_modify, _flag_dbs) <- 
+      getPkgDatabases verbosity True{-modify-} True{-use cache-} my_flags
 
-  let
+  (db, ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
+  let 
+      db_name = location db
+      pkgs    = packages db
+
+      pids = map sourcePackageId ps
+
+      cmds = [ fn pkg | pkg <- pkgs, sourcePackageId pkg `elem` pids ]
+      new_db = updateInternalDB db cmds
+
       old_broken = brokenPackages (allPackagesInStack db_stack)
-      rest_of_stack = [ (nm, mypkgs)
-                      | (nm, mypkgs) <- db_stack, nm /= db_name ]
-      new_stack = (db_name,new_config) : rest_of_stack
+      rest_of_stack = filter ((/= db_name) . location) db_stack
+      new_stack = new_db : rest_of_stack
       new_broken = map sourcePackageId (brokenPackages (allPackagesInStack new_stack))
       newly_broken = filter (`notElem` map sourcePackageId old_broken) new_broken
   --
@@ -608,7 +738,17 @@ modifyPackage fn pkgid verbosity my_flags force = do
            " would break the following packages: "
               ++ unwords (map display newly_broken))
 
-  writeNewConfig verbosity db_name new_config
+  changeDB verbosity cmds db
+
+recache :: Verbosity -> [Flag] -> IO ()
+recache verbosity my_flags = do
+  (db_stack, Just to_modify, _flag_dbs) <- 
+     getPkgDatabases verbosity True{-modify-} False{-no cache-} my_flags
+  let
+        db_to_operate_on = my_head "recache" $
+                           filter ((== to_modify).location) db_stack
+  --
+  changeDB verbosity [] db_to_operate_on
 
 -- -----------------------------------------------------------------------------
 -- Listing packages
@@ -618,18 +758,21 @@ listPackages ::  Verbosity -> [Flag] -> Maybe PackageArg
              -> IO ()
 listPackages verbosity my_flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` my_flags
-  (db_stack, _) <- getPkgDatabases False my_flags
+  (db_stack, _, flag_db_stack) <- 
+     getPkgDatabases verbosity False True{-use cache-} my_flags
+
   let db_stack_filtered -- if a package is given, filter out all other packages
         | Just this <- mPackageName =
-            map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs))
-                db_stack
+            [ db{ packages = filter (this `matchesPkg`) (packages db) }
+            | db <- flag_db_stack ]
         | Just match <- mModuleName = -- packages which expose mModuleName
-            map (\(conf,pkgs) -> (conf, filter (match `exposedInPkg`) pkgs))
-                db_stack
-        | otherwise = db_stack
+            [ db{ packages = filter (match `exposedInPkg`) (packages db) }
+            | db <- flag_db_stack ]
+        | otherwise = flag_db_stack
 
       db_stack_sorted
-          = [ (db, sort_pkgs pkgs) | (db,pkgs) <- db_stack_filtered ]
+          = [ db{ packages = sort_pkgs (packages db) }
+            | db <- db_stack_filtered ]
           where sort_pkgs = sortBy cmpPkgIds
                 cmpPkgIds pkg1 pkg2 =
                    case pkgName p1 `compare` pkgName p2 of
@@ -638,38 +781,65 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                         EQ -> pkgVersion p1 `compare` pkgVersion p2
                    where (p1,p2) = (sourcePackageId pkg1, sourcePackageId pkg2)
 
+      stack = reverse db_stack_sorted
+
       match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
       pkg_map = allPackagesInStack db_stack
       broken = map sourcePackageId (brokenPackages pkg_map)
 
-      show_func = if simple_output then show_simple else mapM_ show_normal
-
-      show_normal (db_name,pkg_confs) =
-          hPutStrLn stdout (render $
-                text db_name <> colon $$ nest 4 packages
-                )
-           where packages
-                    | verbosity >= Verbose = vcat (map pp_pkg pkg_confs)
-                    | otherwise = fsep (punctuate comma (map pp_pkg pkg_confs))
+      show_normal PackageDB{ location = db_name, packages = pkg_confs } =
+          hPutStrLn stdout $ unlines ((db_name ++ ":") : map ("    " ++) pp_pkgs)
+           where
+                 pp_pkgs = map pp_pkg pkg_confs
                  pp_pkg p
-                   | sourcePackageId p `elem` broken = braces doc
+                   | sourcePackageId p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
-                   | otherwise = parens doc
-                   where doc | verbosity >= Verbose = pkg <+> parens ipid
+                   | otherwise = printf "(%s)" doc
+                   where doc | verbosity >= Verbose = printf "%s (%s)" pkg ipid
                              | otherwise            = pkg
                           where
-                          InstalledPackageId ipid_str = installedPackageId p
-                          ipid = text ipid_str
-                          pkg = text (display (sourcePackageId p))
+                          InstalledPackageId ipid = installedPackageId p
+                          pkg = display (sourcePackageId p)
 
       show_simple = simplePackageList my_flags . allPackagesInStack
 
-  when (not (null broken) && verbosity /= Silent) $ do
+  when (not (null broken) && not simple_output && verbosity /= Silent) $ do
      prog <- getProgramName
      putStrLn ("WARNING: there are broken packages.  Run '" ++ prog ++ " check' for more details.")
 
-  show_func (reverse db_stack_sorted)
+  if simple_output then show_simple stack else do
+
+#if __GLASGOW_HASKELL__ < 611
+  mapM_ show_normal stack
+#else
+  let
+     show_colour withF db =
+         mconcat $ map (<#> termText "\n") $
+             (termText (location db) :
+                map (termText "   " <#>) (map pp_pkg (packages db)))
+        where
+                 pp_pkg p
+                   | sourcePackageId p `elem` broken = withF Red  doc
+                   | exposed p                       = doc
+                   | otherwise                       = withF Blue doc
+                   where doc | verbosity >= Verbose
+                             = termText (printf "%s (%s)" pkg ipid)
+                             | otherwise
+                             = termText pkg
+                          where
+                          InstalledPackageId ipid = installedPackageId p
+                          pkg = display (sourcePackageId p)
+
+  is_tty <- hIsTerminalDevice stdout
+  if not is_tty
+     then mapM_ show_normal stack
+     else do tty <- Terminfo.setupTermFromEnv
+             case Terminfo.getCapability tty withForegroundColor of
+                 Nothing -> mapM_ show_normal stack
+                 Just w  -> runTermOutput tty $ mconcat $
+                                                map (show_colour w) stack
+#endif
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
@@ -680,9 +850,11 @@ simplePackageList my_flags pkgs = do
       hPutStrLn stdout $ concat $ intersperse " " strs
 
 showPackageDot :: Verbosity -> [Flag] -> IO ()
-showPackageDot _verbosity myflags = do
-  (db_stack, _) <- getPkgDatabases False myflags
-  let all_pkgs = allPackagesInStack db_stack
+showPackageDot verbosity myflags = do
+  (_, _, flag_db_stack) <- 
+      getPkgDatabases verbosity False True{-use cache-} myflags
+
+  let all_pkgs = allPackagesInStack flag_db_stack
       ipix  = PackageIndex.listToInstalledPackageIndex all_pkgs
 
   putStrLn "digraph {"
@@ -699,10 +871,12 @@ showPackageDot _verbosity myflags = do
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
 
-latestPackage ::  [Flag] -> PackageIdentifier -> IO ()
-latestPackage my_flags pkgid = do
-  (db_stack, _) <- getPkgDatabases False my_flags
-  ps <- findPackages db_stack (Id pkgid)
+latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
+latestPackage verbosity my_flags pkgid = do
+  (_, _, flag_db_stack) <- 
+     getPkgDatabases verbosity False True{-use cache-} my_flags
+
+  ps <- findPackages flag_db_stack (Id pkgid)
   show_pkg (sortBy compPkgIdVer (map sourcePackageId ps))
   where
     show_pkg [] = die "no matches"
@@ -711,16 +885,18 @@ latestPackage my_flags pkgid = do
 -- -----------------------------------------------------------------------------
 -- Describe
 
-describePackage :: [Flag] -> PackageArg -> IO ()
-describePackage my_flags pkgarg = do
-  (db_stack, _) <- getPkgDatabases False my_flags
-  ps <- findPackages db_stack pkgarg
+describePackage :: Verbosity -> [Flag] -> PackageArg -> IO ()
+describePackage verbosity my_flags pkgarg = do
+  (_, _, flag_db_stack) <- 
+      getPkgDatabases verbosity False True{-use cache-} my_flags
+  ps <- findPackages flag_db_stack pkgarg
   doDump ps
 
-dumpPackages :: [Flag] -> IO ()
-dumpPackages my_flags = do
-  (db_stack, _) <- getPkgDatabases False my_flags
-  doDump (allPackagesInStack db_stack)
+dumpPackages :: Verbosity -> [Flag] -> IO ()
+dumpPackages verbosity my_flags = do
+  (_, _, flag_db_stack) <- 
+     getPkgDatabases verbosity False True{-use cache-} my_flags
+  doDump (allPackagesInStack flag_db_stack)
 
 doDump :: [InstalledPackageInfo] -> IO ()
 doDump = mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo
@@ -731,11 +907,11 @@ findPackages db_stack pkgarg
   = fmap (concatMap snd) $ findPackagesByDB db_stack pkgarg
 
 findPackagesByDB :: PackageDBStack -> PackageArg
-                 -> IO [(NamedPackageDB, [InstalledPackageInfo])]
+                 -> IO [(PackageDB, [InstalledPackageInfo])]
 findPackagesByDB db_stack pkgarg
   = case [ (db, matched)
-         | db@(_, pkgs) <- db_stack,
-           let matched = filter (pkgarg `matchesPkg`) pkgs,
+         | db <- db_stack,
+           let matched = filter (pkgarg `matchesPkg`) (packages db),
            not (null matched) ] of
         [] -> die ("cannot find package " ++ pkg_msg pkgarg)
         ps -> return ps
@@ -762,12 +938,13 @@ compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 -- -----------------------------------------------------------------------------
 -- Field
 
-describeField :: [Flag] -> PackageArg -> [String] -> IO ()
-describeField my_flags pkgarg fields = do
-  (db_stack, _) <- getPkgDatabases False my_flags
+describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> IO ()
+describeField verbosity my_flags pkgarg fields = do
+  (_, _, flag_db_stack) <- 
+      getPkgDatabases verbosity False True{-use cache-} my_flags
   fns <- toFields fields
-  ps <- findPackages db_stack pkgarg
-  let top_dir = takeDirectory (fst (last db_stack))
+  ps <- findPackages flag_db_stack pkgarg
+  let top_dir = takeDirectory (location (last flag_db_stack))
   mapM_ (selectFields fns) (mungePackagePaths top_dir ps)
   where toFields [] = return []
         toFields (f:fs) = case toField f of
@@ -828,9 +1005,9 @@ strList = show
 -- -----------------------------------------------------------------------------
 -- Check: Check consistency of installed packages
 
-checkConsistency :: [Flag] -> IO ()
-checkConsistency my_flags = do
-  (db_stack, _) <- getPkgDatabases True my_flags
+checkConsistency :: Verbosity -> [Flag] -> IO ()
+checkConsistency verbosity my_flags = do
+  (db_stack, _, _) <- getPkgDatabases verbosity True True{-use cache-} my_flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
 
@@ -912,12 +1089,12 @@ convertPackageInfoIn
     where convert = fromJust . simpleParse
 
 writeNewConfig :: Verbosity -> FilePath -> [InstalledPackageInfo] -> IO ()
-writeNewConfig verbosity filename packages = do
+writeNewConfig verbosity filename ipis = do
   when (verbosity >= Normal) $
       hPutStr stdout "Writing new package config file... "
   createDirectoryIfMissing True $ takeDirectory filename
   let shown = concat $ intersperse ",\n "
-                     $ map (show . convertPackageInfoOut) packages
+                     $ map (show . convertPackageInfoOut) ipis
       fileContents = "[" ++ shown ++ "\n]"
   writeFileAtomic filename fileContents
     `catch` \e ->
@@ -1028,7 +1205,7 @@ checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Validate ()
 checkDuplicates db_stack pkg update = do
   let
         pkgid = sourcePackageId pkg
-        (_top_db_name, pkgs) : _  = db_stack
+        pkgs  = packages (head db_stack)
   --
   -- Check whether this package id already exists in this DB
   --

@@ -160,7 +160,7 @@ initSysTools mbMinusB dflags0
               installed file = top_dir </> file
               installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
 
-        ; let pkgconfig_path      = installed "package.conf"
+        ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
               ghci_usage_msg_path = installed "ghci-usage.txt"
 
@@ -176,12 +176,6 @@ initSysTools mbMinusB dflags0
 
         ; tmpdir <- getTemporaryDirectory
         ; let dflags1 = setTmpDir tmpdir dflags0
-
-        -- Check that the package config exists
-        ; config_exists <- doesFileExist pkgconfig_path
-        ; when (not config_exists) $
-             ghcError (InstallationError
-                         ("Can't find package.conf as " ++ pkgconfig_path))
 
         -- On Windows, mingw is distributed with GHC,
         --      so we look in TopDir/../mingw/bin

@@ -88,6 +88,8 @@ Library
     if !flag(ncg)
         CPP-Options: -DOMIT_NATIVE_CODEGEN
 
+    Build-Depends: bin-package-db
+
     -- GHC 6.4.2 needs to be able to find WCsubst.c, which needs to be
     -- able to find WCsubst.h
     Include-Dirs: ../libraries/base/cbits, ../libraries/base/include
