@@ -587,43 +587,44 @@ repTy (HsForAllTy _ tvs ctxt ty)  =
     repTForall bndrs1 ctxt1 ty1
 
 repTy (HsTyVar n)
-  | isTvOcc (nameOccName n)       = do 
-				      tv1 <- lookupTvOcc n
-				      repTvar tv1
-  | otherwise		          = do 
-				      tc1 <- lookupOcc n
-				      repNamedTyCon tc1
-repTy (HsAppTy f a)               = do 
-				      f1 <- repLTy f
-				      a1 <- repLTy a
-				      repTapp f1 a1
-repTy (HsFunTy f a)               = do 
-				      f1   <- repLTy f
-				      a1   <- repLTy a
-				      tcon <- repArrowTyCon
-				      repTapps tcon [f1, a1]
-repTy (HsListTy t)		  = do
-				      t1   <- repLTy t
-				      tcon <- repListTyCon
-				      repTapp tcon t1
-repTy (HsPArrTy t)                = do
-				      t1   <- repLTy t
-				      tcon <- repTy (HsTyVar (tyConName parrTyCon))
-				      repTapp tcon t1
-repTy (HsTupleTy _ tys)	  = do
-				      tys1 <- repLTys tys 
-				      tcon <- repTupleTyCon (length tys)
-				      repTapps tcon tys1
-repTy (HsOpTy ty1 n ty2) 	  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
-					   `nlHsAppTy` ty2)
-repTy (HsParTy t)  	       	  = repLTy t
-repTy (HsPredTy pred)             = repPredTy pred
-repTy (HsKindSig t k)             = do
-                                      t1 <- repLTy t
-                                      k1 <- repKind k
-                                      repTSig t1 k1
-repTy ty@(HsNumTy _)              = notHandled "Number types (for generics)" (ppr ty)
-repTy ty			  = notHandled "Exotic form of type" (ppr ty)
+  | isTvOcc (nameOccName n) = do 
+			        tv1 <- lookupTvOcc n
+			        repTvar tv1
+  | otherwise		    = do 
+			        tc1 <- lookupOcc n
+			        repNamedTyCon tc1
+repTy (HsAppTy f a)         = do 
+			        f1 <- repLTy f
+			        a1 <- repLTy a
+			        repTapp f1 a1
+repTy (HsFunTy f a)         = do 
+			        f1   <- repLTy f
+			        a1   <- repLTy a
+			        tcon <- repArrowTyCon
+			        repTapps tcon [f1, a1]
+repTy (HsListTy t)	    = do
+			        t1   <- repLTy t
+			        tcon <- repListTyCon
+			        repTapp tcon t1
+repTy (HsPArrTy t)          = do
+			        t1   <- repLTy t
+			        tcon <- repTy (HsTyVar (tyConName parrTyCon))
+			        repTapp tcon t1
+repTy (HsTupleTy _ tys)	    = do
+			        tys1 <- repLTys tys 
+			        tcon <- repTupleTyCon (length tys)
+			        repTapps tcon tys1
+repTy (HsOpTy ty1 n ty2)    = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
+			    	   `nlHsAppTy` ty2)
+repTy (HsParTy t)  	    = repLTy t
+repTy (HsPredTy pred)       = repPredTy pred
+repTy (HsKindSig t k)       = do
+                                t1 <- repLTy t
+                                k1 <- repKind k
+                                repTSig t1 k1
+repTy (HsSpliceTy splice)   = repSplice splice
+repTy ty@(HsNumTy _)        = notHandled "Number types (for generics)" (ppr ty)
+repTy ty		    = notHandled "Exotic form of type" (ppr ty)
 
 -- represent a kind
 --
@@ -638,6 +639,21 @@ repKind ki
     repNonArrowKind k | isLiftedTypeKind k = repStarK
                       | otherwise          = notHandled "Exotic form of kind" 
                                                         (ppr k)
+
+-----------------------------------------------------------------------------
+-- 		Splices
+-----------------------------------------------------------------------------
+
+repSplice :: HsSplice Name -> DsM (Core a)
+-- See Note [How brackets and nested splices are handled] in TcSplice
+-- We return a CoreExpr of any old type; the context should know
+repSplice (HsSplice n _) 
+ = do { mb_val <- dsLookupMetaEnv n
+       ; case mb_val of
+	   Just (Splice e) -> do { e' <- dsExpr e
+				 ; return (MkC e') }
+	   _ -> pprPanic "HsSplice" (ppr n) }
+			-- Should not happen; statically checked
 
 -----------------------------------------------------------------------------
 -- 		Expressions
@@ -742,14 +758,8 @@ repE (ArithSeq _ aseq) =
 			     ds2 <- repLE e2
 			     ds3 <- repLE e3
 			     repFromThenTo ds1 ds2 ds3
-repE (HsSpliceE (HsSplice n _)) 
-  = do { mb_val <- dsLookupMetaEnv n
-       ; case mb_val of
-		 Just (Splice e) -> do { e' <- dsExpr e
-				       ; return (MkC e') }
-		 _ -> pprPanic "HsSplice" (ppr n) }
-			-- Should not happen; statically checked
 
+repE (HsSpliceE splice)  = repSplice splice
 repE e@(PArrSeq {})      = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})    = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})        = notHandled "Cost centres" (ppr e)

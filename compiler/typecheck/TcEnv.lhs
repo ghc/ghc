@@ -38,7 +38,7 @@ module TcEnv(
 	tcGetGlobalTyVars,
 
 	-- Template Haskell stuff
-	checkWellStaged, spliceOK, bracketOK, tcMetaTy, thLevel, 
+	checkWellStaged, tcMetaTy, thLevel, 
 	topIdLvl, thTopLevelId, thRnBrack, isBrackStage,
 
 	-- New Ids
@@ -526,41 +526,25 @@ tcExtendRules lcl_rules thing_inside
 %************************************************************************
 
 \begin{code}
-instance Outputable ThStage where
-   ppr (Comp l)	     = text "Comp" <+> int l
-   ppr (Brack l _ _) = text "Brack" <+> int l
-   ppr (Splice l)    = text "Splice" <+> int l
-
-
-thLevel :: ThStage -> ThLevel
-thLevel (Comp l)      = l
-thLevel (Splice l)    = l
-thLevel (Brack l _ _) = l
-
-
 checkWellStaged :: SDoc		-- What the stage check is for
 		-> ThLevel 	-- Binding level (increases inside brackets)
-	        -> ThStage	-- Use stage
+	        -> ThLevel	-- Use stage
 		-> TcM ()	-- Fail if badly staged, adding an error
-checkWellStaged pp_thing bind_lvl use_stage
+checkWellStaged pp_thing bind_lvl use_lvl
   | use_lvl >= bind_lvl 	-- OK! Used later than bound
   = return ()			-- E.g.  \x -> [| $(f x) |]
 
-  | bind_lvl == topLevel	-- GHC restriction on top level splices
+  | bind_lvl == outerLevel	-- GHC restriction on top level splices
   = failWithTc $ 
     sep [ptext (sLit "GHC stage restriction:") <+>  pp_thing,
-	 nest 2 (ptext (sLit "is used in") <+> use_lvl_doc <> ptext (sLit ", and must be imported, not defined locally"))]
+	 nest 2 (vcat [ ptext (sLit "is used in a top-level splice or annotation,")
+                      , ptext (sLit ", and must be imported, not defined locally")])]
 
   | otherwise			-- Badly staged
   = failWithTc $ 		-- E.g.  \x -> $(f x)
     ptext (sLit "Stage error:") <+> pp_thing <+> 
 	hsep   [ptext (sLit "is bound at stage") <+> ppr bind_lvl,
 		ptext (sLit "but used at stage") <+> ppr use_lvl]
-  where
-    use_lvl = thLevel use_stage
-    use_lvl_doc | use_lvl == thLevel topStage    = ptext (sLit "a top-level splice")
-                | use_lvl == thLevel topAnnStage = ptext (sLit "an annotation")
-                | otherwise                      = panic "checkWellStaged"
 
 topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk" 
@@ -572,18 +556,8 @@ topIdLvl :: Id -> ThLevel
 --	$( f x )
 -- By the time we are prcessing the $(f x), the binding for "x" 
 -- will be in the global env, not the local one.
-topIdLvl id | isLocalId id = topLevel
+topIdLvl id | isLocalId id = outerLevel
 	    | otherwise    = impLevel
-
--- Indicates the legal transitions on bracket( [| |] ).
-bracketOK :: ThStage -> Maybe ThLevel
-bracketOK (Brack _ _ _) = Nothing	-- Bracket illegal inside a bracket
-bracketOK stage         = Just (thLevel stage + 1)
-
--- Indicates the legal transitions on splice($).
-spliceOK :: ThStage -> Maybe ThLevel
-spliceOK (Splice _) = Nothing	-- Splice illegal inside splice
-spliceOK stage      = Just (thLevel stage - 1)
 
 tcMetaTy :: Name -> TcM Type
 -- Given the name of a Template Haskell data type, 

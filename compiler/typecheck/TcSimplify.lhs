@@ -17,8 +17,6 @@ module TcSimplify (
 	tcSimplifyDeriv, tcSimplifyDefault,
 	bindInstsOfLocalFuns, 
 	
-        tcSimplifyStagedExpr,
-
         misMatchMsg
     ) where
 
@@ -3057,25 +3055,6 @@ tcSimplifyDefault theta = do
     doc = ptext (sLit "default declaration")
 \end{code}
 
-@tcSimplifyStagedExpr@ performs a simplification but does so at a new
-stage. This is used when typechecking annotations and splices.
-
-\begin{code}
-
-tcSimplifyStagedExpr :: ThStage -> TcM a -> TcM (a, TcDictBinds)
--- Type check an expression that runs at a top level stage as if
---   it were going to be spliced and then simplify it
-tcSimplifyStagedExpr stage tc_action
-  = setStage stage $ do { 
-        -- Typecheck the expression
-	  (thing', lie) <- getLIE tc_action
-	
-	-- Solve the constraints
-	; const_binds <- tcSimplifyTop lie
-	
-	; return (thing', const_binds) }
-
-\end{code}
 
 
 %************************************************************************

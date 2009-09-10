@@ -22,7 +22,7 @@ module TcRnTypes(
 
 	-- Template Haskell
 	ThStage(..), topStage, topAnnStage, topSpliceStage,
-	ThLevel, impLevel, topLevel,
+	ThLevel, impLevel, outerLevel, thLevel,
 
 	-- Arrows
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
@@ -382,37 +382,55 @@ pass it inwards.
 -}
 
 ---------------------------
--- Template Haskell levels 
+-- Template Haskell stages and levels 
 ---------------------------
 
+data ThStage	-- See Note [Template Haskell state diagram] in TcSplice
+  = Splice	-- Top-level splicing
+		-- This code will be run *at compile time*;
+		--   the result replaces the splice
+		-- Binding level = 0
+ 
+  | Comp   	-- Ordinary Haskell code
+		-- Binding level = 1
+
+  | Brack  			-- Inside brackets 
+      ThStage 			--   Binding level = level(stage) + 1
+      (TcRef [PendingSplice])	--   Accumulate pending splices here
+      (TcRef LIE)		--     and type constraints here
+
+topStage, topAnnStage, topSpliceStage :: ThStage
+topStage       = Comp
+topAnnStage    = Splice
+topSpliceStage = Splice
+
+instance Outputable ThStage where
+   ppr Splice        = text "Splice"
+   ppr Comp	     = text "Comp"
+   ppr (Brack s _ _) = text "Brack" <> parens (ppr s)
+
 type ThLevel = Int	
-	-- Indicates how many levels of brackets we are inside
-	-- 	(always >= 0)
+        -- See Note [Template Haskell levels] in TcSplice
 	-- Incremented when going inside a bracket,
 	-- decremented when going inside a splice
 	-- NB: ThLevel is one greater than the 'n' in Fig 2 of the
 	--     original "Template meta-programming for Haskell" paper
 
-impLevel, topLevel :: ThLevel
-topLevel = 1	-- Things defined at top level of this module
+impLevel, outerLevel :: ThLevel
 impLevel = 0	-- Imported things; they can be used inside a top level splice
+outerLevel = 1	-- Things defined outside brackets
+-- NB: Things at level 0 are not *necessarily* imported.
+--	eg  $( \b -> ... )   here b is bound at level 0
 --
 -- For example: 
 --	f = ...
 --	g1 = $(map ...)		is OK
 --	g2 = $(f ...)		is not OK; because we havn't compiled f yet
 
-
-data ThStage
-  = Comp   ThLevel			-- Ordinary compiling, usually at level topLevel but annotations use a lower level
-  | Splice ThLevel 			-- Inside a splice
-  | Brack  ThLevel 			-- Inside brackets; 
-	   (TcRef [PendingSplice])	--   accumulate pending splices here
-	   (TcRef LIE)			--   and type constraints here
-topStage, topAnnStage, topSpliceStage :: ThStage
-topStage       = Comp topLevel
-topAnnStage    = Comp (topLevel - 1)
-topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level splice
+thLevel :: ThStage -> ThLevel
+thLevel Splice        = 0
+thLevel Comp          = 1
+thLevel (Brack s _ _) = thLevel s + 1
 
 ---------------------------
 -- Arrow-notation context

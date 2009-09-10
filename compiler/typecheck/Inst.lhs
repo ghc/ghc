@@ -867,7 +867,7 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
 
     { use_stage <- getStage
     ; checkWellStaged (ptext (sLit "instance for") <+> quotes (ppr pred))
-    		      (topIdLvl dfun_id) use_stage
+    		      (topIdLvl dfun_id) (thLevel use_stage)
 
  	-- It's possible that not all the tyvars are in
 	-- the substitution, tenv. For example:

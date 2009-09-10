@@ -262,9 +262,9 @@ incorrect.
  '{-# SCC'	   { L _ ITscc_prag }
  '{-# GENERATED'   { L _ ITgenerated_prag }
  '{-# DEPRECATED'  { L _ ITdeprecated_prag }
- '{-# WARNING'  { L _ ITwarning_prag }
+ '{-# WARNING'     { L _ ITwarning_prag }
  '{-# UNPACK'      { L _ ITunpack_prag }
- '{-# ANN'      { L _ ITann_prag }
+ '{-# ANN'         { L _ ITann_prag }
  '#-}'		   { L _ ITclose_prag }
 
  '..'		{ L _ ITdotdot }  			-- reserved symbols
@@ -559,17 +559,17 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
 	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
-    | '{-# DEPRECATED' deprecations '#-}' { $2 }
-    | '{-# WARNING' warnings '#-}'        { $2 }
+        | '{-# DEPRECATED' deprecations '#-}' { $2 }
+        | '{-# WARNING' warnings '#-}'        { $2 }
 	| '{-# RULES' rules '#-}'		{ $2 }
 	| annotation { unitOL $1 }
       	| decl					{ unLoc $1 }
 
 	-- Template Haskell Extension
-	| '$(' exp ')'				{ unitOL (LL $ SpliceD (SpliceDecl $2)) }
-	| TH_ID_SPLICE				{ unitOL (LL $ SpliceD (SpliceDecl $
-							L1 $ HsVar (mkUnqual varName (getTH_ID_SPLICE $1))
-						  )) }
+	-- The $(..) form is one possible form of infixexp
+	-- but we treat an arbitrary expression just as if 
+	-- it had a $(..) wrapped around it
+	| infixexp 				{ unitOL (LL $ mkTopSpliceDecl $1) } 
 
 -- Type classes
 --

@@ -415,8 +415,10 @@ kc_hs_type ty@(HsRecTy _)
 #ifdef GHCI	/* Only if bootstrapped */
 kc_hs_type (HsSpliceTy sp) = kcSpliceType sp
 #else
-kc_hs_type ty@(HsSpliceTy _) = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
+kc_hs_type ty@(HsSpliceTy {}) = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
 #endif
+
+kc_hs_type (HsSpliceTyOut {}) = panic "kc_hs_type"	-- Should not happen at all
 
 -- remove the doc nodes here, no need to worry about the location since
 -- its the same for a doc node and it's child type node
@@ -612,10 +614,14 @@ ds_type (HsForAllTy _ tv_names ctxt ty)
     tau <- dsHsType ty
     return (mkSigmaTy tyvars theta tau)
 
-ds_type (HsSpliceTy {}) = panic "ds_type: HsSpliceTy"
-
 ds_type (HsDocTy ty _)  -- Remove the doc comment
   = dsHsType ty
+
+ds_type (HsSpliceTyOut kind) 
+  = do { kind' <- zonkTcKindToKind kind
+       ; newFlexiTyVarTy kind' }
+
+ds_type (HsSpliceTy {}) = panic "ds_type"
 
 dsHsTypes :: [LHsType Name] -> TcM [Type]
 dsHsTypes arg_tys = mapM dsHsType arg_tys

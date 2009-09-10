@@ -12,7 +12,9 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC, tcInferRho, tcInferRhoNC, tcSyntaxOp, addExprErrCtxt ) where
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC, 
+                tcInferRho, tcInferRhoNC, tcSyntaxOp, 
+                addExprErrCtxt ) where
 
 #include "HsVersions.h"
 
@@ -890,9 +892,10 @@ tcId orig fun_name res_ty
 tcSyntaxOp :: InstOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
 -- Typecheck a syntax operator, checking that it has the specified type
 -- The operator is always a variable at this stage (i.e. renamer output)
+-- This version assumes ty is a monotype
 tcSyntaxOp orig (HsVar op) ty = tcId orig op ty
-tcSyntaxOp orig other 	   ty = pprPanic "tcSyntaxOp" (ppr other)
-
+tcSyntaxOp orig other 	   ty = pprPanic "tcSyntaxOp" (ppr other) 
+                        
 ---------------------------
 instFun :: InstOrigin
 	-> HsExpr TcId
@@ -1119,22 +1122,31 @@ lookupFun orig id_name
 
 #ifndef GHCI  /* GHCI and TH is off */
 --------------------------------------
--- thLocalId : Check for cross-stage lifting
-thLocalId orig id id_ty th_bind_lvl
+thLocalId :: InstOrigin -> Id -> TcType -> ThLevel -> TcM ()
+-- Check for cross-stage lifting
+thLocalId orig id id_ty bind_lvl
   = return ()
 
 #else	      /* GHCI and TH is on */
-thLocalId orig id id_ty th_bind_lvl 
+thLocalId orig id id_ty bind_lvl 
   = do	{ use_stage <- getStage	-- TH case
-	; case use_stage of
-	    Brack use_lvl ps_var lie_var | use_lvl > th_bind_lvl
-		  -> thBrackId orig id ps_var lie_var
-	    other -> do { checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage
-			; return id }
-	}
+	; let use_lvl = thLevel use_stage
+	; checkWellStaged (quotes (ppr id)) bind_lvl use_lvl
+	; traceTc (text "thLocalId" <+> ppr id <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
+	; when (use_lvl > bind_lvl) $
+          checkCrossStageLifting orig id id_ty bind_lvl use_stage }
 
 --------------------------------------
-thBrackId orig id ps_var lie_var
+checkCrossStageLifting :: InstOrigin -> Id -> TcType -> ThLevel -> ThStage -> TcM ()
+-- We are inside brackets, and (use_lvl > bind_lvl)
+-- Now we must check whether there's a cross-stage lift to do
+-- Examples   \x -> [| x |]  
+--            [| map |]
+
+checkCrossStageLifting _ _ _ _ Comp   = return ()
+checkCrossStageLifting _ _ _ _ Splice = return ()
+
+checkCrossStageLifting orig id id_ty bind_lvl (Brack _ ps_var lie_var) 
   | thTopLevelId id
   =	-- Top-level identifiers in this module,
 	-- (which have External Names)
@@ -1146,9 +1158,10 @@ thBrackId orig id ps_var lie_var
 	-- But we do need to put f into the keep-alive
 	-- set, because after desugaring the code will
 	-- only mention f's *name*, not f itself.
-    do	{ keepAliveTc id; return id }
+    keepAliveTc id
 
-  | otherwise
+  | otherwise	-- bind_lvl = outerLevel presumably,
+		-- but the Id is not bound at top level
   = 	-- Nested identifiers, such as 'x' in
 	-- E.g. \x -> [| h x |]
 	-- We must behave as if the reference to x was
@@ -1158,8 +1171,7 @@ thBrackId orig id ps_var lie_var
 	-- If 'x' occurs many times we may get many identical
 	-- bindings of the same splice proxy, but that doesn't
 	-- matter, although it's a mite untidy.
-    do 	{ let id_ty = idType id
-	; checkTc (isTauTy id_ty) (polySpliceErr id)
+    do 	{ checkTc (isTauTy id_ty) (polySpliceErr id)
 	       -- If x is polymorphic, its occurrence sites might
 	       -- have different instantiations, so we can't use plain
 	       -- 'x' as the splice proxy name.  I don't know how to 
@@ -1183,7 +1195,7 @@ thBrackId orig id ps_var lie_var
 	; ps <- readMutVar ps_var
 	; writeMutVar ps_var ((idName id, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)
 
-	; return id }
+	; return () }
 #endif /* GHCI */
 \end{code}
 

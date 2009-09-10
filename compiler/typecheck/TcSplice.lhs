@@ -5,6 +5,7 @@
 
 TcSplice: Template Haskell splices
 
+
 \begin{code}
 {-# OPTIONS -fno-warn-unused-imports -fno-warn-unused-binds #-}
 -- The above warning supression flag is a temporary kludge.
@@ -143,6 +144,115 @@ setInteractiveContext hsc_env icxt thing_inside
  	; thing_inside }
 \end{code}
 
+Note [How top-level splices are handled]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Top-level splices (those not inside a [| .. |] quotation bracket) are handled
+very straightforwardly:
+
+  1. tcTopSpliceExpr: typecheck the body e of the splice $(e)
+
+  2. runMetaT: desugar, compile, run it, and convert result back to
+     HsSyn RdrName (of the appropriate flavour, eg HsType RdrName,
+     HsExpr RdrName etc)
+
+  3. treat the result as if that's what you saw in the first place
+     e.g for HsType, rename and kind-check
+         for HsExpr, rename and type-check
+
+     (The last step is different for decls, becuase they can *only* be 
+      top-level: we return the result of step 2.)
+
+Note [How brackets and nested splices are handled]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Nested splices (those inside a [| .. |] quotation bracket), are treated
+quite differently. 
+
+  * After typechecking, the bracket [| |] carries
+
+     a) A mutable list of PendingSplice
+          type PendingSplice = (Name, LHsExpr Id)
+
+     b) The quoted expression e, *renamed*: (HsExpr Name)
+          The expression e has been typechecked, but the result of
+	  that typechecking is discarded.  
+
+  * The brakcet is desugared by DsMeta.dsBracket.  It 
+
+      a) Extends the ds_meta environment with the PendingSplices
+         attached to the bracket
+
+      b) Converts the quoted (HsExpr Name) to a CoreExpr that, when
+         run, will produce a suitable TH expression/type/decl.  This
+	 is why we leave the *renamed* expression attached to the bracket:
+         the quoted expression should not be decorated with all the goop
+         added by the type checker
+
+  * Each splice carries a unique Name, called a "splice point", thus
+    ${n}(e).  The name is initialised to an (Unqual "splice") when the
+    splice is created; the renamer gives it a unique.
+
+  * When the type checker type-checks a nested splice ${n}(e), it 
+	- typechecks e
+	- adds the typechecked expression (of type (HsExpr Id))
+	  as a pending splice to the enclosing bracket
+	- returns something non-committal
+    Eg for [| f ${n}(g x) |], the typechecker 
+	- attaches the typechecked term (g x) to the pending splices for n
+	  in the outer bracket
+        - returns a non-committal type \alpha.
+	Remember that the bracket discards the typechecked term altogether
+
+  * When DsMeta (used to desugar the body of the bracket) comes across
+    a splice, it looks up the splice's Name, n, in the ds_meta envt,
+    to find an (HsExpr Id) that should be substituted for the splice;
+    it just desugars it to get a CoreExpr (DsMeta.repSplice).
+
+Example: 
+    Source:	  f = [| Just $(g 3) |]
+      The [| |] part is a HsBracket
+
+    Typechecked:  f = [| Just ${s7}(g 3) |]{s7 = g Int 3}
+      The [| |] part is a HsBracketOut, containing *renamed* 
+	(not typechecked) expression
+      The "s7" is the "splice point"; the (g Int 3) part 
+	is a typechecked expression
+
+    Desugared:	  f = do { s7 <- g Int 3
+		         ; return (ConE "Data.Maybe.Just" s7) }
+
+
+Note [Template Haskell state diagram]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here are the ThStages, s, their corresponding level numbers
+(the result of (thLevel s)), and their state transitions.  
+
+      -----------     $	     ------------   $
+      |  Comp   | ---------> |  Splice  | -----|
+      |   1     |    	     |    0     | <----|
+      -----------     	     ------------
+        ^     |       	       ^      |
+      $ |     | [||]  	     $ |      | [||]
+        |     v       	       |      v
+   --------------     	   ----------------
+   | Brack Comp |     	   | Brack Splice |
+   |     2      |     	   |      1       |
+   --------------     	   ----------------
+
+* Normal top-level declarations start in state Comp 
+       (which has level 1).
+  Annotations start in state Splice, since they are
+       treated very like a splice (only without a '$')
+
+* Code compiled in state Splice (and only such code) 
+  will be *run at compile time*, with the result replacing
+  the splice
+
+* The original paper used level -1 instead of 0, etc.
+
+* The original paper did not allow a splice within a 
+  splice, but there is no reason not to. This is the 
+  $ transition in the top right.
+
 Note [Template Haskell levels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Imported things are impLevel (= 0)
@@ -152,7 +262,7 @@ Note [Template Haskell levels]
 
 * Variables are bound at the "current level"
 
-* The current level starts off at topLevel (= 1)
+* The current level starts off at outerLevel (= 1)
 
 * The level is decremented by splicing $(..)
 	       incremented by brackets [| |]
@@ -260,36 +370,27 @@ runAnnotation   _ q = pprPanic "Cant do runAnnotation without GHCi" (ppr q)
 %*									*
 %************************************************************************
 
-Note [Handling brackets]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Source:		f = [| Just $(g 3) |]
-  The [| |] part is a HsBracket
-
-Typechecked:	f = [| Just ${s7}(g 3) |]{s7 = g Int 3}
-  The [| |] part is a HsBracketOut, containing *renamed* (not typechecked) expression
-  The "s7" is the "splice point"; the (g Int 3) part is a typechecked expression
-
-Desugared:	f = do { s7 <- g Int 3
-		       ; return (ConE "Data.Maybe.Just" s7) }
 
 \begin{code}
+-- See Note [How brackets and nested splices are handled]
 tcBracket brack res_ty 
   = addErrCtxt (hang (ptext (sLit "In the Template Haskell quotation"))
                    2 (ppr brack)) $
-    do { level <- getStage
-       ; case bracketOK level of {
- 	   Nothing         -> failWithTc (illegalBracket level) ;
-	   Just next_level -> do {
+    do { 	-- Check for nested brackets
+         cur_stage <- getStage
+       ; checkTc (not (isBrackStage cur_stage)) illegalBracket 
+
+	-- Brackets are desugared to code that mentions the TH package
+       ; recordThUse
 
    	-- Typecheck expr to make sure it is valid,
 	-- but throw away the results.  We'll type check
 	-- it again when we actually use it.
-          recordThUse
        ; pending_splices <- newMutVar []
        ; lie_var <- getLIEVar
 
-       ; (meta_ty, lie) <- setStage (Brack next_level pending_splices lie_var)
-                                    (getLIE (tc_bracket next_level brack))
+       ; (meta_ty, lie) <- setStage (Brack cur_stage pending_splices lie_var)
+                                    (getLIE (tc_bracket cur_stage brack))
        ; tcSimplifyBracket lie
 
 	-- Make the expected type have the right shape
@@ -297,18 +398,18 @@ tcBracket brack res_ty
 
 	-- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
-       ; return (noLoc (HsBracketOut brack pendings)) }}}
+       ; return (noLoc (HsBracketOut brack pendings)) }
 
-tc_bracket :: ThLevel -> HsBracket Name -> TcM TcType
-tc_bracket use_lvl (VarBr name) 	-- Note [Quoting names]
+tc_bracket :: ThStage -> HsBracket Name -> TcM TcType
+tc_bracket outer_stage (VarBr name) 	-- Note [Quoting names]
   = do	{ thing <- tcLookup name
 	; case thing of
     	    AGlobal _ -> return ()
     	    ATcId { tct_level = bind_lvl, tct_id = id }
-		| thTopLevelId id	-- C.f thTopLevelId case of
-		-> keepAliveTc id 	--     TcExpr.thBrackId
+		| thTopLevelId id	-- C.f TcExpr.checkCrossStageLifting
+		-> keepAliveTc id 	 	
 		| otherwise
-		-> do { checkTc (use_lvl == bind_lvl)
+		-> do { checkTc (thLevel outer_stage + 1 == bind_lvl)
 				(quotedNameStageErr name) }
 	    _ -> pprPanic "th_bracket" (ppr name)
 
@@ -356,77 +457,172 @@ quotedNameStageErr v
 \begin{code}
 tcSpliceExpr (HsSplice name expr) res_ty
   = setSrcSpan (getLoc expr) 	$ do
-    level <- getStage
-    case spliceOK level of {
-	Nothing 	-> failWithTc (illegalSplice level) ;
-	Just next_level -> 
+    { stage <- getStage
+    ; case stage of {
+	Splice -> tcTopSplice expr res_ty ;
+	Comp   -> tcTopSplice expr res_ty ;
 
-     case level of {
-	Comp _ 		       -> do { e <- tcTopSplice expr res_ty
-				     ; return (unLoc e) } ;
-	Brack _ ps_var lie_var -> do
+	Brack pop_stage ps_var lie_var -> do
 
+        -- See Note [How brackets and nested splices are handled]
 	-- A splice inside brackets
   	-- NB: ignore res_ty, apart from zapping it to a mono-type
 	-- e.g.   [| reverse $(h 4) |]
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-      _ <- unBox res_ty
-      meta_exp_ty <- tcMetaTy expQTyConName
-      expr' <- setStage (Splice next_level) (
-                 setLIEVar lie_var    $
-                 tcMonoExpr expr meta_exp_ty
-               )
+     { _ <- unBox res_ty
+     ; meta_exp_ty <- tcMetaTy expQTyConName
+     ; expr' <- setStage pop_stage $
+                setLIEVar lie_var    $
+                tcMonoExpr expr meta_exp_ty
 
 	-- Write the pending splice into the bucket
-      ps <- readMutVar ps_var
-      writeMutVar ps_var ((name,expr') : ps)
+     ; ps <- readMutVar ps_var
+     ; writeMutVar ps_var ((name,expr') : ps)
 
-      return (panic "tcSpliceExpr")	-- The returned expression is ignored
+     ; return (panic "tcSpliceExpr")	-- The returned expression is ignored
+     }}}
 
-     ; Splice {} -> panic "tcSpliceExpr Splice"
-     }} 
+tcTopSplice :: LHsExpr Name -> BoxyRhoType -> TcM (HsExpr Id)
+-- Note [How top-level splices are handled]
+tcTopSplice expr res_ty
+  = do { meta_exp_ty <- tcMetaTy expQTyConName
 
--- tcTopSplice used to have this:
--- Note that we do not decrement the level (to -1) before 
--- typechecking the expression.  For example:
+        -- Typecheck the expression
+       ; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_exp_ty)
+
+        -- Run the expression
+       ; traceTc (text "About to run" <+> ppr zonked_q_expr)
+       ; expr2 <- runMetaE convertToHsExpr zonked_q_expr
+
+       ; traceTc (text "Got result" <+> ppr expr2)
+
+       ; showSplice "expression" expr (ppr expr2)
+
+        -- Rename it, but bale out if there are errors
+        -- otherwise the type checker just gives more spurious errors
+       ; (exp3, _fvs) <- checkNoErrs (rnLExpr expr2)
+
+       ; exp4 <- tcMonoExpr exp3 res_ty
+       ; return (unLoc exp4) }
+
+-------------------
+tcTopSpliceExpr :: TcM (LHsExpr Id) -> TcM (LHsExpr Id)
+-- Note [How top-level splices are handled]
+-- Type check an expression that is the body of a top-level splice
+--   (the caller will compile and run it)
+-- Note that set the level to Splice, regardless of the original level,
+-- before typechecking the expression.  For example:
 --	f x = $( ...$(g 3) ... )
 -- The recursive call to tcMonoExpr will simply expand the 
 -- inner escape before dealing with the outer one
 
-tcTopSplice :: LHsExpr Name -> BoxyRhoType -> TcM (LHsExpr Id)
-tcTopSplice expr res_ty = do
-    meta_exp_ty <- tcMetaTy expQTyConName
-
-        -- Typecheck the expression
-    zonked_q_expr <- tcTopSpliceExpr expr meta_exp_ty
-
-        -- Run the expression
-    traceTc (text "About to run" <+> ppr zonked_q_expr)
-    expr2 <- runMetaE convertToHsExpr zonked_q_expr
-
-    traceTc (text "Got result" <+> ppr expr2)
-
-    showSplice "expression" expr (ppr expr2)
-
-        -- Rename it, but bale out if there are errors
-        -- otherwise the type checker just gives more spurious errors
-    (exp3, _fvs) <- checkNoErrs (rnLExpr expr2)
-
-    tcMonoExpr exp3 res_ty
-
-
-tcTopSpliceExpr :: LHsExpr Name -> TcType -> TcM (LHsExpr Id)
--- Type check an expression that is the body of a top-level splice
---   (the caller will compile and run it)
-tcTopSpliceExpr expr meta_ty 
+tcTopSpliceExpr tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
-    do { (expr', const_binds) <- tcSimplifyStagedExpr topSpliceStage $
-                                 (recordThUse >> tcMonoExpr expr meta_ty)
+    setStage Splice $ 
+    do {    -- Typecheck the expression
+         (expr', lie) <- getLIE tc_action
+        
+	-- Solve the constraints
+	; const_binds <- tcSimplifyTop lie
+	
           -- Zonk it and tie the knot of dictionary bindings
        ; zonkTopLExpr (mkHsDictLet const_binds expr') }
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Splicing a type
+%*									*
+%************************************************************************
+
+Very like splicing an expression, but we don't yet share code.
+
+\begin{code}
+kcSpliceType (HsSplice name hs_expr)
+  = setSrcSpan (getLoc hs_expr) $ do 	
+    { stage <- getStage
+    ; case stage of {
+        Splice -> kcTopSpliceType hs_expr ;
+    	Comp   -> kcTopSpliceType hs_expr ;
+
+    	Brack pop_level ps_var lie_var -> do
+	   -- See Note [How brackets and nested splices are handled]
+	   -- A splice inside brackets
+    { meta_ty <- tcMetaTy typeQTyConName
+    ; expr' <- setStage pop_level $
+    	       setLIEVar lie_var $
+    	       tcMonoExpr hs_expr meta_ty
+
+    	-- Write the pending splice into the bucket
+    ; ps <- readMutVar ps_var
+    ; writeMutVar ps_var ((name,expr') : ps)
+
+    -- e.g.   [| f (g :: Int -> $(h 4)) |]
+    -- Here (h 4) :: Q Type
+    -- but $(h 4) :: a 	i.e. any type, of any kind
+
+    -- We return a HsSpliceTyOut, which serves to convey the kind to 
+    -- the ensuing TcHsType.dsHsType, which makes up a non-committal
+    -- type variable of a suitable kind
+    ; kind <- newKindVar
+    ; return (HsSpliceTyOut kind, kind)	
+    }}}
+
+kcTopSpliceType :: LHsExpr Name -> TcM (HsType Name, TcKind)
+-- Note [How top-level splices are handled]
+kcTopSpliceType expr
+  = do	{ meta_ty <- tcMetaTy typeQTyConName
+
+	-- Typecheck the expression
+	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_ty)
+
+	-- Run the expression
+	; traceTc (text "About to run" <+> ppr zonked_q_expr)
+	; hs_ty2 <- runMetaT convertToHsType zonked_q_expr
+  
+	; traceTc (text "Got result" <+> ppr hs_ty2)
+
+	; showSplice "type" expr (ppr hs_ty2)
+
+	-- Rename it, but bale out if there are errors
+	-- otherwise the type checker just gives more spurious errors
+	; let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
+	; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
+
+	; (ty4, kind) <- kcLHsType hs_ty3
+        ; return (unLoc ty4, kind) }
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Splicing an expression}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- Note [How top-level splices are handled]
+-- Always at top level
+-- Type sig at top of file:
+-- 	tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
+tcSpliceDecls expr
+  = do	{ meta_dec_ty <- tcMetaTy decTyConName
+	; meta_q_ty <- tcMetaTy qTyConName
+	; let list_q = mkAppTy meta_q_ty (mkListTy meta_dec_ty)
+	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr list_q)
+
+		-- Run the expression
+	; traceTc (text "About to run" <+> ppr zonked_q_expr)
+	; decls <- runMetaD convertToHsDecls zonked_q_expr
+
+	; traceTc (text "Got result" <+> vcat (map ppr decls))
+	; showSplice "declarations"
+	  	     expr 
+		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
+	; return decls }
 \end{code}
 
 
@@ -438,37 +634,24 @@ tcTopSpliceExpr expr meta_ty
 
 \begin{code}
 runAnnotation target expr = do
-    expr_ty <- newFlexiTyVarTy liftedTypeKind
-    
     -- Find the classes we want instances for in order to call toAnnotationWrapper
+    loc <- getSrcSpanM
     data_class <- tcLookupClass dataClassName
+    to_annotation_wrapper_id <- tcLookupId toAnnotationWrapperName
     
     -- Check the instances we require live in another module (we want to execute it..)
     -- and check identifiers live in other modules using TH stage checks. tcSimplifyStagedExpr
     -- also resolves the LIE constraints to detect e.g. instance ambiguity
-    ((wrapper, expr'), const_binds) <- tcSimplifyStagedExpr topAnnStage $ do
-                expr' <- tcPolyExprNC expr expr_ty
+    zonked_wrapped_expr' <- tcTopSpliceExpr $ 
+           do { (expr', expr_ty) <- tcInferRhoNC expr
+		-- We manually wrap the typechecked expression in a call to toAnnotationWrapper
                 -- By instantiating the call >here< it gets registered in the 
-		-- LIE consulted by tcSimplifyStagedExpr
+		-- LIE consulted by tcTopSpliceExpr
                 -- and hence ensures the appropriate dictionary is bound by const_binds
-                wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
-                return (wrapper, expr')
-
-    -- We manually wrap the typechecked expression in a call to toAnnotationWrapper
-    loc <- getSrcSpanM
-    to_annotation_wrapper_id <- tcLookupId toAnnotationWrapperName
-    let specialised_to_annotation_wrapper_expr = L loc (HsWrap wrapper (HsVar to_annotation_wrapper_id))
-        wrapped_expr' = mkHsDictLet const_binds $
-                        L loc (HsApp specialised_to_annotation_wrapper_expr expr')
-
-    -- If we have type checking problems then potentially zonking 
-    -- (and certainly compilation) may fail. Give up NOW!
-    failIfErrsM
-
-    -- Zonk the type variables out of that raw expression. Note that
-    -- in particular we don't call recordThUse, since we don't
-    -- necessarily use any code or definitions from that package.
-    zonked_wrapped_expr' <- zonkTopLExpr wrapped_expr'
+              ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
+              ; let specialised_to_annotation_wrapper_expr  
+                      = L loc (HsWrap wrapper (HsVar to_annotation_wrapper_id))
+              ; return (L loc (HsApp specialised_to_annotation_wrapper_expr expr')) }
 
     -- Run the appropriately wrapped expression to get the value of
     -- the annotation and its dictionaries. The return value is of
@@ -538,11 +721,10 @@ runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector desc meta_
       	; let expr = L q_span $
       	             HsApp (L q_span $
       	                    HsApp (L q_span (HsVar quote_selector)) quoterExpr) quoteExpr
-      	; recordThUse
       	; meta_exp_ty <- tcMetaTy meta_ty
 
       	-- Typecheck the expression
-      	; zonked_q_expr <- tcTopSpliceExpr expr meta_exp_ty
+      	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_exp_ty)
 
       	-- Run the expression
       	; traceTc (text "About to run" <+> ppr zonked_q_expr)
@@ -562,97 +744,6 @@ quoteStageError :: Name -> SDoc
 quoteStageError quoter
   = sep [ptext (sLit "GHC stage restriction:") <+> ppr quoter,
          nest 2 (ptext (sLit "is used in a quasiquote, and must be imported, not defined locally"))]
-\end{code}
-
-
-%************************************************************************
-%*									*
-		Splicing a type
-%*									*
-%************************************************************************
-
-Very like splicing an expression, but we don't yet share code.
-
-\begin{code}
-kcSpliceType (HsSplice name hs_expr)
-  = setSrcSpan (getLoc hs_expr) $ do 	
-	{ level <- getStage
-	; case spliceOK level of {
-		Nothing 	-> failWithTc (illegalSplice level) ;
-		Just next_level -> do 
-
-	{ case level of {
-		Comp _ 		       -> do { (t,k) <- kcTopSpliceType hs_expr 
-					     ; return (unLoc t, k) } ;
-		Brack _ ps_var lie_var -> do
-
-	{ 	-- A splice inside brackets
-	; meta_ty <- tcMetaTy typeQTyConName
-	; expr' <- setStage (Splice next_level) $
-		   setLIEVar lie_var	   	$
-		   tcMonoExpr hs_expr meta_ty
-
-		-- Write the pending splice into the bucket
-	; ps <- readMutVar ps_var
-	; writeMutVar ps_var ((name,expr') : ps)
-
-	-- e.g.   [| Int -> $(h 4) |]
-	-- Here (h 4) :: Q Type
-	-- but $(h 4) :: forall a.a 	i.e. any kind
-	; kind <- newKindVar
-	; return (panic "kcSpliceType", kind)	-- The returned type is ignored
-    }
-        ; Splice {} -> panic "kcSpliceType Splice"
-    }}}}
-
-kcTopSpliceType :: LHsExpr Name -> TcM (LHsType Name, TcKind)
-kcTopSpliceType expr
-  = do	{ meta_ty <- tcMetaTy typeQTyConName
-
-	-- Typecheck the expression
-	; zonked_q_expr <- tcTopSpliceExpr expr meta_ty
-
-	-- Run the expression
-	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-	; hs_ty2 <- runMetaT convertToHsType zonked_q_expr
-  
-	; traceTc (text "Got result" <+> ppr hs_ty2)
-
-	; showSplice "type" expr (ppr hs_ty2)
-
-	-- Rename it, but bale out if there are errors
-	-- otherwise the type checker just gives more spurious errors
-	; let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
-	; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
-
-	; kcLHsType hs_ty3 }
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Splicing an expression}
-%*									*
-%************************************************************************
-
-\begin{code}
--- Always at top level
--- Type sig at top of file:
--- 	tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
-tcSpliceDecls expr
-  = do	{ meta_dec_ty <- tcMetaTy decTyConName
-	; meta_q_ty <- tcMetaTy qTyConName
-	; let list_q = mkAppTy meta_q_ty (mkListTy meta_dec_ty)
-	; zonked_q_expr <- tcTopSpliceExpr expr list_q
-
-		-- Run the expression
-	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-	; decls <- runMetaD convertToHsDecls zonked_q_expr
-
-	; traceTc (text "Got result" <+> vcat (map ppr decls))
-	; showSplice "declarations"
-	  	     expr 
-		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
-	; return decls }
 \end{code}
 
 
@@ -836,14 +927,8 @@ showSplice what before after
 				         text "======>",
 				         nest 2 after])]) }
 
-illegalBracket :: ThStage -> SDoc
-illegalBracket level
-  = ptext (sLit "Illegal bracket at level") <+> ppr level
-
-illegalSplice :: ThStage -> SDoc
-illegalSplice level
-  = ptext (sLit "Illegal splice at level") <+> ppr level
-
+illegalBracket :: SDoc
+illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (without intervening splices)")
 #endif 	/* GHCI */
 \end{code}
 

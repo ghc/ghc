@@ -159,6 +159,9 @@ data HsType name
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
+  | HsSpliceTyOut       Kind		-- Used just like KindedTyVar, just between 
+					--   kcHsType and dsHsType
+
   | HsBangTy	HsBang (LHsType name)	-- Bang-style type annotations 
   | HsRecTy [ConDeclField name]	        -- Only in data type declarations
 
@@ -369,17 +372,18 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
     sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
-ppr_mono_ty _         (HsBangTy b ty)     = ppr b <> ppr ty
-ppr_mono_ty _         (HsRecTy flds)      = pprConDeclFields flds
-ppr_mono_ty _         (HsTyVar name)      = ppr name
-ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
-ppr_mono_ty _         (HsTupleTy con tys) = tupleParens con (interpp'SP tys)
-ppr_mono_ty _         (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> pprKind kind)
-ppr_mono_ty _         (HsListTy ty)	  = brackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _         (HsPArrTy ty)	  = pabrackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _         (HsPredTy pred)     = ppr pred
-ppr_mono_ty _         (HsNumTy n)         = integer n  -- generics only
-ppr_mono_ty _         (HsSpliceTy s)      = pprSplice s
+ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr ty
+ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
+ppr_mono_ty _    (HsTyVar name)      = ppr name
+ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
+ppr_mono_ty _    (HsTupleTy con tys) = tupleParens con (interpp'SP tys)
+ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> pprKind kind)
+ppr_mono_ty _    (HsListTy ty)	     = brackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty _    (HsPredTy pred)     = ppr pred
+ppr_mono_ty _    (HsNumTy n)         = integer n  -- generics only
+ppr_mono_ty _    (HsSpliceTy s)      = pprSplice s
+ppr_mono_ty _    (HsSpliceTyOut k)   = text "<splicety>" <> dcolon <> ppr k
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $

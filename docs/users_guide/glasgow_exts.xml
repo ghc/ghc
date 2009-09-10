@@ -6065,12 +6065,11 @@ Wiki page</ulink>.
 		    have type <literal>Q Exp</literal></para></listitem>
 		    <listitem><para> an type; the spliced expression must
 		    have type <literal>Q Typ</literal></para></listitem>
-		    <listitem><para> a list of top-level declarations; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
+		    <listitem><para> a list of top-level declarations; the spliced expression 
+                    must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
-		</para>
 	    Inside a splice you can can only call functions defined in imported modules,
-	not functions defined elsewhere in the same module.</listitem>
-
+	not functions defined elsewhere in the same module.</para></listitem>
 
 	      <listitem><para>
 		  A expression quotation is written in Oxford brackets, thus:
@@ -6087,7 +6086,7 @@ Wiki page</ulink>.
 		  A quasi-quotation can appear in either a pattern context or an
 		  expression context and is also written in Oxford brackets:
 		  <itemizedlist>
-		    <listitem><para> <literal>[:<replaceable>varid</replaceable>| ... |]</literal>,
+		    <listitem><para> <literal>[$<replaceable>varid</replaceable>| ... |]</literal>,
                         where the "..." is an arbitrary string; a full description of the
 			quasi-quotation facility is given in <xref linkend="th-quasiquotation"/>.</para></listitem>
 		  </itemizedlist></para></listitem>
@@ -6107,6 +6106,25 @@ Wiki page</ulink>.
 	          may also be given as an argument to the <literal>reify</literal> function.
 	         </para>
 		</listitem>
+
+	      <listitem><para> You may omit the <literal>$(...)</literal> in a top-level declaration splice. 
+              Simply writing an expression (rather than a declaration) implies a splice.  For example, you can write
+<programlisting>
+module Foo where
+import Bar
+
+f x = x
+
+$(deriveStuff 'f)   -- Uses the $(...) notation
+
+g y = y+1
+
+deriveStuff 'g      -- Omits the $(...)
+
+h z = z-1
+</programlisting>
+            This abbreviation makes top-level declaration slices quieter and less intimidating.
+	    </para></listitem>
 
 		  
 	</itemizedlist>

@@ -191,6 +191,8 @@ rnHsType doc (HsDocTy ty haddock_doc) = do
     haddock_doc' <- rnLHsDoc haddock_doc
     return (HsDocTy ty' haddock_doc')
 
+rnHsType _ (HsSpliceTyOut {}) = panic "rnHsType"
+
 rnLHsTypes :: SDoc -> [LHsType RdrName]
            -> IOEnv (Env TcGblEnv TcLclEnv) [LHsType Name]
 rnLHsTypes doc tys = mapM (rnLHsType doc) tys

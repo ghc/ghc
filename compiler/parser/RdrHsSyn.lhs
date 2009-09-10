@@ -10,7 +10,7 @@ module RdrHsSyn (
  
 	mkHsOpApp, 
 	mkHsIntegral, mkHsFractional, mkHsIsString,
-	mkHsDo, mkHsSplice,
+	mkHsDo, mkHsSplice, mkTopSpliceDecl,
         mkClassDecl, mkTyData, mkTyFamily, mkTySynonym,
         splitCon, mkInlineSpec,	
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
@@ -128,7 +128,8 @@ extract_lty (L loc ty) acc
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty               	-> extract_lty ty acc
       HsNumTy _                 -> acc
-      HsSpliceTy _             	-> acc	-- Type splices mention no type variables
+      HsSpliceTy {}           	-> acc	-- Type splices mention no type variables
+      HsSpliceTyOut {}         	-> acc	-- Type splices mention no type variables
       HsKindSig ty _            -> extract_lty ty acc
       HsForAllTy _ [] cx ty     -> extract_lctxt cx (extract_lty ty acc)
       HsForAllTy _ tvs cx ty    -> acc ++ (filter ((`notElem` locals) . unLoc) $
@@ -223,6 +224,20 @@ mkTyFamily loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars tparams
        ; return (L loc (TyFamily flavour tc tyvars ksig)) }
+
+mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
+-- If the user wrote
+--	$(e)
+-- then that's the splice, but if she wrote, say,
+--      f x
+-- then behave as if she'd written
+--      $(f x)
+mkTopSpliceDecl expr
+  = SpliceD (SpliceDecl expr')
+  where
+    expr' = case expr of
+              (L _ (HsSpliceE (HsSplice _ expr))) -> expr
+              _other                              -> expr
 \end{code}
 
 %************************************************************************

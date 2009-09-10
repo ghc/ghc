@@ -542,7 +542,7 @@ data Token
   | ITprimfloat  Rational
   | ITprimdouble Rational
 
-  -- MetaHaskell extension tokens
+  -- Template Haskell extension tokens
   | ITopenExpQuote  		--  [| or [e|
   | ITopenPatQuote		--  [p|
   | ITopenDecQuote		--  [d|
