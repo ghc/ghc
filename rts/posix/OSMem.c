@@ -11,6 +11,7 @@
 
 #include "Rts.h"
 
+#include "RtsUtils.h"
 #include "sm/OSMem.h"
 
 #ifdef HAVE_UNISTD_H
@@ -36,7 +37,16 @@
 #include <mach/vm_map.h>
 #endif
 
+/* keep track of maps returned by my_mmap */
+typedef struct _map_rec {
+    char* base;              /* base addr */
+    int size;                /* map size */
+    struct _map_rec* next; /* next pointer */
+} map_rec;
+
+
 static caddr_t next_request = 0;
+static map_rec* mmap_rec = NULL;
 
 void osMemInit(void)
 {
@@ -177,7 +187,8 @@ osGetMBlocks(nat n)
 {
   caddr_t ret;
   lnat size = MBLOCK_SIZE * (lnat)n;
- 
+  map_rec* rec;
+
   if (next_request == 0) {
       // use gen_map_mblocks the first time.
       ret = gen_map_mblocks(size);
@@ -198,7 +209,11 @@ osGetMBlocks(nat n)
 	  ret = gen_map_mblocks(size);
       }
   }
-
+  rec = (map_rec*)stgMallocBytes(sizeof(map_rec),"OSMem: osGetMBlocks");
+  rec->size = size;
+  rec->base = ret;
+  rec->next = mmap_rec;
+  mmap_rec = rec;
   // Next time, we'll try to allocate right after the block we just got.
   // ToDo: check that we haven't already grabbed the memory at next_request
   next_request = ret + size;
@@ -208,7 +223,17 @@ osGetMBlocks(nat n)
 
 void osFreeAllMBlocks(void)
 {
-    /* XXX Do something here (bug #711) */
+    map_rec* tmp  = mmap_rec;
+    map_rec* next = NULL;
+
+    for(; tmp!=NULL;) {
+        if(munmap(tmp->base,tmp->size))
+            barf("osFreeAllMBlocks: munmap failed!");
+
+        next = tmp->next;
+        stgFree(tmp);
+        tmp = next;
+    }
 }
 
 lnat getPageSize (void)
