@@ -1,2 +1,6 @@
 
-Simple2a.hs:12:2: parse error (possibly incorrect indentation)
+Simple2a.hs:11:10:
+    Conflicting definitions for `Sd'
+    Bound at: Simple2a.hs:11:10-11
+              Simple2a.hs:12:10-11
+    In the associated types of an instance declaration
