@@ -66,7 +66,7 @@ $(call all-target,$1_$2,$1/$2/package-data.mk)
 # We have a rule for package-data.mk only when the package is
 # disabled, because we want the build to fail if we haven't run phase 0.
 ifneq "$(BINDIST)" "YES"
-$(call build-package-data,$1,$2)
+$(call build-package-data,$1,$2,$3)
 endif
 
 else

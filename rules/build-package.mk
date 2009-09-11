@@ -68,7 +68,6 @@ clean_$1_$2_config:
 
 # --- CONFIGURATION
 
-$1_$2_USE_BOOT_LIBS = YES
 $(call package-config,$1,$2,$3)
 
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
@@ -89,7 +88,7 @@ $(call all-target,$1_$2,$1/$2/package-data.mk)
 ifneq "$$(BINDIST)" "YES"
 # We have a rule for package-data.mk only when the package is
 # disabled, because we want the build to fail if we haven't run phase 0.
-$(call build-package-data,$1,$2)
+$(call build-package-data,$1,$2,$3)
 endif
 
 else

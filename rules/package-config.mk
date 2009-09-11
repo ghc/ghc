@@ -27,11 +27,9 @@ $1_$2_HC_MK_DEPEND = $$($1_$2_HC)
 # on cygwin we get a dep on c:/ghc/..., and make gets confused by the :
 $1_$2_HC_MK_DEPEND_DEP =
 $1_$2_HC_DEP =
-ifeq "$$($1_$2_USE_BOOT_LIBS)" "YES"
 $1_$2_HC_PKGCONF = -package-conf $$(BOOTSTRAPPING_CONF)
 $1_$2_GHC_PKG_OPTS = --package-conf=$$(BOOTSTRAPPING_CONF)
 $1_$2_CONFIGURE_OPTS += --package-db=$$(TOP)/$$(BOOTSTRAPPING_CONF)
-endif
 else
 $1_$2_ghc_ge_609 = YES
 $1_$2_HC_PKGCONF = 

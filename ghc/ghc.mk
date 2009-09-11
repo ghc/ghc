@@ -50,7 +50,6 @@ ghc_stage2_PROG = ghc-stage2$(exeext)
 ghc_stage3_PROG = ghc-stage3$(exeext)
 
 # ToDo: perhaps use ghc-cabal to configure ghc-bin
-ghc_stage1_USE_BOOT_LIBS = YES
 ghc_stage1_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage1_VERSION)
 ghc_stage2_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage2_VERSION)
 ghc_stage3_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSION)
