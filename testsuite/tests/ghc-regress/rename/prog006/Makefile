@@ -15,14 +15,23 @@ include $(TOP)/mk/test.mk
 # If the package format changes, we might have to re-generate pkg.conf
 # using the supplied Cabal configuration.
 
+LOCAL_PKGCONF=local.package.conf
+LOCAL_GHC_PKG = $(GHC_PKG) --no-user-package-conf -f $(LOCAL_PKGCONF)
+
 rn.prog006:
 	$(TEST_HC) --make pwd -v0
 	$(TEST_HC) --make -package-name test-1.0 B.C -fforce-recomp -v0
-	sed "s@__IMPORT__@`./pwd`@" <pkg.conf.in >pkg.conf
-	$(TEST_HC) -c -package-conf pkg.conf -package test -fforce-recomp A.hs -i
+	rm -f pkg.conf
+	echo "name: test" >>pkg.conf
+	echo "version: 1.0" >>pkg.conf
+	echo "id: test-XXX" >>pkg.conf
+	echo "import-dirs: `pwd`" >>pkg.conf
+	echo "exposed-modules: B.C" >>pkg.conf
+	echo "[]" >$(LOCAL_PKGCONF)
+	$(LOCAL_GHC_PKG) register pkg.conf -v0
+	$(TEST_HC) -c -package-conf $(LOCAL_PKGCONF) -package test -fforce-recomp A.hs -i
 # The -i clears the search path, so A.hs will find B.C from package test
-#
-	-$(TEST_HC) -c -package-conf pkg.conf -package test -fforce-recomp Main.hs
+	-$(TEST_HC) -c -package-conf $(LOCAL_PKGCONF) -package test -fforce-recomp Main.hs
 # No -i when compiling Main, so a from-scratch search would find a home-pkg module B.C
 # However, A.hi remembers that B.C came from package test, so all is ok.
 
