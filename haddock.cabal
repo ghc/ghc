@@ -65,7 +65,7 @@ flag in-ghc-tree
 
 executable haddock
   build-depends:
-    base >= 4.0.0.0 && < 4.2.0.0,
+    base >= 4.0.0.0 && < 4.3.0.0,
     filepath,
     directory,
     pretty,
