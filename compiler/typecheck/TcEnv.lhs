@@ -538,7 +538,7 @@ checkWellStaged pp_thing bind_lvl use_lvl
   = failWithTc $ 
     sep [ptext (sLit "GHC stage restriction:") <+>  pp_thing,
 	 nest 2 (vcat [ ptext (sLit "is used in a top-level splice or annotation,")
-                      , ptext (sLit ", and must be imported, not defined locally")])]
+                      , ptext (sLit "and must be imported, not defined locally")])]
 
   | otherwise			-- Badly staged
   = failWithTc $ 		-- E.g.  \x -> $(f x)
