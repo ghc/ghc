@@ -45,7 +45,7 @@ $1/$2/package-data.mk $1/$2/inplace-pkg-config $1/$2/build/autogen/cabal_macros.
 	"$$(GHC_CABAL_INPLACE)" configure --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" --with-gcc="$$(WhatGccIsCalled)" --configure-option=--with-cc="$$(WhatGccIsCalled)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS) -- $2 $1
 ifeq "$$($1_$2_PROG)" ""
 ifeq "$$(ghc_ge_6102) $$($1_$2_USE_BOOT_LIBS)" "NO YES" # NOTE [1] below
-	    cat $1/$2/inplace-pkg-config | sed "s|^import-dirs:|import-dirs: $(TOP)/$1 $(TOP)/$1/src |" | "$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) -
+	    cat $1/$2/inplace-pkg-config | sed "s@^import-dirs:@import-dirs: $(TOP)/$1 $(TOP)/$1/src @" | "$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) -
 else
 	    "$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
 endif
