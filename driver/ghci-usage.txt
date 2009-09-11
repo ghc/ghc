@@ -23,4 +23,4 @@ GHC does.  Some of the options that are commonly used are:
 Full details can be found in the User's Guide, an online copy of which
 can be found here:
 
-    http://www.haskell.org/ghc/documentation.html
+    http://haskell.org/haskellwiki/GHC

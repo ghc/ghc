@@ -75,6 +75,6 @@ Given the above, here are some TYPICAL invocations of $$:
 The User's Guide has more information about GHC's *many* options.  An
 online copy can be found here:
 
-   http://www.haskell.org/ghc/documentation.html
+   http://haskell.org/haskellwiki/GHC
 
 ------------------------------------------------------------------------
