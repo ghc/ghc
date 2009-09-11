@@ -48,6 +48,10 @@ import System.IO.Error (try)
 import Data.List
 import Control.Concurrent
 
+import qualified Data.ByteString.Lazy as B
+import qualified Data.Binary as Bin
+import qualified Data.Binary.Get as Bin
+
 import Foreign
 import Foreign.C
 #ifdef mingw32_HOST_OS
@@ -551,7 +555,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
                   | tcache >= tdir -> do
                      when (verbosity > Normal) $
                         putStrLn ("using cache: " ++ cache)
-                     pkgs <- readBinPackageDB cache
+                     pkgs <- myReadBinPackageDB cache
                      let pkgs' = map convertPackageInfoIn pkgs
                      return PackageDB { location = path, packages = pkgs' }
                   | otherwise -> do
@@ -566,6 +570,17 @@ readParseDatabase verbosity mb_user_conf use_cache path
                                    map (path </>) confs
                      return PackageDB { location = path, packages = pkgs }
 
+-- read the package.cache file strictly, to work around a problem with
+-- bytestring 0.9.0.x (fixed in 0.9.1.x) where the file wasn't closed
+-- after it has been completely read, leading to a sharing violation
+-- later.
+myReadBinPackageDB :: FilePath -> IO [InstalledPackageInfoString]
+myReadBinPackageDB filepath = do
+  h <- openBinaryFile filepath ReadMode
+  sz <- hFileSize h
+  b <- B.hGet h (fromIntegral sz)
+  hClose h
+  return $ Bin.runGet Bin.get b
 
 parseMultiPackageConf :: Verbosity -> FilePath -> IO [InstalledPackageInfo]
 parseMultiPackageConf verbosity file = do
