@@ -1,11 +1,6 @@
 # -----------------------------------------------------------------------------
 # These tests we do even for 'make fast'
 
-def f( opts ):
-  opts.extra_hc_opts = '-fglasgow-exts'
-
-setTestOpts(f)
-
 test('conc003', normal, compile_and_run, [''])
 test('conc006', normal, compile_and_run, [''])
 test('conc027', normal, compile_and_run, [''])
@@ -32,7 +27,6 @@ test('3429', extra_run_opts('+RTS -i0.001 -RTS'), compile_and_run, [''])
 # These tests we only do for a full run
 
 def f( opts ):
-  opts.extra_hc_opts = '-fglasgow-exts'
   if config.fast:
   	opts.skip = 1
 
