@@ -1,4 +1,7 @@
 localshadow1.package.conf:
-    (shadow-1), (shadowdep-1)
+    (shadow-1)
+    (shadowdep-1)
+
 localshadow2.package.conf:
     (shadow-1)
+
