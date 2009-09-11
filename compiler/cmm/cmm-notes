@@ -1,0 +1,345 @@
+Notes on new codegen (Sept 09)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Things to do:
+ - Top-level SRT threading is a bit ugly
+
+ - Add type/newtype for CmmModule = [CmmGroup]    -- A module
+                        CmmGroup  = [CmmTop]      -- A .o file
+                        CmmTop    = Proc | Data   -- A procedure or data
+
+ - This is a *change*: currently a CmmGroup is one function's-worth of code
+   regardless of SplitObjs.   Question: can we *always* generate M.o if there
+   is just one element in the list (rather than M/M1.o, M/M2.o etc)
+
+ - Change  
+      type CmmZ = GenCmm CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
+   to
+      type CmmZ = GenCmm CmmStatic (CmmInfo, CmmStackInfo) CmmGraph
+	-- And perhaps take opportunity to prune CmmInfo?
+
+ - Clarify which fields of CmmInfo are still used
+ - Maybe get rid of CmmFormals arg of CmmProc in all versions?
+
+ - We aren't sure whether cmmToRawCmm is actively used by the new pipeline; check
+   And what does CmmBuildInfoTables do?!
+
+ - Nuke CmmZipUtil, move zipPreds into ZipCfg
+
+ - Pull out Areas into its own module
+   Parameterise AreaMap
+   Add ByteWidth = Int
+   type SubArea    = (Area, ByteOff, ByteWidth) 
+   ByteOff should not be defined in SMRep -- that is too high up the hierarchy
+   
+ - Think about a non-flattened representation?
+
+ - LastCall: 
+    * Use record fields for LastCall!
+    * cml_ret_off should be a ByteOff
+    * Split into 
+         LastCall (which has a successor) and
+         LastJump (which does not, includes return?)
+	   - does not have cml_cont, cml_ret_args, cml_ret_off
+	 LastForeignCall 
+           - safe! 
+           - expands into save/MidForeignCall/restore/goto
+	   - like any LastCall, target of the call gets an info table
+
+ - JD: remind self of what goes wrong if you turn off the 
+   liveness of the update frame
+
+ - Garbage-collect http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/CPS
+   moving good stuff into 
+   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
+
+
+ - We believe that all of CmmProcPointZ.addProcPointProtocols is dead.  What
+   goes wrong if we simply never call it?
+
+ - Something fishy in CmmStackLayout.hs
+   * In particular, 'getAreaSize' returns an AreaMap, but we *know* the width of
+	LocalRegs, so it'd be better to return FiniteMap AreaId ByteWidth
+   * setSuccSPs looks fishy.  Rather than lookin in procPoints, it could
+	just lookup the block in areaSize which, after all, has a binding
+	for precisely successors of calls.  All other blocks (including proc
+        points that are not successors of a call, we think) can be treated
+        uniformly: zero-size Area, and use inSP.
+
+Dead files
+~~~~~~~~~~
+CmmProcPoint (Michael Adams)
+CmmCPS (ditto)
+HscMain.optionallyConvertAndOrCPS
+        testCmmConversion
+DynFlags:  -fconvert-to-zipper-and-back, -frun-cps, -frun-cpsz
+
+Proc-points
+~~~~~~~~~~~~
+Consider this program, which has a diamond control flow, 
+with a call on one branch
+ fn(p,x) {
+        h()
+	if b then { ... f(x) ...; q=5; goto J }
+             else { ...; q=7; goto J }
+     J: ..p...q...
+  }
+then the join point J is a "proc-point".  So, is 'p' passed to J
+as a parameter?  Or, if 'p' was saved on the stack anyway, perhaps
+to keep it alive across the call to h(), maybe 'p' gets communicated
+to J that way. This is an awkward choice.  (We think that we currently
+never pass variables to join points via arguments.)
+
+Furthermore, there is *no way* to pass q to J in a register (other
+than a paramter register).
+
+What we want is to do register allocation across the whole caboodle.
+Then we could drop all the code that deals with the above awkward
+decisions about spilling variables across proc-points.
+
+Note that J doesn't need an info table.
+
+What we really want is for each Block to have an optional info table.
+To do that, we need to be polymorphic over first nodes.
+
+Figuring out proc-points
+~~~~~~~~~~~~~~~~~~~~~~~~
+Proc-points are identified by
+CmmProcPointZ.minimalProcPointSet/extendPPSet Although there isn't
+that much code, JD thinks that it could be done much more nicely using
+a dominator analysis, using the Dataflow Engine.
+
+----------------------------------------------------
+      Top-level structure
+----------------------------------------------------
+
+* New codgen called in HscMain.hscGenHardCode, by calling HscMain.tryNewCodeGen, 
+  enabled by -fnew-codegen (Opt_TryNewCodeGen)
+
+  THEN it calls CmmInfo.cmmToRawCmm to lay out the details of info tables
+      type Cmm    = GenCmm CmmStatic CmmInfo     (ListGraph CmmStmt)
+      type RawCmm = GenCmm CmmStatic [CmmStatic] (ListGraph CmmStmt)
+
+* HscMain.tryNewCodeGen
+    - STG->Cmm:    StgCmm.codeGen (new codegen)
+    - Optimise:    CmmContFlowOpt (simple optimisations, very self contained)
+    - Cps convert: CmmCPSZ.protoCmmCPSZ 
+    - Optimise:    CmmContFlowOpt again
+    - Convert:     CmmCvt.cmmOfZgraph (convert to old rep) very self contained
+
+* StgCmm.hs  The new STG -> Cmm conversion code generator
+  Lots of modules StgCmmXXX
+
+
+----------------------------------------------------
+      CmmCPSZ.protoCmmCPSZ   The new pipeline
+----------------------------------------------------
+
+CmmCPSZprotoCmmCPSZ:
+   1. Do cpsTop for each procedures separately
+   2. Build SRT representation; this spans multiple procedures
+	(unless split-objs)
+
+cpsTop:
+  * CmmCommonBlockElimZ.elimCommonBlocks:
+	eliminate common blocks 
+
+  * CmmProcPointZ.minimalProcPointSet
+	identify proc-points
+
+  * CmmProcPointZ.addProcPointProtocols
+	something to do with the MA optimisation
+        probably entirely unnecessary
+
+
+  * Spill and reload:
+     - CmmSpillReload.dualLivenessWithInsertion
+       insert spills/reloads across 
+	   LastCalls, and 
+	   Branches to proc-points
+     Now sink those reloads:
+     - CmmSpillReload.insertLateReloads
+     - CmmSpillReload.removeDeadAssignmentsAndReloads
+
+  * CmmStackLayout.stubSlotsOnDeath
+	debug only: zero out dead slots when they die
+
+  * Stack layout
+     - CmmStackLayout.lifeSlotAnal: 
+       find which sub-areas are live on entry to each block
+
+     - CmmStackLayout.layout
+       Lay out the stack, returning an AreaMap
+         type AreaMap    = FiniteMap Area ByteOff
+          -- Byte offset of the oldest byte of the Area, 
+          -- relative to the oldest byte of the Old Area
+
+     - CmmStackLayout.manifestSP
+       Manifest the stack pointer
+
+   * Split into separate procedures
+      - CmmProcPointZ.procPointAnalysis
+        Given set of proc points, which blocks are reachable from each
+
+      - CmmProcPointZ.splitAtProcPoints
+	Using this info, split into separate procedures
+
+----------------------------------------------------
+		CAFs
+----------------------------------------------------
+
+* The code for a procedure f may refer to either the *closure* 
+  or the *entry point* of another top-level procedure g.  
+  If f is live, then so is g.  f's SRT must include g's closure.
+
+* The CLabel for the entry-point/closure reveals whether g is 
+  a CAF (or refers to CAFs).  See the IdLabell constructor of CLabel.
+
+* The CAF-ness of the original top-level defininions is figured out
+  (by TidyPgm) before we generate C--.  This CafInfo is only set for
+  top-level Ids; nested bindings stay with NoCafRefs.
+
+* Currently an SRT contains (only) pointers to (top-level) closures.
+
+* Consider this Core code
+	f = \x -> let g = \y -> ...x...y...h1...
+                  in ...h2...g...
+  and suppose that h1, h2 have IdInfo of MayHaveCafRefs.
+  Therefore, so will f,  But g will not (since it's nested).
+
+  This generates C-- roughly like this:
+     f_closure: .word f_entry
+     f_entry() [info-tbl-for-f] { ...jump g_entry...jump h2... }
+     g_entry() [info-tbl-for-g] { ...jump h1 }
+
+  Note that there is no top-level closure for g (only an info table).
+  So:   info-tbl-for-f must have an SRT that keeps h1,h2 alive
+        info-tbl-for-g must have an SRT that keeps h1 (only) alive
+
+  But if we just look for the free CAF refs, we get:
+	f   h2 (only)
+        g   h1
+
+  So we need to do a transitive closure thing to flesh out 
+  f's keep-alive refs to include h1.
+
+* The SRT info is the C_SRT field of Cmm.ClosureTypeInfo in a
+  CmmInfoTable attached to each CmmProc.  CmmCPSZ.toTops actually does
+  the attaching, right at the end of the pipeline.  The C_SRT part
+  gives offsets within a single, shared table of closure pointers.
+
+----------------------------------------------------
+		Foreign calls
+----------------------------------------------------
+
+See Note [Foreign calls] in ZipCfgCmmRep!  This explains that a safe
+foreign call must do this:
+  save thread state
+  push info table (on thread stack) to describe frame
+  make call (via C stack)
+  pop info table
+  restore thread state
+and explains why this expansion must be done late in the day.
+
+Hence, 
+  - Every foreign call is represented as a middle node
+
+  - *Unsafe* foreign calls are simply "fat machine instructions"
+      and are passed along to the native code generator
+
+  - *Safe* foreign calls are "lowered" to unsafe calls by wrapping
+      them in the above save/restore sequence. This step is done
+      very late in the pipeline, just before handing to the native
+      code gen.   
+  
+      This lowering is done by BuildInfoTables.lowerSafeForeignCalls
+
+
+NEW PLAN for foreign calls:
+  - Unsafe foreign calls remain as a middle node (fat machine instruction)
+    Even the parameter passing is not lowered (just as machine instrs
+    get arguments).
+
+  - Initially, safe foreign calls appear as LastCalls with 
+	
+
+----------------------------------------------------
+		Cmm representations
+----------------------------------------------------
+
+* Cmm.hs
+     The type [GenCmm d h g] represents a whole module, 
+	** one list element per .o file **
+	Without SplitObjs, the list has exactly one element
+
+     newtype GenCmm d h g = Cmm [GenCmmTop d h g]  -- A whole .o file
+     data GenCmmTop d h g
+         = CmmProc h g           -- One procedure, graph d
+         | CmmData <stuff> [d]   -- Initialised data, items d
+
+  Old and new piplines use different representations
+  	(CmmCvt.hs converts between the two)
+
+
+-------------
+OLD BACK END representations (Cmm.hs):  
+      type Cmm = GenCmm CmmStatic CmmInfo (ListGraph CmmStmt)
+				-- A whole module
+      newtype ListGraph i = ListGraph [GenBasicBlock i]
+
+      data CmmStmt = Assign | Store | Return etc -- OLD BACK END ONLY
+
+
+   Once the info tables are laid out, we replace CmmInfo with [CmmStatic]
+      type RawCmm    = GenCmm CmmStatic [CmmStatic] (ListGraph CmmStmt)
+   which represents the info tables as data, that should 
+   immediately precede the code
+  
+-------------
+NEW BACK END representations 
+* Not Cmm-specific at all
+    ZipCfg.hs defines  Graph, LGraph, FGraph,
+                       ZHead, ZTail, ZBlock ...
+
+              classes  LastNode, HavingSuccessors
+
+    MkZipCfg.hs: AGraph: building graphs
+
+* ZipCfgCmmRep: instantiates ZipCfg for Cmm
+      data Middle = ...CmmExpr...
+      data Last = ...CmmExpr...
+      type CmmGraph = Graph Middle Last
+
+      type CmmZ = GenCmm CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
+      type CmmStackInfo = (ByteOff, Maybe ByteOff)
+                -- (SP offset on entry, update frame space = SP offset on exit)
+		-- The new codegen produces CmmZ, but once the stack is 
+		-- manifested we can drop that in favour of 
+		--    GenCmm CmmStatic CmmInfo CmmGraph
+
+      Inside a CmmProc:
+	   - CLabel: used
+	   - CmmInfo: partly used by NEW
+           - CmmFormals: not used at all  PERHAPS NOT EVEN BY OLD PIPELINE!
+
+* MkZipCfgCmm.hs: smart constructors for ZipCfgCmmRep
+   Depends on (a) MkZipCfg (Cmm-independent)
+   	      (b) ZipCfgCmmRep (Cmm-specific)
+
+-------------
+* SHARED stuff
+  CmmExpr.hs defines the Cmm expression types
+	- CmmExpr, CmmReg, Width, CmmLit, LocalReg, GlobalReg
+	- CmmType, Width etc   (saparate module?)
+	- MachOp               (separate module?)
+	- Area, AreaId etc     (separate module?)
+
+  BlockId.hs defines  BlockId, BlockEnv, BlockSet
+
+-------------
+
+
+-------------
+* Transactions indicate whether or not the result changes: CmmTx 
+     type Tx a = a -> TxRes a
+     data TxRes a = TxRes ChangeFlag a
