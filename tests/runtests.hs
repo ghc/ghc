@@ -25,7 +25,7 @@ haddockEq file1 file2 = stripLinks file1 == stripLinks file2
 
 
 programOnPath p = do
-  result <- findProgramOnPath p silent
+  result <- findProgramOnPath silent p
   return (isJust result)
 
 
@@ -70,9 +70,9 @@ test = do
   putStrLn ""
 
   libdir <- rawSystemStdout normal "../dist/build/haddock/haddock" ["--print-ghc-libdir"]
-  let basepath = init libdir ++ "/../../share/doc/ghc/libraries/base/"
+  let basepath = init libdir ++ "/../../share/doc/ghc/html/libraries/base/"
   let base = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
-  let processpath = init libdir ++ "/../../share/doc/ghc/libraries/process/"
+  let processpath = init libdir ++ "/../../share/doc/ghc/html/libraries/process/"
   let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
 
   putStrLn "Running tests..."
