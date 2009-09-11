@@ -236,19 +236,19 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc count
 	Pretty.bufLeftRender h
 		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map pprNatCmmTop native
 
-	let lsPprNative =
+           -- carefully evaluate this strictly.  Binding it with 'let'
+           -- and then using 'seq' doesn't work, because the let
+           -- apparently gets inlined first.
+	lsPprNative <- return $!
 		if  dopt Opt_D_dump_asm       dflags
 	         || dopt Opt_D_dump_asm_stats dflags
 			then native
 			else []
 
-	let count'	= count + 1;
-
+	count' <- return $! count + 1;
 
 	-- force evaulation all this stuff to avoid space leaks
 	seqString (showSDoc $ vcat $ map ppr imports) `seq` return ()
-	lsPprNative 	`seq` return ()
-	count'		`seq` return ()
 
 	cmmNativeGens dflags h us' cmms
 			(imports : impAcc)
