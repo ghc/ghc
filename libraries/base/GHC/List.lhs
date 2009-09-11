@@ -89,7 +89,7 @@ last (x:xs)             =  last' x xs
 #endif
 
 -- | Return all the elements of a list except the last one.
--- The list must be finite and non-empty.
+-- The list must be non-empty.
 init                    :: [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 init [x]                =  []
