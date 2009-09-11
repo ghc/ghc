@@ -29,7 +29,7 @@ import CoreUtils
 import CoreArity	( exprArity )
 import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict, Arity )
-import CostCentre       ( currentCCS )
+import CostCentre       ( currentCCS, pushCCisNop )
 import TysPrim          ( realWorldStatePrimTy )
 import PrelInfo         ( realWorldPrimId )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel,
@@ -1004,6 +1004,9 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
 simplNote :: SimplEnv -> Note -> CoreExpr -> SimplCont
           -> SimplM (SimplEnv, OutExpr)
 simplNote env (SCC cc) e cont
+  | pushCCisNop cc (getEnclosingCC env)  -- scc "f" (...(scc "f" e)...) 
+  = simplExprF env e cont	         -- ==>  scc "f" (...e...)
+  | otherwise
   = do  { e' <- simplExpr (setEnclosingCC env currentCCS) e
         ; rebuild env (mkSCC cc e') cont }
 

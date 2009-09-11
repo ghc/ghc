@@ -430,6 +430,8 @@ filters down the matching alternatives in Simplify.rebuildCase.
 		applications.  Note that primop Ids aren't considered
 		trivial unless 
 
+Note [Variable are trivial]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There used to be a gruesome test for (hasNoBinding v) in the
 Var case:
 	exprIsTrivial (Var v) | hasNoBinding v = idArity v == 0
@@ -441,19 +443,22 @@ completely un-applied primops and foreign-call Ids are sufficiently
 rare that I plan to allow them to be duplicated and put up with
 saturating them.
 
-SCC notes.  We do not treat (_scc_ "foo" x) as trivial, because 
-  a) it really generates code, (and a heap object when it's 
-     a function arg) to capture the cost centre
-  b) see the note [SCC-and-exprIsTrivial] in Simplify.simplLazyBind
+Note [SCCs are trivial]
+~~~~~~~~~~~~~~~~~~~~~~~
+We used not to treat (_scc_ "foo" x) as trivial, because it really
+generates code, (and a heap object when it's a function arg) to
+capture the cost centre.  However, the profiling system discounts the
+allocation costs for such "boxing thunks" whereas the extra costs of
+*not* inlining otherwise-trivial bindings can be high, and are hard to
+discount.
 
 \begin{code}
 exprIsTrivial :: CoreExpr -> Bool
-exprIsTrivial (Var _)          = True        -- See notes above
+exprIsTrivial (Var _)          = True        -- See Note [Variables are trivial]
 exprIsTrivial (Type _)         = True
 exprIsTrivial (Lit lit)        = litIsTrivial lit
 exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
-exprIsTrivial (Note (SCC _) _) = False       -- See notes above
-exprIsTrivial (Note _       e) = exprIsTrivial e
+exprIsTrivial (Note _       e) = exprIsTrivial e  -- See Note [SCCs are trivial]
 exprIsTrivial (Cast e _)       = exprIsTrivial e
 exprIsTrivial (Lam b body)     = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial _                = False
