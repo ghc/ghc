@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
 module Main where
 
 -- !!! test for uncaught exception
