@@ -15,7 +15,7 @@ Library {
     exposed-modules:
             Distribution.InstalledPackageInfo.Binary
 
-    build-depends: base == 4.*,
+    build-depends: base >= 3 && < 5,
                    binary == 0.5.*,
                    Cabal == 1.7.*
 }
