@@ -308,8 +308,8 @@ serialiseName bh name _ = do
 -- Hmm, why didn't we dare to make this instance already? It makes things
 -- much easier.
 instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
-  put_ bh m = put_ bh (Map.toAscList m)
-  get bh = fmap (Map.fromAscList) (get bh)
+  put_ bh m = put_ bh (Map.toList m)
+  get bh = fmap (Map.fromList) (get bh)
 
 
 instance Binary InterfaceFile where
