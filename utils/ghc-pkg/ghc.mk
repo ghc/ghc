@@ -62,7 +62,7 @@ utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main
 	       -ilibraries/extensible-exceptions \
 	       -ilibraries/hpc \
 	       -ilibraries/binary/src \
-	       -ilibraries/bin-package-db \
+	       -ilibraries/bin-package-db
 
 
 utils/ghc-pkg/Version.hs: mk/project.mk
