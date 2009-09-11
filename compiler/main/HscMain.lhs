@@ -802,8 +802,8 @@ tryNewCodeGen hsc_env this_mod data_tycons imported_mods
 	; prog <- return $ map (runTx $ runCmmOpts cmmCfgOptsZ) prog
 		-- Control flow optimisation
 
-        -- Note: Have to thread the module's SRT through all the procedures
-        -- because we greedily build it as we go.
+        -- We are building a single SRT for the entire module, so
+        -- we must thread it through all the procedures as we cps-convert them.
         ; us <- mkSplitUniqSupply 'S'
         ; let topSRT = initUs_ us emptySRT
 	; (topSRT, prog) <- foldM (protoCmmCPSZ hsc_env) (topSRT, []) prog

@@ -2,6 +2,8 @@ Notes on new codegen (Sept 09)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Things to do:
+ - Consider module names
+
  - Top-level SRT threading is a bit ugly
 
  - Add type/newtype for CmmModule = [CmmGroup]    -- A module
@@ -11,6 +13,10 @@ Things to do:
  - This is a *change*: currently a CmmGroup is one function's-worth of code
    regardless of SplitObjs.   Question: can we *always* generate M.o if there
    is just one element in the list (rather than M/M1.o, M/M2.o etc)
+
+   One SRT per group.
+
+ - See "CAFs" below; we want to totally refactor the way SRTs are calculated
 
  - Change  
       type CmmZ = GenCmm CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
@@ -32,6 +38,11 @@ Things to do:
    type SubArea    = (Area, ByteOff, ByteWidth) 
    ByteOff should not be defined in SMRep -- that is too high up the hierarchy
    
+ - SMRep should not be imported by any module in cmm/!  Make it so.
+	-- ByteOff etc   ==>  CmmExpr
+        -- rET_SMALL etc ==> CmmInfo
+   Check that there are no other imports from codeGen in cmm/
+
  - Think about a non-flattened representation?
 
  - LastCall: 
@@ -66,48 +77,108 @@ Things to do:
         points that are not successors of a call, we think) can be treated
         uniformly: zero-size Area, and use inSP.
 
-Dead files
-~~~~~~~~~~
-CmmProcPoint (Michael Adams)
-CmmCPS (ditto)
+
+ - Currently AsmCodeGen top level calls AsmCodeGen.cmmToCmm, which is a small
+   C-- optimiser.  It has quite a lot of boilerplate folding code in AsmCodeGen
+   (cmmBlockConFold, cmmStmtConFold, cmmExprConFold), before calling out to
+   CmmOpt.  ToDo: see what optimisations are being done; and do them before
+   AsmCodeGen.
+
+ - Modularise the CPS pipeline; instead of ...; A;B;C; ...
+                                use  ..; ABC; ....
+
+ - Most of HscMain.tryNewCodeGen does not belong in HscMain.  Instead
+	if new_cg then
+             StgCmm.codeGen
+             processCmm  [including generating "raw" cmm]
+        else
+             CodeGen.codeGen
+             cmmToRawCmm
+
+
+ - If we stick CAF and stack liveness info on a LastCall node (not LastRet/Jump)
+   then all CAF and stack liveness stuff be completed before we split
+   into separate C procedures.
+
+   Short term:
+     compute and attach liveness into to LastCall
+     right at end, split, cvt to old rep
+     [must split before cvt, because old rep is not expressive enough]
+
+   Longer term: 
+     when old rep disappears, 
+     move the whole splitting game into the C back end *only*
+	 (guided by the procpoint set)
+
+      
+----------------------------------------------------
+	Modules in cmm/
+----------------------------------------------------
+
+-------- Dead stuff ------------
+CmmProcPoint        Dead: Michael Adams
+CmmCPS              Dead: Michael Adams
+CmmCPSGen.hs        Dead: Michael Adams
+CmmBrokenBlock.hs   Dead: Michael Adams
+CmmLive.hs          Dead: Michael Adams
+CmmProcPoint.hs     Dead: Michael Adams
+Dataflow.hs         Dead: Michael Adams
+StackColor.hs       Norman?
+StackPlacements.hs  Norman?
+
 HscMain.optionallyConvertAndOrCPS
         testCmmConversion
 DynFlags:  -fconvert-to-zipper-and-back, -frun-cps, -frun-cpsz
 
-Proc-points
-~~~~~~~~~~~~
-Consider this program, which has a diamond control flow, 
-with a call on one branch
- fn(p,x) {
-        h()
-	if b then { ... f(x) ...; q=5; goto J }
-             else { ...; q=7; goto J }
-     J: ..p...q...
-  }
-then the join point J is a "proc-point".  So, is 'p' passed to J
-as a parameter?  Or, if 'p' was saved on the stack anyway, perhaps
-to keep it alive across the call to h(), maybe 'p' gets communicated
-to J that way. This is an awkward choice.  (We think that we currently
-never pass variables to join points via arguments.)
+-------- Moribund stuff ------------
+CmmCvt.hs      Conversion between old and new Cmm reps
+CmmOpt.hs      Hopefully-redundant optimiser
+CmmZipUtil.hs  Only one function; move elsewhere
 
-Furthermore, there is *no way* to pass q to J in a register (other
-than a paramter register).
+-------- Stuff to keep ------------
+CmmCPSZ.hs	          Driver for new pipeline
 
-What we want is to do register allocation across the whole caboodle.
-Then we could drop all the code that deals with the above awkward
-decisions about spilling variables across proc-points.
+CmmLiveZ.hs	          Liveness analysis, dead code elim
+CmmProcPointZ.hs          Identifying and splitting out proc-points
 
-Note that J doesn't need an info table.
+CmmSpillReload.hs         Save and restore across calls
 
-What we really want is for each Block to have an optional info table.
-To do that, we need to be polymorphic over first nodes.
+CmmCommonBlockElimZ.hs    Common block elim
+CmmContFlowOpt.hs         Other optimisations (branch-chain, merging)
 
-Figuring out proc-points
-~~~~~~~~~~~~~~~~~~~~~~~~
-Proc-points are identified by
-CmmProcPointZ.minimalProcPointSet/extendPPSet Although there isn't
-that much code, JD thinks that it could be done much more nicely using
-a dominator analysis, using the Dataflow Engine.
+CmmBuildInfoTables.hs     New info-table 
+CmmStackLayout.hs         and stack layout 
+CmmCallConv.hs
+CmmInfo.hs                Defn of InfoTables, and conversion to exact layout
+
+---------- Cmm data types --------------
+ZipCfgCmmRep.hs	    Cmm instantiations of dataflow graph framework
+MkZipCfgCmm.hs      Cmm instantiations of dataflow graph framework
+
+Cmm.hs	      Key module; a mix of old and new stuff
+                  so needs tidying up in due course
+CmmExpr.hs
+CmmUtils.hs
+CmmLint.hs
+
+PprC.hs	            Pretty print Cmm in C syntax
+PprCmm.hs	    Pretty printer for Cmm
+PprCmmZ.hs	    Additional stuff for zipper rep
+
+CLabel.hs     CLabel
+
+----------  Dataflow modules --------------
+   Goal: separate library; for now, separate directory
+
+MkZipCfg.hs
+ZipCfg.hs
+ZipCfgExtras.hs
+ZipDataflow.hs
+CmmTx.hs	      Transactions
+OptimizationFuel.hs   Fuel
+BlockId.hs    BlockId, BlockEnv, BlockSet
+DFMonad.hs	      
+
 
 ----------------------------------------------------
       Top-level structure
@@ -146,11 +217,11 @@ cpsTop:
 
   * CmmProcPointZ.minimalProcPointSet
 	identify proc-points
+        no change to graph
 
   * CmmProcPointZ.addProcPointProtocols
 	something to do with the MA optimisation
         probably entirely unnecessary
-
 
   * Spill and reload:
      - CmmSpillReload.dualLivenessWithInsertion
@@ -170,7 +241,7 @@ cpsTop:
 
      - CmmStackLayout.layout
        Lay out the stack, returning an AreaMap
-         type AreaMap    = FiniteMap Area ByteOff
+         type AreaMap = FiniteMap Area ByteOff
           -- Byte offset of the oldest byte of the Area, 
           -- relative to the oldest byte of the Old Area
 
@@ -180,9 +251,52 @@ cpsTop:
    * Split into separate procedures
       - CmmProcPointZ.procPointAnalysis
         Given set of proc points, which blocks are reachable from each
+        Claim: too few proc-points => code duplication, but program still works??
 
       - CmmProcPointZ.splitAtProcPoints
 	Using this info, split into separate procedures
+
+      - CmmBuildInfoTables.setInfoTableStackMap
+	Attach stack maps to each info table
+
+
+----------------------------------------------------
+	Proc-points
+----------------------------------------------------
+
+Consider this program, which has a diamond control flow, 
+with a call on one branch
+ fn(p,x) {
+        h()
+	if b then { ... f(x) ...; q=5; goto J }
+             else { ...; q=7; goto J }
+     J: ..p...q...
+  }
+then the join point J is a "proc-point".  So, is 'p' passed to J
+as a parameter?  Or, if 'p' was saved on the stack anyway, perhaps
+to keep it alive across the call to h(), maybe 'p' gets communicated
+to J that way. This is an awkward choice.  (We think that we currently
+never pass variables to join points via arguments.)
+
+Furthermore, there is *no way* to pass q to J in a register (other
+than a paramter register).
+
+What we want is to do register allocation across the whole caboodle.
+Then we could drop all the code that deals with the above awkward
+decisions about spilling variables across proc-points.
+
+Note that J doesn't need an info table.
+
+What we really want is for each LastCall (not LastJump/Ret) 
+to have an info table.   Note that ProcPoints that are not successors
+of calls don't need an info table.
+
+Figuring out proc-points
+~~~~~~~~~~~~~~~~~~~~~~~~
+Proc-points are identified by
+CmmProcPointZ.minimalProcPointSet/extendPPSet Although there isn't
+that much code, JD thinks that it could be done much more nicely using
+a dominator analysis, using the Dataflow Engine.
 
 ----------------------------------------------------
 		CAFs
@@ -193,11 +307,11 @@ cpsTop:
   If f is live, then so is g.  f's SRT must include g's closure.
 
 * The CLabel for the entry-point/closure reveals whether g is 
-  a CAF (or refers to CAFs).  See the IdLabell constructor of CLabel.
+  a CAF (or refers to CAFs).  See the IdLabel constructor of CLabel.
 
 * The CAF-ness of the original top-level defininions is figured out
   (by TidyPgm) before we generate C--.  This CafInfo is only set for
-  top-level Ids; nested bindings stay with NoCafRefs.
+  top-level Ids; nested bindings stay with MayHaveCafRefs.
 
 * Currently an SRT contains (only) pointers to (top-level) closures.
 
@@ -210,10 +324,19 @@ cpsTop:
   This generates C-- roughly like this:
      f_closure: .word f_entry
      f_entry() [info-tbl-for-f] { ...jump g_entry...jump h2... }
-     g_entry() [info-tbl-for-g] { ...jump h1 }
+     g_entry() [info-tbl-for-g] { ...jump h1... }
 
   Note that there is no top-level closure for g (only an info table).
-  So:   info-tbl-for-f must have an SRT that keeps h1,h2 alive
+  This fact (whether or not there is a top-level closure) is recorded
+  in the InfoTable attached to the CmmProc for f, g
+  INVARIANT: 
+     Any out-of-Group references to an IdLabel goes to
+     a Proc whose InfoTable says "I have a top-level closure".
+  Equivalently: 
+     A CmmProc whose InfoTable says "I do not have a top-level
+     closure" is referred to only from its own Group.
+
+* So:   info-tbl-for-f must have an SRT that keeps h1,h2 alive
         info-tbl-for-g must have an SRT that keeps h1 (only) alive
 
   But if we just look for the free CAF refs, we get:
@@ -227,6 +350,9 @@ cpsTop:
   CmmInfoTable attached to each CmmProc.  CmmCPSZ.toTops actually does
   the attaching, right at the end of the pipeline.  The C_SRT part
   gives offsets within a single, shared table of closure pointers.
+
+* DECIDED: we can generate SRTs based on the final Cmm program
+  without knowledge of how it is generated.
 
 ----------------------------------------------------
 		Foreign calls

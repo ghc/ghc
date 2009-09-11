@@ -36,6 +36,7 @@ cmmCfgOptsZ g =
         -- with a more exciting combination of optimisations
 
 runCmmOpts :: Tx g -> Tx (GenCmm d h g)
+-- Lifts a transformer on a single graph to one on the whole program
 runCmmOpts opt = mapProcs (optProc opt)
 
 optProc :: Tx g -> Tx (GenCmmTop d h g)
