@@ -62,7 +62,7 @@ config.way_flags = {
 	'profc'      : ['-O -prof -auto-all -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
 	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
-	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci'],
+	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
 	'extcore'    : ['-fext-core'],
 	'optextcore' : ['-O -fext-core'],
 	'threaded1'  : ['-threaded', '-debug'],
