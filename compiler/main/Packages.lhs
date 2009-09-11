@@ -36,7 +36,6 @@ where
 #include "HsVersions.h"
 
 import PackageConfig	
-import ParsePkgConf	( loadPackageConfig )
 import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
 import StaticFlags
 import Config		( cProjectVersion )
@@ -237,7 +236,8 @@ readPackageConfig dflags conf_file = do
               ghcError $ InstallationError $ 
                 "can't find a package database at " ++ conf_file
             debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
-            loadPackageConfig dflags conf_file
+            str <- readFile conf_file
+            return (map installedPackageInfoToPackageConfig $ read str)
 
   let
       top_dir = topDir dflags

@@ -319,7 +319,6 @@ Library
         InteractiveEval
         PackageConfig
         Packages
-        ParsePkgConf
         PprTyThing
         StaticFlags
         StaticFlagParser
