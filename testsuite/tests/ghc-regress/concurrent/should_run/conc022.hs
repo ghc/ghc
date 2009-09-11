@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 -- !!! test tryTakeMVar
 
 import Control.Concurrent
@@ -5,7 +6,7 @@ import Control.Exception
 import IO
 
 import GHC.Exts		( fork# )
-import GHC.IOBase	( IO(..) )
+import GHC.IO    	( IO(..) )
 import GHC.Conc		( ThreadId(..) )
 
 main = do

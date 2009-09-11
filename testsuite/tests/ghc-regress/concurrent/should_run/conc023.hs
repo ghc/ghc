@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- !!! test threadDelay, Random, and QSemN.
 
 -- start a large number (n) of threads each of which will wait for a
