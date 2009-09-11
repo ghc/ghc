@@ -1,6 +1,7 @@
-module CrossPackageDocs (map, Monad(..), runInteractiveProcess {- $ Bugs -}) where
+module CrossPackageDocs (map, Monad(..), runInteractiveProcess, MVar(..), newEmptyMVar  {- $ Bugs -}) where
 
 import System.Process
+import GHC.MVar
 
 -- $ Bugs:
 --
