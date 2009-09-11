@@ -45,6 +45,10 @@ ghc_stage2_MODULES += GhciMonad GhciTags InteractiveUI
 endif
 ghc_stage3_MODULES = $(ghc_stage2_MODULES)
 
+ghc_stage1_C_SRCS = hschooks.c
+ghc_stage2_C_SRCS = hschooks.c
+ghc_stage3_C_SRCS = hschooks.c
+
 ghc_stage1_PROG = ghc-stage1$(exeext)
 ghc_stage2_PROG = ghc-stage2$(exeext)
 ghc_stage3_PROG = ghc-stage3$(exeext)

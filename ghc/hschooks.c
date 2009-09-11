@@ -5,6 +5,9 @@ in instead of the defaults.
 */
 
 #include "Rts.h"
+#if __GLASGOW_HASKELL__ <611
+#include "RtsFlags.h"
+#endif
 
 #include "HsFFI.h"
 
