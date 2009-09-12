@@ -843,6 +843,8 @@ $(eval $(call bindist,.,\
 	$(BINDIST_EXTRAS) \
 	$(includes_H_CONFIG) \
 	$(includes_H_PLATFORM) \
+	includes/ghcconfig.h \
+	includes/rts/Config.h \
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
