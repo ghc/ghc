@@ -15,31 +15,6 @@
 BEGIN_RTS_PRIVATE
 
 // -----------------------------------------------------------------------------
-// Posting events
-// -----------------------------------------------------------------------------
-
-INLINE_HEADER void trace (StgWord32 class, char *msg, ...);
-
-#ifdef DEBUG
-INLINE_HEADER void debugTrace (StgWord32 class, char *msg, ...);
-#endif
-
-INLINE_HEADER void traceSchedEvent (Capability *cap, EventTypeNum tag, 
-                                    StgTSO *tso, StgWord64 other);
-
-INLINE_HEADER void traceCap (StgWord32 class, Capability *cap,
-                             char *msg, ...);
-
-INLINE_HEADER void traceThreadStatus (StgWord32 class, StgTSO *tso);
-
-INLINE_HEADER rtsBool traceClass (StgWord32 class);
-
-#ifdef DEBUG
-void traceBegin (const char *str, ...);
-void traceEnd (void);
-#endif
-
-// -----------------------------------------------------------------------------
 // EventLog API
 // -----------------------------------------------------------------------------
 
@@ -52,137 +27,111 @@ void freeTracing (void);
 #endif /* TRACING */
 
 // -----------------------------------------------------------------------------
-// Message classes, these may be OR-ed together
+// Message classes
 // -----------------------------------------------------------------------------
 
 // debugging flags, set with +RTS -D<something>
-#define DEBUG_sched		   (1<<0)
-#define DEBUG_interp		   (1<<1)
-#define DEBUG_weak		   (1<<2)
-#define DEBUG_gccafs		   (1<<3) 
-#define DEBUG_gc		   (1<<4) 
-#define DEBUG_block_alloc	   (1<<5) 
-#define DEBUG_sanity		   (1<<6) 
-#define DEBUG_stable		   (1<<7) 
-#define DEBUG_stm   		   (1<<8) 
-#define DEBUG_prof		   (1<<9) 
-#define DEBUG_gran		   (1<<10)
-#define DEBUG_par		   (1<<11)
-#define DEBUG_linker		   (1<<12)
-#define DEBUG_squeeze              (1<<13)
-#define DEBUG_hpc                  (1<<14)
-#define DEBUG_sparks		   (1<<15)
+extern int DEBUG_sched;
+extern int DEBUG_interp;
+extern int DEBUG_weak;
+extern int DEBUG_gccafs;
+extern int DEBUG_gc;
+extern int DEBUG_block_alloc;
+extern int DEBUG_sanity;
+extern int DEBUG_stable;
+extern int DEBUG_stm;
+extern int DEBUG_prof;
+extern int DEBUG_gran;
+extern int DEBUG_par;
+extern int DEBUG_linker;
+extern int DEBUG_squeeze;
+extern int DEBUG_hpc;
+extern int DEBUG_sparks;
 
 // events
-#define TRACE_sched                (1<<16)
+extern int TRACE_sched;
 
 // -----------------------------------------------------------------------------
-// PRIVATE below here
+// Posting events
+//
+// We use macros rather than inline functions deliberately.  We want
+// the not-taken case to be as efficient as possible, a simple
+// test-and-jump, and with inline functions gcc seemed to move some of
+// the instructions from the branch up before the test.
+// 
 // -----------------------------------------------------------------------------
+
+#ifdef DEBUG
+void traceBegin (const char *str, ...);
+void traceEnd (void);
+#endif
 
 #ifdef TRACING
 
-extern StgWord32 classes_enabled;
-
-INLINE_HEADER rtsBool traceClass (StgWord32 class) 
-{ return (classes_enabled & class); }
+/* 
+ * Record a scheduler event
+ */
+#define traceSchedEvent(cap, tag, tso, other)   \
+    if (RTS_UNLIKELY(TRACE_sched)) {            \
+        traceSchedEvent_(cap, tag, tso, other); \
+    }
 
 void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
                        StgTSO *tso, StgWord64 other);
 
-/* 
- * Trace an event to the capability's event buffer.
- */
-INLINE_HEADER void traceSchedEvent(Capability *cap, EventTypeNum tag, 
-                                   StgTSO *tso, StgWord64 other)
-{
-    if (traceClass(TRACE_sched)) {
-        traceSchedEvent_(cap, tag, tso, other);
-    }
-}
-
-void traceCap_(Capability *cap, char *msg, va_list ap);
+// variadic macros are C99, and supported by gcc.  However, the
+// ##__VA_ARGS syntax is a gcc extension, which allows the variable
+// argument list to be empty (see gcc docs for details).
 
 /* 
- * Trace a log message
+ * Emit a trace message on a particular Capability
  */
-INLINE_HEADER void traceCap (StgWord32 class, Capability *cap, char *msg, ...)
-{
-    va_list ap;
-    va_start(ap,msg);
-    if (traceClass(class)) {
-        traceCap_(cap, msg, ap);
+#define traceCap(class, cap, msg, ...)          \
+    if (RTS_UNLIKELY(class)) {                  \
+        traceCap_(cap, msg, ##__VA_ARGS__);     \
     }
-    va_end(ap);
-}
 
-void trace_(char *msg, va_list ap);
+void traceCap_(Capability *cap, char *msg, ...);
 
 /* 
- * Trace a log message
+ * Emit a trace message
  */
-INLINE_HEADER void trace (StgWord32 class, char *msg, ...)
-{
-    va_list ap;
-    va_start(ap,msg);
-    if (traceClass(class)) {
-        trace_(msg, ap);
+#define trace(class, msg, ...)                  \
+    if (RTS_UNLIKELY(class)) {                  \
+        trace_(msg, ##__VA_ARGS__);             \
     }
-    va_end(ap);
-}
 
+void trace_(char *msg, ...);
+
+/* 
+ * Emit a debug message (only when DEBUG is defined)
+ */
 #ifdef DEBUG
-INLINE_HEADER void debugTrace (StgWord32 class, char *msg, ...)
-{
-    va_list ap;
-    va_start(ap,msg);
-    if (traceClass(class)) {
-        trace_(msg, ap);
+#define debugTrace(class, msg, ...)             \
+    if (RTS_UNLIKELY(class)) {                  \
+        trace_(msg, ##__VA_ARGS__);             \
     }
-    va_end(ap);
-}
 #else
-
 #define debugTrace(class, str, ...) /* nothing */
-// variable arg macros are C99, and supported by gcc.
-
 #endif
+
+/* 
+ * Emit a message/event describing the state of a thread
+ */
+#define traceThreadStatus(class, tso)           \
+    if (RTS_UNLIKELY(class)) {                  \
+        traceThreadStatus_(tso);                \
+    }
 
 void traceThreadStatus_ (StgTSO *tso);
 
-INLINE_HEADER void traceThreadStatus (StgWord32 class, StgTSO *tso)
-{
-    if (traceClass(class)) {
-        traceThreadStatus_(tso);
-    }
-}    
-
 #else /* !TRACING */
 
-INLINE_HEADER rtsBool traceClass (StgWord32 class STG_UNUSED) 
-{ return rtsFalse; }
-
-INLINE_HEADER void traceSchedEvent (Capability *cap STG_UNUSED,
-                                    EventTypeNum tag STG_UNUSED, 
-                                    StgTSO *tso STG_UNUSED,
-                                    StgWord64 other STG_UNUSED)
-{ /* nothing */ }
-
-INLINE_HEADER void traceCap (StgWord32 class STG_UNUSED,
-                             Capability *cap STG_UNUSED,
-                             char *msg STG_UNUSED, ...)
-{ /* nothing */ }
-
-INLINE_HEADER void trace (StgWord32 class STG_UNUSED, 
-                          char *msg STG_UNUSED, ...)
-{ /* nothing */ }
-
+#define traceSchedEvent(cap, tag, tso, other) /* nothing */
+#define traceCap(class, cap, msg, ...) /* nothing */
+#define trace(class, msg, ...) /* nothing */
 #define debugTrace(class, str, ...) /* nothing */
-// variable arg macros are C99, and supported by gcc.
-
-INLINE_HEADER void traceThreadStatus (StgWord32 class STG_UNUSED, 
-                                      StgTSO *tso STG_UNUSED)
-{ /* nothing */ }
+#define traceThreadStatus(class, tso) /* nothing */
 
 #endif /* TRACING */
 

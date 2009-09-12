@@ -279,7 +279,7 @@ GarbageCollect (rtsBool force_major_gc,
 
 #ifdef DEBUG
   // check for memory leaks if DEBUG is on 
-  memInventory(traceClass(DEBUG_gc));
+  memInventory(DEBUG_gc);
 #endif
 
   // check stack sanity *before* GC
@@ -782,7 +782,7 @@ SET_GCT(gc_threads[0]);
 
 #ifdef DEBUG
   // check for memory leaks if DEBUG is on 
-  memInventory(traceClass(DEBUG_gc));
+  memInventory(DEBUG_gc);
 #endif
 
 #ifdef RTS_GTK_FRONTPANEL

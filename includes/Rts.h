@@ -65,6 +65,12 @@ extern "C" {
 #define END_RTS_PRIVATE   /* disabled: END_RTS_PRIVATE */
 #endif
 
+#if __GNUC__ > 4
+#define RTS_UNLIKELY(p) __builtin_expect((p),0)
+#else
+#define RTS_UNLIKELY(p) p
+#endif
+
 /* Fix for mingw stat problem (done here so it's early enough) */
 #ifdef mingw32_HOST_OS
 #define __MSVCRT__ 1

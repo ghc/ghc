@@ -19,7 +19,26 @@
 #include "Threads.h"
 #include "Printer.h"
 
-StgWord32 classes_enabled; // not static due to inline funcs
+// debugging flags, set with +RTS -D<something>
+int DEBUG_sched;
+int DEBUG_interp;
+int DEBUG_weak;
+int DEBUG_gccafs;
+int DEBUG_gc;
+int DEBUG_block_alloc;
+int DEBUG_sanity;
+int DEBUG_stable;
+int DEBUG_stm;
+int DEBUG_prof;
+int DEBUG_gran;
+int DEBUG_par;
+int DEBUG_linker;
+int DEBUG_squeeze;
+int DEBUG_hpc;
+int DEBUG_sparks;
+
+// events
+int TRACE_sched;
 
 #ifdef THREADED_RTS
 static Mutex trace_utx;
@@ -37,7 +56,7 @@ void initTracing (void)
 
 #ifdef DEBUG
 #define DEBUG_FLAG(name, class) \
-    if (RtsFlags.DebugFlags.name) classes_enabled |= class;
+    class = RtsFlags.DebugFlags.name ? 1 : 0;
 
     DEBUG_FLAG(scheduler,    DEBUG_sched);
     DEBUG_FLAG(scheduler,    TRACE_sched); // -Ds enabled all sched events
@@ -58,7 +77,7 @@ void initTracing (void)
 #endif
 
 #define TRACE_FLAG(name, class) \
-    if (RtsFlags.TraceFlags.name) classes_enabled |= class;
+    class = RtsFlags.TraceFlags.name ? 1 : 0;
 
     TRACE_FLAG(scheduler, TRACE_sched);
 
@@ -200,8 +219,11 @@ static void traceCap_stderr(Capability *cap, char *msg, va_list ap)
 }
 #endif
 
-void traceCap_(Capability *cap, char *msg, va_list ap)
+void traceCap_(Capability *cap, char *msg, ...)
 {
+    va_list ap;
+    va_start(ap,msg);
+    
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.trace_stderr) {
         traceCap_stderr(cap, msg, ap);
@@ -210,6 +232,8 @@ void traceCap_(Capability *cap, char *msg, va_list ap)
     {
         postCapMsg(cap, msg, ap);
     }
+
+    va_end(ap);
 }
 
 #ifdef DEBUG
@@ -225,8 +249,11 @@ static void trace_stderr(char *msg, va_list ap)
 }
 #endif
 
-void trace_(char *msg, va_list ap)
+void trace_(char *msg, ...)
 {
+    va_list ap;
+    va_start(ap,msg);
+
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.trace_stderr) {
         trace_stderr(msg, ap);
@@ -235,6 +262,8 @@ void trace_(char *msg, va_list ap)
     {
         postMsg(msg, ap);
     }
+
+    va_end(ap);
 }
 
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
