@@ -958,7 +958,7 @@ sdist_file = \
     "$(CP)" $(TOP)/$1/$2/build/$4.hs $1/$3/ ; \
     mv $1/$3/$4.$5 $1/$3/$4.$5.source ;\
   else \
-    echo "does not exist: $1/$2//build/$4.hs"; \
+    echo "does not exist: $1/$2/build/$4.hs"; \
     exit 1; \
   fi
 
