@@ -967,25 +967,23 @@ sdist-prep :
 	"$(RM)" $(RM_OPTS) -r $(SRC_DIST_DIR)
 	"$(RM)" $(RM_OPTS) $(SRC_DIST_TARBALL)
 	mkdir $(SRC_DIST_DIR)
-	( cd $(SRC_DIST_DIR) \
-	  && for i in $(SRC_DIST_DIRS); do mkdir $$i; (cd $$i && lndir $(TOP)/$$i ); done \
-	  && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done \
-	  && $(MAKE) distclean \
-	  && if test -f $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then "$(CP)" $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi \
-	  && $(call sdist_file,compiler,stage2,cmm,CmmLex,x) \
-	  && $(call sdist_file,compiler,stage2,cmm,CmmParse,y) \
-	  && $(call sdist_file,compiler,stage2,main,ParsePkgConf,y) \
-	  && $(call sdist_file,compiler,stage2,parser,HaddockLex,x) \
-	  && $(call sdist_file,compiler,stage2,parser,HaddockParse,y) \
-	  && $(call sdist_file,compiler,stage2,parser,Lexer,x) \
-	  && $(call sdist_file,compiler,stage2,parser,Parser,y.pp) \
-	  && $(call sdist_file,compiler,stage2,parser,ParserCore,y) \
-	  && $(call sdist_file,utils/hpc,dist,,HpcParser,y) \
-	  && $(call sdist_file,utils/genprimopcode,dist,,Lexer,x) \
-	  && $(call sdist_file,utils/genprimopcode,dist,,Parser,y) \
-	  && "$(RM)" $(RM_OPTS) -r compiler/stage[123] mk/build.mk \
-	  && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | xargs "$(RM)" $(RM_OPTS) -r \
-	)
+	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
+	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
+	cd $(SRC_DIST_DIR) && $(MAKE) distclean
+	cd $(SRC_DIST_DIR) && if test -f $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then "$(CP)" $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,cmm,CmmLex,x)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,cmm,CmmParse,y)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,main,ParsePkgConf,y)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,HaddockLex,x)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,HaddockParse,y)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,Lexer,x)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,Parser,y.pp)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,ParserCore,y)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,utils/hpc,dist,,HpcParser,y)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,utils/genprimopcode,dist,,Lexer,x)
+	cd $(SRC_DIST_DIR) && $(call sdist_file,utils/genprimopcode,dist,,Parser,y)
+	cd $(SRC_DIST_DIR) && "$(RM)" $(RM_OPTS) -r compiler/stage[123] mk/build.mk
+	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | xargs "$(RM)" $(RM_OPTS) -r
 
 .PHONY: sdist
 sdist : sdist-prep
