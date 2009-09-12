@@ -973,7 +973,6 @@ sdist-prep :
 	cd $(SRC_DIST_DIR) && if test -f $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then "$(CP)" $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,cmm,CmmLex,x)
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,cmm,CmmParse,y)
-	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,main,ParsePkgConf,y)
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,HaddockLex,x)
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,HaddockParse,y)
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,parser,Lexer,x)
