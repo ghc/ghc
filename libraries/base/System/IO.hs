@@ -171,9 +171,9 @@ module System.IO (
     --
     -- The default 'TextEncoding' is the same as the default encoding
     -- on your system, which is also available as 'localeEncoding'.
-    -- (GHC note: on Windows, currently 'localeEncoding' is always
-    -- 'latin1'; there is no support for encoding and decoding using
-    -- the ANSI code page).
+    -- (GHC note: on Windows, we currently do not support double-byte
+    -- encodings; if the console\'s code page is unsupported, then
+    -- 'localeEncoding' will be 'latin1'.)
     --
     -- Encoding and decoding errors are always detected and reported,
     -- except during lazy I/O ('hGetContents', 'getContents', and

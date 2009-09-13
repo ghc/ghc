@@ -30,6 +30,9 @@ import GHC.IO.Encoding.Types
 import GHC.Word
 #if !defined(mingw32_HOST_OS)
 import qualified GHC.IO.Encoding.Iconv  as Iconv
+#else
+import qualified GHC.IO.Encoding.CodePage as CodePage
+import Text.Read (reads)
 #endif
 import qualified GHC.IO.Encoding.Latin1 as Latin1
 import qualified GHC.IO.Encoding.UTF8   as UTF8
@@ -96,7 +99,7 @@ localeEncoding  :: TextEncoding
 #if !defined(mingw32_HOST_OS)
 localeEncoding = Iconv.localeEncoding
 #else
-localeEncoding = Latin1.latin1
+localeEncoding = CodePage.localeEncoding
 #endif
 
 -- | Look up the named Unicode encoding.  May fail with 
@@ -122,6 +125,9 @@ localeEncoding = Latin1.latin1
 --  * a suffix of @\/\/TRANSLIT@ will choose a replacement character
 --    for illegal sequences or code points.
 --
+-- On Windows, you can access supported code pages with the prefix
+-- @CP@; for example, @\"CP1250\"@.
+--
 mkTextEncoding :: String -> IO TextEncoding
 #if !defined(mingw32_HOST_OS)
 mkTextEncoding = Iconv.mkTextEncoding
@@ -133,6 +139,8 @@ mkTextEncoding "UTF-16BE" = return utf16be
 mkTextEncoding "UTF-32"   = return utf32
 mkTextEncoding "UTF-32LE" = return utf32le
 mkTextEncoding "UTF-32BE" = return utf32be
+mkTextEncoding ('C':'P':n)
+    | [(cp,"")] <- reads n = return $ CodePage.codePageEncoding cp
 mkTextEncoding e = ioException
      (IOError Nothing NoSuchThing "mkTextEncoding"
           ("unknown encoding:" ++ e)  Nothing Nothing)

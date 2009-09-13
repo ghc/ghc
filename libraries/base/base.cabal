@@ -65,6 +65,7 @@ Library {
             GHC.IO.Encoding.UTF32,
             GHC.IO.Encoding.Types,
             GHC.IO.Encoding.Iconv,
+            GHC.IO.Encoding.CodePage,
             GHC.IO.Handle,
             GHC.IO.Handle.Types,
             GHC.IO.Handle.Internals,
@@ -92,6 +93,8 @@ Library {
             GHC.Weak,
             GHC.Word,
             System.Timeout
+        if os(windows)
+            exposed-modules: GHC.IO.Encoding.CodePage.Table
         extensions: MagicHash, ExistentialQuantification, Rank2Types,
                     ScopedTypeVariables, UnboxedTuples,
                     ForeignFunctionInterface, UnliftedFFITypes,
