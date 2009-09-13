@@ -1,6 +1,6 @@
 name:		ffi
 version:	1.0
-id:             builtin:ffi
+id:             builtin_ffi
 license:	BSD3
 maintainer:	glasgow-haskell-users@haskell.org
 exposed:	True
