@@ -35,8 +35,6 @@ void postMsg(char *msg, va_list ap);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
-void printAndClearEventLog(Capability *cap);
-
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,

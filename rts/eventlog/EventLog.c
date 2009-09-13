@@ -34,6 +34,7 @@ static int flushCount;
 typedef struct _EventsBuf {
   StgInt8 *begin;
   StgInt8 *pos;
+  StgInt8 *marker;
   StgWord64 size;
 } EventsBuf;
 
@@ -61,7 +62,8 @@ char *EventDesc[] = {
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_CAP_MSG]         = "Log Capability message",
   [EVENT_LOG_MSG]             = "Log message",
-  [EVENT_STARTUP]             = "Startup"
+  [EVENT_STARTUP]             = "Startup",
+  [EVENT_BLOCK_MARKER]        = "Block marker"
 };
 
 // Event type. 
@@ -74,20 +76,14 @@ typedef struct _EventType {
 
 EventType eventTypes[NUM_EVENT_TAGS];
 
-static void printAndClearEventBuf (EventsBuf *eventsBuf);
 static void initEventsBuf(EventsBuf* eb, StgWord64 size);
 static void resetEventsBuf(EventsBuf* eb);
-
-static void beginHeader(EventsBuf *eb);
-static void endHeader(EventsBuf *eb);
-
-static void beginData(EventsBuf *eb);
-static void endData(EventsBuf *eb);
-
-static void beginEventTypes(EventsBuf *eb);
-static void endEventTypes(EventsBuf *eb);
+static void printAndClearEventBuf (EventsBuf *eventsBuf);
 
 static void postEventType(EventsBuf *eb, EventType *et);
+
+static void postBlockMarker(EventsBuf *eb);
+static void closeBlockMarker(EventsBuf *ebuf);
 
 static StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum);
 static StgBool hasRoomForVariableEvent(EventsBuf *eb, nat payload_bytes);
@@ -121,11 +117,14 @@ static inline void postBuf(EventsBuf *eb, StgWord8 *buf, nat size)
     eb->pos += size;
 }
 
+static inline StgWord64 time_ns(void)
+{ return stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND); }
+
 static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
 { postWord16(eb, etNum); }
 
-static inline void postTimestamp(EventsBuf *eb, EventTimestamp t)
-{ postWord64(eb,t); }
+static inline void postTimestamp(EventsBuf *eb)
+{ postWord64(eb, time_ns()); }
 
 static inline void postThreadID(EventsBuf *eb, EventThreadID id)
 { postWord32(eb,id); }
@@ -135,6 +134,12 @@ static inline void postCapNo(EventsBuf *eb, EventCapNo no)
 
 static inline void postPayloadSize(EventsBuf *eb, EventPayloadSize size)
 { postWord16(eb,size); }
+
+static inline void postEventHeader(EventsBuf *eb, EventTypeNum type)
+{
+    postEventTypeNum(eb, type);
+    postTimestamp(eb);
+}    
 
 static inline void postInt8(EventsBuf *eb, StgInt8 i)
 { postWord8(eb, (StgWord8)i); }
@@ -195,10 +200,10 @@ initEventLogging(void)
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE);
 
     // Write in buffer: the header begin marker.
-    beginHeader(&eventBuf);
+    postInt32(&eventBuf, EVENT_HEADER_BEGIN);
 
     // Mark beginning of event types in the header.
-    beginEventTypes(&eventBuf);
+    postInt32(&eventBuf, EVENT_HET_BEGIN);
     for (t = 0; t < NUM_EVENT_TAGS; ++t) {
 
         eventTypes[t].etNum = t;
@@ -238,6 +243,14 @@ initEventLogging(void)
             eventTypes[t].size = 0xffff;
             break;
 
+        case EVENT_STARTUP:
+            eventTypes[t].size = sizeof(EventCapNo);
+            break;
+
+        case EVENT_BLOCK_MARKER:
+            eventTypes[t].size = sizeof(StgWord32) + sizeof(EventTimestamp);
+            break;
+
         default:
             continue; /* ignore deprecated events */
         }
@@ -247,13 +260,13 @@ initEventLogging(void)
     }
 
     // Mark end of event types in the header.
-    endEventTypes(&eventBuf);
+    postInt32(&eventBuf, EVENT_HET_END);
     
     // Write in buffer: the header end marker.
-    endHeader(&eventBuf);
+    postInt32(&eventBuf, EVENT_HEADER_END);
     
     // Prepare event buffer for events (data).
-    beginData(&eventBuf);
+    postInt32(&eventBuf, EVENT_DATA_BEGIN);
     
     // Flush capEventBuf with header.
     /*
@@ -261,6 +274,10 @@ initEventLogging(void)
      * file to have events written to it.
      */
     printAndClearEventBuf(&eventBuf);
+
+    for (c = 0; c < n_caps; ++c) {
+        postBlockMarker(&capEventBuf[c]);
+    }
 }
 
 void
@@ -275,7 +292,7 @@ endEventLogging(void)
     printAndClearEventBuf(&eventBuf);
 
     // Mark end of events (data).
-    endData(&eventBuf);
+    postEventTypeNum(&eventBuf, EVENT_DATA_END);
 
     // Flush the end of data marker.
     printAndClearEventBuf(&eventBuf);
@@ -322,8 +339,7 @@ postSchedEvent (Capability *cap,
         printAndClearEventBuf(eb);
     }
     
-    postEventTypeNum(eb, tag);
-    postTimestamp(eb, stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND));
+    postEventHeader(eb, tag);
     postCapNo(eb, cap->no);
 
     switch (tag) {
@@ -394,8 +410,7 @@ void postMsg(char *msg, va_list ap)
         printAndClearEventBuf(eb);
     }
 
-    postEventTypeNum(eb, EVENT_LOG_MSG);
-    postTimestamp(eb, stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND));
+    postEventHeader(eb, EVENT_LOG_MSG);
     postPayloadSize(eb, size);
     postBuf(eb,(StgWord8*)buf,size);
 
@@ -421,16 +436,43 @@ void postCapMsg(Capability *cap, char *msg, va_list ap)
         printAndClearEventBuf(eb);
     }
 
-    postEventTypeNum(eb, EVENT_LOG_MSG);
-    postTimestamp(eb, stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND));
+    postEventHeader(eb, EVENT_LOG_MSG);
     postPayloadSize(eb, size + sizeof(EventCapNo));
     postCapNo(eb, cap->no);
     postBuf(eb,(StgWord8*)buf,size);
 }
 
-static void printAndClearEventBuf (EventsBuf *ebuf)
+void closeBlockMarker (EventsBuf *ebuf)
+{
+    if (ebuf->marker)
+    {
+        // (type:16, time:64, size:32, end_time:64)
+        *(StgWord32 *)(ebuf->marker + 10) = ebuf->pos - ebuf->marker;
+        *(StgWord64 *)(ebuf->marker + 14) = time_ns();
+        ebuf->marker = NULL;
+    }
+}
+
+
+void postBlockMarker (EventsBuf *eb)
+{
+    if (!hasRoomForEvent(eb, EVENT_BLOCK_MARKER)) {
+        printAndClearEventBuf(eb);
+    }
+
+    closeBlockMarker(eb);
+
+    eb->marker = eb->pos;
+    postEventHeader(eb, EVENT_BLOCK_MARKER);
+    postWord32(eb,0); // these get filled in later by closeBlockMarker();
+    postWord64(eb,0);
+}
+
+void printAndClearEventBuf (EventsBuf *ebuf)
 {
     StgWord64 numBytes = 0, written = 0;
+
+    closeBlockMarker(ebuf);
 
     if (ebuf->begin != NULL && ebuf->pos != ebuf->begin)
     {
@@ -446,60 +488,21 @@ static void printAndClearEventBuf (EventsBuf *ebuf)
         
         resetEventsBuf(ebuf);
         flushCount++;
+
+        postBlockMarker(ebuf);
     }
 }
-
-void
-printAndClearEventLog(Capability *cap)
-{
-    printAndClearEventBuf(&capEventBuf[cap->no]);
-}
-
-/* -----------------------------------------------------------------------------
-   Actual event generation below here
-   -------------------------------------------------------------------------- */
 
 void initEventsBuf(EventsBuf* eb, StgWord64 size)
 {
     eb->begin = eb->pos = stgMallocBytes(size, "initEventsBuf");
     eb->size = size;
+    eb->marker = NULL;
 }
 
 void resetEventsBuf(EventsBuf* eb)
 {
     eb->pos = eb->begin;
-}
-
-// N.B.: Assuming buffer contains enough space for the header begin marker.
-void beginHeader(EventsBuf *eb)
-{
-    postInt32(eb, EVENT_HEADER_BEGIN);
-}
-
-// N.B.: Assuming buffer contains enough space for the header end marker.
-void endHeader(EventsBuf *eb)
-{
-    postInt32(eb, EVENT_HEADER_END);
-}
-
-void beginData(EventsBuf *eb)
-{
-    postInt32(eb, EVENT_DATA_BEGIN);
-}
-
-void endData(EventsBuf *eb)
-{
-    postEventTypeNum(eb, EVENT_DATA_END);
-}
-
-void beginEventTypes(EventsBuf *eb)
-{
-    postInt32(eb, EVENT_HET_BEGIN);
-}
-
-void endEventTypes(EventsBuf *eb)
-{
-    postInt32(eb, EVENT_HET_END);
 }
 
 StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum)
@@ -529,7 +532,7 @@ StgBool hasRoomForVariableEvent(EventsBuf *eb, nat payload_bytes)
   }
 }    
 
-static void postEventType(EventsBuf *eb, EventType *et)
+void postEventType(EventsBuf *eb, EventType *et)
 {
     StgWord8 d;
     nat desclen;
