@@ -509,6 +509,7 @@ GhcMinVersion	= @GhcMinVersion@
 
 ghc_ge_609 = @ghc_ge_609@
 ghc_ge_6102 = @ghc_ge_6102@
+ghc_ge_611 = @ghc_ge_611@
 
 # Canonicalised ghc version number, used for easy (integer) version
 # comparisons.  We must expand $(GhcMinVersion) to two digits by

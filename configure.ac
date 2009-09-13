@@ -128,8 +128,10 @@ if test "$WithGhc" != ""; then
   if test $GhcCanonVersion -ge 609; then ghc_ge_609=YES; else ghc_ge_609=NO; fi
   FP_COMPARE_VERSIONS($GhcVersion,[-ge],[6.10.2],
                       [ghc_ge_6102=YES], [ghc_ge_6102=NO])
+  if test $GhcCanonVersion -ge 611; then ghc_ge_611=YES; else ghc_ge_611=NO; fi
   AC_SUBST(ghc_ge_609)dnl
   AC_SUBST(ghc_ge_6102)dnl
+  AC_SUBST(ghc_ge_611)dnl
 fi
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on

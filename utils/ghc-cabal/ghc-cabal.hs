@@ -26,7 +26,6 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
-import Data.Char
 
 main :: IO ()
 main = do args <- getArgs
