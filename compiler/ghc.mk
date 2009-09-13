@@ -414,9 +414,14 @@ compiler_PACKAGE = ghc
 # when it gets registered; see Note [munge-stage1-package-config]
 # below.
 ifneq "$(ProjectPatchLevel)" "0"
+
 define compiler_PACKAGE_MAGIC
 compiler_stage1_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
 endef
+
+# Don't register the non-munged package
+compiler_stage1_REGISTER_PACKAGE = NO
+
 endif
 
 # haddocking only happens for stage2
