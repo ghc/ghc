@@ -60,3 +60,31 @@ test('T1969',
      compile,
      [''])
 
+
+# This one tests for the space leak in the native code generator,
+# where it holds onto the entire asm output until the end.  The space
+# leak reappears from time to time, so it's a good idea to have a test
+# for it.  The residency of this test will jump by 10MB to 40MB or so
+# on x86-64 if the space leak appears.
+
+test('T3294',
+     [if_wordsize(32,
+          compiler_stats_num_field('max_bytes_used', 14000000,
+                                                     19000000)),
+                                   # expected value: 17754884 (x86/Linux)
+      if_wordsize(64,
+          compiler_stats_num_field('max_bytes_used', 28000000,
+                                                     32000000)),
+                                   # expected value:  (amd64/Linux)
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 800000000,
+                                                      830000000)),
+                                    # expected value: 815479800  (x86/Linux)
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 1200000000,
+                                                      1500000000)),
+                                    # expected value: 1357587088 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile,
+     [''])
