@@ -10,4 +10,3 @@ package.conf.inplace
 setup-config
 src
 test-1.0.tar.gz
-Writing new package config file... done.
