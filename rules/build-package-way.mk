@@ -13,7 +13,7 @@
 
 define build-package-way # $1 = dir, $2 = distdir, $3 = way, $4 = stage
 
-$(call distdir-way-opts,$1,$2,$3)
+$(call distdir-way-opts,$1,$2,$3,$4)
 $(call hs-suffix-rules,$1,$2,$3)
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
   $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3,$$(dir))))

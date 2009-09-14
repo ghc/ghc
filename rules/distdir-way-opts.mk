@@ -13,7 +13,7 @@
 
 # Set compilation flags that additionally depend on a particular way
 
-define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way
+define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 
 # Options for a Haskell compilation:
 #   - CONF_HC_OPTS                 source-tree-wide options, selected at
@@ -59,7 +59,7 @@ $1_$2_$3_ALL_HC_OPTS = \
  -odir $1/$2/build -hidir $1/$2/build -stubdir $1/$2/build \
  -hisuf $$($3_hisuf) -osuf  $$($3_osuf) -hcsuf $$($3_hcsuf)
 
-ifeq "$3" "0"
+ifeq "$4" "0"
 # This is a bit of a hack.
 # If we are compiling something with the bootstrapping compiler on
 # cygwin, and it uses an include file from the rts (say), then we

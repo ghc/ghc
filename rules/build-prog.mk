@@ -84,7 +84,7 @@ $(call build-dependencies,$1,$2)
 # --- IMPLICIT RULES
 
 # Just the 'v' way for programs
-$(call distdir-way-opts,$1,$2,v)
+$(call distdir-way-opts,$1,$2,v,$3)
 
 $(call c-suffix-rules,$1,$2,v,YES)
 
