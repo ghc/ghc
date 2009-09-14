@@ -173,6 +173,12 @@ ourCopyright = "GHC package manager version " ++ Version.version ++ "\n"
 usageHeader :: String -> String
 usageHeader prog = substProg prog $
   "Usage:\n" ++
+  "  $p init {path}\n" ++
+  "    Create and initialise a package database at the location {path}.\n" ++
+  "    Packages can be registered in the new database using the register\n" ++
+  "    command with --package-conf={path}.  To use the new database with GHC,\n" ++
+  "    use GHC's -package-conf flag.\n" ++
+  "\n" ++
   "  $p register {filename | -}\n" ++
   "    Register the package using the specified installed package\n" ++
   "    description. The syntax for the latter is given in the $p\n" ++
@@ -306,6 +312,8 @@ runit verbosity cli nonopts = do
         print filename
         glob filename >>= print
 #endif
+    ["init", filename] ->
+        initPackageDB filename verbosity cli
     ["register", filename] ->
         registerPackage filename verbosity cli auto_ghci_libs False force
     ["update", filename] ->
@@ -598,6 +606,18 @@ parseSingletonPackageConf verbosity file = do
 
 cachefilename :: FilePath
 cachefilename = "package.cache"
+
+-- -----------------------------------------------------------------------------
+-- Creating a new package DB
+
+initPackageDB :: FilePath -> Verbosity -> [Flag] -> IO ()
+initPackageDB filename verbosity _flags = do
+  let eexist = die ("cannot create: " ++ filename ++ " already exists")
+  b1 <- doesFileExist filename
+  when b1 eexist
+  b2 <- doesDirectoryExist filename
+  when b2 eexist
+  changeDB verbosity [] PackageDB{ location = filename, packages = [] }
 
 -- -----------------------------------------------------------------------------
 -- Registering
