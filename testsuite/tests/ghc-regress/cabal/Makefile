@@ -7,8 +7,8 @@ LOCAL_GHC_PKG01 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF01)
 
 # a bunch of tests for ghc-pkg
 ghcpkg01 :
-	@rm -f $(PKGCONF01)
-	echo "[]" >$(PKGCONF01)
+	@rm -rf $(PKGCONF01)
+	$(LOCAL_GHC_PKG01) init $(PKGCONF01)
 	$(LOCAL_GHC_PKG01) list
 	$(LOCAL_GHC_PKG01) register --force test.pkg 2>/dev/null
 	$(LOCAL_GHC_PKG01) describe testpkg
@@ -50,8 +50,8 @@ PKGCONF03=local03.package.conf
 LOCAL_GHC_PKG03 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF03)
 
 ghcpkg03 :
-	@rm -f $(PKGCONF03)
-	echo "[]" >$(PKGCONF03)
+	@rm -rf $(PKGCONF03)
+	$(LOCAL_GHC_PKG03) init $(PKGCONF03)
 	@: # update should hide conflicting packages
 	$(LOCAL_GHC_PKG03) register --force test.pkg
 	$(LOCAL_GHC_PKG03) register --force test2.pkg
@@ -69,8 +69,8 @@ LOCAL_GHC_PKG04 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF04)
 
 # Test that importing a module exposed by two packages reports a conflict
 ghcpkg04 :
-	rm -f $(PKGCONF04)
-	echo "[]" >$(PKGCONF04)
+	rm -rf $(PKGCONF04)
+	$(LOCAL_GHC_PKG04) init $(PKGCONF04)
 	$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1 
 	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1 
 	$(LOCAL_GHC_PKG04) expose testpkg-1.2.3.4  >/dev/null 2>&1
@@ -84,9 +84,9 @@ LOCAL_GHC_PKG05a = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF05a)
 LOCAL_GHC_PKG05b = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF05a) -f $(PKGCONF05b)
 
 ghcpkg05 :
-	rm -f $(PKGCONF05a) $(PKGCONF05b)
-	echo "[]" >$(PKGCONF05a)
-	echo "[]" >$(PKGCONF05b)
+	rm -rf $(PKGCONF05a) $(PKGCONF05b)
+	$(LOCAL_GHC_PKG05a) init $(PKGCONF05a)
+	$(LOCAL_GHC_PKG05b) init $(PKGCONF05b)
 	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1 
 	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1 
 	$(LOCAL_GHC_PKG05b) check || true
@@ -102,8 +102,8 @@ PKGCONF06=local06.package.conf
 LOCAL_GHC_PKG06 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF06)
 
 ghcpkg06 :
-	rm -f $(PKGCONF06)
-	echo "[]" >$(PKGCONF06)
+	rm -rf $(PKGCONF06)
+	$(LOCAL_GHC_PKG06) init $(PKGCONF06)
 	$(LOCAL_GHC_PKG06) register --force test.pkg >/dev/null 2>&1 
 	if $(LOCAL_GHC_PKG06) register testdup.pkg; then false else true; fi
 	$(LOCAL_GHC_PKG06) register --force testdup.pkg
@@ -112,8 +112,8 @@ PKGCONF1750=local1750.package.conf
 LOCAL_GHC_PKG1750 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONF1750)
 
 1750:
-	rm -f $(PKGCONF1750) 1750.hs 1750.o 1750.hi 1750.out
-	echo "[]" >$(PKGCONF1750)
+	rm -rf $(PKGCONF1750) 1750.hs 1750.o 1750.hi 1750.out
+	$(LOCAL_GHC_PKG1750) init $(PKGCONF1750)
 	$(LOCAL_GHC_PKG1750) register --force 1750A.pkg >1750.out 2>&1
 	$(LOCAL_GHC_PKG1750) register --force 1750B.pkg >1750.out 2>&1
 	GHC_PACKAGE_PATH=$(PKGCONF1750) $(GHC_PKG) --no-user-package-conf list
@@ -137,9 +137,9 @@ LOCAL_GHC_PKGSHADOW3 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONFSHADOW1) -f
 # shadow-1-XXX will be shadowed by shadow-1-YYY, thus invalidating
 # shadowdep-1-XXX.
 shadow:
-	rm -f $(PKGCONFSHADOW2) $(PKGCONFSHADOW2) shadow.hs shadow.o shadow.hi shadow.out
-	echo "[]" >$(PKGCONFSHADOW1)
-	echo "[]" >$(PKGCONFSHADOW2)
+	rm -rf $(PKGCONFSHADOW1) $(PKGCONFSHADOW2) shadow.hs shadow.o shadow.hi shadow.out
+	$(LOCAL_GHC_PKGSHADOW1) init $(PKGCONFSHADOW1)
+	$(LOCAL_GHC_PKGSHADOW2) init $(PKGCONFSHADOW2)
 	$(LOCAL_GHC_PKGSHADOW1) register --force shadow1.pkg >shadow1.out 2>&1
 	$(LOCAL_GHC_PKGSHADOW1) register --force shadow2.pkg >shadow2.out 2>&1
 	$(LOCAL_GHC_PKGSHADOW2) register --force shadow3.pkg >shadow3.out 2>&1

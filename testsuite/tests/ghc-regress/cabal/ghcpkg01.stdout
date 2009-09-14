@@ -1,7 +1,6 @@
 local01.package.conf:
 
 Reading package info from "test.pkg" ... done.
-Writing new package config file... done.
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
@@ -64,7 +63,6 @@ haddock-interfaces:
 haddock-html:
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 Reading package info from "test2.pkg" ... done.
-Writing new package config file... done.
 local01.package.conf:
     testpkg-1.2.3.4
     (testpkg-2.0)
@@ -162,17 +160,11 @@ haddock-interfaces:
 haddock-html:
 version: 2.0
 version: 1.2.3.4
-Writing new package config file... done.
 exposed: False
-Writing new package config file... done.
 exposed: True
-Writing new package config file... done.
 exposed: False
 exposed: False
 Reading package info from "test3.pkg" ... done.
-Writing new package config file... done.
-Writing new package config file... done.
-Writing new package config file... done.
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
@@ -203,7 +195,6 @@ framework-dirs:
 frameworks:
 haddock-interfaces:
 haddock-html:
-Writing new package config file... done.
 local01.package.conf:
 
 Reading package info from "test3.pkg" ... done.
