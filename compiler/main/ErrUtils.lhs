@@ -13,7 +13,7 @@ module ErrUtils (
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
-	warnIsErrorMsg,
+	warnIsErrorMsg, mkLongWarnMsg,
 
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
@@ -104,6 +104,9 @@ mkLongErrMsg locn print_unqual msg extra
 
 mkWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> WarnMsg
 mkWarnMsg = mkErrMsg
+
+mkLongWarnMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> ErrMsg
+mkLongWarnMsg = mkLongErrMsg
 
 -- Variant that doesn't care about qualified/unqualified names
 mkPlainWarnMsg :: SrcSpan -> Message -> ErrMsg

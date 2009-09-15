@@ -821,7 +821,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 		  ; return (TH.mkNameU s i) }
 
   qReport True msg  = addErr (text msg)
-  qReport False msg = addReport (text msg)
+  qReport False msg = addReport (text msg) empty
 
   qLocation = do { m <- getModule
 		 ; l <- getSrcSpanM

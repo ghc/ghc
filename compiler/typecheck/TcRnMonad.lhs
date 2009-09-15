@@ -489,26 +489,27 @@ addErrs msgs = mapM_ add msgs
 	     where
 	       add (loc,msg) = addErrAt loc msg
 
-addReport :: Message -> TcRn ()
-addReport msg = do loc <- getSrcSpanM; addReportAt loc msg
+addReport :: Message -> Message -> TcRn ()
+addReport msg extra_info = do loc <- getSrcSpanM; addReportAt loc msg extra_info
 
-addReportAt :: SrcSpan -> Message -> TcRn ()
-addReportAt loc msg
+addReportAt :: SrcSpan -> Message -> Message -> TcRn ()
+addReportAt loc msg extra_info
   = do { errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
          dflags <- getDOpts ;
-	 let { warn = mkWarnMsg loc (mkPrintUnqualified dflags rdr_env) msg } ;
+	 let { warn = mkLongWarnMsg loc (mkPrintUnqualified dflags rdr_env)
+	                            msg extra_info } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns `snocBag` warn, errs) }
 
 addWarn :: Message -> TcRn ()
-addWarn msg = addReport (ptext (sLit "Warning:") <+> msg)
+addWarn msg = addReport (ptext (sLit "Warning:") <+> msg) empty
 
 addWarnAt :: SrcSpan -> Message -> TcRn ()
-addWarnAt loc msg = addReportAt loc (ptext (sLit "Warning:") <+> msg)
+addWarnAt loc msg = addReportAt loc (ptext (sLit "Warning:") <+> msg) empty
 
 addLocWarn :: Located e -> (e -> Message) -> TcRn ()
-addLocWarn (L loc e) fn = addReportAt loc (fn e)
+addLocWarn (L loc e) fn = addReportAt loc (fn e) empty
 
 checkErr :: Bool -> Message -> TcRn ()
 -- Add the error if the bool is False
@@ -765,7 +766,7 @@ addWarnTcM :: (TidyEnv, Message) -> TcM ()
 addWarnTcM (env0, msg)
  = do { ctxt <- getErrCtxt ;
 	err_info <- mkErrInfo env0 ctxt ;
-	addReport (vcat [ptext (sLit "Warning:") <+> msg, err_info]) }
+	addReport (ptext (sLit "Warning:") <+> msg) err_info }
 
 warnTc :: Bool -> Message -> TcM ()
 warnTc warn_if_true warn_msg
