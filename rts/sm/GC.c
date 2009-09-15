@@ -237,7 +237,8 @@ GarbageCollect (rtsBool force_major_gc,
   n = initialise_N(force_major_gc);
 
 #if defined(THREADED_RTS)
-  work_stealing = RtsFlags.ParFlags.parGcLoadBalancing;
+  work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
+                  N >= RtsFlags.ParFlags.parGcLoadBalancingGen;
       // It's not always a good idea to do load balancing in parallel
       // GC.  In particular, for a parallel program we don't want to
       // lose locality by moving cached data into another CPU's cache

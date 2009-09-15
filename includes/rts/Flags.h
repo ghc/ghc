@@ -144,9 +144,14 @@ struct PAR_FLAGS {
   rtsBool        wakeupMigrate;  /* migrate a thread on wakeup */
   unsigned int	 maxLocalSparks;
   rtsBool        parGcEnabled;   /* enable parallel GC */
-  rtsBool        parGcGen;       /* do parallel GC in this generation
+  unsigned int   parGcGen;       /* do parallel GC in this generation
                                   * and higher only */
-  rtsBool        parGcLoadBalancing; /* do load-balancing in parallel GC */
+  rtsBool        parGcLoadBalancingEnabled; 
+                                 /* enable load-balancing in the
+                                  * parallel GC */
+  unsigned int   parGcLoadBalancingGen;
+                                 /* do load-balancing in this
+                                  * generation and higher only */
   rtsBool        setAffinity;    /* force thread affinity with CPUs */
 };
 #endif /* THREADED_RTS */

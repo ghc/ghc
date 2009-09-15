@@ -152,8 +152,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.migrate           = rtsTrue;
     RtsFlags.ParFlags.wakeupMigrate     = rtsFalse;
     RtsFlags.ParFlags.parGcEnabled      = 1;
-    RtsFlags.ParFlags.parGcGen          = 1;
-    RtsFlags.ParFlags.parGcLoadBalancing = 1;
+    RtsFlags.ParFlags.parGcGen          = 0;
+    RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsTrue;
+    RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
     RtsFlags.ParFlags.setAffinity       = 0;
 #endif
 
@@ -307,10 +308,11 @@ usage_text[] = {
 #if defined(THREADED_RTS) && !defined(NOSMP)
 "  -N<n>     Use <n> processors (default: 1)",
 "  -N        Determine the number of processors to use automatically",
-"  -q1       Use one OS thread for GC (turns off parallel GC)",
-"  -qg<n>    Use parallel GC only for generations >= <n> (default: 1)",
-"  -qb       Disable load-balancing in the parallel GC",
-"  -qa       Use the OS to set thread affinity",
+"  -qg[<n>]  Use parallel GC only for generations >= <n>",
+"            (default: 0, -qg alone turns off parallel GC)",
+"  -qb[<n>]  Use load-balancing in the parallel GC only for generations >= <n>",
+"            (default: 1, -qb alone turns off load-balancing)",
+"  -qa       Use the OS to set thread affinity (experimental)",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
@@ -1008,21 +1010,25 @@ error = rtsTrue;
 			errorBelch("incomplete RTS option: %s",rts_argv[arg]);
 			error = rtsTrue;
 			break;
-                    case '1':
-                        RtsFlags.ParFlags.parGcEnabled = rtsFalse;
-                        break;
                     case 'g':
-                        if (rts_argv[arg][3] != '\0') {
+                        if (rts_argv[arg][3] == '\0') {
+                            RtsFlags.ParFlags.parGcEnabled = rtsFalse;
+                        } else {
+                            RtsFlags.ParFlags.parGcEnabled = rtsTrue;
                             RtsFlags.ParFlags.parGcGen
                                 = strtol(rts_argv[arg]+3, (char **) NULL, 10);
-                        } else {
-                            errorBelch("bad value for -qg");
-                            error = rtsTrue;
                         }
                         break;
 		    case 'b':
-			RtsFlags.ParFlags.parGcLoadBalancing = rtsFalse;
-			break;
+                        if (rts_argv[arg][3] == '\0') {
+                            RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsFalse;
+                        }
+                        else {
+                            RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsTrue;
+                            RtsFlags.ParFlags.parGcLoadBalancingGen
+                                = strtol(rts_argv[arg]+3, (char **) NULL, 10);
+                        }
+                        break;
 		    case 'a':
 			RtsFlags.ParFlags.setAffinity = rtsTrue;
 			break;

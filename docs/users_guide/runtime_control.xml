@@ -298,51 +298,58 @@
 
       <varlistentry>
         <term>
-          <option>-q1</option>
-          <indexterm><primary><option>-q1</option><secondary>RTS
+          <option>-qg<optional><replaceable>gen</replaceable></optional></option>
+          <indexterm><primary><option>-qg</option><secondary>RTS
           option</secondary></primary></indexterm>
         </term>
         <listitem>
-          <para>&lsqb;New in GHC 6.12.1&rsqb; Disable the parallel GC.
-            The parallel GC is turned on automatically when parallel
-            execution is enabled with the <option>-N</option> option;
-            this option is available to turn it off if
-            necessary.</para>
+          <para>&lsqb;New in GHC 6.12.1&rsqb; &lsqb;Default: 0&rsqb;
+            Use parallel GC in
+            generation <replaceable>gen</replaceable> and higher.
+            Omitting <replaceable>gen</replaceable> turns off the
+            parallel GC completely, reverting to sequential GC.</para>
           
-          <para>Experiments have shown that parallel GC usually
-            results in a performance improvement given 3 cores or
-            more; with 2 cores it may or may not be beneficial,
-            depending on the workload.  Bigger heaps work better with
-            parallel GC, so set your <option>-H</option> value high (3
-            or more times the maximum residency).  Look at the timing
-            stats with <option>+RTS -s</option> to see whether you're
-            getting any benefit from parallel GC or not.  If you find
-            parallel GC is significantly <emphasis>slower</emphasis>
-            (in elapsed time) than sequential GC, please report it as
-            a bug.</para>
-
-          <para>In GHC 6.10.1 it was possible to use a different
-            number of threads for GC than for execution, because the GC
-            used its own pool of threads.  Now, the GC uses the same
-            threads as the mutator (for executing the program).</para>
+          <para>The default parallel GC settings are usually suitable
+            for parallel programs (i.e. those
+            using <literal>par</literal>, Strategies, or with multiple
+            threads).  However, it is sometimes beneficial to enable
+            the parallel GC for a single-threaded sequential program
+            too, especially if the program has a large amount of heap
+            data and GC is a significant fraction of runtime.  To use
+            the parallel GC in a sequential program, enable the
+            parallel runtime with a suitable <literal>-N</literal>
+            option, and additionally it might be beneficial to
+            restrict parallel GC to the old generation
+            with <literal>-qg1</literal>.</para>
         </listitem>
       </varlistentry>        
 
       <varlistentry>
         <term>
-          <option>-qg<replaceable>n</replaceable></option>
-          <indexterm><primary><option>-qg</option><secondary>RTS
+          <option>-qb<optional><replaceable>gen</replaceable></optional></option>
+          <indexterm><primary><option>-qb</option><secondary>RTS
           option</secondary></primary></indexterm>
         </term>
         <listitem>
           <para>
-            &lsqb;Default: 1&rsqb; &lsqb;New in GHC 6.12.1&rsqb;
-            Enable the parallel GC only in
-            generation <replaceable>n</replaceable> and greater.
-            Parallel GC is often not worthwhile for collections in
-            generation 0 (the young generation), so it is enabled by
-            default only for collections in generation 1 (and higher,
-            if applicable).
+            &lsqb;New in GHC 6.12.1&rsqb; &lsqb;Default: 1&rsqb; Use
+            load-balancing in the parallel GC in
+            generation <replaceable>gen</replaceable> and higher.
+            Omitting <replaceable>gen</replaceable> disables
+            load-balancing entirely.</para>
+          
+          <para>
+            Load-balancing shares out the work of GC between the
+            available cores.  This is a good idea when the heap is
+            large and we need to parallelise the GC work, however it
+            is also pessimal for the short young-generation
+            collections in a parallel program, because it can harm
+            locality by moving data from the cache of the CPU where is
+            it being used to the cache of another CPU.  Hence the
+            default is to do load-balancing only in the
+            old-generation.  In fact, for a parallel program it is
+            sometimes beneficial to disable load-balancing entirely
+            with <literal>-qb</literal>.
           </para>
         </listitem>
       </varlistentry>

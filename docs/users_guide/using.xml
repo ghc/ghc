@@ -1951,6 +1951,10 @@ f "2"    = 2
 
             <para>There is no means (currently) by which this value
 	      may vary after the program has started.</para>
+
+            <para>The current value of the <option>-N</option> option
+              is available to the Haskell program
+              via <literal>GHC.Conc.numCapabilities</literal>.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -1960,6 +1964,17 @@ f "2"    = 2
 
       <variablelist>
 	<varlistentry>
+	  <term><option>-qa</option></term>
+          <indexterm><primary><option>-qa</option></primary><secondary>RTS
+          option</secondary></indexterm>
+	  <listitem>
+            <para>Use the OS's affinity facilities to try to pin OS
+              threads to CPU cores.  This is an experimental feature,
+              and may or may not be useful.  Please let us know
+              whether it helps for you!</para>
+          </listitem>
+        </varlistentry>
+	<varlistentry>
 	  <term><option>-qm</option></term>
           <indexterm><primary><option>-qm</option></primary><secondary>RTS
           option</secondary></indexterm>
@@ -1967,9 +1982,16 @@ f "2"    = 2
             <para>Disable automatic migration for load balancing.
             Normally the runtime will automatically try to schedule
             threads across the available CPUs to make use of idle
-            CPUs; this option disables that behaviour.  It is probably
-            only of use if you are explicitly scheduling threads onto
-            CPUs with <literal>GHC.Conc.forkOnIO</literal>.</para>
+            CPUs; this option disables that behaviour.  Note that
+              migration only applies to threads; sparks created
+              by <literal>par</literal> are load-balanced separately
+              by work-stealing.</para>
+
+            <para>
+              This option is probably only of use for concurrent
+              programs that explicitly schedule threads onto CPUs
+              with <literal>GHC.Conc.forkOnIO</literal>.
+            </para>
           </listitem>
         </varlistentry>
 	<varlistentry>
