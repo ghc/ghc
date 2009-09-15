@@ -13,7 +13,7 @@ Packages
     url="http://hackage.haskell.org/packages/hackage.html">HackageDB</ulink>.</para>
 
   <para>Using a package couldn't be simpler: if you're using
-    <option>--make</option> or GHCi, then most of the installed packages will be
+    <option>&ndash;&ndash;make</option> or GHCi, then most of the installed packages will be
     automatically available to your program without any further options.  The
     exceptions to this rule are covered below in <xref
       linkend="using-packages" />.</para>
@@ -35,26 +35,71 @@ Packages
     
     <para>GHC only knows about packages that are
       <emphasis>installed</emphasis>. To see which packages are installed, use
-      the <literal>ghc-pkg</literal> command:</para>
+      the <literal>ghc-pkg list</literal> command:</para>
 
 <screen>
 $ ghc-pkg list
-/usr/lib/ghc-6.4/package.conf:
-    base-1.0, haskell98-1.0, template-haskell-1.0, mtl-1.0, unix-1.0,
-    Cabal-1.0, haskell-src-1.0, parsec-1.0, network-1.0,
-    QuickCheck-1.0, HUnit-1.1, fgl-1.0, X11-1.1, HGL-3.1, OpenGL-2.0,
-    GLUT-2.0, stm-1.0, readline-1.0, (lang-1.0), (concurrent-1.0),
-    (posix-1.0), (util-1.0), (data-1.0), (text-1.0), (net-1.0),
-    (hssource-1.0), rts-1.0
-      </screen>
+/usr/lib/ghc-6.12.1/package.conf.d:
+    Cabal-1.7.4
+    array-0.2.0.1
+    base-3.0.3.0
+    base-4.2.0.0
+    bin-package-db-0.0.0.0
+    binary-0.5.0.1
+    bytestring-0.9.1.4
+    containers-0.2.0.1
+    directory-1.0.0.2
+    (dph-base-0.4.0)
+    (dph-par-0.4.0)
+    (dph-prim-interface-0.4.0)
+    (dph-prim-par-0.4.0)
+    (dph-prim-seq-0.4.0)
+    (dph-seq-0.4.0)
+    extensible-exceptions-0.1.1.0
+    ffi-1.0
+    filepath-1.1.0.1
+    (ghc-6.12.1)
+    ghc-prim-0.1.0.0
+    haskeline-0.6.2
+    haskell98-1.0.1.0
+    hpc-0.5.0.2
+    integer-gmp-0.1.0.0
+    mtl-1.1.0.2
+    old-locale-1.0.0.1
+    old-time-1.0.0.1
+    pretty-1.0.1.0
+    process-1.0.1.1
+    random-1.0.0.1
+    rts-1.0
+    syb-0.1.0.0
+    template-haskell-2.4.0.0
+    terminfo-0.3.1
+    time-1.1.4
+    unix-2.3.1.0
+    utf8-string-0.3.4
+</screen>
 
-    <para>An installed package is either <emphasis>exposed</emphasis> or <emphasis>hidden</emphasis>
-      by default.      Packages hidden by default are listed in
-      parentheses (eg. <literal>(lang-1.0)</literal>) in the output above.  Command-line flags, described below, allow you to expose a hidden package
-      or hide an exposed one.
-      Only modules from exposed packages may be imported by your Haskell code; if
-      you try to import a module from a hidden package, GHC will emit an error
-      message.</para>
+    <para>An installed package is either <emphasis>exposed</emphasis>
+      or <emphasis>hidden</emphasis> by default.  Packages hidden by
+      default are listed in parentheses
+      (eg. <literal>(lang-1.0)</literal>), or possibly in blue if your
+      terminal supports colour, in the output of <literal>ghc-pkg
+      list</literal>.  Command-line flags, described below, allow you
+      to expose a hidden package or hide an exposed one.  Only modules
+      from exposed packages may be imported by your Haskell code; if
+      you try to import a module from a hidden package, GHC will emit
+      an error message.
+    </para>
+
+    <para>
+      Note: if you're using Cabal, then the exposed or hidden status
+      of a package is irrelevant: the available packages are instead
+      determined by the dependencies listed in
+      your <literal>.cabal</literal> specification.  The
+      exposed/hidden status of packages is only relevant when
+      using <literal>ghc</literal> or <literal>ghci</literal>
+      directly.
+    </para>
 
     <para>To see which modules are provided by a package use the
       <literal>ghc-pkg</literal> command (see <xref linkend="package-management"/>):</para>
@@ -213,7 +258,7 @@ ___stginit_ZCMain
   </sect2>
 
   <sect2 id="package-overlaps">
-    <title>Consequences of packages</title>
+    <title>Consequences of packages for the Haskell language</title>
 
     <para>It is possible that by using packages you might end up with
     a program that contains two modules with the same name: perhaps
@@ -243,21 +288,34 @@ ___stginit_ZCMain
   <sect2 id="package-databases">
     <title>Package Databases</title>
       
-    <para>A package database is a file, normally called
-      <literal>package.conf</literal> which contains descriptions of installed
-      packages.  GHC usually knows about two package databases:</para>
+    <para>
+      A package database is where the details about installed packages
+      are stored.  It is a directory, usually
+      called <literal>package.conf.d</literal>, that contains a file
+      for each package, together with a binary cache of the package
+      data in the file <literal>package.cache</literal>.  Normally
+      you won't need to look at or modify the contents of a package
+      database directly; all management of package databases can be
+      done through the <literal>ghc-pkg</literal> tool (see
+      <xref linkend="package-management" />).
+    </para>
+
+    <para>
+      GHC knows about two package databases in particular:
+    </para>
 
     <itemizedlist>
       <listitem>
 	<para>The global package database, which comes with your GHC
-	  installation.</para>
+	  installation,
+	  e.g. <filename>/usr/lib/ghc-6.12.1/package.conf.d</filename>.</para>
       </listitem>
       <listitem>
 	<para>A package database private to each user.  On Unix
 	  systems this will be
-	  <filename>$HOME/.ghc/<replaceable>arch</replaceable>-<replaceable>os</replaceable>-<replaceable>version</replaceable>/package.conf</filename>, and on
+	  <filename>$HOME/.ghc/<replaceable>arch</replaceable>-<replaceable>os</replaceable>-<replaceable>version</replaceable>/package.conf.d</filename>, and on
 	  Windows it will be something like
-	  <filename>C:\Documents&nbsp;And&nbsp;Settings\<replaceable>user</replaceable>\ghc</filename>.
+	  <filename>C:\Documents&nbsp;And&nbsp;Settings\<replaceable>user</replaceable>\ghc\package.conf.d</filename>.
 	  The <literal>ghc-pkg</literal> tool knows where this file should be
 	  located, and will create it if it doesn't exist (see <xref linkend="package-management" />).</para>
       </listitem>
@@ -268,9 +326,9 @@ ___stginit_ZCMain
       see GHC's package table by running GHC with the <option>-v</option>
       flag.</para> 
 
-    <para>Package databases may overlap: for example, packages in the user
-      database will override those of the same name in the global
-      database.</para> 
+    <para>Package databases may overlap: for example, packages in the
+      user database will override (<emphasis>shadow</emphasis>) those
+      of the same name and version in the global database.</para>
 
     <para>You can control the loading of package databases using the following
       GHC options:</para> 
@@ -300,13 +358,6 @@ ___stginit_ZCMain
 	</listitem>
       </varlistentry>
     </variablelist>
-
-    <para>To create a new package database, just create
-      a new file and put the string
-      <quote><literal>[]</literal></quote> in it.  Packages can be
-      added to the file using the
-      <literal>ghc-pkg</literal> tool, described in <xref
-      linkend="package-management"/>.</para>
 
     <sect3 id="ghc-package-path">
       <title>The <literal>GHC_PACKAGE_PATH</literal> environment variable</title>
@@ -338,124 +389,130 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
     </sect3>
   </sect2>
 
-  <sect2 id="building-packages">
-    <title>Building a package from Haskell source</title>
-    <indexterm><primary>packages</primary>
-      <secondary>building</secondary></indexterm>
+  <sect2 id="broken-packages">
+    <title>Dependencies and broken packages</title>
 
-    <para>We don't recommend building packages the hard way.  Instead, use the
-      <ulink url="../Cabal/index.html">Cabal</ulink> infrastructure
-      if possible.  If your package is particularly complicated or requires a
-      lot of configuration, then you might have to fall back to the low-level
-      mechanisms, so a few hints for those brave souls follow.</para>
-    
-    <para>You need to build an "installed package info" file for
-      passing to <literal>ghc-pkg</literal> when installing your
-      package.  The contents of this file are described in
-      <xref linkend="installed-pkg-info" />.</para>
+    <para>Each installed package has a unique identifier, which
+      distinguishes it from all other installed packages on the
+      system.  To see the identifiers associated with each installed
+      package, use <literal>ghc-pkg list -v</literal>:</para>
 
-    <para>The Haskell code in a package may be built into one or more
-      archive libraries (e.g. <filename>libHSfoo.a</filename>), or a
-      single shared object
-      (e.g. <filename>libHSfoo.dll/.so/.dylib</filename>).  The
-      restriction to a single shared object is because the package
-      system is used to tell the compiler when it should make an
-      inter-shared-object call rather than an intra-shared-object-call
-      call (inter-shared-object calls require an extra
-      indirection).</para>
-    <itemizedlist>
-      <listitem><para>Building a static library is done by using the
-	  <literal>ar</literal> tool, like so:</para>
+    <screen>
+$ ghc-pkg list -v
+using cache: /usr/lib/ghc-6.12.1/package.conf.d/package.cache
+/usr/lib/ghc-6.12.1/package.conf.d
+   Cabal-1.7.4 (Cabal-1.7.4-48f5247e06853af93593883240e11238)
+   array-0.2.0.1 (array-0.2.0.1-9cbf76a576b6ee9c1f880cf171a0928d)
+   base-3.0.3.0 (base-3.0.3.0-6cbb157b9ae852096266e113b8fac4a2)
+   base-4.2.0.0 (base-4.2.0.0-247bb20cde37c3ef4093ee124e04bc1c)
+   ...
+</screen>
 
-<screen>ar cqs libHSfoo-1.0.a A.o B.o C.o ...</screen>
+    <para>
+      The string in parentheses after the package name is the unique
+      identifier: it normally begins with the package name and
+      version, and ends in a hash string derived from the compiled
+      package.  Dependencies between packages are expressed in terms
+      of these unique identifiers, rather than just packages and
+      versions.  For example, take a look at the dependencies of
+      the <literal>haskell98</literal> package:
+    </para>
 
-	  <para>where <filename>A.o</filename>,
-	    <filename>B.o</filename> and so on are the compiled Haskell
-	    modules, and <filename>libHSfoo.a</filename> is the library you
-	    wish to create.  The syntax may differ slightly on your system,
-	    so check the documentation if you run into difficulties.</para>
-      </listitem>
-      <listitem>
-	<para>Versions of the Haskell libraries for use with GHCi may also
-	  abe included: GHCi cannot load <literal>.a</literal> files
-	  directly, instead it will look for an object file
-	  called <filename>HSfoo.o</filename> and load that.  On some
-	  systems, the <literal>ghc-pkg</literal> tool can automatically
-	  build the GHCi version of each library, see
-	  <xref linkend="package-management"/>.  To build these libraries
-	  by hand from the <literal>.a</literal> archive, it is possible
-	  to use GNU <command>ld</command> as follows:</para>
+    <screen>
+$ ghc-pkg field haskell98 depends
+depends: array-0.2.0.1-9cbf76a576b6ee9c1f880cf171a0928d
+         base-4.2.0.0-247bb20cde37c3ef4093ee124e04bc1c
+         directory-1.0.0.2-f51711bc872c35ce4a453aa19c799008
+         old-locale-1.0.0.1-d17c9777c8ee53a0d459734e27f2b8e9
+         old-time-1.0.0.1-1c0d8ea38056e5087ef1e75cb0d139d1
+         process-1.0.1.1-d8fc6d3baf44678a29b9d59ca0ad5780
+         random-1.0.0.1-423d08c90f004795fd10e60384ce6561
+</screen>
 
-<screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
+    <para>
+      The purpose of the unique package identifier is to detect
+      problems caused by re-installing a package without also
+      recompiling the packages that depend on it.  Recompiling
+      dependencies is necessary, because the newly compiled package
+      may have a differnt ABI (Application Binary Interface) than the
+      previous version, even if both packages were built from the same
+      source code using the same compiler.  With unique package
+      identifiers, a recompiled package will have a different unique
+      identifer from the previous version, so packages that depended
+      on the previous version are now orphaned - one of their
+      dependencies is not satisfied.  Packages that are broken in this
+      way are shown in the <literal>ghc-pkg list</literal> output
+      either in red (if possible) or otherwise surrounded by
+      braces.  In the following example, we have recompiled and
+      reinstalled the <literal>filepath</literal> package, and this
+      has caused various dependencies
+      including <literal>Cabal</literal> to break:</para>
 
-	<para>(replace
-	  <literal>&ndash;&ndash;whole-archive</literal> with
-	  <literal>&ndash;all_load</literal> on MacOS X)</para>
-      </listitem>
-      <listitem>
-	<para>When building the package as shared library, GHC can be used to
-	  perform the link step. This hides some of the details
-	  out the underlying linker and provides a common
-	  interface to all shared object variants that are supported
-	  by GHC (DLLs, ELF DSOs, and Mac OS dylibs). The shared
-	  object must be named in specific way for two reasons: (1)
-	  the name must contain the GHC compiler version, so that two
-	  library variants don't collide that are compiled by
-	  different versions of GHC and that therefore are most likely
-	  incompatible with respect to calling conventions, (2) it
-	  must be different from the static name otherwise we would
-	  not be able to control the linker as precisely as necessary
-	  to make
-	  the <option>-static</option>/<option>-dynamic</option> flags
-	  work, see <xref linkend="options-linker" />.</para>
+    <screen>
+$ ghc-pkg list
+WARNING: there are broken packages.  Run 'ghc-pkg check' for more details.
+/usr/lib/ghc-6.12.1/package.conf.d:
+    {Cabal-1.7.4}
+    array-0.2.0.1
+    base-3.0.3.0
+    ... etc ...
+</screen>
 
-<screen>ghc -shared libHSfoo-1.0-ghc<replaceable>GHCVersion</replaceable>.so A.o B.o C.o</screen>
-	<para>Using GHC's version number in the shared object name
-	  allows different library versions compiled by different GHC
-	  versions to be installed in standard system locations,
-	  e.g. under *nix /usr/lib. To obtain the version number of
-	  GHC invoke <literal>ghc --numeric-version</literal> and use
-	  its output in place
-	  of <replaceable>GHCVersion</replaceable>. See also
-	  <xref linkend="options-codegen" /> on how object files must
-	  be prepared for shared object linking.</para>
-      </listitem>
-    </itemizedlist>
+    <para>
+      Additionally, <literal>ghc-pkg list</literal> reminds you that
+      there are broken packages and suggests <literal>ghc-pkg
+      check</literal>, which displays more information about the
+      nature of the failure:
+    </para>
 
-     <para>GHC does not maintain detailed cross-package dependency
-       information.  It does remember which modules in other packages
-       the current module depends on, but not which things within
-       those imported things.</para>
-    
-     <para>To compile a module which is to be part of a new package,
-      use the <literal>-package-name</literal> option (<xref linkend="using-packages"/>).
-      Failure to use the <literal>-package-name</literal> option
-      when compiling a package will probably result in disaster, but
-      you will only discover later when you attempt to import modules
-      from the package.  At this point GHC will complain that the
-      package name it was expecting the module to come from is not the
-      same as the package name stored in the <literal>.hi</literal>
-      file.</para>
+    <screen>
+$ ghc-pkg check
+There are problems in package ghc-6.12.1:
+  dependency "filepath-1.1.0.1-87511764eb0af2bce4db05e702750e63" doesn't exist
+There are problems in package haskeline-0.6.2:
+  dependency "filepath-1.1.0.1-87511764eb0af2bce4db05e702750e63" doesn't exist
+There are problems in package Cabal-1.7.4:
+  dependency "filepath-1.1.0.1-87511764eb0af2bce4db05e702750e63" doesn't exist
+There are problems in package process-1.0.1.1:
+  dependency "filepath-1.1.0.1-87511764eb0af2bce4db05e702750e63" doesn't exist
+There are problems in package directory-1.0.0.2:
+  dependency "filepath-1.1.0.1-87511764eb0af2bce4db05e702750e63" doesn't exist
 
-    <para>It is worth noting with shared objects, when each package
-      is built as a single shared object file, since a reference to a shared object costs an extra
-      indirection, intra-package references are cheaper than
-      inter-package references. Of course, this applies to the
-      <filename>main</filename> package as well.</para>
-    </sect2>
+The following packages are broken, either because they have a problem
+listed above, or because they depend on a broken package.
+ghc-6.12.1
+haskeline-0.6.2
+Cabal-1.7.4
+process-1.0.1.1
+directory-1.0.0.2
+bin-package-db-0.0.0.0
+hpc-0.5.0.2
+haskell98-1.0.1.0
+</screen>
+
+    <para>
+      To fix the problem, you need to recompile the broken packages
+      against the new dependencies.  The easiest way to do this is to
+      use <literal>cabal-install</literal>, or download the packages
+      from <ulink
+    url="http://hackage.haskell.org/packages/hackage.html">HackageDB</ulink>
+      and build and install them as normal.</para>
+
+    <para>Be careful not to recompile any packages that GHC itself
+      depends on, as this may render the <literal>ghc</literal>
+      package itself broken, and <literal>ghc</literal> cannot be
+      simply recompiled.  The only way to recover from this would be
+      to re-install GHC.</para>
+  </sect2>
 
   <sect2 id="package-management">
     <title>Package management (the <literal>ghc-pkg</literal> command)</title>
     <indexterm><primary>packages</primary>
       <secondary>management</secondary></indexterm>
     
-    <para>The <literal>ghc-pkg</literal> tool allows packages to be
-      added or removed from a package database.  By default,
-      the system-wide package database is modified, but alternatively
-      the user's local package database or another specified
-      file can be used.</para>
-
-    <para>To see what package databases are in use, say
+    <para>The <literal>ghc-pkg</literal> tool is for querying and
+      modifying package databases.  To see what package databases are
+      in use, use
       <literal>ghc-pkg&nbsp;list</literal>.  The stack of databases that
       <literal>ghc-pkg</literal> knows about can be modified using the
       <literal>GHC_PACKAGE_PATH</literal> environment variable (see <xref
@@ -471,7 +528,7 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       upon.</para>
 
    <para>Commands that query the package database (list, latest,
-     describe, field) operate on the list of databases specified by
+     describe, field, dot) operate on the list of databases specified by
      the flags <option>--user</option>, <option>--global</option>, and
      <option>--package-conf</option>.  If none of these flags are
      given, the default is <option>--global</option>
@@ -497,6 +554,15 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       to make it clearer that multiple packages are being matched.</para>
 
     <variablelist>
+      <varlistentry>
+        <term><literal>ghc-pkg init <replaceable>path</replaceable></literal></term>
+        <listitem>
+          <para>Creates a new, empty, package database
+            at <replaceable>path</replaceable>, which must not already
+            exist.</para>
+        </listitem>
+      </varlistentry>
+
       <varlistentry>
 	<term><literal>ghc-pkg register <replaceable>file</replaceable></literal></term>
 	<listitem>
@@ -631,6 +697,19 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
       </varlistentry>
 
       <varlistentry>
+        <term><literal>ghc-pkg dot</literal></term>
+        <listitem>
+          <para>
+            Generate a graph of the package dependencies in a form
+            suitable for input for the <ulink url="http://www.graphviz.org/">graphviz</ulink> tools.  For example,
+            to generate a PDF of the dependency graph:</para>
+<screen>
+ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
+</screen>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><literal>ghc-pkg dump</literal></term>
         <listitem>
           <para>Emit the full description of every package, in the
@@ -644,6 +723,29 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
             will emit an error if it can't find any packages that
             match the pattern, <literal>ghc-pkg dump</literal> will
             simply emit nothing.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>ghc-pkg recache</literal></term>
+        <listitem>
+          <para>
+            Re-creates the binary cache
+            file <filename>package.cache</filename> for the selected
+            database.  This may be necessary if the cache has somehow
+            become out-of-sync with the contents of the database
+            (<literal>ghc-pkg</literal> will warn you if this might be
+            the case).</para>
+          
+          <para>
+            The other time when <literal>ghc-pkg recache</literal> is
+            useful is for registering packages manually: it is
+            possible to register a package by simply putting the
+            appropriate file in the package database directory and
+            invoking <literal>ghc-pkg recache</literal> to update the
+            cache.  This method of registering packages may be more
+            convenient for automated packaging systems.
+          </para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -673,7 +775,7 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
     ghc-pkg field '*' haddock-html
     -- dump the whole database
     ghc-pkg describe '*'
-    </screen>
+</screen>
 
     <para>Additionally, the following flags are accepted by
       <literal>ghc-pkg</literal>:</para>
@@ -782,6 +884,23 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
       </varlistentry>
 
       <varlistentry>
+        <term>
+          <option>-v</option><optional><replaceable>n</replaceable></optional><indexterm><primary><option>-v</option></primary><secondary>ghc-pkg 
+              option</secondary></indexterm>
+        </term>
+        <term>
+          <option>--verbose</option><optional>=<replaceable>n</replaceable></optional><indexterm><primary><option>--verbose</option></primary><secondary>ghc-pkg option</secondary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            Control verbosity.  Verbosity levels range from 0-2, where
+            the default is 1, and <option>-v</option> alone selects
+            level 2.
+          </para>
+        </listitem>
+      </varlistentry>          
+
+      <varlistentry>
 	<term>
 	  <option>-V</option><indexterm><primary><option>-V</option></primary>
 	  </indexterm>
@@ -796,14 +915,109 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
       </varlistentry>
     </variablelist>
 
-    <para>When modifying the package database
-      <replaceable>file</replaceable>, a copy of the original file is
-      saved in <replaceable>file</replaceable><literal>.old</literal>,
-      so in an emergency you can always restore the old settings by
-      copying the old file back again.</para>
-
   </sect2>
   
+  <sect2 id="building-packages">
+    <title>Building a package from Haskell source</title>
+    <indexterm><primary>packages</primary>
+      <secondary>building</secondary></indexterm>
+
+    <para>We don't recommend building packages the hard way.  Instead, use the
+      <ulink url="../Cabal/index.html">Cabal</ulink> infrastructure
+      if possible.  If your package is particularly complicated or requires a
+      lot of configuration, then you might have to fall back to the low-level
+      mechanisms, so a few hints for those brave souls follow.</para>
+    
+    <para>You need to build an "installed package info" file for
+      passing to <literal>ghc-pkg</literal> when installing your
+      package.  The contents of this file are described in
+      <xref linkend="installed-pkg-info" />.</para>
+
+    <para>The Haskell code in a package may be built into one or more
+      archive libraries (e.g. <filename>libHSfoo.a</filename>), or a
+      single shared object
+      (e.g. <filename>libHSfoo.dll/.so/.dylib</filename>).  The
+      restriction to a single shared object is because the package
+      system is used to tell the compiler when it should make an
+      inter-shared-object call rather than an intra-shared-object-call
+      call (inter-shared-object calls require an extra
+      indirection).</para>
+    <itemizedlist>
+      <listitem><para>Building a static library is done by using the
+	  <literal>ar</literal> tool, like so:</para>
+
+<screen>ar cqs libHSfoo-1.0.a A.o B.o C.o ...</screen>
+
+	  <para>where <filename>A.o</filename>,
+	    <filename>B.o</filename> and so on are the compiled Haskell
+	    modules, and <filename>libHSfoo.a</filename> is the library you
+	    wish to create.  The syntax may differ slightly on your system,
+	    so check the documentation if you run into difficulties.</para>
+      </listitem>
+      <listitem>
+	<para>Versions of the Haskell libraries for use with GHCi may also
+	  abe included: GHCi cannot load <literal>.a</literal> files
+	  directly, instead it will look for an object file
+	  called <filename>HSfoo.o</filename> and load that.  On some
+	  systems, the <literal>ghc-pkg</literal> tool can automatically
+	  build the GHCi version of each library, see
+	  <xref linkend="package-management"/>.  To build these libraries
+	  by hand from the <literal>.a</literal> archive, it is possible
+	  to use GNU <command>ld</command> as follows:</para>
+
+<screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
+
+	<para>(replace
+	  <literal>&ndash;&ndash;whole-archive</literal> with
+	  <literal>&ndash;all_load</literal> on MacOS X)</para>
+      </listitem>
+      <listitem>
+	<para>When building the package as shared library, GHC can be used to
+	  perform the link step. This hides some of the details
+	  out the underlying linker and provides a common
+	  interface to all shared object variants that are supported
+	  by GHC (DLLs, ELF DSOs, and Mac OS dylibs). The shared
+	  object must be named in specific way for two reasons: (1)
+	  the name must contain the GHC compiler version, so that two
+	  library variants don't collide that are compiled by
+	  different versions of GHC and that therefore are most likely
+	  incompatible with respect to calling conventions, (2) it
+	  must be different from the static name otherwise we would
+	  not be able to control the linker as precisely as necessary
+	  to make
+	  the <option>-static</option>/<option>-dynamic</option> flags
+	  work, see <xref linkend="options-linker" />.</para>
+
+<screen>ghc -shared libHSfoo-1.0-ghc<replaceable>GHCVersion</replaceable>.so A.o B.o C.o</screen>
+	<para>Using GHC's version number in the shared object name
+	  allows different library versions compiled by different GHC
+	  versions to be installed in standard system locations,
+	  e.g. under *nix /usr/lib. To obtain the version number of
+	  GHC invoke <literal>ghc --numeric-version</literal> and use
+	  its output in place
+	  of <replaceable>GHCVersion</replaceable>. See also
+	  <xref linkend="options-codegen" /> on how object files must
+	  be prepared for shared object linking.</para>
+      </listitem>
+    </itemizedlist>
+
+     <para>To compile a module which is to be part of a new package,
+      use the <literal>-package-name</literal> option (<xref linkend="using-packages"/>).
+      Failure to use the <literal>-package-name</literal> option
+      when compiling a package will probably result in disaster, but
+      you will only discover later when you attempt to import modules
+      from the package.  At this point GHC will complain that the
+      package name it was expecting the module to come from is not the
+      same as the package name stored in the <literal>.hi</literal>
+      file.</para>
+
+    <para>It is worth noting with shared objects, when each package
+      is built as a single shared object file, since a reference to a shared object costs an extra
+      indirection, intra-package references are cheaper than
+      inter-package references. Of course, this applies to the
+      <filename>main</filename> package as well.</para>
+    </sect2>
+
   <sect2 id="installed-pkg-info">
     <title>
       <literal>InstalledPackageInfo</literal>: a package specification
@@ -823,46 +1037,51 @@ c:/fptools/validate/ghc/driver/package.conf.inplace:
 <screen>
 $ ghc-pkg describe unix
 name: unix
-version: 1.0
+version: 2.3.1.0
+id: unix-2.3.1.0-de7803f1a8cd88d2161b29b083c94240
 license: BSD3
 copyright:
 maintainer: libraries@haskell.org
 stability:
 homepage:
 package-url:
-description:
-category:
+description: This package gives you access to the set of operating system
+             services standardised by POSIX 1003.1b (or the IEEE Portable
+             Operating System Interface for Computing Environments -
+             IEEE Std. 1003.1).
+             .
+             The package is not supported under Windows (except under Cygwin).
+category: System
 author:
 exposed: True
-exposed-modules: System.Posix,
-                 System.Posix.DynamicLinker.Module,
-                 System.Posix.DynamicLinker.Prim,
-                 System.Posix.Directory,
-                 System.Posix.DynamicLinker,
-                 System.Posix.Env,
-                 System.Posix.Error,
-                 System.Posix.Files,
-                 System.Posix.IO,
-                 System.Posix.Process,
-                 System.Posix.Resource,
-                 System.Posix.Temp,
-                 System.Posix.Terminal,
-                 System.Posix.Time,
-                 System.Posix.Unistd,
-                 System.Posix.User,
-                 System.Posix.Signals.Exts
-import-dirs: /usr/lib/ghc-6.4/libraries/unix
-library-dirs: /usr/lib/ghc-6.4/libraries/unix
-hs-libraries: HSunix
-extra-libraries: HSunix_cbits, dl
-include-dirs: /usr/lib/ghc-6.4/libraries/unix/include
-includes: HsUnix.h
-depends: base-1.0
+exposed-modules: System.Posix System.Posix.DynamicLinker.Module
+                 System.Posix.DynamicLinker.Prim System.Posix.Directory
+                 System.Posix.DynamicLinker System.Posix.Env System.Posix.Error
+                 System.Posix.Files System.Posix.IO System.Posix.Process
+                 System.Posix.Process.Internals System.Posix.Resource
+                 System.Posix.Temp System.Posix.Terminal System.Posix.Time
+                 System.Posix.Unistd System.Posix.User System.Posix.Signals
+                 System.Posix.Signals.Exts System.Posix.Semaphore
+                 System.Posix.SharedMem
+hidden-modules:
+import-dirs: /usr/lib/ghc-6.12.1/unix-2.3.1.0
+library-dirs: /usr/lib/ghc-6.12.1/unix-2.3.1.0
+hs-libraries: HSunix-2.3.1.0
+extra-libraries: rt util dl
+extra-ghci-libraries:
+include-dirs: /usr/lib/ghc-6.12.1/unix-2.3.1.0/include
+includes: HsUnix.h execvpe.h
+depends: base-4.2.0.0-247bb20cde37c3ef4093ee124e04bc1c
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks:
+haddock-interfaces: /usr/share/doc/ghc/html/libraries/unix/unix.haddock
+haddock-html: /usr/share/doc/ghc/html/libraries/unix
 </screen>
 
-    <para>The full <ulink url="../Cabal/index.html">Cabal documentation</ulink>
-      is still in preparation (at time of writing), so in the meantime
-      here is a brief description of the syntax of this file:</para>
+    <para>Here is a brief description of the syntax of this file:</para>
 
     <para>A package description consists of a number of field/value pairs.  A
       field starts with the field name in the left-hand column followed by a
@@ -909,6 +1128,17 @@ depends: base-1.0
 	</term>
 	<listitem>
 	  <para>The package's name (without the version).</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term>
+	  <literal>id</literal>
+	  <indexterm><primary><literal>id</literal></primary><secondary>package specification</secondary></indexterm>
+	</term>
+	<listitem>
+	  <para>The package's unique identifier.  It is up to you to
+	  choose a suitable one.</para>
 	</listitem>
       </varlistentry>
       
@@ -1214,10 +1444,8 @@ depends: base-1.0
             <indexterm><primary><literal>depends</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
-	    <para>(package name list) Packages on which this package depends.  This field contains
-	    packages with explicit versions are required, except that when
-	    submitting a package to <literal>ghc-pkg register</literal>, the
-	    versions will be filled in if they are unambiguous.</para>
+	    <para>(package id list) Packages on which this package
+	    depends.</para>
 	  </listitem>
 	</varlistentry>
 
