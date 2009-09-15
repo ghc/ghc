@@ -195,7 +195,7 @@ fixupPackageId :: [Installed.InstalledPackageInfo]
                -> InstalledPackageId
                -> InstalledPackageId
 fixupPackageId _ x@(InstalledPackageId ipi)
- | "builtin:" `isPrefixOf` ipi = x
+ | "builtin_" `isPrefixOf` ipi = x
 fixupPackageId ipinfos (InstalledPackageId ipi)
  = case stripPrefix (reverse "-inplace") $ reverse ipi of
    Nothing ->
