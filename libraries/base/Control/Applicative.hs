@@ -30,9 +30,9 @@ module Control.Applicative (
         -- * Instances
         Const(..), WrappedMonad(..), WrappedArrow(..), ZipList(..),
         -- * Utility functions
-        (<$>), (<$), (*>), (<*), (<**>),
+        (<$>), (<$), (<**>),
         liftA, liftA2, liftA3,
-        optional, some, many
+        optional,
         ) where
 
 import Prelude hiding (id,(.))
@@ -42,10 +42,10 @@ import Control.Arrow
         (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
 import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.Instances ()
+import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
 
 infixl 3 <|>
-infixl 4 <$>, <$
 infixl 4 <*>, <*, *>, <**>
 
 -- | A functor with application.
@@ -64,6 +64,12 @@ infixl 4 <*>, <*, *>, <**>
 -- [/interchange/]
 --      @u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
+-- [/ignore left value/]
+--      @u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v@
+--
+-- [/ignore right value/]
+--      @u '<*' v = 'pure' 'const' '<*>' u '<*>' v@
+--
 -- The 'Functor' instance should satisfy
 --
 -- @
@@ -71,6 +77,8 @@ infixl 4 <*>, <*, *>, <**>
 -- @
 --
 -- If @f@ is also a 'Monad', define @'pure' = 'return'@ and @('<*>') = 'ap'@.
+--
+-- Minimal complete definition: 'pure' and '<*>'.
 
 class Functor f => Applicative f where
         -- | Lift a value.
@@ -79,12 +87,40 @@ class Functor f => Applicative f where
         -- | Sequential application.
         (<*>) :: f (a -> b) -> f a -> f b
 
+	-- | Sequence actions, discarding the value of the first argument.
+	(*>) :: f a -> f b -> f b
+	(*>) = liftA2 (const id)
+
+	-- | Sequence actions, discarding the value of the second argument.
+	(<*) :: f a -> f b -> f a
+	(<*) = liftA2 const
+
 -- | A monoid on applicative functors.
+--
+-- Minimal complete definition: 'empty' and '<|>'.
+--
+-- 'some' and 'many' should be the least solutions of the equations:
+--
+-- * @some v = (:) '<$>' v '<*>' many v@
+--
+-- * @many v = some v '<|>' 'pure' []@
 class Applicative f => Alternative f where
         -- | The identity of '<|>'
         empty :: f a
         -- | An associative binary operation
         (<|>) :: f a -> f a -> f a
+
+	-- | One or more.
+	some :: f a -> f [a]
+	some v = some_v
+	  where many_v = some_v <|> pure []
+		some_v = (:) <$> v <*> many_v
+
+	-- | Zero or more.
+	many :: f a -> f [a]
+	many v = many_v
+	  where many_v = some_v <|> pure []
+		some_v = (:) <$> v <*> many_v
 
 -- instances for Prelude types
 
@@ -169,22 +205,6 @@ instance Applicative ZipList where
 
 -- extra functions
 
--- | A synonym for 'fmap'.
-(<$>) :: Functor f => (a -> b) -> f a -> f b
-f <$> a = fmap f a
-
--- | Replace the value.
-(<$) :: Functor f => a -> f b -> f a
-(<$) = (<$>) . const
- 
--- | Sequence actions, discarding the value of the first argument.
-(*>) :: Applicative f => f a -> f b -> f b
-(*>) = liftA2 (const id)
- 
--- | Sequence actions, discarding the value of the second argument.
-(<*) :: Applicative f => f a -> f b -> f a
-(<*) = liftA2 const
- 
 -- | A variant of '<*>' with the arguments reversed.
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
@@ -205,15 +225,3 @@ liftA3 f a b c = f <$> a <*> b <*> c
 -- | One or none.
 optional :: Alternative f => f a -> f (Maybe a)
 optional v = Just <$> v <|> pure Nothing
-
--- | One or more.
-some :: Alternative f => f a -> f [a]
-some v = some_v
-  where many_v = some_v <|> pure []
-        some_v = (:) <$> v <*> many_v
-
--- | Zero or more.
-many :: Alternative f => f a -> f [a]
-many v = many_v
-  where many_v = some_v <|> pure []
-        some_v = (:) <$> v <*> many_v
