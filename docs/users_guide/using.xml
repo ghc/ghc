@@ -2002,19 +2002,20 @@ f "2"    = 2
 	whether your program got faster by using more CPUs or not.  If the user
 	time is greater than
 	the elapsed time, then the program used more than one CPU.  You should
-	also run the program without <literal>-N</literal> for comparison.</para>
+	also run the program without <literal>-N</literal> for
+	comparison.</para>
 
-      <para>GHC's parallelism support is new and experimental.  It may make your
-	program go faster, or it might slow it down - either way, we'd be
-	interested to hear from you.</para>
-      
-      <para>One significant limitation with the current implementation is that
-	the garbage collector is still single-threaded, and all execution must
-	stop when GC takes place.  This can be a significant bottleneck in a
-	parallel program, especially if your program does a lot of GC.  If this
-	happens to you, then try reducing the cost of GC by tweaking the GC
-	settings (<xref linkend="rts-options-gc" />): enlarging the heap or the
-	allocation area size is a good start.</para>
+      <para>The output of <literal>+RTS -s</literal> tells you how
+        many &ldquo;sparks&rdquo; were created and executed during the
+        run of the program (see <xref linkend="rts-options-gc" />), which
+        will give you an idea how well your <literal>par</literal>
+        annotations are working.</para>
+
+      <para>GHC's parallelism support has improved in 6.12.1 as a
+        result of much experimentation and tuning in the runtime
+        system.  We'd still be interested to hear how well it works
+        for you, and we're also interested in collecting parallel
+        programs to add to our benchmarking suite.</para>
     </sect2>
   </sect1>
 
