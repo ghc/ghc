@@ -964,6 +964,29 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <option>-eventlog</option>
+          <indexterm><primary><option>-eventlog</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            Link the program with the "eventlog" version of the
+            runtime system.  A program linked in this way can generate
+            a runtime trace of events (such as thread start/stop) to a
+            binary file
+            <literal><replaceable>program</replaceable>.eventlog</literal>,
+            which can then be interpreted later by various tools.  See
+            <xref linkend="eventlog" /> for more information.
+          </para>
+          <para>
+            <option>-eventlog</option> can be used
+            with <option>-threaded</option>.  It is implied
+            by <option>-debug</option>.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-fno-gen-manifest</option>
           <indexterm><primary><option>-fno-gen-manifest</option></primary>
           </indexterm>

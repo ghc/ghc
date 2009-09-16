@@ -817,6 +817,92 @@
     </variablelist>
   </sect2>
 
+  <sect2 id="rts-eventlog">
+    <title>Tracing</title>
+
+    <indexterm><primary>tracing</primary></indexterm>
+    <indexterm><primary>events</primary></indexterm>
+    <indexterm><primary>eventlog files</primary></indexterm>
+
+    <para>
+      When the program is linked with the <option>-eventlog</option>
+      option (<xref linkend="options-linker" />), runtime events can
+      be logged in two ways:
+    </para>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          In binary format to a file for later analysis by a
+          variety of tools.  One such tool
+          is <ulink url="http://hackage.haskell.org/package/ThreadScope">ThreadScope</ulink><indexterm><primary>ThreadScope</primary></indexterm>,
+          which interprets the event log to produce a visual parallel
+          execution profile of the program.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          As text to standard output, for debugging purposes.
+        </para>
+      </listitem>
+    </itemizedlist>
+
+    <variablelist>
+      <varlistentry>
+        <term>
+          <option>-l<optional><replaceable>type</replaceable></optional></option>
+          <indexterm><primary><option>-l</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            Log events in binary format to the
+            file <filename><replaceable>program</replaceable>.eventlog</filename>,
+            where <replaceable>type</replaceable> indicates the type
+            of events to log.  Currently there is only one type
+            supported: <literal>-ls</literal>, for scheduler events.
+          </para>
+
+          <para>
+            The format of the log file is described by the header
+            <filename>EventLogFormat.h</filename> that comes with
+            GHC, and it can be parsed in Haskell using
+            the <ulink url="http://hackage.haskell.org/package/ghc-events">ghc-events</ulink>
+            library.  To dump the contents of
+            a <literal>.eventlog</literal> file as text, use the
+            tool <literal>show-ghc-events</literal> that comes with
+            the <ulink url="http://hackage.haskell.org/package/ghc-events">ghc-events</ulink>
+            package.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-v</option>
+          <indexterm><primary><option>-v</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            Log events as text to standard output, instead of to
+            the <literal>.eventlog</literal> file.
+          </para>
+        </listitem>
+      </varlistentry>
+
+    </variablelist>
+
+    <para>
+      The debugging
+      options <option>-D<replaceable>x</replaceable></option> also
+      generate events which are logged using the tracing framework.
+      By default those events are dumped as text to stdout
+      (<option>-D<replaceable>x</replaceable></option>
+      implies <option>-v</option>), but they may instead be stored in
+      the binary eventlog file by using the <option>-l</option>
+      option.
+    </para>
+  </sect2>
+
   <sect2 id="rts-options-debugging">
     <title>RTS options for hackers, debuggers, and over-interested
     souls</title>
@@ -853,14 +939,28 @@
 
       <varlistentry>
 	<term>
-          <option>-D</option><replaceable>num</replaceable>
+          <option>-D</option><replaceable>x</replaceable>
           <indexterm><primary>-D</primary><secondary>RTS option</secondary></indexterm>
         </term>
 	<listitem>
-	  <para>An RTS debugging flag; varying quantities of output
-          depending on which bits are set in
-          <replaceable>num</replaceable>.  Only works if the RTS was
-          compiled with the <option>DEBUG</option> option.</para>
+	  <para>
+            An RTS debugging flag; only availble if the program was
+	    linked with the <option>-debug</option> option.  Various
+	    values of <replaceable>x</replaceable> are provided to
+	    enable debug messages and additional runtime sanity checks
+	    in different subsystems in the RTS, for
+	    example <literal>+RTS -Ds -RTS</literal> enables debug
+	    messages from the scheduler.
+	    Use <literal>+RTS&nbsp;-?</literal> to find out which
+	    debug flags are supported.
+          </para>
+
+          <para>
+            Debug messages will be sent to the binary event log file
+            instead of stdout if the <option>-l</option> option is
+            added.  This might be useful for reducing the overhead of
+            debug tracing.
+          </para>
 	</listitem>
       </varlistentry>
 
