@@ -173,7 +173,7 @@ initEventLogging(void)
     
     /* Open event log file for writing. */
     if ((event_log_file = fopen(event_log_filename, "wb")) == NULL) {
-        sysErrorBelch("initEventLoggin: can't open %s", event_log_filename);
+        sysErrorBelch("initEventLogging: can't open %s", event_log_filename);
         stg_exit(EXIT_FAILURE);    
     }
 
