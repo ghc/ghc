@@ -19,6 +19,7 @@
 #include "Threads.h"
 #include "Printer.h"
 
+#ifdef DEBUG
 // debugging flags, set with +RTS -D<something>
 int DEBUG_sched;
 int DEBUG_interp;
@@ -36,6 +37,7 @@ int DEBUG_linker;
 int DEBUG_squeeze;
 int DEBUG_hpc;
 int DEBUG_sparks;
+#endif
 
 // events
 int TRACE_sched;
@@ -43,6 +45,8 @@ int TRACE_sched;
 #ifdef THREADED_RTS
 static Mutex trace_utx;
 #endif
+
+static rtsBool eventlog_enabled;
 
 /* ---------------------------------------------------------------------------
    Starting up / shuttting down the tracing facilities
@@ -81,17 +85,42 @@ void initTracing (void)
 
     TRACE_FLAG(scheduler, TRACE_sched);
 
-    initEventLogging();
+    eventlog_enabled = !RtsFlags.TraceFlags.trace_stderr && (
+                       TRACE_sched
+#ifdef DEBUG
+                       | DEBUG_sched
+                       | DEBUG_interp
+                       | DEBUG_weak
+                       | DEBUG_gccafs
+                       | DEBUG_gc
+                       | DEBUG_block_alloc
+                       | DEBUG_sanity
+                       | DEBUG_stable
+                       | DEBUG_stm
+                       | DEBUG_prof
+                       | DEBUG_linker
+                       | DEBUG_squeeze
+                       | DEBUG_hpc
+#endif
+        );
+
+    if (eventlog_enabled) {
+        initEventLogging();
+    }
 }
 
 void endTracing (void)
 {
-    endEventLogging();
+    if (eventlog_enabled) {
+        endEventLogging();
+    }
 }
 
 void freeTracing (void)
 {
-    freeEventLogging();
+    if (eventlog_enabled) {
+        freeEventLogging();
+    }
 }
 
 /* ---------------------------------------------------------------------------
