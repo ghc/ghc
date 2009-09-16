@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -XBangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Prelude
@@ -172,12 +172,16 @@ import Hugs.Prelude
 
 #ifndef __HUGS__
 infixr 0 $!
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Miscellaneous functions
 
 -- | Strict (call-by-value) application, defined in terms of 'seq'.
 ($!)    :: (a -> b) -> a -> b
+#ifdef __GLASGOW_HASKELL__
+f $! x  = let !vx = x in f vx  -- see #2273
+#elif !defined(__HUGS__)
 f $! x  = x `seq` f x
 #endif
 

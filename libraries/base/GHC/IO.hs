@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields -XBangPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -336,7 +336,4 @@ a `finally` sequel =
 -- >   evaluate x = (return $! x) >>= return
 --
 evaluate :: a -> IO a
-evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
-        -- NB. can't write
-        --      a `seq` (# s, a #)
-        -- because we can't have an unboxed tuple as a function argument
+evaluate a = IO $ \s -> let !va = a in (# s, va #) -- NB. see #2273
