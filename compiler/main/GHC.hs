@@ -2318,12 +2318,19 @@ cyclicModuleErr ms
   = hang (ptext (sLit "Module imports form a cycle for modules:"))
        2 (vcat (map show_one ms))
   where
-    show_one ms = sep [ show_mod (ms_hsc_src ms) (ms_mod ms),
-			nest 2 $ ptext (sLit "imports:") <+> 
-				   (pp_imps HsBootFile (ms_srcimps ms)
-				   $$ pp_imps HsSrcFile  (ms_imps ms))]
+    mods_in_cycle = map ms_mod_name ms
+    imp_modname = unLoc . ideclName . unLoc
+    just_in_cycle = filter ((`elem` mods_in_cycle) . imp_modname)
+
+    show_one ms = 
+           vcat [ show_mod (ms_hsc_src ms) (ms_mod_name ms) <+>
+                  maybe empty (parens . text) (ml_hs_file (ms_location ms)),
+                  nest 2 $ ptext (sLit "imports:") <+> vcat [
+                     pp_imps HsBootFile (just_in_cycle $ ms_srcimps ms),
+                     pp_imps HsSrcFile  (just_in_cycle $ ms_imps ms) ]
+                ]
     show_mod hsc_src mod = ppr mod <> text (hscSourceString hsc_src)
-    pp_imps src mods = fsep (map (show_mod src) mods)
+    pp_imps src imps = fsep (map (show_mod src . unLoc . ideclName . unLoc) imps)
 
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
