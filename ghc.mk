@@ -796,7 +796,7 @@ ifeq "$(Windows)" "NO"
 INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-stage2
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-pkg
 else
-INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc-stage2.exe
+INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
