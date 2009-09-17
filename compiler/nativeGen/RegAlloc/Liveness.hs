@@ -457,10 +457,21 @@ stripLive live
 	= stripCmm live
 
  where	stripCmm (CmmData sec ds)	= CmmData sec ds
- 	stripCmm (CmmProc (LiveInfo info _ _) label params sccs)
-		= CmmProc info label params
-                          (ListGraph $ map stripLiveBlock $ flattenSCCs sccs)
-	
+
+ 	stripCmm (CmmProc (LiveInfo info (Just first_id) _) label params sccs)
+	 = let	final_blocks	= flattenSCCs sccs
+		
+		-- make sure the block that was first in the input list
+		--	stays at the front of the output. This is the entry point
+		--	of the proc, and it needs to come first.
+		((first':_), rest')
+				= partition ((== first_id) . blockId) final_blocks
+
+	   in	CmmProc info label params
+                          (ListGraph $ map stripLiveBlock $ first' : rest')
+
+	stripCmm _
+		 = panic "RegAlloc.Liveness.stripLive: no first_id on proc"	
 
 -- | Strip away liveness information from a basic block,
 --	and make real spill instructions out of SPILL, RELOAD pseudos along the way.
