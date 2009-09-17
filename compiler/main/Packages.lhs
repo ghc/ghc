@@ -127,6 +127,8 @@ type PackageConfigMap = UniqFM PackageConfig
 
 type InstalledPackageIdMap = FiniteMap InstalledPackageId PackageId
 
+type InstalledPackageIndex = FiniteMap InstalledPackageId PackageConfig
+
 emptyPackageConfigMap :: PackageConfigMap
 emptyPackageConfigMap = emptyUFM
 
@@ -533,7 +535,7 @@ findBroken pkgs = go [] emptyFM pkgs
             where new_ipids = addListToFM ipids
                                 [ (installedPackageId p, p) | p <- new_avail ]
 
-   depsAvailable :: FiniteMap InstalledPackageId PackageConfig
+   depsAvailable :: InstalledPackageIndex
                  -> PackageConfig
                  -> Either PackageConfig (PackageConfig, [InstalledPackageId])
    depsAvailable ipids pkg
@@ -545,21 +547,27 @@ findBroken pkgs = go [] emptyFM pkgs
 -- Eliminate shadowed packages, giving the user some feedback
 
 -- later packages in the list should shadow earlier ones with the same
--- package name/version.
-shadowPackages :: [PackageConfig] -> UnusablePackages
-shadowPackages pkgs
- = let (_,shadowed) = foldl check (emptyUFM,[]) pkgs
+-- package name/version.  Additionally, a package may be preferred if
+-- it is in the transitive closure of packages selected using -package-id
+-- flags.
+shadowPackages :: [PackageConfig] -> [InstalledPackageId] -> UnusablePackages
+shadowPackages pkgs preferred
+ = let (shadowed,_) = foldl check ([],emptyUFM) pkgs
    in  listToFM shadowed
  where
- check (pkgmap,shadowed) pkg
-    = (addToUFM pkgmap (packageConfigId pkg) pkg, shadowed')
-    where
-    shadowed'
+ check (shadowed,pkgmap) pkg
       | Just oldpkg <- lookupUFM pkgmap (packageConfigId pkg)
-      = (installedPackageId oldpkg, ShadowedBy (installedPackageId pkg))
-        :shadowed
+      = let
+          ipid_new = installedPackageId pkg
+          ipid_old = installedPackageId oldpkg
+        in
+        if ipid_old `elem` preferred
+           then ( (ipid_new, ShadowedBy ipid_old) : shadowed, pkgmap )
+           else ( (ipid_old, ShadowedBy ipid_new) : shadowed, pkgmap' )
       | otherwise
-      = shadowed
+      = (shadowed, pkgmap')
+      where
+        pkgmap' = addToUFM pkgmap (packageConfigId pkg) pkg
 
 -- -----------------------------------------------------------------------------
 
@@ -574,6 +582,20 @@ ignorePackages flags pkgs = listToFM (concatMap doit flags)
     	-- because a common usage is to -ignore-package P as
     	-- a preventative measure just in case P exists.
   doit _ = panic "ignorePackages"
+
+-- -----------------------------------------------------------------------------
+
+depClosure :: InstalledPackageIndex
+           -> [InstalledPackageId]
+           -> [InstalledPackageId]
+depClosure index ipids = closure emptyFM ipids
+  where
+   closure set [] = keysFM set
+   closure set (ipid : ipids)
+     | ipid `elemFM` set = closure set ipids
+     | Just p <- lookupFM index ipid = closure (addToFM set ipid p) 
+                                               (depends p ++ ipids)
+     | otherwise = closure set ipids
 
 -- -----------------------------------------------------------------------------
 -- When all the command-line options are in, we can process our package
@@ -592,13 +614,58 @@ mkPackageState
 
 mkPackageState dflags pkgs0 preload0 this_package = do
 
+{-
+   Plan.
+
+   1. P = transitive closure of packages selected by -package-id 
+
+   2. Apply shadowing.  When there are multiple packages with the same
+      sourcePackageId,
+        * if one is in P, use that one
+        * otherwise, use the one highest in the package stack
+      [
+       rationale: we cannot use two packages with the same sourcePackageId
+       in the same program, because sourcePackageId is the symbol prefix.
+       Hence we must select a consistent set of packages to use.  We have
+       a default algorithm for doing this: packages higher in the stack
+       shadow those lower down.  This default algorithm can be overriden
+       by giving explicit -package-id flags; then we have to take these
+       preferences into account when selecting which other packages are
+       made available.
+
+       Our simple algorithm throws away some solutions: there may be other
+       consistent sets that would satisfy the -package flags, but it's
+       not GHC's job to be doing constraint solving.
+      ]
+
+   3. remove packages selected by -ignore-package
+
+   4. remove any packages with missing dependencies, or mutually recursive
+      dependencies.
+
+   5. report (with -v) any packages that were removed by steps 2-4
+
+   6. apply flags to set exposed/hidden on the resulting packages
+      - if any flag refers to a package which was removed by 2-4, then
+        we can give an error message explaining why
+
+   7. hide any packages which are superseded by later exposed packages
+-}
+
   let
       flags = reverse (packageFlags dflags)
+
+      ipid_map = listToFM [ (installedPackageId p, p) | p <- pkgs0 ]
+
+      ipid_selected = depClosure ipid_map [ InstalledPackageId i
+                                          | ExposePackageId i <- flags ]
+      
       (ignore_flags, other_flags) = partition is_ignore flags
       is_ignore IgnorePackage{} = True
       is_ignore _ = False
 
-      shadowed = shadowPackages pkgs0
+      shadowed = shadowPackages pkgs0 ipid_selected
+
       ignored  = ignorePackages ignore_flags pkgs0
 
       pkgs0' = filter (not . (`elemFM` (plusFM shadowed ignored)) . installedPackageId) pkgs0
