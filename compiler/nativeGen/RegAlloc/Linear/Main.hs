@@ -190,7 +190,7 @@ linearRA_SCCs first_id block_live blocksAcc (AcyclicSCC block : sccs)
 
 linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs) 
  = do
-        blockss' <- process first_id block_live blocks [] (return [])
+        blockss' <- process first_id block_live blocks [] (return []) False
 	linearRA_SCCs first_id block_live
 		(reverse (concat blockss') ++ blocksAcc)
 		sccs
@@ -207,13 +207,21 @@ linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 		
-process _ _ [] []         accum 
+process _ _ [] []         accum _
 	= return $ reverse accum
 
-process first_id block_live [] next_round accum 
-	= process first_id block_live next_round [] accum
+process first_id block_live [] next_round accum madeProgress
+	| not madeProgress
+	= pprPanic "RegAlloc.Linear.Main.process: no progress made, bailing out" 
+		(  text "stalled blocks:"
+		$$ vcat (map ppr next_round))
+	
+	| otherwise
+	= process first_id block_live 
+		  next_round [] accum False
 
-process first_id block_live (b@(BasicBlock id _) : blocks) next_round accum 
+process first_id block_live (b@(BasicBlock id _) : blocks) 
+	next_round accum madeProgress
  = do 	
 	block_assig <- getBlockAssigR
 
@@ -221,9 +229,11 @@ process first_id block_live (b@(BasicBlock id _) : blocks) next_round accum
              || id == first_id
          then do 
 		b'  <- processBlock block_live b
-                process first_id block_live blocks next_round (b' : accum)
+                process first_id block_live blocks 
+			next_round (b' : accum) True
 
-         else 	process first_id block_live blocks (b : next_round) accum
+         else 	process first_id block_live blocks 
+			(b : next_round) accum madeProgress
 
 
 -- | Do register allocation on this basic block
