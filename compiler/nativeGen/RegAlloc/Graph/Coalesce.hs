@@ -14,6 +14,7 @@ import Reg
 
 import Cmm
 import Bag
+import Digraph
 import UniqFM
 import UniqSet
 import UniqSupply
@@ -68,10 +69,9 @@ slurpJoinMovs
 slurpJoinMovs live
 	= slurpCmm emptyBag live
  where	
-  	slurpCmm   rs  CmmData{}		         = rs
-	slurpCmm   rs (CmmProc _ _ _ (ListGraph blocks)) = foldl' slurpComp  rs blocks
-   	slurpComp  rs (BasicBlock _ blocks)	         = foldl' slurpBlock rs blocks
-        slurpBlock rs (BasicBlock _ instrs)              = foldl' slurpLI    rs instrs
+  	slurpCmm   rs  CmmData{}		= rs
+	slurpCmm   rs (CmmProc _ _ _ sccs) 	= foldl' slurpBlock rs (flattenSCCs sccs)
+        slurpBlock rs (BasicBlock _ instrs)	= foldl' slurpLI    rs instrs
                 
         slurpLI    rs (Instr _	Nothing)	         = rs
 	slurpLI    rs (Instr instr (Just live))

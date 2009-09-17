@@ -23,11 +23,11 @@ import Reg
 
 import GraphBase
 
-
 import BlockId
 import Cmm
 import UniqFM
 import UniqSet
+import Digraph		(flattenSCCs)
 import Outputable
 import State
 
@@ -71,11 +71,9 @@ slurpSpillCostInfo cmm
 	= execState (countCmm cmm) zeroSpillCostInfo
  where
 	countCmm CmmData{}		= return ()
-	countCmm (CmmProc info _ _ (ListGraph blocks))
-		= mapM_ (countComp info) blocks
-
-	countComp info (BasicBlock _ blocks)
-		= mapM_ (countBlock info) blocks
+	countCmm (CmmProc info _ _ sccs)
+		= mapM_ (countBlock info)
+		$ flattenSCCs sccs
 
 	-- lookup the regs that are live on entry to this block in
 	--	the info table from the CmmProc

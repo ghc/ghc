@@ -70,10 +70,8 @@ type LiveCmmTop instr
 	= GenCmmTop
 		CmmStatic
 		LiveInfo
-		(ListGraph (GenBasicBlock (LiveInstr instr)))
-			-- the "instructions" here are actually more blocks,
-			--	single blocks are acyclic
-			--	multiple blocks are taken to be cyclic.
+		[SCC (LiveBasicBlock instr)]
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
@@ -175,15 +173,25 @@ mapBlockTopM
 mapBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
-mapBlockTopM f (CmmProc header label params (ListGraph comps))
- = do	comps'	<- mapM (mapBlockCompM f) comps
- 	return	$ CmmProc header label params (ListGraph comps')
+mapBlockTopM f (CmmProc header label params sccs)
+ = do	sccs'	<- mapM (mapSCCM f) sccs
+ 	return	$ CmmProc header label params sccs'
 
+mapSCCM :: Monad m => (a -> m b) -> SCC a -> m (SCC b)
+mapSCCM	f (AcyclicSCC x)	
+ = do	x'	<- f x
+	return	$ AcyclicSCC x'
+
+mapSCCM f (CyclicSCC xs)
+ = do	xs'	<- mapM f xs
+	return	$ CyclicSCC xs'
+
+{-
 mapBlockCompM :: Monad m => (a -> m a') -> (GenBasicBlock a) -> m (GenBasicBlock a')
 mapBlockCompM f (BasicBlock i blocks)
  = do	blocks'	<- mapM f blocks
  	return	$ BasicBlock i blocks'
-
+-}
 
 -- map a function across all the basic blocks in this code
 mapGenBlockTop
@@ -221,11 +229,14 @@ slurpConflicts live
 	= slurpCmm (emptyBag, emptyBag) live
 
  where	slurpCmm   rs  CmmData{}		= rs
- 	slurpCmm   rs (CmmProc info _ _ (ListGraph blocks))
-		= foldl' (slurpComp info) rs blocks
+ 	slurpCmm   rs (CmmProc info _ _ sccs)
+		= foldl' (slurpSCC info) rs sccs
 
-	slurpComp  info rs (BasicBlock _ blocks)	
-		= foldl' (slurpBlock info) rs blocks
+	slurpSCC  info rs (AcyclicSCC b)	
+		= slurpBlock info rs b
+
+	slurpSCC  info rs (CyclicSCC bs)
+		= foldl'  (slurpBlock info) rs bs
 
 	slurpBlock info rs (BasicBlock blockId instrs)	
 		| LiveInfo _ _ (Just blockLive)	<- info
@@ -300,14 +311,14 @@ slurpReloadCoalesce live
 	= slurpCmm emptyBag live
 
  where	slurpCmm cs CmmData{}	= cs
- 	slurpCmm cs (CmmProc _ _ _ (ListGraph blocks))
-		= foldl' slurpComp cs blocks
+ 	slurpCmm cs (CmmProc _ _ _ sccs)
+		= slurpComp cs (flattenSCCs sccs)
 
-	slurpComp  cs comp
-	 = let	(moveBags, _)	= runState (slurpCompM comp) emptyUFM
+	slurpComp  cs blocks
+	 = let	(moveBags, _)	= runState (slurpCompM blocks) emptyUFM
 	   in	unionManyBags (cs : moveBags)
 
-	slurpCompM (BasicBlock _ blocks)
+	slurpCompM blocks
 	 = do	-- run the analysis once to record the mapping across jumps.
 	 	mapM_	(slurpBlock False) blocks
 
@@ -392,12 +403,10 @@ stripLive live
 	= stripCmm live
 
  where	stripCmm (CmmData sec ds)	= CmmData sec ds
- 	stripCmm (CmmProc (LiveInfo info _ _) label params (ListGraph comps))
+ 	stripCmm (CmmProc (LiveInfo info _ _) label params sccs)
 		= CmmProc info label params
-                          (ListGraph $ concatMap stripComp comps)
-
-	stripComp  (BasicBlock _ blocks)	= map stripLiveBlock blocks
-
+                          (ListGraph $ map stripLiveBlock $ flattenSCCs sccs)
+	
 
 -- | Strip away liveness information from a basic block,
 --	and make real spill instructions out of SPILL, RELOAD pseudos along the way.
@@ -463,21 +472,20 @@ patchEraseLive patchF cmm
  where
 	patchCmm cmm@CmmData{}	= cmm
 
-	patchCmm (CmmProc info label params (ListGraph comps))
+	patchCmm (CmmProc info label params sccs)
 	 | LiveInfo static id (Just blockMap)	<- info
 	 = let 	
 	 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
 		blockMap'	= mapBlockEnv patchRegSet blockMap
 
 		info'		= LiveInfo static id (Just blockMap')
-	   in	CmmProc info' label params $ ListGraph $ map patchComp comps
+	   in	CmmProc info' label params $ map patchSCC sccs
 
 	 | otherwise
 	 = panic "RegAlloc.Liveness.patchEraseLive: no blockMap"
 
-
-	patchComp (BasicBlock id blocks)
-		= BasicBlock id $ map patchBlock blocks
+	patchSCC (AcyclicSCC b)	 = AcyclicSCC (patchBlock b)
+	patchSCC (CyclicSCC  bs) = CyclicSCC  (map patchBlock bs)
 
  	patchBlock (BasicBlock id lis)
 		= BasicBlock id $ patchInstrs lis
@@ -578,23 +586,15 @@ regLiveness (CmmData i d)
 regLiveness (CmmProc info lbl params (ListGraph []))
 	= returnUs $ CmmProc
 			(LiveInfo info Nothing (Just emptyBlockEnv))
-			lbl params (ListGraph [])
+			lbl params []
 
 regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
  = let 	first_id		= blockId first
 	sccs			= sccBlocks blocks
 	(ann_sccs, block_live)	= computeLiveness sccs
 
-	liveBlocks
-	 = map (\scc -> case scc of
-	 		AcyclicSCC  b@(BasicBlock l _)		-> BasicBlock l [b]
-			CyclicSCC  bs@(BasicBlock l _ : _)	-> BasicBlock l bs
-			CyclicSCC  []
-			 -> panic "RegLiveness.regLiveness: no blocks in scc list")
-		 $ ann_sccs
-
    in	returnUs $ CmmProc (LiveInfo info (Just first_id) (Just block_live))
-			   lbl params (ListGraph liveBlocks)
+			   lbl params ann_sccs
 
 
 sccBlocks 
