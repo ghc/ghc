@@ -158,16 +158,16 @@ cleanForward _ _ acc []
 --
 cleanForward blockId assoc acc (li1 : li2 : instrs)
 
-	| SPILL  reg1  slot1	<- li1
-	, RELOAD slot2 reg2	<- li2
+	| LiveInstr (SPILL  reg1  slot1) _	<- li1
+	, LiveInstr (RELOAD slot2 reg2)  _	<- li2
 	, slot1 == slot2
 	= do
 		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
 		cleanForward blockId assoc acc
-			(li1 : Instr (mkRegRegMoveInstr reg1 reg2) Nothing : instrs)
+			(li1 : LiveInstr (mkRegRegMoveInstr reg1 reg2) Nothing : instrs)
 
 
-cleanForward blockId assoc acc (li@(Instr i1 _) : instrs)
+cleanForward blockId assoc acc (li@(LiveInstr i1 _) : instrs)
 	| Just (r1, r2)	<- takeRegRegMoveInstr i1
 	= if r1 == r2
 		-- erase any left over nop reg reg moves while we're here
@@ -187,35 +187,32 @@ cleanForward blockId assoc acc (li@(Instr i1 _) : instrs)
 cleanForward blockId assoc acc (li : instrs)
 
 	-- update association due to the spill
-	| SPILL reg slot	<- li
+	| LiveInstr (SPILL reg slot) _	<- li
 	= let	assoc'	= addAssoc (SReg reg)  (SSlot slot)
 			$ delAssoc (SSlot slot)
 			$ assoc
 	  in	cleanForward blockId assoc' (li : acc) instrs
 
 	-- clean a reload instr
-	| RELOAD{}		<- li
+	| LiveInstr (RELOAD{}) _	<- li
 	= do	(assoc', mli)	<- cleanReload blockId assoc li
 		case mli of
 		 Nothing	-> cleanForward blockId assoc' acc 		instrs
 		 Just li'	-> cleanForward blockId assoc' (li' : acc)	instrs
 
 	-- remember the association over a jump
-	| Instr instr _ 	<- li
+	| LiveInstr instr _ 	<- li
 	, targets		<- jumpDestsOfInstr instr
 	, not $ null targets
 	= do	mapM_ (accJumpValid assoc) targets
 		cleanForward blockId assoc (li : acc) instrs
 
 	-- writing to a reg changes its value.
-	| Instr instr _		<- li
+	| LiveInstr instr _	<- li
 	, RU _ written		<- regUsageOfInstr instr
 	= let assoc'	= foldr delAssoc assoc (map SReg $ nub written)
 	  in  cleanForward blockId assoc' (li : acc) instrs
 
--- bogus, to stop pattern match warning
-cleanForward _ _ _ _ 
-	= panic "RegAlloc.Graph.SpillClean.cleanForward: no match"
 
 
 -- | Try and rewrite a reload instruction to something more pleasing
@@ -227,7 +224,7 @@ cleanReload
 	-> LiveInstr instr
 	-> CleanM (Assoc Store, Maybe (LiveInstr instr))
 
-cleanReload blockId assoc li@(RELOAD slot reg)
+cleanReload blockId assoc li@(LiveInstr (RELOAD slot reg) _)
 
 	-- if the reg we're reloading already has the same value as the slot
 	--	then we can erase the instruction outright
@@ -244,7 +241,7 @@ cleanReload blockId assoc li@(RELOAD slot reg)
 				$ delAssoc (SReg reg)
 				$ assoc
 
-		return	(assoc', Just $ Instr (mkRegRegMoveInstr reg2 reg) Nothing)
+		return	(assoc', Just $ LiveInstr (mkRegRegMoveInstr reg2 reg) Nothing)
 
 	-- gotta keep this instr
 	| otherwise
@@ -306,12 +303,12 @@ cleanBackward' _ _      acc []
 cleanBackward' reloadedBy noReloads acc (li : instrs)
 
 	-- if nothing ever reloads from this slot then we don't need the spill
-	| SPILL _ slot	<- li
+	| LiveInstr (SPILL _ slot) _	<- li
 	, Nothing	<- lookupUFM reloadedBy (SSlot slot)
 	= do	modify $ \s -> s { sCleanedSpillsAcc = sCleanedSpillsAcc s + 1 }
 		cleanBackward noReloads acc instrs
 
-	| SPILL _ slot	<- li
+	| LiveInstr (SPILL _ slot) _	<- li
 	= if elementOfUniqSet slot noReloads
 
 	   -- we can erase this spill because the slot won't be read until after the next one
@@ -325,7 +322,7 @@ cleanBackward' reloadedBy noReloads acc (li : instrs)
 	   	cleanBackward noReloads' (li : acc) instrs
 
 	-- if we reload from a slot then it's no longer unused
-	| RELOAD slot _		<- li
+	| LiveInstr (RELOAD slot _) _	<- li
 	, noReloads'		<- delOneFromUniqSet noReloads slot
 	= cleanBackward noReloads' (li : acc) instrs
 

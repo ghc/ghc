@@ -80,19 +80,11 @@ regSpill_instr
 	=> UniqFM Int 
 	-> LiveInstr instr -> SpillM [LiveInstr instr]
 
--- | The thing we're spilling shouldn't already have spill or reloads in it
-regSpill_instr	_ SPILL{}
-	= panic "regSpill_instr: unexpected SPILL"
-
-regSpill_instr	_ RELOAD{}
-	= panic "regSpill_instr: unexpected RELOAD"
-
-
-regSpill_instr _	li@(Instr _ Nothing)
+regSpill_instr _ li@(LiveInstr _ Nothing)
  = do	return [li]
 
 regSpill_instr regSlotMap
-	(Instr instr (Just _))
+	(LiveInstr instr (Just _))
  = do
 	-- work out which regs are read and written in this instr
 	let RU rlRead rlWritten	= regUsageOfInstr instr
@@ -123,7 +115,7 @@ regSpill_instr regSlotMap
 
 	-- final code
 	let instrs'	=  prefixes
-			++ [Instr instr3 Nothing]
+			++ [LiveInstr instr3 Nothing]
 			++ postfixes
 
 	return
@@ -147,7 +139,7 @@ spillRead regSlotMap instr reg
 			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 0, 1) }
 
 	 	return	( instr'
-			, ( [RELOAD slot nReg]
+			, ( [LiveInstr (RELOAD slot nReg) Nothing]
 			  , []) )
 
 	| otherwise	= panic "RegSpill.spillRead: no slot defined for spilled reg"
@@ -162,7 +154,7 @@ spillWrite regSlotMap instr reg
 
 	 	return	( instr'
 			, ( []
-			  , [SPILL nReg slot]))
+			  , [LiveInstr (SPILL nReg slot) Nothing]))
 
 	| otherwise	= panic "RegSpill.spillWrite: no slot defined for spilled reg"
 
@@ -175,8 +167,8 @@ spillModify regSlotMap instr reg
 			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 1) }
 
 		return	( instr'
-			, ( [RELOAD slot nReg]
-			  , [SPILL nReg slot]))
+			, ( [LiveInstr (RELOAD slot nReg) Nothing]
+			  , [LiveInstr (SPILL nReg slot) Nothing]))
 
 	| otherwise	= panic "RegSpill.spillModify: no slot defined for spilled reg"
 

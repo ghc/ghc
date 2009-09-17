@@ -211,8 +211,8 @@ regAlloc_spin
 			<- regSpill code_coalesced slotsFree rsSpill
 
 		-- recalculate liveness
-		let code_nat	= map stripLive code_spilled
-		code_relive	<- mapM regLiveness code_nat
+--		let code_nat	= map stripLive code_spilled
+		code_relive	<- mapM regLiveness code_spilled
 
 		-- record what happened in this stage for debugging
 		let stat	=

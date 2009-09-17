@@ -304,7 +304,9 @@ cmmNativeGen dflags us cmm count
 	-- tag instructions with register liveness information
 	let (withLiveness, usLive) =
 		{-# SCC "regLiveness" #-}
-		initUs usGen $ mapUs regLiveness native
+		initUs usGen 
+			$ mapUs regLiveness 
+			$ map natCmmTopToLive native
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_liveness "Liveness annotations added"

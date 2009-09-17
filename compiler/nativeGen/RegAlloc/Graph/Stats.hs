@@ -258,15 +258,15 @@ countSRM_block (BasicBlock i instrs)
  	return	$ BasicBlock i instrs'
 
 countSRM_instr li
-	| SPILL _ _	<- li
-	= do	modify 	$ \(s, r, m)	-> (s + 1, r, m)
+	| LiveInstr SPILL{} _	 <- li
+	= do	modify  $ \(s, r, m)	-> (s + 1, r, m)
 		return li
 
-	| RELOAD _ _	<- li
-	= do	modify	$ \(s, r, m)	-> (s, r + 1, m)
+	| LiveInstr RELOAD{} _ 	<- li
+	= do	modify  $ \(s, r, m)	-> (s, r + 1, m)
 		return li
-
-	| Instr instr _	<- li
+	
+	| LiveInstr instr _	<- li
 	, Just _	<- takeRegRegMoveInstr instr
 	= do	modify	$ \(s, r, m)	-> (s, r, m + 1)
 		return li

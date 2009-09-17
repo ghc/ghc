@@ -93,13 +93,7 @@ slurpSpillCostInfo cmm
 		= return ()
 
 	-- skip over comment and delta pseudo instrs
-	countLIs rsLive (SPILL{} : lis)
-		= countLIs rsLive lis
-		
-	countLIs rsLive (RELOAD{} : lis)
-		= countLIs rsLive lis
-
-	countLIs rsLive (Instr instr Nothing : lis)
+	countLIs rsLive (LiveInstr instr Nothing : lis)
 		| isMetaInstr instr
 		= countLIs rsLive lis
 
@@ -107,7 +101,7 @@ slurpSpillCostInfo cmm
 		= pprPanic "RegSpillCost.slurpSpillCostInfo"
 			(text "no liveness information on instruction " <> ppr instr)
 
-	countLIs rsLiveEntry (Instr instr (Just live) : lis)
+	countLIs rsLiveEntry (LiveInstr instr (Just live) : lis)
 	 = do
 		-- increment the lifetime counts for regs live on entry to this instr
 		mapM_ incLifetime $ uniqSetToList rsLiveEntry

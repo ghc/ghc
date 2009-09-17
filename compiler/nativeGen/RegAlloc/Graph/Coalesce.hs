@@ -73,8 +73,8 @@ slurpJoinMovs live
 	slurpCmm   rs (CmmProc _ _ _ sccs) 	= foldl' slurpBlock rs (flattenSCCs sccs)
         slurpBlock rs (BasicBlock _ instrs)	= foldl' slurpLI    rs instrs
                 
-        slurpLI    rs (Instr _	Nothing)	         = rs
-	slurpLI    rs (Instr instr (Just live))
+        slurpLI    rs (LiveInstr _	Nothing) = rs
+	slurpLI    rs (LiveInstr instr (Just live))
 	 	| Just (r1, r2)	<- takeRegRegMoveInstr instr
 		, elementOfUniqSet r1 $ liveDieRead live
 		, elementOfUniqSet r2 $ liveBorn live
@@ -86,8 +86,5 @@ slurpJoinMovs live
 		
 		| otherwise
 		= rs
-	
-	slurpLI	   rs SPILL{} 	= rs
-	slurpLI    rs RELOAD{}	= rs
 		
 	

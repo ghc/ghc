@@ -292,7 +292,7 @@ linearRA _          accInstr accFixup _ []
 
 linearRA block_live accInstr accFixups id (instr:instrs)
  = do
- 	(accInstr', new_fixups) 
+	(accInstr', new_fixups) 
 		<- raInsn block_live accInstr id instr
 
 	linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
@@ -309,17 +309,17 @@ raInsn
 		( [instr]			-- new instructions
 		, [NatBasicBlock instr])	-- extra fixup blocks
 
-raInsn _     new_instrs _ (Instr ii Nothing)  
+raInsn _     new_instrs _ (LiveInstr ii Nothing)  
 	| Just n	<- takeDeltaInstr ii
  	= do	setDeltaR n
 		return (new_instrs, [])
 
-raInsn _     new_instrs _ (Instr ii Nothing)
+raInsn _     new_instrs _ (LiveInstr ii Nothing)
 	| isMetaInstr ii
 	= return (new_instrs, [])
 
 
-raInsn block_live new_instrs id (Instr instr (Just live))
+raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
  = do
     assig    <- getAssigR
 
@@ -380,9 +380,9 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     clobber_saves 	<- saveClobberedTemps real_written r_dying
 
     -- debugging
-{-  freeregs <- getFreeRegsR
+    freeregs <- getFreeRegsR
     assig    <- getAssigR
-    pprTrace "genRaInsn" 
+{-    pprTrace "genRaInsn" 
     	(ppr instr 
 		$$ text "r_dying      = " <+> ppr r_dying 
 		$$ text "w_dying      = " <+> ppr w_dying 
