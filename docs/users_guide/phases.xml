@@ -975,7 +975,7 @@ $ cat foo.hspp</screen>
             binary file
             <literal><replaceable>program</replaceable>.eventlog</literal>,
             which can then be interpreted later by various tools.  See
-            <xref linkend="eventlog" /> for more information.
+            <xref linkend="rts-eventlog" /> for more information.
           </para>
           <para>
             <option>-eventlog</option> can be used
