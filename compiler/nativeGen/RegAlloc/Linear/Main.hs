@@ -137,7 +137,7 @@ regAlloc (CmmProc (LiveInfo info _ _) lbl params (ListGraph []))
 		 , Nothing )
 	
 regAlloc (CmmProc static lbl params (ListGraph comps))
-	| LiveInfo info (Just first_id) block_live	<- static
+	| LiveInfo info (Just first_id) (Just block_live)	<- static
 	= do	
  		-- do register allocation on each component.
 		(final_blocks, stats)

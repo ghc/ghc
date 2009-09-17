@@ -103,9 +103,9 @@ data Liveness
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
 data LiveInfo
 	= LiveInfo
-		[CmmStatic]		-- cmm static stuff
-		(Maybe BlockId)		-- id of the first block
-		(BlockMap RegSet)	-- argument locals live on entry to this block
+		[CmmStatic]			-- cmm static stuff
+		(Maybe BlockId)			-- id of the first block
+		(Maybe (BlockMap RegSet))	-- argument locals live on entry to this block
 
 -- | A basic block with liveness information.
 type LiveBasicBlock instr
@@ -228,7 +228,7 @@ slurpConflicts live
 		= foldl' (slurpBlock info) rs blocks
 
 	slurpBlock info rs (BasicBlock blockId instrs)	
-		| LiveInfo _ _ blockLive	<- info
+		| LiveInfo _ _ (Just blockLive)	<- info
 		, Just rsLiveEntry		<- lookupBlockEnv blockLive blockId
 		, (conflicts, moves)		<- slurpLIs rsLiveEntry rs instrs
 		= (consBag rsLiveEntry conflicts, moves)
@@ -464,13 +464,17 @@ patchEraseLive patchF cmm
 	patchCmm cmm@CmmData{}	= cmm
 
 	patchCmm (CmmProc info label params (ListGraph comps))
-	 | LiveInfo static id blockMap	<- info
+	 | LiveInfo static id (Just blockMap)	<- info
 	 = let 	
 	 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
 		blockMap'	= mapBlockEnv patchRegSet blockMap
 
-		info'		= LiveInfo static id blockMap'
+		info'		= LiveInfo static id (Just blockMap')
 	   in	CmmProc info' label params $ ListGraph $ map patchComp comps
+
+	 | otherwise
+	 = panic "RegAlloc.Liveness.patchEraseLive: no blockMap"
+
 
 	patchComp (BasicBlock id blocks)
 		= BasicBlock id $ map patchBlock blocks
@@ -531,6 +535,35 @@ patchRegsLiveInstr patchF li
 	 -> RELOAD slot (patchF reg)
 
 
+--------------------------------------------------------------------------------
+-- | Convert a NatCmmTop to a LiveCmmTop, with empty liveness information
+{-
+natCmmTopToLive 
+	:: NatCmmTop instr
+	-> LiveCmmTop instr
+
+natCmmTopToLive cmm@(CmmData _ _)
+	= cmm
+
+natCmmTopToLive (CmmProc info lbl params (ListGraph []))
+	= CmmProc (LiveInfo info Nothing emptyBlockEnv)
+		lbl params (ListGraph []))
+
+natCmmTopToLive (CmmProc info lbl params (ListGraph blocks))
+ = let	first_id		= blockId first
+	sccs			= sccBlocks blocks
+
+	liveBlocks
+	 = map (\scc -> case scc of
+			AcyclicSCC  b@(BasicBlock l _)		-> BasicBlock l [cmmBlockToLive b]	
+			CyclicSCC  bs@(BasicBlock l _ : _)	-> BasicBlock l (map cmmBlockToLive bs)
+			CyclicSCC  []	
+			 -> panic "RegLiveNess.natCmmTopToLive: no blocks in scc list")
+		sccs
+
+   in	CmmProc (LiveInfo info (Just first_id) ???
+-}
+
 ---------------------------------------------------------------------------------
 -- Annotate code with register liveness information
 --
@@ -544,7 +577,7 @@ regLiveness (CmmData i d)
 
 regLiveness (CmmProc info lbl params (ListGraph []))
 	= returnUs $ CmmProc
-			(LiveInfo info Nothing emptyBlockEnv)
+			(LiveInfo info Nothing (Just emptyBlockEnv))
 			lbl params (ListGraph [])
 
 regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
@@ -560,7 +593,7 @@ regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
 			 -> panic "RegLiveness.regLiveness: no blocks in scc list")
 		 $ ann_sccs
 
-   in	returnUs $ CmmProc (LiveInfo info (Just first_id) block_live)
+   in	returnUs $ CmmProc (LiveInfo info (Just first_id) (Just block_live))
 			   lbl params (ListGraph liveBlocks)
 
 
