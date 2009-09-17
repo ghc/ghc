@@ -17,7 +17,7 @@ include libraries/integer-gmp/gmp/config.mk
 endif
 
 libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/cbits/mkGmpDerivedConstants.c
-	"$(CC)" $(SRC_CC_OPTS) $(libraries/integer-gmp_CC_OPTS) $< -o $@
+	"$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS) $(libraries/integer-gmp_CC_OPTS) $< -o $@
 
 libraries/integer-gmp/cbits/GmpDerivedConstants.h: libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext)
 	$< > $@
