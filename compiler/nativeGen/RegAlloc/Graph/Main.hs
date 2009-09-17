@@ -178,6 +178,7 @@ regAlloc_spin
 			{ raGraph		= graph
 			, raGraphColored	= graph_colored_lint
 			, raCoalesced		= rmCoalesce
+			, raCodeCoalesced	= code_coalesced
 			, raPatched		= code_patched
 			, raSpillClean		= code_spillclean
 			, raFinal		= code_final

@@ -53,13 +53,14 @@ data RegAllocStats instr
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raGraph	 :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
-	, raGraphColored :: Color.Graph VirtualReg RegClass RealReg 	-- ^ the coalesced and colored graph
-	, raCoalesced	:: UniqFM VirtualReg				-- ^ the regs that were coaleced
-	, raPatched	:: [LiveCmmTop instr] 				-- ^ code with vregs replaced by hregs
-	, raSpillClean  :: [LiveCmmTop instr]				-- ^ code with unneeded spill\/reloads cleaned out
-	, raFinal	:: [NatCmmTop instr] 				-- ^ final code
-	, raSRMs	:: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
+	{ raGraph	  :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
+	, raGraphColored  :: Color.Graph VirtualReg RegClass RealReg 	-- ^ the coalesced and colored graph
+	, raCoalesced	  :: UniqFM VirtualReg				-- ^ the regs that were coaleced
+	, raCodeCoalesced :: [LiveCmmTop instr]				-- ^ code with coalescings applied 
+	, raPatched	  :: [LiveCmmTop instr] 			-- ^ code with vregs replaced by hregs
+	, raSpillClean    :: [LiveCmmTop instr]				-- ^ code with unneeded spill\/reloads cleaned out
+	, raFinal	  :: [NatCmmTop instr] 				-- ^ final code
+	, raSRMs	  :: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
 
 instance Outputable instr => Outputable (RegAllocStats instr) where
 
@@ -113,6 +114,10 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 			$$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
 			$$ text ""
 		else empty)
+
+	$$ text "#  Native code after coalescings applied."
+	$$ ppr (raCodeCoalesced s)
+	$$ text ""
 
 	$$ text "#  Native code after register allocation."
 	$$ ppr (raPatched s)
