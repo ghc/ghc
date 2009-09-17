@@ -109,9 +109,11 @@ for opt,arg in opts:
         # these components (see trac #3091), but int() chokes on the
         # 'c1', so we drop it.
         (maj, min, pat) = platform.python_version_tuple()
-        maj = int(re.sub('[^0-9].*', '', maj))
-        min = int(re.sub('[^0-9].*', '', min))
-        pat = int(re.sub('[^0-9].*', '', pat))
+        # We wrap maj, min, and pat in str() to work around a bug in python
+        # 2.6.1
+        maj = int(re.sub('[^0-9].*', '', str(maj)))
+        min = int(re.sub('[^0-9].*', '', str(min)))
+        pat = int(re.sub('[^0-9].*', '', str(pat)))
         if (maj, min, pat) >= (2, 5, 2):
             config.threads = int(arg)
             config.use_threads = 1
