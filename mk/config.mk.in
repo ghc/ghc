@@ -26,7 +26,6 @@
 TOP		= @hardtop@
 
 include $(TOP)/mk/project.mk
-include $(TOP)/mk/install.mk
 
 ################################################################################
 #
@@ -191,6 +190,9 @@ RelocatableBuild = YES
 else
 RelocatableBuild = NO
 endif
+
+# needs to be after $(RelocatableBuild) is set above
+include $(TOP)/mk/install.mk
 
 # When building bindists we set this to yes so that the binaries are as
 # portable as possible.

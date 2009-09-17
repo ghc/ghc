@@ -96,7 +96,8 @@ dvidir    = $(docdir)
 pdfdir    = $(docdir)
 psdir     = $(docdir)
 
-topdir = $(libdir)
+ghclibdir = $(libdir)
+ghcdocdir = $(datarootdir)/doc
 
 else
 
@@ -108,11 +109,11 @@ else
 # where package.conf is, so we just set it globally).
 #
 ghclibdir     = $(libdir)/ghc-$(ProjectVersion)
-ghclibexecdir = $(ghclibdir)
-topdir        = $(ghclibdir)
 ghcdocdir     = $(datarootdir)/doc/ghc
 endif
 
+ghclibexecdir = $(ghclibdir)
+topdir        = $(ghclibdir)
 ghcheaderdir  = $(ghclibdir)/include
 
 #-----------------------------------------------------------------------------
