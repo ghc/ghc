@@ -46,6 +46,7 @@ module Control.Monad
 
     , join          -- :: (Monad m) => m (m a) -> m a
     , msum          -- :: (MonadPlus m) => [m a] -> m a
+    , mfilter       -- :: (MonadPlus m) => (a -> Bool) -> m a -> m a
     , filterM       -- :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
     , mapAndUnzipM  -- :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
     , zipWithM      -- :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
@@ -310,6 +311,20 @@ is equivalent to
 ap                :: (Monad m) => m (a -> b) -> m a -> m b
 ap                =  liftM2 id
 
+
+-- -----------------------------------------------------------------------------
+-- Other MonadPlus functions
+
+-- | Direct 'MonadPlus' equivalent of 'filter'
+-- @'filter'@ = @(mfilter:: (a -> Bool) -> [a] -> [a]@
+-- applicable to any 'MonadPlus', for example
+-- @mfilter odd (Just 1) == Just 1@
+-- @mfilter odd (Just 2) == Nothing@
+
+mfilter :: (MonadPlus m) => (a -> Bool) -> m a -> m a
+mfilter p ma = do
+  a <- ma
+  if p a then return a else mzero
 
 {- $naming
 
