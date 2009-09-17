@@ -137,14 +137,18 @@ LOCAL_GHC_PKGSHADOW3 = $(GHC_PKG) --no-user-package-conf -f $(PKGCONFSHADOW1) -f
 # shadow-1-XXX will be shadowed by shadow-1-YYY, thus invalidating
 # shadowdep-1-XXX.
 shadow:
-	rm -rf $(PKGCONFSHADOW1) $(PKGCONFSHADOW2) shadow.hs shadow.o shadow.hi shadow.out
+	rm -rf $(PKGCONFSHADOW1) $(PKGCONFSHADOW2) shadow.hs shadow.o shadow.hi shadow.out shadow.hs shadow.hi
 	$(LOCAL_GHC_PKGSHADOW1) init $(PKGCONFSHADOW1)
 	$(LOCAL_GHC_PKGSHADOW2) init $(PKGCONFSHADOW2)
 	$(LOCAL_GHC_PKGSHADOW1) register --force shadow1.pkg >shadow1.out 2>&1
 	$(LOCAL_GHC_PKGSHADOW1) register --force shadow2.pkg >shadow2.out 2>&1
 	$(LOCAL_GHC_PKGSHADOW2) register --force shadow3.pkg >shadow3.out 2>&1
 	$(LOCAL_GHC_PKGSHADOW3) list
-	$(TEST_HC) -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package shadowdep || true
+	echo "main = return ()" >shadow.hs
+	$(TEST_HC) -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code || true
+	$(TEST_HC) -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package-id shadowdep-1-XXX -c shadow.hs -fno-code
+# The second one should succeed, by specifying -package-id we've
+# explicitly overriden the default shadowing behaviour.
 
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
