@@ -805,7 +805,8 @@ unifyCtxts :: [TcSigInfo] -> TcM [Inst]
 -- Post-condition: the returned Insts are full zonked
 unifyCtxts [] = panic "unifyCtxts []"
 unifyCtxts (sig1 : sigs)        -- Argument is always non-empty
-  = do  { mapM_ unify_ctxt sigs
+  = do  { traceTc $ text "unifyCtxts" <+> ppr (sig1 : sigs)
+	; mapM_ unify_ctxt sigs
         ; theta <- zonkTcThetaType (sig_theta sig1)
         ; newDictBndrs (sig_loc sig1) theta }
   where

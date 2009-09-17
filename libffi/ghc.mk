@@ -122,8 +122,8 @@ $(libffi_STAMP_CONFIGURE):
 	    export PATH; \
 	    cd build && \
 	    CC=$(WhatGccIsCalled) \
-        CFLAGS="$(SRC_CC_OPTS) -w" \
-        LDFLAGS="$(SRC_LD_OPTS) -w" \
+        CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS) -w" \
+        LDFLAGS="$(SRC_LD_OPTS) $(CONF_LD_OPTS) -w" \
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
@@ -168,7 +168,7 @@ $(eval $(call all-target,libffi,libffi/libHSffi.a libffi/libHSffi_p.a))
 libffi/HSffi.o: libffi/libHSffi.a
 	cd libffi && \
 	  touch empty.c; \
-	  "$(CC)" $(SRC_CC_OPTS) -c empty.c -o HSffi.o
+	  "$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS) -c empty.c -o HSffi.o
 
 $(eval $(call all-target,libffi,libffi/HSffi.o))
 
