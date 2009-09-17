@@ -191,7 +191,7 @@ rts_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
 rts_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
 # Otherwise the stack-smash handler gets triggered.
-ifeq "$(TargetOS_CPP)" "openbsd"
+ifneq "$(findstring $(TargetOS_CPP), darwin openbsd)" ""
 rts_HC_OPTS += -optc-fno-stack-protector
 endif
 

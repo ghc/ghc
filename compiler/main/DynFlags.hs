@@ -2293,10 +2293,20 @@ machdepCCOpts _dflags
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
       --   the fp (%ebp) for our register maps.
         =  let n_regs = stolen_x86_regs _dflags
-               sta = opt_Static
            in
-                    ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
+                    ( 
+#if darwin_TARGET_OS
+                      -- By default, gcc on OS X will generate SSE
+                      -- instructions, which need things 16-byte aligned,
+                      -- but we don't 16-byte align things. Thus drop
+                      -- back to generic i686 compatibility. Trac #2983.
+                      --
+                      -- Since Snow Leopard (10.6), gcc defaults to x86_64.
+                      ["-march=i686", "-m32"],
+#else
+                      [ if opt_Static then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
                       ],
+#endif
                       [ "-fno-defer-pop",
                         "-fomit-frame-pointer",
                         -- we want -fno-builtin, because when gcc inlines
