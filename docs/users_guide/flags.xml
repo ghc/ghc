@@ -1801,6 +1801,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-eventlog</option></entry>
+	      <entry>Enable runtime event tracing</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-fno-gen-manifest</option></entry>
 	      <entry>Do not generate a manifest file (Windows only)</entry>
 	      <entry>dynamic</entry>
