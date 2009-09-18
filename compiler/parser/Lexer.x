@@ -702,6 +702,14 @@ reservedSymsFM = listToUFM $
        ,("→",   ITrarrow, unicodeSyntaxEnabled)
        ,("←",   ITlarrow, unicodeSyntaxEnabled)
        ,("⋯",   ITdotdot, unicodeSyntaxEnabled)
+
+       ,("⤙",   ITlarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤚",   ITrarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤛",   ITLarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤜",   ITRarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+
+       ,("★", ITstar, unicodeSyntaxEnabled)
+
         -- ToDo: ideally, → and ∷ should be "specials", so that they cannot
         -- form part of a large operator.  This would let us have a better
         -- syntax for kinds: ɑ∷*→* would be a legal kind signature. (maybe).
