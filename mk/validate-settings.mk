@@ -35,6 +35,8 @@ libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
 # On Windows, there are also some unused import warnings
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
+libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+
 # Temporarily turn off unused-import warnings for the binary package
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
