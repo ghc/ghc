@@ -79,9 +79,12 @@ import ZipDataflow
 -- which may differ depending on whether there is an update frame.
 live_ptrs :: ByteOff -> BlockEnv SubAreaSet -> AreaMap -> BlockId -> [Maybe LocalReg]
 live_ptrs oldByte slotEnv areaMap bid =
-  -- pprTrace "live_ptrs for" (ppr bid <+> ppr youngByte <+> ppr liveSlots) $
-  reverse $ slotsToList youngByte liveSlots []
-  where slotsToList n [] results | n == oldByte = results -- at old end of stack frame
+  -- pprTrace "live_ptrs for" (ppr bid <+> text (show oldByte ++ "-" ++ show youngByte) <+>
+  --                           ppr liveSlots) $
+  -- pprTrace ("stack layout for " ++ show bid ++ ": ") (ppr res) $ res
+  res
+  where res = reverse $ slotsToList youngByte liveSlots []
+        slotsToList n [] results | n == oldByte = results -- at old end of stack frame
         slotsToList n (s : _) _  | n == oldByte =
           pprPanic "slot left off live_ptrs" (ppr s <+> ppr oldByte <+>
                ppr n <+> ppr liveSlots <+> ppr youngByte)

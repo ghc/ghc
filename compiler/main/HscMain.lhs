@@ -789,11 +789,8 @@ tryNewCodeGen	:: HscEnv -> Module -> [TyCon] -> [Module]
 		-> HpcInfo
 		-> IO [Cmm]
 tryNewCodeGen hsc_env this_mod data_tycons imported_mods 
-	      cost_centre_info stg_binds hpc_info
-  | not (dopt Opt_TryNewCodeGen (hsc_dflags hsc_env))
-  = return []
-  | otherwise
-  = do	{ let dflags = hsc_dflags hsc_env
+	      cost_centre_info stg_binds hpc_info =
+  do	{ let dflags = hsc_dflags hsc_env
         ; prog <- StgCmm.codeGen dflags this_mod data_tycons imported_mods 
 		 	 cost_centre_info stg_binds hpc_info
 	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 

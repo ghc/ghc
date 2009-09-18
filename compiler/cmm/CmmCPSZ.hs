@@ -46,19 +46,16 @@ protoCmmCPSZ :: HscEnv -- Compilation env including
              -> (TopSRT, [CmmZ])  -- SRT table and accumulating list of compiled procs
              -> CmmZ              -- Input C-- with Procedures
              -> IO (TopSRT, [CmmZ]) -- Output CPS transformed C--
-protoCmmCPSZ hsc_env (topSRT, rst) (Cmm tops)
-  | not (dopt Opt_TryNewCodeGen (hsc_dflags hsc_env))
-  = return (topSRT, Cmm tops : rst)                -- Only if -fnew-codegen
-  | otherwise
-  = do	let dflags = hsc_dflags hsc_env
-        showPass dflags "CPSZ"
-        (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
-        let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
-        (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
-        -- (topSRT, tops) <- foldM (\ z f -> f topCAFEnv z) (topSRT, []) toTops 
-        let cmms = Cmm (reverse (concat tops))
-        dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
-        return (topSRT, cmms : rst)
+protoCmmCPSZ hsc_env (topSRT, rst) (Cmm tops) =
+  do let dflags = hsc_dflags hsc_env
+     showPass dflags "CPSZ"
+     (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
+     let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
+     (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
+     -- (topSRT, tops) <- foldM (\ z f -> f topCAFEnv z) (topSRT, []) toTops 
+     let cmms = Cmm (reverse (concat tops))
+     dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
+     return (topSRT, cmms : rst)
 
 {- [Note global fuel]
 ~~~~~~~~~~~~~~~~~~~~~

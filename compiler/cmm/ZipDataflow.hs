@@ -570,7 +570,7 @@ mk_set_or_save :: (DataflowAnalysis df, Monad (df a), Outputable a) =>
                   (BlockId -> Bool) -> LastOutFacts a -> df a ()
 mk_set_or_save is_local (LastOutFacts l) = mapM_ set_or_save_one l
     where set_or_save_one (id, a) =
-              if is_local id then setFact id a else pprTrace "addLastOutFact" (ppr $ length l) $ addLastOutFact (id, a)
+              if is_local id then setFact id a else addLastOutFact (id, a)
 
 
 
@@ -980,7 +980,7 @@ instance FixedPoint ForwardFixedPoint where
 
 
 dump_things :: Bool
-dump_things = True
+dump_things = False
 
 my_trace :: String -> SDoc -> a -> a
 my_trace = if dump_things then pprTrace else \_ _ a -> a
