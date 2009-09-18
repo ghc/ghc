@@ -77,6 +77,8 @@
 #define bci_RETURN_L 			52
 #define bci_RETURN_V 			53
 #define bci_BRK_FUN			54
+#define bci_TESTLT_W   			55
+#define bci_TESTEQ_W  			56
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */

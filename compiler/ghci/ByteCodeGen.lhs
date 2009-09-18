@@ -844,6 +844,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
         my_discr (LitAlt l, _, _)
            = case l of MachInt i     -> DiscrI (fromInteger i)
+                       MachWord w    -> DiscrW (fromInteger w)
                        MachFloat r   -> DiscrF (fromRational r)
                        MachDouble r  -> DiscrD (fromRational r)
                        MachChar i    -> DiscrI (ord i)
@@ -1334,6 +1335,10 @@ mkMultiBranch maybe_ncons raw_ways
                             \(DiscrI i) fail_label -> TESTEQ_I i fail_label,
                             DiscrI minBound,
                             DiscrI maxBound );
+              DiscrW _ -> ( \(DiscrW i) fail_label -> TESTLT_W i fail_label,
+                            \(DiscrW i) fail_label -> TESTEQ_W i fail_label,
+                            DiscrW minBound,
+                            DiscrW maxBound );
               DiscrF _ -> ( \(DiscrF f) fail_label -> TESTLT_F f fail_label,
                             \(DiscrF f) fail_label -> TESTEQ_F f fail_label,
                             DiscrF minF,
@@ -1356,6 +1361,7 @@ mkMultiBranch maybe_ncons raw_ways
                  Nothing -> (minBound, maxBound)
 
          (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
+         (DiscrW w1) `eqAlt` (DiscrW w2) = w1 == w2
          (DiscrF f1) `eqAlt` (DiscrF f2) = f1 == f2
          (DiscrD d1) `eqAlt` (DiscrD d2) = d1 == d2
          (DiscrP i1) `eqAlt` (DiscrP i2) = i1 == i2
@@ -1363,6 +1369,7 @@ mkMultiBranch maybe_ncons raw_ways
          _           `eqAlt` _           = False
 
          (DiscrI i1) `leAlt` (DiscrI i2) = i1 <= i2
+         (DiscrW w1) `leAlt` (DiscrW w2) = w1 <= w2
          (DiscrF f1) `leAlt` (DiscrF f2) = f1 <= f2
          (DiscrD d1) `leAlt` (DiscrD d2) = d1 <= d2
          (DiscrP i1) `leAlt` (DiscrP i2) = i1 <= i2
@@ -1373,6 +1380,7 @@ mkMultiBranch maybe_ncons raw_ways
          isNoDiscr _       = False
 
          dec (DiscrI i) = DiscrI (i-1)
+         dec (DiscrW w) = DiscrW (w-1)
          dec (DiscrP i) = DiscrP (i-1)
          dec other      = other		-- not really right, but if you
 		-- do cases on floating values, you'll get what you deserve
@@ -1394,6 +1402,7 @@ mkMultiBranch maybe_ncons raw_ways
 -- Describes case alts
 data Discr 
    = DiscrI Int
+   | DiscrW Word
    | DiscrF Float
    | DiscrD Double
    | DiscrP Word16
@@ -1401,6 +1410,7 @@ data Discr
 
 instance Outputable Discr where
    ppr (DiscrI i) = int i
+   ppr (DiscrW w) = text (show w)
    ppr (DiscrF f) = text (show f)
    ppr (DiscrD d) = text (show d)
    ppr (DiscrP i) = ppr i

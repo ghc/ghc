@@ -288,6 +288,10 @@ mkBits findLabel st proto_insns
                                         instr2Large st2 bci_TESTLT_I np (findLabel l)
                TESTEQ_I  i l      -> do (np, st2) <- int st i
                                         instr2Large st2 bci_TESTEQ_I np (findLabel l)
+               TESTLT_W  w l      -> do (np, st2) <- word st w
+                                        instr2Large st2 bci_TESTLT_W np (findLabel l)
+               TESTEQ_W  w l      -> do (np, st2) <- word st w
+                                        instr2Large st2 bci_TESTEQ_W np (findLabel l)
                TESTLT_F  f l      -> do (np, st2) <- float st f
                                         instr2Large st2 bci_TESTLT_F np (findLabel l)
                TESTEQ_F  f l      -> do (np, st2) <- float st f
@@ -359,6 +363,11 @@ mkBits findLabel st proto_insns
 
        int (st_i0,st_l0,st_p0) i
           = do let ws = mkLitI i
+               st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
+               return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
+
+       word (st_i0,st_l0,st_p0) w
+          = do let ws = [w]
                st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
                return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
@@ -455,6 +464,8 @@ instrSize16s instr
         LABEL{}                 -> 0    -- !!
         TESTLT_I{}              -> 3
         TESTEQ_I{}              -> 3
+        TESTLT_W{}              -> 3
+        TESTEQ_W{}              -> 3
         TESTLT_F{}              -> 3
         TESTEQ_F{}              -> 3
         TESTLT_D{}              -> 3

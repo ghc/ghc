@@ -1227,6 +1227,27 @@ run_BCO:
 	    goto nextInsn;
 	}
 
+	case bci_TESTLT_W: {
+	    // There should be an Int at Sp[1], and an info table at Sp[0].
+	    int discr   = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
+	    W_ stackWord = (W_)Sp[1];
+	    if (stackWord >= (W_)BCO_LIT(discr))
+		bciPtr = failto;
+	    goto nextInsn;
+	}
+
+	case bci_TESTEQ_W: {
+	    // There should be an Int at Sp[1], and an info table at Sp[0].
+	    int discr   = BCO_NEXT;
+	    int failto  = BCO_GET_LARGE_ARG;
+	    W_ stackWord = (W_)Sp[1];
+	    if (stackWord != (W_)BCO_LIT(discr)) {
+		bciPtr = failto;
+	    }
+	    goto nextInsn;
+	}
+
 	case bci_TESTLT_D: {
 	    // There should be a Double at Sp[1], and an info table at Sp[0].
 	    int discr   = BCO_NEXT;

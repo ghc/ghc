@@ -108,6 +108,8 @@ data BCInstr
    | LABEL     LocalLabel
    | TESTLT_I  Int    LocalLabel
    | TESTEQ_I  Int    LocalLabel
+   | TESTLT_W  Word   LocalLabel
+   | TESTEQ_W  Word   LocalLabel
    | TESTLT_F  Float  LocalLabel
    | TESTEQ_F  Float  LocalLabel
    | TESTLT_D  Double LocalLabel
@@ -205,6 +207,8 @@ instance Outputable BCInstr where
    ppr (LABEL     lab)       = text "__"       <> ppr lab <> colon
    ppr (TESTLT_I  i lab)     = text "TESTLT_I" <+> int i <+> text "__" <> ppr lab
    ppr (TESTEQ_I  i lab)     = text "TESTEQ_I" <+> int i <+> text "__" <> ppr lab
+   ppr (TESTLT_W  i lab)     = text "TESTLT_W" <+> int (fromIntegral i) <+> text "__" <> ppr lab
+   ppr (TESTEQ_W  i lab)     = text "TESTEQ_W" <+> int (fromIntegral i) <+> text "__" <> ppr lab
    ppr (TESTLT_F  f lab)     = text "TESTLT_F" <+> float f <+> text "__" <> ppr lab
    ppr (TESTEQ_F  f lab)     = text "TESTEQ_F" <+> float f <+> text "__" <> ppr lab
    ppr (TESTLT_D  d lab)     = text "TESTLT_D" <+> double d <+> text "__" <> ppr lab
@@ -265,6 +269,8 @@ bciStackUse (UNPACK sz)           = fromIntegral sz
 bciStackUse LABEL{}       	  = 0
 bciStackUse TESTLT_I{}     	  = 0
 bciStackUse TESTEQ_I{}     	  = 0
+bciStackUse TESTLT_W{}     	  = 0
+bciStackUse TESTEQ_W{}     	  = 0
 bciStackUse TESTLT_F{}     	  = 0
 bciStackUse TESTEQ_F{}     	  = 0
 bciStackUse TESTLT_D{}     	  = 0
