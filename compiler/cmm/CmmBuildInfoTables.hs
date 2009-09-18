@@ -3,7 +3,9 @@ module CmmBuildInfoTables
     , setInfoTableSRT, setInfoTableStackMap
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
-    , finishInfoTables, lowerSafeForeignCalls, extendEnvsForSafeForeignCalls )
+    , finishInfoTables, lowerSafeForeignCalls
+    , cafTransfers, liveSlotTransfers
+    , extendEnvWithSafeForeignCalls, extendEnvsForSafeForeignCalls )
 where
 
 #include "HsVersions.h"
@@ -230,6 +232,8 @@ buildSRTs topSRT topCAFMap cafs =
   do let liftCAF lbl () z = -- get CAFs for functions without static closures
            case lookupFM topCAFMap lbl of Just cafs -> z `plusFM` cafs
                                           Nothing   -> addToFM z lbl ()
+         -- For each label referring to a function f without a static closure,
+         -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
            let cafs = keysFM (foldFM liftCAF emptyFM localCafs)
                mkSRT topSRT =
@@ -303,7 +307,7 @@ to_SRT top_srt off len bmp
 -- doesn't have a static closure.
 -- (If it has a static closure, it will already have an SRT to
 --  keep its CAFs live.)
--- Any procedure referring to a non-static CAF c must keep live the
+-- Any procedure referring to a non-static CAF c must keep live
 -- any CAF that is reachable from c.
 localCAFInfo :: CAFEnv -> CmmTopZ -> Maybe (CLabel, CAFSet)
 localCAFInfo _      (CmmData _ _) = Nothing
@@ -347,7 +351,7 @@ type StackLayout = [Maybe LocalReg]
 bundleCAFs :: CAFEnv -> CmmTopForInfoTables -> (CAFSet, CmmTopForInfoTables)
 bundleCAFs cafEnv t@(ProcInfoTable _ procpoints) =
   case blockSetToList procpoints of
-    [bid] -> (expectJust "bundleCAFs " (lookupBlockEnv cafEnv bid), t)
+    [bid] -> (expectJust "bundleCAFs" (lookupBlockEnv cafEnv bid), t)
     _     -> panic "setInfoTableStackMap: unexpect number of procpoints"
              -- until we stop splitting the graphs at procpoints in the native path
 bundleCAFs cafEnv t@(FloatingInfoTable _ bid _) =
@@ -409,6 +413,22 @@ finishInfoTables (FloatingInfoTable (CmmInfo _ _ infotbl) bid _) =
 -- Our analyses capture the dataflow facts at block boundaries, but we need
 -- to extend the CAF and live-slot analyses to safe foreign calls as well,
 -- which show up as middle nodes.
+extendEnvWithSafeForeignCalls ::
+  BackwardTransfers Middle Last a -> BlockEnv a -> CmmGraph -> BlockEnv a
+extendEnvWithSafeForeignCalls transfers env g = fold_blocks block env g
+  where block b z =
+          tail (bt_last_in transfers l (lookup env)) z head
+           where (head, last) = goto_end (G.unzip b)
+                 l = case last of LastOther l -> l
+                                  LastExit -> panic "extendEnvs lastExit"
+        tail _ z (ZFirst _) = z
+        tail fact env (ZHead h m@(MidForeignCall (Safe bid _) _ _ _)) =
+          tail (mid m fact) (extendBlockEnv env bid fact) h
+        tail fact env (ZHead h m) = tail (mid m fact) env h
+        lookup map k = expectJust "extendEnvWithSafeFCalls" $ lookupBlockEnv map k
+        mid = bt_middle_in transfers
+
+
 extendEnvsForSafeForeignCalls :: CAFEnv -> SlotEnv -> CmmGraph -> (CAFEnv, SlotEnv)
 extendEnvsForSafeForeignCalls cafEnv slotEnv g =
   fold_blocks block (cafEnv, slotEnv) g
@@ -497,7 +517,7 @@ lowerSafeCallBlock state b = tail (return state) (ZBlock head (ZLast last))
         tail s b@(ZBlock (ZFirst _) _) =
           do state <- s
              return $ state { s_blocks = insertBlock (G.zip b) (s_blocks state) }
-        tail  s (ZBlock (ZHead h m@(MidForeignCall (Safe bid updfr_off) _ _ _)) t) =
+        tail s (ZBlock (ZHead h m@(MidForeignCall (Safe bid updfr_off) _ _ _)) t) =
           do state <- s
              let state' = state
                    { s_safeCalls = FloatingInfoTable emptyContInfoTable bid updfr_off :

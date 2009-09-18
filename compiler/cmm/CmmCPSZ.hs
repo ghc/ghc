@@ -116,12 +116,11 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
        --------------- Stack layout ----------------
        slotEnv <- run $ liveSlotAnal g
        mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
-       cafEnv <- 
-                -- trace "post liveSlotAnal" $
-                 run $ cafAnal g
-       (cafEnv, slotEnv) <-
-        -- trace "post print cafAnal" $
-          return $ extendEnvsForSafeForeignCalls cafEnv slotEnv g
+       -- cafEnv <- -- trace "post liveSlotAnal" $ run $ cafAnal g
+       -- (cafEnv, slotEnv) <-
+       --  -- trace "post print cafAnal" $
+       --    return $ extendEnvsForSafeForeignCalls cafEnv slotEnv g
+       slotEnv <- return $ extendEnvWithSafeForeignCalls liveSlotTransfers slotEnv g
        mbpprTrace "slotEnv extended for safe foreign calls: " (ppr slotEnv) $ return ()
        let areaMap = layout procPoints slotEnv entry_off g
        mbpprTrace "areaMap" (ppr areaMap) $ return ()
@@ -140,8 +139,11 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
        mapM_ (dump Opt_D_dump_cmmz "after splitting") gs
 
        ------------- More CAFs and foreign calls ------------
+       cafEnv <- run $ cafAnal g
+       cafEnv <- return $ extendEnvWithSafeForeignCalls cafTransfers cafEnv  g
        let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
+
        gs <- liftM concat $ run $ foldM lowerSafeForeignCalls [] gs
        mapM_ (dump Opt_D_dump_cmmz "after lowerSafeForeignCalls") gs
 
