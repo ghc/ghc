@@ -329,7 +329,8 @@ cgDataCon data_con
 	    (dyn_cl_info, arg_things) = layOutDynConstr data_con arg_reps
 
 	    emit_info cl_info ticky_code
-		= emitClosureAndInfoTable cl_info [] $ mk_code ticky_code
+		= emitClosureAndInfoTable cl_info NativeDirectCall []
+                                        $ mk_code ticky_code
 
 	    mk_code ticky_code
 	      = 	-- NB: We don't set CC when entering data (WDP 94/06)

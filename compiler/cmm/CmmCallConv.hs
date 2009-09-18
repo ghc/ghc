@@ -13,6 +13,7 @@ import SMRep
 import ZipCfgCmmRep (Convention(..))
 
 import Constants
+import qualified Data.List as L
 import StaticFlags (opt_Unregisterised)
 import Outputable
 
@@ -31,7 +32,7 @@ type ArgumentFormat a b = [(a, ParamLocation b)]
 
 -- Stack parameters are returned as word offsets.
 assignArguments :: (a -> CmmType) -> [a] -> ArgumentFormat a WordOff
-assignArguments f reps = assignments
+assignArguments f reps = panic "assignArguments only used in dead codegen" -- assignments
     where
       availRegs = getRegsWithNode
       (sizes, assignments) = unzip $ assignArguments' reps (negate (sum sizes)) availRegs
@@ -47,7 +48,7 @@ assignArguments f reps = assignments
 -- Also, I want byte offsets, not word offsets.
 assignArgumentsPos :: (Outputable a) => Convention -> (a -> CmmType) -> [a] ->
                       ArgumentFormat a ByteOff
-assignArgumentsPos conv arg_ty reps = map cvt assignments
+assignArgumentsPos conv arg_ty reps = assignments -- old_assts'
     where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
       regs = case (reps, conv) of
                (_,   NativeNodeCall)   -> getRegsWithNode
@@ -60,7 +61,52 @@ assignArgumentsPos conv arg_ty reps = map cvt assignments
                (_,   PrimOpReturn)     -> getRegsWithNode
                (_,   Slow)             -> noRegs
                _ -> pprPanic "Unknown calling convention" (ppr conv)
-      (sizes, assignments) = unzip $ assignArguments' reps (sum sizes) regs
+      -- The calling conventions first assign arguments to registers,
+      -- then switch to the stack when we first run out of registers
+      -- (even if there are still available registers for args of a
+      -- different type).
+      -- When returning an unboxed tuple, we also separate the stack
+      -- arguments by pointerhood.
+      (reg_assts, stk_args) = assign_regs [] reps regs
+      stk_args' = case conv of NativeReturn -> part
+                               PrimOpReturn -> part
+                               _            -> stk_args
+                  where part = uncurry (++)
+                                       (L.partition (not . isGcPtrType . arg_ty) stk_args)
+      stk_assts = assign_stk 0 [] (reverse stk_args')
+      assignments = reg_assts ++ stk_assts
+
+      assign_regs assts []     _    = (assts, [])
+      assign_regs assts (r:rs) regs = if isFloatType ty then float else int
+        where float = case (w, regs) of
+                        (W32, (vs, f:fs, ds, ls)) -> k (RegisterParam f, (vs, fs, ds, ls))
+                        (W64, (vs, fs, d:ds, ls)) -> k (RegisterParam d, (vs, fs, ds, ls))
+                        (W80, _) -> panic "F80 unsupported register type"
+                        _ -> (assts, (r:rs))
+              int = case (w, regs) of
+                      (W128, _) -> panic "W128 unsupported register type"
+                      (_, (v:vs, fs, ds, ls)) | widthInBits w <= widthInBits wordWidth
+                          -> k (RegisterParam (v gcp), (vs, fs, ds, ls))
+                      (_, (vs, fs, ds, l:ls)) | widthInBits w > widthInBits wordWidth
+                          -> k (RegisterParam l, (vs, fs, ds, ls))
+                      _   -> (assts, (r:rs))
+              k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
+              ty = arg_ty r
+              w  = typeWidth ty
+              gcp | isGcPtrType ty = VGcPtr
+                  | otherwise  	   = VNonGcPtr
+
+      assign_stk offset assts [] = assts
+      assign_stk offset assts (r:rs) = assign_stk off' ((r, StackParam off') : assts) rs
+        where w    = typeWidth (arg_ty r)
+              size = (((widthInBytes w - 1) `div` wORD_SIZE) + 1) * wORD_SIZE
+              off' = offset + size
+       
+     
+      -- DEAD CODE:
+      (old_sizes, old_assignments)  = unzip $ assignArguments' reps (sum old_sizes) regs
+      old_assts' = map cvt old_assignments
+
       assignArguments' [] _ _ = []
       assignArguments' (r:rs) offset avails =
           (size, (r,assignment)):assignArguments' rs new_offset remaining
@@ -153,7 +199,7 @@ assign_reg slot ty off avails
 
 -- Assigning a slot using negative offsets from the stack pointer.
 -- JD: I don't know why this convention stops using all the registers
---     after running out of one class of registers.
+--     after running out of one class of registers, but that's how it is.
 assign_slot_neg :: SlotAssigner
 assign_slot_neg width off _regs =
   (StackParam $ off, off + size, size, ([], [], [], [])) where size = slot_size' width

@@ -474,17 +474,18 @@ emitClosureProcAndInfoTable top_lvl bndr cl_info args body
         ; let node_points = nodeMustPointToIt lf_info
         ; arg_regs <- bindArgsToRegs args
         ; let args' = if node_points then (node : arg_regs) else arg_regs
-        ; emitClosureAndInfoTable cl_info args' $ body (node, arg_regs)
+              conv = if nodeMustPointToIt lf_info
+                     then NativeNodeCall else NativeDirectCall
+        ; emitClosureAndInfoTable cl_info conv args' $ body (node, arg_regs)
         }
 
 -- Data constructors need closures, but not with all the argument handling
 -- needed for functions. The shared part goes here.
-emitClosureAndInfoTable :: ClosureInfo -> [LocalReg] -> FCode () -> FCode ()
-emitClosureAndInfoTable cl_info args body
+emitClosureAndInfoTable ::
+  ClosureInfo -> Convention -> [LocalReg] -> FCode () -> FCode ()
+emitClosureAndInfoTable cl_info conv args body
   = do { info <- mkCmmInfo cl_info
        ; blks <- getCode body
-       ; let conv = if nodeMustPointToIt (closureLFInfo cl_info) then NativeNodeCall
-                    else NativeDirectCall
        ; emitProcWithConvention conv info (infoLblToEntryLbl info_lbl) args blks
        }
   where

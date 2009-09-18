@@ -500,7 +500,7 @@ newTemp rep = do { uniq <- newUnique
 newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])
 -- Choose suitable local regs to use for the components
 -- of an unboxed tuple that we are about to return to 
--- the Sequel.  If the Sequel is a joint point, using the
+-- the Sequel.  If the Sequel is a join point, using the
 -- regs it wants will save later assignments.
 newUnboxedTupleRegs res_ty 
   = ASSERT( isUnboxedTupleType res_ty )
