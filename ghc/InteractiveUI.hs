@@ -399,7 +399,6 @@ runGHCi paths maybe_exprs = do
            -- can we assume this will always be the case?
            -- This would be a good place for runFileInputT.
            Right hdl -> runInputTWithPrefs defaultPrefs defaultSettings $ do
-                            setLogAction
                             runCommands $ fileLoop hdl
      where
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
@@ -446,7 +445,6 @@ runGHCi paths maybe_exprs = do
                                    -- this used to be topHandlerFastExit, see #2228
                                  $ topHandler e
             runInputTWithPrefs defaultPrefs defaultSettings $ do
-                setLogAction
                 runCommands' handle (return Nothing)
 
   -- and finally, exit
@@ -458,9 +456,7 @@ runGHCiInput f = do
                         (return Nothing)
     let settings = setComplete ghciCompleteWord
                     $ defaultSettings {historyFile = histFile}
-    runInputT settings $ do
-        setLogAction
-        f
+    runInputT settings f
 
 nextInputLine :: Bool -> Bool -> InputT GHCi (Maybe String)
 nextInputLine show_prompt is_tty
@@ -1149,13 +1145,13 @@ typeOfExpr str
        ty <- GHC.exprType str
        dflags <- getDynFlags
        let pefas = dopt Opt_PrintExplicitForalls dflags
-       printForUser' $ sep [text str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
+       printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
 
 kindOfType :: String -> InputT GHCi ()
 kindOfType str 
   = handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
        ty <- GHC.typeKind str
-       printForUser' $ text str <+> dcolon <+> ppr ty
+       printForUser $ text str <+> dcolon <+> ppr ty
 
 quit :: String -> InputT GHCi Bool
 quit _ = return True
@@ -2077,7 +2073,7 @@ listCmd "" = do
    mb_span <- lift getCurrentBreakSpan
    case mb_span of
       Nothing ->
-          printForUser' $ text "Not stopped at a breakpoint; nothing to list"
+          printForUser $ text "Not stopped at a breakpoint; nothing to list"
       Just span
        | GHC.isGoodSrcSpan span -> listAround span True
        | otherwise ->
@@ -2089,7 +2085,7 @@ listCmd "" = do
                                       [] -> text "rerunning with :trace,"
                                       _ -> empty
                             doWhat = traceIt <+> text ":back then :list"
-                        printForUser' (text "Unable to list source for" <+>
+                        printForUser (text "Unable to list source for" <+>
                                       ppr span
                                    $$ text "Try" <+> doWhat)
 listCmd str = list2 (words str)
@@ -2120,7 +2116,7 @@ list2 [arg] = do
                   noCanDo name $ text "can't find its location: " <>
                                  ppr loc
     where
-        noCanDo n why = printForUser' $
+        noCanDo n why = printForUser $
             text "cannot list source code for " <> ppr n <> text ": " <> why
 list2  _other = 
         outputStrLn "syntax:  :list [<line> | <module> <line> | <identifier>]"

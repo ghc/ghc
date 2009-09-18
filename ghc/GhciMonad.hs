@@ -15,7 +15,6 @@ module GhciMonad where
 
 import qualified GHC
 import Outputable       hiding (printForUser, printForUserPartWay)
-import qualified Pretty
 import qualified Outputable
 import Panic            hiding (showException)
 import Util
@@ -27,7 +26,6 @@ import ObjLink
 import Linker
 import StaticFlags
 import qualified MonadUtils
-import qualified ErrUtils
 
 import Exception
 -- import Data.Maybe
@@ -45,9 +43,7 @@ import GHC.Exts
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
-import System.Console.Haskeline.Encoding
 import Control.Monad.Trans as Trans
-import qualified Data.ByteString as B
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -240,41 +236,15 @@ unsetOption opt
 io :: IO a -> GHCi a
 io = MonadUtils.liftIO
 
-printForUser :: SDoc -> GHCi ()
+printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
   unqual <- GHC.getPrintUnqual
-  io $ Outputable.printForUser stdout unqual doc
-
-printForUser' :: SDoc -> InputT GHCi ()
-printForUser' doc = do
-    unqual <- GHC.getPrintUnqual
-    Haskeline.outputStrLn $ showSDocForUser unqual doc
+  MonadUtils.liftIO $ Outputable.printForUser stdout unqual doc
 
 printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   io $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
-
--- We set log_action to write encoded output.
--- This fails whenever GHC tries to mention an (already encoded) filename,
--- but I don't know how to work around that.
-setLogAction :: InputT GHCi ()
-setLogAction = do
-    encoder <- getEncoder
-    dflags <- GHC.getSessionDynFlags
-    _ <- GHC.setSessionDynFlags dflags {log_action = logAction encoder}
-    return ()
-  where
-    logAction encoder severity srcSpan style msg = case severity of
-        GHC.SevInfo -> printEncErrs encoder (msg style)
-        GHC.SevFatal -> printEncErrs encoder (msg style)
-        _ -> do
-            hPutChar stderr '\n'
-            printEncErrs encoder (ErrUtils.mkLocMessage srcSpan msg style)
-    printEncErrs encoder doc = do
-        str <- encoder (Pretty.showDocWith Pretty.PageMode doc)
-        B.hPutStrLn stderr str
-        hFlush stderr
 
 runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
 runStmt expr step = do
