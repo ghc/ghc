@@ -801,12 +801,20 @@ collectLinkOpts dflags ps = concat (map all_opts ps)
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
-        non_dyn_ways = filter ((/= WayDyn) . wayName) (ways dflags)
+        ways0 = ways dflags
+
+        ways1 = filter ((/= WayDyn) . wayName) ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
-        tag     = mkBuildTag (filter (not . wayRTSOnly) non_dyn_ways)
-        rts_tag = mkBuildTag non_dyn_ways
+        -- debug RTS includes support for -ticky and -eventlog
+        ways2 | WayDebug `elem` map wayName ways1 
+              = filter ((`notElem` [WayTicky,WayEventLog]) . wayName) ways1
+              | otherwise
+              = ways1
+
+        tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
+        rts_tag = mkBuildTag ways2
 
 	mkDynName | opt_Static = id
 		  | otherwise = (++ ("-ghc" ++ cProjectVersion))

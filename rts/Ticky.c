@@ -6,11 +6,28 @@
  * Ticky-ticky profiling
  *-------------------------------------------------------------------------- */
 
-#if defined(TICKY_TICKY)
-
 #define TICKY_C			/* define those variables */
 #include "PosixSource.h"
 #include "Rts.h"
+
+/* Catch-all top-level counter struct.  Allocations from CAFs will go
+ * here.
+ */
+StgEntCounter top_ct
+        = { 0, 0, 0,
+	    "TOP", "",
+	    0, 0, NULL };
+
+/* Data structure used in ``registering'' one of these counters. */
+
+StgEntCounter *ticky_entry_ctrs = NULL; /* root of list of them */
+
+/* We want Haskell code compiled with -ticky to be linkable with any
+ * version of the RTS, so we have to make sure all the symbols that
+ * ticky-compiled code may refer to are defined by every RTS. (#3439)
+ * Hence the #ifdef is here, rather than up above.
+ */
+#if defined(TICKY_TICKY)
 
 #include "Ticky.h"
 
@@ -553,10 +570,6 @@ PrintTickyInfo(void)
   PR_CTR(GC_WORDS_COPIED_ctr);
 }
 
-/* Data structure used in ``registering'' one of these counters. */
-
-StgEntCounter *ticky_entry_ctrs = NULL; /* root of list of them */
-
 /* To print out all the registered-counter info: */
 
 static void
@@ -585,14 +598,5 @@ printRegisteredCounterInfo (FILE *tf)
 
     }
 }
-
-/* Catch-all top-level counter struct.  Allocations from CAFs will go
- * here.
- */
-StgEntCounter top_ct
-        = { 0, 0, 0,
-	    "TOP", "",
-	    0, 0, NULL };
-
 #endif /* TICKY_TICKY */
 

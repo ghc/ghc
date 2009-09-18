@@ -27,10 +27,11 @@
 #define USING_LIBBFD 1
 #endif
 
-/* DEBUG implies TRACING
+/* DEBUG implies TRACING and TICKY_TICKY
  */
 #if defined(DEBUG)
 #define TRACING
+#define TICKY_TICKY
 #endif
 
 /* -----------------------------------------------------------------------------

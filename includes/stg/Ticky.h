@@ -19,7 +19,6 @@
    keep them consistent with the macros that use them (which are
    defined in Cmm.h. */
 
-#ifdef TICKY_TICKY
 /* same trick as in the former StgTicky.h: recycle the same declarations
    for both extern decls (which are included everywhere)
    and initializations (which only happen once) */
@@ -163,8 +162,6 @@ EXTERN StgInt RET_UNBOXED_TUP_ctr INIT(0);
 EXTERN StgInt RET_SEMI_loads_avoided INIT(0);
 
 /* End of counter declarations. */
-
-#endif /* TICKY_TICKY */
 
 /* This is ugly, but the story is:
    We got rid of StgTicky.h, which was previously
