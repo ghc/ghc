@@ -1623,6 +1623,8 @@ resize_generations (void)
 static void
 resize_nursery (void)
 {
+    lnat min_nursery = RtsFlags.GcFlags.minAllocAreaSize * n_capabilities;
+
     if (RtsFlags.GcFlags.generations == 1)
     {   // Two-space collector:
 	nat blocks;
@@ -1665,9 +1667,9 @@ resize_nursery (void)
 	else
 	{
 	    blocks *= RtsFlags.GcFlags.oldGenFactor;
-	    if (blocks < RtsFlags.GcFlags.minAllocAreaSize)
+	    if (blocks < min_nursery)
 	    {
-		blocks = RtsFlags.GcFlags.minAllocAreaSize;
+		blocks = min_nursery;
 	    }
 	}
 	resizeNurseries(blocks);
@@ -1714,8 +1716,8 @@ resize_nursery (void)
 		(((long)RtsFlags.GcFlags.heapSizeSuggestion - (long)needed) * 100) /
 		(100 + (long)g0s0_pcnt_kept);
 	    
-	    if (blocks < (long)RtsFlags.GcFlags.minAllocAreaSize) {
-		blocks = RtsFlags.GcFlags.minAllocAreaSize;
+	    if (blocks < (long)min_nursery) {
+		blocks = min_nursery;
 	    }
 	    
 	    resizeNurseries((nat)blocks);
