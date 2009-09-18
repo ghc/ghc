@@ -114,13 +114,13 @@ data Last
 	  -- the call goes into a loop.
 	}
 
-data MidCallTarget	-- The target of a MidUnsafeCall
-  = ForeignTarget 	-- A foreign procedure
-	CmmExpr			-- Its address
-	ForeignConvention	-- Its calling convention
+data MidCallTarget        -- The target of a MidUnsafeCall
+  = ForeignTarget         -- A foreign procedure
+        CmmExpr                  -- Its address
+        ForeignConvention        -- Its calling convention
 
-  | PrimTarget		-- A possibly-side-effecting machine operation
-	CallishMachOp		-- Which one
+  | PrimTarget            -- A possibly-side-effecting machine operation
+        CallishMachOp            -- Which one
   deriving Eq
 
 data Convention
@@ -277,8 +277,8 @@ instance UserOfLocalRegs MidCallTarget where
   foldRegsUsed f  z (ForeignTarget e _) = foldRegsUsed f z e
 
 instance UserOfSlots MidCallTarget where
+  foldSlotsUsed  f z (ForeignTarget e _) = foldSlotsUsed f z e
   foldSlotsUsed _f z (PrimTarget _)      = z
-  foldSlotsUsed f  z (ForeignTarget e _) = foldSlotsUsed f z e
 
 instance (UserOfLocalRegs a) => UserOfLocalRegs (Maybe a) where
   foldRegsUsed f z (Just x) = foldRegsUsed f z x

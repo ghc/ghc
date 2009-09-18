@@ -232,8 +232,8 @@ emitPrimOp [res] SizeofMutableByteArrayOp [arg]
 
 
 --  #define touchzh(o)                  /* nothing */
-emitPrimOp [] TouchOp [_arg]
-   = nopC
+emitPrimOp res@[] TouchOp args@[_arg]
+   = do emitPrimCall res MO_Touch args
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp [res] ByteArrayContents_Char [arg]
@@ -413,9 +413,9 @@ emitPrimOp [res] op [arg]
    = emit (mkAssign (CmmLocal res) $
 	   CmmMachOp (mop rep wordWidth) [CmmMachOp (mop wordWidth rep) [arg]])
 
-emitPrimOp [res] op args
+emitPrimOp r@[res] op args
    | Just prim <- callishOp op
-   = do emitPrimCall res prim args
+   = do emitPrimCall r prim args
 
    | Just mop <- translateOp op
    = let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args) in

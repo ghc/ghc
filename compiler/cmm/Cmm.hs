@@ -384,6 +384,7 @@ data CallishMachOp
   | MO_F32_Exp
   | MO_F32_Sqrt
   | MO_WriteBarrier
+  | MO_Touch         -- Keep variables live (when using interior pointers)
   deriving (Eq, Show)
 
 pprCallishMachOp :: CallishMachOp -> SDoc

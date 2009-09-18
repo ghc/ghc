@@ -97,9 +97,9 @@ emitCCall hinted_results fn hinted_args
     fc = ForeignConvention CCallConv arg_hints result_hints
     
 
-emitPrimCall :: CmmFormal -> CallishMachOp -> CmmActuals -> FCode ()
+emitPrimCall :: CmmFormals -> CallishMachOp -> CmmActuals -> FCode ()
 emitPrimCall res op args
-  = emitForeignCall PlayRisky [res] (PrimTarget op) args NoC_SRT CmmMayReturn
+  = emitForeignCall PlayRisky res (PrimTarget op) args NoC_SRT CmmMayReturn
 
 -- alternative entry point, used by CmmParse
 emitForeignCall

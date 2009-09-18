@@ -115,6 +115,7 @@ ofZgraph g = ListGraph $ swallow blocks
           mid (MidComment s)  = CmmComment s
           mid (MidAssign l r) = CmmAssign l r
           mid (MidStore  l r) = CmmStore  l r
+          mid (MidForeignCall _ (PrimTarget MO_Touch) _ _) = CmmNop
           mid (MidForeignCall _ target ress args)
 		= CmmCall (cmm_target target)
 			  (add_hints conv Results   ress) 
