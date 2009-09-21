@@ -4,21 +4,41 @@ use strict;
 
 # Usage:
 #
-# ./darcs-all [-q] [-s] [-i] [-r repo] [--nofib] [--testsuite] get [darcs get flags]
-#   This gets the GHC core repos, if they do not already exist.
+# ./darcs-all [-q] [-s] [-i] [-r repo]
+#             [--nofib] [--testsuite] [--checked-out] cmd [darcs flags]
+#
+# Applies the darcs command "cmd" to each repository in the tree.
+#
+# e.g.
+#      ./darcs-all -r http://darcs.haskell.org/ghc get
+#          To get any repos which do not exist in the local tree
+#
+#      ./darcs-all -r ~/ghc-validate push
+#          To push all your repos to the ~/ghc-validate tree
+#
+#      ./darcs-all pull -a
+#          To pull everything from the default repos
+#
+#      ./darc-all push --dry-run
+#          To see what local patches you have relative to the main repos
+#
 #   -q says to be quite, and -s to be silent.
+#
 #   -i says to ignore darcs errors and move on to the next repository
+#
 #   -r repo says to use repo as the location of package repositories
+#
+#   --checked-out says that the remote repo is in checked-out layout, as
+#   opposed to the layout used for the main repo.  By default a repo on
+#   the local filesystem is assumed to be checked-out, and repos accessed
+#   via HTTP or SSH are assumed to be in the main repo layout; use
+#   --checked-out to override the latter.
+#
 #   --nofib, --testsuite also get the nofib and testsuite repos respectively
+#
 #   The darcs get flag you are most likely to want is --complete. By
 #   default we pass darcs the --partial flag.
 #
-# ./darcs-all [-q] [-s] [-i] [-r repo] cmd [darcs cmd flags]
-#   This runs the darcs "cmd" command, with any flags you give, in all
-#   of the repos you have checked out. e.g.
-#       ./darcs-all pull
-#       ./darcs-all -q send --dry-run
-#   -q says to be quite, and -s to be silent.
 
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
@@ -27,6 +47,7 @@ my $defaultrepo;
 my $verbose = 2;
 my $ignore_failure = 0;
 my $want_remote_repo = 0;
+my $checked_out_flag = 0;
 
 my %tags;
 
@@ -44,7 +65,14 @@ sub getrepo {
         # Above regex says "at least two chars before the :", to avoid
         # catching Win32 drives ("C:\").
         $repo_base = $repo;
-        $checked_out_tree = 0;
+
+        # --checked-out is needed if you want to use a checked-out repo
+        # over SSH or HTTP
+        if ($checked_out_flag) {
+            $checked_out_tree = 1;
+        } else {
+            $checked_out_tree = 0;
+        }
 
         # Don't drop the last part of the path if specified with -r, as
         # it expects repos of the form:
@@ -219,6 +247,9 @@ sub main {
         # It has no effect on the other commands.
         elsif ($arg eq "--testsuite") {
             $tags{"testsuite"} = 1;
+        }
+        elsif ($arg eq "--checked-out") {
+            $checked_out_flag = 1;
         }
         else {
             unshift @_, $arg;
