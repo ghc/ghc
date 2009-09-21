@@ -42,6 +42,8 @@ main = do args <- getArgs
                    (config_args, "--" : distdir : directories) ->
                        mapM_ (generate config_args distdir) directories
                    _ -> die syntax_error
+              "sdist" : dir : distDir : [] ->
+                  doSdist dir distDir
               _ -> die syntax_error
 
 syntax_error :: [String]
@@ -68,6 +70,30 @@ withCurrentDirectory directory io
 -- ends up in it.
 userHooks :: UserHooks
 userHooks = autoconfUserHooks
+
+runDefaultMain :: IO ()
+runDefaultMain
+ = do let verbosity = normal
+      gpdFile <- defaultPackageDesc verbosity
+      gpd <- readPackageDescription verbosity gpdFile
+      case buildType (flattenPackageDescription gpd) of
+          Just Configure -> defaultMainWithHooks autoconfUserHooks
+          -- time has a "Custom" Setup.hs, but it's actually Configure
+          -- plus a "./Setup test" hook. However, Cabal is also
+          -- "Custom", but doesn't have a configure script.
+          Just Custom ->
+              do configureExists <- doesFileExist "configure"
+                 if configureExists
+                     then defaultMainWithHooks autoconfUserHooks
+                     else defaultMain
+          -- not quite right, but good enough for us:
+          _ -> defaultMain
+
+doSdist :: FilePath -> FilePath -> IO ()
+doSdist directory distDir
+ = withCurrentDirectory directory
+ $ withArgs (["sdist", "--builddir", distDir])
+            runDefaultMain
 
 doCheck :: FilePath -> IO ()
 doCheck directory
@@ -215,25 +241,11 @@ generate :: [String] -> FilePath -> FilePath -> IO ()
 generate config_args distdir directory
  = withCurrentDirectory directory
  $ do let verbosity = normal
-      gpdFile <- defaultPackageDesc verbosity
-      gpd <- readPackageDescription verbosity gpdFile
-
       -- XXX We shouldn't just configure with the default flags
       -- XXX And this, and thus the "getPersistBuildConfig distdir" below,
       -- aren't going to work when the deps aren't built yet
       withArgs (["configure", "--distdir", distdir] ++ config_args)
-          (case buildType (flattenPackageDescription gpd) of
-              Just Configure -> defaultMainWithHooks autoconfUserHooks
-              -- time has a "Custom" Setup.hs, but it's actually Configure
-              -- plus a "./Setup test" hook. However, Cabal is also
-              -- "Custom", but doesn't have a configure script.
-              Just Custom ->
-                  do configureExists <- doesFileExist "configure"
-                     if configureExists
-                         then defaultMainWithHooks autoconfUserHooks
-                         else defaultMain
-              -- not quite right, but good enough for us:
-              _ -> defaultMain)
+               runDefaultMain
 
       lbi <- getPersistBuildConfig distdir
       let pd0 = localPkgDescr lbi
