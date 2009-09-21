@@ -488,6 +488,38 @@ Loaded: Prelude
           and <literal>:set show</literal> can now be tab completed.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          We inherit some benefits from an upgraded version of haskeline:
+        </para>
+          <itemizedlist>
+            <listitem>
+              <para>
+                A multitude of new emacs and vi commands.
+              </para>
+            </listitem>
+
+            <listitem>
+              <para>
+                New preference 'historyDuplicates' to prevent storage
+                of duplicate lines.
+              </para>
+            </listitem>
+
+            <listitem>
+              <para>
+                Support PageUp and PageDown keys.
+              </para>
+            </listitem>
+
+            <listitem>
+              <para>
+                Let ctrl-L (clear-screen) work during getInputChar.
+              </para>
+            </listitem>
+          </itemizedlist>
+      </listitem>
     </itemizedlist>
   </sect2>
 
