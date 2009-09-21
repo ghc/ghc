@@ -606,6 +606,8 @@ libraries/index.html: $(ALL_HADDOCK_FILES)
 	cd libraries && sh gen_contents_index --inplace
 $(eval $(call all-target,library_doc_index,libraries/index.html))
 INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
+CLEAN_FILES += libraries/doc-index* libraries/haddock*.css \
+	       libraries/haddock*.js libraries/index*.html libraries/*.gif
 endif
 
 ifeq "$(CHECK_PACKAGES)" "YES"
