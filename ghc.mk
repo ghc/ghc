@@ -124,6 +124,8 @@ $(error Please run ./configure first)
 endif
 endif
 
+include mk/ways.mk
+
 # (Optional) build-specific configuration
 include mk/custom-settings.mk
 
