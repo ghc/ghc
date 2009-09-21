@@ -33,7 +33,6 @@ $1/$2/build/%.hs : $1/$4/%.x $$(MKDIRHIER)
 $1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$4/%.hsc $$(HSC2HS_INPLACE)
 	"$$(MKDIRHIER)" $$(dir $$@)
 	"$$(HSC2HS_INPLACE)" $$($1_$2_$3_ALL_HSC2HS_OPTS) $$< -o $$@
-	touch $$(patsubst %.hsc,%_hsc.c,$$<)
 
 # Compiling Haskell source
 
