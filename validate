@@ -54,9 +54,7 @@ fi
 if [ $testsuite_only -eq 0 ]; then
 
 if [ $no_clean -eq 0 ]; then
-    if [ -f mk/config.mk ]; then
-        make maintainer-clean NO_CLEAN_GMP=YES
-    fi
+    make maintainer-clean NO_CLEAN_GMP=YES
 
     INSTDIR=`pwd`/inst
     if [ "$OSTYPE" = "cygwin" ]
