@@ -3,7 +3,7 @@ set -e
 
 libraries=
 
-tarred=`ls -1 libraries/tarballs | sed "s/-[0-9.]*.tar.gz//"`
+tarred=`ls -1 libraries/tarballs | sed "s/-[0-9.]*\(-snapshot\)\?.tar.gz//"`
 
 for p in $tarred
 do
