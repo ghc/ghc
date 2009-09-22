@@ -5,7 +5,7 @@
 
 module Foo where
 
- import Data.Generics
+ import Data.Data
 
  data Foo a = Foo
     deriving (Data, Typeable)
