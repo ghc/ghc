@@ -4,7 +4,7 @@
 
 module ShouldCompile where
 
-import Data.Generics
+import GHC.Base
 
 class Tag a where
    nCons :: a -> Int
