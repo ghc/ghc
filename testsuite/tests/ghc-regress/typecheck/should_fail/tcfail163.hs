@@ -7,7 +7,7 @@
   
 module Foo where
 
-import Data.Generics 
+import GHC.Base
  
 class ChurchEncode k where 
  
