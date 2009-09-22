@@ -24,7 +24,7 @@ test('drvrun018', skip_if_fast, compile_and_run, [''])
 test('drvrun019', normal, compile_and_run, [''])
 test('drvrun020', normal, compile_and_run, [''])
 test('drvrun021', normal, compile_and_run, [''])
-test('drvrun022', normal, compile_and_run, ['-package syb'])
+test('drvrun022', reqlib('syb'), compile_and_run, ['-package syb'])
 test('T3087',
      [if_compiler_lt('ghc', '6.11', expect_fail),
       reqlib('syb')],
