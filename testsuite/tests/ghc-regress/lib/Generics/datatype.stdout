@@ -1,1 +1,0 @@
-(Main.MyDataType Int,(DataType {tycon = "Main.MyDataType", datarep = AlgRep [MyDataType]},("Main",("MyDataType",("Main","MyDataType")))))
