@@ -3,7 +3,7 @@ module Foo( T ) where
 
 -- Trac 2378
 
-import Data.Generics
+import Data.Data
 
 newtype T f = MkT Int
 
