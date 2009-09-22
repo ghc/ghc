@@ -41,7 +41,6 @@ libraries/old-time                      packages/old-time               darcs
 libraries/pretty                        packages/pretty                 darcs
 libraries/process                       packages/process                darcs
 libraries/random                        packages/random                 darcs
-libraries/syb                           packages/syb                    darcs
 libraries/template-haskell              packages/template-haskell       darcs
 libraries/terminfo                      packages/terminfo               darcs
 libraries/unix                          packages/unix                   darcs
