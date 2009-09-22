@@ -21,7 +21,6 @@ utils/hsc2hs                            hsc2hs                          darcs
 utils/haddock                           haddock2                        darcs
 libraries/array                         packages/array                  darcs
 libraries/base                          packages/base                   darcs
-libraries/base3-compat                  packages/base3-compat           darcs
 libraries/binary                        packages/binary                 darcs
 libraries/bytestring                    packages/bytestring             darcs
 libraries/Cabal                         packages/Cabal                  darcs

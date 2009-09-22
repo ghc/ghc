@@ -165,9 +165,6 @@ NO_INCLUDE_DEPS = YES
 # We want package-data.mk for show
 endif
 
-# We don't haddock base3-compat, as it has the same package name as base
-libraries/base3-compat_dist-install_DO_HADDOCK = NO
-
 # We don't haddock the bootstrapping libraries
 libraries/hpc_dist-boot_DO_HADDOCK = NO
 libraries/Cabal_dist-boot_DO_HADDOCK = NO
@@ -322,7 +319,6 @@ $(eval $(call addPackage,hpc))
 $(eval $(call addPackage,pretty))
 $(eval $(call addPackage,syb))
 $(eval $(call addPackage,template-haskell))
-$(eval $(call addPackage,base3-compat))
 $(eval $(call addPackage,Cabal))
 $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
@@ -592,12 +588,6 @@ $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-instal
 
 # XXX Hack; remove this
 $(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += -Wwarn))
-
-# XXX we configure packages with the bootstrapping compiler (for
-# dependency reasons, see the phase ordering), which doesn't
-# necessarily support all the extensions we need, and Cabal filters
-# out the ones it thinks aren't supported.
-libraries/base3-compat_dist-install_HC_OPTS += -XPackageImports
 
 # A useful pseudo-target
 .PHONY: stage1_libs
