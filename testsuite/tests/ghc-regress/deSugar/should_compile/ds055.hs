@@ -6,7 +6,7 @@
 
 module Foo where
 
-   import Data.Generics
+   import Data.Data
    import Data.HashTable
 
    data Item = forall a. (Data a) => Leaf Bool a
