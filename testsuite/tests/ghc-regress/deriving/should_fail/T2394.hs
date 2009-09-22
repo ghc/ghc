@@ -4,6 +4,6 @@
 
 module Foo where
 
-import Data.Generics(Data)
+import Data.Data(Data)
 
 deriving instance (Data a,Data b) => Data (a->b)
