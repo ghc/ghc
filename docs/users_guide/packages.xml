@@ -168,6 +168,22 @@ exposed-modules: Network.BSD,
       </varlistentry>
       
       <varlistentry>
+        <term>
+	  <option>-package-id <replaceable>P</replaceable></option>
+	  <indexterm><primary><option>-package-id</option></primary></indexterm>
+	</term>
+	<listitem>
+          <para>
+            Exposes a package like <option>-package</option>, but the
+            package is named by its ID rather than by name.  This is a
+            more robust way to name packages, and can be used to
+            select packages that would otherwise be shadowed.  Cabal
+            passes <option>-package-id</option> flags to GHC.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-hide-all-packages</option>
 	<indexterm><primary><option>-hide-package</option></primary>
 	  </indexterm></term>
@@ -232,8 +248,9 @@ exposed-modules: Network.BSD,
 	    If this flag is omitted (a very common case) then the
 	    default package <literal>main</literal> is assumed.</para>
             <para>Note: the argument to <option>-package-name</option>
-            should be the full package identifier for the package,
-            that is it should include the version number.  For example:
+              should be the full
+              package <literal>name-version</literal> for the package.
+              For example:
             <literal>-package mypkg-1.2</literal>.</para>
 	</listitem>
       </varlistentry>
@@ -389,13 +406,15 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
     </sect3>
   </sect2>
 
-  <sect2 id="broken-packages">
-    <title>Dependencies and broken packages</title>
+  <sect2 id="package-ids">
+    <title>Package IDs, dependencies, and broken packages</title>
 
-    <para>Each installed package has a unique identifier, which
-      distinguishes it from all other installed packages on the
-      system.  To see the identifiers associated with each installed
-      package, use <literal>ghc-pkg list -v</literal>:</para>
+    <para>Each installed package has a unique identifier (the
+      &ldquo;installed package ID&rdquo;, or just &ldquo;package
+      ID&rdquo; for short) , which distinguishes it from all other
+      installed packages on the system.  To see the package IDs
+      associated with each installed package, use <literal>ghc-pkg
+      list -v</literal>:</para>
 
     <screen>
 $ ghc-pkg list -v
@@ -409,13 +428,13 @@ using cache: /usr/lib/ghc-6.12.1/package.conf.d/package.cache
 </screen>
 
     <para>
-      The string in parentheses after the package name is the unique
-      identifier: it normally begins with the package name and
-      version, and ends in a hash string derived from the compiled
-      package.  Dependencies between packages are expressed in terms
-      of these unique identifiers, rather than just packages and
-      versions.  For example, take a look at the dependencies of
-      the <literal>haskell98</literal> package:
+      The string in parentheses after the package name is the package
+      ID: it normally begins with the package name and version, and
+      ends in a hash string derived from the compiled package.
+      Dependencies between packages are expressed in terms of package
+      IDs, rather than just packages and versions.  For example, take
+      a look at the dependencies of the <literal>haskell98</literal>
+      package:
     </para>
 
     <screen>
@@ -430,23 +449,23 @@ depends: array-0.2.0.1-9cbf76a576b6ee9c1f880cf171a0928d
 </screen>
 
     <para>
-      The purpose of the unique package identifier is to detect
-      problems caused by re-installing a package without also
-      recompiling the packages that depend on it.  Recompiling
-      dependencies is necessary, because the newly compiled package
-      may have a differnt ABI (Application Binary Interface) than the
-      previous version, even if both packages were built from the same
-      source code using the same compiler.  With unique package
-      identifiers, a recompiled package will have a different unique
-      identifer from the previous version, so packages that depended
-      on the previous version are now orphaned - one of their
-      dependencies is not satisfied.  Packages that are broken in this
-      way are shown in the <literal>ghc-pkg list</literal> output
-      either in red (if possible) or otherwise surrounded by
-      braces.  In the following example, we have recompiled and
-      reinstalled the <literal>filepath</literal> package, and this
-      has caused various dependencies
-      including <literal>Cabal</literal> to break:</para>
+      The purpose of the package ID is to detect problems caused by
+      re-installing a package without also recompiling the packages
+      that depend on it.  Recompiling dependencies is necessary,
+      because the newly compiled package may have a differnt ABI
+      (Application Binary Interface) than the previous version, even
+      if both packages were built from the same source code using the
+      same compiler.  With package IDs, a recompiled
+      package will have a different package ID from the previous
+      version, so packages that depended on the previous version are
+      now orphaned - one of their dependencies is not satisfied.
+      Packages that are broken in this way are shown in
+      the <literal>ghc-pkg list</literal> output either in red (if
+      possible) or otherwise surrounded by braces.  In the following
+      example, we have recompiled and reinstalled
+      the <literal>filepath</literal> package, and this has caused
+      various dependencies including <literal>Cabal</literal> to
+      break:</para>
 
     <screen>
 $ ghc-pkg list
@@ -1137,8 +1156,8 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
 	  <indexterm><primary><literal>id</literal></primary><secondary>package specification</secondary></indexterm>
 	</term>
 	<listitem>
-	  <para>The package's unique identifier.  It is up to you to
-	  choose a suitable one.</para>
+	  <para>The package ID.  It is up to you to choose a suitable
+	  one.</para>
 	</listitem>
       </varlistentry>
       
