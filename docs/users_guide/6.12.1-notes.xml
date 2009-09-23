@@ -521,12 +521,6 @@ Loaded: Prelude
                 Support PageUp and PageDown keys.
               </para>
             </listitem>
-
-            <listitem>
-              <para>
-                Let ctrl-L (clear-screen) work during getInputChar.
-              </para>
-            </listitem>
           </itemizedlist>
       </listitem>
     </itemizedlist>
