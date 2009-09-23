@@ -551,7 +551,7 @@ hSetBinaryMode :: Handle -> Bool -> IO ()
 hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ h_@Handle__{..} ->
     do 
-         flushBuffer h_
+         flushCharBuffer h_
 
          let mb_te | bin       = Nothing
                    | otherwise = Just localeEncoding
