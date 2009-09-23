@@ -586,11 +586,11 @@ printRegisteredCounterInfo (FILE *tf)
     /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%11ld%11ld %6zu%6zu    %-11s%-30s",
+	fprintf(tf, "%11ld%11ld %6lu%6lu    %-11s%-30s",
 		p->entry_count,
 		p->allocs,
-		p->arity,
-		p->stk_args,
+		(unsigned long)p->arity,
+		(unsigned long)p->stk_args,
 		p->arg_kinds,
 		p->str);
 
