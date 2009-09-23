@@ -423,6 +423,10 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(expf)                                \
       SymI_HasProto(logf)                                \
       SymI_HasProto(sqrtf)                               \
+      SymI_HasProto(erf)                                \
+      SymI_HasProto(erfc)                                \
+      SymI_HasProto(erff)                                \
+      SymI_HasProto(erfcf)                               \
       SymI_HasProto(memcpy)                              \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
