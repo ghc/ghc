@@ -169,8 +169,9 @@ data instance T [a] where
         <para>
           The <literal>-#include</literal> flag and
           <literal>INCLUDE</literal> pragma are now deprecated and
-          ignored. GHC now generates its own C prototypes, rather than
-          relying on C prototypes.
+          ignored.  Since version 6.10.1, GHC has generated its own C
+          prototypes for foreign calls, rather than relying on
+          prototypes from C header files.
         </para>
       </listitem>
 
@@ -184,7 +185,8 @@ data instance T [a] where
       <listitem>
         <para>
           There is a new FFI calling convention called
-          <literal>prim</literal>, which allows calling C-- function.
+          <literal>prim</literal>, which allows calling C-- functions
+          (see <xref linkend="ffi-prim" />).
           Most users are not expected to need this.
         </para>
       </listitem>
@@ -252,6 +254,10 @@ data instance T [a] where
 
   <sect2>
     <title>Runtime system</title>
+
+    <para>The following options are all described in
+      <xref linkend="rts-options-gc" />.</para>
+
     <itemizedlist>
       <listitem>
         <para>
@@ -263,31 +269,34 @@ data instance T [a] where
 
       <listitem>
         <para>
-          The new flag <literal>+RTS -q1</literal> disables the parallel
-          garbage collector.
+          The parallel GC now uses the same threads as the mutator,
+          with the consequence that you can no longer select a
+          different number of threads to use for GC.
+          The <option>-g<replaceable>n</replaceable></option> RTS
+          option has been removed, except that <option>-g1</option> is
+          still accepted for backwards compatibility.
+        </para>
+
+        <para>
+          The new flag
+          <literal>+RTS -qg<replaceable>gen</replaceable></literal> sets
+          the minimum generation for which parallel garbage collection
+          is used.  Defaults to 1.  The flag <literal>-qg</literal> on
+          its own disables parallel GC.
         </para>
       </listitem>
 
       <listitem>
         <para>
-          The new flag
-          <literal>+RTS -qg<replaceable>n</replaceable></literal>
-          sets the minimum generation for which parallel garbage
-          collection is used. Defaults to 1.
+          The new flag <literal>+RTS -qb<replaceable>gen</replaceable></literal>
+          controls load balancing in the parallel GC.
         </para>
       </listitem>
 
       <listitem>
         <para>
           The new flag <literal>+RTS -qa</literal>
-          uses the OS to set thread affinity.
-        </para>
-      </listitem>
-
-      <listitem>
-        <para>
-          The new flag <literal>+RTS -qb</literal>
-          disables load balancing in the parallel garbage collector.
+          uses the OS to set thread affinity (experimental).
         </para>
       </listitem>
 
@@ -297,7 +306,7 @@ data instance T [a] where
           the new flag <literal>+RTS -l</literal> generates
           <literal><replaceable>prog</replaceable>.eventlog</literal>
           files, which tools such as ThreadScope can use to show the
-          behaviour of your program. The
+          behaviour of your program (see <xref linkend="rts-eventlog" />). The
           <literal>+RTS -D><replaceable>x</replaceable></literal> output
           is also sent to the eventlog file if this option is enabled.
           The <literal>+RTS -v</literal> flag sends eventlog data to
@@ -343,7 +352,7 @@ SPARKS: 1430 (2 converted, 1427 pruned)
         <para>
           In order to generate the parsers, happy >= 1.16 is now
           required. The parsers are pre-generated in the source tarball,
-          so most users will not need happy.
+          so most users will not need Happy.
         </para>
       </listitem>
 
@@ -577,8 +586,11 @@ deriveMyStuff ''T
         <para>
           Packages can now be identified by a "package ID", which is
           based on a hash of the ABIs. The new flag
-          <literal>-package-id</literal> allows packages to be selected
-          by this identifier.
+          <literal>-package-id</literal> allows packages to be
+          selected by this identifier (see <xref linkend="package-ids"
+          />).  Package IDs enable GHC to detect potential
+          incompatibilities between packages and broken dependencies
+          much more accurately than before.
         </para>
       </listitem>
 
@@ -610,6 +622,31 @@ ghc --abi-hash M1 M2 ...
           Rather than being a single <literal>package.conf</literal> file,
           package databases now consist of a directory containing one
           file per package, and a binary cache of the information.
+          GHC should be much faster to start up when the package
+          database grows large.
+        </para>
+      </listitem>
+
+      <listierm>
+        <para>
+          There is a new command <literal>ghc-pkg init</literal> to
+          create a package database.
+        </para>
+      </listierm>
+
+      <listierm>
+        <para>
+          There is a new command <literal>ghc-pkg dot</literal> to
+          generate a GraphViz graph of the dependencies between
+          installed packages.
+        </para>
+      </listierm>
+
+      <listitem>
+        <para>
+          There is a new command <literal>ghc-pkg recache</literal> to
+          update the package database cache should it become out of
+          date, or for registering packages manually.
         </para>
       </listitem>
     </itemizedlist>
