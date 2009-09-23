@@ -58,6 +58,11 @@ void initTracing (void)
     initMutex(&trace_utx);
 #endif
 
+#define TRACE_FLAG(name, class) \
+    class = RtsFlags.TraceFlags.name ? 1 : 0;
+
+    TRACE_FLAG(scheduler, TRACE_sched);
+
 #ifdef DEBUG
 #define DEBUG_FLAG(name, class) \
     class = RtsFlags.DebugFlags.name ? 1 : 0;
@@ -79,11 +84,6 @@ void initTracing (void)
     DEBUG_FLAG(hpc,          DEBUG_hpc);
     DEBUG_FLAG(sparks,       DEBUG_sparks);
 #endif
-
-#define TRACE_FLAG(name, class) \
-    class = RtsFlags.TraceFlags.name ? 1 : 0;
-
-    TRACE_FLAG(scheduler, TRACE_sched);
 
     eventlog_enabled = !RtsFlags.TraceFlags.trace_stderr && (
                        TRACE_sched
