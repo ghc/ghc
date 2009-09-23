@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude -#include "HsBase.h" #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# OPTIONS_GHC -XRecordWildCards #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -271,8 +270,8 @@ checkSeekableHandle act handle_@Handle__{haDevice=dev} =
 -- Handy IOErrors
 
 ioe_closedHandle, ioe_EOF,
-  ioe_notReadable, ioe_notWritable, ioe_cannotFlushTextRead,
-  ioe_notSeekable, ioe_notSeekable_notBin, ioe_invalidCharacter :: IO a
+  ioe_notReadable, ioe_notWritable, ioe_cannotFlushNotSeekable,
+  ioe_notSeekable, ioe_invalidCharacter :: IO a
 
 ioe_closedHandle = ioException
    (IOError Nothing IllegalOperation ""
@@ -288,13 +287,9 @@ ioe_notWritable = ioException
 ioe_notSeekable = ioException
    (IOError Nothing IllegalOperation ""
         "handle is not seekable" Nothing Nothing)
-ioe_notSeekable_notBin = ioException
+ioe_cannotFlushNotSeekable = ioException
    (IOError Nothing IllegalOperation ""
-      "seek operations on text-mode handles are not allowed on this platform"
-        Nothing Nothing)
-ioe_cannotFlushTextRead = ioException
-   (IOError Nothing IllegalOperation ""
-      "cannot flush the read buffer of a text-mode handle"
+      "cannot flush the read buffer: underlying device is not seekable"
         Nothing Nothing)
 ioe_invalidCharacter = ioException
    (IOError Nothing InvalidArgument ""
@@ -477,7 +472,7 @@ flushByteReadBuffer h_@Handle__{..} = do
   if isEmptyBuffer bbuf then return () else do
 
   seekable <- IODevice.isSeekable haDevice
-  when (not seekable) $ ioe_cannotFlushTextRead
+  when (not seekable) $ ioe_cannotFlushNotSeekable
 
   let seek = negate (bufR bbuf - bufL bbuf)
 
