@@ -1640,7 +1640,7 @@ linkDynLib dflags o_files dep_packages = do
 	 ++ map SysTools.Option (
 	    md_c_flags
 	 ++ o_files
-	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.3", "-install_name " ++ (pwd </> output_fn) ]
+	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.5", "-install_name " ++ (pwd </> output_fn) ]
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ extra_ld_opts
