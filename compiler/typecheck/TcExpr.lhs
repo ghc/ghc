@@ -261,7 +261,7 @@ tcExpr in_expr@(SectionL arg1 lop@(L loc op)) res_ty
 		<+> ptext (sLit "takes one argument")
     tc_args arg2_ty' qtvs qtys [arg1_ty, arg2_ty] 
 	= do { boxyUnify arg2_ty' (substTyWith qtvs qtys arg2_ty)
-	     ; arg1' <- tcArg lop 2 arg1 qtvs qtys arg1_ty 
+	     ; arg1' <- tcArg lop 1 arg1 qtvs qtys arg1_ty
 	     ; qtys' <- mapM refineBox qtys	-- c.f. tcArgs 
 	     ; return (qtys', arg1') }
     tc_args _ _ _ _ = panic "tcExpr SectionL"
