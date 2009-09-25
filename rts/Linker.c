@@ -823,6 +823,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stopTimer)				\
       SymI_HasProto(n_capabilities)			\
       SymI_HasProto(stg_traceCcszh)                     \
+      SymI_HasProto(stg_traceEventzh)                   \
       RTS_USER_SIGNALS_SYMBOLS
 
 

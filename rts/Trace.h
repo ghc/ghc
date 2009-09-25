@@ -104,6 +104,11 @@ void traceCap_(Capability *cap, char *msg, ...);
 void trace_(char *msg, ...);
 
 /* 
+ * A message or event emitted by the program
+ */
+void traceUserMsg(Capability *cap, char *msg);
+
+/* 
  * Emit a debug message (only when DEBUG is defined)
  */
 #ifdef DEBUG

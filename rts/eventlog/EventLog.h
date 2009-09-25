@@ -33,6 +33,8 @@ void postSchedEvent(Capability *cap, EventTypeNum tag,
 
 void postMsg(char *msg, va_list ap);
 
+void postUserMsg(Capability *cap, char *msg);
+
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
 #else /* !TRACING */

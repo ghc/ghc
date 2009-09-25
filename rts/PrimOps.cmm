@@ -1894,3 +1894,13 @@ stg_getSparkzh
    }
 #endif
 }
+
+stg_traceEventzh
+{
+   W_ msg;
+   msg = R1;
+#if defined(TRACING) || defined(DEBUG)
+   foreign "C" traceUserMsg(MyCapability() "ptr", msg "ptr") [];
+#endif
+   jump %ENTRY_CODE(Sp(0));
+}

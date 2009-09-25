@@ -62,6 +62,7 @@ char *EventDesc[] = {
   [EVENT_REQUEST_PAR_GC]      = "Request parallel GC",
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_MSG]             = "Log message",
+  [EVENT_USER_MSG]            = "User message",
   [EVENT_STARTUP]             = "Startup",
   [EVENT_BLOCK_MARKER]        = "Block marker"
 };
@@ -82,7 +83,7 @@ static void printAndClearEventBuf (EventsBuf *eventsBuf);
 
 static void postEventType(EventsBuf *eb, EventType *et);
 
-static void postLogMsg(EventsBuf *eb, char *msg, va_list ap);
+static void postLogMsg(EventsBuf *eb, EventTypeNum type, char *msg, va_list ap);
 
 static void postBlockMarker(EventsBuf *eb);
 static void closeBlockMarker(EventsBuf *ebuf);
@@ -242,6 +243,7 @@ initEventLogging(void)
             break;
 
         case EVENT_LOG_MSG:          // (msg)
+        case EVENT_USER_MSG:         // (msg)
             eventTypes[t].size = 0xffff;
             break;
 
@@ -393,7 +395,7 @@ postSchedEvent (Capability *cap,
 
 #define BUF 512
 
-void postLogMsg(EventsBuf *eb, char *msg, va_list ap)
+void postLogMsg(EventsBuf *eb, EventTypeNum type, char *msg, va_list ap)
 {
     char buf[BUF];
     nat size;
@@ -409,7 +411,7 @@ void postLogMsg(EventsBuf *eb, char *msg, va_list ap)
         printAndClearEventBuf(eb);
     }
 
-    postEventHeader(eb, EVENT_LOG_MSG);
+    postEventHeader(eb, type);
     postPayloadSize(eb, size);
     postBuf(eb,(StgWord8*)buf,size);
 }
@@ -417,14 +419,19 @@ void postLogMsg(EventsBuf *eb, char *msg, va_list ap)
 void postMsg(char *msg, va_list ap)
 {
     ACQUIRE_LOCK(&eventBufMutex);
-    postLogMsg(&eventBuf, msg, ap);
+    postLogMsg(&eventBuf, EVENT_LOG_MSG, msg, ap);
     RELEASE_LOCK(&eventBufMutex);
 }
 
 void postCapMsg(Capability *cap, char *msg, va_list ap)
 {
-    postLogMsg(&capEventBuf[cap->no], msg, ap);
+    postLogMsg(&capEventBuf[cap->no], EVENT_LOG_MSG, msg, ap);
 }
+
+void postUserMsg(Capability *cap, char *msg)
+{
+    postLogMsg(&capEventBuf[cap->no], EVENT_USER_MSG, msg, NULL);
+}    
 
 void closeBlockMarker (EventsBuf *ebuf)
 {

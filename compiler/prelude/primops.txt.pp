@@ -1769,6 +1769,16 @@ pseudoop   "unsafeCoerce#"
 -- the wrapper had type () -> (), and hence the wrapper de-constructed the (), the worker re-constructed
 -- a new (), with the result that the code ended up with "case () of (a,b) -> ...".
 
+primop  TraceEventOp "traceEvent#" GenPrimOp
+   Addr# -> State# s -> State# s
+   { Emits an event via the RTS tracing framework.  The contents
+     of the event is the zero-terminated byte string passed as the first
+     argument.  The event will be emitted either to the .eventlog file,
+     or to stderr, depending on the runtime RTS flags. }
+   with
+   has_side_effects = True
+   out_of_line      = True
+
 ------------------------------------------------------------------------
 ---                                                                  ---
 ------------------------------------------------------------------------

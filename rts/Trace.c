@@ -85,24 +85,7 @@ void initTracing (void)
     DEBUG_FLAG(sparks,       DEBUG_sparks);
 #endif
 
-    eventlog_enabled = !RtsFlags.TraceFlags.trace_stderr && (
-                       TRACE_sched
-#ifdef DEBUG
-                       | DEBUG_sched
-                       | DEBUG_interp
-                       | DEBUG_weak
-                       | DEBUG_gccafs
-                       | DEBUG_gc
-                       | DEBUG_block_alloc
-                       | DEBUG_sanity
-                       | DEBUG_stable
-                       | DEBUG_stm
-                       | DEBUG_prof
-                       | DEBUG_linker
-                       | DEBUG_squeeze
-                       | DEBUG_hpc
-#endif
-        );
+    eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG;
 
     if (eventlog_enabled) {
         initEventLogging();
@@ -225,7 +208,7 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
                       StgTSO *tso, StgWord64 other)
 {
 #ifdef DEBUG
-    if (RtsFlags.TraceFlags.trace_stderr) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         traceSchedEvent_stderr(cap, tag, tso, other);
     } else
 #endif
@@ -254,7 +237,7 @@ void traceCap_(Capability *cap, char *msg, ...)
     va_start(ap,msg);
     
 #ifdef DEBUG
-    if (RtsFlags.TraceFlags.trace_stderr) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         traceCap_stderr(cap, msg, ap);
     } else
 #endif
@@ -284,7 +267,7 @@ void trace_(char *msg, ...)
     va_start(ap,msg);
 
 #ifdef DEBUG
-    if (RtsFlags.TraceFlags.trace_stderr) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         trace_stderr(msg, ap);
     } else
 #endif
@@ -295,10 +278,24 @@ void trace_(char *msg, ...)
     va_end(ap);
 }
 
+void traceUserMsg(Capability *cap, char *msg)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceCap_stderr(cap, msg, NULL);
+    } else
+#endif
+    {
+        if (eventlog_enabled) {
+            postUserMsg(cap, msg);
+        }
+    }
+}
+
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
 {
 #ifdef DEBUG
-    if (RtsFlags.TraceFlags.trace_stderr) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         printThreadStatus(tso);
     } else
 #endif

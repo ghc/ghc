@@ -116,8 +116,9 @@
 #define EVENT_LOG_MSG             16 /* (message ...)          */
 #define EVENT_STARTUP             17 /* (num_capabilities)     */
 #define EVENT_BLOCK_MARKER        18 /* (size, end_time, capability) */
+#define EVENT_USER_MSG            19 /* (message ...)          */
 
-#define NUM_EVENT_TAGS            19
+#define NUM_EVENT_TAGS            20
 
 #if 0  /* DEPRECATED EVENTS: */
 #define EVENT_CREATE_SPARK        13 /* (cap, thread) */

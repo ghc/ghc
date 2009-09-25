@@ -117,8 +117,12 @@ struct PROFILING_FLAGS {
 
 };
 
+#define TRACE_NONE      0
+#define TRACE_EVENTLOG  1
+#define TRACE_STDERR    2
+
 struct TRACE_FLAGS {
-    rtsBool trace_stderr;
+    int tracing;
     rtsBool timestamp;      /* show timestamp in stderr output */
 
     rtsBool scheduler;      /* trace scheduler events */

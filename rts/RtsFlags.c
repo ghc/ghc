@@ -135,7 +135,7 @@ void initRtsFlagsDefaults(void)
 #endif
 
 #ifdef TRACING
-    RtsFlags.TraceFlags.trace_stderr  = rtsFalse;
+    RtsFlags.TraceFlags.tracing       = TRACE_NONE;
     RtsFlags.TraceFlags.timestamp     = rtsFalse;
     RtsFlags.TraceFlags.scheduler     = rtsFalse;
 #endif
@@ -652,7 +652,7 @@ error = rtsTrue;
 		  }
                   // -Dx also turns on -v.  Use -l to direct trace
                   // events to the .eventlog file instead.
-                  RtsFlags.TraceFlags.trace_stderr = rtsTrue;
+                  RtsFlags.TraceFlags.tracing = TRACE_STDERR;
 		  break;
 	      }
 #endif
@@ -760,20 +760,21 @@ error = rtsTrue;
 #ifdef TRACING
                 switch(rts_argv[arg][2]) {
 		case '\0':
-                  RtsFlags.TraceFlags.trace_stderr = rtsFalse;
-                  break;
+                    RtsFlags.TraceFlags.tracing = TRACE_EVENTLOG;
+                    break;
                 case 's':
-                  RtsFlags.TraceFlags.scheduler = rtsTrue;
-                  break;
+                    RtsFlags.TraceFlags.tracing = TRACE_EVENTLOG;
+                    RtsFlags.TraceFlags.scheduler = rtsTrue;
+                    break;
 		default:
 		    errorBelch("unknown RTS option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		    break;
                 }
 #else
-                  errorBelch("not built for: -eventlog");
+                errorBelch("not built for: -eventlog");
 #endif
-                  break;
+                break;
 
 	      case 'P': /* detailed cost centre profiling (time/alloc) */
 	      case 'p': /* cost centre profiling (time/alloc) */
@@ -1080,7 +1081,7 @@ error = rtsTrue;
                 switch(rts_argv[arg][2]) {
 #ifdef TRACING
                 case '\0':
-                    RtsFlags.TraceFlags.trace_stderr = rtsTrue;
+                    RtsFlags.TraceFlags.tracing = TRACE_STDERR;
                     break;
 		case 't':
 		    RtsFlags.TraceFlags.timestamp = rtsTrue;

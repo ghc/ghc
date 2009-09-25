@@ -593,6 +593,7 @@ RTS_FUN(stg_getSparkzh);
 RTS_FUN(stg_noDuplicatezh);
 
 RTS_FUN(stg_traceCcszh);
+RTS_FUN(stg_traceEventzh);
 
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes
