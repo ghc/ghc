@@ -41,7 +41,10 @@ module GHC.Exts
         lazy, inline,
 
         -- * Transform comprehensions
-        Down(..), groupWith, sortWith, the
+        Down(..), groupWith, sortWith, the,
+
+        -- * Event logging
+        traceEvent
 
        ) where
 
@@ -55,6 +58,7 @@ import GHC.Int
 import GHC.Ptr
 import Data.String
 import Data.List
+import Foreign.C
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
@@ -97,3 +101,11 @@ groupByFB c n eq xs0 = groupByFBCore xs0
         groupByFBCore (x:xs) = c (x:ys) (groupByFBCore zs)
             where (ys, zs) = span (eq x) xs
 
+
+-- -----------------------------------------------------------------------------
+-- tracing
+
+traceEvent :: String -> IO ()
+traceEvent msg = do
+  withCString msg $ \(Ptr p) -> IO $ \s ->
+    case traceEvent# p s of s' -> (# s', () #)
