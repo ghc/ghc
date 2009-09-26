@@ -192,16 +192,40 @@ data LabelAccessStyle
 howToAccessLabel 
 	:: DynFlags -> Arch -> OS -> ReferenceKind -> CLabel -> LabelAccessStyle
 
+
 -- Windows
--- 
--- We need to use access *exactly* those things that
--- are imported from a DLL via an __imp_* label.
--- There are no stubs for imported code.
+-- In Windows speak, a "module" is a set of objects linked into the
+-- same Portable Exectuable (PE) file. (both .exe and .dll files are PEs).
+--
+-- If we're compiling a multi-module program then symbols from other modules
+-- are accessed by a symbol pointer named __imp_SYMBOL. At runtime we have the
+-- following.
+--
+--   (in the local module)
+--     __imp_SYMBOL: addr of SYMBOL
+--
+--   (in the other module)
+--     SYMBOL: the real function / data.
+--
+-- To access the function at SYMBOL from our local module, we just need to
+-- dereference the local __imp_SYMBOL.
+--
+-- If opt_Static is set then we assume that all our code will be linked
+-- into the same .exe file. In this case we always access symbols directly, 
+-- and never use __imp_SYMBOL.
 --
 howToAccessLabel dflags _ OSMinGW32 _ lbl
+
+	-- Assume all symbols will be in the same PE, so just access them directly.
+	| opt_Static
+	= AccessDirectly
+	
+	-- If the target symbol is in another PE we need to access it via the
+	--	appropriate __imp_SYMBOL pointer.
 	| labelDynamic (thisPackage dflags) lbl	
 	= AccessViaSymbolPtr
 
+	-- Target symbol is in the same PE as the caller, so just access it directly.
 	| otherwise
 	= AccessDirectly
 

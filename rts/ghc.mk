@@ -173,12 +173,6 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
-ifeq "$(Windows)" "YES"
-# SDM: when compiled with -fasm the RTS currently has bogus references to 
-# __imp_base_ things, so working around for now:
-rts_HC_OPTS += -fvia-C
-endif
-
 ifneq "$(DYNAMIC_RTS)" "YES"
 rts_HC_OPTS += -static
 else
