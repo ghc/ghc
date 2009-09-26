@@ -272,9 +272,6 @@ GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 
 GhcLibHcOpts=-O2 -XGenerics
 
-# Win32 only: Enable the RTS and libraries to be built as DLLs
-DLLized=@EnableWin32DLLs@
-
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.
 #

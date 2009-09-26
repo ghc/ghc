@@ -419,38 +419,6 @@ AC_ARG_WITH(ld,
 # This uses GHC, so put it after the "GHC is required" check above:
 FP_FIND_ROOT
 
-dnl ** Enable the construction of Win32 DLLs?
-dnl --------------------------------------------------------------
-dnl
-dnl [ The ability to build the RTS and libraries as separate DLLs used
-dnl   to be supported, but isn't currently (updates to the RTS, compiler
-dnl   and build system would be required to bring it back again.)
-dnl   Hence, exposing it as an option is false advertisement, so better
-dnl   disable it to avoid confusion (but leave it commented-out rather
-dnl   than removed in order to remind ourselves to bring back the
-dnl   feature at some stage.) ]
-dnl
-dnl AC_ARG_ENABLE(win32-dlls,
-dnl [  --enable-win32-dlls
-dnl         If on a Win32 platform running mingw32/cygwin, enable the
-dnl         construction of DLLs containing ghc-compiled code.
-dnl ],
-dnl [
-dnl case $HostOS_CPP in
-dnl cygwin32) ;;
-dnl mingw32)  ;;
-dnl *)    echo "Unrecognised win32 platform: $HostPlatform"
-dnl       exit 1
-dnl       ;;
-dnl esac
-dnl EnableWin32DLLs=YES
-dnl ],
-dnl [EnableWin32DLLs=NO]
-dnl )
-dnl AC_SUBST(EnableWin32DLLs)
-dnl if test x"$EnableWin32DLLs" = "xYES" ; then
-dnl  AC_DEFINE(HAVE_WIN32_DLL_SUPPORT)
-dnl fi
 
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
