@@ -85,6 +85,14 @@
 
 default : all
 
+# Catch make if it runs away into an infinite loop
+ifeq      "$(MAKE_RESTARTS)" ""
+else ifeq "$(MAKE_RESTARTS)" "1"
+else ifeq "$(MAKE_RESTARTS)" "2"
+else
+$(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug?)
+endif
+
 # Just bring makefiles up to date:
 .PHONY: just-makefiles
 just-makefiles:
