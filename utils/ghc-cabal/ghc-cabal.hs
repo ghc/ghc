@@ -35,9 +35,11 @@ main = do args <- getArgs
               "check" : dir : [] ->
                   doCheck dir
               "install" : ghc : ghcpkg : topdir : directory : distDir
-                        : myDestDir : myPrefix : myLibdir : myDocdir : args' ->
+                        : myDestDir : myPrefix : myLibdir : myDocdir
+                        : relocatableBuild : args' ->
                   doInstall ghc ghcpkg topdir directory distDir
-                            myDestDir myPrefix myLibdir myDocdir args'
+                            myDestDir myPrefix myLibdir myDocdir
+                            relocatableBuild args'
               "configure" : args' -> case break (== "--") args' of
                    (config_args, "--" : distdir : directories) ->
                        mapM_ (generate config_args distdir) directories
@@ -52,7 +54,7 @@ syntax_error =
      "        ghc-cabal install <ghc-pkg> <directory> <distdir> <destdir> <prefix> <args>...",
      "        ghc-cabal haddock <distdir> <directory> <args>..."]
 
-die :: [String] -> IO ()
+die :: [String] -> IO a
 die errs = do mapM_ (hPutStrLn stderr) errs
               exitWith (ExitFailure 1)
 
@@ -137,21 +139,37 @@ runHaddock distdir directory args
           = f pd lbi us flags
 
 doInstall :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-          -> FilePath -> FilePath -> FilePath -> FilePath -> [String]
+          -> FilePath -> FilePath -> FilePath -> FilePath -> String
+          -> [String]
           -> IO ()
-doInstall ghc ghcpkg topdir directory distDir myDestDir myPrefix myLibdir myDocdir args
+doInstall ghc ghcpkg topdir directory distDir
+          myDestDir myPrefix myLibdir myDocdir
+          relocatableBuildStr args
  = withCurrentDirectory directory $ do
-     defaultMainWithHooksArgs hooks (["copy", "--builddir", distDir]
-                                     ++ (if null myDestDir then []
-                                           else ["--destdir", myDestDir])
-                                     ++ args)
-     defaultMainWithHooksArgs hooks ("register" : "--builddir" : distDir : args)
-    where
-      hooks = userHooks {
-                  copyHook = noGhcPrimHook (modHook (copyHook userHooks)),
-                  regHook  = modHook (regHook userHooks)
-              }
+     relocatableBuild <- case relocatableBuildStr of
+                         "YES" -> return True
+                         "NO"  -> return False
+                         _ -> die ["Bad relocatableBuildStr: " ++
+                                   show relocatableBuildStr]
+     let copyArgs = ["copy", "--builddir", distDir]
+                 ++ (if null myDestDir
+                     then []
+                     else ["--destdir", myDestDir])
+                 ++ args
+         regArgs = "register" : "--builddir" : distDir : args
+         copyHooks = userHooks {
+                         copyHook = noGhcPrimHook
+                                  $ modHook False
+                                  $ copyHook userHooks
+                     }
+         regHooks = userHooks {
+                        regHook = modHook relocatableBuild
+                                $ regHook userHooks
+                    }
 
+     defaultMainWithHooksArgs copyHooks copyArgs
+     defaultMainWithHooksArgs regHooks  regArgs
+    where
       noGhcPrimHook f pd lbi us flags
               = let pd'
                      | packageName pd == PackageName "ghc-prim" =
@@ -165,14 +183,25 @@ doInstall ghc ghcpkg topdir directory distDir myDestDir myPrefix myLibdir myDocd
                             error "Expected a library, but none found"
                      | otherwise = pd
                 in f pd' lbi us flags
-      modHook f pd lbi us flags
+      modHook relocatableBuild f pd lbi us flags
        = do let verbosity = normal
                 idts = installDirTemplates lbi
-                idts' = idts { prefix    = toPathTemplate myPrefix,
-                               libdir    = toPathTemplate myLibdir,
-                               libsubdir = toPathTemplate "$pkgid",
-                               docdir    = toPathTemplate (myDocdir </> "$pkg"),
-                               htmldir   = toPathTemplate "$docdir" }
+                idts' = idts {
+                            prefix    = toPathTemplate $
+                                            if relocatableBuild
+                                            then "$topdir"
+                                            else myPrefix,
+                            libdir    = toPathTemplate $
+                                            if relocatableBuild
+                                            then "$topdir"
+                                            else myLibdir,
+                            libsubdir = toPathTemplate "$pkgid",
+                            docdir    = toPathTemplate $
+                                            if relocatableBuild
+                                            then "$topdir/$pkg"
+                                            else (myDocdir </> "$pkg"),
+                            htmldir   = toPathTemplate "$docdir"
+                        }
                 progs = withPrograms lbi
                 ghcProg = ConfiguredProgram {
                               programId = programName ghcProgram,

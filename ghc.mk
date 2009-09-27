@@ -808,13 +808,15 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 		 $(INSTALLED_GHC_PKG_REAL) \
 		 $(DESTDIR)$(topdir) \
 		 libraries/$p dist-install \
-		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' &&) true
+		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
+		 $(RelocatableBuild) &&) true
 	"$(GHC_CABAL_INPLACE)" install \
 		 $(INSTALLED_GHC_REAL) \
 	 	 $(INSTALLED_GHC_PKG_REAL) \
 		 $(DESTDIR)$(topdir) \
 		 compiler stage2 \
-		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries'
+		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
+		 $(RelocatableBuild)
 
 # -----------------------------------------------------------------------------
 # Binary distributions
