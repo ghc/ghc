@@ -396,10 +396,24 @@ runMkDLL dflags args = do
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
-  let (_gcc,gcc_args) = pgm_c dflags
-      windres        = pgm_windres dflags
+  let (gcc, gcc_args) = pgm_c dflags
+      windres = pgm_windres dflags
+      quote x = "\"" ++ x ++ "\""
+      args' = -- If windres.exe and gcc.exe are in a directory containing
+              -- spaces then windres fails to run gcc. We therefore need
+              -- to tell it what command to use...
+              Option ("--preprocessor=" ++
+                      unwords (map quote (gcc :
+                                          map showOpt gcc_args ++
+                                          ["-E", "-xc", "-DRC_INVOKED"])))
+              -- ...but if we do that then if windres calls popen then
+              -- it can't understand the quoting, so we have to use
+              -- --use-temp-file so that it interprets it correctly.
+              -- See #1828.
+            : Option "--use-temp-file"
+            : args
   mb_env <- getGccEnv gcc_args
-  runSomethingFiltered dflags id "Windres" windres args mb_env
+  runSomethingFiltered dflags id "Windres" windres args' mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
