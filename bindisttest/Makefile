@@ -19,6 +19,12 @@ default_target: all
 TOP=..
 include $(TOP)/mk/config.mk
 
+ifeq "$(TEST_PREP)" "YES"
+BIN_DIST_TEST_TAR_BZ2 = ../$(BIN_DIST_PREP_TAR_BZ2)
+else
+BIN_DIST_TEST_TAR_BZ2 = ../$(BIN_DIST_TAR_BZ2)
+endif
+
 all:
 	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
 	$(RM) -rf a/b/c/*
@@ -26,7 +32,7 @@ all:
 # We use the a/b/c subdirectory as configure looks for install-sh in
 # . .. ../.. and we don't want it to find the build system's install-sh.
 # --force-local makes tar not think that c:/foo refers to a remote file
-	cd a/b/c/ && $(TAR) --force-local -jxf $(BIN_DIST_TAR_BZ2)
+	cd a/b/c/ && $(TAR) --force-local -jxf ../../../$(BIN_DIST_TEST_TAR_BZ2)
 ifeq "$(Windows)" "YES"
 	mv a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
