@@ -361,12 +361,12 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 DEFAULT_TMPDIR		= /C/TEMP
 endif
 
-BIN_DIST_DIR=bindistprep/$(BIN_DIST_NAME)
-
-BIN_DIST_NAME=ghc-$(ProjectVersion)
-BIN_DIST_TAR=$(TOP)/bindistprep/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar
-BIN_DIST_TAR_BZ2=$(BIN_DIST_TAR).bz2
-BIN_DIST_LIST=$(TOP)/bindist-list
+BIN_DIST_NAME         = ghc-$(ProjectVersion)
+BIN_DIST_PREP_DIR     = bindistprep/$(BIN_DIST_NAME)
+BIN_DIST_PREP_TAR     = bindistprep/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar
+BIN_DIST_PREP_TAR_BZ2 = $(BIN_DIST_PREP_TAR).bz2
+BIN_DIST_TAR_BZ2      = $(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
+BIN_DIST_LIST         = bindist-list
 
 WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-i386-windows
 WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
