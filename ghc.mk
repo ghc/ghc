@@ -865,26 +865,26 @@ endif
 # mk/project.mk gets an absolute path, so we manually include it in
 # the bindist with a relative path
 
-BIN_DIST_MK = $(BIN_DIST_NAME)/bindist.mk
+BIN_DIST_MK = $(BIN_DIST_DIR)/bindist.mk
 
-binary-dist:
-	"$(RM)" $(RM_OPTS) -r $(BIN_DIST_NAME)
-	mkdir $(BIN_DIST_NAME)
-	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../$$i $(BIN_DIST_NAME)/; done
+unix-binary-dist-prep:
+	"$(RM)" $(RM_OPTS) -r bindistprep/*
+	mkdir $(BIN_DIST_DIR)
+	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../../$$i $(BIN_DIST_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "LATEX_DOCS         = $(LATEX_DOCS)"         >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_HTML = $(BUILD_DOCBOOK_HTML)" >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
-	ln -s ../distrib/configure-bin.ac $(BIN_DIST_NAME)/configure.ac
-	cd $(BIN_DIST_NAME) && autoreconf
+	ln -s ../../distrib/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
+	cd $(BIN_DIST_DIR) && autoreconf
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	"$(TAR)" hcf - -T $(BIN_DIST_LIST) | bzip2 -c > $(BIN_DIST_TAR_BZ2)
+	cd bindistprep && "$(TAR)" hcf - -T $(BIN_DIST_LIST) | bzip2 -c > $(BIN_DIST_TAR_BZ2)
 
-windows-binary-dist:
-	"$(RM)" $(RM_OPTS) -r $(BIN_DIST_NAME)
+windows-binary-dist-prep:
+	"$(RM)" $(RM_OPTS) -r bindistprep/*
 	$(MAKE) prefix=$(BIN_DIST_DIR) install
 	"$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > $(BIN_DIST_TAR_BZ2)
 

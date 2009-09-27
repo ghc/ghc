@@ -45,7 +45,7 @@ endif
 include mk/custom-settings.mk
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
+REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -77,14 +77,20 @@ endif
 	@echo "===--- finished updating makefiles"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
-binary-dist:
+binary-dist: binary-dist-prep
 ifeq "$(mingw32_TARGET_OS)" "1"
-	$(MAKE) -r --no-print-directory -f ghc.mk windows-binary-dist
+	mv bindistprep/*.exe .
+endif
+	mv bindistprep/*.tar.bz2 .
+
+binary-dist-prep:
+ifeq "$(mingw32_TARGET_OS)" "1"
+	$(MAKE) -r --no-print-directory -f ghc.mk windows-binary-dist-prep
 	$(MAKE) -r --no-print-directory -f ghc.mk windows-installer
 else
 	rm -f bindist-list
 	$(MAKE) -r --no-print-directory -f ghc.mk bindist BINDIST=YES
-	$(MAKE) -r --no-print-directory -f ghc.mk binary-dist
+	$(MAKE) -r --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
 
 clean distclean maintainer-clean:
