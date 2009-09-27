@@ -1,3 +1,12 @@
+This package has moved to Hackage!
+http://hackage.haskell.org/package/extcore-0.2
+
+The version of the stand-alone External Core library in the GHC
+source tree is now out-of-date, and will probably go away eventually.
+Please get the latest version from Hackage.
+
+=====================================================================
+
 A set of example programs for handling external core format.
 
 In particular, typechecker and interpreter give a precise semantics.
