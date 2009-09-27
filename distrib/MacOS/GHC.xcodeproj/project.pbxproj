@@ -167,7 +167,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ ${ACTION} = build ]; then\n  make -C ../.. BIN_DIST_TOPDIR_ABS=${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH} BIN_DIST_NAME=ghc binary-dist\nfi\n";
+			shellScript = "if [ ${ACTION} = build ]; then\n  make -C ../.. BIN_DIST_NAME=ghc binary-dist\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
