@@ -74,8 +74,10 @@ test('T3294',
                                    # expected value: 17754884 (x86/Linux)
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 28000000,
-                                                     32000000)),
-                                   # expected value:  (amd64/Linux)
+                                                     34000000)),
+                                   # expected value: 32 478 408 (amd64/Linux)
+                                   # (but varies a lot, depending on when
+                                   # we GC relative to the peak).
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 800000000,
                                                       830000000)),
