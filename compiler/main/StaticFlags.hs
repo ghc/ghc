@@ -271,6 +271,8 @@ opt_UF_DearOp            = ( 4 :: Int)
 opt_PIC :: Bool
 #if darwin_TARGET_OS && x86_64_TARGET_ARCH
 opt_PIC                         = True
+#elif darwin_TARGET_OS
+opt_PIC                         = lookUp (fsLit "-fPIC") || not opt_Static
 #else
 opt_PIC                         = lookUp (fsLit "-fPIC")
 #endif
