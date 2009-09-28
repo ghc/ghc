@@ -307,9 +307,6 @@ PrintTickyInfo(void)
 	      PC(INTAVG(tot_old_updates,tot_gengc_updates)));
   }
 
-  fprintf(tf,"\nTotal bytes copied during GC: %ld\n",
-	  GC_WORDS_COPIED_ctr * sizeof(W_));
-
   printRegisteredCounterInfo(tf);
 
   fprintf(tf,"\n**************************************************\n");
@@ -567,7 +564,6 @@ PrintTickyInfo(void)
   PR_CTR(GC_SEL_MINOR_ctr);
   PR_CTR(GC_SEL_MAJOR_ctr);
   PR_CTR(GC_FAILED_PROMOTION_ctr);
-  PR_CTR(GC_WORDS_COPIED_ctr);
 }
 
 /* To print out all the registered-counter info: */

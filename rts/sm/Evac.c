@@ -97,8 +97,6 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 
     to = alloc_for_copy(size,stp);
     
-    TICK_GC_WORDS_COPIED(size);
-
     from = (StgPtr)src;
     to[0] = (W_)info;
     for (i = 1; i < size; i++) { // unroll for small i
@@ -143,8 +141,6 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
     *p = TAG_CLOSURE(tag,(StgClosure*)to);
     src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
     
-    TICK_GC_WORDS_COPIED(size);
-
     from = (StgPtr)src;
     to[0] = (W_)info;
     for (i = 1; i < size; i++) { // unroll for small i
@@ -194,8 +190,6 @@ spin:
 
     to = alloc_for_copy(size_to_reserve, stp);
     *p = (StgClosure *)to;
-
-    TICK_GC_WORDS_COPIED(size_to_copy);
 
     from = (StgPtr)src;
     to[0] = info;
