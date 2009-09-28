@@ -978,7 +978,9 @@ emitRetUT :: [(CgRep,CmmExpr)] -> Code
 emitRetUT args = do
   tickyUnboxedTupleReturn (length args)  -- TICK
   (sp, stmts) <- pushUnboxedTuple 0 args
-  emitStmts stmts
+  emitSimultaneously stmts -- NB. the args might overlap with the stack slots
+                           -- or regs that we assign to, so better use
+                           -- simultaneous assignments here (#3546)
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
   stmtC (CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord)) [])
   -- TODO (when using CPS): emitStmt (CmmReturn (map snd args))
