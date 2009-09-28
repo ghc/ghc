@@ -95,6 +95,9 @@ then
     rm -f $HPCTIXFILE
 fi
 
+make binary-dist-prep
+make -C bindisttest TEST_PREP=YES
+
 make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
 
 if [ "$hpc" = YES ]
