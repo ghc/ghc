@@ -981,6 +981,8 @@ sdist-prep :
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
 	cd $(SRC_DIST_DIR) && $(MAKE) distclean
+	rm -rf $(SRC_DIST_DIR)/libraries/tarballs/
+	rm -rf $(SRC_DIST_DIR)/libraries/stamp/
 	cd $(SRC_DIST_DIR) && if test -f $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs; then "$(CP)" $(TOP)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ ; mv libraries/haskell-src/Language/Haskell/Parser.ly libraries/haskell-src/Language/Haskell/Parser.ly.source ; fi
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,cmm,CmmLex,x)
 	cd $(SRC_DIST_DIR) && $(call sdist_file,compiler,stage2,cmm,CmmParse,y)
