@@ -7,14 +7,14 @@ test('conc027', normal, compile_and_run, [''])
 test('conc051', normal, compile_and_run, [''])
 
 if ('threaded1' in config.run_ways):
-   threaded_ways = ['ghci','threaded1','threaded2']
+   only_threaded_ways = only_ways(['ghci','threaded1','threaded2'])
 else:
-   threaded_ways = []
+   only_threaded_ways = skip
 
-test('conc069', only_ways(threaded_ways), compile_and_run, [''])
+test('conc069', only_threaded_ways, compile_and_run, [''])
 # this test gives slightly different results for non-threaded ways, so omit
 # those for now.
-test('conc070', only_ways(threaded_ways), compile_and_run, [''])
+test('conc070', only_threaded_ways, compile_and_run, [''])
 
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
