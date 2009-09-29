@@ -34,11 +34,12 @@ if v == '':
     h.close()
     if v != '':
         # If it does then use the first utf8 locale that is available
-        h = os.popen('locale -a | grep -i utf8 | head', 'r')
-        v = h.read()
+        h = os.popen('locale -a | grep -i utf8 2>/dev/null', 'r')
+        v = h.readline().strip()
         h.close()
         if v != '':
             os.environ['LC_ALL'] = v
+            print "setting LC_ALL to", v
         else:
             print 'WARNING: No UTF8 locale found.'
             print 'You may get some spurious test failures.'
