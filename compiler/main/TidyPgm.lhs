@@ -577,8 +577,8 @@ chooseExternalIds hsc_env mod omit_prags binds
 
   binders = bindersOfBinds binds
 
-  bind_env :: IdEnv CoreExpr
-  bind_env = mkVarEnv (flattenBinds binds)
+  bind_env :: IdEnv (Id,CoreExpr)
+  bind_env = mkVarEnv (zip (map fst bs) bs) where bs = flattenBinds binds
 
   avoids   = [getOccName name | bndr <- binders,
                                 let name = idName bndr,
@@ -608,12 +608,18 @@ chooseExternalIds hsc_env mod omit_prags binds
 
   search [] unfold_env occ_env = return (unfold_env, occ_env)
 
-  search ((id,referrer) : rest) unfold_env occ_env
-    | id `elemVarEnv` unfold_env = search rest unfold_env occ_env
+  search ((idocc,referrer) : rest) unfold_env occ_env
+    | idocc `elemVarEnv` unfold_env = search rest unfold_env occ_env
     | otherwise = do
-      (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env id
+      (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env idocc
       let 
-          rhs = expectJust (showSDoc (text "chooseExternalIds: " <> ppr id)) $ lookupVarEnv bind_env id
+          (id, rhs) = expectJust (showSDoc (text "chooseExternalIds: " <>
+                                            ppr idocc)) $
+                                 lookupVarEnv bind_env idocc
+          -- NB. idocc might be an *occurrence* of an Id, whereas we want
+          -- the Id from the binding site, because only the latter is
+          -- guaranteed to have the unfolding attached.  This is why we
+          -- keep binding site Ids in the bind_env.
           (new_ids, show_unfold)
                 | omit_prags = ([], False)
                 | otherwise  = addExternal id rhs
