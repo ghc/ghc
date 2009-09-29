@@ -804,7 +804,7 @@ INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
 INSTALLED_PACKAGES = $(filter-out haskeline mtl terminfo,$(PACKAGES))
-HIDDEN_PACKAGES = ghc-binary
+HIDDEN_PACKAGES = binary
 
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
