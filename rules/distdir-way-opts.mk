@@ -46,7 +46,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
- $$(if $$(findstring YES,$$($1_$2_SplitObjs)),-split-objs,) \
+ $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
  $$($1_$2_HC_OPTS) \
  $$($1_$2_EXTRA_HC_OPTS) \
  $$($1_$2_$3_HC_OPTS) \
