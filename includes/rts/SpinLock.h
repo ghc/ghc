@@ -49,6 +49,7 @@ spin:
     r = cas((StgVolatilePtr)&(p->lock), 1, 0);
     if (r == 0) {
         p->spin++;
+        busy_wait_nop();
         goto spin;
     }
 }
@@ -76,6 +77,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
     StgWord32 r = 0;
     do {
         r = cas((StgVolatilePtr)p, 1, 0);
+        busy_wait_nop();
     } while(r == 0);
 }
 

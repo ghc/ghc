@@ -64,6 +64,13 @@ EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p);
  */
 EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p);
 
+/*
+ * Busy-wait nop: this is a hint to the CPU that we are currently in a
+ * busy-wait loop waiting for another CPU to change something.  On a
+ * hypertreaded CPU it should yield to another thread, for example.
+ */
+EXTERN_INLINE void busy_wait_nop(void);
+
 #endif // !IN_STG_CODE
 
 /*
@@ -213,6 +220,17 @@ atomic_dec(StgVolatilePtr p)
         new = old - 1;
     } while (cas(p, old, new) != old);
     return new;
+#endif
+}
+
+EXTERN_INLINE void
+busy_wait_nop(void)
+{
+#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+    __asm__ __volatile__ ("rep; nop");
+    //
+#else
+    // nothing
 #endif
 }
 
