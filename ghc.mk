@@ -893,8 +893,8 @@ unix-binary-dist-prep:
 
 windows-binary-dist-prep:
 	"$(RM)" $(RM_OPTS) -r bindistprep/*
-	$(MAKE) prefix=$(BIN_DIST_PREP_DIR) install
-	cd bindistprep && "$(TAR)" cf - ../$(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
+	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
+	cd bindistprep && "$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-installer:
 	"$(ISCC)" /O. /F$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
