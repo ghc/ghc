@@ -803,6 +803,9 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
+INSTALLED_PACKAGES = $(filter-out haskeline mtl terminfo,$(PACKAGES))
+HIDDEN_PACKAGES = ghc-binary
+
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) $(DESTDIR)$(topdir)
@@ -810,7 +813,7 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) $(INSTALLED_PACKAGE_CONF)
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
-	$(foreach p, $(PACKAGES) $(PACKAGES_STAGE2),\
+	$(foreach p, $(INSTALLED_PACKAGES) $(PACKAGES_STAGE2),\
 	    "$(GHC_CABAL_INPLACE)" install \
 		 $(INSTALLED_GHC_REAL) \
 		 $(INSTALLED_GHC_PKG_REAL) \
@@ -818,6 +821,9 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 		 libraries/$p dist-install \
 		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
 		 $(RelocatableBuild) &&) true
+	$(foreach p, $(HIDDEN_PACKAGES),\
+	    $(INSTALLED_GHC_PKG_REAL) --global-conf $(INSTALLED_PACKAGE_CONF) \
+	                              hide $p &&) true
 	"$(GHC_CABAL_INPLACE)" install \
 		 $(INSTALLED_GHC_REAL) \
 	 	 $(INSTALLED_GHC_PKG_REAL) \
