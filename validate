@@ -61,18 +61,6 @@ if [ $no_clean -eq 0 ]; then
     then
         INSTDIR=`cygpath -m "$INSTDIR"`
     fi
-    case $OSTYPE in
-        cygwin|msys) config_args=--build=i386-unknown-mingw32
-            if [ -f c:/mingw/bin/gcc.exe ]
-            then
-                config_args="$config_args --with-gcc=c:/mingw/bin/gcc"
-            fi
-            if [ -f c:/mingw/bin/ld.exe ]
-            then
-                config_args="$config_args --with-ld=c:/mingw/bin/ld"
-            fi
-            ;;
-    esac
 
     sh boot
     ./configure --prefix="$INSTDIR" $config_args
