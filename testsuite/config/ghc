@@ -88,7 +88,7 @@ config.way_rts_flags = {
 	'extcore'    : [],
 	'optextcore' : [],
 	'threaded1'  : [],
-	'threaded2'  : ['-N2 -l'],
+	'threaded2'  : ['-N2 -ls'],
 	'threaded2_qw'  : ['-N2', '-qw'],
 	'hpc'	     : [],
         'prof_hc_hb' : ['-hc -hbvoid'],
