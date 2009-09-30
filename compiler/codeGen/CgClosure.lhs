@@ -155,8 +155,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
 	-- Node points to it...
     let
 	name 	     = idName bndr
-	is_elem	     = isIn "cgRhsClosure"
-	bndr_is_a_fv = bndr `is_elem` fvs
+	bndr_is_a_fv = bndr `elem` fvs
 	reduced_fvs | bndr_is_a_fv = fvs `minusList` [bndr]
 		    | otherwise	   = fvs
 
