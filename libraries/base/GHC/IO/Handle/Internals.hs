@@ -727,7 +727,7 @@ readTextDevice h_@Handle__{..} cbuf = do
 
   debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf1)
 
-  (bbuf2,cbuf') <- 
+  (bbuf2,cbuf2) <-
       case haDecoder of
           Nothing      -> do
                writeIORef haLastDecode (error "codec_state", bbuf1)
@@ -737,13 +737,16 @@ readTextDevice h_@Handle__{..} cbuf = do
                writeIORef haLastDecode (state, bbuf1)
                (encode decoder) bbuf1 cbuf
 
-  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
+  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf2 ++ 
         " bbuf=" ++ summaryBuffer bbuf2)
 
+  cbuf3 <- stripByteOrderMark cbuf2
+
   writeIORef haByteBuffer bbuf2
-  if bufR cbuf' == bufR cbuf -- no new characters
+  if bufR cbuf3 == bufR cbuf -- no new characters
      then readTextDevice' h_ bbuf2 cbuf -- we need more bytes to make a Char
-     else return cbuf'
+     else return cbuf3
+
 
 -- we have an incomplete byte sequence at the end of the buffer: try to
 -- read more bytes.
@@ -792,7 +795,7 @@ readTextDeviceNonBlocking h_@Handle__{..} cbuf = do
                    if isNothing r then ioe_EOF else do  -- raise EOF
                    return bbuf1
 
-  (bbuf2,cbuf') <-
+  (bbuf2,cbuf2) <-
       case haDecoder of
           Nothing      -> do
                writeIORef haLastDecode (error "codec_state", bbuf1)
@@ -802,5 +805,23 @@ readTextDeviceNonBlocking h_@Handle__{..} cbuf = do
                writeIORef haLastDecode (state, bbuf1)
                (encode decoder) bbuf1 cbuf
 
+  cbuf3	<- stripByteOrderMark cbuf2
+
   writeIORef haByteBuffer bbuf2
-  return cbuf'
+  return cbuf3
+
+
+-- | When converting from UTF-8 to UCS-4, Solaris iconv adds a Byte Order Mark (BOM)
+--	of value 0xfeff to the start of the stream. We don't want to return this to
+--	the caller, so strip it here. This is a safe operation for other platforms,
+--	so always do it.
+stripByteOrderMark :: CharBuffer -> IO CharBuffer
+stripByteOrderMark cbuf
+  | isEmptyBuffer cbuf
+  = return cbuf
+  
+  | otherwise
+  = do	firstChar <- peekCharBuf (bufRaw cbuf) 0
+  	if firstChar == chr 0xfeff
+	 then 	return (bufferRemove 1 cbuf)
+	 else 	return cbuf
