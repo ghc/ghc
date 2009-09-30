@@ -1,5 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
+-- This should fail, I think, because of the loopy equality,
+-- but the error message is hopeless
+
 module Simple13 where
 
 type family F a

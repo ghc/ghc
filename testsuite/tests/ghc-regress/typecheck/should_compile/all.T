@@ -311,3 +311,4 @@ test('T2412',
      run_command,
      ['$MAKE --no-print-directory -s T2412'])
 
+     
