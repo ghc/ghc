@@ -14,7 +14,7 @@ ChangesEnvironment=yes
 
 
 [Files]
-Source: "ghc-@ProjectVersion@\*"; DestDir: "{app}"; Flags: recursesubdirs
+Source: "bindistprep\ghc-@ProjectVersion@\*"; DestDir: "{app}"; Flags: recursesubdirs
 
 [Icons]
 Name: "{group}\@ProjectVersion@\GHCi"; Filename: "{app}\bin\ghci.exe"
