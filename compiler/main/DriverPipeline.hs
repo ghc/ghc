@@ -1643,16 +1643,22 @@ linkDynLib dflags o_files dep_packages = do
     --	 later, so that it will not complain about the use of the option
     --	 -undefined dynamic_lookup above.
     -- -install_name
-    --   Causes the dynamic linker to ignore the DYLD_LIBRARY_PATH when loading
-    --   this lib and instead look for it at its absolute path.
-    --   When installing the .dylibs (see target.mk), we'll change that path to
-    --   point to the place they are installed. Therefore, we won't have to set
-    --	 up DYLD_LIBRARY_PATH specifically for ghc.
+    --   Mac OS/X stores the path where a dynamic library is (to be) installed
+    --   in the library itself.  It's called the "install name" of the library.
+    --   Then any library or executable that links against it before it's
+    --   installed will search for it in its ultimate install location.  By
+    --   default we set the install name to the absolute path at build time, but
+    --   it can be overridden by the -dylib-install-name option passed to ghc.
+    --   Cabal does this.
     -----------------------------------------------------------------------------
 
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 
-    pwd <- getCurrentDirectory
+    instName <- case dylibInstallName dflags of
+        Just n -> return n
+        Nothing -> do
+            pwd <- getCurrentDirectory
+            return $ pwd `combine` output_fn
     SysTools.runLink dflags
 	 ([ SysTools.Option verb
 	  , SysTools.Option "-dynamiclib"
@@ -1662,7 +1668,8 @@ linkDynLib dflags o_files dep_packages = do
 	 ++ map SysTools.Option (
 	    md_c_flags
 	 ++ o_files
-	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.5", "-install_name " ++ (pwd </> output_fn) ]
+	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.5",
+              "-Wl,-read_only_relocs,suppress", "-install_name", instName ]
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ extra_ld_opts

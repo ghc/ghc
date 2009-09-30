@@ -385,6 +385,7 @@ data DynFlags = DynFlags {
 
   -- paths etc.
   objectDir             :: Maybe String,
+  dylibInstallName      :: Maybe String,
   hiDir                 :: Maybe String,
   stubDir               :: Maybe String,
 
@@ -630,6 +631,7 @@ defaultDynFlags =
         thisPackage             = mainPackageId,
 
         objectDir               = Nothing,
+        dylibInstallName        = Nothing,
         hiDir                   = Nothing,
         stubDir                 = Nothing,
 
@@ -771,7 +773,7 @@ getVerbFlag dflags
   | verbosity dflags >= 3  = "-v"
   | otherwise =  ""
 
-setObjectDir, setHiDir, setStubDir, setOutputDir,
+setObjectDir, setHiDir, setStubDir, setOutputDir, setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, setPgmL, setPgmF, setPgmc, setPgmm, setPgms, setPgma, setPgml, setPgmdll, setPgmwindres,
          addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres,
@@ -786,6 +788,7 @@ setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling with -fvia-C.
 setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
+setDylibInstallName  f d = d{ dylibInstallName = Just f}
 
 setObjectSuf  f d = d{ objectSuf  = f}
 setHiSuf      f d = d{ hiSuf      = f}
@@ -1324,6 +1327,7 @@ dynamic_flags = [
          Supported
   , Flag "dynload"        (HasArg (upd . parseDynLibLoaderMode))
          Supported
+  , Flag "dylib-install-name" (HasArg (upd . setDylibInstallName)) Supported
 
         ------- Libraries ---------------------------------------------------
   , Flag "L"              (Prefix addLibraryPath ) Supported
