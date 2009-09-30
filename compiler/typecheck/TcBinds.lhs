@@ -7,7 +7,7 @@
 \begin{code}
 module TcBinds ( tcLocalBinds, tcTopBinds, 
                  tcHsBootSigs, tcMonoBinds, tcPolyBinds,
-                 TcPragFun, tcSpecPrag, tcPrags, mkPragFun, 
+                 TcPragFun, tcPrags, mkPragFun, 
                  TcSigInfo(..), TcSigFun, mkTcSigFun,
                  badBootDeclErr ) where
 
@@ -423,21 +423,24 @@ pragSigCtxt prag = hang (ptext (sLit "In the pragma")) 2 (ppr prag)
 tcPrag :: TcId -> Sig Name -> TcM Prag
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
-tcPrag poly_id (SpecSig _ hs_ty inl) = tcSpecPrag poly_id hs_ty inl
-tcPrag poly_id (SpecInstSig hs_ty)   = tcSpecPrag poly_id hs_ty defaultInlineSpec
-tcPrag _       (InlineSig _ inl)     = return (InlinePrag inl)
-tcPrag _       sig	             = pprPanic "tcPrag" (ppr sig)
-
-
-tcSpecPrag :: TcId -> LHsType Name -> InlineSpec -> TcM Prag
-tcSpecPrag poly_id hs_ty inl
+-- Most of the work of specialisation is done by 
+-- the desugarer, guided by the SpecPrag
+tcPrag poly_id (SpecSig _ hs_ty inl) 
   = do  { let name = idName poly_id
         ; spec_ty <- tcHsSigType (FunSigCtxt name) hs_ty
         ; co_fn <- tcSubExp (SpecPragOrigin name) (idType poly_id) spec_ty
         ; return (SpecPrag (mkHsWrap co_fn (HsVar poly_id)) spec_ty inl) }
-        -- Most of the work of specialisation is done by 
-        -- the desugarer, guided by the SpecPrag
-  
+tcPrag poly_id (SpecInstSig hs_ty)
+  = do  { let name = idName poly_id
+        ; (tyvars, theta, tau) <- tcHsInstHead hs_ty	
+        ; let spec_ty = mkSigmaTy tyvars theta tau
+        ; co_fn <- tcSubExp (SpecPragOrigin name) (idType poly_id) spec_ty
+        ; return (SpecPrag (mkHsWrap co_fn (HsVar poly_id)) spec_ty defaultInlineSpec) }
+
+tcPrag _  (InlineSig _ inl) = return (InlinePrag inl)
+tcPrag _  sig	            = pprPanic "tcPrag" (ppr sig)
+
+
 --------------
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise 

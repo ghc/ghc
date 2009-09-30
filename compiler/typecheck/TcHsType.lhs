@@ -159,10 +159,26 @@ tcHsSigTypeNC ctxt hs_ty
 tcHsInstHead :: LHsType Name -> TcM ([TyVar], ThetaType, Type)
 -- Typecheck an instance head.  We can't use 
 -- tcHsSigType, because it's not a valid user type.
-tcHsInstHead hs_ty
-  = do	{ kinded_ty <- kcHsSigType hs_ty
-	; poly_ty   <- tcHsKindedType kinded_ty
-	; return (tcSplitSigmaTy poly_ty) }
+tcHsInstHead (L loc ty)
+  = setSrcSpan loc   $	-- No need for an "In the type..." context
+    tc_inst_head ty     -- because that comes from the caller
+  where
+    -- tc_inst_head expects HsPredTy, which isn't usually even allowed
+    tc_inst_head (HsPredTy pred)
+      = do { pred'  <- kcHsPred pred
+    	   ; pred'' <- dsHsPred pred'
+           ; return ([], [], mkPredTy pred'') }
+
+    tc_inst_head (HsForAllTy _ tvs ctxt (L _ (HsPredTy pred)))
+      = kcHsTyVars tvs    $ \ tvs' ->
+    	do { ctxt' <- kcHsContext ctxt
+    	   ; pred' <- kcHsPred    pred
+    	   ; tcTyVarBndrs tvs'  $ \ tvs'' ->
+    	do { ctxt'' <- mapM dsHsLPred (unLoc ctxt')
+    	   ; pred'' <- dsHsPred pred'
+    	   ; return (tvs'', ctxt'', mkPredTy pred'') } }
+
+    tc_inst_head _ = failWithTc (ptext (sLit "Malformed instance type"))
 
 tcHsQuantifiedType :: [LHsTyVarBndr Name] -> LHsType Name -> TcM ([TyVar], Type)
 -- Behave very like type-checking (HsForAllTy sig_tvs hs_ty),
@@ -283,11 +299,6 @@ kc_check_hs_type ty@(HsAppTy ty1 ty2) exp_kind
        ; arg_tys' <- kcCheckApps fun_ty fun_kind arg_tys ty exp_kind
        ; return (mkHsAppTys fun_ty' arg_tys') }
 
-kc_check_hs_type ty@(HsPredTy (HsClassP cls tys)) exp_kind
-  = do { cls_kind <- kcClass cls
-       ; tys' <- kcCheckApps cls cls_kind tys ty exp_kind
-       ; return (HsPredTy (HsClassP cls tys')) }
-
 -- This is the general case: infer the kind and compare
 kc_check_hs_type ty exp_kind
   = do	{ (ty', act_kind) <- kc_hs_type ty
@@ -306,7 +317,6 @@ kc_check_hs_type ty exp_kind
     strip (HsBangTy _ (L _ ty))       = strip ty
     strip (HsForAllTy _ _ _ (L _ ty)) = strip ty
     strip ty			      = ty
-
 \end{code}
 
 	Here comes the main function
@@ -381,12 +391,8 @@ kc_hs_type (HsAppTy ty1 ty2) = do
   where
     (fun_ty, arg_tys) = splitHsAppTys ty1 ty2
 
-kc_hs_type (HsPredTy (HsEqualP _ _))
-  = wrongEqualityErr
-
-kc_hs_type (HsPredTy pred) = do
-    pred' <- kcHsPred pred
-    return (HsPredTy pred', liftedTypeKind)
+kc_hs_type (HsPredTy pred)
+  = wrongPredErr pred
 
 kc_hs_type (HsForAllTy exp tv_names context ty)
   = kcHsTyVars tv_names         $ \ tv_names' ->
@@ -1080,8 +1086,7 @@ dupInScope n n' _
        2 (vcat [ptext (sLit "are bound to the same type (variable)"),
 		ptext (sLit "Distinct scoped type variables must be distinct")])
 
-wrongEqualityErr :: TcM (HsType Name, TcKind)
-wrongEqualityErr
-  = failWithTc (text "Equality predicate used as a type")
+wrongPredErr :: HsPred Name -> TcM (HsType Name, TcKind)
+wrongPredErr pred = failWithTc (text "Predicate used as a type:" <+> ppr pred)
 \end{code}
 

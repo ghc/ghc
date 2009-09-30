@@ -1078,11 +1078,13 @@ checkValidType ctxt ty = do
 	              ThBrackCtxt | unboxed -> UT_Ok
 	              _                     -> UT_NotOk
 
-	-- Check that the thing has kind Type, and is lifted if necessary
-    checkTc kind_ok (kindErr actual_kind)
-
 	-- Check the internal validity of the type itself
     check_type rank ubx_tup ty
+
+	-- Check that the thing has kind Type, and is lifted if necessary
+	-- Do this second, becuase we can't usefully take the kind of an 
+	-- ill-formed type such as (a~Int)
+    checkTc kind_ok (kindErr actual_kind)
 
     traceTc (text "checkValidType done" <+> ppr ty)
 
@@ -1138,15 +1140,12 @@ check_type rank ubx_tup ty
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
    
--- Naked PredTys don't usually show up, but they can as a result of
---	{-# SPECIALISE instance Ord Char #-}
--- The Right Thing would be to fix the way that SPECIALISE instance pragmas
--- are handled, but the quick thing is just to permit PredTys here.
-check_type _ _ (PredTy sty)
-  = do	{ dflags <- getDOpts
-	; check_pred_ty dflags TypeCtxt sty }
+-- Naked PredTys should, I think, have been rejected before now
+check_type _ _ ty@(PredTy {})
+  = failWithTc (text "Predicate used as a type:" <+> ppr ty)
 
 check_type _ _ (TyVarTy _) = return ()
+
 check_type rank _ (FunTy arg_ty res_ty)
   = do	{ check_type (decRank rank) UT_NotOk arg_ty
 	; check_type rank 	    UT_Ok    res_ty }
