@@ -981,7 +981,7 @@ context :: { LHsContext RdrName }
 
 type :: { LHsType RdrName }
         : btype                         { $1 }
-        | btype qtyconop type        { LL $ HsOpTy $1 $2 $3 }
+        | btype qtyconop type           { LL $ HsOpTy $1 $2 $3 }
         | btype tyvarop  type     	{ LL $ HsOpTy $1 $2 $3 }
  	| btype '->'     ctype		{ LL $ HsFunTy $1 $3 }
         | btype '~'      btype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
