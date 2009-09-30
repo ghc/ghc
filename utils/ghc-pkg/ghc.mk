@@ -53,6 +53,7 @@ utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
 	       -Wall -fno-warn-unused-imports \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
+	       -DBOOTSTRAPPING \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
                -iutils/ghc-pkg \

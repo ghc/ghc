@@ -73,7 +73,7 @@ import System.Process(runInteractiveCommand)
 import qualified System.Info(os)
 #endif
 
-#if !defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 611
+#if !defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 611 && !defined(BOOTSTRAPPING)
 import System.Console.Terminfo as Terminfo
 #endif
 
@@ -845,7 +845,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 
   if simple_output then show_simple stack else do
 
-#if defined(mingw32_HOST_OS) || __GLASGOW_HASKELL__ < 611
+#if defined(mingw32_HOST_OS) || __GLASGOW_HASKELL__ < 611 || defined(BOOTSTRAPPING)
   mapM_ show_normal stack
 #else
   let
