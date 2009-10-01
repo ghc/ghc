@@ -1866,6 +1866,15 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-dylib-install-name</option> <replaceable>path</replaceable></entry>
+	      <entry>Set the install name (via <literal>-install_name</literal> passed to Apple's
+              linker), specifying the full install path of the library file. Any libraries
+              or executables that link with it later will pick up that path as their
+              runtime search location for it. (Darwin/MacOS X only)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>

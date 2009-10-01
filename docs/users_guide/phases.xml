@@ -1072,6 +1072,24 @@ $ cat foo.hspp</screen>
             library entirely.</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-dylib-install-name <replaceable>path</replaceable></option>
+          <indexterm><primary><option>-dylib-install-name</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>On Darwin/MacOS X, dynamic libraries are stamped at build time with an
+              "install name", which is the ultimate install path of the library file.
+              Any libraries or executables that subsequently link against it will pick
+              up that path as their runtime search location for it. By default, ghc sets
+              the install name to the location where the library is built. This option
+              allows you to override it with the specified file path. (It passes
+              <literal>-install_name</literal> to Apple's linker.) Ignored on other
+              platforms.</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 

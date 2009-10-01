@@ -242,6 +242,19 @@ ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
       Similarly it would be possible to use a subdirectory relative to the
       executable e.g. <literal>-optl-Wl,-rpath,'$ORIGIN/lib'</literal>.
     </para>
+    <para>
+      The standard assumption on Darwin/MacOS X is that dynamic libraries will
+      be stamped at build time with an "install name", which is the full
+      ultimate install path of the library file. Any libraries or executables
+      that subsequently link against it (even if it hasn't been installed yet)
+      will pick up that path as their runtime search location for it. When
+      compiling with ghc directly, the install name is set by default to the
+      location where it is built. You can override this with the
+      <literal>-dylib-install-name</literal> option (which passes
+      <literal>-install_name</literal> to the Apple linker). Cabal does this
+      for you. It automatically sets the install name for dynamic libraries to
+      the absolute path of the ultimate install location.
+    </para>
   </sect2>
 
 </sect1>
