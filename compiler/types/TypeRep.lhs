@@ -431,7 +431,13 @@ pprTypeApp tc tys = ppr_type_app TopPrec (getName tc) tys
 pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
-pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext (sLit "~")), ppr ty2]
+pprPred (EqPred ty1 ty2) = sep [ ppr_type FunPrec ty1
+                               , nest 2 (ptext (sLit "~"))
+                               , ppr_type FunPrec ty2]
+			       -- Precedence looks like (->) so that we get
+			       --    Maybe a ~ Bool
+			       --    (a->a) ~ Bool
+			       -- Note parens on the latter!
 
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = ppr_type_app TopPrec (getName clas) tys
