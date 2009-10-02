@@ -5999,6 +5999,21 @@ pattern binding must have the same context.  For example, this is fine:
 </para>
 </sect2>
 
+<sect2 id="mono-local-binds">
+<title>Monomorphic local bindings</title>
+<para>
+We are actively thinking of simplifying GHC's type system, by <emphasis>not generalising local bindings</emphasis>.
+The rationale is described in the paper 
+<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">Let should not be generalised</ulink>.
+</para>
+<para>
+The experimental new behaviour is enabled by the flag <option>-XMonoLocalBinds</option>.  The effect is
+that local (that is, non-top-level) bindings without a type signature are not generalised at all.  You can
+think of it as an extreme (but much more predictable) version of the Monomorphism Restriction.
+If you supply a type signature, then the flag has no effect.
+</para>
+</sect2>
+
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
   

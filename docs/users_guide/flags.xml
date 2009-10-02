@@ -757,6 +757,13 @@
 	      <entry><option>-XNoScopedTypeVariables</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XMonoLocalBinds</option></entry>
+	      <entry>Enable <link linkend="mono-local-binds">do not generalise local bindings</link>.
+	      </entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoMonoLocalBinds</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XTemplateHaskell</option></entry>
 	      <entry>Enable <link linkend="template-haskell">Template Haskell</link>. 
 		No longer implied by <option>-fglasgow-exts</option>.</entry>
