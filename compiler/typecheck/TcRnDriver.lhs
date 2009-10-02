@@ -1392,7 +1392,7 @@ tcRnGetInfo :: HscEnv
 	    -> Name
 	    -> IO (Messages, Maybe (TyThing, Fixity, [Instance]))
 
--- Used to implemnent :info in GHCi
+-- Used to implement :info in GHCi
 --
 -- Look up a RdrName and return all the TyThings it might be
 -- A capitalised RdrName is given to us in the DataName namespace,
