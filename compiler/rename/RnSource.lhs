@@ -21,7 +21,7 @@ import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSig
                                 makeMiniFixityEnv)
 import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
 			  lookupTopBndrRn, lookupLocatedTopBndrRn,
-			  lookupOccRn, newLocalBndrsRn, 
+			  lookupOccRn, newLocalBndrsRn, bindLocalNamesFV,
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupRdrNames, mapFvRn
@@ -39,11 +39,11 @@ import NameEnv
 import Outputable
 import Bag
 import FastString
+import Util		( filterOut )
 import SrcLoc
-import DynFlags	( DynFlag(..) )
+import DynFlags	        ( DynFlag(..) )
 import BasicTypes       ( Boxity(..) )
-
-import ListSetOps    (findDupsEq)
+import ListSetOps       ( findDupsEq )
 
 import Control.Monad
 import Data.Maybe
@@ -655,67 +655,45 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			   tcdLName = tycon, tcdTyVars = tyvars, 
 			   tcdTyPats = typatsMaybe, tcdCons = condecls, 
 			   tcdKindSig = sig, tcdDerivs = derivs}
-  | is_vanilla	          -- Normal Haskell data type decl
-  = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
-				-- data type is syntactically illegal 
-    ASSERT( distinctTyVarBndrs tyvars )   -- Tyvars should be distinct	
-    do  { bindTyVarsRn data_doc tyvars                  $ \ tyvars' -> do
-    	{ tycon' <- if isFamInstDecl tydecl
-		    then lookupLocatedOccRn     tycon -- may be imported family
-		    else lookupLocatedTopBndrRn tycon
-	; context' <- rnContext data_doc context
-	; typats' <- rnTyPats data_doc typatsMaybe
-	; condecls' <- rnConDecls (unLoc tycon') condecls
-		-- No need to check for duplicate constructor decls
-		-- since that is done by RnNames.extendGlobalRdrEnvRn
-	; (derivs', deriv_fvs) <- rn_derivs derivs
-	; return (TyData {tcdND = new_or_data, tcdCtxt = context', 
-			   tcdLName = tycon', tcdTyVars = tyvars', 
-			   tcdTyPats = typats', tcdKindSig = Nothing, 
-			   tcdCons = condecls', tcdDerivs = derivs'}, 
-		   delFVs (map hsLTyVarName tyvars')	$
-	     	   extractHsCtxtTyNames context'	`plusFV`
-	     	   plusFVs (map conDeclFVs condecls')   `plusFV`
-	     	   deriv_fvs				`plusFV`
-		   (if isFamInstDecl tydecl
-		   then unitFV (unLoc tycon')	-- type instance => use
-		   else emptyFVs)) 
-        } }
-
-  | otherwise	          -- GADT
   = do	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
-	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
-    	; (tyvars', typats')
+	; checkTc (h98_style || null (unLoc context)) 
+                  (badGadtStupidTheta tycon)
+    	; (tyvars', context', typats', derivs', deriv_fvs)
 		<- bindTyVarsRn data_doc tyvars $ \ tyvars' -> do
+		         	 -- Checks for distinct tyvars
 		   { typats' <- rnTyPats data_doc typatsMaybe
-		   ; return (tyvars', typats') }
+                   ; context' <- rnContext data_doc context
+                   ; (derivs', deriv_fvs) <- rn_derivs derivs
+		   ; return (tyvars', context', typats', derivs', deriv_fvs) }
 		-- For GADTs, the type variables in the declaration 
 		-- do not scope over the constructor signatures
 		-- 	data T a where { T1 :: forall b. b-> b }
 
-	; condecls' <- rnConDecls (unLoc tycon') condecls
+	-- For the constructor declarations, bring into scope the tyvars 
+	-- bound by the header, but *only* in the H98 case
+        ; let tc_tvs_in_scope | h98_style = hsLTyVarNames tyvars'
+                              | otherwise = []
+	; (condecls', con_fvs) <- bindLocalNamesFV tc_tvs_in_scope $
+                                  rnConDecls condecls
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 
-	; (derivs', deriv_fvs) <- rn_derivs derivs
-	; return (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
+	; return (TyData {tcdND = new_or_data, tcdCtxt = context', 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = sig,
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
-	     	   plusFVs (map conDeclFVs condecls') `plusFV` 
-		   deriv_fvs			      `plusFV`
+	     	   con_fvs              `plusFV` 
+		   deriv_fvs		`plusFV`
 		   (if isFamInstDecl tydecl
 		   then unitFV (unLoc tycon')	-- type instance => use
 		   else emptyFVs))
         }
   where
-    is_vanilla = case condecls of	-- Yuk
-		     [] 		   -> True
+    h98_style = case condecls of
 		     L _ (ConDecl { con_res = ResTyH98 }) : _  -> True
-		     _    		   -> False
-
+		     _    		                       -> False
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
 
     rn_derivs Nothing   = return (Nothing, emptyFVs)
@@ -725,8 +703,8 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 -- "type" and "type instance" declarations
 rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
-  = ASSERT( distinctTyVarBndrs tyvars )   -- Tyvars should be distinct	
-    do { bindTyVarsRn syn_doc tyvars                    $ \ tyvars' -> do
+  = do { bindTyVarsRn syn_doc tyvars                    $ \ tyvars' -> do
+         	 -- Checks for distinct tyvars
        { name' <- if isFamInstDecl tydecl
 		  then lookupLocatedOccRn     name -- may be imported family
 		  else lookupLocatedTopBndrRn name
@@ -751,6 +729,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	-- Tyvars scope over superclass context and method signatures
 	; (tyvars', context', fds', ats', ats_fvs, sigs')
 	    <- bindTyVarsRn cls_doc tyvars $ \ tyvars' -> do
+         	 -- Checks for distinct tyvars
 	     { context' <- rnContext cls_doc context
 	     ; fds' <- rnFds cls_doc fds
 	     ; (ats', ats_fvs) <- rnATs ats
@@ -805,13 +784,6 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
     sig_doc  = text "In the signatures for class"  	<+> ppr cname
 
-distinctTyVarBndrs :: [LHsTyVarBndr RdrName] -> Bool
--- The tyvar binders should have distinct names
-distinctTyVarBndrs tvs 
-  = null (findDupsEq eq tvs)
-  where
-    eq (L _ v1) (L _ v2) = hsTyVarName v1 == hsTyVarName v2
-
 badGadtStupidTheta :: Located RdrName -> SDoc
 badGadtStupidTheta _
   = vcat [ptext (sLit "No context is allowed on a GADT-style data declaration"),
@@ -826,38 +798,36 @@ badGadtStupidTheta _
 %*********************************************************
 
 \begin{code}
+rnTyPats :: SDoc -> Maybe [LHsType RdrName] -> RnM (Maybe [LHsType Name])
 -- Although, we are processing type patterns here, all type variables will
 -- already be in scope (they are the same as in the 'tcdTyVars' field of the
 -- type declaration to which these patterns belong)
---
-rnTyPats :: SDoc -> Maybe [LHsType RdrName] -> RnM (Maybe [LHsType Name])
 rnTyPats _   Nothing       = return Nothing
 rnTyPats doc (Just typats) = liftM Just $ rnLHsTypes doc typats
 
-rnConDecls :: Name -> [LConDecl RdrName] -> RnM [LConDecl Name]
-rnConDecls _tycon condecls
-  = mapM (wrapLocM rnConDecl) condecls
+rnConDecls :: [LConDecl RdrName] -> RnM ([LConDecl Name], FreeVars)
+rnConDecls condecls
+  = do { condecls' <- mapM (wrapLocM rnConDecl) condecls
+       ; return (condecls', plusFVs (map conDeclFVs condecls')) }
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
 rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
-                   	, con_cxt = cxt, con_details = details
-                   	, con_res = res_ty, con_doc = mb_doc
-                   	, con_old_rec = old_rec, con_explicit = expl })
+                   	       , con_cxt = cxt, con_details = details
+                   	       , con_res = res_ty, con_doc = mb_doc
+                   	       , con_old_rec = old_rec, con_explicit = expl })
   = do	{ addLocM checkConName name
     	; when old_rec (addWarn (deprecRecSyntax decl))
-
 	; new_name <- lookupLocatedTopBndrRn name
-	; name_env <- getLocalRdrEnv
-	
-	-- For H98 syntax, the tvs are the existential ones
-	-- For GADT syntax, the tvs are all the quantified tyvars
-	-- Hence the 'filter' in the ResTyH98 case only
-	; let not_in_scope  = not . (`elemLocalRdrEnv` name_env) . unLoc
-	      arg_tys       = hsConDeclArgTys details
-	      implicit_tvs  = case res_ty of
-	      	    		ResTyH98     -> filter not_in_scope $
-						get_rdr_tvs arg_tys
-	      	    		ResTyGADT ty -> get_rdr_tvs (ty : arg_tys)
+
+    	   -- For H98 syntax, the tvs are the existential ones
+	   -- For GADT syntax, the tvs are all the quantified tyvars
+	   -- Hence the 'filter' in the ResTyH98 case only
+        ; rdr_env <- getLocalRdrEnv
+        ; let in_scope     = (`elemLocalRdrEnv` rdr_env) . unLoc
+	      arg_tys      = hsConDeclArgTys details
+	      implicit_tvs = case res_ty of
+	      	    	       ResTyH98 -> filterOut in_scope (get_rdr_tvs arg_tys)
+	      	    	       ResTyGADT ty -> get_rdr_tvs (ty : arg_tys)
 	      new_tvs = case expl of
 	        	  Explicit -> tvs
 		    	  Implicit -> userHsTyVarBndrs implicit_tvs
