@@ -51,7 +51,7 @@ install : install_driver_ghcii
 install_driver_ghcii: GHCII_SCRIPT=$(DESTDIR)$(bindir)/ghcii.sh
 install_driver_ghcii: GHCII_SCRIPT_VERSIONED = $(DESTDIR)$(bindir)/ghcii-$(ProjectVersion).sh
 install_driver_ghcii:
-	"$(MKDIRHIER)" $(DESTDIR)$(bindir)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	"$(RM)" $(RM_OPTS) $(GHCII_SCRIPT)
 	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)
 	echo 'exec "$$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
