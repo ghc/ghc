@@ -83,6 +83,11 @@
 
 .PHONY: default all haddock
 
+# We need second expansion for the way we handle directories, so that
+#     | $$$$(dir $$$$@)/.
+# expands to the directoy of a rule that uses a % pattern.
+.SECONDEXPANSION:
+
 default : all
 
 # Catch make if it runs away into an infinite loop
@@ -398,6 +403,12 @@ rts/package.conf.inplace : libffi/package.conf.inplace
 endif
 
 # -----------------------------------------------------------------------------
+# Directories
+
+%/. : $(MKDIRHIER)
+	"$(MKDIRHIER)" $@
+
+# -----------------------------------------------------------------------------
 # Special magic for the ghc-prim package
 
 # We want the ghc-prim package to include the GHC.Prim module when it
@@ -417,8 +428,7 @@ endef
 
 PRIMOPS_TXT = $(GHC_COMPILER_DIR)/prelude/primops.txt
 
-libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT)
-	"$(MKDIRHIER)" $(dir $@)
+libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT) | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers <$(PRIMOPS_TXT) >$@
 
 libraries/ghc-prim/GHC/Prim.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT)
@@ -702,13 +712,13 @@ libraries/ghc-prim/dist-install/doc/html/ghc-prim/ghc-prim.haddock: \
     libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
-                            $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) $(MKDIRHIER)
-	"$(MKDIRHIER)" $(dir $@)
+                            $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
+                          | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-source < $< > $@
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
-                            $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) $(MKDIRHIER)
-	"$(MKDIRHIER)" $(dir $@)
+                            $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
+                          | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers < $< > $@
 
 # -----------------------------------------------------------------------------

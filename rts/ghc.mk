@@ -62,11 +62,9 @@ rts_AUTO_APPLY_CMM = rts/dist/build/AutoApply.cmm
 $(rts_AUTO_APPLY_CMM): $(GENAPPLY_INPLACE)
 	"$(GENAPPLY_INPLACE)" >$@
 
-rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c
-	"$(MKDIRHIER)" $(dir $@)
+rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c | $$(dir $$@)/.
 	cp $< $@
-rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c
-	"$(MKDIRHIER)" $(dir $@)
+rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
 	cp $< $@
 
 rts_H_FILES = $(wildcard includes/*.h) $(wildcard rts/*.h)

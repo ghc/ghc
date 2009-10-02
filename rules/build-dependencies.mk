@@ -21,8 +21,7 @@ endif
 
 ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
 
-$$($1_$2_depfile) : $$(MKDIRHIER) $$(MKDEPENDC) $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) $$($1_$2_C_FILES) $$($1_$2_S_FILES)
-	"$$(MKDIRHIER)" $1/$2/build
+$$($1_$2_depfile) : $$(MKDEPENDC) $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) $$($1_$2_C_FILES) $$($1_$2_S_FILES) | $$$$(dir $$$$@)/.
 	"$$(RM)" $$(RM_OPTS) $$@.tmp
 	touch $$@.tmp
 ifneq "$$($1_$2_C_SRCS)$$($1_$2_S_SRCS)" ""

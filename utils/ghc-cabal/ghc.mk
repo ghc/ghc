@@ -18,13 +18,10 @@ CABAL_DOTTED_VERSION := $(shell grep "^Version:" libraries/Cabal/Cabal.cabal | s
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
-$(GHC_CABAL_INPLACE) : $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext)
-	"$(MKDIRHIER)" $(dir $@)
+$(GHC_CABAL_INPLACE) : $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
-$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/ghc-cabal.hs $(MKDIRHIER)
-	"$(MKDIRHIER)" bootstrapping
-	"$(MKDIRHIER)" $(dir $@)
+$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/ghc-cabal.hs | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) --make $(GHC_CABAL_DIR)/ghc-cabal.hs -o $@ \
 	       -Wall $(WERROR) \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
@@ -54,8 +51,7 @@ $(GHC_CABAL_DIR)_dist-dummy-ghc_MODULES = dummy-ghc
 $(GHC_CABAL_DIR)_dist-dummy-ghc_PROG    = dummy-ghc$(exeext)
 
 # depend on project.mk, so we pick up the new version number if it changes.
-$(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk $(MKDIRHIER) mk/project.mk
-	"$(MKDIRHIER)" $(dir $@)
+$(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk mk/project.mk | $$(dir $$@)/.
 	echo "import System.Environment; import System.Cmd; import System.Exit" >$@
 	echo "main :: IO ()" >>$@
 	echo "main = do args <- getArgs; if args == [\"--numeric-version\"] then putStrLn \"$(ProjectVersion)\" else do e <- rawSystem \"$(GHC_STAGE0)\" args; exitWith e" >>$@

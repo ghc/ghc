@@ -20,8 +20,7 @@ define c-suffix-rules
 # UseGhcForCc is only relevant when not booting from HC files.
 ifeq "$4 $$(BootingFromHc)" "YES NO"
 
-$1/$2/build/%.$$($3_osuf) : $1/%.c $$(MKDIRHIER) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_osuf) : $1/%.c $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.c $$($1_$2_HC_DEP)
@@ -30,8 +29,7 @@ $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.c $$($1_$2_HC_DEP)
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_way_)s $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/%.S $$(MKDIRHIER) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_osuf) : $1/%.S $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.c $$($1_$2_HC_DEP)
@@ -42,8 +40,7 @@ $1/$2/build/%.$$($3_way_)s : $1/%.c $$($1_$2_HC_DEP)
 
 else
 
-$1/$2/build/%.$$($3_osuf) : $1/%.c $$(MKDIRHIER)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_osuf) : $1/%.c | $$$$(dir $$$$@)/.
 	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.c
@@ -52,8 +49,7 @@ $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.c
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_way_)s
 	"$$(AS)" $$($1_$2_$3_ALL_AS_OPTS) -o $$@ $$<
 
-$1/$2/build/%.$$($3_osuf) : $1/%.S $$(MKDIRHIER)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_osuf) : $1/%.S | $$$$(dir $$$$@)/.
 	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -c $$< -o $$@
 
 $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.c

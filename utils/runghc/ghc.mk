@@ -18,8 +18,7 @@ utils/runghc_dist_INSTALL_SHELL_WRAPPER = YES
 
 ifneq "$(BINDIST)" "YES"
 # hack: the build system has trouble with Main modules not called Main.hs
-utils/runghc/dist/build/Main.hs : utils/runghc/runghc.hs $(MKDIRHIER)
-	"$(MKDIRHIER)" $(dir $@)
+utils/runghc/dist/build/Main.hs : utils/runghc/runghc.hs | $$(dir $$@)/.
 	"$(CP)" $< $@
 endif
 

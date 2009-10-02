@@ -18,20 +18,16 @@ define hs-suffix-rules-srcdir
 
 ifneq "$$(BootingFromHc)" "YES"
 
-$1/$2/build/%.hs : $1/$4/%.ly $$(MKDIRHIER)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.hs : $1/$4/%.ly | $$$$(dir $$$$@)/.
 	"$$(HAPPY)" $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
 
-$1/$2/build/%.hs : $1/$4/%.y $$(MKDIRHIER)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.hs : $1/$4/%.y | $$$$(dir $$$$@)/.
 	"$$(HAPPY)" $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
 
-$1/$2/build/%.hs : $1/$4/%.x $$(MKDIRHIER)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.hs : $1/$4/%.x | $$$$(dir $$$$@)/.
 	"$$(ALEX)" $$($1_$2_$3_ALL_ALEX_OPTS) $$< -o $$@
 
-$1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$4/%.hsc $$(HSC2HS_INPLACE)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$4/%.hsc $$(HSC2HS_INPLACE) | $$$$(dir $$$$@)/.
 	"$$(HSC2HS_INPLACE)" $$($1_$2_$3_ALL_HSC2HS_OPTS) $$< -o $$@
 
 # Compiling Haskell source
@@ -53,8 +49,7 @@ endif
 # XXX: for some reason these get used in preference to the direct
 # .hs->.o rule, I don't know why --SDM
 
-$1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h $$(MKDIRHIER)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h | $$$$(dir $$$$@)/.
 	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
 
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghcplatform.h

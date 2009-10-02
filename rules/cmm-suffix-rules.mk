@@ -22,28 +22,22 @@ ifneq "$$(CLEANING)" "YES"
 
 ifneq "$$(BootingFromHc)" "YES"
 
-$1/$2/build/%.$$($3_way_)o : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_way_)o : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)o : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_way_)o : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)hc : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_way_)hc : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -C $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)hc : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_way_)hc : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -C $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)s : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_way_)s : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP)
-	"$$(MKDIRHIER)" $$(dir $$@)
+$1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
 
 endif

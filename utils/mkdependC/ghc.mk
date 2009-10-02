@@ -10,8 +10,7 @@
 #
 # -----------------------------------------------------------------------------
 
-$(MKDEPENDC) : utils/mkdependC/mkdependC.prl $(MKDIRHIER)
-	"$(MKDIRHIER)" $(dir $@)
+$(MKDEPENDC) : utils/mkdependC/mkdependC.prl | $$(dir $$@)/.
 	"$(RM)" $(RM_OPTS) $@
 	echo '#!$(PERL)'                               >> $@
 	echo '$$DEFAULT_TMPDIR = "$(DEFAULT_TMPDIR)";' >> $@
