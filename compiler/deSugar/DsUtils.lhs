@@ -419,7 +419,7 @@ But that is bad for two reasons:
 Seq is very, very special!  So we recognise it right here, and desugar to
         case x of _ -> case y of _ -> (# x,y #)
 
-Note [Desugaring seq (2)]  cf Trac #2231
+Note [Desugaring seq (2)]  cf Trac #2273
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    let chp = case b of { True -> fst x; False -> 0 }
@@ -447,10 +447,14 @@ should have said explicitly
 
 But that's painful.  So the code here does a little hack to make seq
 more robust: a saturated application of 'seq' is turned *directly* into
-the case expression. So we desugar to:
+the case expression, thus:
+   x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
+   e1 `seq` e2 ==> case x of _ -> e2
+
+So we desugar our example to:
    let chp = case b of { True -> fst x; False -> 0 }
    case chp of chp { I# -> ...chp... }
-Notice the shadowing of the case binder! And now all is well.
+And now all is well.
 
 The reason it's a hack is because if you define mySeq=seq, the hack
 won't work on mySeq.  
