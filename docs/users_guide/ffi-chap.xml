@@ -64,7 +64,7 @@ OK:
 </para>
       </sect2>
 
-      <sect2>
+      <sect2 id="ffi-prim">
         <title>Primitive imports</title>
 	<para>
 	  GHC extends the FFI with an additional calling convention
