@@ -4,7 +4,7 @@
 -- !!! Test generics
 module Main where
 
-import Data.Generics
+import GHC.Base
 
 class Bin a where
   toBin   :: a -> [Int]
