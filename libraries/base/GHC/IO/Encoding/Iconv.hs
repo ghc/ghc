@@ -129,10 +129,10 @@ foreign import ccall unsafe "localeEncoding"
 haskellChar :: String
 #ifdef WORDS_BIGENDIAN
 haskellChar | charSize == 2 = "UTF16BE"
-            | otherwise     = "UCS-4"
+            | otherwise     = "UTF32BE"
 #else
 haskellChar | charSize == 2 = "UTF16LE"
-            | otherwise     = "UCS-4LE"
+            | otherwise     = "UTF32LE"
 #endif
 
 char_shift :: Int
