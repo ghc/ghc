@@ -34,11 +34,19 @@ $1/$2/build/%.$$($3_way_)hc : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(d
 $1/$2/build/%.$$($3_way_)hc : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -C $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)s : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
-
-$1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
-	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
+# XXX
+# When we started using "| $$$$(dir $$$$@)/." for directory deps, these
+# rules started getting used when object splitting is enabled for some
+# reason. But they fail with
+#   **splitmangle**: openBinaryFile: does not exist (No such file or directory)
+# so for now they're commented out. They aren't needed, as we can always
+# go directly to .o files.
+#
+# $1/$2/build/%.$$($3_way_)s : $1/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
+# 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
+#
+# $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.cmm $$(rts_H_FILES) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
+# 	"$$($1_$2_HC)" $$($1_$2_$3_MOST_HC_OPTS) -S $$< -o $$@
 
 endif
 
