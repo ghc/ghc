@@ -386,36 +386,27 @@ Debugging/specialising versions of \tr{elem} and \tr{notElem}
 isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
 
 # ifndef DEBUG
-isIn    _msg x ys = elem__    x ys
-isn'tIn _msg x ys = notElem__ x ys
-
---these are here to be SPECIALIZEd (automagically)
-elem__ :: Eq a => a -> [a] -> Bool
-elem__ _ []     = False
-elem__ x (y:ys) = x == y || elem__ x ys
-
-notElem__ :: Eq a => a -> [a] -> Bool
-notElem__ _ []     = True
-notElem__ x (y:ys) = x /= y && notElem__ x ys
+isIn    _msg x ys = x `elem` ys
+isn'tIn _msg x ys = x `notElem` ys
 
 # else /* DEBUG */
 isIn msg x ys
-  = elem (_ILIT(0)) x ys
+  = elem100 (_ILIT(0)) x ys
   where
-    elem _ _ []        = False
-    elem i x (y:ys)
+    elem100 _ _ []        = False
+    elem100 i x (y:ys)
       | i ># _ILIT(100) = trace ("Over-long elem in " ++ msg)
-                                (x `List.elem` (y:ys))
-      | otherwise       = x == y || elem (i +# _ILIT(1)) x ys
+                                (x `elem` (y:ys))
+      | otherwise       = x == y || elem100 (i +# _ILIT(1)) x ys
 
 isn'tIn msg x ys
-  = notElem (_ILIT(0)) x ys
+  = notElem100 (_ILIT(0)) x ys
   where
-    notElem _ _ [] =  True
-    notElem i x (y:ys)
+    notElem100 _ _ [] =  True
+    notElem100 i x (y:ys)
       | i ># _ILIT(100) = trace ("Over-long notElem in " ++ msg)
-                                (x `List.notElem` (y:ys))
-      | otherwise      =  x /= y && notElem (i +# _ILIT(1)) x ys
+                                (x `notElem` (y:ys))
+      | otherwise      =  x /= y && notElem100 (i +# _ILIT(1)) x ys
 # endif /* DEBUG */
 \end{code}
 
