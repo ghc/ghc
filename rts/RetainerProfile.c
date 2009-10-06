@@ -1278,9 +1278,9 @@ retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
 
   while (bitmap != 0) {
       if ((bitmap & 1) != 0) {
-#ifdef ENABLE_WIN32_DLL_SUPPORT
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
 	  if ( (unsigned long)(*srt) & 0x1 ) {
-	      retainClosure(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)), 
+	      retainClosure(* (StgClosure**) ((unsigned long) (*srt) & ~0x1), 
 			    c, c_child_r);
 	  } else {
 	      retainClosure(*srt,c,c_child_r);
