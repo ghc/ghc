@@ -128,11 +128,11 @@ foreign import ccall unsafe "localeEncoding"
 
 haskellChar :: String
 #ifdef WORDS_BIGENDIAN
-haskellChar | charSize == 2 = "UTF16BE"
-            | otherwise     = "UTF32BE"
+haskellChar | charSize == 2 = "UTF-16BE"
+            | otherwise     = "UTF-32BE"
 #else
-haskellChar | charSize == 2 = "UTF16LE"
-            | otherwise     = "UTF32LE"
+haskellChar | charSize == 2 = "UTF-16LE"
+            | otherwise     = "UTF-32LE"
 #endif
 
 char_shift :: Int
