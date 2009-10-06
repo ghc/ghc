@@ -51,10 +51,34 @@ $(GHC_CABAL_DIR)_dist-dummy-ghc_MODULES = dummy-ghc
 $(GHC_CABAL_DIR)_dist-dummy-ghc_PROG    = dummy-ghc$(exeext)
 
 # depend on project.mk, so we pick up the new version number if it changes.
-$(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk mk/project.mk | $$(dir $$@)/.
-	echo "import System.Environment; import System.Cmd; import System.Exit" >$@
-	echo "main :: IO ()" >>$@
-	echo "main = do args <- getArgs; if args == [\"--numeric-version\"] then putStrLn \"$(ProjectVersion)\" else do e <- rawSystem \"$(GHC_STAGE0)\" args; exitWith e" >>$@
+$(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk $(MKDIRHIER) mk/project.mk compiler/main/DynFlags.hs
+	"$(MKDIRHIER)" $(dir $@)
+	"$(RM)" $(RM_OPTS) $@
+	echo 'import System.Environment'                                  >> $@
+	echo 'import System.Cmd'                                          >> $@
+	echo 'import System.Exit'                                         >> $@
+	echo 'main :: IO ()'                                              >> $@
+	echo 'main = do args <- getArgs'                                  >> $@
+	echo '          case args of'                                     >> $@
+	echo '              ["--numeric-version"] ->'                     >> $@
+	echo '                  putStrLn "$(ProjectVersion)"'             >> $@
+	echo '              ["--supported-languages"] ->'                 >> $@
+	echo '                  mapM_ putStrLn extensions'                >> $@
+	echo '              _ ->'                                         >> $@
+	echo '                  do e <- rawSystem "$(GHC_STAGE0)" args'   >> $@
+	echo '                     exitWith e'                            >> $@
+# This unpleasant sed script grabs the lines between the
+# 	xFlags ::
+# line and the
+#   ]
+# line of compiler/main/DynFlags.hs, and if they look like
+#   ( "PostfixOperators", ...
+# then it translates them into
+#   ["PostfixOperators"] ++
+	echo 'extensions :: [String]'                                     >> $@
+	echo 'extensions ='                                               >> $@
+	sed '/^xFlags/,/]/{/^  (/{s/^[^"]*"/  ["/; s/"[^"]*$$/"] ++/; p}}; d' compiler/main/DynFlags.hs >> $@
+	echo '  []'                                                       >> $@
 
 # We don't build dummy-ghc with Cabal, so we need to pass -package
 # flags manually
