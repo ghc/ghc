@@ -58,17 +58,11 @@ void initTracing (void)
     initMutex(&trace_utx);
 #endif
 
-#define TRACE_FLAG(name, class) \
-    class = RtsFlags.TraceFlags.name ? 1 : 0;
-
-    TRACE_FLAG(scheduler, TRACE_sched);
-
 #ifdef DEBUG
 #define DEBUG_FLAG(name, class) \
     class = RtsFlags.DebugFlags.name ? 1 : 0;
 
     DEBUG_FLAG(scheduler,    DEBUG_sched);
-    DEBUG_FLAG(scheduler,    TRACE_sched); // -Ds enabled all sched events
 
     DEBUG_FLAG(interpreter,  DEBUG_interp);
     DEBUG_FLAG(weak,         DEBUG_weak);
@@ -84,6 +78,11 @@ void initTracing (void)
     DEBUG_FLAG(hpc,          DEBUG_hpc);
     DEBUG_FLAG(sparks,       DEBUG_sparks);
 #endif
+
+    // -Ds turns on scheduler tracing too
+    TRACE_sched =
+        RtsFlags.TraceFlags.scheduler ||
+        RtsFlags.DebugFlags.scheduler;
 
     eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG;
 
