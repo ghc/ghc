@@ -39,8 +39,6 @@
 #
 #   * per-source-file dependencies instead of one .depend file?
 #   * eliminate undefined variables, and use --warn-undefined-variables?
-#   * perhaps we should make all the output dirs in the .depend rule, to
-#     avoid all these mkdirhier calls?
 #   * put outputs from different ways in different subdirs of distdir/build,
 #     then we don't have to use -osuf/-hisuf.  We would have to install
 #     them in different places too, so we'd need ghc-pkg support for packages
