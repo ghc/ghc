@@ -890,7 +890,7 @@ showPackageDot verbosity myflags = do
       getPkgDatabases verbosity False True{-use cache-} myflags
 
   let all_pkgs = allPackagesInStack flag_db_stack
-      ipix  = PackageIndex.listToInstalledPackageIndex all_pkgs
+      ipix  = PackageIndex.fromList all_pkgs
 
   putStrLn "digraph {"
   let quote s = '"':s ++ "\""
@@ -898,7 +898,7 @@ showPackageDot verbosity myflags = do
                  | p <- all_pkgs,
                    let from = display (sourcePackageId p),
                    depid <- depends p,
-                   Just dep <- [PackageIndex.lookupInstalledPackage ipix depid],
+                   Just dep <- [PackageIndex.lookupInstalledPackageId ipix depid],
                    let to = display (sourcePackageId dep)
                  ]
   putStrLn "}"

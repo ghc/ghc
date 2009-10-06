@@ -223,15 +223,15 @@ doInstall ghc ghcpkg topdir directory distDir
                 progs' = updateProgram ghcProg
                        $ updateProgram ghcPkgProg progs
             instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
-            let installedPkgs' = PackageIndex.listToInstalledPackageIndex
-                                     instInfos
+            let installedPkgs' = PackageIndex.fromList instInfos
             let mlc = libraryConfig lbi
                 mlc' = case mlc of
                        Just lc ->
-                           let cipds = componentInstalledPackageDeps lc
-                               cipds' = map (fixupPackageId instInfos) cipds
+                           let cipds = componentPackageDeps lc
+                               cipds' = [ (fixupPackageId instInfos ipid, pid)
+                                        | (ipid,pid) <- cipds ]
                            in Just $ lc {
-                                         componentInstalledPackageDeps = cipds'
+                                         componentPackageDeps = cipds'
                                      }
                        Nothing -> Nothing
                 lbi' = lbi {
@@ -335,12 +335,11 @@ generate config_args distdir directory
           -- stricter than gnu ld). Thus we remove the ldOptions for
           -- GHC's rts package:
           hackRtsPackage index =
-            case PackageIndex.lookupInstalledPackageByName index (PackageName "rts") of
-              [rts] -> PackageIndex.addToInstalledPackageIndex rts { Installed.ldOptions = [] } index
+            case PackageIndex.lookupPackageName index (PackageName "rts") of
+              [(_,[rts])] -> PackageIndex.insert rts{ Installed.ldOptions = [] } index
               _ -> error "No (or multiple) ghc rts package is registered!!"
 
-          dep_ids = map (packageId.getLocalPackageInfo lbi) $
-                       externalPackageDeps lbi
+          dep_ids = map snd (externalPackageDeps lbi)
 
       let variablePrefix = directory ++ '_':distdir
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
