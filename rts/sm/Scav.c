@@ -261,7 +261,7 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 	  // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
 	  // closure that's fixed at link-time, and no extra magic is required.
 	  if ( (unsigned long)(*srt) & 0x1 ) {
-	      evacuate(stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
+	      evacuate( (StgClosure**) ((unsigned long) (*srt) & ~0x1));
 	  } else {
 	      evacuate(p);
 	  }
