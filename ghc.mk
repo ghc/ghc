@@ -405,6 +405,9 @@ endif
 # -----------------------------------------------------------------------------
 # Directories
 
+# Don't try to delete directories:
+.PRECIOUS: %/.
+
 %/. : $(MKDIRHIER)
 	"$(MKDIRHIER)" $@
 
