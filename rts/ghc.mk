@@ -307,13 +307,14 @@ endif
 # a different set of dependencies for each way.  Further hack: PROFILING and
 # TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
 rts_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
+rts_MKDEPENDC_OPTS += -Irts/sm
 
 rts_WAYS_DASHED = $(subst $(space),,$(patsubst %,-%,$(strip $(rts_WAYS))))
 rts_dist_depfile = rts/dist/build/.depend$(rts_WAYS_DASHED)
 
-rts_dist_C_SRCS  = $(rts_C_SRCS)
+rts_dist_C_SRCS  = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
 rts_dist_S_SRCS =  $(rts_S_SRCS)
-rts_dist_C_FILES = $(rts_C_SRCS) $(rts_S_SRCS)
+rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 
 $(eval $(call build-dependencies,rts,dist))
 
