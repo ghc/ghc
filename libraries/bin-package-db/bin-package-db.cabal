@@ -17,5 +17,5 @@ Library {
 
     build-depends: base >= 3 && < 5,
                    binary == 0.5.*,
-                   Cabal == 1.7.*
+                   Cabal == 1.8.*
 }
