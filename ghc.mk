@@ -914,7 +914,7 @@ windows-binary-dist-prep:
 	cd bindistprep && "$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-installer:
-	"$(ISCC)" /O. /F$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
+	"$(ISCC)" /O. /Fbindistprep/$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
 
 nTimes = set -e; for i in `seq 1 $(1)`; do echo Try "$$i: $(2)"; if $(2); then break; fi; done
 
