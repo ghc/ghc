@@ -1089,7 +1089,7 @@ unknownNameErr rdr_name
 
 perhapsForallMsg :: SDoc
 perhapsForallMsg 
-  = vcat [ ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
+  = vcat [ ptext (sLit "Perhaps you intended to use -XExplicitForAll or similar flag")
 	 , ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")]
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc

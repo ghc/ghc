@@ -256,6 +256,7 @@ data DynFlag
    | Opt_TypeOperators
    | Opt_PackageImports
    | Opt_NewQualifiedOperators
+   | Opt_ExplicitForAll
 
    | Opt_PrintExplicitForalls
 
@@ -1816,6 +1817,7 @@ xFlags = [
   ( "NPlusKPatterns",                   Opt_NPlusKPatterns, const Supported ),
   -- On by default (which is not strictly H98):
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
+  ( "ExplicitForAll",                   Opt_ExplicitForAll, const Supported ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),
@@ -1847,7 +1849,14 @@ xFlags = [
 
 impliedFlags :: [(DynFlag, DynFlag)]
 impliedFlags
-  = [ (Opt_GADTs,               Opt_RelaxedPolyRec)  -- We want type-sig variables to
+  = [ (Opt_RankNTypes,                Opt_ExplicitForAll)
+    , (Opt_Rank2Types,                Opt_ExplicitForAll)
+    , (Opt_ScopedTypeVariables,       Opt_ExplicitForAll)
+    , (Opt_LiberalTypeSynonyms,       Opt_ExplicitForAll)
+    , (Opt_ExistentialQuantification, Opt_ExplicitForAll)
+    , (Opt_PolymorphicComponents,     Opt_ExplicitForAll)
+
+    , (Opt_GADTs,               Opt_RelaxedPolyRec)  -- We want type-sig variables to
                                                      --      be completely rigid for GADTs
 
     , (Opt_TypeFamilies,        Opt_RelaxedPolyRec)  -- Trac #2944 gives a nice example

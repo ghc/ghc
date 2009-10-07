@@ -1753,26 +1753,21 @@ mkPState buf loc flags  =
     }
     where
       bitmap = genericsBit `setBitIf` dopt Opt_Generics flags
-	       .|. ffiBit       `setBitIf` dopt Opt_ForeignFunctionInterface flags
-	       .|. parrBit      `setBitIf` dopt Opt_PArr         flags
-	       .|. arrowsBit    `setBitIf` dopt Opt_Arrows       flags
-	       .|. thBit        `setBitIf` dopt Opt_TemplateHaskell flags
-	       .|. qqBit        `setBitIf` dopt Opt_QuasiQuotes flags
-	       .|. ipBit        `setBitIf` dopt Opt_ImplicitParams flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_ScopedTypeVariables flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_LiberalTypeSynonyms flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_PolymorphicComponents flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_ExistentialQuantification flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_Rank2Types flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_RankNTypes flags
-	       .|. bangPatBit   `setBitIf` dopt Opt_BangPatterns flags
-	       .|. tyFamBit     `setBitIf` dopt Opt_TypeFamilies flags
-	       .|. haddockBit   `setBitIf` dopt Opt_Haddock      flags
-	       .|. magicHashBit `setBitIf` dopt Opt_MagicHash    flags
-	       .|. kindSigsBit  `setBitIf` dopt Opt_KindSignatures flags
-	       .|. recursiveDoBit `setBitIf` dopt Opt_RecursiveDo flags
-	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
-	       .|. unboxedTuplesBit `setBitIf` dopt Opt_UnboxedTuples flags
+	       .|. ffiBit            `setBitIf` dopt Opt_ForeignFunctionInterface flags
+	       .|. parrBit           `setBitIf` dopt Opt_PArr         flags
+	       .|. arrowsBit         `setBitIf` dopt Opt_Arrows       flags
+	       .|. thBit             `setBitIf` dopt Opt_TemplateHaskell flags
+	       .|. qqBit             `setBitIf` dopt Opt_QuasiQuotes flags
+	       .|. ipBit             `setBitIf` dopt Opt_ImplicitParams flags
+	       .|. explicitForallBit `setBitIf` dopt Opt_ExplicitForAll flags
+	       .|. bangPatBit        `setBitIf` dopt Opt_BangPatterns flags
+	       .|. tyFamBit          `setBitIf` dopt Opt_TypeFamilies flags
+	       .|. haddockBit        `setBitIf` dopt Opt_Haddock      flags
+	       .|. magicHashBit      `setBitIf` dopt Opt_MagicHash    flags
+	       .|. kindSigsBit       `setBitIf` dopt Opt_KindSignatures flags
+	       .|. recursiveDoBit    `setBitIf` dopt Opt_RecursiveDo flags
+	       .|. unicodeSyntaxBit  `setBitIf` dopt Opt_UnicodeSyntax flags
+	       .|. unboxedTuplesBit  `setBitIf` dopt Opt_UnboxedTuples flags
 	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags
                .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags

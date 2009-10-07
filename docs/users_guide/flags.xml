@@ -820,6 +820,19 @@
 	      <entry><option>-XNoNewQualifiedOperators</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XExplicitForALl</option></entry>
+	      <entry>Enable <link linkend="explicit-foralls">explicit universal quantification</link>.
+              Implied by <option>-XScopedTypeVariables</option>,
+	    <option>-XLiberalTypeSynonyms</option>,
+	    <option>-XRank2Types</option>,
+	    <option>-XRankNTypes</option>,
+	    <option>-XPolymorphicComponents</option>,
+	    <option>-XExistentialQuantification</option>
+              </entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoExplicitForAll</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XPolymorphicComponents</option></entry>
 	      <entry>Enable <link linkend="universal-quantification">polymorphic components for data constructors</link>.</entry>
 	      <entry>dynamic</entry>

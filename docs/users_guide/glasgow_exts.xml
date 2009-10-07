@@ -78,6 +78,7 @@ documentation</ulink> describes all the libraries that come with GHC.
           <option>-XPostfixOperators</option>,
           <option>-XPatternGuards</option>,
           <option>-XLiberalTypeSynonyms</option>,
+          <option>-XExplicitForAll</option>,
           <option>-XRankNTypes</option>,
           <option>-XImpredicativeTypes</option>,
           <option>-XTypeOperators</option>,
@@ -1664,7 +1665,8 @@ The following syntax is stolen:
           <indexterm><primary><literal>forall</literal></primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen (in types) by: <option>-XScopedTypeVariables</option>,
+	Stolen (in types) by: <option>-XExplicitForAll</option>, and hence by
+            <option>-XScopedTypeVariables</option>,
 	    <option>-XLiberalTypeSynonyms</option>,
 	    <option>-XRank2Types</option>,
 	    <option>-XRankNTypes</option>,
@@ -4713,10 +4715,30 @@ might be in another module, or even in a module that is not yet written.
 <sect1 id="other-type-extensions">
 <title>Other type system extensions</title>
 
-<sect2 id="type-restrictions">
-<title>Type signatures</title>
+<sect2 id="explicit-foralls"><title>Explicit universal quantification (forall)</title>
+<para>
+Haskell type signatures are implicitly quantified.  When the language option <option>-XExplicitForAll</option>
+is used, the keyword <literal>forall</literal>
+allows us to say exactly what this means.  For example:
+</para>
+<para>
+<programlisting>
+        g :: b -> b
+</programlisting>
+means this:
+<programlisting>
+        g :: forall b. (b -> b)
+</programlisting>
+The two are treated identically.
+</para>
+<para>
+Of course <literal>forall</literal> becomes a keyword; you can't use <literal>forall</literal> as
+a type variable any more!
+</para>
+</sect2>
 
-<sect3 id="flexible-contexts"><title>The context of a type signature</title>
+
+<sect2 id="flexible-contexts"><title>The context of a type signature</title>
 <para>
 The <option>-XFlexibleContexts</option> flag lifts the Haskell 98 restriction
 that the type-class constraints in a type signature must have the 
@@ -4745,7 +4767,7 @@ Consider the type:
 language omits them; in Haskell 98, all the free type variables of an
 explicit source-language type signature are universally quantified,
 except for the class type variables in a class declaration.  However,
-in GHC, you can give the foralls if you want.  See <xref linkend="universal-quantification"/>).
+in GHC, you can give the foralls if you want.  See <xref linkend="explicit-foralls"/>).
 </para>
 
 <para>
@@ -4833,9 +4855,6 @@ territory free in case we need it later.
 </orderedlist>
 
 </para>
-</sect3>
-
-
 
 </sect2>
 
@@ -5313,22 +5332,7 @@ The parentheses are required.
 </title>
 
 <para>
-Haskell type signatures are implicitly quantified.  The new keyword <literal>forall</literal>
-allows us to say exactly what this means.  For example:
-</para>
-<para>
-<programlisting>
-        g :: b -> b
-</programlisting>
-means this:
-<programlisting>
-        g :: forall b. (b -> b)
-</programlisting>
-The two are treated identically.
-</para>
-
-<para>
-However, GHC's type system supports <emphasis>arbitrary-rank</emphasis> 
+GHC's type system supports <emphasis>arbitrary-rank</emphasis> 
 explicit universal quantification in
 types. 
 For example, all the following types are legal:
@@ -5383,8 +5387,6 @@ field type signatures.</para> </listitem>
 </itemizedlist>
 </para></listitem>
 </itemizedlist>
-Of course <literal>forall</literal> becomes a keyword; you can't use <literal>forall</literal> as
-a type variable any more!
 </para>
 
 
