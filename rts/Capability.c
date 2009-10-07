@@ -84,30 +84,33 @@ findSpark (Capability *cap)
       return 0;
   }
 
-  // first try to get a spark from our own pool.
-  // We should be using reclaimSpark(), because it works without
-  // needing any atomic instructions:
-  //   spark = reclaimSpark(cap->sparks);
-  // However, measurements show that this makes at least one benchmark
-  // slower (prsa) and doesn't affect the others.
-  spark = tryStealSpark(cap);
-  if (spark != NULL) {
-      cap->sparks_converted++;
-
-      // Post event for running a spark from capability's own pool.
-      traceSchedEvent(cap, EVENT_RUN_SPARK, cap->r.rCurrentTSO, 0);
-
-      return spark;
-  }
-
-  if (n_capabilities == 1) { return NULL; } // makes no sense...
-
-  debugTrace(DEBUG_sched,
-	     "cap %d: Trying to steal work from other capabilities", 
-	     cap->no);
-
   do {
       retry = rtsFalse;
+
+      // first try to get a spark from our own pool.
+      // We should be using reclaimSpark(), because it works without
+      // needing any atomic instructions:
+      //   spark = reclaimSpark(cap->sparks);
+      // However, measurements show that this makes at least one benchmark
+      // slower (prsa) and doesn't affect the others.
+      spark = tryStealSpark(cap);
+      if (spark != NULL) {
+          cap->sparks_converted++;
+
+          // Post event for running a spark from capability's own pool.
+          traceSchedEvent(cap, EVENT_RUN_SPARK, cap->r.rCurrentTSO, 0);
+
+          return spark;
+      }
+      if (!emptySparkPoolCap(cap)) {
+          retry = rtsTrue;
+      }
+
+      if (n_capabilities == 1) { return NULL; } // makes no sense...
+
+      debugTrace(DEBUG_sched,
+                 "cap %d: Trying to steal work from other capabilities", 
+                 cap->no);
 
       /* visit cap.s 0..n-1 in sequence until a theft succeeds. We could
       start at a random place instead of 0 as well.  */
