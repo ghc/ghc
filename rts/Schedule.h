@@ -126,7 +126,10 @@ void performPendingThrowTos (StgTSO *);
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
  * ASSUMES: cap->running_task is the current task.
  */
-INLINE_HEADER void
+EXTERN_INLINE void
+appendToRunQueue (Capability *cap, StgTSO *tso);
+
+EXTERN_INLINE void
 appendToRunQueue (Capability *cap, StgTSO *tso)
 {
     ASSERT(tso->_link == END_TSO_QUEUE);
