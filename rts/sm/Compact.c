@@ -854,15 +854,15 @@ update_fwd_compact( bdescr *blocks )
 
 	    size = p - q;
 	    if (free + size > free_bd->start + BLOCK_SIZE_W) {
-		// unset the next bit in the bitmap to indicate that
+		// set the next bit in the bitmap to indicate that
 		// this object needs to be pushed into the next
 		// block.  This saves us having to run down the
 		// threaded info pointer list twice during the next pass.
-		unmark(q+1,bd);
+		mark(q+1,bd);
 		free_bd = free_bd->link;
 		free = free_bd->start;
 	    } else {
-		ASSERT(is_marked(q+1,bd));
+		ASSERT(!is_marked(q+1,bd));
 	    }
 
 	    unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
@@ -921,7 +921,7 @@ update_bkwd_compact( step *stp )
 	    }
 #endif
 
-	    if (!is_marked(p+1,bd)) {
+	    if (is_marked(p+1,bd)) {
 		// don't forget to update the free ptr in the block desc.
 		free_bd->free = free;
 		free_bd = free_bd->link;

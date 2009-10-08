@@ -16,36 +16,6 @@
 
 BEGIN_RTS_PRIVATE
 
-INLINE_HEADER rtsBool
-mark_stack_empty(void)
-{
-    return mark_sp == mark_stack;
-}
-
-INLINE_HEADER rtsBool
-mark_stack_full(void)
-{
-    return mark_sp >= mark_splim;
-}
-
-INLINE_HEADER void
-reset_mark_stack(void)
-{
-    mark_sp = mark_stack;
-}
-
-INLINE_HEADER void
-push_mark_stack(StgPtr p)
-{
-    *mark_sp++ = p;
-}
-
-INLINE_HEADER StgPtr
-pop_mark_stack(void)
-{
-    return *--mark_sp;
-}
-
 INLINE_HEADER void 
 mark(StgPtr p, bdescr *bd)
 {

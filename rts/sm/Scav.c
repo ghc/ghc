@@ -19,6 +19,7 @@
 #include "GCThread.h"
 #include "GCUtils.h"
 #include "Compact.h"
+#include "MarkStack.h"
 #include "Evac.h"
 #include "Scav.h"
 #include "Apply.h"
@@ -740,9 +741,7 @@ scavenge_mark_stack(void)
     gct->evac_step = &oldest_gen->steps[0];
     saved_evac_step = gct->evac_step;
 
-linear_scan:
-    while (!mark_stack_empty()) {
-	p = pop_mark_stack();
+    while ((p = pop_mark_stack())) {
 
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 	info = get_itbl((StgClosure *)p);
@@ -1055,49 +1054,7 @@ linear_scan:
 		recordMutableGen_GC((StgClosure *)q, gct->evac_step->gen_no);
 	    }
 	}
-	
-	// mark the next bit to indicate "scavenged"
-	mark(q+1, Bdescr(q));
-
-    } // while (!mark_stack_empty())
-
-    // start a new linear scan if the mark stack overflowed at some point
-    if (mark_stack_overflowed && oldgen_scan_bd == NULL) {
-	debugTrace(DEBUG_gc, "scavenge_mark_stack: starting linear scan");
-	mark_stack_overflowed = rtsFalse;
-	oldgen_scan_bd = oldest_gen->steps[0].old_blocks;
-	oldgen_scan = oldgen_scan_bd->start;
-    }
-
-    if (oldgen_scan_bd) {
-	// push a new thing on the mark stack
-    loop:
-	// find a closure that is marked but not scavenged, and start
-	// from there.
-	while (oldgen_scan < oldgen_scan_bd->free 
-	       && !is_marked(oldgen_scan,oldgen_scan_bd)) {
-	    oldgen_scan++;
-	}
-
-	if (oldgen_scan < oldgen_scan_bd->free) {
-
-	    // already scavenged?
-	    if (is_marked(oldgen_scan+1,oldgen_scan_bd)) {
-		oldgen_scan += sizeofW(StgHeader) + MIN_PAYLOAD_SIZE;
-		goto loop;
-	    }
-	    push_mark_stack(oldgen_scan);
-	    // ToDo: bump the linear scan by the actual size of the object
-	    oldgen_scan += sizeofW(StgHeader) + MIN_PAYLOAD_SIZE;
-	    goto linear_scan;
-	}
-
-	oldgen_scan_bd = oldgen_scan_bd->link;
-	if (oldgen_scan_bd != NULL) {
-	    oldgen_scan = oldgen_scan_bd->start;
-	    goto loop;
-	}
-    }
+    } // while (p = pop_mark_stack())
 }
 
 /* -----------------------------------------------------------------------------
@@ -1964,8 +1921,7 @@ loop:
     }
     
     // scavenge objects in compacted generation
-    if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
-	(mark_stack_bdescr != NULL && !mark_stack_empty())) {
+    if (mark_stack_bd != NULL && !mark_stack_empty()) {
 	scavenge_mark_stack();
 	work_to_do = rtsTrue;
     }

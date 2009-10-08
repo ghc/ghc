@@ -20,6 +20,7 @@
 #include "GCThread.h"
 #include "GCUtils.h"
 #include "Compact.h"
+#include "MarkStack.h"
 #include "Prelude.h"
 #include "Trace.h"
 #include "LdvProfile.h"
@@ -499,11 +500,6 @@ loop:
        */
       if (!is_marked((P_)q,bd)) {
           mark((P_)q,bd);
-          if (mark_stack_full()) {
-              debugTrace(DEBUG_gc,"mark stack overflowed");
-              mark_stack_overflowed = rtsTrue;
-              reset_mark_stack();
-          }
           push_mark_stack((P_)q);
       }
       return;

@@ -44,6 +44,7 @@
 #include "Evac.h"
 #include "Scav.h"
 #include "GCUtils.h"
+#include "MarkStack.h"
 #include "MarkWeak.h"
 #include "Sparks.h"
 #include "Sweep.h"
@@ -154,21 +155,12 @@ static void gcCAFs                  (void);
 #endif
 
 /* -----------------------------------------------------------------------------
-   The mark bitmap & stack.
+   The mark stack.
    -------------------------------------------------------------------------- */
 
-#define MARK_STACK_BLOCKS 4
-
-bdescr *mark_stack_bdescr;
-StgPtr *mark_stack;
-StgPtr *mark_sp;
-StgPtr *mark_splim;
-
-// Flag and pointers used for falling back to a linear scan when the
-// mark stack overflows.
-rtsBool mark_stack_overflowed;
-bdescr *oldgen_scan_bd;
-StgPtr  oldgen_scan;
+bdescr *mark_stack_top_bd; // topmost block in the mark stack
+bdescr *mark_stack_bd;     // current block in the mark stack
+StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
@@ -304,15 +296,15 @@ GarbageCollect (rtsBool force_major_gc,
   /* Allocate a mark stack if we're doing a major collection.
    */
   if (major_gc && oldest_gen->steps[0].mark) {
-      nat mark_stack_blocks;
-      mark_stack_blocks = stg_max(MARK_STACK_BLOCKS, 
-                                  oldest_gen->steps[0].n_old_blocks / 100);
-      mark_stack_bdescr = allocGroup(mark_stack_blocks);
-      mark_stack = (StgPtr *)mark_stack_bdescr->start;
-      mark_sp    = mark_stack;
-      mark_splim = mark_stack + (mark_stack_blocks * BLOCK_SIZE_W);
+      mark_stack_bd     = allocBlock();
+      mark_stack_top_bd = mark_stack_bd;
+      mark_stack_bd->link = NULL;
+      mark_stack_bd->u.back = NULL;
+      mark_sp           = mark_stack_bd->start;
   } else {
-      mark_stack_bdescr = NULL;
+      mark_stack_bd     = NULL;
+      mark_stack_top_bd = NULL;
+      mark_sp           = NULL;
   }
 
   // this is the main thread
@@ -707,8 +699,10 @@ SET_GCT(gc_threads[0]);
   pinned_object_block = NULL;
 
   // Free the mark stack.
-  if (mark_stack_bdescr != NULL) {
-      freeGroup(mark_stack_bdescr);
+  if (mark_stack_top_bd != NULL) {
+      debugTrace(DEBUG_gc, "mark stack: %d blocks",
+                 countBlocks(mark_stack_top_bd));
+      freeChain(mark_stack_top_bd);
   }
 
   // Free any bitmaps.
@@ -985,8 +979,7 @@ any_work (void)
     write_barrier();
 
     // scavenge objects in compacted generation
-    if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
-	(mark_stack_bdescr != NULL && !mark_stack_empty())) {
+    if (mark_stack_bd != NULL && !mark_stack_empty()) {
 	return rtsTrue;
     }
     
@@ -1134,7 +1127,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
                 prodCapability(&capabilities[i], cap->running_task);
             }
         }
-        for (j=0; j < 10000000; j++) {
+        for (j=0; j < 10; j++) {
             retry = rtsFalse;
             for (i=0; i < n_threads; i++) {
                 if (i == me) continue;
@@ -1145,6 +1138,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
                 }
             }
             if (!retry) break;
+            yieldThread();
         }
     }
 }

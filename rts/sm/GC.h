@@ -26,14 +26,10 @@ void         markCAFs     ( evac_fn evac, void *user );
 extern nat N;
 extern rtsBool major_gc;
 
-extern bdescr *mark_stack_bdescr;
-extern StgPtr *mark_stack;
-extern StgPtr *mark_sp;
-extern StgPtr *mark_splim;
-
-extern rtsBool mark_stack_overflowed;
-extern bdescr *oldgen_scan_bd;
-extern StgPtr  oldgen_scan;
+extern bdescr *mark_stack_bd;
+extern bdescr *mark_stack_top_bd;
+extern StgPtr mark_sp;
+extern StgPtr mark_splim;
 
 extern long copied;
 
