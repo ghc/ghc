@@ -33,7 +33,7 @@ test('T1969',
                                              #                 15 (x86/OS X)
                                              #                 19 (x86/OS X)
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 28,
+          compiler_stats_num_field('peak_megabytes_allocated', 26,
                                                                32)),
                                              # expected value: 28 (amd64/Linux)
                                              # expected value: 32 (amd64/Linux)
@@ -43,8 +43,8 @@ test('T1969',
                                    # expected value: 6707308 (x86/OS X)
                                    #                 6694144 (x86/Windows)
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 11000000,
-                                                     14000000)),
+          compiler_stats_num_field('max_bytes_used',  9000000,
+                                                     13000000)),
                                    # expected value: 11404664 (amd64/Linux)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
