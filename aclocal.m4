@@ -538,20 +538,6 @@ AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
 ])# FP_HAVE_GCC
 
-AC_DEFUN([FP_MINGW_GCC],
-[
-  case $HostOS_CPP in
-    mingw*)  AC_MSG_CHECKING([whether $CC is a mingw gcc])
-	     if $CC -v 2>&1 | grep mingw >/dev/null; then
-		AC_MSG_RESULT([yes])
-	     else
-		AC_MSG_RESULT([no])
-		AC_MSG_ERROR([Please use --with-gcc to specify a mingw gcc])
-	     fi;;
-    *) ;;	
-  esac
-])
-
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary.
 dnl
