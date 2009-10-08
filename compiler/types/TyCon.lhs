@@ -1097,13 +1097,10 @@ synTyConResKind tycon  = pprPanic "synTyConResKind" (ppr tycon)
 -- has more than one constructor, or represents a primitive or function type constructor then
 -- @Nothing@ is returned. In any other case, the function panics
 tyConSingleDataCon_maybe :: TyCon -> Maybe DataCon
-tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = DataTyCon {data_cons = [c] }}) = Just c
-tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = c }})    = Just c
-tyConSingleDataCon_maybe (AlgTyCon {})	         = Nothing
-tyConSingleDataCon_maybe (TupleTyCon {dataCon = con}) = Just con
-tyConSingleDataCon_maybe (PrimTyCon {})               = Nothing
-tyConSingleDataCon_maybe (FunTyCon {})                = Nothing  -- case at funty
-tyConSingleDataCon_maybe tc = pprPanic "tyConSingleDataCon_maybe: unexpected tycon " $ ppr tc
+tyConSingleDataCon_maybe (TupleTyCon {dataCon = c}) 			       = Just c
+tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = DataTyCon { data_cons = [c] }}) = Just c
+tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = c }})     = Just c
+tyConSingleDataCon_maybe _                           			       = Nothing
 \end{code}
 
 \begin{code}
