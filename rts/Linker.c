@@ -553,8 +553,122 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_ap_pppppp_ret)
 #endif
 
+/* Modules compiled with -ticky may mention ticky counters */
+/* This list should marry up with the one in $(TOP)/includes/stg/Ticky.h */
+#define RTS_TICKY_SYMBOLS                       \
+      SymI_NeedsProto(ticky_entry_ctrs)         \
+      SymI_NeedsProto(top_ct)                   \
+                                                \
+      SymI_HasProto(ENT_VIA_NODE_ctr)		\
+      SymI_HasProto(ENT_STATIC_THK_ctr)		\
+      SymI_HasProto(ENT_DYN_THK_ctr)		\
+      SymI_HasProto(ENT_STATIC_FUN_DIRECT_ctr)	\
+      SymI_HasProto(ENT_DYN_FUN_DIRECT_ctr)	\
+      SymI_HasProto(ENT_STATIC_CON_ctr)		\
+      SymI_HasProto(ENT_DYN_CON_ctr)		\
+      SymI_HasProto(ENT_STATIC_IND_ctr)		\
+      SymI_HasProto(ENT_DYN_IND_ctr)		\
+      SymI_HasProto(ENT_PERM_IND_ctr)		\
+      SymI_HasProto(ENT_PAP_ctr)		\
+      SymI_HasProto(ENT_AP_ctr)		        \
+      SymI_HasProto(ENT_AP_STACK_ctr)		\
+      SymI_HasProto(ENT_BH_ctr)	        	\
+      SymI_HasProto(UNKNOWN_CALL_ctr)		\
+      SymI_HasProto(SLOW_CALL_v_ctr)		\
+      SymI_HasProto(SLOW_CALL_f_ctr)		\
+      SymI_HasProto(SLOW_CALL_d_ctr)		\
+      SymI_HasProto(SLOW_CALL_l_ctr)		\
+      SymI_HasProto(SLOW_CALL_n_ctr)		\
+      SymI_HasProto(SLOW_CALL_p_ctr)		\
+      SymI_HasProto(SLOW_CALL_pv_ctr)		\
+      SymI_HasProto(SLOW_CALL_pp_ctr)		\
+      SymI_HasProto(SLOW_CALL_ppv_ctr)		\
+      SymI_HasProto(SLOW_CALL_ppp_ctr)		\
+      SymI_HasProto(SLOW_CALL_pppv_ctr)		\
+      SymI_HasProto(SLOW_CALL_pppp_ctr)		\
+      SymI_HasProto(SLOW_CALL_ppppp_ctr)		\
+      SymI_HasProto(SLOW_CALL_pppppp_ctr)		\
+      SymI_HasProto(SLOW_CALL_OTHER_ctr)		\
+      SymI_HasProto(ticky_slow_call_unevald)            \
+      SymI_HasProto(SLOW_CALL_ctr)		        \
+      SymI_HasProto(MULTI_CHUNK_SLOW_CALL_ctr)		\
+      SymI_HasProto(MULTI_CHUNK_SLOW_CALL_CHUNKS_ctr)	\
+      SymI_HasProto(KNOWN_CALL_ctr)		        \
+      SymI_HasProto(KNOWN_CALL_TOO_FEW_ARGS_ctr)	\
+      SymI_HasProto(KNOWN_CALL_EXTRA_ARGS_ctr)		\
+      SymI_HasProto(SLOW_CALL_FUN_TOO_FEW_ctr)		\
+      SymI_HasProto(SLOW_CALL_FUN_CORRECT_ctr)		\
+      SymI_HasProto(SLOW_CALL_FUN_TOO_MANY_ctr)		\
+      SymI_HasProto(SLOW_CALL_PAP_TOO_FEW_ctr)		\
+      SymI_HasProto(SLOW_CALL_PAP_CORRECT_ctr)		\
+      SymI_HasProto(SLOW_CALL_PAP_TOO_MANY_ctr)		\
+      SymI_HasProto(SLOW_CALL_UNEVALD_ctr)		\
+      SymI_HasProto(UPDF_OMITTED_ctr)		\
+      SymI_HasProto(UPDF_PUSHED_ctr)		\
+      SymI_HasProto(CATCHF_PUSHED_ctr)		\
+      SymI_HasProto(UPDF_RCC_PUSHED_ctr)	\
+      SymI_HasProto(UPDF_RCC_OMITTED_ctr)	\
+      SymI_HasProto(UPD_SQUEEZED_ctr)		\
+      SymI_HasProto(UPD_CON_IN_NEW_ctr)		\
+      SymI_HasProto(UPD_CON_IN_PLACE_ctr)	\
+      SymI_HasProto(UPD_PAP_IN_NEW_ctr)		\
+      SymI_HasProto(UPD_PAP_IN_PLACE_ctr)	\
+      SymI_HasProto(ALLOC_HEAP_ctr)		\
+      SymI_HasProto(ALLOC_HEAP_tot)             \
+      SymI_HasProto(ALLOC_FUN_ctr)		\
+      SymI_HasProto(ALLOC_FUN_adm)              \
+      SymI_HasProto(ALLOC_FUN_gds)              \
+      SymI_HasProto(ALLOC_FUN_slp)              \
+      SymI_HasProto(UPD_NEW_IND_ctr)		\
+      SymI_HasProto(UPD_NEW_PERM_IND_ctr)	\
+      SymI_HasProto(UPD_OLD_IND_ctr)		\
+      SymI_HasProto(UPD_OLD_PERM_IND_ctr)		\
+      SymI_HasProto(UPD_BH_UPDATABLE_ctr)		\
+      SymI_HasProto(UPD_BH_SINGLE_ENTRY_ctr)		\
+      SymI_HasProto(UPD_CAF_BH_UPDATABLE_ctr)		\
+      SymI_HasProto(UPD_CAF_BH_SINGLE_ENTRY_ctr)	\
+      SymI_HasProto(GC_SEL_ABANDONED_ctr)		\
+      SymI_HasProto(GC_SEL_MINOR_ctr)		\
+      SymI_HasProto(GC_SEL_MAJOR_ctr)		\
+      SymI_HasProto(GC_FAILED_PROMOTION_ctr)	\
+      SymI_HasProto(ALLOC_UP_THK_ctr)		\
+      SymI_HasProto(ALLOC_SE_THK_ctr)		\
+      SymI_HasProto(ALLOC_THK_adm)		\
+      SymI_HasProto(ALLOC_THK_gds)		\
+      SymI_HasProto(ALLOC_THK_slp)		\
+      SymI_HasProto(ALLOC_CON_ctr)		\
+      SymI_HasProto(ALLOC_CON_adm)		\
+      SymI_HasProto(ALLOC_CON_gds)		\
+      SymI_HasProto(ALLOC_CON_slp)		\
+      SymI_HasProto(ALLOC_TUP_ctr)		\
+      SymI_HasProto(ALLOC_TUP_adm)		\
+      SymI_HasProto(ALLOC_TUP_gds)		\
+      SymI_HasProto(ALLOC_TUP_slp)		\
+      SymI_HasProto(ALLOC_BH_ctr)		\
+      SymI_HasProto(ALLOC_BH_adm)		\
+      SymI_HasProto(ALLOC_BH_gds)		\
+      SymI_HasProto(ALLOC_BH_slp)		\
+      SymI_HasProto(ALLOC_PRIM_ctr)		\
+      SymI_HasProto(ALLOC_PRIM_adm)		\
+      SymI_HasProto(ALLOC_PRIM_gds)		\
+      SymI_HasProto(ALLOC_PRIM_slp)		\
+      SymI_HasProto(ALLOC_PAP_ctr)		\
+      SymI_HasProto(ALLOC_PAP_adm)		\
+      SymI_HasProto(ALLOC_PAP_gds)		\
+      SymI_HasProto(ALLOC_PAP_slp)		\
+      SymI_HasProto(ALLOC_TSO_ctr)		\
+      SymI_HasProto(ALLOC_TSO_adm)		\
+      SymI_HasProto(ALLOC_TSO_gds)		\
+      SymI_HasProto(ALLOC_TSO_slp)		\
+      SymI_HasProto(RET_NEW_ctr)		\
+      SymI_HasProto(RET_OLD_ctr)		\
+      SymI_HasProto(RET_UNBOXED_TUP_ctr)	\
+      SymI_HasProto(RET_SEMI_loads_avoided)
+
+
 #define RTS_SYMBOLS				        \
       Maybe_Stable_Names			        \
+      RTS_TICKY_SYMBOLS                                 \
       SymI_HasProto(StgReturn)				\
       SymI_HasProto(stg_enter_info)			\
       SymI_HasProto(stg_gc_void_info)			\

@@ -17,11 +17,26 @@
 
 /* These should probably be automatically generated in order to
    keep them consistent with the macros that use them (which are
-   defined in Cmm.h. */
+   defined in Cmm.h) */
 
-/* same trick as in the former StgTicky.h: recycle the same declarations
-   for both extern decls (which are included everywhere)
-   and initializations (which only happen once) */
+/* Here are all the counter declarations: */
+/* If you change this list, make the corresponding change
+   in RTS_TICKY_SYMBOLS in rts/Linker.c  */
+
+/* These two are explicitly declared in rts/Ticky.c, and
+   hence should not be extern'd except when using this header
+   file from STG code; hence IN_STG_CODE */
+
+#if IN_STG_CODE
+extern W_ ticky_entry_ctrs[];
+extern W_ top_ct[];
+#endif
+
+/* The rest are not explicity declared in rts/Ticky.c.  Instead
+   we use the same trick as in the former StgTicky.h: recycle the 
+   same declarations for both extern decls (which are included everywhere)
+   and initializations (which only happen once) 
+   TICKY_C is defined only in rts/Ticky.c */
 #ifdef TICKY_C
 #define INIT(ializer) = ializer
 #define EXTERN
@@ -29,8 +44,6 @@
 #define INIT(ializer)
 #define EXTERN extern
 #endif
-
-/* Here are all the counter declarations: */
 
 EXTERN StgInt ENT_VIA_NODE_ctr INIT(0);
 EXTERN StgInt ENT_STATIC_THK_ctr INIT(0);
