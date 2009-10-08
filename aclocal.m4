@@ -289,45 +289,6 @@ AC_SUBST(AlexVersion)
 ])
 
 
-dnl
-dnl Check for windres and version.
-dnl 2.15.91 works
-dnl 2.17.50 doesn't work
-dnl 2.18.50 works
-dnl
-AC_DEFUN([FPTOOLS_WINDRES],
-[
-if test "x$HostPlatform"  = "xi386-unknown-mingw32"
-then
-    AC_PATH_PROG(WindResCmd,windres,)
-    # Alex is passed to Cabal, so we need a native path
-    if test "${OSTYPE}"      != "msys"                  && \
-       test "${WindResCmd}"  != ""
-    then
-        # Canonicalise to <drive>:/path/to/gcc
-        WindResCmd=`cygpath -m ${WindResCmd}`
-    fi
-
-    AC_CACHE_CHECK([for version of windres], fptools_cv_windres_version,
-    changequote(, )dnl
-    [
-        if test x"$WindResCmd" != x
-        then
-            fptools_cv_windres_version="`$WindResCmd --version |
-			  grep 'GNU windres' |
-              sed -e 's/GNU windres[^0-9]* \([0-9\.]*\).*/\1/g'`" ;
-        else
-            fptools_cv_windres_version="";
-        fi
-        changequote([, ])dnl
-    ])
-    FP_COMPARE_VERSIONS([$fptools_cv_windres_version],[-eq],[2.17.50],
-      [AC_MSG_ERROR([Your windres version isn't compatible with GHC. 2.15.91 and 2.18.50 are known to work.])])[]
-    WindResVersion=$fptools_cv_windres_version;
-    AC_SUBST(WindResVersion)
-fi
-])
-
 
 # FP_PROG_LD
 # ----------

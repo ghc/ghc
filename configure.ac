@@ -568,9 +568,6 @@ if test "$BootingFromHc" = "NO"; then
 FPTOOLS_ALEX
 fi;
 
-dnl Check we have an acceptable version of windres
-FPTOOLS_WINDRES
-
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
 dnl --------------------------------------------------
