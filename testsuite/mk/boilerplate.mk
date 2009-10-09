@@ -56,17 +56,22 @@ ifeq "$(TEST_HC)" ""
 STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
 STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
 STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
+
 ifneq "$(wildcard $(STAGE1_GHC) $(STAGE1_GHC).exe)" ""
 
-ifeq "$(stage)" "1"
-TEST_HC := $(STAGE1_GHC)
+ifeq "$(BINDIST)" "YES"
+ifeq '$(shell $(STAGE1_GHC) --info | grep "^ ..\"Host OS\". \"mingw32\".$$")' ''
+TEST_HC := $(abspath $(TOP)/../)/bindisttest/installed/bin/ghc
 else
-ifeq "$(stage)" "3"
+TEST_HC := "$(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc"
+endif
+else ifeq "$(stage)" "1"
+TEST_HC := $(STAGE1_GHC)
+else ifeq "$(stage)" "3"
 TEST_HC := $(STAGE3_GHC)
 else
 # use stage2 by default
 TEST_HC := $(STAGE2_GHC)
-endif
 endif
 
 else
