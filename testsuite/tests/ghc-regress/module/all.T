@@ -327,6 +327,6 @@ test('mod180', extra_clean(['Mod180_A.hi', 'Mod180_A.o', 'Mod180_B.hi', 'Mod180_
      multimod_compile_fail, ['mod180', '-v0'])
 
 test('T1148', normal, compile, [''])
-test('T1074', normal, compile, [''])
+test('T1074', reqlib('mtl'), compile, [''])
 test('T1074a', normal, compile, [''])
 test('T2267', normal, compile, [''])
