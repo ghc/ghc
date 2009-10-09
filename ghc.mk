@@ -893,8 +893,8 @@ endif
 BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 
 unix-binary-dist-prep:
-	"$(RM)" $(RM_OPTS) -r bindistprep/*
-	mkdir $(BIN_DIST_PREP_DIR)
+	"$(RM)" $(RM_OPTS) -r bindistprep/
+	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
 	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "LATEX_DOCS         = $(LATEX_DOCS)"         >> $(BIN_DIST_MK)
@@ -909,7 +909,7 @@ unix-binary-dist-prep:
 	cd bindistprep && "$(TAR)" hcf - -T ../$(BIN_DIST_LIST) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-binary-dist-prep:
-	"$(RM)" $(RM_OPTS) -r bindistprep/*
+	"$(RM)" $(RM_OPTS) -r bindistprep/
 	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
 	cd bindistprep && "$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
@@ -1069,6 +1069,11 @@ ifeq "$(CLEANING)" "YES"
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),\
   $(eval $(call clean-target,libraries/$(lib),dist-install,libraries/$(lib)/dist-install)))
 endif
+
+clean : clean_bindistprep
+.PHONY: clean_bindistprep
+clean_bindistprep:
+	"$(RM)" $(RM_OPTS) -r bindistprep/
 
 distclean : clean
 	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
