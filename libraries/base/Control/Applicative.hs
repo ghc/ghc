@@ -36,6 +36,7 @@ module Control.Applicative (
         ) where
 
 import Prelude hiding (id,(.))
+import qualified Prelude (id)
 
 import Control.Category
 import Control.Arrow
