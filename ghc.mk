@@ -865,6 +865,7 @@ $(eval $(call bindist,.,\
 	$(BINDIST_EXTRAS) \
 	$(includes_H_CONFIG) \
 	$(includes_H_PLATFORM) \
+    $(includes_H_FILES) \
 	includes/ghcconfig.h \
 	includes/rts/Config.h \
     $(INSTALL_HEADERS) \
