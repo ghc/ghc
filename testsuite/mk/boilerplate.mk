@@ -53,19 +53,19 @@ endef
 
 ifeq "$(TEST_HC)" ""
 
-NEW_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
-NEW_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
-NEW_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
-ifneq "$(wildcard $(NEW_BUILD_SYSTEM_STAGE1_GHC) $(NEW_BUILD_SYSTEM_STAGE1_GHC).exe)" ""
+STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
+STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
+STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
+ifneq "$(wildcard $(STAGE1_GHC) $(STAGE1_GHC).exe)" ""
 
 ifeq "$(stage)" "1"
-TEST_HC := $(NEW_BUILD_SYSTEM_STAGE1_GHC)
+TEST_HC := $(STAGE1_GHC)
 else
 ifeq "$(stage)" "3"
-TEST_HC := $(NEW_BUILD_SYSTEM_STAGE3_GHC)
+TEST_HC := $(STAGE3_GHC)
 else
 # use stage2 by default
-TEST_HC := $(NEW_BUILD_SYSTEM_STAGE2_GHC)
+TEST_HC := $(STAGE2_GHC)
 endif
 endif
 
