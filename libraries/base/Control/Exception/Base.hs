@@ -176,8 +176,8 @@ data AssertionFailed
 data PatternMatchFail
 data NoMethodError
 data Deadlock
-data BlockedOnDeadMVar
-data BlockedIndefinitely
+data BlockedIndefinitelyOnMVar
+data BlockedIndefinitelyOnSTM
 data ErrorCall
 data RecConError
 data RecSelError
