@@ -53,33 +53,6 @@ endef
 
 ifeq "$(TEST_HC)" ""
 
-OLD_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../ghc/stage1-inplace/ghc)
-OLD_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../ghc/stage2-inplace/ghc)
-OLD_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../ghc/stage3-inplace/ghc)
-OLD_BUILD_SYSTEM_GHC_PKG    := $(abspath $(TOP)/../utils/ghc-pkg/install-inplace/bin/ghc-pkg)
-OLD_BUILD_SYSTEM_HSC2HS     := $(abspath $(TOP)/../utils/hsc2hs/install-inplace/bin/hsc2hs)
-OLD_BUILD_SYSTEM_HP2PS      := $(abspath $(TOP)/../utils/hp2ps/hp2ps)
-ifneq "$(wildcard $(OLD_BUILD_SYSTEM_STAGE1_GHC) $(OLD_BUILD_SYSTEM_STAGE1_GHC).exe)" ""
-
-ifeq "$(stage)" "1"
-TEST_HC := $(OLD_BUILD_SYSTEM_STAGE1_GHC)
-else
-ifeq "$(stage)" "3"
-TEST_HC := $(OLD_BUILD_SYSTEM_STAGE3_GHC)
-else
-# use stage2 by default
-TEST_HC := $(OLD_BUILD_SYSTEM_STAGE2_GHC)
-endif
-endif
-GHC_PKG := $(OLD_BUILD_SYSTEM_GHC_PKG)
-HSC2HS := $(OLD_BUILD_SYSTEM_HSC2HS)
-HP2PS_ABS := $(OLD_BUILD_SYSTEM_HP2PS)
-# XXX This GCC definition is a hack. Once the in-tree GHC has a gcc in the
-# right place we won't need to do this, as Cabal will be able to find
-# gcc relative to ghc's location.
-GCC := $(shell cd $(TOP)/.. && $(MAKE) --no-print-directory show VALUE=WhatGccIsCalled | sed 's/.*"\(.*\)"/\1/')
-
-else
 NEW_BUILD_SYSTEM_STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
 NEW_BUILD_SYSTEM_STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
 NEW_BUILD_SYSTEM_STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
@@ -100,7 +73,6 @@ else
 TEST_HC := $(shell which ghc)
 endif
 
-endif
 endif
 
 ifeq "$(GHC_PKG)" ""
