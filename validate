@@ -71,6 +71,10 @@ thisdir=`utils/ghc-pwd/ghc-pwd`
 echo "Validating=YES" > mk/are-validating.mk
 
 make -j$threads ValidateHpc=$hpc ValidateSlow=$slow
+
+make binary-dist-prep
+make -C bindisttest TEST_PREP=YES
+
 fi # testsuite-only
 
 if [ "$hpc" = YES ]
@@ -82,9 +86,6 @@ then
     export HPCTIXFILE
     rm -f $HPCTIXFILE
 fi
-
-make binary-dist-prep
-make -C bindisttest TEST_PREP=YES
 
 make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
 
