@@ -77,7 +77,7 @@ findSpark (Capability *cap)
   rtsBool retry;
   nat i = 0;
 
-  if (!emptyRunQueue(cap)) {
+  if (!emptyRunQueue(cap) || cap->returning_tasks_hd != NULL) {
       // If there are other threads, don't try to run any new
       // sparks: sparks might be speculative, we don't want to take
       // resources away from the main computation.
