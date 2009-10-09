@@ -40,7 +40,9 @@ import Data.Typeable
 import Data.Data
 #endif
 
+#ifndef __NHC__
 default () -- avoid any defaulting shenanigans
+#endif
 
 -- | generalisation of 'div' to any instance of Real
 div' :: (Real a,Integral b) => a -> a -> b
