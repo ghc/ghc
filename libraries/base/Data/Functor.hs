@@ -13,12 +13,16 @@
 
 module Data.Functor
     (
-      Functor(fmap, (<$)),
+      Functor(fmap),
+      (<$),
       (<$>),
     ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base (Functor(..))
+#else
+(<$) :: Functor f => a -> f b -> f a
+(<$) =  fmap . const
 #endif
 
 infixl 4 <$>
