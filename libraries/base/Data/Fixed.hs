@@ -35,8 +35,10 @@ module Data.Fixed
 ) where
 
 import Prelude -- necessary to get dependencies right
+#ifndef __NHC__
 import Data.Typeable
 import Data.Data
+#endif
 
 default () -- avoid any defaulting shenanigans
 
@@ -55,8 +57,14 @@ mod' n d = n - (fromInteger f) * d where
     f = div' n d
 
 -- | The type parameter should be an instance of 'HasResolution'.
-newtype Fixed a = MkFixed Integer deriving (Eq,Ord,Typeable)
+newtype Fixed a = MkFixed Integer
+#ifndef __NHC__
+        deriving (Eq,Ord,Typeable)
+#else
+        deriving (Eq,Ord)
+#endif
 
+#ifndef __NHC__
 -- We do this because the automatically derived Data instance requires (Data a) context.
 -- Our manual instance has the more general (Typeable a) context.
 tyFixed :: DataType
@@ -68,6 +76,7 @@ instance (Typeable a) => Data (Fixed a) where
     gunfold k z _ = k (z MkFixed)
     dataTypeOf _ = tyFixed
     toConstr _ = conMkFixed
+#endif
 
 class HasResolution a where
     resolution :: p a -> Integer
@@ -145,43 +154,64 @@ instance (HasResolution a) => Show (Fixed a) where
     show = showFixed False
 
 
-data E0 = E0 deriving (Typeable)
+data E0 = E0
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E0 where
     resolution _ = 1
 -- | resolution of 1, this works the same as Integer
 type Uni = Fixed E0
 
-data E1 = E1 deriving (Typeable)
+data E1 = E1
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E1 where
     resolution _ = 10
 -- | resolution of 10^-1 = .1
 type Deci = Fixed E1
 
-data E2 = E2 deriving (Typeable)
+data E2 = E2
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E2 where
     resolution _ = 100
 -- | resolution of 10^-2 = .01, useful for many monetary currencies
 type Centi = Fixed E2
 
-data E3 = E3 deriving (Typeable)
+data E3 = E3
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E3 where
     resolution _ = 1000
 -- | resolution of 10^-3 = .001
 type Milli = Fixed E3
 
-data E6 = E6 deriving (Typeable)
+data E6 = E6
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E6 where
     resolution _ = 1000000
 -- | resolution of 10^-6 = .000001
 type Micro = Fixed E6
 
-data E9 = E9 deriving (Typeable)
+data E9 = E9
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E9 where
     resolution _ = 1000000000
 -- | resolution of 10^-9 = .000000001
 type Nano = Fixed E9
 
-data E12 = E12 deriving (Typeable)
+data E12 = E12
+#ifndef __NHC__
+     deriving (Typeable)
+#endif
 instance HasResolution E12 where
     resolution _ = 1000000000000
 -- | resolution of 10^-12 = .000000000001
