@@ -273,6 +273,8 @@ instance Bits Integer where
    (.|.) = orInteger
    xor = xorInteger
    complement = complementInteger
+   shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
+                     | otherwise = shiftRInteger x (negateInt# i#)
 #else
    -- reduce bitwise binary operations to special cases we can handle
 
@@ -289,10 +291,9 @@ instance Bits Integer where
 
    -- assuming infinite 2's-complement arithmetic
    complement a = -1 - a
+   shift x i | i >= 0    = x * 2^i
+             | otherwise = x `div` 2^(-i)
 #endif
-
-   shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
-                     | otherwise = shiftRInteger x (negateInt# i#)
 
    rotate x i = shift x i   -- since an Integer never wraps around
 
