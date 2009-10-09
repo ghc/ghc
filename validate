@@ -87,7 +87,7 @@ then
     rm -f $HPCTIXFILE
 fi
 
-make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 THREADS=$threads 2>&1 | tee testlog
+make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 BINDIST=YES THREADS=$threads 2>&1 | tee testlog
 
 if [ "$hpc" = YES ]
 then
