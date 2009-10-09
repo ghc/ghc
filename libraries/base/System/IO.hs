@@ -468,6 +468,8 @@ fixIO k = do
 -- Assume a unix platform, where text and binary I/O are identical.
 openBinaryFile = openFile
 hSetBinaryMode _ _ = return ()
+
+type CMode = Int
 #endif
 
 -- | The function creates a temporary file in ReadWrite mode.
