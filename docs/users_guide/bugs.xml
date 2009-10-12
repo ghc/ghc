@@ -192,15 +192,21 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	    </listitem>
 	  </varlistentry>
 
-	  <varlistentry>
-	    <term>Strings treated as ISO-8859-1</term>
-	    <listitem>
-	      <para>
-            Various library functions, such as <literal>putStrLn</literal>,
-            treat Strings as if they were ISO-8859-1 rather than UTF-8.
-          </para>
-	    </listitem>
-	  </varlistentry>
+          <varlistentry>
+            <term><literal>hGetContents</literal></term>
+            <listitem>
+              <para>
+                Lazy I/O throws an exception if an error is
+                encountered, in contrast to the Haskell 98 spec which
+                requires that errors are discarded (see Section 21.2.2
+                of the Haskell 98 report).  The exception thrown is
+                the usual IO exception that would be thrown if the
+                failing IO operation was performed in the IO monad, and can
+                be caught by <literal>System.IO.Error.catch</literal>
+                or <literal>Control.Exception.catch</literal>.
+              </para>
+            </listitem>
+          </varlistentry>
 	</variablelist>
     </sect3>
   </sect2>

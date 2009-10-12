@@ -692,6 +692,19 @@ ghc --abi-hash M1 M2 ...
 
         <listitem>
           <para>
+            Lazy I/O now throws an exception if an error is
+            encountered, in a divergence from the Haskell 98 spec which
+            requires that errors are discarded (see Section 21.2.2 of
+            the Haskell 98 report).  The exception thrown is the usual
+            IO exception that would be thrown if the failing IO
+            operation was performed in the IO monad, and can be caught
+            by <literal>System.IO.Error.catch</literal>
+            or <literal>Control.Exception.catch</literal>.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
             It is now possible to create your own handles.
             For more information, see the
             <literal>GHC.IO.Handle</literal> haddock docs.
