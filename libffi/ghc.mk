@@ -68,7 +68,7 @@ BINDIST_STAMPS = libffi/stamp.ffi.build libfii/stamp.ffi.configure
 
 INSTALL_HEADERS   += libffi/ffi.h
 libffi_STATIC_LIB  = libffi/libffi.a
-INSTALL_LIBS      += libffi/libHSffi.a libffi/HSffi.o
+INSTALL_LIBS      += libffi/libHSffi.a libffi/libHSffi_p.a libffi/HSffi.o
 
 # We have to add the GHC version to the name of our dynamic libs, because
 # they will be residing in the system location along with dynamic libs from
