@@ -355,12 +355,12 @@ hGetContents handle =
 lazyRead :: Handle -> IO String
 lazyRead handle = 
    unsafeInterleaveIO $
-        withHandle "lazyRead" handle $ \ handle_ -> do
+        withHandle "hGetContents" handle $ \ handle_ -> do
         case haType handle_ of
           ClosedHandle     -> return (handle_, "")
           SemiClosedHandle -> lazyReadBuffered handle handle_
           _ -> ioException 
-                  (IOError (Just handle) IllegalOperation "lazyRead"
+                  (IOError (Just handle) IllegalOperation "hGetContents"
                         "illegal handle type" Nothing Nothing)
 
 lazyReadBuffered :: Handle -> Handle__ -> IO (Handle__, [Char])
@@ -377,14 +377,15 @@ lazyReadBuffered h handle_@Handle__{..} = do
             writeIORef haCharBuffer (bufferAdjustL r buf')
             return (handle_, s)
         )
-        -- all I/O errors are discarded.  Additionally, we close the handle.
         (\e -> do (handle_', _) <- hClose_help handle_
                   debugIO ("hGetContents caught: " ++ show e)
                   -- We might have a \r cached in CRLF mode.  So we
                   -- need to check for that and return it:
-                  if not (isEmptyBuffer buf)
-                     then return (handle_', "\r")
-                     else return (handle_', "")
+                  if isEOFError e
+                     then if not (isEmptyBuffer buf)
+                             then return (handle_', "\r")
+                             else return (handle_', "")
+                     else ioError e
         )
 
 -- ensure we have some characters in the buffer
