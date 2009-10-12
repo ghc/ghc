@@ -534,7 +534,7 @@ mode_flags =
          Supported
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
          Supported
-  , Flag "e"            (HasArg   (\s -> setMode (doEvalMode s) "-e"))
+  , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
          Supported
 
        -- -fno-code says to stop after Hsc but don't generate any code.
