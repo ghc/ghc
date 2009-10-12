@@ -68,15 +68,15 @@ Here follows a summary - if you get into trouble, the Building Guide
 has all the answers.
 
 NB. you need GHC installed in order to build GHC, because the compiler
-is itself written in Haskell.  It is possible to build GHC using just
-a C compiler, but we don't recommend this as the normal route.  If you
-*really* want to do it this way, then see the Building Guide.
+is itself written in Haskell.  For instructions on how to port GHC to a
+new platform, see the Building Guide.
 
 If you're building from darcs sources (as opposed to a source
 distribution) then you also need to install Happy [4] and Alex [5].
 
 For building library documentation, you'll need Haddock [6].  To build
-the compiler documentation, you need a good DocBook XML toolchain.
+the compiler documentation, you need a good DocBook XML toolchain and
+dblatex.
 
 Quick start:  the following gives you a default build:
 
@@ -88,16 +88,6 @@ Quick start:  the following gives you a default build:
 The "sh boot" step is only necessary if this is a tree checked out
 from darcs.  For source distributions downloaded from GHC's web site,
 this step has already been performed.
-
-If you want the documentation too then use these commands instead:
-
-    $ echo "XMLDocWays   = html" > mk/build.mk
-    $ echo "HADDOCK_DOCS = YES" >> mk/build.mk
-    $ sh boot
-    $ ./configure
-    $ make
-    $ make install
-    $ make install-docs
 
 These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).
