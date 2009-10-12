@@ -111,7 +111,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd gmpbuild && \
-	    CC=$(WhatGccIsCalled) $(SHELL) configure \
+	    CC=$(WhatGccIsCalled) NM=$(NM) $(SHELL) configure \
 	          --enable-shared=no --host=$(PLATFORM) --build=$(PLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
