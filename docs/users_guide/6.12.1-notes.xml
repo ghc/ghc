@@ -621,20 +621,20 @@ ghc --abi-hash M1 M2 ...
         </para>
       </listitem>
 
-      <listierm>
+      <listitem>
         <para>
           There is a new command <literal>ghc-pkg init</literal> to
           create a package database.
         </para>
-      </listierm>
+      </listitem>
 
-      <listierm>
+      <listitem>
         <para>
           There is a new command <literal>ghc-pkg dot</literal> to
           generate a GraphViz graph of the dependencies between
           installed packages.
         </para>
-      </listierm>
+      </listitem>
 
       <listitem>
         <para>
