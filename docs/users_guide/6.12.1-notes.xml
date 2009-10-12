@@ -215,16 +215,7 @@ data instance T [a] where
           block, but its result is not bound.
           The flags <literal>-fwarn-unused-do-bind</literal>
           and <literal>-fwarn-wrong-do-bind</literal> control
-          these warnings.
-        </para>
-      </listitem>
-
-      <listitem>
-        <para>
-          There is a new warning if a monadic result of type other than
-          <literal>m ()</literal> is not bound.
-          The flag <literal>-fwarn-unused-do-bind</literal> controls
-          this warning.
+          these warnings (see <xref linkend="options-sanity" />).
         </para>
       </listitem>
 
