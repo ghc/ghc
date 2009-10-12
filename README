@@ -21,27 +21,32 @@ There are two ways to get a source tree:
   1. Download source tarballs
   ---------------------------
 
-  The GHC source distribution comes in two parts:
+  Download the GHC source distribution:
 
       ghc-<version>-src.tar.bz2
-      ghc-<version>-src-extralibs.tar.bz2
 
-  You only need the first one, which contains GHC itself and
-  the "boot" libraries.
+  which contains GHC itself and the "boot" libraries.
 
-  The extralibs package contains a bunch of optional libraries.  If
-  you want, you can unpack this over the top of your source tree, and
-  these extra libraries will be built and installed automatically.
-  Make sure you unpack the extralibs package before running configure
-  (see below).
+  2. Check out the source code from darcs
+  ---------------------------------------
 
-  If you don't build extralibs now, you can add them later by building
-  and installing individual packages using Cabal.
+  The recommended way to get a darcs checkout is to start off by
+  downloading a snapshot with a name like:
 
-  2. Get the source from darcs
-  ----------------------------
+      ghc-HEAD-2009-09-09-ghc-corelibs-testsuite.tar.bz2
 
-  First get the GHC darcs repository:
+  from:
+
+      http://darcs.haskell.org/
+
+  and then untar it and bring it up-to-date with:
+
+     $ cd ghc
+     $ ./darcs-all get
+
+
+  Alternatively you can use darcs to get the repos, but it will take a
+  lot longer. First get the GHC darcs repository:
 
     $ darcs get http://darcs.haskell.org/ghc/
 
@@ -52,13 +57,7 @@ There are two ways to get a source tree:
      $ chmod +x darcs-all
      $ ./darcs-all get
 
-  This grabs the "boot" packages by default.  To get the full set of
-  packages, instead say
-
-     $ ./darcs-all --extra get
-
-  This also downloads the libraries that are normally bundled in the
-  "extralibs" package (see above).
+  This checks out the "boot" packages.
 
 
 Building & Installing
