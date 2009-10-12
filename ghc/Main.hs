@@ -208,7 +208,8 @@ main' postLoadMode dflags0 args flagWarnings = do
     case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags3 f
        DoMake                 -> doMake srcs
-       DoMkDependHS           -> doMkDependHS (map fst srcs)
+       DoMkDependHS           -> do doMkDependHS (map fst srcs)
+                                    GHC.printWarnings
        StopBefore p           -> oneShot hsc_env p srcs >> GHC.printWarnings
        DoInteractive          -> interactiveUI srcs Nothing
        DoEval exprs           -> interactiveUI srcs $ Just $ reverse exprs
