@@ -80,7 +80,9 @@ endif
 
 endif
 
-BIN_ROOT = $(dir $(TEST_HC))
+# We can't use $(dir ...) here as TEST_HC might be in a path
+# containing spaces
+BIN_ROOT = $(shell dirname '$(TEST_HC)')
 
 ifeq "$(GHC_PKG)" ""
 GHC_PKG := $(BIN_ROOT)/ghc-pkg
