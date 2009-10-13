@@ -764,10 +764,14 @@ install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
 	done
 
 install_libexecs:  $(INSTALL_LIBEXECS)
+ifeq "$(INSTALL_LIBEXECS)" ""
+	@:
+else
 	$(INSTALL_DIR) $(DESTDIR)$(ghclibexecdir)
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(ghclibexecdir); \
 	done
+endif
 
 install_topdir_scripts: $(INSTALL_TOPDIR_SCRIPTS)
 	$(INSTALL_DIR) $(DESTDIR)$(topdir)
