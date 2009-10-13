@@ -758,10 +758,14 @@ install_libs: $(INSTALL_LIBS)
 	done
 
 install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
+ifeq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
+	@:
+else
 	$(INSTALL_DIR) $(DESTDIR)$(ghclibexecdir)
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibexecdir); \
 	done
+endif
 
 install_libexecs:  $(INSTALL_LIBEXECS)
 ifeq "$(INSTALL_LIBEXECS)" ""
