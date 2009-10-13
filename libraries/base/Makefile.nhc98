@@ -40,7 +40,7 @@ SRCS	= \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Unsafe/Coerce.hs \
-	WCsubst.c dirUtils.c \
+	WCsubst.c \
 	GHC/IO/Device.hs \
 	System/Posix/Types.hs System/Posix/Internals.hs \
 	System/Console/GetOpt.hs \
@@ -62,6 +62,7 @@ SRCS	= \
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
 #	System/Posix/Types.hs System/Posix/Signals.hsc
 #	System/FilePath.hs
+#	dirUtils.c
 
 
 # Here are the main rules.
