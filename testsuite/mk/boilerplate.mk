@@ -63,7 +63,7 @@ ifeq "$(BINDIST)" "YES"
 ifeq '$(shell $(STAGE1_GHC) +RTS --info | grep "^ ..\"Host OS\". \"mingw32\".$$")' ''
 TEST_HC := $(abspath $(TOP)/../)/bindisttest/installed/bin/ghc
 else
-TEST_HC := "$(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc"
+TEST_HC := "$(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc.exe"
 endif
 else ifeq "$(stage)" "1"
 TEST_HC := $(STAGE1_GHC)
