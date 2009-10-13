@@ -60,7 +60,7 @@ STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
 ifneq "$(wildcard $(STAGE1_GHC) $(STAGE1_GHC).exe)" ""
 
 ifeq "$(BINDIST)" "YES"
-ifeq '$(shell $(STAGE1_GHC) --info | grep "^ ..\"Host OS\". \"mingw32\".$$")' ''
+ifeq '$(shell $(STAGE1_GHC) +RTS --info | grep "^ ..\"Host OS\". \"mingw32\".$$")' ''
 TEST_HC := $(abspath $(TOP)/../)/bindisttest/installed/bin/ghc
 else
 TEST_HC := "$(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc"
