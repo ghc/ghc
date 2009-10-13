@@ -91,21 +91,21 @@ endif
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config=$(CONFIG) \
-	-e config.confdir=\"$(CONFIGDIR)\" \
-	-e config.compiler=\"$(TEST_HC)\" \
-	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
-	-e config.ghc_pkg=\"$(GHC_PKG)\" \
-	-e config.hp2ps=\"$(HP2PS_ABS)\" \
-	-e config.hpc=\"$(HPC)\" \
-	-e config.gs=\"$(GS)\" \
-	-e config.platform=\"$(TARGETPLATFORM)\" \
-	-e config.os=\"$(TargetOS_CPP)\" \
-	-e config.wordsize=\"$(WORDSIZE)\" \
-	-e default_testopts.cleanup=\"$(CLEANUP)\" \
-	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
-	-e config.timeout_prog=\"$(TIMEOUT_PROGRAM)\" \
-	-e config.exeext=\"$(exeext)\" \
-	-e config.top=\"$(TOP_ABS)\" \
+	-e 'config.confdir="$(CONFIGDIR)"' \
+	-e 'config.compiler="$(TEST_HC)"' \
+	-e 'config.compiler_always_flags.append("$(EXTRA_HC_OPTS)")' \
+	-e 'config.ghc_pkg="$(GHC_PKG)"' \
+	-e 'config.hp2ps="$(HP2PS_ABS)"' \
+	-e 'config.hpc="$(HPC)"' \
+	-e 'config.gs="$(GS)"' \
+	-e 'config.platform="$(TARGETPLATFORM)"' \
+	-e 'config.os="$(TargetOS_CPP)"' \
+	-e 'config.wordsize="$(WORDSIZE)"' \
+	-e 'default_testopts.cleanup="$(CLEANUP)"' \
+	-e 'config.timeout="int($(TIMEOUT)) or config.timeout"' \
+	-e 'config.timeout_prog="$(TIMEOUT_PROGRAM)"' \
+	-e 'config.exeext="$(exeext)"' \
+	-e 'config.top="$(TOP_ABS)"' \
 	$(EXTRA_RUNTEST_OPTS)
 
 ifeq "$(fast)" "YES"

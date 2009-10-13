@@ -100,7 +100,8 @@ config.way_rts_flags = {
     	}
 
 def get_compiler_info():
-    h = os.popen(config.compiler + ' --numeric-version', 'r')
+    # This should really not go through the shell
+    h = os.popen('"' + config.compiler + '" --numeric-version', 'r')
     v = h.read()
     h.close()
     v = re.sub('[\r\n]', '', v)
