@@ -797,18 +797,24 @@ install_headers: $(INSTALL_HEADERS)
 
 install_docs: $(INSTALL_HEADERS)
 	$(INSTALL_DIR) $(DESTDIR)$(docdir)
+ifneq "$(INSTALL_DOCS)" ""
 	for i in $(INSTALL_DOCS); do \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir); \
 	done
-	$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html; \
-	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html $(DESTDIR)$(docdir)/html; \
+endif
+	$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html
+	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html $(DESTDIR)$(docdir)/html
+ifneq "$(INSTALL_LIBRARY_DOCS)" ""
 	for i in $(INSTALL_LIBRARY_DOCS); do \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i $(DESTDIR)$(docdir)/html/libraries/; \
 	done
+endif
+ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(INSTALL_DIR) $(INSTALL_OPTS) $(DESTDIR)$(docdir)/html/`basename $$i`; \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* $(DESTDIR)$(docdir)/html/`basename $$i`; \
 	done
+endif
 
 INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 
