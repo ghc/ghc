@@ -17,7 +17,7 @@ show:
 
 define canonicalise
 # $1 = path variable
-$1_CYGPATH := $$(shell $(SHELL) -c "cygpath -m $$($1)" 2> /dev/null)
+$1_CYGPATH := $$(shell $(SHELL) -c "cygpath -m '$$($1)'" 2> /dev/null)
 ifneq "$$($1_CYGPATH)" ""
 $1 := $$($1_CYGPATH)
 endif
@@ -32,15 +32,15 @@ $(call canonicalise,$1)
 endef
 
 define get-ghc-rts-field # $1 = rseult variable, $2 = field name
-$1 := $$(shell $$(TEST_HC) +RTS --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
+$1 := $$(shell '$$(TEST_HC)' +RTS --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 endef
 
 define get-ghc-field # $1 = rseult variable, $2 = field name
-$1 := $$(shell $$(TEST_HC) --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
+$1 := $$(shell '$$(TEST_HC)' --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 endef
 
 define get-ghc-feature-bool # $1 = rseult variable, $2 = field name
-SHELL_RES := $$(shell $$(TEST_HC) --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
+SHELL_RES := $$(shell '$$(TEST_HC)' --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 $1 := $$(strip \
 	  $$(if $$(SHELL_RES), \
          $$(if $$(subst YES,,$$(SHELL_RES)), \
@@ -63,7 +63,7 @@ ifeq "$(BINDIST)" "YES"
 ifeq '$(shell $(STAGE1_GHC) +RTS --info | grep "^ ..\"Host OS\". \"mingw32\".$$")' ''
 TEST_HC := $(abspath $(TOP)/../)/bindisttest/installed/bin/ghc
 else
-TEST_HC := "$(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc.exe"
+TEST_HC := $(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc.exe
 endif
 else ifeq "$(stage)" "1"
 TEST_HC := $(STAGE1_GHC)
@@ -80,44 +80,45 @@ endif
 
 endif
 
+BIN_ROOT = $(TEST_HC)/..
+
 ifeq "$(GHC_PKG)" ""
-GHC_PKG := $(dir $(TEST_HC))/ghc-pkg
+GHC_PKG := $(BIN_ROOT)/ghc-pkg
 endif
 
 ifeq "$(HSC2HS)" ""
-HSC2HS := $(dir $(TEST_HC))/hsc2hs
+HSC2HS := $(BIN_ROOT)/hsc2hs
 endif
 
 ifeq "$(HP2PS_ABS)" ""
-HP2PS_ABS := $(dir $(TEST_HC))/hp2ps
+HP2PS_ABS := $(BIN_ROOT)/hp2ps
 endif
 
 ifeq "$(HPC)" ""
-HPC := $(dir $(TEST_HC))/hpc
+HPC := $(BIN_ROOT)/hpc
 endif
 
-$(eval $(call canonicaliseExecutable,TEST_HC))
-ifeq "$(wildcard $(TEST_HC))" ""
+ifeq "$(shell test -e '$(TEST_HC)' && echo exists)" ""
 $(error Cannot find ghc: $(TEST_HC))
 endif
 
 $(eval $(call canonicaliseExecutable,GHC_PKG))
-ifeq "$(wildcard $(GHC_PKG))" ""
+ifeq "$(shell test -e '$(GHC_PKG)' && echo exists)" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
 endif
 
 $(eval $(call canonicaliseExecutable,HSC2HS))
-ifeq "$(wildcard $(HSC2HS))" ""
+ifeq "$(shell test -e '$(HSC2HS)' && echo exists)" ""
 $(error Cannot find hsc2hs: $(HSC2HS))
 endif
 
 $(eval $(call canonicaliseExecutable,HP2PS_ABS))
-ifeq "$(wildcard $(HP2PS_ABS))" ""
+ifeq "$(shell test -e '$(HP2PS_ABS)' && echo exists)" ""
 $(error Cannot find hp2ps: $(HP2PS_ABS))
 endif
 
 $(eval $(call canonicaliseExecutable,HPC))
-ifeq "$(wildcard $(HPC))" ""
+ifeq "$(shell test -e '$(HPC)' && echo exists)" ""
 $(error Cannot find hpc: $(HPC))
 endif
 
