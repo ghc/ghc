@@ -80,7 +80,7 @@ endif
 
 endif
 
-BIN_ROOT = $(TEST_HC)/..
+BIN_ROOT = $(dir $(TEST_HC))
 
 ifeq "$(GHC_PKG)" ""
 GHC_PKG := $(BIN_ROOT)/ghc-pkg
