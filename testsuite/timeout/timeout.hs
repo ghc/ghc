@@ -28,9 +28,15 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-      [secs,cmd] -> run (read secs) cmd
-      _ -> do hPutStrLn stderr $ "timeout: bad arguments " ++ show args
-              exitWith (ExitFailure 1)
+      [secs,cmd] ->
+          case reads secs of
+          [(secs', "")] -> run secs' cmd
+          _ -> die ("Can't parse " ++ show secs ++ " as a number of seconds")
+      _ -> die ("Bad arguments " ++ show args)
+
+die :: String -> IO ()
+die msg = do hPutStrLn stderr ("timeout: " ++ msg)
+             exitWith (ExitFailure 1)
 
 timeoutMsg :: String
 timeoutMsg = "Timeout happened...killing process..."
