@@ -23,6 +23,6 @@ fin envp ap = runIO $ do
 main = do
   a   <- new (55 :: Int)
   env <- new (66 :: Int)
-  fp  <- Conc.newForeignPtr a (fin env a)
+  fp  <- Conc.newForeignPtr a (finptr env a)
   performGC
   threadDelay 100000
