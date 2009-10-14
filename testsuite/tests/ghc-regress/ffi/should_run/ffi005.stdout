@@ -2,24 +2,10 @@
 Testing sin==mysin (should return lots of Trues)
 [True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True]
 
-Testing errno
-errno == 25
-
 Testing puts (and withString)
 
 Testing peekArray0
 Test successful
-Testing open, read and close
--- !!! test for foreign import dynamic/wrapper, orignally by Alastair Reid,
--- with a few changes to get it to run on GHC by Simon Marlow.
-
-import Foreign
-import Foreign.C
-import Control.Exception
-imp
-
-Testing open, write and close
-
 Testing sin==dynamic_sin (should return lots of Trues)
 [True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True,True]
 

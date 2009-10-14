@@ -13,9 +13,11 @@ main = do
   putStrLn "\nTesting sin==mysin (should return lots of Trues)"
   print (testSin sin mysin)
 
-  putStrLn "\nTesting errno"
-  err <- peek errno
-  putStrLn $ "errno == " ++ show err
+-- disabled because errno is not necessarily a label these days
+
+--   putStrLn "\nTesting errno"
+--   err <- peek errno
+--  putStrLn $ "errno == " ++ show err
 
   putStrLn "\nTesting puts (and withString)"
   withCString "Test successful" puts
@@ -24,12 +26,14 @@ main = do
   s <- withCString "Test successful" (peekArray0 (castCharToCChar '\0'))
   putStr (map castCCharToChar s)
 
-  putStrLn "\nTesting open, read and close"
-  s <- testRead "ffi005.hs" 200
-  putStrLn (map castCCharToChar s)
+-- disabled due to use of non-portable constants in arguments to open:
 
-  putStrLn "\nTesting open, write and close"
-  testWrite "/tmp/test_write" "Test successful"
+--  putStrLn "\nTesting open, read and close"
+--  s <- testRead "ffi005.hs" 200
+--  putStrLn (map castCCharToChar s)
+
+--  putStrLn "\nTesting open, write and close"
+--  testWrite "/tmp/test_write" "Test successful"
 
   putStrLn "\nTesting sin==dynamic_sin (should return lots of Trues)"
   print (testSin sin (dyn_sin sin_addr))
@@ -57,7 +61,7 @@ foreign import ccall "&sin" sin_addr :: FunPtr (CDouble -> CDouble)
 foreign import ccall "wrapper" wrapId :: (CDouble -> CDouble) -> IO (FunPtr (CDouble -> CDouble))
 foreign import ccall "wrapper" wrapIO :: (CDouble -> IO CDouble) -> IO (FunPtr (CDouble -> IO CDouble))
 
-foreign import ccall safe "static stdlib.h &errno" errno :: Ptr CInt
+-- foreign import ccall safe "static stdlib.h &errno" errno :: Ptr CInt
 
 withBuffer sz m = do
   b <- mallocArray sz
@@ -68,29 +72,29 @@ withBuffer sz m = do
 
 foreign import ccall puts :: CString -> IO CInt
 
-foreign import ccall "open" open'  :: CString -> CInt -> IO CInt
-foreign import ccall "open" open2' :: CString -> CInt -> CInt -> IO CInt
-foreign import ccall "creat" creat' :: CString -> CInt -> IO CInt
-foreign import ccall        close :: CInt -> IO CInt
-foreign import ccall "read" read' :: CInt -> CString -> CInt -> IO CInt
-foreign import ccall "write" write' :: CInt -> CString -> CInt -> IO CInt
+-- foreign import ccall "open" open'  :: CString -> CInt -> IO CInt
+-- foreign import ccall "open" open2' :: CString -> CInt -> CInt -> IO CInt
+-- foreign import ccall "creat" creat' :: CString -> CInt -> IO CInt
+-- foreign import ccall        close :: CInt -> IO CInt
+-- foreign import ccall "read" read' :: CInt -> CString -> CInt -> IO CInt
+-- foreign import ccall "write" write' :: CInt -> CString -> CInt -> IO CInt
 
-creat s m   = withCString s $ \s' -> unix "creat" $ creat' s' m
-open s m    = withCString s $ \s' -> unix "open"  $ open' s' m
-open2 s m n = withCString s $ \s' -> unix "open2" $ open2' s' m n
-write fd s  = withCString s $ \s' -> unix "write" $ write' fd s' (fromIntegral (length s))
-read  fd sz = withBuffer sz $ \s' -> unix "read"  $ read' fd s' (fromIntegral sz)
+-- creat s m   = withCString s $ \s' -> unix "creat" $ creat' s' m
+-- open s m    = withCString s $ \s' -> unix "open"  $ open' s' m
+-- open2 s m n = withCString s $ \s' -> unix "open2" $ open2' s' m n
+-- write fd s  = withCString s $ \s' -> unix "write" $ write' fd s' (fromIntegral (length s))
+-- read  fd sz = withBuffer sz $ \s' -> unix "read"  $ read' fd s' (fromIntegral sz)
 
-unix s m = do
-  x <- m
-  if x < 0
-   then do
-     err <- peek errno
-     ioError $ userError $ s ++ ": " ++ show (x,err)
-   else return (fromIntegral x)
+-- unix s m = do
+--   x <- m
+--   if x < 0
+--    then do
+--      err <- peek errno
+--      ioError $ userError $ s ++ ": " ++ show (x,err)
+--    else return (fromIntegral x)
 
-testRead fn sz = bracket (open fn 0) close (flip read sz)
-testWrite fn s = bracket (open2 fn (512+64+1) 511) close (flip write s)
+-- testRead fn sz = bracket (open fn 0) close (flip read sz)
+-- testWrite fn s = bracket (open2 fn (512+64+1) 511) close (flip write s)
 
 foreign import ccall exit :: Int -> IO ()
 

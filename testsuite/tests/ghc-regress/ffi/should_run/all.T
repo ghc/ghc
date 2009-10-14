@@ -26,9 +26,7 @@ test('ffi003', normal, compile_and_run, [''])
 # calling varargs functions is deprecated).  It stopped working in GHC 6.9.
 test('ffi004', skip, compile_and_run, [''])
 
-# skip this test for now: it is non-portable due to the use of literal values
-# instead of CPP symbols for the flag arguments to open().
-test('ffi005', compose(skip, exit_code(3)), compile_and_run, [''])
+test('ffi005', exit_code(3), compile_and_run, [''])
 
 # ffi[006-009] don't work with External Core due to non-static-C foreign calls
 
