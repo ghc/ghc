@@ -11,3 +11,4 @@ test('2388', normal, compile, [''])
 test('3132', normal, compile, ['-dcmm-lint'])
 test('T3286', extra_clean(['T3286b.o','T3286b.hi']), 
               multimod_compile, ['T3286', '-v0'])
+test('3579', normal, compile, [''])
