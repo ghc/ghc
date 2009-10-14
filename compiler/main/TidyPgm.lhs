@@ -303,8 +303,10 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 	      ; th	   = dopt Opt_TemplateHaskell      dflags
               }
 
+    	; let { implicit_binds = getImplicitBinds type_env }
+
         ; (unfold_env, tidy_occ_env)
-              <- chooseExternalIds hsc_env mod omit_prags binds
+              <- chooseExternalIds hsc_env mod omit_prags binds implicit_binds
 
         ; let { ext_rules 
 		   | omit_prags = []
@@ -338,7 +340,6 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		-- empty
 
 	      -- See Note [Injecting implicit bindings]
-    	      ; implicit_binds = getImplicitBinds type_env
     	      ; all_tidy_binds = implicit_binds ++ tidy_binds
 
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
@@ -552,10 +553,11 @@ chooseExternalIds :: HscEnv
                   -> Module
                   -> Bool
 		  -> [CoreBind]
+                  -> [CoreBind]
                   -> IO (UnfoldEnv, TidyOccEnv)
 	-- Step 1 from the notes above
 
-chooseExternalIds hsc_env mod omit_prags binds
+chooseExternalIds hsc_env mod omit_prags binds implicit_binds
   = do
     (unfold_env1,occ_env1) 
         <- search (zip sorted_exports sorted_exports) emptyVarEnv init_occ_env
@@ -576,11 +578,12 @@ chooseExternalIds hsc_env mod omit_prags binds
                      filter isExportedId binders
 
   binders = bindersOfBinds binds
+  implicit_binders = bindersOfBinds implicit_binds
 
   bind_env :: IdEnv (Id,CoreExpr)
   bind_env = mkVarEnv (zip (map fst bs) bs) where bs = flattenBinds binds
 
-  avoids   = [getOccName name | bndr <- binders,
+  avoids   = [getOccName name | bndr <- binders ++ implicit_binders,
                                 let name = idName bndr,
                                 isExternalName name ]
 		-- In computing our "avoids" list, we must include
@@ -589,6 +592,8 @@ chooseExternalIds hsc_env mod omit_prags binds
 		--					all by the renamer)
 		-- since their names are "taken".
 		-- The type environment is a convenient source of such things.
+                -- In particular, the set of binders doesn't include
+                -- implicit Ids at this stage.
 
 	-- We also make sure to avoid any exported binders.  Consider
 	--	f{-u1-} = 1	-- Local decl
