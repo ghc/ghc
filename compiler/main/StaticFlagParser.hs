@@ -120,6 +120,7 @@ static_flags = [
         ------ Debugging ----------------------------------------------------
   , Flag "dppr-debug"        (PassFlag addOpt) Supported
   , Flag "dsuppress-uniques" (PassFlag addOpt) Supported
+  , Flag "dsuppress-coercions" (PassFlag addOpt) Supported
   , Flag "dppr-user-length"  (AnySuffix addOpt) Supported
   , Flag "dopt-fuel"         (AnySuffix addOpt) Supported
   , Flag "dno-debug-output"  (PassFlag addOpt) Supported

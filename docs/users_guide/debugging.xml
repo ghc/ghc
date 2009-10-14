@@ -437,6 +437,17 @@
 
       <varlistentry>
 	<term>
+          <option>-dsuppress-coercions</option>
+          <indexterm><primary><option>-dsuppress-coercions</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Suppress the printing of coercions in Core dumps to make them
+shorter.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-dppr-user-length</option>
           <indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
         </term>

@@ -27,6 +27,7 @@ import DataCon
 import TyCon
 import Type
 import Coercion
+import StaticFlags
 import BasicTypes
 import Util
 import Outputable
@@ -114,9 +115,11 @@ ppr_expr _       (Lit lit)  = ppr lit
 ppr_expr add_par (Cast expr co) 
   = add_par $
     sep [pprParendExpr expr, 
-	 ptext (sLit "`cast`") <+> parens (pprCo co)]
+	 ptext (sLit "`cast`") <+> pprCo co]
   where
-    pprCo co = sep [ppr co, dcolon <+> ppr (coercionKindPredTy co)]
+    pprCo co | opt_SuppressCoercions = ptext (sLit "...")
+             | otherwise = parens
+                         $ sep [ppr co, dcolon <+> ppr (coercionKindPredTy co)]
 	 
 
 ppr_expr add_par expr@(Lam _ _)

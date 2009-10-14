@@ -22,6 +22,7 @@ module StaticFlags (
 	-- Output style options
 	opt_PprUserLength,
 	opt_SuppressUniques,
+        opt_SuppressCoercions,
 	opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
@@ -182,6 +183,8 @@ opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 -- debugging opts
 opt_SuppressUniques :: Bool
 opt_SuppressUniques		= lookUp  (fsLit "-dsuppress-uniques")
+opt_SuppressCoercions :: Bool
+opt_SuppressCoercions           = lookUp  (fsLit "-dsuppress-coercions")
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug		= lookUp  (fsLit "-dppr-debug")
 opt_PprUserLength   :: Int

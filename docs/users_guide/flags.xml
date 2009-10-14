@@ -2307,6 +2307,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-dsuppress-coercions</option></entry>
+	      <entry>Suppress the printing of coercions in Core dumps to make them shorter.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-dppr-noprags</option></entry>
 	      <entry>Don't output pragma info in dumps</entry>
 	      <entry>static</entry>
