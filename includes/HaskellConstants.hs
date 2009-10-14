@@ -1,5 +1,7 @@
 
 import Data.Bits (shiftL)
+import Data.Word
+import Data.Int
 
 -- This magical #include brings in all the everybody-knows-these magic
 -- constants unfortunately, we need to be *explicit* about which one
@@ -134,6 +136,26 @@ wORD_SIZE = SIZEOF_HSWORD
 
 wORD_SIZE_IN_BITS :: Int
 wORD_SIZE_IN_BITS = wORD_SIZE * 8
+
+-- Define a fixed-range integral type equivalent to the target Int/Word
+
+#if SIZEOF_HSWORD == 4
+type TargetInt  = Int32
+type TargetWord = Word32
+#elif SIZEOF_HSWORD == 8
+type TargetInt  = Int64
+type TargetWord = Word64
+#else
+#error unknown SIZEOF_HSWORD
+#endif
+
+tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: Integer
+tARGET_MIN_INT  = fromIntegral (minBound :: TargetInt)
+tARGET_MAX_INT  = fromIntegral (maxBound :: TargetInt)
+tARGET_MAX_WORD = fromIntegral (maxBound :: TargetWord)
+
+tARGET_MAX_CHAR :: Int
+tARGET_MAX_CHAR = 0x10ffff
 
 -- Amount of pointer bits used for semi-tagging constructor closures
 
