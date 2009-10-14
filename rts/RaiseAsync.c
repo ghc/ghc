@@ -886,7 +886,17 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    if (stop_at_atomically) {
 		ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
 		stmCondemnTransaction(cap, tso -> trec);
-		tso->sp = frame;
+		tso->sp = frame - 2;
+                // The ATOMICALLY_FRAME expects to be returned a
+                // result from the transaction, which it stores in the
+                // stack frame.  Hence we arrange to return a dummy
+                // result, so that the GC doesn't get upset (#3578).
+                // Perhaps a better way would be to have a different
+                // ATOMICALLY_FRAME instance for condemned
+                // transactions, but I don't fully understand the
+                // interaction with STM invariants.
+                tso->sp[1] = (W_)&stg_NO_TREC_closure;
+                tso->sp[0] = (W_)&stg_gc_unpt_r1_info;
 		tso->what_next = ThreadRunGHC;
 		return;
 	    }
