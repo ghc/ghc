@@ -342,6 +342,8 @@ main(int argc, char *argv[])
 
     closure_field(StgAtomicInvariant, code);
 
+    closure_field(StgTRecHeader, enclosing_trec);
+
     closure_size(StgCatchSTMFrame);
     closure_field(StgCatchSTMFrame, handler);
     closure_field(StgCatchSTMFrame, code);

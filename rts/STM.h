@@ -83,13 +83,6 @@ void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
 
 void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
 
-/*
- * Return the trec within which the specified trec was created (not
- * valid if trec==NO_TREC).
- */
-
-StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
-
 /*----------------------------------------------------------------------
 
    Validation

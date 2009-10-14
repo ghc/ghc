@@ -650,7 +650,7 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 
    frame = Sp;
    trec = StgTSO_trec(CurrentTSO);
-   ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+   outer  = StgTRecHeader_enclosing_trec(trec);
    (r) = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
    if (r != 0) {
      /* Succeeded (either first branch or second branch) */
@@ -685,7 +685,7 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
   frame  = Sp;
   trec   = StgTSO_trec(CurrentTSO);
   result = R1;
-  ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+  outer  = StgTRecHeader_enclosing_trec(trec);
 
   if (outer == NO_TREC) {
     /* First time back at the atomically frame -- pick up invariants */
@@ -782,7 +782,7 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
       W_ r, frame, trec, outer;
       frame = Sp;
       trec = StgTSO_trec(CurrentTSO);
-      ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      outer  = StgTRecHeader_enclosing_trec(trec);
       (r) = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
       if (r != 0) {
         /* Commit succeeded */
@@ -917,7 +917,7 @@ retry_pop_stack:
   Sp = StgTSO_sp(CurrentTSO);
   frame = Sp;
   trec = StgTSO_trec(CurrentTSO);
-  ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+  outer  = StgTRecHeader_enclosing_trec(trec);
 
   if (frame_type == CATCH_RETRY_FRAME) {
     // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
@@ -950,7 +950,7 @@ retry_pop_stack:
     foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
     trec = outer;
     StgTSO_trec(CurrentTSO) = trec;
-    ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+    outer  = StgTRecHeader_enclosing_trec(trec);
   }
   ASSERT(outer == NO_TREC);
 

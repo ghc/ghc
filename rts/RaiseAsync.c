@@ -884,7 +884,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    
 	case ATOMICALLY_FRAME:
 	    if (stop_at_atomically) {
-		ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
+		ASSERT(tso->trec->enclosing_trec == NO_TREC);
 		stmCondemnTransaction(cap, tso -> trec);
 		tso->sp = frame - 2;
                 // The ATOMICALLY_FRAME expects to be returned a
@@ -914,7 +914,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
 		{
             StgTRecHeader *trec = tso -> trec;
-            StgTRecHeader *outer = stmGetEnclosingTRec(trec);
+            StgTRecHeader *outer = trec -> enclosing_trec;
 	    debugTrace(DEBUG_stm, 
 		       "found atomically block delivering async exception");
             stmAbortTransaction(cap, trec);

@@ -1062,7 +1062,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
             // partially-evaluated thunks on the heap.
             throwToSingleThreaded_(cap, t, NULL, rtsTrue);
             
-            ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
+//            ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
         }
     }
 
@@ -2564,7 +2564,7 @@ findRetryFrameHelper (StgTSO *tso)
       
     case CATCH_STM_FRAME: {
         StgTRecHeader *trec = tso -> trec;
-	StgTRecHeader *outer = stmGetEnclosingTRec(trec);
+	StgTRecHeader *outer = trec -> enclosing_trec;
         debugTrace(DEBUG_stm,
 		   "found CATCH_STM_FRAME at %p during retry", p);
         debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);

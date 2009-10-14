@@ -398,7 +398,7 @@ retry_pop_stack:
       W_ r;
       trec = StgTSO_trec(CurrentTSO);
       (r) = foreign "C" stmValidateNestOfTransactions(trec "ptr") [];
-      ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      outer  = StgTRecHeader_enclosing_trec(trec);
       foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
       foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
 
@@ -498,7 +498,7 @@ retry_pop_stack:
     } else {
       W_ trec, outer;
       trec = StgTSO_trec(CurrentTSO);
-      ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      outer  = StgTRecHeader_enclosing_trec(trec);
       foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
       foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
       StgTSO_trec(CurrentTSO) = outer;

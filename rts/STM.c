@@ -1026,16 +1026,6 @@ void stmCondemnTransaction(Capability *cap,
 
 /*......................................................................*/
 
-StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec) {
-  StgTRecHeader *outer;
-  TRACE("%p : stmGetEnclosingTRec", trec);
-  outer = trec -> enclosing_trec;
-  TRACE("%p : stmGetEnclosingTRec()=%p", trec, outer);
-  return outer;
-}
-
-/*......................................................................*/
-
 StgBool stmValidateNestOfTransactions(StgTRecHeader *trec) {
   StgTRecHeader *t;
   StgBool result;
