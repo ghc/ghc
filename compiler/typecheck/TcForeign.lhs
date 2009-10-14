@@ -94,7 +94,7 @@ tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ (CLabel _))
   = ASSERT( null arg_tys )
-    do { checkCg checkCOrAsm
+    do { checkCg checkCOrAsmOrInterp
        ; checkSafety safety
        ; check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
        ; return idecl }	     -- NB check res_ty not sig_ty!
@@ -244,6 +244,7 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 \begin{code}
 tcCheckFEType :: Type -> ForeignExport -> TcM ()
 tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
+    checkCg checkCOrAsm
     check (isCLabelString str) (badCName str)
     checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
