@@ -496,6 +496,11 @@ why CoreUnfold.mkImplicitUnfolding uses simleExprOpt to do a bit of
 optimisation first.  (Only matters when the selector is used curried;
 eg map x ys.)  See Trac #2070.
 
+[Oct 09: in fact, record selectors are no longer implicit Ids at all,
+because we really do want to optimise them properly. They are treated
+much like any other Id.  But doing "light" optimisation on an implicit
+Id still makes sense.]
+
 At one time I tried injecting the implicit bindings *early*, at the
 beginning of SimplCore.  But that gave rise to real difficulty,
 becuase GlobalIds are supposed to have *fixed* IdInfo, but the
@@ -506,18 +511,23 @@ importing modules were expecting it to have arity 1 (Trac #2844).
 It's much safer just to inject them right at the end, after tidying.
 
 Oh: two other reasons for injecting them late:
+
   - If implicit Ids are already in the bindings when we start TidyPgm,
     we'd have to be careful not to treat them as external Ids (in
     the sense of findExternalIds); else the Ids mentioned in *their*
     RHSs will be treated as external and you get an interface file 
     saying      a18 = <blah>
     but nothing refererring to a18 (because the implicit Id is the 
-    one that does).
+    one that does, and implicit Ids don't appear in interface files).
 
   - More seriously, the tidied type-envt will include the implicit
     Id replete with a18 in its unfolding; but we won't take account
     of a18 when computing a fingerprint for the class; result chaos.
     
+There is one sort of implicit binding that is injected still later,
+namely those for data constructor workers. Reason (I think): it's
+really just a code generation trick.... binding itself makes no sense.
+See CorePrep Note [Data constructor workers].
 
 \begin{code}
 getImplicitBinds :: TypeEnv -> [CoreBind]

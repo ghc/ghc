@@ -497,7 +497,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    let sorted_deps = sortDependencies (mi_deps iface0)
 
    -- the export hash of a module depends on the orphan hashes of the
-   -- orphan modules below us in the dependeny tree.  This is the way
+   -- orphan modules below us in the dependency tree.  This is the way
    -- that changes in orphans get propagated all the way up the
    -- dependency tree.  We only care about orphan modules in the current
    -- package, because changes to orphans outside this package will be

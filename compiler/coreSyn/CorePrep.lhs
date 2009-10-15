@@ -86,7 +86,6 @@ The goal of this pass is to prepare for code generation.
 8.  Inject bindings for the "implicit" Ids:
 	* Constructor wrappers
 	* Constructor workers
-	* Record selectors
     We want curried definitions for all of these in case they
     aren't inlined by some caller.
 	
