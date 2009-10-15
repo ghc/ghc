@@ -11,6 +11,7 @@ module VectBuiltIn (
 
 import DsMonad
 import IfaceEnv        ( lookupOrig )
+import InstEnv
 
 import Module
 import DataCon         ( DataCon, dataConName, dataConWorkId )
@@ -92,6 +93,8 @@ dph_Modules pkg = Modules {
   where
     mk = mkModule pkg . mkModuleNameFS
 
+dph_Orphans :: [Modules -> Module]
+dph_Orphans = [dph_Repr, dph_Instances]
 
 data Builtins = Builtins {
                   dphModules       :: Modules
@@ -174,6 +177,7 @@ closureCtrFun = indexBuiltin "closureCtrFun" closureCtrFuns
 initBuiltins :: PackageId -> DsM Builtins
 initBuiltins pkg
   = do
+      mapM_ load dph_Orphans
       parrayTyCon  <- externalTyCon dph_PArray (fsLit "PArray")
       let [parrayDataCon] = tyConDataCons parrayTyCon
       pdataTyCon   <- externalTyCon dph_PArray (fsLit "PData")
@@ -278,6 +282,11 @@ initBuiltins pkg
              , dph_Scalar         = dph_Scalar
              })
       = dph_Modules pkg
+
+    load get_mod = dsLoadModule doc mod
+      where
+        mod = get_mod modules 
+        doc = ppr mod <+> ptext (sLit "is a DPH module")
 
     numbered :: String -> Int -> Int -> [FastString]
     numbered pfx m n = [mkFastString (pfx ++ show i) | i <- [m..n]]
@@ -453,66 +462,19 @@ initBuiltinDataCons _ = [(dataConName dc, dc)| dc <- defaultDataCons]
 defaultDataCons :: [DataCon]
 defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
 
-initBuiltinDicts :: [(Name, Module, FastString)] -> DsM [(Name, Var)]
-initBuiltinDicts ps
-  = do
-      dicts <- zipWithM externalVar mods fss
-      return $ zip tcs dicts
+initBuiltinPAs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
+initBuiltinPAs (Builtins { dphModules = mods }) insts
+  = liftM (initBuiltinDicts insts) (externalClass (dph_PArray mods) (fsLit "PA"))
+
+initBuiltinPRs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
+initBuiltinPRs (Builtins { dphModules = mods }) insts
+  = liftM (initBuiltinDicts insts) (externalClass (dph_PArray mods) (fsLit "PR"))
+
+initBuiltinDicts :: (InstEnv, InstEnv) -> Class -> [(Name, Var)]
+initBuiltinDicts insts cls = map find $ classInstances insts cls
   where
-    (tcs, mods, fss) = unzip3 ps
-
-initBuiltinPAs :: Builtins -> DsM [(Name, Var)]
-initBuiltinPAs = initBuiltinDicts . builtinPAs
-
-builtinPAs :: Builtins -> [(Name, Module, FastString)]
-builtinPAs bi@(Builtins { dphModules = mods })
-  = [
-      mk (tyConName $ closureTyCon bi)  (dph_Closure   mods) (fsLit "$fPA:->")
-    , mk (tyConName $ voidTyCon bi)     (dph_Repr      mods) (fsLit "$fPAVoid")
-    , mk (tyConName $ parrayTyCon bi)   (dph_Instances mods) (fsLit "$fPAPArray")
-    , mk unitTyConName                  (dph_Instances mods) (fsLit "$fPA()")
-
-    , mk intTyConName                   (dph_Instances mods) (fsLit "$fPAInt")
-    , mk word8TyConName                 (dph_Instances mods) (fsLit "$fPAWord8")
-    , mk doubleTyConName                (dph_Instances mods) (fsLit "$fPADouble")
-    , mk boolTyConName                  (dph_Instances mods) (fsLit "$fPABool")
-    ]
-    ++ tups
-  where
-    mk name mod fs = (name, mod, fs)
-
-    tups = map mk_tup [2..mAX_DPH_PROD]
-    mk_tup n = mk (tyConName $ tupleTyCon Boxed n)
-                  (dph_Instances mods)
-                  (mkFastString $ "$fPA(" ++ replicate (n-1) ',' ++ ")")
-
-initBuiltinPRs :: Builtins -> DsM [(Name, Var)]
-initBuiltinPRs = initBuiltinDicts . builtinPRs
-
-builtinPRs :: Builtins -> [(Name, Module, FastString)]
-builtinPRs bi@(Builtins { dphModules = mods }) =
-  [
-    mk (tyConName   unitTyCon)           (dph_Repr mods)    (fsLit "$fPR()")
-  , mk (tyConName $ voidTyCon        bi) (dph_Repr mods)    (fsLit "$fPRVoid")
-  , mk (tyConName $ wrapTyCon        bi) (dph_Repr mods)    (fsLit "$fPRWrap")
-  , mk (tyConName $ closureTyCon     bi) (dph_Closure mods) (fsLit "$fPR:->")
-
-    -- temporary
-  , mk intTyConName          (dph_Instances mods) (fsLit "$fPRInt")
-  , mk word8TyConName        (dph_Instances mods) (fsLit "$fPRWord8")
-  , mk doubleTyConName       (dph_Instances mods) (fsLit "$fPRDouble")
-  ]
-
-  ++ map mk_sum  [2..mAX_DPH_SUM]
-  ++ map mk_prod [2..mAX_DPH_PROD]
-  where
-    mk name mod fs = (name, mod, fs)
-
-    mk_sum n = (tyConName $ sumTyCon n bi, dph_Repr mods,
-                mkFastString ("$fPRSum" ++ show n))
-
-    mk_prod n = (tyConName $ prodTyCon n bi, dph_Repr mods,
-                 mkFastString ("$fPR(" ++ replicate (n-1) ',' ++ ")"))
+    find i | [Just tc] <- instanceRoughTcs i = (tc, instanceDFunId i)
+           | otherwise = pprPanic "Invalid DPH instance" (ppr i)
 
 initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinBoxedTyCons = return . builtinBoxedTyCons
@@ -621,9 +583,7 @@ externalTyCon mod fs
   = dsLookupTyCon =<< lookupOrig mod (mkTcOccFS fs)
 
 externalClassTyCon :: Module -> FastString -> DsM TyCon
-externalClassTyCon mod fs
-  = liftM classTyCon
-  $ dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
+externalClassTyCon mod fs = liftM classTyCon (externalClass mod fs)
 
 externalType :: Module -> FastString -> DsM Type
 externalType mod fs
@@ -633,7 +593,7 @@ externalType mod fs
 
 externalClass :: Module -> FastString -> DsM Class
 externalClass mod fs
-  = dsLookupClass =<< lookupOrig mod (mkTcOccFS fs)
+  = dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
 
 unitTyConName :: Name
 unitTyConName = tyConName unitTyCon

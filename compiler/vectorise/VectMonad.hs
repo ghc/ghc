@@ -543,14 +543,15 @@ initV pkg hsc_env guts info p
         builtin_vars   <- initBuiltinVars builtins
         builtin_tycons <- initBuiltinTyCons builtins
         let builtin_datacons = initBuiltinDataCons builtins
-        builtin_pas    <- initBuiltinPAs builtins
-        builtin_prs    <- initBuiltinPRs builtins
         builtin_boxed  <- initBuiltinBoxedTyCons builtins
         builtin_scalars <- initBuiltinScalars builtins
 
         eps <- liftIO $ hscEPS hsc_env
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
             instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
+
+        builtin_prs    <- initBuiltinPRs builtins instEnvs
+        builtin_pas    <- initBuiltinPAs builtins instEnvs
 
         let genv = extendImportedVarsEnv builtin_vars
                  . extendScalars builtin_scalars
