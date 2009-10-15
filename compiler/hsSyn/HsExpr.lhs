@@ -469,21 +469,24 @@ ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext (sLit "proc"), ppr pat, ptext (sLit "->"), ppr cmd]
 
 ppr_expr (HsTick tickId vars exp)
-  = hcat [ptext (sLit "tick<"),
-          ppr tickId,
-          ptext (sLit ">("),
-          hsep (map pprHsVar vars),
-          ppr exp,
-          ptext (sLit ")")]
+  = pprTicks (ppr exp) $
+    hcat [ptext (sLit "tick<"),
+    ppr tickId,
+    ptext (sLit ">("),
+    hsep (map pprHsVar vars),
+    ppr exp,
+    ptext (sLit ")")]
 ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
-  = hcat [ptext (sLit "bintick<"),
+  = pprTicks (ppr exp) $
+    hcat [ptext (sLit "bintick<"),
           ppr tickIdTrue,
           ptext (sLit ","),
           ppr tickIdFalse,
           ptext (sLit ">("),
           ppr exp,ptext (sLit ")")]
 ppr_expr (HsTickPragma externalSrcLoc exp)
-  = hcat [ptext (sLit "tickpragma<"),
+  = pprTicks (ppr exp) $
+    hcat [ptext (sLit "tickpragma<"),
           ppr externalSrcLoc,
           ptext (sLit ">("),
           ppr exp,

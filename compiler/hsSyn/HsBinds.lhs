@@ -271,26 +271,36 @@ ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat 
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = pprBndr CaseBind var <+> equals <+> pprExpr (unLoc rhs)
 ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
 			fun_matches = matches,
-		        fun_tick = tick }) = 
-		           (case tick of 
-			      Nothing -> empty
-			      Just t  -> text "-- tick id = " <> ppr t
-			   ) $$ pprFunBind (unLoc fun) inf matches
+		        fun_tick = tick })
+  = pprTicks empty (case tick of 
+			Nothing -> empty
+			Just t  -> text "-- tick id = " <> ppr t)
+    $$  pprFunBind (unLoc fun) inf matches
 
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars, 
 			 abs_exports = exports, abs_binds = val_binds })
-     = sep [ptext (sLit "AbsBinds"),
-	    brackets (interpp'SP tyvars),
-	    brackets (interpp'SP dictvars),
-	    brackets (sep (punctuate comma (map ppr_exp exports)))]
-       $$
-       nest 2 ( vcat [pprBndr LetBind x | (_,x,_,_) <- exports]
-			-- Print type signatures
-		$$ pprLHsBinds val_binds )
+  = sep [ptext (sLit "AbsBinds"),
+  	 brackets (interpp'SP tyvars),
+  	 brackets (interpp'SP dictvars),
+  	 brackets (sep (punctuate comma (map ppr_exp exports)))]
+    $$
+    nest 2 ( vcat [pprBndr LetBind x | (_,x,_,_) <- exports]
+  			-- Print type signatures
+  	     $$ pprLHsBinds val_binds )
   where
     ppr_exp (tvs, gbl, lcl, prags)
 	= vcat [ppr gbl <+> ptext (sLit "<=") <+> ppr tvs <+> ppr lcl,
 	  	nest 2 (vcat (map (pprPrag gbl) prags))]
+\end{code}
+
+
+\begin{code}
+pprTicks :: SDoc -> SDoc -> SDoc
+-- Print stuff about ticks only when -dppr-debug is on, to avoid
+-- them appearing in error messages (from the desugarer); see Trac # 3263
+pprTicks pp_no_debug pp_when_debug
+  = getPprStyle (\ sty -> if debugStyle sty then pp_when_debug 
+                                            else pp_no_debug)
 \end{code}
 
 %************************************************************************
