@@ -253,7 +253,7 @@ ppr_data maybeInst ctxt t argsDoc cs decs
               <+> parens (hsep $ punctuate comma $ map ppr decs)
   where 
     pref :: [Doc] -> [Doc]
-    pref []     = [char '='] -- Can't happen in H98
+    pref []     = []      -- No constructors; can't happen in H98
     pref (d:ds) = (char '=' <+> d):map (char '|' <+>) ds
 
 ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Con -> [Name] -> Doc
