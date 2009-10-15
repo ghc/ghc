@@ -5,13 +5,13 @@ module VectUtils (
 
   newLocalVVar,
 
-  mkBuiltinCo, voidType,
+  mkBuiltinCo, voidType, mkWrapType,
   mkPADictType, mkPArrayType, mkPDataType, mkPReprType, mkPArray,
 
   pdataReprTyCon, pdataReprDataCon, mkVScrut,
-  prDFunOfTyCon,
+  prDictOfType, prDFunOfTyCon,
   paDictArgType, paDictOfType, paDFunType,
-  paMethod, mkPR, replicatePD, emptyPD, packPD,
+  paMethod, wrapPR, replicatePD, emptyPD, packPD,
   combinePD,
   liftPD,
   zipScalars, scalarClosure,
@@ -99,6 +99,9 @@ mkBuiltinTyConApps get_tc tys ty
 
 voidType :: VM Type
 voidType = mkBuiltinTyConApp voidTyCon []
+
+mkWrapType :: Type -> VM Type
+mkWrapType ty = mkBuiltinTyConApp wrapTyCon [ty]
 
 mkClosureTypes :: [Type] -> Type -> VM Type
 mkClosureTypes = mkBuiltinTyConApps closureTyCon
@@ -228,12 +231,32 @@ paMethod method _ ty
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
 
-mkPR :: Type -> VM CoreExpr
-mkPR ty
+prDictOfType :: Type -> VM CoreExpr
+prDictOfType ty = prDictOfTyApp ty_fn ty_args
+  where
+    (ty_fn, ty_args) = splitAppTys ty
+
+prDictOfTyApp :: Type -> [Type] -> VM CoreExpr
+prDictOfTyApp ty_fn ty_args
+  | Just ty_fn' <- coreView ty_fn = prDictOfTyApp ty_fn' ty_args
+prDictOfTyApp (TyConApp tc _) ty_args
   = do
-      fn   <- builtin mkPRVar
-      dict <- paDictOfType ty
-      return $ mkApps (Var fn) [Type ty, dict]
+      dfun <- prDFunOfTyCon tc
+      prDFunApply dfun ty_args
+prDictOfTyApp ty _ = noV
+
+prDFunApply :: CoreExpr -> [Type] -> VM CoreExpr
+prDFunApply dfun tys
+  = do
+      dicts <- mapM prDictOfType tys
+      return $ mkApps (mkTyApps dfun tys) dicts
+
+wrapPR :: Type -> VM CoreExpr
+wrapPR ty
+  = do
+      pa_dict <- paDictOfType ty
+      pr_dfun <- prDFunOfTyCon =<< builtin wrapTyCon
+      return $ mkApps pr_dfun [Type ty, pa_dict]
 
 replicatePD :: CoreExpr -> CoreExpr -> VM CoreExpr
 replicatePD len x = liftM (`mkApps` [len,x])

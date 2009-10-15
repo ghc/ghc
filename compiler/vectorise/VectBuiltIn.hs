@@ -15,7 +15,7 @@ import IfaceEnv        ( lookupOrig )
 import Module
 import DataCon         ( DataCon, dataConName, dataConWorkId )
 import TyCon           ( TyCon, tyConName, tyConDataCons )
-import Class           ( Class )
+import Class           ( Class, classTyCon )
 import CoreSyn         ( CoreExpr, Expr(..) )
 import Var             ( Var )
 import Id              ( mkSysLocal )
@@ -113,8 +113,8 @@ data Builtins = Builtins {
                 , closureTyCon     :: TyCon
                 , voidVar          :: Var
                 , pvoidVar         :: Var
+                , fromVoidVar      :: Var
                 , punitVar         :: Var
-                , mkPRVar          :: Var
                 , closureVar       :: Var
                 , applyVar         :: Var
                 , liftedClosureVar :: Var
@@ -154,8 +154,7 @@ sumTyCon = indexBuiltin "sumTyCon" sumTyCons
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n bi
-  | n == 1                      = wrapTyCon bi
-  | n >= 0 && n <= mAX_DPH_PROD = tupleTyCon Boxed n
+  | n >= 2 && n <= mAX_DPH_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
 prodDataCon :: Int -> Builtins -> DataCon
@@ -178,10 +177,10 @@ initBuiltins pkg
       parrayTyCon  <- externalTyCon dph_PArray (fsLit "PArray")
       let [parrayDataCon] = tyConDataCons parrayTyCon
       pdataTyCon   <- externalTyCon dph_PArray (fsLit "PData")
-      paTyCon      <- externalTyCon dph_PArray (fsLit "PA")
+      paTyCon      <- externalClassTyCon dph_PArray (fsLit "PA")
       let [paDataCon] = tyConDataCons paTyCon
       preprTyCon   <- externalTyCon dph_PArray (fsLit "PRepr")
-      prTyCon      <- externalTyCon dph_PArray (fsLit "PR")
+      prTyCon      <- externalClassTyCon dph_PArray (fsLit "PR")
       let [prDataCon] = tyConDataCons prTyCon
       closureTyCon <- externalTyCon dph_Closure (fsLit ":->")
 
@@ -206,8 +205,8 @@ initBuiltins pkg
 
       voidVar          <- externalVar dph_Repr (fsLit "void")
       pvoidVar         <- externalVar dph_Repr (fsLit "pvoid")
+      fromVoidVar      <- externalVar dph_Repr (fsLit "fromVoid")
       punitVar         <- externalVar dph_Repr (fsLit "punit")
-      mkPRVar          <- externalVar dph_PArray (fsLit "mkPR")
       closureVar       <- externalVar dph_Closure (fsLit "closure")
       applyVar         <- externalVar dph_Closure (fsLit "$:")
       liftedClosureVar <- externalVar dph_Closure (fsLit "liftedClosure")
@@ -255,8 +254,8 @@ initBuiltins pkg
                , closureTyCon     = closureTyCon
                , voidVar          = voidVar
                , pvoidVar         = pvoidVar
+               , fromVoidVar      = fromVoidVar
                , punitVar         = punitVar
-               , mkPRVar          = mkPRVar
                , closureVar       = closureVar
                , applyVar         = applyVar
                , liftedClosureVar = liftedClosureVar
@@ -468,15 +467,15 @@ initBuiltinPAs = initBuiltinDicts . builtinPAs
 builtinPAs :: Builtins -> [(Name, Module, FastString)]
 builtinPAs bi@(Builtins { dphModules = mods })
   = [
-      mk (tyConName $ closureTyCon bi)  (dph_Closure   mods) (fsLit "dPA_Clo")
-    , mk (tyConName $ voidTyCon bi)     (dph_Repr      mods) (fsLit "dPA_Void")
-    , mk (tyConName $ parrayTyCon bi)   (dph_Instances mods) (fsLit "dPA_PArray")
-    , mk unitTyConName                  (dph_Instances mods) (fsLit "dPA_Unit")
+      mk (tyConName $ closureTyCon bi)  (dph_Closure   mods) (fsLit "$fPA:->")
+    , mk (tyConName $ voidTyCon bi)     (dph_Repr      mods) (fsLit "$fPAVoid")
+    , mk (tyConName $ parrayTyCon bi)   (dph_Instances mods) (fsLit "$fPAPArray")
+    , mk unitTyConName                  (dph_Instances mods) (fsLit "$fPA()")
 
-    , mk intTyConName                   (dph_Instances mods) (fsLit "dPA_Int")
-    , mk word8TyConName                 (dph_Instances mods) (fsLit "dPA_Word8")
-    , mk doubleTyConName                (dph_Instances mods) (fsLit "dPA_Double")
-    , mk boolTyConName                  (dph_Instances mods) (fsLit "dPA_Bool")
+    , mk intTyConName                   (dph_Instances mods) (fsLit "$fPAInt")
+    , mk word8TyConName                 (dph_Instances mods) (fsLit "$fPAWord8")
+    , mk doubleTyConName                (dph_Instances mods) (fsLit "$fPADouble")
+    , mk boolTyConName                  (dph_Instances mods) (fsLit "$fPABool")
     ]
     ++ tups
   where
@@ -485,7 +484,7 @@ builtinPAs bi@(Builtins { dphModules = mods })
     tups = map mk_tup [2..mAX_DPH_PROD]
     mk_tup n = mk (tyConName $ tupleTyCon Boxed n)
                   (dph_Instances mods)
-                  (mkFastString $ "dPA_" ++ show n)
+                  (mkFastString $ "$fPA(" ++ replicate (n-1) ',' ++ ")")
 
 initBuiltinPRs :: Builtins -> DsM [(Name, Var)]
 initBuiltinPRs = initBuiltinDicts . builtinPRs
@@ -493,15 +492,15 @@ initBuiltinPRs = initBuiltinDicts . builtinPRs
 builtinPRs :: Builtins -> [(Name, Module, FastString)]
 builtinPRs bi@(Builtins { dphModules = mods }) =
   [
-    mk (tyConName   unitTyCon)           (dph_Repr mods)    (fsLit "dPR_Unit")
-  , mk (tyConName $ voidTyCon        bi) (dph_Repr mods)    (fsLit "dPR_Void")
-  , mk (tyConName $ wrapTyCon        bi) (dph_Repr mods)    (fsLit "dPR_Wrap")
-  , mk (tyConName $ closureTyCon     bi) (dph_Closure mods) (fsLit "dPR_Clo")
+    mk (tyConName   unitTyCon)           (dph_Repr mods)    (fsLit "$fPR()")
+  , mk (tyConName $ voidTyCon        bi) (dph_Repr mods)    (fsLit "$fPRVoid")
+  , mk (tyConName $ wrapTyCon        bi) (dph_Repr mods)    (fsLit "$fPRWrap")
+  , mk (tyConName $ closureTyCon     bi) (dph_Closure mods) (fsLit "$fPR:->")
 
     -- temporary
-  , mk intTyConName          (dph_Instances mods) (fsLit "dPR_Int")
-  , mk word8TyConName        (dph_Instances mods) (fsLit "dPR_Word8")
-  , mk doubleTyConName       (dph_Instances mods) (fsLit "dPR_Double")
+  , mk intTyConName          (dph_Instances mods) (fsLit "$fPRInt")
+  , mk word8TyConName        (dph_Instances mods) (fsLit "$fPRWord8")
+  , mk doubleTyConName       (dph_Instances mods) (fsLit "$fPRDouble")
   ]
 
   ++ map mk_sum  [2..mAX_DPH_SUM]
@@ -510,10 +509,10 @@ builtinPRs bi@(Builtins { dphModules = mods }) =
     mk name mod fs = (name, mod, fs)
 
     mk_sum n = (tyConName $ sumTyCon n bi, dph_Repr mods,
-                mkFastString ("dPR_Sum" ++ show n))
+                mkFastString ("$fPRSum" ++ show n))
 
     mk_prod n = (tyConName $ prodTyCon n bi, dph_Repr mods,
-                 mkFastString ("dPR_" ++ show n))
+                 mkFastString ("$fPR(" ++ replicate (n-1) ',' ++ ")"))
 
 initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinBoxedTyCons = return . builtinBoxedTyCons
@@ -620,6 +619,11 @@ externalFun mod fs
 externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs
   = dsLookupTyCon =<< lookupOrig mod (mkTcOccFS fs)
+
+externalClassTyCon :: Module -> FastString -> DsM TyCon
+externalClassTyCon mod fs
+  = liftM classTyCon
+  $ dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
 
 externalType :: Module -> FastString -> DsM Type
 externalType mod fs
