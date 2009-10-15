@@ -183,7 +183,10 @@ test('tcfail186',
      extra_clean(['Tcfail186_Help.hi', 'Tcfail186_Help.o']),
      multimod_compile_fail, ['tcfail186', '-v0'])
 test('tcfail187', normal, compile_fail, [''])
-test('tcfail188', normal, compile_fail, [''])
+
+test('tcfail188', normal, compile, [''])
+# Now that #959 is fixed, tcfail188 should compile
+
 test('tcfail189', normal, compile_fail, [''])
 test('tcfail190', normal, compile_fail, [''])
 test('tcfail191', normal, compile_fail, [''])
