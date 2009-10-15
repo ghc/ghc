@@ -27,11 +27,11 @@ import OccName
 import TypeRep         ( funTyCon )
 import Type            ( Type, mkTyConApp )
 import TysPrim
-import TysWiredIn      ( unitTyCon, unitDataCon,
+import TysWiredIn      ( unitDataCon,
                          tupleTyCon, tupleCon,
-                         intTyCon, intTyConName,
-                         doubleTyCon, doubleTyConName,
-                         boolTyCon, boolTyConName, trueDataCon, falseDataCon,
+                         intTyCon,
+                         doubleTyCon,
+                         boolTyCon, trueDataCon, falseDataCon,
                          parrTyConName )
 import PrelNames       ( word8TyConName, gHC_PARR )
 import BasicTypes      ( Boxity(..) )
@@ -156,7 +156,7 @@ sumTyCon :: Int -> Builtins -> TyCon
 sumTyCon = indexBuiltin "sumTyCon" sumTyCons
 
 prodTyCon :: Int -> Builtins -> TyCon
-prodTyCon n bi
+prodTyCon n _
   | n >= 2 && n <= mAX_DPH_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
@@ -594,10 +594,6 @@ externalType mod fs
 externalClass :: Module -> FastString -> DsM Class
 externalClass mod fs
   = dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
-
-unitTyConName :: Name
-unitTyConName = tyConName unitTyCon
-
 
 primMethod :: TyCon -> String -> Builtins -> DsM (Maybe Var)
 primMethod  tycon method (Builtins { dphModules = mods })

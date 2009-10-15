@@ -243,7 +243,7 @@ prDictOfTyApp (TyConApp tc _) ty_args
   = do
       dfun <- prDFunOfTyCon tc
       prDFunApply dfun ty_args
-prDictOfTyApp ty _ = noV
+prDictOfTyApp _ _ = noV
 
 prDFunApply :: CoreExpr -> [Type] -> VM CoreExpr
 prDFunApply dfun tys

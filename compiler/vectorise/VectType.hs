@@ -37,7 +37,7 @@ import FastString
 
 import MonadUtils     ( zipWith3M, foldrM, concatMapM )
 import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_, mapAndUnzipM )
-import Data.List      ( inits, tails, zipWith4, zipWith5, zipWith6 )
+import Data.List      ( inits, tails, zipWith4, zipWith6 )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -332,7 +332,7 @@ buildToPRepr vect_tc repr_tc _ repr
 
     wrap_repr_inst = wrapFamInstBody repr_tc ty_args
 
-    to_sum arg arg_ty res_ty EmptySum
+    to_sum _ _ _ EmptySum
       = do
           void <- builtin voidVar
           return $ wrap_repr_inst $ Var void
@@ -348,8 +348,7 @@ buildToPRepr vect_tc repr_tc _ repr
                                   , repr_cons    =  cons })
       = do
           alts <- mapM con_alt cons
-          let ty_args = map Type tys
-              alts' = [(pat, vars, wrap_repr_inst
+          let alts' = [(pat, vars, wrap_repr_inst
                                    $ mkConApp sum_con (map Type tys ++ [body]))
                         | ((pat, vars, body), sum_con)
                             <- zip alts (tyConDataCons sum_tc)]
@@ -400,7 +399,7 @@ buildFromPRepr vect_tc repr_tc _ repr
     ty_args = mkTyVarTys (tyConTyVars vect_tc)
     res_ty  = mkTyConApp vect_tc ty_args
 
-    from_sum expr EmptySum
+    from_sum _ EmptySum
       = do
           dummy <- builtin fromVoidVar
           return $ Var dummy `App` Type res_ty
@@ -419,7 +418,7 @@ buildFromPRepr vect_tc repr_tc _ repr
     from_con expr (ConRepr con r)
       = from_prod expr (mkConApp con $ map Type ty_args) r
 
-    from_prod expr con EmptyProd = return con
+    from_prod _ con EmptyProd = return con
     from_prod expr con (UnaryProd r)
       = do
           e <- from_comp expr r
@@ -562,7 +561,7 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc r
 
     [pdata_con] = tyConDataCons pdata_tc
 
-    from_sum res_ty res expr EmptySum = return (res, [])
+    from_sum _ res _ EmptySum = return (res, [])
     from_sum res_ty res expr (UnarySum r) = from_con res_ty res expr r
     from_sum res_ty res expr (Sum { repr_psum_tc = psum_tc
                                   , repr_sel_ty  = sel_ty
@@ -583,7 +582,7 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc r
 
     from_con res_ty res expr (ConRepr _ r) = from_prod res_ty res expr r
 
-    from_prod res_ty res expr EmptyProd = return (res, [])
+    from_prod _ res _ EmptyProd = return (res, [])
     from_prod res_ty res expr (UnaryProd r)
       = from_comp res_ty res expr r
     from_prod res_ty res expr (Prod { repr_ptup_tc  = ptup_tc
@@ -600,8 +599,8 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc r
       where
         [ptup_con] = tyConDataCons ptup_tc
 
-    from_comp res_ty res expr (Keep _ _) = return (res, [expr])
-    from_comp res_ty res expr (Wrap ty)
+    from_comp _ res expr (Keep _ _) = return (res, [expr])
+    from_comp _ res expr (Wrap ty)
       = do
           wrap_tc  <- builtin wrapTyCon
           (pwrap_tc, _) <- pdataReprTyCon (mkTyConApp wrap_tc [ty])

@@ -327,8 +327,7 @@ dsLoadModule :: SDoc -> Module -> DsM ()
 dsLoadModule doc mod
   = do { env <- getGblEnv
        ; setEnvs (ds_if_env env)
-                 (loadSysInterface doc mod)
-       ; return ()
+                 (loadSysInterface doc mod >> return ())
        }
 \end{code}
 
