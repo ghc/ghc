@@ -79,6 +79,17 @@ void traceEnd (void);
 void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
                        StgTSO *tso, StgWord64 other);
 
+
+/*
+ * Record a nullary event
+ */
+#define traceEvent(cap, tag)                    \
+    if (RTS_UNLIKELY(TRACE_sched)) {            \
+        traceEvent_(cap, tag);                  \
+    }
+
+void traceEvent_ (Capability *cap, EventTypeNum tag);
+
 // variadic macros are C99, and supported by gcc.  However, the
 // ##__VA_ARGS syntax is a gcc extension, which allows the variable
 // argument list to be empty (see gcc docs for details).
@@ -133,6 +144,7 @@ void traceThreadStatus_ (StgTSO *tso);
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
+#define traceEvent(cap, tag) /* nothing */
 #define traceCap(class, cap, msg, ...) /* nothing */
 #define trace(class, msg, ...) /* nothing */
 #define debugTrace(class, str, ...) /* nothing */

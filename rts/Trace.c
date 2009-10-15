@@ -193,6 +193,15 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     case EVENT_GC_END:          // (cap)
         debugBelch("cap %d: finished GC\n", cap->no);
         break;
+    case EVENT_GC_IDLE:        // (cap)
+        debugBelch("cap %d: GC idle\n", cap->no);
+        break;
+    case EVENT_GC_WORK:          // (cap)
+        debugBelch("cap %d: GC working\n", cap->no);
+        break;
+    case EVENT_GC_DONE:          // (cap)
+        debugBelch("cap %d: GC done\n", cap->no);
+        break;
     default:
         debugBelch("cap %2d: thread %lu: event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
@@ -213,6 +222,18 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
 #endif
     {
         postSchedEvent(cap,tag,tso ? tso->id : 0,other);
+    }
+}
+
+void traceEvent_ (Capability *cap, EventTypeNum tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceSchedEvent_stderr(cap, tag, 0, 0);
+    } else
+#endif
+    {
+        postEvent(cap,tag);
     }
 }
 

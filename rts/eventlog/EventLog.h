@@ -26,10 +26,16 @@ void endEventLogging(void);
 void freeEventLogging(void);
 
 /* 
- * Post an event to the capability's event buffer.
+ * Post a scheduler event to the capability's event buffer (an event
+ * that has an associated thread).
  */
 void postSchedEvent(Capability *cap, EventTypeNum tag, 
                     StgThreadID id, StgWord64 other);
+
+/*
+ * Post a nullary event.
+ */
+void postEvent(Capability *cap, EventTypeNum tag);
 
 void postMsg(char *msg, va_list ap);
 
@@ -43,6 +49,10 @@ INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
                                    EventTypeNum tag STG_UNUSED,
                                    StgThreadID id   STG_UNUSED,
                                    StgWord64 other  STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void postEvent (Capability *cap  STG_UNUSED,
+                              EventTypeNum tag STG_UNUSED)
 { /* nothing */ }
 
 INLINE_HEADER void postMsg (char *msg STG_UNUSED, 

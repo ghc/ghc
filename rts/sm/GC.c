@@ -1020,9 +1020,10 @@ scavenge_until_all_done (void)
 {
     nat r;
 	
-    debugTrace(DEBUG_gc, "GC thread %d working", gct->thread_index);
 
 loop:
+    traceEvent(&capabilities[gct->thread_index], EVENT_GC_WORK);
+
 #if defined(THREADED_RTS)
     if (n_gc_threads > 1) {
         scavenge_loop();
@@ -1036,8 +1037,9 @@ loop:
     // scavenge_loop() only exits when there's no work to do
     r = dec_running();
     
-    debugTrace(DEBUG_gc, "GC thread %d idle (%d still running)", 
-               gct->thread_index, r);
+    traceEvent(&capabilities[gct->thread_index], EVENT_GC_IDLE);
+
+    debugTrace(DEBUG_gc, "%d GC threads still running", r);
     
     while (gc_running_threads != 0) {
         // usleep(1);
@@ -1051,8 +1053,7 @@ loop:
         // scavenge_loop() to perform any pending work.
     }
     
-    // All threads are now stopped
-    debugTrace(DEBUG_gc, "GC thread %d finished.", gct->thread_index);
+    traceEvent(&capabilities[gct->thread_index], EVENT_GC_DONE);
 }
 
 #if defined(THREADED_RTS)
