@@ -1418,6 +1418,18 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     if (gc_type == PENDING_GC_SEQ)
     {
         traceSchedEvent(cap, EVENT_REQUEST_SEQ_GC, 0, 0);
+    }
+    else
+    {
+        traceSchedEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
+        debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
+    }
+
+    // do this while the other Capabilities stop:
+    if (cap) scheduleCheckBlackHoles(cap);
+
+    if (gc_type == PENDING_GC_SEQ)
+    {
         // single-threaded GC: grab all the capabilities
         for (i=0; i < n_capabilities; i++) {
             debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
@@ -1440,16 +1452,10 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     {
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
-        traceSchedEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
-        debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
-
         waitForGcThreads(cap);
     }
 #endif
 
-    // so this happens periodically:
-    if (cap) scheduleCheckBlackHoles(cap);
-    
     IF_DEBUG(scheduler, printAllThreads());
 
 delete_threads_and_gc:
