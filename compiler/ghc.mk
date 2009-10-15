@@ -460,10 +460,15 @@ $(compiler_stage2_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(inclu
 $(compiler_stage3_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
 
 # Every Constants.o object file depends on includes/GHCConstants.h:
-$(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS)))
+$(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS) includes/HaskellConstants.hs))
 
 # Every PrimOp.o object file depends on $(PRIMOP_BITS):
 $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
+
+# GHC itself doesn't know about the above dependencies, so we have to
+# switch off the recompilation checker for those modules:
+compiler/prelude/PrimOps_HC_OPTS += -fforce-recomp
+compiler/main/Constants_HC_OPTS  += -fforce-recomp
 
 # Note [munge-stage1-package-config]
 # Strip the date/patchlevel from the version of stage1.  See Note
