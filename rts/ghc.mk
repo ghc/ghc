@@ -214,46 +214,46 @@ DQ = \"
 # Windows gets confused.
 # This has to be in HC rather than CC opts, as otherwise there's a
 # -optc-O2 that comes after it.
-RtsMain_HC_OPTS += -optc-O0
+rts/RtsMain_HC_OPTS += -optc-O0
 
-RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
-RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
+rts/RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
+rts/RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 #
-RtsUtils_CC_OPTS += -DHostPlatform=$(DQ)$(HOSTPLATFORM)$(DQ)
-RtsUtils_CC_OPTS += -DHostArch=$(DQ)$(HostArch_CPP)$(DQ)
-RtsUtils_CC_OPTS += -DHostOS=$(DQ)$(HostOS_CPP)$(DQ)
-RtsUtils_CC_OPTS += -DHostVendor=$(DQ)$(HostVendor_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DHostPlatform=$(DQ)$(HOSTPLATFORM)$(DQ)
+rts/RtsUtils_CC_OPTS += -DHostArch=$(DQ)$(HostArch_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DHostOS=$(DQ)$(HostOS_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DHostVendor=$(DQ)$(HostVendor_CPP)$(DQ)
 #
-RtsUtils_CC_OPTS += -DBuildPlatform=$(DQ)$(BUILDPLATFORM)$(DQ)
-RtsUtils_CC_OPTS += -DBuildArch=$(DQ)$(BuildArch_CPP)$(DQ)
-RtsUtils_CC_OPTS += -DBuildOS=$(DQ)$(BuildOS_CPP)$(DQ)
-RtsUtils_CC_OPTS += -DBuildVendor=$(DQ)$(BuildVendor_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DBuildPlatform=$(DQ)$(BUILDPLATFORM)$(DQ)
+rts/RtsUtils_CC_OPTS += -DBuildArch=$(DQ)$(BuildArch_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DBuildOS=$(DQ)$(BuildOS_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DBuildVendor=$(DQ)$(BuildVendor_CPP)$(DQ)
 #
-RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
-RtsUtils_CC_OPTS += -DTargetArch=$(DQ)$(TargetArch_CPP)$(DQ)
-RtsUtils_CC_OPTS += -DTargetOS=$(DQ)$(TargetOS_CPP)$(DQ)
-RtsUtils_CC_OPTS += -DTargetVendor=$(DQ)$(TargetVendor_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
+rts/RtsUtils_CC_OPTS += -DTargetArch=$(DQ)$(TargetArch_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DTargetOS=$(DQ)$(TargetOS_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DTargetVendor=$(DQ)$(TargetVendor_CPP)$(DQ)
 #
-RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
-RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
+rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
+rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
 
 # ffi.h triggers prototype warnings, so disable them here:
-Interpreter_CC_OPTS += -Wno-strict-prototypes
-Adjustor_CC_OPTS    += -Wno-strict-prototypes
-sm/Storage_CC_OPTS  += -Wno-strict-prototypes
+rts/Interpreter_CC_OPTS += -Wno-strict-prototypes
+rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes
+rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes
 
 # inlining warnings happen in Compact
-sm/Compact_CC_OPTS += -Wno-inline
+rts/sm/Compact_CC_OPTS += -Wno-inline
 
 # emits warnings about call-clobbered registers on x86_64
-StgCRun_CC_OPTS += -w
+rts/StgCRun_CC_OPTS += -w
 
-RetainerProfile_CC_OPTS += -w
-RetainerSet_CC_OPTS += -Wno-format
+rts/RetainerProfile_CC_OPTS += -w
+rts/RetainerSet_CC_OPTS += -Wno-format
 # On Windows:
-win32/ConsoleHandler_CC_OPTS += -w
-win32/ThrIOManager_CC_OPTS += -w
-win32/Ticker_CC_OPTS += -w
+rts/win32/ConsoleHandler_CC_OPTS += -w
+rts/win32/ThrIOManager_CC_OPTS += -w
+rts/win32/Ticker_CC_OPTS += -w
 # The above warning supression flags are a temporary kludge.
 # While working on this module you are encouraged to remove it and fix
 # any warnings in the module. See
@@ -261,16 +261,16 @@ win32/Ticker_CC_OPTS += -w
 # for details
 
 # Without this, thread_obj will not be inlined (at least on x86 with GCC 4.1.0)
-sm/Compact_CC_OPTS += -finline-limit=2500
+rts/sm/Compact_CC_OPTS += -finline-limit=2500
 
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
-sm/Evac_CC_OPTS += -funroll-loops
-sm/Evac_thr_HC_OPTS += -optc-funroll-loops
+rts/sm/Evac_CC_OPTS += -funroll-loops
+rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-funroll-loops
 
 # These files are just copies of sm/Evac.c and sm/Scav.c respectively,
 # but compiled with -DPARALLEL_GC.
-sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
-sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
+rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
+rts/dist/build/sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
 
 #-----------------------------------------------------------------------------
 # Add PAPI library if needed

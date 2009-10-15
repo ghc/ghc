@@ -50,7 +50,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_$2_HC_OPTS) \
  $$($1_$2_EXTRA_HC_OPTS) \
  $$($1_$2_$3_HC_OPTS) \
- $$($$*_HC_OPTS) \
+ $$($$(basename $$<)_HC_OPTS) \
  $$(EXTRA_HC_OPTS)
 
 # For real Haskell compilations we add -hidir etc.
@@ -107,14 +107,14 @@ $1_$2_$3_ALL_HSC2HS_OPTS = \
  --cflag=-D__GLASGOW_HASKELL__=$$(ProjectVersionInt) \
  $$(foreach opt,$$($1_$2_DIST_CC_OPTS),'--cflag=$$(opt)') \
  $$(foreach opt,$$($1_$2_DIST_LD_OPTS),'--lflag=$$(opt)') \
- $$($$*_HSC2HS_OPTS) \
+ $$($$(basename $$<)_HSC2HS_OPTS) \
  $$(EXTRA_HSC2HS_OPTS)
 
 $1_$2_$3_ALL_CC_OPTS = \
  $$(WAY_$3_CC_OPTS) \
  $$($1_$2_DIST_CC_OPTS) \
  $$($1_$2_$3_CC_OPTS) \
- $$($$*_CC_OPTS) \
+ $$($$(basename $$<)_CC_OPTS) \
  $$(EXTRA_CC_OPTS)
 
 $1_$2_$3_GHC_CC_OPTS = \
