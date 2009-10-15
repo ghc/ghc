@@ -436,15 +436,15 @@ isStoreReg ss
 instance Uniquable Store where
     getUnique (SReg  r)
 	| RegReal (RealRegSingle i)	<- r
-	= mkUnique 'R' i
+	= mkRegSingleUnique i
 
 	| RegReal (RealRegPair r1 r2)	<- r
-	= mkUnique 'P' (r1 * 65535 + r2)
+	= mkRegPairUnique (r1 * 65535 + r2)
 
 	| otherwise
 	= error "RegSpillClean.getUnique: found virtual reg during spill clean, only real regs expected."
 
-    getUnique (SSlot i)			= mkUnique 'S' i
+    getUnique (SSlot i)	= mkRegSubUnique i    -- [SLPJ] I hope "SubUnique" is ok
 
 instance Outputable Store where
 	ppr (SSlot i)	= text "slot" <> int i

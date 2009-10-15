@@ -31,13 +31,13 @@ import MkCore
 import CoreUtils
 import CoreFVs
 
-import TcHsSyn	( mkArbitraryType )	-- Mis-placed?
 import TcType
+import TysPrim  ( anyTypeOfKind )
 import CostCentre
 import Module
 import Id
 import MkId	( seqId )
-import Var	( Var, TyVar )
+import Var	( Var, TyVar, tyVarKind )
 import VarSet
 import Rules
 import VarEnv
@@ -192,8 +192,9 @@ dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
 			-- see if it has any impact; it is on by default
   = 	-- Note [Abstracting over tyvars only]
     do	{ core_prs <- ds_lhs_binds NoSccs binds
-	; arby_env <- mkArbitraryTypeEnv tyvars exports
-	; let (lg_binds, core_prs') = mapAndUnzip do_one core_prs
+	; 
+	; let arby_env = mkArbitraryTypeEnv tyvars exports
+              (lg_binds, core_prs') = mapAndUnzip do_one core_prs
 	      bndrs = mkVarSet (map fst core_prs)
 
 	      add_lets | core_prs `lengthExceeds` 10 = add_some
@@ -265,8 +266,8 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	; let mk_bind ((tyvars, global, local, prags), n)  -- locals!!n == local
 	        = 	-- Need to make fresh locals to bind in the selector,
 		      	-- because some of the tyvars will be bound to 'Any'
-		  do { ty_args <- mapM mk_ty_arg all_tyvars
-		     ; let substitute = substTyWith all_tyvars ty_args
+		  do { let ty_args = map mk_ty_arg all_tyvars
+		           substitute = substTyWith all_tyvars ty_args
 		     ; locals' <- newSysLocalsDs (map substitute local_tys)
 		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
 		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global
@@ -281,7 +282,7 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 		     ; return ((global', rhs) : spec_binds) }
 	        where
 	          mk_ty_arg all_tyvar
-			| all_tyvar `elem` tyvars = return (mkTyVarTy all_tyvar)
+			| all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 	      		| otherwise		  = dsMkArbitraryType all_tyvar
 
 	; export_binds_s <- mapM mk_bind (exports `zip` [0..])
@@ -344,9 +345,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 		bs | not (null bs) -> do { warnDs (dead_msg bs); return Nothing } 
 		   | otherwise -> do
 
-	{ f_body <- fix_up (Let mono_bind (Var mono_id))
+	{ let     f_body = fix_up (Let mono_bind (Var mono_id))
 
-	; let	  local_poly  = setIdNotExported poly_id
+	          local_poly  = setIdNotExported poly_id
 			-- Very important to make the 'f' non-exported,
 			-- else it won't be inlined!
 		  spec_id     = mkLocalId spec_name spec_ty
@@ -367,9 +368,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
   where
 	-- Bind to Any any of all_ptvs that aren't 
 	-- relevant for this particular function 
-    fix_up body | null void_tvs = return body
-		| otherwise	= do { void_tys <- mapM dsMkArbitraryType void_tvs
-				     ; return (mkTyApps (mkLams void_tvs body) void_tys) }
+    fix_up body | null void_tvs = body
+		| otherwise	= mkTyApps (mkLams void_tvs body) $
+                                  map dsMkArbitraryType void_tvs
 
     void_tvs = all_tvs \\ tvs
 
@@ -383,27 +384,24 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 		    2 (ppr spec_expr)
     	     
 
-mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> DsM (TyVarEnv Type)
+mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> TyVarEnv Type
 -- If any of the tyvars is missing from any of the lists in 
 -- the second arg, return a binding in the result
 mkArbitraryTypeEnv tyvars exports
   = go emptyVarEnv exports
   where
-    go env [] = return env
+    go env [] = env
     go env ((ltvs, _, _, _) : exports)
-	= do { env' <- foldlM extend env [tv | tv <- tyvars
-					, not (tv `elem` ltvs)
-					, not (tv `elemVarEnv` env)]
-	     ; go env' exports }
+	= go env' exports
+        where
+          env' = foldl extend env [tv | tv <- tyvars
+			              , not (tv `elem` ltvs)
+				      , not (tv `elemVarEnv` env)]
 
-    extend env tv = do { ty <- dsMkArbitraryType tv
-		       ; return (extendVarEnv env tv ty) }
+    extend env tv = extendVarEnv env tv (dsMkArbitraryType tv)
 
-
-dsMkArbitraryType :: TcTyVar -> DsM Type
-dsMkArbitraryType tv = mkArbitraryType warn tv
-  where
-    warn span msg = putSrcSpanDs span (warnDs msg)
+dsMkArbitraryType :: TcTyVar -> Type
+dsMkArbitraryType tv = anyTypeOfKind (tyVarKind tv)
 \end{code}
 
 Note [Unused spec binders]

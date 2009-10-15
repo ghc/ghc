@@ -437,7 +437,7 @@ mkStgAltType bndr alts
 		    | isUnLiftedTyCon tc     -> PrimAlt tc
 		    | isHiBootTyCon tc	     -> look_for_better_tycon
 		    | isAlgTyCon tc 	     -> AlgAlt tc
-		    | otherwise		     -> ASSERT( _is_poly_alt_tycon tc )
+		    | otherwise		     -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
 						PolyAlt
 	Nothing				     -> PolyAlt
 

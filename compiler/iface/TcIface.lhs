@@ -37,6 +37,7 @@ import Class
 import TyCon
 import DataCon
 import TysWiredIn
+import TysPrim		( anyTyConOfKind )
 import Var              ( TyVar )
 import qualified Var
 import VarEnv
@@ -1122,6 +1123,8 @@ tcIfaceTyCon IfaceCharTc      	= tcWiredInTyCon charTyCon
 tcIfaceTyCon IfaceListTc      	= tcWiredInTyCon listTyCon
 tcIfaceTyCon IfacePArrTc      	= tcWiredInTyCon parrTyCon
 tcIfaceTyCon (IfaceTupTc bx ar) = tcWiredInTyCon (tupleTyCon bx ar)
+tcIfaceTyCon (IfaceAnyTc kind)  = do { tc_kind <- tcIfaceType kind
+                                     ; tcWiredInTyCon (anyTyConOfKind tc_kind) }
 tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name 
 				     ; return (check_tc (tyThingTyCon thing)) }
   where

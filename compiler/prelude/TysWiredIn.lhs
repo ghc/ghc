@@ -3,12 +3,9 @@
 %
 \section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
 
-This module tracks the ``state interface'' document, ``GHC prelude:
-types and operations.''
-
 \begin{code}
 -- | This module is about types that can be defined in Haskell, but which
--- must be wired into the compiler nonetheless.
+--   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (
         -- * All wired in things
 	wiredInTyCons, 
@@ -328,6 +325,7 @@ unboxedPairTyCon   = tupleTyCon Unboxed 2
 unboxedPairDataCon :: DataCon
 unboxedPairDataCon = tupleCon   Unboxed 2
 \end{code}
+
 
 %************************************************************************
 %*									*

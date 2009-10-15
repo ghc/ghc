@@ -98,7 +98,7 @@ mkBuiltinTyConApps get_tc tys ty
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
 voidType :: VM Type
-voidType = mkBuiltinTyConApp voidTyCon []
+voidType = mkBuiltinTyConApp VectMonad.voidTyCon []
 
 mkWrapType :: Type -> VM Type
 mkWrapType ty = mkBuiltinTyConApp wrapTyCon [ty]

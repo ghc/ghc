@@ -57,11 +57,11 @@ data Reg
 -- | so we can put regs in UniqSets
 instance Uniquable Reg where
 	getUnique (Reg c i)
-	 = mkUnique 'R'
+	 = mkRegSingleUnique
 	 $ fromEnum c * 1000 + i
 
 	getUnique (RegSub s (Reg c i))
-	 = mkUnique 'S'
+	 = mkRegSubUnique 
 	 $ fromEnum s * 10000 + fromEnum c * 1000 + i
 
 	getUnique (RegSub _ (RegSub _ _))

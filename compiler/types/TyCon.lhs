@@ -20,13 +20,14 @@ module TyCon(
 	mkClassTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
-	mkVoidPrimTyCon,
+	mkKindTyCon,
 	mkLiftedPrimTyCon,
 	mkTupleTyCon,
 	mkSynTyCon,
         mkSuperKindTyCon,
         mkCoercionTyCon,
         mkForeignTyCon,
+        mkAnyTyCon,
 
         -- ** Predicates on TyCons
         isAlgTyCon,
@@ -37,7 +38,7 @@ module TyCon(
         isSynTyCon, isClosedSynTyCon, isOpenSynTyCon,
         isSuperKindTyCon,
         isCoercionTyCon, isCoercionTyCon_maybe,
-        isForeignTyCon,
+        isForeignTyCon, isAnyTyCon,
 
 	isInjectiveTyCon,
 	isDataTyCon, isProductTyCon, isEnumerationTyCon, 
@@ -103,7 +104,7 @@ import Data.List( elemIndex )
 %************************************************************************
 
 \begin{code}
--- | Represents type constructors. Type constructors are introduced by things such as:
+-- | TyCons represent type constructors. Type constructors are introduced by things such as:
 --
 -- 1) Data declarations: @data Foo = ...@ creates the @Foo@ type constructor of kind @*@
 --
@@ -150,6 +151,7 @@ data TyCon
 					-- that doesn't mean it's a true GADT; only that the "where"
 					-- 	form was used. This field is used only to guide
 					--	pretty-printing
+
 	algTcStupidTheta :: [PredType],	-- ^ The \"stupid theta\" for the data type (always empty for GADTs).
 	                                -- A \"stupid theta\" is the context to the left of an algebraic type
 	                                -- declaration, e.g. @Eq a@ in the declaration @data Eq a => T a ...@.
@@ -198,17 +200,19 @@ data TyCon
 	tyConUnique   :: Unique,
 	tyConName     :: Name,
 	tyConKind     :: Kind,
-	tyConArity    :: Arity,		-- SLPJ Oct06: I'm not sure what the significance
-					--	       of the arity of a primtycon is!
+	tyConArity    :: Arity,			-- SLPJ Oct06: I'm not sure what the significance
+						--	       of the arity of a primtycon is!
 
-	primTyConRep  :: PrimRep,
-			-- ^ Many primitive tycons are unboxed, but some are
-			-- boxed (represented by pointers). This 'PrimRep' holds
-			-- that information
+	primTyConRep  :: PrimRep,		-- ^ Many primitive tycons are unboxed, but some are
+                       				--   boxed (represented by pointers). This 'PrimRep' holds
+			                	--   that information.
+						-- Only relevant if tyConKind = *
 
-	isUnLifted   :: Bool,		-- ^ Most primitive tycons are unlifted (may not contain bottom)
-					-- but foreign-imported ones may be lifted
-	tyConExtName :: Maybe FastString	-- ^ @Just e@ for foreign-imported types, holds the name of the imported thing
+	isUnLifted   :: Bool,		        -- ^ Most primitive tycons are unlifted (may not contain bottom)
+					        --   but foreign-imported ones may be lifted
+
+	tyConExtName :: Maybe FastString	-- ^ @Just e@ for foreign-imported types, 
+                                                --   holds the name of the imported thing
     }
 
   -- | Type coercions, such as @(~)@, @sym@, @trans@, @left@ and @right@.
@@ -224,6 +228,19 @@ data TyCon
     		-- INVARIANT: 'coKindFun' is always applied to exactly 'tyConArity' args
 		-- E.g. for @trans (c1 :: ta=tb) (c2 :: tb=tc)@, the 'coKindFun' returns 
 		--	the kind as a pair of types: @(ta, tc)@
+    }
+
+  -- | Any types.  Like tuples, this is a potentially-infinite family of TyCons
+  --   one for each distinct Kind. They have no values at all.
+  --   Because there are infinitely many of them (like tuples) they are 
+  --   defined in GHC.Prim and have names like "Any(*->*)".  
+  --   Their Unique is derived from the OccName.
+  -- See Note [Any types] in TysPrim
+  | AnyTyCon {
+	tyConUnique  :: Unique,
+	tyConName    :: Name,
+	tyConKind    :: Kind	-- Never = *; that is done via PrimTyCon
+		     		-- See Note [Any types] in TysPrim
     }
 
   -- | Super-kinds. These are "kinds-of-kinds" and are never seen in Haskell source programs.
@@ -643,10 +660,10 @@ mkPrimTyCon :: Name  -> Kind -> Arity -> PrimRep -> TyCon
 mkPrimTyCon name kind arity rep
   = mkPrimTyCon' name kind arity rep True  
 
--- | Create the special void 'TyCon' which is unlifted and has 'VoidRep'
-mkVoidPrimTyCon :: Name -> Kind -> Arity -> TyCon
-mkVoidPrimTyCon name kind arity 
-  = mkPrimTyCon' name kind arity VoidRep True  
+-- | Kind constructors
+mkKindTyCon :: Name -> Kind -> TyCon
+mkKindTyCon name kind
+  = mkPrimTyCon' name kind 0 VoidRep True  
 
 -- | Create a lifted primitive 'TyCon' such as @RealWorld@
 mkLiftedPrimTyCon :: Name  -> Kind -> Arity -> PrimRep -> TyCon
@@ -687,6 +704,12 @@ mkCoercionTyCon name arity kindRule
         tyConArity = arity,
         coKindFun = kindRule
     }
+
+mkAnyTyCon :: Name -> Kind -> TyCon
+mkAnyTyCon name kind 
+  = AnyTyCon { tyConName = name,
+		tyConKind = kind,
+        	tyConUnique = nameUnique name }
 
 -- | Create a super-kind 'TyCon'
 mkSuperKindTyCon :: Name -> TyCon -- Super kinds always have arity zero
@@ -906,6 +929,11 @@ isForeignTyCon _                                   = False
 isSuperKindTyCon :: TyCon -> Bool
 isSuperKindTyCon (SuperKindTyCon {}) = True
 isSuperKindTyCon _                   = False
+
+-- | Is this an AnyTyCon?
+isAnyTyCon :: TyCon -> Bool
+isAnyTyCon (AnyTyCon {}) = True
+isAnyTyCon _              = False
 
 -- | Attempt to pull a 'TyCon' apart into the arity and 'coKindFun' of
 -- a coercion 'TyCon'. Returns @Nothing@ if the 'TyCon' is not of the

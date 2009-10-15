@@ -98,7 +98,6 @@ import BasicTypes
 import UniqFM
 import UniqSet
 import FastString
-import FastTypes
 import Outputable
 import Binary
 import Data.Char
@@ -304,22 +303,24 @@ mkClsOccFS = mkOccNameFS clsName
 
 OccEnvs are used mainly for the envts in ModIfaces.
 
+Note [The Unique of an OccName]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 They are efficient, because FastStrings have unique Int# keys.  We assume
-this key is less than 2^24, so we can make a Unique using
+this key is less than 2^24, and indeed FastStrings are allocated keys 
+sequentially starting at 0.
+
+So we can make a Unique using
 	mkUnique ns key  :: Unique
 where 'ns' is a Char reprsenting the name space.  This in turn makes it
 easy to build an OccEnv.
 
 \begin{code}
 instance Uniquable OccName where
-  getUnique (OccName ns fs)
-      = mkUnique char (iBox (uniqueOfFS fs))
-      where	-- See notes above about this getUnique function
-        char = case ns of
-		VarName   -> 'i'
-		DataName  -> 'd'
-		TvName    -> 'v'
-		TcClsName -> 't'
+      -- See Note [The Unique of an OccName]
+  getUnique (OccName VarName   fs) = mkVarOccUnique  fs
+  getUnique (OccName DataName  fs) = mkDataOccUnique fs
+  getUnique (OccName TvName    fs) = mkTvOccUnique   fs
+  getUnique (OccName TcClsName fs) = mkTcOccUnique   fs
 
 newtype OccEnv a = A (UniqFM a)
 

@@ -25,7 +25,6 @@ module Unique (
 
 	pprUnique, 
 
-	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
 	getKey, getKeyFastInt,		-- Used in Var, UniqFM, Name only!
 
@@ -46,6 +45,9 @@ module Unique (
 	mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 	mkPreludeTyConUnique, mkPreludeClassUnique,
 	mkPArrDataConUnique,
+
+        mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
+        mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
 
 	mkBuiltinUnique,
 	mkPseudoUniqueC,
@@ -93,7 +95,6 @@ Now come the functions which construct uniques from their pieces, and vice versa
 The stuff about unique *supplies* is handled further down this module.
 
 \begin{code}
-mkUnique	:: Char -> Int -> Unique	-- Builds a unique from pieces
 unpkUnique	:: Unique -> (Char, Int)	-- The reverse
 
 mkUniqueGrimily :: Int -> Unique		-- A trap-door for UniqSupply
@@ -131,6 +132,9 @@ newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
 -- and as long as the Char fits in 8 bits, which we assume anyway!
 
+mkUnique :: Char -> Int -> Unique	-- Builds a unique from pieces
+-- NOT EXPORTED, so that we can see all the Chars that 
+--               are used in this one module
 mkUnique c i
   = MkUnique (tag `bitOrFastInt` bits)
   where
@@ -340,8 +344,7 @@ isTupleKey u = case unpkUnique u of
 mkPrimOpIdUnique op         = mkUnique '9' op
 mkPreludeMiscIdUnique  i    = mkUnique '0' i
 
--- No numbers left anymore, so I pick something different for the character
--- tag 
+-- No numbers left anymore, so I pick something different for the character tag 
 mkPArrDataConUnique a	        = mkUnique ':' (2*a)
 
 -- The "tyvar uniques" print specially nicely: a, b, c, etc.
@@ -358,5 +361,18 @@ mkPseudoUniqueC i = mkUnique 'C' i -- used for getUnique on Regs
 mkPseudoUniqueD i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
 mkPseudoUniqueE i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
 mkPseudoUniqueH i = mkUnique 'H' i -- used in NCG spiller to create spill VirtualRegs
+
+mkRegSingleUnique, mkRegPairUnique, mkRegSubUnique, mkRegClassUnique :: Int -> Unique
+mkRegSingleUnique = mkUnique 'R'
+mkRegSubUnique    = mkUnique 'S'
+mkRegPairUnique   = mkUnique 'P'
+mkRegClassUnique  = mkUnique 'L'
+
+mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique :: FastString -> Unique
+-- See Note [The Unique of an OccName] in OccName
+mkVarOccUnique  fs = mkUnique 'i' (iBox (uniqueOfFS fs))
+mkDataOccUnique fs = mkUnique 'd' (iBox (uniqueOfFS fs))
+mkTvOccUnique 	fs = mkUnique 'v' (iBox (uniqueOfFS fs))
+mkTcOccUnique 	fs = mkUnique 'c' (iBox (uniqueOfFS fs))
 \end{code}
 

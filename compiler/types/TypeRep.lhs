@@ -304,14 +304,11 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] lif
 tySuperKindTyCon     = mkSuperKindTyCon tySuperKindTyConName
 coSuperKindTyCon     = mkSuperKindTyCon coSuperKindTyConName
 
-liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName
-openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName
-unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName
-ubxTupleKindTyCon     = mkKindTyCon ubxTupleKindTyConName
-argTypeKindTyCon      = mkKindTyCon argTypeKindTyConName
-
-mkKindTyCon :: Name -> TyCon
-mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0
+liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName   tySuperKind
+openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName     tySuperKind
+unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName tySuperKind
+ubxTupleKindTyCon     = mkKindTyCon ubxTupleKindTyConName     tySuperKind
+argTypeKindTyCon      = mkKindTyCon argTypeKindTyConName      tySuperKind
 
 --------------------------
 -- ... and now their names

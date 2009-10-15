@@ -21,9 +21,9 @@ data RegClass
 
 
 instance Uniquable RegClass where
-    getUnique RcInteger	= mkUnique 'L' 0
-    getUnique RcFloat	= mkUnique 'L' 1
-    getUnique RcDouble	= mkUnique 'L' 2
+    getUnique RcInteger	= mkRegClassUnique 0
+    getUnique RcFloat	= mkRegClassUnique 1
+    getUnique RcDouble	= mkRegClassUnique 2
 
 instance Outputable RegClass where
     ppr RcInteger	= Outputable.text "I"

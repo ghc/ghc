@@ -125,8 +125,8 @@ data RealReg
 instance Uniquable RealReg where
 	getUnique reg
 	 = case reg of
-	 	RealRegSingle i		-> mkUnique 'S' i
-		RealRegPair r1 r2	-> mkUnique 'P' (r1 * 65536 + r2)
+	 	RealRegSingle i		-> mkRegSingleUnique i
+		RealRegPair r1 r2	-> mkRegPairUnique (r1 * 65536 + r2)
 
 instance Outputable RealReg where
 	ppr reg
