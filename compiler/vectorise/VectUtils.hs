@@ -241,7 +241,7 @@ prDictOfTyApp ty_fn ty_args
   | Just ty_fn' <- coreView ty_fn = prDictOfTyApp ty_fn' ty_args
 prDictOfTyApp (TyConApp tc _) ty_args
   = do
-      dfun <- prDFunOfTyCon tc
+      dfun <- liftM Var $ maybeV (lookupTyConPR tc)
       prDFunApply dfun ty_args
 prDictOfTyApp _ _ = noV
 
