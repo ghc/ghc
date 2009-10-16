@@ -26,7 +26,10 @@ test('ffi003', normal, compile_and_run, [''])
 # calling varargs functions is deprecated).  It stopped working in GHC 6.9.
 test('ffi004', skip, compile_and_run, [''])
 
-test('ffi005', exit_code(3), compile_and_run, [''])
+# omit prof ways, because this test exits before the RTS has a chance to
+# generate profiling info.
+test('ffi005', [ omit_ways(prof_ways), exit_code(3) ],
+               compile_and_run, [''])
 
 # ffi[006-009] don't work with External Core due to non-static-C foreign calls
 
@@ -137,7 +140,7 @@ test('2917a', normal, compile_and_run, [''])
 
 # omit prof ways, because this test causes the RTS to exit (correctly)
 # without generating profiling information.
-test('ffi020', [ omit_ways(['profc','profasm','profthreaded']),
+test('ffi020', [ omit_ways(prof_ways),
                  exit_code(1) ], compile_and_run, [''])
 
 
