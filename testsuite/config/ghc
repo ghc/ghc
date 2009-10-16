@@ -99,6 +99,14 @@ config.way_rts_flags = {
         'dyn'        : []
     	}
 
+# Useful classes of ways:
+
+prof_ways = filter(lambda x: x in config.run_ways, 
+                   ['profc','profasm','profthreaded'])
+
+threaded_ways = filter(lambda x: x in config.run_ways, 
+                       ['threaded1','threaded2','ghci','profthreaded'])
+
 def get_compiler_info():
     # This should really not go through the shell
     h = os.popen('"' + config.compiler + '" --numeric-version', 'r')
