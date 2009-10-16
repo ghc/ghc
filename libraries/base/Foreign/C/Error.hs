@@ -358,8 +358,9 @@ throwErrnoIfRetry pred loc f  =
           else throwErrno loc
       else return res
 
--- | as 'throwErrnoIfRetry', but checks for operations that would block and
--- executes an alternative action before retrying in that case.
+-- | as 'throwErrnoIfRetry', but additionlly if the operation 
+-- yields the error code 'eAGAIN' or 'eWOULDBLOCK', an alternative
+-- action is executed before retrying.
 --
 throwErrnoIfRetryMayBlock
                 :: (a -> Bool)  -- ^ predicate to apply to the result value
