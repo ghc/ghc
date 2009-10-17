@@ -29,7 +29,7 @@ import IdInfo
 import InstEnv
 import NewDemand
 import BasicTypes
-import Name
+import Name hiding (varName)
 import NameSet
 import IfaceEnv
 import NameEnv
@@ -50,8 +50,9 @@ import Data.IORef	( IORef, readIORef, writeIORef )
 \end{code}
 
 
-Constructing the TypeEnv, Instances, Rules from which the ModIface is
-constructed, and which goes on to subsequent modules in --make mode.
+Constructing the TypeEnv, Instances, Rules, VectInfo from which the
+ModIface is constructed, and which goes on to subsequent modules in
+--make mode.
 
 Most of the interface file is obtained simply by serialising the
 TypeEnv.  One important consequence is that if the *interface file*
@@ -339,6 +340,8 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		-- and indeed it does, but if omit_prags is on, ext_rules is
 		-- empty
 
+              ; tidy_vect_info = tidyVectInfo tidy_env vect_info
+
 	      -- See Note [Injecting implicit bindings]
     	      ; all_tidy_binds = implicit_binds ++ tidy_binds
 
@@ -364,10 +367,9 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		   ModDetails { md_types     = tidy_type_env,
 				md_rules     = tidy_rules,
 				md_insts     = tidy_insts,
-				md_fam_insts = fam_insts,
+                                md_vect_info = tidy_vect_info,			                     	         md_fam_insts = fam_insts,
 				md_exports   = exports,
-				md_anns      = anns,     -- are already tidy
-                                md_vect_info = vect_info --
+				md_anns      = anns      -- are already tidy
                               })
 	}
 
@@ -474,6 +476,29 @@ tidyInstances tidy_dfun ispecs
   where
     tidy ispec = setInstanceDFunId ispec $
 		 tidy_dfun (instanceDFunId ispec)
+\end{code}
+
+\begin{code}
+tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
+tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar     = vars
+                                         , vectInfoPADFun  = pas
+                                         , vectInfoIso     = isos })
+  = info { vectInfoVar    = tidy_vars
+         , vectInfoPADFun = tidy_pas
+         , vectInfoIso    = tidy_isos }
+  where
+    tidy_vars = mkVarEnv
+              $ map tidy_var_mapping
+              $ varEnvElts vars
+
+    tidy_pas = mapNameEnv tidy_snd_var pas
+    tidy_isos = mapNameEnv tidy_snd_var isos
+
+    tidy_var_mapping (from, to) = (from', (from', lookup_var to))
+      where from' = lookup_var from
+    tidy_snd_var (x, var) = (x, lookup_var var)
+      
+    lookup_var var = lookupWithDefaultVarEnv var_env var var
 \end{code}
 
 

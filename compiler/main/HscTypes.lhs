@@ -1986,7 +1986,6 @@ on just the OccName easily in a Core pass.
 
 \begin{code}
 -- | Vectorisation information for 'ModGuts', 'ModDetails' and 'ExternalPackageState'.
--- All of this information is always tidy, even in ModGuts.
 data VectInfo      
   = VectInfo {
       vectInfoVar     :: VarEnv  (Var    , Var  ),   -- ^ @(f, f_v)@ keyed on @f@
