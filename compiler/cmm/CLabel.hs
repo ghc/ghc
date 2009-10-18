@@ -134,7 +134,7 @@ import UniqSet
 -- The CLabel type
 
 {-
-CLabel is an abstract type that supports the following operations:
+  | CLabel is an abstract type that supports the following operations:
 
   - Pretty printing
 
@@ -156,13 +156,27 @@ CLabel is an abstract type that supports the following operations:
 -}
 
 data CLabel
-  = IdLabel	    		-- A family of labels related to the
-	Name			-- definition of a particular Id or Con
+  = -- | A label related to the definition of a particular Id or Con in a .hs file.
+    IdLabel	    		
+	Name			
         CafInfo
 	IdLabelInfo
 
-  | CaseLabel			-- A family of labels related to a particular
-				-- case expression.
+  -- | A label with a baked-in name that definitely comes from the RTS.
+  --    The code for it must compile into libHSrts.a \/ libHSrts.so \/ libHSrts.dll
+  | RtsLabel 			
+	RtsLabelInfo
+
+  -- | A 'C' (or otherwise foreign) label
+  | ForeignLabel FastString     
+        (Maybe Int)		-- possible '@n' suffix for stdcall functions
+				-- When generating C, the '@n' suffix is omitted, but when
+				-- generating assembler we must add it to the label.
+        Bool                    -- True <=> is dynamic
+        FunctionOrData
+
+  -- | A family of labels related to a particular case expression.
+  | CaseLabel			
 	{-# UNPACK #-} !Unique	-- Unique says which case expression
 	CaseLabelInfo
 
@@ -189,62 +203,57 @@ data CLabel
 
   | ModuleRegdLabel
 
-  | RtsLabel RtsLabelInfo
-
-  | ForeignLabel FastString     -- a 'C' (or otherwise foreign) label
-        (Maybe Int)             -- possible '@n' suffix for stdcall functions
-                -- When generating C, the '@n' suffix is omitted, but when
-                -- generating assembler we must add it to the label.
-        Bool                    -- True <=> is dynamic
-        FunctionOrData
-
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
 
-      -- Dynamic Linking in the NCG:
-      -- generated and used inside the NCG only,
-      -- see module PositionIndependentCode for details.
-      
+    
+  -- | These labels are generated and used inside the NCG only. 
+  -- 	They are special variants of a label used for dynamic linking
+  --    see module PositionIndependentCode for details.
   | DynamicLinkerLabel DynamicLinkerLabelInfo CLabel
-        -- special variants of a label used for dynamic linking
-
-  | PicBaseLabel                -- a label used as a base for PIC calculations
-                                -- on some platforms.
-                                -- It takes the form of a local numeric
-                                -- assembler label '1'; it is pretty-printed
-                                -- as 1b, referring to the previous definition
-                                -- of 1: in the assembler source file.
-
+ 
+  -- | This label is generated and used inside the NCG only. 
+  -- 	It is used as a base for PIC calculations on some platforms.
+  --    It takes the form of a local numeric assembler label '1'; and 
+  --    is pretty-printed as 1b, referring to the previous definition
+  --    of 1: in the assembler source file.
+  | PicBaseLabel                
+ 
+  -- | A label before an info table to prevent excessive dead-stripping on darwin
   | DeadStripPreventer CLabel
-    -- label before an info table to prevent excessive dead-stripping on darwin
 
-  | HpcTicksLabel Module       -- Per-module table of tick locations
-  | HpcModuleNameLabel         -- Per-module name of the module for Hpc
 
-  | LargeSRTLabel           -- Label of an StgLargeSRT
+  -- | Per-module table of tick locations
+  | HpcTicksLabel Module
+
+  -- | Per-module name of the module for Hpc
+  | HpcModuleNameLabel
+
+  -- | Label of an StgLargeSRT
+  | LargeSRTLabel
         {-# UNPACK #-} !Unique
 
-  | LargeBitmapLabel        -- A bitmap (function or case return)
+  -- | A bitmap (function or case return)
+  | LargeBitmapLabel
         {-# UNPACK #-} !Unique
 
   deriving (Eq, Ord)
 
 data IdLabelInfo
-  = Closure		-- Label for closure
-  | SRT                 -- Static reference table
-  | InfoTable		-- Info tables for closures; always read-only
-  | Entry		-- entry point
-  | Slow		-- slow entry point
+  = Closure		-- ^ Label for closure
+  | SRT                 -- ^ Static reference table
+  | InfoTable		-- ^ Info tables for closures; always read-only
+  | Entry		-- ^ Entry point
+  | Slow		-- ^ Slow entry point
 
-  | RednCounts		-- Label of place to keep Ticky-ticky  info for 
-			-- this Id
+  | RednCounts		-- ^ Label of place to keep Ticky-ticky  info for this Id
 
-  | ConEntry	  	-- constructor entry point
-  | ConInfoTable 		-- corresponding info table
-  | StaticConEntry  	-- static constructor entry point
-  | StaticInfoTable   	-- corresponding info table
+  | ConEntry	  	-- ^ Constructor entry point
+  | ConInfoTable 	-- ^ Corresponding info table
+  | StaticConEntry  	-- ^ Static constructor entry point
+  | StaticInfoTable   	-- ^ Corresponding info table
 
-  | ClosureTable	-- table of closures for Enum tycons
+  | ClosureTable	-- ^ Table of closures for Enum tycons
 
   deriving (Eq, Ord)
 
@@ -258,35 +267,35 @@ data CaseLabelInfo
 
 
 data RtsLabelInfo
-  = RtsSelectorInfoTable Bool{-updatable-} Int{-offset-}	-- Selector thunks
-  | RtsSelectorEntry   Bool{-updatable-} Int{-offset-}
+  = RtsSelectorInfoTable Bool{-updatable-} Int{-offset-}  -- ^ Selector thunks
+  | RtsSelectorEntry     Bool{-updatable-} Int{-offset-}
 
-  | RtsApInfoTable Bool{-updatable-} Int{-arity-}	        -- AP thunks
-  | RtsApEntry   Bool{-updatable-} Int{-arity-}
+  | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
+  | RtsApEntry           Bool{-updatable-} Int{-arity-}
 
   | RtsPrimOp PrimOp
 
-  | RtsInfo       FastString	-- misc rts info tables
-  | RtsEntry      FastString	-- misc rts entry points
-  | RtsRetInfo    FastString	-- misc rts ret info tables
-  | RtsRet        FastString	-- misc rts return points
-  | RtsData       FastString	-- misc rts data bits, eg CHARLIKE_closure
-  | RtsCode       FastString	-- misc rts code
-  | RtsGcPtr      FastString    -- GcPtrs eg CHARLIKE_closure  
+  | RtsInfo       FastString	-- ^ misc rts info tables
+  | RtsEntry      FastString	-- ^ misc rts entry points
+  | RtsRetInfo    FastString	-- ^ misc rts ret info tables
+  | RtsRet        FastString	-- ^ misc rts return points
+  | RtsData       FastString	-- ^ misc rts data bits, eg CHARLIKE_closure
+  | RtsCode       FastString	-- ^ misc rts code
+  | RtsGcPtr      FastString    -- ^ GcPtrs eg CHARLIKE_closure  
 
-  | RtsApFast	  FastString	-- _fast versions of generic apply
+  | RtsApFast	  FastString	-- ^ _fast versions of generic apply
 
   | RtsSlowTickyCtr String
 
   deriving (Eq, Ord)
-	-- NOTE: Eq on LitString compares the pointer only, so this isn't
-	-- a real equality.
+  -- NOTE: Eq on LitString compares the pointer only, so this isn't
+  -- a real equality.
 
 data DynamicLinkerLabelInfo
-  = CodeStub            -- MachO: Lfoo$stub, ELF: foo@plt
-  | SymbolPtr           -- MachO: Lfoo$non_lazy_ptr, Windows: __imp_foo
-  | GotSymbolPtr        -- ELF: foo@got
-  | GotSymbolOffset     -- ELF: foo@gotoff
+  = CodeStub			-- MachO: Lfoo$stub, ELF: foo@plt
+  | SymbolPtr			-- MachO: Lfoo$non_lazy_ptr, Windows: __imp_foo
+  | GotSymbolPtr		-- ELF: foo@got
+  | GotSymbolOffset		-- ELF: foo@gotoff
   
   deriving (Eq, Ord)
   
