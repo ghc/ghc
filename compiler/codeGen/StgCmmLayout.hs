@@ -63,7 +63,7 @@ import Constants
 import Util
 import Data.List
 import Outputable
-import FastString	( mkFastString, LitString, sLit )
+import FastString	( mkFastString, FastString, fsLit )
 
 ------------------------------------------------------------------------
 --		Call and return sequences
@@ -180,29 +180,29 @@ slow_call :: CmmExpr -> [CmmExpr] -> [LRep] -> FCode ()
 slow_call fun args reps
   = do call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
        emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (ppr fun) ++
-                                        " with pat " ++ showSDoc (ptext rts_fun))
+                                        " with pat " ++ showSDoc (ftext rts_fun))
        emit (mkAssign nodeReg fun <*> call)
   where
     (rts_fun, arity) = slowCallPattern reps
 
 -- These cases were found to cover about 99% of all slow calls:
-slowCallPattern :: [LRep] -> (LitString, Arity)
+slowCallPattern :: [LRep] -> (FastString, Arity)
 -- Returns the generic apply function and arity
-slowCallPattern (P: P: P: P: P: P: _) = (sLit "stg_ap_pppppp", 6)
-slowCallPattern (P: P: P: P: P: _)    = (sLit "stg_ap_ppppp", 5)
-slowCallPattern (P: P: P: P: _)       = (sLit "stg_ap_pppp", 4)
-slowCallPattern (P: P: P: V: _)       = (sLit "stg_ap_pppv", 4)
-slowCallPattern (P: P: P: _)          = (sLit "stg_ap_ppp", 3)
-slowCallPattern (P: P: V: _)          = (sLit "stg_ap_ppv", 3)
-slowCallPattern (P: P: _)	      = (sLit "stg_ap_pp", 2)
-slowCallPattern (P: V: _)	      = (sLit "stg_ap_pv", 2)
-slowCallPattern (P: _)		      = (sLit "stg_ap_p", 1)
-slowCallPattern (V: _)		      = (sLit "stg_ap_v", 1)
-slowCallPattern (N: _)		      = (sLit "stg_ap_n", 1)
-slowCallPattern (F: _)		      = (sLit "stg_ap_f", 1)
-slowCallPattern (D: _)		      = (sLit "stg_ap_d", 1)
-slowCallPattern (L: _)		      = (sLit "stg_ap_l", 1)
-slowCallPattern []		      = (sLit "stg_ap_0", 0)
+slowCallPattern (P: P: P: P: P: P: _) = (fsLit "stg_ap_pppppp", 6)
+slowCallPattern (P: P: P: P: P: _)    = (fsLit "stg_ap_ppppp", 5)
+slowCallPattern (P: P: P: P: _)       = (fsLit "stg_ap_pppp", 4)
+slowCallPattern (P: P: P: V: _)       = (fsLit "stg_ap_pppv", 4)
+slowCallPattern (P: P: P: _)          = (fsLit "stg_ap_ppp", 3)
+slowCallPattern (P: P: V: _)          = (fsLit "stg_ap_ppv", 3)
+slowCallPattern (P: P: _)	      = (fsLit "stg_ap_pp", 2)
+slowCallPattern (P: V: _)	      = (fsLit "stg_ap_pv", 2)
+slowCallPattern (P: _)		      = (fsLit "stg_ap_p", 1)
+slowCallPattern (V: _)		      = (fsLit "stg_ap_v", 1)
+slowCallPattern (N: _)		      = (fsLit "stg_ap_n", 1)
+slowCallPattern (F: _)		      = (fsLit "stg_ap_f", 1)
+slowCallPattern (D: _)		      = (fsLit "stg_ap_d", 1)
+slowCallPattern (L: _)		      = (fsLit "stg_ap_l", 1)
+slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 
 
 -------------------------------------------------------------------------

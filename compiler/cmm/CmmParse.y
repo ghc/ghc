@@ -190,7 +190,7 @@ statics	:: { [ExtFCode [CmmStatic]] }
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static 	:: { ExtFCode [CmmStatic] }
-	: NAME ':'	{ return [CmmDataLabel (mkRtsDataLabelFS $1)] }
+	: NAME ':'	{ return [CmmDataLabel (mkRtsDataLabel $1)] }
 	| type expr ';'	{ do e <- $2;
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised
@@ -243,13 +243,13 @@ cmmproc :: { ExtCode }
 		          $6;
 		          return (formals, gc_block, frame) }
                      blks <- code (cgStmtsToBlocks stmts)
-		     code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkRtsCodeLabelFS $1) formals blks) }
+		     code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkRtsCodeLabel $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, closure type, description, type
 		{ do prof <- profilingInfo $11 $13
-		     return (mkRtsEntryLabelFS $3,
+		     return (mkRtsEntryLabel $3,
 			CmmInfoTable False prof (fromIntegral $9)
 				     (ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
 			[]) }
@@ -257,7 +257,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type
 		{ do prof <- profilingInfo $11 $13
-		     return (mkRtsEntryLabelFS $3,
+		     return (mkRtsEntryLabel $3,
 			CmmInfoTable False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT
 				      0  -- Arity zero
@@ -271,7 +271,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type, arity
 		{ do prof <- profilingInfo $11 $13
-		     return (mkRtsEntryLabelFS $3,
+		     return (mkRtsEntryLabel $3,
 			CmmInfoTable False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $17)
 				      (ArgSpec (fromIntegral $15))
@@ -286,7 +286,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		     -- If profiling is on, this string gets duplicated,
 		     -- but that's the way the old code did it we can fix it some other time.
 		     desc_lit <- code $ mkStringCLit $13
-		     return (mkRtsEntryLabelFS $3,
+		     return (mkRtsEntryLabel $3,
 			CmmInfoTable False prof (fromIntegral $11)
 				     (ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
 			[]) }
@@ -294,15 +294,15 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
 		{ do prof <- profilingInfo $9 $11
-		     return (mkRtsEntryLabelFS $3,
+		     return (mkRtsEntryLabel $3,
 			CmmInfoTable False prof (fromIntegral $7)
 				     (ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
 			[]) }
 
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ')'
 		-- closure type (no live regs)
-		{ do let infoLabel = mkRtsInfoLabelFS $3
-		     return (mkRtsRetLabelFS $3,
+		{ do let infoLabel = mkRtsInfoLabel $3
+		     return (mkRtsRetLabel $3,
 			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 				     (ContInfo [] NoC_SRT),
 			[]) }
@@ -310,7 +310,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_hints0 ')'
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
-		     return (mkRtsRetLabelFS $3,
+		     return (mkRtsRetLabel $3,
 			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 			             (ContInfo live NoC_SRT),
 			live) }
@@ -852,7 +852,7 @@ lookupName name = do
   return $ 
      case lookupUFM env name of
 	Just (Var e) -> e
-	_other -> CmmLit (CmmLabel (mkRtsCodeLabelFS name))
+	_other -> CmmLit (CmmLabel (mkRtsCodeLabel name))
 
 -- Lifting FCode computations into the ExtFCode monad:
 code :: FCode a -> ExtFCode a
@@ -886,8 +886,8 @@ profilingInfo desc_str ty_str = do
 
 staticClosure :: FastString -> FastString -> [CmmLit] -> ExtCode
 staticClosure cl_label info payload
-  = code $ emitDataLits (mkRtsDataLabelFS cl_label) lits
-  where  lits = mkStaticClosure (mkRtsInfoLabelFS info) dontCareCCS payload [] [] []
+  = code $ emitDataLits (mkRtsDataLabel cl_label) lits
+  where  lits = mkStaticClosure (mkRtsInfoLabel info) dontCareCCS payload [] [] []
 
 foreignCall
 	:: String

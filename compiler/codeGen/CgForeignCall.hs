@@ -144,8 +144,8 @@ emitForeignCall' safety results target args vols _srt ret
     emitLoadThreadState
 
 suspendThread, resumeThread :: CmmExpr
-suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "suspendThread")))
-resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
+suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "suspendThread")))
+resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "resumeThread")))
 
 
 -- we might need to load arguments into temporaries before

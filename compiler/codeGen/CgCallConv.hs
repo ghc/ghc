@@ -209,7 +209,7 @@ constructSlowCall
 
    -- don't forget the zero case
 constructSlowCall [] 
-  = (mkRtsApFastLabel (sLit "stg_ap_0"), [], [])
+  = (mkRtsApFastLabel (fsLit "stg_ap_0"), [], [])
 
 constructSlowCall amodes
   = (stg_ap_pat, these, rest)
@@ -227,28 +227,28 @@ slowArgs amodes = (NonPtrArg, mkLblExpr stg_ap_pat) : args ++ slowArgs rest
 	stg_ap_pat = mkRtsRetInfoLabel arg_pat
   
 matchSlowPattern :: [(CgRep,CmmExpr)] 
-		 -> (LitString, [(CgRep,CmmExpr)], [(CgRep,CmmExpr)])
+		 -> (FastString, [(CgRep,CmmExpr)], [(CgRep,CmmExpr)])
 matchSlowPattern amodes = (arg_pat, these, rest)
   where (arg_pat, n)  = slowCallPattern (map fst amodes)
 	(these, rest) = splitAt n amodes
 
 -- These cases were found to cover about 99% of all slow calls:
-slowCallPattern :: [CgRep] -> (LitString, Int)
-slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: _) = (sLit "stg_ap_pppppp", 6)
-slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: _) 	= (sLit "stg_ap_ppppp", 5)
-slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: _) 	= (sLit "stg_ap_pppp", 4)
-slowCallPattern (PtrArg: PtrArg: PtrArg: VoidArg: _) 	= (sLit "stg_ap_pppv", 4)
-slowCallPattern (PtrArg: PtrArg: PtrArg: _)       	= (sLit "stg_ap_ppp", 3)
-slowCallPattern (PtrArg: PtrArg: VoidArg: _)       	= (sLit "stg_ap_ppv", 3)
-slowCallPattern (PtrArg: PtrArg: _)			= (sLit "stg_ap_pp", 2)
-slowCallPattern (PtrArg: VoidArg: _)			= (sLit "stg_ap_pv", 2)
-slowCallPattern (PtrArg: _)				= (sLit "stg_ap_p", 1)
-slowCallPattern (VoidArg: _)				= (sLit "stg_ap_v", 1)
-slowCallPattern (NonPtrArg: _)				= (sLit "stg_ap_n", 1)
-slowCallPattern (FloatArg: _)				= (sLit "stg_ap_f", 1)
-slowCallPattern (DoubleArg: _)				= (sLit "stg_ap_d", 1)
-slowCallPattern (LongArg: _)				= (sLit "stg_ap_l", 1)
-slowCallPattern _  = panic "CgStackery.slowCallPattern"
+slowCallPattern :: [CgRep] -> (FastString, Int)
+slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: _) = (fsLit "stg_ap_pppppp", 6)
+slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: PtrArg: _) 	    = (fsLit "stg_ap_ppppp", 5)
+slowCallPattern (PtrArg: PtrArg: PtrArg: PtrArg: _) 	= (fsLit "stg_ap_pppp", 4)
+slowCallPattern (PtrArg: PtrArg: PtrArg: VoidArg: _) 	= (fsLit "stg_ap_pppv", 4)
+slowCallPattern (PtrArg: PtrArg: PtrArg: _)       	= (fsLit "stg_ap_ppp", 3)
+slowCallPattern (PtrArg: PtrArg: VoidArg: _)       	= (fsLit "stg_ap_ppv", 3)
+slowCallPattern (PtrArg: PtrArg: _)			= (fsLit "stg_ap_pp", 2)
+slowCallPattern (PtrArg: VoidArg: _)			= (fsLit "stg_ap_pv", 2)
+slowCallPattern (PtrArg: _)				= (fsLit "stg_ap_p", 1)
+slowCallPattern (VoidArg: _)				= (fsLit "stg_ap_v", 1)
+slowCallPattern (NonPtrArg: _)				= (fsLit "stg_ap_n", 1)
+slowCallPattern (FloatArg: _)				= (fsLit "stg_ap_f", 1)
+slowCallPattern (DoubleArg: _)				= (fsLit "stg_ap_d", 1)
+slowCallPattern (LongArg: _)				= (fsLit "stg_ap_l", 1)
+slowCallPattern _ 					= panic "CgStackery.slowCallPattern"
 
 -------------------------------------------------------------------------
 --

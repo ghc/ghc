@@ -81,13 +81,6 @@ module CLabel (
 	mkRtsDataLabel,
 	mkRtsGcPtrLabel,
 
-	mkRtsInfoLabelFS,
-	mkRtsEntryLabelFS,
-	mkRtsRetInfoLabelFS,
-	mkRtsRetLabelFS,
-	mkRtsCodeLabelFS,
-	mkRtsDataLabelFS,
-
 	mkRtsApFastLabel,
 
         mkPrimCallLabel,
@@ -273,22 +266,15 @@ data RtsLabelInfo
 
   | RtsPrimOp PrimOp
 
-  | RtsInfo       LitString	-- misc rts info tables
-  | RtsEntry      LitString	-- misc rts entry points
-  | RtsRetInfo    LitString	-- misc rts ret info tables
-  | RtsRet        LitString	-- misc rts return points
-  | RtsData       LitString	-- misc rts data bits
-  | RtsGcPtr      LitString	-- GcPtrs eg CHARLIKE_closure
-  | RtsCode       LitString	-- misc rts code
+  | RtsInfo       FastString	-- misc rts info tables
+  | RtsEntry      FastString	-- misc rts entry points
+  | RtsRetInfo    FastString	-- misc rts ret info tables
+  | RtsRet        FastString	-- misc rts return points
+  | RtsData       FastString	-- misc rts data bits, eg CHARLIKE_closure
+  | RtsCode       FastString	-- misc rts code
+  | RtsGcPtr      FastString    -- GcPtrs eg CHARLIKE_closure  
 
-  | RtsInfoFS     FastString	-- misc rts info tables
-  | RtsEntryFS    FastString	-- misc rts entry points
-  | RtsRetInfoFS  FastString	-- misc rts ret info tables
-  | RtsRetFS      FastString	-- misc rts return points
-  | RtsDataFS     FastString	-- misc rts data bits, eg CHARLIKE_closure
-  | RtsCodeFS     FastString	-- misc rts code
-
-  | RtsApFast	LitString	-- _fast versions of generic apply
+  | RtsApFast	  FastString	-- _fast versions of generic apply
 
   | RtsSlowTickyCtr String
 
@@ -355,17 +341,17 @@ mkModuleInitTableLabel mod       = ModuleInitTableLabel mod
 
 	-- Some fixed runtime system labels
 
-mkSplitMarkerLabel		= RtsLabel (RtsCode (sLit "__stg_split_marker"))
-mkDirty_MUT_VAR_Label		= RtsLabel (RtsCode (sLit "dirty_MUT_VAR"))
-mkUpdInfoLabel			= RtsLabel (RtsInfo (sLit "stg_upd_frame"))
-mkIndStaticInfoLabel		= RtsLabel (RtsInfo (sLit "stg_IND_STATIC"))
-mkMainCapabilityLabel		= RtsLabel (RtsData (sLit "MainCapability"))
-mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo (sLit "stg_MUT_ARR_PTRS_FROZEN0"))
-mkMAP_DIRTY_infoLabel		= RtsLabel (RtsInfo (sLit "stg_MUT_ARR_PTRS_DIRTY"))
-mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo (sLit "stg_EMPTY_MVAR"))
+mkSplitMarkerLabel		= RtsLabel (RtsCode (fsLit "__stg_split_marker"))
+mkDirty_MUT_VAR_Label		= RtsLabel (RtsCode (fsLit "dirty_MUT_VAR"))
+mkUpdInfoLabel			= RtsLabel (RtsInfo (fsLit "stg_upd_frame"))
+mkIndStaticInfoLabel		= RtsLabel (RtsInfo (fsLit "stg_IND_STATIC"))
+mkMainCapabilityLabel		= RtsLabel (RtsData (fsLit "MainCapability"))
+mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo (fsLit "stg_MUT_ARR_PTRS_FROZEN0"))
+mkMAP_DIRTY_infoLabel		= RtsLabel (RtsInfo (fsLit "stg_MUT_ARR_PTRS_DIRTY"))
+mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo (fsLit "stg_EMPTY_MVAR"))
 
-mkTopTickyCtrLabel		= RtsLabel (RtsData (sLit "top_ct"))
-mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsInfo (sLit "stg_CAF_BLACKHOLE"))
+mkTopTickyCtrLabel		= RtsLabel (RtsData (fsLit "top_ct"))
+mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsInfo (fsLit "stg_CAF_BLACKHOLE"))
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
 
 moduleRegdLabel			= ModuleRegdLabel
@@ -411,13 +397,6 @@ mkRtsCodeLabel      str = RtsLabel (RtsCode      str)
 mkRtsDataLabel      str = RtsLabel (RtsData      str)
 mkRtsGcPtrLabel     str = RtsLabel (RtsGcPtr     str)
 
-mkRtsInfoLabelFS    str = RtsLabel (RtsInfoFS    str)
-mkRtsEntryLabelFS   str = RtsLabel (RtsEntryFS   str)
-mkRtsRetInfoLabelFS str = RtsLabel (RtsRetInfoFS str)
-mkRtsRetLabelFS     str = RtsLabel (RtsRetFS     str)
-mkRtsCodeLabelFS    str = RtsLabel (RtsCodeFS    str)
-mkRtsDataLabelFS    str = RtsLabel (RtsDataFS    str)
-
 mkRtsApFastLabel str = RtsLabel (RtsApFast str)
 
 mkRtsSlowTickyCtrLabel :: String -> CLabel
@@ -449,25 +428,21 @@ mkDeadStripPreventer lbl = DeadStripPreventer lbl
 -- Converting between info labels and entry/ret labels.
 
 infoLblToEntryLbl :: CLabel -> CLabel 
-infoLblToEntryLbl (IdLabel n c InfoTable) = IdLabel n c Entry
-infoLblToEntryLbl (IdLabel n c ConInfoTable) = IdLabel n c ConEntry
+infoLblToEntryLbl (IdLabel n c InfoTable)       = IdLabel n c Entry
+infoLblToEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
 infoLblToEntryLbl (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
-infoLblToEntryLbl (CaseLabel n CaseReturnInfo) = CaseLabel n CaseReturnPt
-infoLblToEntryLbl (RtsLabel (RtsInfo s)) = RtsLabel (RtsEntry s)
-infoLblToEntryLbl (RtsLabel (RtsRetInfo s)) = RtsLabel (RtsRet s)
-infoLblToEntryLbl (RtsLabel (RtsInfoFS s)) = RtsLabel (RtsEntryFS s)
-infoLblToEntryLbl (RtsLabel (RtsRetInfoFS s)) = RtsLabel (RtsRetFS s)
+infoLblToEntryLbl (CaseLabel n CaseReturnInfo)  = CaseLabel n CaseReturnPt
+infoLblToEntryLbl (RtsLabel (RtsInfo s))      = RtsLabel (RtsEntry s)
+infoLblToEntryLbl (RtsLabel (RtsRetInfo s))   = RtsLabel (RtsRet s)
 infoLblToEntryLbl _ = panic "CLabel.infoLblToEntryLbl"
 
 entryLblToInfoLbl :: CLabel -> CLabel 
-entryLblToInfoLbl (IdLabel n c Entry) = IdLabel n c InfoTable
-entryLblToInfoLbl (IdLabel n c ConEntry) = IdLabel n c ConInfoTable
-entryLblToInfoLbl (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
-entryLblToInfoLbl (CaseLabel n CaseReturnPt) = CaseLabel n CaseReturnInfo
-entryLblToInfoLbl (RtsLabel (RtsEntry s)) = RtsLabel (RtsInfo s)
-entryLblToInfoLbl (RtsLabel (RtsRet s)) = RtsLabel (RtsRetInfo s)
-entryLblToInfoLbl (RtsLabel (RtsEntryFS s)) = RtsLabel (RtsInfoFS s)
-entryLblToInfoLbl (RtsLabel (RtsRetFS s)) = RtsLabel (RtsRetInfoFS s)
+entryLblToInfoLbl (IdLabel n c Entry)           = IdLabel n c InfoTable
+entryLblToInfoLbl (IdLabel n c ConEntry)        = IdLabel n c ConInfoTable
+entryLblToInfoLbl (IdLabel n c StaticConEntry)  = IdLabel n c StaticInfoTable
+entryLblToInfoLbl (CaseLabel n CaseReturnPt)    = CaseLabel n CaseReturnInfo
+entryLblToInfoLbl (RtsLabel (RtsEntry s))     = RtsLabel (RtsInfo s)
+entryLblToInfoLbl (RtsLabel (RtsRet s))       = RtsLabel (RtsRetInfo s)
 entryLblToInfoLbl l = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
 
 cvtToClosureLbl   (IdLabel n c InfoTable) = IdLabel n c Closure
@@ -669,23 +644,17 @@ labelType (RtsLabel (RtsInfo _))              = DataLabel
 labelType (RtsLabel (RtsEntry _))             = CodeLabel
 labelType (RtsLabel (RtsRetInfo _))           = DataLabel
 labelType (RtsLabel (RtsRet _))               = CodeLabel
-labelType (RtsLabel (RtsDataFS _))            = DataLabel
-labelType (RtsLabel (RtsCodeFS _))            = CodeLabel
-labelType (RtsLabel (RtsInfoFS _))            = DataLabel
-labelType (RtsLabel (RtsEntryFS _))           = CodeLabel
-labelType (RtsLabel (RtsRetInfoFS _))         = DataLabel
-labelType (RtsLabel (RtsRetFS _))             = CodeLabel
-labelType (RtsLabel (RtsApFast _))            = CodeLabel
-labelType (CaseLabel _ CaseReturnInfo)        = DataLabel
-labelType (CaseLabel _ _)	              = CodeLabel
-labelType (ModuleInitLabel _ _)               = CodeLabel
-labelType (PlainModuleInitLabel _)            = CodeLabel
-labelType (ModuleInitTableLabel _)            = DataLabel
-labelType (LargeSRTLabel _)                   = DataLabel
-labelType (LargeBitmapLabel _)                = DataLabel
-labelType (ForeignLabel _ _ _ IsFunction) = CodeLabel
-labelType (IdLabel _ _ info) = idInfoLabelType info
-labelType _                = DataLabel
+labelType (RtsLabel (RtsApFast _))              = CodeLabel
+labelType (CaseLabel _ CaseReturnInfo)          = DataLabel
+labelType (CaseLabel _ _)	                = CodeLabel
+labelType (ModuleInitLabel _ _)                 = CodeLabel
+labelType (PlainModuleInitLabel _)              = CodeLabel
+labelType (ModuleInitTableLabel _)              = DataLabel
+labelType (LargeSRTLabel _)                     = DataLabel
+labelType (LargeBitmapLabel _)                  = DataLabel
+labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel
+labelType (IdLabel _ _ info)                    = idInfoLabelType info
+labelType _                                     = DataLabel
 
 idInfoLabelType info =
   case info of
@@ -836,13 +805,11 @@ pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLi
 -- with a letter so the label will be legal assmbly code.
         
 
-pprCLbl (RtsLabel (RtsCode str))   = ptext str
-pprCLbl (RtsLabel (RtsData str))   = ptext str
-pprCLbl (RtsLabel (RtsGcPtr str))  = ptext str
-pprCLbl (RtsLabel (RtsCodeFS str)) = ftext str
-pprCLbl (RtsLabel (RtsDataFS str)) = ftext str
+pprCLbl (RtsLabel (RtsCode str))   = ftext str
+pprCLbl (RtsLabel (RtsData str))   = ftext str
+pprCLbl (RtsLabel (RtsGcPtr str))  = ftext str
 
-pprCLbl (RtsLabel (RtsApFast str)) = ptext str <> ptext (sLit "_fast")
+pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
   = hcat [ptext (sLit "stg_sel_"), text (show offset),
@@ -873,27 +840,15 @@ pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
 	]
 
 pprCLbl (RtsLabel (RtsInfo fs))
-  = ptext fs <> ptext (sLit "_info")
+  = ftext fs <> ptext (sLit "_info")
 
 pprCLbl (RtsLabel (RtsEntry fs))
-  = ptext fs <> ptext (sLit "_entry")
-
-pprCLbl (RtsLabel (RtsRetInfo fs))
-  = ptext fs <> ptext (sLit "_info")
-
-pprCLbl (RtsLabel (RtsRet fs))
-  = ptext fs <> ptext (sLit "_ret")
-
-pprCLbl (RtsLabel (RtsInfoFS fs))
-  = ftext fs <> ptext (sLit "_info")
-
-pprCLbl (RtsLabel (RtsEntryFS fs))
   = ftext fs <> ptext (sLit "_entry")
 
-pprCLbl (RtsLabel (RtsRetInfoFS fs))
+pprCLbl (RtsLabel (RtsRetInfo fs))
   = ftext fs <> ptext (sLit "_info")
 
-pprCLbl (RtsLabel (RtsRetFS fs))
+pprCLbl (RtsLabel (RtsRet fs))
   = ftext fs <> ptext (sLit "_ret")
 
 pprCLbl (RtsLabel (RtsPrimOp primop)) 

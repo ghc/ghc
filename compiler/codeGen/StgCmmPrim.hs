@@ -201,7 +201,7 @@ emitPrimOp [res] ParOp [arg]
 	-- later, we might want to inline it.
     emitCCall
 	[(res,NoHint)]
-    	(CmmLit (CmmLabel (mkRtsCodeLabel (sLit "newSpark"))))
+    	(CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "newSpark"))))
 	[(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)] 
 
 emitPrimOp [res] ReadMutVarOp [mutv]

@@ -122,7 +122,7 @@ emitPrimOp [res] ParOp [arg] live
         NoC_SRT -- No SRT b/c we do PlayRisky
         CmmMayReturn
   where
-	newspark = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "newSpark")))
+	newspark = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "newSpark")))
 
 emitPrimOp [res] ReadMutVarOp [mutv] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))

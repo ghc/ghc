@@ -259,8 +259,8 @@ foreignCall uniques call results arguments =
 -- Save/restore the thread state in the TSO
 
 suspendThread, resumeThread :: CmmExpr
-suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "suspendThread")))
-resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
+suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "suspendThread")))
+resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "resumeThread")))
 
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.

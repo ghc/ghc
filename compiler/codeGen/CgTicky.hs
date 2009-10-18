@@ -117,19 +117,19 @@ ppr_for_ticky_name mod_name name
 -- Ticky stack frames
 
 tickyPushUpdateFrame, tickyUpdateFrameOmitted :: Code
-tickyPushUpdateFrame    = ifTicky $ bumpTickyCounter (sLit "UPDF_PUSHED_ctr")
-tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (sLit "UPDF_OMITTED_ctr")
+tickyPushUpdateFrame    = ifTicky $ bumpTickyCounter (fsLit "UPDF_PUSHED_ctr")
+tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (fsLit "UPDF_OMITTED_ctr")
 
 -- -----------------------------------------------------------------------------
 -- Ticky entries
 
 tickyEnterDynCon, tickyEnterDynThunk, tickyEnterStaticCon,
     tickyEnterStaticThunk, tickyEnterViaNode :: Code
-tickyEnterDynCon      = ifTicky $ bumpTickyCounter (sLit "ENT_DYN_CON_ctr")
-tickyEnterDynThunk    = ifTicky $ bumpTickyCounter (sLit "ENT_DYN_THK_ctr")
-tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (sLit "ENT_STATIC_CON_ctr")
-tickyEnterStaticThunk = ifTicky $ bumpTickyCounter (sLit "ENT_STATIC_THK_ctr")
-tickyEnterViaNode     = ifTicky $ bumpTickyCounter (sLit "ENT_VIA_NODE_ctr")
+tickyEnterDynCon      = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_CON_ctr")
+tickyEnterDynThunk    = ifTicky $ bumpTickyCounter (fsLit "ENT_DYN_THK_ctr")
+tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (fsLit "ENT_STATIC_CON_ctr")
+tickyEnterStaticThunk = ifTicky $ bumpTickyCounter (fsLit "ENT_STATIC_THK_ctr")
+tickyEnterViaNode     = ifTicky $ bumpTickyCounter (fsLit "ENT_VIA_NODE_ctr")
 
 tickyEnterThunk :: ClosureInfo -> Code
 tickyEnterThunk cl_info
@@ -140,15 +140,15 @@ tickyBlackHole :: Bool{-updatable-} -> Code
 tickyBlackHole updatable
   = ifTicky (bumpTickyCounter ctr)
   where
-    ctr | updatable = sLit "UPD_BH_SINGLE_ENTRY_ctr"
-	| otherwise = sLit "UPD_BH_UPDATABLE_ctr"
+    ctr | updatable = fsLit "UPD_BH_SINGLE_ENTRY_ctr"
+	| otherwise = fsLit "UPD_BH_UPDATABLE_ctr"
 
 tickyUpdateBhCaf :: ClosureInfo -> Code
 tickyUpdateBhCaf cl_info
   = ifTicky (bumpTickyCounter ctr)
   where
-    ctr | closureUpdReqd cl_info = sLit "UPD_CAF_BH_SINGLE_ENTRY_ctr"
-	| otherwise	         = sLit "UPD_CAF_BH_UPDATABLE_ctr"
+    ctr | closureUpdReqd cl_info = fsLit "UPD_CAF_BH_SINGLE_ENTRY_ctr"
+	| otherwise	         = fsLit "UPD_CAF_BH_UPDATABLE_ctr"
 
 tickyEnterFun :: ClosureInfo -> Code
 tickyEnterFun cl_info
@@ -159,8 +159,8 @@ tickyEnterFun cl_info
 	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl oFFSET_StgEntCounter_entry_count)
         }
   where
-    ctr | isStaticClosure cl_info = sLit "ENT_STATIC_FUN_DIRECT_ctr"
-	| otherwise		  = sLit "ENT_DYN_FUN_DIRECT_ctr"
+    ctr | isStaticClosure cl_info = fsLit "ENT_STATIC_FUN_DIRECT_ctr"
+	| otherwise		  = fsLit "ENT_DYN_FUN_DIRECT_ctr"
 
 registerTickyCtr :: CLabel -> Code
 -- Register a ticky counter
@@ -183,25 +183,25 @@ registerTickyCtr ctr_lbl
 	, CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
 				oFFSET_StgEntCounter_registeredp))
 		   (CmmLit (mkIntCLit 1)) ]
-    ticky_entry_ctrs = mkLblExpr (mkRtsDataLabel (sLit "ticky_entry_ctrs"))
+    ticky_entry_ctrs = mkLblExpr (mkRtsDataLabel (fsLit "ticky_entry_ctrs"))
 
 tickyReturnOldCon, tickyReturnNewCon :: Arity -> Code
 tickyReturnOldCon arity 
-  = ifTicky $ do { bumpTickyCounter (sLit "RET_OLD_ctr")
-	         ; bumpHistogram (sLit "RET_OLD_hst") arity }
+  = ifTicky $ do { bumpTickyCounter (fsLit "RET_OLD_ctr")
+	         ; bumpHistogram    (fsLit "RET_OLD_hst") arity }
 tickyReturnNewCon arity 
-  = ifTicky $ do { bumpTickyCounter (sLit "RET_NEW_ctr")
-	         ; bumpHistogram (sLit "RET_NEW_hst") arity }
+  = ifTicky $ do { bumpTickyCounter (fsLit "RET_NEW_ctr")
+	         ; bumpHistogram    (fsLit "RET_NEW_hst") arity }
 
 tickyUnboxedTupleReturn :: Int -> Code
 tickyUnboxedTupleReturn arity
-  = ifTicky $ do { bumpTickyCounter (sLit "RET_UNBOXED_TUP_ctr")
- 	         ; bumpHistogram (sLit "RET_UNBOXED_TUP_hst") arity }
+  = ifTicky $ do { bumpTickyCounter (fsLit "RET_UNBOXED_TUP_ctr")
+ 	         ; bumpHistogram    (fsLit "RET_UNBOXED_TUP_hst") arity }
 
 tickyVectoredReturn :: Int -> Code
 tickyVectoredReturn family_size 
-  = ifTicky $ do { bumpTickyCounter (sLit "VEC_RETURN_ctr")
-		 ; bumpHistogram (sLit "RET_VEC_RETURN_hst") family_size }
+  = ifTicky $ do { bumpTickyCounter (fsLit "VEC_RETURN_ctr")
+		 ; bumpHistogram    (fsLit "RET_VEC_RETURN_hst") family_size }
 
 -- -----------------------------------------------------------------------------
 -- Ticky calls
@@ -209,10 +209,10 @@ tickyVectoredReturn family_size
 -- Ticks at a *call site*:
 tickyKnownCallTooFewArgs, tickyKnownCallExact,
     tickyKnownCallExtraArgs, tickyUnknownCall :: Code
-tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_TOO_FEW_ARGS_ctr")
-tickyKnownCallExact = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_ctr")
-tickyKnownCallExtraArgs = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_EXTRA_ARGS_ctr")
-tickyUnknownCall = ifTicky $ bumpTickyCounter (sLit "UNKNOWN_CALL_ctr")
+tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter (fsLit "KNOWN_CALL_TOO_FEW_ARGS_ctr")
+tickyKnownCallExact      = ifTicky $ bumpTickyCounter (fsLit "KNOWN_CALL_ctr")
+tickyKnownCallExtraArgs  = ifTicky $ bumpTickyCounter (fsLit "KNOWN_CALL_EXTRA_ARGS_ctr")
+tickyUnknownCall         = ifTicky $ bumpTickyCounter (fsLit "UNKNOWN_CALL_ctr")
 
 -- Tick for the call pattern at slow call site (i.e. in addition to
 -- tickyUnknownCall, tickyKnownCallExtraArgs, etc.)
@@ -292,9 +292,9 @@ tickyAllocHeap hp
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				oFFSET_StgEntCounter_allocs)) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLongWidth (mkRtsDataLabel $ sLit "ALLOC_HEAP_ctr") 1,
+	    addToMemLbl cLongWidth (mkRtsDataLabel $ fsLit "ALLOC_HEAP_ctr") 1,
   		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLongWidth (mkRtsDataLabel $ sLit "ALLOC_HEAP_tot") hp] }
+	    addToMemLbl cLongWidth (mkRtsDataLabel $ fsLit "ALLOC_HEAP_tot") hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
@@ -308,14 +308,14 @@ addToMemLbl :: Width -> CLabel -> Int -> CmmStmt
 addToMemLbl rep lbl n = addToMem rep (CmmLit (CmmLabel lbl)) n
 
 -- All the ticky-ticky counters are declared "unsigned long" in C
-bumpTickyCounter :: LitString -> Code
+bumpTickyCounter :: FastString -> Code
 bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkRtsDataLabel lbl) 0)
 
 bumpTickyCounter' :: CmmLit -> Code
 -- krc: note that we're incrementing the _entry_count_ field of the ticky counter
 bumpTickyCounter' lhs = stmtC (addToMemLong (CmmLit lhs) 1)
 
-bumpHistogram :: LitString -> Int -> Code
+bumpHistogram :: FastString -> Int -> Code
 bumpHistogram _lbl _n
 --  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLong))
     = return ()	   -- TEMP SPJ Apr 07

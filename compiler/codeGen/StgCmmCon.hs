@@ -153,7 +153,7 @@ buildDynCon binder _cc con [arg]
   , StgLitArg (MachInt val) <- arg
   , val <= fromIntegral mAX_INTLIKE 	-- Comparisons at type Integer!
   , val >= fromIntegral mIN_INTLIKE	-- ...ditto...
-  = do 	{ let intlike_lbl   = mkRtsGcPtrLabel (sLit "stg_INTLIKE_closure")
+  = do 	{ let intlike_lbl   = mkRtsGcPtrLabel (fsLit "stg_INTLIKE_closure")
 	      val_int = fromIntegral val :: Int
 	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
 		-- INTLIKE closures consist of a header and one word payload
@@ -166,7 +166,7 @@ buildDynCon binder _cc con [arg]
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE
   , val_int >= mIN_CHARLIKE
-  = do 	{ let charlike_lbl   = mkRtsGcPtrLabel (sLit "stg_CHARLIKE_closure")
+  = do 	{ let charlike_lbl   = mkRtsGcPtrLabel (fsLit "stg_CHARLIKE_closure")
 	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = cmmLabelOffW charlike_lbl offsetW

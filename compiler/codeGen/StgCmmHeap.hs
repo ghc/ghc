@@ -40,7 +40,7 @@ import DataCon
 import TyCon
 import CostCentre
 import Outputable
-import FastString( LitString, mkFastString, sLit )
+import FastString( mkFastString, FastString, fsLit )
 import Constants
 
 
@@ -353,7 +353,7 @@ entryHeapCheck fun arity args code
                                               arg_exprs updfr_sz
                          Nothing  -> mkCall generic_gc (GC, GC) [] [] updfr_sz
 
-    gc_lbl :: [LocalReg] -> Maybe LitString
+    gc_lbl :: [LocalReg] -> Maybe FastString
 {-
     gc_lbl [reg]
 	| isGcPtrType ty  = Just (sLit "stg_gc_unpt_r1") -- "stg_gc_fun_1p"
@@ -372,7 +372,7 @@ entryHeapCheck fun arity args code
 
     gc_lbl regs = gc_lbl_ptrs (map (isGcPtrType . localRegType) regs)
 
-    gc_lbl_ptrs :: [Bool] -> Maybe LitString
+    gc_lbl_ptrs :: [Bool] -> Maybe FastString
     -- JD: TEMPORARY -- UNTIL THOSE FUNCTIONS EXIST...
     --gc_lbl_ptrs [True,True]      = Just (sLit "stg_gc_fun_2p")
     --gc_lbl_ptrs [True,True,True] = Just (sLit "stg_gc_fun_3p")
@@ -413,7 +413,7 @@ altHeapCheck regs code
 
 
 generic_gc :: CmmExpr	-- The generic GC procedure; no params, no resuls
-generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_noregs")))
+generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "stg_gc_noregs")))
 -- JD: TEMPORARY -- UNTIL THOSE FUNCTIONS EXIST...
 -- generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_fun")))
 

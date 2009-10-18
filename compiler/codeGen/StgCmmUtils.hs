@@ -283,15 +283,15 @@ tagToClosure tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: LitString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall fun args safe = emitRtsCall' [] fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: LitString -> [(CmmExpr,ForeignHint)] -> [GlobalReg] -> Bool -> FCode ()
+emitRtsCallWithVols :: FastString -> [(CmmExpr,ForeignHint)] -> [GlobalReg] -> Bool -> FCode ()
 emitRtsCallWithVols fun args vols safe
    = emitRtsCall' [] fun args (Just vols) safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> LitString
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> FastString
 	-> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCallWithResult res hint fun args safe
    = emitRtsCall' [(res,hint)] fun args Nothing safe
@@ -299,7 +299,7 @@ emitRtsCallWithResult res hint fun args safe
 -- Make a call to an RTS C procedure
 emitRtsCall'
    :: [(LocalReg,ForeignHint)]
-   -> LitString
+   -> FastString
    -> [(CmmExpr,ForeignHint)]
    -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
