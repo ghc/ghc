@@ -3,4 +3,4 @@ T3600.hs:1:0:
         test
       ======>
         T3600.hs:5:2-5
-        myFunction[a167] = (testFun1 [], testFun2 [], testFun2 "x")
+        myFunction = (testFun1 [], testFun2 [], testFun2 "x")

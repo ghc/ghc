@@ -9,7 +9,7 @@ test = do
          args2 = [] :: String
          args3 = "x" :: String
          body = [| (testFun1 args1, testFun2 args2, testFun2 args3)  |]
-     decNm <- newName "myFunction"
+         decNm = mkName "myFunction"
      (:[]) `fmap` funD decNm [clause [] (normalB body) []]
 
 testFun1 :: [String] -> String
