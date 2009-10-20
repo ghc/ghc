@@ -247,40 +247,45 @@ tcExpr in_expr@(OpApp arg1 lop@(L loc op) fix arg2) res_ty
 -- but it's less work and kind of useful.
 
 tcExpr in_expr@(SectionL arg1 lop@(L loc op)) res_ty
-  = do dflags <- getDOpts
-       if dopt Opt_PostfixOperators dflags
-           then do (op', [arg1']) <- tcApp op 1 (tcArgs lop [arg1]) res_ty
-                   return (SectionL arg1' (L loc op'))
-           else do (co_fn, (op', arg1'))
-                       <- subFunTys doc 1 res_ty Nothing
-                        $ \ [arg2_ty'] res_ty' ->
-                              tcApp op 2 (tc_args arg2_ty') res_ty'
-                   return (mkHsWrap co_fn (SectionL arg1' (L loc op')))
+  = do { dflags <- getDOpts
+       ; if dopt Opt_PostfixOperators dflags
+         then do { (op', [arg1']) <- tcApp op 1 (tcArgs lop [arg1]) res_ty
+                 ; return (SectionL arg1' (L loc op')) }
+         else do 
+       { (co_fn, expr')
+             <- subFunTys doc 1 res_ty Nothing $ \ [arg2_ty'] res_ty' ->
+                do { (op', (arg1', co_arg2)) <- tcApp op 2 (tc_args arg2_ty') res_ty'
+		   ; let coi = mkFunTyCoI arg2_ty' co_arg2 res_ty' IdCo
+                   ; return (mkHsWrapCoI coi (SectionL arg1' (L loc op'))) }
+       ; return (mkHsWrap co_fn expr') } }
   where
     doc = ptext (sLit "The section") <+> quotes (ppr in_expr)
 		<+> ptext (sLit "takes one argument")
     tc_args arg2_ty' qtvs qtys [arg1_ty, arg2_ty] 
-	= do { boxyUnify arg2_ty' (substTyWith qtvs qtys arg2_ty)
-	     ; arg1' <- tcArg lop 1 arg1 qtvs qtys arg1_ty
-	     ; qtys' <- mapM refineBox qtys	-- c.f. tcArgs 
-	     ; return (qtys', arg1') }
+	= do { co_arg2 <- boxyUnify (substTyWith qtvs qtys arg2_ty) arg2_ty' 
+	     ; arg1'   <- tcArg lop 1 arg1 qtvs qtys arg1_ty
+	     ; qtys'   <- mapM refineBox qtys	-- c.f. tcArgs 
+	     ; return (qtys', (arg1', co_arg2)) }
     tc_args _ _ _ _ = panic "tcExpr SectionL"
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --	\ x -> op x expr
  
 tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
-  = do	{ (co_fn, (op', arg2')) <- subFunTys doc 1 res_ty Nothing $ \ [arg1_ty'] res_ty' ->
-				   tcApp op 2 (tc_args arg1_ty') res_ty'
-	; return (mkHsWrap co_fn (SectionR (L loc op') arg2')) }
+  = do	{ (co_fn, expr') 
+              <- subFunTys doc 1 res_ty Nothing $ \ [arg1_ty'] res_ty' ->
+		 do { (op', (co_arg1, arg2')) <- tcApp op 2 (tc_args arg1_ty') res_ty'
+		    ; let coi = mkFunTyCoI arg1_ty' co_arg1 res_ty' IdCo
+                    ; return (mkHsWrapCoI coi $ SectionR (L loc op') arg2') }
+	; return (mkHsWrap co_fn expr') }
   where
     doc = ptext (sLit "The section") <+> quotes (ppr in_expr)
 		<+> ptext (sLit "takes one argument")
     tc_args arg1_ty' qtvs qtys [arg1_ty, arg2_ty] 
-	= do { boxyUnify arg1_ty' (substTyWith qtvs qtys arg1_ty)
-	     ; arg2' <- tcArg lop 2 arg2 qtvs qtys arg2_ty 
-	     ; qtys' <- mapM refineBox qtys	-- c.f. tcArgs 
-	     ; return (qtys', arg2') }
+	= do { co_arg1 <- boxyUnify (substTyWith qtvs qtys arg1_ty) arg1_ty'
+	     ; arg2'   <- tcArg lop 2 arg2 qtvs qtys arg2_ty 
+	     ; qtys'   <- mapM refineBox qtys	-- c.f. tcArgs 
+	     ; return (qtys', (co_arg1, arg2')) }
     tc_args arg1_ty' _ _ _ = panic "tcExpr SectionR"
 
 -- For tuples, take care to preserve rigidity
@@ -1009,7 +1014,7 @@ tcArgs :: LHsExpr Name				-- The function (for error messages)
 type ArgChecker results
    = [TyVar] -> [TcSigmaType] 		-- Current instantiation
    -> [TcSigmaType]			-- Expected arg types (**before** applying the instantiation)
-   -> TcM ([TcSigmaType], results)	-- Resulting instaniation and args
+   -> TcM ([TcSigmaType], results)	-- Resulting instantiation and args
 
 tcArgs fun args qtvs qtys arg_tys
   = go 1 qtys args arg_tys
