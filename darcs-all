@@ -118,6 +118,12 @@ sub download {
     my @cmd = ("wget", $from, "-O", $to);
     message "== running @cmd";
     system @cmd;
+    if ($? == -1) {
+        die "Failed to execute wget: $!\n";
+    }
+    elsif ($? != 0) {
+        die "wget failed: $?\n";
+    }
 }
 
 sub darcs {
