@@ -336,6 +336,11 @@ allowed_combination way = and [ x `allowedWith` y
 	_ `allowedWith` WayDyn  		= True
 	WayDyn `allowedWith` _		        = True
 
+	-- ticky is (now) allowed with everything
+	-- Indeed, ticky should no longer be a 'way' at all
+	_ `allowedWith` WayTicky  		= True
+	WayTicky `allowedWith` _	        = True
+
 	-- debug is allowed with everything
 	_ `allowedWith` WayDebug		= True
 	WayDebug `allowedWith` _		= True
