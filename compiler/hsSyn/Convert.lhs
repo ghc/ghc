@@ -568,10 +568,16 @@ if it isn't a literal string
 
 allCharLs :: [TH.Exp] -> Maybe String
 -- Note [Converting strings]
-allCharLs (LitE (CharL c) : xs) 
-  | Just cs <- allCharLs xs = Just (c:cs)
-allCharLs [] = Just []
-allCharLs _  = Nothing
+-- NB: only fire up this setup for a non-empty list, else
+--     there's a danger of returning "" for [] :: [Int]!
+allCharLs xs
+  = case xs of 
+      LitE (CharL c) : ys -> go [c] ys
+      _                   -> Nothing
+  where
+    go cs []                    = Just (reverse cs)
+    go cs (LitE (CharL c) : ys) = go (c:cs) ys
+    go _  _                     = Nothing
 
 cvtLit :: Lit -> CvtM HsLit
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim i }
