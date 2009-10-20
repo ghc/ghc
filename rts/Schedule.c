@@ -1454,6 +1454,12 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         // GC thread each.
         waitForGcThreads(cap);
     }
+
+#else /* !THREADED_RTS */
+
+    // do this while the other Capabilities stop:
+    if (cap) scheduleCheckBlackHoles(cap);
+
 #endif
 
     IF_DEBUG(scheduler, printAllThreads());
