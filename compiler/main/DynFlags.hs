@@ -263,6 +263,8 @@ data DynFlag
    -- optimisation opts
    | Opt_Strictness
    | Opt_FullLaziness
+   | Opt_FloatIn
+   | Opt_Specialise
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_LiberateCase
@@ -890,6 +892,8 @@ optLevelFlags
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_FullLaziness)
+    , ([1,2],   Opt_Specialise)
+    , ([1,2],   Opt_FloatIn)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
@@ -1051,6 +1055,8 @@ getCoreToDo dflags
     max_iter      = maxSimplIterations dflags
     strictness    = dopt Opt_Strictness dflags
     full_laziness = dopt Opt_FullLaziness dflags
+    do_specialise = dopt Opt_Specialise dflags
+    do_float_in   = dopt Opt_FloatIn dflags
     cse           = dopt Opt_CSE dflags
     spec_constr   = dopt Opt_SpecConstr dflags
     liberate_case = dopt Opt_LiberateCase dflags
@@ -1125,7 +1131,7 @@ getCoreToDo dflags
 
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
-        CoreDoSpecialising,
+        runWhen do_specialise CoreDoSpecialising,
 
         runWhen full_laziness (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
       		-- Was: gentleFloatOutSwitches	
@@ -1136,7 +1142,7 @@ getCoreToDo dflags
 		-- 	    rewrite's allocation by 19%, and made  0.0% difference
 		-- 	    to any other nofib benchmark
 
-        CoreDoFloatInwards,
+        runWhen do_float_in CoreDoFloatInwards,
 
         simpl_phases,
 
@@ -1177,7 +1183,7 @@ getCoreToDo dflags
                 -- succeed in commoning up things floated out by full laziness.
                 -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
 
-        CoreDoFloatInwards,
+        runWhen do_float_in CoreDoFloatInwards,
 
         maybe_rule_check 0,
 
@@ -1689,6 +1695,8 @@ fFlags = [
   ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, const Supported ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, const Supported ),
   ( "strictness",                       Opt_Strictness, const Supported ),
+  ( "specialise",                       Opt_Specialise, const Supported ),
+  ( "float-in",                         Opt_FloatIn, const Supported ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, const Supported ),
   ( "full-laziness",                    Opt_FullLaziness, const Supported ),
   ( "liberate-case",                    Opt_LiberateCase, const Supported ),

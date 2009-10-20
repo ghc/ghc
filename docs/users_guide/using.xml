@@ -1667,6 +1667,26 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
+            <option>-fno-float-in</option>
+            <indexterm><primary><option>-fno-float-in</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turns off the float-in transformation.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fno-specialise</option>
+            <indexterm><primary><option>-fno-specialise</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turns off the automatic specialisation of overloaded functions.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
             <option>-fspec-constr</option>
             <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
           </term>
