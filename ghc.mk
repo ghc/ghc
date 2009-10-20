@@ -703,9 +703,6 @@ install : install_mingw
 install_mingw : $(INPLACE_MINGW)
 	"$(CP)" -Rp $(INPLACE_MINGW) $(prefix)
 
-$(INPLACE_LIB)/perl.exe $(INPLACE_LIB)/perl56.dll :
-	"$(CP)" $(GhcDir)../{perl.exe,perl56.dll} $(INPLACE_LIB)
-
 endif # Windows
 
 libraries/ghc-prim/dist-install/doc/html/ghc-prim/ghc-prim.haddock: \
