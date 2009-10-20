@@ -3264,7 +3264,7 @@ There should be more documentation, but there isn't (yet).  Yell if you need it.
 <sect3><title>Rules for functional dependencies </title>
 <para>
 In a class declaration, all of the class type variables must be reachable (in the sense 
-mentioned in <xref linkend="type-restrictions"/>)
+mentioned in <xref linkend="flexible-contexts"/>)
 from the free variables of each method type.
 For example:
 
