@@ -62,6 +62,8 @@ instance Outputable name => Outputable (AnnTarget name) where
     ppr (NamedTarget nm) = text "Named target" <+> ppr nm
     ppr (ModuleTarget mod) = text "Module target" <+> ppr mod
 
+instance Outputable Annotation where
+    ppr ann = ppr (ann_target ann)
 
 -- | A collection of annotations
 newtype AnnEnv = MkAnnEnv (UniqFM [Serialized])

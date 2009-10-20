@@ -433,11 +433,7 @@ tcTopSplice expr res_ty
        ; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_exp_ty)
 
         -- Run the expression
-       ; traceTc (text "About to run" <+> ppr zonked_q_expr)
-       ; expr2 <- runMetaE convertToHsExpr zonked_q_expr
-
-       ; traceTc (text "Got result" <+> ppr expr2)
-
+       ; expr2 <- runMetaE zonked_q_expr
        ; showSplice "expression" expr (ppr expr2)
 
         -- Rename it, but bale out if there are errors
@@ -521,13 +517,9 @@ kcTopSpliceType expr
 	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_ty)
 
 	-- Run the expression
-	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-	; hs_ty2 <- runMetaT convertToHsType zonked_q_expr
-  
-	; traceTc (text "Got result" <+> ppr hs_ty2)
-
+	; hs_ty2 <- runMetaT zonked_q_expr
 	; showSplice "type" expr (ppr hs_ty2)
-
+  
 	-- Rename it, but bale out if there are errors
 	-- otherwise the type checker just gives more spurious errors
 	; let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
@@ -555,13 +547,10 @@ tcSpliceDecls expr
 	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr list_q)
 
 		-- Run the expression
-	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-	; decls <- runMetaD convertToHsDecls zonked_q_expr
-
-	; traceTc (text "Got result" <+> vcat (map ppr decls))
-	; showSplice "declarations"
-	  	     expr 
+	; decls <- runMetaD zonked_q_expr
+	; showSplice "declarations" expr 
 		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
+
 	; return decls }
 \end{code}
 
@@ -640,11 +629,10 @@ the splice is run by the *renamer* rather than the type checker.
 runQuasiQuote :: Outputable hs_syn
               => HsQuasiQuote Name	-- Contains term of type QuasiQuoter, and the String
               -> Name			-- Of type QuasiQuoter -> String -> Q th_syn
-              -> String			-- Documentation string only
               -> Name			-- Name of th_syn type  
-              -> (SrcSpan -> th_syn -> Either Message hs_syn)
+              -> MetaOps th_syn hs_syn 
               -> TcM hs_syn
-runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector desc meta_ty convert
+runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector meta_ty meta_ops
   = do	{ -- Check that the quoter is not locally defined, otherwise the TH
           -- machinery will not be able to run the quasiquote.
         ; this_mod <- getModule
@@ -667,18 +655,13 @@ runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector desc meta_
       	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr meta_exp_ty)
 
       	-- Run the expression
-      	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-      	; result <- runMetaQ convert zonked_q_expr
-      	; traceTc (text "Got result" <+> ppr result)
-      	; showSplice desc quoteExpr (ppr result)
-      	; return result
-      	}
+      	; result <- runMetaQ meta_ops zonked_q_expr
+      	; showSplice (mt_desc meta_ops) quoteExpr (ppr result)
 
-runQuasiQuoteExpr quasiquote
-    = runQuasiQuote quasiquote quoteExpName "expression" expQTyConName convertToHsExpr
+      	; return result	}
 
-runQuasiQuotePat quasiquote
-    = runQuasiQuote quasiquote quotePatName "pattern" patQTyConName convertToPat
+runQuasiQuoteExpr quasiquote = runQuasiQuote quasiquote quoteExpName expQTyConName exprMetaOps
+runQuasiQuotePat  quasiquote = runQuasiQuote quasiquote quotePatName patQTyConName patMetaOps
 
 quoteStageError :: Name -> SDoc
 quoteStageError quoter
@@ -694,51 +677,70 @@ quoteStageError quoter
 %************************************************************************
 
 \begin{code}
-runMetaAW :: (AnnotationWrapper -> output)
+data MetaOps th_syn hs_syn
+  = MT { mt_desc :: String	       -- Type of beast (expression, type etc)
+       , mt_show :: th_syn -> String   -- How to show the th_syn thing
+       , mt_cvt  :: SrcSpan -> th_syn -> Either Message hs_syn
+       	 	    	       	       -- How to convert to hs_syn
+    }
+
+exprMetaOps :: MetaOps TH.Exp (LHsExpr RdrName)
+exprMetaOps = MT { mt_desc = "expression", mt_show = TH.pprint, mt_cvt = convertToHsExpr }
+
+patMetaOps :: MetaOps TH.Pat (LPat RdrName)
+patMetaOps = MT { mt_desc = "pattern", mt_show = TH.pprint, mt_cvt = convertToPat }
+
+typeMetaOps :: MetaOps TH.Type (LHsType RdrName)
+typeMetaOps = MT { mt_desc = "type", mt_show = TH.pprint, mt_cvt = convertToHsType }
+
+declMetaOps :: MetaOps [TH.Dec] [LHsDecl RdrName]
+declMetaOps = MT { mt_desc = "declarations", mt_show = TH.pprint, mt_cvt = convertToHsDecls }
+
+----------------
+runMetaAW :: Outputable output
+          => (AnnotationWrapper -> output)
           -> LHsExpr Id         -- Of type AnnotationWrapper
           -> TcM output
 runMetaAW k = runMeta False (\_ -> return . Right . k)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the users code
 
-runQThen :: (SrcSpan -> input -> Either Message output)
-         -> SrcSpan
-         -> TH.Q input
-         -> TcM (Either Message output)
-runQThen f expr_span what = TH.runQ what >>= (return . f expr_span)
-
-runMetaQ :: (SrcSpan -> input -> Either Message output)
+-----------------
+runMetaQ :: Outputable hs_syn 
+         => MetaOps th_syn hs_syn
 	 -> LHsExpr Id
-	 -> TcM output
-runMetaQ = runMeta True . runQThen
+	 -> TcM hs_syn
+runMetaQ (MT { mt_show = show_th, mt_cvt = cvt }) expr
+  = runMeta True run_and_cvt expr
+  where
+    run_and_cvt expr_span hval
+       = do { th_result <- TH.runQ hval
+            ; traceTc (text "Got TH result:" <+> text (show_th th_result))
+            ; return (cvt expr_span th_result) }
 
-runMetaE :: (SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName))
-	 -> LHsExpr Id 		-- Of type (Q Exp)
+runMetaE :: LHsExpr Id 		-- Of type (Q Exp)
 	 -> TcM (LHsExpr RdrName)
-runMetaE = runMetaQ
+runMetaE = runMetaQ exprMetaOps
 
-runMetaP :: (SrcSpan -> TH.Pat -> Either Message (Pat RdrName))
-         -> LHsExpr Id          -- Of type (Q Pat)
-         -> TcM (Pat RdrName)
-runMetaP = runMetaQ
-
-runMetaT :: (SrcSpan -> TH.Type -> Either Message (LHsType RdrName))
-	 -> LHsExpr Id 		-- Of type (Q Type)
+runMetaT :: LHsExpr Id 		-- Of type (Q Type)
 	 -> TcM (LHsType RdrName)	
-runMetaT = runMetaQ
+runMetaT = runMetaQ typeMetaOps
 
-runMetaD :: (SrcSpan -> [TH.Dec] -> Either Message [LHsDecl RdrName])
-	 -> LHsExpr Id 		-- Of type Q [Dec]
+runMetaD :: LHsExpr Id 		-- Of type Q [Dec]
 	 -> TcM [LHsDecl RdrName]
-runMetaD = runMetaQ
+runMetaD = runMetaQ declMetaOps
 
-runMeta :: Bool                 -- Whether code should be printed in the exception message
-        -> (SrcSpan -> input -> TcM (Either Message output))
-	-> LHsExpr Id 		-- Of type X
-	-> TcM output		-- Of type t
+---------------
+runMeta :: (Outputable hs_syn)
+        => Bool                 -- Whether code should be printed in the exception message
+        -> (SrcSpan -> x -> TcM (Either Message hs_syn))	-- How to run x 
+	-> LHsExpr Id 		-- Of type x; typically x = Q TH.Exp, or something like that
+	-> TcM hs_syn		-- Of type t
 runMeta show_code run_and_convert expr
-  = do	{ 	-- Desugar
-	  ds_expr <- initDsTc (dsLExpr expr)
+  = do	{ traceTc (text "About to run" <+> ppr expr)
+
+	-- Desugar
+	; ds_expr <- initDsTc (dsLExpr expr)
 	-- Compile and link it; might fail if linking fails
 	; hsc_env <- getTopEnv
 	; src_span <- getSrcSpanM
@@ -766,15 +768,14 @@ runMeta show_code run_and_convert expr
 	     do	{ mb_result <- run_and_convert expr_span (unsafeCoerce# hval)
 		; case mb_result of
 		    Left err     -> failWithTc err
-		    Right result -> return $! result }
+		    Right result -> do { traceTc (ptext (sLit "Got HsSyn result:") <+> ppr result) 
+                                       ; return $! result } }
 
 	; case either_tval of
 	    Right v -> return v
-	    Left se ->
-                    case fromException se of
-                    Just IOEnvFailure ->
-                        failM -- Error already in Tc monad
-                    _ -> failWithTc (mk_msg "run" se)	-- Exception
+	    Left se -> case fromException se of
+                    	 Just IOEnvFailure -> failM -- Error already in Tc monad
+                    	 _ -> failWithTc (mk_msg "run" se)	-- Exception
         }}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
