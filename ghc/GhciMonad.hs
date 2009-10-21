@@ -258,7 +258,13 @@ runStmt expr step = do
           GHC.runStmt expr step
 
 resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
-resume canLogSpan step = GHC.resume canLogSpan step
+resume canLogSpan step = do
+  st <- getGHCiState
+  reifyGHCi $ \x ->
+    withProgName (progname st) $
+    withArgs (args st) $
+      reflectGHCi x $ do
+        GHC.resume canLogSpan step
 
 -- --------------------------------------------------------------------------
 -- timing & statistics
