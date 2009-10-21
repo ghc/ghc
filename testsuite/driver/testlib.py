@@ -1383,6 +1383,7 @@ def platform_wordsize_qualify( name, suff ):
     plat_paths = map (lambda x: x + '-' + config.platform, paths)
 
     dir = glob.glob(basepath + '*')
+    dir = map (lambda d: normalise_slashes_(d), dir)
 
     for f in plat_paths:
        if f in dir:
