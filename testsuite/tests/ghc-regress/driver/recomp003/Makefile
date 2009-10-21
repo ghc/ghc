@@ -9,9 +9,9 @@ OBJSUFFIX = .o
 recomp003:
 	$(RM) A.hi A$(OBJSUFFIX) out
 	$(RM) Char.hs Char.hi Char$(OBJSUFFIX)
-	$(TEST_HC) -c A.hs
+	'$(TEST_HC)' -c A.hs
 	echo "module Char where" >Char.hs
-	$(TEST_HC) -c Char.hs
+	'$(TEST_HC)' -c Char.hs
 	# Should now recompile A.hs, because Char is now a home module:
-	$(TEST_HC) -c A.hs 2>err
+	'$(TEST_HC)' -c A.hs 2>err
 	@if grep NOT err; then false; fi

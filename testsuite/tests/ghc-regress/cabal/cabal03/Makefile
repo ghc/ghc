@@ -16,27 +16,27 @@ SETUP=../Setup -v0
 # Currently the error message from GHC is swallowed by Cabal.
 
 cabal03: clean
-	$(GHC_PKG) init tmp.d
-	$(TEST_HC) -v0 --make Setup
+	'$(GHC_PKG)' init tmp.d
+	'$(TEST_HC)' -v0 --make Setup
 	cd p; \
 	  $(SETUP) clean; \
-	  $(SETUP) configure --with-ghc=$(TEST_HC)  --disable-optimisation; \
+	  $(SETUP) configure --with-ghc='$(TEST_HC)'  --disable-optimisation; \
 	  $(SETUP) build; $(SETUP) register --inplace;
 	cd q; \
-	  $(SETUP) configure --with-ghc=$(TEST_HC) --package-db=../tmp.d; \
+	  $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d; \
 	  $(SETUP) build; $(SETUP) register --inplace
 	cd p; \
 	  $(SETUP) clean; \
-	  $(SETUP) configure --with-ghc=$(TEST_HC) --package-db=../tmp.d; \
+	  $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d; \
 	  $(SETUP) build; $(SETUP) register --inplace
 	cd r; \
-	  ../Setup configure --with-ghc=$(TEST_HC) --package-db=../tmp.d; \
+	  ../Setup configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d; \
 	  if ../Setup build; then false else true; fi
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean
 endif
 
 clean :
-	$(GHC_PKG) unregister --force p >/dev/null 2>&1 || true
-	$(GHC_PKG) unregister --force q >/dev/null 2>&1 || true
+	'$(GHC_PKG)' unregister --force p >/dev/null 2>&1 || true
+	'$(GHC_PKG)' unregister --force q >/dev/null 2>&1 || true
 	$(RM) -r tmp.d *.{o,hi} */*.{o,hi} */Setup$(exeext) */dist
