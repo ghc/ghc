@@ -1352,7 +1352,7 @@ def add_hs_lhs_suffix(name):
         return add_suffix(name, 'hs')
 
 def in_testdir( name ):
-    return os.path.join(testdir, name)
+    return (testdir + '/' + name)
 
 def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))
