@@ -25,7 +25,7 @@ rn.prog006:
 	echo "name: test" >>pkg.conf
 	echo "version: 1.0" >>pkg.conf
 	echo "id: test-XXX" >>pkg.conf
-	echo "import-dirs: `pwd`" >>pkg.conf
+	echo "import-dirs: `./pwd`" >>pkg.conf
 	echo "exposed-modules: B.C" >>pkg.conf
 	echo "[]" >$(LOCAL_PKGCONF)
 	$(LOCAL_GHC_PKG) register pkg.conf -v0

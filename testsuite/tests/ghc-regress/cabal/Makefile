@@ -116,7 +116,7 @@ LOCAL_GHC_PKG1750 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF1750)
 	$(LOCAL_GHC_PKG1750) init $(PKGCONF1750)
 	$(LOCAL_GHC_PKG1750) register --force 1750A.pkg >1750.out 2>&1
 	$(LOCAL_GHC_PKG1750) register --force 1750B.pkg >1750.out 2>&1
-	GHC_PACKAGE_PATH=$(PKGCONF1750) $(GHC_PKG) --no-user-package-conf list
+	GHC_PACKAGE_PATH=$(PKGCONF1750) '$(GHC_PKG)' --no-user-package-conf list
 # GHC_PACKAGE_PATH trick is to make this work with 6.8.2 which doesn't have
 # the patch "Change the command-line semantics for query commands" to
 # ghc-pkg
