@@ -662,6 +662,7 @@ externallyVisibleCLabel (PlainModuleInitLabel _)= True
 externallyVisibleCLabel (ModuleInitTableLabel _)= False
 externallyVisibleCLabel ModuleRegdLabel		= False
 externallyVisibleCLabel (RtsLabel _)		= True
+externallyVisibleCLabel (CmmLabel _ _ _)	= True
 externallyVisibleCLabel (ForeignLabel _ _ _ _)	= True
 externallyVisibleCLabel (IdLabel name _ _)	= isExternalName name
 externallyVisibleCLabel (CC_Label _)		= True
