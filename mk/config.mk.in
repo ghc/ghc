@@ -603,7 +603,8 @@ RANLIB			= @RANLIB@
 SED			= @SedCmd@
 SHELL			= /bin/sh
 
-LD			= @LdCmd@
+LD = @LdCmd@
+NM = @NmCmd@
 
 # Some ld's support the -x flag and some don't, so the configure
 # script detects which we have and sets LdXFlag to "-x" or ""

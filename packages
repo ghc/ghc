@@ -17,6 +17,7 @@
 #
 # Lines that start with a '#' are comments.
 .                                       ghc                             git
+ghc-tarballs                            ghc-tarballs                    darcs
 utils/hsc2hs                            hsc2hs                          darcs
 utils/haddock                           haddock2                        darcs
 libraries/array                         packages/array                  darcs

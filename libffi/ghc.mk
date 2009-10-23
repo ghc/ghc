@@ -106,7 +106,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
 	"$(RM)" $(RM_OPTS) -r $(LIBFFI_DIR) libffi/build
-	cd libffi && $(TAR) -zxf tarball/libffi*.tar.gz
+	cd libffi && $(TAR) -zxf ../ghc-tarballs/libffi/libffi*.tar.gz
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
 	cd libffi/build && "$(PATCH)" -p1 < ../libffi.dllize-3.0.8.patch

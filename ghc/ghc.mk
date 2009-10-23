@@ -135,9 +135,9 @@ $(GHC_STAGE2) : $(INPLACE_LIB)/extra-gcc-opts
 $(GHC_STAGE3) : $(INPLACE_LIB)/extra-gcc-opts
 
 ifeq "$(Windows)" "YES"
-$(GHC_STAGE1) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
-$(GHC_STAGE2) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
-$(GHC_STAGE3) : $(TOUCHY) $(INPLACE)/stamp-mingw $(INPLACE_LIB)/perl.exe
+$(GHC_STAGE1) : $(TOUCHY)
+$(GHC_STAGE2) : $(TOUCHY)
+$(GHC_STAGE3) : $(TOUCHY)
 endif
 
 ifeq "$(BootingFromHc)" "YES"

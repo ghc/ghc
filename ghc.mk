@@ -686,18 +686,6 @@ endif
 
 ifeq "$(Windows)" "YES"
 
-# directories don't work well as dependencies, hence a stamp file
-$(INPLACE)/stamp-mingw : $(MKDIRHIER)
-	$(MKDIRHIER) $(INPLACE_MINGW)/bin
-	GCC=`type -p $(WhatGccIsCalled)`; \
-	GccDir=`dirname $$GCC`; \
-	"$(CP)" -p $$GccDir/{gcc.exe,ar.exe,as.exe,dlltool.exe,dllwrap.exe,windres.exe} $(INPLACE_MINGW)/bin; \
-	"$(CP)" -Rp $$GccDir/../include $(INPLACE_MINGW); \
-	"$(CP)" -Rp $$GccDir/../lib     $(INPLACE_MINGW); \
-	"$(CP)" -Rp $$GccDir/../libexec $(INPLACE_MINGW); \
-	"$(CP)" -Rp $$GccDir/../mingw32 $(INPLACE_MINGW)
-	touch $(INPLACE)/stamp-mingw
-
 install : install_mingw
 .PHONY: install_mingw
 install_mingw : $(INPLACE_MINGW)

@@ -44,6 +44,40 @@ AC_DEFUN([FP_EVAL_STDERR],
 ])# FP_EVAL_STDERR
 
 
+# FP_ARG_WITH_PATH_GNU_PROG
+# --------------------
+# XXX
+#
+# $1 = the command to look for
+# $2 = the variable to set
+#
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
+[
+AC_ARG_WITH($2,
+[AC_HELP_STRING([--with-$2=ARG],
+        [Use ARG as the path to $2 [default=autodetect]])],
+[
+    if test "$HostOS" = "mingw32"
+    then
+        AC_MSG_WARN([Request to use $withval will be ignored])
+    else
+        $1=$withval
+    fi
+],
+[
+    if test "$HostOS" != "mingw32"
+    then
+        AC_PATH_PROG([$1], [$2])
+        if test -z "$$1"
+        then
+            AC_MSG_ERROR([cannot find $2 in your PATH, no idea how to link])
+        fi
+    fi
+]
+)
+]) # FP_ARG_WITH_PATH_GNU_PROG
+
+
 # FP_PROG_CONTEXT_DIFF
 # --------------------
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
@@ -289,46 +323,12 @@ AC_SUBST(AlexVersion)
 ])
 
 
-
-# FP_PROG_LD
-# ----------
-# Sets the output variable LdCmd to the (non-Cygwin version of the) full path
-# of ld. Exits if no ld can be found
-AC_DEFUN([FP_PROG_LD],
-[
-if test -z "$1"
-then
-  AC_PATH_PROG([fp_prog_ld_raw], [ld])
-  if test -z "$fp_prog_ld_raw"; then
-    AC_MSG_ERROR([cannot find ld in your PATH, no idea how to link])
-  fi
-  LdCmd=$fp_prog_ld_raw
-  case $HostPlatform in
-    *mingw32) if test x${OSTYPE} != xmsys; then
-   	      LdCmd="`cygpath -w ${fp_prog_ld_raw} | sed -e 's@\\\\@/@g'`"
-                AC_MSG_NOTICE([normalized ld command to $LdCmd])
-              fi
-  	    # Insist on >= ld-2.15.x, since earlier versions doesn't handle
-  	    # the generation of relocatable object files with large amounts
-  	    # of relocations correctly. (cf. HSbase.o splittage-hack)
-  	    fp_prog_ld_version=`${LdCmd} --version | sed -n '/GNU ld/p' | tr -cd 0-9 | cut -b1-3`
-  	    FP_COMPARE_VERSIONS([$fp_prog_ld_version],[-lt],[214],
-                                  [AC_MSG_ERROR([GNU ld version later than 2.14 required to compile GHC on Windows.])])[]dnl
-              ;;
-  esac
-else
-  LdCmd="$1"
-fi
-AC_SUBST([LdCmd])
-])# FP_PROG_LD
-
-
 # FP_PROG_LD_X
 # ------------
 # Sets the output variable LdXFlag to -x if ld supports this flag, otherwise the
 # variable's value is empty.
 AC_DEFUN([FP_PROG_LD_X],
-[AC_REQUIRE([FP_PROG_LD])
+[
 AC_CACHE_CHECK([whether ld understands -x], [fp_cv_ld_x],
 [echo 'foo() {}' > conftest.c
 ${CC-cc} -c conftest.c
@@ -352,7 +352,7 @@ AC_SUBST([LdXFlag])
 # Sets the output variable LdIsGNULd to YES or NO, depending on whether it is
 # GNU ld or not.
 AC_DEFUN([FP_PROG_LD_IS_GNU],
-[AC_REQUIRE([FP_PROG_LD])
+[
 AC_CACHE_CHECK([whether ld is GNU ld], [fp_cv_gnu_ld],
 [if ${LdCmd} --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
   fp_cv_gnu_ld=yes

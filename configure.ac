@@ -380,47 +380,56 @@ AC_SUBST(WithHc)
 AC_PATH_PROGS(NHC,nhc nhc98)
 AC_PATH_PROG(HBC,hbc)
 
+# This uses GHC, so put it after the "GHC is required" check above:
+FP_FIND_ROOT
+
+if test "$HostOS" = "mingw32"
+then
+    CC="$hardtop/inplace/mingw/bin/gcc.exe"
+    LD="$hardtop/inplace/mingw/bin/ld.exe"
+    NM="$hardtop/inplace/mingw/bin/nm.exe"
+    if ! test -d inplace/mingw ||
+         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libcrypt*.tar.bz2 ||
+         test inplace/mingw -ot ghc-tarballs/mingw/mingw-runtime*.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/perl*.tar.bz2 ||
+         test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.gz
+    then
+        AC_MSG_NOTICE([Making in-tree mingw tree])
+        rm -rf inplace/mingw
+        mkdir inplace
+        mkdir inplace/mingw
+        cd inplace/mingw
+        tar -zxf ../../ghc-tarballs/mingw/binutils*.tar.gz
+        tar -zxf ../../ghc-tarballs/mingw/gcc-core*.tar.gz
+        tar -jxf ../../ghc-tarballs/mingw/libcrypt*.tar.bz2
+        tar -zxf ../../ghc-tarballs/mingw/mingw-runtime*.tar.gz
+        tar -jxf ../../ghc-tarballs/mingw/perl*.tar.bz2
+        tar -zxf ../../ghc-tarballs/mingw/w32api*.tar.gz
+        cd ../..
+        AC_MSG_NOTICE([In-tree mingw tree created])
+    fi
+fi
+
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
-AC_ARG_WITH(gcc,
-[AC_HELP_STRING([--with-gcc=ARG],
-        [Use ARG as the path to GCC  [default=autodetect]])],
-[WhatGccIsCalled="$withval"
- if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-    test "${OSTYPE}"      != "msys"                  && \
-    test "${withval}"     != ""
- then
-     # Canonicalise to <drive>:/path/to/gcc
-     withval=`cygpath -m ${withval}`
- fi;
- CC="$withval"
- export CC
- ],
-[WhatGccIsCalled="gcc"]
-)
+FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
+export CC
+WhatGccIsCalled="$CC"
 AC_SUBST(WhatGccIsCalled)
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-AC_ARG_WITH(ld,
-[AC_HELP_STRING([--with-ld=ARG],
-        [Use ARG as the path to LD  [default=autodetect]])],
-[if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-    test "${OSTYPE}"      != "msys"                  && \
-    test "${withval}"     != ""
- then
-     # Canonicalise to <drive>:/path/to/ld
-     withval=`cygpath -m ${withval}`
- fi;
- LD=$withval
- FP_PROG_LD([$LD])
- ],
- [FP_PROG_LD()]
-)
+FP_ARG_WITH_PATH_GNU_PROG([LD], [ld])
+LdCmd="$LD"
+AC_SUBST([LdCmd])
 
-# This uses GHC, so put it after the "GHC is required" check above:
-FP_FIND_ROOT
-
+dnl ** Which nm to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
+NmCmd="$NM"
+AC_SUBST([NmCmd])
 
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------

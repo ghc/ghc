@@ -184,7 +184,7 @@ initSysTools mbMinusB dflags0
                 | isWindowsHost = installed_mingw_bin "gcc"
                 | otherwise     = cGCC
               perl_path
-                | isWindowsHost = installed cGHC_PERL
+                | isWindowsHost = installed_mingw_bin cGHC_PERL
                 | otherwise     = cGHC_PERL
               -- 'touch' is a GHC util for Windows
               touch_path

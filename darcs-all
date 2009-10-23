@@ -112,20 +112,6 @@ sub warning {
     }
 }
 
-sub download {
-    my ($from, $to) = @_;
-
-    my @cmd = ("wget", $from, "-O", $to);
-    message "== running @cmd";
-    system @cmd;
-    if ($? == -1) {
-        die "Failed to execute wget: $!\n";
-    }
-    elsif ($? != 0) {
-        die "wget failed: $?\n";
-    }
-}
-
 sub darcs {
     message "== running darcs @_";
     system ("darcs", @_) == 0
@@ -178,10 +164,6 @@ sub darcsall {
             die "Bad line: $_";
         }
     }
-
-    if ($_[0] eq "pull" || $_[0] eq "pul") {
-        &sync_tarballs();
-    }
 }
 
 sub darcsget {
@@ -231,63 +213,6 @@ sub darcsget {
         }
         elsif (! /^(#.*)?$/) {
             die "Bad line: $_";
-        }
-    }
-
-    &sync_tarballs();
-}
-
-sub sync_tarballs {
-    my $localpath;
-    my $localdirectory;
-    my $localfilename;
-    my $actualpath;
-    my $actualfilename;
-    my $remotepath;
-    my $path;
-    my @tarballs;
-    my %localtarballs;
-    my ($repo_base, $checked_out_tree) = getrepo();
-
-    message "== Syncing tarballs";
-
-    open IN, "< tarballs" or die "Can't open packages file";
-    @tarballs = <IN>;
-    close IN;
-
-    foreach (@tarballs) {
-        chomp;
-        if (m@^([^# ]+)/([^#/ ]+) +([^ ]+)$@) {
-            $localdirectory = $1;
-            $localfilename = $2;
-            $remotepath = $3;
-            $localpath = "$localdirectory/$localfilename";
-
-            $localtarballs{$localdirectory}{$localfilename} = 1;
-
-            if (! -e $localpath) {
-                if ($checked_out_tree) {
-                    $path = "$repo_base/$localpath";
-                }
-                else {
-                    $path = "$repo_base/$remotepath";
-                }
-                &download($path, $localpath);
-            }
-        }
-        elsif (! /^(#.*)?$/) {
-            die "Bad line: $_";
-        }
-    }
-
-    foreach $localdirectory (keys %localtarballs) {
-        FILE: foreach $actualpath (glob "$localdirectory/*.tar.gz $localdirectory/*.tar.bz2") {
-            $actualfilename = $actualpath;
-            $actualfilename =~ s#.*/##;
-            if (! defined($localtarballs{$localdirectory}{$actualfilename})) {
-                message "== Deleting $actualpath";
-                unlink $actualpath;
-            }
         }
     }
 }
