@@ -18,6 +18,8 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.13], [glasgow-hask
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
 
+set -e
+
 # The primary version (e.g. 6.7, 6.6.1) is set in the AC_INIT line
 # above.  If this is not a released version, then we will append the
 # date to the version number (e.g. 6.7.20070204).  The date is
