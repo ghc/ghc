@@ -22,6 +22,13 @@ STRIP           = :
 
 CHECK_PACKAGES = YES
 
+# dblatex with miktex under msys/mingw can't build the PS and PDF docs,
+# and just building the HTML docs is sufficient to check that the
+# markup is correct, so we turn off PS and PDF doc building when
+# validating.
+BUILD_DOCBOOK_PS  = NO
+BUILD_DOCBOOK_PDF = NO
+
 ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
