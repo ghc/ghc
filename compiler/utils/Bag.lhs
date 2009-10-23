@@ -178,5 +178,5 @@ bagToList b = foldrBag (:) [] b
 
 \begin{code}
 instance (Outputable a) => Outputable (Bag a) where
-    ppr bag = char '<' <> pprWithCommas ppr (bagToList bag) <> char '>'
+    ppr bag = braces (pprWithCommas ppr (bagToList bag))
 \end{code}
