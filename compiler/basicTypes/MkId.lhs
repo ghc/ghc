@@ -922,7 +922,7 @@ lazyId = pcMiscPrelId lazyIdName ty info
 
 Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
-'seq' is special in several ways.  
+'GHC.Prim.seq' is special in several ways.  
 
 a) Its second arg can have an unboxed type
       x `seq` (v +# w)
