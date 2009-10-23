@@ -7,6 +7,10 @@ sh boot-pkgs
 # Check that we have all boot packages.
 for dir in `grep "^[^# ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*$" packages | sed "s/ .*//"`
 do
+    # We would like to just check for an _darcs directory here, but in
+    # an lndir tree we avoid making _darcs directories, so it doesn't
+    # exist. We therefore require that every repo has a LICENSE file
+    # instead.
     if test ! -f $dir/LICENSE
     then
         echo "Error: $dir/LICENSE doesn't exist." >&2
