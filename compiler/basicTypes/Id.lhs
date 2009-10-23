@@ -49,7 +49,7 @@ module Id (
 	isImplicitId, isDeadBinder, isDictId, isStrictId,
 	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector, isNaughtyRecordSelector,
-	isClassOpId_maybe,
+	isClassOpId_maybe, isDFunId,
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
 	isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
@@ -326,6 +326,7 @@ isNaughtyRecordSelector :: Id -> Bool
 isPrimOpId              :: Id -> Bool
 isFCallId               :: Id -> Bool
 isDataConWorkId         :: Id -> Bool
+isDFunId                :: Id -> Bool
 
 isClassOpId_maybe       :: Id -> Maybe Class
 isPrimOpId_maybe        :: Id -> Maybe PrimOp
@@ -347,6 +348,10 @@ isClassOpId_maybe id = case Var.idDetails id of
 isPrimOpId id = case Var.idDetails id of
                         PrimOpId _ -> True
                         _          -> False
+
+isDFunId id = case Var.idDetails id of
+                        DFunId -> True
+                        _      -> False
 
 isPrimOpId_maybe id = case Var.idDetails id of
                         PrimOpId op -> Just op
