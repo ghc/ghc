@@ -19,7 +19,10 @@ ifneq "$(GCC)" ""
 WITH_GCC = --with-gcc='$(GCC)'
 endif
 
-ifeq "$(filter thr, $(GhcRTSWays))" ""
+ifeq "$(WINDOWS)" "NO"
+# Use a python timeout program, so that we don't have to worry about
+# whether or not the compiler we're testing has built the timeout
+# program correctly
 $(TIMEOUT_PROGRAM): timeout.py
 	rm -rf install-inplace
 	mkdir install-inplace
@@ -27,6 +30,8 @@ $(TIMEOUT_PROGRAM): timeout.py
 	cp $< $@
 	chmod +x $@
 else
+# The python timeout program doesn't work on mingw, so we still use the
+# Haskell program on Windows
 $(TIMEOUT_PROGRAM): timeout.hs
 	rm -rf install-inplace
 	'$(TEST_HC)' --make Setup

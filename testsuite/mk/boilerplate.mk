@@ -134,3 +134,10 @@ CP = cp
 RM = rm -f
 PYTHON = python
 
+$(eval $(call get-ghc-rts-field,HostOS,Host OS))
+ifeq "$(HostOS)" "mingw32"
+WINDOWS = YES
+else
+WINDOWS = NO
+endif
+
