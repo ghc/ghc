@@ -1,14 +1,31 @@
 #!/usr/bin/env python
 
+import errno
 import os
 import signal
 import sys
+import time
 
 secs = int(sys.argv[1])
 cmd = sys.argv[2]
 
+def killProcess(pid):
+    os.killpg(pid, signal.SIGKILL)
+    for x in range(10):
+        try:
+            time.sleep(0.3)
+            r = os.waitpid(pid, os.WNOHANG)
+            if r == (0, 0):
+                os.killpg(pid, signal.SIGKILL)
+            else:
+                return
+        except OSError, e:
+            if e.errno == errno.ECHILD:
+                return
+            else:
+                raise e
+
 pid = os.fork()
-# XXX error checking
 if pid == 0:
     # child
     os.setpgrp()
@@ -17,7 +34,7 @@ else:
     # parent
     def handler(signum, frame):
         sys.stderr.write('Timeout happened...killing process...\n')
-        os.killpg(pid, signal.SIGKILL) # XXX Kill better like .hs
+        killProcess(pid)
         sys.exit(99)
     old = signal.signal(signal.SIGALRM, handler)
     signal.alarm(secs)
