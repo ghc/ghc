@@ -65,13 +65,13 @@ $(call all-target,$1_$2,$1/$2/package-data.mk)
 
 # We have a rule for package-data.mk only when the package is
 # disabled, because we want the build to fail if we haven't run phase 0.
-ifneq "$(BINDIST)" "YES"
+ifneq "$$(BINDIST)" "YES"
 $(call build-package-data,$1,$2,$3)
 endif
 
 else
 
-ifneq "$(BINDIST)" "YES"
+ifneq "$$(BINDIST)" "YES"
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 
@@ -111,7 +111,7 @@ ifneq "$3" "0"
 ifeq "$$(ALL_STAGE1_LIBS)" ""
 $$(error ordering failure in $1: $$(ALL_STAGE1_LIBS) is empty)
 endif
-$1/$2/build/tmp/$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
+$1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
 endif
 endif
 
