@@ -822,6 +822,12 @@ simplType env ty
     seqType new_ty   `seq`   return new_ty
   where
     new_ty = substTy env ty
+
+---------------------------------
+simplCoercion :: SimplEnv -> InType -> SimplM OutType
+simplCoercion env co
+  = do { co' <- simplType env co
+       ; return (optCoercion co') }
 \end{code}
 
 
@@ -859,7 +865,7 @@ rebuild env expr cont0
 simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplEnv, OutExpr)
 simplCast env body co0 cont0
-  = do  { co1 <- simplType env co0
+  = do  { co1 <- simplCoercion env co0
         ; simplExprF env body (addCoerce co1 cont0) }
   where
        addCoerce co cont = add_coerce co (coercionKind co) cont

@@ -41,6 +41,9 @@ module Coercion (
         transCoercionTyCon, leftCoercionTyCon, 
         rightCoercionTyCon, instCoercionTyCon, -- needed by TysWiredIn
 
+        -- ** Optimisation
+	optCoercion,
+
         -- ** Comparison
         coreEqCoercion,
 
@@ -666,4 +669,98 @@ mkEqPredCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
 mkEqPredCoI _    IdCo     _   IdCo      = IdCo
 mkEqPredCoI ty1  IdCo     _   (ACo co2) = ACo $ PredTy $ EqPred ty1 co2
 mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi2 ty2)
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                 Optimising coercions									
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+optCoercion :: Coercion -> Coercion
+optCoercion co = co
+{-
+  = pprTrace "optCoercion" (ppr co $$ ppr (coercionKind co)) $
+    ASSERT2( coercionKind co `eq` coercionKind result, ppr co $$ ppr result )
+    result
+  where
+        (s1,t1) `eq` (s2,t2) = s1 `coreEqType` s2 && t1 `coreEqType` t2
+
+        (result,_,_) = go co
+                         -- optimized, changed?, identity?
+        go :: Coercion -> ( Coercion, Bool, Bool )
+        -- traverse coercion term bottom up and return
+        --
+        --    1) equivalent coercion, in optimized form
+        --
+        --    2) whether the output coercion differs from
+        --       the input coercion
+        --
+        --    3) whether the coercion is an identity coercion
+        --
+        -- Performs the following optimizations:
+        --
+        --      sym id          >->     id
+        --      trans id co     >->     co
+        --      trans co id     >->     co
+        --
+        go ty@(TyVarTy a) | isCoVar a = let (ty1,ty2) = coercionKind ty
+                                        in (ty, False, ty1 `coreEqType` ty2)
+                          | otherwise = (ty, False, True)
+        go ty@(AppTy ty1 ty2)
+          = let (ty1', chan1, id1) = go ty1
+                (ty2', chan2, id2) = go ty2
+            in if chan1 || chan2
+                 then (AppTy ty1' ty2', True,  id1 && id2)
+                 else (ty             , False, id1 && id2)
+        go ty@(TyConApp tc args)
+          | tc == symCoercionTyCon, [ty1] <- args
+          = case go ty1 of
+              (ty1', _   ,    True) -> (ty1', True, True)
+              (ty1', True, _      ) -> (TyConApp tc [ty1'], True, False)
+              (_   , _   , _      ) -> (ty, False, False)
+          | tc == transCoercionTyCon, [ty1,ty2] <- args
+          = let (ty1', chan1, id1) = go ty1
+                (ty2', chan2, id2) = go ty2
+            in  if id1
+                  then (ty2', True, id2)
+                  else if id2
+                         then (ty1', True, False)
+                         else if chan1 || chan2
+                                then (TyConApp tc [ty1',ty2'], True , False)
+                                else (ty                     , False, False)
+          | otherwise
+          = let (args', chans, ids) = mapAndUnzip3 go args
+            in  if or chans
+                  then (TyConApp tc args', True , and ids)
+                  else (ty               , False, and ids)
+        go ty@(FunTy ty1 ty2)
+          = let (ty1',chan1,id1) = go ty1
+                (ty2',chan2,id2) = go ty2
+            in  if chan1 || chan2
+                  then (FunTy ty1' ty2', True , id1 && id2)
+                  else (ty             , False, id1 && id2)
+        go ty@(ForAllTy tv ty1)
+          = let (ty1', chan1, id1) = go ty1
+            in if chan1
+                 then (ForAllTy tv ty1', True , id1)
+                 else (ty              , False, id1)
+        go ty@(PredTy (EqPred ty1 ty2))
+          = let (ty1', chan1, id1) = go ty1
+                (ty2', chan2, id2) = go ty2
+            in if chan1 || chan2
+                 then (PredTy (EqPred ty1' ty2'), True , id1 && id2)
+                 else (ty                       , False, id1 && id2)
+        go ty@(PredTy (ClassP cl args))
+          = let (args', chans, ids) = mapAndUnzip3 go args
+            in  if or chans
+                  then (PredTy (ClassP cl args'), True , and ids)
+                  else (ty                      , False, and ids)
+        go ty@(PredTy (IParam name ty1))
+          = let (ty1', chan1, id1) = go ty1
+            in  if chan1
+                  then (PredTy (IParam name ty1'), True , id1)
+                  else (ty                       , False, id1)
+-}
 \end{code}
