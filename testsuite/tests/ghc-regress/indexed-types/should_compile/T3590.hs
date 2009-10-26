@@ -4,9 +4,6 @@
 
 module T3590 where
 
-import Control.Monad.Reader ()
-import Control.Monad.Reader.Class (MonadReader(..))
-
 newtype ListT m a =
   ListT { runListT :: m (Maybe (a, ListT m a)) }
 
