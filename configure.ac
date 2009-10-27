@@ -407,7 +407,9 @@ then
         tar -zxf ../../ghc-tarballs/mingw/mingw-runtime*.tar.gz
         tar -jxf ../../ghc-tarballs/mingw/perl*.tar.bz2
         tar -zxf ../../ghc-tarballs/mingw/w32api*.tar.gz
+        mv bin/gcc.exe bin/realgcc.exe
         cd ../..
+        inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
         AC_MSG_NOTICE([In-tree mingw tree created])
     fi
 fi
