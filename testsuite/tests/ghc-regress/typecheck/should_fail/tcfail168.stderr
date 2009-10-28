@@ -1,7 +1,7 @@
 
 tcfail168.hs:8:10:
-    Couldn't match expected type `IO ()'
-           against inferred type `Char -> ()'
+    Couldn't match expected type `Char -> a'
+           against inferred type `IO ()'
     In a stmt of a 'do' expression: putChar 'a'
     In the expression:
         do { putChar;
