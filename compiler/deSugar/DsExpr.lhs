@@ -49,7 +49,6 @@ import DynFlags
 import StaticFlags
 import CostCentre
 import Id
-import Var
 import PrelInfo
 import DataCon
 import TysWiredIn
