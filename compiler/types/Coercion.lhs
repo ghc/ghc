@@ -679,10 +679,9 @@ mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi
 
 \begin{code}
 optCoercion :: Coercion -> Coercion
-optCoercion co = co
-{-
-  = pprTrace "optCoercion" (ppr co $$ ppr (coercionKind co)) $
-    ASSERT2( coercionKind co `eq` coercionKind result, ppr co $$ ppr result )
+optCoercion co
+  = pprTrace "optCoercion" (ppr co $$ ppr (coercionKind co) $$ text ">-->" $$ ppr result) $
+    ASSERT2( coercionKind co `eq` coercionKind result, ppr co $$ ppr result $$ ppr (coercionKind co) $$ ppr (coercionKind result) )
     result
   where
         (s1,t1) `eq` (s2,t2) = s1 `coreEqType` s2 && t1 `coreEqType` t2
@@ -730,11 +729,23 @@ optCoercion co = co
                          else if chan1 || chan2
                                 then (TyConApp tc [ty1',ty2'], True , False)
                                 else (ty                     , False, False)
-          | otherwise
+          | tc == leftCoercionTyCon, [ty1] <- args
+          = let (ty1', chan1, id1) = go ty1
+            in  if chan1
+                  then (TyConApp tc [ty1'], True , id1)
+                  else (ty                , False, id1) 
+          | tc == rightCoercionTyCon, [ty1] <- args
+          = let (ty1', chan1, id1) = go ty1
+            in  if chan1
+                  then (TyConApp tc [ty1'], True , id1)
+                  else (ty                , False, id1) 
+	  | not (isCoercionTyCon tc)
           = let (args', chans, ids) = mapAndUnzip3 go args
             in  if or chans
                   then (TyConApp tc args', True , and ids)
-                  else (ty               , False, and ids)
+                  else (ty               , False, and ids) 
+          | otherwise
+          = (ty, False, False)
         go ty@(FunTy ty1 ty2)
           = let (ty1',chan1,id1) = go ty1
                 (ty2',chan2,id2) = go ty2
@@ -762,5 +773,4 @@ optCoercion co = co
             in  if chan1
                   then (PredTy (IParam name ty1'), True , id1)
                   else (ty                       , False, id1)
--}
 \end{code}
