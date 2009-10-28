@@ -534,11 +534,13 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
 
 \begin{code}
-mkTupleTy :: Boxity -> Int -> [Type] -> Type
-mkTupleTy boxity arity tys = mkTyConApp (tupleTyCon boxity arity) tys
+mkTupleTy :: Boxity -> [Type] -> Type
+-- Special case for *boxed* 1-tuples, which are represented by the type itself
+mkTupleTy boxity [ty] | Boxed <- boxity = ty
+mkTupleTy boxity tys = mkTyConApp (tupleTyCon boxity (length tys)) tys
 
 unitTy :: Type
-unitTy = mkTupleTy Boxed 0 []
+unitTy = mkTupleTy Boxed []
 \end{code}
 
 %************************************************************************

@@ -348,9 +348,7 @@ mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
 
 -- | Build the type of a small tuple that holds the specified type of thing
 mkCoreTupTy :: [Type] -> Type
-mkCoreTupTy [ty] = ty
-mkCoreTupTy tys  = mkTupleTy Boxed (length tys) tys
-
+mkCoreTupTy tys  = mkTupleTy Boxed tys
 
 -- | Build a big tuple holding the specified variables
 mkBigCoreVarTup :: [Id] -> CoreExpr
