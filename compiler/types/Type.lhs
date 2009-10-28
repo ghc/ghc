@@ -681,7 +681,7 @@ typePrimRep ty = case repType ty of
 \begin{code}
 mkForAllTy :: TyVar -> Type -> Type
 mkForAllTy tyvar ty
-  = mkForAllTys [tyvar] ty
+  = ForAllTy tyvar ty
 
 -- | Wraps foralls over the type using the provided 'TyVar's from left to right
 mkForAllTys :: [TyVar] -> Type -> Type
