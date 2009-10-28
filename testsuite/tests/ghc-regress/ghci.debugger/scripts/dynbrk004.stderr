@@ -1,0 +1,3 @@
+
+<no location info>:
+    Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead

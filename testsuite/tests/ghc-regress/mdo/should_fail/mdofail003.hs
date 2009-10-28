@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -XRecursiveDo #-}
 
 -- shadowing is not allowed II
 

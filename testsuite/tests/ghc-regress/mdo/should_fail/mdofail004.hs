@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -XRecursiveDo #-}
 
 -- mdo requires MonadFix instance, even
 -- if no recursion is present

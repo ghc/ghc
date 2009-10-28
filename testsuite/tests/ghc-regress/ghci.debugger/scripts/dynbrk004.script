@@ -1,6 +1,6 @@
 -- Instrumentation of mdo notation 
                                    
-:set -fglasgow-exts
+:set -XRecursiveDo
 :l ../mdo.hs
 :break Main 13
 :break Main 12
