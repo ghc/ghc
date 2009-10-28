@@ -139,7 +139,9 @@ mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL id
 
 mkExprStmt :: LHsExpr idR -> StmtLR idL idR
 mkBindStmt :: LPat idL -> LHsExpr idR -> StmtLR idL idR
-mkRecStmt  :: [LStmtLR idL idR] -> StmtLR idL idR
+
+emptyRecStmt :: StmtLR idL idR
+mkRecStmt    :: [LStmtLR idL idR] -> StmtLR idL idR
 
 
 mkHsIntegral   i       = OverLit (HsIntegral   i)  noRebindableInfo noSyntaxExpr
@@ -163,7 +165,13 @@ mkGroupByUsingStmt stmts byExpr usingExpr = GroupStmt (stmts, []) (GroupBySometh
 
 mkExprStmt expr	    = ExprStmt expr noSyntaxExpr placeHolderType
 mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
-mkRecStmt stmts	    = RecStmt stmts [] [] [] emptyLHsBinds
+
+emptyRecStmt = RecStmt { recS_stmts = [], recS_later_ids = [], recS_rec_ids = []
+                       , recS_ret_fn = noSyntaxExpr, recS_mfix_fn = noSyntaxExpr
+		       , recS_bind_fn = noSyntaxExpr
+                       , recS_rec_rets = [], recS_dicts = emptyLHsBinds }
+
+mkRecStmt stmts = emptyRecStmt { recS_stmts = stmts }
 
 -------------------------------
 --- A useful function for building @OpApps@.  The operator is always a
@@ -414,8 +422,8 @@ collectStmtBinders (ExprStmt _ _ _)     = []
 collectStmtBinders (ParStmt xs)         = collectLStmtsBinders
                                         $ concatMap fst xs
 collectStmtBinders (TransformStmt (stmts, _) _ _) = collectLStmtsBinders stmts
-collectStmtBinders (GroupStmt (stmts, _) _)     = collectLStmtsBinders stmts
-collectStmtBinders (RecStmt ss _ _ _ _) = collectLStmtsBinders ss
+collectStmtBinders (GroupStmt (stmts, _) _)       = collectLStmtsBinders stmts
+collectStmtBinders (RecStmt { recS_stmts = ss })  = collectLStmtsBinders ss
 \end{code}
 
 

@@ -847,26 +847,41 @@ data StmtLR idL idR
   -- the names which they group over in statements
 
   -- Recursive statement (see Note [RecStmt] below)
-  | RecStmt  [LStmtLR idL idR]
-             --- The next two fields are only valid after renaming
-             [idR] -- The ids are a subset of the variables bound by the
-                   -- stmts that are used in stmts that follow the RecStmt
+  | RecStmt
+     { recS_stmts :: [LStmtLR idL idR]
 
-             [idR] -- Ditto, but these variables are the "recursive" ones,
-                   -- that are used before they are bound in the stmts of
-                   -- the RecStmt. From a type-checking point of view,
-                   -- these ones have to be monomorphic
+        -- The next two fields are only valid after renaming
+     , recS_later_ids :: [idR] -- The ids are a subset of the variables bound by the
+  		               -- stmts that are used in stmts that follow the RecStmt
 
-             --- These fields are only valid after typechecking
-             [PostTcExpr]       -- These expressions correspond 1-to-1 with
-                                -- the "recursive" [id], and are the
-                                -- expressions that should be returned by
-                                -- the recursion.
-                                -- They may not quite be the Ids themselves,
-                                -- because the Id may be *polymorphic*, but
-                                -- the returned thing has to be *monomorphic*.
-             (DictBinds idR)    -- Method bindings of Ids bound by the
-                                -- RecStmt, and used afterwards
+     , recS_rec_ids :: [idR]   -- Ditto, but these variables are the "recursive" ones,
+                   	       -- that are used before they are bound in the stmts of
+                   	       -- the RecStmt. 
+
+	-- An Id can be in both groups
+	-- Both sets of Ids are (now) treated monomorphically
+	-- The only reason they are separate is becuase the DsArrows 
+	-- code uses them separately, and I don't understand it well
+	-- enough to change it
+
+	-- Rebindable syntax
+     , recS_bind_fn :: SyntaxExpr idR -- The bind function
+     , recS_ret_fn  :: SyntaxExpr idR -- The return function
+     , recS_mfix_fn :: SyntaxExpr idR -- The mfix function
+
+        -- These fields are only valid after typechecking
+     , recS_rec_rets :: [PostTcExpr] -- These expressions correspond 1-to-1 with
+                                     -- recS_rec_ids, and are the
+                                     -- expressions that should be returned by
+                                     -- the recursion.
+                                     -- They may not quite be the Ids themselves,
+                                     -- because the Id may be *polymorphic*, but
+                                     -- the returned thing has to be *monomorphic*, 
+				     -- so they may be type applications
+
+      , recS_dicts :: DictBinds idR  -- Method bindings of Ids bound by the
+                                     -- RecStmt, and used afterwards
+      }
 \end{code}
 
 ExprStmts are a bit tricky, because what they mean
@@ -894,8 +909,8 @@ depends on the context.  Consider the following contexts:
 
 Array comprehensions are handled like list comprehensions -=chak
 
-Note [RecStmt]
-~~~~~~~~~~~~~~
+Note [How RecStmt works]
+~~~~~~~~~~~~~~~~~~~~~~~~
 Example:
         HsDo [ BindStmt x ex
 
@@ -917,6 +932,17 @@ Here, the RecStmt binds a,b,c; but
 Nota Bene: the two a's have different types, even though they
 have the same Name.
 
+Note [Typing a RecStmt]
+~~~~~~~~~~~~~~~~~~~~~~~
+A (RecStmt stmts) types as if you had written
+
+  (v1,..,vn, _, ..., _) <- mfix (\~(_, ..., _, r1, ..., rm) ->
+                        	 do { stmts 
+                        	    ; return (v1,..vn, r1, ..., rm) })
+
+where v1..vn are the later_ids
+      r1..rm are the rec_ids
+
 
 \begin{code}
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (StmtLR idL idR) where
@@ -934,7 +960,11 @@ pprStmt (TransformStmt (stmts, _) usingExpr maybeByExpr)
         byExprDoc = maybe empty (\byExpr -> hsep [ptext (sLit "by"), ppr byExpr]) maybeByExpr
 pprStmt (GroupStmt (stmts, _) groupByClause) = (hsep [stmtsDoc, ptext (sLit "then group"), pprGroupByClause groupByClause])
   where stmtsDoc = interpp'SP stmts
-pprStmt (RecStmt segment _ _ _ _) = ptext (sLit "rec") <+> braces (vcat (map ppr segment))
+pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids, recS_later_ids = later_ids })
+  = ptext (sLit "rec") <+> 
+    vcat [ braces (vcat (map ppr segment))
+         , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
+                            , ptext (sLit "later_ids=") <> ppr later_ids])]
 
 pprGroupByClause :: (OutputableBndr id) => GroupByClause id -> SDoc
 pprGroupByClause (GroupByNothing usingExpr) = hsep [ptext (sLit "using"), ppr usingExpr]

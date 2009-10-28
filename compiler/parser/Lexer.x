@@ -662,7 +662,7 @@ reservedWordsFM = listToUFM $
 	( "ccall",      ITccallconv,	 bit ffiBit),
 	( "prim",       ITprimcallconv,	 bit ffiBit),
 
-	( "rec",	ITrec,		 bit arrowsBit),
+	( "rec",	ITrec,		 bit recBit),
 	( "proc",	ITproc,		 bit arrowsBit)
      ]
 
@@ -1672,6 +1672,8 @@ rawTokenStreamBit :: Int
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
 newQualOpsBit :: Int
 newQualOpsBit = 21 -- Haskell' qualified operator syntax, e.g. Prelude.(+)
+recBit :: Int
+recBit = 22 -- rec
 
 always :: Int -> Bool
 always           _     = True
@@ -1766,6 +1768,8 @@ mkPState buf loc flags  =
 	       .|. magicHashBit      `setBitIf` dopt Opt_MagicHash    flags
 	       .|. kindSigsBit       `setBitIf` dopt Opt_KindSignatures flags
 	       .|. recursiveDoBit    `setBitIf` dopt Opt_RecursiveDo flags
+	       .|. recBit 	     `setBitIf` dopt Opt_DoRec  flags
+	       .|. recBit 	     `setBitIf` dopt Opt_Arrows flags
 	       .|. unicodeSyntaxBit  `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit  `setBitIf` dopt Opt_UnboxedTuples flags
 	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags

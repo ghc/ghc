@@ -461,13 +461,15 @@ addTickStmt isGuard (GroupStmt (stmts, binderMap) groupByClause) = do
           case x of
             Left a -> f a >>= (return . Left)
             Right b -> g b >>= (return . Right)
-addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) = do
-  	liftM5 RecStmt 
-		(addTickLStmts isGuard stmts)
-		(return ids1)
-		(return ids2)
-		(return tys)
-		(addTickDictBinds dictbinds)
+addTickStmt isGuard stmt@(RecStmt {})
+  = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
+       ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)
+       ; mfix'  <- addTickSyntaxExpr hpcSrcSpan (recS_mfix_fn stmt)
+       ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
+       ; dicts' <- addTickDictBinds (recS_dicts stmt)
+       ; return (stmt { recS_stmts = stmts', recS_ret_fn = ret'
+                      , recS_mfix_fn = mfix', recS_bind_fn = bind'
+                      , recS_dicts = dicts' }) }
 
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e

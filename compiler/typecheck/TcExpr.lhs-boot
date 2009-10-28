@@ -10,7 +10,7 @@ tcPolyExpr ::
        -> BoxySigmaType
        -> TcM (LHsExpr TcId)
 
-tcMonoExpr :: 
+tcMonoExpr, tcMonoExprNC :: 
   	  LHsExpr Name
        -> BoxyRhoType
        -> TcM (LHsExpr TcId)

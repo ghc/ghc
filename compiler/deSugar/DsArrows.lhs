@@ -779,7 +779,9 @@ dsCmdStmt ids local_vars env_ids out_ids (LetStmt binds) = do
 --			first (loop (arr (\((ys1),~(ys2)) -> (ys)) >>> ss)) >>>
 --			arr (\((xs1),(xs2)) -> (xs')) >>> ss'
 
-dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss _binds) = do
+dsCmdStmt ids local_vars env_ids out_ids 
+          (RecStmt { recS_stmts = stmts, recS_later_ids = later_ids, recS_rec_ids = rec_ids
+                   , recS_rec_rets = rhss, recS_dicts = _binds }) = do
     let         -- ToDo: ****** binds not desugared; ROSS PLEASE FIX ********
         env2_id_set = mkVarSet out_ids `minusVarSet` mkVarSet later_ids
         env2_ids = varSetElems env2_id_set

@@ -49,6 +49,7 @@ import DynFlags
 import StaticFlags
 import CostCentre
 import Id
+import Var
 import PrelInfo
 import DataCon
 import TysWiredIn
@@ -676,13 +677,16 @@ dsDo	:: [LStmt Id]
 	-> Type			-- Type of the whole expression
 	-> DsM CoreExpr
 
-dsDo stmts body _result_ty
+dsDo stmts body result_ty
   = goL stmts
   where
+    -- result_ty must be of the form (m b)
+    (m_ty, _b_ty) = tcSplitAppTy result_ty
+
     goL [] = dsLExpr body
-    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go stmt lstmts)
+    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
   
-    go (ExprStmt rhs then_expr _) stmts
+    go _ (ExprStmt rhs then_expr _) stmts
       = do { rhs2 <- dsLExpr rhs
            ; case tcSplitAppTy_maybe (exprType rhs2) of
                 Just (container_ty, returning_ty) -> warnDiscardedDoBindings rhs container_ty returning_ty
@@ -691,23 +695,52 @@ dsDo stmts body _result_ty
 	   ; rest <- goL stmts
 	   ; return (mkApps then_expr2 [rhs2, rest]) }
     
-    go (LetStmt binds) stmts
+    go _ (LetStmt binds) stmts
       = do { rest <- goL stmts
 	   ; dsLocalBinds binds rest }
 
-    go (BindStmt pat rhs bind_op fail_op) stmts
-      = 
-       do  { body     <- goL stmts
-           ; rhs'     <- dsLExpr rhs
-	   ; bind_op' <- dsExpr bind_op
-	   ; var   <- selectSimpleMatchVarL pat
-	   ; let bind_ty = exprType bind_op' 	-- rhs -> (pat -> res1) -> res2
-		 res1_ty = funResultTy (funArgTy (funResultTy bind_ty))
-	   ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
-    				     res1_ty (cantFailMatchResult body)
-	   ; match_code <- handle_failure pat match fail_op
-	   ; return (mkApps bind_op' [rhs', Lam var match_code]) }
+    go _ (BindStmt pat rhs bind_op fail_op) stmts
+      = do  { body     <- goL stmts
+            ; rhs'     <- dsLExpr rhs
+	    ; bind_op' <- dsExpr bind_op
+	    ; var   <- selectSimpleMatchVarL pat
+	    ; let bind_ty = exprType bind_op' 	-- rhs -> (pat -> res1) -> res2
+	    	  res1_ty = funResultTy (funArgTy (funResultTy bind_ty))
+	    ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
+    	    			      res1_ty (cantFailMatchResult body)
+	    ; match_code <- handle_failure pat match fail_op
+	    ; return (mkApps bind_op' [rhs', Lam var match_code]) }
     
+    go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
+                    , recS_rec_ids = rec_ids, recS_ret_fn = return_op
+                    , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
+                    , recS_rec_rets = rec_rets, recS_dicts = binds }) stmts 
+      = ASSERT( length rec_ids > 0 )
+        goL (new_bind_stmt : let_stmt : stmts)
+      where
+        -- returnE <- dsExpr return_id
+        -- mfixE <- dsExpr mfix_id
+        new_bind_stmt = L loc $ BindStmt (mkLHsPatTup later_pats) mfix_app
+                                         bind_op 
+		                             noSyntaxExpr  -- Tuple cannot fail
+
+        let_stmt = L loc $ LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)] []))
+
+        tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
+        rec_tup_pats = map nlVarPat tup_ids
+        later_pats   = rec_tup_pats
+        rets         = map noLoc rec_rets
+
+        mfix_app   = nlHsApp (noLoc mfix_op) mfix_arg
+        mfix_arg   = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
+                                             (mkFunTy tup_ty body_ty))
+        mfix_pat   = noLoc $ LazyPat $ mkLHsPatTup rec_tup_pats
+        body       = noLoc $ HsDo DoExpr rec_stmts return_app body_ty
+        return_app = nlHsApp (noLoc return_op) (mkLHsTupleExpr rets)
+	body_ty    = mkAppTy m_ty tup_ty
+        tup_ty     = mkCoreTupTy (map idType tup_ids)
+                  -- mkCoreTupTy deals with singleton case
+
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
     handle_failure pat match fail_op
@@ -774,10 +807,11 @@ dsMDo tbl stmts body result_ty
 	   ; return (mkApps (Var bind_id) [Type (hsLPatType pat), Type b_ty, 
 					     rhs', Lam var match_code]) }
     
-    go loc (RecStmt rec_stmts later_ids rec_ids rec_rets binds) stmts
+    go loc (RecStmt rec_stmts later_ids rec_ids _ _ _ rec_rets binds) stmts
       = ASSERT( length rec_ids > 0 )
         ASSERT( length rec_ids == length rec_rets )
-	goL (new_bind_stmt : let_stmt : stmts)
+        pprTrace "dsMDo" (ppr later_ids) $
+	 goL (new_bind_stmt : let_stmt : stmts)
       where
         new_bind_stmt = L loc $ mkBindStmt (mk_tup_pat later_pats) mfix_app
 	let_stmt = L loc $ LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)] []))

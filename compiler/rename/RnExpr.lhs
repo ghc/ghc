@@ -32,9 +32,7 @@ import RnTypes		( rnHsTypeFVs, rnSplice, checkTH,
 import RnPat
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
-import PrelNames	( hasKey, assertIdKey, assertErrorName,
-			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
-			  negateName, thenMName, bindMName, failMName, groupWithName )
+import PrelNames
 
 import Name
 import NameSet
@@ -454,8 +452,8 @@ convertOpFormsStmt (BindStmt pat cmd _ _)
   = BindStmt pat (convertOpFormsLCmd cmd) noSyntaxExpr noSyntaxExpr
 convertOpFormsStmt (ExprStmt cmd _ _)
   = ExprStmt (convertOpFormsLCmd cmd) noSyntaxExpr placeHolderType
-convertOpFormsStmt (RecStmt stmts lvs rvs es binds)
-  = RecStmt (map (fmap convertOpFormsStmt) stmts) lvs rvs es binds
+convertOpFormsStmt stmt@(RecStmt { recS_stmts = stmts })
+  = stmt { recS_stmts = map (fmap convertOpFormsStmt) stmts }
 convertOpFormsStmt stmt = stmt
 
 convertOpFormsMatch :: MatchGroup id -> MatchGroup id
@@ -537,14 +535,13 @@ methodNamesLStmt :: Located (StmtLR Name Name) -> FreeVars
 methodNamesLStmt = methodNamesStmt . unLoc
 
 methodNamesStmt :: StmtLR Name Name -> FreeVars
-methodNamesStmt (ExprStmt cmd _ _)     = methodNamesLCmd cmd
-methodNamesStmt (BindStmt _ cmd _ _) = methodNamesLCmd cmd
-methodNamesStmt (RecStmt stmts _ _ _ _)
-  = methodNamesStmts stmts `addOneFV` loopAName
-methodNamesStmt (LetStmt _)  = emptyFVs
-methodNamesStmt (ParStmt _) = emptyFVs
-methodNamesStmt (TransformStmt _ _ _) = emptyFVs
-methodNamesStmt (GroupStmt _ _) = emptyFVs
+methodNamesStmt (ExprStmt cmd _ _)               = methodNamesLCmd cmd
+methodNamesStmt (BindStmt _ cmd _ _)             = methodNamesLCmd cmd
+methodNamesStmt (RecStmt { recS_stmts = stmts }) = methodNamesStmts stmts `addOneFV` loopAName
+methodNamesStmt (LetStmt _)                      = emptyFVs
+methodNamesStmt (ParStmt _)                      = emptyFVs
+methodNamesStmt (TransformStmt _ _ _)            = emptyFVs
+methodNamesStmt (GroupStmt _ _)                  = emptyFVs
    -- ParStmt, TransformStmt and GroupStmt can't occur in commands, but it's not convenient to error 
    -- here so we just do what's convenient
 \end{code}
@@ -636,67 +633,95 @@ rnStmts ctxt        = rnNormalStmts ctxt
 rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName]
 	      -> RnM (thing, FreeVars)
 	      -> RnM (([LStmt Name], thing), FreeVars)	
--- Used for cases *other* than recursive mdo
--- Implements nested scopes
-
 rnNormalStmts _ [] thing_inside 
   = do { (thing, fvs) <- thing_inside
 	; return (([],thing), fvs) } 
 
-rnNormalStmts ctxt (L loc stmt : stmts) thing_inside
-  = do { ((stmt', (stmts', thing)), fvs) <- rnStmt ctxt stmt $
-            rnNormalStmts ctxt stmts thing_inside
-	; return (((L loc stmt' : stmts'), thing), fvs) }
+rnNormalStmts ctxt (stmt@(L loc _) : stmts) thing_inside
+  = do { ((stmts1, (stmts2, thing)), fvs) 
+            <- setSrcSpan loc $
+               rnStmt ctxt stmt $
+               rnNormalStmts ctxt stmts thing_inside
+	; return (((stmts1 ++ stmts2), thing), fvs) }
 
 
-rnStmt :: HsStmtContext Name -> Stmt RdrName
+rnStmt :: HsStmtContext Name -> LStmt RdrName
        -> RnM (thing, FreeVars)
-       -> RnM ((Stmt Name, thing), FreeVars)
+       -> RnM (([LStmt Name], thing), FreeVars)
 
-rnStmt _ (ExprStmt expr _ _) thing_inside
+rnStmt _ (L loc (ExprStmt expr _ _)) thing_inside
   = do	{ (expr', fv_expr) <- rnLExpr expr
 	; (then_op, fvs1)  <- lookupSyntaxName thenMName
 	; (thing, fvs2)    <- thing_inside
-	; return ((ExprStmt expr' then_op placeHolderType, thing),
+	; return (([L loc (ExprStmt expr' then_op placeHolderType)], thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2) }
 
-rnStmt ctxt (BindStmt pat expr _ _) thing_inside
+rnStmt ctxt (L loc (BindStmt pat expr _ _)) thing_inside
   = do	{ (expr', fv_expr) <- rnLExpr expr
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
 	; rnPats (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
 	{ (thing, fvs3) <- thing_inside
-	; return ((BindStmt pat' expr' bind_op fail_op, thing),
+	; return (([L loc (BindStmt pat' expr' bind_op fail_op)], thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
 	-- but it does not matter because the names are unique
 
-rnStmt ctxt (LetStmt binds) thing_inside 
+rnStmt ctxt (L loc (LetStmt binds)) thing_inside 
   = do	{ checkLetStmt ctxt binds
 	; rnLocalBindsAndThen binds $ \binds' -> do
 	{ (thing, fvs) <- thing_inside
-        ; return ((LetStmt binds', thing), fvs) }  }
+        ; return (([L loc (LetStmt binds')], thing), fvs) }  }
 
-rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
+rnStmt ctxt (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
   = do	{ checkRecStmt ctxt
-	; rn_rec_stmts_and_then rec_stmts	$ \ segs -> do
-	{ (thing, fvs) <- thing_inside
-	; let
-	    segs_w_fwd_refs          = addFwdRefs segs
-	    (ds, us, fs, rec_stmts') = unzip4 segs_w_fwd_refs
-	    later_vars = nameSetToList (plusFVs ds `intersectNameSet` fvs)
-	    fwd_vars   = nameSetToList (plusFVs fs)
-	    uses       = plusFVs us
-	    rec_stmt   = RecStmt rec_stmts' later_vars fwd_vars [] emptyLHsBinds
-	; return ((rec_stmt, thing), uses `plusFV` fvs) } }
 
-rnStmt ctxt (ParStmt segs) thing_inside
+	-- Step1: Bring all the binders of the mdo into scope
+	-- (Remember that this also removes the binders from the
+	-- finally-returned free-vars.)
+   	-- And rename each individual stmt, making a
+	-- singleton segment.  At this stage the FwdRefs field
+	-- isn't finished: it's empty for all except a BindStmt
+	-- for which it's the fwd refs within the bind itself
+	-- (This set may not be empty, because we're in a recursive 
+	-- context.)
+        ; rn_rec_stmts_and_then rec_stmts	$ \ segs -> do
+
+	{ (thing, fvs_later) <- thing_inside
+	; (return_op, fvs1)  <- lookupSyntaxName returnMName
+	; (mfix_op,   fvs2)  <- lookupSyntaxName mfixName
+	; (bind_op,   fvs3)  <- lookupSyntaxName bindMName
+	; let
+		-- Step 2: Fill in the fwd refs.
+		-- 	   The segments are all singletons, but their fwd-ref
+		--	   field mentions all the things used by the segment
+		--	   that are bound after their use
+	    segs_w_fwd_refs          = addFwdRefs segs
+
+		-- Step 3: Group together the segments to make bigger segments
+		--	   Invariant: in the result, no segment uses a variable
+		--	   	      bound in a later segment
+	    grouped_segs = glomSegments segs_w_fwd_refs
+
+		-- Step 4: Turn the segments into Stmts
+		--	   Use RecStmt when and only when there are fwd refs
+		--	   Also gather up the uses from the end towards the
+		--	   start, so we can tell the RecStmt which things are
+		--	   used 'after' the RecStmt
+	    empty_rec_stmt = emptyRecStmt { recS_ret_fn  = return_op
+                                          , recS_mfix_fn = mfix_op
+                                          , recS_bind_fn = bind_op }
+	    (rec_stmts', fvs) = segsToStmts empty_rec_stmt grouped_segs fvs_later
+
+	; return ((rec_stmts', thing), fvs `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) } }
+
+rnStmt ctxt (L loc (ParStmt segs)) thing_inside
   = do	{ checkParStmt ctxt
 	; ((segs', thing), fvs) <- rnParallelStmts (ParStmtCtxt ctxt) segs thing_inside
-	; return ((ParStmt segs', thing), fvs) }
+	; return (([L loc (ParStmt segs')], thing), fvs) }
 
-rnStmt ctxt (TransformStmt (stmts, _) usingExpr maybeByExpr) thing_inside = do
+rnStmt ctxt (L loc (TransformStmt (stmts, _) usingExpr maybeByExpr)) thing_inside = do
     checkTransformStmt ctxt
     
     (usingExpr', fv_usingExpr) <- rnLExpr usingExpr
@@ -707,14 +732,15 @@ rnStmt ctxt (TransformStmt (stmts, _) usingExpr maybeByExpr) thing_inside = do
             
             return ((maybeByExpr', thing), fv_maybeByExpr `plusFV` fv_thing)
     
-    return ((TransformStmt (stmts', binders) usingExpr' maybeByExpr', thing), fv_usingExpr `plusFV` fvs)
+    return (([L loc (TransformStmt (stmts', binders) usingExpr' maybeByExpr')], thing), 
+             fv_usingExpr `plusFV` fvs)
   where
     rnMaybeLExpr Nothing = return (Nothing, emptyFVs)
     rnMaybeLExpr (Just expr) = do
         (expr', fv_expr) <- rnLExpr expr
         return (Just expr', fv_expr)
         
-rnStmt ctxt (GroupStmt (stmts, _) groupByClause) thing_inside = do
+rnStmt ctxt (L loc (GroupStmt (stmts, _) groupByClause)) thing_inside = do
     checkTransformStmt ctxt
     
     -- We must rename the using expression in the context before the transform is begun
@@ -771,7 +797,7 @@ rnStmt ctxt (GroupStmt (stmts, _) groupByClause) thing_inside = do
             return ((groupByClause', usedBinderMap, thing), fv_groupByClause `plusFV` real_fv_thing)
     
     traceRn (text "rnStmt: implicitly rebound these used binders:" <+> ppr usedBinderMap)
-    return ((GroupStmt (stmts', usedBinderMap) groupByClause', thing), fvs)
+    return (([L loc (GroupStmt (stmts', usedBinderMap) groupByClause')], thing), fvs)
   
 rnNormalStmtsAndFindUsedBinders :: HsStmtContext Name 
           -> [LStmt RdrName]
@@ -858,39 +884,12 @@ rnMDoStmts :: [LStmt RdrName]
 	   -> RnM (thing, FreeVars)
 	   -> RnM (([LStmt Name], thing), FreeVars)	
 rnMDoStmts stmts thing_inside
-  =    -- Step1: Bring all the binders of the mdo into scope
-	-- (Remember that this also removes the binders from the
-	-- finally-returned free-vars.)
-   	-- And rename each individual stmt, making a
-	-- singleton segment.  At this stage the FwdRefs field
-	-- isn't finished: it's empty for all except a BindStmt
-	-- for which it's the fwd refs within the bind itself
-	-- (This set may not be empty, because we're in a recursive 
-	-- context.)
-     rn_rec_stmts_and_then stmts $ \ segs -> do {
-
-	; (thing, fvs_later) <- thing_inside
-
-	; let
-	-- Step 2: Fill in the fwd refs.
-	-- 	   The segments are all singletons, but their fwd-ref
-	--	   field mentions all the things used by the segment
-	--	   that are bound after their use
-	    segs_w_fwd_refs = addFwdRefs segs
-
-	-- Step 3: Group together the segments to make bigger segments
-	--	   Invariant: in the result, no segment uses a variable
-	--	   	      bound in a later segment
+  = rn_rec_stmts_and_then stmts $ \ segs -> do
+    { (thing, fvs_later) <- thing_inside
+    ; let   segs_w_fwd_refs = addFwdRefs segs
 	    grouped_segs = glomSegments segs_w_fwd_refs
-
-	-- Step 4: Turn the segments into Stmts
-	--	   Use RecStmt when and only when there are fwd refs
-	--	   Also gather up the uses from the end towards the
-	--	   start, so we can tell the RecStmt which things are
-	--	   used 'after' the RecStmt
-	    (stmts', fvs) = segsToStmts grouped_segs fvs_later
-
-	; return ((stmts', thing), fvs) }
+	    (stmts', fvs) = segsToStmts emptyRecStmt grouped_segs fvs_later
+    ; return ((stmts', thing), fvs) }
 
 ---------------------------------------------
 
@@ -957,7 +956,8 @@ rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds)))
                  emptyFVs
                  )]
 
-rn_rec_stmt_lhs fix_env (L _ (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
+-- XXX Do we need to do something with the return and mfix names?
+rn_rec_stmt_lhs fix_env (L _ (RecStmt { recS_stmts = stmts }))	-- Flatten Rec inside Rec
     = rn_rec_stmts_lhs fix_env stmts
 
 rn_rec_stmt_lhs _ stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
@@ -1020,16 +1020,16 @@ rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
 	    emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
 -- no RecStmt case becuase they get flattened above when doing the LHSes
-rn_rec_stmt _ stmt@(L _ (RecStmt _ _ _ _ _)) _	
+rn_rec_stmt _ stmt@(L _ (RecStmt {})) _
   = pprPanic "rn_rec_stmt: RecStmt" (ppr stmt)
 
-rn_rec_stmt _ stmt@(L _ (ParStmt _)) _	-- Syntactically illegal in mdo
+rn_rec_stmt _ stmt@(L _ (ParStmt {})) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: ParStmt" (ppr stmt)
 
-rn_rec_stmt _ stmt@(L _ (TransformStmt _ _ _)) _	-- Syntactically illegal in mdo
+rn_rec_stmt _ stmt@(L _ (TransformStmt {})) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransformStmt" (ppr stmt)
 
-rn_rec_stmt _ stmt@(L _ (GroupStmt _ _)) _	-- Syntactically illegal in mdo
+rn_rec_stmt _ stmt@(L _ (GroupStmt {})) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: GroupStmt" (ppr stmt)
 
 rn_rec_stmt _ (L _ (LetStmt EmptyLocalBinds)) _
@@ -1120,23 +1120,24 @@ glomSegments ((defs,uses,fwds,stmt) : segs)
 
 
 ----------------------------------------------------
-segsToStmts :: [Segment [LStmt Name]] 
+segsToStmts :: Stmt Name		-- A RecStmt with the SyntaxOps filled in
+            -> [Segment [LStmt Name]] 
 	    -> FreeVars			-- Free vars used 'later'
 	    -> ([LStmt Name], FreeVars)
 
-segsToStmts [] fvs_later = ([], fvs_later)
-segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
+segsToStmts _ [] fvs_later = ([], fvs_later)
+segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
   = ASSERT( not (null ss) )
     (new_stmt : later_stmts, later_uses `plusFV` uses)
   where
-    (later_stmts, later_uses) = segsToStmts segs fvs_later
+    (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
     new_stmt | non_rec	 = head ss
-	     | otherwise = L (getLoc (head ss)) $ 
-			   RecStmt ss (nameSetToList used_later) (nameSetToList fwds) 
-				      [] emptyLHsBinds
-	     where
-	       non_rec    = isSingleton ss && isEmptyNameSet fwds
-	       used_later = defs `intersectNameSet` later_uses
+	     | otherwise = L (getLoc (head ss)) rec_stmt 
+    rec_stmt = empty_rec_stmt { recS_stmts     = ss
+                              , recS_later_ids = nameSetToList used_later
+                              , recS_rec_ids   = nameSetToList fwds }
+    non_rec    = isSingleton ss && isEmptyNameSet fwds
+    used_later = defs `intersectNameSet` later_uses
 				-- The ones needed after the RecStmt
 \end{code}
 
@@ -1187,10 +1188,7 @@ checkLetStmt _ctxt 	     _binds	       = return ()
 ---------
 checkRecStmt :: HsStmtContext Name -> RnM ()
 checkRecStmt (MDoExpr {}) = return ()	-- Recursive stmt ok in 'mdo'
-checkRecStmt (DoExpr {})  = return ()	-- ..and in 'do' but only because of arrows:
-					--   proc x -> do { ...rec... }
-					-- We don't have enough context to distinguish this situation here
-					--	so we leave it to the type checker
+checkRecStmt (DoExpr {})  = return ()	-- and in 'do'
 checkRecStmt ctxt	  = addErr msg
   where
     msg = ptext (sLit "Illegal 'rec' stmt in") <+> pprStmtContext ctxt

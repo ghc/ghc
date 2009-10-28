@@ -246,6 +246,7 @@ data DynFlag
    | Opt_TransformListComp
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
+   | Opt_DoRec
    | Opt_PostfixOperators
    | Opt_TupleSections
    | Opt_PatternGuards
@@ -1650,7 +1651,7 @@ mkFlag turnOn flagPrefix f (name, dynflag, deprecated)
 
 deprecatedForLanguage :: String -> Bool -> Deprecated
 deprecatedForLanguage lang turn_on
-    = Deprecated ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ "#-} instead")
+    = Deprecated ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ " #-} instead")
     where 
       flag | turn_on    = lang
            | otherwise = "No"++lang
@@ -1801,7 +1802,9 @@ xFlags = [
   ( "RankNTypes",                       Opt_RankNTypes, const Supported ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, const Supported ),
   ( "TypeOperators",                    Opt_TypeOperators, const Supported ),
-  ( "RecursiveDo",                      Opt_RecursiveDo, const Supported ),
+  ( "RecursiveDo",                      Opt_RecursiveDo,
+    deprecatedForLanguage "DoRec"),
+  ( "DoRec",                            Opt_DoRec, const Supported ),
   ( "Arrows",                           Opt_Arrows, const Supported ),
   ( "PArr",                             Opt_PArr, const Supported ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, const Supported ),
@@ -1911,7 +1914,7 @@ glasgowExtsFlags = [
            , Opt_LiberalTypeSynonyms
            , Opt_RankNTypes
            , Opt_TypeOperators
-           , Opt_RecursiveDo
+           , Opt_DoRec
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
