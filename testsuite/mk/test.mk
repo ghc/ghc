@@ -84,6 +84,12 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
+ifeq "$(WINDOWS)" "YES"
+RUNTEST_OPTS += -e windows=True
+else
+RUNTEST_OPTS += -e windows=False
+endif
+
 ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
 endif
