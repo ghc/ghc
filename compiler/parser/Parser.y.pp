@@ -1456,35 +1456,27 @@ lexps :: { Located [LHsExpr RdrName] }
 
 flattenedpquals :: { Located [LStmt RdrName] }
     : pquals   { case (unLoc $1) of
-                    ParStmt [(qs, _)] -> L1 qs
+                    [qs] -> L1 qs
                     -- We just had one thing in our "parallel" list so 
                     -- we simply return that thing directly
                     
-                    _ -> L1 [$1]
+                    qss -> L1 [L1 $ ParStmt [(qs, undefined) | qs <- qss]]
                     -- We actually found some actual parallel lists so
-                    -- we leave them into as a ParStmt
+                    -- we wrap them into as a ParStmt
                 }
 
-pquals :: { LStmt RdrName }
-    : pquals1   { L1 (ParStmt [(qs, undefined) | qs <- (reverse (unLoc $1))]) }
+pquals :: { Located [[LStmt RdrName]] }
+    : squals '|' pquals     { L (getLoc $2) (reverse (unLoc $1) : unLoc $3) }
+    | squals                { L (getLoc $1) [reverse (unLoc $1)] }
 
-pquals1 :: { Located [[LStmt RdrName]] }
-    : pquals1 '|' squals    { LL (unLoc $3 : unLoc $1) }
-    | squals                { L (getLoc $1) [unLoc $1] }
-
-squals :: { Located [LStmt RdrName] }
-    : squals1               { L (getLoc $1) (reverse (unLoc $1)) }
-
-squals1 :: { Located [LStmt RdrName] }
-    : transformquals1       { LL (unLoc $1) }
-
-transformquals1 :: { Located [LStmt RdrName] }
-    : transformquals1 ',' transformqual         { LL $ [LL ((unLoc $3) (unLoc $1))] }
-    | transformquals1 ',' qual                  { LL ($3 : unLoc $1) }
---  | transformquals1 ',' '{|' pquals '|}'      { LL ($4 : unLoc $1) }
-    | transformqual                             { LL $ [LL ((unLoc $1) [])] }
-    | qual                                      { L1 [$1] }
---  | '{|' pquals '|}'                          { L1 [$2] }
+squals :: { Located [LStmt RdrName] }	-- In reverse order, because the last 
+					-- one can "grab" the earlier ones
+    : squals ',' transformqual         	     { LL [L (getLoc $3) ((unLoc $3) (reverse (unLoc $1)))] }
+    | squals ',' qual                  	     { LL ($3 : unLoc $1) }
+    | transformqual                          { LL [L (getLoc $1) ((unLoc $1) [])] }
+    | qual                                   { L1 [$1] }
+--  | transformquals1 ',' '{|' pquals '|}'   { LL ($4 : unLoc $1) }
+--  | '{|' pquals '|}'                       { L1 [$2] }
 
 
 -- It is possible to enable bracketing (associating) qualifier lists by uncommenting the lines with {| |}
@@ -1493,10 +1485,11 @@ transformquals1 :: { Located [LStmt RdrName] }
 -- a program that makes use of this temporary syntax you must supply that flag to GHC
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
-    : 'then' exp                { LL $ \leftStmts -> (mkTransformStmt (reverse leftStmts) $2) }
+			-- Function is applied to a list of stmts *in order*
+    : 'then' exp                { LL $ \leftStmts -> (mkTransformStmt leftStmts $2) }
     -- >>>
-    | 'then' exp 'by' exp       { LL $ \leftStmts -> (mkTransformByStmt (reverse leftStmts) $2 $4) }
-    | 'then' 'group' 'by' exp              { LL $ \leftStmts -> (mkGroupByStmt (reverse leftStmts) $4) }
+    | 'then' exp 'by' exp       { LL $ \leftStmts -> (mkTransformByStmt leftStmts $2 $4) }
+    | 'then' 'group' 'by' exp   { LL $ \leftStmts -> (mkGroupByStmt leftStmts $4) }
     -- <<<
     -- These two productions deliberately have a shift-reduce conflict. I have made 'group' into a special_id,
     -- which means you can enable TransformListComp while still using Data.List.group. However, this makes the two
@@ -1506,8 +1499,8 @@ transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
     -- This is rather dubious: the user might be confused as to how to parse this statement. However, it is a good
     -- practical choice. NB: Data.List.group :: [a] -> [[a]], so using the first production would not even type check
     -- if /that/ is the group function we conflict with.
-    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt (reverse leftStmts) $4) }
-    | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt (reverse leftStmts) $4 $6) }
+    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt leftStmts $4) }
+    | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt leftStmts $4 $6) }
 
 -----------------------------------------------------------------------------
 -- Parallel array expressions
