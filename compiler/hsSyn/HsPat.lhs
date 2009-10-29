@@ -310,7 +310,7 @@ instance (OutputableBndr id, Outputable arg)
       => Outputable (HsRecField id arg) where
   ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg, 
 		    hsRecPun = pun })
-    = ppr f <+> (if pun then empty else equals <+> ppr arg)
+    = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
 
 -- add parallel array brackets around a document
 --

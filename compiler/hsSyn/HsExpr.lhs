@@ -777,8 +777,8 @@ pprGRHSs :: (OutputableBndr idL, OutputableBndr idR)
          => HsMatchContext idL -> GRHSs idR -> SDoc
 pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
- $$ if isEmptyLocalBinds binds then empty
-                               else text "where" $$ nest 4 (pprBinds binds)
+ $$ ppUnless (isEmptyLocalBinds binds)
+      (text "where" $$ nest 4 (pprBinds binds))
 
 pprGRHS :: (OutputableBndr idL, OutputableBndr idR)
         => HsMatchContext idL -> GRHS idR -> SDoc
