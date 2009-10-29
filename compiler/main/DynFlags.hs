@@ -351,6 +351,7 @@ data DynFlags = DynFlags {
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
   shouldDumpSimplPhase  :: SimplifierMode -> Bool,
   ruleCheck             :: Maybe String,
+  strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
@@ -606,6 +607,8 @@ defaultDynFlags =
         specConstrThreshold     = Just 200,
         specConstrCount         = Just 3,
         liberateCaseThreshold   = Just 200,
+        strictnessBefore        = [],
+
 #ifndef OMIT_NATIVE_CODEGEN
         targetPlatform          = defaultTargetPlatform,
 #endif
@@ -1066,9 +1069,13 @@ getCoreToDo dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
+    maybe_strictness_before phase
+      = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
+
     simpl_phase phase names iter
       = CoreDoPasses
-          [ CoreDoSimplify (SimplPhase phase names) [
+          [ maybe_strictness_before phase,
+            CoreDoSimplify (SimplPhase phase names) [
               MaxSimplifierIterations iter
             ],
             maybe_rule_check phase
@@ -1557,6 +1564,10 @@ dynamic_flags = [
          Supported
   , Flag "fcontext-stack"
          (IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
+         Supported
+
+  , Flag "fstrictness-before"
+         (IntSuffix (\n -> upd (\dfs -> dfs{ strictnessBefore = n : strictnessBefore dfs })))
          Supported
 
         ------ Profiling ----------------------------------------------------
