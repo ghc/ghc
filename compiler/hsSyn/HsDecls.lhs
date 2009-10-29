@@ -225,7 +225,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 		ppr_ds foreign_decls]
 	where
 	  ppr_ds [] = empty
-	  ppr_ds ds = text "" $$ vcat (map ppr ds)
+	  ppr_ds ds = blankLine $$ vcat (map ppr ds)
 
 data SpliceDecl id = SpliceDecl (Located (HsExpr id))	-- Top level splice
 

@@ -230,10 +230,10 @@ dumpIfSet_dyn_or dflags flags hdr doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc 
-   = vcat [text "", 
+   = vcat [blankLine,
 	   line <+> text hdr <+> line,
 	   doc,
-	   text ""]
+	   blankLine]
      where 
         line = text (replicate 20 '=')
 

@@ -25,6 +25,7 @@ module Outputable (
 	parens, cparen, brackets, braces, quotes, doubleQuotes, angleBrackets,
 	semi, comma, colon, dcolon, space, equals, dot, arrow,
 	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
+	blankLine,
 	(<>), (<+>), hcat, hsep, 
 	($$), ($+$), vcat,
 	sep, cat, 
@@ -56,7 +57,7 @@ module Outputable (
 	ifPprDebug, qualName, qualModule,
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
         mkUserStyle, Depth(..),
-
+	
 	-- * Error handling and debugging utilities
 	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
 	pprTrace, warnPprTrace,
@@ -291,7 +292,7 @@ hPrintDump h doc = do
    Pretty.printDoc PageMode h (better_doc defaultDumpStyle)
    hFlush h
  where
-   better_doc = doc $$ text ""
+   better_doc = doc $$ blankLine
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
@@ -397,23 +398,24 @@ quotes d sty = case show pp_d of
 	       pp_d = d sty
 
 semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
-lparen, rparen, lbrack, rbrack, lbrace, rbrace :: SDoc
+lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
-semi _sty   = Pretty.semi
-comma _sty  = Pretty.comma
-colon _sty  = Pretty.colon
-equals _sty = Pretty.equals
-space _sty  = Pretty.space
-dcolon _sty = Pretty.ptext (sLit "::")
-arrow  _sty = Pretty.ptext (sLit "->")
-underscore  = char '_'
-dot	    = char '.'
-lparen _sty = Pretty.lparen
-rparen _sty = Pretty.rparen
-lbrack _sty = Pretty.lbrack
-rbrack _sty = Pretty.rbrack
-lbrace _sty = Pretty.lbrace
-rbrace _sty = Pretty.rbrace
+blankLine _sty = Pretty.ptext (sLit "")
+dcolon _sty    = Pretty.ptext (sLit "::")
+arrow  _sty    = Pretty.ptext (sLit "->")
+semi _sty      = Pretty.semi
+comma _sty     = Pretty.comma
+colon _sty     = Pretty.colon
+equals _sty    = Pretty.equals
+space _sty     = Pretty.space
+underscore     = char '_'
+dot	       = char '.'
+lparen _sty    = Pretty.lparen
+rparen _sty    = Pretty.rparen
+lbrack _sty    = Pretty.lbrack
+rbrack _sty    = Pretty.rbrack
+lbrace _sty    = Pretty.lbrace
+rbrace _sty    = Pretty.rbrace
 
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount

@@ -115,7 +115,7 @@ instance Outputable CmmInfo where
 -----------------------------------------------------------------------------
 
 pprCmm :: (Outputable d, Outputable info, Outputable g) => GenCmm d info g -> SDoc
-pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
+pprCmm (Cmm tops) = vcat $ intersperse blankLine $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
@@ -506,9 +506,8 @@ pprLit :: CmmLit -> SDoc
 pprLit lit = case lit of
     CmmInt i rep ->
         hcat [ (if i < 0 then parens else id)(integer i)
-             , (if rep == wordWidth
-                    then empty 
-                    else space <> dcolon <+> ppr rep) ]
+             , ppUnless (rep == wordWidth) $
+               space <> dcolon <+> ppr rep ]
 
     CmmFloat f rep     -> hsep [ rational f, dcolon, ppr rep ]
     CmmLabel clbl      -> pprCLabel clbl

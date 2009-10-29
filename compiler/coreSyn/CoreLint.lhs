@@ -650,7 +650,7 @@ initL :: LintM a -> Maybe Message {- errors -}
 initL m
   = case unLintM m [] emptyTvSubst emptyBag of
       (_, errs) | isEmptyBag errs -> Nothing
-		| otherwise	  -> Just (vcat (punctuate (text "") (bagToList errs)))
+		| otherwise	  -> Just (vcat (punctuate blankLine (bagToList errs)))
 \end{code}
 
 \begin{code}

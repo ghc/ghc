@@ -243,7 +243,7 @@ addExportFlags target exports keep_alive prs rules
 ppr_ds_rules :: [CoreRule] -> SDoc
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
-  = text "" $$ text "-------------- DESUGARED RULES -----------------" $$
+  = blankLine $$ text "-------------- DESUGARED RULES -----------------" $$
     pprRules rules
 \end{code}
 

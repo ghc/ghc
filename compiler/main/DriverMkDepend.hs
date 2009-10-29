@@ -352,7 +352,7 @@ dumpModCycles dflags mod_summaries
     cycles = [ c | CyclicSCC c <- GHC.topSortModuleGraph True mod_summaries Nothing ]
 
     pp_cycles = vcat [ (ptext (sLit "---------- Cycle") <+> int n <+> ptext (sLit "----------"))
-                        $$ pprCycle c $$ text ""
+                        $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 
 pprCycle :: [ModSummary] -> SDoc

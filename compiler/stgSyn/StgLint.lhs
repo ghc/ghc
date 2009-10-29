@@ -316,7 +316,7 @@ initL (LintM m)
     if isEmptyBag errs then
         Nothing
     else
-        Just (vcat (punctuate (text "") (bagToList errs)))
+        Just (vcat (punctuate blankLine (bagToList errs)))
     }
 
 instance Monad LintM where

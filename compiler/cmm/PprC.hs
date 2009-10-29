@@ -92,7 +92,7 @@ writeCs dflags handle cmms
 --
 
 pprC :: RawCmm -> SDoc
-pprC (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
+pprC (Cmm tops) = vcat $ intersperse blankLine $ map pprTop tops
 
 --
 -- top level procs
@@ -107,7 +107,7 @@ pprTop (CmmProc info clbl _params (ListGraph blocks)) =
         [] -> empty
          -- the first block doesn't get a label:
         (BasicBlock _ stmts : rest) -> vcat [
-	   text "",
+	   blankLine,
 	   extern_decls,
            (if (externallyVisibleCLabel clbl)
                     then mkFN_ else mkIF_) (pprCLabel clbl) <+> lbrace,

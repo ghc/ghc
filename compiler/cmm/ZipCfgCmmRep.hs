@@ -459,10 +459,9 @@ pprMiddle stmt = pp_stmt <+> pp_debug
     	-- call "ccall" foo(x, y)[r1, r2];
     	-- ToDo ppr volatile
     	MidForeignCall safety target results args ->
-    	    hsep [ if null results
-    	              then empty
-    	              else parens (commafy $ map ppr results) <+> equals,
-                      ppr_safety safety,
+    	    hsep [ ppUnless (null results) $
+    	              parens (commafy $ map ppr results) <+> equals,
+                   ppr_safety safety,
     	           ptext $ sLit "call", 
     	           ppr_call_target target <> parens (commafy $ map ppr args) <> semi]
 

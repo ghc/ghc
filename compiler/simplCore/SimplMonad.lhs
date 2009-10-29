@@ -243,10 +243,10 @@ pprSimplCount VerySimplZero    = ptext (sLit "Total ticks: ZERO!")
 pprSimplCount VerySimplNonZero = ptext (sLit "Total ticks: NON-ZERO!")
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
   = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
-	  text "",
+	  blankLine,
 	  pprTickCounts (fmToList dts),
 	  if verboseSimplStats then
-		vcat [text "",
+		vcat [blankLine,
 		      ptext (sLit "Log (most recent first)"),
 		      nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
 	  else empty

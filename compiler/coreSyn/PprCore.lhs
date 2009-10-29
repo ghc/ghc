@@ -71,13 +71,16 @@ pprTopBinds binds = vcat (map pprTopBind binds)
 
 pprTopBind :: OutputableBndr a => Bind a -> SDoc
 pprTopBind (NonRec binder expr)
- = ppr_binding (binder,expr) $$ text ""
+ = ppr_binding (binder,expr) $$ blankLine
 
-pprTopBind (Rec binds)
+pprTopBind (Rec [])
+  = ptext (sLit "Rec { }")
+pprTopBind (Rec (b:bs))
   = vcat [ptext (sLit "Rec {"),
-	  vcat (map ppr_binding binds),
+	  ppr_binding b,
+	  vcat [blankLine $$ ppr_binding b | b <- bs],
 	  ptext (sLit "end Rec }"),
-	  text ""]
+	  blankLine]
 \end{code}
 
 \begin{code}
