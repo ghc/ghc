@@ -32,7 +32,7 @@
 
 {
 {-# OPTIONS -Wwarn -w #-}
--- The above warning supression flag is a temporary kludge.
+-- The above -Wwarn supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
@@ -880,12 +880,12 @@ withLexedDocType lexDocComment = do
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
 rulePrag :: Action
-rulePrag span _ _ = do
+rulePrag span _buf _len = do
   setExts (.|. bit inRulePragBit)
   return (L span ITrules_prag)
 
 endPrag :: Action
-endPrag span _ _ = do
+endPrag span _buf _len = do
   setExts (.&. complement (bit inRulePragBit))
   return (L span ITclose_prag)
 
