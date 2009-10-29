@@ -964,8 +964,8 @@ reifyThing (AGlobal (AnId id))
 	; fix <- reifyFixity (idName id)
 	; let v = reifyName id
 	; case idDetails id of
-	    ClassOpId cls    -> return (TH.ClassOpI v ty (reifyName cls) fix)
-	    _                -> return (TH.VarI     v ty Nothing fix)
+	    ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls) fix)
+	    _             -> return (TH.VarI     v ty Nothing fix)
     }
 
 reifyThing (AGlobal (ATyCon tc))  = reifyTyCon tc
