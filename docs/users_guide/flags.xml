@@ -1407,6 +1407,14 @@
 	      <entry>-fno-strictness</entry>
 	    </row>
 
+            <row>
+              <entry><option>-fstrictness=before</option>=<replaceable>n</replaceable></entry>
+              <entry>Run an additional strictness analysis before simplifier
+phase <replaceable>n</replaceable></entry>
+              <entry>dynamic</entry>
+              <entry>-</entry>
+            </row>
+
 	    <row>
 	      <entry><option>-fspec-constr</option></entry>
 	      <entry>Turn on the SpecConstr transformation. Implied by <option>-O2</option>.</entry>
