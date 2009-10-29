@@ -22,7 +22,7 @@ module CoreMonad (
     liftIO1, liftIO2, liftIO3, liftIO4,
     
     -- ** Dealing with annotations
-    findAnnotations, addAnnotation,
+    findAnnotations, deserializeAnnotations, addAnnotation,
     
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS, 
@@ -57,6 +57,7 @@ import Outputable
 import qualified ErrUtils as Err
 import Maybes
 import UniqSupply
+import LazyUniqFM       ( UniqFM )
 
 import Data.Dynamic
 import Data.IORef
@@ -250,6 +251,14 @@ findAnnotations :: Typeable a => ([Word8] -> a) -> CoreAnnTarget -> CoreM [a]
 findAnnotations deserialize target = do
      ann_env <- getAnnEnv
      return (findAnns deserialize ann_env target)
+
+-- | Deserialize all annotations of a given type. This happens lazily, that is
+--   no deserialization will take place until the [a] is actually demanded and
+--   the [a] can also be empty (the UniqFM is not filtered).
+deserializeAnnotations :: Typeable a => ([Word8] -> a) -> CoreM (UniqFM [a])
+deserializeAnnotations deserialize = do
+     ann_env <- getAnnEnv
+     return (deserializeAnns deserialize ann_env)
 
 addAnnotation :: Typeable a => (a -> [Word8]) -> CoreAnnTarget -> a -> CoreM ()
 addAnnotation serialize target what = addAnnotationToEnv $ Annotation { ann_target = target, ann_value = toSerialized serialize what }
