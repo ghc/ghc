@@ -9,7 +9,7 @@
 module DsMonad (
 	DsM, mapM, mapAndUnzipM,
 	initDs, initDsTc, fixDs,
-	foldlM, foldrM, ifOptM,
+	foldlM, foldrM, ifOptM, unsetOptM,
 	Applicative(..),(<$>),
 
 	newLocalName,
@@ -221,8 +221,8 @@ it easier to read debugging output.
 
 \begin{code}
 -- Make a new Id with the same print name, but different type, and new unique
-newUniqueId :: Name -> Type -> DsM Id
-newUniqueId id = mkSysLocalM (occNameFS (nameOccName id))
+newUniqueId :: Id -> Type -> DsM Id
+newUniqueId id = mkSysLocalM (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
 duplicateLocalDs old_local 

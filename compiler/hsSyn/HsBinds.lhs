@@ -16,7 +16,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module HsBinds where
 
-import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
+import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
 			       MatchGroup, pprFunBind,
 			       GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
@@ -130,8 +130,10 @@ data HsBindLR idL idR
     }
 
   | VarBind {	-- Dictionary binding and suchlike 
-	var_id :: idL,		-- All VarBinds are introduced by the type checker
-	var_rhs :: LHsExpr idR	-- Located only for consistency
+	var_id     :: idL,	     -- All VarBinds are introduced by the type checker
+	var_rhs    :: LHsExpr idR,   -- Located only for consistency
+	var_inline :: Bool           -- True <=> inline this binding regardless
+				     --	(used for implication constraints only)
     }
 
   | AbsBinds {					-- Binds abstraction; TRANSLATION
@@ -141,7 +143,7 @@ data HsBindLR idL idR
        -- AbsBinds only gets used when idL = idR after renaming,
        -- but these need to be idL's for the collect... code in HsUtil to have
        -- the right type
-	abs_exports :: [([TyVar], idL, idL, [LPrag])],	-- (tvs, poly_id, mono_id, prags)
+	abs_exports :: [([TyVar], idL, idL, [LSpecPrag])],	-- (tvs, poly_id, mono_id, prags)
 	abs_binds   :: LHsBinds idL		-- The dictionary bindings and typechecked user bindings
 						-- mixed up together; you can tell the dict bindings because
 						-- they are all VarBinds
@@ -363,7 +365,6 @@ data HsWrapper
 
   | WpLam Var	 		-- \d. []	the 'd' is a type-class dictionary or coercion variable
   | WpTyLam TyVar 		-- \a. []	the 'a' is a type variable (not coercion var)
-  | WpInline			-- inline_me []   Wrap inline around the thing
 
 	-- Non-empty bindings, so that the identity coercion
 	-- is always exactly WpHole
@@ -384,7 +385,6 @@ pprHsWrapper it wrap =
         help it (WpLam id)    = sep [ptext (sLit "\\") <> pprBndr LambdaBind id <> dot, it]
         help it (WpTyLam tv)  = sep [ptext (sLit "/\\") <> pprBndr LambdaBind tv <> dot, it]
         help it (WpLet binds) = sep [ptext (sLit "let") <+> braces (ppr binds), it]
-        help it WpInline      = sep [ptext (sLit "_inline_me_"), it]
     in
       -- in debug mode, print the wrapper
       -- otherwise just print what's inside
@@ -452,13 +452,15 @@ data Sig name	-- Signatures and pragmas
 	-- An inline pragma
 	-- {#- INLINE f #-}
   | InlineSig	(Located name)	-- Function name
-		InlineSpec
+		InlinePragma	-- Never defaultInlinePragma
 
 	-- A specialisation pragma
 	-- {-# SPECIALISE f :: Int -> Int #-}
   | SpecSig 	(Located name)	-- Specialise a function or datatype ...
 		(LHsType name)	-- ... to these types
-		InlineSpec
+		InlinePragma    -- The pragma on SPECIALISE_INLINE form
+				-- If it's just defaultInlinePragma, then we said
+				--    SPECIALISE, not SPECIALISE_INLINE
 
 	-- A specialisation pragma for instance declarations only
 	-- {-# SPECIALISE instance Eq [Int] #-}
@@ -470,23 +472,11 @@ type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity 
 
 -- A Prag conveys pragmas from the type checker to the desugarer
-type LPrag = Located Prag
-data Prag 
-  = InlinePrag 
-	InlineSpec
-
-  | SpecPrag   
-	(HsExpr Id)	-- An expression, of the given specialised type, which
-	PostTcType 	-- specialises the polymorphic function
-	InlineSpec 	-- Inlining spec for the specialised function
-
-isInlinePrag :: Prag -> Bool
-isInlinePrag (InlinePrag _) = True
-isInlinePrag _              = False
-
-isSpecPrag :: Prag -> Bool
-isSpecPrag (SpecPrag {}) = True
-isSpecPrag _             = False
+type LSpecPrag = Located SpecPrag
+data SpecPrag 
+  = SpecPrag   
+	HsWrapper	-- An wrapper, that specialises the polymorphic function
+	InlinePragma 	-- Inlining spec for the specialised function
 \end{code}
 
 \begin{code}
@@ -585,10 +575,10 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) ty
-ppr_sig (IdSig id)	          = pprVarSig id (varType id)
+ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) (ppr ty)
+ppr_sig (IdSig id)	          = pprVarSig id (ppr (varType id))
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
-ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var ty inl)
+ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var (ppr ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
 ppr_sig (SpecInstSig ty) 	  = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 
@@ -598,14 +588,16 @@ instance Outputable name => Outputable (FixitySig name) where
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}") 
 
-pprVarSig :: (Outputable id, Outputable ty) => id -> ty -> SDoc
-pprVarSig var ty = sep [ppr var <+> dcolon, nest 2 (ppr ty)]
+pprVarSig :: (Outputable id) => id -> SDoc -> SDoc
+pprVarSig var pp_ty = sep [ppr var <+> dcolon, nest 2 pp_ty]
 
-pprSpec :: (Outputable id, Outputable ty) => id -> ty -> InlineSpec -> SDoc
-pprSpec var ty inl = sep [ptext (sLit "SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
+pprSpec :: (Outputable id) => id -> SDoc -> InlinePragma -> SDoc
+pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig var pp_ty
+  where
+    pp_inl | isDefaultInlinePragma inl = empty
+           | otherwise = ppr inl
 
-pprPrag :: Outputable id => id -> LPrag -> SDoc
-pprPrag var (L _ (InlinePrag inl))        = ppr inl <+> ppr var
-pprPrag var (L _ (SpecPrag _expr ty inl)) = pprSpec var ty inl
+pprPrag :: Outputable id => id -> LSpecPrag -> SDoc
+pprPrag var (L _ (SpecPrag _expr inl)) = pprSpec var (ptext (sLit "<type>")) inl
 \end{code}
 

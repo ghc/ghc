@@ -18,7 +18,7 @@ module FloatIn ( floatInwards ) where
 
 import CoreSyn
 import CoreUtils	( exprIsHNF, exprIsDupable )
-import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleVars )
+import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleAndUnfoldingVars )
 import Id		( isOneShotBndr, idType )
 import Var
 import Type		( isUnLiftedType )
@@ -213,10 +213,6 @@ fiExpr to_drop (_, AnnNote note@(SCC _) expr)
   = 	-- Wimp out for now
     mkCoLets' to_drop (Note note (fiExpr [] expr))
 
-fiExpr to_drop (_, AnnNote InlineMe expr)
-  = 	-- Ditto... don't float anything into an INLINE expression
-    mkCoLets' to_drop (Note InlineMe (fiExpr [] expr))
-
 fiExpr to_drop (_, AnnNote note@(CoreNote _) expr)
   = Note note (fiExpr to_drop expr)
 \end{code}
@@ -263,10 +259,12 @@ arrange to dump bindings that bind extra_fvs before the entire let.
 
 Note [extra_fvs (s): free variables of rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider let x{rule mentioning y} = rhs in body
+Consider 
+  let x{rule mentioning y} = rhs in body 
 Here y is not free in rhs or body; but we still want to dump bindings
 that bind y outside the let.  So we augment extra_fvs with the
-idRuleVars of x.
+idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
+idFreeVars.
 
 
 \begin{code}
@@ -275,7 +273,7 @@ fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
   where
     body_fvs = freeVarsOf body
 
-    rule_fvs = idRuleVars id	-- See Note [extra_fvs (2): free variables of rules]
+    rule_fvs = idRuleAndUnfoldingVars id	-- See Note [extra_fvs (2): free variables of rules]
     extra_fvs | noFloatIntoRhs ann_rhs
 	      || isUnLiftedType (idType id) = rule_fvs `unionVarSet` rhs_fvs
 	      | otherwise		    = rule_fvs
@@ -304,7 +302,7 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
     body_fvs = freeVarsOf body
 
 	-- See Note [extra_fvs (1,2)]
-    rule_fvs = foldr (unionVarSet . idRuleVars) emptyVarSet ids
+    rule_fvs = foldr (unionVarSet . idRuleAndUnfoldingVars) emptyVarSet ids
     extra_fvs = rule_fvs `unionVarSet` 
 		unionVarSets [ fvs | (fvs, rhs) <- rhss
 			     , noFloatIntoRhs rhs ]
@@ -359,8 +357,7 @@ fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
 
 noFloatIntoRhs :: AnnExpr' Var (UniqFM Var) -> Bool
-noFloatIntoRhs (AnnNote InlineMe _) = True
-noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
+noFloatIntoRhs (AnnLam b _) = not (is_one_shot b)
 	-- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
 	-- This makes a big difference for things like
 	--	f x# = let x = I# x#

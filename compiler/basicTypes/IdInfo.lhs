@@ -49,11 +49,6 @@ module IdInfo (
         cprInfoFromNewStrictness,
 #endif
 
-        -- ** The WorkerInfo type
-        WorkerInfo(..),
-        workerExists, wrapperArity, workerId,
-        workerInfo, setWorkerInfo, ppWorkerInfo,
-
 	-- ** Unfolding Info
 	unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
 
@@ -94,7 +89,6 @@ import CoreSyn ( CoreRule, setRuleIdName, seqRules, Unfolding, noUnfolding )
 import Class
 import PrimOp
 import Name
-import Var
 import VarSet
 import BasicTypes
 import DataCon
@@ -119,7 +113,6 @@ infixl 	1 `setSpecInfo`,
 	  `setArityInfo`,
 	  `setInlinePragInfo`,
 	  `setUnfoldingInfo`,
-	  `setWorkerInfo`,
 	  `setLBVarInfo`,
 	  `setOccInfo`,
 	  `setCafInfo`,
@@ -165,8 +158,8 @@ seqNewStrictnessInfo Nothing = ()
 seqNewStrictnessInfo (Just ty) = seqStrictSig ty
 
 pprNewStrictness :: Maybe StrictSig -> SDoc
-pprNewStrictness Nothing = empty
-pprNewStrictness (Just sig) = ftext (fsLit "Str:") <+> ppr sig
+pprNewStrictness Nothing    = empty
+pprNewStrictness (Just sig) = ppr sig
 
 #ifdef OLD_STRICTNESS
 oldStrictnessFromNew :: StrictSig -> Demand.StrictnessInfo
@@ -260,35 +253,38 @@ data IdDetails
 				--  b) when desugaring a RecordCon we can get 
 				--     from the Id back to the data con]
 
-  | ClassOpId Class		-- ^ The 'Id' is an operation of a class
+  | ClassOpId Class 		-- ^ The 'Id' is an superclass selector or class operation of a class
 
   | PrimOpId PrimOp		-- ^ The 'Id' is for a primitive operator
   | FCallId ForeignCall		-- ^ The 'Id' is for a foreign call
 
   | TickBoxOpId TickBoxOp	-- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
-  | DFunId			-- ^ A dictionary function.  We don't use this in an essential way,
-    				-- currently, but it's kind of nice that we can keep track of
-				-- which Ids are DFuns, across module boundaries too
+  | DFunId Bool			-- ^ A dictionary function.  
+    	   			--   True <=> the class has only one method, so may be 
+    				--            implemented with a newtype, so it might be bad 
+				--            to be strict on this dictionary
 
 
 instance Outputable IdDetails where
     ppr = pprIdDetails
 
 pprIdDetails :: IdDetails -> SDoc
-pprIdDetails VanillaId         = empty
-pprIdDetails (DataConWorkId _) = ptext (sLit "[DataCon]")
-pprIdDetails (DataConWrapId _) = ptext (sLit "[DataConWrapper]")
-pprIdDetails (ClassOpId _)     = ptext (sLit "[ClassOp]")
-pprIdDetails (PrimOpId _)      = ptext (sLit "[PrimOp]")
-pprIdDetails (FCallId _)       = ptext (sLit "[ForeignCall]")
-pprIdDetails (TickBoxOpId _)   = ptext (sLit "[TickBoxOp]")
-pprIdDetails DFunId            = ptext (sLit "[DFunId]")
-pprIdDetails (RecSelId { sel_naughty = is_naughty })
-  = brackets $ ptext (sLit "RecSel") <> pp_naughty
-  where
-    pp_naughty | is_naughty = ptext (sLit "(naughty)")
-	       | otherwise  = empty
+pprIdDetails VanillaId = empty
+pprIdDetails other     = brackets (pp other)
+ where
+   pp VanillaId         = panic "pprIdDetails"
+   pp (DataConWorkId _) = ptext (sLit "DataCon")
+   pp (DataConWrapId _) = ptext (sLit "DataConWrapper")
+   pp (ClassOpId {})    = ptext (sLit "ClassOp")
+   pp (PrimOpId _)      = ptext (sLit "PrimOp")
+   pp (FCallId _)       = ptext (sLit "ForeignCall")
+   pp (TickBoxOpId _)   = ptext (sLit "TickBoxOp")
+   pp (DFunId b)        = ptext (sLit "DFunId") <> 
+                            ppWhen b (ptext (sLit "(newtype)"))
+   pp (RecSelId { sel_naughty = is_naughty })
+      			 = brackets $ ptext (sLit "RecSel") 
+      			    <> ppWhen is_naughty (ptext (sLit "(naughty)"))
 \end{code}
 
 
@@ -314,20 +310,12 @@ data IdInfo
   = IdInfo {
 	arityInfo 	:: !ArityInfo,		-- ^ 'Id' arity
 	specInfo 	:: SpecInfo,		-- ^ Specialisations of the 'Id's function which exist
+			   			-- See Note [Specialisations and RULES in IdInfo]
 #ifdef OLD_STRICTNESS
 	cprInfo 	:: CprInfo,             -- ^ If the 'Id's function always constructs a product result
 	demandInfo 	:: Demand.Demand,	-- ^ Whether or not the 'Id' is definitely demanded
 	strictnessInfo	:: StrictnessInfo,	-- ^ 'Id' strictness properties
 #endif
-        workerInfo      :: WorkerInfo,          -- ^ Pointer to worker function.
-						-- Within one module this is irrelevant; the 
-						-- inlining of a worker is handled via the 'Unfolding'.
-						-- However, when the module is imported by others, the
-						-- 'WorkerInfo' is used /only/ to indicate the form of
-						-- the RHS, so that interface files don't actually 
-						-- need to contain the RHS; it can be derived from
-						-- the strictness info
-
 	unfoldingInfo	:: Unfolding,		-- ^ The 'Id's unfolding
 	cafInfo		:: CafInfo,		-- ^ 'Id' CAF info
         lbvarInfo	:: LBVarInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
@@ -353,7 +341,6 @@ seqIdInfo (IdInfo {}) = ()
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
   = seqSpecInfo (specInfo info)			`seq`
-    seqWorker (workerInfo info)			`seq`
 
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
@@ -376,8 +363,6 @@ megaSeqIdInfo info
 Setters
 
 \begin{code}
-setWorkerInfo :: IdInfo -> WorkerInfo -> IdInfo
-setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
 setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
@@ -433,7 +418,6 @@ vanillaIdInfo
 	    strictnessInfo	= NoStrictnessInfo,
 #endif
 	    specInfo		= emptySpecInfo,
-	    workerInfo		= NoWorker,
 	    unfoldingInfo	= noUnfolding,
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= defaultInlinePragma,
@@ -505,6 +489,25 @@ type InlinePragInfo = InlinePragma
 %*									*
 %************************************************************************
 
+Note [Specialisations and RULES in IdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, a GlobalIdshas an *empty* SpecInfo.  All their
+RULES are contained in the globally-built rule-base.  In principle,
+one could attach the to M.f the RULES for M.f that are defined in M.
+But we don't do that for instance declarations and so we just treat
+them all uniformly.
+
+The EXCEPTION is PrimOpIds, which do have rules in their IdInfo. That is
+jsut for convenience really.
+
+However, LocalIds may have non-empty SpecInfo.  We treat them 
+differently because:
+  a) they might be nested, in which case a global table won't work
+  b) the RULE might mention free variables, which we use to keep things alive
+
+In TidyPgm, when the LocalId becomes a GlobalId, its RULES are stripped off
+and put in the global list.
+
 \begin{code}
 -- | Records the specializations of this 'Id' that we know about
 -- in the form of rewrite 'CoreRule's that target them
@@ -542,67 +545,6 @@ seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 
 %************************************************************************
 %*									*
-\subsection[worker-IdInfo]{Worker info about an @Id@}
-%*									*
-%************************************************************************
-
-There might not be a worker, even for a strict function, because:
-(a) the function might be small enough to inline, so no need 
-    for w/w split
-(b) the strictness info might be "SSS" or something, so no w/w split.
-
-Sometimes the arity of a wrapper changes from the original arity from
-which it was generated, so we always emit the "original" arity into
-the interface file, as part of the worker info.
-
-How can this happen?  Sometimes we get
-	f = coerce t (\x y -> $wf x y)
-at the moment of w/w split; but the eta reducer turns it into
-	f = coerce t $wf
-which is perfectly fine except that the exposed arity so far as
-the code generator is concerned (zero) differs from the arity
-when we did the split (2).  
-
-All this arises because we use 'arity' to mean "exactly how many
-top level lambdas are there" in interface files; but during the
-compilation of this module it means "how many things can I apply
-this to".
-
-\begin{code}
-
--- | If this Id has a worker then we store a reference to it. Worker
--- functions are generated by the worker\/wrapper pass, using information
--- information from strictness analysis.
-data WorkerInfo = NoWorker              -- ^ No known worker function
-		| HasWorker Id Arity    -- ^ The 'Arity' is the arity of the /wrapper/ at the moment of the
-	                                -- worker\/wrapper split, which may be different from the current 'Id' 'Aritiy'
-
-seqWorker :: WorkerInfo -> ()
-seqWorker (HasWorker id a) = id `seq` a `seq` ()
-seqWorker NoWorker	   = ()
-
-ppWorkerInfo :: WorkerInfo -> SDoc
-ppWorkerInfo NoWorker            = empty
-ppWorkerInfo (HasWorker wk_id _) = ptext (sLit "Worker") <+> ppr wk_id
-
-workerExists :: WorkerInfo -> Bool
-workerExists NoWorker        = False
-workerExists (HasWorker _ _) = True
-
--- | The 'Id' of the worker function if it exists, or a panic otherwise
-workerId :: WorkerInfo -> Id
-workerId (HasWorker id _) = id
-workerId NoWorker = panic "workerId: NoWorker"
-
--- | The 'Arity' of the worker function at the time of the split if it exists, or a panic otherwise
-wrapperArity :: WorkerInfo -> Arity
-wrapperArity (HasWorker _ a) = a
-wrapperArity NoWorker = panic "wrapperArity: NoWorker"
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection[CG-IdInfo]{Code generator-related information}
 %*									*
 %************************************************************************
@@ -633,6 +575,9 @@ mayHaveCafRefs _	       = False
 
 seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()
+
+instance Outputable CafInfo where
+   ppr = ppCafInfo
 
 ppCafInfo :: CafInfo -> SDoc
 ppCafInfo NoCafRefs = ptext (sLit "NoCafRefs")
@@ -777,7 +722,6 @@ zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables
 zapFragileInfo info 
   = Just (info `setSpecInfo` emptySpecInfo
-	       `setWorkerInfo` NoWorker
                `setUnfoldingInfo` noUnfolding
 	       `setOccInfo` if isFragileOcc occ then NoOccInfo else occ)
   where

@@ -19,6 +19,7 @@ import DsMonad
 import HsSyn
 import DataCon
 import CoreUtils
+import CoreUnfold
 import Id
 import Literal
 import Module
@@ -205,9 +206,10 @@ dsFCall fn_id fcall = do
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
-        wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
+        wrap_rhs     = mkLams (tvs ++ args) wrapper_body
+        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineRule InlSat wrap_rhs (length args)
     
-    return ([(work_id, work_rhs), (fn_id, wrap_rhs)], empty, empty)
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs)], empty, empty)
 \end{code}
 
 
@@ -567,8 +569,8 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 						<> comma <> text "cap") <> semi
      ,   assignCResult
      ,   ptext (sLit "rts_unlock(cap);")
-     ,   if res_hty_is_unit then empty
-            else if libffi 
+     ,   ppUnless res_hty_is_unit $
+         if libffi 
                   then char '*' <> parens (cResType <> char '*') <> 
                        ptext (sLit "resp = cret;")
                   else ptext (sLit "return cret;")

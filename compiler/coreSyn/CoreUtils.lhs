@@ -16,7 +16,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
 	-- * Constructing expressions
-	mkInlineMe, mkSCC, mkCoerce, mkCoerceI,
+	mkSCC, mkCoerce, mkCoerceI,
 	bindNonRec, needsCaseBinding,
 	mkAltExpr, mkPiType, mkPiTypes,
 
@@ -27,7 +27,6 @@ module CoreUtils (
 	exprType, coreAltType, coreAltsType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, exprIsExpandable,
 	exprIsHNF,exprOkForSpeculation, exprIsBig, 
-	exprIsConApp_maybe, exprIsBottom,
 	rhsIsStatic,
 
 	-- * Expression and bindings size
@@ -62,7 +61,6 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
-import NewDemand
 import Type
 import Coercion
 import TyCon
@@ -192,47 +190,6 @@ panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
 \subsection{Attaching notes}
 %*									*
 %************************************************************************
-
-mkNote removes redundant coercions, and SCCs where possible
-
-\begin{code}
-#ifdef UNUSED
-mkNote :: Note -> CoreExpr -> CoreExpr
-mkNote (SCC cc)	expr		   = mkSCC cc expr
-mkNote InlineMe expr		   = mkInlineMe expr
-mkNote note     expr		   = Note note expr
-#endif
-\end{code}
-
-Drop trivial InlineMe's.  This is somewhat important, because if we have an unfolding
-that looks like	(Note InlineMe (Var v)), the InlineMe doesn't go away because it may
-not be *applied* to anything.
-
-We don't use exprIsTrivial here, though, because we sometimes generate worker/wrapper
-bindings like
-	fw = ...
-	f  = inline_me (coerce t fw)
-As usual, the inline_me prevents the worker from getting inlined back into the wrapper.
-We want the split, so that the coerces can cancel at the call site.  
-
-However, we can get left with tiresome type applications.  Notably, consider
-	f = /\ a -> let t = e in (t, w)
-Then lifting the let out of the big lambda gives
-	t' = /\a -> e
-	f = /\ a -> let t = inline_me (t' a) in (t, w)
-The inline_me is to stop the simplifier inlining t' right back
-into t's RHS.  In the next phase we'll substitute for t (since
-its rhs is trivial) and *then* we could get rid of the inline_me.
-But it hardly seems worth it, so I don't bother.
-
-\begin{code}
--- | Wraps the given expression in an inlining hint unless the expression
--- is trivial in some sense, so that doing so would usually hurt us
-mkInlineMe :: CoreExpr -> CoreExpr
-mkInlineMe e@(Var _)           = e
-mkInlineMe e@(Note InlineMe _) = e
-mkInlineMe e	               = Note InlineMe e
-\end{code}
 
 \begin{code}
 -- | Wrap the given expression in the coercion, dropping identity coercions and coalescing nested coercions
@@ -418,10 +375,9 @@ Similar things can happen (augmented by GADTs) when the Simplifier
 filters down the matching alternatives in Simplify.rebuildCase.
 
 
-
 %************************************************************************
 %*									*
-\subsection{Figuring out things about expressions}
+         Figuring out things about expressions
 %*									*
 %************************************************************************
 
@@ -478,12 +434,11 @@ exprIsTrivial _                = False
 
 \begin{code}
 exprIsDupable :: CoreExpr -> Bool
-exprIsDupable (Type _)          = True
-exprIsDupable (Var _)           = True
-exprIsDupable (Lit lit)         = litIsDupable lit
-exprIsDupable (Note InlineMe _) = True
-exprIsDupable (Note _ e)        = exprIsDupable e
-exprIsDupable (Cast e _)        = exprIsDupable e
+exprIsDupable (Type _)   = True
+exprIsDupable (Var _)    = True
+exprIsDupable (Lit lit)  = litIsDupable lit
+exprIsDupable (Note _ e) = exprIsDupable e
+exprIsDupable (Cast e _) = exprIsDupable e
 exprIsDupable expr
   = go expr 0
   where
@@ -530,7 +485,6 @@ exprIsCheap' :: (Id -> Bool) -> CoreExpr -> Bool
 exprIsCheap' _          (Lit _)           = True
 exprIsCheap' _          (Type _)          = True
 exprIsCheap' _          (Var _)           = True
-exprIsCheap' _          (Note InlineMe _) = True
 exprIsCheap' is_conlike (Note _ e)        = exprIsCheap' is_conlike e
 exprIsCheap' is_conlike (Cast e _)        = exprIsCheap' is_conlike e
 exprIsCheap' is_conlike (Lam x e)         = isRuntimeVar x
@@ -559,7 +513,7 @@ exprIsCheap' is_conlike other_expr 	-- Applications and variables
     go (Var f) args
  	= case idDetails f of
 		RecSelId {}  -> go_sel args
-		ClassOpId _  -> go_sel args
+		ClassOpId {} -> go_sel args
 		PrimOpId op  -> go_primop op args
 
 		_ | is_conlike f -> go_pap args
@@ -597,7 +551,7 @@ exprIsCheap :: CoreExpr -> Bool
 exprIsCheap = exprIsCheap' isDataConWorkId
 
 exprIsExpandable :: CoreExpr -> Bool
-exprIsExpandable = exprIsCheap' isConLikeId
+exprIsExpandable = exprIsCheap' isConLikeId	-- See Note [CONLIKE pragma] in BasicTypes
 \end{code}
 
 \begin{code}
@@ -665,6 +619,10 @@ exprOkForSpeculation other_expr
 				-- A bit conservative: we don't really need
 				-- to care about lazy arguments, but this is easy
 
+    spec_ok (DFunId new_type) _ = not new_type 
+         -- DFuns terminate, unless the dict is implemented with a newtype
+	 -- in which case they may not
+
     spec_ok _ _ = False
 
 -- | True of dyadic operators that can fail only if the second arg is zero!
@@ -682,8 +640,9 @@ isDivOp _                = False
 \end{code}
 
 \begin{code}
+{-	Never used -- omitting
 -- | True of expressions that are guaranteed to diverge upon execution
-exprIsBottom :: CoreExpr -> Bool
+exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
 exprIsBottom e = go 0 e
                where
                 -- n is the number of args
@@ -699,6 +658,7 @@ exprIsBottom e = go 0 e
 
 idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
+-}
 \end{code}
 
 \begin{code}
@@ -754,8 +714,8 @@ exprIsHNF _                = False
 -- There is at least one value argument
 app_is_value :: CoreExpr -> [CoreArg] -> Bool
 app_is_value (Var fun) args
-  = idArity fun > valArgCount args	-- Under-applied function
-    ||  isDataConWorkId fun 		--  or data constructor
+  = idArity fun > valArgCount args	  -- Under-applied function
+    || isDataConWorkId fun 		  --  or data constructor
 app_is_value (Note _ f) as = app_is_value f as
 app_is_value (Cast f _) as = app_is_value f as
 app_is_value (App f a)  as = app_is_value f (a:as)
@@ -854,131 +814,11 @@ dataConInstPat arg_fun fss uniqs con inst_tys
     mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcSpan
     arg_ids = zipWith3 mk_id_var id_uniqs id_fss arg_tys
 
--- | Returns @Just (dc, [x1..xn])@ if the argument expression is 
--- a constructor application of the form @dc x1 .. xn@
-exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
-exprIsConApp_maybe (Cast expr co)
-  =     -- Here we do the KPush reduction rule as described in the FC paper
-    case exprIsConApp_maybe expr of {
-	Nothing 	   -> Nothing ;
-	Just (dc, dc_args) -> 
-
-	-- The transformation applies iff we have
-	--	(C e1 ... en) `cast` co
-	-- where co :: (T t1 .. tn) ~ (T s1 ..sn)
-	-- That is, with a T at the top of both sides
-	-- The left-hand one must be a T, because exprIsConApp returned True
-	-- but the right-hand one might not be.  (Though it usually will.)
-
-    let (from_ty, to_ty)	   = coercionKind co
-	(from_tc, from_tc_arg_tys) = splitTyConApp from_ty
-  		-- The inner one must be a TyConApp
-    in
-    case splitTyConApp_maybe to_ty of {
-	Nothing -> Nothing ;
-	Just (to_tc, to_tc_arg_tys) 
-		| from_tc /= to_tc -> Nothing
-		-- These two Nothing cases are possible; we might see 
-		--	(C x y) `cast` (g :: T a ~ S [a]),
-		-- where S is a type function.  In fact, exprIsConApp
-		-- will probably not be called in such circumstances,
-		-- but there't nothing wrong with it 
-
-	 	| otherwise  ->
-    let
-	tc_arity = tyConArity from_tc
-
-        (univ_args, rest1)        = splitAt tc_arity dc_args
-        (ex_args, rest2)          = splitAt n_ex_tvs rest1
-	(co_args_spec, rest3)     = splitAt n_cos_spec rest2
-	(co_args_theta, val_args) = splitAt n_cos_theta rest3
-
-        arg_tys 	    = dataConRepArgTys dc
-	dc_univ_tyvars	    = dataConUnivTyVars dc
-        dc_ex_tyvars        = dataConExTyVars dc
-	dc_eq_spec	    = dataConEqSpec dc
-        dc_eq_theta         = dataConEqTheta dc
-        dc_tyvars           = dc_univ_tyvars ++ dc_ex_tyvars
-        n_ex_tvs            = length dc_ex_tyvars
-	n_cos_spec	    = length dc_eq_spec
-	n_cos_theta	    = length dc_eq_theta
-
-	-- Make the "theta" from Fig 3 of the paper
-        gammas              = decomposeCo tc_arity co
-        new_tys             = gammas ++ map (\ (Type t) -> t) ex_args
-        theta               = zipOpenTvSubst dc_tyvars new_tys
-
-          -- First we cast the existential coercion arguments
-        cast_co_spec (tv, ty) co 
-          = cast_co_theta (mkEqPred (mkTyVarTy tv, ty)) co
-        cast_co_theta eqPred (Type co) 
-          | (ty1, ty2) <- getEqPredTys eqPred
-          = Type $ mkSymCoercion (substTy theta ty1)
-		   `mkTransCoercion` co
-		   `mkTransCoercion` (substTy theta ty2)
-        new_co_args = zipWith cast_co_spec  dc_eq_spec  co_args_spec ++
-                      zipWith cast_co_theta dc_eq_theta co_args_theta
-  
-          -- ...and now value arguments
-	new_val_args = zipWith cast_arg arg_tys val_args
-	cast_arg arg_ty arg = mkCoerce (substTy theta arg_ty) arg
-
-    in
-    ASSERT( length univ_args == tc_arity )
-    ASSERT( from_tc == dataConTyCon dc )
-    ASSERT( and (zipWith coreEqType [t | Type t <- univ_args] from_tc_arg_tys) )
-    ASSERT( all isTypeArg (univ_args ++ ex_args) )
-    ASSERT2( equalLength val_args arg_tys, ppr dc $$ ppr dc_tyvars $$ ppr dc_ex_tyvars $$ ppr arg_tys $$ ppr dc_args $$ ppr univ_args $$ ppr ex_args $$ ppr val_args $$ ppr arg_tys  )
-
-    Just (dc, map Type to_tc_arg_tys ++ ex_args ++ new_co_args ++ new_val_args)
-    }}
-
-{-
--- We do not want to tell the world that we have a
--- Cons, to *stop* Case of Known Cons, which removes
--- the TickBox.
-exprIsConApp_maybe (Note (TickBox {}) expr)
-  = Nothing
-exprIsConApp_maybe (Note (BinaryTickBox {}) expr)
-  = Nothing
--}
-
-exprIsConApp_maybe (Note _ expr)
-  = exprIsConApp_maybe expr
-    -- We ignore InlineMe notes in case we have
-    --	x = __inline_me__ (a,b)
-    -- All part of making sure that INLINE pragmas never hurt
-    -- Marcin tripped on this one when making dictionaries more inlinable
-    --
-    -- In fact, we ignore all notes.  For example,
-    --  	case _scc_ "foo" (C a b) of
-    --			C a b -> e
-    -- should be optimised away, but it will be only if we look
-    -- through the SCC note.
-
-exprIsConApp_maybe expr = analyse (collectArgs expr)
-  where
-    analyse (Var fun, args)
-	| Just con <- isDataConWorkId_maybe fun,
-	  args `lengthAtLeast` dataConRepArity con
-		-- Might be > because the arity excludes type args
-	= Just (con,args)
-
-	-- Look through unfoldings, but only cheap ones, because
-	-- we are effectively duplicating the unfolding
-    analyse (Var fun, [])
-	| let unf = idUnfolding fun,
-	  isExpandableUnfolding unf
-	= exprIsConApp_maybe (unfoldingTemplate unf)
-
-    analyse _ = Nothing
 \end{code}
-
-
 
 %************************************************************************
 %*									*
-\subsection{Equality}
+         Equality
 %*									*
 %************************************************************************
 
@@ -1007,6 +847,7 @@ exprIsBig :: Expr b -> Bool
 exprIsBig (Lit _)      = False
 exprIsBig (Var _)      = False
 exprIsBig (Type _)     = False
+exprIsBig (Lam _ e)    = exprIsBig e
 exprIsBig (App f a)    = exprIsBig f || exprIsBig a
 exprIsBig (Cast e _)   = exprIsBig e	-- Hopefully coercions are not too big!
 exprIsBig _            = True
@@ -1039,7 +880,6 @@ exprSize (Type t)        = seqType t `seq` 1
 
 noteSize :: Note -> Int
 noteSize (SCC cc)       = cc `seq` 1
-noteSize InlineMe       = 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
  
 varSize :: Var -> Int
@@ -1195,7 +1035,7 @@ rhsIsStatic :: PackageId -> CoreExpr -> Bool
 -- This is a bit like CoreUtils.exprIsHNF, with the following differences:
 --    a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
 --
---    b) (C x xs), where C is a contructors is updatable if the application is
+--    b) (C x xs), where C is a contructor is updatable if the application is
 --	   dynamic
 -- 
 --    c) don't look through unfolding of f in (f x).

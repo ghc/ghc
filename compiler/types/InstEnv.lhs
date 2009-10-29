@@ -116,7 +116,7 @@ setInstanceDFunId ispec dfun
 	-- are ok; hence the assert
      ispec { is_dfun = dfun, is_tvs = mkVarSet tvs, is_tys = tys }
    where 
-     (tvs, _, _, tys) = tcSplitDFunTy (idType dfun)
+     (tvs, _, tys) = tcSplitDFunTy (idType dfun)
 
 instanceRoughTcs :: Instance -> [Maybe Name]
 instanceRoughTcs = is_tcs
@@ -140,16 +140,20 @@ pprInstanceHdr :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
 pprInstanceHdr ispec@(Instance { is_flag = flag })
   = ptext (sLit "instance") <+> ppr flag
-    <+> sep [pprThetaArrow theta, pprClassPred clas tys]
+    <+> sep [pprThetaArrow theta, ppr res_ty]
   where
-    (_, theta, clas, tys) = instanceHead ispec
+    (_, theta, res_ty) = tcSplitSigmaTy (idType (is_dfun ispec))
 	-- Print without the for-all, which the programmer doesn't write
 
 pprInstances :: [Instance] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
 
-instanceHead :: Instance -> ([TyVar], [PredType], Class, [Type])
-instanceHead ispec = tcSplitDFunTy (idType (is_dfun ispec))
+instanceHead :: Instance -> ([TyVar], ThetaType, Class, [Type])
+instanceHead ispec 
+   = (tvs, theta, cls, tys)
+   where
+     (tvs, theta, tau) = tcSplitSigmaTy (idType (is_dfun ispec))
+     (cls, tys) = tcSplitDFunHead tau
 
 mkLocalInstance :: DFunId -> OverlapFlag -> Instance
 -- Used for local instances, where we can safely pull on the DFunId
@@ -158,7 +162,7 @@ mkLocalInstance dfun oflag
 		is_tvs = mkVarSet tvs, is_tys = tys,
 		is_cls = className cls, is_tcs = roughMatchTcs tys }
   where
-    (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
+    (tvs, cls, tys) = tcSplitDFunTy (idType dfun)
 
 mkImportedInstance :: Name -> [Maybe Name]
 		   -> DFunId -> OverlapFlag -> Instance
@@ -169,7 +173,7 @@ mkImportedInstance cls mb_tcs dfun oflag
 		is_tvs = mkVarSet tvs, is_tys = tys,
 		is_cls = cls, is_tcs = mb_tcs }
   where
-    (tvs, _, _, tys) = tcSplitDFunTy (idType dfun)
+    (tvs, _, tys) = tcSplitDFunTy (idType dfun)
 
 roughMatchTcs :: [Type] -> [Maybe Name]
 roughMatchTcs tys = map rough tys

@@ -362,8 +362,8 @@ renameDeriv is_boot gen_binds insts
 	      ; let binds' = VanillaInst rn_binds [] standalone_deriv
 	      ; return (InstInfo { iSpec = inst, iBinds = binds' }, fvs) }
 	where
-	  (tyvars,_,clas,_) = instanceHead inst
-	  clas_nm  	    = className clas
+	  (tyvars,_, clas,_) = instanceHead inst
+	  clas_nm            = className clas
 
 -----------------------------------------
 mkGenericBinds :: Bool -> [LTyClDecl Name] -> TcM (LHsBinds RdrName)
@@ -1147,9 +1147,9 @@ mkNewTypeEqn orig dflags tvs
 					 
 	cant_derive_err
 	   = vcat [ ptext (sLit "even with cunning newtype deriving:")
-		  , if arity_ok then empty else arity_msg
-		  , if eta_ok then empty else eta_msg
-		  , if ats_ok then empty else ats_msg ]
+		  , ppUnless arity_ok arity_msg
+		  , ppUnless eta_ok eta_msg
+		  , ppUnless ats_ok ats_msg ]
         arity_msg = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
 	eta_msg   = ptext (sLit "cannot eta-reduce the representation type enough")
 	ats_msg   = ptext (sLit "the class has associated types")

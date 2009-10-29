@@ -269,11 +269,12 @@ exp	:: { IfaceExpr }
 	| '%case' '(' ty ')' aexp '%of' id_bndr
 	  '{' alts1 '}'		      { IfaceCase $5 (fst $7) $3 $9 }
         | '%cast' aexp aty { IfaceCast $2 $3 }
-	| '%note' STRING exp 	   
-	    { case $2 of
-	       --"SCC"      -> IfaceNote (IfaceSCC "scc") $3
-	       "InlineMe"   -> IfaceNote IfaceInlineMe $3
-            }
+-- No InlineMe any more
+-- 	| '%note' STRING exp 	   
+--	    { case $2 of
+--	       --"SCC"      -> IfaceNote (IfaceSCC "scc") $3
+--	       "InlineMe"   -> IfaceNote IfaceInlineMe $3
+--            }
         | '%external' STRING aty   { IfaceFCall (ForeignCall.CCall 
                                                     (CCallSpec (StaticTarget (mkFastString $2)) 
                                                                CCallConv (PlaySafe False))) 

@@ -49,7 +49,7 @@ module OccName (
 	-- ** Derived 'OccName's
         isDerivedOccName,
 	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc,
-	mkDerivedTyConOcc, mkNewTyCoOcc, 
+	mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
@@ -58,7 +58,7 @@ module OccName (
 	mkInstTyCoOcc, mkEqPredCoOcc,
         mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
         mkPDataTyConOcc, mkPDataDataConOcc,
-        mkPReprTyConOcc,
+        mkPReprTyConOcc, 
         mkPADFunOcc,
 
 	-- ** Deconstruction
@@ -526,7 +526,7 @@ mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
-	mkInstTyCoOcc, mkEqPredCoOcc, 
+	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
 	mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
 	mkPDataTyConOcc, mkPDataDataConOcc, mkPReprTyConOcc, mkPADFunOcc
@@ -536,6 +536,7 @@ mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
 mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
+mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"
 mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
 mkClassTyConOcc     = mk_simple_deriv tcName   "T:"	-- as a tycon/datacon
 mkClassDataConOcc   = mk_simple_deriv dataName "D:"	-- We go straight to the "real" data con
@@ -544,9 +545,9 @@ mkDictOcc	    = mk_simple_deriv varName  "$d"
 mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
-mkNewTyCoOcc        = mk_simple_deriv tcName  "NTCo:"	-- Coercion for newtypes
-mkInstTyCoOcc       = mk_simple_deriv tcName  "TFCo:"   -- Coercion for type functions
-mkEqPredCoOcc	    = mk_simple_deriv tcName  "$co"
+mkNewTyCoOcc        = mk_simple_deriv tcName   "NTCo:"	-- Coercion for newtypes
+mkInstTyCoOcc       = mk_simple_deriv tcName   "TFCo:"   -- Coercion for type functions
+mkEqPredCoOcc	    = mk_simple_deriv tcName   "$co"
 
 -- used in derived instances
 mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"

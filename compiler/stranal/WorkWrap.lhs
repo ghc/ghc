@@ -7,11 +7,14 @@
 module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
-import CoreUnfold	( certainlyWillInline )
-import CoreUtils	( exprType, exprIsHNF, mkInlineMe )
+import CoreUnfold	( certainlyWillInline, mkInlineRule, mkWwInlineRule )
+import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
 import Var
-import Id
+import Id		( idType, isOneShotLambda, idUnfolding,
+			  setIdNewStrictness, mkWorkerId,
+			  setInlineActivation, setIdUnfolding,
+			  setIdArity )
 import Type		( Type )
 import IdInfo
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
@@ -102,11 +105,9 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type {})         = return e
-wwExpr e@(Lit  {})         = return e
-wwExpr e@(Var  {})         = return e
-wwExpr e@(Note InlineMe _) = return e
-	-- Don't w/w inside InlineMe's
+wwExpr e@(Type {}) = return e
+wwExpr e@(Lit  {}) = return e
+wwExpr e@(Var  {}) = return e
 
 wwExpr (Lam binder expr)
   = Lam binder <$> wwExpr expr
@@ -155,7 +156,10 @@ The only reason this is monadised is for the unique supply.
 Note [Don't w/w inline things (a)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very important to refrain from w/w-ing an INLINE function
-If we do so by mistake we transform
+because the wrapepr will then overwrite the InlineRule unfolding.
+
+It was wrong with the old InlineMe Note too: if we do so by mistake 
+we transform
 	f = __inline (\x -> E)
 into
 	f = __inline (\x -> case x of (a,b) -> fw E)
@@ -242,14 +246,22 @@ tryWW is_rec fn_id rhs
     is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
-checkSize :: Id -> CoreExpr -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
+checkSize :: Id -> CoreExpr
+	  -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
  -- See Note [Don't w/w inline things (a) and (b)]
 checkSize fn_id rhs thing_inside
-  | certainlyWillInline unfolding = return [ (fn_id, mkInlineMe rhs) ]
+  | isStableUnfolding unfolding	   -- For DFuns and INLINE things, leave their
+  = return [ (fn_id, rhs) ]	   -- unfolding unchanged; but still attach 
+    	     	     	  	   -- strictness info to the Id	
+
+  | certainlyWillInline unfolding
+  = return [ (fn_id `setIdUnfolding` inline_rule, rhs) ]
 		-- Note [Don't w/w inline things (b)]
+
   | otherwise = thing_inside
   where
     unfolding = idUnfolding fn_id
+    inline_rule = mkInlineRule InlUnSat rhs (unfoldingArity unfolding)
 
 ---------------------
 splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Activation -> Expr Var
@@ -279,7 +291,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_act rhs
                                 -- arity is consistent with the demand type goes through
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
+	wrap_id  = fn_id `setIdUnfolding` mkWwInlineRule work_id wrap_rhs arity
 
     ; return ([(work_id, work_rhs), (wrap_id, wrap_rhs)]) })
 	-- Worker first, because wrapper mentions it

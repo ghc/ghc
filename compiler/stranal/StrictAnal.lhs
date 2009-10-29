@@ -29,7 +29,6 @@ import Id		( setIdStrictness, setInlinePragma,
 			  idDemandInfo, setIdDemandInfo, isBottomingId,
 			  Id
 			)
-import CoreLint		( showPass, endPass )
 import ErrUtils		( dumpIfSet_dyn )
 import SaAbsInt
 import SaLib

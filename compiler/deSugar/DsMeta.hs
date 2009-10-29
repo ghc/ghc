@@ -36,11 +36,11 @@ import PrelNames
 -- OccName.varName we do this by removing varName from the import of
 -- OccName above, making a qualified instance of OccName and using
 -- OccNameAlias.varName where varName ws previously used in this file.
-import qualified OccName
+import qualified OccName( isDataOcc, isVarOcc, isTcOcc, varName, tcName ) 
 
 import Module
 import Id
-import Name
+import Name hiding( isVarOcc, isTcOcc, varName, tcName ) 
 import NameEnv
 import TcType
 import TyCon
@@ -435,35 +435,38 @@ rep_proto nm ty loc
        ; return [(loc, sig)]
        }
 
-rep_inline :: Located Name -> InlineSpec -> SrcSpan 
+rep_inline :: Located Name 
+           -> InlinePragma	-- Never defaultInlinePragma
+           -> SrcSpan 
            -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_inline nm ispec loc
   = do { nm1 <- lookupLOcc nm
-       ; (_, ispec1) <- rep_InlineSpec ispec
+       ; ispec1 <- rep_InlinePrag ispec
        ; pragma <- repPragInl nm1 ispec1
        ; return [(loc, pragma)]
        }
 
-rep_specialise :: Located Name -> LHsType Name -> InlineSpec -> SrcSpan 
+rep_specialise :: Located Name -> LHsType Name -> InlinePragma -> SrcSpan 
                -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_specialise nm ty ispec loc
   = do { nm1 <- lookupLOcc nm
        ; ty1 <- repLTy ty
-       ; (hasSpec, ispec1) <- rep_InlineSpec ispec
-       ; pragma <- if hasSpec
-                   then repPragSpecInl nm1 ty1 ispec1
-                   else repPragSpec    nm1 ty1 
+       ; pragma <- if isDefaultInlinePragma ispec
+                   then repPragSpec nm1 ty1                  -- SPECIALISE
+                   else do { ispec1 <- rep_InlinePrag ispec  -- SPECIALISE INLINE
+                           ; repPragSpecInl nm1 ty1 ispec1 } 
        ; return [(loc, pragma)]
        }
 
--- extract all the information needed to build a TH.InlineSpec
+-- Extract all the information needed to build a TH.InlinePrag
 --
-rep_InlineSpec :: InlineSpec -> DsM (Bool, Core TH.InlineSpecQ)
-rep_InlineSpec (Inline (InlinePragma activation match) inline)
+rep_InlinePrag :: InlinePragma	-- Never defaultInlinePragma
+               -> DsM (Core TH.InlineSpecQ)
+rep_InlinePrag (InlinePragma { inl_act = activation, inl_rule = match, inl_inline = inline })
   | Nothing            <- activation1 
-    = liftM ((,) False) $ repInlineSpecNoPhase inline1 match1
+    = repInlineSpecNoPhase inline1 match1
   | Just (flag, phase) <- activation1 
-    = liftM ((,) True)  $ repInlineSpecPhase inline1 match1 flag phase
+    = repInlineSpecPhase inline1 match1 flag phase
   | otherwise = {- unreachable, but shuts up -W -} panic "rep_InlineSpec"
     where
       match1      = coreBool (rep_RuleMatchInfo match)
@@ -473,8 +476,8 @@ rep_InlineSpec (Inline (InlinePragma activation match) inline)
       rep_RuleMatchInfo FunLike = False
       rep_RuleMatchInfo ConLike = True
 
-      rep_Activation NeverActive          = Nothing
-      rep_Activation AlwaysActive         = Nothing
+      rep_Activation NeverActive          = Nothing	-- We never have NOINLINE/AlwaysActive
+      rep_Activation AlwaysActive         = Nothing	-- or            INLINE/NeverActive
       rep_Activation (ActiveBefore phase) = Just (coreBool False, 
                                                   MkC $ mkIntExprInt phase)
       rep_Activation (ActiveAfter phase)  = Just (coreBool True, 

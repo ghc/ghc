@@ -19,6 +19,7 @@ import DynFlags		( CoreToDo(..), SimplifierSwitch(..),
 			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
 			  getCoreToDo, shouldDumpSimplPhase )
 import CoreSyn
+import CoreSubst
 import HscTypes
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
@@ -30,11 +31,12 @@ import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
-import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
+import SimplEnv
 import SimplMonad
 import CoreMonad
-import qualified ErrUtils as Err        ( dumpIfSet_dyn, dumpIfSet, showPass )
-import CoreLint		( showPass, endPass, endPassIf, endIteration )
+import qualified ErrUtils as Err 
+import CoreLint
+import CoreMonad	( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
@@ -89,7 +91,7 @@ core2core hsc_env guts = do
     ann_env <- prepareAnnotations hsc_env (Just guts)
 
     -- COMPUTE THE RULE BASE TO USE
-    (imp_rule_base, guts1) <- prepareRules hsc_env guts ru_us
+    (hpt_rule_base, guts1) <- prepareRules hsc_env guts ru_us
 
     -- Get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
@@ -97,7 +99,7 @@ core2core hsc_env guts = do
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
     let mod = mg_module guts
-    (guts2, stats) <- runCoreM hsc_env ann_env imp_rule_base cp_us mod $ do
+    (guts2, stats) <- runCoreM hsc_env ann_env hpt_rule_base cp_us mod $ do
         -- FIND BUILT-IN PASSES
         let builtin_core_todos = getCoreToDo dflags
 
@@ -223,10 +225,10 @@ describePass :: String -> DynFlag -> (ModGuts -> CoreM ModGuts) -> ModGuts -> Co
 describePass name dflag pass guts = do
     dflags <- getDynFlags
     
-    liftIO $ showPass dflags name
+    liftIO $ Err.showPass dflags name
     guts' <- pass guts
-    liftIO $ endPass dflags name dflag (mg_binds guts')
-    
+    liftIO $ endPass dflags name dflag (mg_binds guts') (mg_rules guts')
+
     return guts'
 
 describePassD :: SDoc -> DynFlag -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
@@ -319,64 +321,74 @@ prepareRules :: HscEnv
 
 		    ModGuts)		-- Modified fields are 
 					--	(a) Bindings have rules attached,
+					--		and INLINE rules simplified
 					-- 	(b) Rules are now just orphan rules
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	     guts@(ModGuts { mg_binds = binds, mg_deps = deps 
 	     		   , mg_rules = local_rules, mg_rdr_env = rdr_env })
 	     us 
-  = do	{ let 	-- Simplify the local rules; boringly, we need to make an in-scope set
+  = do	{ us <- mkSplitUniqSupply 'w'
+
+	; let 	-- Simplify the local rules; boringly, we need to make an in-scope set
 		-- from the local binders, to avoid warnings from Simplify.simplVar
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
 	      env	       = setInScopeSet gentleSimplEnv local_ids 
-	      (better_rules,_) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 (mapM (simplRule env) local_rules)
-	      home_pkg_rules   = hptRules hsc_env (dep_mods deps)
+	      (simpl_rules, _) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
+				 mapM (simplRule env) local_rules
 
-		-- Find the rules for locally-defined Ids; then we can attach them
-		-- to the binders in the top-level bindings
-		-- 
-		-- Reason
-		-- 	- It makes the rules easier to look up
-		--	- It means that transformation rules and specialisations for
-		--	  locally defined Ids are handled uniformly
-		--	- It keeps alive things that are referred to only from a rule
-		--	  (the occurrence analyser knows about rules attached to Ids)
-		--	- It makes sure that, when we apply a rule, the free vars
-		--	  of the RHS are more likely to be in scope
-		--	- The imported rules are carried in the in-scope set
-		--	  which is extended on each iteration by the new wave of
-		--	  local binders; any rules which aren't on the binding will
-		--	  thereby get dropped
-	      (rules_for_locals, rules_for_imps) = partition isLocalRule better_rules
-	      local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
-	      binds_w_rules   = updateBinders local_rule_base binds
+	; let (rules_for_locals, rules_for_imps) = partition isLocalRule simpl_rules
 
-	      hpt_rule_base = mkRuleBase home_pkg_rules
-	      imp_rule_base = extendRuleBaseList hpt_rule_base rules_for_imps
+	      home_pkg_rules = hptRules hsc_env (dep_mods deps)
+	      hpt_rule_base  = mkRuleBase home_pkg_rules
+	      binds_w_rules  = updateBinders rules_for_locals binds
+
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
 		(withPprStyle (mkUserStyle (mkPrintUnqualified dflags rdr_env) AllTheWay) $
-		 vcat [text "Local rules", pprRules better_rules,
-		       text "",
-		       text "Imported rules", pprRuleBase imp_rule_base])
+		 vcat [text "Local rules", pprRules simpl_rules,
+		       blankLine,
+		       text "Imported rules", pprRuleBase hpt_rule_base])
 
-	; return (imp_rule_base, guts { mg_binds = binds_w_rules, 
+	; return (hpt_rule_base, guts { mg_binds = binds_w_rules, 
 					mg_rules = rules_for_imps })
     }
 
-updateBinders :: RuleBase -> [CoreBind] -> [CoreBind]
-updateBinders local_rules binds
-  = map update_bndrs binds
-  where
-    update_bndrs (NonRec b r) = NonRec (update_bndr b) r
-    update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
+-- Note [Attach rules to local ids]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Find the rules for locally-defined Ids; then we can attach them
+-- to the binders in the top-level bindings
+-- 
+-- Reason
+-- 	- It makes the rules easier to look up
+--	- It means that transformation rules and specialisations for
+--	  locally defined Ids are handled uniformly
+--	- It keeps alive things that are referred to only from a rule
+--	  (the occurrence analyser knows about rules attached to Ids)
+--	- It makes sure that, when we apply a rule, the free vars
+--	  of the RHS are more likely to be in scope
+--	- The imported rules are carried in the in-scope set
+--	  which is extended on each iteration by the new wave of
+--	  local binders; any rules which aren't on the binding will
+--	  thereby get dropped
 
-    update_bndr bndr = case lookupNameEnv local_rules (idName bndr) of
-			  Nothing    -> bndr
-			  Just rules -> bndr `addIdSpecialisations` rules
-				-- The binder might have some existing rules,
-				-- arising from specialisation pragmas
+updateBinders :: [CoreRule] -> [CoreBind] -> [CoreBind]
+updateBinders rules_for_locals binds
+  = map update_bind binds
+  where
+    local_rules = extendRuleBaseList emptyRuleBase rules_for_locals
+
+    update_bind (NonRec b r) = NonRec (add_rules b) r
+    update_bind (Rec prs)    = Rec (mapFst add_rules prs)
+
+	-- See Note [Attach rules to local ids]
+	-- NB: the binder might have some existing rules,
+	-- arising from specialisation pragmas
+    add_rules bndr
+	| Just rules <- lookupNameEnv local_rules (idName bndr)
+	= bndr `addIdSpecialisations` rules
+	| otherwise
+	= bndr
 \end{code}
 
 Note [Simplifying the left-hand side of a RULE]
@@ -393,6 +405,9 @@ we do not want to get
 otherwise we don't match when given an argument like
 	augment (\a. h a a) (build h)
 
+The simplifier does indeed do eta reduction (it's in
+Simplify.completeLam) but only if -O is on.
+
 \begin{code}
 simplRule env rule@(BuiltinRule {})
   = return rule
@@ -400,18 +415,8 @@ simplRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
   = do (env, bndrs') <- simplBinders env bndrs
        args' <- mapM (simplExprGently env) args
        rhs' <- simplExprGently env rhs
-       return (rule { ru_bndrs = bndrs', ru_args = args', ru_rhs = rhs' })
-
--- It's important that simplExprGently does eta reduction.
--- For example, in a rule like:
---	augment g (build h) 
--- we do not want to get
---	augment (\a. g a) (build h)
--- otherwise we don't match when given an argument like
---	(\a. h a a)
---
--- The simplifier does indeed do eta reduction (it's in
--- Simplify.completeLam) but only if -O is on.
+       return (rule { ru_bndrs = bndrs', ru_args = args'
+                    , ru_rhs = occurAnalyseExpr rhs' })
 \end{code}
 
 \begin{code}
@@ -494,45 +499,49 @@ simplifyPgm mode switches
     do { hsc_env <- getHscEnv
        ; us <- getUniqueSupplyM
        ; rb <- getRuleBase
-       ; let fam_inst_env = mg_fam_inst_env guts
-             dump_phase = shouldDumpSimplPhase (hsc_dflags hsc_env) mode
-	     simplify_pgm = simplifyPgmIO dump_phase mode switches 
-                                          hsc_env us rb fam_inst_env
-
-       ; doPassM (liftIOWithCount . simplify_pgm) guts }
+       ; liftIOWithCount $  
+       	 simplifyPgmIO mode switches hsc_env us rb guts }
   where
     doc = ptext (sLit "Simplifier Phase") <+> text (showPpr mode) 
 
-simplifyPgmIO :: Bool
-            -> SimplifierMode
-	    -> [SimplifierSwitch]
-	    -> HscEnv
-	    -> UniqSupply
-	    -> RuleBase
-	    -> FamInstEnv
-	    -> [CoreBind]
-	    -> IO (SimplCount, [CoreBind])  -- New bindings
+simplifyPgmIO :: SimplifierMode
+	      -> [SimplifierSwitch]
+	      -> HscEnv
+	      -> UniqSupply
+	      -> RuleBase
+	      -> ModGuts
+	      -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgmIO dump_phase mode switches hsc_env us imp_rule_base fam_inst_env binds
+simplifyPgmIO mode switches hsc_env us hpt_rule_base 
+              guts@(ModGuts { mg_binds = binds, mg_rules = rules
+                            , mg_fam_inst_env = fam_inst_env })
   = do {
-	(termination_msg, it_count, counts_out, binds') 
-	   <- do_iteration us 1 (zeroSimplCount dflags) binds ;
+	(termination_msg, it_count, counts_out, guts') 
+	   <- do_iteration us 1 (zeroSimplCount dflags) binds rules ;
 
 	Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
 		  "Simplifier statistics for following pass"
 		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
-			 text "",
+			 blankLine,
 			 pprSimplCount counts_out]);
 
-	return (counts_out, binds')
+	return (counts_out, guts')
     }
   where
-    dflags 	   = hsc_dflags hsc_env
+    dflags     	 = hsc_dflags hsc_env
+    dump_phase 	 = shouldDumpSimplPhase dflags mode
 		   
     sw_chkr	   = isAmongSimpl switches
     max_iterations = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
  
-    do_iteration us iteration_no counts binds
+    do_iteration :: UniqSupply
+                 -> Int		-- Counts iterations
+		 -> SimplCount	-- Logs optimisations performed
+		 -> [CoreBind]	-- Bindings in
+		 -> [CoreRule]	-- and orphan rules
+		 -> IO (String, Int, SimplCount, ModGuts)
+
+    do_iteration us iteration_no counts binds rules
 	-- iteration_no is the number of the iteration we are
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
@@ -542,14 +551,15 @@ simplifyPgmIO dump_phase mode switches hsc_env us imp_rule_base fam_inst_env bin
 			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) ++ "\n" ))
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    return ("Simplifier bailed out", iteration_no - 1, counts, binds)
+	    return ("Simplifier bailed out", iteration_no - 1, counts, 
+                    guts { mg_binds = binds, mg_rules = rules })
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
       | let sz = coreBindsSize binds in sz == sz
       = do {
 		-- Occurrence analysis
-	   let { tagged_binds = {-# SCC "OccAnal" #-} occurAnalysePgm binds } ;
+	   let { tagged_binds = {-# SCC "OccAnal" #-} occurAnalysePgm binds rules } ;
 	   Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
@@ -559,7 +569,8 @@ simplifyPgmIO dump_phase mode switches hsc_env us imp_rule_base fam_inst_env bin
 		-- behind the scenes.  Otherwise there's a danger we'll simply
 		-- miss the rules for Ids hidden inside imported inlinings
 	   eps <- hscEPS hsc_env ;
-	   let	{ rule_base' = unionRuleBase imp_rule_base (eps_rule_base eps)
+	   let	{ rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
+	        ; rule_base2 = extendRuleBaseList rule_base1 rules
 		; simpl_env  = mkSimplEnv mode sw_chkr 
 		; simpl_binds = {-# SCC "SimplTopBinds" #-} 
 				simplTopBinds simpl_env tagged_binds
@@ -576,19 +587,18 @@ simplifyPgmIO dump_phase mode switches hsc_env us imp_rule_base fam_inst_env bin
 		-- 	case t of {(_,counts') -> if counts'=0 then ... }
 		-- So the conditional didn't force counts', because the
 		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags rule_base' fam_envs us1 simpl_binds of {
-	  	(binds', counts') -> do {
+	   case initSmpl dflags rule_base2 fam_envs us1 simpl_binds of {
+	  	(env1, counts1) -> do {
 
-	   let	{ all_counts = counts `plusSimplCount` counts'
-		; herald     = "Simplifier mode " ++ showPpr mode ++ 
-			      ", iteration " ++ show iteration_no ++
-			      " out of " ++ show max_iterations
+	   let	{ all_counts = counts `plusSimplCount` counts1
+	   	; binds1 = getFloats env1
+                ; rules1 = substRulesForImportedIds (mkCoreSubst env1) rules
 	        } ;
 
 		-- Stop if nothing happened; don't dump output
-	   if isZeroSimplCount counts' then
-		return ("Simplifier reached fixed point", iteration_no, 
-			all_counts, binds')
+	   if isZeroSimplCount counts1 then
+		return ("Simplifier reached fixed point", iteration_no, all_counts,
+			guts { mg_binds = binds1, mg_rules = rules1 })
 	   else do {
 		-- Short out indirections
 		-- We do this *after* at least one run of the simplifier 
@@ -598,18 +608,30 @@ simplifyPgmIO dump_phase mode switches hsc_env us imp_rule_base fam_inst_env bin
 		--
 		-- ToDo: alas, this means that indirection-shorting does not happen at all
 		--	 if the simplifier does nothing (not common, I know, but unsavoury)
-	   let { binds'' = {-# SCC "ZapInd" #-} shortOutIndirections binds' } ;
+	   let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
 		-- Dump the result of this iteration
-	   Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations herald
-		         (pprSimplCount counts') ;
-	   endIteration dflags herald Opt_D_dump_simpl_iterations binds'' ;
+	   endIteration dflags mode iteration_no max_iterations counts1 binds2 rules1 ;
 
 		-- Loop
-  	   do_iteration us2 (iteration_no + 1) all_counts binds''
+  	   do_iteration us2 (iteration_no + 1) all_counts binds2 rules1
 	}  } } }
       where
   	  (us1, us2) = splitUniqSupply us
+
+-------------------
+endIteration :: DynFlags -> SimplifierMode -> Int -> Int 
+             -> SimplCount -> [CoreBind] -> [CoreRule] -> IO ()
+-- Same as endPass but with simplifier counts
+endIteration dflags mode iteration_no max_iterations counts binds rules
+  = do { Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations pass_name
+		             (pprSimplCount counts) ;
+
+       ; endPass dflags pass_name Opt_D_dump_simpl_iterations binds rules }
+  where
+    pass_name = "Simplifier mode " ++ showPpr mode ++ 
+	     	", iteration " ++ show iteration_no ++
+	     	" out of " ++ show max_iterations
 \end{code}
 
 
@@ -822,7 +844,7 @@ transferIdInfo exported_id local_id
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
-				 `setWorkerInfo`        workerInfo local_info
+				 `setUnfoldingInfo`     unfoldingInfo local_info
 				 `setInlinePragInfo`	inlinePragInfo local_info
 				 `setSpecInfo`	        addSpecInfo (specInfo exp_info) new_info
     new_info = setSpecInfoHead (idName exported_id) 

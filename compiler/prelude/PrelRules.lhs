@@ -35,7 +35,8 @@ import PrimOp		( PrimOp(..), tagToEnumKey )
 import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
-import CoreUtils	( cheapEqExpr, exprIsConApp_maybe )
+import CoreUtils	( cheapEqExpr )
+import CoreUnfold	( exprIsConApp_maybe )
 import Type		( tyConAppTyCon, coreEqType )
 import OccName		( occNameFS )
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
@@ -457,7 +458,7 @@ dataToTagRule [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
   = Just tag	-- dataToTag (tagToEnum x)   ==>   x
 
 dataToTagRule [_, val_arg]
-  | Just (dc,_) <- exprIsConApp_maybe val_arg
+  | Just (dc,_,_) <- exprIsConApp_maybe val_arg
   = ASSERT( not (isNewTyCon (dataConTyCon dc)) )
     Just (mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
 

@@ -54,12 +54,12 @@ module BasicTypes(
 	StrictnessMark(..), isMarkedUnboxed, isMarkedStrict,
 
 	CompilerPhase, 
-	Activation(..), isActive, isNeverActive, isAlwaysActive,
-        RuleMatchInfo(..), isConLike, isFunLike,
-        InlinePragma(..), defaultInlinePragma, isDefaultInlinePragma,
+	Activation(..), isActive, isNeverActive, isAlwaysActive, isEarlyActive,
+        RuleMatchInfo(..), isConLike, isFunLike, 
+        InlinePragma(..), defaultInlinePragma, neverInlinePragma, dfunInlinePragma,
+	isDefaultInlinePragma, isInlinePragma,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
-	InlineSpec(..), defaultInlineSpec, alwaysInlineSpec, neverInlineSpec,
 
 	SuccessFlag(..), succeeded, failed, successIf
    ) where
@@ -585,10 +585,69 @@ data Activation = NeverActive
 		| ActiveAfter CompilerPhase	-- Active in this phase and later
 		deriving( Eq )			-- Eq used in comparing rules in HsDecls
 
-data RuleMatchInfo = ConLike
+data RuleMatchInfo = ConLike 			-- See Note [CONLIKE pragma]
                    | FunLike
                    deriving( Eq )
 
+data InlinePragma  	     -- Note [InlinePragma]
+  = InlinePragma
+      { inl_inline :: Bool           -- True <=> INLINE, 
+      		      		     -- False <=> no pragma at all, or NOINLINE
+      , inl_act    :: Activation     -- Says during which phases inlining is allowed
+      , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
+    } deriving( Eq )
+\end{code}
+
+Note [InlinePragma]
+~~~~~~~~~~~~~~~~~~~
+This data type mirrors what you can write in an INLINE or NOINLINE pragma in 
+the source program.
+
+If you write nothing at all, you get defaultInlinePragma:
+   inl_inline = False
+   inl_act    = AlwaysActive
+   inl_rule   = FunLike
+
+It's not possible to get that combination by *writing* something, so 
+if an Id has defaultInlinePragma it means the user didn't specify anything.
+
+Note [CONLIKE pragma]
+~~~~~~~~~~~~~~~~~~~~~
+The ConLike constructor of a RuleMatchInfo is aimed at the following.
+Consider first
+    {-# RULE "r/cons" forall a as. r (a:as) = f (a+1) #-}
+    g b bs = let x = b:bs in ..x...x...(r x)...
+Now, the rule applies to the (r x) term, because GHC "looks through" 
+the definition of 'x' to see that it is (b:bs).
+
+Now consider
+    {-# RULE "r/f" forall v. r (f v) = f (v+1) #-}
+    g v = let x = f v in ..x...x...(r x)...
+Normally the (r x) would *not* match the rule, because GHC would be
+scared about duplicating the redex (f v), so it does not "look
+through" the bindings.  
+
+However the CONLIKE modifier says to treat 'f' like a constructor in
+this situation, and "look through" the unfolding for x.  So (r x)
+fires, yielding (f (v+1)).
+
+This is all controlled with a user-visible pragma:
+     {-# NOINLINE CONLIKE [1] f #-}
+
+The main effects of CONLIKE are:
+
+    - The occurrence analyser (OccAnal) and simplifier (Simplify) treat
+      CONLIKE thing like constructors, by ANF-ing them
+
+    - New function coreUtils.exprIsExpandable is like exprIsCheap, but
+      additionally spots applications of CONLIKE functions
+
+    - A CoreUnfolding has a field that caches exprIsExpandable
+
+    - The rule matcher consults this field.  See
+      Note [Expanding variables] in Rules.lhs.
+
+\begin{code}
 isConLike :: RuleMatchInfo -> Bool
 isConLike ConLike = True
 isConLike _            = False
@@ -597,55 +656,39 @@ isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
 isFunLike _            = False
 
-data InlinePragma
-  = InlinePragma
-      Activation        -- Says during which phases inlining is allowed
-      RuleMatchInfo     -- Should the function be treated like a constructor?
-  deriving( Eq )
-
-defaultInlinePragma :: InlinePragma
-defaultInlinePragma = InlinePragma AlwaysActive FunLike
+defaultInlinePragma, neverInlinePragma, dfunInlinePragma :: InlinePragma
+defaultInlinePragma 
+  = InlinePragma { inl_act = AlwaysActive, inl_rule = FunLike, inl_inline = False }
+neverInlinePragma   
+   = InlinePragma { inl_act = NeverActive, inl_rule = FunLike, inl_inline = False }
+dfunInlinePragma   
+   = InlinePragma { inl_act = AlwaysActive, inl_rule = ConLike, inl_inline = False }
+                                    
 
 isDefaultInlinePragma :: InlinePragma -> Bool
-isDefaultInlinePragma (InlinePragma activation match_info)
-  = isAlwaysActive activation && isFunLike match_info
+isDefaultInlinePragma (InlinePragma { inl_act = activation
+                                    , inl_rule = match_info
+                                    , inl_inline = inline })
+  = not inline && isAlwaysActive activation && isFunLike match_info
+
+isInlinePragma :: InlinePragma -> Bool
+isInlinePragma prag = inl_inline prag
 
 inlinePragmaActivation :: InlinePragma -> Activation
-inlinePragmaActivation (InlinePragma activation _) = activation
+inlinePragmaActivation (InlinePragma { inl_act = activation }) = activation
 
 inlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo
-inlinePragmaRuleMatchInfo (InlinePragma _ info) = info
+inlinePragmaRuleMatchInfo (InlinePragma { inl_rule = info }) = info
 
 setInlinePragmaActivation :: InlinePragma -> Activation -> InlinePragma
-setInlinePragmaActivation (InlinePragma _ info) activation
-  = InlinePragma activation info
+setInlinePragmaActivation prag activation = prag { inl_act = activation }
 
 setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
-setInlinePragmaRuleMatchInfo (InlinePragma activation _) info
-  = InlinePragma activation info
-
-data InlineSpec
-  = Inline
-        InlinePragma
-	Bool 		-- True  <=> INLINE
-			-- False <=> NOINLINE
-  deriving( Eq )
-
-defaultInlineSpec :: InlineSpec
-alwaysInlineSpec, neverInlineSpec :: RuleMatchInfo -> InlineSpec
-
-defaultInlineSpec = Inline defaultInlinePragma False
-                                                -- Inlining is OK, but not forced
-alwaysInlineSpec match_info
-                = Inline (InlinePragma AlwaysActive match_info) True
-                                                -- INLINE always
-neverInlineSpec match_info
-                = Inline (InlinePragma NeverActive  match_info) False
-                                                -- NOINLINE
+setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
 instance Outputable Activation where
-   ppr NeverActive      = ptext (sLit "NEVER")
    ppr AlwaysActive     = ptext (sLit "ALWAYS")
+   ppr NeverActive      = ptext (sLit "NEVER")
    ppr (ActiveBefore n) = brackets (char '~' <> int n)
    ppr (ActiveAfter n)  = brackets (int n)
 
@@ -654,25 +697,17 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = ptext (sLit "FUNLIKE")
 
 instance Outputable InlinePragma where
-  ppr (InlinePragma activation FunLike)
-       = ppr activation
-  ppr (InlinePragma activation match_info)
-       = ppr match_info <+> ppr activation
-    
-instance Outputable InlineSpec where
-   ppr (Inline (InlinePragma act match_info) is_inline)  
-	| is_inline = ptext (sLit "INLINE")
-                      <+> ppr_match_info
-		      <+> case act of
-			     AlwaysActive -> empty
-			     _            -> ppr act
-	| otherwise = ptext (sLit "NOINLINE")
-                      <+> ppr_match_info
-		      <+> case act of
-			     NeverActive  -> empty
-			     _            -> ppr act
-     where
-       ppr_match_info = if isFunLike match_info then empty else ppr match_info
+  ppr (InlinePragma { inl_inline = inline, inl_act = activation, inl_rule = info })
+    = pp_inline <+> pp_info <+> pp_activation
+    where
+      pp_inline | inline    = ptext (sLit "INLINE")
+                | otherwise = ptext (sLit "NOINLINE")
+      pp_info | isFunLike info = empty
+              | otherwise      = ppr info
+      pp_activation 
+        | inline     && isAlwaysActive activation = empty
+        | not inline && isNeverActive  activation = empty
+        | otherwise                               = ppr activation    
 
 isActive :: CompilerPhase -> Activation -> Bool
 isActive _ NeverActive      = False
@@ -680,11 +715,15 @@ isActive _ AlwaysActive     = True
 isActive p (ActiveAfter n)  = p <= n
 isActive p (ActiveBefore n) = p >  n
 
-isNeverActive, isAlwaysActive :: Activation -> Bool
+isNeverActive, isAlwaysActive, isEarlyActive :: Activation -> Bool
 isNeverActive NeverActive = True
 isNeverActive _           = False
 
 isAlwaysActive AlwaysActive = True
 isAlwaysActive _            = False
+
+isEarlyActive AlwaysActive      = True
+isEarlyActive (ActiveBefore {}) = True
+isEarlyActive _		        = False
 \end{code}
 

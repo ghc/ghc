@@ -394,20 +394,22 @@ cvtPragmaD (SpecialiseP nm ty opt_ispec)
        ; ty' <- cvtType ty
        ; return $ SpecSig nm' ty' (cvtInlineSpec opt_ispec) }
 
-cvtInlineSpec :: Maybe TH.InlineSpec -> Hs.InlineSpec
+cvtInlineSpec :: Maybe TH.InlineSpec -> Hs.InlinePragma
 cvtInlineSpec Nothing 
-  = defaultInlineSpec
+  = defaultInlinePragma
 cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation)) 
-  = mkInlineSpec opt_activation' matchinfo inline
+  = InlinePragma { inl_act = opt_activation', inl_rule = matchinfo, inl_inline = inline }
   where
     matchinfo       = cvtRuleMatchInfo conlike
-    opt_activation' = fmap cvtActivation opt_activation
+    opt_activation' = cvtActivation opt_activation
 
     cvtRuleMatchInfo False = FunLike
     cvtRuleMatchInfo True  = ConLike
 
-    cvtActivation (False, phase) = ActiveBefore phase
-    cvtActivation (True , phase) = ActiveAfter  phase
+    cvtActivation Nothing | inline      = AlwaysActive
+                          | otherwise   = NeverActive
+    cvtActivation (Just (False, phase)) = ActiveBefore phase
+    cvtActivation (Just (True , phase)) = ActiveAfter  phase
 
 ---------------------------------------------------
 --		Declarations

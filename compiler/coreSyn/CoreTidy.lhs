@@ -153,7 +153,7 @@ tidyLetBndr env (id,rhs)
 	-- separate compilation boundaries
     final_id = new_id `setIdInfo` new_info
     idinfo   = idInfo id
-    new_info = vanillaIdInfo
+    new_info = idInfo new_id
 		`setArityInfo`		exprArity rhs
 		`setAllStrictnessInfo`	newStrictnessInfo idinfo
 		`setNewDemandInfo`	newDemandInfo idinfo
@@ -166,7 +166,7 @@ tidyLetBndr env (id,rhs)
 -- Non-top-level variables
 tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
-  = -- do this pattern match strictly, otherwise we end up holding on to
+  = -- Do this pattern match strictly, otherwise we end up holding on to
     -- stuff in the OccName.
     case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') -> 
     let 
@@ -174,23 +174,35 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- The SrcLoc isn't important now, 
 	-- though we could extract it from the Id
 	-- 
-	-- All nested Ids now have the same IdInfo, namely vanillaIdInfo,
-	-- which should save some space; except that we hang onto dead-ness
-	-- (at the moment, solely to make printing tidy core nicer)
-	-- But note that tidyLetBndr puts some of it back.
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
 	id'      = mkLocalIdWithInfo name' ty' new_info
 	var_env' = extendVarEnv var_env id id'
-        new_info | isDeadOcc (idOccInfo id) = deadIdInfo
-	         | otherwise 	            = vanillaIdInfo
-    in
-     ((tidy_env', var_env'), id')
-   }
 
-deadIdInfo :: IdInfo
-deadIdInfo = vanillaIdInfo `setOccInfo` IAmDead
+	-- Note [Tidy IdInfo]
+        new_info = vanillaIdInfo `setOccInfo` occInfo old_info
+	old_info = idInfo id
+    in
+    ((tidy_env', var_env'), id')
+   }
 \end{code}
+
+Note [Tidy IdInfo]
+~~~~~~~~~~~~~~~~~~
+All nested Ids now have the same IdInfo, namely vanillaIdInfo, which
+should save some space; except that we preserve occurrence info for
+two reasons:
+
+  (a) To make printing tidy core nicer
+
+  (b) Because we tidy RULES and InlineRules, which may then propagate
+      via --make into the compilation of the next module, and we want
+      the benefit of that occurrence analysis when we use the rule or
+      or inline the function.  In particular, it's vital not to lose
+      loop-breaker info, else we get an infinite inlining loop
+      
+Note that tidyLetBndr puts more IdInfo back.
+
 
 \begin{code}
 (=:) :: a -> (a -> b) -> b

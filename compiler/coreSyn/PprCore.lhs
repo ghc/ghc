@@ -32,6 +32,7 @@ import BasicTypes
 import Util
 import Outputable
 import FastString
+import Data.Maybe
 \end{code}
 
 %************************************************************************
@@ -215,9 +216,6 @@ ppr_expr add_par (Let bind expr)
 ppr_expr add_par (Note (SCC cc) expr)
   = add_par (sep [pprCostCentreCore cc, pprCoreExpr expr])
 
-ppr_expr add_par (Note InlineMe expr)
-  = add_par $ ptext (sLit "__inline_me") <+> pprParendExpr expr
-
 ppr_expr add_par (Note (CoreNote s) expr)
   = add_par $ 
     sep [sep [ptext (sLit "__core_note"), pprHsString (mkFastString s)],
@@ -255,11 +253,8 @@ instance OutputableBndr Var where
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
   | isTyVar binder = pprKindedTyVarBndr binder
-  | otherwise
-  = vcat [sig, pprIdExtras binder, pragmas]
-  where
-    sig     = pprTypedBinder binder
-    pragmas = ppIdInfo binder (idInfo binder)
+  | otherwise      = pprTypedBinder binder $$ 
+		     ppIdInfo binder (idInfo binder)
 
 -- Lambda bound type variables are preceded by "@"
 pprCoreBinder LambdaBind bndr 
@@ -274,6 +269,9 @@ pprCoreBinder LambdaBind bndr
 
 -- Case bound things don't get a signature or a herald, unless we have debug on
 pprCoreBinder CaseBind bndr 
+  | isDeadBinder bndr	 -- False for tyvars
+  = ptext (sLit "_")
+  | otherwise
   = getPprStyle $ \ sty ->
     if debugStyle sty then
 	parens (pprTypedBinder bndr)
@@ -290,7 +288,7 @@ pprTypedBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
 pprTypedBinder binder
   | isTyVar binder  = pprKindedTyVarBndr binder
-  | otherwise	    = pprIdBndr binder <+> dcolon <+> pprType (idType binder)
+  | otherwise	    = hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
@@ -316,55 +314,111 @@ pprIdBndrInfo info
     dmd_info  = newDemandInfo info
     lbv_info  = lbvarInfo info
 
-    no_info = isDefaultInlinePragma prag_info && isNoOcc occ_info && 
-	      (case dmd_info of { Nothing -> True; Just d -> isTop d }) &&
-	      hasNoLBVarInfo lbv_info
+    has_prag = not (isDefaultInlinePragma prag_info)
+    has_occ  = not (isNoOcc occ_info)
+    has_dmd  = case dmd_info of { Nothing -> False; Just d -> not (isTop d) }
+    has_lbv  = not (hasNoLBVarInfo lbv_info)
 
-    doc | no_info = empty
- 	| otherwise
-        = brackets $ hsep [ppr prag_info, ppr occ_info, 
-			   ppr dmd_info, ppr lbv_info
-#ifdef OLD_STRICTNESS
-			   , ppr (demandInfo id)
-#endif
-			  ]
+    doc = showAttributes 
+	  [ (has_prag, ptext (sLit "InlPrag=") <> ppr prag_info)
+	  , (has_occ,  ptext (sLit "Occ=") <> ppr occ_info)
+	  , (has_dmd,  ptext (sLit "Dmd=") <> ppr dmd_info)
+	  , (has_lbv , ptext (sLit "Lbv=") <> ppr lbv_info)
+	  ]
 \end{code}
 
 
+-----------------------------------------------------
+--	IdDetails and IdInfo
+-----------------------------------------------------
+
 \begin{code}
-pprIdExtras :: Id -> SDoc
-pprIdExtras id = pp_scope <> ppr (idDetails id)
+ppIdInfo :: Id -> IdInfo -> SDoc
+ppIdInfo id info
+  = showAttributes
+    [ (True, pp_scope <> ppr (idDetails id))
+    , (has_arity,      ptext (sLit "Arity=") <> int arity)
+    , (has_caf_info,   ptext (sLit "Caf=") <> ppr caf_info)
+    , (has_strictness, ptext (sLit "Str=") <> pprNewStrictness str_info)
+    , (has_unf,        ptext (sLit "Unf=") <> ppr unf_info)
+    , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
+    ]	-- Inline pragma, occ, demand, lbvar info
+	-- printed out with all binders (when debug is on); 
+	-- see PprCore.pprIdBndr
   where
     pp_scope | isGlobalId id   = ptext (sLit "GblId")
     	     | isExportedId id = ptext (sLit "LclIdX")
     	     | otherwise       = ptext (sLit "LclId")
 
-ppIdInfo :: Id -> IdInfo -> SDoc
-ppIdInfo _ info
-  = brackets $
-    vcat [  ppArityInfo a,
-	    ppWorkerInfo (workerInfo info),
-	    ppCafInfo (cafInfo info),
-#ifdef OLD_STRICTNESS
-	    ppStrictnessInfo s,
-            ppCprInfo m,
-#endif
-	    pprNewStrictness (newStrictnessInfo info),
-	    if null rules then empty
-	    else ptext (sLit "RULES:") <+> vcat (map pprRule rules)
-	-- Inline pragma, occ, demand, lbvar info
-	-- printed out with all binders (when debug is on); 
-	-- see PprCore.pprIdBndr
-	]
-  where
-    a = arityInfo info
-#ifdef OLD_STRICTNESS
-    s = strictnessInfo info
-    m = cprInfo info
-#endif
+    arity = arityInfo info
+    has_arity = arity /= 0
+
+    caf_info = cafInfo info
+    has_caf_info = not (mayHaveCafRefs caf_info)
+
+    str_info = newStrictnessInfo info
+    has_strictness = isJust str_info
+
+    unf_info = unfoldingInfo info
+    has_unf = hasSomeUnfolding unf_info
+
     rules = specInfoRules (specInfo info)
+
+showAttributes :: [(Bool,SDoc)] -> SDoc
+showAttributes stuff 
+  | null docs = empty
+  | otherwise = brackets (sep (punctuate comma docs))
+  where
+    docs = [d | (True,d) <- stuff]
 \end{code}
 
+-----------------------------------------------------
+--	Unfolding and UnfoldingGuidance
+-----------------------------------------------------
+
+\begin{code}
+instance Outputable UnfoldingGuidance where
+    ppr UnfoldNever  = ptext (sLit "NEVER")
+    ppr UnfoldAlways = ptext (sLit "ALWAYS")
+    ppr (InlineRule { ug_ir_info = inl_info, ug_small = small })
+      = ptext (sLit "InlineRule") <> ppr (inl_info,small)
+    ppr (UnfoldIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
+      = hsep [ ptext (sLit "IF_ARGS"), 
+	       brackets (hsep (map int cs)),
+	       int size,
+	       int discount ]
+
+instance Outputable InlineRuleInfo where
+  ppr (InlWrapper w) = ptext (sLit "worker=") <> ppr w
+  ppr InlSat         = ptext (sLit "sat")
+  ppr InlUnSat       = ptext (sLit "unsat")
+
+instance Outputable Unfolding where
+  ppr NoUnfolding             = ptext (sLit "No unfolding")
+  ppr (OtherCon cs)           = ptext (sLit "OtherCon") <+> ppr cs
+  ppr (DFunUnfolding con ops) = ptext (sLit "DFun") <+> ppr con
+                                 <+> brackets (pprWithCommas pprParendExpr ops)
+  ppr (CoreUnfolding { uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf, uf_is_cheap=cheap
+      		     , uf_expandable=exp, uf_guidance=g, uf_arity=arity}) 
+	= ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
+    where
+      pp_info = hsep [ ptext (sLit "TopLvl=") <> ppr top 
+                     , ptext (sLit "Arity=") <> int arity
+                     , ptext (sLit "Value=") <> ppr hnf
+                     , ptext (sLit "Cheap=") <> ppr cheap
+                     , ptext (sLit "Expandable=") <> ppr exp
+                     , ppr g ]
+      pp_rhs = case g of
+      	      	  UnfoldNever         -> usually_empty
+		  UnfoldIfGoodArgs {} -> usually_empty
+                  _other              -> ppr rhs
+      usually_empty = ifPprDebug (ppr rhs)
+            -- In this case show 'rhs' only in debug mode
+\end{code}
+
+-----------------------------------------------------
+--	Rules
+-----------------------------------------------------
 
 \begin{code}
 instance Outputable CoreRule where

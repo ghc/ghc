@@ -8,7 +8,7 @@
 \begin{code}
 -- | Arit and eta expansion
 module CoreArity (
-	manifestArity, exprArity, 
+	manifestArity, exprArity, exprBotStrictness_maybe,
 	exprEtaExpandArity, etaExpand
     ) where
 
@@ -138,6 +138,15 @@ exprEtaExpandArity dflags e
     = applyStateHack e (arityType dicts_cheap e)
   where
     dicts_cheap = dopt Opt_DictsCheap dflags
+
+exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
+-- A cheap and cheerful function that identifies bottoming functions
+-- and gives them a suitable strictness signatures.  It's used during
+-- float-out
+exprBotStrictness_maybe e
+  = case arityType False e of
+	AT _ ATop -> Nothing
+	AT a ABot -> Just (a, mkStrictSig (mkTopDmdType (replicate a topDmd) BotRes))
 \end{code}	
 
 Note [Definition of arity]
@@ -430,6 +439,13 @@ simplification but it's not too hard.  The alernative, of relying on
 a subsequent clean-up phase of the Simplifier to de-crapify the result,
 means you can't really use it in CorePrep, which is painful.
 
+Note [Eta expansion and SCCs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note that SCCs are not treated specially by etaExpand.  If we have
+	etaExpand 2 (\x -> scc "foo" e)
+	= (\xy -> (scc "foo" e) y)
+So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
+
 \begin{code}
 -- | @etaExpand n us e ty@ returns an expression with
 -- the same meaning as @e@, but with arity @n@.
@@ -444,11 +460,6 @@ means you can't really use it in CorePrep, which is painful.
 etaExpand :: Arity	  	-- ^ Result should have this number of value args
 	  -> CoreExpr	        -- ^ Expression to expand
 	  -> CoreExpr
--- Note that SCCs are not treated specially.  If we have
---	etaExpand 2 (\x -> scc "foo" e)
---	= (\xy -> (scc "foo" e) y)
--- So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
-
 -- etaExpand deals with for-alls. For example:
 --		etaExpand 1 E
 -- where  E :: forall a. a -> a
@@ -468,7 +479,6 @@ etaExpand n orig_expr
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
        	              | otherwise = Lam v (go (n-1) body)
-    go n (Note InlineMe expr) = Note InlineMe (go n expr)
     go n (Cast expr co) = Cast (go n expr) co
     go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
        	 		  etaInfoAbs etas (etaInfoApp subst' expr etas)

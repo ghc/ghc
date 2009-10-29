@@ -10,14 +10,14 @@ module SimplUtils (
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
-	activeInline, activeRule, inlineMode,
+	activeInline, activeRule, 
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
-	countValArgs, countArgs, splitInlineCont,
+	countValArgs, countArgs, 
 	mkBoringStop, mkLazyArgStop, contIsRhsOrArg,
-	interestingCallContext, interestingArgContext,
+	interestingCallContext, 
 
 	interestingArg, mkArgInfo,
 	
@@ -215,34 +215,6 @@ dropArgs :: Int -> SimplCont -> SimplCont
 dropArgs 0 cont = cont
 dropArgs n (ApplyTo _ _ _ cont) = dropArgs (n-1) cont
 dropArgs n other		= pprPanic "dropArgs" (ppr n <+> ppr other)
-
---------------------
-splitInlineCont :: SimplCont -> Maybe (SimplCont, SimplCont)
--- Returns Nothing if the continuation should dissolve an InlineMe Note
--- Return Just (c1,c2) otherwise, 
---	where c1 is the continuation to put inside the InlineMe 
---	and   c2 outside
-
--- Example: (__inline_me__ (/\a. e)) ty
---	Here we want to do the beta-redex without dissolving the InlineMe
--- See test simpl017 (and Trac #1627) for a good example of why this is important
-
-splitInlineCont (ApplyTo dup (Type ty) se c)
-  | Just (c1, c2) <- splitInlineCont c = Just (ApplyTo dup (Type ty) se c1, c2)
-splitInlineCont cont@(Stop {})         = Just (mkBoringStop, cont)
-splitInlineCont cont@(StrictBind {})   = Just (mkBoringStop, cont)
-splitInlineCont _                      = Nothing
-	-- NB: we dissolve an InlineMe in any strict context, 
-	--     not just function aplication.  
-	-- E.g.  foldr k z (__inline_me (case x of p -> build ...))
-	--     Here we want to get rid of the __inline_me__ so we
-	--     can float the case, and see foldr/build
-	--
-	-- However *not* in a strict RHS, else we get
-	-- 	   let f = __inline_me__ (\x. e) in ...f...
-	-- Now if f is guaranteed to be called, hence a strict binding
-	-- we don't thereby want to dissolve the __inline_me__; for
-	-- example, 'f' might be a  wrapper, so we'd inline the worker
 \end{code}
 
 
@@ -320,24 +292,25 @@ interestingCallContext cont
 
 -------------------
 mkArgInfo :: Id
+	  -> [CoreRule]	-- Rules for function
 	  -> Int	-- Number of value args
 	  -> SimplCont	-- Context of the call
 	  -> ArgInfo
 
-mkArgInfo fun n_val_args call_cont
+mkArgInfo fun rules n_val_args call_cont
   | n_val_args < idArity fun		-- Note [Unsaturated functions]
   = ArgInfo { ai_rules = False
 	    , ai_strs = vanilla_stricts 
 	    , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_rules = interestingArgContext fun call_cont
+  = ArgInfo { ai_rules = interestingArgContext rules call_cont
 	    , ai_strs  = add_type_str (idType fun) arg_stricts
 	    , ai_discs = arg_discounts }
   where
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
-			CoreUnfolding _ _ _ _ _ (UnfoldIfGoodArgs _ discounts _ _)
+			CoreUnfolding {uf_guidance = UnfoldIfGoodArgs {ug_args = discounts}}
 			      -> discounts ++ vanilla_discounts
 			_     -> vanilla_discounts
 
@@ -391,7 +364,7 @@ it'll just be floated out again.  Even if f has lots of discounts
 on its first argument -- it must be saturated for these to kick in
 -}
 
-interestingArgContext :: Id -> SimplCont -> Bool
+interestingArgContext :: [CoreRule] -> SimplCont -> Bool
 -- If the argument has form (f x y), where x,y are boring,
 -- and f is marked INLINE, then we don't want to inline f.
 -- But if the context of the argument is
@@ -402,16 +375,18 @@ interestingArgContext :: Id -> SimplCont -> Bool
 -- where h has rules, then we do want to inline f; hence the
 -- call_cont argument to interestingArgContext
 --
--- The interesting_arg_ctxt flag makes this happen; if it's
+-- The ai-rules flag makes this happen; if it's
 -- set, the inliner gets just enough keener to inline f 
 -- regardless of how boring f's arguments are, if it's marked INLINE
 --
 -- The alternative would be to *always* inline an INLINE function,
 -- regardless of how boring its context is; but that seems overkill
 -- For example, it'd mean that wrapper functions were always inlined
-interestingArgContext fn call_cont
-  = idHasRules fn || go call_cont
+interestingArgContext rules call_cont
+  = notNull rules || enclosing_fn_has_rules
   where
+    enclosing_fn_has_rules = go call_cont
+
     go (Select {})	     = False
     go (ApplyTo {})	     = False
     go (StrictArg _ cci _ _) = interesting cci
@@ -458,13 +433,7 @@ unboxed tuples and suchlike.
 
 INLINE pragmas
 ~~~~~~~~~~~~~~
-SimplGently is also used as the mode to simplify inside an InlineMe note.
-
-\begin{code}
-inlineMode :: SimplifierMode
-inlineMode = SimplGently
-\end{code}
-
+We don't simplify inside InlineRules (which come from INLINE pragmas).
 It really is important to switch off inlinings inside such
 expressions.  Consider the following example 
 
@@ -589,7 +558,7 @@ preInlineUnconditionally env top_lvl bndr rhs
   where
     phase = getMode env
     active = case phase of
-		   SimplGently    -> isAlwaysActive act
+		   SimplGently    -> isEarlyActive act
 		   SimplPhase n _ -> isActive n act
     act = idInlineActivation bndr
 
@@ -674,7 +643,7 @@ story for now.
 \begin{code}
 postInlineUnconditionally 
     :: SimplEnv -> TopLevelFlag
-    -> InId		-- The binder (an OutId would be fine too)
+    -> OutId		-- The binder (an InId would be fine too)
     -> OccInfo 		-- From the InId
     -> OutExpr
     -> Unfolding
@@ -684,6 +653,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | isLoopBreaker occ_info = False	-- If it's a loop-breaker of any kind, don't inline
 					-- because it might be referred to "earlier"
   | isExportedId bndr      = False
+  | isInlineRule unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
   | exprIsTrivial rhs 	   = True
   | otherwise
   = case occ_info of
@@ -788,6 +758,23 @@ activeRule dflags env
 	SimplPhase n _ -> Just (isActive n)
 \end{code}
 
+Note [InlineRule and postInlineUnconditionally]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do not do postInlineUnconditionally if the Id has an InlineRule, otherwise
+we lose the unfolding.  Example
+
+     -- f has InlineRule with rhs (e |> co)
+     --   where 'e' is big
+     f = e |> co
+
+Then there's a danger we'll optimise to
+
+     f' = e
+     f = f' |> co
+
+and now postInlineUnconditionally, losing the InlineRule on f.  Now f'
+won't inline because 'e' is too big.
+
 
 %************************************************************************
 %*									*
@@ -803,7 +790,7 @@ mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplM OutExpr
 
 mkLam _b [] body 
   = return body
-mkLam _env bndrs body
+mkLam env bndrs body
   = do	{ dflags <- getDOptsSmpl
 	; mkLam' dflags bndrs body }
   where
@@ -824,7 +811,9 @@ mkLam _env bndrs body
 	   ; return etad_lam }
 
       | dopt Opt_DoLambdaEtaExpansion dflags,
-   	any isRuntimeVar bndrs
+        not (inGentleMode env),	      -- In gentle mode don't eta-expansion
+   	any isRuntimeVar bndrs	      -- because it can clutter up the code
+	    		 	      -- with casts etc that may not be removed
       = do { let body' = tryEtaExpansion dflags body
  	   ; return (mkLams bndrs body') }
    

@@ -815,6 +815,13 @@ buildPADict vect_tc prepr_tc arr_tc repr
           var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
 
+-- The InlineMe note has gone away.  Instead, you need to use
+-- CoreUnfold.mkInlineRule to make an InlineRule for the thing, and
+-- attach *that* as the unfolding for the dictionary binder
+mkInlineMe :: CoreExpr -> CoreExpr
+mkInlineMe expr = pprTrace "VectType: Roman, you need to use the new InlineRule story" 
+	   	           (ppr expr) expr
+
 paMethods :: [(FastString, TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr)]
 paMethods = [(fsLit "dictPRepr",    buildPRDict),
              (fsLit "toPRepr",      buildToPRepr),

@@ -235,7 +235,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec) =
    -- is *stable* (i.e. the compiler won't change it later),
    -- because this name will be referred to by the C code stub.
    id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
-   return (L loc (VarBind id rhs), ForeignExport (L loc id) undefined spec)
+   return (mkVarBind id rhs, ForeignExport (L loc id) undefined spec)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 \end{code}
 

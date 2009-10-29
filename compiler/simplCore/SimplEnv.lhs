@@ -23,13 +23,13 @@ module SimplEnv (
 	mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, 
 	zapSubstEnv, setSubstEnv, 
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
-	getSimplRules, 
+	getSimplRules, inGentleMode,
 
 	SimplSR(..), mkContEx, substId, lookupRecBndr,
 
 	simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs, 
  	simplBinder, simplBinders, addBndrRules,
-	substExpr, substWorker, substTy, 
+	substExpr, substTy, mkCoreSubst,
 
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
@@ -49,7 +49,7 @@ import VarEnv
 import VarSet
 import OrdList
 import Id
-import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substWorker )
+import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substUnfolding )
 import qualified Type		( substTy, substTyVarBndr )
 import Type hiding		( substTy, substTyVarBndr )
 import Coercion
@@ -224,6 +224,11 @@ getMode env = seMode env
 
 setMode :: SimplifierMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }
+
+inGentleMode :: SimplEnv -> Bool
+inGentleMode env = case seMode env of
+	                SimplGently -> True
+		        _other      -> False
 
 ---------------------
 getEnclosingCC :: SimplEnv -> CostCentreStack
@@ -660,29 +665,6 @@ addBndrRules env in_id out_id
     old_rules = idSpecialisation in_id
     new_rules = CoreSubst.substSpec subst out_id old_rules
     final_id  = out_id `setIdSpecialisation` new_rules
-
-------------------
-substIdType :: SimplEnv -> Id -> Id
-substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
-  | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
-  | otherwise	= Id.setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
-		-- The tyVarsOfType is cheaper than it looks
-		-- because we cache the free tyvars of the type
-		-- in a Note in the id's type itself
-  where
-    old_ty = idType id
-
-------------------
-substUnfolding :: SimplEnv -> Unfolding -> Unfolding
-substUnfolding _   NoUnfolding     	       = NoUnfolding
-substUnfolding _   (OtherCon cons) 	       = OtherCon cons
-substUnfolding env (CompulsoryUnfolding rhs)   = CompulsoryUnfolding (substExpr env rhs)
-substUnfolding env (CoreUnfolding rhs t u v w g) = CoreUnfolding (substExpr env rhs) t u v w g
-
-------------------
-substWorker :: SimplEnv -> WorkerInfo -> WorkerInfo
-substWorker _   NoWorker = NoWorker
-substWorker env wkr_info = CoreSubst.substWorker (mkCoreSubst env) wkr_info
 \end{code}
 
 
@@ -718,9 +700,24 @@ mkCoreSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seIdSubst = id
     fiddle (DoneId v)       = Var v
     fiddle (ContEx tv id e) = CoreSubst.substExpr (mk_subst tv id) e
 
+------------------
+substIdType :: SimplEnv -> Id -> Id
+substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
+  | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
+  | otherwise	= Id.setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
+		-- The tyVarsOfType is cheaper than it looks
+		-- because we cache the free tyvars of the type
+		-- in a Note in the id's type itself
+  where
+    old_ty = idType id
+
+------------------
 substExpr :: SimplEnv -> CoreExpr -> CoreExpr
 substExpr env expr = CoreSubst.substExpr (mkCoreSubst env) expr
   -- Do *not* short-cut in the case of an empty substitution
   -- See CoreSubst: Note [Extending the Subst]
+
+substUnfolding :: SimplEnv -> Unfolding -> Unfolding
+substUnfolding env unf = CoreSubst.substUnfolding (mkCoreSubst env) unf
 \end{code}
 

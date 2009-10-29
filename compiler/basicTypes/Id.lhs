@@ -69,7 +69,6 @@ module Id (
 	idArity, 
 	idNewDemandInfo, idNewDemandInfo_maybe,
 	idNewStrictness, idNewStrictness_maybe, 
-	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation, idCoreRules, idHasRules,
 	idCafInfo,
@@ -87,7 +86,6 @@ module Id (
 	setIdArity,
 	setIdNewDemandInfo, 
 	setIdNewStrictness, zapIdNewStrictness,
-	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdCafInfo,
 	setIdOccInfo, zapIdOccInfo,
@@ -140,7 +138,6 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
 	  `setIdNewDemandInfo`,
 	  `setIdNewStrictness`,
-	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
 	  `idCafInfo`
@@ -289,9 +286,7 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId wkr_name ty
-  where
-    wkr_name = mkInternalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcSpan unwrkr)
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
@@ -350,8 +345,8 @@ isPrimOpId id = case Var.idDetails id of
                         _          -> False
 
 isDFunId id = case Var.idDetails id of
-                        DFunId -> True
-                        _      -> False
+                        DFunId _ -> True
+                        _        -> False
 
 isPrimOpId_maybe id = case Var.idDetails id of
                         PrimOpId op -> Just op
@@ -409,11 +404,11 @@ isImplicitId :: Id -> Bool
 -- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
   = case Var.idDetails id of
-        FCallId _       -> True
-	ClassOpId _     -> True
-        PrimOpId _      -> True
-        DataConWorkId _ -> True
-	DataConWrapId _ -> True
+        FCallId {}       -> True
+	ClassOpId {}     -> True
+        PrimOpId {}      -> True
+        DataConWorkId {} -> True
+	DataConWrapId {} -> True
 		-- These are are implied by their type or class decl;
 		-- remember that all type and class decls appear in the interface file.
 		-- The dfun id is not an implicit Id; it must *not* be omitted, because 
@@ -513,14 +508,6 @@ isStrictId id
            (isStrictType (idType id))
 
 	---------------------------------
-	-- WORKER ID
-idWorkerInfo :: Id -> WorkerInfo
-idWorkerInfo id = workerInfo (idInfo id)
-
-setIdWorkerInfo :: Id -> WorkerInfo -> Id
-setIdWorkerInfo id work_info = modifyIdInfo (`setWorkerInfo` work_info) id
-
-	---------------------------------
 	-- UNFOLDING
 idUnfolding :: Id -> Unfolding
 idUnfolding id = unfoldingInfo (idInfo id)
@@ -549,6 +536,9 @@ setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` Just dmd) id
 
 	---------------------------------
 	-- SPECIALISATION
+
+-- See Note [Specialisations and RULES in IdInfo] in IdInfo.lhs
+
 idSpecialisation :: Id -> SpecInfo
 idSpecialisation id = specInfo (idInfo id)
 
@@ -617,7 +607,7 @@ idInlineActivation :: Id -> Activation
 idInlineActivation id = inlinePragmaActivation (idInlinePragma id)
 
 setInlineActivation :: Id -> Activation -> Id
-setInlineActivation id act = modifyInlinePragma id (\(InlinePragma _ match_info) -> InlinePragma act match_info)
+setInlineActivation id act = modifyInlinePragma id (\prag -> setInlinePragmaActivation prag act)
 
 idRuleMatchInfo :: Id -> RuleMatchInfo
 idRuleMatchInfo id = inlinePragmaRuleMatchInfo (idInlinePragma id)

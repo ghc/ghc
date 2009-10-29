@@ -14,7 +14,7 @@ module CprAnalyse ( cprAnalyse ) where
 #include "HsVersions.h"
 
 import DynFlags
-import CoreLint
+import CoreMonad
 import CoreSyn
 import CoreUtils
 import Id
@@ -142,7 +142,7 @@ cprAnalyse dflags binds
         showPass dflags "Constructed Product analysis" ;
         let { binds_plus_cpr = do_prog binds } ;
         endPass dflags "Constructed Product analysis"
-                Opt_D_dump_cpranal binds_plus_cpr
+                Opt_D_dump_cpranal binds_plus_cpr []
         return binds_plus_cpr
     }
   where

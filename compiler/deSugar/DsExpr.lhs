@@ -51,6 +51,7 @@ import StaticFlags
 import CostCentre
 import Id
 import Var
+import VarSet
 import PrelInfo
 import DataCon
 import TysWiredIn
@@ -210,7 +211,9 @@ dsExpr (HsVar var)     	      = return (Var var)
 dsExpr (HsIPVar ip)    	      = return (Var (ipNameName ip))
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
-dsExpr (HsWrap co_fn e)       = dsCoercion co_fn (dsExpr e)
+dsExpr (HsWrap co_fn e)       = do { co_fn' <- dsCoercion co_fn
+                                   ; e' <- dsExpr e
+                                   ; return (co_fn' e') }
 
 dsExpr (NegApp expr neg_expr) 
   = App <$> dsExpr neg_expr <*> dsLExpr expr
@@ -645,7 +648,6 @@ makes all list literals be generated via the simple route.
 
 
 \begin{code}
-
 dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
 dsExplicitList elt_ty xs

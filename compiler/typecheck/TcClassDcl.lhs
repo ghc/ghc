@@ -7,7 +7,7 @@ Typechecking class declarations
 
 \begin{code}
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
-		    findMethodBind, tcInstanceMethodBody, 
+		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
 		    mkGenericDefMethBind, getGenericInstances, mkDefMethRdrName,
 		    tcAddDeclCtxt, badMethodErr, badATErr, omittedATWarn
 		  ) where
@@ -160,11 +160,11 @@ tcClassSig _ s = pprPanic "tcClassSig" (ppr s)
 
 \begin{code}
 tcClassDecl2 :: LTyClDecl Name		-- The class declaration
-	     -> TcM (LHsBinds Id, [Id])
+	     -> TcM ([Id], LHsBinds Id)
 
 tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs, 
 				tcdMeths = default_binds}))
-  = recoverM (return (emptyLHsBinds, []))	$
+  = recoverM (return ([], emptyLHsBinds))	$
     setSrcSpan loc		   		$
     do  { clas <- tcLookupLocatedClass class_name
 
@@ -186,7 +186,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	; inst_loc <- getInstLoc (SigOrigin rigid_info)
 	; this_dict <- newDictBndr inst_loc pred
 
-	; let tc_dm = tcDefMeth rigid_info clas clas_tyvars [pred] 
+	; let tc_dm = tcDefMeth clas clas_tyvars
 				this_dict default_binds
 	      			sig_fn prag_fn
 	      	-- tc_dm is called only for a sel_id
@@ -200,38 +200,109 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	      -- the programmer supplied an explicit default decl for the class.  
 	      -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
 
-	; (defm_binds, dm_ids) <- tcExtendTyVarEnv clas_tyvars  $
+	; (dm_ids, defm_binds) <- tcExtendTyVarEnv clas_tyvars  $
 			          mapAndUnzipM tc_dm dm_sel_ids
 
-	; return (unionManyBags defm_binds, dm_ids) }
+	; return (dm_ids, listToBag defm_binds) }
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
     
-tcDefMeth :: SkolemInfo -> Class -> [TyVar] -> ThetaType -> Inst -> LHsBinds Name
+tcDefMeth :: Class -> [TyVar] -> Inst -> LHsBinds Name
           -> TcSigFun -> TcPragFun -> Id
-          -> TcM (LHsBinds Id, Id)
-tcDefMeth rigid_info clas tyvars theta this_dict binds_in sig_fn prag_fn sel_id
+          -> TcM (Id, LHsBind Id)
+tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn sel_id
   = do	{ let sel_name = idName sel_id
-	; local_dm_name <- newLocalName sel_name
+	; dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_name)
+ 	; local_dm_name <- newLocalName sel_name
+ 	  -- Base the local_dm_name on the selector name, becuase
+ 	  -- type errors from tcInstanceMethodBody come from here
+
+		-- See Note [Silly default-method bind]
+		-- (possibly out of date)
+
 	; let meth_bind = findMethodBind sel_name local_dm_name binds_in
 			  `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 		-- We only call tcDefMeth on selectors for which 
 		-- there is a binding in binds_in
 
-	      meth_sig_fn  _ = sig_fn sel_name
-	      meth_prag_fn _ = prag_fn sel_name
+	      dm_sig_fn  _ = sig_fn sel_name
+	      dm_ty = idType sel_id
+	      dm_id = mkDefaultMethodId dm_name dm_ty
+	      local_dm_type = instantiateMethod clas sel_id (mkTyVarTys tyvars)
+	      local_dm_id   = mkLocalId local_dm_name local_dm_type
 
-	; (top_dm_id, bind) <- tcInstanceMethodBody rigid_info
-			   clas tyvars [this_dict] theta (mkTyVarTys tyvars)
-			   Nothing sel_id
-			   local_dm_name
-			   meth_sig_fn meth_prag_fn
-			   meth_bind
+        ; (dm_id_w_inline, spec_prags) 
+                <- tcPrags NonRecursive False True dm_id (prag_fn sel_name)
 
-	; return (bind, top_dm_id) }
+        ; tcInstanceMethodBody (instLoc this_dict) 
+                               tyvars [this_dict]
+                               ([], emptyBag)
+                               dm_id_w_inline local_dm_id
+                               dm_sig_fn spec_prags meth_bind }
 
+---------------
+tcInstanceMethodBody :: InstLoc -> [TcTyVar] -> [Inst]
+		     -> ([Inst], LHsBinds Id) -> Id -> Id
+          	     -> TcSigFun -> [LSpecPrag] -> LHsBind Name 
+          	     -> TcM (Id, LHsBind Id)
+tcInstanceMethodBody inst_loc tyvars dfun_dicts
+		     (this_dict, this_bind) meth_id local_meth_id
+		     meth_sig_fn spec_prags bind@(L loc _)
+  = do	{       -- Typecheck the binding, first extending the envt
+		-- so that when tcInstSig looks up the local_meth_id to find
+		-- its signature, we'll find it in the environment
+	; ((tc_bind, _), lie) <- getLIE $
+				 tcExtendIdEnv [local_meth_id] $
+	        		 tcPolyBinds TopLevel meth_sig_fn no_prag_fn 
+				 	     NonRecursive NonRecursive
+				 	     (unitBag bind)
+
+	; let avails = this_dict ++ dfun_dicts
+		-- Only need the this_dict stuff if there are type 
+		-- variables involved; otherwise overlap is not possible
+		-- See Note [Subtle interaction of recursion and overlap]
+		-- in TcInstDcls
+	; lie_binds <- tcSimplifyCheck inst_loc tyvars avails lie
+
+	; let full_bind = AbsBinds tyvars dfun_lam_vars
+     				  [(tyvars, meth_id, local_meth_id, spec_prags)]
+				  (this_bind `unionBags` lie_binds 
+				   `unionBags` tc_bind)
+
+	      dfun_lam_vars = map instToVar dfun_dicts	-- Includes equalities
+
+        ; return (meth_id, L loc full_bind) } 
+  where
+    no_prag_fn  _ = []		-- No pragmas for local_meth_id; 
+    		    		-- they are all for meth_id
+\end{code}
+
+\begin{code}
 mkDefMethRdrName :: Name -> RdrName
 mkDefMethRdrName sel_name = mkDerivedRdrName sel_name mkDefaultMethodOcc
+
+instantiateMethod :: Class -> Id -> [TcType] -> TcType
+-- Take a class operation, say  
+--	op :: forall ab. C a => forall c. Ix c => (b,c) -> a
+-- Instantiate it at [ty1,ty2]
+-- Return the "local method type": 
+--	forall c. Ix x => (ty2,c) -> ty1
+instantiateMethod clas sel_id inst_tys
+  = ASSERT( ok_first_pred ) local_meth_ty
+  where
+    (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
+    rho_ty = ASSERT( length sel_tyvars == length inst_tys )
+    	     substTyWith sel_tyvars inst_tys sel_rho
+
+    (first_pred, local_meth_ty) = tcSplitPredFunTy_maybe rho_ty
+    		`orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
+
+    ok_first_pred = case getClassPredTys_maybe first_pred of
+		      Just (clas1, _tys) -> clas == clas1
+                      Nothing -> False
+	      -- The first predicate should be of form (C a b)
+	      -- where C is the class in question
+
 
 ---------------------------
 -- The renamer just puts the selector ID as the binder in the method binding
@@ -246,65 +317,6 @@ findMethodBind sel_name meth_name binds
 	         | op_name == sel_name
 		 = Just (L loc1 (bind { fun_id = L loc2 meth_name }))
 	f _other = Nothing
-
----------------
-tcInstanceMethodBody :: SkolemInfo -> Class -> [TcTyVar] -> [Inst]
-	 	     -> TcThetaType -> [TcType]
-		     -> Maybe (Inst, LHsBind Id) -> Id
-		     -> Name		-- The local method name
-          	     -> TcSigFun -> TcPragFun -> LHsBind Name 
-          	     -> TcM (Id, LHsBinds Id)
-tcInstanceMethodBody rigid_info clas tyvars dfun_dicts theta inst_tys
-		     mb_this_bind sel_id  local_meth_name
-		     sig_fn prag_fn bind@(L loc _)
-  = do	{ let (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
-	      rho_ty = ASSERT( length sel_tyvars == length inst_tys )
-		       substTyWith sel_tyvars inst_tys sel_rho
-
-	      (first_pred, local_meth_ty) = tcSplitPredFunTy_maybe rho_ty
-			`orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
-
-	      local_meth_id = mkLocalId local_meth_name local_meth_ty
-	      meth_ty 	    = mkSigmaTy tyvars theta local_meth_ty
-	      sel_name	    = idName sel_id
-
-		      -- The first predicate should be of form (C a b)
-		      -- where C is the class in question
-	; MASSERT( case getClassPredTys_maybe first_pred of
-			{ Just (clas1, _tys) -> clas == clas1 ; Nothing -> False } )
-
-		-- Typecheck the binding, first extending the envt
-		-- so that when tcInstSig looks up the local_meth_id to find
-		-- its signature, we'll find it in the environment
-	; ((tc_bind, _), lie) <- getLIE $
-		tcExtendIdEnv [local_meth_id] $
-	        tcPolyBinds TopLevel sig_fn prag_fn 
-			    NonRecursive NonRecursive
-			    (unitBag bind)
-
-	; meth_id <- case rigid_info of
-		       ClsSkol _ -> do { dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_name)
-				       ; return (mkDefaultMethodId dm_name meth_ty) }
-		       _other    -> do { meth_name <- newLocalName sel_name
-				       ; return (mkLocalId meth_name meth_ty) }
-    	
-	; let (avails, this_dict_bind) 
-		= case mb_this_bind of
-		    Nothing	      -> (dfun_dicts, emptyBag)
-		    Just (this, bind) -> (this : dfun_dicts, unitBag bind)
-
-	; inst_loc <- getInstLoc (SigOrigin rigid_info)
-	; lie_binds <- tcSimplifyCheck inst_loc tyvars avails lie
-
-	; let full_bind = L loc $ 
-			  AbsBinds tyvars dfun_lam_vars
-     				  [(tyvars, meth_id, local_meth_id, [])]
-				  (this_dict_bind `unionBags` lie_binds 
-				   `unionBags` tc_bind)
-
-	      dfun_lam_vars = map instToVar dfun_dicts	-- Includes equalities
-
-        ; return (meth_id, unitBag full_bind) } 
 \end{code}
 
 Note [Polymorphic methods]
@@ -362,7 +374,6 @@ gives rise to the instance declarations
 
 	instance C 1 where
 	  op Unit      = ...
-
 
 \begin{code}
 mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)

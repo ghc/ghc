@@ -16,8 +16,7 @@ import CoreSyn
 import CoreUnfold
 import CoreFVs
 import CoreTidy
-import PprCore
-import CoreLint
+import CoreMonad
 import CoreUtils
 import CoreArity	( exprArity )
 import Class		( classSelIds )
@@ -297,28 +296,19 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 			        mg_hpc_info = hpc_info,
                                 mg_modBreaks = modBreaks })
 
-  = do	{ let dflags = hsc_dflags hsc_env
-	; showPass dflags "Tidy Core"
-
-	; let { omit_prags = dopt Opt_OmitInterfacePragmas dflags
+  = do	{ let { dflags     = hsc_dflags hsc_env
+	      ; omit_prags = dopt Opt_OmitInterfacePragmas dflags
 	      ; th	   = dopt Opt_TemplateHaskell      dflags
               }
+	; showPass dflags "Tidy Core"
 
     	; let { implicit_binds = getImplicitBinds type_env }
 
         ; (unfold_env, tidy_occ_env)
-              <- chooseExternalIds hsc_env mod omit_prags binds implicit_binds
+              <- chooseExternalIds hsc_env mod omit_prags binds implicit_binds imp_rules
 
-        ; let { ext_rules 
-		   | omit_prags = []
-		   | otherwise  = findExternalRules binds imp_rules unfold_env
-		-- findExternalRules filters imp_rules to avoid binders that 
-		-- aren't externally visible; but the externally-visible binders 
-		-- are computed (by findExternalIds) assuming that all orphan
-		-- rules are exported (they get their Exported flag set in the desugarer)
-		-- So in fact we may export more than we need. 
-		-- (It's a sort of mutual recursion.)
-  	}
+        ; let { ext_rules = findExternalRules omit_prags binds imp_rules unfold_env }
+		-- See Note [Which rules to expose]
 
 	; let { (tidy_env, tidy_binds)
                  = tidyTopBinds hsc_env unfold_env tidy_occ_env binds }
@@ -348,11 +338,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
 	      }
 
-   	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds
-	; dumpIfSet_core dflags Opt_D_dump_simpl
-		"Tidy Core Rules"
-		(pprRules tidy_rules)
-
+   	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds tidy_rules
         ; let dir_imp_mods = moduleEnvKeys dir_imps
 
 	; return (CgGuts { cg_module   = mod, 
@@ -578,8 +564,8 @@ Sete Note [choosing external names].
 
 \begin{code}
 type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
-  -- maps each top-level Id to its new Name (the Id is tidied in step 2)
-  -- The Unique is unchanged.  If the new Id is external, it will be
+  -- Maps each top-level Id to its new Name (the Id is tidied in step 2)
+  -- The Unique is unchanged.  If the new Name is external, it will be
   -- visible in the interface file.  
   --
   -- Bool => expose unfolding or not.
@@ -589,34 +575,38 @@ chooseExternalIds :: HscEnv
                   -> Bool
 		  -> [CoreBind]
                   -> [CoreBind]
+		  -> [CoreRule]
                   -> IO (UnfoldEnv, TidyOccEnv)
 	-- Step 1 from the notes above
 
-chooseExternalIds hsc_env mod omit_prags binds implicit_binds
-  = do
-    (unfold_env1,occ_env1) 
-        <- search (zip sorted_exports sorted_exports) emptyVarEnv init_occ_env
-    let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
-    tidy_internal internal_ids unfold_env1 occ_env1
+chooseExternalIds hsc_env mod omit_prags binds implicit_binds imp_id_rules
+  = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
+       ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
+       ; tidy_internal internal_ids unfold_env1 occ_env1 }
  where
   nc_var = hsc_NC hsc_env 
 
-  -- the exports, sorted by OccName.  This is a deterministic list of
-  -- Ids (i.e. it's the same list every time this module is compiled),
-  -- in contrast to the bindings, which are ordered
-  -- non-deterministically.
-  --
-  -- This list will serve as a starting point for finding a
+  -- init_ext_ids is the intial list of Ids that should be
+  -- externalised.  It serves as the starting point for finding a
   -- deterministic, tidy, renaming for all external Ids in this
   -- module.
-  sorted_exports = sortBy (compare `on` getOccName) $
-                     filter isExportedId binders
+  -- 
+  -- It is sorted, so that it has adeterministic order (i.e. it's the
+  -- same list every time this module is compiled), in contrast to the
+  -- bindings, which are ordered non-deterministically.
+  init_work_list = zip init_ext_ids init_ext_ids
+  init_ext_ids   = sortBy (compare `on` getOccName) $
+                   filter is_external binders
 
-  binders = bindersOfBinds binds
+  -- An Id should be external if either (a) it is exported or
+  -- (b) it appears in the RHS of a local rule for an imported Id.   
+  -- See Note [Which rules to expose]
+  is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars
+  rule_rhs_vars = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet imp_id_rules
+
+  binders          = bindersOfBinds binds
   implicit_binders = bindersOfBinds implicit_binds
-
-  bind_env :: IdEnv (Id,CoreExpr)
-  bind_env = mkVarEnv (zip (map fst bs) bs) where bs = flattenBinds binds
+  binder_set       = mkVarSet binders
 
   avoids   = [getOccName name | bndr <- binders ++ implicit_binders,
                                 let name = idName bndr,
@@ -641,7 +631,12 @@ chooseExternalIds hsc_env mod omit_prags binds implicit_binds
   init_occ_env = initTidyOccEnv avoids
 
 
-  search :: [(Id,Id)]    -- (external id, referrring id)
+  search :: [(Id,Id)]    -- The work-list: (external id, referrring id)
+  	    		 -- Make a tidy, external Name for the external id,
+                         --   add it to the UnfoldEnv, and do the same for the
+                         --   transitive closure of Ids it refers to
+  	    		 -- The referring id is used to generate a tidy
+			 ---  name for the external id
          -> UnfoldEnv    -- id -> (new Name, show_unfold)
          -> TidyOccEnv   -- occ env for choosing new Names
          -> IO (UnfoldEnv, TidyOccEnv)
@@ -653,19 +648,19 @@ chooseExternalIds hsc_env mod omit_prags binds implicit_binds
     | otherwise = do
       (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env idocc
       let 
-          (id, rhs) = expectJust (showSDoc (text "chooseExternalIds: " <>
-                                            ppr idocc)) $
-                                 lookupVarEnv bind_env idocc
-          -- NB. idocc might be an *occurrence* of an Id, whereas we want
-          -- the Id from the binding site, because only the latter is
-          -- guaranteed to have the unfolding attached.  This is why we
-          -- keep binding site Ids in the bind_env.
           (new_ids, show_unfold)
                 | omit_prags = ([], False)
-                | otherwise  = addExternal id rhs
-          unfold_env' = extendVarEnv unfold_env id (name',show_unfold)
-          referrer' | isExportedId id = id
-                    | otherwise       = referrer
+                | otherwise  = addExternal refined_id
+
+		-- 'idocc' is an *occurrence*, but we need to see the
+		-- unfolding in the *definition*; so look up in binder_set
+          refined_id = case lookupVarSet binder_set idocc of
+                         Just id -> id
+                         Nothing -> WARN( True, ppr idocc ) idocc
+
+          unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
+          referrer' | isExportedId refined_id = refined_id
+                    | otherwise               = referrer
       --
       search (zip new_ids (repeat referrer') ++ rest) unfold_env' occ_env'
 
@@ -677,45 +672,36 @@ chooseExternalIds hsc_env mod omit_prags binds implicit_binds
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: Id -> CoreExpr -> ([Id],Bool)
-addExternal id rhs = (new_needed_ids, show_unfold)
+addExternal :: Id -> ([Id],Bool)
+addExternal id = (new_needed_ids, show_unfold)
   where
     new_needed_ids = unfold_ids ++
                      filter (\id -> isLocalId id &&
                                     not (id `elemVarSet` unfold_set))
-                       (varSetElems worker_ids ++ 
-                        varSetElems spec_ids) -- XXX non-det ordering
+                       (varSetElems spec_ids) -- XXX non-det ordering
 
     idinfo	   = idInfo id
     dont_inline	   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
     spec_ids	   = specInfoFreeVars (specInfo idinfo)
-    worker_info	   = workerInfo idinfo
 
 	-- Stuff to do with the Id's unfolding
-	-- The simplifier has put an up-to-date unfolding
-	-- in the IdInfo, but the RHS will do just as well
-    unfolding	 = unfoldingInfo idinfo
-    rhs_is_small = not (neverUnfold unfolding)
-
 	-- We leave the unfolding there even if there is a worker
 	-- In GHCI the unfolding is used by importers
-	-- When writing an interface file, we omit the unfolding 
-	-- if there is a worker
-    show_unfold = not bottoming_fn	 &&	-- Not necessary
-		  not dont_inline	 &&
-		  not loop_breaker	 &&
-		  rhs_is_small		 	-- Small enough
+    show_unfold = isJust mb_unfold_ids
+    (unfold_set, unfold_ids) = mb_unfold_ids `orElse` (emptyVarSet, [])
 
-    (unfold_set, unfold_ids)
-               | show_unfold = freeVarsInDepthFirstOrder rhs
-	       | otherwise   = (emptyVarSet, [])
-
-    worker_ids = case worker_info of
-		   HasWorker work_id _ -> unitVarSet work_id
-		   _otherwise          -> emptyVarSet
-
+    mb_unfold_ids :: Maybe (IdSet, [Id])	-- Nothing => don't unfold
+    mb_unfold_ids = case unfoldingInfo idinfo of
+		      CoreUnfolding { uf_tmpl = unf_rhs, uf_guidance = guide } 
+			| not bottoming_fn	 	-- Not necessary
+			, not dont_inline	 
+			, not loop_breaker	 
+			, not (neverUnfoldGuidance guide)
+			-> Just (exprFvsInOrder unf_rhs)
+		      DFunUnfolding _ ops -> Just (exprsFvsInOrder ops)
+		      _ -> Nothing
 
 -- We want a deterministic free-variable list.  exprFreeVars gives us
 -- a VarSet, which is in a non-deterministic order when converted to a
@@ -724,11 +710,15 @@ addExternal id rhs = (new_needed_ids, show_unfold)
 --
 -- Note [choosing external names]
 
-freeVarsInDepthFirstOrder :: CoreExpr -> (VarSet, [Id])
-freeVarsInDepthFirstOrder e = 
-  case dffvExpr e of
-    DFFV m -> case m emptyVarSet [] of
-                (set,ids,_) -> (set,ids)
+exprFvsInOrder :: CoreExpr -> (VarSet, [Id])
+exprFvsInOrder e = run (dffvExpr e)
+
+exprsFvsInOrder :: [CoreExpr] -> (VarSet, [Id])
+exprsFvsInOrder es = run (mapM_ dffvExpr es)
+
+run :: DFFV () -> (VarSet, [Id])
+run (DFFV m) = case m emptyVarSet [] of
+                 (set,ids,_) -> (set,ids)
 
 newtype DFFV a = DFFV (VarSet -> [Var] -> (VarSet,[Var],a))
 
@@ -848,15 +838,17 @@ tidyTopName mod nc_var maybe_ref occ_env id
 \end{code}
 
 \begin{code}
-findExternalRules :: [CoreBind]
-		  -> [CoreRule]	-- Non-local rules (i.e. ones for imported fns)
+findExternalRules :: Bool	-- Omit pragmas
+                  -> [CoreBind]
+		  -> [CoreRule]	-- Local rules for imported fns
 	          -> UnfoldEnv	-- Ids that are exported, so we need their rules
 	          -> [CoreRule]
   -- The complete rules are gotten by combining
-  --	a) the non-local rules
+  --	a) local rules for imported Ids
   --	b) rules embedded in the top-level Ids
-findExternalRules binds non_local_rules unfold_env
-  = filter (not . internal_rule) (non_local_rules ++ local_rules)
+findExternalRules omit_prags binds imp_id_rules unfold_env
+  | omit_prags = []
+  | otherwise  = filterOut internal_rule (imp_id_rules ++ local_rules)
   where
     local_rules  = [ rule
  		   | id <- bindersOfBinds binds,
@@ -875,7 +867,14 @@ findExternalRules binds non_local_rules unfold_env
       | otherwise = False
 \end{code}
 
-
+Note [Which rules to expose]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+findExternalRules filters imp_rules to avoid binders that 
+aren't externally visible; but the externally-visible binders 
+are computed (by findExternalIds) assuming that all orphan
+rules are externalised (see init_ext_ids in function 
+'search'). So in fact we may export more than we need. 
+(It's a sort of mutual recursion.)
 
 %************************************************************************
 %*									*
@@ -978,12 +977,24 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
     rhs'    = tidyExpr rhs_tidy_env rhs
     idinfo  = idInfo bndr
     idinfo' = tidyTopIdInfo (isExternalName name')
-			    idinfo unfold_info worker_info
+			    idinfo unfold_info
 			    arity caf_info
 
-    unfold_info | show_unfold = mkTopUnfolding rhs'
+    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs' (unfoldingInfo idinfo)
 		| otherwise   = noUnfolding
-    worker_info = tidyWorker rhs_tidy_env show_unfold (workerInfo idinfo)
+    -- NB: do *not* expose the worker if show_unfold is off,
+    --     because that means this thing is a loop breaker or
+    --     marked NOINLINE or something like that
+    -- This is important: if you expose the worker for a loop-breaker
+    -- then you can make the simplifier go into an infinite loop, because
+    -- in effect the unfolding is exposed.  See Trac #1709
+    -- 
+    -- You might think that if show_unfold is False, then the thing should
+    -- not be w/w'd in the first place.  But a legitimate reason is this:
+    -- 	  the function returns bottom
+    -- In this case, show_unfold will be false (we don't expose unfoldings
+    -- for bottoming functions), but we might still have a worker/wrapper
+    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
 
     -- Usually the Id will have an accurate arity on it, because
     -- the simplifier has just run, but not always. 
@@ -1007,9 +1018,9 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
 -- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
 --	CoreToStg makes use of this when constructing SRTs.
 tidyTopIdInfo :: Bool -> IdInfo -> Unfolding
-              -> WorkerInfo -> ArityInfo -> CafInfo
+              -> ArityInfo -> CafInfo
               -> IdInfo
-tidyTopIdInfo is_external idinfo unfold_info worker_info arity caf_info
+tidyTopIdInfo is_external idinfo unfold_info arity caf_info
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
@@ -1025,32 +1036,26 @@ tidyTopIdInfo is_external idinfo unfold_info worker_info arity caf_info
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 	`setInlinePragInfo`    inlinePragInfo idinfo
 	`setUnfoldingInfo`     unfold_info
-	`setWorkerInfo`	       worker_info
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
 
 
 
-------------  Worker  --------------
-tidyWorker :: TidyEnv -> Bool -> WorkerInfo -> WorkerInfo
-tidyWorker _tidy_env _show_unfold NoWorker
-  = NoWorker
-tidyWorker tidy_env show_unfold (HasWorker work_id wrap_arity) 
-  | show_unfold = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
-  | otherwise   = NoWorker
-    -- NB: do *not* expose the worker if show_unfold is off,
-    --     because that means this thing is a loop breaker or
-    --     marked NOINLINE or something like that
-    -- This is important: if you expose the worker for a loop-breaker
-    -- then you can make the simplifier go into an infinite loop, because
-    -- in effect the unfolding is exposed.  See Trac #1709
-    -- 
-    -- You might think that if show_unfold is False, then the thing should
-    -- not be w/w'd in the first place.  But a legitimate reason is this:
-    -- 	  the function returns bottom
-    -- In this case, show_unfold will be false (we don't expose unfoldings
-    -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
+------------ Unfolding  --------------
+tidyUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
+tidyUnfolding tidy_env _ unf@(CoreUnfolding { uf_tmpl = rhs 
+	      	       	 		    , uf_guidance = guide@(InlineRule {}) })
+  = unf { uf_tmpl     = tidyExpr tidy_env rhs, 	   -- Preserves OccInfo
+	  uf_guidance = guide { ug_ir_info = tidyInl tidy_env (ug_ir_info guide) } }
+tidyUnfolding tidy_env _ (DFunUnfolding con ids)
+  = DFunUnfolding con (map (tidyExpr tidy_env) ids)
+tidyUnfolding _ tidy_rhs (CoreUnfolding {})
+  = mkTopUnfolding tidy_rhs
+tidyUnfolding _ _ unf = unf
+
+tidyInl :: TidyEnv -> InlineRuleInfo -> InlineRuleInfo
+tidyInl tidy_env (InlWrapper w) = InlWrapper (tidyVarOcc tidy_env w)
+tidyInl _        inl_info       = inl_info
 \end{code}
 
 %************************************************************************

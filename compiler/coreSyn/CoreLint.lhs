@@ -7,11 +7,7 @@
 A ``lint'' pass to check for Core correctness
 
 \begin{code}
-module CoreLint (
-	lintCoreBindings,
-	lintUnfolding, 
-	showPass, endPass, endPassIf, endIteration
-    ) where
+module CoreLint ( lintCoreBindings, lintUnfolding ) where
 
 #include "HsVersions.h"
 
@@ -28,7 +24,6 @@ import VarEnv
 import VarSet
 import Name
 import Id
-import IdInfo
 import PprCore
 import ErrUtils
 import SrcLoc
@@ -44,43 +39,6 @@ import FastString
 import Util
 import Data.Maybe
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection{End pass}
-%*									*
-%************************************************************************
-
-@showPass@ and @endPass@ don't really belong here, but it makes a convenient
-place for them.  They print out stuff before and after core passes,
-and do Core Lint when necessary.
-
-\begin{code}
-endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
-endPass = dumpAndLint dumpIfSet_core
-
-endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
-endPassIf cond = dumpAndLint (dumpIf_core cond)
-
-endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
-endIteration = dumpAndLint dumpIfSet_dyn
-
-dumpAndLint :: (DynFlags -> DynFlag -> String -> SDoc -> IO ())
-            -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO ()
-dumpAndLint dump dflags pass_name dump_flag binds
-  = do 
-	-- Report result size if required
-	-- This has the side effect of forcing the intermediate to be evaluated
-	debugTraceMsg dflags 2 $
-		(text "    Result size =" <+> int (coreBindsSize binds))
-
-	-- Report verbosely, if required
-	dump dflags dump_flag pass_name (pprCoreBindings binds)
-
-	-- Type check
-	lintCoreBindings dflags pass_name binds
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -226,10 +184,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
    where
     binder_ty                  = idType binder
     maybeDmdTy                 = idNewStrictness_maybe binder
-    bndr_vars                  = varSetElems (idFreeVars binder `unionVarSet` wkr_vars)
-    wkr_vars | workerExists wkr_info = unitVarSet (workerId wkr_info)
-	     | otherwise	     = emptyVarSet
-    wkr_info = idWorkerInfo binder
+    bndr_vars                  = varSetElems (idFreeVars binder)
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
 	           | otherwise = return ()
 \end{code}

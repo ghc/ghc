@@ -17,7 +17,7 @@ module Specialise ( specProgram ) where
 import Id
 import TcType
 import CoreSubst 
-import CoreUnfold	( mkUnfolding )
+import CoreUnfold	( mkUnfolding, mkInlineRule )
 import VarSet
 import VarEnv
 import CoreSyn
@@ -29,6 +29,7 @@ import Name
 import MkId		( voidArgId, realWorldPrimId )
 import FiniteMap
 import Maybes		( catMaybes, isJust )
+import BasicTypes	( Arity )
 import Bag
 import Util
 import Outputable
@@ -800,17 +801,27 @@ specDefn subst body_uds fn rhs
   where
     fn_type	       = idType fn
     fn_arity	       = idArity fn
+    fn_unf             = idUnfolding fn
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
     inline_act         = idInlineActivation fn
 
-    (body_uds_without_me, calls_for_me) = callsForMe fn body_uds
+	-- Figure out whether the function has an INLINE pragma
+	-- See Note [Inline specialisations]
+    fn_has_inline_rule :: Maybe (InlineRuleInfo, Arity)	 -- Gives arity of the *specialised* inline rule
+    fn_has_inline_rule
+      | Just inl <- isInlineRule_maybe fn_unf 
+      = case inl of
+      	   InlWrapper _ -> Just (InlUnSat, spec_arity)
+	   _            -> Just (inl,      spec_arity)
+      | otherwise = Nothing
+      where
+        spec_arity = unfoldingArity fn_unf - n_dicts
 
-	-- It's important that we "see past" any INLINE pragma
-	-- else we'll fail to specialise an INLINE thing
-    (inline_rhs, rhs_inside) = dropInline rhs
-    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs_inside
+    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
+
+    (body_uds_without_me, calls_for_me) = callsForMe fn body_uds
 
     rhs_dict_ids = take n_dicts rhs_ids
     body         = mkLams (drop n_dicts rhs_ids) rhs_body
@@ -898,10 +909,14 @@ specDefn subst body_uds fn rhs
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   	final_uds = foldr consDictBind rhs_uds dx_binds
 
-	   	spec_pr | inline_rhs = (spec_f_w_arity `setInlineActivation` inline_act, Note InlineMe spec_rhs)
-		        | otherwise  = (spec_f_w_arity, 	 	                 spec_rhs)
-
-	   ; return (Just (spec_pr, final_uds, spec_env_rule)) } }
+		-- See Note [Inline specialisations]
+		final_spec_f | Just (inl, spec_arity) <- fn_has_inline_rule
+			     = spec_f_w_arity `setInlineActivation` inline_act
+			               	      `setIdUnfolding` mkInlineRule inl spec_rhs spec_arity
+					      	-- I'm not sure this should be unconditionally InlSat
+			     | otherwise 
+			     = spec_f_w_arity
+	   ; return (Just ((final_spec_f, spec_rhs), final_uds, spec_env_rule)) } }
       where
 	my_zipEqual xs ys zs
 	 | debugIsOn && not (equalLength xs ys && equalLength ys zs)
@@ -1157,11 +1172,6 @@ specialised version.
 A case in point is dictionary functions, which are current marked
 INLINE, but which are worth specialising.
 
-\begin{code}
-dropInline :: CoreExpr -> (Bool, CoreExpr)
-dropInline (Note InlineMe rhs) = (True,  rhs)
-dropInline rhs		       = (False, rhs)
-\end{code}
 
 %************************************************************************
 %*									*

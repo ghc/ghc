@@ -23,7 +23,6 @@ import CoreUtils        ( exprIsTrivial, isDefaultAlt )
 import Coercion		( mkSymCoercion )
 import Id
 import Name		( localiseName )
-import IdInfo
 import BasicTypes
 
 import VarSet
@@ -50,13 +49,16 @@ import Data.List
 Here's the externally-callable interface:
 
 \begin{code}
-occurAnalysePgm :: [CoreBind] -> [CoreBind]
-occurAnalysePgm binds
+occurAnalysePgm :: [CoreBind] -> [CoreRule] -> [CoreBind]
+occurAnalysePgm binds rules
   = snd (go initOccEnv binds)
   where
+    initial_details = addIdOccs emptyDetails (rulesFreeVars rules)
+    -- The RULES keep things alive!
+
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go _ []
-        = (emptyDetails, [])
+        = (initial_details, [])
     go env (bind:binds)
         = (final_usage, bind' ++ binds')
         where
@@ -221,13 +223,15 @@ However things are made quite a bit more complicated by RULES.  Remember
 
     So we must *not* postInlineUnconditionally 'g', even though
     its RHS turns out to be trivial.  (I'm assuming that 'g' is
-    not choosen as a loop breaker.)
+    not choosen as a loop breaker.)  Why not?  Because then we
+    drop the binding for 'g', which leaves it out of scope in the
+    RULE!
 
     We "solve" this by making g a "weak" or "rules-only" loop breaker,
     with OccInfo = IAmLoopBreaker True.  A normal "strong" loop breaker
     has IAmLoopBreaker False.  So
 
-                                Inline  postInlineUnconditinoally
+                                Inline  postInlineUnconditionally
         IAmLoopBreaker False    no      no
         IAmLoopBreaker True     yes     no
         other                   yes     yes
@@ -245,6 +249,14 @@ However things are made quite a bit more complicated by RULES.  Remember
         RULE f x = 4
     Then if we substitute y for x, we'd better do so in the
     rule's LHS too, so we'd better ensure the dependency is respected
+
+
+  * Note [Inline rules]
+    ~~~~~~~~~~~~~~~~~~~
+    None of the above stuff about RULES applies to Inline Rules,
+    stored in a CoreUnfolding.  The unfolding, if any, is simplified
+    at the same time as the regular RHS of the function, so it should
+    be treated *exactly* like an extra RHS.
 
 
 Example [eftInt]
@@ -299,9 +311,10 @@ occAnalBind env (Rec pairs) body_usage
     rec_edges = {-# SCC "occAnalBind.assoc" #-}  map make_node pairs
     
     make_node (bndr, rhs)
-	= (ND bndr rhs' rhs_usage rhs_fvs, idUnique bndr, out_edges)
+	= (ND bndr rhs' all_rhs_usage rhs_fvs, idUnique bndr, out_edges)
 	where
 	  (rhs_usage, rhs') = occAnalRhs env bndr rhs
+	  all_rhs_usage = addRuleUsage rhs_usage bndr    -- Note [Rules are extra RHSs]
 	  rhs_fvs = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
 	  out_edges = keysUFM (rhs_fvs `unionVarSet` idRuleVars bndr)
         -- (a -> b) means a mentions b
@@ -324,7 +337,7 @@ occAnalRec (AcyclicSCC (ND bndr rhs rhs_usage _, _, _)) (body_usage, binds)
   = (body_usage, binds)
 
   | otherwise			-- It's mentioned in the body
-  = (body_usage' +++ addRuleUsage rhs_usage bndr,	-- Note [Rules are extra RHSs]
+  = (body_usage' +++ rhs_usage,	
      NonRec tagged_bndr rhs : binds)
   where
     (body_usage', tagged_bndr) = tagBinder body_usage bndr
@@ -346,8 +359,7 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
 	----------------------------
 	-- Tag the binders with their occurrence info
     total_usage = foldl add_usage body_usage nodes
-    add_usage body_usage (ND bndr _ rhs_usage _, _, _)
-	= body_usage +++ addRuleUsage rhs_usage bndr
+    add_usage usage_so_far (ND _ _ rhs_usage _, _, _) = usage_so_far +++ rhs_usage
     (final_usage, tagged_nodes) = mapAccumL tag_node total_usage nodes
 
     tag_node :: UsageDetails -> Node Details -> (UsageDetails, Node Details)
@@ -371,7 +383,7 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
  	  | otherwise = foldr (reOrderRec 0) [] $
 			stronglyConnCompFromEdgedVerticesR loop_breaker_edges
 
-	-- See Note [Choosing loop breakers] for looop_breaker_edges
+	-- See Note [Choosing loop breakers] for loop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes
     mk_node (details@(ND _ _ _ rhs_fvs), k, _) = (details, k, new_ks)
 	where
@@ -400,11 +412,6 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
                 | otherwise               = (False,     (b,new_fvs `unionVarSet` fvs))
                 where
                   new_fvs = extendFvs env emptyVarSet fvs
-
-idRuleRhsVars :: Id -> VarSet
--- Just the variables free on the *rhs* of a rule
--- See Note [Choosing loop breakers]
-idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet (idCoreRules id)
 
 extendFvs :: IdEnv IdSet -> IdSet -> IdSet -> IdSet
 -- (extendFVs env fvs s) returns (fvs `union` env(s))
@@ -456,9 +463,14 @@ type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the 
 						-- which is gotten from the Id.
 data Details = ND Id 		-- Binder
 		  CoreExpr	-- RHS
-		  UsageDetails	-- Full usage from RHS (*not* including rules)
-		  IdSet		-- Other binders from this Rec group mentioned on RHS
-				-- (derivable from UsageDetails but cached here)
+
+		  UsageDetails	-- Full usage from RHS, 
+                                -- including *both* RULES *and* InlineRule unfolding
+
+		  IdSet		-- Other binders *from this Rec group* mentioned in
+		  		--   * the  RHS
+		  		--   * any InlineRule unfolding
+				-- but *excluding* any RULES
 
 reOrderRec :: Int -> SCC (Node Details)
            -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
@@ -514,17 +526,21 @@ reOrderCycle depth (bind : binds) pairs
 
     score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
     score (ND bndr rhs _ _, _, _)
-        | workerExists (idWorkerInfo bndr)      = 10
-                -- Note [Worker inline loop]
-
-        | exprIsTrivial rhs        = 5  -- Practically certain to be inlined
+        | exprIsTrivial rhs        = 10  -- Practically certain to be inlined
                 -- Used to have also: && not (isExportedId bndr)
                 -- But I found this sometimes cost an extra iteration when we have
                 --      rec { d = (a,b); a = ...df...; b = ...df...; df = d }
                 -- where df is the exported dictionary. Then df makes a really
                 -- bad choice for loop breaker
 
-        | is_con_app rhs = 3    -- Data types help with cases
+        | Just inl_rule_info <- isInlineRule_maybe (idUnfolding bndr)
+	= case inl_rule_info of
+	     InlWrapper {} -> 10  -- Note [INLINE pragmas]
+	     _other	   ->  3  -- Data structures are more important than this
+	     		          -- so that dictionary/method recursion unravels
+                
+        | is_con_app rhs = 5    -- Data types help with cases
+	  	     	   	-- Includes dict funs
                 -- Note [Constructor applictions]
 
 -- If an Id is marked "never inline" then it makes a great loop breaker
@@ -533,34 +549,16 @@ reOrderCycle depth (bind : binds) pairs
 -- so it probably isn't worth the time to test on every binder
 --	| isNeverActive (idInlinePragma bndr) = -10
 
-        | inlineCandidate bndr rhs = 2  -- Likely to be inlined
-                -- Note [Inline candidates]
+        | isOneOcc (idOccInfo bndr) = 2  -- Likely to be inlined
 
-        | not (neverUnfold (idUnfolding bndr)) = 1
+        | canUnfold (idUnfolding bndr) = 1
                 -- the Id has some kind of unfolding
 
         | otherwise = 0
+        where
+	  
 
-    inlineCandidate :: Id -> CoreExpr -> Bool
-    inlineCandidate _  (Note InlineMe _) = True
-    inlineCandidate id _                 = isOneOcc (idOccInfo id)
-
-        -- Note [conapp]
-        --
-        -- It's really really important to inline dictionaries.  Real
-        -- example (the Enum Ordering instance from GHC.Base):
-        --
-        --      rec     f = \ x -> case d of (p,q,r) -> p x
-        --              g = \ x -> case d of (p,q,r) -> q x
-        --              d = (v, f, g)
-        --
-        -- Here, f and g occur just once; but we can't inline them into d.
-        -- On the other hand we *could* simplify those case expressions if
-        -- we didn't stupidly choose d as the loop breaker.
-        -- But we won't because constructor args are marked "Many".
-        -- Inlining dictionaries is really essential to unravelling
-        -- the loops in static numeric dictionaries, see GHC.Float.
-
+	-- Checking for a constructor application
         -- Cheap and cheerful; the simplifer moves casts out of the way
         -- The lambda case is important to spot x = /\a. C (f a)
         -- which comes up when C is a dictionary constructor and
@@ -569,7 +567,7 @@ reOrderCycle depth (bind : binds) pairs
         --
         -- However we *also* treat (\x. C p q) as a con-app-like thing,
         --      Note [Closure conversion]
-    is_con_app (Var v)    = isDataConWorkId v
+    is_con_app (Var v)    = isConLikeId v
     is_con_app (App f _)  = is_con_app f
     is_con_app (Lam _ e)  = is_con_app e
     is_con_app (Note _ e) = is_con_app e
@@ -634,8 +632,18 @@ strict (and hence it gets an auto-generated wrapper).  Result: an
 infinite inlining in the importing scope.  So be a bit careful if you
 change this.  A good example is Tree.repTree in
 nofib/spectral/minimax. If the repTree wrapper is chosen as the loop
-breaker then compiling Game.hs goes into an infinite loop (this
-happened when we gave is_con_app a lower score than inline candidates).
+breaker then compiling Game.hs goes into an infinite loop.  This
+happened when we gave is_con_app a lower score than inline candidates:
+
+  Tree.repTree
+    = __inline_me (/\a. \w w1 w2 -> 
+                   case Tree.$wrepTree @ a w w1 w2 of
+                    { (# ww1, ww2 #) -> Branch @ a ww1 ww2 })
+  Tree.$wrepTree
+    = /\a w w1 w2 -> 
+      (# w2_smP, map a (Tree a) (Tree.repTree a w1 w) (w w2) #)
+
+Here we do *not* want to choose 'repTree' as the loop breaker.
 
 Note [Constructor applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -693,10 +701,13 @@ occAnalRhs :: OccEnv
                                 -- For non-recs the binder is alrady tagged
                                 -- with occurrence info
            -> (UsageDetails, CoreExpr)
+	      -- Returned usage details includes any INLINE rhs
 
 occAnalRhs env id rhs
-  = occAnal ctxt rhs
+  = (addIdOccs rhs_usage (idUnfoldingVars id), rhs')
+    	-- Include occurrences for the "extra RHS" from a CoreUnfolding
   where
+    (rhs_usage, rhs') = occAnal ctxt rhs
     ctxt | certainly_inline id = env
          | otherwise           = rhsCtxt env
         -- Note that we generally use an rhsCtxt.  This tells the occ anal n
@@ -724,12 +735,15 @@ occAnalRhs env id rhs
 \begin{code}
 addRuleUsage :: UsageDetails -> Id -> UsageDetails
 -- Add the usage from RULES in Id to the usage
-addRuleUsage usage id
-  = foldVarSet add usage (idRuleVars id)
+addRuleUsage usage id = addIdOccs usage (idRuleVars id)
         -- idRuleVars here: see Note [Rule dependency info]
+
+addIdOccs :: UsageDetails -> VarSet -> UsageDetails
+addIdOccs usage id_set = foldVarSet add usage id_set
   where
-    add v u = addOneOcc u v NoOccInfo
-	-- Give a non-committal binder info (i.e manyOcc) because
+    add v u | isId v    = addOneOcc u v NoOccInfo
+            | otherwise = u
+	-- Give a non-committal binder info (i.e NoOccInfo) because
 	--   a) Many copies of the specialised thing can appear
 	--   b) We don't want to substitute a BIG expression inside a RULE
 	--	even if that's the only occurrence of the thing
@@ -774,11 +788,6 @@ occAnal _   expr@(Lit _) = (emptyDetails, expr)
 \end{code}
 
 \begin{code}
-occAnal env (Note InlineMe body)
-  = case occAnal env body of { (usage, body') ->
-    (mapVarEnv markMany usage, Note InlineMe body')
-    }
-
 occAnal env (Note note@(SCC _) body)
   = case occAnal env body of { (usage, body') ->
     (mapVarEnv markInsideSCC usage, Note note body')
@@ -823,7 +832,9 @@ occAnal env (Lam x body) | isTyVar x
 occAnal env expr@(Lam _ _)
   = case occAnal env_body body of { (body_usage, body') ->
     let
-        (final_usage, tagged_binders) = tagBinders body_usage binders
+        (final_usage, tagged_binders) = tagLamBinders body_usage binders'
+		      -- Use binders' to put one-shot info on the lambdas
+
         --      URGH!  Sept 99: we don't seem to be able to use binders' here, because
         --      we get linear-typed things in the resulting program that we can't handle yet.
         --      (e.g. PrelShow)  TODO
@@ -847,8 +858,7 @@ occAnal env (Case scrut bndr ty alts)
     case mapAndUnzip occ_anal_alt alts of { (alts_usage_s, alts')   ->
     let
         alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
-        alts_usage' = addCaseBndrUsage alts_usage
-        (alts_usage1, tagged_bndr) = tagBinder alts_usage' bndr
+        (alts_usage1, tagged_bndr) = tag_case_bndr alts_usage bndr
         total_usage = scrut_usage +++ alts_usage1
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
@@ -862,9 +872,10 @@ occAnal env (Case scrut bndr ty alts)
         --      case x of w { (p,q) -> f w }
         -- into
         --      case x of w { (p,q) -> f (p,q) }
-    addCaseBndrUsage usage = case lookupVarEnv usage bndr of
-                                Nothing -> usage
-                                Just _  -> extendVarEnv usage bndr NoOccInfo
+    tag_case_bndr usage bndr
+      = case lookupVarEnv usage bndr of
+          Nothing -> (usage,                  setIdOccInfo bndr IAmDead)
+          Just _  -> (usage `delVarEnv` bndr, setIdOccInfo bndr NoOccInfo)
 
     alt_env = mkAltEnv env bndr_swap
         -- Consider     x = case v of { True -> (p,q); ... }
@@ -915,6 +926,7 @@ occAnalApp env (Var fun, args)
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
     is_pap = isConLikeId fun || valArgCount args < idArity fun
+    	   -- See Note [CONLIKE pragma] in BasicTypes
 
                 -- Hack for build, fold, runST
     args_stuff  | fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
@@ -1128,9 +1140,9 @@ Consider
     case x of y { (a,b) -> f y }
 We treat 'a', 'b' as dead, because they don't physically occur in the
 case alternative.  (Indeed, a variable is dead iff it doesn't occur in
-its scope in the output of OccAnal.)  This invariant is It really
-helpe to know when binders are unused.  See esp the call to
-isDeadBinder in Simplify.mkDupableAlt
+its scope in the output of OccAnal.)  It really helps to know when
+binders are unused.  See esp the call to isDeadBinder in
+Simplify.mkDupableAlt
 
 In this example, though, the Simplifier will bring 'a' and 'b' back to
 life, beause it binds 'y' to (a,b) (imagine got inlined and
@@ -1145,7 +1157,7 @@ occAnalAlt :: OccEnv
 occAnalAlt env case_bndr mb_scrut_var (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage, rhs') ->
     let
-        (alt_usg, tagged_bndrs) = tagBinders rhs_usage bndrs
+        (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage bndrs
         bndrs' = tagged_bndrs      -- See Note [Binders in case alternatives]
     in
     case mb_scrut_var of
@@ -1213,7 +1225,7 @@ type CtxtTy = [Bool]
         --                      the CtxtTy inside applies
 
 initOccEnv :: OccEnv
-initOccEnv = OccEnv { occ_encl = OccRhs
+initOccEnv = OccEnv { occ_encl = OccVanilla
 	      	    , occ_ctxt = []
 		    , occ_scrut_ids = emptyVarSet }
 
@@ -1302,17 +1314,21 @@ v `usedIn`      details =  isExportedId v || v `localUsedIn` details
 
 type IdWithOccInfo = Id
 
-tagBinders :: UsageDetails          -- Of scope
-           -> [Id]                  -- Binders
-           -> (UsageDetails,        -- Details with binders removed
-              [IdWithOccInfo])    -- Tagged binders
-
-tagBinders usage binders
- = let
-     usage' = usage `delVarEnvList` binders
-     uss    = map (setBinderOcc usage) binders
-   in
-   usage' `seq` (usage', uss)
+tagLamBinders :: UsageDetails          -- Of scope
+              -> [Id]                  -- Binders
+              -> (UsageDetails,        -- Details with binders removed
+                 [IdWithOccInfo])    -- Tagged binders
+-- Used for lambda and case binders
+-- It copes with the fact that lambda bindings can have InlineRule 
+-- unfoldings, used for join points
+tagLamBinders usage binders = usage' `seq` (usage', bndrs')
+  where
+    (usage', bndrs') = mapAccumR tag_lam usage binders
+    tag_lam usage bndr = (usage2, setBinderOcc usage bndr)
+      where
+        usage1 = usage `delVarEnv` bndr
+        usage2 | isId bndr = addIdOccs usage1 (idUnfoldingVars bndr)
+               | otherwise = usage1
 
 tagBinder :: UsageDetails           -- Of scope
           -> Id                     -- Binders

@@ -1390,12 +1390,12 @@ instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
     is_local name = nameIsLocalOrFrom mod name
 
 	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
-    (_, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
+    (_, cls, tys) = tcSplitDFunTy (idType dfun_id)
 		-- Slightly awkward: we need the Class to get the fundeps
     (tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (tyClsNamesOfType ty) | ty <- tys]
     orph | is_local cls_name = Just (nameOccName cls_name)
-	 | all isJust mb_ns  = head mb_ns
+	 | all isJust mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
 	 | otherwise	     = Nothing
     
     mb_ns :: [Maybe OccName]	-- One for each fundep; a locally-defined name
@@ -1442,7 +1442,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 --------------------------
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId 		        = IfVanillaId
-toIfaceIdDetails DFunId    		        = IfVanillaId	            
+toIfaceIdDetails (DFunId {})   		        = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
 		 	   , sel_tycon = tc })  = IfRecSelId (toIfaceTyCon tc) n
 toIfaceIdDetails other	     		        = pprTrace "toIfaceIdDetails" (ppr other) 
@@ -1451,7 +1451,7 @@ toIfaceIdDetails other	     		        = pprTrace "toIfaceIdDetails" (ppr other)
 toIfaceIdInfo :: IdInfo -> [IfaceInfoItem]
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
-	       inline_hsinfo, wrkr_hsinfo,  unfold_hsinfo] 
+	       inline_hsinfo,  unfold_hsinfo] 
   where
     ------------  Arity  --------------
     arity_info = arityInfo id_info
@@ -1470,35 +1470,32 @@ toIfaceIdInfo id_info
 			Just sig | not (isTopSig sig) -> Just (HsStrictness sig)
 			_other			      -> Nothing
 
-    ------------  Worker  --------------
-    work_info   = workerInfo id_info
-    has_worker  = workerExists work_info
-    wrkr_hsinfo = case work_info of
-		    HasWorker work_id wrap_arity -> 
-			Just (HsWorker ((idName work_id)) wrap_arity)
-		    NoWorker -> Nothing
-
     ------------  Unfolding  --------------
-    -- The unfolding is redundant if there is a worker
-    unfold_info  = unfoldingInfo id_info
-    rhs		 = unfoldingTemplate unfold_info
-    no_unfolding = neverUnfold unfold_info
-		  	-- The CoreTidy phase retains unfolding info iff
-			-- we want to expose the unfolding, taking into account
-			-- unconditional NOINLINE, etc.  See TidyPgm.addExternal
-    unfold_hsinfo | no_unfolding = Nothing			
-		  | has_worker   = Nothing	-- Unfolding is implicit
-		  | otherwise	 = Just (HsUnfold (toIfaceExpr rhs))
+    unfold_hsinfo = toIfUnfolding (unfoldingInfo id_info)
 					
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
     inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
-		  | no_unfolding && not has_worker 
-                      && isFunLike (inlinePragmaRuleMatchInfo inline_prag)
-                                                      = Nothing
-			-- If the iface file give no unfolding info, we 
-			-- don't need to say when inlining is OK!
-		  | otherwise			      = Just (HsInline inline_prag)
+                  | otherwise = Just (HsInline inline_prag)
+
+--------------------------
+toIfUnfolding :: Unfolding -> Maybe IfaceInfoItem
+toIfUnfolding (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity, uf_guidance = guidance })
+  = case guidance of
+	InlineRule { ug_ir_info = InlSat } 	 -> Just (HsUnfold (IfInlineRule arity True  (toIfaceExpr rhs)))
+	InlineRule { ug_ir_info = InlUnSat }     -> Just (HsUnfold (IfInlineRule arity False (toIfaceExpr rhs)))
+	InlineRule { ug_ir_info = InlWrapper w } -> Just (HsUnfold (IfWrapper arity (idName w)))
+	UnfoldNever         -> Nothing
+	UnfoldIfGoodArgs {} -> Just (HsUnfold (IfCoreUnfold (toIfaceExpr rhs)))
+	UnfoldAlways	    -> panic "toIfUnfolding:UnfoldAlways"
+				-- Never happens because we never have 
+				-- bindings for unfold-always things
+toIfUnfolding (DFunUnfolding _con ops)
+  = Just (HsUnfold (IfDFunUnfold (map toIfaceExpr ops)))
+      -- No need to serialise the data constructor; 
+      -- we can recover it from the type of the dfun
+toIfUnfolding _
+  = Nothing
 
 --------------------------
 coreRuleToIfaceRule :: Module -> CoreRule -> IfaceRule
@@ -1555,7 +1552,6 @@ toIfaceExpr (Note n e)    = IfaceNote (toIfaceNote n) (toIfaceExpr e)
 ---------------------
 toIfaceNote :: Note -> IfaceNote
 toIfaceNote (SCC cc)      = IfaceSCC cc
-toIfaceNote InlineMe      = IfaceInlineMe
 toIfaceNote (CoreNote s)  = IfaceCoreNote s
 
 ---------------------

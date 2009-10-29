@@ -27,10 +27,8 @@ import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 import Module
 import RdrName
 import NameSet
-import VarSet
 import Rules
-import CoreLint
-import CoreFVs
+import CoreMonad	( endPass )
 import ErrUtils
 import Outputable
 import SrcLoc
@@ -107,7 +105,7 @@ deSugar hsc_env
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
 	; let final_prs = addExportFlags target export_set
-                                 keep_alive all_prs ds_rules
+                                 keep_alive all_prs 
 	      ds_binds  = [Rec final_prs]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
 	-- When compiling PrelFloat, which defines data Float = F# Float#
@@ -116,7 +114,7 @@ deSugar hsc_env
 	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
 	-- Lint result if necessary
-	; endPass dflags "Desugar" Opt_D_dump_ds ds_binds
+	; endPass dflags "Desugar" Opt_D_dump_ds ds_binds ds_rules
 
 	-- Dump output
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
@@ -206,26 +204,17 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr = do
 -- it's just because the type checker is rather busy already and
 -- I didn't want to pass in yet another mapping.
 
-addExportFlags :: HscTarget -> NameSet -> NameSet -> [(Id, t)] -> [CoreRule]
+addExportFlags :: HscTarget -> NameSet -> NameSet -> [(Id, t)]
                -> [(Id, t)]
-addExportFlags target exports keep_alive prs rules
+addExportFlags target exports keep_alive prs
   = [(add_export bndr, rhs) | (bndr,rhs) <- prs]
   where
     add_export bndr
 	| dont_discard bndr = setIdExported bndr
 	| otherwise	    = bndr
 
-    orph_rhs_fvs = unionVarSets [ ruleRhsFreeVars rule
-			        | rule <- rules, 
-				  not (isLocalRule rule) ]
-	-- A non-local rule keeps alive the free vars of its right-hand side. 
-	-- (A "non-local" is one whose head function is not locally defined.)
-	-- Local rules are (later, after gentle simplification) 
-	-- attached to the Id, and that keeps the rhs free vars alive.
-
     dont_discard bndr = is_exported name
 		     || name `elemNameSet` keep_alive
-		     || bndr `elemVarSet` orph_rhs_fvs 
 		     where
 			name = idName bndr
 
@@ -260,7 +249,10 @@ dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
-	; lhs'  <- dsLExpr lhs
+
+	; lhs'  <- unsetOptM Opt_EnableRewriteRules $
+	           dsLExpr lhs	-- Note [Desugaring RULE lhss]
+
 	; rhs'  <- dsLExpr rhs
 
 	-- Substitute the dict bindings eagerly,
@@ -273,15 +265,21 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 		-- NB: isLocalId is False of implicit Ids.  This is good becuase
 		-- we don't want to attach rules to the bindings of implicit Ids, 
 		-- because they don't show up in the bindings until just before code gen
-	      fn_name   = idName fn_id
-
-	      rule = Rule { ru_name = name, ru_fn = fn_name, ru_act = act,
-			    ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs', 
-			    ru_rough = roughTopNames args, 
-			    ru_local = local_rule }
+	      fn_name = idName fn_id
+	      rule    = mkRule local_rule name act fn_name bndrs args rhs' 
 	; return (Just rule)
 	} } }
   where
     msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar; ignored"))
 	     2 (ppr lhs)
 \end{code}
+
+Note [Desugaring RULE left hand sides]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the LHS of a RULE we do *not* want to desugar
+    [x]   to    build (\cn. x `c` n)
+We want to leave explicit lists simply as chains
+of cons's. We can achieve that slightly indirectly by
+switching off EnableRewriteRules.
+
+That keeps the desugaring of list comprehensions simple too.

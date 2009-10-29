@@ -1018,16 +1018,17 @@ makeImplicationBind loc all_tvs
 		     <.> mkWpTyApps eq_cotvs
 		     <.> mkWpTyApps (mkTyVarTys all_tvs)
 	      bind | [dict_irred_id] <- dict_irred_ids  
-                   = VarBind dict_irred_id rhs
+                   = mkVarBind dict_irred_id rhs
 		   | otherwise        
-                   = PatBind { pat_lhs = lpat
+                   = L span $ 
+                     PatBind { pat_lhs = lpat
 			     , pat_rhs = unguardedGRHSs rhs 
 			     , pat_rhs_ty = hsLPatType lpat
 			     , bind_fvs = placeHolderNames 
                              }
 
 	; traceTc $ text "makeImplicationBind" <+> ppr implic_inst
-	; return ([implic_inst], unitBag (L span bind)) 
+	; return ([implic_inst], unitBag bind) 
         }
 
 -----------------------------------------------------------
@@ -2381,11 +2382,7 @@ reduceImplication env
               eq_cotvs = map instToVar extra_eq_givens
 	      dict_ids = map instToId  extra_dict_givens 
 
-                        -- Note [Always inline implication constraints]
-              wrap_inline | null dict_ids = idHsWrapper
-                          | otherwise	  = WpInline
-              co         = wrap_inline
-                           <.> mkWpTyLams tvs
+              co         = mkWpTyLams tvs
                            <.> mkWpTyLams eq_cotvs
                            <.> mkWpLams dict_ids
                            <.> WpLet (binds `unionBags` bind)
@@ -2397,12 +2394,15 @@ reduceImplication env
                            . filter (not . isEqInst) 
                            $ wanteds
               payload    = mkBigLHsTup dict_bndrs
-
 	
 	; traceTc (vcat [text "reduceImplication" <+> ppr name,
 			 ppr simpler_implic_insts,
 			 text "->" <+> ppr rhs])
-	; return (unitBag (L loc (VarBind (instToId orig_implic) rhs)),
+	; return (unitBag (L loc (VarBind { var_id= instToId orig_implic
+					  , var_rhs = rhs
+					  , var_inline = notNull dict_ids }
+				-- See Note [Always inline implication constraints]
+			  )),
 		  simpler_implic_insts)
   	} 
     }

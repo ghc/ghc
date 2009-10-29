@@ -45,6 +45,7 @@ import BasicTypes
 import Outputable
 import FastString
 
+import Data.List( partition )
 import Control.Monad
 \end{code}
 
@@ -350,7 +351,8 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
         -- BUILD THE POLYMORPHIC RESULT IDs
   ; let dict_vars = map instToVar dicts -- May include equality constraints
-  ; exports <- mapM (mkExport top_lvl prag_fn tyvars_to_gen (map varType dict_vars))
+  ; exports <- mapM (mkExport top_lvl rec_group (length mono_bind_infos > 1)
+                              prag_fn tyvars_to_gen (map varType dict_vars))
                     mono_bind_infos
 
   ; let poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
@@ -365,9 +367,12 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
 
 --------------
-mkExport :: TopLevelFlag -> TcPragFun -> [TyVar] -> [TcType]
+mkExport :: TopLevelFlag -> RecFlag
+	 -> Bool	 -- More than one variable is bound, so we'll desugar to
+	    		 -- a tuple, so INLINE pragmas won't work
+         -> TcPragFun -> [TyVar] -> [TcType]
          -> MonoBindInfo
-         -> TcM ([TyVar], Id, Id, [LPrag])
+         -> TcM ([TyVar], Id, Id, [LSpecPrag])
 -- mkExport generates exports with 
 --      zonked type variables, 
 --      zonked poly_ids
@@ -379,16 +384,18 @@ mkExport :: TopLevelFlag -> TcPragFun -> [TyVar] -> [TcType]
 
 -- Pre-condition: the inferred_tvs are already zonked
 
-mkExport top_lvl prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
+mkExport top_lvl rec_group multi_bind prag_fn inferred_tvs dict_tys
+         (poly_name, mb_sig, mono_id)
   = do  { warn_missing_sigs <- doptM Opt_WarnMissingSigs
         ; let warn = isTopLevel top_lvl && warn_missing_sigs
         ; (tvs, poly_id) <- mk_poly_id warn mb_sig
                 -- poly_id has a zonked type
 
-        ; prags <- tcPrags poly_id (prag_fn poly_name)
+        ; (poly_id', spec_prags) <- tcPrags rec_group multi_bind (notNull dict_tys)
+                                            poly_id (prag_fn poly_name)
                 -- tcPrags requires a zonked poly_id
 
-        ; return (tvs, poly_id, mono_id, prags) }
+        ; return (tvs, poly_id', mono_id, spec_prags) }
   where
     poly_ty = mkForAllTys inferred_tvs (mkFunTys dict_tys (idType mono_id))
 
@@ -411,34 +418,89 @@ mkPragFun sigs = \n -> lookupNameEnv env n `orElse` []
           env = foldl add emptyNameEnv prs
           add env (n,p) = extendNameEnv_Acc (:) singleton env n p
 
-tcPrags :: Id -> [LSig Name] -> TcM [LPrag]
-tcPrags poly_id prags = mapM (wrapLocM tc_prag) prags
-  where
-    tc_prag prag = addErrCtxt (pragSigCtxt prag) $ 
-                   tcPrag poly_id prag
-
-pragSigCtxt :: Sig Name -> SDoc
-pragSigCtxt prag = hang (ptext (sLit "In the pragma")) 2 (ppr prag)
-
-tcPrag :: TcId -> Sig Name -> TcM Prag
+tcPrags :: RecFlag
+	-> Bool     -- True <=> AbsBinds binds more than one variable
+        -> Bool     -- True <=> function is overloaded
+        -> Id -> [LSig Name]
+        -> TcM (Id, [LSpecPrag])
+-- Add INLINE and SPECLIASE pragmas
+--    INLINE prags are added to the Id directly
+--    SPECIALISE prags are passed to the desugarer via [LSpecPrag]
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
--- Most of the work of specialisation is done by 
--- the desugarer, guided by the SpecPrag
-tcPrag poly_id (SpecSig _ hs_ty inl) 
-  = do  { let name = idName poly_id
+tcPrags _rec_group _multi_bind _is_overloaded_id poly_id prag_sigs
+  = do { poly_id' <- tc_inl inl_sigs
+
+       ; spec_prags <- mapM (wrapLocM (tcSpecPrag poly_id')) spec_sigs
+
+-- Commented out until bytestring library removes redundant pragmas
+-- for packWith and unpackWith
+--       ; unless (null spec_sigs || is_overloaded_id) warn_discarded_spec
+
+       ; unless (null bad_sigs) warn_discarded_sigs
+
+       ; return (poly_id', spec_prags) }
+  where
+    (inl_sigs, other_sigs) = partition isInlineLSig prag_sigs
+    (spec_sigs, bad_sigs)  = partition isSpecLSig   other_sigs
+
+--    warn_discarded_spec = warnPrags poly_id spec_sigs $
+--                          ptext (sLit "SPECIALISE pragmas for non-overloaded function")
+    warn_dup_inline 	= warnPrags poly_id inl_sigs $
+                    	  ptext (sLit "Duplicate INLINE pragmas for")
+    warn_discarded_sigs = warnPrags poly_id bad_sigs $
+                          ptext (sLit "Discarding unexpected pragmas for")
+
+    -----------
+    tc_inl [] = return poly_id
+    tc_inl (L loc (InlineSig _ prag) : other_inls)
+       = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
+            ; return (poly_id `setInlinePragma` prag) }
+    tc_inl _ = panic "tc_inl"
+
+{- Earlier we tried to warn about
+   (a) INLINE for recursive function
+   (b) INLINE for function that is part of a multi-binder group
+   Code fragments below. But we want to allow
+       {-# INLINE f #-}
+       f x = x : g y
+       g y = ....f...f....
+   even though they are mutually recursive.  
+   So I'm just omitting the warnings for now
+
+       | multi_bind && isInlinePragma prag
+       = do { setSrcSpan loc $ addWarnTc multi_bind_warn
+            ; return poly_id }
+       | otherwise
+            ; when (isInlinePragma prag && isRec rec_group)
+                   (setSrcSpan loc (addWarnTc rec_inline_warn))
+
+    rec_inline_warn = ptext (sLit "INLINE pragma for recursive binder")
+                      <+> quotes (ppr poly_id) <+> ptext (sLit "may be discarded")
+ 
+    multi_bind_warn = hang (ptext (sLit "Discarding INLINE pragma for") <+> quotes (ppr poly_id))
+		         2 (ptext (sLit "because it is bound by a pattern, or mutual recursion") )
+-}
+
+
+warnPrags :: Id -> [LSig Name] -> SDoc -> TcM ()
+warnPrags id bad_sigs herald
+  = addWarnTc (hang (herald <+> quotes (ppr id))
+                  2 (ppr_sigs bad_sigs))
+  where
+    ppr_sigs sigs = vcat (map (ppr . getLoc) sigs)
+
+--------------
+tcSpecPrag :: TcId -> Sig Name -> TcM SpecPrag
+tcSpecPrag poly_id prag@(SpecSig _ hs_ty inl) 
+  = addErrCtxt (spec_ctxt prag) $
+    do  { let name = idName poly_id
         ; spec_ty <- tcHsSigType (FunSigCtxt name) hs_ty
         ; co_fn <- tcSubExp (SpecPragOrigin name) (idType poly_id) spec_ty
-        ; return (SpecPrag (mkHsWrap co_fn (HsVar poly_id)) spec_ty inl) }
-tcPrag poly_id (SpecInstSig hs_ty)
-  = do  { let name = idName poly_id
-        ; (tyvars, theta, tau) <- tcHsInstHead hs_ty	
-        ; let spec_ty = mkSigmaTy tyvars theta tau
-        ; co_fn <- tcSubExp (SpecPragOrigin name) (idType poly_id) spec_ty
-        ; return (SpecPrag (mkHsWrap co_fn (HsVar poly_id)) spec_ty defaultInlineSpec) }
-
-tcPrag _  (InlineSig _ inl) = return (InlinePrag inl)
-tcPrag _  sig	            = pprPanic "tcPrag" (ppr sig)
+        ; return (SpecPrag co_fn inl) }
+  where
+    spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
+tcSpecPrag _ sig = pprPanic "tcSpecPrag" (ppr sig)
 
 
 --------------

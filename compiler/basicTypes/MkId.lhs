@@ -345,8 +345,8 @@ mkDataConIds wrap_name wkr_name data_con
         --      ...(let w = C x in ...(w p q)...)...
         -- we want to see that w is strict in its two arguments
 
-    wrap_unf = mkImplicitUnfolding $ Note InlineMe $
-               mkLams wrap_tvs $ 
+    wrap_unf = mkInlineRule InlSat wrap_rhs (length dict_args + length id_args)
+    wrap_rhs = mkLams wrap_tvs $ 
                mkLams eq_args $
                mkLams dict_args $ mkLams id_args $
                foldr mk_case con_app 
@@ -460,11 +460,24 @@ mkDictSelId no_unf name clas
     info = noCafIdInfo
                 `setArityInfo`          1
                 `setAllStrictnessInfo`  Just strict_sig
-                `setUnfoldingInfo`      (if no_unf then noUnfolding
-						   else mkImplicitUnfolding rhs)
+		`setSpecInfo`       mkSpecInfo [rule]
+		`setInlinePragInfo` neverInlinePragma
+                `setUnfoldingInfo`  (if no_unf then noUnfolding
+				       else mkImplicitUnfolding rhs)
+	-- Experimental: NOINLINE, so that their rule matches
 
         -- We no longer use 'must-inline' on record selectors.  They'll
         -- inline like crazy if they scrutinise a constructor
+
+    n_ty_args = length tyvars
+
+    -- This is the built-in rule that goes
+    -- 	    op (dfT d1 d2) --->  opT d1 d2
+    rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS` 
+    	   	       	 	     occNameFS (getOccName name)
+                       , ru_fn    = name
+    	               , ru_nargs = n_ty_args + 1
+                       , ru_try   = dictSelRule index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
         -- where the V depends on which item we are selecting
@@ -480,7 +493,8 @@ mkDictSelId no_unf name clas
     tyvars     = dataConUnivTyVars data_con
     arg_tys    = {- ASSERT( isVanillaDataCon data_con ) -} dataConRepArgTys data_con
     eq_theta   = dataConEqTheta data_con
-    the_arg_id = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` arg_ids) name
+    index      = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` [0..]) name
+    the_arg_id = arg_ids !! index
 
     pred       = mkClassPred clas (mkTyVarTys tyvars)
     dict_id    = mkTemplateLocal     1 $ mkPredTy pred
@@ -496,6 +510,20 @@ mkDictSelId no_unf name clas
     rhs_body | isNewTyCon tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
              | otherwise        = Case (Var dict_id) dict_id (idType the_arg_id)
                                        [(DataAlt data_con, eq_ids ++ arg_ids, Var the_arg_id)]
+
+dictSelRule :: Int -> Arity -> [CoreExpr] -> Maybe CoreExpr
+-- Oh, very clever
+--       op_i t1..tk (df s1..sn d1..dm) = op_i_helper s1..sn d1..dm
+--       op_i t1..tk (D t1..tk op1 ... opm) = opi
+--
+-- NB: the data constructor has the same number of type args as the class op
+
+dictSelRule index n_ty_args args
+  | (dict_arg : _) <- drop n_ty_args args
+  , Just (_, _, val_args) <- exprIsConApp_maybe dict_arg
+  = Just (val_args !! index)
+  | otherwise
+  = Nothing
 \end{code}
 
 
@@ -825,8 +853,9 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
             -> Id
 
 mkDictFunId dfun_name inst_tyvars dfun_theta clas inst_tys
-  = mkExportedLocalVar DFunId dfun_name dfun_ty vanillaIdInfo
+  = mkExportedLocalVar (DFunId is_nt) dfun_name dfun_ty vanillaIdInfo
   where
+    is_nt = isNewTyCon (classTyCon clas)
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 \end{code}
 
@@ -934,7 +963,7 @@ c) It has quite a bit of desugaring magic.
 
 d) There is some special rule handing: Note [RULES for seq]
 
-Note [Rules for seq]
+Note [RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~
 Roman found situations where he had
       case (f n) of _ -> e

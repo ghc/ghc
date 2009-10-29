@@ -12,7 +12,7 @@ module RdrHsSyn (
 	mkHsIntegral, mkHsFractional, mkHsIsString,
 	mkHsDo, mkHsSplice, mkTopSpliceDecl,
         mkClassDecl, mkTyData, mkTyFamily, mkTySynonym,
-        splitCon, mkInlineSpec,	
+        splitCon, mkInlinePragma,	
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
 
 	cvBindGroup,
@@ -54,9 +54,8 @@ import Class            ( FunDep )
 import TypeRep          ( Kind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
-import BasicTypes	( maxPrecedence, Activation, RuleMatchInfo,
-                          InlinePragma(..),  InlineSpec(..),
-                          alwaysInlineSpec, neverInlineSpec )
+import BasicTypes	( maxPrecedence, Activation(..), RuleMatchInfo,
+                          InlinePragma(..) )
 import Lexer
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall
@@ -960,13 +959,20 @@ mk_rec_fields :: [HsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
-mkInlineSpec :: Maybe Activation -> RuleMatchInfo -> Bool -> InlineSpec
--- The Maybe is becuase the user can omit the activation spec (and usually does)
-mkInlineSpec Nothing    match_info True  = alwaysInlineSpec match_info
-                                                                -- INLINE
-mkInlineSpec Nothing 	match_info False = neverInlineSpec  match_info
-                                                                -- NOINLINE
-mkInlineSpec (Just act) match_info inl   = Inline (InlinePragma act match_info) inl
+mkInlinePragma :: Maybe Activation -> RuleMatchInfo -> Bool -> InlinePragma
+-- The Maybe is because the user can omit the activation spec (and usually does)
+mkInlinePragma mb_act match_info inl 
+  = InlinePragma { inl_inline = inl
+                 , inl_act    = act
+                 , inl_rule   = match_info }
+  where
+    act = case mb_act of
+            Just act -> act
+            Nothing | inl       -> AlwaysActive
+                    | otherwise -> NeverActive
+        -- If no specific phase is given then:
+	--   NOINLINE => NeverActive
+        --   INLINE   => Active
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations

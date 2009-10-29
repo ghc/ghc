@@ -22,9 +22,9 @@ module Rules (
 	addIdSpecialisations, 
 	
 	-- * Misc. CoreRule helpers
-        rulesOfBinds, getRules, pprRulesForUser,
+        rulesOfBinds, getRules, pprRulesForUser, expandId,
         
-        lookupRule, mkLocalRule, roughTopNames
+        lookupRule, mkRule, mkLocalRule, roughTopNames
     ) where
 
 #include "HsVersions.h"
@@ -96,11 +96,18 @@ mkLocalRule :: RuleName -> Activation
 	    -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being 
 -- compiled. See also 'CoreSyn.CoreRule'
-mkLocalRule name act fn bndrs args rhs
+mkLocalRule = mkRule True
+
+mkRule :: Bool -> RuleName -> Activation 
+       -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
+-- ^ Used to make 'CoreRule' for an 'Id' defined in the module being 
+-- compiled. See also 'CoreSyn.CoreRule'
+mkRule is_local name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
 	   ru_bndrs = bndrs, ru_args = args,
-	   ru_rhs = rhs, ru_rough = roughTopNames args,
-	   ru_local = True }
+	   ru_rhs = occurAnalyseExpr rhs, 
+	   ru_rough = roughTopNames args,
+	   ru_local = is_local }
 
 --------------
 roughTopNames :: [CoreExpr] -> [Maybe Name]
@@ -192,17 +199,31 @@ rulesOfBinds :: [CoreBind] -> [CoreRule]
 rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
 
 getRules :: RuleBase -> Id -> [CoreRule]
-	-- The rules for an Id come from two places:
-	--	(a) the ones it is born with (idCoreRules fn)
-	--	(b) rules added in subsequent modules (extra_rules)
-	-- PrimOps, for example, are born with a bunch of rules under (a)
+-- See Note [Where rules are found]
 getRules rule_base fn
-  | isLocalId fn  = idCoreRules fn
-  | otherwise     = WARN( not (isPrimOpId fn) && notNull (idCoreRules fn), 
- 			  ppr fn <+> ppr (idCoreRules fn) )
-		    idCoreRules fn ++ (lookupNameEnv rule_base (idName fn) `orElse` [])
-	-- Only PrimOpIds have rules inside themselves, and perhaps more besides
+  = idCoreRules fn ++ imp_rules
+  where
+    imp_rules = lookupNameEnv rule_base (idName fn) `orElse` []
 \end{code}
+
+Note [Where rules are found]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The rules for an Id come from two places:
+  (a) the ones it is born with, stored inside the Id iself (idCoreRules fn),
+  (b) rules added in other modules, stored in the global RuleBase (imp_rules)
+
+It's tempting to think that 
+     - LocalIds have only (a)
+     - non-LocalIds have only (b)
+
+but that isn't quite right:
+
+     - PrimOps and ClassOps are born with a bunch of rules inside the Id,
+       even when they are imported
+
+     - The rules in PrelRules.builtinRules should be active even
+       in the module defining the Id (when it's a LocalId), but 
+       the rules are kept in the global RuleBase
 
 
 %************************************************************************
@@ -355,6 +376,7 @@ matchRule :: (Activation -> Bool) -> InScopeSet
 
 matchRule _is_active _in_scope args _rough_args
 	  (BuiltinRule { ru_try = match_fn })
+-- Built-in rules can't be switched off, it seems
   = case match_fn args of
 	Just expr -> Just expr
 	Nothing   -> Nothing
@@ -828,7 +850,6 @@ eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && eqExpr (rnBndrs2 env vs1  vs2) r1
 eq_note :: RnEnv2 -> Note -> Note -> Bool
 eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
 eq_note _ (CoreNote s1) (CoreNote s2)  = s1 == s2
-eq_note _ (InlineMe)    (InlineMe)     = True
 eq_note _ _             _              = False
 \end{code}
 

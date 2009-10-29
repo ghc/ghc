@@ -24,6 +24,9 @@ module CoreMonad (
     -- ** Dealing with annotations
     findAnnotations, deserializeAnnotations, addAnnotation,
     
+    -- ** Debug output
+    endPass, endPassIf, 
+
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS, 
     fatalErrorMsg, fatalErrorMsgS, 
@@ -39,6 +42,10 @@ module CoreMonad (
 #ifdef GHCI
 import Name( Name )
 #endif
+import CoreSyn
+import PprCore
+import CoreUtils
+import CoreLint		( lintCoreBindings )
 import PrelNames        ( iNTERACTIVE )
 import HscTypes
 import Module           ( Module )
@@ -54,6 +61,7 @@ import TcEnv            ( tcLookupGlobal )
 import TcRnMonad        ( TcM, initTc )
 
 import Outputable
+import FastString
 import qualified ErrUtils as Err
 import Maybes
 import UniqSupply
@@ -72,7 +80,50 @@ import qualified Language.Haskell.TH as TH
 #endif
 \end{code}
 
-\subsection{Monad and carried data structure definitions}
+%************************************************************************
+%*									*
+                       Debug output
+%*									*
+%************************************************************************
+
+These functions are not CoreM monad stuff, but they probably ought to
+be, and it makes a conveneint place.  place for them.  They print out
+stuff before and after core passes, and do Core Lint when necessary.
+
+\begin{code}
+endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
+endPass = dumpAndLint Err.dumpIfSet_core
+
+endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
+endPassIf cond = dumpAndLint (Err.dumpIf_core cond)
+
+dumpAndLint :: (DynFlags -> DynFlag -> String -> SDoc -> IO ())
+            -> DynFlags -> String -> DynFlag 
+            -> [CoreBind] -> [CoreRule] -> IO ()
+dumpAndLint dump dflags pass_name dump_flag binds rules
+  = do {  -- Report result size if required
+	  -- This has the side effect of forcing the intermediate to be evaluated
+       ; Err.debugTraceMsg dflags 2 $
+		(text "    Result size =" <+> int (coreBindsSize binds))
+
+	-- Report verbosely, if required
+       ; dump dflags dump_flag pass_name
+              (pprCoreBindings binds $$ ppUnless (null rules) pp_rules)
+
+	-- Type check
+       ; lintCoreBindings dflags pass_name binds }
+  where
+    pp_rules = vcat [ blankLine
+                    , ptext (sLit "------ Local rules for imported ids --------")
+                    , pprRules rules ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+             Monad and carried data structure definitions
+%*									*
+%************************************************************************
 
 \begin{code}
 data CoreState = CoreState {
@@ -160,7 +211,12 @@ runCoreM hsc_env ann_env rule_base us mod m =
 
 \end{code}
 
-\subsection{Core combinators, not exported}
+
+%************************************************************************
+%*									*
+             Core combinators, not exported
+%*									*
+%************************************************************************
 
 \begin{code}
 
@@ -200,7 +256,12 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 
 \end{code}
 
-\subsection{Reader, writer and state accessors}
+
+%************************************************************************
+%*									*
+             Reader, writer and state accessors
+%*									*
+%************************************************************************
 
 \begin{code}
 
@@ -233,7 +294,12 @@ getOrigNameCache = do
 
 \end{code}
 
-\subsection{Dealing with annotations}
+
+%************************************************************************
+%*									*
+             Dealing with annotations
+%*									*
+%************************************************************************
 
 \begin{code}
 
@@ -268,7 +334,12 @@ addAnnotationToEnv annotation = modifyS (\state -> state { cs_ann_env = extendAn
 
 \end{code}
 
-\subsection{Direct screen output}
+
+%************************************************************************
+%*									*
+                Direct screen output
+%*									*
+%************************************************************************
 
 \begin{code}
 
@@ -312,7 +383,6 @@ debugTraceMsg = msg (flip Err.debugTraceMsg 3)
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
 dumpIfSet_dyn :: DynFlag -> String -> SDoc -> CoreM ()
 dumpIfSet_dyn flag str = msg (\dflags -> Err.dumpIfSet_dyn dflags flag str)
-
 \end{code}
 
 \begin{code}
@@ -322,18 +392,25 @@ initTcForLookup hsc_env = liftM (expectJust "initTcInteractive" . snd) . initTc 
 
 \end{code}
 
-\subsection{Finding TyThings}
+
+%************************************************************************
+%*									*
+               Finding TyThings
+%*									*
+%************************************************************************
 
 \begin{code}
-
 instance MonadThings CoreM where
     lookupThing name = do
         hsc_env <- getHscEnv
         liftIO $ initTcForLookup hsc_env (tcLookupGlobal name)
-
 \end{code}
 
-\subsection{Template Haskell interoperability}
+%************************************************************************
+%*									*
+               Template Haskell interoperability
+%*									*
+%************************************************************************
 
 \begin{code}
 #ifdef GHCI

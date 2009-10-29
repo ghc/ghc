@@ -50,11 +50,11 @@ import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
 import Type		( isUnLiftedType, coreEqType, splitTyConApp_maybe )
 import Coercion         ( coercionKind )
-import CoreLint		( showPass, endPass )
 import Util		( mapAndUnzip, lengthIs )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
 			  RecFlag(..), isRec )
 import Maybes		( orElse, expectJust )
+import ErrUtils		( showPass )
 import Outputable
 
 import Data.List

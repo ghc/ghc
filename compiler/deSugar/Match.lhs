@@ -344,10 +344,11 @@ matchCoercion :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
 matchCoercion (var:vars) ty (eqns@(eqn1:_))
   = do	{ let CoPat co pat _ = firstPat eqn1
-	; var' <- newUniqueId (idName var) (hsPatType pat)
+	; var' <- newUniqueId var (hsPatType pat)
 	; match_result <- match (var':vars) ty (map decomposeFirst_Coercion eqns)
-	; rhs <- dsCoercion co (return (Var var))
-	; return (mkCoLetMatchResult (NonRec var' rhs) match_result) }
+	; co' <- dsCoercion co
+        ; let rhs' = co' (Var var)
+	; return (mkCoLetMatchResult (NonRec var' rhs') match_result) }
 
 matchView :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the view function to the match variable and then match that
@@ -357,7 +358,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
          -- to figure out the type of the fresh variable
          let ViewPat viewExpr (L _ pat) _ = firstPat eqn1
          -- do the rest of the compilation 
-	; var' <- newUniqueId (idName var) (hsPatType pat)
+	; var' <- newUniqueId var (hsPatType pat)
 	; match_result <- match (var':vars) ty (map decomposeFirst_View eqns)
          -- compile the view expressions
        ; viewExpr' <- dsLExpr viewExpr

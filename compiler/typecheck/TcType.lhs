@@ -643,7 +643,6 @@ getDFunTyKey ty		     = pprPanic "getDFunTyKey" (pprType ty)
 These tcSplit functions are like their non-Tc analogues, but
 	a) they do not look through newtypes
 	b) they do not look through PredTys
-	c) [future] they ignore usage-type annotations
 
 However, they are non-monadic and do not follow through mutable type
 variables.  It's up to you to make sure this doesn't matter.
@@ -804,18 +803,29 @@ tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty = maybeToBool (tcGetTyVar_maybe ty)
 
 -----------------------
-tcSplitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
+tcSplitDFunTy :: Type -> ([TyVar], Class, [Type])
 -- Split the type of a dictionary function
+-- We don't use tcSplitSigmaTy,  because a DFun may (with NDP)
+-- have non-Pred arguments, such as
+--     df :: forall m. (forall b. Eq b => Eq (m b)) -> C m
 tcSplitDFunTy ty 
-  = case tcSplitSigmaTy ty   of { (tvs, theta, tau) ->
-    case tcSplitDFunHead tau of { (clas, tys) -> 
-    (tvs, theta, clas, tys) }}
+  = case tcSplitForAllTys ty                 of { (tvs, rho)  ->
+    case tcSplitDFunHead (drop_pred_tys rho) of { (clas, tys) -> 
+    (tvs, clas, tys) }}
+  where
+    -- Discard the context of the dfun.  This can be a mix of
+    -- coercion and class constraints; or (in the general NDP case)
+    -- some other function argument
+    drop_pred_tys ty | Just ty' <- tcView ty = drop_pred_tys ty'
+    drop_pred_tys (ForAllTy tv ty) = ASSERT( isCoVar tv ) drop_pred_tys ty
+    drop_pred_tys (FunTy _ ty)     = drop_pred_tys ty
+    drop_pred_tys ty               = ty
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead tau  
   = case tcSplitPredTy_maybe tau of 
 	Just (ClassP clas tys) -> (clas, tys)
-	_ -> panic "tcSplitDFunHead"
+	_ -> pprPanic "tcSplitDFunHead" (ppr tau)
 
 tcInstHeadTyNotSynonym :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head

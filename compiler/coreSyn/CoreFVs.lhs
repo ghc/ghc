@@ -16,6 +16,7 @@ Taken quite directly from the Peyton Jones/Lester paper.
 module CoreFVs (
         -- * Free variables of expressions and binding groups
 	exprFreeVars,	-- CoreExpr   -> VarSet	-- Find all locally-defined free Ids or tyvars
+	exprFreeIds,	-- CoreExpr   -> IdSet	-- Find all locally-defined free Ids
 	exprsFreeVars,	-- [CoreExpr] -> VarSet
 	bindFreeVars, 	-- CoreBind   -> VarSet
 
@@ -25,7 +26,9 @@ module CoreFVs (
 	exprFreeNames, exprsFreeNames,
 
         -- * Free variables of Rules, Vars and Ids
-	idRuleVars, idFreeVars, varTypeTyVars, varTypeTcTyVars, 
+        varTypeTyVars, varTypeTcTyVars, 
+	idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
+	idRuleVars, idRuleRhsVars,
 	ruleRhsFreeVars, rulesFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
@@ -70,6 +73,10 @@ but not those that are free in the type of variable occurrence.
 -- | Find all locally-defined free Ids or type variables in an expression
 exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = exprSomeFreeVars isLocalVar
+
+-- | Find all locally-defined free Ids in an expression
+exprFreeIds :: CoreExpr -> IdSet	-- Find all locally-defined free Ids
+exprFreeIds = exprSomeFreeVars isLocalId
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 exprsFreeVars :: [CoreExpr] -> VarSet
@@ -194,7 +201,8 @@ expr_fvs (Let (Rec pairs) body)
 
 ---------
 rhs_fvs :: (Id,CoreExpr) -> FV
-rhs_fvs (bndr, rhs) = expr_fvs rhs `union` someVars (bndrRuleVars bndr)
+rhs_fvs (bndr, rhs) = expr_fvs rhs `union` 
+                      someVars (bndrRuleAndUnfoldingVars bndr)
 	-- Treat any RULES as extra RHSs of the binding
 
 ---------
@@ -271,6 +279,7 @@ ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
 
 -- | Those variables free in the both the left right hand sides of a rule
 ruleFreeVars :: CoreRule -> VarSet
+ruleFreeVars (BuiltinRule {}) = noFVs
 ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
   = delFromUFM fvs fn	-- Note [Rule free var hack]
   where
@@ -334,8 +343,8 @@ delBinderFV :: Var -> VarSet -> VarSet
 
 -- (b `delBinderFV` s) removes the binder b from the free variable set s,
 -- but *adds* to s
---	(a) the free variables of b's type
---	(b) the idSpecVars of b
+--
+--	the free variables of b's type
 --
 -- This is really important for some lambdas:
 -- 	In (\x::a -> x) the only mention of "a" is in the binder.
@@ -378,14 +387,41 @@ varTypeTcTyVars var
   | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 idFreeVars :: Id -> VarSet
-idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` varTypeTyVars id
+-- Type variables, rule variables, and inline variables
+idFreeVars id = ASSERT( isId id) 
+		varTypeTyVars id `unionVarSet`
+	        idRuleAndUnfoldingVars id
 
-bndrRuleVars ::Var -> VarSet
-bndrRuleVars v | isTyVar v = emptyVarSet
-	       | otherwise = idRuleVars v
+bndrRuleAndUnfoldingVars ::Var -> VarSet
+-- A 'let' can bind a type variable, and idRuleVars assumes 
+-- it's seeing an Id. This function tests first.
+bndrRuleAndUnfoldingVars v | isTyVar v = emptyVarSet
+	                   | otherwise = idRuleAndUnfoldingVars v
 
-idRuleVars ::Id -> VarSet
+idRuleAndUnfoldingVars :: Id -> VarSet
+idRuleAndUnfoldingVars id = ASSERT( isId id) 
+			    idRuleVars id    `unionVarSet` 
+			    idUnfoldingVars id
+
+idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
 idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
+
+idRuleRhsVars :: Id -> VarSet	 -- Does *not* include the CoreUnfolding vars
+-- Just the variables free on the *rhs* of a rule
+-- See Note [Choosing loop breakers] in Simplify.lhs
+idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars) 
+			 emptyVarSet
+			 (idCoreRules id)
+
+idUnfoldingVars :: Id -> VarSet
+-- Produce free vars for an unfolding, but NOT for an ordinary
+-- (non-inline) unfolding, since it is a dup of the rhs
+idUnfoldingVars id
+  = case idUnfolding id of
+      CoreUnfolding { uf_tmpl = rhs, uf_guidance = InlineRule {} }
+	                   -> exprFreeVars rhs
+      DFunUnfolding _ args -> exprsFreeVars args
+      _                    -> emptyVarSet
 \end{code}
 
 
@@ -436,7 +472,9 @@ freeVars (Case scrut bndr ty alts)
 			     rhs2 = freeVars rhs
 
 freeVars (Let (NonRec binder rhs) body)
-  = (freeVarsOf rhs2 `unionFVs` body_fvs `unionFVs` bndrRuleVars binder,
+  = (freeVarsOf rhs2 
+       `unionFVs` body_fvs 
+       `unionFVs` bndrRuleAndUnfoldingVars binder,
 		-- Remember any rules; cf rhs_fvs above
      AnnLet (AnnNonRec binder rhs2) body2)
   where
@@ -452,7 +490,7 @@ freeVars (Let (Rec binds) body)
 
     rhss2     = map freeVars rhss
     rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
-    all_fvs      = foldr (unionFVs . idRuleVars) rhs_body_fvs binders
+    all_fvs      = foldr (unionFVs . idRuleAndUnfoldingVars) rhs_body_fvs binders
 	-- The "delBinderFV" happens after adding the idSpecVars,
 	-- since the latter may add some of the binders as fvs
 

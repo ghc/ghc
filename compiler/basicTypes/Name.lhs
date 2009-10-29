@@ -37,7 +37,7 @@ module Name (
 	BuiltInSyntax(..),
 
 	-- ** Creating 'Name's
-	mkInternalName, mkSystemName,
+	mkInternalName, mkSystemName, mkDerivedInternalName, 
 	mkSystemVarName, mkSysTvName, 
 	mkFCallName, mkIPName,
         mkTickBoxOpName,
@@ -248,6 +248,11 @@ mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq, n_sort = Inter
 	--	  uniques if you get confused
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
+
+mkDerivedInternalName :: (OccName -> OccName) -> Unique -> Name -> Name
+mkDerivedInternalName derive_occ uniq (Name { n_occ = occ, n_loc = loc })
+  = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal
+         , n_occ = derive_occ occ, n_loc = loc }
 
 -- | Create a name which definitely originates in the given module
 mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name

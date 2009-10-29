@@ -48,7 +48,7 @@ import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
 import Class		( FunDep )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  Activation(..), RuleMatchInfo(..), defaultInlineSpec )
+			  Activation(..), RuleMatchInfo(..), defaultInlinePragma )
 import DynFlags
 import OrdList
 import HaddockUtils
@@ -559,8 +559,8 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
 	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
-        | '{-# DEPRECATED' deprecations '#-}' { $2 }
-        | '{-# WARNING' warnings '#-}'        { $2 }
+        | '{-# DEPRECATED' deprecations '#-}'   { $2 }
+        | '{-# WARNING' warnings '#-}'          { $2 }
 	| '{-# RULES' rules '#-}'		{ $2 }
 	| annotation { unitOL $1 }
       	| decl					{ unLoc $1 }
@@ -1228,17 +1228,17 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      
-				{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlineSpec $2 FunLike (getINLINE $1)))) }
+		{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma $2 FunLike (getINLINE $1)))) }
         | '{-# INLINE_CONLIKE' activation qvar '#-}'
-                                { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlineSpec $2 ConLike (getINLINE_CONLIKE $1)))) }
+                { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma $2 ConLike (getINLINE_CONLIKE $1)))) }
 	| '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
-			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlineSpec) 
+		{ LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlinePragma) 
 					    | t <- $4] }
 	| '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-			 	{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlineSpec $2 FunLike (getSPEC_INLINE $1)))
+		{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlinePragma $2 FunLike (getSPEC_INLINE $1)))
 					    | t <- $5] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'
-				{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
+		{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
 
 -----------------------------------------------------------------------------
 -- Expressions

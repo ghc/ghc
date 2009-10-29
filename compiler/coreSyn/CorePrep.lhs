@@ -15,7 +15,7 @@ import PrelNames	( lazyIdKey, hasKey )
 import CoreUtils
 import CoreArity
 import CoreFVs
-import CoreLint
+import CoreMonad	( endPass )
 import CoreSyn
 import Type
 import Coercion
@@ -147,7 +147,7 @@ corePrepPgm dflags binds data_tycons = do
                       floats2 <- corePrepTopBinds implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
-    endPass dflags "CorePrep" Opt_D_dump_prep binds_out
+    endPass dflags "CorePrep" Opt_D_dump_prep binds_out []
     return binds_out
 
 corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
@@ -640,7 +640,6 @@ ignoreNote :: Note -> Bool
 -- want to get this:
 --     unzip = /\ab \xs. (__inline_me__ ...) a b xs
 ignoreNote (CoreNote _) = True 
-ignoreNote InlineMe     = True
 ignoreNote _other       = False
 
 

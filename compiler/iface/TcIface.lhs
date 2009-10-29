@@ -19,6 +19,7 @@ import LoadIface
 import IfaceEnv
 import BuildTyCl
 import TcRnMonad
+import TcType
 import Type
 import TypeRep
 import HscTypes
@@ -43,6 +44,7 @@ import qualified Var
 import VarEnv
 import Name
 import NameEnv
+import OccurAnal	( occurAnalyseExpr )
 import Module
 import LazyUniqFM
 import UniqSupply
@@ -53,7 +55,6 @@ import SrcLoc
 import DynFlags
 import Util
 import FastString
-import BasicTypes (Arity)
 
 import Control.Monad
 import Data.List
@@ -416,7 +417,7 @@ tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
  	    		 	   ifIdDetails = details, ifIdInfo = info})
   = do	{ name <- lookupIfaceTop occ_name
 	; ty <- tcIfaceType iface_type
-	; details <- tcIdDetails details
+	; details <- tcIdDetails ty details
 	; info <- tcIdInfo ignore_prags name ty info
 	; return (AnId (mkGlobalId details name ty info)) }
 
@@ -631,7 +632,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 	; let mb_tcs = map ifTopFreeName args
 	; return (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
 			  ru_bndrs = bndrs', ru_args = args', 
-			  ru_rhs = rhs', 
+			  ru_rhs = occurAnalyseExpr rhs', 
 			  ru_rough = mb_tcs,
 			  ru_local = False }) }	-- An imported RULE is never for a local Id
 						-- or, even if it is (module loop, perhaps)
@@ -885,7 +886,6 @@ tcIfaceExpr (IfaceCast expr co) = do
 tcIfaceExpr (IfaceNote note expr) = do
     expr' <- tcIfaceExpr expr
     case note of
-        IfaceInlineMe     -> return (Note InlineMe   expr')
         IfaceSCC cc       -> return (Note (SCC cc)   expr')
         IfaceCoreNote n   -> return (Note (CoreNote n) expr')
 
@@ -964,10 +964,14 @@ do_one (IfaceRec pairs) thing_inside
 %************************************************************************
 
 \begin{code}
-tcIdDetails :: IfaceIdDetails -> IfL IdDetails
-tcIdDetails IfVanillaId = return VanillaId
-tcIdDetails IfDFunId    = return DFunId
-tcIdDetails (IfRecSelId tc naughty)
+tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
+tcIdDetails _  IfVanillaId = return VanillaId
+tcIdDetails ty IfDFunId
+  = return (DFunId (isNewTyCon (classTyCon cls)))
+  where
+    (_, cls, _) = tcSplitDFunTy ty
+
+tcIdDetails _ (IfRecSelId tc naughty)
   = do { tc' <- tcIfaceTyCon tc
        ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty }) }
 
@@ -983,52 +987,62 @@ tcIdInfo ignore_prags name ty info
     init_info = vanillaIdInfo
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
-    tcPrag info HsNoCafRefs         = return (info `setCafInfo`   NoCafRefs)
-    tcPrag info (HsArity arity)     = return (info `setArityInfo` arity)
-    tcPrag info (HsStrictness str)  = return (info `setAllStrictnessInfo` Just str)
+    tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
+    tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
+    tcPrag info (HsStrictness str) = return (info `setAllStrictnessInfo` Just str)
+    tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
 
 	-- The next two are lazy, so they don't transitively suck stuff in
-    tcPrag info (HsWorker nm arity) = tcWorkerInfo ty info nm arity
-    tcPrag info (HsInline inline_prag) = return (info `setInlinePragInfo` inline_prag)
-    tcPrag info (HsUnfold expr) = do
-          maybe_expr' <- tcPragExpr name expr
-	  let
-		-- maybe_expr' doesn't get looked at if the unfolding
-		-- is never inspected; so the typecheck doesn't even happen
-		unfold_info = case maybe_expr' of
-				Nothing    -> noUnfolding
-				Just expr' -> mkTopUnfolding expr' 
-          return (info `setUnfoldingInfoLazily` unfold_info)
+    tcPrag info (HsUnfold if_unf)  = do { unf <- tcUnfolding name ty info if_unf
+				        ; return (info `setUnfoldingInfoLazily` unf) }
 \end{code}
 
 \begin{code}
-tcWorkerInfo :: Type -> IdInfo -> Name -> Arity -> IfL IdInfo
-tcWorkerInfo ty info wkr arity
-  = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)
+tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
+tcUnfolding name _ _ (IfCoreUnfold if_expr)
+  = do 	{ mb_expr <- tcPragExpr name if_expr
+	; return (case mb_expr of
+		    Nothing -> NoUnfolding
+		    Just expr -> mkTopUnfolding expr) }
 
-	-- We return without testing maybe_wkr_id, but as soon as info is
-	-- looked at we will test it.  That's ok, because its outside the
-	-- knot; and there seems no big reason to further defer the
-	-- tcIfaceId lookup.  (Contrast with tcPragExpr, where postponing walking
-	-- over the unfolding until it's actually used does seem worth while.)
-	; us <- newUniqueSupply
-
-	; return (case mb_wkr_id of
-		     Nothing     -> info
-		     Just wkr_id -> add_wkr_info us wkr_id info) }
+tcUnfolding name _ _ (IfInlineRule arity sat if_expr)
+  = do 	{ mb_expr <- tcPragExpr name if_expr
+	; return (case mb_expr of
+		    Nothing   -> NoUnfolding
+		    Just expr -> mkInlineRule inl_info expr arity) }
   where
-    doc = text "Worker for" <+> ppr wkr
-    add_wkr_info us wkr_id info
-	= info `setUnfoldingInfoLazily`  mk_unfolding us wkr_id
-	       `setWorkerInfo`           HasWorker wkr_id arity
+    inl_info | sat       = InlSat
+    	     | otherwise = InlUnSat
 
-    mk_unfolding us wkr_id = mkTopUnfolding (initUs_ us (mkWrapper ty strict_sig) wkr_id)
+tcUnfolding name ty info (IfWrapper arity wkr)
+  = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)
+	; us <- newUniqueSupply
+	; return (case mb_wkr_id of
+		     Nothing     -> noUnfolding
+		     Just wkr_id -> make_inline_rule wkr_id us) }
+  where
+    doc = text "Worker for" <+> ppr name
+
+    make_inline_rule wkr_id us 
+	= mkWwInlineRule wkr_id
+	  		 (initUs_ us (mkWrapper ty strict_sig) wkr_id) 
+		         arity
 
     	-- We are relying here on strictness info always appearing 
 	-- before worker info,  fingers crossed ....
     strict_sig = case newStrictnessInfo info of
 		   Just sig -> sig
 		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr)
+
+tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
+  = do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
+       ; return (case mb_ops1 of
+       	 	    Nothing   -> noUnfolding
+                    Just ops1 -> DFunUnfolding data_con ops1) }
+  where
+    doc = text "Class ops for dfun" <+> ppr name
+    (_, cls, _) = tcSplitDFunTy dfun_ty
+    data_con = classDataCon cls
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check
