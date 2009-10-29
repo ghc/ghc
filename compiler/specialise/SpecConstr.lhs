@@ -11,7 +11,7 @@
 -- for details
 
 module SpecConstr(
-	specConstrProgram	
+	specConstrProgram, SpecConstrAnnotation(..)
     ) where
 
 #include "HsVersions.h"
@@ -21,8 +21,12 @@ import CoreSubst
 import CoreUtils
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import CoreFVs 		( exprsFreeVars )
+import CoreMonad
+import HscTypes         ( ModGuts(..) )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConRepArity, dataConUnivTyVars )
+import DataCon		( dataConTyCon, dataConRepArity, dataConUnivTyVars )
+import TyCon            ( TyCon )
+import Literal          ( literalType )
 import Coercion	
 import Rules
 import Type		hiding( substTy )
@@ -39,14 +43,17 @@ import BasicTypes	( Activation(..) )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
 import NewDemand
 import DmdAnal		( both )
+import Serialized       ( deserializeWithData )
 import Util
 import UniqSupply
 import Outputable
 import FastString
 import UniqFM
+import qualified LazyUniqFM as L
 import MonadUtils
 import Control.Monad	( zipWithM )
 import Data.List
+import Data.Data        ( Data, Typeable )
 \end{code}
 
 -----------------------------------------------------
@@ -455,7 +462,18 @@ But perhaps the first one isn't good.  After all, we know that tpl_B2 is
 a T (I# x) really, because T is strict and Int has one constructor.  (We can't
 unbox the strict fields, becuase T is polymorphic!)
 
+%************************************************************************
+%*									*
+\subsection{Annotations}
+%*									*
+%************************************************************************
 
+Annotating a type with NoSpecConstr will make SpecConstr not specialise
+for arguments of that type.
+
+\begin{code}
+data SpecConstrAnnotation = NoSpecConstr deriving( Data, Typeable )
+\end{code}
 
 %************************************************************************
 %*									*
@@ -464,8 +482,14 @@ unbox the strict fields, becuase T is polymorphic!)
 %************************************************************************
 
 \begin{code}
-specConstrProgram :: DynFlags -> UniqSupply -> [CoreBind] -> [CoreBind]
-specConstrProgram dflags us binds = fst $ initUs us (go (initScEnv dflags) binds)
+specConstrProgram :: ModGuts -> CoreM ModGuts
+specConstrProgram guts
+  = do
+      dflags <- getDynFlags
+      us     <- getUniqueSupplyM
+      annos  <- deserializeAnnotations deserializeWithData
+      let binds' = fst $ initUs us (go (initScEnv dflags annos) (mg_binds guts))
+      return (guts { mg_binds = binds' })
   where
     go _   []	        = return []
     go env (bind:binds) = do (env', bind') <- scTopBind env bind
@@ -491,9 +515,11 @@ data ScEnv = SCE { sc_size  :: Maybe Int,	-- Size threshold
 			-- Binds interesting non-top-level variables
 			-- Domain is OutVars (*after* applying the substitution)
 
-		   sc_vals  :: ValueEnv
+		   sc_vals  :: ValueEnv,
 			-- Domain is OutIds (*after* applying the substitution)
 			-- Used even for top-level bindings (but not imported ones)
+
+                   sc_annotations :: L.UniqFM SpecConstrAnnotation
 	     }
 
 ---------------------
@@ -517,13 +543,14 @@ instance Outputable Value where
    ppr LambdaVal	 = ptext (sLit "<Lambda>")
 
 ---------------------
-initScEnv :: DynFlags -> ScEnv
-initScEnv dflags
+initScEnv :: DynFlags -> L.UniqFM [SpecConstrAnnotation] -> ScEnv
+initScEnv dflags annos
   = SCE { sc_size = specConstrThreshold dflags,
 	  sc_count = specConstrCount dflags,
 	  sc_subst = emptySubst, 
 	  sc_how_bound = emptyVarEnv, 
-	  sc_vals = emptyVarEnv }
+	  sc_vals = emptyVarEnv,
+          sc_annotations = L.mapUFM head $ L.filterUFM (not . null) annos }
 
 data HowBound = RecFun	-- These are the recursive functions for which 
 			-- we seek interesting call patterns
@@ -622,6 +649,23 @@ extendCaseBndrs env case_bndr con alt_bndrs
 		      where
 		       	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
 				       varsToCoreExprs alt_bndrs
+
+ignoreTyCon :: ScEnv -> TyCon -> Bool
+ignoreTyCon env tycon
+  = case L.lookupUFM (sc_annotations env) tycon of
+      Just NoSpecConstr -> True
+      _                 -> False
+
+ignoreType :: ScEnv -> Type -> Bool
+ignoreType env ty
+  = case splitTyConApp_maybe ty of
+      Just (tycon, _) -> ignoreTyCon env tycon
+      _               -> False
+
+ignoreAltCon :: ScEnv -> AltCon -> Bool
+ignoreAltCon env (DataAlt dc) = ignoreTyCon env (dataConTyCon dc)
+ignoreAltCon env (LitAlt lit) = ignoreType env (literalType lit)
+ignoreAltCon _   DEFAULT      = True
 \end{code}
 
 
@@ -1211,7 +1255,7 @@ callToPats env bndr_occs (con_env, args)
   = return Nothing
   | otherwise
   = do	{ let in_scope = substInScope (sc_subst env)
-	; prs <- argsToPats in_scope con_env (args `zip` bndr_occs)
+	; prs <- argsToPats env in_scope con_env (args `zip` bndr_occs)
 	; let (interesting_s, pats) = unzip prs
 	      pat_fvs = varSetElems (exprsFreeVars pats)
 	      qvars   = filterOut (`elemInScopeSet` in_scope) pat_fvs
@@ -1235,7 +1279,8 @@ callToPats env bndr_occs (con_env, args)
     -- placeholder variables.  For example:
     --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
 
-argToPat :: InScopeSet			-- What's in scope at the fn defn site
+argToPat :: ScEnv
+         -> InScopeSet			-- What's in scope at the fn defn site
 	 -> ValueEnv			-- ValueEnv at the call site
 	 -> CoreArg			-- A call arg (or component thereof)
 	 -> ArgOcc
@@ -1250,11 +1295,11 @@ argToPat :: InScopeSet			-- What's in scope at the fn defn site
 --		lvl7	     --> (True, lvl7)	   if lvl7 is bound 
 --						   somewhere further out
 
-argToPat _in_scope _val_env arg@(Type {}) _arg_occ
+argToPat _env _in_scope _val_env arg@(Type {}) _arg_occ
   = return (False, arg)
 
-argToPat in_scope val_env (Note _ arg) arg_occ
-  = argToPat in_scope val_env arg arg_occ
+argToPat env in_scope val_env (Note _ arg) arg_occ
+  = argToPat env in_scope val_env arg arg_occ
 	-- Note [Notes in call patterns]
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	-- Ignore Notes.  In particular, we want to ignore any InlineMe notes
@@ -1262,16 +1307,16 @@ argToPat in_scope val_env (Note _ arg) arg_occ
 	-- ride roughshod over them all for now.
 	--- See Note [Notes in RULE matching] in Rules
 
-argToPat in_scope val_env (Let _ arg) arg_occ
-  = argToPat in_scope val_env arg arg_occ
+argToPat env in_scope val_env (Let _ arg) arg_occ
+  = argToPat env in_scope val_env arg arg_occ
 	-- Look through let expressions
 	-- e.g.		f (let v = rhs in \y -> ...v...)
 	-- Here we can specialise for f (\y -> ...)
 	-- because the rule-matcher will look through the let.
 
-argToPat in_scope val_env (Cast arg co) arg_occ
-  = do	{ (interesting, arg') <- argToPat in_scope val_env arg arg_occ
-	; let (ty1,ty2) = coercionKind co
+argToPat env in_scope val_env (Cast arg co) arg_occ
+  | not (ignoreType env ty2)
+  = do	{ (interesting, arg') <- argToPat env in_scope val_env arg arg_occ
 	; if not interesting then 
 		wildCardPat ty2
 	  else do
@@ -1280,6 +1325,10 @@ argToPat in_scope val_env (Cast arg co) arg_occ
 	; let co_name = mkSysTvName uniq (fsLit "sg")
 	      co_var = mkCoVar co_name (mkCoKind ty1 ty2)
 	; return (interesting, Cast arg' (mkTyVarTy co_var)) } }
+  where
+    (ty1, ty2) = coercionKind co
+
+    
 
 {-	Disabling lambda specialisation for now
 	It's fragile, and the spec_loop can be infinite
@@ -1295,15 +1344,16 @@ argToPat in_scope val_env arg arg_occ
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
-argToPat in_scope val_env arg arg_occ
+argToPat env in_scope val_env arg arg_occ
   | Just (ConVal dc args) <- isValue val_env arg
+  , not (ignoreAltCon env dc)
   , case arg_occ of
 	ScrutOcc _ -> True		-- Used only by case scrutinee
 	BothOcc    -> case arg of	-- Used elsewhere
 			App {} -> True	--     see Note [Reboxing]
 			_other -> False
 	_other	   -> False	-- No point; the arg is not decomposed
-  = do	{ args' <- argsToPats in_scope val_env (args `zip` conArgOccs arg_occ dc)
+  = do	{ args' <- argsToPats env in_scope val_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
 
   -- Check if the argument is a variable that 
@@ -1311,9 +1361,10 @@ argToPat in_scope val_env arg arg_occ
   -- It's worth specialising on this if
   --	(a) it's used in an interesting way in the body
   --	(b) we know what its value is
-argToPat in_scope val_env (Var v) arg_occ
+argToPat env in_scope val_env (Var v) arg_occ
   | case arg_occ of { UnkOcc -> False; _other -> True },	-- (a)
-    is_value							-- (b)
+    is_value,							-- (b)
+    not (ignoreType env (varType v))
   = return (True, Var v)
   where
     is_value 
@@ -1342,7 +1393,7 @@ argToPat in_scope val_env (Var v) arg_occ
 	-- We don't want to specialise for that *particular* x,y
 
   -- The default case: make a wild-card
-argToPat _in_scope _val_env arg _arg_occ
+argToPat _env _in_scope _val_env arg _arg_occ
   = wildCardPat (exprType arg)
 
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
@@ -1350,13 +1401,13 @@ wildCardPat ty = do { uniq <- getUniqueUs
 		    ; let id = mkSysLocal (fsLit "sc") uniq ty
 		    ; return (False, Var id) }
 
-argsToPats :: InScopeSet -> ValueEnv
+argsToPats :: ScEnv -> InScopeSet -> ValueEnv
 	   -> [(CoreArg, ArgOcc)]
 	   -> UniqSM [(Bool, CoreArg)]
-argsToPats in_scope val_env args
+argsToPats env in_scope val_env args
   = mapM do_one args
   where
-    do_one (arg,occ) = argToPat in_scope val_env arg occ
+    do_one (arg,occ) = argToPat env in_scope val_env arg occ
 \end{code}
 
 

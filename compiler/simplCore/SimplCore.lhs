@@ -178,7 +178,7 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        describePassR "SpecConstr" Opt_D_dump_spec $
-                                       doPassDU  specConstrProgram
+                                       specConstrProgram
 
 doCorePass (CoreDoVectorisation be)  = {-# SCC "Vectorise" #-}
                                        describePass "Vectorisation" Opt_D_dump_vect $ 
