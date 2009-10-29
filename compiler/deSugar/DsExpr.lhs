@@ -43,12 +43,14 @@ import Type
 import Coercion
 import CoreSyn
 import CoreUtils
+import CoreFVs
 import MkCore
 
 import DynFlags
 import StaticFlags
 import CostCentre
 import Id
+import Var
 import PrelInfo
 import DataCon
 import TysWiredIn
@@ -646,20 +648,28 @@ makes all list literals be generated via the simple route.
 
 dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
-dsExplicitList elt_ty xs = do
-    dflags <- getDOptsDs
-    xs' <- mapM dsLExpr xs
-    if  opt_SimpleListLiterals || not (dopt Opt_EnableRewriteRules dflags)
-        then return $ mkListExpr elt_ty xs'
-        else mkBuildExpr elt_ty (mkSplitExplicitList (thisPackage dflags) xs')
+dsExplicitList elt_ty xs
+  = do { dflags <- getDOptsDs
+       ; xs' <- mapM dsLExpr xs
+       ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
+       ; if opt_SimpleListLiterals 	       		-- -fsimple-list-literals
+         || not (dopt Opt_EnableRewriteRules dflags)	-- Rewrite rules off
+         || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!
+         then return $ mkListExpr elt_ty xs'
+         else mkBuildExpr elt_ty (mkSplitExplicitList dynamic_prefix static_suffix) }
   where
-    mkSplitExplicitList this_package xs' (c, _) (n, n_ty) = do
-        let (dynamic_prefix, static_suffix) = spanTail (rhsIsStatic this_package) xs'
-            static_suffix' = mkListExpr elt_ty static_suffix
-        
-        folded_static_suffix <- mkFoldrExpr elt_ty n_ty (Var c) (Var n) static_suffix'
-        let build_body = foldr (App . App (Var c)) folded_static_suffix dynamic_prefix
-        return build_body
+    is_static :: CoreExpr -> Bool
+    is_static e = all is_static_var (varSetElems (exprFreeVars e))
+
+    is_static_var :: Var -> Bool
+    is_static_var v 
+      | isId v = isExternalName (idName v)  -- Top-level things are given external names
+      | otherwise = False                   -- Type variables
+
+    mkSplitExplicitList prefix suffix (c, _) (n, n_ty)
+      = do { let suffix' = mkListExpr elt_ty suffix
+           ; folded_suffix <- mkFoldrExpr elt_ty n_ty (Var c) (Var n) suffix'
+           ; return (foldr (App . App (Var c)) folded_suffix prefix) }
 
 spanTail :: (a -> Bool) -> [a] -> ([a], [a])
 spanTail f xs = (reverse rejected, reverse satisfying)
