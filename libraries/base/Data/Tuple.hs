@@ -41,15 +41,19 @@ module Data.Tuple
     where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Bool
-import GHC.Classes
-import GHC.Ordering
--- XXX The standalone deriving clauses fail with
---     The data constructors of `(,)' are not all in scope
---       so you cannot derive an instance for it
---     In the stand-alone deriving instance for `Eq (a, b)'
--- if we don't import GHC.Tuple
+
+import GHC.Base
+-- We need to depend on GHC.Base so that
+-- a) so that we get GHC.Bool, GHC.Classes, GHC.Ordering
+
+-- b) so that GHC.Base.inline is available, which is used
+--    when expanding instance declarations
+
 import GHC.Tuple
+-- We must import GHC.Tuple, to ensure sure that the 
+-- data constructors of `(,)' are in scope when we do
+-- the standalone deriving instance for Eq (a,b) etc
+
 #endif  /* __GLASGOW_HASKELL__ */
 
 #ifdef __NHC__
