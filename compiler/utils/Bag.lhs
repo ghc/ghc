@@ -22,6 +22,9 @@ import Outputable
 import Util ( isSingleton )
 
 import Data.List ( partition )
+
+infixr 3 `consBag`
+infixl 3 `snocBag`
 \end{code}
 
 
