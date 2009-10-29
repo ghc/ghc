@@ -4117,7 +4117,8 @@ static int relocateSection(
 		        || scat->r_type == PPC_RELOC_HI16_SECTDIFF
 		        || scat->r_type == PPC_RELOC_HA16_SECTDIFF)
 #else
-                    else if(scat->r_type == GENERIC_RELOC_SECTDIFF)
+                    else if(scat->r_type == GENERIC_RELOC_SECTDIFF
+                        || scat->r_type == GENERIC_RELOC_LOCAL_SECTDIFF)
 #endif
 		    {
 		        struct scattered_relocation_info *pair =
@@ -4180,7 +4181,8 @@ static int relocateSection(
                         || scat->r_type == PPC_RELOC_SECTDIFF)
 #else
                     if(scat->r_type == GENERIC_RELOC_VANILLA
-                        || scat->r_type == GENERIC_RELOC_SECTDIFF)
+                        || scat->r_type == GENERIC_RELOC_SECTDIFF
+                        || scat->r_type == GENERIC_RELOC_LOCAL_SECTDIFF)
 #endif
                     {
                         *wordPtr = word;
