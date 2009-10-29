@@ -21,3 +21,5 @@ not :: Bool -> Bool
 not True  = False
 not False = True
 
+inline x = x
+
