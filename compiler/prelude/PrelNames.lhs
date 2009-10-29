@@ -242,12 +242,14 @@ gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_CLASSES
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW, cONTROL_APPLICATIVE,
     gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION_BASE :: Module
+
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
+
 gHC_CLASSES	= mkBaseModule (fsLit "GHC.Classes")
 gHC_BASE	= mkBaseModule (fsLit "GHC.Base")
 gHC_ENUM	= mkBaseModule (fsLit "GHC.Enum")
@@ -255,7 +257,7 @@ gHC_SHOW	= mkBaseModule (fsLit "GHC.Show")
 gHC_READ	= mkBaseModule (fsLit "GHC.Read")
 gHC_NUM		= mkBaseModule (fsLit "GHC.Num")
 gHC_INTEGER	= mkIntegerModule (fsLit "GHC.Integer")
-gHC_INTEGER_TYPE	= mkIntegerModule (fsLit "GHC.Integer.Type")
+gHC_INTEGER_TYPE= mkIntegerModule (fsLit "GHC.Integer.Type")
 gHC_LIST	= mkBaseModule (fsLit "GHC.List")
 gHC_PARR	= mkBaseModule (fsLit "GHC.PArr")
 gHC_TUPLE	= mkPrimModule (fsLit "GHC.Tuple")
@@ -283,7 +285,7 @@ tYPEABLE	= mkBaseModule (fsLit "Data.Typeable")
 gENERICS        = mkBaseModule (fsLit "Data.Data")
 dOTNET		= mkBaseModule (fsLit "GHC.Dotnet")
 rEAD_PREC	= mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
-lEX		    = mkBaseModule (fsLit "Text.Read.Lex")
+lEX		= mkBaseModule (fsLit "Text.Read.Lex")
 gHC_INT		= mkBaseModule (fsLit "GHC.Int")
 gHC_WORD	= mkBaseModule (fsLit "GHC.Word")
 mONAD		= mkBaseModule (fsLit "Control.Monad")
