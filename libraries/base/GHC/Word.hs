@@ -181,10 +181,6 @@ instance Bits Word where
     bitSize  _               = WORD_SIZE_IN_BITS
     isSigned _               = False
 
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
-
 {-# RULES
 "fromIntegral/Int->Word"  fromIntegral = \(I# x#) -> W# (int2Word# x#)
 "fromIntegral/Word->Int"  fromIntegral = \(W# x#) -> I# (word2Int# x#)
@@ -284,10 +280,6 @@ instance Bits Word8 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
     isSigned _                = False
-
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
 
 {-# RULES
 "fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
@@ -390,10 +382,6 @@ instance Bits Word16 where
     bitSize  _                = 16
     isSigned _                = False
 
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
-
 {-# RULES
 "fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# x#
 "fromIntegral/Word16->Word16"  fromIntegral = id :: Word16 -> Word16
@@ -492,10 +480,6 @@ instance Bits Word32 where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
     isSigned _                = False
-
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
 
 {-# RULES
 "fromIntegral/Int->Word32"    fromIntegral = \(I#   x#) -> W32# (int32ToWord32# (intToInt32# x#))
@@ -603,10 +587,6 @@ instance Bits Word32 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
     isSigned _                = False
-
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
 
 {-# RULES
 "fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# x#
@@ -734,10 +714,6 @@ instance Bits Word64 where
     bitSize  _                = 64
     isSigned _                = False
 
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
-
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
 -- cases when we're shifting more than 64 bits to avoid unspecified
@@ -841,10 +817,6 @@ instance Bits Word64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
     isSigned _                = False
-
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
 
 {-# RULES
 "fromIntegral/a->Word64" fromIntegral = \x -> case fromIntegral x of W# x# -> W64# x#

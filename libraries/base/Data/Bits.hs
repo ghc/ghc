@@ -151,6 +151,11 @@ class Num a => Bits a where
         value of the argument is ignored -}
     isSigned          :: a -> Bool
 
+    {-# INLINE bit #-}
+    {-# INLINE setBit #-}
+    {-# INLINE clearBit #-}
+    {-# INLINE complementBit #-}
+    {-# INLINE testBit #-}
     bit i               = 1 `shiftL` i
     x `setBit` i        = x .|. bit i
     x `clearBit` i      = x .&. complement (bit i)
@@ -164,6 +169,7 @@ class Num a => Bits a where
         'shift', depending on which is more convenient for the type in
         question. -}
     shiftL            :: a -> Int -> a
+    {-# INLINE shiftL #-}
     x `shiftL`  i = x `shift`  i
 
     {-| Shift the first argument right by the specified number of bits
@@ -176,6 +182,7 @@ class Num a => Bits a where
         'shift', depending on which is more convenient for the type in
         question. -}
     shiftR            :: a -> Int -> a
+    {-# INLINE shiftR #-}
     x `shiftR`  i = x `shift`  (-i)
 
     {-| Rotate the argument left by the specified number of bits
@@ -185,6 +192,7 @@ class Num a => Bits a where
         'rotate', depending on which is more convenient for the type in
         question. -}
     rotateL           :: a -> Int -> a
+    {-# INLINE rotateL #-}
     x `rotateL` i = x `rotate` i
 
     {-| Rotate the argument right by the specified number of bits
@@ -194,6 +202,7 @@ class Num a => Bits a where
         'rotate', depending on which is more convenient for the type in
         question. -}
     rotateR           :: a -> Int -> a
+    {-# INLINE rotateR #-}
     x `rotateR` i = x `rotate` (-i)
 
 instance Bits Int where
@@ -222,9 +231,6 @@ instance Bits Int where
         !wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSize  _             = WORD_SIZE_IN_BITS
 
-    {-# INLINE shiftR #-}
-    -- same as the default definition, but we want it inlined (#2376)
-    x `shiftR`  i = x `shift`  (-i)
 #else /* !__GLASGOW_HASKELL__ */
 
 #ifdef __HUGS__
