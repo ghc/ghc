@@ -647,7 +647,7 @@ lazy x = x
 -- that tries to inline 'f' (if it has an unfolding) unconditionally
 -- The 'NOINLINE' pragma arranges that inline only gets inlined (and
 -- hence eliminated) late in compilation, after the rule has had
--- a god chance to fire.
+-- a good chance to fire.
 inline :: a -> a
 {-# NOINLINE[0] inline #-}
 inline x = x
@@ -987,14 +987,21 @@ unpackAppendCString# addr rest
         !ch = indexCharOffAddr# addr nh
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
-{-# NOINLINE [0] unpackFoldrCString# #-}
--- Unlike unpackCString#, there *is* some point in inlining unpackFoldrCString#, 
--- because we get better code for the function call.
--- However, don't inline till right at the end;
--- usually the unpack-list rule turns it into unpackCStringList
+
+-- Usually the unpack-list rule turns unpackFoldrCString# into unpackCString#
+
 -- It also has a BuiltInRule in PrelRules.lhs:
 --      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
 --        =  unpackFoldrCString# "foobaz" c n
+
+{-# NOINLINE unpackFoldrCString# #-}
+-- At one stage I had NOINLINE [0] on the grounds that, unlike
+-- unpackCString#, there *is* some point in inlining
+-- unpackFoldrCString#, because we get better code for the
+-- higher-order function call.  BUT there may be a lot of
+-- literal strings, and making a separate 'unpack' loop for
+-- each is highly gratuitous.  See nofib/real/anna/PrettyPrint.
+
 unpackFoldrCString# addr f z 
   = unpack 0#
   where
