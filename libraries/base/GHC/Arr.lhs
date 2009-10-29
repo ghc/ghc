@@ -76,8 +76,13 @@ class (Ord a) => Ix a where
     unsafeRangeSize     :: (a,a) -> Int
 
         -- Must specify one of index, unsafeIndex
+
+	-- 'index' is typically over-ridden in instances, with essentially
+	-- the same code, but using indexError instead of hopelessIndexError
+	-- Reason: we have 'Show' at the instances
     index b i | inRange b i = unsafeIndex b i   
-              | otherwise   = error "Error in array index"
+              | otherwise   = hopelessIndexError
+
     unsafeIndex b i = index b i
 
     rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
@@ -116,6 +121,9 @@ indexError rng i tp
            showParen True (showsPrec 0 i) .
            showString " out of range " $
            showParen True (showsPrec 0 rng) "")
+
+hopelessIndexError :: Int -- Try to use 'indexError' instead!
+hopelessIndexError = error "Error in array index"
 
 ----------------------------------------------------------------------
 instance  Ix Char  where
@@ -430,16 +438,24 @@ arr@(Array l u n _) ! i = unsafeAt arr $ safeIndex (l,u) n i
 {-# INLINE safeRangeSize #-}
 safeRangeSize :: Ix i => (i, i) -> Int
 safeRangeSize (l,u) = let r = rangeSize (l, u)
-                      in if r < 0 then error "Negative range size"
+                      in if r < 0 then negRange
                                   else r
+
+-- Don't inline this error message everywhere!!
+negRange :: Int	  -- Uninformative, but Ix does not provide Show
+negRange = error "Negative range size"
 
 {-# INLINE safeIndex #-}
 safeIndex :: Ix i => (i, i) -> Int -> i -> Int
 safeIndex (l,u) n i = let i' = index (l,u) i
                       in if (0 <= i') && (i' < n)
                          then i'
-                         else error ("Error in array index; " ++ show i' ++
-                                     " not in range [0.." ++ show n ++ ")")
+                         else badSafeIndex i' n
+
+-- Don't inline this long error message everywhere!!
+badSafeIndex :: Int -> Int -> Int
+badSafeIndex i' n = error ("Error in array index; " ++ show i' ++
+                        " not in range [0.." ++ show n ++ ")")
 
 {-# INLINE unsafeAt #-}
 unsafeAt :: Ix i => Array i e -> Int -> e
