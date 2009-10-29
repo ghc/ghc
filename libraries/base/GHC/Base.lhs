@@ -283,10 +283,12 @@ foldr            :: (a -> b -> b) -> b -> [a] -> b
 -- foldr f z (x:xs) =  f x (foldr f z xs)
 {-# INLINE [0] foldr #-}
 -- Inline only in the final stage, after the foldr/cons rule has had a chance
-foldr k z xs = go xs
-             where
-               go []     = z
-               go (y:ys) = y `k` go ys
+-- Also note that we inline it when it has *two* parameters, which are the 
+-- ones we are keen about specialising!
+foldr k z = go
+          where
+            go []     = z
+            go (y:ys) = y `k` go ys
 
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely
@@ -684,8 +686,10 @@ const x _               =  x
 
 -- | Function composition.
 {-# INLINE (.) #-}
-(.)       :: (b -> c) -> (a -> b) -> a -> c
-(.) f g x = f (g x)
+-- Make sure it has TWO args only on the left, so that it inlines
+-- when applied to two functions, even if there is no final argument
+(.)    :: (b -> c) -> (a -> b) -> a -> c
+(.) f g = \x -> f (g x)
 
 -- | @'flip' f@ takes its (first) two arguments in the reverse order of @f@.
 flip                    :: (a -> b -> c) -> b -> a -> c
