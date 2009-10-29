@@ -36,6 +36,8 @@ default ()              -- Double isn't available yet
 class  Eq a  where
     (==), (/=)           :: a -> a -> Bool
 
+    {-# INLINE (/=) #-}
+    {-# INLINE (==) #-}
     x /= y               = not (x == y)
     x == y               = not (x /= y)
 

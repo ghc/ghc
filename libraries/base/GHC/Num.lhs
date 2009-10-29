@@ -75,6 +75,8 @@ class  (Eq a, Show a) => Num a  where
     -- so such literals have type @('Num' a) => a@.
     fromInteger         :: Integer -> a
 
+    {-# INLINE (-) #-}
+    {-# INLINE negate #-}
     x - y               = x + negate y
     negate x            = 0 - x
 

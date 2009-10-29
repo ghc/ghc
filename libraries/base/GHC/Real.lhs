@@ -133,10 +133,15 @@ class  (Real a, Enum a) => Integral a  where
     -- | conversion to 'Integer'
     toInteger           :: a -> Integer
 
+    {-# INLINE quot #-}
+    {-# INLINE rem #-}
+    {-# INLINE div #-}
+    {-# INLINE mod #-}
     n `quot` d          =  q  where (q,_) = quotRem n d
     n `rem` d           =  r  where (_,r) = quotRem n d
     n `div` d           =  q  where (q,_) = divMod n d
     n `mod` d           =  r  where (_,r) = divMod n d
+
     divMod n d          =  if signum r == negate (signum d) then (q-1, r+d) else qr
                            where qr@(q,r) = quotRem n d
 
@@ -154,6 +159,8 @@ class  (Num a) => Fractional a  where
     -- @('Fractional' a) => a@.
     fromRational        :: Rational -> a
 
+    {-# INLINE recip #-}
+    {-# INLINE (/) #-}
     recip x             =  1 / x
     x / y               = x * recip y
 
@@ -182,6 +189,7 @@ class  (Real a, Fractional a) => RealFrac a  where
     -- | @'floor' x@ returns the greatest integer not greater than @x@
     floor               :: (Integral b) => a -> b
 
+    {-# INLINE truncate #-}
     truncate x          =  m  where (m,_) = properFraction x
     
     round x             =  let (n,r) = properFraction x

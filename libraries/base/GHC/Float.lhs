@@ -57,6 +57,11 @@ class  (Fractional a) => Floating a  where
     sinh, cosh, tanh    :: a -> a
     asinh, acosh, atanh :: a -> a
 
+    {-# INLINE (**) #-}
+    {-# INLINE logBase #-}
+    {-# INLINE sqrt #-}
+    {-# INLINE tan #-}
+    {-# INLINE tanh #-}
     x ** y              =  exp (log x * y)
     logBase x y         =  log y / log x
     sqrt x              =  x ** 0.5

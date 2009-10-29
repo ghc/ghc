@@ -224,6 +224,7 @@ class  Monad m  where
     -- failure in a @do@ expression.
     fail        :: String -> m a
 
+    {-# INLINE (>>) #-}
     m >> k      = m >>= \_ -> k
     fail s      = error s
 \end{code}
