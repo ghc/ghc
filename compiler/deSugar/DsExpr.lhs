@@ -749,8 +749,7 @@ dsDo stmts body result_ty
         body       = noLoc $ HsDo DoExpr rec_stmts return_app body_ty
         return_app = nlHsApp (noLoc return_op) (mkLHsTupleExpr rets)
 	body_ty    = mkAppTy m_ty tup_ty
-        tup_ty     = mkCoreTupTy (map idType tup_ids)
-                  -- mkCoreTupTy deals with singleton case
+        tup_ty     = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
 
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
@@ -848,8 +847,7 @@ dsMDo tbl stmts body result_ty
 	mfix_pat = noLoc $ LazyPat $ mk_tup_pat rec_tup_pats
 	body     = noLoc $ HsDo ctxt rec_stmts return_app body_ty
 	body_ty = mkAppTy m_ty tup_ty
-	tup_ty  = mkCoreTupTy (map idType (later_ids' ++ rec_ids))
-		  -- mkCoreTupTy deals with singleton case
+	tup_ty  = mkBoxedTupleTy (map idType (later_ids' ++ rec_ids))  -- Deals with singleton case
 
 	return_app  = nlHsApp (nlHsTyApp return_id [tup_ty]) 
 			      (mkLHsTupleExpr rets)

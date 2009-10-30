@@ -25,7 +25,6 @@ import TcType
 import TcBinds
 import TcUnify
 import TcSimplify
-import MkCore
 import Name
 import TysWiredIn
 import PrelNames
@@ -524,7 +523,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
         ; let tup_ids = zipWith mkLocalId tup_names tup_elt_tys
-	      tup_ty  = mkCoreTupTy tup_elt_tys
+	      tup_ty  = mkBoxedTupleTy tup_elt_tys
 
         ; tcExtendIdEnv tup_ids $ do
         { ((stmts', (ret_op', tup_rets)), stmts_ty)

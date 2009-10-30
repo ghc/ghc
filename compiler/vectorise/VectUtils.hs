@@ -25,7 +25,7 @@ module VectUtils (
 import VectCore
 import VectMonad
 
-import MkCore ( mkCoreTup, mkCoreTupTy, mkWildCase )
+import MkCore ( mkCoreTup, mkWildCase )
 import CoreSyn
 import CoreUtils
 import CoreUnfold         ( mkInlineRule )
@@ -514,5 +514,5 @@ buildEnv vs
   where
     (vvs, lvs) = unzip vs
     tys        = map vVarType vs
-    ty         = mkCoreTupTy tys
+    ty         = mkBoxedTupleTy tys
 

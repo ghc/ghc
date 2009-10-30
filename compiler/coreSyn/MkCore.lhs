@@ -18,8 +18,7 @@ module MkCore (
         mkChunkified,
         
         -- * Constructing small tuples
-        mkCoreVarTup, mkCoreVarTupTy,
-        mkCoreTup, mkCoreTupTy,
+        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, 
         
         -- * Constructing big tuples
         mkBigCoreVarTup, mkBigCoreVarTupTy,
@@ -337,7 +336,7 @@ mkCoreVarTup ids = mkCoreTup (map Var ids)
 
 -- | Bulid the type of a small tuple that holds the specified variables
 mkCoreVarTupTy :: [Id] -> Type
-mkCoreVarTupTy ids = mkCoreTupTy (map idType ids)
+mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 
 -- | Build a small tuple holding the specified expressions
 mkCoreTup :: [CoreExpr] -> CoreExpr
@@ -345,10 +344,6 @@ mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
 mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
                          (map (Type . exprType) cs ++ cs)
-
--- | Build the type of a small tuple that holds the specified type of thing
-mkCoreTupTy :: [Type] -> Type
-mkCoreTupTy tys  = mkTupleTy Boxed tys
 
 -- | Build a big tuple holding the specified variables
 mkBigCoreVarTup :: [Id] -> CoreExpr
@@ -364,7 +359,7 @@ mkBigCoreTup = mkChunkified mkCoreTup
 
 -- | Build the type of a big tuple that holds the specified type of thing
 mkBigCoreTupTy :: [Type] -> Type
-mkBigCoreTupTy = mkChunkified mkCoreTupTy
+mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 \end{code}
 
 %************************************************************************
@@ -408,7 +403,7 @@ mkTupleSelector vars the_var scrut_var scrut
     mk_tup_sel vars_s the_var = mkSmallTupleSelector group the_var tpl_v $
                                 mk_tup_sel (chunkify tpl_vs) tpl_v
         where
-          tpl_tys = [mkCoreTupTy (map idType gp) | gp <- vars_s]
+          tpl_tys = [mkBoxedTupleTy (map idType gp) | gp <- vars_s]
           tpl_vs  = mkTemplateLocals tpl_tys
           [(tpl_v, group)] = [(tpl,gp) | (tpl,gp) <- zipEqual "mkTupleSelector" tpl_vs vars_s,
                                          the_var `elem` gp ]
@@ -469,7 +464,7 @@ mkTupleCase uniqs vars body scrut_var scrut
     one_tuple_case chunk_vars (us, vs, body)
       = let (us1, us2) = splitUniqSupply us
             scrut_var = mkSysLocal (fsLit "ds") (uniqFromSupply us1)
-              (mkCoreTupTy (map idType chunk_vars))
+              (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us2, scrut_var:vs, body')
 \end{code}

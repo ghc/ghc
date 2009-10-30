@@ -38,7 +38,7 @@ module TysWiredIn (
 	mkListTy,
 
 	-- * Tuples
-	mkTupleTy,
+	mkTupleTy, mkBoxedTupleTy,
 	tupleTyCon, tupleCon, 
 	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
 	unboxedSingletonTyCon, unboxedSingletonDataCon,
@@ -538,6 +538,10 @@ mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy boxity [ty] | Boxed <- boxity = ty
 mkTupleTy boxity tys = mkTyConApp (tupleTyCon boxity (length tys)) tys
+
+-- | Build the type of a small tuple that holds the specified type of thing
+mkBoxedTupleTy :: [Type] -> Type
+mkBoxedTupleTy tys = mkTupleTy Boxed tys
 
 unitTy :: Type
 unitTy = mkTupleTy Boxed []

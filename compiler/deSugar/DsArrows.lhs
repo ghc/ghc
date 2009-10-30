@@ -142,7 +142,7 @@ coreCasePair scrut_var var1 var2 body
 
 \begin{code}
 mkCorePairTy :: Type -> Type -> Type
-mkCorePairTy t1 t2 = mkCoreTupTy [t1, t2]
+mkCorePairTy t1 t2 = mkBoxedTupleTy [t1, t2]
 
 mkCorePairExpr :: CoreExpr -> CoreExpr -> CoreExpr
 mkCorePairExpr e1 e2 = mkCoreTup [e1, e2]
