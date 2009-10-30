@@ -611,7 +611,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
 	   let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
 		-- Dump the result of this iteration
-	   endIteration dflags mode iteration_no max_iterations counts1 binds2 rules1 ;
+	   end_iteration dflags mode iteration_no max_iterations counts1 binds2 rules1 ;
 
 		-- Loop
   	   do_iteration us2 (iteration_no + 1) all_counts binds2 rules1
@@ -620,14 +620,14 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
   	  (us1, us2) = splitUniqSupply us
 
 -------------------
-endIteration :: DynFlags -> SimplifierMode -> Int -> Int 
+end_iteration :: DynFlags -> SimplifierMode -> Int -> Int 
              -> SimplCount -> [CoreBind] -> [CoreRule] -> IO ()
--- Same as endPass but with simplifier counts
-endIteration dflags mode iteration_no max_iterations counts binds rules
+-- Same as endIteration but with simplifier counts
+end_iteration dflags mode iteration_no max_iterations counts binds rules
   = do { Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations pass_name
 		             (pprSimplCount counts) ;
 
-       ; endPass dflags pass_name Opt_D_dump_simpl_iterations binds rules }
+       ; endIteration dflags pass_name Opt_D_dump_simpl_iterations binds rules }
   where
     pass_name = "Simplifier mode " ++ showPpr mode ++ 
 	     	", iteration " ++ show iteration_no ++

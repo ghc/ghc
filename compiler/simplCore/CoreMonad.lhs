@@ -25,7 +25,7 @@ module CoreMonad (
     findAnnotations, deserializeAnnotations, addAnnotation,
     
     -- ** Debug output
-    endPass, endPassIf, 
+    endPass, endPassIf, endIteration,
 
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS, 
@@ -96,6 +96,10 @@ endPass = dumpAndLint Err.dumpIfSet_core
 
 endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
 endPassIf cond = dumpAndLint (Err.dumpIf_core cond)
+
+-- Same as endPass but doesn't dump Core even with -dverbose-core2core
+endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
+endIteration = dumpAndLint Err.dumpIfSet_dyn
 
 dumpAndLint :: (DynFlags -> DynFlag -> String -> SDoc -> IO ())
             -> DynFlags -> String -> DynFlag 
