@@ -1,6 +1,6 @@
 module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon, prodDataCon,
-  selTy, selReplicate, selPick, selElements,
+  selTy, selReplicate, selPick, selTags, selElements,
   combinePDVar, scalarZip, closureCtrFun,
   initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
@@ -111,6 +111,7 @@ data Builtins = Builtins {
                 , selTys           :: Array Int Type
                 , selReplicates    :: Array Int CoreExpr
                 , selPicks         :: Array Int CoreExpr
+                , selTagss         :: Array Int CoreExpr
                 , selEls           :: Array (Int, Int) CoreExpr
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
@@ -125,6 +126,7 @@ data Builtins = Builtins {
                 , replicatePDVar   :: Var
                 , emptyPDVar       :: Var
                 , packPDVar        :: Var
+                , packByTagPDVar   :: Var
                 , combinePDVars    :: Array Int Var
                 , scalarClass      :: Class
                 , scalarZips       :: Array Int Var
@@ -148,6 +150,9 @@ selReplicate = indexBuiltin "selReplicate" selReplicates
 
 selPick :: Int -> Builtins -> CoreExpr
 selPick = indexBuiltin "selPick" selPicks
+
+selTags :: Int -> Builtins -> CoreExpr
+selTags = indexBuiltin "selTags" selTagss
 
 selElements :: Int -> Int -> Builtins -> CoreExpr
 selElements i j = indexBuiltin "selElements" selEls (i,j)
@@ -196,6 +201,8 @@ initBuiltins pkg
                              (numbered "replicate" 2 mAX_DPH_SUM)
       sel_picks    <- mapM (externalFun dph_Selector)
                            (numbered "pick" 2 mAX_DPH_SUM)
+      sel_tags     <- mapM (externalFun dph_Selector)
+                           (numbered "tagsSel" 2 mAX_DPH_SUM)
       sel_els      <- mapM mk_elements
                            [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
       sum_tcs      <- mapM (externalTyCon dph_Repr)
@@ -204,6 +211,7 @@ initBuiltins pkg
       let selTys        = listArray (2, mAX_DPH_SUM) sel_tys
           selReplicates = listArray (2, mAX_DPH_SUM) sel_replicates
           selPicks      = listArray (2, mAX_DPH_SUM) sel_picks
+          selTagss      = listArray (2, mAX_DPH_SUM) sel_tags
           selEls        = array ((2,0), (mAX_DPH_SUM, mAX_DPH_SUM)) sel_els
           sumTyCons     = listArray (2, mAX_DPH_SUM) sum_tcs
 
@@ -218,6 +226,7 @@ initBuiltins pkg
       replicatePDVar   <- externalVar dph_PArray (fsLit "replicatePD")
       emptyPDVar       <- externalVar dph_PArray (fsLit "emptyPD")
       packPDVar        <- externalVar dph_PArray (fsLit "packPD")
+      packByTagPDVar   <- externalVar dph_PArray (fsLit "packByTagPD")
 
       combines <- mapM (externalVar dph_PArray)
                        [mkFastString ("combine" ++ show i ++ "PD")
@@ -253,6 +262,7 @@ initBuiltins pkg
                , selTys           = selTys
                , selReplicates    = selReplicates
                , selPicks         = selPicks
+               , selTagss         = selTagss
                , selEls           = selEls
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
@@ -267,6 +277,7 @@ initBuiltins pkg
                , replicatePDVar   = replicatePDVar
                , emptyPDVar       = emptyPDVar
                , packPDVar        = packPDVar
+               , packByTagPDVar   = packByTagPDVar
                , combinePDVars    = combinePDVars
                , scalarClass      = scalarClass
                , scalarZips       = scalarZips

@@ -11,7 +11,7 @@ module VectUtils (
   pdataReprTyCon, pdataReprDataCon, mkVScrut,
   prDictOfType, prDFunOfTyCon,
   paDictArgType, paDictOfType, paDFunType,
-  paMethod, wrapPR, replicatePD, emptyPD, packPD,
+  paMethod, wrapPR, replicatePD, emptyPD, packPD, packByTagPD,
   combinePD,
   liftPD,
   zipScalars, scalarClosure,
@@ -268,6 +268,12 @@ emptyPD = paMethod emptyPDVar "emptyPD"
 packPD :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> VM CoreExpr
 packPD ty xs len sel = liftM (`mkApps` [xs, len, sel])
                              (paMethod packPDVar "packPD" ty)
+
+packByTagPD :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
+                 -> VM CoreExpr
+packByTagPD ty xs len tags t
+  = liftM (`mkApps` [xs, len, tags, t])
+          (paMethod packByTagPDVar "packByTagPD" ty)
 
 combinePD :: Type -> CoreExpr -> CoreExpr -> [CoreExpr]
           -> VM CoreExpr

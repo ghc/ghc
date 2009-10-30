@@ -10,7 +10,7 @@ module VectMonad (
   newExportedVar, newLocalVar, newLocalVars, newDummyVar, newTyVar,
   
   Builtins(..), sumTyCon, prodTyCon, prodDataCon,
-  selTy, selReplicate, selPick, selElements,
+  selTy, selReplicate, selPick, selTags, selElements,
   combinePDVar, scalarZip, closureCtrFun,
   builtin, builtins,
 

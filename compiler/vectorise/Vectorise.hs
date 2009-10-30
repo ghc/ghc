@@ -27,6 +27,7 @@ import OccName
 
 import Literal              ( Literal, mkMachInt )
 import TysWiredIn
+import TysPrim              ( intPrimTy )
 
 import Outputable
 import FastString
@@ -447,9 +448,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
               tag  = mkDataConTag vect_dc
               fvs  = freeVarsOf body `delVarSetList` bndrs
 
-          pick <- builtin (selPick arity)
-          let flags_expr = mkApps pick [sel, tag]
-          flags_var <- newLocalVar (fsLit "flags") (exprType flags_expr)
+          sel_tags  <- liftM (`App` sel) (builtin (selTags arity))
           lc        <- builtin liftingContext
           elems     <- builtin (selElements arity ntag)
 
@@ -457,15 +456,17 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
             <- vectBndrsIn bndrs
              . localV
              $ do
-                 binds    <- mapM (pack_var (Var lc) (Var flags_var))
+                 binds    <- mapM (pack_var (Var lc) sel_tags tag)
                            . filter isLocalId
                            $ varSetElems fvs
                  (ve, le) <- vectExpr body
-                 empty    <- emptyPD vty
                  return (ve, Case (elems `App` sel) lc lty
-                               [(DEFAULT, [], Let (NonRec flags_var flags_expr)
-                                              $ mkLets (concat binds) le),
-                                (LitAlt (mkMachInt 0), [], empty)])
+                             [(DEFAULT, [], (mkLets (concat binds) le))])
+                 -- empty    <- emptyPD vty
+                 -- return (ve, Case (elems `App` sel) lc lty
+                 --             [(DEFAULT, [], Let (NonRec flags_var flags_expr)
+                 --                             $ mkLets (concat binds) le),
+                 --               (LitAlt (mkMachInt 0), [], empty)])
           let (vect_bndrs, lift_bndrs) = unzip vbndrs
           return (vect_dc, vect_bndrs, lift_bndrs, vbody)
 
@@ -473,14 +474,14 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
 
     mk_vect_alt vect_dc bndrs body = (DataAlt vect_dc, bndrs, body)
 
-    pack_var len flags v
+    pack_var len tags t v
       = do
           r <- lookupVar v
           case r of
             Local (vv, lv) ->
               do
                 lv'  <- cloneVar lv
-                expr <- packPD (idType vv) (Var lv) len flags
+                expr <- packByTagPD (idType vv) (Var lv) len tags t
                 updLEnv (\env -> env { local_vars = extendVarEnv
                                                 (local_vars env) v (vv, lv') })
                 return [(NonRec lv' expr)]
