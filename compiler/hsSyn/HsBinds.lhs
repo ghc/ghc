@@ -477,6 +477,9 @@ data SpecPrag
   = SpecPrag   
 	HsWrapper	-- An wrapper, that specialises the polymorphic function
 	InlinePragma 	-- Inlining spec for the specialised function
+
+instance Outputable SpecPrag where
+  ppr (SpecPrag _ p) = ptext (sLit "SpecPrag") <+> ppr p
 \end{code}
 
 \begin{code}

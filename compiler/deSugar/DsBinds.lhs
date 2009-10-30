@@ -144,9 +144,9 @@ dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
 	      ar_env = mkArityEnv binds
 	      do_one (lcl_id, rhs) 
 		| Just (_, gbl_id, _, spec_prags) <- lookupVarEnv env lcl_id
-		= ASSERT( null spec_prags )	  -- Not overloaded
-                  makeCorePair gbl_id (lookupArity ar_env lcl_id) $
-		  addAutoScc auto_scc gbl_id rhs
+		= WARN( not (null spec_prags), ppr gbl_id $$ ppr spec_prags )	  -- Not overloaded
+                  makeCorePair gbl_id (lookupArity ar_env lcl_id)
+		               (addAutoScc auto_scc gbl_id rhs)
 
 		| otherwise = (lcl_id, rhs)
 
@@ -228,14 +228,14 @@ dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
 
 	      do_one lg_binds (lcl_id, rhs) 
 		| Just (id_tvs, gbl_id, _, spec_prags) <- lookupVarEnv env lcl_id
-		= ASSERT( null spec_prags )	  -- Not overloaded
-                  let rhs' = addAutoScc auto_scc gbl_id  $
-			     mkLams id_tvs $
-			     mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
-			            | tv <- tyvars, not (tv `elem` id_tvs)] $
-		             add_lets lg_binds rhs
+		= WARN( not (null spec_prags), ppr gbl_id $$ ppr spec_prags )	  -- Not overloaded
+                  (let rhs' = addAutoScc auto_scc gbl_id  $
+			      mkLams id_tvs $
+			      mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
+			             | tv <- tyvars, not (tv `elem` id_tvs)] $
+		              add_lets lg_binds rhs
 		  in return (mk_lg_bind lcl_id gbl_id id_tvs,
-			     makeCorePair gbl_id (lookupArity ar_env lcl_id) rhs')
+			     makeCorePair gbl_id (lookupArity ar_env lcl_id) rhs'))
 		| otherwise
 		= do { non_exp_gbl_id <- newUniqueId lcl_id (mkForAllTys tyvars (idType lcl_id))
 		     ; return (mk_lg_bind lcl_id non_exp_gbl_id tyvars,
