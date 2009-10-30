@@ -632,7 +632,7 @@ addNonRecWithUnf env new_bndr new_rhs new_unfolding
     ASSERT( isId new_bndr )
     WARN( new_arity < old_arity || new_arity < dmd_arity, 
           (ptext (sLit "Arity decrease:") <+> ppr final_id <+> ppr old_arity
-		<+> ppr new_arity <+> ppr dmd_arity) $$ ppr new_rhs )
+		<+> ppr new_arity <+> ppr dmd_arity) )
 	-- Note [Arity decrease]
 
     final_id `seq`   -- This seq forces the Id, and hence its IdInfo,
