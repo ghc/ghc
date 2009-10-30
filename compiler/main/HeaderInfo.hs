@@ -237,13 +237,16 @@ languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
   throw $ mkSrcErr $ unitBag $
      (mkPlainErrMsg loc $
-       text "cannot parse LANGUAGE pragma: comma-separated list expected")
+       vcat [ text "Cannot parse LANGUAGE pragma"
+            , text "Expecting comma-separated list of language options,"
+            , text "each starting with a capital letter"
+            , nest 2 (text "E.g. {-# LANGUAGE RecordPuns, Generics #-}") ])
 
 unsupportedExtnError :: SrcSpan -> String -> a
 unsupportedExtnError loc unsup =
   throw $ mkSrcErr $ unitBag $
     mkPlainErrMsg loc $
-        text "unsupported extension: " <> text unsup
+        text "Unsupported extension: " <> text unsup
 
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages
