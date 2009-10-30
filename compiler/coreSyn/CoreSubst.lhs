@@ -227,10 +227,10 @@ lookupTvSubst (Subst _ _ tvs) v = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
 --   No left-right shadowing
 --   ie the substitution for   (\x \y. e) a1 a2
 --      so neither x nor y scope over a1 a2
-mkOpenSubst :: [(Var,CoreArg)] -> Subst
-mkOpenSubst pairs = Subst (mkInScopeSet (exprsFreeVars (map snd pairs)))
-	    	          (mkVarEnv [(id,e)  | (id, e) <- pairs, isId id])
-			  (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
+mkOpenSubst :: InScopeSet -> [(Var,CoreArg)] -> Subst
+mkOpenSubst in_scope pairs = Subst in_scope
+	    	          	   (mkVarEnv [(id,e)  | (id, e) <- pairs, isId id])
+			  	   (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
 
 ------------------------------
 isInScope :: Var -> Subst -> Bool

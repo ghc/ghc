@@ -42,6 +42,7 @@ import CoreSyn
 import PprCore		()	-- Instances
 import OccurAnal
 import CoreSubst hiding( substTy )
+import CoreFVs         ( exprFreeVars )
 import CoreUtils
 import Id
 import DataCon
@@ -54,6 +55,7 @@ import TcType		( tcSplitDFunTy )
 import Type 
 import Coercion
 import PrelNames
+import VarEnv           ( mkInScopeSet )
 import Bag
 import Util
 import FastTypes
@@ -1110,6 +1112,9 @@ exprIsConApp_maybe expr
     analyse _ _ = Nothing
 
     -----------
+    in_scope = mkInScopeSet (exprFreeVars expr)
+
+    -----------
     beta (Lam v body) pairs (arg : args) 
         | isTypeArg arg
         = beta body ((v,arg):pairs) args 
@@ -1118,12 +1123,13 @@ exprIsConApp_maybe expr
 	= Nothing
 
     beta fun pairs args
-        = case analyse (substExpr (mkOpenSubst pairs) fun) args of
+        = case analyse (substExpr subst fun) args of
 	    Nothing  -> -- pprTrace "Bale out! exprIsConApp_maybe" doc $
 	    	        Nothing
 	    Just ans -> -- pprTrace "Woo-hoo! exprIsConApp_maybe" doc $
                         Just ans
         where
+          subst = mkOpenSubst in_scope pairs
 	  -- doc = vcat [ppr fun, ppr expr, ppr pairs, ppr args]
 
 
