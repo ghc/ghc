@@ -15,7 +15,8 @@ module VectUtils (
   combinePD,
   liftPD,
   zipScalars, scalarClosure,
-  polyAbstract, polyApply, polyVApply,
+  polyAbstract, polyApply, polyVApply, polyArity,
+  Inline(..), addInlineArity, inlineMe,
   hoistBinding, hoistExpr, hoistPolyVExpr, takeHoisted,
   buildClosure, buildClosures,
   mkClosureApp
@@ -27,6 +28,7 @@ import VectMonad
 import MkCore ( mkCoreTup, mkCoreTupTy, mkWildCase )
 import CoreSyn
 import CoreUtils
+import CoreUnfold         ( mkInlineRule )
 import Coercion
 import Type
 import TypeRep
@@ -34,6 +36,7 @@ import TyCon
 import DataCon
 import Var
 import MkId               ( unwrapFamInstScrut )
+import Id                 ( setIdUnfolding )
 import TysWiredIn
 import BasicTypes         ( Boxity(..) )
 import Literal            ( Literal, mkMachInt )
@@ -42,7 +45,6 @@ import Outputable
 import FastString
 
 import Control.Monad
-
 
 collectAnnTypeArgs :: AnnExpr b ann -> (AnnExpr b ann, [Type])
 collectAnnTypeArgs expr = go expr []
@@ -315,13 +317,14 @@ newLocalVVar fs vty
       lv  <- newLocalVar fs lty
       return (vv,lv)
 
-polyAbstract :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
+polyAbstract :: [TyVar] -> ([Var] -> VM a) -> VM a
 polyAbstract tvs p
   = localV
   $ do
       mdicts <- mapM mk_dict_var tvs
-      zipWithM_ (\tv -> maybe (defLocalTyVar tv) (defLocalTyVarWithPA tv . Var)) tvs mdicts
-      p (mk_lams mdicts)
+      zipWithM_ (\tv -> maybe (defLocalTyVar tv)
+                              (defLocalTyVarWithPA tv . Var)) tvs mdicts
+      p (mk_args mdicts)
   where
     mk_dict_var tv = do
                        r <- paDictArgType tv
@@ -329,7 +332,12 @@ polyAbstract tvs p
                          Just ty -> liftM Just (newLocalVar (fsLit "dPA") ty)
                          Nothing -> return Nothing
 
-    mk_lams mdicts = mkLams (tvs ++ [dict | Just dict <- mdicts])
+    mk_args mdicts = [dict | Just dict <- mdicts]
+
+polyArity :: [TyVar] -> VM Int
+polyArity tvs = do
+                  tys <- mapM paDictArgType tvs
+                  return $ length [() | Just _ <- tys]
 
 polyApply :: CoreExpr -> [Type] -> VM CoreExpr
 polyApply expr tys
@@ -343,31 +351,48 @@ polyVApply expr tys
       dicts <- mapM paDictOfType tys
       return $ mapVect (\e -> e `mkTyApps` tys `mkApps` dicts) expr
 
+
+data Inline = Inline Int -- arity
+            | DontInline
+
+addInlineArity :: Inline -> Int -> Inline
+addInlineArity (Inline m) n = Inline (m+n)
+addInlineArity DontInline _ = DontInline
+
+inlineMe :: Inline
+inlineMe = Inline 0
+
 hoistBinding :: Var -> CoreExpr -> VM ()
 hoistBinding v e = updGEnv $ \env ->
   env { global_bindings = (v,e) : global_bindings env }
 
-hoistExpr :: FastString -> CoreExpr -> VM Var
-hoistExpr fs expr
+hoistExpr :: FastString -> CoreExpr -> Inline -> VM Var
+hoistExpr fs expr inl
   = do
-      var <- newLocalVar fs (exprType expr)
+      var <- mk_inline `liftM` newLocalVar fs (exprType expr)
       hoistBinding var expr
       return var
+  where
+    mk_inline var = case inl of
+                      Inline arity -> var `setIdUnfolding`
+                                      mkInlineRule InlSat expr arity
+                      DontInline   -> var
 
-hoistVExpr :: VExpr -> VM VVar
-hoistVExpr (ve, le)
+hoistVExpr :: VExpr -> Inline -> VM VVar
+hoistVExpr (ve, le) inl
   = do
       fs <- getBindName
-      vv <- hoistExpr ('v' `consFS` fs) ve
-      lv <- hoistExpr ('l' `consFS` fs) le
+      vv <- hoistExpr ('v' `consFS` fs) ve inl
+      lv <- hoistExpr ('l' `consFS` fs) le (addInlineArity inl 1)
       return (vv, lv)
 
-hoistPolyVExpr :: [TyVar] -> VM VExpr -> VM VExpr
-hoistPolyVExpr tvs p
+hoistPolyVExpr :: [TyVar] -> Inline -> VM VExpr -> VM VExpr
+hoistPolyVExpr tvs inline p
   = do
-      expr <- closedV . polyAbstract tvs $ \abstract ->
-              liftM (mapVect abstract) p
-      fn   <- hoistVExpr expr
+      inline' <- liftM (addInlineArity inline) (polyArity tvs)
+      expr <- closedV . polyAbstract tvs $ \args ->
+              liftM (mapVect (mkLams $ tvs ++ args)) p
+      fn   <- hoistVExpr expr inline'
       polyVApply (vVar fn) (mkTyVarTys tvs)
 
 takeHoisted :: VM [(Var, CoreExpr)]
@@ -413,14 +438,15 @@ buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
 buildClosures _   _    [] _ mk_body
   = mk_body
 buildClosures tvs vars [arg_ty] res_ty mk_body
-  = liftM vInlineMe (buildClosure tvs vars arg_ty res_ty mk_body)
+  = -- liftM vInlineMe $
+      buildClosure tvs vars arg_ty res_ty mk_body
 buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
   = do
       res_ty' <- mkClosureTypes arg_tys res_ty
       arg <- newLocalVVar (fsLit "x") arg_ty
-      liftM vInlineMe
-        . buildClosure tvs vars arg_ty res_ty'
-        . hoistPolyVExpr tvs
+      -- liftM vInlineMe
+      buildClosure tvs vars arg_ty res_ty'
+        . hoistPolyVExpr tvs (Inline (length vars + 1))
         $ do
             lc <- builtin liftingContext
             clo <- buildClosures tvs (vars ++ [arg]) arg_tys res_ty mk_body
@@ -438,11 +464,11 @@ buildClosure tvs vars arg_ty res_ty mk_body
       env_bndr <- newLocalVVar (fsLit "env") env_ty
       arg_bndr <- newLocalVVar (fsLit "arg") arg_ty
 
-      fn <- hoistPolyVExpr tvs
+      fn <- hoistPolyVExpr tvs (Inline 2)
           $ do
               lc    <- builtin liftingContext
               body  <- mk_body
-              return . vInlineMe
+              return -- . vInlineMe
                      . vLams lc [env_bndr, arg_bndr]
                      $ bind (vVar env_bndr)
                             (vVarApps lc body (vars ++ [arg_bndr]))

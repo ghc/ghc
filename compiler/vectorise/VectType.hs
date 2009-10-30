@@ -11,6 +11,7 @@ import VectCore
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import CoreSyn
 import CoreUtils
+import CoreUnfold
 import MkCore		 ( mkWildCase )
 import BuildTyCl
 import DataCon
@@ -20,9 +21,11 @@ import TypeRep
 import Coercion
 import FamInstEnv        ( FamInst, mkLocalFamInst )
 import OccName
+import Id
 import MkId
-import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
-import Var               ( Var, TyVar )
+import BasicTypes        ( StrictnessMark(..), boolToRecFlag,
+                           dfunInlinePragma )
+import Var               ( Var, TyVar, varType )
 import Name              ( Name, getOccName )
 import NameEnv
 
@@ -37,7 +40,7 @@ import FastString
 
 import MonadUtils     ( zipWith3M, foldrM, concatMapM )
 import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_, mapAndUnzipM )
-import Data.List      ( inits, tails, zipWith4, zipWith6 )
+import Data.List      ( inits, tails, zipWith4, zipWith5 )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -119,26 +122,28 @@ vectTypeEnv env
       let orig_tcs = keep_tcs ++ conv_tcs
           vect_tcs = keep_tcs ++ new_tcs
 
-      dfuns <- mapM mkPADFun vect_tcs
-      defTyConPAs (zip vect_tcs dfuns)
-      reprs <- mapM tyConRepr vect_tcs
-      repr_tcs  <- zipWith3M buildPReprTyCon orig_tcs vect_tcs reprs
-      pdata_tcs <- zipWith3M buildPDataTyCon orig_tcs vect_tcs reprs
-      binds    <- sequence (zipWith6 buildTyConBindings orig_tcs
-                                                        vect_tcs
-                                                        repr_tcs
-                                                        pdata_tcs
-                                                        dfuns
-                                                        reprs)
+      (_, binds, inst_tcs) <- fixV $ \ ~(dfuns', _, _) ->
+        do
+          defTyConPAs (zipLazy vect_tcs dfuns')
+          reprs <- mapM tyConRepr vect_tcs
+          repr_tcs  <- zipWith3M buildPReprTyCon orig_tcs vect_tcs reprs
+          pdata_tcs <- zipWith3M buildPDataTyCon orig_tcs vect_tcs reprs
+          dfuns <- sequence $ zipWith5 buildTyConBindings orig_tcs
+                                                          vect_tcs
+                                                          repr_tcs
+                                                          pdata_tcs
+                                                          reprs
+          binds <- takeHoisted
+          return (dfuns, binds, repr_tcs ++ pdata_tcs)
 
-      let all_new_tcs = new_tcs ++ repr_tcs ++ pdata_tcs
+      let all_new_tcs = new_tcs ++ inst_tcs
 
       let new_env = extendTypeEnvList env
                        (map ATyCon all_new_tcs
                         ++ [ADataCon dc | tc <- all_new_tcs
                                         , dc <- tyConDataCons tc])
 
-      return (new_env, map mkLocalFamInst (repr_tcs ++ pdata_tcs), concat binds)
+      return (new_env, map mkLocalFamInst inst_tcs, binds)
   where
     tycons = typeEnvTyCons env
     groups = tyConGroups tycons
@@ -715,18 +720,12 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
     comp_ty r = mkPDataType (compOrigType r)
 
 
-mkPADFun :: TyCon -> VM Var
-mkPADFun vect_tc
-  = newExportedVar (mkPADFunOcc $ getOccName vect_tc) =<< paDFunType vect_tc
-
-buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> Var -> SumRepr 
-                   -> VM [(Var, CoreExpr)]
-buildTyConBindings orig_tc vect_tc prepr_tc pdata_tc dfun repr
+buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> SumRepr 
+                   -> VM Var
+buildTyConBindings orig_tc vect_tc prepr_tc pdata_tc repr
   = do
       vectDataConWorkers orig_tc vect_tc pdata_tc
-      dict <- buildPADict vect_tc prepr_tc pdata_tc repr
-      binds <- takeHoisted
-      return $ (dfun, dict) : binds
+      buildPADict vect_tc prepr_tc pdata_tc repr
 
 vectDataConWorkers :: TyCon -> TyCon -> TyCon -> VM ()
 vectDataConWorkers orig_tc vect_tc arr_tc
@@ -781,53 +780,71 @@ vectDataConWorkers orig_tc vect_tc arr_tc
 
     def_worker data_con arg_tys mk_body
       = do
+          arity <- polyArity tyvars
           body <- closedV
                 . inBind orig_worker
-                . polyAbstract tyvars $ \abstract ->
-                  liftM (abstract . vectorised)
+                . polyAbstract tyvars $ \args ->
+                  liftM (mkLams (tyvars ++ args) . vectorised)
                 $ buildClosures tyvars [] arg_tys res_ty mk_body
 
-          vect_worker <- cloneId mkVectOcc orig_worker (exprType body)
+          raw_worker <- cloneId mkVectOcc orig_worker (exprType body)
+          let vect_worker = raw_worker `setIdUnfolding`
+                              mkInlineRule InlSat body arity
           defGlobalVar orig_worker vect_worker
           return (vect_worker, body)
       where
         orig_worker = dataConWorkId data_con
 
-buildPADict :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
+buildPADict :: TyCon -> TyCon -> TyCon -> SumRepr -> VM Var
 buildPADict vect_tc prepr_tc arr_tc repr
-  = polyAbstract tvs $ \abstract ->
+  = polyAbstract tvs $ \args ->
     do
-      meth_binds <- mapM mk_method paMethods
-      let meth_exprs = map (Var . fst) meth_binds
+      method_ids <- mapM (method args) paMethods
 
-      pa_dc <- builtin paDataCon
-      let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
-          body = Let (Rec meth_binds) dict
-      return . mkInlineMe $ abstract body
+      pa_tc  <- builtin paTyCon
+      pa_con <- builtin paDataCon
+      let dict = mkLams (tvs ++ args)
+               $ mkConApp pa_con
+               $ Type inst_ty : map (method_call args) method_ids
+
+          dfun_ty = mkForAllTys tvs
+                  $ mkFunTys (map varType args) (mkTyConApp pa_tc [inst_ty])
+
+      raw_dfun <- newExportedVar dfun_name dfun_ty
+      let dfun = raw_dfun `setIdUnfolding` mkDFunUnfolding pa_con method_ids
+                          `setInlinePragma` dfunInlinePragma
+
+      hoistBinding dfun dict
+      return dfun
   where
-    tvs = tyConTyVars arr_tc
+    tvs = tyConTyVars vect_tc
     arg_tys = mkTyVarTys tvs
+    inst_ty = mkTyConApp vect_tc arg_tys
 
-    mk_method (name, build)
+    dfun_name = mkPADFunOcc (getOccName vect_tc)
+
+    method args (name, build)
       = localV
       $ do
-          body <- build vect_tc prepr_tc arr_tc repr
-          var  <- newLocalVar name (exprType body)
-          return (var, mkInlineMe body)
+          expr <- build vect_tc prepr_tc arr_tc repr
+          let body = mkLams (tvs ++ args) expr
+          raw_var <- newExportedVar (method_name name) (exprType body)
+          let var = raw_var
+                      `setIdUnfolding` mkInlineRule InlSat body (length args)
+          hoistBinding var body
+          return var
 
--- The InlineMe note has gone away.  Instead, you need to use
--- CoreUnfold.mkInlineRule to make an InlineRule for the thing, and
--- attach *that* as the unfolding for the dictionary binder
-mkInlineMe :: CoreExpr -> CoreExpr
-mkInlineMe expr = pprTrace "VectType: Roman, you need to use the new InlineRule story" 
-	   	           (ppr expr) expr
+    method_call args id = mkApps (Var id) (map Type arg_tys ++ map Var args)
 
-paMethods :: [(FastString, TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr)]
-paMethods = [(fsLit "dictPRepr",    buildPRDict),
-             (fsLit "toPRepr",      buildToPRepr),
-             (fsLit "fromPRepr",    buildFromPRepr),
-             (fsLit "toArrPRepr",   buildToArrPRepr),
-             (fsLit "fromArrPRepr", buildFromArrPRepr)]
+    method_name name = mkVarOcc $ occNameString dfun_name ++ ('$' : name)
+
+
+paMethods :: [(String, TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr)]
+paMethods = [("dictPRepr",    buildPRDict),
+             ("toPRepr",      buildToPRepr),
+             ("fromPRepr",    buildFromPRepr),
+             ("toArrPRepr",   buildToArrPRepr),
+             ("fromArrPRepr", buildFromArrPRepr)]
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains

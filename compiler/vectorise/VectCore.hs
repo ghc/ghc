@@ -10,7 +10,7 @@ module VectCore (
 
   vVar, vType, vNote, vLet,
   vLams, vLamsWithoutLC, vVarApps,
-  vCaseDEFAULT, vInlineMe
+  vCaseDEFAULT
 ) where
 
 #include "HsVersions.h"
@@ -18,7 +18,6 @@ module VectCore (
 import CoreSyn
 import Type           ( Type )
 import Var
-import Outputable
 
 type Vect a = (a,a)
 type VVar   = Vect Var
@@ -83,8 +82,3 @@ vCaseDEFAULT (vscrut, lscrut) (vbndr, lbndr) vty lty (vbody, lbody)
   where
     mkDEFAULT e = [(DEFAULT, [], e)]
 
-vInlineMe :: VExpr -> VExpr
-vInlineMe (vexpr, lexpr) = (mkInlineMe vexpr, mkInlineMe lexpr)
-
-mkInlineMe :: CoreExpr -> CoreExpr
-mkInlineMe = pprTrace "VectCore.mkInlineMe" (text "Roman: need to replace mkInlineMe with an InlineRule somehow")
