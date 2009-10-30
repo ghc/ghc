@@ -819,7 +819,7 @@ simplExprF' env expr@(Lam _ _) cont
 
 simplExprF' env (Type ty) cont
   = ASSERT( contIsRhsOrArg cont )
-    do  { ty' <- simplType env ty
+    do  { ty' <- simplCoercion env ty
         ; rebuild env (Type ty') cont }
 
 simplExprF' env (Case scrut bndr _ alts) cont
@@ -857,6 +857,8 @@ simplType env ty
 
 ---------------------------------
 simplCoercion :: SimplEnv -> InType -> SimplM OutType
+-- The InType isn't *necessarily* a coercion, but it might be
+-- (in a type application, say) and optCoercion is a no-op on types
 simplCoercion env co
   = do { co' <- simplType env co
        ; return (optCoercion co') }
@@ -1165,7 +1167,7 @@ rebuildCall env fun (ArgInfo { ai_strs = [] }) cont
                    | otherwise = mkCoerce co expr
 
 rebuildCall env fun info (ApplyTo _ (Type arg_ty) se cont)
-  = do  { ty' <- simplType (se `setInScope` env) arg_ty
+  = do  { ty' <- simplCoercion (se `setInScope` env) arg_ty
         ; rebuildCall env (fun `App` Type ty') info cont }
 
 rebuildCall env fun 

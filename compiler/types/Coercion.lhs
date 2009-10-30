@@ -680,8 +680,8 @@ mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi
 \begin{code}
 optCoercion :: Coercion -> Coercion
 optCoercion co
-  = pprTrace "optCoercion" (ppr co $$ ppr (coercionKind co) $$ text ">-->" $$ ppr result) $
-    ASSERT2( coercionKind co `eq` coercionKind result, ppr co $$ ppr result $$ ppr (coercionKind co) $$ ppr (coercionKind result) )
+  = ASSERT2( coercionKind co `eq` coercionKind result, 
+             ppr co $$ ppr result $$ ppr (coercionKind co) $$ ppr (coercionKind result) )
     result
   where
         (s1,t1) `eq` (s2,t2) = s1 `coreEqType` s2 && t1 `coreEqType` t2
