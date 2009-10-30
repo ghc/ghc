@@ -1013,7 +1013,9 @@ repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
 repP (ParPat p)        = repLP p 
 repP (ListPat ps _)    = do { qs <- repLPs ps; repPlist qs }
-repP (TuplePat ps _ _) = do { qs <- repLPs ps; repPtup qs }
+repP p@(TuplePat ps boxed _) 
+  | not (isBoxed boxed) = notHandled "Unboxed tuples" (ppr p)
+  | otherwise           = do { qs <- repLPs ps; repPtup qs }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
