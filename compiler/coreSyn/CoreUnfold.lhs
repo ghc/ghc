@@ -1072,7 +1072,8 @@ exprIsConApp_maybe (Cast expr co)
     let dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
                          ppr ex_args, ppr val_args]
-    ASSERT2( coreEqType from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
+    in
+    ASSERT2( coreEqType _from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
     ASSERT2( all isTypeArg (ex_args ++ co_args), dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
 #endif
