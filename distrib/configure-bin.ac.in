@@ -8,6 +8,9 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [
 
 FP_FIND_ROOT
 
+BootingFromHc=NO
+AC_SUBST(BootingFromHc)
+
 dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
