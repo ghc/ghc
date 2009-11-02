@@ -1,3 +1,6 @@
 
 read029.hs:1:13:
-    cannot parse LANGUAGE pragma: comma-separated list expected
+    Cannot parse LANGUAGE pragma
+    Expecting comma-separated list of language options,
+    each starting with a capital letter
+      E.g. {-# LANGUAGE RecordPuns, Generics #-}
