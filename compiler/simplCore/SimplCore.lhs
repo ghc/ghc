@@ -668,11 +668,11 @@ x_local to transfer to x_exported.  Hence the copyIdInfo call.
 RULES: we want to *add* any RULES for x_local to x_exported.
 
 
-Note [Messing up the exported Id's IdInfo]
+Note [Messing up the exported Id's RULES]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must be careful about discarding the IdInfo on the old Id
-
-The example that went bad on me at one stage was this one:
+We must be careful about discarding (obviously) or even merging the
+RULES on the exported Id. The example that went bad on me at one stage
+was this one:
 	
     iterate :: (a -> a) -> a -> [a]
 	[Exported]
