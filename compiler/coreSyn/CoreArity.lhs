@@ -282,7 +282,7 @@ applyStateHack e (AT orig_arity is_bot)
 	        1 + go res (arity-1)
           else WARN( arity > 0, ppr arity ) 0
 -}						 
-	| otherwise = WARN( arity > 0, ppr arity ) 0
+	| otherwise = WARN( arity > 0, ppr arity <+> ppr ty) 0
 \end{code}
 
 Note [State hack and bottoming functions]
