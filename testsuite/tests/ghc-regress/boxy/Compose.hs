@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -XEmptyDataDecls -XGADTs #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs #-}
 
 -- Trac #1118
 

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags #-}
 
 module PList2 where 
 -- Polymorphic lists 2: require smart-app-arg & smart-app-res: Should fail w/o smart-app-arg

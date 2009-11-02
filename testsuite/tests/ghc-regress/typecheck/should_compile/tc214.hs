@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -XGADTs #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XGADTs #-}
 
 -- This program sent GHC 6.6 into a loop, because the fixpointing
 -- of the substitution in type refinement got its in-scope-set

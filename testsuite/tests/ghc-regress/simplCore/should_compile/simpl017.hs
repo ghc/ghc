@@ -1,4 +1,4 @@
-{-# OPTIONS -XImpredicativeTypes -XEmptyDataDecls -XGADTs -XLiberalTypeSynonyms -XFlexibleInstances #-}
+{-# OPTIONS -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs -XLiberalTypeSynonyms -XFlexibleInstances #-}
 
 -- See Trac #1627.  The point is that we should get nice
 -- 		    compact code for Foo

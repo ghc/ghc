@@ -1,4 +1,4 @@
-{-# OPTIONS -XImpredicativeTypes #-}
+{-# OPTIONS -XImpredicativeTypes -fno-warn-deprecated-flags #-}
 
 module ShouldFail where
 

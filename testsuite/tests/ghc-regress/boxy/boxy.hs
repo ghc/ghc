@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -XScopedTypeVariables #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XScopedTypeVariables #-}
 
 module ShouldCompile where
 

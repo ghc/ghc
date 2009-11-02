@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes #-}
+{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags #-}
 
 module Base1 where 
 -- basic examples of impredicative instantiation of variables 
