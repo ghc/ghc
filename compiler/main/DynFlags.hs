@@ -1812,7 +1812,7 @@ xFlags = [
   ( "Rank2Types",                       Opt_Rank2Types, const Supported ),
   ( "RankNTypes",                       Opt_RankNTypes, const Supported ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, 
-        const $ Deprecated "Impredicative polymorphism will be simplified or removed in GHC 6.14" ),
+        const $ Deprecated "impredicative polymorphism will be simplified or removed in GHC 6.14" ),
   ( "TypeOperators",                    Opt_TypeOperators, const Supported ),
   ( "RecursiveDo",                      Opt_RecursiveDo,
     deprecatedForLanguage "DoRec"),
