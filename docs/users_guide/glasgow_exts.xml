@@ -7541,6 +7541,14 @@ itself, so an INLINE pragma is always ignored.</para>
         portable).</para>
       </sect3>
 
+      <sect3 id="conlike-pragma">
+	<title>CONLIKE modifier</title>
+	<indexterm><primary>CONLIKE</primary></indexterm>
+        <para>An INLINE or NOINLINE pragma may have a CONLIKE modifier, 
+        which affects matching in RULEs (only).  See <xref linkend="conlike"/>.
+        </para>
+      </sect3>
+
       <sect3 id="phase-control">
 	<title>Phase control</title>
 
@@ -8176,18 +8184,24 @@ not be substituted, and the rule would not fire.
 
 </para>
 </listitem>
-<listitem>
+</itemizedlist>
+
+</para>
+
+</sect2>
+
+<sect2 id="conlike">
+<title>How rules interact with INLINE/NOINLINE and CONLIKE pragmas</title>
 
 <para>
 Ordinary inlining happens at the same time as rule rewriting, which may lead to unexpected
 results.  Consider this (artificial) example
 <programlisting>
 f x = x
-{-# RULES "f" f True = False #-}
-
 g y = f y
-
 h z = g True
+
+{-# RULES "f" f True = False #-}
 </programlisting>
 Since <literal>f</literal>'s right-hand side is small, it is inlined into <literal>g</literal>,
 to give
@@ -8201,14 +8215,37 @@ would have been a better chance that <literal>f</literal>'s RULE might fire.
 </para>
 <para>
 The way to get predictable behaviour is to use a NOINLINE 
-pragma on <literal>f</literal>, to ensure
+pragma, or an INLINE[<replaceable>phase</replaceable>] pragma, on <literal>f</literal>, to ensure
 that it is not inlined until its RULEs have had a chance to fire.
 </para>
-</listitem>
-</itemizedlist>
-
+<para>
+GHC is very cautious about duplicating work.  For example, consider
+<programlisting>
+f k z xs = let xs = build g
+           in ...(foldr k z xs)...sum xs...
+{-# RULES "foldr/build" forall k z g. foldr k z (build g) = g k z #-}
+</programlisting>
+Since <literal>xs</literal> is used twice, GHC does not fire the foldr/build rule.  Rightly
+so, because it might take a lot of work to compute <literal>xs</literal>, which would be
+duplicated if the rule fired.
 </para>
-
+<para>
+Sometimes, however, this approach is over-cautious, and we <emphasis>do</emphasis> want the
+rule to fire, even though doing so would duplicate redex.  There is no way that GHC can work out
+when this is a good idea, so we provide the CONLIKE pragma to declare it, thus:
+<programlisting>
+{-# INLINE[1] CONLIKE f #-}
+f x = <replaceable>blah</replaceable>
+</programlisting>
+CONLIKE is a modifier to an INLINE or NOINLINE pragam.  It specifies that an application
+of f to one argument (in general, the number of arguments to the left of the '=' sign)
+should be considered cheap enough to duplicate, if such a duplication would make rule
+fire.  (The name "CONLIKE" is short for "constructor-like", because constructors certainly
+have such a property.)
+The CONLIKE pragam is a modifier to INLINE/NOINLINE because it really only makes sense to match 
+<literal>f</literal> on the LHS of a rule if you are sure that <literal>f</literal> is
+not going to be inlined before the rule has a chance to fire.
+</para>
 </sect2>
 
 <sect2>
@@ -8480,15 +8517,22 @@ comparison.
  Use <option>-ddump-rules</option> to see what transformation rules GHC is using.
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
  Use <option>-ddump-simpl-stats</option> to see what rules are being fired.
 If you add <option>-dppr-debug</option> you get a more detailed listing.
 </para>
 </listitem>
-<listitem>
 
+<listitem>
+<para>
+ Use <option>-ddump-rule-firings</option> to see in great detail what rules are being fired.
+If you add <option>-dppr-debug</option> you get a still more detailed listing.
+</para>
+</listitem>
+
+<listitem>
 <para>
  The definition of (say) <function>build</function> in <filename>GHC/Base.lhs</filename> looks like this:
 
