@@ -67,6 +67,12 @@ test('T1969',
 # for it.  The residency of this test will jump by 10MB to 40MB or so
 # on x86-64 if the space leak appears.
 
+# Only run this one if we have an NCG:
+if 'optasm' in config.compile_ways:
+   conf_3294 = only_ways(['normal'])
+else:
+   conf_3294 = skip
+
 test('T3294',
      [if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 14000000,
@@ -86,7 +92,7 @@ test('T3294',
           compiler_stats_num_field('bytes allocated', 1200000000,
                                                       1500000000)),
                                     # expected value: 1357587088 (amd64/Linux)
-      only_ways(['normal'])
+      conf_3294
       ],
      compile,
      [''])
