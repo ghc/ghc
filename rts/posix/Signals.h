@@ -24,6 +24,8 @@ extern siginfo_t *next_pending_handler;
 void startSignalHandlers(Capability *cap);
 #endif
 
+Capability *ioManagerStartCap (Capability *cap);
+
 extern StgInt *signal_handlers;
 
 END_RTS_PRIVATE
