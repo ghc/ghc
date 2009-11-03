@@ -816,6 +816,21 @@ endif
 INSTALLED_PACKAGES = $(filter-out haskeline mtl terminfo,$(PACKAGES))
 HIDDEN_PACKAGES = binary
 
+define set_INSTALL_DISTDIR
+# $1 = libraries/base, $2 = dist-install
+# =>
+# INSTALL_DISTDIR_libraries/base = dist-install
+INSTALL_DISTDIR_$1 = $2
+endef
+
+$(eval $(foreach p,$(INSTALLED_PACKAGES) $(PACKAGES_STAGE2),\
+$(call set_INSTALL_DISTDIR,libraries/$p,dist-install)))
+INSTALL_DISTDIR_compiler = stage2
+
+ALL_INSTALLED_PACKAGES = $(addprefix libraries/,$(INSTALLED_PACKAGES)) \
+                         compiler \
+                         $(addprefix libraries/,$(PACKAGES_STAGE2))
+
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) $(DESTDIR)$(topdir)
@@ -823,24 +838,17 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) $(INSTALLED_PACKAGE_CONF)
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf $(INSTALLED_PACKAGE_CONF) update rts/package.conf.install
-	$(foreach p, $(INSTALLED_PACKAGES) $(PACKAGES_STAGE2),\
+	$(foreach p, $(ALL_INSTALLED_PACKAGES),\
 	    "$(GHC_CABAL_INPLACE)" install \
 		 $(INSTALLED_GHC_REAL) \
 		 $(INSTALLED_GHC_PKG_REAL) \
 		 $(DESTDIR)$(topdir) \
-		 libraries/$p dist-install \
+		 $p $(INSTALL_DISTDIR_$p) \
 		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
 		 $(RelocatableBuild) &&) true
 	$(foreach p, $(HIDDEN_PACKAGES),\
 	    $(INSTALLED_GHC_PKG_REAL) --global-conf $(INSTALLED_PACKAGE_CONF) \
 	                              hide $p &&) true
-	"$(GHC_CABAL_INPLACE)" install \
-		 $(INSTALLED_GHC_REAL) \
-	 	 $(INSTALLED_GHC_PKG_REAL) \
-		 $(DESTDIR)$(topdir) \
-		 compiler stage2 \
-		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
-		 $(RelocatableBuild)
 
 # -----------------------------------------------------------------------------
 # Binary distributions
