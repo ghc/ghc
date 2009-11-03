@@ -1,0 +1,6 @@
+Stopped at ../getargs.hs:(3,7)-(5,10)
+_result :: IO () = _
+Stopped at ../getargs.hs:4:11-17
+_result :: IO [String] = _
+Stopped at ../getargs.hs:5:2-10
+arg :: String = ['4','2']

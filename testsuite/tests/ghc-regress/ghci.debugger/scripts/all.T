@@ -81,3 +81,5 @@ test('list002', normal, ghci_script, ['list002.script'])
 test('hist001', normal, ghci_script, ['hist001.script'])
 
 test('2740', normal, ghci_script, ['2740.script'])
+
+test('getargs', normal, ghci_script, ['getargs.script'])

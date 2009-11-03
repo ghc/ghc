@@ -1,0 +1,5 @@
+:l ../getargs.hs
+:set args 42
+:step main
+:step
+:step
