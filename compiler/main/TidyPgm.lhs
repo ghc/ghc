@@ -18,7 +18,7 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CoreUtils
-import CoreArity	( exprArity )
+import CoreArity	( exprArity, exprBotStrictness_maybe )
 import Class		( classSelIds )
 import VarEnv
 import VarSet
@@ -969,18 +969,27 @@ tidyTopPair :: Bool  -- show unfolding
 	-- in the IdInfo of one early in the group
 
 tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
-  = (bndr', rhs')
+  = WARN( not _bottom_exposed, ppr bndr1 )
+    (bndr1, rhs1)
   where
-    bndr' = mkGlobalId details name' ty' idinfo'
+    -- If the cheap-and-cheerful bottom analyser can see that
+    -- the RHS is bottom, it should jolly well be exposed
+    _bottom_exposed = case exprBotStrictness_maybe rhs of
+                        Nothing         -> True
+                        Just (arity, _) -> appIsBottom str arity
+        where
+          str = newStrictnessInfo idinfo `orElse` topSig
+
+    bndr1   = mkGlobalId details name' ty' idinfo'
     details = idDetails bndr	-- Preserve the IdDetails
     ty'	    = tidyTopType (idType bndr)
-    rhs'    = tidyExpr rhs_tidy_env rhs
+    rhs1    = tidyExpr rhs_tidy_env rhs
     idinfo  = idInfo bndr
     idinfo' = tidyTopIdInfo (isExternalName name')
 			    idinfo unfold_info
 			    arity caf_info
 
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs' (unfoldingInfo idinfo)
+    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs1 (unfoldingInfo idinfo)
 		| otherwise   = noUnfolding
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
