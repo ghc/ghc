@@ -48,6 +48,7 @@ import IdInfo
 import Unique
 import UniqSupply
 import Maybes
+import BasicTypes ( isAlwaysActive )
 import Outputable
 import PprCore		()		-- Instances
 import FastString
@@ -667,6 +668,7 @@ simpleOptExpr expr
 
       | isId b		-- let x = e in <body>
       , safe_to_inline (idOccInfo b) || exprIsTrivial r'
+      , isAlwaysActive (idInlineActivation b)	-- Note [Inline prag in simplOpt]
       = Left (extendIdSubst subst b r')
       
       | otherwise
@@ -682,3 +684,22 @@ simpleOptExpr expr
     safe_to_inline (IAmALoopBreaker {})     = False
     safe_to_inline NoOccInfo                = False
 \end{code}
+
+Note [Inline prag in simplOpt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If there's an INLINE/NOINLINE pragma that restricts the phase in 
+which the binder can be inlined, we don't inline here; after all,
+we don't know what phase we're in.  Here's an example
+
+  foo :: Int -> Int -> Int
+  {-# INLINE foo #-}
+  foo m n = inner m
+     where
+       {-# INLINE [1] inner #-}
+       inner m = m+n
+
+  bar :: Int -> Int
+  bar n = foo n 1
+
+When inlining 'foo' in 'bar' we want the let-binding for 'inner' 
+to remain visible until Phase 1
