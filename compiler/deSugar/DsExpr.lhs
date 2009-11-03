@@ -656,6 +656,7 @@ dsExplicitList elt_ty xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
        ; if opt_SimpleListLiterals 	       		-- -fsimple-list-literals
          || not (dopt Opt_EnableRewriteRules dflags)	-- Rewrite rules off
+	    	-- Don't generate a build if there are no rules to eliminate it!
          || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!
          then return $ mkListExpr elt_ty xs'
          else mkBuildExpr elt_ty (mkSplitExplicitList dynamic_prefix static_suffix) }
