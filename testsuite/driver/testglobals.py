@@ -80,6 +80,9 @@ class TestConfig:
         # Do we have profiling support?
         self.have_profiling = False
 
+        # Do we have shared libraries?
+        self.have_shared_libs = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
