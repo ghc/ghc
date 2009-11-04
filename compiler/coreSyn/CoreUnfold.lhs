@@ -121,6 +121,7 @@ mkCoreUnfolding top_lvl expr arity guidance
     		    uf_arity      = arity,
 		    uf_is_top 	  = top_lvl,
 		    uf_is_value   = exprIsHNF expr,
+                    uf_is_conlike = exprIsConLike expr,
 		    uf_is_cheap   = exprIsCheap expr,
 		    uf_expandable = exprIsExpandable expr,
 		    uf_guidance   = guidance }
@@ -958,10 +959,10 @@ interestingArg e = go e 0
        	 	     	     		--    data constructors here
        | idArity v > n	   = ValueArg	-- Catches (eg) primops with arity but no unfolding
        | n > 0	           = NonTrivArg	-- Saturated or unknown call
-       | evald_unfolding   = ValueArg	-- n==0; look for a value
+       | conlike_unfolding = ValueArg	-- n==0; look for an interesting unfolding
        | otherwise	   = TrivArg	-- n==0, no useful unfolding
        where
-         evald_unfolding = isEvaldUnfolding (idUnfolding v)
+         conlike_unfolding = isConLikeUnfolding (idUnfolding v)
 
     go (Type _)          _ = TrivArg
     go (App fn (Type _)) n = go fn n    

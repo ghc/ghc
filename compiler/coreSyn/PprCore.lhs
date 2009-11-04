@@ -398,13 +398,15 @@ instance Outputable Unfolding where
   ppr (OtherCon cs)           = ptext (sLit "OtherCon") <+> ppr cs
   ppr (DFunUnfolding con ops) = ptext (sLit "DFun") <+> ppr con
                                  <+> brackets (pprWithCommas pprParendExpr ops)
-  ppr (CoreUnfolding { uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf, uf_is_cheap=cheap
+  ppr (CoreUnfolding { uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
+                     , uf_is_conlike=conlike, uf_is_cheap=cheap
       		     , uf_expandable=exp, uf_guidance=g, uf_arity=arity}) 
 	= ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
     where
       pp_info = hsep [ ptext (sLit "TopLvl=") <> ppr top 
                      , ptext (sLit "Arity=") <> int arity
                      , ptext (sLit "Value=") <> ppr hnf
+                     , ptext (sLit "ConLike=") <> ppr conlike
                      , ptext (sLit "Cheap=") <> ppr cheap
                      , ptext (sLit "Expandable=") <> ppr exp
                      , ppr g ]

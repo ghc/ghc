@@ -45,7 +45,7 @@ module CoreSyn (
 	unfoldingTemplate, setUnfoldingTemplate,
 	maybeUnfoldingTemplate, otherCons, unfoldingArity,
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
-        isExpandableUnfolding, 
+        isExpandableUnfolding, isConLikeUnfolding,
 	isInlineRule, isInlineRule_maybe, isClosedUnfolding, hasSomeUnfolding, 
 	isStableUnfolding, canUnfold, neverUnfoldGuidance,
 
@@ -413,6 +413,8 @@ data Unfolding
 	uf_is_top     :: Bool,		-- True <=> top level binding
 	uf_is_value   :: Bool,		-- exprIsHNF template (cached); it is ok to discard a `seq` on
 		      			--	this variable
+        uf_is_conlike :: Bool,          -- True <=> application of constructor or CONLIKE function
+                                        --      Cached version of exprIsConLike
 	uf_is_cheap   :: Bool,		-- True <=> doesn't waste (much) work to expand inside an inlining
 					-- 	Cached version of exprIsCheap
 	uf_expandable :: Bool,		-- True <=> can expand in RULE matching
@@ -496,8 +498,9 @@ mkOtherCon = OtherCon
 seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top, 
 		uf_is_value = b1, uf_is_cheap = b2, 
-	   	uf_expandable = b3, uf_arity = a, uf_guidance = g})
-  = seqExpr e `seq` top `seq` b1 `seq` a `seq` b2 `seq` b3 `seq` seqGuidance g
+	   	uf_expandable = b3, uf_is_conlike = b4,
+                uf_arity = a, uf_guidance = g})
+  = seqExpr e `seq` top `seq` b1 `seq` a `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
 
 seqUnfolding _ = ()
 
@@ -540,6 +543,13 @@ isEvaldUnfolding :: Unfolding -> Bool
 isEvaldUnfolding (OtherCon _)		                    = True
 isEvaldUnfolding (CoreUnfolding { uf_is_value = is_evald }) = is_evald
 isEvaldUnfolding _                                          = False
+
+-- | @True@ if the unfolding is a constructor application, the application
+-- of a CONLIKE function or 'OtherCon'
+isConLikeUnfolding :: Unfolding -> Bool
+isConLikeUnfolding (OtherCon _)                             = True
+isConLikeUnfolding (CoreUnfolding { uf_is_conlike = con })  = con
+isConLikeUnfolding _                                        = False
 
 -- | Is the thing we will unfold into certainly cheap?
 isCheapUnfolding :: Unfolding -> Bool

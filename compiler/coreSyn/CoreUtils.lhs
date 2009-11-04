@@ -26,7 +26,7 @@ module CoreUtils (
 	-- * Properties of expressions
 	exprType, coreAltType, coreAltsType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, exprIsExpandable,
-	exprIsHNF,exprOkForSpeculation, exprIsBig, 
+	exprIsHNF, exprOkForSpeculation, exprIsBig, exprIsConLike,
 	rhsIsStatic,
 
 	-- * Expression and bindings size
@@ -662,6 +662,45 @@ idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 \end{code}
 
 \begin{code}
+-- | Returns true for values or value-like expressions. These are lambdas,
+-- constructors / CONLIKE functions (as determined by the function argument)
+-- or PAPs.
+--
+exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
+exprIsHNFlike is_con is_con_unf = is_hnf_like
+  where
+    is_hnf_like (Var v) 
+                        -- NB: There are no value args at this point
+      =  is_con v   	-- Catches nullary constructors, 
+			--	so that [] and () are values, for example
+      || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
+      || is_con_unf (idUnfolding v)
+	-- Check the thing's unfolding; it might be bound to a value
+	-- A worry: what if an Id's unfolding is just itself: 
+	-- then we could get an infinite loop...
+
+    is_hnf_like (Lit _)          = True
+    is_hnf_like (Type _)         = True       -- Types are honorary Values;
+                                              -- we don't mind copying them
+    is_hnf_like (Lam b e)        = isRuntimeVar b || is_hnf_like e
+    is_hnf_like (Note _ e)       = is_hnf_like e
+    is_hnf_like (Cast e _)       = is_hnf_like e
+    is_hnf_like (App e (Type _)) = is_hnf_like e
+    is_hnf_like (App e a)        = app_is_value e [a]
+    is_hnf_like _                = False
+
+    -- There is at least one value argument
+    app_is_value :: CoreExpr -> [CoreArg] -> Bool
+    app_is_value (Var fun) args
+      = idArity fun > valArgCount args	  -- Under-applied function
+        || is_con fun    		  --  or constructor-like
+    app_is_value (Note _ f) as = app_is_value f as
+    app_is_value (Cast f _) as = app_is_value f as
+    app_is_value (App f a)  as = app_is_value f (a:as)
+    app_is_value _          _  = False
+\end{code}
+
+\begin{code}
 
 -- | This returns true for expressions that are certainly /already/ 
 -- evaluated to /head/ normal form.  This is used to decide whether it's ok 
@@ -692,34 +731,15 @@ idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 -- happen: see "CoreSyn#let_app_invariant". This invariant states that arguments of
 -- unboxed type must be ok-for-speculation (or trivial).
 exprIsHNF :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
-exprIsHNF (Var v) 	-- NB: There are no value args at this point
-  =  isDataConWorkId v 	-- Catches nullary constructors, 
-			--	so that [] and () are values, for example
-  || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
-  || isEvaldUnfolding (idUnfolding v)
-	-- Check the thing's unfolding; it might be bound to a value
-	-- A worry: what if an Id's unfolding is just itself: 
-	-- then we could get an infinite loop...
+exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
+\end{code}
 
-exprIsHNF (Lit _)          = True
-exprIsHNF (Type _)         = True       -- Types are honorary Values;
-                                        -- we don't mind copying them
-exprIsHNF (Lam b e)        = isRuntimeVar b || exprIsHNF e
-exprIsHNF (Note _ e)       = exprIsHNF e
-exprIsHNF (Cast e _)       = exprIsHNF e
-exprIsHNF (App e (Type _)) = exprIsHNF e
-exprIsHNF (App e a)        = app_is_value e [a]
-exprIsHNF _                = False
-
--- There is at least one value argument
-app_is_value :: CoreExpr -> [CoreArg] -> Bool
-app_is_value (Var fun) args
-  = idArity fun > valArgCount args	  -- Under-applied function
-    || isDataConWorkId fun 		  --  or data constructor
-app_is_value (Note _ f) as = app_is_value f as
-app_is_value (Cast f _) as = app_is_value f as
-app_is_value (App f a)  as = app_is_value f (a:as)
-app_is_value _          _  = False
+\begin{code}
+-- | Similar to 'exprIsHNF' but includes CONLIKE functions as well as
+-- data constructors. Conlike arguments are considered interesting by the
+-- inliner.
+exprIsConLike :: CoreExpr -> Bool	-- True => lambda, conlike, PAP
+exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
 \end{code}
 
 These InstPat functions go here to avoid circularity between DataCon and Id
