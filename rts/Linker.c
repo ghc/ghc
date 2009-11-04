@@ -1076,7 +1076,7 @@ static void ghciInsertStrHashTable ( char* obj_name,
                                      void *data
 				   )
 {
-#define GHC_CONC "base_GHCziConc"
+#define GHC_CONC MAYBE_LEADING_UNDERSCORE_STR("base_GHCziConc")
 
     if (lookupHashTable(table, (StgWord)key) == NULL)
     {
