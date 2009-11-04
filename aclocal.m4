@@ -415,7 +415,7 @@ else
   touch conftest.dummy
   for fp_var in clqsZ clqs cqs clq cq ; do
      rm -f conftest.a
-     if $fp_prog_ar_raw $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
+     if "$fp_prog_ar_raw" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
         fp_cv_prog_ar_args=$fp_var
         break
      fi
@@ -1207,7 +1207,7 @@ if test ! -f utils/ghc-pwd/ghc-pwd && test ! -f utils/ghc-pwd/ghc-pwd.exe; then
   rm -f *.hi
   rm -f ghc-pwd
   rm -f ghc-pwd.exe
-  $WithGhc -v0 --make ghc-pwd -o ghc-pwd
+  "$WithGhc" -v0 --make ghc-pwd -o ghc-pwd
   cd ../..
 fi
 

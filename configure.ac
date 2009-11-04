@@ -156,7 +156,7 @@ fi;
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
 then
-    ghc_host=`${WithGhc} +RTS --info | grep 'Host platform' | sed -e 's/.*, "//' -e 's/")//'`
+    ghc_host=`"${WithGhc}" +RTS --info | grep 'Host platform' | sed -e 's/.*, "//' -e 's/")//'`
 
     if test "$ghc_host" = "i386-unknown-mingw32"
     then
@@ -165,7 +165,7 @@ then
             WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
         else
             # Canonicalise to <drive>:/path/to/ghc
-            WithGhc=`cygpath -m ${WithGhc}`
+            WithGhc=`cygpath -m "${WithGhc}"`
         fi
         echo "GHC path canonicalised to: ${WithGhc}"
     fi
@@ -212,7 +212,7 @@ if test "$build" = ""
 then
     if test "${WithGhc}" != ""
     then
-        build=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        build=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
         echo "Build platform inferred as: $build"
     else
         echo "Can't work out build platform"
@@ -224,7 +224,7 @@ if test "$host" = ""
 then
     if test "${WithGhc}" != ""
     then
-        host=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        host=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
         echo "Host platform inferred as: $host"
     else
         echo "Can't work out host platform"
@@ -236,7 +236,7 @@ if test "$target" = ""
 then
     if test "${WithGhc}" != ""
     then
-        target=`${WithGhc} +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        target=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
         echo "Target platform inferred as: $target"
     else
         echo "Can't work out target platform"
