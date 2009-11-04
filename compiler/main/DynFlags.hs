@@ -546,7 +546,9 @@ isNoLink _      = False
 -- Is it worth evaluating this Bool and caching it in the DynFlags value
 -- during initDynFlags?
 doingTickyProfiling :: DynFlags -> Bool
-doingTickyProfiling dflags = WayTicky `elem` wayNames dflags
+doingTickyProfiling _ = opt_Ticky
+  -- XXX -ticky is a static flag, because it implies -debug which is also
+  -- static.  If the way flags were made dynamic, we could fix this.
 
 data PackageFlag
   = ExposePackage  String

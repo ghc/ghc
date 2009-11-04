@@ -107,7 +107,6 @@ static_flags = [
         ------- ways --------------------------------------------------------
   , Flag "prof"           (NoArg (addWay WayProf)) Supported
   , Flag "eventlog"       (NoArg (addWay WayEventLog)) Supported
-  , Flag "ticky"          (NoArg (addWay WayTicky)) Supported
   , Flag "parallel"       (NoArg (addWay WayPar)) Supported
   , Flag "gransim"        (NoArg (addWay WayGran)) Supported
   , Flag "smp"            (NoArg (addWay WayThreaded))
@@ -115,7 +114,10 @@ static_flags = [
   , Flag "debug"          (NoArg (addWay WayDebug)) Supported
   , Flag "ndp"            (NoArg (addWay WayNDP)) Supported
   , Flag "threaded"       (NoArg (addWay WayThreaded)) Supported
-        -- ToDo: user ways
+
+  , Flag "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug)) Supported
+    -- -ticky enables ticky-ticky code generation, and also implies -debug which
+    -- is required to get the RTS ticky support.
 
         ------ Debugging ----------------------------------------------------
   , Flag "dppr-debug"        (PassFlag addOpt) Supported

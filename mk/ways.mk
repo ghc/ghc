@@ -40,10 +40,6 @@ WAY_v_HC_OPTS=
 WAY_p_NAME=profiling
 WAY_p_HC_OPTS= -prof
 
-# Way 't':
-WAY_t_NAME=ticky-ticky profiling
-WAY_t_HC_OPTS= -ticky
-
 # Way 'l':
 WAY_l_NAME=event logging
 WAY_l_HC_OPTS= -eventlog
@@ -79,10 +75,6 @@ WAY_debug_HC_OPTS=-optc-DDEBUG
 # Way 'debug_p':
 WAY_debug_p_NAME=debug profiled
 WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
-
-# Way 'debug_t':
-WAY_debug_t_NAME=debug ticky-ticky profiling
-WAY_debug_t_HC_OPTS= -ticky -optc-DDEBUG
 
 # Way 'thr_debug':
 WAY_thr_debug_NAME=threaded

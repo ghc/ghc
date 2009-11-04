@@ -235,8 +235,6 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 #   debug_p     : debugging profiled
 #   thr_debug   : debugging threaded
 #   thr_debug_p : debugging threaded profiled
-#   t		: ticky-ticky profiling
-#   debug_t	: debugging ticky-ticky profiling
 #   l           : event logging
 #   thr_l       : threaded and event logging
 #

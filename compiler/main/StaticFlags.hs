@@ -73,6 +73,7 @@ module StaticFlags (
 	v_Ld_inputs,
 	tablesNextToCode,
         opt_StubDeadValues,
+        opt_Ticky,
 
     -- For the parser
     addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready
@@ -290,6 +291,8 @@ tablesNextToCode 		= not opt_Unregisterised
 opt_ErrorSpans :: Bool
 opt_ErrorSpans			= lookUp (fsLit "-ferror-spans")
 
+opt_Ticky :: Bool
+opt_Ticky                       = lookUp (fsLit "-ticky")
 
 -- object files and libraries to be linked in are collected here.
 -- ToDo: perhaps this could be done without a global, it wasn't obvious
@@ -306,7 +309,7 @@ GLOBAL_VAR(v_Ld_inputs,	[],      [String])
 -- non-profiling objects.
 
 -- After parsing the command-line options, we determine which "way" we
--- are building - this might be a combination way, eg. profiling+ticky-ticky.
+-- are building - this might be a combination way, eg. profiling+threaded.
 
 -- We then find the "build-tag" associated with this way, and this
 -- becomes the suffix used to find .hi files and libraries used in
@@ -317,7 +320,6 @@ data WayName
   | WayDebug
   | WayProf
   | WayEventLog
-  | WayTicky
   | WayPar
   | WayGran
   | WayNDP
@@ -337,11 +339,6 @@ allowed_combination way = and [ x `allowedWith` y
 	-- dyn is allowed with everything
 	_ `allowedWith` WayDyn  		= True
 	WayDyn `allowedWith` _		        = True
-
-	-- ticky is (now) allowed with everything
-	-- Indeed, ticky should no longer be a 'way' at all
-	_ `allowedWith` WayTicky  		= True
-	WayTicky `allowedWith` _	        = True
 
 	-- debug is allowed with everything
 	_ `allowedWith` WayDebug		= True
@@ -418,10 +415,6 @@ way_details =
     Way WayEventLog "l" True "RTS Event Logging"
 	[ "-DTRACING"
 	, "-optc-DTRACING" ],
-
-    Way WayTicky "t" True "Ticky-ticky Profiling"  
-	[ "-DTICKY_TICKY"
-	, "-optc-DTICKY_TICKY" ],
 
     Way WayPar "mp" False "Parallel" 
 	[ "-fparallel"

@@ -808,9 +808,9 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
-        -- debug RTS includes support for -ticky and -eventlog
+        -- debug RTS includes support for -eventlog
         ways2 | WayDebug `elem` map wayName ways1 
-              = filter ((`notElem` [WayTicky,WayEventLog]) . wayName) ways1
+              = filter ((/= WayEventLog) . wayName) ways1
               | otherwise
               = ways1
 
