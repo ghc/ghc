@@ -528,7 +528,16 @@ dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage span msg)))
 checkNonStdWay :: DynFlags -> SrcSpan -> IO (Maybe String)
 checkNonStdWay dflags srcspan = do
   let tag = buildTag dflags
-  if null tag || tag == "dyn" then return Nothing else do
+  if null tag {-  || tag == "dyn" -} then return Nothing else do
+    -- see #3604: object files compiled for way "dyn" need to link to the
+    -- dynamic packages, so we can't load them into a statically-linked GHCi.
+    -- we have to treat "dyn" in the same way as "prof".
+    --
+    -- In the future when GHCi is dynamically linked we should be able to relax
+    -- this, but they we may have to make it possible to load either ordinary
+    -- .o files or -dynamic .o files into GHCi (currently that's not possible
+    -- because the dynamic objects contain refs to e.g. __stginit_base_Prelude_dyn
+    -- whereas we have __stginit_base_Prelude_.
   let default_osuf = phaseInputExt StopLn
   if objectSuf dflags == default_osuf
 	then failNonStd srcspan
