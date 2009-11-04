@@ -976,13 +976,13 @@ typedef struct _RtsSymbolVal {
 
 #define RTS_GHC_CONC_SYMBOLS \
       SymI_NeedsProto(base_GHCziConc_pendingDelays_closure) \
-      SymI_NeedsProto(base_GHCziConc_pendingEvents_closure) \
       SymI_NeedsProto(base_GHCziConc_ioManagerThread_closure)
 
 #ifdef mingw32_HOST_OS
 #define RTS_GHC_CONC_OS_SYMBOLS /* empty */
 #else
 #define RTS_GHC_CONC_OS_SYMBOLS \
+      SymI_NeedsProto(base_GHCziConc_pendingEvents_closure) \
       SymI_NeedsProto(base_GHCziConc_prodding_closure) \
       SymI_NeedsProto(base_GHCziConc_sync_closure) \
       SymI_NeedsProto(base_GHCziConc_stick_closure)
