@@ -765,15 +765,13 @@ data DelayReq
   | DelaySTM {-# UNPACK #-} !USecs {-# UNPACK #-} !(TVar Bool)
 
 #ifndef mingw32_HOST_OS
-pendingEvents :: IORef [IOReq]
-#endif
-pendingDelays :: IORef [DelayReq]
 {-# NOINLINE pendingEvents #-}
+pendingEvents :: IORef [IOReq]
+pendingEvents = unsafePerformIO $ newIORef []
+#endif
 {-# NOINLINE pendingDelays #-}
-(pendingEvents,pendingDelays) = unsafePerformIO $ do
-  reqs <- newIORef []
-  dels <- newIORef []
-  return (reqs, dels)
+pendingDelays :: IORef [DelayReq]
+pendingDelays = unsafePerformIO $ newIORef []
 
 {-# NOINLINE ioManagerThread #-}
 ioManagerThread :: MVar (Maybe ThreadId)
