@@ -934,12 +934,25 @@ seqId :: Id	-- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+                       `setSpecInfo` mkSpecInfo [seq_cast_rule]
            
 
     ty  = mkForAllTys [alphaTyVar,openBetaTyVar]
                       (mkFunTy alphaTy (mkFunTy openBetaTy openBetaTy))
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
+
+    seq_cast_rule = BuiltinRule { ru_name  = fsLit "seq of cast"
+                                , ru_fn    = seqName
+                                , ru_nargs = 4
+                                , ru_try   = match_seq_of_cast
+                                }
+
+match_seq_of_cast :: [CoreExpr] -> Maybe CoreExpr     -- Note [RULES for seq]
+match_seq_of_cast [Type _, Type res_ty, Cast scrut co, expr]
+  = Just (Var seqId `mkApps` [Type (fst (coercionKind co)), Type res_ty,
+                              scrut, expr])
+match_seq_of_cast _ = Nothing
 
 ------------------------------------------------
 lazyId :: Id	-- See Note [lazyId magic]
@@ -986,6 +999,12 @@ To make this work, we need to be careful that the magical desugaring
 done in Note [seqId magic] item (c) is *not* done on the LHS of a rule.
 Or rather, we arrange to un-do it, in DsBinds.decomposeRuleLhs.
 
+We also have the following builtin rule:
+
+  seq (x `cast` co) y = seq x y
+
+This eliminates unnecessary casts and also allows other seq rules to
+match more often.
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~

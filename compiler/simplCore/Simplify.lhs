@@ -1450,7 +1450,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
 
 rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
-  = 	-- For this case, see Note [Rules for seq] in MkId
+  = 	-- For this case, see Note [RULES for seq] in MkId
     do { let rhs' = substExpr env rhs
              out_args = [Type (substTy env (idType case_bndr)), 
 	     	         Type (exprType rhs'), scrut, rhs']
@@ -1540,7 +1540,10 @@ where x::F Int.  Then we'd like to rewrite (F Int) to Int, getting
                     in rhs
 
 so that 'rhs' can take advantage of the form of x'.  Notice that Note
-[Case of cast] may then apply to the result.
+[Case of cast] may then apply to the result. We only do this if x is actually
+used in the rhs. There is no point in adding the cast if this is really just a
+seq and doing so would interfere with seq rules (Note [RULES for seq]), in
+particular with the one that removes casts.
 
 This showed up in Roman's experiments.  Example:
   foo :: F Int -> Int -> Int
@@ -1564,8 +1567,9 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 	   -> SimplM (SimplEnv, OutExpr, OutId)
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
-  | Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
-  =  do { case_bndr2 <- newId (fsLit "nt") ty2
+  | not (isDeadBinder case_bndr)
+  , Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
+  = do { case_bndr2 <- newId (fsLit "nt") ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
