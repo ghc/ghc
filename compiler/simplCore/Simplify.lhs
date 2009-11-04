@@ -1518,7 +1518,7 @@ much always zap the OccInfo of the binders.  It doesn't matter much though.
 
 Note [Case of cast]
 ~~~~~~~~~~~~~~~~~~~
-Consider        case (v `cast` co) of x { I# ->
+Consider        case (v `cast` co) of x { I# y ->
                 ... (case (v `cast` co) of {...}) ...
 We'd like to eliminate the inner case.  We can get this neatly by
 arranging that inside the outer case we add the unfolding
