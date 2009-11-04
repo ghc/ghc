@@ -521,10 +521,11 @@ endif
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
    $(patsubst %, libraries/%, $(PACKAGES) $(PACKAGES_STAGE2))
+endif
+
 ifneq "$(BootingFromHc)" "YES"
 BUILD_DIRS += \
    libraries/dph
-endif
 endif
 
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
