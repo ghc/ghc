@@ -1012,7 +1012,7 @@ parseCImport cconv safety nm str =
 
    mk = CImport cconv safety
 
-   hdr_char c = isAscii c && (isAlphaNum c || c `elem` "._")
+   hdr_char c = isAscii c && (isAlphaNum c || c `elem` "._-")
    id_char  c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
