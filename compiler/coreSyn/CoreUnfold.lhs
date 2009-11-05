@@ -120,9 +120,9 @@ mkCoreUnfolding top_lvl expr arity guidance
   = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
     		    uf_arity      = arity,
 		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF expr,
-                    uf_is_conlike = exprIsConLike expr,
-		    uf_is_cheap   = exprIsCheap expr,
+		    uf_is_value   = exprIsHNF        expr,
+                    uf_is_conlike = exprIsConLike    expr,
+		    uf_is_cheap   = exprIsCheap      expr,
 		    uf_expandable = exprIsExpandable expr,
 		    uf_guidance   = guidance }
 
@@ -937,7 +937,7 @@ Note [Conlike is interesting]
 Consider
 	f d = ...((*) d x y)...
 	... f (df d')...
-where df is con-like. Then we'd really like to inline so that the
+where df is con-like. Then we'd really like to inline 'f' so that the
 rule for (*) (df d) can fire.  To do this 
   a) we give a discount for being an argument of a class-op (eg (*) d)
   b) we say that a con-like argument (eg (df d)) is interesting
@@ -960,6 +960,7 @@ interestingArg e = go e 0
        | idArity v > n	   = ValueArg	-- Catches (eg) primops with arity but no unfolding
        | n > 0	           = NonTrivArg	-- Saturated or unknown call
        | conlike_unfolding = ValueArg	-- n==0; look for an interesting unfolding
+                                        -- See Note [Conlike is interesting]
        | otherwise	   = TrivArg	-- n==0, no useful unfolding
        where
          conlike_unfolding = isConLikeUnfolding (idUnfolding v)

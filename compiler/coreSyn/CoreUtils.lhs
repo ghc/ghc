@@ -377,10 +377,12 @@ filters down the matching alternatives in Simplify.rebuildCase.
 
 %************************************************************************
 %*									*
-         Figuring out things about expressions
+             exprIsTrivial
 %*									*
 %************************************************************************
 
+Note [exprIsTrivial]
+~~~~~~~~~~~~~~~~~~~~
 @exprIsTrivial@ is true of expressions we are unconditionally happy to
 		duplicate; simple variables and constants, and type
 		applications.  Note that primop Ids aren't considered
@@ -421,6 +423,14 @@ exprIsTrivial _                = False
 \end{code}
 
 
+%************************************************************************
+%*									*
+             exprIsDupable
+%*									*
+%************************************************************************
+
+Note [exprIsDupable]
+~~~~~~~~~~~~~~~~~~~~
 @exprIsDupable@	is true of expressions that can be duplicated at a modest
 		cost in code size.  This will only happen in different case
 		branches, so there's no issue about duplicating work.
@@ -452,6 +462,14 @@ dupAppSize :: Int
 dupAppSize = 4		-- Size of application we are prepared to duplicate
 \end{code}
 
+%************************************************************************
+%*									*
+             exprIsCheap, exprIsExpandable
+%*									*
+%************************************************************************
+
+Note [exprIsCheap]
+~~~~~~~~~~~~~~~~~~
 @exprIsCheap@ looks at a Core expression and returns \tr{True} if
 it is obviously in weak head normal form, or is cheap to get to WHNF.
 [Note that that's not the same as exprIsDupable; an expression might be
@@ -554,6 +572,12 @@ exprIsExpandable :: CoreExpr -> Bool
 exprIsExpandable = exprIsCheap' isConLikeId	-- See Note [CONLIKE pragma] in BasicTypes
 \end{code}
 
+%************************************************************************
+%*									*
+             exprOkForSpeculation
+%*									*
+%************************************************************************
+
 \begin{code}
 -- | 'exprOkForSpeculation' returns True of an expression that is:
 --
@@ -639,29 +663,55 @@ isDivOp DoubleDivOp      = True
 isDivOp _                = False
 \end{code}
 
-\begin{code}
-{-	Never used -- omitting
--- | True of expressions that are guaranteed to diverge upon execution
-exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
-exprIsBottom e = go 0 e
-               where
-                -- n is the number of args
-                 go n (Note _ e)     = go n e
-                 go n (Cast e _)     = go n e
-                 go n (Let _ e)      = go n e
-                 go _ (Case e _ _ _) = go 0 e   -- Just check the scrut
-                 go n (App e _)      = go (n+1) e
-                 go n (Var v)        = idAppIsBottom v n
-                 go _ (Lit _)        = False
-                 go _ (Lam _ _)      = False
-                 go _ (Type _)       = False
+%************************************************************************
+%*									*
+             exprIsHNF, exprIsConLike
+%*									*
+%************************************************************************
 
-idAppIsBottom :: Id -> Int -> Bool
-idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
--}
+\begin{code}
+-- Note [exprIsHNF]
+-- ~~~~~~~~~~~~~~~~
+-- | exprIsHNF returns true for expressions that are certainly /already/ 
+-- evaluated to /head/ normal form.  This is used to decide whether it's ok 
+-- to change:
+--
+-- > case x of _ -> e
+--
+--    into:
+--
+-- > e
+--
+-- and to decide whether it's safe to discard a 'seq'.
+-- 
+-- So, it does /not/ treat variables as evaluated, unless they say they are.
+-- However, it /does/ treat partial applications and constructor applications
+-- as values, even if their arguments are non-trivial, provided the argument
+-- type is lifted. For example, both of these are values:
+--
+-- > (:) (f x) (map f xs)
+-- > map (...redex...)
+--
+-- because 'seq' on such things completes immediately.
+--
+-- For unlifted argument types, we have to be careful:
+--
+-- > C (f x :: Int#)
+--
+-- Suppose @f x@ diverges; then @C (f x)@ is not a value. However this can't 
+-- happen: see "CoreSyn#let_app_invariant". This invariant states that arguments of
+-- unboxed type must be ok-for-speculation (or trivial).
+exprIsHNF :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
+exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
 \end{code}
 
 \begin{code}
+-- | Similar to 'exprIsHNF' but includes CONLIKE functions as well as
+-- data constructors. Conlike arguments are considered interesting by the
+-- inliner.
+exprIsConLike :: CoreExpr -> Bool	-- True => lambda, conlike, PAP
+exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
+
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
 -- or PAPs.
@@ -669,8 +719,7 @@ idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
 exprIsHNFlike is_con is_con_unf = is_hnf_like
   where
-    is_hnf_like (Var v) 
-                        -- NB: There are no value args at this point
+    is_hnf_like (Var v) -- NB: There are no value args at this point
       =  is_con v   	-- Catches nullary constructors, 
 			--	so that [] and () are values, for example
       || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
@@ -700,47 +749,12 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     app_is_value _          _  = False
 \end{code}
 
-\begin{code}
 
--- | This returns true for expressions that are certainly /already/ 
--- evaluated to /head/ normal form.  This is used to decide whether it's ok 
--- to change:
---
--- > case x of _ -> e
---
--- into:
---
--- > e
---
--- and to decide whether it's safe to discard a 'seq'.
--- So, it does /not/ treat variables as evaluated, unless they say they are.
--- However, it /does/ treat partial applications and constructor applications
--- as values, even if their arguments are non-trivial, provided the argument
--- type is lifted. For example, both of these are values:
---
--- > (:) (f x) (map f xs)
--- > map (...redex...)
---
--- Because 'seq' on such things completes immediately.
---
--- For unlifted argument types, we have to be careful:
---
--- > C (f x :: Int#)
---
--- Suppose @f x@ diverges; then @C (f x)@ is not a value. However this can't 
--- happen: see "CoreSyn#let_app_invariant". This invariant states that arguments of
--- unboxed type must be ok-for-speculation (or trivial).
-exprIsHNF :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
-exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
-\end{code}
-
-\begin{code}
--- | Similar to 'exprIsHNF' but includes CONLIKE functions as well as
--- data constructors. Conlike arguments are considered interesting by the
--- inliner.
-exprIsConLike :: CoreExpr -> Bool	-- True => lambda, conlike, PAP
-exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
-\end{code}
+%************************************************************************
+%*									*
+             Instantiating data constructors
+%*									*
+%************************************************************************
 
 These InstPat functions go here to avoid circularity between DataCon and Id
 
