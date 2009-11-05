@@ -2,6 +2,21 @@ Notes on new codegen (Sept 09)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Things to do:
+ - Refactor Cmm so that it contains only shared stuff
+   Add a module MoribundCmm which contains stuff from
+   Cmm for old code gen path
+
+ - Question: currently we lift procpoints to become separate
+   CmmProcs.  Do we still want to do this?
+    
+   NB: and advantage of continuing to do this is that
+   we can do common-proc elimination!
+
+ - Move to new Cmm rep:
+     * Make native CG consume New Cmm; 
+     * Convert Old Cmm->New Cmm to keep old path alive
+     * Produce New Cmm when reading in .cmm files
+
  - Consider module names
 
  - Top-level SRT threading is a bit ugly
