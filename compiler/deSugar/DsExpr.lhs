@@ -643,6 +643,9 @@ Example: the foldr/single rule in GHC.Base
    foldr k z [x] = ...
 We do not want to generate a build invocation on the LHS of this RULE!
 
+We fix this by disabling rules in rule LHSs, and testing that
+flag here; see Note [Desugaring RULE left hand sides] in Desugar
+
 To test this I've added a (static) flag -fsimple-list-literals, which
 makes all list literals be generated via the simple route.  
 
@@ -657,6 +660,7 @@ dsExplicitList elt_ty xs
        ; if opt_SimpleListLiterals 	       		-- -fsimple-list-literals
          || not (dopt Opt_EnableRewriteRules dflags)	-- Rewrite rules off
 	    	-- Don't generate a build if there are no rules to eliminate it!
+		-- See Note [Desugaring RULE left hand sides] in Desugar
          || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!
          then return $ mkListExpr elt_ty xs'
          else mkBuildExpr elt_ty (mkSplitExplicitList dynamic_prefix static_suffix) }

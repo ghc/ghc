@@ -280,6 +280,6 @@ For the LHS of a RULE we do *not* want to desugar
     [x]   to    build (\cn. x `c` n)
 We want to leave explicit lists simply as chains
 of cons's. We can achieve that slightly indirectly by
-switching off EnableRewriteRules.
+switching off EnableRewriteRules.  See DsExpr.dsExplicitList.
 
 That keeps the desugaring of list comprehensions simple too.
