@@ -28,6 +28,8 @@ import Outputable
 import Constants	(rESERVED_C_STACK_BYTES)
 
 import CLabel
+import UniqSet
+import Unique
 
 -- Size of a PPC memory address, in bytes.
 --
@@ -799,12 +801,13 @@ data JumpDest = DestBlockId BlockId | DestImm Imm
 
 
 canShortcut :: Instr -> Maybe JumpDest
-canShortcut (JXX ALWAYS id) 	= Just (DestBlockId id)
-canShortcut (JMP (OpImm imm)) 	= Just (DestImm imm)
-canShortcut _ 			= Nothing
+canShortcut (JXX ALWAYS id)    = Just (DestBlockId id)
+canShortcut (JMP (OpImm imm))  = Just (DestImm imm)
+canShortcut _                  = Nothing
 
 
--- The helper ensures that we don't follow cycles.
+-- This helper shortcuts a sequence of branches.
+-- The blockset helps avoid following cycles.
 shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
 shortcutJump fn insn = shortcutJump' fn emptyBlockSet insn
   where shortcutJump' fn seen insn@(JXX cc id) =
@@ -820,10 +823,10 @@ shortcutJump fn insn = shortcutJump' fn emptyBlockSet insn
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
   | Just uq <- maybeAsmTemp lab 
-  = CmmStaticLit (CmmLabel (shortBlockId fn (BlockId uq)))
+  = CmmStaticLit (CmmLabel (shortBlockId fn emptyUniqSet (BlockId uq)))
 shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
   | Just uq <- maybeAsmTemp lbl1
-  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn (BlockId uq)) lbl2 off)
+  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn emptyUniqSet (BlockId uq)) lbl2 off)
         -- slightly dodgy, we're ignoring the second label, but this
         -- works with the way we use CmmLabelDiffOff for jump tables now.
 
@@ -832,12 +835,14 @@ shortcutStatic _ other_static
 
 shortBlockId 
 	:: (BlockId -> Maybe JumpDest)
+	-> UniqSet Unique
 	-> BlockId
 	-> CLabel
 
-shortBlockId fn blockid@(BlockId uq) =
-   case fn blockid of
-      Nothing -> mkAsmTempLabel uq
-      Just (DestBlockId blockid')  -> shortBlockId fn blockid'
-      Just (DestImm (ImmCLbl lbl)) -> lbl
-      _other -> panic "shortBlockId"
+shortBlockId fn seen blockid@(BlockId uq) =
+  case (elementOfUniqSet uq seen, fn blockid) of
+    (True, _)    -> mkAsmTempLabel uq
+    (_, Nothing) -> mkAsmTempLabel uq
+    (_, Just (DestBlockId blockid'))  -> shortBlockId fn (addOneToUniqSet seen uq) blockid'
+    (_, Just (DestImm (ImmCLbl lbl))) -> lbl
+    (_, _other) -> panic "shortBlockId"

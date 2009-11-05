@@ -292,7 +292,7 @@ cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
   -- The Sequel is a type-correct assignment, albeit bogus.
   -- The (dead) continuation loops; it would be better to invoke some kind
   -- of panic function here.
-cgCase scrut@(StgApp v []) bndr _ _ _ 
+cgCase scrut@(StgApp v []) bndr _ (PrimAlt _) _ 
   | not (isUnLiftedType (idType v)) && reps_incompatible
   =
     do { mb_cc <- maybeSaveCostCentre True

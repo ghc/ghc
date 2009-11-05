@@ -72,6 +72,7 @@ import Reg
 import RegClass
 import NCGMonad
 
+import BlockId
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
 import PprCmm
@@ -630,10 +631,17 @@ build_mapping (CmmProc info lbl params (ListGraph (head:blocks)))
   where
     -- find all the blocks that just consist of a jump that can be
     -- shorted.
-    (shortcut_blocks, others) = partitionWith split blocks
-    split (BasicBlock id [insn]) | Just dest <- canShortcut insn 
-                                 = Left (id,dest)
-    split other = Right other
+    -- Don't completely eliminate loops here -- that can leave a dangling jump!
+    (_, shortcut_blocks, others) = foldl split (emptyBlockSet, [], []) blocks
+    split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
+        | Just (DestBlockId dest) <- canShortcut insn,
+          (elemBlockSet dest s) || dest == id -- loop checks
+        = (s, shortcut_blocks, b : others)
+    split (s, shortcut_blocks, others) (BasicBlock id [insn])
+        | Just dest <- canShortcut insn
+        = (extendBlockSet s id, (id,dest) : shortcut_blocks, others)
+    split (s, shortcut_blocks, others) other = (s, shortcut_blocks, other : others)
+
 
     -- build a mapping from BlockId to JumpDest for shorting branches
     mapping = foldl add emptyUFM shortcut_blocks
