@@ -1450,7 +1450,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
 
 rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
-  = 	-- For this case, see Note [RULES for seq] in MkId
+  = 	-- For this case, see Note [User-defined RULES for seq] in MkId
     do { let rhs' = substExpr env rhs
              out_args = [Type (substTy env (idType case_bndr)), 
 	     	         Type (exprType rhs'), scrut, rhs']
@@ -1539,13 +1539,31 @@ where x::F Int.  Then we'd like to rewrite (F Int) to Int, getting
            I# x# -> let x = x' `cast` sym co
                     in rhs
 
-so that 'rhs' can take advantage of the form of x'.  Notice that Note
-[Case of cast] may then apply to the result. We only do this if x is actually
-used in the rhs. There is no point in adding the cast if this is really just a
-seq and doing so would interfere with seq rules (Note [RULES for seq]), in
-particular with the one that removes casts.
+so that 'rhs' can take advantage of the form of x'.  
 
-This showed up in Roman's experiments.  Example:
+Notice that Note [Case of cast] may then apply to the result. 
+
+Nota Bene: We only do the [Improving seq] transformation if the 
+case binder 'x' is actually used in the rhs; that is, if the case 
+is *not* a *pure* seq.  
+  a) There is no point in adding the cast to a pure seq.
+  b) There is a good reason not to: doing so would interfere 
+     with seq rules (Note [Built-in RULES for seq] in MkId).
+     In particular, this [Improving seq] thing *adds* a cast
+     while [Built-in RULES for seq] *removes* one, so they
+     just flip-flop.
+
+You might worry about 
+   case v of x { __DEFAULT ->
+      ... case (v `cast` co) of y { I# -> ... }}
+This is a pure seq (since x is unused), so [Improving seq] won't happen.
+But it's ok: the simplifier will replace 'v' by 'x' in the rhs to get
+   case v of x { __DEFAULT ->
+      ... case (x `cast` co) of y { I# -> ... }}
+Now the outer case is not a pure seq, so [Improving seq] will happen,
+and then the inner case will disappear.
+
+The need for [Improving seq] showed up in Roman's experiments.  Example:
   foo :: F Int -> Int -> Int
   foo t n = t `seq` bar n
      where
@@ -1554,11 +1572,9 @@ This showed up in Roman's experiments.  Example:
 Here we'd like to avoid repeated evaluating t inside the loop, by
 taking advantage of the `seq`.
 
-At one point I did transformation in LiberateCase, but it's more robust here.
-(Otherwise, there's a danger that we'll simply drop the 'seq' altogether, before
-LiberateCase gets to see it.)
-
-
+At one point I did transformation in LiberateCase, but it's more
+robust here.  (Otherwise, there's a danger that we'll simply drop the
+'seq' altogether, before LiberateCase gets to see it.)
 
 
 \begin{code}
@@ -1567,7 +1583,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 	   -> SimplM (SimplEnv, OutExpr, OutId)
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
-  | not (isDeadBinder case_bndr)
+  | not (isDeadBinder case_bndr)	-- Not a pure seq!  See the Note!
   , Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)

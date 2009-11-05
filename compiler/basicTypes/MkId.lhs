@@ -942,13 +942,15 @@ seqId = pcMiscPrelId seqName ty info
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
 
+    -- See Note [Built-in RULES for seq]
     seq_cast_rule = BuiltinRule { ru_name  = fsLit "seq of cast"
                                 , ru_fn    = seqName
                                 , ru_nargs = 4
                                 , ru_try   = match_seq_of_cast
                                 }
 
-match_seq_of_cast :: [CoreExpr] -> Maybe CoreExpr     -- Note [RULES for seq]
+match_seq_of_cast :: [CoreExpr] -> Maybe CoreExpr
+    -- See Note [Built-in RULES for seq]
 match_seq_of_cast [Type _, Type res_ty, Cast scrut co, expr]
   = Just (Var seqId `mkApps` [Type (fst (coercionKind co)), Type res_ty,
                               scrut, expr])
@@ -974,10 +976,10 @@ b) Its fixity is set in LoadIface.ghcPrimIface
 c) It has quite a bit of desugaring magic. 
    See DsUtils.lhs Note [Desugaring seq (1)] and (2) and (3)
 
-d) There is some special rule handing: Note [RULES for seq]
+d) There is some special rule handing: Note [User-defined RULES for seq]
 
-Note [RULES for seq]
-~~~~~~~~~~~~~~~~~~~~
+Note [User-defined RULES for seq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Roman found situations where he had
       case (f n) of _ -> e
 where he knew that f (which was strict in n) would terminate if n did.
@@ -999,12 +1001,20 @@ To make this work, we need to be careful that the magical desugaring
 done in Note [seqId magic] item (c) is *not* done on the LHS of a rule.
 Or rather, we arrange to un-do it, in DsBinds.decomposeRuleLhs.
 
-We also have the following builtin rule:
+Note [Built-in RULES for seq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We also have the following built-in rule for seq
 
   seq (x `cast` co) y = seq x y
 
 This eliminates unnecessary casts and also allows other seq rules to
-match more often.
+match more often.  Notably,     
+
+   seq (f x `cast` co) y  -->  seq (f x) y
+  
+and now a user-defined rule for seq (see Note [User-defined RULES for seq])
+may fire.
+
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
