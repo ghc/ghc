@@ -13,7 +13,7 @@ module CoreSubst (
         -- ** Substituting into expressions and related types
 	deShadowBinds, substSpec, substRulesForImportedIds,
 	substTy, substExpr, substBind, substUnfolding,
-	substInlineRuleGuidance, lookupIdSubst, lookupTvSubst, substIdOcc,
+	substInlineRuleInfo, lookupIdSubst, lookupTvSubst, substIdOcc,
 
         -- ** Operations on substitutions
 	emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst, 

@@ -279,7 +279,6 @@ data DynFlag
    | Opt_UnboxStrictFields
    | Opt_MethodSharing
    | Opt_DictsCheap
-   | Opt_InlineIfEnoughArgs
    | Opt_EnableRewriteRules		-- Apply rewrite rules during simplification
    | Opt_Vectorise
    | Opt_RegsGraph                      -- do graph coloring register allocation
@@ -1725,7 +1724,6 @@ fFlags = [
   ( "unbox-strict-fields",              Opt_UnboxStrictFields, const Supported ),
   ( "method-sharing",                   Opt_MethodSharing, const Supported ),
   ( "dicts-cheap",                      Opt_DictsCheap, const Supported ),
-  ( "inline-if-enough-args",            Opt_InlineIfEnoughArgs, const Supported ),
   ( "excess-precision",                 Opt_ExcessPrecision, const Supported ),
   ( "eager-blackholing",                Opt_EagerBlackHoling, const Supported ),
   ( "asm-mangling",                     Opt_DoAsmMangling, const Supported ),
@@ -2148,7 +2146,6 @@ setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          })
                    `dopt_set`   Opt_DictsCheap
                    `dopt_unset` Opt_MethodSharing
-                   `dopt_set`   Opt_InlineIfEnoughArgs
 
 data DPHBackend = DPHPar
                 | DPHSeq
