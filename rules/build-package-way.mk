@@ -26,6 +26,15 @@ $(call hs-objs,$1,$2,$3)
 $1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
 $$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
+# hack: the DEPS_LIBS mechanism assumes that the distdirs for packges
+# that depend on each other are the same, but that is not the case for
+# ghc where we use stage1/stage2 rather than dist/dist-install.
+# Really we should use a consistent scheme for distdirs, but in the
+# meantime we work around it by defining ghc-<ver>_dist-install_way_LIB:
+ifeq "$$($1_PACKAGE) $2" "ghc stage2"
+$$($1_PACKAGE)-$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
+endif
+
 # All the .a/.so library file dependencies for this library
 $1_$2_$3_DEPS_LIBS=$$(foreach dep,$$($1_$2_DEPS),$$($$(dep)_$2_$3_LIB))
 

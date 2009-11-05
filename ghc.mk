@@ -525,7 +525,7 @@ endif
 
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
-   $(patsubst %, libraries/%, $(PACKAGES) $(PACKAGES_STAGE2))
+   $(patsubst %, libraries/%, $(PACKAGES))
 endif
 
 ifneq "$(BootingFromHc)" "YES"
@@ -547,6 +547,12 @@ BUILD_DIRS += \
 ifeq "$(Windows)" "YES"
 BUILD_DIRS += \
    $(GHC_TOUCHY_DIR)
+endif
+
+ifneq "$(CLEANING)" "YES"
+# After compiler/, because these packages depend on it
+BUILD_DIRS += \
+   $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 endif
 
 # XXX libraries/% must come before any programs built with stage1, see
@@ -684,6 +690,15 @@ $(ghc_stage1_depfile) : $(compiler_stage1_v_LIB)
 libraries/bin-package-db/dist-boot/build/Distribution/InstalledPackageInfo/Binary.$(v_osuf) : libraries/binary/dist-boot/build/Data/Binary.$(v_hisuf) libraries/Cabal/dist-boot/build/Distribution/InstalledPackageInfo.$(v_hisuf)
 
 $(foreach pkg,$(BOOT_PKGS),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
+
+# Make sure we have all the GHCi libs by the time we've built
+# ghc-stage2.  DPH includes a bit of Template Haskell which needs the
+# GHCI libs, and we don't have a better way to express that dependency.
+#
+GHCI_LIBS = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_GHCI_LIB)) \
+	    $(compiler_stage2_GHCI_LIB)
+
+ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(GHCI_LIBS)
 
 endif
 
