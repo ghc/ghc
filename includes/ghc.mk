@@ -186,10 +186,10 @@ install: install_includes
 
 .PHONY: install_includes
 install_includes :
-	$(INSTALL_DIR) $(DESTDIR)$(ghcheaderdir)
+	$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)"
 	for d in $(includes_subdirs); do \
-		$(INSTALL_DIR) $(DESTDIR)$(ghcheaderdir)/$$d; \
+		$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)/$$d"; \
 	done
 	for i in $(subst includes/,,$(includes_H_FILES) $(includes_H_CONFIG) $(includes_H_PLATFORM)); do \
-		$(INSTALL_HEADER) $(INSTALL_OPTS) includes/$$i $(DESTDIR)$(ghcheaderdir)/$$i; \
+		$(INSTALL_HEADER) $(INSTALL_OPTS) includes/$$i "$(DESTDIR)$(ghcheaderdir)/$$i"; \
 	done

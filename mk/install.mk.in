@@ -133,8 +133,8 @@ INSTALL_GROUP =
 # Invocations of `install' for the four different classes
 # of targets:
 #
-CREATE_SCRIPT   = create () { touch $$1 && chmod 755 $$1 ; } && create
-CREATE_DATA     = create () { touch $$1 && chmod 644 $$1 ; } && create
+CREATE_SCRIPT   = create () { touch "$$1" && chmod 755 "$$1" ; } && create
+CREATE_DATA     = create () { touch "$$1" && chmod 644 "$$1" ; } && create
 INSTALL_PROGRAM = $(INSTALL) -m 755
 INSTALL_SCRIPT  = $(INSTALL) -m 755
 INSTALL_SHLIB   = $(INSTALL) -m 755

@@ -784,12 +784,6 @@ ICONV_LIB_DIRS = @ICONV_LIB_DIRS@
 #
 ################################################################################
 
-ifeq "$(Windows)" "YES"
 BIN_DIST_INST_SUBDIR = "install dir"
-else
-# I very much doubt that paths with spaces will work on Unix
-BIN_DIST_INST_SUBDIR = installed
-endif
-
 BIN_DIST_INST_DIR = $(TOP)/bindisttest/$(BIN_DIST_INST_SUBDIR)
 

@@ -153,8 +153,8 @@ ifeq "$(Windows)" "NO"
 install: install_ghc_link
 .PNONY: install_ghc_link
 install_ghc_link: 
-	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghc
-	$(LN_S) ghc-$(ProjectVersion) $(DESTDIR)$(bindir)/ghc
+	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/ghc"
+	$(LN_S) ghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghc"
 else
 # On Windows we install the main binary as $(bindir)/ghc.exe
 # To get ghc-<version>.exe we have a little C program in driver/ghc
