@@ -24,15 +24,15 @@ utils/haddock_dist_MODULES += Paths_haddock
 install: install_utils/haddock_html
 .PHONY: install_utils/haddock_html
 install_utils/haddock_html:
-	$(INSTALL_DIR) $(DESTDIR)$(docdir)/html
-	"$(CP)" -R utils/haddock/html $(DESTDIR)$(docdir)/html
+	$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html"
+	"$(CP)" -R utils/haddock/html "$(DESTDIR)$(docdir)/html"
 
 install: install_utils/haddock_data
 .PHONY: install_utils/haddock_data
 install_utils/haddock_data:
-	$(INSTALL_DIR) $(DESTDIR)$(ghclibdir)/html
+	$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)/html"
 	for i in utils/haddock/html/*; do \
-	    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(ghclibdir)/html; \
+	    $(INSTALL_DATA) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)/html"; \
 	done
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/,html/*)
