@@ -1556,7 +1556,7 @@ phase <replaceable>n</replaceable></entry>
 	    </row>
 	    <row>
 	      <entry><option>-ticky</option></entry>
-	      <entry>Turn on ticky-ticky profiling</entry>
+	      <entry><link linkend="ticky-ticky">Turn on ticky-ticky profiling</link></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

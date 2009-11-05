@@ -973,20 +973,13 @@
         </term>
 	<listitem>
 	  <para>Produce &ldquo;ticky-ticky&rdquo; statistics at the
-          end of the program run.  The <replaceable>file</replaceable>
-          business works just like on the <option>-S</option> RTS
-          option (above).</para>
+          end of the program run (only available if the program was
+          linked with <option>-debug</option>).
+          The <replaceable>file</replaceable> business works just like
+          on the <option>-S</option> RTS option, above.</para>
 
-	  <para>&ldquo;Ticky-ticky&rdquo; statistics are counts of
-          various program actions (updates, enters, etc.)  The program
-          must have been compiled using
-          <option>-ticky</option><indexterm><primary><option>-ticky</option></primary></indexterm>
-          (a.k.a. &ldquo;ticky-ticky profiling&rdquo;), and, for it to
-          be really useful, linked with suitable system libraries.
-          Not a trivial undertaking: consult the installation guide on
-          how to set things up for easy &ldquo;ticky-ticky&rdquo;
-          profiling.  For more information, see <xref
-          linkend="ticky-ticky"/>.</para>
+          <para>For more information on ticky-ticky profiling, see
+          <xref linkend="ticky-ticky"/>.</para>
 	</listitem>
       </varlistentry>
 
