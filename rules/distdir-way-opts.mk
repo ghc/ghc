@@ -75,6 +75,10 @@ else
 $1_$2_DEP_INCLUDE_DIRS_FLAG = -I
 endif
 
+# We have to do this mangling using the shell, because words may contain
+# spaces and GNU make doesn't have any quoting interpretation.
+$1_$2_CC_INC_FLAGS:=$$(shell for i in $$($1_$2_DEP_INCLUDE_DIRS); do echo $$($1_$2_DEP_INCLUDE_DIRS_FLAG)\"$$$$i\"; done)
+
 $1_$2_DIST_CC_OPTS = \
  $$(CONF_CC_OPTS) \
  $$(SRC_CC_OPTS) \
@@ -83,21 +87,26 @@ $1_$2_DIST_CC_OPTS = \
  $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
  $$($1_$2_CC_OPTS) \
  $$($1_$2_CPP_OPTS) \
- $$(foreach dir,$$($1_$2_DEP_INCLUDE_DIRS),$$($1_$2_DEP_INCLUDE_DIRS_FLAG)$$(dir)) \
+ $$($1_$2_CC_INC_FLAGS) \
  $$($1_$2_DEP_CC_OPTS)
+
+$1_$2_DIST_LD_LIB_DIRS:=$$(shell for i in $$($1_$2_DEP_LIB_DIRS); do echo \"-L$$$$i\"; done)
 
 $1_$2_DIST_LD_OPTS = \
  $$(CONF_LD_OPTS) \
  $$(SRC_LD_OPTS) \
  $$($1_LD_OPTS) \
  $$($1_$2_LD_OPTS) \
- $$(foreach opt,$$($1_$2_DEP_LIB_DIRS),-L$$(opt)) \
+ $$($1_$2_DIST_LD_LIB_DIRS) \
  $$(foreach opt,$$($1_$2_DEP_EXTRA_LIBS),-l$$(opt)) \
  $$($1_$2_DEP_LD_OPTS)
 
 # c.f. Cabal's Distribution.Simple.PreProcess.ppHsc2hs
 # We use '' around cflags and lflags to handle paths with backslashes in
 # on Windows
+$1_$2_$3_HSC2HS_CC_OPTS:=$$(shell for i in $$($1_$2_DIST_CC_OPTS); do echo \'--cflag=$$$$i\'; done)
+$1_$2_$3_HSC2HS_LD_OPTS:=$$(shell for i in $$($1_$2_DIST_LD_OPTS); do echo \'--lflag=$$$$i\'; done)
+
 $1_$2_$3_ALL_HSC2HS_OPTS = \
  --cc=$$(WhatGccIsCalled) \
  --ld=$$(WhatGccIsCalled) \
@@ -105,8 +114,8 @@ $1_$2_$3_ALL_HSC2HS_OPTS = \
  $$(SRC_HSC2HS_OPTS) \
  $$(WAY_$3_HSC2HS_OPTS) \
  --cflag=-D__GLASGOW_HASKELL__=$$(ProjectVersionInt) \
- $$(foreach opt,$$($1_$2_DIST_CC_OPTS),'--cflag=$$(opt)') \
- $$(foreach opt,$$($1_$2_DIST_LD_OPTS),'--lflag=$$(opt)') \
+ $$($1_$2_$3_HSC2HS_CC_OPTS) \
+ $$($1_$2_$3_HSC2HS_LD_OPTS) \
  $$($$(basename $$<)_HSC2HS_OPTS) \
  $$(EXTRA_HSC2HS_OPTS)
 

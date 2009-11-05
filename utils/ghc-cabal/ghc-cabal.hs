@@ -363,12 +363,12 @@ generate config_args distdir directory
                 variablePrefix ++ "_CC_OPTS = " ++ unwords (ccOptions bi),
                 variablePrefix ++ "_CPP_OPTS = " ++ unwords (cppOptions bi),
                 variablePrefix ++ "_LD_OPTS = " ++ unwords (ldOptions bi),
-                variablePrefix ++ "_DEP_INCLUDE_DIRS = " ++ unwords (forDeps Installed.includeDirs),
+                variablePrefix ++ "_DEP_INCLUDE_DIRS = " ++ unwords (wrap $ forDeps Installed.includeDirs),
                 variablePrefix ++ "_DEP_CC_OPTS = "    ++ unwords (forDeps Installed.ccOptions),
-                variablePrefix ++ "_DEP_LIB_DIRS = "   ++ unwords (forDeps Installed.libraryDirs),
+                variablePrefix ++ "_DEP_LIB_DIRS = "   ++ unwords (wrap $ forDeps Installed.libraryDirs),
                 variablePrefix ++ "_DEP_EXTRA_LIBS = " ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions)]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
-
+     wrap = map (\s -> "\'" ++ s ++ "\'")

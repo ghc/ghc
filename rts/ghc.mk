@@ -114,7 +114,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) | $$(XARGS) $$(AR) $$(EXTRA_AR_ARGS) $$@
+	echo $$(rts_$1_OBJS) | $$(XARGS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
 endif
 
 endef
@@ -334,7 +334,7 @@ $(DYNWRAPPER_PROG): $(DYNWRAPPER_SRC)
 # build the static lib containing the C main symbol
 
 rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
-	$(AR) $(EXTRA_AR_ARGS) $@ $<
+	"$(AR)" $(AR_OPTS) $(EXTRA_AR_ARGS) $@ $<
 
 # -----------------------------------------------------------------------------
 # The RTS package config

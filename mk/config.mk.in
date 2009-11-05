@@ -563,6 +563,7 @@ HaveLibMingwEx	= @HaveLibMingwEx@
 # Other standard (ha!) Unix utilities
 
 AR			= @ArCmd@
+AR_OPTS			= @ArArgs@
 ArSupportsInput		= @ArSupportsInput@
 # Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
 BASH                    = /usr/local/bin/bash

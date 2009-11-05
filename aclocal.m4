@@ -426,7 +426,8 @@ else
   fi
 fi])
 fp_prog_ar_args=$fp_cv_prog_ar_args
-AC_SUBST([ArCmd], ["$fp_prog_ar $fp_prog_ar_args"])
+AC_SUBST([ArCmd], ["$fp_prog_ar"])
+AC_SUBST([ArArgs], ["$fp_prog_ar_args"])
 
 ])# FP_PROG_AR_ARGS
 
