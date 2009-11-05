@@ -1,4 +1,6 @@
 
 rnfail001.hs:3:2:
     Conflicting definitions for `x'
+    Bound at: rnfail001.hs:3:2
+              rnfail001.hs:3:4
     In the definition of `f'

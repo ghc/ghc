@@ -2,4 +2,3 @@
 rn039.hs:6:15:
     Warning: This binding for `-' shadows the existing binding
                imported from Prelude
-             In the binding group for: -

@@ -1,4 +1,6 @@
 
 TH_spliceD1.hs:10:2:
     Conflicting definitions for `c'
+    Bound at: TH_spliceD1.hs:10:2-4
+              TH_spliceD1.hs:10:2-4
     In the definition of `f'

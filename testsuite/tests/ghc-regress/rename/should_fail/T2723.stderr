@@ -2,4 +2,3 @@
 T2723.hs:15:4:
     Warning: This binding for `field3' shadows the existing binding
                defined at T2723.hs:7:0
-             In the binding group for: field1, field2, field3

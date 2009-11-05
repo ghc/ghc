@@ -1,4 +1,5 @@
 
 mod23.hs:3:7:
     Conflicting definitions for `a'
-    In the declaration for type synonym `T'
+    Bound at: mod23.hs:3:7
+              mod23.hs:3:9

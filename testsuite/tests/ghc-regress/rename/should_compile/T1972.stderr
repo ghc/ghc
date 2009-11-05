@@ -2,12 +2,10 @@
 T1972.hs:12:2:
     Warning: This binding for `name' shadows the existing binding
                defined at T1972.hs:9:18
-             In the definition of `h'
 
 T1972.hs:14:2:
     Warning: This binding for `mapAccumL' shadows the existing bindings
                defined at T1972.hs:16:0
                imported from Data.List at T1972.hs:7:0-15
-             In the definition of `f'
 
 T1972.hs:20:9: Warning: Defined but not used: `c'

@@ -2,5 +2,4 @@
 Simple2b.hs:9:10:
     Conflicting definitions for `Sd'
     Bound at: Simple2b.hs:9:10-11
-	      Simple2b.hs:10:10-11
-    In the associated types of an instance declaration
+              Simple2b.hs:10:10-11

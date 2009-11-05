@@ -2,5 +2,4 @@
 mdofail003.hs:10:8:
     Conflicting definitions for `x'
     Bound at: mdofail003.hs:10:8
-	      mdofail003.hs:11:12
-    In a recursive mdo-expression
+              mdofail003.hs:11:12
