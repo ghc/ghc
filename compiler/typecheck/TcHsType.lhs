@@ -1049,7 +1049,7 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
 
 \begin{code}
 pprHsSigCtxt :: UserTypeCtxt -> LHsType Name -> SDoc
-pprHsSigCtxt ctxt hs_ty = vcat [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> colon, 
+pprHsSigCtxt ctxt hs_ty = sep [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> colon, 
 				 nest 2 (pp_sig ctxt) ]
   where
     pp_sig (FunSigCtxt n)  = pp_n_colon n
