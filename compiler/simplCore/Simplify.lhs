@@ -335,8 +335,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 -- See Note [Floating and type abstraction] in SimplUtils
 
         -- Simplify the RHS
-        ; (body_env1, body1) <- simplExprF body_env body mkBoringStop
-
+        ; (body_env1, body1) <- simplExprF body_env body mkRhsStop
         -- ANF-ise a constructor or PAP rhs
         ; (body_env2, body2) <- prepareRhs body_env1 body1
 
@@ -1190,8 +1189,8 @@ rebuildCall env fun
         ; rebuildCall env (fun `App` arg') arg_info' cont }
   where
     arg_info' = ArgInfo { ai_rules = has_rules, ai_strs = strs, ai_discs = discs }
-    cci | has_rules || disc > 0 = ArgCtxt has_rules disc  -- Be keener here
-        | otherwise             = BoringCtxt              -- Nothing interesting
+    cci | has_rules || disc > 0 = ArgCtxt has_rules  -- Be keener here
+        | otherwise             = BoringCtxt         -- Nothing interesting
 
 rebuildCall env fun _ cont
   = rebuild env fun cont

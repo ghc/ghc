@@ -604,11 +604,13 @@ instance Outputable ArgSummary where
 
 data CallCtxt = BoringCtxt
 
-	      | ArgCtxt Bool	-- We're somewhere in the RHS of function with rules
-				--	=> be keener to inline
-			Int	-- We *are* the argument of a function with this arg discount
-				--	=> be keener to inline
-		-- INVARIANT: ArgCtxt False 0 ==> BoringCtxt
+	      | ArgCtxt		-- We are somewhere in the argument of a function
+                        Bool	-- True  <=> we're somewhere in the RHS of function with rules
+				-- False <=> we *are* the argument of a function with non-zero
+				-- 	     arg discount
+                                --        OR 
+                                --           we *are* the RHS of a let  Note [RHS of lets]
+                                -- In both cases, be a little keener to inline
 
 	      | ValAppCtxt 	-- We're applied to at least one value arg
 				-- This arises when we have ((f x |> co) y)
@@ -618,10 +620,10 @@ data CallCtxt = BoringCtxt
 				-- that decomposes its scrutinee
 
 instance Outputable CallCtxt where
-  ppr BoringCtxt    = ptext (sLit "BoringCtxt")
-  ppr (ArgCtxt rules disc) = ptext (sLit "ArgCtxt") <> ppr (rules,disc)
-  ppr CaseCtxt 	    = ptext (sLit "CaseCtxt")
-  ppr ValAppCtxt    = ptext (sLit "ValAppCtxt")
+  ppr BoringCtxt      = ptext (sLit "BoringCtxt")
+  ppr (ArgCtxt rules) = ptext (sLit "ArgCtxt") <+> ppr rules
+  ppr CaseCtxt 	      = ptext (sLit "CaseCtxt")
+  ppr ValAppCtxt      = ptext (sLit "ValAppCtxt")
 
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
   = let
@@ -707,6 +709,15 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
     }
 \end{code}
 
+Note [RHS of lets]
+~~~~~~~~~~~~~~~~~~
+Be a tiny bit keener to inline in the RHS of a let, because that might
+lead to good thing later
+     f y = (y,y,y)
+     g y = let x = f y in ...(case x of (a,b,c) -> ...) ...
+We'd inline 'f' if the call was in a case context, and it kind-of-is,
+only we can't see it.  So we treat the RHS of a let as not-totally-boring.
+    
 Note [Unsaturated applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When a call is not saturated, we *still* inline if one of the
@@ -805,6 +816,11 @@ and 20% to 'power'.
 At one stage I replaced this condition by 'True' (leading to the above 
 slow-down).  The motivation was test eyeball/inline1.hs; but that seems
 to work ok now.
+
+NOTE: arguably, we should inline in ArgCtxt only if the result of the
+call is at least CONLIKE.  At least for the cases where we use ArgCtxt
+for the RHS of a 'let', we only profit from the inlining if we get a 
+CONLIKE thing (modulo lets).
 
 Note [Lone variables]
 ~~~~~~~~~~~~~~~~~~~~~

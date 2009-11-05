@@ -16,7 +16,7 @@ module SimplUtils (
 	SimplCont(..), DupFlag(..), ArgInfo(..),
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
 	countValArgs, countArgs, 
-	mkBoringStop, mkLazyArgStop, contIsRhsOrArg,
+	mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, 
 
 	interestingArg, mkArgInfo,
@@ -152,6 +152,9 @@ instance Outputable DupFlag where
 mkBoringStop :: SimplCont
 mkBoringStop = Stop BoringCtxt
 
+mkRhsStop :: SimplCont	-- See Note [RHS of lets] in CoreUnfold
+mkRhsStop = Stop (ArgCtxt False)
+
 mkLazyArgStop :: CallCtxt -> SimplCont
 mkLazyArgStop cci = Stop cci
 
@@ -260,8 +263,9 @@ interestingCallContext cont
   where
     interesting (Select _ bndr _ _ _)
 	| isDeadBinder bndr = CaseCtxt
-	| otherwise	    = ArgCtxt False 2	-- If the binder is used, this
+	| otherwise	    = ArgCtxt False	-- If the binder is used, this
 						-- is like a strict let
+						-- See Note [RHS of lets] in CoreUnfold
 		
     interesting (ApplyTo _ arg _ cont)
 	| isTypeArg arg = interesting cont
@@ -394,8 +398,8 @@ interestingArgContext rules call_cont
     go (CoerceIt _ c)	     = go c
     go (Stop cci)            = interesting cci
 
-    interesting (ArgCtxt rules _) = rules
-    interesting _                 = False
+    interesting (ArgCtxt rules) = rules
+    interesting _               = False
 \end{code}
 
 
