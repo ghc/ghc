@@ -438,10 +438,17 @@ tcTopSplice expr res_ty
 
         -- Rename it, but bale out if there are errors
         -- otherwise the type checker just gives more spurious errors
-       ; (exp3, _fvs) <- checkNoErrs (rnLExpr expr2)
+       ; addErrCtxt (spliceResultDoc expr) $ do 
+       { (exp3, _fvs) <- checkNoErrs (rnLExpr expr2)
 
-       ; exp4 <- tcMonoExpr exp3 res_ty
-       ; return (unLoc exp4) }
+       ; exp4 <- tcMonoExpr exp3 res_ty 
+       ; return (unLoc exp4) } }
+
+spliceResultDoc :: LHsExpr Name -> SDoc
+spliceResultDoc expr
+  = sep [ ptext (sLit "In the result of the splice:")
+        , nest 2 (char '$' <> pprParendExpr expr)
+        , ptext (sLit "To see what the splice expanded to, use -ddump-splices")]
 
 -------------------
 tcTopSpliceExpr :: TcM (LHsExpr Id) -> TcM (LHsExpr Id)
@@ -522,11 +529,11 @@ kcTopSpliceType expr
   
 	-- Rename it, but bale out if there are errors
 	-- otherwise the type checker just gives more spurious errors
-	; let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
+        ; addErrCtxt (spliceResultDoc expr) $ do 
+	{ let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
 	; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
-
 	; (ty4, kind) <- kcLHsType hs_ty3
-        ; return (unLoc ty4, kind) }
+        ; return (unLoc ty4, kind) }}
 \end{code}
 
 %************************************************************************
