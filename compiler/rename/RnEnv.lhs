@@ -25,8 +25,8 @@ module RnEnv (
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
 
-	checkDupRdrNames, checkDupNames, checkShadowedNames, 
-	checkDupAndShadowedRdrNames,
+	checkDupRdrNames, checkDupAndShadowedRdrNames,
+        checkDupAndShadowedNames, 
 	mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
@@ -795,20 +795,11 @@ newLocalBndrsRn :: [Located RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
 ---------------------
-checkDupAndShadowedRdrNames :: SDoc -> [Located RdrName] -> RnM ()
-checkDupAndShadowedRdrNames doc loc_rdr_names
-  = do	{ checkDupRdrNames doc loc_rdr_names
-	; envs <- getRdrEnvs
-	; checkShadowedNames doc envs 
-		[(loc,rdrNameOcc rdr) | L loc rdr <- loc_rdr_names] }
-
----------------------
-bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
-	            -> [Located RdrName]
+bindLocatedLocalsRn :: [Located RdrName]
 	    	    -> ([Name] -> RnM a)
 	    	    -> RnM a
-bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
-  = do { checkDupAndShadowedRdrNames doc_str rdr_names_w_loc
+bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
+  = do { checkDupAndShadowedRdrNames rdr_names_w_loc
 
 	-- Make fresh Names and extend the environment
        ; names <- newLocalBndrsRn rdr_names_w_loc
@@ -835,20 +826,20 @@ bindLocalNamesFV names enclosed_scope
 -------------------------------------
 	-- binLocalsFVRn is the same as bindLocalsRn
 	-- except that it deals with free vars
-bindLocatedLocalsFV :: SDoc -> [Located RdrName] 
+bindLocatedLocalsFV :: [Located RdrName] 
                     -> ([Name] -> RnM (a,FreeVars)) -> RnM (a, FreeVars)
-bindLocatedLocalsFV doc rdr_names enclosed_scope
-  = bindLocatedLocalsRn doc rdr_names	$ \ names ->
+bindLocatedLocalsFV rdr_names enclosed_scope
+  = bindLocatedLocalsRn rdr_names	$ \ names ->
     enclosed_scope names		`thenM` \ (thing, fvs) ->
     return (thing, delListFromNameSet fvs names)
 
 -------------------------------------
-bindTyVarsRn :: SDoc -> [LHsTyVarBndr RdrName]
+bindTyVarsRn ::  [LHsTyVarBndr RdrName]
 	      -> ([LHsTyVarBndr Name] -> RnM a)
 	      -> RnM a
 -- Haskell-98 binding of type variables; e.g. within a data type decl
-bindTyVarsRn doc_str tyvar_names enclosed_scope
-  = bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
+bindTyVarsRn tyvar_names enclosed_scope
+  = bindLocatedLocalsRn located_tyvars	$ \ names ->
     do { kind_sigs_ok <- doptM Opt_KindSignatures
        ; unless (null kinded_tyvars || kind_sigs_ok) 
        	 	(mapM_ (addErr . kindSigErr) kinded_tyvars)
@@ -875,9 +866,7 @@ bindPatSigTyVars tys thing_inside
 		--	f (x :: t) (y :: t) = ....
 		-- We don't want to complain about binding t twice!
 
-	; bindLocatedLocalsRn doc_sig nubbed_tvs thing_inside }}
-  where
-    doc_sig = text "In a pattern type-signature"
+	; bindLocatedLocalsRn nubbed_tvs thing_inside }}
 
 bindPatSigTyVarsFV :: [LHsType RdrName]
 		   -> RnM (a, FreeVars)
@@ -902,30 +891,42 @@ extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
-checkDupRdrNames :: SDoc
-	         -> [Located RdrName]
-	         -> RnM ()
-checkDupRdrNames doc_str rdr_names_w_loc
+checkDupRdrNames :: [Located RdrName] -> RnM ()
+checkDupRdrNames rdr_names_w_loc
   = 	-- Check for duplicated names in a binding group
-    mapM_ (dupNamesErr getLoc doc_str) dups
+    mapM_ (dupNamesErr getLoc) dups
   where
     (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
-checkDupNames :: SDoc
-	      -> [Name]
-	      -> RnM ()
-checkDupNames doc_str names
+checkDupNames :: [Name] -> RnM ()
+checkDupNames names
   = 	-- Check for duplicated names in a binding group
-    mapM_ (dupNamesErr nameSrcSpan doc_str) dups
+    mapM_ (dupNamesErr nameSrcSpan) dups
   where
     (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) names
 
+---------------------
+checkDupAndShadowedRdrNames :: [Located RdrName] -> RnM ()
+checkDupAndShadowedRdrNames loc_rdr_names
+  = do	{ checkDupRdrNames loc_rdr_names
+	; envs <- getRdrEnvs
+	; checkShadowedOccs envs loc_occs }
+  where
+    loc_occs = [(loc,rdrNameOcc rdr) | L loc rdr <- loc_rdr_names]
+
+checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
+checkDupAndShadowedNames envs names
+  = do { checkDupNames names
+       ; checkShadowedOccs envs loc_occs }
+  where
+    loc_occs = [(nameSrcSpan name, nameOccName name) | name <- names]
+
 -------------------------------------
-checkShadowedNames :: SDoc -> (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
-checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
+checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
+checkShadowedOccs (global_env,local_env) loc_occs
   = ifOptM Opt_WarnNameShadowing $ 
-    do	{ traceRn (text "shadow" <+> ppr loc_rdr_names)
-	; mapM_ check_shadow loc_rdr_names }
+    do	{ traceRn (text "shadow" <+> ppr loc_occs)
+	; mapM_ check_shadow loc_occs }
   where
     check_shadow (loc, occ)
         | startsWithUnderscore occ = return ()	-- Do not report shadowing for "_x"
@@ -935,7 +936,7 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 			 ; complain (map pprNameProvenance gres') }
 	where
 	  complain []      = return ()
-	  complain pp_locs = addWarnAt loc (shadowedNameWarn doc_str occ pp_locs)
+	  complain pp_locs = addWarnAt loc (shadowedNameWarn occ pp_locs)
 	  mb_local = lookupLocalRdrOcc local_env occ
           gres     = lookupGRE_RdrName (mkRdrUnqual occ) global_env
 		-- Make an Unqualified RdrName and look that up, so that
@@ -1070,12 +1071,11 @@ addNameClashErrRn rdr_name names
     msgs = [ptext (sLit "    or") <+> mk_ref np | np <- nps]
     mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
 
-shadowedNameWarn :: SDoc -> OccName -> [SDoc] -> SDoc
-shadowedNameWarn doc occ shadowed_locs
+shadowedNameWarn :: OccName -> [SDoc] -> SDoc
+shadowedNameWarn occ shadowed_locs
   = sep [ptext (sLit "This binding for") <+> quotes (ppr occ)
 	    <+> ptext (sLit "shadows the existing binding") <> plural shadowed_locs,
 	 nest 2 (vcat shadowed_locs)]
-    $$ doc
 
 unknownNameErr :: RdrName -> SDoc
 unknownNameErr rdr_name
@@ -1102,18 +1102,15 @@ badOrigBinding name
   = ptext (sLit "Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
-dupNamesErr :: Outputable n => (n -> SrcSpan) -> SDoc -> [n] -> RnM ()
-dupNamesErr get_loc descriptor names
+dupNamesErr :: Outputable n => (n -> SrcSpan) -> [n] -> RnM ()
+dupNamesErr get_loc names
   = addErrAt big_loc $
     vcat [ptext (sLit "Conflicting definitions for") <+> quotes (ppr (head names)),
-	  locations, descriptor]
+	  locations]
   where
     locs      = map get_loc names
     big_loc   = foldr1 combineSrcSpans locs
-    one_line  = isOneLineSpan big_loc
-    locations | one_line  = empty 
-	      | otherwise = ptext (sLit "Bound at:") <+> 
-			    vcat (map ppr (sortLe (<=) locs))
+    locations = ptext (sLit "Bound at:") <+> vcat (map ppr (sortLe (<=) locs))
 
 kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing

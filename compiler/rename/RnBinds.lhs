@@ -158,9 +158,8 @@ rnTopBindsLHS :: MiniFixityEnv
               -> HsValBinds RdrName 
               -> RnM (HsValBindsLR Name RdrName)
 rnTopBindsLHS fix_env binds
-  = do { let (boundNames,doc) = bindersAndDoc binds 
-       ; mod <- getModule
-       ; rnValBindsLHSFromDoc (topRecNameMaker mod fix_env) boundNames doc binds }
+  = do { mod <- getModule
+       ; rnValBindsLHSFromDoc (topRecNameMaker mod fix_env) binds }
 
 rnTopBindsRHS :: NameSet	-- Names bound by these binds
               -> HsValBindsLR Name RdrName 
@@ -241,63 +240,46 @@ rnIPBind (IPBind n expr) = do
 %************************************************************************
 
 \begin{code}
--- wrapper for local binds
--- creates the documentation info and calls the helper below
+-- Renaming local binding gropus 
+-- Does duplicate/shadow check
 rnValBindsLHS :: MiniFixityEnv
               -> HsValBinds RdrName
-              -> RnM (HsValBindsLR Name RdrName)
-rnValBindsLHS fix_env binds = 
-    let (boundNames,doc) = bindersAndDoc binds 
-    in rnValBindsLHSFromDoc_Local boundNames doc fix_env binds
-
--- a helper used for local binds that does the duplicates check,
--- just so we don't forget to do it somewhere
-rnValBindsLHSFromDoc_Local :: [Located RdrName] -- RdrNames of the LHS (so we don't have to gather them twice)
-                           -> SDoc              -- doc string for dup names and shadowing
-                           -> MiniFixityEnv
-                           -> HsValBinds RdrName
-                           -> RnM (HsValBindsLR Name RdrName)
-
-rnValBindsLHSFromDoc_Local boundNames doc fix_env binds = do
-     -- Do error checking: we need to check for dups here because we
-     -- don't don't bind all of the variables from the ValBinds at once
-     -- with bindLocatedLocals any more.
-     checkDupAndShadowedRdrNames doc boundNames
-
-     -- (Note that we don't want to do this at the top level, since
-     -- sorting out duplicates and shadowing there happens elsewhere.
-     -- The behavior is even different. For example,
-     --   import A(f)
-     --   f = ...
-     -- should not produce a shadowing warning (but it will produce
-     -- an ambiguity warning if you use f), but
-     --   import A(f)
-     --   g = let f = ... in f
-     -- should.
-     rnValBindsLHSFromDoc (localRecNameMaker fix_env) boundNames doc binds 
-
-bindersAndDoc :: HsValBinds RdrName -> ([Located RdrName], SDoc)
-bindersAndDoc binds = 
-    let
-        -- the unrenamed bndrs for error checking and reporting
-        orig = collectHsValBinders binds
-        doc = text "In the binding group for:" <+> pprWithCommas ppr (map unLoc orig)
-    in
-      (orig, doc)
+              -> RnM ([Name], HsValBindsLR Name RdrName)
+rnValBindsLHS fix_env binds 
+  = do { -- Do error checking: we need to check for dups here because we
+     	 -- don't don't bind all of the variables from the ValBinds at once
+     	 -- with bindLocatedLocals any more.
+         -- 
+     	 -- Note that we don't want to do this at the top level, since
+     	 -- sorting out duplicates and shadowing there happens elsewhere.
+     	 -- The behavior is even different. For example,
+     	 --   import A(f)
+     	 --   f = ...
+     	 -- should not produce a shadowing warning (but it will produce
+     	 -- an ambiguity warning if you use f), but
+     	 --   import A(f)
+     	 --   g = let f = ... in f
+     	 -- should.
+       ; binds' <- rnValBindsLHSFromDoc (localRecNameMaker fix_env) binds 
+       ; let bound_names = map unLoc $ collectHsValBinders binds'
+       ; envs <- getRdrEnvs
+       ; checkDupAndShadowedNames envs bound_names
+       ; return (bound_names, binds') }
 
 -- renames the left-hand sides
 -- generic version used both at the top level and for local binds
 -- does some error checking, but not what gets done elsewhere at the top level
 rnValBindsLHSFromDoc :: NameMaker 
-                     -> [Located RdrName] -- RdrNames of the LHS (so we don't have to gather them twice)
-                     -> SDoc              -- doc string for dup names and shadowing
                      -> HsValBinds RdrName
                      -> RnM (HsValBindsLR Name RdrName)
-rnValBindsLHSFromDoc topP _original_bndrs doc (ValBindsIn mbinds sigs) = do
-     -- rename the LHSes
-     mbinds' <- mapBagM (rnBindLHS topP doc) mbinds
-     return $ ValBindsIn mbinds' sigs
-rnValBindsLHSFromDoc _ _ _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
+rnValBindsLHSFromDoc topP (ValBindsIn mbinds sigs)
+  = do { mbinds' <- mapBagM (rnBindLHS topP doc) mbinds
+       ; return $ ValBindsIn mbinds' sigs }
+  where
+    bndrs = collectHsBindBinders mbinds
+    doc   = text "In the binding group for:" <+> pprWithCommas ppr bndrs
+
+rnValBindsLHSFromDoc _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
 
 -- General version used both from the top-level and for local things
 -- Assumes the LHS vars are in scope
@@ -310,16 +292,16 @@ rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
                  -> HsValBindsLR Name RdrName
                  -> RnM (HsValBinds Name, DefUses)
 
-rnValBindsRHSGen trim bound_names (ValBindsIn mbinds sigs) = do
-   -- rename the sigs
-   sigs' <- renameSigs (Just bound_names) okBindSig sigs
-   -- rename the RHSes
-   binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
-   case depAnalBinds binds_w_dus of
-       (anal_binds, anal_dus) ->
-           do let valbind' = ValBindsOut anal_binds sigs'
-                  valbind'_dus = usesOnly (hsSigsFVs sigs') `plusDU` anal_dus
-              return (valbind', valbind'_dus)
+rnValBindsRHSGen trim bound_names (ValBindsIn mbinds sigs)
+  = do {  -- rename the sigs
+         sigs' <- renameSigs (Just bound_names) okBindSig sigs
+          -- rename the RHSes
+       ; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
+       ; case depAnalBinds binds_w_dus of
+            (anal_binds, anal_dus) -> do
+       { let valbind' = ValBindsOut anal_binds sigs'
+             valbind'_dus = usesOnly (hsSigsFVs sigs') `plusDU` anal_dus
+       ; return (valbind', valbind'_dus) }}
 
 rnValBindsRHSGen _ _ b = pprPanic "rnValBindsRHSGen" (ppr b)
 
@@ -346,14 +328,11 @@ rnValBindsAndThen :: HsValBinds RdrName
                   -> (HsValBinds Name -> RnM (result, FreeVars))
                   -> RnM (result, FreeVars)
 rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
- = do	{ let (original_bndrs, doc) = bindersAndDoc binds
-
-	      -- (A) Create the local fixity environment 
-	; new_fixities <- makeMiniFixityEnv [L loc sig | L loc (FixSig sig) <- sigs]
+ = do	{     -- (A) Create the local fixity environment 
+	  new_fixities <- makeMiniFixityEnv [L loc sig | L loc (FixSig sig) <- sigs]
 
 	      -- (B) Rename the LHSes 
-	; new_lhs <- rnValBindsLHSFromDoc_Local original_bndrs doc new_fixities binds
-	; let bound_names = map unLoc $ collectHsValBinders new_lhs
+	; (bound_names, new_lhs) <- rnValBindsLHS new_fixities binds
 
 	      --     ...and bring them (and their fixities) into scope
 	; bindLocalNamesFV_WithFixities bound_names new_fixities $ do
@@ -418,7 +397,7 @@ makeMiniFixityEnv decls = foldlM add_one emptyFsEnv decls
          Nothing -> return $ extendFsEnv env fs fix_item
          Just (L loc' _) -> do
            { setSrcSpan loc $ 
-             addLocErr (L name_loc name) (dupFixityDecl loc')
+             addErrAt name_loc (dupFixityDecl loc' name)
            ; return env}
      }
 
@@ -670,8 +649,8 @@ rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = 
 
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind _ _ _ mbind@(L _ (PatBind _ _ _ _)) = do
-    addLocErr mbind methodBindErr
+rnMethodBind _ _ _ (L loc bind@(PatBind {})) = do
+    addErrAt loc (methodBindErr bind)
     return (emptyBag, emptyFVs)
 
 rnMethodBind _ _ _ b = pprPanic "rnMethodBind" (ppr b)
@@ -765,8 +744,7 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
   = do 	{ 	-- Result type signatures are no longer supported
 	  case maybe_rhs_sig of	
 	        Nothing -> return ()
-	        Just ty -> addLocErr ty (resSigErr ctxt match)
-
+	        Just (L loc ty) -> addErrAt loc (resSigErr ctxt match ty)
 
 	       -- Now the main event
 	       -- note that there are no local ficity decls for matches
@@ -775,7 +753,6 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 
 	; return (Match pats' Nothing grhss', grhss_fvs) }}
 	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
-  where
 
 resSigErr :: HsMatchContext Name -> Match RdrName -> HsType RdrName -> SDoc 
 resSigErr ctxt match ty

@@ -950,7 +950,7 @@ rn_rec_stmt_lhs _ (L _ (LetStmt binds@(HsIPBinds _)))
   = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds))) 
-    = do binds' <- rnValBindsLHS fix_env binds
+    = do (_bound_names, binds') <- rnValBindsLHS fix_env binds
          return [(L loc (LetStmt (HsValBinds binds')),
                  -- Warning: this is bogus; see function invariant
                  emptyFVs
@@ -975,15 +975,14 @@ rn_rec_stmt_lhs _ (L _ (LetStmt EmptyLocalBinds))
 rn_rec_stmts_lhs :: MiniFixityEnv
                  -> [LStmt RdrName] 
                  -> RnM [(LStmtLR Name RdrName, FreeVars)]
-rn_rec_stmts_lhs fix_env stmts = 
-    let boundNames = collectLStmtsBinders stmts
-        doc = text "In a recursive mdo-expression"
-    in do
-     -- First do error checking: we need to check for dups here because we
-     -- don't bind all of the variables from the Stmt at once
-     -- with bindLocatedLocals.
-     checkDupRdrNames doc boundNames
-     mapM (rn_rec_stmt_lhs fix_env) stmts `thenM` \ ls -> return (concat ls)
+rn_rec_stmts_lhs fix_env stmts
+  = do { let boundNames = collectLStmtsBinders stmts
+            -- First do error checking: we need to check for dups here because we
+            -- don't bind all of the variables from the Stmt at once
+            -- with bindLocatedLocals.
+       ; checkDupRdrNames boundNames
+       ; ls <- mapM (rn_rec_stmt_lhs fix_env) stmts
+       ; return (concat ls) }
 
 
 -- right-hand-sides

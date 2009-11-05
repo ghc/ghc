@@ -454,6 +454,7 @@ wrapLocSndM fn (L loc a) =
     return (b, L loc c)
 \end{code}
 
+Reporting errors
 
 \begin{code}
 getErrsVar :: TcRn (TcRef Messages)
@@ -468,48 +469,25 @@ addErr msg = do { loc <- getSrcSpanM ; addErrAt loc msg }
 failWith :: Message -> TcRn a
 failWith msg = addErr msg >> failM
 
-addLocErr :: Located e -> (e -> Message) -> TcRn ()
-addLocErr (L loc e) fn = addErrAt loc (fn e)
-
 addErrAt :: SrcSpan -> Message -> TcRn ()
-addErrAt loc msg = addLongErrAt loc msg empty
-
-addLongErrAt :: SrcSpan -> Message -> Message -> TcRn ()
-addLongErrAt loc msg extra
-  = do { traceTc (ptext (sLit "Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
-	 errs_var <- getErrsVar ;
-	 rdr_env <- getGlobalRdrEnv ;
-         dflags <- getDOpts ;
-	 let { err = mkLongErrMsg loc (mkPrintUnqualified dflags rdr_env) msg extra } ;
-	 (warns, errs) <- readMutVar errs_var ;
-  	 writeMutVar errs_var (warns, errs `snocBag` err) }
+-- addErrAt is mainly (exclusively?) used by the renamer, where
+-- tidying is not an issue, but it's all lazy so the extra
+-- work doesn't matter
+addErrAt loc msg = do { ctxt <- getErrCtxt 
+	     	      ; tidy_env <- tcInitTidyEnv
+                      ; err_info <- mkErrInfo tidy_env ctxt
+	              ; addLongErrAt loc msg err_info }
 
 addErrs :: [(SrcSpan,Message)] -> TcRn ()
 addErrs msgs = mapM_ add msgs
 	     where
 	       add (loc,msg) = addErrAt loc msg
 
-addReport :: Message -> Message -> TcRn ()
-addReport msg extra_info = do loc <- getSrcSpanM; addReportAt loc msg extra_info
-
-addReportAt :: SrcSpan -> Message -> Message -> TcRn ()
-addReportAt loc msg extra_info
-  = do { errs_var <- getErrsVar ;
-	 rdr_env <- getGlobalRdrEnv ;
-         dflags <- getDOpts ;
-	 let { warn = mkLongWarnMsg loc (mkPrintUnqualified dflags rdr_env)
-	                            msg extra_info } ;
-	 (warns, errs) <- readMutVar errs_var ;
-  	 writeMutVar errs_var (warns `snocBag` warn, errs) }
-
 addWarn :: Message -> TcRn ()
 addWarn msg = addReport (ptext (sLit "Warning:") <+> msg) empty
 
 addWarnAt :: SrcSpan -> Message -> TcRn ()
 addWarnAt loc msg = addReportAt loc (ptext (sLit "Warning:") <+> msg) empty
-
-addLocWarn :: Located e -> (e -> Message) -> TcRn ()
-addLocWarn (L loc e) fn = addReportAt loc (fn e) empty
 
 checkErr :: Bool -> Message -> TcRn ()
 -- Add the error if the bool is False
@@ -539,6 +517,38 @@ discardWarnings thing_inside
 	; (_warns, errs) <- readMutVar errs_var
 	; addMessages (emptyBag, errs)
 	; return result }
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Shared error message stuff: renamer and typechecker
+%*									*
+%************************************************************************
+
+\begin{code}
+addReport :: Message -> Message -> TcRn ()
+addReport msg extra_info = do loc <- getSrcSpanM; addReportAt loc msg extra_info
+
+addReportAt :: SrcSpan -> Message -> Message -> TcRn ()
+addReportAt loc msg extra_info
+  = do { errs_var <- getErrsVar ;
+	 rdr_env <- getGlobalRdrEnv ;
+         dflags <- getDOpts ;
+	 let { warn = mkLongWarnMsg loc (mkPrintUnqualified dflags rdr_env)
+	                            msg extra_info } ;
+	 (warns, errs) <- readMutVar errs_var ;
+  	 writeMutVar errs_var (warns `snocBag` warn, errs) }
+
+addLongErrAt :: SrcSpan -> Message -> Message -> TcRn ()
+addLongErrAt loc msg extra
+  = do { traceTc (ptext (sLit "Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
+	 errs_var <- getErrsVar ;
+	 rdr_env <- getGlobalRdrEnv ;
+         dflags <- getDOpts ;
+	 let { err = mkLongErrMsg loc (mkPrintUnqualified dflags rdr_env) msg extra } ;
+	 (warns, errs) <- readMutVar errs_var ;
+  	 writeMutVar errs_var (warns, errs `snocBag` err) }
 \end{code}
 
 
@@ -674,8 +684,7 @@ failIfErrsM = ifErrsM failM (return ())
 
 %************************************************************************
 %*									*
-	Context management and error message generation
-	  	    for the type checker
+	Context management for the type checker
 %*									*
 %************************************************************************
 
@@ -719,6 +728,12 @@ setInstCtxt :: InstLoc -> TcM a -> TcM a
 setInstCtxt (InstLoc _ src_loc ctxt) thing_inside
   = setSrcSpan src_loc (setErrCtxt ctxt thing_inside)
 \end{code}
+
+%************************************************************************
+%*									*
+	     Error message generation (type checker)
+%*									*
+%************************************************************************
 
     The addErrTc functions add an error message, but do not cause failure.
     The 'M' variants pass a TidyEnv that has already been used to

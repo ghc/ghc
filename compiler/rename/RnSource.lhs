@@ -299,9 +299,10 @@ rnSrcWarnDecls _bound_names []
 
 rnSrcWarnDecls bound_names decls 
   = do { -- check for duplicates
-       ; mapM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupWarnDecl lrdr')) warn_rdr_dups
-       ; mapM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
-         return (WarnSome ((concat pairs_s))) }
+       ; mapM_ (\ (L loc rdr:lrdr':_) -> addErrAt loc (dupWarnDecl lrdr' rdr)) 
+               warn_rdr_dups
+       ; pairs_s <- mapM (addLocM rn_deprec) decls
+       ; return (WarnSome ((concat pairs_s))) }
  where
    rn_deprec (Warning rdr_name txt)
        -- ensures that the names are defined locally
@@ -400,11 +401,10 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the bindings are for the right class
     let
-	meth_doc    = text "In the bindings in an instance declaration"
 	meth_names  = collectHsBindLocatedBinders mbinds
 	(inst_tyvars, _, cls,_) = splitHsInstDeclTy (unLoc inst_ty')
     in
-    checkDupRdrNames meth_doc meth_names 	`thenM_`
+    checkDupRdrNames meth_names 	`thenM_`
 	-- Check that the same method is not given twice in the
 	-- same instance decl	instance C T where
 	--			      f x = ...
@@ -424,10 +424,9 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the declarations are for the right class
     let
-	at_doc   = text "In the associated types of an instance declaration"
 	at_names = map (head . tyClDeclNames . unLoc) ats
     in
-    checkDupRdrNames at_doc at_names		`thenM_`
+    checkDupRdrNames at_names		`thenM_`
 	-- See notes with checkDupRdrNames for methods, above
 
     rnATInsts ats				`thenM` \ (ats', at_fvs) ->
@@ -521,7 +520,7 @@ standaloneDerivErr
 rnHsRuleDecl :: RuleDecl RdrName -> RnM (RuleDecl Name, FreeVars)
 rnHsRuleDecl (HsRule rule_name act vars lhs _fv_lhs rhs _fv_rhs)
   = bindPatSigTyVarsFV (collectRuleBndrSigTys vars)	$
-    bindLocatedLocalsFV doc (map get_var vars)		$ \ ids ->
+    bindLocatedLocalsFV (map get_var vars)		$ \ ids ->
     do	{ (vars', fv_vars) <- mapFvRn rn_var (vars `zip` ids)
 		-- NB: The binders in a rule are always Ids
 		--     We don't (yet) support type variables
@@ -661,7 +660,7 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 	; checkTc (h98_style || null (unLoc context)) 
                   (badGadtStupidTheta tycon)
     	; (tyvars', context', typats', derivs', deriv_fvs)
-		<- bindTyVarsRn data_doc tyvars $ \ tyvars' -> do
+		<- bindTyVarsRn tyvars $ \ tyvars' -> do
 		         	 -- Checks for distinct tyvars
 		   { typats' <- rnTyPats data_doc typatsMaybe
                    ; context' <- rnContext data_doc context
@@ -703,21 +702,21 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 -- "type" and "type instance" declarations
 rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
-  = do { bindTyVarsRn syn_doc tyvars                    $ \ tyvars' -> do
-         	 -- Checks for distinct tyvars
-       { name' <- if isFamInstDecl tydecl
-		  then lookupLocatedOccRn     name -- may be imported family
-		  else lookupLocatedTopBndrRn name
-       ; typats' <- rnTyPats syn_doc typatsMaybe
-       ; (ty', fvs) <- rnHsTypeFVs syn_doc ty
-       ; return (TySynonym {tcdLName = name', tcdTyVars = tyvars', 
-			     tcdTyPats = typats', tcdSynRhs = ty'},
-	          delFVs (map hsLTyVarName tyvars') $
-		  fvs			      `plusFV`
-		   (if isFamInstDecl tydecl
-		   then unitFV (unLoc name')	-- type instance => use
-		   else emptyFVs))
-       } }
+  = bindTyVarsRn tyvars $ \ tyvars' -> do
+    {    	 -- Checks for distinct tyvars
+      name' <- if isFamInstDecl tydecl
+    		  then lookupLocatedOccRn     name -- may be imported family
+    		  else lookupLocatedTopBndrRn name
+    ; typats' <- rnTyPats syn_doc typatsMaybe
+    ; (ty', fvs) <- rnHsTypeFVs syn_doc ty
+    ; return (TySynonym { tcdLName = name', tcdTyVars = tyvars' 
+    			, tcdTyPats = typats', tcdSynRhs = ty'},
+    	      delFVs (map hsLTyVarName tyvars') $
+    	      fvs			      `plusFV`
+    	       (if isFamInstDecl tydecl
+    	       then unitFV (unLoc name')	-- type instance => use
+    	       else emptyFVs))
+    }
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
@@ -728,7 +727,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 
 	-- Tyvars scope over superclass context and method signatures
 	; (tyvars', context', fds', ats', ats_fvs, sigs')
-	    <- bindTyVarsRn cls_doc tyvars $ \ tyvars' -> do
+	    <- bindTyVarsRn tyvars $ \ tyvars' -> do
          	 -- Checks for distinct tyvars
 	     { context' <- rnContext cls_doc context
 	     ; fds' <- rnFds cls_doc fds
@@ -742,7 +741,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
 	; let sig_rdr_names_w_locs = [op | L _ (TypeSig op _) <- sigs]
-	; checkDupRdrNames sig_doc sig_rdr_names_w_locs
+	; checkDupRdrNames sig_rdr_names_w_locs
 		-- Typechecker is responsible for checking that we only
 		-- give default-method bindings for things in this class.
 		-- The renamer *could* check this for class decls, but can't
@@ -782,7 +781,6 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	     	  ats_fvs) }
   where
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
-    sig_doc  = text "In the signatures for class"  	<+> ppr cname
 
 badGadtStupidTheta :: Located RdrName -> SDoc
 badGadtStupidTheta _
@@ -834,7 +832,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
 
         ; mb_doc' <- rnMbLHsDoc mb_doc 
 
-        ; bindTyVarsRn doc new_tvs $ \new_tyvars -> do
+        ; bindTyVarsRn new_tvs $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
 	; new_details <- rnConDeclDetails doc details
         ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
@@ -892,7 +890,7 @@ rnConDeclDetails doc (RecCon fields)
 --   are usage occurences for associated types.
 --
 rnFamily :: TyClDecl RdrName 
-         -> (SDoc -> [LHsTyVarBndr RdrName] -> 
+         -> ([LHsTyVarBndr RdrName] -> 
 	     ([LHsTyVarBndr Name] -> RnM (TyClDecl Name, FreeVars)) ->
 	     RnM (TyClDecl Name, FreeVars))
          -> RnM (TyClDecl Name, FreeVars)
@@ -900,16 +898,13 @@ rnFamily :: TyClDecl RdrName
 rnFamily (tydecl@TyFamily {tcdFlavour = flavour, 
 			   tcdLName = tycon, tcdTyVars = tyvars}) 
         bindIdxVars =
-      do { bindIdxVars (family_doc tycon) tyvars $ \tyvars' -> do {
+      do { bindIdxVars tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
 	 ; return (TyFamily {tcdFlavour = flavour, tcdLName = tycon', 
 			      tcdTyVars = tyvars', tcdKind = tcdKind tydecl}, 
 		    emptyFVs) 
          } }
 rnFamily d _ = pprPanic "rnFamily" (ppr d)
-
-family_doc :: Located RdrName -> SDoc
-family_doc tycon = text "In the family declaration for" <+> quotes (ppr tycon)
 
 -- Rename associated type declarations (in classes)
 --
@@ -925,7 +920,7 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
         rnTyClDecl tydecl
     rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 
-    lookupIdxVars _ tyvars cont = 
+    lookupIdxVars tyvars cont = 
       do { checkForDups tyvars;
 	 ; tyvars' <- mapM lookupIdxVar tyvars
 	 ; cont tyvars'

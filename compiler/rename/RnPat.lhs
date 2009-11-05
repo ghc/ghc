@@ -220,9 +220,7 @@ rnPats ctxt pats thing_inside
 	         -- Nor can we check incrementally for shadowing, else we'll
 	         -- 	complain *twice* about duplicates e.g. f (x,x) = ...
         ; let names = collectPatsBinders pats'
-        ; checkDupNames doc_pat names
-	; checkShadowedNames doc_pat envs_before
-			     [(nameSrcSpan name, nameOccName name) | name <- names]
+        ; addErrCtxt doc_pat $ checkDupAndShadowedNames envs_before names
         ; thing_inside pats' } }
   where
     doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt

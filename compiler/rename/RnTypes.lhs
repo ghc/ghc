@@ -213,7 +213,7 @@ rnForAll doc _ [] (L _ []) (L _ ty) = rnHsType doc ty
 	-- of kind *.
 
 rnForAll doc exp forall_tyvars ctxt ty
-  = bindTyVarsRn doc forall_tyvars $ \ new_tyvars -> do
+  = bindTyVarsRn forall_tyvars $ \ new_tyvars -> do
     new_ctxt <- rnContext doc ctxt
     new_ty <- rnLHsType doc ty
     return (HsForAllTy exp new_tyvars new_ctxt new_ty)
