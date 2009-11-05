@@ -1055,7 +1055,7 @@ tidyUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
 tidyUnfolding tidy_env _ unf@(CoreUnfolding { uf_tmpl = rhs 
 	      	       	 		    , uf_guidance = guide@(InlineRule {}) })
   = unf { uf_tmpl     = tidyExpr tidy_env rhs, 	   -- Preserves OccInfo
-	  uf_guidance = guide { ug_ir_info = tidyInl tidy_env (ug_ir_info guide) } }
+	  uf_guidance = guide { ir_info = tidyInl tidy_env (ir_info guide) } }
 tidyUnfolding tidy_env _ (DFunUnfolding con ids)
   = DFunUnfolding con (map (tidyExpr tidy_env) ids)
 tidyUnfolding _ tidy_rhs (CoreUnfolding {})

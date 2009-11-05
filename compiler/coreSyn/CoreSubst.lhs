@@ -510,27 +510,27 @@ substUnfolding subst (DFunUnfolding con args)
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_guidance = guide@(InlineRule {}) })
 	-- Retain an InlineRule!
   = seqExpr new_tmpl `seq` 
-    new_mb_wkr `seq`
-    unf { uf_tmpl = new_tmpl, uf_guidance = guide { ug_ir_info = new_mb_wkr } }
+    new_info `seq`
+    unf { uf_tmpl = new_tmpl, uf_guidance = guide { ir_info = new_info } }
   where
-    new_tmpl   = substExpr subst tmpl
-    new_mb_wkr = substInlineRuleGuidance subst (ug_ir_info guide)
+    new_tmpl = substExpr subst tmpl
+    new_info = substInlineRuleInfo subst (ir_info guide)
 
 substUnfolding _ (CoreUnfolding {}) = NoUnfolding	-- Discard
 	-- Always zap a CoreUnfolding, to save substitution work
 
-substUnfolding _ unf = unf	-- Otherwise no substitution to do
+substUnfolding _ unf = unf	-- NoUnfolding, OtherCon
 
 -------------------
-substInlineRuleGuidance :: Subst -> InlineRuleInfo -> InlineRuleInfo
-substInlineRuleGuidance subst (InlWrapper wkr)
+substInlineRuleInfo :: Subst -> InlineRuleInfo -> InlineRuleInfo
+substInlineRuleInfo subst (InlWrapper wkr)
   = case lookupIdSubst subst wkr of
       Var w1 -> InlWrapper w1
       other  -> WARN( not (exprIsTrivial other), text "CoreSubst.substWorker:" <+> ppr wkr )
-      	        InlUnSat   -- Worker has got substituted away altogether
+      	        InlVanilla -- Worker has got substituted away altogether
 			   -- (This can happen if it's trivial, via
 			   --  postInlineUnconditionally, hence only warning)
-substInlineRuleGuidance _ info = info
+substInlineRuleInfo _ info = info
 
 ------------------
 substIdOcc :: Subst -> Id -> Id

@@ -79,21 +79,6 @@ mkImplicitUnfolding :: CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
 mkImplicitUnfolding expr = mkTopUnfolding (simpleOptExpr expr)
 
-mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
-mkWwInlineRule id = mkInlineRule (InlWrapper id)
-
-mkInlineRule :: InlineRuleInfo -> CoreExpr -> Arity -> Unfolding
-mkInlineRule inl_info expr arity 
-  = mkCoreUnfolding True  	 -- Note [Top-level flag on inline rules]
-    		    expr' arity 
-		    (InlineRule { ug_ir_info = inl_info, ug_small = small })
-  where
-    expr' = simpleOptExpr expr
-    small = case calcUnfoldingGuidance (arity+1) expr' of
-              (arity_e, UnfoldIfGoodArgs { ug_size = size_e }) 
-                   -> uncondInline arity_e size_e
-              _other {- actually UnfoldNever -} -> False
-
 -- Note [Top-level flag on inline rules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Slight hack: note that mk_inline_rules conservatively sets the
@@ -129,9 +114,28 @@ mkCoreUnfolding top_lvl expr arity guidance
 mkDFunUnfolding :: DataCon -> [Id] -> Unfolding
 mkDFunUnfolding con ops = DFunUnfolding con (map Var ops)
 
+mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
+mkWwInlineRule id expr arity
+  = mkCoreUnfolding True (simpleOptExpr expr) arity
+         (InlineRule { ir_sat = InlUnSat, ir_info = InlWrapper id })
+
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
-mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
-  = mkCoreUnfolding True expr 0 UnfoldAlways	   -- Arity of unfolding doesn't matter
+mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
+  = mkCoreUnfolding True expr 0    -- Arity of unfolding doesn't matter
+                    (InlineRule { ir_info = InlAlways, ir_sat = InlUnSat })	
+
+mkInlineRule :: InlSatFlag -> CoreExpr -> Arity -> Unfolding
+mkInlineRule sat expr arity 
+  = mkCoreUnfolding True  	 -- Note [Top-level flag on inline rules]
+    		    expr' arity 
+		    (InlineRule { ir_sat = sat, ir_info = info })
+  where
+    expr' = simpleOptExpr expr
+    info = if small then InlSmall else InlVanilla
+    small = case calcUnfoldingGuidance (arity+1) expr' of
+              (arity_e, UnfoldIfGoodArgs { ug_size = size_e }) 
+                   -> uncondInline arity_e size_e
+              _other {- actually UnfoldNever -} -> False
 \end{code}
 
 
@@ -552,7 +556,6 @@ certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
 certainlyWillInline (CoreUnfolding { uf_is_cheap = is_cheap, uf_arity = n_vals, uf_guidance = guidance })
   = case guidance of
-      UnfoldAlways {} -> True
       UnfoldNever     -> False
       InlineRule {}   -> True
       UnfoldIfGoodArgs { ug_size = size} 
@@ -661,23 +664,19 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 	  = case guidance of
 	      UnfoldNever  -> False
 
-	      UnfoldAlways -> True
-		-- UnfoldAlways => there is no top-level binding for
-		-- these things, so we must inline it.  Only a few
-		-- primop-like things have compulsory unfoldings (see
- 		-- MkId.lhs).  Ignore is_active because we want to
- 		-- inline even if SimplGently is on.
-
-	      InlineRule { ug_ir_info = inl_info, ug_small = uncond_inline }
+	      InlineRule { ir_info = inl_info, ir_sat = sat }
+                 | InlAlways <- inl_info -> True         -- No top-level binding, so inline!
+		   	     		                 -- Ignore is_active because we want to 
+                                                         -- inline even if SimplGently is on.
  	         | not active_inline     -> False
 		 | n_val_args < uf_arity -> yes_unsat	 -- Not enough value args
-		 | uncond_inline         -> True	 -- Note [INLINE for small functions]
+		 | InlSmall <- inl_info  -> True         -- Note [INLINE for small functions]
 		 | otherwise	         -> some_benefit -- Saturated or over-saturated
 		 where
 		   -- See Note [Inlining an InlineRule]
-		   yes_unsat = case inl_info of
-		   	          InlSat -> False
-				  _other -> interesting_args
+		   yes_unsat = case sat of 
+                                 InlSat   -> False
+			         InlUnSat -> interesting_args
 
 	      UnfoldIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
  	         | not active_inline  	      -> False
@@ -743,7 +742,7 @@ Consider	{-# INLINE f #-}
                 g y = f y
 Then f's RHS is no larger than its LHS, so we should inline it
 into even the most boring context.  (We do so if there is no INLINE
-pragma!)  That's the reason for the 'inl_small' flag on an InlineRule.
+pragma!)  That's the reason for the 'ug_small' flag on an InlineRule.
 
 
 Note [Things to watch]
@@ -899,7 +898,7 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
 			CaseCtxt    -> res_discount
 			_other      -> 4 `min` res_discount
 		-- res_discount can be very large when a function returns
-		-- construtors; but we only want to invoke that large discount
+		-- constructors; but we only want to invoke that large discount
 		-- when there's a case continuation.
 		-- Otherwise we, rather arbitrarily, threshold it.  Yuk.
 		-- But we want to aovid inlining large functions that return 

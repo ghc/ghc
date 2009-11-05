@@ -29,7 +29,6 @@ import Name
 import MkId		( voidArgId, realWorldPrimId )
 import FiniteMap
 import Maybes		( catMaybes, isJust )
-import BasicTypes	( Arity )
 import Bag
 import Util
 import Outputable
@@ -809,15 +808,12 @@ specDefn subst body_uds fn rhs
 
 	-- Figure out whether the function has an INLINE pragma
 	-- See Note [Inline specialisations]
-    fn_has_inline_rule :: Maybe (InlineRuleInfo, Arity)	 -- Gives arity of the *specialised* inline rule
-    fn_has_inline_rule
-      | Just inl <- isInlineRule_maybe fn_unf 
-      = case inl of
-      	   InlWrapper _ -> Just (InlUnSat, spec_arity)
-	   _            -> Just (inl,      spec_arity)
-      | otherwise = Nothing
-      where
-        spec_arity = unfoldingArity fn_unf - n_dicts
+    fn_has_inline_rule :: Maybe InlSatFlag	-- Derive sat-flag from existing thing
+    fn_has_inline_rule = case isInlineRule_maybe fn_unf of
+                           Just (_,sat) -> Just sat
+			   Nothing      -> Nothing
+
+    spec_arity = unfoldingArity fn_unf - n_dicts  -- Arity of the *specialised* inline rule
 
     (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
 
@@ -910,9 +906,9 @@ specDefn subst body_uds fn rhs
 	   	final_uds = foldr consDictBind rhs_uds dx_binds
 
 		-- See Note [Inline specialisations]
-		final_spec_f | Just (inl, spec_arity) <- fn_has_inline_rule
+		final_spec_f | Just sat <- fn_has_inline_rule
 			     = spec_f_w_arity `setInlineActivation` inline_act
-			               	      `setIdUnfolding` mkInlineRule inl spec_rhs spec_arity
+			               	      `setIdUnfolding` mkInlineRule sat spec_rhs spec_arity
 					      	-- I'm not sure this should be unconditionally InlSat
 			     | otherwise 
 			     = spec_f_w_arity

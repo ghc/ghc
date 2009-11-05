@@ -1482,14 +1482,12 @@ toIfaceIdInfo id_info
 toIfUnfolding :: Unfolding -> Maybe IfaceInfoItem
 toIfUnfolding (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity, uf_guidance = guidance })
   = case guidance of
-	InlineRule { ug_ir_info = InlSat } 	 -> Just (HsUnfold (IfInlineRule arity True  (toIfaceExpr rhs)))
-	InlineRule { ug_ir_info = InlUnSat }     -> Just (HsUnfold (IfInlineRule arity False (toIfaceExpr rhs)))
-	InlineRule { ug_ir_info = InlWrapper w } -> Just (HsUnfold (IfWrapper arity (idName w)))
+	InlineRule { ir_info = InlWrapper w } -> Just (HsUnfold (IfWrapper arity (idName w)))
+	InlineRule { ir_sat = InlSat }        -> Just (HsUnfold (IfInlineRule arity True  (toIfaceExpr rhs)))
+	InlineRule { ir_sat = InlUnSat }      -> Just (HsUnfold (IfInlineRule arity False (toIfaceExpr rhs)))
 	UnfoldNever         -> Nothing
 	UnfoldIfGoodArgs {} -> Just (HsUnfold (IfCoreUnfold (toIfaceExpr rhs)))
-	UnfoldAlways	    -> panic "toIfUnfolding:UnfoldAlways"
-				-- Never happens because we never have 
-				-- bindings for unfold-always things
+
 toIfUnfolding (DFunUnfolding _con ops)
   = Just (HsUnfold (IfDFunUnfold (map toIfaceExpr ops)))
       -- No need to serialise the data constructor; 

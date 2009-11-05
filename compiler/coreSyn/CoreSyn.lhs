@@ -35,7 +35,7 @@ module CoreSyn (
 	isValArg, isTypeArg, valArgCount, valBndrCount, isRuntimeArg, isRuntimeVar,
 
 	-- * Unfolding data types
-	Unfolding(..),	UnfoldingGuidance(..), InlineRuleInfo(..),
+	Unfolding(..),	UnfoldingGuidance(..), InlineRuleInfo(..), InlSatFlag(..),
 		-- Abstract everywhere but in CoreUnfold.lhs
 	
 	-- ** Constructing 'Unfolding's
@@ -440,20 +440,14 @@ data Unfolding
 ------------------------------------------------
 -- | 'UnfoldingGuidance' says when unfolding should take place
 data UnfoldingGuidance
-  = UnfoldAlways	-- There is /no original definition/, so you'd better unfold.
-			-- The unfolding is guaranteed to have no free variables
-    			-- so no need to think about it during dependency analysis
-
-  | InlineRule {	-- See Note [InlineRules]
-                        -- Be very keen to inline this
+  = InlineRule {        -- Be very keen to inline this; See Note [InlineRules]
       	       		-- The uf_tmpl is the *original* RHS; do *not* replace it on
 			--   each simlifier run.  Hence, the *actual* RHS of the function 
 			--   may be different by now, because it may have been optimised.
-      ug_ir_info :: InlineRuleInfo, 	-- Supplementary info about the InlineRule
-      ug_small :: Bool		        -- True <=> the RHS is so small (eg no bigger than a call) 
-      	             			--          that you should always inline a saturated call,
-    }				        --           regardless of how boring the context is
-    					-- See Note [INLINE for small functions] in CoreUnfold]
+
+        ir_sat  :: InlSatFlag,  
+        ir_info :: InlineRuleInfo
+    }
 
   | UnfoldIfGoodArgs {	-- Arose from a normal Id; the info here is the
     		     	-- result of a simple analysis of the RHS
@@ -468,20 +462,29 @@ data UnfoldingGuidance
     }			  -- a context (case (thing args) of ...),
 			  -- (where there are the right number of arguments.)
 
-  | UnfoldNever
+  | UnfoldNever		  -- A variant of UnfoldIfGoodArgs, used for big RHSs
 
 data InlineRuleInfo
-  = InlSat		-- A user-specifed or compiler injected INLINE pragma
-    			-- ONLY inline when it's applied to 'arity' arguments
+  = InlAlways       -- Inline absolutely always, however boring the context.
+                    -- There is /no original definition/. Only a few primop-like things 
+		    -- have this property (see MkId.lhs, calls to mkCompulsoryUnfolding).
 
-  | InlUnSat		-- The compiler decided to "capture" the RHS into an
-    			-- InlineRule, but do not require that it appears saturated
+  | InlSmall	    -- The RHS is very small (eg no bigger than a call), so inline any
+   		    -- /saturated/ application, regardless of context
+                    -- See Note [INLINE for small functions] in CoreUnfold
 
-  | InlWrapper Id	-- This unfolding is a the wrapper in a 
-			--     worker/wrapper split from the strictness analyser
-			-- Used to abbreviate the uf_tmpl in interface files
-			--	which don't need to contain the RHS; 
-			--	it can be derived from the strictness info
+  | InlVanilla
+
+  | InlWrapper Id   -- This unfolding is a the wrapper in a 
+		    --     worker/wrapper split from the strictness analyser
+		    -- Used to abbreviate the uf_tmpl in interface files
+		    --	which don't need to contain the RHS; 
+		    --	it can be derived from the strictness info
+		    -- [In principle this is orthogonal to the InlSmall/InVanilla thing, 
+                    --  but it's convenient to have it here.]
+
+data InlSatFlag = InlSat | InlUnSat
+    -- Specifies whether to INLINE only if the thing is applied to 'arity' args
 
 ------------------------------------------------
 noUnfolding :: Unfolding
@@ -564,10 +567,10 @@ isInlineRule :: Unfolding -> Bool
 isInlineRule (CoreUnfolding { uf_guidance = InlineRule {}}) = True
 isInlineRule _		                                    = False
 
-isInlineRule_maybe :: Unfolding -> Maybe InlineRuleInfo
-isInlineRule_maybe (CoreUnfolding {
-                       uf_guidance = InlineRule { ug_ir_info = inl } }) = Just inl
-isInlineRule_maybe _		                                        = Nothing
+isInlineRule_maybe :: Unfolding -> Maybe (InlineRuleInfo, InlSatFlag)
+isInlineRule_maybe (CoreUnfolding { uf_guidance = 
+                        InlineRule { ir_info = inl, ir_sat = sat } }) = Just (inl,sat)
+isInlineRule_maybe _		                                      = Nothing
 
 isStableUnfolding :: Unfolding -> Bool
 -- True of unfoldings that should not be overwritten 

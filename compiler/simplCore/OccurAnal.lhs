@@ -533,7 +533,7 @@ reOrderCycle depth (bind : binds) pairs
                 -- where df is the exported dictionary. Then df makes a really
                 -- bad choice for loop breaker
 
-        | Just inl_rule_info <- isInlineRule_maybe (idUnfolding bndr)
+        | Just (inl_rule_info, _) <- isInlineRule_maybe (idUnfolding bndr)
 	= case inl_rule_info of
 	     InlWrapper {} -> 10  -- Note [INLINE pragmas]
 	     _other	   ->  3  -- Data structures are more important than this

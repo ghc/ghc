@@ -379,19 +379,23 @@ showAttributes stuff
 \begin{code}
 instance Outputable UnfoldingGuidance where
     ppr UnfoldNever  = ptext (sLit "NEVER")
-    ppr UnfoldAlways = ptext (sLit "ALWAYS")
-    ppr (InlineRule { ug_ir_info = inl_info, ug_small = small })
-      = ptext (sLit "InlineRule") <> ppr (inl_info,small)
+    ppr (InlineRule { ir_info = info, ir_sat = sat })
+      = ptext (sLit "InlineRule") <> ppr (sat,info)
     ppr (UnfoldIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
       = hsep [ ptext (sLit "IF_ARGS"), 
 	       brackets (hsep (map int cs)),
 	       int size,
 	       int discount ]
 
-instance Outputable InlineRuleInfo where
-  ppr (InlWrapper w) = ptext (sLit "worker=") <> ppr w
+instance Outputable InlSatFlag where
   ppr InlSat         = ptext (sLit "sat")
   ppr InlUnSat       = ptext (sLit "unsat")
+
+instance Outputable InlineRuleInfo where
+  ppr (InlWrapper w) = ptext (sLit "worker=") <> ppr w
+  ppr InlSmall       = ptext (sLit "small")
+  ppr InlAlways      = ptext (sLit "always")
+  ppr InlVanilla     = ptext (sLit "-")
 
 instance Outputable Unfolding where
   ppr NoUnfolding             = ptext (sLit "No unfolding")

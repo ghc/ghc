@@ -656,9 +656,10 @@ simplUnfolding env top_lvl _ _ _
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
                    , uf_guidance = guide@(InlineRule {}) })
   = do { expr' <- simplExpr (setMode SimplGently env) expr
-       ; let mb_wkr' = CoreSubst.substInlineRuleGuidance (mkCoreSubst env) (ug_ir_info guide)
+       	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
+       ; let mb_wkr' = CoreSubst.substInlineRuleInfo (mkCoreSubst env) (ir_info guide)
        ; return (mkCoreUnfolding (isTopLevel top_lvl) expr' arity 
-                                 (guide { ug_ir_info = mb_wkr' })) }
+                                 (guide { ir_info = mb_wkr' })) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
 
 simplUnfolding _ top_lvl _ occ_info new_rhs _

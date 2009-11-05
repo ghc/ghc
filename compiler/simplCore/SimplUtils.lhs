@@ -410,7 +410,7 @@ Inlining is controlled partly by the SimplifierMode switch.  This has two
 settings:
 
 	SimplGently	(a) Simplifying before specialiser/full laziness
-			(b) Simplifiying inside INLINE pragma
+			(b) Simplifiying inside InlineRules
 			(c) Simplifying the LHS of a rule
 			(d) Simplifying a GHCi expression or Template 
 				Haskell splice
@@ -431,11 +431,11 @@ running it, we don't want to use -O2.  Indeed, we don't want to inline
 anything, because the byte-code interpreter might get confused about 
 unboxed tuples and suchlike.
 
-INLINE pragmas
-~~~~~~~~~~~~~~
-We don't simplify inside InlineRules (which come from INLINE pragmas).
-It really is important to switch off inlinings inside such
-expressions.  Consider the following example 
+Note [Simplifying gently inside InlineRules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't do much simplification inside InlineRules (which come from
+INLINE pragmas).  It really is important to switch off inlinings
+inside such expressions.  Consider the following example
 
      	let f = \pq -> BIG
      	in
@@ -444,16 +444,14 @@ expressions.  Consider the following example
      	in ...g...g...g...g...g...
 
 Now, if that's the ONLY occurrence of f, it will be inlined inside g,
-and thence copied multiple times when g is inlined.
+and thence copied multiple times when g is inlined.  
 
-
-This function may be inlinined in other modules, so we
-don't want to remove (by inlining) calls to functions that have
-specialisations, or that may have transformation rules in an importing
-scope.
+This function may be inlinined in other modules, so we don't want to
+remove (by inlining) calls to functions that have specialisations, or
+that may have transformation rules in an importing scope.
 
 E.g. 	{-# INLINE f #-}
-		f x = ...g...
+	f x = ...g...
 
 and suppose that g is strict *and* has specialisations.  If we inline
 g's wrapper, we deny f the chance of getting the specialised version
@@ -471,15 +469,14 @@ continuation.  That's why the keep_inline predicate returns True for
 ArgOf continuations.  It shouldn't do any harm not to dissolve the
 inline-me note under these circumstances.
 
-Note that the result is that we do very little simplification
-inside an InlineMe.  
+Although we do very little simplification inside an InlineRule,
+the RHS is simplified as normal.  For example:
 
 	all xs = foldr (&&) True xs
 	any p = all . map p  {-# INLINE any #-}
 
-Problem: any won't get deforested, and so if it's exported and the
-importer doesn't use the inlining, (eg passes it as an arg) then we
-won't get deforestation at all.  We havn't solved this problem yet!
+The RHS of 'any' will get optimised and deforested; but the InlineRule
+will still mention the original RHS.
 
 
 preInlineUnconditionally
