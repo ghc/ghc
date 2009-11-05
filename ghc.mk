@@ -367,24 +367,29 @@ endif
 
 # We cannot run ghc-cabal to configure a package until we have
 # configured and registered all of its dependencies.  So the following
-# hack forces all the configure steps to happen in exactly the order
-# given in the PACKAGES variable above.  Ideally we should use the
-# correct dependencies here to allow more parallelism, but we don't
-# know the dependencies until we've generated the pacakge-data.mk
-# files.
+# hack forces all the configure steps to happen in exactly the following order:
+#
+#  $(PACKAGES) ghc(stage2) $(PACKAGES_STAGE2)
+#
+# Ideally we should use the correct dependencies here to allow more
+# parallelism, but we don't know the dependencies until we've
+# generated the pacakge-data.mk files.
 define fixed_pkg_dep
-libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(if $$(fixed_pkg_prev),libraries/$$(fixed_pkg_prev)/$2/package-data.mk)
-fixed_pkg_prev:=$1
+libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(fixed_pkg_prev)
+fixed_pkg_prev:=libraries/$1/$2/package-data.mk
 endef
 
 ifneq "$(BINDIST)" "YES"
 fixed_pkg_prev=
-$(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval $(call fixed_pkg_dep,$(pkg),dist-install)))
+$(foreach pkg,$(PACKAGES),$(eval $(call fixed_pkg_dep,$(pkg),dist-install)))
 
-# We assume that the stage2 compiler depends on all the libraries, so
-# they all get added to the package database before we try to configure
-# it
-compiler/stage2/package-data.mk: $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),libraries/$(pkg)/dist-install/package-data.mk)
+# the GHC package doesn't live in libraries/, so we add its dependency manually:
+compiler/stage2/package-data.mk: $(fixed_pkg_prev)
+fixed_pkg_prev:=compiler/stage2/package-data.mk
+
+# and continue with PACKAGES_STAGE2, which depend on GHC:
+$(foreach pkg,$(PACKAGES_STAGE2),$(eval $(call fixed_pkg_dep,$(pkg),dist-install)))
+
 ghc/stage1/package-data.mk: compiler/stage1/package-data.mk
 ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # haddock depends on ghc and some libraries, but depending on GHC's
