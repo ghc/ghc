@@ -25,7 +25,7 @@ endef
 
 define canonicaliseExecutable
 # $1 = program path variable
-ifneq "$$(wildcard $$($1).exe)" ""
+ifneq "$$(shell test -e '$$($1).exe' && echo exists)" ""
 $1 := $$($1).exe
 endif
 $(call canonicalise,$1)
