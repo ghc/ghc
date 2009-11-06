@@ -62,6 +62,7 @@ import TyCon
 import Constants
 import SMRep
 import StgSyn	( SRT(..) )
+import Module
 import Literal
 import Digraph
 import ListSetOps
@@ -283,28 +284,29 @@ tagToClosure tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCall fun args safe = emitRtsCall' [] fun args Nothing safe
+emitRtsCall :: PackageId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall pkg fun args safe = emitRtsCall' [] pkg fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: FastString -> [(CmmExpr,ForeignHint)] -> [GlobalReg] -> Bool -> FCode ()
-emitRtsCallWithVols fun args vols safe
-   = emitRtsCall' [] fun args (Just vols) safe
+emitRtsCallWithVols :: PackageId -> FastString -> [(CmmExpr,ForeignHint)] -> [GlobalReg] -> Bool -> FCode ()
+emitRtsCallWithVols pkg fun args vols safe
+   = emitRtsCall' [] pkg fun args (Just vols) safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> FastString
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> PackageId -> FastString
 	-> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCallWithResult res hint fun args safe
-   = emitRtsCall' [(res,hint)] fun args Nothing safe
+emitRtsCallWithResult res hint pkg fun args safe
+   = emitRtsCall' [(res,hint)] pkg fun args Nothing safe
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
    :: [(LocalReg,ForeignHint)]
+   -> PackageId
    -> FastString
    -> [(CmmExpr,ForeignHint)]
    -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
-emitRtsCall' res fun args _vols safe
+emitRtsCall' res pkg fun args _vols safe
   = --error "emitRtsCall'"
     do { updfr_off <- getUpdFrameOff
        ; emit caller_save
@@ -320,7 +322,7 @@ emitRtsCall' res fun args _vols safe
     (args', arg_hints) = unzip args
     (res',  res_hints) = unzip res
     (caller_save, caller_load) = callerSaveVolatileRegs
-    fun_expr = mkLblExpr (mkRtsCodeLabel fun)
+    fun_expr = mkLblExpr (mkCmmCodeLabel pkg fun)
 
 
 -----------------------------------------------------------------------------

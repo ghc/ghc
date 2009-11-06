@@ -494,8 +494,8 @@ emitBlackHoleCode is_single_entry
   | otherwise = 
 	nopC
   where
-    bh_lbl | is_single_entry = mkRtsDataLabel (fsLit "stg_SE_BLACKHOLE_info")
-	   | otherwise	     = mkRtsDataLabel (fsLit "stg_BLACKHOLE_info")
+    bh_lbl | is_single_entry = mkCmmDataLabel rtsPackageId (fsLit "stg_SE_BLACKHOLE_info")
+	   | otherwise	     = mkCmmDataLabel rtsPackageId (fsLit "stg_BLACKHOLE_info")
 
 	-- If we wanted to do eager blackholing with slop filling,
 	-- we'd need to do it at the *end* of a basic block, otherwise
@@ -605,7 +605,7 @@ link_caf cl_info _is_upd = do
 	-- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten, 
 	-- because the old info table ptr is needed for reversion
-  ; emitRtsCallWithVols (fsLit "newCAF") [(CmmReg nodeReg,AddrHint)] [node] False
+  ; emitRtsCallWithVols rtsPackageId (fsLit "newCAF") [(CmmReg nodeReg,AddrHint)] [node] False
 	-- node is live, so save it.
 
 	-- Overwrite the closure with a (static) indirection 

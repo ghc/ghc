@@ -46,9 +46,9 @@
 module Lexer (
    Token(..), lexer, pragState, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc, 
-   getPState,
+   getPState, getDynFlags, withThisPackage,
    failLocMsgP, failSpanMsgP, srcParseFail,
-   getMessages,
+   getMessages, 
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
    extension, standaloneDerivingEnabled, bangPatEnabled,
@@ -64,6 +64,7 @@ import FastString
 import SrcLoc
 import UniqFM
 import DynFlags
+import Module
 import Ctype
 import Util		( readRational )
 
@@ -1514,6 +1515,14 @@ failSpanMsgP span msg = P $ \_ -> PFailed span msg
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
+
+getDynFlags :: P DynFlags
+getDynFlags = P $ \s -> POk s (dflags s)
+
+withThisPackage :: (PackageId -> a) -> P a
+withThisPackage f
+ = do	pkg	<- liftM thisPackage getDynFlags
+	return	$ f pkg
 
 extension :: (Int -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)

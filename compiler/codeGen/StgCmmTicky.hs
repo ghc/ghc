@@ -187,7 +187,7 @@ registerTickyCtr ctr_lbl
 	, mkStore (CmmLit (cmmLabelOffB ctr_lbl 
 				oFFSET_StgEntCounter_registeredp))
 		   (CmmLit (mkIntCLit 1)) ]
-    ticky_entry_ctrs = mkLblExpr (mkRtsDataLabel (fsLit "ticky_entry_ctrs"))
+    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
 
 tickyReturnOldCon, tickyReturnNewCon :: Arity -> FCode ()
 tickyReturnOldCon arity 
@@ -317,9 +317,9 @@ tickyAllocHeap hp
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				oFFSET_StgEntCounter_allocs)) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLong (mkRtsDataLabel (fsLit "ALLOC_HEAP_ctr")) 1,
+	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr")) 1,
 		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLong (mkRtsDataLabel (fsLit "ALLOC_HEAP_tot")) hp] }
+	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_tot")) hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
@@ -331,7 +331,7 @@ ifTicky code = do dflags <- getDynFlags
 
 -- All the ticky-ticky counters are declared "unsigned long" in C
 bumpTickyCounter :: FastString -> FCode ()
-bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkRtsDataLabel lbl) 0)
+bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkCmmDataLabel rtsPackageId lbl) 0)
 
 bumpTickyCounter' :: CmmLit -> FCode ()
 -- krc: note that we're incrementing the _entry_count_ field of the ticky counter

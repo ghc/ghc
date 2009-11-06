@@ -28,6 +28,7 @@ import CmmUtils
 import PrimOp
 import SMRep
 import Constants
+import Module
 import FastString
 import Outputable
 
@@ -201,7 +202,7 @@ emitPrimOp [res] ParOp [arg]
 	-- later, we might want to inline it.
     emitCCall
 	[(res,NoHint)]
-    	(CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "newSpark"))))
+    	(CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
 	[(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)] 
 
 emitPrimOp [res] ReadMutVarOp [mutv]

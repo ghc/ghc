@@ -46,6 +46,7 @@ import PrelInfo
 import Outputable
 import ListSetOps
 import Util
+import Module
 import FastString
 import StaticFlags
 \end{code}
@@ -170,7 +171,7 @@ buildDynCon binder _ con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
-  = do 	{ let intlike_lbl   = mkRtsGcPtrLabel (fsLit "stg_INTLIKE_closure")
+  = do 	{ let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
 	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
 		-- INTLIKE closures consist of a header and one word payload
 	      intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
@@ -181,7 +182,7 @@ buildDynCon binder _ con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
-  = do 	{ let charlike_lbl   = mkRtsGcPtrLabel (fsLit "stg_CHARLIKE_closure")
+  = do 	{ let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
 	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)

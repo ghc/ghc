@@ -41,6 +41,7 @@ import DataCon
 import TyCon
 import CostCentre
 import Util
+import Module
 import Constants
 import Outputable
 import FastString
@@ -346,7 +347,7 @@ altHeapCheck alt_type code
 	; setRealHp hpHw
 	; code }
   where
-    rts_label PolyAlt = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "stg_gc_unpt_r1")))
+    rts_label PolyAlt = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_unpt_r1")))
       	-- Do *not* enter R1 after a heap check in
 	-- a polymorphic case.  It might be a function
 	-- and the entry code for a function (currently)
@@ -360,14 +361,14 @@ altHeapCheck alt_type code
     rts_label (PrimAlt tc)
       = CmmLit $ CmmLabel $ 
 	case primRepToCgRep (tyConPrimRep tc) of
-	  VoidArg   -> mkRtsCodeLabel (fsLit "stg_gc_noregs")
-	  FloatArg  -> mkRtsCodeLabel (fsLit "stg_gc_f1")
-	  DoubleArg -> mkRtsCodeLabel (fsLit "stg_gc_d1")
-	  LongArg   -> mkRtsCodeLabel (fsLit "stg_gc_l1")
+	  VoidArg   -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_noregs")
+	  FloatArg  -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_f1")
+	  DoubleArg -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_d1")
+	  LongArg   -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_l1")
 				-- R1 is boxed but unlifted: 
-	  PtrArg    -> mkRtsCodeLabel (fsLit "stg_gc_unpt_r1")
+	  PtrArg    -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_unpt_r1")
 				-- R1 is unboxed:
-	  NonPtrArg -> mkRtsCodeLabel (fsLit "stg_gc_unbx_r1")
+	  NonPtrArg -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_unbx_r1")
 
     rts_label (UbxTupAlt _) = panic "altHeapCheck"
 \end{code}
@@ -405,7 +406,7 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
     assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9 VNonGcPtr)) 	-- Ho ho ho!
 				(CmmLit (mkWordCLit liveness))
     liveness 	    = mkRegLiveness regs ptrs nptrs
-    rts_label	    = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "stg_gc_ut")))
+    rts_label	    = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_ut")))
 
 \end{code}
 
@@ -514,7 +515,7 @@ stkChkNodePoints bytes
   = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts stg_gc_enter1
 
 stg_gc_gen :: CmmExpr
-stg_gc_gen = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "stg_gc_gen")))
+stg_gc_gen = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_gen")))
 stg_gc_enter1 :: CmmExpr
 stg_gc_enter1 = CmmReg (CmmGlobal GCEnter1)
 \end{code}

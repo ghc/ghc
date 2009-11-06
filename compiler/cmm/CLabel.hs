@@ -73,13 +73,13 @@ module CLabel (
 	mkSelectorInfoLabel,
 	mkSelectorEntryLabel,
 
-	mkRtsInfoLabel,
-	mkRtsEntryLabel,
-	mkRtsRetInfoLabel,
-	mkRtsRetLabel,
-	mkRtsCodeLabel,
-	mkRtsDataLabel,
-	mkRtsGcPtrLabel,
+	mkCmmInfoLabel,
+	mkCmmEntryLabel,
+	mkCmmRetInfoLabel,
+	mkCmmRetLabel,
+	mkCmmCodeLabel,
+	mkCmmDataLabel,
+	mkCmmGcPtrLabel,
 
 	mkRtsApFastLabel,
 
@@ -164,7 +164,7 @@ data CLabel
   
   -- | A label from a .cmm file that is not associated with a .hs level Id.
   | CmmLabel			
-	Module			-- what Cmm source module the label belongs to
+	PackageId		-- what package the label belongs to.
 	FastString		-- identifier giving the prefix of the label
 	CmmLabelInfo		-- encodes the suffix of the label
 
@@ -342,38 +342,30 @@ mkStaticInfoTableLabel name c     = IdLabel    name c StaticInfoTable
 mkConEntryLabel name        c     = IdLabel name c ConEntry
 mkStaticConEntryLabel name  c     = IdLabel name c StaticConEntry
 
-
 -- Constructing Cmm Labels
-
--- | Pretend that wired-in names from the RTS are in a top-level module called RTS, 
---      located in the RTS package. It doesn't matter what module they're actually in
---      as long as that module is in the correct package.
-topRtsModule :: Module
-topRtsModule = mkModule rtsPackageId (mkModuleNameFS (fsLit "RTS"))
-
-mkSplitMarkerLabel		= CmmLabel topRtsModule (fsLit "__stg_split_marker")	CmmCode
-mkDirty_MUT_VAR_Label		= CmmLabel topRtsModule (fsLit "dirty_MUT_VAR")		CmmCode
-mkUpdInfoLabel			= CmmLabel topRtsModule (fsLit "stg_upd_frame")		CmmInfo
-mkIndStaticInfoLabel		= CmmLabel topRtsModule (fsLit "stg_IND_STATIC")	CmmInfo
-mkMainCapabilityLabel		= CmmLabel topRtsModule (fsLit "MainCapability")	CmmData
-mkMAP_FROZEN_infoLabel		= CmmLabel topRtsModule (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
-mkMAP_DIRTY_infoLabel		= CmmLabel topRtsModule (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkEMPTY_MVAR_infoLabel		= CmmLabel topRtsModule (fsLit "stg_EMPTY_MVAR")	CmmInfo
-mkTopTickyCtrLabel		= CmmLabel topRtsModule (fsLit "top_ct")		CmmData
-mkCAFBlackHoleInfoTableLabel	= CmmLabel topRtsModule (fsLit "stg_CAF_BLACKHOLE")	CmmInfo
+mkSplitMarkerLabel		= CmmLabel rtsPackageId (fsLit "__stg_split_marker")	CmmCode
+mkDirty_MUT_VAR_Label		= CmmLabel rtsPackageId (fsLit "dirty_MUT_VAR")		CmmCode
+mkUpdInfoLabel			= CmmLabel rtsPackageId (fsLit "stg_upd_frame")		CmmInfo
+mkIndStaticInfoLabel		= CmmLabel rtsPackageId (fsLit "stg_IND_STATIC")	CmmInfo
+mkMainCapabilityLabel		= CmmLabel rtsPackageId (fsLit "MainCapability")	CmmData
+mkMAP_FROZEN_infoLabel		= CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
+mkMAP_DIRTY_infoLabel		= CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkEMPTY_MVAR_infoLabel		= CmmLabel rtsPackageId (fsLit "stg_EMPTY_MVAR")	CmmInfo
+mkTopTickyCtrLabel		= CmmLabel rtsPackageId (fsLit "top_ct")		CmmData
+mkCAFBlackHoleInfoTableLabel	= CmmLabel rtsPackageId (fsLit "stg_CAF_BLACKHOLE")	CmmInfo
 
 -----
-mkRtsInfoLabel,   mkRtsEntryLabel, mkRtsRetInfoLabel, mkRtsRetLabel,
-  mkRtsCodeLabel, mkRtsDataLabel,  mkRtsGcPtrLabel
-	:: FastString -> CLabel
+mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
+  mkCmmCodeLabel, mkCmmDataLabel,  mkCmmGcPtrLabel
+	:: PackageId -> FastString -> CLabel
 
-mkRtsInfoLabel      str 	= CmmLabel topRtsModule str CmmInfo
-mkRtsEntryLabel     str 	= CmmLabel topRtsModule str CmmEntry
-mkRtsRetInfoLabel   str 	= CmmLabel topRtsModule str CmmRetInfo
-mkRtsRetLabel       str 	= CmmLabel topRtsModule str CmmRet
-mkRtsCodeLabel      str		= CmmLabel topRtsModule str CmmCode
-mkRtsDataLabel      str		= CmmLabel topRtsModule str CmmData
-mkRtsGcPtrLabel     str		= CmmLabel topRtsModule str CmmGcPtr
+mkCmmInfoLabel      pkg str 	= CmmLabel pkg str CmmInfo
+mkCmmEntryLabel     pkg str 	= CmmLabel pkg str CmmEntry
+mkCmmRetInfoLabel   pkg str 	= CmmLabel pkg str CmmRetInfo
+mkCmmRetLabel       pkg str 	= CmmLabel pkg str CmmRet
+mkCmmCodeLabel      pkg str	= CmmLabel pkg str CmmCode
+mkCmmDataLabel      pkg str	= CmmLabel pkg str CmmData
+mkCmmGcPtrLabel     pkg str	= CmmLabel pkg str CmmGcPtr
 
 
 -- Constructing RtsLabels
@@ -740,8 +732,9 @@ idInfoLabelType info =
 labelDynamic :: PackageId -> CLabel -> Bool
 labelDynamic this_pkg lbl =
   case lbl of
-   RtsLabel _  	     -> not opt_Static && (this_pkg /= rtsPackageId) -- i.e., is the RTS in a DLL or not?
-   IdLabel n _ k       -> isDllName this_pkg n
+   RtsLabel _  	     	-> not opt_Static && (this_pkg /= rtsPackageId) -- i.e., is the RTS in a DLL or not?
+   CmmLabel pkg _ _	-> not opt_Static && (this_pkg /= pkg)
+   IdLabel n _ k     	-> isDllName this_pkg n
 #if mingw32_TARGET_OS
    ForeignLabel _ _ d _ -> d
 #else

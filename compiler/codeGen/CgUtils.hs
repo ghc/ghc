@@ -67,6 +67,7 @@ import CmmUtils
 import ForeignCall
 import ClosureInfo
 import StgSyn (SRT(..))
+import Module
 import Literal
 import Digraph
 import ListSetOps
@@ -331,28 +332,39 @@ emitIfThenElse cond then_part else_part
        ; labelC join_id
        }
 
-emitRtsCall :: FastString -> [CmmHinted CmmExpr] -> Bool -> Code
-emitRtsCall fun args safe = emitRtsCall' [] fun args Nothing safe
+
+-- | Emit code to call a Cmm function.
+emitRtsCall 
+   :: PackageId 		-- ^ package the function is in
+   -> FastString 		-- ^ name of function
+   -> [CmmHinted CmmExpr] 	-- ^ function args
+   -> Bool 			-- ^ whether this is a safe call
+   -> Code			-- ^ cmm code
+
+emitRtsCall pkg fun args safe = emitRtsCall' [] pkg fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: FastString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Bool -> Code
-emitRtsCallWithVols fun args vols safe
-   = emitRtsCall' [] fun args (Just vols) safe
+emitRtsCallWithVols :: PackageId -> FastString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Bool -> Code
+emitRtsCallWithVols pkg fun args vols safe
+   = emitRtsCall' [] pkg fun args (Just vols) safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> FastString
-	-> [CmmHinted CmmExpr] -> Bool -> Code
-emitRtsCallWithResult res hint fun args safe
-   = emitRtsCall' [CmmHinted res hint] fun args Nothing safe
+emitRtsCallWithResult 
+   :: LocalReg -> ForeignHint 
+   -> PackageId -> FastString
+   -> [CmmHinted CmmExpr] -> Bool -> Code
+emitRtsCallWithResult res hint pkg fun args safe
+   = emitRtsCall' [CmmHinted res hint] pkg fun args Nothing safe
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
    :: [CmmHinted LocalReg]
+   -> PackageId
    -> FastString
    -> [CmmHinted CmmExpr]
    -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
    -> Code
-emitRtsCall' res fun args vols safe = do
+emitRtsCall' res pkg fun args vols safe = do
   safety <- if safe
             then getSRTInfo >>= (return . CmmSafe)
             else return CmmUnsafe
@@ -362,7 +374,7 @@ emitRtsCall' res fun args vols safe = do
   where
     (caller_save, caller_load) = callerSaveVolatileRegs vols
     target   = CmmCallee fun_expr CCallConv
-    fun_expr = mkLblExpr (mkRtsCodeLabel fun)
+    fun_expr = mkLblExpr (mkCmmCodeLabel pkg fun)
 
 -----------------------------------------------------------------------------
 --

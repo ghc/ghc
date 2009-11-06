@@ -47,7 +47,7 @@ module CgMonad (
 	Sequel(..), -- ToDo: unabstract?
 
 	-- ideally we wouldn't export these, but some other modules access internal state
-	getState, setState, getInfoDown, getDynFlags, getThisPackage,
+	getState, setState, getInfoDown, getDynFlags, getThisPackage, 
 
 	-- more localised access to monad state	
 	getStkUsage, setStkUsage,

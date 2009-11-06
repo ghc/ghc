@@ -33,6 +33,7 @@ import ClosureInfo
 import Constants
 import StaticFlags
 import Outputable
+import Module
 import FastString
 import BasicTypes
 
@@ -144,8 +145,8 @@ emitForeignCall' safety results target args vols _srt ret
     emitLoadThreadState
 
 suspendThread, resumeThread :: CmmExpr
-suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "suspendThread")))
-resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "resumeThread")))
+suspendThread = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "suspendThread")))
+resumeThread  = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "resumeThread")))
 
 
 -- we might need to load arguments into temporaries before

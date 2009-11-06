@@ -45,6 +45,7 @@ import Name
 import Bitmap
 import Util
 import StaticFlags
+import Module
 import FastString
 import Outputable
 import Unique
@@ -224,7 +225,7 @@ slowArgs :: [(CgRep,CmmExpr)] -> [(CgRep,CmmExpr)]
 slowArgs [] = []
 slowArgs amodes = (NonPtrArg, mkLblExpr stg_ap_pat) : args ++ slowArgs rest
   where	(arg_pat, args, rest) = matchSlowPattern amodes
-	stg_ap_pat = mkRtsRetInfoLabel arg_pat
+	stg_ap_pat 	= mkCmmRetInfoLabel rtsPackageId arg_pat
   
 matchSlowPattern :: [(CgRep,CmmExpr)] 
 		 -> (FastString, [(CgRep,CmmExpr)], [(CgRep,CmmExpr)])

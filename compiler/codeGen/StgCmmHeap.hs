@@ -40,6 +40,7 @@ import DataCon
 import TyCon
 import CostCentre
 import Outputable
+import Module
 import FastString( mkFastString, FastString, fsLit )
 import Constants
 
@@ -349,8 +350,9 @@ entryHeapCheck fun arity args code
     gc_call updfr_sz
         | arity == 0 = mkJumpGC (CmmReg (CmmGlobal GCEnter1)) arg_exprs updfr_sz
         | otherwise  = case gc_lbl args' of
-                         Just lbl -> mkJumpGC (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
-                                              arg_exprs updfr_sz
+                         Just _lbl -> panic "StgCmmHeap.entryHeapCheck: gc_lbl not finished"
+				     -- mkJumpGC (CmmLit (CmmLabel (mkRtsCodeLabel lbl)))
+                                     --         arg_exprs updfr_sz
                          Nothing  -> mkCall generic_gc (GC, GC) [] [] updfr_sz
 
     gc_lbl :: [LocalReg] -> Maybe FastString
@@ -388,8 +390,9 @@ altHeapCheck regs code
 	| null regs = mkCall generic_gc (GC, GC) [] [] updfr_sz
 
 	| Just gc_lbl <- rts_label regs	-- Canned call
-	= mkCall    (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl))) (GC, GC)
-		    regs (map (CmmReg . CmmLocal) regs) updfr_sz
+	= panic "StgCmmHeap.altHeapCheck: rts_label not finished"
+		-- mkCall    (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl))) (GC, GC)
+		--	    regs (map (CmmReg . CmmLocal) regs) updfr_sz
 	| otherwise		-- No canned call, and non-empty live vars
 	= mkCall generic_gc (GC, GC) [] [] updfr_sz
 
@@ -413,7 +416,7 @@ altHeapCheck regs code
 
 
 generic_gc :: CmmExpr	-- The generic GC procedure; no params, no resuls
-generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "stg_gc_noregs")))
+generic_gc = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_noregs")))
 -- JD: TEMPORARY -- UNTIL THOSE FUNCTIONS EXIST...
 -- generic_gc = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_fun")))
 

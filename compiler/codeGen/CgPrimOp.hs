@@ -23,6 +23,7 @@ import CLabel
 import CmmUtils
 import PrimOp
 import SMRep
+import Module
 import Constants
 import Outputable
 import FastString
@@ -122,7 +123,7 @@ emitPrimOp [res] ParOp [arg] live
         NoC_SRT -- No SRT b/c we do PlayRisky
         CmmMayReturn
   where
-	newspark = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "newSpark")))
+	newspark = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark")))
 
 emitPrimOp [res] ReadMutVarOp [mutv] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))

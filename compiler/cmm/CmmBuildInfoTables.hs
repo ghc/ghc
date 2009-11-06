@@ -23,6 +23,7 @@ import CmmProcPointZ
 import CmmStackLayout
 import CmmTx
 import DFMonad
+import Module
 import FastString
 import FiniteMap
 import ForeignCall
@@ -518,8 +519,8 @@ lowerSafeForeignCall state m@(MidForeignCall (Safe infotable _) _ _ _) tail = do
     new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
     let (caller_save, caller_load) = callerSaveVolatileRegs 
     load_tso <- newTemp gcWord -- TODO FIXME NOW
-    let suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "suspendThread")))
-        resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (fsLit "resumeThread")))
+    let suspendThread = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "suspendThread")))
+        resumeThread  = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "resumeThread")))
         suspend = mkStore (CmmReg spReg) (CmmLit (CmmBlock infotable)) <*>
                   saveThreadState <*>
                   caller_save <*>

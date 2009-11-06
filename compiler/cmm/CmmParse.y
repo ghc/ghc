@@ -3,6 +3,8 @@
 -- (c) The University of Glasgow, 2004-2006
 --
 -- Parser for concrete Cmm.
+-- This doesn't just parse the Cmm file, we also do some code generation
+-- along the way for switches and foreign calls etc.
 --
 -----------------------------------------------------------------------------
 
@@ -16,7 +18,8 @@
 
 module CmmParse ( parseCmmFile ) where
 
-import CgMonad
+import CgMonad		hiding (getDynFlags)
+import CgExtCode
 import CgHeapery
 import CgUtils
 import CgProf
@@ -40,6 +43,7 @@ import SMRep
 import Lexer
 
 import ForeignCall
+import Module
 import Literal
 import Unique
 import UniqFM
@@ -54,6 +58,7 @@ import Constants
 import Outputable
 import BasicTypes
 import Bag              ( emptyBag, unitBag )
+import Var
 
 import Control.Monad
 import Data.Array
@@ -166,8 +171,9 @@ cmmtop	:: { ExtCode }
 	| cmmdata			{ $1 }
 	| decl				{ $1 } 
 	| 'CLOSURE' '(' NAME ',' NAME lits ')' ';'  
-		{ do lits <- sequence $6;
-		     staticClosure $3 $5 (map getLit lits) }
+		{% withThisPackage $ \pkg -> 
+		   do lits <- sequence $6;
+		      staticClosure pkg $3 $5 (map getLit lits) }
 
 -- The only static closures in the RTS are dummy closures like
 -- stg_END_TSO_QUEUE_closure and stg_dummy_ret.  We don't need
@@ -190,7 +196,10 @@ statics	:: { [ExtFCode [CmmStatic]] }
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static 	:: { ExtFCode [CmmStatic] }
-	: NAME ':'	{ return [CmmDataLabel (mkRtsDataLabel $1)] }
+	: NAME ':'	
+		{% withThisPackage $ \pkg -> 
+		   return [CmmDataLabel (mkCmmDataLabel pkg $1)] }
+
 	| type expr ';'	{ do e <- $2;
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised
@@ -235,29 +244,33 @@ cmmproc :: { ExtCode }
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo Nothing Nothing info) formals []) }
 
 	| NAME maybe_formals_without_hints maybe_gc_block maybe_frame '{' body '}'
-		{ do ((formals, gc_block, frame), stmts) <-
-			getCgStmtsEC' $ loopDecls $ do {
-		          formals <- sequence $2;
-		          gc_block <- $3;
-			  frame <- $4;
-		          $6;
-		          return (formals, gc_block, frame) }
-                     blks <- code (cgStmtsToBlocks stmts)
-		     code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkRtsCodeLabel $1) formals blks) }
+		{% withThisPackage $ \pkg ->
+		   do	newFunctionName $1 pkg
+		   	((formals, gc_block, frame), stmts) <-
+			 	getCgStmtsEC' $ loopDecls $ do {
+		          		formals <- sequence $2;
+		          		gc_block <- $3;
+			  		frame <- $4;
+		          		$6;
+		          		return (formals, gc_block, frame) }
+			blks <- code (cgStmtsToBlocks stmts)
+			code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkCmmCodeLabel pkg $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, closure type, description, type
-		{ do prof <- profilingInfo $11 $13
-		     return (mkRtsEntryLabel $3,
+		{% withThisPackage $ \pkg ->
+		   do prof <- profilingInfo $11 $13
+		      return (mkCmmEntryLabel pkg $3,
 			CmmInfoTable False prof (fromIntegral $9)
 				     (ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
 			[]) }
 	
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type
-		{ do prof <- profilingInfo $11 $13
-		     return (mkRtsEntryLabel $3,
+		{% withThisPackage $ \pkg -> 
+		   do prof <- profilingInfo $11 $13
+		      return (mkCmmEntryLabel pkg $3,
 			CmmInfoTable False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT
 				      0  -- Arity zero
@@ -270,8 +283,9 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	-- A variant with a non-zero arity (needed to write Main_main in Cmm)
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type, arity
-		{ do prof <- profilingInfo $11 $13
-		     return (mkRtsEntryLabel $3,
+		{% withThisPackage $ \pkg ->
+		   do prof <- profilingInfo $11 $13
+		      return (mkCmmEntryLabel pkg $3,
 			CmmInfoTable False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $17)
 				      (ArgSpec (fromIntegral $15))
@@ -282,35 +296,39 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	
 	| 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, tag, closure type, description, type
-		{ do prof <- profilingInfo $13 $15
+		{% withThisPackage $ \pkg ->
+		   do prof <- profilingInfo $13 $15
 		     -- If profiling is on, this string gets duplicated,
 		     -- but that's the way the old code did it we can fix it some other time.
-		     desc_lit <- code $ mkStringCLit $13
-		     return (mkRtsEntryLabel $3,
+		      desc_lit <- code $ mkStringCLit $13
+		      return (mkCmmEntryLabel pkg $3,
 			CmmInfoTable False prof (fromIntegral $11)
 				     (ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
 			[]) }
 	
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
-		{ do prof <- profilingInfo $9 $11
-		     return (mkRtsEntryLabel $3,
+		{% withThisPackage $ \pkg ->
+		   do prof <- profilingInfo $9 $11
+		      return (mkCmmEntryLabel pkg $3,
 			CmmInfoTable False prof (fromIntegral $7)
 				     (ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
 			[]) }
 
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ')'
 		-- closure type (no live regs)
-		{ do let infoLabel = mkRtsInfoLabel $3
-		     return (mkRtsRetLabel $3,
+		{% withThisPackage $ \pkg ->
+		   do let infoLabel = mkCmmInfoLabel pkg $3
+		      return (mkCmmRetLabel pkg $3,
 			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 				     (ContInfo [] NoC_SRT),
 			[]) }
 
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_hints0 ')'
 		-- closure type, live regs
-		{ do live <- sequence (map (liftM Just) $7)
-		     return (mkRtsRetLabel $3,
+		{% withThisPackage $ \pkg ->
+		   do live <- sequence (map (liftM Just) $7)
+		      return (mkCmmRetLabel pkg $3,
 			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 			             (ContInfo live NoC_SRT),
 			live) }
@@ -322,12 +340,25 @@ body	:: { ExtCode }
 
 decl	:: { ExtCode }
 	: type names ';'		{ mapM_ (newLocal $1) $2 }
-	| 'import' names ';'		{ mapM_ newImport $2 }
+	| 'import' importNames ';'	{ mapM_ newImport $2 }
 	| 'export' names ';'		{ return () }  -- ignore exports
 
+
+-- an imported function name, with optional packageId
+importNames  
+	:: { [(Maybe PackageId, FastString)] }
+	: importName			{ [$1] }
+	| importName ',' importNames	{ $1 : $3 }		
+	
+importName
+	:: { (Maybe PackageId, FastString) }
+	: NAME				{ (Nothing, $1) }
+	| STRING NAME			{ (Just (fsToPackageId (mkFastString $1)), $2) }
+	
+	
 names 	:: { [FastString] }
-	: NAME			{ [$1] }
-	| NAME ',' names	{ $1 : $3 }
+	: NAME				{ [$1] }
+	| NAME ',' names		{ $1 : $3 }
 
 stmt	:: { ExtCode }
 	: ';'					{ nopEC }
@@ -768,110 +799,6 @@ stmtMacros = listToUFM [
 
  ]
 
--- -----------------------------------------------------------------------------
--- Our extended FCode monad.
-
--- We add a mapping from names to CmmExpr, to support local variable names in
--- the concrete C-- code.  The unique supply of the underlying FCode monad
--- is used to grab a new unique for each local variable.
-
--- In C--, a local variable can be declared anywhere within a proc,
--- and it scopes from the beginning of the proc to the end.  Hence, we have
--- to collect declarations as we parse the proc, and feed the environment
--- back in circularly (to avoid a two-pass algorithm).
-
-data Named = Var CmmExpr | Label BlockId
-type Decls = [(FastString,Named)]
-type Env   = UniqFM Named
-
-newtype ExtFCode a = EC { unEC :: Env -> Decls -> FCode (Decls, a) }
-
-type ExtCode = ExtFCode ()
-
-returnExtFC a = EC $ \e s -> return (s, a)
-thenExtFC (EC m) k = EC $ \e s -> do (s',r) <- m e s; unEC (k r) e s'
-
-instance Monad ExtFCode where
-  (>>=) = thenExtFC
-  return = returnExtFC
-
--- This function takes the variable decarations and imports and makes 
--- an environment, which is looped back into the computation.  In this
--- way, we can have embedded declarations that scope over the whole
--- procedure, and imports that scope over the entire module.
--- Discards the local declaration contained within decl'
-loopDecls :: ExtFCode a -> ExtFCode a
-loopDecls (EC fcode) =
-      EC $ \e globalDecls -> do
-	(decls', a) <- fixC (\ ~(decls,a) -> fcode (addListToUFM e (decls ++ globalDecls)) globalDecls)
-	return (globalDecls, a)
-
-getEnv :: ExtFCode Env
-getEnv = EC $ \e s -> return (s, e)
-
-addVarDecl :: FastString -> CmmExpr -> ExtCode
-addVarDecl var expr = EC $ \e s -> return ((var, Var expr):s, ())
-
-addLabel :: FastString -> BlockId -> ExtCode
-addLabel name block_id = EC $ \e s -> return ((name, Label block_id):s, ())
-
-newLocal :: CmmType -> FastString -> ExtFCode LocalReg
-newLocal ty name = do
-   u <- code newUnique
-   let reg = LocalReg u ty
-   addVarDecl name (CmmReg (CmmLocal reg))
-   return reg
-
--- Creates a foreign label in the import. CLabel's labelDynamic
--- classifies these labels as dynamic, hence the code generator emits the
--- PIC code for them.
-newImport :: FastString -> ExtFCode ()
-newImport name
-   = addVarDecl name (CmmLit (CmmLabel (mkForeignLabel name Nothing True IsFunction)))
-
-newLabel :: FastString -> ExtFCode BlockId
-newLabel name = do
-   u <- code newUnique
-   addLabel name (BlockId u)
-   return (BlockId u)
-
-lookupLabel :: FastString -> ExtFCode BlockId
-lookupLabel name = do
-  env <- getEnv
-  return $ 
-     case lookupUFM env name of
-	Just (Label l) -> l
-	_other -> BlockId (newTagUnique (getUnique name) 'L')
-
--- Unknown names are treated as if they had been 'import'ed.
--- This saves us a lot of bother in the RTS sources, at the expense of
--- deferring some errors to link time.
-lookupName :: FastString -> ExtFCode CmmExpr
-lookupName name = do
-  env <- getEnv
-  return $ 
-     case lookupUFM env name of
-	Just (Var e) -> e
-	_other -> CmmLit (CmmLabel (mkRtsCodeLabel name))
-
--- Lifting FCode computations into the ExtFCode monad:
-code :: FCode a -> ExtFCode a
-code fc = EC $ \e s -> do r <- fc; return (s, r)
-
-code2 :: (FCode (Decls,b) -> FCode ((Decls,b),c))
-	 -> ExtFCode b -> ExtFCode c
-code2 f (EC ec) = EC $ \e s -> do ((s',b),c) <- f (ec e s); return (s',c)
-
-nopEC = code nopC
-stmtEC stmt = code (stmtC stmt)
-stmtsEC stmts = code (stmtsC stmts)
-getCgStmtsEC = code2 getCgStmts'
-getCgStmtsEC' = code2 (\m -> getCgStmts' m >>= f)
-  where f ((decl, b), c) = return ((decl, b), (b, c))
-
-forkLabelledCodeEC ec = do
-  stmts <- getCgStmtsEC ec
-  code (forkCgStmts stmts)
 
 
 profilingInfo desc_str ty_str = do
@@ -884,10 +811,10 @@ profilingInfo desc_str ty_str = do
   return (ProfilingInfo lit1 lit2)
 
 
-staticClosure :: FastString -> FastString -> [CmmLit] -> ExtCode
-staticClosure cl_label info payload
-  = code $ emitDataLits (mkRtsDataLabel cl_label) lits
-  where  lits = mkStaticClosure (mkRtsInfoLabel info) dontCareCCS payload [] [] []
+staticClosure :: PackageId -> FastString -> FastString -> [CmmLit] -> ExtCode
+staticClosure pkg cl_label info payload
+  = code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
+  where  lits = mkStaticClosure (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
 
 foreignCall
 	:: String
