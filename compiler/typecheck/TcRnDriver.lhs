@@ -40,6 +40,7 @@ import TcHsSyn
 import TcExpr
 import TcRnMonad
 import TcType
+import Coercion
 import Inst
 import FamInst
 import InstEnv
@@ -74,6 +75,7 @@ import Name
 import NameEnv
 import NameSet
 import TyCon
+import TysPrim
 import TysWiredIn
 import SrcLoc
 import HscTypes
@@ -1580,8 +1582,12 @@ ppr_tydecls tycons
   where
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
     ppr_tycon tycon 
-      | isCoercionTyCon tycon = ptext (sLit "coercion") <+> ppr tycon
+      | isCoercionTyCon tycon 
+      = sep [ptext (sLit "coercion") <+> ppr tycon <+> ppr tvs
+            , nest 2 (dcolon <+> pprEqPred (coercionKind (mkTyConApp tycon (mkTyVarTys tvs))))]
       | otherwise             = ppr (tyThingToIfaceDecl (ATyCon tycon))
+      where
+        tvs = take (tyConArity tycon) alphaTyVars
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
