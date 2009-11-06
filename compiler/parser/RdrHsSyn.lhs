@@ -1012,7 +1012,9 @@ parseCImport cconv safety nm str =
 
    mk = CImport cconv safety
 
-   hdr_char c = isAscii c && (isAlphaNum c || c `elem` "._-")
+   hdr_char c = not (isSpace c) -- header files are filenames, which can contain
+                                -- pretty much any char (depending on the platform),
+                                -- so just accept any non-space character
    id_char  c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
