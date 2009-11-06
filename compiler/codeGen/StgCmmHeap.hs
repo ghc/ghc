@@ -389,7 +389,7 @@ altHeapCheck regs code
     gc_call updfr_sz
 	| null regs = mkCall generic_gc (GC, GC) [] [] updfr_sz
 
-	| Just gc_lbl <- rts_label regs	-- Canned call
+	| Just _gc_lbl <- rts_label regs	-- Canned call
 	= panic "StgCmmHeap.altHeapCheck: rts_label not finished"
 		-- mkCall    (CmmLit (CmmLabel (mkRtsCodeLabel gc_lbl))) (GC, GC)
 		--	    regs (map (CmmReg . CmmLocal) regs) updfr_sz

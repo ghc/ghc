@@ -530,6 +530,7 @@ needsCDecl ModuleRegdLabel		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
+needsCDecl (CmmLabel _ _ _)		= False
 needsCDecl l@(ForeignLabel _ _ _ _)	= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
