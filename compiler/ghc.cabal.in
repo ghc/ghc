@@ -219,6 +219,7 @@ Library
         CgClosure
         CgCon
         CgExpr
+        CgExtCode
         CgForeignCall
         CgHeapery
         CgHpc
