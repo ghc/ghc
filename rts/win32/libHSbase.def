@@ -1,0 +1,64 @@
+
+LIBRARY base
+
+EXPORTS
+
+	ffi_call
+	ffi_prep_cif
+	ffi_call
+	ffi_type_void
+	ffi_type_float
+	ffi_type_double
+	ffi_type_sint64
+	ffi_type_uint64
+	ffi_type_sint32
+	ffi_type_uint32
+	ffi_type_sint16
+	ffi_type_uint16
+	ffi_type_sint8
+	ffi_type_uint8
+	ffi_type_pointer
+
+	ghczmprim_GHCziBool_True_closure
+	ghczmprim_GHCziBool_False_closure
+	ghczmprim_GHCziTypes_Czh_con_info
+	ghczmprim_GHCziTypes_Izh_con_info
+	ghczmprim_GHCziTypes_Fzh_con_info
+	ghczmprim_GHCziTypes_Dzh_con_info
+	ghczmprim_GHCziTypes_Czh_static_info
+	ghczmprim_GHCziTypes_Izh_static_info
+
+	base_GHCziInt_I8zh_con_info
+	base_GHCziInt_I16zh_con_info
+	base_GHCziInt_I32zh_con_info
+	base_GHCziInt_I64zh_con_info
+
+	base_GHCziWord_Wzh_con_info
+	base_GHCziWord_W8zh_con_info
+	base_GHCziWord_W16zh_con_info
+	base_GHCziWord_W32zh_con_info
+	base_GHCziWord_W64zh_con_info
+
+	base_GHCziStable_StablePtr_con_info
+
+	base_GHCziPack_unpackCString_closure
+
+	base_GHCziTopHandler_runIO_closure
+	base_GHCziTopHandler_runNonIO_closure
+
+	base_GHCziIOziException_stackOverflow_closure
+	base_GHCziIOziException_heapOverflow_closure
+
+	base_GHCziPtr_Ptr_con_info
+	base_GHCziPtr_FunPtr_con_info
+
+	base_GHCziWeak_runFinalizzerBatch_closure
+	base_GHCziPack_unpackCString_closure
+	base_GHCziIOziException_blockedIndefinitelyOnMVar_closure
+	base_GHCziIOziException_blockedIndefinitelyOnSTM_closure
+	base_GHCziIOziException_stackOverflow_closure
+
+	base_ControlziExceptionziBase_nonTermination_closure
+	base_ControlziExceptionziBase_nestedAtomically_closure
+
+

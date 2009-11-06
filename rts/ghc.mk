@@ -108,11 +108,23 @@ rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
 rts_dist_$1_CC_OPTS += -DRtsWay=$$(DQ)rts_$1$$(DQ)
 
+
+# Making a shared library for the RTS.
+#	On Windows, as the RTS and base library has recursive imports
+#	we have to break the loop with a import library (libHSbase.so.a)
+#	This is made from rts/win32/libHSbase.def which contains a list of
+#	all the symbols in the base library used by the RTS.
 ifneq "$$(findstring dyn, $1)" ""
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
+  ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+	dlltool -d rts/win32/libHSbase.def -l rts/dist/build/win32/libHSbase.so.a
+	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
+	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) rts/dist/build/win32/libHSbase.so.a -o $$@
+  else
 	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
+  endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
