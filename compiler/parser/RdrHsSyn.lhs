@@ -73,7 +73,7 @@ import Maybes
 import Control.Applicative ((<$>))       
 import Text.ParserCombinators.ReadP as ReadP
 import Data.List        ( nubBy )
-import Data.Char        ( isAscii, isAlphaNum, isAlpha )
+import Data.Char
 
 #include "HsVersions.h"
 \end{code}
