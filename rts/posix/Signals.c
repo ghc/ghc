@@ -124,12 +124,6 @@ ioManagerDie (void)
     }
 }
 
-Capability *
-ioManagerStartCap (Capability *cap)
-{
-    return rts_evalIO(cap,&base_GHCziConc_ensureIOManagerIsRunning_closure,NULL);
-}
-
 void
 ioManagerStart (void)
 {
@@ -137,7 +131,7 @@ ioManagerStart (void)
     Capability *cap;
     if (io_manager_pipe < 0) {
 	cap = rts_lock();
-	cap = ioManagerStartCap(cap);
+	cap = rts_evalIO(cap,&base_GHCziConc_ensureIOManagerIsRunning_closure,NULL);
 	rts_unlock(cap);
     }
 }

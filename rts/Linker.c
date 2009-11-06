@@ -957,37 +957,6 @@ typedef struct _RtsSymbolVal {
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
-/* NOTE [io-manager-ghci]
-
-   When GHCi loads the base package, it gets another copy of the CAFs
-   in GHC.Conc that record the IO manager's ThreadId, and the blocking
-   queues, so we get another IO manager.  This is bad enough, but what
-   is worse is that GHCi by default reverts all CAFs on every :load,
-   so we'll get *another* IO manager thread (and an associated pipe)
-   every time the user does :load.  Miraculously, this actually
-   manages to just about work in GHC 6.10 and earlier, but broke when
-   I tried to fix #1185 (restarting the IO manager after a fork()).
-
-   To work around it and ensure that we only have a single IO manager,
-   we map the CAFs in the dynamically-loaded GHC.Conc to the
-   statically-linked GHC.Conc.  This is an ugly hack, but it's the
-   least ugly hack that I could think of (SDM 3/11/2009)
-*/
-
-#define RTS_GHC_CONC_SYMBOLS \
-      SymI_NeedsProto(base_GHCziConc_pendingDelays_closure) \
-      SymI_NeedsProto(base_GHCziConc_ioManagerThread_closure)
-
-#ifdef mingw32_HOST_OS
-#define RTS_GHC_CONC_OS_SYMBOLS /* empty */
-#else
-#define RTS_GHC_CONC_OS_SYMBOLS \
-      SymI_NeedsProto(base_GHCziConc_pendingEvents_closure) \
-      SymI_NeedsProto(base_GHCziConc_prodding_closure) \
-      SymI_NeedsProto(base_GHCziConc_sync_closure) \
-      SymI_NeedsProto(base_GHCziConc_stick_closure)
-#endif
-
 #if defined(darwin_HOST_OS) && defined(powerpc_HOST_ARCH)
       // Symbols that don't have a leading underscore
       // on Mac OS X. They have to receive special treatment,
@@ -1016,8 +985,6 @@ RTS_CYGWIN_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_LIBFFI_SYMBOLS
-RTS_GHC_CONC_SYMBOLS
-RTS_GHC_CONC_OS_SYMBOLS
 #undef SymI_NeedsProto
 #undef SymI_HasProto
 #undef SymI_HasProto_redirect
@@ -1053,8 +1020,6 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
       RTS_LIBFFI_SYMBOLS
-      RTS_GHC_CONC_SYMBOLS
-      RTS_GHC_CONC_OS_SYMBOLS
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
       // dyld stub code contains references to this,
       // but it should never be called because we treat
@@ -1076,18 +1041,12 @@ static void ghciInsertStrHashTable ( char* obj_name,
                                      void *data
 				   )
 {
-#define GHC_CONC MAYBE_LEADING_UNDERSCORE_STR("base_GHCziConc")
-
-    if (lookupHashTable(table, (StgWord)key) == NULL)
-    {
+   if (lookupHashTable(table, (StgWord)key) == NULL)
+   {
       insertStrHashTable(table, (StgWord)key, data);
       return;
-    }
-    if (strncmp(key, GHC_CONC, strlen(GHC_CONC)) == 0) {
-        /* see NOTE [io-manager-ghci] */
-        return;
-    }
-    debugBelch(
+   }
+   debugBelch(
       "\n\n"
       "GHCi runtime linker: fatal error: I found a duplicate definition for symbol\n"
       "   %s\n"
@@ -1102,8 +1061,8 @@ static void ghciInsertStrHashTable ( char* obj_name,
       "\n",
       (char*)key,
       obj_name
-    );
-    exit(1);
+   );
+   exit(1);
 }
 /* -----------------------------------------------------------------------------
  * initialize the object linker
