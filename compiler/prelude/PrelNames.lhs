@@ -1026,7 +1026,8 @@ argTypeKindTyConKey                     = mkPreludeTyConUnique 91
 
 -- Coercion constructors
 symCoercionTyConKey, transCoercionTyConKey, leftCoercionTyConKey,
-    rightCoercionTyConKey, instCoercionTyConKey, unsafeCoercionTyConKey
+    rightCoercionTyConKey, instCoercionTyConKey, unsafeCoercionTyConKey,
+    csel1CoercionTyConKey, csel2CoercionTyConKey, cselRCoercionTyConKey
     :: Unique
 symCoercionTyConKey                     = mkPreludeTyConUnique 93
 transCoercionTyConKey                   = mkPreludeTyConUnique 94
@@ -1034,10 +1035,13 @@ leftCoercionTyConKey                    = mkPreludeTyConUnique 95
 rightCoercionTyConKey                   = mkPreludeTyConUnique 96
 instCoercionTyConKey                    = mkPreludeTyConUnique 97
 unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
+csel1CoercionTyConKey                   = mkPreludeTyConUnique 99
+csel2CoercionTyConKey                   = mkPreludeTyConUnique 100
+cselRCoercionTyConKey                   = mkPreludeTyConUnique 101
 
 unknownTyConKey, unknown1TyConKey, unknown2TyConKey, unknown3TyConKey,
     opaqueTyConKey :: Unique
-unknownTyConKey				= mkPreludeTyConUnique 99
+unknownTyConKey				= mkPreludeTyConUnique 129
 unknown1TyConKey			= mkPreludeTyConUnique 130
 unknown2TyConKey			= mkPreludeTyConUnique 131
 unknown3TyConKey			= mkPreludeTyConUnique 132

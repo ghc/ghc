@@ -206,7 +206,7 @@ match_kind :: MatchEnv -> TvSubstEnv -> TyVar -> Type -> Maybe TvSubstEnv
 -- Match the kind of the template tyvar with the kind of Type
 -- Note [Matching kinds]
 match_kind menv subst tv ty
-  | isCoVar tv = do { let (ty1,ty2) = splitCoercionKind (tyVarKind tv)
+  | isCoVar tv = do { let (ty1,ty2) = coVarKind tv
 			  (ty3,ty4) = coercionKind ty
 		    ; subst1 <- match menv subst ty1 ty3
 		    ; match menv subst1 ty2 ty4 }

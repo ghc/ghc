@@ -210,7 +210,7 @@ mkCoerce co expr
 --    if to_ty `coreEqType` from_ty
 --    then expr
 --    else 
-        ASSERT2(from_ty `coreEqType` (exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionKindPredTy co))
+        ASSERT2(from_ty `coreEqType` (exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ pprEqPred (coercionKind co))
          (Cast expr co)
 \end{code}
 

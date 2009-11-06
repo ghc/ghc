@@ -132,7 +132,7 @@ module Type (
 
 	-- * Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
-	pprPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind,
+	pprPred, pprEqPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind,
 	
 	pprSourceTyCon
     ) where
@@ -446,8 +446,8 @@ splitAppTys ty = split ty ty []
 \begin{code}
 mkFunTy :: Type -> Type -> Type
 -- ^ Creates a function type from the given argument and result type
-mkFunTy (PredTy (EqPred ty1 ty2)) res = mkForAllTy (mkWildCoVar (PredTy (EqPred ty1 ty2))) res
-mkFunTy arg res = FunTy arg res
+mkFunTy arg@(PredTy (EqPred {})) res = ForAllTy (mkWildCoVar arg) res
+mkFunTy arg                      res = FunTy    arg               res
 
 mkFunTys :: [Type] -> Type -> Type
 mkFunTys tys ty = foldr mkFunTy ty tys

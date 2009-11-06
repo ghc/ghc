@@ -20,7 +20,7 @@ module TypeRep (
 	-- Pretty-printing
 	pprType, pprParendType, pprTypeApp,
 	pprTyThing, pprTyThingCategory, 
-	pprPred, pprTheta, pprForAll, pprThetaArrow, pprClassPred,
+	pprPred, pprEqPred, pprTheta, pprForAll, pprThetaArrow, pprClassPred,
 
 	-- Kinds
 	liftedTypeKind, unliftedTypeKind, openTypeKind,
@@ -428,9 +428,12 @@ pprTypeApp tc tys = ppr_type_app TopPrec (getName tc) tys
 pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
-pprPred (EqPred ty1 ty2) = sep [ ppr_type FunPrec ty1
-                               , nest 2 (ptext (sLit "~"))
-                               , ppr_type FunPrec ty2]
+pprPred (EqPred ty1 ty2) = pprEqPred (ty1,ty2)
+
+pprEqPred :: (Type,Type) -> SDoc
+pprEqPred (ty1,ty2) = sep [ ppr_type FunPrec ty1
+                          , nest 2 (ptext (sLit "~"))
+                          , ppr_type FunPrec ty2]
 			       -- Precedence looks like (->) so that we get
 			       --    Maybe a ~ Bool
 			       --    (a->a) ~ Bool

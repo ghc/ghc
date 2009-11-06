@@ -123,7 +123,7 @@ ppr_expr add_par (Cast expr co)
   where
     pprCo co | opt_SuppressCoercions = ptext (sLit "...")
              | otherwise = parens
-                         $ sep [ppr co, dcolon <+> ppr (coercionKindPredTy co)]
+                         $ sep [ppr co, dcolon <+> pprEqPred (coercionKind co)]
 	 
 
 ppr_expr add_par expr@(Lam _ _)
@@ -407,18 +407,20 @@ instance Outputable Unfolding where
       		     , uf_expandable=exp, uf_guidance=g, uf_arity=arity}) 
 	= ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
     where
-      pp_info = hsep [ ptext (sLit "TopLvl=") <> ppr top 
-                     , ptext (sLit "Arity=") <> int arity
-                     , ptext (sLit "Value=") <> ppr hnf
-                     , ptext (sLit "ConLike=") <> ppr conlike
-                     , ptext (sLit "Cheap=") <> ppr cheap
-                     , ptext (sLit "Expandable=") <> ppr exp
-                     , ppr g ]
+      pp_info = fsep $ punctuate comma 
+                [ ptext (sLit "TopLvl=")     <> ppr top 
+                , ptext (sLit "Arity=")      <> int arity
+                , ptext (sLit "Value=")      <> ppr hnf
+                , ptext (sLit "ConLike=")    <> ppr conlike
+                , ptext (sLit "Cheap=")      <> ppr cheap
+                , ptext (sLit "Expandable=") <> ppr exp
+                , ptext (sLit "Guidance=")   <> ppr g ]
+      pp_tmpl = ptext (sLit "Tmpl=") <+> ppr rhs
       pp_rhs = case g of
       	      	  UnfoldNever         -> usually_empty
 		  UnfoldIfGoodArgs {} -> usually_empty
-                  _other              -> ppr rhs
-      usually_empty = ifPprDebug (ppr rhs)
+                  _other              -> pp_tmpl
+      usually_empty = ifPprDebug pp_tmpl
             -- In this case show 'rhs' only in debug mode
 \end{code}
 

@@ -37,6 +37,7 @@ import DynFlags
 import Outputable
 import FastString
 import Util
+import Control.Monad
 import Data.Maybe
 \end{code}
 
@@ -99,11 +100,22 @@ lintCoreBindings dflags _whoDunnit _binds
   = return ()
 
 lintCoreBindings dflags whoDunnit binds
-  = case (initL (lint_binds binds)) of
-      Nothing       -> showPass dflags ("Core Linted result of " ++ whoDunnit)
-      Just bad_news -> printDump (display bad_news)	>>
-		       ghcExit dflags 1
+  | isEmptyBag errs
+  = do { showPass dflags ("Core Linted result of " ++ whoDunnit)
+       ; unless (isEmptyBag warns) $ printDump $
+         (banner "warnings" $$ displayMessageBag warns)
+       ; return () }
+
+  | otherwise
+  = do { printDump (vcat [ banner "errors", displayMessageBag errs
+			 , ptext (sLit "*** Offending Program ***")
+			 , pprCoreBindings binds
+			 , ptext (sLit "*** End of Offense ***") ])
+
+       ; ghcExit dflags 1 }
   where
+    (warns, errs) = initL (lint_binds binds)
+
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
 	-- into use 'unexpectedly'
@@ -114,13 +126,12 @@ lintCoreBindings dflags whoDunnit binds
     lint_bind (Rec prs)		= mapM_ (lintSingleBinding TopLevel Recursive) prs
     lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
 
-    display bad_news
-      = vcat [  text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
-		bad_news,
-		ptext (sLit "*** Offending Program ***"),
-		pprCoreBindings binds,
-		ptext (sLit "*** End of Offense ***")
-	]
+    banner string = ptext (sLit "*** Core Lint")      <+> text string 
+                    <+> ptext (sLit ": in result of") <+> text whoDunnit 
+                    <+> ptext (sLit "***")
+
+displayMessageBag :: Bag Message -> SDoc
+displayMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 \end{code}
 
 %************************************************************************
@@ -139,9 +150,12 @@ lintUnfolding :: SrcLoc
 	      -> Maybe Message	-- Nothing => OK
 
 lintUnfolding locn vars expr
-  = initL (addLoc (ImportedUnfolding locn) $
-	   addInScopeVars vars	           $
-	   lintCoreExpr expr)
+  | isEmptyBag errs = Nothing
+  | otherwise       = Just (displayMessageBag errs)
+  where
+    (_warns, errs) = initL (addLoc (ImportedUnfolding locn) $
+                            addInScopeVars vars	           $
+                            lintCoreExpr expr)
 \end{code}
 
 %************************************************************************
@@ -171,6 +185,9 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
            (mkStrictMsg binder)
         -- Check whether binder's specialisations contain any out-of-scope variables
        ; mapM_ (checkBndrIdInScope binder) bndr_vars 
+
+       ; when (isLoopBreaker (idOccInfo binder) && isInlinePragma (idInlinePragma binder))
+              (addWarnL (ptext (sLit "INLINE binder is loop breaker:") <+> ppr binder))
 
       -- Check whether arity and demand type are consistent (only if demand analysis
       -- already happened)
@@ -351,7 +368,7 @@ lintCoreArg fun_ty arg =
         Just (arg,res) -> 
           do { checkTys arg arg_ty err1
              ; return res }
-        _ -> addErrL err2 }
+        _ -> failWithL err2 }
 \end{code}
 
 \begin{code}
@@ -359,7 +376,7 @@ lintCoreArg fun_ty arg =
 lintTyApp :: OutType -> OutType -> LintM OutType
 lintTyApp ty arg_ty 
   = case splitForAllTy_maybe ty of
-      Nothing -> addErrL (mkTyAppMsg ty arg_ty)
+      Nothing -> failWithL (mkTyAppMsg ty arg_ty)
 
       Just (tyvar,body)
         -> do	{ checkL (isTyVar tyvar) (mkTyAppMsg ty arg_ty)
@@ -372,12 +389,15 @@ checkKinds tyvar arg_ty
 	-- tyvar; notably this is used so that we can give
 	-- 	error :: forall a:*. String -> a
 	-- and then apply it to both boxed and unboxed types.
-  = checkL (arg_kind `isSubKind` tyvar_kind)
-	   (mkKindErrMsg tyvar arg_ty)
+  | isCoVar tyvar = unless (s1 `coreEqType` s2 && t1 `coreEqType` t2)
+                           (addErrL (mkCoAppErrMsg tyvar arg_ty))
+  | otherwise     = unless (arg_kind `isSubKind` tyvar_kind)
+                           (addErrL (mkKindErrMsg tyvar arg_ty))
   where
     tyvar_kind = tyVarKind tyvar
-    arg_kind | isCoVar tyvar = coercionKindPredTy arg_ty
-	     | otherwise     = typeKind arg_ty
+    arg_kind   = typeKind arg_ty
+    (s1,t1) = coVarKind tyvar
+    (s2,t2) = coercionKind arg_ty
 
 checkDeadIdOcc :: Id -> LintM ()
 -- Occurrences of an Id should never be dead....
@@ -561,8 +581,10 @@ newtype LintM a =
             TvSubst ->               -- Current type substitution; we also use this
 				     -- to keep track of all the variables in scope,
 				     -- both Ids and TyVars
-	    Bag Message ->           -- Error messages so far
-	    (Maybe a, Bag Message) } -- Result and error messages (if any)
+	    WarnsAndErrs ->           -- Error and warning messages so far
+	    (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
+
+type WarnsAndErrs = (Bag Message, Bag Message)
 
 {-	Note [Type substitution]
 	~~~~~~~~~~~~~~~~~~~~~~~~
@@ -581,7 +603,7 @@ Here we substitute 'ty' for 'a' in 'body', on the fly.
 
 instance Monad LintM where
   return x = LintM (\ _   _     errs -> (Just x, errs))
-  fail err = LintM (\ loc subst errs -> (Nothing, addErr subst errs (text err) loc))
+  fail err = failWithL (text err)
   m >>= k  = LintM (\ loc subst errs -> 
                        let (res, errs') = unLintM m loc subst errs in
                          case res of
@@ -601,25 +623,33 @@ data LintLocInfo
 
                  
 \begin{code}
-initL :: LintM a -> Maybe Message {- errors -}
+initL :: LintM a -> WarnsAndErrs    -- Errors and warnings
 initL m
-  = case unLintM m [] emptyTvSubst emptyBag of
-      (_, errs) | isEmptyBag errs -> Nothing
-		| otherwise	  -> Just (vcat (punctuate blankLine (bagToList errs)))
+  = case unLintM m [] emptyTvSubst (emptyBag, emptyBag) of
+      (_, errs) -> errs
 \end{code}
 
 \begin{code}
 checkL :: Bool -> Message -> LintM ()
 checkL True  _   = return ()
-checkL False msg = addErrL msg
+checkL False msg = failWithL msg
 
-addErrL :: Message -> LintM a
-addErrL msg = LintM (\ loc subst errs -> (Nothing, addErr subst errs msg loc))
+failWithL :: Message -> LintM a
+failWithL msg = LintM $ \ loc subst (warns,errs) ->
+                (Nothing, (warns, addMsg subst errs msg loc))
 
-addErr :: TvSubst -> Bag Message -> Message -> [LintLocInfo] -> Bag Message
-addErr subst errs_so_far msg locs
+addErrL :: Message -> LintM ()
+addErrL msg = LintM $ \ loc subst (warns,errs) -> 
+              (Just (), (warns, addMsg subst errs msg loc))
+
+addWarnL :: Message -> LintM ()
+addWarnL msg = LintM $ \ loc subst (warns,errs) -> 
+              (Just (), (addMsg subst warns msg loc, errs))
+
+addMsg :: TvSubst ->  Bag Message -> Message -> [LintLocInfo] -> Bag Message
+addMsg subst msgs msg locs
   = ASSERT( notNull locs )
-    errs_so_far `snocBag` mk_msg msg
+    msgs `snocBag` mk_msg msg
   where
    (loc, cxt1) = dumpLoc (head locs)
    cxts        = [snd (dumpLoc loc) | loc <- locs]   
@@ -644,7 +674,7 @@ addInScopeVars vars m
   | null dups
   = LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
   | otherwise
-  = addErrL (dupVars dups)
+  = failWithL (dupVars dups)
   where
     (_, dups) = removeDups compare vars 
 
@@ -672,7 +702,7 @@ lookupIdInScope id
   = do	{ subst <- getTvSubst
 	; case lookupInScope (getTvInScope subst) id of
 		Just v  -> return v
-		Nothing -> do { _ <- addErrL out_of_scope
+		Nothing -> do { addErrL out_of_scope
 			      ; return id } }
   where
     out_of_scope = ppr id <+> ptext (sLit "is out of scope")
@@ -836,6 +866,14 @@ mkKindErrMsg tyvar arg_ty
 		 4 (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)),
 	  hang (ptext (sLit "Arg type:"))   
 	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
+
+mkCoAppErrMsg :: TyVar -> Type -> Message
+mkCoAppErrMsg tyvar arg_ty
+  = vcat [ptext (sLit "Kinds don't match in coercion application:"),
+	  hang (ptext (sLit "Coercion variable:"))
+		 4 (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)),
+	  hang (ptext (sLit "Arg coercion:"))   
+	         4 (ppr arg_ty <+> dcolon <+> pprEqPred (coercionKind arg_ty))]
 
 mkTyAppMsg :: Type -> Type -> Message
 mkTyAppMsg ty arg_ty
