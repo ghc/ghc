@@ -177,7 +177,7 @@ However things are made quite a bit more complicated by RULES.  Remember
     "loop"?  In particular, a RULE is like an equation for 'f' that
     is *always* inlined if it is applicable.  We do *not* disable
     rules for loop-breakers.  It's up to whoever makes the rules to
-    make sure that the rules themselves alwasys terminate.  See Note
+    make sure that the rules themselves always terminate.  See Note
     [Rules for recursive functions] in Simplify.lhs
 
     Hence, if

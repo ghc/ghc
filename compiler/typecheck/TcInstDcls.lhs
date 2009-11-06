@@ -122,16 +122,16 @@ Running example:
 	{-# RULE "op1@C[a]" forall a, d:C a. 
                             op1 [a] (df_i d) = op1_i a d #-}
 
-* The dictionary function itself is inlined as vigorously as we
+* We want to inline the dictionary function itself as vigorously as we
   possibly can, so that we expose that dictionary constructor to
-  selectors as much as poss.  That is why the op_i stuff is in 
-  *separate* bindings, so that the df_i binding is small enough
-  to inline.  See Note [Inline dfuns unconditionally].
+  selectors as much as poss.  We don't actually inline it; rather, we
+  use a Builtin RULE for the ClassOps (see MkId.mkDictSelId) to short
+  circuit such applications.  But the RULE only applies if it can "see"
+  the dfun's DFunUnfolding. 
 
 * Note that df_i may be mutually recursive with both op1_i and op2_i.
   It's crucial that df_i is not chosen as the loop breaker, even 
   though op1_i has a (user-specified) INLINE pragma.
-  Not even once!  Else op1_i, op2_i may be inlined into df_i.
 
 * Instead the idea is to inline df_i into op1_i, which may then select
   methods from the MkC record, and thereby break the recursion with
@@ -142,8 +142,10 @@ Running example:
 * If op1_i is marked INLINE by the user there's a danger that we won't
   inline df_i in it, and that in turn means that (since it'll be a
   loop-breaker because df_i isn't), op1_i will ironically never be 
-  inlined.  We need to fix this somehow -- perhaps allowing inlining
-  of INLINE functions inside other INLINE functions.
+  inlined.  But this is OK: the recursion breaking happens by way of
+  a RULE (the magic ClassOp rule above), and RULES work inside InlineRule
+  unfoldings. See Note [RULEs enabled in SimplGently] in SimplUtils
+
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
