@@ -72,6 +72,11 @@ dnl ** Check gcc version and flags we need to pass it **
 #
 FP_GCC_EXTRA_FLAGS
 
+CONF_CC_OPTS="@CONF_CC_OPTS@"
+CONF_LD_OPTS="@CONF_LD_OPTS@"
+AC_SUBST(CONF_CC_OPTS)
+AC_SUBST(CONF_LD_OPTS)
+
 #
 AC_CONFIG_FILES(extra-gcc-opts mk/config.mk mk/install.mk)
 AC_OUTPUT
