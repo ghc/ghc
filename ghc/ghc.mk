@@ -89,6 +89,12 @@ ghc_stage3_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER = YES
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME = ghc-$(ProjectVersion)
 
+# We override the program name to be ghc, rather than ghc-stage2.
+# This means the right program name is used in error messages etc.
+define ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_EXTRA
+echo 'executablename="$$$$exedir/ghc"' >> "$$(WRAPPER)"
+endef
+
 # stage 1 is enabled unless $(stage) is set to something other than 1
 ifeq "$(filter-out 1,$(stage))" ""
 $(eval $(call build-prog,ghc,stage1,0))

@@ -781,6 +781,9 @@ else
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)"; \
 	done
+# We rename ghc-stage2, so that the right program name is used in error
+# messages etc.
+	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/ghc-stage2" "$(DESTDIR)$(ghclibexecdir)/ghc"
 endif
 
 install_topdir_scripts: $(INSTALL_TOPDIR_SCRIPTS)
@@ -827,7 +830,7 @@ INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
 ifeq "$(Windows)" "NO"
-INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-stage2
+INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/ghc
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-pkg
 else
 INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
