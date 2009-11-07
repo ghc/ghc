@@ -32,6 +32,7 @@ endif
 ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 all_$1_$2 : $$(INPLACE_BIN)/$$($1_$2_PROG)
 
+$$(INPLACE_BIN)/$$($1_$2_PROG): WRAPPER=$$@
 $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE)
 	"$$(RM)" $$(RM_OPTS)                              $$@
 	echo '#!$$(SHELL)'                             >> $$@
@@ -39,8 +40,8 @@ $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE)
 	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'       >> $$@
 	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'        >> $$@
 	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'     >> $$@
-	$($1_$2_SHELL_WRAPPER_EXTRA)
-	$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
+	$$($1_$2_SHELL_WRAPPER_EXTRA)
+	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
 	cat $$($1_$2_SHELL_WRAPPER_NAME)               >> $$@
 	$$(EXECUTABLE_FILE)                               $$@
 endif
@@ -70,8 +71,8 @@ install_$1_$2_wrapper:
 	echo 'datadir="$$(datadir)"'                             >> "$$(WRAPPER)"
 	echo 'bindir="$$(bindir)"'                               >> "$$(WRAPPER)"
 	echo 'topdir="$$(topdir)"'                               >> "$$(WRAPPER)"
-	$($1_$2_SHELL_WRAPPER_EXTRA)
-	$($1_$2_INSTALL_SHELL_WRAPPER_EXTRA)
+	$$($1_$2_SHELL_WRAPPER_EXTRA)
+	$$($1_$2_INSTALL_SHELL_WRAPPER_EXTRA)
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"
 	$$(EXECUTABLE_FILE)                                         "$$(WRAPPER)"
 
