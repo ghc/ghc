@@ -618,10 +618,9 @@ LdIsGNULd		= @LdIsGNULd@
 #   ar: Bad file number
 # see #3201.  We need to specify a smaller max command-line size
 # to work around it.  32767 doesn't work; 30000 does.
-ifeq "$(Windows)" "YES"
-XARGS = xargs -s 30000
-else
 XARGS = xargs
+ifeq "$(Windows)" "YES"
+XARGS_OPTS = -s 30000
 endif
 
 #
