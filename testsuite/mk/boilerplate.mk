@@ -96,6 +96,7 @@ ifeq "$(HPC)" ""
 HPC := $(BIN_ROOT)/hpc
 endif
 
+$(eval $(call canonicaliseExecutable,TEST_HC))
 ifeq "$(shell test -e '$(TEST_HC)' && echo exists)" ""
 $(error Cannot find ghc: $(TEST_HC))
 endif
