@@ -29,7 +29,6 @@ endif
 # Utils that are old and/or bitrotted:
 #	stat2resid
 #	debugNCG
-#	ext-core
 #	genargs
 #	heap-view
 #	pvm
