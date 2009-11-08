@@ -198,8 +198,8 @@ doInstall ghc ghcpkg strip topdir directory distDir
                             libsubdir = toPathTemplate "$pkgid",
                             docdir    = toPathTemplate $
                                             if relocatableBuild
-                                            then "$topdir/$pkg"
-                                            else (myDocdir </> "$pkg"),
+                                            then "$topdir/$pkgid"
+                                            else (myDocdir </> "$pkgid"),
                             htmldir   = toPathTemplate "$docdir"
                         }
                 progs = withPrograms lbi

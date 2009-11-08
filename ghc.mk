@@ -817,6 +817,8 @@ ifneq "$(INSTALL_LIBRARY_DOCS)" ""
 	for i in $(INSTALL_LIBRARY_DOCS); do \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i "$(DESTDIR)$(docdir)/html/libraries/"; \
 	done
+	$(INSTALL_DATA) $(INSTALL_OPTS) libraries/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"
+	$(INSTALL_SCRIPT) $(INSTALL_OPTS) libraries/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"
 endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
