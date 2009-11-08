@@ -34,10 +34,10 @@ main = do args <- getArgs
                   runHaddock distDir dir args'
               "check" : dir : [] ->
                   doCheck dir
-              "install" : ghc : ghcpkg : topdir : directory : distDir
+              "install" : ghc : ghcpkg : strip : topdir : directory : distDir
                         : myDestDir : myPrefix : myLibdir : myDocdir
                         : relocatableBuild : args' ->
-                  doInstall ghc ghcpkg topdir directory distDir
+                  doInstall ghc ghcpkg strip topdir directory distDir
                             myDestDir myPrefix myLibdir myDocdir
                             relocatableBuild args'
               "configure" : args' -> case break (== "--") args' of
@@ -139,10 +139,10 @@ runHaddock distdir directory args
           = f pd lbi us flags
 
 doInstall :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-          -> FilePath -> FilePath -> FilePath -> FilePath -> String
-          -> [String]
+          -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+          -> String -> [String]
           -> IO ()
-doInstall ghc ghcpkg topdir directory distDir
+doInstall ghc ghcpkg strip topdir directory distDir
           myDestDir myPrefix myLibdir myDocdir
           relocatableBuildStr args
  = withCurrentDirectory directory $ do
@@ -220,8 +220,16 @@ doInstall ghc ghcpkg topdir directory distDir
                                                   else [],
                                  programLocation = UserSpecified ghcpkg
                              }
+                stripProg = ConfiguredProgram {
+                              programId = programName stripProgram,
+                              programVersion = Nothing,
+                              programArgs = [],
+                              programLocation = UserSpecified strip
+                          }
                 progs' = updateProgram ghcProg
-                       $ updateProgram ghcPkgProg progs
+                       $ updateProgram ghcPkgProg
+                       $ updateProgram stripProg
+                         progs
             instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
             let mlc = libraryConfig lbi

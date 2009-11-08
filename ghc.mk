@@ -866,6 +866,7 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	    "$(GHC_CABAL_INPLACE)" install \
 		 "$(INSTALLED_GHC_REAL)" \
 		 "$(INSTALLED_GHC_PKG_REAL)" \
+		 "$(STRIP)" \
 		 "$(DESTDIR)$(topdir)" \
 		 $p $(INSTALL_DISTDIR_$p) \
 		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
