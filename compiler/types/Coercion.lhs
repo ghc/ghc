@@ -797,6 +797,9 @@ optCoercion co
         --      sym id          >->     id
         --      trans id co     >->     co
         --      trans co id     >->     co
+        --      sym (sym co)    >->     co
+	--      trans g (sym g) >->     id
+	--      trans (sym g) g >->     id
         --
         go ty@(TyVarTy a) | isCoVar a = let (ty1,ty2) = coercionKind ty
                                         in (ty, False, ty1 `coreEqType` ty2)
@@ -808,31 +811,16 @@ optCoercion co
                  then (AppTy ty1' ty2', True,  id1 && id2)
                  else (ty             , False, id1 && id2)
         go ty@(TyConApp tc args)
-          | tc == symCoercionTyCon, [ty1] <- args
-          = case go ty1 of
-              (ty1', _   ,    True) -> (ty1', True, True)
-              (ty1', True, _      ) -> (TyConApp tc [ty1'], True, False)
-              (_   , _   , _      ) -> (ty, False, False)
+          | tc == symCoercionTyCon, (ty1:tys) <- args
+          = goSym ty ty1 tys
           | tc == transCoercionTyCon, [ty1,ty2] <- args
-          = let (ty1', chan1, id1) = go ty1
-                (ty2', chan2, id2) = go ty2
-            in  if id1
-                  then (ty2', True, id2)
-                  else if id2
-                         then (ty1', True, False)
-                         else if chan1 || chan2
-                                then (TyConApp tc [ty1',ty2'], True , False)
-                                else (ty                     , False, False)
+          = goTrans ty ty1 ty2
           | tc == leftCoercionTyCon, [ty1] <- args
-          = let (ty1', chan1, id1) = go ty1
-            in  if chan1
-                  then (TyConApp tc [ty1'], True , id1)
-                  else (ty                , False, id1) 
+	  = goLeft ty ty1
           | tc == rightCoercionTyCon, [ty1] <- args
-          = let (ty1', chan1, id1) = go ty1
-            in  if chan1
-                  then (TyConApp tc [ty1'], True , id1)
-                  else (ty                , False, id1) 
+	  = goRight ty ty1
+	  | tc == instCoercionTyCon, [ty1,ty2] <- args
+	  = goInst ty ty1 ty2
 	  | not (isCoercionTyCon tc)
           = let (args', chans, ids) = mapAndUnzip3 go args
             in  if or chans
@@ -867,4 +855,99 @@ optCoercion co
             in  if chan1
                   then (PredTy (IParam name ty1'), True , id1)
                   else (ty                       , False, id1)
-\end{code}
+
+        goSym :: Coercion -> Coercion -> [Coercion] -> ( Coercion, Bool, Bool )
+	--
+        -- pushes the sym constructor inwards, if possible
+	--
+	--   takes original coercion term
+	--                  first argument 
+        --                  rest of arguments
+        goSym ty ty1 tys  
+          = case mkSymCoercion ty1 of
+	      (TyConApp tc _ ) | tc == symCoercionTyCon
+                               -> let (tys',chans',ids) = mapAndUnzip3 go (ty1:tys)
+                                  in  if or chans'
+                                        then (TyConApp symCoercionTyCon tys', True , and ids)
+                                        else (ty                            , False, and ids)
+              ty1'             -> let (ty',_   ,id') = go (mkAppsCoercion ty1' tys)
+                                  in  (ty',True,id')
+
+
+        goRight :: Coercion -> Coercion -> ( Coercion, Bool, Bool )
+	--
+        -- reduces the right constructor, if possible
+	--
+	--   takes original coercion term
+	--                  argument 
+	--
+        goRight ty ty1  
+          = case mkRightCoercion ty1 of
+	      (TyConApp tc _ ) | tc == rightCoercionTyCon
+                               -> let (ty1',chan1,id1) = go ty1
+                                  in  if chan1
+                                        then (TyConApp rightCoercionTyCon [ty1'], True , id1)
+                                        else (ty                                , False, id1)
+              ty1'             -> let (ty',_   ,id') = go ty1'
+                                  in  (ty',True,id')
+
+        goLeft :: Coercion -> Coercion -> ( Coercion, Bool, Bool )
+	--
+        -- reduces the left constructor, if possible
+	--
+	--   takes original coercion term
+	--                  argument 
+	--
+        goLeft ty ty1  
+          = case mkLeftCoercion ty1 of
+	      (TyConApp tc _ ) | tc == leftCoercionTyCon
+                               -> let (ty1',chan1,id1) = go ty1
+                                  in  if chan1
+                                        then (TyConApp leftCoercionTyCon [ty1'], True , id1)
+                                        else (ty                                , False, id1)
+              ty1'             -> let (ty',_   ,id') = go ty1'
+                                  in  (ty',True,id')
+
+        goInst :: Coercion -> Coercion -> Coercion -> ( Coercion, Bool, Bool )
+	--
+        -- reduces the inst constructor, if possible
+	--
+	--   takes original coercion term
+	--                  coercion argument 
+	-- 		    type argument
+	--
+        goInst ty ty1 ty2
+          = case mkInstCoercion ty1 ty2 of
+	      (TyConApp tc _ ) | tc == instCoercionTyCon
+                               -> let (ty1',chan1,id1) = go ty1
+                                  in  if chan1
+                                        then (TyConApp instCoercionTyCon [ty1',ty2], True , id1)
+                                        else (ty                                   , False, id1)
+              ty1'             -> let (ty',_   ,id') = go ty1'
+                                  in  (ty',True,id')
+
+        goTrans :: Coercion -> Coercion -> Coercion -> ( Coercion, Bool, Bool )
+	--
+        --      trans id co     >->     co
+        --      trans co id     >->     co
+	--      trans g (sym g) >->     id
+	--      trans (sym g) g >->     id
+	--
+        goTrans ty ty1 ty2
+	  | id1
+          = (ty2', True, id2)
+          | id2
+          = (ty1', True, False)
+          | chan1 || chan2
+	  = (TyConApp transCoercionTyCon [ty1',ty2'], True , False)
+	  | Just ty' <- mty'
+          = (ty', True, True)
+          | otherwise
+          = (ty, False, False)
+          where (ty1', chan1, id1) = go ty1
+                (ty2', chan2, id2) = go ty2
+		mty' = case mkTransCoercion ty1' ty2'
+                         of (TyConApp tc _) | tc == transCoercionTyCon
+                                             -> Nothing
+                            ty'              -> Just ty' 
+\end{code}  
