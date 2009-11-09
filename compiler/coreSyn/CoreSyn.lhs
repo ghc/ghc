@@ -477,6 +477,7 @@ data InlineRuleInfo
 
   | InlWrapper Id   -- This unfolding is a the wrapper in a 
 		    --     worker/wrapper split from the strictness analyser
+	            -- The Id is the worker-id
 		    -- Used to abbreviate the uf_tmpl in interface files
 		    --	which don't need to contain the RHS; 
 		    --	it can be derived from the strictness info

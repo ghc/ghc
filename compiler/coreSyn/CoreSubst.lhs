@@ -523,13 +523,11 @@ substUnfolding _ unf = unf	-- NoUnfolding, OtherCon
 
 -------------------
 substInlineRuleInfo :: Subst -> InlineRuleInfo -> InlineRuleInfo
-substInlineRuleInfo subst (InlWrapper wkr)
-  = case lookupIdSubst subst wkr of
-      Var w1 -> InlWrapper w1
-      other  -> WARN( not (exprIsTrivial other), text "CoreSubst.substWorker:" <+> ppr wkr )
-      	        InlVanilla -- Worker has got substituted away altogether
-			   -- (This can happen if it's trivial, via
-			   --  postInlineUnconditionally, hence only warning)
+substInlineRuleInfo (Subst in_scope ids _) (InlWrapper wkr)
+  | Just (Var w1) <- lookupVarEnv  ids      wkr = InlWrapper w1
+  | Just w1       <- lookupInScope in_scope wkr = InlWrapper w1
+  | otherwise = WARN( True, text "Interesting! CoreSubst.substWorker:" <+> ppr wkr )
+      	        InlVanilla -- Note [Worker inlining]
 substInlineRuleInfo _ info = info
 
 ------------------
@@ -583,6 +581,18 @@ substVarSet subst fvs
 	| isId fv   = exprFreeVars (lookupIdSubst subst fv)
 	| otherwise = Type.tyVarsOfType (lookupTvSubst subst fv)
 \end{code}
+
+Note [Worker inlining]
+~~~~~~~~~~~~~~~~~~~~~~
+A worker can get sustituted away entirely.
+	- it might be trivial
+	- it might simply be very small
+We do not treat an InlWrapper as an 'occurrence' in the occurence 
+analyser, so it's possible that the worker is not even in scope any more.
+
+In all all these cases we simply drop the special case, returning to
+InlVanilla.  The WARN is just so I can see if it happens a lot.
+
 
 %************************************************************************
 %*									*
