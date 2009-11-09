@@ -34,3 +34,4 @@ test('ffi001', normal, compile, [''])
 test('ffi-deriv1', normal, compile, [''])
 
 test('1357', normal, compile, [''])
+test('3624', normal, compile, [''])
