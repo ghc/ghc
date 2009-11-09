@@ -1592,31 +1592,6 @@ improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
 
 improveSeq _ env scrut _ case_bndr1 _
   = return (env, scrut, case_bndr1)
-
-{-
-    improve_case_bndr env scrut case_bndr
-        -- See Note [no-case-of-case]
-	--  | switchIsOn (getSwitchChecker env) NoCaseOfCase
-	--  = (env, case_bndr)
-
-        | otherwise     -- Failed try; see Note [Suppressing the case binder-swap]
-                        --     not (isEvaldUnfolding (idUnfolding v))
-        = case scrut of
-            Var v -> (modifyInScope env1 v case_bndr', case_bndr')
-                -- Note about using modifyInScope for v here
-                -- We could extend the substitution instead, but it would be
-                -- a hack because then the substitution wouldn't be idempotent
-                -- any more (v is an OutId).  And this does just as well.
-
-            Cast (Var v) co -> (addBinderUnfolding env1 v rhs, case_bndr')
-                            where
-                                rhs = Cast (Var case_bndr') (mkSymCoercion co)
-
-            _ -> (env, case_bndr)
-        where
-          case_bndr' = zapIdOccInfo case_bndr
-          env1       = modifyInScope env case_bndr case_bndr'
--}
 \end{code}
 
 
