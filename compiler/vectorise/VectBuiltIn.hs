@@ -233,7 +233,7 @@ initBuiltins pkg
                           | i <- [2..mAX_DPH_COMBINE]]
       let combinePDVars = listArray (2, mAX_DPH_COMBINE) combines
 
-      scalarClass <- externalClass dph_Scalar (fsLit "Scalar")
+      scalarClass <- externalClass dph_PArray (fsLit "Scalar")
       scalar_map <- externalVar dph_Scalar (fsLit "scalar_map")
       scalar_zip2 <- externalVar dph_Scalar (fsLit "scalar_zipWith")
       scalar_zips <- mapM (externalVar dph_Scalar)
