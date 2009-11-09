@@ -1,6 +1,6 @@
 
 ==================== FloatOut stats: ====================
-0 Lets floated to top level; 0 Lets floated elsewhere; from 0 Lambda groups
+1 Lets floated to top level; 0 Lets floated elsewhere; from 1 Lambda groups
 
 
 
@@ -10,9 +10,9 @@
 
 
 ==================== Grand total simplifier statistics ====================
-Total ticks:     46
+Total ticks:     45
 
-16 PreInlineUnconditionally
+15 PreInlineUnconditionally
 1 PostInlineUnconditionally
 1 UnfoldingDone
 5 RuleFired
@@ -23,6 +23,6 @@ Total ticks:     46
     1 unpack-list
 1 LetFloatFromLet
 22 BetaReduction
-9 SimplifierDone
+10 SimplifierDone
 
 
