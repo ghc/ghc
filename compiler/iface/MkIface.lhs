@@ -399,7 +399,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 	       , let out = localOccs $ freeNamesDeclABI abi
                ]
 
-       name_module n = ASSERT( isExternalName n ) nameModule n
+       name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
        localOccs = map (getUnique . getParent . getOccName) 
                         . filter ((== this_mod) . name_module)
                         . nameSetToList
