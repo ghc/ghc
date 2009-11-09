@@ -257,6 +257,7 @@ $(PRIMOPS_TXT) compiler/parser/Parser.y: %: %.pp compiler/stage1/$(PLATFORM_H)
 
 $(eval $(call clean-target,compiler,primop, $(PRIMOPS_TXT) compiler/parser/Parser.y $(PRIMOP_BITS)))
 
+ifneq "$(BootingFromHc)" "YES"
 compiler/primop-data-decl.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 	"$(GENPRIMOP_INPLACE)" --data-decl          < $< > $@
 compiler/primop-tag.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
@@ -282,6 +283,7 @@ compiler/primop-primop-info.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 # can still generate them if we want them back
 compiler/primop-usage.hs-incl: $(PRIMOPS_TXT)
 	"$(GENPRIMOP_INPLACE)" --usage              < $< > $@
+endif
 
 # -----------------------------------------------------------------------------
 # Configuration
