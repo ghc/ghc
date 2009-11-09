@@ -206,8 +206,8 @@ seIdSubst:
 
 
 \begin{code}
-mkSimplEnv :: SimplifierMode -> SwitchChecker -> SimplEnv
-mkSimplEnv mode switches
+mkSimplEnv :: SwitchChecker -> SimplifierMode -> SimplEnv
+mkSimplEnv switches mode
   = SimplEnv { seChkr = switches, seCC = subsumedCCS, 
 	       seMode = mode, seInScope = emptyInScopeSet, 
 	       seFloats = emptyFloats,
@@ -227,8 +227,8 @@ setMode mode env = env { seMode = mode }
 
 inGentleMode :: SimplEnv -> Bool
 inGentleMode env = case seMode env of
-	                SimplGently -> True
-		        _other      -> False
+	                SimplGently {} -> True
+		        _other         -> False
 
 ---------------------
 getEnclosingCC :: SimplEnv -> CostCentreStack

@@ -11,6 +11,7 @@ module SimplUtils (
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
 	activeInline, activeRule, 
+        simplEnvForGHCi, simplEnvForRules, simplGentlyForInlineRules,
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
@@ -410,9 +411,25 @@ interestingArgContext rules call_cont
 %*									*
 %************************************************************************
 
-Inlining is controlled partly by the SimplifierMode switch.  This has two
-settings:
+\begin{code}
+simplEnvForGHCi :: SimplEnv
+simplEnvForGHCi = mkSimplEnv allOffSwitchChecker $
+                  SimplGently { sm_rules = False, sm_inline = False }
+   -- Do not do any inlining, in case we expose some unboxed
+   -- tuple stuff that confuses the bytecode interpreter
 
+simplEnvForRules :: SimplEnv
+simplEnvForRules = mkSimplEnv allOffSwitchChecker $
+                   SimplGently { sm_rules = True, sm_inline = False }
+
+simplGentlyForInlineRules :: SimplifierMode
+simplGentlyForInlineRules = SimplGently { sm_rules = True, sm_inline = True }
+	-- Simplify as much as possible, subject to the usual "gentle" rules
+\end{code}
+
+Inlining is controlled partly by the SimplifierMode switch.  This has two
+settings
+	
 	SimplGently	(a) Simplifying before specialiser/full laziness
 			(b) Simplifiying inside InlineRules
 			(c) Simplifying the LHS of a rule
@@ -421,7 +438,31 @@ settings:
 
 	SimplPhase n _	 Used at all other times
 
-The key thing about SimplGently is that it does no call-site inlining.
+Note [Gentle mode]
+~~~~~~~~~~~~~~~~~~
+Gentle mode has a separate boolean flag to control
+	a) inlining (sm_inline flag)
+	b) rules    (sm_rules  flag)
+A key invariant about Gentle mode is that it is treated as the EARLIEST
+phase.  Something is inlined if the sm_inline flag is on AND the thing
+is inlinable in the earliest phase.  This is important. Example
+
+  {-# INLINE [~1] g #-}
+  g = ...
+  
+  {-# INLINE f #-}
+  f x = g (g x)
+
+If we were to inline g into f's inlining, then an importing module would
+never be able to do
+	f e --> g (g e) ---> RULE fires
+because the InlineRule for f has had g inlined into it.
+
+On the other hand, it is bad not to do ANY inlining into an
+InlineRule, because then recursive knots in instance declarations
+don't get unravelled.
+
+However, *sometimes* SimplGently must do no call-site inlining at all.
 Before full laziness we must be careful not to inline wrappers,
 because doing so inhibits floating
     e.g. ...(case f x of ...)...
@@ -547,6 +588,18 @@ seems a bit fragile.
 Conclusion: inline top level things gaily until Phase 0 (the last
 phase), at which point don't.
 
+Note [pre/postInlineUnconditionally in gentle mode]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Even in gentle mode we want to do preInlineUnconditionally.  The
+reason is that too little clean-up happens if you don't inline
+use-once things.  Also a bit of inlining is *good* for full laziness;
+it can expose constant sub-expressions.  Example in
+spectral/mandel/Mandel.hs, where the mandelset function gets a useful
+let-float if you inline windowToViewport
+
+However, as usual for Gentle mode, do not inline things that are
+inactive in the intial stages.  See Note [Gentle mode].
+
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
 preInlineUnconditionally env top_lvl bndr rhs
@@ -559,7 +612,8 @@ preInlineUnconditionally env top_lvl bndr rhs
   where
     phase = getMode env
     active = case phase of
-		   SimplGently    -> isEarlyActive act
+		   SimplGently {} -> isEarlyActive act
+			-- See Note [pre/postInlineUnconditionally in gentle mode]
 		   SimplPhase n _ -> isActive n act
     act = idInlineActivation bndr
 
@@ -716,21 +770,17 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 
   where
     active = case getMode env of
-		   SimplGently    -> isAlwaysActive act
+		   SimplGently {} -> isEarlyActive act
+			-- See Note [pre/postInlineUnconditionally in gentle mode]
 		   SimplPhase n _ -> isActive n act
     act = idInlineActivation bndr
 
 activeInline :: SimplEnv -> OutId -> Bool
 activeInline env id
   = case getMode env of
-      SimplGently -> False
-	-- No inlining at all when doing gentle stuff,
-	-- except for local things that occur once (pre/postInlineUnconditionally)
-	-- The reason is that too little clean-up happens if you 
-	-- don't inline use-once things.   Also a bit of inlining is *good* for
-	-- full laziness; it can expose constant sub-expressions.
-	-- Example in spectral/mandel/Mandel.hs, where the mandelset 
-	-- function gets a useful let-float if you inline windowToViewport
+      SimplGently { sm_inline = inlining_on } 
+         -> inlining_on && isEarlyActive act
+	-- See Note [Gentle mode]
 
 	-- NB: we used to have a second exception, for data con wrappers.
 	-- On the grounds that we use gentle mode for rule LHSs, and 
@@ -750,13 +800,15 @@ activeRule dflags env
   = Nothing	-- Rewriting is off
   | otherwise
   = case getMode env of
-	SimplGently    -> Just isAlwaysActive
+      SimplGently { sm_rules = rules_on } 
+        | rules_on  -> Just isEarlyActive
+        | otherwise -> Nothing
 			-- Used to be Nothing (no rules in gentle mode)
 			-- Main motivation for changing is that I wanted
 			-- 	lift String ===> ...
 			-- to work in Template Haskell when simplifying
 			-- splices, so we get simpler code for literal strings
-	SimplPhase n _ -> Just (isActive n)
+      SimplPhase n _ -> Just (isActive n)
 \end{code}
 
 Note [InlineRule and postInlineUnconditionally]

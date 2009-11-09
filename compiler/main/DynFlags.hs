@@ -1004,17 +1004,26 @@ data CoreToDo           -- These are diff core-to-core passes,
 
 data SimplifierMode             -- See comments in SimplMonad
   = SimplGently
-  | SimplPhase Int [String]
+	{ sm_rules :: Bool	-- Whether RULES are enabled 
+        , sm_inline :: Bool }	-- Whether inlining is enabled
+
+  | SimplPhase 
+        { sm_num :: Int 	  -- Phase number; counts downward so 0 is last phase
+        , sm_names :: [String] }  -- Name(s) of the phase
 
 instance Outputable SimplifierMode where
-    ppr SimplGently       = ptext (sLit "gentle")
-    ppr (SimplPhase n ss) = int n <+> brackets (text (concat $ intersperse "," ss))
-
+    ppr (SimplPhase { sm_num = n, sm_names = ss })
+       = int n <+> brackets (text (concat $ intersperse "," ss))
+    ppr (SimplGently { sm_rules = r, sm_inline = i }) 
+       = ptext (sLit "gentle") <> 
+           brackets (pp_flag r (sLit "rules") <> comma <>
+                     pp_flag i (sLit "inline"))
+	 where
+           pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
 
 data SimplifierSwitch
   = MaxSimplifierIterations Int
   | NoCaseOfCase
-
 
 data FloatOutSwitches = FloatOutSwitches {
         floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
@@ -1103,7 +1112,9 @@ getCoreToDo dflags
 
 
         -- initial simplify: mk specialiser happy: minimum effort please
-    simpl_gently = CoreDoSimplify SimplGently [
+    simpl_gently = CoreDoSimplify 
+                       (SimplGently { sm_rules = True, sm_inline = False })
+                       [
                         --      Simplify "gently"
                         -- Don't inline anything till full laziness has bitten
                         -- In particular, inlining wrappers inhibits floating
@@ -2070,8 +2081,8 @@ setDumpSimplPhases s = do forceRecompile
     phase_num _ _                = False
 
     phase_name :: String -> SimplifierMode -> Bool
-    phase_name s SimplGently       = s == "gentle"
-    phase_name s (SimplPhase _ ss) = s `elem` ss
+    phase_name s (SimplGently {})               = s == "gentle"
+    phase_name s (SimplPhase { sm_names = ss }) = s `elem` ss
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })

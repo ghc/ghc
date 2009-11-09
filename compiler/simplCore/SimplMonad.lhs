@@ -21,7 +21,7 @@ module SimplMonad (
 
 	-- Switch checker
 	SwitchChecker, SwitchResult(..), getSimplIntSwitch,
-	isAmongSimpl, intSwitchSet, switchIsOn
+	isAmongSimpl, intSwitchSet, switchIsOn, allOffSwitchChecker
     ) where
 
 import Id		( Id, mkSysLocal )
@@ -418,6 +418,9 @@ data SwitchResult
   = SwBool	Bool		-- on/off
   | SwString	FastString	-- nothing or a String
   | SwInt	Int		-- nothing or an Int
+
+allOffSwitchChecker :: SwitchChecker
+allOffSwitchChecker _ = SwBool False
 
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
 isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*

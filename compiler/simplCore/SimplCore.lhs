@@ -31,6 +31,7 @@ import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
+import SimplUtils	( simplEnvForGHCi, simplEnvForRules )
 import SimplEnv
 import SimplMonad
 import CoreMonad
@@ -120,6 +121,8 @@ simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
 	     -> IO CoreExpr
 -- simplifyExpr is called by the driver to simplify an
 -- expression typed in at the interactive prompt
+--
+-- Also used by Template Haskell
 simplifyExpr dflags expr
   = do	{
 	; Err.showPass dflags "Simplify"
@@ -127,16 +130,13 @@ simplifyExpr dflags expr
 	; us <-  mkSplitUniqSupply 's'
 
 	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 simplExprGently gentleSimplEnv expr
+				 simplExprGently simplEnvForGHCi expr
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')
 
 	; return expr'
 	}
-
-gentleSimplEnv :: SimplEnv
-gentleSimplEnv = mkSimplEnv SimplGently  (isAmongSimpl [])
 
 doCorePasses :: [CorePass] -> ModGuts -> CoreM ModGuts
 doCorePasses passes guts = foldM (flip doCorePass) guts passes
@@ -333,7 +333,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	; let 	-- Simplify the local rules; boringly, we need to make an in-scope set
 		-- from the local binders, to avoid warnings from Simplify.simplVar
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
-	      env	       = setInScopeSet gentleSimplEnv local_ids 
+	      env	       = setInScopeSet simplEnvForRules local_ids 
 	      (simpl_rules, _) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
 				 mapM (simplRule env) local_rules
 
@@ -409,6 +409,7 @@ The simplifier does indeed do eta reduction (it's in
 Simplify.completeLam) but only if -O is on.
 
 \begin{code}
+simplRule :: SimplEnv -> CoreRule -> SimplM CoreRule
 simplRule env rule@(BuiltinRule {})
   = return rule
 simplRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
@@ -571,7 +572,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
 	   eps <- hscEPS hsc_env ;
 	   let	{ rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
 	        ; rule_base2 = extendRuleBaseList rule_base1 rules
-		; simpl_env  = mkSimplEnv mode sw_chkr 
+		; simpl_env  = mkSimplEnv sw_chkr mode
 		; simpl_binds = {-# SCC "SimplTopBinds" #-} 
 				simplTopBinds simpl_env tagged_binds
 		; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
