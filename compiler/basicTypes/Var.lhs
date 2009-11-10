@@ -363,7 +363,7 @@ setIdNotExported id = ASSERT( isLocalId id )
 %************************************************************************
 
 \begin{code}
-isTyVar :: Var -> Bool
+isTyVar :: Var -> Bool		-- True of both type and coercion variables
 isTyVar (TyVar {})   = True
 isTyVar (TcTyVar {}) = True
 isTyVar _            = False
