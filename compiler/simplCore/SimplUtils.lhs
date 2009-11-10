@@ -777,6 +777,10 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 
 activeInline :: SimplEnv -> OutId -> Bool
 activeInline env id
+  | isNonRuleLoopBreaker (idOccInfo id)	  -- Things with an INLINE pragma may have 
+    			 	          -- an unfolding *and* be a loop breaker
+  = False				  -- (maybe the knot is not yet untied)
+  | otherwise
   = case getMode env of
       SimplGently { sm_inline = inlining_on } 
          -> inlining_on && isEarlyActive act
