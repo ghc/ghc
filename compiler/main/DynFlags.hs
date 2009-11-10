@@ -344,7 +344,7 @@ data DynFlags = DynFlags {
   hscTarget             :: HscTarget,
   hscOutName            :: String,      -- ^ Name of the output file
   extCoreName           :: String,      -- ^ Name of the .hcr output file
-  verbosity             :: Int,         -- ^ Verbosity level: see "DynFlags#verbosity_levels"
+  verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
@@ -730,9 +730,8 @@ defaultDynFlags =
       }
 
 {-
-    #verbosity_levels#
-    Verbosity levels:
-
+Note [Verbosity levels]
+~~~~~~~~~~~~~~~~~~~~~~~
     0   |   print errors & warnings only
     1   |   minimal verbosity: print "compiling M ... done." for each module.
     2   |   equivalent to -dshow-passes
@@ -1475,7 +1474,8 @@ dynamic_flags = [
          Supported
   , Flag "dsource-stats"           (setDumpFlag Opt_D_source_stats)
          Supported
-  , Flag "dverbose-core2core"      (NoArg setVerboseCore2Core)
+  , Flag "dverbose-core2core"      (NoArg (do { setVerbosity (Just 2)
+                                              ; setVerboseCore2Core }))
          Supported
   , Flag "dverbose-stg2stg"        (setDumpFlag Opt_D_verbose_stg2stg)
          Supported
@@ -2029,7 +2029,8 @@ unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 --------------------------
 setDumpFlag :: DynFlag -> OptKind DynP
 setDumpFlag dump_flag
-  = NoArg (setDynFlag dump_flag >> when want_recomp forceRecompile)
+  = NoArg (do { setDynFlag dump_flag
+              ; when want_recomp forceRecompile })
   where
 	-- Certain dumpy-things are really interested in what's going
         -- on during recompilation checking, so in those cases we
