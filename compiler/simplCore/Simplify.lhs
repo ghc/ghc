@@ -942,14 +942,19 @@ simplCast env body co0 cont0
 
        add_coerce co (s1s2, _t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
                 -- (f |> g) ty  --->   (f ty) |> (g @ ty)
-                -- This implements the PushT rule from the paper
+                -- This implements the PushT and PushC rules from the paper
          | Just (tyvar,_) <- splitForAllTy_maybe s1s2
-         , not (isCoVar tyvar)
-         = ApplyTo dup (Type ty') (zapSubstEnv env) (addCoerce (mkInstCoercion co ty') cont)
+         = let 
+             (new_arg_ty, new_cast)
+               | isCoVar tyvar = (new_arg_co, mkCselRCoercion co)       -- PushC rule
+               | otherwise     = (ty',        mkInstCoercion co ty')    -- PushT rule
+           in 
+           ApplyTo dup (Type new_arg_ty) (zapSubstEnv env) (addCoerce new_cast cont)
          where
            ty' = substTy (arg_se `setInScope` env) arg_ty
-
-        -- ToDo: the PushC rule is not implemented at all
+	   new_arg_co = mkCsel1Coercion co  `mkTransCoercion`
+                              ty'           `mkTransCoercion`
+                        mkSymCoercion (mkCsel2Coercion co)
 
        add_coerce co (s1s2, _t1t2) (ApplyTo dup arg arg_se cont)
          | not (isTypeArg arg)  -- This implements the Push rule from the paper
