@@ -11,7 +11,7 @@ module SimplUtils (
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
 	activeInline, activeRule, 
-        simplEnvForGHCi, simplEnvForRules, simplGentlyForInlineRules,
+        simplEnvForGHCi, simplEnvForRules, updModeForInlineRules,
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
@@ -422,8 +422,11 @@ simplEnvForRules :: SimplEnv
 simplEnvForRules = mkSimplEnv allOffSwitchChecker $
                    SimplGently { sm_rules = True, sm_inline = False }
 
-simplGentlyForInlineRules :: SimplifierMode
-simplGentlyForInlineRules = SimplGently { sm_rules = True, sm_inline = True }
+updModeForInlineRules :: SimplifierMode -> SimplifierMode
+updModeForInlineRules mode
+  = case mode of      
+      SimplGently {} -> mode	-- Don't modify mode if we already gentle
+      SimplPhase  {} -> SimplGently { sm_rules = True, sm_inline = True }
 	-- Simplify as much as possible, subject to the usual "gentle" rules
 \end{code}
 
@@ -475,6 +478,19 @@ compiling in one-shot mode with -O2; but when TH compiles a splice before
 running it, we don't want to use -O2.  Indeed, we don't want to inline
 anything, because the byte-code interpreter might get confused about 
 unboxed tuples and suchlike.
+
+Note [RULEs enabled in SimplGently]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RULES are enabled when doing "gentle" simplification.  Two reasons:
+
+  * We really want the class-op cancellation to happen:
+        op (df d1 d2) --> $cop3 d1 d2
+    because this breaks the mutual recursion between 'op' and 'df'
+
+  * I wanted the RULE
+        lift String ===> ...
+    to work in Template Haskell when simplifying
+    splices, so we get simpler code for literal strings
 
 Note [Simplifying gently inside InlineRules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -805,13 +821,8 @@ activeRule dflags env
   | otherwise
   = case getMode env of
       SimplGently { sm_rules = rules_on } 
-        | rules_on  -> Just isEarlyActive
+        | rules_on  -> Just isEarlyActive	-- Note [RULEs enabled in SimplGently]
         | otherwise -> Nothing
-			-- Used to be Nothing (no rules in gentle mode)
-			-- Main motivation for changing is that I wanted
-			-- 	lift String ===> ...
-			-- to work in Template Haskell when simplifying
-			-- splices, so we get simpler code for literal strings
       SimplPhase n _ -> Just (isActive n)
 \end{code}
 

@@ -10,7 +10,7 @@ module SimplEnv (
         InCoercion, OutCoercion,
 
 	-- The simplifier mode
-	setMode, getMode, 
+	setMode, getMode, updMode,
 
 	-- Switch checker
 	SwitchChecker, SwitchResult(..), getSwitchChecker, getSimplIntSwitch,
@@ -224,6 +224,9 @@ getMode env = seMode env
 
 setMode :: SimplifierMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }
+
+updMode :: (SimplifierMode -> SimplifierMode) -> SimplEnv -> SimplEnv
+updMode upd env = env { seMode = upd (seMode env) }
 
 inGentleMode :: SimplEnv -> Bool
 inGentleMode env = case seMode env of
