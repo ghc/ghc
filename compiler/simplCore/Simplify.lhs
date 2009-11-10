@@ -18,6 +18,7 @@ import Id
 import MkId		( mkImpossibleExpr, seqId )
 import Var
 import IdInfo
+import Name		( mkSystemVarName )
 import Coercion
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
@@ -337,7 +338,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
         -- Simplify the RHS
         ; (body_env1, body1) <- simplExprF body_env body mkRhsStop
         -- ANF-ise a constructor or PAP rhs
-        ; (body_env2, body2) <- prepareRhs body_env1 body1
+        ; (body_env2, body2) <- prepareRhs body_env1 bndr1 body1
 
         ; (env', rhs')
             <-  if not (doFloatFromRhs top_lvl is_rec False body2 body_env2)
@@ -383,7 +384,7 @@ completeNonRecX :: SimplEnv
                 -> SimplM SimplEnv
 
 completeNonRecX env is_strict old_bndr new_bndr new_rhs
-  = do  { (env1, rhs1) <- prepareRhs (zapFloats env) new_rhs
+  = do  { (env1, rhs1) <- prepareRhs (zapFloats env) new_bndr new_rhs
         ; (env2, rhs2) <-
                 if doFloatFromRhs NotTopLevel NonRecursive is_strict rhs1 env1
                 then do { tick LetFloatFromLet
@@ -434,15 +435,19 @@ Here we want to make e1,e2 trivial and get
 That's what the 'go' loop in prepareRhs does
 
 \begin{code}
-prepareRhs :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
+prepareRhs :: SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
-prepareRhs env (Cast rhs co)    -- Note [Float coercions]
+prepareRhs env id (Cast rhs co)    -- Note [Float coercions]
   | (ty1, _ty2) <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
   , not (isUnLiftedType ty1)            -- see Note [Float coercions (unlifted)]
-  = do  { (env', rhs') <- makeTrivial env rhs
+  = do  { (env', rhs') <- makeTrivialWithInfo env sanitised_info rhs
         ; return (env', Cast rhs' co) }
+  where
+    sanitised_info = vanillaIdInfo `setNewStrictnessInfo` newStrictnessInfo info
+                                   `setNewDemandInfo`     newDemandInfo info
+    info = idInfo id
 
-prepareRhs env0 rhs0
+prepareRhs env0 _ rhs0
   = do  { (_is_val, env1, rhs1) <- go 0 env0 rhs0
         ; return (env1, rhs1) }
   where
@@ -492,6 +497,17 @@ and lead to further optimisation.  Example:
           go n = case x of { T m -> go (n-m) }
                 -- This case should optimise
 
+Note [Preserve strictness when floating coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the Note [Float coercions] transformation, keep the strictness info.
+Eg
+	f = e `cast` co	   -- f has strictness SSL
+When we transform to
+        f' = e		   -- f' also has strictness SSL
+        f = f' `cast` co   -- f still has strictness SSL
+
+Its not wrong to drop it on the floor, but better to keep it.
+
 Note [Float coercions (unlifted)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 BUT don't do [Float coercions] if 'e' has an unlifted type.
@@ -512,16 +528,19 @@ These strange casts can happen as a result of case-of-case
 \begin{code}
 makeTrivial :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Binds the expression to a variable, if it's not trivial, returning the variable
-makeTrivial env expr
+makeTrivial env expr = makeTrivialWithInfo env vanillaIdInfo expr
+
+makeTrivialWithInfo :: SimplEnv -> IdInfo -> OutExpr -> SimplM (SimplEnv, OutExpr)
+-- Propagate strictness and demand info to the new binder
+-- Note [Preserve strictness when floating coercions]
+makeTrivialWithInfo env info expr
   | exprIsTrivial expr
   = return (env, expr)
   | otherwise           -- See Note [Take care] below
-  = do  { var <- newId (fsLit "a") (exprType expr)
+  = do  { uniq <- getUniqueM
+        ; let name = mkSystemVarName uniq (fsLit "a")
+              var = mkLocalIdWithInfo name (exprType expr) info
         ; env' <- completeNonRecX env False var var expr
---	  pprTrace "makeTrivial" (vcat [ppr var <+> ppr (exprArity (substExpr env' (Var var)))
---	  	   		       , ppr expr
---	  	   		       , ppr (substExpr env' (Var var))
---				       , ppr (idArity (fromJust (lookupInScope (seInScope env') var))) ]) $
 	; return (env', substExpr env' (Var var)) }
 	-- The substitution is needed becase we're constructing a new binding
 	--     a = rhs
