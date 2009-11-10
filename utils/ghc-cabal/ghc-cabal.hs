@@ -310,7 +310,10 @@ generate config_args distdir directory
               let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
               let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                          pd lib lbi clbi
-                  final_ipi = installedPkgInfo{ Installed.installedPackageId = ipid }
+                  final_ipi = installedPkgInfo {
+                                  Installed.installedPackageId = ipid,
+                                  Installed.haddockHTMLs = ["../" ++ display (packageId pd)]
+                              }
                   content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
               writeFileAtomic (distdir </> "inplace-pkg-config") content
           _ -> error "Inconsistent lib components; can't happen?"
