@@ -428,6 +428,21 @@ FP_ARG_WITH_PATH_GNU_PROG([LD], [ld])
 LdCmd="$LD"
 AC_SUBST([LdCmd])
 
+dnl ** Check for dlltool on Windows
+dnl --------------------------------------------------------------
+case $HostOS_CPP in
+cygwin32|mingw32)
+	AC_PATH_PROG(DlltoolCmd,dlltool)
+	if test -z "$DlltoolCmd"; then
+	  echo "Can't find dlltool in your path, can't make DLLs."
+	  exit 1
+	fi
+	;;
+*)
+	AC_SUBST(DlltoolCmd,"")
+	;;
+esac
+
 dnl ** Which nm to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])

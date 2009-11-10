@@ -118,7 +118,7 @@ ifneq "$$(findstring dyn, $1)" ""
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
   ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-	dlltool -d rts/win32/libHSbase.def -l rts/dist/build/win32/libHSbase.so.a
+	"$$(DLLTOOL)" -d rts/win32/libHSbase.def -l rts/dist/build/win32/libHSbase.so.a
 	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) rts/dist/build/win32/libHSbase.so.a -o $$@
   else
