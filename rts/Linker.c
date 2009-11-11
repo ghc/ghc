@@ -63,12 +63,12 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(ia64_HOST_ARCH) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
+#if defined(ia64_HOST_ARCH) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#if defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
+#if defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -76,7 +76,7 @@
 
 #endif
 
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
 #  define OBJFORMAT_ELF
 #elif defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
@@ -1403,7 +1403,7 @@ mmap_again:
        } else {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
-#if defined(freebsd_HOST_OS)
+#if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS)
                // Some platforms require MAP_FIXED.  This is normally
                // a bad idea, because MAP_FIXED will overwrite
                // existing mappings.

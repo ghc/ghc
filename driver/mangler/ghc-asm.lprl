@@ -160,12 +160,12 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|gnu|freebsd|netbsd|openbsd|kfreebsdgnu)$/m ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|gnu|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu)$/m ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = # regexp that says what comes before APP/NO_APP
-		      ($TargetPlatform =~ /-(linux|gnu|freebsd|netbsd|openbsd)$/m) ? '#' : '/' ;
+		      ($TargetPlatform =~ /-(linux|gnu|freebsd|dragonfly|netbsd|openbsd)$/m) ? '#' : '/' ;
     $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
     $T_X86_PRE_LLBL_PAT = '\.L';
@@ -216,7 +216,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 8\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^x86_64-.*-(linux|openbsd|freebsd|netbsd)$/m ) {
+    } elsif ( $TargetPlatform =~ /^x86_64-.*-(linux|openbsd|freebsd|dragonfly|netbsd)$/m ) {
 
     $T_STABBY       = 0; # 1 iff .stab things (usually if a.out format)
     $T_US           = ''; # _ if symbols have an underscore on the front

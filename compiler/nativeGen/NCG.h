@@ -38,6 +38,12 @@
 # define IF_OS_freebsd(x,y) y
 #endif
 -- - - - - - - - - - - - - - - - - - - - - - 
+#if dragonfly_TARGET_OS
+# define IF_OS_dragonfly(x,y) x
+#else
+# define IF_OS_dragonfly(x,y) y
+#endif
+-- - - - - - - - - - - - - - - - - - - - - - 
 #if netbsd_TARGET_OS
 # define IF_OS_netbsd(x,y) x
 #else
