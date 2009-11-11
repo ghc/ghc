@@ -125,6 +125,7 @@ sub darcsall {
     my $path;
     my $tag;
     my @repos;
+    my $command = $_[0];
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
@@ -148,7 +149,12 @@ sub darcsall {
 
             if (-d "$localpath/_darcs") {
                 if ($want_remote_repo) {
-                    darcs (@_, "--repodir", $localpath, $path);
+                    if ($command =~ /^opt/) {
+                        # Allows ./darcs-all optimize --relink
+                        darcs (@_, "--repodir", $localpath, "--sibling=$path");
+                    } else {
+                        darcs (@_, "--repodir", $localpath, $path);
+                    }
                 } else {
                     darcs (@_, "--repodir", $localpath);
                 }
@@ -272,7 +278,7 @@ sub main {
             # Hack around whatsnew failing if there are no changes
             $ignore_failure = 1;
         }
-        if ($command =~ /^(pul|pus|sen|put)/) {
+        if ($command =~ /^(pul|pus|sen|put|opt)/) {
             $want_remote_repo = 1;
         }
         darcsall @_;
