@@ -86,18 +86,16 @@ static int io_manager_pipe = -1;
 
 #define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
+#define IO_MANAGER_SYNC   0xfd
 
 void
 setIOManagerPipe (int fd)
 {
     // only called when THREADED_RTS, but unconditionally
     // compiled here because GHC.Conc depends on it.
-    if (io_manager_pipe < 0) {
-        io_manager_pipe = fd;
-    }
+    io_manager_pipe = fd;
 }
 
-#if defined(THREADED_RTS)
 void
 ioManagerWakeup (void)
 {
@@ -110,6 +108,19 @@ ioManagerWakeup (void)
     }
 }
 
+void
+ioManagerSync (void)
+{
+    int r;
+    // Wake up the IO Manager thread by sending a byte down its pipe
+    if (io_manager_pipe >= 0) {
+	StgWord8 byte = (StgWord8)IO_MANAGER_SYNC;
+	r = write(io_manager_pipe, &byte, 1);
+        if (r == -1) { sysErrorBelch("ioManagerSync: write"); }
+    }
+}
+
+#if defined(THREADED_RTS)
 void
 ioManagerDie (void)
 {

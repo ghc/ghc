@@ -18,6 +18,10 @@
 #define RTS_GLOBALS_H
 
 StgStablePtr getOrSetTypeableStore(StgStablePtr value);
-StgStablePtr getOrSetSignalHandlerStore(StgStablePtr value);
+StgStablePtr getOrSetGHCConcSignalHandlerStore(StgStablePtr value);
+StgStablePtr getOrSetGHCConcPendingEventsStore(StgStablePtr ptr);
+StgStablePtr getOrSetGHCConcPendingDelaysStore(StgStablePtr ptr);
+StgStablePtr getOrSetGHCConcIOManagerThreadStore(StgStablePtr ptr);
+StgStablePtr getOrSetGHCConcProddingStore(StgStablePtr ptr);
 
 #endif /* RTS_GLOBALS_H */

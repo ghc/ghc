@@ -27,6 +27,7 @@ void     sendIOManagerEvent (HsWord32 event);
 #else
 
 void     setIOManagerPipe   (int fd);
+void     ioManagerSync (void);
 
 #endif
 
@@ -35,8 +36,8 @@ void     setIOManagerPipe   (int fd);
 // Posix implementation in posix/Signals.c
 // Win32 implementation in win32/ThrIOManager.c
 //
-#if defined(THREADED_RTS)
 void ioManagerWakeup (void);
+#if defined(THREADED_RTS)
 void ioManagerDie (void);
 void ioManagerStart (void);
 #endif

@@ -7,6 +7,9 @@
  * even when multiple versions of the library are loaded.  e.g. see
  * Data.Typeable and GHC.Conc.
  *
+ * If/when we switch to a dynamically-linked GHCi, this can all go
+ * away, because there would be just one copy of each library.
+ *
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
@@ -15,18 +18,29 @@
 #include "Globals.h"
 #include "Stable.h"
 
-static StgStablePtr typeableStore      = 0;
-static StgStablePtr signalHandlerStore = 0;
+typedef enum {
+    TypeableStore,
+    GHCConcSignalHandlerStore,
+    GHCConcPendingEventsStore,
+    GHCConcPendingDelaysStore,
+    GHCConcIOManagerThreadStore,
+    GHCConcProddingStore,
+    MaxStoreKey
+} StoreKey;
 
 #ifdef THREADED_RTS
 Mutex globalStoreLock;
 #endif
 
+StgStablePtr store[MaxStoreKey];
+
 void
 initGlobalStore(void)
 {
-    typeableStore      = 0;
-    signalHandlerStore = 0;
+    nat i;
+    for (i=0; i < MaxStoreKey; i++) {
+        store[i] = 0;
+    }
 #ifdef THREADED_RTS
     initMutex(&globalStoreLock);
 #endif
@@ -35,53 +49,69 @@ initGlobalStore(void)
 void
 exitGlobalStore(void)
 {
+    nat i;
 #ifdef THREADED_RTS
     closeMutex(&globalStoreLock);
 #endif
-    if(typeableStore!=0) {
-        freeStablePtr((StgStablePtr)typeableStore);
-        typeableStore=0;
-    }
-    if(signalHandlerStore!=0) {
-        freeStablePtr((StgStablePtr)signalHandlerStore);
-        signalHandlerStore=0;
+    for (i=0; i < MaxStoreKey; i++) {
+        if (store[i] != 0) {
+            freeStablePtr(store[i]);
+            store[i] = 0;
+        }
     }
 }
+
+static StgStablePtr getOrSetKey(StoreKey key, StgStablePtr ptr)
+{
+    StgStablePtr ret = store[key];
+    if(ret==0) {
+#ifdef THREADED_RTS
+        ACQUIRE_LOCK(&globalStoreLock);
+        ret = store[key];
+        if(ret==0) {
+#endif
+            store[key] = ret = ptr;
+#ifdef THREADED_RTS
+        }
+        RELEASE_LOCK(&globalStoreLock);
+#endif
+    }
+    return ret;
+}    
+
 
 StgStablePtr
 getOrSetTypeableStore(StgStablePtr ptr)
 {
-    StgStablePtr ret = typeableStore;
-    if(ret==0) {
-#ifdef THREADED_RTS
-        ACQUIRE_LOCK(&globalStoreLock);
-        ret=typeableStore;
-        if(ret==0) {
-#endif
-            typeableStore = ret = ptr;
-#ifdef THREADED_RTS
-        }
-        RELEASE_LOCK(&globalStoreLock);
-#endif
-    }
-    return ret;
+    return getOrSetKey(TypeableStore,ptr);
 }
 
 StgStablePtr
-getOrSetSignalHandlerStore(StgStablePtr ptr)
+getOrSetGHCConcSignalHandlerStore(StgStablePtr ptr)
 {
-    StgStablePtr ret = signalHandlerStore;
-    if(ret==0) {
-#ifdef THREADED_RTS
-        ACQUIRE_LOCK(&globalStoreLock);
-        ret=signalHandlerStore;
-        if(ret==0) {
-#endif
-            signalHandlerStore = ret = ptr;
-#ifdef THREADED_RTS
-        }
-        RELEASE_LOCK(&globalStoreLock);
-#endif
-    }
-    return ret;
+    return getOrSetKey(GHCConcSignalHandlerStore,ptr);
+}
+
+StgStablePtr
+getOrSetGHCConcPendingEventsStore(StgStablePtr ptr)
+{
+    return getOrSetKey(GHCConcPendingEventsStore,ptr);
+}
+
+StgStablePtr
+getOrSetGHCConcPendingDelaysStore(StgStablePtr ptr)
+{
+    return getOrSetKey(GHCConcPendingDelaysStore,ptr);
+}
+
+StgStablePtr
+getOrSetGHCConcIOManagerThreadStore(StgStablePtr ptr)
+{
+    return getOrSetKey(GHCConcIOManagerThreadStore,ptr);
+}
+
+StgStablePtr
+getOrSetGHCConcProddingStore(StgStablePtr ptr)
+{
+    return getOrSetKey(GHCConcProddingStore,ptr);
 }

@@ -505,10 +505,13 @@ typedef struct _RtsSymbolVal {
 #if !defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS_SYMBOLS \
    SymI_HasProto(setIOManagerPipe) \
+   SymI_HasProto(ioManagerWakeup) \
+   SymI_HasProto(ioManagerSync) \
    SymI_HasProto(blockUserSignals) \
    SymI_HasProto(unblockUserSignals)
 #else
 #define RTS_USER_SIGNALS_SYMBOLS     \
+   SymI_HasProto(ioManagerWakeup) \
    SymI_HasProto(sendIOManagerEvent) \
    SymI_HasProto(readIOManagerEvent) \
    SymI_HasProto(getIOManagerEvent)  \
@@ -736,7 +739,11 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(forkOS_createThread)		\
       SymI_HasProto(freeHaskellFunctionPtr)		\
       SymI_HasProto(getOrSetTypeableStore)		\
-      SymI_HasProto(getOrSetSignalHandlerStore)		\
+      SymI_HasProto(getOrSetGHCConcSignalHandlerStore)		\
+      SymI_HasProto(getOrSetGHCConcPendingEventsStore)		\
+      SymI_HasProto(getOrSetGHCConcPendingDelaysStore)		\
+      SymI_HasProto(getOrSetGHCConcIOManagerThreadStore)	\
+      SymI_HasProto(getOrSetGHCConcProddingStore)		\
       SymI_HasProto(genSymZh)				\
       SymI_HasProto(genericRaise)			\
       SymI_HasProto(getProgArgv)			\
