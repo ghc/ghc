@@ -919,6 +919,8 @@ $(eval $(call bindist,.,\
 	mk/project.mk \
 	mk/install.mk.in \
 	bindist.mk \
+	libraries/gen_contents_index \
+	libraries/prologue.txt \
 	libraries/dph/LICENSE \
  ))
 endif
