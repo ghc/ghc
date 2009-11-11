@@ -95,6 +95,8 @@ endif
 $(call distdir-way-opts,rts,dist,$1)
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
+$(call hs-suffix-rules-srcdir,rts,dist,$1,$$(dir))
+# hs-suffix-rules-srcdir is needed when BootingFromHc to get the .hc rules
 
 rts_$1_LIB = rts/dist/build/libHSrts$$($1_libsuf)
 
