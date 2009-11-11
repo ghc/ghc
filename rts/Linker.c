@@ -4173,9 +4173,16 @@ static int relocateSection(
                         i++;
                     }
  #endif
-                    else
-		        continue;  // ignore the others
-
+                    else 
+                    {
+		        barf ("Don't know how to handle this Mach-O "
+		              "scattered relocation entry: "
+                              "object file %s; entry type %ld; "
+                              "address %#lx\n", 
+                              oc->fileName, scat->r_type, scat->r_address);
+                        return 0;
+                     }
+                     
 #ifdef powerpc_HOST_ARCH
                     if(scat->r_type == GENERIC_RELOC_VANILLA
                         || scat->r_type == PPC_RELOC_SECTDIFF)
@@ -4203,11 +4210,28 @@ static int relocateSection(
                     }
 #endif
 		}
+		else
+		{
+            	    barf("Can't handle Mach-O scattered relocation entry "
+            	         "with this r_length tag: "
+                         "object file %s; entry type %ld; "
+                         "r_length tag %ld; address %#lx\n", 
+                         oc->fileName, scat->r_type, scat->r_length,
+                         scat->r_address);
+                    return 0;
+		}
 	    }
-
-	    continue; // FIXME: I hope it's OK to ignore all the others.
+	    else /* scat->r_pcrel */
+	    {
+	        barf("Don't know how to handle *PC-relative* Mach-O "
+	             "scattered relocation entry: "
+                     "object file %s; entry type %ld; address %#lx\n", 
+                     oc->fileName, scat->r_type, scat->r_address);
+               return 0;
+            }
+      
 	}
-	else
+	else /* !(relocs[i].r_address & R_SCATTERED) */
 	{
 	    struct relocation_info *reloc = &relocs[i];
 	    if(reloc->r_pcrel && !reloc->r_extern)
@@ -4252,6 +4276,14 @@ static int relocateSection(
 		    word = (word & 0x03FFFFFC) | ((word & 0x02000000) ? 0xFC000000 : 0);
 		}
 #endif
+                else
+                {
+                    barf("Can't handle this Mach-O relocation entry "
+		         "(not scattered): "
+                         "object file %s; entry type %ld; address %#lx\n", 
+                         oc->fileName, reloc->r_type, reloc->r_address);
+                    return 0;
+                }
 
 		if(!reloc->r_extern)
 		{
@@ -4343,8 +4375,16 @@ static int relocateSection(
 		}
 #endif
             }
-	    barf("\nunknown relocation %d",reloc->r_type);
-	    return 0;
+            else
+            {
+ 	         barf("Can't handle Mach-O relocation entry (not scattered) "
+                      "with this r_length tag: "
+                      "object file %s; entry type %ld; "
+                      "r_length tag %ld; address %#lx\n", 
+                      oc->fileName, reloc->r_type, reloc->r_length,
+                      reloc->r_address);
+	         return 0;
+	    }
 	}
 #endif
     }
