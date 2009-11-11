@@ -102,7 +102,7 @@ lintCoreBindings dflags _whoDunnit _binds
 lintCoreBindings dflags whoDunnit binds
   | isEmptyBag errs
   = do { showPass dflags ("Core Linted result of " ++ whoDunnit)
-       ; unless (isEmptyBag warns) $ printDump $
+       ; unless (isEmptyBag warns || opt_NoDebugOutput) $ printDump $
          (banner "warnings" $$ displayMessageBag warns)
        ; return () }
 
