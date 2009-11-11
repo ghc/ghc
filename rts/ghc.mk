@@ -74,9 +74,54 @@ rts/libs.depend : $(GHC_PKG_INPLACE)
 	"$(GHC_PKG_INPLACE)" field rts extra-libraries \
 	  | sed -e 's/^extra-libraries: //' -e 's/\([a-z0-9]*\)[ ]*/-l\1 /g' > $@
 
+
+# ----------------------------------------------------------------------------
+# On Windows, as the RTS and base libraries have recursive imports,
+# 	we have to break the loop with "import libraries".
+# 	These are made from rts/win32/libHS*.def which contain lists of
+# 	all the symbols in those libraries used by the RTS.
+#
+ifneq "$$(findstring dyn, $1)" ""
+ifeq  "$(HOSTPLATFORM)" "i386-unknown-mingw32" 
+
+ALL_RTS_DEF_LIBNAMES 	= base ghc-prim
+ALL_RTS_DEF_LIBS	= \
+	rts/dist/build/win32/libHSbase.dll.a \
+	rts/dist/build/win32/libHSghc-prim.dll.a \
+	rts/dist/build/win32/libHSffi.dll.a \
+	gmp/libgmp.dll.a
+
+
+# -- import libs for the regular Haskell libraries
+define make-importlib-def # args $1 = lib name
+rts/dist/build/win32/libHS$1.def : rts/win32/libHS$1.def
+	cat rts/win32/libHS$1.def \
+		| sed "s/@LibVersion@/$$(libraries/$1_dist-install_VERSION)/" \
+		| sed "s/@ProjectVersion@/$(ProjectVersion)/" \
+		> rts/dist/build/win32/libHS$1.def
+		
+rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
+	"$$(DLLTOOL)" 	-d rts/dist/build/win32/libHS$1.def \
+			-l rts/dist/build/win32/libHS$1.dll.a
+endef
+$(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
+
+
+# -- import libs for libffi
+rts/dist/build/win32/libHSffi.def : rts/win32/libHSffi.def
+	cat rts/win32/libHSffi.def \
+		| sed "s/@ProjectVersion@/$(ProjectVersion)/" \
+		> rts/dist/build/win32/libHSffi.def
+		
+rts/dist/build/win32/libHSffi.dll.a : rts/dist/build/win32/libHSffi.def
+	"$(DLLTOOL)" 	-d rts/dist/build/win32/libHSffi.def \
+			-l rts/dist/build/win32/libHSffi.dll.a
+endif
+endif
+
+
 #-----------------------------------------------------------------------------
 # Building one way
-
 define build-rts-way # args: $1 = way
 
 # The per-way CC_OPTS
@@ -108,23 +153,19 @@ rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
 rts_dist_$1_CC_OPTS += -DRtsWay=$$(DQ)rts_$1$$(DQ)
 
-
 # Making a shared library for the RTS.
-#	On Windows, as the RTS and base library has recursive imports
-#	we have to break the loop with a import library (libHSbase.so.a)
-#	This is made from rts/win32/libHSbase.def which contains a list of
-#	all the symbols in the base library used by the RTS.
 ifneq "$$(findstring dyn, $1)" ""
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
+	"$$(RM)" $$(RM_OPTS) $$@
+	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
+	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
+else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
-  ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-	"$$(DLLTOOL)" -d rts/win32/libHSbase.def -l rts/dist/build/win32/libHSbase.so.a
-	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) rts/dist/build/win32/libHSbase.so.a -o $$@
-  else
 	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
-  endif
+endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
