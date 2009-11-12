@@ -34,7 +34,7 @@ if v == '':
     h.close()
     if v != '':
         # If it does then use the first utf8 locale that is available
-        h = os.popen('locale -a | grep -i utf8 2>/dev/null', 'r')
+        h = os.popen('locale -a | grep -i "utf8\|utf-8" 2>/dev/null', 'r')
         v = h.readline().strip()
         h.close()
         if v != '':
