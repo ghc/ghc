@@ -112,13 +112,13 @@ sendIOManagerEvent (HsWord32 event)
 #endif
 }    
 
-#if defined(THREADED_RTS)
 void
 ioManagerWakeup (void)
 {
     sendIOManagerEvent(IO_MANAGER_WAKEUP);
 }
 
+#if defined(THREADED_RTS)
 void
 ioManagerDie (void)
 {
