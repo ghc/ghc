@@ -125,7 +125,6 @@ data Builtins = Builtins {
                 , liftedApplyVar   :: Var
                 , replicatePDVar   :: Var
                 , emptyPDVar       :: Var
-                , packPDVar        :: Var
                 , packByTagPDVar   :: Var
                 , combinePDVars    :: Array Int Var
                 , scalarClass      :: Class
@@ -225,7 +224,6 @@ initBuiltins pkg
       liftedApplyVar   <- externalVar dph_Closure (fsLit "liftedApply")
       replicatePDVar   <- externalVar dph_PArray (fsLit "replicatePD")
       emptyPDVar       <- externalVar dph_PArray (fsLit "emptyPD")
-      packPDVar        <- externalVar dph_PArray (fsLit "packPD")
       packByTagPDVar   <- externalVar dph_PArray (fsLit "packByTagPD")
 
       combines <- mapM (externalVar dph_PArray)
@@ -276,7 +274,6 @@ initBuiltins pkg
                , liftedApplyVar   = liftedApplyVar
                , replicatePDVar   = replicatePDVar
                , emptyPDVar       = emptyPDVar
-               , packPDVar        = packPDVar
                , packByTagPDVar   = packByTagPDVar
                , combinePDVars    = combinePDVars
                , scalarClass      = scalarClass
