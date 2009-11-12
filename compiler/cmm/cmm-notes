@@ -2,6 +2,24 @@ Notes on new codegen (Sept 09)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Things to do:
+
+ - CmmContFlowOpt.runCmmContFlowOptZs is not called!
+ - Why is runCmmOpts called from HscMain?  Seems too "high up".
+   In fact HscMain calls (runCmmOpts cmmCfgOptsZ) which is what
+   runCmmContFlowOptZs does.  Tidy up!
+
+
+ - AsmCodeGen has a generic Cmm optimiser; move this into new pipeline
+
+ - AsmCodeGen has post-native-cg branch elimiator (shortCutBranches);
+   we ultimately want to share this with the Cmm branch eliminator.
+
+ - At the moment, references to global registers like Hp are "lowered" 
+   late (in AsmCodeGen.fixAssignTop and cmmToCmm). We should do this
+   early, in the new native codegen, much in the way that we lower 
+   calling conventions.  Might need to be a bit sophisticated about
+   aliasing.
+
  - Refactor Cmm so that it contains only shared stuff
    Add a module MoribundCmm which contains stuff from
    Cmm for old code gen path

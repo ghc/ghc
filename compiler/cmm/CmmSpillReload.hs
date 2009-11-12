@@ -31,20 +31,23 @@ import UniqSet
 import Data.Maybe
 import Prelude hiding (zip)
 
--- The point of this module is to insert spills and reloads to
--- establish the invariant that at a call (or at any proc point with
--- an established protocol) all live variables not expected in
--- registers are sitting on the stack.  We use a backward analysis to
--- insert spills and reloads.  It should be followed by a
--- forward transformation to sink reloads as deeply as possible, so as
--- to reduce register pressure.
+{- Note [Overview of spill/reload]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The point of this module is to insert spills and reloads to
+establish the invariant that at a call (or at any proc point with
+an established protocol) all live variables not expected in
+registers are sitting on the stack.  We use a backward analysis to
+insert spills and reloads.  It should be followed by a
+forward transformation to sink reloads as deeply as possible, so as
+to reduce register pressure.
 
--- A variable can be expected to be live in a register, live on the
--- stack, or both.  This analysis ensures that spills and reloads are
--- inserted as needed to make sure that every live variable needed
--- after a call is available on the stack.  Spills are pushed back to
--- their reaching definitions, but reloads are dropped wherever needed
--- and will have to be sunk by a later forward transformation.
+A variable can be expected to be live in a register, live on the
+stack, or both.  This analysis ensures that spills and reloads are
+inserted as needed to make sure that every live variable needed
+after a call is available on the stack.  Spills are pushed back to
+their reaching definitions, but reloads are dropped wherever needed
+and will have to be sunk by a later forward transformation.
+-}
 
 data DualLive = DualLive { on_stack :: RegSet, in_regs :: RegSet }
 
