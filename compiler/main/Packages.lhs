@@ -658,6 +658,14 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
       ipid_map = listToFM [ (installedPackageId p, p) | p <- pkgs0 ]
 
+      -- pkgs0 with duplicate packages filtered out.  This is
+      -- important: it is possible for a package in the user package
+      -- DB to have the same IPID as a package in the global DB, and
+      -- we want the former to take precedence.  This is not the same
+      -- as shadowing (below), since in this case the two packages
+      -- have the same ABI and are interchangeable.
+      pkgs0_unique = eltsFM ipid_map
+
       ipid_selected = depClosure ipid_map [ InstalledPackageId i
                                           | ExposePackageId i <- flags ]
       
@@ -665,11 +673,11 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       is_ignore IgnorePackage{} = True
       is_ignore _ = False
 
-      shadowed = shadowPackages pkgs0 ipid_selected
+      shadowed = shadowPackages pkgs0_unique ipid_selected
 
-      ignored  = ignorePackages ignore_flags pkgs0
+      ignored  = ignorePackages ignore_flags pkgs0_unique
 
-      pkgs0' = filter (not . (`elemFM` (plusFM shadowed ignored)) . installedPackageId) pkgs0
+      pkgs0' = filter (not . (`elemFM` (plusFM shadowed ignored)) . installedPackageId) pkgs0_unique
       broken   = findBroken pkgs0'
       unusable = shadowed `plusFM` ignored `plusFM` broken
 
@@ -679,7 +687,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   -- Modify the package database according to the command-line flags
   -- (-package, -hide-package, -ignore-package, -hide-all-packages).
   --
-  pkgs1 <- foldM (applyPackageFlag unusable) pkgs0 other_flags
+  pkgs1 <- foldM (applyPackageFlag unusable) pkgs0_unique other_flags
   let pkgs2 = filter (not . (`elemFM` unusable) . installedPackageId) pkgs1
 
   -- Here we build up a set of the packages mentioned in -package
