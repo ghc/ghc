@@ -631,6 +631,6 @@ freshEtaId n subst ty
         ty'     = substTy subst ty
 	eta_id' = uniqAway (getTvInScope subst) $
 		  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
-	subst'  = extendTvInScope subst [eta_id']		  
+	subst'  = extendTvInScope subst eta_id'		  
 \end{code}
 

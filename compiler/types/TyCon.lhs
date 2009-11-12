@@ -8,7 +8,7 @@ The @TyCon@ datatype
 \begin{code}
 module TyCon(
         -- * Main TyCon data types
-	TyCon, FieldLabel,
+	TyCon, FieldLabel, CoTyConKindChecker,
 
 	AlgTyConRhs(..), visibleDataCons, 
         TyConParent(..), 
@@ -36,9 +36,9 @@ module TyCon(
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, 
         isSynTyCon, isClosedSynTyCon, isOpenSynTyCon,
-        isSuperKindTyCon,
+        isSuperKindTyCon, isDecomposableTyCon,
         isCoercionTyCon, isCoercionTyCon_maybe,
-        isForeignTyCon, isAnyTyCon,
+        isForeignTyCon, isAnyTyCon, tyConHasKind,
 
 	isInjectiveTyCon,
 	isDataTyCon, isProductTyCon, isEnumerationTyCon, 
@@ -124,7 +124,7 @@ data TyCon
     FunTyCon {
 	tyConUnique :: Unique,
 	tyConName   :: Name,
-	tyConKind   :: Kind,
+	tc_kind   :: Kind,
 	tyConArity  :: Arity
     }
 
@@ -133,7 +133,7 @@ data TyCon
   | AlgTyCon {		
 	tyConUnique :: Unique,
 	tyConName   :: Name,
-	tyConKind   :: Kind,
+	tc_kind   :: Kind,
 	tyConArity  :: Arity,
 
 	tyConTyVars :: [TyVar],		-- ^ The type variables used in the type constructor.
@@ -171,7 +171,7 @@ data TyCon
   | TupleTyCon {
 	tyConUnique :: Unique,
 	tyConName   :: Name,
-	tyConKind   :: Kind,
+	tc_kind   :: Kind,
 	tyConArity  :: Arity,
 	tyConBoxed  :: Boxity,
 	tyConTyVars :: [TyVar],
@@ -183,7 +183,7 @@ data TyCon
   | SynTyCon {
 	tyConUnique  :: Unique,
 	tyConName    :: Name,
-	tyConKind    :: Kind,
+	tc_kind    :: Kind,
 	tyConArity   :: Arity,
 
 	tyConTyVars  :: [TyVar],	-- Bound tyvars
@@ -199,14 +199,14 @@ data TyCon
   | PrimTyCon {			
 	tyConUnique   :: Unique,
 	tyConName     :: Name,
-	tyConKind     :: Kind,
+	tc_kind     :: Kind,
 	tyConArity    :: Arity,			-- SLPJ Oct06: I'm not sure what the significance
 						--	       of the arity of a primtycon is!
 
 	primTyConRep  :: PrimRep,		-- ^ Many primitive tycons are unboxed, but some are
                        				--   boxed (represented by pointers). This 'PrimRep' holds
 			                	--   that information.
-						-- Only relevant if tyConKind = *
+						-- Only relevant if tc_kind = *
 
 	isUnLifted   :: Bool,		        -- ^ Most primitive tycons are unlifted (may not contain bottom)
 					        --   but foreign-imported ones may be lifted
@@ -216,18 +216,14 @@ data TyCon
     }
 
   -- | Type coercions, such as @(~)@, @sym@, @trans@, @left@ and @right@.
-  -- INVARIANT: coercions are always fully applied
+  -- INVARIANT: Coercion TyCons are always fully applied
+  -- 		But note that a CoercionTyCon can be over-saturated in a type.
+  -- 		E.g.  (sym g1) Int  will be represented as (TyConApp sym [g1,Int])
   | CoercionTyCon {	
 	tyConUnique :: Unique,
         tyConName   :: Name,
 	tyConArity  :: Arity,
-	coKindFun   :: [Type] -> (Type,Type)
-    		-- ^ Function that when given a list of the type arguments to the 'TyCon'
-    		-- constructs the types that the resulting coercion relates.
-    		--
-    		-- INVARIANT: 'coKindFun' is always applied to exactly 'tyConArity' args
-		-- E.g. for @trans (c1 :: ta=tb) (c2 :: tb=tc)@, the 'coKindFun' returns 
-		--	the kind as a pair of types: @(ta, tc)@
+	coKindFun   :: CoTyConKindChecker
     }
 
   -- | Any types.  Like tuples, this is a potentially-infinite family of TyCons
@@ -239,7 +235,7 @@ data TyCon
   | AnyTyCon {
 	tyConUnique  :: Unique,
 	tyConName    :: Name,
-	tyConKind    :: Kind	-- Never = *; that is done via PrimTyCon
+	tc_kind    :: Kind	-- Never = *; that is done via PrimTyCon
 		     		-- See Note [Any types] in TysPrim
     }
 
@@ -253,6 +249,23 @@ data TyCon
         tyConUnique :: Unique,
         tyConName   :: Name
     }
+
+type CoTyConKindChecker = forall m. Monad m => CoTyConKindCheckerFun m
+
+type CoTyConKindCheckerFun m 
+  =    (Type -> m Kind)		-- Kind checker for types
+    -> (Type -> m (Type,Type))	-- and for coercions
+    -> Bool  	  		-- True => apply consistency checks
+    -> [Type]	  		-- Exactly right number of args
+    -> m (Type, Type)		-- Kind of this application
+
+    		-- ^ Function that when given a list of the type arguments to the 'TyCon'
+    		-- constructs the types that the resulting coercion relates.
+		-- Returns Nothing if ill-kinded.
+    		--
+    		-- INVARIANT: 'coKindFun' is always applied to exactly 'tyConArity' args
+		-- E.g. for @trans (c1 :: ta=tb) (c2 :: tb=tc)@, the 'coKindFun' returns 
+		--	the kind as a pair of types: @(ta, tc)@
 
 -- | Names of the fields in an algebraic record type
 type FieldLabel = Name
@@ -578,7 +591,7 @@ mkFunTyCon name kind
   = FunTyCon { 
 	tyConUnique = nameUnique name,
 	tyConName   = name,
-	tyConKind   = kind,
+	tc_kind   = kind,
 	tyConArity  = 2
     }
 
@@ -598,7 +611,7 @@ mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
-	tyConKind	 = kind,
+	tc_kind	 = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
 	algTcStupidTheta = stupid,
@@ -626,7 +639,7 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
   = TupleTyCon {
 	tyConUnique = nameUnique name,
 	tyConName = name,
-	tyConKind = kind,
+	tc_kind = kind,
 	tyConArity = arity,
 	tyConBoxed = boxed,
 	tyConTyVars = tyvars,
@@ -647,7 +660,7 @@ mkForeignTyCon name ext_name kind arity
   = PrimTyCon {
 	tyConName    = name,
 	tyConUnique  = nameUnique name,
-	tyConKind    = kind,
+	tc_kind    = kind,
 	tyConArity   = arity,
 	primTyConRep = PtrRep, -- they all do
 	isUnLifted   = False,
@@ -675,7 +688,7 @@ mkPrimTyCon' name kind arity rep is_unlifted
   = PrimTyCon {
 	tyConName    = name,
 	tyConUnique  = nameUnique name,
-	tyConKind    = kind,
+	tc_kind    = kind,
 	tyConArity   = arity,
 	primTyConRep = rep,
 	isUnLifted   = is_unlifted,
@@ -688,7 +701,7 @@ mkSynTyCon name kind tyvars rhs parent
   = SynTyCon {	
 	tyConName = name,
 	tyConUnique = nameUnique name,
-	tyConKind = kind,
+	tc_kind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
 	synTcRhs = rhs,
@@ -696,19 +709,27 @@ mkSynTyCon name kind tyvars rhs parent
     }
 
 -- | Create a coercion 'TyCon'
-mkCoercionTyCon :: Name -> Arity -> ([Type] -> (Type,Type)) -> TyCon
-mkCoercionTyCon name arity kindRule
+mkCoercionTyCon :: Name -> Arity 
+                -> CoTyConKindChecker
+                -> TyCon
+mkCoercionTyCon name arity rule_fn
   = CoercionTyCon {
-        tyConName = name,
+        tyConName   = name,
         tyConUnique = nameUnique name,
-        tyConArity = arity,
-        coKindFun = kindRule
+        tyConArity  = arity,
+#ifdef DEBUG
+        coKindFun   = \ ty co fail args -> 
+                      ASSERT2( length args == arity, ppr name )
+                      rule_fn ty co fail args
+#else
+	coKindFun   = rule_fn
+#endif
     }
 
 mkAnyTyCon :: Name -> Kind -> TyCon
 mkAnyTyCon name kind 
-  = AnyTyCon { tyConName = name,
-		tyConKind = kind,
+  = AnyTyCon {  tyConName = name,
+		tc_kind = kind,
         	tyConUnique = nameUnique name }
 
 -- | Create a super-kind 'TyCon'
@@ -778,6 +799,11 @@ isNewTyCon :: TyCon -> Bool
 isNewTyCon (AlgTyCon {algTcRhs = NewTyCon {}}) = True
 isNewTyCon _                                   = False
 
+tyConHasKind :: TyCon -> Bool
+tyConHasKind (SuperKindTyCon {}) = False
+tyConHasKind (CoercionTyCon {})  = False
+tyConHasKind _                   = True
+
 -- | Take a 'TyCon' apart into the 'TyVar's it scopes over, the 'Type' it expands
 -- into, and (possibly) a coercion from the representation type to the @newtype@.
 -- Returns @Nothing@ if this is not possible.
@@ -822,6 +848,13 @@ isClosedSynTyCon tycon = isSynTyCon tycon && not (isOpenTyCon tycon)
 -- | Is this a synonym 'TyCon' that can have may have further instances appear?
 isOpenSynTyCon :: TyCon -> Bool
 isOpenSynTyCon tycon = isSynTyCon tycon && isOpenTyCon tycon
+
+isDecomposableTyCon :: TyCon -> Bool
+-- True iff we can deocmpose (T a b c) into ((T a b) c)
+-- Specifically NOT true of synonyms (open and otherwise) and coercions
+isDecomposableTyCon (SynTyCon      {}) = False
+isDecomposableTyCon (CoercionTyCon {}) = False
+isDecomposableTyCon _other             = True
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -938,7 +971,7 @@ isAnyTyCon _              = False
 -- | Attempt to pull a 'TyCon' apart into the arity and 'coKindFun' of
 -- a coercion 'TyCon'. Returns @Nothing@ if the 'TyCon' is not of the
 -- appropriate kind
-isCoercionTyCon_maybe :: TyCon -> Maybe (Arity, [Type] -> (Type,Type))
+isCoercionTyCon_maybe :: Monad m => TyCon -> Maybe (Arity, CoTyConKindCheckerFun m)
 isCoercionTyCon_maybe (CoercionTyCon {tyConArity = ar, coKindFun = rule}) 
   = Just (ar, rule)
 isCoercionTyCon_maybe _ = Nothing
@@ -1022,6 +1055,15 @@ tyConHasGenerics :: TyCon -> Bool
 tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
 tyConHasGenerics (TupleTyCon {hasGenerics = hg}) = hg
 tyConHasGenerics _                               = False        -- Synonyms
+
+tyConKind :: TyCon -> Kind
+tyConKind (FunTyCon   { tc_kind = k }) = k
+tyConKind (AlgTyCon   { tc_kind = k }) = k
+tyConKind (TupleTyCon { tc_kind = k }) = k
+tyConKind (SynTyCon   { tc_kind = k }) = k
+tyConKind (PrimTyCon  { tc_kind = k }) = k
+tyConKind (AnyTyCon   { tc_kind = k }) = k
+tyConKind tc                           = pprPanic "tyConKind" (ppr tc)
 
 -- | As 'tyConDataCons_maybe', but returns the empty list of constructors if no constructors
 -- could be found

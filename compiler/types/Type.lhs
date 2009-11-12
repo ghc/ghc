@@ -64,7 +64,7 @@ module Type (
         Kind, SimpleKind, KindVar,
         
         -- ** Deconstructing Kinds 
-        kindFunResult, splitKindFunTys, splitKindFunTysN,
+        kindFunResult, splitKindFunTys, splitKindFunTysN, splitKindFunTy_maybe,
 
         -- ** Common Kinds and SuperKinds
         liftedTypeKind, unliftedTypeKind, openTypeKind,
@@ -122,7 +122,7 @@ module Type (
 	emptyTvSubstEnv, emptyTvSubst,
 	
 	mkTvSubst, mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
-	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
+	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope, extendTvInScopeList,
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst, zipTyEnv,
         isEmptyTvSubst,
 
@@ -403,7 +403,7 @@ repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 repSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 repSplitAppTy_maybe (TyConApp tc tys) 
-  | not (isOpenSynTyCon tc) || length tys > tyConArity tc 
+  | isDecomposableTyCon tc || length tys > tyConArity tc 
   = case snocView tys of       -- never create unsaturated type family apps
       Just (tys', ty') -> Just (TyConApp tc tys', ty')
       Nothing	       -> Nothing
@@ -427,9 +427,9 @@ splitAppTys ty = split ty ty []
     split _       (AppTy ty arg)        args = split ty ty (arg:args)
     split _       (TyConApp tc tc_args) args
       = let -- keep type families saturated
-            n | isOpenSynTyCon tc = tyConArity tc
-              | otherwise         = 0
-            (tc_args1, tc_args2)  = splitAt n tc_args
+            n | isDecomposableTyCon tc = tyConArity tc
+              | otherwise              = 0
+            (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _       (FunTy ty1 ty2)       args = ASSERT( null args )
@@ -1433,8 +1433,11 @@ notElemTvSubst tv (TvSubst _ env) = not (tv `elemVarEnv` env)
 setTvSubstEnv :: TvSubst -> TvSubstEnv -> TvSubst
 setTvSubstEnv (TvSubst in_scope _) env = TvSubst in_scope env
 
-extendTvInScope :: TvSubst -> [Var] -> TvSubst
-extendTvInScope (TvSubst in_scope env) vars = TvSubst (extendInScopeSetList in_scope vars) env
+extendTvInScope :: TvSubst -> Var -> TvSubst
+extendTvInScope (TvSubst in_scope env) var = TvSubst (extendInScopeSet in_scope var) env
+
+extendTvInScopeList :: TvSubst -> [Var] -> TvSubst
+extendTvInScopeList (TvSubst in_scope env) vars = TvSubst (extendInScopeSetList in_scope vars) env
 
 extendTvSubst :: TvSubst -> TyVar -> Type -> TvSubst
 extendTvSubst (TvSubst in_scope env) tv ty = TvSubst in_scope (extendVarEnv env tv ty)
@@ -1719,6 +1722,9 @@ kindFunResult k = funResultTy k
 -- | Essentially 'splitFunTys' on kinds
 splitKindFunTys :: Kind -> ([Kind],Kind)
 splitKindFunTys k = splitFunTys k
+
+splitKindFunTy_maybe :: Kind -> Maybe (Kind,Kind)
+splitKindFunTy_maybe = splitFunTy_maybe
 
 -- | Essentially 'splitFunTysN' on kinds
 splitKindFunTysN :: Int -> Kind -> ([Kind],Kind)

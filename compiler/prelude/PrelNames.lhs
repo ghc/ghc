@@ -1302,6 +1302,13 @@ numericTyKeys =
 	, doubleTyConKey
 	, floatTyConKey
 	]
+
+kindKeys :: [Unique] 
+kindKeys = [ liftedTypeKindTyConKey
+	   , openTypeKindTyConKey
+	   , unliftedTypeKindTyConKey
+	   , ubxTupleKindTyConKey 
+	   , argTypeKindTyConKey ]
 \end{code}
 
 

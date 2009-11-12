@@ -28,11 +28,14 @@ import PprCore
 import ErrUtils
 import SrcLoc
 import Type
+import TypeRep
 import Coercion
 import TyCon
+import Class
 import BasicTypes
 import StaticFlags
 import ListSetOps
+import PrelNames
 import DynFlags
 import Outputable
 import FastString
@@ -81,7 +84,7 @@ That is, use a type let.   See Note [Type let] in CoreSyn.
 However, when linting <body> we need to remember that a=Int, else we might
 reject a correct program.  So we carry a type substitution (in this example 
 [a -> Int]) and apply this substitution before comparing types.  The functin
-	lintTy :: Type -> LintM Type
+	lintInTy :: Type -> LintM Type
 returns a substituted type; that's the only reason it returns anything.
 
 When we encounter a binder (like x::a) we must apply the substitution
@@ -214,7 +217,13 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
 \begin{code}
 type InType  = Type	-- Substitution not yet applied
-type OutType = Type	-- Substitution has been applied to this
+type InVar   = Var
+type InTyVar = TyVar
+
+type OutType  = Type	-- Substitution has been applied to this
+type OutVar   = Var
+type OutTyVar = TyVar
+type OutCoVar = CoVar
 
 lintCoreExpr :: CoreExpr -> LintM OutType
 -- The returned type has the substitution from the monad 
@@ -235,17 +244,10 @@ lintCoreExpr (Var var)
 lintCoreExpr (Lit lit)
   = return (literalType lit)
 
---lintCoreExpr (Note (Coerce to_ty from_ty) expr)
---  = do	{ expr_ty <- lintCoreExpr expr
---	; to_ty <- lintTy to_ty
---	; from_ty <- lintTy from_ty	
---	; checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)
---	; return to_ty }
-
 lintCoreExpr (Cast expr co)
   = do { expr_ty <- lintCoreExpr expr
-       ; co' <- lintTy co
-       ; let (from_ty, to_ty) = coercionKind co'
+       ; co' <- applySubst co
+       ; (from_ty, to_ty) <- lintCoercion co'
        ; checkTys from_ty expr_ty (mkCastErr from_ty expr_ty)
        ; return to_ty }
 
@@ -255,16 +257,14 @@ lintCoreExpr (Note _ expr)
 lintCoreExpr (Let (NonRec tv (Type ty)) body)
   =	-- See Note [Type let] in CoreSyn
     do	{ checkL (isTyVar tv) (mkKindErrMsg tv ty)	-- Not quite accurate
-	; ty' <- lintTy ty
-        ; kind' <- lintTy (tyVarKind tv)
-        ; let tv' = setTyVarKind tv kind'
-        ; checkKinds tv' ty'              
+	; ty' <- lintInTy ty
+        ; lintTyBndr tv              $ \ tv' -> 
+          addLoc (BodyOfLetRec [tv]) $ 
+          extendSubstL tv' ty'       $ do
+        { checkKinds tv' ty'              
 		-- Now extend the substitution so we 
 		-- take advantage of it in the body
-        ; addLoc (BodyOfLetRec [tv]) $
-	  addInScopeVars [tv'] $
-          extendSubstL tv' ty' $
-   	  lintCoreExpr body }
+        ; lintCoreExpr body } }
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
   = do	{ lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
@@ -297,8 +297,8 @@ lintCoreExpr (Lam var expr)
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
   do { scrut_ty <- lintCoreExpr scrut
-     ; alt_ty   <- lintTy alt_ty  
-     ; var_ty   <- lintTy (idType var)	
+     ; alt_ty   <- lintInTy alt_ty  
+     ; var_ty   <- lintInTy (idType var)	
 
      ; let mb_tc_app = splitTyConApp_maybe (idType var)
      ; case mb_tc_app of 
@@ -330,7 +330,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
     pass_var f = f var
 
 lintCoreExpr (Type ty)
-  = do { ty' <- lintTy ty
+  = do { ty' <- lintInTy ty
        ; return (typeKind ty') }
 \end{code}
 
@@ -355,49 +355,46 @@ lintCoreArgs ty (a : args) =
   do { res <- lintCoreArg ty a
      ; lintCoreArgs res args }
 
-lintCoreArg fun_ty (Type arg_ty) =
-  do { arg_ty <- lintTy arg_ty	
-     ; lintTyApp fun_ty arg_ty }
+lintCoreArg fun_ty (Type arg_ty)
+  | Just (tyvar,body) <- splitForAllTy_maybe fun_ty
+  = do	{ arg_ty' <- applySubst arg_ty
+        ; checkKinds tyvar arg_ty'
+	; if isCoVar tyvar then 
+             return body   -- Co-vars don't appear in body!
+          else 
+             return (substTyWith [tyvar] [arg_ty'] body) }
+  | otherwise
+  = failWithL (mkTyAppMsg fun_ty arg_ty)
 
-lintCoreArg fun_ty arg = 
+lintCoreArg fun_ty arg
        -- Make sure function type matches argument
-  do { arg_ty <- lintCoreExpr arg
-     ; let err1 =  mkAppMsg fun_ty arg_ty arg
-           err2 = mkNonFunAppMsg fun_ty arg_ty arg
-     ; case splitFunTy_maybe fun_ty of
-        Just (arg,res) -> 
-          do { checkTys arg arg_ty err1
-             ; return res }
-        _ -> failWithL err2 }
+ = do { arg_ty <- lintCoreExpr arg
+      ; let err1 = mkAppMsg fun_ty arg_ty arg
+            err2 = mkNonFunAppMsg fun_ty arg_ty arg
+      ; case splitFunTy_maybe fun_ty of
+          Just (arg,res) -> 
+            do { checkTys arg arg_ty err1
+               ; return res }
+          _ -> failWithL err2 }
 \end{code}
 
 \begin{code}
+checkKinds :: Var -> OutType -> LintM ()
 -- Both args have had substitution applied
-lintTyApp :: OutType -> OutType -> LintM OutType
-lintTyApp ty arg_ty 
-  = case splitForAllTy_maybe ty of
-      Nothing -> failWithL (mkTyAppMsg ty arg_ty)
-
-      Just (tyvar,body)
-        -> do	{ checkL (isTyVar tyvar) (mkTyAppMsg ty arg_ty)
-		; checkKinds tyvar arg_ty
-		; return (substTyWith [tyvar] [arg_ty] body) }
-
-checkKinds :: Var -> Type -> LintM ()
 checkKinds tyvar arg_ty
 	-- Arg type might be boxed for a function with an uncommitted
 	-- tyvar; notably this is used so that we can give
 	-- 	error :: forall a:*. String -> a
 	-- and then apply it to both boxed and unboxed types.
-  | isCoVar tyvar = unless (s1 `coreEqType` s2 && t1 `coreEqType` t2)
-                           (addErrL (mkCoAppErrMsg tyvar arg_ty))
-  | otherwise     = unless (arg_kind `isSubKind` tyvar_kind)
-                           (addErrL (mkKindErrMsg tyvar arg_ty))
+  | isCoVar tyvar = do { (s2,t2) <- lintCoercion arg_ty
+                       ; unless (s1 `coreEqType` s2 && t1 `coreEqType` t2)
+                                (addErrL (mkCoAppErrMsg tyvar arg_ty)) }
+  | otherwise     = do { arg_kind <- lintType arg_ty
+                       ; unless (arg_kind `isSubKind` tyvar_kind)
+                                (addErrL (mkKindErrMsg tyvar arg_ty)) }
   where
     tyvar_kind = tyVarKind tyvar
-    arg_kind   = typeKind arg_ty
-    (s1,t1) = coVarKind tyvar
-    (s2,t2) = coercionKind arg_ty
+    (s1,t1)    = coVarKind tyvar
 
 checkDeadIdOcc :: Id -> LintM ()
 -- Occurrences of an Id should never be dead....
@@ -522,51 +519,227 @@ lintBinders (var:vars) linterF = lintBinder var $ \var' ->
 
 lintBinder :: Var -> (Var -> LintM a) -> LintM a
 lintBinder var linterF
-  | isTyVar var = lint_ty_bndr
-  | otherwise   = lintIdBndr var linterF
-  where
-    lint_ty_bndr = do { _ <- lintTy (tyVarKind var)
-		      ; subst <- getTvSubst
-		      ; let (subst', tv') = substTyVarBndr subst var
-		      ; updateTvSubst subst' (linterF tv') }
+  | isId var  = lintIdBndr var linterF
+  | otherwise = lintTyBndr var linterF
 
-lintIdBndr :: Var -> (Var -> LintM a) -> LintM a
+lintTyBndr :: InTyVar -> (OutTyVar -> LintM a) -> LintM a
+lintTyBndr tv thing_inside
+  = do { subst <- getTvSubst
+       ; let (subst', tv') = substTyVarBndr subst tv
+       ; lintTyBndrKind tv'
+       ; updateTvSubst subst' (thing_inside tv') }
+
+lintIdBndr :: Id -> (Id -> LintM a) -> LintM a
 -- Do substitution on the type of a binder and add the var with this 
 -- new type to the in-scope set of the second argument
 -- ToDo: lint its rules
+
 lintIdBndr id linterF 
   = do 	{ checkL (not (isUnboxedTupleType (idType id))) 
 		 (mkUnboxedTupleMsg id)
 		-- No variable can be bound to an unboxed tuple.
-        ; lintAndScopeId id $ \id' -> linterF id'
-        }
+        ; lintAndScopeId id $ \id' -> linterF id' }
 
 lintAndScopeIds :: [Var] -> ([Var] -> LintM a) -> LintM a
 lintAndScopeIds ids linterF 
   = go ids
   where
     go []       = linterF []
-    go (id:ids) = do { lintAndScopeId id $ \id ->
-                           lintAndScopeIds ids $ \ids ->
-                           linterF (id:ids) }
+    go (id:ids) = lintAndScopeId id $ \id ->
+                  lintAndScopeIds ids $ \ids ->
+                  linterF (id:ids)
 
-lintAndScopeId :: Var -> (Var -> LintM a) -> LintM a
+lintAndScopeId :: InVar -> (OutVar -> LintM a) -> LintM a
 lintAndScopeId id linterF 
-  = do { ty <- lintTy (idType id)
+  = do { ty <- lintInTy (idType id)
        ; let id' = setIdType id ty
-       ; addInScopeVars [id'] $ (linterF id')
-       }
+       ; addInScopeVar id' $ (linterF id') }
+\end{code}
 
-lintTy :: InType -> LintM OutType
+
+%************************************************************************
+%*									*
+\subsection[lint-monad]{The Lint monad}
+%*									*
+%************************************************************************
+
+\begin{code}
+lintInTy :: InType -> LintM OutType
 -- Check the type, and apply the substitution to it
 -- See Note [Linting type lets]
 -- ToDo: check the kind structure of the type
-lintTy ty 
-  = do	{ ty' <- applySubst ty
-	; mapM_ checkTyVarInScope (varSetElems (tyVarsOfType ty'))
+lintInTy ty 
+  = addLoc (InType ty) $
+    do	{ ty' <- applySubst ty
+	; _ <- lintType ty'
 	; return ty' }
-\end{code}
 
+-------------------
+lintKind :: Kind -> LintM ()
+-- Check well-formedness of kinds: *, *->*, etc
+lintKind (TyConApp tc []) 
+  | getUnique tc `elem` kindKeys
+  = return ()
+lintKind (FunTy k1 k2)
+  = lintKind k1 >> lintKind k2
+lintKind kind 
+  = addErrL (hang (ptext (sLit "Malformed kind:")) 2 (quotes (ppr kind)))
+
+-------------------
+lintTyBndrKind :: OutTyVar -> LintM ()
+lintTyBndrKind tv 
+  | isCoVar tv = lintCoVarKind tv
+  | otherwise  = lintKind (tyVarKind tv)
+
+-------------------
+lintCoVarKind :: OutCoVar -> LintM ()
+-- Check the kind of a coercion binder
+lintCoVarKind tv
+  = do { (ty1,ty2) <- lintSplitCoVar tv
+       ; k1 <- lintType ty1
+       ; k2 <- lintType ty2
+       ; unless (k1 `eqKind` k2) 
+                (addErrL (sep [ ptext (sLit "Kind mis-match in coercion kind of:")
+                              , nest 2 (quotes (ppr tv))
+                              , ppr [k1,k2] ])) }
+
+-------------------
+lintSplitCoVar :: CoVar -> LintM (Type,Type)
+lintSplitCoVar cv
+  = case coVarKind_maybe cv of
+      Just ts -> return ts
+      Nothing -> failWithL (sep [ ptext (sLit "Coercion variable with non-equality kind:")
+                                , nest 2 (ppr cv <+> dcolon <+> ppr (tyVarKind cv))])
+
+-------------------
+lintCoercion :: OutType -> LintM (OutType, OutType)
+-- Check the kind of a coercion term, returning the kind
+lintCoercion ty@(TyVarTy tv)
+  = do { checkTyVarInScope tv
+       ; if isCoVar tv then return (coVarKind tv) 
+                       else return (ty, ty) }
+
+lintCoercion ty@(AppTy ty1 ty2) 
+  = do { (s1,t1) <- lintCoercion ty1
+       ; (s2,t2) <- lintCoercion ty2
+       ; check_co_app ty (typeKind s1) [s2]
+       ; return (AppTy s1 s2, AppTy t1 t2) }
+
+lintCoercion ty@(FunTy ty1 ty2) 
+  = do { (s1,t1) <- lintCoercion ty1
+       ; (s2,t2) <- lintCoercion ty2
+       ; check_co_app ty (tyConKind funTyCon) [s1, s2]
+       ; return (FunTy s1 s2, FunTy t1 t2) }
+
+lintCoercion ty@(TyConApp tc tys) 
+  | Just (ar, rule) <- isCoercionTyCon_maybe tc
+  = do { unless (tys `lengthAtLeast` ar) (badCo ty)
+       ; (s,t)   <- rule lintType lintCoercion 
+                         True (take ar tys)
+       ; (ss,ts) <- mapAndUnzipM lintCoercion (drop ar tys)
+       ; check_co_app ty (typeKind s) ss
+       ; return (mkAppTys s ss, mkAppTys t ts) }
+
+  | not (tyConHasKind tc)	-- Just something bizarre like SuperKindTyCon
+  = badCo ty
+
+  | otherwise
+  = do { (ss,ts) <- mapAndUnzipM lintCoercion tys
+       ; check_co_app ty (tyConKind tc) ss
+       ; return (TyConApp tc ss, TyConApp tc ts) }
+
+lintCoercion ty@(PredTy (ClassP cls tys))
+  = do { (ss,ts) <- mapAndUnzipM lintCoercion tys
+       ; check_co_app ty (tyConKind (classTyCon cls)) ss
+       ; return (PredTy (ClassP cls ss), PredTy (ClassP cls ts)) }
+
+lintCoercion (PredTy (IParam n p_ty))
+  = do { (s,t) <- lintCoercion p_ty
+       ; return (PredTy (IParam n s), PredTy (IParam n t)) }
+
+lintCoercion ty@(PredTy (EqPred {}))
+  = failWithL (badEq ty)
+
+lintCoercion (ForAllTy tv ty)
+  | isCoVar tv
+  = do { (co1, co2) <- lintSplitCoVar tv
+       ; (s1,t1)    <- lintCoercion co1
+       ; (s2,t2)    <- lintCoercion co2
+       ; (sr,tr)    <- lintCoercion ty
+       ; return (mkCoPredTy s1 s2 sr, mkCoPredTy t1 t2 tr) }
+
+  | otherwise
+  = do { lintKind (tyVarKind tv)
+       ; (s,t) <- addInScopeVar tv (lintCoercion ty)
+       ; return (ForAllTy tv s, ForAllTy tv t) }
+
+badCo :: Coercion -> LintM a
+badCo co = failWithL (hang (ptext (sLit "Ill-kinded coercion term:")) 2 (ppr co))
+
+-------------------
+lintType :: OutType -> LintM Kind
+lintType (TyVarTy tv)
+  = do { checkTyVarInScope tv
+       ; return (tyVarKind tv) }
+
+lintType ty@(AppTy t1 t2) 
+  = do { k1 <- lintType t1
+       ; lint_ty_app ty k1 [t2] }
+
+lintType ty@(FunTy t1 t2)
+  = lint_ty_app ty (tyConKind funTyCon) [t1,t2]
+
+lintType ty@(TyConApp tc tys)
+  | tyConHasKind tc
+  = lint_ty_app ty (tyConKind tc) tys
+  | otherwise
+  = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
+
+lintType (ForAllTy tv ty)
+  = do { lintTyBndrKind tv
+       ; addInScopeVar tv (lintType ty) }
+
+lintType ty@(PredTy (ClassP cls tys))
+  = lint_ty_app ty (tyConKind (classTyCon cls)) tys
+
+lintType (PredTy (IParam _ p_ty))
+  = lintType p_ty
+
+lintType ty@(PredTy (EqPred {}))
+  = failWithL (badEq ty)
+
+----------------
+lint_ty_app :: Type -> Kind -> [OutType] -> LintM Kind
+lint_ty_app ty k tys 
+  = do { ks <- mapM lintType tys
+       ; lint_kind_app (ptext (sLit "type") <+> quotes (ppr ty)) k ks }
+                      
+----------------
+check_co_app :: Coercion -> Kind -> [OutType] -> LintM ()
+check_co_app ty k tys 
+  = do { _ <- lint_kind_app (ptext (sLit "coercion") <+> quotes (ppr ty))  
+                            k (map typeKind tys)
+       ; return () }
+                      
+----------------
+lint_kind_app :: SDoc -> Kind -> [Kind] -> LintM Kind
+lint_kind_app doc kfn ks = go kfn ks
+  where
+    fail_msg = vcat [hang (ptext (sLit "Kind application error in")) 2 doc,
+               	     nest 2 (ptext (sLit "Function kind =") <+> ppr kfn),
+               	     nest 2 (ptext (sLit "Arg kinds =") <+> ppr ks)]
+
+    go kfn []     = return kfn
+    go kfn (k:ks) = case splitKindFunTy_maybe kfn of
+       	              Nothing         -> failWithL fail_msg
+		      Just (kfa, kfb) -> do { unless (k `isSubKind` kfa)
+                                                     (addErrL fail_msg)
+                                            ; go kfb ks } 
+--------------
+badEq :: Type -> SDoc
+badEq ty = hang (ptext (sLit "Unexpected equality predicate:"))
+              1 (quotes (ppr ty))
+\end{code}
     
 %************************************************************************
 %*									*
@@ -619,6 +792,7 @@ data LintLocInfo
   | AnExpr CoreExpr	-- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
+  | InType Type		-- Inside a type
 \end{code}
 
                  
@@ -672,11 +846,15 @@ inCasePat = LintM $ \ loc _ errs -> (Just (is_case_pat loc), errs)
 addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m
   | null dups
-  = LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
+  = LintM (\ loc subst errs -> unLintM m loc (extendTvInScopeList subst vars) errs)
   | otherwise
   = failWithL (dupVars dups)
   where
     (_, dups) = removeDups compare vars 
+
+addInScopeVar :: Var -> LintM a -> LintM a
+addInScopeVar var m
+  = LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst var) errs)
 
 updateTvSubst :: TvSubst -> LintM a -> LintM a
 updateTvSubst subst' m = 
@@ -768,6 +946,8 @@ dumpLoc (ImportedUnfolding locn)
   = (locn, brackets (ptext (sLit "in an imported unfolding")))
 dumpLoc TopLevelBindings
   = (noSrcLoc, empty)
+dumpLoc (InType ty)
+  = (noSrcLoc, text "In the type" <+> quotes (ppr ty))
 
 pp_binders :: [Var] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))

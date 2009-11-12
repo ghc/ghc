@@ -1,9 +1,9 @@
-T%
+%
 % (c) The University of Glasgow 2006
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
+{-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -21,7 +21,7 @@ module Coercion (
         -- * Main data type
         Coercion,
  
-        mkCoKind, mkReflCoKind, coVarKind,
+        mkCoKind, mkCoPredTy, coVarKind, coVarKind_maybe,
         coercionKind, coercionKinds, isIdentityCoercion,
 
 	-- ** Equality predicates
@@ -30,7 +30,7 @@ module Coercion (
 	-- ** Coercion transformations
 	mkCoercion,
         mkSymCoercion, mkTransCoercion,
-        mkLeftCoercion, mkRightCoercion, mkRightCoercions,
+        mkLeftCoercion, mkRightCoercion, 
 	mkInstCoercion, mkAppCoercion, mkTyConCoercion, mkFunCoercion,
         mkForAllCoercion, mkInstsCoercion, mkUnsafeCoercion,
         mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
@@ -42,6 +42,9 @@ module Coercion (
         transCoercionTyCon, leftCoercionTyCon, 
         rightCoercionTyCon, instCoercionTyCon, -- needed by TysWiredIn
         csel1CoercionTyCon, csel2CoercionTyCon, cselRCoercionTyCon, 
+
+        -- ** Decomposition
+        decompLR_maybe, decompCsel_maybe, decompInst_maybe,
 
         -- ** Optimisation
 	optCoercion,
@@ -70,7 +73,9 @@ import Var
 import Name
 import PrelNames
 import Util
+import Control.Monad
 import BasicTypes
+import MonadUtils
 import Outputable
 import FastString
 
@@ -102,21 +107,37 @@ decomposeCo n co
 
 coVarKind :: CoVar -> (Type,Type) 
 -- c :: t1 ~ t2
-coVarKind cv = splitCoVarKind (tyVarKind cv)
+coVarKind cv = case coVarKind_maybe cv of
+                 Just ts -> ts
+                 Nothing -> pprPanic "coVarKind" (ppr cv $$ ppr (tyVarKind cv))
+
+coVarKind_maybe :: CoVar -> Maybe (Type,Type) 
+coVarKind_maybe cv = splitCoKind_maybe (tyVarKind cv)
 
 -- | Take a 'CoercionKind' apart into the two types it relates: see also 'mkCoKind'.
 -- Panics if the argument is not a valid 'CoercionKind'
-splitCoVarKind :: Kind -> (Type, Type)
-splitCoVarKind co | Just co' <- kindView co = splitCoVarKind co'
-splitCoVarKind (PredTy (EqPred ty1 ty2))    = (ty1, ty2)
+splitCoKind_maybe :: Kind -> Maybe (Type, Type)
+splitCoKind_maybe co | Just co' <- kindView co = splitCoKind_maybe co'
+splitCoKind_maybe (PredTy (EqPred ty1 ty2))    = Just (ty1, ty2)
+splitCoKind_maybe _                            = Nothing
 
--- | Makes a 'CoercionKind' from two types: the types whose equality is proven by the relevant 'Coercion'
+-- | Makes a 'CoercionKind' from two types: the types whose equality 
+-- is proven by the relevant 'Coercion'
 mkCoKind :: Type -> Type -> CoercionKind
 mkCoKind ty1 ty2 = PredTy (EqPred ty1 ty2)
 
 -- | (mkCoPredTy s t r) produces the type:   (s~t) => r
 mkCoPredTy :: Type -> Type -> Type -> Type
 mkCoPredTy s t r = ForAllTy (mkWildCoVar (mkCoKind s t)) r
+
+splitCoPredTy_maybe :: Type -> Maybe (Type, Type, Type)
+splitCoPredTy_maybe ty
+  | Just (cv,r) <- splitForAllTy_maybe ty
+  , isCoVar cv
+  , Just (s,t) <- coVarKind_maybe cv
+  = Just (s,t,r)
+  | otherwise
+  = Nothing
 
 -- | Tests whether a type is just a type equality predicate
 isEqPredTy :: Type -> Bool
@@ -133,10 +154,6 @@ getEqPredTys :: PredType -> (Type,Type)
 getEqPredTys (EqPred ty1 ty2) = (ty1, ty2)
 getEqPredTys other	      = pprPanic "getEqPredTys" (ppr other)
 
--- | Create a reflexive 'CoercionKind' that asserts that a type can be coerced to itself
-mkReflCoKind :: Type -> CoercionKind
-mkReflCoKind ty = mkCoKind ty ty
-
 -- | If it is the case that
 --
 -- > c :: (t1 ~ t2)
@@ -146,16 +163,20 @@ coercionKind :: Coercion -> (Type, Type)
 coercionKind ty@(TyVarTy a) | isCoVar a = coVarKind a
                             | otherwise = (ty, ty)
 coercionKind (AppTy ty1 ty2) 
-  = let (t1, t2) = coercionKind ty1
-        (s1, s2) = coercionKind ty2 in
-    (mkAppTy t1 s1, mkAppTy t2 s2)
-coercionKind (TyConApp tc args)
+  = let (s1, t1) = coercionKind ty1
+        (s2, t2) = coercionKind ty2 in
+    (mkAppTy s1 s2, mkAppTy t1 t2)
+coercionKind co@(TyConApp tc args)
   | Just (ar, rule) <- isCoercionTyCon_maybe tc 
     -- CoercionTyCons carry their kinding rule, so we use it here
-  = ASSERT( length args >= ar )	-- Always saturated
-    let (ty1,ty2)    = rule (take ar args)	-- Apply the rule to the right number of args
-	(tys1, tys2) = coercionKinds (drop ar args)
-    in (mkAppTys ty1 tys1, mkAppTys ty2 tys2)
+  = WARN( not (length args >= ar), ppr co )	-- Always saturated
+    (let (ty1,ty2) = runID (rule (return . typeKind)
+                                (return . coercionKind)
+				False (take ar args))
+	     	       	      -- Apply the rule to the right number of args
+    	     	       	      -- Always succeeds (if term is well-kinded!)
+	 (tys1, tys2) = coercionKinds (drop ar args)
+     in (mkAppTys ty1 tys1, mkAppTys ty2 tys2))
 
   | otherwise
   = let (lArgs, rArgs) = coercionKinds args in
@@ -262,97 +283,25 @@ mkSymCoercion :: Coercion -> Coercion
 -- ^ Create a symmetric version of the given 'Coercion' that asserts equality
 -- between the same types but in the other "direction", so a kind of @t1 ~ t2@ 
 -- becomes the kind @t2 ~ t1@.
---
--- This function attempts to simplify the generated 'Coercion' by removing 
--- redundant applications of @sym@. This is done by pushing this new @sym@ 
--- down into the 'Coercion' and exploiting the fact that @sym (sym co) = co@.
-mkSymCoercion co      
-  | Just co' <- coreView co = mkSymCoercion co'
-
-mkSymCoercion (ForAllTy tv ty)  = ForAllTy tv (mkSymCoercion ty)
-mkSymCoercion (AppTy co1 co2) 	= AppTy (mkSymCoercion co1) (mkSymCoercion co2)
-mkSymCoercion (FunTy co1 co2) 	= FunTy (mkSymCoercion co1) (mkSymCoercion co2)
-
-mkSymCoercion (TyConApp tc cos) 
-  | not (isCoercionTyCon tc) = mkTyConApp tc (map mkSymCoercion cos)
-
-mkSymCoercion (TyConApp tc [co]) 
-  | tc `hasKey` symCoercionTyConKey   = co    -- sym (sym co) --> co
-  | tc `hasKey` leftCoercionTyConKey  = mkLeftCoercion (mkSymCoercion co)
-  | tc `hasKey` rightCoercionTyConKey = mkRightCoercion (mkSymCoercion co)
-
-mkSymCoercion (TyConApp tc [co1,co2]) 
-  | tc `hasKey` transCoercionTyConKey
-     -- sym (co1 `trans` co2) --> (sym co2) `trans (sym co2)
-     -- Note reversal of arguments!
-  = mkTransCoercion (mkSymCoercion co2) (mkSymCoercion co1)
-
-  | tc `hasKey` instCoercionTyConKey
-     -- sym (co @ ty) --> (sym co) @ ty
-     -- Note: sym is not applied to 'ty'
-  = mkInstCoercion (mkSymCoercion co1) co2
-
-mkSymCoercion (TyConApp tc cos) 	-- Other coercion tycons, such as those
-  = mkCoercion symCoercionTyCon [TyConApp tc cos]  -- arising from newtypes
-
-mkSymCoercion (TyVarTy tv) 
-  | isCoVar tv = mkCoercion symCoercionTyCon [TyVarTy tv]
-  | otherwise  = TyVarTy tv	-- Reflexive
-
--------------------------------
--- ToDo: we should be cleverer about transitivity
+mkSymCoercion g = mkCoercion symCoercionTyCon [g]
 
 mkTransCoercion :: Coercion -> Coercion -> Coercion
 -- ^ Create a new 'Coercion' by exploiting transitivity on the two given 'Coercion's.
--- 
--- This function attempts to simplify the generated 'Coercion' by exploiting the fact that
--- @sym g `trans` g = id@.
-mkTransCoercion g1 g2	-- sym g `trans` g = id
-  | (t1,_) <- coercionKind g1
-  , (_,t2) <- coercionKind g2
-  , t1 `coreEqType` t2 
-  = t1	
-
-  | otherwise
-  = mkCoercion transCoercionTyCon [g1, g2]
-
-
--------------------------------
--- Smart constructors for left and right
+mkTransCoercion g1 g2 = mkCoercion transCoercionTyCon [g1, g2]
 
 mkLeftCoercion :: Coercion -> Coercion
 -- ^ From an application 'Coercion' build a 'Coercion' that asserts the equality of 
 -- the "functions" on either side of the type equality. So if @c@ has kind @f x ~ g y@ then:
 --
 -- > mkLeftCoercion c :: f ~ g
-mkLeftCoercion co 
-  | Just (co', _) <- splitAppCoercion_maybe co = co'
-  | otherwise = mkCoercion leftCoercionTyCon [co]
+mkLeftCoercion co = mkCoercion leftCoercionTyCon [co]
 
 mkRightCoercion :: Coercion -> Coercion
 -- ^ From an application 'Coercion' build a 'Coercion' that asserts the equality of 
 -- the "arguments" on either side of the type equality. So if @c@ has kind @f x ~ g y@ then:
 --
 -- > mkLeftCoercion c :: x ~ y
-mkRightCoercion  co      
-  | Just (_, co2) <- splitAppCoercion_maybe co = co2
-  | otherwise = mkCoercion rightCoercionTyCon [co]
-
-mkRightCoercions :: Int -> Coercion -> [Coercion]
--- ^ As 'mkRightCoercion', but finds the 'Coercion's available on the right side of @n@
--- nested application 'Coercion's, manufacturing new left or right cooercions as necessary
--- if suffficiently many are not directly available.
-mkRightCoercions n co
-  = go n co []
-  where
-    go n co acc 
-       | n > 0
-       = case splitAppCoercion_maybe co of
-          Just (co1,co2) -> go (n-1) co1 (co2:acc)
-          Nothing        -> go (n-1) (mkCoercion leftCoercionTyCon [co]) (mkCoercion rightCoercionTyCon [co]:acc)
-       | otherwise
-       = acc
-
+mkRightCoercion co = mkCoercion rightCoercionTyCon [co]
 
 mkCsel1Coercion, mkCsel2Coercion, mkCselRCoercion :: Coercion -> Coercion
 mkCsel1Coercion co = mkCoercion csel1CoercionTyCon [co]
@@ -363,71 +312,11 @@ mkCselRCoercion co = mkCoercion cselRCoercionTyCon [co]
 mkInstCoercion :: Coercion -> Type -> Coercion
 -- ^ Instantiates a 'Coercion' with a 'Type' argument. If possible, it immediately performs
 -- the resulting beta-reduction, otherwise it creates a suspended instantiation.
-mkInstCoercion co ty
-  | Just (tv,co') <- splitForAllTy_maybe co
-  = substTyWith [tv] [ty] co'	-- (forall a.co) @ ty  -->  co[ty/a]
-  | otherwise
-  = mkCoercion instCoercionTyCon  [co, ty]
+mkInstCoercion co ty = mkCoercion instCoercionTyCon  [co, ty]
 
 mkInstsCoercion :: Coercion -> [Type] -> Coercion
 -- ^ As 'mkInstCoercion', but instantiates the coercion with a number of type arguments, left-to-right
 mkInstsCoercion co tys = foldl mkInstCoercion co tys
-
-{-
-splitSymCoercion_maybe :: Coercion -> Maybe Coercion
-splitSymCoercion_maybe (TyConApp tc [co]) = 
-  if tc `hasKey` symCoercionTyConKey
-  then Just co
-  else Nothing
-splitSymCoercion_maybe co = Nothing
--}
-
-splitAppCoercion_maybe :: Coercion -> Maybe (Coercion, Coercion)
--- ^ Splits a coercion application, being careful *not* to split @left c@ etc.
--- This is because those are really syntactic constructs, not applications
-splitAppCoercion_maybe co  | Just co' <- coreView co = splitAppCoercion_maybe co'
-splitAppCoercion_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
-splitAppCoercion_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
-splitAppCoercion_maybe (TyConApp tc tys) 
-   | not (isCoercionTyCon tc)
-   = case snocView tys of
-       Just (tys', ty') -> Just (TyConApp tc tys', ty')
-       Nothing          -> Nothing
-splitAppCoercion_maybe _ = Nothing
-
-{-
-splitTransCoercion_maybe :: Coercion -> Maybe (Coercion, Coercion)
-splitTransCoercion_maybe (TyConApp tc [ty1, ty2]) 
- = if tc `hasKey` transCoercionTyConKey then
-       Just (ty1, ty2)
-   else
-       Nothing
-splitTransCoercion_maybe other = Nothing
-
-splitInstCoercion_maybe :: Coercion -> Maybe (Coercion, Type)
-splitInstCoercion_maybe (TyConApp tc [ty1, ty2])
- = if tc `hasKey` instCoercionTyConKey then
-       Just (ty1, ty2)
-    else
-       Nothing
-splitInstCoercion_maybe other = Nothing
-
-splitLeftCoercion_maybe :: Coercion -> Maybe Coercion
-splitLeftCoercion_maybe (TyConApp tc [co])
- = if tc `hasKey` leftCoercionTyConKey then
-       Just co
-   else
-       Nothing
-splitLeftCoercion_maybe other = Nothing
-
-splitRightCoercion_maybe :: Coercion -> Maybe Coercion
-splitRightCoercion_maybe (TyConApp tc [co])
- = if tc `hasKey` rightCoercionTyConKey then
-       Just co
-   else
-       Nothing
-splitRightCoercion_maybe other = Nothing
--}
 
 -- | Manufacture a coercion from this air. Needless to say, this is not usually safe,
 -- but it is used when we know we are dealing with bottom, which is one case in which 
@@ -449,8 +338,12 @@ mkNewTypeCoercion name tycon tvs rhs_ty
   where
     co_con_arity = length tvs
 
-    rule args = ASSERT( co_con_arity == length args )
-		(TyConApp tycon args, substTyWith tvs args rhs_ty)
+    rule :: CoTyConKindChecker
+    rule kc_ty kc_co checking args 
+      = do { ks <- mapM kc_ty args
+           ; unless (not checking || kindAppOk (tyConKind tycon) ks) 
+                    (fail "Argument kind mis-match")
+           ; return (TyConApp tycon args, substTyWith tvs args rhs_ty) }
 
 -- | Create a coercion identifying a @data@, @newtype@ or @type@ representation type
 -- and its family instance.  It has the form @Co tvs :: F ts ~ R tvs@, where @Co@ is 
@@ -466,9 +359,22 @@ mkFamInstCoercion name tvs family instTys rep_tycon
   = mkCoercionTyCon name coArity rule
   where
     coArity = length tvs
-    rule args = (substTyWith tvs args $		     -- with sigma = [tys/tvs],
-		   TyConApp family instTys,	     --       sigma (F ts)
-		 TyConApp rep_tycon args)	     --   ~ R tys
+
+    rule :: CoTyConKindChecker
+    rule kc_ty kc_co checking args 
+      = do { ks <- mapM kc_ty args
+           ; unless (not checking  || kindAppOk (tyConKind rep_tycon) ks)
+                    (fail "Argument kind mis-match")
+           ; return (substTyWith tvs args $	     -- with sigma = [tys/tvs],
+		     TyConApp family instTys	     --       sigma (F ts)
+		    , TyConApp rep_tycon args) }     --   ~ R tys
+
+kindAppOk :: Kind -> [Kind] -> Bool
+kindAppOk kfn [] = True
+kindAppOk kfn (k:ks) 
+  = case splitKindFunTy_maybe kfn of
+      Just (kfa, kfb) | k `isSubKind` kfa -> kindAppOk kfb ks
+      _other                              -> False
 \end{code}
 
 
@@ -497,92 +403,103 @@ symCoercionTyCon, transCoercionTyCon, leftCoercionTyCon,
   rightCoercionTyCon, instCoercionTyCon, unsafeCoercionTyCon,
   csel1CoercionTyCon, csel2CoercionTyCon, cselRCoercionTyCon :: TyCon
 
-symCoercionTyCon = 
-  mkCoercionTyCon symCoercionTyConName 1 flipCoercionKindOf
+symCoercionTyCon 
+  = mkCoercionTyCon symCoercionTyConName 1 kc_sym
   where
-    flipCoercionKindOf (co:rest) = ASSERT( null rest ) (ty2, ty1)
-	where
-	  (ty1, ty2) = coercionKind co
+    kc_sym :: CoTyConKindChecker
+    kc_sym kc_ty kc_co _ (co:_) 
+      = do { (ty1,ty2) <- kc_co co
+           ; return (ty2,ty1) }
 
-transCoercionTyCon = 
-  mkCoercionTyCon transCoercionTyConName 2 composeCoercionKindsOf
+transCoercionTyCon 
+  = mkCoercionTyCon transCoercionTyConName 2 kc_trans
   where
-    composeCoercionKindsOf (co1:co2:rest)
-      = ASSERT( null rest )
-        WARN( not (r1 `coreEqType` a2),
-              text "Strange! Type mismatch in trans coercion, probably a bug"
-              $$
-	      _err_stuff )
-        (a1, r2)
-      where
-        (a1, r1) = coercionKind co1
-        (a2, r2) = coercionKind co2 
-
-        _err_stuff = vcat [ text "co1:" <+> ppr co1
-                          , text "co1 kind left:"  <+> ppr a1
-                          , text "co1 kind right:" <+> ppr r1
-                          , text "co2:" <+> ppr co2
-                          , text "co2 kind left:"  <+> ppr a2
-                          , text "co2 kind right:" <+> ppr r2 ]
+    kc_trans :: CoTyConKindChecker
+    kc_trans kc_ty kc_co checking (co1:co2:_)
+      = do { (a1, r1) <- kc_co co1
+           ; (a2, r2) <- kc_co co2 
+	   ; unless (not checking || (r1 `coreEqType` a2))
+                    (fail "Trans coercion mis-match")
+           ; return (a1, r2) }
 
 ---------------------------------------------------
-leftCoercionTyCon  = mkCoercionTyCon leftCoercionTyConName  1 (fst . decompLR)
-rightCoercionTyCon = mkCoercionTyCon rightCoercionTyConName 1 (snd . decompLR)
+leftCoercionTyCon  = mkCoercionTyCon leftCoercionTyConName  1 (kcLR_help fst)
+rightCoercionTyCon = mkCoercionTyCon rightCoercionTyConName 1 (kcLR_help snd)
 
-decompLR :: [Type] -> ((Type,Type), (Type,Type))
+kcLR_help :: (forall a. (a,a)->a) -> CoTyConKindChecker
+kcLR_help select kc_ty kc_co _checking (co : _)
+  = do { (ty1, ty2)  <- kc_co co
+       ; case decompLR_maybe ty1 ty2 of
+           Nothing  -> fail "decompLR" 
+           Just res -> return (select res) }
+
+decompLR_maybe :: Type -> Type -> Maybe ((Type,Type), (Type,Type))
 -- Helper for left and right.  Finds coercion kind of its input and
 -- returns the left and right projections of the coercion...
 --
 -- if c :: t1 s1 ~ t2 s2 then splitCoercionKindOf c = ((t1, t2), (s1, s2))
-decompLR (co : rest)
-  | (ty1, ty2) <- coercionKind co
-  , Just (ty_fun1, ty_arg1) <- splitAppTy_maybe ty1
+decompLR_maybe ty1 ty2
+  | Just (ty_fun1, ty_arg1) <- splitAppTy_maybe ty1
   , Just (ty_fun2, ty_arg2) <- splitAppTy_maybe ty2
-  = ASSERT( null rest) 
-    ((ty_fun1, ty_fun2),(ty_arg1, ty_arg2))
-decompLR cos 
-  = pprPanic "Coercion.decompLR" 
-             (ppr cos $$ vcat (map (pprEqPred .coercionKind) cos))
+  = Just ((ty_fun1, ty_fun2),(ty_arg1, ty_arg2))
+decompLR_maybe _ _ = Nothing
 
 ---------------------------------------------------
 instCoercionTyCon 
-  =  mkCoercionTyCon instCoercionTyConName 2 instCoercionKind
+  =  mkCoercionTyCon instCoercionTyConName 2 kcInst_help
   where
-    instantiateCo t s =
-      let Just (tv, ty) = splitForAllTy_maybe t in
-      substTyWith [tv] [s] ty
+    kcInst_help :: CoTyConKindChecker
+    kcInst_help kc_ty kc_co checking (co : ty : _)
+      = do { (t1,t2) <- kc_co co
+           ; k <- kc_ty ty
+           ; case decompInst_maybe t1 t2 of
+               Nothing -> fail "decompInst"
+               Just ((tv1,tv2), (ty1,ty2)) -> do
+           { unless (not checking || (k `isSubKind` tyVarKind tv1))
+                    (fail "Coercion instantation kind mis-match")
+           ; return (substTyWith [tv1] [ty] ty1,
+                     substTyWith [tv2] [ty] ty2) } }
 
-    instCoercionKind (co1:ty:rest) = ASSERT( null rest )
-				     (instantiateCo t1 ty, instantiateCo t2 ty)
-      where (t1, t2) = coercionKind co1
+decompInst_maybe :: Type -> Type -> Maybe ((TyVar,TyVar), (Type,Type))
+decompInst_maybe ty1 ty2
+  | Just (tv1,r1) <- splitForAllTy_maybe ty1
+  , Just (tv2,r2) <- splitForAllTy_maybe ty2
+  = Just ((tv1,tv2), (r1,r2))
+
 
 ---------------------------------------------------
 unsafeCoercionTyCon 
-  = mkCoercionTyCon unsafeCoercionTyConName 2 unsafeCoercionKind
+  = mkCoercionTyCon unsafeCoercionTyConName 2 kc_unsafe
   where
-   unsafeCoercionKind (ty1:ty2:rest) = ASSERT( null rest ) (ty1,ty2) 
+   kc_unsafe kc_ty kc_co _checking (ty1:ty2:_) 
+    = do { k1 <- kc_ty ty1
+         ; k2 <- kc_ty ty2
+         ; return (ty1,ty2) }
         
 ---------------------------------------------------
 -- The csel* family
+
+csel1CoercionTyCon = mkCoercionTyCon csel1CoercionTyConName 1 (kcCsel_help fstOf3)
+csel2CoercionTyCon = mkCoercionTyCon csel2CoercionTyConName 1 (kcCsel_help sndOf3)
+cselRCoercionTyCon = mkCoercionTyCon cselRCoercionTyConName 1 (kcCsel_help thirdOf3) 
+
+kcCsel_help :: (forall a. (a,a,a) -> a) -> CoTyConKindChecker
+kcCsel_help select kc_ty kc_co _checking (co : rest)
+  = do { (ty1,ty2) <- kc_co co
+       ; case decompCsel_maybe ty1 ty2 of
+           Nothing  -> fail "decompCsel"
+           Just res -> return (select res) }
+
+decompCsel_maybe :: Type -> Type -> Maybe ((Type,Type), (Type,Type), (Type,Type))
 --   If         co :: (s1~t1 => r1) ~ (s2~t2 => r2)
--- Then   csel1 co :: s1 ~ s2
---        csel2 co :: t1 ~ t2
---        cselR co :: r1 ~ r2
-
-csel1CoercionTyCon = mkCoercionTyCon csel1CoercionTyConName 1 (fstOf3   . decompCsel)
-csel2CoercionTyCon = mkCoercionTyCon csel2CoercionTyConName 1 (sndOf3   . decompCsel)
-cselRCoercionTyCon = mkCoercionTyCon cselRCoercionTyConName 1 (thirdOf3 . decompCsel)
-
-decompCsel :: [Coercion] -> ((Type,Type), (Type,Type), (Type,Type))
-decompCsel (co : rest)
-  | (ty1,ty2) <- coercionKind co
-  , Just (cv1, r1) <- splitForAllTy_maybe ty1
-  , Just (cv2, r2) <- splitForAllTy_maybe ty2
-  , (s1,t1) <- ASSERT( isCoVar cv1) coVarKind cv1
-  , (s2,t2) <- ASSERT( isCoVar cv1) coVarKind cv2
-  = ASSERT( null rest )
-    ((s1,s2), (t1,t2), (r1,r2))
-decompCsel other = pprPanic "decompCsel" (ppr other)
+-- Then   csel1 co ::            s1 ~ s2
+--        csel2 co :: 		 t1 ~ t2
+--        cselR co :: 		 r1 ~ r2
+decompCsel_maybe ty1 ty2
+  | Just (s1, t1, r1) <- splitCoPredTy_maybe ty1
+  , Just (s2, t2, r2) <- splitCoPredTy_maybe ty2
+  = Just ((s1,s2), (t1,t2), (r1,r2))
+decompCsel_maybe _ _ = Nothing
 
 fstOf3   :: (a,b,c) -> a    
 sndOf3   :: (a,b,c) -> b    
@@ -729,7 +646,7 @@ mkAppTyCoI _   IdCo _   IdCo = IdCo
 mkAppTyCoI ty1 coi1 ty2 coi2 =
 	ACo $ AppTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
 
--- | Smart constructor for function-'Coercion's on 'CoercionI', see also 'mkFunCoercion'
+
 mkFunTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
 mkFunTyCoI _   IdCo _   IdCo = IdCo
 mkFunTyCoI ty1 coi1 ty2 coi2 =
@@ -772,182 +689,209 @@ mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi
 %************************************************************************
 
 \begin{code}
-optCoercion :: Coercion -> Coercion
-optCoercion co
-  = ASSERT2( coercionKind co `eq` coercionKind result, 
-             ppr co $$ ppr result $$ ppr (coercionKind co) $$ ppr (coercionKind result) )
-    result
+type NormalCo = Coercion
+  -- Invariants: 
+  --  * For trans coercions (co1 `trans` co2)
+  --       co1 is not a trans, and neither co1 nor co2 is identity
+  --  * If the coercion is the identity, it has no CoVars of CoTyCons in it (just types)
+
+type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity
+
+optCoercion :: Coercion -> NormalCo
+optCoercion co = opt_co False co
+
+opt_co :: Bool	       -- True <=> return (sym co)
+       -> Coercion
+       -> NormalCo
+opt_co = opt_co'
+-- opt_co sym co = pprTrace "opt_co {" (ppr sym <+> ppr co) $
+--       	        co1 `seq` 
+--                pprTrace "opt_co done }" (ppr co1) 
+--               WARN( not same_co_kind, ppr co  <+> dcolon <+> pprEqPred (s1,t1) 
+--                                     $$ ppr co1 <+> dcolon <+> pprEqPred (s2,t2) )
+--                co1
+--  where
+--    co1 = opt_co' sym co
+--    same_co_kind = s1 `coreEqType` s2 && t1 `coreEqType` t2
+--    (s,t) = coercionKind co
+--    (s1,t1) | sym = (t,s)
+--            | otherwise = (s,t)
+--    (s2,t2) = coercionKind co1
+
+opt_co' sym (AppTy ty1 ty2) 	      = mkAppTy (opt_co sym ty1) (opt_co sym ty2)
+opt_co' sym (FunTy ty1 ty2) 	      = FunTy (opt_co sym ty1) (opt_co sym ty2)
+opt_co' sym (PredTy (ClassP cls tys)) = PredTy (ClassP cls (map (opt_co sym) tys))
+opt_co' sym (PredTy (IParam n ty))    = PredTy (IParam n (opt_co sym ty))
+
+opt_co' sym co@(TyVarTy tv)
+  | not (isCoVar tv)     = co   -- Identity; does not mention a CoVar
+  | ty1 `coreEqType` ty2 = ty1	-- Identity; ..ditto..
+  | not sym              = co
+  | otherwise            = mkSymCoercion co
   where
-        (s1,t1) `eq` (s2,t2) = s1 `coreEqType` s2 && t1 `coreEqType` t2
+    (ty1,ty2) = coVarKind tv
 
-        (result,_,_) = go co
-                         -- optimized, changed?, identity?
-        go :: Coercion -> ( Coercion, Bool, Bool )
-        -- traverse coercion term bottom up and return
-        --
-        --    1) equivalent coercion, in optimized form
-        --
-        --    2) whether the output coercion differs from
-        --       the input coercion
-        --
-        --    3) whether the coercion is an identity coercion
-        --
-        -- Performs the following optimizations:
-        --
-        --      sym id          >->     id
-        --      trans id co     >->     co
-        --      trans co id     >->     co
-        --      sym (sym co)    >->     co
-	--      trans g (sym g) >->     id
-	--      trans (sym g) g >->     id
-        --
-        go ty@(TyVarTy a) | isCoVar a = let (ty1,ty2) = coercionKind ty
-                                        in (ty, False, ty1 `coreEqType` ty2)
-                          | otherwise = (ty, False, True)
-        go ty@(AppTy ty1 ty2)
-          = let (ty1', chan1, id1) = go ty1
-                (ty2', chan2, id2) = go ty2
-            in if chan1 || chan2
-                 then (AppTy ty1' ty2', True,  id1 && id2)
-                 else (ty             , False, id1 && id2)
-        go ty@(TyConApp tc args)
-          | tc == symCoercionTyCon, (ty1:tys) <- args
-          = goSym ty ty1 tys
-          | tc == transCoercionTyCon, [ty1,ty2] <- args
-          = goTrans ty ty1 ty2
-          | tc == leftCoercionTyCon, [ty1] <- args
-	  = goLeft ty ty1
-          | tc == rightCoercionTyCon, [ty1] <- args
-	  = goRight ty ty1
-	  | tc == instCoercionTyCon, [ty1,ty2] <- args
-	  = goInst ty ty1 ty2
-	  | not (isCoercionTyCon tc)
-          = let (args', chans, ids) = mapAndUnzip3 go args
-            in  if or chans
-                  then (TyConApp tc args', True , and ids)
-                  else (ty               , False, and ids) 
-          | otherwise
-          = (ty, False, False)
-        go ty@(FunTy ty1 ty2)
-          = let (ty1',chan1,id1) = go ty1
-                (ty2',chan2,id2) = go ty2
-            in  if chan1 || chan2
-                  then (FunTy ty1' ty2', True , id1 && id2)
-                  else (ty             , False, id1 && id2)
-        go ty@(ForAllTy tv ty1)
-          = let (ty1', chan1, id1) = go ty1
-            in if chan1
-                 then (ForAllTy tv ty1', True , id1)
-                 else (ty              , False, id1)
-        go ty@(PredTy (EqPred ty1 ty2))
-          = let (ty1', chan1, id1) = go ty1
-                (ty2', chan2, id2) = go ty2
-            in if chan1 || chan2
-                 then (PredTy (EqPred ty1' ty2'), True , id1 && id2)
-                 else (ty                       , False, id1 && id2)
-        go ty@(PredTy (ClassP cl args))
-          = let (args', chans, ids) = mapAndUnzip3 go args
-            in  if or chans
-                  then (PredTy (ClassP cl args'), True , and ids)
-                  else (ty                      , False, and ids)
-        go ty@(PredTy (IParam name ty1))
-          = let (ty1', chan1, id1) = go ty1
-            in  if chan1
-                  then (PredTy (IParam name ty1'), True , id1)
-                  else (ty                       , False, id1)
+opt_co' sym (ForAllTy tv cor) 
+  | isCoVar tv = mkCoPredTy (opt_co sym co1) (opt_co sym co2) (opt_co sym cor)
+  | otherwise  = ForAllTy tv (opt_co sym cor)
+  where
+    (co1,co2) = coVarKind tv
 
-        goSym :: Coercion -> Coercion -> [Coercion] -> ( Coercion, Bool, Bool )
-	--
-        -- pushes the sym constructor inwards, if possible
-	--
-	--   takes original coercion term
-	--                  first argument 
-        --                  rest of arguments
-        goSym ty ty1 tys  
-          = case mkSymCoercion ty1 of
-	      (TyConApp tc _ ) | tc == symCoercionTyCon
-                               -> let (tys',chans',ids) = mapAndUnzip3 go (ty1:tys)
-                                  in  if or chans'
-                                        then (TyConApp symCoercionTyCon tys', True , and ids)
-                                        else (ty                            , False, and ids)
-              ty1'             -> let (ty',_   ,id') = go (mkAppsCoercion ty1' tys)
-                                  in  (ty',True,id')
+opt_co' sym (TyConApp tc cos)
+  | isCoercionTyCon tc
+  = foldl mkAppTy opt_co_tc 
+          (map (opt_co sym) (drop arity cos))
+  | otherwise
+  = TyConApp tc (map (opt_co sym) cos)
+  where
+    arity = tyConArity tc
+    opt_co_tc :: NormalCo
+    opt_co_tc = opt_co_tc_app sym tc (take arity cos)
 
+--------
+opt_co_tc_app :: Bool -> TyCon -> [Type] -> NormalCo
+-- Used for CoercionTyCons only
+opt_co_tc_app sym tc cos
+  | tc `hasKey` symCoercionTyConKey
+  = opt_co (not sym) co1
 
-        goRight :: Coercion -> Coercion -> ( Coercion, Bool, Bool )
-	--
-        -- reduces the right constructor, if possible
-	--
-	--   takes original coercion term
-	--                  argument 
-	--
-        goRight ty ty1  
-          = case mkRightCoercion ty1 of
-	      (TyConApp tc _ ) | tc == rightCoercionTyCon
-                               -> let (ty1',chan1,id1) = go ty1
-                                  in  if chan1
-                                        then (TyConApp rightCoercionTyCon [ty1'], True , id1)
-                                        else (ty                                , False, id1)
-              ty1'             -> let (ty',_   ,id') = go ty1'
-                                  in  (ty',True,id')
+  | tc `hasKey` transCoercionTyConKey
+  = if sym then opt_trans opt_co2 opt_co1
+           else opt_trans opt_co1 opt_co2
 
-        goLeft :: Coercion -> Coercion -> ( Coercion, Bool, Bool )
-	--
-        -- reduces the left constructor, if possible
-	--
-	--   takes original coercion term
-	--                  argument 
-	--
-        goLeft ty ty1  
-          = case mkLeftCoercion ty1 of
-	      (TyConApp tc _ ) | tc == leftCoercionTyCon
-                               -> let (ty1',chan1,id1) = go ty1
-                                  in  if chan1
-                                        then (TyConApp leftCoercionTyCon [ty1'], True , id1)
-                                        else (ty                                , False, id1)
-              ty1'             -> let (ty',_   ,id') = go ty1'
-                                  in  (ty',True,id')
+  | tc `hasKey` leftCoercionTyConKey
+  , Just (co1, _) <- splitAppTy_maybe opt_co1
+  = co1
 
-        goInst :: Coercion -> Coercion -> Coercion -> ( Coercion, Bool, Bool )
-	--
-        -- reduces the inst constructor, if possible
-	--
-	--   takes original coercion term
-	--                  coercion argument 
-	-- 		    type argument
-	--
-        goInst ty ty1 ty2
-          = case mkInstCoercion ty1 ty2 of
-	      (TyConApp tc _ ) | tc == instCoercionTyCon
-                               -> let (ty1',chan1,id1) = go ty1
-                                  in  if chan1
-                                        then (TyConApp instCoercionTyCon [ty1',ty2], True , id1)
-                                        else (ty                                   , False, id1)
-              ty1'             -> let (ty',_   ,id') = go ty1'
-                                  in  (ty',True,id')
+  | tc `hasKey` rightCoercionTyConKey
+  , Just (_, co2) <- splitAppTy_maybe opt_co1
+  = co2
 
-        goTrans :: Coercion -> Coercion -> Coercion -> ( Coercion, Bool, Bool )
-	--
-        --      trans id co     >->     co
-        --      trans co id     >->     co
-	--      trans g (sym g) >->     id
-	--      trans (sym g) g >->     id
-	--
-        goTrans ty ty1 ty2
-	  | id1
-          = (ty2', True, id2)
-          | id2
-          = (ty1', True, False)
-          | chan1 || chan2
-	  = (TyConApp transCoercionTyCon [ty1',ty2'], True , False)
-	  | Just ty' <- mty'
-          = (ty', True, True)
-          | otherwise
-          = (ty, False, False)
-          where (ty1', chan1, id1) = go ty1
-                (ty2', chan2, id2) = go ty2
-		mty' = case mkTransCoercion ty1' ty2'
-                         of (TyConApp tc _) | tc == transCoercionTyCon
-                                             -> Nothing
-                            ty'              -> Just ty' 
+  | tc `hasKey` csel1CoercionTyConKey
+  , Just (s1,_,_) <- splitCoPredTy_maybe opt_co1
+  = s1
+
+  | tc `hasKey` csel2CoercionTyConKey
+  , Just (_,s2,_) <- splitCoPredTy_maybe opt_co1
+  = s2
+
+  | tc `hasKey` cselRCoercionTyConKey
+  , Just (_,_,r) <- splitCoPredTy_maybe opt_co1
+  = r
+
+  | tc `hasKey` instCoercionTyConKey
+  , Just (tv, co'') <- splitForAllTy_maybe opt_co1
+  , let ty = co2
+  = substTyWith [tv] [ty] co''
+
+  | otherwise	  -- Do not push sym inside top-level axioms
+    		  -- e.g. if g is a top-level axiom
+    		  --   g a : F a ~ a
+		  -- Then (sym (g ty)) /= g (sym ty) !!
+  = if sym then mkSymCoercion the_co 
+           else the_co
+  where
+    the_co = TyConApp tc cos
+    (co1 : cos1) = cos
+    (co2 : _)    = cos1
+    opt_co1 = opt_co sym co1
+    opt_co2 = opt_co sym co2
+
+-------------
+opt_trans :: NormalCo -> NormalCo -> NormalCo
+opt_trans co1 co2
+  | isIdNormCo co1 = co2
+  | otherwise      = opt_trans1 co1 co2
+
+opt_trans1 :: NormalNonIdCo -> NormalCo -> NormalCo
+-- First arg is not the identity
+opt_trans1 co1 co2
+  | isIdNormCo co2 = co1
+  | otherwise      = opt_trans2 co1 co2
+
+opt_trans2 :: NormalNonIdCo -> NormalNonIdCo -> NormalCo
+-- Neither arg is the identity
+opt_trans2 (TyConApp tc [co1a,co1b]) co2
+  | tc `hasKey` transCoercionTyConKey
+  = opt_trans1 co1a (opt_trans2 co1b co2)
+
+opt_trans2 co1 co2 
+  | Just co <- opt_trans_rule co1 co2
+  = co
+
+opt_trans2 co1 (TyConApp tc [co2a,co2b])
+  | tc `hasKey` transCoercionTyConKey
+  , Just co1_2a <- opt_trans_rule co1 co2a
+  = if isIdNormCo co1_2a
+    then co2b
+    else opt_trans2 co1_2a co2b
+
+opt_trans2 co1 co2
+  = mkTransCoercion co1 co2
+
+------
+opt_trans_rule :: NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
+opt_trans_rule (TyConApp tc [co1]) co2
+  | tc `hasKey` symCoercionTyConKey
+  , co1 `coreEqType` co2
+  , (_,ty2) <- coercionKind co2
+  = Just ty2
+
+opt_trans_rule co1 (TyConApp tc [co2])
+  | tc `hasKey` symCoercionTyConKey
+  , co1 `coreEqType` co2
+  , (ty1,_) <- coercionKind co1
+  = Just ty1
+
+opt_trans_rule (TyConApp tc1 [co1,ty1]) (TyConApp tc2 [co2,ty2])
+  | tc1 `hasKey` instCoercionTyConKey
+  , tc1 == tc2
+  , ty1 `coreEqType` ty2
+  = Just (mkInstCoercion (opt_trans2 co1 co2) ty1) 
+
+opt_trans_rule (TyConApp tc1 cos1) (TyConApp tc2 cos2)
+  | not (isCoercionTyCon tc1) || 
+    getUnique tc1 `elem` [ leftCoercionTyConKey, rightCoercionTyConKey
+                         , csel1CoercionTyConKey, csel2CoercionTyConKey
+ 			 , cselRCoercionTyConKey ]	--Yuk!
+  , tc1 == tc2 		 -- Works for left,right, and csel* family
+    	   		 -- BUT NOT equality axioms 
+			 -- E.g.        (g Int) `trans` (g Bool)
+			 -- 	   /= g (Int . Bool)
+  = Just (TyConApp tc1 (zipWith opt_trans cos1 cos2))
+
+opt_trans_rule co1 co2
+  | Just (co1a, co1b) <- splitAppTy_maybe co1
+  , Just (co2a, co2b) <- splitAppTy_maybe co2
+  = Just (mkAppTy (opt_trans co1a co2a) (opt_trans co1b co2b))
+
+  | Just (s1,t1,r1) <- splitCoPredTy_maybe co1
+  , Just (s2,t2,r2) <- splitCoPredTy_maybe co1
+  = Just (mkCoPredTy (opt_trans s1 s2)
+                     (opt_trans t1 t2)
+                     (opt_trans r1 r2))
+
+  | Just (tv1,r1) <- splitForAllTy_maybe co1
+  , Just (tv2,r2) <- splitForAllTy_maybe co2
+  , not (isCoVar tv1)		     -- Both have same kind
+  , let r2' = substTyWith [tv2] [TyVarTy tv1] r2
+  = Just (ForAllTy tv1 (opt_trans2 r1 r2'))
+
+opt_trans_rule _ _ = Nothing
+
+  
+-------------
+isIdNormCo :: NormalCo -> Bool
+-- Cheap identity test: look for coercions with no coercion variables at all
+-- So it'll return False for (sym g `trans` g)
+isIdNormCo ty = go ty
+  where
+    go (TyVarTy tv)  	       = not (isCoVar tv)
+    go (AppTy t1 t2) 	       = go t1 && go t2
+    go (FunTy t1 t2) 	       = go t1 && go t2
+    go (ForAllTy tv ty)        = go (tyVarKind tv) && go ty
+    go (TyConApp tc tys)       = not (isCoercionTyCon tc) && all go tys
+    go (PredTy (IParam _ ty))  = go ty
+    go (PredTy (ClassP _ tys)) = all go tys
+    go (PredTy (EqPred t1 t2)) = go t1 && go t2
 \end{code}  
