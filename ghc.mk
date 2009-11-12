@@ -1060,7 +1060,13 @@ publish-sdist :
 endif
 
 ifeq "$(BootingFromHc)" "YES"
-SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
+# In a normal build we use GHC to compile C files (see
+# rules/c-suffix-rules.mk), which passes a number of its own options
+# to the C compiler.  So when bootstrapping we have to provide these
+# flags explicitly to C compilations.
+SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
+SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
 endif
 
 # -----------------------------------------------------------------------------
