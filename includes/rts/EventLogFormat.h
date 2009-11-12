@@ -145,7 +145,7 @@
 
 typedef StgWord16 EventTypeNum;
 typedef StgWord64 EventTimestamp; // in nanoseconds
-typedef StgWord64 EventThreadID;
+typedef StgWord32 EventThreadID;
 typedef StgWord16 EventCapNo;
 typedef StgWord16 EventPayloadSize; // variable-size events
 
