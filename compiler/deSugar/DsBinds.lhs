@@ -376,9 +376,9 @@ get to do the inlining, which is a Terribly Bad thing given that the
 user said "inline"!
 
 To avoid this we pre-emptively eta-expand the definition, so that foo
-has arity 2 (one for the Eq and one for x); and that in turn should
-mean that (foo d) is a PAP and we don't share it.
-
+has the arity with which it is declared in the source code.  In this
+example it has arity 2 (one for the Eq and one for x). Doing this 
+should mean that (foo d) is a PAP and we don't share it.
 
 Note [Nested arities]
 ~~~~~~~~~~~~~~~~~~~~~
