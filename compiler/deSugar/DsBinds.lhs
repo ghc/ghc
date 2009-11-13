@@ -29,6 +29,7 @@ import CoreSyn		-- lots of things
 import CoreSubst
 import MkCore
 import CoreUtils
+import CoreArity ( etaExpand )
 import CoreUnfold
 import CoreFVs
 
@@ -318,7 +319,13 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 ------------------------
 makeCorePair :: Id-> Arity -> CoreExpr -> (Id, CoreExpr)
 makeCorePair gbl_id arity rhs
-  = (addInline gbl_id arity rhs, rhs)
+  | isInlinePragma (idInlinePragma gbl_id)
+      	-- Add an Unfolding for an INLINE (but not for NOINLINE)
+	-- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
+  = (gbl_id `setIdUnfolding` mkInlineRule InlSat rhs arity,
+     etaExpand arity rhs)
+  | otherwise
+  = (gbl_id, rhs)
 
 ------------------------
 type AbsBindEnv = VarEnv ([TyVar], Id, Id, [LSpecPrag])
@@ -354,18 +361,27 @@ dictArity dicts = count isId dicts
 
 lookupArity :: IdEnv Arity -> Id -> Arity
 lookupArity ar_env id = lookupVarEnv ar_env id `orElse` 0
-
-addInline :: Id -> Arity -> CoreExpr -> Id
-addInline id arity rhs 
-  | isInlinePragma (idInlinePragma id)
-      	-- Add an Unfolding for an INLINE (but not for NOINLINE)
-  = id `setIdUnfolding` mkInlineRule InlSat rhs arity
-  | otherwise
-  = id
 \end{code}
 
-Nested arities
-~~~~~~~~~~~~~~
+Note [Eta-expanding INLINE things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   foo :: Eq a => a -> a
+   {-# INLINE foo #-}
+   foo x = ...
+
+If (foo d) ever gets floated out as a common sub-expression (which can
+happen as a result of method sharing), there's a danger that we never 
+get to do the inlining, which is a Terribly Bad thing given that the
+user said "inline"!
+
+To avoid this we pre-emptively eta-expand the definition, so that foo
+has arity 2 (one for the Eq and one for x); and that in turn should
+mean that (foo d) is a PAP and we don't share it.
+
+
+Note [Nested arities]
+~~~~~~~~~~~~~~~~~~~~~
 For reasons that are not entirely clear, method bindings come out looking like
 this:
 
