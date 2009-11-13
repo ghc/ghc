@@ -8,7 +8,7 @@ test('3586',
                                                   18),
                                      # expected value: 17 (amd64/Linux)
       stats_num_field('bytes allocated', 16000000,
-                                         17000000)),
+                                         17000000),
                                      # expected value: 16835544 (amd64/Linux)
       only_ways(['normal'])
       ],
