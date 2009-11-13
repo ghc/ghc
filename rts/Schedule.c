@@ -1683,6 +1683,10 @@ forkProcess(HsStablePtr *entry
         initTimer();
         startTimer();
 
+#if defined(THREADED_RTS)
+        cap = ioManagerStartCap(cap);
+#endif
+
 	cap = rts_evalStableIO(cap, entry, NULL);  // run the action
 	rts_checkSchedStatus("forkProcess",cap);
 	
