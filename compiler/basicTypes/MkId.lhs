@@ -457,17 +457,25 @@ mkDictSelId no_unf name clas
         -- But it's type must expose the representation of the dictionary
         -- to get (say)         C a -> (a -> a)
 
-    info = noCafIdInfo
-                `setArityInfo`          1
+    base_info = noCafIdInfo
+                `setArityInfo`      1
                 `setAllStrictnessInfo`  Just strict_sig
-		`setSpecInfo`       mkSpecInfo [rule]
-		`setInlinePragInfo` neverInlinePragma
                 `setUnfoldingInfo`  (if no_unf then noUnfolding
-				       else mkImplicitUnfolding rhs)
-	-- Experimental: NOINLINE, so that their rule matches
+				     else mkImplicitUnfolding rhs)
+		   -- In module where class op is defined, we must add
+		   -- the unfolding, even though it'll never be inlined
+		   -- becuase we use that to generate a top-level binding
+		   -- for the ClassOp
 
-        -- We no longer use 'must-inline' on record selectors.  They'll
-        -- inline like crazy if they scrutinise a constructor
+    info | new_tycon = base_info  
+    	   	         -- For newtype dictionaries, just inline the class op
+                         -- See Note [Single-method classes] in TcInstDcls
+         | otherwise = base_info
+	 		`setSpecInfo`       mkSpecInfo [rule]
+			`setInlinePragInfo` neverInlinePragma
+			-- Otherwise add a magic BuiltinRule, and never inline it
+			-- so that the rule is always available to fire.
+			-- See Note [ClassOp/DFun selection] in TcInstDcls
 
     n_ty_args = length tyvars
 
@@ -484,11 +492,12 @@ mkDictSelId no_unf name clas
         -- It's worth giving one, so that absence info etc is generated
         -- even if the selector isn't inlined
     strict_sig = mkStrictSig (mkTopDmdType [arg_dmd] TopRes)
-    arg_dmd | isNewTyCon tycon = evalDmd
-            | otherwise        = Eval (Prod [ if the_arg_id == id then evalDmd else Abs
-                                            | id <- arg_ids ])
+    arg_dmd | new_tycon = evalDmd
+            | otherwise = Eval (Prod [ if the_arg_id == id then evalDmd else Abs
+                                     | id <- arg_ids ])
 
     tycon      = classTyCon clas
+    new_tycon  = isNewTyCon tycon
     [data_con] = tyConDataCons tycon
     tyvars     = dataConUnivTyVars data_con
     arg_tys    = {- ASSERT( isVanillaDataCon data_con ) -} dataConRepArgTys data_con
@@ -497,8 +506,8 @@ mkDictSelId no_unf name clas
     the_arg_id = arg_ids !! index
 
     pred       = mkClassPred clas (mkTyVarTys tyvars)
-    dict_id    = mkTemplateLocal     1 $ mkPredTy pred
-    (eq_ids,n) = mkCoVarLocals 2 $ mkPredTys eq_theta
+    dict_id    = mkTemplateLocal 1 $ mkPredTy pred
+    (eq_ids,n) = mkCoVarLocals   2 $ mkPredTys eq_theta
     arg_ids    = mkTemplateLocalsNum n arg_tys
 
     mkCoVarLocals i []     = ([],i)
@@ -507,9 +516,9 @@ mkDictSelId no_unf name clas
                              in (y:ys,j)
 
     rhs = mkLams tyvars  (Lam dict_id   rhs_body)
-    rhs_body | isNewTyCon tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
-             | otherwise        = Case (Var dict_id) dict_id (idType the_arg_id)
-                                       [(DataAlt data_con, eq_ids ++ arg_ids, Var the_arg_id)]
+    rhs_body | new_tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
+             | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
+                                [(DataAlt data_con, eq_ids ++ arg_ids, Var the_arg_id)]
 
 dictSelRule :: Int -> Arity -> [CoreExpr] -> Maybe CoreExpr
 -- Oh, very clever

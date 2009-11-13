@@ -122,13 +122,8 @@ Running example:
 	{-# RULE "op1@C[a]" forall a, d:C a. 
                             op1 [a] (df_i d) = op1_i a d #-}
 
-* We want to inline the dictionary function itself as vigorously as we
-  possibly can, so that we expose that dictionary constructor to
-  selectors as much as poss.  We don't actually inline it; rather, we
-  use a Builtin RULE for the ClassOps (see MkId.mkDictSelId) to short
-  circuit such applications.  But the RULE only applies if it can "see"
-  the dfun's DFunUnfolding. 
-
+Note [Instances and loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Note that df_i may be mutually recursive with both op1_i and op2_i.
   It's crucial that df_i is not chosen as the loop breaker, even 
   though op1_i has a (user-specified) INLINE pragma.
@@ -145,6 +140,70 @@ Running example:
   inlined.  But this is OK: the recursion breaking happens by way of
   a RULE (the magic ClassOp rule above), and RULES work inside InlineRule
   unfoldings. See Note [RULEs enabled in SimplGently] in SimplUtils
+
+Note [ClassOp/DFun selection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One thing we see a lot is stuff like
+    op2 (df d1 d2)
+where 'op2' is a ClassOp and 'df' is DFun.  Now, we could inline *both*
+'op2' and 'df' to get
+     case (MkD ($cop1 d1 d2) ($cop2 d1 d2) ... of
+       MkD _ op2 _ _ _ -> op2
+And that will reduce to ($cop2 d1 d2) which is what we wanted.
+
+But it's tricky to make this work in practice, because it requires us to 
+inline both 'op2' and 'df'.  But neither is keen to inline without having
+seen the other's result; and it's very easy to get code bloat (from the 
+big intermediate) if you inline a bit too much.
+
+Instead we use a cunning trick.
+ * We arrange that 'df' and 'op2' NEVER inline.  
+
+ * We arrange that 'df' is ALWAYS defined in the sylised form
+      df d1 d2 = MkD ($cop1 d1 d2) ($cop2 d1 d2) ...
+
+ * We give 'df' a magical unfolding (DFunUnfolding [$cop1, $cop2, ..])
+   that lists its methods.
+
+ * We make CoreUnfold.exprIsConApp_maybe spot a DFunUnfolding and return
+   a suitable constructor application -- inlining df "on the fly" as it 
+   were.
+
+ * We give the ClassOp 'op2' a BuiltinRule that extracts the right piece
+   iff its argument satisfies exprIsConApp_maybe.  This is done in
+   MkId mkDictSelId
+
+ * We make 'df' CONLIKE, so that shared uses stil match; eg
+      let d = df d1 d2
+      in ...(op2 d)...(op1 d)...
+
+Note [Single-method classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the class has just one method (or, more accurately, just one elemen
+of {superclasses + methods}), then we want a different strategy. 
+
+   class C a where op :: a -> a
+   instance C a => C [a] where op = <blah>
+
+We translate the class decl into a newtype, which just gives
+a top-level axiom:
+
+   axiom Co:C a :: C a ~ (a->a)
+
+   op :: forall a. C a -> (a -> a)
+   op a d = d |> (Co:C a)
+
+   df :: forall a. C a => C [a]
+   {-# INLINE df #-}
+   df = $cop_list |> (forall a. C a -> (sym (Co:C a))
+
+   $cop_list :: forall a. C a => a -> a
+   $cop_list = <blah>
+
+So the ClassOp is just a cast; and so is the dictionary function.
+(The latter doesn't even have any lambdas.)  We can inline both freely.
+No need for fancy BuiltIn rules.  Indeed the BuiltinRule stuff does
+not work well for newtypes because it uses exprIsConApp_maybe.
 
 
 Note [Subtle interaction of recursion and overlap]
@@ -710,8 +769,12 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
  	     mk_app fun arg_id = L loc (HsApp fun (L loc (wrapId arg_wrapper arg_id)))
 	     arg_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars')
 
-             dfun_id_w_fun = dfun_id 
-                             `setIdUnfolding` mkDFunUnfolding dict_constr (sc_ids ++ meth_ids)
+             dfun_id_w_fun | isNewTyCon (classTyCon clas) 
+                           = dfun_id   -- Just let the dfun inline; see Note [Single-method classes]
+                           | otherwise 
+                           = dfun_id   -- Do not inline; instead give it a magic DFunFunfolding
+			     	       -- See Note [ClassOp/DFun selection]
+                             `setIdUnfolding`  mkDFunUnfolding dict_constr (sc_ids ++ meth_ids)
                              `setInlinePragma` dfunInlinePragma
 
              main_bind = noLoc $ AbsBinds
