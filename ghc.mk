@@ -411,7 +411,11 @@ endif
 # Don't try to delete directories:
 .PRECIOUS: %/.
 
-%/. : $(MKDIRHIER)
+# Create build directories on demand.  NB. the | below: this indicates
+# that $(MKDIRHIER) is an order-only dependency, which means that this
+# rule fires after building mkdirhier, but we won't try to recreate
+# directories if mkdirhier changes.
+%/. : | $(MKDIRHIER)
 	"$(MKDIRHIER)" $@
 
 # -----------------------------------------------------------------------------
