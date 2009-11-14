@@ -51,13 +51,25 @@ $1_$2_$3_NON_HS_OBJS = $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS)  $$($1_$2_$3_S_
 $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
 
 ifeq "$3" "dyn"
+
 # Link a dynamic library
+# On windows we have to supply the extra libs this one links to when building it.
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
+	"$$($1_$2_HC)" $$($1_$2_$3_ALL_OBJS) \
+         `$$($1_$2_$3_MKSTUBOBJS)` \
+         -shared -dynamic -dynload deploy \
+	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
+         -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
+         -o $$@
+else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_OBJS) \
          `$$($1_$2_$3_MKSTUBOBJS)` \
          -shared -dynamic -dynload deploy \
          -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
          -o $$@
+endif
 else
 # Build the ordinary .a library
 ifeq "$$($1_$2_SplitObjs)" "YES"
