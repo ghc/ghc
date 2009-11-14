@@ -571,7 +571,7 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
  *	-- this is currently broken BL 2009/11/14.
  *	   we don't rewrite to static closures at all with Windows DLLs.
  */
-#warning Is this correct? _imp is a pointer!
+// #warning Is this correct? _imp is a pointer!
 #define Char_hash_static_info _imp__ghczmprim_GHCziTypes_Czh_static_info
 #define Int_hash_static_info _imp__ghczmprim_GHCziTypes_Izh_static_info
 #else
