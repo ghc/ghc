@@ -88,9 +88,7 @@ ALL_RTS_DEF_LIBNAMES 	= base ghc-prim
 ALL_RTS_DEF_LIBS	= \
 	rts/dist/build/win32/libHSbase.dll.a \
 	rts/dist/build/win32/libHSghc-prim.dll.a \
-	rts/dist/build/win32/libHSffi.dll.a \
-	gmp/libgmp.dll.a
-
+	rts/dist/build/win32/libHSffi.dll.a 
 
 # -- import libs for the regular Haskell libraries
 define make-importlib-def # args $1 = lib name
