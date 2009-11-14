@@ -669,6 +669,21 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(RET_SEMI_loads_avoided)
 
 
+// On most platforms, the garbage collector rewrites references
+//	to small integer and char objects to a set of common, shared ones.
+//
+// We don't do this when compiling to Windows DLLs at the moment because
+//	it doesn't support cross package data references well.
+//
+#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#define RTS_INTCHAR_SYMBOLS
+#else
+#define RTS_INTCHAR_SYMBOLS				\
+      SymI_HasProto(stg_CHARLIKE_closure)		\
+      SymI_HasProto(stg_INTLIKE_closure)		
+#endif
+
+
 #define RTS_SYMBOLS				        \
       Maybe_Stable_Names			        \
       RTS_TICKY_SYMBOLS                                 \
@@ -853,11 +868,9 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_CAF_BLACKHOLE_info)		\
       SymI_HasProto(__stg_EAGER_BLACKHOLE_info)		\
       SymI_HasProto(startTimer)                         \
-      SymI_HasProto(stg_CHARLIKE_closure)		\
       SymI_HasProto(stg_MVAR_CLEAN_info)		\
       SymI_HasProto(stg_MVAR_DIRTY_info)		\
       SymI_HasProto(stg_IND_STATIC_info)		\
-      SymI_HasProto(stg_INTLIKE_closure)		\
       SymI_HasProto(stg_ARR_WORDS_info)                 \
       SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)	\
       SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_info)	\
@@ -945,7 +958,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(n_capabilities)			\
       SymI_HasProto(stg_traceCcszh)                     \
       SymI_HasProto(stg_traceEventzh)                   \
-      RTS_USER_SIGNALS_SYMBOLS
+      RTS_USER_SIGNALS_SYMBOLS				\
+      RTS_INTCHAR_SYMBOLS
 
 
 // 64-bit support functions in libgcc.a
