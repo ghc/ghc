@@ -974,13 +974,12 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                         then [] 
                         else [ "-ffloat-store" ]) ++
 #endif
+
 		-- gcc's -fstrict-aliasing allows two accesses to memory
 		-- to be considered non-aliasing if they have different types.
 		-- This interacts badly with the C code we generate, which is
 		-- very weakly typed, being derived from C--.
 		["-fno-strict-aliasing"]
-
-
 
 	liftIO $ SysTools.runCc dflags (
 		-- force the C compiler to interpret this file as C when
@@ -997,6 +996,18 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 		       ++ map SysTools.Option (
 		          md_c_flags
                        ++ pic_c_flags
+
+#if    defined(__PIC__) && defined(mingw32_HOST_OS)
+		-- Stub files generated for foreign exports references the runIO_closure
+		-- and runNonIO_closure symbols, which are defined in the base package.
+		-- These symbols are imported into the stub.c file via RtsAPI.h, and the
+		-- way we do the import depends on whether we're currently compiling
+		-- the base package or not.
+		       ++ (if thisPackage dflags == basePackageId
+		       		then [ "-DCOMPILING_BASE_PACKAGE" ]
+				else [])
+#endif	
+
 #ifdef sparc_TARGET_ARCH
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction. Note that the user can still override this

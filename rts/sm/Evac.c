@@ -549,8 +549,17 @@ loop:
       copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),stp);
       return;
 
+  // For ints and chars of low value, save space by replacing references to
+  //	these with closures with references to common, shared ones in the RTS.
+  //
+  // * Except when compiling into Windows DLLs which don't support cross-package
+  //	data references very well.
+  //
   case CONSTR_0_1:
-  { 
+  {   
+#if defined(__PIC__) && defined(mingw32_HOST_OS) 
+      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,stp,tag);
+#else
       StgWord w = (StgWord)q->payload[0];
       if (info == Czh_con_info &&
 	  // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&  
@@ -568,6 +577,7 @@ loop:
       else {
           copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,stp,tag);
       }
+#endif
       return;
   }
 

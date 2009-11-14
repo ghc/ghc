@@ -564,10 +564,12 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
 
 #if defined(__PIC__) && defined(mingw32_TARGET_OS)
 /*
- * When sticking the RTS in a DLL, we delay populating the
+ * When sticking the RTS in a Windows DLL, we delay populating the
  * Charlike and Intlike tables until load-time, which is only
  * when we've got the real addresses to the C# and I# closures.
- *
+ *	
+ *	-- this is currently broken BL 2009/11/14.
+ *	   we don't rewrite to static closures at all with Windows DLLs.
  */
 #warning Is this correct? _imp is a pointer!
 #define Char_hash_static_info _imp__ghczmprim_GHCziTypes_Czh_static_info
@@ -587,6 +589,7 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
 
 /* end the name with _closure, to convince the mangler this is a closure */
 
+#if !(defined(__PIC__) && defined(mingw32_HOST_OS))
 section "data" {
  stg_CHARLIKE_closure:
     CHARLIKE_HDR(0)
@@ -883,3 +886,5 @@ section "data" {
     INTLIKE_HDR(15)
     INTLIKE_HDR(16)	/* MAX_INTLIKE == 16 */
 }
+
+#endif // !(defined(__PIC__) && defined(mingw32_HOST_OS))

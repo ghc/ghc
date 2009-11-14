@@ -147,8 +147,13 @@ work with any old argument, but for @Int@-like ones the argument has
 to be a literal.  Reason: @Char@ like closures have an argument type
 which is guaranteed in range.
 
-Because of this, we use can safely return an addressing mode. -}
+Because of this, we use can safely return an addressing mode. 
 
+We don't support this optimisation when compiling into Windows DLLs yet
+because they don't support cross package data references well.
+-}
+
+#if !(defined(__PIC__) && defined(mingw32_HOST_OS))
 buildDynCon binder _cc con [arg]
   | maybeIntLikeCon con 
   , StgLitArg (MachInt val) <- arg
@@ -172,6 +177,7 @@ buildDynCon binder _cc con [arg]
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = cmmLabelOffW charlike_lbl offsetW
 	; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
+#endif
 
 -------- buildDynCon: the general case -----------
 buildDynCon binder ccs con args

@@ -165,7 +165,13 @@ which is guaranteed in range.
 
 Because of this, we use can safely return an addressing mode.
 
+We don't support this optimisation when compiling into Windows DLLs yet
+because they don't support cross package data references well.
+
 \begin{code}
+
+
+#if !(defined(__PIC__) && defined(mingw32_HOST_OS))
 buildDynCon binder _ con [arg_amode]
   | maybeIntLikeCon con 
   , (_, CmmLit (CmmInt val _)) <- arg_amode
@@ -187,6 +193,8 @@ buildDynCon binder _ con [arg_amode]
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
 	; returnFC (taggedStableIdInfo binder charlike_amode (mkConLFInfo con) con) }
+#endif
+
 \end{code}
 
 Now the general case.
