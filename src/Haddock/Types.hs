@@ -28,6 +28,7 @@ module Haddock.Types (
 
 
 import Control.Exception
+import Control.Arrow
 import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -380,11 +381,11 @@ liftErrMsg = WriterGhc . return . runWriter
 --tell :: [ErrMsg] -> ErrMsgGhc ()
 --tell msgs = WriterGhc $ return ( (), msgs )
 instance Functor ErrMsgGhc where
-  fmap f (WriterGhc x) = WriterGhc (fmap (\(a,msgs)->(f a,msgs)) x)
+  fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
 instance Monad ErrMsgGhc where
   return a = WriterGhc (return (a, []))
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
-               fmap (\ (b, msgs2) -> (b, msgs1 ++ msgs2)) (runWriterGhc (k a))
+               fmap (second (msgs1 ++)) (runWriterGhc (k a))
 
 -- When HsDoc syntax is part of the Haddock codebase, we'll just
 -- declare a Functor instance.

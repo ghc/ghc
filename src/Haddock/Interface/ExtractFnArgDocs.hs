@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.ExtractFnArgDocs

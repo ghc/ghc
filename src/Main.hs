@@ -90,14 +90,14 @@ handleHaddockExceptions inner =
   catches inner [Handler handler]
   where
     handler (e::HaddockException) = do
-      putStrLn $ "haddock: " ++ (show e)
+      putStrLn $ "haddock: " ++ show e
       exitFailure
 
 
 handleGhcExceptions :: IO a -> IO a
-handleGhcExceptions inner =
+handleGhcExceptions =
   -- error messages propagated as exceptions
-  handleGhcException (\e -> do
+  handleGhcException $ \e -> do
     hFlush stdout
     case e of
       PhaseFailed _ code -> exitWith code
@@ -105,7 +105,6 @@ handleGhcExceptions inner =
       _ -> do
         print (e :: GhcException)
         exitFailure
-  ) inner
 
 
 -------------------------------------------------------------------------------
@@ -232,7 +231,7 @@ render flags ifaces installedIfaces = do
                 allVisibleIfaces
     copyHtmlBits odir libDir css_file
 
-  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
+  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $
     ppHtmlHelpFiles title packageStr visibleIfaces odir maybe_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
@@ -322,7 +321,7 @@ startGhc libDir flags ghcActs = do
       -- TODO: handle warnings?
       (dynflags', rest, _) <- parseDynamicFlags dynflags flags_
       if not (null rest)
-        then throwE ("Couldn't parse GHC options: " ++ (unwords origFlags))
+        then throwE ("Couldn't parse GHC options: " ++ unwords origFlags)
         else return dynflags'
 
 
@@ -331,7 +330,7 @@ startGhc libDir flags ghcActs = do
 -------------------------------------------------------------------------------
 
 getHaddockLibDir :: [Flag] -> IO String
-getHaddockLibDir flags = do
+getHaddockLibDir flags =
   case [str | Flag_Lib str <- flags] of
     [] ->
 #ifdef IN_GHC_TREE
@@ -342,7 +341,7 @@ getHaddockLibDir flags = do
     fs -> return (last fs)
 
 getGhcLibDir :: [Flag] -> IO String
-getGhcLibDir flags = do
+getGhcLibDir flags =
   case [ dir | Flag_GhcLibDir dir <- flags ] of
     [] ->
 #ifdef IN_GHC_TREE
@@ -374,12 +373,12 @@ handleEasyFlags flags = do
     dir <- getGhcLibDir flags
     bye $ dir ++ "\n"
 
-  when (Flag_UseUnicode `elem` flags && not (Flag_Html `elem` flags)) $
-  	throwE ("Unicode can only be enabled for HTML output.")
+  when (Flag_UseUnicode `elem` flags && Flag_Html `notElem` flags) $
+  	throwE "Unicode can only be enabled for HTML output."
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
-    throwE ("-h cannot be used with --gen-index or --gen-contents")
+    throwE "-h cannot be used with --gen-index or --gen-contents"
   where
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
@@ -389,8 +388,7 @@ handleEasyFlags flags = do
 
 
 updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()
-updateHTMLXRefs packages = do
-  writeIORef html_xrefs_ref (Map.fromList mapping)
+updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
   where
     mapping = [ (instMod iface, html) | (ifaces, html) <- packages
               , iface <- ifInstalledIfaces ifaces ]

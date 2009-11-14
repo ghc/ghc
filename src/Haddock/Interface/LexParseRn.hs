@@ -58,8 +58,7 @@ lexParseRnHaddockComment hty gre (HsDocString fs) = do
      Nothing -> do
        tell ["doc comment parse failed: "++str]
        return Nothing
-     Just doc -> do
-       return (Just (rnHsDoc gre doc))
+     Just doc -> return (Just (rnHsDoc gre doc))
 #else
 lexParseRnHaddockComment _ _ doc = return (Just doc)
 #endif

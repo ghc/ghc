@@ -280,7 +280,7 @@ warnAboutFilteredDecls mdl decls = do
     tell $ nub [
       "Warning: " ++ modStr ++ ": Instances of type and data "
       ++ "families are not yet supported. Instances of the following families "
-      ++ "will be filtered out:\n  " ++ (concat $ intersperse ", "
+      ++ "will be filtered out:\n  " ++ concat (intersperse ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
   let instances = nub [ pretty i | (L _ (InstD (InstDecl i _ _ ats)), _, _) <- decls
@@ -289,7 +289,7 @@ warnAboutFilteredDecls mdl decls = do
   unless (null instances) $
     tell $ nub [
       "Warning: " ++ modStr ++ ": We do not support associated types in instances yet. "
-      ++ "These instances are affected:\n" ++ (concat $ intersperse ", " instances) ]
+      ++ "These instances are affected:\n" ++ concat (intersperse ", " instances) ]
 
 
 --------------------------------------------------------------------------------
@@ -446,13 +446,13 @@ mkExportItems modMap this_mod gre exported_names decls declMap
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  = fullContentsOf m
-    lookupExport (IEGroup lev docStr)  = liftErrMsg $ do
+    lookupExport (IEGroup lev docStr)  = liftErrMsg $
       ifDoc (lexParseRnHaddockComment DocSectionComment gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
-    lookupExport (IEDoc docStr)        = liftErrMsg $ do
+    lookupExport (IEDoc docStr)        = liftErrMsg $
       ifDoc (lexParseRnHaddockComment NormalHaddockComment gre docStr)
             (\doc -> return [ ExportDoc doc ])
-    lookupExport (IEDocNamed str) = liftErrMsg $ do
+    lookupExport (IEDocNamed str) = liftErrMsg $
       ifDoc (findNamedDoc str [ unL d | (d,_,_) <- decls ])
             (\docStr ->
             ifDoc (lexParseRnHaddockComment NormalHaddockComment gre docStr)
@@ -606,7 +606,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
         subs' = filter ((`elem` exported_names) . fst) subs
         sub_names = map fst subs'
 
-    isExported n = n `elem` exported_names
+    isExported = (`elem` exported_names)
 
     fullContentsOf modname
 	| m == this_mod = liftErrMsg $ fullContentsOfThisModule gre decls
@@ -663,7 +663,7 @@ fullContentsOfThisModule gre decls = liftM catMaybes $ mapM mkExportItem decls
   where
     mkExportItem (L _ (DocD (DocGroup lev docStr)), _, _) = do
         mbDoc <- lexParseRnHaddockComment DocSectionComment gre docStr
-        return $ fmap (\doc -> ExportGroup lev "" doc) mbDoc
+        return $ fmap (ExportGroup lev "") mbDoc
     mkExportItem (L _ (DocD (DocCommentNamed _ docStr)), _, _) = do
         mbDoc <- lexParseRnHaddockComment NormalHaddockComment gre docStr
         return $ fmap ExportDoc mbDoc

@@ -49,7 +49,7 @@ tyThingToLHsDecl t = noLoc $ case t of
       (map (\ (l,r) -> noLoc
                  (map getName l, map getName r) ) $
          snd $ classTvsFds cl)
-      (map (\i -> noLoc $ synifyIdSig DeleteTopLevelQuantification i)
+      (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
            (classMethods cl))
       emptyBag --ignore default method definitions, they don't affect signature
       (map synifyClassAT (classATs cl))
@@ -58,7 +58,7 @@ tyThingToLHsDecl t = noLoc $ case t of
 -- class associated-types are a subset of TyCon
 -- (mainly only type/data-families)
 synifyClassAT :: TyCon -> LTyClDecl Name
-synifyClassAT tc = noLoc $ synifyTyCon tc
+synifyClassAT = noLoc . synifyTyCon
 
 synifyTyCon :: TyCon -> TyClDecl Name
 synifyTyCon tc
@@ -185,14 +185,14 @@ synifyDataCon use_gadt_syntax dc = noLoc $
 #endif
 
 synifyName :: NamedThing n => n -> Located Name
-synifyName n = noLoc (getName n)
+synifyName = noLoc . getName
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig Name
 synifyIdSig s i = TypeSig (synifyName i) (synifyType s (varType i))
 
 
 synifyCtx :: [PredType] -> LHsContext Name
-synifyCtx ps = noLoc (map synifyPred ps)
+synifyCtx = noLoc . map synifyPred
 
 synifyPred :: PredType -> LHsPred Name
 synifyPred (ClassP cls tys) =
