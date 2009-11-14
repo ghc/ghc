@@ -17,6 +17,7 @@
 
 #include "sm/Storage.h"
 #include "RtsUtils.h"
+#include "Prelude.h"
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "STM.h"        /* initSTM */
@@ -164,8 +165,8 @@ hs_init(int *argc, char **argv[])
      * knows about.  We don't know whether these turn out to be CAFs
      * or refer to CAFs, but we have to assume that they might.
      */
-    getStablePtr((StgPtr)base_GHCziTopHandler_runIO_closure);
-    getStablePtr((StgPtr)base_GHCziTopHandler_runNonIO_closure);
+    getStablePtr((StgPtr)runIO_closure);
+    getStablePtr((StgPtr)runNonIO_closure);
     getStablePtr((StgPtr)stackOverflow_closure);
     getStablePtr((StgPtr)heapOverflow_closure);
     getStablePtr((StgPtr)runFinalizerBatch_closure);
