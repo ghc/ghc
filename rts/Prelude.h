@@ -87,6 +87,8 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define runFinalizerBatch_closure DLL_IMPORT_DATA_REF(base_GHCziWeak_runFinalizzerBatch_closure)
 #define mainIO_closure            (&ZCMain_main_closure)
 
+#define runSparks_closure         DLL_IMPORT_DATA_REF(base_GHCziConc_runSparks_closure)
+
 #define stackOverflow_closure     DLL_IMPORT_DATA_REF(base_GHCziIOziException_stackOverflow_closure)
 #define heapOverflow_closure      DLL_IMPORT_DATA_REF(base_GHCziIOziException_heapOverflow_closure)
 #define blockedIndefinitelyOnMVar_closure DLL_IMPORT_DATA_REF(base_GHCziIOziException_blockedIndefinitelyOnMVar_closure)
