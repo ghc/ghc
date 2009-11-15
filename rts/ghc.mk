@@ -19,8 +19,8 @@ rts_dist_HC = $(GHC_STAGE1)
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 
-ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf)) \
-	       rts/dist/build/libHSrtsmain.a
+ALL_RTS_LIBS = rts/dist/build/libHSrtsmain.a \
+	       $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
 all_rts : $(ALL_RTS_LIBS)
 
 # -----------------------------------------------------------------------------
