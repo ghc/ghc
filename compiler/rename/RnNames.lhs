@@ -1475,11 +1475,11 @@ nullModuleExport mod
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"), 
-          nest 4 (ppr txt) ]
+          nest 2 (vcat (map ppr txt)) ]
 moduleWarn mod (DeprecatedTxt txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
                                 <+> ptext (sLit "is deprecated:"), 
-          nest 4 (ppr txt) ]
+          nest 2 (vcat (map ppr txt)) ]
 
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn
