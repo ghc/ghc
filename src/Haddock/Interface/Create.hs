@@ -393,14 +393,6 @@ finishedDoc :: Decl -> MaybeDocStringsFast -> [(Decl, MaybeDocStrings)] -> [(Dec
 finishedDoc d doc rest = (d, docStringToList doc) : rest
 
 
-{-
-attachATs :: [IE Name] -> ([IE Name], [Name])
-attachATs exports = 
-  where
-    ats =   <- export ]
--}
-
-
 -- | Build the list of items that will become the documentation, from the
 -- export list.  At this point, the list of ExportItems is in terms of
 -- original names.
