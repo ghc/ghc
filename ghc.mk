@@ -808,7 +808,7 @@ install_headers: $(INSTALL_HEADERS)
 		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghcheaderdir)"; \
 	done
 
-install_docs: $(INSTALL_HEADERS)
+install_docs: $(INSTALL_DOCS) $(INSTALL_LIBRARY_DOCS)
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
 ifneq "$(INSTALL_DOCS)" ""
 	for i in $(INSTALL_DOCS); do \
@@ -818,6 +818,7 @@ endif
 	$(INSTALL_DIR) $(INSTALL_OPTS) "$(DESTDIR)$(docdir)/html"
 	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html "$(DESTDIR)$(docdir)/html"
 ifneq "$(INSTALL_LIBRARY_DOCS)" ""
+	$(INSTALL_DIR) $(INSTALL_OPTS) "$(DESTDIR)$(docdir)/html/libraries"
 	for i in $(INSTALL_LIBRARY_DOCS); do \
 		$(INSTALL_DOC) $(INSTALL_OPTS) $$i "$(DESTDIR)$(docdir)/html/libraries/"; \
 	done
