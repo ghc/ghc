@@ -2908,6 +2908,13 @@ Prelude> :set -fno-glasgow-exts
             because this is normally what you want in an interpreter:
             output appears as it is generated.
           </para>
+          <para> 
+            If you want line-buffered behaviour, as in GHC, you can 
+            start your program thus:
+            <programlisting>
+               main = do { hSetBuffering stdout LineBuffering; ... }
+            </programlisting>
+          </para>
         </listitem>
       </varlistentry>
     </variablelist>
