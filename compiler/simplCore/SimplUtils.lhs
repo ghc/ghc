@@ -16,7 +16,7 @@ module SimplUtils (
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
-	countValArgs, countArgs, 
+	pushArgs, countValArgs, countArgs, addArgTo,
 	mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, 
 
@@ -99,44 +99,53 @@ data SimplCont
 
   | ApplyTo  		-- C arg
 	DupFlag 
-	InExpr SimplEnv		-- The argument and its static env
+	InExpr StaticEnv		-- The argument and its static env
 	SimplCont
 
   | Select   		-- case C of alts
 	DupFlag 
-	InId [InAlt] SimplEnv	-- The case binder, alts, and subst-env
+	InId [InAlt] StaticEnv	-- The case binder, alts, and subst-env
 	SimplCont
 
   -- The two strict forms have no DupFlag, because we never duplicate them
   | StrictBind 		-- (\x* \xs. e) C
 	InId [InBndr]		-- let x* = [] in e 	
-	InExpr SimplEnv		--	is a special case 
+	InExpr StaticEnv	--	is a special case 
 	SimplCont	
 
-  | StrictArg 		-- e C
-	OutExpr			-- e; *always* of form (Var v `App1` e1 .. `App` en)
-	CallCtxt		-- Whether *this* argument position is interesting
- 	ArgInfo			-- Whether the function at the head of e has rules, etc
-	SimplCont		--     plus strictness flags for *further* args
+  | StrictArg 		-- f e1 ..en C
+ 	ArgInfo		-- Specifies f, e1..en, Whether f has rules, etc
+			--     plus strictness flags for *further* args
+        CallCtxt        -- Whether *this* argument position is interesting
+	SimplCont		
 
 data ArgInfo 
   = ArgInfo {
-	ai_rules :: Bool,	-- Function has rules (recursively)
-				--	=> be keener to inline in all args
-	ai_strs :: [Bool],	-- Strictness of arguments
+        ai_fun   :: Id,		-- The function
+	ai_args  :: [OutExpr],	-- ...applied to these args (which are in *reverse* order)
+	ai_rules :: [CoreRule],	-- Rules for this function
+
+	ai_encl :: Bool,	-- Flag saying whether this function 
+				-- or an enclosing one has rules (recursively)
+				--	True => be keener to inline in all args
+	
+	ai_strs :: [Bool],	-- Strictness of remaining arguments
 				--   Usually infinite, but if it is finite it guarantees
 				--   that the function diverges after being given
 				--   that number of args
-	ai_discs :: [Int]	-- Discounts for arguments; non-zero => be keener to inline
+	ai_discs :: [Int]	-- Discounts for remaining arguments; non-zero => be keener to inline
 				--   Always infinite
     }
+
+addArgTo :: ArgInfo -> OutExpr -> ArgInfo
+addArgTo ai arg = ai { ai_args = arg : ai_args ai }
 
 instance Outputable SimplCont where
   ppr (Stop interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
   ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg f _ _ cont)         = (ptext (sLit "StrictArg") <+> ppr f) $$ ppr cont
+  ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
   ppr (Select dup bndr alts _ cont)  = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
@@ -191,12 +200,16 @@ contResultType env ty cont
     go (Stop {})                      ty = ty
     go (CoerceIt co cont)             _  = go cont (snd (coercionKind co))
     go (StrictBind _ bs body se cont) _  = go cont (subst_ty se (exprType (mkLams bs body)))
-    go (StrictArg fn _ _ cont)        _  = go cont (funResultTy (exprType fn))
+    go (StrictArg ai _ cont)          _  = go cont (funResultTy (argInfoResultTy ai))
     go (Select _ _ alts se cont)      _  = go cont (subst_ty se (coreAltsType alts))
     go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
 
     apply_to_arg ty (Type ty_arg) se = applyTy ty (subst_ty se ty_arg)
     apply_to_arg ty _             _  = funResultTy ty
+
+argInfoResultTy :: ArgInfo -> OutType
+argInfoResultTy (ArgInfo { ai_fun = fun, ai_args = args })
+  = foldr (\arg fn_ty -> applyTypeToArg fn_ty arg) (idType fun) args
 
 -------------------
 countValArgs :: SimplCont -> Int
@@ -214,6 +227,10 @@ contArgs cont = go [] cont
   where
     go args (ApplyTo _ arg se cont) = go (substExpr se arg : args) cont
     go args cont		    = (reverse args, cont)
+
+pushArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
+pushArgs _env []         cont = cont
+pushArgs env  (arg:args) cont = ApplyTo NoDup arg env (pushArgs env args cont)
 
 dropArgs :: Int -> SimplCont -> SimplCont
 dropArgs 0 cont = cont
@@ -275,10 +292,10 @@ interestingCallContext cont
 					-- motivation to inline. See Note [Cast then apply]
 					-- in CoreUnfold
 
-    interesting (StrictArg _ cci _ _)	= cci
-    interesting (StrictBind {})	  	= BoringCtxt
-    interesting (Stop cci)   		= cci
-    interesting (CoerceIt _ cont) 	= interesting cont
+    interesting (StrictArg _ cci _) = cci
+    interesting (StrictBind {})	    = BoringCtxt
+    interesting (Stop cci)   	    = cci
+    interesting (CoerceIt _ cont)   = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -304,11 +321,13 @@ mkArgInfo :: Id
 
 mkArgInfo fun rules n_val_args call_cont
   | n_val_args < idArity fun		-- Note [Unsaturated functions]
-  = ArgInfo { ai_rules = False
+  = ArgInfo { ai_fun = fun, ai_args = [], ai_rules = rules
+            , ai_encl = False
 	    , ai_strs = vanilla_stricts 
 	    , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_rules = interestingArgContext rules call_cont
+  = ArgInfo { ai_fun = fun, ai_args = [], ai_rules = rules
+            , ai_encl = interestingArgContext rules call_cont
 	    , ai_strs  = add_type_str (idType fun) arg_stricts
 	    , ai_discs = arg_discounts }
   where
@@ -392,12 +411,12 @@ interestingArgContext rules call_cont
   where
     enclosing_fn_has_rules = go call_cont
 
-    go (Select {})	     = False
-    go (ApplyTo {})	     = False
-    go (StrictArg _ cci _ _) = interesting cci
-    go (StrictBind {})	     = False	-- ??
-    go (CoerceIt _ c)	     = go c
-    go (Stop cci)            = interesting cci
+    go (Select {})	   = False
+    go (ApplyTo {})	   = False
+    go (StrictArg _ cci _) = interesting cci
+    go (StrictBind {})	   = False	-- ??
+    go (CoerceIt _ c)	   = go c
+    go (Stop cci)          = interesting cci
 
     interesting (ArgCtxt rules) = rules
     interesting _               = False

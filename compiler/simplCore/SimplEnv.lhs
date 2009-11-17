@@ -19,7 +19,7 @@ module SimplEnv (
 	setEnclosingCC, getEnclosingCC,
 
 	-- Environments
-	SimplEnv(..), pprSimplEnv,	-- Temp not abstract
+	SimplEnv(..), StaticEnv, pprSimplEnv,	-- Temp not abstract
 	mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, 
 	zapSubstEnv, setSubstEnv, 
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
@@ -99,22 +99,31 @@ type OutArg	 = CoreArg
 \begin{code}
 data SimplEnv
   = SimplEnv {
+     ----------- Static part of the environment -----------
+     -- Static in the sense of lexically scoped, 
+     -- wrt the original expression
+
 	seMode 	    :: SimplifierMode,
 	seChkr      :: SwitchChecker,
 	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
+
+	-- The current substitution
+	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
+	seIdSubst   :: SimplIdSubst,	-- InId    |--> OutExpr
+
+     ----------- Dynamic part of the environment -----------
+     -- Dynamic in the sense of describing the setup where
+     -- the expression finally ends up
 
 	-- The current set of in-scope variables
 	-- They are all OutVars, and all bound in this module
 	seInScope   :: InScopeSet,	-- OutVars only
 		-- Includes all variables bound by seFloats
-	seFloats    :: Floats,
+	seFloats    :: Floats
 		-- See Note [Simplifier floats]
-
-	-- The current substitution
-	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
-	seIdSubst   :: SimplIdSubst	-- InId    |--> OutExpr
-
     }
+
+type StaticEnv = SimplEnv 	-- Just the static part is relevant
 
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective

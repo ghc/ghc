@@ -37,7 +37,7 @@ import TysPrim          ( realWorldStatePrimTy )
 import PrelInfo         ( realWorldPrimId )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel,
                           RecFlag(..), isNonRuleLoopBreaker )
-import MonadUtils	( foldlM )
+import MonadUtils	( foldlM, mapAccumLM )
 import Maybes           ( orElse )
 import Data.List        ( mapAccumL )
 import Outputable
@@ -900,7 +900,7 @@ rebuild env expr cont0
       Stop {}                      -> return (env, expr)
       CoerceIt co cont             -> rebuild env (mkCoerce co expr) cont
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont
-      StrictArg fun _ info cont    -> rebuildCall env (fun `App` expr) info cont
+      StrictArg info _ cont        -> rebuildCall env (info `addArgTo` expr) cont
       StrictBind b bs body se cont -> do { env' <- simplNonRecX (se `setFloats` env) b expr
                                          ; simplLam env' bs body cont }
       ApplyTo _ arg se cont        -> do { arg' <- simplExpr (se `setInScope` env) arg
@@ -949,7 +949,7 @@ simplCast env body co0 cont0
                | isCoVar tyvar = (new_arg_co, mkCselRCoercion co)       -- PushC rule
                | otherwise     = (ty',        mkInstCoercion co ty')    -- PushT rule
            in 
-           ApplyTo dup (Type new_arg_ty) (zapSubstEnv env) (addCoerce new_cast cont)
+           ApplyTo dup (Type new_arg_ty) (zapSubstEnv arg_se) (addCoerce new_cast cont)
          where
            ty' = substTy (arg_se `setInScope` env) arg_ty
 	   new_arg_co = mkCsel1Coercion co  `mkTransCoercion`
@@ -973,7 +973,7 @@ simplCast env body co0 cont0
                 -- But it isn't a common case.
                 --
                 -- Example of use: Trac #995
-         = ApplyTo dup new_arg (zapSubstEnv env) (addCoerce co2 cont)
+         = ApplyTo dup new_arg (zapSubstEnv arg_se) (addCoerce co2 cont)
          where
            -- we split coercion t1->t2 ~ s1->s2 into t1 ~ s1 and
            -- t2 ~ s2 with left and right on the curried form:
@@ -1092,7 +1092,7 @@ simplVar env var cont
   = case substId env var of
         DoneEx e         -> simplExprF (zapSubstEnv env) e cont
         ContEx tvs ids e -> simplExprF (setSubstEnv env tvs ids) e cont
-        DoneId var1      -> completeCall (zapSubstEnv env) var1 cont
+        DoneId var1      -> completeCall env var1 cont
                 -- Note [zapSubstEnv]
                 -- The template is already simplified, so don't re-substitute.
                 -- This is VITAL.  Consider
@@ -1108,41 +1108,21 @@ simplVar env var cont
 
 completeCall :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
 completeCall env var cont
-  = do  { let   (args,call_cont) = contArgs cont
+  = do  {   ------------- Try inlining ----------------
+          dflags <- getDOptsSmpl
+        ; let  (args,call_cont) = contArgs cont
                 -- The args are OutExprs, obtained by *lazily* substituting
                 -- in the args found in cont.  These args are only examined
                 -- to limited depth (unless a rule fires).  But we must do
                 -- the substitution; rule matching on un-simplified args would
                 -- be bogus
 
-        ------------- First try rules ----------------
-        -- Do this before trying inlining.  Some functions have
-        -- rules *and* are strict; in this case, we don't want to
-        -- inline the wrapper of the non-specialised thing; better
-        -- to call the specialised thing instead.
-        --
-        -- We used to use the black-listing mechanism to ensure that inlining of
-        -- the wrapper didn't occur for things that have specialisations till a
-        -- later phase, so but now we just try RULES first
-	-- 
-	-- See also Note [Rules for recursive functions]
-        ; rule_base <- getSimplRules
-	; let rules = getRules rule_base var
-	; mb_rule <- tryRules env var rules args call_cont
-	; case mb_rule of {
-	     Just (n_args, rule_rhs) -> simplExprF env rule_rhs (dropArgs n_args cont) ;
-                 -- The ruleArity says how many args the rule consumed
-           ; Nothing -> do       -- No rules
-
-
-        ------------- Next try inlining ----------------
-        { dflags <- getDOptsSmpl
-        ; let   arg_infos = [interestingArg arg | arg <- args, isValArg arg]
-                n_val_args = length arg_infos
-                interesting_cont = interestingCallContext call_cont
-                active_inline = activeInline env var
-                maybe_inline  = callSiteInline dflags active_inline var
-                                               (null args) arg_infos interesting_cont
+               arg_infos  = [interestingArg arg | arg <- args, isValArg arg]
+               n_val_args = length arg_infos
+               interesting_cont = interestingCallContext call_cont
+               active_inline = activeInline env var
+               maybe_inline  = callSiteInline dflags active_inline var
+                                              (null args) arg_infos interesting_cont
         ; case maybe_inline of {
             Just unfolding      -- There is an inlining!
               ->  do { tick (UnfoldingDone var)
@@ -1153,24 +1133,20 @@ completeCall env var cont
                                 text "Cont:  " <+> ppr call_cont])
                          else
                                 id)
-                       simplExprF env unfolding cont }
+                       simplExprF (zapSubstEnv env) unfolding cont }
 
-            ; Nothing ->                -- No inlining!
+            ; Nothing -> do               -- No inlining!
 
-        ------------- No inlining! ----------------
-        -- Next, look for rules or specialisations that match
-        --
-        rebuildCall env (Var var)
-                    (mkArgInfo var rules n_val_args call_cont) 
-                    cont
-    }}}}
+        { rule_base <- getSimplRules
+        ; let info = mkArgInfo var (getRules rule_base var) n_val_args call_cont
+        ; rebuildCall env info cont
+    }}}
 
 rebuildCall :: SimplEnv
-            -> OutExpr       -- Function 
             -> ArgInfo
             -> SimplCont
             -> SimplM (SimplEnv, OutExpr)
-rebuildCall env fun (ArgInfo { ai_strs = [] }) cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) cont
   -- When we run out of strictness args, it means
   -- that the call is definitely bottom; see SimplUtils.mkArgInfo
   -- Then we want to discard the entire strict continuation.  E.g.
@@ -1182,25 +1158,26 @@ rebuildCall env fun (ArgInfo { ai_strs = [] }) cont
   -- the continuation, leaving just the bottoming expression.  But the
   -- type might not be right, so we may have to add a coerce.
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
-  = return (env, mk_coerce fun)  -- contination to discard, else we do it
+  = return (env, mk_coerce res)  -- contination to discard, else we do it
   where                          -- again and again!
-    fun_ty  = exprType fun
-    cont_ty = contResultType env fun_ty cont
-    co      = mkUnsafeCoercion fun_ty cont_ty
-    mk_coerce expr | cont_ty `coreEqType` fun_ty = expr
+    res     = mkApps (Var fun) (reverse rev_args)
+    res_ty  = exprType res
+    cont_ty = contResultType env res_ty cont
+    co      = mkUnsafeCoercion res_ty cont_ty
+    mk_coerce expr | cont_ty `coreEqType` res_ty = expr
                    | otherwise = mkCoerce co expr
 
-rebuildCall env fun info (ApplyTo _ (Type arg_ty) se cont)
+rebuildCall env info (ApplyTo _ (Type arg_ty) se cont)
   = do  { ty' <- simplCoercion (se `setInScope` env) arg_ty
-        ; rebuildCall env (fun `App` Type ty') info cont }
+        ; rebuildCall env (info `addArgTo` Type ty') cont }
 
-rebuildCall env fun 
-           (ArgInfo { ai_rules = has_rules, ai_strs = str:strs, ai_discs = disc:discs })
-           (ApplyTo _ arg arg_se cont)
+rebuildCall env info@(ArgInfo { ai_encl = encl_rules
+                              , ai_strs = str:strs, ai_discs = disc:discs })
+            (ApplyTo _ arg arg_se cont)
   | str 	        -- Strict argument
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setFloats` env) arg
-               (StrictArg fun cci arg_info' cont)
+               (StrictArg info' cci cont)
                 -- Note [Shadowing]
 
   | otherwise                           -- Lazy argument
@@ -1210,15 +1187,39 @@ rebuildCall env fun
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScope` env) arg
                              (mkLazyArgStop cci)
-        ; rebuildCall env (fun `App` arg') arg_info' cont }
+        ; rebuildCall env (addArgTo info' arg') cont }
   where
-    arg_info' = ArgInfo { ai_rules = has_rules, ai_strs = strs, ai_discs = discs }
-    cci | has_rules || disc > 0 = ArgCtxt has_rules  -- Be keener here
-        | otherwise             = BoringCtxt         -- Nothing interesting
+    info' = info { ai_strs = strs, ai_discs = discs }
+    cci | encl_rules || disc > 0 = ArgCtxt encl_rules  -- Be keener here
+        | otherwise              = BoringCtxt          -- Nothing interesting
 
-rebuildCall env fun _ cont
-  = rebuild env fun cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+  = do {  -- We've accumulated a simplified call in <fun,rev_args> 
+          -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
+	  -- See also Note [Rules for recursive functions]
+	; let args = reverse rev_args
+              env' = zapSubstEnv env
+	; mb_rule <- tryRules env rules fun args cont
+	; case mb_rule of {
+	     Just (n_args, rule_rhs) -> simplExprF env' rule_rhs $
+                                        pushArgs env' (drop n_args args) cont ;
+                 -- n_args says how many args the rule consumed
+           ; Nothing -> rebuild env (mkApps (Var fun) args) cont      -- No rules
+    } }
 \end{code}
+
+Note [RULES apply to simplified arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very desirable to try RULES once the arguments have been simplified, because
+doing so ensures that rule cascades work in one pass.  Consider
+   {-# RULES g (h x) = k x
+            f (k x) = x #-}
+   ...f (g (h x))...
+Then we want to rewrite (g (h x)) to (k x) and only then try f's rules. If
+we match f's rules against the un-simplified RHS, it won't match.  This 
+makes a particularly big difference when superclass selectors are involved:
+	op ($p1 ($p2 (df d)))
+We want all this to unravel in one sweeep.
 
 Note [Shadowing]
 ~~~~~~~~~~~~~~~~
@@ -1252,11 +1253,11 @@ all this at once is TOO HARD!
 %************************************************************************
 
 \begin{code}
-tryRules :: SimplEnv
-         -> Id -> [CoreRule] -> [OutExpr] -> SimplCont 
+tryRules :: SimplEnv -> [CoreRule]
+         -> Id -> [OutExpr] -> SimplCont 
 	 -> SimplM (Maybe (Arity, CoreExpr))	     -- The arity is the number of
 	    	   	  	  		     -- args consumed by the rule
-tryRules env fn rules args call_cont
+tryRules env rules fn args call_cont
   | null rules
   = return Nothing
   | otherwise
@@ -1264,7 +1265,6 @@ tryRules env fn rules args call_cont
        ; case activeRule dflags env of {
            Nothing     -> return Nothing  ; -- No rules apply
            Just act_fn -> 
-
          case lookupRule act_fn (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
@@ -1481,8 +1481,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
 	     	      -- Lazily evaluated, so we don't do most of this
 
        ; rule_base <- getSimplRules
-       ; let rules = getRules rule_base seqId
-       ; mb_rule <- tryRules env seqId rules out_args cont
+       ; mb_rule <- tryRules env (getRules rule_base seqId) seqId out_args cont
        ; case mb_rule of 
            Just (n_args, res) -> simplExprF (zapSubstEnv env) 
 	   	       		    	    (mkApps res (drop n_args out_args))
@@ -1896,18 +1895,11 @@ mkDupableCont env cont@(StrictBind {})
   =  return (env, mkBoringStop, cont)
         -- See Note [Duplicating StrictBind]
 
-mkDupableCont env (StrictArg fun cci ai cont)
+mkDupableCont env (StrictArg info cci cont)
         -- See Note [Duplicating StrictArg]
   = do { (env', dup, nodup) <- mkDupableCont env cont
-       ; (env'', fun') <- mk_dupable_call env' fun
-       ; return (env'', StrictArg fun' cci ai dup, nodup) }
-  where
-    mk_dupable_call env (Var v)       = return (env, Var v)
-    mk_dupable_call env (App fun arg) = do { (env', fun') <- mk_dupable_call env fun
-                                           ; (env'', arg') <- makeTrivial env' arg
-                                           ; return (env'', fun' `App` arg') }
-    mk_dupable_call _ other = pprPanic "mk_dupable_call" (ppr other)
-	-- The invariant of StrictArg is that the first arg is always an App chain
+       ; (env'', args')     <- mapAccumLM makeTrivial env' (ai_args info)
+       ; return (env'', StrictArg (info { ai_args = args' }) cci dup, nodup) }
 
 mkDupableCont env (ApplyTo _ arg se cont)
   =     -- e.g.         [...hole...] (...arg...)
