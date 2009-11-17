@@ -3,7 +3,6 @@ LIBRARY "libHSffi-ghc@ProjectVersion@.dll"
 
 EXPORTS
 
-	ffi_call
 	ffi_prep_cif
 	ffi_call
 	ffi_type_void
