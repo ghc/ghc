@@ -39,6 +39,7 @@ import Literal
 import PrelInfo
 import Outputable
 import Util             ( lengthIs )
+import StaticFlags	( opt_PIC )
 import Data.Char
 
 
@@ -153,9 +154,11 @@ We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-#if !(defined(__PIC__) && defined(mingw32_HOST_OS))
 buildDynCon binder _cc con [arg]
   | maybeIntLikeCon con 
+#if defined(mingw32_TARGET_OS)
+  , not opt_PIC
+#endif
   , StgLitArg (MachInt val) <- arg
   , val <= fromIntegral mAX_INTLIKE 	-- Comparisons at type Integer!
   , val >= fromIntegral mIN_INTLIKE	-- ...ditto...
@@ -167,7 +170,10 @@ buildDynCon binder _cc con [arg]
 	; return (litIdInfo binder (mkConLFInfo con) intlike_amode, mkNop) }
 
 buildDynCon binder _cc con [arg]
-  | maybeCharLikeCon con 
+  | maybeCharLikeCon con
+#if defined(mingw32_TARGET_OS)
+  , not opt_PIC
+#endif
   , StgLitArg (MachChar val) <- arg
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE
@@ -177,7 +183,6 @@ buildDynCon binder _cc con [arg]
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = cmmLabelOffW charlike_lbl offsetW
 	; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
-#endif
 
 -------- buildDynCon: the general case -----------
 buildDynCon binder ccs con args

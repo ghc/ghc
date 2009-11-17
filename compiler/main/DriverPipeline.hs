@@ -997,7 +997,7 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 		          md_c_flags
                        ++ pic_c_flags
 
-#if    defined(__PIC__) && defined(mingw32_HOST_OS)
+#if    defined(mingw32_TARGET_OS)
 		-- Stub files generated for foreign exports references the runIO_closure
 		-- and runNonIO_closure symbols, which are defined in the base package.
 		-- These symbols are imported into the stub.c file via RtsAPI.h, and the

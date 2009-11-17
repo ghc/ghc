@@ -171,9 +171,11 @@ because they don't support cross package data references well.
 \begin{code}
 
 
-#if !(defined(__PIC__) && defined(mingw32_HOST_OS))
 buildDynCon binder _ con [arg_amode]
   | maybeIntLikeCon con 
+#if defined(mingw32_TARGET_OS)
+  , not opt_PIC
+#endif
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
@@ -185,6 +187,9 @@ buildDynCon binder _ con [arg_amode]
 
 buildDynCon binder _ con [arg_amode]
   | maybeCharLikeCon con 
+#if defined(mingw32_TARGET_OS)
+  , not opt_PIC
+#endif
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
@@ -193,7 +198,6 @@ buildDynCon binder _ con [arg_amode]
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
 	; returnFC (taggedStableIdInfo binder charlike_amode (mkConLFInfo con) con) }
-#endif
 
 \end{code}
 
