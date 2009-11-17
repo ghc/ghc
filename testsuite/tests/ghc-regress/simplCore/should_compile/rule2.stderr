@@ -1,0 +1,22 @@
+
+==================== FloatOut stats: ====================
+0 Lets floated to top level; 0 Lets floated elsewhere; from 4 Lambda groups
+
+
+
+==================== FloatOut stats: ====================
+0 Lets floated to top level; 0 Lets floated elsewhere; from 3 Lambda groups
+
+
+
+==================== Grand total simplifier statistics ====================
+Total ticks:     9
+
+1 PreInlineUnconditionally
+1 UnfoldingDone
+1 RuleFired
+    1 foo/bar
+6 BetaReduction
+8 SimplifierDone
+
+

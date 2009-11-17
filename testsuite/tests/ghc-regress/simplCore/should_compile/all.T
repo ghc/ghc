@@ -34,6 +34,7 @@ test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
 
 test('rule1', normal, compile, [''])
+test('rule2', only_ways(['optc','optasm']), compile, [''])
 
 test('strict-float', normal, compile, [''])
 test('T3118', normal, compile, [''])
