@@ -14,7 +14,7 @@ case $* in
     do
         LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
         NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
-        VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*[ \t]//'`
+        VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*[[:space:]]//'`
         HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
         HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
     done
