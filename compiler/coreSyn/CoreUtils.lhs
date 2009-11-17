@@ -736,6 +736,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     is_hnf_like (Cast e _)       = is_hnf_like e
     is_hnf_like (App e (Type _)) = is_hnf_like e
     is_hnf_like (App e a)        = app_is_value e [a]
+    is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
     is_hnf_like _                = False
 
     -- There is at least one value argument
