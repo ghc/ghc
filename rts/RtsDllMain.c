@@ -30,7 +30,11 @@ DllMain ( HINSTANCE hInstance
    *       you pass to the RTS.
    */
   switch (reason) {
-  case DLL_PROCESS_DETACH: shutdownHaskell();
+  
+  // shutdownHaskelAndExit() is already being called,
+  //	so I don't think we need this. BL 2009/11/17
+ 
+  //case DLL_PROCESS_DETACH: shutdownHaskell();
   }
   return TRUE;
 }
