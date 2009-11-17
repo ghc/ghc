@@ -269,9 +269,6 @@ pprCoreBinder LambdaBind bndr
 
 -- Case bound things don't get a signature or a herald, unless we have debug on
 pprCoreBinder CaseBind bndr 
-  | isDeadBinder bndr	 -- False for tyvars
-  = ptext (sLit "_")
-  | otherwise
   = getPprStyle $ \ sty ->
     if debugStyle sty then
 	parens (pprTypedBinder bndr)
@@ -420,8 +417,9 @@ instance Outputable Unfolding where
       	      	  UnfoldNever         -> usually_empty
 		  UnfoldIfGoodArgs {} -> usually_empty
                   _other              -> pp_tmpl
-      usually_empty = ifPprDebug pp_tmpl
-            -- In this case show 'rhs' only in debug mode
+      usually_empty = ifPprDebug (ptext (sLit "<rhs>"))
+            -- Don't print the RHS or we get a quadratic 
+	    -- blowup in the size of the printout!
 \end{code}
 
 -----------------------------------------------------
