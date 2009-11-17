@@ -24,6 +24,22 @@ import Outputable
 import FastString
 \end{code}
 
+Note [Typechecking rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We *infer* the typ of the LHS, and use that type to *check* the type of 
+the RHS.  That means that higher-rank rules work reasonably well. Here's
+an example (test simplCore/should_compile/rule2.hs) produced by Roman:
+
+   foo :: (forall m. m a -> m b) -> m a -> m b
+   foo f = ...
+
+   bar :: (forall m. m a -> m a) -> m a -> m a
+   bar f = ...
+
+   {-# RULES "foo/bar" foo = bar #-}
+
+He wanted the rule to typecheck.
+
 \begin{code}
 tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
 tcRules decls = mapM (wrapLocM tcRule) decls
@@ -32,15 +48,14 @@ tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
 tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
   = addErrCtxt (ruleCtxt name)			$ do
     traceTc (ptext (sLit "---- Rule ------") <+> ppr name)
-    rule_ty <- newFlexiTyVarTy openTypeKind
 
 	-- Deal with the tyvars mentioned in signatures
-    (ids, lhs', rhs', lhs_lie, rhs_lie) <-
+    (ids, lhs', rhs', lhs_lie, rhs_lie, rule_ty) <-
       tcRuleBndrs vars $ \ ids -> do
-		-- Now LHS and RHS
-        (lhs', lhs_lie) <- getLIE (tcMonoExpr lhs rule_ty)
+		-- Now LHS and RHS; see Note [Typechecking rules]
+        ((lhs', rule_ty), lhs_lie) <- getLIE (tcInferRho lhs)
         (rhs', rhs_lie) <- getLIE (tcMonoExpr rhs rule_ty)
-        return (ids, lhs', rhs', lhs_lie, rhs_lie)
+        return (ids, lhs', rhs', lhs_lie, rhs_lie, rule_ty)
 
 		-- Check that LHS has no overloading at all
     (lhs_dicts, lhs_binds) <- tcSimplifyRuleLhs lhs_lie
