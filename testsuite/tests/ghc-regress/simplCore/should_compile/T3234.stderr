@@ -12,8 +12,8 @@
 ==================== Grand total simplifier statistics ====================
 Total ticks:     45
 
-15 PreInlineUnconditionally
-1 PostInlineUnconditionally
+14 PreInlineUnconditionally
+2 PostInlineUnconditionally
 1 UnfoldingDone
 5 RuleFired
     1 ++
