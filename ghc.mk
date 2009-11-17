@@ -718,9 +718,11 @@ install_mingw : $(INPLACE_MINGW)
 
 endif # Windows
 
-libraries/ghc-prim/dist-install/doc/html/ghc-prim/ghc-prim.haddock: \
+ifneq "$(BINDIST)" "YES"
+$(ghc-prim_HADDOCK_FILE): \
     libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs \
     libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs
+endif # BINDIST
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
                             $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
@@ -808,7 +810,7 @@ install_headers: $(INSTALL_HEADERS)
 		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghcheaderdir)"; \
 	done
 
-install_docs: $(INSTALL_DOCS) $(INSTALL_LIBRARY_DOCS)
+install_docs: $(INSTALL_DOCS)
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
 ifneq "$(INSTALL_DOCS)" ""
 	for i in $(INSTALL_DOCS); do \
