@@ -41,7 +41,7 @@ diff -Nur libffi-3.0.8/include/ffi.h.in dllize-3.0.8/include/ffi.h.in
  #define @TARGET@
  #endif
  
-+#if @LIBFFI_DLL@
++#if @LIBFFI_DLL@ && !defined(LIBFFI_NOT_DLL)
 +#ifdef DLL_EXPORT
 +#define __FFI_DECLSPEC __declspec(__dllexport__)
 +#else

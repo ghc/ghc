@@ -27,6 +27,13 @@
 #include <errno.h>
 #endif
 
+// When building the RTS in the non-dyn way on Windows, we don't
+//	want declspec(__dllimport__) on the front of function prototypes
+//	from libffi.
+#if defined(mingw32_HOST_OS) && !defined(__PIC__)
+# define LIBFFI_NOT_DLL
+#endif
+
 #include "ffi.h"
 
 /* --------------------------------------------------------------------------
