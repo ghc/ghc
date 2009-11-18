@@ -1006,7 +1006,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts compiler ghc driver libraries
+SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts compiler ghc driver libraries ghc-tarballs
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
