@@ -1608,6 +1608,11 @@ linkDynLib dflags o_files dep_packages = do
 	 ++ map (SysTools.FileOption "") o_files
 	 ++ map SysTools.Option (
 	    md_c_flags
+	    
+         -- Permit the linker to auto link _symbol to _imp_symbol
+	 -- This lets us link against DLLs without needing an "import library"
+	 ++ ["-Wl,--enable-auto-import"]
+
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ extra_ld_opts
