@@ -360,9 +360,9 @@ ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn
 endif
 BOOT_LIBS = $(foreach lib,$(BOOT_PKGS),$(libraries/$(lib)_dist-boot_v_LIB))
 
-OTHER_LIBS = libffi/libHSffi$(v_libsuf) libffi/HSffi.o
+OTHER_LIBS = libffi/dist-install/build/libHSffi$(v_libsuf) libffi/dist-install/build/HSffi.o
 ifeq "$(BuildSharedLibs)" "YES"
-OTHER_LIBS  += libffi/libHSffi$(dyn_libsuf)
+OTHER_LIBS  += libffi/dist-install/build/libHSffi$(dyn_libsuf)
 endif
 
 # We cannot run ghc-cabal to configure a package until we have

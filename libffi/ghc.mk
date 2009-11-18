@@ -66,23 +66,27 @@ endif
 
 BINDIST_STAMPS = libffi/stamp.ffi.build libfii/stamp.ffi.configure
 
-INSTALL_HEADERS   += libffi/ffi.h
-libffi_STATIC_LIB  = libffi/libffi.a
-INSTALL_LIBS      += libffi/libHSffi.a libffi/libHSffi_p.a libffi/HSffi.o
+INSTALL_HEADERS   += libffi/dist-install/build/ffi.h
+libffi_STATIC_LIB  = libffi/dist-install/build/libffi.a
+INSTALL_LIBS      += libffi/dist-install/build/libHSffi.a \
+                     libffi/dist-install/build/libHSffi_p.a \
+                     libffi/dist-install/build/HSffi.o
 
 # We have to add the GHC version to the name of our dynamic libs, because
 # they will be residing in the system location along with dynamic libs from
 # other GHC installations.
 
 libffi_HS_DYN_LIB_NAME = libHSffi$(dyn_libsuf)
-libffi_HS_DYN_LIB      = libffi/$(libffi_HS_DYN_LIB_NAME)
+libffi_HS_DYN_LIB      = libffi/dist-install/build/$(libffi_HS_DYN_LIB_NAME)
 
 ifeq "$(Windows)" "YES"
 libffi_DYNAMIC_PROG = $(libffi_HS_DYN_LIB).a
 libffi_DYNAMIC_LIBS = $(libffi_HS_DYN_LIB)
 else
 libffi_DYNAMIC_PROG =
-libffi_DYNAMIC_LIBS = libffi/libffi.so libffi/libffi.so.5 libffi/libffi.so.5.0.9
+libffi_DYNAMIC_LIBS = libffi/dist-install/build/libffi.so \
+                      libffi/dist-install/build/libffi.so.5 \
+                      libffi/dist-install/build/libffi.so.5.0.9
 endif
 
 ifeq "$(BuildSharedLibs)" "YES"
@@ -143,34 +147,33 @@ $(libffi_STAMP_CONFIGURE):
 
 	touch $@
 
-libffi/ffi.h: $(libffi_STAMP_CONFIGURE)
+libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
 	"$(CP)" libffi/build/include/ffi.h $@
 
-$(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
-	cd libffi && \
-	  $(MAKE) -C build MAKEFLAGS=; \
-	  (cd build; ./libtool --mode=install cp libffi.la $(TOP)/libffi)
+$(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE) | libffi/dist-install/build/.
+	$(MAKE) -C libffi/build MAKEFLAGS=
+	cd libffi/build && ./libtool --mode=install cp libffi.la $(TOP)/libffi/dist-install/build
 	touch $@
 
 $(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
 # Rename libffi.a to libHSffi.a
-libffi/libHSffi.a libffi/libHSffi_p.a: $(libffi_STATIC_LIB)
-	"$(CP)" $(libffi_STATIC_LIB) libffi/libHSffi.a
-	"$(CP)" $(libffi_STATIC_LIB) libffi/libHSffi_p.a
+libffi/dist-install/build/libHSffi.a libffi/dist-install/build/libHSffi_p.a: $(libffi_STATIC_LIB)
+	"$(CP)" $(libffi_STATIC_LIB) libffi/dist-install/build/libHSffi.a
+	"$(CP)" $(libffi_STATIC_LIB) libffi/dist-install/build/libHSffi_p.a
 
-$(eval $(call all-target,libffi,libffi/libHSffi.a libffi/libHSffi_p.a))
+$(eval $(call all-target,libffi,$(INSTALL_HEADERS) $(INSTALL_LIBS)))
 
 # The GHCi import lib isn't needed as compiler/ghci/Linker.lhs + rts/Linker.c
 # link the interpreted references to FFI to the compiled FFI.
 # Instead of adding libffi to the list preloaded packages (see
 # compiler/ghci/Linker.lhs:emptyPLS) we generate an empty HSffi.o
 
-libffi/HSffi.o: libffi/libHSffi.a
-	cd libffi && \
-	  touch empty.c; \
+libffi/dist-install/build/HSffi.o: libffi/dist-install/build/libHSffi.a
+	cd libffi/dist-install/build && \
+	  touch empty.c && \
 	  "$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS) -c empty.c -o HSffi.o
 
-$(eval $(call all-target,libffi,libffi/HSffi.o))
+$(eval $(call all-target,libffi,libffi/dist-install/build/HSffi.o))
 
 ifeq "$(BuildSharedLibs)" "YES"
 ifeq "$(Windows)" "YES"
@@ -179,15 +182,15 @@ libffi/libffi.dll.a $(libffi_HS_DYN_LIB): $(libffi_STAMP_BUILD)
 # there is no need to copy from libffi.dll to libHSffi...dll.
 # However, the renaming is still required for the import library
 # libffi.dll.a.
-$(libffi_HS_DYN_LIB).a: libffi/libffi.dll.a
-	"$(CP)" libffi/libffi.dll.a $(libffi_HS_DYN_LIB).a
+$(libffi_HS_DYN_LIB).a: libffi/dist-install/build/libffi.dll.a | $$(dir $$@)/.
+	"$(CP)" $< $@
 
 $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB).a))
 
 else
 $(libffi_DYNAMIC_LIBS): $(libffi_STAMP_BUILD)
 # Rename libffi.so to libHSffi...so
-$(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS)
+$(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS) | $$(dir $$@)/.
 	"$(CP)" $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB)
 
 $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB)))
@@ -195,11 +198,7 @@ endif
 endif
 
 $(eval $(call clean-target,libffi,, \
-   libffi/build libffi/stamp.ffi.* libffi/ffi.h libffi/empty.c \
-   libffi/libffi.a libffi/libffi.la \
-   libffi/HSffi.o libffi/libHSffi.a libffi/libHSffi_p.a \
-   $(libffi_DYNAMIC_PROG) $(libffi_DYNAMIC_LIBS) \
-   $(libffi_HS_DYN_LIB) $(libffi_HS_DYN_LIB).a))
+   libffi/build libffi/stamp.ffi.* libffi/dist-install))
 endif
 
 #-----------------------------------------------------------------------------

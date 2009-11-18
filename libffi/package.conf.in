@@ -12,7 +12,7 @@ import-dirs:
 #ifdef INSTALLING
 library-dirs:		LIB_DIR
 #else /* !INSTALLING */
-library-dirs:		TOP"/libffi"
+library-dirs:		TOP"/libffi/dist-install/build"
 #endif
 
 hs-libraries:   "HSffi"
@@ -20,7 +20,7 @@ hs-libraries:   "HSffi"
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:		TOP"/libffi/build/include"
+include-dirs:		TOP"/libffi/dist-install/build"
 #endif
 
 depends:

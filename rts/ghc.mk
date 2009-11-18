@@ -314,7 +314,7 @@ rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 
 $(eval $(call build-dependencies,rts,dist))
 
-$(rts_dist_depfile) : libffi/ffi.h
+$(rts_dist_depfile) : libffi/dist-install/build/ffi.h
 
 #-----------------------------------------------------------------------------
 # libffi stuff
