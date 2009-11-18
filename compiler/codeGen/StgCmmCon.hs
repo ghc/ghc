@@ -39,8 +39,12 @@ import Literal
 import PrelInfo
 import Outputable
 import Util             ( lengthIs )
-import StaticFlags	( opt_PIC )
+
 import Data.Char
+
+#if defined(mingw32_TARGET_OS)
+import StaticFlags	( opt_PIC )
+#endif
 
 
 ---------------------------------------------------------------
