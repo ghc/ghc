@@ -1447,6 +1447,12 @@ linkBinary dflags o_files dep_packages = do
 		       ]
 		      ++ map SysTools.Option (
 		         md_c_flags
+
+#ifdef mingw32_TARGET_OS
+                      -- Permit the linker to auto link _symbol to _imp_symbol.
+		      -- This lets us link against DLLs without needing an "import library".
+		      ++ ["-Wl,--enable-auto-import"]
+#endif
 	 	      ++ o_files
 		      ++ extra_ld_inputs
 	 	      ++ lib_path_opts
