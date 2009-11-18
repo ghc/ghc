@@ -391,6 +391,7 @@ then
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/libcrypt*.tar.bz2 ||
          test inplace/mingw -ot ghc-tarballs/mingw/mingw-runtime*.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/msysCORE*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/perl*.tar.bz2 ||
          test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.gz
     then
@@ -404,6 +405,7 @@ then
             tar -zxf ../../ghc-tarballs/mingw/gcc-core*.tar.gz &&
             tar -jxf ../../ghc-tarballs/mingw/libcrypt*.tar.bz2 &&
             tar -zxf ../../ghc-tarballs/mingw/mingw-runtime*.tar.gz &&
+            tar -zxf ../../ghc-tarballs/mingw/msysCORE*.tar.gz &&
             tar -jxf ../../ghc-tarballs/mingw/perl*.tar.bz2 &&
             tar -zxf ../../ghc-tarballs/mingw/w32api*.tar.gz &&
             mv bin/gcc.exe bin/realgcc.exe
