@@ -162,13 +162,19 @@ rts_getSchedStatus (Capability *cap);
    These are used by foreign export and foreign import "wrapper" stubs.
    ----------------------------------------------------------------------- */
 
-// When producing Windows DLLs the compiler needs to know which symbols
-// 	are in the local package/DLL vs external ones. 
-//	DLL_IMPORT_BASE expands to __declspec(dllimport) when we're not compiling
-//	the the base package.
-
-DLL_IMPORT_BASE extern StgWord base_GHCziTopHandler_runIO_closure[];
-DLL_IMPORT_BASE extern StgWord base_GHCziTopHandler_runNonIO_closure[];
+// When producing Windows DLLs the we need to know which symbols are in the 
+//	local package/DLL vs external ones. 
+//
+//	Note that RtsAPI.h is also included by foreign export stubs in
+//	the base package itself.
+//
+#if defined(mingw32_TARGET_OS) && defined(__PIC__) && !defined(COMPILING_BASE_PACKAGE)
+__declspec(dllimport) extern StgWord base_GHCziTopHandler_runIO_closure[];
+__declspec(dllimport) extern StgWord base_GHCziTopHandler_runNonIO_closure[];
+#else
+extern StgWord base_GHCziTopHandler_runIO_closure[];
+extern StgWord base_GHCziTopHandler_runNonIO_closure[];
+#endif
 
 #define runIO_closure     base_GHCziTopHandler_runIO_closure
 #define runNonIO_closure  base_GHCziTopHandler_runNonIO_closure

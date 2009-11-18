@@ -53,13 +53,6 @@
 #endif
 
 
-#ifdef COMPILING_BASE_PACKAGE
-# define DLL_IMPORT_BASE 
-#else
-# define DLL_IMPORT_BASE DLLIMPORT
-#endif
-
-
 #ifdef COMPILING_STDLIB
 #define DLL_IMPORT_STDLIB
 #else
