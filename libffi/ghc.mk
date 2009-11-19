@@ -150,9 +150,17 @@ $(libffi_STAMP_CONFIGURE):
 libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
 	"$(CP)" libffi/build/include/ffi.h $@
 
+
 $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE) | libffi/dist-install/build/.
 	$(MAKE) -C libffi/build MAKEFLAGS=
 	cd libffi/build && ./libtool --mode=install cp libffi.la $(TOP)/libffi/dist-install/build
+
+	# We actually want both static and dllized libraries, because we build
+	#   the runtime system both ways. libffi_convenience.a is the static version.
+ifeq "$(Windows)" "YES"
+	cp libffi/build/.libs/libffi_convenience.a $(libffi_STATIC_LIB)
+endif
+
 	touch $@
 
 $(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
