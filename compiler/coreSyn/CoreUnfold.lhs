@@ -319,9 +319,13 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	   _     	    -> funSize top_args fun (length val_args)
 
     ------------ 
-    size_up_alt (_con, _bndrs, rhs) = size_up rhs
+    size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 1
  	-- Don't charge for args, so that wrappers look cheap
 	-- (See comments about wrappers with Case)
+	--
+	-- IMPORATANT: *do* charge 1 for the alternative, else we 
+	-- find that giant case nests are treated as practically free
+	-- A good example is Foreign.C.Error.errrnoToIOError
 
     ------------
 	-- These addSize things have to be here because
