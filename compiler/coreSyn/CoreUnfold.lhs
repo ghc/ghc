@@ -93,11 +93,12 @@ mkUnfolding top_lvl expr
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
 	-- two copies of the thing while the occurrence-analysed expression doesn't
-	-- Nevertheless, we don't occ-analyse before computing the size because the
+	-- Nevertheless, we *don't* occ-analyse before computing the size because the
 	-- size computation bales out after a while, whereas occurrence analysis does not.
 	--
 	-- This can occasionally mean that the guidance is very pessimistic;
-	-- it gets fixed up next round
+	-- it gets fixed up next round.  And it should be rare, because large
+	-- let-bound things that are dead are usually caught by preInlineUnconditionally
 
 mkCoreUnfolding :: Bool -> CoreExpr -> Arity -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
@@ -121,7 +122,8 @@ mkWwInlineRule id expr arity
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
-  = mkCoreUnfolding True expr 0    -- Arity of unfolding doesn't matter
+  = mkCoreUnfolding True expr 
+                    0    -- Arity of unfolding doesn't matter
                     (InlineRule { ir_info = InlAlways, ir_sat = InlUnSat })	
 
 mkInlineRule :: InlSatFlag -> CoreExpr -> Arity -> Unfolding
@@ -190,6 +192,7 @@ Examples
   --------------
     0	  42#
     0	  x
+    0     True
     2	  f x
     1	  Just x
     4 	  f (g x)
@@ -389,7 +392,7 @@ funSize top_args fun n_val_args
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0      = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))
+  | n_val_args == 0      = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))	-- Like variables
   | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n_val_args +# _ILIT(1))
   | otherwise		 = SizeIs (_ILIT(1)) emptyBag (iUnbox n_val_args +# _ILIT(1))
 	-- Treat a constructors application as size 1, regardless of how
