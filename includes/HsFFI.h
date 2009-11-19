@@ -100,9 +100,11 @@ typedef void*			HsStablePtr;
 #if   SIZEOF_VOID_P == 8
 #define HS_INT_MIN		__INT64_MIN
 #define HS_INT_MAX		__INT64_MAX
+#define HS_WORD_MAX		__UINT64_MAX
 #elif SIZEOF_VOID_P == 4
 #define HS_INT_MIN		__INT32_MIN
 #define HS_INT_MAX		__INT32_MAX
+#define HS_WORD_MAX		__UINT32_MAX
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif
