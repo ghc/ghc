@@ -17,7 +17,7 @@ import TcRnMonad
 import IfaceEnv
 import HscTypes
 import BasicTypes
-import NewDemand
+import Demand
 import Annotations
 import IfaceSyn
 import Module
@@ -335,7 +335,7 @@ data BinDictionary = BinDictionary {
 {-! for StrictnessMark derive: Binary !-}
 {-! for Activation derive: Binary !-}
 
--- NewDemand
+-- Demand
 {-! for Demand derive: Binary !-}
 {-! for Demands derive: Binary !-}
 {-! for DmdResult derive: Binary !-}

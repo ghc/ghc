@@ -26,7 +26,7 @@ import Var
 import Id
 import IdInfo
 import InstEnv
-import NewDemand
+import Demand
 import BasicTypes
 import Name hiding (varName)
 import NameSet
@@ -686,7 +686,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
     idinfo	   = idInfo id
     dont_inline	   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
+    bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
     spec_ids	   = specInfoFreeVars (specInfo idinfo)
 
 	-- Stuff to do with the Id's unfolding
@@ -983,7 +983,7 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
                         Nothing         -> True
                         Just (arity, _) -> appIsBottom str arity
         where
-          str = newStrictnessInfo idinfo `orElse` topSig
+          str = strictnessInfo idinfo `orElse` topSig
 
     bndr1   = mkGlobalId details name' ty' idinfo'
     details = idDetails bndr	-- Preserve the IdDetails
@@ -1043,14 +1043,14 @@ tidyTopIdInfo is_external idinfo unfold_info arity caf_info occ_info
         `setOccInfo`           robust_occ_info
 	`setCafInfo` 	       caf_info
 	`setArityInfo`	       arity
-	`setAllStrictnessInfo` newStrictnessInfo idinfo
+	`setStrictnessInfo` strictnessInfo idinfo
 
   | otherwise		-- Externally-visible Ids get the whole lot
   = vanillaIdInfo
         `setOccInfo`           robust_occ_info
 	`setCafInfo` 	       caf_info
 	`setArityInfo`	       arity
-	`setAllStrictnessInfo` newStrictnessInfo idinfo
+	`setStrictnessInfo` strictnessInfo idinfo
 	`setInlinePragInfo`    inlinePragInfo idinfo
 	`setUnfoldingInfo`     unfold_info
 		-- NB: we throw away the Rules

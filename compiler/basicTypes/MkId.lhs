@@ -65,7 +65,7 @@ import DataCon
 import Id
 import Var              ( Var, TyVar, mkCoVar, mkExportedLocalVar )
 import IdInfo
-import NewDemand
+import Demand
 import CoreSyn
 import Unique
 import PrelNames
@@ -265,7 +265,7 @@ mkDataConIds wrap_name wkr_name data_con
     wkr_arity = dataConRepArity data_con
     wkr_info  = noCafIdInfo
                 `setArityInfo`          wkr_arity
-                `setAllStrictnessInfo`  Just wkr_sig
+                `setStrictnessInfo`  Just wkr_sig
                 `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                         -- even if arity = 0
 
@@ -329,7 +329,7 @@ mkDataConIds wrap_name wkr_name data_con
                         -- It's important to specify the arity, so that partial
                         -- applications are treated as values
                     `setUnfoldingInfo`     wrap_unf
-                    `setAllStrictnessInfo` Just wrap_sig
+                    `setStrictnessInfo` Just wrap_sig
 
     all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
     wrap_sig = mkStrictSig (mkTopDmdType arg_dmds cpr_info)
@@ -459,7 +459,7 @@ mkDictSelId no_unf name clas
 
     base_info = noCafIdInfo
                 `setArityInfo`      1
-                `setAllStrictnessInfo`  Just strict_sig
+                `setStrictnessInfo`  Just strict_sig
                 `setUnfoldingInfo`  (if no_unf then noUnfolding
 				     else mkImplicitUnfolding rhs)
 		   -- In module where class op is defined, we must add
@@ -763,7 +763,7 @@ mkPrimOpId prim_op
     info = noCafIdInfo
            `setSpecInfo`          mkSpecInfo (primOpRules prim_op name)
            `setArityInfo`         arity
-           `setAllStrictnessInfo` Just strict_sig
+           `setStrictnessInfo` Just strict_sig
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
 -- a fresh unique, a type that is correct for this particular ccall,
@@ -789,7 +789,7 @@ mkFCallId uniq fcall ty
 
     info = noCafIdInfo
            `setArityInfo`         arity
-           `setAllStrictnessInfo` Just strict_sig
+           `setStrictnessInfo` Just strict_sig
 
     (_, tau)     = tcSplitForAllTys ty
     (arg_tys, _) = tcSplitFunTys tau
@@ -1158,7 +1158,7 @@ pc_bottoming_Id :: Name -> Type -> Id
 pc_bottoming_Id name ty
  = pcMiscPrelId name ty bottoming_info
  where
-    bottoming_info = vanillaIdInfo `setAllStrictnessInfo` Just strict_sig
+    bottoming_info = vanillaIdInfo `setStrictnessInfo` Just strict_sig
 				   `setArityInfo`         1
 			-- Make arity and strictness agree
 

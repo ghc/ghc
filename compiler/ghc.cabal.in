@@ -162,7 +162,6 @@ Library
         Name
         NameEnv
         NameSet
-        NewDemand
         OccName
         RdrName
         SrcLoc
@@ -266,7 +265,6 @@ Library
         MkExternalCore
         PprCore
         PprExternalCore
-        CprAnalyse
         Check
         Coverage
         Desugar
@@ -374,9 +372,6 @@ Library
         StgLint
         StgSyn
         DmdAnal
-        SaAbsInt
-        SaLib
-        StrictAnal
         WorkWrap
         WwLib
         FamInst

@@ -1180,10 +1180,6 @@ getCoreToDo dflags
                 -- Don't stop now!
         simpl_phase 0 ["main"] (max max_iter 3),
 
-
-#ifdef OLD_STRICTNESS
-        CoreDoOldStrictness,
-#endif
         runWhen strictness (CoreDoPasses [
                 CoreDoStrictness,
                 CoreDoWorkerWrapper,

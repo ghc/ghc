@@ -23,7 +23,7 @@ import Coercion
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
 import CoreSyn
-import NewDemand        ( isStrictDmd, splitStrictSig )
+import Demand           ( isStrictDmd, splitStrictSig )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold       ( mkUnfolding, mkCoreUnfolding, mkInlineRule, 
                           exprIsConApp_maybe, callSiteInline, CallCtxt(..) )
@@ -442,8 +442,8 @@ prepareRhs env id (Cast rhs co)    -- Note [Float coercions]
   = do  { (env', rhs') <- makeTrivialWithInfo env sanitised_info rhs
         ; return (env', Cast rhs' co) }
   where
-    sanitised_info = vanillaIdInfo `setNewStrictnessInfo` newStrictnessInfo info
-                                   `setNewDemandInfo`     newDemandInfo info
+    sanitised_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
+                                   `setDemandInfo`     demandInfo info
     info = idInfo id
 
 prepareRhs env0 _ rhs0
@@ -644,7 +644,7 @@ addNonRecWithUnf env new_bndr new_rhs new_unfolding
               | otherwise                      = info2
 
         final_id = new_bndr `setIdInfo` info3
-	dmd_arity = length $ fst $ splitStrictSig $ idNewStrictness new_bndr
+	dmd_arity = length $ fst $ splitStrictSig $ idStrictness new_bndr
     in
     ASSERT( isId new_bndr )
     WARN( new_arity < old_arity || new_arity < dmd_arity, 
@@ -1468,7 +1468,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
   where
         -- The case binder is going to be evaluated later,
         -- and the scrutinee is a simple variable
-    var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo case_bndr)
+    var_demanded_later (Var v) = isStrictDmd (idDemandInfo case_bndr)
                                  && not (isTickBoxOp v)
                                     -- ugly hack; covering this case is what
                                     -- exprOkForSpeculation was intended for.

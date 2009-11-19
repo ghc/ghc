@@ -40,7 +40,7 @@ import CoreUnfold
 import Name
 import Id
 import Var	( isCoVar )
-import NewDemand
+import Demand
 import SimplMonad
 import Type	hiding( substTy )
 import Coercion ( coercionKind )
@@ -342,7 +342,7 @@ mkArgInfo fun rules n_val_args call_cont
     vanilla_stricts  = repeat False
 
     arg_stricts
-      = case splitStrictSig (idNewStrictness fun) of
+      = case splitStrictSig (idStrictness fun) of
 	  (demands, result_info)
 		| not (demands `lengthExceeds` n_val_args)
 		-> 	-- Enough args, use the strictness given.

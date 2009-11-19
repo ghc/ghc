@@ -990,7 +990,7 @@ tcIdInfo ignore_prags name ty info
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
-    tcPrag info (HsStrictness str) = return (info `setAllStrictnessInfo` Just str)
+    tcPrag info (HsStrictness str) = return (info `setStrictnessInfo` Just str)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
 
 	-- The next two are lazy, so they don't transitively suck stuff in
@@ -1034,7 +1034,7 @@ tcUnfolding name ty info (IfWrapper arity wkr)
 
     	-- We are relying here on strictness info always appearing 
 	-- before worker info,  fingers crossed ....
-    strict_sig = case newStrictnessInfo info of
+    strict_sig = case strictnessInfo info of
 		   Just sig -> sig
 		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr)
 
@@ -1219,7 +1219,7 @@ tcIfaceLetBndr (IfLetBndr fs ty info)
     tc_info [] = vanillaIdInfo
     tc_info (HsInline p     : i) = tc_info i `setInlinePragInfo` p 
     tc_info (HsArity a      : i) = tc_info i `setArityInfo` a 
-    tc_info (HsStrictness s : i) = tc_info i `setAllStrictnessInfo` Just s 
+    tc_info (HsStrictness s : i) = tc_info i `setStrictnessInfo` Just s 
     tc_info (other          : i) = pprTrace "tcIfaceLetBndr: discarding unexpected IdInfo" 
 					    (ppr other) (tc_info i)
 

@@ -22,7 +22,7 @@ module DmdAnal ( dmdAnalPgm, dmdAnalTopRhs,
 
 import DynFlags		( DynFlags, DynFlag(..) )
 import StaticFlags	( opt_MaxWorkerArgs )
-import NewDemand	-- All of it
+import Demand	-- All of it
 import CoreSyn
 import PprCore	
 import CoreUtils	( exprIsHNF, exprIsTrivial )
@@ -31,17 +31,11 @@ import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlineActivation,
 			  isDataConWorkId, isGlobalId, idArity,
-#ifdef OLD_STRICTNESS
-			  idDemandInfo,  idStrictness, idCprInfo, idName,
-#endif
-			  idNewStrictness, idNewStrictness_maybe,
-			  setIdNewStrictness, idNewDemandInfo,
-			  idNewDemandInfo_maybe,
-			  setIdNewDemandInfo
+			  idStrictness, idStrictness_maybe,
+			  setIdStrictness, idDemandInfo,
+			  idDemandInfo_maybe,
+			  setIdDemandInfo
 			)
-#ifdef OLD_STRICTNESS
-import IdInfo 		( newStrictnessFromOld, newDemand )
-#endif
 import Var		( Var )
 import VarEnv
 import TysWiredIn	( unboxedPairDataCon )
@@ -79,12 +73,6 @@ dmdAnalPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
 dmdAnalPgm dflags binds
   = do {
 	let { binds_plus_dmds = do_prog binds } ;
-#ifdef OLD_STRICTNESS
-	-- Only if OLD_STRICTNESS is on, because only then is the old
-	-- strictness analyser run
-	let { dmd_changes = get_changes binds_plus_dmds } ;
-	printDump (text "Changes in demands" $$ dmd_changes) ;
-#endif
 	return binds_plus_dmds
     }
   where
@@ -257,7 +245,7 @@ dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
 	--	x = (a, absent-error)
 	-- and that'll crash.
 	-- So at one stage I had:
-	--	dead_case_bndr		 = isAbsentDmd (idNewDemandInfo case_bndr')
+	--	dead_case_bndr		 = isAbsentDmd (idDemandInfo case_bndr')
 	--	keepity | dead_case_bndr = Drop
 	--		| otherwise	 = Keep		
 	--
@@ -268,9 +256,9 @@ dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
 	-- The insight is, of course, that a demand on y is a demand on the
 	-- scrutinee, so we need to `both` it with the scrut demand
 
-	alt_dmd 	   = Eval (Prod [idNewDemandInfo b | b <- bndrs', isId b])
+	alt_dmd 	   = Eval (Prod [idDemandInfo b | b <- bndrs', isId b])
         scrut_dmd 	   = alt_dmd `both`
-			     idNewDemandInfo case_bndr'
+			     idDemandInfo case_bndr'
 
 	(scrut_ty, scrut') = dmdAnal sigs scrut_dmd scrut
     in
@@ -425,7 +413,7 @@ dmdFix top_lvl sigs orig_pairs
 	-- of the fixpoint algorithm.  (Cunning plan.)
 	-- Note that the cunning plan extends to the DmdEnv too,
 	-- since it is part of the strictness signature
-initialSig id = idNewStrictness_maybe id `orElse` botSig
+initialSig id = idStrictness_maybe id `orElse` botSig
 
 dmdAnalRhs :: TopLevelFlag -> RecFlag
 	-> SigEnv -> (Id, CoreExpr)
@@ -443,7 +431,7 @@ dmdAnalRhs top_lvl rec_flag sigs (id, rhs)
 				-- The RHS can be eta-reduced to just a variable, 
 				-- in which case we should not complain. 
 		       mkSigTy top_lvl rec_flag id rhs rhs_dmd_ty
-  id'		     = id `setIdNewStrictness` sig_ty
+  id'		     = id `setIdStrictness` sig_ty
   sigs'		     = extendSigEnv top_lvl sigs id sig_ty
 \end{code}
 
@@ -464,7 +452,7 @@ mkSigTy top_lvl rec_flag id rhs dmd_ty
   = mk_sig_ty never_inline thunk_cpr_ok rhs dmd_ty
   where
     never_inline = isNeverActive (idInlineActivation id)
-    maybe_id_dmd = idNewDemandInfo_maybe id
+    maybe_id_dmd = idDemandInfo_maybe id
 	-- Is Nothing the first time round
 
     thunk_cpr_ok
@@ -734,7 +722,7 @@ annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- No effect on the argument demands
 annotateBndr dmd_ty@(DmdType fv ds res) var
   | isTyVar var = (dmd_ty, var)
-  | otherwise   = (DmdType fv' ds res, setIdNewDemandInfo var dmd)
+  | otherwise   = (DmdType fv' ds res, setIdDemandInfo var dmd)
   where
     (fv', dmd) = removeFV fv var res
 
@@ -749,7 +737,7 @@ annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    (DmdType fv' (hacked_dmd:ds) res, setIdNewDemandInfo id hacked_dmd)
+    (DmdType fv' (hacked_dmd:ds) res, setIdDemandInfo id hacked_dmd)
   where
     (fv', dmd) = removeFV fv id res
     hacked_dmd = argDemand dmd
@@ -815,7 +803,7 @@ extendSigsWithLam :: SigEnv -> Id -> SigEnv
 -- CPR results (e.g. from \x -> x!).
 
 extendSigsWithLam sigs id
-  = case idNewDemandInfo_maybe id of
+  = case idDemandInfo_maybe id of
 	Nothing	              -> extendVarEnv sigs id (cprSig, NotTopLevel)
 		-- Optimistic in the Nothing case;
 		-- See notes [CPR-AND-STRICTNESS]
@@ -835,7 +823,7 @@ dmdTransform sigs var dmd
 ------ 	DATA CONSTRUCTOR
   | isDataConWorkId var		-- Data constructor
   = let 
-	StrictSig dmd_ty    = idNewStrictness var	-- It must have a strictness sig
+	StrictSig dmd_ty    = idStrictness var	-- It must have a strictness sig
 	DmdType _ _ con_res = dmd_ty
 	arity		    = idArity var
     in
@@ -866,7 +854,7 @@ dmdTransform sigs var dmd
 
 ------ 	IMPORTED FUNCTION
   | isGlobalId var,		-- Imported function
-    let StrictSig dmd_ty = idNewStrictness var
+    let StrictSig dmd_ty = idStrictness var
   = if dmdTypeDepth dmd_ty <= call_depth then	-- Saturated, so unleash the demand
 	dmd_ty
     else
@@ -1145,89 +1133,4 @@ both (Defer ds1) (Defer ds2) = deferEval (ds1 `boths` ds2)
 both d1@(Defer ds1) d2	     = d2 `both` d1
  
 boths ds1 ds2 = zipWithDmds both ds1 ds2
-\end{code}
-
-
-
-%************************************************************************
-%*									*
-\subsection{Miscellaneous
-%*									*
-%************************************************************************
-
-
-\begin{code}
-#ifdef OLD_STRICTNESS
-get_changes binds = vcat (map get_changes_bind binds)
-
-get_changes_bind (Rec pairs) = vcat (map get_changes_pr pairs)
-get_changes_bind (NonRec id rhs) = get_changes_pr (id,rhs)
-
-get_changes_pr (id,rhs) 
-  = get_changes_var id $$ get_changes_expr rhs
-
-get_changes_var var
-  | isId var  = get_changes_str var $$ get_changes_dmd var
-  | otherwise = empty
-
-get_changes_expr (Type t)     = empty
-get_changes_expr (Var v)      = empty
-get_changes_expr (Lit l)      = empty
-get_changes_expr (Note n e)   = get_changes_expr e
-get_changes_expr (App e1 e2)  = get_changes_expr e1 $$ get_changes_expr e2
-get_changes_expr (Lam b e)    = {- get_changes_var b $$ -} get_changes_expr e
-get_changes_expr (Let b e)    = get_changes_bind b $$ get_changes_expr e
-get_changes_expr (Case e b a) = get_changes_expr e $$ {- get_changes_var b $$ -} vcat (map get_changes_alt a)
-
-get_changes_alt (con,bs,rhs) = {- vcat (map get_changes_var bs) $$ -} get_changes_expr rhs
-
-get_changes_str id
-  | new_better && old_better = empty
-  | new_better	       	     = message "BETTER"
-  | old_better	       	     = message "WORSE"
-  | otherwise	       	     = message "INCOMPARABLE" 
-  where
-    message word = text word <+> text "strictness for" <+> ppr id <+> info
-    info = (text "Old" <+> ppr old) $$ (text "New" <+> ppr new)
-    new = squashSig (idNewStrictness id)	-- Don't report spurious diffs that the old
-						-- strictness analyser can't track
-    old = newStrictnessFromOld (idName id) (idArity id) (idStrictness id) (idCprInfo id)
-    old_better = old `betterStrictness` new
-    new_better = new `betterStrictness` old
-
-get_changes_dmd id
-  | isUnLiftedType (idType id) = empty	-- Not useful
-  | new_better && old_better = empty
-  | new_better	       	     = message "BETTER"
-  | old_better	       	     = message "WORSE"
-  | otherwise	       	     = message "INCOMPARABLE" 
-  where
-    message word = text word <+> text "demand for" <+> ppr id <+> info
-    info = (text "Old" <+> ppr old) $$ (text "New" <+> ppr new)
-    new = squashDmd (argDemand (idNewDemandInfo id))	-- To avoid spurious improvements
-							-- A bit of a hack
-    old = newDemand (idDemandInfo id)
-    new_better = new `betterDemand` old 
-    old_better = old `betterDemand` new
-
-betterStrictness :: StrictSig -> StrictSig -> Bool
-betterStrictness (StrictSig t1) (StrictSig t2) = betterDmdType t1 t2
-
-betterDmdType t1 t2 = (t1 `lubType` t2) == t2
-
-betterDemand :: Demand -> Demand -> Bool
--- If d1 `better` d2, and d2 `better` d2, then d1==d2
-betterDemand d1 d2 = (d1 `lub` d2) == d2
-
-squashSig (StrictSig (DmdType fv ds res))
-  = StrictSig (DmdType emptyDmdEnv (map squashDmd ds) res)
-  where
-	-- squash just gets rid of call demands
-	-- which the old analyser doesn't track
-squashDmd (Call d)   = evalDmd
-squashDmd (Box d)    = Box (squashDmd d)
-squashDmd (Eval ds)  = Eval (mapDmds squashDmd ds)
-squashDmd (Defer ds) = Defer (mapDmds squashDmd ds)
-squashDmd d          = d
-#endif
 \end{code}

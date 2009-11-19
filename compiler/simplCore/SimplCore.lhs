@@ -55,10 +55,6 @@ import Specialise	( specProgram)
 import SpecConstr	( specConstrProgram)
 import DmdAnal		( dmdAnalPgm )
 import WorkWrap	        ( wwTopBinds )
-#ifdef OLD_STRICTNESS
-import StrictAnal	( saBinds )
-import CprAnalyse       ( cprAnalyse )
-#endif
 import Vectorise        ( vectorise )
 import FastString
 import Util
@@ -190,24 +186,8 @@ doCorePass CoreDoGlomBinds              = dontDescribePass $ doPassDM  glomBinds
 doCorePass CoreDoPrintCore              = dontDescribePass $ observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = dontDescribePass $ ruleCheck phase pat
 
-#ifdef OLD_STRICTNESS
-doCorePass CoreDoOldStrictness          = {-# SCC "OldStrictness" #-} doOldStrictness
-#endif
-
 doCorePass CoreDoNothing                = return
 doCorePass (CoreDoPasses passes)        = doCorePasses passes
-
-#ifdef OLD_STRICTNESS
-doOldStrictness :: ModGuts -> CoreM ModGuts
-doOldStrictness guts
-  = do dfs <- getDynFlags
-       guts'  <- describePass "Strictness analysis" Opt_D_dump_stranal $ 
-                 doPassM (saBinds dfs) guts
-       guts'' <- describePass "Constructed Product analysis" Opt_D_dump_cpranal $ 
-                 doPass cprAnalyse guts'
-       return guts''
-#endif
-
 \end{code}
 
 %************************************************************************
@@ -844,7 +824,7 @@ transferIdInfo exported_id local_id
   = modifyIdInfo transfer exported_id
   where
     local_info = idInfo local_id
-    transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
+    transfer exp_info = exp_info `setStrictnessInfo` strictnessInfo local_info
 				 `setUnfoldingInfo`     unfoldingInfo local_info
 				 `setInlinePragInfo`	inlinePragInfo local_info
 				 `setSpecInfo`	        addSpecInfo (specInfo exp_info) new_info

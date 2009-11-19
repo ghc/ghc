@@ -17,12 +17,7 @@ import CostCentre
 import Var
 import Id
 import IdInfo
-import NewDemand
-#ifdef OLD_STRICTNESS
-import Id
-import IdInfo
-#endif
-
+import Demand
 import DataCon
 import TyCon
 import Type
@@ -308,7 +303,7 @@ pprIdBndrInfo info
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
-    dmd_info  = newDemandInfo info
+    dmd_info  = demandInfo info
     lbv_info  = lbvarInfo info
 
     has_prag = not (isDefaultInlinePragma prag_info)
@@ -336,7 +331,7 @@ ppIdInfo id info
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,      ptext (sLit "Arity=") <> int arity)
     , (has_caf_info,   ptext (sLit "Caf=") <> ppr caf_info)
-    , (has_strictness, ptext (sLit "Str=") <> pprNewStrictness str_info)
+    , (has_strictness, ptext (sLit "Str=") <> pprStrictness str_info)
     , (has_unf,        ptext (sLit "Unf=") <> ppr unf_info)
     , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
     ]	-- Inline pragma, occ, demand, lbvar info
@@ -353,7 +348,7 @@ ppIdInfo id info
     caf_info = cafInfo info
     has_caf_info = not (mayHaveCafRefs caf_info)
 
-    str_info = newStrictnessInfo info
+    str_info = strictnessInfo info
     has_strictness = isJust str_info
 
     unf_info = unfoldingInfo info

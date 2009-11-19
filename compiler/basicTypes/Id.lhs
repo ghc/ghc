@@ -67,34 +67,23 @@ module Id (
 
 	-- ** Reading 'IdInfo' fields
 	idArity, 
-	idNewDemandInfo, idNewDemandInfo_maybe,
-	idNewStrictness, idNewStrictness_maybe, 
+	idDemandInfo, idDemandInfo_maybe,
+	idStrictness, idStrictness_maybe, 
 	idUnfolding, realIdUnfolding,
 	idSpecialisation, idCoreRules, idHasRules,
 	idCafInfo,
 	idLBVarInfo,
 	idOccInfo,
 
-#ifdef OLD_STRICTNESS
-	idDemandInfo, 
-	idStrictness, 
-	idCprInfo,
-#endif
-
 	-- ** Writing 'IdInfo' fields
 	setIdUnfolding,
 	setIdArity,
-	setIdNewDemandInfo, 
-	setIdNewStrictness, zapIdNewStrictness,
+	setIdDemandInfo, 
+	setIdStrictness, zapIdStrictness,
 	setIdSpecialisation,
 	setIdCafInfo,
 	setIdOccInfo, zapIdOccInfo,
 
-#ifdef OLD_STRICTNESS
-	setIdStrictness, 
-	setIdDemandInfo, 
-	setIdCprInfo,
-#endif
     ) where
 
 #include "HsVersions.h"
@@ -114,11 +103,8 @@ import TyCon
 import Type
 import TcType
 import TysPrim
-#ifdef OLD_STRICTNESS
-import qualified Demand
-#endif
 import DataCon
-import NewDemand
+import Demand
 import Name
 import Module
 import Class
@@ -136,16 +122,11 @@ import StaticFlags
 -- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
-	  `setIdNewDemandInfo`,
-	  `setIdNewStrictness`,
+	  `setIdDemandInfo`,
+	  `setIdStrictness`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
 	  `idCafInfo`
-#ifdef OLD_STRICTNESS
-	  ,`idCprInfo`
-	  ,`setIdStrictness`
-	  ,`setIdDemandInfo`
-#endif
 \end{code}
 
 %************************************************************************
@@ -469,31 +450,21 @@ idArity id = arityInfo (idInfo id)
 setIdArity :: Id -> Arity -> Id
 setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
 
-#ifdef OLD_STRICTNESS
-	---------------------------------
-	-- (OLD) STRICTNESS 
-idStrictness :: Id -> StrictnessInfo
-idStrictness id = strictnessInfo (idInfo id)
-
-setIdStrictness :: Id -> StrictnessInfo -> Id
-setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) id
-#endif
-
 -- | Returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool
-isBottomingId id = isBottomingSig (idNewStrictness id)
+isBottomingId id = isBottomingSig (idStrictness id)
 
-idNewStrictness_maybe :: Id -> Maybe StrictSig
-idNewStrictness :: Id -> StrictSig
+idStrictness_maybe :: Id -> Maybe StrictSig
+idStrictness :: Id -> StrictSig
 
-idNewStrictness_maybe id = newStrictnessInfo (idInfo id)
-idNewStrictness       id = idNewStrictness_maybe id `orElse` topSig
+idStrictness_maybe id = strictnessInfo (idInfo id)
+idStrictness       id = idStrictness_maybe id `orElse` topSig
 
-setIdNewStrictness :: Id -> StrictSig -> Id
-setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
+setIdStrictness :: Id -> StrictSig -> Id
+setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` Just sig) id
 
-zapIdNewStrictness :: Id -> Id
-zapIdNewStrictness id = modifyIdInfo (`setNewStrictnessInfo` Nothing) id
+zapIdStrictness :: Id -> Id
+zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` Nothing) id
 
 -- | This predicate says whether the 'Id' has a strict demand placed on it or
 -- has a type such that it can always be evaluated strictly (e.g., an
@@ -504,7 +475,7 @@ zapIdNewStrictness id = modifyIdInfo (`setNewStrictnessInfo` Nothing) id
 isStrictId :: Id -> Bool
 isStrictId id
   = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
-           (isStrictDmd (idNewDemandInfo id)) || 
+           (isStrictDmd (idDemandInfo id)) || 
            (isStrictType (idType id))
 
 	---------------------------------
@@ -524,24 +495,14 @@ realIdUnfolding id = unfoldingInfo (idInfo id)
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
-#ifdef OLD_STRICTNESS
-	---------------------------------
-	-- (OLD) DEMAND
-idDemandInfo :: Id -> Demand.Demand
-idDemandInfo id = demandInfo (idInfo id)
+idDemandInfo_maybe :: Id -> Maybe Demand
+idDemandInfo       :: Id -> Demand
 
-setIdDemandInfo :: Id -> Demand.Demand -> Id
-setIdDemandInfo id demand_info = modifyIdInfo (`setDemandInfo` demand_info) id
-#endif
+idDemandInfo_maybe id = demandInfo (idInfo id)
+idDemandInfo       id = demandInfo (idInfo id) `orElse` topDmd
 
-idNewDemandInfo_maybe :: Id -> Maybe NewDemand.Demand
-idNewDemandInfo       :: Id -> NewDemand.Demand
-
-idNewDemandInfo_maybe id = newDemandInfo (idInfo id)
-idNewDemandInfo       id = newDemandInfo (idInfo id) `orElse` NewDemand.topDmd
-
-setIdNewDemandInfo :: Id -> NewDemand.Demand -> Id
-setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` Just dmd) id
+setIdDemandInfo :: Id -> Demand -> Id
+setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` Just dmd) id
 
 	---------------------------------
 	-- SPECIALISATION
@@ -563,26 +524,10 @@ setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 	---------------------------------
 	-- CAF INFO
 idCafInfo :: Id -> CafInfo
-#ifdef OLD_STRICTNESS
-idCafInfo id = case cgInfo (idInfo id) of
-		  NoCgInfo -> pprPanic "idCafInfo" (ppr id)
-		  info     -> cgCafInfo info
-#else
 idCafInfo id = cafInfo (idInfo id)
-#endif
 
 setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
-
-	---------------------------------
-	-- CPR INFO
-#ifdef OLD_STRICTNESS
-idCprInfo :: Id -> CprInfo
-idCprInfo id = cprInfo (idInfo id)
-
-setIdCprInfo :: Id -> CprInfo -> Id
-setIdCprInfo id cpr_info = modifyIdInfo (`setCprInfo` cpr_info) id
-#endif
 
 	---------------------------------
 	-- Occcurrence INFO
@@ -751,10 +696,10 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_arity       = arityInfo old_info
     old_inline_prag = inlinePragInfo old_info
     new_arity       = old_arity + arity_increase
-    old_strictness  = newStrictnessInfo old_info
+    old_strictness  = strictnessInfo old_info
     new_strictness  = fmap (increaseStrictSigArity arity_increase) old_strictness
 
-    transfer new_info = new_info `setNewStrictnessInfo` new_strictness
+    transfer new_info = new_info `setStrictnessInfo` new_strictness
 			         `setArityInfo` new_arity
  			         `setInlinePragInfo` old_inline_prag
 \end{code}

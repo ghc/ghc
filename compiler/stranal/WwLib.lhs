@@ -10,13 +10,13 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs ) where
 
 import CoreSyn
 import CoreUtils	( exprType )
-import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
+import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			  isOneShotLambda, setOneShotLambda, setIdUnfolding,
                           setIdInfo
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon
-import NewDemand	( Demand(..), DmdResult(..), Demands(..) ) 
+import Demand		( Demand(..), DmdResult(..), Demands(..) ) 
 import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID,
                           mkUnpackCase, mkProductBox )
 import TysWiredIn	( tupleCon )
@@ -133,7 +133,7 @@ mkWwBodies fun_ty demands res_info one_shots
 	             return (id, id, res_ty)
 
 	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
-	; return ([idNewDemandInfo v | v <- work_call_args, isId v],
+	; return ([idDemandInfo v | v <- work_call_args, isId v],
                   wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
                   mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
@@ -278,9 +278,9 @@ mkWWargs subst fun_ty arg_info
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Type -> NewDemand.Demand -> Bool -> Id
+mk_wrap_arg :: Unique -> Type -> Demand -> Bool -> Id
 mk_wrap_arg uniq ty dmd one_shot 
-  = set_one_shot one_shot (setIdNewDemandInfo (mkSysLocal (fsLit "w") uniq ty) dmd)
+  = set_one_shot one_shot (setIdDemandInfo (mkSysLocal (fsLit "w") uniq ty) dmd)
   where
     set_one_shot True  id = setOneShotLambda id
     set_one_shot False id = id
@@ -340,7 +340,7 @@ mkWWstr_one arg
   = return ([arg],  nop_fn, nop_fn)
 
   | otherwise
-  = case idNewDemandInfo arg of
+  = case idDemandInfo arg of
 
 	-- Absent case.  We don't deal with absence for unlifted types,
 	-- though, because it's not so easy to manufacture a placeholder
@@ -392,7 +392,7 @@ mkWWstr_one arg
 	-- If the wrapper argument is a one-shot lambda, then
 	-- so should (all) the corresponding worker arguments be
 	-- This bites when we do w/w on a case join point
-    set_worker_arg_info worker_arg demand = set_one_shot (setIdNewDemandInfo worker_arg demand)
+    set_worker_arg_info worker_arg demand = set_one_shot (setIdDemandInfo worker_arg demand)
 
     set_one_shot | isOneShotLambda arg = setOneShotLambda
 		 | otherwise	       = \x -> x

@@ -54,7 +54,7 @@ import IfaceSyn
 import LoadIface
 import Id
 import IdInfo
-import NewDemand
+import Demand
 import Annotations
 import CoreSyn
 import CoreFVs
@@ -1466,7 +1466,7 @@ toIfaceIdInfo id_info
 
     ------------  Strictness  --------------
 	-- No point in explicitly exporting TopSig
-    strict_hsinfo = case newStrictnessInfo id_info of
+    strict_hsinfo = case strictnessInfo id_info of
 			Just sig | not (isTopSig sig) -> Just (HsStrictness sig)
 			_other			      -> Nothing
 

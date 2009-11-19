@@ -41,7 +41,7 @@ import StaticFlags	( opt_PprStyle_Debug )
 import StaticFlags	( opt_SpecInlineJoinPoints )
 import BasicTypes	( Activation(..) )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
-import NewDemand
+import Demand
 import DmdAnal		( both )
 import Serialized       ( deserializeWithData )
 import Util
@@ -1162,7 +1162,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 	      spec_rhs  = mkLams spec_lam_args spec_body
 	      spec_str  = calcSpecStrictness fn spec_lam_args pats
 	      spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
-	      		    `setIdNewStrictness` spec_str    	-- See Note [Transfer strictness]
+	      		    `setIdStrictness` spec_str    	-- See Note [Transfer strictness]
 			    `setIdArity` count isId spec_lam_args
 	      body_ty   = exprType spec_body
 	      rule_rhs  = mkVarApps (Var spec_id) spec_call_args
@@ -1177,7 +1177,7 @@ calcSpecStrictness fn qvars pats
   = StrictSig (mkTopDmdType spec_dmds TopRes)
   where
     spec_dmds = [ lookupVarEnv dmd_env qv `orElse` lazyDmd | qv <- qvars, isId qv ]
-    StrictSig (DmdType _ dmds _) = idNewStrictness fn
+    StrictSig (DmdType _ dmds _) = idStrictness fn
 
     dmd_env = go emptyVarEnv dmds pats
 

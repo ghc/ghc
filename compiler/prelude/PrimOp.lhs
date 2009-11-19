@@ -31,7 +31,7 @@ module PrimOp (
 import TysPrim
 import TysWiredIn
 
-import NewDemand
+import Demand
 import Var		( TyVar )
 import OccName		( OccName, pprOccName, mkVarOccFS )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )

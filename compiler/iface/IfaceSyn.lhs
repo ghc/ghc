@@ -28,7 +28,7 @@ module IfaceSyn (
 
 import IfaceType
 
-import NewDemand
+import Demand
 import Annotations
 import Class
 import NameSet 

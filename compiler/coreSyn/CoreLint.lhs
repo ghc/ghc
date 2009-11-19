@@ -11,7 +11,7 @@ module CoreLint ( lintCoreBindings, lintUnfolding ) where
 
 #include "HsVersions.h"
 
-import NewDemand
+import Demand
 import CoreSyn
 import CoreFVs
 import CoreUtils
@@ -204,7 +204,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
  	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
    where
     binder_ty                  = idType binder
-    maybeDmdTy                 = idNewStrictness_maybe binder
+    maybeDmdTy                 = idStrictness_maybe binder
     bndr_vars                  = varSetElems (idFreeVars binder)
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
 	           | otherwise = return ()
@@ -1083,7 +1083,7 @@ mkStrictMsg :: Id -> Message
 mkStrictMsg binder
   = vcat [hsep [ptext (sLit "Recursive or top-level binder has strict demand info:"),
 		     ppr binder],
-	      hsep [ptext (sLit "Binder's demand info:"), ppr (idNewDemandInfo binder)]
+	      hsep [ptext (sLit "Binder's demand info:"), ppr (idDemandInfo binder)]
 	     ]
 
 mkArityMsg :: Id -> Message
@@ -1097,7 +1097,7 @@ mkArityMsg binder
 	      hsep [ptext (sLit "Binder's strictness signature:"), ppr dmd_ty]
 
          ]
-           where (StrictSig dmd_ty) = idNewStrictness binder
+           where (StrictSig dmd_ty) = idStrictness binder
 
 mkUnboxedTupleMsg :: Id -> Message
 mkUnboxedTupleMsg binder

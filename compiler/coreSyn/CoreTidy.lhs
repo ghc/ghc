@@ -155,8 +155,8 @@ tidyLetBndr env (id,rhs)
     idinfo   = idInfo id
     new_info = idInfo new_id
 		`setArityInfo`		exprArity rhs
-		`setAllStrictnessInfo`	newStrictnessInfo idinfo
-		`setNewDemandInfo`	newDemandInfo idinfo
+		`setStrictnessInfo`	strictnessInfo idinfo
+		`setDemandInfo`	demandInfo idinfo
 		`setInlinePragInfo`	inlinePragInfo idinfo
 
     -- Override the env we get back from tidyId with the new IdInfo

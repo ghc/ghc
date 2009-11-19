@@ -12,12 +12,12 @@ import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
 import Var
 import Id		( idType, isOneShotLambda, idUnfolding,
-			  setIdNewStrictness, mkWorkerId,
+			  setIdStrictness, mkWorkerId,
 			  setInlineActivation, setIdUnfolding,
 			  setIdArity )
 import Type		( Type )
 import IdInfo
-import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
+import Demand           ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
 import UniqSupply
@@ -225,12 +225,12 @@ tryWW is_rec fn_id rhs
 
   where
     fn_info   	 = idInfo fn_id
-    maybe_fn_dmd = newDemandInfo fn_info
+    maybe_fn_dmd = demandInfo fn_info
     inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
 
 	-- In practice it always will have a strictness 
 	-- signature, even if it's a uninformative one
-    strict_sig  = newStrictnessInfo fn_info `orElse` topSig
+    strict_sig  = strictnessInfo fn_info `orElse` topSig
     StrictSig (DmdType env wrap_dmds res_info) = strict_sig
 
 	-- new_fn_id has the DmdEnv zapped.  
@@ -239,7 +239,7 @@ tryWW is_rec fn_id rhs
 	--	(c) it becomes incorrect as things are cloned, because
 	--	    we don't push the substitution into it
     new_fn_id | isEmptyVarEnv env = fn_id
-	      | otherwise	  = fn_id `setIdNewStrictness` 
+	      | otherwise	  = fn_id `setIdStrictness` 
 				     StrictSig (mkTopDmdType wrap_dmds res_info)
 
     is_fun    = notNull wrap_dmds
@@ -283,7 +283,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_act rhs
 				-- can't think of a compelling reason. (In ptic, INLINE things are 
 				-- not w/wd). However, the RuleMatchInfo is not transferred since
                                 -- it does not make sense for workers to be constructorlike.
-			`setIdNewStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
+			`setIdStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
 				-- Even though we may not be at top level, 
 				-- it's ok to give it an empty DmdEnv
                         `setIdArity` (exprArity work_rhs)

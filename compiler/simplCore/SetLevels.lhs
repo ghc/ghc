@@ -64,7 +64,7 @@ import CoreSubst	( Subst, emptySubst, extendInScope, extendInScopeList,
 import Id		( idType, mkSysLocal, isOneShotLambda,
 			  zapDemandIdInfo, transferPolyIdInfo,
 			  idSpecialisation, idUnfolding, setIdInfo, 
-			  setIdNewStrictness, setIdArity
+			  setIdStrictness, setIdArity
 			)
 import IdInfo
 import Var
@@ -398,7 +398,7 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 		-- Note [Bottoming floats]
        let var_w_str = case exprBotStrictness_maybe expr of
 			  Just (arity,str) -> var `setIdArity` arity
-						  `setIdNewStrictness` str
+						  `setIdStrictness` str
 			  Nothing  -> var
        return (Let (NonRec (TB var_w_str dest_lvl) expr') 
                    (mkVarApps (Var var_w_str) abs_vars))

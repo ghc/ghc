@@ -17,7 +17,7 @@ module CoreArity (
 import CoreSyn
 import CoreFVs
 import CoreUtils
-import NewDemand
+import Demand
 import TyCon	( isRecursiveTyCon )
 import qualified CoreSubst
 import CoreSubst ( Subst, substBndr, substBndrs, substExpr
@@ -361,7 +361,7 @@ trimArity False  (AT _ ATop) = AT 0 ATop	-- Bale out
 ---------------------------
 arityType :: Bool -> CoreExpr -> ArityType
 arityType _ (Var v)
-  | Just strict_sig <- idNewStrictness_maybe v
+  | Just strict_sig <- idStrictness_maybe v
   , (ds, res) <- splitStrictSig strict_sig
   , isBotRes res
   = AT (length ds) ABot	-- Function diverges

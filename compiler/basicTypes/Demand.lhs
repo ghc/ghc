@@ -5,215 +5,338 @@
 \section[Demand]{@Demand@: the amount of demand on a value}
 
 \begin{code}
-#ifndef OLD_STRICTNESS
-module Demand () where
-#else
-
 module Demand(
-	Demand(..),
+	Demand(..), 
+	topDmd, lazyDmd, seqDmd, evalDmd, errDmd, isStrictDmd, 
+	isTop, isAbsent, seqDemand,
 
-	wwLazy, wwStrict, wwUnpack, wwPrim, wwEnum, 
-	isStrict, isLazy, isPrim,
+	DmdType(..), topDmdType, botDmdType, mkDmdType, mkTopDmdType, 
+		dmdTypeDepth, seqDmdType,
+	DmdEnv, emptyDmdEnv,
+	DmdResult(..), retCPR, isBotRes, returnsCPR, resTypeArgDmd,
+	
+	Demands(..), mapDmds, zipWithDmds, allTop, seqDemands,
 
-	pprDemands, seqDemand, seqDemands,
-
-	StrictnessInfo(..),	
-	mkStrictnessInfo,
-	noStrictnessInfo,
-	ppStrictnessInfo, seqStrictnessInfo,
-	isBottomingStrictness, appIsBottom,
-
+	StrictSig(..), mkStrictSig, topSig, botSig, cprSig,
+        isTopSig,
+	splitStrictSig, increaseStrictSigArity,
+	pprIfaceStrictSig, appIsBottom, isBottomingSig, seqStrictSig,
      ) where
 
 #include "HsVersions.h"
 
-import Outputable
+import StaticFlags
+import BasicTypes
+import VarEnv
+import UniqFM
 import Util
+import Outputable
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{The @Demand@ data type}
+\subsection{Demands}
 %*									*
 %************************************************************************
 
 \begin{code}
 data Demand
-  = WwLazy		-- Argument is lazy as far as we know
-	MaybeAbsent	-- (does not imply worker's existence [etc]).
-			-- If MaybeAbsent == True, then it is
-			--  *definitely* lazy.  (NB: Absence implies
-			-- a worker...)
+  = Top			-- T; used for unlifted types too, so that
+			--	A `lub` T = T
+  | Abs			-- A
 
-  | WwStrict		-- Argument is strict but that's all we know
-			-- (does not imply worker's existence or any
-			-- calling-convention magic)
+  | Call Demand		-- C(d)
 
-  | WwUnpack		-- Argument is strict & a single-constructor type
-	Bool		-- True <=> wrapper unpacks it; False <=> doesn't
-	[Demand]	-- Its constituent parts (whose StrictInfos
-			-- are in the list) should be passed
-			-- as arguments to the worker.
+  | Eval Demands	-- U(ds)
 
-  | WwPrim		-- Argument is of primitive type, therefore
-			-- strict; doesn't imply existence of a worker;
-			-- argument should be passed as is to worker.
+  | Defer Demands	-- D(ds)
 
-  | WwEnum		-- Argument is strict & an enumeration type;
-			-- an Int# representing the tag (start counting
-			-- at zero) should be passed to the worker.
+  | Box Demand		-- B(d)
+
+  | Bot			-- B
   deriving( Eq )
+	-- Equality needed for fixpoints in DmdAnal
 
-type MaybeAbsent = Bool -- True <=> not even used
+data Demands = Poly Demand	-- Polymorphic case
+	     | Prod [Demand]	-- Product case
+	     deriving( Eq )
 
--- versions that don't worry about Absence:
-wwLazy, wwStrict, wwPrim, wwEnum :: Demand
-wwUnpack :: [Demand] -> Demand
+allTop :: Demands -> Bool
+allTop (Poly d)  = isTop d
+allTop (Prod ds) = all isTop ds
 
-wwLazy	    = WwLazy 	  False
-wwStrict    = WwStrict
-wwUnpack xs = WwUnpack False xs
-wwPrim	    = WwPrim
-wwEnum	    = WwEnum
+isTop :: Demand -> Bool
+isTop Top = True
+isTop _   = False 
+
+isAbsent :: Demand -> Bool
+isAbsent Abs = True
+isAbsent _   = False 
+
+mapDmds :: (Demand -> Demand) -> Demands -> Demands
+mapDmds f (Poly d)  = Poly (f d)
+mapDmds f (Prod ds) = Prod (map f ds)
+
+zipWithDmds :: (Demand -> Demand -> Demand)
+	    -> Demands -> Demands -> Demands
+zipWithDmds f (Poly d1)  (Poly d2)  = Poly (d1 `f` d2)
+zipWithDmds f (Prod ds1) (Poly d2)  = Prod [d1 `f` d2 | d1 <- ds1]
+zipWithDmds f (Poly d1)  (Prod ds2) = Prod [d1 `f` d2 | d2 <- ds2]
+zipWithDmds f (Prod ds1) (Prod ds2) 
+  | length ds1 == length ds2 = Prod (zipWithEqual "zipWithDmds" f ds1 ds2)
+  | otherwise		     = Poly topDmd
+	-- This really can happen with polymorphism
+	-- \f. case f x of (a,b) -> ...
+	--     case f y of (a,b,c) -> ...
+	-- Here the two demands on f are C(LL) and C(LLL)!
+
+topDmd, lazyDmd, seqDmd, evalDmd, errDmd :: Demand
+topDmd  = Top			-- The most uninformative demand
+lazyDmd = Box Abs
+seqDmd  = Eval (Poly Abs)	-- Polymorphic seq demand
+evalDmd = Box seqDmd		-- Evaluate and return
+errDmd  = Box Bot		-- This used to be called X
+
+isStrictDmd :: Demand -> Bool
+isStrictDmd Bot      = True
+isStrictDmd (Eval _) = True
+isStrictDmd (Call _) = True
+isStrictDmd (Box d)  = isStrictDmd d
+isStrictDmd _        = False
 
 seqDemand :: Demand -> ()
-seqDemand (WwLazy a)      = a `seq` ()
-seqDemand (WwUnpack b ds) = b `seq` seqDemands ds
-seqDemand _               = ()
+seqDemand (Call d)   = seqDemand d
+seqDemand (Eval ds)  = seqDemands ds
+seqDemand (Defer ds) = seqDemands ds
+seqDemand (Box d)    = seqDemand d
+seqDemand _          = ()
 
-seqDemands :: [Demand] -> ()
-seqDemands [] = ()
-seqDemands (d:ds) = seqDemand d `seq` seqDemands ds
-\end{code}
+seqDemands :: Demands -> ()
+seqDemands (Poly d)  = seqDemand d
+seqDemands (Prod ds) = seqDemandList ds
 
-
-%************************************************************************
-%*									*
-\subsection{Functions over @Demand@}
-%*									*
-%************************************************************************
-
-\begin{code}
-isLazy :: Demand -> Bool
-isLazy (WwLazy _) = True
-isLazy _	  = False
-
-isStrict :: Demand -> Bool
-isStrict d = not (isLazy d)
-
-isPrim :: Demand -> Bool
-isPrim WwPrim = True
-isPrim _      = False
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Instances}
-%*									*
-%************************************************************************
-
-
-\begin{code}
-pprDemands :: [Demand] -> Bool -> SDoc
-pprDemands demands bot = hcat (map pprDemand demands) <> pp_bot
-		       where
-			 pp_bot | bot       = ptext (sLit "B")
-				| otherwise = empty
-
-
-pprDemand :: Demand -> SDoc
-pprDemand (WwLazy False)  	 = char 'L'
-pprDemand (WwLazy True)   	 = char 'A'
-pprDemand WwStrict	      	 = char 'S'
-pprDemand WwPrim	      	 = char 'P'
-pprDemand WwEnum	      	 = char 'E'
-pprDemand (WwUnpack wu args)     = char ch <> parens (hcat (map pprDemand args))
-				      where
-					ch = if wu then 'U' else 'u'
+seqDemandList :: [Demand] -> ()
+seqDemandList [] = ()
+seqDemandList (d:ds) = seqDemand d `seq` seqDemandList ds
 
 instance Outputable Demand where
-    ppr (WwLazy False) = empty
-    ppr other_demand   = ptext (sLit "__D") <+> pprDemand other_demand
+    ppr Top  = char 'T'
+    ppr Abs  = char 'A'
+    ppr Bot  = char 'B'
 
-instance Show Demand where
-    showsPrec p d = showsPrecSDoc p (ppr d)
+    ppr (Defer ds)      = char 'D' <> ppr ds
+    ppr (Eval ds)       = char 'U' <> ppr ds
+				      
+    ppr (Box (Eval ds)) = char 'S' <> ppr ds
+    ppr (Box Abs)	= char 'L'
+    ppr (Box Bot)	= char 'X'
+    ppr d@(Box _)	= pprPanic "ppr: Bad boxed demand" (ppr d)
 
--- Reading demands is done in Lex.lhs
+    ppr (Call d)	= char 'C' <> parens (ppr d)
+
+
+instance Outputable Demands where
+    ppr (Poly Abs) = empty
+    ppr (Poly d)   = parens (ppr d <> char '*')
+    ppr (Prod ds)  = parens (hcat (map ppr ds))
+	-- At one time I printed U(AAA) as U, but that
+	-- confuses (Poly Abs) with (Prod AAA), and the
+	-- worker/wrapper generation differs slightly for these two
+	-- [Reason: in the latter case we can avoid passing the arg;
+	--  see notes with WwLib.mkWWstr_one.]
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection[strictness-IdInfo]{Strictness info about an @Id@}
+\subsection{Demand types}
 %*									*
 %************************************************************************
 
-We specify the strictness of a function by giving information about
-each of the ``wrapper's'' arguments (see the description about
-worker/wrapper-style transformations in the PJ/Launchbury paper on
-unboxed types).
-
-The list of @Demands@ specifies: (a)~the strictness properties of a
-function's arguments; and (b)~the type signature of that worker (if it
-exists); i.e. its calling convention.
-
-Note that the existence of a worker function is now denoted by the Id's
-workerInfo field.
-
 \begin{code}
-data StrictnessInfo
-  = NoStrictnessInfo
+data DmdType = DmdType 
+		    DmdEnv	-- Demand on explicitly-mentioned 
+				--	free variables
+		    [Demand]	-- Demand on arguments
+		    DmdResult	-- Nature of result
 
-  | StrictnessInfo [Demand] 	-- Demands on the arguments.
+	-- 		IMPORTANT INVARIANT
+	-- The default demand on free variables not in the DmdEnv is:
+	-- DmdResult = BotRes        <=>  Bot
+	-- DmdResult = TopRes/ResCPR <=>  Abs
 
-		   Bool		-- True <=> the function diverges regardless of its arguments
-				-- Useful for "error" and other disguised variants thereof.  
-				-- BUT NB: f = \x y. error "urk"
-				-- 	   will have info  SI [SS] True
-				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
-  deriving( Eq )
+	-- 		ANOTHER IMPORTANT INVARIANT
+	-- The Demands in the argument list are never
+	--	Bot, Defer d
+	-- Handwavey reason: these don't correspond to calling conventions
+	-- See DmdAnal.funArgDemand for details
 
-	-- NOTA BENE: if the arg demands are, say, [S,L], this means that
-	-- 	(f bot) is not necy bot, only (f bot x) is bot
-	-- We simply cannot express accurately the strictness of a function
-	-- like		f = \x -> case x of (a,b) -> \y -> ...
-	-- The up-side is that we don't need to restrict the strictness info
-	-- to the visible arity of the function.
 
-seqStrictnessInfo :: StrictnessInfo -> ()
-seqStrictnessInfo (StrictnessInfo ds b) = b `seq` seqDemands ds
-seqStrictnessInfo _                     = ()
+-- This guy lets us switch off CPR analysis
+-- by making sure that everything uses TopRes instead of RetCPR
+-- Assuming, of course, that they don't mention RetCPR by name.
+-- They should onlyu use retCPR
+retCPR :: DmdResult
+retCPR | opt_CprOff = TopRes
+       | otherwise  = RetCPR
+
+seqDmdType :: DmdType -> ()
+seqDmdType (DmdType _env ds res) = 
+  {- ??? env `seq` -} seqDemandList ds `seq` res `seq` ()
+
+type DmdEnv = VarEnv Demand
+
+data DmdResult = TopRes	-- Nothing known	
+	       | RetCPR	-- Returns a constructed product
+	       | BotRes	-- Diverges or errors
+	       deriving( Eq, Show )
+	-- Equality for fixpoints
+	-- Show needed for Show in Lex.Token (sigh)
+
+-- Equality needed for fixpoints in DmdAnal
+instance Eq DmdType where
+  (==) (DmdType fv1 ds1 res1)
+       (DmdType fv2 ds2 res2) =  ufmToList fv1 == ufmToList fv2
+			      && ds1 == ds2 && res1 == res2
+
+instance Outputable DmdType where
+  ppr (DmdType fv ds res) 
+    = hsep [text "DmdType",
+	    hcat (map ppr ds) <> ppr res,
+	    if null fv_elts then empty
+	    else braces (fsep (map pp_elt fv_elts))]
+    where
+      pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
+      fv_elts = ufmToList fv
+
+instance Outputable DmdResult where
+  ppr TopRes = empty	  -- Keep these distinct from Demand letters
+  ppr RetCPR = char 'm'	  -- so that we can print strictness sigs as
+  ppr BotRes = char 'b'   --    dddr
+			  -- without ambiguity
+
+emptyDmdEnv :: VarEnv Demand
+emptyDmdEnv = emptyVarEnv
+
+topDmdType, botDmdType, cprDmdType :: DmdType
+topDmdType = DmdType emptyDmdEnv [] TopRes
+botDmdType = DmdType emptyDmdEnv [] BotRes
+cprDmdType = DmdType emptyVarEnv [] retCPR
+
+isTopDmdType :: DmdType -> Bool
+-- Only used on top-level types, hence the assert
+isTopDmdType (DmdType env [] TopRes) = ASSERT( isEmptyVarEnv env) True	
+isTopDmdType _                       = False
+
+isBotRes :: DmdResult -> Bool
+isBotRes BotRes = True
+isBotRes _      = False
+
+resTypeArgDmd :: DmdResult -> Demand
+-- TopRes and BotRes are polymorphic, so that
+--	BotRes = Bot -> BotRes
+--	TopRes = Top -> TopRes
+-- This function makes that concrete
+-- We can get a RetCPR, because of the way in which we are (now)
+-- giving CPR info to strict arguments.  On the first pass, when
+-- nothing has demand info, we optimistically give CPR info or RetCPR to all args
+resTypeArgDmd TopRes = Top
+resTypeArgDmd RetCPR = Top
+resTypeArgDmd BotRes = Bot
+
+returnsCPR :: DmdResult -> Bool
+returnsCPR RetCPR = True
+returnsCPR _      = False
+
+mkDmdType :: DmdEnv -> [Demand] -> DmdResult -> DmdType
+mkDmdType fv ds res = DmdType fv ds res
+
+mkTopDmdType :: [Demand] -> DmdResult -> DmdType
+mkTopDmdType ds res = DmdType emptyDmdEnv ds res
+
+dmdTypeDepth :: DmdType -> Arity
+dmdTypeDepth (DmdType _ ds _) = length ds
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Strictness signature
+%*									*
+%************************************************************************
+
+In a let-bound Id we record its strictness info.  
+In principle, this strictness info is a demand transformer, mapping
+a demand on the Id into a DmdType, which gives
+	a) the free vars of the Id's value
+	b) the Id's arguments
+	c) an indication of the result of applying 
+	   the Id to its arguments
+
+However, in fact we store in the Id an extremely emascuated demand transfomer,
+namely 
+		a single DmdType
+(Nevertheless we dignify StrictSig as a distinct type.)
+
+This DmdType gives the demands unleashed by the Id when it is applied
+to as many arguments as are given in by the arg demands in the DmdType.
+
+For example, the demand transformer described by the DmdType
+		DmdType {x -> U(LL)} [V,A] Top
+says that when the function is applied to two arguments, it
+unleashes demand U(LL) on the free var x, V on the first arg,
+and A on the second.  
+
+If this same function is applied to one arg, all we can say is
+that it uses x with U*(LL), and its arg with demand L.
+
 \begin{code}
-mkStrictnessInfo :: ([Demand], Bool) -> StrictnessInfo
+newtype StrictSig = StrictSig DmdType
+		  deriving( Eq )
 
-mkStrictnessInfo (xs, is_bot)
-  | all totally_boring xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
-  | otherwise		    	        = StrictnessInfo xs is_bot
-  where
-    totally_boring (WwLazy False) = True
-    totally_boring _              = False
+instance Outputable StrictSig where
+   ppr (StrictSig ty) = ppr ty
 
-noStrictnessInfo :: StrictnessInfo
-noStrictnessInfo = NoStrictnessInfo
+instance Show StrictSig where
+   show (StrictSig ty) = showSDoc (ppr ty)
 
-isBottomingStrictness :: StrictnessInfo -> Bool
-isBottomingStrictness (StrictnessInfo _ bot) = bot
-isBottomingStrictness NoStrictnessInfo       = False
+mkStrictSig :: DmdType -> StrictSig
+mkStrictSig dmd_ty = StrictSig dmd_ty
+
+splitStrictSig :: StrictSig -> ([Demand], DmdResult)
+splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
+
+increaseStrictSigArity :: Int -> StrictSig -> StrictSig
+-- Add extra arguments to a strictness signature
+increaseStrictSigArity arity_increase (StrictSig (DmdType env dmds res))
+  = StrictSig (DmdType env (replicate arity_increase topDmd ++ dmds) res)
+
+isTopSig :: StrictSig -> Bool
+isTopSig (StrictSig ty) = isTopDmdType ty
+
+topSig, botSig, cprSig :: StrictSig
+topSig = StrictSig topDmdType
+botSig = StrictSig botDmdType
+cprSig = StrictSig cprDmdType
+	
 
 -- appIsBottom returns true if an application to n args would diverge
-appIsBottom :: StrictnessInfo -> Int -> Bool
-appIsBottom (StrictnessInfo ds bot)   n = bot && (listLengthCmp ds n /=GT) -- not more than 'n' elts in 'ds'.
-appIsBottom  NoStrictnessInfo         _ = False
+appIsBottom :: StrictSig -> Int -> Bool
+appIsBottom (StrictSig (DmdType _ ds BotRes)) n = listLengthCmp ds n /= GT
+appIsBottom _				      _ = False
 
-ppStrictnessInfo :: StrictnessInfo -> SDoc
-ppStrictnessInfo NoStrictnessInfo		   = empty
-ppStrictnessInfo (StrictnessInfo wrapper_args bot) = hsep [pprDemands wrapper_args bot]
-\end{code}
+isBottomingSig :: StrictSig -> Bool
+isBottomingSig (StrictSig (DmdType _ _ BotRes)) = True
+isBottomingSig _				= False
 
-\begin{code}
-#endif /* OLD_STRICTNESS */
+seqStrictSig :: StrictSig -> ()
+seqStrictSig (StrictSig ty) = seqDmdType ty
+
+pprIfaceStrictSig :: StrictSig -> SDoc
+-- Used for printing top-level strictness pragmas in interface files
+pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
+  = hcat (map ppr dmds) <> ppr res
 \end{code}
+    
+
