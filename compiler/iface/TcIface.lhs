@@ -40,6 +40,7 @@ import DataCon
 import TysWiredIn
 import TysPrim		( anyTyConOfKind )
 import Var              ( TyVar )
+import BasicTypes	( nonRuleLoopBreaker )
 import qualified Var
 import VarEnv
 import Name
@@ -993,8 +994,11 @@ tcIdInfo ignore_prags name ty info
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
 
 	-- The next two are lazy, so they don't transitively suck stuff in
-    tcPrag info (HsUnfold if_unf)  = do { unf <- tcUnfolding name ty info if_unf
-				        ; return (info `setUnfoldingInfoLazily` unf) }
+    tcPrag info (HsUnfold lb if_unf) 
+      = do { unf <- tcUnfolding name ty info if_unf
+    	   ; let info1 | lb        = info `setOccInfo` nonRuleLoopBreaker
+	     	       | otherwise = info
+	   ; return (info1 `setUnfoldingInfoLazily` unf) }
 \end{code}
 
 \begin{code}

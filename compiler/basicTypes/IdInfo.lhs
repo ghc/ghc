@@ -58,7 +58,7 @@ module IdInfo (
 
 	-- ** The OccInfo type
 	OccInfo(..),
-	isFragileOcc, isDeadOcc, isLoopBreaker,
+	isDeadOcc, isLoopBreaker,
 	occInfo, setOccInfo,
 
 	InsideLam, OneBranch,
@@ -723,7 +723,7 @@ zapFragileInfo :: IdInfo -> Maybe IdInfo
 zapFragileInfo info 
   = Just (info `setSpecInfo` emptySpecInfo
                `setUnfoldingInfo` noUnfolding
-	       `setOccInfo` if isFragileOcc occ then NoOccInfo else occ)
+	       `setOccInfo` zapFragileOcc occ)
   where
     occ = occInfo info
 \end{code}

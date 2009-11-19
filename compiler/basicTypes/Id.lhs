@@ -69,7 +69,7 @@ module Id (
 	idArity, 
 	idNewDemandInfo, idNewDemandInfo_maybe,
 	idNewStrictness, idNewStrictness_maybe, 
-	idUnfolding,
+	idUnfolding, realIdUnfolding,
 	idSpecialisation, idCoreRules, idHasRules,
 	idCafInfo,
 	idLBVarInfo,
@@ -99,7 +99,7 @@ module Id (
 
 #include "HsVersions.h"
 
-import CoreSyn ( CoreRule, Unfolding )
+import CoreSyn ( CoreRule, Unfolding( NoUnfolding ) )
 
 import IdInfo
 import BasicTypes
@@ -510,7 +510,16 @@ isStrictId id
 	---------------------------------
 	-- UNFOLDING
 idUnfolding :: Id -> Unfolding
-idUnfolding id = unfoldingInfo (idInfo id)
+-- Do not expose the unfolding of a loop breaker!
+idUnfolding id 
+  | isNonRuleLoopBreaker (occInfo info) = NoUnfolding
+  | otherwise                           = unfoldingInfo info
+  where
+    info = idInfo id
+
+realIdUnfolding :: Id -> Unfolding
+-- Expose the unfolding if there is one, including for loop breakers
+realIdUnfolding id = unfoldingInfo (idInfo id)
 
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id

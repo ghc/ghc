@@ -42,8 +42,9 @@ module BasicTypes(
 
 	TupCon(..), tupleParens,
 
-	OccInfo(..), seqOccInfo, isFragileOcc, isOneOcc, 
+	OccInfo(..), seqOccInfo, zapFragileOcc, isOneOcc, 
 	isDeadOcc, isLoopBreaker, isNonRuleLoopBreaker, isNoOcc,
+        nonRuleLoopBreaker,
 
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch,
@@ -476,17 +477,20 @@ isNonRuleLoopBreaker :: OccInfo -> Bool
 isNonRuleLoopBreaker (IAmALoopBreaker False) = True   -- Loop-breaker that breaks a non-rule cycle
 isNonRuleLoopBreaker _                       = False
 
+nonRuleLoopBreaker :: OccInfo
+nonRuleLoopBreaker = IAmALoopBreaker False
+
 isDeadOcc :: OccInfo -> Bool
 isDeadOcc IAmDead = True
 isDeadOcc _       = False
 
 isOneOcc :: OccInfo -> Bool
-isOneOcc (OneOcc _ _ _) = True
-isOneOcc _              = False
+isOneOcc (OneOcc {}) = True
+isOneOcc _           = False
 
-isFragileOcc :: OccInfo -> Bool
-isFragileOcc (OneOcc _ _ _) = True
-isFragileOcc _              = False
+zapFragileOcc :: OccInfo -> OccInfo
+zapFragileOcc (OneOcc {}) = NoOccInfo
+zapFragileOcc occ         = occ
 \end{code}
 
 \begin{code}

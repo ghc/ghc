@@ -1471,7 +1471,8 @@ toIfaceIdInfo id_info
 			_other			      -> Nothing
 
     ------------  Unfolding  --------------
-    unfold_hsinfo = toIfUnfolding (unfoldingInfo id_info)
+    unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info) 
+    loop_breaker  = isNonRuleLoopBreaker (occInfo id_info)
 					
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
@@ -1479,20 +1480,25 @@ toIfaceIdInfo id_info
                   | otherwise = Just (HsInline inline_prag)
 
 --------------------------
-toIfUnfolding :: Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity, uf_guidance = guidance })
+toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
+toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity, uf_guidance = guidance })
   = case guidance of
-	InlineRule { ir_info = InlWrapper w } -> Just (HsUnfold (IfWrapper arity (idName w)))
-	InlineRule { ir_sat = InlSat }        -> Just (HsUnfold (IfInlineRule arity True  (toIfaceExpr rhs)))
-	InlineRule { ir_sat = InlUnSat }      -> Just (HsUnfold (IfInlineRule arity False (toIfaceExpr rhs)))
-	UnfoldNever         -> Nothing
-	UnfoldIfGoodArgs {} -> Just (HsUnfold (IfCoreUnfold (toIfaceExpr rhs)))
+	InlineRule { ir_info = InlWrapper w } -> Just (HsUnfold lb (IfWrapper arity (idName w)))
+	InlineRule { ir_sat = InlSat }        -> Just (HsUnfold lb (IfInlineRule arity True  (toIfaceExpr rhs)))
+	InlineRule { ir_sat = InlUnSat }      -> Just (HsUnfold lb (IfInlineRule arity False (toIfaceExpr rhs)))
+	UnfoldIfGoodArgs {} -> vanilla_unfold
+	UnfoldNever         -> vanilla_unfold	-- Yes, even if guidance is UnfoldNever, expose the unfolding
+			       			-- If we didn't want to expose the unfolding, TidyPgm would
+			       			-- have stuck in NoUnfolding.  For supercompilation we want 
+						-- to see that unfolding!
+  where
+    vanilla_unfold = Just (HsUnfold lb (IfCoreUnfold (toIfaceExpr rhs)))
 
-toIfUnfolding (DFunUnfolding _con ops)
-  = Just (HsUnfold (IfDFunUnfold (map toIfaceExpr ops)))
+toIfUnfolding lb (DFunUnfolding _con ops)
+  = Just (HsUnfold lb (IfDFunUnfold (map toIfaceExpr ops)))
       -- No need to serialise the data constructor; 
       -- we can recover it from the type of the dfun
-toIfUnfolding _
+toIfUnfolding _ _
   = Nothing
 
 --------------------------

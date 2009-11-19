@@ -452,7 +452,7 @@ dsSpecs all_tvs dicts tvs poly_id mono_id inl_arity mono_bind prags
 	   	bs | not (null bs) -> do { warnDs (dead_msg bs); return Nothing } 
 	   	   | otherwise -> do
 
-	   { (spec_unf, unf_pairs) <- specUnfolding wrap_fn (idUnfolding poly_id)
+	   { (spec_unf, unf_pairs) <- specUnfolding wrap_fn (realIdUnfolding poly_id)
 
 	   ; let f_body = fix_up (Let mono_bind (Var mono_id))
                  spec_ty = exprType ds_spec_expr

@@ -633,10 +633,7 @@ instance Outputable CallCtxt where
   ppr ValAppCtxt      = ptext (sLit "ValAppCtxt")
 
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
-  = let
-	n_val_args  = length arg_infos
-    in
-    case idUnfolding id of {
+  = case idUnfolding id of {
 	NoUnfolding 	 -> Nothing ;
 	OtherCon _  	 -> Nothing ;
 	DFunUnfolding {} -> Nothing ;	-- Never unfold a DFun
@@ -645,6 +642,8 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
     let
+	n_val_args  = length arg_infos
+
 	result | yes_or_no = Just unf_template
 	       | otherwise = Nothing
 
@@ -1132,7 +1131,9 @@ exprIsConApp_maybe expr
                       analyse rhs args
         where
 	  is_saturated = count isValArg args == idArity fun
-          unfolding = idUnfolding fun
+          unfolding = idUnfolding fun    -- Does not look through loop breakers
+		    -- ToDo: we *may* look through variables that are NOINLINE
+		    --       in this phase, and that is really not right
 
     analyse _ _ = Nothing
 

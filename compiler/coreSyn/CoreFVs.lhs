@@ -416,8 +416,11 @@ idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars)
 idUnfoldingVars :: Id -> VarSet
 -- Produce free vars for an unfolding, but NOT for an ordinary
 -- (non-inline) unfolding, since it is a dup of the rhs
+-- and we'll get exponential behaviour if we look at both unf and rhs!
+-- But do look at the *real* unfolding, even for loop breakers, else
+-- we might get out-of-scope variables
 idUnfoldingVars id
-  = case idUnfolding id of
+  = case realIdUnfolding id of
       CoreUnfolding { uf_tmpl = rhs, uf_guidance = InlineRule {} }
 	                   -> exprFreeVars rhs
       DFunUnfolding _ args -> exprsFreeVars args

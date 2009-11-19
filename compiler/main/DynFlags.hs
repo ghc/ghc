@@ -270,8 +270,6 @@ data DynFlag
    | Opt_CSE
    | Opt_LiberateCase
    | Opt_SpecConstr
-   | Opt_IgnoreInterfacePragmas
-   | Opt_OmitInterfacePragmas
    | Opt_DoLambdaEtaExpansion
    | Opt_IgnoreAsserts
    | Opt_DoEtaReduction
@@ -283,6 +281,11 @@ data DynFlag
    | Opt_Vectorise
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
+
+   -- Interface files
+   | Opt_IgnoreInterfacePragmas
+   | Opt_OmitInterfacePragmas
+   | Opt_ExposeAllUnfoldings
 
    -- profiling opts
    | Opt_AutoSccsOnAllToplevs
@@ -1728,6 +1731,7 @@ fFlags = [
   ( "cse",                              Opt_CSE, const Supported ),
   ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, const Supported ),
   ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, const Supported ),
+  ( "expose-all-unfoldings",            Opt_ExposeAllUnfoldings, const Supported ),
   ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion, const Supported ),
   ( "ignore-asserts",                   Opt_IgnoreAsserts, const Supported ),
   ( "do-eta-reduction",                 Opt_DoEtaReduction, const Supported ),

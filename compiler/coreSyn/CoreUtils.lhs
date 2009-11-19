@@ -507,17 +507,20 @@ exprIsCheap' is_conlike (Note _ e)        = exprIsCheap' is_conlike e
 exprIsCheap' is_conlike (Cast e _)        = exprIsCheap' is_conlike e
 exprIsCheap' is_conlike (Lam x e)         = isRuntimeVar x
                                             || exprIsCheap' is_conlike e
+
 exprIsCheap' is_conlike (Case e _ _ alts) = exprIsCheap' is_conlike e && 
-				and [exprIsCheap' is_conlike rhs | (_,_,rhs) <- alts]
+				            and [exprIsCheap' is_conlike rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
 	-- (and case __coerce x etc.)
 	-- This improves arities of overloaded functions where
 	-- there is only dictionary selection (no construction) involved
+
 exprIsCheap' is_conlike (Let (NonRec x _) e)  
       | isUnLiftedType (idType x) = exprIsCheap' is_conlike e
       | otherwise		  = False
-	-- strict lets always have cheap right hand sides,
-	-- and do no allocation.
+	-- Strict lets always have cheap right hand sides,
+	-- and do no allocation, so just look at the body
+	-- Non-strict lets do allocation so we don't treat them as cheap
 
 exprIsCheap' is_conlike other_expr 	-- Applications and variables
   = go other_expr []
@@ -725,8 +728,9 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
       || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
       || is_con_unf (idUnfolding v)
 	-- Check the thing's unfolding; it might be bound to a value
-	-- A worry: what if an Id's unfolding is just itself: 
-	-- then we could get an infinite loop...
+	-- We don't look through loop breakers here, which is a bit conservative
+	-- but otherwise I worry that if an Id's unfolding is just itself, 
+	-- we could get an infinite loop
 
     is_hnf_like (Lit _)          = True
     is_hnf_like (Type _)         = True       -- Types are honorary Values;

@@ -35,8 +35,7 @@ import BasicTypes       ( isMarkedStrict, Arity )
 import CostCentre       ( currentCCS, pushCCisNop )
 import TysPrim          ( realWorldStatePrimTy )
 import PrelInfo         ( realWorldPrimId )
-import BasicTypes       ( TopLevelFlag(..), isTopLevel,
-                          RecFlag(..), isNonRuleLoopBreaker )
+import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils	( foldlM, mapAccumLM )
 import Maybes           ( orElse )
 import Data.List        ( mapAccumL )
@@ -680,11 +679,14 @@ simplUnfolding env top_lvl _ _ _
                                  (guide { ir_info = mb_wkr' })) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
 
-simplUnfolding _ top_lvl _ occ_info new_rhs _
-  | omit_unfolding = return NoUnfolding	
-  | otherwise	   = return (mkUnfolding (isTopLevel top_lvl) new_rhs)
-  where
-    omit_unfolding = isNonRuleLoopBreaker occ_info
+simplUnfolding _ top_lvl _ _occ_info new_rhs _
+  = return (mkUnfolding (isTopLevel top_lvl) new_rhs)
+  -- We make an  unfolding *even for loop-breakers*.
+  -- Reason: (a) It might be useful to know that they are WHNF
+  -- 	     (b) In TidyPgm we currently assume that, if we want to
+  --	         expose the unfolding then indeed we *have* an unfolding
+  --		 to expose.  (We could instead use the RHS, but currently
+  --		 we don't.)  The simple thing is always to have one.
 \end{code}
 
 Note [Arity decrease]

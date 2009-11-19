@@ -21,7 +21,7 @@ module PrelRules ( primOpRules, builtinRules ) where
 
 import CoreSyn
 import MkCore		( mkWildCase )
-import Id		( idUnfolding )
+import Id		( realIdUnfolding )
 import Literal		( Literal(..), mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit
@@ -551,7 +551,7 @@ match_eq_string _ = Nothing
 ---------------------------------------------------
 -- The rule is this:
 --	inline f_ty (f a b c) = <f's unfolding> a b c
--- (if f has an unfolding)
+-- (if f has an unfolding, EVEN if it's a loop breaker)
 --
 -- It's important to allow the argument to 'inline' to have args itself
 -- (a) because its more forgiving to allow the programmer to write
@@ -564,7 +564,7 @@ match_eq_string _ = Nothing
 match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_inline (Type _ : e : _)
   | (Var f, args1) <- collectArgs e,
-    Just unf <- maybeUnfoldingTemplate (idUnfolding f)
+    Just unf <- maybeUnfoldingTemplate (realIdUnfolding f)
   = Just (mkApps unf args1)
 
 match_inline _ = Nothing

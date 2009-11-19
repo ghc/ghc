@@ -298,6 +298,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 
   = do	{ let { dflags     = hsc_dflags hsc_env
 	      ; omit_prags = dopt Opt_OmitInterfacePragmas dflags
+	      ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
 	      ; th	   = dopt Opt_TemplateHaskell      dflags
               }
 	; showPass dflags "Tidy Core"
@@ -305,7 +306,8 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
     	; let { implicit_binds = getImplicitBinds type_env }
 
         ; (unfold_env, tidy_occ_env)
-              <- chooseExternalIds hsc_env mod omit_prags binds implicit_binds imp_rules
+              <- chooseExternalIds hsc_env mod omit_prags expose_all 
+                                   binds implicit_binds imp_rules
 
         ; let { ext_rules = findExternalRules omit_prags binds imp_rules unfold_env }
 		-- See Note [Which rules to expose]
@@ -353,7 +355,8 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		   ModDetails { md_types     = tidy_type_env,
 				md_rules     = tidy_rules,
 				md_insts     = tidy_insts,
-                                md_vect_info = tidy_vect_info,			                     	         md_fam_insts = fam_insts,
+                                md_vect_info = tidy_vect_info,
+                                md_fam_insts = fam_insts,
 				md_exports   = exports,
 				md_anns      = anns      -- are already tidy
                               })
@@ -550,7 +553,7 @@ getImplicitBinds type_env
     implicit_ids _            = []
     
     get_defn :: Id -> CoreBind
-    get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
+    get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
 \end{code}
 
 
@@ -572,14 +575,14 @@ type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
 
 chooseExternalIds :: HscEnv
                   -> Module
-                  -> Bool
+                  -> Bool -> Bool
 		  -> [CoreBind]
                   -> [CoreBind]
 		  -> [CoreRule]
                   -> IO (UnfoldEnv, TidyOccEnv)
 	-- Step 1 from the notes above
 
-chooseExternalIds hsc_env mod omit_prags binds implicit_binds imp_id_rules
+chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -650,7 +653,7 @@ chooseExternalIds hsc_env mod omit_prags binds implicit_binds imp_id_rules
       let 
           (new_ids, show_unfold)
                 | omit_prags = ([], False)
-                | otherwise  = addExternal refined_id
+                | otherwise  = addExternal expose_all refined_id
 
 		-- 'idocc' is an *occurrence*, but we need to see the
 		-- unfolding in the *definition*; so look up in binder_set
@@ -672,8 +675,8 @@ chooseExternalIds hsc_env mod omit_prags binds implicit_binds imp_id_rules
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: Id -> ([Id],Bool)
-addExternal id = (new_needed_ids, show_unfold)
+addExternal :: Bool -> Id -> ([Id],Bool)
+addExternal expose_all id = (new_needed_ids, show_unfold)
   where
     new_needed_ids = unfold_ids ++
                      filter (\id -> isLocalId id &&
@@ -695,10 +698,12 @@ addExternal id = (new_needed_ids, show_unfold)
     mb_unfold_ids :: Maybe (IdSet, [Id])	-- Nothing => don't unfold
     mb_unfold_ids = case unfoldingInfo idinfo of
 		      CoreUnfolding { uf_tmpl = unf_rhs, uf_guidance = guide } 
-			| not bottoming_fn	 	-- Not necessary
-			, not dont_inline	 
-			, not loop_breaker	 
-			, not (neverUnfoldGuidance guide)
+			| expose_all ||	     -- expose_all says to expose all 
+			  	     	     -- unfoldings willy-nilly
+                          not (bottoming_fn	 -- No need to inline bottom functions
+			    || dont_inline	 -- Or ones that say not to
+			    || loop_breaker	 -- Or that are loop breakers
+			    || neverUnfoldGuidance guide)
 			-> Just (exprFvsInOrder unf_rhs)
 		      DFunUnfolding _ ops -> Just (exprsFvsInOrder ops)
 		      _ -> Nothing
@@ -987,7 +992,8 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
     idinfo  = idInfo bndr
     idinfo' = tidyTopIdInfo (isExternalName name')
 			    idinfo unfold_info
-			    arity caf_info
+			    arity caf_info 
+                            (occInfo idinfo)
 
     unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs1 (unfoldingInfo idinfo)
 		| otherwise   = noUnfolding
@@ -1027,19 +1033,21 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
 -- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
 --	CoreToStg makes use of this when constructing SRTs.
 tidyTopIdInfo :: Bool -> IdInfo -> Unfolding
-              -> ArityInfo -> CafInfo
+              -> ArityInfo -> CafInfo -> OccInfo
               -> IdInfo
-tidyTopIdInfo is_external idinfo unfold_info arity caf_info
+tidyTopIdInfo is_external idinfo unfold_info arity caf_info occ_info
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
 			--	c.f. CoreTidy.tidyLetBndr
+        `setOccInfo`           robust_occ_info
 	`setCafInfo` 	       caf_info
 	`setArityInfo`	       arity
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 
   | otherwise		-- Externally-visible Ids get the whole lot
   = vanillaIdInfo
+        `setOccInfo`           robust_occ_info
 	`setCafInfo` 	       caf_info
 	`setArityInfo`	       arity
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
@@ -1047,6 +1055,10 @@ tidyTopIdInfo is_external idinfo unfold_info arity caf_info
 	`setUnfoldingInfo`     unfold_info
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
+  where
+    robust_occ_info = zapFragileOcc occ_info
+    -- It's important to keep loop-breaker information
+    -- when we are doing -fexpose-all-unfoldings
 
 
 

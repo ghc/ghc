@@ -202,7 +202,8 @@ data IfaceInfoItem
   = HsArity	 Arity
   | HsStrictness StrictSig
   | HsInline     InlinePragma
-  | HsUnfold	 IfaceUnfolding
+  | HsUnfold	 Bool		  -- True <=> isNonRuleLoopBreaker is true
+		 IfaceUnfolding   -- See Note [Expose recursive functions] 
   | HsNoCafRefs
 
 -- NB: Specialisations and rules come in separately and are
@@ -255,6 +256,13 @@ data IfaceBinding
 -- See Note [IdInfo on nested let-bindings]
 data IfaceLetBndr = IfLetBndr FastString IfaceType IfaceIdInfo
 \end{code}
+
+Note [Expose recursive functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For supercompilation we want to put *all* unfoldings in the interface
+file, even for functions that are recursive (or big).  So we need to
+know when an unfolding belongs to a loop-breaker so that we can refrain
+from inlining it (except during supercompilation).
 
 Note [IdInfo on nested let-bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -660,7 +668,8 @@ instance Outputable IfaceIdInfo where
   ppr (HasInfo is) = ptext (sLit "{-") <+> pprWithCommas ppr is <+> ptext (sLit "-}")
 
 instance Outputable IfaceInfoItem where
-  ppr (HsUnfold unf)  	 = ptext (sLit "Unfolding:") <+> ppr unf
+  ppr (HsUnfold lb unf)  = ptext (sLit "Unfolding") <> ppWhen lb (ptext (sLit "(loop-breaker)")) 
+                           <> colon <+> ppr unf
   ppr (HsInline prag)    = ptext (sLit "Inline:") <+> ppr prag
   ppr (HsArity arity)    = ptext (sLit "Arity:") <+> int arity
   ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
@@ -786,8 +795,8 @@ freeNamesIfIdInfo NoInfo = emptyNameSet
 freeNamesIfIdInfo (HasInfo i) = fnList freeNamesItem i
 
 freeNamesItem :: IfaceInfoItem -> NameSet
-freeNamesItem (HsUnfold u)     = freeNamesIfUnfold u
-freeNamesItem _                = emptyNameSet
+freeNamesItem (HsUnfold _ u) = freeNamesIfUnfold u
+freeNamesItem _              = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold e)     = freeNamesIfExpr e

@@ -800,7 +800,7 @@ specDefn subst body_uds fn rhs
   where
     fn_type	       = idType fn
     fn_arity	       = idArity fn
-    fn_unf             = idUnfolding fn
+    fn_unf             = realIdUnfolding fn	-- Ignore loop-breaker-ness here
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta

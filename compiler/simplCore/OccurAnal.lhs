@@ -559,8 +559,9 @@ reOrderCycle depth (bind : binds) pairs
 
         | isOneOcc (idOccInfo bndr) = 2  -- Likely to be inlined
 
-        | canUnfold (idUnfolding bndr) = 1
-                -- the Id has some kind of unfolding
+        | canUnfold (realIdUnfolding bndr) = 1
+                -- The Id has some kind of unfolding
+		-- Ignore loop-breaker-ness here because that is what we are setting!
 
         | otherwise = 0
 
