@@ -6,7 +6,7 @@
 \begin{code}
 module SimplUtils (
 	-- Rebuilding
-	mkLam, mkCase, prepareAlts, bindCaseBndr,
+	mkLam, mkCase, prepareAlts, 
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
@@ -1296,83 +1296,61 @@ Historical note: if you use let-bindings instead of a substitution, beware of th
 
 prepareAlts tries these things:
 
-1.  If several alternatives are identical, merge them into
-    a single DEFAULT alternative.  I've occasionally seen this 
-    making a big difference:
+1.  Eliminate alternatives that cannot match, including the
+    DEFAULT alternative.
 
-	case e of		=====>     case e of
-	  C _ -> f x			     D v -> ....v....
-	  D v -> ....v....		     DEFAULT -> f x
-	  DEFAULT -> f x
+2.  If the DEFAULT alternative can match only one possible constructor,
+    then make that constructor explicit.
+    e.g.
+        case e of x { DEFAULT -> rhs }
+     ===>
+        case e of x { (a,b) -> rhs }
+    where the type is a single constructor type.  This gives better code
+    when rhs also scrutinises x or e.
 
-   The point is that we merge common RHSs, at least for the DEFAULT case.
-   [One could do something more elaborate but I've never seen it needed.]
-   To avoid an expensive test, we just merge branches equal to the *first*
-   alternative; this picks up the common cases
-	a) all branches equal
-	b) some branches equal to the DEFAULT (which occurs first)
+3. Returns a list of the constructors that cannot holds in the
+   DEFAULT alternative (if there is one)
 
-2.  Case merging:
-       case e of b {             ==>   case e of b {
-    	 p1 -> rhs1	                 p1 -> rhs1
-    	 ...	                         ...
-    	 pm -> rhsm                      pm -> rhsm
-    	 _  -> case b of b' {            pn -> let b'=b in rhsn
- 		     pn -> rhsn          ...
- 		     ...                 po -> let b'=b in rhso
- 		     po -> rhso          _  -> let b'=b in rhsd
- 		     _  -> rhsd
-       }  
-    
-    which merges two cases in one case when -- the default alternative of
-    the outer case scrutises the same variable as the outer case This
-    transformation is called Case Merging.  It avoids that the same
-    variable is scrutinised multiple times.
+Here "cannot match" includes knowledge from GADTs
 
+It's a good idea do do this stuff before simplifying the alternatives, to
+avoid simplifying alternatives we know can't happen, and to come up with
+the list of constructors that are handled, to put into the IdInfo of the
+case binder, for use when simplifying the alternatives.
 
-The case where transformation (1) showed up was like this (lib/std/PrelCError.lhs):
+Eliminating the default alternative in (1) isn't so obvious, but it can
+happen:
 
-	x | p `is` 1 -> e1
-	  | p `is` 2 -> e2
-	...etc...
+data Colour = Red | Green | Blue
 
-where @is@ was something like
-	
-	p `is` n = p /= (-1) && p == n
+f x = case x of
+        Red -> ..
+        Green -> ..
+        DEFAULT -> h x
 
-This gave rise to a horrible sequence of cases
+h y = case y of
+        Blue -> ..
+        DEFAULT -> [ case y of ... ]
 
-	case p of
-	  (-1) -> $j p
-	  1    -> e1
-	  DEFAULT -> $j p
-
-and similarly in cascade for all the join points!
-
-Note [Dead binders]
-~~~~~~~~~~~~~~~~~~~~
-We do this *here*, looking at un-simplified alternatives, because we
-have to check that r doesn't mention the variables bound by the
-pattern in each alternative, so the binder-info is rather useful.
+If we inline h into f, the default case of the inlined h can't happen.
+If we don't notice this, we may end up filtering out *all* the cases
+of the inner case y, which give us nowhere to go!
 
 \begin{code}
-prepareAlts :: SimplEnv -> OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
-prepareAlts env scrut case_bndr' alts
-  = do	{ dflags <- getDOptsSmpl
-	; alts <- combineIdenticalAlts case_bndr' alts
-
-	; let (alts_wo_default, maybe_deflt) = findDefault alts
+prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts scrut case_bndr' alts
+  = do	{ let (alts_wo_default, maybe_deflt) = findDefault alts
 	      alt_cons = [con | (con,_,_) <- alts_wo_default]
 	      imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
 		-- "imposs_deflt_cons" are handled 
 		--   EITHER by the context, 
 		--   OR by a non-DEFAULT branch in this case expression.
 
-	; default_alts <- prepareDefault dflags env case_bndr' mb_tc_app 
+	; default_alts <- prepareDefault case_bndr' mb_tc_app 
 					 imposs_deflt_cons maybe_deflt
 
 	; let trimmed_alts = filterOut impossible_alt alts_wo_default
-	      merged_alts = mergeAlts trimmed_alts default_alts
+	      merged_alts  = mergeAlts trimmed_alts default_alts
 		-- We need the mergeAlts in case the new default_alt 
 		-- has turned into a constructor alternative.
 		-- The merge keeps the inner DEFAULT at the front, if there is one
@@ -1393,29 +1371,7 @@ prepareAlts env scrut case_bndr' alts
     impossible_alt _                   = False
 
 
---------------------------------------------------
---	1. Merge identical branches
---------------------------------------------------
-combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
-
-combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
-  | all isDeadBinder bndrs1,			-- Remember the default 
-    length filtered_alts < length con_alts	-- alternative comes first
-	-- Also Note [Dead binders]
-  = do	{ tick (AltMerge case_bndr)
-	; return ((DEFAULT, [], rhs1) : filtered_alts) }
-  where
-    filtered_alts	 = filter keep con_alts
-    keep (_con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
-
-combineIdenticalAlts _ alts = return alts
-
--------------------------------------------------------------------------
---			Prepare the default alternative
--------------------------------------------------------------------------
-prepareDefault :: DynFlags
-	       -> SimplEnv
-	       -> OutId		-- Case binder; need just for its type. Note that as an
+prepareDefault :: OutId		-- Case binder; need just for its type. Note that as an
 				--   OutId, it has maximum information; this is important.
 				--   Test simpl013 is an example
 	       -> Maybe (TyCon, [Type])	-- Type of scrutinee, decomposed
@@ -1423,42 +1379,9 @@ prepareDefault :: DynFlags
 	       -> Maybe InExpr	-- Rhs
 	       -> SimplM [InAlt]	-- Still unsimplified
 					-- We use a list because it's what mergeAlts expects,
-					-- And becuase case-merging can cause many to show up
-
--------	Merge nested cases ----------
-prepareDefault dflags env outer_bndr _bndr_ty imposs_cons (Just deflt_rhs)
-  | dopt Opt_CaseMerge dflags
-  , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
-  , DoneId inner_scrut_var' <- substId env inner_scrut_var
-	-- Remember, inner_scrut_var is an InId, but outer_bndr is an OutId
-  , inner_scrut_var' == outer_bndr
-	-- NB: the substId means that if the outer scrutinee was a 
-	--     variable, and inner scrutinee is the same variable, 
-	--     then inner_scrut_var' will be outer_bndr
-	--     via the magic of simplCaseBinder
-  = do	{ tick (CaseMerge outer_bndr)
-
-	; let munge_rhs rhs = bindCaseBndr inner_bndr (Var outer_bndr) rhs
-	; return [(con, args, munge_rhs rhs) | (con, args, rhs) <- inner_alts,
-					       not (con `elem` imposs_cons) ]
-		-- NB: filter out any imposs_cons.  Example:
-		--	case x of 
-		--	  A -> e1
-		--	  DEFAULT -> case x of 
-		--			A -> e2
-		--			B -> e3
-		-- When we merge, we must ensure that e1 takes 
-		-- precedence over e2 as the value for A!  
-	}
-    	-- Warning: don't call prepareAlts recursively!
-    	-- Firstly, there's no point, because inner alts have already had
-    	-- mkCase applied to them, so they won't have a case in their default
-    	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
-    	-- in munge_rhs may put a case into the DEFAULT branch!
-
 
 --------- Fill in known constructor -----------
-prepareDefault _ _ case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
+prepareDefault case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
   | 	-- This branch handles the case where we are 
 	-- scrutinisng an algebraic data type
     isAlgTyCon tycon		-- It's a data type, tuple, or unboxed tuples.  
@@ -1477,7 +1400,7 @@ prepareDefault _ _ case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rh
 				-- which would be quite legitmate.  But it's a really obscure corner, and
 				-- not worth wasting code on.
   , let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
-	impossible con  = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
+	impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
   = case filterOut impossible all_cons of
 	[]    -> return []	-- Eliminate the default alternative
 				-- altogether if it can't match
@@ -1492,27 +1415,48 @@ prepareDefault _ _ case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rh
 	_ -> return [(DEFAULT, [], deflt_rhs)]
 
   | debugIsOn, isAlgTyCon tycon, not (isOpenTyCon tycon), null (tyConDataCons tycon)
-	-- This can legitimately happen for type families, so don't report that
+	-- Check for no data constructors
+        -- This can legitimately happen for type families, so don't report that
   = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon)
         $ return [(DEFAULT, [], deflt_rhs)]
 
 --------- Catch-all cases -----------
-prepareDefault _dflags _env _case_bndr _bndr_ty _imposs_cons (Just deflt_rhs)
+prepareDefault _case_bndr _bndr_ty _imposs_cons (Just deflt_rhs)
   = return [(DEFAULT, [], deflt_rhs)]
 
-prepareDefault _dflags _env _case_bndr _bndr_ty _imposs_cons Nothing
+prepareDefault _case_bndr _bndr_ty _imposs_cons Nothing
   = return []	-- No default branch
 \end{code}
 
 
 
-=================================================================================
+%************************************************************************
+%*									*
+		mkCase
+%*									*
+%************************************************************************
 
 mkCase tries these things
 
-1.  Eliminate the case altogether if possible
+1.  Merge Nested Cases
 
-2.  Case-identity:
+       case e of b {             ==>   case e of b {
+    	 p1 -> rhs1	                 p1 -> rhs1
+    	 ...	                         ...
+    	 pm -> rhsm                      pm -> rhsm
+    	 _  -> case b of b' {            pn -> let b'=b in rhsn
+ 		     pn -> rhsn          ...
+ 		     ...                 po -> let b'=b in rhso
+ 		     po -> rhso          _  -> let b'=b in rhsd
+ 		     _  -> rhsd
+       }  
+    
+    which merges two cases in one case when -- the default alternative of
+    the outer case scrutises the same variable as the outer case. This
+    transformation is called Case Merging.  It avoids that the same
+    variable is scrutinised multiple times.
+
+2.  Eliminate Identity Case
 
 	case e of 		===> e
 		True  -> True;
@@ -1520,19 +1464,99 @@ mkCase tries these things
 
     and similar friends.
 
+3.  Merge identical alternatives.
+    If several alternatives are identical, merge them into
+    a single DEFAULT alternative.  I've occasionally seen this 
+    making a big difference:
+
+	case e of		=====>     case e of
+	  C _ -> f x			     D v -> ....v....
+	  D v -> ....v....		     DEFAULT -> f x
+	  DEFAULT -> f x
+
+   The point is that we merge common RHSs, at least for the DEFAULT case.
+   [One could do something more elaborate but I've never seen it needed.]
+   To avoid an expensive test, we just merge branches equal to the *first*
+   alternative; this picks up the common cases
+	a) all branches equal
+	b) some branches equal to the DEFAULT (which occurs first)
+
+The case where Merge Identical Alternatives transformation showed up
+was like this (base/Foreign/C/Err/Error.lhs):
+
+	x | p `is` 1 -> e1
+	  | p `is` 2 -> e2
+	...etc...
+
+where @is@ was something like
+	
+	p `is` n = p /= (-1) && p == n
+
+This gave rise to a horrible sequence of cases
+
+	case p of
+	  (-1) -> $j p
+	  1    -> e1
+	  DEFAULT -> $j p
+
+and similarly in cascade for all the join points!
+
 
 \begin{code}
-mkCase :: OutExpr -> OutId -> [OutAlt]	-- Increasing order
-       -> SimplM OutExpr
+mkCase, mkCase1, mkCase2 
+   :: DynFlags 
+   -> OutExpr -> OutId
+   -> [OutAlt]		-- Alternatives in standard (increasing) order
+   -> SimplM OutExpr
 
 --------------------------------------------------
---	2. Identity case
+--	1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase scrut case_bndr alts	-- Identity case
+mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
+  | dopt Opt_CaseMerge dflags
+  , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
+  , inner_scrut_var == outer_bndr
+  = do	{ tick (CaseMerge outer_bndr)
+
+	; let wrap_alt (con, args, rhs) = ASSERT( outer_bndr `notElem` args )
+                                          (con, args, wrap_rhs rhs)
+		-- Simplifier's no-shadowing invariant should ensure
+		-- that outer_bndr is not shadowed by the inner patterns
+              wrap_rhs rhs = Let (NonRec inner_bndr (Var outer_bndr)) rhs
+		-- The let is OK even for unboxed binders, 
+
+	      wrapped_alts | isDeadBinder inner_bndr = inner_alts
+                           | otherwise               = map wrap_alt inner_alts
+
+	      merged_alts = mergeAlts outer_alts wrapped_alts
+		-- NB: mergeAlts gives priority to the left
+		--	case x of 
+		--	  A -> e1
+		--	  DEFAULT -> case x of 
+		--			A -> e2
+		--			B -> e3
+		-- When we merge, we must ensure that e1 takes 
+		-- precedence over e2 as the value for A!  
+
+	; mkCase1 dflags scrut outer_bndr merged_alts
+	}
+    	-- Warning: don't call mkCase recursively!
+    	-- Firstly, there's no point, because inner alts have already had
+    	-- mkCase applied to them, so they won't have a case in their default
+    	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
+    	-- in munge_rhs may put a case into the DEFAULT branch!
+
+mkCase dflags scrut bndr alts = mkCase1 dflags scrut bndr alts
+
+--------------------------------------------------
+--	2. Eliminate Identity Case
+--------------------------------------------------
+
+mkCase1 _dflags scrut case_bndr alts	-- Identity case
   | all identity_alt alts
-  = do tick (CaseIdentity case_bndr)
-       return (re_cast scrut)
+  = do { tick (CaseIdentity case_bndr)
+       ; return (re_cast scrut) }
   where
     identity_alt (con, args, rhs) = check_eq con args (de_cast rhs)
 
@@ -1560,22 +1584,93 @@ mkCase scrut case_bndr alts	-- Identity case
 			(_,_,Cast _ co) -> Cast scrut co
 			_    	        -> scrut
 
+--------------------------------------------------
+--	3. Merge Identical Alternatives
+--------------------------------------------------
+mkCase1 dflags scrut case_bndr ((_con1,bndrs1,rhs1) : con_alts)
+  | all isDeadBinder bndrs1			-- Remember the default 
+  , length filtered_alts < length con_alts	-- alternative comes first
+	-- Also Note [Dead binders]
+  = do	{ tick (AltMerge case_bndr)
+	; mkCase2 dflags scrut case_bndr alts' }
+  where
+    alts' = (DEFAULT, [], rhs1) : filtered_alts
+    filtered_alts	  = filter keep con_alts
+    keep (_con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
 
+mkCase1 dflags scrut bndr alts = mkCase2 dflags scrut bndr alts
 
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
-mkCase scrut bndr alts = return (Case scrut bndr (coreAltsType alts) alts)
+mkCase2 _dflags scrut bndr alts 
+  = return (Case scrut bndr (coreAltsType alts) alts)
 \end{code}
 
+Note [Dead binders]
+~~~~~~~~~~~~~~~~~~~~
+Note that dead-ness is maintained by the simplifier, so that it is
+accurate after simplification as well as before.
 
-When adding auxiliary bindings for the case binder, it's worth checking if
-its dead, because it often is, and occasionally these mkCase transformations
-cascade rather nicely.
 
-\begin{code}
-bindCaseBndr :: Id -> CoreExpr -> CoreExpr -> CoreExpr
-bindCaseBndr bndr rhs body
-  | isDeadBinder bndr = body
-  | otherwise         = bindNonRec bndr rhs body
-\end{code}
+Note [Cascading case merge]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case merging should cascade in one sweep, because it
+happens bottom-up
+
+      case e of a {
+        DEFAULT -> case a of b 
+                      DEFAULT -> case b of c {
+                                     DEFAULT -> e
+                                     A -> ea
+                      B -> eb
+        C -> ec
+==>
+      case e of a {
+        DEFAULT -> case a of b 
+                      DEFAULT -> let c = b in e
+                      A -> let c = b in ea
+                      B -> eb
+        C -> ec
+==>
+      case e of a {
+        DEFAULT -> let b = a in let c = b in e
+        A -> let b = a in let c = b in ea
+        B -> let b = a in eb
+        C -> ec
+
+
+However here's a tricky case that we still don't catch, and I don't
+see how to catch it in one pass:
+
+  case x of c1 { I# a1 ->
+  case a1 of c2 ->
+    0 -> ...
+    DEFAULT -> case x of c3 { I# a2 ->
+               case a2 of ...
+
+After occurrence analysis (and its binder-swap) we get this
+ 
+  case x of c1 { I# a1 -> 
+  let x = c1 in		-- Binder-swap addition
+  case a1 of c2 -> 
+    0 -> ...
+    DEFAULT -> case x of c3 { I# a2 ->
+               case a2 of ...
+
+When we simplify the inner case x, we'll see that
+x=c1=I# a1.  So we'll bind a2 to a1, and get
+
+  case x of c1 { I# a1 -> 
+  case a1 of c2 -> 
+    0 -> ...
+    DEFAULT -> case a1 of ...
+
+This is corect, but we can't do a case merge in this sweep
+because c2 /= a1.  Reason: the binding c1=I# a1 went inwards
+without getting changed to c1=I# c2.  
+
+I don't think this is worth fixing, even if I knew how. It'll
+all come out in the next pass anyway.
+
+  

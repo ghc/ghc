@@ -597,7 +597,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 	; if postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs new_unfolding
 	                -- Inline and discard the binding
 	  then do  { tick (PostInlineUnconditionally old_bndr)
-	            ; return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
+	           ; return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
 	        -- Use the substitution to make quite, quite sure that the
 	        -- substitution will happen, since we are going to discard the binding
 
@@ -1472,10 +1472,13 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
                                     -- exprOkForSpeculation was intended for.
     var_demanded_later _       = False
 
+--------------------------------------------------
+--      3. Try seq rules; see Note [User-defined RULES for seq] in MkId
+--------------------------------------------------
+
 rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
-  = 	-- For this case, see Note [User-defined RULES for seq] in MkId
-    do { let rhs' = substExpr env rhs
+  = do { let rhs' = substExpr env rhs
              out_args = [Type (substTy env (idType case_bndr)), 
 	     	         Type (exprType rhs'), scrut, rhs']
 	     	      -- Lazily evaluated, so we don't do most of this
@@ -1506,9 +1509,11 @@ reallyRebuildCase env scrut case_bndr alts cont
 	-- Check for empty alternatives
 	; if null alts' then missingAlt env case_bndr alts cont
 	  else do
-	{ case_expr <- mkCase scrut' case_bndr' alts'
+        { dflags <- getDOptsSmpl
+        ; case_expr <- mkCase dflags scrut' case_bndr' alts'
 
-	-- Notice that rebuild gets the in-scope set from env, not alt_env
+	-- Notice that rebuild gets the in-scope set from env', not alt_env
+	-- (which in any case is only build in simplAlts)
 	-- The case binder *not* scope over the whole returned case-expression
 	; rebuild env' case_expr nodup_cont } }
 \end{code}
@@ -1599,8 +1604,33 @@ At one point I did transformation in LiberateCase, but it's more
 robust here.  (Otherwise, there's a danger that we'll simply drop the
 'seq' altogether, before LiberateCase gets to see it.)
 
-
 \begin{code}
+simplAlts :: SimplEnv
+          -> OutExpr
+          -> InId                       -- Case binder
+          -> [InAlt]			-- Non-empty
+	  -> SimplCont
+          -> SimplM (OutExpr, OutId, [OutAlt])  -- Includes the continuation
+-- Like simplExpr, this just returns the simplified alternatives;
+-- it does not return an environment
+
+simplAlts env scrut case_bndr alts cont'
+  = -- pprTrace "simplAlts" (ppr alts $$ ppr (seIdSubst env)) $
+    do  { let env0 = zapFloats env
+
+        ; (env1, case_bndr1) <- simplBinder env0 case_bndr
+
+        ; fam_envs <- getFamEnvs
+	; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env1 scrut 
+						       case_bndr case_bndr1 alts
+
+        ; (imposs_deflt_cons, in_alts) <- prepareAlts scrut' case_bndr' alts
+
+        ; alts' <- mapM (simplAlt alt_env' imposs_deflt_cons case_bndr' cont') in_alts
+        ; return (scrut', case_bndr', alts') }
+
+
+------------------------------------
 improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 	   -> OutExpr -> InId -> OutId -> [InAlt]
 	   -> SimplM (SimplEnv, OutExpr, OutId)
@@ -1615,73 +1645,7 @@ improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
 
 improveSeq _ env scrut _ case_bndr1 _
   = return (env, scrut, case_bndr1)
-\end{code}
 
-
-simplAlts does two things:
-
-1.  Eliminate alternatives that cannot match, including the
-    DEFAULT alternative.
-
-2.  If the DEFAULT alternative can match only one possible constructor,
-    then make that constructor explicit.
-    e.g.
-        case e of x { DEFAULT -> rhs }
-     ===>
-        case e of x { (a,b) -> rhs }
-    where the type is a single constructor type.  This gives better code
-    when rhs also scrutinises x or e.
-
-Here "cannot match" includes knowledge from GADTs
-
-It's a good idea do do this stuff before simplifying the alternatives, to
-avoid simplifying alternatives we know can't happen, and to come up with
-the list of constructors that are handled, to put into the IdInfo of the
-case binder, for use when simplifying the alternatives.
-
-Eliminating the default alternative in (1) isn't so obvious, but it can
-happen:
-
-data Colour = Red | Green | Blue
-
-f x = case x of
-        Red -> ..
-        Green -> ..
-        DEFAULT -> h x
-
-h y = case y of
-        Blue -> ..
-        DEFAULT -> [ case y of ... ]
-
-If we inline h into f, the default case of the inlined h can't happen.
-If we don't notice this, we may end up filtering out *all* the cases
-of the inner case y, which give us nowhere to go!
-
-
-\begin{code}
-simplAlts :: SimplEnv
-          -> OutExpr
-          -> InId                       -- Case binder
-          -> [InAlt]			-- Non-empty
-	  -> SimplCont
-          -> SimplM (OutExpr, OutId, [OutAlt])  -- Includes the continuation
--- Like simplExpr, this just returns the simplified alternatives;
--- it not return an environment
-
-simplAlts env scrut case_bndr alts cont'
-  = -- pprTrace "simplAlts" (ppr alts $$ ppr (seIdSubst env)) $
-    do  { let env0 = zapFloats env
-
-        ; (env1, case_bndr1) <- simplBinder env0 case_bndr
-
-        ; fam_envs <- getFamEnvs
-	; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env1 scrut 
-						       case_bndr case_bndr1 alts
-
-        ; (imposs_deflt_cons, in_alts) <- prepareAlts alt_env' scrut' case_bndr' alts
-
-        ; alts' <- mapM (simplAlt alt_env' imposs_deflt_cons case_bndr' cont') in_alts
-        ; return (scrut', case_bndr', alts') }
 
 ------------------------------------
 simplAlt :: SimplEnv
