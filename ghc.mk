@@ -492,6 +492,7 @@ endif
 
 BUILD_DIRS += \
    docs/users_guide \
+   docs/man \
    libraries/Cabal/doc \
    $(GHC_UNLIT_DIR) \
    $(GHC_HP2PS_DIR)
@@ -915,6 +916,7 @@ $(eval $(call bindist,.,\
     $(INSTALL_TOPDIRS) \
     $(INSTALL_TOPDIR_SCRIPTS) \
     $(INSTALL_BINS) \
+    $(INSTALL_MANPAGES) \
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
@@ -946,6 +948,7 @@ unix-binary-dist-prep:
 	echo "BUILD_DOCBOOK_HTML = $(BUILD_DOCBOOK_HTML)" >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
+	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
 	ln -s ../../distrib/configure-bin.ac $(BIN_DIST_PREP_DIR)/configure.ac
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_PREP_TAR)
