@@ -51,7 +51,7 @@ open_stats_file (
     const char *FILENAME_FMT,
     FILE **file_ret);
 
-static I_ decode(const char *s);
+static StgWord64 decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max);
 static void bad_option(const char *s);
 
 /* -----------------------------------------------------------------------------
@@ -531,12 +531,10 @@ error = rtsTrue;
                   }
 		  break;
 	      case 'A':
-		RtsFlags.GcFlags.minAllocAreaSize
-		  = decode(rts_argv[arg]+2) / BLOCK_SIZE;
-		if (RtsFlags.GcFlags.minAllocAreaSize <= 0) {
-		  bad_option(rts_argv[arg]);
-		}
-		break;
+                  RtsFlags.GcFlags.minAllocAreaSize
+                      = decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_INT_MAX)
+                           / BLOCK_SIZE;
+                  break;
 
 #ifdef USE_PAPI
 	      case 'a':
@@ -658,56 +656,42 @@ error = rtsTrue;
 #endif
 
 	      case 'K':
-		RtsFlags.GcFlags.maxStkSize = 
-		  decode(rts_argv[arg]+2) / sizeof(W_);
-
-		if (RtsFlags.GcFlags.maxStkSize == 0) 
-		  bad_option( rts_argv[arg] );
-		break;
+                  RtsFlags.GcFlags.maxStkSize =
+                      decodeSize(rts_argv[arg], 2, 1, HS_WORD_MAX) / sizeof(W_);
+                  break;
 
 	      case 'k':
-		RtsFlags.GcFlags.initialStkSize = 
-		  decode(rts_argv[arg]+2) / sizeof(W_);
-
-		if (RtsFlags.GcFlags.initialStkSize == 0) 
-		  bad_option( rts_argv[arg] );
-		break;
+                  RtsFlags.GcFlags.initialStkSize =
+                      decodeSize(rts_argv[arg], 2, 1, HS_WORD_MAX) / sizeof(W_);
+                  break;
 
 	      case 'M':
-		RtsFlags.GcFlags.maxHeapSize = 
-		  decode(rts_argv[arg]+2) / BLOCK_SIZE;
-		/* user give size in *bytes* but "maxHeapSize" is in *blocks* */
-
-		if (RtsFlags.GcFlags.maxHeapSize <= 0) {
-		  bad_option(rts_argv[arg]);
-		}
-		break;
+                  RtsFlags.GcFlags.maxHeapSize =
+                      decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE;
+                  /* user give size in *bytes* but "maxHeapSize" is in *blocks* */
+                  break;
 
 	      case 'm':
-		RtsFlags.GcFlags.pcFreeHeap = atof(rts_argv[arg]+2);
+                  RtsFlags.GcFlags.pcFreeHeap = atof(rts_argv[arg]+2);
 
-		if (RtsFlags.GcFlags.pcFreeHeap < 0 || 
-		    RtsFlags.GcFlags.pcFreeHeap > 100)
-		  bad_option( rts_argv[arg] );
-		break;
+                  if (RtsFlags.GcFlags.pcFreeHeap < 0 ||
+                      RtsFlags.GcFlags.pcFreeHeap > 100)
+                      bad_option( rts_argv[arg] );
+                  break;
 
 	      case 'G':
-		RtsFlags.GcFlags.generations = decode(rts_argv[arg]+2);
-		if (RtsFlags.GcFlags.generations < 1) {
-		  bad_option(rts_argv[arg]);
-		}
-		break;
+                  RtsFlags.GcFlags.generations =
+                      decodeSize(rts_argv[arg], 2, 1, HS_INT_MAX);
+                  break;
 
-	      case 'T':
-		RtsFlags.GcFlags.steps = decode(rts_argv[arg]+2);
-		if (RtsFlags.GcFlags.steps < 1) {
-		  bad_option(rts_argv[arg]);
-		}
+              case 'T':
+                  RtsFlags.GcFlags.steps =
+                      decodeSize(rts_argv[arg], 2, 1, HS_INT_MAX);
 		break;
 
 	      case 'H':
-		RtsFlags.GcFlags.heapSizeSuggestion = 
-		  decode(rts_argv[arg]+2) / BLOCK_SIZE;
+		RtsFlags.GcFlags.heapSizeSuggestion =
+                    (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
 		break;
 
 #ifdef RTS_GTK_FRONTPANEL
@@ -1278,28 +1262,44 @@ open_stats_file (
 
 
 
-static I_
-decode(const char *s)
+static StgWord64
+decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
 {
-    I_ c;
+    char c;
+    const char *s;
     StgDouble m;
+    StgWord64 val;
+
+    s = flag + offset;
 
     if (!*s)
-	return 0;
+    {
+        m = 0;
+    }
+    else
+    {
+        m = atof(s);
+        c = s[strlen(s)-1];
 
-    m = atof(s);
-    c = s[strlen(s)-1];
+        if (c == 'g' || c == 'G') 
+            m *= 1024*1024*1024;
+        else if (c == 'm' || c == 'M')
+            m *= 1024*1024;
+        else if (c == 'k' || c == 'K')
+            m *= 1024;
+        else if (c == 'w' || c == 'W')
+            m *= sizeof(W_);
+    }
 
-    if (c == 'g' || c == 'G')
-	m *= 1000*1000*1000;	/* UNchecked! */
-    else if (c == 'm' || c == 'M')
-	m *= 1000*1000;			/* We do not use powers of 2 (1024) */
-    else if (c == 'k' || c == 'K')	/* to avoid possible bad effects on */
-	m *= 1000;			/* a direct-mapped cache.   	    */ 
-    else if (c == 'w' || c == 'W')
-	m *= sizeof(W_);
+    val = (StgWord64)m;
 
-    return (I_)m;
+    if (m < 0 || val < min || val > max) {
+        errorBelch("error in RTS option %s: size outside allowed range (%" FMT_Word64 " - %" FMT_Word64 ")", 
+                   flag, min, max);
+        stg_exit(EXIT_FAILURE);
+    }
+
+    return val;
 }
 
 static void GNU_ATTRIBUTE(__noreturn__)
