@@ -427,8 +427,8 @@ splitAppTys ty = split ty ty []
     split _       (AppTy ty arg)        args = split ty ty (arg:args)
     split _       (TyConApp tc tc_args) args
       = let -- keep type families saturated
-            n | isDecomposableTyCon tc = tyConArity tc
-              | otherwise              = 0
+            n | isDecomposableTyCon tc = 0
+              | otherwise              = tyConArity tc
             (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
