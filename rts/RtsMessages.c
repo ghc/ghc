@@ -187,7 +187,7 @@ rtsErrorMsgFn(const char *s, va_list ap)
 #endif
   {
      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-     if (prog_argv != NULL && prog_name != NULL) {
+     if (prog_name != NULL) {
        fprintf(stderr, "%s: ", prog_name);
      }
      vfprintf(stderr, s, ap);
