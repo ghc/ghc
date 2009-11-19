@@ -1081,6 +1081,15 @@ SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
 endif
 
 # -----------------------------------------------------------------------------
+# sdisting libraries
+
+# Use manually, with e.g.:
+#     make sdist_directory
+
+sdist_%:
+	inplace/bin/ghc-cabal sdist libraries/$* dist-install
+
+# -----------------------------------------------------------------------------
 # Cleaning
 
 .PHONY: clean
