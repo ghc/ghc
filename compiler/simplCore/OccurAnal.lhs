@@ -526,23 +526,28 @@ reOrderCycle depth (bind : binds) pairs
 
     score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
     score (ND bndr rhs _ _, _, _)
-        | exprIsTrivial rhs        = 10  -- Practically certain to be inlined
-                -- Used to have also: && not (isExportedId bndr)
-                -- But I found this sometimes cost an extra iteration when we have
-                --      rec { d = (a,b); a = ...df...; b = ...df...; df = d }
-                -- where df is the exported dictionary. Then df makes a really
-                -- bad choice for loop breaker
+        | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
+	   	     	      -- Note [DFuns should not be loop breakers]
 
         | Just (inl_rule_info, _) <- isInlineRule_maybe (idUnfolding bndr)
 	= case inl_rule_info of
 	     InlWrapper {} -> 10  -- Note [INLINE pragmas]
 	     _other	   ->  3  -- Data structures are more important than this
 	     		          -- so that dictionary/method recursion unravels
+		-- Note that this case hits all InlineRule things, so we
+		-- never look at 'rhs for InlineRule stuff. That's right, because
+		-- 'rhs' is irrelevant for inlining things with an InlineRule
                 
         | is_con_app rhs = 5  -- Data types help with cases: Note [Constructor applications]
-	   	     	      -- Includes dict funs: Note [DFuns should not be loop breakers]
                 
+        | exprIsTrivial rhs = 10  -- Practically certain to be inlined
+                -- Used to have also: && not (isExportedId bndr)
+                -- But I found this sometimes cost an extra iteration when we have
+                --      rec { d = (a,b); a = ...df...; b = ...df...; df = d }
+                -- where df is the exported dictionary. Then df makes a really
+                -- bad choice for loop breaker
 
+	
 -- If an Id is marked "never inline" then it makes a great loop breaker
 -- The only reason for not checking that here is that it is rare
 -- and I've never seen a situation where it makes a difference,
@@ -648,6 +653,19 @@ Note [DFuns should not be loop breakers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's particularly bad to make a DFun into a loop breaker.  See
 Note [How instance declarations are translated] in TcInstDcls
+
+We give DFuns a higher score than ordinary CONLIKE things because 
+if there's a choice we want the DFun to be the non-looop breker. Eg
+ 
+rec { sc = /\ a \$dC. $fBWrap (T a) ($fCT @ a $dC)
+
+      $fCT :: forall a_afE. (Roman.C a_afE) => Roman.C (Roman.T a_afE)
+      {-# DFUN #-}
+      $fCT = /\a \$dC. MkD (T a) ((sc @ a $dC) |> blah) ($ctoF @ a $dC)
+    }
+
+Here 'sc' (the superclass) looks CONLIKE, but we'll never get to it
+if we can't unravel the DFun first.
 
 Note [Constructor applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
