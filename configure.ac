@@ -405,13 +405,24 @@ then
             tar -zxf ../../ghc-tarballs/mingw/gcc-core*.tar.gz &&
             tar -jxf ../../ghc-tarballs/mingw/libcrypt*.tar.bz2 &&
             tar -zxf ../../ghc-tarballs/mingw/mingw-runtime*.tar.gz &&
-            tar -zxf ../../ghc-tarballs/mingw/msysCORE*.tar.gz &&
-            tar -jxf ../../ghc-tarballs/mingw/perl*.tar.bz2 &&
             tar -zxf ../../ghc-tarballs/mingw/w32api*.tar.gz &&
             mv bin/gcc.exe bin/realgcc.exe
         )
         inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
         AC_MSG_NOTICE([In-tree mingw tree created])
+    fi
+    if ! test -d inplace/perl ||
+         test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz
+    then
+        AC_MSG_NOTICE([Making in-tree perl tree])
+        rm -rf inplace/perl
+        mkdir inplace
+        mkdir inplace/perl
+        (
+            cd inplace/perl &&
+            tar -zxf ../../ghc-tarballs/perl/ghc-perl*.tar.gz
+        )
+        AC_MSG_NOTICE([In-tree perl tree created])
     fi
 fi
 

@@ -159,6 +159,7 @@ initSysTools mbMinusB dflags0
         ; let installed :: FilePath -> FilePath
               installed file = top_dir </> file
               installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
+              installed_perl_bin file = top_dir </> ".." </> "perl" </> file
 
         ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -184,7 +185,7 @@ initSysTools mbMinusB dflags0
                 | isWindowsHost = installed_mingw_bin "gcc"
                 | otherwise     = cGCC
               perl_path
-                | isWindowsHost = installed_mingw_bin cGHC_PERL
+                | isWindowsHost = installed_perl_bin cGHC_PERL
                 | otherwise     = cGHC_PERL
               -- 'touch' is a GHC util for Windows
               touch_path
