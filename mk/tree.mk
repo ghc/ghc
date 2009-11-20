@@ -46,6 +46,7 @@ INPLACE_BIN             = $(INPLACE)/bin
 INPLACE_LIB             = $(INPLACE)/lib
 INPLACE_TOPDIR          = $(INPLACE)/lib
 INPLACE_MINGW           = $(INPLACE)/mingw
+INPLACE_PERL            = $(INPLACE)/perl
 
 # These are here, rather than in config.mk, as they need to exist in an
 # unconfigured tree so that the various clean targets can be used
