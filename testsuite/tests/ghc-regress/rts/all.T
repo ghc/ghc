@@ -57,3 +57,6 @@ test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
 test('3424', # it's slow:
              [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
              compile_and_run, [''])
+
+# Test for out-of-range heap size
+test('rtsflags001', [ exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
