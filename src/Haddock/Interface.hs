@@ -89,9 +89,9 @@ createInterfaces' verbosity modules flags instIfaceMap = do
   modgraph' <- if needsTemplateHaskell modgraph
        then do
          dflags <- getSessionDynFlags
-         _ <- setSessionDynFlags dflags { hscTarget = HscAsm } 
-         -- we need to set HscAsm on all the ModSummaries as well
-         let addHscAsm m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = HscAsm } }  
+         _ <- setSessionDynFlags dflags { hscTarget = defaultObjectTarget }
+         -- we need to set defaultObjectTarget on all the ModSummaries as well
+         let addHscAsm m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = defaultObjectTarget } }
          return (map addHscAsm modgraph)
        else return modgraph
 #else
