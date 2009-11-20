@@ -129,7 +129,6 @@ Library
         cmm
         codeGen
         coreSyn
-        cprAnalysis
         deSugar
         ghci
         hsSyn
