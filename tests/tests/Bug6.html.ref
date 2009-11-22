@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -78,11 +76,10 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AA"
->A</A
->  = <A HREF="#v%3AA"
->A</A
-> Int</TD
+>  <A HREF="">A</A
+>  = <A HREF="">A</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -92,16 +89,14 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AB"
->B</A
->  = <A HREF="#v%3AB"
->B</A
+>  <A HREF="">B</A
+>  = <A HREF="">B</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Ab"
->b</A
-> :: Int</TD
+><A HREF="">b</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 >}</TD
@@ -114,22 +109,20 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AC"
->C</A
->  = <A HREF="#v%3AC"
->C</A
+>  <A HREF="">C</A
+>  = <A HREF="">C</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Ac1"
->c1</A
-> :: Int</TD
+><A HREF="">c1</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Ac2"
->c2</A
-> :: Int</TD
+><A HREF="">c2</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 >}</TD
@@ -142,11 +135,11 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AD"
->D</A
->  = <A HREF="#v%3AD"
->D</A
-> Int Int</TD
+>  <A HREF="">D</A
+>  = <A HREF="">D</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -156,11 +149,10 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AE"
->E</A
->  = <A HREF="#v%3AE"
->E</A
-> Int</TD
+>  <A HREF="">E</A
+>  = <A HREF="">E</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></TD
@@ -212,7 +204,8 @@
 ></A
 ><B
 >A</B
-> Int</TD
+> <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -277,7 +270,8 @@
 ></A
 ><B
 >b</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -344,7 +338,8 @@
 ></A
 ><B
 >c1</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -356,7 +351,8 @@
 ></A
 ><B
 >c2</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -409,7 +405,9 @@
 ></A
 ><B
 >D</B
-> Int Int</TD
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -458,7 +456,8 @@
 ></A
 ><B
 >E</B
-> Int</TD
+> <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -474,8 +473,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

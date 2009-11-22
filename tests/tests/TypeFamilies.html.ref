@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -69,8 +67,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >type family</SPAN
-> <A HREF="#t%3AG"
->G</A
+> <A HREF="">G</A
 > a :: *</TD
 ></TR
 ><TR
@@ -81,8 +78,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3AA"
->A</A
+>  <A HREF="">A</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -94,17 +90,15 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
-> <A HREF="#t%3AB"
->B</A
+> <A HREF="">B</A
 > a :: * -&gt; *</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Af"
->f</A
-> :: <A HREF="TypeFamilies.html#t%3AB"
->B</A
-> a Int</TD
+><A HREF="">f</A
+> :: <A HREF="">B</A
+> a <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></TD
@@ -117,8 +111,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >type family</SPAN
-> <A HREF="#t%3AF"
->F</A
+> <A HREF="">F</A
 > a </TD
 ></TR
 ></TABLE
@@ -241,9 +234,9 @@
 ></A
 ><B
 >f</B
-> :: <A HREF="TypeFamilies.html#t%3AB"
->B</A
-> a Int</TD
+> :: <A HREF="">B</A
+> a <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="doc"
@@ -268,9 +261,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="TypeFamilies.html#t%3AA"
->A</A
-> Int</TD
+><A HREF="">A</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></DIV
@@ -312,8 +305,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

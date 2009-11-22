@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -63,8 +61,7 @@
 ><TD
 ><DL
 ><DT
-><A HREF="#1"
->The <TT
+><A HREF="">The <TT
 >HashTable</TT
 > type
 </A
@@ -72,8 +69,7 @@
 ><DD
 ><DL
 ><DT
-><A HREF="#2"
->Operations on <TT
+><A HREF="">Operations on <TT
 >HashTable</TT
 >s
 </A
@@ -81,8 +77,7 @@
 ></DL
 ></DD
 ><DT
-><A HREF="#3"
->The <TT
+><A HREF="">The <TT
 >Hash</TT
 > class
 </A
@@ -126,8 +121,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AHashTable"
->HashTable</A
+>  <A HREF="">HashTable</A
 > key val</TD
 ></TR
 ><TR
@@ -136,16 +130,12 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Anew"
->new</A
-> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
->Eq</A
-> key, <A HREF="Hash.html#t%3AHash"
->Hash</A
-> key) =&gt; Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF="Hash.html#t%3AHashTable"
->HashTable</A
+><A HREF="">new</A
+> :: (<A HREF="">Eq</A
+> key, <A HREF="">Hash</A
+> key) =&gt; <A HREF="">Int</A
+> -&gt; <A HREF="">IO</A
+> (<A HREF="">HashTable</A
 > key val)</TD
 ></TR
 ><TR
@@ -154,14 +144,10 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ainsert"
->insert</A
-> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
->Eq</A
-> key, <A HREF="Hash.html#t%3AHash"
->Hash</A
-> key) =&gt; key -&gt; val -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+><A HREF="">insert</A
+> :: (<A HREF="">Eq</A
+> key, <A HREF="">Hash</A
+> key) =&gt; key -&gt; val -&gt; <A HREF="">IO</A
 > ()</TD
 ></TR
 ><TR
@@ -170,14 +156,10 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Alookup"
->lookup</A
-> :: <A HREF="Hash.html#t%3AHash"
->Hash</A
-> key =&gt; key -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
+><A HREF="">lookup</A
+> :: <A HREF="">Hash</A
+> key =&gt; key -&gt; <A HREF="">IO</A
+> (<A HREF="">Maybe</A
 > val)</TD
 ></TR
 ><TR
@@ -188,8 +170,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3AHash"
->Hash</A
+>  <A HREF="">Hash</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -199,9 +180,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ahash"
->hash</A
-> :: a -&gt; Int</TD
+><A HREF="">hash</A
+> :: a -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></TD
@@ -257,8 +238,7 @@
  The type <TT
 >key</TT
 > should be an instance of <TT
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
->Eq</A
+><A HREF="">Eq</A
 ></TT
 >.
 </TD
@@ -293,14 +273,11 @@
 ></A
 ><B
 >new</B
-> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
->Eq</A
-> key, <A HREF="Hash.html#t%3AHash"
->Hash</A
-> key) =&gt; Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF="Hash.html#t%3AHashTable"
->HashTable</A
+> :: (<A HREF="">Eq</A
+> key, <A HREF="">Hash</A
+> key) =&gt; <A HREF="">Int</A
+> -&gt; <A HREF="">IO</A
+> (<A HREF="">HashTable</A
 > key val)</TD
 ></TR
 ><TR
@@ -320,12 +297,9 @@
 ></A
 ><B
 >insert</B
-> :: (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Eq.html#t%3AEq"
->Eq</A
-> key, <A HREF="Hash.html#t%3AHash"
->Hash</A
-> key) =&gt; key -&gt; val -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+> :: (<A HREF="">Eq</A
+> key, <A HREF="">Hash</A
+> key) =&gt; key -&gt; val -&gt; <A HREF="">IO</A
 > ()</TD
 ></TR
 ><TR
@@ -345,26 +319,21 @@
 ></A
 ><B
 >lookup</B
-> :: <A HREF="Hash.html#t%3AHash"
->Hash</A
-> key =&gt; key -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
+> :: <A HREF="">Hash</A
+> key =&gt; key -&gt; <A HREF="">IO</A
+> (<A HREF="">Maybe</A
 > val)</TD
 ></TR
 ><TR
 ><TD CLASS="doc"
 >Looks up a key in the hash table, returns <TT
 ><TT
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#v%3AJust"
->Just</A
+><A HREF="">Just</A
 ></TT
 > val</TT
 > if the key
  was found, or <TT
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#v%3ANothing"
->Nothing</A
+><A HREF="">Nothing</A
 ></TT
 > otherwise.
 </TD
@@ -429,14 +398,16 @@
 ></A
 ><B
 >hash</B
-> :: a -&gt; Int</TD
+> :: a -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="doc"
 >hashes the value of type <TT
 >a</TT
 > into an <TT
->Int</TT
+><A HREF="">Int</A
+></TT
 >
 </TD
 ></TR
@@ -458,24 +429,21 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="Hash.html#t%3AHash"
->Hash</A
-> Float</TD
+><A HREF="">Hash</A
+> <A HREF="">Float</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="Hash.html#t%3AHash"
->Hash</A
-> Int</TD
+><A HREF="">Hash</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->(<A HREF="Hash.html#t%3AHash"
->Hash</A
-> a, <A HREF="Hash.html#t%3AHash"
->Hash</A
-> b) =&gt; <A HREF="Hash.html#t%3AHash"
->Hash</A
+>(<A HREF="">Hash</A
+> a, <A HREF="">Hash</A
+> b) =&gt; <A HREF="">Hash</A
 > (a, b)</TD
 ></TR
 ></TABLE
@@ -491,8 +459,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

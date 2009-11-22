@@ -27,8 +27,7 @@
 >Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -67,8 +66,7 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Amap"
->map</A
+><A HREF="">map</A
 > ::  (a -&gt; b) -&gt; [a] -&gt; [b]</TD
 ></TR
 ><TR
@@ -79,8 +77,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3AMonad"
->Monad</A
+>  <A HREF="">Monad</A
 > m  <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -90,14 +87,12 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3A%3E%3E%3D"
->(&gt;&gt;=)</A
+><A HREF="">(&gt;&gt;=)</A
 > ::  m a -&gt; (a -&gt; m b) -&gt; m b</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3A%3E%3E"
->(&gt;&gt;)</A
+><A HREF="">(&gt;&gt;)</A
 > ::  m a -&gt; m b -&gt; m b</TD
 ></TR
 ><TR

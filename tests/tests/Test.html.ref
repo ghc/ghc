@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -85,69 +83,57 @@
 ><TD
 ><DL
 ><DT
-><A HREF="#1"
->Type declarations
+><A HREF="">Type declarations
 </A
 ></DT
 ><DD
 ><DL
 ><DT
-><A HREF="#2"
->Data types
+><A HREF="">Data types
 </A
 ></DT
 ><DT
-><A HREF="#3"
->Records
+><A HREF="">Records
 </A
 ></DT
 ></DL
 ></DD
 ><DT
-><A HREF="#4"
->Class declarations
+><A HREF="">Class declarations
 </A
 ></DT
 ><DT
-><A HREF="#5"
->Function types
+><A HREF="">Function types
 </A
 ></DT
 ><DT
-><A HREF="#6"
->Auxiliary stuff
+><A HREF="">Auxiliary stuff
 </A
 ></DT
 ><DT
-><A HREF="#7"
->A hidden module
+><A HREF="">A hidden module
 </A
 ></DT
 ><DT
-><A HREF="#8"
->A visible module
+><A HREF="">A visible module
 </A
 ></DT
 ><DT
-><A HREF="#9"
->Existential / Universal types
+><A HREF="">Existential / Universal types
 </A
 ></DT
 ><DT
-><A HREF="#10"
->Type signatures with argument docs
+><A HREF="">Type signatures with argument docs
 </A
 ></DT
 ><DT
-><A HREF="#11"
->A section
+><A HREF="">A section
 </A
 ></DT
 ><DD
 ><DL
 ><DT
-><A HREF="#12"
->A subsection 
+><A HREF="">A subsection 
 </A
 ></DT
 ></DL
@@ -170,20 +156,16 @@
 ><TD CLASS="doc"
 >This module illustrates &amp; tests most of the features of Haddock.
  Testing references from the description: <TT
-><A HREF="Test.html#t%3AT"
->T</A
+><A HREF="">T</A
 ></TT
 >, <TT
-><A HREF="Test.html#v%3Af"
->f</A
+><A HREF="">f</A
 ></TT
 >, <TT
-><A HREF="Test.html#v%3Ag"
->g</A
+><A HREF="">g</A
 ></TT
 >, <TT
-><A HREF="Visible.html#v%3Avisible"
->visible</A
+><A HREF="">visible</A
 ></TT
 >.
 </TD
@@ -210,8 +192,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AT"
->T</A
+>  <A HREF="">T</A
 > a b </TD
 ></TR
 ><TR
@@ -219,21 +200,20 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
->= <A HREF="#v%3AA"
->A</A
-> Int (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
-> Float)</TD
+>= <A HREF="">A</A
+> <A HREF="">Int</A
+> (<A HREF="">Maybe</A
+> <A HREF="">Float</A
+>)</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AB"
->B</A
-> (<A HREF="Test.html#t%3AT"
->T</A
-> a b, <A HREF="Test.html#t%3AT"
->T</A
-> Int Float)</TD
+>| <A HREF="">B</A
+> (<A HREF="">T</A
+> a b, <A HREF="">T</A
+> <A HREF="">Int</A
+> <A HREF="">Float</A
+>)</TD
 ></TR
 ></TABLE
 ></TD
@@ -249,8 +229,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AT2"
->T2</A
+>  <A HREF="">T2</A
 > a b</TD
 ></TR
 ><TR
@@ -264,8 +243,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AT3"
->T3</A
+>  <A HREF="">T3</A
 > a b </TD
 ></TR
 ><TR
@@ -273,14 +251,12 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
->= <A HREF="#v%3AA1"
->A1</A
+>= <A HREF="">A1</A
 > a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AB1"
->B1</A
+>| <A HREF="">B1</A
 > b</TD
 ></TR
 ></TABLE
@@ -300,8 +276,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AT4"
->T4</A
+>  <A HREF="">T4</A
 > a b </TD
 ></TR
 ><TR
@@ -309,14 +284,12 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
->= <A HREF="#v%3AA2"
->A2</A
+>= <A HREF="">A2</A
 > a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AB2"
->B2</A
+>| <A HREF="">B2</A
 > b</TD
 ></TR
 ></TABLE
@@ -336,8 +309,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AT5"
->T5</A
+>  <A HREF="">T5</A
 > a b </TD
 ></TR
 ><TR
@@ -345,14 +317,12 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
->= <A HREF="#v%3AA3"
->A3</A
+>= <A HREF="">A3</A
 > a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AB3"
->B3</A
+>| <A HREF="">B3</A
 > b</TD
 ></TR
 ></TABLE
@@ -372,8 +342,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AT6"
->T6</A
+>  <A HREF="">T6</A
 >  </TD
 ></TR
 ><TR
@@ -381,20 +350,17 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
->= <A HREF="#v%3AA4"
->A4</A
+>= <A HREF="">A4</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AB4"
->B4</A
+>| <A HREF="">B4</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AC4"
->C4</A
+>| <A HREF="">C4</A
 ></TD
 ></TR
 ></TABLE
@@ -411,10 +377,8 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AN1"
->N1</A
-> a = <A HREF="#v%3AN1"
->N1</A
+>  <A HREF="">N1</A
+> a = <A HREF="">N1</A
 > a</TD
 ></TR
 ><TR
@@ -425,15 +389,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AN2"
->N2</A
-> a b = <A HREF="#v%3AN2"
->N2</A
+>  <A HREF="">N2</A
+> a b = <A HREF="">N2</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3An"
->n</A
+><A HREF="">n</A
 > :: a b</TD
 ></TR
 ></TABLE
@@ -447,15 +408,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AN3"
->N3</A
-> a b = <A HREF="#v%3AN3"
->N3</A
+>  <A HREF="">N3</A
+> a b = <A HREF="">N3</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3An3"
->n3</A
+><A HREF="">n3</A
 > :: a b</TD
 ></TR
 ></TABLE
@@ -469,8 +427,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AN4"
->N4</A
+>  <A HREF="">N4</A
 > a b</TD
 ></TR
 ><TR
@@ -481,15 +438,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AN5"
->N5</A
-> a b = <A HREF="#v%3AN5"
->N5</A
+>  <A HREF="">N5</A
+> a b = <A HREF="">N5</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3An5"
->n5</A
+><A HREF="">n5</A
 > :: a b</TD
 ></TR
 ></TABLE
@@ -503,15 +457,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AN6"
->N6</A
-> a b = <A HREF="#v%3AN6"
->N6</A
+>  <A HREF="">N6</A
+> a b = <A HREF="">N6</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3An6"
->n6</A
+><A HREF="">n6</A
 > :: a b</TD
 ></TR
 ></TABLE
@@ -525,15 +476,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AN7"
->N7</A
-> a b = <A HREF="#v%3AN7"
->N7</A
+>  <A HREF="">N7</A
+> a b = <A HREF="">N7</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3An7"
->n7</A
+><A HREF="">n7</A
 > :: a b</TD
 ></TR
 ></TABLE
@@ -550,8 +498,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AR"
->R</A
+>  <A HREF="">R</A
 >  </TD
 ></TR
 ><TR
@@ -559,68 +506,66 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
->= <A HREF="#v%3AC1"
->C1</A
+>= <A HREF="">C1</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Ap"
->p</A
-> :: Int</TD
+><A HREF="">p</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Aq"
->q</A
+><A HREF="">q</A
 > :: <SPAN CLASS="keyword"
 >forall</SPAN
 > a.  a -&gt; a</TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Ar"
->r</A
-> :: Int</TD
+><A HREF="">r</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3As"
->s</A
-> :: Int</TD
+><A HREF="">s</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 >}</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AC2"
->C2</A
+>| <A HREF="">C2</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3At"
->t</A
-> :: T1 -&gt; <A HREF="Test.html#t%3AT2"
->T2</A
-> Int Int -&gt; <A HREF="Test.html#t%3AT3"
->T3</A
-> Bool Bool -&gt; <A HREF="Test.html#t%3AT4"
->T4</A
-> Float Float -&gt; <A HREF="Test.html#t%3AT5"
->T5</A
+><A HREF="">t</A
+> :: T1 -&gt; <A HREF="">T2</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+> -&gt; <A HREF="">T3</A
+> <A HREF="">Bool</A
+> <A HREF="">Bool</A
+> -&gt; <A HREF="">T4</A
+> <A HREF="">Float</A
+> <A HREF="">Float</A
+> -&gt; <A HREF="">T5</A
 > () ()</TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Au"
->u</A
-> :: Int</TD
+><A HREF="">u</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Av"
->v</A
-> :: Int</TD
+><A HREF="">v</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 >}</TD
@@ -639,28 +584,26 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AR1"
->R1</A
->  = <A HREF="#v%3AC3"
->C3</A
+>  <A HREF="">R1</A
+>  = <A HREF="">C3</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3As1"
->s1</A
-> :: Int</TD
+><A HREF="">s1</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3As2"
->s2</A
-> :: Int</TD
+><A HREF="">s2</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3As3"
->s3</A
-> :: Int</TD
+><A HREF="">s3</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 >}</TD
@@ -673,10 +616,8 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A HREF="Test.html#t%3AD"
->D</A
-> a =&gt; <A HREF="#t%3AC"
->C</A
+> <A HREF="">D</A
+> a =&gt; <A HREF="">C</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -686,16 +627,13 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Aa"
->a</A
-> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+><A HREF="">a</A
+> :: <A HREF="">IO</A
 > a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ab"
->b</A
+><A HREF="">b</A
 > :: [a]</TD
 ></TR
 ></TABLE
@@ -709,8 +647,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3AD"
->D</A
+>  <A HREF="">D</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -720,16 +657,13 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ad"
->d</A
-> ::  <A HREF="Test.html#t%3AT"
->T</A
+><A HREF="">d</A
+> ::  <A HREF="">T</A
 > a b</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ae"
->e</A
+><A HREF="">e</A
 > :: (a, a)</TD
 ></TR
 ></TABLE
@@ -743,8 +677,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3AE"
->E</A
+>  <A HREF="">E</A
 > a </TD
 ></TR
 ><TR
@@ -755,8 +688,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3AF"
->F</A
+>  <A HREF="">F</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -766,8 +698,7 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Aff"
->ff</A
+><A HREF="">ff</A
 > :: a</TD
 ></TR
 ></TABLE
@@ -779,11 +710,10 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Af"
->f</A
-> :: <A HREF="Test.html#t%3AC"
->C</A
-> a =&gt; a -&gt; Int</TD
+><A HREF="">f</A
+> :: <A HREF="">C</A
+> a =&gt; a -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -791,10 +721,9 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ag"
->g</A
-> :: Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+><A HREF="">g</A
+> :: <A HREF="">Int</A
+> -&gt; <A HREF="">IO</A
 > CInt</TD
 ></TR
 ><TR
@@ -803,9 +732,10 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ahidden"
->hidden</A
-> :: Int -&gt; Int</TD
+><A HREF="">hidden</A
+> :: <A HREF="">Int</A
+> -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -813,8 +743,7 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
->module <A HREF="Visible.html"
->Visible</A
+>module <A HREF="">Visible</A
 ></TD
 ></TR
 ><TR
@@ -828,8 +757,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AEx"
->Ex</A
+>  <A HREF="">Ex</A
 > a </TD
 ></TR
 ><TR
@@ -839,34 +767,28 @@
 ><TD CLASS="decl"
 >= <SPAN CLASS="keyword"
 >forall</SPAN
-> b . <A HREF="Test.html#t%3AC"
->C</A
-> b =&gt; <A HREF="#v%3AEx1"
->Ex1</A
+> b . <A HREF="">C</A
+> b =&gt; <A HREF="">Ex1</A
 > b</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
 >| <SPAN CLASS="keyword"
 >forall</SPAN
-> b . <A HREF="#v%3AEx2"
->Ex2</A
+> b . <A HREF="">Ex2</A
 > b</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
 >| <SPAN CLASS="keyword"
 >forall</SPAN
-> b . <A HREF="Test.html#t%3AC"
->C</A
-> a =&gt; <A HREF="#v%3AEx3"
->Ex3</A
+> b . <A HREF="">C</A
+> a =&gt; <A HREF="">Ex3</A
 > b</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
->| <A HREF="#v%3AEx4"
->Ex4</A
+>| <A HREF="">Ex4</A
 > (<SPAN CLASS="keyword"
 >forall</SPAN
 > a.  a -&gt; a)</TD
@@ -883,20 +805,19 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ak"
->k</A
-> :: <A HREF="Test.html#t%3AT"
->T</A
-> () () -&gt; <A HREF="Test.html#t%3AT2"
->T2</A
-> Int Int -&gt; (<A HREF="Test.html#t%3AT3"
->T3</A
-> Bool Bool -&gt; <A HREF="Test.html#t%3AT4"
->T4</A
-> Float Float) -&gt; <A HREF="Test.html#t%3AT5"
->T5</A
-> () () -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+><A HREF="">k</A
+> :: <A HREF="">T</A
+> () () -&gt; <A HREF="">T2</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+> -&gt; (<A HREF="">T3</A
+> <A HREF="">Bool</A
+> <A HREF="">Bool</A
+> -&gt; <A HREF="">T4</A
+> <A HREF="">Float</A
+> <A HREF="">Float</A
+>) -&gt; <A HREF="">T5</A
+> () () -&gt; <A HREF="">IO</A
 > ()</TD
 ></TR
 ><TR
@@ -905,9 +826,12 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Al"
->l</A
-> :: (Int, Int, Float) -&gt; Int</TD
+><A HREF="">l</A
+> :: (<A HREF="">Int</A
+>, <A HREF="">Int</A
+>, <A HREF="">Float</A
+>) -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -915,15 +839,12 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Am"
->m</A
-> :: <A HREF="Test.html#t%3AR"
->R</A
-> -&gt; <A HREF="Test.html#t%3AN1"
->N1</A
-> () -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> Int</TD
+><A HREF="">m</A
+> :: <A HREF="">R</A
+> -&gt; <A HREF="">N1</A
+> () -&gt; <A HREF="">IO</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -931,11 +852,11 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ao"
->o</A
-> :: Float -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> Float</TD
+><A HREF="">o</A
+> :: <A HREF="">Float</A
+> -&gt; <A HREF="">IO</A
+> <A HREF="">Float</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -943,9 +864,9 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Af%27"
->f'</A
-> :: Int</TD
+><A HREF="">f'</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></TD
@@ -1022,13 +943,13 @@
 ></A
 ><B
 >A</B
-> Int (<A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
-> Float)</TD
+> <A HREF="">Int</A
+> (<A HREF="">Maybe</A
+> <A HREF="">Float</A
+>)</TD
 ><TD CLASS="rdoc"
 >This comment describes the <TT
-><A HREF="Test.html#v%3AA"
->A</A
+><A HREF="">A</A
 ></TT
 > constructor
 </TD
@@ -1041,15 +962,14 @@
 ></A
 ><B
 >B</B
-> (<A HREF="Test.html#t%3AT"
->T</A
-> a b, <A HREF="Test.html#t%3AT"
->T</A
-> Int Float)</TD
+> (<A HREF="">T</A
+> a b, <A HREF="">T</A
+> <A HREF="">Int</A
+> <A HREF="">Float</A
+>)</TD
 ><TD CLASS="rdoc"
 >This comment describes the <TT
-><A HREF="Test.html#v%3AB"
->B</A
+><A HREF="">B</A
 ></TT
 > constructor
 </TD
@@ -1241,8 +1161,7 @@
 > a</TD
 ><TD CLASS="rdoc"
 >documents <TT
-><A HREF="Test.html#v%3AA3"
->A3</A
+><A HREF="">A3</A
 ></TT
 >
 </TD
@@ -1258,8 +1177,7 @@
 > b</TD
 ><TD CLASS="rdoc"
 >documents <TT
-><A HREF="Test.html#v%3AB3"
->B3</A
+><A HREF="">B3</A
 ></TT
 >
 </TD
@@ -1312,8 +1230,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >This is the doc for <TT
-><A HREF="Test.html#v%3AA4"
->A4</A
+><A HREF="">A4</A
 ></TT
 >
 </TD
@@ -1329,8 +1246,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >This is the doc for <TT
-><A HREF="Test.html#v%3AB4"
->B4</A
+><A HREF="">B4</A
 ></TT
 >
 </TD
@@ -1346,8 +1262,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >This is the doc for <TT
-><A HREF="Test.html#v%3AC4"
->C4</A
+><A HREF="">C4</A
 ></TT
 >
 </TD
@@ -1531,8 +1446,7 @@
 > :: a b</TD
 ><TD CLASS="rdoc"
 >this is the <TT
-><A HREF="Test.html#v%3An3"
->n3</A
+><A HREF="">n3</A
 ></TT
 > field 
 </TD
@@ -1742,8 +1656,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >The <TT
-><A HREF="Test.html#t%3AN7"
->N7</A
+><A HREF="">N7</A
 ></TT
 > constructor
 </TD
@@ -1807,25 +1720,20 @@
 ><TR
 ><TD CLASS="ndoc"
 >This is the documentation for the <TT
-><A HREF="Test.html#t%3AR"
->R</A
+><A HREF="">R</A
 ></TT
 > record, which has four fields,
  <TT
-><A HREF="Test.html#v%3Ap"
->p</A
+><A HREF="">p</A
 ></TT
 >, <TT
-><A HREF="Test.html#v%3Aq"
->q</A
+><A HREF="">q</A
 ></TT
 >, <TT
-><A HREF="Test.html#v%3Ar"
->r</A
+><A HREF="">r</A
 ></TT
 >, and <TT
-><A HREF="Test.html#v%3As"
->s</A
+><A HREF="">s</A
 ></TT
 >.
 </TD
@@ -1848,8 +1756,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >This is the <TT
-><A HREF="Test.html#v%3AC1"
->C1</A
+><A HREF="">C1</A
 ></TT
 > record constructor, with the following fields:
 </TD
@@ -1865,11 +1772,11 @@
 ></A
 ><B
 >p</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >This comment applies to the <TT
-><A HREF="Test.html#v%3Ap"
->p</A
+><A HREF="">p</A
 ></TT
 > field
 </TD
@@ -1887,8 +1794,7 @@
 > a.  a -&gt; a</TD
 ><TD CLASS="rdoc"
 >This comment applies to the <TT
-><A HREF="Test.html#v%3Aq"
->q</A
+><A HREF="">q</A
 ></TT
 > field
 </TD
@@ -1901,15 +1807,14 @@
 ></A
 ><B
 >r</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >This comment applies to both <TT
-><A HREF="Test.html#v%3Ar"
->r</A
+><A HREF="">r</A
 ></TT
 > and <TT
-><A HREF="Test.html#v%3As"
->s</A
+><A HREF="">s</A
 ></TT
 >
 </TD
@@ -1922,15 +1827,14 @@
 ></A
 ><B
 >s</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >This comment applies to both <TT
-><A HREF="Test.html#v%3Ar"
->r</A
+><A HREF="">r</A
 ></TT
 > and <TT
-><A HREF="Test.html#v%3As"
->s</A
+><A HREF="">s</A
 ></TT
 >
 </TD
@@ -1949,8 +1853,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >This is the <TT
-><A HREF="Test.html#v%3AC2"
->C2</A
+><A HREF="">C2</A
 ></TT
 > record constructor, also with some fields:
 </TD
@@ -1966,14 +1869,16 @@
 ></A
 ><B
 >t</B
-> :: T1 -&gt; <A HREF="Test.html#t%3AT2"
->T2</A
-> Int Int -&gt; <A HREF="Test.html#t%3AT3"
->T3</A
-> Bool Bool -&gt; <A HREF="Test.html#t%3AT4"
->T4</A
-> Float Float -&gt; <A HREF="Test.html#t%3AT5"
->T5</A
+> :: T1 -&gt; <A HREF="">T2</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+> -&gt; <A HREF="">T3</A
+> <A HREF="">Bool</A
+> <A HREF="">Bool</A
+> -&gt; <A HREF="">T4</A
+> <A HREF="">Float</A
+> <A HREF="">Float</A
+> -&gt; <A HREF="">T5</A
 > () ()</TD
 ><TD CLASS="rdoc"
 ></TD
@@ -1986,7 +1891,8 @@
 ></A
 ><B
 >u</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -1998,7 +1904,8 @@
 ></A
 ><B
 >v</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -2053,8 +1960,7 @@
 ></TD
 ><TD CLASS="rdoc"
 >This is the <TT
-><A HREF="Test.html#v%3AC3"
->C3</A
+><A HREF="">C3</A
 ></TT
 > record constructor
 </TD
@@ -2070,11 +1976,11 @@
 ></A
 ><B
 >s1</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >The <TT
-><A HREF="Test.html#v%3As1"
->s1</A
+><A HREF="">s1</A
 ></TT
 > record selector
 </TD
@@ -2087,11 +1993,11 @@
 ></A
 ><B
 >s2</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >The <TT
-><A HREF="Test.html#v%3As2"
->s2</A
+><A HREF="">s2</A
 ></TT
 > record selector
 </TD
@@ -2104,11 +2010,11 @@
 ></A
 ><B
 >s3</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >The <TT
-><A HREF="Test.html#v%3As3"
->s3</A
+><A HREF="">s3</A
 ></TT
 > record selector
 </TD
@@ -2152,8 +2058,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A HREF="Test.html#t%3AD"
->D</A
+> <A HREF="">D</A
 > a =&gt; <A NAME="t:C"
 ><A NAME="t%3AC"
 ></A
@@ -2172,8 +2077,7 @@
 >This comment applies to the <EM
 >previous</EM
 > declaration (the <TT
-><A HREF="Test.html#t%3AC"
->C</A
+><A HREF="">C</A
 ></TT
 > class)
 </TD
@@ -2197,15 +2101,13 @@
 ></A
 ><B
 >a</B
-> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+> :: <A HREF="">IO</A
 > a</TD
 ></TR
 ><TR
 ><TD CLASS="doc"
 >this is a description of the <TT
-><A HREF="Test.html#v%3Aa"
->a</A
+><A HREF="">a</A
 ></TT
 > method
 </TD
@@ -2227,8 +2129,7 @@
 ><TR
 ><TD CLASS="doc"
 >this is a description of the <TT
-><A HREF="Test.html#v%3Ab"
->b</A
+><A HREF="">b</A
 ></TT
 > method
 </TD
@@ -2284,8 +2185,7 @@
 ></A
 ><B
 >d</B
-> ::  <A HREF="Test.html#t%3AT"
->T</A
+> ::  <A HREF="">T</A
 > a b</TD
 ></TR
 ><TR
@@ -2320,15 +2220,15 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="Test.html#t%3AD"
->D</A
-> Float</TD
+><A HREF="">D</A
+> <A HREF="">Float</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="Test.html#t%3AD"
->D</A
-> Int</TD
+><A HREF="">D</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></DIV
@@ -2446,21 +2346,19 @@
 ></A
 ><B
 >f</B
-> :: <A HREF="Test.html#t%3AC"
->C</A
-> a =&gt; a -&gt; Int</TD
+> :: <A HREF="">C</A
+> a =&gt; a -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="doc"
 ><P
 >In a comment string we can refer to identifiers in scope with
 single quotes like this: <TT
-><A HREF="Test.html#t%3AT"
->T</A
+><A HREF="">T</A
 ></TT
 >, and we can refer to modules by
-using double quotes: <A HREF="Foo.html"
->Foo</A
+using double quotes: <A HREF="">Foo</A
 >.  We can add emphasis <EM
 >like this</EM
 >.
@@ -2484,8 +2382,7 @@ using double quotes: <A HREF="Foo.html"
 ><PRE
 >
      This is a block of code, which can include other markup: <TT
-><A HREF="Test.html#t%3AR"
->R</A
+><A HREF="">R</A
 ></TT
 >
      formatting
@@ -2496,8 +2393,7 @@ using double quotes: <A HREF="Foo.html"
 > this is another block of code
 </PRE
 ><P
->We can also include URLs in documentation: <A HREF="http://www.haskell.org/"
->http://www.haskell.org/</A
+>We can also include URLs in documentation: <A HREF="">http://www.haskell.org/</A
 >.
 </P
 ></TD
@@ -2514,8 +2410,8 @@ using double quotes: <A HREF="Foo.html"
 ></A
 ><B
 >g</B
-> :: Int -&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+> :: <A HREF="">Int</A
+> -&gt; <A HREF="">IO</A
 > CInt</TD
 ></TR
 ><TR
@@ -2746,7 +2642,9 @@ test2
 ></A
 ><B
 >hidden</B
-> :: Int -&gt; Int</TD
+> :: <A HREF="">Int</A
+> -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -2767,8 +2665,7 @@ test2
 ></TR
 ><TR
 ><TD CLASS="decl"
->module <A HREF="Visible.html"
->Visible</A
+>module <A HREF="">Visible</A
 ></TD
 ></TR
 ><TR
@@ -2828,8 +2725,7 @@ test2
 ><TD CLASS="arg"
 ><SPAN CLASS="keyword"
 >forall</SPAN
-> b . <A HREF="Test.html#t%3AC"
->C</A
+> b . <A HREF="">C</A
 > b =&gt; <A NAME="v:Ex1"
 ><A NAME="v%3AEx1"
 ></A
@@ -2858,8 +2754,7 @@ test2
 ><TD CLASS="arg"
 ><SPAN CLASS="keyword"
 >forall</SPAN
-> b . <A HREF="Test.html#t%3AC"
->C</A
+> b . <A HREF="">C</A
 > a =&gt; <A NAME="v:Ex3"
 ><A NAME="v%3AEx3"
 ></A
@@ -2922,33 +2817,34 @@ test2
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
->:: <A HREF="Test.html#t%3AT"
->T</A
+>:: <A HREF="">T</A
 > () ()</TD
 ><TD CLASS="rdoc"
 >This argument has type <TT
-><A HREF="Test.html#t%3AT"
->T</A
+><A HREF="">T</A
 ></TT
 >
 </TD
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF="Test.html#t%3AT2"
->T2</A
-> Int Int</TD
+>-&gt; <A HREF="">T2</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >This argument has type 'T2 Int Int'
 </TD
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF="Test.html#t%3AT3"
->T3</A
-> Bool Bool -&gt; <A HREF="Test.html#t%3AT4"
->T4</A
-> Float Float</TD
+>-&gt; <A HREF="">T3</A
+> <A HREF="">Bool</A
+> <A HREF="">Bool</A
+> -&gt; <A HREF="">T4</A
+> <A HREF="">Float</A
+> <A HREF="">Float</A
+></TD
 ><TD CLASS="rdoc"
 >This argument has type <TT
 >T3 Bool Bool -&gt; T4 Float Float</TT
@@ -2957,8 +2853,7 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF="Test.html#t%3AT5"
->T5</A
+>-&gt; <A HREF="">T5</A
 > () ()</TD
 ><TD CLASS="rdoc"
 >This argument has a very long description that should
@@ -2968,8 +2863,7 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
+>-&gt; <A HREF="">IO</A
 > ()</TD
 ><TD CLASS="rdoc"
 >This is the result type
@@ -3002,17 +2896,22 @@ test2
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
->:: (Int, Int, Float)</TD
+>:: (<A HREF="">Int</A
+>, <A HREF="">Int</A
+>, <A HREF="">Float</A
+>)</TD
 ><TD CLASS="rdoc"
 >takes a triple
 </TD
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; Int</TD
+>-&gt; <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >returns an <TT
->Int</TT
+><A HREF="">Int</A
+></TT
 >
 </TD
 ></TR
@@ -3038,16 +2937,14 @@ test2
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
->:: <A HREF="Test.html#t%3AR"
->R</A
+>:: <A HREF="">R</A
 ></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF="Test.html#t%3AN1"
->N1</A
+>-&gt; <A HREF="">N1</A
 > ()</TD
 ><TD CLASS="rdoc"
 >one of the arguments
@@ -3055,9 +2952,9 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> Int</TD
+>-&gt; <A HREF="">IO</A
+> <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >and the return value
 </TD
@@ -3089,16 +2986,17 @@ test2
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
->:: Float</TD
+>:: <A HREF="">Float</A
+></TD
 ><TD CLASS="rdoc"
 >The input float
 </TD
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> Float</TD
+>-&gt; <A HREF="">IO</A
+> <A HREF="">Float</A
+></TD
 ><TD CLASS="rdoc"
 >The output float
 </TD
@@ -3165,13 +3063,13 @@ test2
 ></A
 ><B
 >f'</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="doc"
 >a function with a prime can be referred to as <TT
-><A HREF="Test.html#v%3Af%27"
->f'</A
+><A HREF="">f'</A
 ></TT
 > 
  but f' doesn't get link'd 'f\''
@@ -3183,8 +3081,7 @@ test2
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

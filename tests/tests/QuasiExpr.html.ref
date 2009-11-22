@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -96,7 +94,8 @@
 ></A
 ><B
 >IntExpr</B
-> Integer</TD
+> <A HREF="">Integer</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -108,8 +107,7 @@
 ></A
 ><B
 >AntiIntExpr</B
-> <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Char.html#t%3AString"
->String</A
+> <A HREF="">String</A
 ></TD
 ><TD CLASS="rdoc"
 ></TD
@@ -122,12 +120,9 @@
 ></A
 ><B
 >BinopExpr</B
-> <A HREF="QuasiExpr.html#t%3ABinOp"
->BinOp</A
-> <A HREF="QuasiExpr.html#t%3AExpr"
->Expr</A
-> <A HREF="QuasiExpr.html#t%3AExpr"
->Expr</A
+> <A HREF="">BinOp</A
+> <A HREF="">Expr</A
+> <A HREF="">Expr</A
 ></TD
 ><TD CLASS="rdoc"
 ></TD
@@ -140,8 +135,7 @@
 ></A
 ><B
 >AntiExpr</B
-> <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Char.html#t%3AString"
->String</A
+> <A HREF="">String</A
 ></TD
 ><TD CLASS="rdoc"
 ></TD
@@ -160,26 +154,20 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Data.html#t%3AData"
->Data</A
-> <A HREF="QuasiExpr.html#t%3AExpr"
->Expr</A
+><A HREF="">Data</A
+> <A HREF="">Expr</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Text-Show.html#t%3AShow"
->Show</A
-> <A HREF="QuasiExpr.html#t%3AExpr"
->Expr</A
+><A HREF="">Show</A
+> <A HREF="">Expr</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Typeable.html#t%3ATypeable"
->Typeable</A
-> <A HREF="QuasiExpr.html#t%3AExpr"
->Expr</A
+><A HREF="">Typeable</A
+> <A HREF="">Expr</A
 ></TD
 ></TR
 ></TABLE
@@ -277,26 +265,20 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Data.html#t%3AData"
->Data</A
-> <A HREF="QuasiExpr.html#t%3ABinOp"
->BinOp</A
+><A HREF="">Data</A
+> <A HREF="">BinOp</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Text-Show.html#t%3AShow"
->Show</A
-> <A HREF="QuasiExpr.html#t%3ABinOp"
->BinOp</A
+><A HREF="">Show</A
+> <A HREF="">BinOp</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Typeable.html#t%3ATypeable"
->Typeable</A
-> <A HREF="QuasiExpr.html#t%3ABinOp"
->BinOp</A
+><A HREF="">Typeable</A
+> <A HREF="">BinOp</A
 ></TD
 ></TR
 ></TABLE
@@ -318,9 +300,9 @@
 ></A
 ><B
 >eval</B
-> :: <A HREF="QuasiExpr.html#t%3AExpr"
->Expr</A
-> -&gt; Integer</TD
+> :: <A HREF="">Expr</A
+> -&gt; <A HREF="">Integer</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -334,8 +316,7 @@
 ></A
 ><B
 >parseExprExp</B
-> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Char.html#t%3AString"
->String</A
+> :: <A HREF="">String</A
 > -&gt; Q Exp</TD
 ></TR
 ><TR
@@ -344,8 +325,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

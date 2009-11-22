@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -72,8 +70,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AH1"
->H1</A
+>  <A HREF="">H1</A
 > a b <SPAN CLASS="keyword"
 >where</SPAN
 ></TD
@@ -83,53 +80,46 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3AC1"
->C1</A
-> ::  <A HREF="GADTRecords.html#t%3AH1"
->H1</A
+><A HREF="">C1</A
+> ::  <A HREF="">H1</A
 > a b</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3AC2"
->C2</A
-> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Ord.html#t%3AOrd"
->Ord</A
-> a =&gt; [a] -&gt; <A HREF="GADTRecords.html#t%3AH1"
->H1</A
+><A HREF="">C2</A
+> :: <A HREF="">Ord</A
+> a =&gt; [a] -&gt; <A HREF="">H1</A
 > a a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3AC3"
->C3</A
+><A HREF="">C3</A
 > ::  {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Afield"
->field</A
-> :: Int</TD
+><A HREF="">field</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
->} -&gt; <A HREF="GADTRecords.html#t%3AH1"
->H1</A
-> Int Int</TD
+>} -&gt; <A HREF="">H1</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3AC4"
->C4</A
+><A HREF="">C4</A
 > ::  {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3Afield2"
->field2</A
+><A HREF="">field2</A
 > :: a</TD
 ></TR
 ></TABLE
->} -&gt; <A HREF="GADTRecords.html#t%3AH1"
->H1</A
-> Int a</TD
+>} -&gt; <A HREF="">H1</A
+> <A HREF="">Int</A
+> a</TD
 ></TR
 ></TABLE
 ></TD
@@ -189,8 +179,7 @@
 ></A
 ><B
 >C1</B
-> ::  <A HREF="GADTRecords.html#t%3AH1"
->H1</A
+> ::  <A HREF="">H1</A
 > a b</TD
 ><TD CLASS="rdoc"
 ></TD
@@ -203,10 +192,8 @@
 ></A
 ><B
 >C2</B
-> :: <A HREF=" /home/david/compilers/ghc-6.10.4/lib/ghc-6.10.4/./../../share/doc/ghc/libraries/base/Data-Ord.html#t%3AOrd"
->Ord</A
-> a =&gt; [a] -&gt; <A HREF="GADTRecords.html#t%3AH1"
->H1</A
+> :: <A HREF="">Ord</A
+> a =&gt; [a] -&gt; <A HREF="">H1</A
 > a a</TD
 ><TD CLASS="rdoc"
 ></TD
@@ -219,9 +206,11 @@
 ></A
 ><B
 >C3</B
-> ::  Int -&gt; <A HREF="GADTRecords.html#t%3AH1"
->H1</A
-> Int Int</TD
+> ::  <A HREF="">Int</A
+> -&gt; <A HREF="">H1</A
+> <A HREF="">Int</A
+> <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -236,7 +225,8 @@
 ></A
 ><B
 >field</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ><TD CLASS="rdoc"
 >hello docs
 </TD
@@ -252,9 +242,9 @@
 ></A
 ><B
 >C4</B
-> ::  a -&gt; <A HREF="GADTRecords.html#t%3AH1"
->H1</A
-> Int a</TD
+> ::  a -&gt; <A HREF="">H1</A
+> <A HREF="">Int</A
+> a</TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -289,8 +279,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

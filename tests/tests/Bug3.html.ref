@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -67,9 +65,9 @@
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Afoo"
->foo</A
-> :: Int</TD
+><A HREF="">foo</A
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ></TABLE
 ></TD
@@ -94,7 +92,8 @@
 ></A
 ><B
 >foo</B
-> :: Int</TD
+> :: <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="doc"
@@ -108,8 +107,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE

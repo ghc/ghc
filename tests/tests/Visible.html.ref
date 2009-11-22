@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -74,7 +72,9 @@
 ></A
 ><B
 >visible</B
-> :: Int -&gt; Int</TD
+> :: <A HREF="">Int</A
+> -&gt; <A HREF="">Int</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -82,8 +82,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE
