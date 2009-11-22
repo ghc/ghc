@@ -5,6 +5,8 @@ import System.Exit
 import System.Directory
 import Data.List
 import Control.Monad
+import Text.Regex
+
 
 main = do
   args <- getArgs
@@ -13,11 +15,16 @@ main = do
   if not $ null args
     then
       mapM copy [ "output" </> file  | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
-    else    
+    else
       mapM copy [ "output" </> file | file <- contents, ".html" `isSuffixOf` file ]
+
 
 copy file = do
   let new = "tests" </> takeFileName file <.> ".ref"
-  print file 
+  print file
   print new
-  copyFile file ("tests" </> takeFileName file <.> ".ref") 
+  contents <- readFile file
+  writeFile new (stripLinks contents)
+
+
+stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
