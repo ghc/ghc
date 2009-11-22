@@ -184,7 +184,7 @@ test('tcfail186',
      multimod_compile_fail, ['tcfail186', '-v0'])
 test('tcfail187', normal, compile_fail, [''])
 
-test('tcfail188', normal, compile, [''])
+test('tcfail188', if_compiler_lt('ghc', '6.13', expect_fail), compile, [''])
 # Now that #959 is fixed, tcfail188 should compile
 
 test('tcfail189', normal, compile_fail, [''])
