@@ -20,9 +20,8 @@ main = do
 
 
 haddockEq file1 file2 = stripLinks file1 == stripLinks file2
-  where
-    stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
 
+stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
 
 programOnPath p = do
   result <- findProgramOnPath silent p
@@ -42,10 +41,16 @@ check modules strict = do
         if not $ haddockEq out ref
           then do
             putStrLn $ "Output for " ++ mod ++ " has changed! Exiting with diff:"
+            let ref' = stripLinks ref
+                out' = stripLinks out
+            let reffile' = "output" </> takeFileName reffile ++ ".nolinks"
+                outfile' = "output" </> takeFileName outfile ++ ".nolinks"
+            writeFile reffile' ref'
+            writeFile outfile' out'
             b <- programOnPath "colordiff"
             if b
-              then system $ "colordiff " ++ reffile ++ " " ++ outfile
-              else system $ "diff " ++ reffile ++ " " ++ outfile
+              then system $ "colordiff " ++ reffile' ++ " " ++ outfile'
+              else system $ "diff " ++ reffile' ++ " " ++ outfile'
             if strict then exitFailure else return ()
           else do
             putStrLn $ "Pass: " ++ mod
