@@ -23,8 +23,7 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
 ><A HREF="">Index</A
@@ -97,16 +96,13 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Areturn"
->return</A
+><A HREF="">return</A
 > ::  a -&gt; m a</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Afail"
->fail</A
-> ::  <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
+><A HREF="">fail</A
+> ::  <A HREF="">String</A
 > -&gt; m a</TD
 ></TR
 ></TABLE
@@ -118,63 +114,20 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3ArunInteractiveProcess"
->runInteractiveProcess</A
-> :: <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AFilePath"
->FilePath</A
-> -&gt; [<A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
->] -&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
-> <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AFilePath"
->FilePath</A
-> -&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
-> [(<A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
->)] -&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/process/System-Process.html#t%3AProcessHandle"
->ProcessHandle</A
+><A HREF="">runInteractiveProcess</A
+> :: <A HREF="">FilePath</A
+> -&gt; [<A HREF="">String</A
+>] -&gt; <A HREF="">Maybe</A
+> <A HREF="">FilePath</A
+> -&gt; <A HREF="">Maybe</A
+> [(<A HREF="">String</A
+>, <A HREF="">String</A
+>)] -&gt; <A HREF="">IO</A
+> (<A HREF="">Handle</A
+>, <A HREF="">Handle</A
+>, <A HREF="">Handle</A
+>, <A HREF="">ProcessHandle</A
 >)</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->data</SPAN
->  <A HREF="#t%3AMVar"
->MVar</A
-> a = <A HREF="#v%3AMVar"
->MVar</A
-> (MVar# <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Control-Monad-ST.html#t%3ARealWorld"
->RealWorld</A
-> a)</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="#v%3AnewEmptyMVar"
->newEmptyMVar</A
-> ::  <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-> a)</TD
 ></TR
 ></TABLE
 ></TD
@@ -205,8 +158,7 @@
 ><TD CLASS="doc"
 ><P
 ><TT
-><A HREF="CrossPackageDocs.html#v%3Amap"
->map</A
+><A HREF="">map</A
 ></TT
 > <TT
 >f xs</TT
@@ -248,8 +200,7 @@
 ><TD CLASS="ndoc"
 ><P
 >The <TT
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 ></TT
 > class defines the basic operations over a <EM
 >monad</EM
@@ -268,19 +219,16 @@ monadic expressions.
 </P
 ><P
 >Minimal complete definition: <TT
-><A HREF="CrossPackageDocs.html#v%3A%3E%3E%3D"
->&gt;&gt;=</A
+><A HREF="">&gt;&gt;=</A
 ></TT
 > and <TT
-><A HREF="CrossPackageDocs.html#v%3Areturn"
->return</A
+><A HREF="">return</A
 ></TT
 >.
 </P
 ><P
 >Instances of <TT
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 ></TT
 > should satisfy the following laws:
 </P
@@ -291,12 +239,10 @@ monadic expressions.
 </TT
 ><P
 >Instances of both <TT
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 ></TT
 > and <TT
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Control-Monad.html#t%3AFunctor"
->Functor</A
+><A HREF="">Functor</A
 ></TT
 > should additionally satisfy the law:
 </P
@@ -305,12 +251,10 @@ monadic expressions.
 </TT
 ><P
 >The instances of <TT
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 ></TT
 > for lists, Data.Maybe.Maybe and System.IO.IO
-defined in the <A HREF="Prelude.html"
->Prelude</A
+defined in the <A HREF="">Prelude</A
 > satisfy these laws.
 </P
 ></TD
@@ -394,8 +338,7 @@ defined in the <A HREF="Prelude.html"
 ></A
 ><B
 >fail</B
-> ::  <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
+> ::  <A HREF="">String</A
 > -&gt; m a</TD
 ></TR
 ><TR
@@ -425,36 +368,29 @@ defined in the <A HREF="Prelude.html"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="decl"
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 > []</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
-> <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AIO"
->IO</A
+><A HREF="">Monad</A
+> <A HREF="">IO</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 > Q</TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
-> <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
+><A HREF="">Monad</A
+> <A HREF="">Maybe</A
 ></TD
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="CrossPackageDocs.html#t%3AMonad"
->Monad</A
+><A HREF="">Monad</A
 > ((-&gt;) r)</TD
 ></TR
 ></TABLE
@@ -483,8 +419,7 @@ defined in the <A HREF="Prelude.html"
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
->:: <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AFilePath"
->FilePath</A
+>:: <A HREF="">FilePath</A
 ></TD
 ><TD CLASS="rdoc"
 >Filename of the executable
@@ -492,8 +427,7 @@ defined in the <A HREF="Prelude.html"
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; [<A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
+>-&gt; [<A HREF="">String</A
 >]</TD
 ><TD CLASS="rdoc"
 >Arguments to pass to the executable
@@ -501,10 +435,8 @@ defined in the <A HREF="Prelude.html"
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
-> <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AFilePath"
->FilePath</A
+>-&gt; <A HREF="">Maybe</A
+> <A HREF="">FilePath</A
 ></TD
 ><TD CLASS="rdoc"
 >Optional path to the working directory
@@ -512,12 +444,9 @@ defined in the <A HREF="Prelude.html"
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Maybe.html#t%3AMaybe"
->Maybe</A
-> [(<A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Char.html#t%3AString"
->String</A
+>-&gt; <A HREF="">Maybe</A
+> [(<A HREF="">String</A
+>, <A HREF="">String</A
 >)]</TD
 ><TD CLASS="rdoc"
 >Optional environment (otherwise inherit)
@@ -525,16 +454,11 @@ defined in the <A HREF="Prelude.html"
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
->, <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/process/System-Process.html#t%3AProcessHandle"
->ProcessHandle</A
+>-&gt; <A HREF="">IO</A
+> (<A HREF="">Handle</A
+>, <A HREF="">Handle</A
+>, <A HREF="">Handle</A
+>, <A HREF="">ProcessHandle</A
 >)</TD
 ><TD CLASS="rdoc"
 ></TD
@@ -543,8 +467,7 @@ defined in the <A HREF="Prelude.html"
 ><TD CLASS="ndoc" COLSPAN="2"
 ><P
 >Runs a raw command, and returns <TT
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
+><A HREF="">Handle</A
 ></TT
 >s that may be used to communicate
      with the process via its <TT
@@ -564,13 +487,11 @@ defined in the <A HREF="Prelude.html"
 </TT
 ><P
 >The <TT
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#t%3AHandle"
->Handle</A
+><A HREF="">Handle</A
 ></TT
 >s are initially in binary mode; if you need them to be
     in text mode then use <TT
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/GHC-IO-Handle.html#v%3AhSetBinaryMode"
->hSetBinaryMode</A
+><A HREF="">hSetBinaryMode</A
 ></TT
 >.
 </P
@@ -584,154 +505,8 @@ defined in the <A HREF="Prelude.html"
 ></TD
 ></TR
 ><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->data</SPAN
->  <A NAME="t:MVar"
-><A NAME="t%3AMVar"
-></A
-></A
-><B
->MVar</B
-> a </TD
-></TR
-><TR
-><TD CLASS="body"
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-><TR
-><TD CLASS="ndoc"
->An <TT
-><A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-></TT
-> (pronounced &quot;em-var&quot;) is a synchronising variable, used
-for communication between concurrent threads.  It can be thought of
-as a a box, which may be empty or full.
-</TD
-></TR
-><TR
-><TD CLASS="section4"
->Constructors</TD
-></TR
-><TR
-><TD CLASS="body"
-><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
-><TR
-><TD CLASS="arg"
-><A NAME="v:MVar"
-><A NAME="v%3AMVar"
-></A
-></A
-><B
->MVar</B
-> (MVar# <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Control-Monad-ST.html#t%3ARealWorld"
->RealWorld</A
-> a)</TD
-><TD CLASS="rdoc"
-></TD
-></TR
-></TABLE
-></TD
-></TR
-><TR
-><TD CLASS="section4"
-><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:MVar')" ALT="show/hide"
-> Instances</TD
-></TR
-><TR
-><TD CLASS="body"
-><DIV ID="i:MVar" STYLE="display:block;"
-><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
-><TR
-><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Typeable.html#t%3ATypeable1"
->Typeable1</A
-> <A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Eq.html#t%3AEq"
->Eq</A
-> (<A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-> a)</TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Typeable.html#t%3ATypeable"
->Typeable</A
-> a =&gt; <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/Data-Data.html#t%3AData"
->Data</A
-> (<A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-> a)</TD
-></TR
-></TABLE
-></DIV
-></TD
-></TR
-></TABLE
-></TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A NAME="v:newEmptyMVar"
-><A NAME="v%3AnewEmptyMVar"
-></A
-></A
-><B
->newEmptyMVar</B
-> ::  <A HREF=" /home/david/compilers/ghc-6.11/lib/ghc-6.11.20090909/../../share/doc/ghc/html/libraries/base/System-IO.html#t%3AIO"
->IO</A
-> (<A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-> a)</TD
-></TR
-><TR
-><TD CLASS="doc"
->Create an <TT
-><A HREF="CrossPackageDocs.html#t%3AMVar"
->MVar</A
-></TT
-> which is initially empty.
-</TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="doc"
-><P
->Bugs:
-</P
-><UL
-><LI
-> [] a
-</LI
-><LI
-> No instances list
-</LI
-><LI
-> No docs on function arguments
-</LI
-></UL
-></TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE
