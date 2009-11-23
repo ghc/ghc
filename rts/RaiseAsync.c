@@ -150,6 +150,8 @@ throwTo (Capability *cap,	// the Capability we hold
 {
     StgWord status;
 
+    ASSERT(target != END_TSO_QUEUE);
+
     // follow ThreadRelocated links in the target first
     while (target->what_next == ThreadRelocated) {
 	target = target->_link;
@@ -169,6 +171,8 @@ retry:
     debugTrace(DEBUG_sched, "throwTo: retrying...");
 
 check_target:
+    ASSERT(target != END_TSO_QUEUE);
+
     // Thread already dead?
     if (target->what_next == ThreadComplete 
 	|| target->what_next == ThreadKilled) {
