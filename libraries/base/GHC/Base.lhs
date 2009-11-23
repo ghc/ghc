@@ -468,20 +468,6 @@ by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
 'Prelude.Enum' class respectively (or equivalently 'ord' and 'chr').
 -}
 
--- We don't use deriving for Eq and Ord, because for Ord the derived
--- instance defines only compare, which takes two primops.  Then
--- '>' uses compare, and therefore takes two primops instead of one.
-
-instance Eq Char where
-    (C# c1) == (C# c2) = c1 `eqChar#` c2
-    (C# c1) /= (C# c2) = c1 `neChar#` c2
-
-instance Ord Char where
-    (C# c1) >  (C# c2) = c1 `gtChar#` c2
-    (C# c1) >= (C# c2) = c1 `geChar#` c2
-    (C# c1) <= (C# c2) = c1 `leChar#` c2
-    (C# c1) <  (C# c2) = c1 `ltChar#` c2
-
 {-# RULES
 "x# `eqChar#` x#" forall x#. x# `eqChar#` x# = True
 "x# `neChar#` x#" forall x#. x# `neChar#` x# = False

@@ -21,6 +21,8 @@ import GHC.Bool
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
 import GHC.Ordering
+import GHC.Prim
+import GHC.Types
 
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
@@ -60,6 +62,10 @@ instance Eq Ordering where
     LT == LT = True
     GT == GT = True
     _  == _  = False
+
+instance Eq Char where
+    (C# c1) == (C# c2) = c1 `eqChar#` c2
+    (C# c1) /= (C# c2) = c1 `neChar#` c2
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
@@ -112,6 +118,15 @@ instance Ord Ordering where
     EQ <= _  = True
     _  <= EQ = False
     GT <= GT = True
+
+-- We don't use deriving for Ord Char, because for Ord the derived
+-- instance defines only compare, which takes two primops.  Then
+-- '>' uses compare, and therefore takes two primops instead of one.
+instance Ord Char where
+    (C# c1) >  (C# c2) = c1 `gtChar#` c2
+    (C# c1) >= (C# c2) = c1 `geChar#` c2
+    (C# c1) <= (C# c2) = c1 `leChar#` c2
+    (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 -- OK, so they're technically not part of a class...:
 
