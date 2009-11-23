@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 #include "Typeable.h"
 
