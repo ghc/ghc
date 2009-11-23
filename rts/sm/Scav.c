@@ -1490,9 +1490,11 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    case TSO: {
 		StgTSO *tso = (StgTSO *)p;
 		if (tso->dirty == 0) {
-                    // Must be on the mutable list because its link
-                    // field is dirty.
-                    ASSERT(tso->flags & TSO_LINK_DIRTY);
+                    // Should be on the mutable list because its link
+                    // field is dirty.  However, in parallel GC we may
+                    // have a thread on multiple mutable lists, so
+                    // this assertion would be invalid:
+                    // ASSERT(tso->flags & TSO_LINK_DIRTY);
 
                     scavenge_TSO_link(tso);
                     if (gct->failed_to_evac) {
