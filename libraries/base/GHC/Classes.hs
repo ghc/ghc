@@ -1,5 +1,7 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+-- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -22,7 +24,9 @@ import GHC.Bool
 import GHC.Magic ()
 import GHC.Ordering
 import GHC.Prim
+import GHC.Tuple
 import GHC.Types
+import GHC.Unit
 
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
@@ -44,6 +48,40 @@ class  Eq a  where
     {-# INLINE (==) #-}
     x /= y               = not (x == y)
     x == y               = not (x /= y)
+
+deriving instance Eq ()
+deriving instance (Eq  a, Eq  b) => Eq  (a, b)
+deriving instance (Eq  a, Eq  b, Eq  c) => Eq  (a, b, c)
+deriving instance (Eq  a, Eq  b, Eq  c, Eq  d) => Eq  (a, b, c, d)
+deriving instance (Eq  a, Eq  b, Eq  c, Eq  d, Eq  e) => Eq  (a, b, c, d, e)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f)
+               => Eq (a, b, c, d, e, f)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g)
+               => Eq (a, b, c, d, e, f, g)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h)
+               => Eq (a, b, c, d, e, f, g, h)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i)
+               => Eq (a, b, c, d, e, f, g, h, i)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i, Eq j)
+               => Eq (a, b, c, d, e, f, g, h, i, j)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i, Eq j, Eq k)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i, Eq j, Eq k, Eq l)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i, Eq j, Eq k, Eq l, Eq m)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i, Eq j, Eq k, Eq l, Eq m, Eq n)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
+                   Eq h, Eq i, Eq j, Eq k, Eq l, Eq m, Eq n, Eq o)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
 
 instance (Eq a) => Eq [a] where
     {-# SPECIALISE instance Eq [Char] #-}
@@ -105,6 +143,52 @@ class  (Eq a) => Ord a  where
         -- because the latter is often more expensive
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
+
+-- XXX Deriving this doesn't work:
+-- ghc-stage1: panic! (the 'impossible' happened)
+--   (GHC version 6.13.20091123 for x86_64-unknown-linux):
+--         TcGenDeriv:mk_FunBind
+instance Ord () where
+    () <= () = True
+    () <  () = False
+    () >= () = True
+    () >  () = False
+    max () () = ()
+    min () () = ()
+    compare () () = EQ
+
+deriving instance (Ord a, Ord b) => Ord (a, b)
+deriving instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
+deriving instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e) => Ord (a, b, c, d, e)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f)
+               => Ord (a, b, c, d, e, f)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g)
+               => Ord (a, b, c, d, e, f, g)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h)
+               => Ord (a, b, c, d, e, f, g, h)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i)
+               => Ord (a, b, c, d, e, f, g, h, i)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i, Ord j)
+               => Ord (a, b, c, d, e, f, g, h, i, j)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i, Ord j, Ord k)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i, Ord j, Ord k, Ord l)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i, Ord j, Ord k, Ord l, Ord m)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i, Ord j, Ord k, Ord l, Ord m, Ord n)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
+                   Ord h, Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
 
 instance (Ord a) => Ord [a] where
     {-# SPECIALISE instance Ord [Char] #-}
