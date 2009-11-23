@@ -234,7 +234,9 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS, gHC_CLASSES, gHC_BASE, gHC_ENUM,
+gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
+    gHC_MAGIC,
+    gHC_CLASSES, gHC_BASE, gHC_ENUM,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST, gHC_PARR,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
@@ -249,6 +251,7 @@ gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
+gHC_MAGIC	= mkPrimModule (fsLit "GHC.Magic")
 
 gHC_CLASSES	= mkBaseModule (fsLit "GHC.Classes")
 gHC_BASE	= mkBaseModule (fsLit "GHC.Base")
@@ -564,7 +567,7 @@ stringTyConName         = tcQual  gHC_BASE (fsLit "String") stringTyConKey
 
 -- The 'inline' function
 inlineIdName :: Name
-inlineIdName	 	= varQual gHC_BASE (fsLit "inline") inlineIdKey
+inlineIdName	 	= varQual gHC_MAGIC (fsLit "inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
 eqClassName, eqName, ordClassName, geName, functorClassName :: Name
