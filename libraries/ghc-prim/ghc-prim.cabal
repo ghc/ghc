@@ -25,6 +25,7 @@ Library {
         GHC.Bool
         GHC.Debug
         GHC.Generics
+        GHC.Magic
         GHC.Ordering
         GHC.PrimopWrappers
         GHC.IntWord32
