@@ -52,6 +52,7 @@ import Prelude
 
 import GHC.Prim
 import GHC.Base
+import GHC.Magic
 import GHC.Word
 import GHC.Int
 -- import GHC.Float

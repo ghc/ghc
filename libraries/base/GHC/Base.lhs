@@ -469,36 +469,6 @@ otherwise               =  True
 
 %*********************************************************
 %*                                                      *
-\subsection{Type @Ordering@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
--- | Represents an ordering relationship between two values: less
--- than, equal to, or greater than.  An 'Ordering' is returned by
--- 'compare'.
--- XXX These don't work:
--- deriving instance Eq Ordering
--- deriving instance Ord Ordering
--- Illegal binding of built-in syntax: con2tag_Ordering#
-instance Eq Ordering where
-    EQ == EQ = True
-    LT == LT = True
-    GT == GT = True
-    _  == _  = False
-        -- Read in GHC.Read, Show in GHC.Show
-
-instance Ord Ordering where
-    LT <= _  = True
-    _  <= LT = False
-    EQ <= _  = True
-    _  <= EQ = False
-    GT <= GT = True
-\end{code}
-
-
-%*********************************************************
-%*                                                      *
 \subsection{Type @Char@ and @String@}
 %*                                                      *
 %*********************************************************
@@ -641,16 +611,6 @@ lazy x = x
 -- That way, 'lazy' does not get inlined, and the strictness analyser
 -- sees it as lazy.  Then the worker/wrapper phase inlines it.
 -- Result: happiness
-
-
--- | The call '(inline f)' reduces to 'f', but 'inline' has a BuiltInRule
--- that tries to inline 'f' (if it has an unfolding) unconditionally
--- The 'NOINLINE' pragma arranges that inline only gets inlined (and
--- hence eliminated) late in compilation, after the rule has had
--- a good chance to fire.
-inline :: a -> a
-{-# NOINLINE[0] inline #-}
-inline x = x
 
 -- Assertion function.  This simply ignores its boolean argument.
 -- The compiler may rewrite it to @('assertError' line)@.

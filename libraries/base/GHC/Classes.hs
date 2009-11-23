@@ -18,6 +18,8 @@
 module GHC.Classes where
 
 import GHC.Bool
+-- GHC.Magic is used in some derived instances
+import GHC.Magic ()
 import GHC.Ordering
 
 infix  4  ==, /=, <, <=, >=, >
@@ -40,6 +42,15 @@ class  Eq a  where
     {-# INLINE (==) #-}
     x /= y               = not (x == y)
     x == y               = not (x /= y)
+
+-- XXX This doesn't work:
+-- deriving instance Eq Ordering
+-- Illegal binding of built-in syntax: con2tag_Ordering#
+instance Eq Ordering where
+    EQ == EQ = True
+    LT == LT = True
+    GT == GT = True
+    _  == _  = False
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
@@ -73,6 +84,16 @@ class  (Eq a) => Ord a  where
         -- because the latter is often more expensive
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
+
+-- XXX This doesn't work:
+-- deriving instance Ord Ordering
+-- Illegal binding of built-in syntax: con2tag_Ordering#
+instance Ord Ordering where
+    LT <= _  = True
+    _  <= LT = False
+    EQ <= _  = True
+    _  <= EQ = False
+    GT <= GT = True
 
 -- OK, so they're technically not part of a class...:
 
