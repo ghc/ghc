@@ -390,16 +390,16 @@ foreign import ccall unsafe "HsBase.h __hscore_lseek"
 foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CFilePath -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "__hscore_open"
+foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h read" 
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
-foreign import ccall safe "read"
+foreign import ccall safe "HsBase.h read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
-foreign import ccall unsafe "__hscore_stat"
+foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h umask"
@@ -408,7 +408,7 @@ foreign import ccall unsafe "HsBase.h umask"
 foreign import ccall unsafe "HsBase.h write" 
    c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
-foreign import ccall safe "write"
+foreign import ccall safe "HsBase.h write"
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
