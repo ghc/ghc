@@ -44,6 +44,15 @@ class  Eq a  where
     x == y               = not (x /= y)
 
 -- XXX This doesn't work:
+-- deriving instance Eq Bool
+-- <wired into compiler>:
+--     Illegal binding of built-in syntax: con2tag_Bool#
+instance Eq Bool where
+    True  == True  = True
+    False == False = True
+    _     == _     = False
+
+-- XXX This doesn't work:
 -- deriving instance Eq Ordering
 -- Illegal binding of built-in syntax: con2tag_Ordering#
 instance Eq Ordering where
@@ -84,6 +93,15 @@ class  (Eq a) => Ord a  where
         -- because the latter is often more expensive
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
+
+-- XXX This doesn't work:
+-- deriving instance Ord Bool
+-- <wired into compiler>:
+--     Illegal binding of built-in syntax: con2tag_Bool#
+instance Ord Bool where
+    compare False True  = LT
+    compare True  False = GT
+    compare _     _     = EQ
 
 -- XXX This doesn't work:
 -- deriving instance Ord Ordering

@@ -434,30 +434,6 @@ mapFB c f x ys = c (f x) ys
 %*********************************************************
 
 \begin{code}
--- |The 'Bool' type is an enumeration.  It is defined with 'False'
--- first so that the corresponding 'Prelude.Enum' instance will give
--- 'Prelude.fromEnum' 'False' the value zero, and
--- 'Prelude.fromEnum' 'True' the value 1.
--- The actual definition is in the ghc-prim package.
-
--- XXX These don't work:
--- deriving instance Eq Bool
--- deriving instance Ord Bool
--- <wired into compiler>:
---     Illegal binding of built-in syntax: con2tag_Bool#
-
-instance Eq Bool where
-    True  == True  = True
-    False == False = True
-    _     == _     = False
-
-instance Ord Bool where
-    compare False True  = LT
-    compare True  False = GT
-    compare _     _     = EQ
-
--- Read is in GHC.Read, Show in GHC.Show
-
 -- |'otherwise' is defined as the value 'True'.  It helps to make
 -- guards more readable.  eg.
 --
