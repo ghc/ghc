@@ -367,31 +367,41 @@ defined in the <A HREF="">Prelude</A
 ><DIV ID="i:Monad" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
 ><A HREF="">Monad</A
 > []</TD
+><TD CLASS="rdoc"
+></TD
 ></TR
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
 ><A HREF="">Monad</A
 > <A HREF="">IO</A
 ></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="">Monad</A
-> Q</TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="">Monad</A
-> <A HREF="">Maybe</A
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
+><A HREF="">Monad</A
+> Q</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A HREF="">Monad</A
+> <A HREF="">Maybe</A
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
 ><A HREF="">Monad</A
 > ((-&gt;) r)</TD
+><TD CLASS="rdoc"
+></TD
 ></TR
 ></TABLE
 ></DIV

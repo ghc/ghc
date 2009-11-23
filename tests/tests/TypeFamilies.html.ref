@@ -260,9 +260,11 @@
 ><DIV ID="i:A" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
 ><A HREF="">A</A
 > <A HREF="">Int</A
+></TD
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ></TABLE

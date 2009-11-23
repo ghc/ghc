@@ -428,23 +428,29 @@
 ><DIV ID="i:Hash" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
 ><A HREF="">Hash</A
 > <A HREF="">Float</A
 ></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="">Hash</A
-> <A HREF="">Int</A
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
+><A HREF="">Hash</A
+> <A HREF="">Int</A
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
 >(<A HREF="">Hash</A
 > a, <A HREF="">Hash</A
 > b) =&gt; <A HREF="">Hash</A
 > (a, b)</TD
+><TD CLASS="rdoc"
+></TD
 ></TR
 ></TABLE
 ></DIV

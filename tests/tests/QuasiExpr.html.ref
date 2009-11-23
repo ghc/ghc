@@ -153,21 +153,27 @@
 ><DIV ID="i:Expr" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
 ><A HREF="">Data</A
 > <A HREF="">Expr</A
 ></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="">Show</A
-> <A HREF="">Expr</A
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
+><A HREF="">Show</A
+> <A HREF="">Expr</A
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
 ><A HREF="">Typeable</A
 > <A HREF="">Expr</A
+></TD
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ></TABLE
@@ -264,21 +270,27 @@
 ><DIV ID="i:BinOp" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
 ><A HREF="">Data</A
 > <A HREF="">BinOp</A
 ></TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="">Show</A
-> <A HREF="">BinOp</A
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ><TR
-><TD CLASS="decl"
+><TD CLASS="arg"
+><A HREF="">Show</A
+> <A HREF="">BinOp</A
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
 ><A HREF="">Typeable</A
 > <A HREF="">BinOp</A
+></TD
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ></TABLE

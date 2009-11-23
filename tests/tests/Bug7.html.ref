@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -79,10 +77,8 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AFoo"
->Foo</A
->  = <A HREF="#v%3AFoo"
->Foo</A
+>  <A HREF="">Foo</A
+>  = <A HREF="">Foo</A
 ></TD
 ></TR
 ><TR
@@ -93,8 +89,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
->  <A HREF="#t%3ABar"
->Bar</A
+>  <A HREF="">Bar</A
 > x y </TD
 ></TR
 ></TABLE
@@ -164,14 +159,14 @@
 ><DIV ID="i:Foo" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
-><A HREF="Bug7.html#t%3ABar"
->Bar</A
-> <A HREF="Bug7.html#t%3AFoo"
->Foo</A
-> <A HREF="Bug7.html#t%3AFoo"
->Foo</A
+><TD CLASS="arg"
+><A HREF="">Bar</A
+> <A HREF="">Foo</A
+> <A HREF="">Foo</A
 ></TD
+><TD CLASS="rdoc"
+>Just one instance
+</TD
 ></TR
 ></TABLE
 ></DIV
@@ -218,14 +213,14 @@
 ><DIV ID="i:Bar" STYLE="display:block;"
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
-><TD CLASS="decl"
-><A HREF="Bug7.html#t%3ABar"
->Bar</A
-> <A HREF="Bug7.html#t%3AFoo"
->Foo</A
-> <A HREF="Bug7.html#t%3AFoo"
->Foo</A
+><TD CLASS="arg"
+><A HREF="">Bar</A
+> <A HREF="">Foo</A
+> <A HREF="">Foo</A
 ></TD
+><TD CLASS="rdoc"
+>Just one instance
+</TD
 ></TR
 ></TABLE
 ></DIV
@@ -240,8 +235,7 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
+>Produced by <A HREF="">Haddock</A
 > version 2.5.0</TD
 ></TR
 ></TABLE
