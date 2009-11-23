@@ -45,6 +45,12 @@ class  Eq a  where
     x /= y               = not (x == y)
     x == y               = not (x /= y)
 
+instance (Eq a) => Eq [a] where
+    {-# SPECIALISE instance Eq [Char] #-}
+    []     == []     = True
+    (x:xs) == (y:ys) = x == y && xs == ys
+    _xs    == _ys    = False
+
 -- XXX This doesn't work:
 -- deriving instance Eq Bool
 -- <wired into compiler>:
@@ -99,6 +105,15 @@ class  (Eq a) => Ord a  where
         -- because the latter is often more expensive
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
+
+instance (Ord a) => Ord [a] where
+    {-# SPECIALISE instance Ord [Char] #-}
+    compare []     []     = EQ
+    compare []     (_:_)  = LT
+    compare (_:_)  []     = GT
+    compare (x:xs) (y:ys) = case compare x y of
+                                EQ    -> compare xs ys
+                                other -> other
 
 -- XXX This doesn't work:
 -- deriving instance Ord Bool

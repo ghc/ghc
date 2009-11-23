@@ -237,24 +237,6 @@ class  Monad m  where
 %*********************************************************
 
 \begin{code}
--- do explicitly: deriving (Eq, Ord)
--- to avoid weird names like con2tag_[]#
-
-instance (Eq a) => Eq [a] where
-    {-# SPECIALISE instance Eq [Char] #-}
-    []     == []     = True
-    (x:xs) == (y:ys) = x == y && xs == ys
-    _xs    == _ys    = False
-
-instance (Ord a) => Ord [a] where
-    {-# SPECIALISE instance Ord [Char] #-}
-    compare []     []     = EQ
-    compare []     (_:_)  = LT
-    compare (_:_)  []     = GT
-    compare (x:xs) (y:ys) = case compare x y of
-                                EQ    -> compare xs ys
-                                other -> other
-
 instance Functor [] where
     fmap = map
 
