@@ -1,6 +1,6 @@
 module Main where
 
 import C (x)
-import GHC.Base (inline)
+import GHC.Exts (inline)
 
 main = print (inline x)
