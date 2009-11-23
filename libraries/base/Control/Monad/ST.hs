@@ -36,11 +36,17 @@ import Control.Monad.Fix
 
 #include "Typeable.h"
 
-#ifdef __HUGS__
+#if defined(__GLASGOW_HASKELL__)
+import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
+import GHC.Base         ( RealWorld )
+import GHC.IO           ( stToIO, unsafeIOToST, unsafeSTToIO )
+#elif defined(__HUGS__)
 import Data.Typeable
 import Hugs.ST
 import qualified Hugs.LazyST as LazyST
+#endif
 
+#if defined(__HUGS__)
 INSTANCE_TYPEABLE2(ST,sTTc,"ST")
 INSTANCE_TYPEABLE0(RealWorld,realWorldTc,"RealWorld")
 
@@ -50,12 +56,6 @@ fixST f = LazyST.lazyToStrictST (LazyST.fixST (LazyST.strictToLazyST . f))
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST =
     LazyST.lazyToStrictST . LazyST.unsafeInterleaveST . LazyST.strictToLazyST
-#endif
-
-#ifdef __GLASGOW_HASKELL__
-import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
-import GHC.Base         ( RealWorld )
-import GHC.IO           ( stToIO, unsafeIOToST, unsafeSTToIO )
 #endif
 
 instance MonadFix (ST s) where
