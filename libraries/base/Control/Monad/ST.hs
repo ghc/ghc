@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.ST
@@ -32,7 +31,11 @@ module Control.Monad.ST
         unsafeSTToIO            -- :: ST s a -> IO a
       ) where
 
+#if defined(__GLASGOW_HASKELL__)
+import Control.Monad.Fix ()
+#else
 import Control.Monad.Fix
+#endif
 
 #include "Typeable.h"
 
@@ -58,6 +61,8 @@ unsafeInterleaveST =
     LazyST.lazyToStrictST . LazyST.unsafeInterleaveST . LazyST.strictToLazyST
 #endif
 
+#if !defined(__GLASGOW_HASKELL__)
 instance MonadFix (ST s) where
         mfix = fixST
+#endif
 

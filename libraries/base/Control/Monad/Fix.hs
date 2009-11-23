@@ -29,6 +29,9 @@ import Data.Function (fix)
 #ifdef __HUGS__
 import Hugs.Prelude (MonadFix(mfix))
 #endif
+#if defined(__GLASGOW_HASKELL__)
+import GHC.ST
+#endif
 
 #ifndef __HUGS__
 -- | Monads having fixed points with a \'knot-tying\' semantics.
@@ -77,3 +80,9 @@ instance MonadFix IO where
 
 instance MonadFix ((->) r) where
     mfix f = \ r -> let a = f a r in a
+
+#if defined(__GLASGOW_HASKELL__)
+instance MonadFix (ST s) where
+        mfix = fixST
+#endif
+
