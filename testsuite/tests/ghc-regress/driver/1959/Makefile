@@ -15,11 +15,11 @@ clean ::
 	rm -f *.o *.hi E.hs
 
 dotest ::
-	@$(MAKE) clean >compile.out 2>&1 
-	@cp E1.hs E.hs
-	@$(MAKE) compile >compile.out 2>&1 
+	$(MAKE) clean >compile.out 2>&1 
+	cp E1.hs E.hs
+	$(MAKE) compile >compile.out 2>&1 
 	./prog
-	@sleep 1
-	@cp E2.hs E.hs
-	@$(MAKE) compile >compile.out 2>&1
+	sleep 1
+	cp E2.hs E.hs
+	$(MAKE) compile >compile.out 2>&1
 	./prog
