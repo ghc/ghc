@@ -464,9 +464,6 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
 
--- XXX to use another Integer implementation, you might need to disable
--- the gcd/Integer and lcm/Integer RULES above
---
 gcdInteger' :: Integer -> Integer -> Integer
 gcdInteger' 0 0 = error "GHC.Real.gcdInteger': gcd 0 0 is undefined"
 gcdInteger' a b = gcdInteger a b
