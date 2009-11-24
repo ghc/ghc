@@ -30,6 +30,7 @@ RUNTEST_OPTS =
 $(eval $(call get-ghc-rts-field,WORDSIZE,Word size))
 $(eval $(call get-ghc-rts-field,TARGETPLATFORM,Target platform))
 $(eval $(call get-ghc-rts-field,TargetOS_CPP,Target OS))
+$(eval $(call get-ghc-rts-field,TargetARCH_CPP,Target architecture))
 ifeq "$(filter $(TargetOS_CPP), cygwin32 mingw32)" ""
 exeext =
 else
@@ -106,6 +107,7 @@ RUNTEST_OPTS +=  \
 	-e 'config.gs="$(GS)"' \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
+	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \
 	-e 'default_testopts.cleanup="$(CLEANUP)"' \
 	-e 'config.timeout=int($(TIMEOUT)) or config.timeout' \

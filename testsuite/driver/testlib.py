@@ -260,6 +260,12 @@ def if_os( os, f ):
     else:
         return normal
 
+def if_arch( arch, f ):
+    if config.arch == arch:
+        return f
+    else:
+        return normal
+
 def if_wordsize( ws, f ):
     if config.wordsize == str(ws):
         return f
