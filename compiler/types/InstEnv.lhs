@@ -59,7 +59,7 @@ data Instance
 		-- INVARIANT: is_dfun Id has type 
 		--	forall is_tvs. (...) => is_cls is_tys
 
-	     , is_dfun :: DFunId
+	     , is_dfun :: DFunId -- See Note [Haddock assumptions]
 	     , is_flag :: OverlapFlag	-- See detailed comments with
 					-- the decl of BasicTypes.OverlapFlag
     }
@@ -99,7 +99,20 @@ However, note that:
    (This is so that we can use the matching substitution to
     instantiate the dfun's context.)
 
+Note [Haddock assumptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+For normal user-written instances, Haddock relies on
 
+ * the SrcSpan of
+ * the Name of
+ * the is_dfun of
+ * an Instance
+
+being equal to
+
+  * the SrcSpan of
+  * the instance head type of
+  * the InstDecl used to construct the Instance.
 
 \begin{code}
 instanceDFunId :: Instance -> DFunId
