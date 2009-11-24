@@ -89,23 +89,8 @@ instance (Eq a) => Eq [a] where
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False
 
--- XXX This doesn't work:
--- deriving instance Eq Bool
--- <wired into compiler>:
---     Illegal binding of built-in syntax: con2tag_Bool#
-instance Eq Bool where
-    True  == True  = True
-    False == False = True
-    _     == _     = False
-
--- XXX This doesn't work:
--- deriving instance Eq Ordering
--- Illegal binding of built-in syntax: con2tag_Ordering#
-instance Eq Ordering where
-    EQ == EQ = True
-    LT == LT = True
-    GT == GT = True
-    _  == _  = False
+deriving instance Eq Bool
+deriving instance Eq Ordering
 
 instance Eq Char where
     (C# c1) == (C# c2) = c1 `eqChar#` c2
@@ -187,24 +172,8 @@ instance (Ord a) => Ord [a] where
                                 EQ    -> compare xs ys
                                 other -> other
 
--- XXX This doesn't work:
--- deriving instance Ord Bool
--- <wired into compiler>:
---     Illegal binding of built-in syntax: con2tag_Bool#
-instance Ord Bool where
-    compare False True  = LT
-    compare True  False = GT
-    compare _     _     = EQ
-
--- XXX This doesn't work:
--- deriving instance Ord Ordering
--- Illegal binding of built-in syntax: con2tag_Ordering#
-instance Ord Ordering where
-    LT <= _  = True
-    _  <= LT = False
-    EQ <= _  = True
-    _  <= EQ = False
-    GT <= GT = True
+deriving instance Ord Bool
+deriving instance Ord Ordering
 
 -- We don't use deriving for Ord Char, because for Ord the derived
 -- instance defines only compare, which takes two primops.  Then
