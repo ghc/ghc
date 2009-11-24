@@ -18,7 +18,9 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 import Haddock.Types
 import Haddock.Convert
 
+import Control.Arrow
 import Data.List
+import qualified Data.Map as Map
 
 import GHC
 import Name
@@ -40,28 +42,45 @@ import FastString
 #define FSLIT(x) (mkFastString# (x#))
 
 
-attachInstances :: [Interface] -> Ghc [Interface]
-attachInstances = mapM attach
+attachInstances :: [Interface] -> InstIfaceMap -> Ghc [Interface]
+attachInstances ifaces instIfaceMap = mapM attach ifaces
   where
     attach iface = do
       newItems <- mapM attachExport $ ifaceExportItems iface
       return $ iface { ifaceExportItems = newItems }
+      where
+        attachExport export@ExportDecl{expItemDecl = L _ (TyClD d)} = do
+           mb_info <- getAllInfo (unLoc (tcdLName d))
+           return $ export { expItemInstances = case mb_info of
+             Just (_, _, instances) ->
+               let insts = map (first synifyInstHead) $ sortImage (first instHead)
+                             [ (instanceHead i, getName i) | i <- instances ]
+               in [ (name, inst, lookupInstDoc name iface instIfaceMap)
+                  | (inst, name) <- insts ]
+             Nothing -> []
+            }
+        attachExport export = return export
 
-    attachExport export@ExportDecl{expItemDecl = L _ (TyClD d)} = do
-       mb_info <- getAllInfo (unLoc (tcdLName d))
-       return $ export { expItemInstances = case mb_info of
-         Just (_, _, instances) ->
-           map synifyInstHead . sortImage instHead . map instanceHead $ instances
-         Nothing ->
-           []
-        }
-    attachExport export = return export
+
+lookupInstDoc :: Name -> Interface -> InstIfaceMap -> Maybe (HsDoc Name)
+-- TODO: capture this pattern in a function (when we have streamlined the
+-- handling of instances)
+lookupInstDoc name iface ifaceMap =
+  case Map.lookup name (ifaceInstanceDocMap iface) of
+    Just doc -> Just doc
+    Nothing -> do -- in Maybe
+      instIface <- Map.lookup modName ifaceMap
+      (Just doc, _) <- Map.lookup name (instDocMap instIface)
+      return doc
+  where
+    modName = nameModule name
 
 
 -- | Like GHC's getInfo but doesn't cut things out depending on the
 -- interative context, which we don't set sufficiently anyway.
 getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[Instance]))
 getAllInfo name = withSession $ \hsc_env -> ioMsg $ tcRnGetInfo hsc_env name
+
 
 --------------------------------------------------------------------------------
 -- Collecting and sorting instances

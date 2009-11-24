@@ -809,7 +809,7 @@ declWithDoc False links loc nm (Just doc) html_decl =
 
 -- TODO: use DeclInfo DocName or something
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName -> 
-          DocForDecl DocName -> [InstHead DocName] -> [(DocName, DocForDecl DocName)] -> Bool -> HtmlTable
+          DocForDecl DocName -> [DocInstance DocName] -> [(DocName, DocForDecl DocName)] -> Bool -> HtmlTable
 ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances subdocs unicode = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d unicode
   TyClD d@(TyData {})
@@ -955,7 +955,7 @@ ppTyFam summary associated links loc mbDoc decl unicode
   	  tda [theclass "body"] << 
             collapsed thediv instId (
               spacedTable1 << (
-                aboves (map (declBox . ppInstHead unicode) instances)
+                aboves (map (ppDocInstance unicode) instances)
               )
             )
 
@@ -1150,7 +1150,7 @@ ppShortClassDecl _ _ _ _ _ _ = error "declaration type not supported by ppShortC
     
 
 
-ppClassDecl :: Bool -> LinksInfo -> [InstHead DocName] -> SrcSpan
+ppClassDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan
             -> Maybe (HsDoc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> HtmlTable
 ppClassDecl summary links instances loc mbDoc subdocs
@@ -1191,10 +1191,17 @@ ppClassDecl summary links instances loc mbDoc subdocs
         =  s8 </> instHdr instId </>
            tda [theclass "body"] << 
              collapsed thediv instId (
-             spacedTable1 << (
-               aboves (map (declBox . ppInstHead unicode) instances)
-             ))
+               spacedTable1 << aboves (map (ppDocInstance unicode) instances)
+             )
 ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
+
+
+-- | Print a possibly commented instance. The instance header is printed inside
+-- an 'argBox'. The comment is printed to the right of the box in normal comment
+-- style.
+ppDocInstance :: Bool -> DocInstance DocName -> HtmlTable
+ppDocInstance unicode (_, instHead, maybeDoc) =
+  argBox (ppInstHead unicode instHead) <-> maybeRDocBox maybeDoc
 
 
 ppInstHead :: Bool -> InstHead DocName -> Html
@@ -1249,7 +1256,7 @@ ppShortDataDecl summary links loc dataDecl unicode
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
 
-ppDataDecl :: Bool -> LinksInfo -> [InstHead DocName] ->
+ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
               SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> Bool -> HtmlTable
 ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
@@ -1303,8 +1310,7 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
         = instHdr instId </>
 	  tda [theclass "body"] << 
           collapsed thediv instId (
-            spacedTable1 << (
-              aboves (map (declBox . ppInstHead unicode) instances)
+            spacedTable1 << aboves (map (ppDocInstance unicode) instances
             )
           )
 
@@ -1374,17 +1380,17 @@ ppSideBySideConstr subdocs unicode (L _ con) = case con_res con of
 
     PrefixCon args -> 
       argBox (hsep ((header_ unicode +++ ppBinder False occ) : map (ppLParendType unicode) args)) 
-      <-> maybeRDocBox mbLDoc  
+      <-> maybeRDocBox mbDoc  
 
     RecCon fields -> 
       argBox (header_ unicode +++ ppBinder False occ) <->
-      maybeRDocBox mbLDoc
+      maybeRDocBox mbDoc
       </>
       doRecordFields fields
 
     InfixCon arg1 arg2 -> 
       argBox (hsep [header_ unicode+++ppLParendType unicode arg1, ppBinder False occ, ppLParendType unicode arg2])
-      <-> maybeRDocBox mbLDoc
+      <-> maybeRDocBox mbDoc
  
   ResTyGADT resTy -> case con_details con of
     -- prefix & infix could also use hsConDeclArgTys if it seemed to
@@ -1401,7 +1407,7 @@ ppSideBySideConstr subdocs unicode (L _ con) = case con_res con of
     doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon unicode <+> hsep [
                                ppForAll forall ltvs (con_cxt con) unicode,
                                ppLType unicode (foldr mkFunTy resTy args) ]
-                            ) <-> maybeRDocBox mbLDoc
+                            ) <-> maybeRDocBox mbDoc
 
 
     header_ = ppConstrHdr forall tyVars context
@@ -1412,19 +1418,17 @@ ppSideBySideConstr subdocs unicode (L _ con) = case con_res con of
     forall  = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    -- The 'fmap' and 'join' are in Maybe
-    mbLDoc  = fmap noLoc $ join $ fmap fst $
-                lookup (unLoc $ con_name con) subdocs
+    -- 'join' is in Maybe.
+    mbDoc = join $ fmap fst $ lookup (unLoc $ con_name con) subdocs
     mkFunTy a b = noLoc (HsFunTy a b)
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  HtmlTable
 ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
   argBox (ppBinder False (docNameOcc name)
-    <+> dcolon unicode <+> ppLType unicode ltype) <->
-  maybeRDocBox mbLDoc
+    <+> dcolon unicode <+> ppLType unicode ltype) <-> maybeRDocBox mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbLDoc = fmap noLoc $ join $ fmap fst $ lookup name subdocs
+    mbDoc = join $ fmap fst $ lookup name subdocs
 
 {-
 ppHsFullConstr :: HsConDecl -> Html
@@ -1764,6 +1768,7 @@ htmlCleanup = idMarkup {
 -- -----------------------------------------------------------------------------
 -- * Misc
 
+
 hsep :: [Html] -> Html
 hsep [] = noHtml
 hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
@@ -1890,9 +1895,9 @@ ndocBox html = tda [theclass "ndoc"] << html
 rdocBox :: Html -> HtmlTable
 rdocBox html = tda [theclass "rdoc"] << html
 
-maybeRDocBox :: Maybe (LHsDoc DocName) -> HtmlTable
+maybeRDocBox :: Maybe (HsDoc DocName) -> HtmlTable
 maybeRDocBox Nothing = rdocBox (noHtml)
-maybeRDocBox (Just ldoc) = rdocBox (docToHtml (unLoc ldoc))
+maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
 
 -- a box for the buttons at the top of the page
 topButBox :: Html -> HtmlTable

@@ -56,13 +56,18 @@ createInterface ghcMod flags modMap instIfaceMap = do
   (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader
                                        gre (ghcMbDocHdr ghcMod)
   decls0           <- liftErrMsg $ declInfos gre (topDecls (ghcGroup ghcMod))
-  let decls         = filterOutInstances decls0
+
+  let instances      = ghcInstances ghcMod
+      localInsts     = filter (nameIsLocalOrFrom mdl . getName) instances
+      declDocs       = [ (decl, doc) | (L _ decl, (Just doc, _), _) <- decls0 ]
+      instanceDocMap = mkInstanceDocMap localInsts declDocs
+
+      decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
       localNames    = ghcDefinedNames ghcMod
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
-      instances     = ghcInstances ghcMod
 
   liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
@@ -93,7 +98,8 @@ createInterface ghcMod flags modMap instIfaceMap = do
     ifaceVisibleExports  = visibleNames, 
     ifaceDeclMap         = declMap,
     ifaceSubMap          = mkSubMap declMap exportedNames,
-    ifaceInstances       = ghcInstances ghcMod
+    ifaceInstances       = instances,
+    ifaceInstanceDocMap  = instanceDocMap
   }
 
 
@@ -128,6 +134,22 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 -- Declarations
 --------------------------------------------------------------------------------
 
+
+mkInstanceDocMap :: [Instance] -> [(HsDecl name, doc)] -> Map Name doc
+mkInstanceDocMap instances decls =
+  -- We relate Instances to InstDecls using the SrcSpans buried inside them.
+  -- That should work for normal user-written instances (from looking at GHC
+  -- sources). We can assume that commented instances are user-written.
+  -- This lets us relate Names (from Instances) to comments (associated
+  -- with InstDecls).
+  let docMap = Map.fromList [ (loc, doc)
+                            | (InstD (InstDecl (L loc _) _ _ _), doc) <- decls ]
+
+  in Map.fromList [ (name, doc) | inst <- instances
+                  , let name = getName inst
+                  , Just doc <- [ Map.lookup (getSrcSpan name) docMap ] ]
+
+
 -- | Make a sub map from a declaration map. Make sure we only include exported
 -- names.
 mkSubMap :: Map Name DeclInfo -> [Name] -> Map Name [Name]
@@ -137,13 +159,13 @@ mkSubMap declMap exports =
     filterSubs (_, _, subs) = [ sub  | (sub, _) <- subs, sub `elem` exports ]
 
 
--- Make a map from names to 'DeclInfo's. Exclude declarations that don't
--- have names (instances and stand-alone documentation comments). Include
+-- Make a map from names to 'DeclInfo's. Exclude declarations that don't have
+-- names (e.g. instances and stand-alone documentation comments). Include
 -- subordinate names, but map them to their parent declarations. 
 mkDeclMap :: [DeclInfo] -> Map Name DeclInfo
 mkDeclMap decls = Map.fromList . concat $
   [ (declName d, (parent, doc, subs)) : subDecls
-  | (parent@(L _ d), doc, subs) <- decls 
+  | (parent@(L _ d), doc, subs) <- decls
   , let subDecls = [ (n, (parent, doc', [])) | (n, doc') <- subs ]
   , not (isDocD d), not (isInstD d) ]
 

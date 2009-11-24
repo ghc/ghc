@@ -61,7 +61,7 @@ createInterfaces verbosity modules flags extIfaces = do
 
   -- part 3, attach instances
   out verbosity verbose "Attaching instances..."
-  interfaces' <- attachInstances interfaces
+  interfaces' <- attachInstances interfaces instIfaceMap
 
   -- part 4, rename interfaces
   out verbosity verbose "Renaming interfaces..."

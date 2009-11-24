@@ -37,8 +37,13 @@ renameInterface renamingEnv warnings iface =
   let localEnv = foldl fn renamingEnv (ifaceVisibleExports iface)
         where fn env name = Map.insert name (ifaceMod iface) env
 
-      docMap = Map.map (\(_,x,_) -> x) (ifaceDeclMap iface)
-      docs   = Map.toList docMap
+      docMap   = Map.map (\(_,x,_) -> x) (ifaceDeclMap iface)
+
+      -- make instance docs into 'docForDecls'
+      instDocs = [ (name, (Just doc, Map.empty))
+                 | (name, doc) <- Map.toList (ifaceInstanceDocMap iface) ]
+
+      docs     = Map.toList docMap ++ instDocs
       renameMapElem (k,d) = do d' <- renameDocForDecl d; return (k, d')
 
       -- rename names in the exported declarations to point to things that
@@ -448,7 +453,11 @@ renameExportItem item = case item of
     decl' <- renameLDecl decl
     doc'  <- renameDocForDecl doc
     subs' <- mapM renameSub subs
-    instances' <- mapM renameInstHead instances
+    instances' <- forM instances $ \(name, inst, idoc) -> do
+      name' <- rename name
+      inst' <- renameInstHead inst
+      idoc' <- mapM renameDoc idoc
+      return (name', inst', idoc')
     return (ExportDecl decl' doc' subs' instances')
   ExportNoDecl x subs -> do
     x'    <- lookupRn id x

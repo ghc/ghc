@@ -40,6 +40,8 @@ import Name
 type Decl = LHsDecl Name
 type Doc  = HsDoc Name
 
+type DocInstance name = (name, InstHead name, Maybe (HsDoc name))
+
 #if __GLASGOW_HASKELL__ <= 610
 type HsDocString = HsDoc Name
 type LHsDocString = Located HsDocString
@@ -98,8 +100,8 @@ data ExportItem name
       -- | Subordinate names, possibly with documentation
       expItemSubDocs :: [(name, DocForDecl name)],
 
-      -- | Instances relevant to this declaration
-      expItemInstances :: [InstHead name]
+      -- | Instances relevant to this declaration, possibly with documentation
+      expItemInstances :: [DocInstance name]
 	
 	  }	-- ^ An exported declaration 
 		    
@@ -131,7 +133,11 @@ data ExportItem name
   | ExportModule Module    -- ^ A cross-reference to another module
 
 
+-- | The head of an instance. Consists of a context, a class name and a list of
+-- instance types.
 type InstHead name = ([HsPred name], name, [HsType name])
+
+
 type ModuleMap     = Map Module Interface
 type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (HsDoc DocName)
@@ -215,7 +221,10 @@ data Interface = Interface {
   ifaceVisibleExports  :: ![Name],
 
   -- | The instances exported by this module
-  ifaceInstances       :: ![Instance]
+  ifaceInstances       :: ![Instance],
+
+  -- | Docs for instances defined in this module
+  ifaceInstanceDocMap  :: Map Name (HsDoc Name)
 }
 
 
