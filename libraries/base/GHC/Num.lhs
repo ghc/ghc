@@ -122,27 +122,6 @@ divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
 
 %*********************************************************
 %*                                                      *
-\subsection{The @Integer@ instances for @Eq@, @Ord@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
-instance  Eq Integer  where
-    (==) = eqInteger
-    (/=) = neqInteger
-
-------------------------------------------------------------------------
-instance Ord Integer where
-    (<=) = leInteger
-    (>)  = gtInteger
-    (<)  = ltInteger
-    (>=) = geInteger
-    compare = compareInteger
-\end{code}
-
-
-%*********************************************************
-%*                                                      *
 \subsection{The @Integer@ instances for @Show@}
 %*                                                      *
 %*********************************************************
