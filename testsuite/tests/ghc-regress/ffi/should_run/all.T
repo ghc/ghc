@@ -28,7 +28,13 @@ test('ffi004', skip, compile_and_run, [''])
 
 # omit prof ways, because this test exits before the RTS has a chance to
 # generate profiling info.
-test('ffi005', [ omit_ways(prof_ways), exit_code(3) ],
+#
+# On x86, the test suffers from floating-point differences due to the
+# use of 80-bit internal precision when using the native code generator.
+#
+test('ffi005', [ omit_ways(prof_ways), 
+                 if_arch('i386', only_ways(['optc'])),
+                 exit_code(3) ],
                compile_and_run, [''])
 
 # ffi[006-009] don't work with External Core due to non-static-C foreign calls
