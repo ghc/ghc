@@ -864,6 +864,7 @@ isGadtSyntaxTyCon _                                    = False
 -- | Is this an algebraic 'TyCon' which is just an enumeration of values?
 isEnumerationTyCon :: TyCon -> Bool
 isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
+isEnumerationTyCon (TupleTyCon {tyConArity = arity}) = arity == 0
 isEnumerationTyCon _                                                   = False
 
 -- | Is this a 'TyCon', synonym or otherwise, that may have further instances appear?
@@ -1093,8 +1094,9 @@ tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 -- | Extract an 'AlgTyConRhs' with information about data constructors from an algebraic or tuple
 -- 'TyCon'. Panics for any other sort of 'TyCon'
 algTyConRhs :: TyCon -> AlgTyConRhs
-algTyConRhs (AlgTyCon {algTcRhs = rhs})  = rhs
-algTyConRhs (TupleTyCon {dataCon = con}) = DataTyCon { data_cons = [con], is_enum = False }
+algTyConRhs (AlgTyCon {algTcRhs = rhs}) = rhs
+algTyConRhs (TupleTyCon {dataCon = con, tyConArity = arity})
+    = DataTyCon { data_cons = [con], is_enum = arity == 0 }
 algTyConRhs other = pprPanic "algTyConRhs" (ppr other)
 \end{code}
 
