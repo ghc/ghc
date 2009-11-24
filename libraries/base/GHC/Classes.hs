@@ -144,19 +144,7 @@ class  (Eq a) => Ord a  where
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
 
--- XXX Deriving this doesn't work:
--- ghc-stage1: panic! (the 'impossible' happened)
---   (GHC version 6.13.20091123 for x86_64-unknown-linux):
---         TcGenDeriv:mk_FunBind
-instance Ord () where
-    () <= () = True
-    () <  () = False
-    () >= () = True
-    () >  () = False
-    max () () = ()
-    min () () = ()
-    compare () () = EQ
-
+deriving instance Ord ()
 deriving instance (Ord a, Ord b) => Ord (a, b)
 deriving instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
 deriving instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
