@@ -739,10 +739,12 @@ begin :: Int -> Action
 begin code _span _str _len = do pushLexState code; lexToken
 
 pop :: Action
-pop _span _buf _len = do popLexState; lexToken
+pop _span _buf _len = do _ <- popLexState
+                         lexToken
 
 pop_and :: Action -> Action
-pop_and act span buf len = do popLexState; act span buf len
+pop_and act span buf len = do _ <- popLexState
+                              act span buf len
 
 {-# INLINE nextCharIs #-}
 nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
@@ -1061,10 +1063,10 @@ do_bol span _str _len = do
 		return (L span ITvccurly)
 	    EQ -> do
                 --trace "layout: inserting ';'" $ do
-		popLexState
+		_ <- popLexState
 		return (L span ITsemi)
 	    GT -> do
-		popLexState
+		_ <- popLexState
 		lexToken
 
 -- certain keywords put us in the "layout" state, where we might
@@ -1089,7 +1091,7 @@ maybe_layout _	        = return ()
 --
 new_layout_context :: Bool -> Action
 new_layout_context strict span _buf _len = do
-    popLexState
+    _ <- popLexState
     (AI _ offset _) <- getInput
     ctx <- getContext
     case ctx of
@@ -1106,7 +1108,7 @@ new_layout_context strict span _buf _len = do
 
 do_layout_left :: Action
 do_layout_left span _buf _len = do
-    popLexState
+    _ <- popLexState
     pushLexState bol  -- we must be at the start of a line
     return (L span ITvccurly)
 
@@ -1118,7 +1120,7 @@ setLine code span buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
   setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
 	-- subtract one: the line number refers to the *following* line
-  popLexState
+  _ <- popLexState
   pushLexState code
   lexToken
 
@@ -1126,7 +1128,7 @@ setFile :: Int -> Action
 setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
   setSrcLoc (mkSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
-  popLexState
+  _ <- popLexState
   pushLexState code
   lexToken
 
@@ -1963,6 +1965,6 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                                               "noinline" -> "notinline"
                                               "specialise" -> "specialize"
                                               "constructorlike" -> "conlike"
-                                              otherwise -> prag'
+                                              _ -> prag'
                           canon_ws s = unwords (map canonical (words s))
 }
