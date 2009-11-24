@@ -311,75 +311,80 @@ gen_Ord_binds loc tycon
   | Just (con, prim_tc) <- primWrapperType_maybe tycon
   = gen_PrimOrd_binds con prim_tc
 
-  | otherwise 
+  | otherwise
   = (unitBag compare, aux_binds)
- 	-- `AndMonoBinds` compare	
-	-- The default declaration in PrelBase handles this
+        -- `AndMonoBinds` compare
+        -- The default declaration in PrelBase handles this
   where
     aux_binds | single_con_type = []
-	      | otherwise	= [GenCon2Tag tycon]
+              | otherwise       = [GenCon2Tag tycon]
 
     compare = L loc (mkFunBind (L loc compare_RDR) compare_matches)
     compare_matches = [mkMatch [a_Pat, b_Pat] compare_rhs cmp_eq_binds]
     cmp_eq_binds    = HsValBinds (ValBindsIn (unitBag cmp_eq) [])
 
     compare_rhs
-	| single_con_type = cmp_eq_Expr a_Expr b_Expr
- 	| otherwise
-	= untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)]
-		  (cmp_tags_Expr eqInt_RDR ah_RDR bh_RDR
-			(cmp_eq_Expr a_Expr b_Expr)	-- True case
-			-- False case; they aren't equal
-			-- So we need to do a less-than comparison on the tags
-		  	(cmp_tags_Expr ltInt_RDR ah_RDR bh_RDR ltTag_Expr gtTag_Expr))
+        | single_con_type = cmp_eq_Expr a_Expr b_Expr
+        | otherwise
+        = untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)]
+                  (cmp_tags_Expr eqInt_RDR ah_RDR bh_RDR
+                        (cmp_eq_Expr a_Expr b_Expr)     -- True case
+                        -- False case; they aren't equal
+                        -- So we need to do a less-than comparison on the tags
+                        (cmp_tags_Expr ltInt_RDR ah_RDR bh_RDR
+                                       ltTag_Expr gtTag_Expr))
 
     tycon_data_cons = tyConDataCons tycon
     single_con_type = isSingleton tycon_data_cons
     (nullary_cons, nonnullary_cons)
        | isNewTyCon tycon = ([], tyConDataCons tycon)
-       | otherwise	  = partition isNullarySrcDataCon tycon_data_cons
+       | otherwise        = partition isNullarySrcDataCon tycon_data_cons
 
     cmp_eq = mk_FunBind loc cmp_eq_RDR cmp_eq_match
     cmp_eq_match
       | isEnumerationTyCon tycon
-			   -- We know the tags are equal, so if it's an enumeration TyCon,
-			   -- then there is nothing left to do
-			   -- Catch this specially to avoid warnings
-			   -- about overlapping patterns from the desugarer,
-			   -- and to avoid unnecessary pattern-matching
+                           -- We know the tags are equal, so if it's an
+                           -- enumeration TyCon,
+                           -- then there is nothing left to do
+                           -- Catch this specially to avoid warnings
+                           -- about overlapping patterns from the desugarer,
+                           -- and to avoid unnecessary pattern-matching
       = [([nlWildPat,nlWildPat], eqTag_Expr)]
       | otherwise
       = map pats_etc nonnullary_cons ++
-	(if single_con_type then	-- Omit wildcards when there's just one 
-	      []			-- constructor, to silence desugarer
-	else
+        (if single_con_type then        -- Omit wildcards when there's just one
+              []                        -- constructor, to silence desugarer
+        else
               [([nlWildPat, nlWildPat], default_rhs)])
 
-    default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
-							-- inexhaustive patterns
-		| otherwise	    = eqTag_Expr	-- Some nullary constructors;
-							-- Tags are equal, no args => return EQ
+    default_rhs | null nullary_cons = -- Keep desugarer from complaining about
+                                      -- inexhaustive patterns
+                                      impossible_Expr
+                | otherwise         = -- Some nullary constructors;
+                                      -- Tags are equal, no args => return EQ
+                                      eqTag_Expr
     pats_etc data_con
-	= ([con1_pat, con2_pat],
-	   nested_compare_expr tys_needed as_needed bs_needed)
-	where
-	  con1_pat = nlConVarPat data_con_RDR as_needed
-	  con2_pat = nlConVarPat data_con_RDR bs_needed
+        = ([con1_pat, con2_pat],
+           nested_compare_expr tys_needed as_needed bs_needed)
+        where
+          con1_pat = nlConVarPat data_con_RDR as_needed
+          con2_pat = nlConVarPat data_con_RDR bs_needed
 
-	  data_con_RDR = getRdrName data_con
-	  con_arity   = length tys_needed
-	  as_needed   = take con_arity as_RDRs
-	  bs_needed   = take con_arity bs_RDRs
-	  tys_needed  = dataConOrigArgTys data_con
+          data_con_RDR = getRdrName data_con
+          con_arity   = length tys_needed
+          as_needed   = take con_arity as_RDRs
+          bs_needed   = take con_arity bs_RDRs
+          tys_needed  = dataConOrigArgTys data_con
 
-	  nested_compare_expr [ty] [a] [b]
-	    = careful_compare_Case tycon ty eqTag_Expr (nlHsVar a) (nlHsVar b)
+          nested_compare_expr [ty] [a] [b]
+            = careful_compare_Case tycon ty eqTag_Expr (nlHsVar a) (nlHsVar b)
 
-	  nested_compare_expr (ty:tys) (a:as) (b:bs)
-	    = let eq_expr = nested_compare_expr tys as bs
-		in  careful_compare_Case tycon ty eq_expr (nlHsVar a) (nlHsVar b)
+          nested_compare_expr (ty:tys) (a:as) (b:bs)
+            = let eq_expr = nested_compare_expr tys as bs
+              in careful_compare_Case tycon ty eq_expr (nlHsVar a) (nlHsVar b)
 
-	  nested_compare_expr _ _ _ = panic "nested_compare_expr"	-- Args always equal length
+          -- Args always equal length
+          nested_compare_expr _ _ _ = panic "nested_compare_expr"
 \end{code}
 
 Note [Comparision of primitive types]
