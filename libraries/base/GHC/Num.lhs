@@ -7,7 +7,7 @@
 -- Module      :  GHC.Num
 -- Copyright   :  (c) The University of Glasgow 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -41,7 +41,7 @@ import GHC.Integer
 infixl 7  *
 infixl 6  +, -
 
-default ()              -- Double isn't available yet, 
+default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
 \end{code}
 
@@ -62,7 +62,7 @@ class  (Eq a, Show a) => Num a  where
     -- | Absolute value.
     abs                 :: a -> a
     -- | Sign of a number.
-    -- The functions 'abs' and 'signum' should satisfy the law: 
+    -- The functions 'abs' and 'signum' should satisfy the law:
     --
     -- > abs x * signum x == x
     --
