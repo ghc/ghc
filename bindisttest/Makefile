@@ -44,7 +44,8 @@ endif
 	$(BIN_DIST_INST_DIR)/bin/ghc --make HelloWorld
 	./HelloWorld > output
 	$(CONTEXT_DIFF) output expected_output
-	$(BIN_DIST_INST_DIR)/bin/ghc-pkg check
+# Without --no-user-package-conf we might pick up random packages from ~/.ghc
+	$(BIN_DIST_INST_DIR)/bin/ghc-pkg check --no-user-package-conf
 
 clean distclean:
 	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
