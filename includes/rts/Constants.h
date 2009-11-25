@@ -257,6 +257,10 @@
  */
 #define TSO_LINK_DIRTY 32
 
+/*
+ * Used by the sanity checker to check whether TSOs are on the correct
+ * mutable list.
+ */
 #define TSO_MARKED 64
 
 /* -----------------------------------------------------------------------------
