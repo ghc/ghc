@@ -2070,6 +2070,8 @@ isALRopen ITif     = True
 isALRopen IToparen = True
 isALRopen ITobrack = True
 isALRopen ITocurly = True
+-- GHC Extensions:
+isALRopen IToubxparen = True
 isALRopen _        = False
 
 isALRclose :: Token -> Bool
@@ -2078,11 +2080,15 @@ isALRclose ITthen   = True
 isALRclose ITcparen = True
 isALRclose ITcbrack = True
 isALRclose ITccurly = True
+-- GHC Extensions:
+isALRclose ITcubxparen = True
 isALRclose _        = False
 
 containsCommas :: Token -> Bool
 containsCommas IToparen = True
 containsCommas ITobrack = True
+-- GHC Extensions:
+containsCommas IToubxparen = True
 containsCommas _        = False
 
 topNoLayoutContainsCommas :: [ALRContext] -> Bool
