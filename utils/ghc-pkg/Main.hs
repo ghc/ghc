@@ -182,11 +182,11 @@ usageHeader prog = substProg prog $
   "  $p register {filename | -}\n" ++
   "    Register the package using the specified installed package\n" ++
   "    description. The syntax for the latter is given in the $p\n" ++
-  "    documentation.\n" ++
+  "    documentation.  The input file should be encoded in UTF-8.\n" ++
   "\n" ++
   "  $p update {filename | -}\n" ++
   "    Register the package, overwriting any other package with the\n" ++
-  "    same name.\n" ++
+  "    same name. The input file should be encoded in UTF-8.\n" ++
   "\n" ++
   "  $p unregister {pkg-id}\n" ++
   "    Unregister the specified package.\n" ++
@@ -233,7 +233,8 @@ usageHeader prog = substProg prog $
   "  $p dump\n" ++
   "    Dump the registered description for every package.  This is like\n" ++
   "    \"ghc-pkg describe '*'\", except that it is intended to be used\n" ++
-  "    by tools that parse the results, rather than humans.\n" ++
+  "    by tools that parse the results, rather than humans.  The output is\n" ++
+  "    always encoded in UTF-8, regardless of the current locale.\n" ++
   "\n" ++
   " Substring matching is supported for {module} in find-module and\n" ++
   " for {pkg} in list, describe, and field, where a '*' indicates\n" ++
@@ -593,7 +594,7 @@ myReadBinPackageDB filepath = do
 parseMultiPackageConf :: Verbosity -> FilePath -> IO [InstalledPackageInfo]
 parseMultiPackageConf verbosity file = do
   when (verbosity > Normal) $ putStrLn ("reading package database: " ++ file)
-  str <- readFile file
+  str <- readUTF8File file
   let pkgs = map convertPackageInfoIn $ read str
   Exception.evaluate pkgs
     `catchError` \e->
@@ -602,7 +603,7 @@ parseMultiPackageConf verbosity file = do
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
   when (verbosity > Normal) $ putStrLn ("reading package config: " ++ file)
-  readFile file >>= parsePackageInfo
+  readUTF8File file >>= parsePackageInfo
 
 cachefilename :: FilePath
 cachefilename = "package.cache"
@@ -642,11 +643,15 @@ registerPackage input verbosity my_flags auto_ghci_libs update force = do
       "-" -> do
         when (verbosity >= Normal) $
             putStr "Reading package info from stdin ... "
+#if __GLASGOW_HASKELL__ >= 612
+        -- fix the encoding to UTF-8, since this is an interchange format
+        hSetEncoding stdin utf8
+#endif
         getContents
       f   -> do
         when (verbosity >= Normal) $
             putStr ("Reading package info from " ++ show f ++ " ... ")
-        readFile f
+        readUTF8File f
 
   expanded <- expandEnvVars s force
 
@@ -934,7 +939,12 @@ dumpPackages verbosity my_flags = do
   doDump (allPackagesInStack flag_db_stack)
 
 doDump :: [InstalledPackageInfo] -> IO ()
-doDump = mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo
+doDump pkgs = do
+#if __GLASGOW_HASKELL__ >= 612
+  -- fix the encoding to UTF-8, since this is an interchange format
+  hSetEncoding stdout utf8
+#endif
+  mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo $ pkgs
 
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
@@ -1643,3 +1653,12 @@ parseSearchPath path = split path
             _                                 -> chunk'
 
         (chunk', rest') = break isSearchPathSeparator s
+
+readUTF8File :: FilePath -> IO String
+readUTF8File file = do
+  h <- openFile file ReadMode
+#if __GLASGOW_HASKELL__ >= 612
+  -- fix the encoding to UTF-8
+  hSetEncoding h utf8
+#endif
+  hGetContents h
