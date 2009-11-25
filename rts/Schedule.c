@@ -2189,12 +2189,27 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   // while we are moving the TSO:
   lockClosure((StgClosure *)tso);
 
-  if (tso->stack_size >= tso->max_stack_size && !(tso->flags & TSO_BLOCKEX)) {
+  if (tso->stack_size >= tso->max_stack_size
+      && !(tso->flags & TSO_BLOCKEX)) {
       // NB. never raise a StackOverflow exception if the thread is
       // inside Control.Exceptino.block.  It is impractical to protect
       // against stack overflow exceptions, since virtually anything
       // can raise one (even 'catch'), so this is the only sensible
       // thing to do here.  See bug #767.
+      //
+
+      if (tso->flags & TSO_SQUEEZED) {
+          return tso;
+      }
+      // #3677: In a stack overflow situation, stack squeezing may
+      // reduce the stack size, but we don't know whether it has been
+      // reduced enough for the stack check to succeed if we try
+      // again.  Fortunately stack squeezing is idempotent, so all we
+      // need to do is record whether *any* squeezing happened.  If we
+      // are at the stack's absolute -K limit, and stack squeezing
+      // happened, then we try running the thread again.  The
+      // TSO_SQUEEZED flag is set by threadPaused() to tell us whether
+      // squeezing happened or not.
 
       debugTrace(DEBUG_gc,
 		 "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
@@ -2207,6 +2222,21 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
       // Send this thread the StackOverflow exception
       unlockTSO(tso);
       throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
+      return tso;
+  }
+
+
+  // We also want to avoid enlarging the stack if squeezing has
+  // already released some of it.  However, we don't want to get into
+  // a pathalogical situation where a thread has a nearly full stack
+  // (near its current limit, but not near the absolute -K limit),
+  // keeps allocating a little bit, squeezing removes a little bit,
+  // and then it runs again.  So to avoid this, if we squeezed *and*
+  // there is still less than BLOCK_SIZE_W words free, then we enlarge
+  // the stack anyway.
+  if ((tso->flags & TSO_SQUEEZED) && 
+      ((W_)(tso->sp - tso->stack) >= BLOCK_SIZE_W)) {
+      unlockTSO(tso);
       return tso;
   }
 

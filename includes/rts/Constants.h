@@ -263,6 +263,13 @@
  */
 #define TSO_MARKED 64
 
+/*
+ * Used to communicate between stackSqueeze() and
+ * threadStackOverflow() that a thread's stack was squeezed and the
+ * stack may not need to be expanded.
+ */
+#define TSO_SQUEEZED 128
+
 /* -----------------------------------------------------------------------------
    RET_DYN stack frames
    -------------------------------------------------------------------------- */

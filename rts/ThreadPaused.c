@@ -317,5 +317,10 @@ end:
     if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
 	((weight <= 5 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
 	stackSqueeze(tso, (StgPtr)frame);
+        tso->flags |= TSO_SQUEEZED;
+        // This flag tells threadStackOverflow() that the stack was
+        // squeezed, because it may not need to be expanded.
+    } else {
+        tso->flags &= ~TSO_SQUEEZED;
     }
 }
