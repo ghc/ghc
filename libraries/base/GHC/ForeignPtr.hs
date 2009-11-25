@@ -42,11 +42,11 @@ import Data.Typeable
 import GHC.Show
 import GHC.List         ( null )
 import GHC.Base
--- import GHC.IO
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 import GHC.Err
+import GHC.Num          ( fromInteger )
 
 #include "Typeable.h"
 
@@ -150,7 +150,9 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 -- 
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
-        doMalloc a = do
+        doMalloc a
+          | I# size < 0 = error "mallocForeignPtr: size must be >= 0"
+          | otherwise = do
           r <- newIORef (NoFinalizers, [])
           IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
@@ -163,6 +165,8 @@ mallocForeignPtr = doMalloc undefined
 -- | This function is similar to 'mallocForeignPtr', except that the
 -- size of the memory required is given explicitly as a number of bytes.
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
+mallocForeignPtrBytes size | size < 0 =
+  error "mallocForeignPtrBytes: size must be >= 0"
 mallocForeignPtrBytes (I# size) = do 
   r <- newIORef (NoFinalizers, [])
   IO $ \s ->
@@ -187,7 +191,9 @@ mallocForeignPtrBytes (I# size) = do
 mallocPlainForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocPlainForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
-        doMalloc a = IO $ \s ->
+        doMalloc a
+          | I# size < 0 = error "mallocForeignPtr: size must be >= 0"
+          | otherwise = IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
              (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
                                (PlainPtr mbarr#) #)
@@ -200,6 +206,8 @@ mallocPlainForeignPtr = doMalloc undefined
 -- finalizer is used. Attempts to add a finalizer will cause an
 -- exception to be thrown.
 mallocPlainForeignPtrBytes :: Int -> IO (ForeignPtr a)
+mallocPlainForeignPtrBytes size | size < 0 =
+  error "mallocPlainForeignPtrBytes: size must be >= 0"
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
     case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
        (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
