@@ -2050,7 +2050,7 @@ alternativeLayoutRuleToken t
                  do setALRContext ls
                     setPendingImplicitTokens [t]
                     return (L thisLoc ITccurly)
-             (ITin, _ : ls, _) ->
+             (ITin, ALRLayout _ _ : ls, _) ->
                  do setALRContext ls
                     setNextToken t
                     return (L thisLoc ITccurly)
