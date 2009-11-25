@@ -1072,13 +1072,22 @@ do_bol span _str _len = do
 -- certain keywords put us in the "layout" state, where we might
 -- add an opening curly brace.
 maybe_layout :: Token -> P ()
-maybe_layout ITdo	= pushLexState layout_do
-maybe_layout ITmdo	= pushLexState layout_do
-maybe_layout ITof	= pushLexState layout
-maybe_layout ITlet	= pushLexState layout
-maybe_layout ITwhere	= pushLexState layout
-maybe_layout ITrec	= pushLexState layout
-maybe_layout _	        = return ()
+maybe_layout t = do -- If the alternative layout rule is enabled then
+                    -- we never create an implicit layout context here.
+                    -- Layout is handled XXX instead.
+                    -- The code for closing implicit contexts, or
+                    -- inserting implicit semi-colons, is therefore
+                    -- irrelevant as it only applies in an implicit
+                    -- context.
+                    alr <- extension alternativeLayoutRule
+                    unless alr $ f t
+    where f ITdo    = pushLexState layout_do
+          f ITmdo   = pushLexState layout_do
+          f ITof    = pushLexState layout
+          f ITlet   = pushLexState layout
+          f ITwhere = pushLexState layout
+          f ITrec   = pushLexState layout
+          f _       = return ()
 
 -- Pushing a new implicit layout context.  If the indentation of the
 -- next token is not greater than the previous layout context, then
@@ -1479,13 +1488,26 @@ data PState = PState {
         loc        :: SrcLoc,   -- current loc (end of prev token + 1)
 	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
 	context	   :: [LayoutContext],
-	lex_state  :: [Int]
+	lex_state  :: [Int],
+        -- Used in the alternative layout rule:
+        alr_pending_implicit_tokens :: [Located Token],
+        alr_next_token :: Maybe (Located Token),
+        alr_last_loc :: SrcSpan,
+        alr_context :: [ALRContext],
+        alr_expecting_ocurly :: Maybe ALRLayout
      }
 	-- last_loc and last_len are used when generating error messages,
 	-- and in pushCurrentContext only.  Sigh, if only Happy passed the
 	-- current token to happyError, we could at least get rid of last_len.
 	-- Getting rid of last_loc would require finding another way to 
 	-- implement pushCurrentContext (which is only called from one place).
+
+data ALRContext = ALRNoLayout Bool{- does it contain commas? -}
+                | ALRLayout ALRLayout Int
+data ALRLayout = ALRLayoutLet
+               | ALRLayoutWhere
+               | ALRLayoutOf
+               | ALRLayoutDo
 
 newtype P a = P { unP :: PState -> ParseResult a }
 
@@ -1636,6 +1658,42 @@ popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state=l } ls
 getLexState :: P Int
 getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
 
+popNextToken :: P (Maybe (Located Token))
+popNextToken
+    = P $ \s@PState{ alr_next_token = m } ->
+              POk (s {alr_next_token = Nothing}) m
+
+setAlrLastLoc :: SrcSpan -> P ()
+setAlrLastLoc l = P $ \s -> POk (s {alr_last_loc = l}) ()
+
+getAlrLastLoc :: P SrcSpan
+getAlrLastLoc = P $ \s@(PState {alr_last_loc = l}) -> POk s l
+
+getALRContext :: P [ALRContext]
+getALRContext = P $ \s@(PState {alr_context = cs}) -> POk s cs
+
+setALRContext :: [ALRContext] -> P ()
+setALRContext cs = P $ \s -> POk (s {alr_context = cs}) ()
+
+setNextToken :: Located Token -> P ()
+setNextToken t = P $ \s -> POk (s {alr_next_token = Just t}) ()
+
+popPendingImplicitToken :: P (Maybe (Located Token))
+popPendingImplicitToken
+    = P $ \s@PState{ alr_pending_implicit_tokens = ts } ->
+              case ts of
+              [] -> POk s Nothing
+              (t : ts') -> POk (s {alr_pending_implicit_tokens = ts'}) (Just t)
+
+setPendingImplicitTokens :: [Located Token] -> P ()
+setPendingImplicitTokens ts = P $ \s -> POk (s {alr_pending_implicit_tokens = ts}) ()
+
+getAlrExpectingOCurly :: P (Maybe ALRLayout)
+getAlrExpectingOCurly = P $ \s@(PState {alr_expecting_ocurly = b}) -> POk s b
+
+setAlrExpectingOCurly :: Maybe ALRLayout -> P ()
+setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
+
 -- for reasons of efficiency, flags indicating language extensions (eg,
 -- -fglasgow-exts or -XParr) are represented by a bitmap stored in an unboxed
 -- integer
@@ -1685,6 +1743,8 @@ newQualOpsBit :: Int
 newQualOpsBit = 21 -- Haskell' qualified operator syntax, e.g. Prelude.(+)
 recBit :: Int
 recBit = 22 -- rec
+alternativeLayoutRuleBit :: Int
+alternativeLayoutRuleBit = 23
 
 always :: Int -> Bool
 always           _     = True
@@ -1726,6 +1786,8 @@ newQualOps :: Int -> Bool
 newQualOps       flags = testBit flags newQualOpsBit
 oldQualOps :: Int -> Bool
 oldQualOps flags = not (newQualOps flags)
+alternativeLayoutRule :: Int -> Bool
+alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
 
 -- PState for parsing options pragmas
 --
@@ -1742,7 +1804,12 @@ pragState dynflags buf loc =
       loc           = loc,
       extsBitmap    = 0,
       context       = [],
-      lex_state     = [bol, option_prags, 0]
+      lex_state     = [bol, option_prags, 0],
+      alr_pending_implicit_tokens = [],
+      alr_next_token = Nothing,
+      alr_last_loc = noSrcSpan,
+      alr_context = [],
+      alr_expecting_ocurly = Nothing
     }
 
 
@@ -1761,8 +1828,13 @@ mkPState buf loc flags  =
       loc           = loc,
       extsBitmap    = fromIntegral bitmap,
       context       = [],
-      lex_state     = [bol, 0]
+      lex_state     = [bol, 0],
 	-- we begin in the layout state if toplev_layout is set
+      alr_pending_implicit_tokens = [],
+      alr_next_token = Nothing,
+      alr_last_loc = noSrcSpan,
+      alr_context = [],
+      alr_expecting_ocurly = Nothing
     }
     where
       bitmap = genericsBit `setBitIf` dopt Opt_Generics flags
@@ -1787,6 +1859,7 @@ mkPState buf loc flags  =
                .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
                .|. newQualOpsBit `setBitIf` dopt Opt_NewQualifiedOperators flags
+               .|. alternativeLayoutRuleBit `setBitIf` dopt Opt_AlternativeLayoutRule flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -1867,9 +1940,155 @@ lexError str = do
 
 lexer :: (Located Token -> P a) -> P a
 lexer cont = do
-  tok@(L _span _tok__) <- lexToken
+  alr <- extension alternativeLayoutRule
+  let lexTokenFun = if alr then lexTokenAlr else lexToken
+  tok@(L _span _tok__) <- lexTokenFun
 --  trace ("token: " ++ show tok__) $ do
   cont tok
+
+lexTokenAlr :: P (Located Token)
+lexTokenAlr = do mPending <- popPendingImplicitToken
+                 t <- case mPending of
+                      Nothing ->
+                          do mNext <- popNextToken
+                             t <- case mNext of
+                                  Nothing -> lexToken
+                                  Just next -> return next
+                             alternativeLayoutRuleToken t
+                      Just t ->
+                          return t
+                 setAlrLastLoc (getLoc t)
+                 case unLoc t of
+                     ITwhere -> setAlrExpectingOCurly (Just ALRLayoutWhere)
+                     ITlet   -> setAlrExpectingOCurly (Just ALRLayoutLet)
+                     ITof    -> setAlrExpectingOCurly (Just ALRLayoutOf)
+                     ITdo    -> setAlrExpectingOCurly (Just ALRLayoutDo)
+                     _       -> return ()
+                 return t
+
+alternativeLayoutRuleToken :: Located Token -> P (Located Token)
+alternativeLayoutRuleToken t
+    = do context <- getALRContext
+         lastLoc <- getAlrLastLoc
+         mExpectingOCurly <- getAlrExpectingOCurly
+         let thisLoc = getLoc t
+             thisCol = srcSpanStartCol thisLoc
+             newLine = srcSpanStartLine thisLoc > srcSpanEndLine lastLoc
+         case (unLoc t, context, mExpectingOCurly) of
+             -- I think our implicit open-curly handling is slightly
+             -- different to John's, in how it interacts with newlines
+             -- and "in"
+             (ITocurly, _, Just _) ->
+                 do setAlrExpectingOCurly Nothing
+                    setNextToken t
+                    lexTokenAlr
+             (_, ALRLayout _ col : ls, Just expectingOCurly)
+              | thisCol > col ->
+                 do setAlrExpectingOCurly Nothing
+                    setALRContext (ALRLayout expectingOCurly thisCol : context)
+                    setNextToken t
+                    return (L thisLoc ITocurly)
+              | otherwise ->
+                 do setAlrExpectingOCurly Nothing
+                    setPendingImplicitTokens [L thisLoc ITccurly]
+                    setNextToken t
+                    return (L thisLoc ITocurly)
+             (_, _, Just expectingOCurly) ->
+                 do setAlrExpectingOCurly Nothing
+                    setALRContext (ALRLayout expectingOCurly thisCol : context)
+                    setNextToken t
+                    return (L thisLoc ITocurly)
+             (ITin, ALRLayout ALRLayoutLet _ : ls, _)
+              | newLine ->
+                 do setPendingImplicitTokens [t]
+                    setALRContext ls
+                    return (L thisLoc ITccurly)
+             (_, ls@(ALRLayout _ col : _), _)
+              | newLine && thisCol <= col ->
+                 do let f ls'@(ALRLayout _ col' : ls'')
+                         | thisCol < col' = case f ls'' of
+                                            (ts, ls''') ->
+                                                (L thisLoc ITccurly : ts, ls''')
+                         | thisCol == col' = ([L thisLoc ITsemi], ls')
+                         | otherwise       = ([], ls')
+                        f ls' = ([], ls')
+                    case f ls of
+                        (t' : ts, ls') ->
+                            do setPendingImplicitTokens ts
+                               setNextToken t
+                               return t'
+                        _ -> panic "Layout rule: [] when considering newline"
+             (u, _, _)
+              | isALRopen u ->
+                 do setALRContext (ALRNoLayout (containsCommas u) : context)
+                    return t
+             (u, _, _)
+              | isALRclose u ->
+                 case context of
+                 ALRLayout _ _ : ls ->
+                     do setALRContext ls
+                        setNextToken t
+                        return (L thisLoc ITccurly)
+                 ALRNoLayout _ : ls ->
+                     do setALRContext ls
+                        return t
+                 [] ->
+                     -- XXX This is an error in John's code, but
+                     -- it looks reachable to me at first glance
+                     return t
+             (ITin, ALRLayout ALRLayoutLet _ : ls, _) ->
+                 do setALRContext ls
+                    setPendingImplicitTokens [t]
+                    return (L thisLoc ITccurly)
+             (ITin, _ : ls, _) ->
+                 do setALRContext ls
+                    setNextToken t
+                    return (L thisLoc ITccurly)
+             -- the other ITin case omitted; general case below covers it
+             (ITcomma, ALRLayout _ _ : ls, _)
+              | topNoLayoutContainsCommas ls ->
+                 do setALRContext ls
+                    setNextToken t
+                    return (L thisLoc ITccurly)
+             (ITwhere, ALRLayout ALRLayoutDo _ : ls, _) ->
+                 do setALRContext ls
+                    setPendingImplicitTokens [t]
+                    return (L thisLoc ITccurly)
+             -- the other ITwhere case omitted; general case below covers it
+             -- The first [] case comes before the general case, as we
+             -- have an actual EOF token
+             (ITeof, ALRLayout _ _ : ls, _) ->
+                 do setALRContext ls
+                    setNextToken t
+                    return (L thisLoc ITccurly)
+             -- the other ITeof case omitted; general case below covers it
+             (_, _, _) -> return t
+
+isALRopen :: Token -> Bool
+isALRopen ITcase   = True
+isALRopen ITif     = True
+isALRopen IToparen = True
+isALRopen ITobrack = True
+isALRopen ITocurly = True
+isALRopen _        = False
+
+isALRclose :: Token -> Bool
+isALRclose ITof     = True
+isALRclose ITthen   = True
+isALRclose ITcparen = True
+isALRclose ITcbrack = True
+isALRclose ITccurly = True
+isALRclose _        = False
+
+containsCommas :: Token -> Bool
+containsCommas IToparen = True
+containsCommas ITobrack = True
+containsCommas _        = False
+
+topNoLayoutContainsCommas :: [ALRContext] -> Bool
+topNoLayoutContainsCommas [] = False
+topNoLayoutContainsCommas (ALRLayout _ _ : ls) = topNoLayoutContainsCommas ls
+topNoLayoutContainsCommas (ALRNoLayout b : _) = b
 
 lexToken :: P (Located Token)
 lexToken = do

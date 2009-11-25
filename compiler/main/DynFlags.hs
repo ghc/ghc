@@ -258,6 +258,7 @@ data DynFlag
    | Opt_PackageImports
    | Opt_NewQualifiedOperators
    | Opt_ExplicitForAll
+   | Opt_AlternativeLayoutRule
 
    | Opt_PrintExplicitForalls
 
@@ -1852,6 +1853,7 @@ xFlags = [
   -- On by default (which is not strictly H98):
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, const Supported ),
+  ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, const Supported ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),
