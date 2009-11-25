@@ -31,15 +31,15 @@
 --       qualified varids.
 
 {
-{-# OPTIONS -Wwarn -w #-}
--- The above -Wwarn supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
---
--- Note that Alex itself generates code with with some unused bindings and
--- without type signatures, so removing the flag might not be possible.
+-- XXX The above flags turn off warnings in the generated code:
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+-- But alex still generates some code that causes the "lazy unlifted bindings"
+-- warning, and old compilers don't know about it so we can't easily turn
+-- it off, so for now we use the sledge hammer:
+{-# OPTIONS_GHC -w #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
