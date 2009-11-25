@@ -214,7 +214,7 @@ addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> f r >> return ()
   MallocPtr     _ r -> f r >> return ()
   _ -> error "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
-  where
+ where
     f r =
       noMixing CFinalizers r $
         IO $ \s ->
@@ -232,7 +232,7 @@ addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> f r >> return ()
   MallocPtr     _ r -> f r >> return ()
   _ -> error "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
-  where
+ where
     f r =
       noMixing CFinalizers r $
         IO $ \s ->
