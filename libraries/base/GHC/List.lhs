@@ -680,9 +680,11 @@ zipWith :: (a->b->c) -> [a]->[b]->[c]
 zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
 zipWith _ _      _      = []
 
+-- zipWithFB must have arity 2 since it gets two arguments in the "zipWith"
+-- rule; it might not get inlined otherwise
 {-# INLINE [0] zipWithFB #-}
 zipWithFB :: (a -> b -> c) -> (d -> e -> a) -> d -> e -> b -> c
-zipWithFB c f x y r = (x `f` y) `c` r
+zipWithFB c f = \x y r -> (x `f` y) `c` r
 
 {-# RULES
 "zipWith"       [~1] forall f xs ys.    zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
