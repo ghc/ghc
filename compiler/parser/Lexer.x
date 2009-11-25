@@ -2012,22 +2012,15 @@ alternativeLayoutRuleToken t
                  do setPendingImplicitTokens [t]
                     setALRContext ls
                     return (L thisLoc ITccurly)
-             (_, ls@(ALRLayout _ col : _), _)
-              | newLine && thisCol <= col ->
-                 do let f ls'@(ALRLayout _ col' : ls'')
-                         | thisCol < col' = case f ls'' of
-                                            (ts, ls''') ->
-                                                (L thisLoc ITccurly : ts, ls''')
-                         | thisCol == col' = ([L thisLoc ITsemi], ls')
-                         | otherwise       = ([], ls')
-                        f ls' = ([], ls')
-                    case f ls of
-                        (t' : ts, ls') ->
-                            do setALRContext ls'
-                               setPendingImplicitTokens ts
-                               setNextToken t
-                               return t'
-                        _ -> panic "Layout rule: [] when considering newline"
+             (_, ALRLayout _ col : ls, _)
+              | newLine && thisCol == col ->
+                 do setNextToken t
+                    return (L thisLoc ITsemi)
+              | newLine && thisCol < col ->
+                 do setALRContext ls
+                    -- Note that we use lastLoc, as we may need to close
+                    -- more layouts, or give a semicolon
+                    return (L lastLoc ITccurly)
              (u, _, _)
               | isALRopen u ->
                  do setALRContext (ALRNoLayout (containsCommas u) : context)
