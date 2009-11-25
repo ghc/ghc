@@ -2018,6 +2018,7 @@ alternativeLayoutRuleToken t
                     return (L thisLoc ITsemi)
               | newLine && thisCol < col ->
                  do setALRContext ls
+                    setNextToken t
                     -- Note that we use lastLoc, as we may need to close
                     -- more layouts, or give a semicolon
                     return (L lastLoc ITccurly)
