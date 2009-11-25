@@ -1998,6 +1998,15 @@ alternativeLayoutRuleToken t
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
                     return (L thisLoc ITocurly)
+             -- We do the [] cases earlier than in the spec, as we
+             -- have an actual EOF token
+             (ITeof, ALRLayout _ _ : ls, _) ->
+                 do setALRContext ls
+                    setNextToken t
+                    return (L thisLoc ITccurly)
+             (ITeof, _, _) ->
+                 return t
+             -- the other ITeof case omitted; general case below covers it
              (ITin, ALRLayout ALRLayoutLet _ : ls, _)
               | newLine ->
                  do setPendingImplicitTokens [t]
@@ -2014,7 +2023,8 @@ alternativeLayoutRuleToken t
                         f ls' = ([], ls')
                     case f ls of
                         (t' : ts, ls') ->
-                            do setPendingImplicitTokens ts
+                            do setALRContext ls'
+                               setPendingImplicitTokens ts
                                setNextToken t
                                return t'
                         _ -> panic "Layout rule: [] when considering newline"
@@ -2055,13 +2065,6 @@ alternativeLayoutRuleToken t
                     setPendingImplicitTokens [t]
                     return (L thisLoc ITccurly)
              -- the other ITwhere case omitted; general case below covers it
-             -- The first [] case comes before the general case, as we
-             -- have an actual EOF token
-             (ITeof, ALRLayout _ _ : ls, _) ->
-                 do setALRContext ls
-                    setNextToken t
-                    return (L thisLoc ITccurly)
-             -- the other ITeof case omitted; general case below covers it
              (_, _, _) -> return t
 
 isALRopen :: Token -> Bool
