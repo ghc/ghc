@@ -307,7 +307,8 @@ munch1 :: (Char -> Bool) -> ReadP String
 --   Hence NOT the same as (many1 (satisfy p))
 munch1 p =
   do c <- get
-     if p c then do s <- munch p; return (c:s) else pfail
+     if p c then do s <- munch p; return (c:s)
+            else pfail
 
 choice :: [ReadP a] -> ReadP a
 -- ^ Combines all parsers in the specified list.
