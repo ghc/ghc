@@ -351,6 +351,15 @@ Indeed, the bindings can even be recursive.
 	      <entry>Name</entry>
 	    </row>
 	  </thead>
+
+<!--
+               to find the DocBook entities for these characters, find
+               the Unicode code point (e.g. 0x2237), and grep for it in
+               /usr/share/sgml/docbook/xml-dtd-*/ent/* (or equivalent on
+               your system.  Some of these Unicode code points don't have
+               equivalent DocBook entities.
+            -->
+
 	  <tbody>
 	    <row>
 	      <entry><literal>::</literal></entry>
@@ -399,6 +408,52 @@ Indeed, the bindings can even be recursive.
 	      <entry>MIDLINE HORIZONTAL ELLIPSIS</entry>
 	    </row>
           </tbody>
+
+	  <tbody>
+	    <row>
+	      <entry>-&lt;</entry>
+	      <entry>&larrtl;</entry>
+	      <entry>0x2919</entry>
+	      <entry>LEFTWARDS ARROW-TAIL</entry>
+	    </row>
+          </tbody>
+
+	  <tbody>
+	    <row>
+	      <entry>&gt;-</entry>
+	      <entry>&rarrtl;</entry>
+	      <entry>0x291A</entry>
+	      <entry>RIGHTWARDS ARROW-TAIL</entry>
+	    </row>
+          </tbody>
+
+	  <tbody>
+	    <row>
+	      <entry>-&lt;&lt;</entry>
+	      <entry></entry>
+	      <entry>0x291B</entry>
+	      <entry>LEFTWARDS DOUBLE ARROW-TAIL</entry>
+	    </row>
+          </tbody>
+
+	  <tbody>
+	    <row>
+	      <entry>&gt;&gt;-</entry>
+	      <entry></entry>
+	      <entry>0x291C</entry>
+	      <entry>RIGHTWARDS DOUBLE ARROW-TAIL</entry>
+	    </row>
+          </tbody>
+
+	  <tbody>
+	    <row>
+	      <entry>*</entry>
+	      <entry>&starf;</entry>
+	      <entry>0x2605</entry>
+	      <entry>BLACK STAR</entry>
+	    </row>
+          </tbody>
+
         </tgroup>
       </informaltable>
     </sect2>
