@@ -31,6 +31,7 @@ import GHC.IO.FD
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
 import GHC.IO.Exception
+import GHC.Exception
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
 import qualified GHC.IO.Device as IODevice
@@ -381,11 +382,14 @@ lazyReadBuffered h handle_@Handle__{..} = do
                   debugIO ("hGetContents caught: " ++ show e)
                   -- We might have a \r cached in CRLF mode.  So we
                   -- need to check for that and return it:
-                  if isEOFError e
-                     then if not (isEmptyBuffer buf)
-                             then return (handle_', "\r")
-                             else return (handle_', "")
-                     else ioError e
+                  let r = if isEOFError e
+                             then if not (isEmptyBuffer buf)
+                                     then "\r"
+                                     else ""
+                             else
+                                  throw (augmentIOError e "hGetContents" h)
+
+                  return (handle_', r)
         )
 
 -- ensure we have some characters in the buffer
