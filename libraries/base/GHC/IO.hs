@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields -XBangPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
