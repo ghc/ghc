@@ -359,7 +359,7 @@ map f (x:xs) = f x : map f xs
 -- Note eta expanded
 mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
 {-# INLINE [0] mapFB #-}
-mapFB c f x ys = c (f x) ys
+mapFB c f = \x ys -> c (f x) ys
 
 -- The rules for map work like this.
 -- 

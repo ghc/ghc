@@ -647,7 +647,7 @@ zip _      _      = []
 
 {-# INLINE [0] zipFB #-}
 zipFB :: ((a, b) -> c -> d) -> a -> b -> c -> d
-zipFB c x y r = (x,y) `c` r
+zipFB c = \x y r -> (x,y) `c` r
 
 {-# RULES
 "zip"      [~1] forall xs ys. zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
