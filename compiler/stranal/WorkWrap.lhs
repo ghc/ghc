@@ -156,7 +156,7 @@ The only reason this is monadised is for the unique supply.
 Note [Don't w/w inline things (a)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very important to refrain from w/w-ing an INLINE function
-because the wrapepr will then overwrite the InlineRule unfolding.
+because the wrapper will then overwrite the InlineRule unfolding.
 
 It was wrong with the old InlineMe Note too: if we do so by mistake 
 we transform

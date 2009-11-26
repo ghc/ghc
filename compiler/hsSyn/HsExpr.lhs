@@ -857,12 +857,9 @@ data StmtLR idL idR
      , recS_rec_ids :: [idR]   -- Ditto, but these variables are the "recursive" ones,
                    	       -- that are used before they are bound in the stmts of
                    	       -- the RecStmt. 
-
 	-- An Id can be in both groups
 	-- Both sets of Ids are (now) treated monomorphically
-	-- The only reason they are separate is becuase the DsArrows 
-	-- code uses them separately, and I don't understand it well
-	-- enough to change it
+	-- See Note [How RecStmt works] for why they are separate
 
 	-- Rebindable syntax
      , recS_bind_fn :: SyntaxExpr idR -- The bind function
@@ -912,25 +909,30 @@ Array comprehensions are handled like list comprehensions -=chak
 Note [How RecStmt works]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Example:
-        HsDo [ BindStmt x ex
+   HsDo [ BindStmt x ex
 
-             , RecStmt [a::forall a. a -> a, b]
-                       [a::Int -> Int,       c]
-                       [ BindStmt b (return x)
-                       , LetStmt a = ea
-                       , BindStmt c ec ]
+        , RecStmt { recS_rec_ids   = [a, c]
+                  , recS_stmts 	   = [ BindStmt b (return (a,c))
+                  	       	     , LetStmt a = ...b...
+                  	       	     , BindStmt c ec ]
+                  , recS_later_ids = [a, b]
 
-             , return (a b) ]
+        , return (a b) ]
 
 Here, the RecStmt binds a,b,c; but
   - Only a,b are used in the stmts *following* the RecStmt,
-        This 'a' is *polymorphic'
   - Only a,c are used in the stmts *inside* the RecStmt
         *before* their bindings
-        This 'a' is monomorphic
 
-Nota Bene: the two a's have different types, even though they
-have the same Name.
+Why do we need *both* rec_ids and later_ids?  For monads they could be
+combined into a single set of variables, but not for arrows.  That
+follows from the types of the respective feedback operators:
+
+	mfix :: MonadFix m => (a -> m a) -> m a
+	loop :: ArrowLoop a => a (b,d) (c,d) -> a b c
+
+* For mfix, the 'a' covers the union of the later_ids and the rec_ids 
+* For 'loop', 'c' is the later_ids and 'd' is the rec_ids 
 
 Note [Typing a RecStmt]
 ~~~~~~~~~~~~~~~~~~~~~~~
