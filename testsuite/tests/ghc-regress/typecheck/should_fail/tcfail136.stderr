@@ -1,5 +1,5 @@
 
-tcfail136.hs:9:34:
+tcfail136.hs:9:35:
     `SymDict' is not applied to enough type arguments
     Expected kind `?', but `SymDict' has kind `k -> *'
     In the type `SymDict'

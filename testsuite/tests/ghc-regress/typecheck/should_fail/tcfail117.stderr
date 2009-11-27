@@ -1,10 +1,10 @@
 
-tcfail117.hs:5:31:
+tcfail117.hs:5:32:
     Can't make a derived instance of `Enum N1'
       (`N1' has non-nullary constructors)
     In the newtype declaration for `N1'
 
-tcfail117.hs:6:31:
+tcfail117.hs:6:32:
     Can't make a derived instance of `Enum N2'
       (`N2' has non-nullary constructors)
     In the data type declaration for `N2'

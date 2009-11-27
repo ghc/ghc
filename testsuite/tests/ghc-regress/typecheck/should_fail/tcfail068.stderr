@@ -1,5 +1,5 @@
 
-tcfail068.hs:13:1:
+tcfail068.hs:13:2:
     Inferred type is less polymorphic than expected
       Quantified type variable `s' escapes
     In the first argument of `runST', namely
@@ -8,37 +8,37 @@ tcfail068.hs:13:1:
     In the definition of `itgen':
 	itgen n x = runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:19:13:
+tcfail068.hs:19:14:
     Couldn't match expected type `s1' against inferred type `s'
       `s1' is a rigid type variable bound by
-	   the polymorphic type `forall s1. GHC.ST.ST s1 a'
-	     at tcfail068.hs:18:1
+           the polymorphic type `forall s1. GHC.ST.ST s1 a'
+             at tcfail068.hs:18:2
       `s' is a rigid type variable bound by
-	  the type signature for `itiap' at tcfail068.hs:16:57
+          the type signature for `itiap' at tcfail068.hs:16:58
       Expected type: STArray s1 (Int, Int) a1
       Inferred type: IndTree s a1
     In the first argument of `readSTArray', namely `arr'
     In the first argument of `(>>=)', namely `readSTArray arr i'
 
-tcfail068.hs:24:34:
+tcfail068.hs:24:35:
     Couldn't match expected type `s1' against inferred type `s'
       `s1' is a rigid type variable bound by
-	   the polymorphic type `forall s1. GHC.ST.ST s1 a'
-	     at tcfail068.hs:24:28
+           the polymorphic type `forall s1. GHC.ST.ST s1 a'
+             at tcfail068.hs:24:29
       `s' is a rigid type variable bound by
-	  the type signature for `itrap' at tcfail068.hs:23:69
+          the type signature for `itrap' at tcfail068.hs:23:70
       Expected type: GHC.ST.ST s1 (IndTree s a1)
       Inferred type: GHC.ST.ST s (IndTree s a1)
     In the first argument of `runST', namely `(itrap' i k)'
     In the expression: runST (itrap' i k)
 
-tcfail068.hs:36:45:
+tcfail068.hs:36:46:
     Couldn't match expected type `s1' against inferred type `s'
       `s1' is a rigid type variable bound by
-	   the polymorphic type `forall s1. GHC.ST.ST s1 a'
-	     at tcfail068.hs:36:39
+           the polymorphic type `forall s1. GHC.ST.ST s1 a'
+             at tcfail068.hs:36:40
       `s' is a rigid type variable bound by
-	  the type signature for `itrapstate' at tcfail068.hs:35:25
+          the type signature for `itrapstate' at tcfail068.hs:35:26
       Expected type: GHC.ST.ST s1 (c, IndTree s b)
       Inferred type: GHC.ST.ST s (c, IndTree s b)
     In the first argument of `runST', namely `(itrapstate' i k s)'

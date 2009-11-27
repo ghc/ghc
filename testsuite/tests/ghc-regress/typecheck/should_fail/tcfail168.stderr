@@ -1,5 +1,5 @@
 
-tcfail168.hs:8:10:
+tcfail168.hs:8:11:
     Couldn't match expected type `Char -> a'
            against inferred type `IO ()'
     In a stmt of a 'do' expression: putChar 'a'

@@ -1,7 +1,7 @@
 
-tcfail010.hs:3:17:
+tcfail010.hs:3:18:
     No instance for (Num [t])
-      arising from the literal `2' at tcfail010.hs:3:17
+      arising from the literal `2' at tcfail010.hs:3:18
     Possible fix: add an instance declaration for (Num [t])
     In the second argument of `(+)', namely `2'
     In the expression: z + 2

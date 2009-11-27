@@ -1,7 +1,7 @@
 
-tcfail171.hs:9:9:
+tcfail171.hs:9:10:
     Could not deduce (PrintfArg a, PrintfType b) from the context ()
-      arising from a use of `printf' at tcfail171.hs:9:9-23
+      arising from a use of `printf' at tcfail171.hs:9:10-24
     Possible fix:
       add (PrintfArg a, PrintfType b) to the context of
         the type signature for `phex'

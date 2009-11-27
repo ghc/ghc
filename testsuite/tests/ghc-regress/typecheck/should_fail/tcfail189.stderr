@@ -1,5 +1,5 @@
 
-tcfail189.hs:9:30:
+tcfail189.hs:9:31:
     Couldn't match expected type `a -> t' against inferred type `[a1]'
     In the expression: take 2
     In a stmt of a list comprehension:

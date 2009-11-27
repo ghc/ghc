@@ -1,5 +1,5 @@
 
-tcfail156.hs:7:25:
+tcfail156.hs:7:26:
     A newtype constructor cannot have an existential context,
       but `Foo' does
     In the definition of data constructor `Foo'

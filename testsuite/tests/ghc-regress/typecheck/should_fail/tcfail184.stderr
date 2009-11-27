@@ -1,5 +1,5 @@
 
-tcfail184.hs:8:18:
+tcfail184.hs:8:19:
     Illegal polymorphic or qualified type:
       forall a. (Ord a) => [a] -> [a]
     Perhaps you intended to use -XRankNTypes or -XRank2Types

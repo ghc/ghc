@@ -1,5 +1,5 @@
 
-tcfail120.hs:13:25:
+tcfail120.hs:13:26:
     A wild-card pattern cannot be bound to an unboxed tuple
     In the pattern: _
     In a case alternative: _ -> (# 3, 4 #)

@@ -1,5 +1,5 @@
 
-tcfail160.hs:7:7:
+tcfail160.hs:7:8:
     Kind mis-match
     The first argument of `T' should have kind `* -> *',
     but `Int' has kind `*'

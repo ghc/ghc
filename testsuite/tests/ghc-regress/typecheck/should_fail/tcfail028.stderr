@@ -1,5 +1,5 @@
 
-tcfail028.hs:4:16:
+tcfail028.hs:4:17:
     `A a' is not applied to enough type arguments
     Expected kind `?', but `A a' has kind `k -> *'
     In the type `A a'

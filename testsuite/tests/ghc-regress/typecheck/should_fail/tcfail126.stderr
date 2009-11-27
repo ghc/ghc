@@ -1,5 +1,5 @@
 
-tcfail126.hs:20:14:
+tcfail126.hs:20:15:
     Couldn't match expected type `forall (m :: * -> *).
 				  (Monad m) =>
 				  Bar m'

@@ -1,5 +1,5 @@
 
-tcfail104.hs:11:6:
+tcfail104.hs:11:7:
     Cannot match a monotype with `forall a. a -> a'
     In the expression: (\ x -> x)
     In the expression:
@@ -8,7 +8,7 @@ tcfail104.hs:11:6:
         f v = (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x))
                 id 'c'
 
-tcfail104.hs:17:6:
+tcfail104.hs:17:7:
     Cannot match a monotype with `forall a. a -> a'
     In the expression: (\ x -> x)
     In the expression:

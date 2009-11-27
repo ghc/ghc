@@ -1,5 +1,5 @@
 
-T3406.hs:11:5:
+T3406.hs:11:6:
     The type variables `a, b'
     should be bound by the pattern signature `ItemColID a b'
     but are actually discarded by a type synonym

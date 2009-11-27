@@ -1,7 +1,7 @@
 
-tcfail008.hs:3:6:
+tcfail008.hs:3:7:
     No instance for (Num [t])
-      arising from the literal `2' at tcfail008.hs:3:6
+      arising from the literal `2' at tcfail008.hs:3:7
     Possible fix: add an instance declaration for (Num [t])
     In the second argument of `(:)', namely `2'
     In the expression: 1 : 2

@@ -1,5 +1,5 @@
 
-tcfail079.hs:9:26:
+tcfail079.hs:9:27:
     Expecting a lifted type, but `Int#' is unlifted
     Expected kind `*', but `Int#' has kind `#'
     In the type `Int#'

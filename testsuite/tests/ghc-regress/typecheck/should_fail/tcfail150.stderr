@@ -1,5 +1,5 @@
 
-tcfail150.hs:5:0:
+tcfail150.hs:5:1:
     All of the type variables in the constraint `Eq a'
     are already in scope (at least one must be universally quantified here)
 	(Use -XFlexibleContexts to lift this restriction)

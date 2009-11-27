@@ -1,5 +1,5 @@
 
-tcfail016.hs:9:17:
+tcfail016.hs:9:18:
     Couldn't match expected type `(t, Expr t)'
            against inferred type `Expr t'
       Expected type: AnnExpr t -> [a]

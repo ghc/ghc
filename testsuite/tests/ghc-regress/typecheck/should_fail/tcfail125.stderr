@@ -1,7 +1,7 @@
 
-tcfail125.hs:11:3:
+tcfail125.hs:11:4:
     Could not deduce (Show a) from the context ()
-      arising from a use of `LiftObs' at tcfail125.hs:11:3-9
+      arising from a use of `LiftObs' at tcfail125.hs:11:4-10
     Possible fix:
       add (Show a) to the context of the type signature for `f'
     In the pattern: LiftObs _ _

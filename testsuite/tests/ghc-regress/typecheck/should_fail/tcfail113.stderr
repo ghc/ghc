@@ -1,18 +1,18 @@
 
-tcfail113.hs:12:6:
+tcfail113.hs:12:7:
     `Maybe' is not applied to enough type arguments
     Expected kind `*', but `Maybe' has kind `* -> *'
     In the type signature for `f':
       f :: [Maybe]
 
-tcfail113.hs:15:7:
+tcfail113.hs:15:8:
     Kind mis-match
     The first argument of `T' should have kind `* -> *',
     but `Int' has kind `*'
     In the type signature for `g':
       g :: T Int
 
-tcfail113.hs:18:5:
+tcfail113.hs:18:6:
     `Int' is applied to too many type arguments
     In the type signature for `h':
       h :: Int Int

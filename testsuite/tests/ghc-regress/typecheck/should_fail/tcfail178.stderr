@@ -1,11 +1,11 @@
 
-tcfail178.hs:15:6:
+tcfail178.hs:15:7:
     Couldn't match expected type `[a]' against inferred type `()'
     In the first argument of `a', namely `y'
     In the expression: a y
     In the definition of `c': c = a y
 
-tcfail178.hs:18:6:
+tcfail178.hs:18:7:
     Couldn't match expected type `Bool -> [a]'
            against inferred type `()'
     In the first argument of `a', namely `()'

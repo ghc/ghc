@@ -1,5 +1,5 @@
 
-tcfail090.hs:8:8:
+tcfail090.hs:8:9:
     Couldn't match kind `*' against `#'
     When matching the kinds of `a :: *' and `ByteArray# :: #'
       Expected type: ByteArray#

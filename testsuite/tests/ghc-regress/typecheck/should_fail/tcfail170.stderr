@@ -1,5 +1,5 @@
 
-tcfail170.hs:7:0:
+tcfail170.hs:7:1:
     Illegal instance declaration for `C [p] [q]'
 	(the Coverage Condition fails for one of the functional dependencies;
 	 Use -XUndecidableInstances to permit this)

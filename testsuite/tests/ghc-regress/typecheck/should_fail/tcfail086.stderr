@@ -1,5 +1,5 @@
 
-tcfail086.hs:6:37:
+tcfail086.hs:6:38:
     Can't make a derived instance of `Eq Ex'
       (Constructor `Ex' does not have a Haskell-98 type)
     In the data type declaration for `Ex'

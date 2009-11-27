@@ -1,8 +1,8 @@
 
-tcfail201.hs:17:5:
+tcfail201.hs:17:6:
     Couldn't match expected type `a' against inferred type `HsDoc id'
       `a' is a rigid type variable bound by
-          the type signature for `gfoldl'' at tcfail201.hs:15:77
+          the type signature for `gfoldl'' at tcfail201.hs:15:78
     In the pattern: DocEmpty
     In a case alternative: DocEmpty -> z DocEmpty
     In the expression:

@@ -1,7 +1,7 @@
 
-tcfail007.hs:3:15:
+tcfail007.hs:3:16:
     No instance for (Num Bool)
-      arising from the literal `1' at tcfail007.hs:3:15
+      arising from the literal `1' at tcfail007.hs:3:16
     Possible fix: add an instance declaration for (Num Bool)
     In the second argument of `(+)', namely `1'
     In the expression: x + 1

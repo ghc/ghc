@@ -1,5 +1,5 @@
 
-tcfail132.hs:17:36:
+tcfail132.hs:17:37:
     Kind mis-match
     The first argument of `T' should have kind `k -> k1 -> k2 -> *',
     but `Object f' f t' has kind `k -> k1 -> *'

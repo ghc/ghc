@@ -1,5 +1,5 @@
 
-tcfail139.hs:6:0:
+tcfail139.hs:6:1:
     Illegal instance declaration for `Bounded Foo'
 	(All instance types must be of the form (T t1 ... tn)
 	 where T is not a synonym.

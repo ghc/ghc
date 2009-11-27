@@ -1,8 +1,8 @@
 
-tcfail020.hs:10:9:
+tcfail020.hs:10:10:
     Could not deduce (A [a]) from the context (A a)
       arising from the superclasses of an instance declaration
-                   at tcfail020.hs:10:9-22
+                   at tcfail020.hs:10:10-23
     Possible fix:
       add (A [a]) to the context of the instance declaration
       or add an instance declaration for (A [a])

@@ -1,5 +1,5 @@
 
-tcfail182.hs:9:2:
+tcfail182.hs:9:3:
     Couldn't match expected type `Prelude.Maybe a'
 	   against inferred type `Maybe a1'
     In the pattern: Foo

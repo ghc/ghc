@@ -1,5 +1,5 @@
 
-tcfail069.hs:21:6:
+tcfail069.hs:21:7:
     Couldn't match expected type `([Int], [Int])'
            against inferred type `[a]'
     In the pattern: []

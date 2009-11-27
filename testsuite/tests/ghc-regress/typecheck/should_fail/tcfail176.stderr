@@ -1,5 +1,5 @@
 
-tcfail176.hs:7:20:
+tcfail176.hs:7:21:
     Data constructor `Bug' returns type `Maybe a'
       instead of an instance of its parent type `Bug a'
     In the definition of data constructor `Bug'

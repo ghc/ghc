@@ -1,5 +1,5 @@
 
-T2414.hs:9:12:
+T2414.hs:9:13:
     Occurs check: cannot construct the infinite type: b = (Bool, b)
       Expected type: b
       Inferred type: (Bool, b)

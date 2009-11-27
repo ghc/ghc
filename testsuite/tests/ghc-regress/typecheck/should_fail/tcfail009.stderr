@@ -1,5 +1,5 @@
 
-tcfail009.hs:3:16:
+tcfail009.hs:3:17:
     Couldn't match expected type `Int' against inferred type `Integer'
     In the expression: (2 :: Integer)
     In the expression: [(1 :: Int) .. (2 :: Integer)]

@@ -1,5 +1,5 @@
 
-tcfail134.hs:5:32:
+tcfail134.hs:5:33:
     `XML' is not applied to enough type arguments
     Expected kind `?', but `XML' has kind `* -> *'
     In the type `a -> XML'

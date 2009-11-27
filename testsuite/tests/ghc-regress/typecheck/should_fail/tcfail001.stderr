@@ -1,5 +1,5 @@
 
-tcfail001.hs:9:1:
+tcfail001.hs:9:2:
     The equation(s) for `op' have one argument,
     but its type `[a]' has none
     In the instance declaration for `A [a]'

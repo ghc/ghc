@@ -1,5 +1,5 @@
 
-tcfail200.hs:5:14:
+tcfail200.hs:5:15:
     Couldn't match kind `#' against `*'
     When matching the kinds of `GHC.Prim.Int# :: #' and `t :: *'
       Expected type: t

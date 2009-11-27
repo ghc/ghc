@@ -1,5 +1,5 @@
 
-tcfail186.hs:7:8:
+tcfail186.hs:7:9:
     Couldn't match expected type `Int' against inferred type `[Char]'
       Expected type: PhantomSyn a
       Inferred type: [Char]
