@@ -88,11 +88,11 @@ data DocOption
 
 data ExportItem name
 
-  = ExportDecl {		  		
-	
+  = ExportDecl {
+
       -- | A declaration
-      expItemDecl :: LHsDecl name, 
-			       
+      expItemDecl :: LHsDecl name,
+
       -- | Maybe a doc comment, and possibly docs for arguments (if this
       -- decl is a function or type-synonym)
       expItemMbDoc :: DocForDecl name,
@@ -102,27 +102,27 @@ data ExportItem name
 
       -- | Instances relevant to this declaration, possibly with documentation
       expItemInstances :: [DocInstance name]
-	
-	  }	-- ^ An exported declaration 
-		    
+
+    } -- ^ An exported declaration
+
   | ExportNoDecl {
       expItemName :: name,
 
       -- | Subordinate names
       expItemSubs :: [name]
 
-		} -- ^ An exported entity for which we have no 
-          -- documentation (perhaps because it resides in
-          -- another package)
+    } -- ^ An exported entity for which we have no
+      -- documentation (perhaps because it resides in
+      -- another package)
 
-  | ExportGroup { 
+  | ExportGroup {
 
       -- | Section level (1, 2, 3, ... )
       expItemSectionLevel :: Int,
 
       -- | Section id (for hyperlinks)
-      expItemSectionId :: String,     
-			
+      expItemSectionId :: String,
+
       -- | Section heading text
       expItemSectionText :: HsDoc name
 
@@ -149,7 +149,7 @@ type GhcDocHdr = Maybe LHsDocString
 type GhcDocHdr = (HaddockModInfo Name, Maybe (HsDoc Name))
 #endif
 
--- | This structure holds the module information we get from GHC's 
+-- | This structure holds the module information we get from GHC's
 -- type checking phase
 data GhcModule = GhcModule {
    ghcModule         :: Module,
@@ -166,7 +166,7 @@ data GhcModule = GhcModule {
 
 
 -- | This is the data structure used to render a Haddock page for a module - it
--- is the "interface" of the module. The core of Haddock lies in creating this 
+-- is the "interface" of the module. The core of Haddock lies in creating this
 -- structure (see Haddock.Interface). The structure also holds intermediate
 -- data needed during its creation.
 data Interface = Interface {
@@ -177,7 +177,7 @@ data Interface = Interface {
   -- | The original filename for this module
   ifaceOrigFilename    :: FilePath,
 
-  -- | Textual information about the module 
+  -- | Textual information about the module
   ifaceInfo            :: !(HaddockModInfo Name),
 
   -- | The documentation header for this module
@@ -235,7 +235,7 @@ data InstalledInterface = InstalledInterface {
   -- | The module represented by this interface
   instMod            :: Module,
 
-  -- | Textual information about the module 
+  -- | Textual information about the module
   instInfo           :: HaddockModInfo Name,
 
   -- | Everything declared in the module (including subordinates) that has docs
