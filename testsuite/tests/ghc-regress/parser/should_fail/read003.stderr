@@ -1,5 +1,5 @@
 
-read003.hs:4:23:
+read003.hs:4:24:
     Occurs check: cannot construct the infinite type: t = (t, [a], t1)
       Expected type: (t, [a], t1)
       Inferred type: t

@@ -1,2 +1,2 @@
 
-read015.hs:6:0: parse error (possibly incorrect indentation)
+read015.hs:6:1: parse error (possibly incorrect indentation)

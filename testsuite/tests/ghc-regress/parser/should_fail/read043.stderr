@@ -1,21 +1,21 @@
 
-read043.hs:10:8:
+read043.hs:10:9:
     Illegal transform or grouping list comprehension: use -XTransformListComp
 
-read043.hs:10:19: Not in scope: `by'
+read043.hs:10:20: Not in scope: `by'
 
-read043.hs:10:22: Not in scope: `x'
+read043.hs:10:23: Not in scope: `x'
 
-read043.hs:11:8:
+read043.hs:11:9:
     Illegal transform or grouping list comprehension: use -XTransformListComp
 
-read043.hs:11:19: Not in scope: `by'
+read043.hs:11:20: Not in scope: `by'
 
-read043.hs:11:22: Not in scope: `x'
+read043.hs:11:23: Not in scope: `x'
 
-read043.hs:11:24: Not in scope: `using'
+read043.hs:11:25: Not in scope: `using'
 
-read043.hs:12:8:
+read043.hs:12:9:
     Illegal transform or grouping list comprehension: use -XTransformListComp
 
-read043.hs:12:19: Not in scope: `using'
+read043.hs:12:20: Not in scope: `using'

@@ -1,5 +1,5 @@
 
-read039.hs:8:13:
+read039.hs:8:14:
     Can't make a derived instance of `C Foo'
       (`C' is not a derivable class
        Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension)

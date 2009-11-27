@@ -1,2 +1,2 @@
 
-read018.hs:3:0: unterminated `{-'
+read018.hs:3:1: unterminated `{-'
