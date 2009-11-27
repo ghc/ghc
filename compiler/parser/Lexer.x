@@ -1991,7 +1991,9 @@ alternativeLayoutRuleToken t
                     setNextToken t
                     lexTokenAlr
              (_, ALRLayout _ col : ls, Just expectingOCurly)
-              | thisCol > col ->
+              | (thisCol > col) ||
+                (thisCol == col &&
+                 isNonDecreasingIntentation expectingOCurly) ->
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
@@ -2088,6 +2090,10 @@ isALRclose ITccurly = True
 -- GHC Extensions:
 isALRclose ITcubxparen = True
 isALRclose _        = False
+
+isNonDecreasingIntentation :: ALRLayout -> Bool
+isNonDecreasingIntentation ALRLayoutDo = True
+isNonDecreasingIntentation _           = False
 
 containsCommas :: Token -> Bool
 containsCommas IToparen = True
