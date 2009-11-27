@@ -374,7 +374,7 @@ handleEasyFlags flags = do
     bye $ dir ++ "\n"
 
   when (Flag_UseUnicode `elem` flags && Flag_Html `notElem` flags) $
-  	throwE "Unicode can only be enabled for HTML output."
+    throwE "Unicode can only be enabled for HTML output."
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
