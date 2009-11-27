@@ -391,8 +391,6 @@ then
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/libcrypt*.tar.bz2 ||
          test inplace/mingw -ot ghc-tarballs/mingw/mingw-runtime*.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/msysCORE*.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/perl*.tar.bz2 ||
          test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.gz
     then
         AC_MSG_NOTICE([Making in-tree mingw tree])
