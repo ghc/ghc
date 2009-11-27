@@ -66,11 +66,11 @@ createInterfaces verbosity modules flags extIfaces = do
   -- part 4, rename interfaces
   out verbosity verbose "Renaming interfaces..."
   let warnings = Flag_NoWarnings `notElem` flags
-  let (interfaces'', msgs) = 
+  let (interfaces'', msgs) =
          runWriter $ mapM (renameInterface links warnings) interfaces'
   liftIO $ mapM_ putStrLn msgs
 
-  return (interfaces'', homeLinks)  
+  return (interfaces'', homeLinks)
 
 
 createInterfaces' :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc [Interface]
@@ -137,14 +137,14 @@ processModule verbosity modsum flags modMap instIfaceMap = do
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
 
-type FullyCheckedMod = (ParsedSource, 
-                        RenamedSource, 
-                        TypecheckedSource, 
+type FullyCheckedMod = (ParsedSource,
+                        RenamedSource,
+                        TypecheckedSource,
                         ModuleInfo)
 
 
 -- | Dig out what we want from the typechecker output
-mkGhcModule :: CheckedMod -> DynFlags -> GhcModule 
+mkGhcModule :: CheckedMod -> DynFlags -> GhcModule
 mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
   ghcModule         = mdl,
   ghcFilename       = file,
@@ -154,7 +154,7 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
   ghcMbExports      = mbExports,
   ghcExportedNames  = modInfoExports modInfo,
   ghcDefinedNames   = map getName $ modInfoTyThings modInfo,
-  ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo, 
+  ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo,
   ghcInstances      = modInfoInstances modInfo
 }
   where
@@ -173,7 +173,7 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
 -- "best", we use "the module nearest the bottom of the dependency
 -- graph which exports this name", not including hidden modules.  When
 -- there are multiple choices, we pick a random one.
--- 
+--
 -- The interfaces are passed in in topologically sorted order, but we start
 -- by reversing the list so we can do a foldl.
 buildHomeLinks :: [Interface] -> LinkEnv
