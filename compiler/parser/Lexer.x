@@ -1135,7 +1135,7 @@ do_layout_left span _buf _len = do
 setLine :: Int -> Action
 setLine code span buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
-  setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
+  setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
 	-- subtract one: the line number refers to the *following* line
   _ <- popLexState
   pushLexState code

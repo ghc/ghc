@@ -269,7 +269,7 @@ tok_string str = CmmT_String (read str)
 setLine :: Int -> Action
 setLine code span buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
-  setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
+  setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
 	-- subtract one: the line number refers to the *following* line
   -- trace ("setLine "  ++ show line) $ do
   popLexState

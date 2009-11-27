@@ -2012,6 +2012,6 @@ sL span a = span `seq` a `seq` L span a
 fileSrcSpan :: P SrcSpan
 fileSrcSpan = do 
   l <- getSrcLoc; 
-  let loc = mkSrcLoc (srcLocFile l) 1 0;
+  let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
 }

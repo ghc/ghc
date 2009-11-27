@@ -183,7 +183,7 @@ hscParse mod_summary = do
             Just b  -> return b
             Nothing -> liftIO $ hGetStringBuffer src_filename
 
-   let loc  = mkSrcLoc (mkFastString src_filename) 1 0
+   let loc  = mkSrcLoc (mkFastString src_filename) 1 1
 
    case unP parseModule (mkPState buf loc dflags) of
      PFailed span err ->
@@ -984,7 +984,7 @@ hscParseThing parser dflags str
 
       buf <- liftIO $ stringToStringBuffer str
 
-      let loc  = mkSrcLoc (fsLit "<interactive>") 1 0
+      let loc  = mkSrcLoc (fsLit "<interactive>") 1 1
 
       case unP parser (mkPState buf loc dflags) of
 

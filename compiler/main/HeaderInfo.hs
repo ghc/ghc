@@ -55,7 +55,7 @@ getImports :: GhcMonad m =>
            -> m ([Located (ImportDecl RdrName)], [Located (ImportDecl RdrName)], Located ModuleName)
               -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
-  let loc  = mkSrcLoc (mkFastString filename) 1 0
+  let loc  = mkSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (mkPState buf loc dflags) of
     PFailed span err -> parseError span err
     POk pst rdr_module -> do
@@ -70,7 +70,7 @@ getImports dflags buf filename source_filename = do
 	  case rdr_module of
 	    L _ (HsModule mb_mod _ imps _ _ _) ->
 	      let
-                main_loc = mkSrcLoc (mkFastString source_filename) 1 0
+                main_loc = mkSrcLoc (mkFastString source_filename) 1 1
 		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
 	        (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
 		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc) 
@@ -109,7 +109,7 @@ lazyGetToks dflags filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
   unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False
  where
-  loc  = mkSrcLoc (mkFastString filename) 1 0
+  loc  = mkSrcLoc (mkFastString filename) 1 1
 
   lazyLexBuf :: Handle -> PState -> Bool -> IO [Located Token]
   lazyLexBuf handle state eof = do
@@ -141,7 +141,7 @@ lazyGetToks dflags filename handle = do
 getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
 getToks dflags filename buf = lexAll (pragState dflags buf loc)
  where
-  loc  = mkSrcLoc (mkFastString filename) 1 0
+  loc  = mkSrcLoc (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer return) state of
                    POk _      t@(L _ ITeof) -> [t]

@@ -2580,7 +2580,7 @@ getModuleSourceAndFlags mod = do
 getTokenStream :: GhcMonad m => Module -> m [Located Token]
 getTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod
-  let startLoc = mkSrcLoc (mkFastString sourceFile) 0 0
+  let startLoc = mkSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
     PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
@@ -2591,7 +2591,7 @@ getTokenStream mod = do
 getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod
-  let startLoc = mkSrcLoc (mkFastString sourceFile) 0 0
+  let startLoc = mkSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
     PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
@@ -2622,7 +2622,7 @@ addSourceToTokens loc buf (t@(L span _) : ts)
 showRichTokenStream :: [(Located Token, String)] -> String
 showRichTokenStream ts = go startLoc ts ""
     where sourceFile = srcSpanFile (getLoc . fst . head $ ts)
-          startLoc = mkSrcLoc sourceFile 0 0
+          startLoc = mkSrcLoc sourceFile 1 1
           go _ [] = id
           go loc ((L span _, str):ts)
               | not (isGoodSrcSpan span) = go loc ts

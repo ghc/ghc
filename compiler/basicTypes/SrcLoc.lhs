@@ -87,10 +87,7 @@ this is the obvious stuff:
 data SrcLoc
   = SrcLoc	FastString	-- A precise location (file name)
 		{-# UNPACK #-} !Int		-- line number, begins at 1
-		{-# UNPACK #-} !Int		-- column number, begins at 0
-		-- Don't ask me why lines start at 1 and columns start at
-		-- zero.  That's just the way it is, so there.  --SDM
-
+		{-# UNPACK #-} !Int		-- column number, begins at 1
   | UnhelpfulLoc FastString	-- Just a general indication
 \end{code}
 
@@ -137,7 +134,7 @@ srcLocCol _other         = panic "srcLocCol: unknown col"
 -- | Move the 'SrcLoc' down by one line if the character is a newline
 -- and across by one character in any other case
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
-advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 0
+advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 advanceSrcLoc loc	     _	  = loc	-- Better than nothing
 \end{code}

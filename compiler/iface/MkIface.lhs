@@ -741,7 +741,7 @@ ruleOrphWarn unqual mod rule
   = mkWarnMsg silly_loc unqual $
     ptext (sLit "Orphan rule:") <+> ppr rule
   where
-    silly_loc = srcLocSpan (mkSrcLoc (moduleNameFS (moduleName mod)) 1 0)
+    silly_loc = srcLocSpan (mkSrcLoc (moduleNameFS (moduleName mod)) 1 1)
     -- We don't have a decent SrcSpan for a Rule, not even the CoreRule
     -- Could readily be fixed by adding a SrcSpan to CoreRule, if we wanted to
 
