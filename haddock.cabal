@@ -63,6 +63,10 @@ flag in-ghc-tree
   default: False
   manual: True
 
+flag test
+  default: False
+  manual: True
+
 executable haddock
   build-depends:
     base >= 4.0.0.0 && < 4.3.0.0,
@@ -79,6 +83,10 @@ executable haddock
     extensions: ForeignFunctionInterface
   else
     build-depends: ghc-paths
+
+  if flag(test)
+    cpp-options: -DTEST
+    build-depends: QuickCheck
 
   main-is:              Main.hs
   hs-source-dirs:       src
