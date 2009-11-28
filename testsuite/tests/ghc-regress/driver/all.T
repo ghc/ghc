@@ -51,18 +51,19 @@ test('driver017',
      ['$MAKE -s --no-print-directory test017'])
 
 test('driver018',
-     [alone,
-      extra_clean(['F018.hi', 'F018_stub.c', 'F018_stub.h',
-                   'obj018/TestStub018.o', 'obj018/TestStub018_stub.o',
-                   'obj018'])],
+     extra_clean(['F018.hi', 'F018_stub.c', 'F018_stub.h',
+                  'obj018/TestStub018.o', 'obj018/TestStub018_stub.o',
+                  'obj018']),
      run_command,
      ['$MAKE -s --no-print-directory test018'])
+
 test('driver018a',
-     [alone,
-      extra_clean(['F018a.hi', 'F018a_stub.c', 'F018a_stub.h',
-                   'TestStub018a.obj.018', 'obj018a/TestStub018a_stub.obj.018'])],
+     extra_clean(['F018a.hi', 'F018a_stub.c', 'F018a_stub.h',
+                  'TestStub018a.obj.018',
+                  'obj018a/TestStub018a_stub.obj.018']),
      run_command,
      ['$MAKE -s --no-print-directory test018a'])
+
 test('driver019',
      [alone,
       extra_clean(['out019/TestStub.hi','out019/TestStub.o','out019/TestStub_stub.c','out019/TestStub_stub.h','out019/TestStub_stub.o'])],
