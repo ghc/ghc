@@ -349,7 +349,7 @@ test062e:
 # The compilation will fail, but we ignore the failure and just
 # compare the output, because make might give us a different exit code.
 test063:
-	$(RM) A063.hi A$(OBJSUFFIX) A063.hc D063.hi D063$(OBJSUFFIX) D063.hc
+	$(RM) A063.hi A063$(OBJSUFFIX) A063.hc D063.hi D063$(OBJSUFFIX) D063.hc
 	-"$(TEST_HC)" --make -i -v0 D063.hs
 
 # Test -E
