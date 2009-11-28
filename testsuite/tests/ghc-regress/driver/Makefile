@@ -184,19 +184,19 @@ test031:
 
 # test -odir
 test032:
-	$(RM) A.hi
-	$(RM) -rf obj
-	mkdir obj
-	"$(TEST_HC)" -v0 --make A.hs -odir obj
-	test -f obj/A$(OBJSUFFIX)
+	$(RM) A032.hi
+	$(RM) -rf obj032
+	mkdir obj032
+	"$(TEST_HC)" -v0 --make A032.hs -odir obj032
+	test -f obj032/A032$(OBJSUFFIX)
 
 # test -hidir
 test033:
 	$(RM) -rf hi
-	$(RM) A$(OBJSUFFIX)
-	mkdir hi
-	"$(TEST_HC)" -v0 --make A.hs -hidir hi
-	test -f hi/A.hi
+	$(RM) A033$(OBJSUFFIX)
+	mkdir hi033
+	"$(TEST_HC)" -v0 --make A033.hs -hidir hi033
+	test -f hi033/A033.hi
 
 # test stub generation
 test034:
