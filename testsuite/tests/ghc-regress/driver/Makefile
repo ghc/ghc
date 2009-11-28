@@ -103,11 +103,11 @@ test019:
 # One-shot compilation, hierarchical modules
 
 test021:
-	$(RM) B/C.hi
-	$(RM) B/C$(OBJSUFFIX)
-	"$(TEST_HC)" -c B/C.hs
-	test -f B/C.hi
-	test -f B/C$(OBJSUFFIX)
+	$(RM) B021/C.hi
+	$(RM) B021/C$(OBJSUFFIX)
+	"$(TEST_HC)" -c B021/C.hs
+	test -f B021/C.hi
+	test -f B021/C$(OBJSUFFIX)
 
 # test -o
 test022:
