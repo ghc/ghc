@@ -1,20 +1,5 @@
 setTestOpts(only_compiler_types(['ghc']))
 
-def cleanall():
-    clean(['A.hc', 'A.hi', 'A.hspp', 'A.o', 'A.ooo', 'A.s', 'A.tmp', 'A.xhi',
-           'B/C.hi', 'B/C.o', 'B/C.ooo', 'B/C.xhi', 'B/stub.c',
-           'B/F.hi', 'B/F.o', 'B/F_stub.c', 'B/F_stub.h', 'B/F_stub.o',
-           'F.hi', 'F.o', 'F_stub.c', 'F_stub.h', 'F_stub.o',
-           'Hello.hi', 'Hello.hs', 'Hello.o',
-           'B/Hello.hi', 'B/Hello.hs', 'B/Hello.o',
-           'd1/P/Q.hi', 'd1/P/Q.o', 'd2/R/S.hi', 'd2/R/S.o',
-           'depend', 'depend.bak', 'hello'])
-
-    if default_testopts.cleanup != '':
-        rawSystem(['rm', '-rf', in_testdir('hi')])
-        rawSystem(['rm', '-rf', in_testdir('obj')])
-        rawSystem(['rm', '-rf', in_testdir('stub')])
-
 test('driver011',
      extra_clean(['A011.hi', 'A011.o']),
      run_command,
