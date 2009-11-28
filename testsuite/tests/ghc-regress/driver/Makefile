@@ -247,10 +247,11 @@ test044:
 
 # test -stubdir
 test045:
-	$(RM) B/F.hi B/F$(OBJSUFFIX) stub/B/F_stub.c stub/B/F_stub.h
-	"$(TEST_HC)" -v0 --make B/F.hs -stubdir stub
-	test -f stub/B/F_stub.c
-	test -f stub/B/F_stub.h
+	$(RM) B045/F.hi B045/F$(OBJSUFFIX)
+	$(RM) stub045/B045/F_stub.c stub045/B045/F_stub.h
+	"$(TEST_HC)" -v0 --make B045/F.hs -stubdir stub045
+	test -f stub045/B045/F_stub.c
+	test -f stub045/B045/F_stub.h
 
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, hierarchical modules, non-root modules
