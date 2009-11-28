@@ -245,30 +245,45 @@ test('driver062e',
 test('driver063', alone, run_command,
      ['$MAKE -s --no-print-directory test063'])
 cleanall()
-test('driver064', alone, run_command,
+test('driver064',
+     extra_clean(['A064.hi', 'A064.o', 'A064.hspp']),
+     run_command,
      ['$MAKE -s --no-print-directory test064'])
-cleanall()
-test('driver065', alone, run_command,
+
+test('driver065',
+     extra_clean(['A065.hi', 'A065.o', 'A065.hspp']),
+     run_command,
      ['$MAKE -s --no-print-directory test065'])
-cleanall()
-test('driver066', alone, run_command,
+
+test('driver066',
+     extra_clean(['A066.hi', 'A066.o', 'A066.tmp']),
+     run_command,
      ['$MAKE -s --no-print-directory test066'])
-cleanall()
-test('driver067', alone, run_command,
+
+test('driver067',
+     extra_clean(['A067.hi', 'A067.o', 'A067.tmp']),
+     run_command,
      ['$MAKE -s --no-print-directory test067'])
-cleanall()
-test('driver068', alone, run_command,
+
+test('driver068',
+     extra_clean(['A068.hi', 'A068.o', 'A068.hc']),
+     run_command,
      ['$MAKE -s --no-print-directory test068'])
-cleanall()
-test('driver069', alone, run_command,
+
+test('driver069',
+     extra_clean(['A069.hi', 'A069.o', 'A069.tmp']),
+     run_command,
      ['$MAKE -s --no-print-directory test069'])
-cleanall()
-test('driver070', alone, run_command,
+
+test('driver070',
+     extra_clean(['A070.hi', 'A070.o', 'A070.s']),
+     run_command,
      ['$MAKE -s --no-print-directory test070'])
-cleanall()
-test('driver071', alone, run_command,
+
+test('driver071',
+     extra_clean(['A071.hi', 'A071.o', 'A071.tmp']),
+     run_command,
      ['$MAKE -s --no-print-directory test071'])
-cleanall()
 
 test('driver080', alone, run_command,
      ['$MAKE -s --no-print-directory test080'])

@@ -349,56 +349,56 @@ test062e:
 # The compilation will fail, but we ignore the failure and just
 # compare the output, because make might give us a different exit code.
 test063:
-	$(RM) A.hi A$(OBJSUFFIX) A.hc D.hi D$(OBJSUFFIX) D.hc
-	-"$(TEST_HC)" --make -i -v0 D.hs
+	$(RM) A063.hi A$(OBJSUFFIX) A063.hc D063.hi D063$(OBJSUFFIX) D063.hc
+	-"$(TEST_HC)" --make -i -v0 D063.hs
 
 # Test -E
 test064:
-	$(RM) A.hi A.hspp
-	"$(TEST_HC)" -E A.hs
-	test -f A.hspp
+	$(RM) A064.hi A064.hspp
+	"$(TEST_HC)" -E A064.hs
+	test -f A064.hspp
 
 # Test -E/-cpp
 test065:
-	$(RM) A.hi A.hspp
-	"$(TEST_HC)" -E -cpp A.hs
-	test -f A.hspp
+	$(RM) A065.hi A065.hspp
+	"$(TEST_HC)" -E -cpp A065.hs
+	test -f A065.hspp
 
 # Test -E/-o
 test066:
-	$(RM) A.hi A.tmp
-	"$(TEST_HC)" -E A.hs -o A.tmp
-	test -f A.tmp
+	$(RM) A066.hi A066.tmp
+	"$(TEST_HC)" -E A066.hs -o A066.tmp
+	test -f A066.tmp
 
 # Test -E/-cpp/-o
 test067:
-	$(RM) A.hi A.tmp
-	"$(TEST_HC)" -cpp -E A.hs -o A.tmp
-	test -f A.tmp
+	$(RM) A067.hi A067.tmp
+	"$(TEST_HC)" -cpp -E A067.hs -o A067.tmp
+	test -f A067.tmp
 
 # Test -C
 test068:
-	$(RM) A.hi A.hc
-	"$(TEST_HC)" -C A.hs
-	test -f A.hc
+	$(RM) A068.hi A068.hc
+	"$(TEST_HC)" -C A068.hs
+	test -f A068.hc
 
 # Test -C/-o
 test069:
-	$(RM) A.hi A.tmp
-	"$(TEST_HC)" -C A.hs -o A.tmp
-	test -f A.tmp
+	$(RM) A069.hi A069.tmp
+	"$(TEST_HC)" -C A069.hs -o A069.tmp
+	test -f A069.tmp
 
 # Test -S
 test070:
-	$(RM) A.hi A.s
-	"$(TEST_HC)" -S A.hs
-	test -f A.s
+	$(RM) A070.hi A070.s
+	"$(TEST_HC)" -S A070.hs
+	test -f A070.s
 
 # Test -S/-o
 test071:
-	$(RM) A.hi A.tmp
-	"$(TEST_HC)" -S A.hs -o A.tmp
-	test -f A.tmp
+	$(RM) A071.hi A071.tmp
+	"$(TEST_HC)" -S A071.hs -o A071.tmp
+	test -f A071.tmp
 
 # No recompilation required, but we requested a .hc file --> should recompile
 # Broken briefy in ghc-6.3.
