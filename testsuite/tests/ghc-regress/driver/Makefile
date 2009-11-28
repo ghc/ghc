@@ -125,11 +125,11 @@ test023:
 
 # test -odir
 test024:
-	$(RM) -f B/C024.hi
+	$(RM) -f B024/C.hi
 	$(RM) -rf obj024
 	mkdir obj024
-	"$(TEST_HC)" -c B/C024.hs -odir obj024
-	test -f obj024/B/C024$(OBJSUFFIX)
+	"$(TEST_HC)" -c B024/C.hs -odir obj024
+	test -f obj024/B024/C$(OBJSUFFIX)
 
 # test -odir with non-Haskell compilation
 test024a:
