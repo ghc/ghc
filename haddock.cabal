@@ -86,7 +86,7 @@ executable haddock
 
   if flag(test)
     cpp-options: -DTEST
-    build-depends: QuickCheck
+    build-depends: QuickCheck >= 2.1 && < 3
 
   main-is:              Main.hs
   hs-source-dirs:       src
