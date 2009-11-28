@@ -374,26 +374,19 @@ def _compose( opts, f, g ):
 # -----------------------------------------------------------------------------
 # The current directory of tests
 
-global testdir
-testdir = '.'
-
 def newTestDir( dir ):
-    global testdir, thisdir_testopts
-    testdir = dir
+    global thisdir_testopts
     # reset the options for this test directory
     thisdir_testopts = copy.copy(default_testopts)
-
-def getTestDir():
-    return testdir
+    thisdir_testopts.testdir = dir
 
 # -----------------------------------------------------------------------------
 # Actually doing tests
 
-# name  :: String
-# setup :: TestOpts -> IO ()  
-def test ( name, setup, func, args):
+allTests = []
+
+def runTest (opts, name, setup, func, args):
     n = 1
-    opts = copy.copy(thisdir_testopts)
 
     if type(setup) is types.ListType:
        setup = composes(setup)
@@ -419,6 +412,13 @@ def test ( name, setup, func, args):
                 t.thread_pool.release()
     else:
         test_common_work (name, opts, func, args)
+
+# name  :: String
+# setup :: TestOpts -> IO ()  
+def test (name, setup, func, args):
+    global allTests
+    myTestOpts = copy.copy(thisdir_testopts)
+    allTests += [lambda : runTest(myTestOpts, name, setup, func, args)]
 
 if config.use_threads:
     def test_common_thread(n, name, opts, func, args):
@@ -748,7 +748,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
     if opts.compiler_stats_num_fields != []:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
-    cmd = 'cd ' + testdir + " && '" \
+    cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + to_do + ' ' + srcname + ' ' \
@@ -819,7 +819,7 @@ def simple_run( name, way, prog, args ):
         stdin_comes_from = ''
     else:
         stdin_comes_from = ' <' + use_stdin
-    cmd = 'cd ' + testdir + ' && ' \
+    cmd = 'cd ' + getTestOpts().testdir + ' && ' \
 	    + prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
         + stdin_comes_from         \
@@ -926,7 +926,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         
     script.close()
 
-    cmd = 'cd ' + testdir + " && " + cmd_prefix + "'" \
+    cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + srcname + ' ' \
@@ -1015,7 +1015,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     else:
         to_do = ' --make ' + top_mod + ' ' 
 
-    cmd = 'cd ' + testdir + " && '" \
+    cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
@@ -1045,7 +1045,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
         
     flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
     
-    cmd = 'cd ' + testdir + " && '" \
+    cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + to_compile + ' ' \
@@ -1132,7 +1132,7 @@ def write_file(file, str):
 def check_hp_ok(name):
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = 'cd ' + testdir + ' && ' + config.hp2ps + ' ' + name 
+    hp2psCmd = 'cd ' + getTestOpts().testdir + ' && ' + config.hp2ps + ' ' + name 
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
@@ -1358,7 +1358,7 @@ def add_hs_lhs_suffix(name):
         return add_suffix(name, 'hs')
 
 def in_testdir( name ):
-    return (testdir + '/' + name)
+    return (getTestOpts().testdir + '/' + name)
 
 def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))

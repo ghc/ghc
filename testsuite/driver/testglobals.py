@@ -205,6 +205,9 @@ class TestOptions:
        # Extra output normalisation
        self.extra_normaliser = lambda x: x
 
+       # The directory the test is in
+       self.testdir = '.'
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()
