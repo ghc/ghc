@@ -150,11 +150,11 @@ test025:
 
 # This is a hierarchical module that lives in a subdirectory.
 test026:
-	$(RM) d1/P/Q.hi
-	$(RM) d1/P/Q$(OBJSUFFIX)
-	"$(TEST_HC)" -c d1/P/Q.hs
-	test -f d1/P/Q.hi
-	test -f d1/P/Q$(OBJSUFFIX)
+	$(RM) d026/P/Q.hi
+	$(RM) d026/P/Q$(OBJSUFFIX)
+	"$(TEST_HC)" -c d026/P/Q.hs
+	test -f d026/P/Q.hi
+	test -f d026/P/Q$(OBJSUFFIX)
 
 # test stub generation
 # -fvia-C, because we want to check that the .hc file can #include the stub.h
