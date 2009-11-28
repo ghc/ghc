@@ -66,11 +66,14 @@ test016:
 
 # test -stubdir (filename differs from module name)
 test017:
-	$(RM) F.hi F$(OBJSUFFIX) stub/TestStub_stub.c stub/TestStub_stub.h stub/TestStub_stub$(OBJSUFFIX) F_stub$(OBJSUFFIX) 
-	"$(TEST_HC)" -c F.hs -stubdir stub
-	test -f F_stub$(OBJSUFFIX)
-	test -f stub/TestStub_stub.c
-	test -f stub/TestStub_stub.h
+	$(RM) F017.hi F017$(OBJSUFFIX)
+	$(RM) stub017/TestStub_stub.c stub017/TestStub_stub.h
+	$(RM) stub017/TestStub_stub$(OBJSUFFIX)
+	$(RM) F017_stub$(OBJSUFFIX)
+	"$(TEST_HC)" -c F017.hs -stubdir stub017
+	test -f F017_stub$(OBJSUFFIX)
+	test -f stub017/TestStub017_stub.c
+	test -f stub017/TestStub017_stub.h
 
 # test -odir with stubs (filename differs from module name)
 test018:
