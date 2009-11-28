@@ -1,22 +1,22 @@
 
-rn_dup.hs:9:9:
+rn_dup.hs:9:10:
     Multiple declarations of `Dup.MkT'
-    Declared at: rn_dup.hs:7:9
-                 rn_dup.hs:7:15
-                 rn_dup.hs:9:9
+    Declared at: rn_dup.hs:7:10
+                 rn_dup.hs:7:16
+                 rn_dup.hs:9:10
 
-rn_dup.hs:12:15:
+rn_dup.hs:12:16:
     Multiple declarations of `Dup.rf'
-    Declared at: rn_dup.hs:11:15
-                 rn_dup.hs:11:26
-                 rn_dup.hs:12:15
+    Declared at: rn_dup.hs:11:16
+                 rn_dup.hs:11:27
+                 rn_dup.hs:12:16
 
-rn_dup.hs:17:7:
+rn_dup.hs:17:8:
     Multiple declarations of `Dup.CT'
-    Declared at: rn_dup.hs:15:7
-                 rn_dup.hs:17:7
+    Declared at: rn_dup.hs:15:8
+                 rn_dup.hs:17:8
 
-rn_dup.hs:18:2:
+rn_dup.hs:18:3:
     Multiple declarations of `Dup.f'
-    Declared at: rn_dup.hs:16:2
-                 rn_dup.hs:18:2
+    Declared at: rn_dup.hs:16:3
+                 rn_dup.hs:18:3

@@ -1,4 +1,4 @@
 
-rnfail034.hs:4:10: Qualified name in binding position: M.y
+rnfail034.hs:4:11: Qualified name in binding position: M.y
 
-rnfail034.hs:4:25: Not in scope: `M.y'
+rnfail034.hs:4:26: Not in scope: `M.y'

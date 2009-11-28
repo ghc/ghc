@@ -1,5 +1,5 @@
 
-rnfail052.hs:6:13:
+rnfail052.hs:6:14:
     Illegal symbol '.' in type
     Perhaps you intended -XRankNTypes or similar flag
     to enable explicit-forall syntax: forall <tvs>. <type>
