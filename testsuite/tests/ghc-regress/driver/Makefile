@@ -403,11 +403,11 @@ test071:
 # No recompilation required, but we requested a .hc file --> should recompile
 # Broken briefy in ghc-6.3.
 test080:
-	$(RM) A.hi A$(OBJSUFFIX) A.hc
-	"$(TEST_HC)" -c A.hs
-	test -f A$(OBJSUFFIX)
-	"$(TEST_HC)" -C A.hs
-	test -f A.hc
+	$(RM) A080.hi A080$(OBJSUFFIX) A080.hc
+	"$(TEST_HC)" -c A080.hs
+	test -f A080$(OBJSUFFIX)
+	"$(TEST_HC)" -C A080.hs
+	test -f A080.hc
 
 
 # Tests for #2248, -o and .exe
