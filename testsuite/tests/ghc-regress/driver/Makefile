@@ -269,15 +269,15 @@ test051:
 
 # test -odir
 test052:
-	$(RM) d2/R/S.hi
-	$(RM) d1/P/Q.hi
-	$(RM) -rf obj
-	mkdir obj
-	"$(TEST_HC)" -v0 --make -id1 -id2 -odir obj R.S 
-	test -f d2/R/S.hi
-	test -f obj/R/S$(OBJSUFFIX)
-	test -f d1/P/Q.hi
-	test -f obj/P/Q$(OBJSUFFIX)
+	$(RM) d052_2/R/S.hi
+	$(RM) d052_1/P/Q.hi
+	$(RM) -rf obj052
+	mkdir obj052
+	"$(TEST_HC)" -v0 --make -id052_1 -id052_2 -odir obj052 R.S
+	test -f d052_2/R/S.hi
+	test -f obj052/R/S$(OBJSUFFIX)
+	test -f d052_1/P/Q.hi
+	test -f obj052/P/Q$(OBJSUFFIX)
 
 # test -hidir
 test053:

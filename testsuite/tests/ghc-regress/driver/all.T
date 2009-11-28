@@ -182,9 +182,15 @@ test('driver051',
      run_command,
      ['$MAKE -s --no-print-directory test051'])
 
-test('driver052', alone, run_command,
+test('driver052',
+     extra_clean(['d052_1/P/Q.hi', 'd052_1/P/Q.o',
+                  'd052_2/R/S.hi', 'd052_2/R/S.o',
+                  'obj052/P/Q.o', 'obj052/P',
+                  'obj052/R/S.o', 'obj052/R',
+                  'obj052']),
+     run_command,
      ['$MAKE -s --no-print-directory test052'])
-cleanall()
+
 test('driver053', alone, run_command,
      ['$MAKE -s --no-print-directory test053'])
 cleanall()
