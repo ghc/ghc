@@ -1,7 +1,17 @@
 {-# LANGUAGE PatternGuards #-}
-
--- This functionality may be moved into GHC at some point, and then
--- we can use the GHC version (#if GHC version is new enough).
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Haddock.Convert
+-- Copyright   :  (c) Isaac Dupree 2009,
+-- License     :  BSD-like
+--
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Conversion between TyThing and HsDecl. This functionality may be moved into
+-- GHC at some point.
+-----------------------------------------------------------------------------
 
 -- Some other functions turned out to be useful for converting
 -- instance heads, which aren't TyThings, so just export everything.
