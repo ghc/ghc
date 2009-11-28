@@ -158,9 +158,12 @@ test('driver042',
      run_command,
      ['$MAKE -s --no-print-directory test042'])
 
-test('driver043', alone, run_command,
+test('driver043',
+     extra_clean(['B043/C.hi', 'B043/C.o',
+                  'hi043/B043/C.hi', 'hi043/B043', 'hi043']),
+     run_command,
      ['$MAKE -s --no-print-directory test043'])
-cleanall()
+
 test('driver044', alone, run_command,
      ['$MAKE -s --no-print-directory test044'])
 cleanall()
