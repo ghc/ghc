@@ -176,11 +176,11 @@ test028:
 # Compilation-manager compilations, flat modules
 
 test031:
-	$(RM) A.hi
-	$(RM) A$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make A.hs
-	test -f A.hi
-	test -f A$(OBJSUFFIX)
+	$(RM) A031.hi
+	$(RM) A031$(OBJSUFFIX)
+	"$(TEST_HC)" -v0 --make A031.hs
+	test -f A031.hi
+	test -f A031$(OBJSUFFIX)
 
 # test -odir
 test032:
