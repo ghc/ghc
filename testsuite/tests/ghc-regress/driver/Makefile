@@ -216,11 +216,11 @@ test035:
 # Compilation-manager compilations, hierarchical modules
 
 test041:
-	$(RM) B/C.hi
-	$(RM) B/C$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make B/C.hs
-	test -f B/C.hi
-	test -f B/C$(OBJSUFFIX)
+	$(RM) B041/C.hi
+	$(RM) B041/C$(OBJSUFFIX)
+	"$(TEST_HC)" -v0 --make B041/C.hs
+	test -f B041/C.hi
+	test -f B041/C$(OBJSUFFIX)
 
 # test -odir
 test042:
