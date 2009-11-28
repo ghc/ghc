@@ -23,12 +23,10 @@
 ><TD CLASS="title"
 ></TD
 ><TD CLASS="topbut"
-><A HREF="index.html"
->Contents</A
+><A HREF="">Contents</A
 ></TD
 ><TD CLASS="topbut"
-><A HREF="doc-index.html"
->Index</A
+><A HREF="">Index</A
 ></TD
 ></TR
 ></TABLE
@@ -63,8 +61,7 @@
 ><TD
 ><DL
 ><DT
-><A HREF="#1"
->stuff
+><A HREF="">stuff
 </A
 ></DT
 ></DL
@@ -96,8 +93,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  a <A HREF="#t%3A%3A-%3A"
->:-:</A
+>  a <A HREF="">:-:</A
 > b</TD
 ></TR
 ><TR
@@ -108,8 +104,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  (a <A HREF="#t%3A%3A%2B%3A"
->:+:</A
+>  (a <A HREF="">:+:</A
 > b) c</TD
 ></TR
 ><TR
@@ -120,8 +115,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A HREF="#t%3AOp"
->Op</A
+>  <A HREF="">Op</A
 > a b</TD
 ></TR
 ><TR
@@ -132,15 +126,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AO"
->O</A
-> g f a = <A HREF="#v%3AO"
->O</A
+>  <A HREF="">O</A
+> g f a = <A HREF="">O</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3AunO"
->unO</A
+><A HREF="">unO</A
 > :: g (f a)</TD
 ></TR
 ></TABLE
@@ -152,10 +143,8 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3AbiO"
->biO</A
-> ::  (g `<A HREF="TypeOperators.html#t%3AO"
->O</A
+><A HREF="">biO</A
+> ::  (g `<A HREF="">O</A
 >` f) a</TD
 ></TR
 ><TR
@@ -166,15 +155,12 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AFlip"
->Flip</A
-> (~&gt;) b a = <A HREF="#v%3AFlip"
->Flip</A
+>  <A HREF="">Flip</A
+> (~&gt;) b a = <A HREF="">Flip</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3AunFlip"
->unFlip</A
+><A HREF="">unFlip</A
 > :: a ~&gt; b</TD
 ></TR
 ></TABLE
@@ -322,8 +308,7 @@
 ></A
 ><B
 >biO</B
-> ::  (g `<A HREF="TypeOperators.html#t%3AO"
->O</A
+> ::  (g `<A HREF="">O</A
 >` f) a</TD
 ></TR
 ><TR
@@ -394,9 +379,8 @@
 ></TR
 ><TR
 ><TD CLASS="botbar"
->Produced by <A HREF="http://www.haskell.org/haddock/"
->Haddock</A
-> version 2.5.0</TD
+>Produced by <A HREF="">Haddock</A
+> version 2.6.0</TD
 ></TR
 ></TABLE
 ></BODY
