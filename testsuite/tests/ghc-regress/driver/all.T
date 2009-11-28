@@ -299,11 +299,9 @@ test('driver200', alone, run_command,
 cleanall()
 
 test('2566',
-     [alone,
-      normalise_fun(normalise_errmsg)],
+     normalise_fun(normalise_errmsg),
      run_command,
      ['$MAKE -s --no-print-directory 2566'])
-cleanall()
 
 test('pragma001', normal, compile, [''])
 test('pragma002', normal, compile, [''])

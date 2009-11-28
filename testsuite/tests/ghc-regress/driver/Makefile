@@ -452,7 +452,7 @@ test200:
 # -----------------------------------------------------------------------------
 
 2566::
-	if "$(TEST_HC)" -c foo.bar; then false else true; fi
+	if "$(TEST_HC)" -c foo2566.bar; then false else true; fi
 
 .PHONY: mode001
 # We use
