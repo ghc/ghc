@@ -1,5 +1,5 @@
 
-NoMatchErr.hs:20:11:
+NoMatchErr.hs:20:12:
     Couldn't match expected type `Memo d'
            against inferred type `Memo d1'
       NB: `Memo' is a type function, and may not be injective

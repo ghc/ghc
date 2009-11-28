@@ -1,5 +1,5 @@
 
-T2693.hs:10:14:
+T2693.hs:10:15:
     Couldn't match expected type `(a1, b)'
            against inferred type `TFn a'
       NB: `TFn' is a type function, and may not be injective

@@ -1,5 +1,5 @@
 
-Simple2b.hs:9:10:
+Simple2b.hs:9:11:
     Conflicting definitions for `Sd'
-    Bound at: Simple2b.hs:9:10-11
-              Simple2b.hs:10:10-11
+    Bound at: Simple2b.hs:9:11-12
+              Simple2b.hs:10:11-12

@@ -1,5 +1,5 @@
 
-Simple9.hs:13:2:
+Simple9.hs:13:3:
     Type indexes must match class instance head
     Found `(b, Int)' but expected `(a, Int)'
     In the associated type instance for `S7'
