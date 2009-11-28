@@ -296,9 +296,9 @@ test053:
 
 # Test the -keep-hc-files works without --make
 test060:
-	$(RM) A.hi A$(OBJSUFFIX) A.hc
-	"$(TEST_HC)" -c -keep-hc-files -fvia-C A.hs
-	test -f A.hc
+	$(RM) A060.hi A060$(OBJSUFFIX) A060.hc
+	"$(TEST_HC)" -c -keep-hc-files -fvia-C A060.hs
+	test -f A060.hc
 
 # Test the -keep-hc-files works with --make
 test061:
