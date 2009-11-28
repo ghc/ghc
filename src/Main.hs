@@ -271,7 +271,7 @@ readInterfaceFiles name_cache_accessor pairs = do
       case eIface of
         Left err -> liftIO $ do
           putStrLn ("Warning: Cannot read " ++ iface ++ ":")
-          putStrLn ("   " ++ show err)
+          putStrLn ("   " ++ err)
           putStrLn "Skipping this interface."
           return Nothing
         Right f -> return $ Just (f, html)
