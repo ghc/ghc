@@ -224,11 +224,11 @@ test041:
 
 # test -odir
 test042:
-	$(RM) -rf obj
-	mkdir obj
-	$(RM) B/C.hi
-	"$(TEST_HC)" -v0 --make B/C.hs -odir obj
-	test -f obj/B/C$(OBJSUFFIX)
+	$(RM) -rf obj042
+	mkdir obj042
+	$(RM) B042/C.hi
+	"$(TEST_HC)" -v0 --make B042/C.hs -odir obj042
+	test -f obj042/B042/C$(OBJSUFFIX)
 
 # test -hidir
 test043:
