@@ -136,7 +136,7 @@ srcLocCol _other         = panic "srcLocCol: unknown col"
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
 advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
-advanceSrcLoc loc	     _	  = loc	-- Better than nothing
+advanceSrcLoc loc            _    = loc -- Better than nothing
 \end{code}
 
 %************************************************************************
