@@ -31,15 +31,15 @@ test('driver013',
      ['$MAKE -s --no-print-directory test013'])
 
 test('driver014',
-     [alone,
-      extra_clean(['A014.hi', 'obj014/A014.o', 'obj014'])],
+     extra_clean(['A014.hi', 'obj014/A014.o', 'obj014']),
      run_command,
      ['$MAKE -s --no-print-directory test014'])
+
 test('driver015',
-     [alone,
-      extra_clean(['A015.o', 'hi015/A015.hi', 'hi015'])],
+     extra_clean(['A015.o', 'hi015/A015.hi', 'hi015']),
      run_command,
      ['$MAKE -s --no-print-directory test015'])
+
 test('driver016', alone, run_command,
      ['$MAKE -s --no-print-directory test016'])
 cleanall()
