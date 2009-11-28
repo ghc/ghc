@@ -63,7 +63,7 @@ ppHtml	:: String
 	-> Maybe String				-- package
 	-> [Interface]
 	-> FilePath			-- destination directory
-	-> Maybe (HsDoc GHC.RdrName)    -- prologue text, maybe
+	-> Maybe (Doc GHC.RdrName)    -- prologue text, maybe
 	-> Maybe String		        -- the Html Help format (--html-help)
 	-> SourceURLs			-- the source URL (--source)
 	-> WikiURLs			-- the wiki URL (--wiki)
@@ -306,7 +306,7 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [InstalledInterface] -> Bool -> Maybe (HsDoc GHC.RdrName)
+   -> [InstalledInterface] -> Bool -> Maybe (Doc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
@@ -341,7 +341,7 @@ ppHtmlContents odir doctitle
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 
-ppPrologue :: String -> Maybe (HsDoc GHC.RdrName) -> HtmlTable
+ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> HtmlTable
 ppPrologue _ Nothing = Html.emptyTable
 ppPrologue title (Just doc) = 
   (tda [theclass "section1"] << toHtml title) </>
@@ -800,7 +800,7 @@ ppDocGroup lev doc
   | lev == 3  = tda [ theclass "section3" ] << doc
   | otherwise = tda [ theclass "section4" ] << doc
 
-declWithDoc :: Bool -> LinksInfo -> SrcSpan -> DocName -> Maybe (HsDoc DocName) -> Html -> HtmlTable
+declWithDoc :: Bool -> LinksInfo -> SrcSpan -> DocName -> Maybe (Doc DocName) -> Html -> HtmlTable
 declWithDoc True  _     _   _  _          html_decl = declBox html_decl
 declWithDoc False links loc nm Nothing    html_decl = topDeclBox links loc nm html_decl
 declWithDoc False links loc nm (Just doc) html_decl = 
@@ -928,7 +928,7 @@ ppTyFamHeader summary associated decl unicode =
     Nothing -> empty
 
 
-ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
+ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
               TyClDecl DocName -> Bool -> HtmlTable
 ppTyFam summary associated links loc mbDoc decl unicode
   
@@ -985,7 +985,7 @@ ppDataInst = undefined
 --------------------------------------------------------------------------------
 
  
-ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
+ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
             TyClDecl DocName -> Bool -> HtmlTable
 ppTyInst summary associated links loc mbDoc decl unicode
   
@@ -1151,7 +1151,7 @@ ppShortClassDecl _ _ _ _ _ _ = error "declaration type not supported by ppShortC
 
 
 ppClassDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan
-            -> Maybe (HsDoc DocName) -> [(DocName, DocForDecl DocName)]
+            -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> HtmlTable
 ppClassDecl summary links instances loc mbDoc subdocs
 	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
@@ -1258,7 +1258,7 @@ ppShortDataDecl summary links loc dataDecl unicode
 
 ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
-              SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> Bool -> HtmlTable
+              SrcSpan -> Maybe (Doc DocName) -> TyClDecl DocName -> Bool -> HtmlTable
 ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
   
   | summary = declWithDoc summary links loc docname mbDoc 
@@ -1738,13 +1738,13 @@ htmlRdrMarkup = parHtmlMarkup ppRdrName isRdrTc
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
-docToHtml :: HsDoc DocName -> Html
+docToHtml :: Doc DocName -> Html
 docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
 
-origDocToHtml :: HsDoc Name -> Html
+origDocToHtml :: Doc Name -> Html
 origDocToHtml doc = markup htmlOrigMarkup (unParagraph (markup htmlCleanup doc))
 
-rdrDocToHtml :: HsDoc RdrName -> Html
+rdrDocToHtml :: Doc RdrName -> Html
 rdrDocToHtml doc = markup htmlRdrMarkup (unParagraph (markup htmlCleanup doc))
 
 -- If there is a single paragraph, then surrounding it with <P>..</P>
@@ -1752,13 +1752,13 @@ rdrDocToHtml doc = markup htmlRdrMarkup (unParagraph (markup htmlCleanup doc))
 -- we have multiple paragraphs, then we want the extra whitespace to
 -- separate them.  So we catch the single paragraph case and transform it
 -- here.
-unParagraph :: HsDoc a -> HsDoc a
+unParagraph :: Doc a -> Doc a
 unParagraph (DocParagraph d) = d
 --NO: This eliminates line breaks in the code block:  (SDM, 6/5/2003)
 --unParagraph (DocCodeBlock d) = (DocMonospaced d)
 unParagraph doc              = doc
 
-htmlCleanup :: DocMarkup a (HsDoc a)
+htmlCleanup :: DocMarkup a (Doc a)
 htmlCleanup = idMarkup { 
   markupUnorderedList = DocUnorderedList . map unParagraph,
   markupOrderedList   = DocOrderedList   . map unParagraph
@@ -1894,7 +1894,7 @@ ndocBox html = tda [theclass "ndoc"] << html
 rdocBox :: Html -> HtmlTable
 rdocBox html = tda [theclass "rdoc"] << html
 
-maybeRDocBox :: Maybe (HsDoc DocName) -> HtmlTable
+maybeRDocBox :: Maybe (Doc DocName) -> HtmlTable
 maybeRDocBox Nothing = rdocBox (noHtml)
 maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
 

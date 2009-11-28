@@ -1,4 +1,4 @@
-module Haddock.HsDoc (
+module Haddock.Doc (
   docAppend,
   docParagraph
   ) where
@@ -9,7 +9,7 @@ import Data.Char (isSpace)
 
 
 -- used to make parsing easier; we group the list items later
-docAppend :: HsDoc id -> HsDoc id -> HsDoc id
+docAppend :: Doc id -> Doc id -> Doc id
 docAppend (DocUnorderedList ds1) (DocUnorderedList ds2)
   = DocUnorderedList (ds1++ds2)
 docAppend (DocUnorderedList ds1) (DocAppend (DocUnorderedList ds2) d)
@@ -29,7 +29,7 @@ docAppend d1 d2
 
 -- again to make parsing easier - we spot a paragraph whose only item
 -- is a DocMonospaced and make it into a DocCodeBlock
-docParagraph :: HsDoc id -> HsDoc id
+docParagraph :: Doc id -> Doc id
 docParagraph (DocMonospaced p)
   = DocCodeBlock (docCodeBlock p)
 docParagraph (DocAppend (DocString s1) (DocMonospaced p))
@@ -56,7 +56,7 @@ docParagraph p
 -- gives an extra vertical space after the code block.  The single space
 -- on the final line seems to trigger the extra vertical space.
 --
-docCodeBlock :: HsDoc id -> HsDoc id
+docCodeBlock :: Doc id -> Doc id
 docCodeBlock (DocString s)
   = DocString (reverse $ dropWhile (`elem` " \t") $ reverse s)
 docCodeBlock (DocAppend l r)

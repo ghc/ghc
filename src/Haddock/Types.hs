@@ -35,15 +35,14 @@ import Test.QuickCheck
 
 -- convenient short-hands
 type Decl = LHsDecl Name
-type Doc  = HsDoc Name
 
-type DocInstance name = (InstHead name, Maybe (HsDoc name))
+type DocInstance name = (InstHead name, Maybe (Doc name))
 
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
-type FnArgsDoc name = Map Int (HsDoc name)
-type DocForDecl name = (Maybe (HsDoc name), FnArgsDoc name)
+type FnArgsDoc name = Map Int (Doc name)
+type DocForDecl name = (Maybe (Doc name), FnArgsDoc name)
 
 noDocForDecl :: DocForDecl name
 noDocForDecl = (Nothing, Map.empty)
@@ -117,11 +116,11 @@ data ExportItem name
       expItemSectionId :: String,
 
       -- | Section heading text
-      expItemSectionText :: HsDoc name
+      expItemSectionText :: Doc name
 
     } -- ^ A section heading
 
-  | ExportDoc (HsDoc name) -- ^ Some documentation
+  | ExportDoc (Doc name) -- ^ Some documentation
 
   | ExportModule Module    -- ^ A cross-reference to another module
 
@@ -133,7 +132,7 @@ type InstHead name = ([HsPred name], name, [HsType name])
 
 type ModuleMap     = Map Module Interface
 type InstIfaceMap  = Map Module InstalledInterface
-type DocMap        = Map Name (HsDoc DocName)
+type DocMap        = Map Name (Doc DocName)
 type LinkEnv       = Map Name Module
 
 
@@ -172,10 +171,10 @@ data Interface = Interface {
   ifaceInfo            :: !(HaddockModInfo Name),
 
   -- | The documentation header for this module
-  ifaceDoc             :: !(Maybe (HsDoc Name)),
+  ifaceDoc             :: !(Maybe (Doc Name)),
 
   -- | The renamed documentation header for this module
-  ifaceRnDoc           :: Maybe (HsDoc DocName),
+  ifaceRnDoc           :: Maybe (Doc DocName),
 
   -- | The Haddock options for this module (prune, ignore-exports, etc)
   ifaceOptions         :: ![DocOption],
@@ -215,7 +214,7 @@ data Interface = Interface {
   ifaceInstances       :: ![Instance],
 
   -- | Docs for instances defined in this module
-  ifaceInstanceDocMap  :: Map Name (HsDoc Name)
+  ifaceInstanceDocMap  :: Map Name (Doc Name)
 }
 
 
@@ -266,26 +265,26 @@ toInstalledIface interface = InstalledInterface {
   instSubMap         = ifaceSubMap         interface
 }
 
-unrenameHsDoc :: HsDoc DocName -> HsDoc Name
-unrenameHsDoc = fmap getName
+unrenameDoc :: Doc DocName -> Doc Name
+unrenameDoc = fmap getName
 unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
 unrenameDocForDecl (mbDoc, fnArgsDoc) =
-    (fmap unrenameHsDoc mbDoc, fmap unrenameHsDoc fnArgsDoc)
+    (fmap unrenameDoc mbDoc, fmap unrenameDoc fnArgsDoc)
 
 
-data HsDoc id
+data Doc id
   = DocEmpty
-  | DocAppend (HsDoc id) (HsDoc id)
+  | DocAppend (Doc id) (Doc id)
   | DocString String
-  | DocParagraph (HsDoc id)
+  | DocParagraph (Doc id)
   | DocIdentifier [id]
   | DocModule String
-  | DocEmphasis (HsDoc id)
-  | DocMonospaced (HsDoc id)
-  | DocUnorderedList [HsDoc id]
-  | DocOrderedList [HsDoc id]
-  | DocDefList [(HsDoc id, HsDoc id)]
-  | DocCodeBlock (HsDoc id)
+  | DocEmphasis (Doc id)
+  | DocMonospaced (Doc id)
+  | DocUnorderedList [Doc id]
+  | DocOrderedList [Doc id]
+  | DocDefList [(Doc id, Doc id)]
+  | DocCodeBlock (Doc id)
   | DocURL String
   | DocPic String
   | DocAName String
@@ -294,7 +293,7 @@ data HsDoc id
 
 #ifdef TEST
 -- TODO: use derive
-instance Arbitrary a => Arbitrary (HsDoc a) where
+instance Arbitrary a => Arbitrary (Doc a) where
   arbitrary =
     oneof [ return DocEmpty
           , do { a <- arbitrary; b <- arbitrary; return (DocAppend a b) }
@@ -314,7 +313,7 @@ instance Arbitrary a => Arbitrary (HsDoc a) where
 #endif
 
 
-type LHsDoc id = Located (HsDoc id)
+type LDoc id = Located (Doc id)
 
 
 data DocMarkup id a = Markup {
@@ -337,7 +336,7 @@ data DocMarkup id a = Markup {
 
 
 data HaddockModInfo name = HaddockModInfo {
-        hmi_description :: Maybe (HsDoc name),
+        hmi_description :: Maybe (Doc name),
         hmi_portability :: Maybe String,
         hmi_stability   :: Maybe String,
         hmi_maintainer  :: Maybe String

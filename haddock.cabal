@@ -116,7 +116,7 @@ executable haddock
     Haddock.Backends.Hoogle
     Haddock.ModuleTree
     Haddock.Types
-    Haddock.HsDoc
+    Haddock.Doc
     Haddock.Version
     Haddock.InterfaceFile        
     Haddock.Options

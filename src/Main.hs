@@ -394,7 +394,7 @@ updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
               , iface <- ifInstalledIfaces ifaces ]
 
 
-getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
+getPrologue :: [Flag] -> IO (Maybe (Doc RdrName))
 getPrologue flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing

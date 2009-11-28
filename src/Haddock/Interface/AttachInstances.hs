@@ -56,7 +56,7 @@ attachInstances ifaces instIfaceMap = mapM attach ifaces
         attachExport export = return export
 
 
-lookupInstDoc :: Name -> Interface -> InstIfaceMap -> Maybe (HsDoc Name)
+lookupInstDoc :: Name -> Interface -> InstIfaceMap -> Maybe (Doc Name)
 -- TODO: capture this pattern in a function (when we have streamlined the
 -- handling of instances)
 lookupInstDoc name iface ifaceMap =

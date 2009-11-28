@@ -12,8 +12,8 @@ module Haddock.Interface.Parse (
 ) where
 
 import Haddock.Interface.Lex
-import Haddock.Types (HsDoc(..))
-import Haddock.HsDoc
+import Haddock.Types (Doc(..))
+import Haddock.Doc
 import HsSyn
 import RdrName
 }
@@ -45,49 +45,49 @@ import RdrName
 
 %%
 
-doc	:: { HsDoc RdrName }
+doc	:: { Doc RdrName }
 	: apara PARA doc	{ docAppend $1 $3 }
 	| PARA doc 		{ $2 }
 	| apara			{ $1 }
 	| {- empty -}		{ DocEmpty }
 
-apara	:: { HsDoc RdrName }
+apara	:: { Doc RdrName }
 	: ulpara		{ DocUnorderedList [$1] }
 	| olpara		{ DocOrderedList [$1] }
         | defpara               { DocDefList [$1] }
 	| para			{ $1 }
 
-ulpara  :: { HsDoc RdrName }
+ulpara  :: { Doc RdrName }
 	: '-' para		{ $2 }
 
-olpara  :: { HsDoc RdrName } 
+olpara  :: { Doc RdrName } 
 	: '(n)' para		{ $2 }
 
-defpara :: { (HsDoc RdrName, HsDoc RdrName) }
+defpara :: { (Doc RdrName, Doc RdrName) }
 	: '[' seq ']' seq	{ ($2, $4) }
 
-para    :: { HsDoc RdrName }
+para    :: { Doc RdrName }
 	: seq			{ docParagraph $1 }
 	| codepara		{ DocCodeBlock $1 }
 
-codepara :: { HsDoc RdrName }
+codepara :: { Doc RdrName }
 	: '>..' codepara	{ docAppend (DocString $1) $2 }
 	| '>..'			{ DocString $1 }
 
-seq	:: { HsDoc RdrName }
+seq	:: { Doc RdrName }
 	: elem seq		{ docAppend $1 $2 }
 	| elem			{ $1 }
 
-elem	:: { HsDoc RdrName }
+elem	:: { Doc RdrName }
 	: elem1			{ $1 }
 	| '@' seq1 '@'		{ DocMonospaced $2 }
 
-seq1	:: { HsDoc RdrName }
+seq1	:: { Doc RdrName }
 	: PARA seq1             { docAppend (DocString "\n") $2 }
 	| elem1 seq1            { docAppend $1 $2 }
 	| elem1			{ $1 }
 
-elem1	:: { HsDoc RdrName }
+elem1	:: { Doc RdrName }
 	: STRING		{ DocString $1 }
 	| '/../'                { DocEmphasis (DocString $1) }
 	| URL			{ DocURL $1 }

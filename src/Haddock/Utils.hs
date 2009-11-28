@@ -33,7 +33,7 @@ module Haddock.Utils (
   -- * HTML cross reference mapping
   html_xrefs_ref,
 
-  -- * HsDoc markup 
+  -- * Doc markup 
   markup, 
   idMarkup,
 
@@ -102,11 +102,11 @@ out progVerbosity msgVerbosity msg
 
 
 -- | extract a module's short description.
-toDescription :: Interface -> Maybe (HsDoc Name)
+toDescription :: Interface -> Maybe (Doc Name)
 toDescription = hmi_description . ifaceInfo
 
 -- | extract a module's short description.
-toInstalledDescription :: InstalledInterface -> Maybe (HsDoc Name)
+toInstalledDescription :: InstalledInterface -> Maybe (Doc Name)
 toInstalledDescription = hmi_description . instInfo
 
 
@@ -311,7 +311,7 @@ replace a b = map (\x -> if x == a then b else x)
 -----------------------------------------------------------------------------
 -- put here temporarily
 
-markup :: DocMarkup id a -> HsDoc id -> a
+markup :: DocMarkup id a -> Doc id -> a
 markup m DocEmpty              = markupEmpty m
 markup m (DocAppend d1 d2)     = markupAppend m (markup m d1) (markup m d2)
 markup m (DocString s)         = markupString m s
@@ -328,11 +328,11 @@ markup m (DocURL url)          = markupURL m url
 markup m (DocAName ref)        = markupAName m ref
 markup m (DocPic img)          = markupPic m img
 
-markupPair :: DocMarkup id a -> (HsDoc id, HsDoc id) -> (a, a)
+markupPair :: DocMarkup id a -> (Doc id, Doc id) -> (a, a)
 markupPair m (a,b) = (markup m a, markup m b)
 
 -- | The identity markup
-idMarkup :: DocMarkup a (HsDoc a)
+idMarkup :: DocMarkup a (Doc a)
 idMarkup = Markup {
   markupEmpty         = DocEmpty,
   markupString        = DocString,

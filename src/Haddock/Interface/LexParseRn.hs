@@ -23,7 +23,7 @@ import Haddock.Interface.Lex
 import Haddock.Interface.Parse
 import Haddock.Interface.Rn
 import Haddock.Interface.ParseModuleHeader
-import Haddock.HsDoc
+import Haddock.Doc
 import Data.Maybe
 import FastString
 import GHC
@@ -31,7 +31,7 @@ import RdrName
 
 data HaddockCommentType = NormalHaddockComment | DocSectionComment
 
-lexParseRnHaddockCommentList :: HaddockCommentType -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (HsDoc Name))
+lexParseRnHaddockCommentList :: HaddockCommentType -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
 lexParseRnHaddockCommentList hty gre docStrs = do
   docMbs <- mapM (lexParseRnHaddockComment hty gre) docStrs
   let docs = catMaybes docMbs
@@ -41,7 +41,7 @@ lexParseRnHaddockCommentList hty gre docStrs = do
     _ -> return (Just doc)
 
 lexParseRnHaddockComment :: HaddockCommentType ->
-    GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (HsDoc Name))
+    GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
 lexParseRnHaddockComment hty gre (HsDocString fs) = do
    let str = unpackFS fs
    let toks = tokenise str
@@ -52,14 +52,14 @@ lexParseRnHaddockComment hty gre (HsDocString fs) = do
      Nothing -> do
        tell ["doc comment parse failed: "++str]
        return Nothing
-     Just doc -> return (Just (rnHsDoc gre doc))
+     Just doc -> return (Just (rnDoc gre doc))
 
-lexParseRnMbHaddockComment :: HaddockCommentType -> GlobalRdrEnv -> Maybe HsDocString -> ErrMsgM (Maybe (HsDoc Name))
+lexParseRnMbHaddockComment :: HaddockCommentType -> GlobalRdrEnv -> Maybe HsDocString -> ErrMsgM (Maybe (Doc Name))
 lexParseRnMbHaddockComment _ _ Nothing = return Nothing
 lexParseRnMbHaddockComment hty gre (Just d) = lexParseRnHaddockComment hty gre d
 
 -- yes, you always get a HaddockModInfo though it might be empty
-lexParseRnHaddockModHeader :: GlobalRdrEnv -> GhcDocHdr -> ErrMsgM (HaddockModInfo Name, Maybe (HsDoc Name))
+lexParseRnHaddockModHeader :: GlobalRdrEnv -> GhcDocHdr -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
 lexParseRnHaddockModHeader gre mbStr = do
   let failure = (emptyHaddockModInfo, Nothing)
   case mbStr of
@@ -71,4 +71,4 @@ lexParseRnHaddockModHeader gre mbStr = do
           tell ["haddock module header parse failed: " ++ mess]
           return failure
         Right (info, doc) ->
-          return (rnHaddockModInfo gre info, Just (rnHsDoc gre doc))
+          return (rnHaddockModInfo gre info, Just (rnDoc gre doc))

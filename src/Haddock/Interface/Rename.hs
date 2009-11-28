@@ -146,14 +146,14 @@ renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
 renameExportItems = mapM renameExportItem
 
 
-renameDocForDecl :: (Maybe (HsDoc Name), FnArgsDoc Name) -> RnM (Maybe (HsDoc DocName), FnArgsDoc DocName)
+renameDocForDecl :: (Maybe (Doc Name), FnArgsDoc Name) -> RnM (Maybe (Doc DocName), FnArgsDoc DocName)
 renameDocForDecl (mbDoc, fnArgsDoc) = do
   mbDoc' <- renameMaybeDoc mbDoc
   fnArgsDoc' <- renameFnArgsDoc fnArgsDoc
   return (mbDoc', fnArgsDoc')
 
 
-renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
+renameMaybeDoc :: Maybe (Doc Name) -> RnM (Maybe (Doc DocName))
 renameMaybeDoc = mapM renameDoc
 
 
@@ -161,7 +161,7 @@ renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
 renameLDocHsSyn = return
 
 
-renameDoc :: HsDoc Name -> RnM (HsDoc DocName)
+renameDoc :: Doc Name -> RnM (Doc DocName)
 renameDoc d = case d of
   DocEmpty -> return DocEmpty
   DocAppend a b -> do

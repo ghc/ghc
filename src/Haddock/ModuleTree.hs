@@ -12,15 +12,15 @@
 
 module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 
-import Haddock.Types ( HsDoc )
+import Haddock.Types ( Doc )
 
 import GHC           ( Name )
 import Module        ( Module, moduleNameString, moduleName, modulePackageId,
                        packageIdString )
 
-data ModuleTree = Node String Bool (Maybe String) (Maybe (HsDoc Name)) [ModuleTree]
+data ModuleTree = Node String Bool (Maybe String) (Maybe (Doc Name)) [ModuleTree]
 
-mkModuleTree :: Bool -> [(Module, Maybe (HsDoc Name))] -> [ModuleTree]
+mkModuleTree :: Bool -> [(Module, Maybe (Doc Name))] -> [ModuleTree]
 mkModuleTree showPkgs mods = 
   foldr fn [] [ (splitModule mdl, modPkg mdl, short) | (mdl, short) <- mods ]
   where
@@ -28,7 +28,7 @@ mkModuleTree showPkgs mods =
                 | otherwise = Nothing
     fn (mod_,pkg,short) = addToTrees mod_ pkg short
 
-addToTrees :: [String] -> Maybe String -> Maybe (HsDoc Name) -> [ModuleTree] -> [ModuleTree]
+addToTrees :: [String] -> Maybe String -> Maybe (Doc Name) -> [ModuleTree] -> [ModuleTree]
 addToTrees [] _ _ ts = ts
 addToTrees ss pkg short [] = mkSubTree ss pkg short
 addToTrees (s1:ss) pkg short (t@(Node s2 leaf node_pkg node_short subs) : ts)
@@ -39,7 +39,7 @@ addToTrees (s1:ss) pkg short (t@(Node s2 leaf node_pkg node_short subs) : ts)
   this_pkg = if null ss then pkg else node_pkg
   this_short = if null ss then short else node_short
 
-mkSubTree :: [String] -> Maybe String -> Maybe (HsDoc Name) -> [ModuleTree]
+mkSubTree :: [String] -> Maybe String -> Maybe (Doc Name) -> [ModuleTree]
 mkSubTree []     _   _     = []
 mkSubTree [s]    pkg short = [Node s True pkg short []]
 mkSubTree (s:ss) pkg short = [Node s (null ss) Nothing Nothing (mkSubTree ss pkg short)]

@@ -26,7 +26,7 @@ import Data.Char
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: String -> Either String (HaddockModInfo RdrName, HsDoc RdrName)
+parseModuleHeader :: String -> Either String (HaddockModInfo RdrName, Doc RdrName)
 parseModuleHeader str0 =
    let
       getKey :: String -> String -> (Maybe String,String)
@@ -43,7 +43,7 @@ parseModuleHeader str0 =
       (stabilityOpt,str7) = getKey "Stability" str6
       (portabilityOpt,str8) = getKey "Portability" str7
 
-      description1 :: Either String (Maybe (HsDoc RdrName))
+      description1 :: Either String (Maybe (Doc RdrName))
       description1 = case descriptionOpt of
          Nothing -> Right Nothing
          Just description -> case parseHaddockString . tokenise $ description of
