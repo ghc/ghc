@@ -302,21 +302,21 @@ test060:
 
 # Test the -keep-hc-files works with --make
 test061:
-	$(RM) A.hi A$(OBJSUFFIX) A.hc
-	"$(TEST_HC)" -v0 --make -keep-hc-files -fvia-C A.hs
-	test -f A.hc
+	$(RM) A061.hi A061$(OBJSUFFIX) A061.hc
+	"$(TEST_HC)" -v0 --make -keep-hc-files -fvia-C A061.hs
+	test -f A061.hc
 
 # Test that -keep-s-files works with --make and -fvia-C
-test061a.1:
-	$(RM) A.hi A$(OBJSUFFIX) A.s
-	"$(TEST_HC)" -v0 --make -keep-s-files -fvia-C A.hs
-	test -f A.s
+test061a:
+	$(RM) A061a.hi A061a$(OBJSUFFIX) A061a.s
+	"$(TEST_HC)" -v0 --make -keep-s-files -fvia-C A061a.hs
+	test -f A061a.s
 
 # Test that -keep-s-files works without --make
-test061a.2:
-	$(RM) A.hi A$(OBJSUFFIX) A.s
-	"$(TEST_HC)" -c -keep-s-files -fvia-C A.hs
-	test -f A.s
+test061b:
+	$(RM) A061b.hi A061b$(OBJSUFFIX) A061b.s
+	"$(TEST_HC)" -c -keep-s-files -fvia-C A061b.hs
+	test -f A061b.s
 
 # Test that -main-is works with --make
 test062.1:

@@ -205,15 +205,21 @@ test('driver060',
      run_command,
      ['$MAKE -s --no-print-directory test060'])
 
-test('driver061', alone, run_command,
+test('driver061',
+     extra_clean(['A061.hi', 'A061.o', 'A061.hc']),
+     run_command,
      ['$MAKE -s --no-print-directory test061'])
-cleanall()
-test('driver061a.1', alone, run_command,
-     ['$MAKE -s --no-print-directory test061a.1'])
-cleanall()
-test('driver061a.2', alone, run_command,
-     ['$MAKE -s --no-print-directory test061a.2'])
-cleanall()
+
+test('driver061a',
+     extra_clean(['A061a.hi', 'A061a.o', 'A061a.s']),
+     run_command,
+     ['$MAKE -s --no-print-directory test061a'])
+
+test('driver061b',
+     extra_clean(['A061b.hi', 'A061b.o', 'A061b.s']),
+     run_command,
+     ['$MAKE -s --no-print-directory test061b'])
+
 
 test('driver062.1', alone, run_command,
      ['$MAKE -s --no-print-directory test062.1'])
