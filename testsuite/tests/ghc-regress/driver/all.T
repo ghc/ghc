@@ -133,7 +133,7 @@ test('driver032',
      ['$MAKE -s --no-print-directory test032'])
 
 test('driver033',
-     extra_clean(['A033.hi', 'A033.o']),
+     extra_clean(['A033.hi', 'A033.o', 'hi033/A033.hi', 'hi033']),
      run_command,
      ['$MAKE -s --no-print-directory test033'])
 
