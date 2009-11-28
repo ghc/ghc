@@ -1,7 +1,7 @@
-Breakpoint 0 activated at ../QSort.hs:(4,0)-(6,54)
-Stopped at ../QSort.hs:(4,0)-(6,54)
+Breakpoint 0 activated at ../QSort.hs:(4,1)-(6,55)
+Stopped at ../QSort.hs:(4,1)-(6,55)
 _result :: [a] = _
-Stopped at ../QSort.hs:5:15-50
+Stopped at ../QSort.hs:5:16-51
 _result :: [a] = _
 a :: a = _
 left :: [a] = _

@@ -1,12 +1,12 @@
-Stopped at ../mdo.hs:(29,0)-(31,26)
+Stopped at ../mdo.hs:(29,1)-(31,27)
 
-Stopped at ../mdo.hs:(29,15)-(31,26)
+Stopped at ../mdo.hs:(29,16)-(31,27)
 x :: Char = 'h'
 xs :: [Char] = _
-Stopped at ../mdo.hs:29:29-41
+Stopped at ../mdo.hs:29:30-42
 _result :: IO (N Char) = _
 f :: N Char = _
 l :: N Char = _
 x :: Char = 'h'
-Stopped at ../mdo.hs:(7,0)-(8,41)
+Stopped at ../mdo.hs:(7,1)-(8,42)
 

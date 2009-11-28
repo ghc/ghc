@@ -1,5 +1,5 @@
 
-annfail07.hs:9:16:
+annfail07.hs:9:17:
     Couldn't match expected type `[a]' against inferred type `Bool'
     In the first argument of `head', namely `True'
     In the expression: (head True)

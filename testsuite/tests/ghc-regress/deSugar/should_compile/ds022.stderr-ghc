@@ -1,5 +1,5 @@
 
-ds022.hs:20:0:
+ds022.hs:20:1:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `i':
 		 i 1 1.1 = ...

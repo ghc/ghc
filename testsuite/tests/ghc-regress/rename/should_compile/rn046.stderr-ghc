@@ -1,8 +1,8 @@
 
-rn046.hs:2:0:
+rn046.hs:2:1:
     Warning: The import of `List' is redundant
                except perhaps to import instances from `List'
              To import instances alone, use: import List()
 
-rn046.hs:3:0:
+rn046.hs:3:1:
     Warning: The import of `ord' from module `Char' is redundant

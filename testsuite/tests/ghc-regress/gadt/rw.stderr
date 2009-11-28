@@ -1,16 +1,16 @@
 
-rw.hs:14:32:
+rw.hs:14:33:
     Couldn't match expected type `a' against inferred type `Int'
       `a' is a rigid type variable bound by
-          the type signature for `writeInt' at rw.hs:12:13
+          the type signature for `writeInt' at rw.hs:12:14
     In the second argument of `writeIORef', namely `(1 :: Int)'
     In the expression: writeIORef ref (1 :: Int)
     In a case alternative: ~(Li x) -> writeIORef ref (1 :: Int)
 
-rw.hs:19:36:
+rw.hs:19:37:
     Couldn't match expected type `a' against inferred type `Bool'
       `a' is a rigid type variable bound by
-          the type signature for `readBool' at rw.hs:16:13
+          the type signature for `readBool' at rw.hs:16:14
     In the second argument of `(.)', namely `not'
     In the second argument of `(>>=)', namely `(print . not)'
     In the expression: readIORef ref >>= (print . not)

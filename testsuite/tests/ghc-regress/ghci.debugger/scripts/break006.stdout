@@ -1,6 +1,6 @@
-Stopped at ../Test3.hs:(1,0)-(2,30)
+Stopped at ../Test3.hs:(1,1)-(2,31)
 _result :: [a] = _
-Stopped at ../Test3.hs:2:17-30
+Stopped at ../Test3.hs:2:18-31
 _result :: [a] = _
 f :: t -> a = _
 x :: t = _

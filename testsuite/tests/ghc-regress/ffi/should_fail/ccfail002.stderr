@@ -1,5 +1,5 @@
 
-ccfail002.hs:10:0:
+ccfail002.hs:10:1:
     Unacceptable result type in foreign declaration:
         (# Int#, Int#, Int# #)
     When checking declaration:

@@ -1,5 +1,5 @@
 
-rn037.hs:3:0:
+rn037.hs:3:1:
     Warning: The import of `Time' is redundant
                except perhaps to import instances from `Time'
              To import instances alone, use: import Time()

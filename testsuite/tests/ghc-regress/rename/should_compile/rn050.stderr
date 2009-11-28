@@ -1,10 +1,10 @@
 
-rn050.hs:7:0:
+rn050.hs:7:1:
     Warning: In the use of data constructor `C'
 	     (imported from Rn050_A):
 	     Deprecated: "Use D instead"
 
-rn050.hs:7:0:
+rn050.hs:7:1:
     Warning: In the use of `op'
 	     (imported from Rn050_A):
 	     Deprecated: "Use bop instead"

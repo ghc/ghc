@@ -1,5 +1,5 @@
 
-T2111.hs:6:22:
+T2111.hs:6:23:
     The arrow command
       undefined -< x
     was found where an expression was expected

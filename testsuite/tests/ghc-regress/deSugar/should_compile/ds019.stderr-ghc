@@ -1,5 +1,5 @@
 
-ds019.hs:5:0:
+ds019.hs:5:1:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `f':
 		 f d (j, k) p = ...

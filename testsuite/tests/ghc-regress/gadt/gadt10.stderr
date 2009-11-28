@@ -1,5 +1,5 @@
 
-gadt10.hs:6:23:
+gadt10.hs:6:24:
     `RInt' is not applied to enough type arguments
     Expected kind `?', but `RInt' has kind `k -> *'
     In the type `RInt'

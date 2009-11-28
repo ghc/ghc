@@ -1,5 +1,5 @@
 
-T3066.hs:6:0:
+T3066.hs:6:1:
     Unacceptable argument type in foreign declaration: forall u. X u
     When checking declaration:
         foreign import ccall safe "static bla" bla

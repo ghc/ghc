@@ -1,5 +1,5 @@
 
-TH_runIO.hs:12:8:
+TH_runIO.hs:12:9:
     Exception when trying to run compile-time code:
       user error (hi)
       Code: let

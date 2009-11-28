@@ -1,6 +1,6 @@
 
-A.hs:1:15: parse error on input `where'
+A.hs:1:16: parse error on input `where'
 
-<interactive>:1:0: Not in scope: `yan'
+<interactive>:1:1: Not in scope: `yan'
 
-A.hs:1:15: parse error on input `where'
+A.hs:1:16: parse error on input `where'

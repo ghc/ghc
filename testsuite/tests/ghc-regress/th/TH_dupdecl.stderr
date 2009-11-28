@@ -1,5 +1,5 @@
 
-TH_dupdecl.hs:10:3:
+TH_dupdecl.hs:10:4:
     Multiple declarations of `x'
-    Declared at: TH_dupdecl.hs:8:3
-		 TH_dupdecl.hs:10:3
+    Declared at: TH_dupdecl.hs:8:4
+                 TH_dupdecl.hs:10:4

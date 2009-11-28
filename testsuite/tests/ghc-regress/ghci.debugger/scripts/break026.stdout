@@ -1,55 +1,55 @@
-Stopped at break026.hs:(5,0)-(7,34)
+Stopped at break026.hs:(5,1)-(7,35)
 _result :: t1 = _
-Stopped at break026.hs:5:15-21
+Stopped at break026.hs:5:16-22
 _result :: t1 = _
 c :: t1 = _
 go :: t1 -> [t] -> t1 = _
 xs :: [t] = _
-Stopped at break026.hs:(6,8)-(7,34)
+Stopped at break026.hs:(6,9)-(7,35)
 _result :: t1 = _
 f :: t1 -> t -> t1 = _
-Stopped at break026.hs:7:22-34
+Stopped at break026.hs:7:23-35
 _result :: t1 = _
 c :: t1 = _
 f :: t1 -> Integer -> t1 = _
 x :: Integer = 1
 xs :: [Integer] = _
-Stopped at break026.hs:(6,8)-(7,34)
+Stopped at break026.hs:(6,9)-(7,35)
 _result :: t1 = _
 f :: t1 -> t -> t1 = _
-Stopped at break026.hs:7:22-34
+Stopped at break026.hs:7:23-35
 _result :: t1 = _
 c :: t1 = _
 f :: t1 -> Integer -> t1 = _
 x :: Integer = 2
 xs :: [Integer] = _
 c = 1
-Stopped at break026.hs:(5,0)-(7,34)
+Stopped at break026.hs:(5,1)-(7,35)
 _result :: t1 = _
-Stopped at break026.hs:5:15-21
+Stopped at break026.hs:5:16-22
 _result :: t1 = _
 c :: t1 = _
 go :: t1 -> [t] -> t1 = _
 xs :: [t] = _
-Stopped at break026.hs:(6,8)-(7,34)
+Stopped at break026.hs:(6,9)-(7,35)
 _result :: t1 = _
 f :: t1 -> t -> t1 = _
-Stopped at break026.hs:7:22-34
+Stopped at break026.hs:7:23-35
 _result :: t1 = _
 c :: t1 = _
 f :: t1 -> Integer -> t1 = _
 x :: Integer = 1
 xs :: [Integer] = _
-Stopped at break026.hs:(6,8)-(7,34)
+Stopped at break026.hs:(6,9)-(7,35)
 _result :: t1 = _
 f :: t1 -> t -> t1 = _
-Stopped at break026.hs:7:22-34
+Stopped at break026.hs:7:23-35
 _result :: t1 = _
 c :: t1 = _
 f :: t1 -> Integer -> t1 = _
 x :: Integer = 2
 xs :: [Integer] = _
-Stopped at break026.hs:7:26-30
+Stopped at break026.hs:7:27-31
 _result :: t1 = _
 c :: t1 = _
 f :: t1 -> Integer -> t1 = _

@@ -1,5 +1,5 @@
-Breakpoint 0 activated at ../Test6.hs:5:7-10
-Stopped at ../Test6.hs:5:7-10
+Breakpoint 0 activated at ../Test6.hs:5:8-11
+Stopped at ../Test6.hs:5:8-11
 _result :: a = _
-Stopped at ../Test6.hs:5:7-10
+Stopped at ../Test6.hs:5:8-11
 _result :: a = _

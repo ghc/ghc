@@ -1,4 +1,4 @@
 
-FD3.hs:15:0:
+FD3.hs:15:1:
     Occurs check: cannot construct the infinite type: a = (String, a)
     When generalising the type(s) for `translate'

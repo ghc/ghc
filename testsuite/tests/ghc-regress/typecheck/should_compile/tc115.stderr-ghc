@@ -1,4 +1,4 @@
 
-tc115.hs:12:9:
+tc115.hs:12:10:
     Warning: No explicit method nor default method for `foo'
 	     In the instance declaration for `Foo [m a] (m a)'

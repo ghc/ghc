@@ -1,5 +1,5 @@
 
-T3395.hs:6:8:
+T3395.hs:6:9:
     Illegal last statement of a list comprehension:
       r1 <- undefined
     (It should be an expression.)

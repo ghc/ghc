@@ -1,5 +1,5 @@
 
-C.hs:6:10:
+C.hs:6:11:
     Couldn't match expected type `bug1465-1.0:A.T'
            against inferred type `A.T'
     In the expression: B2.f

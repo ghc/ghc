@@ -1,6 +1,6 @@
 "Stopped at <exception thrown>
 _exception :: e = _
-Logged breakpoint at ../QSort.hs:6:23-37
+Logged breakpoint at ../QSort.hs:6:24-38
 _result :: [Char]
 a :: Char
 as :: [Char]

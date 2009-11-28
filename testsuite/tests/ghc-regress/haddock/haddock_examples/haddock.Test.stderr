@@ -150,12 +150,12 @@ m = undefined
 
 
 
-Test.hs:32:1: Warning: `p' is exported by `p' and `R(..)'
+Test.hs:32:2: Warning: `p' is exported by `p' and `R(..)'
 
-Test.hs:32:4: Warning: `q' is exported by `q' and `R(..)'
+Test.hs:32:5: Warning: `q' is exported by `q' and `R(..)'
 
-Test.hs:32:7: Warning: `u' is exported by `u' and `R(..)'
+Test.hs:32:8: Warning: `u' is exported by `u' and `R(..)'
 
-Test.hs:38:1: Warning: `a' is exported by `a' and `C(a, b)'
+Test.hs:38:2: Warning: `a' is exported by `a' and `C(a, b)'
 Warning: output was redirected with -o, but no output will be generated
 because there is no Main module.

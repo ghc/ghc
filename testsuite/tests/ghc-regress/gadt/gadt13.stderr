@@ -1,5 +1,5 @@
 
-gadt13.hs:12:5:
+gadt13.hs:12:6:
     GADT pattern match in non-rigid context for `I'
       Probable solution: add a type signature for `shw'
     In the pattern: I t

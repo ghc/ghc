@@ -1,12 +1,12 @@
 
-arrowfail003.hs:8:6:
+arrowfail003.hs:8:7:
     The arrow command
       returnA -< []
     was found where an expression was expected
     In the expression: returnA -< []
     In the definition of `foo': foo = returnA -< []
 
-arrowfail003.hs:9:6:
+arrowfail003.hs:9:7:
     The arrow command
       (|zeroArrow |)
     was found where an expression was expected

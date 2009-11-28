@@ -1,21 +1,21 @@
 
-T2494.hs:15:13:
+T2494.hs:15:14:
     Couldn't match expected type `a' against inferred type `b'
       `a' is a rigid type variable bound by
-          the type signature for `f' at T2494.hs:13:45
+          the type signature for `f' at T2494.hs:13:46
       `b' is a rigid type variable bound by
-          the type signature for `g' at T2494.hs:14:45
+          the type signature for `g' at T2494.hs:14:46
       Expected type: Maybe (m a)
       Inferred type: Maybe (m b)
     In the first argument of `foo', namely `g'
     In the second argument of `foo', namely `(foo g x)'
 
-T2494.hs:15:29:
+T2494.hs:15:30:
     Couldn't match expected type `a' against inferred type `b'
       `a' is a rigid type variable bound by
-          the type signature for `f' at T2494.hs:13:45
+          the type signature for `f' at T2494.hs:13:46
       `b' is a rigid type variable bound by
-          the type signature for `g' at T2494.hs:14:45
+          the type signature for `g' at T2494.hs:14:46
       Expected type: Maybe (m a)
       Inferred type: Maybe (m b)
     In the second argument of `(.)', namely `g'

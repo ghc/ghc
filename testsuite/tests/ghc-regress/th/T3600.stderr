@@ -1,6 +1,6 @@
-T3600.hs:1:0:
-    T3600.hs:1:0: Splicing declarations
+T3600.hs:1:1:
+    T3600.hs:1:1: Splicing declarations
         test
       ======>
-        T3600.hs:5:2-5
+        T3600.hs:5:3-6
         myFunction = (testFun1 [], testFun2 [], testFun2 "x")

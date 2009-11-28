@@ -1,20 +1,20 @@
-Breakpoint 0 activated at ../Test3.hs:1:13-14
-[2,3Stopped at ../Test3.hs:1:13-14
+Breakpoint 0 activated at ../Test3.hs:1:14-15
+[2,3Stopped at ../Test3.hs:1:14-15
 _result :: [a] = _
--1  : mymap (../Test3.hs:(1,0)-(2,30))
--2  : mymap (../Test3.hs:2:21-30)
--3  : mymap (../Test3.hs:2:17-19)
--4  : mymap (../Test3.hs:2:17-30)
--5  : mymap (../Test3.hs:(1,0)-(2,30))
--6  : mymap (../Test3.hs:2:21-30)
--7  : mymap (../Test3.hs:2:17-19)
--8  : mymap (../Test3.hs:2:17-30)
--9  : mymap (../Test3.hs:(1,0)-(2,30))
+-1  : mymap (../Test3.hs:(1,1)-(2,31))
+-2  : mymap (../Test3.hs:2:22-31)
+-3  : mymap (../Test3.hs:2:18-20)
+-4  : mymap (../Test3.hs:2:18-31)
+-5  : mymap (../Test3.hs:(1,1)-(2,31))
+-6  : mymap (../Test3.hs:2:22-31)
+-7  : mymap (../Test3.hs:2:18-20)
+-8  : mymap (../Test3.hs:2:18-31)
+-9  : mymap (../Test3.hs:(1,1)-(2,31))
 <end of history>
-Logged breakpoint at ../Test3.hs:(1,0)-(2,30)
+Logged breakpoint at ../Test3.hs:(1,1)-(2,31)
 _result :: [a]
 _result :: [a] = _
-Logged breakpoint at ../Test3.hs:2:21-30
+Logged breakpoint at ../Test3.hs:2:22-31
 _result :: [a]
 f :: t -> a
 xs :: [t]
@@ -23,9 +23,9 @@ f :: t -> a = _
 xs :: [t] = []
 *** Ignoring breakpoint
 _result = []
-Logged breakpoint at ../Test3.hs:2:17-19
+Logged breakpoint at ../Test3.hs:2:18-20
 _result :: a
 f :: Integer -> a
 x :: Integer
-Logged breakpoint at ../Test3.hs:2:21-30
+Logged breakpoint at ../Test3.hs:2:22-31
 _result :: [a]

@@ -1,7 +1,7 @@
-Breakpoint 0 activated at ../Test.hs:40:0-16
-Stopped at ../Test.hs:40:0-16
+Breakpoint 0 activated at ../Test.hs:40:1-17
+Stopped at ../Test.hs:40:1-17
 _result :: () = _
-Stopped at ../Test.hs:40:9-16
+Stopped at ../Test.hs:40:10-17
 _result :: () = _
 x :: a = _
 x = (_t1::a)

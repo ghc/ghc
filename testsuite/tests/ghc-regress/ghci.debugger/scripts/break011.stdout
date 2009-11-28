@@ -3,15 +3,15 @@ Stopped at <exception thrown>
 _exception :: e = _
 Stopped at <exception thrown>
 _exception :: e = _
--1  : main (..\Test7.hs:2:17-27)
--2  : main (..\Test7.hs:2:7-28)
+-1  : main (../Test7.hs:2:18-28)
+-2  : main (../Test7.hs:2:8-29)
 <end of history>
-Logged breakpoint at ..\Test7.hs:2:17-27
+Logged breakpoint at ../Test7.hs:2:18-28
 _result :: a
-Logged breakpoint at ..\Test7.hs:2:7-28
+Logged breakpoint at ../Test7.hs:2:8-29
 _result :: IO a
 no more logged breakpoints
-Logged breakpoint at ..\Test7.hs:2:17-27
+Logged breakpoint at ../Test7.hs:2:18-28
 _result :: a
 Stopped at <exception thrown>
 _exception :: e

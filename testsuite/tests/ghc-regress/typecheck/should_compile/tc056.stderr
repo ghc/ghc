@@ -1,5 +1,5 @@
 
-tc056.hs:16:0:
+tc056.hs:16:1:
     Warning: Duplicate constraint(s): Eq' a
 	     In the context: (Eq' a, Eq' a)
 	     While checking the context of an instance declaration

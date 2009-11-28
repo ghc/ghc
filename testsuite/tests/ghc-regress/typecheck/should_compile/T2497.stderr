@@ -1,2 +1,2 @@
 
-T2497.hs:15:0: Warning: Defined but not used: `beq'
+T2497.hs:15:1: Warning: Defined but not used: `beq'

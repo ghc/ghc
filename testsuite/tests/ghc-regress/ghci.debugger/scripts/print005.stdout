@@ -1,5 +1,5 @@
-Breakpoint 0 activated at ../QSort.hs:5:15-50
-Stopped at ../QSort.hs:5:15-50
+Breakpoint 0 activated at ../QSort.hs:5:16-51
+Stopped at ../QSort.hs:5:16-51
 _result :: [a] = _
 a :: a = _
 left :: [a] = _
@@ -12,7 +12,7 @@ left = (_t2::[Integer])
 left = 4 : (_t3::[Integer])
 1
 left = [4]
-Stopped at ../QSort.hs:5:15-50
+Stopped at ../QSort.hs:5:16-51
 _result :: [Integer] = _
 a :: Integer = 4
 left :: [Integer] = _

@@ -1,8 +1,8 @@
 
-tc126.hs:15:24:
+tc126.hs:15:25:
     Warning: No explicit method nor default method for `bug'
 	     In the instance declaration for `Bug (Int -> r) Int r'
 
-tc126.hs:16:9:
+tc126.hs:16:10:
     Warning: No explicit method nor default method for `bug'
-	     In the instance declaration for `Bug f (c a) (c r)'
+    In the instance declaration for `Bug f (c a) (c r)'
