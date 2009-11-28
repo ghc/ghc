@@ -1,5 +1,5 @@
 
-tcrun026.hs:17:28:
+tcrun026.hs:17:29:
     Couldn't match expected type `forall x. L x'
 	   against inferred type `L x'
     In the pattern: L x
