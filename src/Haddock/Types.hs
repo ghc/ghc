@@ -29,6 +29,9 @@ import qualified Data.Map as Map
 import GHC hiding (NoLink)
 import Name
 
+#ifdef TEST
+import Test.QuickCheck
+#endif
 
 -- convenient short-hands
 type Decl = LHsDecl Name
@@ -287,6 +290,28 @@ data HsDoc id
   | DocPic String
   | DocAName String
   deriving (Eq, Show, Functor)
+
+
+#ifdef TEST
+-- TODO: use derive
+instance Arbitrary a => Arbitrary (HsDoc a) where
+  arbitrary =
+    oneof [ return DocEmpty
+          , do { a <- arbitrary; b <- arbitrary; return (DocAppend a b) }
+          , fmap DocString arbitrary
+          , fmap DocParagraph arbitrary
+          , fmap DocIdentifier arbitrary
+          , fmap DocModule arbitrary
+          , fmap DocEmphasis arbitrary
+          , fmap DocMonospaced arbitrary
+          , fmap DocUnorderedList arbitrary
+          , fmap DocOrderedList arbitrary
+          , fmap DocDefList arbitrary
+          , fmap DocCodeBlock arbitrary
+          , fmap DocURL arbitrary
+          , fmap DocPic arbitrary
+          , fmap DocAName arbitrary ]
+#endif
 
 
 type LHsDoc id = Located (HsDoc id)
