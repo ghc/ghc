@@ -281,15 +281,15 @@ test052:
 
 # test -hidir
 test053:
-	$(RM) hi/R/S.hi
-	$(RM) d2/R/S$(OBJSUFFIX)
-	$(RM) hi/P/Q.hi
-	$(RM) d1/P/Q$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make -id1 -id2 -hidir hi R.S
-	test -f hi/R/S.hi
-	test -f d2/R/S$(OBJSUFFIX)
-	test -f hi/P/Q.hi
-	test -f d1/P/Q$(OBJSUFFIX)
+	$(RM) hi053/R/S.hi
+	$(RM) d053_2/R/S$(OBJSUFFIX)
+	$(RM) hi053/P/Q.hi
+	$(RM) d053_1/P/Q$(OBJSUFFIX)
+	"$(TEST_HC)" -v0 --make -id053_1 -id053_2 -hidir hi053 R.S
+	test -f hi053/R/S.hi
+	test -f d053_2/R/S$(OBJSUFFIX)
+	test -f hi053/P/Q.hi
+	test -f d053_1/P/Q$(OBJSUFFIX)
 
 # -----------------------------------------------------------------------------
 # Other tests
