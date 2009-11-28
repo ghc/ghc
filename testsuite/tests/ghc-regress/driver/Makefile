@@ -33,10 +33,10 @@ test012:
 
 # test -ohi
 test013:
-	$(RM) A.xhi
-	$(RM) A$(OBJSUFFIX)
-	"$(TEST_HC)" -c A.hs -ohi A.xhi
-	test -f A.xhi
+	$(RM) A013.xhi
+	$(RM) A013$(OBJSUFFIX)
+	"$(TEST_HC)" -c A013.hs -ohi A013.xhi
+	test -f A013.xhi
 
 # test -odir
 test014:
