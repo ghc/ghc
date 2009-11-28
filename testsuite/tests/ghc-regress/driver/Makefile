@@ -232,18 +232,18 @@ test042:
 
 # test -hidir
 test043:
-	$(RM) -f B/C$(OBJSUFFIX)
-	$(RM) -rf hi
-	mkdir hi
-	"$(TEST_HC)" -v0 --make B/C.hs -hidir hi
-	test -f hi/B/C.hi
+	$(RM) -f B043/C$(OBJSUFFIX)
+	$(RM) -rf hi043
+	mkdir hi043
+	"$(TEST_HC)" -v0 --make B043/C.hs -hidir hi043
+	test -f hi043/B043/C.hi
 
 # test stub generation
 test044:
-	$(RM) B/F.hi B/F$(OBJSUFFIX) B/F_stub.c B/F_stub.h
-	"$(TEST_HC)" -v0 --make B/F.hs
-	test -f B/F_stub.c
-	test -f B/F_stub.h
+	$(RM) B044/F.hi B044/F$(OBJSUFFIX) B044/F_stub.c B044/F_stub.h
+	"$(TEST_HC)" -v0 --make B044/F.hs
+	test -f B044/F_stub.c
+	test -f B044/F_stub.h
 
 # test -stubdir
 test045:
