@@ -93,9 +93,12 @@ test('driver024',
      run_command,
      ['$MAKE -s --no-print-directory test024'])
 
-test('driver024a', alone, run_command,
+test('driver024a',
+     extra_clean(['B024a/stub.c',
+                  'obj024a/B024a/stub.o', 'obj024a/B024a', 'obj024a']),
+     run_command,
      ['$MAKE -s --no-print-directory test024a'])
-cleanall()
+
 test('driver025', alone, run_command,
      ['$MAKE -s --no-print-directory test025'])
 cleanall()

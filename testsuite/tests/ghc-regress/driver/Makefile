@@ -133,12 +133,12 @@ test024:
 
 # test -odir with non-Haskell compilation
 test024a:
-	$(RM) -f B/stub.c
-	$(RM) -rf obj
-	mkdir obj
-	echo >B/stub.c
-	"$(TEST_HC)" -c B/stub.c -odir obj
-	test -f obj/B/stub$(OBJSUFFIX)
+	$(RM) -f B024a/stub.c
+	$(RM) -rf obj024a
+	mkdir obj024a
+	echo >B024a/stub.c
+	"$(TEST_HC)" -c B024a/stub.c -odir obj024a
+	test -f obj024a/B024a/stub$(OBJSUFFIX)
 
 # test -hidir
 test025:
