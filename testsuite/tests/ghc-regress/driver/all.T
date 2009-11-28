@@ -15,9 +15,11 @@ def cleanall():
         rawSystem(['rm', '-rf', in_testdir('obj')])
         rawSystem(['rm', '-rf', in_testdir('stub')])
 
-test('driver011', alone, run_command,
+test('driver011',
+     extra_clean(['A011.hi', 'A011.o']),
+     run_command,
      ['$MAKE -s --no-print-directory test011'])
-cleanall()
+
 test('driver012', alone, run_command,
      ['$MAKE -s --no-print-directory test012'])
 cleanall()

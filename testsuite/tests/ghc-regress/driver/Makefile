@@ -18,11 +18,11 @@ OBJSUFFIX = .o
 # One-shot compilations, non-hierarchical modules
 
 test011:
-	$(RM) A.hi
-	$(RM) A$(OBJSUFFIX)
-	"$(TEST_HC)" -c A.hs
-	test -f A.hi
-	test -f A$(OBJSUFFIX)
+	$(RM) A011.hi
+	$(RM) A011$(OBJSUFFIX)
+	"$(TEST_HC)" -c A011.hs
+	test -f A011.hi
+	test -f A011$(OBJSUFFIX)
 
 # test -o
 test012:
