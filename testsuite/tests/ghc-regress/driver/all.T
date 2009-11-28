@@ -299,12 +299,12 @@ test('2566',
      ['$MAKE -s --no-print-directory 2566'])
 cleanall()
 
-test('pragma001', alone, compile, [''])
-test('pragma002', alone, compile, [''])
+test('pragma001', normal, compile, [''])
+test('pragma002', normal, compile, [''])
 
-test('2499', alone, compile_fail, [''])
+test('2499', normal, compile_fail, [''])
 
-test('mode001', alone, run_command,
+test('mode001', normal, run_command,
      ['$MAKE -s --no-print-directory mode001'])
 
 if config.platform == 'i386-unknown-mingw32':
@@ -313,15 +313,13 @@ else:
      only_windows = skip
 
 test('shared001',
-     [alone,
-      only_windows,
+     [only_windows,
       extra_clean(['Shared001.hi', 'Shared001.o', 'HSdll.dll.a', 'HSdll.dll', 'Shared001_stub.c', 'Shared001_stub.h', 'Shared001_stub.o'])],
      run_command,
      ['$MAKE -s --no-print-directory shared001'])
 
 test('dynHelloWorld',
-     [alone,
-      only_ways(['dyn'])],
+     only_ways(['dyn']),
      compile_and_run,
      [''])
 
