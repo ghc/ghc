@@ -301,9 +301,8 @@ test('driver081.2', alone, run_command,
 cleanall()
 
 test('driver100',
-     [alone,
-      extra_clean(['overlap/List.hi', 'overlap/List.o',
-                   'overlap/Overlap.hi', 'overlap/Overlap.o'])],
+     extra_clean(['overlap/List.hi', 'overlap/List.o',
+                  'overlap/Overlap.hi', 'overlap/Overlap.o']),
      run_command,
      ['$MAKE -s --no-print-directory test100'])
 
