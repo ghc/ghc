@@ -521,7 +521,7 @@ def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
 
     try:
-        print '=====>', full_name
+        print '=====>', full_name, t.total_tests, 'of', len(allTests)
         
         if config.use_threads:
             t.lock.release()
