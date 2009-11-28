@@ -72,6 +72,8 @@ module SrcLoc (
 import Util
 import Outputable
 import FastString
+
+import Data.Bits
 \end{code}
 
 %************************************************************************
@@ -131,10 +133,13 @@ srcLocCol :: SrcLoc -> Int
 srcLocCol (SrcLoc _ _ c) = c
 srcLocCol _other         = panic "srcLocCol: unknown col"
 
--- | Move the 'SrcLoc' down by one line if the character is a newline
--- and across by one character in any other case
+-- | Move the 'SrcLoc' down by one line if the character is a newline,
+-- to the next 8-char tabstop if it is a tab, and across by one
+-- character in any other case
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
 advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
+advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l ((((c `shiftR` 3) + 1)
+                                                  `shiftL` 3) + 1)
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 advanceSrcLoc loc            _    = loc -- Better than nothing
 \end{code}
