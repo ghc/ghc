@@ -111,17 +111,17 @@ test021:
 
 # test -o
 test022:
-	$(RM) B/C.hi
-	$(RM) B/C$(OBJSUFFIX)oo
-	"$(TEST_HC)" -c B/C.hs -o B/C$(OBJSUFFIX)oo
-	test -f B/C$(OBJSUFFIX)oo
+	$(RM) B022/C.hi
+	$(RM) B022/C$(OBJSUFFIX)oo
+	"$(TEST_HC)" -c B022/C.hs -o B022/C$(OBJSUFFIX)oo
+	test -f B022/C$(OBJSUFFIX)oo
 
 # test -ohi
 test023:
-	$(RM) B/C.xhi
-	$(RM) B/C$(OBJSUFFIX)
-	"$(TEST_HC)" -c B/C.hs -ohi B/C.xhi
-	test -f B/C.xhi
+	$(RM) B023/C.xhi
+	$(RM) B023/C$(OBJSUFFIX)
+	"$(TEST_HC)" -c B023/C.hs -ohi B023/C.xhi
+	test -f B023/C.xhi
 
 # test -odir
 test024:
