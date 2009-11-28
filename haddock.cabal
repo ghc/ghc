@@ -97,7 +97,6 @@ executable haddock
     Haddock.Interface.Rn
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
-    Haddock.Utils.FastMutInt2
     Haddock.Utils.BlockTable
     Haddock.Utils.Html
     Haddock.Utils
