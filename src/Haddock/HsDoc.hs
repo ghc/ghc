@@ -3,14 +3,8 @@ module Haddock.HsDoc (
   docParagraph
   ) where
 
-#if __GLASGOW_HASKELL__ <= 610
-
-import HsDoc -- just re-export
-
-#else
 
 import Haddock.Types
-
 import Data.Char (isSpace)
 
 
@@ -68,6 +62,3 @@ docCodeBlock (DocString s)
 docCodeBlock (DocAppend l r)
   = DocAppend l (docCodeBlock r)
 docCodeBlock d = d
-
-#endif
-

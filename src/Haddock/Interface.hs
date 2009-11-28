@@ -79,13 +79,9 @@ createInterfaces' verbosity modules flags instIfaceMap = do
   setTargets targets
   modgraph <- depanal [] False
 
-#if (__GLASGOW_HASKELL__ == 610 && __GHC_PATCHLEVEL__ >= 2) || __GLASGOW_HASKELL__ >= 611
   -- If template haskell is used by the package, we can not use
   -- HscNothing as target since we might need to run code generated from
   -- one or more of the modules during typechecking.
-#if __GLASGOW_HASKELL__ < 611
-  let needsTemplateHaskell = any (dopt Opt_TemplateHaskell . ms_hspp_opts)
-#endif
   modgraph' <- if needsTemplateHaskell modgraph
        then do
          dflags <- getSessionDynFlags
@@ -94,9 +90,6 @@ createInterfaces' verbosity modules flags instIfaceMap = do
          let addHscAsm m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = defaultObjectTarget } }
          return (map addHscAsm modgraph)
        else return modgraph
-#else
-  let modgraph' = modgraph
-#endif
 
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph' Nothing
   (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
@@ -159,12 +152,7 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
 }
   where
     mbOpts = haddockOptions dynflags
-#if __GLASGOW_HASKELL__ >= 611
     (group_, _, mbExports, mbDocHdr) = renamed
-#else
-    (group_, _, mbExports, mbDoc, info) = renamed
-    mbDocHdr = (info, mbDoc)
-#endif
     (_, renamed, _, modInfo) = checkedMod
 
 

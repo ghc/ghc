@@ -156,17 +156,9 @@ renameDocForDecl (mbDoc, fnArgsDoc) = do
 renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
 renameMaybeDoc = mapM renameDoc
 
-#if __GLASGOW_HASKELL__ >= 611
+
 renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
 renameLDocHsSyn = return
-#else
-renameLDocHsSyn :: LHsDoc Name -> RnM (LHsDoc DocName)
-renameLDocHsSyn = renameLDoc
-
--- This is inside the #if to avoid a defined-but-not-used warning.
-renameLDoc :: LHsDoc Name -> RnM (LHsDoc DocName)
-renameLDoc = mapM renameDoc
-#endif
 
 
 renameDoc :: HsDoc Name -> RnM (HsDoc DocName)
@@ -336,15 +328,9 @@ renameLTyClD (L loc d) = return . L loc =<< renameTyClD d
 
 renameTyClD :: TyClDecl Name -> RnM (TyClDecl DocName)
 renameTyClD d = case d of
-#if __GLASGOW_HASKELL__ >= 611
   ForeignType lname b -> do
     lname' <- renameL lname
     return (ForeignType lname' b)
-#else
-  ForeignType lname a b -> do
-    lname' <- renameL lname
-    return (ForeignType lname' a b)
-#endif
 
   TyFamily flav lname ltyvars kind -> do
     lname'   <- renameL lname

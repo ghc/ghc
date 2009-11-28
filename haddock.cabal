@@ -116,16 +116,6 @@ executable haddock
     Haddock.GhcUtils
     Haddock.Convert
    
-  -- Cabal doesn't define __GHC_PATCHLEVEL__
-  if impl(ghc == 6.10.1)
-    cpp-options: -D__GHC_PATCHLEVEL__=1
-  if impl(ghc == 6.10.2)
-    cpp-options: -D__GHC_PATCHLEVEL__=2
-  if impl(ghc == 6.10.3)
-    cpp-options: -D__GHC_PATCHLEVEL__=3
-  if impl(ghc == 6.10.4)
-    cpp-options: -D__GHC_PATCHLEVEL__=4
-
 library
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
@@ -137,16 +127,5 @@ library
     Haddock.Utils
     Haddock.GhcUtils
   
-  -- Cabal doesn't define __GHC_PATCHLEVEL__
-  if impl(ghc == 6.10.1)
-    cpp-options: -D__GHC_PATCHLEVEL__=1
-  if impl(ghc == 6.10.2)
-    cpp-options: -D__GHC_PATCHLEVEL__=2
-  if impl(ghc == 6.10.3)
-    cpp-options: -D__GHC_PATCHLEVEL__=3
-  if impl(ghc == 6.10.4)
-    cpp-options: -D__GHC_PATCHLEVEL__=4
-
   if flag(in-ghc-tree)
     buildable: False
-

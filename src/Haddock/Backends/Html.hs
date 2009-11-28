@@ -1604,10 +1604,9 @@ ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP 
 ppr_mono_ty _         (HsPredTy p)        u = parens (ppPred u p)
 ppr_mono_ty _         (HsNumTy n)         _ = toHtml (show n) -- generics only
 ppr_mono_ty _         (HsSpliceTy _)      _ = error "ppr_mono_ty HsSpliceTy"
-#if __GLASGOW_HASKELL__ >= 611
 ppr_mono_ty _         (HsSpliceTyOut _)   _ = error "ppr_mono_ty HsSpliceTyOut"
 ppr_mono_ty _         (HsRecTy _)         _ = error "ppr_mono_ty HsRecTy"
-#endif
+
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode 
   = maybeParen ctxt_prec pREC_CON $

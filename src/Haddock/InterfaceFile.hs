@@ -54,11 +54,7 @@ binaryInterfaceMagic = 0xD0Cface
 -- because we store GHC datatypes in our interface files, we need to make sure
 -- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
-#if __GLASGOW_HASKELL__ == 610
-binaryInterfaceVersion = 14
-#elif __GLASGOW_HASKELL__ == 611
-binaryInterfaceVersion = 15
-#elif __GLASGOW_HASKELL__ == 612
+#if __GLASGOW_HASKELL__ == 612
 binaryInterfaceVersion = 15
 #elif __GLASGOW_HASKELL__ == 613
 binaryInterfaceVersion = 15

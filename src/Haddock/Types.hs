@@ -1,5 +1,5 @@
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Types
@@ -17,13 +17,7 @@
 
 module Haddock.Types (
   module Haddock.Types
--- avoid duplicate-export warnings, use the conditional to only
--- mention things not defined in this module:
-#if __GLASGOW_HASKELL__ >= 611
   , HsDocString, LHsDocString
-#else
-  , HsDoc(..), LHsDoc, HaddockModInfo(..), emptyHaddockModInfo
-#endif
  ) where
 
 
@@ -42,10 +36,6 @@ type Doc  = HsDoc Name
 
 type DocInstance name = (InstHead name, Maybe (HsDoc name))
 
-#if __GLASGOW_HASKELL__ <= 610
-type HsDocString = HsDoc Name
-type LHsDocString = Located HsDocString
-#endif
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
@@ -143,11 +133,9 @@ type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (HsDoc DocName)
 type LinkEnv       = Map Name Module
 
-#if __GLASGOW_HASKELL__ >= 611
+
 type GhcDocHdr = Maybe LHsDocString
-#else
-type GhcDocHdr = (HaddockModInfo Name, Maybe (HsDoc Name))
-#endif
+
 
 -- | This structure holds the module information we get from GHC's
 -- type checking phase
@@ -276,12 +264,12 @@ toInstalledIface interface = InstalledInterface {
 }
 
 unrenameHsDoc :: HsDoc DocName -> HsDoc Name
-unrenameHsDoc = fmapHsDoc getName
+unrenameHsDoc = fmap getName
 unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
 unrenameDocForDecl (mbDoc, fnArgsDoc) =
     (fmap unrenameHsDoc mbDoc, fmap unrenameHsDoc fnArgsDoc)
 
-#if __GLASGOW_HASKELL__ >= 611
+
 data HsDoc id
   = DocEmpty
   | DocAppend (HsDoc id) (HsDoc id)
@@ -298,10 +286,11 @@ data HsDoc id
   | DocURL String
   | DocPic String
   | DocAName String
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
+
 
 type LHsDoc id = Located (HsDoc id)
-#endif
+
 
 data DocMarkup id a = Markup {
   markupEmpty         :: a,
@@ -321,13 +310,14 @@ data DocMarkup id a = Markup {
   markupPic           :: String -> a
 }
 
-#if __GLASGOW_HASKELL__ >= 611
+
 data HaddockModInfo name = HaddockModInfo {
         hmi_description :: Maybe (HsDoc name),
         hmi_portability :: Maybe String,
         hmi_stability   :: Maybe String,
         hmi_maintainer  :: Maybe String
 }
+
 
 emptyHaddockModInfo :: HaddockModInfo a
 emptyHaddockModInfo = HaddockModInfo {
@@ -336,7 +326,6 @@ emptyHaddockModInfo = HaddockModInfo {
         hmi_stability   = Nothing,
         hmi_maintainer  = Nothing
 }
-#endif
 
 
 -- A monad which collects error messages, locally defined to avoid a dep on mtl
@@ -395,23 +384,3 @@ instance Monad ErrMsgGhc where
   return a = WriterGhc (return (a, []))
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
                fmap (second (msgs1 ++)) (runWriterGhc (k a))
-
--- When HsDoc syntax is part of the Haddock codebase, we'll just
--- declare a Functor instance.
-fmapHsDoc :: (a->b) -> HsDoc a -> HsDoc b
-fmapHsDoc _ DocEmpty = DocEmpty
-fmapHsDoc f (DocAppend a b) = DocAppend (fmapHsDoc f a) (fmapHsDoc f b)
-fmapHsDoc _ (DocString s) = DocString s
-fmapHsDoc _ (DocModule s) = DocModule s
-fmapHsDoc _ (DocURL s) = DocURL s
-fmapHsDoc _ (DocPic s) = DocPic s
-fmapHsDoc _ (DocAName s) = DocAName s
-fmapHsDoc f (DocParagraph a) = DocParagraph (fmapHsDoc f a)
-fmapHsDoc f (DocEmphasis a) = DocEmphasis (fmapHsDoc f a)
-fmapHsDoc f (DocMonospaced a) = DocMonospaced (fmapHsDoc f a)
-fmapHsDoc f (DocCodeBlock a) = DocMonospaced (fmapHsDoc f a)
-fmapHsDoc f (DocIdentifier a) = DocIdentifier (map f a)
-fmapHsDoc f (DocOrderedList a) = DocOrderedList (map (fmapHsDoc f) a)
-fmapHsDoc f (DocUnorderedList a) = DocUnorderedList (map (fmapHsDoc f) a)
-fmapHsDoc f (DocDefList a) = DocDefList (map (\(b,c)->(fmapHsDoc f b, fmapHsDoc f c)) a)
-
