@@ -6,12 +6,9 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module Haddock.Interface.Parse (
-  parseHaddockParagraphs, 
-  parseHaddockString 
-) where
+module Haddock.Parse where
 
-import Haddock.Interface.Lex
+import Haddock.Lex
 import Haddock.Types (Doc(..))
 import Haddock.Doc
 import HsSyn
@@ -40,8 +37,8 @@ import RdrName
 
 %monad { Maybe }
 
-%name parseHaddockParagraphs  doc
-%name parseHaddockString seq
+%name parseParas doc
+%name parseString seq
 
 %%
 

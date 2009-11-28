@@ -100,11 +100,11 @@ executable haddock
     Haddock.Interface.Create
     Haddock.Interface.ExtractFnArgDocs
     Haddock.Interface.AttachInstances
-    Haddock.Interface.Lex
-    Haddock.Interface.Parse
     Haddock.Interface.Rn
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
+    Haddock.Lex
+    Haddock.Parse
     Haddock.Utils.BlockTable
     Haddock.Utils.Html
     Haddock.Utils

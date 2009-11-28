@@ -19,8 +19,8 @@ module Haddock.Interface.LexParseRn (
   ) where
 
 import Haddock.Types
-import Haddock.Interface.Lex
-import Haddock.Interface.Parse
+import Haddock.Lex
+import Haddock.Parse
 import Haddock.Interface.Rn
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Doc
@@ -46,8 +46,8 @@ lexParseRnHaddockComment hty gre (HsDocString fs) = do
    let str = unpackFS fs
    let toks = tokenise str
    let parse = case hty of
-         NormalHaddockComment -> parseHaddockParagraphs
-         DocSectionComment -> parseHaddockString
+         NormalHaddockComment -> parseParas
+         DocSectionComment -> parseString
    case parse toks of
      Nothing -> do
        tell ["doc comment parse failed: "++str]

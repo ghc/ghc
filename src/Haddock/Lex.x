@@ -3,7 +3,8 @@
 --
 -- (c) Simon Marlow 2002
 --
--- This file was modified and integrated into GHC by David Waern 2006
+-- This file was modified and integrated into GHC by David Waern 2006.
+-- Then moved back into Haddock by Isaac Dupree in 2009 :-)
 --
 
 {
@@ -14,7 +15,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module Haddock.Interface.Lex (
+module Haddock.Lex (
 	Token(..),
 	tokenise
  ) where
