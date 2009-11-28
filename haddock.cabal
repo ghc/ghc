@@ -72,7 +72,7 @@ executable haddock
     containers,
     array,
     Cabal >= 1.5,
-    ghc >= 6.10 && < 6.14
+    ghc >= 6.12 && < 6.14
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
