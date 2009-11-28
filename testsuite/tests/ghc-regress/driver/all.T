@@ -221,21 +221,26 @@ test('driver061b',
      ['$MAKE -s --no-print-directory test061b'])
 
 
-test('driver062.1', alone, run_command,
-     ['$MAKE -s --no-print-directory test062.1'])
-cleanall()
-test('driver062.2', alone, run_command,
-     ['$MAKE -s --no-print-directory test062.2'])
-cleanall()
-test('driver062.3', alone, run_command,
-     ['$MAKE -s --no-print-directory test062.3'])
-cleanall()
-test('driver062.4', alone, run_command,
-     ['$MAKE -s --no-print-directory test062.4'])
-cleanall()
-test('driver062.5', alone, run_command,
-     ['$MAKE -s --no-print-directory test062.5'])
-cleanall()
+test('driver062a',
+     extra_clean(['Hello062a.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory test062a'])
+test('driver062b',
+     extra_clean(['Hello062b.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory test062b'])
+test('driver062c',
+     extra_clean(['Hello062c.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory test062c'])
+test('driver062d',
+     extra_clean(['B062d/Hello062d.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory test062d'])
+test('driver062e',
+     extra_clean(['B062e/Hello062e.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory test062e'])
 
 test('driver063', alone, run_command,
      ['$MAKE -s --no-print-directory test063'])

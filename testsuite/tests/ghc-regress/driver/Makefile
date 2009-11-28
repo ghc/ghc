@@ -319,31 +319,31 @@ test061b:
 	test -f A061b.s
 
 # Test that -main-is works with --make
-test062.1:
-	$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
-	echo "module Hello where { hello = putStrLn \"ok\" }" >Hello.hs
-	"$(TEST_HC)" -v0 --make -main-is Hello.hello Hello -o hello
-	./hello
-test062.2:
-	$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
-	echo "module Hello where { main = putStrLn \"ok\" }" >Hello.hs
-	"$(TEST_HC)" -v0 --make -main-is Hello Hello -o hello
-	./hello
-test062.3:
-	$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
-	echo "module Main (hello) where { hello = putStrLn \"ok\" }" >Hello.hs
-	"$(TEST_HC)" -v0 --make -main-is hello Hello.hs -o hello
-	./hello
-test062.4:
-	$(RM) B/Hello.hs B/Hello.hi B/Hello$(OBJSUFFIX) B/Hello.hc hello
-	echo "module B.Hello (hello) where { hello = putStrLn \"ok\" }" >B/Hello.hs
-	"$(TEST_HC)" -v0 --make -main-is B.Hello.hello B/Hello.hs -o hello
-	./hello
-test062.5:
-	$(RM) B/Hello.hs B/Hello.hi B/Hello$(OBJSUFFIX) Hello.hc hello
-	echo "module B.Hello (main) where { main = putStrLn \"ok\" }" >B/Hello.hs
-	"$(TEST_HC)" -v0 --make -main-is B.Hello B/Hello.hs -o hello
-	./hello
+test062a:
+	$(RM) Hello062a.hs Hello062a.hi Hello062a$(OBJSUFFIX) Hello062a.hc hello062a
+	echo "module Hello062a where { hello062a = putStrLn \"ok\" }" >Hello062a.hs
+	"$(TEST_HC)" -v0 --make -main-is Hello062a.hello062a Hello062a -o hello062a
+	./hello062a
+test062b:
+	$(RM) Hello062b.hs Hello062b.hi Hello062b$(OBJSUFFIX) Hello062b.hc hello062b
+	echo "module Hello062b where { main = putStrLn \"ok\" }" >Hello062b.hs
+	"$(TEST_HC)" -v0 --make -main-is Hello062b Hello062b -o hello062b
+	./hello062b
+test062c:
+	$(RM) Hello062c.hs Hello062c.hi Hello062c$(OBJSUFFIX) Hello062c.hc hello062c
+	echo "module Main (hello062c) where { hello062c = putStrLn \"ok\" }" >Hello062c.hs
+	"$(TEST_HC)" -v0 --make -main-is hello062c Hello062c.hs -o hello062c
+	./hello062c
+test062d:
+	$(RM) B062d/Hello062d.hs B062d/Hello062d.hi B062d/Hello062d$(OBJSUFFIX) B062d/Hello062d.hc hello062d
+	echo "module B062d.Hello062d (hello062d) where { hello062d = putStrLn \"ok\" }" >B062d/Hello062d.hs
+	"$(TEST_HC)" -v0 --make -main-is B062d.Hello062d.hello062d B062d/Hello062d.hs -o hello062d
+	./hello062d
+test062e:
+	$(RM) B062e/Hello062e.hs B062e/Hello062e.hi B062e/Hello062e$(OBJSUFFIX) Hello062e.hc hello062e
+	echo "module B062e.Hello062e (main) where { main = putStrLn \"ok\" }" >B062e/Hello062e.hs
+	"$(TEST_HC)" -v0 --make -main-is B062e.Hello062e B062e/Hello062e.hs -o hello062e
+	./hello062e
 
 # Test that -i deletes the list of search paths.
 # The compilation will fail, but we ignore the failure and just
