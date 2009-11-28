@@ -419,10 +419,10 @@ echo "module Main where { main = putStrLn \"ok\" }" >$(1).hs
 test -f $(1)$(exeext)
 endef
 
-test081.1:
-	$(call test081, Test_0)
-test081.2:
-	$(call test081, Test.0)
+test081a:
+	$(call test081, Test_081a)
+test081b:
+	$(call test081, Test.081b)
 
 # -----------------------------------------------------------------------------
 # --make tests

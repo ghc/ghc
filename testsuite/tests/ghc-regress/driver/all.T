@@ -293,12 +293,15 @@ test('driver080',
      run_command,
      ['$MAKE -s --no-print-directory test080'])
 
-test('driver081.1', alone, run_command,
-     ['$MAKE -s --no-print-directory test081.1'])
-cleanall()
-test('driver081.2', alone, run_command,
-     ['$MAKE -s --no-print-directory test081.2'])
-cleanall()
+test('driver081a',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory test081a'])
+
+test('driver081b',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory test081b'])
 
 test('driver100',
      extra_clean(['overlap/List.hi', 'overlap/List.o',
