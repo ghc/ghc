@@ -9,14 +9,14 @@ tcfail075.hs:14:5:
       Inferred type: a
     In the first argument of `(+#)', namely `x'
 
-tcfail075.hs:17:8:
+tcfail075.hs:17:15:
     Couldn't match kind `*' against `#'
     When matching the kinds of `a :: *' and `Int# :: #'
       Expected type: Int#
       Inferred type: a
     In the first argument of `(-#)', namely `x'
 
-tcfail075.hs:19:5:
+tcfail075.hs:19:12:
     Couldn't match kind `*' against `#'
     When matching the kinds of `a :: *' and `Int# :: #'
       Expected type: Int#

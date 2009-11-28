@@ -1,5 +1,5 @@
 
-rw.hs:14:33:
+rw.hs:14:47:
     Couldn't match expected type `a' against inferred type `Int'
       `a' is a rigid type variable bound by
           the type signature for `writeInt' at rw.hs:12:14
@@ -7,7 +7,7 @@ rw.hs:14:33:
     In the expression: writeIORef ref (1 :: Int)
     In a case alternative: ~(Li x) -> writeIORef ref (1 :: Int)
 
-rw.hs:19:37:
+rw.hs:19:51:
     Couldn't match expected type `a' against inferred type `Bool'
       `a' is a rigid type variable bound by
           the type signature for `readBool' at rw.hs:16:14

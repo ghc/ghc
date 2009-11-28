@@ -1,5 +1,5 @@
 
-tcfail185.hs:7:32:
+tcfail185.hs:7:46:
     Couldn't match expected type `Int -> Int'
            against inferred type `Bool'
     In the expression: x

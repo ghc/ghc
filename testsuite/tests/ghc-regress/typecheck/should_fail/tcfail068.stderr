@@ -1,18 +1,18 @@
 
-tcfail068.hs:13:2:
+tcfail068.hs:13:9:
     Inferred type is less polymorphic than expected
       Quantified type variable `s' escapes
     In the first argument of `runST', namely
-	`(newSTArray ((1, 1), n) x)'
+        `(newSTArray ((1, 1), n) x)'
     In the expression: runST (newSTArray ((1, 1), n) x)
     In the definition of `itgen':
-	itgen n x = runST (newSTArray ((1, 1), n) x)
+        itgen n x = runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:19:14:
+tcfail068.hs:19:21:
     Couldn't match expected type `s1' against inferred type `s'
       `s1' is a rigid type variable bound by
            the polymorphic type `forall s1. GHC.ST.ST s1 a'
-             at tcfail068.hs:18:2
+             at tcfail068.hs:18:9
       `s' is a rigid type variable bound by
           the type signature for `itiap' at tcfail068.hs:16:58
       Expected type: STArray s1 (Int, Int) a1
@@ -38,7 +38,7 @@ tcfail068.hs:36:46:
            the polymorphic type `forall s1. GHC.ST.ST s1 a'
              at tcfail068.hs:36:40
       `s' is a rigid type variable bound by
-          the type signature for `itrapstate' at tcfail068.hs:35:26
+          the type signature for `itrapstate' at tcfail068.hs:35:40
       Expected type: GHC.ST.ST s1 (c, IndTree s b)
       Inferred type: GHC.ST.ST s (c, IndTree s b)
     In the first argument of `runST', namely `(itrapstate' i k s)'

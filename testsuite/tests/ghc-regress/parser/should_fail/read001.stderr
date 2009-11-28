@@ -1,5 +1,5 @@
 
-read001.hs:25:10:
+read001.hs:25:11:
     The fixity signature for `+#' lacks an accompanying binding
 
 read001.hs:38:48: Not in scope: type constructor or class `EqLeaf'
@@ -8,7 +8,7 @@ read001.hs:38:59: Not in scope: type constructor or class `EqLeaf'
 
 read001.hs:87:11: Not in scope: `x'
 
-read001.hs:88:12: Not in scope: `x'
+read001.hs:88:19: Not in scope: `x'
 
 read001.hs:94:19: Not in scope: `isSpace'
 

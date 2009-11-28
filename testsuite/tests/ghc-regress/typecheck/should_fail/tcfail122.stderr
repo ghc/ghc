@@ -1,5 +1,5 @@
 
-tcfail122.hs:8:2:
+tcfail122.hs:8:9:
     Couldn't match kind `(* -> *) -> *' against `* -> *'
     When matching the kinds of `c :: (* -> *) -> *' and `a :: * -> *'
       Expected type: a b
