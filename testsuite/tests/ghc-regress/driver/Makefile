@@ -207,10 +207,10 @@ test034:
 
 # test -stubdir (filename differs from module name)
 test035:
-	$(RM) F.hi F$(OBJSUFFIX) stub/Stubs_stub.c stub/Stubs_stub.h
-	"$(TEST_HC)" -v0 --make F.hs -stubdir stub
-	test -f stub/TestStub_stub.c
-	test -f stub/TestStub_stub.h
+	$(RM) F035.hi F$(OBJSUFFIX) stub035/Stubs_stub.c stub035/Stubs_stub.h
+	"$(TEST_HC)" -v0 --make F035.hs -stubdir stub035
+	test -f stub035/TestStub035_stub.c
+	test -f stub035/TestStub035_stub.h
 
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, hierarchical modules
