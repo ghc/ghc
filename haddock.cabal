@@ -119,7 +119,9 @@ library
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
-  exposed-modules:      Distribution.Haddock
+  exposed-modules:
+    Documentation.Haddock
+
   other-modules:
     Haddock.Types
     Haddock.InterfaceFile

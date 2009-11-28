@@ -5,7 +5,7 @@
 --
 
 
-module Distribution.Haddock (
+module Documentation.Haddock (
   readInterfaceFile,
   nameCacheFromGhc,
   freshNameCache,
@@ -20,4 +20,3 @@ module Distribution.Haddock (
 
 import Haddock.InterfaceFile
 import Haddock.Types
-
