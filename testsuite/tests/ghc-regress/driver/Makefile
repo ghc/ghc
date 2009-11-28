@@ -436,18 +436,18 @@ test100:
 # -----------------------------------------------------------------------------
 # dependency-generation tests
 
-DEPFILE= depend
+DEPFILE200 = depend200
 
 # Test that we can create a dependency file, and that we can
 # modify an existing dependency file.
 test200:
-	$(RM) $(DEPFILE)
-	"$(TEST_HC)" -M -dep-makefile $(DEPFILE) D
-	test -f $(DEPFILE)
-	"$(TEST_HC)" -M -dep-makefile $(DEPFILE) D B.C A
-	test -f $(DEPFILE)
-	"$(TEST_HC)" -M -dep-makefile $(DEPFILE) D.hs B/C.hs A.hs
-	test -f $(DEPFILE)
+	$(RM) $(DEPFILE200)
+	"$(TEST_HC)" -M -dep-makefile $(DEPFILE200) D200
+	test -f $(DEPFILE200)
+	"$(TEST_HC)" -M -dep-makefile $(DEPFILE200) D200 B200.C A200
+	test -f $(DEPFILE200)
+	"$(TEST_HC)" -M -dep-makefile $(DEPFILE200) D200.hs B200/C.hs A200.hs
+	test -f $(DEPFILE200)
 
 # -----------------------------------------------------------------------------
 

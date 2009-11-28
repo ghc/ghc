@@ -294,9 +294,10 @@ test('driver100',
      run_command,
      ['$MAKE -s --no-print-directory test100'])
 
-test('driver200', alone, run_command,
+test('driver200',
+     extra_clean(['depend200']),
+     run_command,
      ['$MAKE -s --no-print-directory test200'])
-cleanall()
 
 test('2566',
      normalise_fun(normalise_errmsg),
