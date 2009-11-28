@@ -200,10 +200,10 @@ test033:
 
 # test stub generation
 test034:
-	$(RM) F.hi F$(OBJSUFFIX) F_stub.c F_stub.h
-	"$(TEST_HC)" -v0 --make F.hs
-	test -f F_stub.c
-	test -f F_stub.h
+	$(RM) F034.hi F034$(OBJSUFFIX) F034_stub.c F034_stub.h
+	"$(TEST_HC)" -v0 --make F034.hs
+	test -f F034_stub.c
+	test -f F034_stub.h
 
 # test -stubdir (filename differs from module name)
 test035:
