@@ -257,15 +257,15 @@ test045:
 # Compilation-manager compilations, hierarchical modules, non-root modules
 
 test051:
-	$(RM) d2/R/S.hi
-	$(RM) d2/R/S$(OBJSUFFIX)
-	$(RM) d1/P/Q.hi
-	$(RM) d1/P/Q$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make -id1 -id2 R.S
-	test -f d2/R/S.hi
-	test -f d2/R/S$(OBJSUFFIX)
-	test -f d1/P/Q.hi
-	test -f d1/P/Q$(OBJSUFFIX)
+	$(RM) d051_2/R/S.hi
+	$(RM) d051_2/R/S$(OBJSUFFIX)
+	$(RM) d051_1/P/Q.hi
+	$(RM) d051_1/P/Q$(OBJSUFFIX)
+	"$(TEST_HC)" -v0 --make -id051_1 -id051_2 R.S
+	test -f d051_2/R/S.hi
+	test -f d051_2/R/S$(OBJSUFFIX)
+	test -f d051_1/P/Q.hi
+	test -f d051_1/P/Q$(OBJSUFFIX)
 
 # test -odir
 test052:
