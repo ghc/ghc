@@ -1,2 +1,2 @@
 
-mod136.hs:6:4: Not in scope: `zipWith5'
+mod136.hs:6:5: Not in scope: `zipWith5'

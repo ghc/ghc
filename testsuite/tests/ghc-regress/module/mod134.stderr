@@ -1,2 +1,2 @@
 
-mod134.hs:6:18: Not in scope: `Prelude.head'
+mod134.hs:6:19: Not in scope: `Prelude.head'

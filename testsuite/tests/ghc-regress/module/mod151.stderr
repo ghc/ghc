@@ -1,5 +1,5 @@
 
-mod151.hs:2:19:
+mod151.hs:2:20:
     Ambiguous occurrence `id'
-    It could refer to either `M.id', defined at mod151.hs:2:29
-		          or `Prelude.id', imported from Prelude
+    It could refer to either `M.id', defined at mod151.hs:2:30
+                          or `Prelude.id', imported from Prelude

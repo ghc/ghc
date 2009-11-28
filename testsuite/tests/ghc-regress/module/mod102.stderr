@@ -1,2 +1,2 @@
 
-mod102.hs:8:4: Not in scope:  `methB'
+mod102.hs:8:5: Not in scope: `methB'

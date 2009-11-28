@@ -1,2 +1,2 @@
 
-mod73.hs:3:6: Not in scope:  `Prelude.g'
+mod73.hs:3:7: Not in scope: `Prelude.g'

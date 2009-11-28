@@ -1,5 +1,5 @@
 
-mod41.hs:3:0:
+mod41.hs:3:1:
     Illegal instance declaration for `Eq (Either a a)'
         (All instance types must be of the form (T a1 ... an)
          where a1 ... an are type *variables*,
