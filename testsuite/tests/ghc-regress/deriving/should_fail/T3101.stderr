@@ -1,5 +1,5 @@
 
-T3101.hs:9:11:
+T3101.hs:9:12:
     Can't make a derived instance of `Show Boom'
       (Constructor `Boom' does not have a Haskell-98 type)
     In the data type declaration for `Boom'

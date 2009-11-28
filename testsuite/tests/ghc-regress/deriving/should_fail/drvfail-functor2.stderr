@@ -1,29 +1,29 @@
 
-drvfail-functor2.hs:7:13:
+drvfail-functor2.hs:7:14:
     Can't make a derived instance of `Functor InFunctionArgument'
       (Constructor `InFunctionArgument' uses the type variable in a function argument)
     In the newtype declaration for `InFunctionArgument'
 
-drvfail-functor2.hs:10:13:
+drvfail-functor2.hs:10:14:
     Can't make a derived instance of `Functor OnSecondArg'
       (Constructor `OnSecondArg' uses the type variable in an argument other than the last)
     In the newtype declaration for `OnSecondArg'
 
-drvfail-functor2.hs:15:13:
+drvfail-functor2.hs:15:14:
     Cannot derive well-kinded instance of form `Functor (NoArguments ...)'
       Class `Functor' expects an argument of kind `* -> *'
     In the newtype declaration for `NoArguments'
 
-drvfail-functor2.hs:20:13:
+drvfail-functor2.hs:20:14:
     Can't derive instances where the instance context mentions
     type variables that are not data type parameters
       Offending constraint: Eq a
     When deriving the instance for (Functor StupidConstraint)
 
-drvfail-functor2.hs:26:13:
+drvfail-functor2.hs:26:14:
     No instance for (Functor NoFunctor)
       arising from the 'deriving' clause of a data type declaration
-                   at drvfail-functor2.hs:26:13-19
+                   at drvfail-functor2.hs:26:14-20
     Possible fix:
       add an instance declaration for (Functor NoFunctor)
       or use a standalone 'deriving instance' declaration instead,
