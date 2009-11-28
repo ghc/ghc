@@ -142,11 +142,11 @@ test024a:
 
 # test -hidir
 test025:
-	$(RM) -rf hi
-	mkdir hi
-	$(RM) B/C$(OBJSUFFIX)
-	"$(TEST_HC)" -c B/C.hs -hidir hi
-	test -f hi/B/C.hi
+	$(RM) -rf hi025
+	mkdir hi025
+	$(RM) B025/C$(OBJSUFFIX)
+	"$(TEST_HC)" -c B025/C.hs -hidir hi025
+	test -f hi025/B025/C.hi
 
 # This is a hierarchical module that lives in a subdirectory.
 test026:
