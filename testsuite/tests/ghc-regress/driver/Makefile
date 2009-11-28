@@ -26,10 +26,10 @@ test011:
 
 # test -o
 test012:
-	$(RM) A.hi
-	$(RM) A$(OBJSUFFIX)oo
-	"$(TEST_HC)" -c A.hs -o A$(OBJSUFFIX)oo
-	test -f A$(OBJSUFFIX)oo
+	$(RM) A012.hi
+	$(RM) A012$(OBJSUFFIX)oo
+	"$(TEST_HC)" -c A012.hs -o A012$(OBJSUFFIX)oo
+	test -f A012$(OBJSUFFIX)oo
 
 # test -ohi
 test013:
