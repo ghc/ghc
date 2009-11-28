@@ -55,7 +55,7 @@ attachInstances ifaces instIfaceMap = mapM attach ifaces
              Just (_, _, instances) ->
                let insts = map (first synifyInstHead) $ sortImage (first instHead)
                              [ (instanceHead i, getName i) | i <- instances ]
-               in [ (name, inst, lookupInstDoc name iface instIfaceMap)
+               in [ (inst, lookupInstDoc name iface instIfaceMap)
                   | (inst, name) <- insts ]
              Nothing -> []
             }

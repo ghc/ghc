@@ -1200,7 +1200,7 @@ ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortCl
 -- an 'argBox'. The comment is printed to the right of the box in normal comment
 -- style.
 ppDocInstance :: Bool -> DocInstance DocName -> HtmlTable
-ppDocInstance unicode (_, instHead, maybeDoc) =
+ppDocInstance unicode (instHead, maybeDoc) =
   argBox (ppInstHead unicode instHead) <-> maybeRDocBox maybeDoc
 
 

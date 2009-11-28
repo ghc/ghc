@@ -453,11 +453,10 @@ renameExportItem item = case item of
     decl' <- renameLDecl decl
     doc'  <- renameDocForDecl doc
     subs' <- mapM renameSub subs
-    instances' <- forM instances $ \(name, inst, idoc) -> do
-      name' <- rename name
+    instances' <- forM instances $ \(inst, idoc) -> do
       inst' <- renameInstHead inst
       idoc' <- mapM renameDoc idoc
-      return (name', inst', idoc')
+      return (inst', idoc')
     return (ExportDecl decl' doc' subs' instances')
   ExportNoDecl x subs -> do
     x'    <- lookupRn id x

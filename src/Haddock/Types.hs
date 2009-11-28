@@ -40,7 +40,7 @@ import Name
 type Decl = LHsDecl Name
 type Doc  = HsDoc Name
 
-type DocInstance name = (name, InstHead name, Maybe (HsDoc name))
+type DocInstance name = (InstHead name, Maybe (HsDoc name))
 
 #if __GLASGOW_HASKELL__ <= 610
 type HsDocString = HsDoc Name
