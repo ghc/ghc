@@ -2002,9 +2002,9 @@ alternativeLayoutRuleToken t
                     return (L thisLoc ITocurly)
               | otherwise ->
                  do setAlrExpectingOCurly Nothing
-                    setPendingImplicitTokens [L thisLoc ITccurly]
+                    setPendingImplicitTokens [L lastLoc ITccurly]
                     setNextToken t
-                    return (L thisLoc ITocurly)
+                    return (L lastLoc ITocurly)
              (_, _, Just expectingOCurly) ->
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
