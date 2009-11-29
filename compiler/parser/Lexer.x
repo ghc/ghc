@@ -2100,6 +2100,10 @@ isNonDecreasingIntentation _           = False
 containsCommas :: Token -> Bool
 containsCommas IToparen = True
 containsCommas ITobrack = True
+-- John doesn't have {} as containing commas, but records contain them,
+-- which caused a problem parsing Cabal's Distribution.Simple.InstallDirs
+-- (defaultInstallDirs).
+containsCommas ITocurly = True
 -- GHC Extensions:
 containsCommas IToubxparen = True
 containsCommas _        = False
