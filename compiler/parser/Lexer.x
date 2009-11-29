@@ -1144,6 +1144,7 @@ setLine code span buf len = do
 setFile :: Int -> Action
 setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
+  setAlrLastLoc noSrcSpan
   setSrcLoc (mkSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
   _ <- popLexState
   pushLexState code
@@ -1981,7 +1982,8 @@ alternativeLayoutRuleToken t
          mExpectingOCurly <- getAlrExpectingOCurly
          let thisLoc = getLoc t
              thisCol = srcSpanStartCol thisLoc
-             newLine = srcSpanStartLine thisLoc > srcSpanEndLine lastLoc
+             newLine = (lastLoc == noSrcSpan)
+                    || (srcSpanStartLine thisLoc > srcSpanEndLine lastLoc)
          case (unLoc t, context, mExpectingOCurly) of
              -- I think our implicit open-curly handling is slightly
              -- different to John's, in how it interacts with newlines
