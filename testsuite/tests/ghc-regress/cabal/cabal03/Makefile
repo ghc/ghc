@@ -20,14 +20,16 @@ cabal03: clean
 	'$(TEST_HC)' -v0 --make Setup
 	cd p && $(SETUP) clean
 	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d --disable-optimisation
-	cd p && $(SETUP) build; $(SETUP) register --inplace
+	cd p && $(SETUP) build
+	cd p && $(SETUP) register --inplace
 	cd q && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d
-	cd q && $(SETUP) build; $(SETUP) register --inplace
+	cd q && $(SETUP) build
+	cd q && $(SETUP) register --inplace
 	cd p && $(SETUP) clean
 	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d
-	cd p && $(SETUP) build; $(SETUP) register --inplace
-	cd r && ../Setup configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d
-	cd r && if ../Setup build; then false else true; fi
+	cd p && $(SETUP) build
+	cd p && $(SETUP) register --inplace
+	cd r && ! ../Setup configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean
 endif
