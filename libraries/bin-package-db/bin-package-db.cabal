@@ -11,11 +11,21 @@ source-repository head
     type:     darcs
     location: http://darcs.haskell.org/ghc
 
+flag base3
+    default: False
+
 Library {
     exposed-modules:
             Distribution.InstalledPackageInfo.Binary
 
-    build-depends: base >= 3 && < 5,
-                   binary == 0.5.*,
+    if flag(base3)
+        build-depends: base >= 3 && < 4
+        cpp-options: -DBASE3
+    else
+        build-depends: base >= 4 && < 5
+
+    build-depends: binary == 0.5.*,
                    Cabal == 1.8.*
+
+    extensions: CPP
 }
