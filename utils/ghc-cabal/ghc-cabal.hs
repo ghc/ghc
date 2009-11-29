@@ -206,24 +206,27 @@ doInstall ghc ghcpkg strip topdir directory distDir
                 ghcProg = ConfiguredProgram {
                               programId = programName ghcProgram,
                               programVersion = Nothing,
-                              programArgs = ["-B" ++ topdir],
+                              programDefaultArgs = ["-B" ++ topdir],
+                              programOverrideArgs = [],
                               programLocation = UserSpecified ghc
                           }
                 ghcpkgconf = topdir </> "package.conf.d"
                 ghcPkgProg = ConfiguredProgram {
                                  programId = programName ghcPkgProgram,
                                  programVersion = Nothing,
-                                 programArgs = ["--global-conf",
-                                                ghcpkgconf]
+                                 programDefaultArgs = ["--global-conf",
+                                                       ghcpkgconf]
                                                ++ if not (null myDestDir)
                                                   then ["--force"]
                                                   else [],
+                                 programOverrideArgs = [],
                                  programLocation = UserSpecified ghcpkg
                              }
                 stripProg = ConfiguredProgram {
                               programId = programName stripProgram,
                               programVersion = Nothing,
-                              programArgs = [],
+                              programDefaultArgs = [],
+                              programOverrideArgs = [],
                               programLocation = UserSpecified strip
                           }
                 progs' = updateProgram ghcProg
@@ -367,10 +370,11 @@ generate config_args distdir directory
                 variablePrefix ++ "_CMM_SRCS  = $(addprefix cbits/,$(notdir $(wildcard " ++ directory ++ "/cbits/*.cmm)))",
                 -- XXX This includes things it shouldn't, like:
                 -- -odir dist-bootstrapping/build
-                variablePrefix ++ "_HC_OPTS = " ++ escape (unwords 
-                        (programArgs ghcProg
+                variablePrefix ++ "_HC_OPTS = " ++ escape (unwords
+                       (   programDefaultArgs ghcProg
                         ++ hcOptions GHC bi
-                        ++ extensionsToFlags (compiler lbi) (extensions bi))),
+                        ++ extensionsToFlags (compiler lbi) (extensions bi)
+                        ++ programOverrideArgs ghcProg)),
                 variablePrefix ++ "_CC_OPTS = " ++ unwords (ccOptions bi),
                 variablePrefix ++ "_CPP_OPTS = " ++ unwords (cppOptions bi),
                 variablePrefix ++ "_LD_OPTS = " ++ unwords (ldOptions bi),
