@@ -19,7 +19,7 @@ cabal03: clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)'  --disable-optimisation
+	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d --disable-optimisation
 	cd p && $(SETUP) build; $(SETUP) register --inplace
 	cd q && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d
 	cd q && $(SETUP) build; $(SETUP) register --inplace
