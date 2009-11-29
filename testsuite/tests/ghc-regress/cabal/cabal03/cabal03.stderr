@@ -1,4 +1,0 @@
-Warning: This package indirectly depends on multiple versions of the same
-package. This is highly likely to cause a compile failure.
-package r-1.0 requires p-1.0
-package q-1.0 requires p-1.0
