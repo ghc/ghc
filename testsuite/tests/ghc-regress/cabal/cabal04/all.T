@@ -16,6 +16,6 @@ else:
    cleanup = ''
 
 test('cabal04',
-     normal,
+     alone,
      run_command, 
      ['$MAKE -s --no-print-directory cabal04 PROF=' + prof + ' DYN=' + dyn + ' ' + cleanup])
