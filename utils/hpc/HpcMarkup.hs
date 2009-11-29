@@ -281,7 +281,7 @@ addMarkup tabStop cs loc os ((t1,t2,tik0):ticks) | loc == t1 =
     | not (allowNesting tik0 tik') 
     -> addMarkup tabStop cs loc os ticks -- already marked or bool within marked bool
   _ -> openTick tik0 ++ addMarkup tabStop cs loc (addTo (t2,tik0) os) ticks
-  where
+ where
 
   addTo (t,tik) []             = [(t,tik)]
   addTo (t,tik) ((t',tik'):xs) | t <= t'   = (t,tik):(t',tik'):xs
