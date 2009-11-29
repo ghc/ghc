@@ -2,6 +2,8 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+LOCAL_PKGCONF=local.package.conf
+
 PKG=bug1465
 
 clean:
@@ -9,24 +11,23 @@ clean:
 	rm -f v2/setup v2/Setup.o v2/Setup.hi
 	rm -rf v1/dist v2/dist
 	rm -f *.o *.hi
-	rm -f clean.out prep.out
-	-'$(GHC_PKG)' unregister $(PKG)
+	rm -f $(LOCAL_PKGCONF)
 
-# We aren't interested in the output from the cabal & compilation
-# stages, so redirect it to a file.
 bug1465:
-	$(MAKE) clean 1>clean.out 2>clean.out
-	$(MAKE) prep  1>prep.out 2>prep.out
-	'$(TEST_HC)' -c C.hs || exit 0
-	$(MAKE) clean 1>>clean.out 2>>clean.out
+	$(MAKE) clean
+	$(MAKE) prep
+	'$(TEST_HC)' -package-conf $(LOCAL_PKGCONF) -c C.hs || exit 0
+	$(MAKE) clean
 
 prep:
-	for i in v1 v2; do \
-	   (cd $$i && \
-		'$(TEST_HC)' --make -o setup Setup.hs && \
-		./setup configure -v0 --with-compiler='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' && \
-		./setup build && \
-		./setup register --inplace ); done
+	echo "[]" >$(LOCAL_PKGCONF)
+	$(MAKE) prep.v1
+	$(MAKE) prep.v2
+	'$(TEST_HC)' -package-conf $(LOCAL_PKGCONF) -c -package $(PKG)-1.0 B1.hs
+	'$(TEST_HC)' -package-conf $(LOCAL_PKGCONF) -c -package $(PKG)-2.0 B2.hs
 
-	'$(TEST_HC)' -c -package $(PKG)-1.0 B1.hs
-	'$(TEST_HC)' -c -package $(PKG)-2.0 B2.hs
+prep.%:
+	cd $* && '$(TEST_HC)' -v0 --make -o setup Setup.hs
+	cd $* && ./setup configure -v0 --with-compiler='$(TEST_HC)' --with-ghc-pkg='$(GHC_PKG)' --package-db ../$(LOCAL_PKGCONF)
+	cd $* && ./setup build -v0
+	cd $* && ./setup register -v0 --inplace
