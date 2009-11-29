@@ -282,8 +282,7 @@ evacuate_large(StgPtr p)
   ws = &gct->steps[new_stp->abs_no];
 
   bd->flags |= BF_EVACUATED;
-  bd->step = new_stp;
-  bd->gen_no = new_stp->gen_no;
+  initBdescr(bd, new_stp);
 
   // If this is a block of pinned objects, we don't have to scan
   // these objects, because they aren't allowed to contain any
@@ -505,7 +504,7 @@ loop:
       return;
   }
       
-  stp = bd->step->to;
+  stp = bd->dest;
 
   info = q->header.info;
   if (IS_FORWARDING_PTR(info))
@@ -1069,7 +1068,7 @@ bale_out:
     // check whether it was updated in the meantime.
     *q = (StgClosure *)p;
     if (evac) {
-        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
+        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest);
     }
     unchain_thunk_selectors(prev_thunk_selector, *q);
     return;

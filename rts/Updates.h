@@ -191,7 +191,7 @@ no_slop:
     StgInd_indirectee(p1) = p2;					\
     prim %write_barrier() [];					\
     bd = Bdescr(p1);						\
-    if (bdescr_gen_no(bd) != 0 :: CInt) {			\
+    if (bdescr_gen_no(bd) != 0 :: bits16) {			\
       recordMutableCap(p1, TO_W_(bdescr_gen_no(bd)), R1);  	\
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
       LDV_RECORD_CREATE(p1);					\

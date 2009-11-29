@@ -411,8 +411,7 @@ allocNursery (step *stp, bdescr *tail, nat blocks)
 	if (tail != NULL) {
 	    tail->u.back = bd;
 	}
-	bd->step = stp;
-	bd->gen_no = 0;
+        initBdescr(bd, stp);
 	bd->flags = 0;
 	bd->free = bd->start;
 	tail = bd;
@@ -612,8 +611,7 @@ allocateInGen (generation *g, lnat n)
 	dbl_link_onto(bd, &stp->large_objects);
 	stp->n_large_blocks += bd->blocks; // might be larger than req_blocks
 	alloc_blocks += bd->blocks;
-	bd->gen_no  = g->no;
-	bd->step = stp;
+        initBdescr(bd, stp);
 	bd->flags = BF_LARGE;
 	bd->free = bd->start + n;
 	ret = bd->start;
@@ -624,8 +622,7 @@ allocateInGen (generation *g, lnat n)
         bd = stp->blocks;
 	if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
             bd = allocBlock();
-            bd->gen_no = g->no;
-            bd->step = stp;
+            initBdescr(bd, stp);
             bd->flags = 0;
             bd->link = stp->blocks;
             stp->blocks = bd;
@@ -676,8 +673,7 @@ splitLargeBlock (bdescr *bd, nat blocks)
 
     dbl_link_onto(new_bd, &g0s0->large_objects);
     g0s0->n_large_blocks += new_bd->blocks;
-    new_bd->gen_no  = g0s0->no;
-    new_bd->step    = g0s0;
+    initBdescr(new_bd, g0s0);
     new_bd->flags   = BF_LARGE;
     new_bd->free    = bd->free;
     ASSERT(new_bd->free <= new_bd->start + new_bd->blocks * BLOCK_SIZE_W);
@@ -733,8 +729,7 @@ allocateLocal (Capability *cap, lnat n)
             bd = allocBlock();
             cap->r.rNursery->n_blocks++;
             RELEASE_SM_LOCK;
-            bd->gen_no = 0;
-            bd->step = cap->r.rNursery;
+            initBdescr(bd, cap->r.rNursery);
             bd->flags = 0;
             // NO: alloc_blocks++;
             // calcAllocated() uses the size of the nursery, and we've
@@ -807,8 +802,7 @@ allocatePinned( lnat n )
 	pinned_object_block = bd = allocBlock();
 	dbl_link_onto(bd, &g0s0->large_objects);
 	g0s0->n_large_blocks++;
-	bd->gen_no = 0;
-	bd->step   = g0s0;
+        initBdescr(bd, g0s0);
 	bd->flags  = BF_PINNED | BF_LARGE;
 	bd->free   = bd->start;
 	alloc_blocks++;

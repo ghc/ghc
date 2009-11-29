@@ -214,4 +214,11 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
 /* (needed when dynamic libraries are used). */
 extern rtsBool keepCAFs;
 
+INLINE_HEADER void initBdescr(bdescr *bd, step *step)
+{
+    bd->step   = step;
+    bd->gen_no = step->gen_no;
+    bd->dest   = step->to;
+}
+
 #endif /* RTS_STORAGE_GC_H */

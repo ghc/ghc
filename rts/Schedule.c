@@ -1118,8 +1118,8 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    { 
 		bdescr *x;
 		for (x = bd; x < bd + blocks; x++) {
-		    x->step = cap->r.rNursery;
-		    x->gen_no = 0;
+                    initBdescr(x,cap->r.rNursery);
+                    x->free = x->start;
 		    x->flags = 0;
 		}
 	    }

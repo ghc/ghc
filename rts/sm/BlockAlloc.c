@@ -59,6 +59,7 @@ static void  initMBlock(void *mblock);
      bd->flags
      bd->gen_no
      bd->step
+     bd->dest
 
   Exceptions: we don't maintain invariants for all the blocks within a
   group on the free list, because it is expensive to modify every

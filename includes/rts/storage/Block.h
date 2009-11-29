@@ -48,22 +48,26 @@
 
 #ifndef CMINUSMINUS
 typedef struct bdescr_ {
-  StgPtr start;			/* start addr of memory */
-  StgPtr free;			/* first free byte of memory */
-  struct bdescr_ *link;		/* used for chaining blocks together */
-  union { 
-      struct bdescr_ *back;	/* used (occasionally) for doubly-linked lists*/
-      StgWord *bitmap;
-      StgPtr  scan;             /* scan pointer for copying GC */
-  } u;
-  unsigned int gen_no;		/* generation */
-  struct step_ *step;		/* step */
-  StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
-  StgWord32 flags;              /* block is in to-space */
+    StgPtr start;              /* start addr of memory */
+    StgPtr free;               /* first free byte of memory */
+    struct bdescr_ *link;      /* used for chaining blocks together */
+    union {
+        struct bdescr_ *back;  /* used (occasionally) for doubly-linked lists*/
+        StgWord *bitmap;
+        StgPtr  scan;           /* scan pointer for copying GC */
+    } u;
+
+    struct step_ *step;		/* step */
+    struct step_ *dest;		/* destination step */
+
+    StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
+
+    StgWord16 gen_no;
+    StgWord16 flags;            /* block flags, see below */
 #if SIZEOF_VOID_P == 8
-  StgWord32 _padding[2];
+    StgWord32 _padding[2];
 #else
-  StgWord32 _padding[0];
+    StgWord32 _padding[0];
 #endif
 } bdescr;
 #endif

@@ -86,6 +86,7 @@ arenaAlloc( Arena *arena, size_t size )
 
 	bd->gen_no  = 0;
 	bd->step    = NULL;
+	bd->dest    = NULL;
 	bd->flags   = 0;
 	bd->free    = bd->start;
 	bd->link    = arena->current;
