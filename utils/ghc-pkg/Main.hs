@@ -236,6 +236,13 @@ usageHeader prog = substProg prog $
   "    by tools that parse the results, rather than humans.  The output is\n" ++
   "    always encoded in UTF-8, regardless of the current locale.\n" ++
   "\n" ++
+  "  $p recache\n" ++
+  "    Regenerate the package database cache.  This command should only be\n" ++
+  "    necessary if you added a package to the database by dropping a file\n" ++
+  "    into the database directory manually.  By default, the global DB\n" ++
+  "    is recached; to recache a different DB use --user or --package-conf\n" ++
+  "    as appropriate.\n" ++
+  "\n" ++
   " Substring matching is supported for {module} in find-module and\n" ++
   " for {pkg} in list, describe, and field, where a '*' indicates\n" ++
   " open substring ends (prefix*, *suffix, *infix*).\n" ++
