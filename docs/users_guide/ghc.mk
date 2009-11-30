@@ -26,6 +26,14 @@ $(eval $(call docbook,docs/users_guide,users_guide))
 build_ug_book = docs/users_guide/ug-book.xml
 src_ug_book  = $(dir $(realpath $(dir $(build_ug_book))/ug-book.xml.in))ug-book.xml
 
+html_docs/users_guide : docs/users_guide/users_guide/prof_scc.png
+
+docs/users_guide/users_guide/prof_scc.png : \
+		docs/users_guide/prof_scc.png \
+		docs/users_guide/users_guide/index.html
+	$(CP) $< $@
+# dep. on d/u/u/index.html is to make sure that the d/u/u dir is created first
+
 ifneq "$(build_ug_book)" "$(src_ug_book)"
 $(src_ug_book) : $(build_ug_book)
 	"$(CP)" $< $@
