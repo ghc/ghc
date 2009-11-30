@@ -1070,17 +1070,22 @@ reifyClass cls
 
 ------------------------------
 reifyType :: TypeRep.Type -> TcM TH.Type
+reifyType ty@(ForAllTy _ _)        = reify_for_all ty
+reifyType ty@(PredTy {} `FunTy` _) = reify_for_all ty	        -- Types like ((?x::Int) => Char -> Char)
 reifyType (TyVarTy tv)	    = return (TH.VarT (reifyName tv))
-reifyType (TyConApp tc tys) = reify_tc_app (reifyName tc) tys
+reifyType (TyConApp tc tys) = reify_tc_app (reifyName tc) tys   -- Do not expand type synonyms here
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
 reifyType (FunTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
-reifyType ty@(ForAllTy _ _) = do { cxt' <- reifyCxt cxt; 
-				 ; tau' <- reifyType tau 
-				 ; return (TH.ForallT (reifyTyVars tvs) cxt' tau') }
-			    where
-				(tvs, cxt, tau) = tcSplitSigmaTy ty
-reifyType (PredTy {}) = panic "reifyType PredTy"
+reifyType ty@(PredTy {})    = pprPanic "reifyType PredTy" (ppr ty)
 
+reify_for_all :: TypeRep.Type -> TcM TH.Type
+reify_for_all ty
+  = do { cxt' <- reifyCxt cxt; 
+       ; tau' <- reifyType tau 
+       ; return (TH.ForallT (reifyTyVars tvs) cxt' tau') }
+  where
+    (tvs, cxt, tau) = tcSplitSigmaTy ty   
+				
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
 
