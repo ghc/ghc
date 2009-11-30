@@ -34,6 +34,7 @@ struct GC_FLAGS {
     nat     minAllocAreaSize;   /* in *blocks* */
     nat     minOldGenSize;      /* in *blocks* */
     nat     heapSizeSuggestion; /* in *blocks* */
+    rtsBool heapSizeSuggestionAuto;
     double  oldGenFactor;
     double  pcFreeHeap;
 

@@ -70,6 +70,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize	= 0;    /* off by default */
     RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
+    RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsFalse;
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.generations        = 2;
@@ -690,9 +691,13 @@ error = rtsTrue;
 		break;
 
 	      case 'H':
-		RtsFlags.GcFlags.heapSizeSuggestion =
-                    (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
-		break;
+                  if (rts_argv[arg][2] == '\0') {
+                      RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsTrue;
+                  } else {
+                      RtsFlags.GcFlags.heapSizeSuggestion =
+                          (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
+                  }
+                  break;
 
 #ifdef RTS_GTK_FRONTPANEL
 	      case 'f':

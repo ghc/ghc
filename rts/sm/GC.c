@@ -1548,6 +1548,10 @@ resize_generations (void)
 	size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
 		       RtsFlags.GcFlags.minOldGenSize);
 	
+        if (RtsFlags.GcFlags.heapSizeSuggestionAuto) {
+            RtsFlags.GcFlags.heapSizeSuggestion = size;
+        }
+
 	// minimum size for generation zero
 	min_alloc = stg_max((RtsFlags.GcFlags.pcFreeHeap * max) / 200,
 			    RtsFlags.GcFlags.minAllocAreaSize);
