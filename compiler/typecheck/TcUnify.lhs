@@ -578,9 +578,10 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
 
     go ty1 ty2          -- C.f. the isSigmaTy case for boxySubMatchType
         | isSigmaTy ty1
-        , (tvs1, _, tau1) <- tcSplitSigmaTy ty1
-        , (tvs2, _, tau2) <- tcSplitSigmaTy ty2
+        , (tvs1, ps1, tau1) <- tcSplitSigmaTy ty1
+        , (tvs2, ps2, tau2) <- tcSplitSigmaTy ty2
         , equalLength tvs1 tvs2
+        , equalLength ps1  ps2
         = boxy_match (tmpl_tvs `delVarSetList` tvs1)    tau1
                      (boxy_tvs `extendVarSetList` tvs2) tau2 subst
 
