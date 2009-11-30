@@ -39,10 +39,9 @@ newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign object by associating
 -- a finalizer - given by the monadic operation - with the reference.
 -- The finalizer will be executed after the last reference to the
--- foreign object is dropped.  Note that there is no guarantee on how
--- soon the finalizer is executed after the last reference was dropped;
--- this depends on the details of the Haskell storage manager.  The only
--- guarantee is that the finalizer runs before the program terminates.
+-- foreign object is dropped.  There is no guarantee of promptness, and
+-- in fact there is no guarantee that the finalizer will eventually
+-- run at all.
 newForeignPtr = GHC.ForeignPtr.newConcForeignPtr
 
 addForeignPtrFinalizer :: ForeignPtr a -> IO () -> IO ()

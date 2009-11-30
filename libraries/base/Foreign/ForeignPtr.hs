@@ -101,13 +101,10 @@ instance Show (ForeignPtr a) where
 #ifndef __NHC__
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and
--- associates a finaliser with the reference.  The finaliser will be executed
--- after the last reference to the foreign object is dropped.  Note that there
--- is no guarantee on how soon the finaliser is executed after the last
--- reference was dropped; this depends on the details of the Haskell storage
--- manager.  Indeed, there is no guarantee that the finalizer is executed at
--- all; a program may exit with finalizers outstanding.  (This is true
--- of GHC, other implementations may give stronger guarantees).
+-- associates a finaliser with the reference.  The finaliser will be
+-- executed after the last reference to the foreign object is dropped.
+-- There is no guarantee of promptness, however the finalizer will be
+-- executed before the program exits.
 newForeignPtr finalizer p
   = do fObj <- newForeignPtr_ p
        addForeignPtrFinalizer finalizer fObj
