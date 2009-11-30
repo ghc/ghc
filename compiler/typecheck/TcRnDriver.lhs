@@ -178,6 +178,9 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	tcg_env <- rnExports (isJust maybe_mod) export_ies tcg_env ;
 	traceRn (text "rn4b: after exportss") ;
 
+                -- Check that main is exported (must be after rnExports)
+        checkMainExported tcg_env ;
+
 	-- Compare the hi-boot iface (if any) with the real thing
 	-- Must be done after processing the exports
  	tcg_env <- checkHiBootIface tcg_env boot_iface ;
@@ -942,13 +945,14 @@ check_main dflags tcg_env
 	      ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
 	      ; main_bind = mkVarBind root_main_id rhs }
 
-	; return (tcg_env { tcg_binds = tcg_binds tcg_env 
+	; return (tcg_env { tcg_main  = Just main_name,
+                            tcg_binds = tcg_binds tcg_env
 					`snocBag` main_bind,
 			    tcg_dus   = tcg_dus tcg_env
 				        `plusDU` usesOnly (unitFV main_name)
 			-- Record the use of 'main', so that we don't 
 			-- complain about it being defined but not used
-		 }) 
+		 })
     }}}
   where
     mod 	 = tcg_mod tcg_env
@@ -964,8 +968,13 @@ check_main dflags tcg_env
     mainCtxt  = ptext (sLit "When checking the type of the") <+> pp_main_fn
     noMainMsg = ptext (sLit "The") <+> pp_main_fn
 		<+> ptext (sLit "is not defined in module") <+> quotes (ppr main_mod)
-    pp_main_fn | main_fn == main_RDR_Unqual = ptext (sLit "function") <+> quotes (ppr main_fn)
-	       | otherwise                  = ptext (sLit "main function") <+> quotes (ppr main_fn)
+    pp_main_fn = ppMainFn main_fn
+
+ppMainFn main_fn
+  | main_fn == main_RDR_Unqual
+  = ptext (sLit "function") <+> quotes (ppr main_fn)
+  | otherwise
+  = ptext (sLit "main function") <+> quotes (ppr main_fn)
 	       
 -- | Get the unqualified name of the function to use as the \"main\" for the main module.
 -- Either returns the default name or the one configured on the command line with -main-is
@@ -973,6 +982,17 @@ getMainFun :: DynFlags -> RdrName
 getMainFun dflags = case (mainFunIs dflags) of
     Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
     Nothing -> main_RDR_Unqual
+
+checkMainExported :: TcGblEnv -> TcM ()
+checkMainExported tcg_env = do
+  dflags    <- getDOpts
+  case tcg_main tcg_env of
+    Nothing -> return () -- not the main module
+    Just main_name -> do
+      let main_mod = mainModIs dflags
+      checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
+              ptext (sLit "The") <+> ppMainFn (nameRdrName main_name) <+>
+              ptext (sLit "is not exported by module") <+> quotes (ppr main_mod)
 \end{code}
 
 Note [Root-main Id]

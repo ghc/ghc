@@ -115,7 +115,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_dfun_n   = dfun_n_var,
 		tcg_keep     = keep_var,
 		tcg_doc_hdr  = Nothing,
-                tcg_hpc      = False
+                tcg_hpc      = False,
+                tcg_main     = Nothing
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,

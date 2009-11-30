@@ -247,8 +247,12 @@ data TcGblEnv
 	tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
 
 	tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
-        tcg_hpc :: AnyHpcUsage -- ^ @True@ if any part of the prog uses hpc
-                               -- instrumentation.
+        tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
+                                             --  prog uses hpc instrumentation.
+
+        tcg_main      :: Maybe Name          -- ^ The Name of the main
+                                             -- function, if this module is
+                                             -- the main module.
     }
 
 data RecFieldEnv 
