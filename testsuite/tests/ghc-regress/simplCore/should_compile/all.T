@@ -38,6 +38,7 @@ test('rule2', [only_ways(['optc','optasm']),
                if_compiler_lt('ghc', '6.13', expect_fail)],
               compile, [''])
 
+test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
 test('T3118', normal, compile, [''])
 
