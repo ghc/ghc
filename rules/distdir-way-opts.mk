@@ -77,7 +77,9 @@ endif
 
 # We have to do this mangling using the shell, because words may contain
 # spaces and GNU make doesn't have any quoting interpretation.
+ifneq ($(strip $($1_$2_DEP_INCLUDE_DIRS)),)
 $1_$2_CC_INC_FLAGS:=$$(shell for i in $$($1_$2_DEP_INCLUDE_DIRS); do echo $$($1_$2_DEP_INCLUDE_DIRS_FLAG)\"$$$$i\"; done)
+endif
 
 $1_$2_DIST_CC_OPTS = \
  $$(CONF_CC_OPTS) \
@@ -90,7 +92,9 @@ $1_$2_DIST_CC_OPTS = \
  $$($1_$2_CC_INC_FLAGS) \
  $$($1_$2_DEP_CC_OPTS)
 
+ifneq ($(strip $($1_$2_DEP_LIB_DIRS)),)
 $1_$2_DIST_LD_LIB_DIRS:=$$(shell for i in $$($1_$2_DEP_LIB_DIRS); do echo \"-L$$$$i\"; done)
+endif
 
 $1_$2_DIST_LD_OPTS = \
  $$(CONF_LD_OPTS) \
@@ -104,8 +108,12 @@ $1_$2_DIST_LD_OPTS = \
 # c.f. Cabal's Distribution.Simple.PreProcess.ppHsc2hs
 # We use '' around cflags and lflags to handle paths with backslashes in
 # on Windows
+ifneq ($(strip $($1_$2_DIST_CC_OPTS)),)
 $1_$2_$3_HSC2HS_CC_OPTS:=$$(shell for i in $$($1_$2_DIST_CC_OPTS); do echo \'--cflag=$$$$i\'; done)
+endif
+ifneq ($(strip $($1_$2_DIST_LD_OPTS)),)
 $1_$2_$3_HSC2HS_LD_OPTS:=$$(shell for i in $$($1_$2_DIST_LD_OPTS); do echo \'--lflag=$$$$i\'; done)
+endif
 
 $1_$2_$3_ALL_HSC2HS_OPTS = \
  --cc=$$(WhatGccIsCalled) \
