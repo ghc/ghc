@@ -2331,6 +2331,16 @@ bar
 
       <varlistentry>
 	<term>
+          <literal>:run</literal>
+          <indexterm><primary><literal>:run</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>See <literal>:main</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:set</literal> <optional><replaceable>option</replaceable>...</optional>
           <indexterm><primary><literal>:set</literal></primary></indexterm>
         </term>
