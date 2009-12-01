@@ -2100,9 +2100,10 @@ exitScheduler(
 	for (i = 0; i < n_capabilities; i++) {
 	    shutdownCapability(&capabilities[i], task, wait_foreign);
 	}
-	boundTaskExiting(task);
     }
 #endif
+
+    boundTaskExiting(task);
 }
 
 void
