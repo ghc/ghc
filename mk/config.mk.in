@@ -550,7 +550,7 @@ SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
 # Mingwex Library
 #
 HaveLibMingwEx	= @HaveLibMingwEx@
-DLLTOOL			= @DlltoolCmd@
+DLLTOOL			= inplace/mingw/bin/dlltool.exe
 
 #-----------------------------------------------------------------------------
 # Flex (currently unused, could be moved to glafp-utils)
