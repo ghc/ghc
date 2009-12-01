@@ -1049,7 +1049,7 @@ It supports rebindable syntax (see <xref linkend="rebindable-syntax"/>).
 
 <sect3> <title> Mdo-notation (deprecated) </title>
 
-<para> GHC used to support the flag <option>-XREecursiveDo</option>,
+<para> GHC used to support the flag <option>-XRecursiveDo</option>,
 which enabled the keyword <literal>mdo</literal>, precisely as described in
 <ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>,
 but this is now deprecated.  Instead of <literal>mdo { Q; e }</literal>, write
