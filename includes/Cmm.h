@@ -380,11 +380,12 @@
    HP_CHK_GEN(alloc,liveness,reentry);			\
    TICK_ALLOC_HEAP_NOCTR(alloc);
 
-// allocateLocal() allocates from the nursery, so we check to see
+// allocate() allocates from the nursery, so we check to see
 // whether the nursery is nearly empty in any function that uses
-// allocateLocal() - this includes many of the primops.
+// allocate() - this includes many of the primops.
 #define MAYBE_GC(liveness,reentry)			\
-  if (bdescr_link(CurrentNursery) == NULL || CInt[alloc_blocks] >= CInt[alloc_blocks_lim]) {		\
+    if (bdescr_link(CurrentNursery) == NULL || \
+        step_n_large_blocks(StgRegTable_rNursery(BaseReg)) >= CInt[alloc_blocks_lim]) { \
 	R9  = liveness;					\
         R10 = reentry;					\
         HpAlloc = 0;					\

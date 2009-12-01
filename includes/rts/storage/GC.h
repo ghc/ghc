@@ -75,10 +75,6 @@ typedef struct step_ {
     // ------------------------------------
     // Fields below are used during GC only
 
-    // During GC, if we are collecting this step, blocks and n_blocks
-    // are copied into the following two fields.  After GC, these blocks
-    // are freed.
-
 #if defined(THREADED_RTS)
     char pad[128];                      // make sure the following is
                                         // on a separate cache line.
@@ -89,6 +85,9 @@ typedef struct step_ {
     int          mark;			// mark (not copy)? (old gen only)
     int          compact;		// compact (not sweep)? (old gen only)
 
+    // During GC, if we are collecting this step, blocks and n_blocks
+    // are copied into the following two fields.  After GC, these blocks
+    // are freed.
     bdescr *     old_blocks;	        // bdescr of first from-space block
     unsigned int n_old_blocks;		// number of blocks in from-space
     unsigned int live_estimate;         // for sweeping: estimate of live data
@@ -125,7 +124,6 @@ typedef struct generation_ {
 extern generation * generations;
 
 extern generation * g0;
-extern step * g0s0;
 extern generation * oldest_gen;
 extern step * all_steps;
 extern nat total_steps;
@@ -133,21 +131,14 @@ extern nat total_steps;
 /* -----------------------------------------------------------------------------
    Generic allocation
 
-   StgPtr allocateInGen(generation *g, nat n)
-                                Allocates a chunk of contiguous store
-   				n words long in generation g,
-   				returning a pointer to the first word.
-   				Always succeeds.
-				
-   StgPtr allocate(nat n)       Equaivalent to allocateInGen(g0)
-				
-   StgPtr allocateLocal(Capability *cap, nat n)
+   StgPtr allocate(Capability *cap, nat n)
                                 Allocates memory from the nursery in
 				the current Capability.  This can be
 				done without taking a global lock,
                                 unlike allocate().
 
-   StgPtr allocatePinned(nat n) Allocates a chunk of contiguous store
+   StgPtr allocatePinned(Capability *cap, nat n) 
+                                Allocates a chunk of contiguous store
    				n words long, which is at a fixed
 				address (won't be moved by GC).  
 				Returns a pointer to the first word.
@@ -163,27 +154,16 @@ extern nat total_steps;
 				allocatePinned, for the
 				benefit of the ticky-ticky profiler.
 
-   rtsBool doYouWantToGC(void)  Returns True if the storage manager is
-   				ready to perform a GC, False otherwise.
-
-   lnat  allocatedBytes(void)  Returns the number of bytes allocated
-                                via allocate() since the last GC.
-				Used in the reporting of statistics.
-
    -------------------------------------------------------------------------- */
 
-StgPtr  allocate        ( lnat n );
-StgPtr  allocateInGen   ( generation *g, lnat n );
-StgPtr  allocateLocal   ( Capability *cap, lnat n );
-StgPtr  allocatePinned  ( lnat n );
-lnat    allocatedBytes  ( void );
+StgPtr  allocate        ( Capability *cap, lnat n );
+StgPtr  allocatePinned  ( Capability *cap, lnat n );
 
 /* memory allocator for executable memory */
 void * allocateExec(unsigned int len, void **exec_addr);
 void   freeExec (void *p);
 
 // Used by GC checks in external .cmm code:
-extern nat alloc_blocks;
 extern nat alloc_blocks_lim;
 
 /* -----------------------------------------------------------------------------

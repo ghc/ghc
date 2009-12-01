@@ -9,6 +9,8 @@
 #ifndef SM_STORAGE_H
 #define SM_STORAGE_H
 
+#include "Capability.h"
+
 BEGIN_RTS_PRIVATE
 
 /* -----------------------------------------------------------------------------
@@ -23,12 +25,11 @@ void freeStorage(void);
    Storage manager state
    -------------------------------------------------------------------------- */
 
-extern bdescr * pinned_object_block;
-
 INLINE_HEADER rtsBool
-doYouWantToGC( void )
+doYouWantToGC( Capability *cap )
 {
-  return (alloc_blocks >= alloc_blocks_lim);
+  return (cap->r.rCurrentNursery->link == NULL ||
+          cap->r.rNursery->n_large_blocks >= alloc_blocks_lim);
 }
 
 /* for splitting blocks groups in two */
@@ -119,6 +120,8 @@ void dirty_MVAR(StgRegTable *reg, StgClosure *p);
 /* -----------------------------------------------------------------------------
    Nursery manipulation
    -------------------------------------------------------------------------- */
+
+extern step *nurseries;
 
 void     resetNurseries       ( void );
 void     resizeNurseries      ( nat blocks );

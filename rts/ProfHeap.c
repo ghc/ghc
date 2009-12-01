@@ -1086,7 +1086,7 @@ heapCensus( void )
 
   // Traverse the heap, collecting the census info
   if (RtsFlags.GcFlags.generations == 1) {
-      heapCensusChain( census, g0s0->blocks );
+      heapCensusChain( census, g0->steps[0].blocks );
   } else {
       for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 	  for (s = 0; s < generations[g].n_steps; s++) {

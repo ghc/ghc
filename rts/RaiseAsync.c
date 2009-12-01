@@ -792,7 +792,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    // fun field.
 	    //
 	    words = frame - sp - 1;
-	    ap = (StgAP_STACK *)allocateLocal(cap,AP_STACK_sizeW(words));
+	    ap = (StgAP_STACK *)allocate(cap,AP_STACK_sizeW(words));
 	    
 	    ap->size = words;
 	    ap->fun  = (StgClosure *)sp[0];
@@ -856,7 +856,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    // we've got an exception to raise, so let's pass it to the
 	    // handler in this frame.
 	    //
-	    raise = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+1);
+	    raise = (StgThunk *)allocate(cap,sizeofW(StgThunk)+1);
 	    TICK_ALLOC_SE_THK(1,0);
 	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
 	    raise->payload[0] = exception;

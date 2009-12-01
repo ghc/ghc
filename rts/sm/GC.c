@@ -425,9 +425,9 @@ SET_GCT(gc_threads[0]);
   // g0s0->old_blocks is the old nursery
   // g0s0->blocks is to-space from the previous GC
   if (RtsFlags.GcFlags.generations == 1) {
-      if (g0s0->blocks != NULL) {
-	  freeChain(g0s0->blocks);
-	  g0s0->blocks = NULL;
+      if (g0->steps[0].blocks != NULL) {
+	  freeChain(g0->steps[0].blocks);
+	  g0->steps[0].blocks = NULL;
       }
   }
 
@@ -646,18 +646,13 @@ SET_GCT(gc_threads[0]);
 
 	/* LARGE OBJECTS.  The current live large objects are chained on
 	 * scavenged_large, having been moved during garbage
-	 * collection from large_objects.  Any objects left on
+	 * collection from large_objects.  Any objects left on the
 	 * large_objects list are therefore dead, so we free them here.
 	 */
-	for (bd = stp->large_objects; bd != NULL; bd = next) {
-	  next = bd->link;
-	  freeGroup(bd);
-	  bd = next;
-	}
-
+        freeChain(stp->large_objects);
 	stp->large_objects  = stp->scavenged_large_objects;
 	stp->n_large_blocks = stp->n_scavenged_large_blocks;
-
+        ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
       }
       else // for older generations... 
       {
@@ -672,6 +667,7 @@ SET_GCT(gc_threads[0]);
 
 	// add the new blocks we promoted during this GC 
 	stp->n_large_blocks += stp->n_scavenged_large_blocks;
+        ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
       }
     }
   }
@@ -685,18 +681,19 @@ SET_GCT(gc_threads[0]);
   // Free the small objects allocated via allocate(), since this will
   // all have been copied into G0S1 now.  
   if (RtsFlags.GcFlags.generations > 1) {
-      if (g0s0->blocks != NULL) {
-          freeChain(g0s0->blocks);
-          g0s0->blocks = NULL;
+      if (g0->steps[0].blocks != NULL) {
+          freeChain(g0->steps[0].blocks);
+          g0->steps[0].blocks = NULL;
       }
-      g0s0->n_blocks = 0;
-      g0s0->n_words = 0;
+      g0->steps[0].n_blocks = 0;
+      g0->steps[0].n_words = 0;
   }
-  alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
   // Start a new pinned_object_block
-  pinned_object_block = NULL;
+  for (n = 0; n < n_capabilities; n++) {
+      capabilities[n].pinned_object_block = NULL;
+  }
 
   // Free the mark stack.
   if (mark_stack_top_bd != NULL) {
@@ -932,14 +929,23 @@ initGcThreads (void)
 void
 freeGcThreads (void)
 {
+    nat s;
     if (gc_threads != NULL) {
 #if defined(THREADED_RTS)
         nat i;
-	for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+	for (i = 0; i < n_capabilities; i++) {
+            for (s = 0; s < total_steps; s++)
+            {
+                freeWSDeque(gc_threads[i]->steps[s].todo_q);
+            }
             stgFree (gc_threads[i]);
 	}
         stgFree (gc_threads);
 #else
+        for (s = 0; s < total_steps; s++)
+        {
+            freeWSDeque(gc_threads[0]->steps[s].todo_q);
+        }
         stgFree (gc_threads);
 #endif
         gc_threads = NULL;
@@ -1230,8 +1236,21 @@ init_collected_gen (nat g, nat n_threads)
 	}
     }
 
+    if (g == 0) {
+        for (i = 0; i < n_capabilities; i++) {
+            stp = &nurseries[i];
+            stp->old_threads = stp->threads;
+            stp->threads = END_TSO_QUEUE;
+        }
+    }
+
     for (s = 0; s < generations[g].n_steps; s++) {
 
+	// generation 0, step 0 doesn't need to-space, unless -G1
+	if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
+	    continue; 
+	}
+	
 	stp = &generations[g].steps[s];
 	ASSERT(stp->gen_no == g);
 
@@ -1240,11 +1259,6 @@ init_collected_gen (nat g, nat n_threads)
         stp->old_threads = stp->threads;
         stp->threads = END_TSO_QUEUE;
 
-	// generation 0, step 0 doesn't need to-space 
-	if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-	    continue; 
-	}
-	
 	// deprecate the existing blocks
 	stp->old_blocks   = stp->blocks;
 	stp->n_old_blocks = stp->n_blocks;
@@ -1642,7 +1656,7 @@ resize_nursery (void)
 	 * performance we get from 3L bytes, reducing to the same
 	 * performance at 2L bytes.
 	 */
-	blocks = g0s0->n_blocks;
+	blocks = generations[0].steps[0].n_blocks;
 	
 	if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
 	     blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 

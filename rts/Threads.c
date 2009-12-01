@@ -63,7 +63,7 @@ createThread(Capability *cap, nat size)
     }
 
     size = round_to_mblocks(size);
-    tso = (StgTSO *)allocateLocal(cap, size);
+    tso = (StgTSO *)allocate(cap, size);
 
     stack_size = size - TSO_STRUCT_SIZEW;
     TICK_ALLOC_TSO(stack_size, 0);
@@ -102,8 +102,8 @@ createThread(Capability *cap, nat size)
      */
     ACQUIRE_LOCK(&sched_mutex);
     tso->id = next_thread_id++;  // while we have the mutex
-    tso->global_link = g0s0->threads;
-    g0s0->threads = tso;
+    tso->global_link = cap->r.rNursery->threads;
+    cap->r.rNursery->threads = tso;
     RELEASE_LOCK(&sched_mutex);
     
     // ToDo: report the stack size in the event?

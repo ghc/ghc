@@ -2262,7 +2262,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
 	     "increasing stack size from %ld words to %d.",
 	     (long)tso->stack_size, new_stack_size);
 
-  dest = (StgTSO *)allocateLocal(cap,new_tso_size);
+  dest = (StgTSO *)allocate(cap,new_tso_size);
   TICK_ALLOC_TSO(new_stack_size,0);
 
   /* copy the TSO block and the old stack into the new area */
@@ -2533,7 +2533,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
 	    // Only create raise_closure if we need to.
 	    if (raise_closure == NULL) {
 		raise_closure = 
-		    (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+1);
+		    (StgThunk *)allocate(cap,sizeofW(StgThunk)+1);
 		SET_HDR(raise_closure, &stg_raise_info, CCCS);
 		raise_closure->payload[0] = exception;
 	    }

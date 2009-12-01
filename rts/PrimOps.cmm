@@ -58,7 +58,7 @@ stg_newByteArrayzh
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    ("ptr" p) = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
+    ("ptr" p) = foreign "C" allocate(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
@@ -85,7 +85,7 @@ stg_newPinnedByteArrayzh
     /* Now we convert to a number of words: */
     words = ROUNDUP_BYTES_TO_WDS(bytes);
 
-    ("ptr" p) = foreign "C" allocatePinned(words) [];
+    ("ptr" p) = foreign "C" allocatePinned(MyCapability() "ptr", words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
     /* Now we need to move p forward so that the payload is aligned
@@ -117,7 +117,7 @@ stg_newAlignedPinnedByteArrayzh
     /* Now we convert to a number of words: */
     words = ROUNDUP_BYTES_TO_WDS(bytes);
 
-    ("ptr" p) = foreign "C" allocatePinned(words) [];
+    ("ptr" p) = foreign "C" allocatePinned(MyCapability() "ptr", words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
     /* Now we need to move p forward so that the payload is aligned
@@ -139,7 +139,7 @@ stg_newArrayzh
     MAYBE_GC(R2_PTR,stg_newArrayzh);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
-    ("ptr" arr) = foreign "C" allocateLocal(MyCapability() "ptr",words) [R2];
+    ("ptr" arr) = foreign "C" allocate(MyCapability() "ptr",words) [R2];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
@@ -356,7 +356,7 @@ stg_mkWeakForeignEnvzh
 
   payload_words = 4;
   words         = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-  ("ptr" p)     = foreign "C" allocateLocal(MyCapability() "ptr", words) [];
+  ("ptr" p)     = foreign "C" allocate(MyCapability() "ptr", words) [];
 
   TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);

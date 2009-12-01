@@ -120,7 +120,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
 
-    arr = (StgMutArrPtrs *)allocateLocal(cap, sizeofW(StgMutArrPtrs) + n);
+    arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + n);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;

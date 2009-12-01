@@ -412,7 +412,7 @@ static void unpark_waiters_on(Capability *cap, StgTVar *s) {
 static StgInvariantCheckQueue *new_stg_invariant_check_queue(Capability *cap,
 							     StgAtomicInvariant *invariant) {
   StgInvariantCheckQueue *result;
-  result = (StgInvariantCheckQueue *)allocateLocal(cap, sizeofW(StgInvariantCheckQueue));
+  result = (StgInvariantCheckQueue *)allocate(cap, sizeofW(StgInvariantCheckQueue));
   SET_HDR (result, &stg_INVARIANT_CHECK_QUEUE_info, CCS_SYSTEM);
   result -> invariant = invariant;
   result -> my_execution = NO_TREC;
@@ -422,7 +422,7 @@ static StgInvariantCheckQueue *new_stg_invariant_check_queue(Capability *cap,
 static StgTVarWatchQueue *new_stg_tvar_watch_queue(Capability *cap,
 						   StgClosure *closure) {
   StgTVarWatchQueue *result;
-  result = (StgTVarWatchQueue *)allocateLocal(cap, sizeofW(StgTVarWatchQueue));
+  result = (StgTVarWatchQueue *)allocate(cap, sizeofW(StgTVarWatchQueue));
   SET_HDR (result, &stg_TVAR_WATCH_QUEUE_info, CCS_SYSTEM);
   result -> closure = closure;
   return result;
@@ -430,7 +430,7 @@ static StgTVarWatchQueue *new_stg_tvar_watch_queue(Capability *cap,
 
 static StgTRecChunk *new_stg_trec_chunk(Capability *cap) {
   StgTRecChunk *result;
-  result = (StgTRecChunk *)allocateLocal(cap, sizeofW(StgTRecChunk));
+  result = (StgTRecChunk *)allocate(cap, sizeofW(StgTRecChunk));
   SET_HDR (result, &stg_TREC_CHUNK_info, CCS_SYSTEM);
   result -> prev_chunk = END_STM_CHUNK_LIST;
   result -> next_entry_idx = 0;
@@ -440,7 +440,7 @@ static StgTRecChunk *new_stg_trec_chunk(Capability *cap) {
 static StgTRecHeader *new_stg_trec_header(Capability *cap,
                                           StgTRecHeader *enclosing_trec) {
   StgTRecHeader *result;
-  result = (StgTRecHeader *) allocateLocal(cap, sizeofW(StgTRecHeader));
+  result = (StgTRecHeader *) allocate(cap, sizeofW(StgTRecHeader));
   SET_HDR (result, &stg_TREC_HEADER_info, CCS_SYSTEM);
 
   result -> enclosing_trec = enclosing_trec;
@@ -1175,7 +1175,7 @@ void stmAddInvariantToCheck(Capability *cap,
   // 1. Allocate an StgAtomicInvariant, set last_execution to NO_TREC
   //    to signal that this is a new invariant in the current atomic block
 
-  invariant = (StgAtomicInvariant *) allocateLocal(cap, sizeofW(StgAtomicInvariant));
+  invariant = (StgAtomicInvariant *) allocate(cap, sizeofW(StgAtomicInvariant));
   TRACE("%p : stmAddInvariantToCheck allocated invariant=%p", trec, invariant);
   SET_HDR (invariant, &stg_ATOMIC_INVARIANT_info, CCS_SYSTEM);
   invariant -> code = code;
@@ -1657,7 +1657,7 @@ void stmWriteTVar(Capability *cap,
 StgTVar *stmNewTVar(Capability *cap,
                     StgClosure *new_value) {
   StgTVar *result;
-  result = (StgTVar *)allocateLocal(cap, sizeofW(StgTVar));
+  result = (StgTVar *)allocate(cap, sizeofW(StgTVar));
   SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
   result -> current_value = new_value;
   result -> first_watch_queue_entry = END_STM_WATCH_QUEUE;

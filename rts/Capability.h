@@ -69,6 +69,9 @@ struct Capability_ {
     bdescr **mut_lists;
     bdescr **saved_mut_lists; // tmp use during GC
 
+    // block for allocating pinned objects into
+    bdescr *pinned_object_block;
+
     // Context switch flag. We used to have one global flag, now one 
     // per capability. Locks required  : none (conflicts are harmless)
     int context_switch;
