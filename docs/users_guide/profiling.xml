@@ -280,7 +280,12 @@ main = do let xs = {-# SCC "X" #-} [1..1000000]
 
       <para>which gives this heap profile when run:</para>
 
-      <imagedata fileref="prof_scc.png"/>
+      <!-- contentwidth/contentheight don't appear to have any effect
+           other than making the PS file generation work, rather than
+           falling over.  The result seems to be broken PS on the page
+           with the image. -->
+      <imagedata fileref="prof_scc" contentwidth="645px"
+      contentdepth="428px"/>
 
     </sect2>
 
