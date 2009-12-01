@@ -338,6 +338,9 @@ hs_exit_(rtsBool wait_foreign)
     
     OnExitHook();
 
+    // Free the full argv storage
+    freeFullProgArgv();
+
 #if defined(THREADED_RTS)
     ioManagerDie();
 #endif

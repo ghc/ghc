@@ -1389,3 +1389,18 @@ setFullProgArgv(int argc, char *argv[])
     full_prog_argv[argc] = NULL;
 }
 
+void
+freeFullProgArgv (void)
+{
+    int i;
+
+    if (full_prog_argv != NULL) {
+        for (i = 0; i < full_prog_argc; i++) {
+            stgFree(full_prog_argv[i]);
+        }
+        stgFree(full_prog_argv);
+    }
+
+    full_prog_argc = 0;
+    full_prog_argv = NULL;
+}
