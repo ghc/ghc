@@ -1,7 +1,7 @@
 THISPKG	= base
 SEARCH	= -I$(TOPDIR)/targets/$(MACHINE) -Iinclude \
 	  -I../../prelude/PreludeIO -I../../prelude/`$(LOCAL)harch`
-EXTRA_H_FLAGS   = -H4M -K3M
+EXTRA_H_FLAGS   = -H4M -K6M
 EXTRA_C_FLAGS   = -D__NHC__
 EXTRA_HBC_FLAGS = -H16M -A1M
 
