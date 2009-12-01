@@ -559,7 +559,7 @@ AC_PROG_LN_S
 
 
 dnl ** Find the path to sed
-AC_PATH_PROG(SedCmd,sed)
+AC_PATH_PROGS(SedCmd,gsed sed,sed)
 
 
 dnl ** check for time command
