@@ -40,7 +40,7 @@ The GHC Developer's Wiki
   
   The GHC Commentary
   
-     http://hackage.haskell.org/trac/wiki/Commentary
+     http://hackage.haskell.org/trac/ghc/wiki/Commentary
 
      Notes on the internals and architecture of GHC.
      
