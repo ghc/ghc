@@ -1206,9 +1206,6 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     }
 #endif
     
-    IF_DEBUG(sanity,
-	     //debugBelch("&& Doing sanity check on yielding TSO %ld.", t->id);
-	     checkTSO(t));
     ASSERT(t->_link == END_TSO_QUEUE);
     
     // Shortcut if we're just switching evaluators: don't bother
@@ -1217,6 +1214,10 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     if (t->what_next != prev_what_next) {
 	return rtsTrue;
     }
+
+    IF_DEBUG(sanity,
+	     //debugBelch("&& Doing sanity check on yielding TSO %ld.", t->id);
+	     checkTSO(t));
 
     addToRunQueue(cap,t);
 
