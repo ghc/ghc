@@ -162,7 +162,7 @@ static Capability *scheduleDoGC(Capability *cap, Task *task,
 static rtsBool checkBlackHoles(Capability *cap);
 
 static StgTSO *threadStackOverflow(Capability *cap, StgTSO *tso);
-static StgTSO *threadStackUnderflow(Task *task, StgTSO *tso);
+static StgTSO *threadStackUnderflow(Capability *cap, Task *task, StgTSO *tso);
 
 static void deleteThread (Capability *cap, StgTSO *tso);
 static void deleteAllThreads (Capability *cap);
@@ -547,7 +547,7 @@ run_thread:
     schedulePostRunThread(cap,t);
 
     if (ret != StackOverflow) {
-        t = threadStackUnderflow(task,t);
+        t = threadStackUnderflow(cap,task,t);
     }
 
     ready_to_gc = rtsFalse;
@@ -2300,7 +2300,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
 }
 
 static StgTSO *
-threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
+threadStackUnderflow (Capability *cap, Task *task, StgTSO *tso)
 {
     bdescr *bd, *new_bd;
     lnat free_w, tso_size_w;
@@ -2337,6 +2337,13 @@ threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
     new_tso = (StgTSO *)new_bd->start;
     memcpy(new_tso,tso,TSO_STRUCT_SIZE);
     new_tso->stack_size = new_bd->free - new_tso->stack;
+
+    // The original TSO was dirty and probably on the mutable
+    // list. The new TSO is not yet on the mutable list, so we better
+    // put it there.
+    new_tso->dirty = 0;
+    new_tso->flags &= !TSO_LINK_DIRTY;
+    dirty_TSO(cap, new_tso);
 
     debugTrace(DEBUG_sched, "thread %ld: reducing TSO size from %lu words to %lu",
                (long)tso->id, tso_size_w, tso_sizeW(new_tso));
