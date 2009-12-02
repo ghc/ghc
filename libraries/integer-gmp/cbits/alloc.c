@@ -73,7 +73,7 @@ stgAllocForGMP (size_t size_in_bytes)
   total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
 
   /* allocate and fill it in. */
-  arr = (StgArrWords *)allocateLocal(rts_unsafeGetMyCapability(), total_size_in_words);
+  arr = (StgArrWords *)allocate(rts_unsafeGetMyCapability(), total_size_in_words);
   SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
 
   /* and return a ptr to the goods inside the array */
