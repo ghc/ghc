@@ -578,9 +578,12 @@ checkGlobalTSOList (rtsBool checkTSOs)
           if (checkTSOs)
               checkTSO(tso);
 
+          while (tso->what_next == ThreadRelocated) {
+              tso = tso->_link;
+          }
+
           // If this TSO is dirty and in an old generation, it better
           // be on the mutable list.
-          if (tso->what_next == ThreadRelocated) continue;
           if (tso->dirty || (tso->flags & TSO_LINK_DIRTY)) {
               ASSERT(Bdescr((P_)tso)->gen_no == 0 || (tso->flags & TSO_MARKED));
               tso->flags &= ~TSO_MARKED;
