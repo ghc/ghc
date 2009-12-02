@@ -30,9 +30,7 @@ stg_ap_0_fast
 	foreign "C" printClosure(R1 "ptr") [R1]);
 
     IF_DEBUG(sanity,
-	foreign "C" checkStackChunk(Sp "ptr",
-				    CurrentTSO + TSO_OFFSET_StgTSO_stack +
-				    WDS(TO_W_(StgTSO_stack_size(CurrentTSO))) "ptr") [R1]);
+	foreign "C" checkStackFrame(Sp "ptr") [R1]);
 
     ENTER();
 }
