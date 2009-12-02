@@ -82,6 +82,7 @@ import Maybes           ( orElse )
 import SrcLoc
 import FastString
 import FiniteMap
+import BasicTypes	( CompilerPhase )
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
@@ -998,8 +999,8 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoOldStrictness
   | CoreDoGlomBinds
   | CoreCSE
-  | CoreDoRuleCheck Int{-CompilerPhase-} String -- Check for non-application of rules
-                                                -- matching this string
+  | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
+                                           -- matching this string
   | CoreDoVectorisation PackageId
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things

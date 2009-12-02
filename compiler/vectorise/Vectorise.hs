@@ -106,7 +106,7 @@ vectTopBinder var inline expr
       return var'
   where
     unfolding = case inline of
-                  Inline arity -> mkInlineRule InlSat expr arity
+                  Inline arity -> mkInlineRule needSaturated expr arity
                   DontInline   -> noUnfolding
 
 vectTopRhs :: Var -> CoreExpr -> VM (Inline, CoreExpr)

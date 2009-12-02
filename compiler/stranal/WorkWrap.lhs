@@ -261,7 +261,7 @@ checkSize fn_id rhs thing_inside
   | otherwise = thing_inside
   where
     unfolding = idUnfolding fn_id
-    inline_rule = mkInlineRule InlUnSat rhs (unfoldingArity unfolding)
+    inline_rule = mkInlineRule unSaturatedOk rhs (unfoldingArity unfolding)
 
 ---------------------
 splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Activation -> Expr Var

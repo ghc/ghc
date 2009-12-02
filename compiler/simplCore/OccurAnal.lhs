@@ -20,7 +20,7 @@ module OccurAnal (
 import CoreSyn
 import CoreFVs
 import Type		( tyVarsOfType )
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, mkCoerceI )
+import CoreUtils        ( exprIsTrivial, isDefaultAlt, mkCoerceI, isExpandableApp )
 import Coercion		( CoercionI(..), mkSymCoI )
 import Id
 import Name		( localiseName )
@@ -532,11 +532,11 @@ reOrderCycle depth (bind : binds) pairs
         | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
 	   	     	      -- Note [DFuns should not be loop breakers]
 
-        | Just (inl_rule_info, _) <- isInlineRule_maybe (idUnfolding bndr)
-	= case inl_rule_info of
-	     InlWrapper {} -> 10  -- Note [INLINE pragmas]
-	     _other	   ->  3  -- Data structures are more important than this
-	     		          -- so that dictionary/method recursion unravels
+        | Just (inl_source, _) <- isInlineRule_maybe (idUnfolding bndr)
+	= case inl_source of
+	     InlineWrapper {} -> 10  -- Note [INLINE pragmas]
+	     _other	      ->  3  -- Data structures are more important than this
+	     		             -- so that dictionary/method recursion unravels
 		-- Note that this case hits all InlineRule things, so we
 		-- never look at 'rhs for InlineRule stuff. That's right, because
 		-- 'rhs' is irrelevant for inlining things with an InlineRule
@@ -940,14 +940,16 @@ occAnalApp :: OccEnv
 occAnalApp env (Var fun, args)
   = case args_stuff of { (args_uds, args') ->
     let
-        final_args_uds = markRhsUds env is_pap args_uds
+        final_args_uds = markRhsUds env is_exp args_uds
     in
     (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
-    is_pap = isConLikeId fun || valArgCount args < idArity fun
+    is_exp = isExpandableApp fun (valArgCount args)
     	   -- See Note [CONLIKE pragma] in BasicTypes
+	   -- The definition of is_exp should match that in
+	   -- Simplify.prepareRhs
 
                 -- Hack for build, fold, runST
     args_stuff  | fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args

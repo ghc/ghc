@@ -1,4 +1,4 @@
-%
+calcU%
 % (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -87,9 +87,18 @@ mkImplicitUnfolding expr = mkTopUnfolding (simpleOptExpr expr)
 
 mkUnfolding :: Bool -> CoreExpr -> Unfolding
 mkUnfolding top_lvl expr
-  = mkCoreUnfolding top_lvl expr arity guidance
+  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
+    		    uf_src        = InlineRhs,
+    		    uf_arity      = arity,
+		    uf_is_top 	  = top_lvl,
+		    uf_is_value   = exprIsHNF        expr,
+                    uf_is_conlike = exprIsConLike    expr,
+		    uf_expandable = exprIsExpandable expr,
+		    uf_is_cheap   = is_cheap,
+		    uf_guidance   = guidance }
   where
-    (arity, guidance) = calcUnfoldingGuidance opt_UF_CreationThreshold expr
+    is_cheap = exprIsCheap expr
+    (arity, guidance) = calcUnfoldingGuidance is_cheap opt_UF_CreationThreshold expr
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
 	-- two copies of the thing while the occurrence-analysed expression doesn't
@@ -100,10 +109,12 @@ mkUnfolding top_lvl expr
 	-- it gets fixed up next round.  And it should be rare, because large
 	-- let-bound things that are dead are usually caught by preInlineUnconditionally
 
-mkCoreUnfolding :: Bool -> CoreExpr -> Arity -> UnfoldingGuidance -> Unfolding
+mkCoreUnfolding :: Bool -> UnfoldingSource -> CoreExpr
+                -> Arity -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
-mkCoreUnfolding top_lvl expr arity guidance 
+mkCoreUnfolding top_lvl src expr arity guidance 
   = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
+    		    uf_src        = src,
     		    uf_arity      = arity,
 		    uf_is_top 	  = top_lvl,
 		    uf_is_value   = exprIsHNF        expr,
@@ -117,27 +128,28 @@ mkDFunUnfolding con ops = DFunUnfolding con (map Var ops)
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
 mkWwInlineRule id expr arity
-  = mkCoreUnfolding True (simpleOptExpr expr) arity
-         (InlineRule { ir_sat = InlUnSat, ir_info = InlWrapper id })
+  = mkCoreUnfolding True (InlineWrapper id) 
+                   (simpleOptExpr expr) arity
+                   (UnfWhen unSaturatedOk boringCxtNotOk)
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
-  = mkCoreUnfolding True expr 
-                    0    -- Arity of unfolding doesn't matter
-                    (InlineRule { ir_info = InlAlways, ir_sat = InlUnSat })	
+  = mkCoreUnfolding True InlineCompulsory
+                    expr 0    -- Arity of unfolding doesn't matter
+                    (UnfWhen unSaturatedOk boringCxtOk)
 
-mkInlineRule :: InlSatFlag -> CoreExpr -> Arity -> Unfolding
-mkInlineRule sat expr arity 
-  = mkCoreUnfolding True  	 -- Note [Top-level flag on inline rules]
+mkInlineRule :: Bool -> CoreExpr -> Arity -> Unfolding
+mkInlineRule unsat_ok expr arity 
+  = mkCoreUnfolding True InlineRule 	 -- Note [Top-level flag on inline rules]
     		    expr' arity 
-		    (InlineRule { ir_sat = sat, ir_info = info })
+		    (UnfWhen unsat_ok boring_ok)
   where
     expr' = simpleOptExpr expr
-    info = if small then InlSmall else InlVanilla
-    small = case calcUnfoldingGuidance (arity+1) expr' of
-              (arity_e, UnfoldIfGoodArgs { ug_size = size_e }) 
-                   -> uncondInline arity_e size_e
-              _other {- actually UnfoldNever -} -> False
+    boring_ok = case calcUnfoldingGuidance True    -- Treat as cheap
+                                           (arity+1) expr' of
+              	  (_, UnfWhen _ boring_ok) -> boring_ok
+              	  _other                   -> boringCxtNotOk
+     -- See Note [INLINE for small functions]
 \end{code}
 
 
@@ -149,25 +161,34 @@ mkInlineRule sat expr arity
 
 \begin{code}
 calcUnfoldingGuidance
-	:: Int		    	-- bomb out if size gets bigger than this
-	-> CoreExpr    		-- expression to look at
+	:: Bool		-- True <=> the rhs is cheap, or we want to treat it
+	   		--          as cheap (INLINE things)	 
+        -> Int		-- Bomb out if size gets bigger than this
+	-> CoreExpr    	-- Expression to look at
 	-> (Arity, UnfoldingGuidance)
-calcUnfoldingGuidance bOMB_OUT_SIZE expr
-  = case collectBinders expr of { (binders, body) ->
+calcUnfoldingGuidance expr_is_cheap bOMB_OUT_SIZE expr
+  = case collectBinders expr of { (bndrs, body) ->
     let
-        val_binders = filter isId binders
-	n_val_binders = length val_binders
+        val_bndrs   = filter isId bndrs
+	n_val_bndrs = length val_bndrs
+
+    	guidance 
+          = case (sizeExpr (iUnbox bOMB_OUT_SIZE) val_bndrs body) of
+      	      TooBig -> UnfNever
+      	      SizeIs size cased_bndrs scrut_discount
+      	        | uncondInline n_val_bndrs (iBox size) && expr_is_cheap
+      	        -> UnfWhen needSaturated boringCxtOk
+
+	        | otherwise
+      	        -> UnfIfGoodArgs { ug_args  = map (discount cased_bndrs) val_bndrs
+      	                         , ug_size  = iBox size
+      	        	  	 , ug_res   = iBox scrut_discount }
+
+        discount cbs bndr
+           = foldlBag (\acc (b',n) -> if bndr==b' then acc+n else acc) 
+		      0 cbs
     in
-    case (sizeExpr (iUnbox bOMB_OUT_SIZE) val_binders body) of
-      TooBig -> (n_val_binders, UnfoldNever)
-      SizeIs size cased_args scrut_discount
-	-> (n_val_binders, UnfoldIfGoodArgs { ug_args  = map discount_for val_binders
-			    		    , ug_size  = iBox size
-			    		    , ug_res   = iBox scrut_discount })
-	where        
-	    discount_for b = foldlBag (\acc (b',n) -> if b==b' then acc+n else acc) 
-				      0 cased_args
-    }
+    (n_val_bndrs, guidance) }
 \end{code}
 
 Note [Computing the size of an expression]
@@ -267,7 +288,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
     size_up (Case (Var v) _ _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
-	= alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the case itself
+	= alts_size (foldr1 addSize alt_sizes)	-- The 1 is for the case itself
 		    (foldr1 maxSize alt_sizes)
 		-- Good to inline if an arg is scrutinised, because
 		-- that may eliminate allocation in the caller
@@ -279,7 +300,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 		-- the case when we are scrutinising an argument variable
 	  alts_size (SizeIs tot tot_disc _tot_scrut)           -- Size of all alternatives
 		    (SizeIs max _max_disc  max_scrut)           -- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, iBox (_ILIT(1) +# tot -# max)) `unionBags` tot_disc) max_scrut
+	 	= SizeIs tot (unitBag (v, iBox (_ILIT(2) +# tot -# max)) `unionBags` tot_disc) max_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of the largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
@@ -292,12 +313,13 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (Case e _ _ alts) = foldr (addSize . size_up_alt) 
 				      (nukeScrutDiscount (size_up e))
 				      alts
-			 	`addSizeN` 1	-- Add 1 for the case itself
 	  	-- We don't charge for the case itself
 		-- It's a strict thing, and the price of the call
 		-- is paid by scrut.  Also consider
 		--	case f x of DEFAULT -> e
 		-- This is just ';'!  Don't charge for it.
+		--
+		-- Moreover, we charge one per alternative.
 
     ------------ 
     -- size_up_app is used when there's ONE OR MORE value args
@@ -522,15 +544,12 @@ maxSize _              TooBig				  = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 					      | otherwise = s2
 
-sizeZero, sizeOne :: ExprSize
+sizeZero :: ExprSize
 sizeN :: Int -> ExprSize
 
 sizeZero = SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
-sizeOne  = SizeIs (_ILIT(1))  emptyBag (_ILIT(0))
 sizeN n  = SizeIs (iUnbox n) emptyBag (_ILIT(0))
 \end{code}
-
-
 
 
 %************************************************************************
@@ -547,13 +566,13 @@ actual arguments.
 \begin{code}
 couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
 couldBeSmallEnoughToInline threshold rhs 
-  = case calcUnfoldingGuidance threshold rhs of
-       (_, UnfoldNever) -> False
-       _                -> True
+  = case calcUnfoldingGuidance False threshold rhs of
+       (_, UnfNever) -> False
+       _             -> True
 
 ----------------
 smallEnoughToInline :: Unfolding -> Bool
-smallEnoughToInline (CoreUnfolding {uf_guidance = UnfoldIfGoodArgs {ug_size = size}})
+smallEnoughToInline (CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_size = size}})
   = size <= opt_UF_UseThreshold
 smallEnoughToInline _
   = False
@@ -563,9 +582,9 @@ certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
 certainlyWillInline (CoreUnfolding { uf_is_cheap = is_cheap, uf_arity = n_vals, uf_guidance = guidance })
   = case guidance of
-      UnfoldNever     -> False
-      InlineRule {}   -> True
-      UnfoldIfGoodArgs { ug_size = size} 
+      UnfNever      -> False
+      UnfWhen {}    -> True
+      UnfIfGoodArgs { ug_size = size} 
                     -> is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
 
 certainlyWillInline _
@@ -596,8 +615,8 @@ StrictAnal.addStrictnessInfoToTopId
 
 \begin{code}
 callSiteInline :: DynFlags
-	       -> Bool			-- True <=> the Id can be inlined
 	       -> Id			-- The Id
+	       -> Unfolding		-- Its unfolding (if active)
 	       -> Bool			-- True if there are are no arguments at all (incl type args)
 	       -> [ArgSummary]		-- One for each value arg; True if it is interesting
 	       -> CallCtxt		-- True <=> continuation is interesting
@@ -632,8 +651,8 @@ instance Outputable CallCtxt where
   ppr CaseCtxt 	      = ptext (sLit "CaseCtxt")
   ppr ValAppCtxt      = ptext (sLit "ValAppCtxt")
 
-callSiteInline dflags active_inline id lone_variable arg_infos cont_info
-  = case idUnfolding id of {
+callSiteInline dflags id unfolding lone_variable arg_infos cont_info
+  = case unfolding of {
 	NoUnfolding 	 -> Nothing ;
 	OtherCon _  	 -> Nothing ;
 	DFunUnfolding {} -> Nothing ;	-- Never unfold a DFun
@@ -642,7 +661,8 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
     let
-	n_val_args  = length arg_infos
+	n_val_args = length arg_infos
+        saturated  = n_val_args >= uf_arity
 
 	result | yes_or_no = Just unf_template
 	       | otherwise = Nothing
@@ -657,9 +677,12 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 	       -- arguments (ie n_val_args >= arity). But there must
 	       -- be *something* interesting about some argument, or the
 	       -- result context, to make it worth inlining
-	some_benefit =  interesting_args
-                     || n_val_args > uf_arity	    -- Over-saturated
-                     || interesting_saturated_call  -- Exactly saturated
+	some_benefit 
+           | not saturated = interesting_args	-- Under-saturated
+		   	      		     	-- Note [Unsaturated applications]
+	   | n_val_args > uf_arity = True	-- Over-saturated
+           | otherwise = interesting_args	-- Saturated
+                      || interesting_saturated_call 
 
 	interesting_saturated_call 
 	  = case cont_info of
@@ -668,46 +691,35 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 	      ArgCtxt {} -> uf_arity > 0     			-- Note [Inlining in ArgCtxt]
 	      ValAppCtxt -> True				-- Note [Cast then apply]
 
-	yes_or_no
+	(yes_or_no, extra_doc)
 	  = case guidance of
-	      UnfoldNever  -> False
+	      UnfNever -> (False, empty)
 
-	      InlineRule { ir_info = inl_info, ir_sat = sat }
-                 | InlAlways <- inl_info -> True         -- No top-level binding, so inline!
-		   	     		                 -- Ignore is_active because we want to 
-                                                         -- inline even if SimplGently is on.
- 	         | not active_inline     -> False
-		 | n_val_args < uf_arity -> yes_unsat	 -- Not enough value args
-		 | InlSmall <- inl_info  -> True         -- Note [INLINE for small functions]
-		 | otherwise	         -> some_benefit -- Saturated or over-saturated
+	      UnfWhen unsat_ok boring_ok -> ( (unsat_ok  || saturated)
+                                           && (boring_ok || some_benefit)
+                                            , empty )
+		   -- For the boring_ok part see Note [INLINE for small functions]
+
+	      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
+	  	 -> ( is_cheap && some_benefit && small_enough
+                    , (text "discounted size =" <+> int discounted_size) )
 		 where
-		   -- See Note [Inlining an InlineRule]
-		   yes_unsat = case sat of 
-                                 InlSat   -> False
-			         InlUnSat -> interesting_args
-
-	      UnfoldIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
- 	         | not active_inline  	      -> False
- 	         | not is_cheap       	      -> False
-		 | n_val_args < uf_arity      -> interesting_args && small_enough	
-		   	      		      		-- Note [Unsaturated applications]
-		 | uncondInline uf_arity size -> True
-	  	 | otherwise	      	      -> some_benefit && small_enough
-
-		 where
-		   small_enough = (size - discount) <= opt_UF_UseThreshold
+		   discounted_size = size - discount
+		   small_enough = discounted_size <= opt_UF_UseThreshold
 		   discount = computeDiscount uf_arity arg_discounts 
 				              res_discount arg_infos cont_info
 		
     in    
     if dopt Opt_D_dump_inlinings dflags then
 	pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
-		 (vcat [text "active:" <+> ppr active_inline,
-			text "arg infos" <+> ppr arg_infos,
+		 (vcat [text "arg infos" <+> ppr arg_infos,
+			text "uf arity" <+> ppr uf_arity,
 			text "interesting continuation" <+> ppr cont_info,
+			text "some_benefit" <+> ppr some_benefit,
 			text "is value:" <+> ppr is_value,
                         text "is cheap:" <+> ppr is_cheap,
 			text "guidance" <+> ppr guidance,
+			extra_doc,
 			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
 		  result
     else
@@ -759,7 +771,7 @@ Consider	{-# INLINE f #-}
                 g y = f y
 Then f's RHS is no larger than its LHS, so we should inline it
 into even the most boring context.  (We do so if there is no INLINE
-pragma!)  That's the reason for the 'ug_small' flag on an InlineRule.
+pragma!)  
 
 
 Note [Things to watch]
@@ -776,7 +788,7 @@ Note [Things to watch]
 Note [Inlining an InlineRule]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An InlineRules is used for
-  (a) pogrammer INLINE pragmas
+  (a) programmer INLINE pragmas
   (b) inlinings from worker/wrapper
 
 For (a) the RHS may be large, and our contract is that we *only* inline
@@ -1025,17 +1037,17 @@ However e might not *look* as if
 -- | Returns @Just (dc, [t1..tk], [x1..xn])@ if the argument expression is 
 -- a *saturated* constructor application of the form @dc t1..tk x1 .. xn@,
 -- where t1..tk are the *universally-qantified* type args of 'dc'
-exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+exprIsConApp_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 
-exprIsConApp_maybe (Note _ expr)
-  = exprIsConApp_maybe expr
+exprIsConApp_maybe id_unf (Note _ expr)
+  = exprIsConApp_maybe id_unf expr
 	-- We ignore all notes.  For example,
 	--  	case _scc_ "foo" (C a b) of
 	--			C a b -> e
 	-- should be optimised away, but it will be only if we look
 	-- through the SCC note.
 
-exprIsConApp_maybe (Cast expr co)
+exprIsConApp_maybe id_unf (Cast expr co)
   =     -- Here we do the KPush reduction rule as described in the FC paper
 	-- The transformation applies iff we have
 	--	(C e1 ... en) `cast` co
@@ -1043,7 +1055,7 @@ exprIsConApp_maybe (Cast expr co)
 	-- The left-hand one must be a T, because exprIsConApp returned True
 	-- but the right-hand one might not be.  (Though it usually will.)
 
-    case exprIsConApp_maybe expr of {
+    case exprIsConApp_maybe id_unf expr of {
 	Nothing 	                 -> Nothing ;
 	Just (dc, _dc_univ_args, dc_args) -> 
 
@@ -1104,7 +1116,7 @@ exprIsConApp_maybe (Cast expr co)
     Just (dc, to_tc_arg_tys, ex_args ++ new_co_args ++ new_val_args)
     }}
 
-exprIsConApp_maybe expr 
+exprIsConApp_maybe id_unf expr 
   = analyse expr [] 
   where
     analyse (App fun arg) args = analyse fun (arg:args)
@@ -1131,7 +1143,7 @@ exprIsConApp_maybe expr
                       analyse rhs args
         where
 	  is_saturated = count isValArg args == idArity fun
-          unfolding = idUnfolding fun    -- Does not look through loop breakers
+          unfolding = id_unf fun    -- Does not look through loop breakers
 		    -- ToDo: we *may* look through variables that are NOINLINE
 		    --       in this phase, and that is really not right
 

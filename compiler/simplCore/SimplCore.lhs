@@ -225,11 +225,10 @@ printCore _ binds = Err.dumpIfSet True "Print Core" (pprCoreBindings binds)
 
 ruleCheck :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheck current_phase pat guts = do
-    let is_active = isActive current_phase
     rb <- getRuleBase
     dflags <- getDynFlags
     liftIO $ Err.showPass dflags "RuleCheck"
-    liftIO $ printDump (ruleCheckProgram is_active pat rb (mg_binds guts))
+    liftIO $ printDump (ruleCheckProgram current_phase pat rb (mg_binds guts))
     return guts
 
 

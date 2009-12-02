@@ -1009,14 +1009,11 @@ tcUnfolding name _ _ (IfCoreUnfold if_expr)
 		    Nothing -> NoUnfolding
 		    Just expr -> mkTopUnfolding expr) }
 
-tcUnfolding name _ _ (IfInlineRule arity sat if_expr)
+tcUnfolding name _ _ (IfInlineRule arity unsat_ok if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
 	; return (case mb_expr of
 		    Nothing   -> NoUnfolding
-		    Just expr -> mkInlineRule inl_info expr arity) }
-  where
-    inl_info | sat       = InlSat
-    	     | otherwise = InlUnSat
+		    Just expr -> mkInlineRule unsat_ok expr arity) }
 
 tcUnfolding name ty info (IfWrapper arity wkr)
   = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)

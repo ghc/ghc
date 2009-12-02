@@ -35,19 +35,20 @@ module CoreSyn (
 	isValArg, isTypeArg, valArgCount, valBndrCount, isRuntimeArg, isRuntimeVar,
 
 	-- * Unfolding data types
-	Unfolding(..),	UnfoldingGuidance(..), InlineRuleInfo(..), InlSatFlag(..),
+	Unfolding(..),	UnfoldingGuidance(..), UnfoldingSource(..),
 		-- Abstract everywhere but in CoreUnfold.lhs
 	
 	-- ** Constructing 'Unfolding's
 	noUnfolding, evaldUnfolding, mkOtherCon,
+        unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
 	
 	-- ** Predicates and deconstruction on 'Unfolding'
 	unfoldingTemplate, setUnfoldingTemplate,
 	maybeUnfoldingTemplate, otherCons, unfoldingArity,
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
-        isExpandableUnfolding, isConLikeUnfolding,
+        isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
 	isInlineRule, isInlineRule_maybe, isClosedUnfolding, hasSomeUnfolding, 
-	isStableUnfolding, canUnfold, neverUnfoldGuidance,
+	isStableUnfolding, canUnfold, neverUnfoldGuidance, isInlineRuleSource,
 
 	-- * Strictness
 	seqExpr, seqExprs, seqUnfolding, 
@@ -60,7 +61,7 @@ module CoreSyn (
 
 	-- * Core rule data types
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
-	RuleName, 
+	RuleName, IdUnfoldingFun,
 	
 	-- ** Operations on 'CoreRule's 
 	seqRules, ruleArity, ruleName, ruleIdName, ruleActivation_maybe,
@@ -333,12 +334,17 @@ data CoreRule
 	ru_fn    :: Name,       -- ^ As above
 	ru_nargs :: Int,	-- ^ Number of arguments that 'ru_try' consumes,
 				-- if it fires, including type arguments
-	ru_try  :: [CoreExpr] -> Maybe CoreExpr
+	ru_try  :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 		-- ^ This function does the rewrite.  It given too many
 		-- arguments, it simply discards them; the returned 'CoreExpr'
 		-- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
 		-- See Note [Extra args in rule matching] in Rules.lhs
+
+type IdUnfoldingFun = Id -> Unfolding
+-- A function that embodies how to unfold an Id if you need
+-- to do that in the Rule.  The reason we need to pass this info in
+-- is that whether an Id is unfoldable depends on the simplifier phase
 
 isBuiltinRule :: CoreRule -> Bool
 isBuiltinRule (BuiltinRule {}) = True
@@ -408,9 +414,10 @@ data Unfolding
 
   | CoreUnfolding {		-- An unfolding for an Id with no pragma, or perhaps a NOINLINE pragma
 				-- (For NOINLINE, the phase, if any, is in the InlinePragInfo for this Id.)
-	uf_tmpl       :: CoreExpr,	-- Template; occurrence info is correct
-	uf_arity      :: Arity,		-- Number of value arguments expected
+	uf_tmpl       :: CoreExpr,	  -- Template; occurrence info is correct
+	uf_src        :: UnfoldingSource, -- Where the unfolding came from
 	uf_is_top     :: Bool,		-- True <=> top level binding
+	uf_arity      :: Arity,		-- Number of value arguments expected
 	uf_is_value   :: Bool,		-- exprIsHNF template (cached); it is ok to discard a `seq` on
 		      			--	this variable
         uf_is_conlike :: Bool,          -- True <=> application of constructor or CONLIKE function
@@ -438,18 +445,38 @@ data Unfolding
   --  uf_guidance:  Tells us about the /size/ of the unfolding template
 
 ------------------------------------------------
+data UnfoldingSource 
+  = InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
+    		       -- Only a few primop-like things have this property 
+                       -- (see MkId.lhs, calls to mkCompulsoryUnfolding).
+                       -- Inline absolutely always, however boring the context.
+
+  | InlineRule	       -- From an {-# INLINE #-} pragma; See Note [InlineRules]
+
+  | InlineWrapper Id   -- This unfolding is a the wrapper in a 
+		       --     worker/wrapper split from the strictness analyser
+	               -- The Id is the worker-id
+		       -- Used to abbreviate the uf_tmpl in interface files
+		       --	which don't need to contain the RHS; 
+		       --	it can be derived from the strictness info
+
+  | InlineRhs          -- The current rhs of the function
+
+   -- For InlineRhs, the uf_tmpl is replaced each time around
+   -- For all the others we leave uf_tmpl alone
+
+
 -- | 'UnfoldingGuidance' says when unfolding should take place
 data UnfoldingGuidance
-  = InlineRule {        -- Be very keen to inline this; See Note [InlineRules]
-      	       		-- The uf_tmpl is the *original* RHS; do *not* replace it on
-			--   each simlifier run.  Hence, the *actual* RHS of the function 
-			--   may be different by now, because it may have been optimised.
-
-        ir_sat  :: InlSatFlag,  
-        ir_info :: InlineRuleInfo
+  = UnfWhen {	-- Inline without thinking about the *size* of the uf_tmpl
+    		-- Used (a) for small *and* cheap unfoldings
+ 		--      (b) for INLINE functions 
+                -- See Note [INLINE for small functions] in CoreUnfold
+      ug_unsat_ok  :: Bool,	-- True <=> ok to inline even if unsaturated
+      ug_boring_ok :: Bool      -- True <=> ok to inline even if the context is boring
     }
 
-  | UnfoldIfGoodArgs {	-- Arose from a normal Id; the info here is the
+  | UnfIfGoodArgs {	-- Arose from a normal Id; the info here is the
     		     	-- result of a simple analysis of the RHS
 
       ug_args ::  [Int],  -- Discount if the argument is evaluated.
@@ -462,30 +489,16 @@ data UnfoldingGuidance
     }			  -- a context (case (thing args) of ...),
 			  -- (where there are the right number of arguments.)
 
-  | UnfoldNever		  -- A variant of UnfoldIfGoodArgs, used for big RHSs
+  | UnfNever	    -- The RHS is big, so don't inline it
 
-data InlineRuleInfo
-  = InlAlways       -- Inline absolutely always, however boring the context.
-                    -- There is /no original definition/. Only a few primop-like things 
-		    -- have this property (see MkId.lhs, calls to mkCompulsoryUnfolding).
+-- Constants for the UnfWhen constructor
+needSaturated, unSaturatedOk :: Bool
+needSaturated = False
+unSaturatedOk = True
 
-  | InlSmall	    -- The RHS is very small (eg no bigger than a call), so inline any
-   		    -- /saturated/ application, regardless of context
-                    -- See Note [INLINE for small functions] in CoreUnfold
-
-  | InlVanilla
-
-  | InlWrapper Id   -- This unfolding is a the wrapper in a 
-		    --     worker/wrapper split from the strictness analyser
-	            -- The Id is the worker-id
-		    -- Used to abbreviate the uf_tmpl in interface files
-		    --	which don't need to contain the RHS; 
-		    --	it can be derived from the strictness info
-		    -- [In principle this is orthogonal to the InlSmall/InVanilla thing, 
-                    --  but it's convenient to have it here.]
-
-data InlSatFlag = InlSat | InlUnSat
-    -- Specifies whether to INLINE only if the thing is applied to 'arity' args
+boringCxtNotOk, boringCxtOk :: Bool
+boringCxtOk    = True
+boringCxtNotOk = False
 
 ------------------------------------------------
 noUnfolding :: Unfolding
@@ -509,11 +522,17 @@ seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
 seqUnfolding _ = ()
 
 seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfoldIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
-seqGuidance _                         = ()
+seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
+seqGuidance _                      = ()
 \end{code}
 
 \begin{code}
+isInlineRuleSource :: UnfoldingSource -> Bool
+isInlineRuleSource InlineCompulsory   = True
+isInlineRuleSource InlineRule         = True
+isInlineRuleSource (InlineWrapper {}) = True
+isInlineRuleSource InlineRhs          = False
+ 
 -- | Retrieves the template of an unfolding: panics if none is known
 unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl
@@ -565,20 +584,29 @@ isExpandableUnfolding (CoreUnfolding { uf_expandable = is_expable }) = is_expabl
 isExpandableUnfolding _                                              = False
 
 isInlineRule :: Unfolding -> Bool
-isInlineRule (CoreUnfolding { uf_guidance = InlineRule {}}) = True
-isInlineRule _		                                    = False
+isInlineRule (CoreUnfolding { uf_src = src }) = isInlineRuleSource src
+isInlineRule _		                      = False
 
-isInlineRule_maybe :: Unfolding -> Maybe (InlineRuleInfo, InlSatFlag)
-isInlineRule_maybe (CoreUnfolding { uf_guidance = 
-                        InlineRule { ir_info = inl, ir_sat = sat } }) = Just (inl,sat)
-isInlineRule_maybe _		                                      = Nothing
+isInlineRule_maybe :: Unfolding -> Maybe (UnfoldingSource, Bool)
+isInlineRule_maybe (CoreUnfolding { uf_src = src, uf_guidance = guide }) 
+   | isInlineRuleSource src
+   = Just (src, unsat_ok)
+   where
+     unsat_ok = case guide of
+     	      	  UnfWhen unsat_ok _ -> unsat_ok
+                  _                  -> needSaturated
+isInlineRule_maybe _ = Nothing
+
+isCompulsoryUnfolding :: Unfolding -> Bool
+isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True
+isCompulsoryUnfolding _                                             = False
 
 isStableUnfolding :: Unfolding -> Bool
 -- True of unfoldings that should not be overwritten 
 -- by a CoreUnfolding for the RHS of a let-binding
-isStableUnfolding (CoreUnfolding { uf_guidance = InlineRule {} }) = True
-isStableUnfolding (DFunUnfolding {})				  = True
-isStableUnfolding _                                               = False
+isStableUnfolding (CoreUnfolding { uf_src = src }) = isInlineRuleSource src
+isStableUnfolding (DFunUnfolding {})		   = True
+isStableUnfolding _                                = False
 
 unfoldingArity :: Unfolding -> Arity
 unfoldingArity (CoreUnfolding { uf_arity = arity }) = arity
@@ -594,15 +622,15 @@ hasSomeUnfolding NoUnfolding = False
 hasSomeUnfolding _           = True
 
 neverUnfoldGuidance :: UnfoldingGuidance -> Bool
-neverUnfoldGuidance UnfoldNever = True
-neverUnfoldGuidance _           = False
+neverUnfoldGuidance UnfNever = True
+neverUnfoldGuidance _        = False
 
 canUnfold :: Unfolding -> Bool
 canUnfold (CoreUnfolding { uf_guidance = g }) = not (neverUnfoldGuidance g)
 canUnfold _  				      = False
 \end{code}
 
-Note [InlineRule]
+Note [InlineRules]
 ~~~~~~~~~~~~~~~~~
 When you say 
       {-# INLINE f #-}

@@ -339,9 +339,9 @@ litEq op_name is_eq
 		   ru_fn = op_name, 
 		   ru_nargs = 2, ru_try = rule_fn }]
   where
-    rule_fn [Lit lit, expr] = do_lit_eq lit expr
-    rule_fn [expr, Lit lit] = do_lit_eq lit expr
-    rule_fn _    	    = Nothing
+    rule_fn _ [Lit lit, expr] = do_lit_eq lit expr
+    rule_fn _ [expr, Lit lit] = do_lit_eq lit expr
+    rule_fn _ _    	      = Nothing
     
     do_lit_eq lit expr
       = Just (mkWildCase expr (literalType lit) boolTy
@@ -374,7 +374,9 @@ wordResult result
 %************************************************************************
 
 \begin{code}
-mkBasicRule :: Name -> Int -> ([CoreExpr] -> Maybe CoreExpr) -> [CoreRule]
+mkBasicRule :: Name -> Int
+            -> (IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr)
+            -> [CoreRule]
 -- Gives the Rule the same name as the primop itself
 mkBasicRule op_name n_args rule_fn
   = [BuiltinRule { ru_name = occNameFS (nameOccName op_name),
@@ -386,16 +388,16 @@ oneLit :: Name -> (Literal -> Maybe CoreExpr)
 oneLit op_name test
   = mkBasicRule op_name 1 rule_fn
   where
-    rule_fn [Lit l1] = test (convFloating l1)
-    rule_fn _        = Nothing
+    rule_fn _ [Lit l1] = test (convFloating l1)
+    rule_fn _ _        = Nothing
 
 twoLits :: Name -> (Literal -> Literal -> Maybe CoreExpr)
 	-> [CoreRule]
 twoLits op_name test 
   = mkBasicRule op_name 2 rule_fn
   where
-    rule_fn [Lit l1, Lit l2] = test (convFloating l1) (convFloating l2)
-    rule_fn _                = Nothing
+    rule_fn _ [Lit l1, Lit l2] = test (convFloating l1) (convFloating l2)
+    rule_fn _ _                = Nothing
 
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
@@ -428,8 +430,8 @@ mkDoubleVal d = Lit (convFloating (MachDouble d))
 %************************************************************************
 
 \begin{code}
-tagToEnumRule :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-tagToEnumRule [Type ty, Lit (MachInt i)]
+tagToEnumRule :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+tagToEnumRule _ [Type ty, Lit (MachInt i)]
   = ASSERT( isEnumerationTyCon tycon ) 
     case filter correct_tag (tyConDataCons_maybe tycon `orElse` []) of
 
@@ -442,7 +444,7 @@ tagToEnumRule [Type ty, Lit (MachInt i)]
     tag   = fromInteger i
     tycon = tyConAppTyCon ty
 
-tagToEnumRule _ = Nothing
+tagToEnumRule _ _ = Nothing
 \end{code}
 
 For dataToTag#, we can reduce if either 
@@ -451,18 +453,18 @@ For dataToTag#, we can reduce if either
 	(b) the argument is a variable whose unfolding is a known constructor
 
 \begin{code}
-dataToTagRule :: [Expr CoreBndr] -> Maybe (Arg CoreBndr)
-dataToTagRule [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
+dataToTagRule :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Arg CoreBndr)
+dataToTagRule _ [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
   | tag_to_enum `hasKey` tagToEnumKey
   , ty1 `coreEqType` ty2
   = Just tag	-- dataToTag (tagToEnum x)   ==>   x
 
-dataToTagRule [_, val_arg]
-  | Just (dc,_,_) <- exprIsConApp_maybe val_arg
+dataToTagRule id_unf [_, val_arg]
+  | Just (dc,_,_) <- exprIsConApp_maybe id_unf val_arg
   = ASSERT( not (isNewTyCon (dataConTyCon dc)) )
     Just (mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
 
-dataToTagRule _ = Nothing
+dataToTagRule _ _ = Nothing
 \end{code}
 
 %************************************************************************
@@ -515,15 +517,15 @@ builtinRules
 -- The rule is this:
 -- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
 
-match_append_lit :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_append_lit [Type ty1,
-		   Lit (MachStr s1),
-		   c1,
-		   Var unpk `App` Type ty2 
-		  	    `App` Lit (MachStr s2)
-		  	    `App` c2
-		  	    `App` n
-		  ]
+match_append_lit :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_append_lit _ [Type ty1,
+		    Lit (MachStr s1),
+		    c1,
+		    Var unpk `App` Type ty2 
+		  	     `App` Lit (MachStr s2)
+		  	     `App` c2
+		  	     `App` n
+		   ]
   | unpk `hasKey` unpackCStringFoldrIdKey && 
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 `coreEqType` ty2 )
@@ -532,20 +534,20 @@ match_append_lit [Type ty1,
 		   `App` c1
 		   `App` n)
 
-match_append_lit _ = Nothing
+match_append_lit _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
 -- 	eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
-match_eq_string :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_eq_string [Var unpk1 `App` Lit (MachStr s1),
-		 Var unpk2 `App` Lit (MachStr s2)]
+match_eq_string :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_eq_string _ [Var unpk1 `App` Lit (MachStr s1),
+		   Var unpk2 `App` Lit (MachStr s2)]
   | unpk1 `hasKey` unpackCStringIdKey,
     unpk2 `hasKey` unpackCStringIdKey
   = Just (if s1 == s2 then trueVal else falseVal)
 
-match_eq_string _ = Nothing
+match_eq_string _ _ = Nothing
 
 
 ---------------------------------------------------
@@ -561,11 +563,12 @@ match_eq_string _ = Nothing
 --     programmer can't avoid
 --
 -- Also, don't forget about 'inline's type argument!
-match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_inline (Type _ : e : _)
+match_inline :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_inline _ (Type _ : e : _)
   | (Var f, args1) <- collectArgs e,
     Just unf <- maybeUnfoldingTemplate (realIdUnfolding f)
+    	     -- Ignore the IdUnfoldingFun here!
   = Just (mkApps unf args1)
 
-match_inline _ = Nothing
+match_inline _ _ = Nothing
 \end{code}

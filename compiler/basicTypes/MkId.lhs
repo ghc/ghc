@@ -345,7 +345,7 @@ mkDataConIds wrap_name wkr_name data_con
         --      ...(let w = C x in ...(w p q)...)...
         -- we want to see that w is strict in its two arguments
 
-    wrap_unf = mkInlineRule InlSat wrap_rhs (length dict_args + length id_args)
+    wrap_unf = mkInlineRule needSaturated wrap_rhs (length dict_args + length id_args)
     wrap_rhs = mkLams wrap_tvs $ 
                mkLams eq_args $
                mkLams dict_args $ mkLams id_args $
@@ -520,16 +520,16 @@ mkDictSelId no_unf name clas
              | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
                                 [(DataAlt data_con, eq_ids ++ arg_ids, Var the_arg_id)]
 
-dictSelRule :: Int -> Arity -> [CoreExpr] -> Maybe CoreExpr
+dictSelRule :: Int -> Arity -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 -- Oh, very clever
 --       op_i t1..tk (df s1..sn d1..dm) = op_i_helper s1..sn d1..dm
 --       op_i t1..tk (D t1..tk op1 ... opm) = opi
 --
 -- NB: the data constructor has the same number of type args as the class op
 
-dictSelRule index n_ty_args args
+dictSelRule index n_ty_args id_unf args
   | (dict_arg : _) <- drop n_ty_args args
-  , Just (_, _, val_args) <- exprIsConApp_maybe dict_arg
+  , Just (_, _, val_args) <- exprIsConApp_maybe id_unf dict_arg
   = Just (val_args !! index)
   | otherwise
   = Nothing
@@ -958,12 +958,12 @@ seqId = pcMiscPrelId seqName ty info
                                 , ru_try   = match_seq_of_cast
                                 }
 
-match_seq_of_cast :: [CoreExpr] -> Maybe CoreExpr
+match_seq_of_cast :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
     -- See Note [Built-in RULES for seq]
-match_seq_of_cast [Type _, Type res_ty, Cast scrut co, expr]
+match_seq_of_cast _ [Type _, Type res_ty, Cast scrut co, expr]
   = Just (Var seqId `mkApps` [Type (fst (coercionKind co)), Type res_ty,
                               scrut, expr])
-match_seq_of_cast _ = Nothing
+match_seq_of_cast _ _ = Nothing
 
 ------------------------------------------------
 lazyId :: Id	-- See Note [lazyId magic]

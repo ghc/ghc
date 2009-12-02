@@ -13,7 +13,7 @@ module CoreSubst (
         -- ** Substituting into expressions and related types
 	deShadowBinds, substSpec, substRulesForImportedIds,
 	substTy, substExpr, substBind, substUnfolding,
-	substInlineRuleInfo, lookupIdSubst, lookupTvSubst, substIdOcc,
+	substUnfoldingSource, lookupIdSubst, lookupTvSubst, substIdOcc,
 
         -- ** Operations on substitutions
 	emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst, 
@@ -507,28 +507,39 @@ substUnfolding :: Subst -> Unfolding -> Unfolding
 substUnfolding subst (DFunUnfolding con args)
   = DFunUnfolding con (map (substExpr subst) args)
 
-substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_guidance = guide@(InlineRule {}) })
+substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!
+  | not (isInlineRuleSource src)  -- Always zap a CoreUnfolding, to save substitution work
+  = NoUnfolding
+  | otherwise                     -- But keep an InlineRule!
   = seqExpr new_tmpl `seq` 
-    new_info `seq`
-    unf { uf_tmpl = new_tmpl, uf_guidance = guide { ir_info = new_info } }
+    new_src `seq`
+    unf { uf_tmpl = new_tmpl, uf_src = new_src }
   where
     new_tmpl = substExpr subst tmpl
-    new_info = substInlineRuleInfo subst (ir_info guide)
-
-substUnfolding _ (CoreUnfolding {}) = NoUnfolding	-- Discard
-	-- Always zap a CoreUnfolding, to save substitution work
+    new_src  = substUnfoldingSource subst src
 
 substUnfolding _ unf = unf	-- NoUnfolding, OtherCon
 
 -------------------
-substInlineRuleInfo :: Subst -> InlineRuleInfo -> InlineRuleInfo
-substInlineRuleInfo (Subst in_scope ids _) (InlWrapper wkr)
-  | Just (Var w1) <- lookupVarEnv  ids      wkr = InlWrapper w1
-  | Just w1       <- lookupInScope in_scope wkr = InlWrapper w1
-  | otherwise = WARN( True, text "Interesting! CoreSubst.substWorker:" <+> ppr wkr )
-      	        InlVanilla -- Note [Worker inlining]
-substInlineRuleInfo _ info = info
+substUnfoldingSource :: Subst -> UnfoldingSource -> UnfoldingSource
+substUnfoldingSource (Subst in_scope ids _) (InlineWrapper wkr)
+  | Just wkr_expr <- lookupVarEnv ids wkr 
+  = case wkr_expr of
+      Var w1 -> InlineWrapper w1
+      _other -> WARN( True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
+                            <+> equals <+> ppr wkr_expr )   -- Note [Worker inlining]
+                InlineRule    -- It's not a wrapper any more, but still inline it!
+
+  | Just w1  <- lookupInScope in_scope wkr = InlineWrapper w1
+  | otherwise = WARN( True, text "Interesting! CoreSubst.substWorker2:" <+> ppr wkr )
+    	      	-- This can legitimately happen.  The worker has been inlined and
+		-- dropped as dead code, because we don't treat the UnfoldingSource
+		-- as an "occurrence".
+                -- Note [Worker inlining]
+      	        InlineRule
+
+substUnfoldingSource _ src = src
 
 ------------------
 substIdOcc :: Subst -> Id -> Id

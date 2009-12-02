@@ -22,7 +22,7 @@ module Rules (
 	addIdSpecialisations, 
 	
 	-- * Misc. CoreRule helpers
-        rulesOfBinds, getRules, pprRulesForUser, expandId,
+        rulesOfBinds, getRules, pprRulesForUser, 
         
         lookupRule, mkRule, mkLocalRule, roughTopNames
     ) where
@@ -45,7 +45,7 @@ import VarSet
 import Name		( Name, NamedThing(..) )
 import NameEnv
 import Unify 		( ruleMatchTyX, MatchEnv(..) )
-import BasicTypes	( Activation )
+import BasicTypes	( Activation, CompilerPhase, isActive )
 import StaticFlags	( opt_PprStyle_Debug )
 import Outputable
 import FastString
@@ -288,13 +288,15 @@ to lookupRule are the result of a lazy substitution
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
 -- successful.
-lookupRule :: (Activation -> Bool) -> InScopeSet
+lookupRule :: (Activation -> Bool)	-- When rule is active
+	    -> IdUnfoldingFun		-- When Id can be unfolded
+            -> InScopeSet
 	    -> Id -> [CoreExpr]
 	    -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
-lookupRule is_active in_scope fn args rules
+lookupRule is_active id_unf in_scope fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr rules) $
     case go [] rules of
 	[]     -> Nothing
@@ -304,7 +306,7 @@ lookupRule is_active in_scope fn args rules
 
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms []	       = ms
-    go ms (r:rs) = case (matchRule is_active in_scope args rough_args r) of
+    go ms (r:rs) = case (matchRule is_active id_unf in_scope args rough_args r) of
 			Just e  -> go ((r,e):ms) rs
 			Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$ 
 				   -- 	ppr [(arg_id, unfoldingTemplate unf) | Var arg_id <- args, let unf = idUnfolding arg_id, isCheapUnfolding unf] )
@@ -339,8 +341,9 @@ isMoreSpecific (BuiltinRule {}) _ = True
 isMoreSpecific _ (BuiltinRule {}) = False
 isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 	       (Rule { ru_bndrs = bndrs2, ru_args = args2 })
-  = isJust (matchN in_scope bndrs2 args2 args1)
+  = isJust (matchN id_unfolding_fun in_scope bndrs2 args2 args1)
   where
+   id_unfolding_fun _ = NoUnfolding	-- Don't expand in templates
    in_scope = mkInScopeSet (mkVarSet bndrs1)
 	-- Actually we should probably include the free vars 
 	-- of rule1's args, but I can't be bothered
@@ -348,7 +351,8 @@ isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 noBlackList :: Activation -> Bool
 noBlackList _ = False		-- Nothing is black listed
 
-matchRule :: (Activation -> Bool) -> InScopeSet
+matchRule :: (Activation -> Bool) -> IdUnfoldingFun
+          -> InScopeSet
 	  -> [CoreExpr] -> [Maybe Name]
 	  -> CoreRule -> Maybe CoreExpr
 
@@ -374,21 +378,21 @@ matchRule :: (Activation -> Bool) -> InScopeSet
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule _is_active _in_scope args _rough_args
+matchRule _is_active id_unf _in_scope args _rough_args
 	  (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
-  = case match_fn args of
+  = case match_fn id_unf args of
 	Just expr -> Just expr
 	Nothing   -> Nothing
 
-matchRule is_active in_scope args rough_args
+matchRule is_active id_unf in_scope args rough_args
           (Rule { ru_act = act, ru_rough = tpl_tops,
 		  ru_bndrs = tpl_vars, ru_args = tpl_args,
 		  ru_rhs = rhs })
   | not (is_active act)		      = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
-  = case matchN in_scope tpl_vars tpl_args args of
+  = case matchN id_unf in_scope tpl_vars tpl_args args of
 	Nothing		       -> Nothing
 	Just (binds, tpl_vals) -> Just (mkLets binds $
 					rule_fn `mkApps` tpl_vals)
@@ -401,14 +405,15 @@ matchRule is_active in_scope args rough_args
 -- For a given match template and context, find bindings to wrap around 
 -- the entire result and what should be substituted for each template variable.
 -- Fail if there are two few actual arguments from the target to match the template
-matchN	:: InScopeSet           -- ^ In-scope variables
+matchN	:: IdUnfoldingFun
+        -> InScopeSet           -- ^ In-scope variables
 	-> [Var]		-- ^ Match template type variables
 	-> [CoreExpr]		-- ^ Match template
 	-> [CoreExpr]		-- ^ Target; can have more elements than the template
 	-> Maybe ([CoreBind],
 		  [CoreExpr])
 
-matchN in_scope tmpl_vars tmpl_es target_es
+matchN id_unf in_scope tmpl_vars tmpl_es target_es
   = do	{ (tv_subst, id_subst, binds)
 		<- go init_menv emptySubstEnv tmpl_es target_es
 	; return (fromOL binds, 
@@ -421,7 +426,7 @@ matchN in_scope tmpl_vars tmpl_es target_es
 		
     go _    subst []     _  	= Just subst
     go _    _     _      [] 	= Nothing	-- Fail if too few actual args
-    go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e 
+    go menv subst (t:ts) (e:es) = do { subst1 <- match id_unf menv subst t e 
 				     ; go menv subst1 ts es }
 
     lookup_tmpl :: TvSubstEnv -> IdSubstEnv -> Var -> CoreExpr
@@ -484,7 +489,8 @@ emptySubstEnv = (emptyVarEnv, emptyVarEnv, nilOL)
 --	SLPJ July 99
 
 
-match :: MatchEnv
+match :: IdUnfoldingFun
+      -> MatchEnv
       -> SubstEnv
       -> CoreExpr		-- Template
       -> CoreExpr		-- Target
@@ -506,19 +512,19 @@ match :: MatchEnv
 -- succeed in matching what looks like the template variable 'a' against 3.
 
 -- The Var case follows closely what happens in Unify.match
-match menv subst (Var v1) e2 
-  | Just subst <- match_var menv subst v1 e2
+match idu menv subst (Var v1) e2 
+  | Just subst <- match_var idu menv subst v1 e2
   = Just subst
 
-match menv subst (Note _ e1) e2 = match menv subst e1 e2
-match menv subst e1 (Note _ e2) = match menv subst e1 e2
+match idu menv subst (Note _ e1) e2 = match idu menv subst e1 e2
+match idu menv subst e1 (Note _ e2) = match idu menv subst e1 e2
       -- Ignore notes in both template and thing to be matched
       -- See Note [Notes in RULE matching]
 
-match menv subst e1 (Var v2)      -- Note [Expanding variables]
+match id_unfolding_fun menv subst e1 (Var v2)      -- Note [Expanding variables]
   | not (locallyBoundR rn_env v2) -- Note [Do not expand locally-bound variables]
-  , Just e2' <- expandId v2'
-  = match (menv { me_env = nukeRnEnvR rn_env }) subst e1 e2'
+  , Just e2' <- expandUnfolding (id_unfolding_fun v2')
+  = match id_unfolding_fun (menv { me_env = nukeRnEnvR rn_env }) subst e1 e2'
   where
     v2'    = lookupRnInScope rn_env v2
     rn_env = me_env menv
@@ -527,10 +533,10 @@ match menv subst e1 (Var v2)      -- Note [Expanding variables]
 	-- No need to apply any renaming first (hence no rnOccR)
 	-- becuase of the not-locallyBoundR
 
-match menv (tv_subst, id_subst, binds) e1 (Let bind e2)
+match idu menv (tv_subst, id_subst, binds) e1 (Let bind e2)
   | all freshly_bound bndrs	-- See Note [Matching lets]
   , not (any (locallyBoundR rn_env) bind_fvs)
-  = match (menv { me_env = rn_env' }) 
+  = match idu (menv { me_env = rn_env' }) 
 	  (tv_subst, id_subst, binds `snocOL` bind')
 	  e1 e2'
   where
@@ -542,16 +548,16 @@ match menv (tv_subst, id_subst, binds) e1 (Let bind e2)
     e2'     = e2
     rn_env' = extendRnInScopeList rn_env bndrs
 
-match _ subst (Lit lit1) (Lit lit2)
+match _ _ subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
   = Just subst
 
-match menv subst (App f1 a1) (App f2 a2)
-  = do 	{ subst' <- match menv subst f1 f2
-	; match menv subst' a1 a2 }
+match idu menv subst (App f1 a1) (App f2 a2)
+  = do 	{ subst' <- match idu menv subst f1 f2
+	; match idu menv subst' a1 a2 }
 
-match menv subst (Lam x1 e1) (Lam x2 e2)
-  = match menv' subst e1 e2
+match idu menv subst (Lam x1 e1) (Lam x2 e2)
+  = match idu menv' subst e1 e2
   where
     menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
 
@@ -560,45 +566,46 @@ match menv subst (Lam x1 e1) (Lam x2 e2)
 -- It's important that this is *after* the let rule,
 -- so that 	(\x.M)  ~  (let y = e in \y.N)
 -- does the let thing, and then gets the lam/lam rule above
-match menv subst (Lam x1 e1) e2
-  = match menv' subst e1 (App e2 (varToCoreExpr new_x))
+match idu menv subst (Lam x1 e1) e2
+  = match idu menv' subst e1 (App e2 (varToCoreExpr new_x))
   where
     (rn_env', new_x) = rnBndrL (me_env menv) x1
     menv' = menv { me_env = rn_env' }
 
 -- Eta expansion the other way
 --	M  ~  (\y.N)	iff   M	y     ~  N
-match menv subst e1 (Lam x2 e2)
-  = match menv' subst (App e1 (varToCoreExpr new_x)) e2
+match idu menv subst e1 (Lam x2 e2)
+  = match idu menv' subst (App e1 (varToCoreExpr new_x)) e2
   where
     (rn_env', new_x) = rnBndrR (me_env menv) x2
     menv' = menv { me_env = rn_env' }
 
-match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
+match idu menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do	{ subst1 <- match_ty menv subst ty1 ty2
-	; subst2 <- match menv subst1 e1 e2
+	; subst2 <- match idu menv subst1 e1 e2
 	; let menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
-	; match_alts menv' subst2 alts1 alts2	-- Alts are both sorted
+	; match_alts idu menv' subst2 alts1 alts2	-- Alts are both sorted
 	}
 
-match menv subst (Type ty1) (Type ty2)
+match _ menv subst (Type ty1) (Type ty2)
   = match_ty menv subst ty1 ty2
 
-match menv subst (Cast e1 co1) (Cast e2 co2)
+match idu menv subst (Cast e1 co1) (Cast e2 co2)
   = do	{ subst1 <- match_ty menv subst co1 co2
-	; match menv subst1 e1 e2 }
+	; match idu menv subst1 e1 e2 }
 
 -- Everything else fails
-match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $ 
+match _ _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $ 
 			 Nothing
 
 ------------------------------------------
-match_var :: MatchEnv
+match_var :: IdUnfoldingFun
+          -> MatchEnv
       	  -> SubstEnv
       	  -> Var		-- Template
       	  -> CoreExpr		-- Target
       	  -> Maybe SubstEnv
-match_var menv subst@(tv_subst, id_subst, binds) v1 e2
+match_var idu menv subst@(tv_subst, id_subst, binds) v1 e2
   | v1' `elemVarSet` me_tmpls menv
   = case lookupVarEnv id_subst v1' of
 	Nothing	| any (inRnEnvR rn_env) (varSetElems (exprFreeVars e2))
@@ -621,7 +628,7 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 						-- c.f. match_ty below
 			; return (tv_subst', extendVarEnv id_subst v1' e2, binds) }
 
-	Just e1' | eqExpr (nukeRnEnvL rn_env) e1' e2 
+	Just e1' | eqExpr idu (nukeRnEnvL rn_env) e1' e2 
 		 -> Just subst
 
 		 | otherwise
@@ -642,22 +649,23 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 				
 
 ------------------------------------------
-match_alts :: MatchEnv
-      -> SubstEnv
-      -> [CoreAlt]		-- Template
-      -> [CoreAlt]		-- Target
-      -> Maybe SubstEnv
-match_alts _ subst [] []
+match_alts :: IdUnfoldingFun
+           -> MatchEnv
+      	   -> SubstEnv
+      	   -> [CoreAlt]		-- Template
+      	   -> [CoreAlt]		-- Target
+      	   -> Maybe SubstEnv
+match_alts _ _ subst [] []
   = return subst
-match_alts menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
+match_alts idu menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
   | c1 == c2
-  = do	{ subst1 <- match menv' subst r1 r2
-	; match_alts menv subst1 alts1 alts2 }
+  = do	{ subst1 <- match idu menv' subst r1 r2
+	; match_alts idu menv subst1 alts1 alts2 }
   where
     menv' :: MatchEnv
     menv' = menv { me_env = rnBndrs2 (me_env menv) vs1 vs2 }
 
-match_alts _ _ _ _
+match_alts _ _ _ _ _
   = Nothing
 \end{code}
 
@@ -795,57 +803,55 @@ That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
 
 \begin{code}
-eqExpr :: RnEnv2 -> CoreExpr -> CoreExpr -> Bool
+eqExpr :: IdUnfoldingFun -> RnEnv2 -> CoreExpr -> CoreExpr -> Bool
 -- ^ A kind of shallow equality used in rule matching, so does 
 -- /not/ look through newtypes or predicate types
 
-eqExpr env (Var v1) (Var v2)
+eqExpr _ env (Var v1) (Var v2)
   | rnOccL env v1 == rnOccR env v2
   = True
 
 -- The next two rules expand non-local variables
 -- C.f. Note [Expanding variables]
 -- and  Note [Do not expand locally-bound variables]
-eqExpr env (Var v1) e2
+eqExpr id_unfolding_fun env (Var v1) e2
   | not (locallyBoundL env v1)
-  , Just e1' <- expandId (lookupRnInScope env v1)
-  = eqExpr (nukeRnEnvL env) e1' e2
+  , Just e1' <- expandUnfolding (id_unfolding_fun (lookupRnInScope env v1))
+  = eqExpr id_unfolding_fun (nukeRnEnvL env) e1' e2
 
-eqExpr env e1 (Var v2)
+eqExpr id_unfolding_fun env e1 (Var v2)
   | not (locallyBoundR env v2)
-  , Just e2' <- expandId (lookupRnInScope env v2)
-  = eqExpr (nukeRnEnvR env) e1 e2'
+  , Just e2' <- expandUnfolding (id_unfolding_fun (lookupRnInScope env v2))
+  = eqExpr id_unfolding_fun (nukeRnEnvR env) e1 e2'
 
-eqExpr _   (Lit lit1)    (Lit lit2)    = lit1 == lit2
-eqExpr env (App f1 a1)   (App f2 a2)   = eqExpr env f1 f2 && eqExpr env a1 a2
-eqExpr env (Lam v1 e1)   (Lam v2 e2)   = eqExpr (rnBndr2 env v1 v2) e1 e2
-eqExpr env (Note n1 e1)  (Note n2 e2)  = eq_note env n1 n2 && eqExpr env e1 e2
-eqExpr env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && eqExpr env e1 e2
-eqExpr env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
+eqExpr _   _   (Lit lit1)    (Lit lit2)    = lit1 == lit2
+eqExpr idu env (App f1 a1)   (App f2 a2)   = eqExpr idu env f1 f2 && eqExpr idu env a1 a2
+eqExpr idu env (Lam v1 e1)   (Lam v2 e2)   = eqExpr idu (rnBndr2 env v1 v2) e1 e2
+eqExpr idu env (Note n1 e1)  (Note n2 e2)  = eq_note env n1 n2 && eqExpr idu env e1 e2
+eqExpr idu env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && eqExpr idu env e1 e2
+eqExpr _   env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
 
-eqExpr env (Let (NonRec v1 r1) e1)
-	   (Let (NonRec v2 r2) e2) =  eqExpr env r1 r2 
-				   && eqExpr (rnBndr2 env v1 v2) e1 e2
-eqExpr env (Let (Rec ps1) e1)
-	   (Let (Rec ps2) e2)      =  equalLength ps1 ps2
-				   && and (zipWith eq_rhs ps1 ps2)
-				   && eqExpr env' e1 e2
-				   where
-				      env' = foldl2 rn_bndr2 env ps2 ps2
-				      rn_bndr2 env (b1,_) (b2,_) = rnBndr2 env b1 b2
-				      eq_rhs       (_,r1) (_,r2) = eqExpr env' r1 r2
-eqExpr env (Case e1 v1 t1 a1)
-	   (Case e2 v2 t2 a2) =  eqExpr env e1 e2
-                              && tcEqTypeX env t1 t2                      
-			      && equalLength a1 a2
-			      && and (zipWith (eq_alt env') a1 a2)
-			      where
-				env' = rnBndr2 env v1 v2
-
-eqExpr _   _             _             = False
-
-eq_alt :: RnEnv2 -> CoreAlt -> CoreAlt -> Bool
-eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && eqExpr (rnBndrs2 env vs1  vs2) r1 r2
+eqExpr idu env (Let (NonRec v1 r1) e1)
+	       (Let (NonRec v2 r2) e2) =  eqExpr idu env r1 r2 
+				       && eqExpr idu (rnBndr2 env v1 v2) e1 e2
+eqExpr idu env (Let (Rec ps1) e1)
+	       (Let (Rec ps2) e2)      =  equalLength ps1 ps2
+				       && and (zipWith eq_rhs ps1 ps2)
+				       && eqExpr idu env' e1 e2
+				       where
+				      	  env' = foldl2 rn_bndr2 env ps2 ps2
+				      	  rn_bndr2 env (b1,_) (b2,_) = rnBndr2 env b1 b2
+				      	  eq_rhs       (_,r1) (_,r2) = eqExpr idu env' r1 r2
+eqExpr idu env (Case e1 v1 t1 a1)
+	       (Case e2 v2 t2 a2) =  eqExpr idu env e1 e2
+                              	  && tcEqTypeX env t1 t2                      
+			      	  && equalLength a1 a2
+			      	  && and (zipWith eq_alt a1 a2)
+			      	  where
+			      	    env' = rnBndr2 env v1 v2
+                                    eq_alt (c1,vs1,r1) (c2,vs2,r2) 
+                                       = c1==c2 && eqExpr idu (rnBndrs2 env' vs1  vs2) r1 r2
+eqExpr _ _ _ _ = False
 
 eq_note :: RnEnv2 -> Note -> Note -> Bool
 eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
@@ -861,12 +867,10 @@ locallyBoundL rn_env v = inRnEnvL rn_env v
 locallyBoundR rn_env v = inRnEnvR rn_env v
 
 
-expandId :: Id -> Maybe CoreExpr
-expandId id
+expandUnfolding :: Unfolding -> Maybe CoreExpr
+expandUnfolding unfolding
   | isExpandableUnfolding unfolding = Just (unfoldingTemplate unfolding)
   | otherwise		  	    = Nothing
-  where
-    unfolding = idUnfolding id
 \end{code}
 
 %************************************************************************
@@ -881,12 +885,12 @@ expandId id
 \begin{code}
 -- | Report partial matches for rules beginning with the specified
 -- string for the purposes of error reporting
-ruleCheckProgram :: (Activation -> Bool)    -- ^ Rule activation test
+ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
                  -> RuleBase                    -- ^ Database of rules
                  -> [CoreBind]                  -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram is_active rule_pat rule_base binds 
+ruleCheckProgram phase rule_pat rule_base binds 
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -895,11 +899,17 @@ ruleCheckProgram is_active rule_pat rule_base binds
 	  vcat [ p $$ line | p <- bagToList results ]
 	 ]
   where
-    results = unionManyBags (map (ruleCheckBind (RuleCheckEnv is_active rule_pat rule_base)) binds)
+    env = RuleCheckEnv { rc_is_active = isActive phase
+                       , rc_id_unf    = idUnfolding	-- Not quite right
+		       	 	      			-- Should use activeUnfolding
+                       , rc_pattern   = rule_pat
+                       , rc_rule_base = rule_base }
+    results = unionManyBags (map (ruleCheckBind env) binds)
     line = text (replicate 20 '-')
 	  
 data RuleCheckEnv = RuleCheckEnv {
     rc_is_active :: Activation -> Bool, 
+    rc_id_unf  :: IdUnfoldingFun,
     rc_pattern :: String, 
     rc_rule_base :: RuleBase
 }
@@ -934,13 +944,13 @@ ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
 
 ruleCheckFun env fn args
   | null name_match_rules = emptyBag
-  | otherwise		  = unitBag (ruleAppCheck_help (rc_is_active env) fn args name_match_rules)
+  | otherwise		  = unitBag (ruleAppCheck_help env fn args name_match_rules)
   where
     name_match_rules = filter match (getRules (rc_rule_base env) fn)
     match rule = (rc_pattern env) `isPrefixOf` unpackFS (ruleName rule)
 
-ruleAppCheck_help :: (Activation -> Bool) -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
-ruleAppCheck_help is_active fn args rules
+ruleAppCheck_help :: RuleCheckEnv -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
+ruleAppCheck_help env fn args rules
   = 	-- The rules match the pattern, so we want to print something
     vcat [text "Expression:" <+> ppr (mkApps (Var fn) args),
 	  vcat (map check_rule rules)]
@@ -957,14 +967,14 @@ ruleAppCheck_help is_active fn args rules
 	= ptext (sLit "Rule") <+> doubleQuotes (ftext name)
 
     rule_info rule
-	| Just _ <- matchRule noBlackList emptyInScopeSet args rough_args rule
+	| Just _ <- matchRule noBlackList (rc_id_unf env) emptyInScopeSet args rough_args rule
 	= text "matches (which is very peculiar!)"
 
     rule_info (BuiltinRule {}) = text "does not match"
 
     rule_info (Rule { ru_act = act, 
 		      ru_bndrs = rule_bndrs, ru_args = rule_args})
-	| not (is_active act)    = text "active only in later phase"
+	| not (rc_is_active env act)  = text "active only in later phase"
 	| n_args < n_rule_args	      = text "too few arguments"
 	| n_mismatches == n_rule_args = text "no arguments match"
 	| n_mismatches == 0	      = text "all arguments match (considered individually), but rule as a whole does not"
@@ -976,7 +986,7 @@ ruleAppCheck_help is_active fn args rules
 			      not (isJust (match_fn rule_arg arg))]
 
 	  lhs_fvs = exprsFreeVars rule_args	-- Includes template tyvars
-	  match_fn rule_arg arg = match menv emptySubstEnv rule_arg arg
+	  match_fn rule_arg arg = match (rc_id_unf env) menv emptySubstEnv rule_arg arg
 		where
 		  in_scope = lhs_fvs `unionVarSet` exprFreeVars arg
 		  menv = ME { me_env   = mkRnEnv2 (mkInScopeSet in_scope)

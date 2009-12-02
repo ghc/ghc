@@ -421,7 +421,8 @@ idUnfoldingVars :: Id -> VarSet
 -- we might get out-of-scope variables
 idUnfoldingVars id
   = case realIdUnfolding id of
-      CoreUnfolding { uf_tmpl = rhs, uf_guidance = InlineRule {} }
+      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
+      		           | isInlineRuleSource src
 	                   -> exprFreeVars rhs
       DFunUnfolding _ args -> exprsFreeVars args
       _                    -> emptyVarSet

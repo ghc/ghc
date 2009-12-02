@@ -10,7 +10,7 @@ module SimplUtils (
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
-	activeInline, activeRule, 
+	activeUnfolding, activeUnfInRule, activeRule, 
         simplEnvForGHCi, simplEnvForRules, updModeForInlineRules,
 
 	-- The continuation type
@@ -334,7 +334,7 @@ mkArgInfo fun rules n_val_args call_cont
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
-			CoreUnfolding {uf_guidance = UnfoldIfGoodArgs {ug_args = discounts}}
+			CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_args = discounts}}
 			      -> discounts ++ vanilla_discounts
 			_     -> vanilla_discounts
 
@@ -739,12 +739,12 @@ postInlineUnconditionally
     -> Unfolding
     -> Bool
 postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
-  | not active		   = False
-  | isLoopBreaker occ_info = False	-- If it's a loop-breaker of any kind, don't inline
+  | not active		        = False
+  | isLoopBreaker occ_info      = False	-- If it's a loop-breaker of any kind, don't inline
 					-- because it might be referred to "earlier"
-  | isExportedId bndr      = False
-  | isInlineRule unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
-  | exprIsTrivial rhs 	   = True
+  | isExportedId bndr           = False
+  | isStableUnfolding unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
+  | exprIsTrivial rhs 	        = True
   | otherwise
   = case occ_info of
 	-- The point of examining occ_info here is that for *non-values* 
@@ -757,7 +757,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 	--	case v of
 	--	   True  -> case x of ...
 	--	   False -> case x of ...
-	-- I'm not sure how important this is in practice
+	-- This is very important in practice; e.g. wheel-seive1 doubles 
+	-- in allocation if you miss this out
       OneOcc in_lam _one_br int_cxt	-- OneOcc => no code-duplication issue
 	->     smallEnoughToInline unfolding	-- Small enough to dup
 			-- ToDo: consider discount on smallEnoughToInline if int_cxt is true
@@ -810,27 +811,56 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 		   SimplPhase n _ -> isActive n act
     act = idInlineActivation bndr
 
-activeInline :: SimplEnv -> OutId -> Bool
-activeInline env id
-  | isNonRuleLoopBreaker (idOccInfo id)	  -- Things with an INLINE pragma may have 
-    			 	          -- an unfolding *and* be a loop breaker
-  = False				  -- (maybe the knot is not yet untied)
-  | otherwise
+activeUnfolding :: SimplEnv -> IdUnfoldingFun
+activeUnfolding env
   = case getMode env of
-      SimplGently { sm_inline = inlining_on } 
-         -> inlining_on && isEarlyActive act
-	-- See Note [Gentle mode]
+      SimplGently { sm_inline = False } -> active_unfolding_minimal
+      SimplGently { sm_inline = True  } -> active_unfolding_gentle
+      SimplPhase n _                    -> active_unfolding n
 
-	-- NB: we used to have a second exception, for data con wrappers.
-	-- On the grounds that we use gentle mode for rule LHSs, and 
-	-- they match better when data con wrappers are inlined.
-	-- But that only really applies to the trivial wrappers (like (:)),
-	-- and they are now constructed as Compulsory unfoldings (in MkId)
-	-- so they'll happen anyway.
+activeUnfInRule :: SimplEnv -> IdUnfoldingFun
+-- When matching in RULE, we want to "look through" an unfolding
+-- if *rules* are on, even if *inlinings* are not.  A notable example
+-- is DFuns, which really we want to match in rules like (op dfun)
+-- in gentle mode.
+activeUnfInRule env
+  = case getMode env of
+      SimplGently { sm_rules = False } -> active_unfolding_minimal
+      SimplGently { sm_rules = True  } -> active_unfolding_gentle
+      SimplPhase n _                   -> active_unfolding n
 
-      SimplPhase n _ -> isActive n act
+active_unfolding_minimal :: IdUnfoldingFun
+-- Compuslory unfoldings only
+-- Ignore SimplGently, because we want to inline regardless;
+-- the Id has no top-level binding at all
+--
+-- NB: we used to have a second exception, for data con wrappers.
+-- On the grounds that we use gentle mode for rule LHSs, and 
+-- they match better when data con wrappers are inlined.
+-- But that only really applies to the trivial wrappers (like (:)),
+-- and they are now constructed as Compulsory unfoldings (in MkId)
+-- so they'll happen anyway.
+active_unfolding_minimal id
+  | isCompulsoryUnfolding unf = unf
+  | otherwise                 = NoUnfolding
   where
-    act = idInlineActivation id
+    unf = realIdUnfolding id	-- Never a loop breaker
+
+active_unfolding_gentle :: IdUnfoldingFun
+-- Anything that is early-active
+-- See Note [Gentle mode]
+active_unfolding_gentle id
+  | isEarlyActive (idInlineActivation id) = idUnfolding id
+  | otherwise                             = NoUnfolding
+      -- idUnfolding checks for loop-breakers
+      -- Things with an INLINE pragma may have 
+      -- an unfolding *and* be a loop breaker  
+      -- (maybe the knot is not yet untied)
+
+active_unfolding :: CompilerPhase -> IdUnfoldingFun
+active_unfolding n id
+  | isActive n (idInlineActivation id) = idUnfolding id
+  | otherwise                          = NoUnfolding
 
 activeRule :: DynFlags -> SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all

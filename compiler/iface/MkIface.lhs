@@ -1481,23 +1481,26 @@ toIfaceIdInfo id_info
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity, uf_guidance = guidance })
-  = case guidance of
-	InlineRule { ir_info = InlWrapper w } -> Just (HsUnfold lb (IfWrapper arity (idName w)))
-	InlineRule { ir_sat = InlSat }        -> Just (HsUnfold lb (IfInlineRule arity True  (toIfaceExpr rhs)))
-	InlineRule { ir_sat = InlUnSat }      -> Just (HsUnfold lb (IfInlineRule arity False (toIfaceExpr rhs)))
-	UnfoldIfGoodArgs {} -> vanilla_unfold
-	UnfoldNever         -> vanilla_unfold	-- Yes, even if guidance is UnfoldNever, expose the unfolding
-			       			-- If we didn't want to expose the unfolding, TidyPgm would
-			       			-- have stuck in NoUnfolding.  For supercompilation we want 
-						-- to see that unfolding!
+toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
+                                , uf_src = src, uf_guidance = guidance })
+  = case src of
+	InlineWrapper w -> Just (HsUnfold lb (IfWrapper arity (idName w)))
+	InlineRule {}   -> Just (HsUnfold lb (IfInlineRule arity sat (toIfaceExpr rhs)))
+        _other          -> Just (HsUnfold lb (IfCoreUnfold (toIfaceExpr rhs)))
+	-- Yes, even if guidance is UnfNever, expose the unfolding
+	-- If we didn't want to expose the unfolding, TidyPgm would
+	-- have stuck in NoUnfolding.  For supercompilation we want 
+	-- to see that unfolding!
   where
-    vanilla_unfold = Just (HsUnfold lb (IfCoreUnfold (toIfaceExpr rhs)))
+    sat = case guidance of
+            UnfWhen unsat_ok _ -> unsat_ok
+            _other             -> needSaturated
 
 toIfUnfolding lb (DFunUnfolding _con ops)
   = Just (HsUnfold lb (IfDFunUnfold (map toIfaceExpr ops)))
       -- No need to serialise the data constructor; 
       -- we can recover it from the type of the dfun
+
 toIfUnfolding _ _
   = Nothing
 

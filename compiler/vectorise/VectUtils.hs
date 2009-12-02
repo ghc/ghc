@@ -371,7 +371,7 @@ hoistExpr fs expr inl
   where
     mk_inline var = case inl of
                       Inline arity -> var `setIdUnfolding`
-                                      mkInlineRule InlSat expr arity
+                                      mkInlineRule needSaturated expr arity
                       DontInline   -> var
 
 hoistVExpr :: VExpr -> Inline -> VM VVar

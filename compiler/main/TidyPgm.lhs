@@ -1064,19 +1064,19 @@ tidyTopIdInfo is_external idinfo unfold_info arity caf_info occ_info
 
 ------------ Unfolding  --------------
 tidyUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
-tidyUnfolding tidy_env _ unf@(CoreUnfolding { uf_tmpl = rhs 
-	      	       	 		    , uf_guidance = guide@(InlineRule {}) })
-  = unf { uf_tmpl     = tidyExpr tidy_env rhs, 	   -- Preserves OccInfo
-	  uf_guidance = guide { ir_info = tidyInl tidy_env (ir_info guide) } }
 tidyUnfolding tidy_env _ (DFunUnfolding con ids)
   = DFunUnfolding con (map (tidyExpr tidy_env) ids)
-tidyUnfolding _ tidy_rhs (CoreUnfolding {})
+tidyUnfolding tidy_env tidy_rhs unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
+  | isInlineRuleSource src
+  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
+	  uf_src  = tidyInl tidy_env src }
+  | otherwise
   = mkTopUnfolding tidy_rhs
 tidyUnfolding _ _ unf = unf
 
-tidyInl :: TidyEnv -> InlineRuleInfo -> InlineRuleInfo
-tidyInl tidy_env (InlWrapper w) = InlWrapper (tidyVarOcc tidy_env w)
-tidyInl _        inl_info       = inl_info
+tidyInl :: TidyEnv -> UnfoldingSource -> UnfoldingSource
+tidyInl tidy_env (InlineWrapper w) = InlineWrapper (tidyVarOcc tidy_env w)
+tidyInl _        inl_info          = inl_info
 \end{code}
 
 %************************************************************************

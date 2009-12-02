@@ -207,7 +207,7 @@ dsFCall fn_id fcall = do
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
-        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineRule InlSat wrap_rhs (length args)
+        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineRule needSaturated wrap_rhs (length args)
     
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs)], empty, empty)
 \end{code}

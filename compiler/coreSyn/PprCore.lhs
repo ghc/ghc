@@ -370,37 +370,37 @@ showAttributes stuff
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr UnfoldNever  = ptext (sLit "NEVER")
-    ppr (InlineRule { ir_info = info, ir_sat = sat })
-      = ptext (sLit "InlineRule") <> ppr (sat,info)
-    ppr (UnfoldIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
+    ppr UnfNever  = ptext (sLit "NEVER")
+    ppr (UnfWhen sat_ok boring_ok)
+      = ptext (sLit "ALWAYS_IF") <> 
+        parens (ptext (sLit "sat_ok=") <> ppr sat_ok <> comma <>
+                ptext (sLit "boring_ok=") <> ppr boring_ok)
+    ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
       = hsep [ ptext (sLit "IF_ARGS"), 
 	       brackets (hsep (map int cs)),
 	       int size,
 	       int discount ]
 
-instance Outputable InlSatFlag where
-  ppr InlSat         = ptext (sLit "sat")
-  ppr InlUnSat       = ptext (sLit "unsat")
-
-instance Outputable InlineRuleInfo where
-  ppr (InlWrapper w) = ptext (sLit "worker=") <> ppr w
-  ppr InlSmall       = ptext (sLit "small")
-  ppr InlAlways      = ptext (sLit "always")
-  ppr InlVanilla     = ptext (sLit "-")
+instance Outputable UnfoldingSource where
+  ppr InlineCompulsory  = ptext (sLit "Compulsory")
+  ppr (InlineWrapper w) = ptext (sLit "Worker=") <> ppr w
+  ppr InlineRule        = ptext (sLit "InlineRule")
+  ppr InlineRhs         = ptext (sLit "<vanilla>")
 
 instance Outputable Unfolding where
   ppr NoUnfolding             = ptext (sLit "No unfolding")
   ppr (OtherCon cs)           = ptext (sLit "OtherCon") <+> ppr cs
   ppr (DFunUnfolding con ops) = ptext (sLit "DFun") <+> ppr con
                                  <+> brackets (pprWithCommas pprParendExpr ops)
-  ppr (CoreUnfolding { uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
+  ppr (CoreUnfolding { uf_src = src
+                     , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_cheap=cheap
       		     , uf_expandable=exp, uf_guidance=g, uf_arity=arity}) 
 	= ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
     where
       pp_info = fsep $ punctuate comma 
-                [ ptext (sLit "TopLvl=")     <> ppr top 
+                [ ptext (sLit "Src=")        <> ppr src
+                , ptext (sLit "TopLvl=")     <> ppr top 
                 , ptext (sLit "Arity=")      <> int arity
                 , ptext (sLit "Value=")      <> ppr hnf
                 , ptext (sLit "ConLike=")    <> ppr conlike
@@ -408,11 +408,8 @@ instance Outputable Unfolding where
                 , ptext (sLit "Expandable=") <> ppr exp
                 , ptext (sLit "Guidance=")   <> ppr g ]
       pp_tmpl = ptext (sLit "Tmpl=") <+> ppr rhs
-      pp_rhs = case g of
-      	      	  UnfoldNever         -> usually_empty
-		  UnfoldIfGoodArgs {} -> usually_empty
-                  _other              -> pp_tmpl
-      usually_empty = ifPprDebug (ptext (sLit "<rhs>"))
+      pp_rhs | isInlineRuleSource src = pp_tmpl
+             | otherwise              = empty
             -- Don't print the RHS or we get a quadratic 
 	    -- blowup in the size of the printout!
 \end{code}

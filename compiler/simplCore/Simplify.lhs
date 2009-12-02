@@ -447,28 +447,29 @@ prepareRhs env id (Cast rhs co)    -- Note [Float coercions]
     info = idInfo id
 
 prepareRhs env0 _ rhs0
-  = do  { (_is_val, env1, rhs1) <- go 0 env0 rhs0
+  = do  { (_is_exp, env1, rhs1) <- go 0 env0 rhs0
         ; return (env1, rhs1) }
   where
     go n_val_args env (Cast rhs co)
-        = do { (is_val, env', rhs') <- go n_val_args env rhs
-             ; return (is_val, env', Cast rhs' co) }
+        = do { (is_exp, env', rhs') <- go n_val_args env rhs
+             ; return (is_exp, env', Cast rhs' co) }
     go n_val_args env (App fun (Type ty))
-        = do { (is_val, env', rhs') <- go n_val_args env fun
-             ; return (is_val, env', App rhs' (Type ty)) }
+        = do { (is_exp, env', rhs') <- go n_val_args env fun
+             ; return (is_exp, env', App rhs' (Type ty)) }
     go n_val_args env (App fun arg)
-        = do { (is_val, env', fun') <- go (n_val_args+1) env fun
-             ; case is_val of
+        = do { (is_exp, env', fun') <- go (n_val_args+1) env fun
+             ; case is_exp of
                 True -> do { (env'', arg') <- makeTrivial env' arg
                            ; return (True, env'', App fun' arg') }
                 False -> return (False, env, App fun arg) }
     go n_val_args env (Var fun)
-        = return (is_val, env, Var fun)
+        = return (is_exp, env, Var fun)
         where
-          is_val = n_val_args > 0       -- There is at least one arg
-                                        -- ...and the fun a constructor or PAP
-                 && (isConLikeId fun || n_val_args < idArity fun)
-		        	   -- See Note [CONLIKE pragma] in BasicTypes
+          is_exp = isExpandableApp fun n_val_args   -- The fun a constructor or PAP
+		        -- See Note [CONLIKE pragma] in BasicTypes
+			-- The definition of is_exp should match that in
+	                -- OccurAnal.occAnalApp
+
     go _ env other
         = return (False, env, other)
 \end{code}
@@ -596,7 +597,8 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 	; if postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs new_unfolding
 	                -- Inline and discard the binding
 	  then do  { tick (PostInlineUnconditionally old_bndr)
-	           ; return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
+	           ; -- pprTrace "postInlineUnconditionally" (ppr old_bndr <+> equals <+> ppr new_rhs) $
+                     return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
 	        -- Use the substitution to make quite, quite sure that the
 	        -- substitution will happen, since we are going to discard the binding
 
@@ -671,12 +673,12 @@ simplUnfolding env _ _ _ _ (DFunUnfolding con ops)
 
 simplUnfolding env top_lvl _ _ _ 
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
-                   , uf_guidance = guide@(InlineRule {}) })
+                   , uf_src = src, uf_guidance = guide })
+  | isInlineRuleSource src
   = do { expr' <- simplExpr (updMode updModeForInlineRules env) expr
        	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
-       ; let mb_wkr' = CoreSubst.substInlineRuleInfo (mkCoreSubst env) (ir_info guide)
-       ; return (mkCoreUnfolding (isTopLevel top_lvl) expr' arity 
-                                 (guide { ir_info = mb_wkr' })) }
+       ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst env) src
+       ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
 
 simplUnfolding _ top_lvl _ _occ_info new_rhs _
@@ -1122,9 +1124,9 @@ completeCall env var cont
                arg_infos  = [interestingArg arg | arg <- args, isValArg arg]
                n_val_args = length arg_infos
                interesting_cont = interestingCallContext call_cont
-               active_inline = activeInline env var
-               maybe_inline  = callSiteInline dflags active_inline var
-                                              (null args) arg_infos interesting_cont
+               unfolding    = activeUnfolding env var
+               maybe_inline = callSiteInline dflags var unfolding
+                                             (null args) arg_infos interesting_cont
         ; case maybe_inline of {
             Just unfolding      -- There is an inlining!
               ->  do { tick (UnfoldingDone var)
@@ -1267,7 +1269,7 @@ tryRules env rules fn args call_cont
        ; case activeRule dflags env of {
            Nothing     -> return Nothing  ; -- No rules apply
            Just act_fn -> 
-         case lookupRule act_fn (getInScope env) fn args rules of {
+         case lookupRule act_fn (activeUnfInRule env) (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
 
@@ -1414,7 +1416,7 @@ rebuildCase env scrut case_bndr alts cont
 	    Nothing           -> missingAlt env case_bndr alts cont
 	    Just (_, bs, rhs) -> simple_rhs bs rhs }
 
-  | Just (con, ty_args, other_args) <- exprIsConApp_maybe scrut
+  | Just (con, ty_args, other_args) <- exprIsConApp_maybe (activeUnfInRule env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
   = do  { tick (KnownBranch case_bndr)
@@ -1946,7 +1948,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
 	      	      DataAlt dc -> setIdUnfolding case_bndr unf
 		      	  where
 			     	 -- See Note [Case binders and join points]
-		      	     unf = mkInlineRule InlSat rhs 0
+		      	     unf = mkInlineRule needSaturated rhs 0
 		      	     rhs = mkConApp dc (map Type (tyConAppArgs scrut_ty)
 			     	   	        ++ varsToCoreExprs bndrs')
 

@@ -212,7 +212,7 @@ data IfaceInfoItem
 data IfaceUnfolding 
   = IfCoreUnfold IfaceExpr
   | IfInlineRule Arity 
-                 Bool		-- Sat/UnSat
+                 Bool		-- OK to inline even if *un*-saturated
                  IfaceExpr 
   | IfWrapper    Arity Name	  -- NB: we need a Name (not just OccName) because the worker
 				  --     can simplify to a function in another module.

@@ -27,7 +27,7 @@ module CoreUtils (
 	exprType, coreAltType, coreAltsType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, exprIsExpandable,
 	exprIsHNF, exprOkForSpeculation, exprIsBig, exprIsConLike,
-	rhsIsStatic,
+	rhsIsStatic, isCheapApp, isExpandableApp,
 
 	-- * Expression and bindings size
 	coreBindsSize, exprSize,
@@ -61,6 +61,7 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
+import TcType	( isPredTy )
 import Type
 import Coercion
 import TyCon
@@ -499,30 +500,37 @@ Notice that a variable is considered 'cheap': we can push it inside a lambda,
 because sharing will make sure it is only evaluated once.
 
 \begin{code}
-exprIsCheap' :: (Id -> Bool) -> CoreExpr -> Bool
-exprIsCheap' _          (Lit _)           = True
-exprIsCheap' _          (Type _)          = True
-exprIsCheap' _          (Var _)           = True
-exprIsCheap' is_conlike (Note _ e)        = exprIsCheap' is_conlike e
-exprIsCheap' is_conlike (Cast e _)        = exprIsCheap' is_conlike e
-exprIsCheap' is_conlike (Lam x e)         = isRuntimeVar x
-                                            || exprIsCheap' is_conlike e
+exprIsCheap :: CoreExpr -> Bool
+exprIsCheap = exprIsCheap' isCheapApp
 
-exprIsCheap' is_conlike (Case e _ _ alts) = exprIsCheap' is_conlike e && 
-				            and [exprIsCheap' is_conlike rhs | (_,_,rhs) <- alts]
+exprIsExpandable :: CoreExpr -> Bool
+exprIsExpandable = exprIsCheap' isExpandableApp	-- See Note [CONLIKE pragma] in BasicTypes
+
+
+exprIsCheap' :: (Id -> Int -> Bool) -> CoreExpr -> Bool
+exprIsCheap' _          (Lit _)   = True
+exprIsCheap' _          (Type _)  = True
+exprIsCheap' _          (Var _)   = True
+exprIsCheap' good_app (Note _ e)  = exprIsCheap' good_app e
+exprIsCheap' good_app (Cast e _)  = exprIsCheap' good_app e
+exprIsCheap' good_app (Lam x e)   = isRuntimeVar x
+                                 || exprIsCheap' good_app e
+
+exprIsCheap' good_app (Case e _ _ alts) = exprIsCheap' good_app e && 
+				          and [exprIsCheap' good_app rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
 	-- (and case __coerce x etc.)
 	-- This improves arities of overloaded functions where
 	-- there is only dictionary selection (no construction) involved
 
-exprIsCheap' is_conlike (Let (NonRec x _) e)  
-      | isUnLiftedType (idType x) = exprIsCheap' is_conlike e
+exprIsCheap' good_app (Let (NonRec x _) e)  
+      | isUnLiftedType (idType x) = exprIsCheap' good_app e
       | otherwise		  = False
 	-- Strict lets always have cheap right hand sides,
 	-- and do no allocation, so just look at the body
 	-- Non-strict lets do allocation so we don't treat them as cheap
 
-exprIsCheap' is_conlike other_expr 	-- Applications and variables
+exprIsCheap' good_app other_expr 	-- Applications and variables
   = go other_expr []
   where
 	-- Accumulate value arguments, then decide
@@ -533,14 +541,12 @@ exprIsCheap' is_conlike other_expr 	-- Applications and variables
 				-- (f t1 t2 t3) counts as WHNF
     go (Var f) args
  	= case idDetails f of
-		RecSelId {}  -> go_sel args
-		ClassOpId {} -> go_sel args
-		PrimOpId op  -> go_primop op args
-
-		_ | is_conlike f -> go_pap args
-                  | length args < idArity f -> go_pap args
-
-	        _ -> isBottomingId f
+		RecSelId {}  	    	     -> go_sel args
+		ClassOpId {} 	    	     -> go_sel args
+		PrimOpId op  	    	     -> go_primop op args
+		_ | good_app f (length args) -> go_pap args
+                  | isBottomingId f 	     -> True
+                  | otherwise       	     -> False
 			-- Application of a function which
 			-- always gives bottom; we treat this as cheap
 			-- because it certainly doesn't need to be shared!
@@ -555,25 +561,52 @@ exprIsCheap' is_conlike other_expr 	-- Applications and variables
  	-- We'll put up with one constructor application, but not dozens
  	
     --------------
-    go_primop op args = primOpIsCheap op && all (exprIsCheap' is_conlike) args
+    go_primop op args = primOpIsCheap op && all (exprIsCheap' good_app) args
  	-- In principle we should worry about primops
  	-- that return a type variable, since the result
  	-- might be applied to something, but I'm not going
  	-- to bother to check the number of args
  
     --------------
-    go_sel [arg] = exprIsCheap' is_conlike arg	-- I'm experimenting with making record selection
+    go_sel [arg] = exprIsCheap' good_app arg	-- I'm experimenting with making record selection
     go_sel _     = False		-- look cheap, so we will substitute it inside a
  					-- lambda.  Particularly for dictionary field selection.
   		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
   		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
 
-exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsCheap' isDataConWorkId
+isCheapApp :: Id -> Int -> Bool
+isCheapApp fn n_val_args
+  = isDataConWorkId fn 
+  || n_val_args < idArity fn
 
-exprIsExpandable :: CoreExpr -> Bool
-exprIsExpandable = exprIsCheap' isConLikeId	-- See Note [CONLIKE pragma] in BasicTypes
+isExpandableApp :: Id -> Int -> Bool
+isExpandableApp fn n_val_args
+  =  isConLikeId fn
+  || n_val_args < idArity fn
+  || go n_val_args (idType fn)
+  where
+  -- See if all the arguments are PredTys (implicit params or classes)
+  -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     go 0 _ = True
+     go n_val_args ty 
+       | Just (_, ty) <- splitForAllTy_maybe ty   = go n_val_args ty
+       | Just (arg, ty) <- splitFunTy_maybe ty
+       , isPredTy arg                             = go (n_val_args-1) ty
+       | otherwise                                = False
 \end{code}
+
+Note [Expandable overloadings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the user wrote this
+   {-# RULE  forall x. foo (negate x) = h x #-}
+   f x = ....(foo (negate x))....
+He'd expect the rule to fire. But since negate is overloaded, we might
+get this:
+    f = \d -> let n = negate d in \x -> ...foo (n x)...
+So we treat the application of a function (negate in this case) to a
+*dictionary* as expandable.  In effect, every function is CONLIKE when
+it's applied only to dictionaries.
+
 
 %************************************************************************
 %*									*

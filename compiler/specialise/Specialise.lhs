@@ -808,7 +808,7 @@ specDefn subst body_uds fn rhs
 
 	-- Figure out whether the function has an INLINE pragma
 	-- See Note [Inline specialisations]
-    fn_has_inline_rule :: Maybe InlSatFlag	-- Derive sat-flag from existing thing
+    fn_has_inline_rule :: Maybe Bool	-- Derive sat-flag from existing thing
     fn_has_inline_rule = case isInlineRule_maybe fn_unf of
                            Just (_,sat) -> Just sat
 			   Nothing      -> Nothing
@@ -825,7 +825,8 @@ specDefn subst body_uds fn rhs
 
     already_covered :: [CoreExpr] -> Bool
     already_covered args	  -- Note [Specialisations already covered]
-       = isJust (lookupRule (const True) (substInScope subst) 
+       = isJust (lookupRule (const True) realIdUnfolding 
+                            (substInScope subst) 
        	 		    fn args (idCoreRules fn))
 
     mk_ty_args :: [Maybe Type] -> [CoreExpr]
