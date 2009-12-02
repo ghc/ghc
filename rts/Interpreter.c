@@ -269,7 +269,8 @@ eval_obj:
              debugBelch("\n\n");
             );
 
-    IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
+//    IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
+    IF_DEBUG(sanity,checkStackFrame(Sp));
 
     switch ( get_itbl(obj)->type ) {
 
