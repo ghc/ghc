@@ -192,7 +192,7 @@ test032:
 
 # test -hidir
 test033:
-	$(RM) -rf hi
+	$(RM) -rf hi033
 	$(RM) A033$(OBJSUFFIX)
 	mkdir hi033
 	"$(TEST_HC)" -v0 --make A033.hs -hidir hi033
