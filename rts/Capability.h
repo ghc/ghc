@@ -43,9 +43,6 @@ struct Capability_ {
     // catching unsafe call-ins.
     rtsBool in_haskell;
 
-    // true if this Capability is currently in the GC
-    rtsBool in_gc;
-
     // The run queue.  The Task owning this Capability has exclusive
     // access to its run queue, so can wake up threads without
     // taking a lock, and the common path through the scheduler is

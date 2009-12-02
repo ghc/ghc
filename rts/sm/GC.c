@@ -1071,8 +1071,6 @@ gcWorkerThread (Capability *cap)
     // necessary if we stole a callee-saves register for gct:
     saved_gct = gct;
 
-    cap->in_gc = rtsTrue;
-
     gct = gc_threads[cap->no];
     gct->id = osThreadId();
 
