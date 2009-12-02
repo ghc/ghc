@@ -143,9 +143,7 @@ HsInt64 getAllocations (void);
 
 #if defined(DEBUG)
 void    memInventory       (rtsBool show);
-void    checkSanity        (void);
 nat     countBlocks        (bdescr *);
-void    checkNurserySanity (step *stp);
 #endif
 
 /* ----------------------------------------------------------------------------

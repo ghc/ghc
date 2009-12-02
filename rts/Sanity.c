@@ -670,4 +670,64 @@ checkStaticObjects ( StgClosure* static_objects )
   }
 }
 
+/* Nursery sanity check */
+void
+checkNurserySanity( step *stp )
+{
+    bdescr *bd, *prev;
+    nat blocks = 0;
+
+    prev = NULL;
+    for (bd = stp->blocks; bd != NULL; bd = bd->link) {
+	ASSERT(bd->u.back == prev);
+	prev = bd;
+	blocks += bd->blocks;
+    }
+
+    ASSERT(blocks == stp->n_blocks);
+    ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
+}
+
+
+/* Full heap sanity check. */
+void
+checkSanity( rtsBool check_heap )
+{
+    nat g, s;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (s = 0; s < generations[g].n_steps; s++) {
+            if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
+                continue;
+            }
+            ASSERT(countBlocks(generations[g].steps[s].blocks)
+                   == generations[g].steps[s].n_blocks);
+            ASSERT(countBlocks(generations[g].steps[s].large_objects)
+                   == generations[g].steps[s].n_large_blocks);
+            if (check_heap) {
+                checkHeap(generations[g].steps[s].blocks);
+            }
+            checkLargeObjects(generations[g].steps[s].large_objects);
+        }
+    }
+    
+    for (s = 0; s < n_capabilities; s++) {
+        checkNurserySanity(&nurseries[s]);
+    }
+    
+    checkFreeListSanity();
+
+#if defined(THREADED_RTS)
+    // always check the stacks in threaded mode, because checkHeap()
+    // does nothing in this case.
+    checkMutableLists(rtsTrue);
+#else
+    if (check_heap) {
+        checkMutableLists(rtsFalse);
+    } else {
+        checkMutableLists(rtsTrue);
+    }
+#endif
+}
+
 #endif /* DEBUG */

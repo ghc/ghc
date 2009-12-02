@@ -274,9 +274,8 @@ GarbageCollect (rtsBool force_major_gc,
   memInventory(DEBUG_gc);
 #endif
 
-  // check stack sanity *before* GC
-  IF_DEBUG(sanity, checkFreeListSanity());
-  IF_DEBUG(sanity, checkMutableLists(rtsTrue));
+  // check sanity *before* GC
+  IF_DEBUG(sanity, checkSanity(rtsTrue));
 
   // Initialise all our gc_thread structures
   for (t = 0; t < n_gc_threads; t++) {
@@ -755,8 +754,8 @@ SET_GCT(gc_threads[0]);
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
 
-  // check sanity after GC 
-  IF_DEBUG(sanity, checkSanity());
+  // check sanity after GC
+  IF_DEBUG(sanity, checkSanity(rtsTrue));
 
   // extra GC trace info 
   IF_DEBUG(gc, statDescribeGens());

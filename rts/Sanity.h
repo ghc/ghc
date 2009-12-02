@@ -21,10 +21,12 @@ BEGIN_RTS_PRIVATE
 # endif
 
 /* debugging routines */
-void checkHeap      ( bdescr *bd );
-void checkHeapChunk ( StgPtr start, StgPtr end );
-void checkLargeObjects ( bdescr *bd );
-void checkTSO       ( StgTSO* tso );
+void checkSanity        ( rtsBool check_heap );
+void checkNurserySanity ( step *stp );
+void checkHeap          ( bdescr *bd );
+void checkHeapChunk     ( StgPtr start, StgPtr end );
+void checkLargeObjects  ( bdescr *bd );
+void checkTSO           ( StgTSO* tso );
 void checkGlobalTSOList ( rtsBool checkTSOs );
 void checkStaticObjects ( StgClosure* static_objects );
 void checkStackChunk    ( StgPtr sp, StgPtr stack_end );
@@ -32,7 +34,7 @@ StgOffset checkStackFrame ( StgPtr sp );
 StgOffset checkClosure  ( StgClosure* p );
 
 void checkMutableList   ( bdescr *bd, nat gen );
-void checkMutableLists ( rtsBool checkTSOs );
+void checkMutableLists  ( rtsBool checkTSOs );
 
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 

@@ -1292,60 +1292,6 @@ memInventory (rtsBool show)
 }
 
 
-/* Full heap sanity check. */
-void
-checkSanity( void )
-{
-    nat g, s;
-
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (s = 0; s < generations[g].n_steps; s++) {
-            if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-                continue;
-            }
-            ASSERT(countBlocks(generations[g].steps[s].blocks)
-                   == generations[g].steps[s].n_blocks);
-            ASSERT(countBlocks(generations[g].steps[s].large_objects)
-                   == generations[g].steps[s].n_large_blocks);
-            checkHeap(generations[g].steps[s].blocks);
-            checkLargeObjects(generations[g].steps[s].large_objects);
-        }
-    }
-    
-    for (s = 0; s < n_nurseries; s++) {
-        ASSERT(countBlocks(nurseries[s].blocks)
-               == nurseries[s].n_blocks);
-        ASSERT(countBlocks(nurseries[s].large_objects)
-               == nurseries[s].n_large_blocks);
-    }
-    
-    checkFreeListSanity();
-
-#if defined(THREADED_RTS)
-    // check the stacks too in threaded mode, because we don't do a
-    // full heap sanity check in this case (see checkHeap())
-    checkMutableLists(rtsTrue);
-#else
-    checkMutableLists(rtsFalse);
-#endif
-}
-
-/* Nursery sanity check */
-void
-checkNurserySanity( step *stp )
-{
-    bdescr *bd, *prev;
-    nat blocks = 0;
-
-    prev = NULL;
-    for (bd = stp->blocks; bd != NULL; bd = bd->link) {
-	ASSERT(bd->u.back == prev);
-	prev = bd;
-	blocks += bd->blocks;
-    }
-    ASSERT(blocks == stp->n_blocks);
-}
-
 // handy function for use in gdb, because Bdescr() is inlined.
 extern bdescr *_bdescr( StgPtr p );
 
