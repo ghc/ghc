@@ -21,6 +21,7 @@
 #include "HsFFI.h"
 
 #include "sm/Storage.h"
+#include "Stats.h"
 #include "Hash.h"
 #include "LinkerInternals.h"
 #include "RtsUtils.h"

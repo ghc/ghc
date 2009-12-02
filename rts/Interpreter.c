@@ -11,10 +11,10 @@
 
 // internal headers
 #include "sm/Storage.h"
+#include "sm/Sanity.h"
 #include "RtsUtils.h"
 #include "Schedule.h"
 #include "Updates.h"
-#include "Sanity.h"
 #include "Prelude.h"
 #include "Stable.h"
 #include "Printer.h"

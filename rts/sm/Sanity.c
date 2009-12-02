@@ -25,6 +25,7 @@
 #include "Schedule.h"
 #include "Apply.h"
 #include "Printer.h"
+#include "Arena.h"
 
 /* -----------------------------------------------------------------------------
    Forward decls.
@@ -729,5 +730,177 @@ checkSanity( rtsBool check_heap )
     }
 #endif
 }
+
+// If memInventory() calculates that we have a memory leak, this
+// function will try to find the block(s) that are leaking by marking
+// all the ones that we know about, and search through memory to find
+// blocks that are not marked.  In the debugger this can help to give
+// us a clue about what kind of block leaked.  In the future we might
+// annotate blocks with their allocation site to give more helpful
+// info.
+static void
+findMemoryLeak (void)
+{
+  nat g, s, i;
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (i = 0; i < n_capabilities; i++) {
+	  markBlocks(capabilities[i].mut_lists[g]);
+      }
+      markBlocks(generations[g].mut_list);
+      for (s = 0; s < generations[g].n_steps; s++) {
+	  markBlocks(generations[g].steps[s].blocks);
+	  markBlocks(generations[g].steps[s].large_objects);
+      }
+  }
+
+  for (i = 0; i < n_capabilities; i++) {
+      markBlocks(nurseries[i].blocks);
+      markBlocks(nurseries[i].large_objects);
+  }
+
+#ifdef PROFILING
+  // TODO:
+  // if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
+  //    markRetainerBlocks();
+  // }
+#endif
+
+  // count the blocks allocated by the arena allocator
+  // TODO:
+  // markArenaBlocks();
+
+  // count the blocks containing executable memory
+  markBlocks(exec_block);
+
+  reportUnmarkedBlocks();
+}
+
+
+/* -----------------------------------------------------------------------------
+   Memory leak detection
+
+   memInventory() checks for memory leaks by counting up all the
+   blocks we know about and comparing that to the number of blocks
+   allegedly floating around in the system.
+   -------------------------------------------------------------------------- */
+
+// Useful for finding partially full blocks in gdb
+void findSlop(bdescr *bd);
+void findSlop(bdescr *bd)
+{
+    lnat slop;
+
+    for (; bd != NULL; bd = bd->link) {
+        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
+        if (slop > (1024/sizeof(W_))) {
+            debugBelch("block at %p (bdescr %p) has %ldKB slop\n",
+                       bd->start, bd, slop / (1024/sizeof(W_)));
+        }
+    }
+}
+
+static lnat
+stepBlocks (step *stp)
+{
+    ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
+    ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
+    return stp->n_blocks + stp->n_old_blocks + 
+	    countAllocdBlocks(stp->large_objects);
+}
+
+void
+memInventory (rtsBool show)
+{
+  nat g, s, i;
+  step *stp;
+  lnat gen_blocks[RtsFlags.GcFlags.generations];
+  lnat nursery_blocks, retainer_blocks,
+       arena_blocks, exec_blocks;
+  lnat live_blocks = 0, free_blocks = 0;
+  rtsBool leak;
+
+  // count the blocks we current have
+
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      gen_blocks[g] = 0;
+      for (i = 0; i < n_capabilities; i++) {
+	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
+      }	  
+      gen_blocks[g] += countAllocdBlocks(generations[g].mut_list);
+      for (s = 0; s < generations[g].n_steps; s++) {
+	  stp = &generations[g].steps[s];
+	  gen_blocks[g] += stepBlocks(stp);
+      }
+  }
+
+  nursery_blocks = 0;
+  for (i = 0; i < n_capabilities; i++) {
+      nursery_blocks += stepBlocks(&nurseries[i]);
+  }
+
+  retainer_blocks = 0;
+#ifdef PROFILING
+  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
+      retainer_blocks = retainerStackBlocks();
+  }
+#endif
+
+  // count the blocks allocated by the arena allocator
+  arena_blocks = arenaBlocks();
+
+  // count the blocks containing executable memory
+  exec_blocks = countAllocdBlocks(exec_block);
+
+  /* count the blocks on the free list */
+  free_blocks = countFreeList();
+
+  live_blocks = 0;
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      live_blocks += gen_blocks[g];
+  }
+  live_blocks += nursery_blocks + 
+               + retainer_blocks + arena_blocks + exec_blocks;
+
+#define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
+
+  leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
+
+  if (show || leak)
+  {
+      if (leak) { 
+          debugBelch("Memory leak detected:\n");
+      } else {
+          debugBelch("Memory inventory:\n");
+      }
+      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	  debugBelch("  gen %d blocks : %5lu blocks (%lu MB)\n", g, 
+                     gen_blocks[g], MB(gen_blocks[g]));
+      }
+      debugBelch("  nursery      : %5lu blocks (%lu MB)\n", 
+                 nursery_blocks, MB(nursery_blocks));
+      debugBelch("  retainer     : %5lu blocks (%lu MB)\n", 
+                 retainer_blocks, MB(retainer_blocks));
+      debugBelch("  arena blocks : %5lu blocks (%lu MB)\n", 
+                 arena_blocks, MB(arena_blocks));
+      debugBelch("  exec         : %5lu blocks (%lu MB)\n", 
+                 exec_blocks, MB(exec_blocks));
+      debugBelch("  free         : %5lu blocks (%lu MB)\n", 
+                 free_blocks, MB(free_blocks));
+      debugBelch("  total        : %5lu blocks (%lu MB)\n",
+                 live_blocks + free_blocks, MB(live_blocks+free_blocks));
+      if (leak) {
+          debugBelch("\n  in system    : %5lu blocks (%lu MB)\n", 
+                     mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
+      }
+  }
+
+  if (leak) {
+      debugBelch("\n");
+      findMemoryLeak();
+  }
+  ASSERT(n_alloc_blocks == live_blocks);
+  ASSERT(!leak);
+}
+
 
 #endif /* DEBUG */

@@ -139,16 +139,12 @@ lnat    calcLiveBlocks (void);
 lnat    calcLiveWords  (void);
 lnat    countOccupied  (bdescr *bd);
 lnat    calcNeeded     (void);
-HsInt64 getAllocations (void);
-
-#if defined(DEBUG)
-void    memInventory       (rtsBool show);
-nat     countBlocks        (bdescr *);
-#endif
 
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals
    ------------------------------------------------------------------------- */
+
+extern bdescr *exec_block;
 
 #define END_OF_STATIC_LIST ((StgClosure*)1)
 

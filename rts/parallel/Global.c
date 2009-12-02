@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
-   Time-stamp: <Wed Mar 21 2001 16:32:23 Stardate: [-30]6363.44 hwloidl>
+   Time-stamp: <2009-12-02 12:26:23 simonmar>
 
    (c) The AQUA/Parade Projects, Glasgow University, 1995
        The GdH/APART 624 Projects, Heriot-Watt University, Edinburgh, 1999
@@ -36,7 +36,7 @@
 #include "HLC.h"
 #include "ParallelRts.h"
 #if defined(DEBUG)
-# include "Sanity.h"
+# include "sm/Sanity.h"
 #include "ParallelDebug.h"
 #endif
 #if defined(DIST)

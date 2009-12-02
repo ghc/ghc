@@ -61,6 +61,8 @@ Ticks stat_getElapsedTime(void);
 void statsPrintf( char *s, ... ) 
     GNUC3_ATTRIBUTE(format (printf, 1, 2));
 
+HsInt64 getAllocations (void);
+
 END_RTS_PRIVATE
 
 #endif /* STATS_H */

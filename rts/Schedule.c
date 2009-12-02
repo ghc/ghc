@@ -17,7 +17,7 @@
 #include "Interpreter.h"
 #include "Printer.h"
 #include "RtsSignals.h"
-#include "Sanity.h"
+#include "sm/Sanity.h"
 #include "Stats.h"
 #include "STM.h"
 #include "Prelude.h"

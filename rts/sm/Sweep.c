@@ -14,7 +14,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#include "Storage.h"
+#include "BlockAlloc.h"
 #include "Sweep.h"
 #include "Trace.h"
 

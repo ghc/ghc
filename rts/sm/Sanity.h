@@ -36,6 +36,8 @@ StgOffset checkClosure  ( StgClosure* p );
 void checkMutableList   ( bdescr *bd, nat gen );
 void checkMutableLists  ( rtsBool checkTSOs );
 
+void memInventory (rtsBool show);
+
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 
 END_RTS_PRIVATE

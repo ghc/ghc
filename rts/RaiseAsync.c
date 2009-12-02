@@ -16,7 +16,7 @@
 #include "Schedule.h"
 #include "Updates.h"
 #include "STM.h"
-#include "Sanity.h"
+#include "sm/Sanity.h"
 #include "Profiling.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"

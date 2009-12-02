@@ -43,7 +43,7 @@ rtsBool       keepCAFs;
 nat alloc_blocks_lim;    /* GC if n_large_blocks in any nursery
                           * reaches this. */
 
-static bdescr *exec_block;
+bdescr *exec_block;
 
 generation *generations = NULL;	/* all the generations */
 generation *g0		= NULL; /* generation 0, for convenience */
@@ -54,8 +54,7 @@ step *all_steps         = NULL; /* single array of steps */
 
 ullong total_allocated = 0;	/* total memory allocated during run */
 
-nat n_nurseries         = 0;    /* == RtsFlags.ParFlags.nNodes, convenience */
-step *nurseries         = NULL; /* array of nurseries, >1 only if THREADED_RTS */
+step *nurseries         = NULL; /* array of nurseries, size == n_capabilities */
 
 #ifdef THREADED_RTS
 /*
@@ -185,8 +184,7 @@ initStorage( void )
     g0->steps   = all_steps;
   }
 
-  n_nurseries = n_capabilities;
-  nurseries = stgMallocBytes (n_nurseries * sizeof(struct step_),
+  nurseries = stgMallocBytes (n_capabilities * sizeof(struct step_),
 			      "initStorage: nurseries");
 
   /* Initialise all steps */
@@ -196,7 +194,7 @@ initStorage( void )
     }
   }
   
-  for (s = 0; s < n_nurseries; s++) {
+  for (s = 0; s < n_capabilities; s++) {
       initStep(&nurseries[s], 0, s);
   }
   
@@ -209,7 +207,7 @@ initStorage( void )
   }
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
   
-  for (s = 0; s < n_nurseries; s++) {
+  for (s = 0; s < n_capabilities; s++) {
       nurseries[s].to = generations[0].steps[0].to;
   }
   
@@ -417,7 +415,7 @@ assignNurseriesToCapabilities (void)
 {
     nat i;
 
-    for (i = 0; i < n_nurseries; i++) {
+    for (i = 0; i < n_capabilities; i++) {
 	capabilities[i].r.rNursery        = &nurseries[i];
 	capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
 	capabilities[i].r.rCurrentAlloc   = NULL;
@@ -429,7 +427,7 @@ allocNurseries( void )
 { 
     nat i;
 
-    for (i = 0; i < n_nurseries; i++) {
+    for (i = 0; i < n_capabilities; i++) {
 	nurseries[i].blocks = 
 	    allocNursery(&nurseries[i], NULL, 
 			 RtsFlags.GcFlags.minAllocAreaSize);
@@ -447,7 +445,7 @@ resetNurseries( void )
     bdescr *bd;
     step *stp;
 
-    for (i = 0; i < n_nurseries; i++) {
+    for (i = 0; i < n_capabilities; i++) {
 	stp = &nurseries[i];
 	for (bd = stp->blocks; bd; bd = bd->link) {
 	    bd->free = bd->start;
@@ -469,7 +467,7 @@ countNurseryBlocks (void)
     nat i;
     lnat blocks = 0;
 
-    for (i = 0; i < n_nurseries; i++) {
+    for (i = 0; i < n_capabilities; i++) {
 	blocks += nurseries[i].n_blocks;
         blocks += nurseries[i].n_large_blocks;
     }
@@ -523,7 +521,7 @@ void
 resizeNurseriesFixed (nat blocks)
 {
     nat i;
-    for (i = 0; i < n_nurseries; i++) {
+    for (i = 0; i < n_capabilities; i++) {
 	resizeNursery(&nurseries[i], blocks);
     }
 }
@@ -536,7 +534,7 @@ resizeNurseries (nat blocks)
 {
     // If there are multiple nurseries, then we just divide the number
     // of available blocks between them.
-    resizeNurseriesFixed(blocks / n_nurseries);
+    resizeNurseriesFixed(blocks / n_capabilities);
 }
 
 
@@ -824,8 +822,7 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
  *
  * Approximate how much we've allocated: number of blocks in the
  * nursery + blocks allocated via allocate() - unused nusery blocks.
- * This leaves a little slop at the end of each block, and doesn't
- * take into account large objects (ToDo).
+ * This leaves a little slop at the end of each block.
  * -------------------------------------------------------------------------- */
 
 lnat
@@ -1088,209 +1085,7 @@ void freeExec (void *addr)
 
 #endif /* mingw32_HOST_OS */
 
-/* -----------------------------------------------------------------------------
-   Debugging
-
-   memInventory() checks for memory leaks by counting up all the
-   blocks we know about and comparing that to the number of blocks
-   allegedly floating around in the system.
-   -------------------------------------------------------------------------- */
-
 #ifdef DEBUG
-
-// Useful for finding partially full blocks in gdb
-void findSlop(bdescr *bd);
-void findSlop(bdescr *bd)
-{
-    lnat slop;
-
-    for (; bd != NULL; bd = bd->link) {
-        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
-        if (slop > (1024/sizeof(W_))) {
-            debugBelch("block at %p (bdescr %p) has %ldKB slop\n",
-                       bd->start, bd, slop / (1024/sizeof(W_)));
-        }
-    }
-}
-
-nat
-countBlocks(bdescr *bd)
-{
-    nat n;
-    for (n=0; bd != NULL; bd=bd->link) {
-	n += bd->blocks;
-    }
-    return n;
-}
-
-// (*1) Just like countBlocks, except that we adjust the count for a
-// megablock group so that it doesn't include the extra few blocks
-// that would be taken up by block descriptors in the second and
-// subsequent megablock.  This is so we can tally the count with the
-// number of blocks allocated in the system, for memInventory().
-static nat
-countAllocdBlocks(bdescr *bd)
-{
-    nat n;
-    for (n=0; bd != NULL; bd=bd->link) {
-	n += bd->blocks;
-	// hack for megablock groups: see (*1) above
-	if (bd->blocks > BLOCKS_PER_MBLOCK) {
-	    n -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
-		* (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
-	}
-    }
-    return n;
-}
-
-static lnat
-stepBlocks (step *stp)
-{
-    ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
-    ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
-    return stp->n_blocks + stp->n_old_blocks + 
-	    countAllocdBlocks(stp->large_objects);
-}
-
-// If memInventory() calculates that we have a memory leak, this
-// function will try to find the block(s) that are leaking by marking
-// all the ones that we know about, and search through memory to find
-// blocks that are not marked.  In the debugger this can help to give
-// us a clue about what kind of block leaked.  In the future we might
-// annotate blocks with their allocation site to give more helpful
-// info.
-static void
-findMemoryLeak (void)
-{
-  nat g, s, i;
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (i = 0; i < n_capabilities; i++) {
-	  markBlocks(capabilities[i].mut_lists[g]);
-      }
-      markBlocks(generations[g].mut_list);
-      for (s = 0; s < generations[g].n_steps; s++) {
-	  markBlocks(generations[g].steps[s].blocks);
-	  markBlocks(generations[g].steps[s].large_objects);
-      }
-  }
-
-  for (i = 0; i < n_nurseries; i++) {
-      markBlocks(nurseries[i].blocks);
-      markBlocks(nurseries[i].large_objects);
-  }
-
-#ifdef PROFILING
-  // TODO:
-  // if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-  //    markRetainerBlocks();
-  // }
-#endif
-
-  // count the blocks allocated by the arena allocator
-  // TODO:
-  // markArenaBlocks();
-
-  // count the blocks containing executable memory
-  markBlocks(exec_block);
-
-  reportUnmarkedBlocks();
-}
-
-
-void
-memInventory (rtsBool show)
-{
-  nat g, s, i;
-  step *stp;
-  lnat gen_blocks[RtsFlags.GcFlags.generations];
-  lnat nursery_blocks, retainer_blocks,
-       arena_blocks, exec_blocks;
-  lnat live_blocks = 0, free_blocks = 0;
-  rtsBool leak;
-
-  // count the blocks we current have
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      gen_blocks[g] = 0;
-      for (i = 0; i < n_capabilities; i++) {
-	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
-      }	  
-      gen_blocks[g] += countAllocdBlocks(generations[g].mut_list);
-      for (s = 0; s < generations[g].n_steps; s++) {
-	  stp = &generations[g].steps[s];
-	  gen_blocks[g] += stepBlocks(stp);
-      }
-  }
-
-  nursery_blocks = 0;
-  for (i = 0; i < n_nurseries; i++) {
-      nursery_blocks += stepBlocks(&nurseries[i]);
-  }
-
-  retainer_blocks = 0;
-#ifdef PROFILING
-  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-      retainer_blocks = retainerStackBlocks();
-  }
-#endif
-
-  // count the blocks allocated by the arena allocator
-  arena_blocks = arenaBlocks();
-
-  // count the blocks containing executable memory
-  exec_blocks = countAllocdBlocks(exec_block);
-
-  /* count the blocks on the free list */
-  free_blocks = countFreeList();
-
-  live_blocks = 0;
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      live_blocks += gen_blocks[g];
-  }
-  live_blocks += nursery_blocks + 
-               + retainer_blocks + arena_blocks + exec_blocks;
-
-#define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
-
-  leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
-
-  if (show || leak)
-  {
-      if (leak) { 
-          debugBelch("Memory leak detected:\n");
-      } else {
-          debugBelch("Memory inventory:\n");
-      }
-      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	  debugBelch("  gen %d blocks : %5lu blocks (%lu MB)\n", g, 
-                     gen_blocks[g], MB(gen_blocks[g]));
-      }
-      debugBelch("  nursery      : %5lu blocks (%lu MB)\n", 
-                 nursery_blocks, MB(nursery_blocks));
-      debugBelch("  retainer     : %5lu blocks (%lu MB)\n", 
-                 retainer_blocks, MB(retainer_blocks));
-      debugBelch("  arena blocks : %5lu blocks (%lu MB)\n", 
-                 arena_blocks, MB(arena_blocks));
-      debugBelch("  exec         : %5lu blocks (%lu MB)\n", 
-                 exec_blocks, MB(exec_blocks));
-      debugBelch("  free         : %5lu blocks (%lu MB)\n", 
-                 free_blocks, MB(free_blocks));
-      debugBelch("  total        : %5lu blocks (%lu MB)\n",
-                 live_blocks + free_blocks, MB(live_blocks+free_blocks));
-      if (leak) {
-          debugBelch("\n  in system    : %5lu blocks (%lu MB)\n", 
-                     mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
-      }
-  }
-
-  if (leak) {
-      debugBelch("\n");
-      findMemoryLeak();
-  }
-  ASSERT(n_alloc_blocks == live_blocks);
-  ASSERT(!leak);
-}
-
 
 // handy function for use in gdb, because Bdescr() is inlined.
 extern bdescr *_bdescr( StgPtr p );

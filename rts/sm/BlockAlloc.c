@@ -629,6 +629,40 @@ initMBlock(void *mblock)
 }
 
 /* -----------------------------------------------------------------------------
+   Stats / metrics
+   -------------------------------------------------------------------------- */
+
+nat
+countBlocks(bdescr *bd)
+{
+    nat n;
+    for (n=0; bd != NULL; bd=bd->link) {
+	n += bd->blocks;
+    }
+    return n;
+}
+
+// (*1) Just like countBlocks, except that we adjust the count for a
+// megablock group so that it doesn't include the extra few blocks
+// that would be taken up by block descriptors in the second and
+// subsequent megablock.  This is so we can tally the count with the
+// number of blocks allocated in the system, for memInventory().
+nat
+countAllocdBlocks(bdescr *bd)
+{
+    nat n;
+    for (n=0; bd != NULL; bd=bd->link) {
+	n += bd->blocks;
+	// hack for megablock groups: see (*1) above
+	if (bd->blocks > BLOCKS_PER_MBLOCK) {
+	    n -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
+		* (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
+	}
+    }
+    return n;
+}
+
+/* -----------------------------------------------------------------------------
    Debugging
    -------------------------------------------------------------------------- */
 

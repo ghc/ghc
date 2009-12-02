@@ -14,6 +14,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "BlockAlloc.h"
 #include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"

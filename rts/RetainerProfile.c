@@ -25,7 +25,7 @@
 #include "Schedule.h"
 #include "Printer.h"
 #include "Weak.h"
-#include "Sanity.h"
+#include "sm/Sanity.h"
 #include "Profiling.h"
 #include "Stats.h"
 #include "ProfHeap.h"

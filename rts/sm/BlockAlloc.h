@@ -13,6 +13,9 @@ BEGIN_RTS_PRIVATE
 
 /* Debugging  -------------------------------------------------------------- */
 
+extern nat countBlocks       (bdescr *bd);
+extern nat countAllocdBlocks (bdescr *bd);
+
 #ifdef DEBUG
 void checkFreeListSanity(void);
 nat  countFreeList(void);

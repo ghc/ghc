@@ -1,5 +1,5 @@
 /* 
-   Time-stamp: <Wed Mar 21 2001 16:32:47 Stardate: [-30]6363.44 hwloidl>
+   Time-stamp: <2009-12-02 12:26:34 simonmar>
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
@@ -50,7 +50,7 @@
 #include "GranSimRts.h"
 #include "ParallelRts.h"
 # if defined(DEBUG)
-# include "Sanity.h"
+# include "sm/Sanity.h"
 # include "Printer.h"
 # include "ParallelDebug.h"
 # endif
