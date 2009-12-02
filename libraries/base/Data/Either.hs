@@ -79,8 +79,8 @@ rights x = [a | Right a <- x]
 partitionEithers :: [Either a b] -> ([a],[b])
 partitionEithers = foldr (either left right) ([],[])
  where
-  left  a (l, r) = (a:l, r)
-  right a (l, r) = (l, a:r)
+  left  a ~(l, r) = (a:l, r)
+  right a ~(l, r) = (l, a:r)
 
 {-
 {--------------------------------------------------------------------
