@@ -1290,7 +1290,7 @@ finish_char_tok loc ch	-- We've already seen the closing quote
 				return (L (mkSrcSpan loc end) (ITprimchar ch))
 			_other ->
 				return (L (mkSrcSpan loc end) (ITchar ch))
-	        else do
+	    else do
 		   return (L (mkSrcSpan loc end) (ITchar ch))
 
 lex_char :: Char -> AlexInput -> P Char

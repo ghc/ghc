@@ -556,12 +556,12 @@ shadowPackages pkgs preferred
    in  listToFM shadowed
  where
  check (shadowed,pkgmap) pkg
-      | Just oldpkg <- lookupUFM pkgmap (packageConfigId pkg),
-        let
+      | Just oldpkg <- lookupUFM pkgmap (packageConfigId pkg)
+      , let
             ipid_new = installedPackageId pkg
-            ipid_old = installedPackageId oldpkg,
+            ipid_old = installedPackageId oldpkg
         --
-        ipid_old /= ipid_new
+      , ipid_old /= ipid_new
       = if ipid_old `elem` preferred
            then ( (ipid_new, ShadowedBy ipid_old) : shadowed, pkgmap )
            else ( (ipid_old, ShadowedBy ipid_new) : shadowed, pkgmap' )

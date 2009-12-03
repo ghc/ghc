@@ -217,9 +217,9 @@ dmdAnal sigs dmd (Lam var body)
     (deferType lam_ty, Lam var' body')
 
 dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
-  | let tycon = dataConTyCon dc,
-    isProductTyCon tycon,
-    not (isRecursiveTyCon tycon)
+  | let tycon = dataConTyCon dc
+  , isProductTyCon tycon
+  , not (isRecursiveTyCon tycon)
   = let
 	sigs_alt	      = extendSigEnv NotTopLevel sigs case_bndr case_bndr_sig
 	(alt_ty, alt')	      = dmdAnalAlt sigs_alt dmd alt

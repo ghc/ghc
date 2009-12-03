@@ -985,9 +985,9 @@ mkImport :: CCallConv
 	 -> P (HsDecl RdrName)
 mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (StaticTarget entity)
-      importSpec = CImport PrimCallConv safety nilFS funcTarget
-  return (ForD (ForeignImport v ty importSpec))
+    let funcTarget = CFunction (StaticTarget entity)
+        importSpec = CImport PrimCallConv safety nilFS funcTarget
+    return (ForD (ForeignImport v ty importSpec))
   | otherwise = do
     case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
       Nothing         -> parseError loc "Malformed entity string"
