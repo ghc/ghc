@@ -945,6 +945,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_yieldzh)                        \
       SymI_NeedsProto(stg_interp_constr_entry)          \
       SymI_HasProto(alloc_blocks_lim)                   \
+      SymI_HasProto(g0)                                 \
       SymI_HasProto(allocate)                           \
       SymI_HasProto(allocateExec)	                \
       SymI_HasProto(freeExec)		                \
