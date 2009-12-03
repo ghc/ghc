@@ -1985,6 +1985,14 @@ alternativeLayoutRuleToken t
              newLine = (lastLoc == noSrcSpan)
                     || (srcSpanStartLine thisLoc > srcSpanEndLine lastLoc)
          case (unLoc t, context, mExpectingOCurly) of
+             -- This case handles a GHC extension to the original H98
+             -- layout rule...
+             (ITocurly, _, Just _) ->
+                 do setAlrExpectingOCurly Nothing
+                    setALRContext (ALRNoLayout (containsCommas ITocurly) : context)
+                    return t
+             -- ...and makes this case unnecessary
+             {-
              -- I think our implicit open-curly handling is slightly
              -- different to John's, in how it interacts with newlines
              -- and "in"
@@ -1992,6 +2000,7 @@ alternativeLayoutRuleToken t
                  do setAlrExpectingOCurly Nothing
                     setNextToken t
                     lexTokenAlr
+             -}
              (_, ALRLayout _ col : ls, Just expectingOCurly)
               | (thisCol > col) ||
                 (thisCol == col &&
