@@ -24,7 +24,7 @@ import OccName
 import Id
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag,
-                           dfunInlinePragma )
+                           alwaysInlinePragma, dfunInlinePragma )
 import Var               ( Var, TyVar, varType )
 import Name              ( Name, getOccName )
 import NameEnv
@@ -831,6 +831,7 @@ buildPADict vect_tc prepr_tc arr_tc repr
           raw_var <- newExportedVar (method_name name) (exprType body)
           let var = raw_var
                       `setIdUnfolding` mkInlineRule needSaturated body (length args)
+                      `setInlinePragma` alwaysInlinePragma
           hoistBinding var body
           return var
 

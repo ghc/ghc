@@ -57,7 +57,7 @@ module BasicTypes(
 	CompilerPhase, 
 	Activation(..), isActive, isNeverActive, isAlwaysActive, isEarlyActive,
         RuleMatchInfo(..), isConLike, isFunLike, 
-        InlinePragma(..), defaultInlinePragma, neverInlinePragma, dfunInlinePragma,
+        InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma,
 	isDefaultInlinePragma, isInlinePragma,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
@@ -660,9 +660,12 @@ isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
 isFunLike _            = False
 
-defaultInlinePragma, neverInlinePragma, dfunInlinePragma :: InlinePragma
+defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
+  :: InlinePragma
 defaultInlinePragma 
   = InlinePragma { inl_act = AlwaysActive, inl_rule = FunLike, inl_inline = False }
+alwaysInlinePragma
+  = InlinePragma { inl_act = AlwaysActive, inl_rule = FunLike, inl_inline = True }
 neverInlinePragma   
    = InlinePragma { inl_act = NeverActive, inl_rule = FunLike, inl_inline = False }
 dfunInlinePragma   
