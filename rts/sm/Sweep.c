@@ -19,20 +19,20 @@
 #include "Trace.h"
 
 void
-sweep(step *step)
+sweep(generation *gen)
 {
     bdescr *bd, *prev, *next;
     nat i;
     nat freed, resid, fragd, blocks, live;
     
-    ASSERT(countBlocks(step->old_blocks) == step->n_old_blocks);
+    ASSERT(countBlocks(gen->old_blocks) == gen->n_old_blocks);
 
     live = 0; // estimate of live data in this gen
     freed = 0;
     fragd = 0;
     blocks = 0;
     prev = NULL;
-    for (bd = step->old_blocks; bd != NULL; bd = next)
+    for (bd = gen->old_blocks; bd != NULL; bd = next)
     {
         next = bd->link;
 
@@ -52,9 +52,9 @@ sweep(step *step)
         if (resid == 0)
         {
             freed++;
-            step->n_old_blocks--;
+            gen->n_old_blocks--;
             if (prev == NULL) {
-                step->old_blocks = next;
+                gen->old_blocks = next;
             } else {
                 prev->link = next;
             }
@@ -70,15 +70,15 @@ sweep(step *step)
         }
     }
 
-    step->live_estimate = live;
+    gen->live_estimate = live;
 
     debugTrace(DEBUG_gc, "sweeping: %d blocks, %d were copied, %d freed (%d%%), %d are fragmented, live estimate: %ld%%",
-          step->n_old_blocks + freed,
-          step->n_old_blocks - blocks + freed,
+          gen->n_old_blocks + freed,
+          gen->n_old_blocks - blocks + freed,
           freed,
           blocks == 0 ? 0 : (freed * 100) / blocks,
           fragd, 
           (unsigned long)((blocks - freed) == 0 ? 0 : ((live / BLOCK_SIZE_W) * 100) / (blocks - freed)));
 
-    ASSERT(countBlocks(step->old_blocks) == step->n_old_blocks);
+    ASSERT(countBlocks(gen->old_blocks) == gen->n_old_blocks);
 }

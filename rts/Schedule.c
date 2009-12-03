@@ -1118,7 +1118,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    { 
 		bdescr *x;
 		for (x = bd; x < bd + blocks; x++) {
-                    initBdescr(x,cap->r.rNursery);
+                    initBdescr(x,g0,g0);
                     x->free = x->start;
 		    x->flags = 0;
 		}
@@ -1378,7 +1378,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     if (sched_state < SCHED_INTERRUPTING
         && RtsFlags.ParFlags.parGcEnabled
         && N >= RtsFlags.ParFlags.parGcGen
-        && ! oldest_gen->steps[0].mark)
+        && ! oldest_gen->mark)
     {
         gc_type = PENDING_GC_PAR;
     } else {
@@ -1580,7 +1580,7 @@ forkProcess(HsStablePtr *entry
     pid_t pid;
     StgTSO* t,*next;
     Capability *cap;
-    nat s;
+    nat g;
     
 #if defined(THREADED_RTS)
     if (RtsFlags.ParFlags.nNodes > 1) {
@@ -1628,8 +1628,8 @@ forkProcess(HsStablePtr *entry
 	// all Tasks, because they correspond to OS threads that are
 	// now gone.
 
-        for (s = 0; s < total_steps; s++) {
-          for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
+        for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+          for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
 	    if (t->what_next == ThreadRelocated) {
 		next = t->_link;
 	    } else {
@@ -1655,8 +1655,8 @@ forkProcess(HsStablePtr *entry
 
 	// Empty the threads lists.  Otherwise, the garbage
 	// collector may attempt to resurrect some of these threads.
-        for (s = 0; s < total_steps; s++) {
-            all_steps[s].threads = END_TSO_QUEUE;
+        for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+            generations[g].threads = END_TSO_QUEUE;
         }
 
 	// Wipe the task list, except the current Task.
@@ -1710,19 +1710,19 @@ deleteAllThreads ( Capability *cap )
     // NOTE: only safe to call if we own all capabilities.
 
     StgTSO* t, *next;
-    nat s;
+    nat g;
 
     debugTrace(DEBUG_sched,"deleting all threads");
-    for (s = 0; s < total_steps; s++) {
-      for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
-	if (t->what_next == ThreadRelocated) {
-	    next = t->_link;
-	} else {
-	    next = t->global_link;
-	    deleteThread(cap,t);
-	}
-      }
-    }      
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
+            if (t->what_next == ThreadRelocated) {
+                next = t->_link;
+            } else {
+                next = t->global_link;
+                deleteThread(cap,t);
+            }
+        }
+    }
 
     // The run queue now contains a bunch of ThreadKilled threads.  We
     // must not throw these away: the main thread(s) will be in there
@@ -2655,14 +2655,14 @@ resurrectThreads (StgTSO *threads)
 {
     StgTSO *tso, *next;
     Capability *cap;
-    step *step;
+    generation *gen;
 
     for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
 	next = tso->global_link;
 
-        step = Bdescr((P_)tso)->step;
-	tso->global_link = step->threads;
-	step->threads = tso;
+        gen = Bdescr((P_)tso)->gen;
+	tso->global_link = gen->threads;
+	gen->threads = tso;
 
 	debugTrace(DEBUG_sched, "resurrecting thread %lu", (unsigned long)tso->id);
 	
@@ -2719,7 +2719,7 @@ performPendingThrowTos (StgTSO *threads)
     StgTSO *tso, *next;
     Capability *cap;
     Task *task, *saved_task;;
-    step *step;
+    generation *gen;
 
     task = myTask();
     cap = task->cap;
@@ -2727,9 +2727,9 @@ performPendingThrowTos (StgTSO *threads)
     for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
 	next = tso->global_link;
 
-        step = Bdescr((P_)tso)->step;
-	tso->global_link = step->threads;
-	step->threads = tso;
+        gen = Bdescr((P_)tso)->gen;
+	tso->global_link = gen->threads;
+	gen->threads = tso;
 
 	debugTrace(DEBUG_sched, "performing blocked throwTo to thread %lu", (unsigned long)tso->id);
 	

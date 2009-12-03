@@ -53,24 +53,32 @@
  *
  * ------------------------------------------------------------------------- */
 
-typedef struct step_ {
-    unsigned int         no;		// step number in this generation
-    unsigned int         abs_no;	// absolute step number
+typedef struct nursery_ {
+    bdescr *       blocks;
+    unsigned int   n_blocks;
+} nursery;
 
-    struct generation_ * gen;		// generation this step belongs to
-    unsigned int         gen_no;        // generation number (cached)
+typedef struct generation_ {
+    unsigned int   no;			// generation number
 
-    bdescr *             blocks;	// blocks in this step
-    unsigned int         n_blocks;	// number of blocks
-    unsigned int         n_words;       // number of words
+    bdescr *       blocks;	        // blocks in this gen
+    unsigned int   n_blocks;	        // number of blocks
+    unsigned int   n_words;             // number of words
 
-    struct step_ *       to;		// destination step for live objects
+    bdescr *       large_objects;	// large objects (doubly linked)
+    unsigned int   n_large_blocks;      // no. of blocks used by large objs
 
-    bdescr *             large_objects;	 // large objects (doubly linked)
-    unsigned int         n_large_blocks; // no. of blocks used by large objs
-
-    StgTSO *             threads;       // threads in this step
+    unsigned int   max_blocks;		// max blocks
+    bdescr        *mut_list;      	// mut objects in this gen (not G0)
+    
+    StgTSO *       threads;             // threads in this gen
                                         // linked via global_link
+    struct generation_ *to;		// destination gen for live objects
+
+    // stats information
+    unsigned int collections;
+    unsigned int par_collections;
+    unsigned int failed_promotions;
 
     // ------------------------------------
     // Fields below are used during GC only
@@ -85,13 +93,15 @@ typedef struct step_ {
     int          mark;			// mark (not copy)? (old gen only)
     int          compact;		// compact (not sweep)? (old gen only)
 
-    // During GC, if we are collecting this step, blocks and n_blocks
+    // During GC, if we are collecting this gen, blocks and n_blocks
     // are copied into the following two fields.  After GC, these blocks
     // are freed.
     bdescr *     old_blocks;	        // bdescr of first from-space block
     unsigned int n_old_blocks;		// number of blocks in from-space
     unsigned int live_estimate;         // for sweeping: estimate of live data
     
+    bdescr *     saved_mut_list;
+
     bdescr *     part_blocks;           // partially-full scanned blocks
     unsigned int n_part_blocks;         // count of above
 
@@ -101,32 +111,11 @@ typedef struct step_ {
     bdescr *     bitmap;  		// bitmap for compacting collection
 
     StgTSO *     old_threads;
-
-} step;
-
-
-typedef struct generation_ {
-    unsigned int   no;			// generation number
-    step *         steps;		// steps
-    unsigned int   n_steps;		// number of steps
-    unsigned int   max_blocks;		// max blocks in step 0
-    bdescr        *mut_list;      	// mut objects in this gen (not G0)
-    
-    // stats information
-    unsigned int collections;
-    unsigned int par_collections;
-    unsigned int failed_promotions;
-
-    // temporary use during GC:
-    bdescr        *saved_mut_list;
 } generation;
 
 extern generation * generations;
-
 extern generation * g0;
 extern generation * oldest_gen;
-extern step * all_steps;
-extern nat total_steps;
 
 /* -----------------------------------------------------------------------------
    Generic allocation
@@ -194,11 +183,11 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
 /* (needed when dynamic libraries are used). */
 extern rtsBool keepCAFs;
 
-INLINE_HEADER void initBdescr(bdescr *bd, step *step)
+INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->step   = step;
-    bd->gen_no = step->gen_no;
-    bd->dest   = step->to;
+    bd->gen    = gen;
+    bd->gen_no = gen->no;
+    bd->dest   = dest;
 }
 
 #endif /* RTS_STORAGE_GC_H */

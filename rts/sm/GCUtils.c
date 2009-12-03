@@ -87,12 +87,12 @@ freeChain_sync(bdescr *bd)
    -------------------------------------------------------------------------- */
 
 bdescr *
-grab_local_todo_block (step_workspace *ws)
+grab_local_todo_block (gen_workspace *ws)
 {
     bdescr *bd;
-    step *stp;
+    generation *gen;
 
-    stp = ws->step;
+    gen = ws->gen;
 
     bd = ws->todo_overflow;
     if (bd != NULL)
@@ -115,7 +115,7 @@ grab_local_todo_block (step_workspace *ws)
 
 #if defined(THREADED_RTS)
 bdescr *
-steal_todo_block (nat s)
+steal_todo_block (nat g)
 {
     nat n;
     bdescr *bd;
@@ -123,7 +123,7 @@ steal_todo_block (nat s)
     // look for work to steal
     for (n = 0; n < n_gc_threads; n++) {
         if (n == gct->thread_index) continue;
-        bd = stealWSDeque(gc_threads[n]->steps[s].todo_q);
+        bd = stealWSDeque(gc_threads[n]->gens[g].todo_q);
         if (bd) {
             return bd;
         }
@@ -133,11 +133,11 @@ steal_todo_block (nat s)
 #endif
 
 void
-push_scanned_block (bdescr *bd, step_workspace *ws)
+push_scanned_block (bdescr *bd, gen_workspace *ws)
 {
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
-    ASSERT(bd->step == ws->step);
+    ASSERT(bd->gen == ws->gen);
     ASSERT(bd->u.scan == bd->free);
 
     if (bd->start + bd->blocks * BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
@@ -161,7 +161,7 @@ push_scanned_block (bdescr *bd, step_workspace *ws)
 }
 
 StgPtr
-todo_block_full (nat size, step_workspace *ws)
+todo_block_full (nat size, gen_workspace *ws)
 {
     StgPtr p;
     bdescr *bd;
@@ -174,7 +174,7 @@ todo_block_full (nat size, step_workspace *ws)
 
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
-    ASSERT(bd->step == ws->step);
+    ASSERT(bd->gen == ws->gen);
 
     // If the global list is not empty, or there's not much work in
     // this block to push, and there's enough room in
@@ -213,11 +213,11 @@ todo_block_full (nat size, step_workspace *ws)
         // Otherwise, push this block out to the global list.
         else 
         {
-            step *stp;
-            stp = ws->step;
+            generation *gen;
+            gen = ws->gen;
             debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld", 
                   bd->start, (unsigned long)(bd->free - bd->u.scan),
-                  stp->abs_no, dequeElements(ws->todo_q));
+                  gen->no, dequeElements(ws->todo_q));
 
             if (!pushWSDeque(ws->todo_q, bd)) {
                 bd->link = ws->todo_overflow;
@@ -239,7 +239,7 @@ todo_block_full (nat size, step_workspace *ws)
 }
 
 StgPtr
-alloc_todo_block (step_workspace *ws, nat size)
+alloc_todo_block (gen_workspace *ws, nat size)
 {
     bdescr *bd/*, *hd, *tl */;
 
@@ -270,7 +270,7 @@ alloc_todo_block (step_workspace *ws, nat size)
         } else {
             bd = allocBlock_sync();
         }
-        initBdescr(bd, ws->step);
+        initBdescr(bd, ws->gen, ws->gen->to);
         bd->flags = BF_EVACUATED;
         bd->u.scan = bd->free = bd->start;
     }
@@ -282,8 +282,8 @@ alloc_todo_block (step_workspace *ws, nat size)
     ws->todo_lim  = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
                             bd->free + stg_max(WORK_UNIT_WORDS,size));
 
-    debugTrace(DEBUG_gc, "alloc new todo block %p for step %d", 
-               bd->free, ws->step->abs_no);
+    debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d", 
+               bd->free, ws->gen->no);
 
     return ws->todo_free;
 }

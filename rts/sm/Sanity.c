@@ -569,10 +569,10 @@ void
 checkGlobalTSOList (rtsBool checkTSOs)
 {
   StgTSO *tso;
-  nat s;
+  nat g;
 
-  for (s = 0; s < total_steps; s++) {
-      for (tso=all_steps[s].threads; tso != END_TSO_QUEUE; 
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (tso=generations[g].threads; tso != END_TSO_QUEUE; 
            tso = tso->global_link) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
           ASSERT(get_itbl(tso)->type == TSO);
@@ -673,20 +673,19 @@ checkStaticObjects ( StgClosure* static_objects )
 
 /* Nursery sanity check */
 void
-checkNurserySanity( step *stp )
+checkNurserySanity (nursery *nursery)
 {
     bdescr *bd, *prev;
     nat blocks = 0;
 
     prev = NULL;
-    for (bd = stp->blocks; bd != NULL; bd = bd->link) {
+    for (bd = nursery->blocks; bd != NULL; bd = bd->link) {
 	ASSERT(bd->u.back == prev);
 	prev = bd;
 	blocks += bd->blocks;
     }
 
-    ASSERT(blocks == stp->n_blocks);
-    ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
+    ASSERT(blocks == nursery->n_blocks);
 }
 
 
@@ -694,26 +693,21 @@ checkNurserySanity( step *stp )
 void
 checkSanity( rtsBool check_heap )
 {
-    nat g, s;
+    nat g, n;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (s = 0; s < generations[g].n_steps; s++) {
-            if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-                continue;
-            }
-            ASSERT(countBlocks(generations[g].steps[s].blocks)
-                   == generations[g].steps[s].n_blocks);
-            ASSERT(countBlocks(generations[g].steps[s].large_objects)
-                   == generations[g].steps[s].n_large_blocks);
-            if (check_heap) {
-                checkHeap(generations[g].steps[s].blocks);
-            }
-            checkLargeObjects(generations[g].steps[s].large_objects);
+        ASSERT(countBlocks(generations[g].blocks)
+               == generations[g].n_blocks);
+        ASSERT(countBlocks(generations[g].large_objects)
+                   == generations[g].n_large_blocks);
+        if (check_heap) {
+            checkHeap(generations[g].blocks);
         }
+        checkLargeObjects(generations[g].large_objects);
     }
     
-    for (s = 0; s < n_capabilities; s++) {
-        checkNurserySanity(&nurseries[s]);
+    for (n = 0; n < n_capabilities; n++) {
+        checkNurserySanity(&nurseries[n]);
     }
     
     checkFreeListSanity();
@@ -741,21 +735,18 @@ checkSanity( rtsBool check_heap )
 static void
 findMemoryLeak (void)
 {
-  nat g, s, i;
+  nat g, i;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (i = 0; i < n_capabilities; i++) {
 	  markBlocks(capabilities[i].mut_lists[g]);
       }
       markBlocks(generations[g].mut_list);
-      for (s = 0; s < generations[g].n_steps; s++) {
-	  markBlocks(generations[g].steps[s].blocks);
-	  markBlocks(generations[g].steps[s].large_objects);
-      }
+      markBlocks(generations[g].blocks);
+      markBlocks(generations[g].large_objects);
   }
 
   for (i = 0; i < n_capabilities; i++) {
       markBlocks(nurseries[i].blocks);
-      markBlocks(nurseries[i].large_objects);
   }
 
 #ifdef PROFILING
@@ -800,19 +791,18 @@ void findSlop(bdescr *bd)
 }
 
 static lnat
-stepBlocks (step *stp)
+genBlocks (generation *gen)
 {
-    ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
-    ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
-    return stp->n_blocks + stp->n_old_blocks + 
-	    countAllocdBlocks(stp->large_objects);
+    ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
+    return gen->n_blocks + gen->n_old_blocks + 
+	    countAllocdBlocks(gen->large_objects);
 }
 
 void
 memInventory (rtsBool show)
 {
-  nat g, s, i;
-  step *stp;
+  nat g, i;
   lnat gen_blocks[RtsFlags.GcFlags.generations];
   lnat nursery_blocks, retainer_blocks,
        arena_blocks, exec_blocks;
@@ -827,15 +817,13 @@ memInventory (rtsBool show)
 	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
       }	  
       gen_blocks[g] += countAllocdBlocks(generations[g].mut_list);
-      for (s = 0; s < generations[g].n_steps; s++) {
-	  stp = &generations[g].steps[s];
-	  gen_blocks[g] += stepBlocks(stp);
-      }
+      gen_blocks[g] += genBlocks(&generations[g]);
   }
 
   nursery_blocks = 0;
   for (i = 0; i < n_capabilities; i++) {
-      nursery_blocks += stepBlocks(&nurseries[i]);
+      ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
+      nursery_blocks += nurseries[i].n_blocks;
   }
 
   retainer_blocks = 0;

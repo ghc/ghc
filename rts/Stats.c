@@ -701,14 +701,12 @@ stat_exit(int alloc)
 #endif
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
             {
-                nat g, s;
+                nat g;
                 
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
                 statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                    for (s = 0; s < generations[g].n_steps; s++) {
-                        statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);
-                    }
+                    statsPrintf("gen[%d].sync_large_objects: %"FMT_Word64"\n", g, generations[g].sync_large_objects.spin);
                 }
             }
 #endif
@@ -769,17 +767,17 @@ stat_exit(int alloc)
 void
 statDescribeGens(void)
 {
-  nat g, s, mut, lge;
+  nat g, mut, lge;
   lnat live, slop;
   lnat tot_live, tot_slop;
   bdescr *bd;
-  step *step;
-
+  generation *gen;
+  
   debugBelch(
-"-----------------------------------------------------------------\n"
-"  Gen     Max  Mut-list  Step   Blocks    Large     Live     Slop\n"
-"       Blocks     Bytes                 Objects                  \n"
-"-----------------------------------------------------------------\n");
+"----------------------------------------------------------\n"
+"  Gen     Max  Mut-list  Blocks    Large     Live     Slop\n"
+"       Blocks     Bytes          Objects                  \n"
+"----------------------------------------------------------\n");
 
   tot_live = 0;
   tot_slop = 0;
@@ -789,27 +787,23 @@ statDescribeGens(void)
 	  mut += (bd->free - bd->start) * sizeof(W_);
       }
 
-    debugBelch("%5d %7d %9d", g, generations[g].max_blocks, mut);
+      gen = &generations[g];
 
-    for (s = 0; s < generations[g].n_steps; s++) {
-      step = &generations[g].steps[s];
-      for (bd = step->large_objects, lge = 0; bd; bd = bd->link) {
-	lge++;
+      debugBelch("%5d %7d %9d", g, gen->max_blocks, mut);
+
+      for (bd = gen->large_objects, lge = 0; bd; bd = bd->link) {
+          lge++;
       }
-      live = step->n_words + countOccupied(step->large_objects);
-      if (s != 0) {
-	debugBelch("%23s","");
-      }
-      slop = (step->n_blocks + step->n_large_blocks) * BLOCK_SIZE_W - live;
-      debugBelch("%6d %8d %8d %8ld %8ld\n", s, step->n_blocks, lge,
+      live = gen->n_words + countOccupied(gen->large_objects);
+      slop = (gen->n_blocks + gen->n_large_blocks) * BLOCK_SIZE_W - live;
+      debugBelch("%8d %8d %8ld %8ld\n", gen->n_blocks, lge,
                  live*sizeof(W_), slop*sizeof(W_));
       tot_live += live;
       tot_slop += slop;
-    }
   }
-  debugBelch("-----------------------------------------------------------------\n");
-  debugBelch("%48s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));
-  debugBelch("-----------------------------------------------------------------\n");
+  debugBelch("----------------------------------------------------------\n");
+  debugBelch("%41s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));
+  debugBelch("----------------------------------------------------------\n");
   debugBelch("\n");
 }
 

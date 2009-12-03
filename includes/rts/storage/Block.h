@@ -57,8 +57,8 @@ typedef struct bdescr_ {
         StgPtr  scan;           /* scan pointer for copying GC */
     } u;
 
-    struct step_ *step;		/* step */
-    struct step_ *dest;		/* destination step */
+    struct generation_ *gen;   /* generation */
+    struct generation_ *dest;  /* destination gen */
 
     StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
 

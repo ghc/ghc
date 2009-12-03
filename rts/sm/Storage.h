@@ -29,7 +29,7 @@ INLINE_HEADER rtsBool
 doYouWantToGC( Capability *cap )
 {
   return (cap->r.rCurrentNursery->link == NULL ||
-          cap->r.rNursery->n_large_blocks >= alloc_blocks_lim);
+          g0->n_large_blocks >= alloc_blocks_lim);
 }
 
 /* for splitting blocks groups in two */
@@ -121,7 +121,7 @@ void dirty_MVAR(StgRegTable *reg, StgClosure *p);
    Nursery manipulation
    -------------------------------------------------------------------------- */
 
-extern step *nurseries;
+extern nursery *nurseries;
 
 void     resetNurseries       ( void );
 void     resizeNurseries      ( nat blocks );

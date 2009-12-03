@@ -1067,7 +1067,7 @@ heapCensusChain( Census *census, bdescr *bd )
 void
 heapCensus( void )
 {
-  nat g, s;
+  nat g;
   Census *census;
 
   census = &censuses[era];
@@ -1085,17 +1085,11 @@ heapCensus( void )
 #endif
 
   // Traverse the heap, collecting the census info
-  if (RtsFlags.GcFlags.generations == 1) {
-      heapCensusChain( census, g0->steps[0].blocks );
-  } else {
-      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	  for (s = 0; s < generations[g].n_steps; s++) {
-	      heapCensusChain( census, generations[g].steps[s].blocks );
-	      // Are we interested in large objects?  might be
-	      // confusing to include the stack in a heap profile.
-	      heapCensusChain( census, generations[g].steps[s].large_objects );
-	  }
-      }
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      heapCensusChain( census, generations[g].blocks );
+      // Are we interested in large objects?  might be
+      // confusing to include the stack in a heap profile.
+      heapCensusChain( census, generations[g].large_objects );
   }
 
   // dump out the census info

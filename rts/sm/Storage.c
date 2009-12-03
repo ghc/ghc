@@ -49,12 +49,9 @@ generation *generations = NULL;	/* all the generations */
 generation *g0		= NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 
-nat total_steps         = 0;
-step *all_steps         = NULL; /* single array of steps */
-
 ullong total_allocated = 0;	/* total memory allocated during run */
 
-step *nurseries         = NULL; /* array of nurseries, size == n_capabilities */
+nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
 
 #ifdef THREADED_RTS
 /*
@@ -67,37 +64,38 @@ Mutex sm_mutex;
 static void allocNurseries ( void );
 
 static void
-initStep (step *stp, int g, int s)
+initGeneration (generation *gen, int g)
 {
-    stp->no = s;
-    stp->abs_no = RtsFlags.GcFlags.steps * g + s;
-    stp->blocks = NULL;
-    stp->n_blocks = 0;
-    stp->n_words = 0;
-    stp->live_estimate = 0;
-    stp->old_blocks = NULL;
-    stp->n_old_blocks = 0;
-    stp->gen = &generations[g];
-    stp->gen_no = g;
-    stp->large_objects = NULL;
-    stp->n_large_blocks = 0;
-    stp->scavenged_large_objects = NULL;
-    stp->n_scavenged_large_blocks = 0;
-    stp->mark = 0;
-    stp->compact = 0;
-    stp->bitmap = NULL;
+    gen->no = g;
+    gen->collections = 0;
+    gen->par_collections = 0;
+    gen->failed_promotions = 0;
+    gen->max_blocks = 0;
+    gen->blocks = NULL;
+    gen->n_blocks = 0;
+    gen->n_words = 0;
+    gen->live_estimate = 0;
+    gen->old_blocks = NULL;
+    gen->n_old_blocks = 0;
+    gen->large_objects = NULL;
+    gen->n_large_blocks = 0;
+    gen->mut_list = allocBlock();
+    gen->scavenged_large_objects = NULL;
+    gen->n_scavenged_large_blocks = 0;
+    gen->mark = 0;
+    gen->compact = 0;
+    gen->bitmap = NULL;
 #ifdef THREADED_RTS
-    initSpinLock(&stp->sync_large_objects);
+    initSpinLock(&gen->sync_large_objects);
 #endif
-    stp->threads = END_TSO_QUEUE;
-    stp->old_threads = END_TSO_QUEUE;
+    gen->threads = END_TSO_QUEUE;
+    gen->old_threads = END_TSO_QUEUE;
 }
 
 void
 initStorage( void )
 {
-  nat g, s;
-  generation *gen;
+  nat g;
 
   if (generations != NULL) {
       // multi-init protection
@@ -142,83 +140,30 @@ initStorage( void )
 
   /* Initialise all generations */
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    gen = &generations[g];
-    gen->no = g;
-    gen->mut_list = allocBlock();
-    gen->collections = 0;
-    gen->par_collections = 0;
-    gen->failed_promotions = 0;
-    gen->max_blocks = 0;
+      initGeneration(&generations[g], g);
   }
 
   /* A couple of convenience pointers */
   g0 = &generations[0];
   oldest_gen = &generations[RtsFlags.GcFlags.generations-1];
 
-  /* allocate all the steps into an array.  It is important that we do
-     it this way, because we need the invariant that two step pointers
-     can be directly compared to see which is the oldest.
-     Remember that the last generation has only one step. */
-  total_steps = 1 + (RtsFlags.GcFlags.generations - 1) * RtsFlags.GcFlags.steps;
-  all_steps   = stgMallocBytes(total_steps * sizeof(struct step_),
-                               "initStorage: steps");
-
-  /* Allocate step structures in each generation */
-  if (RtsFlags.GcFlags.generations > 1) {
-    /* Only for multiple-generations */
-
-    /* Oldest generation: one step */
-    oldest_gen->n_steps = 1;
-    oldest_gen->steps   = all_steps + (RtsFlags.GcFlags.generations - 1)
-	                              * RtsFlags.GcFlags.steps;
-
-    /* set up all except the oldest generation with 2 steps */
-    for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
-      generations[g].n_steps = RtsFlags.GcFlags.steps;
-      generations[g].steps   = all_steps + g * RtsFlags.GcFlags.steps;
-    }
-    
-  } else {
-    /* single generation, i.e. a two-space collector */
-    g0->n_steps = 1;
-    g0->steps   = all_steps;
-  }
-
-  nurseries = stgMallocBytes (n_capabilities * sizeof(struct step_),
-			      "initStorage: nurseries");
-
-  /* Initialise all steps */
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-	initStep(&generations[g].steps[s], g, s);
-    }
-  }
-  
-  for (s = 0; s < n_capabilities; s++) {
-      initStep(&nurseries[s], 0, s);
-  }
+  nurseries = stgMallocBytes(n_capabilities * sizeof(struct nursery_),
+                             "initStorage: nurseries");
   
   /* Set up the destination pointers in each younger gen. step */
   for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
-    for (s = 0; s < generations[g].n_steps-1; s++) {
-      generations[g].steps[s].to = &generations[g].steps[s+1];
-    }
-    generations[g].steps[s].to = &generations[g+1].steps[0];
+      generations[g].to = &generations[g+1];
   }
-  oldest_gen->steps[0].to = &oldest_gen->steps[0];
-  
-  for (s = 0; s < n_capabilities; s++) {
-      nurseries[s].to = generations[0].steps[0].to;
-  }
+  oldest_gen->to = oldest_gen;
   
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
       if (RtsFlags.GcFlags.generations == 1) {
 	  errorBelch("WARNING: compact/sweep is incompatible with -G1; disabled");
       } else {
-	  oldest_gen->steps[0].mark = 1;
+	  oldest_gen->mark = 1;
           if (RtsFlags.GcFlags.compact)
-              oldest_gen->steps[0].compact = 1;
+              oldest_gen->compact = 1;
       }
   }
 
@@ -264,7 +209,6 @@ exitStorage (void)
 void
 freeStorage (void)
 {
-    stgFree(all_steps); // frees all the steps
     stgFree(generations);
     freeAllMBlocks();
 #if defined(THREADED_RTS)
@@ -380,7 +324,7 @@ newDynCAF(StgClosure *caf)
    -------------------------------------------------------------------------- */
 
 static bdescr *
-allocNursery (step *stp, bdescr *tail, nat blocks)
+allocNursery (bdescr *tail, nat blocks)
 {
     bdescr *bd;
     nat i;
@@ -401,7 +345,7 @@ allocNursery (step *stp, bdescr *tail, nat blocks)
 	if (tail != NULL) {
 	    tail->u.back = bd;
 	}
-        initBdescr(bd, stp);
+        initBdescr(bd, g0, g0);
 	bd->flags = 0;
 	bd->free = bd->start;
 	tail = bd;
@@ -429,11 +373,9 @@ allocNurseries( void )
 
     for (i = 0; i < n_capabilities; i++) {
 	nurseries[i].blocks = 
-	    allocNursery(&nurseries[i], NULL, 
-			 RtsFlags.GcFlags.minAllocAreaSize);
-	nurseries[i].n_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
-	nurseries[i].old_blocks   = NULL;
-	nurseries[i].n_old_blocks = 0;
+            allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
+	nurseries[i].n_blocks =
+            RtsFlags.GcFlags.minAllocAreaSize;
     }
     assignNurseriesToCapabilities();
 }
@@ -443,20 +385,14 @@ resetNurseries( void )
 {
     nat i;
     bdescr *bd;
-    step *stp;
 
     for (i = 0; i < n_capabilities; i++) {
-	stp = &nurseries[i];
-	for (bd = stp->blocks; bd; bd = bd->link) {
+	for (bd = nurseries[i].blocks; bd; bd = bd->link) {
 	    bd->free = bd->start;
 	    ASSERT(bd->gen_no == 0);
-	    ASSERT(bd->step == stp);
+	    ASSERT(bd->gen == g0);
 	    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
 	}
-        // these large objects are dead, since we have just GC'd
-        freeChain(stp->large_objects);
-        stp->large_objects = NULL;
-        stp->n_large_blocks = 0;
     }
     assignNurseriesToCapabilities();
 }
@@ -469,24 +405,23 @@ countNurseryBlocks (void)
 
     for (i = 0; i < n_capabilities; i++) {
 	blocks += nurseries[i].n_blocks;
-        blocks += nurseries[i].n_large_blocks;
     }
     return blocks;
 }
 
 static void
-resizeNursery ( step *stp, nat blocks )
+resizeNursery ( nursery *nursery, nat blocks )
 {
   bdescr *bd;
   nat nursery_blocks;
 
-  nursery_blocks = stp->n_blocks;
+  nursery_blocks = nursery->n_blocks;
   if (nursery_blocks == blocks) return;
 
   if (nursery_blocks < blocks) {
       debugTrace(DEBUG_gc, "increasing size of nursery to %d blocks", 
 		 blocks);
-    stp->blocks = allocNursery(stp, stp->blocks, blocks-nursery_blocks);
+    nursery->blocks = allocNursery(nursery->blocks, blocks-nursery_blocks);
   } 
   else {
     bdescr *next_bd;
@@ -494,7 +429,7 @@ resizeNursery ( step *stp, nat blocks )
     debugTrace(DEBUG_gc, "decreasing size of nursery to %d blocks", 
 	       blocks);
 
-    bd = stp->blocks;
+    bd = nursery->blocks;
     while (nursery_blocks > blocks) {
 	next_bd = bd->link;
 	next_bd->u.back = NULL;
@@ -502,16 +437,16 @@ resizeNursery ( step *stp, nat blocks )
 	freeGroup(bd);
 	bd = next_bd;
     }
-    stp->blocks = bd;
+    nursery->blocks = bd;
     // might have gone just under, by freeing a large block, so make
     // up the difference.
     if (nursery_blocks < blocks) {
-	stp->blocks = allocNursery(stp, stp->blocks, blocks-nursery_blocks);
+	nursery->blocks = allocNursery(nursery->blocks, blocks-nursery_blocks);
     }
   }
   
-  stp->n_blocks = blocks;
-  ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
+  nursery->n_blocks = blocks;
+  ASSERT(countBlocks(nursery->blocks) == nursery->n_blocks);
 }
 
 // 
@@ -566,26 +501,26 @@ splitLargeBlock (bdescr *bd, nat blocks)
 
     ACQUIRE_SM_LOCK;
 
-    ASSERT(countBlocks(bd->step->large_objects) == bd->step->n_large_blocks);
+    ASSERT(countBlocks(bd->gen->large_objects) == bd->gen->n_large_blocks);
 
     // subtract the original number of blocks from the counter first
-    bd->step->n_large_blocks -= bd->blocks;
+    bd->gen->n_large_blocks -= bd->blocks;
 
     new_bd = splitBlockGroup (bd, blocks);
-    initBdescr(new_bd, bd->step);
+    initBdescr(new_bd, bd->gen, bd->gen->to);
     new_bd->flags   = BF_LARGE | (bd->flags & BF_EVACUATED); 
     // if new_bd is in an old generation, we have to set BF_EVACUATED
     new_bd->free    = bd->free;
-    dbl_link_onto(new_bd, &bd->step->large_objects);
+    dbl_link_onto(new_bd, &bd->gen->large_objects);
 
     ASSERT(new_bd->free <= new_bd->start + new_bd->blocks * BLOCK_SIZE_W);
 
     // add the new number of blocks to the counter.  Due to the gaps
     // for block descriptors, new_bd->blocks + bd->blocks might not be
     // equal to the original bd->blocks, which is why we do it this way.
-    bd->step->n_large_blocks += bd->blocks + new_bd->blocks;
+    bd->gen->n_large_blocks += bd->blocks + new_bd->blocks;
 
-    ASSERT(countBlocks(bd->step->large_objects) == bd->step->n_large_blocks);
+    ASSERT(countBlocks(bd->gen->large_objects) == bd->gen->n_large_blocks);
 
     RELEASE_SM_LOCK;
 
@@ -610,7 +545,6 @@ allocate (Capability *cap, lnat n)
 {
     bdescr *bd;
     StgPtr p;
-    step *stp;
 
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
 	lnat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
@@ -629,14 +563,12 @@ allocate (Capability *cap, lnat n)
 	    stg_exit(EXIT_HEAPOVERFLOW);
         }
 
-        stp = &nurseries[cap->no];
-
         ACQUIRE_SM_LOCK
 	bd = allocGroup(req_blocks);
+	dbl_link_onto(bd, &g0->large_objects);
+	g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
         RELEASE_SM_LOCK;
-	dbl_link_onto(bd, &stp->large_objects);
-	stp->n_large_blocks += bd->blocks; // might be larger than req_blocks
-        initBdescr(bd, stp);
+        initBdescr(bd, g0, g0);
 	bd->flags = BF_LARGE;
 	bd->free = bd->start + n;
 	return bd->start;
@@ -662,7 +594,7 @@ allocate (Capability *cap, lnat n)
             bd = allocBlock();
             cap->r.rNursery->n_blocks++;
             RELEASE_SM_LOCK;
-            initBdescr(bd, cap->r.rNursery);
+            initBdescr(bd, g0, g0);
             bd->flags = 0;
             // If we had to allocate a new block, then we'll GC
             // pretty quickly now, because MAYBE_GC() will
@@ -690,7 +622,7 @@ allocate (Capability *cap, lnat n)
 
    We allocate small pinned objects into a single block, allocating a
    new block when the current one overflows.  The block is chained
-   onto the large_object_list of generation 0 step 0.
+   onto the large_object_list of generation 0.
 
    NOTE: The GC can't in general handle pinned objects.  This
    interface is only safe to use for ByteArrays, which have no
@@ -713,7 +645,6 @@ allocatePinned (Capability *cap, lnat n)
 {
     StgPtr p;
     bdescr *bd;
-    step *stp;
 
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
@@ -731,13 +662,12 @@ allocatePinned (Capability *cap, lnat n)
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, allocate a new one.
     if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
-        ACQUIRE_SM_LOCK
+        ACQUIRE_SM_LOCK;
 	cap->pinned_object_block = bd = allocBlock();
-        RELEASE_SM_LOCK
-        stp = &nurseries[cap->no];
-	dbl_link_onto(bd, &stp->large_objects);
-	stp->n_large_blocks++;
-        initBdescr(bd, stp);
+	dbl_link_onto(bd, &g0->large_objects);
+	g0->n_large_blocks++;
+        RELEASE_SM_LOCK;
+        initBdescr(bd, g0, g0);
 	bd->flags  = BF_PINNED | BF_LARGE;
 	bd->free   = bd->start;
     }
@@ -861,30 +791,23 @@ calcAllocated( void )
 /* Approximate the amount of live data in the heap.  To be called just
  * after garbage collection (see GarbageCollect()).
  */
-lnat 
-calcLiveBlocks(void)
+lnat calcLiveBlocks (void)
 {
-  nat g, s;
+  nat g;
   lnat live = 0;
-  step *stp;
+  generation *gen;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
       /* approximate amount of live data (doesn't take into account slop
        * at end of each block).
        */
-      if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
-	  continue; 
-      }
-      stp = &generations[g].steps[s];
-      live += stp->n_large_blocks + stp->n_blocks;
-    }
+      gen = &generations[g];
+      live += gen->n_large_blocks + gen->n_blocks;
   }
   return live;
 }
 
-lnat
-countOccupied(bdescr *bd)
+lnat countOccupied (bdescr *bd)
 {
     lnat words;
 
@@ -898,20 +821,16 @@ countOccupied(bdescr *bd)
 
 // Return an accurate count of the live data in the heap, excluding
 // generation 0.
-lnat
-calcLiveWords(void)
+lnat calcLiveWords (void)
 {
-    nat g, s;
+    nat g;
     lnat live;
-    step *stp;
+    generation *gen;
     
     live = 0;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (s = 0; s < generations[g].n_steps; s++) {
-            if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) continue; 
-            stp = &generations[g].steps[s];
-            live += stp->n_words + countOccupied(stp->large_objects);
-        } 
+        gen = &generations[g];
+        live += gen->n_words + countOccupied(gen->large_objects);
     }
     return live;
 }
@@ -919,44 +838,39 @@ calcLiveWords(void)
 /* Approximate the number of blocks that will be needed at the next
  * garbage collection.
  *
- * Assume: all data currently live will remain live.  Steps that will
- * be collected next time will therefore need twice as many blocks
- * since all the data will be copied.
+ * Assume: all data currently live will remain live.  Generationss
+ * that will be collected next time will therefore need twice as many
+ * blocks since all the data will be copied.
  */
 extern lnat 
 calcNeeded(void)
 {
     lnat needed = 0;
-    nat g, s;
-    step *stp;
+    nat g;
+    generation *gen;
     
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	for (s = 0; s < generations[g].n_steps; s++) {
-	    if (g == 0 && s == 0) { continue; }
-	    stp = &generations[g].steps[s];
+        gen = &generations[g];
 
-            // we need at least this much space
-            needed += stp->n_blocks + stp->n_large_blocks;
-
-            // any additional space needed to collect this gen next time?
-	    if (g == 0 || // always collect gen 0
-                (generations[g].steps[0].n_blocks +
-                 generations[g].steps[0].n_large_blocks 
-                 > generations[g].max_blocks)) {
-                // we will collect this gen next time
-                if (stp->mark) {
-                    //  bitmap:
-                    needed += stp->n_blocks / BITS_IN(W_);
-                    //  mark stack:
-                    needed += stp->n_blocks / 100;
-                }
-                if (stp->compact) {
-                    continue; // no additional space needed for compaction
-                } else {
-                    needed += stp->n_blocks;
-                }
-	    }
-	}
+        // we need at least this much space
+        needed += gen->n_blocks + gen->n_large_blocks;
+        
+        // any additional space needed to collect this gen next time?
+        if (g == 0 || // always collect gen 0
+            (gen->n_blocks + gen->n_large_blocks > gen->max_blocks)) {
+            // we will collect this gen next time
+            if (gen->mark) {
+                //  bitmap:
+                needed += gen->n_blocks / BITS_IN(W_);
+                //  mark stack:
+                needed += gen->n_blocks / 100;
+            }
+            if (gen->compact) {
+                continue; // no additional space needed for compaction
+            } else {
+                needed += gen->n_blocks;
+            }
+        }
     }
     return needed;
 }

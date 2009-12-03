@@ -102,8 +102,8 @@ createThread(Capability *cap, nat size)
      */
     ACQUIRE_LOCK(&sched_mutex);
     tso->id = next_thread_id++;  // while we have the mutex
-    tso->global_link = cap->r.rNursery->threads;
-    cap->r.rNursery->threads = tso;
+    tso->global_link = g0->threads;
+    g0->threads = tso;
     RELEASE_LOCK(&sched_mutex);
     
     // ToDo: report the stack size in the event?
@@ -387,7 +387,7 @@ void
 printAllThreads(void)
 {
   StgTSO *t, *next;
-  nat i, s;
+  nat i, g;
   Capability *cap;
 
 # if defined(GRAN)
@@ -415,8 +415,8 @@ printAllThreads(void)
   }
 
   debugBelch("other threads:\n");
-  for (s = 0; s < total_steps; s++) {
-    for (t = all_steps[s].threads; t != END_TSO_QUEUE; t = next) {
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
       if (t->why_blocked != NotBlocked) {
 	  printThreadStatus(t);
       }

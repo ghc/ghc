@@ -249,8 +249,7 @@ main(int argc, char *argv[])
 
     struct_size(generation);
     struct_field(generation, mut_list);
-
-    struct_field(step, n_large_blocks);
+    struct_field(generation, n_large_blocks);
 
     struct_size(CostCentreStack);
     struct_field(CostCentreStack, ccsID);

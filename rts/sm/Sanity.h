@@ -22,7 +22,7 @@ BEGIN_RTS_PRIVATE
 
 /* debugging routines */
 void checkSanity        ( rtsBool check_heap );
-void checkNurserySanity ( step *stp );
+void checkNurserySanity ( nursery *nursery );
 void checkHeap          ( bdescr *bd );
 void checkHeapChunk     ( StgPtr start, StgPtr end );
 void checkLargeObjects  ( bdescr *bd );

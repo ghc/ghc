@@ -58,7 +58,7 @@ static void  initMBlock(void *mblock);
    The following fields are not used by the allocator:
      bd->flags
      bd->gen_no
-     bd->step
+     bd->gen
      bd->dest
 
   Exceptions: we don't maintain invariants for all the blocks within a
@@ -470,7 +470,7 @@ freeGroup(bdescr *p)
   ASSERT(p->free != (P_)-1);
 
   p->free = (void *)-1;  /* indicates that this block is free */
-  p->step = NULL;
+  p->gen = NULL;
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(sanity,memset(p->start, 0xaa, p->blocks * BLOCK_SIZE));

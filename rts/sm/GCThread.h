@@ -30,18 +30,18 @@ BEGIN_RTS_PRIVATE
    thread-local data.  We'll keep a pointer to this in a thread-local
    variable, or possibly in a register.
 
-   In the gc_thread structure is a step_workspace for each step.  The
-   primary purpose of the step_workspace is to hold evacuated objects;
+   In the gc_thread structure is a gen_workspace for each generation.  The
+   primary purpose of the gen_workspace is to hold evacuated objects;
    when an object is evacuated, it is copied to the "todo" block in
-   the thread's workspace for the appropriate step.  When the todo
-   block is full, it is pushed to the global step->todos list, which
+   the thread's workspace for the appropriate generation.  When the todo
+   block is full, it is pushed to the global gen->todos list, which
    is protected by a lock.  (in fact we intervene a one-place buffer
    here to reduce contention).
 
    A thread repeatedly grabs a block of work from one of the
-   step->todos lists, scavenges it, and keeps the scavenged block on
+   gen->todos lists, scavenges it, and keeps the scavenged block on
    its own ws->scavd_list (this is to avoid unnecessary contention
-   returning the completed buffers back to the step: we can just
+   returning the completed buffers back to the generation: we can just
    collect them all later).
 
    When there is no global work to do, we start scavenging the todo
@@ -57,7 +57,7 @@ BEGIN_RTS_PRIVATE
    scan_bd may still be the same as todo_bd, or it might be different:
    if enough objects were copied into this block that it filled up,
    then we will have allocated a new todo block, but *not* pushed the
-   old one to the step, because it is partially scanned.
+   old one to the generation, because it is partially scanned.
 
    The reason to leave scanning the todo blocks until last is that we
    want to deal with full blocks as far as possible.
@@ -65,17 +65,18 @@ BEGIN_RTS_PRIVATE
 
 
 /* -----------------------------------------------------------------------------
-   Step Workspace
+   Generation Workspace
   
-   A step workspace exists for each step for each GC thread. The GC
-   thread takes a block from the todos list of the step into the
-   scanbd and then scans it.  Objects referred to by those in the scan
-   block are copied into the todo or scavd blocks of the relevant step.
+   A generation workspace exists for each generation for each GC
+   thread. The GC thread takes a block from the todos list of the
+   generation into the scanbd and then scans it.  Objects referred to
+   by those in the scan block are copied into the todo or scavd blocks
+   of the relevant generation.
   
    ------------------------------------------------------------------------- */
 
-typedef struct step_workspace_ {
-    step * step;		// the step for this workspace 
+typedef struct gen_workspace_ {
+    generation * gen;		// the gen for this workspace 
     struct gc_thread_ * my_gct; // the gc_thread that contains this workspace
 
     // where objects to be scavenged go
@@ -100,17 +101,17 @@ typedef struct step_workspace_ {
 
     StgWord pad[3];
 
-} step_workspace ATTRIBUTE_ALIGNED(64);
-// align so that computing gct->steps[n] is a shift, not a multiply
+} gen_workspace ATTRIBUTE_ALIGNED(64);
+// align so that computing gct->gens[n] is a shift, not a multiply
 // fails if the size is <64, which is why we need the pad above
 
 /* ----------------------------------------------------------------------------
    GC thread object
 
-   Every GC thread has one of these. It contains all the step specific
-   workspaces and other GC thread local information. At some later
-   point it maybe useful to move this other into the TLS store of the
-   GC threads
+   Every GC thread has one of these. It contains all the generation
+   specific workspaces and other GC thread local information. At some
+   later point it maybe useful to move this other into the TLS store
+   of the GC threads
    ------------------------------------------------------------------------- */
 
 typedef struct gc_thread_ {
@@ -145,7 +146,7 @@ typedef struct gc_thread_ {
     // --------------------
     // evacuate flags
 
-    step *evac_step;               // Youngest generation that objects
+    generation *evac_gen;          // Youngest generation that objects
                                    // should be evacuated to in
                                    // evacuate().  (Logically an
                                    // argument to evacuate, but it's
@@ -184,7 +185,7 @@ typedef struct gc_thread_ {
     // the gc_thread pointer to a workspace using only pointer
     // arithmetic, no memory access.  This happens in the inner loop
     // of the GC, see Evac.c:alloc_for_copy().
-    step_workspace steps[];
+    gen_workspace gens[];
 } gc_thread;
 
 

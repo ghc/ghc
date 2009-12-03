@@ -943,7 +943,7 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 void
 findPtr(P_ p, int follow)
 {
-  nat s, g;
+  nat g;
   bdescr *bd;
 #if defined(__GNUC__)
   const int arr_size = 1024;
@@ -955,13 +955,11 @@ findPtr(P_ p, int follow)
   searched = 0;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (s = 0; s < generations[g].n_steps; s++) {
-	  bd = generations[g].steps[s].blocks;
-          i = findPtrBlocks(p,bd,arr,arr_size,i);
-	  bd = generations[g].steps[s].large_objects;
-          i = findPtrBlocks(p,bd,arr,arr_size,i);
-          if (i >= arr_size) return;
-      }
+      bd = generations[g].blocks;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      bd = generations[g].large_objects;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      if (i >= arr_size) return;
   }
   if (follow && i == 1) {
       debugBelch("-->\n");

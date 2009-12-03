@@ -80,10 +80,10 @@ typedef struct StgRegTable_ {
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
-  struct StgTSO_ *rCurrentTSO;
-  struct step_   *rNursery;
-  struct bdescr_ *rCurrentNursery; /* Hp/HpLim point into this block */
-  struct bdescr_ *rCurrentAlloc;   /* for allocation using allocate() */
+  struct StgTSO_ *     rCurrentTSO;
+  struct nursery_ *    rNursery;
+  struct bdescr_ *     rCurrentNursery; /* Hp/HpLim point into this block */
+  struct bdescr_ *     rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
   StgWord         rRet;  // holds the return code of the thread
 } StgRegTable;

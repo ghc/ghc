@@ -83,8 +83,8 @@ StgTSO *resurrected_threads;
 // List of blocked threads found to have pending throwTos
 StgTSO *exception_threads;
 
-static void resurrectUnreachableThreads (step *stp);
-static rtsBool tidyThreadList (step *stp);
+static void resurrectUnreachableThreads (generation *gen);
+static rtsBool tidyThreadList (generation *gen);
 
 void
 initWeakForGC(void)
@@ -113,7 +113,7 @@ traverseWeakPtrList(void)
       /* doesn't matter where we evacuate values/finalizers to, since
        * these pointers are treated as roots (iff the keys are alive).
        */
-      gct->evac_step = 0;
+      gct->evac_gen = 0;
       
       last_w = &old_weak_ptr_list;
       for (w = old_weak_ptr_list; w != NULL; w = next_w) {
@@ -191,19 +191,18 @@ traverseWeakPtrList(void)
        * become garbage, we wake them up and administer an exception.
        */
   {
-      nat g, s, n;
+      nat g;
 	  
       // Traverse thread lists for generations we collected...
-      for (n = 0; n < n_capabilities; n++) {
-          if (tidyThreadList(&nurseries[n])) {
-              flag = rtsTrue;
-          }
-      }              
+//      ToDo when we have one gen per capability:
+//      for (n = 0; n < n_capabilities; n++) {
+//          if (tidyThreadList(&nurseries[n])) {
+//              flag = rtsTrue;
+//          }
+//      }              
       for (g = 0; g <= N; g++) {
-          for (s = 0; s < generations[g].n_steps; s++) {
-              if (tidyThreadList(&generations[g].steps[s])) {
-                  flag = rtsTrue;
-              }
+          if (tidyThreadList(&generations[g])) {
+              flag = rtsTrue;
           }
       }
 
@@ -214,15 +213,9 @@ traverseWeakPtrList(void)
       /* And resurrect any threads which were about to become garbage.
        */
       {
-          nat g, s, n;
-
-          for (n = 0; n < n_capabilities; n++) {
-              resurrectUnreachableThreads(&nurseries[n]);
-          }              
+          nat g;
           for (g = 0; g <= N; g++) {
-              for (s = 0; s < generations[g].n_steps; s++) {
-                  resurrectUnreachableThreads(&generations[g].steps[s]);
-              }
+              resurrectUnreachableThreads(&generations[g]);
           }
       }
         
@@ -251,11 +244,11 @@ traverseWeakPtrList(void)
   }
 }
   
-  static void resurrectUnreachableThreads (step *stp)
+  static void resurrectUnreachableThreads (generation *gen)
 {
     StgTSO *t, *tmp, *next;
 
-    for (t = stp->old_threads; t != END_TSO_QUEUE; t = next) {
+    for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
         next = t->global_link;
         
         // ThreadFinished and ThreadComplete: we have to keep
@@ -275,14 +268,14 @@ traverseWeakPtrList(void)
     }
 }
 
-static rtsBool tidyThreadList (step *stp)
+static rtsBool tidyThreadList (generation *gen)
 {
     StgTSO *t, *tmp, *next, **prev;
     rtsBool flag = rtsFalse;
 
-    prev = &stp->old_threads;
+    prev = &gen->old_threads;
 
-    for (t = stp->old_threads; t != END_TSO_QUEUE; t = next) {
+    for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
 	      
         tmp = (StgTSO *)isAlive((StgClosure *)t);
 	
@@ -339,10 +332,10 @@ static rtsBool tidyThreadList (step *stp)
             *prev = next;
             
             // move this thread onto the correct threads list.
-            step *new_step;
-            new_step = Bdescr((P_)t)->step;
-            t->global_link = new_step->threads;
-            new_step->threads  = t;
+            generation *new_gen;
+            new_gen = Bdescr((P_)t)->gen;
+            t->global_link = new_gen->threads;
+            new_gen->threads  = t;
         }
     }
 

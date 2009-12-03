@@ -875,7 +875,7 @@ update_fwd_compact( bdescr *blocks )
 }
 
 static nat
-update_bkwd_compact( step *stp )
+update_bkwd_compact( generation *gen )
 {
     StgPtr p, free;
 #if 0
@@ -886,7 +886,7 @@ update_bkwd_compact( step *stp )
     nat size, free_blocks;
     StgWord iptr;
 
-    bd = free_bd = stp->old_blocks;
+    bd = free_bd = gen->old_blocks;
     free = free_bd->start;
     free_blocks = 1;
 
@@ -965,8 +965,8 @@ update_bkwd_compact( step *stp )
 void
 compact(StgClosure *static_objects)
 {
-    nat g, s, blocks;
-    step *stp;
+    nat g, blocks;
+    generation *gen;
 
     // 1. thread the roots
     markCapabilities((evac_fn)thread_root, NULL);
@@ -1000,8 +1000,8 @@ compact(StgClosure *static_objects)
     }
 
     // the global thread list
-    for (s = 0; s < total_steps; s++) {
-        thread((void *)&all_steps[s].threads);
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        thread((void *)&generations[g].threads);
     }
 
     // any threads resurrected during this GC
@@ -1031,30 +1031,24 @@ compact(StgClosure *static_objects)
 
     // 2. update forward ptrs
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	for (s = 0; s < generations[g].n_steps; s++) {
-	    if (g==0 && s ==0) continue;
-	    stp = &generations[g].steps[s];
-	    debugTrace(DEBUG_gc, "update_fwd:  %d.%d", 
-		       stp->gen->no, stp->no);
+        gen = &generations[g];
+        debugTrace(DEBUG_gc, "update_fwd:  %d", g);
 
-	    update_fwd(stp->blocks);
-	    update_fwd_large(stp->scavenged_large_objects);
-	    if (g == RtsFlags.GcFlags.generations-1 && stp->old_blocks != NULL) {
-		debugTrace(DEBUG_gc, "update_fwd:  %d.%d (compact)",
-			   stp->gen->no, stp->no);
-		update_fwd_compact(stp->old_blocks);
-	    }
+        update_fwd(gen->blocks);
+        update_fwd_large(gen->scavenged_large_objects);
+        if (g == RtsFlags.GcFlags.generations-1 && gen->old_blocks != NULL) {
+            debugTrace(DEBUG_gc, "update_fwd:  %d (compact)", g);
+            update_fwd_compact(gen->old_blocks);
 	}
     }
 
     // 3. update backward ptrs
-    stp = &oldest_gen->steps[0];
-    if (stp->old_blocks != NULL) {
-	blocks = update_bkwd_compact(stp);
+    gen = oldest_gen;
+    if (gen->old_blocks != NULL) {
+	blocks = update_bkwd_compact(gen);
 	debugTrace(DEBUG_gc, 
-		   "update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)",
-		   stp->gen->no, stp->no,
-		   stp->n_old_blocks, blocks);
-	stp->n_old_blocks = blocks;
+		   "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
+		   gen->no, gen->n_old_blocks, blocks);
+	gen->n_old_blocks = blocks;
     }
 }
