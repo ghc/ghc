@@ -631,7 +631,9 @@ allocate (Capability *cap, lnat n)
 
         stp = &nurseries[cap->no];
 
+        ACQUIRE_SM_LOCK
 	bd = allocGroup(req_blocks);
+        RELEASE_SM_LOCK;
 	dbl_link_onto(bd, &stp->large_objects);
 	stp->n_large_blocks += bd->blocks; // might be larger than req_blocks
         initBdescr(bd, stp);
