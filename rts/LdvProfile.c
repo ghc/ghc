@@ -233,27 +233,6 @@ processNurseryForDead( void )
 }
 
 /* --------------------------------------------------------------------------
- * Calls processHeapClosureForDead() on every *dead* closures in the
- * small object pool.
- * ----------------------------------------------------------------------- */
-static void
-processSmallObjectPoolForDead( void )
-{
-    bdescr *bd;
-    StgPtr p;
-
-    for (bd = g0s0->blocks; bd != NULL; bd = bd->link) {
-	p = bd->start;
-	while (p < bd->free) {
-	    p += processHeapClosureForDead((StgClosure *)p);
-	    while (p < bd->free && !*p)    // skip slop
-		p++;
-	}
-	ASSERT(p == bd->free);
-    }
-}
-
-/* --------------------------------------------------------------------------
  * Calls processHeapClosureForDead() on every *dead* closures in the closure
  * chain.
  * ----------------------------------------------------------------------- */
@@ -295,7 +274,6 @@ LdvCensusForDead( nat N )
 	for (g = 0; g <= N; g++)
 	    for (s = 0; s < generations[g].n_steps; s++) {
 		if (g == 0 && s == 0) {
-		    processSmallObjectPoolForDead();
 		    processNurseryForDead();
 		    processChainForDead(generations[g].steps[s].large_objects);
 		} else{
