@@ -742,9 +742,9 @@ mkHpcPos pos
    start = srcSpanStart pos
    end   = srcSpanEnd pos
    hpcPos = toHpcPos ( srcLocLine start
-		     , srcLocCol start + 1
+		     , srcLocCol start
 		     , srcLocLine end
-		     , srcLocCol end
+		     , srcLocCol end - 1
 		     )
 
 hpcSrcSpan :: SrcSpan

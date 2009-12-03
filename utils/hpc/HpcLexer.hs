@@ -11,11 +11,11 @@ data Token
 	deriving (Eq,Show)
 
 initLexer :: String -> [Token]
-initLexer str = [ t | (_,_,t) <- lexer str 1 0 ]
+initLexer str = [ t | (_,_,t) <- lexer str 1 1 ]
 
 lexer :: String -> Int -> Int ->  [(Int,Int,Token)]
 lexer (c:cs) line column
-  | c == '\n' = lexer cs (succ line) 0
+  | c == '\n' = lexer cs (succ line) 1
   | c == '\"' = lexerSTR cs line (succ column)
   | c == '[' = lexerCAT cs "" line (succ column)
   | c `elem` "{};-:" 
