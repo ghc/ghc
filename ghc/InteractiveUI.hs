@@ -2164,9 +2164,9 @@ listAround span do_highlight = do
   where
         file  = GHC.srcSpanFile span
         line1 = GHC.srcSpanStartLine span
-        col1  = GHC.srcSpanStartCol span
+        col1  = GHC.srcSpanStartCol span - 1
         line2 = GHC.srcSpanEndLine span
-        col2  = GHC.srcSpanEndCol span
+        col2  = GHC.srcSpanEndCol span - 1
 
         pad_before | line1 == 1 = 0
                    | otherwise  = 1
