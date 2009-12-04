@@ -723,17 +723,21 @@ if test $HaveLibMingwEx = YES ; then
   AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
 fi
 
-dnl ** check whether this machine has BFD and liberty installed (used for debugging)
-dnl    the order of these tests matters: bfd needs liberty
-AC_CHECK_LIB(iberty, xmalloc)
-AC_CHECK_LIB(bfd,    bfd_init)
-
 dnl ** check for math library
+dnl    Keep that check as early as possible.
+dnl    as we need to know whether we need libm
+dnl    for math functions or not
+dnl    (see http://hackage.haskell.org/trac/ghc/ticket/3730)
 AC_CHECK_FUNC(atan,[fp_libm_not_needed=yes;LIBM=],[fp_libm_not_needed=dunno])
 if test x"$fp_libm_not_needed" = xdunno; then
    AC_CHECK_LIB([m], [atan], [LIBS="-lm $LIBS"; LIBM="-lm"],[LIBM=])
 fi
 AC_SUBST([LIBM])
+
+dnl ** check whether this machine has BFD and liberty installed (used for debugging)
+dnl    the order of these tests matters: bfd needs liberty
+AC_CHECK_LIB(iberty, xmalloc)
+AC_CHECK_LIB(bfd,    bfd_init)
 
 dnl ################################################################
 dnl Check for libraries
