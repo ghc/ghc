@@ -48,7 +48,7 @@ module UniqFM (
 	isNullUFM,
 	lookupUFM, lookupUFM_Directly,
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
-	eltsUFM, keysUFM,
+	eltsUFM, keysUFM, splitUFM,
 	ufmToList 
     ) where
 
@@ -130,6 +130,8 @@ hashUFM		:: UniqFM elt -> Int
 elemUFM		:: Uniquable key => key -> UniqFM elt -> Bool
 elemUFM_Directly:: Unique -> UniqFM elt -> Bool
 
+splitUFM        :: Uniquable key => UniqFM elt -> key -> (UniqFM elt, Maybe elt, UniqFM elt)
+		   -- Splits a UFM into things less than, equal to, and greater than the key
 lookupUFM	:: Uniquable key => UniqFM elt -> key -> Maybe elt
 lookupUFM_Directly  -- when you've got the Unique already
 		:: UniqFM elt -> Unique -> Maybe elt
@@ -137,7 +139,6 @@ lookupWithDefaultUFM
 		:: Uniquable key => UniqFM elt -> elt -> key -> elt
 lookupWithDefaultUFM_Directly
 		:: UniqFM elt -> elt -> Unique -> elt
-
 keysUFM		:: UniqFM elt -> [Unique]	-- Get the keys
 eltsUFM		:: UniqFM elt -> [elt]
 ufmToList	:: UniqFM elt -> [(Unique, elt)]
@@ -358,7 +359,7 @@ plusUFM_C f fm1 fm2	= mix_trees fm1 fm2
 			(mix_trees t2 t2')
 		-- Now the 4 different other ways; all like this:
 		--
-		-- Given j >^ j' (and, say,  j > j')
+ -- Given j >^ j' (and, say,  j > j')
 		--
 		--	  j		j'			 j
 		--	 / \	+      / \	==>		/ \
@@ -608,6 +609,25 @@ lookUp fm i	    = lookup_tree fm
 	  | otherwise	= lookup_tree t2
 
 	lookup_tree EmptyUFM = panic "lookup Failed"
+
+-------------------
+splitUFM fm key = split fm (getKeyFastInt (getUnique key))
+
+split :: UniqFM a -> FastInt -> (UniqFM a, Maybe a, UniqFM a)
+-- Splits a UFM into things less than, equal to, and greater than the key
+split EmptyUFM _ = (EmptyUFM, Nothing, EmptyUFM)
+split fm i       = go fm
+  where
+    go (LeafUFM j b) | i <# j    = (EmptyUFM,    Nothing, LeafUFM j b)
+       		     | i ># j    = (LeafUFM j b, Nothing, EmptyUFM)
+                     | otherwise = (EmptyUFM,    Just b,  EmptyUFM)
+       		     
+    go (NodeUFM j p t1 t2) 
+      | j ># i 
+      , (lt, eq, gt) <- go t1 = (lt, eq, mkSLNodeUFM (NodeUFMData j p) gt t2)
+      | (lt, eq, gt) <- go t2 = (mkLSNodeUFM (NodeUFMData j p) t1 lt, eq, gt)
+
+    go EmptyUFM = panic "splitUFM failed"
 \end{code}
 
 folds are *wonderful* things.
