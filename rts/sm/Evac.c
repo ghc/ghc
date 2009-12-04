@@ -239,10 +239,11 @@ copy(StgClosure **p, const StgInfoTable *info,
 STATIC_INLINE void
 evacuate_large(StgPtr p)
 {
-  bdescr *bd = Bdescr(p);
+  bdescr *bd;
   generation *gen, *new_gen;
   gen_workspace *ws;
     
+  bd = Bdescr(p);
   gen = bd->gen;
   ACQUIRE_SPIN_LOCK(&gen->sync_large_objects);
 
@@ -271,7 +272,7 @@ evacuate_large(StgPtr p)
   
   /* link it on to the evacuated large object list of the destination gen
    */
-  new_gen = gen->to;
+  new_gen = bd->dest;
   if (new_gen < gct->evac_gen) {
       if (gct->eager_promotion) {
 	  new_gen = gct->evac_gen;
