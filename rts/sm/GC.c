@@ -649,6 +649,7 @@ SET_GCT(gc_threads[0]);
         freeChain(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
+	gen->n_new_large_blocks = 0;
         ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
     }
     else // for generations > N

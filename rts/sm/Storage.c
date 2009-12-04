@@ -79,6 +79,7 @@ initGeneration (generation *gen, int g)
     gen->n_old_blocks = 0;
     gen->large_objects = NULL;
     gen->n_large_blocks = 0;
+    gen->n_new_large_blocks = 0;
     gen->mut_list = allocBlock();
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
@@ -567,6 +568,7 @@ allocate (Capability *cap, lnat n)
 	bd = allocGroup(req_blocks);
 	dbl_link_onto(bd, &g0->large_objects);
 	g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
+	g0->n_new_large_blocks += bd->blocks;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
 	bd->flags = BF_LARGE;
@@ -666,6 +668,7 @@ allocatePinned (Capability *cap, lnat n)
 	cap->pinned_object_block = bd = allocBlock();
 	dbl_link_onto(bd, &g0->large_objects);
 	g0->n_large_blocks++;
+	g0->n_new_large_blocks++;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
 	bd->flags  = BF_PINNED | BF_LARGE;
@@ -783,6 +786,8 @@ calcAllocated( void )
               cap->pinned_object_block->free;
       }
   }
+
+  allocated += g0->n_new_large_blocks * BLOCK_SIZE_W;
 
   total_allocated += allocated;
   return allocated;
