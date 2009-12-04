@@ -751,9 +751,6 @@ install_bins: $(INSTALL_BINS)
 	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	for i in $(INSTALL_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
-                if test "$(darwin_TARGET_OS)" = "1"; then \
-                   sh mk/fix_install_names.sh $(ghclibdir) "$(DESTDIR)$(bindir)/$$i" ; \
-                fi ; \
 	done
 
 install_libs: $(INSTALL_LIBS)
@@ -768,8 +765,7 @@ install_libs: $(INSTALL_LIBS)
 		  *.so) \
 		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)" ;; \
 		  *.dylib) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)"; \
-		    install_name_tool -id "$(DESTDIR)$(ghclibdir)/`basename $$i`" "$(DESTDIR)$(ghclibdir)/`basename $$i`" ;; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)";; \
 		  *) \
 		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)"; \
 		esac; \
@@ -930,7 +926,6 @@ $(eval $(call bindist,.,\
 	$(wildcard libraries/*/dist-install/doc/) \
     $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
-	mk/fix_install_names.sh \
 	mk/project.mk \
 	mk/install.mk.in \
 	bindist.mk \

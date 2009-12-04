@@ -141,7 +141,8 @@ $(call cmm-suffix-rules,rts,dist,$1)
 $(call hs-suffix-rules-srcdir,rts,dist,$1,$$(dir))
 # hs-suffix-rules-srcdir is needed when BootingFromHc to get the .hc rules
 
-rts_$1_LIB = rts/dist/build/libHSrts$$($1_libsuf)
+rts_$1_LIB_NAME = libHSrts$$($1_libsuf)
+rts_$1_LIB = rts/dist/build/$$(rts_$1_LIB_NAME)
 
 rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
 rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
@@ -158,6 +159,10 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
+ifeq "$(darwin_TARGET_OS)" "1"
+	# Ensure library's install name is correct before anyone links with it.
+	install_name_tool -id $(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
+endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
