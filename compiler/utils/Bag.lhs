@@ -11,7 +11,7 @@ module Bag (
 
         emptyBag, unitBag, unionBags, unionManyBags,
         mapBag,
-        elemBag,
+        elemBag, lengthBag,
         filterBag, partitionBag, concatBag, foldBag, foldrBag, foldlBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
         listToBag, bagToList,
@@ -40,6 +40,12 @@ emptyBag = EmptyBag
 
 unitBag :: a -> Bag a
 unitBag  = UnitBag
+
+lengthBag :: Bag a -> Int
+lengthBag EmptyBag        = 0
+lengthBag (UnitBag {})    = 1
+lengthBag (TwoBags b1 b2) = lengthBag b1 + lengthBag b2
+lengthBag (ListBag xs)    = length xs
 
 elemBag :: Eq a => a -> Bag a -> Bool
 elemBag _ EmptyBag        = False
