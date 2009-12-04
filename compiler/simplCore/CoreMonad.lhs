@@ -11,7 +11,7 @@ module CoreMonad (
     CoreM, runCoreM,
     
     -- ** Reading from the monad
-    getHscEnv, getAnnEnv, getRuleBase, getModule,
+    getHscEnv, getRuleBase, getModule,
     getDynFlags, getOrigNameCache,
     
     -- ** Writing to the monad
@@ -22,7 +22,7 @@ module CoreMonad (
     liftIO1, liftIO2, liftIO3, liftIO4,
     
     -- ** Dealing with annotations
-    findAnnotations, deserializeAnnotations, addAnnotation,
+    getAnnotations, getFirstAnnotations,
     
     -- ** Debug output
     endPass, endPassIf, endIteration,
@@ -53,7 +53,6 @@ import DynFlags         ( DynFlags, DynFlag )
 import SimplMonad       ( SimplCount, plusSimplCount, zeroSimplCount )
 import Rules            ( RuleBase )
 import Annotations
-import Serialized
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
@@ -65,7 +64,7 @@ import FastString
 import qualified ErrUtils as Err
 import Maybes
 import UniqSupply
-import LazyUniqFM       ( UniqFM )
+import LazyUniqFM       ( UniqFM, mapUFM, filterUFM )
 
 import Data.Dynamic
 import Data.IORef
@@ -130,9 +129,8 @@ dumpAndLint dump dflags pass_name dump_flag binds rules
 %************************************************************************
 
 \begin{code}
-data CoreState = CoreState {
-        cs_uniq_supply :: UniqSupply,
-        cs_ann_env :: AnnEnv
+newtype CoreState = CoreState {
+        cs_uniq_supply :: UniqSupply
 }
 
 data CoreReader = CoreReader {
@@ -191,13 +189,12 @@ instance MonadUnique CoreM where
         return us1
 
 runCoreM :: HscEnv
-         -> AnnEnv
          -> RuleBase
          -> UniqSupply
          -> Module
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env ann_env rule_base us mod m =
+runCoreM hsc_env rule_base us mod m =
         liftM extract $ runIOEnv reader $ unCoreM m state
   where
     reader = CoreReader {
@@ -206,8 +203,7 @@ runCoreM hsc_env ann_env rule_base us mod m =
             cr_module = mod
         }
     state = CoreState { 
-            cs_uniq_supply = us,
-            cs_ann_env = ann_env
+            cs_uniq_supply = us
         }
 
     extract :: (a, CoreState, CoreWriter) -> (a, SimplCount)
@@ -272,9 +268,6 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 getHscEnv :: CoreM HscEnv
 getHscEnv = read cr_hsc_env
 
-getAnnEnv :: CoreM AnnEnv
-getAnnEnv = getS cs_ann_env
-
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
 
@@ -306,38 +299,45 @@ getOrigNameCache = do
 %************************************************************************
 
 \begin{code}
-
--- | Find all the annotations we currently know about for the given target. Note that no
--- annotations will be returned if we haven't loaded information about the particular target
--- you are inquiring about: by default, only those modules that have been imported by the
--- program being compiled will have been loaded in this way.
+-- | Get all annotations of a given type. This happens lazily, that is
+-- no deserialization will take place until the [a] is actually demanded and
+-- the [a] can also be empty (the UniqFM is not filtered).
 --
--- To load the information from additional modules, you can use the functions 'DynamicLoading.forceLoadModuleInterfaces'
--- and 'DynamicLoading.forceLoadNameModuleInterface', but be aware that doing this indiscriminantly
--- will impose a performance penalty.
+-- This should be done once at the start of a Core-to-Core pass that uses
+-- annotations.
 --
--- If no deserialization function is supplied, only transient annotations will be returned.
-findAnnotations :: Typeable a => ([Word8] -> a) -> CoreAnnTarget -> CoreM [a]
-findAnnotations deserialize target = do
-     ann_env <- getAnnEnv
-     return (findAnns deserialize ann_env target)
-
--- | Deserialize all annotations of a given type. This happens lazily, that is
---   no deserialization will take place until the [a] is actually demanded and
---   the [a] can also be empty (the UniqFM is not filtered).
-deserializeAnnotations :: Typeable a => ([Word8] -> a) -> CoreM (UniqFM [a])
-deserializeAnnotations deserialize = do
-     ann_env <- getAnnEnv
+-- See Note [Annotations]
+getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (UniqFM [a])
+getAnnotations deserialize guts = do
+     hsc_env <- getHscEnv
+     ann_env <- liftIO $ prepareAnnotations hsc_env (Just guts)
      return (deserializeAnns deserialize ann_env)
 
-addAnnotation :: Typeable a => (a -> [Word8]) -> CoreAnnTarget -> a -> CoreM ()
-addAnnotation serialize target what = addAnnotationToEnv $ Annotation { ann_target = target, ann_value = toSerialized serialize what }
-
-addAnnotationToEnv :: Annotation -> CoreM ()
-addAnnotationToEnv annotation = modifyS (\state -> state { cs_ann_env = extendAnnEnvList (cs_ann_env state) [annotation] })
-
+-- | Get at most one annotation of a given type per Unique.
+getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (UniqFM a)
+getFirstAnnotations deserialize guts
+  = liftM (mapUFM head . filterUFM (not . null))
+  $ getAnnotations deserialize guts
+  
 \end{code}
 
+Note [Annotations]
+~~~~~~~~~~~~~~~~~~
+A Core-to-Core pass that wants to make use of annotations calls
+getAnnotations or getFirstAnnotations at the beginning to obtain a UniqFM with
+annotations of a specific type. This produces all annotations from interface
+files read so far. However, annotations from interface files read during the
+pass will not be visible until getAnnotations is called again. This is similar
+to how rules work and probably isn't too bad.
+
+The current implementation could be optimised a bit: when looking up
+annotations for a thing from the HomePackageTable, we could search directly in
+the module where the thing is defined rather than building one UniqFM which
+contains all annotations we know of. This would work because annotations can
+only be given to things defined in the same module. However, since we would
+only want to deserialise every annotation once, we would have to build a cache
+for every module in the HTP. In the end, it's probably not worth it as long as
+we aren't using annotations heavily.
 
 %************************************************************************
 %*									*

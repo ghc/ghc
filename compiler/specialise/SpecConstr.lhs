@@ -492,7 +492,7 @@ specConstrProgram guts
   = do
       dflags <- getDynFlags
       us     <- getUniqueSupplyM
-      annos  <- deserializeAnnotations guts deserializeWithData
+      annos  <- getFirstAnnotations deserializeWithData guts
       let binds' = fst $ initUs us (go (initScEnv dflags annos) (mg_binds guts))
       return (guts { mg_binds = binds' })
   where
@@ -548,14 +548,14 @@ instance Outputable Value where
    ppr LambdaVal	 = ptext (sLit "<Lambda>")
 
 ---------------------
-initScEnv :: DynFlags -> L.UniqFM [SpecConstrAnnotation] -> ScEnv
-initScEnv dflags annos
+initScEnv :: DynFlags -> L.UniqFM SpecConstrAnnotation -> ScEnv
+initScEnv dflags anns
   = SCE { sc_size = specConstrThreshold dflags,
 	  sc_count = specConstrCount dflags,
 	  sc_subst = emptySubst, 
 	  sc_how_bound = emptyVarEnv, 
 	  sc_vals = emptyVarEnv,
-          sc_annotations = L.mapUFM head $ L.filterUFM (not . null) annos }
+          sc_annotations = anns }
 
 data HowBound = RecFun	-- These are the recursive functions for which 
 			-- we seek interesting call patterns

@@ -84,9 +84,6 @@ core2core hsc_env guts = do
     us <- mkSplitUniqSupply 's'
     let (cp_us, ru_us) = splitUniqSupply us
 
-    -- COMPUTE THE ANNOTATIONS TO USE
-    ann_env <- prepareAnnotations hsc_env (Just guts)
-
     -- COMPUTE THE RULE BASE TO USE
     (hpt_rule_base, guts1) <- prepareRules hsc_env guts ru_us
 
@@ -96,7 +93,7 @@ core2core hsc_env guts = do
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
     let mod = mg_module guts
-    (guts2, stats) <- runCoreM hsc_env ann_env hpt_rule_base cp_us mod $ do
+    (guts2, stats) <- runCoreM hsc_env hpt_rule_base cp_us mod $ do
         -- FIND BUILT-IN PASSES
         let builtin_core_todos = getCoreToDo dflags
 
