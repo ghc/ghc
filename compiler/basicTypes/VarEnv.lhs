@@ -11,7 +11,7 @@ module VarEnv (
 	-- ** Manipulating these environments
 	emptyVarEnv, unitVarEnv, mkVarEnv,
 	elemVarEnv, varEnvElts, varEnvKeys,
-	extendVarEnv, extendVarEnv_C, extendVarEnvList,
+	extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnvList,
 	plusVarEnv, plusVarEnv_C,
 	delVarEnvList, delVarEnv,
 	lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
@@ -316,6 +316,7 @@ zipVarEnv	  :: [Var] -> [a] -> VarEnv a
 unitVarEnv	  :: Var -> a -> VarEnv a
 extendVarEnv	  :: VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_C	  :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
+extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
 plusVarEnv	  :: VarEnv a -> VarEnv a -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 		  
@@ -344,6 +345,7 @@ elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
 extendVarEnv	 = addToUFM
 extendVarEnv_C	 = addToUFM_C
+extendVarEnv_Acc = addToUFM_Acc
 extendVarEnvList = addListToUFM
 plusVarEnv_C	 = plusUFM_C
 delVarEnvList	 = delListFromUFM

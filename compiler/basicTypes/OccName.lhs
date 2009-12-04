@@ -75,7 +75,7 @@ module OccName (
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
-        filterOccEnv, delListFromOccEnv, delFromOccEnv,
+        extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
 
 	-- * The 'OccSet' type
 	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
@@ -335,6 +335,7 @@ elemOccEnv   :: OccName -> OccEnv a -> Bool
 foldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
 occEnvElts   :: OccEnv a -> [a]
 extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
+extendOccEnv_Acc :: (a->b->b) -> (a->b) -> OccEnv b -> OccName -> a -> OccEnv b
 plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
 plusOccEnv_C   :: (a->a->a) -> OccEnv a -> OccEnv a -> OccEnv a
 mapOccEnv      :: (a->b) -> OccEnv a -> OccEnv b
@@ -354,6 +355,7 @@ occEnvElts (A x)	 = eltsUFM x
 plusOccEnv (A x) (A y)	 = A $ plusUFM x y 
 plusOccEnv_C f (A x) (A y)	 = A $ plusUFM_C f x y 
 extendOccEnv_C f (A x) y z   = A $ addToUFM_C f x y z
+extendOccEnv_Acc f g (A x) y z   = A $ addToUFM_Acc f g x y z
 mapOccEnv f (A x)	 = A $ mapUFM f x
 mkOccEnv_C comb l = A $ addListToUFM_C comb emptyUFM l
 delFromOccEnv (A x) y    = A $ delFromUFM x y

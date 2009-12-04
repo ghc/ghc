@@ -428,10 +428,9 @@ lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
 					Just gres -> gres
 
 extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
-extendGlobalRdrEnv env gre = extendOccEnv_C add env occ [gre]
+extendGlobalRdrEnv env gre = extendOccEnv_Acc (:) singleton env occ gre
   where
     occ = nameOccName (gre_name gre)
-    add gres _ = gre:gres
 
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env
@@ -515,9 +514,9 @@ mkGlobalRdrEnv :: [GlobalRdrElt] -> GlobalRdrEnv
 mkGlobalRdrEnv gres
   = foldr add emptyGlobalRdrEnv gres
   where
-    add gre env = extendOccEnv_C (foldr insertGRE) env 
-				 (nameOccName (gre_name gre)) 
-				 [gre]
+    add gre env = extendOccEnv_Acc insertGRE singleton env 
+				   (nameOccName (gre_name gre)) 
+				   gre
 
 findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> (GlobalRdrEnv, [[Name]])
 -- ^ For each 'OccName', see if there are multiple local definitions

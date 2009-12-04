@@ -722,7 +722,7 @@ gresFromIE decl_spec (L loc ie, avail)
 mkChildEnv :: [GlobalRdrElt] -> NameEnv [Name]
 mkChildEnv gres = foldr add emptyNameEnv gres
     where
-	add (GRE { gre_name = n, gre_par = ParentIs p }) env = extendNameEnv_C (++) env p [n]
+	add (GRE { gre_name = n, gre_par = ParentIs p }) env = extendNameEnv_Acc (:) singleton env p n
 	add _                                            env = env
 
 findChildren :: NameEnv [Name] -> Name -> [Name]

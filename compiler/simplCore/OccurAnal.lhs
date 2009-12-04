@@ -1370,8 +1370,9 @@ extendProxyEnv pe scrut co case_bndr
   | otherwise          = PE env2 fvs2	--   don't extend
   where
     PE env1 fvs1 = trimProxyEnv pe [case_bndr]
-    env2 = extendVarEnv_C add env1 scrut1 (scrut1, [(case_bndr,co)])
-    add (x, cb_cos) _ = (x, (case_bndr,co):cb_cos)
+    env2 = extendVarEnv_Acc add single env1 scrut1 (case_bndr,co)
+    single cb_co = (scrut1, [cb_co]) 
+    add cb_co (x, cb_cos) = (x, cb_co:cb_cos)
     fvs2 = fvs1 `unionVarSet`  freeVarsCoI co
 		`extendVarSet` case_bndr
 		`extendVarSet` scrut1
