@@ -1,5 +1,8 @@
 {-# LANGUAGE RecordWildCards, TypeSynonymInstances, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
-{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+-- This module deliberately defines orphan instances for now. Should
+-- become unnecessary once we move to using the binary package properly:
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Distribution.InstalledPackageInfo.Binary
