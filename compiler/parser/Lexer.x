@@ -1499,10 +1499,19 @@ data PState = PState {
 	context	   :: [LayoutContext],
 	lex_state  :: [Int],
         -- Used in the alternative layout rule:
+        -- These tokens are the next ones to be sent out. They are
+        -- just blindly emitted, without the rule looking at them again:
         alr_pending_implicit_tokens :: [Located Token],
+        -- This is the next token to be considered or, if it is Nothing,
+        -- we need to get the next token from the input stream:
         alr_next_token :: Maybe (Located Token),
+        -- This is what we consider to be the locatino of the last token
+        -- emitted:
         alr_last_loc :: SrcSpan,
+        -- The stack of layout contexts:
         alr_context :: [ALRContext],
+        -- Are we expecting a '{'? If it's Just, then the ALRLayout tells
+        -- us what sort of layout the '{' will open:
         alr_expecting_ocurly :: Maybe ALRLayout
      }
 	-- last_loc and last_len are used when generating error messages,
