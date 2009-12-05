@@ -1,0 +1,4 @@
+Running with -XNoAlternativeLayoutRule
+Running with -XAlternativeLayoutRule
+
+layout001.hs:6:3: parse error on input `where'
