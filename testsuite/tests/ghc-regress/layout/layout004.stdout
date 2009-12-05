@@ -1,0 +1,4 @@
+Running with -XNoAlternativeLayoutRule
+Running with -XAlternativeLayoutRule
+
+layout004.hs:7:14: parse error on input `,'
