@@ -1,3 +1,4 @@
+-- This module deliberately declares orphan instances:
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
