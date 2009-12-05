@@ -101,6 +101,12 @@ instance  Eq Integer  where
     (==) = eqInteger
     (/=) = neqInteger
 
+instance Eq Float where
+    (F# x) == (F# y) = x `eqFloat#` y
+
+instance Eq Double where
+    (D# x) == (D# y) = x ==## y
+
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
 -- Instances of 'Ord' can be derived for any user-defined
@@ -195,6 +201,28 @@ instance Ord Integer where
     (<)  = ltInteger
     (>=) = geInteger
     compare = compareInteger
+
+instance Ord Float where
+    (F# x) `compare` (F# y)
+        = if      x `ltFloat#` y then LT
+          else if x `eqFloat#` y then EQ
+          else                        GT
+
+    (F# x) <  (F# y) = x `ltFloat#`  y
+    (F# x) <= (F# y) = x `leFloat#`  y
+    (F# x) >= (F# y) = x `geFloat#`  y
+    (F# x) >  (F# y) = x `gtFloat#`  y
+
+instance Ord Double where
+    (D# x) `compare` (D# y)
+        = if      x <##  y then LT
+          else if x ==## y then EQ
+          else                  GT
+
+    (D# x) <  (D# y) = x <##  y
+    (D# x) <= (D# y) = x <=## y
+    (D# x) >= (D# y) = x >=## y
+    (D# x) >  (D# y) = x >##  y
 
 -- OK, so they're technically not part of a class...:
 

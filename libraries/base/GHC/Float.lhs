@@ -154,19 +154,6 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 %*********************************************************
 
 \begin{code}
-instance Eq Float where
-    (F# x) == (F# y) = x `eqFloat#` y
-
-instance Ord Float where
-    (F# x) `compare` (F# y) | x `ltFloat#` y = LT
-                            | x `eqFloat#` y = EQ
-                            | otherwise      = GT
-
-    (F# x) <  (F# y) = x `ltFloat#`  y
-    (F# x) <= (F# y) = x `leFloat#`  y
-    (F# x) >= (F# y) = x `geFloat#`  y
-    (F# x) >  (F# y) = x `gtFloat#`  y
-
 instance  Num Float  where
     (+)         x y     =  plusFloat x y
     (-)         x y     =  minusFloat x y
@@ -298,19 +285,6 @@ instance  Show Float  where
 %*********************************************************
 
 \begin{code}
-instance Eq Double where
-    (D# x) == (D# y) = x ==## y
-
-instance Ord Double where
-    (D# x) `compare` (D# y) | x <## y   = LT
-                            | x ==## y  = EQ
-                            | otherwise = GT
-
-    (D# x) <  (D# y) = x <##  y
-    (D# x) <= (D# y) = x <=## y
-    (D# x) >= (D# y) = x >=## y
-    (D# x) >  (D# y) = x >##  y
-
 instance  Num Double  where
     (+)         x y     =  plusDouble x y
     (-)         x y     =  minusDouble x y
