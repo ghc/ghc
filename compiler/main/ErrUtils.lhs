@@ -10,6 +10,7 @@ module ErrUtils (
 
 	ErrMsg, WarnMsg,
         ErrorMessages, WarningMessages,
+        errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
 	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
