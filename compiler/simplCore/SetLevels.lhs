@@ -251,15 +251,9 @@ lvlExpr _ env (_, AnnVar v)   = return (lookupVar env v)
 lvlExpr _ _   (_, AnnLit lit) = return (Lit lit)
 
 lvlExpr ctxt_lvl env (_, AnnApp fun arg) = do
-    fun' <- lvl_fun fun
+    fun' <- lvlExpr ctxt_lvl env fun   -- We don't do MFE on partial applications
     arg' <- lvlMFE  False ctxt_lvl env arg
     return (App fun' arg')
-  where
--- gaw 2004
-    lvl_fun (_, AnnCase _ _ _ _) = lvlMFE True ctxt_lvl env fun
-    lvl_fun _                    = lvlExpr ctxt_lvl env fun
-	-- We don't do MFE on partial applications generally,
-	-- but we do if the function is big and hairy, like a case
 
 lvlExpr ctxt_lvl env (_, AnnNote note expr) = do
     expr' <- lvlExpr ctxt_lvl env expr
