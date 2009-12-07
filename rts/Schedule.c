@@ -2342,7 +2342,7 @@ threadStackUnderflow (Capability *cap, Task *task, StgTSO *tso)
     // list. The new TSO is not yet on the mutable list, so we better
     // put it there.
     new_tso->dirty = 0;
-    new_tso->flags &= !TSO_LINK_DIRTY;
+    new_tso->flags &= ~TSO_LINK_DIRTY;
     dirty_TSO(cap, new_tso);
 
     debugTrace(DEBUG_sched, "thread %ld: reducing TSO size from %lu words to %lu",
