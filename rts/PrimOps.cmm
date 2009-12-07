@@ -321,8 +321,10 @@ stg_mkWeakzh
   StgWeak_finalizer(w)  = R3;
   StgWeak_cfinalizer(w) = stg_NO_FINALIZER_closure;
 
+  ACQUIRE_LOCK(sm_mutex);
   StgWeak_link(w)	= W_[weak_ptr_list];
   W_[weak_ptr_list] 	= w;
+  RELEASE_LOCK(sm_mutex);
 
   IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
 
