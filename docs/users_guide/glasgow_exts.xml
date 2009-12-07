@@ -4005,6 +4005,51 @@ of the instance declaration, thus:
 (You need <link linkend="instance-rules"><option>-XFlexibleInstances</option></link> to do this.)
 </para>
 <para>
+Warning: overlapping instances must be used with care.  They 
+can give rise to incoherence (ie different instance choices are made
+in different parts of the program) even without <option>-XIncoherentInstances</option>. Consider:
+<programlisting>
+{-# LANGUAGE OverlappingInstances #-}
+module Help where
+
+    class MyShow a where
+      myshow :: a -> String
+
+    instance MyShow a => MyShow [a] where
+      myshow xs = concatMap myshow xs
+
+    showHelp :: MyShow a => [a] -> String
+    showHelp xs = myshow xs
+
+{-# LANGUAGE FlexibleInstances, OverlappingInstances #-}
+module Main where
+    import Help
+
+    data T = MkT
+
+    instance MyShow T where
+      myshow x = "Used generic instance"
+
+    instance MyShow [T] where
+      myshow xs = "Used more specific instance"
+
+    main = do { print (myshow [MkT]); print (showHelp [MkT]) }
+</programlisting>
+In function <literal>showHelp</literal> GHC sees no overlapping
+instances, and so uses the <literal>MyShow [a]</literal> instance
+without complaint.  In the call to <literal>myshow</literal> in <literal>main</literal>,
+GHC resolves the <literal>MyShow [T]</literal> constraint using the overlapping
+instance declaration in module <literal>Main</literal>. As a result, 
+the program prints
+<programlisting>
+  "Used more specific instance"
+  "Used generic instance"
+</programlisting>
+(An alternative possible behaviour, not currently implemented, 
+would be to reject module <literal>Help</literal>
+on the grounds that a later instance declaration might overlap the local one.)
+</para>
+<para>
 The willingness to be overlapped or incoherent is a property of 
 the <emphasis>instance declaration</emphasis> itself, controlled by the
 presence or otherwise of the <option>-XOverlappingInstances</option> 
