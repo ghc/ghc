@@ -813,7 +813,7 @@ statDescribeGens(void)
    -------------------------------------------------------------------------- */
 
 extern HsInt64 getAllocations( void ) 
-{ return (HsInt64)total_allocated * sizeof(W_); }
+{ return (HsInt64)GC_tot_alloc * sizeof(W_); }
 
 /* -----------------------------------------------------------------------------
    Dumping stuff in the stats file, or via the debug message interface

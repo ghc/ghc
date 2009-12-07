@@ -49,8 +49,6 @@ generation *generations = NULL;	/* all the generations */
 generation *g0		= NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 
-ullong total_allocated = 0;	/* total memory allocated during run */
-
 nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
 
 #ifdef THREADED_RTS
@@ -789,7 +787,6 @@ calcAllocated( void )
 
   allocated += g0->n_new_large_blocks * BLOCK_SIZE_W;
 
-  total_allocated += allocated;
   return allocated;
 }  
 

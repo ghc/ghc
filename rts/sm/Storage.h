@@ -132,8 +132,6 @@ lnat     countNurseryBlocks   ( void );
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-extern ullong total_allocated;
-
 lnat    calcAllocated  (void);
 lnat    calcLiveBlocks (void);
 lnat    calcLiveWords  (void);
