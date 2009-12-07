@@ -92,6 +92,10 @@ data DerivSpec  = DS { ds_loc     :: SrcSpan
 	-- ds_newtype = True  <=> Newtype deriving
 	--		False <=> Vanilla deriving
 
+type DerivContext = Maybe ThetaType
+   -- Nothing 	 <=> Vanilla deriving; infer the context of the instance decl
+   -- Just theta <=> Standalone deriving: context supplied by programmer
+
 type EarlyDerivSpec = Either DerivSpec DerivSpec
 	-- Left  ds => the context for the instance should be inferred
 	--	       In this case ds_theta is the list of all the 
@@ -549,7 +553,7 @@ After all, we can write it out
 
 \begin{code}
 mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
-          -> Maybe ThetaType	-- Just    => context supplied (standalone deriving)
+          -> DerivContext	-- Just    => context supplied (standalone deriving)
 				-- Nothing => context inferred (deriving on data decl)
           -> TcRn EarlyDerivSpec
 -- Make the EarlyDerivSpec for an instance
@@ -584,7 +588,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 		mkNewTypeEqn orig dflags tvs cls cls_tys 
 			     tycon tc_args rep_tc rep_tc_args mtheta }
   | otherwise
-  = failWithTc (derivingThingErr cls cls_tys tc_app
+  = failWithTc (derivingThingErr False cls cls_tys tc_app
 	       (ptext (sLit "The last argument of the instance must be a data or newtype application")))
 \end{code}
 
@@ -643,28 +647,28 @@ mkDataTypeEqn :: InstOrigin
               -> [Var]                  -- Universally quantified type variables in the instance
               -> Class                  -- Class for which we need to derive an instance
               -> [Type]                 -- Other parameters to the class except the last
-              -> TyCon                  -- Type constructor for which the instance is requested (last parameter to the type class)
+              -> TyCon                  -- Type constructor for which the instance is requested 
+					--    (last parameter to the type class)
               -> [Type]                 -- Parameters to the type constructor
               -> TyCon                  -- rep of the above (for type families)
               -> [Type]                 -- rep of the above
-              -> Maybe ThetaType        -- Context of the instance, for standalone deriving
+              -> DerivContext        -- Context of the instance, for standalone deriving
               -> TcRn EarlyDerivSpec    -- Return 'Nothing' if error
 
 mkDataTypeEqn orig dflags tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
-  | isJust mtheta = go_for_it	-- Do not test side conditions for standalone deriving
-  | otherwise     = case checkSideConditions dflags cls cls_tys rep_tc of
-		      -- NB: pass the *representation* tycon to checkSideConditions
-		      CanDerive               -> go_for_it
-		      NonDerivableClass	      -> bale_out (nonStdErr cls)
-		      DerivableClassError msg -> bale_out msg
+  = case checkSideConditions dflags mtheta cls cls_tys rep_tc of
+	-- NB: pass the *representation* tycon to checkSideConditions
+	CanDerive               -> go_for_it
+	NonDerivableClass	-> bale_out (nonStdErr cls)
+	DerivableClassError msg -> bale_out msg
   where
     go_for_it    = mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
-    bale_out msg = failWithTc (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) msg)
+    bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
 
 mk_data_eqn, mk_typeable_eqn
    :: InstOrigin -> [TyVar] -> Class 
-   -> TyCon -> [TcType] -> TyCon -> [TcType] -> Maybe ThetaType
+   -> TyCon -> [TcType] -> TyCon -> [TcType] -> DerivContext
    -> TcM EarlyDerivSpec
 mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   | getName cls `elem` typeableClassNames
@@ -781,12 +785,14 @@ data DerivStatus = CanDerive
 		 | DerivableClassError SDoc	-- Standard class, but can't do it
      		 | NonDerivableClass		-- Non-standard class
 
-checkSideConditions :: DynFlags -> Class -> [TcType] -> TyCon -> DerivStatus
-checkSideConditions dflags cls cls_tys rep_tc
-  | Just cond <- sideConditions cls
+checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType] -> TyCon -> DerivStatus
+checkSideConditions dflags mtheta cls cls_tys rep_tc
+  | Just cond <- sideConditions mtheta cls
   = case (cond (dflags, rep_tc)) of
 	Just err -> DerivableClassError err	-- Class-specific error
-	Nothing  | null cls_tys -> CanDerive
+	Nothing  | null cls_tys -> CanDerive	-- All derivable classes are unary, so
+						-- cls_tys (the type args other than last) 
+						-- should be null
 		 | otherwise    -> DerivableClassError ty_args_why	-- e.g. deriving( Eq s )
   | otherwise = NonDerivableClass	-- Not a standard class
   where
@@ -795,8 +801,8 @@ checkSideConditions dflags cls cls_tys rep_tc
 nonStdErr :: Class -> SDoc
 nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
-sideConditions :: Class -> Maybe Condition
-sideConditions cls
+sideConditions :: DerivContext -> Class -> Maybe Condition
+sideConditions mtheta cls
   | cls_key == eqClassKey      	   = Just cond_std
   | cls_key == ordClassKey     	   = Just cond_std
   | cls_key == showClassKey    	   = Just cond_std
@@ -816,6 +822,7 @@ sideConditions cls
   | otherwise = Nothing
   where
     cls_key = getUnique cls
+    cond_std = cond_stdOK mtheta
 
 type Condition = (DynFlags, TyCon) -> Maybe SDoc
 	-- first Bool is whether or not we are allowed to derive Data and Typeable
@@ -838,15 +845,19 @@ andCond c1 c2 tc = case c1 tc of
 		     Nothing -> c2 tc	-- c1 succeeds
 		     Just x  -> Just x	-- c1 fails
 
-cond_std :: Condition
-cond_std (_, rep_tc)
-  | null data_cons      = Just no_cons_why
-  | not (null con_whys) = Just (vcat con_whys)
+cond_stdOK :: DerivContext -> Condition
+cond_stdOK (Just _) _
+  = Nothing	-- Don't check these conservative conditions for
+		-- standalone deriving; just generate the code
+cond_stdOK Nothing (_, rep_tc)
+  | null data_cons      = Just (no_cons_why $$ suggestion)
+  | not (null con_whys) = Just (vcat con_whys $$ suggestion)
   | otherwise      	= Nothing
   where
-    data_cons       = tyConDataCons rep_tc
-    no_cons_why	    = quotes (pprSourceTyCon rep_tc) <+> 
-		      ptext (sLit "has no data constructors")
+    suggestion  = ptext (sLit "Possible fix: use a standalone deriving declaration instead")
+    data_cons   = tyConDataCons rep_tc
+    no_cons_why	= quotes (pprSourceTyCon rep_tc) <+> 
+		  ptext (sLit "has no data constructors")
 
     con_whys = mapCatMaybes check_con data_cons
 
@@ -1007,7 +1018,7 @@ a context for the Data instances:
 \begin{code}
 mkNewTypeEqn :: InstOrigin -> DynFlags -> [Var] -> Class
              -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
-             -> Maybe ThetaType
+             -> DerivContext
              -> TcRn EarlyDerivSpec
 mkNewTypeEqn orig dflags tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
@@ -1025,9 +1036,8 @@ mkNewTypeEqn orig dflags tvs
 	; return (if isJust mtheta then Right spec
 				   else Left spec) }
 
-  | isJust mtheta = go_for_it	-- Do not check side conditions for standalone deriving
   | otherwise
-  = case checkSideConditions dflags cls cls_tys rep_tycon of
+  = case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
       CanDerive               -> go_for_it 	-- Use the standard H98 method
       DerivableClassError msg -> bale_out msg	-- Error with standard class
       NonDerivableClass 	-- Must use newtype deriving
@@ -1036,7 +1046,7 @@ mkNewTypeEqn orig dflags tvs
   where
         newtype_deriving = dopt Opt_GeneralizedNewtypeDeriving dflags
         go_for_it        = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
-	bale_out msg     = failWithTc (derivingThingErr cls cls_tys inst_ty msg)
+	bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
 
 	non_std_err = nonStdErr cls $$
 		      ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
@@ -1146,8 +1156,7 @@ mkNewTypeEqn orig dflags tvs
 	       -- so for 'data' instance decls
 					 
 	cant_derive_err
-	   = vcat [ ptext (sLit "even with cunning newtype deriving:")
-		  , ppUnless arity_ok arity_msg
+	   = vcat [ ppUnless arity_ok arity_msg
 		  , ppUnless eta_ok eta_msg
 		  , ppUnless ats_ok ats_msg ]
         arity_msg = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
@@ -1440,12 +1449,15 @@ typeFamilyPapErr tc cls cls_tys inst_ty
   = hang (ptext (sLit "Derived instance") <+> quotes (pprClassPred cls (cls_tys ++ [inst_ty])))
        2 (ptext (sLit "requires illegal partial application of data type family") <+> ppr tc) 
 
-derivingThingErr :: Class -> [Type] -> Type -> Message -> Message
-derivingThingErr clas tys ty why
-  = sep [hsep [ptext (sLit "Can't make a derived instance of"), 
-	       quotes (ppr pred)],
-	 nest 2 (parens why)]
+derivingThingErr :: Bool -> Class -> [Type] -> Type -> Message -> Message
+derivingThingErr newtype_deriving clas tys ty why
+  = sep [(hang (ptext (sLit "Can't make a derived instance of"))
+	     2 (quotes (ppr pred)) 
+          $$ nest 2 extra) <> colon,
+	 nest 2 why]
   where
+    extra | newtype_deriving = ptext (sLit "(even with cunning newtype deriving)")
+          | otherwise        = empty
     pred = mkClassPred clas (tys ++ [ty])
 
 derivingHiddenErr :: TyCon -> SDoc
