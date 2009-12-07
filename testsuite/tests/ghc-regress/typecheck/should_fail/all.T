@@ -220,6 +220,7 @@ test('T2806', normal, compile_fail, [''])
 test('T3323', normal, compile_fail, [''])
 test('T3406', normal, compile_fail, [''])
 test('T3540', normal, compile_fail, [''])
+test('T3102', normal, compile_fail, [''])
 test('T3613', normal, compile_fail, [''])
 test('fd-loop', normal, compile_fail, [''])
 
