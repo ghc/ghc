@@ -259,7 +259,7 @@ processChainForDead( bdescr *bd )
 void
 LdvCensusForDead( nat N )
 {
-    nat g, s;
+    nat g;
 
     // ldvTime == 0 means that LDV profiling is currently turned off.
     if (era == 0)
@@ -271,16 +271,11 @@ LdvCensusForDead( nat N )
 	//
 	barf("Lag/Drag/Void profiling not supported with -G1");
     } else {
-	for (g = 0; g <= N; g++)
-	    for (s = 0; s < generations[g].n_steps; s++) {
-		if (g == 0 && s == 0) {
-		    processNurseryForDead();
-		    processChainForDead(generations[g].steps[s].large_objects);
-		} else{
-		    processHeapForDead(generations[g].steps[s].old_blocks);
-		    processChainForDead(generations[g].steps[s].large_objects);
-		}
-	    }
+        processNurseryForDead();
+	for (g = 0; g <= N; g++) {
+            processHeapForDead(generations[g].old_blocks);
+            processChainForDead(generations[g].large_objects);
+        }
     }
 }
 
