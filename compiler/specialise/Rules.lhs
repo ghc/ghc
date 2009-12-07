@@ -57,6 +57,71 @@ import Data.List
 \end{code}
 
 
+Note [Overall plumbing for rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* The ModGuts initially contains mg_rules :: [CoreRule] of rules
+  declared in this module. During the core-to-core pipeline,
+  locally-declared rules for locally-declared Ids are attached to the
+  IdInfo for that Id, so the mg_rules field of ModGuts now only
+  contains locally-declared rules for *imported* Ids.  TidyPgm restores
+  the original setup, so that the ModGuts again has *all* the
+  locally-declared rules.  See Note [Attach rules to local ids] in
+  SimplCore
+
+* The HomePackageTable contains a ModDetails for each home package
+  module.  Each contains md_rules :: [CoreRule] of rules declared in
+  that module.  The HomePackageTable grows as ghc --make does its
+  up-sweep.  In batch mode (ghc -c), the HPT is empty; all imported modules
+  are treated by the "external" route, discussed next, regardless of
+  which package they come from.
+
+* The ExternalPackageState has a single eps_rule_base :: RuleBase for
+  Ids in other packages.  This RuleBase simply grow monotonically, as
+  ghc --make compiles one module after another.
+
+  During simplification, interface files may get demand-loaded,
+  as the simplifier explores the unfoldings for Ids it has in 
+  its hand.  (Via an unsafePerformIO; the EPS is really a cache.)
+  That in turn may make the EPS rule-base grow.  In contrast, the
+  HPT never grows in this way.
+
+* The result of all this is that during Core-to-Core optimisation
+  there are four sources of rules:
+
+    (a) Rules in the IdInfo of the Id they are a rule for.  These are
+        easy: fast to look up, and if you apply a substitution then
+        it'll be applied to the IdInfo as a matter of course.
+
+    (b) Rules declared in this module for imported Ids, kept in the
+        ModGuts. If you do a substitution, you'd better apply the
+        substitution to these.  There are seldom many of these.
+
+    (c) Rules declared in the HomePackageTable.  These never change.
+
+    (d) Rules in the ExternalPackageTable. These can grow in response
+        to lazy demand-loading of interfaces.
+
+* At the moment (c) is carried in a reader-monad way by the CoreMonad.
+  The HomePackageTable doesn't have a single RuleBase because technically
+  we should only be able to "see" rules "below" this module; so we
+  generate a RuleBase for (c) by combing rules from all the modules
+  "below" us.  That's whye we can't just select the home-package RuleBase
+  from HscEnv.
+
+  [NB: we are inconsistent here.  We should do the same for external
+  pacakges, but we don't.  Same for type-class instances.]
+
+* So in the outer simplifier loop, we combine (b-d) into a single
+  RuleBase, reading 
+     (b) from the ModGuts, 
+     (c) from the CoreMonad, and
+     (d) from its mutable variable
+  [Of coures this means that we won't see new EPS rules that come in
+  during a single simplifier iteration, but that probably does not
+  matter.]
+
+
 %************************************************************************
 %*									*
 \subsection[specialisation-IdInfo]{Specialisation info about an @Id@}

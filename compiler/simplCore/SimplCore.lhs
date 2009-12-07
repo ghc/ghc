@@ -85,6 +85,7 @@ core2core hsc_env guts = do
     let (cp_us, ru_us) = splitUniqSupply us
 
     -- COMPUTE THE RULE BASE TO USE
+    -- See Note [Overall plumbing for rules] in Rules.lhs
     (hpt_rule_base, guts1) <- prepareRules hsc_env guts ru_us
 
     -- Get the module out of the current HscEnv so we can retrieve it from the monad.
@@ -541,6 +542,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
 		     (pprCoreBindings tagged_binds);
 
 	   	-- Get any new rules, and extend the rule base
+		-- See Note [Overall plumbing for rules] in Rules.lhs
 		-- We need to do this regularly, because simplification can
 		-- poke on IdInfo thunks, which in turn brings in new rules
 		-- behind the scenes.  Otherwise there's a danger we'll simply

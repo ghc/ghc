@@ -310,6 +310,8 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
                                    binds implicit_binds imp_rules
 
         ; let { ext_rules = findExternalRules omit_prags binds imp_rules unfold_env }
+	        -- Glom together imp_rules and rules currently attached to binders
+		-- Then pick just the ones we need to expose
 		-- See Note [Which rules to expose]
 
 	; let { (tidy_env, tidy_binds)

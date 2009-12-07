@@ -978,9 +978,7 @@ data ModGuts
 	mg_insts     :: ![Instance],	 -- ^ Class instances declared in this module
 	mg_fam_insts :: ![FamInst],	 -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],	 -- ^ Before the core pipeline starts, contains 
-                                         -- rules declared in this module. After the core
-                                         -- pipeline starts, it is changed to contain all
-                                         -- known rules for those things imported
+		     			 -- See Note [Overall plumbing for rules] in Rules.lhs
 	mg_binds     :: ![CoreBind],	 -- ^ Bindings for this module
 	mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
 	mg_warns     :: !Warnings,	 -- ^ Warnings declared in the module
