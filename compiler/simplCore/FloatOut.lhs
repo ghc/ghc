@@ -17,9 +17,12 @@ import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType )
 import Type		( isUnLiftedType )
 import SetLevels	( Level(..), LevelledExpr, LevelledBind,
-			  setLevels, ltMajLvl, ltLvl, isTopLvl )
+			  setLevels, isTopLvl, tOP_LEVEL )
 import UniqSupply       ( UniqSupply )
-import Data.List
+import Bag
+import Util
+import Maybes
+import UniqFM
 import Outputable
 import FastString
 \end{code}
@@ -96,10 +99,6 @@ vwhich might usefully be separated to
 @
 Well, maybe.  We don't do this at the moment.
 
-\begin{code}
-type FloatBind     = (Level, CoreBind)	-- INVARIANT: a FloatBind is always lifted
-type FloatBinds    = [FloatBind]	
-\end{code}
 
 %************************************************************************
 %*									*
@@ -135,7 +134,7 @@ floatOutwards float_sws dflags us pgm
 floatTopBind :: LevelledBind -> (FloatStats, [CoreBind])
 floatTopBind bind
   = case (floatBind bind) of { (fs, floats) ->
-    (fs, floatsToBinds floats)
+    (fs, bagToList (flattenFloats floats))
     }
 \end{code}
 
@@ -151,11 +150,11 @@ floatBind :: LevelledBind -> (FloatStats, FloatBinds)
 
 floatBind (NonRec (TB name level) rhs)
   = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
-    (fs, rhs_floats ++ [(level, NonRec name rhs')]) }
+    (fs, rhs_floats `plusFloats` unitFloat level (NonRec name rhs')) }
 
 floatBind bind@(Rec pairs)
   = case (unzip3 (map do_pair pairs)) of { (fss, rhss_floats, new_pairs) ->
-    let rhs_floats = concat rhss_floats in
+    let rhs_floats = foldr1 plusFloats rhss_floats in
 
     if not (isTopLvl bind_dest_lvl) then
 	-- Find which bindings float out at least one lambda beyond this one
@@ -165,7 +164,9 @@ floatBind bind@(Rec pairs)
 	-- they may not be mutually recursive but the occurrence analyser will
 	-- find that out.
 	case (partitionByMajorLevel bind_dest_lvl rhs_floats) of { (floats', heres) ->
-	(sum_stats fss, floats' ++ [(bind_dest_lvl, Rec (floatsToBindPairs heres ++ new_pairs))]) }
+	(sum_stats fss, 
+         floats' `plusFloats` unitFloat bind_dest_lvl 
+	 	 	        (Rec (floatsToBindPairs heres new_pairs))) }
     else
 	-- In a recursive binding, *destined for* the top level
 	-- (only), the rhs floats may contain references to the 
@@ -180,7 +181,8 @@ floatBind bind@(Rec pairs)
 	-- This can only happen for bindings destined for the top level,
 	-- because only then will partitionByMajorLevel allow through a binding
 	-- that only differs in its minor level
-	(sum_stats fss, [(bind_dest_lvl, Rec (new_pairs ++ floatsToBindPairs rhs_floats))])
+	(sum_stats fss, unitFloat tOP_LEVEL
+		   	   (Rec (floatsToBindPairs (flattenFloats rhs_floats) new_pairs)))
     }
   where
     bind_dest_lvl = getBindLevel bind
@@ -244,14 +246,14 @@ floatRhs lvl arg	-- Used for nested non-rec rhss, and fn args
 -- We use exprIsCheap because that is also what's used by the simplifier
 -- to decide whether to float a let out of a let
 
-floatExpr _ (Var v)   = (zeroStats, [], Var v)
-floatExpr _ (Type ty) = (zeroStats, [], Type ty)
-floatExpr _ (Lit lit) = (zeroStats, [], Lit lit)
+floatExpr _ (Var v)   = (zeroStats, emptyFloats, Var v)
+floatExpr _ (Type ty) = (zeroStats, emptyFloats, Type ty)
+floatExpr _ (Lit lit) = (zeroStats, emptyFloats, Lit lit)
 	  
 floatExpr lvl (App e a)
   = case (floatExpr      lvl e) of { (fse, floats_e, e') ->
     case (floatRhs lvl a) 	of { (fsa, floats_a, a') ->
-    (fse `add_stats` fsa, floats_e ++ floats_a, App e' a') }}
+    (fse `add_stats` fsa, floats_e `plusFloats` floats_a, App e' a') }}
 
 floatExpr _ lam@(Lam _ _)
   = let
@@ -282,20 +284,9 @@ floatExpr lvl (Note note@(SCC cc) expr)
 	-- Annotate bindings floated outwards past an scc expression
 	-- with the cc.  We mark that cc as "duplicated", though.
 
-	annotated_defns = annotate (dupifyCC cc) floating_defns
+	annotated_defns = wrapCostCentre (dupifyCC cc) floating_defns
     in
     (fs, annotated_defns, Note note expr') }
-  where
-    annotate :: CostCentre -> FloatBinds -> FloatBinds
-
-    annotate dupd_cc defn_groups
-      = [ (level, ann_bind floater) | (level, floater) <- defn_groups ]
-      where
-	ann_bind (NonRec binder rhs)
-	  = NonRec binder (mkSCC dupd_cc rhs)
-
-	ann_bind (Rec pairs)
-	  = Rec [(binder, mkSCC dupd_cc rhs) | (binder, rhs) <- pairs]
 
 floatExpr lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->
@@ -310,19 +301,19 @@ floatExpr lvl (Let (NonRec (TB bndr bndr_lvl) rhs) body)
 				-- I.e. floatExpr for rhs, floatCaseAlt for body
   = case floatExpr lvl rhs	    of { (_, rhs_floats, rhs') ->
     case floatCaseAlt bndr_lvl body of { (fs, body_floats, body') ->
-    (fs, rhs_floats ++ body_floats, Let (NonRec bndr rhs') body') }}
+    (fs, rhs_floats `plusFloats` body_floats, Let (NonRec bndr rhs') body') }}
 
 floatExpr lvl (Let bind body)
   = case (floatBind bind)     of { (fsb, bind_floats) ->
     case (floatExpr lvl body) of { (fse, body_floats, body') ->
     (add_stats fsb fse,
-     bind_floats ++ body_floats,
+     bind_floats `plusFloats` body_floats,
      body')  }}
 
 floatExpr lvl (Case scrut (TB case_bndr case_lvl) ty alts)
   = case floatExpr lvl scrut	of { (fse, fde, scrut') ->
     case floatList float_alt alts	of { (fsa, fda, alts')  ->
-    (add_stats fse fsa, fda ++ fde, Case scrut' case_bndr ty alts')
+    (add_stats fse fsa, fda `plusFloats` fde, Case scrut' case_bndr ty alts')
     }}
   where
 	-- Use floatCaseAlt for the alternatives, so that we
@@ -333,10 +324,15 @@ floatExpr lvl (Case scrut (TB case_bndr case_lvl) ty alts)
 
 
 floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
-floatList _ [] = (zeroStats, [], [])
+floatList _ [] = (zeroStats, emptyFloats, [])
 floatList f (a:as) = case f a		 of { (fs_a,  binds_a,  b)  ->
 		     case floatList f as of { (fs_as, binds_as, bs) ->
-		     (fs_a `add_stats` fs_as, binds_a ++ binds_as, b:bs) }}
+		     (fs_a `add_stats` fs_as, binds_a `plusFloats`  binds_as, b:bs) }}
+
+getBindLevel :: Bind (TaggedBndr Level) -> Level
+getBindLevel (NonRec (TB _ lvl) _)       = lvl
+getBindLevel (Rec (((TB _ lvl), _) : _)) = lvl
+getBindLevel (Rec [])                    = panic "getBindLevel Rec []"
 \end{code}
 
 %************************************************************************
@@ -367,13 +363,9 @@ add_stats :: FloatStats -> FloatStats -> FloatStats
 add_stats (FlS a1 b1 c1) (FlS a2 b2 c2)
   = FlS (a1 + a2) (b1 + b2) (c1 + c2)
 
-add_to_stats :: FloatStats -> [(Level, Bind CoreBndr)] -> FloatStats
-add_to_stats (FlS a b c) floats
-  = FlS (a + length top_floats) (b + length other_floats) (c + 1)
-  where
-    (top_floats, other_floats) = partition to_very_top floats
-
-    to_very_top (my_lvl, _) = isTopLvl my_lvl
+add_to_stats :: FloatStats -> FloatBinds -> FloatStats
+add_to_stats (FlS a b c) (FB tops others)
+  = FlS (a + lengthBag tops) (b + lengthBag (flattenMajor others)) (c + 1)
 \end{code}
 
 
@@ -383,57 +375,115 @@ add_to_stats (FlS a b c) floats
 %*									*
 %************************************************************************
 
-\begin{code}
-getBindLevel :: Bind (TaggedBndr Level) -> Level
-getBindLevel (NonRec (TB _ lvl) _)       = lvl
-getBindLevel (Rec (((TB _ lvl), _) : _)) = lvl
-getBindLevel (Rec [])                    = panic "getBindLevel Rec []"
-\end{code}
+Note [Representation of FloatBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The FloatBinds types is somewhat important.  We can get very large numbers
+of floating bindings, often all destined for the top level.  A typical example
+is     x = [4,2,5,2,5, .... ]
+Then we get lots of small expressions like (fromInteger 4), which all get
+lifted to top level.  
+
+The trouble is that  
+  (a) we partition these floating bindings *at every binding site* 
+  (b) SetLevels introduces a new bindings site for every float
+So we had better not look at each binding at each binding site!
+
+That is why MajorEnv is represented as a finite map.
+
+We keep the bindings destined for the *top* level separate, because
+we float them out even if they don't escape a *value* lambda; see
+partitionByMajorLevel.
+
 
 \begin{code}
+type FloatBind = CoreBind	-- INVARIANT: a FloatBind is always lifted
+
+data FloatBinds  = FB !(Bag FloatBind)	   	-- Destined for top level
+     		      !MajorEnv			-- Levels other than top
+     -- See Note [Representation of FloatBinds]
+
+type MajorEnv = UniqFM MinorEnv			-- Keyed by major level
+type MinorEnv = UniqFM (Bag FloatBind)		-- Keyed by minor level
+
+flattenFloats :: FloatBinds -> Bag FloatBind
+flattenFloats (FB tops others) = tops `unionBags` flattenMajor others
+
+flattenMajor :: MajorEnv -> Bag FloatBind
+flattenMajor = foldUFM (unionBags . flattenMinor) emptyBag
+
+flattenMinor :: MinorEnv -> Bag FloatBind
+flattenMinor = foldUFM unionBags emptyBag
+
+emptyFloats :: FloatBinds
+emptyFloats = FB emptyBag emptyUFM
+
+unitFloat :: Level -> FloatBind -> FloatBinds
+unitFloat lvl@(Level major minor) b 
+  | isTopLvl lvl = FB (unitBag b) emptyUFM
+  | otherwise    = FB emptyBag (unitUFM major (unitUFM minor (unitBag b)))
+
+plusFloats :: FloatBinds -> FloatBinds -> FloatBinds
+plusFloats (FB t1 b1) (FB t2 b2) = FB (t1 `unionBags` t2) (b1 `plusMajor` b2)
+
+plusMajor :: MajorEnv -> MajorEnv -> MajorEnv
+plusMajor = plusUFM_C plusMinor
+
+plusMinor :: MinorEnv -> MinorEnv -> MinorEnv
+plusMinor = plusUFM_C unionBags
+
+floatsToBindPairs :: Bag FloatBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
+floatsToBindPairs floats binds = foldrBag add binds floats
+  where
+   add (Rec pairs)         binds = pairs ++ binds
+   add (NonRec binder rhs) binds = (binder,rhs) : binds
+
+install :: Bag FloatBind -> CoreExpr -> CoreExpr
+install defn_groups expr
+  = foldrBag install_group expr defn_groups
+  where
+    install_group defns body = Let defns body
+
 partitionByMajorLevel, partitionByLevel
 	:: Level		-- Partitioning level
-
 	-> FloatBinds   	-- Defns to be divided into 2 piles...
+	-> (FloatBinds,		-- Defns  with level strictly < partition level,
+	    Bag FloatBind)	-- The rest
 
-	-> (FloatBinds,	-- Defns  with level strictly < partition level,
-	    FloatBinds)	-- The rest
+-- 	 ---- partitionByMajorLevel ----
+-- Float it if we escape a value lambda, *or* if we get to the top level
+-- If we can get to the top level, say "yes" anyway. This means that 
+--	x = f e
+-- transforms to 
+--    lvl = e
+--    x = f lvl
+-- which is as it should be
 
-
-partitionByMajorLevel ctxt_lvl defns
-  = partition float_further defns
+partitionByMajorLevel (Level major _) (FB tops defns)
+  = (FB tops outer, heres `unionBags` flattenMajor inner)
   where
-	-- Float it if we escape a value lambda, or if we get to the top level
-    float_further (my_lvl, _) = my_lvl `ltMajLvl` ctxt_lvl || isTopLvl my_lvl
-	-- The isTopLvl part says that if we can get to the top level, say "yes" anyway
-	-- This means that 
-	--	x = f e
-	-- transforms to 
-	--    lvl = e
-	--    x = f lvl
-	-- which is as it should be
+    (outer, mb_heres, inner) = splitUFM defns major
+    heres = case mb_heres of 
+               Nothing -> emptyBag
+               Just h  -> flattenMinor h
 
-partitionByLevel ctxt_lvl defns
-  = partition float_further defns
+partitionByLevel (Level major minor) (FB tops defns)
+  = (FB tops (outer_maj `plusMajor` unitUFM major outer_min),
+     here_min `unionBags` flattenMinor inner_min 
+              `unionBags` flattenMajor inner_maj)
+
   where
-    float_further (my_lvl, _) = my_lvl `ltLvl` ctxt_lvl
+    (outer_maj, mb_here_maj, inner_maj) = splitUFM defns major
+    (outer_min, mb_here_min, inner_min) = case mb_here_maj of
+                                            Nothing -> (emptyUFM, Nothing, emptyUFM)
+                                            Just min_defns -> splitUFM min_defns minor
+    here_min = mb_here_min `orElse` emptyBag
+
+wrapCostCentre :: CostCentre -> FloatBinds -> FloatBinds
+wrapCostCentre cc (FB tops defns)
+  = FB (wrap_defns tops) (mapUFM (mapUFM wrap_defns) defns)
+  where
+    wrap_defns = mapBag wrap_one 
+    wrap_one (NonRec binder rhs) = NonRec binder (mkSCC cc rhs)
+    wrap_one (Rec pairs)         = Rec (mapSnd (mkSCC cc) pairs)
 \end{code}
 
-\begin{code}
-floatsToBinds :: FloatBinds -> [CoreBind]
-floatsToBinds floats = map snd floats
-
-floatsToBindPairs :: FloatBinds -> [(Id,CoreExpr)]
-
-floatsToBindPairs floats = concat (map mk_pairs floats)
-  where
-   mk_pairs (_, Rec pairs)         = pairs
-   mk_pairs (_, NonRec binder rhs) = [(binder,rhs)]
-
-install :: FloatBinds -> CoreExpr -> CoreExpr
-
-install defn_groups expr
-  = foldr install_group expr defn_groups
-  where
-    install_group (_, defns) body = Let defns body
-\end{code}
