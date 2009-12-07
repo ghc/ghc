@@ -3,6 +3,10 @@ Notes on new codegen (Sept 09)
 
 Things to do:
 
+
+ - All dataflow analyses are in the FuelMonad, even though they
+   are guarnteed to consume no fuel.  This seems silly
+
  - CmmContFlowOpt.runCmmContFlowOptZs is not called!
  - Why is runCmmOpts called from HscMain?  Seems too "high up".
    In fact HscMain calls (runCmmOpts cmmCfgOptsZ) which is what
