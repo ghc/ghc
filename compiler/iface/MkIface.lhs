@@ -385,7 +385,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
  = do
    eps <- hscEPS hsc_env
    let
-        -- the ABI of a declaration represents everything that is made
+        -- The ABI of a declaration represents everything that is made
         -- visible about the declaration that a client can depend on.
         -- see IfaceDeclABI below.
        declABI :: IfaceDecl -> IfaceDeclABI 
@@ -589,19 +589,46 @@ sortDependencies d
           dep_pkgs   = sortBy (compare `on` packageIdFS)  (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
+\end{code}
 
--- The ABI of a declaration consists of:
-     -- the full name of the identifier (inc. module and package, because
-     --   these are used to construct the symbol name by which the 
-     --   identifier is known externally).
-     -- the fixity of the identifier
-     -- the declaration itself, as exposed to clients.  That is, the
-     --   definition of an Id is included in the fingerprint only if
-     --   it is made available as as unfolding in the interface.
-     -- for Ids: rules
-     -- for classes: instances, fixity & rules for methods
-     -- for datatypes: instances, fixity & rules for constrs
+
+%************************************************************************
+%*		                					*
+          The ABI of an IfaceDecl       									
+%*	       	     							*
+%************************************************************************
+
+Note [The ABI of an IfaceDecl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ABI of a declaration consists of:
+
+   (a) the full name of the identifier (inc. module and package,
+       because these are used to construct the symbol name by which
+       the identifier is known externally).
+
+   (b) the declaration itself, as exposed to clients.  That is, the
+       definition of an Id is included in the fingerprint only if
+       it is made available as as unfolding in the interface.
+
+   (c) the fixity of the identifier
+   (d) for Ids: rules
+   (e) for classes: instances, fixity & rules for methods
+   (f) for datatypes: instances, fixity & rules for constrs
+
+Items (c)-(f) are not stored in the IfaceDecl, but instead appear
+elsewhere in the interface file.  But they are *fingerprinted* with
+the Id itself. This is done by grouping (c)-(f) in IfaceDeclExtras,
+and fingerprinting that as part of the Id.
+
+\begin{code}
 type IfaceDeclABI = (Module, IfaceDecl, IfaceDeclExtras)
+
+data IfaceDeclExtras 
+  = IfaceIdExtras    Fixity [IfaceRule]
+  | IfaceDataExtras  Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
+  | IfaceClassExtras Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
+  | IfaceSynExtras   Fixity
+  | IfaceOtherDeclExtras
 
 abiDecl :: IfaceDeclABI -> IfaceDecl
 abiDecl (_, decl, _) = decl
@@ -613,13 +640,6 @@ cmp_abiNames abi1 abi2 = ifName (abiDecl abi1) `compare`
 freeNamesDeclABI :: IfaceDeclABI -> NameSet
 freeNamesDeclABI (_mod, decl, extras) =
   freeNamesIfDecl decl `unionNameSets` freeNamesDeclExtras extras
-
-data IfaceDeclExtras 
-  = IfaceIdExtras    Fixity [IfaceRule]
-  | IfaceDataExtras  Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
-  | IfaceClassExtras Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
-  | IfaceSynExtras   Fixity
-  | IfaceOtherDeclExtras
 
 freeNamesDeclExtras :: IfaceDeclExtras -> NameSet
 freeNamesDeclExtras (IfaceIdExtras    _ rules)
@@ -636,6 +656,7 @@ freeNamesDeclExtras IfaceOtherDeclExtras
 freeNamesSub :: (Fixity,[IfaceRule]) -> NameSet
 freeNamesSub (_,rules) = unionManyNameSets (map freeNamesIfRule rules)
 
+-- This instance is used only to compute fingerprints
 instance Binary IfaceDeclExtras where
   get _bh = panic "no get for IfaceDeclExtras"
   put_ bh (IfaceIdExtras fix rules) = do
@@ -761,17 +782,16 @@ mkOrphMap get_key decls
   where
     go (non_orphs, orphs) d
 	| Just occ <- get_key d
-	= (extendOccEnv_C (\ ds _ -> d:ds) non_orphs occ [d], orphs)
+	= (extendOccEnv_Acc (:) singleton non_orphs occ d, orphs)
 	| otherwise = (non_orphs, d:orphs)
 \end{code}
 
 
-%*********************************************************
-%*							*
-\subsection{Keeping track of what we've slurped, and fingerprints}
-%*							*
-%*********************************************************
-
+%************************************************************************
+%*		                					*
+       Keeping track of what we've slurped, and fingerprints
+%*	       	     							*
+%************************************************************************
 
 \begin{code}
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> IO [Usage]
