@@ -1,0 +1,9 @@
+
+T3102.hs:11:12:
+    Couldn't match expected type `a1'
+           against inferred type `(?p::Int) => a'
+      `a1' is a rigid type variable bound by
+           the polymorphic type `forall a1. a1 -> String' at T3102.hs:11:10
+    In the first argument of `f', namely `t'
+    In the expression: f t
+    In the definition of `result': result = f t
