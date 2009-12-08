@@ -323,9 +323,9 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
 		(withPprStyle (mkUserStyle (mkPrintUnqualified dflags rdr_env) AllTheWay) $
-		 vcat [text "Local rules", pprRules simpl_rules,
+		 vcat [text "Local rules for local Ids", pprRules simpl_rules,
 		       blankLine,
-		       text "Imported rules", pprRuleBase hpt_rule_base])
+		       text "Local rules for imported Ids", pprRuleBase hpt_rule_base])
 
 	; return (hpt_rule_base, guts { mg_binds = binds_w_rules, 
 					mg_rules = rules_for_imps })

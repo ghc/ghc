@@ -120,8 +120,9 @@
                 <indexterm><primary><option>-ddump-rules</option></primary></indexterm>
 	      </term>
 	      <listitem>
-		<para>dumps all rewrite rules (including those generated
-	      by the specialisation pass)</para>
+		<para>dumps all rewrite rules specified in this module; 
+                      see <xref linkend="controlling-rules"/>.
+                </para>
 	      </listitem>
 	    </varlistentry>
 
