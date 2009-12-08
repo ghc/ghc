@@ -140,7 +140,6 @@ static nat  initialise_N            (rtsBool force_major_gc);
 static void init_collected_gen      (nat g, nat threads);
 static void init_uncollected_gen    (nat g, nat threads);
 static void init_gc_thread          (gc_thread *t);
-static void update_task_list        (void);
 static void resize_generations      (void);
 static void resize_nursery          (void);
 static void start_gc_threads        (void);
@@ -415,9 +414,6 @@ SET_GCT(gc_threads[0]);
   }
 
   shutdown_gc_threads(n_gc_threads, gct->thread_index);
-
-  // Update pointers from the Task list
-  update_task_list();
 
   // Now see which stable names are still alive.
   gcStablePtrTable();
@@ -1449,39 +1445,6 @@ zero_static_object_list(StgClosure* first_static)
     link = *STATIC_LINK(info, p);
     *STATIC_LINK(info,p) = NULL;
   }
-}
-
-/* ----------------------------------------------------------------------------
-   Update the pointers from the task list
-
-   These are treated as weak pointers because we want to allow a main
-   thread to get a BlockedOnDeadMVar exception in the same way as any
-   other thread.  Note that the threads should all have been retained
-   by GC by virtue of being on the all_threads list, we're just
-   updating pointers here.
-   ------------------------------------------------------------------------- */
-
-static void
-update_task_list (void)
-{
-    Task *task;
-    StgTSO *tso;
-    for (task = all_tasks; task != NULL; task = task->all_link) {
-	if (!task->stopped && task->tso) {
-	    ASSERT(task->tso->bound == task);
-	    tso = (StgTSO *) isAlive((StgClosure *)task->tso);
-	    if (tso == NULL) {
-		barf("task %p: main thread %d has been GC'd", 
-#ifdef THREADED_RTS
-		     (void *)task->id, 
-#else
-		     (void *)task,
-#endif
-		     task->tso->id);
-	    }
-	    task->tso = tso;
-	}
-    }
 }
 
 /* ----------------------------------------------------------------------------

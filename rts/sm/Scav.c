@@ -73,6 +73,11 @@ scavengeTSO (StgTSO *tso)
 
     debugTrace(DEBUG_gc,"scavenging thread %d",(int)tso->id);
 
+    // update the pointer from the Task.
+    if (tso->bound != NULL) {
+        tso->bound->tso = tso;
+    }
+
     saved_eager = gct->eager_promotion;
     gct->eager_promotion = rtsFalse;
 
