@@ -618,7 +618,7 @@ extern StgWord stg_ap_stack_entries[];
 extern StgWord stg_stack_save_entries[];
 
 // Storage.c
-extern unsigned int RTS_VAR(alloc_blocks);
+extern unsigned int RTS_VAR(g0);
 extern unsigned int RTS_VAR(alloc_blocks_lim);
 extern StgWord RTS_VAR(weak_ptr_list);
 extern StgWord RTS_VAR(atomic_modify_mutvar_mutex);
