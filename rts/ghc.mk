@@ -321,8 +321,8 @@ rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-funroll-loops
 
 # These files are just copies of sm/Evac.c and sm/Scav.c respectively,
 # but compiled with -DPARALLEL_GC.
-rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
-rts/dist/build/sm/Scav_thr_HC_OPTS += -optc-DPARALLEL_GC -Irts/sm
+rts/dist/build/sm/Evac_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
+rts/dist/build/sm/Scav_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
 
 #-----------------------------------------------------------------------------
 # Add PAPI library if needed
