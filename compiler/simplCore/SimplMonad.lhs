@@ -177,17 +177,22 @@ plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
 \end{code}
 
 \begin{code}
-data SimplCount = VerySimplZero		-- These two are used when 
-		| VerySimplNonZero	-- we are only interested in 
-					-- termination info
+data SimplCount 
+   = VerySimplZero		-- These two are used when 
+   | VerySimplNonZero	-- we are only interested in 
+				-- termination info
 
-		| SimplCount	{
-			ticks   :: !Int,		-- Total ticks
-			details :: !TickCounts,		-- How many of each type
-			n_log	:: !Int,		-- N
-			log1	:: [Tick],		-- Last N events; <= opt_HistorySize
-			log2	:: [Tick]		-- Last opt_HistorySize events before that
-		  }
+   | SimplCount	{
+	ticks   :: !Int,	-- Total ticks
+	details :: !TickCounts,	-- How many of each type
+
+	n_log	:: !Int,	-- N
+	log1	:: [Tick],	-- Last N events; <= opt_HistorySize, 
+		   		--   most recent first
+	log2	:: [Tick]	-- Last opt_HistorySize events before that
+		   		-- Having log1, log2 lets us accumulate the
+				-- recent history reasonably efficiently
+     }
 
 type TickCounts = FiniteMap Tick Int
 
@@ -267,12 +272,8 @@ pprTickCounts ((tick1,n1):ticks)
     tot_n		= sum [n | (_,n) <- real_these]
 
 pprTCDetails :: [(Tick, Int)] -> SDoc
-pprTCDetails ticks@((tick,_):_)
-  | verboseSimplStats || isRuleFired tick
+pprTCDetails ticks
   = nest 4 (vcat [int n <+> pprTickCts tick | (tick,n) <- ticks])
-  | otherwise
-  = empty
-pprTCDetails [] = panic "pprTCDetails []"
 \end{code}
 
 %************************************************************************
@@ -305,10 +306,6 @@ data Tick
 
   | BottomFound		
   | SimplifierDone		-- Ticked at each iteration of the simplifier
-
-isRuleFired :: Tick -> Bool
-isRuleFired (RuleFired _) = True
-isRuleFired _             = False
 
 instance Outputable Tick where
   ppr tick = text (tickString tick) <+> pprTickCts tick
@@ -380,11 +377,8 @@ pprTickCts _    			= empty
 cmpTick :: Tick -> Tick -> Ordering
 cmpTick a b = case (tickToTag a `compare` tickToTag b) of
 		GT -> GT
-		EQ | isRuleFired a || verboseSimplStats -> cmpEqTick a b
-		   | otherwise				-> EQ
+		EQ -> cmpEqTick a b
 		LT -> LT
-	-- Always distinguish RuleFired, so that the stats
-	-- can report them even in non-verbose mode
 
 cmpEqTick :: Tick -> Tick -> Ordering
 cmpEqTick (PreInlineUnconditionally a)	(PreInlineUnconditionally b)	= a `compare` b
