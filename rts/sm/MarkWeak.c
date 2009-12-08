@@ -127,14 +127,8 @@ traverseWeakPtrList(void)
 	      continue;
 	  }
 	  
-          info = w->header.info;
-          if (IS_FORWARDING_PTR(info)) {
-	      next_w = (StgWeak *)UN_FORWARDING_PTR(info);
-	      *last_w = next_w;
-	      continue;
-          }
-
-	  switch (INFO_PTR_TO_STRUCT(info)->type) {
+          info = get_itbl(w);
+	  switch (info->type) {
 
 	  case WEAK:
 	      /* Now, check whether the key is reachable.
@@ -386,21 +380,17 @@ traverseBlackholeQueue (void)
 }
 
 /* -----------------------------------------------------------------------------
-   After GC, the live weak pointer list may have forwarding pointers
-   on it, because a weak pointer object was evacuated after being
-   moved to the live weak pointer list.  We remove those forwarding
-   pointers here.
+   Evacuate every weak pointer object on the weak_ptr_list, and update
+   the link fields.
 
-   Also, we don't consider weak pointer objects to be reachable, but
-   we must nevertheless consider them to be "live" and retain them.
-   Therefore any weak pointer objects which haven't as yet been
-   evacuated need to be evacuated now.
+   ToDo: with a lot of weak pointers, this will be expensive.  We
+   should have a per-GC weak pointer list, just like threads.
    -------------------------------------------------------------------------- */
 
 void
 markWeakPtrList ( void )
 {
-  StgWeak *w, **last_w, *tmp;
+  StgWeak *w, **last_w;
 
   last_w = &weak_ptr_list;
   for (w = weak_ptr_list; w; w = w->link) {
@@ -408,10 +398,13 @@ markWeakPtrList ( void )
       ASSERT(IS_FORWARDING_PTR(w->header.info)
              || w->header.info == &stg_DEAD_WEAK_info 
 	     || get_itbl(w)->type == WEAK);
-      tmp = w;
-      evacuate((StgClosure **)&tmp);
-      *last_w = w;
-      last_w = &(w->link);
+      evacuate((StgClosure **)last_w);
+      w = *last_w;
+      if (w->header.info == &stg_DEAD_WEAK_info) {
+          last_w = &(((StgDeadWeak*)w)->link);
+      } else {
+          last_w = &(w->link);
+      }
   }
 }
 
