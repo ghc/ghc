@@ -27,7 +27,8 @@ test('T1969',
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 420000000,
                                                       480000000)),
-                                    # expected value: 434845560 (amd64/Linux)
+                                    # 17/11/2009:     434,845,560 (amd64/Linux)
+                                    # 08/12/2009:     459,776,680 (amd64/Linux)
       only_ways(['normal'])
       ],
      compile,
