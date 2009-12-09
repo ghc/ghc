@@ -2201,6 +2201,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
       //
 
       if (tso->flags & TSO_SQUEEZED) {
+          unlockTSO(tso);
           return tso;
       }
       // #3677: In a stack overflow situation, stack squeezing may
