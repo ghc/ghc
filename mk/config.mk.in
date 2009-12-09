@@ -569,6 +569,8 @@ BASH                    = /usr/local/bin/bash
 
 CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
+# It's not easy to separate the CPP program from its flags, as
+# AC_PROG_CPP defines CPP as "/usr/bin/gcc -E"
 CPP			= @CPP@ @CPPFLAGS@
 CTAGS 			= $(ETAGS)
 #
