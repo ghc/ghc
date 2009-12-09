@@ -83,7 +83,7 @@
 
 # We need second expansion for the way we handle directories, so that
 #     | $$$$(dir $$$$@)/.
-# expands to the directoy of a rule that uses a % pattern.
+# expands to the directory of a rule that uses a % pattern.
 .SECONDEXPANSION:
 
 default : all
