@@ -4,7 +4,11 @@ include $(TOP)/mk/test.mk
 
 # The libraries that we actually know about. We don't want to test
 # extralibs that are in our tree but which we haven't built.
-LIBRARIES := $(shell $(GHC_PKG) list --simple-output --names-only)
+LIBRARIES := $(shell '$(GHC_PKG)' list --simple-output --names-only)
+
+ifeq "$(findstring base,$(LIBRARIES))" ""
+$(error base library does not seem to be installed)
+endif
 
 # XXX Do this better?
 # Now find the "tests" directories of those libraries, where they exist
