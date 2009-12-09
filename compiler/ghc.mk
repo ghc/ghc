@@ -419,8 +419,13 @@ compiler_PACKAGE = ghc
 # Note: we also have to tweak the version number of the package itself
 # when it gets registered; see Note [munge-stage1-package-config]
 # below.
-ifneq "$(ProjectPatchLevel)" "0"
+# The ProjectPatchLevel > 20000000 iff it's a date. If it's e.g. 6.12.1
+# then we don't want to remove it
+ifeq "$(shell [ $(ProjectPatchLevel) -gt 20000000 ] && echo YES)" "YES"
+compiler_stage1_VERSION_MUNGED = YES
+endif
 
+ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
 define compiler_PACKAGE_MAGIC
 compiler_stage1_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
 endef
@@ -481,7 +486,7 @@ compiler/main/Constants_HC_OPTS  += -fforce-recomp
 # Note [munge-stage1-package-config]
 # Strip the date/patchlevel from the version of stage1.  See Note
 # [fiddle-stage1-version] above.
-ifneq "$(ProjectPatchLevel)" "0"
+ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
 compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
 	sed -e 's/^\(version: .*\)\.$(ProjectPatchLevel)$$/\1/' \
 	    -e 's/^\(id: .*\)\.$(ProjectPatchLevel)$$/\1/' \
