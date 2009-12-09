@@ -72,12 +72,14 @@ endif
 else
 
 ifneq "$$(BINDIST)" "YES"
+$1_$2_WAYS = v
+
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 
 # --- DEPENDENCIES
 
-$1_$2_depfile = $1/$2/build/.depend
+$1_$2_depfile_base = $1/$2/build/.depend
 
 $(call build-dependencies,$1,$2)
 

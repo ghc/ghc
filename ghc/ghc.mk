@@ -18,6 +18,14 @@ ghc_stage1_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_HC_OPTS = $(GhcStage2HcOpts)
 ghc_stage3_HC_OPTS = $(GhcStage3HcOpts)
 
+ghc_stage2_CC_OPTS = -Iincludes
+ghc_stage3_CC_OPTS = -Iincludes
+
+ghc_stage1_C_FILES_NODEPS = ghc/hschooks.c
+
+ghc_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
+ghc_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
+
 ifeq "$(GhcWithInterpreter)" "YES"
 ghc_stage2_HC_OPTS += -DGHCI
 ghc_stage3_HC_OPTS += -DGHCI
@@ -118,9 +126,9 @@ ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_v_LIB)
 ghc/stage3/build/tmp/$(ghc_stage3_PROG) : $(compiler_stage3_v_LIB)
 
 # Modules here import HsVersions.h, so we need ghc_boot_platform.h
-$(ghc_stage1_depfile) : compiler/stage1/$(PLATFORM_H)
-$(ghc_stage2_depfile) : compiler/stage2/$(PLATFORM_H)
-$(ghc_stage3_depfile) : compiler/stage3/$(PLATFORM_H)
+$(ghc_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
+$(ghc_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
+$(ghc_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
 
 all_ghc_stage1 : $(GHC_STAGE1)
 all_ghc_stage2 : $(GHC_STAGE2)

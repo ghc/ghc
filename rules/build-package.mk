@@ -119,7 +119,7 @@ $(call includes-sources,$1,$2)
 # We must use a different dependency file if $(GhcLibWays) changes, so
 # encode the ways into the name of the file.
 $1_$2_WAYS_DASHED = $$(subst $$(space),,$$(patsubst %,-%,$$(strip $$($1_$2_WAYS))))
-$1_$2_depfile = $1/$2/build/.depend$$($1_$2_WAYS_DASHED)
+$1_$2_depfile_base = $1/$2/build/.depend$$($1_$2_WAYS_DASHED)
 
 $(call build-dependencies,$1,$2)
 

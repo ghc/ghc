@@ -23,7 +23,6 @@ GHC_RTS_DIR             = rts
 GHC_DRIVER_DIR          = driver
 GHC_COMPAT_DIR          = compat
 
-GHC_MKDEPENDC_DIR       = $(GHC_UTILS_DIR)/mkdependC
 GHC_LTX_DIR             = $(GHC_UTILS_DIR)/ltx
 GHC_LNDIR_DIR           = $(GHC_UTILS_DIR)/lndir
 GHC_MKDIRHIER_DIR       = $(GHC_UTILS_DIR)/mkdirhier

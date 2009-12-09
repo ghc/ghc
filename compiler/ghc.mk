@@ -29,6 +29,12 @@ endef
 
 compiler_CONFIG_HS = compiler/main/Config.hs
 
+# This is just to avoid generating a warning when generating deps
+# involving RtsFlags.h
+compiler_stage1_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
+compiler_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
+compiler_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
+
 ifneq "$(BINDIST)" "YES"
 compiler/stage1/package-data.mk : $(compiler_CONFIG_HS)
 compiler/stage2/package-data.mk : $(compiler_CONFIG_HS)
@@ -453,13 +459,13 @@ ifeq "$(stage)" "3"
 $(eval $(call build-package,compiler,stage3,2))
 endif
 
-$(compiler_stage1_depfile) : compiler/stage1/$(PLATFORM_H)
-$(compiler_stage2_depfile) : compiler/stage2/$(PLATFORM_H)
-$(compiler_stage3_depfile) : compiler/stage3/$(PLATFORM_H)
+$(compiler_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
+$(compiler_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
+$(compiler_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
 
-$(compiler_stage1_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
-$(compiler_stage2_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
-$(compiler_stage3_depfile) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
+$(compiler_stage1_depfile_haskell) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
+$(compiler_stage2_depfile_haskell) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
+$(compiler_stage3_depfile_haskell) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
 
 # Every Constants.o object file depends on includes/GHCConstants.h:
 $(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS) includes/HaskellConstants.hs))

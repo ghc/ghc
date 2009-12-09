@@ -486,7 +486,6 @@ BUILD_DIRS =
 
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
-   $(GHC_MKDEPENDC_DIR) \
    $(GHC_MKDIRHIER_DIR)
 endif
 
@@ -682,8 +681,8 @@ compiler/stage1/package-data.mk : \
 
 # These are necessary because the bootstrapping compiler may not know
 # about cross-package dependencies:
-$(compiler_stage1_depfile) : $(BOOT_LIBS)
-$(ghc_stage1_depfile) : $(compiler_stage1_v_LIB)
+$(compiler_stage1_depfile_haskell) : $(BOOT_LIBS)
+$(ghc_stage1_depfile_haskell) : $(compiler_stage1_v_LIB)
 
 # A few careful dependencies between bootstrapping packages.  When we
 # can rely on the stage 0 compiler being able to generate

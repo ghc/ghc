@@ -18,6 +18,7 @@ rts_dist_HC = $(GHC_STAGE1)
 
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
+rts_dist_WAYS = $(rts_WAYS)
 
 ALL_RTS_LIBS = rts/dist/build/libHSrtsmain.a \
 	       $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
@@ -354,15 +355,8 @@ endif
 # -----------------------------------------------------------------------------
 # dependencies
 
-# Hack: we define every way-related option here, so that we get (hopefully)
-# a superset of the dependencies.  To do this properly, we should generate
-# a different set of dependencies for each way.  Further hack: PROFILING and
-# TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
-rts_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
-rts_MKDEPENDC_OPTS += -Irts/sm
-
 rts_WAYS_DASHED = $(subst $(space),,$(patsubst %,-%,$(strip $(rts_WAYS))))
-rts_dist_depfile = rts/dist/build/.depend$(rts_WAYS_DASHED)
+rts_dist_depfile_base = rts/dist/build/.depend$(rts_WAYS_DASHED)
 
 rts_dist_C_SRCS  = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
 rts_dist_S_SRCS =  $(rts_S_SRCS)
@@ -370,7 +364,7 @@ rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 
 $(eval $(call build-dependencies,rts,dist))
 
-$(rts_dist_depfile) : libffi/dist-install/build/ffi.h
+$(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h
 
 #-----------------------------------------------------------------------------
 # libffi stuff
