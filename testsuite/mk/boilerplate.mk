@@ -31,15 +31,15 @@ endif
 $(call canonicalise,$1)
 endef
 
-define get-ghc-rts-field # $1 = rseult variable, $2 = field name
+define get-ghc-rts-field # $1 = result variable, $2 = field name
 $1 := $$(shell '$$(TEST_HC)' +RTS --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 endef
 
-define get-ghc-field # $1 = rseult variable, $2 = field name
+define get-ghc-field # $1 = result variable, $2 = field name
 $1 := $$(shell '$$(TEST_HC)' --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 endef
 
-define get-ghc-feature-bool # $1 = rseult variable, $2 = field name
+define get-ghc-feature-bool # $1 = result variable, $2 = field name
 SHELL_RES := $$(shell '$$(TEST_HC)' --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
 $1 := $$(strip \
 	  $$(if $$(SHELL_RES), \
