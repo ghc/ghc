@@ -894,6 +894,8 @@ ifneq "$(CLEANING)" "YES"
 
 $(eval $(call bindist,.,\
     LICENSE \
+    README \
+    INSTALL \
     configure config.sub config.guess install-sh \
     extra-gcc-opts.in \
     Makefile \
@@ -941,14 +943,13 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep:
 	"$(RM)" $(RM_OPTS) -r bindistprep/
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "LATEX_DOCS         = $(LATEX_DOCS)"         >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_HTML = $(BUILD_DOCBOOK_HTML)" >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
-	ln -s ../../distrib/configure-bin.ac $(BIN_DIST_PREP_DIR)/configure.ac
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_PREP_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
