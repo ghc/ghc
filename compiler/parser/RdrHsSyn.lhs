@@ -1002,13 +1002,17 @@ parseCImport cconv safety nm str =
  listToMaybe $ map fst $ filter (null.snd) $ 
      readP_to_S parse str
  where
-   parse = choice [
+   parse = do
+       skipSpaces
+       r <- choice [
           string "dynamic" >> return (mk nilFS (CFunction DynamicTarget)),
           string "wrapper" >> return (mk nilFS CWrapper),
           optional (string "static" >> skipSpaces) >> 
            (mk nilFS <$> cimp nm) +++
            (do h <- munch1 hdr_char; skipSpaces; mk (mkFastString h) <$> cimp nm)
-       ]
+         ]
+       skipSpaces
+       return r
 
    mk = CImport cconv safety
 
