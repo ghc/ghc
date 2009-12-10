@@ -759,11 +759,11 @@ nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
 nextCharIs buf p = not (atEnd buf) && p (currentChar buf)
 
 notFollowedBy :: Char -> AlexAccPred Int
-notFollowedBy char _ _ _ (AI _ _ buf) 
+notFollowedBy char _ _ _ (AI _ buf) 
   = nextCharIs buf (/=char)
 
 notFollowedBySymbol :: AlexAccPred Int
-notFollowedBySymbol _ _ _ (AI _ _ buf)
+notFollowedBySymbol _ _ _ (AI _ buf)
   = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
 
 -- We must reject doc comments as being ordinary comments everywhere.
@@ -772,7 +772,7 @@ notFollowedBySymbol _ _ _ (AI _ _ buf)
 -- valid in all states, but the doc-comment rules are only valid in
 -- the non-layout states.
 isNormalComment :: AlexAccPred Int
-isNormalComment bits _ _ (AI _ _ buf)
+isNormalComment bits _ _ (AI _ buf)
   | haddockEnabled bits = notFollowedByDocOrPragma
   | otherwise           = nextCharIs buf (/='#')
   where
@@ -783,12 +783,12 @@ spaceAndP :: StringBuffer -> (StringBuffer -> Bool) -> Bool
 spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
 
 {-
-haddockDisabledAnd p bits _ _ (AI _ _ buf)
+haddockDisabledAnd p bits _ _ (AI _ buf)
   = if haddockEnabled bits then False else (p buf)
 -}
 
 atEOL :: AlexAccPred Int
-atEOL _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf == '\n'
+atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
 
 ifExtension :: (Int -> Bool) -> AlexAccPred Int
 ifExtension pred bits _ _ _ = pred bits
@@ -874,7 +874,7 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
 withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (Located Token))
                  -> P (Located Token)
 withLexedDocType lexDocComment = do
-  input@(AI _ _ buf) <- getInput
+  input@(AI _ buf) <- getInput
   case prevChar buf ' ' of
     '|' -> lexDocComment input ITdocCommentNext False
     '^' -> lexDocComment input ITdocCommentPrev False
@@ -908,32 +908,20 @@ endPrag span _buf _len = do
 -- it writes the wrong token length to the parser state. This function is
 -- called afterwards, so it can just update the state. 
 
--- This is complicated by the fact that Haddock tokens can span multiple lines, 
--- which is something that the original lexer didn't account for. 
--- I have added last_line_len in the parser state which represents the length 
--- of the part of the token that is on the last line. It is now used for layout 
--- calculation in pushCurrentContext instead of last_len. last_len is, like it 
--- was before, the full length of the token, and it is now only used for error
--- messages. /Waern 
-
 docCommentEnd :: AlexInput -> String -> (String -> Token) -> StringBuffer ->
                  SrcSpan -> P (Located Token) 
 docCommentEnd input commentAcc docType buf span = do
   setInput input
-  let (AI loc last_offs nextBuf) = input
+  let (AI loc nextBuf) = input
       comment = reverse commentAcc
       span' = mkSrcSpan (srcSpanStart span) loc
       last_len = byteDiff buf nextBuf
       
-      last_line_len = if (last_offs - last_len < 0) 
-        then last_offs
-        else last_len  
-  
-  span `seq` setLastToken span' last_len last_line_len
+  span `seq` setLastToken span' last_len
   return (L span' (docType comment))
  
 errBrace :: AlexInput -> SrcSpan -> P a
-errBrace (AI end _ _) span = failLocMsgP (srcSpanStart span) end "unterminated `{-'"
+errBrace (AI end _) span = failLocMsgP (srcSpanStart span) end "unterminated `{-'"
 
 open_brace, close_brace :: Action
 open_brace span _str _len = do 
@@ -1109,7 +1097,8 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
 new_layout_context :: Bool -> Action
 new_layout_context strict span _buf _len = do
     _ <- popLexState
-    (AI _ offset _) <- getInput
+    (AI l _) <- getInput
+    let offset = srcLocCol l
     ctx <- getContext
     case ctx of
 	Layout prev_off : _  | 
@@ -1173,7 +1162,7 @@ lex_string_prag mkTok span _buf _len
               = case alexGetChar i of
                   Just (c,i') | c == x    -> isString i' xs
                   _other -> False
-          err (AI end _ _) = failLocMsgP (srcSpanStart span) end "unterminated options pragma"
+          err (AI end _) = failLocMsgP (srcSpanStart span) end "unterminated options pragma"
 
 
 -- -----------------------------------------------------------------------------
@@ -1246,21 +1235,21 @@ lex_char_tok span _buf _len = do	-- We've seen '
    case alexGetChar' i1 of
 	Nothing -> lit_error 
 
-	Just ('\'', i2@(AI end2 _ _)) -> do 	-- We've seen ''
+	Just ('\'', i2@(AI end2 _)) -> do 	-- We've seen ''
 		  th_exts <- extension thEnabled
 		  if th_exts then do
 			setInput i2
 			return (L (mkSrcSpan loc end2)  ITtyQuote)
 		   else lit_error
 
-	Just ('\\', i2@(AI _end2 _ _)) -> do 	-- We've seen 'backslash
+	Just ('\\', i2@(AI _end2 _)) -> do 	-- We've seen 'backslash
 		  setInput i2
 		  lit_ch <- lex_escape
 		  mc <- getCharOrFail	-- Trailing quote
 		  if mc == '\'' then finish_char_tok loc lit_ch
 			        else do setInput i2; lit_error 
 
-        Just (c, i2@(AI _end2 _ _))
+        Just (c, i2@(AI _end2 _))
 		| not (isAny c) -> lit_error
 		| otherwise ->
 
@@ -1274,7 +1263,7 @@ lex_char_tok span _buf _len = do	-- We've seen '
 		       	  		-- (including the possibility of EOF)
 					-- If TH is on, just parse the quote only
 			th_exts <- extension thEnabled	
-			let (AI end _ _) = i1
+			let (AI end _) = i1
 			if th_exts then return (L (mkSrcSpan loc end) ITvarQuote)
 				   else do setInput i2; lit_error
 
@@ -1282,10 +1271,10 @@ finish_char_tok :: SrcLoc -> Char -> P (Located Token)
 finish_char_tok loc ch	-- We've already seen the closing quote
 			-- Just need to check for trailing #
   = do	magicHash <- extension magicHashEnabled
-	i@(AI end _ _) <- getInput
+	i@(AI end _) <- getInput
 	if magicHash then do
 		case alexGetChar' i of
-			Just ('#',i@(AI end _ _)) -> do
+			Just ('#',i@(AI end _)) -> do
 				setInput i
 				return (L (mkSrcSpan loc end) (ITprimchar ch))
 			_other ->
@@ -1489,11 +1478,7 @@ data PState = PState {
         dflags     :: DynFlags,
         messages   :: Messages,
         last_loc   :: SrcSpan,	-- pos of previous token
-        last_offs  :: !Int, 	-- offset of the previous token from the
-				-- beginning of  the current line.
-				-- \t is equal to 8 spaces.
 	last_len   :: !Int,	-- len of previous token
-        last_line_len :: !Int,
         loc        :: SrcLoc,   -- current loc (end of prev token + 1)
 	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
 	context	   :: [LayoutContext],
@@ -1581,27 +1566,25 @@ setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
 getSrcLoc :: P SrcLoc
 getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
-setLastToken :: SrcSpan -> Int -> Int -> P ()
-setLastToken loc len line_len = P $ \s -> POk s { 
+setLastToken :: SrcSpan -> Int -> P ()
+setLastToken loc len = P $ \s -> POk s { 
   last_loc=loc, 
-  last_len=len,
-  last_line_len=line_len 
-} ()
+  last_len=len
+  } ()
 
-data AlexInput = AI SrcLoc {-#UNPACK#-}!Int StringBuffer
+data AlexInput = AI SrcLoc StringBuffer
 
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (AI _ _ buf) = prevChar buf '\n'
+alexInputPrevChar (AI _ buf) = prevChar buf '\n'
 
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar (AI loc ofs s) 
+alexGetChar (AI loc s) 
   | atEnd s   = Nothing
-  | otherwise = adj_c `seq` loc' `seq` ofs' `seq` s' `seq` 
+  | otherwise = adj_c `seq` loc' `seq` s' `seq` 
 		--trace (show (ord c)) $
-		Just (adj_c, (AI loc' ofs' s'))
+		Just (adj_c, (AI loc' s'))
   where (c,s') = nextChar s
         loc'   = advanceSrcLoc loc c
-        ofs'   = advanceOffs c ofs
 
 	non_graphic     = '\x0'
 	upper 		= '\x1'
@@ -1647,25 +1630,19 @@ alexGetChar (AI loc ofs s)
 -- This version does not squash unicode characters, it is used when
 -- lexing strings.
 alexGetChar' :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar' (AI loc ofs s) 
+alexGetChar' (AI loc s) 
   | atEnd s   = Nothing
-  | otherwise = c `seq` loc' `seq` ofs' `seq` s' `seq` 
+  | otherwise = c `seq` loc' `seq` s' `seq` 
 		--trace (show (ord c)) $
-		Just (c, (AI loc' ofs' s'))
+		Just (c, (AI loc' s'))
   where (c,s') = nextChar s
         loc'   = advanceSrcLoc loc c
-        ofs'   = advanceOffs c ofs
-
-advanceOffs :: Char -> Int -> Int
-advanceOffs '\n' _    = 0
-advanceOffs '\t' offs = (offs `quot` 8 + 1) * 8
-advanceOffs _    offs = offs + 1
 
 getInput :: P AlexInput
-getInput = P $ \s@PState{ loc=l, last_offs=o, buffer=b } -> POk s (AI l o b)
+getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (AI l b)
 
 setInput :: AlexInput -> P ()
-setInput (AI l o b) = P $ \s -> POk s{ loc=l, last_offs=o, buffer=b } ()
+setInput (AI l b) = P $ \s -> POk s{ loc=l, buffer=b } ()
 
 pushLexState :: Int -> P ()
 pushLexState ls = P $ \s@PState{ lex_state=l } -> POk s{lex_state=ls:l} ()
@@ -1816,9 +1793,7 @@ pragState dynflags buf loc =
       messages      = emptyMessages,
       dflags        = dynflags,
       last_loc      = mkSrcSpan loc loc,
-      last_offs     = 0,
       last_len      = 0,
-      last_line_len = 0,
       loc           = loc,
       extsBitmap    = 0,
       context       = [],
@@ -1840,9 +1815,7 @@ mkPState buf loc flags  =
       dflags        = flags,
       messages      = emptyMessages,
       last_loc      = mkSrcSpan loc loc,
-      last_offs     = 0,
       last_len      = 0,
-      last_line_len = 0,
       loc           = loc,
       extsBitmap    = fromIntegral bitmap,
       context       = [],
@@ -1910,14 +1883,15 @@ popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
 -- This is only used at the outer level of a module when the 'module'
 -- keyword is missing.
 pushCurrentContext :: P ()
-pushCurrentContext = P $ \ s@PState{ last_offs=offs, last_line_len=len, context=ctx } -> 
-    POk s{context = Layout (offs-len) : ctx} ()
---trace ("off: " ++ show offs ++ ", len: " ++ show len) $ POk s{context = Layout (offs-len) : ctx} ()
+pushCurrentContext = P $ \ s@PState{ last_loc=loc, context=ctx } -> 
+    POk s{context = Layout (srcSpanStartCol loc) : ctx} ()
 
 getOffside :: P Ordering
-getOffside = P $ \s@PState{last_offs=offs, context=stk} ->
+getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
+                let offs = srcSpanStartCol loc in
 		let ord = case stk of
-			(Layout n:_) -> compare offs n
+			(Layout n:_) -> --trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $ 
+                                        compare offs n
 			_            -> GT
 		in POk s ord
 
@@ -1949,7 +1923,7 @@ srcParseFail = P $ \PState{ buffer = buf, last_len = len,
 lexError :: String -> P a
 lexError str = do
   loc <- getSrcLoc
-  (AI end _ buf) <- getInput
+  (AI end buf) <- getInput
   reportLexError loc end buf str
 
 -- -----------------------------------------------------------------------------
@@ -1961,7 +1935,7 @@ lexer cont = do
   alr <- extension alternativeLayoutRule
   let lexTokenFun = if alr then lexTokenAlr else lexToken
   tok@(L _span _tok__) <- lexTokenFun
---  trace ("token: " ++ show tok__) $ do
+  --trace ("token: " ++ show _tok__) $ do
   cont tok
 
 lexTokenAlr :: P (Located Token)
@@ -2133,24 +2107,24 @@ topNoLayoutContainsCommas (ALRNoLayout b : _) = b
 
 lexToken :: P (Located Token)
 lexToken = do
-  inp@(AI loc1 _ buf) <- getInput
+  inp@(AI loc1 buf) <- getInput
   sc <- getLexState
   exts <- getExts
   case alexScanUser exts inp sc of
     AlexEOF -> do
         let span = mkSrcSpan loc1 loc1
-        setLastToken span 0 0
+        setLastToken span 0
         return (L span ITeof)
-    AlexError (AI loc2 _ buf) ->
+    AlexError (AI loc2 buf) ->
         reportLexError loc1 loc2 buf "lexical error"
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
-    AlexToken inp2@(AI end _ buf2) _ t -> do
+    AlexToken inp2@(AI end buf2) _ t -> do
         setInput inp2
         let span = mkSrcSpan loc1 end
         let bytes = byteDiff buf buf2
-        span `seq` setLastToken span bytes bytes
+        span `seq` setLastToken span bytes
         t span buf bytes
 
 reportLexError :: SrcLoc -> SrcLoc -> StringBuffer -> [Char] -> P a
@@ -2213,7 +2187,7 @@ dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToStr
                                        Nothing -> lexError "unknown pragma"
 
 known_pragma :: Map String Action -> AlexAccPred Int
-known_pragma prags _ _ len (AI _ _ buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
+known_pragma prags _ _ len (AI _ buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
                                           && (nextCharIs buf (\c -> not (isAlphaNum c || c == '_')))
 
 clean_pragma :: String -> String
