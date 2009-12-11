@@ -155,18 +155,14 @@ shadow:
 # every package we know about.  This is for testing the pretty printing/parsing
 # of InstalledPackageInfo.
 
-COPY_PACKAGE_CONF = package.conf.copy
-GHC_PKG_COPY = '$(GHC_PKG)' --no-user-package-conf --global-conf=$(COPY_PACKAGE_CONF)
-
-# Hack: the testsuite is separate from the build tree now, we don't
-# have a good way to do this.
-INPLACE_DATA_DIR = $(TOP)/../inplace/lib
+PACKAGE_CONF_ghcpkg02 = package.conf.ghcpkg02
+GHC_PKG_ghcpkg02 = '$(GHC_PKG)' --no-user-package-conf --global-conf=$(PACKAGE_CONF_ghcpkg02)
 
 ghcpkg02:
-	rm -rf $(COPY_PACKAGE_CONF)
-	cp -r $(INPLACE_DATA_DIR)/package.conf.d $(COPY_PACKAGE_CONF)
+	rm -rf $(PACKAGE_CONF_ghcpkg02)
+	$(GHC_PKG_ghcpkg02) init $(PACKAGE_CONF_ghcpkg02)
 	set -e; \
-	for i in `$(GHC_PKG_COPY) list --global --simple-output -v0`; do \
+	for i in `$(GHC_PKG) list --global --simple-output -v0`; do \
 		echo Updating $$i; \
-		$(GHC_PKG_COPY) describe --global $$i | $(GHC_PKG_COPY) update --global --force -; \
+		$(GHC_PKG) describe --global $$i | $(GHC_PKG_ghcpkg02) update --global --force -; \
 	done

@@ -7,7 +7,7 @@ test('ghcpkg01',
      ['$MAKE -s --no-print-directory ghcpkg01'])
 test('ghcpkg02',
      [ignore_output,
-      extra_clean(['package.conf.copy', 'package.conf.copy.old'])],
+      extra_clean(['package.conf.ghcpkg02', 'package.conf.ghcpkg02.old'])],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg02'])
 test('ghcpkg03',
