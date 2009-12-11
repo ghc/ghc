@@ -45,7 +45,9 @@ test('conc008', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc009', compose(only_compiler_types(['ghc']), exit_code(1)),
 		compile_and_run, [''])
 test('conc010', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc012', normal, compile_and_run, [''])
+
+# conc012(ghci) needs a smaller stack, or it takes forever
+test('conc012', normal, compile_and_run, ['+RTS -K8m -RTS'])
 
 test('conc013', only_compiler_types(['ghc']), compile_and_run, [''])
 
