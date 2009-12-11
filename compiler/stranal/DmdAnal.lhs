@@ -1085,22 +1085,11 @@ both :: Demand -> Demand -> Demand
 
 both Abs d2 = d2
 
+-- Note [Bottom demands]
 both Bot Bot 	   = Bot
 both Bot Abs 	   = Bot 
 both Bot (Eval ds) = Eval (mapDmds (`both` Bot) ds)
-	-- Consider
-	--	f x = error x
-	-- From 'error' itself we get demand Bot on x
-	-- From the arg demand on x we get 
-	--	x :-> evalDmd = Box (Eval (Poly Abs))
-	-- So we get  Bot `both` Box (Eval (Poly Abs))
-	--	    = Seq Keep (Poly Bot)
-	--
-	-- Consider also
-	--	f x = if ... then error (fst x) else fst x
-	-- Then we get (Eval (Box Bot, Bot) `lub` Eval (SA))
-	--	= Eval (SA)
-	-- which is what we want.
+both Bot (Defer ds) = Eval (mapDmds (`both` Bot) ds)
 both Bot d = errDmd
 
 both Top Bot 	     = errDmd
@@ -1134,3 +1123,30 @@ both d1@(Defer ds1) d2	     = d2 `both` d1
  
 boths ds1 ds2 = zipWithDmds both ds1 ds2
 \end{code}
+
+Note [Bottom demands]
+~~~~~~~~~~~~~~~~~~~~~
+Consider
+	f x = error x
+From 'error' itself we get demand Bot on x
+From the arg demand on x we get 
+	x :-> evalDmd = Box (Eval (Poly Abs))
+So we get  Bot `both` Box (Eval (Poly Abs))
+	    = Seq Keep (Poly Bot)
+
+Consider also
+	f x = if ... then error (fst x) else fst x
+Then we get (Eval (Box Bot, Bot) `lub` Eval (SA))
+	= Eval (SA)
+which is what we want.
+
+Consider also
+  f x = error [fst x]
+Then we get 
+     x :-> Bot `both` Defer [SA]
+and we want the Bot demand to cancel out the Defer
+so that we get Eval [SA].  Otherwise we'd have the odd
+situation that
+  f x = error (fst x)      -- Strictness U(SA)b
+  g x = error ('y':fst x)  -- Strictness Tb
+
