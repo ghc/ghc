@@ -50,7 +50,7 @@ module Coercion (
 	optCoercion,
 
         -- ** Comparison
-        coreEqCoercion,
+        coreEqCoercion, coreEqCoercion2,
 
 	-- * CoercionI
 	CoercionI(..),
@@ -70,6 +70,7 @@ import Type
 import TyCon
 import Class
 import Var
+import VarEnv
 import Name
 import PrelNames
 import Util
@@ -576,6 +577,9 @@ splitNewTypeRepCo_maybe _
 -- | Determines syntactic equality of coercions
 coreEqCoercion :: Coercion -> Coercion -> Bool
 coreEqCoercion = coreEqType
+
+coreEqCoercion2 :: RnEnv2 -> Coercion -> Coercion -> Bool
+coreEqCoercion2 = coreEqType2
 \end{code}
 
 

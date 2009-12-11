@@ -98,7 +98,8 @@ module Type (
 	tidyKind,
 
 	-- * Type comparison
-	coreEqType, tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
+	coreEqType, coreEqType2,
+        tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
 	tcEqPred, tcEqPredX, tcCmpPred, tcEqTypeX, tcPartOfType, tcPartOfPred,
 
 	-- * Forcing evaluation of types
@@ -1140,11 +1141,14 @@ See Note [Newtype eta] in TyCon.lhs
 \begin{code}
 -- | Type equality test for Core types (i.e. ignores predicate-types, synonyms etc.)
 coreEqType :: Type -> Type -> Bool
-coreEqType t1 t2
-  = eq rn_env t1 t2
+coreEqType t1 t2 = coreEqType2 rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfType t1 `unionVarSet` tyVarsOfType t2))
 
+coreEqType2 :: RnEnv2 -> Type -> Type -> Bool
+coreEqType2 rn_env t1 t2
+  = eq rn_env t1 t2
+  where
     eq env (TyVarTy tv1)       (TyVarTy tv2)     = rnOccL env tv1 == rnOccR env tv2
     eq env (ForAllTy tv1 t1)   (ForAllTy tv2 t2) = eq (rnBndr2 env tv1 tv2) t1 t2
     eq env (AppTy s1 t1)       (AppTy s2 t2)     = eq env s1 s2 && eq env t1 t2

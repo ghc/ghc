@@ -11,7 +11,7 @@ module CSE (
 #include "HsVersions.h"
 
 import Id		( Id, idType, idInlineActivation, zapIdOccInfo )
-import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr, exprIsCheap )
+import CoreUtils	( hashExpr, eqExpr, exprIsBig, mkAltExpr, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
 import CoreSyn
@@ -301,15 +301,19 @@ emptyCSEnv :: CSEnv
 emptyCSEnv = CS emptyUFM emptyInScopeSet emptyVarEnv
 
 lookupCSEnv :: CSEnv -> CoreExpr -> Maybe CoreExpr
-lookupCSEnv (CS cs _ _) expr
+lookupCSEnv (CS cs in_scope _) expr
   = case lookupUFM cs (hashExpr expr) of
 	Nothing -> Nothing
-	Just pairs -> lookup_list pairs expr
-
-lookup_list :: [(CoreExpr,CoreExpr)] -> CoreExpr -> Maybe CoreExpr
-lookup_list [] _ = Nothing
-lookup_list ((e,e'):es) expr | cheapEqExpr e expr = Just e'
-			     | otherwise	  = lookup_list es expr
+	Just pairs -> lookup_list pairs
+  where
+  -- In this lookup we use full expression equality
+  -- Reason: when expressions differ we generally find out quickly
+  --         but I found that cheapEqExpr was saying (\x.x) /= (\y.y),
+  -- 	     and this kind of thing happened in real programs
+    lookup_list :: [(CoreExpr,CoreExpr)] -> Maybe CoreExpr
+    lookup_list []                                   = Nothing
+    lookup_list ((e,e'):es) | eqExpr in_scope e expr = Just e'
+        		    | otherwise	             = lookup_list es
 
 addCSEnvItem :: CSEnv -> CoreExpr -> CoreExpr -> CSEnv
 addCSEnvItem env expr expr' | exprIsBig expr = env
