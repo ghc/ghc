@@ -1492,7 +1492,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
 	-- just to float all constraints
 	--
-	-- At top level, we *do* squash methods becuase we want to 
+	-- At top level, we *do* squash methods because we want to 
 	-- expose implicit parameters to the test that follows
 	; let is_nested_group = isNotTopLevel top_lvl
 	      try_me inst | isFreeWrtTyVars qtvs inst,
