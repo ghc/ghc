@@ -1213,29 +1213,6 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
         identicalOpenSynTyConApp = idxTys1 `tcEqTypes` idxTys2
         -- See Note [OpenSynTyCon app]
 
-        -- If we can reduce a family app => proceed with reduct
-        -- NB: We use isOpenSynTyCon, not isOpenSynTyConApp as we also must
-        --     defer oversaturated applications!
-    go outer sty1 ty1@(TyConApp con1 _) sty2 ty2
-      | isOpenSynTyCon con1
-      = do { (coi1, ty1') <- tcNormaliseFamInst ty1
-           ; case coi1 of
-               IdCo -> defer    -- no reduction, see [Deferred Unification]
-               _    -> liftM (coi1 `mkTransCoI`) $ go outer sty1 ty1' sty2 ty2
-           }
-
-        -- If we can reduce a family app => proceed with reduct
-        -- NB: We use isOpenSynTyCon, not isOpenSynTyConApp as we also must
-        --     defer oversaturated applications!
-    go outer sty1 ty1 sty2 ty2@(TyConApp con2 _)
-      | isOpenSynTyCon con2
-      = do { (coi2, ty2') <- tcNormaliseFamInst ty2
-           ; case coi2 of
-               IdCo -> defer    -- no reduction, see [Deferred Unification]
-               _    -> liftM (`mkTransCoI` mkSymCoI coi2) $ 
-                         go outer sty1 ty1 sty2 ty2'
-           }
-
         -- Functions; just check the two parts
     go _ _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
       = do { coi_l <- uTys nb1 fun1 nb2 fun2
@@ -1260,6 +1237,30 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
       = do { coi_s <- go outer s1 s1 s2 s2
            ; coi_t <- uTys nb1 t1 nb2 t2
            ; return $ mkAppTyCoI s1 coi_s t1 coi_t }
+
+        -- If we can reduce a family app => proceed with reduct
+        -- NB1: We use isOpenSynTyCon, not isOpenSynTyConApp as we also must
+        --      defer oversaturated applications!
+	-- 
+	-- NB2: Do this *after* trying decomposing applications, so that decompose
+	--     	  (m a) ~ (F Int b)
+	--      where F has arity 1
+    go _ _ ty1@(TyConApp con1 _) _ ty2
+      | isOpenSynTyCon con1
+      = do { (coi1, ty1') <- tcNormaliseFamInst ty1
+           ; case coi1 of
+               IdCo -> defer    -- no reduction, see [Deferred Unification]
+               _    -> liftM (coi1 `mkTransCoI`) $ uTys nb1 ty1' nb2 ty2
+           }
+
+    go _ _ ty1 _ ty2@(TyConApp con2 _)
+      | isOpenSynTyCon con2
+      = do { (coi2, ty2') <- tcNormaliseFamInst ty2
+           ; case coi2 of
+               IdCo -> defer    -- no reduction, see [Deferred Unification]
+               _    -> liftM (`mkTransCoI` mkSymCoI coi2) $ 
+                       uTys nb1 ty1 nb2 ty2'
+           }
 
         -- Anything else fails
     go outer _ _ _ _ = bale_out outer
