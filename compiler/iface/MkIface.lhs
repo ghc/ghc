@@ -1472,6 +1472,8 @@ toIfaceIdInfo :: IdInfo -> [IfaceInfoItem]
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
 	       inline_hsinfo,  unfold_hsinfo] 
+	       -- NB: strictness must be before unfolding
+	       -- See TcIface.tcUnfolding
   where
     ------------  Arity  --------------
     arity_info = arityInfo id_info

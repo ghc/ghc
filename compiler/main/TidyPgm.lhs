@@ -983,21 +983,24 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
     -- the RHS is bottom, it should jolly well be exposed
     _bottom_exposed = case exprBotStrictness_maybe rhs of
                         Nothing         -> True
-                        Just (arity, _) -> appIsBottom str arity
+                        Just (arity, _) -> appIsBottom str_sig arity
         where
-          str = strictnessInfo idinfo `orElse` topSig
 
-    bndr1   = mkGlobalId details name' ty' idinfo'
-    details = idDetails bndr	-- Preserve the IdDetails
-    ty'	    = tidyTopType (idType bndr)
-    rhs1    = tidyExpr rhs_tidy_env rhs
-    idinfo  = idInfo bndr
-    idinfo' = tidyTopIdInfo (isExternalName name')
+
+    bndr1    = mkGlobalId details name' ty' idinfo'
+    details  = idDetails bndr	-- Preserve the IdDetails
+    ty'	     = tidyTopType (idType bndr)
+    rhs1     = tidyExpr rhs_tidy_env rhs
+    idinfo   = idInfo bndr
+    unf_info = unfoldingInfo idinfo
+    str_sig  = strictnessInfo idinfo `orElse` topSig
+    is_bot   = isBottomingSig str_sig
+    idinfo'  = tidyTopIdInfo (isExternalName name')
 			    idinfo unfold_info
 			    arity caf_info 
                             (occInfo idinfo)
 
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs1 (unfoldingInfo idinfo)
+    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs1 is_bot unf_info
 		| otherwise   = noUnfolding
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
@@ -1065,16 +1068,17 @@ tidyTopIdInfo is_external idinfo unfold_info arity caf_info occ_info
 
 
 ------------ Unfolding  --------------
-tidyUnfolding :: TidyEnv -> CoreExpr -> Unfolding -> Unfolding
-tidyUnfolding tidy_env _ (DFunUnfolding con ids)
+tidyUnfolding :: TidyEnv -> CoreExpr -> Bool -> Unfolding -> Unfolding
+tidyUnfolding tidy_env _ _ (DFunUnfolding con ids)
   = DFunUnfolding con (map (tidyExpr tidy_env) ids)
-tidyUnfolding tidy_env tidy_rhs unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
+tidyUnfolding tidy_env tidy_rhs is_bottoming
+              unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
   | isInlineRuleSource src
   = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
 	  uf_src  = tidyInl tidy_env src }
   | otherwise
-  = mkTopUnfolding tidy_rhs
-tidyUnfolding _ _ unf = unf
+  = mkTopUnfolding is_bottoming tidy_rhs
+tidyUnfolding _ _ _ unf = unf
 
 tidyInl :: TidyEnv -> UnfoldingSource -> UnfoldingSource
 tidyInl tidy_env (InlineWrapper w) = InlineWrapper (tidyVarOcc tidy_env w)

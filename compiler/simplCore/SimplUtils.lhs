@@ -635,11 +635,18 @@ let-float if you inline windowToViewport
 However, as usual for Gentle mode, do not inline things that are
 inactive in the intial stages.  See Note [Gentle mode].
 
+Note [Top-level botomming Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Don't inline top-level Ids that are bottoming, even if they are used just
+once, because FloatOut has gone to some trouble to extract them out.
+Inlining them won't make the program run faster!
+
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
 preInlineUnconditionally env top_lvl bndr rhs
-  | not active 		   = False
-  | opt_SimplNoPreInlining = False
+  | not active 		                     = False
+  | isTopLevel top_lvl && isBottomingId bndr = False	-- Note [Top-level bottoming Ids]
+  | opt_SimplNoPreInlining                   = False
   | otherwise = case idOccInfo bndr of
 		  IAmDead	     	     -> True	-- Happens in ((\x.1) v)
 	  	  OneOcc in_lam True int_cxt -> try_once in_lam int_cxt
@@ -651,12 +658,11 @@ preInlineUnconditionally env top_lvl bndr rhs
 			-- See Note [pre/postInlineUnconditionally in gentle mode]
 		   SimplPhase n _ -> isActive n act
     act = idInlineActivation bndr
-
     try_once in_lam int_cxt	-- There's one textual occurrence
 	| not in_lam = isNotTopLevel top_lvl || early_phase
 	| otherwise  = int_cxt && canInlineInLam rhs
 
--- Be very careful before inlining inside a lambda, becuase (a) we must not 
+-- Be very careful before inlining inside a lambda, because (a) we must not 
 -- invalidate occurrence information, and (b) we want to avoid pushing a
 -- single allocation (here) into multiple allocations (inside lambda).  
 -- Inlining a *function* with a single *saturated* call would be ok, mind you.
@@ -745,6 +751,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | isExportedId bndr           = False
   | isStableUnfolding unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
   | exprIsTrivial rhs 	        = True
+  | isTopLevel top_lvl          = False	-- Note [Top level and postInlineUnconditionally]
   | otherwise
   = case occ_info of
 	-- The point of examining occ_info here is that for *non-values* 
@@ -771,8 +778,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 			-- PRINCIPLE: when we've already simplified an expression once, 
 			-- make sure that we only inline it if it's reasonably small.
 
-	   &&  ((isNotTopLevel top_lvl && not in_lam) || 
-			-- But outside a lambda, we want to be reasonably aggressive
+           && (not in_lam || 
+			-- Outside a lambda, we want to be reasonably aggressive
 			-- about inlining into multiple branches of case
 			-- e.g. let x = <non-value> 
 			--	in case y of { C1 -> ..x..; C2 -> ..x..; C3 -> ... } 
@@ -874,6 +881,14 @@ activeRule dflags env
         | otherwise -> Nothing
       SimplPhase n _ -> Just (isActive n)
 \end{code}
+
+Note [Top level and postInlineUnconditionally]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't do postInlineUnconditionally for top-level things (except
+ones that are trivial).  There is no point, because the main goal is
+to get rid of local bindings used in multiple case branches. And
+doing so risks replacing a single global allocation with local allocations.
+
 
 Note [InlineRule and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

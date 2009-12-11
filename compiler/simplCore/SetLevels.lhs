@@ -56,12 +56,12 @@ module SetLevels (
 import CoreSyn
 
 import DynFlags		( FloatOutSwitches(..) )
-import CoreUtils	( exprType, exprIsTrivial, mkPiTypes )
+import CoreUtils	( exprType, mkPiTypes )
 import CoreArity	( exprBotStrictness_maybe )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendInScopeList,
 			  extendIdSubst, cloneIdBndr, cloneRecIdBndrs )
-import Id		( idType, mkSysLocal, isOneShotLambda,
+import Id		( idType, mkLocalIdWithInfo, mkSysLocal, isOneShotLambda,
 			  zapDemandIdInfo, transferPolyIdInfo,
 			  idSpecialisation, idUnfolding, setIdInfo, 
 			  setIdStrictness, setIdArity
@@ -70,10 +70,11 @@ import IdInfo
 import Var
 import VarSet
 import VarEnv
-import Name		( getOccName )
+import Demand		( StrictSig, increaseStrictSigArity )
+import Name		( getOccName, mkSystemVarName )
 import OccName		( occNameString )
 import Type		( isUnLiftedType, Type )
-import BasicTypes	( TopLevelFlag(..) )
+import BasicTypes	( TopLevelFlag(..), Arity )
 import UniqSupply
 import Util		( sortLe, isSingleton, count )
 import Outputable
@@ -340,10 +341,25 @@ If we see
 we'd like to float the call to error, to get
 	lvl = error "urk"
 	f = \x. g lvl
-But, it's very helpful for lvl to get a strictness signature, so that,
-for example, its unfolding is not exposed in interface files (unnecessary).
-But this float-out might occur after strictness analysis. So we use the
-cheap-and-cheerful exprBotStrictness_maybe function.
+Furthermore, we want to float a bottoming expression even if it has free
+variables:
+	f = \x. g (let v = h x in error ("urk" ++ v))
+Then we'd like to abstact over 'x' can float the whole arg of g:
+	lvl = \x. let v = h x in error ("urk" ++ v)
+	f = \x. g (lvl x)
+See Maessen's paper 1999 "Bottom extraction: factoring error handling out
+of functional programs" (unpublished I think).
+
+When we do this, we set the strictness and arity of the new bottoming 
+Id, so that it's properly exposed as such in the interface file, even if
+this is all happening after strictness analysis.  
+
+Note [Bottoming floats: eta expansion] c.f Note [Bottoming floats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tiresomely, though, the simplifier has an invariant that the manifest
+arity of the RHS should be the same as the arity; but we can't call
+etaExpand during SetLevels because it works over a decorated form of
+CoreExpr.  So we do the eta expansion later, in FloatOut.
 
 Note [Case MFEs]
 ~~~~~~~~~~~~~~~~
@@ -381,25 +397,21 @@ lvlMFE True ctxt_lvl env e@(_, AnnCase {})
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   |  isUnLiftedType ty			-- Can't let-bind it; see Note [Unlifted MFEs]
-  || exprIsTrivial expr			-- Never float if it's trivial
+  || notWorthFloating ann_expr abs_vars
   || not good_destination
   = 	-- Don't float it out
     lvlExpr ctxt_lvl env ann_expr
 
   | otherwise	-- Float it out!
   = do expr' <- lvlFloatRhs abs_vars dest_lvl env ann_expr
-       var <- newLvlVar "lvl" abs_vars ty
-		-- Note [Bottoming floats]
-       let var_w_str = case exprBotStrictness_maybe expr of
-			  Just (arity,str) -> var `setIdArity` arity
-						  `setIdStrictness` str
-			  Nothing  -> var
-       return (Let (NonRec (TB var_w_str dest_lvl) expr') 
-                   (mkVarApps (Var var_w_str) abs_vars))
+       var <- newLvlVar abs_vars ty mb_bot
+       return (Let (NonRec (TB var dest_lvl) expr') 
+                   (mkVarApps (Var var) abs_vars))
   where
     expr     = deAnnotate ann_expr
     ty       = exprType expr
-    dest_lvl = destLevel env fvs (isFunction ann_expr)
+    mb_bot   = exprBotStrictness_maybe expr
+    dest_lvl = destLevel env fvs (isFunction ann_expr) mb_bot
     abs_vars = abstractVars dest_lvl env fvs
 
 	-- A decision to float entails let-binding this thing, and we only do 
@@ -426,6 +438,42 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 	  --	concat = /\ a -> lvl a
 	  --	lvl    = /\ a -> foldr ..a.. (++) []
 	  -- which is pretty stupid.  Hence the strict_ctxt test
+
+annotateBotStr :: Id -> Maybe (Arity, StrictSig) -> Id
+annotateBotStr id Nothing            = id
+annotateBotStr id (Just (arity,sig)) = id `setIdArity` arity
+				          `setIdStrictness` sig
+
+notWorthFloating :: CoreExprWithFVs -> [Var] -> Bool
+-- Returns True if the expression would be replaced by
+-- something bigger than it is now.  For example:
+--   abs_vars = tvars only:  return True if e is trivial, 
+--                           but False for anything bigger
+--   abs_vars = [x] (an Id): return True for trivial, or an application (f x)
+--   	      	    	     but False for (f x x) 
+--
+-- One big goal is that floating should be idempotent.  Eg if
+-- we replace e with (lvl79 x y) and then run FloatOut again, don't want
+-- to replace (lvl79 x y) with (lvl83 x y)!
+
+notWorthFloating e abs_vars
+  = go e (count isId abs_vars)
+  where
+    go (_, AnnVar {}) n    = n == 0
+    go (_, AnnLit {}) n    = n == 0
+    go (_, AnnCast e _)  n = go e n
+    go (_, AnnApp e arg) n 
+       | (_, AnnType {}) <- arg = go e n
+       | n==0                   = False
+       | is_triv arg       	= go e (n-1)
+       | otherwise         	= False
+    go _ _                 	= False
+
+    is_triv (_, AnnLit {})   	       	  = True	-- Treat all literals as trivial
+    is_triv (_, AnnVar {})   	       	  = True	-- (ie not worth floating)
+    is_triv (_, AnnCast e _) 	       	  = is_triv e
+    is_triv (_, AnnApp e (_, AnnType {})) = is_triv e
+    is_triv _                             = False     
 \end{code}
 
 Note [Escaping a value lambda]
@@ -502,13 +550,15 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
   | otherwise
   = do  -- Yes, type abstraction; create a new binder, extend substitution, etc
        rhs' <- lvlFloatRhs abs_vars dest_lvl env rhs
-       (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
+       (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr_w_str]
        return (NonRec (TB bndr' dest_lvl) rhs', env')
 
   where
-    bind_fvs = rhs_fvs `unionVarSet` idFreeVars bndr
-    abs_vars = abstractVars dest_lvl env bind_fvs
-    dest_lvl = destLevel env bind_fvs (isFunction rhs)
+    bind_fvs   = rhs_fvs `unionVarSet` idFreeVars bndr
+    abs_vars   = abstractVars dest_lvl env bind_fvs
+    dest_lvl   = destLevel env bind_fvs (isFunction rhs) mb_bot
+    mb_bot     = exprBotStrictness_maybe (deAnnotate rhs)
+    bndr_w_str = annotateBotStr bndr mb_bot
 \end{code}
 
 
@@ -562,7 +612,7 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
 		      `minusVarSet`
 		      mkVarSet bndrs
 
-    dest_lvl = destLevel env bind_fvs (all isFunction rhss)
+    dest_lvl = destLevel env bind_fvs (all isFunction rhss) Nothing
     abs_vars = abstractVars dest_lvl env bind_fvs
 
 ----------------------------------------------------
@@ -619,12 +669,14 @@ lvlLamBndrs lvl bndrs
 \begin{code}
   -- Destintion level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
-destLevel :: LevelEnv -> VarSet -> Bool -> Level
-destLevel env fvs is_function
+destLevel :: LevelEnv -> VarSet -> Bool -> Maybe (Arity, StrictSig) -> Level
+destLevel env fvs is_function mb_bot
+  | Just {} <- mb_bot = tOP_LEVEL	-- Send bottoming bindings to the top 
+					-- regardless; see Note [Bottoming floats]
   |  floatLams env
-  && is_function = tOP_LEVEL		-- Send functions to top level; see
+  && is_function      = tOP_LEVEL	-- Send functions to top level; see
 					-- the comments with isFunction
-  | otherwise    = maxIdLevel env fvs
+  | otherwise         = maxIdLevel env fvs
 
 isFunction :: CoreExprWithFVs -> Bool
 -- The idea here is that we want to float *functions* to
@@ -857,12 +909,20 @@ newPolyBndrs dest_lvl env abs_vars bndrs = do
 			     str     = "poly_" ++ occNameString (getOccName bndr)
 			     poly_ty = mkPiTypes abs_vars (idType bndr)
 
-newLvlVar :: String 
-	  -> [CoreBndr] -> Type 	-- Abstract wrt these bndrs
+newLvlVar :: [CoreBndr] -> Type 	-- Abstract wrt these bndrs
+	  -> Maybe (Arity, StrictSig)   -- Note [Bottoming floats]
 	  -> LvlM Id
-newLvlVar str vars body_ty = do
-    uniq <- getUniqueM
-    return (mkSysLocal (mkFastString str) uniq (mkPiTypes vars body_ty))
+newLvlVar vars body_ty mb_bot
+  = do { uniq <- getUniqueM
+       ; return (mkLocalIdWithInfo (mk_name uniq) (mkPiTypes vars body_ty) info) }
+  where
+    mk_name uniq = mkSystemVarName uniq (mkFastString "lvl")
+    arity = count isId vars
+    info = case mb_bot of
+		Nothing               -> vanillaIdInfo
+		Just (bot_arity, sig) -> vanillaIdInfo 
+					   `setArityInfo`      (arity + bot_arity)
+					   `setStrictnessInfo` Just (increaseStrictSigArity arity sig)
     
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.

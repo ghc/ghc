@@ -1,4 +1,4 @@
-calcU%
+%
 % (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -72,12 +72,13 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-mkTopUnfolding :: CoreExpr -> Unfolding
-mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
+mkTopUnfolding :: Bool -> CoreExpr -> Unfolding
+mkTopUnfolding is_bottoming expr 
+  = mkUnfolding True {- Top level -} is_bottoming expr
 
 mkImplicitUnfolding :: CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
-mkImplicitUnfolding expr = mkTopUnfolding (simpleOptExpr expr)
+mkImplicitUnfolding expr = mkTopUnfolding False (simpleOptExpr expr) 
 
 -- Note [Top-level flag on inline rules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,8 +86,8 @@ mkImplicitUnfolding expr = mkTopUnfolding (simpleOptExpr expr)
 -- top-level flag to True.  It gets set more accurately by the simplifier
 -- Simplify.simplUnfolding.
 
-mkUnfolding :: Bool -> CoreExpr -> Unfolding
-mkUnfolding top_lvl expr
+mkUnfolding :: Bool -> Bool -> CoreExpr -> Unfolding
+mkUnfolding top_lvl is_bottoming expr
   = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
     		    uf_src        = InlineRhs,
     		    uf_arity      = arity,
@@ -98,7 +99,8 @@ mkUnfolding top_lvl expr
 		    uf_guidance   = guidance }
   where
     is_cheap = exprIsCheap expr
-    (arity, guidance) = calcUnfoldingGuidance is_cheap opt_UF_CreationThreshold expr
+    (arity, guidance) = calcUnfoldingGuidance is_cheap (top_lvl && is_bottoming) 
+                                              opt_UF_CreationThreshold expr
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
 	-- two copies of the thing while the occurrence-analysed expression doesn't
@@ -146,6 +148,7 @@ mkInlineRule unsat_ok expr arity
   where
     expr' = simpleOptExpr expr
     boring_ok = case calcUnfoldingGuidance True    -- Treat as cheap
+    	      	     			   False   -- But not bottoming
                                            (arity+1) expr' of
               	  (_, UnfWhen _ boring_ok) -> boring_ok
               	  _other                   -> boringCxtNotOk
@@ -163,10 +166,12 @@ mkInlineRule unsat_ok expr arity
 calcUnfoldingGuidance
 	:: Bool		-- True <=> the rhs is cheap, or we want to treat it
 	   		--          as cheap (INLINE things)	 
+        -> Bool		-- True <=> this is a top-level unfolding for a
+	                --          diverging function; don't inline this
         -> Int		-- Bomb out if size gets bigger than this
 	-> CoreExpr    	-- Expression to look at
 	-> (Arity, UnfoldingGuidance)
-calcUnfoldingGuidance expr_is_cheap bOMB_OUT_SIZE expr
+calcUnfoldingGuidance expr_is_cheap top_bot bOMB_OUT_SIZE expr
   = case collectBinders expr of { (bndrs, body) ->
     let
         val_bndrs   = filter isId bndrs
@@ -178,6 +183,9 @@ calcUnfoldingGuidance expr_is_cheap bOMB_OUT_SIZE expr
       	      SizeIs size cased_bndrs scrut_discount
       	        | uncondInline n_val_bndrs (iBox size) && expr_is_cheap
       	        -> UnfWhen needSaturated boringCxtOk
+
+		| top_bot  -- See Note [Do not inline top-level bottoming functions]
+		-> UnfNever
 
 	        | otherwise
       	        -> UnfIfGoodArgs { ug_args  = map (discount cased_bndrs) val_bndrs
@@ -221,6 +229,15 @@ Examples
 Notice that 'x' counts 0, while (f x) counts 2.  That's deliberate: there's
 a function call to account for.  Notice also that constructor applications 
 are very cheap, because exposing them to a caller is so valuable.
+
+
+Note [Do not inline top-level bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The FloatOut pass has gone to some trouble to float out calls to 'error' 
+and similar friends.  See Note [Bottoming floats] in SetLevels.
+Do not re-inline them!  But we *do* still inline if they are very small
+(the uncondInline stuff).
+
 
 Note [Unconditional inlining]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -566,7 +583,7 @@ actual arguments.
 \begin{code}
 couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
 couldBeSmallEnoughToInline threshold rhs 
-  = case calcUnfoldingGuidance False threshold rhs of
+  = case calcUnfoldingGuidance False False threshold rhs of
        (_, UnfNever) -> False
        _             -> True
 

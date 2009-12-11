@@ -939,7 +939,7 @@ bindAuxiliaryDicts subst triples = go subst [] triples
              -- No auxiliary binding necessary
       | otherwise        = go subst_w_unf (NonRec dx_id dx : binds) pairs
       where
-        dx_id1 = dx_id `setIdUnfolding` mkUnfolding False dx
+        dx_id1 = dx_id `setIdUnfolding` mkUnfolding False False dx
 	subst_w_unf = extendIdSubst subst d (Var dx_id1)
        	     -- Important!  We're going to substitute dx_id1 for d
 	     -- and we want it to look "interesting", else we won't gather *any*

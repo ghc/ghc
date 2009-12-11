@@ -662,7 +662,7 @@ addNonRecWithUnf env new_bndr new_rhs new_unfolding
 
 ------------------------------
 simplUnfolding :: SimplEnv-> TopLevelFlag
-	       -> Id	-- Debug output only
+	       -> Id
 	       -> OccInfo -> OutExpr
 	       -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
@@ -681,8 +681,8 @@ simplUnfolding env top_lvl _ _ _
        ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
 
-simplUnfolding _ top_lvl _ _occ_info new_rhs _
-  = return (mkUnfolding (isTopLevel top_lvl) new_rhs)
+simplUnfolding _ top_lvl id _occ_info new_rhs _
+  = return (mkUnfolding (isTopLevel top_lvl) (isBottomingId id) new_rhs)
   -- We make an  unfolding *even for loop-breakers*.
   -- Reason: (a) It might be useful to know that they are WHNF
   -- 	     (b) In TidyPgm we currently assume that, if we want to
@@ -1724,7 +1724,7 @@ simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
 
 addBinderUnfolding :: SimplEnv -> Id -> CoreExpr -> SimplEnv
 addBinderUnfolding env bndr rhs
-  = modifyInScope env (bndr `setIdUnfolding` mkUnfolding False rhs)
+  = modifyInScope env (bndr `setIdUnfolding` mkUnfolding False False rhs)
 
 addBinderOtherCon :: SimplEnv -> Id -> [AltCon] -> SimplEnv
 addBinderOtherCon env bndr cons

@@ -46,6 +46,7 @@ import VarEnv
 import Name
 import NameEnv
 import OccurAnal	( occurAnalyseExpr )
+import Demand		( isBottomingSig )
 import Module
 import LazyUniqFM
 import UniqSupply
@@ -1003,11 +1004,16 @@ tcIdInfo ignore_prags name ty info
 
 \begin{code}
 tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
-tcUnfolding name _ _ (IfCoreUnfold if_expr)
+tcUnfolding name _ info (IfCoreUnfold if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
 	; return (case mb_expr of
 		    Nothing -> NoUnfolding
-		    Just expr -> mkTopUnfolding expr) }
+		    Just expr -> mkTopUnfolding is_bottoming expr) }
+  where
+     -- Strictness should occur before unfolding!
+    is_bottoming = case strictnessInfo info of
+    		     Just sig -> isBottomingSig sig
+ 		     Nothing  -> False
 
 tcUnfolding name _ _ (IfInlineRule arity unsat_ok if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
@@ -1029,8 +1035,8 @@ tcUnfolding name ty info (IfWrapper arity wkr)
 	  		 (initUs_ us (mkWrapper ty strict_sig) wkr_id) 
 		         arity
 
-    	-- We are relying here on strictness info always appearing 
-	-- before worker info,  fingers crossed ....
+    	-- Again we rely here on strictness info always appearing 
+	-- before unfolding
     strict_sig = case strictnessInfo info of
 		   Just sig -> sig
 		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr)
