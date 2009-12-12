@@ -1903,8 +1903,23 @@ stg_traceEventzh
 {
    W_ msg;
    msg = R1;
+
 #if defined(TRACING) || defined(DEBUG)
+
    foreign "C" traceUserMsg(MyCapability() "ptr", msg "ptr") [];
+
+#elif defined(DTRACE)
+
+   W_ enabled;
+
+   // We should go through the macro HASKELLEVENT_USER_MSG_ENABLED from
+   // RtsProbes.h, but that header file includes unistd.h, which doesn't
+   // work in Cmm
+   (enabled) = foreign "C" __dtrace_isenabled$HaskellEvent$user__msg$v1() [];
+   if (enabled != 0) {
+     foreign "C" dtraceUserMsgWrapper(MyCapability() "ptr", msg "ptr") [];
+   }
+
 #endif
    jump %ENTRY_CODE(Sp(0));
 }

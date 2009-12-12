@@ -70,6 +70,11 @@ rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
 
 rts_H_FILES = $(wildcard includes/*.h) $(wildcard rts/*.h)
 
+ifeq "$(HaveDtrace)" "YES"
+DTRACEPROBES_H = rts/dist/build/RtsProbes.h
+rts_H_FILES += $(DTRACEPROBES_H)
+endif
+
 # collect the -l flags that we need to link the rts dyn lib.
 rts/libs.depend : $(GHC_PKG_INPLACE)
 	"$(GHC_PKG_INPLACE)" field rts extra-libraries \
@@ -362,9 +367,15 @@ rts_dist_C_SRCS  = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
 rts_dist_S_SRCS =  $(rts_S_SRCS)
 rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 
+ifeq "$(HaveDtrace)" "YES"
+
+rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
+
+endif
+
 $(eval $(call build-dependencies,rts,dist))
 
-$(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h
+$(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h $(DTRACEPROBES_H)
 
 #-----------------------------------------------------------------------------
 # libffi stuff
@@ -381,6 +392,20 @@ DYNWRAPPER_SRC = rts/dyn-wrapper.c
 DYNWRAPPER_PROG = rts/dyn-wrapper$(exeext)
 $(DYNWRAPPER_PROG): $(DYNWRAPPER_SRC)
 	"$(HC)" -cpp -optc-include -optcdyn-wrapper-patchable-behaviour.h $(INPLACE_EXTRA_FLAGS) $< -o $@
+
+# -----------------------------------------------------------------------------
+# compile dtrace probes if dtrace is supported
+
+ifeq "$(HaveDtrace)" "YES"
+
+rts_CC_OPTS		+= -DDTRACE
+rts_HC_OPTS		+= -DDTRACE
+
+DTRACEPROBES_SRC = rts/RtsProbes.d
+$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) | $(dir $@)/.
+	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C -h -o $@ -s $<
+
+endif
 
 # -----------------------------------------------------------------------------
 # build the static lib containing the C main symbol

@@ -9,10 +9,11 @@
 // external headers
 #include "Rts.h"
 
-#ifdef TRACING
-
 // internal headers
 #include "Trace.h"
+
+#ifdef TRACING
+
 #include "GetTime.h"
 #include "Stats.h"
 #include "eventlog/EventLog.h"
@@ -310,6 +311,7 @@ void traceUserMsg(Capability *cap, char *msg)
             postUserMsg(cap, msg);
         }
     }
+    dtraceUserMsg(cap->no, msg);
 }
 
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
@@ -345,3 +347,15 @@ void traceEnd (void)
 #endif /* DEBUG */
 
 #endif /* TRACING */
+
+// If DTRACE is enabled, but neither DEBUG nor TRACING, we need a C land
+// wrapper for the user-msg probe (as we can't expand that in PrimOps.cmm)
+//
+#if !defined(DEBUG) && !defined(TRACING) && defined(DTRACE)
+
+void dtraceUserMsgWrapper(Capability *cap, char *msg)
+{
+    dtraceUserMsg(cap->no, msg);
+}
+
+#endif /* !defined(DEBUG) && !defined(TRACING) && defined(DTRACE) */

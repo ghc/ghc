@@ -139,7 +139,7 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 	setTSOLink(cap, cap->run_queue_tl, tso);
     }
     cap->run_queue_tl = tso;
-    traceSchedEvent (cap, EVENT_THREAD_RUNNABLE, tso, 0);
+    traceEventThreadRunnable (cap, tso);
 }
 
 /* Push a thread on the beginning of the run queue.

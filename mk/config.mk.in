@@ -603,6 +603,9 @@ RANLIB			= @RANLIB@
 SED			= @SedCmd@
 SHELL			= /bin/sh
 
+HaveDtrace		= @HaveDtrace@
+DTRACE			= @DtraceCmd@
+
 LD = @LdCmd@
 NM = @NmCmd@
 

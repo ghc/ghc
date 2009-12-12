@@ -107,7 +107,7 @@ createThread(Capability *cap, nat size)
     RELEASE_LOCK(&sched_mutex);
     
     // ToDo: report the stack size in the event?
-    traceSchedEvent (cap, EVENT_CREATE_THREAD, tso, tso->stack_size);
+    traceEventCreateThread(cap, tso);
 
     return tso;
 }
@@ -254,7 +254,7 @@ unblockOne_ (Capability *cap, StgTSO *tso,
   cap->context_switch = 1;
 #endif
 
-  traceSchedEvent (cap, EVENT_THREAD_WAKEUP, tso, tso->cap->no);
+  traceEventThreadWakeup (cap, tso, tso->cap->no);
 
   return next;
 }

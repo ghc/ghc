@@ -98,7 +98,7 @@ findSpark (Capability *cap)
           cap->sparks_converted++;
 
           // Post event for running a spark from capability's own pool.
-          traceSchedEvent(cap, EVENT_RUN_SPARK, cap->r.rCurrentTSO, 0);
+          traceEventRunSpark(cap, cap->r.rCurrentTSO);
 
           return spark;
       }
@@ -132,8 +132,7 @@ findSpark (Capability *cap)
           if (spark != NULL) {
               cap->sparks_converted++;
 
-              traceSchedEvent(cap, EVENT_STEAL_SPARK, 
-                              cap->r.rCurrentTSO, robbed->no);
+              traceEventStealSpark(cap, cap->r.rCurrentTSO, robbed->no);
               
               return spark;
           }
@@ -579,9 +578,9 @@ yieldCapability (Capability** pCap, Task *task)
     Capability *cap = *pCap;
 
     if (waiting_for_gc == PENDING_GC_PAR) {
-        traceSchedEvent(cap, EVENT_GC_START, 0, 0);
+        traceEventGcStart(cap);
         gcWorkerThread(cap);
-        traceSchedEvent(cap, EVENT_GC_END, 0, 0);
+        traceEventGcEnd(cap);
         return;
     }
 
@@ -788,7 +787,7 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
             continue;
         }
             
-        traceSchedEvent(cap, EVENT_SHUTDOWN, 0, 0);
+        traceEventShutdown(cap);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }

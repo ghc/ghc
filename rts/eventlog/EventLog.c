@@ -13,7 +13,6 @@
 
 #include "Trace.h"
 #include "Capability.h"
-#include "Trace.h"
 #include "RtsUtils.h"
 #include "Stats.h"
 #include "EventLog.h"

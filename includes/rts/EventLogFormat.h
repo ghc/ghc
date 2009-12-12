@@ -112,7 +112,7 @@
 #define EVENT_GC_END              10 /* ()                     */
 #define EVENT_REQUEST_SEQ_GC      11 /* ()                     */
 #define EVENT_REQUEST_PAR_GC      12 /* ()                     */
-#define EVENT_CREATE_SPARK_THREAD 15 /* (thread, spark_thread) */
+#define EVENT_CREATE_SPARK_THREAD 15 /* (spark_thread)         */
 #define EVENT_LOG_MSG             16 /* (message ...)          */
 #define EVENT_STARTUP             17 /* (num_capabilities)     */
 #define EVENT_BLOCK_MARKER        18 /* (size, end_time, capability) */
@@ -148,6 +148,7 @@ typedef StgWord64 EventTimestamp; // in nanoseconds
 typedef StgWord32 EventThreadID;
 typedef StgWord16 EventCapNo;
 typedef StgWord16 EventPayloadSize; // variable-size events
+typedef StgWord16 EventThreadStatus; // status for EVENT_STOP_THREAD
 
 #endif
 

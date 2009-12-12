@@ -468,7 +468,7 @@ run_thread:
     }
 #endif
 
-    traceSchedEvent(cap, EVENT_RUN_THREAD, t, 0);
+    traceEventRunThread(cap, t);
 
     switch (prev_what_next) {
 	
@@ -518,7 +518,7 @@ run_thread:
     t->saved_winerror = GetLastError();
 #endif
 
-    traceSchedEvent (cap, EVENT_STOP_THREAD, t, ret);
+    traceEventStopThread(cap, t, ret);
 
 #if defined(THREADED_RTS)
     // If ret is ThreadBlocked, and this Task is bound to the TSO that
@@ -778,7 +778,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
 		    appendToRunQueue(free_caps[i],t);
 
-                    traceSchedEvent (cap, EVENT_MIGRATE_THREAD, t, free_caps[i]->no);
+            traceEventMigrateThread (cap, t, free_caps[i]->no);
 
 		    if (t->bound) { t->bound->cap = free_caps[i]; }
 		    t->cap = free_caps[i];
@@ -802,7 +802,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    if (spark != NULL) {
 			debugTrace(DEBUG_sched, "pushing spark %p to capability %d", spark, free_caps[i]->no);
 
-      traceSchedEvent(free_caps[i], EVENT_STEAL_SPARK, t, cap->no);
+            traceEventStealSpark(free_caps[i], t, cap->no);
 
 			newSpark(&(free_caps[i]->r), spark);
 		    }
@@ -1418,11 +1418,11 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     
     if (gc_type == PENDING_GC_SEQ)
     {
-        traceSchedEvent(cap, EVENT_REQUEST_SEQ_GC, 0, 0);
+        traceEventRequestSeqGc(cap);
     }
     else
     {
-        traceSchedEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
+        traceEventRequestParGc(cap);
         debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
     }
 
@@ -1478,8 +1478,8 @@ delete_threads_and_gc:
     
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
+    traceEventGcStart(cap);
 #if defined(THREADED_RTS)
-    traceSchedEvent(cap, EVENT_GC_START, 0, 0);
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     waiting_for_gc = 0;
@@ -1487,7 +1487,7 @@ delete_threads_and_gc:
 #else
     GarbageCollect(force_major || heap_census, 0, cap);
 #endif
-    traceSchedEvent(cap, EVENT_GC_END, 0, 0);
+    traceEventGcEnd(cap);
 
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
     {
@@ -1806,7 +1806,7 @@ suspendThread (StgRegTable *reg)
   task = cap->running_task;
   tso = cap->r.rCurrentTSO;
 
-  traceSchedEvent(cap, EVENT_STOP_THREAD, tso, THREAD_SUSPENDED_FOREIGN_CALL);
+  traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL);
 
   // XXX this might not be necessary --SDM
   tso->what_next = ThreadRunGHC;
@@ -1869,7 +1869,7 @@ resumeThread (void *task_)
     task->suspended_tso = NULL;
     tso->_link = END_TSO_QUEUE; // no write barrier reqd
 
-    traceSchedEvent(cap, EVENT_RUN_THREAD, tso, tso->what_next);
+    traceEventRunThread(cap, tso);
     
     if (tso->why_blocked == BlockedOnCCall) {
         // avoid locking the TSO if we don't have to
@@ -1925,7 +1925,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
     } else {
-        traceSchedEvent (cap, EVENT_MIGRATE_THREAD, tso, capabilities[cpu].no);
+        traceEventMigrateThread (cap, tso, capabilities[cpu].no);
 	wakeupThreadOnCapability(cap, &capabilities[cpu], tso);
     }
 #else

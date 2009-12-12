@@ -47,7 +47,7 @@ createSparkThread (Capability *cap)
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize, 
                           &base_GHCziConc_runSparks_closure);
 
-    traceSchedEvent(cap, EVENT_CREATE_SPARK_THREAD, 0, tso->id);
+    traceEventCreateSparkThread(cap, tso->id);
 
     appendToRunQueue(cap,tso);
 }
