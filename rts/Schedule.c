@@ -463,7 +463,11 @@ run_thread:
         if (prev == ACTIVITY_DONE_GC) {
             startTimer();
         }
-    } else {
+    } else if (recent_activity != ACTIVITY_INACTIVE) {
+        // If we reached ACTIVITY_INACTIVE, then don't reset it until
+        // we've done the GC.  The thread running here might just be
+        // the IO manager thread that handle_tick() woke up via
+        // wakeUpRts().
         recent_activity = ACTIVITY_YES;
     }
 #endif
