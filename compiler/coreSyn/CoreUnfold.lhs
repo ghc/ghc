@@ -283,29 +283,27 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     	    	       	 	      	    -- discounts even on nullary constructors
 
     size_up (App fun (Type _)) = size_up fun
-    size_up (App fun arg)      = size_up_app fun [arg]
-    	     	      		  `addSize` nukeScrutDiscount (size_up arg)
+    size_up (App fun arg)      = size_up arg  `addSizeNSD`
+                                 size_up_app fun [arg]
 
     size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
 		      | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
-      = nukeScrutDiscount (size_up rhs)		`addSize`
-	size_up body				`addSizeN`
+      = size_up rhs		`addSizeNSD`
+	size_up body		`addSizeN`
 	(if isUnLiftedType (idType binder) then 0 else 1)
 		-- For the allocation
 		-- If the binder has an unlifted type there is no allocation
 
     size_up (Let (Rec pairs) body)
-      = nukeScrutDiscount rhs_size		`addSize`
-	size_up body				`addSizeN`
-	length pairs		-- For the allocation
-      where
-	rhs_size = foldr (addSize . size_up . snd) sizeZero pairs
+      = foldr (addSizeNSD . size_up . snd) 
+              (size_up body `addSizeN` length pairs)	-- (length pairs) for the allocation
+              pairs
 
     size_up (Case (Var v) _ _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
-	= alts_size (foldr1 addSize alt_sizes)	-- The 1 is for the case itself
+	= alts_size (foldr1 addAltSize alt_sizes)
 		    (foldr1 maxSize alt_sizes)
 		-- Good to inline if an arg is scrutinised, because
 		-- that may eliminate allocation in the caller
@@ -315,9 +313,9 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 		-- alts_size tries to compute a good discount for
 		-- the case when we are scrutinising an argument variable
-	  alts_size (SizeIs tot tot_disc _tot_scrut)           -- Size of all alternatives
-		    (SizeIs max _max_disc  max_scrut)           -- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, iBox (_ILIT(2) +# tot -# max)) `unionBags` tot_disc) max_scrut
+	  alts_size (SizeIs tot tot_disc tot_scrut)  -- Size of all alternatives
+		    (SizeIs max _        _)          -- Size of biggest alternative
+	 	= SizeIs tot (unitBag (v, iBox (_ILIT(2) +# tot -# max)) `unionBags` tot_disc) tot_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of the largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
@@ -327,9 +325,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 	  alts_size tot_size _ = tot_size
 
-    size_up (Case e _ _ alts) = foldr (addSize . size_up_alt) 
-				      (nukeScrutDiscount (size_up e))
-				      alts
+    size_up (Case e _ _ alts) = size_up e  `addSizeNSD` 
+                                foldr (addAltSize . size_up_alt) sizeZero alts
 	  	-- We don't charge for the case itself
 		-- It's a strict thing, and the price of the call
 		-- is paid by scrut.  Also consider
@@ -342,8 +339,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     -- size_up_app is used when there's ONE OR MORE value args
     size_up_app (App fun arg) args 
 	| isTypeArg arg		   = size_up_app fun args
-	| otherwise		   = size_up_app fun (arg:args)
-	  			     `addSize` nukeScrutDiscount (size_up arg)
+	| otherwise		   = size_up arg  `addSizeNSD`
+                                     size_up_app fun (arg:args)
     size_up_app (Var fun)     args = size_up_call fun args
     size_up_app other         args = size_up other `addSizeN` length args
 
@@ -372,10 +369,22 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     addSizeN TooBig          _  = TooBig
     addSizeN (SizeIs n xs d) m 	= mkSizeIs bOMB_OUT_SIZE (n +# iUnbox m) xs d
     
-    addSize TooBig	      _			= TooBig
-    addSize _		      TooBig		= TooBig
-    addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2) 
-	= mkSizeIs bOMB_OUT_SIZE (n1 +# n2) (xs `unionBags` ys) (d1 +# d2)
+        -- addAltSize is used to add the sizes of case alternatives
+    addAltSize TooBig	         _	= TooBig
+    addAltSize _		 TooBig	= TooBig
+    addAltSize (SizeIs n1 xs d1) (SizeIs n2 ys d2) 
+	= mkSizeIs bOMB_OUT_SIZE (n1 +# n2) 
+                                 (xs `unionBags` ys) 
+                                 (d1 +# d2)   -- Note [addAltSize result discounts]
+
+        -- This variant ignores the result discount from its LEFT argument
+	-- It's used when the second argument isn't part of the result
+    addSizeNSD TooBig	         _	= TooBig
+    addSizeNSD _		 TooBig	= TooBig
+    addSizeNSD (SizeIs n1 xs _) (SizeIs n2 ys d2) 
+	= mkSizeIs bOMB_OUT_SIZE (n1 +# n2) 
+                                 (xs `unionBags` ys) 
+                                 d2  -- Ignore d1
 \end{code}
 
 \begin{code}
@@ -481,15 +490,20 @@ augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
 	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
 	-- e plus ys. The -2 accounts for the \cn 
 
-nukeScrutDiscount :: ExprSize -> ExprSize
-nukeScrutDiscount (SizeIs n vs _) = SizeIs n vs (_ILIT(0))
-nukeScrutDiscount TooBig          = TooBig
-
 -- When we return a lambda, give a discount if it's used (applied)
 lamScrutDiscount :: ExprSize -> ExprSize
 lamScrutDiscount (SizeIs n vs _) = SizeIs n vs (iUnbox opt_UF_FunAppDiscount)
 lamScrutDiscount TooBig          = TooBig
 \end{code}
+
+Note [addAltSize result discounts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When adding the size of alternatives, we *add* the result discounts
+too, rather than take the *maximum*.  For a multi-branch case, this
+gives a discount for each branch that returns a constructor, making us
+keener to inline.  I did try using 'max' instead, but it makes nofib 
+'rewrite' and 'puzzle' allocate significantly more, and didn't make
+binary sizes shrink significantly either.
 
 Note [Discounts and thresholds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
