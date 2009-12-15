@@ -36,7 +36,7 @@ test('spec003', normal, compile, [''])
 test('rule1', normal, compile, [''])
 test('rule2', [only_ways(['optc','optasm']),
                if_compiler_lt('ghc', '6.13', expect_fail)],
-              compile, [''])
+              compile, ['-dsuppress-uniques -fno-code'])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
