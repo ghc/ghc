@@ -1181,9 +1181,6 @@ exprIsConApp_maybe id_unf expr
     analyse _ _ = Nothing
 
     -----------
-    in_scope = mkInScopeSet (exprFreeVars expr)
-
-    -----------
     beta (Lam v body) pairs (arg : args) 
         | isTypeArg arg
         = beta body ((v,arg):pairs) args 
@@ -1198,7 +1195,7 @@ exprIsConApp_maybe id_unf expr
 	    Just ans -> -- pprTrace "Woo-hoo! exprIsConApp_maybe" doc $
                         Just ans
         where
-          subst = mkOpenSubst in_scope pairs
+          subst = mkOpenSubst (mkInScopeSet (exprFreeVars fun)) pairs
 	  -- doc = vcat [ppr fun, ppr expr, ppr pairs, ppr args]
 
 
