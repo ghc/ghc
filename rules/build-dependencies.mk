@@ -45,9 +45,12 @@ $$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) | $$$$(dir $$
 	"$$(RM)" $$(RM_OPTS) $$@.tmp
 	touch $$@.tmp
 ifneq "$$(strip $$($1_$2_C_FILES_DEPS)$$($1_$2_S_FILES))" ""
+# We ought to actually do this for each way in $$($1_$2_WAYS), but then
+# it takes a long time to make the C deps for the RTS (30 seconds rather
+# than 3), so instead we just pass the list of ways in and let addCFileDeps
+# copy the deps for each way on the assumption that they are the same
 	$$(foreach f,$$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES), \
-	  $$(foreach w,$$($1_$2_WAYS), \
-	    $$(call addCFileDeps,$1,$2,$$($1_$2_depfile_c_asm),$$f,$$w)))
+	    $$(call addCFileDeps,$1,$2,$$($1_$2_depfile_c_asm),$$f,$$($1_$2_WAYS)))
 	"$$(RM)" $$(RM_OPTS) $$@.bit
 endif
 	echo "$1_$2_depfile_c_asm_EXISTS = YES" >> $$@.tmp
@@ -79,12 +82,12 @@ endef
 # $2 = distdir
 # $3 = depfile
 # $4 = file
-# $5 = way
+# $5 = ways
 # The formatting of this definition (e.g. the blank line above) is
 # important, in order to get make to generate the right makefile code.
 define addCFileDeps
 
-	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$5_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
-	sed -e "1s|\.o|\.$($5_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "s|$(TOP)/||g" -e "s|$2/build/$2/build|$2/build|g" $3.bit >> $3.tmp
+	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_v_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
+	$(foreach w,$5,sed -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "s|$(TOP)/||g" -e "s|$2/build/$2/build|$2/build|g" $3.bit >> $3.tmp &&) true
 endef
 

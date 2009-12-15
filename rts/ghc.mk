@@ -367,6 +367,13 @@ rts_dist_C_SRCS  = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
 rts_dist_S_SRCS =  $(rts_S_SRCS)
 rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 
+# Hack: we define every way-related option here, so that we get (hopefully)
+# a superset of the dependencies.  To do this properly, we should generate
+# a different set of dependencies for each way.  Further hack: PROFILING an
+
+# TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
+rts_dist_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
+
 ifeq "$(HaveDtrace)" "YES"
 
 rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
