@@ -54,5 +54,8 @@ test('T3055',
 
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 
-test('T3234', only_ways(['optc','optasm']), compile, ['-ddump-simpl-stats'])
+test('T3234',
+     only_ways(['optc','optasm']),
+     compile,
+     ['-ddump-simpl-stats -dsuppress-uniques -fno-code'])
 

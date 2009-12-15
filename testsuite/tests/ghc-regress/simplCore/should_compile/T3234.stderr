@@ -13,8 +13,25 @@
 Total ticks:     45
 
 14 PreInlineUnconditionally
+    1 n
+    1 a2
+    1 g
+    1 xs
+    1 ys
+    1 k
+    1 z
+    1 x
+    1 g
+    1 h
+    1 n
+    1 a2
+    1 lvl
+    1 lvl
 2 PostInlineUnconditionally
+    1 c
+    1 c
 1 UnfoldingDone
+    1 GHC.Base.build
 5 RuleFired
     1 ++
     1 augment/build
@@ -22,7 +39,31 @@ Total ticks:     45
     1 unpack
     1 unpack-list
 1 LetFloatFromLet
+    1
 22 BetaReduction
+    1 a2
+    1 b
+    1 a
+    1 g
+    1 a
+    1 xs
+    1 ys
+    1 b
+    1 c
+    1 n
+    1 a
+    1 b
+    1 k
+    1 z
+    1 x
+    1 a
+    1 g
+    1 h
+    1 b
+    1 c
+    1 n
+    1 a2
 10 SimplifierDone
+    10
 
 
