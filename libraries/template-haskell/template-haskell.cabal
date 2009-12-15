@@ -10,7 +10,7 @@ build-type: Simple
 Cabal-Version: >= 1.6
 
 Library
-    build-depends: base >= 3 && < 5,
+    build-depends: base >= 4 && < 5,
                    pretty, containers
     exposed-modules:
         Language.Haskell.TH.Syntax.Internals
