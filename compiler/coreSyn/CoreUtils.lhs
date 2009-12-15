@@ -655,6 +655,11 @@ exprOkForSpeculation (Var v)     = isUnLiftedType (idType v)
 				 && not (isTickBoxOp v)
 exprOkForSpeculation (Note _ e)  = exprOkForSpeculation e
 exprOkForSpeculation (Cast e _)  = exprOkForSpeculation e
+
+exprOkForSpeculation (Case e _ _ alts) 
+  =  exprOkForSpeculation e  -- Note [exprOkForSpeculation: case expressions]
+  && all (\(_,_,rhs) -> exprOkForSpeculation rhs) alts
+
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
 	(Var f, args) -> spec_ok (idDetails f) args
@@ -698,6 +703,36 @@ isDivOp FloatDivOp       = True
 isDivOp DoubleDivOp      = True
 isDivOp _                = False
 \end{code}
+
+Note [exprOkForSpeculation: case expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
+It's always sound for exprOkForSpeculation to return False, and we
+don't want it to take too long, so it bales out on complicated-looking
+terms.  Notably lets, which can be stacked very deeply; and in any 
+case the argument of exprOkForSpeculation is usually in a strict context,
+so any lets will have been floated away.
+
+However, we keep going on case-expressions.  An example like this one
+showed up in DPH code:
+    foo :: Int -> Int
+    foo 0 = 0
+    foo n = (if n < 5 then 1 else 2) `seq` foo (n-1)
+
+If exprOkForSpeculation doesn't look through case expressions, you get this:
+    T.$wfoo =
+      \ (ww :: GHC.Prim.Int#) ->
+        case ww of ds {
+          __DEFAULT -> case (case <# ds 5 of _ {
+                          GHC.Bool.False -> lvl1; 
+                          GHC.Bool.True -> lvl})
+                       of _ { __DEFAULT ->
+                       T.$wfoo (GHC.Prim.-# ds_XkE 1) };
+          0 -> 0
+        }
+
+The inner case is redundant, and should be nuked.
+
 
 %************************************************************************
 %*									*
