@@ -35,6 +35,8 @@ compiler_stage1_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 compiler_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 compiler_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 
+compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
+
 ifneq "$(BINDIST)" "YES"
 compiler/stage1/package-data.mk : $(compiler_CONFIG_HS)
 compiler/stage2/package-data.mk : $(compiler_CONFIG_HS)
