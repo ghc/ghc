@@ -72,8 +72,9 @@ endif
 
 endef
 
-define addCFileDeps
-
+# This comment is outside the "define addCFileDeps" as that definition
+# is a list of command lines, and if it is inside it then we pass this
+# comment to the shell every time we call the definition.
 # $1 = dir
 # $2 = distdir
 # $3 = depfile
@@ -81,6 +82,8 @@ define addCFileDeps
 # $5 = way
 # The formatting of this definition (e.g. the blank line above) is
 # important, in order to get make to generate the right makefile code.
+define addCFileDeps
+
 	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$5_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
 	sed -e "1s|\.o|\.$($5_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "s|$(TOP)/||g" -e "s|$2/build/$2/build|$2/build|g" $3.bit >> $3.tmp
 endef
