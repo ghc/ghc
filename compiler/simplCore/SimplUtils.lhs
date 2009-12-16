@@ -884,11 +884,13 @@ activeRule dflags env
 
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't do postInlineUnconditionally for top-level things (except
-ones that are trivial).  There is no point, because the main goal is
-to get rid of local bindings used in multiple case branches. And
-doing so risks replacing a single global allocation with local allocations.
-
+We don't do postInlineUnconditionally for top-level things (exept ones that
+are trivial):
+  * There is no point, because the main goal is to get rid of local
+    bindings used in multiple case branches.
+  * Doing so will inline top-level error expressions that have been
+    carefully floated out by FloatOut.  More generally, it might 
+    replace static allocation with dynamic.
 
 Note [InlineRule and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
