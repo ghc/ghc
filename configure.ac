@@ -728,11 +728,8 @@ dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
 dnl    for math functions or not
 dnl    (see http://hackage.haskell.org/trac/ghc/ticket/3730)
-AC_CHECK_FUNC(atan,[fp_libm_not_needed=yes;LIBM=],[fp_libm_not_needed=dunno])
-if test x"$fp_libm_not_needed" = xdunno; then
-   AC_CHECK_LIB([m], [atan], [LIBS="-lm $LIBS"; LIBM="-lm"],[LIBM=])
-fi
-AC_SUBST([LIBM])
+AC_SEARCH_LIBS(atan, m, 
+  [AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])])
 
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
 dnl    the order of these tests matters: bfd needs liberty

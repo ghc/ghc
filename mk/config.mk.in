@@ -302,9 +302,6 @@ SupportsSplitObjs=$(strip $(if $(filter YES,$(ArchSupportsSplitObjs)),\
 # By default, enable SplitObjs for the libraries if this build supports it
 SplitObjs=$(SupportsSplitObjs)
 
-# Math library
-LIBM=@LIBM@
-
 # .NET interop support?
 #
 DotnetSupport=NO
