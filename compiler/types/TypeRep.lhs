@@ -471,7 +471,8 @@ ppr_type :: Prec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)		-- Note [Infix type variables]
   | isSymOcc (getOccName tv)  = parens (ppr tv)
   | otherwise		      = ppr tv
-ppr_type _ (PredTy pred)      = ifPprDebug (ptext (sLit "<pred>")) <> (ppr pred)
+ppr_type p (PredTy pred)      = maybeParen p TyConPrec $
+                                ifPprDebug (ptext (sLit "<pred>")) <> (ppr pred)
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
