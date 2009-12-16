@@ -23,12 +23,12 @@ define build-perl
 # $2 = distdir
 
 ifeq "$$($1_$2_TOPDIR)" "YES"
-$1_$2_INPLACE = $(INPLACE_TOPDIR)/$$($1_$2_PROG)
+$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
 else
-$1_$2_INPLACE = $(INPLACE_BIN)/$$($1_$2_PROG)
+$1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
 endif
 
-$(call all-target,$$($1_$2_INPLACE))
+$(call all-target,$1_$2,$$($1_$2_INPLACE))
 
 $(call clean-target,$1,$2,$1/$2 $$($1_$2_INPLACE))
 .PHONY: clean_$1

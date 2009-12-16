@@ -89,7 +89,8 @@ getTree isFileInteresting root dir subdir
           dir' = dir <//> subdir
           doEntry :: FilePath -> IO (Maybe Tree)
           doEntry e = liftM Just (getTree isFileInteresting root dir' e)
-              `catch` \_ -> -- XXX Do this better
+            `catchIO` \_ -> -- XXX We ought to check this is a
+                            -- "not a directory" exception really
                       if isFileInteresting e
                       then do let fn = dir' <//> e
                               h <- openFile (root </> fn) ReadMode
@@ -97,6 +98,9 @@ getTree isFileInteresting root dir subdir
                               hClose h
                               return $ Just $ File e fn size
                       else return Nothing
+
+catchIO :: IO a -> (IOError -> IO a) -> IO a
+catchIO = catch
 
 ----------------------------------------------------------------------
 -- Comparing the trees

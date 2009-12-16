@@ -1,0 +1,19 @@
+name:                 compareSizes
+version:              0.1.0.0
+cabal-version:        >= 1.6
+license:              BSD3
+build-type:           Simple
+license-file:         LICENSE
+stability:            experimental
+synopsis:             Size comparison util
+description:          Size comparison util
+category:             Development
+
+executable compareSizes
+  build-depends:
+    base >= 4 && < 5,
+    directory,
+    filepath
+
+  main-is: Main.hs
+

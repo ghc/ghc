@@ -398,6 +398,7 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/compare_sizes/dist/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final two package.conf dependencies: ghc-prim depends on RTS,
 # and RTS depends on libffi.
@@ -553,6 +554,9 @@ BUILD_DIRS += \
    $(GHC_TOUCHY_DIR)
 endif
 
+BUILD_DIRS += utils/count_lines
+BUILD_DIRS += utils/compare_sizes
+
 ifneq "$(CLEANING)" "YES"
 # After compiler/, because these packages depend on it
 BUILD_DIRS += \
@@ -595,6 +599,7 @@ utils/runghc_dist_DISABLE = YES
 utils/hpc_dist_DISABLE = YES
 utils/hsc2hs_dist-install_DISABLE = YES
 utils/ghc-pkg_dist-install_DISABLE = YES
+utils/compare_sizes_dist_DISABLE = YES
 compiler_stage2_DISABLE = YES
 compiler_stage3_DISABLE = YES
 ghc_stage2_DISABLE = YES
