@@ -3,7 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -340,7 +339,7 @@ mkNewTypeCoercion name tycon tvs rhs_ty
     co_con_arity = length tvs
 
     rule :: CoTyConKindChecker
-    rule kc_ty kc_co checking args 
+    rule kc_ty _kc_co checking args 
       = do { ks <- mapM kc_ty args
            ; unless (not checking || kindAppOk (tyConKind tycon) ks) 
                     (fail "Argument kind mis-match")
@@ -362,7 +361,7 @@ mkFamInstCoercion name tvs family instTys rep_tycon
     coArity = length tvs
 
     rule :: CoTyConKindChecker
-    rule kc_ty kc_co checking args 
+    rule kc_ty _kc_co checking args 
       = do { ks <- mapM kc_ty args
            ; unless (not checking  || kindAppOk (tyConKind rep_tycon) ks)
                     (fail "Argument kind mis-match")
@@ -371,7 +370,7 @@ mkFamInstCoercion name tvs family instTys rep_tycon
 		    , TyConApp rep_tycon args) }     --   ~ R tys
 
 kindAppOk :: Kind -> [Kind] -> Bool
-kindAppOk kfn [] = True
+kindAppOk _   [] = True
 kindAppOk kfn (k:ks) 
   = case splitKindFunTy_maybe kfn of
       Just (kfa, kfb) | k `isSubKind` kfa -> kindAppOk kfb ks
@@ -408,31 +407,34 @@ symCoercionTyCon
   = mkCoercionTyCon symCoercionTyConName 1 kc_sym
   where
     kc_sym :: CoTyConKindChecker
-    kc_sym kc_ty kc_co _ (co:_) 
+    kc_sym _kc_ty kc_co _ (co:_) 
       = do { (ty1,ty2) <- kc_co co
            ; return (ty2,ty1) }
+    kc_sym _ _ _ _ = panic "kc_sym"
 
 transCoercionTyCon 
   = mkCoercionTyCon transCoercionTyConName 2 kc_trans
   where
     kc_trans :: CoTyConKindChecker
-    kc_trans kc_ty kc_co checking (co1:co2:_)
+    kc_trans _kc_ty kc_co checking (co1:co2:_)
       = do { (a1, r1) <- kc_co co1
            ; (a2, r2) <- kc_co co2 
 	   ; unless (not checking || (r1 `coreEqType` a2))
                     (fail "Trans coercion mis-match")
            ; return (a1, r2) }
+    kc_trans _ _ _ _ = panic "kc_sym"
 
 ---------------------------------------------------
 leftCoercionTyCon  = mkCoercionTyCon leftCoercionTyConName  1 (kcLR_help fst)
 rightCoercionTyCon = mkCoercionTyCon rightCoercionTyConName 1 (kcLR_help snd)
 
 kcLR_help :: (forall a. (a,a)->a) -> CoTyConKindChecker
-kcLR_help select kc_ty kc_co _checking (co : _)
+kcLR_help select _kc_ty kc_co _checking (co : _)
   = do { (ty1, ty2)  <- kc_co co
        ; case decompLR_maybe ty1 ty2 of
            Nothing  -> fail "decompLR" 
            Just res -> return (select res) }
+kcLR_help _ _ _ _ _ = panic "kcLR_help"
 
 decompLR_maybe :: Type -> Type -> Maybe ((Type,Type), (Type,Type))
 -- Helper for left and right.  Finds coercion kind of its input and
@@ -460,22 +462,24 @@ instCoercionTyCon
                     (fail "Coercion instantation kind mis-match")
            ; return (substTyWith [tv1] [ty] ty1,
                      substTyWith [tv2] [ty] ty2) } }
+    kcInst_help _ _ _ _ = panic "kcInst_help"
 
 decompInst_maybe :: Type -> Type -> Maybe ((TyVar,TyVar), (Type,Type))
 decompInst_maybe ty1 ty2
   | Just (tv1,r1) <- splitForAllTy_maybe ty1
   , Just (tv2,r2) <- splitForAllTy_maybe ty2
   = Just ((tv1,tv2), (r1,r2))
-
+decompInst_maybe _ _ = Nothing
 
 ---------------------------------------------------
 unsafeCoercionTyCon 
   = mkCoercionTyCon unsafeCoercionTyConName 2 kc_unsafe
   where
-   kc_unsafe kc_ty kc_co _checking (ty1:ty2:_) 
-    = do { k1 <- kc_ty ty1
-         ; k2 <- kc_ty ty2
+   kc_unsafe kc_ty _kc_co _checking (ty1:ty2:_) 
+    = do { _ <- kc_ty ty1
+         ; _ <- kc_ty ty2
          ; return (ty1,ty2) }
+   kc_unsafe _ _ _ _ = panic "kc_unsafe"
         
 ---------------------------------------------------
 -- The csel* family
@@ -485,11 +489,12 @@ csel2CoercionTyCon = mkCoercionTyCon csel2CoercionTyConName 1 (kcCsel_help sndOf
 cselRCoercionTyCon = mkCoercionTyCon cselRCoercionTyConName 1 (kcCsel_help thirdOf3) 
 
 kcCsel_help :: (forall a. (a,a,a) -> a) -> CoTyConKindChecker
-kcCsel_help select kc_ty kc_co _checking (co : rest)
+kcCsel_help select _kc_ty kc_co _checking (co : _)
   = do { (ty1,ty2) <- kc_co co
        ; case decompCsel_maybe ty1 ty2 of
            Nothing  -> fail "decompCsel"
            Just res -> return (select res) }
+kcCsel_help _ _ _ _ _ = panic "kcCsel_help"
 
 decompCsel_maybe :: Type -> Type -> Maybe ((Type,Type), (Type,Type), (Type,Type))
 --   If         co :: (s1~t1 => r1) ~ (s2~t2 => r2)
@@ -664,7 +669,8 @@ mkForAllTyCoI tv (ACo co) = ACo $ ForAllTy tv co
 -- | Extract a 'Coercion' from a 'CoercionI' if it represents one. If it is the identity coercion,
 -- panic
 fromACo :: CoercionI -> Coercion
-fromACo (ACo co) = co
+fromACo (ACo co)  = co
+fromACo (IdCo {}) = panic "fromACo"
 
 -- | Smart constructor for class 'Coercion's on 'CoercionI'. Satisfies:
 --
