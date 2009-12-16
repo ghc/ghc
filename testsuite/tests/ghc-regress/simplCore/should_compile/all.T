@@ -59,3 +59,8 @@ test('T3234',
      compile,
      ['-ddump-simpl-stats -dsuppress-uniques -fno-code'])
 
+test('T3717', only_ways(['optc','optasm']), 
+              compile, 
+              ['-ddump-simpl -dsuppress-uniques -fno-code'])
+
+
