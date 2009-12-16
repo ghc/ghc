@@ -1,3 +1,24 @@
+-- This program compares the sizes of corresponding files in two tress
+
+--   $ ./compareSizes --hi ~/ghc/darcs/ghc ~/ghc/6.12-branch/ghc
+--        Size | Change | Filename
+--      25644 | -0.99% | compiler/stage1/build/Demand.hi
+--      21103 | -0.98% | compiler/stage2/build/Demand.hi
+--     180044 | -0.98% | libraries/base/dist-install/build/GHC/Classes.hi
+--       6415 | -0.58% | .../Data/Array/Parallel/Prelude/Base/Tuple.hi
+--       6507 | -0.57% | .../Data/Array/Parallel/Prelude/Base/Tuple.hi
+--   [...]
+--       3264 |  3.16% | .../Parallel/Unlifted/Sequential/Flat/Enum.hi
+--      51389 |  3.30% | .../build/Language/Haskell/Extension.hi
+--       1415 | 72.18% | libraries/base/dist-install/build/Data/Tuple.hi
+--   28752162 | -0.00% | TOTAL
+
+-- Flags:
+--    --o to compare object files.
+--    --hi to compare interface files [DEFAULT]
+
+-- There's a hack to avoid descending into '*_split' directories
+
 
 module Main (main) where
 
