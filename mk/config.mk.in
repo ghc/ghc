@@ -598,6 +598,7 @@ PIC			= pic
 PREPROCESSCMD		= $(CC) -E
 RANLIB			= @RANLIB@
 SED			= @SedCmd@
+TR 			= tr
 SHELL			= /bin/sh
 
 HaveDtrace		= @HaveDtrace@

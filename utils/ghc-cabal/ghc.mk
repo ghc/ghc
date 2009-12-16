@@ -79,9 +79,11 @@ $(GHC_CABAL_DIR)/dist-dummy-ghc/build/dummy-ghc.hs : $(GHC_CABAL_DIR)/ghc.mk $(M
 #   ( "PostfixOperators", ...
 # then it translates them into
 #   ["PostfixOperators"] ++
+# Tabs are a pain to handle portably with sed, so rather than worrying
+# about them we just use tr to remove them all before we start.
 	echo 'extensions :: [String]'                                     >> $@
 	echo 'extensions ='                                               >> $@
-	'$(SED)' '/^xFlags/,/]/s/^[[:space:]]*([[:space:]]*\("[^"]*"\)[^"]*/  [\1] ++/p;d' compiler/main/DynFlags.hs >> $@
+	'$(TR)' -d '\t' < compiler/main/DynFlags.hs | '$(SED)' '/^xFlags/,/]/s/^ *( *\("[^"]*"\)[^"]*/  [\1] ++/p;d' >> $@
 	echo '  []'                                                       >> $@
 
 # We don't build dummy-ghc with Cabal, so we need to pass -package
