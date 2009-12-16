@@ -60,3 +60,13 @@ test('3424', # it's slow:
 
 # Test for out-of-range heap size
 test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
+
+# Test to see if linker scripts link properly to real ELF files
+test('T2615', [ if_platform('i386-unknown-mingw32',skip),
+                cmd_prefix(' '.join([
+			'$MAKE T2615-prep &&',
+			'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.',
+				# Add current directory to dlopen search path
+			''])),
+		extra_clean(['libfoo_T2615.so']) ],
+              compile_and_run, ['-package ghc'])
