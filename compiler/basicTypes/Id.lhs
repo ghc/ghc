@@ -126,6 +126,7 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdStrictness`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
+	  `setInlineActivation`,
 	  `idCafInfo`
 \end{code}
 
