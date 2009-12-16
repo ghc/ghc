@@ -29,7 +29,7 @@ module SimplEnv (
 
 	simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs, 
  	simplBinder, simplBinders, addBndrRules,
-	substExpr, substTy, mkCoreSubst,
+	substExpr, substTy, getTvSubst, mkCoreSubst,
 
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
@@ -687,13 +687,16 @@ addBndrRules env in_id out_id
 %************************************************************************
 
 \begin{code}
+getTvSubst :: SimplEnv -> TvSubst
+getTvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env })
+  = mkTvSubst in_scope tv_env
+
 substTy :: SimplEnv -> Type -> Type 
-substTy (SimplEnv { seInScope = in_scope, seTvSubst = tv_env }) ty
-  = Type.substTy (TvSubst in_scope tv_env) ty
+substTy env ty = Type.substTy (getTvSubst env) ty
 
 substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
-substTyVarBndr env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_env }) tv
-  = case Type.substTyVarBndr (TvSubst in_scope tv_env) tv of
+substTyVarBndr env tv
+  = case Type.substTyVarBndr (getTvSubst env) tv of
 	(TvSubst in_scope' tv_env', tv') 
 	   -> (env { seInScope = in_scope', seTvSubst = tv_env'}, tv')
 

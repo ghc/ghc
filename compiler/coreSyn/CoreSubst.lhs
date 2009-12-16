@@ -39,6 +39,7 @@ import OccurAnal( occurAnalyseExpr )
 
 import qualified Type
 import Type     ( Type, TvSubst(..), TvSubstEnv )
+import Coercion ( optCoercion )
 import VarSet
 import VarEnv
 import Id
@@ -290,7 +291,10 @@ substExpr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Note note e)   = Note (go_note note) (go e)
-    go (Cast e co)     = Cast (go e) (substTy subst co)
+    go (Cast e co)     = Cast (go e) (optCoercion (getTvSubst subst) co)
+	-- Optimise coercions as we go; this is good, for example
+	-- in the RHS of rules, which are only substituted in
+
     go (Lam bndr body) = Lam bndr' (substExpr subst' body)
 		       where
 			 (subst', bndr') = substBndr subst bndr
@@ -463,8 +467,10 @@ substTyVarBndr (Subst in_scope id_env tv_env) tv
 
 -- | See 'Type.substTy'
 substTy :: Subst -> Type -> Type 
-substTy (Subst in_scope _id_env tv_env) ty
-  = Type.substTy (TvSubst in_scope tv_env) ty
+substTy subst ty = Type.substTy (getTvSubst subst) ty
+
+getTvSubst :: Subst -> TvSubst
+getTvSubst (Subst in_scope _id_env tv_env) = TvSubst in_scope tv_env
 \end{code}
 
 

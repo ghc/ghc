@@ -123,7 +123,8 @@ module Type (
 	emptyTvSubstEnv, emptyTvSubst,
 	
 	mkTvSubst, mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
-	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope, extendTvInScopeList,
+	getTvSubstEnv, setTvSubstEnv, zapTvSubstEnv, getTvInScope, 
+        extendTvInScope, extendTvInScopeList,
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst, zipTyEnv,
         isEmptyTvSubst,
 
@@ -1436,6 +1437,9 @@ notElemTvSubst tv (TvSubst _ env) = not (tv `elemVarEnv` env)
 
 setTvSubstEnv :: TvSubst -> TvSubstEnv -> TvSubst
 setTvSubstEnv (TvSubst in_scope _) env = TvSubst in_scope env
+
+zapTvSubstEnv :: TvSubst -> TvSubst
+zapTvSubstEnv (TvSubst in_scope _) = TvSubst in_scope emptyVarEnv
 
 extendTvInScope :: TvSubst -> Var -> TvSubst
 extendTvInScope (TvSubst in_scope env) var = TvSubst (extendInScopeSet in_scope var) env

@@ -699,20 +699,24 @@ mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi
 %************************************************************************
 
 \begin{code}
+optCoercion :: TvSubst -> Coercion -> NormalCo
+-- ^ optCoercion applies a substitution to a coercion, 
+--   *and* optimises it to reduce its size
+optCoercion env co = opt_co env False co
+
 type NormalCo = Coercion
   -- Invariants: 
+  --  * The substitution has been fully applied
   --  * For trans coercions (co1 `trans` co2)
   --       co1 is not a trans, and neither co1 nor co2 is identity
   --  * If the coercion is the identity, it has no CoVars of CoTyCons in it (just types)
 
 type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity
 
-optCoercion :: Coercion -> NormalCo
-optCoercion co = opt_co False co
-
-opt_co :: Bool	       -- True <=> return (sym co)
-       -> Coercion
-       -> NormalCo
+opt_co, opt_co' :: TvSubst
+       		-> Bool	       -- True <=> return (sym co)
+       		-> Coercion
+       		-> NormalCo	
 opt_co = opt_co'
 -- opt_co sym co = pprTrace "opt_co {" (ppr sym <+> ppr co) $
 --       	        co1 `seq` 
@@ -728,12 +732,14 @@ opt_co = opt_co'
 --            | otherwise = (s,t)
 --    (s2,t2) = coercionKind co1
 
-opt_co' sym (AppTy ty1 ty2) 	      = mkAppTy (opt_co sym ty1) (opt_co sym ty2)
-opt_co' sym (FunTy ty1 ty2) 	      = FunTy (opt_co sym ty1) (opt_co sym ty2)
-opt_co' sym (PredTy (ClassP cls tys)) = PredTy (ClassP cls (map (opt_co sym) tys))
-opt_co' sym (PredTy (IParam n ty))    = PredTy (IParam n (opt_co sym ty))
+opt_co' env sym (AppTy ty1 ty2) 	  = mkAppTy (opt_co env sym ty1) (opt_co env sym ty2)
+opt_co' env sym (FunTy ty1 ty2) 	  = FunTy (opt_co env sym ty1) (opt_co env sym ty2)
+opt_co' env sym (PredTy (ClassP cls tys)) = PredTy (ClassP cls (map (opt_co env sym) tys))
+opt_co' env sym (PredTy (IParam n ty))    = PredTy (IParam n (opt_co env sym ty))
+opt_co' _   _   co@(PredTy (EqPred {}))   = pprPanic "optCoercion" (ppr co)
 
-opt_co' sym co@(TyVarTy tv)
+opt_co' env sym co@(TyVarTy tv)
+  | Just ty <- lookupTyVar env tv = opt_co' (zapTvSubstEnv env) sym ty
   | not (isCoVar tv)     = co   -- Identity; does not mention a CoVar
   | ty1 `coreEqType` ty2 = ty1	-- Identity; ..ditto..
   | not sym              = co
@@ -741,41 +747,43 @@ opt_co' sym co@(TyVarTy tv)
   where
     (ty1,ty2) = coVarKind tv
 
-opt_co' sym (ForAllTy tv cor) 
-  | isCoVar tv = mkCoPredTy (opt_co sym co1) (opt_co sym co2) (opt_co sym cor)
-  | otherwise  = ForAllTy tv (opt_co sym cor)
+opt_co' env sym (ForAllTy tv cor) 
+  | isCoVar tv = mkCoPredTy (opt_co env sym co1) (opt_co env sym co2) (opt_co env sym cor)
+  | otherwise  = case substTyVarBndr env tv of
+                   (env', tv') -> ForAllTy tv' (opt_co env' sym cor)
   where
     (co1,co2) = coVarKind tv
 
-opt_co' sym (TyConApp tc cos)
+opt_co' env sym (TyConApp tc cos)
   | isCoercionTyCon tc
-  = foldl mkAppTy opt_co_tc 
-          (map (opt_co sym) (drop arity cos))
+  = foldl mkAppTy 
+	  (opt_co_tc_app env sym tc (take arity cos))
+          (map (opt_co env sym) (drop arity cos))
   | otherwise
-  = TyConApp tc (map (opt_co sym) cos)
+  = TyConApp tc (map (opt_co env sym) cos)
   where
     arity = tyConArity tc
-    opt_co_tc :: NormalCo
-    opt_co_tc = opt_co_tc_app sym tc (take arity cos)
 
 --------
-opt_co_tc_app :: Bool -> TyCon -> [Type] -> NormalCo
+opt_co_tc_app :: TvSubst -> Bool -> TyCon -> [Coercion] -> NormalCo
 -- Used for CoercionTyCons only
-opt_co_tc_app sym tc cos
+-- Arguments are *not* already simplified/substituted
+opt_co_tc_app env sym tc cos
   | tc `hasKey` symCoercionTyConKey
-  = opt_co (not sym) co1
+  = opt_co env (not sym) co1
 
   | tc `hasKey` transCoercionTyConKey
-  = if sym then opt_trans opt_co2 opt_co1
+  = if sym then opt_trans opt_co2 opt_co1   -- sym (g `o` h) = sym h `o` sym g
            else opt_trans opt_co1 opt_co2
 
   | tc `hasKey` leftCoercionTyConKey
-  , Just (co1, _) <- splitAppTy_maybe opt_co1
-  = co1
+  , Just (opt_co1_left, _) <- splitAppTy_maybe opt_co1
+  = opt_co1_left	-- sym (left g) = left (sym g) 
+			-- The opt_co has the sym pushed into it
 
   | tc `hasKey` rightCoercionTyConKey
-  , Just (_, co2) <- splitAppTy_maybe opt_co1
-  = co2
+  , Just (_, opt_co1_right) <- splitAppTy_maybe opt_co1
+  = opt_co1_right
 
   | tc `hasKey` csel1CoercionTyConKey
   , Just (s1,_,_) <- splitCoPredTy_maybe opt_co1
@@ -789,10 +797,16 @@ opt_co_tc_app sym tc cos
   , Just (_,_,r) <- splitCoPredTy_maybe opt_co1
   = r
 
-  | tc `hasKey` instCoercionTyConKey
-  , Just (tv, co'') <- splitForAllTy_maybe opt_co1
-  , let ty = co2
-  = substTyWith [tv] [ty] co''
+  | tc `hasKey` instCoercionTyConKey	-- See if the first arg 	
+					-- is already a forall
+  , Just (tv, co1_body) <- splitForAllTy_maybe co1
+  , let ty = substTy env co2
+  = opt_co (extendTvSubst env tv ty) sym co1_body
+
+  | tc `hasKey` instCoercionTyConKey	-- See if is *now* a forall
+  , Just (tv, opt_co1_body) <- splitForAllTy_maybe opt_co1
+  , let ty = substTy env co2
+  = substTyWith [tv] [ty] opt_co1_body	-- An inefficient one-variable substitution
 
   | otherwise	  -- Do not push sym inside top-level axioms
     		  -- e.g. if g is a top-level axiom
@@ -801,11 +815,15 @@ opt_co_tc_app sym tc cos
   = if sym then mkSymCoercion the_co 
            else the_co
   where
-    the_co = TyConApp tc cos
     (co1 : cos1) = cos
     (co2 : _)    = cos1
-    opt_co1 = opt_co sym co1
-    opt_co2 = opt_co sym co2
+
+	-- These opt_cos have the sym pushed into them
+    opt_co1 = opt_co env sym co1
+    opt_co2 = opt_co env sym co2
+
+	-- However the_co does *not* have sym pushed into it
+    the_co = TyConApp tc (map (opt_co env False) cos)
 
 -------------
 opt_trans :: NormalCo -> NormalCo -> NormalCo

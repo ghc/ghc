@@ -874,7 +874,7 @@ simplType :: SimplEnv -> InType -> SimplM OutType
         -- Kept monadic just so we can do the seqType
 simplType env ty
   = -- pprTrace "simplType" (ppr ty $$ ppr (seTvSubst env)) $
-    seqType new_ty   `seq`   return new_ty
+    seqType new_ty `seq` return new_ty
   where
     new_ty = substTy env ty
 
@@ -883,8 +883,9 @@ simplCoercion :: SimplEnv -> InType -> SimplM OutType
 -- The InType isn't *necessarily* a coercion, but it might be
 -- (in a type application, say) and optCoercion is a no-op on types
 simplCoercion env co
-  = do { co' <- simplType env co
-       ; return (optCoercion co') }
+  = seqType new_co `seq` return new_co
+  where 
+    new_co = optCoercion (getTvSubst env) co
 \end{code}
 
 
