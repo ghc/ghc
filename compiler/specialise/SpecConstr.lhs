@@ -39,7 +39,6 @@ import Name
 import DynFlags		( DynFlags(..) )
 import StaticFlags	( opt_PprStyle_Debug )
 import StaticFlags	( opt_SpecInlineJoinPoints )
-import BasicTypes	( Activation(..) )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
 import Demand
 import DmdAnal		( both )
@@ -1179,18 +1178,19 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 	      	-- Usual w/w hack to avoid generating 
 	      	-- a spec_rhs of unlifted type and no args
 	
-	      fn_name   = idName fn
-	      fn_loc    = nameSrcSpan fn_name
-	      spec_occ  = mkSpecOcc (nameOccName fn_name)
-	      rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
-	      spec_rhs  = mkLams spec_lam_args spec_body
-	      spec_str  = calcSpecStrictness fn spec_lam_args pats
-	      spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
-	      		    `setIdStrictness` spec_str    	-- See Note [Transfer strictness]
-			    `setIdArity` count isId spec_lam_args
-	      body_ty   = exprType spec_body
-	      rule_rhs  = mkVarApps (Var spec_id) spec_call_args
-	      rule      = mkLocalRule rule_name specConstrActivation fn_name qvars pats rule_rhs
+	      fn_name    = idName fn
+	      fn_loc     = nameSrcSpan fn_name
+	      spec_occ   = mkSpecOcc (nameOccName fn_name)
+	      rule_name  = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
+	      spec_rhs   = mkLams spec_lam_args spec_body
+	      spec_str   = calcSpecStrictness fn spec_lam_args pats
+	      spec_id    = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
+	      		     `setIdStrictness` spec_str    	-- See Note [Transfer strictness]
+			     `setIdArity` count isId spec_lam_args
+	      body_ty    = exprType spec_body
+	      rule_rhs   = mkVarApps (Var spec_id) spec_call_args
+              inline_act = idInlineActivation fn
+	      rule       = mkLocalRule rule_name inline_act fn_name qvars pats rule_rhs
 	; return (spec_usg, OS call_pat rule spec_id spec_rhs) }
 
 calcSpecStrictness :: Id 		     -- The original function
@@ -1215,17 +1215,22 @@ calcSpecStrictness fn qvars pats
     	   | (Var _, args) <- collectArgs e = go env ds args
     go_one env _         _ = env
 
--- In which phase should the specialise-constructor rules be active?
--- Originally I made them always-active, but Manuel found that
--- this defeated some clever user-written rules.  So Plan B
--- is to make them active only in Phase 0; after all, currently,
--- the specConstr transformation is only run after the simplifier
--- has reached Phase 0.  In general one would want it to be 
--- flag-controllable, but for now I'm leaving it baked in
---					[SLPJ Oct 01]
-specConstrActivation :: Activation
-specConstrActivation = ActiveAfter 0	-- Baked in; see comments above
 \end{code}
+
+Note [Transfer activation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+In which phase should the specialise-constructor rules be active?
+Originally I made them always-active, but Manuel found that this
+defeated some clever user-written rules.  Then I made them active only
+in Phase 0; after all, currently, the specConstr transformation is
+only run after the simplifier has reached Phase 0, but that meant
+that specialisations didn't fire inside wrappers; see test
+simplCore/should_compile/spec-inline.
+
+So now I just use the inline-activation of the parent Id, as the
+activation for the specialiation RULE, just like the main specialiser;
+see Note [Auto-specialisation and RULES] in Specialise.
+
 
 Note [Transfer strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

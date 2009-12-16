@@ -671,15 +671,17 @@ simplUnfolding env _ _ _ _ (DFunUnfolding con ops)
   where
     ops' = map (CoreSubst.substExpr (mkCoreSubst env)) ops
 
-simplUnfolding env top_lvl _ _ _ 
+simplUnfolding env top_lvl id _ _ 
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
                    , uf_src = src, uf_guidance = guide })
   | isInlineRuleSource src
-  = do { expr' <- simplExpr (updMode updModeForInlineRules env) expr
-       	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
+  = do { expr' <- simplExpr rule_env expr
        ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst env) src
        ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
+  where
+    rule_env = updMode (updModeForInlineRules (idInlineActivation id)) env
+       	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
 
 simplUnfolding _ top_lvl id _occ_info new_rhs _
   = return (mkUnfolding (isTopLevel top_lvl) (isBottomingId id) new_rhs)

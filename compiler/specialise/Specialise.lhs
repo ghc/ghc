@@ -29,6 +29,7 @@ import Name
 import MkId		( voidArgId, realWorldPrimId )
 import FiniteMap
 import Maybes		( catMaybes, isJust )
+import BasicTypes	( isNeverActive, inlinePragmaActivation )
 import Bag
 import Util
 import Outputable
@@ -773,6 +774,9 @@ specDefn subst body_uds fn rhs
   |  rhs_tyvars `lengthIs`     n_tyvars -- Rhs of fn's defn has right number of big lambdas
   && rhs_ids    `lengthAtLeast` n_dicts	-- and enough dict args
   && notNull calls_for_me		-- And there are some calls to specialise
+  && not (isNeverActive (idInlineActivation fn))
+	-- Don't specialise NOINLINE things
+	-- See Note [Auto-specialisation and RULES]
 
 --   && not (certainlyWillInline (idUnfolding fn))	-- And it's not small
 --	See Note [Inline specialisation] for why we do not 
@@ -804,7 +808,7 @@ specDefn subst body_uds fn rhs
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
-    inline_act         = idInlineActivation fn
+    inl_act            = inlinePragmaActivation (idInlinePragma fn)
 
 	-- Figure out whether the function has an INLINE pragma
 	-- See Note [Inline specialisations]
@@ -886,10 +890,6 @@ specDefn subst body_uds fn rhs
 	         spec_id_ty = mkPiTypes lam_args body_ty
 	
            ; spec_f <- newSpecIdSM fn spec_id_ty
-  	   ; let spec_f_w_arity = setIdArity spec_f (max 0 (fn_arity - n_dicts))
-		-- Adding arity information just propagates it a bit faster
-		-- See Note [Arity decrease] in Simplify
-
            ; (spec_rhs, rhs_uds) <- specExpr rhs_subst2 (mkLams lam_args body)
 	   ; let
 		-- The rule to put in the function's specialisation is:
@@ -897,20 +897,26 @@ specDefn subst body_uds fn rhs
 	        rule_name = mkFastString ("SPEC " ++ showSDoc (ppr fn <+> ppr spec_ty_args))
   		spec_env_rule = mkLocalRule
 			          rule_name
-				  inline_act 	-- Note [Auto-specialisation and RULES]
+				  inl_act 	-- Note [Auto-specialisation and RULES]
 			 	  (idName fn)
 			          (poly_tyvars ++ inst_dict_ids)
 				  inst_args 
-				  (mkVarApps (Var spec_f_w_arity) app_args)
+				  (mkVarApps (Var spec_f) app_args)
 
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   	final_uds = foldr consDictBind rhs_uds dx_binds
 
+		-- Adding arity information just propagates it a bit faster
+		-- 	See Note [Arity decrease] in Simplify
+		-- Copy InlinePragma information from the parent Id.
+		-- So if f has INLINE[1] so does spec_f
+  	        spec_f_w_arity = spec_f `setIdArity`          max 0 (fn_arity - n_dicts)
+                                        `setInlineActivation` inl_act
+
+		-- Add an InlineRule if the parent has one
 		-- See Note [Inline specialisations]
 		final_spec_f | Just sat <- fn_has_inline_rule
-			     = spec_f_w_arity `setInlineActivation` inline_act
-			               	      `setIdUnfolding` mkInlineRule sat spec_rhs spec_arity
-					      	-- I'm not sure this should be unconditionally InlSat
+			     = spec_f_w_arity `setIdUnfolding` mkInlineRule sat spec_rhs spec_arity
 			     | otherwise 
 			     = spec_f_w_arity
 	   ; return (Just ((final_spec_f, spec_rhs), final_uds, spec_env_rule)) } }
@@ -1112,10 +1118,14 @@ also add
 	RULE f g_spec = 0
 
 But that's a bit complicated.  For now we ask the programmer's help,
-by *copying the INLINE activation pragma* to the auto-specialised rule.
-So if g says {-# NOINLINE[2] g #-}, then the auto-spec rule will also
-not be active until phase 2.  
+by *copying the INLINE activation pragma* to the auto-specialised
+rule.  So if g says {-# NOINLINE[2] g #-}, then the auto-spec rule
+will also not be active until phase 2.  And that's what programmers
+should jolly well do anyway, even aside from specialisation, to ensure
+that g doesn't inline too early.
 
+This in turn means that the RULE would never fire for a NOINLINE
+thing so not much point in generating a specialisation at all.
 
 Note [Specialisation shape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1141,13 +1151,12 @@ It's a silly exapmle, but we get
 where choose doesn't have any dict arguments.  Thus far I have not
 tried to fix this (wait till there's a real example).
 
-
 Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We transfer to the specialised function any INLINE stuff from the
-original.  This means (a) the Activation in the IdInfo, and (b) any
-InlineMe on the RHS.  We do not, however, transfer the RuleMatchInfo
-since we do not expect the specialisation to occur in rewrite rules.
+original.  This means 
+   (a) the Activation for its inlining (from its InlinePragma)
+   (b) any InlineRule
 
 This is a change (Jun06).  Previously the idea is that the point of
 inlining was precisely to specialise the function at its call site,
@@ -1165,9 +1174,6 @@ they aren't applied to interesting arguments.  But perhaps the type
 arguments alone are enough to specialise (even though the args are too
 boring to trigger inlining), and it's certainly better to call the 
 specialised version.
-
-A case in point is dictionary functions, which are current marked
-INLINE, but which are worth specialising.
 
 
 %************************************************************************

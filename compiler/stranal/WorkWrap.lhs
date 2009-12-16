@@ -12,7 +12,7 @@ import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
 import Var
 import Id		( idType, isOneShotLambda, idUnfolding,
-			  setIdStrictness, mkWorkerId,
+			  setIdStrictness, mkWorkerId, setInlinePragma,
 			  setInlineActivation, setIdUnfolding,
 			  setIdArity )
 import Type		( Type )
@@ -22,7 +22,8 @@ import Demand           ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..),
 			)
 import UniqSupply
 import BasicTypes	( RecFlag(..), isNonRec, isNeverActive,
-                          Activation, inlinePragmaActivation )
+                          Activation(..), InlinePragma(..), 
+			  inlinePragmaActivation, inlinePragmaRuleMatchInfo )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import WwLib
@@ -145,33 +146,22 @@ wwExpr (Case expr binder ty alts) = do
 front-end into the proper form, then calls @mkWwBodies@ to do
 the business.
 
-We have to BE CAREFUL that we don't worker-wrapperize an Id that has
-already been w-w'd!  (You can end up with several liked-named Ids
-bouncing around at the same time---absolute mischief.)  So the
-criterion we use is: if an Id already has an unfolding (for whatever
-reason), then we don't w-w it.
-
 The only reason this is monadised is for the unique supply.
 
 Note [Don't w/w inline things (a)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's very important to refrain from w/w-ing an INLINE function
-because the wrapper will then overwrite the InlineRule unfolding.
 
-It was wrong with the old InlineMe Note too: if we do so by mistake 
-we transform
-	f = __inline (\x -> E)
-into
-	f = __inline (\x -> case x of (a,b) -> fw E)
-	fw = \ab -> (__inline (\x -> E)) (a,b)
-and the original __inline now vanishes, so E is no longer
-inside its __inline wrapper.  Death!  Disaster!
+It's very important to refrain from w/w-ing an INLINE function (ie one
+with an InlineRule) because the wrapper will then overwrite the
+InlineRule unfolding.
 
 Furthermore, if the programmer has marked something as INLINE, 
 we may lose by w/w'ing it.
 
 If the strictness analyser is run twice, this test also prevents
-wrappers (which are INLINEd) from being re-done.
+wrappers (which are INLINEd) from being re-done.  (You can end up with
+several liked-named Ids bouncing around at the same time---absolute
+mischief.)  
 
 Notice that we refrain from w/w'ing an INLINE function even if it is
 in a recursive group.  It might not be the loop breaker.  (We could
@@ -179,11 +169,10 @@ test for loop-breaker-hood, but I'm not sure that ever matters.)
 
 Note [Don't w/w inline things (b)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general, therefore, we refrain from w/w-ing *small* functions,
-because they'll inline anyway.  But we must take care: it may look
-small now, but get to be big later after other inling has happened.
-So we take the precaution of adding an INLINE pragma to any such
-functions.  
+In general, we refrain from w/w-ing *small* functions, because they'll
+inline anyway.  But we must take care: it may look small now, but get
+to be big later after other inling has happened.  So we take the
+precaution of adding an INLINE pragma to any such functions.
 
 I made this change when I observed a big function at the end of
 compilation with a useful strictness signature but no w-w.  When 
@@ -191,6 +180,34 @@ I measured it on nofib, it didn't make much difference; just a few
 percent improved allocation on one benchmark (bspt/Euclid.space).  
 But nothing got worse.
 
+Note [Wrapper activation]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+When should the wrapper inlining be active?  It must not be active
+earlier than the current Activation of the Id (eg it might have a
+NOINLINE pragma).  But in fact strictness analysis happens fairly
+late in the pipeline, and we want to prioritise specialisations over
+strictness.  Eg if we have 
+  module Foo where
+    f :: Num a => a -> Int -> a
+    f n 0 = n  	       	   -- Strict in the Int, hence wrapper
+    f n x = f (n+n) (x-1)
+
+    g :: Int -> Int
+    g x = f x x		   -- Provokes a specialisation for f
+
+  module Bsr where
+    import Foo
+
+    h :: Int -> Int
+    h x = f 3 x
+
+Then we want the specialisation for 'f' to kick in before the wrapper does.
+
+Now in fact the 'gentle' simplification pass encourages this, by
+having rules on, but inlinings off.  But that's kind of lucky. It seems 
+more robust to give the wrapper an Activation of (ActiveAfter 0),
+so that it becomes active in an importing module at the same time that
+it appears in the first place in the defining module.
 
 \begin{code}
 tryWW	:: RecFlag
@@ -218,7 +235,7 @@ tryWW is_rec fn_id rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
   = checkSize new_fn_id rhs $
-    splitFun new_fn_id fn_info wrap_dmds res_info inline_act rhs
+    splitFun new_fn_id fn_info wrap_dmds res_info rhs
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
@@ -264,9 +281,9 @@ checkSize fn_id rhs thing_inside
     inline_rule = mkInlineRule unSaturatedOk rhs (unfoldingArity unfolding)
 
 ---------------------
-splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Activation -> Expr Var
+splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
          -> UniqSM [(Id, CoreExpr)]
-splitFun fn_id fn_info wrap_dmds res_info inline_act rhs
+splitFun fn_id fn_info wrap_dmds res_info rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
     (do {
 	-- The arity should match the signature
@@ -275,32 +292,45 @@ splitFun fn_id fn_info wrap_dmds res_info inline_act rhs
     ; let
 	work_rhs = work_fn rhs
 	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
-			`setInlineActivation` inline_act
+			`setInlineActivation` (inlinePragmaActivation inl_prag)
 				-- Any inline activation (which sets when inlining is active) 
-				-- on the original function is duplicated on the worker and wrapper
+				-- on the original function is duplicated on the worker
 				-- It *matters* that the pragma stays on the wrapper
 				-- It seems sensible to have it on the worker too, although we
 				-- can't think of a compelling reason. (In ptic, INLINE things are 
 				-- not w/wd). However, the RuleMatchInfo is not transferred since
                                 -- it does not make sense for workers to be constructorlike.
+
 			`setIdStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
 				-- Even though we may not be at top level, 
 				-- it's ok to give it an empty DmdEnv
+
                         `setIdArity` (exprArity work_rhs)
                                 -- Set the arity so that the Core Lint check that the 
                                 -- arity is consistent with the demand type goes through
 
-	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdUnfolding` mkWwInlineRule work_id wrap_rhs arity
+	wrap_rhs  = wrap_fn work_id
+	wrap_prag = InlinePragma { inl_inline = True
+                                 , inl_act    = ActiveAfter 0
+                                 , inl_rule   = rule_match_info }
+
+	wrap_id   = fn_id `setIdUnfolding` mkWwInlineRule work_id wrap_rhs arity
+			  `setInlinePragma` wrap_prag
+			 	-- See Note [Wrapper activation]
+				-- The RuleMatchInfo is (and must be) unaffected
+				-- The inl_inline is bound to be False, else we would not be
+				--    making a wrapper
 
     ; return ([(work_id, work_rhs), (wrap_id, wrap_rhs)]) })
 	-- Worker first, because wrapper mentions it
 	-- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
   where
-    fun_ty = idType fn_id
-
-    arity  = arityInfo fn_info	-- The arity is set by the simplifier using exprEtaExpandArity
-				-- So it may be more than the number of top-level-visible lambdas
+    fun_ty          = idType fn_id
+    inl_prag        = inlinePragInfo fn_info
+    rule_match_info = inlinePragmaRuleMatchInfo inl_prag
+    arity           = arityInfo fn_info	
+    		    -- The arity is set by the simplifier using exprEtaExpandArity
+		    -- So it may be more than the number of top-level-visible lambdas
 
     work_res_info | isBotRes res_info = BotRes	-- Cpr stuff done by wrapper
 		  | otherwise	      = TopRes
