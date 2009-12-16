@@ -80,6 +80,7 @@ class (Ord a) => Ix a where
 	-- 'index' is typically over-ridden in instances, with essentially
 	-- the same code, but using indexError instead of hopelessIndexError
 	-- Reason: we have 'Show' at the instances
+    {-# INLINE index #-}  -- See Note [Inlining index]
     index b i | inRange b i = unsafeIndex b i   
               | otherwise   = hopelessIndexError
 
@@ -110,8 +111,26 @@ hence is empty
 %*                                                      *
 %*********************************************************
 
+Note [Inlining index]
+~~~~~~~~~~~~~~~~~~~~~
+We inline the 'index' operation, 
+
+ * Partly because it generates much faster code 
+   (although bigger); see Trac #1216
+
+ * Partly because it exposes the bounds checks to the simplifier which
+   might help a big.
+
+If you make a per-instance index method, you may consider inlining it.
+
+Note [Out-of-bounds error messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The default method for 'index' generates hoplelessIndexError, because
+Ix doesn't have Show as a superclass.  For particular base types we
+can do better, so we override the default method for index.
+
 \begin{code}
--- abstract these errors from the relevant index functions so that
+-- Abstract these errors from the relevant index functions so that
 -- the guts of the function will be small enough to inline.
 
 {-# NOINLINE indexError #-}
@@ -133,6 +152,8 @@ instance  Ix Char  where
     {-# INLINE unsafeIndex #-}
     unsafeIndex (m,_n) i = fromEnum i - fromEnum m
 
+    {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
+                          -- and Note [Inlining index]
     index b i | inRange b i =  unsafeIndex b i
               | otherwise   =  indexError b i "Char"
 
@@ -148,6 +169,8 @@ instance  Ix Int  where
     {-# INLINE unsafeIndex #-}
     unsafeIndex (m,_n) i = i - m
 
+    {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
+                          -- and Note [Inlining index]
     index b i | inRange b i =  unsafeIndex b i
               | otherwise   =  indexError b i "Int"
 
@@ -162,6 +185,8 @@ instance  Ix Integer  where
     {-# INLINE unsafeIndex #-}
     unsafeIndex (m,_n) i   = fromInteger (i - m)
 
+    {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
+                          -- and Note [Inlining index]
     index b i | inRange b i =  unsafeIndex b i
               | otherwise   =  indexError b i "Integer"
 
@@ -175,6 +200,8 @@ instance Ix Bool where -- as derived
     {-# INLINE unsafeIndex #-}
     unsafeIndex (l,_) i = fromEnum i - fromEnum l
 
+    {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
+                          -- and Note [Inlining index]
     index b i | inRange b i =  unsafeIndex b i
               | otherwise   =  indexError b i "Bool"
 
@@ -188,6 +215,8 @@ instance Ix Ordering where -- as derived
     {-# INLINE unsafeIndex #-}
     unsafeIndex (l,_) i = fromEnum i - fromEnum l
 
+    {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
+                          -- and Note [Inlining index]
     index b i | inRange b i =  unsafeIndex b i
               | otherwise   =  indexError b i "Ordering"
 
@@ -201,7 +230,8 @@ instance Ix () where
     unsafeIndex   ((), ()) () = 0
     {-# INLINE inRange #-}
     inRange ((), ()) () = True
-    {-# INLINE index #-}
+
+    {-# INLINE index #-}  -- See Note [Inlining index]
     index b i = unsafeIndex b i
 
 ----------------------------------------------------------------------
