@@ -615,6 +615,8 @@ If you write nothing at all, you get defaultInlinePragma:
 It's not possible to get that combination by *writing* something, so 
 if an Id has defaultInlinePragma it means the user didn't specify anything.
 
+If inl_inline = True, then the Id should have an InlineRule unfolding.
+
 Note [CONLIKE pragma]
 ~~~~~~~~~~~~~~~~~~~~~
 The ConLike constructor of a RuleMatchInfo is aimed at the following.

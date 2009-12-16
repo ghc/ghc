@@ -645,11 +645,13 @@ When you say
 you intend that calls (f e) are replaced by <rhs>[e/x] So we
 should capture (\x.<rhs>) in the Unfolding of 'f', and never meddle
 with it.  Meanwhile, we can optimise <rhs> to our heart's content,
-leaving the original unfolding intact in Unfolding of 'f'.
+leaving the original unfolding intact in Unfolding of 'f'. For example
+	all xs = foldr (&&) True xs
+	any p = all . map p  {-# INLINE any #-}
+We optimise any's RHS fully, but leave the InlineRule saying "all . map p",
+which deforests well at the call site.
 
-So the representation of an Unfolding has changed quite a bit
-(see CoreSyn).  An INLINE pragma gives rise to an InlineRule 
-unfolding.  
+So INLINE pragma gives rise to an InlineRule, which captures the original RHS.
 
 Moreover, it's only used when 'f' is applied to the
 specified number of arguments; that is, the number of argument on 

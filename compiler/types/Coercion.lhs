@@ -808,7 +808,7 @@ opt_co_tc_app env sym tc cos
   , let ty = substTy env co2
   = substTyWith [tv] [ty] opt_co1_body	-- An inefficient one-variable substitution
 
-  | otherwise	  -- Do not push sym inside top-level axioms
+  | otherwise	  -- Do *not* push sym inside top-level axioms
     		  -- e.g. if g is a top-level axiom
     		  --   g a : F a ~ a
 		  -- Then (sym (g ty)) /= g (sym ty) !!
