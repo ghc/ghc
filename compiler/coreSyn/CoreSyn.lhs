@@ -43,7 +43,7 @@ module CoreSyn (
         unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
 	
 	-- ** Predicates and deconstruction on 'Unfolding'
-	unfoldingTemplate, setUnfoldingTemplate,
+	unfoldingTemplate, setUnfoldingTemplate, expandUnfolding_maybe,
 	maybeUnfoldingTemplate, otherCons, unfoldingArity,
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
@@ -582,6 +582,13 @@ isCheapUnfolding _                                          = False
 isExpandableUnfolding :: Unfolding -> Bool
 isExpandableUnfolding (CoreUnfolding { uf_expandable = is_expable }) = is_expable
 isExpandableUnfolding _                                              = False
+
+expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
+-- Expand an expandable unfolding; this is used in rule matching 
+--   See Note [Expanding variables] in Rules.lhs
+-- The key point here is that CONLIKE things can be expanded
+expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
+expandUnfolding_maybe _                                                       = Nothing
 
 isInlineRule :: Unfolding -> Bool
 isInlineRule (CoreUnfolding { uf_src = src }) = isInlineRuleSource src

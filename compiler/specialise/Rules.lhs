@@ -32,9 +32,9 @@ module Rules (
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, eqExprX )
 import PprCore		( pprRules )
-import Type		( Type, TvSubstEnv, tcEqTypeX )
+import Type		( Type, TvSubstEnv )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
 import Id
@@ -587,8 +587,8 @@ match idu menv subst e1 (Note _ e2) = match idu menv subst e1 e2
       -- See Note [Notes in RULE matching]
 
 match id_unfolding_fun menv subst e1 (Var v2)      -- Note [Expanding variables]
-  | not (locallyBoundR rn_env v2) -- Note [Do not expand locally-bound variables]
-  , Just e2' <- expandUnfolding (id_unfolding_fun v2')
+  | not (inRnEnvR rn_env v2) -- Note [Do not expand locally-bound variables]
+  , Just e2' <- expandUnfolding_maybe (id_unfolding_fun v2')
   = match id_unfolding_fun (menv { me_env = nukeRnEnvR rn_env }) subst e1 e2'
   where
     v2'    = lookupRnInScope rn_env v2
@@ -596,11 +596,11 @@ match id_unfolding_fun menv subst e1 (Var v2)      -- Note [Expanding variables]
 	-- Notice that we look up v2 in the in-scope set
 	-- See Note [Lookup in-scope]
 	-- No need to apply any renaming first (hence no rnOccR)
-	-- becuase of the not-locallyBoundR
+	-- because of the not-inRnEnvR
 
 match idu menv (tv_subst, id_subst, binds) e1 (Let bind e2)
   | all freshly_bound bndrs	-- See Note [Matching lets]
-  , not (any (locallyBoundR rn_env) bind_fvs)
+  , not (any (inRnEnvR rn_env) bind_fvs)
   = match idu (menv { me_env = rn_env' }) 
 	  (tv_subst, id_subst, binds `snocOL` bind')
 	  e1 e2'
@@ -693,7 +693,7 @@ match_var idu menv subst@(tv_subst, id_subst, binds) v1 e2
 						-- c.f. match_ty below
 			; return (tv_subst', extendVarEnv id_subst v1' e2, binds) }
 
-	Just e1' | eqExpr idu (nukeRnEnvL rn_env) e1' e2 
+	Just e1' | eqExprX idu (nukeRnEnvL rn_env) e1' e2 
 		 -> Just subst
 
 		 | otherwise
@@ -866,77 +866,6 @@ at all.
 
 That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
-
-\begin{code}
-eqExpr :: IdUnfoldingFun -> RnEnv2 -> CoreExpr -> CoreExpr -> Bool
--- ^ A kind of shallow equality used in rule matching, so does 
--- /not/ look through newtypes or predicate types
-
-eqExpr _ env (Var v1) (Var v2)
-  | rnOccL env v1 == rnOccR env v2
-  = True
-
--- The next two rules expand non-local variables
--- C.f. Note [Expanding variables]
--- and  Note [Do not expand locally-bound variables]
-eqExpr id_unfolding_fun env (Var v1) e2
-  | not (locallyBoundL env v1)
-  , Just e1' <- expandUnfolding (id_unfolding_fun (lookupRnInScope env v1))
-  = eqExpr id_unfolding_fun (nukeRnEnvL env) e1' e2
-
-eqExpr id_unfolding_fun env e1 (Var v2)
-  | not (locallyBoundR env v2)
-  , Just e2' <- expandUnfolding (id_unfolding_fun (lookupRnInScope env v2))
-  = eqExpr id_unfolding_fun (nukeRnEnvR env) e1 e2'
-
-eqExpr _   _   (Lit lit1)    (Lit lit2)    = lit1 == lit2
-eqExpr idu env (App f1 a1)   (App f2 a2)   = eqExpr idu env f1 f2 && eqExpr idu env a1 a2
-eqExpr idu env (Lam v1 e1)   (Lam v2 e2)   = eqExpr idu (rnBndr2 env v1 v2) e1 e2
-eqExpr idu env (Note n1 e1)  (Note n2 e2)  = eq_note env n1 n2 && eqExpr idu env e1 e2
-eqExpr idu env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && eqExpr idu env e1 e2
-eqExpr _   env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
-
-eqExpr idu env (Let (NonRec v1 r1) e1)
-	       (Let (NonRec v2 r2) e2) =  eqExpr idu env r1 r2 
-				       && eqExpr idu (rnBndr2 env v1 v2) e1 e2
-eqExpr idu env (Let (Rec ps1) e1)
-	       (Let (Rec ps2) e2)      =  equalLength ps1 ps2
-				       && and (zipWith eq_rhs ps1 ps2)
-				       && eqExpr idu env' e1 e2
-				       where
-				      	  env' = foldl2 rn_bndr2 env ps2 ps2
-				      	  rn_bndr2 env (b1,_) (b2,_) = rnBndr2 env b1 b2
-				      	  eq_rhs       (_,r1) (_,r2) = eqExpr idu env' r1 r2
-eqExpr idu env (Case e1 v1 t1 a1)
-	       (Case e2 v2 t2 a2) =  eqExpr idu env e1 e2
-                              	  && tcEqTypeX env t1 t2                      
-			      	  && equalLength a1 a2
-			      	  && and (zipWith eq_alt a1 a2)
-			      	  where
-			      	    env' = rnBndr2 env v1 v2
-                                    eq_alt (c1,vs1,r1) (c2,vs2,r2) 
-                                       = c1==c2 && eqExpr idu (rnBndrs2 env' vs1  vs2) r1 r2
-eqExpr _ _ _ _ = False
-
-eq_note :: RnEnv2 -> Note -> Note -> Bool
-eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
-eq_note _ (CoreNote s1) (CoreNote s2)  = s1 == s2
-eq_note _ _             _              = False
-\end{code}
-
-Auxiliary functions
-
-\begin{code}
-locallyBoundL, locallyBoundR :: RnEnv2 -> Var -> Bool
-locallyBoundL rn_env v = inRnEnvL rn_env v
-locallyBoundR rn_env v = inRnEnvR rn_env v
-
-
-expandUnfolding :: Unfolding -> Maybe CoreExpr
-expandUnfolding unfolding
-  | isExpandableUnfolding unfolding = Just (unfoldingTemplate unfolding)
-  | otherwise		  	    = Nothing
-\end{code}
 
 %************************************************************************
 %*									*

@@ -36,7 +36,7 @@ module CoreUtils (
 	hashExpr,
 
 	-- * Equality
-	cheapEqExpr, eqExpr,
+	cheapEqExpr, eqExpr, eqExprX,
 
 	-- * Manipulating data constructors and types
 	applyTypeToArgs, applyTypeToArg,
@@ -966,36 +966,62 @@ exprIsBig _            = True
 eqExpr :: InScopeSet -> CoreExpr -> CoreExpr -> Bool
 -- Compares for equality, modulo alpha
 eqExpr in_scope e1 e2
-  = go (mkRnEnv2 in_scope) e1 e2
+  = eqExprX id_unf (mkRnEnv2 in_scope) e1 e2
   where
-    go _   (Lit lit1) 	(Lit lit2)   = lit1 == lit2
-    go env (Type t1)  	(Type t2)    = coreEqType2 env t1 t2
-    go env (Var v1)   	(Var v2)     = rnOccL env v1 == rnOccR env v2
-    go env (Cast e1 t1) (Cast e2 t2) = go env e1 e2 && coreEqCoercion2 env t1 t2
-    go env (App f1 a1)  (App f2 a2)  = go env f1 f2 && go env a1 a2
+    id_unf _ = noUnfolding	-- Don't expand
+\end{code}
+    
+\begin{code}
+eqExprX :: IdUnfoldingFun -> RnEnv2 -> CoreExpr -> CoreExpr -> Bool
+-- ^ Compares expressions for equality, modulo alpha.
+-- Does /not/ look through newtypes or predicate types
+-- Used in rule matching, and also CSE
+
+eqExprX id_unfolding_fun env e1 e2
+  = go env e1 e2
+  where
+    go env (Var v1) (Var v2)
+      | rnOccL env v1 == rnOccR env v2
+      = True
+
+    -- The next two rules expand non-local variables
+    -- C.f. Note [Expanding variables] in Rules.lhs
+    -- and  Note [Do not expand locally-bound variables] in Rules.lhs
+    go env (Var v1) e2
+      | not (locallyBoundL env v1)
+      , Just e1' <- expandUnfolding_maybe (id_unfolding_fun (lookupRnInScope env v1))
+      = go (nukeRnEnvL env) e1' e2
+
+    go env e1 (Var v2)
+      | not (locallyBoundR env v2)
+      , Just e2' <- expandUnfolding_maybe (id_unfolding_fun (lookupRnInScope env v2))
+      = go (nukeRnEnvR env) e1 e2'
+
+    go _   (Lit lit1)    (Lit lit2)    = lit1 == lit2
+    go env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
+    go env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && go env e1 e2
+    go env (App f1 a1)   (App f2 a2)   = go env f1 f2 && go env a1 a2
+    go env (Note n1 e1)  (Note n2 e2)  = go_note n1 n2 && go env e1 e2
 
     go env (Lam b1 e1)  (Lam b2 e2)  
-      =  coreEqType2 env (varType b1) (varType b2)	-- Will return False for Id/TyVar combination
+      =  tcEqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
       && go (rnBndr2 env b1 b2) e1 e2
+
+    go env (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2) 
+      =  go env r1 r2  -- No need to check binder types, since RHSs match
+      && go (rnBndr2 env v1 v2) e1 e2
+
+    go env (Let (Rec ps1) e1) (Let (Rec ps2) e2) 
+      = all2 (go env') rs1 rs2 && go env' e1 e2
+      where
+        (bs1,rs1) = unzip ps1	   
+        (bs2,rs2) = unzip ps2
+        env' = rnBndrs2 env bs1 bs2
 
     go env (Case e1 b1 _ a1) (Case e2 b2 _ a2)
       =  go env e1 e2
-      && coreEqType2 env (idType b1) (idType b2)
+      && tcEqTypeX env (idType b1) (idType b2)
       && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
-   
-    go env (Let (NonRec b1 r1) e1) (Let (NonRec b2 r2) e2)
-      =  go env r1 r2	-- No need to check binder types, since RHSs match
-      && go (rnBndr2 env b1 b2) e1 e2	
-
-    go env (Let (Rec p1) e1) (Let (Rec p2) e2)
-      | equalLength p1 p2
-      =  all2 (go env') rs1 rs2 && go env' e1 e2
-      where
-         (bs1,rs1) = unzip p1
-         (bs2,rs2) = unzip p2
-         env' = rnBndrs2 env bs1 bs2
-
-    go env (Note n1 e1) (Note n2 e2) = go_note n1 n2 && go env e1 e2
 
     go _ _ _ = False
 
@@ -1004,11 +1030,19 @@ eqExpr in_scope e1 e2
       = c1 == c2 && go (rnBndrs2 env bs1 bs2) e1 e2
 
     -----------
-    go_note (SCC cc1)     (SCC cc2)     = cc1==cc2
-    go_note (CoreNote s1) (CoreNote s2) = s1==s2
-    go_note _ _ = False
+    go_note (SCC cc1)     (SCC cc2)      = cc1 == cc2
+    go_note (CoreNote s1) (CoreNote s2)  = s1 == s2
+    go_note _             _              = False
 \end{code}
-    
+
+Auxiliary functions
+
+\begin{code}
+locallyBoundL, locallyBoundR :: RnEnv2 -> Var -> Bool
+locallyBoundL rn_env v = inRnEnvL rn_env v
+locallyBoundR rn_env v = inRnEnvR rn_env v
+\end{code}
+
 
 %************************************************************************
 %*									*

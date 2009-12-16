@@ -1169,14 +1169,12 @@ exprIsConApp_maybe id_unf expr
 
 	-- Look through unfoldings, but only cheap ones, because
 	-- we are effectively duplicating the unfolding
-	| CoreUnfolding { uf_expandable = expand_me, uf_tmpl = rhs } <- unfolding
-	, expand_me = -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
-                      analyse rhs args
+	| Just rhs <- expandUnfolding_maybe unfolding
+	= -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
+          analyse rhs args
         where
 	  is_saturated = count isValArg args == idArity fun
-          unfolding = id_unf fun    -- Does not look through loop breakers
-		    -- ToDo: we *may* look through variables that are NOINLINE
-		    --       in this phase, and that is really not right
+	  unfolding = id_unf fun
 
     analyse _ _ = Nothing
 
