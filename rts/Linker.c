@@ -39,6 +39,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <assert.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -79,6 +81,8 @@
 
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
 #  define OBJFORMAT_ELF
+#  include <regex.h>	// regex is already used by dlopen() so this is OK
+			// to use here without requiring an additional lib
 #elif defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
 #  include <windows.h>
@@ -1095,12 +1099,19 @@ static int linker_init_done = 0 ;
 
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 static void *dl_prog_handle;
+static regex_t re_invalid;
+static regex_t re_realso;
+static void initLinkerCleanup( void );
+#ifdef THREADED_RTS
+static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
+#endif
 #endif
 
 void
 initLinker( void )
 {
     RtsSymbolVal *sym;
+    int compileResult;
 
     /* Make initLinker idempotent, so we can call it
        before evey relevant operation; that means we
@@ -1109,6 +1120,9 @@ initLinker( void )
       linker_init_done = 1;
     }
 
+#ifdef THREADED_RTS
+    initMutex(&dl_mutex);
+#endif
     stablehash = allocStrHashTable();
     symhash = allocStrHashTable();
 
@@ -1127,6 +1141,15 @@ initLinker( void )
 #   else
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
 #   endif /* RTLD_DEFAULT */
+
+    compileResult = regcomp(&re_invalid,
+           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*invalid ELF header",
+           REG_EXTENDED);
+    ASSERT( compileResult == 0 );
+    compileResult = regcomp(&re_realso,
+           "GROUP *\\( *(([^ )])+)",
+           REG_EXTENDED);
+    ASSERT( compileResult == 0 );
 #   endif
 
 #if defined(x86_64_HOST_ARCH)
@@ -1144,6 +1167,19 @@ initLinker( void )
      */
     addDLL("msvcrt");
     addDLL("kernel32");
+#endif
+}
+
+void
+exitLinker( void ) {
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+   if (linker_init_done == 1) {
+      regfree(&re_invalid);
+      regfree(&re_realso);
+#ifdef THREADED_RTS
+      closeMutex(&dl_mutex);
+#endif
+   }
 #endif
 }
 
@@ -1182,29 +1218,112 @@ typedef
 static OpenedDLL* opened_dlls = NULL;
 #endif
 
+#  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
+
+static char *
+internal_dlopen(const char *dll_name)
+{
+   void *hdl;
+   char *errmsg, *errmsg_copy;
+
+   // omitted: RTLD_NOW
+   // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
+   IF_DEBUG(linker,
+      debugBelch("internal_dlopen: dll_name = '%s'\n", dll_name));
+
+   //-------------- Begin critical section ------------------
+   // This critical section is necessary because dlerror() is not
+   // required to be reentrant (see POSIX -- IEEE Std 1003.1-2008)
+   // Also, the error message returned must be copied to preserve it
+   // (see POSIX also)
+
+   ACQUIRE_LOCK(&dl_mutex);
+   hdl = dlopen(dll_name, RTLD_LAZY | RTLD_GLOBAL);
+
+   errmsg = NULL;
+   if (hdl == NULL) {
+      /* dlopen failed; return a ptr to the error msg. */
+      errmsg = dlerror();
+      if (errmsg == NULL) errmsg = "addDLL: unknown error";
+      errmsg_copy = stgMallocBytes(strlen(errmsg)+1, "addDLL");
+      strcpy(errmsg_copy, errmsg);
+      errmsg = errmsg_copy;
+   }
+   RELEASE_LOCK(&dl_mutex);
+   //--------------- End critical section -------------------
+
+   return errmsg;
+}
+#  endif
+
 const char *
 addDLL( char *dll_name )
 {
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    /* ------------------- ELF DLL loader ------------------- */
-   void *hdl;
-   const char *errmsg;
+
+#define NMATCH 5
+   regmatch_t match[NMATCH];
+   char *errmsg;
+   FILE* fp;
+   size_t match_length;
+#define MAXLINE 1000
+   char line[MAXLINE];
+   int result;
 
    initLinker();
 
-   // omitted: RTLD_NOW
-   // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
-   hdl= dlopen(dll_name, RTLD_LAZY | RTLD_GLOBAL);
+   IF_DEBUG(linker, debugBelch("addDLL: dll_name = '%s'\n", dll_name));
+   errmsg = internal_dlopen(dll_name);
 
-   if (hdl == NULL) {
-      /* dlopen failed; return a ptr to the error msg. */
-      errmsg = dlerror();
-      if (errmsg == NULL) errmsg = "addDLL: unknown error";
-      return errmsg;
-   } else {
+   if (errmsg == NULL) {
       return NULL;
    }
-   /*NOTREACHED*/
+
+   // GHC Trac ticket #2615
+   // On some systems (e.g., Gentoo Linux) dynamic files (e.g. libc.so)
+   // contain linker scripts rather than ELF-format object code. This
+   // code handles the situation by recognizing the real object code
+   // file name given in the linker script.
+   //
+   // If an "invalid ELF header" error occurs, it is assumed that the
+   // .so file contains a linker script instead of ELF object code.
+   // In this case, the code looks for the GROUP ( ... ) linker
+   // directive. If one is found, the first file name inside the
+   // parentheses is treated as the name of a dynamic library and the
+   // code attempts to dlopen that file. If this is also unsuccessful,
+   // an error message is returned.
+
+   // see if the error message is due to an invalid ELF header
+   IF_DEBUG(linker, debugBelch("errmsg = '%s'\n", errmsg));
+   result = regexec(&re_invalid, errmsg, (size_t) NMATCH, match, 0);
+   IF_DEBUG(linker, debugBelch("result = %i\n", result));
+   if (result == 0) {
+      // success -- try to read the named file as a linker script
+      match_length = (size_t) stg_min((match[1].rm_eo - match[1].rm_so),
+		                 MAXLINE-1);
+      strncpy(line, (errmsg+(match[1].rm_so)),match_length);
+      line[match_length] = '\0'; // make sure string is null-terminated
+      IF_DEBUG(linker, debugBelch ("file name = '%s'\n", line));
+      if ((fp = fopen(line, "r")) == NULL) {
+	 return errmsg;	// return original error if open fails
+      }
+      // try to find a GROUP ( ... ) command
+      while (fgets(line, MAXLINE, fp) != NULL) {
+	 IF_DEBUG(linker, debugBelch("input line = %s", line));
+	 if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
+            // success -- try to dlopen the first named file
+            IF_DEBUG(linker, debugBelch("match%s\n",""));
+	    line[match[1].rm_eo] = '\0';
+	    errmsg = internal_dlopen(line+match[1].rm_so);
+	    break;
+	 }
+	 // if control reaches here, no GROUP ( ... ) directive was found
+	 // and the original error message is returned to the caller
+      }
+      fclose(fp);
+   }
+   return errmsg;
 
 #  elif defined(OBJFORMAT_PEi386)
    /* ------------------- Win32 DLL loader ------------------- */
@@ -4195,7 +4314,7 @@ static int relocateSection(
                         i++;
                     }
  #endif
-                    else 
+                    else
                     {
 		        barf ("Don't know how to handle this Mach-O "
 		              "scattered relocation entry: "
@@ -4204,7 +4323,7 @@ static int relocateSection(
                               oc->fileName, scat->r_type, scat->r_address);
                         return 0;
                      }
-                     
+
 #ifdef powerpc_HOST_ARCH
                     if(scat->r_type == GENERIC_RELOC_VANILLA
                         || scat->r_type == PPC_RELOC_SECTDIFF)
@@ -4250,8 +4369,8 @@ static int relocateSection(
                      "object file %s; entry type %ld; address %#lx\n", 
                      oc->fileName, scat->r_type, scat->r_address);
                return 0;
-            }
-      
+	    }
+
 	}
 	else /* !(relocs[i].r_address & R_SCATTERED) */
 	{

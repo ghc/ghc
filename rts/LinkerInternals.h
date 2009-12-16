@@ -109,4 +109,6 @@ typedef struct _ObjectCode {
 
 extern ObjectCode *objects;
 
+void exitLinker( void );
+
 #endif /* LINKERINTERNALS_H */

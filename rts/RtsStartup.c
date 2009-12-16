@@ -34,6 +34,7 @@
 #include "Profiling.h"
 #include "Timer.h"
 #include "Globals.h"
+void exitLinker( void );	// there is no Linker.h file to include
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -387,6 +388,9 @@ hs_exit_(rtsBool wait_foreign)
 
     /* free shared Typeable store */
     exitGlobalStore();
+
+    /* free linker data */
+    exitLinker();
 
     /* free file locking tables, if necessary */
 #if !defined(mingw32_HOST_OS)    
