@@ -17,6 +17,10 @@
 #include "Select.h"
 #include "AwaitEvent.h"
 
+# ifdef HAVE_SYS_SELECT_H
+#  include <sys/select.h>
+# endif
+
 # ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>
 # endif
