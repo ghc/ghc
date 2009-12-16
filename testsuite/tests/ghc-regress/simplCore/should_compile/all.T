@@ -63,4 +63,8 @@ test('T3717', only_ways(['optc','optasm']),
               compile, 
               ['-ddump-simpl -dsuppress-uniques -fno-code'])
 
+test('spec-inline', only_ways(['optc','optasm']), 
+              	    compile, 
+              	    ['-O2 -ddump-simpl -dsuppress-uniques -fno-code'])
+
 
