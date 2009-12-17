@@ -390,21 +390,7 @@ printAllThreads(void)
   nat i, g;
   Capability *cap;
 
-# if defined(GRAN)
-  char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
-  ullong_format_string(TIME_ON_PROC(CurrentProc), 
-		       time_string, rtsFalse/*no commas!*/);
-
-  debugBelch("all threads at [%s]:\n", time_string);
-# elif defined(PARALLEL_HASKELL)
-  char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
-  ullong_format_string(CURRENT_TIME,
-		       time_string, rtsFalse/*no commas!*/);
-
-  debugBelch("all threads at [%s]:\n", time_string);
-# else
   debugBelch("all threads:\n");
-# endif
 
   for (i = 0; i < n_capabilities; i++) {
       cap = &capabilities[i];
