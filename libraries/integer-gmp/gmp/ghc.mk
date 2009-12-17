@@ -16,8 +16,6 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp/gmp/config.mk
 endif
 
-$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h
-
 libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/cbits/mkGmpDerivedConstants.c
 	"$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS) $(libraries/integer-gmp_CC_OPTS) $< -o $@
 
@@ -56,6 +54,8 @@ $(foreach w,$(GhcLibWays),$(eval $(call GmpDerivedConstants-dependencies,$w)))
 
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
+$(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h
+
 libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/gmp/gmp.h
 
 libraries/integer-gmp_CC_OPTS += -I$(TOP)/libraries/integer-gmp/gmp
