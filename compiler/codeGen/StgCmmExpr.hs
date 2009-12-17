@@ -292,19 +292,41 @@ cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
   -- The Sequel is a type-correct assignment, albeit bogus.
   -- The (dead) continuation loops; it would be better to invoke some kind
   -- of panic function here.
+  --
+  -- However, we also want to allow an assignment to be generated
+  -- in the case when the types are compatible, because this allows
+  -- some slightly-dodgy but occasionally-useful casts to be used,
+  -- such as in RtClosureInspect where we cast an HValue to a MutVar#
+  -- so we can print out the contents of the MutVar#.  If we generate
+  -- code that enters the HValue, then we'll get a runtime panic, because
+  -- the HValue really is a MutVar#.  The types are compatible though,
+  -- so we can just generate an assignment.
+cgCase scrut@(StgApp v []) bndr _ alt_type@(PrimAlt _) alts
+  | isUnLiftedType (idType v)
+  || reps_compatible
+  = -- assignment instruction suffices for unlifted types
+    do { v_info <- getCgIdInfo v
+       ; emit $ mkComment $ mkFastString "New case:"
+       ; emit (mkAssign (CmmLocal (idToReg (NonVoid bndr))) (idInfoToAmode v_info))
+       ; _ <- bindArgsToRegs [NonVoid bndr]
+       ; cgAlts NoGcInAlts (NonVoid bndr) alt_type alts }
+  where
+    reps_compatible = idCgRep v == idCgRep bndr
+
 cgCase scrut@(StgApp v []) bndr _ (PrimAlt _) _ 
-  | not (isUnLiftedType (idType v)) && reps_incompatible
-  =
+  | lifted 
+  = -- fail at run-time, not compile-time
     do { mb_cc <- maybeSaveCostCentre True
        ; withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emit $ mkComment $ mkFastString "should be unreachable code"
        ; emit $ withFreshLabel "l" (\l -> mkLabel l <*> mkBranch l)}
   where
-    reps_incompatible = idCgRep v /= idCgRep bndr
+    lifted = not (isUnLiftedType (idType v))
 
 cgCase scrut bndr srt alt_type alts 
-  = do { up_hp_usg <- getVirtHp        -- Upstream heap usage
+  = -- the general case
+    do { up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map idToReg ret_bndrs
              simple_scrut = isSimpleScrut scrut alt_type
