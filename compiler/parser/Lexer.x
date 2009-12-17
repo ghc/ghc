@@ -1180,7 +1180,7 @@ lex_string :: String -> P Token
 lex_string s = do
   i <- getInput
   case alexGetChar' i of
-    Nothing -> lit_error
+    Nothing -> lit_error i
 
     Just ('"',i)  -> do
 	setInput i
@@ -1205,21 +1205,25 @@ lex_string s = do
     Just ('\\',i)
 	| Just ('&',i) <- next -> do 
 		setInput i; lex_string s
-	| Just (c,i) <- next, is_space c -> do 
+	| Just (c,i) <- next, c <= '\x7f' && is_space c -> do
+                           -- is_space only works for <= '\x7f' (#3751)
 		setInput i; lex_stringgap s
 	where next = alexGetChar' i
 
-    Just (c, i) -> do
-	c' <- lex_char c i
-	lex_string (c':s)
+    Just (c, i1) -> do
+        case c of
+          '\\' -> do setInput i1; c' <- lex_escape; lex_string (c':s)
+          c | isAny c -> do setInput i1; lex_string (c:s)
+          _other -> lit_error i
 
 lex_stringgap :: String -> P Token
 lex_stringgap s = do
-  c <- getCharOrFail
+  i <- getInput
+  c <- getCharOrFail i
   case c of
     '\\' -> lex_string s
     c | is_space c -> lex_stringgap s
-    _other -> lit_error
+    _other -> lit_error i
 
 
 lex_char_tok :: Action
@@ -1233,24 +1237,25 @@ lex_char_tok span _buf _len = do	-- We've seen '
    i1 <- getInput	-- Look ahead to first character
    let loc = srcSpanStart span
    case alexGetChar' i1 of
-	Nothing -> lit_error 
+	Nothing -> lit_error  i1
 
 	Just ('\'', i2@(AI end2 _)) -> do 	-- We've seen ''
 		  th_exts <- extension thEnabled
 		  if th_exts then do
 			setInput i2
 			return (L (mkSrcSpan loc end2)  ITtyQuote)
-		   else lit_error
+		   else lit_error i1
 
 	Just ('\\', i2@(AI _end2 _)) -> do 	-- We've seen 'backslash
 		  setInput i2
 		  lit_ch <- lex_escape
-		  mc <- getCharOrFail	-- Trailing quote
+                  i3 <- getInput
+		  mc <- getCharOrFail i3 -- Trailing quote
 		  if mc == '\'' then finish_char_tok loc lit_ch
-			        else do setInput i2; lit_error 
+			        else lit_error i3
 
         Just (c, i2@(AI _end2 _))
-		| not (isAny c) -> lit_error
+		| not (isAny c) -> lit_error i1
 		| otherwise ->
 
 		-- We've seen 'x, where x is a valid character
@@ -1265,7 +1270,7 @@ lex_char_tok span _buf _len = do	-- We've seen '
 			th_exts <- extension thEnabled	
 			let (AI end _) = i1
 			if th_exts then return (L (mkSrcSpan loc end) ITvarQuote)
-				   else do setInput i2; lit_error
+				   else lit_error i2
 
 finish_char_tok :: SrcLoc -> Char -> P (Located Token)
 finish_char_tok loc ch	-- We've already seen the closing quote
@@ -1282,20 +1287,14 @@ finish_char_tok loc ch	-- We've already seen the closing quote
 	    else do
 		   return (L (mkSrcSpan loc end) (ITchar ch))
 
-lex_char :: Char -> AlexInput -> P Char
-lex_char c inp = do
-  case c of
-      '\\' -> do setInput inp; lex_escape
-      c | isAny c -> do setInput inp; return c
-      _other -> lit_error
-
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
 	| otherwise  = is_any c
 
 lex_escape :: P Char
 lex_escape = do
-  c <- getCharOrFail
+  i0 <- getInput
+  c <- getCharOrFail i0
   case c of
 	'a'   -> return '\a'
 	'b'   -> return '\b'
@@ -1307,10 +1306,11 @@ lex_escape = do
 	'\\'  -> return '\\'
 	'"'   -> return '\"'
 	'\''  -> return '\''
-	'^'   -> do c <- getCharOrFail
+	'^'   -> do i1 <- getInput
+                    c <- getCharOrFail i1
 		    if c >= '@' && c <= '_'
 			then return (chr (ord c - ord '@'))
-			else lit_error
+			else lit_error i1
 
 	'x'   -> readNum is_hexdigit 16 hexDigit
 	'o'   -> readNum is_octdigit  8 octDecDigit
@@ -1319,10 +1319,10 @@ lex_escape = do
 	c1 ->  do
 	   i <- getInput
 	   case alexGetChar' i of
-	    Nothing -> lit_error
+	    Nothing -> lit_error i0
 	    Just (c2,i2) -> 
               case alexGetChar' i2 of
-		Nothing	-> do setInput i2; lit_error
+		Nothing	-> do lit_error i0
 		Just (c3,i3) -> 
 		   let str = [c1,c2,c3] in
 		   case [ (c,rest) | (p,c) <- silly_escape_chars,
@@ -1333,15 +1333,15 @@ lex_escape = do
 			  (escape_char,_:_):_ -> do
 				setInput i2
 				return escape_char
-			  [] -> lit_error
+			  [] -> lit_error i0
 
 readNum :: (Char -> Bool) -> Int -> (Char -> Int) -> P Char
 readNum is_digit base conv = do
   i <- getInput
-  c <- getCharOrFail
+  c <- getCharOrFail i
   if is_digit c 
 	then readNum2 is_digit base conv (conv c)
-	else do setInput i; lit_error
+	else lit_error i
 
 readNum2 :: (Char -> Bool) -> Int -> (Char -> Int) -> Int -> P Char
 readNum2 is_digit base conv i = do
@@ -1354,7 +1354,7 @@ readNum2 is_digit base conv i = do
 	    _other -> do
 		if i >= 0 && i <= 0x10FFFF
 		   then do setInput input; return (chr i)
-		   else lit_error
+		   else lit_error input
 
 silly_escape_chars :: [(String, Char)]
 silly_escape_chars = [
@@ -1398,12 +1398,11 @@ silly_escape_chars = [
 -- the position of the error in the buffer.  This is so that we can report
 -- a correct location to the user, but also so we can detect UTF-8 decoding
 -- errors if they occur.
-lit_error :: P a
-lit_error = lexError "lexical error in string/character literal"
+lit_error :: AlexInput -> P a
+lit_error i = do setInput i; lexError "lexical error in string/character literal"
 
-getCharOrFail :: P Char
-getCharOrFail =  do
-  i <- getInput
+getCharOrFail :: AlexInput -> P Char
+getCharOrFail i =  do
   case alexGetChar' i of
 	Nothing -> lexError "unexpected end-of-file in string/character literal"
 	Just (c,i)  -> do setInput i; return c
@@ -1427,7 +1426,7 @@ lex_quasiquote :: String -> P String
 lex_quasiquote s = do
   i <- getInput
   case alexGetChar' i of
-    Nothing -> lit_error
+    Nothing -> lit_error i
 
     Just ('\\',i)
 	| Just ('|',i) <- next -> do 
