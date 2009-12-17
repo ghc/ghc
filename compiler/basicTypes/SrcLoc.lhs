@@ -126,12 +126,12 @@ srcLocFile _other	      = (fsLit "<unknown file")
 -- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocLine :: SrcLoc -> Int
 srcLocLine (SrcLoc _ l _) = l
-srcLocLine _other	  = panic "srcLocLine: unknown line"
+srcLocLine (UnhelpfulLoc s) = pprPanic "srcLocLine" (ftext s)
 
 -- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocCol :: SrcLoc -> Int
 srcLocCol (SrcLoc _ _ c) = c
-srcLocCol _other         = panic "srcLocCol: unknown col"
+srcLocCol (UnhelpfulLoc s) = pprPanic "srcLocCol" (ftext s)
 
 -- | Move the 'SrcLoc' down by one line if the character is a newline,
 -- to the next 8-char tabstop if it is a tab, and across by one
