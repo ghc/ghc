@@ -136,7 +136,9 @@ typedef struct {
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
+    StgWord     size; // ptrs plus card table
     StgClosure *payload[FLEXIBLE_ARRAY];
+    // see also: StgMutArrPtrs macros in ClosureMacros.h
 } StgMutArrPtrs;
 
 typedef struct {

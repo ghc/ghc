@@ -278,7 +278,7 @@ INLINE_HEADER StgOffset arr_words_sizeW( StgArrWords* x )
 { return sizeofW(StgArrWords) + x->words; }
 
 INLINE_HEADER StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
-{ return sizeofW(StgMutArrPtrs) + x->ptrs; }
+{ return sizeofW(StgMutArrPtrs) + x->size; }
 
 INLINE_HEADER StgWord tso_sizeW ( StgTSO *tso )
 { return TSO_STRUCT_SIZEW + tso->stack_size; }
@@ -390,6 +390,34 @@ INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
     default:
 	return 1 + BITMAP_SIZE(info->i.layout.bitmap);
     }
+}
+
+/* -----------------------------------------------------------------------------
+   StgMutArrPtrs macros
+
+   An StgMutArrPtrs has a card table to indicate which elements are
+   dirty for the generational GC.  The card table is an array of
+   bytes, where each byte covers (1 << MUT_ARR_PTRS_CARD_BITS)
+   elements.  The card table is directly after the array data itself.
+   -------------------------------------------------------------------------- */
+
+// The number of card bytes needed
+INLINE_HEADER lnat mutArrPtrsCards (lnat elems)
+{
+    return (lnat)((elems + (1 << MUT_ARR_PTRS_CARD_BITS) - 1)
+                           >> MUT_ARR_PTRS_CARD_BITS);
+}
+
+// The number of words in the card table
+INLINE_HEADER lnat mutArrPtrsCardTableSize (lnat elems)
+{
+    return ROUNDUP_BYTES_TO_WDS(mutArrPtrsCards(elems));
+}
+
+// The address of the card for a particular card number
+INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, lnat n)
+{
+    return ((StgWord8 *)&(a->payload[a->ptrs]) + n);
 }
 
 #endif /* RTS_STORAGE_CLOSUREMACROS_H */

@@ -463,6 +463,9 @@
 #define StgFunInfoExtra_bitmap(i)     StgFunInfoExtraFwd_bitmap(i)
 #endif
 
+#define mutArrPtrsCardWords(n) \
+    ROUNDUP_BYTES_TO_WDS(((n) + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) >> MUT_ARR_PTRS_CARD_BITS)
+
 /* -----------------------------------------------------------------------------
    Voluntary Yields/Blocks
 

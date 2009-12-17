@@ -66,6 +66,13 @@
 #define MAX_CHARLIKE		255
 #define MIN_CHARLIKE		0
 
+/* Each byte in the card table for an StgMutaArrPtrs covers
+ * (1<<MUT_ARR_PTRS_CARD_BITS) elements in the array.  To find a good
+ * value for this, I used the benchmarks nofib/gc/hash,
+ * nofib/gc/graph, and nofib/gc/gc_bench.
+ */
+#define MUT_ARR_PTRS_CARD_BITS 7
+
 /* -----------------------------------------------------------------------------
    STG Registers.
 

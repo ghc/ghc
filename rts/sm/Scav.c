@@ -112,6 +112,81 @@ scavengeTSO (StgTSO *tso)
 }
 
 /* -----------------------------------------------------------------------------
+   Mutable arrays of pointers
+   -------------------------------------------------------------------------- */
+
+static StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
+{
+    lnat m;
+    rtsBool any_failed;
+    StgPtr p, q;
+
+    any_failed = rtsFalse;
+    p = (StgPtr)&a->payload[0];
+    for (m = 0; (int)m < (int)mutArrPtrsCards(a->ptrs) - 1; m++)
+    {
+        q = p + (1 << MUT_ARR_PTRS_CARD_BITS);
+        for (; p < q; p++) {
+            evacuate((StgClosure**)p);
+        }
+        if (gct->failed_to_evac) {
+            any_failed = rtsTrue;
+            *mutArrPtrsCard(a,m) = 1;
+            gct->failed_to_evac = rtsFalse;
+        } else {
+            *mutArrPtrsCard(a,m) = 0;
+        }
+    }
+
+    q = (StgPtr)&a->payload[a->ptrs];
+    if (p < q) {
+        for (; p < q; p++) {
+            evacuate((StgClosure**)p);
+        }
+        if (gct->failed_to_evac) {
+            any_failed = rtsTrue;
+            *mutArrPtrsCard(a,m) = 1;
+            gct->failed_to_evac = rtsFalse;
+        } else {
+            *mutArrPtrsCard(a,m) = 0;
+        }
+    }
+
+    gct->failed_to_evac = any_failed;
+    return (StgPtr)a + mut_arr_ptrs_sizeW(a);
+}
+    
+// scavenge only the marked areas of a MUT_ARR_PTRS
+static StgPtr scavenge_mut_arr_ptrs_marked (StgMutArrPtrs *a)
+{
+    lnat m;
+    StgPtr p, q;
+    rtsBool any_failed;
+
+    any_failed = rtsFalse;
+    for (m = 0; m < mutArrPtrsCards(a->ptrs); m++)
+    {
+        if (*mutArrPtrsCard(a,m) != 0) {
+            p = (StgPtr)&a->payload[m << MUT_ARR_PTRS_CARD_BITS];
+            q = stg_min(p + (1 << MUT_ARR_PTRS_CARD_BITS),
+                        (StgPtr)&a->payload[a->ptrs]);
+            for (; p < q; p++) {
+                evacuate((StgClosure**)p);
+            }
+            if (gct->failed_to_evac) {
+                any_failed = rtsTrue;
+                gct->failed_to_evac = rtsFalse;
+            } else {
+                *mutArrPtrsCard(a,m) = 0;
+            }
+        }
+    }
+
+    gct->failed_to_evac = any_failed;
+    return (StgPtr)a + mut_arr_ptrs_sizeW(a);
+}
+
+/* -----------------------------------------------------------------------------
    Blocks of function args occur on the stack (at the top) and
    in PAPs.
    -------------------------------------------------------------------------- */
@@ -554,20 +629,14 @@ scavenge_block (bdescr *bd)
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
-	// follow everything 
     {
-	StgPtr next;
+        // We don't eagerly promote objects pointed to by a mutable
+        // array, but if we find the array only points to objects in
+        // the same or an older generation, we mark it "clean" and
+        // avoid traversing it during minor GCs.
+        gct->eager_promotion = rtsFalse;
 
-	// We don't eagerly promote objects pointed to by a mutable
-	// array, but if we find the array only points to objects in
-	// the same or an older generation, we mark it "clean" and
-	// avoid traversing it during minor GCs.
-	gct->eager_promotion = rtsFalse;
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    evacuate((StgClosure **)p);
-	}
-	gct->eager_promotion = saved_eager_promotion;
+        p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
 	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
@@ -575,6 +644,7 @@ scavenge_block (bdescr *bd)
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
 	}
 
+	gct->eager_promotion = saved_eager_promotion;
 	gct->failed_to_evac = rtsTrue; // always put it on the mutable list.
 	break;
     }
@@ -583,17 +653,12 @@ scavenge_block (bdescr *bd)
     case MUT_ARR_PTRS_FROZEN0:
 	// follow everything 
     {
-	StgPtr next;
-
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    evacuate((StgClosure **)p);
-	}
+        p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
 	// If we're going to put this object on the mutable list, then
 	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
 	if (gct->failed_to_evac) {
-	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
 	}
@@ -922,7 +987,6 @@ scavenge_mark_stack(void)
 	case MUT_ARR_PTRS_DIRTY:
 	    // follow everything 
 	{
-	    StgPtr next;
 	    rtsBool saved_eager;
 
 	    // We don't eagerly promote objects pointed to by a mutable
@@ -931,18 +995,16 @@ scavenge_mark_stack(void)
 	    // avoid traversing it during minor GCs.
 	    saved_eager = gct->eager_promotion;
 	    gct->eager_promotion = rtsFalse;
-	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		evacuate((StgClosure **)p);
-	    }
+
+            scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
+
+            if (gct->failed_to_evac) {
+                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+            } else {
+                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+            }
+
 	    gct->eager_promotion = saved_eager;
-
-	    if (gct->failed_to_evac) {
-		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
-	    } else {
-		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
-	    }
-
 	    gct->failed_to_evac = rtsTrue; // mutable anyhow.
 	    break;
 	}
@@ -951,12 +1013,9 @@ scavenge_mark_stack(void)
 	case MUT_ARR_PTRS_FROZEN0:
 	    // follow everything 
 	{
-	    StgPtr next, q = p;
+	    StgPtr q = p;
 	    
-	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		evacuate((StgClosure **)p);
-	    }
+            scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
 	    // If we're going to put this object on the mutable list, then
 	    // set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
@@ -1196,7 +1255,6 @@ scavenge_one(StgPtr p)
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     {
-	StgPtr next, q;
 	rtsBool saved_eager;
 
 	// We don't eagerly promote objects pointed to by a mutable
@@ -1205,19 +1263,16 @@ scavenge_one(StgPtr p)
 	// avoid traversing it during minor GCs.
 	saved_eager = gct->eager_promotion;
 	gct->eager_promotion = rtsFalse;
-	q = p;
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    evacuate((StgClosure **)p);
-	}
-	gct->eager_promotion = saved_eager;
+
+        scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
 	if (gct->failed_to_evac) {
-	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+	    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
 	} else {
-	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+	    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
 	}
 
+	gct->eager_promotion = saved_eager;
 	gct->failed_to_evac = rtsTrue;
 	break;
     }
@@ -1226,19 +1281,14 @@ scavenge_one(StgPtr p)
     case MUT_ARR_PTRS_FROZEN0:
     {
 	// follow everything 
-	StgPtr next, q=p;
-      
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    evacuate((StgClosure **)p);
-	}
-
+        scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
+        
 	// If we're going to put this object on the mutable list, then
 	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
 	if (gct->failed_to_evac) {
-	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+	    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
 	} else {
-	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
+	    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
 	}
 	break;
     }
@@ -1412,13 +1462,32 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    // definitely doesn't point into a young generation.
 	    // Clean objects don't need to be scavenged.  Some clean
 	    // objects (MUT_VAR_CLEAN) are not kept on the mutable
-	    // list at all; others, such as MUT_ARR_PTRS_CLEAN
+	    // list at all; others, such as TSO
 	    // are always on the mutable list.
 	    //
 	    switch (get_itbl((StgClosure *)p)->type) {
 	    case MUT_ARR_PTRS_CLEAN:
 		recordMutableGen_GC((StgClosure *)p,gen->no);
 		continue;
+	    case MUT_ARR_PTRS_DIRTY:
+            {
+                rtsBool saved_eager;
+                saved_eager = gct->eager_promotion;
+                gct->eager_promotion = rtsFalse;
+
+                scavenge_mut_arr_ptrs_marked((StgMutArrPtrs *)p);
+
+                if (gct->failed_to_evac) {
+                    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+                } else {
+                    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+                }
+
+                gct->eager_promotion = saved_eager;
+                gct->failed_to_evac = rtsFalse;
+		recordMutableGen_GC((StgClosure *)p,gen->no);
+		continue;
+            }
 	    case TSO: {
 		StgTSO *tso = (StgTSO *)p;
 		if (tso->dirty == 0) {

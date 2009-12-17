@@ -279,6 +279,7 @@ main(int argc, char *argv[])
 
     closure_size(StgMutArrPtrs);
     closure_field(StgMutArrPtrs, ptrs);
+    closure_field(StgMutArrPtrs, size);
 
     closure_size(StgArrWords);
     closure_field(StgArrWords, words);

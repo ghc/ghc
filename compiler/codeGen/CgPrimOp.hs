@@ -571,9 +571,21 @@ doWriteByteArrayOp _ _ _ _
 
 doWritePtrArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 doWritePtrArrayOp addr idx val
-   = do stmtC (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
-        mkBasicIndexedWrite arrPtrsHdrSize Nothing bWord addr idx val
+   = do mkBasicIndexedWrite arrPtrsHdrSize Nothing bWord addr idx val
+        stmtC (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+   -- the write barrier.  We must write a byte into the mark table:
+   -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
+        stmtC $ CmmStore (
+          cmmOffsetExpr
+           (cmmOffsetExprW (cmmOffsetB addr arrPtrsHdrSize)
+                          (loadArrPtrsSize addr))
+           (CmmMachOp mo_wordUShr [idx,
+                                   CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)])
+          ) (CmmLit (CmmInt 1 W8))
 
+loadArrPtrsSize :: CmmExpr -> CmmExpr
+loadArrPtrsSize addr = CmmLoad (cmmOffsetB addr off) bWord
+ where off = fixedHdrSize*wORD_SIZE + oFFSET_StgMutArrPtrs_ptrs
 
 mkBasicIndexedRead :: ByteOff -> Maybe MachOp -> CmmType 
 		   -> LocalReg -> CmmExpr -> CmmExpr -> Code

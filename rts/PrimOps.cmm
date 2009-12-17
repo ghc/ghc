@@ -132,18 +132,23 @@ stg_newAlignedPinnedByteArrayzh
 
 stg_newArrayzh
 {
-    W_ words, n, init, arr, p;
+    W_ words, n, init, arr, p, size;
     /* Args: R1 = words, R2 = initialisation value */
 
     n = R1;
     MAYBE_GC(R2_PTR,stg_newArrayzh);
 
-    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
+    // the mark area contains one byte for each 2^MUT_ARR_PTRS_CARD_BITS words
+    // in the array, making sure we round up, and then rounding up to a whole
+    // number of words.
+    size = n + mutArrPtrsCardWords(n);
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
     ("ptr" arr) = foreign "C" allocate(MyCapability() "ptr",words) [R2];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(arr) = n;
+    StgMutArrPtrs_size(arr) = size;
 
     // Initialise all elements of the the array with the value in R2
     init = R2;
@@ -153,6 +158,13 @@ stg_newArrayzh
 	W_[p] = init;
 	p = p + WDS(1);
 	goto for;
+    }
+    // Initialise the mark bits with 0
+  for2:
+    if (p < arr + WDS(size)) {
+	W_[p] = 0;
+	p = p + WDS(1);
+	goto for2;
     }
 
     RET_P(arr);
@@ -165,7 +177,7 @@ stg_unsafeThawArrayzh
   // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN 
   // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
   // it on the mutable list for the GC to remove (removing something from
-  // the mutable list is not easy, because the mut_list is only singly-linked).
+  // the mutable list is not easy).
   // 
   // So that we can tell whether a MUT_ARR_PTRS_FROZEN is on the mutable list,
   // when we freeze it we set the info ptr to be MUT_ARR_PTRS_FROZEN0
@@ -1582,9 +1594,10 @@ stg_unpackClosurezh
     }}
 out:
 
-    W_ ptrs_arr_sz, nptrs_arr_sz;
+    W_ ptrs_arr_sz, ptrs_arr_cards, nptrs_arr_sz;
     nptrs_arr_sz = SIZEOF_StgArrWords   + WDS(nptrs);
-    ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs);
+    ptrs_arr_cards = mutArrPtrsCardWords(ptrs);
+    ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs) + WDS(ptrs_arr_cards);
 
     ALLOC_PRIM (ptrs_arr_sz + nptrs_arr_sz, R1_PTR, stg_unpackClosurezh);
 
@@ -1596,6 +1609,8 @@ out:
 
     SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(ptrs_arr) = ptrs;
+    StgMutArrPtrs_size(ptrs_arr) = ptrs + ptrs_arr_cards;
+
     p = 0;
 for:
     if(p < ptrs) {
@@ -1603,6 +1618,9 @@ for:
 	 p = p + 1;
 	 goto for;
     }
+    /* We can leave the card table uninitialised, since the array is
+       allocated in the nursery.  The GC will fill it in if/when the array
+       is promoted. */
     
     SET_HDR(nptrs_arr, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(nptrs_arr) = nptrs;

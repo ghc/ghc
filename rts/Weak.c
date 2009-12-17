@@ -76,7 +76,8 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     StgWeak *w;
     StgTSO *t;
     StgMutArrPtrs *arr;
-    nat n;
+    StgWord size;
+    nat n, i;
 
     running_finalizers = rtsTrue;
 
@@ -120,10 +121,12 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
 
-    arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + n);
+    size = n + mutArrPtrsCardTableSize(n);
+    arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;
+    arr->size = size;
 
     n = 0;
     for (w = list; w; w = w->link) {
@@ -131,6 +134,10 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 	    arr->payload[n] = w->finalizer;
 	    n++;
 	}
+    }
+    // set all the cards to 1
+    for (i = n; i < size; i++) {
+        arr->payload[i] = (StgClosure *)(W_)(-1);
     }
 
     t = createIOThread(cap, 
