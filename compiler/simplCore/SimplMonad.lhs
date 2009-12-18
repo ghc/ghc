@@ -14,8 +14,7 @@ module SimplMonad (
         MonadUnique(..), newId,
 
 	-- Counting
-	SimplCount, Tick(..),
-	tick, freeTick,
+	SimplCount, tick, freeTick,
 	getSimplCount, zeroSimplCount, pprSimplCount, 
 	plusSimplCount, isZeroSimplCount,
 
@@ -29,10 +28,9 @@ import Type             ( Type )
 import FamInstEnv	( FamInstEnv )
 import Rules		( RuleBase )
 import UniqSupply
-import DynFlags		( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt )
-import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
+import DynFlags		( DynFlags )
 import Maybes		( expectJust )
-import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM, plusFM_C, fmToList )
+import CoreMonad
 import FastString
 import Outputable
 import FastTypes
@@ -154,248 +152,15 @@ getSimplCount = SM (\_st_env us sc -> (sc, us, sc))
 
 tick :: Tick -> SimplM ()
 tick t 
-   = SM (\_st_env us sc -> let sc' = doTick t sc 
+   = SM (\_st_env us sc -> let sc' = doSimplTick t sc 
                            in sc' `seq` ((), us, sc'))
 
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is
 -- used to decide when nothing further has happened
 freeTick t 
-   = SM (\_st_env us sc -> let sc' = doFreeTick t sc
+   = SM (\_st_env us sc -> let sc' = doFreeSimplTick t sc
                            in sc' `seq` ((), us, sc'))
-\end{code}
-
-\begin{code}
-verboseSimplStats :: Bool
-verboseSimplStats = opt_PprStyle_Debug		-- For now, anyway
-
-zeroSimplCount	   :: DynFlags -> SimplCount
-isZeroSimplCount   :: SimplCount -> Bool
-pprSimplCount	   :: SimplCount -> SDoc
-doTick, doFreeTick :: Tick -> SimplCount -> SimplCount
-plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
-\end{code}
-
-\begin{code}
-data SimplCount 
-   = VerySimplZero		-- These two are used when 
-   | VerySimplNonZero	-- we are only interested in 
-				-- termination info
-
-   | SimplCount	{
-	ticks   :: !Int,	-- Total ticks
-	details :: !TickCounts,	-- How many of each type
-
-	n_log	:: !Int,	-- N
-	log1	:: [Tick],	-- Last N events; <= opt_HistorySize, 
-		   		--   most recent first
-	log2	:: [Tick]	-- Last opt_HistorySize events before that
-		   		-- Having log1, log2 lets us accumulate the
-				-- recent history reasonably efficiently
-     }
-
-type TickCounts = FiniteMap Tick Int
-
-zeroSimplCount dflags
-		-- This is where we decide whether to do
-		-- the VerySimpl version or the full-stats version
-  | dopt Opt_D_dump_simpl_stats dflags
-  = SimplCount {ticks = 0, details = emptyFM,
-                n_log = 0, log1 = [], log2 = []}
-  | otherwise
-  = VerySimplZero
-
-isZeroSimplCount VerySimplZero    	    = True
-isZeroSimplCount (SimplCount { ticks = 0 }) = True
-isZeroSimplCount _    			    = False
-
-doFreeTick tick sc@SimplCount { details = dts } 
-  = sc { details = dts `addTick` tick }
-doFreeTick _ sc = sc 
-
-doTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 }
-  | nl >= opt_HistorySize = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
-  | otherwise		  = sc1 { n_log = nl+1, log1 = tick : l1 }
-  where
-    sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
-
-doTick _ _ = VerySimplNonZero -- The very simple case
-
-
--- Don't use plusFM_C because that's lazy, and we want to 
--- be pretty strict here!
-addTick :: TickCounts -> Tick -> TickCounts
-addTick fm tick = case lookupFM fm tick of
-			Nothing -> addToFM fm tick 1
-			Just n  -> n1 `seq` addToFM fm tick n1
-				where
-				   n1 = n+1
-
-
-plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
-	       sc2@(SimplCount { ticks = tks2, details = dts2 })
-  = log_base { ticks = tks1 + tks2, details = plusFM_C (+) dts1 dts2 }
-  where
-	-- A hackish way of getting recent log info
-    log_base | null (log1 sc2) = sc1	-- Nothing at all in sc2
-	     | null (log2 sc2) = sc2 { log2 = log1 sc1 }
-	     | otherwise       = sc2
-
-plusSimplCount VerySimplZero VerySimplZero = VerySimplZero
-plusSimplCount _             _             = VerySimplNonZero
-
-pprSimplCount VerySimplZero    = ptext (sLit "Total ticks: ZERO!")
-pprSimplCount VerySimplNonZero = ptext (sLit "Total ticks: NON-ZERO!")
-pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
-  = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
-	  blankLine,
-	  pprTickCounts (fmToList dts),
-	  if verboseSimplStats then
-		vcat [blankLine,
-		      ptext (sLit "Log (most recent first)"),
-		      nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
-	  else empty
-    ]
-
-pprTickCounts :: [(Tick,Int)] -> SDoc
-pprTickCounts [] = empty
-pprTickCounts ((tick1,n1):ticks)
-  = vcat [int tot_n <+> text (tickString tick1),
-	  pprTCDetails real_these,
-	  pprTickCounts others
-    ]
-  where
-    tick1_tag		= tickToTag tick1
-    (these, others)	= span same_tick ticks
-    real_these		= (tick1,n1):these
-    same_tick (tick2,_) = tickToTag tick2 == tick1_tag
-    tot_n		= sum [n | (_,n) <- real_these]
-
-pprTCDetails :: [(Tick, Int)] -> SDoc
-pprTCDetails ticks
-  = nest 4 (vcat [int n <+> pprTickCts tick | (tick,n) <- ticks])
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Ticks}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Tick
-  = PreInlineUnconditionally	Id
-  | PostInlineUnconditionally	Id
-
-  | UnfoldingDone    		Id
-  | RuleFired			FastString	-- Rule name
-
-  | LetFloatFromLet
-  | EtaExpansion		Id	-- LHS binder
-  | EtaReduction		Id	-- Binder on outer lambda
-  | BetaReduction		Id	-- Lambda binder
-
-
-  | CaseOfCase			Id	-- Bndr on *inner* case
-  | KnownBranch			Id	-- Case binder
-  | CaseMerge			Id	-- Binder on outer case
-  | AltMerge			Id	-- Case binder
-  | CaseElim			Id	-- Case binder
-  | CaseIdentity		Id	-- Case binder
-  | FillInCaseDefault		Id	-- Case binder
-
-  | BottomFound		
-  | SimplifierDone		-- Ticked at each iteration of the simplifier
-
-instance Outputable Tick where
-  ppr tick = text (tickString tick) <+> pprTickCts tick
-
-instance Eq Tick where
-  a == b = case a `cmpTick` b of
-           EQ -> True
-           _ -> False
-
-instance Ord Tick where
-  compare = cmpTick
-
-tickToTag :: Tick -> Int
-tickToTag (PreInlineUnconditionally _)	= 0
-tickToTag (PostInlineUnconditionally _)	= 1
-tickToTag (UnfoldingDone _)		= 2
-tickToTag (RuleFired _)			= 3
-tickToTag LetFloatFromLet		= 4
-tickToTag (EtaExpansion _)		= 5
-tickToTag (EtaReduction _)		= 6
-tickToTag (BetaReduction _)		= 7
-tickToTag (CaseOfCase _)		= 8
-tickToTag (KnownBranch _)		= 9
-tickToTag (CaseMerge _)			= 10
-tickToTag (CaseElim _)			= 11
-tickToTag (CaseIdentity _)		= 12
-tickToTag (FillInCaseDefault _)		= 13
-tickToTag BottomFound			= 14
-tickToTag SimplifierDone		= 16
-tickToTag (AltMerge _)			= 17
-
-tickString :: Tick -> String
-tickString (PreInlineUnconditionally _)	= "PreInlineUnconditionally"
-tickString (PostInlineUnconditionally _)= "PostInlineUnconditionally"
-tickString (UnfoldingDone _)		= "UnfoldingDone"
-tickString (RuleFired _)		= "RuleFired"
-tickString LetFloatFromLet		= "LetFloatFromLet"
-tickString (EtaExpansion _)		= "EtaExpansion"
-tickString (EtaReduction _)		= "EtaReduction"
-tickString (BetaReduction _)		= "BetaReduction"
-tickString (CaseOfCase _)		= "CaseOfCase"
-tickString (KnownBranch _)		= "KnownBranch"
-tickString (CaseMerge _)		= "CaseMerge"
-tickString (AltMerge _)			= "AltMerge"
-tickString (CaseElim _)			= "CaseElim"
-tickString (CaseIdentity _)		= "CaseIdentity"
-tickString (FillInCaseDefault _)	= "FillInCaseDefault"
-tickString BottomFound			= "BottomFound"
-tickString SimplifierDone		= "SimplifierDone"
-
-pprTickCts :: Tick -> SDoc
-pprTickCts (PreInlineUnconditionally v)	= ppr v
-pprTickCts (PostInlineUnconditionally v)= ppr v
-pprTickCts (UnfoldingDone v)		= ppr v
-pprTickCts (RuleFired v)		= ppr v
-pprTickCts LetFloatFromLet		= empty
-pprTickCts (EtaExpansion v)		= ppr v
-pprTickCts (EtaReduction v)		= ppr v
-pprTickCts (BetaReduction v)		= ppr v
-pprTickCts (CaseOfCase v)		= ppr v
-pprTickCts (KnownBranch v)		= ppr v
-pprTickCts (CaseMerge v)		= ppr v
-pprTickCts (AltMerge v)			= ppr v
-pprTickCts (CaseElim v)			= ppr v
-pprTickCts (CaseIdentity v)		= ppr v
-pprTickCts (FillInCaseDefault v)	= ppr v
-pprTickCts _    			= empty
-
-cmpTick :: Tick -> Tick -> Ordering
-cmpTick a b = case (tickToTag a `compare` tickToTag b) of
-		GT -> GT
-		EQ -> cmpEqTick a b
-		LT -> LT
-
-cmpEqTick :: Tick -> Tick -> Ordering
-cmpEqTick (PreInlineUnconditionally a)	(PreInlineUnconditionally b)	= a `compare` b
-cmpEqTick (PostInlineUnconditionally a)	(PostInlineUnconditionally b)	= a `compare` b
-cmpEqTick (UnfoldingDone a)		(UnfoldingDone b)		= a `compare` b
-cmpEqTick (RuleFired a)			(RuleFired b)			= a `compare` b
-cmpEqTick (EtaExpansion a)		(EtaExpansion b)		= a `compare` b
-cmpEqTick (EtaReduction a)		(EtaReduction b)		= a `compare` b
-cmpEqTick (BetaReduction a)		(BetaReduction b)		= a `compare` b
-cmpEqTick (CaseOfCase a)		(CaseOfCase b)			= a `compare` b
-cmpEqTick (KnownBranch a)		(KnownBranch b)			= a `compare` b
-cmpEqTick (CaseMerge a)			(CaseMerge b)			= a `compare` b
-cmpEqTick (AltMerge a)			(AltMerge b)			= a `compare` b
-cmpEqTick (CaseElim a)			(CaseElim b)			= a `compare` b
-cmpEqTick (CaseIdentity a)		(CaseIdentity b)		= a `compare` b
-cmpEqTick (FillInCaseDefault a)		(FillInCaseDefault b)		= a `compare` b
-cmpEqTick _     			_     				= EQ
 \end{code}
 
 

@@ -28,6 +28,7 @@ module SimplUtils (
 #include "HsVersions.h"
 
 import SimplEnv
+import CoreMonad	( SimplifierMode(..), Tick(..) )
 import DynFlags
 import StaticFlags
 import CoreSyn
@@ -601,15 +602,13 @@ updModeForInlineRules inline_rule_act current_mode
       ActiveBefore {} -> mk_gentle current_mode
       ActiveAfter n   -> mk_phase n current_mode
   where
-    no_op  = SimplGently { sm_rules = False, sm_inline = False }
+    no_op = SimplGently { sm_rules = False, sm_inline = False }
 
     mk_gentle (SimplGently {}) = current_mode
-    mk_gentle _                = SimplGently { sm_rules = True,  sm_inline = True }
+    mk_gentle _                = SimplGently { sm_rules = True, sm_inline = True }
 
-    mk_phase n (SimplPhase cp ss) 
-                    | cp > n    = no_op	-- Current phase earlier than n
-                    | otherwise = SimplPhase n ss
-    mk_phase _ (SimplGently {}) = no_op
+    mk_phase n (SimplPhase _ ss) = SimplPhase n ss
+    mk_phase n (SimplGently {})  = SimplPhase n ["gentle-rules"]
 \end{code}
 
 

@@ -40,6 +40,7 @@ module SimplEnv (
 #include "HsVersions.h"
 
 import SimplMonad
+import CoreMonad	( SimplifierMode(..) )
 import IdInfo
 import CoreSyn
 import CoreUtils
@@ -54,7 +55,6 @@ import qualified Type		( substTy, substTyVarBndr )
 import Type hiding		( substTy, substTyVarBndr )
 import Coercion
 import BasicTypes	
-import DynFlags
 import MonadUtils
 import Outputable
 import FastString

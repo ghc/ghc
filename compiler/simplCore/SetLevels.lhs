@@ -54,8 +54,7 @@ module SetLevels (
 #include "HsVersions.h"
 
 import CoreSyn
-
-import DynFlags		( FloatOutSwitches(..) )
+import CoreMonad	( FloatOutSwitches(..) )
 import CoreUtils	( exprType, mkPiTypes )
 import CoreArity	( exprBotStrictness_maybe )
 import CoreFVs		-- all of it

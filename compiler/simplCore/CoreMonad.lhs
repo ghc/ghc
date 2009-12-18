@@ -7,6 +7,17 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module CoreMonad (
+    -- * Configuration of the core-to-core passes
+    CoreToDo(..),
+    SimplifierMode(..),
+    SimplifierSwitch(..),
+    FloatOutSwitches(..),
+    getCoreToDo, dumpSimplPhase,
+
+    -- * Counting
+    SimplCount, doSimplTick, doFreeSimplTick,
+    pprSimplCount, plusSimplCount, zeroSimplCount, isZeroSimplCount, Tick(..),
+
     -- * The monad
     CoreM, runCoreM,
     
@@ -48,11 +59,13 @@ import CoreUtils
 import CoreLint		( lintCoreBindings )
 import PrelNames        ( iNTERACTIVE )
 import HscTypes
-import Module           ( Module )
-import DynFlags         ( DynFlags, DynFlag )
-import SimplMonad       ( SimplCount, plusSimplCount, zeroSimplCount )
+import Module           ( PackageId, Module )
+import DynFlags
+import StaticFlags	
 import Rules            ( RuleBase )
+import BasicTypes	( CompilerPhase )
 import Annotations
+import Id		( Id )
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
@@ -65,7 +78,10 @@ import qualified ErrUtils as Err
 import Maybes
 import UniqSupply
 import LazyUniqFM       ( UniqFM, mapUFM, filterUFM )
+import FiniteMap
 
+import Util		( split )
+import Data.List	( intersperse )
 import Data.Dynamic
 import Data.IORef
 import Data.Word
@@ -119,6 +135,533 @@ dumpAndLint dump dflags pass_name dump_flag binds rules
     pp_rules = vcat [ blankLine
                     , ptext (sLit "------ Local rules for imported ids --------")
                     , pprRules rules ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+              The CoreToDo type and related types
+	  Abstraction of core-to-core passes to run.
+%*									*
+%************************************************************************
+
+\begin{code}
+data CoreToDo           -- These are diff core-to-core passes,
+                        -- which may be invoked in any order,
+                        -- as many times as you like.
+
+  = CoreDoSimplify      -- The core-to-core simplifier.
+        SimplifierMode
+        [SimplifierSwitch]
+                        -- Each run of the simplifier can take a different
+                        -- set of simplifier-specific flags.
+  | CoreDoFloatInwards
+  | CoreDoFloatOutwards FloatOutSwitches
+  | CoreLiberateCase
+  | CoreDoPrintCore
+  | CoreDoStaticArgs
+  | CoreDoStrictness
+  | CoreDoWorkerWrapper
+  | CoreDoSpecialising
+  | CoreDoSpecConstr
+  | CoreDoOldStrictness
+  | CoreDoGlomBinds
+  | CoreCSE
+  | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
+                                           -- matching this string
+  | CoreDoVectorisation PackageId
+  | CoreDoNothing                -- Useful when building up
+  | CoreDoPasses [CoreToDo]      -- lists of these things
+
+
+data SimplifierMode             -- See comments in SimplMonad
+  = SimplGently
+	{ sm_rules :: Bool	-- Whether RULES are enabled 
+        , sm_inline :: Bool }	-- Whether inlining is enabled
+
+  | SimplPhase 
+        { sm_num :: Int 	  -- Phase number; counts downward so 0 is last phase
+        , sm_names :: [String] }  -- Name(s) of the phase
+
+instance Outputable SimplifierMode where
+    ppr (SimplPhase { sm_num = n, sm_names = ss })
+       = int n <+> brackets (text (concat $ intersperse "," ss))
+    ppr (SimplGently { sm_rules = r, sm_inline = i }) 
+       = ptext (sLit "gentle") <> 
+           brackets (pp_flag r (sLit "rules") <> comma <>
+                     pp_flag i (sLit "inline"))
+	 where
+           pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
+
+data SimplifierSwitch
+  = MaxSimplifierIterations Int
+  | NoCaseOfCase
+
+data FloatOutSwitches = FloatOutSwitches {
+        floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
+        floatOutConstants :: Bool    -- ^ True <=> float constants to top level,
+                                     --            even if they do not escape a lambda
+    }
+
+instance Outputable FloatOutSwitches where
+    ppr = pprFloatOutSwitches
+
+pprFloatOutSwitches :: FloatOutSwitches -> SDoc
+pprFloatOutSwitches sw = pp_not (floatOutLambdas sw) <+> text "lambdas" <> comma
+                     <+> pp_not (floatOutConstants sw) <+> text "constants"
+  where
+    pp_not True  = empty
+    pp_not False = text "not"
+
+-- | Switches that specify the minimum amount of floating out
+-- gentleFloatOutSwitches :: FloatOutSwitches
+-- gentleFloatOutSwitches = FloatOutSwitches False False
+
+-- | Switches that do not specify floating out of lambdas, just of constants
+constantsOnlyFloatOutSwitches :: FloatOutSwitches
+constantsOnlyFloatOutSwitches = FloatOutSwitches False True
+\end{code}
+
+
+%************************************************************************
+%*									*
+           Generating the main optimisation pipeline
+%*									*
+%************************************************************************
+
+\begin{code}
+getCoreToDo :: DynFlags -> [CoreToDo]
+getCoreToDo dflags
+  = core_todo
+  where
+    opt_level     = optLevel dflags
+    phases        = simplPhases dflags
+    max_iter      = maxSimplIterations dflags
+    strictness    = dopt Opt_Strictness dflags
+    full_laziness = dopt Opt_FullLaziness dflags
+    do_specialise = dopt Opt_Specialise dflags
+    do_float_in   = dopt Opt_FloatIn dflags
+    cse           = dopt Opt_CSE dflags
+    spec_constr   = dopt Opt_SpecConstr dflags
+    liberate_case = dopt Opt_LiberateCase dflags
+    rule_check    = ruleCheck dflags
+    static_args   = dopt Opt_StaticArgumentTransformation dflags
+
+    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
+
+    maybe_strictness_before phase
+      = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
+
+    simpl_phase phase names iter
+      = CoreDoPasses
+          [ maybe_strictness_before phase,
+            CoreDoSimplify (SimplPhase phase names) [
+              MaxSimplifierIterations iter
+            ],
+            maybe_rule_check phase
+          ]
+
+    vectorisation
+      = runWhen (dopt Opt_Vectorise dflags)
+        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphPackage dflags) ]
+
+
+                -- By default, we have 2 phases before phase 0.
+
+                -- Want to run with inline phase 2 after the specialiser to give
+                -- maximum chance for fusion to work before we inline build/augment
+                -- in phase 1.  This made a difference in 'ansi' where an
+                -- overloaded function wasn't inlined till too late.
+
+                -- Need phase 1 so that build/augment get
+                -- inlined.  I found that spectral/hartel/genfft lost some useful
+                -- strictness in the function sumcode' if augment is not inlined
+                -- before strictness analysis runs
+    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
+                                  | phase <- [phases, phases-1 .. 1] ]
+
+
+        -- initial simplify: mk specialiser happy: minimum effort please
+    simpl_gently = CoreDoSimplify 
+                       (SimplGently { sm_rules = True, sm_inline = False })
+                       [
+                        --      Simplify "gently"
+                        -- Don't inline anything till full laziness has bitten
+                        -- In particular, inlining wrappers inhibits floating
+                        -- e.g. ...(case f x of ...)...
+                        --  ==> ...(case (case x of I# x# -> fw x#) of ...)...
+                        --  ==> ...(case x of I# x# -> case fw x# of ...)...
+                        -- and now the redex (f x) isn't floatable any more
+                        -- Similarly, don't apply any rules until after full
+                        -- laziness.  Notably, list fusion can prevent floating.
+
+            NoCaseOfCase,       -- Don't do case-of-case transformations.
+                                -- This makes full laziness work better
+            MaxSimplifierIterations max_iter
+        ]
+
+    core_todo =
+     if opt_level == 0 then
+       [vectorisation,
+        simpl_phase 0 ["final"] max_iter]
+     else {- opt_level >= 1 -} [
+
+    -- We want to do the static argument transform before full laziness as it
+    -- may expose extra opportunities to float things outwards. However, to fix
+    -- up the output of the transformation we need at do at least one simplify
+    -- after this before anything else
+        runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
+
+        -- We run vectorisation here for now, but we might also try to run
+        -- it later
+        vectorisation,
+
+        -- initial simplify: mk specialiser happy: minimum effort please
+        simpl_gently,
+
+        -- Specialisation is best done before full laziness
+        -- so that overloaded functions have all their dictionary lambdas manifest
+        runWhen do_specialise CoreDoSpecialising,
+
+        runWhen full_laziness (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
+      		-- Was: gentleFloatOutSwitches	
+		-- I have no idea why, but not floating constants to top level is
+		-- very bad in some cases. 
+		-- Notably: p_ident in spectral/rewrite
+		-- 	    Changing from "gentle" to "constantsOnly" improved
+		-- 	    rewrite's allocation by 19%, and made  0.0% difference
+		-- 	    to any other nofib benchmark
+
+        runWhen do_float_in CoreDoFloatInwards,
+
+        simpl_phases,
+
+                -- Phase 0: allow all Ids to be inlined now
+                -- This gets foldr inlined before strictness analysis
+
+                -- At least 3 iterations because otherwise we land up with
+                -- huge dead expressions because of an infelicity in the
+                -- simpifier.
+                --      let k = BIG in foldr k z xs
+                -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
+                -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
+                -- Don't stop now!
+        simpl_phase 0 ["main"] (max max_iter 3),
+
+        runWhen strictness (CoreDoPasses [
+                CoreDoStrictness,
+                CoreDoWorkerWrapper,
+                CoreDoGlomBinds,
+                simpl_phase 0 ["post-worker-wrapper"] max_iter
+                ]),
+
+        runWhen full_laziness
+          (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
+                -- nofib/spectral/hartel/wang doubles in speed if you
+                -- do full laziness late in the day.  It only happens
+                -- after fusion and other stuff, so the early pass doesn't
+                -- catch it.  For the record, the redex is
+                --        f_el22 (f_el21 r_midblock)
+
+
+        runWhen cse CoreCSE,
+                -- We want CSE to follow the final full-laziness pass, because it may
+                -- succeed in commoning up things floated out by full laziness.
+                -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
+
+        runWhen do_float_in CoreDoFloatInwards,
+
+        maybe_rule_check 0,
+
+                -- Case-liberation for -O2.  This should be after
+                -- strictness analysis and the simplification which follows it.
+        runWhen liberate_case (CoreDoPasses [
+            CoreLiberateCase,
+            simpl_phase 0 ["post-liberate-case"] max_iter
+            ]),         -- Run the simplifier after LiberateCase to vastly
+                        -- reduce the possiblility of shadowing
+                        -- Reason: see Note [Shadowing] in SpecConstr.lhs
+
+        runWhen spec_constr CoreDoSpecConstr,
+
+        maybe_rule_check 0,
+
+        -- Final clean-up simplification:
+        simpl_phase 0 ["final"] max_iter
+     ]
+
+-- The core-to-core pass ordering is derived from the DynFlags:
+runWhen :: Bool -> CoreToDo -> CoreToDo
+runWhen True  do_this = do_this
+runWhen False _       = CoreDoNothing
+
+runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
+runMaybe (Just x) f = f x
+runMaybe Nothing  _ = CoreDoNothing
+
+dumpSimplPhase :: DynFlags -> SimplifierMode -> Bool
+dumpSimplPhase dflags mode
+   | Just spec_string <- shouldDumpSimplPhase dflags
+   = match_spec spec_string
+   | otherwise
+   = dopt Opt_D_verbose_core2core dflags
+
+  where
+    match_spec :: String -> Bool
+    match_spec spec_string 
+      = or $ map (and . map match . split ':') 
+           $ split ',' spec_string
+
+    match :: String -> Bool
+    match "" = True
+    match s  = case reads s of
+                [(n,"")] -> phase_num  n
+                _        -> phase_name s
+
+    phase_num :: Int -> Bool
+    phase_num n = case mode of
+                    SimplPhase k _ -> n == k
+                    _              -> False
+
+    phase_name :: String -> Bool
+    phase_name s = case mode of
+                     SimplGently {}               -> s == "gentle"
+                     SimplPhase { sm_names = ss } -> s `elem` ss
+\end{code}
+
+
+%************************************************************************
+%*									*
+             Counting and logging
+%*									*
+%************************************************************************
+
+\begin{code}
+verboseSimplStats :: Bool
+verboseSimplStats = opt_PprStyle_Debug		-- For now, anyway
+
+zeroSimplCount	   :: DynFlags -> SimplCount
+isZeroSimplCount   :: SimplCount -> Bool
+pprSimplCount	   :: SimplCount -> SDoc
+doSimplTick, doFreeSimplTick :: Tick -> SimplCount -> SimplCount
+plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
+\end{code}
+
+\begin{code}
+data SimplCount 
+   = VerySimplZero		-- These two are used when 
+   | VerySimplNonZero	-- we are only interested in 
+				-- termination info
+
+   | SimplCount	{
+	ticks   :: !Int,	-- Total ticks
+	details :: !TickCounts,	-- How many of each type
+
+	n_log	:: !Int,	-- N
+	log1	:: [Tick],	-- Last N events; <= opt_HistorySize, 
+		   		--   most recent first
+	log2	:: [Tick]	-- Last opt_HistorySize events before that
+		   		-- Having log1, log2 lets us accumulate the
+				-- recent history reasonably efficiently
+     }
+
+type TickCounts = FiniteMap Tick Int
+
+zeroSimplCount dflags
+		-- This is where we decide whether to do
+		-- the VerySimpl version or the full-stats version
+  | dopt Opt_D_dump_simpl_stats dflags
+  = SimplCount {ticks = 0, details = emptyFM,
+                n_log = 0, log1 = [], log2 = []}
+  | otherwise
+  = VerySimplZero
+
+isZeroSimplCount VerySimplZero    	    = True
+isZeroSimplCount (SimplCount { ticks = 0 }) = True
+isZeroSimplCount _    			    = False
+
+doFreeSimplTick tick sc@SimplCount { details = dts } 
+  = sc { details = dts `addTick` tick }
+doFreeSimplTick _ sc = sc 
+
+doSimplTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 }
+  | nl >= opt_HistorySize = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
+  | otherwise		  = sc1 { n_log = nl+1, log1 = tick : l1 }
+  where
+    sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
+
+doSimplTick _ _ = VerySimplNonZero -- The very simple case
+
+
+-- Don't use plusFM_C because that's lazy, and we want to 
+-- be pretty strict here!
+addTick :: TickCounts -> Tick -> TickCounts
+addTick fm tick = case lookupFM fm tick of
+			Nothing -> addToFM fm tick 1
+			Just n  -> n1 `seq` addToFM fm tick n1
+				where
+				   n1 = n+1
+
+
+plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
+	       sc2@(SimplCount { ticks = tks2, details = dts2 })
+  = log_base { ticks = tks1 + tks2, details = plusFM_C (+) dts1 dts2 }
+  where
+	-- A hackish way of getting recent log info
+    log_base | null (log1 sc2) = sc1	-- Nothing at all in sc2
+	     | null (log2 sc2) = sc2 { log2 = log1 sc1 }
+	     | otherwise       = sc2
+
+plusSimplCount VerySimplZero VerySimplZero = VerySimplZero
+plusSimplCount _             _             = VerySimplNonZero
+
+pprSimplCount VerySimplZero    = ptext (sLit "Total ticks: ZERO!")
+pprSimplCount VerySimplNonZero = ptext (sLit "Total ticks: NON-ZERO!")
+pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
+  = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
+	  blankLine,
+	  pprTickCounts (fmToList dts),
+	  if verboseSimplStats then
+		vcat [blankLine,
+		      ptext (sLit "Log (most recent first)"),
+		      nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
+	  else empty
+    ]
+
+pprTickCounts :: [(Tick,Int)] -> SDoc
+pprTickCounts [] = empty
+pprTickCounts ((tick1,n1):ticks)
+  = vcat [int tot_n <+> text (tickString tick1),
+	  pprTCDetails real_these,
+	  pprTickCounts others
+    ]
+  where
+    tick1_tag		= tickToTag tick1
+    (these, others)	= span same_tick ticks
+    real_these		= (tick1,n1):these
+    same_tick (tick2,_) = tickToTag tick2 == tick1_tag
+    tot_n		= sum [n | (_,n) <- real_these]
+
+pprTCDetails :: [(Tick, Int)] -> SDoc
+pprTCDetails ticks
+  = nest 4 (vcat [int n <+> pprTickCts tick | (tick,n) <- ticks])
+\end{code}
+
+
+\begin{code}
+data Tick
+  = PreInlineUnconditionally	Id
+  | PostInlineUnconditionally	Id
+
+  | UnfoldingDone    		Id
+  | RuleFired			FastString	-- Rule name
+
+  | LetFloatFromLet
+  | EtaExpansion		Id	-- LHS binder
+  | EtaReduction		Id	-- Binder on outer lambda
+  | BetaReduction		Id	-- Lambda binder
+
+
+  | CaseOfCase			Id	-- Bndr on *inner* case
+  | KnownBranch			Id	-- Case binder
+  | CaseMerge			Id	-- Binder on outer case
+  | AltMerge			Id	-- Case binder
+  | CaseElim			Id	-- Case binder
+  | CaseIdentity		Id	-- Case binder
+  | FillInCaseDefault		Id	-- Case binder
+
+  | BottomFound		
+  | SimplifierDone		-- Ticked at each iteration of the simplifier
+
+instance Outputable Tick where
+  ppr tick = text (tickString tick) <+> pprTickCts tick
+
+instance Eq Tick where
+  a == b = case a `cmpTick` b of
+           EQ -> True
+           _ -> False
+
+instance Ord Tick where
+  compare = cmpTick
+
+tickToTag :: Tick -> Int
+tickToTag (PreInlineUnconditionally _)	= 0
+tickToTag (PostInlineUnconditionally _)	= 1
+tickToTag (UnfoldingDone _)		= 2
+tickToTag (RuleFired _)			= 3
+tickToTag LetFloatFromLet		= 4
+tickToTag (EtaExpansion _)		= 5
+tickToTag (EtaReduction _)		= 6
+tickToTag (BetaReduction _)		= 7
+tickToTag (CaseOfCase _)		= 8
+tickToTag (KnownBranch _)		= 9
+tickToTag (CaseMerge _)			= 10
+tickToTag (CaseElim _)			= 11
+tickToTag (CaseIdentity _)		= 12
+tickToTag (FillInCaseDefault _)		= 13
+tickToTag BottomFound			= 14
+tickToTag SimplifierDone		= 16
+tickToTag (AltMerge _)			= 17
+
+tickString :: Tick -> String
+tickString (PreInlineUnconditionally _)	= "PreInlineUnconditionally"
+tickString (PostInlineUnconditionally _)= "PostInlineUnconditionally"
+tickString (UnfoldingDone _)		= "UnfoldingDone"
+tickString (RuleFired _)		= "RuleFired"
+tickString LetFloatFromLet		= "LetFloatFromLet"
+tickString (EtaExpansion _)		= "EtaExpansion"
+tickString (EtaReduction _)		= "EtaReduction"
+tickString (BetaReduction _)		= "BetaReduction"
+tickString (CaseOfCase _)		= "CaseOfCase"
+tickString (KnownBranch _)		= "KnownBranch"
+tickString (CaseMerge _)		= "CaseMerge"
+tickString (AltMerge _)			= "AltMerge"
+tickString (CaseElim _)			= "CaseElim"
+tickString (CaseIdentity _)		= "CaseIdentity"
+tickString (FillInCaseDefault _)	= "FillInCaseDefault"
+tickString BottomFound			= "BottomFound"
+tickString SimplifierDone		= "SimplifierDone"
+
+pprTickCts :: Tick -> SDoc
+pprTickCts (PreInlineUnconditionally v)	= ppr v
+pprTickCts (PostInlineUnconditionally v)= ppr v
+pprTickCts (UnfoldingDone v)		= ppr v
+pprTickCts (RuleFired v)		= ppr v
+pprTickCts LetFloatFromLet		= empty
+pprTickCts (EtaExpansion v)		= ppr v
+pprTickCts (EtaReduction v)		= ppr v
+pprTickCts (BetaReduction v)		= ppr v
+pprTickCts (CaseOfCase v)		= ppr v
+pprTickCts (KnownBranch v)		= ppr v
+pprTickCts (CaseMerge v)		= ppr v
+pprTickCts (AltMerge v)			= ppr v
+pprTickCts (CaseElim v)			= ppr v
+pprTickCts (CaseIdentity v)		= ppr v
+pprTickCts (FillInCaseDefault v)	= ppr v
+pprTickCts _    			= empty
+
+cmpTick :: Tick -> Tick -> Ordering
+cmpTick a b = case (tickToTag a `compare` tickToTag b) of
+		GT -> GT
+		EQ -> cmpEqTick a b
+		LT -> LT
+
+cmpEqTick :: Tick -> Tick -> Ordering
+cmpEqTick (PreInlineUnconditionally a)	(PreInlineUnconditionally b)	= a `compare` b
+cmpEqTick (PostInlineUnconditionally a)	(PostInlineUnconditionally b)	= a `compare` b
+cmpEqTick (UnfoldingDone a)		(UnfoldingDone b)		= a `compare` b
+cmpEqTick (RuleFired a)			(RuleFired b)			= a `compare` b
+cmpEqTick (EtaExpansion a)		(EtaExpansion b)		= a `compare` b
+cmpEqTick (EtaReduction a)		(EtaReduction b)		= a `compare` b
+cmpEqTick (BetaReduction a)		(BetaReduction b)		= a `compare` b
+cmpEqTick (CaseOfCase a)		(CaseOfCase b)			= a `compare` b
+cmpEqTick (KnownBranch a)		(KnownBranch b)			= a `compare` b
+cmpEqTick (CaseMerge a)			(CaseMerge b)			= a `compare` b
+cmpEqTick (AltMerge a)			(AltMerge b)			= a `compare` b
+cmpEqTick (CaseElim a)			(CaseElim b)			= a `compare` b
+cmpEqTick (CaseIdentity a)		(CaseIdentity b)		= a `compare` b
+cmpEqTick (FillInCaseDefault a)		(FillInCaseDefault b)		= a `compare` b
+cmpEqTick _     			_     				= EQ
 \end{code}
 
 

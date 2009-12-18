@@ -18,10 +18,11 @@ import Id
 import MkId		( mkImpossibleExpr, seqId )
 import Var
 import IdInfo
-import Name		( mkSystemVarName )
+import Name		( mkSystemVarName, isExternalName )
 import Coercion
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
+import CoreMonad	( SimplifierSwitch(..), Tick(..) )
 import CoreSyn
 import Demand           ( isStrictDmd, splitStrictSig )
 import PprCore          ( pprParendExpr, pprCoreExpr )
@@ -674,12 +675,14 @@ simplUnfolding env top_lvl id _ _
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
                    , uf_src = src, uf_guidance = guide })
   | isInlineRuleSource src
-  = do { expr' <- simplExpr rule_env expr
+  = -- pprTrace "su" (vcat [ppr id, ppr act, ppr (getMode env), ppr (getMode rule_env)]) $
+    do { expr' <- simplExpr rule_env expr
        ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst env) src
        ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
   where
-    rule_env = updMode (updModeForInlineRules (idInlineActivation id)) env
+    act      = idInlineActivation id
+    rule_env = updMode (updModeForInlineRules act) env
        	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
 
 simplUnfolding _ top_lvl id _occ_info new_rhs _

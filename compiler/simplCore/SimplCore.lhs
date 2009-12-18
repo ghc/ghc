@@ -15,9 +15,7 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
-import DynFlags		( CoreToDo(..), SimplifierSwitch(..),
-			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
-			  getCoreToDo, shouldDumpSimplPhase )
+import DynFlags		( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreSubst
 import HscTypes
@@ -37,7 +35,6 @@ import SimplMonad
 import CoreMonad
 import qualified ErrUtils as Err 
 import CoreLint
-import CoreMonad	( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
@@ -507,7 +504,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
     }
   where
     dflags     	 = hsc_dflags hsc_env
-    dump_phase 	 = shouldDumpSimplPhase dflags mode
+    dump_phase 	 = dumpSimplPhase dflags mode
 		   
     sw_chkr	   = isAmongSimpl switches
     max_iterations = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2

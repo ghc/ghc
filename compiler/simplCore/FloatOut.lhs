@@ -11,8 +11,9 @@ module FloatOut ( floatOutwards ) where
 import CoreSyn
 import CoreUtils
 import CoreArity	( etaExpand )
+import CoreMonad	( FloatOutSwitches(..) )
 
-import DynFlags	( DynFlags, DynFlag(..), FloatOutSwitches(..) )
+import DynFlags		( DynFlags, DynFlag(..) )
 import ErrUtils		( dumpIfSet_dyn )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType, idArity, isBottomingId )

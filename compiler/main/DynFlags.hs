@@ -46,13 +46,6 @@ module DynFlags (
         -- ** DynFlag C compiler options
         machdepCCOpts, picCCOpts,
 
-        -- * Configuration of the core-to-core passes
-        CoreToDo(..),
-        SimplifierMode(..),
-        SimplifierSwitch(..),
-        FloatOutSwitches(..),
-        getCoreToDo,
-
         -- * Configuration of the stg-to-stg passes
         StgToDo(..),
         getStgToDo,
@@ -82,7 +75,6 @@ import Maybes           ( orElse )
 import SrcLoc
 import FastString
 import FiniteMap
-import BasicTypes	( CompilerPhase )
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
@@ -344,8 +336,6 @@ data DynFlag
 data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
   ghcLink               :: GhcLink,
-  coreToDo              :: Maybe [CoreToDo], -- reserved for -Ofile
-  stgToDo               :: Maybe [StgToDo],  -- similarly
   hscTarget             :: HscTarget,
   hscOutName            :: String,      -- ^ Name of the output file
   extCoreName           :: String,      -- ^ Name of the .hcr output file
@@ -353,7 +343,7 @@ data DynFlags = DynFlags {
   optLevel              :: Int,         -- ^ Optimisation level
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
-  shouldDumpSimplPhase  :: SimplifierMode -> Bool,
+  shouldDumpSimplPhase  :: Maybe String,
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
@@ -600,8 +590,6 @@ defaultDynFlags =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        coreToDo                = Nothing,
-        stgToDo                 = Nothing,
         hscTarget               = defaultHscTarget,
         hscOutName              = "",
         extCoreName             = "",
@@ -609,7 +597,7 @@ defaultDynFlags =
         optLevel                = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
-        shouldDumpSimplPhase    = const False,
+        shouldDumpSimplPhase    = Nothing,
         ruleCheck               = Nothing,
         specConstrThreshold     = Just 200,
         specConstrCount         = Just 3,
@@ -979,255 +967,6 @@ minuswRemovesOpts
       ]
 
 -- -----------------------------------------------------------------------------
--- CoreToDo:  abstraction of core-to-core passes to run.
-
-data CoreToDo           -- These are diff core-to-core passes,
-                        -- which may be invoked in any order,
-                        -- as many times as you like.
-
-  = CoreDoSimplify      -- The core-to-core simplifier.
-        SimplifierMode
-        [SimplifierSwitch]
-                        -- Each run of the simplifier can take a different
-                        -- set of simplifier-specific flags.
-  | CoreDoFloatInwards
-  | CoreDoFloatOutwards FloatOutSwitches
-  | CoreLiberateCase
-  | CoreDoPrintCore
-  | CoreDoStaticArgs
-  | CoreDoStrictness
-  | CoreDoWorkerWrapper
-  | CoreDoSpecialising
-  | CoreDoSpecConstr
-  | CoreDoOldStrictness
-  | CoreDoGlomBinds
-  | CoreCSE
-  | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
-                                           -- matching this string
-  | CoreDoVectorisation PackageId
-  | CoreDoNothing                -- Useful when building up
-  | CoreDoPasses [CoreToDo]      -- lists of these things
-
-
-data SimplifierMode             -- See comments in SimplMonad
-  = SimplGently
-	{ sm_rules :: Bool	-- Whether RULES are enabled 
-        , sm_inline :: Bool }	-- Whether inlining is enabled
-
-  | SimplPhase 
-        { sm_num :: Int 	  -- Phase number; counts downward so 0 is last phase
-        , sm_names :: [String] }  -- Name(s) of the phase
-
-instance Outputable SimplifierMode where
-    ppr (SimplPhase { sm_num = n, sm_names = ss })
-       = int n <+> brackets (text (concat $ intersperse "," ss))
-    ppr (SimplGently { sm_rules = r, sm_inline = i }) 
-       = ptext (sLit "gentle") <> 
-           brackets (pp_flag r (sLit "rules") <> comma <>
-                     pp_flag i (sLit "inline"))
-	 where
-           pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
-
-data SimplifierSwitch
-  = MaxSimplifierIterations Int
-  | NoCaseOfCase
-
-data FloatOutSwitches = FloatOutSwitches {
-        floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
-        floatOutConstants :: Bool    -- ^ True <=> float constants to top level,
-                                     --            even if they do not escape a lambda
-    }
-
-instance Outputable FloatOutSwitches where
-    ppr = pprFloatOutSwitches
-
-pprFloatOutSwitches :: FloatOutSwitches -> SDoc
-pprFloatOutSwitches sw = pp_not (floatOutLambdas sw) <+> text "lambdas" <> comma
-                     <+> pp_not (floatOutConstants sw) <+> text "constants"
-  where
-    pp_not True  = empty
-    pp_not False = text "not"
-
--- | Switches that specify the minimum amount of floating out
--- gentleFloatOutSwitches :: FloatOutSwitches
--- gentleFloatOutSwitches = FloatOutSwitches False False
-
--- | Switches that do not specify floating out of lambdas, just of constants
-constantsOnlyFloatOutSwitches :: FloatOutSwitches
-constantsOnlyFloatOutSwitches = FloatOutSwitches False True
-
-
--- The core-to-core pass ordering is derived from the DynFlags:
-runWhen :: Bool -> CoreToDo -> CoreToDo
-runWhen True  do_this = do_this
-runWhen False _       = CoreDoNothing
-
-runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
-runMaybe (Just x) f = f x
-runMaybe Nothing  _ = CoreDoNothing
-
-getCoreToDo :: DynFlags -> [CoreToDo]
-getCoreToDo dflags
-  | Just todo <- coreToDo dflags = todo -- set explicitly by user
-  | otherwise = core_todo
-  where
-    opt_level     = optLevel dflags
-    phases        = simplPhases dflags
-    max_iter      = maxSimplIterations dflags
-    strictness    = dopt Opt_Strictness dflags
-    full_laziness = dopt Opt_FullLaziness dflags
-    do_specialise = dopt Opt_Specialise dflags
-    do_float_in   = dopt Opt_FloatIn dflags
-    cse           = dopt Opt_CSE dflags
-    spec_constr   = dopt Opt_SpecConstr dflags
-    liberate_case = dopt Opt_LiberateCase dflags
-    rule_check    = ruleCheck dflags
-    static_args   = dopt Opt_StaticArgumentTransformation dflags
-
-    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
-
-    maybe_strictness_before phase
-      = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
-
-    simpl_phase phase names iter
-      = CoreDoPasses
-          [ maybe_strictness_before phase,
-            CoreDoSimplify (SimplPhase phase names) [
-              MaxSimplifierIterations iter
-            ],
-            maybe_rule_check phase
-          ]
-
-    vectorisation
-      = runWhen (dopt Opt_Vectorise dflags)
-        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphPackage dflags) ]
-
-
-                -- By default, we have 2 phases before phase 0.
-
-                -- Want to run with inline phase 2 after the specialiser to give
-                -- maximum chance for fusion to work before we inline build/augment
-                -- in phase 1.  This made a difference in 'ansi' where an
-                -- overloaded function wasn't inlined till too late.
-
-                -- Need phase 1 so that build/augment get
-                -- inlined.  I found that spectral/hartel/genfft lost some useful
-                -- strictness in the function sumcode' if augment is not inlined
-                -- before strictness analysis runs
-    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
-                                  | phase <- [phases, phases-1 .. 1] ]
-
-
-        -- initial simplify: mk specialiser happy: minimum effort please
-    simpl_gently = CoreDoSimplify 
-                       (SimplGently { sm_rules = True, sm_inline = False })
-                       [
-                        --      Simplify "gently"
-                        -- Don't inline anything till full laziness has bitten
-                        -- In particular, inlining wrappers inhibits floating
-                        -- e.g. ...(case f x of ...)...
-                        --  ==> ...(case (case x of I# x# -> fw x#) of ...)...
-                        --  ==> ...(case x of I# x# -> case fw x# of ...)...
-                        -- and now the redex (f x) isn't floatable any more
-                        -- Similarly, don't apply any rules until after full
-                        -- laziness.  Notably, list fusion can prevent floating.
-
-            NoCaseOfCase,       -- Don't do case-of-case transformations.
-                                -- This makes full laziness work better
-            MaxSimplifierIterations max_iter
-        ]
-
-    core_todo =
-     if opt_level == 0 then
-       [vectorisation,
-        simpl_phase 0 ["final"] max_iter]
-     else {- opt_level >= 1 -} [
-
-    -- We want to do the static argument transform before full laziness as it
-    -- may expose extra opportunities to float things outwards. However, to fix
-    -- up the output of the transformation we need at do at least one simplify
-    -- after this before anything else
-        runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
-
-        -- We run vectorisation here for now, but we might also try to run
-        -- it later
-        vectorisation,
-
-        -- initial simplify: mk specialiser happy: minimum effort please
-        simpl_gently,
-
-        -- Specialisation is best done before full laziness
-        -- so that overloaded functions have all their dictionary lambdas manifest
-        runWhen do_specialise CoreDoSpecialising,
-
-        runWhen full_laziness (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
-      		-- Was: gentleFloatOutSwitches	
-		-- I have no idea why, but not floating constants to top level is
-		-- very bad in some cases. 
-		-- Notably: p_ident in spectral/rewrite
-		-- 	    Changing from "gentle" to "constantsOnly" improved
-		-- 	    rewrite's allocation by 19%, and made  0.0% difference
-		-- 	    to any other nofib benchmark
-
-        runWhen do_float_in CoreDoFloatInwards,
-
-        simpl_phases,
-
-                -- Phase 0: allow all Ids to be inlined now
-                -- This gets foldr inlined before strictness analysis
-
-                -- At least 3 iterations because otherwise we land up with
-                -- huge dead expressions because of an infelicity in the
-                -- simpifier.
-                --      let k = BIG in foldr k z xs
-                -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
-                -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
-                -- Don't stop now!
-        simpl_phase 0 ["main"] (max max_iter 3),
-
-        runWhen strictness (CoreDoPasses [
-                CoreDoStrictness,
-                CoreDoWorkerWrapper,
-                CoreDoGlomBinds,
-                simpl_phase 0 ["post-worker-wrapper"] max_iter
-                ]),
-
-        runWhen full_laziness
-          (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
-                -- nofib/spectral/hartel/wang doubles in speed if you
-                -- do full laziness late in the day.  It only happens
-                -- after fusion and other stuff, so the early pass doesn't
-                -- catch it.  For the record, the redex is
-                --        f_el22 (f_el21 r_midblock)
-
-
-        runWhen cse CoreCSE,
-                -- We want CSE to follow the final full-laziness pass, because it may
-                -- succeed in commoning up things floated out by full laziness.
-                -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
-
-        runWhen do_float_in CoreDoFloatInwards,
-
-        maybe_rule_check 0,
-
-                -- Case-liberation for -O2.  This should be after
-                -- strictness analysis and the simplification which follows it.
-        runWhen liberate_case (CoreDoPasses [
-            CoreLiberateCase,
-            simpl_phase 0 ["post-liberate-case"] max_iter
-            ]),         -- Run the simplifier after LiberateCase to vastly
-                        -- reduce the possiblility of shadowing
-                        -- Reason: see Note [Shadowing] in SpecConstr.lhs
-
-        runWhen spec_constr CoreDoSpecConstr,
-
-        maybe_rule_check 0,
-
-        -- Final clean-up simplification:
-        simpl_phase 0 ["final"] max_iter
-     ]
-
--- -----------------------------------------------------------------------------
 -- StgToDo:  abstraction of stg-to-stg passes to run.
 
 data StgToDo
@@ -1238,8 +977,7 @@ data StgToDo
 
 getStgToDo :: DynFlags -> [StgToDo]
 getStgToDo dflags
-  | Just todo <- stgToDo dflags = todo -- set explicitly by user
-  | otherwise = todo2
+  = todo2
   where
         stg_stats = dopt Opt_StgStats dflags
 
@@ -2056,41 +1794,16 @@ forceRecompile = do { dfs <- getCmdLineState
 	  force_recomp dfs = isOneShot (ghcMode dfs)
 
 setVerboseCore2Core :: DynP ()
-setVerboseCore2Core = do setDynFlag Opt_D_verbose_core2core 
-		         forceRecompile
-                         upd (\s -> s { shouldDumpSimplPhase = const True })
+setVerboseCore2Core = do forceRecompile
+                         setDynFlag Opt_D_verbose_core2core 
+                         upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
+		         
 
 setDumpSimplPhases :: String -> DynP ()
 setDumpSimplPhases s = do forceRecompile
-                          upd (\s -> s { shouldDumpSimplPhase = spec })
+                          upd (\dfs -> dfs { shouldDumpSimplPhase = Just spec })
   where
-    spec :: SimplifierMode -> Bool
-    spec = join (||)
-         . map (join (&&) . map match . split ':')
-         . split ','
-         $ case s of
-             '=' : s' -> s'
-             _        -> s
-
-    join :: (Bool -> Bool -> Bool)
-         -> [SimplifierMode -> Bool]
-         -> SimplifierMode -> Bool
-    join _  [] = const True
-    join op ss = foldr1 (\f g x -> f x `op` g x) ss
-
-    match :: String -> SimplifierMode -> Bool
-    match "" = const True
-    match s  = case reads s of
-                [(n,"")] -> phase_num  n
-                _        -> phase_name s
-
-    phase_num :: Int -> SimplifierMode -> Bool
-    phase_num n (SimplPhase k _) = n == k
-    phase_num _ _                = False
-
-    phase_name :: String -> SimplifierMode -> Bool
-    phase_name s (SimplGently {})               = s == "gentle"
-    phase_name s (SimplPhase { sm_names = ss }) = s `elem` ss
+    spec = case s of { ('=' : s') -> s';  _ -> s }
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
