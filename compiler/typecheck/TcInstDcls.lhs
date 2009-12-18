@@ -205,6 +205,9 @@ So the ClassOp is just a cast; and so is the dictionary function.
 No need for fancy BuiltIn rules.  Indeed the BuiltinRule stuff does
 not work well for newtypes because it uses exprIsConApp_maybe.
 
+The INLINE on df is vital, else $cop_list occurs just once and is inlined,
+which is a disaster if $cop_list *itself* has an INLINE pragma.
+
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -771,6 +774,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
 
              dfun_id_w_fun | isNewTyCon (classTyCon clas) 
                            = dfun_id   -- Just let the dfun inline; see Note [Single-method classes]
+                             `setInlinePragma` alwaysInlinePragma
                            | otherwise 
                            = dfun_id   -- Do not inline; instead give it a magic DFunFunfolding
 			     	       -- See Note [ClassOp/DFun selection]
