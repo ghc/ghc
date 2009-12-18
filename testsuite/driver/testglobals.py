@@ -84,6 +84,9 @@ class TestConfig:
         # Do we have shared libraries?
         self.have_shared_libs = False
 
+        # Are we testing an in-tree compiler?
+        self.in_tree_compiler = True
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300

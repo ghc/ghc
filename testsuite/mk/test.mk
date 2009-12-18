@@ -91,6 +91,12 @@ else
 RUNTEST_OPTS += -e windows=False
 endif
 
+ifeq "$(IN_TREE_COMPILER)" "YES"
+RUNTEST_OPTS += -e in_tree_compiler=True
+else
+RUNTEST_OPTS += -e in_tree_compiler=False
+endif
+
 ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
 endif

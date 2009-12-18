@@ -274,6 +274,18 @@ def if_wordsize( ws, f ):
 
 # ---
 
+def if_in_tree_compiler( f ):
+    if config.in_tree_compiler:
+        return f
+    else:
+        return normal
+
+def unless_in_tree_compiler( f ):
+    if config.in_tree_compiler:
+        return normal
+    else:
+        return f
+
 def if_compiler_type( compiler, f ):
     if config.compiler_type == compiler:
         return f
