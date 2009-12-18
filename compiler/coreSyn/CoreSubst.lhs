@@ -534,7 +534,8 @@ substUnfoldingSource (Subst in_scope ids _) (InlineWrapper wkr)
   = case wkr_expr of
       Var w1 -> InlineWrapper w1
       _other -> WARN( True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
-                            <+> equals <+> ppr wkr_expr )   -- Note [Worker inlining]
+                            <+> ifPprDebug (equals <+> ppr wkr_expr) )   
+			      -- Note [Worker inlining]
                 InlineRule    -- It's not a wrapper any more, but still inline it!
 
   | Just w1  <- lookupInScope in_scope wkr = InlineWrapper w1

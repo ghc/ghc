@@ -790,7 +790,7 @@ warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = trace (show (doc PprDebug)) x
+  = trace (show (doc defaultDumpStyle)) x
   where
     doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
 	       msg]
