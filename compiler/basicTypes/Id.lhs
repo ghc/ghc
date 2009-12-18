@@ -122,6 +122,7 @@ import StaticFlags
 -- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
+	  `setIdOccInfo`,
 	  `setIdDemandInfo`,
 	  `setIdStrictness`,
 	  `setIdSpecialisation`,
