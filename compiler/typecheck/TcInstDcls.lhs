@@ -1113,7 +1113,9 @@ Note carefully:
      isn't what the user expected
 
   b) We use the magic 'inline' Id to ensure that $dmop1 really is
-     inlined in $cop1, even though the latter itself has an INLINE pragma
+     inlined in $cop1, even though 
+       (i)  the latter itself has an INLINE pragma
+       (ii) $dmop1 is not saturated
      That is important to allow the mutual recursion between $fooInt and
      $cop1 to be broken
 
