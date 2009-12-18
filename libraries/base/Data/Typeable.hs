@@ -302,6 +302,22 @@ showTuple args = showChar '('
 --
 -------------------------------------------------------------
 
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+IMPORTANT: we don't want to recalculate the type-rep once per
+call to the dummy argument.  This is what went wrong in Trac #3245
+So we help GHC by manually keeping the 'rep' *outside* the value 
+lambda, thus
+    
+    typeOfDefault :: forall t a. (Typeable1 t, Typeable a) => t a -> TypeRep
+    typeOfDefault = \_ -> rep
+      where
+        rep = typeOf1 (undefined :: t a) `mkAppTy` 
+              typeOf  (undefined :: a)
+
+Notice the crucial use of scoped type variables here!
+-}
+
 -- | The class 'Typeable' allows a concrete representation of a type to
 -- be calculated.
 class Typeable a where
@@ -316,77 +332,84 @@ class Typeable1 t where
   typeOf1 :: t a -> TypeRep
 
 -- | For defining a 'Typeable' instance from any 'Typeable1' instance.
-typeOfDefault :: (Typeable1 t, Typeable a) => t a -> TypeRep
-typeOfDefault x = typeOf1 x `mkAppTy` typeOf (argType x)
+typeOfDefault :: forall t a. (Typeable1 t, Typeable a) => t a -> TypeRep
+typeOfDefault = \_ -> rep
  where
-   argType :: t a -> a
-   argType =  undefined
+   rep = typeOf1 (undefined :: t a) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
 
 -- | Variant for binary type constructors
 class Typeable2 t where
   typeOf2 :: t a b -> TypeRep
 
 -- | For defining a 'Typeable1' instance from any 'Typeable2' instance.
-typeOf1Default :: (Typeable2 t, Typeable a) => t a b -> TypeRep
-typeOf1Default x = typeOf2 x `mkAppTy` typeOf (argType x)
+typeOf1Default :: forall t a b. (Typeable2 t, Typeable a) => t a b -> TypeRep
+typeOf1Default = \_ -> rep 
  where
-   argType :: t a b -> a
-   argType =  undefined
+   rep = typeOf2 (undefined :: t a b) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
 
 -- | Variant for 3-ary type constructors
 class Typeable3 t where
   typeOf3 :: t a b c -> TypeRep
 
 -- | For defining a 'Typeable2' instance from any 'Typeable3' instance.
-typeOf2Default :: (Typeable3 t, Typeable a) => t a b c -> TypeRep
-typeOf2Default x = typeOf3 x `mkAppTy` typeOf (argType x)
+typeOf2Default :: forall t a b c. (Typeable3 t, Typeable a) => t a b c -> TypeRep
+typeOf2Default = \_ -> rep 
  where
-   argType :: t a b c -> a
-   argType =  undefined
+   rep = typeOf3 (undefined :: t a b c) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
 
 -- | Variant for 4-ary type constructors
 class Typeable4 t where
   typeOf4 :: t a b c d -> TypeRep
 
 -- | For defining a 'Typeable3' instance from any 'Typeable4' instance.
-typeOf3Default :: (Typeable4 t, Typeable a) => t a b c d -> TypeRep
-typeOf3Default x = typeOf4 x `mkAppTy` typeOf (argType x)
+typeOf3Default :: forall t a b c d. (Typeable4 t, Typeable a) => t a b c d -> TypeRep
+typeOf3Default = \_ -> rep
  where
-   argType :: t a b c d -> a
-   argType =  undefined
-
+   rep = typeOf4 (undefined :: t a b c d) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+   
 -- | Variant for 5-ary type constructors
 class Typeable5 t where
   typeOf5 :: t a b c d e -> TypeRep
 
 -- | For defining a 'Typeable4' instance from any 'Typeable5' instance.
-typeOf4Default :: (Typeable5 t, Typeable a) => t a b c d e -> TypeRep
-typeOf4Default x = typeOf5 x `mkAppTy` typeOf (argType x)
+typeOf4Default :: forall t a b c d e. (Typeable5 t, Typeable a) => t a b c d e -> TypeRep
+typeOf4Default = \_ -> rep 
  where
-   argType :: t a b c d e -> a
-   argType =  undefined
+   rep = typeOf5 (undefined :: t a b c d e) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
 
 -- | Variant for 6-ary type constructors
 class Typeable6 t where
   typeOf6 :: t a b c d e f -> TypeRep
 
 -- | For defining a 'Typeable5' instance from any 'Typeable6' instance.
-typeOf5Default :: (Typeable6 t, Typeable a) => t a b c d e f -> TypeRep
-typeOf5Default x = typeOf6 x `mkAppTy` typeOf (argType x)
+typeOf5Default :: forall t a b c d e f. (Typeable6 t, Typeable a) => t a b c d e f -> TypeRep
+typeOf5Default = \_ -> rep
  where
-   argType :: t a b c d e f -> a
-   argType =  undefined
+   rep = typeOf6 (undefined :: t a b c d e f) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
 
 -- | Variant for 7-ary type constructors
 class Typeable7 t where
   typeOf7 :: t a b c d e f g -> TypeRep
 
 -- | For defining a 'Typeable6' instance from any 'Typeable7' instance.
-typeOf6Default :: (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
-typeOf6Default x = typeOf7 x `mkAppTy` typeOf (argType x)
+typeOf6Default :: forall t a b c d e f g. (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
+typeOf6Default = \_ -> rep
  where
-   argType :: t a b c d e f g -> a
-   argType =  undefined
+   rep = typeOf7 (undefined :: t a b c d e f g) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
 
 #ifdef __GLASGOW_HASKELL__
 -- Given a @Typeable@/n/ instance for an /n/-ary type constructor,
