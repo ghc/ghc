@@ -423,8 +423,10 @@ compiler_PACKAGE = ghc
 # below.
 # The ProjectPatchLevel > 20000000 iff it's a date. If it's e.g. 6.12.1
 # then we don't want to remove it
+ifneq "$(CLEANING)" "YES"
 ifeq "$(shell [ $(ProjectPatchLevel) -gt 20000000 ] && echo YES)" "YES"
 compiler_stage1_VERSION_MUNGED = YES
+endif
 endif
 
 ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
