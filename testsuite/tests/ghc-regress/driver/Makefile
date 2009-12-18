@@ -58,11 +58,11 @@ test015:
 
 # test stub generation
 test016:
-	$(RM) F.hi F$(OBJSUFFIX) F_stub.c F_stub.h
-	"$(TEST_HC)" -c F.hs
-	test -f F_stub$(OBJSUFFIX)
-	test -f F_stub.c
-	test -f F_stub.h
+	$(RM) F016.hi F016$(OBJSUFFIX) F016_stub.c F016_stub.h
+	"$(TEST_HC)" -c F016.hs
+	test -f F016_stub$(OBJSUFFIX)
+	test -f F016_stub.c
+	test -f F016_stub.h
 
 # test -stubdir (filename differs from module name)
 test017:
@@ -92,12 +92,12 @@ test018a:
 # test -outputdir
 test019:
 	$(RM) -rf out019
-	"$(TEST_HC)" -c F.hs -outputdir out019
-	test -f out019/TestStub.hi
-	test -f out019/TestStub$(OBJSUFFIX)
-	test -f out019/TestStub_stub$(OBJSUFFIX)
-	test -f out019/TestStub_stub.c
-	test -f out019/TestStub_stub.h
+	"$(TEST_HC)" -c F019.hs -outputdir out019
+	test -f out019/TestStub019.hi
+	test -f out019/TestStub019$(OBJSUFFIX)
+	test -f out019/TestStub019_stub$(OBJSUFFIX)
+	test -f out019/TestStub019_stub.c
+	test -f out019/TestStub019_stub.h
 
 # -----------------------------------------------------------------------------
 # One-shot compilation, hierarchical modules
@@ -167,10 +167,11 @@ test027:
 # test -stubdir
 # -fvia-C, because we want to check that the .hc file can #include the stub.h
 test028:
-	$(RM) B/F.hi B/F$(OBJSUFFIX) stub/B/F_stub.c stub/B/F_stub.h
-	"$(TEST_HC)" -c B/F.hs -stubdir stub -fvia-C
-	test -f stub/B/F_stub.c
-	test -f stub/B/F_stub.h
+	$(RM) B028/F.hi B028/F$(OBJSUFFIX)
+	$(RM) stub028/B028/F_stub.c stub028/B028/F_stub.h
+	"$(TEST_HC)" -c B028/F.hs -stubdir stub028 -fvia-C
+	test -f stub028/B028/F_stub.c
+	test -f stub028/B028/F_stub.h
 
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, flat modules
