@@ -301,7 +301,7 @@ cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
   -- code that enters the HValue, then we'll get a runtime panic, because
   -- the HValue really is a MutVar#.  The types are compatible though,
   -- so we can just generate an assignment.
-cgCase scrut@(StgApp v []) bndr _ alt_type@(PrimAlt _) alts
+cgCase (StgApp v []) bndr _ alt_type@(PrimAlt _) alts
   | isUnLiftedType (idType v)
   || reps_compatible
   = -- assignment instruction suffices for unlifted types
@@ -313,7 +313,7 @@ cgCase scrut@(StgApp v []) bndr _ alt_type@(PrimAlt _) alts
   where
     reps_compatible = idCgRep v == idCgRep bndr
 
-cgCase scrut@(StgApp v []) bndr _ (PrimAlt _) _ 
+cgCase scrut@(StgApp v []) _ _ (PrimAlt _) _ 
   | lifted 
   = -- fail at run-time, not compile-time
     do { mb_cc <- maybeSaveCostCentre True
