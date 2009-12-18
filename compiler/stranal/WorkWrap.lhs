@@ -11,10 +11,7 @@ import CoreUnfold	( certainlyWillInline, mkInlineRule, mkWwInlineRule )
 import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
 import Var
-import Id		( idType, isOneShotLambda, idUnfolding,
-			  setIdStrictness, mkWorkerId, setInlinePragma,
-			  setInlineActivation, setIdUnfolding,
-			  setIdArity )
+import Id
 import Type		( Type )
 import IdInfo
 import Demand           ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
@@ -292,6 +289,12 @@ splitFun fn_id fn_info wrap_dmds res_info rhs
     ; let
 	work_rhs = work_fn rhs
 	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
+		        `setIdOccInfo` occInfo fn_info
+				-- Copy over occurrence info from parent
+				-- Notably whether it's a loop breaker
+				-- Doesn't matter much, since we will simplify next, but
+				-- seems right-er to do so
+
 			`setInlineActivation` (inlinePragmaActivation inl_prag)
 				-- Any inline activation (which sets when inlining is active) 
 				-- on the original function is duplicated on the worker
@@ -320,6 +323,9 @@ splitFun fn_id fn_info wrap_dmds res_info rhs
 				-- The RuleMatchInfo is (and must be) unaffected
 				-- The inl_inline is bound to be False, else we would not be
 				--    making a wrapper
+		          `setIdOccInfo` NoOccInfo
+			        -- Zap any loop-breaker-ness, to avoid bleating from Lint
+				-- about a loop breaker with an INLINE rule
 
     ; return ([(work_id, work_rhs), (wrap_id, wrap_rhs)]) })
 	-- Worker first, because wrapper mentions it
