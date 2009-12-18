@@ -51,6 +51,7 @@ foreach $f ( @ARGV ) {
 # print the info
 $tot = 0;
 $totcmts = 0;
+printf "\n                      Code  Comments\n";
 foreach $d (sort (keys %DirCount)) {
     printf "%-20s %6d %6d\n", $d, $DirCount{$d}, $DirComments{$d};
     $tot     += $DirCount{$d};
