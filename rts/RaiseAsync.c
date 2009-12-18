@@ -143,7 +143,7 @@ suspendComputation(Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
 
 nat
 throwTo (Capability *cap,	// the Capability we hold 
-	 StgTSO *source,	// the TSO sending the exception
+	 StgTSO *source,	// the TSO sending the exception (or NULL)
 	 StgTSO *target,        // the TSO receiving the exception
 	 StgClosure *exception, // the exception closure
 	 /*[out]*/ void **out USED_IF_THREADS)
@@ -159,8 +159,13 @@ throwTo (Capability *cap,	// the Capability we hold
 	// ASSERT(get_itbl(target)->type == TSO);
     }
 
-    debugTrace(DEBUG_sched, "throwTo: from thread %lu to thread %lu",
-	       (unsigned long)source->id, (unsigned long)target->id);
+    if (source != NULL) {
+        debugTrace(DEBUG_sched, "throwTo: from thread %lu to thread %lu",
+                   (unsigned long)source->id, (unsigned long)target->id);
+    } else {
+        debugTrace(DEBUG_sched, "throwTo: from RTS to thread %lu",
+                   (unsigned long)target->id);
+    }
 
 #ifdef DEBUG
     traceThreadStatus(DEBUG_sched, target);
@@ -486,14 +491,16 @@ check_target:
 static void
 blockedThrowTo (Capability *cap, StgTSO *source, StgTSO *target)
 {
-    debugTrace(DEBUG_sched, "throwTo: blocking on thread %lu", (unsigned long)target->id);
-    setTSOLink(cap, source, target->blocked_exceptions);
-    target->blocked_exceptions = source;
-    dirty_TSO(cap,target); // we modified the blocked_exceptions queue
-    
-    source->block_info.tso = target;
-    write_barrier(); // throwTo_exception *must* be visible if BlockedOnException is.
-    source->why_blocked = BlockedOnException;
+    if (source != NULL) {
+        debugTrace(DEBUG_sched, "throwTo: blocking on thread %lu", (unsigned long)target->id);
+        setTSOLink(cap, source, target->blocked_exceptions);
+        target->blocked_exceptions = source;
+        dirty_TSO(cap,target); // we modified the blocked_exceptions queue
+        
+        source->block_info.tso = target;
+        write_barrier(); // throwTo_exception *must* be visible if BlockedOnException is.
+        source->why_blocked = BlockedOnException;
+    }
 }
 
 
