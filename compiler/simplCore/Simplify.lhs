@@ -213,8 +213,7 @@ simplTopBinds env0 binds0
                 -- It's rather as if the top-level binders were imported.
         ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
         ; dflags <- getDOptsSmpl
-        ; let dump_flag = dopt Opt_D_dump_inlinings dflags ||
-                          dopt Opt_D_dump_rule_firings dflags
+        ; let dump_flag = dopt Opt_D_verbose_core2core dflags
         ; env2 <- simpl_binds dump_flag env1 binds0
         ; freeTick SimplifierDone
         ; return env2 }
@@ -1133,13 +1132,7 @@ completeCall env var cont
         ; case maybe_inline of {
             Just unfolding      -- There is an inlining!
               ->  do { tick (UnfoldingDone var)
-                     ; (if dopt Opt_D_dump_inlinings dflags then
-                           pprTrace ("Inlining done: " ++ showSDoc (ppr var)) (vcat [
-                                text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
-                                text "Inlined fn: " <+> nest 2 (ppr unfolding),
-                                text "Cont:  " <+> ppr call_cont])
-                         else
-                                id)
+                     ; trace_inline dflags unfolding args call_cont $
                        simplExprF (zapSubstEnv env) unfolding cont }
 
             ; Nothing -> do               -- No inlining!
@@ -1148,6 +1141,19 @@ completeCall env var cont
         ; let info = mkArgInfo var (getRules rule_base var) n_val_args call_cont
         ; rebuildCall env info cont
     }}}
+  where
+    trace_inline dflags unfolding args call_cont stuff
+      | not (dopt Opt_D_dump_inlinings dflags) = stuff
+      | not (dopt Opt_D_verbose_core2core dflags) 
+      = if isExternalName (idName var) then 
+      	  pprTrace "Inlining done:" (ppr var) stuff
+        else stuff
+      | otherwise
+      = pprTrace ("Inlining done: " ++ showSDoc (ppr var))
+           (vcat [text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
+                  text "Inlined fn: " <+> nest 2 (ppr unfolding),
+                  text "Cont:  " <+> ppr call_cont])
+           stuff
 
 rebuildCall :: SimplEnv
             -> ArgInfo
@@ -1277,15 +1283,21 @@ tryRules env rules fn args call_cont
            Just (rule, rule_rhs) ->
 
              do { tick (RuleFired (ru_name rule))
-                ; (if dopt Opt_D_dump_rule_firings dflags then
-                     pprTrace "Rule fired" (vcat [
-                        text "Rule:" <+> ftext (ru_name rule),
-                        text "Before:" <+> ppr fn <+> sep (map pprParendExpr args),
-                        text "After: " <+> pprCoreExpr rule_rhs,
-                        text "Cont:  " <+> ppr call_cont])
-                   else
-                        id)             $
-                   return (Just (ruleArity rule, rule_rhs)) }}}}
+                ; trace_dump dflags rule rule_rhs $
+                  return (Just (ruleArity rule, rule_rhs)) }}}}
+  where
+    trace_dump dflags rule rule_rhs stuff
+      | not (dopt Opt_D_dump_rule_firings dflags) = stuff
+      | not (dopt Opt_D_verbose_core2core dflags) 
+
+      = pprTrace "Rule fired:" (ftext (ru_name rule)) stuff
+      | otherwise
+      = pprTrace "Rule fired"
+           (vcat [text "Rule:" <+> ftext (ru_name rule),
+           	  text "Before:" <+> ppr fn <+> sep (map pprParendExpr args),
+           	  text "After: " <+> pprCoreExpr rule_rhs,
+           	  text "Cont:  " <+> ppr call_cont])
+           stuff
 \end{code}
 
 Note [Rules for recursive functions]

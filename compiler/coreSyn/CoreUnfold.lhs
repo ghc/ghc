@@ -741,7 +741,7 @@ callSiteInline dflags id unfolding lone_variable arg_infos cont_info
 				              res_discount arg_infos cont_info
 		
     in    
-    if dopt Opt_D_dump_inlinings dflags then
+    if (dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags) then
 	pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
 		 (vcat [text "arg infos" <+> ppr arg_infos,
 			text "uf arity" <+> ppr uf_arity,
