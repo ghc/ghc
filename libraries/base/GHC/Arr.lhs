@@ -123,6 +123,34 @@ We inline the 'index' operation,
 
 If you make a per-instance index method, you may consider inlining it.
 
+Note [Double bounds-checking of index values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When you index an array, a!x, there are two possible bounds checks we might make:
+
+  (A) Check that (inRange (bounds a) x) holds.  
+
+      (A) is checked in the method for 'index'
+
+  (B) Check that (index (bounds a) x) lies in the range 0..n, 
+      where n is the size of the underlying array
+
+      (B) is checked in the top-level function (!), in safeIndex.
+
+Of course it *should* be the case that (A) holds iff (B) holds, but that 
+is a property of the particular instances of index, bounds, and inRange,
+so GHC cannot guarantee it.
+
+ * If you do (A) and not (B), then you might get a seg-fault, 
+   by indexing at some bizarre location.  Trac #1610
+
+ * If you do (B) but not (A), you may get no complaint when you index
+   an array out of its semantic bounds.  Trac #2120
+
+At various times we have had (A) and not (B), or (B) and not (A); both
+led to complaints.  So now we implement *both* checks (Trac #2669).
+
+For 1-d, 2-d, and 3-d arrays of Int we have specialised instances to avoid this.
+
 Note [Out-of-bounds error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The default method for 'index' generates hoplelessIndexError, because
@@ -475,12 +503,26 @@ safeRangeSize (l,u) = let r = rangeSize (l, u)
 negRange :: Int	  -- Uninformative, but Ix does not provide Show
 negRange = error "Negative range size"
 
-{-# INLINE safeIndex #-}
+{-# INLINE[1] safeIndex #-}
+-- See Note [Double bounds-checking of index values]
+-- Inline *after* (!) so the rules can fire
 safeIndex :: Ix i => (i, i) -> Int -> i -> Int
 safeIndex (l,u) n i = let i' = index (l,u) i
                       in if (0 <= i') && (i' < n)
                          then i'
                          else badSafeIndex i' n
+
+-- See Note [Double bounds-checking of index values]
+{-# RULES
+"safeIndex/I"       safeIndex = lessSafeIndex :: (Int,Int) -> Int -> Int -> Int
+"safeIndex/(I,I)"   safeIndex = lessSafeIndex :: ((Int,Int),(Int,Int)) -> Int -> (Int,Int) -> Int
+"safeIndex/(I,I,I)" safeIndex = lessSafeIndex :: ((Int,Int,Int),(Int,Int,Int)) -> Int -> (Int,Int,Int) -> Int
+  #-}
+
+lessSafeIndex :: Ix i => (i, i) -> Int -> i -> Int
+-- See Note [Double bounds-checking of index values]
+-- Do only (A), the semantic check
+lessSafeIndex (l,u) _ i = index (l,u) i  
 
 -- Don't inline this long error message everywhere!!
 badSafeIndex :: Int -> Int -> Int
