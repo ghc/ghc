@@ -14,3 +14,5 @@ test('3586',
       ],
      compile_and_run,
      ['-O'])
+
+test('T3245', normal, compile_and_run, ['-O'])
