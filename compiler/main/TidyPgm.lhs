@@ -686,7 +686,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
                        (varSetElems spec_ids) -- XXX non-det ordering
 
     idinfo	   = idInfo id
-    dont_inline	   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
+    never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
     spec_ids	   = specInfoFreeVars (specInfo idinfo)
@@ -699,16 +699,23 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
 
     mb_unfold_ids :: Maybe (IdSet, [Id])	-- Nothing => don't unfold
     mb_unfold_ids = case unfoldingInfo idinfo of
-		      CoreUnfolding { uf_tmpl = unf_rhs, uf_guidance = guide } 
-			| expose_all ||	     -- expose_all says to expose all 
-			  	     	     -- unfoldings willy-nilly
-                          not (bottoming_fn	 -- No need to inline bottom functions
-			    || dont_inline	 -- Or ones that say not to
-			    || loop_breaker	 -- Or that are loop breakers
-			    || neverUnfoldGuidance guide)
+		      CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_guidance = guide } 
+			| show_unfolding src guide
 			-> Just (exprFvsInOrder unf_rhs)
 		      DFunUnfolding _ ops -> Just (exprsFvsInOrder ops)
-		      _ -> Nothing
+		      _                   -> Nothing
+
+    show_unfolding unf_source unf_guidance
+       =  expose_all 	     -- 'expose_all' says to expose all 
+			     -- unfoldings willy-nilly
+
+       || isInlineRuleSource unf_source	     -- Always expose things whose 
+       	  		     		     -- source is an inline rule
+
+       || not (bottoming_fn	 -- No need to inline bottom functions
+	   || never_active	 -- Or ones that say not to
+	   || loop_breaker	 -- Or that are loop breakers
+	   || neverUnfoldGuidance unf_guidance)
 
 -- We want a deterministic free-variable list.  exprFreeVars gives us
 -- a VarSet, which is in a non-deterministic order when converted to a
