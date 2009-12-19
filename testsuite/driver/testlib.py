@@ -353,6 +353,14 @@ def c_src( opts ):
 
 # ----
 
+def pre_cmd( cmd ):
+    return lambda opts, c=cmd: _pre_cmd(opts, cmd)
+
+def _pre_cmd( opts, cmd ):
+    opts.pre_cmd = cmd
+
+# ----
+
 def cmd_prefix( prefix ):
     return lambda opts, p=prefix: _cmd_prefix(opts, prefix)
 
@@ -537,6 +545,17 @@ def do_test(name, way, func, args):
         
         if config.use_threads:
             t.lock.release()
+
+        try:
+            preCmd = getTestOpts().pre_cmd
+            print preCmd
+            if preCmd != None:
+                result = runCmd('cd ' + getTestOpts().testdir + ' && ' + preCmd)
+                if result != 0:
+                    framework_fail(name, way, 'pre-command failed: ' + str(result))
+        except e:
+            framework_fail(name, way, 'pre-command exception')
+
         try:
             result = apply(func, [name,way] + args)
         finally:

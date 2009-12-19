@@ -202,6 +202,9 @@ class TestOptions:
        # Does this test use a .c file?
        self.c_src = 0
 
+       # Command to run before the test
+       self.pre_cmd = None
+
        # Prefix to put on the command before running it
        self.cmd_prefix = ''
 
