@@ -6,6 +6,3 @@ test('mod175',
      run_command,
      ['$MAKE -s mod175'])
 
-if default_testopts.cleanup != '':
-    runCmd('$MAKE -C ' + in_testdir('') + ' clean')
-

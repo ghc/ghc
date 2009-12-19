@@ -1,4 +1,6 @@
-test('recomp001', skip_if_fast, run_command, ['$MAKE -s --no-print-directory recomp001'])
+test('recomp001',
+     [skip_if_fast,
+      clean_cmd('$MAKE -s clean')],
+     run_command,
+     ['$MAKE -s --no-print-directory recomp001'])
 
-if default_testopts.cleanup != '':
-    runCmd('$MAKE -C ' + in_testdir('') + ' clean')
