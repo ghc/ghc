@@ -8,15 +8,13 @@ setTestOpts(compose(skip_if_fast, if_compiler_lt('ghc', '6.11', skip)));
 # now, just disable the profiling ways.
 test('annrun01',
      [extra_clean(['Annrun01_Help.hi', 'Annrun01_Help.o',
-                    'annrun01.hi', 'annrun01.o']),
-      pre_cmd('$MAKE config'),
+                    'annrun01.hi', 'annrun01.o',
+                    'Config.hs', 'Config.hi', 'Config.o']),
+      pre_cmd('$MAKE -s config'),
       omit_ways(['profc','profasm','profthreaded'])],
       multimod_compile_and_run,
       ['annrun01', '-package ghc']
     )
-
-if default_testopts.cleanup != '':
-    runCmd('$MAKE -C ' + in_testdir('') + ' clean')
 
 """"
 Helpful things to C+P:
