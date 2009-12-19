@@ -531,9 +531,6 @@ def test_common_work (name, opts, func, args):
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
 
-def clean_o_hi():
-    clean_full_paths(glob.glob(in_testdir('*.o')) + glob.glob(in_testdir('*.hi')))
-
 def clean_full_paths(names):
     if getTestOpts().cleanup != '':
         for name in names:
