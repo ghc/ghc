@@ -504,21 +504,23 @@ def test_common_work (name, opts, func, args):
         if way not in do_ways:
             skiptest (name,way)
 
-    clean(map (lambda suff: name + suff,
-              ['', '.exe', '.exe.manifest', '.genscript',
-               '.stderr.normalised',        '.stdout.normalised',
-               '.run.stderr',               '.run.stdout',
-               '.run.stderr.normalised',    '.run.stdout.normalised',
-               '.comp.stderr',              '.comp.stdout',
-               '.comp.stderr.normalised',   '.comp.stdout.normalised',
-               '.interp.stderr',            '.interp.stdout',
-               '.interp.stderr.normalised', '.interp.stdout.normalised',
-               '.stats',
-               '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
-               '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
-
-    clean(getTestOpts().clean_files)
     if getTestOpts().cleanup != '':
+        clean(map (lambda suff: name + suff,
+                  ['', '.exe', '.exe.manifest', '.genscript',
+                   '.stderr.normalised',        '.stdout.normalised',
+                   '.run.stderr',               '.run.stdout',
+                   '.run.stderr.normalised',    '.run.stdout.normalised',
+                   '.comp.stderr',              '.comp.stdout',
+                   '.comp.stderr.normalised',   '.comp.stdout.normalised',
+                   '.interp.stderr',            '.interp.stdout',
+                   '.interp.stderr.normalised', '.interp.stdout.normalised',
+                   '.stats',
+                   '.hi', '.o', '.prof', '.exe.prof', '.hc',
+                   '_stub.h', '_stub.c', '_stub.o',
+                   '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
+
+        clean(getTestOpts().clean_files)
+
         try:
             cleanCmd = getTestOpts().clean_cmd
             if cleanCmd != None:
@@ -532,24 +534,23 @@ def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
 
 def clean_full_paths(names):
-    if getTestOpts().cleanup != '':
-        for name in names:
+    for name in names:
+        try:
+            # Remove files...
+            os.remove(name)
+        except OSError, e1:
             try:
-                # Remove files...
-                os.remove(name)
-            except OSError, e1:
-                try:
-                    # ... and empty directories
-                    os.rmdir(name)
-                except OSError, e2:
-                    # We don't want to fail here, but we do want to know
-                    # what went wrong, so print out the exceptions.
-                    # ENOENT isn't a problem, though, as we clean files
-                    # that don't necessarily exist.
-                    if e1.errno != errno.ENOENT:
-                        print e1
-                    if e2.errno != errno.ENOENT:
-                        print e2
+                # ... and empty directories
+                os.rmdir(name)
+            except OSError, e2:
+                # We don't want to fail here, but we do want to know
+                # what went wrong, so print out the exceptions.
+                # ENOENT isn't a problem, though, as we clean files
+                # that don't necessarily exist.
+                if e1.errno != errno.ENOENT:
+                    print e1
+                if e2.errno != errno.ENOENT:
+                    print e2
 
 def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
