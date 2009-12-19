@@ -83,11 +83,33 @@ endef
 # $3 = depfile
 # $4 = file
 # $5 = ways
+#
 # The formatting of this definition (e.g. the blank line above) is
 # important, in order to get make to generate the right makefile code.
+#
+# "1s|\.o|\.$($w_osuf)|"
+#    We will have dependencies for .o files, so we need to fix them up
+#    for the right object suffix for the way we're doing
+# "1s|^|$(dir $4)|"
+#    We always get deps for just foo.o when the file we're making is
+#    a/b/c/foo.o, so we need to prepend the directory of the source file
+# "1s|$1/|$1/$2/build/|"
+#    Well, almost. We actually need to insert e.g. "dist/build" in the
+#    middle of that directory
+# "1s|$2/build/$2/build|$2/build|g"
+#    But some source files, e.g. sm/Evac_thr.c, are also inside the
+#    "dist/build" directory, so now we've just made
+#    "dist/build/dist/build", so we need to remove the duplication
+#    again
+# "s|$(TOP)/||gi"
+#    Finally, cpp -MM will give us full paths for some files, but this
+#    causes problems on Windows where make interprets the colon in
+#    c:/foo/bar.h as make syntax. So we sed off $(TOP) (case
+#    insensitively, as sometimes you get C:/... when you are expecting
+#    c:/... or vice versa)
 define addCFileDeps
 
 	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_v_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
-	$(foreach w,$5,sed -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "s|$(TOP)/||gi" -e "s|$2/build/$2/build|$2/build|g" $3.bit >> $3.tmp &&) true
+	$(foreach w,$5,sed -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||gi" $3.bit >> $3.tmp &&) true
 endef
 
