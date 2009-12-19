@@ -7,8 +7,9 @@ setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal']));
 
-test('TH_recompile', expect_broken(481), run_command, ['$MAKE -s TH_recompile'])
-
-if default_testopts.cleanup != '':
-    runCmd('$MAKE -C ' + in_testdir('') + ' clean')
+test('TH_recompile',
+     [expect_broken(481),
+      clean_cmd('$MAKE -s clean')],
+     run_command,
+     ['$MAKE -s TH_recompile'])
 
