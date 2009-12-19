@@ -548,7 +548,6 @@ def do_test(name, way, func, args):
 
         try:
             preCmd = getTestOpts().pre_cmd
-            print preCmd
             if preCmd != None:
                 result = runCmd('cd ' + getTestOpts().testdir + ' && ' + preCmd)
                 if result != 0:
