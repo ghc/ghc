@@ -361,6 +361,14 @@ def _pre_cmd( opts, cmd ):
 
 # ----
 
+def clean_cmd( cmd ):
+    return lambda opts, c=cmd: _clean_cmd(opts, cmd)
+
+def _clean_cmd( opts, cmd ):
+    opts.clean_cmd = cmd
+
+# ----
+
 def cmd_prefix( prefix ):
     return lambda opts, p=prefix: _cmd_prefix(opts, prefix)
 
@@ -510,6 +518,15 @@ def test_common_work (name, opts, func, args):
                '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
     clean(getTestOpts().clean_files)
+    if getTestOpts().cleanup != '':
+        try:
+            cleanCmd = getTestOpts().clean_cmd
+            if cleanCmd != None:
+                result = runCmd('cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
+                if result != 0:
+                    framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
+        except e:
+            framework_fail(name, way, 'clean-command exception')
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))

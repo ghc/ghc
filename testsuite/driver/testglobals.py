@@ -205,6 +205,9 @@ class TestOptions:
        # Command to run before the test
        self.pre_cmd = None
 
+       # Command to run for extra cleaning
+       self.clean_cmd = None
+
        # Prefix to put on the command before running it
        self.cmd_prefix = ''
 
