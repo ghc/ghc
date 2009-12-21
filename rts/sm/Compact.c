@@ -511,13 +511,13 @@ update_fwd_large( bdescr *bd )
     case MUT_ARR_PTRS_FROZEN0:
       // follow everything 
       {
-	StgPtr next;
+          StgMutArrPtrs *a;
 
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    thread((StgClosure **)p);
-	}
-	continue;
+          a = (StgMutArrPtrs*)p;
+          for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+              thread((StgClosure **)p);
+          }
+          continue;
       }
 
     case TSO:
@@ -692,13 +692,14 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case MUT_ARR_PTRS_FROZEN0:
 	// follow everything 
     {
-	StgPtr next;
-	
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+        StgMutArrPtrs *a;
+
+        a = (StgMutArrPtrs *)p;
+	for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
 	    thread((StgClosure **)p);
 	}
-	return p;
+
+	return (StgPtr)a + mut_arr_ptrs_sizeW(a);
     }
     
     case TSO:
