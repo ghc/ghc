@@ -1,3 +1,25 @@
+Changes in version 2.6.0:
+
+  * Drop support for GHC 6.10.*
+
+  * Add support for GHC 6.12.1
+
+  * Cross-package documentation: full documentation show up when re-exporting
+    things coming from external packages
+
+  * Lexing and parsing the Haddock comment markup is now done in Haddock
+    again, instead of in GHC
+
+  * Slightly prettier printing of instance heads
+
+  * Support platforms for which GHC has no native code generator
+
+  * Add a flag --print-ghc-libdir
+
+  * Minor bug fixes
+
+-----------------------------------------------------------------------------
+
 Changed in version 2.5.0:
 
   * Drop support for GHC 6.8.*
