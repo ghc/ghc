@@ -52,8 +52,9 @@ noDocForDecl = (Nothing, Map.empty)
 type DeclInfo = (Decl, DocForDecl Name, [(Name, DocForDecl Name)])
 
 
--- | A 'DocName' is an identifier that may be documented. The 'Module'
--- component specifies the place which we want to link to in the documentation.
+-- | A 'DocName' identifies something that may have documentation. The 'Module'
+-- argument specifies where we prefer to link to in the documentation. It may
+-- be different than the original module.
 data DocName = Documented Name Module | Undocumented Name
   deriving Eq
 
