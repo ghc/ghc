@@ -153,7 +153,7 @@ Ticks getThreadCPUTime(void)
 nat
 getPageFaults(void)
 {
-#if !defined(HAVE_GETRUSAGE) || irix_HOST_OS
+#if !defined(HAVE_GETRUSAGE) || irix_HOST_OS || haiku_HOST_OS
     return 0;
 #else
     struct rusage t;
