@@ -22,6 +22,37 @@ use strict;
 #      ./darc-all push --dry-run
 #          To see what local patches you have relative to the main repos
 #
+# ------------ Which repos to use -------------
+# darcs-all uses the following algorithm to decide which remote repos to use
+#
+#  It always computes the remote repos from a single base, $repo_base
+#  How is $repo_base set?  
+#    If you say "-r repo", then that's $repo_base
+#    othewise $repo_base is set thus:
+#       look in _darcs/prefs/defaultrepo, 
+#       and remove the trailing 'ghc'
+#
+#  Then darcs-all iterates over the package found in the file
+#  ./packages, which has entries like:
+#         libraries/array  packages/array  darcs
+#    or, in general
+#         <local-path>  <remote-path> <vcs>
+# 
+#    If $repo_base looks like a local filesystem path, or if you give
+#    the --checked-out flag, darcs-all works on repos of form
+#          $repo_base/<local-path>
+#    otherwise darcs-all works on repos of form
+#          $repo_base/<remote-path>
+#    This logic lets you say
+#      both    darcs-all -r http://darcs.haskell.org/ghc-6.12 pull
+#      and     darcs-all -r ../HEAD pull
+#    The latter is called a "checked-out tree".
+
+# NB: darcs-all *ignores* the defaultrepo of all repos other than the
+# root one.  So the remote repos must be laid out in one of the two
+# formats given by <local-path> and <remote-path> in the file 'packages'.
+
+# -------------- Flags -------------------
 #   -q says to be quite, and -s to be silent.
 #
 #   -i says to ignore darcs errors and move on to the next repository
