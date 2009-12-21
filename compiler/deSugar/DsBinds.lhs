@@ -397,6 +397,40 @@ gotten from the binding for fromT_1.
 It might be better to have just one level of AbsBinds, but that requires more
 thought!
 
+Note [Implementing SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example:
+	f :: (Eq a, Ix b) => a -> b -> Bool
+	{-# SPECIALISE f :: (Ix p, Ix q) => Int -> (p,q) -> Bool #-}
+
+From this the typechecker generates
+
+    AbsBinds [ab] [d1,d2] [([ab], f, f_mono, prags)] binds
+
+    SpecPrag (wrap_fn :: forall a b. (Eq a, Ix b) => XXX
+                      -> forall p q. (Ix p, Ix q) => XXX[ Int/a, (p,q)/b ])
+
+Note that wrap_fn can transform *any* function with the right type prefix 
+    forall ab. (Eq a, Ix b) => <blah>
+regardless of <blah>.  It's sort of polymorphic in <blah>.  This is
+useful: we use the same wrapper to transform each of the class ops, as
+well as the dict.
+
+From these we generate:
+
+    Rule: 	forall p, q, (dp:Ix p), (dq:Ix q). 
+                    f Int (p,q) dInt ($dfInPair dp dq) = f_spec p q dp dq
+
+    Spec bind:	f_spec = wrap_fn (/\ab \d1 d2. Let binds in f_mono)
+
+Note that 
+
+  * The LHS of the rule may mention dictionary *expressions* (eg
+    $dfIxPair dp dq), and that is essential because the dp, dq are
+    needed on the RHS.
+
+  * The RHS of f_spec has a *copy* of 'binds', so that it can fully
+    specialise it.
 
 \begin{code}
 ------------------------
@@ -405,36 +439,7 @@ dsSpecs :: [TyVar] -> [DictId] -> [TyVar]
         -> CoreBind -> [LSpecPrag]
         -> DsM ( [(Id,CoreExpr)] 	-- Binding for specialised Ids
 	       , [CoreRule] )		-- Rules for the Global Ids
--- Example:
---	f :: (Eq a, Ix b) => a -> b -> Bool
---	{-# SPECIALISE f :: (Ix p, Ix q) => Int -> (p,q) -> Bool #-}
---
---	AbsBinds [ab] [d1,d2] [([ab], f, f_mono, prags)] binds
--- 
--- 	SpecPrag /\pq.\(dp:Ix p, dq:Ix q). f Int (p,q) dInt ($dfIxPair dp dq)
---	     :: forall p q. (Ix p, Ix q) => Int -> (p,q) -> Bool 
---
---
--- Rule: 	forall p,q,(dp:Ix p),(dq:Ix q). 
---                 f Int (p,q) dInt ($dfInPair dp dq) = f_spec p q dp dq
---
--- Spec bind:	f_spec = Let f = /\ab \(d1:Eq a)(d2:Ix b). let binds in f_mono 
---			 /\pq.\(dp:Ix p, dq:Ix q). f Int (p,q) dInt ($dfIxPair dp dq)
---		The idea is that f occurs just once, so it'll be 
---		inlined and specialised
---
--- Note that the LHS of the rule may mention dictionary *expressions* 
---   (eg $dfIxPair dp dq), and that is essential because 
---   the dp, dq are needed on the RHS.
---
--- In general, given SpecPrag (/\as.\ds. f es) t, we have
--- the defn		f_spec as ds = let-nonrec f = /\fas\fds. let f_mono = <f-rhs> in f_mono
---				       in f es 
--- and the RULE		forall as, ds. f es = f_spec as ds
---
--- It is *possible* that 'es' does not mention all of the dictionaries 'ds'
--- (a bit silly, because then the 
-
+-- See Note [Implementing SPECIALISE pragmas]
 dsSpecs all_tvs dicts tvs poly_id mono_id inl_arity mono_bind prags
   = do { pairs <- mapMaybeM spec_one prags
        ; let (spec_binds_s, rules) = unzip pairs
