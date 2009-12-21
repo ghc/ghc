@@ -33,6 +33,7 @@ import DataCon
 import Class
 import Var
 import CoreUnfold ( mkDFunUnfolding )
+import CoreUtils  ( mkPiTypes )
 import PrelNames  ( inlineIdName )
 import Id
 import MkId
@@ -207,6 +208,19 @@ not work well for newtypes because it uses exprIsConApp_maybe.
 
 The INLINE on df is vital, else $cop_list occurs just once and is inlined,
 which is a disaster if $cop_list *itself* has an INLINE pragma.
+
+Notice, also, that we go to the trouble of generating a complicated cast,
+rather than do this:
+       df = /\a. \d. MkD ($cop_list a d)
+where the MkD "constructor" willl expand to a suitable cast:
+       df = /\a. \d. ($cop_list a d) |>  (...)
+Reason: suppose $cop_list has an INLINE pragma.  We want to avoid the
+nasty possibility that we eta-expand df, to get
+       df = (/\a \d \x. $cop_list a d x) |> (...)
+and now $cop_list may get inlined into the df, rather than at
+the actual call site.  Of course, eta reduction may get there first,
+but it seems less fragile to generate the Right Thing in the first place.
+See Trac #3772.
 
 
 Note [Subtle interaction of recursion and overlap]
@@ -755,42 +769,57 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
        ; checkSigTyVars inst_tyvars'
 
        -- Create the result bindings
-       ; let dict_constr   = classDataCon clas
-             this_dict_id  = instToId this_dict
-	     dict_bind     = mkVarBind this_dict_id dict_rhs
-             dict_rhs      = foldl mk_app inst_constr (sc_ids ++ meth_ids)
- 	     inst_constr   = L loc $ wrapId (mkWpTyApps inst_tys')
-	     			            (dataConWrapId dict_constr)
-                     -- We don't produce a binding for the dict_constr; instead we
-                     -- rely on the simplifier to unfold this saturated application
-                     -- We do this rather than generate an HsCon directly, because
-                     -- it means that the special cases (e.g. dictionary with only one
-                     -- member) are dealt with by the common MkId.mkDataConWrapId code rather
-                     -- than needing to be repeated here.
-
-	     mk_app :: LHsExpr Id -> Id -> LHsExpr Id
- 	     mk_app fun arg_id = L loc (HsApp fun (L loc (wrapId arg_wrapper arg_id)))
-	     arg_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars')
-
-             dfun_id_w_fun | isNewTyCon (classTyCon clas) 
-                           = dfun_id   -- Just let the dfun inline; see Note [Single-method classes]
-                             `setInlinePragma` alwaysInlinePragma
-                           | otherwise 
-                           = dfun_id   -- Do not inline; instead give it a magic DFunFunfolding
-			     	       -- See Note [ClassOp/DFun selection]
-                             `setIdUnfolding`  mkDFunUnfolding dict_constr (sc_ids ++ meth_ids)
-                             `setInlinePragma` dfunInlinePragma
-
-             main_bind = noLoc $ AbsBinds
-                                 inst_tyvars'
-                                 dfun_lam_vars
-                                 [(inst_tyvars', dfun_id_w_fun, this_dict_id, spec_inst_prags)]
-                                 (unitBag dict_bind)
+       ; let this_dict_id  = instToId this_dict
+             arg_ids       = sc_ids ++ meth_ids
+             arg_binds     = listToBag meth_binds `unionBags` 
+                             listToBag sc_binds
 
        ; showLIE (text "instance")
-       ; return (unitBag main_bind    `unionBags` 
-		 listToBag meth_binds `unionBags` 
-                 listToBag sc_binds) }
+       ; case newTyConCo_maybe (classTyCon clas) of
+           Nothing 	       -- A multi-method class
+             -> return (unitBag (L loc data_bind)  `unionBags` arg_binds)
+             where
+               data_dfun_id = dfun_id   -- Do not inline; instead give it a magic DFunFunfolding
+			     	       -- See Note [ClassOp/DFun selection]
+                             	`setIdUnfolding`  mkDFunUnfolding dict_constr arg_ids
+                             	`setInlinePragma` dfunInlinePragma
+
+               data_bind = AbsBinds inst_tyvars' dfun_lam_vars
+                             [(inst_tyvars', data_dfun_id, this_dict_id, spec_inst_prags)]
+                             (unitBag dict_bind)
+
+	       dict_bind   = mkVarBind this_dict_id dict_rhs
+               dict_rhs    = foldl mk_app inst_constr arg_ids
+               dict_constr = classDataCon clas
+               inst_constr = L loc $ wrapId (mkWpTyApps inst_tys')
+	       			            (dataConWrapId dict_constr)
+                       -- We don't produce a binding for the dict_constr; instead we
+                       -- rely on the simplifier to unfold this saturated application
+                       -- We do this rather than generate an HsCon directly, because
+                       -- it means that the special cases (e.g. dictionary with only one
+                       -- member) are dealt with by the common MkId.mkDataConWrapId code rather
+                       -- than needing to be repeated here.
+
+	       mk_app :: LHsExpr Id -> Id -> LHsExpr Id
+ 	       mk_app fun arg_id = L loc (HsApp fun (L loc (wrapId arg_wrapper arg_id)))
+	       arg_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars')
+
+           Just the_nt_co  	 -- (Just co) for a single-method class
+             -> return (unitBag (L loc nt_bind) `unionBags` arg_binds)
+             where
+               nt_dfun_id = dfun_id   -- Just let the dfun inline; see Note [Single-method classes]
+                            `setInlinePragma` alwaysInlinePragma
+
+	       local_nt_dfun = setIdType this_dict_id inst_ty	-- A bit of a hack, but convenient
+
+	       nt_bind = AbsBinds [] [] 
+                            [([], nt_dfun_id, local_nt_dfun, spec_inst_prags)]
+                            (unitBag (mkVarBind local_nt_dfun (L loc (wrapId nt_cast the_meth_id))))
+
+	       the_meth_id = ASSERT( length arg_ids == 1 ) head arg_ids
+               nt_cast = WpCast $ mkPiTypes (inst_tyvars' ++ dfun_lam_vars) $
+                         mkSymCoercion (mkTyConApp the_nt_co inst_tys')
+    }
 
 
 ------------------------------
@@ -1118,8 +1147,6 @@ Note carefully:
        (ii) $dmop1 is not saturated
      That is important to allow the mutual recursion between $fooInt and
      $cop1 to be broken
-
-This is all regrettably delicate.
 
 
 %************************************************************************
