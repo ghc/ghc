@@ -983,31 +983,73 @@ tidyTopPair :: Bool  -- show unfolding
 	-- in the IdInfo of one early in the group
 
 tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
-  = WARN( not _bottom_exposed, ppr bndr1 )
-    (bndr1, rhs1)
+  = (bndr1, rhs1)
   where
-    -- If the cheap-and-cheerful bottom analyser can see that
-    -- the RHS is bottom, it should jolly well be exposed
-    _bottom_exposed = case exprBotStrictness_maybe rhs of
-                        Nothing         -> True
-                        Just (arity, _) -> appIsBottom str_sig arity
-        where
-
-
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails bndr	-- Preserve the IdDetails
     ty'	     = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo   = idInfo bndr
-    unf_info = unfoldingInfo idinfo
-    str_sig  = strictnessInfo idinfo `orElse` topSig
-    is_bot   = isBottomingSig str_sig
-    idinfo'  = tidyTopIdInfo (isExternalName name')
-			    idinfo unfold_info
-			    arity caf_info 
-                            (occInfo idinfo)
+    idinfo'  = tidyTopIdInfo rhs_tidy_env name' rhs rhs1 (idInfo bndr) 
+                             show_unfold caf_info
 
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env rhs1 is_bot unf_info
+-- tidyTopIdInfo creates the final IdInfo for top-level
+-- binders.  There are two delicate pieces:
+--
+--  * Arity.  After CoreTidy, this arity must not change any more.
+--	Indeed, CorePrep must eta expand where necessary to make
+--	the manifest arity equal to the claimed arity.
+--
+--  * CAF info.  This must also remain valid through to code generation.
+-- 	We add the info here so that it propagates to all
+-- 	occurrences of the binders in RHSs, and hence to occurrences in
+-- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
+--	CoreToStg makes use of this when constructing SRTs.
+tidyTopIdInfo :: TidyEnv -> Name -> CoreExpr -> CoreExpr 
+              -> IdInfo -> Bool -> CafInfo -> IdInfo
+tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
+  | not is_external	-- For internal Ids (not externally visible)
+  = vanillaIdInfo	-- we only need enough info for code generation
+			-- Arity and strictness info are enough;
+			--	c.f. CoreTidy.tidyLetBndr
+	`setCafInfo` 	    caf_info
+	`setArityInfo`	    arity
+	`setStrictnessInfo` final_sig
+
+  | otherwise		-- Externally-visible Ids get the whole lot
+  = vanillaIdInfo
+	`setCafInfo` 	       caf_info
+	`setArityInfo`	       arity
+	`setStrictnessInfo`    final_sig
+        `setOccInfo`           robust_occ_info
+	`setInlinePragInfo`    (inlinePragInfo idinfo)
+	`setUnfoldingInfo`     unfold_info
+		-- NB: we throw away the Rules
+		-- They have already been extracted by findExternalRules
+  where
+    is_external = isExternalName name
+
+    --------- OccInfo ------------
+    robust_occ_info = zapFragileOcc (occInfo idinfo)
+    -- It's important to keep loop-breaker information
+    -- when we are doing -fexpose-all-unfoldings
+
+    --------- Strictness ------------
+    final_sig | Just sig <- strictnessInfo idinfo
+              = WARN( _bottom_hidden sig, ppr name ) Just sig
+              | Just (_, sig) <- mb_bot_str = Just sig
+              | otherwise                   = Nothing
+
+    -- If the cheap-and-cheerful bottom analyser can see that
+    -- the RHS is bottom, it should jolly well be exposed
+    _bottom_hidden id_sig = case mb_bot_str of
+                               Nothing         -> False
+                               Just (arity, _) -> not (appIsBottom id_sig arity)
+
+    mb_bot_str = exprBotStrictness_maybe orig_rhs
+
+    --------- Unfolding ------------
+    unf_info = unfoldingInfo idinfo
+    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env tidy_rhs final_sig unf_info
 		| otherwise   = noUnfolding
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
@@ -1023,68 +1065,33 @@ tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
     -- for bottoming functions), but we might still have a worker/wrapper
     -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
 
+    --------- Arity ------------
     -- Usually the Id will have an accurate arity on it, because
     -- the simplifier has just run, but not always. 
     -- One case I found was when the last thing the simplifier
     -- did was to let-bind a non-atomic argument and then float
     -- it to the top level. So it seems more robust just to
     -- fix it here.
-    arity = exprArity rhs
-
-
--- tidyTopIdInfo creates the final IdInfo for top-level
--- binders.  There are two delicate pieces:
---
---  * Arity.  After CoreTidy, this arity must not change any more.
---	Indeed, CorePrep must eta expand where necessary to make
---	the manifest arity equal to the claimed arity.
---
---  * CAF info.  This must also remain valid through to code generation.
--- 	We add the info here so that it propagates to all
--- 	occurrences of the binders in RHSs, and hence to occurrences in
--- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
---	CoreToStg makes use of this when constructing SRTs.
-tidyTopIdInfo :: Bool -> IdInfo -> Unfolding
-              -> ArityInfo -> CafInfo -> OccInfo
-              -> IdInfo
-tidyTopIdInfo is_external idinfo unfold_info arity caf_info occ_info
-  | not is_external	-- For internal Ids (not externally visible)
-  = vanillaIdInfo	-- we only need enough info for code generation
-			-- Arity and strictness info are enough;
-			--	c.f. CoreTidy.tidyLetBndr
-        `setOccInfo`           robust_occ_info
-	`setCafInfo` 	       caf_info
-	`setArityInfo`	       arity
-	`setStrictnessInfo` strictnessInfo idinfo
-
-  | otherwise		-- Externally-visible Ids get the whole lot
-  = vanillaIdInfo
-        `setOccInfo`           robust_occ_info
-	`setCafInfo` 	       caf_info
-	`setArityInfo`	       arity
-	`setStrictnessInfo` strictnessInfo idinfo
-	`setInlinePragInfo`    inlinePragInfo idinfo
-	`setUnfoldingInfo`     unfold_info
-		-- NB: we throw away the Rules
-		-- They have already been extracted by findExternalRules
-  where
-    robust_occ_info = zapFragileOcc occ_info
-    -- It's important to keep loop-breaker information
-    -- when we are doing -fexpose-all-unfoldings
+    arity = exprArity orig_rhs
 
 
 
 ------------ Unfolding  --------------
-tidyUnfolding :: TidyEnv -> CoreExpr -> Bool -> Unfolding -> Unfolding
+tidyUnfolding :: TidyEnv -> CoreExpr -> Maybe StrictSig -> Unfolding -> Unfolding
 tidyUnfolding tidy_env _ _ (DFunUnfolding con ids)
   = DFunUnfolding con (map (tidyExpr tidy_env) ids)
-tidyUnfolding tidy_env tidy_rhs is_bottoming
+tidyUnfolding tidy_env tidy_rhs strict_sig
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
   | isInlineRuleSource src
   = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
 	  uf_src  = tidyInl tidy_env src }
   | otherwise
-  = mkTopUnfolding is_bottoming tidy_rhs
+  = mkTopUnfolding is_bot tidy_rhs
+  where
+    is_bot = case strict_sig of 
+                Just sig -> isBottomingSig sig
+                Nothing  -> False
+
 tidyUnfolding _ _ _ unf = unf
 
 tidyInl :: TidyEnv -> UnfoldingSource -> UnfoldingSource
