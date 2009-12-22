@@ -549,11 +549,13 @@ checkInstType (L l t)
 checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
 checkDictTy (L spn ty) = check ty []
   where
-  check (HsTyVar t) args | not (isRdrTyVar t) 
-  	= return (L spn (HsPredTy (HsClassP t args)))
+  check (HsTyVar tc)            args | isRdrTc tc = done tc args
+  check (HsOpTy t1 (L _ tc) t2) args | isRdrTc tc = done tc (t1:t2:args)
   check (HsAppTy l r) args = check (unLoc l) (r:args)
   check (HsParTy t)   args = check (unLoc t) args
   check _ _ = parseError spn "Malformed instance header"
+
+  done tc args = return (L spn (HsPredTy (HsClassP tc args)))
 
 checkTParams :: Bool	  -- Type/data family
 	     -> [LHsType RdrName]
