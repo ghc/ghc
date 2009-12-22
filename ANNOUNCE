@@ -1,43 +1,41 @@
 --------------------------------------------
--- Haddock 2.5.0
+-- Haddock 2.6.0
 --------------------------------------------
 
 A new version of Haddock, the Haskell documentation tool, is out!
 
-If you're using GHC 6.10.2 and Haddock 2.4.2, you should be able to upgrade to
-this version without any problem. If you're using something else, you should
-re-install any documentation that you want to link to after upgrading.
+This is the version that comes with GHC 6.12.1. It contains the main results of
+Isaac Dupree's Summer of Code project, which are:
 
-Please use the bug tracker to submit bug reports or feature requests.
+  * Cross-package documentation (exporting something that comes from another
+    package is handled correctly. The full documentation of that thing shows
+    up in your documentation)
+
+  * Lexing and parsing of Haddock comment markup is moved from GHC back into
+    Haddock. This will make it easier to make changes to the markup format
+
+We have decided to drop compatibility with older GHC versions in order to speed
+up development.
 
 --------------------------------------------
--- Changes in version 2.5.0
+-- Full list of changes in version 2.6.0
 --------------------------------------------
 
-  * Drop support for GHC 6.8.*
+  * Drop support for GHC 6.10.*
 
-  * Add support for GHC 6.10.3 and 6.10.4
+  * Add support for GHC 6.12.1
 
-  * Revert to the old multi-page index for large packages (#106)
+  * Cross-package documentation
 
-  * Show GADT records in the generated documentation
+  * Move lexing and parsing of the Haddock comment markup back to Haddock
 
-  * Create the output directory if it doesn't exist (#104)
+  * Slightly prettier printing of instance heads
 
-  * Use the native codegen instead of compiling via C for TH modules
+  * Support platforms for which GHC has no native code generator
 
-  * Add --use-unicode flag for displaying prettier versions of common symbols
+  * Add a flag --print-ghc-libdir
 
-  * Mutiple verbosity levels: remove --verbose and add --verbosity=n
-
-  * Simpler versioning of .haddock files
-
-To avoid slow search, Haddock switches from the searchable index to the old
-multi-page index for large packages (containing over 150 items). This, and
-support for GADT records in the generated documentation was implemented by
-Isaac Dupree as part of his Summer of Code project.
-
-The --use-unicode flag was contributed by George Porges.
+  * Minor bug fixes
 
 --------------------------------------------
 -- Links
@@ -47,7 +45,7 @@ Homepage:
  http://www.haskell.org/haddock
 
 Hackage page:
- http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.5.0
+ http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.6.0
 
 Bugtracker and wiki:
  http://trac.haskell.org/haddock
@@ -66,26 +64,8 @@ The following people contributed patches to this release:
 
  Isaac Dupree
  Ian Lynagh
- Simon Marlow
  Simon Peyton-Jones
- George Porges
  David Waern
-
---------------------------------------------
--- Future Plans
---------------------------------------------
-
-Here are the top priority tickets right now:
-
- * Cross-package documentation (#24)
- * Good warning messages when encountering unexpected Haddock comments (#94)
- * Comments on instance declarations (#29)
-
-Isaac Dupree has been working on the first item as part of his SoC project and
-it is near completion.
-
-If you have any input on what we should prioritize, add yourself to the CC list
-of the ticket(s) that you are interested in.
 
 --------------------------------------------
 -- Get Involved
