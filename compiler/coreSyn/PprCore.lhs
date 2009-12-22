@@ -371,9 +371,9 @@ showAttributes stuff
 \begin{code}
 instance Outputable UnfoldingGuidance where
     ppr UnfNever  = ptext (sLit "NEVER")
-    ppr (UnfWhen sat_ok boring_ok)
+    ppr (UnfWhen unsat_ok boring_ok)
       = ptext (sLit "ALWAYS_IF") <> 
-        parens (ptext (sLit "sat_ok=") <> ppr sat_ok <> comma <>
+        parens (ptext (sLit "unsat_ok=") <> ppr unsat_ok <> comma <>
                 ptext (sLit "boring_ok=") <> ppr boring_ok)
     ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
       = hsep [ ptext (sLit "IF_ARGS"), 
