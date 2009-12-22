@@ -181,8 +181,9 @@ calcUnfoldingGuidance expr_is_cheap top_bot bOMB_OUT_SIZE expr
           = case (sizeExpr (iUnbox bOMB_OUT_SIZE) val_bndrs body) of
       	      TooBig -> UnfNever
       	      SizeIs size cased_bndrs scrut_discount
-      	        | uncondInline n_val_bndrs (iBox size) && expr_is_cheap
-      	        -> UnfWhen needSaturated boringCxtOk
+      	        | uncondInline n_val_bndrs (iBox size)
+                , expr_is_cheap
+      	        -> UnfWhen unSaturatedOk boringCxtOk   -- Note [INLINE for small functions]
 
 		| top_bot  -- See Note [Do not inline top-level bottoming functions]
 		-> UnfNever
@@ -239,24 +240,52 @@ Do not re-inline them!  But we *do* still inline if they are very small
 (the uncondInline stuff).
 
 
-Note [Unconditional inlining]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We inline *unconditionally* if inlined thing is smaller (using sizeExpr)
-than the thing it's replacing.  Notice that
+Note [INLINE for small functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider	{-# INLINE f #-}
+                f x = Just x
+                g y = f y
+Then f's RHS is no larger than its LHS, so we should inline it into
+even the most boring context.  In general, f the function is
+sufficiently small that its body is as small as the call itself, the
+inline unconditionally, regardless of how boring the context is.
+
+Things to note:
+
+ * We inline *unconditionally* if inlined thing is smaller (using sizeExpr)
+   than the thing it's replacing.  Notice that
       (f x) --> (g 3) 		  -- YES, unconditionally
       (f x) --> x : []		  -- YES, *even though* there are two
       	    	    		  --      arguments to the cons
       x     --> g 3		  -- NO
       x	    --> Just v		  -- NO
 
-It's very important not to unconditionally replace a variable by
-a non-atomic term.
+  It's very important not to unconditionally replace a variable by
+  a non-atomic term.
+
+* We do this even if the thing isn't saturated, else we end up with the
+  silly situation that
+     f x y = x
+     ...map (f 3)...
+  doesn't inline.  Even in a boring context, inlining without being
+  saturated will give a lambda instead of a PAP, and will be more
+  efficient at runtime.
+
+* However, when the function's arity > 0, we do insist that it 
+  has at least one value argument at the call site.  Otherwise we find this:
+       f = /\a \x:a. x
+       d = /\b. MkD (f b)
+  If we inline f here we get
+       d = /\b. MkD (\x:b. x)
+  and then prepareRhs floats out the argument, abstracting the type
+  variables, so we end up with the original again!
+
 
 \begin{code}
 uncondInline :: Arity -> Int -> Bool
 -- Inline unconditionally if there no size increase
 -- Size of call is arity (+1 for the function)
--- See Note [Unconditional inlining]
+-- See Note [INLINE for small functions]
 uncondInline arity size 
   | arity == 0 = size == 0
   | otherwise  = size <= arity + 1
@@ -726,10 +755,10 @@ callSiteInline dflags id unfolding lone_variable arg_infos cont_info
 	  = case guidance of
 	      UnfNever -> (False, empty)
 
-	      UnfWhen unsat_ok boring_ok -> ( (unsat_ok  || saturated)
-                                           && (boring_ok || some_benefit)
-                                            , empty )
-		   -- For the boring_ok part see Note [INLINE for small functions]
+	      UnfWhen unsat_ok boring_ok 
+                 -> (enough_args && (boring_ok || some_benefit), empty )
+                 where      -- See Note [INLINE for small functions]
+                   enough_args = saturated || (unsat_ok && n_val_args > 0)
 
 	      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
 	  	 -> ( is_cheap && some_benefit && small_enough
@@ -793,16 +822,6 @@ But the defn of GHC.Classes.$dmmin is:
 
 We *really* want to inline $dmmin, even though it has arity 3, in
 order to unravel the recursion.
-
-
-Note [INLINE for small functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider	{-# INLINE f #-}
-                f x = Just x
-                g y = f y
-Then f's RHS is no larger than its LHS, so we should inline it
-into even the most boring context.  (We do so if there is no INLINE
-pragma!)  
 
 
 Note [Things to watch]
