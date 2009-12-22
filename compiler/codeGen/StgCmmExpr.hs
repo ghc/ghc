@@ -40,6 +40,7 @@ import SMRep
 import TyCon
 import Type
 import CostCentre	( CostCentreStack, currentCCS )
+import Control.Monad (when)
 import Maybes
 import Util
 import FastString
@@ -304,9 +305,10 @@ cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
 cgCase (StgApp v []) bndr _ alt_type@(PrimAlt _) alts
   | isUnLiftedType (idType v)
   || reps_compatible
-  = -- assignment instruction suffices for unlifted types
-    do { v_info <- getCgIdInfo v
-       ; emit $ mkComment $ mkFastString "New case:"
+  = -- assignment suffices for unlifted types
+    do { when (not reps_compatible) $
+           panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
+       ; v_info <- getCgIdInfo v
        ; emit (mkAssign (CmmLocal (idToReg (NonVoid bndr))) (idInfoToAmode v_info))
        ; _ <- bindArgsToRegs [NonVoid bndr]
        ; cgAlts NoGcInAlts (NonVoid bndr) alt_type alts }
@@ -314,15 +316,12 @@ cgCase (StgApp v []) bndr _ alt_type@(PrimAlt _) alts
     reps_compatible = idCgRep v == idCgRep bndr
 
 cgCase scrut@(StgApp v []) _ _ (PrimAlt _) _ 
-  | lifted 
   = -- fail at run-time, not compile-time
     do { mb_cc <- maybeSaveCostCentre True
        ; withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emit $ mkComment $ mkFastString "should be unreachable code"
        ; emit $ withFreshLabel "l" (\l -> mkLabel l <*> mkBranch l)}
-  where
-    lifted = not (isUnLiftedType (idType v))
 
 cgCase scrut bndr srt alt_type alts 
   = -- the general case
