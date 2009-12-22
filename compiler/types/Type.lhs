@@ -6,7 +6,6 @@
 Type - public interface
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -53,7 +52,7 @@ module Type (
         funTyCon,
 
         -- ** Predicates on types
-        isTyVarTy, isFunTy,
+        isTyVarTy, isFunTy, isDictTy,
 
 	-- (Lifting and boxity)
 	isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
@@ -820,6 +819,11 @@ pprSourceTyCon tycon
   = ppr $ fam_tc `TyConApp` tys	       -- can't be FunTyCon
   | otherwise
   = ppr tycon
+
+isDictTy :: Type -> Bool
+isDictTy ty = case splitTyConApp_maybe ty of
+                Just (tc, _) -> isClassTyCon tc
+		Nothing      -> False
 \end{code}
 
 

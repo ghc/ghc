@@ -101,7 +101,6 @@ import qualified Var
 
 import TyCon
 import Type
-import TcType
 import TysPrim
 import DataCon
 import Demand
