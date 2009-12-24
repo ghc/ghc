@@ -73,3 +73,5 @@ test('T1624', normal, compile_and_run, [''])
 
 # Support files for T1735 are in directory T1735_Help/
 test('T1735', normal, multimod_compile_and_run, ['T1735',''])
+
+test('T3731', expect_broken(3731), compile_and_run, [''])
