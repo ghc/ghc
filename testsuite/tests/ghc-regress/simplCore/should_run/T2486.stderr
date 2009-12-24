@@ -6,26 +6,26 @@ Local rules for imported Ids
 
 
 
-==================== Top-level specialisations ====================
+==================== Tidy Core rules ====================
 "SPEC Main.fib [GHC.Types.Double]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Double
             $dOrd :: GHC.Classes.Ord GHC.Types.Double}
       Main.fib @ GHC.Types.Double $dNum $dOrd
-      = $sfib
+      = Main.fib_fib
 "SPEC Main.fib [GHC.Types.Int]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Int
             $dOrd :: GHC.Classes.Ord GHC.Types.Int}
       Main.fib @ GHC.Types.Int $dNum $dOrd
-      = $sfib
+      = Main.fib_fib1
 "SPEC Main.tak [GHC.Types.Double]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Double
             $dOrd :: GHC.Classes.Ord GHC.Types.Double}
       Main.tak @ GHC.Types.Double $dNum $dOrd
-      = $stak
+      = Main.tak_tak
 "SPEC Main.tak [GHC.Types.Int]" ALWAYS
     forall {$dNum :: GHC.Num.Num GHC.Types.Int
             $dOrd :: GHC.Classes.Ord GHC.Types.Int}
       Main.tak @ GHC.Types.Int $dNum $dOrd
-      = $stak
+      = Main.tak_tak1
 
 
