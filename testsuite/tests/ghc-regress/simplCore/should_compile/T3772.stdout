@@ -1,0 +1,25 @@
+
+==================== Tidy Core ====================
+Rec {
+xs :: GHC.Prim.Int# -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType L]
+xs =
+  \ (m :: GHC.Prim.Int#) ->
+    case GHC.Prim.<=# m 1 of _ {
+      GHC.Bool.False -> xs (GHC.Prim.-# m 1);
+      GHC.Bool.True -> GHC.Unit.()
+    }
+end Rec }
+
+T3772.foo [InlPrag=NOINLINE] :: GHC.Types.Int -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType U(L)]
+T3772.foo =
+  \ (n :: GHC.Types.Int) ->
+    case n of _ { GHC.Types.I# n# ->
+    case GHC.Prim.<=# n# 0 of _ {
+      GHC.Bool.False -> xs n#; GHC.Bool.True -> GHC.Unit.()
+    }
+    }
+
+
+

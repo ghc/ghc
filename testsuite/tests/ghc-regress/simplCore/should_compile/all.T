@@ -46,12 +46,6 @@ test('T3118', normal, compile, [''])
 # testsuite driver times out.
 test('T3016', [ skip_if_fast, omit_ways(['optc','profc']) ], compile, [''])
 
-test('T3055',
-     [extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
-      if_compiler_lt('ghc', '6.11', expect_fail)],
-     run_command,
-     ['$MAKE -s --no-print-directory T3055'])
-
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 
 test('T3234',
@@ -67,4 +61,14 @@ test('spec-inline', only_ways(['optc','optasm']),
               	    compile, 
               	    ['-O2 -ddump-simpl -dsuppress-uniques -fno-code'])
 
+test('T3055',
+     [extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
+      if_compiler_lt('ghc', '6.11', expect_fail)],
+     run_command,
+     ['$MAKE -s --no-print-directory T3055'])
+
+test('T3772',
+#      only_ways(['optc','optasm']), 
+     extra_clean(['T3772_A.hi', 'T3772_A.o']),
+     run_command, ['$MAKE -s --no-print-directory T3772'])
 
