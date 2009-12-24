@@ -30,7 +30,7 @@ module Type (
 
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, 
 	splitFunTys, splitFunTysN,
-	funResultTy, funArgTy, zipFunTys,
+	funResultTy, funArgTy, zipFunTys, typeArity,
 
 	mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
@@ -141,6 +141,7 @@ import VarSet
 import Name
 import Class
 import TyCon
+import BasicTypes	( Arity )
 
 -- others
 import StaticFlags
@@ -495,6 +496,14 @@ funArgTy :: Type -> Type
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (FunTy arg _res)  = arg
 funArgTy ty                = pprPanic "funArgTy" (ppr ty)
+
+typeArity :: Type -> Arity
+-- How many value arrows are visible in the type?
+-- We look through foralls, but not through newtypes, dictionaries etc
+typeArity ty | Just ty' <- coreView ty = typeArity ty'
+typeArity (FunTy _ ty)    = 1 + typeArity ty
+typeArity (ForAllTy _ ty) = typeArity ty
+typeArity _               = 0
 \end{code}
 
 ---------------------------------------------------------------------
@@ -1334,7 +1343,7 @@ then (substTy subst ty) does nothing.
 For example, consider:
 	(/\a. /\b:(a~Int). ...b..) Int
 We substitute Int for 'a'.  The Unique of 'b' does not change, but
-nevertheless we add 'b' to the TvSubstEnv, because b's type does change
+nevertheless we add 'b' to the TvSubstEnv, because b's kind does change
 
 This invariant has several crucial consequences:
 

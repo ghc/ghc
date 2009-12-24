@@ -99,28 +99,34 @@ exprArity :: CoreExpr -> Arity
 -- ^ An approximate, fast, version of 'exprEtaExpandArity'
 exprArity e = go e
   where
-    go (Var v) 	       	         = idArity v
-    go (Lam x e) | isId x    	 = go e + 1
-    		 | otherwise 	 = go e
-    go (Note _ e)                = go e
-    go (Cast e co)               = trim_arity (go e) 0 (snd (coercionKind co))
-    go (App e (Type _))          = go e
-    go (App f a) | exprIsCheap a = (go f - 1) `max` 0
-    	-- NB: exprIsCheap a!  
-    	--	f (fac x) does not have arity 2, 
-    	-- 	even if f has arity 3!
-    	-- NB: `max 0`!  (\x y -> f x) has arity 2, even if f is
-    	--		 unknown, hence arity 0
+    go (Var v) 	       	           = idArity v
+    go (Lam x e) | isId x    	   = go e + 1
+    		 | otherwise 	   = go e
+    go (Note _ e)                  = go e
+    go (Cast e co)                 = go e `min` typeArity (snd (coercionKind co))
+       	       			     	-- Note [exprArity invariant]
+    go (App e (Type _))            = go e
+    go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
+        -- See Note [exprArity for applications]
     go _		       	   = 0
-
-	-- Note [exprArity invariant]
-    trim_arity n a ty
-	| n==a					      = a
-	| Just (_, ty') <- splitForAllTy_maybe ty     = trim_arity n a     ty'
-	| Just (_, ty') <- splitFunTy_maybe ty        = trim_arity n (a+1) ty'
-	| Just (ty',_)  <- splitNewTypeRepCo_maybe ty = trim_arity n a     ty'
-	| otherwise				      = a
 \end{code}
+
+Note [exprArity for applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we come to an application we check that the arg is trivial.
+   eg  f (fac x) does not have arity 2, 
+                 even if f has arity 3!
+
+* We require that is trivial rather merely cheap.  Suppose f has arity 2.
+  Then    f (Just y)
+  has arity 0, because if we gave it arity 1 and then inlined f we'd get
+          let v = Just y in \w. <f-body>
+  which has arity 0.  And we try to maintain the invariant that we don't
+  have arity decreases.
+
+*  The `max 0` is important!  (\x y -> f x) has arity 2, even if f is
+   unknown, hence arity 0
+
 
 %************************************************************************
 %*									*
@@ -169,7 +175,6 @@ Or, to put it another way, in any context C
          is as efficient as
    C[ e ]
 
-
 It's all a bit more subtle than it looks:
 
 Note [Arity of case expressions]
@@ -191,7 +196,6 @@ This should diverge!  But if we eta-expand, it won't.   Again, we ignore this
 "problem", because being scrupulous would lose an important transformation for
 many programs.
 
-
 1.  Note [One-shot lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider one-shot lambdas
@@ -211,7 +215,6 @@ then we want to get arity 2.  Technically, this isn't quite right, because
 should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
 do so; it improves some programs significantly, and increasing convergence
 isn't a bad thing.  Hence the ABot/ATop in ArityType.
-
 
 4. Note [Newtype arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,6 +236,40 @@ we want to get: 		 coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
   And since negate has arity 2, you might try to eta expand.  But you can't
   decopose Int to a function type.   Hence the final case in eta_expand.
   
+\begin{code}
+applyStateHack :: CoreExpr -> ArityType -> Arity
+applyStateHack e (AT orig_arity is_bot)
+  | opt_NoStateHack = orig_arity
+  | ABot <- is_bot  = orig_arity   -- Note [State hack and bottoming functions]
+  | otherwise       = go orig_ty orig_arity
+  where			-- Note [The state-transformer hack]
+    orig_ty = exprType e
+    go :: Type -> Arity -> Arity
+    go ty arity		-- This case analysis should match that in eta_expand
+	| Just (_, ty') <- splitForAllTy_maybe ty   = go ty' arity
+	| Just (arg,res) <- splitFunTy_maybe ty
+	, arity > 0 || isStateHackType arg = 1 + go res (arity-1)
+
+-- See Note [trimCast]
+	| Just (tc,tys) <- splitTyConApp_maybe ty 
+	, Just (ty', _) <- instNewTyCon_maybe tc tys
+	, not (isRecursiveTyCon tc)	            = go ty' arity
+		-- Important to look through non-recursive newtypes, so that, eg 
+		--	(f x)   where f has arity 2, f :: Int -> IO ()
+		-- Here we want to get arity 1 for the result!
+-------
+
+{-
+	= if arity > 0 then 1 + go res (arity-1)
+	  else if isStateHackType arg then
+		pprTrace "applystatehack" (vcat [ppr orig_arity, ppr orig_ty,
+						ppr ty, ppr res, ppr e]) $
+	        1 + go res (arity-1)
+          else WARN( arity > 0, ppr arity ) 0
+-}						 
+	| otherwise = WARN( arity > 0, ppr arity <+> ppr ty) 0
+\end{code}
+
 Note [The state-transformer hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have 
@@ -252,38 +289,6 @@ apply to foo too, so we can eta expand the case.
 Then we expect that if f is applied to one arg, it'll be applied to two
 (that's the hack -- we don't really know, and sometimes it's false)
 See also Id.isOneShotBndr.
-
-\begin{code}
-applyStateHack :: CoreExpr -> ArityType -> Arity
-applyStateHack e (AT orig_arity is_bot)
-  | opt_NoStateHack = orig_arity
-  | ABot <- is_bot  = orig_arity   -- Note [State hack and bottoming functions]
-  | otherwise       = go orig_ty orig_arity
-  where			-- Note [The state-transformer hack]
-    orig_ty = exprType e
-    go :: Type -> Arity -> Arity
-    go ty arity		-- This case analysis should match that in eta_expand
-	| Just (_, ty') <- splitForAllTy_maybe ty   = go ty' arity
-
-	| Just (tc,tys) <- splitTyConApp_maybe ty 
-	, Just (ty', _) <- instNewTyCon_maybe tc tys
-	, not (isRecursiveTyCon tc)	            = go ty' arity
-		-- Important to look through non-recursive newtypes, so that, eg 
-		--	(f x)   where f has arity 2, f :: Int -> IO ()
-		-- Here we want to get arity 1 for the result!
-
-	| Just (arg,res) <- splitFunTy_maybe ty
-	, arity > 0 || isStateHackType arg = 1 + go res (arity-1)
-{-
-	= if arity > 0 then 1 + go res (arity-1)
-	  else if isStateHackType arg then
-		pprTrace "applystatehack" (vcat [ppr orig_arity, ppr orig_ty,
-						ppr ty, ppr res, ppr e]) $
-	        1 + go res (arity-1)
-          else WARN( arity > 0, ppr arity ) 0
--}						 
-	| otherwise = WARN( arity > 0, ppr arity <+> ppr ty) 0
-\end{code}
 
 Note [State hack and bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -348,6 +353,29 @@ andArityType (AT _  ABot) (AT a2 ATop) = AT a2		  ATop
 andArityType (AT a1 ATop) (AT _  ABot) = AT a1		  ATop
 andArityType (AT a1 ABot) (AT a2 ABot) = AT (a1 `max` a2) ABot
 
+---------------------------
+trimCast :: Coercion -> ArityType -> ArityType
+-- Trim the arity to be no more than allowed by the
+-- arrows in ty2, where co :: ty1~ty2
+trimCast _ at = at
+
+{-	   Omitting for now Note [trimCast]
+trimCast co at@(AT ar _)
+  | ar > co_arity = AT co_arity ATop
+  | otherwise     = at
+  where
+    (_, ty2) = coercionKind co
+    co_arity = typeArity ty2
+-}
+\end{code}
+
+Note [trimCast]
+~~~~~~~~~~~~~~~
+When you try putting trimCast back in, comment out the snippets
+flagged by the other references to Note [trimCast]
+
+\begin{code}
+---------------------------
 trimArity :: Bool -> ArityType -> ArityType
 -- We have something like (let x = E in b), where b has the given
 -- arity type.  Then
@@ -417,9 +445,9 @@ arityType dicts_cheap (Let b e)
 	-- See Note [Dictionary-like types] in TcType.lhs for why we use
 	-- isDictLikeTy here rather than isDictTy
 
-arityType dicts_cheap (Note _ e) = arityType dicts_cheap e
-arityType dicts_cheap (Cast e _) = arityType dicts_cheap e
-arityType _           _          = vanillaArityType
+arityType dicts_cheap (Note _ e)  = arityType dicts_cheap e
+arityType dicts_cheap (Cast e co) = trimCast co (arityType dicts_cheap e)
+arityType _           _           = vanillaArityType
 \end{code}
   
   
@@ -470,11 +498,9 @@ etaExpand :: Arity	  	-- ^ Result should have this number of value args
 -- so perhaps the extra code isn't worth it
 
 etaExpand n orig_expr
-  | manifestArity orig_expr >= n = orig_expr	-- The no-op case
-  | otherwise 		    
   = go n orig_expr
   where
-      -- Strip off existing lambdas
+      -- Strip off existing lambdas and casts
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
@@ -560,8 +586,8 @@ mkEtaWW :: Arity -> InScopeSet -> Type
 	-- Outgoing InScopeSet includes the EtaInfo vars
 	--   and the original free vars
 
-mkEtaWW n in_scope ty
-  = go n empty_subst ty []
+mkEtaWW orig_n in_scope orig_ty
+  = go orig_n empty_subst orig_ty []
   where
     empty_subst = mkTvSubst in_scope emptyTvSubstEnv
 
@@ -579,6 +605,7 @@ mkEtaWW n in_scope ty
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
        				   
+-- See Note [trimCast]
        | Just(ty',co) <- splitNewTypeRepCo_maybe ty
        = 	-- Given this:
        		-- 	newtype T = MkT ([T] -> Int)
