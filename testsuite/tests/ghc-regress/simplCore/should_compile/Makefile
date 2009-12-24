@@ -7,3 +7,7 @@ T3055:
 	'$(TEST_HC)' -O -c T3055.hs -ddump-simpl > T3055.simpl
 	grep 'I# (-28)' T3055.simpl | sed 's/.*\(I# (-28)\).*/\1/'
 
+T3772:
+	$(RM) -f rm -f T3772*.hi T3772*.o
+	'$(TEST_HC)' -c -O T3772_A.hs 
+	'$(TEST_HC)' -c -O T3772.hs -dsuppress-uniques -fno-code -ddump-simpl
