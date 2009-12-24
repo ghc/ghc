@@ -568,7 +568,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
 
 	   let	{ all_counts = counts `plusSimplCount` counts1
 	   	; binds1 = getFloats env1
-                ; rules1 = substRulesForImportedIds (mkCoreSubst env1) rules
+                ; rules1 = substRulesForImportedIds (mkCoreSubst (text "imp-rules") env1) rules
 	        } ;
 
 		-- Stop if nothing happened; don't dump output

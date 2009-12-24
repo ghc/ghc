@@ -17,15 +17,13 @@ module CoreArity (
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import CoreSubst
 import Demand
-import TyCon	( isRecursiveTyCon )
-import qualified CoreSubst
-import CoreSubst ( Subst, substBndr, substBndrs, substExpr
-       		 , mkEmptySubst, isEmptySubst )
 import Var
 import VarEnv
 import Id
 import Type
+import TyCon	( isRecursiveTyCon )
 import TcType	( isDictLikeTy )
 import Coercion
 import BasicTypes
@@ -613,10 +611,12 @@ mkEtaWW orig_n in_scope orig_ty
        		--  	eta_expand 1 e T
        		-- We want to get
        		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
-         go n subst ty' (EtaCo (substTy subst co) : eis)
+         go n subst ty' (EtaCo (Type.substTy subst co) : eis)
+-------
 
        | otherwise	       	           -- We have an expression of arity > 0, 
-       = (getTvInScope subst, reverse eis) -- but its type isn't a function. 
+       = WARN( True, ppr orig_n <+> ppr orig_ty )
+         (getTvInScope subst, reverse eis) -- but its type isn't a function. 
     	-- This *can* legitmately happen:
     	-- e.g.  coerce Int (\x. x) Essentially the programmer is
 	-- playing fast and loose with types (Happy does this a lot).
@@ -625,22 +625,13 @@ mkEtaWW orig_n in_scope orig_ty
    
 
 --------------
--- Avoiding unnecessary substitution
+-- Avoiding unnecessary substitution; use short-cutting versions
 
 subst_expr :: Subst -> CoreExpr -> CoreExpr
-subst_expr s e | isEmptySubst s = e
-	       | otherwise      = substExpr s e
+subst_expr = substExprSC (text "CoreArity:substExpr")
 
 subst_bind :: Subst -> CoreBind -> (Subst, CoreBind)
-subst_bind subst (NonRec b r)
-  = (subst', NonRec b' (subst_expr subst r))
-  where
-    (subst', b') = substBndr subst b
-subst_bind subst (Rec prs)
-  = (subst', Rec (bs1 `zip` map (subst_expr subst') rhss))
-  where
-    (bs, rhss) = unzip prs
-    (subst', bs1) = substBndrs subst bs 
+subst_bind = substBindSC
 
 
 --------------
@@ -655,7 +646,7 @@ freshEtaId :: Int -> TvSubst -> Type -> (TvSubst, Id)
 freshEtaId n subst ty
       = (subst', eta_id')
       where
-        ty'     = substTy subst ty
+        ty'     = Type.substTy subst ty
 	eta_id' = uniqAway (getTvInScope subst) $
 		  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
 	subst'  = extendTvInScope subst eta_id'		  

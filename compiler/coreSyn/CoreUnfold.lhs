@@ -1206,7 +1206,7 @@ exprIsConApp_maybe id_unf expr
 	= Nothing
 
     beta fun pairs args
-        = case analyse (substExpr subst fun) args of
+        = case analyse (substExpr (text "subst-expr-is-con-app") subst fun) args of
 	    Nothing  -> -- pprTrace "Bale out! exprIsConApp_maybe" doc $
 	    	        Nothing
 	    Just ans -> -- pprTrace "Woo-hoo! exprIsConApp_maybe" doc $

@@ -12,7 +12,8 @@ module CoreSubst (
 
         -- ** Substituting into expressions and related types
 	deShadowBinds, substSpec, substRulesForImportedIds,
-	substTy, substExpr, substBind, substUnfolding,
+	substTy, substExpr, substExprSC, substBind, substBindSC,
+        substUnfolding, substUnfoldingSC,
 	substUnfoldingSource, lookupIdSubst, lookupTvSubst, substIdOcc,
 
         -- ** Operations on substitutions
@@ -212,13 +213,13 @@ extendSubstList subst []	      = subst
 extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var rhs) prs
 
 -- | Find the substitution for an 'Id' in the 'Subst'
-lookupIdSubst :: Subst -> Id -> CoreExpr
-lookupIdSubst (Subst in_scope ids _) v
+lookupIdSubst :: SDoc -> Subst -> Id -> CoreExpr
+lookupIdSubst doc (Subst in_scope ids _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope ) 
+  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope $$ doc) 
 		Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
@@ -282,11 +283,20 @@ instance Outputable Subst where
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]
-substExpr :: Subst -> CoreExpr -> CoreExpr
-substExpr subst expr
+substExprSC :: SDoc -> Subst -> CoreExpr -> CoreExpr
+substExprSC _doc subst orig_expr
+  | isEmptySubst subst = orig_expr
+  | otherwise          = -- pprTrace "enter subst-expr" (doc $$ ppr orig_expr) $
+                         subst_expr subst orig_expr
+
+substExpr :: SDoc -> Subst -> CoreExpr -> CoreExpr
+substExpr _doc subst orig_expr = subst_expr subst orig_expr
+
+subst_expr :: Subst -> CoreExpr -> CoreExpr
+subst_expr subst expr
   = go expr
   where
-    go (Var v)	       = lookupIdSubst subst v 
+    go (Var v)	       = lookupIdSubst (text "subst_expr") subst v 
     go (Type ty)       = Type (substTy subst ty)
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
@@ -295,11 +305,11 @@ substExpr subst expr
 	-- Optimise coercions as we go; this is good, for example
 	-- in the RHS of rules, which are only substituted in
 
-    go (Lam bndr body) = Lam bndr' (substExpr subst' body)
+    go (Lam bndr body) = Lam bndr' (subst_expr subst' body)
 		       where
 			 (subst', bndr') = substBndr subst bndr
 
-    go (Let bind body) = Let bind' (substExpr subst' body)
+    go (Let bind body) = Let bind' (subst_expr subst' body)
 		       where
 			 (subst', bind') = substBind subst bind
 
@@ -307,7 +317,7 @@ substExpr subst expr
 			         where
 			  	 (subst', bndr') = substBndr subst bndr
 
-    go_alt subst (con, bndrs, rhs) = (con, bndrs', substExpr subst' rhs)
+    go_alt subst (con, bndrs, rhs) = (con, bndrs', subst_expr subst' rhs)
 				 where
 				   (subst', bndrs') = substBndrs subst bndrs
 
@@ -315,16 +325,32 @@ substExpr subst expr
 
 -- | Apply a substititon to an entire 'CoreBind', additionally returning an updated 'Subst'
 -- that should be used by subsequent substitutons.
-substBind :: Subst -> CoreBind -> (Subst, CoreBind)
-substBind subst (NonRec bndr rhs) = (subst', NonRec bndr' (substExpr subst rhs))
+substBind, substBindSC :: Subst -> CoreBind -> (Subst, CoreBind)
+
+substBindSC subst bind 	  -- Short-cut if the substitution is empty
+  | not (isEmptySubst subst)
+  = substBind subst bind
+  | otherwise
+  = case bind of
+       NonRec bndr rhs -> (subst', NonRec bndr' rhs)
+          where
+      	    (subst', bndr') = substBndr subst bndr
+       Rec pairs -> (subst', Rec (bndrs' `zip` rhss'))
+          where
+            (bndrs, rhss)    = unzip pairs
+      	    (subst', bndrs') = substRecBndrs subst bndrs
+      	    rhss' | isEmptySubst subst' = rhss
+                  | otherwise	        = map (subst_expr subst') rhss
+
+substBind subst (NonRec bndr rhs) = (subst', NonRec bndr' (subst_expr subst rhs))
 				  where
 				    (subst', bndr') = substBndr subst bndr
 
-substBind subst (Rec pairs) = (subst', Rec pairs')
+substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
 			    where
-				(subst', bndrs') = substRecBndrs subst (map fst pairs)
-				pairs'	= bndrs' `zip` rhss'
-				rhss'	= map (substExpr subst' . snd) pairs
+                                (bndrs, rhss)    = unzip pairs
+				(subst', bndrs') = substRecBndrs subst bndrs
+				rhss' = map (subst_expr subst') rhss
 \end{code}
 
 \begin{code}
@@ -360,7 +386,7 @@ preserve occ info in rules.
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
   | isTyVar bndr  = substTyVarBndr subst bndr
-  | otherwise     = substIdBndr subst subst bndr
+  | otherwise     = substIdBndr (text "var-bndr") subst subst bndr
 
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right
 substBndrs :: Subst -> [Var] -> (Subst, [Var])
@@ -371,18 +397,20 @@ substRecBndrs :: Subst -> [Id] -> (Subst, [Id])
 substRecBndrs subst bndrs 
   = (new_subst, new_bndrs)
   where		-- Here's the reason we need to pass rec_subst to subst_id
-    (new_subst, new_bndrs) = mapAccumL (substIdBndr new_subst) subst bndrs
+    (new_subst, new_bndrs) = mapAccumL (substIdBndr (text "rec-bndr") new_subst) subst bndrs
 \end{code}
 
 
 \begin{code}
-substIdBndr :: Subst		-- ^ Substitution to use for the IdInfo
+substIdBndr :: SDoc 
+            -> Subst		-- ^ Substitution to use for the IdInfo
 	    -> Subst -> Id 	-- ^ Substitition and Id to transform
 	    -> (Subst, Id)	-- ^ Transformed pair
 				-- NB: unfolding may be zapped
 
-substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
-  = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
+substIdBndr _doc rec_subst subst@(Subst in_scope env tvs) old_id
+  = -- pprTrace "substIdBndr" (doc $$ ppr old_id $$ ppr in_scope) $
+    (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
   where
     id1 = uniqAway in_scope old_id	-- id1 is cloned if necessary
     id2 | no_type_change = id1
@@ -507,11 +535,16 @@ substIdInfo subst new_id info
 
 ------------------
 -- | Substitutes for the 'Id's within an unfolding
-substUnfolding :: Subst -> Unfolding -> Unfolding
+substUnfolding, substUnfoldingSC :: Subst -> Unfolding -> Unfolding
 	-- Seq'ing on the returned Unfolding is enough to cause
 	-- all the substitutions to happen completely
+
+substUnfoldingSC subst unf 	 -- Short-cut version
+  | isEmptySubst subst = unf
+  | otherwise          = substUnfolding subst unf
+
 substUnfolding subst (DFunUnfolding con args)
-  = DFunUnfolding con (map (substExpr subst) args)
+  = DFunUnfolding con (map (substExpr (text "dfun-unf") subst) args)
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!
@@ -522,7 +555,7 @@ substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
     new_src `seq`
     unf { uf_tmpl = new_tmpl, uf_src = new_src }
   where
-    new_tmpl = substExpr subst tmpl
+    new_tmpl = substExpr (text "subst-unf") subst tmpl
     new_src  = substUnfoldingSource subst src
 
 substUnfolding _ unf = unf	-- NoUnfolding, OtherCon
@@ -551,7 +584,7 @@ substUnfoldingSource _ src = src
 ------------------
 substIdOcc :: Subst -> Id -> Id
 -- These Ids should not be substituted to non-Ids
-substIdOcc subst v = case lookupIdSubst subst v of
+substIdOcc subst v = case lookupIdSubst (text "substIdOcc") subst v of
 	   	        Var v' -> v'
 			other  -> pprPanic "substIdOcc" (vcat [ppr v <+> ppr other, ppr subst])
 
@@ -585,8 +618,8 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
                                        , ru_fn = fn_name, ru_rhs = rhs })
   = rule { ru_bndrs = bndrs', 
 	   ru_fn    = subst_ru_fn fn_name,
-	   ru_args  = map (substExpr subst') args,
-	   ru_rhs   = substExpr subst' rhs }
+	   ru_args  = map (substExpr (text "subst-rule" <+> ppr fn_name) subst') args,
+	   ru_rhs   = substExpr (text "subst-rule" <+> ppr fn_name) subst' rhs }
   where
     (subst', bndrs') = substBndrs subst bndrs
 
@@ -596,7 +629,7 @@ substVarSet subst fvs
   = foldVarSet (unionVarSet . subst_fv subst) emptyVarSet fvs
   where
     subst_fv subst fv 
-	| isId fv   = exprFreeVars (lookupIdSubst subst fv)
+	| isId fv   = exprFreeVars (lookupIdSubst (text "substVarSet") subst fv)
 	| otherwise = Type.tyVarsOfType (lookupTvSubst subst fv)
 \end{code}
 
@@ -630,7 +663,8 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- may change radically
 
 simpleOptExpr expr
-  = go init_subst (occurAnalyseExpr expr)
+  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
+    go init_subst (occurAnalyseExpr expr)
   where
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 	-- It's potentially important to make a proper in-scope set
@@ -643,7 +677,7 @@ simpleOptExpr expr
 	-- It's a bit painful to call exprFreeVars, because it makes
 	-- three passes instead of two (occ-anal, and go)
 
-    go subst (Var v)          = lookupIdSubst subst v
+    go subst (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
     go subst (App e1 e2)      = App (go subst e1) (go subst e2)
     go subst (Type ty)        = Type (substTy subst ty)
     go _     (Lit lit)        = Lit lit

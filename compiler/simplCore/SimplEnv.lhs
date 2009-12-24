@@ -5,8 +5,8 @@
 
 \begin{code}
 module SimplEnv (
-	InId, InBind, InExpr, InAlt, InArg, InType, InBndr,
-	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr,
+	InId, InBind, InExpr, InAlt, InArg, InType, InBndr, InVar,
+	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr, OutVar,
         InCoercion, OutCoercion,
 
 	-- The simplifier mode
@@ -29,7 +29,7 @@ module SimplEnv (
 
 	simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs, 
  	simplBinder, simplBinders, addBndrRules,
-	substExpr, substTy, getTvSubst, mkCoreSubst,
+	substExpr, substTy, substTyVar, getTvSubst, mkCoreSubst,
 
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
@@ -50,9 +50,9 @@ import VarEnv
 import VarSet
 import OrdList
 import Id
-import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substUnfolding )
-import qualified Type		( substTy, substTyVarBndr )
-import Type hiding		( substTy, substTyVarBndr )
+import qualified CoreSubst
+import qualified Type		( substTy, substTyVarBndr, substTyVar )
+import Type hiding		( substTy, substTyVarBndr, substTyVar )
 import Coercion
 import BasicTypes	
 import MonadUtils
@@ -70,6 +70,7 @@ import Data.List
 
 \begin{code}
 type InBndr     = CoreBndr
+type InVar      = Var			-- Not yet cloned
 type InId       = Id			-- Not yet cloned
 type InType     = Type			-- Ditto
 type InBind     = CoreBind
@@ -79,6 +80,7 @@ type InArg      = CoreArg
 type InCoercion = Coercion
 
 type OutBndr     = CoreBndr
+type OutVar	 = Var			-- Cloned
 type OutId	 = Id			-- Cloned
 type OutTyVar	 = TyVar		-- Cloned
 type OutType	 = Type			-- Cloned
@@ -673,7 +675,7 @@ addBndrRules env in_id out_id
   | isEmptySpecInfo old_rules = (env, out_id)
   | otherwise = (modifyInScope env final_id, final_id)
   where
-    subst     = mkCoreSubst env
+    subst     = mkCoreSubst (text "local rules") env
     old_rules = idSpecialisation in_id
     new_rules = CoreSubst.substSpec subst out_id old_rules
     final_id  = out_id `setIdSpecialisation` new_rules
@@ -694,6 +696,9 @@ getTvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env })
 substTy :: SimplEnv -> Type -> Type 
 substTy env ty = Type.substTy (getTvSubst env) ty
 
+substTyVar :: SimplEnv -> TyVar -> Type 
+substTyVar env tv = Type.substTyVar (getTvSubst env) tv
+
 substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
 substTyVarBndr env tv
   = case Type.substTyVarBndr (getTvSubst env) tv of
@@ -705,15 +710,16 @@ substTyVarBndr env tv
 -- here.  I think the this will not usually result in a lot of work;
 -- the substitutions are typically small, and laziness will avoid work in many cases.
 
-mkCoreSubst  :: SimplEnv -> CoreSubst.Subst
-mkCoreSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seIdSubst = id_env })
+mkCoreSubst  :: SDoc -> SimplEnv -> CoreSubst.Subst
+mkCoreSubst doc (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seIdSubst = id_env })
   = mk_subst tv_env id_env
   where
     mk_subst tv_env id_env = CoreSubst.mkSubst in_scope tv_env (mapVarEnv fiddle id_env)
 
     fiddle (DoneEx e)       = e
     fiddle (DoneId v)       = Var v
-    fiddle (ContEx tv id e) = CoreSubst.substExpr (mk_subst tv id) e
+    fiddle (ContEx tv id e) = CoreSubst.substExpr (text "mkCoreSubst" <+> doc) (mk_subst tv id) e
+    	   	      	      			-- Don't shortcut here
 
 ------------------
 substIdType :: SimplEnv -> Id -> Id
@@ -727,12 +733,14 @@ substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
     old_ty = idType id
 
 ------------------
-substExpr :: SimplEnv -> CoreExpr -> CoreExpr
-substExpr env expr = CoreSubst.substExpr (mkCoreSubst env) expr
+substExpr :: SDoc -> SimplEnv -> CoreExpr -> CoreExpr
+substExpr doc env
+  = CoreSubst.substExprSC (text "SimplEnv.substExpr1" <+> doc) 
+                          (mkCoreSubst (text "SimplEnv.substExpr2" <+> doc) env) 
   -- Do *not* short-cut in the case of an empty substitution
   -- See CoreSubst: Note [Extending the Subst]
 
 substUnfolding :: SimplEnv -> Unfolding -> Unfolding
-substUnfolding env unf = CoreSubst.substUnfolding (mkCoreSubst env) unf
+substUnfolding env unf = CoreSubst.substUnfoldingSC (mkCoreSubst (text "subst-unfolding") env) unf
 \end{code}
 

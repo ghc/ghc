@@ -570,7 +570,7 @@ lookupHowBound :: ScEnv -> Id -> Maybe HowBound
 lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
 
 scSubstId :: ScEnv -> Id -> CoreExpr
-scSubstId env v = lookupIdSubst (sc_subst env) v
+scSubstId env v = lookupIdSubst (text "scSubstId") (sc_subst env) v
 
 scSubstTy :: ScEnv -> Type -> Type
 scSubstTy env ty = substTy (sc_subst env) ty

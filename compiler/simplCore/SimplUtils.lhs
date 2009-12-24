@@ -147,8 +147,8 @@ instance Outputable SimplCont where
 					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
   ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select dup bndr alts _ cont)  = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
-				       (nest 4 (ppr alts)) $$ ppr cont 
+  ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
+				       (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
 
 data DupFlag = OkToDup | NoDup
@@ -222,12 +222,21 @@ countArgs :: SimplCont -> Int
 countArgs (ApplyTo _ _ _ cont) = 1 + countArgs cont
 countArgs _                    = 0
 
-contArgs :: SimplCont -> ([OutExpr], SimplCont)
+contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Uses substitution to turn each arg into an OutExpr
-contArgs cont = go [] cont
+contArgs cont@(ApplyTo {})
+  = case go [] cont of { (args, cont') -> (False, args, cont') }
   where
-    go args (ApplyTo _ arg se cont) = go (substExpr se arg : args) cont
-    go args cont		    = (reverse args, cont)
+    go args (ApplyTo _ arg se cont)
+      | isTypeArg arg = go args                           cont
+      | otherwise     = go (is_interesting arg se : args) cont
+    go args cont      = (reverse args, cont)
+
+    is_interesting arg se = interestingArg (substExpr (text "contArgs") se arg)
+    		   -- Do *not* use short-cutting substitution here
+		   -- because we want to get as much IdInfo as possible
+
+contArgs cont = (True, [], cont)
 
 pushArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
 pushArgs _env []         cont = cont
@@ -1282,7 +1291,7 @@ abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExp
 abstractFloats main_tvs body_env body
   = ASSERT( notNull body_floats )
     do	{ (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
-	; return (float_binds, CoreSubst.substExpr subst body) }
+	; return (float_binds, CoreSubst.substExpr (text "abstract_floats1") subst body) }
   where
     main_tv_set = mkVarSet main_tvs
     body_floats = getFloats body_env
@@ -1295,7 +1304,7 @@ abstractFloats main_tvs body_env body
 		 subst'   = CoreSubst.extendIdSubst subst id poly_app
 	   ; return (subst', (NonRec poly_id poly_rhs)) }
       where
-	rhs' = CoreSubst.substExpr subst rhs
+	rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
 	tvs_here | any isCoVar main_tvs = main_tvs	-- Note [Abstract over coercions]
 		 | otherwise 
 		 = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
@@ -1319,7 +1328,8 @@ abstractFloats main_tvs body_env body
     abstract subst (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly tvs_here) ids
 	    ; let subst' = CoreSubst.extendSubstList subst (ids `zip` poly_apps)
-		  poly_rhss = [mkLams tvs_here (CoreSubst.substExpr subst' rhs) | rhs <- rhss]
+		  poly_rhss = [mkLams tvs_here (CoreSubst.substExpr (text "abstract_floats3") subst' rhs) 
+                              | rhs <- rhss]
 	    ; return (subst', Rec (poly_ids `zip` poly_rhss)) }
        where
 	 (ids,rhss) = unzip prs

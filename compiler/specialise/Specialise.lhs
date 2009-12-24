@@ -588,7 +588,7 @@ specProgram us binds = initSM us $
 
 \begin{code}
 specVar :: Subst -> Id -> CoreExpr
-specVar subst v = lookupIdSubst subst v
+specVar subst v = lookupIdSubst (text "specVar") subst v
 
 specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 -- We carry a substitution down:

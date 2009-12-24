@@ -10,7 +10,7 @@ module Simplify ( simplTopBinds, simplExpr ) where
 
 import DynFlags
 import SimplMonad
-import Type hiding      ( substTy, extendTvSubst )
+import Type hiding      ( substTy, extendTvSubst, substTyVar )
 import SimplEnv
 import SimplUtils
 import FamInstEnv	( FamInstEnv )
@@ -534,6 +534,7 @@ makeTrivial env expr = makeTrivialWithInfo env vanillaIdInfo expr
 makeTrivialWithInfo :: SimplEnv -> IdInfo -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Propagate strictness and demand info to the new binder
 -- Note [Preserve strictness when floating coercions]
+-- Returned SimplEnv has same substitution as incoming one
 makeTrivialWithInfo env info expr
   | exprIsTrivial expr
   = return (env, expr)
@@ -542,14 +543,17 @@ makeTrivialWithInfo env info expr
         ; let name = mkSystemVarName uniq (fsLit "a")
               var = mkLocalIdWithInfo name (exprType expr) info
         ; env' <- completeNonRecX env False var var expr
-	; return (env', substExpr env' (Var var)) }
-	-- The substitution is needed becase we're constructing a new binding
+	; expr' <- simplVar env' var
+        ; return (env', expr') }
+	-- The simplVar is needed becase we're constructing a new binding
 	--     a = rhs
 	-- And if rhs is of form (rhs1 |> co), then we might get
 	--     a1 = rhs1
 	--     a = a1 |> co
 	-- and now a's RHS is trivial and can be substituted out, and that
 	-- is what completeNonRecX will do
+	-- To put it another way, it's as if we'd simplified
+	--    let var = e in var
 \end{code}
 
 
@@ -670,15 +674,14 @@ simplUnfolding :: SimplEnv-> TopLevelFlag
 simplUnfolding env _ _ _ _ (DFunUnfolding con ops)
   = return (DFunUnfolding con ops')
   where
-    ops' = map (CoreSubst.substExpr (mkCoreSubst env)) ops
+    ops' = map (substExpr (text "simplUnfolding") env) ops
 
 simplUnfolding env top_lvl id _ _ 
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
                    , uf_src = src, uf_guidance = guide })
   | isInlineRuleSource src
-  = -- pprTrace "su" (vcat [ppr id, ppr act, ppr (getMode env), ppr (getMode rule_env)]) $
-    do { expr' <- simplExpr rule_env expr
-       ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst env) src
+  = do { expr' <- simplExpr rule_env expr
+       ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst (text "inline-unf") env) src
        ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
   where
@@ -820,7 +823,7 @@ simplExprF env e cont
 
 simplExprF' :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplEnv, OutExpr)
-simplExprF' env (Var v)        cont = simplVar env v cont
+simplExprF' env (Var v)        cont = simplVarF env v cont
 simplExprF' env (Lit lit)      cont = rebuild env (Lit lit) cont
 simplExprF' env (Note n expr)  cont = simplNote env n expr cont
 simplExprF' env (Cast body co) cont = simplCast env body co cont
@@ -990,7 +993,7 @@ simplCast env body co0 cont0
            --    (->) t1 t2 ~ (->) s1 s2
            [co1, co2] = decomposeCo 2 co
            new_arg    = mkCoerce (mkSymCoercion co1) arg'
-           arg'       = substExpr (arg_se `setInScope` env) arg
+           arg'       = substExpr (text "move-cast") (arg_se `setInScope` env) arg
 
        add_coerce co _ cont = CoerceIt co cont
 \end{code}
@@ -1092,13 +1095,24 @@ simplNote env (CoreNote s) e cont
 
 %************************************************************************
 %*                                                                      *
-\subsection{Dealing with calls}
+                     Variables
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
-simplVar :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
-simplVar env var cont
+simplVar :: SimplEnv -> InVar -> SimplM OutExpr
+-- Look up an InVar in the environment
+simplVar env var
+  | isTyVar var 
+  = return (Type (substTyVar env var))
+  | otherwise
+  = case substId env var of
+        DoneId var1      -> return (Var var1)
+        DoneEx e         -> return e
+        ContEx tvs ids e -> simplExpr (setSubstEnv env tvs ids) e
+
+simplVarF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplEnv, OutExpr)
+simplVarF env var cont
   = case substId env var of
         DoneEx e         -> simplExprF (zapSubstEnv env) e cont
         ContEx tvs ids e -> simplExprF (setSubstEnv env tvs ids) e cont
@@ -1120,24 +1134,23 @@ completeCall :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
 completeCall env var cont
   = do  {   ------------- Try inlining ----------------
           dflags <- getDOptsSmpl
-        ; let  (args,call_cont) = contArgs cont
+        ; let  (lone_variable, arg_infos, call_cont) = contArgs cont
                 -- The args are OutExprs, obtained by *lazily* substituting
                 -- in the args found in cont.  These args are only examined
                 -- to limited depth (unless a rule fires).  But we must do
                 -- the substitution; rule matching on un-simplified args would
                 -- be bogus
 
-               arg_infos  = [interestingArg arg | arg <- args, isValArg arg]
                n_val_args = length arg_infos
                interesting_cont = interestingCallContext call_cont
                unfolding    = activeUnfolding env var
                maybe_inline = callSiteInline dflags var unfolding
-                                             (null args) arg_infos interesting_cont
+                                             lone_variable arg_infos interesting_cont
         ; case maybe_inline of {
-            Just unfolding      -- There is an inlining!
+            Just expr      -- There is an inlining!
               ->  do { tick (UnfoldingDone var)
-                     ; trace_inline dflags unfolding args call_cont $
-                       simplExprF (zapSubstEnv env) unfolding cont }
+                     ; trace_inline dflags expr cont $
+                       simplExprF (zapSubstEnv env) expr cont }
 
             ; Nothing -> do               -- No inlining!
 
@@ -1146,7 +1159,7 @@ completeCall env var cont
         ; rebuildCall env info cont
     }}}
   where
-    trace_inline dflags unfolding args call_cont stuff
+    trace_inline dflags unfolding cont stuff
       | not (dopt Opt_D_dump_inlinings dflags) = stuff
       | not (dopt Opt_D_verbose_core2core dflags) 
       = if isExternalName (idName var) then 
@@ -1154,9 +1167,8 @@ completeCall env var cont
         else stuff
       | otherwise
       = pprTrace ("Inlining done: " ++ showSDoc (ppr var))
-           (vcat [text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
-                  text "Inlined fn: " <+> nest 2 (ppr unfolding),
-                  text "Cont:  " <+> ppr call_cont])
+           (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
+                  text "Cont:  " <+> ppr cont])
            stuff
 
 rebuildCall :: SimplEnv
@@ -1501,7 +1513,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
 
 rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
-  = do { let rhs' = substExpr env rhs
+  = do { let rhs' = substExpr (text "rebuild-case") env rhs
              out_args = [Type (substTy env (idType case_bndr)), 
 	     	         Type (exprType rhs'), scrut, rhs']
 	     	      -- Lazily evaluated, so we don't do most of this
@@ -1638,7 +1650,7 @@ simplAlts :: SimplEnv
 -- it does not return an environment
 
 simplAlts env scrut case_bndr alts cont'
-  = -- pprTrace "simplAlts" (ppr alts $$ ppr (seIdSubst env)) $
+  = -- pprTrace "simplAlts" (ppr alts $$ ppr (seTvSubst env)) $
     do  { let env0 = zapFloats env
 
         ; (env1, case_bndr1) <- simplBinder env0 case_bndr
@@ -1787,23 +1799,8 @@ knownCon :: SimplEnv
          -> SimplM (SimplEnv, OutExpr)
 
 knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
-  = do  { env' <- bind_args env bs dc_args
-        ; let
-                -- It's useful to bind bndr to scrut, rather than to a fresh
-                -- binding      x = Con arg1 .. argn
-                -- because very often the scrut is a variable, so we avoid
-                -- creating, and then subsequently eliminating, a let-binding
-                -- BUT, if scrut is a not a variable, we must be careful
-                -- about duplicating the arg redexes; in that case, make
-                -- a new con-app from the args
-                bndr_rhs | exprIsTrivial scrut = scrut
-			 | otherwise           = con_app
-                con_app = Var (dataConWorkId dc) 
-                          `mkTyApps` dc_ty_args
-                          `mkApps`   [substExpr env' (varToCoreExpr b) | b <- bs]
-                         -- dc_ty_args are aready OutTypes, but bs are InBndrs
-
-        ; env'' <- simplNonRecX env' bndr bndr_rhs
+  = do  { env'  <- bind_args env bs dc_args
+        ; env'' <- bind_case_bndr env'
         ; simplExprF env'' rhs cont }
   where
     zap_occ = zapCasePatIdOcc bndr    -- bndr is an InId
@@ -1830,6 +1827,24 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
       pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr dc_args $$
                              text "scrut:" <+> ppr scrut
 
+       -- It's useful to bind bndr to scrut, rather than to a fresh
+       -- binding      x = Con arg1 .. argn
+       -- because very often the scrut is a variable, so we avoid
+       -- creating, and then subsequently eliminating, a let-binding
+       -- BUT, if scrut is a not a variable, we must be careful
+       -- about duplicating the arg redexes; in that case, make
+       -- a new con-app from the args
+    bind_case_bndr env
+      | isDeadBinder bndr   = return env
+      | exprIsTrivial scrut = return (extendIdSubst env bndr (DoneEx scrut))
+      | otherwise           = do { dc_args <- mapM (simplVar env) bs
+      			      	         -- dc_ty_args are aready OutTypes, 
+					 -- but bs are InBndrs
+		    	         ; let con_app = Var (dataConWorkId dc) 
+                          			 `mkTyApps` dc_ty_args      
+                          			 `mkApps`   dc_args
+      			         ; simplNonRecX env bndr con_app }
+  
 -------------------
 missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExpr)
    		-- This isn't strictly an error, although it is unusual. 
