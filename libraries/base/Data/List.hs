@@ -793,10 +793,50 @@ sort = sortBy compare
 sortBy cmp = foldr (insertBy cmp) []
 #else
 
+{-
+GHC's mergesort replaced by a better implementation, 24/12/2009.
+This code originally contributed to the nhc12 compiler by Thomas Nordin
+in 2002.  Rumoured to have been based on code by Lennart Augustsson, e.g.
+    http://www.mail-archive.com/haskell@haskell.org/msg01822.html
+and possibly to bear similarities to a 1982 paper by Richard O'Keefe:
+"A smooth applicative merge sort".
+
+Benchmarks show it to be often 2x the speed of the previous implementation.
+Fixes ticket http://hackage.haskell.org/trac/ghc/ticket/2143
+-}
+
+sort = sortBy compare
+sortBy cmp = mergeAll . sequences
+  where
+    sequences (a:b:xs)
+      | a `cmp` b == GT = descending b [a]  xs
+      | otherwise       = ascending  b (a:) xs
+    sequences xs = [xs]
+
+    descending a as (b:bs)
+      | a `cmp` b == GT = descending b (a:as) bs
+    descending a as bs  = (a:as): sequences bs
+
+    ascending a as (b:bs)
+      | a `cmp` b /= GT = ascending b (\ys -> as (a:ys)) bs
+    ascending a as bs   = as [a]: sequences bs
+
+    mergeAll [x] = x
+    mergeAll xs  = mergeAll (mergePairs xs)
+
+    mergePairs (a:b:xs) = merge a b: mergePairs xs
+    mergePairs xs       = xs
+
+    merge as@(a:as') bs@(b:bs')
+      | a `cmp` b == GT = b:merge as  bs'
+      | otherwise       = a:merge as' bs
+    merge [] bs         = bs
+    merge as []         = as
+
+{-
 sortBy cmp l = mergesort cmp l
 sort l = mergesort compare l
 
-{-
 Quicksort replaced by mergesort, 14/5/2002.
 
 From: Ian Lynagh <igloo@earth.li>
@@ -837,7 +877,6 @@ func            100000           sorted        sort        5831.47
 func            100000           sorted        mergesort   2.23
 func            100000           revsorted     sort        5872.34
 func            100000           revsorted     mergesort   2.24
--}
 
 mergesort :: (a -> a -> Ordering) -> [a] -> [a]
 mergesort cmp = mergesort' cmp . map wrap
@@ -863,8 +902,9 @@ merge cmp (x:xs) (y:ys)
 wrap :: a -> [a]
 wrap x = [x]
 
-{-
-OLD: qsort version
+
+
+OLDER: qsort version
 
 -- qsort is stable and does not concatenate.
 qsort :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
