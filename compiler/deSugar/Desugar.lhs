@@ -28,7 +28,7 @@ import Module
 import RdrName
 import NameSet
 import Rules
-import CoreMonad	( endPass )
+import CoreMonad	( endPass, CoreToDo(..) )
 import ErrUtils
 import Outputable
 import SrcLoc
@@ -114,7 +114,7 @@ deSugar hsc_env
 	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
 	-- Lint result if necessary
-	; endPass dflags "Desugar" Opt_D_dump_ds ds_binds ds_rules
+	; endPass dflags CoreDesugar ds_binds ds_rules
 
 	-- Dump output
 	; doIfSet (dopt Opt_D_dump_ds dflags) 

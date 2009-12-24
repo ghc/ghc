@@ -130,57 +130,55 @@ simplifyExpr dflags expr
 	}
 
 doCorePasses :: [CorePass] -> ModGuts -> CoreM ModGuts
-doCorePasses passes guts = foldM (flip doCorePass) guts passes
+doCorePasses passes guts 
+  = foldM do_pass guts passes
+  where
+    do_pass guts CoreDoNothing = return guts
+    do_pass guts (CoreDoPasses ps) = doCorePasses ps guts
+    do_pass guts pass 
+       = do { dflags <- getDynFlags
+       	    ; liftIO $ showPass dflags pass
+       	    ; guts' <- doCorePass pass guts
+       	    ; liftIO $ endPass dflags pass (mg_binds guts') (mg_rules guts')
+       	    ; return guts' }
 
 doCorePass :: CorePass -> ModGuts -> CoreM ModGuts
-doCorePass (CoreDoSimplify mode sws) = {-# SCC "Simplify" #-}
-                                       simplifyPgm mode sws
+doCorePass pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
+                                       simplifyPgm pass
 
 doCorePass CoreCSE                   = {-# SCC "CommonSubExpr" #-}   
-	   			       describePass "Common sub-expression" Opt_D_dump_cse $ 
 				       doPass cseProgram
 
 doCorePass CoreLiberateCase          = {-# SCC "LiberateCase" #-}
-	   			       describePass "Liberate case" Opt_D_verbose_core2core $ 
                                        doPassD liberateCase
 
 doCorePass CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
-                                       describePass "Float inwards" Opt_D_verbose_core2core $ 
                                        doPass floatInwards
 
 doCorePass (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
-                                       describePassD (text "Float out" <+> parens (ppr f)) 
-                                                     Opt_D_verbose_core2core $ 
                                        doPassDUM (floatOutwards f)
 
 doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
-                                       describePass "Static argument" Opt_D_verbose_core2core $ 
                                        doPassU doStaticArgs
 
 doCorePass CoreDoStrictness          = {-# SCC "Stranal" #-}
-                                       describePass "Demand analysis" Opt_D_dump_stranal $
                                        doPassDM dmdAnalPgm
 
 doCorePass CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
-                                       describePass "Worker Wrapper binds" Opt_D_dump_worker_wrapper $
                                        doPassU wwTopBinds
 
 doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
-                                       describePassR "Specialise" Opt_D_dump_spec $ 
                                        doPassU specProgram
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
-                                       describePassR "SpecConstr" Opt_D_dump_spec $
                                        specConstrProgram
 
 doCorePass (CoreDoVectorisation be)  = {-# SCC "Vectorise" #-}
-                                       describePass "Vectorisation" Opt_D_dump_vect $ 
                                        vectorise be
 
-doCorePass CoreDoGlomBinds              = dontDescribePass $ doPassDM  glomBinds
-doCorePass CoreDoPrintCore              = dontDescribePass $ observe   printCore
-doCorePass (CoreDoRuleCheck phase pat)  = dontDescribePass $ ruleCheck phase pat
-
+doCorePass CoreDoGlomBinds              = doPassDM  glomBinds
+doCorePass CoreDoPrintCore              = observe   printCore
+doCorePass (CoreDoRuleCheck phase pat)  = ruleCheck phase pat
 doCorePass CoreDoNothing                = return
 doCorePass (CoreDoPasses passes)        = doCorePasses passes
 \end{code}
@@ -192,30 +190,6 @@ doCorePass (CoreDoPasses passes)        = doCorePasses passes
 %************************************************************************
 
 \begin{code}
-
-dontDescribePass :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-dontDescribePass = ($)
-
-describePass :: String -> DynFlag -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-describePass name dflag pass guts = do
-    dflags <- getDynFlags
-    
-    liftIO $ Err.showPass dflags name
-    guts' <- pass guts
-    liftIO $ endPass dflags name dflag (mg_binds guts') (mg_rules guts')
-
-    return guts'
-
-describePassD :: SDoc -> DynFlag -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-describePassD doc = describePass (showSDoc doc)
-
-describePassR :: String -> DynFlag -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-describePassR name dflag pass guts = do
-    guts' <- describePass name dflag pass guts
-    dumpIfSet_dyn Opt_D_dump_rules "Top-level specialisations"
-                (pprRulesForUser (rulesOfBinds (mg_binds guts')))
-    return guts'
-
 printCore _ binds = Err.dumpIfSet True "Print Core" (pprCoreBindings binds)
 
 ruleCheck :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
@@ -468,26 +442,23 @@ glomBinds dflags binds
 %************************************************************************
 
 \begin{code}
-simplifyPgm :: SimplifierMode -> [SimplifierSwitch] -> ModGuts -> CoreM ModGuts
-simplifyPgm mode switches
-  = describePassD doc Opt_D_dump_simpl_phases $ \guts -> 
-    do { hsc_env <- getHscEnv
+simplifyPgm :: CoreToDo -> ModGuts -> CoreM ModGuts
+simplifyPgm pass guts
+  = do { hsc_env <- getHscEnv
        ; us <- getUniqueSupplyM
        ; rb <- getRuleBase
        ; liftIOWithCount $  
-       	 simplifyPgmIO mode switches hsc_env us rb guts }
-  where
-    doc = ptext (sLit "Simplifier Phase") <+> text (showPpr mode) 
+       	 simplifyPgmIO pass hsc_env us rb guts }
 
-simplifyPgmIO :: SimplifierMode
-	      -> [SimplifierSwitch]
+simplifyPgmIO :: CoreToDo
 	      -> HscEnv
 	      -> UniqSupply
 	      -> RuleBase
 	      -> ModGuts
 	      -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgmIO mode switches hsc_env us hpt_rule_base 
+simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
+              hsc_env us hpt_rule_base 
               guts@(ModGuts { mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
   = do {
@@ -505,10 +476,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
   where
     dflags     	 = hsc_dflags hsc_env
     dump_phase 	 = dumpSimplPhase dflags mode
-		   
-    sw_chkr	   = isAmongSimpl switches
-    max_iterations = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
- 
+    sw_chkr	 = isAmongSimpl switches
     do_iteration :: UniqSupply
                  -> Int		-- Counts iterations
 		 -> SimplCount	-- Logs optimisations performed
@@ -587,7 +555,7 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
 	   let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
 		-- Dump the result of this iteration
-	   end_iteration dflags mode iteration_no max_iterations counts1 binds2 rules1 ;
+	   end_iteration dflags pass iteration_no counts1 binds2 rules1 ;
 
 		-- Loop
   	   do_iteration us2 (iteration_no + 1) all_counts binds2 rules1
@@ -596,18 +564,15 @@ simplifyPgmIO mode switches hsc_env us hpt_rule_base
   	  (us1, us2) = splitUniqSupply us
 
 -------------------
-end_iteration :: DynFlags -> SimplifierMode -> Int -> Int 
+end_iteration :: DynFlags -> CoreToDo -> Int 
              -> SimplCount -> [CoreBind] -> [CoreRule] -> IO ()
 -- Same as endIteration but with simplifier counts
-end_iteration dflags mode iteration_no max_iterations counts binds rules
-  = do { Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations pass_name
-		             (pprSimplCount counts) ;
+end_iteration dflags pass iteration_no counts binds rules
+  = do { dumpIfSet (dopt Opt_D_dump_simpl_iterations dflags)
+                   pass (ptext (sLit "Simplifier counts"))
+		   (pprSimplCount counts)
 
-       ; endIteration dflags pass_name Opt_D_dump_simpl_iterations binds rules }
-  where
-    pass_name = "Simplifier mode " ++ showPpr mode ++ 
-	     	", iteration " ++ show iteration_no ++
-	     	" out of " ++ show max_iterations
+       ; endIteration dflags pass iteration_no binds rules }
 \end{code}
 
 

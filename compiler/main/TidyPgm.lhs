@@ -18,6 +18,7 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CoreUtils
+import Rules
 import CoreArity	( exprArity, exprBotStrictness_maybe )
 import Class		( classSelIds )
 import VarEnv
@@ -38,11 +39,11 @@ import TyCon
 import Module
 import HscTypes
 import Maybes
-import ErrUtils
 import UniqSupply
 import Outputable
 import FastBool hiding ( fastOr )
 import Util
+import FastString
 
 import Data.List	( sortBy )
 import Data.IORef	( IORef, readIORef, writeIORef )
@@ -133,7 +134,7 @@ mkBootModDetails :: HscEnv -> [AvailInfo] -> NameEnv TyThing
                  -> [Instance] -> [FamInstEnv.FamInst] -> IO ModDetails
 mkBootModDetails hsc_env exports type_env insts fam_insts
   = do	{ let dflags = hsc_dflags hsc_env 
-	; showPass dflags "Tidy [hoot] type env"
+	; showPass dflags CoreTidy
 
 	; let { insts'     = tidyInstances globaliseAndTidyId insts
 	      ; dfun_ids   = map instanceDFunId insts'
@@ -301,7 +302,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 	      ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
 	      ; th	   = dopt Opt_TemplateHaskell      dflags
               }
-	; showPass dflags "Tidy Core"
+	; showPass dflags CoreTidy
 
     	; let { implicit_binds = getImplicitBinds type_env }
 
@@ -342,7 +343,15 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
 	      }
 
-   	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds tidy_rules
+   	; endPass dflags CoreTidy all_tidy_binds tidy_rules
+
+	  -- If the endPass didn't print the rules, but ddump-rules is on, print now
+	; dumpIfSet (dopt Opt_D_dump_rules dflags 
+                     && (not (dopt Opt_D_dump_simpl dflags))) 
+		    CoreTidy
+                    (ptext (sLit "rules"))
+                    (pprRulesForUser tidy_rules)
+
         ; let dir_imp_mods = moduleEnvKeys dir_imps
 
 	; return (CgGuts { cg_module   = mod, 

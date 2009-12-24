@@ -36,7 +36,6 @@ import BasicTypes
 import StaticFlags
 import ListSetOps
 import PrelNames
-import DynFlags
 import Outputable
 import FastString
 import Util
@@ -96,29 +95,11 @@ find an occurence of an Id, we fetch it from the in-scope set.
 
 
 \begin{code}
-lintCoreBindings :: DynFlags -> String -> [CoreBind] -> IO ()
-
-lintCoreBindings dflags _whoDunnit _binds
-  | not (dopt Opt_DoCoreLinting dflags)
-  = return ()
-
-lintCoreBindings dflags whoDunnit binds
-  | isEmptyBag errs
-  = do { showPass dflags ("Core Linted result of " ++ whoDunnit)
-       ; unless (isEmptyBag warns || opt_NoDebugOutput) $ printDump $
-         (banner "warnings" $$ displayMessageBag warns)
-       ; return () }
-
-  | otherwise
-  = do { printDump (vcat [ banner "errors", displayMessageBag errs
-			 , ptext (sLit "*** Offending Program ***")
-			 , pprCoreBindings binds
-			 , ptext (sLit "*** End of Offense ***") ])
-
-       ; ghcExit dflags 1 }
+lintCoreBindings :: [CoreBind] -> (Bag Message, Bag Message)
+--   Returns (warnings, errors)
+lintCoreBindings binds
+  = initL (lint_binds binds)
   where
-    (warns, errs) = initL (lint_binds binds)
-
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
 	-- into use 'unexpectedly'
@@ -128,13 +109,6 @@ lintCoreBindings dflags whoDunnit binds
 
     lint_bind (Rec prs)		= mapM_ (lintSingleBinding TopLevel Recursive) prs
     lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
-
-    banner string = ptext (sLit "*** Core Lint")      <+> text string 
-                    <+> ptext (sLit ": in result of") <+> text whoDunnit 
-                    <+> ptext (sLit "***")
-
-displayMessageBag :: Bag Message -> SDoc
-displayMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 \end{code}
 
 %************************************************************************
@@ -154,7 +128,7 @@ lintUnfolding :: SrcLoc
 
 lintUnfolding locn vars expr
   | isEmptyBag errs = Nothing
-  | otherwise       = Just (displayMessageBag errs)
+  | otherwise       = Just (pprMessageBag errs)
   where
     (_warns, errs) = initL (addLoc (ImportedUnfolding locn) $
                             addInScopeVars vars	           $

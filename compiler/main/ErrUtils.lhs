@@ -5,7 +5,7 @@
 
 \begin{code}
 module ErrUtils (
-	Message, mkLocMessage, printError,
+	Message, mkLocMessage, printError, pprMessageBag,
 	Severity(..),
 
 	ErrMsg, WarnMsg,
@@ -18,7 +18,7 @@ module ErrUtils (
 
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
-	dumpIfSet, dumpIf_core, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or,
+	dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_or,
         mkDumpDoc, dumpSDoc,
 
 	--  * Messages during compilation
@@ -48,6 +48,9 @@ import System.IO
 -- Basic error messages: just render a message with a source location.
 
 type Message = SDoc
+
+pprMessageBag :: Bag Message -> SDoc
+pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
 data Severity
   = SevInfo
@@ -201,19 +204,6 @@ dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag   = return ()
   | otherwise  = printDump (mkDumpDoc hdr doc)
-
-dumpIf_core :: Bool -> DynFlags -> DynFlag -> String -> SDoc -> IO ()
-dumpIf_core cond dflags dflag hdr doc
-  | cond
-    || verbosity dflags >= 4
-    || dopt Opt_D_verbose_core2core dflags
-  = dumpSDoc dflags dflag hdr doc
-
-  | otherwise = return ()
-
-dumpIfSet_core :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
-dumpIfSet_core dflags flag hdr doc
-  = dumpIf_core (dopt flag dflags) dflags flag hdr doc
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc

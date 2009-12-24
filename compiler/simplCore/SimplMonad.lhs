@@ -201,8 +201,6 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
     -- (avoid some unboxing, bounds checking, and other horrible things:)
     \ switch -> unsafeAt sw_tbl $ iBox (tagOf_SimplSwitch switch)
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl)
-	= (iBox (tagOf_SimplSwitch k), SwInt lvl)
     mk_assoc_elem k
 	= (iBox (tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
 
@@ -252,8 +250,7 @@ instance Ord SimplifierSwitch where
 
 
 tagOf_SimplSwitch :: SimplifierSwitch -> FastInt
-tagOf_SimplSwitch (MaxSimplifierIterations _)	= _ILIT(1)
-tagOf_SimplSwitch NoCaseOfCase			= _ILIT(2)
+tagOf_SimplSwitch NoCaseOfCase			= _ILIT(1)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 

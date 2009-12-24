@@ -36,13 +36,13 @@ module CoreMonad (
     getAnnotations, getFirstAnnotations,
     
     -- ** Debug output
-    endPass, endPassIf, endIteration,
+    showPass, endPass, endIteration, dumpIfSet,
 
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS, 
     fatalErrorMsg, fatalErrorMsgS, 
     debugTraceMsg, debugTraceMsgS,
-    dumpIfSet_dyn,
+    dumpIfSet_dyn, 
 
 #ifdef GHCI
     -- * Getting 'Name's
@@ -75,6 +75,7 @@ import TcRnMonad        ( TcM, initTc )
 import Outputable
 import FastString
 import qualified ErrUtils as Err
+import Bag
 import Maybes
 import UniqSupply
 import LazyUniqFM       ( UniqFM, mapUFM, filterUFM )
@@ -106,35 +107,80 @@ be, and it makes a conveneint place.  place for them.  They print out
 stuff before and after core passes, and do Core Lint when necessary.
 
 \begin{code}
-endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
-endPass = dumpAndLint Err.dumpIfSet_core
+showPass :: DynFlags -> CoreToDo -> IO ()
+showPass dflags pass = Err.showPass dflags (showSDoc (ppr pass))
 
-endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
-endPassIf cond = dumpAndLint (Err.dumpIf_core cond)
+endPass :: DynFlags -> CoreToDo -> [CoreBind] -> [CoreRule] -> IO ()
+endPass dflags pass = dumpAndLint dflags True pass empty (coreDumpFlag pass)
 
 -- Same as endPass but doesn't dump Core even with -dverbose-core2core
-endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> [CoreRule] -> IO ()
-endIteration = dumpAndLint Err.dumpIfSet_dyn
+endIteration :: DynFlags -> CoreToDo -> Int -> [CoreBind] -> [CoreRule] -> IO ()
+endIteration dflags pass n
+  = dumpAndLint dflags False pass (ptext (sLit "iteration=") <> int n)
+                (Just Opt_D_dump_simpl_iterations)
 
-dumpAndLint :: (DynFlags -> DynFlag -> String -> SDoc -> IO ())
-            -> DynFlags -> String -> DynFlag 
+dumpIfSet :: Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
+dumpIfSet dump_me pass extra_info doc
+  = Err.dumpIfSet dump_me (showSDoc (ppr pass <+> extra_info)) doc
+
+dumpAndLint :: DynFlags -> Bool -> CoreToDo -> SDoc -> Maybe DynFlag
             -> [CoreBind] -> [CoreRule] -> IO ()
-dumpAndLint dump dflags pass_name dump_flag binds rules
+-- The "show_all" parameter says to print dump if -dverbose-core2core is on
+dumpAndLint dflags show_all pass extra_info mb_dump_flag binds rules
   = do {  -- Report result size if required
 	  -- This has the side effect of forcing the intermediate to be evaluated
        ; Err.debugTraceMsg dflags 2 $
 		(text "    Result size =" <+> int (coreBindsSize binds))
 
 	-- Report verbosely, if required
-       ; dump dflags dump_flag pass_name
-              (pprCoreBindings binds $$ ppUnless (null rules) pp_rules)
+       ; let pass_name = showSDoc (ppr pass <+> extra_info)
+             dump_doc  = pprCoreBindings binds 
+                         $$ ppUnless (null rules) pp_rules
+
+       ; case mb_dump_flag of
+            Nothing        -> return ()
+            Just dump_flag -> Err.dumpIfSet_dyn_or dflags dump_flags pass_name dump_doc
+               where
+                 dump_flags | show_all  = [dump_flag, Opt_D_verbose_core2core]
+		 	    | otherwise = [dump_flag] 
 
 	-- Type check
-       ; lintCoreBindings dflags pass_name binds }
+       ; when (dopt Opt_DoCoreLinting dflags) $
+         do { let (warns, errs) = lintCoreBindings binds
+            ; Err.showPass dflags ("Core Linted result of " ++ pass_name)
+            ; displayLintResults dflags pass warns errs binds  } }
   where
     pp_rules = vcat [ blankLine
                     , ptext (sLit "------ Local rules for imported ids --------")
                     , pprRules rules ]
+
+displayLintResults :: DynFlags -> CoreToDo
+                   -> Bag Err.Message -> Bag Err.Message -> [CoreBind]
+                   -> IO ()
+displayLintResults dflags pass warns errs binds
+  | not (isEmptyBag errs)
+  = do { printDump (vcat [ banner "errors", Err.pprMessageBag errs
+			 , ptext (sLit "*** Offending Program ***")
+			 , pprCoreBindings binds
+			 , ptext (sLit "*** End of Offense ***") ])
+       ; Err.ghcExit dflags 1 }
+
+  | not (isEmptyBag warns)
+  , not opt_NoDebugOutput
+  , showLintWarnings pass
+  = printDump (banner "warnings" $$ Err.pprMessageBag warns)
+
+  | otherwise = return ()
+  where
+    banner string = ptext (sLit "*** Core Lint")      <+> text string 
+                    <+> ptext (sLit ": in result of") <+> ppr pass
+                    <+> ptext (sLit "***")
+
+showLintWarnings :: CoreToDo -> Bool
+-- Disable Lint warnings on the first simplifier pass, because
+-- there may be some INLINE knots still tied, which is tiresomely noisy
+showLintWarnings (CoreDoSimplify (SimplGently {}) _ _) = False
+showLintWarnings _                                     = True
 \end{code}
 
 
@@ -152,9 +198,9 @@ data CoreToDo           -- These are diff core-to-core passes,
 
   = CoreDoSimplify      -- The core-to-core simplifier.
         SimplifierMode
-        [SimplifierSwitch]
-                        -- Each run of the simplifier can take a different
-                        -- set of simplifier-specific flags.
+	Int		       -- Max iterations
+        [SimplifierSwitch]     -- Each run of the simplifier can take a different
+                               -- set of simplifier-specific flags.
   | CoreDoFloatInwards
   | CoreDoFloatOutwards FloatOutSwitches
   | CoreLiberateCase
@@ -164,7 +210,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoSpecConstr
-  | CoreDoOldStrictness
   | CoreDoGlomBinds
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
@@ -173,7 +218,59 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
+  | CoreDesugar	 -- Not strictly a core-to-core pass, but produces
+                 -- Core output, and hence useful to pass to endPass
 
+  | CoreTidy
+  | CorePrep
+
+coreDumpFlag :: CoreToDo -> Maybe DynFlag
+coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_dump_simpl_phases
+coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
+coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoStaticArgs 	      = Just Opt_D_verbose_core2core
+coreDumpFlag CoreDoStrictness 	      = Just Opt_D_dump_stranal
+coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
+coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
+coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
+coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse 
+coreDumpFlag (CoreDoVectorisation {}) = Just Opt_D_dump_vect
+coreDumpFlag CoreDesugar	      = Just Opt_D_dump_ds 
+coreDumpFlag CoreTidy 		      = Just Opt_D_dump_simpl
+coreDumpFlag CorePrep 		      = Just Opt_D_dump_prep
+
+coreDumpFlag CoreDoPrintCore         = Nothing
+coreDumpFlag (CoreDoRuleCheck {})    = Nothing
+coreDumpFlag CoreDoNothing           = Nothing
+coreDumpFlag CoreDoGlomBinds         = Nothing
+coreDumpFlag (CoreDoPasses {})       = Nothing
+
+instance Outputable CoreToDo where
+  ppr (CoreDoSimplify md n _)  = ptext (sLit "Simplifier") 
+                                 <+> ppr md
+                                 <+> ptext (sLit "max-iterations=") <> int n
+  ppr CoreDoFloatInwards       = ptext (sLit "Float inwards")
+  ppr (CoreDoFloatOutwards f)  = ptext (sLit "Float out") <> parens (ppr f)
+  ppr CoreLiberateCase         = ptext (sLit "Liberate case")
+  ppr CoreDoStaticArgs 	       = ptext (sLit "Static argument")
+  ppr CoreDoStrictness 	       = ptext (sLit "Demand analysis")
+  ppr CoreDoWorkerWrapper      = ptext (sLit "Worker Wrapper binds")
+  ppr CoreDoSpecialising       = ptext (sLit "Specialise")
+  ppr CoreDoSpecConstr         = ptext (sLit "SpecConstr")
+  ppr CoreCSE                  = ptext (sLit "Common sub-expression")
+  ppr (CoreDoVectorisation {}) = ptext (sLit "Vectorisation")
+  ppr CoreDesugar	       = ptext (sLit "Desugar")
+  ppr CoreTidy 		       = ptext (sLit "Tidy Core")
+  ppr CorePrep 		       = ptext (sLit "CorePrep")
+  ppr CoreDoPrintCore          = ptext (sLit "Print core")
+  ppr (CoreDoRuleCheck {})     = ptext (sLit "Rule check")
+  ppr CoreDoGlomBinds          = ptext (sLit "Glom binds")
+  ppr CoreDoNothing            = ptext (sLit "CoreDoNothing")
+  ppr (CoreDoPasses {})        = ptext (sLit "CoreDoPasses")
+\end{code}
+
+\begin{code}
 data SimplifierMode             -- See comments in SimplMonad
   = SimplGently
 	{ sm_rules :: Bool	-- Whether RULES are enabled 
@@ -185,7 +282,7 @@ data SimplifierMode             -- See comments in SimplMonad
 
 instance Outputable SimplifierMode where
     ppr (SimplPhase { sm_num = n, sm_names = ss })
-       = int n <+> brackets (text (concat $ intersperse "," ss))
+       = ptext (sLit "Phase") <+> int n <+> brackets (text (concat $ intersperse "," ss))
     ppr (SimplGently { sm_rules = r, sm_inline = i }) 
        = ptext (sLit "gentle") <> 
            brackets (pp_flag r (sLit "rules") <> comma <>
@@ -194,15 +291,16 @@ instance Outputable SimplifierMode where
            pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
 
 data SimplifierSwitch
-  = MaxSimplifierIterations Int
-  | NoCaseOfCase
+  = NoCaseOfCase
+\end{code}
 
+
+\begin{code}
 data FloatOutSwitches = FloatOutSwitches {
         floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
         floatOutConstants :: Bool    -- ^ True <=> float constants to top level,
                                      --            even if they do not escape a lambda
     }
-
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
 
@@ -254,11 +352,10 @@ getCoreToDo dflags
 
     simpl_phase phase names iter
       = CoreDoPasses
-          [ maybe_strictness_before phase,
-            CoreDoSimplify (SimplPhase phase names) [
-              MaxSimplifierIterations iter
-            ],
-            maybe_rule_check phase
+          [ maybe_strictness_before phase
+          , CoreDoSimplify (SimplPhase phase names) 
+                           iter []
+          , maybe_rule_check phase
           ]
 
     vectorisation
@@ -284,6 +381,7 @@ getCoreToDo dflags
         -- initial simplify: mk specialiser happy: minimum effort please
     simpl_gently = CoreDoSimplify 
                        (SimplGently { sm_rules = True, sm_inline = False })
+                       max_iter
                        [
                         --      Simplify "gently"
                         -- Don't inline anything till full laziness has bitten
@@ -295,9 +393,8 @@ getCoreToDo dflags
                         -- Similarly, don't apply any rules until after full
                         -- laziness.  Notably, list fusion can prevent floating.
 
-            NoCaseOfCase,       -- Don't do case-of-case transformations.
+            NoCaseOfCase        -- Don't do case-of-case transformations.
                                 -- This makes full laziness work better
-            MaxSimplifierIterations max_iter
         ]
 
     core_todo =
