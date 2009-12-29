@@ -1633,7 +1633,7 @@ genCCall target dest_regs args = do
 		w  = typeWidth ty
 		r_dest_hi = getHiVRegFromLo r_dest
 		r_dest    = getRegisterReg (CmmLocal dest)
-	assign_code many = panic "genCCall.assign_code many"
+	assign_code many = pprPanic "genCCall.assign_code - too many return values:" (ppr many)
 
     return (push_code `appOL` 
 	    call `appOL` 
