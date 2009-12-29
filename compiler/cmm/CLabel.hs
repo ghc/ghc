@@ -171,7 +171,7 @@ data CLabel
   -- | A label with a baked-in \/ algorithmically generated name that definitely
   --    comes from the RTS. The code for it must compile into libHSrts.a \/ libHSrts.so
   --    If it doesn't have an algorithmically generated name then use a CmmLabel 
-  --    instead and give it an appropriate Module argument.
+  --    instead and give it an appropriate PackageId argument.
   | RtsLabel 			
 	RtsLabelInfo
 
