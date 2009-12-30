@@ -709,7 +709,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
     Capability *free_caps[n_capabilities], *cap0;
     nat i, n_free_caps;
 
-    // migration can be turned off with +RTS -qg
+    // migration can be turned off with +RTS -qm
     if (!RtsFlags.ParFlags.migrate) return;
 
     // Check whether we have more threads on our run queue, or sparks
