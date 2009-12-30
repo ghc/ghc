@@ -779,7 +779,6 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    setTSOLink(cap, prev, t);
 		    prev = t;
 		} else {
-		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
 		    appendToRunQueue(free_caps[i],t);
 
             traceEventMigrateThread (cap, t, free_caps[i]->no);
