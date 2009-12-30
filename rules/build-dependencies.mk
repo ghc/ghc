@@ -101,15 +101,31 @@ endef
 #    "dist/build" directory, so now we've just made
 #    "dist/build/dist/build", so we need to remove the duplication
 #    again
-# "s|$(TOP)/||gi"
-#    Finally, cpp -MM will give us full paths for some files, but this
-#    causes problems on Windows where make interprets the colon in
-#    c:/foo/bar.h as make syntax. So we sed off $(TOP) (case
-#    insensitively, as sometimes you get C:/... when you are expecting
-#    c:/... or vice versa)
+# "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)"
+#    Finally, when making deps for packages like ghc stage2, we have
+#    some include paths for packages registered in the in-tree package
+#    database. These include paths are full (i.e. not relative) paths,
+#    which means that the "cpp -MM" output uses full paths in some cases.
+#    This causes 2 problems:
+#    * they don't match up with the rules to rebuild the files, where
+#      appropriate.
+#    * on Windows, make interprets the colon in c:/foo/bar.h as make
+#      syntax.
+#    So we sed off $(TOP). Unfortunately, on Windows, the case for the
+#    drive letter is sometimes different in what $(TOP) starts with, and
+#    what the path in the package database starts with. We therefore
+#	 need to do the substitution case-insensitively on Windows. But
+#    the s///i modifier isn't portable, so we set CASE_INSENSITIVE_SED
+#    to "i" on Windows and "" on any other platform.
 define addCFileDeps
 
 	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_v_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
-	$(foreach w,$5,sed -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||gi" $3.bit >> $3.tmp &&) true
+	$(foreach w,$5,sed -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
+
+ifeq "$(Windows)" "YES"
+CASE_INSENSITIVE_SED = i
+else
+CASE_INSENSITIVE_SED =
+endif
 
