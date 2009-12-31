@@ -36,7 +36,6 @@ static void scavenge_large_bitmap (StgPtr p,
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 # define evacuate(a) evacuate1(a)
-# define recordMutableGen_GC(a,b) recordMutableGen(a,b)
 # define scavenge_loop(a) scavenge_loop1(a)
 # define scavenge_block(a) scavenge_block1(a)
 # define scavenge_mutable_list(bd,g) scavenge_mutable_list1(bd,g)
