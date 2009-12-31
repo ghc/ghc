@@ -15,62 +15,6 @@ BEGIN_RTS_PRIVATE
 
 /* -----------------------------------------------------------------------------
    Updates
-
-   We have two layers of update macros.  The top layer, UPD_IND() and
-   friends perform all the work of an update.  In detail:
-
-      - if the closure being updated is a blocking queue, then all the
-        threads waiting on the blocking queue are updated.
-
-      - then the lower level updateWithIndirection() macro is invoked 
-        to actually replace the closure with an indirection (see below).
-
-   -------------------------------------------------------------------------- */
-
-#  define SEMI ;
-# define UPD_IND(updclosure, heapptr) \
-   UPD_REAL_IND(updclosure,INFO_PTR(stg_IND_info),heapptr,SEMI)
-# define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
-   UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
-
-/* These macros have to work in both C and C--, so here's the
- * impedance matching:
- */
-#ifdef CMINUSMINUS
-#define BLOCK_BEGIN
-#define BLOCK_END
-#define INFO_PTR(info)      info
-#else
-#define BLOCK_BEGIN         {
-#define BLOCK_END           }
-#define INFO_PTR(info)      &info
-#define StgBlockingQueue_blocking_queue(closure) \
-    (((StgBlockingQueue *)closure)->blocking_queue)
-#endif
-
-/* krc: there used to be an UPD_REAL_IND and an
-   UPD_PERM_IND, the latter of which was used for
-   ticky and cost-centre profiling.
-   for now, we just have UPD_REAL_IND. */
-#define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
-        BLOCK_BEGIN						\
-	updateWithIndirection(ind_info,				\
-			      updclosure,			\
-			      heapptr,				\
-			      and_then);			\
-	BLOCK_END
-
-/* -----------------------------------------------------------------------------
-   Awaken any threads waiting on a blocking queue (BLACKHOLE_BQ).
-   -------------------------------------------------------------------------- */
-
-/* -----------------------------------------------------------------------------
-   Updates: lower-level macros which update a closure with an
-   indirection to another closure.
-
-   There are several variants of this code.
-
-       PROFILING:
    -------------------------------------------------------------------------- */
 
 /* LDV profiling:
@@ -182,7 +126,7 @@ no_slop:
  * invert the optimisation.  Grrrr --SDM).
  */
 #ifdef CMINUSMINUS
-#define generation(n) (W_[generations] + n*SIZEOF_generation)
+
 #define updateWithIndirection(ind_info, p1, p2, and_then)	\
     W_ bd;							\
 								\
@@ -203,32 +147,41 @@ no_slop:
       TICK_UPD_NEW_IND();					\
       and_then;							\
   }
-#else
-#define updateWithIndirection(ind_info, p1, p2, and_then)	\
-  {								\
-    bdescr *bd;							\
-								\
-    ASSERT( (P_)p1 != (P_)p2 );                                 \
-    /* not necessarily true: ASSERT( !closure_IND(p1) ); */     \
-    /* occurs in RaiseAsync.c:raiseAsync() */                   \
-    DEBUG_FILL_SLOP(p1);					\
-    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
-    ((StgInd *)p1)->indirectee = p2;				\
-    write_barrier();						\
-    bd = Bdescr((P_)p1);					\
-    if (bd->gen_no != 0) {					\
-      recordMutableGenLock(p1, bd->gen_no);			\
-      SET_INFO(p1, &stg_IND_OLDGEN_info);			\
-      TICK_UPD_OLD_IND();					\
-      and_then;							\
-    } else {							\
-      SET_INFO(p1, ind_info);					\
-      LDV_RECORD_CREATE(p1);					\
-      TICK_UPD_NEW_IND();					\
-      and_then;							\
-    }								\
-  }
+
+#else /* !CMINUSMINUS */
+
+INLINE_HEADER void updateWithIndirection (Capability *cap, 
+                                          const StgInfoTable *ind_info, 
+                                          StgClosure *p1, 
+                                          StgClosure *p2)
+{
+    bdescr *bd;
+    
+    ASSERT( (P_)p1 != (P_)p2 );
+    /* not necessarily true: ASSERT( !closure_IND(p1) ); */
+    /* occurs in RaiseAsync.c:raiseAsync() */
+    DEBUG_FILL_SLOP(p1);
+    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);
+    ((StgInd *)p1)->indirectee = p2;
+    write_barrier();
+    bd = Bdescr((StgPtr)p1);
+    if (bd->gen_no != 0) {
+        recordMutableCap(p1, cap, bd->gen_no);
+        SET_INFO(p1, &stg_IND_OLDGEN_info);
+        TICK_UPD_OLD_IND();
+    } else {
+        SET_INFO(p1, ind_info);
+        LDV_RECORD_CREATE(p1);
+        TICK_UPD_NEW_IND();
+    }
+}
+
 #endif /* CMINUSMINUS */
+
+#define UPD_IND(cap, updclosure, heapptr)        \
+    updateWithIndirection(cap, &stg_IND_info,    \
+                          updclosure,            \
+                          heapptr)
 
 #ifndef CMINUSMINUS
 END_RTS_PRIVATE

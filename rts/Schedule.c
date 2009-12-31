@@ -2550,7 +2550,8 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
 		SET_HDR(raise_closure, &stg_raise_info, CCCS);
 		raise_closure->payload[0] = exception;
 	    }
-	    UPD_IND(((StgUpdateFrame *)p)->updatee,(StgClosure *)raise_closure);
+	    UPD_IND(cap, ((StgUpdateFrame *)p)->updatee,
+                    (StgClosure *)raise_closure);
 	    p = next;
 	    continue;
 

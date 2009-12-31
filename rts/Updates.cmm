@@ -42,7 +42,10 @@
 	  /* ToDo: it might be a PAP, so we should check... */  	\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));  \
 									\
-	  UPD_SPEC_IND(updatee, stg_IND_direct_info, R1, jump %ENTRY_CODE(Sp(0))); \
+          updateWithIndirection(stg_IND_direct_info,                    \
+			        updatee,                                \
+			        R1,                                     \
+			        jump %ENTRY_CODE(Sp(0)));               \
 	}
 
 #if defined(PROFILING)

@@ -28,7 +28,7 @@
 struct stack_gap { StgWord gap_size; struct stack_gap *next_gap; };
 
 static void
-stackSqueeze(StgTSO *tso, StgPtr bottom)
+stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
 {
     StgPtr frame;
     rtsBool prev_was_update_frame;
@@ -75,7 +75,7 @@ stackSqueeze(StgTSO *tso, StgPtr bottom)
 		 * screw us up if we don't check.
 		 */
 		if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
-		    UPD_IND(upd->updatee, updatee);
+		    UPD_IND(cap, upd->updatee, updatee);
 		}
 
 		// now mark this update frame as a stack gap.  The gap
@@ -316,7 +316,7 @@ end:
     // number of stack words we squeeze away by doing so.
     if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
 	((weight <= 5 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
-	stackSqueeze(tso, (StgPtr)frame);
+	stackSqueeze(cap, tso, (StgPtr)frame);
         tso->flags |= TSO_SQUEEZED;
         // This flag tells threadStackOverflow() that the stack was
         // squeezed, because it may not need to be expanded.

@@ -834,7 +834,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 // Perform the update
                 // TODO: this may waste some work, if the thunk has
                 // already been updated by another thread.
-                UPD_IND(((StgUpdateFrame *)frame)->updatee, (StgClosure *)ap);
+                UPD_IND(cap, ((StgUpdateFrame *)frame)->updatee, (StgClosure *)ap);
             }
 
 	    sp += sizeofW(StgUpdateFrame) - 1;

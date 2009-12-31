@@ -443,7 +443,7 @@ do_return:
         // to a PAP by the GC, violating the invariant that PAPs
         // always contain a tagged pointer to the function.
 	INTERP_TICK(it_retto_UPDATE);
-	UPD_IND(((StgUpdateFrame *)Sp)->updatee, tagged_obj); 
+	UPD_IND(cap, ((StgUpdateFrame *)Sp)->updatee, tagged_obj); 
 	Sp += sizeofW(StgUpdateFrame);
 	goto do_return;
 
