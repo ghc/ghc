@@ -1,15 +1,15 @@
-#!/usr/bin/perl -w
+#!/bin/sh
 
-use strict;
+if [ "$#" -ne 2 ]
+then
+    echo "Usage: $0 <ghc commands> <libdir>"
+    exit 1
+fi
 
-if ($#ARGV ne 1) {
-    die "Usage: $0 <ghc commands> <libdir>\n"
-}
+GHC_COMMANDS="$1"
+LIBDIR="$2"
 
-my @ghc_commands = split / /, $ARGV[0];
-my $libdir = $ARGV[1];
-
-print <<'EOF';
+cat <<'EOF'
 <?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE xsl:stylesheet [
 ]>
@@ -31,18 +31,22 @@ GHC \- the Glasgow Haskell Compiler
 .SH SYNOPSIS
 EOF
 
-my $started = 0;
+STARTED=0
 
-for my $ghc_command (@ghc_commands) {
-    print ".br\n" if $started;
-    $started = 1;
-    print <<"EOF";
-.B $ghc_command
+for GHC_COMMAND in $GHC_COMMANDS
+do
+    if [ "$STARTED" -ne 0 ]
+    then
+        echo ".br"
+    fi
+    STARTED=1
+    cat <<EOF
+.B $GHC_COMMAND
 .RI [ option | filename ]...
 EOF
-}
+done
 
-print <<'EOF';
+cat <<'EOF'
 
 .SH DESCRIPTION
 This manual page documents briefly the
@@ -107,8 +111,9 @@ interface files
 
 .SH FILES
 EOF
-print ".I $libdir";
-print <<'EOF';
+
+echo ".I $LIBDIR"
+cat <<'EOF'
 
 .SH COPYRIGHT
 

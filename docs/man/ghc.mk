@@ -24,8 +24,8 @@ $(MAN_PATH): docs/man/flags.xsl docs/man/flags.xml
 endif
 
 # Insert the commands and the library directory into the man page
-docs/man/flags.xsl: docs/man/gen_flags.xsl.pl
-	$(PERL) $< "$(MAN_GHC_COMMANDS)" "$(libdir)" > $@
+docs/man/flags.xsl: docs/man/gen_flags.xsl.sh
+	$(SHELL) $< "$(MAN_GHC_COMMANDS)" "$(libdir)" > $@
 
 # Re-use the flags documentation from the user's guide by injecting some
 # entities after the XML declaration to make it a stand-alone document.
