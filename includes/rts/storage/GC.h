@@ -167,8 +167,8 @@ void performMajorGC(void);
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-void newCAF     (StgClosure*);
-void newDynCAF  (StgClosure *);
+void newCAF     (StgRegTable *reg, StgClosure *);
+void newDynCAF  (StgRegTable *reg, StgClosure *);
 void revertCAFs (void);
 
 /* -----------------------------------------------------------------------------

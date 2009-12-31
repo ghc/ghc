@@ -94,7 +94,7 @@ initGeneration (generation *gen, int g)
 void
 initStorage( void )
 {
-  nat g;
+    nat g, n;
 
   if (generations != NULL) {
       // multi-init protection
@@ -192,6 +192,13 @@ initStorage( void )
 
   N = 0;
 
+  // allocate a block for each mut list
+  for (n = 0; n < n_capabilities; n++) {
+      for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
+          capabilities[n].mut_lists[g] = allocBlock();
+      }
+  }
+
   initGcThreads();
 
   IF_DEBUG(gc, statDescribeGens());
@@ -234,8 +241,8 @@ freeStorage (void)
 
    newCaf() does the following:
        
-      - it puts the CAF on the oldest generation's mut-once list.
-        This is so that we can treat the CAF as a root when collecting
+      - it puts the CAF on the oldest generation's mutable list.
+        This is so that we treat the CAF as a root when collecting
 	younger generations.
 
    For GHCI, we have additional requirements when dealing with CAFs:
@@ -259,10 +266,8 @@ freeStorage (void)
    -------------------------------------------------------------------------- */
 
 void
-newCAF(StgClosure* caf)
+newCAF(StgRegTable *reg, StgClosure* caf)
 {
-  ACQUIRE_SM_LOCK;
-
 #ifdef DYNAMIC
   if(keepCAFs)
   {
@@ -277,24 +282,19 @@ newCAF(StgClosure* caf)
     // do another hack here and do an address range test on caf to figure
     // out whether it is from a dynamic library.
     ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
+
+    ACQUIRE_SM_LOCK; // caf_list is global, locked by sm_mutex
     ((StgIndStatic *)caf)->static_link = caf_list;
     caf_list = caf;
+    RELEASE_SM_LOCK;
   }
   else
 #endif
   {
-    /* Put this CAF on the mutable list for the old generation.
-    * This is a HACK - the IND_STATIC closure doesn't really have
-    * a mut_link field, but we pretend it has - in fact we re-use
-    * the STATIC_LINK field for the time being, because when we
-    * come to do a major GC we won't need the mut_link field
-    * any more and can use it as a STATIC_LINK.
-    */
+    // Put this CAF on the mutable list for the old generation.
     ((StgIndStatic *)caf)->saved_info = NULL;
-    recordMutableGen(caf, oldest_gen->no);
+    recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
   }
-  
-  RELEASE_SM_LOCK;
 }
 
 // An alternate version of newCaf which is used for dynamically loaded
@@ -307,7 +307,7 @@ newCAF(StgClosure* caf)
 // The linker hackily arranges that references to newCaf from dynamic
 // code end up pointing to newDynCAF.
 void
-newDynCAF(StgClosure *caf)
+newDynCAF (StgRegTable *reg STG_UNUSED, StgClosure *caf)
 {
     ACQUIRE_SM_LOCK;
 

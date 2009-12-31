@@ -560,7 +560,10 @@ link_caf cl_info _is_upd = do
 	-- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten, 
 	-- because the old info table ptr is needed for reversion
-  ; emitRtsCallWithVols rtsPackageId (fsLit "newCAF") [CmmHinted (CmmReg nodeReg) AddrHint] [node] False
+  ; emitRtsCallWithVols rtsPackageId (fsLit "newCAF")
+      [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
+        CmmHinted (CmmReg nodeReg) AddrHint ]
+      [node] False
 	-- node is live, so save it.
 
 	-- Overwrite the closure with a (static) indirection 
