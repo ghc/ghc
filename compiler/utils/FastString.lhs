@@ -99,7 +99,7 @@ import Foreign.C
 import GHC.Exts
 import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
-import Data.IORef       ( IORef, newIORef, readIORef, atomicModifyIORef )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
 
@@ -207,61 +207,100 @@ lookupTbl :: FastStringTable -> Int -> IO [FastString]
 lookupTbl (FastStringTable _ arr#) (I# i#) =
   IO $ \ s# -> readArray# arr# i# s#
 
-updTbl :: FastStringTable -> Int -> [FastString] -> IO FastStringTable
-updTbl (FastStringTable uid arr#) (I# i#) ls = do
+updTbl :: IORef FastStringTable -> FastStringTable -> Int -> [FastString] -> IO ()
+updTbl fs_table_var (FastStringTable uid arr#) (I# i#) ls = do
   (IO $ \ s# -> case writeArray# arr# i# ls s# of { s2# -> (# s2#, () #) })
-  return (FastStringTable (uid+1) arr#)
-
--- | Helper function for various forms of fast string constructors.
-mkFSInternal :: Ptr Word8 -> Int
-             -> (Int -> IO FastString)
-             -> IO FastString
--- The interesting part is the use of unsafePerformIO to make the
--- argument to atomicModifyIORef pure.  This is safe because any
--- effect dependencies are enforced by data dependencies.
--- Furthermore, every result is used and hence there should be no
--- space leaks.
-mkFSInternal ptr len mk_it = do
-  r <- atomicModifyIORef string_table $
-         \fs_tbl@(FastStringTable uid _) ->
-           let h = hashStr ptr len
-               add_it ls = do
-                 fs <- mk_it uid
-                 fst' <- updTbl fs_tbl h (fs:ls)
-                 fs `seq` fst' `seq` return (fst', fs)
-           in unsafePerformIO $ do
-             lookup_result <- lookupTbl fs_tbl h
-             case lookup_result of
-               [] -> add_it []
-               ls -> do
-                 b <- bucket_match ls len ptr
-                 case b of
-                   Nothing -> add_it ls
-                   Just v -> return (fs_tbl, v)
-  r `seq` return r
+  writeIORef fs_table_var (FastStringTable (uid+1) arr#)
 
 mkFastString# :: Addr# -> FastString
 mkFastString# a# = mkFastStringBytes ptr (ptrStrLength ptr)
   where ptr = Ptr a#
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
-mkFastStringBytes ptr len = inlinePerformIO $ do
-  mkFSInternal ptr len (\uid -> copyNewFastString uid ptr len)
+mkFastStringBytes ptr len = unsafePerformIO $ do
+  ft@(FastStringTable uid _) <- readIORef string_table
+  let
+   h = hashStr ptr len
+   add_it ls = do
+        fs <- copyNewFastString uid ptr len
+        updTbl string_table ft h (fs:ls)
+        {- _trace ("new: " ++ show f_str)   $ -}
+        return fs
+  --
+  lookup_result <- lookupTbl ft h
+  case lookup_result of
+    [] -> add_it []
+    ls -> do
+       b <- bucket_match ls len ptr
+       case b of
+         Nothing -> add_it ls
+         Just v  -> {- _trace ("re-use: "++show v) $ -} return v
 
 mkZFastStringBytes :: Ptr Word8 -> Int -> FastString
-mkZFastStringBytes ptr len = inlinePerformIO $ do
-  mkFSInternal ptr len (\uid -> copyNewZFastString uid ptr len)
+mkZFastStringBytes ptr len = unsafePerformIO $ do
+  ft@(FastStringTable uid _) <- readIORef string_table
+  let
+   h = hashStr ptr len
+   add_it ls = do
+        fs <- copyNewZFastString uid ptr len
+        updTbl string_table ft h (fs:ls)
+        {- _trace ("new: " ++ show f_str)   $ -}
+        return fs
+  --
+  lookup_result <- lookupTbl ft h
+  case lookup_result of
+    [] -> add_it []
+    ls -> do
+       b <- bucket_match ls len ptr
+       case b of
+         Nothing -> add_it ls
+         Just v  -> {- _trace ("re-use: "++show v) $ -} return v
 
 -- | Create a 'FastString' from an existing 'ForeignPtr'; the difference
 -- between this and 'mkFastStringBytes' is that we don't have to copy
 -- the bytes if the string is new to the table.
 mkFastStringForeignPtr :: Ptr Word8 -> ForeignPtr Word8 -> Int -> IO FastString
 mkFastStringForeignPtr ptr fp len = do
-  mkFSInternal ptr len (\uid -> mkNewFastString uid ptr fp len)
+  ft@(FastStringTable uid _) <- readIORef string_table
+--  _trace ("hashed: "++show (I# h)) $
+  let
+    h = hashStr ptr len
+    add_it ls = do
+        fs <- mkNewFastString uid ptr fp len
+        updTbl string_table ft h (fs:ls)
+        {- _trace ("new: " ++ show f_str)   $ -}
+        return fs
+  --
+  lookup_result <- lookupTbl ft h
+  case lookup_result of
+    [] -> add_it []
+    ls -> do
+       b <- bucket_match ls len ptr
+       case b of
+         Nothing -> add_it ls
+         Just v  -> {- _trace ("re-use: "++show v) $ -} return v
 
 mkZFastStringForeignPtr :: Ptr Word8 -> ForeignPtr Word8 -> Int -> IO FastString
 mkZFastStringForeignPtr ptr fp len = do
-  mkFSInternal ptr len (\uid -> mkNewZFastString uid ptr fp len)
+  ft@(FastStringTable uid _) <- readIORef string_table
+--  _trace ("hashed: "++show (I# h)) $
+  let
+    h = hashStr ptr len
+    add_it ls = do
+        fs <- mkNewZFastString uid ptr fp len
+        updTbl string_table ft h (fs:ls)
+        {- _trace ("new: " ++ show f_str)   $ -}
+        return fs
+  --
+  lookup_result <- lookupTbl ft h
+  case lookup_result of
+    [] -> add_it []
+    ls -> do
+       b <- bucket_match ls len ptr
+       case b of
+         Nothing -> add_it ls
+         Just v  -> {- _trace ("re-use: "++show v) $ -} return v
+
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
@@ -401,13 +440,13 @@ zEncodeFS fs@(FastString _ _ _ _ enc) =
     ZEncoded -> fs
     UTF8Encoded ref ->
       inlinePerformIO $ do
-        r <- atomicModifyIORef ref $ \m ->
-               case m of
-                 Just fs -> (m, fs)
-                 Nothing ->
-                   let efs = mkZFastString (zEncodeString (unpackFS fs)) in
-                   efs `seq` (Just efs, efs)
-        r `seq` return r
+        m <- readIORef ref
+        case m of
+          Just fs -> return fs
+          Nothing -> do
+            let efs = mkZFastString (zEncodeString (unpackFS fs))
+            writeIORef ref (Just efs)
+            return efs
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastString (unpackFS fs1 ++ unpackFS fs2)
