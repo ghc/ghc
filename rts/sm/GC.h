@@ -29,7 +29,6 @@ extern rtsBool major_gc;
 extern bdescr *mark_stack_bd;
 extern bdescr *mark_stack_top_bd;
 extern StgPtr mark_sp;
-extern StgPtr mark_splim;
 
 extern long copied;
 
