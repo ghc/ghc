@@ -137,7 +137,7 @@ typedef struct StgBlockingQueue_ {
 
 typedef struct {
     StgHeader  header;
-    StgWord    words;
+    StgWord    bytes;
     StgWord    payload[FLEXIBLE_ARRAY];
 } StgArrWords;
 

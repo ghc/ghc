@@ -127,7 +127,7 @@
 
 #define SET_ARR_HDR(c,info,costCentreStack,n_words)	\
    SET_HDR(c,info,costCentreStack);			\
-   (c)->words = n_words;
+   (c)->bytes = n_words*sizeof(W_);
 
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \
@@ -280,8 +280,11 @@ INLINE_HEADER StgOffset ap_sizeW( StgAP* x )
 INLINE_HEADER StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }
 
+INLINE_HEADER StgWord arr_words_words( StgArrWords* x)
+{ return ROUNDUP_BYTES_TO_WDS(x->bytes); }
+
 INLINE_HEADER StgOffset arr_words_sizeW( StgArrWords* x )
-{ return sizeofW(StgArrWords) + x->words; }
+{ return sizeofW(StgArrWords) + arr_words_words(x); }
 
 INLINE_HEADER StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->size; }

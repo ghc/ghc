@@ -293,7 +293,7 @@ printClosure( StgClosure *obj )
             for (i = 0; arrWordsGetChar(obj,i); ++i) {
                 putchar(arrWordsGetChar(obj,i));
 		} */
-	    for (i=0; i<((StgArrWords *)obj)->words; i++)
+	    for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
 	      debugBelch("%lu", (lnat)((StgArrWords *)obj)->payload[i]);
             debugBelch("\")\n");
             break;

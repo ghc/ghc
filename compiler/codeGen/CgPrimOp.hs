@@ -143,16 +143,13 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
                 CmmMayReturn
 
 --  #define sizzeofByteArrayzh(r,a) \
---     r = (((StgArrWords *)(a))->words * sizeof(W_))
+--     r = ((StgArrWords *)(a))->bytes
 emitPrimOp [res] SizeofByteArrayOp [arg] _
    = stmtC $
-	CmmAssign (CmmLocal res) (CmmMachOp mo_wordMul [
-			  cmmLoadIndexW arg fixedHdrSize bWord,
-			  CmmLit (mkIntCLit wORD_SIZE)
-			])
+	CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord)
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
---      r = (((StgArrWords *)(a))->words * sizeof(W_))
+--      r = ((StgArrWords *)(a))->bytes
 emitPrimOp [res] SizeofMutableByteArrayOp [arg] live
    = emitPrimOp [res] SizeofByteArrayOp [arg] live
 

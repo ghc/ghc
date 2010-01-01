@@ -64,7 +64,7 @@ stg_newByteArrayzh
     ("ptr" p) = foreign "C" allocate(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-    StgArrWords_words(p) = payload_words;
+    StgArrWords_bytes(p) = n;
     RET_P(p);
 }
 
@@ -73,10 +73,11 @@ stg_newByteArrayzh
 
 stg_newPinnedByteArrayzh
 {
-    W_ words, bytes, payload_words, p;
+    W_ words, n, bytes, payload_words, p;
 
     MAYBE_GC(NO_PTRS,stg_newPinnedByteArrayzh);
-    bytes = R1;
+    n = R1;
+    bytes = n;
     /* payload_words is what we will tell the profiler we had to allocate */
     payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
     /* When we actually allocate memory, we need to allow space for the
@@ -96,17 +97,19 @@ stg_newPinnedByteArrayzh
     p = p + ((-p - SIZEOF_StgArrWords) & BA_MASK);
 
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-    StgArrWords_words(p) = payload_words;
+    StgArrWords_bytes(p) = n;
     RET_P(p);
 }
 
 stg_newAlignedPinnedByteArrayzh
 {
-    W_ words, bytes, payload_words, p, alignment;
+    W_ words, n, bytes, payload_words, p, alignment;
 
     MAYBE_GC(NO_PTRS,stg_newAlignedPinnedByteArrayzh);
-    bytes = R1;
+    n = R1;
     alignment = R2;
+
+    bytes = n;
 
     /* payload_words is what we will tell the profiler we had to allocate */
     payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
@@ -129,7 +132,7 @@ stg_newAlignedPinnedByteArrayzh
     p = p + ((-p - SIZEOF_StgArrWords) & (alignment - 1));
 
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-    StgArrWords_words(p) = payload_words;
+    StgArrWords_bytes(p) = n;
     RET_P(p);
 }
 
@@ -378,7 +381,7 @@ stg_mkWeakForeignEnvzh
   TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
 
-  StgArrWords_words(p)     = payload_words;
+  StgArrWords_bytes(p)     = WDS(payload_words);
   StgArrWords_payload(p,0) = fptr;
   StgArrWords_payload(p,1) = ptr;
   StgArrWords_payload(p,2) = eptr;
@@ -1548,7 +1551,7 @@ stg_newBCOzh
     
     bitmap_arr = R5;
 
-    words = BYTES_TO_WDS(SIZEOF_StgBCO) + StgArrWords_words(bitmap_arr);
+    words = BYTES_TO_WDS(SIZEOF_StgBCO) + BYTE_ARR_WDS(bitmap_arr);
     bytes = WDS(words);
 
     ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R5_PTR, stg_newBCOzh );
@@ -1566,7 +1569,7 @@ stg_newBCOzh
     W_ i;
     i = 0;
 for:
-    if (i < StgArrWords_words(bitmap_arr)) {
+    if (i < BYTE_ARR_WDS(bitmap_arr)) {
 	StgBCO_bitmap(bco,i) = StgArrWords_payload(bitmap_arr,i);
 	i = i + 1;
 	goto for;
@@ -1660,7 +1663,7 @@ for:
        is promoted. */
     
     SET_HDR(nptrs_arr, stg_ARR_WORDS_info, W_[CCCS]);
-    StgArrWords_words(nptrs_arr) = nptrs;
+    StgArrWords_bytes(nptrs_arr) = WDS(nptrs);
     p = 0;
 for2:
     if(p < nptrs) {

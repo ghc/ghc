@@ -276,7 +276,7 @@ main(int argc, char *argv[])
     closure_field(StgMutArrPtrs, size);
 
     closure_size(StgArrWords);
-    closure_field(StgArrWords, words);
+    closure_field(StgArrWords, bytes);
     closure_payload(StgArrWords, payload);
 
     closure_field(StgTSO, _link);

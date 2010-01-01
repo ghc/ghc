@@ -1045,7 +1045,7 @@ get_closure_info(StgClosure* node, nat *size, nat *ptrs, nat *nonptrs,
     /* ToDo: check whether this can be merged with the default case */
     *size = arr_words_sizeW((StgArrWords *)node); 
     *ptrs = 0;
-    *nonptrs = ((StgArrWords *)node)->words;
+    *nonptrs = arr_words_words(((StgArrWords *)node));
     *vhs = *size - *ptrs - *nonptrs - sizeofW(StgHeader);
     return info;
 

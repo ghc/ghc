@@ -1278,7 +1278,7 @@ PackArray(StgClosure *closure)
   ASSERT(info->type == ARR_WORDS || info->type == MUT_ARR_PTRS ||
 	 info->type == MUT_ARR_PTRS_FROZEN || info->type == MUT_VAR);
 
-  n = ((StgArrWords *)closure)->words;
+  n = arr_words_words(((StgArrWords *)closure));
   // this includes the header!: arr_words_sizeW(stgCast(StgArrWords*,q)); 
 
   IF_PAR_DEBUG(pack,
@@ -1299,7 +1299,7 @@ PackArray(StgClosure *closure)
   if (RtsFlags.ParFlags.ParStats.Global &&
       RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
     globalParStats.tot_arrs++;
-    globalParStats.tot_arr_size += ((StgArrWords *)closure)->words;
+    globalParStats.tot_arr_size += arr_words_words(((StgArrWords *)closure));
   }
 
   /* record offset of the closure and allocate a GA */
@@ -1313,7 +1313,7 @@ PackArray(StgClosure *closure)
 
   /* Pack the header (2 words: info ptr and the number of words to follow) */
   Pack((StgWord)*(StgPtr)closure);
-  Pack(((StgArrWords *)closure)->words);
+  Pack(arr_words_words(((StgArrWords *)closure)));
 
   /* pack the payload of the closure (all non-ptrs) */
   for (i=0; i<n; i++)
@@ -2817,7 +2817,7 @@ UnpackArray(StgWord ***bufptrP, StgClosure *graph)
 	   ASSERT(info->type == ARR_WORDS || info->type == MUT_ARR_PTRS ||
 		  info->type == MUT_ARR_PTRS_FROZEN || info->type == MUT_VAR));
 
-  n = ((StgArrWords *)bufptr)->words;
+  n = arr_words_words(((StgArrWords *)bufptr));
   // this includes the header!: arr_words_sizeW(stgCast(StgArrWords*,q)); 
 
   IF_PAR_DEBUG(pack,
@@ -2834,7 +2834,7 @@ UnpackArray(StgWord ***bufptrP, StgClosure *graph)
 
   /* Unpack the header (2 words: info ptr and the number of words to follow) */
   ((StgArrWords *)graph)->header.info = (StgInfoTable*)*bufptr++;  // assumes _HS==1; yuck!
-  ((StgArrWords *)graph)->words = (StgWord)*bufptr++;
+  ((StgArrWords *)graph)->bytes = ((StgWord)*bufptr++) * sizeof(StgWord);
 
   /* unpack the payload of the closure (all non-ptrs) */
   for (i=0; i<n; i++)
@@ -3928,7 +3928,7 @@ rtsPackBuffer *packBuffer;
       /* ToDo: check whether this is really needed */
       if (ip->type == ARR_WORDS) {
 	ptrs = vhs = 0;
-	nonptrs = ((StgArrWords *)bufptr)->words;
+	nonptrs = arr_words_words(((StgArrWords *)bufptr));
 	size = arr_words_sizeW((StgArrWords *)bufptr);
       }
 
@@ -4087,7 +4087,7 @@ rtsPackBuffer *packBuffer;
       /* ToDo: check whether this is really needed */
       if (ip->type == ARR_WORDS) {
 	ptrs = vhs = 0;
-	nonptrs = ((StgArrWords *)bufptr)->words+1; // payload+words
+	nonptrs = arr_words_words(((StgArrWords *)bufptr))+1; // payload+words
 	size = arr_words_sizeW((StgArrWords *)bufptr);
 	ASSERT(size==_HS+vhs+nonptrs);
       }

@@ -1269,7 +1269,7 @@ PrintGraph_(StgClosure *p, int indent_level)
   case ARR_WORDS:
     /* an array of (non-mutable) words */
     fprintf(stderr, "ARR_WORDS (%p) of %d non-ptrs (maybe a string?)\n", 
-	    p, ((StgArrWords *)q)->words);
+	    p, arr_words_words((StgArrWords *)q));
     break;
 
   case MUT_ARR_PTRS:
@@ -1626,7 +1626,7 @@ GraphFingerPrint_(StgClosure *p, char *finger_print)
   case ARR_WORDS:
     {
 	char str[6];
-	sprintf(str,"%d",((StgArrWords*)p)->words);
+	sprintf(str,"%d",arr_words_words((StgArrWords*)p));
 	strcat(finger_print,str); 
     }
     break;
