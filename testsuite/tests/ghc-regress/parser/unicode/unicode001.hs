@@ -8,7 +8,7 @@ Test for valid unicode identifiers
     has several times got the encoding wrong for me and inserted bogus
     bytes, especially in the 4-byte characters.  Edit the file literally
     (M-x find-file-literally).  By all means view it in Emacs' UTF-8
-    more (C-x RET c utf-8, C-x f unicode001.hs), but don't edit and save.
+    mode (C-x RET c utf-8, C-x f unicode001.hs), but don't edit and save.
 
 Here's a selection of characters I pulled from UnicodeData.txt that we
 can use to test with:
