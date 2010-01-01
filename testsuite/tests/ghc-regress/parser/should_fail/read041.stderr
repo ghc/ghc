@@ -1,5 +1,0 @@
-
-read041.hs:6:1:
-    Fundeps in class `Foo'
-    (Use -XFunctionalDependencies to allow fundeps)
-    In the class declaration for `Foo'

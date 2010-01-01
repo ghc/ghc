@@ -1,0 +1,3 @@
+
+readFail038.hs:6:7:
+    Illegal parallel list comprehension: use -XParallelListComp

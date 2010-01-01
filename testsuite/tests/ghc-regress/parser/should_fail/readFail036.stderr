@@ -1,0 +1,4 @@
+
+readFail036.hs:4:1:
+    Illegal kind signature for `a'
+      Perhaps you intended to use -XKindSignatures
