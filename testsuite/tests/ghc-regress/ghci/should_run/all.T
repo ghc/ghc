@@ -2,9 +2,9 @@
 def just_ghci( opts ):
   opts.only_ways = ['ghci']
 
-test('ghci001', just_ghci, compile_and_run, [''])
-test('ghci002', just_ghci, compile_and_run, [''])
-test('ghci003', just_ghci, compile_and_run, [''])
+test('ghcirun001', just_ghci, compile_and_run, [''])
+test('ghcirun002', just_ghci, compile_and_run, [''])
+test('ghcirun003', just_ghci, compile_and_run, [''])
 test('2589',    just_ghci, compile_and_run, [''])
 test('2881',    just_ghci, compile_and_run, [''])
 

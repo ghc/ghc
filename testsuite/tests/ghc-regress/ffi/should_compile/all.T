@@ -30,7 +30,7 @@ test('cc010', expect_fail_for(['extcore','optextcore']), compile, [''])
 test('cc011', normal, compile, [''])
 test('cc012', normal, compile, [''])
 test('cc013', normal, compile, [''])
-test('ffi001', normal, compile, [''])
+test('cc014', normal, compile, [''])
 test('ffi-deriv1', normal, compile, [''])
 
 test('1357', normal, compile, [''])
