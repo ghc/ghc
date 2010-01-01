@@ -67,7 +67,7 @@ integer_cmm_int2Integerzh
 
    p = Hp - SIZEOF_StgArrWords;
    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-   StgArrWords_words(p) = 1;
+   StgArrWords_bytes(p) = SIZEOF_W;
 
    /* mpz_set_si is inlined here, makes things simpler */
    if (%lt(val,0)) {
@@ -101,7 +101,7 @@ integer_cmm_word2Integerzh
 
    p = Hp - SIZEOF_StgArrWords;
    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-   StgArrWords_words(p) = 1;
+   StgArrWords_bytes(p) = SIZEOF_W;
 
    if (val != 0) {
         s = 1;
@@ -148,7 +148,7 @@ integer_cmm_int64ToIntegerzh
 
    p = Hp - SIZEOF_StgArrWords - WDS(words_needed) + WDS(1);
    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-   StgArrWords_words(p) = words_needed;
+   StgArrWords_bytes(p) = WDS(words_needed);
 
    if ( %lt(hi,0) ) {
      neg = 1;
@@ -203,7 +203,7 @@ integer_cmm_word64ToIntegerzh
 
    p = Hp - SIZEOF_StgArrWords - WDS(words_needed) + WDS(1);
    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-   StgArrWords_words(p) = words_needed;
+   StgArrWords_bytes(p) = WDS(words_needed);
 
    if ( hi != 0 ) {
      s = 2;
@@ -248,10 +248,10 @@ name                                                                    \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
   mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                  \
   mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                  \
-  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(StgArrWords_words(d1));          \
+  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(BYTE_ARR_WDS(d1));               \
   MP_INT__mp_size(mp_tmp1)  = (s1);                                     \
   MP_INT__mp_d(mp_tmp1)     = BYTE_ARR_CTS(d1);                         \
-  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(StgArrWords_words(d2));          \
+  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(BYTE_ARR_WDS(d2));               \
   MP_INT__mp_size(mp_tmp2)  = (s2);                                     \
   MP_INT__mp_d(mp_tmp2)     = BYTE_ARR_CTS(d2);                         \
                                                                         \
@@ -284,7 +284,7 @@ name                                                                    \
                                                                         \
   mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                                  \
   mp_result  = Sp - 2 * SIZEOF_MP_INT;                                  \
-  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(StgArrWords_words(d1));           \
+  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));                \
   MP_INT__mp_size(mp_tmp)  = (s1);                                      \
   MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                          \
                                                                         \
@@ -315,7 +315,7 @@ name                                                                    \
                                                                         \
   mp_tmp1    = Sp - 1 * SIZEOF_MP_INT;                                  \
   mp_result1 = Sp - 2 * SIZEOF_MP_INT;                                  \
-  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(StgArrWords_words(d1));      \
+  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(BYTE_ARR_WDS(d1));           \
   MP_INT__mp_size(mp_tmp1)      = (s1);                                 \
   MP_INT__mp_d(mp_tmp1)         = BYTE_ARR_CTS(d1);                     \
                                                                         \
@@ -352,10 +352,10 @@ name                                                                            
   mp_tmp2    = Sp - 2 * SIZEOF_MP_INT;                                                  \
   mp_result1 = Sp - 3 * SIZEOF_MP_INT;                                                  \
   mp_result2 = Sp - 4 * SIZEOF_MP_INT;                                                  \
-  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(StgArrWords_words(d1));                      \
+  MP_INT__mp_alloc(mp_tmp1)     = W_TO_INT(BYTE_ARR_WDS(d1));                           \
   MP_INT__mp_size(mp_tmp1)      = (s1);                                                 \
   MP_INT__mp_d(mp_tmp1)         = BYTE_ARR_CTS(d1);                                     \
-  MP_INT__mp_alloc(mp_tmp2)     = W_TO_INT(StgArrWords_words(d2));                      \
+  MP_INT__mp_alloc(mp_tmp2)     = W_TO_INT(BYTE_ARR_WDS(d2));                           \
   MP_INT__mp_size(mp_tmp2)      = (s2);                                                 \
   MP_INT__mp_d(mp_tmp2)         = BYTE_ARR_CTS(d2);                                     \
                                                                                         \
@@ -571,7 +571,7 @@ integer_cmm_decodeDoublezh
        where mantissa.d can be put (it does not care about the rest) */
     p = Hp - ARR_SIZE + WDS(1);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
-    StgArrWords_words(p) = BYTES_TO_WDS(DOUBLE_MANTISSA_SIZE);
+    StgArrWords_bytes(p) = DOUBLE_MANTISSA_SIZE;
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
 
     /* Perform the operation */
