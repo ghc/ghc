@@ -412,6 +412,7 @@ def newTestDir( dir ):
 # Actually doing tests
 
 allTests = []
+allTestNames = set([])
 
 def runTest (opts, name, setup, func, args):
     n = 1
@@ -445,8 +446,12 @@ def runTest (opts, name, setup, func, args):
 # setup :: TestOpts -> IO ()  
 def test (name, setup, func, args):
     global allTests
+    global allTestNames
+    if name in allTestNames:
+        framework_fail(name, 'duplicate', 'There are multiple tests with this name')
     myTestOpts = copy.copy(thisdir_testopts)
     allTests += [lambda : runTest(myTestOpts, name, setup, func, args)]
+    allTestNames.add(name)
 
 if config.use_threads:
     def test_common_thread(n, name, opts, func, args):
