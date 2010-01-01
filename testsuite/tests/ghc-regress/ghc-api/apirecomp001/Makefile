@@ -6,6 +6,6 @@ clean:
 	rm -f *.o *.hi
 
 apirecomp001: clean
-	$(TEST_HC) --make -v0 -package ghc myghc.hs
-	./myghc "`$(TEST_HC) --print-libdir`"
+	'$(TEST_HC)' --make -v0 -package ghc myghc.hs
+	./myghc "`'$(TEST_HC)' --print-libdir`"
 
