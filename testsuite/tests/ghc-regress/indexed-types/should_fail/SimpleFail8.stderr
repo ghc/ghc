@@ -1,0 +1,4 @@
+
+SimpleFail8.hs:9:8: Not in scope: type constructor or class `Map'
+
+SimpleFail8.hs:10:8: Not in scope: type constructor or class `S3'

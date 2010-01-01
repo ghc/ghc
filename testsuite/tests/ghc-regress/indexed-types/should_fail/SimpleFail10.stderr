@@ -1,5 +1,5 @@
 
-Simple10.hs:13:3:
+SimpleFail10.hs:13:3:
     Arguments that do not correspond to a class parameter must be variables
     Instead of a variable, found Char
     In the associated type instance for `S8'

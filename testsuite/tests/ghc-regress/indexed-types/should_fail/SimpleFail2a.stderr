@@ -1,0 +1,5 @@
+
+SimpleFail2a.hs:11:11:
+    Conflicting definitions for `Sd'
+    Bound at: SimpleFail2a.hs:11:11-12
+              SimpleFail2a.hs:12:11-12

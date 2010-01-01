@@ -1,5 +1,5 @@
 
-Simple14.hs:5:15:
+SimpleFail14.hs:5:15:
     Predicate used as a type: a ~ a
     In the type `a ~ a'
     In the definition of data constructor `T'
