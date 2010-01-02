@@ -1059,7 +1059,7 @@ genCCall target dest_regs argsAndHints
             do
                 dflags <- getDynFlagsNat
                 mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
-                              mkForeignLabel functionName Nothing True IsFunction
+                              mkForeignLabel functionName Nothing ForeignLabelInThisPackage IsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
                         _ -> Right mopExpr
