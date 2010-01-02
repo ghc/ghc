@@ -942,6 +942,8 @@ instance Outputable ForeignImport where
         ptext (sLit "static") <+> pp_hdr <+> char '&' <> ppr lbl
       pprCEntity (CFunction (StaticTarget lbl)) = 
         ptext (sLit "static") <+> pp_hdr <+> ppr lbl
+      pprCEntity (CFunction (PackageTarget lbl _)) =
+        ptext (sLit "static") <+> pp_hdr <+> ppr lbl
       pprCEntity (CFunction (DynamicTarget)) =
         ptext (sLit "dynamic")
       pprCEntity (CWrapper) = ptext (sLit "wrapper")
