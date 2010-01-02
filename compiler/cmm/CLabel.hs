@@ -596,7 +596,15 @@ needsCDecl ModuleRegdLabel		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
-needsCDecl (CmmLabel _ _ _)		= True
+
+needsCDecl (CmmLabel pkgId _ _)		
+	-- Prototypes for labels defined in the runtime system are imported
+	--	into HC files via includes/Stg.h.
+	| pkgId == rtsPackageId		= False
+	
+	-- For other labels we inline one into the HC file directly.
+	| otherwise			= True
+
 needsCDecl l@(ForeignLabel{})		= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
