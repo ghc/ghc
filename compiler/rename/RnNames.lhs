@@ -1304,20 +1304,20 @@ isImpAll _other				= False
 
 \begin{code}
 warnUnusedImport :: ImportDeclUsage -> RnM ()
-warnUnusedImport (L loc decl, used, unused) 
-  | Just (False,[]) <- ideclHiding decl 
-		= return ()	       -- Do not warn for 'import M()'
+warnUnusedImport (L loc decl, used, unused)
+  | Just (False,[]) <- ideclHiding decl
+                = return ()            -- Do not warn for 'import M()'
   | null used   = addWarnAt loc msg1   -- Nothing used; drop entire decl
-  | null unused = return () 	       -- Everything imported is used; nop
+  | null unused = return ()            -- Everything imported is used; nop
   | otherwise   = addWarnAt loc msg2   -- Some imports are unused
   where
     msg1 = vcat [pp_herald <+> quotes pp_mod <+> pp_not_used,
-		 nest 2 (ptext (sLit "except perhaps to import instances from")
-				   <+> quotes pp_mod),
-		 ptext (sLit "To import instances alone, use:") 
-				   <+> ptext (sLit "import") <+> pp_mod <> parens empty ]
+                 nest 2 (ptext (sLit "except perhaps to import instances from")
+                                   <+> quotes pp_mod),
+                 ptext (sLit "To import instances alone, use:")
+                                   <+> ptext (sLit "import") <+> pp_mod <> parens empty ]
     msg2 = sep [pp_herald <+> quotes (pprWithCommas ppr unused),
-		    text "from module" <+> quotes pp_mod <+> pp_not_used]
+                    text "from module" <+> quotes pp_mod <+> pp_not_used]
     pp_herald   = text "The import of"
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
