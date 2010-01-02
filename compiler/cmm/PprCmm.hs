@@ -272,11 +272,16 @@ pprStmt stmt = case stmt of
 		      CmmCallConv -> empty
 		      _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
 
+    -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
     CmmCall (CmmPrim op) results args safety ret ->
         pprStmt (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
                         results args safety ret)
         where
-          lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False IsFunction)
+	  -- HACK: A CallishMachOp doesn't really correspond to a ForeignLabel, but we
+	  --	   use one to get the label printed.
+          lbl = CmmLabel (mkForeignLabel 
+	  			(mkFastString (show op)) 
+	  			Nothing ForeignLabelInThisPackage IsFunction)
 
     CmmBranch ident          -> genBranch ident
     CmmCondBranch expr ident -> genCondBranch expr ident

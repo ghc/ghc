@@ -407,7 +407,14 @@ way_details =
 
     Way WayDyn "dyn" False "Dynamic"
 	[ "-DDYNAMIC"
-	, "-optc-DDYNAMIC" ],
+	, "-optc-DDYNAMIC" 
+#if defined(mingw32_TARGET_OS)
+	-- On Windows, code that is to be linked into a dynamic library must be compiled
+	--	with -fPIC. Labels not in the current package are assumed to be in a DLL 
+	--	different from the current one.
+	, "-fPIC"
+#endif
+	],
 
     Way WayProf "p" False "Profiling"
 	[ "-fscc-profiling"

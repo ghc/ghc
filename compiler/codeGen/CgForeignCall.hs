@@ -78,8 +78,27 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   where
       (call_args, cmm_target)
 	= case target of
-	   StaticTarget lbl -> (args, CmmLit (CmmLabel 
-					(mkForeignLabel lbl call_size False IsFunction)))
+
+	   -- A target label known to be in the current package.
+	   StaticTarget lbl 
+	    -> ( args
+	       , CmmLit (CmmLabel 
+			(mkForeignLabel lbl call_size ForeignLabelInThisPackage IsFunction)))
+
+	   -- If the packageId is Nothing then the label is taken to be in the
+	   --	package currently being compiled.
+	   PackageTarget lbl mPkgId
+	    -> let labelSource 
+	    		= case mPkgId of
+				Nothing		-> ForeignLabelInThisPackage
+				Just pkgId	-> ForeignLabelInPackage pkgId
+	       in ( args
+	          , CmmLit (CmmLabel 
+			   	(mkForeignLabel lbl call_size labelSource IsFunction)))
+
+	   -- A label imported with "foreign import ccall "dynamic" ..."
+	   --	Note: "dynamic" here doesn't mean "dynamic library".
+	   --	Read the FFI spec for details.
 	   DynamicTarget    ->  case args of
 	                        (CmmHinted fn _):rest -> (rest, fn)
 	                        [] -> panic "emitForeignCall: DynamicTarget []"

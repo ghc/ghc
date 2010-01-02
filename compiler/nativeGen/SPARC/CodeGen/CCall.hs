@@ -263,7 +263,7 @@ outOfLineFloatOp mop
 	
  	dflags	<- getDynFlagsNat
 	mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference 
-		$  mkForeignLabel functionName Nothing True IsFunction
+		$  mkForeignLabel functionName Nothing ForeignLabelInExternalPackage IsFunction
 
 	let mopLabelOrExpr 
 		= case mopExpr of

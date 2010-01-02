@@ -15,6 +15,8 @@
 
 module CLabel (
 	CLabel,	-- abstract type
+	ForeignLabelSource(..),
+	pprDebugCLabel,
 
 	mkClosureLabel,
 	mkSRTLabel,
@@ -175,12 +177,17 @@ data CLabel
   | RtsLabel 			
 	RtsLabelInfo
 
-  -- | A 'C' (or otherwise foreign) label
-  | ForeignLabel FastString     
+  -- | A 'C' (or otherwise foreign) label.
+  --
+  | ForeignLabel 
+  	FastString    		-- name of the imported label.
+
         (Maybe Int)		-- possible '@n' suffix for stdcall functions
 				-- When generating C, the '@n' suffix is omitted, but when
 				-- generating assembler we must add it to the label.
-        Bool                    -- True <=> is dynamic
+
+	ForeignLabelSource	-- what package the foreign label is in.
+	
         FunctionOrData
 
   -- | A family of labels related to a particular case expression.
@@ -247,6 +254,52 @@ data CLabel
 
   deriving (Eq, Ord)
 
+
+-- | Record where a foreign label is stored.
+data ForeignLabelSource
+
+   -- | Label is in a named package
+   = ForeignLabelInPackage	PackageId
+  
+   -- | Label is in some external, system package that doesn't also
+   --	contain compiled Haskell code, and is not associated with any .hi files.
+   --	We don't have to worry about Haskell code being inlined from
+   --	external packages. It is safe to treat the RTS package as "external".
+   | ForeignLabelInExternalPackage 
+
+   -- | Label is in the package currenly being compiled.
+   --	This is only used for creating hacky tmp labels during code generation.
+   --	Don't use it in any code that might be inlined across a package boundary
+   --	(ie, core code) else the information will be wrong relative to the
+   --	destination module.
+   | ForeignLabelInThisPackage
+      
+   deriving (Eq, Ord)   
+
+
+-- | For debugging problems with the CLabel representation.
+--	We can't make a Show instance for CLabel because lots of its components don't have instances.
+--	The regular Outputable instance only shows the label name, and not its other info.
+--
+pprDebugCLabel :: CLabel -> SDoc
+pprDebugCLabel lbl
+ = case lbl of
+ 	IdLabel{}	-> ppr lbl <> (parens $ text "IdLabel")
+	CmmLabel pkg name _info	
+	 -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
+
+	RtsLabel{}	-> ppr lbl <> (parens $ text "RtsLabel")
+
+	ForeignLabel name mSuffix src funOrData
+	 -> ppr lbl <> (parens 
+	 			$ text "ForeignLabel" 
+	 			<+> ppr mSuffix
+				<+> ppr src  
+				<+> ppr funOrData)
+
+	_		-> ppr lbl <> (parens $ text "other CLabel)")
+
+
 data IdLabelInfo
   = Closure		-- ^ Label for closure
   | SRT                 -- ^ Static reference table
@@ -301,6 +354,7 @@ data CmmLabelInfo
   | CmmData       		-- ^ misc rts data bits, eg CHARLIKE_closure
   | CmmCode       		-- ^ misc rts code
   | CmmGcPtr			-- ^ GcPtrs eg CHARLIKE_closure  
+  | CmmPrimCall			-- ^ a prim call to some hand written Cmm code
   deriving (Eq, Ord)
 
 data DynamicLinkerLabelInfo
@@ -378,22 +432,34 @@ mkApInfoTableLabel   upd off	= RtsLabel (RtsApInfoTable       upd off)
 mkApEntryLabel       upd off	= RtsLabel (RtsApEntry           upd off)
 
 
--- Constructing ForeignLabels
--- Primitive / cmm call labels
+-- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
-mkPrimCallLabel (PrimCall str)  = ForeignLabel str Nothing False IsFunction
+mkPrimCallLabel (PrimCall str pkg)  
+	= CmmLabel pkg str CmmPrimCall
 
--- Foreign labels
-mkForeignLabel :: FastString -> Maybe Int -> Bool -> FunctionOrData -> CLabel
-mkForeignLabel str mb_sz is_dynamic fod
-    = ForeignLabel str mb_sz is_dynamic fod
 
+-- Constructing ForeignLabels
+
+-- | Make a foreign label
+mkForeignLabel 
+	:: FastString 		-- name
+	-> Maybe Int 		-- size prefix
+	-> ForeignLabelSource	-- what package it's in
+	-> FunctionOrData 	
+	-> CLabel
+
+mkForeignLabel str mb_sz src fod
+    = ForeignLabel str mb_sz src  fod
+
+
+-- | Update the label size field in a ForeignLabel
 addLabelSize :: CLabel -> Int -> CLabel
-addLabelSize (ForeignLabel str _ is_dynamic fod) sz
-    = ForeignLabel str (Just sz) is_dynamic fod
+addLabelSize (ForeignLabel str _ src  fod) sz
+    = ForeignLabel str (Just sz) src fod
 addLabelSize label _
     = label
 
+-- | Get the label size field from a ForeignLabel
 foreignLabelStdcallInfo :: CLabel -> Maybe Int
 foreignLabelStdcallInfo (ForeignLabel _ info _ _) = info
 foreignLabelStdcallInfo _lbl = Nothing
@@ -530,8 +596,8 @@ needsCDecl ModuleRegdLabel		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
-needsCDecl (CmmLabel _ _ _)		= False
-needsCDecl l@(ForeignLabel _ _ _ _)	= not (isMathFun l)
+needsCDecl (CmmLabel _ _ _)		= True
+needsCDecl l@(ForeignLabel{})		= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
 needsCDecl (HpcTicksLabel _)            = True
@@ -551,12 +617,12 @@ maybeAsmTemp (AsmTempLabel uq) 		= Just uq
 maybeAsmTemp _ 	    	       		= Nothing
 
 
--- Check whether a label corresponds to a C function that has 
+-- | Check whether a label corresponds to a C function that has 
 --      a prototype in a system header somehere, or is built-in
 --      to the C compiler. For these labels we abovoid generating our
 --      own C prototypes.
 isMathFun :: CLabel -> Bool
-isMathFun (ForeignLabel fs _ _ _) = fs `elementOfUniqSet` math_funs
+isMathFun (ForeignLabel fs _ _ _) 	= fs `elementOfUniqSet` math_funs
 isMathFun _ = False
 
 math_funs = mkUniqSet [
@@ -640,12 +706,10 @@ math_funs = mkUniqSet [
     ]
 
 -- -----------------------------------------------------------------------------
--- Is a CLabel visible outside this object file or not?
-
--- From the point of view of the code generator, a name is
--- externally visible if it has to be declared as exported
--- in the .o file's symbol table; that is, made non-static.
-
+-- | Is a CLabel visible outside this object file or not?
+-- 	From the point of view of the code generator, a name is
+-- 	externally visible if it has to be declared as exported
+-- 	in the .o file's symbol table; that is, made non-static.
 externallyVisibleCLabel :: CLabel -> Bool -- not C "static"
 externallyVisibleCLabel (CaseLabel _ _)		= False
 externallyVisibleCLabel (StringLitLabel _)	= False
@@ -656,7 +720,7 @@ externallyVisibleCLabel (ModuleInitTableLabel _)= False
 externallyVisibleCLabel ModuleRegdLabel		= False
 externallyVisibleCLabel (RtsLabel _)		= True
 externallyVisibleCLabel (CmmLabel _ _ _)	= True
-externallyVisibleCLabel (ForeignLabel _ _ _ _)	= True
+externallyVisibleCLabel (ForeignLabel{})	= True
 externallyVisibleCLabel (IdLabel name _ _)	= isExternalName name
 externallyVisibleCLabel (CC_Label _)		= True
 externallyVisibleCLabel (CCS_Label _)		= True
@@ -707,7 +771,7 @@ labelType (PlainModuleInitLabel _)              = CodeLabel
 labelType (ModuleInitTableLabel _)              = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
-labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel
+labelType (ForeignLabel _ _ _ IsFunction)	= CodeLabel
 labelType (IdLabel _ _ info)                    = idInfoLabelType info
 labelType _                                     = DataLabel
 
@@ -733,15 +797,32 @@ idInfoLabelType info =
 labelDynamic :: PackageId -> CLabel -> Bool
 labelDynamic this_pkg lbl =
   case lbl of
-   RtsLabel _  	     	-> not opt_Static && (this_pkg /= rtsPackageId) -- i.e., is the RTS in a DLL or not?
-   CmmLabel pkg _ _	-> not opt_Static && (this_pkg /= pkg)
+   -- is the RTS in a DLL or not?
+   RtsLabel _  	     	-> not opt_Static && (this_pkg /= rtsPackageId)
+
+   -- When compiling in the "dyn" way, eack package is to be linked into its own shared library.
+   CmmLabel pkg _ _
+    -> not opt_Static && (this_pkg /= pkg)
+
    IdLabel n _ k     	-> isDllName this_pkg n
+
 #if mingw32_TARGET_OS
-   ForeignLabel _ _ d _ -> d
+   -- Foreign label is in some un-named foreign package (or DLL)
+   ForeignLabel _ _ ForeignLabelInExternalPackage _  -> True
+
+   -- Foreign label is linked into the same package as the source file currently being compiled.
+   ForeignLabel _ _ ForeignLabelInThisPackage  _     -> False
+      
+   -- Foreign label is in some named package.
+   --	When compiling in the "dyn" way, each package is to be linked into its own DLL.
+   ForeignLabel _ _ (ForeignLabelInPackage pkgId) _
+    -> (not opt_Static) && (this_pkg /= pkgId)
+
 #else
    -- On Mac OS X and on ELF platforms, false positives are OK,
    -- so we claim that all foreign imports come from dynamic libraries
    ForeignLabel _ _ _ _ -> True
+
 #endif
    ModuleInitLabel m _    -> not opt_Static && this_pkg /= (modulePackageId m)
    PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
@@ -864,6 +945,7 @@ pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLi
 pprCLbl (CmmLabel _ str CmmCode)	= ftext str
 pprCLbl (CmmLabel _ str CmmData)	= ftext str
 pprCLbl (CmmLabel _ str CmmGcPtr)	= ftext str
+pprCLbl (CmmLabel _ str CmmPrimCall)	= ftext str
 
 pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
 
@@ -958,6 +1040,14 @@ ppIdFlavor x = pp_cSEP <>
 
 
 pp_cSEP = char '_'
+
+
+instance Outputable ForeignLabelSource where
+ ppr fs
+  = case fs of
+  	ForeignLabelInPackage pkgId	-> parens $ text "package: " <> ppr pkgId 
+	ForeignLabelInThisPackage	-> parens $ text "this package"
+	ForeignLabelInExternalPackage	-> parens $ text "external package"
 
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.

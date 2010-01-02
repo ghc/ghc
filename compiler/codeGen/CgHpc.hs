@@ -67,7 +67,7 @@ initHpc this_mod (HpcInfo tickCount hashNo)
                PlayRisky
                [CmmHinted id NoHint]
                (CmmCallee
-                 (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False IsFunction)
+                 (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing ForeignLabelInThisPackage IsFunction)
                   CCallConv
                )
                [ CmmHinted (mkLblExpr mkHpcModuleNameLabel) AddrHint

@@ -55,7 +55,7 @@ initHpc this_mod (HpcInfo tickCount hashNo)
     	; id <- newTemp bWord -- TODO FIXME NOW
         ; emitCCall
                [(id,NoHint)]
-               (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False IsFunction)
+               (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing ForeignLabelInThisPackage IsFunction)
                [ (mkLblExpr mkHpcModuleNameLabel,AddrHint)
                , (CmmLit $ mkIntCLit tickCount,NoHint)
                , (CmmLit $ mkIntCLit hashNo,NoHint)

@@ -43,6 +43,7 @@ import Unique		( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastTypes
 import FastString
+import Module		( PackageId )
 \end{code}
 
 %************************************************************************
@@ -517,9 +518,10 @@ pprPrimOp other_op = pprOccName (primOpOcc other_op)
 %************************************************************************
 
 \begin{code}
-newtype PrimCall = PrimCall CLabelString
+data PrimCall = PrimCall CLabelString PackageId
 
 instance Outputable PrimCall where
-  ppr (PrimCall lbl) = ppr lbl
+  ppr (PrimCall lbl pkgId) 
+  	= text "__primcall" <+> ppr pkgId <+> ppr lbl
 
 \end{code}

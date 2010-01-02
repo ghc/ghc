@@ -528,15 +528,20 @@ coreToStgApp _ f args = do
 	res_ty = exprType (mkApps (Var f) args)
 	app = case idDetails f of
       		DataConWorkId dc | saturated -> StgConApp dc args'
+
+		-- Some primitive operator that might be implemented as a library call.
 	        PrimOpId op  	 -> ASSERT( saturated )
 				    StgOpApp (StgPrimOp op) args' res_ty
-		FCallId (CCall (CCallSpec (StaticTarget lbl) PrimCallConv _))
-                                 -- prim calls are represented as FCalls in core,
-                                 -- but in stg we distinguish them
-				 -> ASSERT( saturated )
-                                    StgOpApp (StgPrimCallOp (PrimCall lbl)) args' res_ty
+
+		-- A call to some primitive Cmm function.
+		FCallId (CCall (CCallSpec (PackageTarget lbl (Just pkgId)) PrimCallConv _))
+		                 -> ASSERT( saturated )
+				    StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
+
+		-- A regular foreign call.
 		FCallId call	 -> ASSERT( saturated )
 				    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
 		_other      	 -> StgApp f args'
 

@@ -64,12 +64,12 @@ import NCGMonad
 
 
 import Cmm
-import CLabel           ( CLabel, pprCLabel,
+import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
                           labelDynamic, externallyVisibleCLabel )
 
-import CLabel           ( mkForeignLabel )
+import CLabel           ( mkForeignLabel, pprDebugCLabel )
 
 
 import StaticFlags	( opt_PIC, opt_Static )
@@ -81,6 +81,7 @@ import qualified Outputable
 import Panic            ( panic )
 import DynFlags
 import FastString
+
 
 
 --------------------------------------------------------------------------------
@@ -110,8 +111,12 @@ cmmMakeDynamicReference
              -> ReferenceKind     -- whether this is the target of a jump
              -> CLabel            -- the label
              -> m CmmExpr
-  
+
 cmmMakeDynamicReference dflags addImport referenceKind lbl
+   = cmmMakeDynamicReference' dflags addImport referenceKind lbl
+
+  
+cmmMakeDynamicReference' dflags addImport referenceKind lbl
   | Just _ <- dynamicLinkerLabelInfo lbl
   = return $ CmmLit $ CmmLabel lbl   -- already processed it, pass through
 
@@ -450,8 +455,10 @@ needImportedSymbols arch os
 -- position-independent code.
 gotLabel :: CLabel
 gotLabel 
-	= mkForeignLabel -- HACK: it's not really foreign
-        	(fsLit ".LCTOC1") Nothing False IsData
+	-- HACK: this label isn't really foreign
+	= mkForeignLabel 
+		(fsLit ".LCTOC1") 
+		Nothing ForeignLabelInThisPackage IsData
 
 
 

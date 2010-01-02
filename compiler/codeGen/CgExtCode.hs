@@ -21,7 +21,6 @@ module CgExtCode (
 	newLabel,
 	newFunctionName,
 	newImport,
-
 	lookupLabel,
 	lookupName,
 
@@ -42,7 +41,7 @@ import CgMonad
 import CLabel
 import Cmm
 
-import BasicTypes
+-- import BasicTypes
 import BlockId
 import FastString
 import Module
@@ -146,14 +145,13 @@ newFunctionName name pkg
 -- | Add an imported foreign label to the list of local declarations.
 --	If this is done at the start of the module the declaration will scope
 --	over the whole module.
---	CLabel's labelDynamic classifies these labels as dynamic, hence the
---	code generator emits PIC code for them.
-newImport :: (Maybe PackageId, FastString) -> ExtFCode ()
-newImport (Nothing, name)
-   = addVarDecl name (CmmLit (CmmLabel (mkForeignLabel name Nothing True IsFunction)))
+newImport 
+	:: (FastString, CLabel) 
+	-> ExtFCode ()
 
-newImport (Just pkg, name)
-   = addVarDecl name (CmmLit (CmmLabel (mkCmmCodeLabel pkg name)))
+newImport (name, cmmLabel) 
+   = addVarDecl name (CmmLit (CmmLabel cmmLabel))
+
 
 -- | Lookup the BlockId bound to the label with this name.
 --	If one hasn't been bound yet, create a fresh one based on the 

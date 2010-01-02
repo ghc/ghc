@@ -59,7 +59,7 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
                     StaticTarget lbl ->
                       (unzip cmm_args,
                        CmmLit (CmmLabel (mkForeignLabel lbl (call_size cmm_args)
-                                                        False IsFunction)))
+                                                        ForeignLabelInThisPackage IsFunction)))
                     DynamicTarget    ->  case cmm_args of
                                            (fn,_):rest -> (unzip rest, fn)
                                            [] -> panic "cgForeignCall []"

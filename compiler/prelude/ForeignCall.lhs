@@ -24,6 +24,7 @@ module ForeignCall (
 import FastString
 import Binary
 import Outputable
+import Module
 
 import Data.Char
 \end{code}
@@ -101,9 +102,19 @@ data CCallSpec
 The call target:
 
 \begin{code}
+
+-- | How to call a particular function in C land.
 data CCallTarget
-  = StaticTarget  CLabelString  -- An "unboxed" ccall# to `fn'.
-  | DynamicTarget 		-- First argument (an Addr#) is the function pointer
+  -- An "unboxed" ccall# to named function
+  = StaticTarget  CLabelString  
+
+  -- The first argument of the import is the name of a function pointer (an Addr#).
+  --	Used when importing a label as "foreign import ccall "dynamic" ..."
+  | DynamicTarget
+
+  -- An "unboxed" ccall# to a named function from a particular package.
+  | PackageTarget CLabelString (Maybe PackageId)
+  
   deriving( Eq )
   {-! derive: Binary !-}
 
@@ -186,8 +197,17 @@ instance Outputable CCallSpec where
       gc_suf | playSafe safety = text "_GC"
 	     | otherwise       = empty
 
-      ppr_fun DynamicTarget     = text "__dyn_ccall" <> gc_suf <+> text "\"\""
-      ppr_fun (StaticTarget fn) = text "__ccall"     <> gc_suf <+> pprCLabelString fn
+      ppr_fun DynamicTarget     
+        = text "__dyn_ccall" <> gc_suf <+> text "\"\""
+
+      ppr_fun (PackageTarget fn Nothing)
+     	= text "__pkg_ccall" <> gc_suf <+> pprCLabelString fn
+
+      ppr_fun (PackageTarget fn (Just pkgId))
+     	= text "__pkg_ccall" <> gc_suf <+> ppr pkgId <+> pprCLabelString fn
+
+      ppr_fun (StaticTarget fn) 
+        = text "__ccall"     <> gc_suf <+> pprCLabelString fn
 \end{code}
 
 
@@ -242,12 +262,19 @@ instance Binary CCallTarget where
 	    put_ bh aa
     put_ bh DynamicTarget = do
 	    putByte bh 1
+    put_ bh (PackageTarget aa ab) = do
+    	    putByte bh 2
+	    put_ bh aa
+	    put_ bh ab
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> do aa <- get bh
 		      return (StaticTarget aa)
-	      _ -> do return DynamicTarget
+	      1 -> do return DynamicTarget
+	      _ -> do aa <- get bh
+	      	      ab <- get bh
+		      return (PackageTarget aa ab)
 
 instance Binary CCallConv where
     put_ bh CCallConv = do

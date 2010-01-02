@@ -111,9 +111,11 @@ mkSimpleLit (MachWord i)      = CmmInt i wordWidth
 mkSimpleLit (MachWord64 i)    = CmmInt i W64
 mkSimpleLit (MachFloat r)     = CmmFloat r W32
 mkSimpleLit (MachDouble r)    = CmmFloat r W64
-mkSimpleLit (MachLabel fs ms fod) = CmmLabel (mkForeignLabel fs ms is_dyn fod)
-			      where
-				is_dyn = False	-- ToDo: fix me
+mkSimpleLit (MachLabel fs ms fod) 
+	= CmmLabel (mkForeignLabel fs ms labelSrc fod)
+	where
+		-- TODO: Literal labels might not actually be in the current package...
+		labelSrc = ForeignLabelInThisPackage	
 	
 mkLtOp :: Literal -> MachOp
 -- On signed literals we must do a signed comparison

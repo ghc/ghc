@@ -214,7 +214,7 @@ static 	:: { ExtFCode [CmmStatic] }
 	| 'CLOSURE' '(' NAME lits ')'
 		{ do lits <- sequence $4;
 		     return $ map CmmStaticLit $
-                       mkStaticClosure (mkForeignLabel $3 Nothing True IsData)
+                       mkStaticClosure (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
 			 dontCareCCS (map getLit lits) [] [] [] }
@@ -346,14 +346,21 @@ decl	:: { ExtCode }
 
 -- an imported function name, with optional packageId
 importNames  
-	:: { [(Maybe PackageId, FastString)] }
+	:: { [(FastString, CLabel)] }
 	: importName			{ [$1] }
 	| importName ',' importNames	{ $1 : $3 }		
 	
 importName
-	:: { (Maybe PackageId, FastString) }
-	: NAME				{ (Nothing, $1) }
-	| STRING NAME			{ (Just (fsToPackageId (mkFastString $1)), $2) }
+	:: { (FastString,  CLabel) }
+
+	-- A label imported without an explicit packageId.
+	--	These are taken to come frome some foreign, unnamed package.
+	: NAME	
+	{ ($1, mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction) }
+
+	-- A label imported with an explicit packageId.
+	| STRING NAME
+	{ ($2, mkCmmCodeLabel (fsToPackageId (mkFastString $1)) $2) }
 	
 	
 names 	:: { [FastString] }

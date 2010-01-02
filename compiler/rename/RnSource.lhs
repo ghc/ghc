@@ -31,6 +31,8 @@ import HscTypes      	( GenAvailInfo(..), availsToNameSet )
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
+import ForeignCall	( CCallTarget(..) )
+import Module
 import HscTypes		( Warnings(..), plusWarns )
 import Class		( FunDep )
 import Name		( Name, nameOccName )
@@ -41,9 +43,11 @@ import Bag
 import FastString
 import Util		( filterOut )
 import SrcLoc
-import DynFlags	        ( DynFlag(..) )
+import DynFlags	        ( DynFlag(..), DynFlags, thisPackage )
+import HscTypes		( HscEnv, hsc_dflags )
 import BasicTypes       ( Boxity(..) )
 import ListSetOps       ( findDupsEq )
+
 
 import Control.Monad
 import Data.Maybe
@@ -368,9 +372,15 @@ rnDefaultDecl (DefaultDecl tys)
 \begin{code}
 rnHsForeignDecl :: ForeignDecl RdrName -> RnM (ForeignDecl Name, FreeVars)
 rnHsForeignDecl (ForeignImport name ty spec)
-  = lookupLocatedTopBndrRn name	        `thenM` \ name' ->
+  = getTopEnv                           `thenM` \ (topEnv :: HscEnv) ->
+    lookupLocatedTopBndrRn name	        `thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty	`thenM` \ (ty', fvs) ->
-    return (ForeignImport name' ty' spec, fvs)
+
+    -- Mark any PackageTarget style imports as coming from the current package
+    let packageId	= thisPackage $ hsc_dflags topEnv
+	spec'		= patchForeignImport packageId spec
+
+    in	return (ForeignImport name' ty' spec', fvs)
 
 rnHsForeignDecl (ForeignExport name ty spec)
   = lookupLocatedOccRn name	        `thenM` \ name' ->
@@ -382,6 +392,32 @@ rnHsForeignDecl (ForeignExport name ty spec)
 
 fo_decl_msg :: Located RdrName -> SDoc
 fo_decl_msg name = ptext (sLit "In the foreign declaration for") <+> ppr name
+
+
+-- | For Windows DLLs we need to know what packages imported symbols are from
+--	to generate correct calls. Imported symbols are tagged with the current
+--	package, so if they get inlined across a package boundry we'll still
+--	know where they're from.
+--
+patchForeignImport :: PackageId -> ForeignImport -> ForeignImport
+patchForeignImport packageId (CImport cconv safety fs spec)
+	= CImport cconv safety fs (patchCImportSpec packageId spec) 
+
+patchCImportSpec :: PackageId -> CImportSpec -> CImportSpec
+patchCImportSpec packageId spec
+ = case spec of
+	CFunction callTarget	-> CFunction $ patchCCallTarget packageId callTarget
+	_			-> spec
+
+patchCCallTarget :: PackageId -> CCallTarget -> CCallTarget
+patchCCallTarget packageId callTarget
+ = case callTarget of
+ 	PackageTarget label Nothing
+	 -> PackageTarget label (Just packageId)
+
+	_			-> callTarget	
+
+
 \end{code}
 
 
