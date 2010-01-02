@@ -808,13 +808,13 @@ labelDynamic this_pkg lbl =
    -- is the RTS in a DLL or not?
    RtsLabel _  	     	-> not opt_Static && (this_pkg /= rtsPackageId)
 
+   IdLabel n _ k     	-> isDllName this_pkg n
+
+#if mingw32_TARGET_OS
    -- When compiling in the "dyn" way, eack package is to be linked into its own shared library.
    CmmLabel pkg _ _
     -> not opt_Static && (this_pkg /= pkg)
 
-   IdLabel n _ k     	-> isDllName this_pkg n
-
-#if mingw32_TARGET_OS
    -- Foreign label is in some un-named foreign package (or DLL)
    ForeignLabel _ _ ForeignLabelInExternalPackage _  -> True
 
@@ -830,6 +830,8 @@ labelDynamic this_pkg lbl =
    -- On Mac OS X and on ELF platforms, false positives are OK,
    -- so we claim that all foreign imports come from dynamic libraries
    ForeignLabel _ _ _ _ -> True
+
+   CmmLabel pkg _ _     -> True 
 
 #endif
    ModuleInitLabel m _    -> not opt_Static && this_pkg /= (modulePackageId m)
