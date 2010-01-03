@@ -25,7 +25,7 @@ endef
 
 define canonicaliseExecutable
 # $1 = program path variable
-ifneq "$$(shell test -e '$$($1).exe' && echo exists)" ""
+ifneq "$$(shell test -x '$$($1).exe' && echo exists)" ""
 $1 := $$($1).exe
 endif
 $(call canonicalise,$1)
@@ -99,27 +99,27 @@ HPC := $(BIN_ROOT)/hpc
 endif
 
 $(eval $(call canonicaliseExecutable,TEST_HC))
-ifeq "$(shell test -e '$(TEST_HC)' && echo exists)" ""
+ifeq "$(shell test -x '$(TEST_HC)' && echo exists)" ""
 $(error Cannot find ghc: $(TEST_HC))
 endif
 
 $(eval $(call canonicaliseExecutable,GHC_PKG))
-ifeq "$(shell test -e '$(GHC_PKG)' && echo exists)" ""
+ifeq "$(shell test -x '$(GHC_PKG)' && echo exists)" ""
 $(error Cannot find ghc-pkg: $(GHC_PKG))
 endif
 
 $(eval $(call canonicaliseExecutable,HSC2HS))
-ifeq "$(shell test -e '$(HSC2HS)' && echo exists)" ""
+ifeq "$(shell test -x '$(HSC2HS)' && echo exists)" ""
 $(error Cannot find hsc2hs: $(HSC2HS))
 endif
 
 $(eval $(call canonicaliseExecutable,HP2PS_ABS))
-ifeq "$(shell test -e '$(HP2PS_ABS)' && echo exists)" ""
+ifeq "$(shell test -x '$(HP2PS_ABS)' && echo exists)" ""
 $(error Cannot find hp2ps: $(HP2PS_ABS))
 endif
 
 $(eval $(call canonicaliseExecutable,HPC))
-ifeq "$(shell test -e '$(HPC)' && echo exists)" ""
+ifeq "$(shell test -x '$(HPC)' && echo exists)" ""
 $(error Cannot find hpc: $(HPC))
 endif
 
