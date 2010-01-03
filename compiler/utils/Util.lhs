@@ -7,7 +7,7 @@
 -- | Highly random utility functions
 module Util (
         -- * Flags dependent on the compiler build
-        ghciSupported, debugIsOn, ghciTablesNextToCode, picIsOn,
+        ghciSupported, debugIsOn, ghciTablesNextToCode, isDynamicGhcLib,
         isWindowsHost, isWindowsTarget, isDarwinTarget,
 
         -- * General list processing
@@ -141,11 +141,11 @@ ghciTablesNextToCode = True
 ghciTablesNextToCode = False
 #endif
 
-picIsOn :: Bool
-#ifdef __PIC__
-picIsOn = True
+isDynamicGhcLib :: Bool
+#ifdef DYNAMIC
+isDynamicGhcLib = True
 #else
-picIsOn = False
+isDynamicGhcLib = False
 #endif
 
 isWindowsHost :: Bool

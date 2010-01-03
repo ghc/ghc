@@ -1084,23 +1084,20 @@ loadFrameworks pkg
 -- If it isn't present, we assume it's a dynamic library.
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec
 locateOneObj dirs lib
- | not picIsOn
+  | not isDynamicGhcLib
     -- When the GHC package was not compiled as dynamic library 
-    -- (=__PIC__ not set), we search for .o libraries first.
+    -- (=DYNAMIC not set), we search for .o libraries.
   = do	{ mb_obj_path <- findFile mk_obj_path dirs 
 	; case mb_obj_path of
 	    Just obj_path -> return (Object obj_path)
-	    Nothing	  -> 
-                do { mb_lib_path <- findFile mk_dyn_lib_path dirs
-                   ; case mb_lib_path of
-                       Just _  -> return (DLL dyn_lib_name)
-                       Nothing -> return (DLL lib) }} -- We assume
- | otherwise
-    -- When the GHC package was compiled as dynamic library (=__PIC__ set),
+	    Nothing	  -> return (DLL lib) }
+
+  | otherwise
+    -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
   = do	{ mb_lib_path <- findFile mk_dyn_lib_path dirs
 	; case mb_lib_path of
-	    Just _ -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
+	    Just _ -> return (DLL dyn_lib_name)
 	    Nothing	  ->
                 do { mb_obj_path <- findFile mk_obj_path dirs
                    ; case mb_obj_path of
