@@ -985,7 +985,7 @@ mkImport :: CCallConv
 	 -> P (HsDecl RdrName)
 mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (PackageTarget entity Nothing)
+  let funcTarget = CFunction (StaticTarget entity Nothing)
       importSpec = CImport PrimCallConv safety nilFS funcTarget
   return (ForD (ForeignImport v ty importSpec))
 
@@ -1023,7 +1023,7 @@ parseCImport cconv safety nm str =
    id_char  c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
-             +++ ((\c -> CFunction (PackageTarget c Nothing)) <$> cid)
+             +++ ((\c -> CFunction (StaticTarget c Nothing)) <$> cid)
           where 
             cid = return nm +++
                   (do c  <- satisfy (\c -> isAlpha c || c == '_')

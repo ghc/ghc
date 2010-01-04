@@ -129,7 +129,7 @@ make_exp (Var v) = do
   isLocal <- isALocal vName
   return $
      case idDetails v of
-       FCallId (CCall (CCallSpec (StaticTarget nm) callconv _)) 
+       FCallId (CCall (CCallSpec (StaticTarget nm _) callconv _)) 
            -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (varType v))
        FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
            -> C.DynExternal            (showSDoc (ppr callconv)) (make_ty (varType v))

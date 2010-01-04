@@ -91,7 +91,7 @@ dsCCall lbl args may_gc result_ty
        (ccall_result_ty, res_wrapper) <- boxResult result_ty
        uniq <- newUnique
        let
-           target = StaticTarget lbl
+           target = StaticTarget lbl Nothing
            the_fcall    = CCall (CCallSpec target CCallConv may_gc)
            the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)

@@ -78,16 +78,9 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   where
       (call_args, cmm_target)
 	= case target of
-
-	   -- A target label known to be in the current package.
-	   StaticTarget lbl 
-	    -> ( args
-	       , CmmLit (CmmLabel 
-			(mkForeignLabel lbl call_size ForeignLabelInThisPackage IsFunction)))
-
 	   -- If the packageId is Nothing then the label is taken to be in the
 	   --	package currently being compiled.
-	   PackageTarget lbl mPkgId
+	   StaticTarget lbl mPkgId
 	    -> let labelSource 
 	    		= case mPkgId of
 				Nothing		-> ForeignLabelInThisPackage

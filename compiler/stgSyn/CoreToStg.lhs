@@ -534,7 +534,7 @@ coreToStgApp _ f args = do
 				    StgOpApp (StgPrimOp op) args' res_ty
 
 		-- A call to some primitive Cmm function.
-		FCallId (CCall (CCallSpec (PackageTarget lbl (Just pkgId)) PrimCallConv _))
+		FCallId (CCall (CCallSpec (StaticTarget lbl (Just pkgId)) PrimCallConv _))
 		                 -> ASSERT( saturated )
 				    StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
 

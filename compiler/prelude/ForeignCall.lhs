@@ -103,17 +103,23 @@ The call target:
 
 \begin{code}
 
--- | How to call a particular function in C land.
+-- | How to call a particular function in C-land.
 data CCallTarget
-  -- An "unboxed" ccall# to named function
-  = StaticTarget  CLabelString  
+  -- An "unboxed" ccall# to named function in a particular package.
+  = StaticTarget  
+	CLabelString  			-- C-land name of label.
+
+	(Maybe PackageId)		-- What package the function is in.
+					-- If Nothing, then it's taken to be in the current package.
+					-- Note: This information is only used for PrimCalls on Windows.
+					--	 See CLabel.labelDynamic and CoreToStg.coreToStgApp 
+					--	 for the difference in representation between PrimCalls
+					--	 and ForeignCalls. If the CCallTarget is representing
+					--	 a regular ForeignCall then it's safe to set this to Nothing.
 
   -- The first argument of the import is the name of a function pointer (an Addr#).
   --	Used when importing a label as "foreign import ccall "dynamic" ..."
   | DynamicTarget
-
-  -- An "unboxed" ccall# to a named function from a particular package.
-  | PackageTarget CLabelString (Maybe PackageId)
   
   deriving( Eq )
   {-! derive: Binary !-}
@@ -197,17 +203,14 @@ instance Outputable CCallSpec where
       gc_suf | playSafe safety = text "_GC"
 	     | otherwise       = empty
 
-      ppr_fun DynamicTarget     
-        = text "__dyn_ccall" <> gc_suf <+> text "\"\""
-
-      ppr_fun (PackageTarget fn Nothing)
+      ppr_fun (StaticTarget fn Nothing)
      	= text "__pkg_ccall" <> gc_suf <+> pprCLabelString fn
 
-      ppr_fun (PackageTarget fn (Just pkgId))
+      ppr_fun (StaticTarget fn (Just pkgId))
      	= text "__pkg_ccall" <> gc_suf <+> ppr pkgId <+> pprCLabelString fn
 
-      ppr_fun (StaticTarget fn) 
-        = text "__ccall"     <> gc_suf <+> pprCLabelString fn
+      ppr_fun DynamicTarget     
+        = text "__dyn_ccall" <> gc_suf <+> text "\"\""
 \end{code}
 
 
@@ -257,24 +260,19 @@ instance Binary CCallSpec where
 	  return (CCallSpec aa ab ac)
 
 instance Binary CCallTarget where
-    put_ bh (StaticTarget aa) = do
+    put_ bh (StaticTarget aa ab) = do
 	    putByte bh 0
 	    put_ bh aa
+            put_ bh ab
     put_ bh DynamicTarget = do
 	    putByte bh 1
-    put_ bh (PackageTarget aa ab) = do
-    	    putByte bh 2
-	    put_ bh aa
-	    put_ bh ab
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> do aa <- get bh
-		      return (StaticTarget aa)
-	      1 -> do return DynamicTarget
-	      _ -> do aa <- get bh
-	      	      ab <- get bh
-		      return (PackageTarget aa ab)
+                      ab <- get bh
+		      return (StaticTarget aa ab)
+	      _ -> do return DynamicTarget
 
 instance Binary CCallConv where
     put_ bh CCallConv = do

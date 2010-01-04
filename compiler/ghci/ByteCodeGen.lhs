@@ -1029,20 +1029,7 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
                  DynamicTarget
                     -> return (False, panic "ByteCodeGen.generateCCall(dyn)")
 
-                 PackageTarget target _
-                    -> do res <- ioToBc (lookupStaticPtr stdcall_adj_target)
-                          return (True, res)
-                   where
-                      stdcall_adj_target
-#ifdef mingw32_TARGET_OS
-                          | StdCallConv <- cconv
-                          = let size = fromIntegral a_reps_sizeW * wORD_SIZE in
-                            mkFastString (unpackFS target ++ '@':show size)
-#endif
-                          | otherwise
-                          = target
-
-                 StaticTarget target
+                 StaticTarget target _
                     -> do res <- ioToBc (lookupStaticPtr stdcall_adj_target)
                           return (True, res)
                    where

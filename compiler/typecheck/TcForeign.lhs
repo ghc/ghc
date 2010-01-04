@@ -162,11 +162,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
-checkCTarget (StaticTarget str) = do
-    checkCg checkCOrAsmOrDotNetOrInterp
-    check (isCLabelString str) (badCName str)
-
-checkCTarget (PackageTarget str _) = do
+checkCTarget (StaticTarget str _) = do
     checkCg checkCOrAsmOrDotNetOrInterp
     check (isCLabelString str) (badCName str)
 

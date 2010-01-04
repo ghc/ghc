@@ -277,7 +277,7 @@ exp	:: { IfaceExpr }
 --	       "InlineMe"   -> IfaceNote IfaceInlineMe $3
 --            }
         | '%external' STRING aty   { IfaceFCall (ForeignCall.CCall 
-                                                    (CCallSpec (StaticTarget (mkFastString $2)) 
+                                                    (CCallSpec (StaticTarget (mkFastString $2) Nothing) 
                                                                CCallConv (PlaySafe False))) 
                                                  $3 }
 

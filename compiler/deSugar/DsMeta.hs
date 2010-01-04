@@ -338,10 +338,10 @@ repForD (L loc (ForeignImport name typ (CImport cc s ch cis)))
  where
     conv_cimportspec (CLabel cls) = notHandled "Foreign label" (doubleQuotes (ppr cls))
     conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
-    conv_cimportspec (CFunction (StaticTarget fs)) = return (unpackFS fs)
+    conv_cimportspec (CFunction (StaticTarget fs _)) = return (unpackFS fs)
     conv_cimportspec CWrapper = return "wrapper"
     static = case cis of
-                 CFunction (StaticTarget _) -> "static "
+                 CFunction (StaticTarget _ _) -> "static "
                  _ -> ""
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
