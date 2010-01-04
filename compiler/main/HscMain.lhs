@@ -336,12 +336,6 @@ type Compiler result =  GhcMonad m =>
 
 data HsCompiler a
   = HsCompiler {
-    -- | The main interface.
-    hscCompile :: GhcMonad m =>
-                  HscEnv -> ModSummary -> Bool
-               -> Maybe ModIface -> Maybe (Int, Int)
-               -> m a,
-
     -- | Called when no recompilation is necessary.
     hscNoRecomp :: GhcMonad m =>
                    ModIface -> m a,
@@ -418,19 +412,7 @@ hscOneShotCompiler :: HsCompiler OneShotResult
 hscOneShotCompiler =
   HsCompiler {
 
-    hscCompile = \hsc_env mod_summary src_changed mb_old_iface mb_i_of_n -> do
-       -- One-shot mode needs a knot-tying mutable variable for interface
-       -- files.  See TcRnTypes.TcGblEnv.tcg_type_env_var.
-      type_env_var <- liftIO $ newIORef emptyNameEnv
-      let
-         mod = ms_mod mod_summary
-         hsc_env' = hsc_env{ hsc_type_env_var = Just (mod, type_env_var) }
-      ---
-      genericHscCompile hscOneShotCompiler
-                        oneShotMsg hsc_env' mod_summary src_changed
-                        mb_old_iface mb_i_of_n
-
-  , hscNoRecomp = \_old_iface -> do
+    hscNoRecomp = \_old_iface -> do
       withSession (liftIO . dumpIfaceStats)
       return HscNoRecomp
 
@@ -454,7 +436,18 @@ hscOneShotCompiler =
 
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: Compiler OneShotResult
-hscCompileOneShot = hscCompile hscOneShotCompiler
+hscCompileOneShot hsc_env mod_summary src_changed mb_old_iface mb_i_of_n = do
+       -- One-shot mode needs a knot-tying mutable variable for interface
+       -- files.  See TcRnTypes.TcGblEnv.tcg_type_env_var.
+      type_env_var <- liftIO $ newIORef emptyNameEnv
+      let
+         mod = ms_mod mod_summary
+         hsc_env' = hsc_env{ hsc_type_env_var = Just (mod, type_env_var) }
+      ---
+      genericHscCompile hscOneShotCompiler
+                        oneShotMsg hsc_env' mod_summary src_changed
+                        mb_old_iface mb_i_of_n
+
 
 --------------------------------------------------------------
 
@@ -462,9 +455,7 @@ hscBatchCompiler :: HsCompiler BatchResult
 hscBatchCompiler =
   HsCompiler {
 
-    hscCompile = genericHscCompile hscBatchCompiler batchMsg
-
-  , hscNoRecomp = \iface -> do
+    hscNoRecomp = \iface -> do
        details <- genModDetails iface
        return (HscNoRecomp, iface, details)
 
@@ -489,16 +480,14 @@ hscBatchCompiler =
 
 -- Compile Haskell, boot and extCore in batch mode.
 hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileBatch = hscCompile hscBatchCompiler
+hscCompileBatch = genericHscCompile hscBatchCompiler batchMsg
 
 --------------------------------------------------------------
 
 hscInteractiveCompiler :: HsCompiler InteractiveResult
 hscInteractiveCompiler =
   HsCompiler {
-    hscCompile = genericHscCompile hscInteractiveCompiler batchMsg
-
-  , hscNoRecomp = \iface -> do
+    hscNoRecomp = \iface -> do
        details <- genModDetails iface
        return (HscNoRecomp, iface, details)
 
@@ -519,16 +508,14 @@ hscInteractiveCompiler =
 
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
-hscCompileInteractive = hscCompile hscInteractiveCompiler
+hscCompileInteractive = genericHscCompile hscInteractiveCompiler batchMsg
 
 --------------------------------------------------------------
 
 hscNothingCompiler :: HsCompiler NothingResult
 hscNothingCompiler =
   HsCompiler {
-    hscCompile = genericHscCompile hscNothingCompiler batchMsg
-
-  , hscNoRecomp = \iface -> do
+    hscNoRecomp = \iface -> do
        details <- genModDetails iface
        return (HscNoRecomp, iface, details)
 
@@ -550,9 +537,10 @@ hscNothingCompiler =
   , hscGenOutput = \_ _ _ ->
         panic "hscCompileNothing: hscGenOutput should not be called"
   }
+
 -- Type-check Haskell and .hs-boot only (no external core)
 hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileNothing = hscCompile hscNothingCompiler
+hscCompileNothing = genericHscCompile hscNothingCompiler batchMsg
 
 --------------------------------------------------------------
 -- NoRecomp handlers
