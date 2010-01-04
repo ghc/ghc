@@ -580,10 +580,10 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
     lookup_ie opt_typeFamilies ie 
       = let bad_ie = Failed (badImportItemErr iface decl_spec ie)
 
-            lookup_name rdrName = 
-                case lookupOccEnv occ_env (rdrNameOcc rdrName) of
-                   Nothing -> bad_ie
-                   Just n  -> return n
+            lookup_name rdr 
+	      | isQual rdr = Failed (qualImportItemErr rdr)
+              | Just nm <- lookupOccEnv occ_env (rdrNameOcc rdr) = return nm
+              | otherwise                                        = bad_ie
         in
         case ie of
          IEVar n -> do
@@ -1386,6 +1386,11 @@ printMinimalImports imports_w_usage
 %************************************************************************
 
 \begin{code}
+qualImportItemErr :: RdrName -> SDoc
+qualImportItemErr rdr
+  = hang (ptext (sLit "Illegal qualified name in import item:"))
+       2 (ppr rdr)
+
 badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
 badImportItemErr iface decl_spec ie
   = sep [ptext (sLit "Module"), quotes (ppr (is_mod decl_spec)), source_import,
