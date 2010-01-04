@@ -19,7 +19,7 @@ import Maybes
 import Name             ( getSrcLoc )
 import ErrUtils         ( Message, mkLocMessage )
 import TypeRep
-import Type             ( mkFunTys, splitFunTys, splitTyConApp_maybe,
+import Type             ( mkFunTys, splitFunTy_maybe, splitTyConApp_maybe,
                           isUnLiftedType, isTyVarTy, dropForAlls
                         )
 import TyCon            ( isAlgTyCon, isNewTyCon, tyConDataCons )
@@ -200,7 +200,7 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
         UbxTupAlt tc -> check_bndr tc
         PolyAlt      -> return ()
 
-    MaybeT $ trace (showSDoc (ppr e)) $ do
+    MaybeT $ do
         -- we only allow case of tail-call or primop.
      case scrut of
         StgApp _ _     -> return ()
@@ -387,26 +387,21 @@ checkFunApp :: Type                 -- The function type
 checkFunApp fun_ty arg_tys msg = LintM checkFunApp'
  where
   checkFunApp' loc _scope errs
-   = cfa res_ty expected_arg_tys arg_tys
+   = cfa fun_ty arg_tys
    where
-    (expected_arg_tys, res_ty) = splitFunTys (dropForAlls fun_ty)
+    cfa fun_ty []      -- Args have run out; that's fine
+      = (Just fun_ty, errs)
 
-    cfa res_ty expected []      -- Args have run out; that's fine
-      = (Just (mkFunTys expected res_ty), errs)
+    cfa fun_ty (_:arg_tys)   
+      | Just (_arg_ty, res_ty) <- splitFunTy_maybe (dropForAlls fun_ty)
+      = cfa res_ty arg_tys
 
-    cfa res_ty [] arg_tys       -- Expected arg tys ran out first;
-                                -- first see if res_ty is a tyvar template;
-                                -- otherwise, maybe res_ty is a
-                                -- dictionary type which is actually a function?
-      | isTyVarTy res_ty
-      = (Just res_ty, errs)
+      | isTyVarTy fun_ty      -- Expected arg tys ran out first;
+      = (Just fun_ty, errs)   -- first see if fun_ty is a tyvar template;
+                              -- otherwise, maybe fun_ty is a
+                              -- dictionary type which is actually a function?
       | otherwise
-      = case splitFunTys res_ty of
-          ([], _)                 -> (Nothing, addErr errs msg loc)     -- Too many args
-          (new_expected, new_res) -> cfa new_res new_expected arg_tys
-
-    cfa res_ty (_:expected_arg_tys) (_:arg_tys)
-      = cfa res_ty expected_arg_tys arg_tys
+      = (Nothing, addErr errs msg loc)     -- Too many args
 \end{code}
 
 \begin{code}
