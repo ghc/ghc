@@ -42,9 +42,9 @@ module InteractiveEval (
 import HscMain          hiding (compileExpr)
 import HscTypes
 import TcRnDriver
-import Type             hiding (typeKind)
-import TcType           hiding (typeKind)
 import InstEnv
+import Type
+import TcType		hiding( typeKind )
 import Var
 import Id
 import Name             hiding ( varName )

@@ -20,6 +20,7 @@ import Var
 import IdInfo
 import Name		( mkSystemVarName, isExternalName )
 import Coercion
+import OptCoercion	( optCoercion )
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
 import CoreMonad	( SimplifierSwitch(..), Tick(..) )

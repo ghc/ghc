@@ -39,7 +39,7 @@ import OccurAnal( occurAnalyseExpr )
 
 import qualified Type
 import Type     ( Type, TvSubst(..), TvSubstEnv )
-import Coercion ( optCoercion )
+import OptCoercion ( optCoercion )
 import VarSet
 import VarEnv
 import Id

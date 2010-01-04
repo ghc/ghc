@@ -16,7 +16,7 @@ module Unify (
 	Refinement, emptyRefinement, isEmptyRefinement, 
 	matchRefine, refineType, refinePred, refineResType,
 
-        -- side-effect free unification
+        -- Side-effect free unification
         tcUnifyTys, BindFlag(..)
 
    ) where

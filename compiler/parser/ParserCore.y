@@ -16,8 +16,9 @@ import RdrName
 import OccName
 import Type ( Kind,
               liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
-              argTypeKindTyCon, ubxTupleKindTyCon, mkArrowKind, mkTyConApp
+              argTypeKindTyCon, ubxTupleKindTyCon, mkTyConApp
             )
+import Coercion( mkArrowKind )
 import Name( Name, nameOccName, nameModule, mkExternalName )
 import Module
 import ParserCoreUtils

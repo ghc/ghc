@@ -326,6 +326,7 @@ Library
         HaddockUtils
         LexCore
         Lexer
+        OptCoercion
         Parser
         ParserCore
         ParserCoreUtils

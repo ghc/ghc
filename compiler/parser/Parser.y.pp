@@ -45,7 +45,8 @@ import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 			  mkSrcLoc, mkSrcSpan )
 import Module
 import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
-import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
+import Type		( Kind, liftedTypeKind, unliftedTypeKind )
+import Coercion		( mkArrowKind )
 import Class		( FunDep )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..), RuleMatchInfo(..), defaultInlinePragma )

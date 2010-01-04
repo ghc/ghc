@@ -19,6 +19,7 @@ import qualified OccName
 import OccName
 import SrcLoc
 import Type
+import Coercion
 import TysWiredIn
 import BasicTypes as Hs
 import ForeignCall

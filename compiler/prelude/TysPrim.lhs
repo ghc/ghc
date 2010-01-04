@@ -57,6 +57,7 @@ import OccName		( mkTcOcc )
 import OccName		( mkTyVarOccFS, mkTcOccFS )
 import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon, mkAnyTyCon )
 import Type
+import Coercion
 import SrcLoc
 import Unique		( mkAlphaTyVarUnique )
 import PrelNames

@@ -33,6 +33,7 @@ module HsTypes (
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import Type
+import Coercion
 import HsDoc
 import BasicTypes
 import SrcLoc

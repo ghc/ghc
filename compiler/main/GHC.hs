@@ -254,8 +254,8 @@ import NameSet
 import RdrName
 import qualified HsSyn -- hack as we want to reexport the whole module
 import HsSyn hiding ((<.>))
-import Type             hiding (typeKind)
-import TcType           hiding (typeKind)
+import Type
+import TcType		hiding( typeKind )
 import Id
 import Var
 import TysPrim		( alphaTyVars )

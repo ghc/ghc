@@ -30,6 +30,9 @@ module Util (
 
         isIn, isn'tIn,
 
+        -- * Tuples
+        fstOf3, sndOf3, thirdOf3,
+
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
         dropTail,
@@ -179,6 +182,15 @@ nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
 nTimes n f = f . nTimes (n-1) f
+\end{code}
+
+\begin{code}
+fstOf3   :: (a,b,c) -> a    
+sndOf3   :: (a,b,c) -> b    
+thirdOf3 :: (a,b,c) -> c    
+fstOf3      (a,_,_) =  a
+sndOf3      (_,b,_) =  b
+thirdOf3    (_,_,c) =  c
 \end{code}
 
 %************************************************************************
