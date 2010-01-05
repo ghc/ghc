@@ -33,7 +33,7 @@ import DataCon
 import Class
 import Var
 import CoreUnfold ( mkDFunUnfolding )
-import CoreUtils  ( mkPiTypes )
+-- import CoreUtils  ( mkPiTypes )
 import PrelNames  ( inlineIdName )
 import Id
 import MkId
@@ -180,8 +180,8 @@ Instead we use a cunning trick.
 
 Note [Single-method classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the class has just one method (or, more accurately, just one elemen
-of {superclasses + methods}), then we want a different strategy. 
+If the class has just one method (or, more accurately, just one element
+of {superclasses + methods}), then we still use the *same* strategy
 
    class C a where op :: a -> a
    instance C a => C [a] where op = <blah>
@@ -194,34 +194,39 @@ a top-level axiom:
    op :: forall a. C a -> (a -> a)
    op a d = d |> (Co:C a)
 
+   MkC :: forall a. (a->a) -> C a
+   MkC = /\a.\op. op |> (sym Co:C a)
+
    df :: forall a. C a => C [a]
-   {-# INLINE df #-}
-   df = $cop_list |> (forall a. C a -> (sym (Co:C a))
+   {-# NOINLINE df   DFun[ $cop_list ] #-}
+   df = /\a. \d. MkD ($cop_list a d)
 
    $cop_list :: forall a. C a => a -> a
    $cop_list = <blah>
 
-So the ClassOp is just a cast; and so is the dictionary function.
-(The latter doesn't even have any lambdas.)  We can inline both freely.
-No need for fancy BuiltIn rules.  Indeed the BuiltinRule stuff does
-not work well for newtypes because it uses exprIsConApp_maybe.
+The "constructor" MkD expands to a cast, as does the class-op selector.
+The RULE works just like for multi-field dictionaries:
+  * (df a d) returns (Just (MkD,..,[$cop_list a d])) 
+    to exprIsConApp_Maybe
 
-The INLINE on df is vital, else $cop_list occurs just once and is inlined,
-which is a disaster if $cop_list *itself* has an INLINE pragma.
+  * The RULE for op picks the right result
 
-Notice, also, that we go to the trouble of generating a complicated cast,
-rather than do this:
-       df = /\a. \d. MkD ($cop_list a d)
-where the MkD "constructor" willl expand to a suitable cast:
-       df = /\a. \d. ($cop_list a d) |>  (...)
-Reason: suppose $cop_list has an INLINE pragma.  We want to avoid the
-nasty possibility that we eta-expand df, to get
-       df = (/\a \d \x. $cop_list a d x) |> (...)
-and now $cop_list may get inlined into the df, rather than at
-the actual call site.  Of course, eta reduction may get there first,
-but it seems less fragile to generate the Right Thing in the first place.
-See Trac #3772.
+This is a bit of a hack, because (df a d) isn't *really* a constructor
+application.  But it works just fine in this case, exprIsConApp_maybe
+is otherwise used only when we hit a case expression which will have
+a real data constructor in it.
 
+The biggest reason for doing it this way, apart form uniformity, is
+that we want to be very careful when we have
+    instance C a => C [a] where
+      {-# INLINE op #-}
+      op = ...
+then we'll get an INLINE pragma on $cop_list.  The danger is that
+we'll get something like
+      foo = /\a.\d. $cop_list a d
+and then we'll eta expand, and then we'll inline TOO EARLY. This happened in 
+Trac #3772 and I spent far too long fiddling arond trying to fix it.
+Look at the test for Trac #3772.
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -769,6 +774,44 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
        ; checkSigTyVars inst_tyvars'
 
        -- Create the result bindings
+       ; let dict_constr   = classDataCon clas
+             this_dict_id  = instToId this_dict
+	     dict_bind     = mkVarBind this_dict_id dict_rhs
+             dict_rhs      = foldl mk_app inst_constr (sc_ids ++ meth_ids)
+ 	     inst_constr   = L loc $ wrapId (mkWpTyApps inst_tys')
+	     			            (dataConWrapId dict_constr)
+                     -- We don't produce a binding for the dict_constr; instead we
+                     -- rely on the simplifier to unfold this saturated application
+                     -- We do this rather than generate an HsCon directly, because
+                     -- it means that the special cases (e.g. dictionary with only one
+                     -- member) are dealt with by the common MkId.mkDataConWrapId code rather
+                     -- than needing to be repeated here.
+
+	     mk_app :: LHsExpr Id -> Id -> LHsExpr Id
+ 	     mk_app fun arg_id = L loc (HsApp fun (L loc (wrapId arg_wrapper arg_id)))
+	     arg_wrapper = mkWpApps dfun_lam_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars')
+
+	        -- Do not inline the dfun; instead give it a magic DFunFunfolding
+	        -- See Note [ClassOp/DFun selection]
+		-- See also note [Single-method classes]
+             dfun_id_w_fun = dfun_id  
+                             `setIdUnfolding`  mkDFunUnfolding dict_constr (sc_ids ++ meth_ids)
+                             `setInlinePragma` dfunInlinePragma
+
+             main_bind = AbsBinds
+                         inst_tyvars'
+                         dfun_lam_vars
+                         [(inst_tyvars', dfun_id_w_fun, this_dict_id, spec_inst_prags)]
+                         (unitBag dict_bind)
+
+       ; showLIE (text "instance")
+       ; return (unitBag (L loc main_bind) `unionBags` 
+		 listToBag meth_binds     `unionBags` 
+                 listToBag sc_binds)
+       }
+
+{-
+       -- Create the result bindings
        ; let this_dict_id  = instToId this_dict
              arg_ids       = sc_ids ++ meth_ids
              arg_binds     = listToBag meth_binds `unionBags` 
@@ -819,8 +862,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
 	       the_meth_id = ASSERT( length arg_ids == 1 ) head arg_ids
                nt_cast = WpCast $ mkPiTypes (inst_tyvars' ++ dfun_lam_vars) $
                          mkSymCoercion (mkTyConApp the_nt_co inst_tys')
-    }
-
+-}
 
 ------------------------------
 tcSuperClass :: InstLoc -> [TyVar] -> [Inst]

@@ -467,15 +467,11 @@ mkDictSelId no_unf name clas
 		   -- becuase we use that to generate a top-level binding
 		   -- for the ClassOp
 
-    info | new_tycon = base_info  
-    	   	         -- For newtype dictionaries, just inline the class op
-                         -- See Note [Single-method classes] in TcInstDcls
-         | otherwise = base_info
-	 		`setSpecInfo`       mkSpecInfo [rule]
+    info = base_info    `setSpecInfo`       mkSpecInfo [rule]
 			`setInlinePragInfo` neverInlinePragma
-			-- Otherwise add a magic BuiltinRule, and never inline it
-			-- so that the rule is always available to fire.
-			-- See Note [ClassOp/DFun selection] in TcInstDcls
+		-- Add a magic BuiltinRule, and never inline it
+		-- so that the rule is always available to fire.
+		-- See Note [ClassOp/DFun selection] in TcInstDcls
 
     n_ty_args = length tyvars
 
