@@ -867,8 +867,20 @@ checkValSig
 checkValSig (L l (HsVar v)) ty 
   | isUnqual v && not (isDataOcc (rdrNameOcc v))
   = return (TypeSig (L l v) ty)
-checkValSig (L l _)         _
+checkValSig lhs@(L l _)         _
+  | looks_like_foreign lhs
+  = parseError l "Invalid type signature; perhaps you meant to use -XForeignFunctionInterface?"
+  | otherwise
   = parseError l "Invalid type signature"
+  where
+    -- A common error is to forget the ForeignFunctionInterface flag
+    -- so check for that, and suggest.  cf Trac #3805
+    -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
+    looks_like_foreign (L _ (HsVar v))     = v == foreign_RDR
+    looks_like_foreign (L _ (HsApp lhs _)) = looks_like_foreign lhs
+    looks_like_foreign _                   = False
+
+    foreign_RDR = mkUnqual varName (fsLit "foreign")
 \end{code}
 
 
