@@ -1008,8 +1008,9 @@ mkLam env bndrs body
 
       | dopt Opt_DoLambdaEtaExpansion dflags,
         not (inGentleMode env),	      -- In gentle mode don't eta-expansion
-   	any isRuntimeVar bndrs	      -- because it can clutter up the code
+	    		  	      -- because it can clutter up the code
 	    		 	      -- with casts etc that may not be removed
+   	not (all isTyVar bndrs) -- Don't eta expand type abstractions
       = do { let body' = tryEtaExpansion dflags body
  	   ; return (mkLams bndrs body') }
    
