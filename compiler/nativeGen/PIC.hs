@@ -69,7 +69,7 @@ import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
                           labelDynamic, externallyVisibleCLabel )
 
-import CLabel           ( mkForeignLabel, pprDebugCLabel )
+import CLabel           ( mkForeignLabel )
 
 
 import StaticFlags	( opt_PIC, opt_Static )
@@ -104,7 +104,7 @@ data ReferenceKind
         deriving(Eq)
 
 
-cmmMakeDynamicReference
+cmmMakeDynamicReference, cmmMakeDynamicReference'
   :: Monad m => DynFlags
              -> (CLabel -> m ())  -- a monad & a function
                                   -- used for recording imported symbols
@@ -112,9 +112,7 @@ cmmMakeDynamicReference
              -> CLabel            -- the label
              -> m CmmExpr
 
-cmmMakeDynamicReference dflags addImport referenceKind lbl
-   = cmmMakeDynamicReference' dflags addImport referenceKind lbl
-
+cmmMakeDynamicReference = cmmMakeDynamicReference'
   
 cmmMakeDynamicReference' dflags addImport referenceKind lbl
   | Just _ <- dynamicLinkerLabelInfo lbl
