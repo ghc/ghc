@@ -1168,7 +1168,9 @@ deriving :: { Located (Maybe [LHsType RdrName]) }
 -----------------------------------------------------------------------------
 -- Value definitions
 
-{- There's an awkward overlap with a type signature.  Consider
+{- Note [Declaration/signature overlap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's an awkward overlap with a type signature.  Consider
 	f :: Int -> Int = ...rhs...
    Then we can't tell whether it's a type signature or a value
    definition with a result signature until we see the '='.
@@ -1220,10 +1222,9 @@ gdrh :: { LGRHS RdrName }
 	: '|' guardquals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
-	: infixexp '::' sigtypedoc
-				{% do s <- checkValSig $1 $3; 
-				      return (LL $ unitOL (LL $ SigD s)) }
-		-- See the above notes for why we need infixexp here
+	: infixexp '::' sigtypedoc	{% do s <- checkValSig $1 $3 
+				         ; return (LL $ unitOL (LL $ SigD s)) }
+		-- See Note [Declaration/signature overlap] for why we need infixexp here
 	| var ',' sig_vars '::' sigtypedoc
 				{ LL $ toOL [ LL $ SigD (TypeSig n $5) | n <- $1 : unLoc $3 ] }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
