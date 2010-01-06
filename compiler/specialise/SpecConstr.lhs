@@ -1097,20 +1097,24 @@ specialise env force_spec bind_calls (fn, arg_bndrs, body, arg_occs)
   , notNull arg_bndrs		-- Only specialise functions
   , Just all_calls <- lookupVarEnv bind_calls fn
   = do	{ (boring_call, pats) <- callsToPats env specs arg_occs all_calls
---	; pprTrace "specialise" (vcat [ppr fn <+> ppr arg_occs,
---	  				text "calls" <+> ppr all_calls,
---	  				text "good pats" <+> ppr pats])  $
+--	; pprTrace "specialise" (vcat [ ppr fn <+> text "with" <+> int (length pats) <+> text "good patterns"
+--                                      , text "arg_occs" <+> ppr arg_occs,
+--	  			      ,	text "calls" <+> ppr all_calls,
+--	  			      , text "good pats" <+> ppr pats])  $
 --	  return ()
 
 		-- Bale out if too many specialisations
 		-- Rather a hacky way to do so, but it'll do for now
-	; let spec_count' = length pats + spec_count
+	; let n_pats = length pats
+              spec_count' = length pats + spec_count
 	; case sc_count env of
 	    Just max | not force_spec && spec_count' > max
-		-> WARN( True, msg ) return (nullUsage, spec_info)
+		-> pprTrace "SpecConstr" msg $  
+                  return (nullUsage, spec_info)
 		where
-		   msg = vcat [ sep [ ptext (sLit "SpecConstr: specialisation of") <+> quotes (ppr fn)
-		       	            , nest 2 (ptext (sLit "limited by bound of")) <+> int max ]
+		   msg = vcat [ sep [ ptext (sLit "Function") <+> quotes (ppr fn)
+		       	            , nest 2 (ptext (sLit "has") <+> int n_pats <+> 
+                                              ptext (sLit "call pattterns, but the limit is") <+> int max) ]
 			      , ptext (sLit "Use -fspec-constr-count=n to set the bound")
 			      , extra ]
 	           extra | not opt_PprStyle_Debug = ptext (sLit "Use -dppr-debug to see specialisations")
