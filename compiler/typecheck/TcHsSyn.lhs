@@ -363,8 +363,12 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_dicts = dicts,
     zonkExport env (tyvars, global, local, prags)
 	-- The tyvars are already zonked
 	= zonkIdBndr env global			`thenM` \ new_global ->
-	  mapM zonk_prag prags			`thenM` \ new_prags -> 
+	  zonk_prags prags			`thenM` \ new_prags -> 
 	  returnM (tyvars, new_global, zonkIdOcc env local, new_prags)
+
+    zonk_prags IsDefaultMethod = return IsDefaultMethod
+    zonk_prags (SpecPrags ps)  = do { ps' <- mapM zonk_prag ps; return (SpecPrags ps') }
+
     zonk_prag (L loc (SpecPrag co_fn inl))
 	= do { (_, co_fn') <- zonkCoFn env co_fn
 	     ; return (L loc (SpecPrag co_fn' inl)) }

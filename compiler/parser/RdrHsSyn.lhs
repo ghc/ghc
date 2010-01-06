@@ -977,6 +977,7 @@ mkInlinePragma :: Maybe Activation -> RuleMatchInfo -> Bool -> InlinePragma
 -- The Maybe is because the user can omit the activation spec (and usually does)
 mkInlinePragma mb_act match_info inl 
   = InlinePragma { inl_inline = inl
+                 , inl_sat    = Nothing
                  , inl_act    = act
                  , inl_rule   = match_info }
   where

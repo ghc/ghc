@@ -789,7 +789,7 @@ vectDataConWorkers orig_tc vect_tc arr_tc
 
           raw_worker <- cloneId mkVectOcc orig_worker (exprType body)
           let vect_worker = raw_worker `setIdUnfolding`
-                              mkInlineRule needSaturated body arity
+                              mkInlineRule body (Just arity)
           defGlobalVar orig_worker vect_worker
           return (vect_worker, body)
       where
@@ -830,7 +830,7 @@ buildPADict vect_tc prepr_tc arr_tc repr
           let body = mkLams (tvs ++ args) expr
           raw_var <- newExportedVar (method_name name) (exprType body)
           let var = raw_var
-                      `setIdUnfolding` mkInlineRule needSaturated body (length args)
+                      `setIdUnfolding` mkInlineRule body (Just (length args))
                       `setInlinePragma` alwaysInlinePragma
           hoistBinding var body
           return var

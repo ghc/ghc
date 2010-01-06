@@ -142,12 +142,10 @@ dsHsBind _ rest
 dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
 	; let env = mkABEnv exports
-	      ar_env = mkArityEnv binds
 	      do_one (lcl_id, rhs) 
 		| Just (_, gbl_id, _, spec_prags) <- lookupVarEnv env lcl_id
-		= WARN( not (null spec_prags), ppr gbl_id $$ ppr spec_prags )	  -- Not overloaded
-                  makeCorePair gbl_id (lookupArity ar_env lcl_id)
-		               (addAutoScc auto_scc gbl_id rhs)
+		= WARN( hasSpecPrags spec_prags, pprTcSpecPrags gbl_id spec_prags )	  -- Not overloaded
+                  makeCorePair gbl_id False 0 (addAutoScc auto_scc gbl_id rhs)
 
 		| otherwise = (lcl_id, rhs)
 
@@ -217,9 +215,7 @@ dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
 		where
 		  fvs = exprSomeFreeVars (`elemVarSet` bndrs) rhs
 
-	      ar_env = mkArityEnv binds
 	      env = mkABEnv exports
-
 	      mk_lg_bind lcl_id gbl_id tyvars
 		 = NonRec (setIdInfo lcl_id vanillaIdInfo)
 				-- Nuke the IdInfo so that no old unfoldings
@@ -229,14 +225,14 @@ dsHsBind auto_scc rest (AbsBinds tyvars [] exports binds)
 
 	      do_one lg_binds (lcl_id, rhs) 
 		| Just (id_tvs, gbl_id, _, spec_prags) <- lookupVarEnv env lcl_id
-		= WARN( not (null spec_prags), ppr gbl_id $$ ppr spec_prags )	  -- Not overloaded
+		= WARN( hasSpecPrags spec_prags, pprTcSpecPrags gbl_id spec_prags )	  -- Not overloaded
                   (let rhs' = addAutoScc auto_scc gbl_id  $
 			      mkLams id_tvs $
 			      mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
 			             | tv <- tyvars, not (tv `elem` id_tvs)] $
 		              add_lets lg_binds rhs
 		  in return (mk_lg_bind lcl_id gbl_id id_tvs,
-			     makeCorePair gbl_id (lookupArity ar_env lcl_id) rhs'))
+			     makeCorePair gbl_id False 0 rhs'))
 		| otherwise
 		= do { non_exp_gbl_id <- newUniqueId lcl_id (mkForAllTys tyvars (idType lcl_id))
 		     ; return (mk_lg_bind lcl_id non_exp_gbl_id tyvars,
@@ -254,25 +250,24 @@ dsHsBind auto_scc rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
     do	{ core_prs <- ds_lhs_binds NoSccs binds
 
-	; let	-- Always treat the binds as recursive, because the typechecker
-	        -- makes rather mixed-up dictionary bindings
+	; let	-- Always treat the binds as recursive, because the 
+	        -- typechecker makes rather mixed-up dictionary bindings
 	        core_bind = Rec core_prs
-		inl_arity = lookupArity (mkArityEnv binds) local
     
 	; (spec_binds, rules) <- dsSpecs all_tyvars dicts tyvars global 
-				         local inl_arity core_bind prags
+				         local core_bind prags
 
 	; let   global'   = addIdSpecialisations global rules
 	        rhs       = addAutoScc auto_scc global $
 			    mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
-		main_bind = makeCorePair global' (inl_arity + dictArity dicts) rhs
+		main_bind = makeCorePair global' (isDefaultMethod prags)
+                                         (dictArity dicts) rhs 
     
 	; return (main_bind : spec_binds ++ rest) }
 
 dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
 	; let env = mkABEnv exports
-	      ar_env = mkArityEnv binds
 	      do_one (lcl_id,rhs) | Just (_, gbl_id, _, _prags) <- lookupVarEnv env lcl_id
 			          = (lcl_id, addAutoScc auto_scc gbl_id rhs)
 				  | otherwise = (lcl_id,rhs)
@@ -297,7 +292,7 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 		     ; locals' <- newSysLocalsDs (map substitute local_tys)
 		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
 		     ; (spec_binds, rules) <- dsSpecs all_tyvars dicts tyvars global local 
-					              (lookupArity ar_env local) core_bind 
+					              core_bind 
 				                      spec_prags
 		     ; let global' = addIdSpecialisations global rules
 	                   rhs = mkLams tyvars $ mkLams dicts $
@@ -317,50 +312,40 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 		    (concat export_binds_s ++ rest)) }
 
 ------------------------
-makeCorePair :: Id-> Arity -> CoreExpr -> (Id, CoreExpr)
-makeCorePair gbl_id arity rhs
-  | isInlinePragma (idInlinePragma gbl_id)
-      	-- Add an Unfolding for an INLINE (but not for NOINLINE)
-	-- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
-  = (gbl_id `setIdUnfolding` mkInlineRule needSaturated rhs arity,
-     etaExpand arity rhs)
-  | otherwise
+makeCorePair :: Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
+makeCorePair gbl_id is_default_method dict_arity rhs
+  | is_default_method		      -- Default methods are *always* inlined
+  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
+
+  | not (isInlinePragma inline_prag)
   = (gbl_id, rhs)
 
-------------------------
-type AbsBindEnv = VarEnv ([TyVar], Id, Id, [LSpecPrag])
-	-- Maps the "lcl_id" for an AbsBind to
-	-- its "gbl_id" and associated pragmas, if any
+  | Just arity <- inlinePragmaSat inline_prag
+      	-- Add an Unfolding for an INLINE (but not for NOINLINE)
+	-- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
+  = (gbl_id `setIdUnfolding` mkInlineRule rhs (Just (dict_arity + arity)),
+    	    -- NB: The arity in the InlineRule takes account of the dictionaries
+     etaExpand arity rhs)
 
-mkABEnv :: [([TyVar], Id, Id, [LSpecPrag])] -> AbsBindEnv
--- Takes the exports of a AbsBinds, and returns a mapping
---	lcl_id -> (tyvars, gbl_id, lcl_id, prags)
-mkABEnv exports = mkVarEnv [ (lcl_id, export) | export@(_, _, lcl_id, _) <- exports]
-
-mkArityEnv :: LHsBinds Id -> IdEnv Arity
-	-- Maps a local to the arity of its definition
-mkArityEnv binds = foldrBag (plusVarEnv . lhsBindArity) emptyVarEnv binds
-
-lhsBindArity :: LHsBind Id -> IdEnv Arity
-lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) 
-  = unitVarEnv (unLoc id) (matchGroupArity ms)
-lhsBindArity (L _ (AbsBinds { abs_exports = exports
-                            , abs_dicts = dicts
-                            , abs_binds = binds })) 
-  = mkVarEnv [ (gbl, lookupArity ar_env lcl + n_val_dicts) 
-             | (_, gbl, lcl, _) <- exports]
-  where	     -- See Note [Nested arities] 
-    ar_env = mkArityEnv binds
-    n_val_dicts = dictArity dicts	
-
-lhsBindArity _ = emptyVarEnv	-- PatBind/VarBind
+  | otherwise
+  = (gbl_id `setIdUnfolding` mkInlineRule rhs Nothing, rhs)
+  where
+    inline_prag = idInlinePragma gbl_id
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity
 dictArity dicts = count isId dicts
 
-lookupArity :: IdEnv Arity -> Id -> Arity
-lookupArity ar_env id = lookupVarEnv ar_env id `orElse` 0
+
+------------------------
+type AbsBindEnv = VarEnv ([TyVar], Id, Id, TcSpecPrags)
+	-- Maps the "lcl_id" for an AbsBind to
+	-- its "gbl_id" and associated pragmas, if any
+
+mkABEnv :: [([TyVar], Id, Id, TcSpecPrags)] -> AbsBindEnv
+-- Takes the exports of a AbsBinds, and returns a mapping
+--	lcl_id -> (tyvars, gbl_id, lcl_id, prags)
+mkABEnv exports = mkVarEnv [ (lcl_id, export) | export@(_, _, lcl_id, _) <- exports]
 \end{code}
 
 Note [Eta-expanding INLINE things]
@@ -435,17 +420,19 @@ Note that
 \begin{code}
 ------------------------
 dsSpecs :: [TyVar] -> [DictId] -> [TyVar]
-        -> Id -> Id -> Arity		-- Global, local, arity of local
-        -> CoreBind -> [LSpecPrag]
+        -> Id -> Id 	-- Global, local
+        -> CoreBind -> TcSpecPrags
         -> DsM ( [(Id,CoreExpr)] 	-- Binding for specialised Ids
 	       , [CoreRule] )		-- Rules for the Global Ids
 -- See Note [Implementing SPECIALISE pragmas]
-dsSpecs all_tvs dicts tvs poly_id mono_id inl_arity mono_bind prags
-  = do { pairs <- mapMaybeM spec_one prags
-       ; let (spec_binds_s, rules) = unzip pairs
-       ; return (concat spec_binds_s, rules) }
+dsSpecs all_tvs dicts tvs poly_id mono_id mono_bind prags
+  = case prags of
+      IsDefaultMethod      -> return ([], [])
+      SpecPrags sps -> do { pairs <- mapMaybeM spec_one sps
+                          ; let (spec_binds_s, rules) = unzip pairs
+                          ; return (concat spec_binds_s, rules) }
  where 
-    spec_one :: LSpecPrag -> DsM (Maybe ([(Id,CoreExpr)], CoreRule))
+    spec_one :: Located TcSpecPrag -> DsM (Maybe ([(Id,CoreExpr)], CoreRule))
     spec_one (L loc (SpecPrag spec_co spec_inl))
       = putSrcSpanDs loc $ 
         do { let poly_name = idName poly_id
@@ -475,8 +462,6 @@ dsSpecs all_tvs dicts tvs poly_id mono_id inl_arity mono_bind prags
 	   	      -- Get the INLINE pragma from SPECIALISE declaration, or,
                       -- failing that, from the original Id
 
-              	 spec_id_arity = inl_arity + count isDictId bndrs
-
               	 extra_dict_bndrs = [ localiseId d  -- See Note [Constant rule dicts]
 	      	 	  	    | d <- varSetElems (exprFreeVars ds_spec_expr)
 	      	 	  	    , isDictId d]
@@ -488,7 +473,7 @@ dsSpecs all_tvs dicts tvs poly_id mono_id inl_arity mono_bind prags
 	    			(mkVarApps (Var spec_id) bndrs)
 
                  spec_rhs = wrap_fn (mkLams (tvs ++ dicts) f_body)
-                 spec_pair = makeCorePair spec_id spec_id_arity spec_rhs
+                 spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
 
 	    ; return (Just (spec_pair : unf_pairs, rule))
 	    } } } }

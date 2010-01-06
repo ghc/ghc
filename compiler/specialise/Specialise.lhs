@@ -915,10 +915,15 @@ specDefn subst body_uds fn rhs
 
 		-- Add an InlineRule if the parent has one
 		-- See Note [Inline specialisations]
-		final_spec_f | Just sat <- fn_has_inline_rule
-			     = spec_f_w_arity `setIdUnfolding` mkInlineRule sat spec_rhs spec_arity
-			     | otherwise 
-			     = spec_f_w_arity
+		final_spec_f 
+                  | Just sat <- fn_has_inline_rule
+		  = let 
+                       mb_spec_arity = if sat then Just spec_arity else Nothing
+                    in 
+                    spec_f_w_arity `setIdUnfolding` mkInlineRule spec_rhs mb_spec_arity
+		  | otherwise 
+		  = spec_f_w_arity
+
 	   ; return (Just ((final_spec_f, spec_rhs), final_uds, spec_env_rule)) } }
       where
 	my_zipEqual xs ys zs

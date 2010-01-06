@@ -38,7 +38,7 @@ import Var
 import MkId               ( unwrapFamInstScrut )
 import Id                 ( setIdUnfolding )
 import TysWiredIn
-import BasicTypes         ( Boxity(..) )
+import BasicTypes         ( Boxity(..), Arity )
 import Literal            ( Literal, mkMachInt )
 
 import Outputable
@@ -348,7 +348,7 @@ polyVApply expr tys
       return $ mapVect (\e -> e `mkTyApps` tys `mkApps` dicts) expr
 
 
-data Inline = Inline Int -- arity
+data Inline = Inline Arity
             | DontInline
 
 addInlineArity :: Inline -> Int -> Inline
@@ -371,7 +371,7 @@ hoistExpr fs expr inl
   where
     mk_inline var = case inl of
                       Inline arity -> var `setIdUnfolding`
-                                      mkInlineRule needSaturated expr arity
+                                      mkInlineRule expr (Just arity)
                       DontInline   -> var
 
 hoistVExpr :: VExpr -> Inline -> VM VVar

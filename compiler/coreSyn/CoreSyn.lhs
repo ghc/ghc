@@ -474,6 +474,7 @@ data UnfoldingGuidance
                 -- See Note [INLINE for small functions] in CoreUnfold
       ug_unsat_ok  :: Bool,	-- True <=> ok to inline even if unsaturated
       ug_boring_ok :: Bool      -- True <=> ok to inline even if the context is boring
+      		-- So True,True means "always"
     }
 
   | UnfIfGoodArgs {	-- Arose from a normal Id; the info here is the

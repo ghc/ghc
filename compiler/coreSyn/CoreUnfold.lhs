@@ -43,6 +43,7 @@ import PprCore		()	-- Instances
 import OccurAnal
 import CoreSubst hiding( substTy )
 import CoreFVs         ( exprFreeVars )
+import CoreArity       ( manifestArity )
 import CoreUtils
 import Id
 import DataCon
@@ -140,13 +141,17 @@ mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolde
                     expr 0    -- Arity of unfolding doesn't matter
                     (UnfWhen unSaturatedOk boringCxtOk)
 
-mkInlineRule :: Bool -> CoreExpr -> Arity -> Unfolding
-mkInlineRule unsat_ok expr arity 
+mkInlineRule :: CoreExpr -> Maybe Arity -> Unfolding
+mkInlineRule expr mb_arity 
   = mkCoreUnfolding True InlineRule 	 -- Note [Top-level flag on inline rules]
     		    expr' arity 
 		    (UnfWhen unsat_ok boring_ok)
   where
     expr' = simpleOptExpr expr
+    (unsat_ok, arity) = case mb_arity of
+                          Nothing -> (unSaturatedOk, manifestArity expr')
+                          Just ar -> (needSaturated, ar)
+              
     boring_ok = case calcUnfoldingGuidance True    -- Treat as cheap
     	      	     			   False   -- But not bottoming
                                            (arity+1) expr' of
@@ -184,7 +189,6 @@ calcUnfoldingGuidance expr_is_cheap top_bot bOMB_OUT_SIZE expr
       	        | uncondInline n_val_bndrs (iBox size)
                 , expr_is_cheap
       	        -> UnfWhen unSaturatedOk boringCxtOk   -- Note [INLINE for small functions]
-
 		| top_bot  -- See Note [Do not inline top-level bottoming functions]
 		-> UnfNever
 
@@ -626,9 +630,11 @@ actual arguments.
 \begin{code}
 couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
 couldBeSmallEnoughToInline threshold rhs 
-  = case calcUnfoldingGuidance False False threshold rhs of
-       (_, UnfNever) -> False
-       _             -> True
+  = case sizeExpr (iUnbox threshold) [] body of
+       TooBig -> False
+       _      -> True
+  where
+    (_, body) = collectBinders rhs
 
 ----------------
 smallEnoughToInline :: Unfolding -> Bool

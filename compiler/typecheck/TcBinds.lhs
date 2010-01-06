@@ -149,7 +149,7 @@ tcValBinds _ (ValBindsIn binds _) _
 
 tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
   = do  {       -- Typecheck the signature
-        ; let { prag_fn = mkPragFun sigs
+        ; let { prag_fn = mkPragFun sigs (foldr (unionBags . snd) emptyBag binds)
               ; ty_sigs = filter isTypeLSig sigs
               ; sig_fn  = mkTcSigFun ty_sigs }
 
@@ -336,9 +336,13 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
   ; if is_strict then
     do  { extendLIEs lie_req
         ; let exports = zipWith mk_export mono_bind_infos zonked_mono_tys
-              mk_export (name, Nothing,  mono_id) mono_ty = ([], mkLocalId name mono_ty, mono_id, [])
-              mk_export (_,    Just sig, mono_id) _       = ([], sig_id sig,             mono_id, [])
-                        -- ToDo: prags for unlifted bindings
+              mk_export (name, mb_sig,  mono_id) mono_ty 
+                = ([], the_id, mono_id, noSpecPrags)
+                              -- ToDo: prags for unlifted bindings
+	      	where
+                  the_id = case mb_sig of
+                             Just sig -> sig_id sig
+                             Nothing  -> mkLocalId name mono_ty
 
         ; return ( unitBag $ L loc $ AbsBinds [] [] exports binds',
                    [poly_id | (_, poly_id, _, _) <- exports]) } -- Guaranteed zonked
@@ -372,7 +376,7 @@ mkExport :: TopLevelFlag -> RecFlag
 	    		 -- a tuple, so INLINE pragmas won't work
          -> TcPragFun -> [TyVar] -> [TcType]
          -> MonoBindInfo
-         -> TcM ([TyVar], Id, Id, [LSpecPrag])
+         -> TcM ([TyVar], Id, Id, TcSpecPrags)
 -- mkExport generates exports with 
 --      zonked type variables, 
 --      zonked poly_ids
@@ -395,7 +399,7 @@ mkExport top_lvl rec_group multi_bind prag_fn inferred_tvs dict_tys
                                             poly_id (prag_fn poly_name)
                 -- tcPrags requires a zonked poly_id
 
-        ; return (tvs, poly_id', mono_id, spec_prags) }
+        ; return (tvs, poly_id', mono_id, SpecPrags spec_prags) }
   where
     poly_ty = mkForAllTys inferred_tvs (mkFunTys dict_tys (idType mono_id))
 
@@ -410,22 +414,41 @@ mkExport top_lvl rec_group multi_bind prag_fn inferred_tvs dict_tys
 ------------------------
 type TcPragFun = Name -> [LSig Name]
 
-mkPragFun :: [LSig Name] -> TcPragFun
-mkPragFun sigs = \n -> lookupNameEnv env n `orElse` []
-        where
-          prs = [(expectJust "mkPragFun" (sigName sig), sig) 
-                | sig <- sigs, isPragLSig sig]
-          env = foldl add emptyNameEnv prs
-          add env (n,p) = extendNameEnv_Acc (:) singleton env n p
+mkPragFun :: [LSig Name] -> LHsBinds Name -> TcPragFun
+mkPragFun sigs binds = \n -> lookupNameEnv prag_env n `orElse` []
+  where
+    prs = mapCatMaybes get_sig sigs
+
+    get_sig :: LSig Name -> Maybe (Located Name, LSig Name)
+    get_sig (L l (SpecSig nm ty inl)) = Just (nm, L l $ SpecSig  nm ty (add_arity nm inl))
+    get_sig (L l (InlineSig nm inl))  = Just (nm, L l $ InlineSig nm   (add_arity nm inl))
+    get_sig _                         = Nothing
+
+    add_arity (L _ n) inl_prag   -- Adjust inl_sat field to match visible arity of function
+      | Just ar <- lookupNameEnv ar_env n = inl_prag { inl_sat = Just ar }
+      | otherwise                         = inl_prag
+
+    prag_env :: NameEnv [LSig Name]
+    prag_env = foldl add emptyNameEnv prs
+    add env (L _ n,p) = extendNameEnv_Acc (:) singleton env n p
+
+    -- ar_env maps a local to the arity of its definition
+    ar_env :: NameEnv Arity
+    ar_env = foldrBag lhsBindArity emptyNameEnv binds
+
+lhsBindArity :: LHsBind Name -> NameEnv Arity -> NameEnv Arity
+lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
+  = extendNameEnv env (unLoc id) (matchGroupArity ms)
+lhsBindArity _ env = env	-- PatBind/VarBind
 
 tcPrags :: RecFlag
 	-> Bool     -- True <=> AbsBinds binds more than one variable
         -> Bool     -- True <=> function is overloaded
         -> Id -> [LSig Name]
-        -> TcM (Id, [LSpecPrag])
+        -> TcM (Id, [Located TcSpecPrag])
 -- Add INLINE and SPECLIASE pragmas
---    INLINE prags are added to the Id directly
---    SPECIALISE prags are passed to the desugarer via [LSpecPrag]
+--    INLINE prags are added to the (polymorphic) Id directly
+--    SPECIALISE prags are passed to the desugarer via TcSpecPrags
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
 tcPrags _rec_group _multi_bind _is_overloaded_id poly_id prag_sigs
@@ -491,7 +514,7 @@ warnPrags id bad_sigs herald
     ppr_sigs sigs = vcat (map (ppr . getLoc) sigs)
 
 --------------
-tcSpecPrag :: TcId -> Sig Name -> TcM SpecPrag
+tcSpecPrag :: TcId -> Sig Name -> TcM TcSpecPrag
 tcSpecPrag poly_id prag@(SpecSig _ hs_ty inl) 
   = addErrCtxt (spec_ctxt prag) $
     do  { let name = idName poly_id

@@ -33,8 +33,6 @@ import DataCon
 import Class
 import Var
 import CoreUnfold ( mkDFunUnfolding )
--- import CoreUtils  ( mkPiTypes )
-import PrelNames  ( inlineIdName )
 import Id
 import MkId
 import Name
@@ -667,7 +665,7 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi)
 
         ; return (unitBag $ noLoc $
                   AbsBinds inst_tvs' (map instToVar dfun_dicts)
-                            [(inst_tvs', dfun_id, instToId this_dict, [])]
+                            [(inst_tvs', dfun_id, instToId this_dict, noSpecPrags)]
                             (dict_bind `consBag` sc_binds)) }
   where
       -----------------------
@@ -753,7 +751,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
        ; spec_inst_prags <- mapM (wrapLocM (tcSpecInst dfun_id)) spec_inst_sigs
 
         -- Typecheck the methods
-       ; let prag_fn = mkPragFun uprags 
+       ; let prag_fn = mkPragFun uprags monobinds
              tc_meth = tcInstanceMethod loc standalone_deriv
                                         clas inst_tyvars'
 	     	       	 		dfun_dicts inst_tys'
@@ -801,7 +799,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
              main_bind = AbsBinds
                          inst_tyvars'
                          dfun_lam_vars
-                         [(inst_tyvars', dfun_id_w_fun, this_dict_id, spec_inst_prags)]
+                         [(inst_tyvars', dfun_id_w_fun, this_dict_id, SpecPrags spec_inst_prags)]
                          (unitBag dict_bind)
 
        ; showLIE (text "instance")
@@ -891,7 +889,7 @@ tcSuperClass inst_loc tyvars dicts (this_dict, this_bind)
 	     sc_id      = instToVar sc_dict
 	     sc_op_bind = AbsBinds tyvars 
 			     (map instToVar dicts) 
-                             [(tyvars, sc_op_id, sc_id, [])]
+                             [(tyvars, sc_op_id, sc_id, noSpecPrags)]
                              (this_bind `unionBags` sc_binds)
 
        ; return (sc_op_id, noLoc sc_op_bind) }
@@ -948,7 +946,7 @@ SpecPrag which, as it turns out, can be used unchanged for each method.
 The "it turns out" bit is delicate, but it works fine!
 
 \begin{code}
-tcSpecInst :: Id -> Sig Name -> TcM SpecPrag
+tcSpecInst :: Id -> Sig Name -> TcM TcSpecPrag
 tcSpecInst dfun_id prag@(SpecInstSig hs_ty) 
   = addErrCtxt (spec_ctxt prag) $
     do  { let name = idName dfun_id
@@ -981,7 +979,7 @@ tcInstanceMethod :: SrcSpan -> Bool -> Class -> [TcTyVar] -> [Inst]
 	 	 -> [TcType]
 		 -> (Inst, LHsBinds Id)  -- "This" and its binding
           	 -> TcPragFun	    	 -- Local prags
-		 -> [LSpecPrag]		 -- Arising from 'SPECLALISE instance'
+		 -> [Located TcSpecPrag] -- Arising from 'SPECLALISE instance'
                  -> LHsBinds Name 
 	  	 -> (Id, DefMeth)
           	 -> TcM (Id, LHsBind Id)
@@ -1006,13 +1004,13 @@ tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts inst_tys
 	      tc_body rn_bind 
                 = add_meth_ctxt rn_bind $
                   do { (meth_id1, spec_prags) <- tcPrags NonRecursive False True 
-                                                    meth_id (prag_fn sel_name)
+                                                         meth_id (prag_fn sel_name)
                      ; tcInstanceMethodBody (instLoc this_dict)
                                     tyvars dfun_dicts
 				    ([this_dict], this_dict_bind)
                                     meth_id1 local_meth_id
 				    meth_sig_fn 
-                                    (spec_inst_prags ++ spec_prags) 
+                                    (SpecPrags (spec_inst_prags ++ spec_prags))
                                     rn_bind }
 
     	    --------------
@@ -1040,14 +1038,9 @@ tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts inst_tys
 		       dm_name <- lookupGlobalOccRn (mkDefMethRdrName sel_name)
 					-- Might not be imported, but will be an OrigName
 		     ; dm_id <- tcLookupId dm_name
-		     ; inline_id <- tcLookupId inlineIdName
                      ; let dm_inline_prag = idInlinePragma dm_id
-                           dm_app = HsWrap (WpApp (instToId this_dict) <.> mkWpTyApps inst_tys) $
-			            HsVar dm_id 
-                           rhs | isInlinePragma dm_inline_prag  -- See Note [INLINE and default methods]
-                               = HsApp (L loc (HsWrap (WpTyApp local_meth_ty) (HsVar inline_id)))
-                                       (L loc dm_app)
-                               | otherwise = dm_app
+                           rhs = HsWrap (WpApp (instToId this_dict) <.> mkWpTyApps inst_tys) $
+			         HsVar dm_id 
 
 		           meth_bind = L loc $ VarBind { var_id = local_meth_id
                                                        , var_rhs = L loc rhs 
@@ -1057,8 +1050,8 @@ tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts inst_tys
 				    -- method to this version. Note [INLINE and default methods]
 				    
                            bind = AbsBinds { abs_tvs = tyvars, abs_dicts =  dfun_lam_vars
-                                           , abs_exports = [( tyvars, meth_id1
-                                                            , local_meth_id, spec_inst_prags)]
+                                           , abs_exports = [( tyvars, meth_id1, local_meth_id
+                                                            , SpecPrags spec_inst_prags)]
                                            , abs_binds = this_dict_bind `unionBags` unitBag meth_bind }
 		     -- Default methods in an instance declaration can't have their own 
 		     -- INLINE or SPECIALISE pragmas. It'd be possible to allow them, but
@@ -1143,7 +1136,8 @@ From the class decl we get
    $dmfoo :: forall v x. Baz v x => x -> x
    $dmfoo y = <blah>
 
-Notice that the type is ambiguous.  That's fine, though. The instance decl generates
+Notice that the type is ambiguous.  That's fine, though. The instance
+decl generates
 
    $dBazIntInt = MkBaz fooIntInt
    fooIntInt = $dmfoo Int Int $dBazIntInt
@@ -1155,8 +1149,9 @@ less work to generate the translated version!
 
 Note [INLINE and default methods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We *copy* any INLINE pragma from the default method to the instance.
-Example:
+Default methods need special case.  They are supposed to behave rather like
+macros.  For exmample
+
   class Foo a where
     op1, op2 :: Bool -> a -> a
 
@@ -1164,31 +1159,57 @@ Example:
     op1 b x = op2 (not b) x
 
   instance Foo Int where
+    -- op1 via default method
+    op2 b x = <blah>
+   
+The instance declaration should behave
+
+   just as if 'op1' had been defined with the
+   code, and INLINE pragma, from its original
+   definition. 
+
+That is, just as if you'd written
+
+  instance Foo Int where
     op2 b x = <blah>
 
-Then we generate:
+    {-# INLINE op1 #-}
+    op1 b x = op2 (not b) x
+
+So for the above example we generate:
+
 
   {-# INLINE $dmop1 #-}
+  -- $dmop1 has an InlineCompulsory unfolding
   $dmop1 d b x = op2 d (not b) x
 
   $fFooInt = MkD $cop1 $cop2
 
   {-# INLINE $cop1 #-}
-  $cop1 = inline $dmop1 $fFooInt
+  $cop1 = $dmop1 $fFooInt
 
   $cop2 = <blah>
 
-Note carefully:
-  a) We copy $dmop1's inline pragma to $cop1.  Otherwise 
-     we'll just inline the former in the latter and stop, which 
-     isn't what the user expected
+Note carefullly:
 
-  b) We use the magic 'inline' Id to ensure that $dmop1 really is
-     inlined in $cop1, even though 
-       (i)  the latter itself has an INLINE pragma
-       (ii) $dmop1 is not saturated
-     That is important to allow the mutual recursion between $fooInt and
-     $cop1 to be broken
+* We *copy* any INLINE pragma from the default method $dmop1 to the
+  instance $cop1.  Otherwise we'll just inline the former in the
+  latter and stop, which isn't what the user expected
+
+* Regardless of its pragma, we give the default method an 
+  unfolding with an InlineCompulsory source. That means
+  that it'll be inlined at every use site, notably in
+  each instance declaration, such as $cop1.  This inlining
+  must happen even though 
+    a) $dmop1 is not saturated in $cop1
+    b) $cop1 itself has an INLINE pragma
+
+  It's vital that $dmop1 *is* inlined in this way, to allow the mutual
+  recursion between $fooInt and $cop1 to be broken
+
+* To communicate the need for an InlineCompulsory to the desugarer
+  (which makes the Unfoldings), we use the IsDefaultMethod constructor
+  in TcSpecPrags.
 
 
 %************************************************************************

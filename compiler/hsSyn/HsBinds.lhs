@@ -143,7 +143,7 @@ data HsBindLR idL idR
        -- AbsBinds only gets used when idL = idR after renaming,
        -- but these need to be idL's for the collect... code in HsUtil to have
        -- the right type
-	abs_exports :: [([TyVar], idL, idL, [LSpecPrag])],	-- (tvs, poly_id, mono_id, prags)
+	abs_exports :: [([TyVar], idL, idL, TcSpecPrags)],	-- (tvs, poly_id, mono_id, prags)
 	abs_binds   :: LHsBinds idL		-- The dictionary bindings and typechecked user bindings
 						-- mixed up together; you can tell the dict bindings because
 						-- they are all VarBinds
@@ -292,7 +292,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars,
   where
     ppr_exp (tvs, gbl, lcl, prags)
 	= vcat [ppr gbl <+> ptext (sLit "<=") <+> ppr tvs <+> ppr lcl,
-	  	nest 2 (vcat (map (pprPrag gbl) prags))]
+	  	nest 2 (pprTcSpecPrags gbl prags)]
 \end{code}
 
 
@@ -471,15 +471,28 @@ data Sig name	-- Signatures and pragmas
 type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity 
 
--- A Prag conveys pragmas from the type checker to the desugarer
-type LSpecPrag = Located SpecPrag
-data SpecPrag 
+-- TsSpecPrags conveys pragmas from the type checker to the desugarer
+data TcSpecPrags 
+  = IsDefaultMethod	-- Super-specialised: a default method should 
+    			-- be macro-expanded at every call site
+  | SpecPrags [Located TcSpecPrag]
+
+data TcSpecPrag 
   = SpecPrag   
 	HsWrapper	-- An wrapper, that specialises the polymorphic function
 	InlinePragma 	-- Inlining spec for the specialised function
 
-instance Outputable SpecPrag where
-  ppr (SpecPrag _ p) = ptext (sLit "SpecPrag") <+> ppr p
+noSpecPrags :: TcSpecPrags
+noSpecPrags = SpecPrags []
+
+hasSpecPrags :: TcSpecPrags -> Bool
+hasSpecPrags (SpecPrags ps) = not (null ps)
+hasSpecPrags IsDefaultMethod = False
+
+isDefaultMethod :: TcSpecPrags -> Bool
+isDefaultMethod IsDefaultMethod = True
+isDefaultMethod (SpecPrags {})  = False
+
 \end{code}
 
 \begin{code}
@@ -600,7 +613,14 @@ pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig var p
     pp_inl | isDefaultInlinePragma inl = empty
            | otherwise = ppr inl
 
-pprPrag :: Outputable id => id -> LSpecPrag -> SDoc
-pprPrag var (L _ (SpecPrag _expr inl)) = pprSpec var (ptext (sLit "<type>")) inl
+pprTcSpecPrags :: Outputable id => id -> TcSpecPrags -> SDoc
+pprTcSpecPrags _   IsDefaultMethod = ptext (sLit "<default method>")
+pprTcSpecPrags gbl (SpecPrags ps)  = vcat (map (pprSpecPrag gbl) ps)
+
+pprSpecPrag :: Outputable id => id -> Located TcSpecPrag -> SDoc
+pprSpecPrag var (L _ (SpecPrag _expr inl)) = pprSpec var (ptext (sLit "<type>")) inl
+
+instance Outputable TcSpecPrag where
+  ppr (SpecPrag _ p) = ptext (sLit "SpecPrag") <+> ppr p
 \end{code}
 

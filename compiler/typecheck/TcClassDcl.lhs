@@ -179,7 +179,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	; let
 	      (tyvars, _, _, op_items) = classBigSig clas
 	      rigid_info  = ClsSkol clas
-	      prag_fn	  = mkPragFun sigs
+	      prag_fn	  = mkPragFun sigs default_binds
 	      sig_fn	  = mkTcSigFun sigs
 	      clas_tyvars = tcSkolSigTyVars rigid_info tyvars
 	      pred  	  = mkClassPred clas (mkTyVarTys clas_tyvars)
@@ -234,16 +234,20 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn sel_id
         ; (dm_id_w_inline, spec_prags) 
                 <- tcPrags NonRecursive False True dm_id (prag_fn sel_name)
 
+        ; warnTc (not (null spec_prags))
+                 (ptext (sLit "Ignoring SPECIALISE pragmas on default method") 
+                  <+> quotes (ppr sel_name))
+
         ; tcInstanceMethodBody (instLoc this_dict) 
                                tyvars [this_dict]
                                ([], emptyBag)
                                dm_id_w_inline local_dm_id
-                               dm_sig_fn spec_prags meth_bind }
+                               dm_sig_fn IsDefaultMethod meth_bind }
 
 ---------------
 tcInstanceMethodBody :: InstLoc -> [TcTyVar] -> [Inst]
 		     -> ([Inst], LHsBinds Id) -> Id -> Id
-          	     -> TcSigFun -> [LSpecPrag] -> LHsBind Name 
+          	     -> TcSigFun -> TcSpecPrags -> LHsBind Name 
           	     -> TcM (Id, LHsBind Id)
 tcInstanceMethodBody inst_loc tyvars dfun_dicts
 		     (this_dict, this_bind) meth_id local_meth_id

@@ -1015,11 +1015,19 @@ tcUnfolding name _ info (IfCoreUnfold if_expr)
     		     Just sig -> isBottomingSig sig
  		     Nothing  -> False
 
-tcUnfolding name _ _ (IfInlineRule arity unsat_ok if_expr)
+tcUnfolding name _ _ (IfCompulsory if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
 	; return (case mb_expr of
 		    Nothing   -> NoUnfolding
-		    Just expr -> mkInlineRule unsat_ok expr arity) }
+		    Just expr -> mkCompulsoryUnfolding expr) }
+
+tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
+  = do 	{ mb_expr <- tcPragExpr name if_expr
+	; return (case mb_expr of
+		    Nothing   -> NoUnfolding
+		    Just expr -> mkCoreUnfolding True InlineRule expr arity 
+                                                 (UnfWhen unsat_ok boring_ok))
+    }
 
 tcUnfolding name ty info (IfWrapper arity wkr)
   = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)

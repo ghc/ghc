@@ -1982,7 +1982,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
 	      	      DataAlt dc -> setIdUnfolding case_bndr unf
 		      	  where
 			     	 -- See Note [Case binders and join points]
-		      	     unf = mkInlineRule needSaturated rhs 0
+		      	     unf = mkInlineRule rhs Nothing
 		      	     rhs = mkConApp dc (map Type (tyConAppArgs scrut_ty)
 			     	   	        ++ varsToCoreExprs bndrs')
 

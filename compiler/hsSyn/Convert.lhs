@@ -399,7 +399,8 @@ cvtInlineSpec :: Maybe TH.InlineSpec -> Hs.InlinePragma
 cvtInlineSpec Nothing 
   = defaultInlinePragma
 cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation)) 
-  = InlinePragma { inl_act = opt_activation', inl_rule = matchinfo, inl_inline = inline }
+  = InlinePragma { inl_act = opt_activation', inl_rule = matchinfo
+                 , inl_inline = inline, inl_sat = Nothing }
   where
     matchinfo       = cvtRuleMatchInfo conlike
     opt_activation' = cvtActivation opt_activation

@@ -58,7 +58,7 @@ module BasicTypes(
 	Activation(..), isActive, isNeverActive, isAlwaysActive, isEarlyActive,
         RuleMatchInfo(..), isConLike, isFunLike, 
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma,
-	isDefaultInlinePragma, isInlinePragma,
+	isDefaultInlinePragma, isInlinePragma, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
 
@@ -597,6 +597,8 @@ data InlinePragma  	     -- Note [InlinePragma]
   = InlinePragma
       { inl_inline :: Bool           -- True <=> INLINE, 
       		      		     -- False <=> no pragma at all, or NOINLINE
+      , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n 
+      		      	    	     --            explicit (non-type, non-dictionary) args
       , inl_act    :: Activation     -- Says during which phases inlining is allowed
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq )
@@ -664,14 +666,14 @@ isFunLike _            = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
-defaultInlinePragma 
-  = InlinePragma { inl_act = AlwaysActive, inl_rule = FunLike, inl_inline = False }
-alwaysInlinePragma
-  = InlinePragma { inl_act = AlwaysActive, inl_rule = FunLike, inl_inline = True }
-neverInlinePragma   
-   = InlinePragma { inl_act = NeverActive, inl_rule = FunLike, inl_inline = False }
-dfunInlinePragma   
-   = InlinePragma { inl_act = AlwaysActive, inl_rule = ConLike, inl_inline = False }
+defaultInlinePragma = InlinePragma { inl_act = AlwaysActive
+                                   , inl_rule = FunLike
+                                   , inl_inline = False
+                                   , inl_sat = Nothing }
+
+alwaysInlinePragma = defaultInlinePragma { inl_inline = True }
+neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
+dfunInlinePragma   = defaultInlinePragma { inl_rule   = ConLike }
                                     
 
 isDefaultInlinePragma :: InlinePragma -> Bool
@@ -682,6 +684,9 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = inl_inline prag
+
+inlinePragmaSat :: InlinePragma -> Maybe Arity
+inlinePragmaSat = inl_sat
 
 inlinePragmaActivation :: InlinePragma -> Activation
 inlinePragmaActivation (InlinePragma { inl_act = activation }) = activation
@@ -706,11 +711,14 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = ptext (sLit "FUNLIKE")
 
 instance Outputable InlinePragma where
-  ppr (InlinePragma { inl_inline = inline, inl_act = activation, inl_rule = info })
-    = pp_inline <+> pp_info <+> pp_activation
+  ppr (InlinePragma { inl_inline = inline, inl_act = activation
+                    , inl_rule = info, inl_sat = mb_arity })
+    = pp_inline <> pp_sat <+> pp_info <+> pp_activation
     where
       pp_inline | inline    = ptext (sLit "INLINE")
                 | otherwise = ptext (sLit "NOINLINE")
+      pp_sat | Just ar <- mb_arity = braces (int ar)
+             | otherwise           = empty
       pp_info | isFunLike info = empty
               | otherwise      = ppr info
       pp_activation 

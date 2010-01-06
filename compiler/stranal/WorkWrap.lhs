@@ -274,8 +274,8 @@ checkSize fn_id rhs thing_inside
 
   | otherwise = thing_inside
   where
-    unfolding = idUnfolding fn_id
-    inline_rule = mkInlineRule unSaturatedOk rhs (unfoldingArity unfolding)
+    unfolding   = idUnfolding fn_id
+    inline_rule = mkInlineRule rhs Nothing
 
 ---------------------
 splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
@@ -314,15 +314,16 @@ splitFun fn_id fn_info wrap_dmds res_info rhs
 
 	wrap_rhs  = wrap_fn work_id
 	wrap_prag = InlinePragma { inl_inline = True
+                                 , inl_sat    = Nothing
                                  , inl_act    = ActiveAfter 0
                                  , inl_rule   = rule_match_info }
+		-- See Note [Wrapper activation]
+		-- The RuleMatchInfo is (and must be) unaffected
+		-- The inl_inline is bound to be False, else we would not be
+		--    making a wrapper
 
 	wrap_id   = fn_id `setIdUnfolding` mkWwInlineRule work_id wrap_rhs arity
 			  `setInlinePragma` wrap_prag
-			 	-- See Note [Wrapper activation]
-				-- The RuleMatchInfo is (and must be) unaffected
-				-- The inl_inline is bound to be False, else we would not be
-				--    making a wrapper
 		          `setIdOccInfo` NoOccInfo
 			        -- Zap any loop-breaker-ness, to avoid bleating from Lint
 				-- about a loop breaker with an INLINE rule

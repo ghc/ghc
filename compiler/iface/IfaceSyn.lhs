@@ -211,11 +211,16 @@ data IfaceInfoItem
 
 data IfaceUnfolding 
   = IfCoreUnfold IfaceExpr
+  | IfCompulsory IfaceExpr	-- Only used for default methods, in fact
+
   | IfInlineRule Arity 
                  Bool		-- OK to inline even if *un*-saturated
+		 Bool		-- OK to inline even if context is boring
                  IfaceExpr 
+
   | IfWrapper    Arity Name	  -- NB: we need a Name (not just OccName) because the worker
 				  --     can simplify to a function in another module.
+
   | IfDFunUnfold [IfaceExpr]
 
 --------------------------------
@@ -676,10 +681,11 @@ instance Outputable IfaceInfoItem where
   ppr HsNoCafRefs	 = ptext (sLit "HasNoCafRefs")
 
 instance Outputable IfaceUnfolding where
+  ppr (IfCompulsory e)     = ptext (sLit "<compulsory>") <+> parens (ppr e)
   ppr (IfCoreUnfold e)     = parens (ppr e)
-  ppr (IfInlineRule a b e) = ptext (sLit "InlineRule:")
-                             <+> parens (ptext (sLit "arity") <+> int a <+> ppr b) 
-      		      	     <+> parens (ppr e)
+  ppr (IfInlineRule a uok bok e) = ptext (sLit "InlineRule")
+                                  <+> ppr (a,uok,bok) 
+      		      	          <+> parens (ppr e)
   ppr (IfWrapper a wkr)    = ptext (sLit "Worker:") <+> ppr wkr <+> parens (ptext (sLit "arity") <+> int a)
   ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:") <+> brackets (pprWithCommas (pprIfaceExpr parens) ns)
 
@@ -799,10 +805,11 @@ freeNamesItem (HsUnfold _ u) = freeNamesIfUnfold u
 freeNamesItem _              = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
-freeNamesIfUnfold (IfCoreUnfold e)     = freeNamesIfExpr e
-freeNamesIfUnfold (IfInlineRule _ _ e) = freeNamesIfExpr e
-freeNamesIfUnfold (IfWrapper _ v)      = unitNameSet v
-freeNamesIfUnfold (IfDFunUnfold vs)    = fnList freeNamesIfExpr vs
+freeNamesIfUnfold (IfCoreUnfold e)       = freeNamesIfExpr e
+freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
+freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
+freeNamesIfUnfold (IfWrapper _ v)        = unitNameSet v
+freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr vs
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)	  = unitNameSet v

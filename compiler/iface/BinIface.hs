@@ -600,16 +600,18 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Binary InlinePragma where
-    put_ bh (InlinePragma a b c) = do
+    put_ bh (InlinePragma a b c d) = do
             put_ bh a
             put_ bh b
             put_ bh c
+            put_ bh d
 
     get bh = do
            a <- get bh
            b <- get bh
            c <- get bh
-           return (InlinePragma a b c)
+           d <- get bh
+           return (InlinePragma a b c d)
 
 instance Binary StrictnessMark where
     put_ bh MarkedStrict    = putByte bh 0
@@ -1188,11 +1190,12 @@ instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold e) = do
 	putByte bh 0
 	put_ bh e
-    put_ bh (IfInlineRule a b e) = do
+    put_ bh (IfInlineRule a b c d) = do
 	putByte bh 1
 	put_ bh a
 	put_ bh b
-	put_ bh e
+	put_ bh c
+	put_ bh d
     put_ bh (IfWrapper a n) = do
 	putByte bh 2
 	put_ bh a
@@ -1200,6 +1203,9 @@ instance Binary IfaceUnfolding where
     put_ bh (IfDFunUnfold as) = do
 	putByte bh 3
 	put_ bh as
+    put_ bh (IfCompulsory e) = do
+	putByte bh 4
+	put_ bh e
     get bh = do
 	h <- getByte bh
 	case h of
@@ -1207,13 +1213,16 @@ instance Binary IfaceUnfolding where
 		  return (IfCoreUnfold e)
 	  1 -> do a <- get bh
 		  b <- get bh
-		  e <- get bh
-		  return (IfInlineRule a b e)
+		  c <- get bh
+		  d <- get bh
+		  return (IfInlineRule a b c d)
 	  2 -> do a <- get bh
 		  n <- get bh
 		  return (IfWrapper a n)
-	  _ -> do as <- get bh
+	  3 -> do as <- get bh
 		  return (IfDFunUnfold as)
+	  _ -> do e <- get bh
+		  return (IfCompulsory e)
 
 instance Binary IfaceNote where
     put_ bh (IfaceSCC aa) = do
