@@ -9,7 +9,8 @@ module Platform (
 	Arch(..),
 	OS(..),
 
-	defaultTargetPlatform
+	defaultTargetPlatform,
+	osElfTarget
 )
 
 where
@@ -47,8 +48,15 @@ data OS
 	| OSDarwin
 	| OSSolaris
 	| OSMinGW32
+	| OSFreeBSD
 	deriving (Show, Eq)
 
+
+-- | This predicates tells us whether the OS supports ELF-like shared libraries.
+osElfTarget :: OS -> Bool
+osElfTarget OSLinux   = True
+osElfTarget OSFreeBSD = True
+osElfTarget _         = False
 
 -- | This is the target platform as far as the #ifdefs are concerned.
 --	These are set in includes/ghcplatform.h by the autoconf scripts
@@ -86,6 +94,8 @@ defaultTargetOS	= OSDarwin
 defaultTargetOS	= OSSolaris
 #elif mingw32_TARGET_OS
 defaultTargetOS	= OSMinGW32
+#elif freebsd_TARGET_OS
+defaultTargetOS	= OSFreeBSD
 #else
 defaultTargetOS	= OSUnknown
 #endif

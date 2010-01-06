@@ -115,7 +115,7 @@ pprGloblDecl lbl
 		pprCLabel_asm lbl
 
 pprTypeAndSizeDecl :: CLabel -> Doc
-#if linux_TARGET_OS
+#if elf_OBJ_FORMAT
 pprTypeAndSizeDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = ptext (sLit ".type ") <>

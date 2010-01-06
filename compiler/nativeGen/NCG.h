@@ -110,5 +110,11 @@
 #else
 # define IF_OS_darwin(x,y) y
 #endif
+-- - - - - - - - - - - - - - - - - - - - - - 
+#if freebsd_TARGET_OS
+# define IF_OS_freebsd(x,y) x
+#else
+# define IF_OS_freebsd(x,y) y
+#endif
 ---------------------------------------------
 #endif

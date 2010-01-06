@@ -1374,7 +1374,7 @@ linkBinary dflags o_files dep_packages = do
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
-#ifdef linux_TARGET_OS
+#ifdef elf_OBJ_FORMAT
         get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
                                 | otherwise = ["-L" ++ l]
 #else
@@ -1573,7 +1573,7 @@ linkDynLib dflags o_files dep_packages = do
 #endif
     let pkg_lib_paths = collectLibraryPaths pkgs_no_rts
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
-#ifdef linux_TARGET_OS
+#ifdef elf_OBJ_FORMAT
         get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
                                 | otherwise = ["-L" ++ l]
 #else

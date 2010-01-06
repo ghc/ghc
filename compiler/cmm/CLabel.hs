@@ -1101,7 +1101,7 @@ pprDynamicLinkerAsmLabel SymbolPtr lbl
 pprDynamicLinkerAsmLabel _ _
   = panic "pprDynamicLinkerAsmLabel"
 
-#elif powerpc_TARGET_ARCH && linux_TARGET_OS
+#elif powerpc_TARGET_ARCH && elf_OBJ_FORMAT
 pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
 pprDynamicLinkerAsmLabel SymbolPtr lbl
@@ -1109,7 +1109,7 @@ pprDynamicLinkerAsmLabel SymbolPtr lbl
 pprDynamicLinkerAsmLabel _ _
   = panic "pprDynamicLinkerAsmLabel"
 
-#elif x86_64_TARGET_ARCH && linux_TARGET_OS
+#elif x86_64_TARGET_ARCH && elf_OBJ_FORMAT
 pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
 pprDynamicLinkerAsmLabel GotSymbolPtr lbl
@@ -1119,7 +1119,7 @@ pprDynamicLinkerAsmLabel GotSymbolOffset lbl
 pprDynamicLinkerAsmLabel SymbolPtr lbl
   = text ".LC_" <> pprCLabel lbl
 
-#elif linux_TARGET_OS
+#elif elf_OBJ_FORMAT
 pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
 pprDynamicLinkerAsmLabel SymbolPtr lbl

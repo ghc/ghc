@@ -293,37 +293,38 @@ howToAccessLabel dflags arch OSDarwin _ lbl
 -- from position independent code. It is also required from the main program
 -- when dynamic libraries containing Haskell code are used.
 
-howToAccessLabel _ ArchPPC_64 OSLinux kind _
+howToAccessLabel _ ArchPPC_64 os kind _
+	| osElfTarget os
+	= if kind == DataReference
+	    -- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
+            then AccessViaSymbolPtr
+	    -- actually, .label instead of label
+            else AccessDirectly
 
-	-- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
-	| DataReference	<- kind
-	= AccessViaSymbolPtr
-	
-	-- actually, .label instead of label
-	| otherwise
-	= AccessDirectly 
-
-howToAccessLabel _ _ OSLinux _ _
+howToAccessLabel _ _ os _ _
 	-- no PIC -> the dynamic linker does everything for us;
 	--           if we don't dynamically link to Haskell code,
 	--           it actually manages to do so without messing thins up.
-	| not opt_PIC && opt_Static 
+	| osElfTarget os
+	, not opt_PIC && opt_Static 
 	= AccessDirectly
 
-howToAccessLabel dflags arch OSLinux DataReference lbl
-	-- A dynamic label needs to be accessed via a symbol pointer.
-	| labelDynamic (thisPackage dflags) lbl 
-	= AccessViaSymbolPtr
+howToAccessLabel dflags arch os DataReference lbl
+	| osElfTarget os
+	= case () of
+	    -- A dynamic label needs to be accessed via a symbol pointer.
+          _ | labelDynamic (thisPackage dflags) lbl 
+	    -> AccessViaSymbolPtr
 
- 	-- For PowerPC32 -fPIC, we have to access even static data
-	-- via a symbol pointer (see below for an explanation why
-	-- PowerPC32 Linux is especially broken).
-	| arch == ArchPPC
-	, opt_PIC
-	= AccessViaSymbolPtr
+ 	    -- For PowerPC32 -fPIC, we have to access even static data
+	    -- via a symbol pointer (see below for an explanation why
+	    -- PowerPC32 Linux is especially broken).
+	    | arch == ArchPPC
+	    , opt_PIC
+	    -> AccessViaSymbolPtr
 	
-	| otherwise 
-	= AccessDirectly
+	    | otherwise 
+	    -> AccessDirectly
 
 
 	-- In most cases, we have to avoid symbol stubs on ELF, for the following reasons:
@@ -338,20 +339,21 @@ howToAccessLabel dflags arch OSLinux DataReference lbl
 	-- (AccessDirectly, because we get an implicit symbol stub)
 	-- and calling functions from PIC code on non-i386 platforms (via a symbol stub) 
 
-howToAccessLabel dflags arch OSLinux CallReference lbl
-	| labelDynamic (thisPackage dflags) lbl && not opt_PIC
+howToAccessLabel dflags arch os CallReference lbl
+	| osElfTarget os
+	, labelDynamic (thisPackage dflags) lbl && not opt_PIC
 	= AccessDirectly
 
-	| arch /= ArchX86
+	| osElfTarget os
+	, arch /= ArchX86
 	, labelDynamic (thisPackage dflags) lbl && opt_PIC
 	= AccessViaStub
 
-howToAccessLabel dflags _ OSLinux _ lbl
-	| labelDynamic (thisPackage dflags) lbl 
-	= AccessViaSymbolPtr
-
-	| otherwise 
-	= AccessDirectly
+howToAccessLabel dflags _ os _ lbl
+	| osElfTarget os
+	= if labelDynamic (thisPackage dflags) lbl 
+	    then AccessViaSymbolPtr
+	    else AccessDirectly
 
 -- all other platforms
 howToAccessLabel _ _ _ _ _
@@ -387,7 +389,8 @@ picRelative arch OSDarwin lbl
 -- We have made sure that *everything* is accessed indirectly, so this
 -- is only used for offsets from the GOT to symbol pointers inside the
 -- GOT.
-picRelative ArchPPC OSLinux lbl
+picRelative ArchPPC os lbl
+	| osElfTarget os
 	= CmmLabelDiffOff lbl gotLabel 0
 
 
@@ -399,7 +402,7 @@ picRelative ArchPPC OSLinux lbl
 -- and a GotSymbolOffset label for other things.
 -- For reasons of tradition, the symbol offset label is written as a plain label.
 picRelative arch os lbl
-	| os == OSLinux || (os == OSDarwin && arch == ArchX86_64)
+	| osElfTarget os || (os == OSDarwin && arch == ArchX86_64)
 	= let	result
 			| Just (SymbolPtr, lbl') <- dynamicLinkerLabelInfo lbl
   			= CmmLabel $ mkDynamicLinkerLabel GotSymbolPtr lbl'
@@ -436,12 +439,12 @@ needImportedSymbols arch os
 	= True
 	
 	-- PowerPC Linux: -fPIC or -dynamic
-	| os	== OSLinux
+	| osElfTarget os
 	, arch	== ArchPPC
 	= opt_PIC || not opt_Static
 
 	-- i386 (and others?): -dynamic but not -fPIC
-	| os	== OSLinux
+	| osElfTarget os
 	, arch	/= ArchPPC_64
 	= not opt_Static && not opt_PIC
 
@@ -482,12 +485,14 @@ pprGotDeclaration _ OSDarwin
 -- The .LCTOC1 label is defined to point 32768 bytes into the table,
 -- to make the most of the PPC's 16-bit displacements.
 -- Only needed for PIC.
-pprGotDeclaration arch OSLinux
-	| arch	/= ArchPPC_64
+pprGotDeclaration arch os
+	| osElfTarget os
+	, arch	/= ArchPPC_64
 	, not opt_PIC 
 	= Pretty.empty
 
-	| arch	/= ArchPPC_64
+	| osElfTarget os
+	, arch	/= ArchPPC_64
 	= vcat [
 		ptext (sLit ".section \".got2\",\"aw\""),
 		ptext (sLit ".LCTOC1 = .+32768") ]
@@ -645,23 +650,26 @@ pprImportedSymbol _ OSDarwin _
 -- the NCG will keep track of all DynamicLinkerLabels it uses
 -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol ArchPPC_64 OSLinux _
+pprImportedSymbol ArchPPC_64 os _
+	| osElfTarget os
 	= empty
 
-pprImportedSymbol _ OSLinux importedLbl
-	| Just (SymbolPtr, lbl)	<- dynamicLinkerLabelInfo importedLbl
-	= let	symbolSize = case wordWidth of
-		     W32 -> sLit "\t.long"
-		     W64 -> sLit "\t.quad"
-		     _ -> panic "Unknown wordRep in pprImportedSymbol"
+pprImportedSymbol _ os importedLbl
+	| osElfTarget os
+	= case dynamicLinkerLabelInfo importedLbl of
+	    Just (SymbolPtr, lbl)
+	      -> let symbolSize = case wordWidth of
+		         W32 -> sLit "\t.long"
+		         W64 -> sLit "\t.quad"
+		         _ -> panic "Unknown wordRep in pprImportedSymbol"
 
-	  in vcat [
-	        ptext (sLit ".section \".got2\", \"aw\""),
-	        ptext (sLit ".LC_") <> pprCLabel_asm lbl <> char ':',
-	        ptext symbolSize <+> pprCLabel_asm lbl ]
+	         in vcat [
+	              ptext (sLit ".section \".got2\", \"aw\""),
+	              ptext (sLit ".LC_") <> pprCLabel_asm lbl <> char ':',
+	              ptext symbolSize <+> pprCLabel_asm lbl ]
 
-	-- PLT code stubs are generated automatically by the dynamic linker.
-	| otherwise = empty
+	    -- PLT code stubs are generated automatically by the dynamic linker.
+	    _ -> empty
 
 pprImportedSymbol _ _ _
 	= panic "PIC.pprImportedSymbol: no match"
@@ -704,8 +712,9 @@ initializePicBase_ppc
 	-> [NatCmmTop PPC.Instr] 
 	-> NatM [NatCmmTop PPC.Instr]
 
-initializePicBase_ppc ArchPPC OSLinux picReg
+initializePicBase_ppc ArchPPC os picReg
     (CmmProc info lab params (ListGraph blocks) : statics)
+    | osElfTarget os
     = do
         gotOffLabel <- getNewLabelNat
         tmp <- getNewRegNat $ intSize wordWidth
@@ -756,8 +765,9 @@ initializePicBase_x86
 	-> [NatCmmTop X86.Instr] 
 	-> NatM [NatCmmTop X86.Instr]
 
-initializePicBase_x86 ArchX86 OSLinux picReg 
+initializePicBase_x86 ArchX86 os picReg 
 	(CmmProc info lab params (ListGraph blocks) : statics)
+    | osElfTarget os
     = return (CmmProc info lab params (ListGraph (b':tail blocks)) : statics)
     where BasicBlock bID insns = head blocks
           b' = BasicBlock bID (X86.FETCHGOT picReg : insns)
