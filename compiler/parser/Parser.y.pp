@@ -1417,7 +1417,7 @@ texp :: { LHsExpr RdrName }
 	| qopm infixexp       { LL $ SectionR $1 $2 }
 
        -- View patterns get parenthesized above
-	| exp '->' exp   { LL $ EViewPat $1 $3 }
+	| exp '->' texp   { LL $ EViewPat $1 $3 }
 
 -- Always at least one comma
 tup_exprs :: { [HsTupArg RdrName] }
