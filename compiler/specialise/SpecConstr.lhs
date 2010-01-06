@@ -38,7 +38,6 @@ import VarSet
 import Name
 import DynFlags		( DynFlags(..) )
 import StaticFlags	( opt_PprStyle_Debug )
-import StaticFlags	( opt_SpecInlineJoinPoints )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
 import Demand
 import DmdAnal		( both )
@@ -878,38 +877,23 @@ scExpr' env (Case scrut b ty alts)
 scExpr' env (Let (NonRec bndr rhs) body)
   | isTyVar bndr	-- Type-lets may be created by doBeta
   = scExpr' (extendScSubst env bndr rhs) body
-  | otherwise
+
+  | otherwise		   -- Note [Local let bindings]
   = do	{ let (body_env, bndr') = extendBndr env bndr
-	; (rhs_usg, (_, args', rhs_body', _)) <- scRecRhs env (bndr',rhs)
-	; let rhs' = mkLams args' rhs_body'
+	; (rhs_usg, rhs_info) <- scRecRhs env (bndr',rhs)
+	; let force_spec = False
+	; let body_env2 = extendHowBound body_env [bndr'] RecFun
+	; (body_usg, body') <- scExpr body_env2 body
+	; (spec_usg, specs) <- specialise env force_spec 
+                                          (scu_calls body_usg) 
+					  rhs_info
+                                          (SI [] 0 Nothing)
 
-	; if not opt_SpecInlineJoinPoints || null args' || isEmptyVarEnv (scu_calls rhs_usg) then do
-	    do	{ 	-- Vanilla case
-		  let body_env2 = extendValEnv body_env bndr' (isValue (sc_vals env) rhs')
-			-- Record if the RHS is a value
-		; (body_usg, body') <- scExpr body_env2 body
-		; return (body_usg `combineUsage` rhs_usg, Let (NonRec bndr' rhs') body') }
-	  else 	-- For now, just brutally inline the join point
-	    do { let body_env2 = extendScSubst env bndr rhs'
-	       ; scExpr body_env2 body } }
-	
-
-{-  Old code
-	    do	{ 	-- Join-point case
-		  let body_env2 = extendHowBound body_env [bndr'] RecFun
-			-- If the RHS of this 'let' contains calls
-			-- to recursive functions that we're trying
-			-- to specialise, then treat this let too
-			-- as one to specialise
-		; (body_usg, body') <- scExpr body_env2 body
-
-		; (spec_usg, _, specs) <- specialise env (scu_calls body_usg) ([], rhs_info)
-
-		; return (body_usg { scu_calls = scu_calls body_usg `delVarEnv` bndr' } 
+	; return (body_usg { scu_calls = scu_calls body_usg `delVarEnv` bndr' } 
 			  `combineUsage` rhs_usg `combineUsage` spec_usg,
 			  mkLets [NonRec b r | (b,r) <- specInfoBinds rhs_info specs] body')
 	}
--}
+
 
 -- A *local* recursive group: see Note [Local recursive groups]
 scExpr' env (Let (Rec prs) body)
@@ -931,8 +915,26 @@ scExpr' env (Let (Rec prs) body)
 
 	; return (all_usg { scu_calls = scu_calls all_usg `delVarEnvList` bndrs' },
 	          Let bind' body') }
+\end{code}
 
------------------------------------
+Note [Local let bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+It is not uncommon to find this
+
+   let $j = \x. <blah> in ...$j True...$j True...
+
+Here $j is an arbitrary let-bound function, but it often comes up for
+join points.  We might like to specialise $j for its call patterns.
+Notice the difference from a letrec, where we look for call patterns
+in the *RHS* of the function.  Here we look for call patterns in the
+*body* of the let.
+
+At one point I predicated this on the RHS mentioning the outer
+recursive function, but that's not essential and might even be
+harmful.  I'm not sure.
+
+
+\begin{code}
 scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
 
 scApp env (Var fn, args)	-- Function is a variable
