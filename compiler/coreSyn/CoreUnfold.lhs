@@ -477,21 +477,44 @@ funSize top_args fun n_val_args
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0      = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))	-- Like variables
-  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n_val_args +# _ILIT(1))
-  | otherwise		 = SizeIs (_ILIT(1)) emptyBag (iUnbox n_val_args +# _ILIT(1))
-	-- Treat a constructors application as size 1, regardless of how
-	-- many arguments it has; we are keen to expose them
-	-- (and we charge separately for their args).  We can't treat
-	-- them as size zero, else we find that (Just x) has size 0,
-	-- which is the same as a lone variable; and hence 'v' will 
-	-- always be replaced by (Just x), where v is bound to Just x.
-	--
-	-- However, unboxed tuples count as size zero
-	-- I found occasions where we had 
-	--	f x y z = case op# x y z of { s -> (# s, () #) }
-	-- and f wasn't getting inlined
+  | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))	-- Like variables
 
+-- See Note [Constructor size]
+  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+
+-- See Note [Unboxed tuple result discount]
+--  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (_ILIT(0))
+
+-- See Note [Constructor size]
+  | otherwise = SizeIs (_ILIT(1)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+\end{code}
+
+Note [Constructor size]
+~~~~~~~~~~~~~~~~~~~~~~~
+Treat a constructors application as size 1, regardless of how many
+arguments it has; we are keen to expose them (and we charge separately
+for their args).  We can't treat them as size zero, else we find that
+(Just x) has size 0, which is the same as a lone variable; and hence
+'v' will always be replaced by (Just x), where v is bound to Just x.
+
+However, unboxed tuples count as size zero. I found occasions where we had 
+	f x y z = case op# x y z of { s -> (# s, () #) }
+and f wasn't getting inlined.
+
+Note [Unboxed tuple result discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I tried giving unboxed tuples a *result discount* of zero (see the
+commented-out line).  Why?  When returned as a result they do not
+allocate, so maybe we don't want to charge so much for them If you
+have a non-zero discount here, we find that workers often get inlined
+back into wrappers, because it look like
+    f x = case $wf x of (# a,b #) -> (a,b)
+and we are keener because of the case.  However while this change
+shrank binary sizes by 0.5% it also made spectral/boyer allocate 5%
+more. All other changes were very small. So it's not a big deal but I
+didn't adopt the idea.
+
+\begin{code}
 primOpSize :: PrimOp -> Int -> ExprSize
 primOpSize op n_val_args
  | not (primOpIsDupable op) = sizeN opt_UF_DearOp
