@@ -871,7 +871,7 @@ checkValSig lhs@(L l _)         _
   | looks_like_foreign lhs
   = parseError l "Invalid type signature; perhaps you meant to use -XForeignFunctionInterface?"
   | otherwise
-  = parseError l "Invalid type signature"
+  = parseError l "Invalid type signature: should be of form <variable> :: <type>"
   where
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
