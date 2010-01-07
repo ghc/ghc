@@ -70,7 +70,8 @@ import TyCon
 import Var
 
 -- others:
-import TcRnMonad          -- TcType, amongst others
+import HsSyn		-- HsType
+import TcRnMonad        -- TcType, amongst others
 import FunDeps
 import Name
 import VarEnv
@@ -1638,11 +1639,15 @@ instTypeErr pp_ty msg
 %*									*
 %************************************************************************
 
-
 \begin{code}
-checkValidInstance :: [TyVar] -> ThetaType -> Class -> [TcType] -> TcM ()
-checkValidInstance tyvars theta clas inst_tys
-  = do	{ undecidable_ok <- doptM Opt_UndecidableInstances
+checkValidInstance :: LHsType Name -> [TyVar] -> ThetaType -> Type 
+                   -> TcM (Class, [TcType])
+checkValidInstance hs_type tyvars theta tau
+  = setSrcSpan (getLoc hs_type) $
+    do	{ (clas, inst_tys) <- setSrcSpan head_loc $
+                              checkValidInstHead tau
+
+        ; undecidable_ok <- doptM Opt_UndecidableInstances
 
 	; checkValidTheta InstThetaCtxt theta
 	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
@@ -1656,10 +1661,17 @@ checkValidInstance tyvars theta clas inst_tys
 	-- The Coverage Condition
 	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
+
+        ; return (clas, inst_tys)
 	}
   where
     msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
 			 undecidableMsg])
+
+	-- The location of the "head" of the instance
+    head_loc = case hs_type of
+                 L _ (HsForAllTy _ _ _ (L loc _)) -> loc
+                 L loc _                          -> loc
 \end{code}
 
 Termination test: the so-called "Paterson conditions" (see Section 5 of
@@ -1727,7 +1739,6 @@ Notice that this instance (just) satisfies the Paterson termination
 conditions.  Then we *could* derive an instance decl like this:
 
 	instance (C Int a, Eq b, Eq c) => Eq (T a b c) 
-
 even though there is no instance for (C Int a), because there just
 *might* be an instance for, say, (C Int Bool) at a site where we
 need the equality instance for T's.  

@@ -440,8 +440,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
               <+> text "tvs:" <+> ppr tvs
               <+> text "theta:" <+> ppr theta
               <+> text "tau:" <+> ppr tau)
-       ; (cls, inst_tys) <- checkValidInstHead tau
-       ; checkValidInstance tvs theta cls inst_tys
+       ; (cls, inst_tys) <- checkValidInstance deriv_ty tvs theta tau
 		-- C.f. TcInstDcls.tcLocalInstDecl1
 
        ; let cls_tys = take (length inst_tys - 1) inst_tys

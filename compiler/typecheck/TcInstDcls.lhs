@@ -410,8 +410,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
         ; (tyvars, theta, tau) <- tcHsInstHead poly_ty
 
         -- Now, check the validity of the instance.
-        ; (clas, inst_tys) <- checkValidInstHead tau
-        ; checkValidInstance tyvars theta clas inst_tys
+        ; (clas, inst_tys) <- checkValidInstance poly_ty tyvars theta tau
 
         -- Next, process any associated types.
         ; idx_tycons <- recoverM (return []) $
