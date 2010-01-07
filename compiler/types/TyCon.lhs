@@ -836,7 +836,7 @@ isOpenSynTyCon :: TyCon -> Bool
 isOpenSynTyCon tycon = isSynTyCon tycon && isOpenTyCon tycon
 
 isDecomposableTyCon :: TyCon -> Bool
--- True iff we can deocmpose (T a b c) into ((T a b) c)
+-- True iff we can decompose (T a b c) into ((T a b) c)
 -- Specifically NOT true of synonyms (open and otherwise) and coercions
 isDecomposableTyCon (SynTyCon {}) = False
 isDecomposableTyCon (CoTyCon {})  = False
