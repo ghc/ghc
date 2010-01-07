@@ -459,18 +459,18 @@ not_op_pat (ConPatIn _ (InfixCon _ _)) = False
 not_op_pat _        	               = True
 
 --------------------------------------
-checkPrecMatch :: Bool -> Name -> MatchGroup Name -> RnM ()
-	-- True indicates an infix lhs
-	-- See comments with rnExpr (OpApp ...) about "deriving"
+checkPrecMatch :: Name -> MatchGroup Name -> RnM ()
+  -- Check precedence of a function binding written infix
+  --   eg  a `op` b `C` c = ...
+  -- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch False _ _
-  = return ()
-checkPrecMatch True op (MatchGroup ms _)	
+checkPrecMatch op (MatchGroup ms _)	
   = mapM_ check ms			 	
   where
-    check (L _ (Match (p1:p2:_) _ _))
-      = do checkPrec op (unLoc p1) False
-           checkPrec op (unLoc p2) True
+    check (L _ (Match (L l1 p1 : L l2 p2 :_) _ _))
+      = setSrcSpan (combineSrcSpans l1 l2) $
+        do checkPrec op p1 False
+           checkPrec op p2 True
 
     check _ = return ()	
 	-- This can happen.  Consider

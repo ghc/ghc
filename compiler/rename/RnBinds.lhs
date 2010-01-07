@@ -483,7 +483,7 @@ rnBind _ trim (L loc (PatBind { pat_lhs = pat,
 rnBind sig_fn 
        trim 
        (L loc (FunBind { fun_id = name, 
-                         fun_infix = inf, 
+                         fun_infix = is_infix, 
                          fun_matches = matches,
                          -- no pattern FVs
                          bind_fvs = _
@@ -494,18 +494,19 @@ rnBind sig_fn
 
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 				-- bindSigTyVars tests for Opt_ScopedTyVars
-			     rnMatchGroup (FunRhs plain_name inf) matches
+			     rnMatchGroup (FunRhs plain_name is_infix) matches
 	; let fvs' = trim fvs
 
-	; checkPrecMatch inf plain_name matches'
+	; when is_infix $ checkPrecMatch plain_name matches'
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
-      return (L loc (FunBind { fun_id = name,
-                                  fun_infix = inf, 
-                                  fun_matches = matches',
-				     bind_fvs = fvs',
-                                  fun_co_fn = idHsWrapper, 
-                                  fun_tick = Nothing }), 
+
+          return (L loc (FunBind { fun_id = name,
+                               	   fun_infix = is_infix, 
+                               	   fun_matches = matches',
+			       	   bind_fvs = fvs',
+                               	   fun_co_fn = idHsWrapper, 
+                               	   fun_tick = Nothing }), 
 		  [plain_name], fvs)
       }
 
@@ -615,21 +616,20 @@ rnMethodBind :: Name
 	      -> [Name]
 	      -> LHsBindLR RdrName RdrName
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
-rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
+rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = is_infix, 
 					             fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ do
     sel_name <- wrapLocM (lookupInstDeclBndr cls) name
     let plain_name = unLoc sel_name
         -- We use the selector name as the binder
 
-    bindSigTyVarsFV (sig_fn plain_name) $ do
-     (new_matches, fvs) <- mapFvRn (rn_match plain_name) matches
-     let
-         new_group = MatchGroup new_matches placeHolderType
+    (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
+                          mapFvRn (rn_match (FunRhs plain_name is_infix)) matches
+    let new_group = MatchGroup new_matches placeHolderType
 
-     checkPrecMatch inf plain_name new_group
-     return (unitBag (L loc (FunBind {
-                                fun_id = sel_name, fun_infix = inf,
+    when is_infix $ checkPrecMatch plain_name new_group
+    return (unitBag (L loc (FunBind {
+                                fun_id = sel_name, fun_infix = is_infix,
                                 fun_matches = new_group,
                                 bind_fvs = fvs, fun_co_fn = idHsWrapper,
                                 fun_tick = Nothing })),
@@ -638,15 +638,14 @@ rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = 
   where
 	-- Truly gruesome; bring into scope the correct members of the generic 
 	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
-    rn_match sel_name match@(L _ (Match (L _ (TypePat ty) : _) _ _))
+    rn_match info match@(L _ (Match (L _ (TypePat ty) : _) _ _))
 	= extendTyVarEnvFVRn gen_tvs 	$
-	  rnMatch (FunRhs sel_name inf) match
+	  rnMatch info match
 	where
 	  tvs     = map (rdrNameOcc.unLoc) (extractHsTyRdrTyVars ty)
 	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
 
-    rn_match sel_name match = rnMatch (FunRhs sel_name inf) match
-
+    rn_match info match = rnMatch info match
 
 -- Can't handle method pattern-bindings which bind multiple methods.
 rnMethodBind _ _ _ (L loc bind@(PatBind {})) = do
