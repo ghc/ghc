@@ -1,5 +1,5 @@
 
-mod42.hs:3:1:
+mod42.hs:3:10:
     Illegal instance declaration for `Eq a'
         (All instance types must be of the form (T a1 ... an)
          where a1 ... an are type *variables*,

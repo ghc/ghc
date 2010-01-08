@@ -1,5 +1,5 @@
 
-drvfail002.hs:16:1:
+drvfail002.hs:16:10:
     Ambiguous constraint `X T c'
         At least one of the forall'd type variables mentioned by the constraint
         must be reachable from the type after the '=>'

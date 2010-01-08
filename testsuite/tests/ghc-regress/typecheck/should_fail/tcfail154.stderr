@@ -1,5 +1,5 @@
 
-tcfail154.hs:12:1:
+tcfail154.hs:12:10:
     Variable occurs more often in a constraint than in the instance head
       in the constraint: C a a
     (Use -XUndecidableInstances to permit this)

@@ -1,5 +1,5 @@
 
-drvfail015.hs:10:1:
+drvfail015.hs:10:19:
     Illegal instance declaration for `Eq T'
         (All instance types must be of the form (T t1 ... tn)
          where T is not a synonym.
