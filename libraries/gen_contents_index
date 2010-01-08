@@ -16,7 +16,7 @@ case $* in
         NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
         # It's easier to portably remove tabs with tr than to try to get
         # sed to do what we want
-        VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://'` | tr -d ' \t'
+        VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
         HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
         HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
     done
