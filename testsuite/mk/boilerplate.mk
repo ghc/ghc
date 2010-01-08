@@ -76,6 +76,8 @@ IN_TREE_COMPILER = NO
 TEST_HC := $(shell which ghc)
 endif
 
+else
+IN_TREE_COMPILER = NO
 endif
 
 # We can't use $(dir ...) here as TEST_HC might be in a path
