@@ -19,14 +19,18 @@ define canonicalise
 # $1 = path variable
 $1_CYGPATH := $$(shell $(SHELL) -c "cygpath -m '$$($1)'" 2> /dev/null)
 ifneq "$$($1_CYGPATH)" ""
-$1 := $$($1_CYGPATH)
+# We use 'override' in case we are trying to update a value given on
+# the commandline (e.g. TEST_HC)
+override $1 := $$($1_CYGPATH)
 endif
 endef
 
 define canonicaliseExecutable
 # $1 = program path variable
 ifneq "$$(shell test -x '$$($1).exe' && echo exists)" ""
-$1 := $$($1).exe
+# We use 'override' in case we are trying to update a value given on
+# the commandline (e.g. TEST_HC)
+override $1 := $$($1).exe
 endif
 $(call canonicalise,$1)
 endef
@@ -78,6 +82,13 @@ endif
 
 else
 IN_TREE_COMPILER = NO
+# We want to support both "ghc" and "/usr/bin/ghc" as values of TEST_HC
+# passed in by the user, but
+#     which ghc          == /usr/bin/ghc
+#     which /usr/bin/ghc == /usr/bin/ghc
+# so we can just always 'which' it. We need to use 'override' in order
+# to override a value given on the commandline.
+override TEST_HC := $(shell which '$(TEST_HC)')
 endif
 
 # We can't use $(dir ...) here as TEST_HC might be in a path
