@@ -1,2 +1,3 @@
 
-readFail031.hs:4:3: Invalid type signature
+readFail031.hs:4:3:
+    Invalid type signature: should be of form <variable> :: <type>
