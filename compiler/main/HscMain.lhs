@@ -24,6 +24,7 @@ module HscMain
     , hscCompileBatch       -- :: Compiler (HscStatus, ModIface, ModDetails)
     , hscCompileNothing     -- :: Compiler (HscStatus, ModIface, ModDetails)
     , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
+    , hscCheckRecompBackend
     , HscStatus' (..)
     , InteractiveStatus, HscStatus
 
@@ -381,6 +382,22 @@ genericHscCompile compiler hscMessage
        _otherwise
            -> do hscMessage mb_mod_index True mod_summary
                  hscRecompile compiler mod_summary mb_old_hash
+
+hscCheckRecompBackend :: HsCompiler a -> TcGblEnv -> Compiler a
+hscCheckRecompBackend compiler tc_result 
+                   hsc_env mod_summary source_unchanged mb_old_iface _m_of_n =
+   withTempSession (\_ -> hsc_env) $ do
+     (recomp_reqd, mb_checked_iface)
+         <- {-# SCC "checkOldIface" #-}
+            liftIO $ checkOldIface hsc_env mod_summary
+                                   source_unchanged mb_old_iface
+
+     let mb_old_hash = fmap mi_iface_hash mb_checked_iface
+     case mb_checked_iface of
+       Just iface | not recomp_reqd
+           -> hscNoRecomp compiler iface{ mi_globals = Just (tcg_rdr_env tc_result) }
+       _otherwise
+           -> hscBackend compiler tc_result mod_summary mb_old_hash
 
 genericHscRecompile :: GhcMonad m =>
                        HsCompiler a

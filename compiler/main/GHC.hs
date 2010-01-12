@@ -1115,24 +1115,34 @@ loadModule :: (TypecheckedMod mod, GhcMonad m) => mod -> m mod
 loadModule tcm = do
    let ms = modSummary tcm
    let mod = ms_mod_name ms
+   let loc = ms_location ms
    let (tcg, _details) = tm_internals tcm
    hpt_new <-
        withTempSession (\e -> e { hsc_dflags = ms_hspp_opts ms }) $ do
 
          let compilerBackend comp env ms' _ _mb_old_iface _ =
                withTempSession (\_ -> env) $
-                 hscBackend comp tcg ms'
-                            Nothing
+                 hscBackend comp tcg ms' Nothing
+
          hsc_env <- getSession
-         mod_info
-             <- compile' (compilerBackend hscNothingCompiler
-                         ,compilerBackend hscInteractiveCompiler
-                         ,compilerBackend hscBatchCompiler)
-                         hsc_env ms 1 1 Nothing Nothing
+         mod_info <- do
+             mb_linkable <- 
+                  case ms_obj_date ms of
+                     Just t | t > ms_hs_date ms  -> do
+                         l <- liftIO $ findObjectLinkable (ms_mod ms) 
+                                                  (ml_obj_file loc) t
+                         return (Just l)
+                     _otherwise -> return Nothing
+                                                
+             compile' (compilerBackend hscNothingCompiler
+                      ,compilerBackend hscInteractiveCompiler
+                      ,hscCheckRecompBackend hscBatchCompiler tcg)
+                      hsc_env ms 1 1 Nothing mb_linkable
          -- compile' shouldn't change the environment
          return $ addToUFM (hsc_HPT hsc_env) mod mod_info
    modifySession $ \e -> e{ hsc_HPT = hpt_new }
    return tcm
+
 
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' parses, typechecks, and
