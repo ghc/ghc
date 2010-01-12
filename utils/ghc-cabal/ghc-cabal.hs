@@ -30,8 +30,8 @@ import System.FilePath
 main :: IO ()
 main = do args <- getArgs
           case args of
-              "haddock" : distDir : dir : args' ->
-                  runHaddock distDir dir args'
+              "hscolour" : distDir : dir : args' ->
+                  runHsColour distDir dir args'
               "check" : dir : [] ->
                   doCheck dir
               "install" : ghc : ghcpkg : strip : topdir : directory : distDir
@@ -52,7 +52,7 @@ syntax_error :: [String]
 syntax_error =
     ["syntax: ghc-cabal configure <configure-args> -- <distdir> <directory>...",
      "        ghc-cabal install <ghc-pkg> <directory> <distdir> <destdir> <prefix> <args>...",
-     "        ghc-cabal haddock <distdir> <directory> <args>..."]
+     "        ghc-cabal hscolour <distdir> <directory> <args>..."]
 
 die :: [String] -> IO a
 die errs = do mapM_ (hPutStrLn stderr) errs
@@ -111,32 +111,10 @@ doCheck directory
     where isFailure (PackageDistSuspicious {}) = False
           isFailure _ = True
 
-runHaddock :: FilePath -> FilePath -> [String] -> IO ()
-runHaddock distdir directory args
+runHsColour :: FilePath -> FilePath -> [String] -> IO ()
+runHsColour distdir directory args
  = withCurrentDirectory directory
- $ defaultMainWithHooksArgs hooks ("haddock" : "--builddir" : distdir : args)
-    where
-      hooks = userHooks {
-                  haddockHook = modHook (haddockHook userHooks)
-              }
-      modHook f pd lbi us flags
-       | packageName pd == PackageName "ghc-prim"
-          = let pd' = case library pd of
-                      Just lib ->
-                          let ghcPrim = fromJust (simpleParse "GHC.Prim")
-                              ems = filter (ghcPrim /=)
-                                           (exposedModules lib)
-                              lib' = lib { exposedModules = ems }
-                          in pd { library = Just lib' }
-                      Nothing ->
-                          error "Expected a library, but none found"
-                pc = withPrograms lbi
-                pc' = userSpecifyArgs "haddock"
-                          ["dist-install/build/autogen/GHC/Prim.hs"] pc
-                lbi' = lbi { withPrograms = pc' }
-            in f pd' lbi' us flags
-       | otherwise
-          = f pd lbi us flags
+ $ defaultMainArgs ("hscolour" : "--builddir" : distdir : args)
 
 doInstall :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
@@ -358,6 +336,7 @@ generate config_args distdir directory
       let variablePrefix = directory ++ '_':distdir
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
+                variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords (map display dep_ids),
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) dep_ids),
@@ -384,6 +363,9 @@ generate config_args distdir directory
                 variablePrefix ++ "_DEP_EXTRA_LIBS = " ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions)]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
+      writeFile (distdir ++ "/haddock-prologue.txt") $ 
+          if null (description pd) then synopsis pd
+                                   else description pd
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = map (\s -> "\'" ++ s ++ "\'")

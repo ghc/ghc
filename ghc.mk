@@ -442,9 +442,8 @@ PRIMOPS_TXT = $(GHC_COMPILER_DIR)/prelude/primops.txt
 libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT) | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers <$(PRIMOPS_TXT) >$@
 
-libraries/ghc-prim/GHC/Prim.hs : $(GENPRIMOP_INPLACE) $(PRIMOPS_TXT)
-	"$(GENPRIMOP_INPLACE)" --make-haskell-source <$(PRIMOPS_TXT) >$@
-
+# Required so that Haddock documents the primops.
+libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
 
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
@@ -729,7 +728,7 @@ install_perl : $(INPLACE_PERL)
 endif # Windows
 
 ifneq "$(BINDIST)" "YES"
-$(ghc-prim_HADDOCK_FILE): \
+$(ghc-prim-$(libraries/ghc-prim_dist-install_VERSION)_HADDOCK_FILE): \
     libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs \
     libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs
 endif # BINDIST

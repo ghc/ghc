@@ -395,7 +395,7 @@ compiler_stage3_CONFIGURE_OPTS := $(compiler_stage2_CONFIGURE_OPTS)
 compiler_stage1_CONFIGURE_OPTS += --ghc-option=-DSTAGE=1
 compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DSTAGE=2
 compiler_stage3_CONFIGURE_OPTS += --ghc-option=-DSTAGE=3
-compiler_stage2_HADDOCK_OPTS += --haddock-option=--optghc=-DSTAGE=2
+compiler_stage2_HADDOCK_OPTS += --optghc=-DSTAGE=2
 
 compiler_stage1_CONFIGURE_OPTS += --ghc-options='$(GhcStage1HcOpts)'
 compiler_stage2_CONFIGURE_OPTS += --ghc-options='$(GhcStage2HcOpts)'
