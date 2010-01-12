@@ -51,7 +51,7 @@ import GHC.IO.Device as IODevice
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
 import GHC.IO.Handle.Text
-import System.IO.Error
+import qualified GHC.IO.BufferedIO as Buffered
 
 import GHC.Base
 import GHC.Exception
@@ -140,14 +140,24 @@ hSetFileSize handle size =
 -- physical file, if the current I\/O position is equal to the length of
 -- the file.  Otherwise, it returns 'False'.
 --
--- NOTE: 'hIsEOF' may block, because it is the same as calling
--- 'hLookAhead' and checking for an EOF exception.
+-- NOTE: 'hIsEOF' may block, because it has to attempt to read from
+-- the stream to determine whether there is any more data to be read.
 
 hIsEOF :: Handle -> IO Bool
-hIsEOF handle =
-  catch
-     (hLookAhead handle >> return False)
-     (\e -> if isEOFError e then return True else ioError e)
+hIsEOF handle = wantReadableHandle_ "hIsEOF" handle $ \Handle__{..} -> do
+
+  cbuf <- readIORef haCharBuffer
+  if not (isEmptyBuffer cbuf) then return False else do
+
+  bbuf <- readIORef haByteBuffer
+  if not (isEmptyBuffer bbuf) then return False else do
+
+  -- NB. do no decoding, just fill the byte buffer; see #3808
+  (r,bbuf') <- Buffered.fillReadBuffer haDevice bbuf
+  if r == 0
+     then return True
+     else do writeIORef haByteBuffer bbuf'
+             return False
 
 -- ---------------------------------------------------------------------------
 -- Looking ahead
