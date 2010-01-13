@@ -336,6 +336,7 @@ generate config_args distdir directory
       let variablePrefix = directory ++ '_':distdir
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
+                variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords (map display (otherModules bi)),
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords (map display dep_ids),
