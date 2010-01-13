@@ -39,7 +39,9 @@ endif
 
 ifneq "$$(BINDIST)" "YES"
 $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$(INPLACE_BIN)/haddock$$(exeext) $$(GHC_CABAL_INPLACE) $$($1_$2_HS_SRCS) $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
+ifeq "$$(HSCOLOUR_SRCS)" "YES"
 	"$$(GHC_CABAL_INPLACE)" hscolour $2 $1
+endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \
 	  --dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
