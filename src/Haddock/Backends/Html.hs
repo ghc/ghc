@@ -858,9 +858,14 @@ ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) 
             <-> rdocBox noHtml) </> 
             do_largs n (darrow unicode) ltype
     do_args n leader (HsForAllTy Implicit _ lctxt ltype)
+      | not (null (unLoc lctxt))
       = (argBox (leader <+> ppLContextNoArrow lctxt unicode)
           <-> rdocBox noHtml) </> 
-          do_largs (n+1) (darrow unicode) ltype
+          do_largs n (darrow unicode) ltype
+      -- if we're not showing any 'forall' or class constraints or
+      -- anything, skip having an empty line for the context.
+      | otherwise
+      = do_largs n leader ltype
     do_args n leader (HsFunTy lt r)
       = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (argDocHtml n))
           </> do_largs (n+1) (arrow unicode) r
