@@ -8,7 +8,15 @@ SETUP=./Setup -v0
 # profiling and dynamic linking. (#3604)
 
 cabal04:
+	$(MAKE) clean
 	'$(TEST_HC)' -v0 --make Setup
 	$(SETUP) clean
 	$(SETUP) configure --with-ghc='$(TEST_HC)' $(PROF) $(DYN)
 	$(SETUP) build
+ifneq "$(CLEANUP)" ""
+	$(MAKE) clean
+endif
+
+clean :
+	$(RM) -r *.o *.hi dist Setup$(exeext)
+
