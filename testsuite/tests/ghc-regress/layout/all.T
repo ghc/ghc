@@ -41,3 +41,9 @@ test('layout007',
      run_command,
      ['$MAKE -s --no-print-directory layout007'])
 
+test('layout008',
+     [extra_clean(['layout008.hi', 'layout008.o']),
+      only_compiler_types(['ghc'])],
+     run_command,
+     ['$MAKE -s --no-print-directory layout008'])
+
