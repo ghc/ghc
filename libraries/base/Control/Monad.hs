@@ -40,6 +40,7 @@ module Control.Monad
     , (>=>)         -- :: (Monad m) => (a -> m b) -> (b -> m c) -> (a -> m c)
     , (<=<)         -- :: (Monad m) => (b -> m c) -> (a -> m b) -> (a -> m c)
     , forever       -- :: (Monad m) => m a -> m b
+    , void
 
     -- ** Generalisations of list functions
 
