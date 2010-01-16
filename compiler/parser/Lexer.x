@@ -1954,6 +1954,8 @@ lexTokenAlr = do mPending <- popPendingImplicitToken
                      ITlet   -> setAlrExpectingOCurly (Just ALRLayoutLet)
                      ITof    -> setAlrExpectingOCurly (Just ALRLayoutOf)
                      ITdo    -> setAlrExpectingOCurly (Just ALRLayoutDo)
+                     ITmdo   -> setAlrExpectingOCurly (Just ALRLayoutDo)
+                     ITrec   -> setAlrExpectingOCurly (Just ALRLayoutDo)
                      _       -> return ()
                  return t
 
