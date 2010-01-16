@@ -1116,7 +1116,7 @@ specialise env force_spec bind_calls (fn, arg_bndrs, body, arg_occs)
 		where
 		   msg = vcat [ sep [ ptext (sLit "Function") <+> quotes (ppr fn)
 		       	            , nest 2 (ptext (sLit "has") <+> int n_pats <+> 
-                                              ptext (sLit "call pattterns, but the limit is") <+> int max) ]
+                                              ptext (sLit "call patterns, but the limit is") <+> int max) ]
 			      , ptext (sLit "Use -fspec-constr-count=n to set the bound")
 			      , extra ]
 	           extra | not opt_PprStyle_Debug = ptext (sLit "Use -dppr-debug to see specialisations")
