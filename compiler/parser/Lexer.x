@@ -2065,14 +2065,15 @@ alternativeLayoutRuleToken t
              (_, _, _) -> return t
 
 isALRopen :: Token -> Bool
-isALRopen ITcase   = True
-isALRopen ITif     = True
-isALRopen IToparen = True
-isALRopen ITobrack = True
-isALRopen ITocurly = True
+isALRopen ITcase        = True
+isALRopen ITif          = True
+isALRopen IToparen      = True
+isALRopen ITobrack      = True
+isALRopen ITocurly      = True
 -- GHC Extensions:
-isALRopen IToubxparen = True
-isALRopen _        = False
+isALRopen IToubxparen   = True
+isALRopen ITparenEscape = True
+isALRopen _             = False
 
 isALRclose :: Token -> Bool
 isALRclose ITof     = True
