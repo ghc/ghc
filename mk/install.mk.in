@@ -45,8 +45,8 @@
 define set_default
 # $1 = variable to set
 # $2 = default value to use, if configure didn't expand it
-# If $1 starts with an @ then configure didn't set it,
-# so set it to a sensible value
+# If $1 starts with an @ then configure didn't set it (because a version
+# of autoconf that is too old was used), so set it to a sensible value
 ifneq "$$(filter @%,$$($1))" ""
 $1 = $2
 endif
@@ -66,9 +66,6 @@ datadir         = @datadir@
 libdir          = @libdir@
 includedir      = @includedir@
 mandir          = @mandir@
-
-# New autoconf (>= 2.60?) make a configure with --docdir=DIR etc flags.
-# However, in order to support older autoconf's we don't use them.
 
 docdir = @docdir@
 $(eval $(call set_default,docdir,$${datarootdir}/doc/ghc))
