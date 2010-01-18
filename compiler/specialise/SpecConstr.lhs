@@ -1107,15 +1107,14 @@ specialise env force_spec bind_calls (fn, arg_bndrs, body, arg_occs)
 
 		-- Bale out if too many specialisations
 		-- Rather a hacky way to do so, but it'll do for now
-	; let n_pats = length pats
-              spec_count' = length pats + spec_count
+	; let spec_count' = length pats + spec_count
 	; case sc_count env of
 	    Just max | not force_spec && spec_count' > max
 		-> pprTrace "SpecConstr" msg $  
                   return (nullUsage, spec_info)
 		where
 		   msg = vcat [ sep [ ptext (sLit "Function") <+> quotes (ppr fn)
-		       	            , nest 2 (ptext (sLit "has") <+> int n_pats <+> 
+		       	            , nest 2 (ptext (sLit "has") <+> int spec_count' <+>
                                               ptext (sLit "call patterns, but the limit is") <+> int max) ]
 			      , ptext (sLit "Use -fspec-constr-count=n to set the bound")
 			      , extra ]
