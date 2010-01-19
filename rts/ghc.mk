@@ -128,6 +128,8 @@ endif
 # Building one way
 define build-rts-way # args: $1 = way
 
+ifneq "$$(BINDIST)" "YES"
+
 # The per-way CC_OPTS
 ifneq "$$(findstring debug, $1)" ""
 rts_dist_$1_HC_OPTS =
@@ -179,6 +181,8 @@ else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
 	echo $$(rts_$1_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
+endif
+
 endif
 
 endef
@@ -417,8 +421,10 @@ endif
 # -----------------------------------------------------------------------------
 # build the static lib containing the C main symbol
 
+ifneq "$(BINDIST)" "YES"
 rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
 	"$(AR)" $(AR_OPTS) $(EXTRA_AR_ARGS) $@ $<
+endif
 
 # -----------------------------------------------------------------------------
 # The RTS package config
@@ -441,13 +447,7 @@ endif
 # -----------------------------------------------------------------------------
 # installing
 
-install : install_rts
-
-.PHONY: install_rts
-install_rts:
-	$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)/include"
-	"$(CP)" $(ALL_RTS_LIBS) "$(DESTDIR)$(ghclibdir)"
+INSTALL_LIBS += $(ALL_RTS_LIBS)
 
 # -----------------------------------------------------------------------------
 # cleaning
