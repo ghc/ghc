@@ -135,7 +135,7 @@ endif
 endif
 
 # C and S files are possibly built the "dyn" way.
-ifeq "$(BuildSharedLibs)" "YES"
+ifeq "$$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)
 $(call c-suffix-rules,$1,$2,dyn,YES)
 endif

@@ -54,7 +54,7 @@ ifeq "$3" "dyn"
 
 # Link a dynamic library
 # On windows we have to supply the extra libs this one links to when building it.
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$$(HOSTPLATFORM)" "i386-unknown-mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_OBJS) \
          `$$($1_$2_$3_MKSTUBOBJS)` \
