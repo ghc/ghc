@@ -160,12 +160,12 @@ rts_dist_$1_CC_OPTS += -DRtsWay=$$(DQ)rts_$1$$(DQ)
 
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$$(HOSTPLATFORM)" "i386-unknown-mingw32"
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
-ifeq "$(darwin_TARGET_OS)" "1"
+ifeq "$$(darwin_TARGET_OS)" "1"
 	# Ensure library's install name is correct before anyone links with it.
 	install_name_tool -id $(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
 endif
