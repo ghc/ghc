@@ -632,14 +632,15 @@ primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
 ------------------------------------------------------------------------
 section "Byte Arrays"
 	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
-         raw memory in the garbage-collected heap, which is not scanned
-         for pointers. It carries its own size (in bytes). There are
-	 three sets of operations for accessing byte array contents:
-	 index for reading from immutable byte arrays, and read/write
-	 for mutable byte arrays.  Each set contains operations for 
-	 a range of useful primitive data types.  Each operation takes	
-	 an offset measured in terms of the size fo the primitive type
-	 being read or written.}
+         raw memory in the garbage-collected heap, which is not
+         scanned for pointers. It carries its own size (in bytes,
+         rounded up to the nearest multiple of a word). There are
+         three sets of operations for accessing byte array contents:
+         index for reading from immutable byte arrays, and read/write
+         for mutable byte arrays.  Each set contains operations for a
+         range of useful primitive data types.  Each operation takes
+         an offset measured in terms of the size fo the primitive type
+         being read or written.}
 
 ------------------------------------------------------------------------
 
@@ -681,10 +682,13 @@ primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
 
 primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp  
    ByteArray# -> Int#
+   {Return the size of the array in bytes, rounded up to the nearest multiple
+   of a word.}
 
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
-
+   {Return the size of the array in bytes, rounded up to the nearest multiple
+   of a word.}
 
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#
