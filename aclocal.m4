@@ -1235,4 +1235,96 @@ case "$hardtop" in
 esac
 ])
 
+# GHC_CONVERT_CPU(cpu, target_var)
+# --------------------------------
+# converts cpu from gnu to ghc naming, and assigns the result to $target_var
+AC_DEFUN([GHC_CONVERT_CPU],[
+case "$1" in
+  alpha*)
+    $2="alpha"
+    ;;
+  arm*)
+    $2="arm"
+    ;;
+  hppa1.1*)
+    $2="hppa1_1"
+    ;;
+  hppa*)
+    $2="hppa"
+    ;;
+  i386)
+    $2="i386"
+    ;;
+  ia64)
+    $2="ia64"
+    ;;
+  m68k*)
+    $2="m68k"
+    ;;
+  mipseb*)
+    $2="mipseb"
+    ;;
+  mipsel*)
+    $2="mipsel"
+    ;;
+  mips*)
+    $2="mips"
+    ;;
+  powerpc64*)
+    $2="powerpc64"
+    ;;
+  powerpc*)
+    $2="powerpc"
+    ;;
+  rs6000)
+    $2="rs6000"
+    ;;
+  s390*)
+    $2="s390"
+    ;;
+  sparc64*)
+    $2="sparc64"
+    ;;
+  sparc*)
+    $2="sparc"
+    ;;
+  vax)
+    $2="vax"
+    ;;
+  x86_64)
+    $2="x86_64"
+    ;;
+  *)
+    echo "Unknown CPU $1"
+    exit 1
+    ;;
+  esac
+])
+
+# GHC_CONVERT_VENDOR(vendor, target_var)
+# --------------------------------
+# converts vendor from gnu to ghc naming, and assigns the result to $target_var
+AC_DEFUN([GHC_CONVERT_VENDOR],[
+$2="$1"
+])
+
+# GHC_CONVERT_OS(os, target_var)
+# --------------------------------
+# converts os from gnu to ghc naming, and assigns the result to $target_var
+AC_DEFUN([GHC_CONVERT_OS],[
+case "$1" in
+  linux-*|linux)
+    $2="linux"
+    ;;
+  # As far as I'm aware, none of these have relevant variants
+  freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+    $2="$1"
+    ;;
+  *)
+    echo "Unknown OS $1"
+    exit 1
+    ;;
+  esac
+])
+
 # LocalWords:  fi

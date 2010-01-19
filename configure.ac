@@ -208,40 +208,87 @@ System types:
   --host=HOST       cross-compile to build programs to run on HOST [guessed]
   --target=TARGET   configure for building compilers for TARGET [guessed]]])dnl
 
-if test "$build" = ""
+if test "${WithGhc}" != ""
+then
+        bootstrap_host=`"${WithGhc}" +RTS --info | grep '^ ,("Host platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        bootstrap_target=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        if test "$bootstrap_host" != "$bootstrap_target"
+        then
+                echo "Bootstrapping GHC is a cross compiler. This probably isn't going to work"
+        fi
+fi
+
+# We have to run these unconditionally, but we may discard their
+# results in the following code
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
+# If no argument was given for a configuration variable, then discard
+# the guessed canonical system and use the configuration of the
+# bootstrapping ghc. If an argument was given, map it from gnu format
+# to ghc format.
+#
+# For why we do it this way, see: #3637, #1717, #2951
+
+if test "$build_alias" = ""
 then
     if test "${WithGhc}" != ""
     then
-        build=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        build=$bootstrap_target
         echo "Build platform inferred as: $build"
     else
         echo "Can't work out build platform"
         exit 1
     fi
+
+    BuildArch=`echo "$build" | sed 's/-.*//'`
+    BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
+    BuildOS=`echo "$build" | sed 's/.*-//'`
+else
+    GHC_CONVERT_CPU([$build_cpu], [BuildArch])
+    GHC_CONVERT_VENDOR([$build_vendor], [BuildVendor])
+    GHC_CONVERT_OS([$build_os], [BuildOS])
 fi
 
-if test "$host" = ""
+if test "$host_alias" = ""
 then
     if test "${WithGhc}" != ""
     then
-        host=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        host=$bootstrap_target
         echo "Host platform inferred as: $host"
     else
         echo "Can't work out host platform"
         exit 1
     fi
+
+    HostArch=`echo "$host" | sed 's/-.*//'`
+    HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
+    HostOS=`echo "$host" | sed 's/.*-//'`
+else
+    GHC_CONVERT_CPU([$host_cpu], [HostArch])
+    GHC_CONVERT_VENDOR([$host_vendor], [HostVendor])
+    GHC_CONVERT_OS([$host_os], [HostOS])
 fi
 
-if test "$target" = ""
+if test "$target_alias" = ""
 then
     if test "${WithGhc}" != ""
     then
-        target=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        target=$bootstrap_target
         echo "Target platform inferred as: $target"
     else
         echo "Can't work out target platform"
         exit 1
     fi
+
+    TargetArch=`echo "$target" | sed 's/-.*//'`
+    TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
+    TargetOS=`echo "$target" | sed 's/.*-//'`
+else
+    GHC_CONVERT_CPU([$target_cpu], [TargetArch])
+    GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
+    GHC_CONVERT_OS([$target_os], [TargetOS])
 fi
 
 exeext=''
@@ -305,10 +352,7 @@ checkOS() {
     esac
 }
 
-BuildPlatform=$build
-BuildArch=`echo "$build" | sed 's/-.*//'`
-BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
-BuildOS=`echo "$build" | sed 's/.*-//'`
+BuildPlatform="$BuildArch-$BuildVendor-$BuildOS"
 BuildPlatform_CPP=`echo "$BuildPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
 BuildArch_CPP=`    echo "$BuildArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
 BuildVendor_CPP=`  echo "$BuildVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
@@ -318,10 +362,7 @@ checkArch "$BuildArch"
 checkVendor "$BuildVendor"
 checkOS "$BuildOS"
 
-HostPlatform=$host
-HostArch=`echo "$host" | sed 's/-.*//'`
-HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
-HostOS=`echo "$host" | sed 's/.*-//'`
+HostPlatform="$HostArch-$HostVendor-$HostOS"
 HostPlatform_CPP=`echo "$HostPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
 HostArch_CPP=`    echo "$HostArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
 HostVendor_CPP=`  echo "$HostVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
@@ -331,10 +372,7 @@ checkArch "$HostArch"
 checkVendor "$HostVendor"
 checkOS "$HostOS"
 
-TargetPlatform=$target
-TargetArch=`echo "$target" | sed 's/-.*//'`
-TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
-TargetOS=`echo "$target" | sed 's/.*-//'`
+TargetPlatform="$TargetArch-$TargetVendor-$TargetOS"
 TargetPlatform_CPP=`echo "$TargetPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
 TargetArch_CPP=`    echo "$TargetArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
 TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
