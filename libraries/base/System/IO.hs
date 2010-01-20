@@ -234,9 +234,11 @@ import System.Posix.Types
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import GHC.Real
 import GHC.IO hiding ( onException )
 import GHC.IO.IOMode
 import GHC.IO.Handle.FD
+import qualified GHC.IO.FD as FD
 import GHC.IO.Handle
 import GHC.IORef
 import GHC.IO.Exception ( userError )
@@ -545,10 +547,10 @@ openTempFile' loc tmp_dir template binary mode = do
     oflags = oflags1 .|. binary_flags
 #endif
 
-#ifdef __NHC__
+#if defined(__NHC__)
     findTempName x = do h <- openFile filepath ReadWriteMode
                         return (filepath, h)
-#else
+#elif defined(__GLASGOW_HASKELL__)
     findTempName x = do
       fd <- withFilePath filepath $ \ f ->
               c_open f oflags mode
@@ -559,12 +561,20 @@ openTempFile' loc tmp_dir template binary mode = do
            then findTempName (x+1)
            else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
        else do
-         -- XXX We want to tell fdToHandle what the filepath is,
-         -- as any exceptions etc will only be able to report the
-         -- fd currently
+
+         (fD,fd_type) <- FD.mkFD (fromIntegral fd) ReadWriteMode Nothing{-no stat-}
+                              False{-is_socket-} 
+                              True{-is_nonblock-}
+
+         h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-}
+                           (Just localeEncoding)
+
+         return (filepath, h)
+#else
          h <- fdToHandle fd `onException` c_close fd
          return (filepath, h)
 #endif
+
       where
         filename        = prefix ++ show x ++ suffix
         filepath        = tmp_dir `combine` filename
