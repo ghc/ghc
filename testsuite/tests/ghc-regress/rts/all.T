@@ -64,6 +64,8 @@ test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS 
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [ if_platform('i386-unknown-mingw32',skip),
+       # OS X doesn't seem to support linker scripts
+       if_os('darwin', skip),
        cmd_prefix('$MAKE T2615-prep && ' +
                   # Add current directory to dlopen search path
                   'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
