@@ -249,8 +249,8 @@ tcFamInstDecl (L loc decl)
   =	-- Prime error recovery, set source location
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
-    do { -- type families require -XTypeFamilies and can't be in an
-	 -- hs-boot file
+    do { -- type family instances require -XTypeFamilies
+	 -- and can't (currently) be in an hs-boot file
        ; type_families <- doptM Opt_TypeFamilies
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl (tcdLName decl)
