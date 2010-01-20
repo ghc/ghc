@@ -133,9 +133,11 @@ which is how you go from a RdrName to a Name
 data NameMaker 
   = LamMk 	-- Lambdas 
       Bool	-- True <=> report unused bindings
+      		--   (even if True, the warning only comes out 
+		--    if -fwarn-unused-matches is on)
 
   | LetMk       -- Let bindings, incl top level
-		-- Do not check for unused bindings
+		-- Do *not* check for unused bindings
       (Maybe Module)   -- Just m  => top level of module m
                        -- Nothing => not top level
       MiniFixityEnv
@@ -146,8 +148,14 @@ topRecNameMaker mod fix_env = LetMk (Just mod) fix_env
 localRecNameMaker :: MiniFixityEnv -> NameMaker
 localRecNameMaker fix_env = LetMk Nothing fix_env 
 
-matchNameMaker :: NameMaker
-matchNameMaker = LamMk True
+matchNameMaker :: HsMatchContext a -> NameMaker
+matchNameMaker ctxt = LamMk report_unused
+  where
+    -- Do not report unused names in interactive contexts
+    -- i.e. when you type 'x <- e' at the GHCi prompt
+    report_unused = case ctxt of
+                      StmtCtxt GhciStmt -> False
+                      _                 -> True
 
 newName :: NameMaker -> Located RdrName -> CpsRn Name
 newName (LamMk report_unused) rdr_name
@@ -212,8 +220,8 @@ rnPats ctxt pats thing_inside
 	  -- (0) bring into scope all of the type variables bound by the patterns
 	  -- (1) rename the patterns, bringing into scope all of the term variables
 	  -- (2) then do the thing inside.
-	; bindPatSigTyVarsFV (collectSigTysFromPats pats) $ 
-	  unCpsRn (rnLPatsAndThen matchNameMaker pats)	  $ \ pats' -> do
+	; bindPatSigTyVarsFV (collectSigTysFromPats pats)     $ 
+	  unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
         { -- Check for duplicated and shadowed names 
 	         -- Because we don't bind the vars all at once, we can't
 	         -- 	check incrementally for duplicates; 

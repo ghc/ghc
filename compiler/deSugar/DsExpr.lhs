@@ -323,6 +323,9 @@ dsExpr (HsDo ListComp stmts body result_ty)
 dsExpr (HsDo DoExpr stmts body result_ty)
   = dsDo stmts body result_ty
 
+dsExpr (HsDo GhciStmt stmts body result_ty)
+  = dsDo stmts body result_ty
+
 dsExpr (HsDo (MDoExpr tbl) stmts body result_ty)
   = dsMDo tbl stmts body result_ty
 

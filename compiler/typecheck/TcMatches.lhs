@@ -243,8 +243,7 @@ tcDoStmts PArrComp stmts body res_ty
                      (HsDo PArrComp stmts' body' (mkPArrTy elt_ty)) }
 
 tcDoStmts DoExpr stmts body res_ty
-  = do	{ (stmts', body') <- tcStmts DoExpr tcDoStmt stmts 
-				     res_ty $
+  = do	{ (stmts', body') <- tcStmts DoExpr tcDoStmt stmts res_ty $
 			     tcBody body
 	; return (HsDo DoExpr stmts' body' res_ty) }
 

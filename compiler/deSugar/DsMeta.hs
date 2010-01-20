@@ -714,20 +714,26 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; e2 <- addBinds ss (repLE e)
 			       ; z <- repLetE ds e2
 			       ; wrapGenSyns ss z }
+
 -- FIXME: I haven't got the types here right yet
-repE (HsDo DoExpr sts body _) 
+repE e@(HsDo ctxt sts body _) 
+ | case ctxt of { DoExpr -> True; GhciStmt -> True; _ -> False }
  = do { (ss,zs) <- repLSts sts; 
 	body'	<- addBinds ss $ repLE body;
 	ret	<- repNoBindSt body';	
-        e       <- repDoE (nonEmptyCoreList (zs ++ [ret]));
-        wrapGenSyns ss e }
-repE (HsDo ListComp sts body _)
+        e'      <- repDoE (nonEmptyCoreList (zs ++ [ret]));
+        wrapGenSyns ss e' }
+
+ | ListComp <- ctxt
  = do { (ss,zs) <- repLSts sts; 
 	body'	<- addBinds ss $ repLE body;
 	ret	<- repNoBindSt body';	
-        e       <- repComp (nonEmptyCoreList (zs ++ [ret]));
-        wrapGenSyns ss e }
-repE e@(HsDo _ _ _ _) = notHandled "mdo and [: :]" (ppr e)
+        e'      <- repComp (nonEmptyCoreList (zs ++ [ret]));
+        wrapGenSyns ss e' }
+
+  | otherwise
+  = notHandled "mdo and [: :]" (ppr e)
+
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple es boxed) 

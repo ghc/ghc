@@ -1065,7 +1065,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     setInteractiveContext hsc_env ictxt $ do {
 
     -- Rename; use CmdLineMode because tcRnStmt is only used interactively
-    (([rn_stmt], _), fvs) <- rnStmts DoExpr [rdr_stmt] (return ((), emptyFVs)) ;
+    (([rn_stmt], _), fvs) <- rnStmts GhciStmt [rdr_stmt] (return ((), emptyFVs)) ;
     traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
     failIfErrsM ;
     rnDump (ppr rn_stmt) ;
@@ -1234,7 +1234,7 @@ tcGhciStmts stmts
 	let {
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-	    tc_io_stmts stmts = tcStmts DoExpr tcDoStmt stmts io_ret_ty ;
+	    tc_io_stmts stmts = tcStmts GhciStmt tcDoStmt stmts io_ret_ty ;
 
 	    names = map unLoc (collectLStmtsBinders stmts) ;
 
@@ -1269,7 +1269,7 @@ tcGhciStmts stmts
 
 	traceTc (text "TcRnDriver.tcGhciStmts: done") ;
 	return (ids, mkHsDictLet const_binds $
-		     noLoc (HsDo DoExpr tc_stmts (mk_return ids) io_ret_ty))
+		     noLoc (HsDo GhciStmt tc_stmts (mk_return ids) io_ret_ty))
     }
 \end{code}
 

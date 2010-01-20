@@ -978,7 +978,7 @@ pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
 pprDo (MDoExpr _) stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
 pprDo ListComp    stmts body = pprComp brackets    stmts body
 pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
-pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
+pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt, GhciStmt
 
 ppr_do_stmts :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
@@ -1092,6 +1092,7 @@ data HsMatchContext id  -- Context of a Match
 data HsStmtContext id
   = ListComp
   | DoExpr
+  | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
   | MDoExpr PostTcTable                  -- Recursive do-expression
                                          -- (tiresomely, it needs table
                                          --  of its return/bind ops)
@@ -1143,6 +1144,7 @@ pprStmtContext (TransformStmtCtxt c)
  = sep [ptext (sLit "a transformed branch of"), pprStmtContext c]
 pprStmtContext (PatGuard ctxt)
  = ptext (sLit "a pattern guard for") $$ pprMatchContext ctxt
+pprStmtContext GhciStmt        = ptext (sLit "an interactive GHCi command")
 pprStmtContext DoExpr          = ptext (sLit "a 'do' expression")
 pprStmtContext (MDoExpr _)     = ptext (sLit "an 'mdo' expression")
 pprStmtContext ListComp        = ptext (sLit "a list comprehension")
@@ -1174,6 +1176,7 @@ matchContextErrString ProcExpr                   = ptext (sLit "proc")
 matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))    = ptext (sLit "pattern guard")
+matchContextErrString (StmtCtxt GhciStmt)        = ptext (sLit "interactive GHCi command")
 matchContextErrString (StmtCtxt DoExpr)          = ptext (sLit "'do' expression")
 matchContextErrString (StmtCtxt (MDoExpr _))     = ptext (sLit "'mdo' expression")
 matchContextErrString (StmtCtxt ListComp)        = ptext (sLit "list comprehension")

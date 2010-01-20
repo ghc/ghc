@@ -651,7 +651,6 @@ type MiniFixityEnv = FastStringEnv (Located Fixity)
 --------------------------------
 -- Used for nested fixity decls to bind names along with their fixities.
 -- the fixities are given as a UFM from an OccName's FastString to a fixity decl
--- Also check for unused binders
 bindLocalNamesFV_WithFixities :: [Name]
 			      -> MiniFixityEnv
 			      -> RnM (a, FreeVars) -> RnM (a, FreeVars)
