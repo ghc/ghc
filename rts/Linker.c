@@ -1101,7 +1101,6 @@ static int linker_init_done = 0 ;
 static void *dl_prog_handle;
 static regex_t re_invalid;
 static regex_t re_realso;
-static void initLinkerCleanup( void );
 #ifdef THREADED_RTS
 static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
