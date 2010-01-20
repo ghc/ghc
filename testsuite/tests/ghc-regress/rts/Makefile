@@ -2,14 +2,6 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-.SUFFIXES: .so
-
-.o.so:
-	'$(TEST_HC)' -shared -no-auto-link-packages -o $@ $<
-
-.c.o:
-	'$(TEST_HC)' -fPIC -c -o $@ $<
-
 outofmem-prep::
 	'$(TEST_HC)' --make -fforce-recomp outofmem.hs -o outofmem
 
@@ -24,5 +16,8 @@ outofmem2::
 	@$(MAKE) outofmem2-prep >prep.out 2>prep.out
 	@ulimit -v 1000000 2>/dev/null; ./outofmem2 +RTS -M5m -RTS || echo "exit($$?)"
 
-T2615-prep: libfoo_T2615.so
+T2615-prep:
+	$(RM) libfoo_T2615.so
+	'$(TEST_HC)' -fPIC -c libfoo_T2615.c -o libfoo_T2615.o
+	'$(TEST_HC)' -shared -no-auto-link-packages libfoo_T2615.o -o libfoo_T2615.so
 
