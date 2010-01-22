@@ -299,7 +299,7 @@ warnAboutFilteredDecls mdl decls = do
         nub [ tcdName d | (L _ (TyClD d), _, _) <- decls, isFamInstDecl d ]
 
   unless (null typeInstances) $
-    tell $ nub [
+    tell [
       "Warning: " ++ modStr ++ ": Instances of type and data "
       ++ "families are not yet supported. Instances of the following families "
       ++ "will be filtered out:\n  " ++ concat (intersperse ", "
@@ -309,7 +309,7 @@ warnAboutFilteredDecls mdl decls = do
                                  , not (null ats) ]
 
   unless (null instances) $
-    tell $ nub [
+    tell [
       "Warning: " ++ modStr ++ ": We do not support associated types in instances yet. "
       ++ "These instances are affected:\n" ++ concat (intersperse ", " instances) ]
 
