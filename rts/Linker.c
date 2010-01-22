@@ -1110,7 +1110,9 @@ void
 initLinker( void )
 {
     RtsSymbolVal *sym;
+#if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     int compileResult;
+#endif
 
     /* Make initLinker idempotent, so we can call it
        before evey relevant operation; that means we
