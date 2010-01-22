@@ -867,7 +867,7 @@ ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) 
       | otherwise
       = do_largs n leader ltype
     do_args n leader (HsFunTy lt r)
-      = (argBox (leader <+> ppLType unicode lt) <-> rdocBox (argDocHtml n))
+      = (argBox (leader <+> ppLFunLhType unicode lt) <-> rdocBox (argDocHtml n))
           </> do_largs (n+1) (arrow unicode) r
     do_args n leader t
       = argBox (leader <+> ppType unicode t) <-> rdocBox (argDocHtml n)
@@ -1565,14 +1565,16 @@ maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
                                | otherwise            = p
 
 
-ppLType, ppLParendType :: Bool -> Located (HsType DocName) -> Html
+ppLType, ppLParendType, ppLFunLhType :: Bool -> Located (HsType DocName) -> Html
 ppLType       unicode y = ppType unicode (unLoc y)
 ppLParendType unicode y = ppParendType unicode (unLoc y) 
+ppLFunLhType  unicode y = ppFunLhType unicode (unLoc y)
 
 
-ppType, ppParendType :: Bool -> HsType DocName -> Html
+ppType, ppParendType, ppFunLhType :: Bool -> HsType DocName -> Html
 ppType       unicode ty = ppr_mono_ty pREC_TOP ty unicode 
 ppParendType unicode ty = ppr_mono_ty pREC_CON ty unicode 
+ppFunLhType  unicode ty = ppr_mono_ty pREC_FUN ty unicode
 
 
 -- Drop top-level for-all type variables in user style
