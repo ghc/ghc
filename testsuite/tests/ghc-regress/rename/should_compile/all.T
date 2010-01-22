@@ -129,3 +129,9 @@ test('timing003', normal, compile, [''])
 test('T1792_imports', extra_clean(['T1792_imports.imports']), run_command,
      ['$MAKE -s --no-print-directory T1792_imports'])
 
+test('T3823',
+     extra_clean(['T3823A.hi-boot', 'T3823A.hi', 'T3823B.hi',
+                  'T3823A.o-boot', 'T3823A.o', 'T3823B.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T3823'])
+
