@@ -296,4 +296,13 @@
 #error RESERVED_STACK_WORDS may be wrong!
 #endif
 
+/*
+ * The number of times we spin in a spin lock before yielding (see
+ * #3758).  To tune this value, use the benchmark in #3758: run the
+ * server with -N2 and the client both on a dual-core.  Also make sure
+ * that the chosen value doesn't slow down any of the parallel
+ * benchmarks in nofib/parallel.
+ */
+#define SPIN_COUNT 1000
+
 #endif /* RTS_CONSTANTS_H */

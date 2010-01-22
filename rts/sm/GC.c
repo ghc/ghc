@@ -997,6 +997,9 @@ any_work (void)
 #endif
 
     gct->no_work++;
+#if defined(THREADED_RTS)
+    yieldThread();
+#endif
 
     return rtsFalse;
 }    

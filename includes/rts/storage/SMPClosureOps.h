@@ -28,8 +28,6 @@ EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
  * This is used primarily in the implementation of MVars.
  * -------------------------------------------------------------------------- */
 
-#define SPIN_COUNT 4000
-
 // We want a callable copy of lockClosure() so that we can refer to it
 // from .cmm files compiled using the native codegen.
 EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)

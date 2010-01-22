@@ -36,7 +36,6 @@ typedef StgWord SpinLock;
 
 typedef lnat SpinLockCount;
 
-
 #if defined(PROF_SPIN)
 
 // PROF_SPIN enables counting the number of times we spin on a lock
@@ -45,13 +44,16 @@ typedef lnat SpinLockCount;
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
     StgWord32 r = 0;
-spin:
-    r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-    if (r == 0) {
-        p->spin++;
-        busy_wait_nop();
-        goto spin;
-    }
+    nat i;
+    do {
+        for (i = 0; i < SPIN_COUNT; i++) {
+            r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+            if (r != 0) return;
+            p->spin++;
+            busy_wait_nop();
+        }
+        yieldThread();
+    } while (1);
 }
 
 // release spin lock
@@ -75,10 +77,15 @@ INLINE_HEADER void initSpinLock(SpinLock * p)
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
     StgWord32 r = 0;
+    nat i;
     do {
-        r = cas((StgVolatilePtr)p, 1, 0);
-        busy_wait_nop();
-    } while(r == 0);
+        for (i = 0; i < SPIN_COUNT; i++) {
+            r = cas((StgVolatilePtr)p, 1, 0);
+            if (r != 0) return;
+            busy_wait_nop();
+        }
+        yieldThread();
+    } while (1);
 }
 
 // release spin lock
