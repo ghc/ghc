@@ -171,13 +171,20 @@ hs_init(int *argc, char **argv[])
      */
     getStablePtr((StgPtr)runIO_closure);
     getStablePtr((StgPtr)runNonIO_closure);
+
+    getStablePtr((StgPtr)runFinalizerBatch_closure);
+
     getStablePtr((StgPtr)stackOverflow_closure);
     getStablePtr((StgPtr)heapOverflow_closure);
-    getStablePtr((StgPtr)runFinalizerBatch_closure);
     getStablePtr((StgPtr)unpackCString_closure);
     getStablePtr((StgPtr)blockedIndefinitelyOnMVar_closure);
     getStablePtr((StgPtr)nonTermination_closure);
     getStablePtr((StgPtr)blockedIndefinitelyOnSTM_closure);
+    getStablePtr((StgPtr)nestedAtomically_closure);
+
+    getStablePtr((StgPtr)runSparks_closure);
+    getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
+    getStablePtr((StgPtr)runHandlers_closure);
 
     /* initialise the shared Typeable store */
     initGlobalStore();
