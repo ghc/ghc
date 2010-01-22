@@ -32,7 +32,7 @@ typedef enum {
 Mutex globalStoreLock;
 #endif
 
-StgStablePtr store[MaxStoreKey];
+static StgStablePtr store[MaxStoreKey];
 
 void
 initGlobalStore(void)
