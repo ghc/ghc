@@ -24,7 +24,7 @@ haddockEq file1 file2 = stripLinks file1 == stripLinks file2
 stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
 
 programOnPath p = do
-  result <- findProgramOnPath p silent
+  result <- findProgramLocation silent p
   return (isJust result)
 
 
