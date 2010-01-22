@@ -1121,7 +1121,7 @@ initLinker( void )
       linker_init_done = 1;
     }
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS) && (defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO))
     initMutex(&dl_mutex);
 #endif
     stablehash = allocStrHashTable();
