@@ -131,6 +131,54 @@
 ></TD
 ></TR
 ><TR
+><TD CLASS="decl"
+><A NAME="v:g"
+><A NAME="v%3Ag"
+></A
+></A
+><B
+>g</B
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+>:: a</TD
+><TD CLASS="rdoc"
+>First argument
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; b</TD
+><TD CLASS="rdoc"
+>Second argument
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; c</TD
+><TD CLASS="rdoc"
+>Third argument
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; d</TD
+><TD CLASS="rdoc"
+>Result
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
 ><TD CLASS="botbar"
 >Produced by <A HREF="">Haddock</A
 > version 2.6.0</TD

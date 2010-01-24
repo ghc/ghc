@@ -2842,13 +2842,13 @@ test2
 ></TR
 ><TR
 ><TD CLASS="arg"
->-&gt; <A HREF="">T3</A
+>-&gt; (<A HREF="">T3</A
 > <A HREF="">Bool</A
 > <A HREF="">Bool</A
 > -&gt; <A HREF="">T4</A
 > <A HREF="">Float</A
 > <A HREF="">Float</A
-></TD
+>)</TD
 ><TD CLASS="rdoc"
 >This argument has type <TT
 >T3 Bool Bool -&gt; T4 Float Float</TT
