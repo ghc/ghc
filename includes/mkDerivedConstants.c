@@ -31,19 +31,13 @@
 
 #define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
 
-#ifdef mingw32_HOST_OS
-#define SIZET_FMT "d"
-#else
-#define SIZET_FMT "zd"
-#endif
-
 #if defined(GEN_HASKELL)
 #define def_offset(str, offset)                          \
     printf("oFFSET_" str " :: Int\n");                   \
-    printf("oFFSET_" str " = %" SIZET_FMT "\n", offset);
+    printf("oFFSET_" str " = %lu\n", (unsigned long)offset);
 #else
 #define def_offset(str, offset) \
-    printf("#define OFFSET_" str " %" SIZET_FMT "\n", offset);
+    printf("#define OFFSET_" str " %lu\n", (unsigned long)offset);
 #endif
 
 #if defined(GEN_HASKELL)
