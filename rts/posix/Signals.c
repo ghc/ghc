@@ -183,7 +183,14 @@ generic_handler(int sig USED_IF_THREADS,
         int r;
 
         buf[0] = sig;
-        memcpy(buf+1, info, sizeof(siginfo_t));
+
+	if (info == NULL) {
+	    // info may be NULL on Solaris (see #3790)
+	    memset(buf+1, 0, sizeof(siginfo_t));
+	} else {
+	    memcpy(buf+1, info, sizeof(siginfo_t));
+	}
+
 	r = write(io_manager_pipe, buf, sizeof(siginfo_t)+1);
         if (r == -1 && errno == EAGAIN)
         {
