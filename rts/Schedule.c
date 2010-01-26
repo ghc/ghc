@@ -1331,6 +1331,17 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 #ifdef DEBUG
 	  removeThreadLabel((StgWord)task->tso->id);
 #endif
+
+          // We no longer consider this thread and task to be bound to
+          // each other.  The TSO lives on until it is GC'd, but the
+          // task is about to be released by the caller, and we don't
+          // want anyone following the pointer from the TSO to the
+          // defunct task (which might have already been
+          // re-used). This was a real bug: the GC updated
+          // tso->bound->tso which lead to a deadlock.
+          t->bound = NULL;
+          task->tso = NULL;
+
 	  return rtsTrue; // tells schedule() to return
       }
 
@@ -1940,6 +1951,7 @@ Capability *
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 {
     Task *task;
+    StgThreadID id;
 
     // We already created/initialised the Task
     task = cap->running_task;
@@ -1955,14 +1967,15 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 
     appendToRunQueue(cap,tso);
 
-    debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)tso->id);
+    id = tso->id;
+    debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)id);
 
     cap = schedule(cap,task);
 
     ASSERT(task->stat != NoStatus);
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    debugTrace(DEBUG_sched, "bound thread (%lu) finished", (unsigned long)task->tso->id);
+    debugTrace(DEBUG_sched, "bound thread (%lu) finished", (unsigned long)id);
     return cap;
 }
 
@@ -2092,7 +2105,8 @@ exitScheduler(
     if (sched_state < SCHED_SHUTTING_DOWN) {
 	sched_state = SCHED_INTERRUPTING;
         waitForReturnCapability(&task->cap,task);
-	scheduleDoGC(task->cap,task,rtsFalse);    
+	scheduleDoGC(task->cap,task,rtsFalse);
+        ASSERT(task->tso == NULL);
         releaseCapability(task->cap);
     }
     sched_state = SCHED_SHUTTING_DOWN;
@@ -2102,6 +2116,7 @@ exitScheduler(
 	nat i;
 	
 	for (i = 0; i < n_capabilities; i++) {
+            ASSERT(task->tso == NULL);
 	    shutdownCapability(&capabilities[i], task, wait_foreign);
 	}
     }
