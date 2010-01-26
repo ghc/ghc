@@ -394,7 +394,10 @@ releaseCapability_ (Capability* cap,
     // give this Capability to the appropriate Task.
     if (!emptyRunQueue(cap) && cap->run_queue_hd->bound) {
 	// Make sure we're not about to try to wake ourselves up
-	ASSERT(task != cap->run_queue_hd->bound);
+	// ASSERT(task != cap->run_queue_hd->bound);
+        // assertion is false: in schedule() we force a yield after
+	// ThreadBlocked, but the thread may be back on the run queue
+	// by now.
 	task = cap->run_queue_hd->bound;
 	giveCapabilityToTask(cap,task);
 	return;
