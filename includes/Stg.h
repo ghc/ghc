@@ -61,6 +61,27 @@
    that depend on config info, such as __USE_FILE_OFFSET64 */
 #include <math.h>
 
+// On Solaris, we don't get the INFINITY and NAN constants unless we
+// #define _STDC_C99, and we can't do that unless we also use -std=c99,
+// because _STDC_C99 causes the headers to use C99 syntax (e.g. restrict).
+// We aren't ready for -std=c99 yet, so define INFINITY/NAN by hand using
+// the gcc builtins.
+#if !defined(INFINITY)
+#if defined(__GNUC__)
+#define INFINITY __builtin_inf()
+#else
+#error No definition for INFINITY
+#endif
+#endif
+
+#if !defined(NAN)
+#if defined(__GNUC__)
+#define NAN __builtin_nan("")
+#else
+#error No definition for NAN
+#endif
+#endif
+
 /* -----------------------------------------------------------------------------
    Useful definitions
    -------------------------------------------------------------------------- */
