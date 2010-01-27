@@ -197,14 +197,13 @@ installSignalHandlers = do
 	   [] -> return ()
 	   (thread:_) -> throwTo thread interrupt_exn
 
-      fatal_signal n = throwTo main_thread (Signal (fromIntegral n))
-
   --
 #if !defined(mingw32_HOST_OS)
   _ <- installHandler sigQUIT  (Catch interrupt) Nothing 
   _ <- installHandler sigINT   (Catch interrupt) Nothing
   -- see #3656; in the future we should install these automatically for
   -- all Haskell programs in the same way that we install a ^C handler.
+  let fatal_signal n = throwTo main_thread (Signal (fromIntegral n))
   _ <- installHandler sigHUP   (Catch (fatal_signal sigHUP))  Nothing
   _ <- installHandler sigTERM  (Catch (fatal_signal sigTERM)) Nothing
   return ()
