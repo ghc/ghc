@@ -86,7 +86,7 @@ waitCondition ( Condition* pCond, Mutex* pMut )
 void
 yieldThread()
 {
-  Sleep(0);
+  SwitchToThread();
   return;
 }
 
