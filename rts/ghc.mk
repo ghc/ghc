@@ -103,7 +103,7 @@ rts/dist/build/win32/libHS$1.def : rts/win32/libHS$1.def
 		| sed "s/@LibVersion@/$$(libraries/$1_dist-install_VERSION)/" \
 		| sed "s/@ProjectVersion@/$(ProjectVersion)/" \
 		> rts/dist/build/win32/libHS$1.def
-		
+
 rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
 	"$$(DLLTOOL)" 	-d rts/dist/build/win32/libHS$1.def \
 			-l rts/dist/build/win32/libHS$1.dll.a
@@ -116,7 +116,7 @@ rts/dist/build/win32/libHSffi.def : rts/win32/libHSffi.def
 	cat rts/win32/libHSffi.def \
 		| sed "s/@ProjectVersion@/$(ProjectVersion)/" \
 		> rts/dist/build/win32/libHSffi.def
-		
+
 rts/dist/build/win32/libHSffi.dll.a : rts/dist/build/win32/libHSffi.def
 	"$(DLLTOOL)" 	-d rts/dist/build/win32/libHSffi.def \
 			-l rts/dist/build/win32/libHSffi.dll.a
