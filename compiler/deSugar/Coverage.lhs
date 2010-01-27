@@ -52,12 +52,10 @@ addCoverageTicksToBinds
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
-addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do 
-
-  let orig_file = 
-             case ml_hs_file mod_loc of
-		    Just file -> file
-		    Nothing -> panic "can not find the original file during hpc trans"
+addCoverageTicksToBinds dflags mod mod_loc tyCons binds = 
+ case ml_hs_file mod_loc of
+ Nothing -> return (binds, emptyHpcInfo False, emptyModBreaks)
+ Just orig_file -> do
 
   if "boot" `isSuffixOf` orig_file then return (binds, emptyHpcInfo False, emptyModBreaks) else do
 
