@@ -40,7 +40,7 @@ WINAPI
 TimerProc(PVOID param)
 {
   int ms = (int)param;
-  DWORD waitRes;
+  DWORD waitRes = 0;
   
   /* interpret a < 0 timeout period as 'instantaneous' */ 
   if (ms < 0) ms = 0;
