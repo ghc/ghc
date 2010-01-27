@@ -184,7 +184,9 @@ hs_init(int *argc, char **argv[])
 
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
+#ifndef mingw32_HOST_OS
     getStablePtr((StgPtr)runHandlers_closure);
+#endif
 
     /* initialise the shared Typeable store */
     initGlobalStore();
