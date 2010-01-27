@@ -36,7 +36,8 @@ import GHC.ConsoleHandler
 #endif
 
 import Exception
-import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar )
+import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar, modifyMVar_,
+                            myThreadId )
 import Data.Dynamic
 import Debug.Trace	( trace )
 import System.IO.Unsafe	( unsafePerformIO )
@@ -63,6 +64,7 @@ data GhcException
   = PhaseFailed String		-- name of phase 
   		ExitCode	-- an external phase (eg. cpp) failed
   | Interrupted			-- someone pressed ^C
+  | Signal Int                  -- some other fatal signal (SIGHUP,SIGTERM)
   | UsageError String		-- prints the short usage msg after the error
   | CmdLineError String		-- cmdline prob, but doesn't print usage
   | Panic String		-- the `impossible' happened
@@ -107,6 +109,8 @@ showGhcException (InstallationError str)
    = showString str
 showGhcException (Interrupted)
    = showString "interrupted"
+showGhcException (Signal n)
+   = showString "signal: " . shows n
 showGhcException (Panic s)
    = showString ("panic! (the 'impossible' happened)\n"
 		 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
@@ -159,6 +163,7 @@ tryMost action = do r <- try action
                             case fromException se of
                                 -- Some GhcException's we rethrow,
                                 Just Interrupted -> throwIO se
+                                Just (Signal _)  -> throwIO se
                                 Just (Panic _)   -> throwIO se
                                 -- others we return
                                 Just _           -> return (Left se)
@@ -180,6 +185,9 @@ installSignalHandlers.
 \begin{code}
 installSignalHandlers :: IO ()
 installSignalHandlers = do
+  main_thread <- myThreadId
+  modifyMVar_ interruptTargetThread (return . (main_thread :))
+
   let
       interrupt_exn = (toException Interrupted)
 
@@ -188,10 +196,17 @@ installSignalHandlers = do
 	  case targets of
 	   [] -> return ()
 	   (thread:_) -> throwTo thread interrupt_exn
+
+      fatal_signal n = throwTo main_thread (Signal (fromIntegral n))
+
   --
 #if !defined(mingw32_HOST_OS)
-  _ <- installHandler sigQUIT (Catch interrupt) Nothing 
-  _ <- installHandler sigINT  (Catch interrupt) Nothing
+  _ <- installHandler sigQUIT  (Catch interrupt) Nothing 
+  _ <- installHandler sigINT   (Catch interrupt) Nothing
+  -- see #3656; in the future we should install these automatically for
+  -- all Haskell programs in the same way that we install a ^C handler.
+  _ <- installHandler sigHUP   (Catch (fatal_signal sigHUP))  Nothing
+  _ <- installHandler sigTERM  (Catch (fatal_signal sigTERM)) Nothing
   return ()
 #else
   -- GHC 6.3+ has support for console events on Windows

@@ -300,7 +300,6 @@ import Maybes		( expectJust, mapCatMaybes )
 import FastString
 import Lexer
 
-import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist,
                           getCurrentDirectory )
 import Data.Maybe
@@ -353,6 +352,7 @@ defaultErrorHandler dflags inner =
   		case ge of
 		     PhaseFailed _ code -> exitWith code
 		     Interrupted -> exitWith (ExitFailure 1)
+		     Signal _ -> exitWith (ExitFailure 1)
 		     _ -> do fatalErrorMsg dflags (text (show ge))
 			     exitWith (ExitFailure 1)
 	    ) $
@@ -454,8 +454,6 @@ runGhcT mb_top_dir ghct = do
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir = do
   -- catch ^C
-  main_thread <- liftIO $ myThreadId
-  liftIO $ modifyMVar_ interruptTargetThread (return . (main_thread :))
   liftIO $ installSignalHandlers
 
   liftIO $ StaticFlags.initStaticOpts
