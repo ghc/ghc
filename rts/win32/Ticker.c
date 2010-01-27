@@ -127,7 +127,7 @@ stopTicker(void)
 }
 
 void
-exitTicker(void)
+exitTicker (rtsBool wait)
 {
     // We must wait for the ticker thread to terminate, since if we
     // are in a DLL that is about to be unloaded, the ticker thread
@@ -138,10 +138,20 @@ exitTicker(void)
 	DWORD exitCode;
         ticker_state = TickerExit;
 	SetEvent(hStopEvent);
-	while (1) {
-	    WaitForSingleObject(tickThread, 20);
+	while (wait) {
+            // See #3748:
+            //
+            // when the RTS is compiled into a DLL (wait==rtsTrue),
+            // the ticker thread must stop before we exit, or chaos
+            // will ensue.  We can't kill it, because it may be
+            // holding a lock.
+            //
+            // When not compiled into a DLL, we wait for
+            // the thread out of courtesy, but give up after 200ms if
+            // it still hasn't stopped.
+	    WaitForSingleObject(tickThread, 200);
 	    if (!GetExitCodeThread(tickThread, &exitCode)) {
-		return 1;
+		return;
 	    }
 	    if (exitCode != STILL_ACTIVE) {
 		tickThread = INVALID_HANDLE_VALUE;
@@ -149,9 +159,8 @@ exitTicker(void)
 		    CloseHandle(hStopEvent);
 		    hStopEvent = INVALID_HANDLE_VALUE;
 		}
-		return 0;
+		return;
 	    }
-	    TerminateThread(tickThread, 0);
 	}
     }
 }

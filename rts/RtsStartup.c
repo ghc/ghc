@@ -370,7 +370,7 @@ hs_exit_(rtsBool wait_foreign)
 
     /* stop the ticker */
     stopTimer();
-    exitTimer();
+    exitTimer(wait_foreign);
 
     // set the terminal settings back to what they were
 #if !defined(mingw32_HOST_OS)    

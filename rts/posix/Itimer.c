@@ -221,7 +221,7 @@ stopTicker(void)
 }
 
 void
-exitTicker(void)
+exitTicker (rtsBool wait STG_UNUSED)
 {
 #if defined(USE_TIMER_CREATE)
     timer_delete(timer);

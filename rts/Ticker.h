@@ -16,7 +16,7 @@ typedef void (*TickProc)(int);
 void initTicker  (nat ms, TickProc handle_tick);
 void startTicker (void);
 void stopTicker  (void);
-void exitTicker  (void);
+void exitTicker  (rtsBool wait);
 
 END_RTS_PRIVATE
 
