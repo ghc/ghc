@@ -315,7 +315,8 @@ end:
     // the number of words we have to shift down is less than the
     // number of stack words we squeeze away by doing so.
     if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
-	((weight <= 5 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
+	((weight <= 8 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
+        // threshold above bumped from 5 to 8 as a result of #2797
 	stackSqueeze(cap, tso, (StgPtr)frame);
         tso->flags |= TSO_SQUEEZED;
         // This flag tells threadStackOverflow() that the stack was
