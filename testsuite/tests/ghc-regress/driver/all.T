@@ -328,3 +328,4 @@ test('dynHelloWorld',
      compile_and_run,
      [''])
 
+test('2464', normal, compile, [''])
