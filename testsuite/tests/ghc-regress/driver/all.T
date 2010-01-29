@@ -329,3 +329,5 @@ test('dynHelloWorld',
      [''])
 
 test('2464', normal, compile, [''])
+test('3674', ignore_output, run_command, 
+             ['$MAKE -s --no-print-directory 3674'])

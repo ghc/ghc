@@ -477,3 +477,10 @@ mode001:
 shared001:
 	$(RM) Shared001.hi Shared001.o HSdll.dll.a HSdll.dll Shared001_stub.*
 	"$(TEST_HC)" -shared Shared001.hs
+
+# -----------------------------------------------------------------------------
+
+3674:
+	$(RM) 3674*.o 3674*.hi 3674_pre
+	"$(TEST_HC)" --make 3674_pre.hs
+	"$(TEST_HC)" --make 3674.hs
