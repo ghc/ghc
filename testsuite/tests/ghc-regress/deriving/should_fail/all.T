@@ -36,3 +36,5 @@ test('drvfail-foldable-traversable1',
      if_compiler_lt('ghc', '6.11', expect_fail),
      compile_fail,
      [''])
+test('T3833', normal, compile_fail, [''])
+test('T3834', normal, compile_fail, [''])
