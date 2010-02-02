@@ -35,6 +35,7 @@ import base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import ghczmprim_GHCziBool_False_closure;
+import sm_mutex;
 
 /*-----------------------------------------------------------------------------
   Array Primitives
