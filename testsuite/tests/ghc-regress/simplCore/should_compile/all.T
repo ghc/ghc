@@ -72,3 +72,4 @@ test('T3772',
      extra_clean(['T3772_A.hi', 'T3772_A.o']),
      run_command, ['$MAKE -s --no-print-directory T3772'])
 
+test('T3831', normal, compile, [''])
