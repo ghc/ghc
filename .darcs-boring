@@ -42,6 +42,7 @@
 ^libraries/arrows(/|$)
 ^libraries/base(/|$)
 ^libraries/base3-compat(/|$)
+^libraries/binary(/|$)
 ^libraries/bytestring(/|$)
 ^libraries/cgi(/|$)
 ^libraries/concurrent(/|$)
