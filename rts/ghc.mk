@@ -207,7 +207,6 @@ WARNING_OPTS += -Winline
 WARNING_OPTS += -Waggregate-return
 WARNING_OPTS += -Wpointer-arith
 WARNING_OPTS += -Wmissing-noreturn
-WARNING_OPTS += -Wcast-align
 WARNING_OPTS += -Wnested-externs
 WARNING_OPTS += -Wredundant-decls 
 
@@ -216,6 +215,15 @@ WARNING_OPTS += -Wredundant-decls
 #WARNING_OPTS += -Wbad-function-cast
 #WARNING_OPTS += -Wshadow
 #WARNING_OPTS += -Wcast-qual
+
+# This one seems buggy on GCC 4.1.2, which is the only GCC version we 
+# have that can bootstrap the SPARC build. We end up with lots of supurious
+# warnings of the form "cast increases required alignment of target type".
+# Some legitimate warnings can be fixed by adding an intermediate cast to
+# (void*), but we get others in rts/sm/GCUtils.c concerning the gct var
+# that look innocuous to me. We could enable this again once we deprecate
+# support for registerised builds on this arch. -- BL 2010/02/03
+# WARNING_OPTS += -Wcast-align
 
 STANDARD_OPTS += -Iincludes -Irts
 # COMPILING_RTS is only used when building Win32 DLL support.
