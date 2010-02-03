@@ -200,7 +200,7 @@ static void hpc_init(void) {
     /* Then, try open the file
      */
     tixFilename = (char *) malloc(strlen(hpc_tixdir) + strlen(prog_name) + 12);
-    sprintf(tixFilename,"%s/%s-%d.tix",hpc_tixdir,prog_name,hpc_pid);
+    sprintf(tixFilename,"%s/%s-%d.tix",hpc_tixdir,prog_name,(int)hpc_pid);
   } else {
     tixFilename = (char *) malloc(strlen(prog_name) + 6);
     sprintf(tixFilename, "%s.tix", prog_name);
