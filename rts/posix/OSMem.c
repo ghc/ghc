@@ -158,10 +158,10 @@ gen_map_mblocks (lnat size)
     // unmap the slop bits around the chunk we allocated
     slop = (W_)ret & MBLOCK_MASK;
     
-    if (munmap(ret, MBLOCK_SIZE - slop) == -1) {
+    if (munmap((void*)ret, MBLOCK_SIZE - slop) == -1) {
       barf("gen_map_mblocks: munmap failed");
     }
-    if (slop > 0 && munmap(ret+size-slop, slop) == -1) {
+    if (slop > 0 && munmap((void*)(ret+size-slop), slop) == -1) {
       barf("gen_map_mblocks: munmap failed");
     }
 
