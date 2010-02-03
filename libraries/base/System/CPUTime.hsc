@@ -108,7 +108,7 @@ foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
 #else
 # if defined(HAVE_TIMES)
     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
-    times p_tms
+    _ <- times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
     return (( (realToInteger u_ticks + realToInteger s_ticks) * 1000000000000) 
