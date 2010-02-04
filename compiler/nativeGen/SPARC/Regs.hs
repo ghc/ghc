@@ -95,22 +95,21 @@ virtualRegSqueeze cls vr
 	 -> case vr of
 	 	VirtualRegI{}		-> _ILIT(1)
 		VirtualRegHi{}		-> _ILIT(1)
-		VirtualRegF{}		-> _ILIT(0)
-		VirtualRegD{}		-> _ILIT(0)
+                _other                  -> _ILIT(0)
 
 	RcFloat
 	 -> case vr of
-	 	VirtualRegI{}		-> _ILIT(0)
-		VirtualRegHi{}		-> _ILIT(0)
 		VirtualRegF{}		-> _ILIT(1)
 		VirtualRegD{}		-> _ILIT(2)
+                _other                  -> _ILIT(0)
 
 	RcDouble
 	 -> case vr of
-	 	VirtualRegI{}		-> _ILIT(0)
-		VirtualRegHi{}		-> _ILIT(0)
 		VirtualRegF{}		-> _ILIT(1)
 		VirtualRegD{}		-> _ILIT(1)
+                _other                  -> _ILIT(0)
+
+        _other -> _ILIT(0)
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> FastInt
@@ -141,6 +140,7 @@ realRegSqueeze cls rr
 			
 		RealRegPair{}		-> _ILIT(1)
 	 		 	 	
+        _other -> _ILIT(0)
  	
 -- | All the allocatable registers in the machine, 
 --	including register pairs.
@@ -283,7 +283,7 @@ regDotColor reg
  = case classOfRealReg reg of
  	RcInteger	-> text "blue"
 	RcFloat		-> text "red"
-	RcDouble	-> text "green"
+	_other          -> text "green"
 
 
 

@@ -312,6 +312,7 @@ data DynFlag
    | Opt_EmitExternalCore
    | Opt_SharedImplib
    | Opt_BuildingCabalPackage
+   | Opt_SSE2
 
 	-- temporary flags
    | Opt_RunCPS
@@ -1263,6 +1264,9 @@ dynamic_flags = [
   , Flag "monly-3-regs" (NoArg (upd (\s -> s{stolen_x86_regs = 3}) ))
          Supported
   , Flag "monly-4-regs" (NoArg (upd (\s -> s{stolen_x86_regs = 4}) ))
+         Supported
+
+  , Flag "msse2" (NoArg (setDynFlag Opt_SSE2))
          Supported
 
      ------ Warning opts -------------------------------------------------

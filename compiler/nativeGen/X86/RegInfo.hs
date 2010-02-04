@@ -23,12 +23,11 @@ import X86.Regs
 
 mkVirtualReg :: Unique -> Size -> VirtualReg
 mkVirtualReg u size
-   | not (isFloatSize size) = VirtualRegI u
-   | otherwise
    = case size of
-        FF32	-> VirtualRegD u
-        FF64	-> VirtualRegD u
-	_	-> panic "mkVirtualReg"
+        FF32	-> VirtualRegSSE u
+        FF64	-> VirtualRegSSE u
+        FF80	-> VirtualRegD   u
+        _other  -> VirtualRegI   u
 
 
 -- reg colors for x86
@@ -44,15 +43,8 @@ regColors
  $  	[ (eax,	"#00ff00")
 	, (ebx,	"#0000ff")
 	, (ecx,	"#00ffff")
-	, (edx,	"#0080ff")
-
-	, (fake0, "#ff00ff")
-	, (fake1, "#ff00aa")
-	, (fake2, "#aa00ff")
-	, (fake3, "#aa00aa")
-	, (fake4, "#ff0055")
-	, (fake5, "#5500ff") ]
-
+	, (edx,	"#0080ff") ]
+        ++ fpRegColors
 
 -- reg colors for x86_64
 #elif x86_64_TARGET_ARCH
@@ -76,9 +68,19 @@ regColors
 	, (r13, "#004080")
 	, (r14, "#004040")
 	, (r15, "#002080") ]
-
-	++ zip (map regSingle [16..31]) (repeat "red")
+	++ fpRegColors
 #else
 regDotColor :: Reg -> SDoc
 regDotColor	= panic "not defined"
 #endif
+
+fpRegColors :: [(Reg,String)]
+fpRegColors =
+        [ (fake0, "#ff00ff")
+	, (fake1, "#ff00aa")
+	, (fake2, "#aa00ff")
+	, (fake3, "#aa00aa")
+	, (fake4, "#ff0055")
+	, (fake5, "#5500ff") ]
+
+	++ zip (map regSingle [24..39]) (repeat "red")

@@ -171,6 +171,7 @@ pprReg r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
       RegVirtual (VirtualRegF  u)  -> text "%vF_" <> asmSDoc (pprUnique u)
       RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> asmSDoc (pprUnique u)
   where
 #if darwin_TARGET_OS
     ppr_reg_no :: Int -> Doc

@@ -156,6 +156,7 @@ pprReg reg
 		VirtualRegHi u	-> text "%vHi_" <> asmSDoc (pprUnique u)
 		VirtualRegF  u	-> text "%vF_"  <> asmSDoc (pprUnique u)
 		VirtualRegD  u	-> text "%vD_"  <> asmSDoc (pprUnique u)
+                VirtualRegSSE u -> text "%vSSE_" <> asmSDoc (pprUnique u)
 
 	RegReal rr
 	 -> case rr of

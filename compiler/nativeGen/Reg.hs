@@ -55,6 +55,7 @@ data VirtualReg
 	| VirtualRegHi {-# UNPACK #-} !Unique  -- High part of 2-word register
 	| VirtualRegF  {-# UNPACK #-} !Unique
 	| VirtualRegD  {-# UNPACK #-} !Unique
+	| VirtualRegSSE {-# UNPACK #-} !Unique
 	deriving (Eq, Show, Ord)
 
 instance Uniquable VirtualReg where
@@ -64,6 +65,7 @@ instance Uniquable VirtualReg where
 		VirtualRegHi u	-> u
 		VirtualRegF u	-> u
 		VirtualRegD u	-> u
+		VirtualRegSSE u	-> u
 
 instance Outputable VirtualReg where
 	ppr reg
@@ -72,6 +74,7 @@ instance Outputable VirtualReg where
 		VirtualRegHi u  -> text "%vHi_" <> pprUnique u
 		VirtualRegF  u  -> text "%vF_" 	<> pprUnique u
 		VirtualRegD  u  -> text "%vD_" 	<> pprUnique u
+		VirtualRegSSE u -> text "%vSSE_" <> pprUnique u
 
 
 renameVirtualReg :: Unique -> VirtualReg -> VirtualReg
@@ -81,6 +84,7 @@ renameVirtualReg u r
 	VirtualRegHi _	-> VirtualRegHi u
 	VirtualRegF _	-> VirtualRegF  u
 	VirtualRegD _	-> VirtualRegD  u
+	VirtualRegSSE _	-> VirtualRegSSE u
 
 
 classOfVirtualReg :: VirtualReg -> RegClass
@@ -90,6 +94,7 @@ classOfVirtualReg vr
 	VirtualRegHi{}	-> RcInteger
 	VirtualRegF{}	-> RcFloat
 	VirtualRegD{}	-> RcDouble
+	VirtualRegSSE{}	-> RcDoubleSSE
 
 
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform

@@ -380,25 +380,13 @@ seqNode node
 	`seq` (seqVirtualRegList (uniqSetToList (Color.nodeCoalesce node)))
 
 seqVirtualReg :: VirtualReg -> ()
-seqVirtualReg reg
- = case reg of
-	VirtualRegI _	-> ()
-	VirtualRegHi _	-> ()
-	VirtualRegF _	-> ()
-	VirtualRegD _	-> ()
+seqVirtualReg reg = reg `seq` ()
 
 seqRealReg :: RealReg -> ()
-seqRealReg reg
- = case reg of
- 	RealRegSingle _ -> ()
-	RealRegPair _ _	-> ()
+seqRealReg reg = reg `seq` ()
 
 seqRegClass :: RegClass -> ()
-seqRegClass c
- = case c of
- 	RcInteger	-> ()
-	RcFloat		-> ()
-	RcDouble	-> ()
+seqRegClass c = c `seq` ()
 
 seqMaybeRealReg :: Maybe RealReg -> ()
 seqMaybeRealReg mr

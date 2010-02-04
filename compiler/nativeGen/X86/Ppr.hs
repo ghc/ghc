@@ -181,6 +181,7 @@ pprReg s r
       RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
       RegVirtual (VirtualRegF  u)  -> text "%vF_" <> asmSDoc (pprUnique u)
       RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> asmSDoc (pprUnique u)
   where
 #if i386_TARGET_ARCH
     ppr_reg_no :: Size -> Int -> Doc
@@ -210,10 +211,7 @@ pprReg s r
 	 2 -> sLit "%ecx";    3 -> sLit "%edx";
 	 4 -> sLit "%esi";    5 -> sLit "%edi";
 	 6 -> sLit "%ebp";    7 -> sLit "%esp";
-	 8 -> sLit "%fake0";  9 -> sLit "%fake1";
-	10 -> sLit "%fake2"; 11 -> sLit "%fake3";
-	12 -> sLit "%fake4"; 13 -> sLit "%fake5";
-	_  -> sLit "very naughty I386 register"
+         _  -> ppr_reg_float i
       })
 #elif x86_64_TARGET_ARCH
     ppr_reg_no :: Size -> Int -> Doc
@@ -271,20 +269,26 @@ pprReg s r
 	10 -> sLit "%r10";    11 -> sLit "%r11";
 	12 -> sLit "%r12";    13 -> sLit "%r13";
 	14 -> sLit "%r14";    15 -> sLit "%r15";
-	16 -> sLit "%xmm0";   17 -> sLit "%xmm1";
-	18 -> sLit "%xmm2";   19 -> sLit "%xmm3";
-	20 -> sLit "%xmm4";   21 -> sLit "%xmm5";
-	22 -> sLit "%xmm6";   23 -> sLit "%xmm7";
-	24 -> sLit "%xmm8";   25 -> sLit "%xmm9";
-	26 -> sLit "%xmm10";  27 -> sLit "%xmm11";
-	28 -> sLit "%xmm12";  29 -> sLit "%xmm13";
-	30 -> sLit "%xmm14";  31 -> sLit "%xmm15";
-	_  -> sLit "very naughty x86_64 register"
+        _  -> ppr_reg_float i
       })
 #else
      ppr_reg_no _ = panic "X86.Ppr.ppr_reg_no: no match"
 #endif
 
+ppr_reg_float :: Int -> LitString
+ppr_reg_float i = case i of
+	16 -> sLit "%fake0";  17 -> sLit "%fake1"
+	18 -> sLit "%fake2";  19 -> sLit "%fake3"
+	20 -> sLit "%fake4";  21 -> sLit "%fake5"
+	24 -> sLit "%xmm0";   25 -> sLit "%xmm1"
+	26 -> sLit "%xmm2";   27 -> sLit "%xmm3"
+	28 -> sLit "%xmm4";   29 -> sLit "%xmm5"
+	30 -> sLit "%xmm6";   31 -> sLit "%xmm7"
+	32 -> sLit "%xmm8";   33 -> sLit "%xmm9"
+	34 -> sLit "%xmm10";  35 -> sLit "%xmm11"
+	36 -> sLit "%xmm12";  37 -> sLit "%xmm13"
+	38 -> sLit "%xmm14";  39 -> sLit "%xmm15"
+	_  -> sLit "very naughty x86 register"
 
 pprSize :: Size -> Doc
 pprSize x 
@@ -293,18 +297,18 @@ pprSize x
 		II16  -> sLit "w"
 		II32  -> sLit "l"
 		II64  -> sLit "q"
-#if i386_TARGET_ARCH
+		FF32  -> sLit "ss"	-- "scalar single-precision float" (SSE2)
+		FF64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
+		FF80  -> sLit "t"
+	        )
+
+pprSize_x87 :: Size -> Doc
+pprSize_x87 x
+  = ptext $ case x of
 		FF32  -> sLit "s"
 		FF64  -> sLit "l"
 		FF80  -> sLit "t"
-#elif x86_64_TARGET_ARCH
-		FF32  -> sLit "ss"	-- "scalar single-precision float" (SSE2)
-		FF64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
-                _     -> panic "X86.Ppr.pprSize: no match"
-#else
-		_     -> panic "X86.Ppr.pprSize: no match"
-#endif
-	        )
+                _     -> panic "X86.Ppr.pprSize_x87"
 
 pprCond :: Cond -> Doc
 pprCond c
@@ -636,12 +640,12 @@ pprInstr (MUL size op1 op2) = pprSizeOpOp (sLit "mul") size op1 op2
 
 pprInstr (FDIV size op1 op2) = pprSizeOpOp (sLit "div") size op1 op2
 
-pprInstr (CVTSS2SD from to)   = pprRegReg (sLit "cvtss2sd") from to
-pprInstr (CVTSD2SS from to)   = pprRegReg (sLit "cvtsd2ss") from to
-pprInstr (CVTTSS2SIQ from to) = pprOpReg  (sLit "cvttss2siq") from to
-pprInstr (CVTTSD2SIQ from to) = pprOpReg  (sLit "cvttsd2siq") from to
-pprInstr (CVTSI2SS from to)   = pprOpReg  (sLit "cvtsi2ssq") from to
-pprInstr (CVTSI2SD from to)   = pprOpReg  (sLit "cvtsi2sdq") from to
+pprInstr (CVTSS2SD from to)      = pprRegReg (sLit "cvtss2sd") from to
+pprInstr (CVTSD2SS from to)      = pprRegReg (sLit "cvtsd2ss") from to
+pprInstr (CVTTSS2SIQ sz from to) = pprSizeOpReg (sLit "cvttss2si") sz from to
+pprInstr (CVTTSD2SIQ sz from to) = pprSizeOpReg (sLit "cvttsd2si") sz from to
+pprInstr (CVTSI2SS sz from to)   = pprSizeOpReg (sLit "cvtsi2ss") sz from to
+pprInstr (CVTSI2SD sz from to)   = pprSizeOpReg (sLit "cvtsi2sd") sz from to
 
     -- FETCHGOT for PIC on ELF platforms
 pprInstr (FETCHGOT reg)
@@ -673,20 +677,24 @@ pprInstr g@(GMOV src dst)
    | otherwise 
    = pprG g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
 
--- GLD sz addr dst ==> FFREE %st(7) ; FLDsz addr ; FSTP (dst+1)
+-- GLD sz addr dst ==> FLDsz addr ; FSTP (dst+1)
 pprInstr g@(GLD sz addr dst)
- = pprG g (hcat [gtab, text "ffree %st(7) ; fld", pprSize sz, gsp, 
+ = pprG g (hcat [gtab, text "fld", pprSize_x87 sz, gsp, 
                  pprAddr addr, gsemi, gpop dst 1])
 
--- GST sz src addr ==> FFREE %st(7) ; FLD dst ; FSTPsz addr
+-- GST sz src addr ==> FLD dst ; FSTPsz addr
 pprInstr g@(GST sz src addr)
+ | src == fake0 && sz /= FF80 -- fstt instruction doesn't exist
+ = pprG g (hcat [gtab, 
+                 text "fst", pprSize_x87 sz, gsp, pprAddr addr])
+ | otherwise
  = pprG g (hcat [gtab, gpush src 0, gsemi, 
-                 text "fstp", pprSize sz, gsp, pprAddr addr])
+                 text "fstp", pprSize_x87 sz, gsp, pprAddr addr])
 
 pprInstr g@(GLDZ dst)
- = pprG g (hcat [gtab, text "ffree %st(7) ; fldz ; ", gpop dst 1])
+ = pprG g (hcat [gtab, text "fldz ; ", gpop dst 1])
 pprInstr g@(GLD1 dst)
- = pprG g (hcat [gtab, text "ffree %st(7) ; fld1 ; ", gpop dst 1])
+ = pprG g (hcat [gtab, text "fld1 ; ", gpop dst 1])
 
 pprInstr (GFTOI src dst) 
    = pprInstr (GDTOI src dst)
@@ -710,7 +718,7 @@ pprInstr (GITOF src dst)
 
 pprInstr g@(GITOD src dst) 
    = pprG g (hcat [gtab, text "pushl ", pprReg II32 src, 
-                   text " ; ffree %st(7); fildl (%esp) ; ",
+                   text " ; fildl (%esp) ; ",
                    gpop dst 1, text " ; addl $4,%esp"])
 
 {- Gruesome swamp follows.  If you're unfortunate enough to have ventured
@@ -868,7 +876,7 @@ pprInstr g@(GDIV _ src1 src2 dst)
 
 pprInstr GFREE 
    = vcat [ ptext (sLit "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
-            ptext (sLit "\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
+            ptext (sLit "\tffree %st(4) ;ffree %st(5)") 
           ]
 
 pprInstr _
@@ -927,15 +935,14 @@ gcoerceto _    = panic "X86.Ppr.gcoerceto: no match"
 
 gpush :: Reg -> RegNo -> Doc
 gpush reg offset
-   = hcat [text "ffree %st(7) ; fld ", greg reg offset]
-
+   = hcat [text "fld ", greg reg offset]
 
 gpop :: Reg -> RegNo -> Doc
 gpop reg offset
    = hcat [text "fstp ", greg reg offset]
 
 greg :: Reg -> RegNo -> Doc
-greg reg offset = text "%st(" <> int (gregno reg - 8+offset) <> char ')'
+greg reg offset = text "%st(" <> int (gregno reg - 16+offset) <> char ')'
 
 gsemi :: Doc
 gsemi = text " ; "
@@ -1072,11 +1079,11 @@ pprRegReg name reg1 reg2
     ]
 
 
-pprOpReg :: LitString -> Operand -> Reg -> Doc
-pprOpReg name op1 reg2
+pprSizeOpReg :: LitString -> Size -> Operand -> Reg -> Doc
+pprSizeOpReg name size op1 reg2
   = hcat [
-	pprMnemonic_ name,
-	pprOperand archWordSize op1,
+	pprMnemonic name size,
+	pprOperand size op1,
         comma,
         pprReg archWordSize reg2
     ]

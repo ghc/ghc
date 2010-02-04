@@ -50,24 +50,27 @@ import FastTypes
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(3))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(6))
 #define ALLOCATABLE_REGS_FLOAT   (_ILIT(0))
+#define ALLOCATABLE_REGS_SSE     (_ILIT(16))
 
 
 #elif x86_64_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(5))
-#define ALLOCATABLE_REGS_DOUBLE  (_ILIT(2))
+#define ALLOCATABLE_REGS_DOUBLE  (_ILIT(0))
 #define ALLOCATABLE_REGS_FLOAT   (_ILIT(0))
-
+#define ALLOCATABLE_REGS_SSE     (_ILIT(10))
 
 #elif powerpc_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(16))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(26))
 #define ALLOCATABLE_REGS_FLOAT   (_ILIT(0))
+#define ALLOCATABLE_REGS_SSE     (_ILIT(0))
 
 
 #elif sparc_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(14))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(11))
 #define ALLOCATABLE_REGS_FLOAT   (_ILIT(22))
+#define ALLOCATABLE_REGS_SSE     (_ILIT(0))
 
 
 #else
@@ -138,6 +141,17 @@ trivColorable virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
 				exclusions
 
 	= count3 <# ALLOCATABLE_REGS_DOUBLE
+
+trivColorable virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
+	| count2	<- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_SSE
+				(virtualRegSqueeze RcDoubleSSE)
+				conflicts
+				
+	, count3	<- accSqueeze  count2    ALLOCATABLE_REGS_SSE
+				(realRegSqueeze   RcDoubleSSE)
+				exclusions
+
+	= count3 <# ALLOCATABLE_REGS_SSE
 
 
 -- Specification Code ----------------------------------------------------------

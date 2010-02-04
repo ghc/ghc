@@ -87,25 +87,15 @@ virtualRegSqueeze cls vr
 	 -> case vr of
 	 	VirtualRegI{}		-> _ILIT(1)
 		VirtualRegHi{}		-> _ILIT(1)
-		VirtualRegD{}		-> _ILIT(0)
-		VirtualRegF{}		-> _ILIT(0)
-
-	-- We don't use floats on this arch, but we can't
-	--	return error because the return type is unboxed...
-	RcFloat
-	 -> case vr of
-	 	VirtualRegI{}		-> _ILIT(0)
-		VirtualRegHi{}		-> _ILIT(0)
-		VirtualRegD{}		-> _ILIT(0)
-		VirtualRegF{}		-> _ILIT(0)
+                _other                  -> _ILIT(0)
 
 	RcDouble
 	 -> case vr of
-	 	VirtualRegI{}		-> _ILIT(0)
-		VirtualRegHi{}		-> _ILIT(0)
 		VirtualRegD{}		-> _ILIT(1)
 		VirtualRegF{}		-> _ILIT(0)
+                _other                  -> _ILIT(0)
 
+        _other -> _ILIT(0)
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> FastInt
@@ -119,16 +109,6 @@ realRegSqueeze cls rr
 			
 		RealRegPair{}		-> _ILIT(0)
 
-	-- We don't use floats on this arch, but we can't
-	--	return error because the return type is unboxed...
-	RcFloat
-	 -> case rr of
-	 	RealRegSingle regNo
-			| regNo	< 32	-> _ILIT(0)
-			| otherwise	-> _ILIT(0)
-			
-		RealRegPair{}		-> _ILIT(0)
-
 	RcDouble
 	 -> case rr of
 	 	RealRegSingle regNo
@@ -136,6 +116,8 @@ realRegSqueeze cls rr
 			| otherwise	-> _ILIT(1)
 			
 		RealRegPair{}		-> _ILIT(0)
+
+        _other -> _ILIT(0)
 
 mkVirtualReg :: Unique -> Size -> VirtualReg
 mkVirtualReg u size
@@ -152,6 +134,7 @@ regDotColor reg
         RcInteger       -> Outputable.text "blue"
         RcFloat         -> Outputable.text "red"
         RcDouble        -> Outputable.text "green"
+        RcDoubleSSE     -> Outputable.text "yellow"
 
 
 -- immediates ------------------------------------------------------------------
