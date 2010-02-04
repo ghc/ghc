@@ -28,10 +28,6 @@ import Hugs.IOExts (unsafePerformIO, unsafeInterleaveIO)
 #endif
 
 #ifdef __NHC__
-import NHC.Internal (unsafePerformIO)
+import NHC.Internal (unsafePerformIO, unsafeInterleaveIO)
 #endif
 
-#if !__GLASGOW_HASKELL__ && !__HUGS__
-unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO f = return (unsafePerformIO f)
-#endif
