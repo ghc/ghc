@@ -105,7 +105,7 @@ realRegSqueeze cls rr
  	RcInteger
 	 -> case rr of
 	 	RealRegSingle regNo
-			| regNo	< 16	-> _ILIT(1)	-- first xmm reg is 16
+			| regNo	< firstfake -> _ILIT(1)	-- first fake reg is 16
 			| otherwise	-> _ILIT(0)
 			
 		RealRegPair{}		-> _ILIT(0)
@@ -113,14 +113,14 @@ realRegSqueeze cls rr
 	RcDouble
 	 -> case rr of
 	 	RealRegSingle regNo
-			| regNo >= 16 && regNo < 24 -> _ILIT(1)
+			| regNo >= firstfake && regNo < lastfake -> _ILIT(1)
 			| otherwise	-> _ILIT(0)
 			
 		RealRegPair{}		-> _ILIT(0)
 
         RcDoubleSSE
 	 -> case rr of
-	 	RealRegSingle regNo | regNo >= 24 -> _ILIT(1)
+	 	RealRegSingle regNo | regNo >= firstxmm -> _ILIT(1)
                 _otherwise                        -> _ILIT(0)
 
         _other -> _ILIT(0)
@@ -218,6 +218,27 @@ spRel _	= panic "X86.Regs.spRel: not defined for this architecture"
 
 #endif
 
+firstfake, lastfake :: RegNo
+firstfake = 16
+lastfake  = 21
+
+firstxmm, lastxmm :: RegNo
+firstxmm  = 24
+lastxmm   = 39
+
+lastint :: RegNo
+#if i386_TARGET_ARCH
+lastint = 7 -- not %r8..%r15
+#else
+lastint = 15
+#endif
+
+intregnos, fakeregnos, xmmregnos, floatregnos :: [RegNo]
+intregnos   = [0..lastint]
+fakeregnos  = [firstfake .. lastfake]
+xmmregnos   = [firstxmm  .. lastxmm]
+floatregnos = fakeregnos ++ xmmregnos;
+
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
@@ -228,12 +249,7 @@ argRegs _	= panic "MachRegs.argRegs(x86): should not be used!"
 
 -- | The complete set of machine registers.
 allMachRegNos :: [RegNo]
-#if i386_TARGET_ARCH
-allMachRegNos  = [0..7]  ++ floatregs -- not %r8..%r15
-#else
-allMachRegNos  = [0..15] ++ floatregs
-#endif
-  where floatregs = fakes ++ xmms; fakes = [16..21]; xmms = [24..39]
+allMachRegNos  = intregnos ++ floatregnos
 
 -- | Take the class of a register.
 {-# INLINE classOfRealReg      #-}
@@ -245,19 +261,19 @@ classOfRealReg :: RealReg -> RegClass
 classOfRealReg reg
  = case reg of
 	RealRegSingle i
-          | i < 16    -> RcInteger
-          | i < 24    -> RcDouble
-          | otherwise -> RcDoubleSSE
+          | i <= lastint  -> RcInteger
+          | i <= lastfake -> RcDouble
+          | otherwise     -> RcDoubleSSE
 
 	RealRegPair{}	-> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
 showReg :: RegNo -> String
 showReg n
-	| n >= 24	= "%xmm" ++ show (n-24)
-        | n >= 16       = "%fake" ++ show (n-16)
-	| n >= 8	= "%r" ++ show n
-	| otherwise	= regNames !! n
+	| n >= firstxmm	 = "%xmm" ++ show (n-firstxmm)
+        | n >= firstfake = "%fake" ++ show (n-firstfake)
+	| n >= 8	 = "%r" ++ show n
+	| otherwise	 = regNames !! n
 
 regNames :: [String]
 regNames 
@@ -610,13 +626,13 @@ allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
 #if   i386_TARGET_ARCH
 -- caller-saves registers
 callClobberedRegs
-  = map regSingle ([eax,ecx,edx]  ++ [16..39])
+  = map regSingle ([eax,ecx,edx]  ++ floatregnos)
 
 #elif x86_64_TARGET_ARCH
 -- all xmm regs are caller-saves
 -- caller-saves registers
 callClobberedRegs    
-  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ [16..39])
+  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos)
 
 #else
 callClobberedRegs
