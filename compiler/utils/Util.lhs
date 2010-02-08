@@ -88,7 +88,6 @@ import Data.List        hiding (group)
 import Control.Concurrent.MVar ( MVar, newMVar, newEmptyMVar )
 
 #ifdef DEBUG
-import qualified Data.List as List ( elem, notElem )
 import FastTypes
 #endif
 
