@@ -12,7 +12,7 @@ class (Monoid s, OutputCap s) => TermStr s
 
 class OutputCap f where
     outputCap :: ([Int] -> String) -> [Int] -> f
-    optputCap = error "urk"
+    outputCap = error "urk"
 
 instance OutputCap [Char] where
 instance (Enum p, OutputCap f) => OutputCap (p -> f) where
