@@ -726,9 +726,10 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		   else emptyFVs))
         }
   where
-    h98_style = case condecls of
-		     L _ (ConDecl { con_res = ResTyH98 }) : _  -> True
-		     _    		                       -> False
+    h98_style = case condecls of	 -- Note [Stupid theta]
+		     L _ (ConDecl { con_res = ResTyGADT {} }) : _  -> False
+		     _    		                           -> True
+               		     						  
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
 
     rn_derivs Nothing   = return (Nothing, emptyFVs)
@@ -823,6 +824,15 @@ badGadtStupidTheta _
   = vcat [ptext (sLit "No context is allowed on a GADT-style data declaration"),
 	  ptext (sLit "(You can put a context on each contructor, though.)")]
 \end{code}
+
+Note [Stupid theta]
+~~~~~~~~~~~~~~~~~~~
+Trac #3850 complains about a regression wrt 6.10 for 
+     data Show a => T a
+There is no reason not to allow the stupid theta if there are no data
+constructors.  It's still stupid, but does no harm, and I don't want
+to cause programs to break unnecessarily (notably HList).  So if there
+are no data constructors we allow h98_style = True
 
 
 %*********************************************************
