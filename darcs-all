@@ -213,7 +213,7 @@ sub darcsget {
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
-    if (! grep /(?:--complete|--partial)/, @_) {
+    if (! grep /(?:--complete|--partial|--lazy)/, @_) {
         warning("adding --partial, to override use --complete");
         $r_flags = [@_, "--partial"];
     }
