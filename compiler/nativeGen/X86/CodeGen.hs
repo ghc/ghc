@@ -1575,7 +1575,7 @@ genCCall target dest_regs args = do
 	      return (unitOL (CALL (Left fn_imm) []), conv)
 	   where fn_imm = ImmCLbl lbl
         CmmCallee expr conv
-           -> do { (dyn_c, dyn_r) <- get_op expr
+           -> do { (dyn_r, dyn_c) <- getSomeReg expr
                  ; ASSERT( isWord32 (cmmExprType expr) )
                    return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
 
@@ -1655,13 +1655,11 @@ genCCall target dest_regs args = do
 			     DELTA (delta-8)]
             )
 
-      | otherwise = do
-        (code, reg) <- get_op arg
+      | isFloatType arg_ty = do
+        (reg, code) <- getSomeReg arg
         delta <- getDeltaNat
-        let size = arg_size arg_ty	-- Byte size
         setDeltaNat (delta-size)
-        if (isFloatType arg_ty)
-           then return (code `appOL`
+        return (code `appOL`
                         toOL [SUB II32 (OpImm (ImmInt size)) (OpReg esp),
                               DELTA (delta-size),
                               let addr = AddrBaseIndex (EABaseReg esp) 
@@ -1674,18 +1672,18 @@ genCCall target dest_regs args = do
                                  else GST size reg addr
                              ]
                        )
-           else return (code `snocOL`
-                        PUSH II32 (OpReg reg) `snocOL`
-                        DELTA (delta-size)
-                       )
+
+      | otherwise = do
+        (operand, code) <- getOperand arg
+        delta <- getDeltaNat
+        setDeltaNat (delta-size)
+        return (code `snocOL`
+                PUSH II32 operand `snocOL`
+                DELTA (delta-size))
+
       where
          arg_ty = cmmExprType arg
-
-    ------------
-    get_op :: CmmExpr -> NatM (InstrBlock, Reg) -- code, reg
-    get_op op = do
-        (reg,code) <- getSomeReg op
-	return (code, reg)
+         size = arg_size arg_ty	-- Byte size
 
 #elif x86_64_TARGET_ARCH
 
