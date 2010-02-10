@@ -233,7 +233,11 @@ data TcGblEnv
         tcg_rn_imports :: [LImportDecl Name],
 		-- Keep the renamed imports regardless.  They are not 
 		-- voluminous and are needed if you want to report unused imports
+
         tcg_used_rdrnames :: TcRef (Set RdrName),
+		-- The set of used *imported* (not locally-defined) RdrNames
+		-- Used only to report unused import declarations
+
 	tcg_rn_decls :: Maybe (HsGroup Name),
           -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
           -- decls.

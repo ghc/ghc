@@ -1272,7 +1272,7 @@ calcSpecStrictness fn qvars pats
 
 Note [Specialise original body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The RhsInfo for a binding keeps the *oringal* body of the binding.  We
+The RhsInfo for a binding keeps the *original* body of the binding.  We
 must specialise that, *not* the result of applying specExpr to the RHS
 (which is also kept in RhsInfo). Otherwise we end up specialising a
 specialised RHS, and that can lead directly to exponential behaviour.
