@@ -115,10 +115,10 @@ tcLookupGlobal name
 
 		-- Should it have been in the local envt?
 	{ case nameModule_maybe name of
-		Nothing -> notFound name env -- Internal names can happen in GHCi
+		Nothing -> notFound name -- Internal names can happen in GHCi
 
 		Just mod | mod == tcg_mod env 	-- Names from this module 
-			 -> notFound name env -- should be in tcg_type_env
+			 -> notFound name -- should be in tcg_type_env
 			 | otherwise
 		         -> tcImportDecl name	-- Go find it in an interface
 	}}}}}
@@ -707,12 +707,14 @@ pprBinders :: [Name] -> SDoc
 pprBinders [bndr] = quotes (ppr bndr)
 pprBinders bndrs  = pprWithCommas ppr bndrs
 
-notFound :: Name -> TcGblEnv -> TcM TyThing
-notFound name env
-  = failWithTc (vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
+notFound :: Name -> TcM TyThing
+notFound name 
+  = do { (gbl,lcl) <- getEnvs
+       ; failWithTc (vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),
-                     ptext (sLit "tcg_type_env of environment:") <+> ppr (tcg_type_env env)]
-                    )
+                     ptext (sLit "tcg_type_env of environment:") <+> ppr (tcg_type_env gbl),
+                     ptext (sLit "tcl_env of environment:") <+> ppr (tcl_env lcl)]
+                    ) }
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a
 wrongThingErr expected thing name
