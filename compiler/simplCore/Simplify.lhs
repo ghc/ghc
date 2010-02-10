@@ -338,12 +338,12 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
         -- Simplify the RHS
         ; (body_env1, body1) <- simplExprF body_env body mkRhsStop
         -- ANF-ise a constructor or PAP rhs
-        ; (body_env2, body2) <- prepareRhs body_env1 bndr1 body1
+        ; (body_env2, body2) <- prepareRhs top_lvl body_env1 bndr1 body1
 
         ; (env', rhs')
             <-  if not (doFloatFromRhs top_lvl is_rec False body2 body_env2)
-                then                            -- No floating, just wrap up!
-                     do { rhs' <- mkLam env tvs' (wrapFloats body_env2 body2)
+                then                            -- No floating, revert to body1
+                     do { rhs' <- mkLam env tvs' (wrapFloats body_env1 body1)
                         ; return (env, rhs') }
 
                 else if null tvs then           -- Simple floating
@@ -374,17 +374,18 @@ simplNonRecX env bndr new_rhs
   = return env		-- 		 Here b is dead, and we avoid creating
   | otherwise		--		 the binding b = (a,b)
   = do  { (env', bndr') <- simplBinder env bndr
-        ; completeNonRecX env' (isStrictId bndr) bndr bndr' new_rhs }
+        ; completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
+		-- simplNonRecX is only used for NotTopLevel things
 
-completeNonRecX :: SimplEnv
+completeNonRecX :: TopLevelFlag -> SimplEnv
                 -> Bool
                 -> InId                 -- Old binder
                 -> OutId                -- New binder
                 -> OutExpr              -- Simplified RHS
                 -> SimplM SimplEnv
 
-completeNonRecX env is_strict old_bndr new_bndr new_rhs
-  = do  { (env1, rhs1) <- prepareRhs (zapFloats env) new_bndr new_rhs
+completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
+  = do  { (env1, rhs1) <- prepareRhs top_lvl (zapFloats env) new_bndr new_rhs
         ; (env2, rhs2) <-
                 if doFloatFromRhs NotTopLevel NonRecursive is_strict rhs1 env1
                 then do { tick LetFloatFromLet
@@ -435,19 +436,19 @@ Here we want to make e1,e2 trivial and get
 That's what the 'go' loop in prepareRhs does
 
 \begin{code}
-prepareRhs :: SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
+prepareRhs :: TopLevelFlag -> SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
-prepareRhs env id (Cast rhs co)    -- Note [Float coercions]
+prepareRhs top_lvl env id (Cast rhs co)    -- Note [Float coercions]
   | (ty1, _ty2) <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
   , not (isUnLiftedType ty1)            -- see Note [Float coercions (unlifted)]
-  = do  { (env', rhs') <- makeTrivialWithInfo env sanitised_info rhs
+  = do  { (env', rhs') <- makeTrivialWithInfo top_lvl env sanitised_info rhs
         ; return (env', Cast rhs' co) }
   where
     sanitised_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
                                    `setDemandInfo`     demandInfo info
     info = idInfo id
 
-prepareRhs env0 _ rhs0
+prepareRhs top_lvl env0 _ rhs0
   = do  { (_is_exp, env1, rhs1) <- go 0 env0 rhs0
         ; return (env1, rhs1) }
   where
@@ -460,7 +461,7 @@ prepareRhs env0 _ rhs0
     go n_val_args env (App fun arg)
         = do { (is_exp, env', fun') <- go (n_val_args+1) env fun
              ; case is_exp of
-                True -> do { (env'', arg') <- makeTrivial env' arg
+                True -> do { (env'', arg') <- makeTrivial top_lvl env' arg
                            ; return (True, env'', App fun' arg') }
                 False -> return (False, env, App fun arg) }
     go n_val_args env (Var fun)
@@ -527,22 +528,25 @@ These strange casts can happen as a result of case-of-case
 
 
 \begin{code}
-makeTrivial :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
+makeTrivial :: TopLevelFlag -> SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Binds the expression to a variable, if it's not trivial, returning the variable
-makeTrivial env expr = makeTrivialWithInfo env vanillaIdInfo expr
+makeTrivial top_lvl env expr = makeTrivialWithInfo top_lvl env vanillaIdInfo expr
 
-makeTrivialWithInfo :: SimplEnv -> IdInfo -> OutExpr -> SimplM (SimplEnv, OutExpr)
+makeTrivialWithInfo :: TopLevelFlag -> SimplEnv -> IdInfo 
+                    -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Propagate strictness and demand info to the new binder
 -- Note [Preserve strictness when floating coercions]
 -- Returned SimplEnv has same substitution as incoming one
-makeTrivialWithInfo env info expr
-  | exprIsTrivial expr
+makeTrivialWithInfo top_lvl env info expr
+  | exprIsTrivial expr 				-- Already trivial
+  || not (bindingOk top_lvl expr expr_ty)	-- Cannot trivialise
+						--   See Note [Cannot trivialise]
   = return (env, expr)
   | otherwise           -- See Note [Take care] below
   = do  { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq (fsLit "a")
-              var = mkLocalIdWithInfo name (exprType expr) info
-        ; env' <- completeNonRecX env False var var expr
+              var = mkLocalIdWithInfo name expr_ty info
+        ; env' <- completeNonRecX top_lvl env False var var expr
 	; expr' <- simplVar env' var
         ; return (env', expr') }
 	-- The simplVar is needed becase we're constructing a new binding
@@ -554,8 +558,38 @@ makeTrivialWithInfo env info expr
 	-- is what completeNonRecX will do
 	-- To put it another way, it's as if we'd simplified
 	--    let var = e in var
+  where
+    expr_ty = exprType expr
+
+bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
+-- True iff we can have a binding of this expression at this leve
+-- Precondition: the type is the type of the expression
+bindingOk top_lvl _ expr_ty
+  | isTopLevel top_lvl = not (isUnLiftedType expr_ty) 
+  | otherwise          = True
 \end{code}
 
+Note [Cannot trivialise]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Consider tih
+   f :: Int -> Addr#
+   
+   foo :: Bar
+   foo = Bar (f 3)
+
+Then we can't ANF-ise foo, even though we'd like to, because
+we can't make a top-level binding for the Addr# (f 3). And if
+so we don't want to turn it into
+   foo = let x = f 3 in Bar x
+because we'll just end up inlining x back, and that makes the
+simplifier loop.  Better not to ANF-ise it at all.
+
+A case in point is literal strings (a MachStr is not regarded as
+trivial):
+
+   foo = Ptr "blob"#
+
+We don't want to ANF-ise this.
 
 %************************************************************************
 %*                                                                      *
@@ -1900,7 +1934,7 @@ mkDupableCont env cont@(StrictBind {})
 mkDupableCont env (StrictArg info cci cont)
         -- See Note [Duplicating StrictArg]
   = do { (env', dup, nodup) <- mkDupableCont env cont
-       ; (env'', args')     <- mapAccumLM makeTrivial env' (ai_args info)
+       ; (env'', args')     <- mapAccumLM (makeTrivial NotTopLevel) env' (ai_args info)
        ; return (env'', StrictArg (info { ai_args = args' }) cci dup, nodup) }
 
 mkDupableCont env (ApplyTo _ arg se cont)
@@ -1910,7 +1944,7 @@ mkDupableCont env (ApplyTo _ arg se cont)
         --              in [...hole...] a
     do  { (env', dup_cont, nodup_cont) <- mkDupableCont env cont
         ; arg' <- simplExpr (se `setInScope` env') arg
-        ; (env'', arg'') <- makeTrivial env' arg'
+        ; (env'', arg'') <- makeTrivial NotTopLevel env' arg'
         ; let app_cont = ApplyTo OkToDup arg'' (zapSubstEnv env'') dup_cont
         ; return (env'', app_cont, nodup_cont) }
 
