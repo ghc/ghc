@@ -307,7 +307,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   \$ @varid / { ifExtension thEnabled }	{ skip_one_varid ITidEscape }
   "$("	    / { ifExtension thEnabled }	{ token ITparenEscape }
 
-  "[$" @varid "|"  / { ifExtension qqEnabled }
+  "[" @varid "|"  / { ifExtension qqEnabled }
                      { lex_quasiquote_tok }
 }
 
@@ -1412,8 +1412,9 @@ getCharOrFail i =  do
 
 lex_quasiquote_tok :: Action
 lex_quasiquote_tok span buf len = do
-  let quoter = reverse $ takeWhile (/= '$')
-               $ reverse $ lexemeToString buf (len - 1)
+  let quoter = tail (lexemeToString buf (len - 1))
+		-- 'tail' drops the initial '[', 
+		-- while the -1 drops the trailing '|'
   quoteStart <- getSrcLoc              
   quote <- lex_quasiquote ""
   end <- getSrcLoc 
