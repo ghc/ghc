@@ -2,4 +2,4 @@
 module Main where
 
 main :: IO ()
-main = print $ \parse -> [$parse||]
+main = print $ \parse -> [parse||]

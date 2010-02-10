@@ -5,5 +5,5 @@ parse = undefined
 
 main :: IO ()
 main = case () of
-         [$parse||] -> return ()
+         [parse||] -> return ()
          _ -> return ()

@@ -74,7 +74,7 @@ parseExpr (Loc {loc_filename = file, loc_start = (line,col)}) s =
             eof
             return e
 
-expr = QuasiQuoter parseExprExp parseExprPat
+expr = QuasiQuoter { quoteExp = parseExprExp, quotePat = parseExprPat }
 
 parseExprExp :: String -> Q Exp
 parseExprExp s =  do  loc <- location
