@@ -8,8 +8,10 @@ import Data.Data
 import Language.Haskell.TH.Lib
 import Language.Haskell.TH.Syntax
 
-data QuasiQuoter = QuasiQuoter { quoteExp :: String -> Q Exp,
-                                 quotePat :: String -> Q Pat }
+data QuasiQuoter = QuasiQuoter { quoteExp  :: String -> Q Exp,
+                                 quotePat  :: String -> Q Pat,
+                                 quoteType :: String -> Q Type,
+                                 quoteDec  :: String -> Q [Dec] }
 
 dataToQa  ::  forall a k q. Data a
           =>  (Name -> k)

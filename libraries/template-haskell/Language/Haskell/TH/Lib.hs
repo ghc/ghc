@@ -18,6 +18,7 @@ type PatQ           = Q Pat
 type FieldPatQ      = Q FieldPat
 type ExpQ           = Q Exp
 type DecQ           = Q Dec
+type DecsQ          = Q [Dec]
 type ConQ           = Q Con
 type TypeQ          = Q Type
 type CxtQ           = Q Cxt
