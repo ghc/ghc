@@ -147,7 +147,7 @@ ppClass x = out x{tcdSigs=[]} :
         context = reL $ HsClassP (unL $ tcdLName x)
             (map (reL . HsTyVar . tyVar . unL) (tcdTyVars x))
 
-        tyVar (UserTyVar v) = v
+        tyVar (UserTyVar v _) = v
         tyVar (KindedTyVar v _) = v
 
 
@@ -191,7 +191,7 @@ ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
         name = out $ unL $ con_name con
 
         resType = case con_res con of
-            ResTyH98 -> apps $ map (reL . HsTyVar) $ unL (tcdLName dat) : [x | UserTyVar x <- map unL $ tcdTyVars dat]
+            ResTyH98 -> apps $ map (reL . HsTyVar) $ unL (tcdLName dat) : [x | UserTyVar x _ <- map unL $ tcdTyVars dat]
             ResTyGADT x -> x
 
 

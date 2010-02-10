@@ -226,7 +226,7 @@ synifyTyVars = map synifyTyVar
       kind = tyVarKind tv
       name = getName tv
      in if isLiftedTypeKind kind
-        then UserTyVar name
+        then UserTyVar name placeHolderKind
         else KindedTyVar name kind
 
 --states of what to do with foralls:
