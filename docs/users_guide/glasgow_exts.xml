@@ -6249,25 +6249,29 @@ Wiki page</ulink>.
 		    <listitem><para> a list of top-level declarations; the spliced expression 
                     must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
+            Note that pattern splices are not supported.
 	    Inside a splice you can can only call functions defined in imported modules,
-	not functions defined elsewhere in the same module.</para></listitem>
+	    not functions defined elsewhere in the same module.</para></listitem>
 
 	      <listitem><para>
 		  A expression quotation is written in Oxford brackets, thus:
 		  <itemizedlist>
-		    <listitem><para> <literal>[| ... |]</literal>, where the "..." is an expression; 
+		    <listitem><para> <literal>[| ... |]</literal>, or <literal>[e| ... |]</literal>, 
+                             where the "..." is an expression; 
                              the quotation has type <literal>Q Exp</literal>.</para></listitem>
 		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;
                              the quotation has type <literal>Q [Dec]</literal>.</para></listitem>
 		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type;
-                             the quotation has type <literal>Q Typ</literal>.</para></listitem>
+                             the quotation has type <literal>Q Type</literal>.</para></listitem>
+		    <listitem><para> <literal>[p| ... |]</literal>, where the "..." is a pattern;
+                             the quotation has type <literal>Q Pat</literal>.</para></listitem>
 		  </itemizedlist></para></listitem>
 
 	      <listitem><para>
 		  A quasi-quotation can appear in either a pattern context or an
 		  expression context and is also written in Oxford brackets:
 		  <itemizedlist>
-		    <listitem><para> <literal>[$<replaceable>varid</replaceable>| ... |]</literal>,
+		    <listitem><para> <literal>[<replaceable>varid</replaceable>| ... |]</literal>,
                         where the "..." is an arbitrary string; a full description of the
 			quasi-quotation facility is given in <xref linkend="th-quasiquotation"/>.</para></listitem>
 		  </itemizedlist></para></listitem>
@@ -6473,19 +6477,67 @@ several examples are documented in
 Nice to be Quoted: Quasiquoting for Haskell</ulink>" (Proc Haskell Workshop
 2007). The example below shows how to write a quasiquoter for a simple
 expression language.</para>
-
 <para>
-In the example, the quasiquoter <literal>expr</literal> is bound to a value of
-type <literal>Language.Haskell.TH.Quote.QuasiQuoter</literal> which contains two
-functions for quoting expressions and patterns, respectively. The first argument
-to each quoter is the (arbitrary) string enclosed in the Oxford brackets. The
-context of the quasi-quotation statement determines which of the two parsers is
-called: if the quasi-quotation occurs in an expression context, the expression
-parser is called, and if it occurs in a pattern context, the pattern parser is
-called.</para>
+Here are the salient features
+<itemizedlist>
+<listitem><para>
+A quasi-quote has the form
+<literal>[<replaceable>quoter</replaceable>| <replaceable>string</replaceable> |]</literal>.
+<itemizedlist>
+<listitem><para>
+The <replaceable>quoter</replaceable> must be the (unqualified) name of an imported 
+quoter; it cannot be an arbitrary expression.  
+</para></listitem>
+<listitem><para>
+The <replaceable>quoter</replaceable> cannot be "<literal>e</literal>", 
+"<literal>t</literal>", "<literal>d</literal>", or "<literal>p</literal>", since
+those overlap with Template Haskell quotations.
+</para></listitem>
+<listitem><para>
+There must be no spaces in the token
+<literal>[<replaceable>quoter</replaceable>|</literal>.
+</para></listitem>
+<listitem><para>
+The quoted <replaceable>string</replaceable> 
+can be arbitrary, and may contain newlines.
+</para></listitem>
+</itemizedlist>
+</para></listitem>
 
+<listitem><para>
+A quasiquote may appear in place of
+<itemizedlist>
+<listitem><para>An expression</para></listitem>
+<listitem><para>A pattern</para></listitem>
+<listitem><para>A type</para></listitem>
+<listitem><para>A top-level declaration</para></listitem>
+</itemizedlist>
+(Only the first two are described in the paper.)
+</para></listitem>
+
+<listitem><para>
+A quoter is a value of type <literal>Language.Haskell.TH.Quote.QuasiQuoter</literal>, 
+which is defined thus:
+<programlisting>
+data QuasiQuoter = QuasiQuoter { quoteExp  :: String -> Q Exp,
+                                 quotePat  :: String -> Q Pat,
+                                 quoteType :: String -> Q Type,
+                                 quoteDec  :: String -> Q [Dec] }
+</programlisting>
+That is, a quoter is a tuple of four parsers, one for each of the contexts
+in which a quasi-quote can occur.
+</para></listitem>
+<listitem><para>
+A quasi-quote is expanded by applying the appropriate parser to the string
+enclosed by the Oxford brackets.  The context of the quasi-quote (expression, pattern,
+type, declaration) determines which of the parsers is called.
+</para></listitem>
+</itemizedlist>
+</para>
 <para>
-Note that in the example we make use of an antiquoted
+The example below shows quasi-quotation in action.  The quoter <literal>expr</literal>
+is bound to a value of type <literal>QuasiQuoter</literal> defined in module <literal>Expr</literal>.
+The example makes use of an antiquoted
 variable <literal>n</literal>, indicated by the syntax <literal>'int:n</literal>
 (this syntax for anti-quotation was defined by the parser's
 author, <emphasis>not</emphasis> by GHC). This binds <literal>n</literal> to the
@@ -6497,12 +6549,6 @@ an expression parser that returns a value of type <literal>Q Exp</literal> and a
 pattern parser that returns a value of type <literal>Q Pat</literal>.
 </para>
 
-<para>In general, a quasi-quote has the form
-<literal>[$<replaceable>quoter</replaceable>| <replaceable>string</replaceable> |]</literal>.
-The <replaceable>quoter</replaceable> must be the name of an imported quoter; it
-cannot be an arbitrary expression.  The quoted <replaceable>string</replaceable> 
-can be arbitrary, and may contain newlines.
-</para>
 <para>
 Quasiquoters must obey the same stage restrictions as Template Haskell, e.g., in
 the example, <literal>expr</literal> cannot be defined
@@ -6510,22 +6556,21 @@ in <literal>Main.hs</literal> where it is used, but must be imported.
 </para>
 
 <programlisting>
-
-{- Main.hs -}
+{- ------------- file Main.hs --------------- -}
 module Main where
 
 import Expr
 
 main :: IO ()
-main = do { print $ eval [$expr|1 + 2|]
+main = do { print $ eval [expr|1 + 2|]
           ; case IntExpr 1 of
-              { [$expr|'int:n|] -> print n
+              { [expr|'int:n|] -> print n
               ;  _              -> return ()
               }
           }
 
 
-{- Expr.hs -}
+{- ------------- file Expr.hs --------------- -}
 module Expr where
 
 import qualified Language.Haskell.TH as TH
@@ -6552,7 +6597,7 @@ eval (BinopExpr op x y) = (opToFun op) (eval x) (eval y)
     opToFun MulOp = (*)
     opToFun DivOp = div
 
-expr = QuasiQuoter parseExprExp parseExprPat
+expr = QuasiQuoter { quoteExp = parseExprExp, quotePat =  parseExprPat }
 
 -- Parse an Expr, returning its representation as
 -- either a Q Exp or a Q Pat. See the referenced paper
@@ -6568,19 +6613,18 @@ parseExprPat ...
 </programlisting>
 
 <para>Now run the compiler:
-</para>
 <programlisting>
 $ ghc --make -XQuasiQuotes Main.hs -o main
 </programlisting>
+</para>
 
-<para>Run "main" and here is your output:</para>
-
+<para>Run "main" and here is your output:
 <programlisting>
 $ ./main
 3
 1
 </programlisting>
-
+</para>
 </sect2>
 
 </sect1>
