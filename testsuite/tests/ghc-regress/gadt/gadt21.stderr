@@ -7,4 +7,4 @@ gadt21.hs:21:60:
     In the first argument of `Just', namely `(f e)'
     In the expression: Just (f e)
     In the definition of `withOrdDynExpr':
-        withOrdDynExpr (DynExpr (e@(Const (TypeSet _) _))) f = Just (f e)
+        withOrdDynExpr (DynExpr e@(Const (TypeSet _) _)) f = Just (f e)
