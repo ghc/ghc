@@ -1598,7 +1598,8 @@ genAuxBind loc (GenCon2Tag tycon)
     get_tag_rhs = L loc $ ExprWithTySig 
 			(nlHsLam (mkSimpleHsAlt (nlVarPat a_RDR) 
 					      (nlHsApp (nlHsVar getTag_RDR) a_Expr)))
-			(noLoc (mkExplicitHsForAllTy (map (noLoc.UserTyVar) tvs) (noLoc []) con2tag_ty))
+			(noLoc (mkExplicitHsForAllTy (userHsTyVarBndrs (map noLoc tvs)) 
+                                                     (noLoc []) con2tag_ty))
 
     con2tag_ty = nlHsTyConApp (getRdrName tycon) (map nlHsTyVar tvs)
 		`nlHsFunTy` 

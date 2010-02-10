@@ -1014,11 +1014,9 @@ atype :: { LHsType RdrName }
 	| '(' ctype ')'		        { LL $ HsParTy   $2 }
 	| '(' ctype '::' kind ')'	{ LL $ HsKindSig $2 (unLoc $4) }
 	| quasiquote       	        { L1 (HsQuasiQuoteTy (unLoc $1)) }
-	| '$(' exp ')'	      		{ LL $ HsSpliceTy (mkHsSplice $2 ) }
-	| TH_ID_SPLICE	      		{ LL $ HsSpliceTy (mkHsSplice 
-					         (L1 $ HsVar (mkUnqual varName 
-							        (getTH_ID_SPLICE $1)))) } -- $x
-
+	| '$(' exp ')'	      		{ LL $ mkHsSpliceTy $2 }
+	| TH_ID_SPLICE	      		{ LL $ mkHsSpliceTy $ L1 $ HsVar $ 
+					  mkUnqual varName (getTH_ID_SPLICE $1) }
 -- Generics
         | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
 
@@ -1046,7 +1044,7 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
 	 | {- empty -}			{ [] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
-	: tyvar				{ L1 (UserTyVar (unLoc $1)) }
+	: tyvar				{ L1 (UserTyVar (unLoc $1) placeHolderKind) }
 	| '(' tyvar '::' kind ')'	{ LL (KindedTyVar (unLoc $2) 
 							  (unLoc $4)) }
 
@@ -1364,8 +1362,8 @@ aexp2	:: { LHsExpr RdrName }
 	-- Template Haskell Extension
 	| TH_ID_SPLICE          { L1 $ HsSpliceE (mkHsSplice 
 					(L1 $ HsVar (mkUnqual varName 
-							(getTH_ID_SPLICE $1)))) } -- $x
-	| '$(' exp ')'   	{ LL $ HsSpliceE (mkHsSplice $2) }               -- $( exp )
+							(getTH_ID_SPLICE $1)))) } 
+	| '$(' exp ')'   	{ LL $ HsSpliceE (mkHsSplice $2) }               
 
 
 	| TH_VAR_QUOTE qvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }

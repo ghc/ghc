@@ -185,9 +185,9 @@ rnHsType doc (HsPredTy pred) = do
     pred' <- rnPred doc pred
     return (HsPredTy pred')
 
-rnHsType _ (HsSpliceTy sp)
-  = do { (sp', _fvs) <- rnSplice sp	-- ToDo: deal with fvs
-       ; return (HsSpliceTy sp') }
+rnHsType _ (HsSpliceTy sp _ k)
+  = do { (sp', fvs) <- rnSplice sp	-- ToDo: deal with fvs
+       ; return (HsSpliceTy sp' fvs k) }
 
 rnHsType doc (HsDocTy ty haddock_doc) = do
     ty' <- rnLHsType doc ty
@@ -200,7 +200,6 @@ rnHsType _ ty@(HsQuasiQuoteTy _) = pprPanic "Can't do quasiquotation without GHC
 rnHsType doc (HsQuasiQuoteTy qq) = do { ty <- runQuasiQuoteType qq
                                       ; rnHsType doc (unLoc ty) }
 #endif
-rnHsType _ (HsSpliceTyOut {}) = panic "rnHsType"
 
 rnLHsTypes :: SDoc -> [LHsType RdrName]
            -> IOEnv (Env TcGblEnv TcLclEnv) [LHsType Name]
@@ -209,7 +208,7 @@ rnLHsTypes doc tys = mapM (rnLHsType doc) tys
 
 
 \begin{code}
-rnForAll :: SDoc -> HsExplicitForAll -> [LHsTyVarBndr RdrName]
+rnForAll :: SDoc -> HsExplicitFlag -> [LHsTyVarBndr RdrName]
 	 -> LHsContext RdrName -> LHsType RdrName -> RnM (HsType Name)
 
 rnForAll doc _ [] (L _ []) (L _ ty) = rnHsType doc ty

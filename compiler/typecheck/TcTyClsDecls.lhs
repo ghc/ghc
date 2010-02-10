@@ -481,7 +481,7 @@ getInitialKind decl
 	; res_kind  <- mk_res_kind decl
 	; return (tcdName decl, mkArrowKinds arg_kinds res_kind) }
   where
-    mk_arg_kind (UserTyVar _)        = newKindVar
+    mk_arg_kind (UserTyVar _ _)      = newKindVar
     mk_arg_kind (KindedTyVar _ kind) = return kind
 
     mk_res_kind (TyFamily { tcdKind    = Just kind }) = return kind
@@ -513,17 +513,13 @@ kcSynDecl (AcyclicSCC (L loc decl))
 			<+> brackets (ppr k_tvs))
        ; (k_rhs, rhs_kind) <- kcLHsType (tcdSynRhs decl)
        ; traceTc (text "kcd2" <+> ppr (unLoc (tcdLName decl)))
-       ; let tc_kind = foldr (mkArrowKind . kindedTyVarKind) rhs_kind k_tvs
+       ; let tc_kind = foldr (mkArrowKind . hsTyVarKind . unLoc) rhs_kind k_tvs
        ; return (L loc (decl { tcdTyVars = k_tvs, tcdSynRhs = k_rhs }),
 		 (unLoc (tcdLName decl), tc_kind)) })
 
 kcSynDecl (CyclicSCC decls)
   = do { recSynErr decls; failM }	-- Fail here to avoid error cascade
 					-- of out-of-scope tycons
-
-kindedTyVarKind :: LHsTyVarBndr Name -> Kind
-kindedTyVarKind (L _ (KindedTyVar _ k)) = k
-kindedTyVarKind x = pprPanic "kindedTyVarKind" (ppr x)
 
 ------------------------------------------------------------------------
 kcTyClDecl :: TyClDecl Name -> TcM (TyClDecl Name)
@@ -566,14 +562,16 @@ kcTyClDeclBody decl thing_inside
   = tcAddDeclCtxt decl		$
     do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
 	; let tc_kind	 = case tc_ty_thing of
-                           AThing k -> k
-                           _ -> pprPanic "kcTyClDeclBody" (ppr tc_ty_thing)
+                             AThing k -> k
+                             _ -> pprPanic "kcTyClDeclBody" (ppr tc_ty_thing)
 	      (kinds, _) = splitKindFunTys tc_kind
 	      hs_tvs 	 = tcdTyVars decl
 	      kinded_tvs = ASSERT( length kinds >= length hs_tvs )
-			   [ L loc (KindedTyVar (hsTyVarName tv) k)
-			   | (L loc tv, k) <- zip hs_tvs kinds]
-	; tcExtendKindEnvTvs kinded_tvs (thing_inside kinded_tvs) }
+			   zipWith add_kind hs_tvs kinds
+	; tcExtendKindEnvTvs kinded_tvs thing_inside }
+  where
+    add_kind (L loc (UserTyVar n _))   k = L loc (UserTyVar n k)
+    add_kind (L loc (KindedTyVar n _)) k = L loc (KindedTyVar n k)
 
 -- Kind check a data declaration, assuming that we already extended the
 -- kind environment with the type variables of the left-hand side (these
@@ -633,11 +631,13 @@ kcFamilyDecl classTvs decl@(TyFamily {tcdKind = kind})
 		       -- default result kind is '*'
        }
   where
-    unifyClassParmKinds (L _ (KindedTyVar n k))
-      | Just classParmKind <- lookup n classTyKinds = unifyKind k classParmKind
-      | otherwise                                   = return ()
-    unifyClassParmKinds x = pprPanic "kcFamilyDecl/unifyClassParmKinds" (ppr x)
-    classTyKinds = [(n, k) | L _ (KindedTyVar n k) <- classTvs]
+    unifyClassParmKinds (L _ tv) 
+      | (n,k) <- hsTyVarNameKind tv
+      , Just classParmKind <- lookup n classTyKinds 
+      = unifyKind k classParmKind
+      | otherwise = return ()
+    classTyKinds = [hsTyVarNameKind tv | L _ tv <- classTvs]
+
 kcFamilyDecl _ (TySynonym {})              -- type family defaults
   = panic "TcTyClsDecls.kcFamilyDecl: not implemented yet"
 kcFamilyDecl _ d = pprPanic "kcFamilyDecl" (ppr d)

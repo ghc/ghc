@@ -9,7 +9,7 @@ HsTypes: Abstract syntax: user-defined types
 module HsTypes (
 	HsType(..), LHsType, 
 	HsTyVarBndr(..), LHsTyVarBndr,
-	HsExplicitForAll(..),
+	HsExplicitFlag(..),
 	HsContext, LHsContext,
 	HsPred(..), LHsPred,
 	HsQuasiQuote(..),
@@ -21,20 +21,21 @@ module HsTypes (
 	
 	mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
 	hsTyVarName, hsTyVarNames, replaceTyVarName,
+	hsTyVarKind, hsTyVarNameKind,
 	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
 	splitHsInstDeclTy, splitHsFunType,
 	
 	-- Type place holder
-	PostTcType, placeHolderType,
+	PostTcType, placeHolderType, PostTcKind, placeHolderKind,
 
 	-- Printing
-	pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
+	pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context,
     ) where
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
+import NameSet( FreeVars )
 import Type
-import Coercion
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -51,6 +52,7 @@ import FastString
 %************************************************************************
 
 \begin{code}
+type PostTcKind = Kind
 type PostTcType = Type		-- Used for slots in the abstract syntax
 				-- where we want to keep slot for a type
 				-- to be added by the type checker...but
@@ -58,6 +60,9 @@ type PostTcType = Type		-- Used for slots in the abstract syntax
 
 placeHolderType :: PostTcType	-- Used before typechecking
 placeHolderType  = panic "Evaluated the place holder for a PostTcType"
+
+placeHolderKind :: PostTcKind	-- Used before typechecking
+placeHolderKind  = panic "Evaluated the place holder for a PostTcKind"
 \end{code}
 
 %************************************************************************
@@ -134,7 +139,7 @@ data HsPred name = HsClassP name [LHsType name]		 -- class constraint
 type LHsType name = Located (HsType name)
 
 data HsType name
-  = HsForAllTy	HsExplicitForAll	-- Renamer leaves this flag unchanged, to record the way
+  = HsForAllTy	HsExplicitFlag   	-- Renamer leaves this flag unchanged, to record the way
 					-- the user wrote it originally, so that the printer can
 					-- print it as the user wrote it
 		[LHsTyVarBndr name]	-- With ImplicitForAll, this is the empty list
@@ -179,20 +184,18 @@ data HsType name
   | HsKindSig		(LHsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
 
-  | HsSpliceTy		(HsSplice name)
   | HsQuasiQuoteTy	(HsQuasiQuote name)
 
-  | HsDocTy             (LHsType name) LHsDocString -- A documented type
+  | HsSpliceTy		(HsSplice name) 
+                        FreeVars  	-- Variables free in the splice (filled in by renamer)
+			PostTcKind
 
-  | HsSpliceTyOut       Kind		-- Used just like KindedTyVar, just between 
-					--   kcHsType and dsHsType
+  | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
   | HsBangTy	HsBang (LHsType name)	-- Bang-style type annotations 
   | HsRecTy [ConDeclField name]	        -- Only in data type declarations
 
-data HsExplicitForAll = Explicit | Implicit
-
-
+data HsExplicitFlag = Explicit | Implicit
 
 data ConDeclField name	-- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_name :: Located name,
@@ -215,13 +218,13 @@ mkExplicitHsForAllTy :: [LHsTyVarBndr name] -> LHsContext name -> LHsType name -
 mkImplicitHsForAllTy     ctxt ty = mkHsForAllTy Implicit [] ctxt ty
 mkExplicitHsForAllTy tvs ctxt ty = mkHsForAllTy Explicit tvs ctxt ty
 
-mkHsForAllTy :: HsExplicitForAll -> [LHsTyVarBndr name] -> LHsContext name -> LHsType name -> HsType name
+mkHsForAllTy :: HsExplicitFlag -> [LHsTyVarBndr name] -> LHsContext name -> LHsType name -> HsType name
 -- Smart constructor for HsForAllTy
 mkHsForAllTy exp tvs (L _ []) ty = mk_forall_ty exp tvs ty
 mkHsForAllTy exp tvs ctxt ty = HsForAllTy exp tvs ctxt ty
 
 -- mk_forall_ty makes a pure for-all type (no context)
-mk_forall_ty :: HsExplicitForAll -> [LHsTyVarBndr name] -> LHsType name -> HsType name
+mk_forall_ty :: HsExplicitFlag -> [LHsTyVarBndr name] -> LHsType name -> HsType name
 mk_forall_ty exp  tvs  (L _ (HsParTy ty))		    = mk_forall_ty exp tvs ty
 mk_forall_ty exp1 tvs1 (L _ (HsForAllTy exp2 tvs2 ctxt ty)) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ tvs2) ctxt ty
 mk_forall_ty exp  tvs  ty			            = HsForAllTy exp tvs (L noSrcSpan []) ty
@@ -231,7 +234,7 @@ mk_forall_ty exp  tvs  ty			            = HsForAllTy exp tvs (L noSrcSpan []) ty
 	--	(see the sigtype production in Parser.y.pp)
 	-- 	so that (forall. ty) isn't implicitly quantified
 
-plus :: HsExplicitForAll -> HsExplicitForAll -> HsExplicitForAll
+plus :: HsExplicitFlag -> HsExplicitFlag -> HsExplicitFlag
 Implicit `plus` Implicit = Implicit
 _        `plus` _        = Explicit
 
@@ -244,15 +247,28 @@ hsExplicitTvs _                                   = []
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
 
 data HsTyVarBndr name
-  = UserTyVar name
-  | KindedTyVar name Kind
-	--  *** NOTA BENE *** A "monotype" in a pragma can have
-	-- for-alls in it, (mostly to do with dictionaries).  These
-	-- must be explicitly Kinded.
+  = UserTyVar		-- No explicit kinding
+         name 		-- See Note [Printing KindedTyVars]
+         PostTcKind
+
+  | KindedTyVar 
+         name 
+         Kind 
+      --  *** NOTA BENE *** A "monotype" in a pragma can have
+      -- for-alls in it, (mostly to do with dictionaries).  These
+      -- must be explicitly Kinded.
 
 hsTyVarName :: HsTyVarBndr name -> name
-hsTyVarName (UserTyVar n)     = n
+hsTyVarName (UserTyVar n _)   = n
 hsTyVarName (KindedTyVar n _) = n
+
+hsTyVarKind :: HsTyVarBndr name -> Kind
+hsTyVarKind (UserTyVar _ k)   = k
+hsTyVarKind (KindedTyVar _ k) = k
+
+hsTyVarNameKind :: HsTyVarBndr name -> (name, Kind)
+hsTyVarNameKind (UserTyVar n k)   = (n,k)
+hsTyVarNameKind (KindedTyVar n k) = (n,k)
 
 hsLTyVarName :: LHsTyVarBndr name -> name
 hsLTyVarName = hsTyVarName . unLoc
@@ -270,7 +286,7 @@ hsLTyVarLocNames :: [LHsTyVarBndr name] -> [Located name]
 hsLTyVarLocNames = map hsLTyVarLocName
 
 replaceTyVarName :: HsTyVarBndr name1 -> name2 -> HsTyVarBndr name2
-replaceTyVarName (UserTyVar _)     n' = UserTyVar n'
+replaceTyVarName (UserTyVar _ k)   n' = UserTyVar n' k
 replaceTyVarName (KindedTyVar _ k) n' = KindedTyVar n' k
 \end{code}
 
@@ -316,8 +332,8 @@ instance (OutputableBndr name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
 
 instance (Outputable name) => Outputable (HsTyVarBndr name) where
-    ppr (UserTyVar name)        = ppr name
-    ppr (KindedTyVar name kind) = pprHsTyVarBndr name kind
+    ppr (UserTyVar name _)      = ppr name
+    ppr (KindedTyVar name kind) = hsep [ppr name, dcolon, pprParendKind kind]
 
 instance OutputableBndr name => Outputable (HsPred name) where
     ppr (HsClassP clas tys) = ppr clas <+> hsep (map pprLHsType tys)
@@ -328,11 +344,7 @@ instance OutputableBndr name => Outputable (HsPred name) where
 pprLHsType :: OutputableBndr name => LHsType name -> SDoc
 pprLHsType = pprParendHsType . unLoc
 
-pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
-pprHsTyVarBndr name kind | isLiftedTypeKind kind = ppr name
-			 | otherwise 	  	 = hsep [ppr name, dcolon, pprParendKind kind]
-
-pprHsForAll :: OutputableBndr name => HsExplicitForAll -> [LHsTyVarBndr name] ->  LHsContext name -> SDoc
+pprHsForAll :: OutputableBndr name => HsExplicitFlag -> [LHsTyVarBndr name] ->  LHsContext name -> SDoc
 pprHsForAll exp tvs cxt 
   | show_forall = forall_part <+> pprHsContext (unLoc cxt)
   | otherwise   = pprHsContext (unLoc cxt)
@@ -357,6 +369,17 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
 			    cd_fld_doc = doc })
   	= ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
 \end{code}
+
+Note [Printing KindedTyVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trac #3830 reminded me that we should really only print the kind
+signature on a KindedTyVar if the kind signature was put there by the
+programmer.  During kind inference GHC now adds a PostTcKind to UserTyVars,
+rather than converting to KindedTyVars as before.
+
+(As it happens, the message in #3830 comes out a different way now,
+and the problem doesn't show up; but having the flag on a KindedTyVar
+seems like the Right Thing anyway.)
 
 \begin{code}
 pREC_TOP, pREC_FUN, pREC_OP, pREC_CON :: Int
@@ -408,8 +431,7 @@ ppr_mono_ty _    (HsListTy ty)	     = brackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPredTy pred)     = ppr pred
 ppr_mono_ty _    (HsNumTy n)         = integer n  -- generics only
-ppr_mono_ty _    (HsSpliceTy s)      = pprSplice s
-ppr_mono_ty _    (HsSpliceTyOut k)   = text "<splicety>" <> dcolon <> ppr k
+ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $

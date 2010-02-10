@@ -68,9 +68,8 @@ extractHsTyNames ty
     get (HsRecTy flds)         = extractHsTyNames_s (map cd_fld_type flds)
     get (HsNumTy _)            = emptyNameSet
     get (HsTyVar tv)           = unitNameSet tv
-    get (HsSpliceTy {})        = emptyNameSet   -- Type splices mention no type variables
-    get (HsSpliceTyOut {})     = emptyNameSet   -- Ditto
-    get (HsQuasiQuoteTy {})    = emptyNameSet   -- Ditto
+    get (HsSpliceTy _ fvs _)   = fvs
+    get (HsQuasiQuoteTy {})    = emptyNameSet
     get (HsKindSig ty _)       = getl ty
     get (HsForAllTy _ tvs
                     ctxt ty)   = (extractHsCtxtTyNames ctxt

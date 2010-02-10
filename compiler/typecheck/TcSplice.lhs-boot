@@ -3,6 +3,7 @@ module TcSplice where
 import HsSyn	( HsSplice, HsBracket, HsQuasiQuote,
                   HsExpr, HsType, LHsType, LHsExpr, LPat, LHsDecl )
 import Name	( Name )
+import NameSet	( FreeVars )
 import RdrName	( RdrName )
 import TcRnTypes( TcM, TcId )
 import TcType	( BoxyRhoType, TcKind )
@@ -13,7 +14,7 @@ tcSpliceExpr :: HsSplice Name
 	     -> BoxyRhoType
 	     -> TcM (HsExpr TcId)
 
-kcSpliceType :: HsSplice Name
+kcSpliceType :: HsSplice Name -> FreeVars
 	     -> TcM (HsType Name, TcKind)
 
 tcBracket :: HsBracket Name 

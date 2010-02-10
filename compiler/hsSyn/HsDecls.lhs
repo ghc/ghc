@@ -698,7 +698,7 @@ data ConDecl name
         -- ^ Constructor name.  This is used for the DataCon itself, and for
         -- the user-callable wrapper Id.
 
-    , con_explicit  :: HsExplicitForAll
+    , con_explicit  :: HsExplicitFlag
         -- ^ Is there an user-written forall? (cf. 'HsTypes.HsForAllTy')
 
     , con_qvars     :: [LHsTyVarBndr name]

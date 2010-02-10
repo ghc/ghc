@@ -641,7 +641,7 @@ cvtTvs tvs = mapM cvt_tv tvs
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm) 
   = do { nm' <- tName nm
-       ; returnL $ UserTyVar nm' 
+       ; returnL $ UserTyVar nm' placeHolderKind
        }
 cvt_tv (TH.KindedTV nm ki) 
   = do { nm' <- tName nm

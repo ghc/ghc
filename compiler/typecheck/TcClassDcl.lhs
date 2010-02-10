@@ -528,7 +528,8 @@ mkGenericInstance clas (hs_ty, binds) = do
 	-- and wrap them as forall'd tyvars, so that kind inference
 	-- works in the standard way
     let
-	sig_tvs = map (noLoc.UserTyVar) (nameSetToList (extractHsTyVars (noLoc hs_ty)))
+	sig_tvs = userHsTyVarBndrs $ map noLoc $ nameSetToList $
+                  extractHsTyVars (noLoc hs_ty)
 	hs_forall_ty = noLoc $ mkExplicitHsForAllTy sig_tvs (noLoc []) (noLoc hs_ty)
 
 	-- Type-check the instance type, and check its form

@@ -46,6 +46,7 @@ import TcIface
 import TypeRep
 import Name
 import NameEnv
+import NameSet
 import PrelNames
 import HscTypes
 import OccName
@@ -284,7 +285,7 @@ The predicate we use is TcEnv.thTopLevelId.
 tcBracket     :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
-kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
+kcSpliceType  :: HsSplice Name -> FreeVars -> TcM (HsType Name, TcKind)
 	-- None of these functions add constraints to the LIE
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
@@ -300,7 +301,7 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 tcBracket     x _ = pprPanic "Cant do tcBracket without GHCi"     (ppr x)
 tcSpliceExpr  e   = pprPanic "Cant do tcSpliceExpr without GHCi"  (ppr e)
 tcSpliceDecls x   = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr x)
-kcSpliceType  x   = pprPanic "Cant do kcSpliceType without GHCi"  (ppr x)
+kcSpliceType  x fvs = pprPanic "Cant do kcSpliceType without GHCi"  (ppr x)
 
 lookupThName_maybe n = pprPanic "Cant do lookupThName_maybe without GHCi" (ppr n)
 
@@ -495,7 +496,7 @@ tcTopSpliceExpr tc_action
 Very like splicing an expression, but we don't yet share code.
 
 \begin{code}
-kcSpliceType (HsSplice name hs_expr)
+kcSpliceType splice@(HsSplice name hs_expr) fvs
   = setSrcSpan (getLoc hs_expr) $ do 	
     { stage <- getStage
     ; case stage of {
@@ -518,11 +519,8 @@ kcSpliceType (HsSplice name hs_expr)
     -- Here (h 4) :: Q Type
     -- but $(h 4) :: a 	i.e. any type, of any kind
 
-    -- We return a HsSpliceTyOut, which serves to convey the kind to 
-    -- the ensuing TcHsType.dsHsType, which makes up a non-committal
-    -- type variable of a suitable kind
     ; kind <- newKindVar
-    ; return (HsSpliceTyOut kind, kind)	
+    ; return (HsSpliceTy splice fvs kind, kind)	
     }}}
 
 kcTopSpliceType :: LHsExpr Name -> TcM (HsType Name, TcKind)

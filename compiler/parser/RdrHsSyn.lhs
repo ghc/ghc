@@ -128,7 +128,6 @@ extract_lty (L loc ty) acc
       HsNumTy _                 -> acc
       HsQuasiQuoteTy {}	        -> acc  -- Quasi quotes mention no type variables
       HsSpliceTy {}           	-> acc	-- Type splices mention no type variables
-      HsSpliceTyOut {}         	-> acc	-- Type splices mention no type variables
       HsKindSig ty _            -> extract_lty ty acc
       HsForAllTy _ [] cx ty     -> extract_lctxt cx (extract_lty ty acc)
       HsForAllTy _ tvs cx ty    -> acc ++ (filter ((`notElem` locals) . unLoc) $
@@ -503,8 +502,7 @@ checkTParams is_family tparams
   = do { tyvars <- checkTyVars tparams
        ; return (tyvars, Nothing) }
   | otherwise		 -- Family case (b)
-  = do { let tyvars = [L l (UserTyVar tv) 
-                      | L l tv <- extractHsTysRdrTyVars tparams]
+  = do { let tyvars = userHsTyVarBndrs (extractHsTysRdrTyVars tparams)
        ; return (tyvars, Just tparams) }
 
 checkTyVars :: [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
@@ -519,7 +517,7 @@ checkTyVars tparms = mapM chk tparms
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
 	| isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
-        | isRdrTyVar tv    = return (L l (UserTyVar tv))
+        | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
     chk (L l _)            =
 	  parseError l "Type found where type variable expected"
 

@@ -28,6 +28,7 @@ import Coercion
 import Type
 import DataCon
 import Name
+import NameSet
 import BasicTypes
 import SrcLoc
 import FastString
@@ -183,6 +184,9 @@ mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
 mkHsSplice e = HsSplice unqualSplice e
 
+mkHsSpliceTy :: LHsExpr RdrName -> HsType RdrName
+mkHsSpliceTy e = HsSpliceTy (mkHsSplice e) emptyFVs placeHolderKind
+
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 		-- A name (uniquified later) to
@@ -201,7 +205,7 @@ mkHsString s = HsString (mkFastString s)
 
 -------------
 userHsTyVarBndrs :: [Located name] -> [Located (HsTyVarBndr name)]
-userHsTyVarBndrs bndrs = [ L loc (UserTyVar v) | L loc v <- bndrs ]
+userHsTyVarBndrs bndrs = [ L loc (UserTyVar v placeHolderKind) | L loc v <- bndrs ]
 \end{code}
 
 

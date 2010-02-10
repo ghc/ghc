@@ -536,9 +536,10 @@ lookupTyVarBinds tvs m =
 --
 repTyVarBndrWithKind :: LHsTyVarBndr Name 
                      -> Core TH.Name -> DsM (Core TH.TyVarBndr)
-repTyVarBndrWithKind (L _ (UserTyVar _))      = repPlainTV
-repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) = 
-  \nm -> repKind ki >>= repKindedTV nm
+repTyVarBndrWithKind (L _ (UserTyVar {})) nm
+  = repPlainTV nm
+repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
+  = repKind ki >>= repKindedTV nm
 
 -- represent a type context
 --
@@ -632,9 +633,9 @@ repTy (HsKindSig t k)       = do
                                 t1 <- repLTy t
                                 k1 <- repKind k
                                 repTSig t1 k1
-repTy (HsSpliceTy splice)   = repSplice splice
-repTy ty@(HsNumTy _)        = notHandled "Number types (for generics)" (ppr ty)
-repTy ty		    = notHandled "Exotic form of type" (ppr ty)
+repTy (HsSpliceTy splice _ _) = repSplice splice
+repTy ty@(HsNumTy _)          = notHandled "Number types (for generics)" (ppr ty)
+repTy ty		      = notHandled "Exotic form of type" (ppr ty)
 
 -- represent a kind
 --

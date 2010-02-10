@@ -16,7 +16,7 @@ module TcHsType (
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
-	tcTyVarBndrs, dsHsType, tcLHsConResTy,
+	tcTyVarBndrs, dsHsType, 
 	tcDataKindSig, ExpKind(..), EkCtxt(..),
 
 		-- Pattern type signatures
@@ -419,12 +419,11 @@ kc_hs_type ty@(HsRecTy _)
       -- should have been removed by now
 
 #ifdef GHCI	/* Only if bootstrapped */
-kc_hs_type (HsSpliceTy sp) = kcSpliceType sp
+kc_hs_type (HsSpliceTy sp fvs _) = kcSpliceType sp fvs
 #else
 kc_hs_type ty@(HsSpliceTy {}) = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
 #endif
 
-kc_hs_type (HsSpliceTyOut {})  = panic "kc_hs_type"	-- Should not happen at all
 kc_hs_type (HsQuasiQuoteTy {}) = panic "kc_hs_type"	-- Eliminated by renamer
 
 -- remove the doc nodes here, no need to worry about the location since
@@ -624,11 +623,10 @@ ds_type (HsForAllTy _ tv_names ctxt ty)
 ds_type (HsDocTy ty _)  -- Remove the doc comment
   = dsHsType ty
 
-ds_type (HsSpliceTyOut kind) 
+ds_type (HsSpliceTy _ _ kind) 
   = do { kind' <- zonkTcKindToKind kind
        ; newFlexiTyVarTy kind' }
 
-ds_type (HsSpliceTy {})     = panic "ds_type"
 ds_type (HsQuasiQuoteTy {}) = panic "ds_type"	-- Eliminated by renamer
 
 dsHsTypes :: [LHsType Name] -> TcM [Type]
@@ -684,35 +682,7 @@ dsHsPred (HsIParam name ty)
        }
 \end{code}
 
-GADT constructor signatures
-
 \begin{code}
-tcLHsConResTy :: LHsType Name -> TcM (TyCon, [TcType])
-tcLHsConResTy (L span res_ty)
-  = setSrcSpan span $
-    case get_args res_ty [] of
-	   (HsTyVar tc_name, args) 
-	      -> do { args' <- mapM dsHsType args
-		    ; thing <- tcLookup tc_name
-		    ; case thing of
-		        AGlobal (ATyCon tc) -> return (tc, args')
-		        _ -> failWithTc (badGadtDecl res_ty) }
-	   _ -> failWithTc (badGadtDecl res_ty)
-  where
-	-- We can't call dsHsType on res_ty, and then do tcSplitTyConApp_maybe
-	-- because that causes a black hole, and for good reason.  Building
-	-- the type means expanding type synonyms, and we can't do that
-	-- inside the "knot".  So we have to work by steam.
-    get_args (HsAppTy (L _ fun) arg)   args = get_args fun (arg:args)
-    get_args (HsParTy (L _ ty))        args = get_args ty  args
-    get_args (HsOpTy ty1 (L _ tc) ty2) args = (HsTyVar tc, ty1:ty2:args)
-    get_args ty                        args = (ty, args)
-
-badGadtDecl :: HsType Name -> SDoc
-badGadtDecl ty
-  = hang (ptext (sLit "Malformed constructor result type:"))
-       2 (ppr ty)
-
 addKcTypeCtxt :: LHsType Name -> TcM a -> TcM a
 	-- Wrap a context around only if we want to show that contexts.  
 addKcTypeCtxt (L _ (HsPredTy _)) thing = thing
@@ -735,14 +705,14 @@ kcHsTyVars :: [LHsTyVarBndr Name]
 	   -> ([LHsTyVarBndr Name] -> TcM r) 	-- These binders are kind-annotated
 						-- They scope over the thing inside
 	   -> TcM r
-kcHsTyVars tvs thing_inside  = do
-    bndrs <- mapM (wrapLocM kcHsTyVar) tvs
-    tcExtendKindEnvTvs bndrs (thing_inside bndrs)
+kcHsTyVars tvs thing_inside
+  = do { kinded_tvs <- mapM (wrapLocM kcHsTyVar) tvs
+       ; tcExtendKindEnvTvs kinded_tvs thing_inside }
 
 kcHsTyVar :: HsTyVarBndr Name -> TcM (HsTyVarBndr Name)
 	-- Return a *kind-annotated* binder, and a tyvar with a mutable kind in it	
-kcHsTyVar (UserTyVar name)        = KindedTyVar name <$> newKindVar
-kcHsTyVar (KindedTyVar name kind) = return (KindedTyVar name kind)
+kcHsTyVar (UserTyVar name _)  = UserTyVar name <$> newKindVar
+kcHsTyVar tv@(KindedTyVar {}) = return tv
 
 ------------------
 tcTyVarBndrs :: [LHsTyVarBndr Name] 	-- Kind-annotated binders, which need kind-zonking
@@ -754,10 +724,9 @@ tcTyVarBndrs bndrs thing_inside = do
     tyvars <- mapM (zonk . unLoc) bndrs
     tcExtendTyVarEnv tyvars (thing_inside tyvars)
   where
-    zonk (KindedTyVar name kind) = do { kind' <- zonkTcKindToKind kind
-				      ; return (mkTyVar name kind') }
-    zonk (UserTyVar name) = WARN( True, ptext (sLit "Un-kinded tyvar") <+> ppr name )
-			    return (mkTyVar name liftedTypeKind)
+    zonk (UserTyVar name kind) = do { kind' <- zonkTcKindToKind kind
+				    ; return (mkTyVar name kind') }
+    zonk (KindedTyVar name kind) = return (mkTyVar name kind)
 
 -----------------------------------
 tcDataKindSig :: Maybe Kind -> TcM [TyVar]
@@ -867,9 +836,9 @@ tcHsPatSigType ctxt hs_ty
 		-- should be bound by the pattern signature
  	  in_scope <- getInLocalScope
 	; let span = getLoc hs_ty
-	      sig_tvs = [ L span (UserTyVar n) 
-			| n <- nameSetToList (extractHsTyVars hs_ty),
-			  not (in_scope n) ]
+	      sig_tvs = userHsTyVarBndrs $ map (L span) $ 
+			filterOut in_scope $
+                        nameSetToList (extractHsTyVars hs_ty)
 
 	; (tyvars, sig_ty) <- tcHsQuantifiedType sig_tvs hs_ty
 	; checkValidType ctxt sig_ty 

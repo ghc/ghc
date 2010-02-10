@@ -319,13 +319,10 @@ tcExtendKindEnv things thing_inside
     upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
     extend env  = extendNameEnvList env [(n, AThing k) | (n,k) <- things]
 
-tcExtendKindEnvTvs :: [LHsTyVarBndr Name] -> TcM r -> TcM r
+tcExtendKindEnvTvs :: [LHsTyVarBndr Name] -> ([LHsTyVarBndr Name] -> TcM r) -> TcM r
 tcExtendKindEnvTvs bndrs thing_inside
-  = updLclEnv upd thing_inside
-  where
-    upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
-    extend env  = extendNameEnvList env pairs
-    pairs       = [(n, AThing k) | L _ (KindedTyVar n k) <- bndrs]
+  = tcExtendKindEnv (map (hsTyVarNameKind . unLoc) bndrs)
+                    (thing_inside bndrs)
 
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
