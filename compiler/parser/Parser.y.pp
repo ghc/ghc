@@ -1013,10 +1013,12 @@ atype :: { LHsType RdrName }
 	| '[:' ctype ':]'		{ LL $ HsPArrTy  $2 }
 	| '(' ctype ')'		        { LL $ HsParTy   $2 }
 	| '(' ctype '::' kind ')'	{ LL $ HsKindSig $2 (unLoc $4) }
+	| quasiquote       	        { L1 (HsQuasiQuoteTy (unLoc $1)) }
 	| '$(' exp ')'	      		{ LL $ HsSpliceTy (mkHsSplice $2 ) }
 	| TH_ID_SPLICE	      		{ LL $ HsSpliceTy (mkHsSplice 
 					         (L1 $ HsVar (mkUnqual varName 
 							        (getTH_ID_SPLICE $1)))) } -- $x
+
 -- Generics
         | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
 
@@ -1245,6 +1247,12 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 -----------------------------------------------------------------------------
 -- Expressions
 
+quasiquote :: { Located (HsQuasiQuote RdrName) }
+	: TH_QUASIQUOTE   { let { loc = getLoc $1
+                                ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
+                                ; quoterId = mkUnqual varName quoter }
+                            in L1 (mkHsQuasiQuote quoterId quoteSpan quote) }
+
 exp   :: { LHsExpr RdrName }
 	: infixexp '::' sigtype		{ LL $ ExprWithTySig $1 $3 }
 	| infixexp '-<' exp		{ LL $ HsArrApp $1 $3 placeHolderType HsFirstOrderApp True }
@@ -1359,11 +1367,7 @@ aexp2	:: { LHsExpr RdrName }
 							(getTH_ID_SPLICE $1)))) } -- $x
 	| '$(' exp ')'   	{ LL $ HsSpliceE (mkHsSplice $2) }               -- $( exp )
 
-	| TH_QUASIQUOTE       	{ let { loc = getLoc $1
-                                      ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
-                                      ; quoterId = mkUnqual varName quoter
-                                      }
-                                  in sL loc $ HsQuasiQuoteE (mkHsQuasiQuote quoterId quoteSpan quote) }
+
 	| TH_VAR_QUOTE qvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_VAR_QUOTE qcon 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_TY_QUOTE tyvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
@@ -1372,8 +1376,8 @@ aexp2	:: { LHsExpr RdrName }
 	| '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }                       
 	| '[p|' infixexp '|]'   {% checkPattern $2 >>= \p ->
 					return (LL $ HsBracket (PatBr p)) }
-	| '[d|' cvtopbody '|]'	{% checkDecBrGroup $2 >>= \g -> 
-					return (LL $ HsBracket (DecBr g)) }
+	| '[d|' cvtopbody '|]'	{ LL $ HsBracket (DecBrL $2) }
+	| quasiquote       	{ L1 (HsQuasiQuoteE (unLoc $1)) }
 
 	-- arrow notation extension
 	| '(|' aexp2 cmdargs '|)'	{ LL $ HsArrForm $2 Nothing (reverse $3) }

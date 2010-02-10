@@ -20,7 +20,7 @@ module RnExpr (
 import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
 #endif 	/* GHCI */
 
-import RnSource  ( rnSrcDecls )
+import RnSource  ( rnSrcDecls, findSplice )
 import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
                    rnMatchGroup, makeMiniFixityEnv) 
 import HsSyn
@@ -171,10 +171,8 @@ rnExpr (HsSpliceE splice)
 rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
 #else
 rnExpr (HsQuasiQuoteE qq)
-  = rnQuasiQuote qq 		`thenM` \ (qq', fvs_qq) ->
-    runQuasiQuoteExpr qq'	`thenM` \ (L _ expr') ->
-    rnExpr expr'		`thenM` \ (expr'', fvs_expr) ->
-    return (expr'', fvs_qq `plusFV` fvs_expr)
+  = runQuasiQuoteExpr qq	`thenM` \ (L _ expr') ->
+    rnExpr expr'
 #endif 	/* GHCI */
 
 ---------------------------------------------
@@ -306,7 +304,7 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 \begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
-    rnPats ProcExpr [pat] $ \ [pat'] ->
+    rnPat ProcExpr pat $ \ pat' ->
     rnCmdTop body	         `thenM` \ (body',fvBody) ->
     return (HsProc pat' body', fvBody)
 
@@ -597,15 +595,24 @@ rnBracket (VarBr n) = do { name <- lookupOccRn n
 rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 			 ; return (ExpBr e', fvs) }
 
-rnBracket (PatBr _) = failWith (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"))
+rnBracket (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
+
 rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
 			 ; return (TypBr t', fvs) }
 		    where
 		      doc = ptext (sLit "In a Template-Haskell quoted type")
-rnBracket (DecBr group) 
-  = do { gbl_env  <- getGblEnv
 
-	; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
+rnBracket (DecBrL decls) 
+  = do { (group, mb_splice) <- findSplice decls
+       ; case mb_splice of
+           Nothing -> return ()
+           Just (SpliceDecl (L loc _), _)  
+              -> setSrcSpan loc $
+                 addErr (ptext (sLit "Declaration splices are not permitted inside declaration brackets"))
+		-- Why not?  See Section 7.3 of the TH paper.  
+
+       ; gbl_env  <- getGblEnv
+       ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
 	      		  -- The emptyDUs is so that we just collect uses for this
                           -- group alone in the call to rnSrcDecls below
        ; (tcg_env, group') <- setGblEnv new_gbl_env $ 
@@ -613,7 +620,9 @@ rnBracket (DecBr group)
 			      rnSrcDecls group      
 
        -- Discard the tcg_env; it contains only extra info about fixity
-	; return (DecBr group', allUses (tcg_dus tcg_env)) }
+	; return (DecBrG group', allUses (tcg_dus tcg_env)) }
+
+rnBracket (DecBrG _) = panic "rnBracket: unexpected DecBrG"
 \end{code}
 
 %************************************************************************
@@ -661,7 +670,7 @@ rnStmt ctxt (L loc (BindStmt pat expr _ _)) thing_inside
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
-	; rnPats (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
+	; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
 	{ (thing, fvs3) <- thing_inside
 	; return (([L loc (BindStmt pat' expr' bind_op fail_op)], thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}

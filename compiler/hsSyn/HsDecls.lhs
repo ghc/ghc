@@ -102,6 +102,7 @@ data HsDecl id
   | RuleD	(RuleDecl id)
   | SpliceD	(SpliceDecl id)
   | DocD	(DocDecl)
+  | QuasiQuoteD	(HsQuasiQuote id)
 
 
 -- NB: all top-level fixity decls are contained EITHER
@@ -204,6 +205,7 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (AnnD ad)               = ppr ad
     ppr (SpliceD dd)            = ppr dd
     ppr (DocD doc)              = ppr doc
+    ppr (QuasiQuoteD qq)        = ppr qq
 
 instance OutputableBndr name => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,

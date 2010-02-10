@@ -424,7 +424,8 @@ kc_hs_type (HsSpliceTy sp) = kcSpliceType sp
 kc_hs_type ty@(HsSpliceTy {}) = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
 #endif
 
-kc_hs_type (HsSpliceTyOut {}) = panic "kc_hs_type"	-- Should not happen at all
+kc_hs_type (HsSpliceTyOut {})  = panic "kc_hs_type"	-- Should not happen at all
+kc_hs_type (HsQuasiQuoteTy {}) = panic "kc_hs_type"	-- Eliminated by renamer
 
 -- remove the doc nodes here, no need to worry about the location since
 -- its the same for a doc node and it's child type node
@@ -627,7 +628,8 @@ ds_type (HsSpliceTyOut kind)
   = do { kind' <- zonkTcKindToKind kind
        ; newFlexiTyVarTy kind' }
 
-ds_type (HsSpliceTy {}) = panic "ds_type"
+ds_type (HsSpliceTy {})     = panic "ds_type"
+ds_type (HsQuasiQuoteTy {}) = panic "ds_type"	-- Eliminated by renamer
 
 dsHsTypes :: [LHsType Name] -> TcM [Type]
 dsHsTypes arg_tys = mapM dsHsType arg_tys

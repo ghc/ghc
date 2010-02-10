@@ -70,6 +70,7 @@ extractHsTyNames ty
     get (HsTyVar tv)           = unitNameSet tv
     get (HsSpliceTy {})        = emptyNameSet   -- Type splices mention no type variables
     get (HsSpliceTyOut {})     = emptyNameSet   -- Ditto
+    get (HsQuasiQuoteTy {})    = emptyNameSet   -- Ditto
     get (HsKindSig ty _)       = getl ty
     get (HsForAllTy _ tvs
                     ctxt ty)   = (extractHsCtxtTyNames ctxt

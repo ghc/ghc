@@ -12,6 +12,7 @@ module HsTypes (
 	HsExplicitForAll(..),
 	HsContext, LHsContext,
 	HsPred(..), LHsPred,
+	HsQuasiQuote(..),
 
 	LBangType, BangType, HsBang(..), 
         getBangType, getBangStrictness, 
@@ -58,6 +59,28 @@ type PostTcType = Type		-- Used for slots in the abstract syntax
 placeHolderType :: PostTcType	-- Used before typechecking
 placeHolderType  = panic "Evaluated the place holder for a PostTcType"
 \end{code}
+
+%************************************************************************
+%*									*
+	Quasi quotes; used in types and elsewhere
+%*									*
+%************************************************************************
+
+\begin{code}
+data HsQuasiQuote id = HsQuasiQuote 
+		       	   id		-- The quasi-quoter
+		       	   SrcSpan	-- The span of the enclosed string
+		       	   FastString	-- The enclosed string
+
+instance OutputableBndr id => Outputable (HsQuasiQuote id) where
+    ppr = ppr_qq
+
+ppr_qq :: OutputableBndr id => HsQuasiQuote id -> SDoc
+ppr_qq (HsQuasiQuote quoter _ quote) =
+    char '[' <> ppr quoter <> ptext (sLit "|") <>
+    ppr quote <> ptext (sLit "|]")
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -157,6 +180,7 @@ data HsType name
 			Kind		-- A type with a kind signature
 
   | HsSpliceTy		(HsSplice name)
+  | HsQuasiQuoteTy	(HsQuasiQuote name)
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
@@ -374,6 +398,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
     sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
 ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr ty
+ppr_mono_ty _    (HsQuasiQuoteTy qq) = ppr qq
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
 ppr_mono_ty _    (HsTyVar name)      = ppr name
 ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2

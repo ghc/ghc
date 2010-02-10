@@ -11,7 +11,7 @@ free variables.
 
 \begin{code}
 module RnPat (-- main entry points
-              rnPats, rnBindPat,
+              rnPat, rnPats, rnBindPat,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
@@ -21,9 +21,6 @@ module RnPat (-- main entry points
 
 	      -- Literals
 	      rnLit, rnOverLit,     
-
-	      -- Quasiquotation
-	      rnQuasiQuote,
 
              -- Pattern Error messages that are also used elsewhere
              checkTupSize, patSigErr
@@ -233,6 +230,12 @@ rnPats ctxt pats thing_inside
   where
     doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt
 
+rnPat :: HsMatchContext Name -- for error messages
+      -> LPat RdrName 
+      -> (LPat Name -> RnM (a, FreeVars))
+      -> RnM (a, FreeVars)
+rnPat ctxt pat thing_inside 
+  = rnPats ctxt [pat] (\[pat'] -> thing_inside pat')
 
 applyNameMaker :: NameMaker -> Located RdrName -> RnM Name
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newName mk rdr); return n }
@@ -363,8 +366,7 @@ rnPatAndThen _ p@(QuasiQuotePat {})
   = pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
 #else
 rnPatAndThen mk (QuasiQuotePat qq)
-  = do { qq' <- liftCpsFV $ rnQuasiQuote qq
-       ; pat <- liftCps $ runQuasiQuotePat qq'
+  = do { pat <- liftCps $ runQuasiQuotePat qq
        ; L _ pat' <- rnLPatAndThen mk pat
        ; return pat' }
 #endif 	/* GHCI */
@@ -561,27 +563,6 @@ rnOverLit lit@(OverLit {ol_val=val})
 				_	-> panic "rnOverLit"
 	; return (lit { ol_witness = from_thing_name
 		      , ol_rebindable = rebindable }, fvs) }
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection{Quasiquotation}
-%*									*
-%************************************************************************
-
-See Note [Quasi-quote overview] in TcSplice.
-
-\begin{code}
-rnQuasiQuote :: HsQuasiQuote RdrName -> RnM (HsQuasiQuote Name, FreeVars)
-rnQuasiQuote (HsQuasiQuote n quoter quoteSpan quote)
-  = do	{ loc  <- getSrcSpanM
-   	; n' <- newLocalBndrRn (L loc n)
-   	; quoter' <- lookupOccRn quoter
-		-- If 'quoter' is not in scope, proceed no further
-		-- Otherwise lookupOcc adds an error messsage and returns 
-		-- an "unubound name", which makes the subsequent attempt to
-		-- run the quote fail
-   	; return (HsQuasiQuote n' quoter' quoteSpan quote, unitFV quoter') }
 \end{code}
 
 %************************************************************************

@@ -744,7 +744,7 @@ pprPatBind pat ty@(grhss)
 
 pprMatch :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> Match idR -> SDoc
 pprMatch ctxt (Match pats maybe_ty grhss)
-  = herald <+> sep [sep (map ppr other_pats),
+  = herald <+> sep [sep (map pprParendLPat other_pats),
                     ppr_maybe_ty,
                     nest 2 (pprGRHSs ctxt grhss)]
   where
@@ -756,18 +756,21 @@ pprMatch ctxt (Match pats maybe_ty grhss)
                         -- Not pprBndr; the AbsBinds will
                         -- have printed the signature
 
-                | null pats3 -> (pp_infix, [])
+                | null pats2 -> (pp_infix, [])
                         -- x &&& y = e
 
-                | otherwise -> (parens pp_infix, pats3)
+                | otherwise -> (parens pp_infix, pats2)
                         -- (x &&& y) z = e
                 where
-                  (pat1:pat2:pats3) = pats
-                  pp_infix = ppr pat1 <+> ppr fun <+> ppr pat2
+                  pp_infix = pprParendLPat pat1 <+> ppr fun <+> pprParendLPat pat2
 
             LambdaExpr -> (char '\\', pats)
-            _          -> (empty,     pats)
+	    
+            _  -> ASSERT( null pats1 )
+                  (ppr pat1, [])	-- No parens around the single pat
 
+    (pat1:pats1) = pats
+    (pat2:pats2) = pats1
     ppr_maybe_ty = case maybe_ty of
                         Just ty -> dcolon <+> ppr ty
                         Nothing -> empty
@@ -975,10 +978,11 @@ pprGroupByClause (GroupBySomething eitherUsingExpr byExpr) = hsep [ptext (sLit "
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
 pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
+pprDo GhciStmt    stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
 pprDo (MDoExpr _) stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
 pprDo ListComp    stmts body = pprComp brackets    stmts body
 pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
-pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt, GhciStmt
+pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
 
 ppr_do_stmts :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
@@ -1013,22 +1017,24 @@ pprSplice (HsSplice n e)
     = char '$' <> ifPprDebug (brackets (ppr n)) <> pprParendExpr e
 
 
-data HsBracket id = ExpBr (LHsExpr id)          -- [|  expr  |]
-                  | PatBr (LPat id)             -- [p| pat   |]
-                  | DecBr (HsGroup id)          -- [d| decls |]
-                  | TypBr (LHsType id)          -- [t| type  |]
-                  | VarBr id                    -- 'x, ''T
+data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
+                  | PatBr (LPat id)      -- [p| pat   |]
+                  | DecBrL [LHsDecl id]	 -- [d| decls |]; result of parser
+                  | DecBrG (HsGroup id)  -- [d| decls |]; result of renamer
+                  | TypBr (LHsType id)   -- [t| type  |]
+                  | VarBr id             -- 'x, ''T
 
 instance OutputableBndr id => Outputable (HsBracket id) where
   ppr = pprHsBracket
 
 
 pprHsBracket :: OutputableBndr id => HsBracket id -> SDoc
-pprHsBracket (ExpBr e) = thBrackets empty (ppr e)
-pprHsBracket (PatBr p) = thBrackets (char 'p') (ppr p)
-pprHsBracket (DecBr d) = thBrackets (char 'd') (ppr d)
-pprHsBracket (TypBr t) = thBrackets (char 't') (ppr t)
-pprHsBracket (VarBr n) = char '\'' <> ppr n
+pprHsBracket (ExpBr e) 	 = thBrackets empty (ppr e)
+pprHsBracket (PatBr p) 	 = thBrackets (char 'p') (ppr p)
+pprHsBracket (DecBrG gp) = thBrackets (char 'd') (ppr gp)
+pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
+pprHsBracket (TypBr t) 	 = thBrackets (char 't') (ppr t)
+pprHsBracket (VarBr n) 	 = char '\'' <> ppr n
 -- Infelicity: can't show ' vs '', because
 -- we can't ask n what its OccName is, because the
 -- pretty-printer for HsExpr doesn't ask for NamedThings
@@ -1087,6 +1093,7 @@ data HsMatchContext id  -- Context of a Match
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
   | StmtCtxt (HsStmtContext id) -- Pattern of a do-stmt or list comprehension
+  | ThPatQuote			-- A Template Haskell pattern quotation [p| (a,b) |]
   deriving ()
 
 data HsStmtContext id
@@ -1123,6 +1130,7 @@ matchSeparator ProcExpr     = ptext (sLit "->")
 matchSeparator PatBindRhs   = ptext (sLit "=")
 matchSeparator (StmtCtxt _) = ptext (sLit "<-")
 matchSeparator RecUpd       = panic "unused"
+matchSeparator ThPatQuote   = panic "unused"
 \end{code}
 
 \begin{code}
@@ -1131,6 +1139,7 @@ pprMatchContext (FunRhs fun _)    = ptext (sLit "the definition of")
                                     <+> quotes (ppr fun)
 pprMatchContext CaseAlt           = ptext (sLit "a case alternative")
 pprMatchContext RecUpd            = ptext (sLit "a record-update construct")
+pprMatchContext ThPatQuote        = ptext (sLit "a Template Haskell pattern quotation")
 pprMatchContext PatBindRhs        = ptext (sLit "a pattern binding")
 pprMatchContext LambdaExpr        = ptext (sLit "a lambda abstraction")
 pprMatchContext ProcExpr          = ptext (sLit "an arrow abstraction")
@@ -1173,6 +1182,7 @@ matchContextErrString PatBindRhs                 = ptext (sLit "pattern binding"
 matchContextErrString RecUpd                     = ptext (sLit "record update")
 matchContextErrString LambdaExpr                 = ptext (sLit "lambda")
 matchContextErrString ProcExpr                   = ptext (sLit "proc")
+matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))    = ptext (sLit "pattern guard")

@@ -25,7 +25,6 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 import DynFlags
 import StaticFlags
 import HsSyn
-import RdrHsSyn
 import PrelNames
 import RdrName
 import TcHsSyn
@@ -411,7 +410,7 @@ tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
 -- Loops around dealing with each top level inter-splice group 
 -- in turn, until it's dealt with the entire module
 tc_rn_src_decls boot_details ds
- = do { let { (first_group, group_tail) = findSplice ds } ;
+ = do { (first_group, group_tail) <- findSplice ds  ;
 		-- If ds is [] we get ([], Nothing)
 
 	-- Deal with decls up to, but not including, the first splice
@@ -461,7 +460,7 @@ tc_rn_src_decls boot_details ds
 \begin{code}
 tcRnHsBootDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
 tcRnHsBootDecls decls
-   = do { let { (first_group, group_tail) = findSplice decls }
+   = do { (first_group, group_tail) <- findSplice decls
 
 		-- Rename the declarations
 	; (tcg_env, HsGroup { 

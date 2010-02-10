@@ -18,7 +18,6 @@ module RdrHsSyn (
 	cvBindGroup,
         cvBindsAndSigs,
 	cvTopDecls,
-	findSplice, checkDecBrGroup,
         placeHolderPunRhs,
 
 	-- Stuff to do with Foreign declarations
@@ -65,7 +64,7 @@ import PrelNames	( forall_tv_RDR )
 import DynFlags
 import SrcLoc
 import OrdList		( OrdList, fromOL )
-import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
+import Bag		( Bag, emptyBag, consBag, foldrBag )
 import Outputable
 import FastString
 import Maybes
@@ -127,6 +126,7 @@ extract_lty (L loc ty) acc
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty               	-> extract_lty ty acc
       HsNumTy _                 -> acc
+      HsQuasiQuoteTy {}	        -> acc  -- Quasi quotes mention no type variables
       HsSpliceTy {}           	-> acc	-- Type splices mention no type variables
       HsSpliceTyOut {}         	-> acc	-- Type splices mention no type variables
       HsKindSig ty _            -> extract_lty ty acc
@@ -226,17 +226,14 @@ mkTyFamily loc flavour lhs ksig
 
 mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- If the user wrote
---	$(e)
--- then that's the splice, but if she wrote, say,
---      f x
--- then behave as if she'd written
---      $(f x)
-mkTopSpliceDecl expr
-  = SpliceD (SpliceDecl expr')
-  where
-    expr' = case expr of
-              (L _ (HsSpliceE (HsSplice _ expr))) -> expr
-              _other                              -> expr
+--      [pads| ... ]   then return a QuasiQuoteD
+--	$(e)           then return a SpliceD
+-- but if she wrote, say,
+--      f x            then behave as if she'd written $(f x)
+--		       ie a SpliceD
+mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
+mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr)
+mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr)
 \end{code}
 
 %************************************************************************
@@ -332,80 +329,6 @@ has_args ((L _ (Match args _ _)) : _) = not (null args)
 	-- no arguments.  This is necessary now that variable bindings
 	-- with no arguments are now treated as FunBinds rather
 	-- than pattern bindings (tests/rename/should_fail/rnfail002).
-\end{code}
-
-\begin{code}
-findSplice :: [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
-findSplice ds = addl emptyRdrGroup ds
-
-checkDecBrGroup :: [LHsDecl a] -> P (HsGroup a)
--- Turn the body of a [d| ... |] into a HsGroup
--- There should be no splices in the "..."
-checkDecBrGroup decls 
-  = case addl emptyRdrGroup decls of
-	(group, Nothing) -> return group
-	(_, Just (SpliceDecl (L loc _), _)) -> 
-		parseError loc "Declaration splices are not permitted inside declaration brackets"
-		-- Why not?  See Section 7.3 of the TH paper.  
-
-addl :: HsGroup a -> [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
-	-- This stuff reverses the declarations (again) but it doesn't matter
-
--- Base cases
-addl gp []	     = (gp, Nothing)
-addl gp (L l d : ds) = add gp l d ds
-
-
-add :: HsGroup a -> SrcSpan -> HsDecl a -> [LHsDecl a]
-  -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
-
-add gp _ (SpliceD e) ds = (gp, Just (e, ds))
-
--- Class declarations: pull out the fixity signatures to the top
-add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) 
-    l (TyClD d) ds
-	| isClassDecl d = 	
-		let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
-		addl (gp { hs_tyclds = L l d : ts, hs_fixds = fsigs ++ fs}) ds
-	| otherwise =
-		addl (gp { hs_tyclds = L l d : ts }) ds
-
--- Signatures: fixity sigs go a different place than all others
-add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig f)) ds
-  = addl (gp {hs_fixds = L l f : ts}) ds
-add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
-  = addl (gp {hs_valds = add_sig (L l d) ts}) ds
-
--- Value declarations: use add_bind
-add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
-  = addl (gp { hs_valds = add_bind (L l d) ts }) ds
-
--- The rest are routine
-add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
-  = addl (gp { hs_instds = L l d : ts }) ds
-add gp@(HsGroup {hs_derivds = ts})  l (DerivD d) ds
-  = addl (gp { hs_derivds = L l d : ts }) ds
-add gp@(HsGroup {hs_defds  = ts})  l (DefD d) ds
-  = addl (gp { hs_defds = L l d : ts }) ds
-add gp@(HsGroup {hs_fords  = ts}) l (ForD d) ds
-  = addl (gp { hs_fords = L l d : ts }) ds
-add gp@(HsGroup {hs_warnds  = ts})  l (WarningD d) ds
-  = addl (gp { hs_warnds = L l d : ts }) ds
-add gp@(HsGroup {hs_annds  = ts}) l (AnnD d) ds
-  = addl (gp { hs_annds = L l d : ts }) ds
-add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
-  = addl (gp { hs_ruleds = L l d : ts }) ds
-
-add gp l (DocD d) ds
-  = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
-
-add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
-add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
-
-add_sig :: LSig a -> HsValBinds a -> HsValBinds a
-add_sig s (ValBindsIn bs sigs) = ValBindsIn bs (s:sigs) 
-add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
 \end{code}
 
 %************************************************************************

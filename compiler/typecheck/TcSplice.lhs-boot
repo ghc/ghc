@@ -1,7 +1,7 @@
 \begin{code}
 module TcSplice where
 import HsSyn	( HsSplice, HsBracket, HsQuasiQuote,
-                  HsExpr, HsType, LHsExpr, LPat, LHsDecl )
+                  HsExpr, HsType, LHsType, LHsExpr, LPat, LHsDecl )
 import Name	( Name )
 import RdrName	( RdrName )
 import TcRnTypes( TcM, TcId )
@@ -24,7 +24,9 @@ tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 
-runQuasiQuoteExpr :: HsQuasiQuote Name.Name -> TcM (LHsExpr RdrName)
-runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)
+runQuasiQuoteDecl :: HsQuasiQuote RdrName -> TcM [LHsDecl RdrName]
+runQuasiQuoteExpr :: HsQuasiQuote RdrName -> TcM (LHsExpr RdrName)
+runQuasiQuoteType :: HsQuasiQuote RdrName -> TcM (LHsType RdrName)
+runQuasiQuotePat  :: HsQuasiQuote RdrName -> TcM (LPat RdrName)
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 \end{code}

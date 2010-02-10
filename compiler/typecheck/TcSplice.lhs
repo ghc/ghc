@@ -16,7 +16,9 @@ TcSplice: Template Haskell splices
 
 module TcSplice( kcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  lookupThName_maybe,
-                 runQuasiQuoteExpr, runQuasiQuotePat, runAnnotation ) where
+                 runQuasiQuoteExpr, runQuasiQuotePat, 
+                 runQuasiQuoteDecl, runQuasiQuoteType,
+                 runAnnotation ) where
 
 #include "HsVersions.h"
 
@@ -31,6 +33,7 @@ import RnExpr
 import RnEnv
 import RdrName
 import RnTypes
+import TcPat
 import TcExpr
 import TcHsSyn
 import TcSimplify
@@ -286,8 +289,11 @@ kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 
-runQuasiQuoteExpr :: HsQuasiQuote Name -> TcM (LHsExpr RdrName)
-runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)
+runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)
+runQuasiQuotePat  :: HsQuasiQuote RdrName -> RnM (LPat RdrName)
+runQuasiQuoteType :: HsQuasiQuote RdrName -> RnM (LHsType RdrName)
+runQuasiQuoteDecl :: HsQuasiQuote RdrName -> RnM [LHsDecl RdrName]
+
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 
 #ifndef GHCI
@@ -300,6 +306,8 @@ lookupThName_maybe n = pprPanic "Cant do lookupThName_maybe without GHCi" (ppr n
 
 runQuasiQuoteExpr q = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
 runQuasiQuotePat  q = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
+runQuasiQuoteType q = pprPanic "Cant do runQuasiQuoteType without GHCi" (ppr q)
+runQuasiQuoteDecl q = pprPanic "Cant do runQuasiQuoteDecl without GHCi" (ppr q)
 runAnnotation   _ q = pprPanic "Cant do runAnnotation without GHCi" (ppr q)
 #else
 \end{code}
@@ -360,26 +368,28 @@ tc_bracket _ (ExpBr expr)
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
 	; _ <- tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
 	; tcMetaTy expQTyConName }
-	-- Result type is Expr (= Q Exp)
+	-- Result type is ExpQ (= Q Exp)
 
 tc_bracket _ (TypBr typ) 
   = do	{ _ <- tcHsSigTypeNC ThBrackCtxt typ
 	; tcMetaTy typeQTyConName }
 	-- Result type is Type (= Q Typ)
 
-tc_bracket _ (DecBr decls)
+tc_bracket _ (DecBrG decls)
   = do	{ _ <- tcTopSrcDecls emptyModDetails decls
-	-- Typecheck the declarations, dicarding the result
-	-- We'll get all that stuff later, when we splice it in
+	       -- Typecheck the declarations, dicarding the result
+	       -- We'll get all that stuff later, when we splice it in
+	; tcMetaTy decsQTyConName } -- Result type is Q [Dec]
 
-	; decl_ty <- tcMetaTy decTyConName
-	; q_ty    <- tcMetaTy qTyConName
-	; return (mkAppTy q_ty (mkListTy decl_ty))
-	-- Result type is Q [Dec]
-    }
+tc_bracket _ (PatBr pat)
+  = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
+	; _ <- tcPat ThPatQuote pat any_ty unitTy $ \_ ->
+               return ()
+	; tcMetaTy patQTyConName }
+	-- Result type is PatQ (= Q Pat)
 
-tc_bracket _ (PatBr _)
-  = failWithTc (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"))
+tc_bracket _ (DecBrL _)
+  = panic "tc_bracket: Unexpected DecBrL"
 
 quotedNameStageErr :: Name -> SDoc
 quotedNameStageErr v 
@@ -548,9 +558,7 @@ kcTopSpliceType expr
 -- Type sig at top of file:
 -- 	tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceDecls expr
-  = do	{ meta_dec_ty <- tcMetaTy decTyConName
-	; meta_q_ty <- tcMetaTy qTyConName
-	; let list_q = mkAppTy meta_q_ty (mkListTy meta_dec_ty)
+  = do	{ list_q <- tcMetaTy decsQTyConName	-- Q [Dec]
 	; zonked_q_expr <- tcTopSpliceExpr (tcMonoExpr expr list_q)
 
 		-- Run the expression
@@ -622,7 +630,7 @@ The GHC "quasi-quote" extension is described by Geoff Mainland's paper
 Workshop 2007).
 
 Briefly, one writes
-	[:p| stuff |]
+	[p| stuff |]
 and the arbitrary string "stuff" gets parsed by the parser 'p', whose
 type should be Language.Haskell.TH.Quote.QuasiQuoter.  'p' must be
 defined in another module, because we are going to run it here.  It's
@@ -632,26 +640,42 @@ a bit like a TH splice:
 However, you can do this in patterns as well as terms.  Becuase of this,
 the splice is run by the *renamer* rather than the type checker.
 
+%************************************************************************
+%*									*
+\subsubsection{Quasiquotation}
+%*									*
+%************************************************************************
+
+See Note [Quasi-quote overview] in TcSplice.
+
 \begin{code}
 runQuasiQuote :: Outputable hs_syn
-              => HsQuasiQuote Name	-- Contains term of type QuasiQuoter, and the String
+              => HsQuasiQuote RdrName	-- Contains term of type QuasiQuoter, and the String
               -> Name			-- Of type QuasiQuoter -> String -> Q th_syn
               -> Name			-- Name of th_syn type  
               -> MetaOps th_syn hs_syn 
-              -> TcM hs_syn
-runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector meta_ty meta_ops
-  = do	{ -- Check that the quoter is not locally defined, otherwise the TH
+              -> RnM hs_syn
+runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
+  = do	{ quoter' <- lookupOccRn quoter
+		-- If 'quoter' is not in scope, proceed no further
+		-- Otherwise lookupOcc adds an error messsage and returns 
+		-- an "unubound name", which makes the subsequent attempt to
+		-- run the quote fail
+		--
+		-- We use lookupOcc rather than lookupGlobalOcc because in the
+		-- erroneous case of \x -> [x| ...|] we get a better error message
+		-- (stage restriction rather than out of scope).
+
+          -- Check that the quoter is not locally defined, otherwise the TH
           -- machinery will not be able to run the quasiquote.
-        ; this_mod <- getModule
-        ; let is_local = case nameModule_maybe quoter of
-                           Just mod | mod == this_mod -> True
-                                    | otherwise       -> False
-                           Nothing -> True
+   	; this_mod <- getModule
+        ; let is_local = nameIsLocalOrFrom this_mod quoter'
+        ; checkTc (not is_local) (quoteStageError quoter')
+
 	; traceTc (text "runQQ" <+> ppr quoter <+> ppr is_local)
-        ; checkTc (not is_local) (quoteStageError quoter)
 
 	  -- Build the expression 
-      	; let quoterExpr = L q_span $! HsVar $! quoter
+      	; let quoterExpr = L q_span $! HsVar $! quoter'
       	; let quoteExpr = L q_span $! HsLit $! HsString quote
       	; let expr = L q_span $
       	             HsApp (L q_span $
@@ -667,8 +691,10 @@ runQuasiQuote (HsQuasiQuote _name quoter q_span quote) quote_selector meta_ty me
 
       	; return result	}
 
-runQuasiQuoteExpr quasiquote = runQuasiQuote quasiquote quoteExpName expQTyConName exprMetaOps
-runQuasiQuotePat  quasiquote = runQuasiQuote quasiquote quotePatName patQTyConName patMetaOps
+runQuasiQuoteExpr qq = runQuasiQuote qq quoteExpName  expQTyConName  exprMetaOps
+runQuasiQuotePat  qq = runQuasiQuote qq quotePatName  patQTyConName  patMetaOps
+runQuasiQuoteType qq = runQuasiQuote qq quoteTypeName typeQTyConName typeMetaOps
+runQuasiQuoteDecl qq = runQuasiQuote qq quoteDecName  decsQTyConName declMetaOps
 
 quoteStageError :: Name -> SDoc
 quoteStageError quoter

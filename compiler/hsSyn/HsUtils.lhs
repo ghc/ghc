@@ -189,7 +189,7 @@ unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 		-- identify the splice
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsQuasiQuote RdrName
-mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualQuasiQuote quoter span quote
+mkHsQuasiQuote quoter span quote = HsQuasiQuote quoter span quote
 
 unqualQuasiQuote :: RdrName
 unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))

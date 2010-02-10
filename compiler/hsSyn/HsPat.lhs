@@ -19,13 +19,13 @@ module HsPat (
 	HsConPatDetails, hsConPatArgs, 
 	HsRecFields(..), HsRecField(..), hsRecFields,
 
-	HsQuasiQuote(..),
-
 	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat, mkCoPatCoI,
 
 	isBangHsBind, hsPatNeedsParens,
 	patsAreAllCons, isConPat, isSigPat, isWildPat,
-	patsAreAllLits,	isLitPat, isIrrefutableHsPat
+	patsAreAllLits,	isLitPat, isIrrefutableHsPat,
+
+	pprParendLPat
     ) where
 
 import {-# SOURCE #-} HsExpr		(SyntaxExpr, LHsExpr, pprLExpr)
@@ -215,24 +215,6 @@ hsRecFields :: HsRecFields id arg -> [id]
 hsRecFields rbinds = map (unLoc . hsRecFieldId) (rec_flds rbinds)
 \end{code}
 
-\begin{code}
-data HsQuasiQuote id = HsQuasiQuote 
-		       id
-		       id
-		       SrcSpan
-		       FastString
-
-instance OutputableBndr id => Outputable (HsQuasiQuote id) where
-    ppr = ppr_qq
-
-ppr_qq :: OutputableBndr id => HsQuasiQuote id -> SDoc
-ppr_qq (HsQuasiQuote name quoter _ quote) =
-    char '$' <> brackets (ppr name) <>
-    ptext (sLit "[:") <> ppr quoter <> ptext (sLit "|") <>
-    ppr quote <> ptext (sLit "|]")
-\end{code}
-
-
 %************************************************************************
 %*									*
 %* 		Printing patterns
@@ -252,14 +234,30 @@ pprPatBndr var		  	-- Print with type info if -dppr-debug is on
     else
 	ppr var
 
+pprParendLPat :: (OutputableBndr name) => LPat name -> SDoc
+pprParendLPat (L _ p) = pprParendPat p
+
+pprParendPat :: (OutputableBndr name) => Pat name -> SDoc
+pprParendPat p | patNeedsParens p = parens (pprPat p)
+               | otherwise        = pprPat p
+
+patNeedsParens :: Pat name -> Bool
+patNeedsParens (ConPatIn _ d)               = not (null (hsConPatArgs d))
+patNeedsParens (ConPatOut { pat_args = d }) = not (null (hsConPatArgs d))
+patNeedsParens (SigPatIn {})  = True
+patNeedsParens (SigPatOut {}) = True
+patNeedsParens (ViewPat {})   = True
+patNeedsParens (CoPat {})     = True
+patNeedsParens _              = False
+
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
 pprPat (VarPat var)  	  = pprPatBndr var
-pprPat (VarPatOut var bs) = parens (pprPatBndr var <+> braces (ppr bs))
+pprPat (VarPatOut var bs) = pprPatBndr var <+> braces (ppr bs)
 pprPat (WildPat _)	  = char '_'
-pprPat (LazyPat pat)      = char '~' <> ppr pat
-pprPat (BangPat pat)      = char '!' <> ppr pat
-pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
-pprPat (ViewPat expr pat _) = parens (hcat [pprLExpr expr, text " -> ", ppr pat])
+pprPat (LazyPat pat)      = char '~' <> pprParendLPat pat
+pprPat (BangPat pat)      = char '!' <> pprParendLPat pat
+pprPat (AsPat name pat)   = hcat [ppr name, char '@', pprParendLPat pat]
+pprPat (ViewPat expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat pat)	    = parens (ppr pat)
 pprPat (ListPat pats _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
@@ -275,26 +273,23 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
 		   	  pprLHsBinds binds, pprConArgs details]
     else pprUserCon con details
 
-pprPat (LitPat s)	      = ppr s
+pprPat (LitPat s)	    = ppr s
 pprPat (NPat l Nothing  _)  = ppr l
 pprPat (NPat l (Just _) _)  = char '-' <> ppr l
-pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
-pprPat (QuasiQuotePat (HsQuasiQuote name quoter _ quote)) 
-    = char '$' <> brackets (ppr name) <>
-      ptext (sLit "[:") <> ppr quoter <> ptext (sLit "|") <>
-      ppr quote <> ptext (sLit "|]")
-pprPat (TypePat ty)	      = ptext (sLit "{|") <> ppr ty <> ptext (sLit "|}")
-pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
-pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
-pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
+pprPat (NPlusKPat n k _ _)  = hcat [ppr n, char '+', ppr k]
+pprPat (QuasiQuotePat qq)   = ppr qq
+pprPat (TypePat ty)	    = ptext (sLit "{|") <> ppr ty <> ptext (sLit "|}")
+pprPat (CoPat co pat _)	    = pprHsWrapper (ppr pat) co
+pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPatOut pat ty)   = ppr pat <+> dcolon <+> ppr ty
 
 pprUserCon :: (Outputable con, OutputableBndr id) => con -> HsConPatDetails id -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> ppr c <+> ppr p2
 pprUserCon c details          = ppr c <+> pprConArgs details
 
 pprConArgs ::  OutputableBndr id => HsConPatDetails id -> SDoc
-pprConArgs (PrefixCon pats) = interppSP pats
-pprConArgs (InfixCon p1 p2) = interppSP [p1,p2]
+pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
+pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
 pprConArgs (RecCon rpats)   = ppr rpats
 
 instance (OutputableBndr id, Outputable arg)

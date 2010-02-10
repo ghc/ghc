@@ -5,12 +5,15 @@
 
 \begin{code}
 module RnSource ( 
-	rnSrcDecls, addTcgDUs, rnTyClDecls 
+	rnSrcDecls, addTcgDUs, rnTyClDecls, findSplice
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
+#ifdef GHCI
+import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
+#endif 	/* GHCI */
 
 import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, rdrNameOcc )
@@ -1096,3 +1099,83 @@ rnHsTyVar _doc tyvar = lookupOccRn tyvar
 \end{code}
 
 
+%*********************************************************
+%*							*
+	findSplice
+%*							*
+%*********************************************************
+
+This code marches down the declarations, looking for the first
+Template Haskell splice.  As it does so it
+	a) groups the declarations into a HsGroup
+	b) runs any top-level quasi-quotes
+
+\begin{code}
+findSplice :: [LHsDecl RdrName] -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
+findSplice ds = addl emptyRdrGroup ds
+
+addl :: HsGroup RdrName -> [LHsDecl RdrName]
+     -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
+-- This stuff reverses the declarations (again) but it doesn't matter
+addl gp []	     = return (gp, Nothing)
+addl gp (L l d : ds) = add gp l d ds
+
+
+add :: HsGroup RdrName -> SrcSpan -> HsDecl RdrName -> [LHsDecl RdrName]
+    -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
+
+add gp _ (SpliceD e) ds = return (gp, Just (e, ds))
+
+#ifndef GHCI
+add _ _ (QuasiQuoteD qq) _
+  = pprPanic "Can't do QuasiQuote declarations without GHCi" (ppr qq)
+#else
+add gp _ (QuasiQuoteD qq) ds		-- Expand quasiquotes
+  = do { ds' <- runQuasiQuoteDecl qq
+       ; addl gp (ds' ++ ds) }
+#endif
+
+-- Class declarations: pull out the fixity signatures to the top
+add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds
+  | isClassDecl d
+  = let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
+    addl (gp { hs_tyclds = L l d : ts, hs_fixds = fsigs ++ fs}) ds
+  | otherwise
+  = addl (gp { hs_tyclds = L l d : ts }) ds
+
+-- Signatures: fixity sigs go a different place than all others
+add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig f)) ds
+  = addl (gp {hs_fixds = L l f : ts}) ds
+add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
+  = addl (gp {hs_valds = add_sig (L l d) ts}) ds
+
+-- Value declarations: use add_bind
+add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
+  = addl (gp { hs_valds = add_bind (L l d) ts }) ds
+
+-- The rest are routine
+add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
+  = addl (gp { hs_instds = L l d : ts }) ds
+add gp@(HsGroup {hs_derivds = ts})  l (DerivD d) ds
+  = addl (gp { hs_derivds = L l d : ts }) ds
+add gp@(HsGroup {hs_defds  = ts})  l (DefD d) ds
+  = addl (gp { hs_defds = L l d : ts }) ds
+add gp@(HsGroup {hs_fords  = ts}) l (ForD d) ds
+  = addl (gp { hs_fords = L l d : ts }) ds
+add gp@(HsGroup {hs_warnds  = ts})  l (WarningD d) ds
+  = addl (gp { hs_warnds = L l d : ts }) ds
+add gp@(HsGroup {hs_annds  = ts}) l (AnnD d) ds
+  = addl (gp { hs_annds = L l d : ts }) ds
+add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
+  = addl (gp { hs_ruleds = L l d : ts }) ds
+add gp l (DocD d) ds
+  = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
+
+add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
+add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
+add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
+
+add_sig :: LSig a -> HsValBinds a -> HsValBinds a
+add_sig s (ValBindsIn bs sigs) = ValBindsIn bs (s:sigs) 
+add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
+\end{code}

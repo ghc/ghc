@@ -18,6 +18,9 @@ module RnTypes (
   ) where
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
+#ifdef GHCI
+import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
+#endif 	/* GHCI */
 
 import DynFlags
 import HsSyn
@@ -191,6 +194,12 @@ rnHsType doc (HsDocTy ty haddock_doc) = do
     haddock_doc' <- rnLHsDoc haddock_doc
     return (HsDocTy ty' haddock_doc')
 
+#ifndef GHCI
+rnHsType _ ty@(HsQuasiQuoteTy _) = pprPanic "Can't do quasiquotation without GHCi" (ppr ty)
+#else
+rnHsType doc (HsQuasiQuoteTy qq) = do { ty <- runQuasiQuoteType qq
+                                      ; rnHsType doc (unLoc ty) }
+#endif
 rnHsType _ (HsSpliceTyOut {}) = panic "rnHsType"
 
 rnLHsTypes :: SDoc -> [LHsType RdrName]
