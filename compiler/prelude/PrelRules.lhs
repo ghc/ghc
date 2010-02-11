@@ -293,7 +293,9 @@ floatOp2 _ _ _ = Nothing
 floatOp2Z :: (Rational -> Rational -> Rational) -> Literal -> Literal
           -> Maybe (Expr CoreBndr)
 floatOp2Z op (MachFloat f1) (MachFloat f2)
-  | f2 /= 0   = Just (mkFloatVal (f1 `op` f2))
+  | (f1 /= 0 || f2 > 0)  -- see Note [negative zero]
+  && f2 /= 0             -- avoid NaN and Infinity/-Infinity
+  = Just (mkFloatVal (f1 `op` f2))
 floatOp2Z _ _ _ = Nothing
 
 --------------------------
@@ -306,7 +308,13 @@ doubleOp2 _ _ _ = Nothing
 doubleOp2Z :: (Rational -> Rational -> Rational) -> Literal -> Literal
            -> Maybe (Expr CoreBndr)
 doubleOp2Z op (MachDouble f1) (MachDouble f2)
-  | f2 /= 0   = Just (mkDoubleVal (f1 `op` f2))
+  | (f1 /= 0 || f2 > 0)  -- see Note [negative zero]
+  && f2 /= 0             -- avoid NaN and Infinity/-Infinity
+  = Just (mkDoubleVal (f1 `op` f2))
+  -- Note [negative zero] Avoid (0 / -d), otherwise 0/(-1) reduces to
+  -- zero, but we might want to preserve the negative zero here which
+  -- is representable in Float/Double but not in (normalised)
+  -- Rational. (#3676) Perhaps we should generate (0 :% (-1)) instead?
 doubleOp2Z _ _ _ = Nothing
 
 
