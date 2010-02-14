@@ -652,6 +652,8 @@ SIZE			= size
 STRIP			= strip
 PATCH			= @PatchCmd@
 TAR			= @TarCmd@
+BZIP2                   = bzip2
+GZIP                    = gzip
 ZIP			= zip
 
 HSCOLOUR = @HSCOLOUR@
