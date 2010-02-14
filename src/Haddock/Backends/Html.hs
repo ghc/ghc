@@ -399,7 +399,7 @@ mkNode ss (Node s leaf pkg short ts) depth id_ = htmlNode
     (s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
     
-    id_s = "n:" ++ show id_
+    id_s = "n." ++ show id_
     
     (sub_tree,id') = genSubTree emptyTable (id_+1) ts
     
