@@ -281,7 +281,10 @@ regNames
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
 #elif x86_64_TARGET_ARCH
    = ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp" ]
+#else
+   = []
 #endif
+
 
 
 -- machine specific ------------------------------------------------------------

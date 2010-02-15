@@ -74,6 +74,7 @@ regDotColor :: Reg -> SDoc
 regDotColor	= panic "not defined"
 #endif
 
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 fpRegColors :: [(Reg,String)]
 fpRegColors =
         [ (fake0, "#ff00ff")
@@ -84,3 +85,4 @@ fpRegColors =
 	, (fake5, "#5500ff") ]
 
 	++ zip (map regSingle [24..39]) (repeat "red")
+#endif
