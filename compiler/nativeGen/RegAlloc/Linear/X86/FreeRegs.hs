@@ -12,7 +12,11 @@ import Data.Word
 import Data.Bits
 
 type FreeRegs 
+#ifdef i386_TARGET_ARCH
 	= Word32
+#else
+	= Word64
+#endif
 
 noFreeRegs :: FreeRegs
 noFreeRegs = 0

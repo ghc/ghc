@@ -942,7 +942,7 @@ gpop reg offset
    = hcat [text "fstp ", greg reg offset]
 
 greg :: Reg -> RegNo -> Doc
-greg reg offset = text "%st(" <> int (gregno reg - 16+offset) <> char ')'
+greg reg offset = text "%st(" <> int (gregno reg - firstfake+offset) <> char ')'
 
 gsemi :: Doc
 gsemi = text " ; "

@@ -25,7 +25,7 @@ module X86.Regs (
 	EABase(..), EAIndex(..), addrModeRegs,
 
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
-	fake0, fake1, fake2, fake3, fake4, fake5,
+	fake0, fake1, fake2, fake3, fake4, fake5, firstfake,
 
 	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
 	r8,  r9,  r10, r11, r12, r13, r14, r15,
@@ -105,7 +105,7 @@ realRegSqueeze cls rr
  	RcInteger
 	 -> case rr of
 	 	RealRegSingle regNo
-			| regNo	< firstfake -> _ILIT(1)	-- first fake reg is 16
+			| regNo	< firstfake -> _ILIT(1)
 			| otherwise	-> _ILIT(0)
 			
 		RealRegPair{}		-> _ILIT(0)
@@ -218,13 +218,21 @@ spRel _	= panic "X86.Regs.spRel: not defined for this architecture"
 
 #endif
 
+-- The register numbers must fit into 32 bits on x86, so that we can
+-- use a Word32 to represent the set of free registers in the register
+-- allocator.
+
 firstfake, lastfake :: RegNo
 firstfake = 16
 lastfake  = 21
 
 firstxmm, lastxmm :: RegNo
 firstxmm  = 24
+#if i386_TARGET_ARCH
+lastxmm   = 31
+#else
 lastxmm   = 39
+#endif
 
 lastint :: RegNo
 #if i386_TARGET_ARCH
@@ -296,7 +304,7 @@ Intel x86 architecture:
 - Only ebx, esi, edi and esp are available across a C call (they are callee-saves).
 - Registers 0-7 have 16-bit counterparts (ax, bx etc.)
 - Registers 0-3 have 8 bit counterparts (ah, bh etc.)
-- Registers 8-13 are fakes; we pretend x86 has 6 conventionally-addressable
+- Registers fake0..fake5 are fakes; we pretend x86 has 6 conventionally-addressable
   fp registers, and 3-operand insns for them, and we translate this into
   real stack-based x86 fp code after register allocation.
 
@@ -372,7 +380,7 @@ xmm14 = regSingle 38
 xmm15 = regSingle 39
 
 allFPArgRegs :: [Reg]
-allFPArgRegs	= map regSingle [24 .. 31]
+allFPArgRegs	= map regSingle [firstxmm .. firstxmm+7]
 
 ripRel :: Displacement -> AddrMode
 ripRel imm	= AddrBaseIndex EABaseRip EAIndexNone imm
@@ -391,7 +399,7 @@ esp = rsp
 -}
 
 xmm :: RegNo -> Reg
-xmm n = regSingle (24+n)
+xmm n = regSingle (firstxmm+n)
 
 
 
@@ -457,7 +465,6 @@ callClobberedRegs 	:: [Reg]
 #define xmm13 37
 #define xmm14 38
 #define xmm15 39
-
 
 #if i386_TARGET_ARCH
 freeReg esp = fastBool False  --	%esp is the C stack pointer
