@@ -1188,6 +1188,24 @@ scheduleHandleStackOverflow (Capability *cap, Task *task, StgTSO *t)
 static rtsBool
 scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
 {
+    /* put the thread back on the run queue.  Then, if we're ready to
+     * GC, check whether this is the last task to stop.  If so, wake
+     * up the GC thread.  getThread will block during a GC until the
+     * GC is finished.
+     */
+
+    ASSERT(t->_link == END_TSO_QUEUE);
+    
+    // Shortcut if we're just switching evaluators: don't bother
+    // doing stack squeezing (which can be expensive), just run the
+    // thread.
+    if (cap->context_switch == 0 && t->what_next != prev_what_next) {
+	debugTrace(DEBUG_sched,
+		   "--<< thread %ld (%s) stopped to switch evaluators", 
+		   (long)t->id, what_next_strs[t->what_next]);
+	return rtsTrue;
+    }
+
     // Reset the context switch flag.  We don't do this just before
     // running the thread, because that would mean we would lose ticks
     // during GC, which can lead to unfair scheduling (a thread hogs
@@ -1196,28 +1214,6 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     // better than the alternative.
     cap->context_switch = 0;
     
-    /* put the thread back on the run queue.  Then, if we're ready to
-     * GC, check whether this is the last task to stop.  If so, wake
-     * up the GC thread.  getThread will block during a GC until the
-     * GC is finished.
-     */
-#ifdef DEBUG
-    if (t->what_next != prev_what_next) {
-	debugTrace(DEBUG_sched,
-		   "--<< thread %ld (%s) stopped to switch evaluators", 
-		   (long)t->id, what_next_strs[t->what_next]);
-    }
-#endif
-    
-    ASSERT(t->_link == END_TSO_QUEUE);
-    
-    // Shortcut if we're just switching evaluators: don't bother
-    // doing stack squeezing (which can be expensive), just run the
-    // thread.
-    if (t->what_next != prev_what_next) {
-	return rtsTrue;
-    }
-
     IF_DEBUG(sanity,
 	     //debugBelch("&& Doing sanity check on yielding TSO %ld.", t->id);
 	     checkTSO(t));
