@@ -671,7 +671,7 @@ ignoreAltCon env (LitAlt lit) = ignoreType env (literalType lit)
 ignoreAltCon _   DEFAULT      = True
 
 forceSpecBndr :: ScEnv -> Var -> Bool
-forceSpecBndr env var = forceSpecFunTy env . varType $ var
+forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
 forceSpecFunTy env = any (forceSpecArgTy env) . fst . splitFunTys
