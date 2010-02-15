@@ -389,6 +389,38 @@ But fspec doesn't have decent strictnes info.  As it happened,
 and hence f.  But now f's strictness is less than its arity, which
 breaks an invariant.
 
+Note [Forcing specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With stream fusion and in other similar cases, we want to fully specialise
+some (but not necessarily all!) loops regardless of their size and the
+number of specialisations. We allow a library to specify this by annotating
+a type with ForceSpecConstr and then adding a parameter of that type to the
+loop. Here is a (simplified) example from the vector library:
+
+  data SPEC = SPEC | SPEC2
+  {-# ANN type SPEC ForceSpecConstr #-}
+
+  foldl :: (a -> b -> a) -> a -> Stream b -> a
+  {-# INLINE foldl #-}
+  foldl f z (Stream step s _) = foldl_loop SPEC z s
+    where
+      foldl_loop SPEC z s = case step s of
+                              Yield x s' -> foldl_loop SPEC (f z x) s'
+                              Skip       -> foldl_loop SPEC z s'
+                              Done       -> z
+
+SpecConstr will spot the SPEC parameter and always fully specialise
+foldl_loop. Note that we can't just annotate foldl_loop since it isn't a
+top-level function but even if we could, inlining etc. could easily drop the
+annotation. We also have to prevent the SPEC argument from being removed by
+w/w which is why SPEC is a sum type. This is all quite ugly; we ought to come
+up with a better design.
+
+ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
+force_spec to True when calling specLoop. This flag makes specLoop and
+specialise ignore specConstrCount and specConstrThreshold when deciding
+whether to specialise a function.
+
 -----------------------------------------------------
 		Stuff not yet handled
 -----------------------------------------------------
@@ -918,6 +950,9 @@ scExpr' env (Let (NonRec bndr rhs) body)
 
 	; (rhs_usg, rhs_info) <- scRecRhs env (bndr',rhs)
 
+          -- NB: We don't use the ForceSpecConstr mechanism (see
+          -- Note [Forcing specialisation]) for non-recursive bindings
+          -- at the moment. I'm not sure if this is the right thing to do.
 	; let force_spec = False
 	; (spec_usg, specs) <- specialise env force_spec 
                                           (scu_calls body_usg) 
@@ -936,6 +971,7 @@ scExpr' env (Let (Rec prs) body)
 	      (rhs_env1,bndrs') = extendRecBndrs env bndrs
 	      rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
               force_spec = any (forceSpecBndr env) bndrs'
+                -- Note [Forcing specialisation]
 
 	; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
 	; (body_usg, body')     <- scExpr rhs_env2 body
@@ -1039,6 +1075,7 @@ scTopBind env (Rec prs)
   where
     (bndrs,rhss) = unzip prs
     force_spec = any (forceSpecBndr env) bndrs
+      -- Note [Forcing specialisation]
 
 scTopBind env (NonRec bndr rhs)
   = do	{ (_, rhs') <- scExpr env rhs
@@ -1108,6 +1145,7 @@ data OneSpec  = OS CallPat 		-- Call pattern that generated this specialisation
 
 specLoop :: ScEnv
          -> Bool                                -- force specialisation?
+                                                -- Note [Forcing specialisation]
 	 -> CallEnv
 	 -> [RhsInfo]
 	 -> ScUsage -> [SpecInfo]		-- One per binder; acccumulating parameter
@@ -1126,6 +1164,7 @@ specLoop env force_spec all_calls rhs_infos usg_so_far specs_so_far
 specialise 
    :: ScEnv
    -> Bool                              -- force specialisation?
+                                        --   Note [Forcing specialisation]
    -> CallEnv				-- Info on calls
    -> RhsInfo
    -> SpecInfo				-- Original RHS plus patterns dealt with
