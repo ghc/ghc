@@ -49,7 +49,7 @@ module StgCmmUtils (
 import StgCmmMonad
 import StgCmmClosure
 import BlockId
-import Cmm
+import Cmm hiding (regUsedIn)
 import MkZipCfgCmm
 import CLabel
 import CmmUtils
@@ -595,7 +595,6 @@ reg  `regUsedIn` CmmReg (CmmLocal reg')      = reg == reg'
 reg  `regUsedIn` CmmRegOff (CmmLocal reg') _ = reg == reg'
 reg  `regUsedIn` CmmMachOp _ es   	     = any (reg `regUsedIn`) es
 _reg `regUsedIn` _other		 	     = False    	-- The CmmGlobal cases
-
 
 -------------------------------------------------------------------------
 --	mkSwitch

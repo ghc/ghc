@@ -116,27 +116,18 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
 cmmMiniInlineStmts uses (stmt:stmts)
   = stmt : cmmMiniInlineStmts uses stmts
 
+lookForInline u expr (stmt : rest)
+  | Just 1 <- lookupUFM (countUses stmt) u, ok_to_inline
+  = Just (inlineStmt u expr stmt : rest)
 
--- Try to inline a temporary assignment.  We can skip over assignments to
--- other tempoararies, because we know that expressions aren't side-effecting
--- and temporaries are single-assignment.
-lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _)) rhs) : rest)
-  | u /= u' 
-  = case lookupUFM (countUses rhs) u of
-	Just 1 -> Just (inlineStmt u expr stmt : rest)
-	_other -> case lookForInline u expr rest of
-		     Nothing    -> Nothing
-		     Just stmts -> Just (stmt:stmts)
+  | ok_to_skip
+  = case lookForInline u expr rest of
+           Nothing    -> Nothing
+           Just stmts -> Just (stmt:stmts)
 
-lookForInline u expr (CmmNop : rest)
-  = lookForInline u expr rest
+  | otherwise 
+  = Nothing
 
-lookForInline _ _ [] = Nothing
-
-lookForInline u expr (stmt:stmts)
-  = case lookupUFM (countUses stmt) u of
-	Just 1 | ok_to_inline -> Just (inlineStmt u expr stmt : stmts)
-	_other -> Nothing
   where
 	-- we don't inline into CmmCall if the expression refers to global
 	-- registers.  This is a HACK to avoid global registers clashing with
@@ -146,6 +137,16 @@ lookForInline u expr (stmt:stmts)
     ok_to_inline = case stmt of
 		     CmmCall{} -> hasNoGlobalRegs expr
 		     _ -> True
+
+   -- We can skip over assignments to other tempoararies, because we
+   -- know that expressions aren't side-effecting and temporaries are
+   -- single-assignment.
+    ok_to_skip = case stmt of
+                 CmmNop -> True
+                 CmmAssign (CmmLocal (LocalReg u' _)) rhs | u' /= u -> True
+                 CmmAssign g@(CmmGlobal _) rhs -> not (g `regUsedIn` expr)
+                 _other -> False
+
 
 inlineStmt :: Unique -> CmmExpr -> CmmStmt -> CmmStmt
 inlineStmt u a (CmmAssign r e) = CmmAssign r (inlineExpr u a e)

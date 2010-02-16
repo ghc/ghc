@@ -945,13 +945,6 @@ anySrc p (CmmComment _)	    = False
 anySrc p CmmNop		    = False
 anySrc p other		    = True		-- Conservative
 
-regUsedIn :: CmmReg -> CmmExpr -> Bool
-reg `regUsedIn` CmmLit _ 	 = False
-reg `regUsedIn` CmmLoad e  _ 	 = reg `regUsedIn` e
-reg `regUsedIn` CmmReg reg' 	 = reg == reg'
-reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
-reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
-
 locUsedIn :: CmmExpr -> CmmType -> CmmExpr -> Bool
 -- (locUsedIn a r e) checks whether writing to r[a] could affect the value of
 -- 'e'.  Returns True if it's not sure.

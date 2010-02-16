@@ -22,6 +22,7 @@ module CmmExpr
     , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet
+    , regUsedIn
     , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, isStackSlotOf
  
    -- MachOp
@@ -274,6 +275,16 @@ instance DefinerOfLocalRegs a => DefinerOfLocalRegs (Maybe a) where
   foldRegsDefd _ set Nothing  = set
   foldRegsDefd f set (Just x) = foldRegsDefd f set x
 
+-----------------------------------------------------------------------------
+-- Another reg utility
+
+regUsedIn :: CmmReg -> CmmExpr -> Bool
+_   `regUsedIn` CmmLit _ 	 = False
+reg `regUsedIn` CmmLoad e  _ 	 = reg `regUsedIn` e
+reg `regUsedIn` CmmReg reg' 	 = reg == reg'
+reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
+reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
+_   `regUsedIn` CmmStackSlot _ _ = False
 
 -----------------------------------------------------------------------------
 --    Stack slots
