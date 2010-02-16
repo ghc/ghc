@@ -10,7 +10,7 @@
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
-import Distribution.InstalledPackageInfo.Binary
+import Distribution.InstalledPackageInfo.Binary()
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import Distribution.ModuleName hiding (main)
 import Distribution.InstalledPackageInfo
@@ -735,7 +735,7 @@ updateDBCache verbosity db = do
   let filename = location db </> cachefilename
   when (verbosity > Normal) $
       putStrLn ("writing cache " ++ filename)
-  writeBinPackageDB filename (map convertPackageInfoOut (packages db))
+  writeBinaryFileAtomic filename (map convertPackageInfoOut (packages db))
     `catch` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
@@ -1548,12 +1548,20 @@ catchError io handler = io `Exception.catch` handler'
     where handler' (Exception.ErrorCall err) = handler err
 
 
+writeBinaryFileAtomic :: Bin.Binary a => FilePath -> a -> IO ()
+writeBinaryFileAtomic targetFile obj =
+  withFileAtomic targetFile $ \h -> B.hPutStr h (Bin.encode obj)
+
+writeFileAtomic :: FilePath -> String -> IO ()
+writeFileAtomic targetFile content =
+  withFileAtomic targetFile $ \h -> hPutStr h content
+
 -- copied from Cabal's Distribution.Simple.Utils, except that we want
 -- to use text files here, rather than binary files.
-writeFileAtomic :: FilePath -> String -> IO ()
-writeFileAtomic targetFile content = do
+withFileAtomic :: FilePath -> (Handle -> IO ()) -> IO ()
+withFileAtomic targetFile write_content = do
   (newFile, newHandle) <- openNewFile targetDir template
-  do  hPutStr newHandle content
+  do  write_content newHandle
       hClose newHandle
 #if mingw32_HOST_OS || mingw32_TARGET_OS
       renameFile newFile targetFile
