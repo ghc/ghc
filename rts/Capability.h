@@ -294,7 +294,8 @@ recordMutableCap (StgClosure *p, Capability *cap, nat gen)
     bdescr *bd;
 
     // We must own this Capability in order to modify its mutable list.
-    ASSERT(cap->running_task == myTask());
+    //    ASSERT(cap->running_task == myTask());
+    // NO: assertion is violated by performPendingThrowTos()
     bd = cap->mut_lists[gen];
     if (bd->free >= bd->start + BLOCK_SIZE_W) {
 	bdescr *new_bd;
