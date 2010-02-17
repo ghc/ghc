@@ -1,0 +1,7 @@
+name: a
+version: 1.0
+exposed-modules: A
+build-depends: base
+build-type: Simple
+ghc-options: -O0
+
