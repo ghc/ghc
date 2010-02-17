@@ -48,3 +48,6 @@ libraries/utf8-string                   packages/utf8-string            darcs
 libraries/Win32                         packages/Win32                  darcs
 testsuite                   testsuite   testsuite                       darcs
 nofib                       nofib       nofib                           darcs
+libraries/deepseq           extra       packages/deepseq                darcs
+libraries/parallel          extra       packages/parallel               darcs
+libraries/stm               extra       packages/stm                    darcs

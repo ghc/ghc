@@ -285,6 +285,11 @@ sub main {
         elsif ($arg eq "--testsuite") {
             $tags{"testsuite"} = 1;
         }
+        # --extralibs tells get to also grab the extra repos.
+        # It has no effect on the other commands.
+        elsif ($arg eq "--extra") {
+            $tags{"extra"} = 1;
+        }
         elsif ($arg eq "--checked-out") {
             $checked_out_flag = 1;
         }
