@@ -512,7 +512,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
    export_hash <- computeFingerprint dflags putNameLiterally 
-                      (mi_exports iface0, orphan_hash, dep_orphan_hashes)
+                      (mi_exports iface0,
+                       orphan_hash,
+                       dep_orphan_hashes,
+                       dep_pkgs (mi_deps iface0))
+                        -- dep_pkgs: see "Package Version Changes" on
+                        -- wiki/Commentary/Compiler/RecompilationAvoidance
 
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = eltsFM $ listToFM $
