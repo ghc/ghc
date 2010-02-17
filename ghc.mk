@@ -339,6 +339,8 @@ $(eval $(call addPackage,terminfo,($$(Windows),NO)))
 
 $(eval $(call addPackage,haskeline))
 
+$(foreach pkg,$(EXTRA_PACKAGES),$(eval $(call addPackage,$(pkg))))
+
 ifneq "$(BootingFromHc)" "YES"
 PACKAGES_STAGE2 += \
 	dph/dph-base \
