@@ -54,7 +54,6 @@ char *mkString(const char *fmt, ...) {
 char *quote(char *str) {
     char *quotedStr;
     char *p;
-    int i;
 
     quotedStr = malloc(2 * strlen(str) + 2 + 1);
     if (quotedStr == NULL) {
@@ -74,7 +73,7 @@ char *quote(char *str) {
     return quotedStr;
 }
 
-int run(char *exePath, int numArgs1, char **args1, int numArgs2, char **args2) {
+__attribute__((noreturn)) int run(char *exePath, int numArgs1, char **args1, int numArgs2, char **args2) {
     char **p;
     char **newArgv;
     int i, ret;
