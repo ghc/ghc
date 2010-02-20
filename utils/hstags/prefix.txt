@@ -1,9 +1,0 @@
-#
-# hstags - generating a tags file from Haskell source
-#
-# To use the script on your system, the following variable
-# needs to be set (and uncommented!), if it hasn't already
-# been set above:
-#
-#$libdir='/local/fp/lib/sparc-sun-sunos4/ghc-2.02';
-#
