@@ -108,7 +108,7 @@ null                    :: [a] -> Bool
 null []                 =  True
 null (_:_)              =  False
 
--- | 'length' returns the length of a finite list as an 'Int'.
+-- | /O(n)/. 'length' returns the length of a finite list as an 'Int'.
 -- It is an instance of the more general 'Data.List.genericLength',
 -- the result type of which may be any kind of number.
 length                  :: [a] -> Int
