@@ -269,6 +269,7 @@ include rules/build-perl.mk
 include rules/build-package.mk
 include rules/build-package-way.mk
 include rules/haddock.mk
+include rules/tags-package.mk
 
 # -----------------------------------------------------------------------------
 # Registering hand-written package descriptions (used in libffi and rts)
@@ -547,6 +548,7 @@ BUILD_DIRS += \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
+   utils/ghctags \
    utils/hpc \
    utils/runghc \
    ghc
@@ -597,6 +599,7 @@ ifneq "$(findstring $(phase),0 1 2 3)" ""
 # In phases 0-3, we disable stage2-3, the full libraries and haddock
 utils/haddock_dist_DISABLE = YES
 utils/runghc_dist_DISABLE = YES
+utils/ghctags_dist_DISABLE = YES
 utils/hpc_dist_DISABLE = YES
 utils/hsc2hs_dist-install_DISABLE = YES
 utils/ghc-pkg_dist-install_DISABLE = YES
@@ -744,6 +747,9 @@ libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
                             $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
                           | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers < $< > $@
+
+.PHONY: tags
+tags: tags_compiler
 
 # -----------------------------------------------------------------------------
 # Installation
