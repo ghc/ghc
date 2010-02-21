@@ -19,7 +19,7 @@ SRCS	= \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
 	Data/Monoid.hs \
 	Data/Eq.hs Data/Ord.hs Data/Fixed.hs \
-	Data/Foldable.hs Data/Traversable.hs \
+	Data/Functor.hs Data/Foldable.hs Data/Traversable.hs \
 	Data/Function.hs \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Instances.hs \
 	Control/Arrow.hs Control/Applicative.hs \
