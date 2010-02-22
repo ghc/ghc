@@ -275,6 +275,7 @@ pprReg s r
      ppr_reg_no _ = panic "X86.Ppr.ppr_reg_no: no match"
 #endif
 
+#if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 ppr_reg_float :: Int -> LitString
 ppr_reg_float i = case i of
 	16 -> sLit "%fake0";  17 -> sLit "%fake1"
@@ -289,6 +290,7 @@ ppr_reg_float i = case i of
 	36 -> sLit "%xmm12";  37 -> sLit "%xmm13"
 	38 -> sLit "%xmm14";  39 -> sLit "%xmm15"
 	_  -> sLit "very naughty x86 register"
+#endif
 
 pprSize :: Size -> Doc
 pprSize x 
