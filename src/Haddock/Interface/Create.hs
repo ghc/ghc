@@ -558,7 +558,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
               -- for example).
               --
               -- But I might be missing something obvious.  What's important
-              -- *here* is that we behave reasonably when we run into one of
+              -- /here/ is that we behave reasonably when we run into one of
               -- those exported type-inferenced values.
               isLocalAndTypeInferenced <- liftGhcToErrMsgGhc $
                     isLoaded (moduleName (nameModule t))
