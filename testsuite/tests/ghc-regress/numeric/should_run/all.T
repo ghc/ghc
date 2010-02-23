@@ -48,4 +48,4 @@ test('arith019', normal, compile_and_run, [''])
 test('expfloat', normal, compile_and_run, ['-fglasgow-exts'])
 
 test('1603', skip, compile_and_run, ['-fglasgow-exts'])
-test('3676', normal, compile_and_run, [''])
+test('3676', expect_broken(3676), compile_and_run, [''])
