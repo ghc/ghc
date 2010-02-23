@@ -1,6 +1,10 @@
 test('qq007',
      [skip_if_fast,
       extra_clean(['QQ.hi', 'QQ.o']),
+      # We'd need to jump through some hoops to run this test the
+      # profiling ways, due to the TH use, so for now we just
+      # omit the profiling ways
+      omit_ways(['profc','profasm','profthreaded']),
       only_compiler_types(['ghc'])],
      multimod_compile,
      ['Test', '-v0'])
