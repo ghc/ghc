@@ -19,7 +19,7 @@ Foreign function interface (FFI)
 
   <para>The FFI libraries are documented in the accompanying library
   documentation; see for example the
-    <ulink url="../libraries/base/Control-Concurrent.html"><literal>Foreign</literal></ulink> module.</para>
+    <ulink url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Foreign</literal></ulink> module.</para>
 
   <sect1 id="ffi-ghcexts">
     <title>GHC extensions to the FFI Addendum</title>
@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
           threads</emphasis>, which are Haskell threads tied to a
           particular OS thread.  For information on bound threads, see
           the documentation
-          for the <ulink url="../libraries/base/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>
+          for the <ulink url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>
           module.</para>
       </sect3>
       

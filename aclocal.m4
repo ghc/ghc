@@ -1327,4 +1327,12 @@ case "$1" in
   esac
 ])
 
+# LIBRARY_VERSION(lib)
+# --------------------------------
+# Gets the version number of a library
+AC_DEFUN([LIBRARY_VERSION],[
+LIBRARY_$1_VERSION=`grep -i "^version:" libraries/$1/$1.cabal | sed "s/.* //"`
+AC_SUBST(LIBRARY_$1_VERSION)
+])
+
 # LocalWords:  fi

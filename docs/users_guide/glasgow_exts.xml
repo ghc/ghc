@@ -1245,7 +1245,7 @@ then group by e
     <para>This form of grouping is essentially the same as the one described above. However,
     since no function to use for the grouping has been supplied it will fall back on the
     <literal>groupWith</literal> function defined in 
-    <ulink url="../libraries/base/GHC-Exts.html"><literal>GHC.Exts</literal></ulink>. This
+    <ulink url="&libraryBaseLocation;/GHC-Exts.html"><literal>GHC.Exts</literal></ulink>. This
     is the form of the group statement that we made use of in the opening example.</para>
 
     </listitem>
@@ -6697,7 +6697,7 @@ The arrows web page at
 With the <option>-XArrows</option> flag, GHC supports the arrow
 notation described in the second of these papers,
 translating it using combinators from the
-<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="&libraryBaseLocation;/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module.
 What follows is a brief introduction to the notation;
 it won't make much sense unless you've read Hughes's paper.
@@ -6812,7 +6812,7 @@ the arrow <literal>f</literal>, and matches its output against
 <literal>y</literal>.
 In the next line, the output is discarded.
 The arrow <function>returnA</function> is defined in the
-<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="&libraryBaseLocation;/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module as <literal>arr id</literal>.
 The above example is treated as an abbreviation for
 <screen>
@@ -6829,7 +6829,7 @@ arr (\ x -> (x, x)) >>>
 Note that variables not used later in the composition are projected out.
 After simplification using rewrite rules (see <xref linkend="rewrite-rules"/>)
 defined in the
-<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="&libraryBaseLocation;/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module, this reduces to
 <screen>
 arr (\ x -> (x+1, x)) >>>
@@ -7125,7 +7125,7 @@ additional restrictions:
 <listitem>
 <para>
 The module must import
-<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>.
+<ulink url="&libraryBaseLocation;/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>.
 </para>
 </listitem>
 

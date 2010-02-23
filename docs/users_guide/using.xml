@@ -1841,7 +1841,7 @@ f "2"    = 2
       special option or libraries compiled in a certain way.  To get access to
       the support libraries for Concurrent Haskell, just import
       <ulink
-	url="../libraries/base/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>.  More information on Concurrent Haskell is provided in the documentation for that module.</para>
+	url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>.  More information on Concurrent Haskell is provided in the documentation for that module.</para>
 
     <para>The following RTS option(s) affect the behaviour of Concurrent
       Haskell programs:<indexterm><primary>RTS options, concurrent</primary></indexterm></para>

@@ -38,7 +38,7 @@
   </para><para>
   To the programmer, Concurrent Haskell introduces no new language constructs;
   rather, it appears simply as a library, <ulink
-  url="../libraries/base/Control-Concurrent.html">
+  url="&libraryBaseLocation;/Control-Concurrent.html">
 	      Control.Concurrent</ulink>.  The functions exported by this
 	      library include:
   <itemizedlist>

@@ -71,7 +71,7 @@ Notice how the "%1" argument is quoted (or not).
   <para>This problem doesn't just affect GHCi, it affects any
   GHC-compiled program that wants to catch console events.  See the
   <ulink
-  url="../libraries/base/GHC-ConsoleHandler.html">GHC.ConsoleHandler</ulink>
+  url="&libraryBaseLocation;/GHC-ConsoleHandler.html">GHC.ConsoleHandler</ulink>
   module.</para>
 </sect1>
 
