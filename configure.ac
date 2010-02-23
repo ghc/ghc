@@ -905,12 +905,14 @@ AC_SUBST(BUILD_DOCBOOK_PDF)
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal)
 LIBRARY_VERSION(ghc-prim)
+LIBRARY_ghc_VERSION="$ProjectVersion"
+AC_SUBST(LIBRARY_ghc_VERSION)
 
 if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml distrib/ghc.iss distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml libraries/prologue.txt distrib/ghc.iss distrib/configure.ac])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
 
