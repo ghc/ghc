@@ -9,6 +9,8 @@ test('barton-mangler-bug',
                    'Plot.hi',              'Plot.o',
                    'PlotExample.hi',       'PlotExample.o',
                    'TypesettingTricks.hi', 'TypesettingTricks.o']),
+      # omit via-C ways, gcc takes too long:
+      omit_ways(['profc','optc']),
       omit_compiler_types(['hugs'])],
      multimod_compile_and_run, ['Main', ''])
 
