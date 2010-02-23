@@ -1329,10 +1329,11 @@ case "$1" in
 
 # LIBRARY_VERSION(lib)
 # --------------------------------
-# Gets the version number of a library
+# Gets the version number of a library.
+# If $1 is ghc-prim, then we define LIBRARY_ghc_prim_VERSION as 1.2.3
 AC_DEFUN([LIBRARY_VERSION],[
-LIBRARY_$1_VERSION=`grep -i "^version:" libraries/$1/$1.cabal | sed "s/.* //"`
-AC_SUBST(LIBRARY_$1_VERSION)
+LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/$1/$1.cabal | sed "s/.* //"`
+AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 ])
 
 # LocalWords:  fi

@@ -110,7 +110,7 @@ While you really can use this stuff to write fast code,
 
 <para>All these primitive data types and operations are exported by the 
 library <literal>GHC.Prim</literal>, for which there is 
-<ulink url="../libraries/ghc-prim/GHC-Prim.html">detailed online documentation</ulink>.
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html">detailed online documentation</ulink>.
 (This documentation is generated from the file <filename>compiler/prelude/primops.txt.pp</filename>.)
 </para>
 <para>
@@ -7489,7 +7489,7 @@ Assertion failures can be caught, see the documentation for the
 
       <para>Any extension from the <literal>Extension</literal> type defined in
 	<ulink
-	  url="../libraries/Cabal/Language-Haskell-Extension.html"><literal>Language.Haskell.Extension</literal></ulink>
+	  url="&libraryCabalLocation;/Language-Haskell-Extension.html"><literal>Language.Haskell.Extension</literal></ulink>
 	may be used.  GHC will report an error if any of the requested extensions are not supported.</para>
     </sect2>
 
@@ -8780,7 +8780,7 @@ r) ->
 <title>Special built-in functions</title>
 <para>GHC has a few built-in functions with special behaviour.  These
 are now described in the module <ulink
-url="../libraries/ghc-prim/GHC-Prim.html"><literal>GHC.Prim</literal></ulink>
+url="&libraryGhcPrimLocation;/GHC-Prim.html"><literal>GHC.Prim</literal></ulink>
 in the library documentation.</para>
 </sect1>
 

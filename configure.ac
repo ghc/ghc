@@ -903,6 +903,8 @@ AC_SUBST(BUILD_DOCBOOK_PS)
 AC_SUBST(BUILD_DOCBOOK_PDF)
 
 LIBRARY_VERSION(base)
+LIBRARY_VERSION(Cabal)
+LIBRARY_VERSION(ghc-prim)
 
 if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])

@@ -61,9 +61,9 @@ the FFI with concurrency</ulink>.</para></listitem>
     papers</ulink> are an excellent introduction to what STM is, and how to use
     it.</para>
 
-   <para>The main library you need to use STM is <ulink
-  url="../libraries/stm/Control-Concurrent-STM.html">
-	      Control.Concurrent.STM</ulink>. The main features supported are these:
+   <para>The main library you need to use is the <ulink
+  url="http://hackage.haskell.org/package/stm">
+	      stm library</ulink>. The main features supported are these:
 <itemizedlist>
 <listitem><para>Atomic blocks.</para></listitem>
 <listitem><para>Transactional variables.</para></listitem>
@@ -109,8 +109,8 @@ All these features are described in the papers mentioned earlier.
     One way to do so is forking threads using Concurrent Haskell (<xref
     linkend="concurrent-haskell"/>), but the simplest mechanism for extracting parallelism from pure code is
       to use the <literal>par</literal> combinator, which is closely related to (and often used
-      with) <literal>seq</literal>.  Both of these are available from <ulink
-	url="../libraries/parallel/Control-Parallel.html"><literal>Control.Parallel</literal></ulink>:</para>
+      with) <literal>seq</literal>.  Both of these are available from the <ulink
+	url="http://hackage.haskell.org/package/parallel">parallel library</ulink>:</para>
 
 <programlisting>
 infixr 0 `par`
@@ -177,8 +177,9 @@ nfib n | n &#60;= 1 = 1
       statistics; see <xref linkend="rts-options-gc" />.</para>
 
     <para>More sophisticated combinators for expressing parallelism are
-      available from the <ulink
-	url="../libraries/parallel/Control-Parallel-Strategies.html"><literal>Control.Parallel.Strategies</literal></ulink> module.
+      available from the <literal>Control.Parallel.Strategies</literal>
+      module in the <ulink
+	url="http://hackage.haskell.org/package/parallel">parallel package</ulink>.
       This module builds functionality around <literal>par</literal>,
       expressing more elaborate patterns of parallel computation, such as
       parallel <literal>map</literal>.</para>
