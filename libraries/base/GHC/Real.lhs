@@ -54,10 +54,9 @@ ratioPrec, ratioPrec1 :: Int
 ratioPrec  = 7  -- Precedence of ':%' constructor
 ratioPrec1 = ratioPrec + 1
 
-infinity, notANumber, negativeZero :: Rational
+infinity, notANumber :: Rational
 infinity   = 1 :% 0
 notANumber = 0 :% 0
-negativeZero = 0 :% (-1)
 
 -- Use :%, not % for Inf/NaN; the latter would 
 -- immediately lead to a runtime error, because it normalises. 

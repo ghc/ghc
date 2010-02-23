@@ -171,10 +171,7 @@ instance  Num Float  where
     fromInteger i = F# (floatFromInteger i)
 
 instance  Real Float  where
-    toRational x | isInfinite x     = if x < 0 then -infinity else infinity
-                 | isNaN x          = notANumber
-                 | isNegativeZero x = negativeZero
-                 | otherwise        = (m%1)*(b%1)^^n
+    toRational x        =  (m%1)*(b%1)^^n
                            where (m,n) = decodeFloat x
                                  b     = floatRadix  x
 
@@ -306,10 +303,7 @@ instance  Num Double  where
 
 
 instance  Real Double  where
-    toRational x | isInfinite x     = if x < 0 then -infinity else infinity
-                 | isNaN x          = notANumber
-                 | isNegativeZero x = negativeZero
-                 | otherwise        = (m%1)*(b%1)^^n
+    toRational x        =  (m%1)*(b%1)^^n
                            where (m,n) = decodeFloat x
                                  b     = floatRadix  x
 
@@ -719,7 +713,6 @@ fromRat (n :% 0) | n > 0     =  1/0        -- +Infinity
 
 fromRat (n :% d) | n > 0     = fromRat' (n :% d)
                  | n < 0     = - fromRat' ((-n) :% d)
-                 | d < 0     = 0/(-1)      -- -0.0
                  | otherwise = encodeFloat 0 0             -- Zero
 
 -- Conversion process:
