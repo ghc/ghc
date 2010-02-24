@@ -11,26 +11,23 @@ test('arith005', normal, compile_and_run, [''])
 test('arith006', normal, compile_and_run, [''])
 test('arith007', normal, compile_and_run, [''])
 
-# This test generates slightly different results with the NCG on x86,
-# because of the extra precision when floating point computations are
-# done in registers rather than going via memory.
+# On i386, we need -msse2 to get reliable floating point results
+ways = normal
+opts = ''
 if config.platform.startswith('i386-'):
-	ways = expect_fail_for(['optasm','threaded2','hpc','dyn'])
-else:
-	ways = normal
+   if config.compiler_type == 'ghc' and \
+      version_ge(config.compiler_version, '6.13'):
+	opts = '-msse2'
+   else:
+	ways = expect_fail_for(['optasm','threaded2','hpc','dyn','profasm'])
 
-test('arith008', compose(normal,ways), compile_and_run, [''])
+test('arith008', ways, compile_and_run, [opts])
 
 test('arith009', normal, compile_and_run, [''])
 test('arith010', normal, compile_and_run, [''])
 test('arith011', normal, compile_and_run, [''])
 
-if config.platform.startswith('i386-'):
-	ways = expect_fail_for(['optasm','threaded2','hpc','dyn'])
-else:
-	ways = normal
-
-test('arith012', compose(normal,ways), compile_and_run, [''])
+test('arith012', ways, compile_and_run, [opts])
 
 test('arith013', compose(normal,only_compiler_types(['ghc'])), compile_and_run, [''])
 test('arith014', normal, compile_and_run, [''])
