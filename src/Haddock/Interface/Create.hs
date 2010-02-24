@@ -65,7 +65,6 @@ createInterface ghcMod flags modMap instIfaceMap = do
       decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
       exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
-      localNames    = ghcDefinedNames ghcMod
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
       exportedNames = ghcExportedNames ghcMod
 
@@ -90,7 +89,6 @@ createInterface ghcMod flags modMap instIfaceMap = do
     ifaceDoc             = mbDoc,
     ifaceRnDoc           = Nothing,
     ifaceOptions         = opts,
-    ifaceLocals          = localNames,
     ifaceRnDocMap        = Map.empty,
     ifaceExportItems     = prunedExportItems,
     ifaceRnExportItems   = [],

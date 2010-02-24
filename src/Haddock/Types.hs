@@ -198,9 +198,6 @@ data Interface = Interface {
   ifaceExportItems     :: ![ExportItem Name],
   ifaceRnExportItems   :: [ExportItem DocName],
 
-  -- | All names defined in the module.
-  ifaceLocals          :: ![Name],
-
   -- | All names exported by the module.
   ifaceExports         :: ![Name],
 
