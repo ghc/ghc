@@ -480,8 +480,9 @@ data DataType = DataType
 
               deriving Show
 
-
--- | Representation of constructors
+-- | Representation of constructors. Note that equality on constructors
+-- with different types may not work -- i.e. the constructors for 'False' and
+-- 'Nothing' may compare equal.
 data Constr = Constr
                         { conrep    :: ConstrRep
                         , constring :: String
