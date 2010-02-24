@@ -75,9 +75,9 @@ test = do
   putStrLn ""
 
   libdir <- rawSystemStdout normal "../dist/build/haddock/haddock" ["--print-ghc-libdir"]
-  let basepath = init libdir ++ "/../../share/doc/ghc/html/libraries/base/"
+  let basepath = init libdir ++ "/../../share/doc/ghc/html/libraries/base-4.2.0.0/"
   let base = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
-  let processpath = init libdir ++ "/../../share/doc/ghc/html/libraries/process/"
+  let processpath = init libdir ++ "/../../share/doc/ghc/html/libraries/process-1.0.1.2/"
   let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
 
   putStrLn "Running tests..."

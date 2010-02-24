@@ -36,6 +36,8 @@ import Test.QuickCheck
 -- convenient short-hands
 type Decl = LHsDecl Name
 
+
+-- | An instance head that may have documentation.
 type DocInstance name = (InstHead name, Maybe (Doc name))
 
 
@@ -52,14 +54,13 @@ noDocForDecl = (Nothing, Map.empty)
 type DeclInfo = (Decl, DocForDecl Name, [(Name, DocForDecl Name)])
 
 
--- | A 'DocName' identifies something that may have documentation. The 'Module'
--- argument specifies where we prefer to link to in the documentation. It may
--- be different than the original module.
-data DocName = Documented Name Module | Undocumented Name
-  deriving Eq
+-- | An extension of 'Name' that may contain the preferred place to link to in
+-- the documentation.
+data DocName = Documented Name Module | Undocumented Name deriving Eq
+-- TODO: simplify to data DocName = DocName Name (Maybe Module)
 
 
--- | The 'OccName' belonging to this name
+-- | The 'OccName' of this name.
 docNameOcc :: DocName -> OccName
 docNameOcc = nameOccName . getName
 
@@ -70,6 +71,7 @@ instance NamedThing DocName where
 
 
 {-! for DocOption derive: Binary !-}
+-- | Source-level options for controlling the documentation.
 data DocOption
   = OptHide           -- ^ This module should not appear in the docs
   | OptPrune
@@ -134,6 +136,8 @@ type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module Interface
 type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (Doc DocName)
+
+-- | An environment used to create hyper-linked syntax.
 type LinkEnv       = Map Name Module
 
 
@@ -156,36 +160,37 @@ data GhcModule = GhcModule {
 }
 
 
--- | This is the data structure used to render a Haddock page for a module - it
--- is the "interface" of the module. The core of Haddock lies in creating this
+-- | The data structure used to render a Haddock page for a module - it is
+-- the interface of the module. The core of Haddock lies in creating this
 -- structure (see Haddock.Interface). The structure also holds intermediate
 -- data needed during its creation.
 data Interface = Interface {
 
-  -- | The module represented by this interface
+  -- | The module represented by this interface.
   ifaceMod             :: Module,
 
-  -- | The original filename for this module
+  -- | Original file name of the module.
   ifaceOrigFilename    :: FilePath,
 
-  -- | Textual information about the module
+  -- | Textual information about the module.
   ifaceInfo            :: !(HaddockModInfo Name),
 
-  -- | The documentation header for this module
+  -- | Documentation header.
   ifaceDoc             :: !(Maybe (Doc Name)),
 
-  -- | The renamed documentation header for this module
+  -- | Documentation header with link information.
   ifaceRnDoc           :: Maybe (Doc DocName),
 
-  -- | The Haddock options for this module (prune, ignore-exports, etc)
+  -- | Haddock options for this module (prune, ignore-exports, etc).
   ifaceOptions         :: ![DocOption],
 
-  -- | The declarations of the module.  Excludes declarations that don't
-  -- have names (instances and stand-alone documentation comments). Includes
-  -- subordinate names, but they are mapped to their parent declarations.
+  -- | Declarations originating from the module. Excludes declarations without
+  -- names (instances and stand-alone documentation comments). Includes
+  -- names of subordinate declarations mapped to their parent declarations.
   ifaceDeclMap         :: Map Name DeclInfo,
 
-  -- | Everything declared in the module (including subordinates) that has docs
+  -- | Documentation of declarations originating from the module (including
+  -- subordinates).
   ifaceRnDocMap        :: Map Name (DocForDecl DocName),
 
   ifaceSubMap          :: Map Name [Name],
@@ -193,61 +198,48 @@ data Interface = Interface {
   ifaceExportItems     :: ![ExportItem Name],
   ifaceRnExportItems   :: [ExportItem DocName],
 
-  -- | All names defined in this module
+  -- | All names defined in the module.
   ifaceLocals          :: ![Name],
 
-  -- | All names exported by this module
+  -- | All names exported by the module.
   ifaceExports         :: ![Name],
 
-  -- | All the visible names exported by this module
-  -- For a name to be visible, it has to:
-  --
-  --  * be exported normally, and not via a full module re-exportation.
-  --
-  --  * have a declaration in this module or any of it's imports, with the
-  --    exception that it can't be from another package.
-  --
-  -- Basically, a visible name is a name that will show up in the documentation
-  -- for this module.
+  -- | All \"visible\" names exported by the module.
+  -- A visible name is a name that will show up in the documentation of the
+  -- module.
   ifaceVisibleExports  :: ![Name],
 
-  -- | The instances exported by this module
+  -- | Instances exported by the module.
   ifaceInstances       :: ![Instance],
 
-  -- | Docs for instances defined in this module
+  -- | Documentation of instances defined in the module.
   ifaceInstanceDocMap  :: Map Name (Doc Name)
 }
 
 
--- | A smaller version of 'Interface' that we can get from the Haddock
--- interface files.
+-- | A smaller version of 'Interface' that can be created from Haddock's
+-- interface files ('InterfaceFile').
 data InstalledInterface = InstalledInterface {
 
-  -- | The module represented by this interface
+  -- | The module represented by this interface.
   instMod            :: Module,
 
-  -- | Textual information about the module
+  -- | Textual information about the module.
   instInfo           :: HaddockModInfo Name,
 
-  -- | Everything declared in the module (including subordinates) that has docs
+  -- | Documentation of declarations originating from the module (including
+  -- subordinates).
   instDocMap         :: Map Name (DocForDecl Name),
 
-  -- | All names exported by this module
+  -- | All names exported by this module.
   instExports        :: [Name],
 
-  -- | All the visible names exported by this module
-  -- For a name to be visible, it has to:
-  --
-  --  * be exported normally, and not via a full module re-exportation.
-  --
-  --  * have a declaration in this module or any of it's imports, with the
-  --    exception that it can't be from another package.
-  --
-  -- Basically, a visible name is a name that will show up in the documentation
-  -- for this module.
+  -- | All \"visible\" names exported by the module.
+  -- A visible name is a name that will show up in the documentation of the
+  -- module.
   instVisibleExports :: [Name],
 
-  -- | The Haddock options for this module (prune, ignore-exports, etc)
+  -- | Haddock options for this module (prune, ignore-exports, etc).
   instOptions        :: [DocOption],
 
   instSubMap         :: Map Name [Name]

@@ -1,22 +1,60 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Documentation.Haddock
+-- Copyright   :  (c) David Waern 2010
+-- License     :  BSD-like
 --
--- Haddock - A Haskell Documentation Tool
+-- Maintainer  :  haddock@projects.haskellorg
+-- Stability   :  experimental
+-- Portability :  portable
 --
--- (c) Simon Marlow 2003
---
+-- The Haddock API: A rudimentory, highly experimental API exposing some of
+-- the internals of Haddock. Don't expect it to be stable.
+-----------------------------------------------------------------------------
 
 
 module Documentation.Haddock (
+
+  -- * Interface
+  Interface(..),
+  InstalledInterface(..),
+  createInterfaces,
+
+  -- * Export items & declarations
+  ExportItem(..),
+  DeclInfo,
+  DocForDecl,
+  FnArgsDoc, 
+ 
+  -- * Hyperlinking
+  LinkEnv,
+  DocName(..),
+  docNameOcc,
+
+  -- * Instances
+  DocInstance,
+  InstHead(..),
+
+  -- * Documentation comments
+  Doc(..),
+  DocMarkup(..),
+
+  -- * Interface Files
+  -- | (.haddock files)
+  InterfaceFile(..),
   readInterfaceFile,
   nameCacheFromGhc,
   freshNameCache,
   NameCacheAccessor,
-  InterfaceFile(..),
-  LinkEnv,
-  InstalledInterface(..),
-  DocName(..),
-  docNameOcc
+  
+  -- * Flags and options
+  Flag(..),
+  DocOption(..)
+
 ) where
 
 
 import Haddock.InterfaceFile
+import Haddock.Interface
 import Haddock.Types
+import Haddock.Options

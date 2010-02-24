@@ -40,10 +40,15 @@ import Digraph
 import HscTypes
 
 
--- | Turn a topologically sorted list of module names/filenames into interfaces. Also
--- return the home link environment created in the process.
-createInterfaces :: Verbosity -> [String] -> [Flag] -> [InterfaceFile]
-                 -> Ghc ([Interface], LinkEnv)
+-- | Create 'Interface' structures by typechecking the list of modules
+-- using the GHC API and processing the resulting syntax trees.
+createInterfaces
+  :: Verbosity -- ^ Verbosity of logging to 'stdout'
+  -> [String] -- ^ A list of file or module names sorted by module topology
+  -> [Flag] -- ^ Command-line flags
+  -> [InterfaceFile] -- ^ Interface files of package dependencies
+  -> Ghc ([Interface], LinkEnv)
+  -- ^ Resulting list of interfaces and renaming environment
 createInterfaces verbosity modules flags extIfaces = do
   -- part 1, create interfaces
   let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces

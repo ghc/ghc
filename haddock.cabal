@@ -131,6 +131,8 @@ library
     Documentation.Haddock
 
   other-modules:
+    Haddock.Lex
+    Haddock.Parse
     Haddock.Types
     Haddock.InterfaceFile
     Haddock.Utils
