@@ -52,8 +52,17 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
+#if __GLASGOW_HASKELL__ < 612
 import Foreign
 import Foreign.C
+import System.Posix.Internals
+#if __GLASGOW_HASKELL__ >= 611
+import GHC.IO.Handle.FD (fdToHandle)
+#else
+import GHC.Handle (fdToHandle)
+#endif
+#endif
+
 #ifdef mingw32_HOST_OS
 import GHC.ConsoleHandler
 #else
@@ -61,12 +70,6 @@ import System.Posix hiding (fdToHandle)
 #endif
 
 import IO ( isPermissionError )
-import System.Posix.Internals
-#if __GLASGOW_HASKELL__ >= 611
-import GHC.IO.Handle.FD (fdToHandle)
-#else
-import GHC.Handle (fdToHandle)
-#endif
 
 #if defined(GLOB)
 import System.Process(runInteractiveCommand)
@@ -726,7 +729,7 @@ changeDBDir verbosity cmds db = do
   do_cmd (AddPackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
     when (verbosity > Normal) $ putStrLn ("writing " ++ file)
-    writeFileAtomic file (showInstalledPackageInfo p)
+    writeFileAtomic file utf8 (showInstalledPackageInfo p)
   do_cmd (ModifyPackage p) = 
     do_cmd (AddPackage p)
 
@@ -1148,7 +1151,7 @@ writeNewConfig verbosity filename ipis = do
   let shown = concat $ intersperse ",\n "
                      $ map (show . convertPackageInfoOut) ipis
       fileContents = "[" ++ shown ++ "\n]"
-  writeFileAtomic filename fileContents
+  writeFileAtomic filename utf8 fileContents
     `catch` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
@@ -1550,11 +1553,15 @@ catchError io handler = io `Exception.catch` handler'
 
 writeBinaryFileAtomic :: Bin.Binary a => FilePath -> a -> IO ()
 writeBinaryFileAtomic targetFile obj =
-  withFileAtomic targetFile $ \h -> B.hPutStr h (Bin.encode obj)
+  withFileAtomic targetFile $ \h -> do
+     hSetBinaryMode h True
+     B.hPutStr h (Bin.encode obj)
 
-writeFileAtomic :: FilePath -> String -> IO ()
-writeFileAtomic targetFile content =
-  withFileAtomic targetFile $ \h -> hPutStr h content
+writeFileAtomic :: FilePath -> TextEncoding -> String -> IO ()
+writeFileAtomic targetFile encoding content =
+  withFileAtomic targetFile $ \h -> do
+     hSetEncoding h encoding
+     hPutStr h content
 
 -- copied from Cabal's Distribution.Simple.Utils, except that we want
 -- to use text files here, rather than binary files.
@@ -1588,10 +1595,16 @@ withFileAtomic targetFile write_content = do
     --      to always return a valid dir
     (targetDir_,targetName) = splitFileName targetFile
 
--- Ugh, this is a copy/paste of code from the base library, but
--- if uses 666 rather than 600 for the permissions.
 openNewFile :: FilePath -> String -> IO (FilePath, Handle)
 openNewFile dir template = do
+#if __GLASGOW_HASKELL__ >= 612
+  -- this was added to System.IO in 6.12.1
+  -- we must use this version because the version below opens the file
+  -- in binary mode.
+  openTempFileWithDefaultPermissions dir template
+#else
+  -- Ugh, this is a copy/paste of code from the base library, but
+  -- if uses 666 rather than 600 for the permissions.
   pid <- c_getpid
   findTempName pid
   where
@@ -1648,6 +1661,7 @@ std_flags, output_flags, rw_flags :: CInt
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 rw_flags     = output_flags .|. o_RDWR
+#endif /* GLASGOW_HASKELL < 612 */
 
 -- | The function splits the given string to substrings
 -- using 'isSearchPathSeparator'.
