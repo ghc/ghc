@@ -61,7 +61,12 @@ check modules strict = do
 test = do
   contents <- getDirectoryContents "tests"
   args <- getArgs
-  let mods = filter ((==) ".hs" . takeExtension) contents
+
+  let mods =
+        case args of
+          x:_ | x /= "all" -> [x ++ ".hs"]
+          _ -> filter ((==) ".hs" . takeExtension) contents
+
   let outdir = "output"
   let mods' = map ("tests" </>) mods
   putStrLn ""
