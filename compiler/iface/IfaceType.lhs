@@ -73,7 +73,8 @@ data IfaceTyCon 	-- Abbreviations for common tycons with known names
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc
   | IfaceListTc | IfacePArrTc
   | IfaceTupTc Boxity Arity 
-  | IfaceAnyTc IfaceKind    -- Used for AnyTyCon (see Note [Any Types] in TysPrim)
+  | IfaceAnyTc FastString    -- Used for AnyTyCon (see Note [Any Types] in TysPrim)
+    	       		     -- other than 'Any :: *' itself
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
 
