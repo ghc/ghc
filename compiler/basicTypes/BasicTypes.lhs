@@ -713,11 +713,11 @@ instance Outputable RuleMatchInfo where
 instance Outputable InlinePragma where
   ppr (InlinePragma { inl_inline = inline, inl_act = activation
                     , inl_rule = info, inl_sat = mb_arity })
-    = pp_inline <> pp_sat <+> pp_info <+> pp_activation
+    = pp_inline <> pp_activation <+> pp_sat <+> pp_info 
     where
       pp_inline | inline    = ptext (sLit "INLINE")
                 | otherwise = ptext (sLit "NOINLINE")
-      pp_sat | Just ar <- mb_arity = braces (int ar)
+      pp_sat | Just ar <- mb_arity = parens (ptext (sLit "sat-args=") <> int ar)
              | otherwise           = empty
       pp_info | isFunLike info = empty
               | otherwise      = ppr info
