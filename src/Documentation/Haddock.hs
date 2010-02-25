@@ -38,6 +38,7 @@ module Documentation.Haddock (
   -- * Documentation comments
   Doc(..),
   DocMarkup(..),
+  HaddockModInfo(..),
 
   -- * Interface Files
   -- | (.haddock files)
