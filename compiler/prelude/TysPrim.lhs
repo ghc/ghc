@@ -233,8 +233,14 @@ Note [Uniques of Any]
 Although Any(*->*), say, doesn't have a binding site, it still needs
 to have a Unique.  Unlike tuples (which are also an infinite family)
 there is no convenient way to index them, so we use the Unique from
-their OccName instead.  That should be unique!  (But in principle we
-must take care: it does not include the module/package.)
+their OccName instead.  That should be unique, 
+
+  - both wrt each other, because their strings differ
+
+  - and wrt any other Name, because Names get uniques with 
+    various 'char' tags, but the OccName of Any will 
+    get a Unique built with mkTcOccUnique, which has a particular 'char' 
+    tag; see Unique.mkTcOccUnique!
 
 Note [Strangely-kinded void TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
