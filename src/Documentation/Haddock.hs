@@ -40,7 +40,7 @@ module Documentation.Haddock (
   DocMarkup(..),
   HaddockModInfo(..),
 
-  -- * Interface Files
+  -- * Interface files
   -- | (.haddock files)
   InterfaceFile(..),
   readInterfaceFile,
