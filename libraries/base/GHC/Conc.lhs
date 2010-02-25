@@ -837,10 +837,11 @@ foreign import ccall unsafe "getOrSetGHCConcProddingStore"
 
 prodServiceThread :: IO ()
 prodServiceThread = do
-  was_set <- readIORef prodding
-  writeIORef prodding True
-     -- no need for atomicModifyIORef, extra prods are harmless.
-  if (not (was_set)) then wakeupIOManager else return ()
+  -- NB. use atomicModifyIORef here, otherwise there are race
+  -- conditions in which prodding is left at True but the server is
+  -- blocked in select().
+  was_set <- atomicModifyIORef prodding $ \b -> (True,b)
+  if (not (was_set)) then  wakeupIOManager else return ()
 
 -- Machinery needed to ensure that we only have one copy of certain
 -- CAFs in this module even when the base package is present twice, as
@@ -1014,6 +1015,17 @@ service_loop
    -> IO ()
 service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
+  -- reset prodding before we look at the new requests.  If a new
+  -- client arrives after this point they will send a wakup which will
+  -- cause the server to loop around again, so we can be sure to not
+  -- miss any requests.
+  --
+  -- NB. it's important to do this in the *first* iteration of
+  -- service_loop, rather than after calling select(), since a client
+  -- may have set prodding to True without sending a wakeup byte down
+  -- the pipe, because the pipe wasn't set up.
+  atomicModifyIORef prodding (\_ -> (False, ()))
+
   -- pick up new IO requests
   new_reqs <- atomicModifyIORef pendingEvents (\a -> ([],a))
   let reqs = new_reqs ++ old_reqs
@@ -1083,8 +1095,6 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
                        return False
 
   unless exit $ do
-
-  atomicModifyIORef prodding (\_ -> (False, ()))
 
   reqs' <- if wakeup_all then do wakeupAll reqs; return []
                          else completeRequests reqs readfds writefds []
