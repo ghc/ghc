@@ -448,9 +448,9 @@ void postCapMsg(Capability *cap, char *msg, va_list ap)
     postLogMsg(&capEventBuf[cap->no], EVENT_LOG_MSG, msg, ap);
 }
 
-void postUserMsg(Capability *cap, char *msg)
+void postUserMsg(Capability *cap, char *msg, va_list ap)
 {
-    postLogMsg(&capEventBuf[cap->no], EVENT_USER_MSG, msg, NULL);
+    postLogMsg(&capEventBuf[cap->no], EVENT_USER_MSG, msg, ap);
 }    
 
 void closeBlockMarker (EventsBuf *ebuf)

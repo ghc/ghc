@@ -299,19 +299,27 @@ void trace_(char *msg, ...)
     va_end(ap);
 }
 
-void traceUserMsg(Capability *cap, char *msg)
+static void traceFormatUserMsg(Capability *cap, char *msg, ...)
 {
+    va_list ap;
+    va_start(ap,msg);
+
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
-        traceCap_stderr(cap, msg, NULL);
+        traceCap_stderr(cap, msg, ap);
     } else
 #endif
     {
         if (eventlog_enabled) {
-            postUserMsg(cap, msg);
+            postUserMsg(cap, msg, ap);
         }
     }
     dtraceUserMsg(cap->no, msg);
+}
+
+void traceUserMsg(Capability *cap, char *msg)
+{
+    traceFormatUserMsg(cap, "%s", msg);
 }
 
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
