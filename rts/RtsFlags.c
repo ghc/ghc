@@ -53,6 +53,9 @@ open_stats_file (
 
 static StgWord64 decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max);
 static void bad_option(const char *s);
+#ifdef TRACING
+static void read_trace_flags(char *arg);
+#endif
 
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
@@ -74,7 +77,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.generations        = 2;
-    RtsFlags.GcFlags.steps              = 2;
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
     RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
@@ -198,7 +200,6 @@ usage_text[] = {
 "  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
 "  -m<n>    Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
-"  -T<n>    Number of steps in younger generations (default: 2)",
 "  -c<n>    Use in-place compaction instead of copying in the oldest generation",
 "           when live data is at least <n>% of the maximum heap size set with",
 "           -M (default: 30%)",
@@ -253,18 +254,20 @@ usage_text[] = {
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
-"",
 # endif
 #endif /* PROFILING or PAR */
 
 #ifdef TRACING
 "",
-"  -v       Log events to stderr",
-"  -l       Log events in binary format to the file <program>.eventlog",
-"  -vt      Include time stamps when tracing events to stderr with -v",
-"",
-"  -ls      Log scheduler events",
-"",
+"  -l[flags]  Log events in binary format to the file <program>.eventlog",
+#  ifdef DEBUG
+"  -v[flags]  Log events to stderr",
+#  endif
+"             where [flags] can contain:",
+"                s    scheduler events",
+#  ifdef DEBUG
+"                t    add time stamps (only useful with -v)",
+#  endif
 #endif
 
 #if !defined(PROFILING)
@@ -302,7 +305,7 @@ usage_text[] = {
 "  -Dc  DEBUG: program coverage",
 "  -Dr  DEBUG: sparks",
 "",
-"     NOTE: all -D options also enable -v automatically.  Use -l to create a",
+"     NOTE: DEBUG events are sent to stderr by default; add -l to create a",
 "     binary event log file instead.",
 "",
 #endif /* DEBUG */
@@ -472,7 +475,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 # define TICKY_BUILD_ONLY(x) x
 #else
 # define TICKY_BUILD_ONLY(x) \
-errorBelch("not built for: ticky-ticky stats"); \
+errorBelch("the flag %s requires the program to be built with -ticky", rts_argv[arg]); \
 error = rtsTrue;
 #endif
 
@@ -480,7 +483,7 @@ error = rtsTrue;
 # define PROFILING_BUILD_ONLY(x)   x
 #else
 # define PROFILING_BUILD_ONLY(x) \
-errorBelch("not built for: -prof"); \
+errorBelch("the flag %s requires the program to be built with -prof", rts_argv[arg]); \
 error = rtsTrue;
 #endif
 
@@ -488,7 +491,7 @@ error = rtsTrue;
 # define TRACING_BUILD_ONLY(x)   x
 #else
 # define TRACING_BUILD_ONLY(x) \
-errorBelch("not built for: -par-prof"); \
+errorBelch("the flag %s requires the program to be built with -eventlog or -debug", rts_argv[arg]); \
 error = rtsTrue;
 #endif
 
@@ -496,7 +499,15 @@ error = rtsTrue;
 # define THREADED_BUILD_ONLY(x)      x
 #else
 # define THREADED_BUILD_ONLY(x) \
-errorBelch("not built for: -smp"); \
+errorBelch("the flag %s requires the program to be built with -threaded", rts_argv[arg]); \
+error = rtsTrue;
+#endif
+
+#ifdef DEBUG
+# define DEBUG_BUILD_ONLY(x) x
+#else
+# define DEBUG_BUILD_ONLY(x) \
+errorBelch("the flag %s requires the program to be built with -debug", rts_argv[arg]); \
 error = rtsTrue;
 #endif
 
@@ -593,8 +604,8 @@ error = rtsTrue;
 		  bad_option( rts_argv[arg] );
 		break;
 	      
-#ifdef DEBUG
 	      case 'D':
+              DEBUG_BUILD_ONLY(
 	      { 
 		  char *c;
 
@@ -652,9 +663,8 @@ error = rtsTrue;
                   // -Dx also turns on -v.  Use -l to direct trace
                   // events to the .eventlog file instead.
                   RtsFlags.TraceFlags.tracing = TRACE_STDERR;
-		  break;
-	      }
-#endif
+	      })
+              break;
 
 	      case 'K':
                   RtsFlags.GcFlags.maxStkSize =
@@ -684,11 +694,6 @@ error = rtsTrue;
                   RtsFlags.GcFlags.generations =
                       decodeSize(rts_argv[arg], 2, 1, HS_INT_MAX);
                   break;
-
-              case 'T':
-                  RtsFlags.GcFlags.steps =
-                      decodeSize(rts_argv[arg], 2, 1, HS_INT_MAX);
-		break;
 
 	      case 'H':
                   if (rts_argv[arg][2] == '\0') {
@@ -744,26 +749,6 @@ error = rtsTrue;
 		break;
 
 	      /* =========== PROFILING ========================== */
-
-              case 'l':
-#ifdef TRACING
-                switch(rts_argv[arg][2]) {
-		case '\0':
-                    RtsFlags.TraceFlags.tracing = TRACE_EVENTLOG;
-                    break;
-                case 's':
-                    RtsFlags.TraceFlags.tracing = TRACE_EVENTLOG;
-                    RtsFlags.TraceFlags.scheduler = rtsTrue;
-                    break;
-		default:
-		    errorBelch("unknown RTS option: %s",rts_argv[arg]);
-		    error = rtsTrue;
-		    break;
-                }
-#else
-                errorBelch("not built for: -eventlog");
-#endif
-                break;
 
 	      case 'P': /* detailed cost centre profiling (time/alloc) */
 	      case 'p': /* cost centre profiling (time/alloc) */
@@ -955,7 +940,7 @@ error = rtsTrue;
                 }
                 break;
 
-#if defined(THREADED_RTS) && !defined(NOSMP)
+#if !defined(NOSMP)
 	      case 'N':
 		THREADED_BUILD_ONLY(
 		if (rts_argv[arg][2] == '\0') {
@@ -995,6 +980,7 @@ error = rtsTrue;
                     ) break;
 
 	      case 'q':
+		THREADED_BUILD_ONLY(
 		    switch (rts_argv[arg][2]) {
 		    case '\0':
 			errorBelch("incomplete RTS option: %s",rts_argv[arg]);
@@ -1033,7 +1019,7 @@ error = rtsTrue;
 			error = rtsTrue;
 			break;
 		    }
-		    break;
+                    ) break;
 #endif
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
@@ -1066,26 +1052,19 @@ error = rtsTrue;
 
 	      /* =========== TRACING ---------=================== */
 
+              case 'l':
+                  TRACING_BUILD_ONLY(
+                      RtsFlags.TraceFlags.tracing = TRACE_EVENTLOG;
+                      read_trace_flags(&rts_argv[arg][2]);
+                      );
+                  break;
+
 	      case 'v':
-                switch(rts_argv[arg][2]) {
-#ifdef TRACING
-                case '\0':
-                    RtsFlags.TraceFlags.tracing = TRACE_STDERR;
-                    break;
-		case 't':
-		    RtsFlags.TraceFlags.timestamp = rtsTrue;
-		    break;
-#endif
-		case 's':
-		case 'g':
-                    // ignored for backwards-compat
-		    break;
-		default:
-		    errorBelch("unknown RTS option: %s",rts_argv[arg]);
-		    error = rtsTrue;
-		    break;
-		}
-                break;
+                  DEBUG_BUILD_ONLY(
+                      RtsFlags.TraceFlags.tracing = TRACE_STDERR;
+                      read_trace_flags(&rts_argv[arg][2]);
+                      );
+                  break;
 
 	      /* =========== EXTENDED OPTIONS =================== */
 
@@ -1307,6 +1286,32 @@ decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
 
     return val;
 }
+
+#if defined(TRACING)
+static void read_trace_flags(char *arg)
+{
+    char *c;
+
+    for (c  = arg; *c != '\0'; c++) {
+        switch(*c) {
+        case '\0':
+            break;
+        case 's':
+            RtsFlags.TraceFlags.scheduler = rtsTrue;
+            break;
+        case 't':
+            RtsFlags.TraceFlags.timestamp = rtsTrue;
+            break;
+        case 'g':
+            // ignored for backwards-compat
+            break;
+        default:
+            errorBelch("unknown trace option: %c",*c);
+            break;
+        }
+    }
+}
+#endif
 
 static void GNU_ATTRIBUTE(__noreturn__)
 bad_option(const char *s)
