@@ -73,3 +73,6 @@ test('T2615',
      compile_and_run,
      ['-package ghc'])
 
+# omit dyn, because we don't build a dyn_l variant of the RTS by default
+test('traceEvent', [ omit_ways(['dyn']), extra_run_opts('+RTS -ls -RTS') ], 
+                   compile_and_run, ['-eventlog'])
