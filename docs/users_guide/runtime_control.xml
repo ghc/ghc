@@ -850,15 +850,16 @@
     <variablelist>
       <varlistentry>
         <term>
-          <option>-l<optional><replaceable>type</replaceable></optional></option>
+          <option>-l<optional><replaceable>flags</replaceable></optional></option>
           <indexterm><primary><option>-l</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
         <listitem>
           <para>
             Log events in binary format to the
             file <filename><replaceable>program</replaceable>.eventlog</filename>,
-            where <replaceable>type</replaceable> indicates the type
-            of events to log.  Currently there is only one type
+            where <replaceable>flags</replaceable> is a sequence of
+            zero or more characters indicating which kinds of events
+            to log.  Currently there is only one type
             supported: <literal>-ls</literal>, for scheduler events.
           </para>
 
@@ -878,13 +879,19 @@
 
       <varlistentry>
         <term>
-          <option>-v</option>
+          <option>-v</option><optional><replaceable>flags</replaceable></optional>
           <indexterm><primary><option>-v</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
         <listitem>
           <para>
             Log events as text to standard output, instead of to
             the <literal>.eventlog</literal> file.
+            The <replaceable>flags</replaceable> are the same as
+            for <option>-l</option>, with the additional
+            option <literal>t</literal> which indicates that the
+            each event printed should be preceded by a timestamp value
+            (in the binary <literal>.eventlog</literal> file, all
+            events are automatically associated with a timestamp).
           </para>
         </listitem>
       </varlistentry>
