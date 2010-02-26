@@ -1,5 +1,5 @@
 
-test	('dotp' 
+test	('dph-quickhull' 
  	, [ reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
