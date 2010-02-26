@@ -729,7 +729,7 @@ changeDBDir verbosity cmds db = do
   do_cmd (AddPackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
     when (verbosity > Normal) $ putStrLn ("writing " ++ file)
-    writeFileAtomic file utf8 (showInstalledPackageInfo p)
+    writeFileUtf8Atomic file (showInstalledPackageInfo p)
   do_cmd (ModifyPackage p) = 
     do_cmd (AddPackage p)
 
@@ -1151,7 +1151,7 @@ writeNewConfig verbosity filename ipis = do
   let shown = concat $ intersperse ",\n "
                      $ map (show . convertPackageInfoOut) ipis
       fileContents = "[" ++ shown ++ "\n]"
-  writeFileAtomic filename utf8 fileContents
+  writeFileUtf8Atomic filename fileContents
     `catch` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
@@ -1557,10 +1557,12 @@ writeBinaryFileAtomic targetFile obj =
      hSetBinaryMode h True
      B.hPutStr h (Bin.encode obj)
 
-writeFileAtomic :: FilePath -> TextEncoding -> String -> IO ()
-writeFileAtomic targetFile encoding content =
+writeFileUtf8Atomic :: FilePath -> String -> IO ()
+writeFileUtf8Atomic targetFile content =
   withFileAtomic targetFile $ \h -> do
-     hSetEncoding h encoding
+#if __GLASGOW_HASKELL__ >= 612
+     hSetEncoding h utf8
+#endif
      hPutStr h content
 
 -- copied from Cabal's Distribution.Simple.Utils, except that we want
