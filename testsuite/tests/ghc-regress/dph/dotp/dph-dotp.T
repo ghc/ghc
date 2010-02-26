@@ -5,6 +5,6 @@ test	('dph-dotp'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
 	, multimod_compile_and_run 
 	, [ 'Main'
-	  , '-Odph -funfolding-use-threshold30 -funbox-strict-fields -fcpr-off -package dph-par -package dph-prim-par'])
+	  , '-Odph -funbox-strict-fields -fcpr-off -package dph-par -package dph-prim-par'])
 
 

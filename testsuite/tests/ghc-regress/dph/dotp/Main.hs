@@ -38,9 +38,17 @@ generateVectors n =
     return (v,w)
 
 main 
- = do	vectors		<- generateVectors 1000000
-	let result	= (uncurry dotp) vectors
+ = do	-- compute dot product with NDP
+	vectors			<- generateVectors 100000
+	let resultViaNDP	= (uncurry dotp) vectors
+
+	-- compute with lists
+	let (aVecX, aVecY) = vectors
+	let vecX		= P.toList aVecX
+	let vecY		= P.toList aVecY
+	let resultViaList	= sum $ zipWith (*) vecX vecY
 
 	-- ignore wibbles in low order bits
-	putStr $ (take 12 $ show result) ++ "\n"
+	putStr $ (take 12 $ show resultViaNDP) ++ "\n"
+	putStr $ (take 12 $ show resultViaList) ++ "\n"
 	
