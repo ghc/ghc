@@ -751,6 +751,9 @@ libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
 .PHONY: tags
 tags: tags_compiler
 
+.PHONY: TAGS
+TAGS: TAGS_compiler
+
 # -----------------------------------------------------------------------------
 # Installation
 
