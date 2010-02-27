@@ -118,7 +118,13 @@ mkOpenDataTyConRhs = OpenTyCon Nothing
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons
-  = DataTyCon { data_cons = cons, is_enum = all isNullarySrcDataCon cons }
+  = DataTyCon {
+        data_cons = cons,
+        is_enum = -- We define datatypes with no constructors to not be
+                  -- enumerations; this fixes trac #2578
+                  not (null cons) &&
+                  all isNullarySrcDataCon cons
+    }
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 -- Monadic because it makes a Name for the coercion TyCon
