@@ -449,7 +449,18 @@ zEncodeFS fs@(FastString _ _ _ _ enc) =
             return efs
 
 appendFS :: FastString -> FastString -> FastString
-appendFS fs1 fs2 = mkFastString (unpackFS fs1 ++ unpackFS fs2)
+appendFS fs1 fs2 =
+  inlinePerformIO $ do
+    r <- mallocForeignPtrBytes len
+    withForeignPtr r $ \ r' -> do
+    withForeignPtr (buf fs1) $ \ fs1Ptr -> do
+    withForeignPtr (buf fs2) $ \ fs2Ptr -> do
+        copyBytes r' fs1Ptr len1
+        copyBytes (advancePtr r' len1) fs2Ptr len2
+        mkFastStringForeignPtr r' r len
+  where len  = len1 + len2
+        len1 = lengthFS fs1
+        len2 = lengthFS fs2
 
 concatFS :: [FastString] -> FastString
 concatFS ls = mkFastString (Prelude.concat (map unpackFS ls)) -- ToDo: do better
