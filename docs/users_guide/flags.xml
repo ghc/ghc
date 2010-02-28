@@ -599,6 +599,12 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-no-auto-link-packages</option></entry>
+	      <entry>Don't automatically link in the haskell98 package.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>

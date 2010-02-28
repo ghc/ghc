@@ -239,6 +239,17 @@ exposed-modules: Network.BSD,
       </varlistentry>
 
       <varlistentry>
+        <term><option>-no-auto-link-packages</option>
+        <indexterm><primary><option>-no-auto-link-packages</option></primary>
+          </indexterm></term>
+        <listitem>
+          <para>By default, GHC will automatically link in the
+            <literal>haskell98</literal> package. This flag disables that
+            behaviour.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-package-name</option> <replaceable>foo</replaceable>
         <indexterm><primary><option>-package-name</option></primary>
           </indexterm></term>
