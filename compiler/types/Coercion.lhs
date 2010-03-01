@@ -379,9 +379,18 @@ mkInstsCoercion co tys = foldl mkInstCoercion co tys
 -- | Manufacture a coercion from this air. Needless to say, this is not usually safe,
 -- but it is used when we know we are dealing with bottom, which is one case in which 
 -- it is safe.  This is also used implement the @unsafeCoerce#@ primitive.
+-- Optimise by pushing down through type constructors
 mkUnsafeCoercion :: Type -> Type -> Coercion
-mkUnsafeCoercion ty1 ty2 = mkCoercion unsafeCoercionTyCon [ty1, ty2]
+mkUnsafeCoercion (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+  | tc1 == tc2
+  = TyConApp tc1 (zipWith mkUnsafeCoercion tys1 tys2)
 
+mkUnsafeCoercion (FunTy a1 r1) (FunTy a2 r2)
+  = FunTy (mkUnsafeCoercion a1 a2) (mkUnsafeCoercion r1 r2)
+
+mkUnsafeCoercion ty1 ty2 
+  | ty1 `coreEqType` ty2 = ty1
+  | otherwise            = mkCoercion unsafeCoercionTyCon [ty1, ty2]
 
 -- See note [Newtype coercions] in TyCon
 

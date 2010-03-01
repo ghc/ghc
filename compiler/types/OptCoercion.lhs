@@ -112,8 +112,8 @@ opt_co_tc_app env sym tc desc cos
         | otherwise -> opt_trans opt_co1 opt_co2
 
       CoUnsafe
-        | sym       -> TyConApp tc [opt_co2,opt_co1]
-        | otherwise -> TyConApp tc [opt_co1,opt_co2]
+        | sym       -> mkUnsafeCoercion ty2' ty1'
+        | otherwise -> mkUnsafeCoercion ty1' ty2'
 
       CoSym   -> opt_co env (not sym) co1
       CoLeft  -> opt_lr fst
@@ -125,20 +125,21 @@ opt_co_tc_app env sym tc desc cos
       CoInst        -- See if the first arg is already a forall
 		    -- ...then we can just extend the current substitution
         | Just (tv, co1_body) <- splitForAllTy_maybe co1
-        -> opt_co (extendTvSubst env tv ty') sym co1_body
+        -> opt_co (extendTvSubst env tv ty2') sym co1_body
 
                     -- See if is *now* a forall
         | Just (tv, opt_co1_body) <- splitForAllTy_maybe opt_co1
-        -> substTyWith [tv] [ty'] opt_co1_body	-- An inefficient one-variable substitution
+        -> substTyWith [tv] [ty2'] opt_co1_body	-- An inefficient one-variable substitution
 
         | otherwise
-        -> TyConApp tc [opt_co1, ty']
-        where
-          ty' = substTy env co2
+        -> TyConApp tc [opt_co1, ty2']
 
   where
     (co1 : cos1) = cos
     (co2 : _)    = cos1
+
+    ty1' = substTy env co1
+    ty2' = substTy env co2
 
 	-- These opt_cos have the sym pushed into them
     opt_co1 = opt_co env sym co1
@@ -362,6 +363,8 @@ etaCoPred_maybe co
   = Nothing
 
 etaApp_maybe :: Coercion -> Maybe (Coercion, Coercion)
+-- Split a coercion g :: t1a t1b ~ t2a t2b
+-- into (left g, right g) if possible
 etaApp_maybe co
   | Just (co1, co2) <- splitAppTy_maybe co
   = Just (co1, co2)
