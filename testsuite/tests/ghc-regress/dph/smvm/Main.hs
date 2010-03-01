@@ -4,6 +4,7 @@ import SMVMVect (smvm)
 
 import Control.Exception (evaluate)
 import System.IO
+import System.Environment
 
 import qualified Data.Array.Parallel.Unlifted as U
 import Data.Array.Parallel.Prelude
@@ -40,18 +41,25 @@ loadSM' fname =
     return (segd, m, dv)
 
 main 
- = do	(m, v)		<- loadSM "test.dat"
-	let result	= smvm m v
+ = do	[inFile, outFile]	<- getArgs
+	(m, v)			<- loadSM inFile
+	let result		= smvm m v
 
 	-- ignore wibbles in low-order bits
-	putStr	$ unlines
-		$ map (take 12)
-		$ map show
-		$ P.toList result
+	let output
+		=  (unlines
+			$ map (take 12)
+			$ map show
+			$ P.toList result)
+		++ ("SUM = "
+			++ (take 12 $ show $ sum $ P.toList result)
+			++ "\n")
 
-	putStr 	$ "SUM = "
-		++ (take 12 $ show $ sum $ P.toList result)
-		++ "\n"
+	-- check our result against the provided outFile
+	outputCheck <- readFile outFile
+	print $	output == outputCheck
+
+
 	
 
 
