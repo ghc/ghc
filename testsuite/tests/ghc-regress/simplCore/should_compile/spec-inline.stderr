@@ -143,7 +143,7 @@ Roman.$wgo =
         }
     }
 
-Roman.foo_go [InlPrag=INLINE [0]]
+Roman.foo_go [InlPrag=INLINE[0]]
   :: Data.Maybe.Maybe GHC.Types.Int
      -> Data.Maybe.Maybe GHC.Types.Int
      -> GHC.Types.Int
