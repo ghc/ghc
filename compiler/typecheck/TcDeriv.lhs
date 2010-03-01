@@ -965,12 +965,24 @@ checkFlag flag (dflags, _)
                  other -> pprPanic "checkFlag" (ppr other)
 
 std_class_via_iso :: Class -> Bool
-std_class_via_iso clas	-- These standard classes can be derived for a newtype
-			-- using the isomorphism trick *even if no -fglasgow-exts*
+-- These standard classes can be derived for a newtype
+-- using the isomorphism trick *even if no -XGeneralizedNewtypeDeriving
+-- because giving so gives the same results as generating the boilerplate
+std_class_via_iso clas	
   = classKey clas `elem` [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
 	-- Not Read/Show because they respect the type
 	-- Not Enum, because newtypes are never in Enum
 
+
+non_iso_class :: Class -> Bool
+-- *Never* derive Read,Show,Typeable,Data by isomorphism,
+-- even with -XGeneralizedNewtypeDeriving
+non_iso_class cls 
+  = classKey cls `elem` ([readClassKey, showClassKey, dataClassKey] ++
+			 typeableClassKeys)
+
+typeableClassKeys :: [Unique]
+typeableClassKeys = map getUnique typeableClassNames
 
 new_dfun_name :: Class -> TyCon -> TcM Name
 new_dfun_name clas tycon 	-- Just a simple wrapper
@@ -1037,18 +1049,21 @@ mkNewTypeEqn orig dflags tvs
 
   | otherwise
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
-      CanDerive               -> go_for_it 	-- Use the standard H98 method
-      DerivableClassError msg -> bale_out msg	-- Error with standard class
+      CanDerive -> go_for_it 	-- Use the standard H98 method
+      DerivableClassError msg 	-- Error with standard class
+        | can_derive_via_isomorphism -> bale_out (msg $$ suggest_nd)
+        | otherwise                  -> bale_out msg
       NonDerivableClass 	-- Must use newtype deriving
-      	| newtype_deriving    -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
-      	| otherwise           -> bale_out non_std_err      -- Try newtype deriving!
+      	| newtype_deriving           -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
+        | can_derive_via_isomorphism -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
+      	| otherwise                  -> bale_out non_std
   where
         newtype_deriving = dopt Opt_GeneralizedNewtypeDeriving dflags
         go_for_it        = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
 	bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
 
-	non_std_err = nonStdErr cls $$
-		      ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
+	non_std    = nonStdErr cls
+        suggest_nd = ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
 
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
@@ -1131,10 +1146,6 @@ mkNewTypeEqn orig dflags tvs
 	   && eta_ok
 	   && ats_ok
 --	   && not (isRecursiveTyCon tycon)	-- Note [Recursive newtypes]
-
-		-- Never derive Read,Show,Typeable,Data by isomorphism
-	non_iso_class cls = className cls `elem` ([readClassName, showClassName, dataClassName] ++
-					  	  typeableClassNames)
 
 	arity_ok = length cls_tys + 1 == classArity cls
  		-- Well kinded; eg not: newtype T ... deriving( ST )
