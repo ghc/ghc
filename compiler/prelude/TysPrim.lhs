@@ -46,7 +46,7 @@ module TysPrim(
 	word64PrimTyCon,	word64PrimTy,
 
 	-- * Any
-	anyTyCon, anyType, anyTyConOfKind, anyTypeOfKind
+	anyTyCon, anyTyConOfKind, anyTypeOfKind
   ) where
 
 #include "HsVersions.h"
@@ -234,7 +234,6 @@ Although Any(*->*), say, doesn't have a binding site, it still needs
 to have a Unique.  Unlike tuples (which are also an infinite family)
 there is no convenient way to index them, so we use the Unique from
 their OccName instead.  That should be unique, 
-
   - both wrt each other, because their strings differ
 
   - and wrt any other Name, because Names get uniques with 
@@ -269,22 +268,14 @@ anyTyConName = mkPrimTc (fsLit "Any") anyTyConKey anyTyCon
 anyTyCon :: TyCon
 anyTyCon = mkLiftedPrimTyCon anyTyConName liftedTypeKind 0 PtrRep
 
-anyType :: Type
-anyType = mkTyConApp anyTyCon []
-
 anyTypeOfKind :: Kind -> Type
-anyTypeOfKind kind
-  | isLiftedTypeKind kind = anyType
-  | otherwise             = mkTyConApp (mk_any_tycon kind) []
+anyTypeOfKind kind = mkTyConApp (anyTyConOfKind kind) []
 
 anyTyConOfKind :: Kind -> TyCon
+-- Map all superkinds of liftedTypeKind to liftedTypeKind
 anyTyConOfKind kind 
-  | isLiftedTypeKind kind = anyTyCon
-  | otherwise             = mk_any_tycon kind
-
-mk_any_tycon :: Kind -> TyCon
-mk_any_tycon kind    -- Kind other than *
-  = tycon
+  | liftedTypeKind `isSubKind` kind = anyTyCon
+  | otherwise                       = tycon
   where
 	  -- Derive the name from the kind, thus:
 	  --     Any(*->*), Any(*->*->*)
