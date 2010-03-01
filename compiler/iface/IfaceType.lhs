@@ -73,7 +73,7 @@ data IfaceTyCon 	-- Abbreviations for common tycons with known names
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc
   | IfaceListTc | IfacePArrTc
   | IfaceTupTc Boxity Arity 
-  | IfaceAnyTc FastString    -- Used for AnyTyCon (see Note [Any Types] in TysPrim)
+  | IfaceAnyTc IfaceKind     -- Used for AnyTyCon (see Note [Any Types] in TysPrim)
     	       		     -- other than 'Any :: *' itself
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
@@ -91,15 +91,16 @@ ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
 ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
 ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
 ifaceTyConName (IfaceTc ext)           = ext
-ifaceTyConName (IfaceAnyTc kind)       = pprPanic "ifaceTyConName" (ppr (IfaceAnyTc kind))
+ifaceTyConName (IfaceAnyTc k)          = pprPanic "ifaceTyConName" (ppr k)
 	       		    	       	 -- Note [The Name of an IfaceAnyTc]
 \end{code}
 
 Note [The Name of an IfaceAnyTc]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It isn't easy to get the Name of an IfaceAnyTc in a pure way.  What you
 really need to do is to transform it to a TyCon, and get the Name of that.
-But doing so needs the monad.
+But doing so needs the monad because there's an IfaceKind inside, and we
+need a Kind.
 
 In fact, ifaceTyConName is only used for instances and rules, and we don't
 expect to instantiate those at these (internal-ish) Any types, so rather
@@ -254,8 +255,11 @@ instance Outputable IfacePredType where
 			     <+> sep (map pprParendIfaceType ts)
 
 instance Outputable IfaceTyCon where
-  ppr (IfaceTc ext) = ppr ext
-  ppr other_tc      = ppr (ifaceTyConName other_tc)
+  ppr (IfaceAnyTc k) = ptext (sLit "Any") <> pprParendIfaceType k
+      		       	     -- We can't easily get the Name of an IfaceAnyTc
+			     -- (see Note [The Name of an IfaceAnyTc])
+			     -- so we fake it.  It's only for debug printing!
+  ppr other_tc       = ppr (ifaceTyConName other_tc)
 
 -------------------
 pprIfaceContext :: IfaceContext -> SDoc
