@@ -64,7 +64,7 @@ blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
 
 -----
 
--- |The thread is awiting to retry an STM transaction, but there are no
+-- |The thread is awaiting to retry an STM transaction, but there are no
 -- other references to any @TVar@s involved, so it can't ever continue.
 data BlockedIndefinitelyOnSTM = BlockedIndefinitelyOnSTM
     deriving Typeable
@@ -91,8 +91,7 @@ instance Show Deadlock where
 
 -----
 
--- |There are no runnable threads, so the program is deadlocked.
--- The @Deadlock@ exception is raised in the main thread only.
+-- |'assert' was applied to 'False'.
 data AssertionFailed = AssertionFailed String
     deriving Typeable
 
