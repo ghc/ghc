@@ -547,7 +547,7 @@ instance Outputable IfaceRule where
 		   ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs }) 
     = sep [hsep [doubleQuotes (ftext name), ppr act,
 		 ptext (sLit "forall") <+> pprIfaceBndrs bndrs],
-	   nest 2 (sep [ppr fn <+> sep (map (pprIfaceExpr parens) args),
+	   nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
 		        ptext (sLit "=") <+> ppr rhs])
       ]
 
@@ -576,6 +576,9 @@ ppr_rough (Just tc) = ppr tc
 \begin{code}
 instance Outputable IfaceExpr where
     ppr e = pprIfaceExpr noParens e
+
+pprParendIfaceExpr :: IfaceExpr -> SDoc
+pprParendIfaceExpr = pprIfaceExpr parens
 
 pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 	-- The function adds parens in context that need
@@ -612,7 +615,7 @@ pprIfaceExpr add_par (IfaceCase scrut bndr ty alts)
   		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
 pprIfaceExpr _       (IfaceCast expr co)
-  = sep [pprIfaceExpr parens expr,
+  = sep [pprParendIfaceExpr expr,
 	 nest 2 (ptext (sLit "`cast`")),
 	 pprParendIfaceType co]
 
@@ -628,7 +631,7 @@ pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
 		  ptext (sLit "} in"),
 		  pprIfaceExpr noParens body])
 
-pprIfaceExpr add_par (IfaceNote note body) = add_par (ppr note <+> pprIfaceExpr parens body)
+pprIfaceExpr add_par (IfaceNote note body) = add_par (ppr note <+> pprParendIfaceExpr body)
 
 ppr_alt :: (IfaceConAlt, [FastString], IfaceExpr) -> SDoc
 ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs, 
@@ -645,8 +648,8 @@ ppr_bind (IfLetBndr b ty info, rhs)
 
 ------------------
 pprIfaceApp :: IfaceExpr -> [SDoc] -> SDoc
-pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun (nest 2 (pprIfaceExpr parens arg) : args)
-pprIfaceApp fun	 	       args = sep (pprIfaceExpr parens fun : args)
+pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun (nest 2 (pprParendIfaceExpr arg) : args)
+pprIfaceApp fun	 	       args = sep (pprParendIfaceExpr fun : args)
 
 ------------------
 instance Outputable IfaceNote where
@@ -683,11 +686,10 @@ instance Outputable IfaceInfoItem where
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = ptext (sLit "<compulsory>") <+> parens (ppr e)
   ppr (IfCoreUnfold e)     = parens (ppr e)
-  ppr (IfInlineRule a uok bok e) = ptext (sLit "InlineRule")
-                                  <+> ppr (a,uok,bok) 
-      		      	          <+> parens (ppr e)
+  ppr (IfInlineRule a uok bok e) = sep [ptext (sLit "InlineRule") <+> ppr (a,uok,bok),
+      		           	        pprParendIfaceExpr e]
   ppr (IfWrapper a wkr)    = ptext (sLit "Worker:") <+> ppr wkr <+> parens (ptext (sLit "arity") <+> int a)
-  ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:") <+> brackets (pprWithCommas (pprIfaceExpr parens) ns)
+  ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:") <+> brackets (pprWithCommas pprParendIfaceExpr ns)
 
 
 -- -----------------------------------------------------------------------------
