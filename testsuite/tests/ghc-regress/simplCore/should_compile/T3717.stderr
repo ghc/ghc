@@ -25,7 +25,7 @@ T3717.$wfoo =
     }
 end Rec }
 
-T3717.foo [InlPrag=INLINE [0]] :: GHC.Types.Int -> GHC.Types.Int
+T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
