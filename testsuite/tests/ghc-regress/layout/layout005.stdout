@@ -1,4 +1,3 @@
 Running with -XNoAlternativeLayoutRule
 Running with -XAlternativeLayoutRule
-
-layout005.hs:9:13: parse error on input `else'
+Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
