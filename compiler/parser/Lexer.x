@@ -1981,7 +1981,9 @@ alternativeLayoutRuleToken t
          mExpectingOCurly <- getAlrExpectingOCurly
          justClosedExplicitLetBlock <- getJustClosedExplicitLetBlock
          setJustClosedExplicitLetBlock False
-         let thisLoc = getLoc t
+         dflags <- getDynFlags
+         let transitional = dopt Opt_AlternativeLayoutRuleTransitional dflags
+             thisLoc = getLoc t
              thisCol = srcSpanStartCol thisLoc
              newLine = (lastLoc == noSrcSpan)
                     || (srcSpanStartLine thisLoc > srcSpanEndLine lastLoc)
@@ -2040,6 +2042,18 @@ alternativeLayoutRuleToken t
                  do setPendingImplicitTokens [t]
                     setALRContext ls
                     return (L thisLoc ITccurly)
+             -- This next case is to handle a transitional issue:
+             (ITwhere, ALRLayout _ col : ls, _)
+              | newLine && thisCol == col && transitional ->
+                 do addWarning Opt_WarnAlternativeLayoutRuleTransitional
+                               thisLoc
+                               (transitionalAlternativeLayoutWarning
+                                    "`where' clause at the same depth as implicit layout block")
+                    setALRContext ls
+                    setNextToken t
+                    -- Note that we use lastLoc, as we may need to close
+                    -- more layouts, or give a semicolon
+                    return (L lastLoc ITccurly)
              (_, ALRLayout _ col : ls, _)
               | newLine && thisCol == col ->
                  do setNextToken t
@@ -2089,6 +2103,11 @@ alternativeLayoutRuleToken t
                     return (L thisLoc ITccurly)
              -- the other ITwhere case omitted; general case below covers it
              (_, _, _) -> return t
+
+transitionalAlternativeLayoutWarning :: String -> SDoc
+transitionalAlternativeLayoutWarning msg
+    = text "transitional layout will not be accepted in the future:"
+   $$ text msg
 
 isALRopen :: Token -> Bool
 isALRopen ITcase        = True

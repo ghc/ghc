@@ -184,6 +184,7 @@ data DynFlag
    | Opt_WarnLazyUnliftedBindings
    | Opt_WarnUnusedDoBind
    | Opt_WarnWrongDoBind
+   | Opt_WarnAlternativeLayoutRuleTransitional
 
 
    -- language opts
@@ -252,6 +253,7 @@ data DynFlag
    | Opt_NewQualifiedOperators
    | Opt_ExplicitForAll
    | Opt_AlternativeLayoutRule
+   | Opt_AlternativeLayoutRuleTransitional
 
    | Opt_PrintExplicitForalls
 
@@ -930,7 +932,8 @@ standardWarnings
         Opt_WarnDuplicateExports,
         Opt_WarnLazyUnliftedBindings,
         Opt_WarnDodgyForeignImports,
-        Opt_WarnWrongDoBind
+        Opt_WarnWrongDoBind,
+        Opt_WarnAlternativeLayoutRuleTransitional
       ]
 
 minusWOpts :: [DynFlag]
@@ -1464,6 +1467,7 @@ fFlags = [
     const $ Deprecated "lazy unlifted bindings will be an error in GHC 6.14, and this flag will no longer exist"),
   ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, const Supported ),
   ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, const Supported ),
+  ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, const Supported ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, const Supported ),
   ( "strictness",                       Opt_Strictness, const Supported ),
   ( "specialise",                       Opt_Specialise, const Supported ),
@@ -1601,6 +1605,7 @@ xFlags = [
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, const Supported ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, const Supported ),
+  ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, const Supported ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),
