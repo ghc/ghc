@@ -2054,6 +2054,18 @@ alternativeLayoutRuleToken t
                     -- Note that we use lastLoc, as we may need to close
                     -- more layouts, or give a semicolon
                     return (L lastLoc ITccurly)
+             -- This next case is to handle a transitional issue:
+             (ITvbar, ALRLayout _ col : ls, _)
+              | newLine && thisCol == col && transitional ->
+                 do addWarning Opt_WarnAlternativeLayoutRuleTransitional
+                               thisLoc
+                               (transitionalAlternativeLayoutWarning
+                                    "`|' at the same depth as implicit layout block")
+                    setALRContext ls
+                    setNextToken t
+                    -- Note that we use lastLoc, as we may need to close
+                    -- more layouts, or give a semicolon
+                    return (L lastLoc ITccurly)
              (_, ALRLayout _ col : ls, _)
               | newLine && thisCol == col ->
                  do setNextToken t
