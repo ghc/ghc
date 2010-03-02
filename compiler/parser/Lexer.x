@@ -1497,7 +1497,10 @@ data PState = PState {
         alr_context :: [ALRContext],
         -- Are we expecting a '{'? If it's Just, then the ALRLayout tells
         -- us what sort of layout the '{' will open:
-        alr_expecting_ocurly :: Maybe ALRLayout
+        alr_expecting_ocurly :: Maybe ALRLayout,
+        -- Have we just had the '}' for a let block? If so, than an 'in'
+        -- token doesn't need to close anything:
+        alr_justClosedExplicitLetBlock :: Bool
      }
 	-- last_loc and last_len are used when generating error messages,
 	-- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -1506,6 +1509,7 @@ data PState = PState {
 	-- implement pushCurrentContext (which is only called from one place).
 
 data ALRContext = ALRNoLayout Bool{- does it contain commas? -}
+                              Bool{- is it a 'let' block? -}
                 | ALRLayout ALRLayout Int
 data ALRLayout = ALRLayoutLet
                | ALRLayoutWhere
@@ -1670,6 +1674,14 @@ getALRContext = P $ \s@(PState {alr_context = cs}) -> POk s cs
 setALRContext :: [ALRContext] -> P ()
 setALRContext cs = P $ \s -> POk (s {alr_context = cs}) ()
 
+getJustClosedExplicitLetBlock :: P Bool
+getJustClosedExplicitLetBlock
+ = P $ \s@(PState {alr_justClosedExplicitLetBlock = b}) -> POk s b
+
+setJustClosedExplicitLetBlock :: Bool -> P ()
+setJustClosedExplicitLetBlock b
+ = P $ \s -> POk (s {alr_justClosedExplicitLetBlock = b}) ()
+
 setNextToken :: Located Token -> P ()
 setNextToken t = P $ \s -> POk (s {alr_next_token = Just t}) ()
 
@@ -1802,7 +1814,8 @@ pragState dynflags buf loc =
       alr_next_token = Nothing,
       alr_last_loc = noSrcSpan,
       alr_context = [],
-      alr_expecting_ocurly = Nothing
+      alr_expecting_ocurly = Nothing,
+      alr_justClosedExplicitLetBlock = False
     }
 
 
@@ -1825,7 +1838,8 @@ mkPState buf loc flags  =
       alr_next_token = Nothing,
       alr_last_loc = noSrcSpan,
       alr_context = [],
-      alr_expecting_ocurly = Nothing
+      alr_expecting_ocurly = Nothing,
+      alr_justClosedExplicitLetBlock = False
     }
     where
       bitmap = genericsBit `setBitIf` dopt Opt_Generics flags
@@ -1965,6 +1979,8 @@ alternativeLayoutRuleToken t
     = do context <- getALRContext
          lastLoc <- getAlrLastLoc
          mExpectingOCurly <- getAlrExpectingOCurly
+         justClosedExplicitLetBlock <- getJustClosedExplicitLetBlock
+         setJustClosedExplicitLetBlock False
          let thisLoc = getLoc t
              thisCol = srcSpanStartCol thisLoc
              newLine = (lastLoc == noSrcSpan)
@@ -1972,9 +1988,12 @@ alternativeLayoutRuleToken t
          case (unLoc t, context, mExpectingOCurly) of
              -- This case handles a GHC extension to the original H98
              -- layout rule...
-             (ITocurly, _, Just _) ->
+             (ITocurly, _, Just alrLayout) ->
                  do setAlrExpectingOCurly Nothing
-                    setALRContext (ALRNoLayout (containsCommas ITocurly) : context)
+                    let isLet = case alrLayout of
+                                ALRLayoutLet -> True
+                                _ -> False
+                    setALRContext (ALRNoLayout (containsCommas ITocurly) isLet : context)
                     return t
              -- ...and makes this case unnecessary
              {-
@@ -2013,6 +2032,9 @@ alternativeLayoutRuleToken t
              (ITeof, _, _) ->
                  return t
              -- the other ITeof case omitted; general case below covers it
+             (ITin, _, _)
+              | justClosedExplicitLetBlock ->
+                 return t
              (ITin, ALRLayout ALRLayoutLet _ : ls, _)
               | newLine ->
                  do setPendingImplicitTokens [t]
@@ -2030,7 +2052,7 @@ alternativeLayoutRuleToken t
                     return (L lastLoc ITccurly)
              (u, _, _)
               | isALRopen u ->
-                 do setALRContext (ALRNoLayout (containsCommas u) : context)
+                 do setALRContext (ALRNoLayout (containsCommas u) False : context)
                     return t
              (u, _, _)
               | isALRclose u ->
@@ -2039,8 +2061,9 @@ alternativeLayoutRuleToken t
                      do setALRContext ls
                         setNextToken t
                         return (L thisLoc ITccurly)
-                 ALRNoLayout _ : ls ->
+                 ALRNoLayout _ isLet : ls ->
                      do setALRContext ls
+                        when isLet $ setJustClosedExplicitLetBlock True
                         return t
                  [] ->
                      -- XXX This is an error in John's code, but
@@ -2106,7 +2129,7 @@ containsCommas _        = False
 topNoLayoutContainsCommas :: [ALRContext] -> Bool
 topNoLayoutContainsCommas [] = False
 topNoLayoutContainsCommas (ALRLayout _ _ : ls) = topNoLayoutContainsCommas ls
-topNoLayoutContainsCommas (ALRNoLayout b : _) = b
+topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 
 lexToken :: P (Located Token)
 lexToken = do
