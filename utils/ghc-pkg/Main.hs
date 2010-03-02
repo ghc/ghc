@@ -52,8 +52,11 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
-#if __GLASGOW_HASKELL__ < 612
+#if __GLASGOW_HASKELL__ < 612 || defined(mingw32_HOST_OS)
 import Foreign
+#endif
+
+#if __GLASGOW_HASKELL__ < 612
 import Foreign.C
 import System.Posix.Internals
 #if __GLASGOW_HASKELL__ >= 611
