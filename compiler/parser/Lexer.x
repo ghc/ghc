@@ -2064,10 +2064,8 @@ alternativeLayoutRuleToken t
                     -- Note that we use lastLoc, as we may need to close
                     -- more layouts, or give a semicolon
                     return (L lastLoc ITccurly)
-             (u, _, _)
-              | isALRopen u ->
-                 do setALRContext (ALRNoLayout (containsCommas u) False : context)
-                    return t
+             -- We need to handle close before open, as 'then' is both
+             -- an open and a close
              (u, _, _)
               | isALRclose u ->
                  case context of
@@ -2076,13 +2074,24 @@ alternativeLayoutRuleToken t
                         setNextToken t
                         return (L thisLoc ITccurly)
                  ALRNoLayout _ isLet : ls ->
-                     do setALRContext ls
+                     do let ls' = if isALRopen u
+                                     then ALRNoLayout (containsCommas u) False : ls
+                                     else ls
+                        setALRContext ls'
                         when isLet $ setJustClosedExplicitLetBlock True
                         return t
                  [] ->
-                     -- XXX This is an error in John's code, but
-                     -- it looks reachable to me at first glance
-                     return t
+                     do let ls = if isALRopen u
+                                    then [ALRNoLayout (containsCommas u) False]
+                                    else ls
+                        setALRContext ls
+                        -- XXX This is an error in John's code, but
+                        -- it looks reachable to me at first glance
+                        return t
+             (u, _, _)
+              | isALRopen u ->
+                 do setALRContext (ALRNoLayout (containsCommas u) False : context)
+                    return t
              (ITin, ALRLayout ALRLayoutLet _ : ls, _) ->
                  do setALRContext ls
                     setPendingImplicitTokens [t]
@@ -2112,6 +2121,7 @@ transitionalAlternativeLayoutWarning msg
 isALRopen :: Token -> Bool
 isALRopen ITcase        = True
 isALRopen ITif          = True
+isALRopen ITthen        = True
 isALRopen IToparen      = True
 isALRopen ITobrack      = True
 isALRopen ITocurly      = True
@@ -2123,6 +2133,7 @@ isALRopen _             = False
 isALRclose :: Token -> Bool
 isALRclose ITof     = True
 isALRclose ITthen   = True
+isALRclose ITelse   = True
 isALRclose ITcparen = True
 isALRclose ITcbrack = True
 isALRclose ITccurly = True
