@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-layout001 layout002 layout003 layout004 layout005 layout006 layout007 layout008: %:
+layout001 layout002 layout003 layout004 layout005 layout006 layout007 layout008 layout009: %:
 	$(RM) $*.hi $*.o
 	echo Running with -XNoAlternativeLayoutRule
 	-"$(TEST_HC)" -v0 -XNoAlternativeLayoutRule -c $*.hs 2>&1
