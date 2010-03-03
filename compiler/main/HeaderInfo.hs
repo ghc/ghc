@@ -9,6 +9,7 @@
 -----------------------------------------------------------------------------
 
 module HeaderInfo ( getImports
+                  , mkPrelImports -- used by the renamer too
                   , getOptionsFromFile, getOptions
                   , optionsErrorMsgs,
                     checkProcessArgsResult ) where
@@ -20,9 +21,9 @@ import HscTypes
 import Parser		( parseHeader )
 import Lexer
 import FastString
-import HsSyn		( ImportDecl(..), HsModule(..) )
-import Module		( ModuleName, moduleName )
-import PrelNames        ( gHC_PRIM, mAIN_NAME )
+import HsSyn
+import Module
+import PrelNames
 import StringBuffer
 import SrcLoc
 import DynFlags
@@ -73,12 +74,46 @@ getImports dflags buf filename source_filename = do
                 main_loc = mkSrcLoc (mkFastString source_filename) 1 1
 		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
 	        (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
+
+		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
 		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc) 
 					ord_idecls
-		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
+
+                implicit_prelude = dopt Opt_ImplicitPrelude dflags
+                implicit_imports = mkPrelImports (unLoc mod) implicit_prelude imps
 	      in
-	      return (src_idecls, ordinary_imps, mod)
-  
+	      return (src_idecls, implicit_imports ++ ordinary_imps, mod)
+
+mkPrelImports :: ModuleName -> Bool -> [LImportDecl RdrName]
+              -> [LImportDecl RdrName]
+-- Consruct the implicit declaration "import Prelude" (or not)
+--
+-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
+-- because the former doesn't even look at Prelude.hi for instance
+-- declarations, whereas the latter does.
+mkPrelImports this_mod implicit_prelude import_decls
+  | this_mod == pRELUDE_NAME
+   || explicit_prelude_import
+   || not implicit_prelude
+  = []
+  | otherwise = [preludeImportDecl]
+  where
+      explicit_prelude_import
+       = notNull [ () | L _ (ImportDecl mod Nothing _ _ _ _) <- import_decls,
+	           unLoc mod == pRELUDE_NAME ]
+
+      preludeImportDecl :: LImportDecl RdrName
+      preludeImportDecl
+        = L loc $
+	  ImportDecl (L loc pRELUDE_NAME)
+               Nothing {- no specific package -}
+	       False {- Not a boot interface -}
+	       False	{- Not qualified -}
+	       Nothing	{- No "as" -}
+	       Nothing	{- No import list -}
+
+      loc = mkGeneralSrcSpan (fsLit "Implicit import declaration")
+
 parseError :: GhcMonad m => SrcSpan -> Message -> m a
 parseError span err = throwOneError $ mkPlainErrMsg span err
 

@@ -21,6 +21,7 @@ import IfaceEnv		( ifaceExportNames )
 import LoadIface	( loadSrcInterface, loadSysInterface )
 import TcRnMonad hiding (LIE)
 
+import HeaderInfo       ( mkPrelImports )
 import PrelNames
 import Module
 import Name
@@ -60,7 +61,7 @@ rnImports imports
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
          implicit_prelude <- doptM Opt_ImplicitPrelude
-         let prel_imports	= mkPrelImports this_mod implicit_prelude imports
+         let prel_imports	= mkPrelImports (moduleName this_mod) implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ _ is_boot _ _ _)) = is_boot
 
@@ -83,36 +84,6 @@ rnImports imports
                    gbl_env1 `plusGlobalRdrEnv` gbl_env2,
                    imp_avails1 `plusImportAvails` imp_avails2,
 		   hpc_usage1 || hpc_usage2)
-
-mkPrelImports :: Module -> Bool -> [LImportDecl RdrName] -> [LImportDecl RdrName]
--- Consruct the implicit declaration "import Prelude" (or not)
---
--- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
--- because the former doesn't even look at Prelude.hi for instance 
--- declarations, whereas the latter does.
-mkPrelImports this_mod implicit_prelude import_decls
-  | this_mod == pRELUDE
-   || explicit_prelude_import
-   || not implicit_prelude
-  = []
-  | otherwise = [preludeImportDecl]
-  where
-      explicit_prelude_import
-       = notNull [ () | L _ (ImportDecl mod Nothing _ _ _ _) <- import_decls, 
-	           unLoc mod == pRELUDE_NAME ]
-
-      preludeImportDecl :: LImportDecl RdrName
-      preludeImportDecl
-        = L loc $
-	  ImportDecl (L loc pRELUDE_NAME)
-               Nothing {- no specific package -}
-	       False {- Not a boot interface -}
-	       False	{- Not qualified -}
-	       Nothing	{- No "as" -}
-	       Nothing	{- No import list -}
-
-      loc = mkGeneralSrcSpan (fsLit "Implicit import declaration")         
-
 
 rnImportDecl  :: Module
 	      -> LImportDecl RdrName

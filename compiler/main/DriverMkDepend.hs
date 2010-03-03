@@ -18,7 +18,6 @@ module DriverMkDepend (
 import qualified GHC
 -- import GHC              ( ModSummary(..), GhcMonad )
 import HsSyn            ( ImportDecl(..) )
-import PrelNames
 import DynFlags
 import Util
 import HscTypes
@@ -218,9 +217,6 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
 
         ; do_imps True  (ms_srcimps node)
         ; do_imps False (ms_imps node)
-
-        ; when (dopt Opt_ImplicitPrelude (ms_hspp_opts node)) $
-            do_imp noSrcSpan False Nothing pRELUDE_NAME
         }
 
 
