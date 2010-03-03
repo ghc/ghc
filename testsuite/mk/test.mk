@@ -44,7 +44,8 @@ else
 RUNTEST_OPTS += -e ghc_with_native_codegen=0
 endif
 
-HAVE_PROFILING:=$(if $(wildcard $(shell "$(GHC_PKG)" field haskell98 library-dirs | sed 's/^[^:]*: *//')/libHShaskell98-*_p.a),YES,NO)
+HASKELL98_LIBDIR := $(shell "$(GHC_PKG)" field haskell98 library-dirs | sed 's/^[^:]*: *//')
+HAVE_PROFILING := $(shell if [ -f $(HASKELL98_LIBDIR)/libHShaskell98-*_p.a ]; then echo YES; else echo NO; fi)
 
 ifeq "$(HAVE_PROFILING)" "YES"
 RUNTEST_OPTS += -e ghc_with_profiling=1
