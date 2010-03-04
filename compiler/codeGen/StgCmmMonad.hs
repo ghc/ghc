@@ -260,7 +260,9 @@ data CgState
 data HeapUsage =
   HeapUsage {
 	virtHp :: VirtualHpOffset,	-- Virtual offset of highest-allocated word
+	       	  			--   Incremented whenever we allocate
 	realHp :: VirtualHpOffset	-- realHp: Virtual offset of real heap ptr
+	       	  			--   Used in instruction addressing modes
   }
 
 type VirtualHpOffset = WordOff
