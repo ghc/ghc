@@ -844,14 +844,7 @@ isBuiltInOcc ctxt_ns occ
 mk_uniq_occ :: OccName.NameSpace -> String -> Int# -> OccName.OccName
 mk_uniq_occ ns occ uniq 
   = OccName.mkOccName ns (occ ++ '[' : shows (mk_uniq uniq) "]")
-	-- The idea here is to make a name that 
-	-- a) the user could not possibly write, and
-	-- b) cannot clash with another NameU
-	-- Previously I generated an Exact RdrName with mkInternalName.
-	-- This works fine for local binders, but does not work at all for
-	-- top-level binders, which must have External Names, since they are
-	-- rapidly baked into data constructors and the like.  Baling out
-	-- and generating an unqualified RdrName here is the simple solution
+        -- See Note [Unique OccNames from Template Haskell]
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> String -> OccName.OccName
@@ -872,3 +865,17 @@ mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)
 \end{code}
 
+Note [Unique OccNames from Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The idea here is to make a name that 
+  a) the user could not possibly write (it has a "[" 
+     and letters or digits from the unique)
+  b) cannot clash with another NameU
+Previously I generated an Exact RdrName with mkInternalName.  This
+works fine for local binders, but does not work at all for top-level
+binders, which must have External Names, since they are rapidly baked
+into data constructors and the like.  Baling out and generating an
+unqualified RdrName here is the simple solution
+
+See also Note [Suppressing uniques in OccNames] in OccName, which
+suppresses the unique when opt_SuppressUniques is on.
