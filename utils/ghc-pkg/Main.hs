@@ -53,11 +53,12 @@ import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
 #if __GLASGOW_HASKELL__ < 612 || defined(mingw32_HOST_OS)
+-- mingw32 needs these for getExecDir, GHC <6.12 needs them for openNewFile
 import Foreign
+import Foreign.C
 #endif
 
 #if __GLASGOW_HASKELL__ < 612
-import Foreign.C
 import System.Posix.Internals
 #if __GLASGOW_HASKELL__ >= 611
 import GHC.IO.Handle.FD (fdToHandle)
