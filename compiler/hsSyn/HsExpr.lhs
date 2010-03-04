@@ -808,15 +808,6 @@ type LStmtLR idL idR = Located (StmtLR idL idR)
 
 type Stmt id = StmtLR id id
 
-data GroupByClause id
-    = GroupByNothing (LHsExpr id) -- Using expression, i.e.
-                                  -- "then group using f" ==> GroupByNothing f
-    | GroupBySomething (Either (LHsExpr id) (SyntaxExpr id)) (LHsExpr id)
-      -- "then group using f by e" ==> GroupBySomething (Left f) e
-      -- "then group by e"         ==> GroupBySomething (Right _) e: in
-      --                               this case the expression is filled
-      --                               in by the renamer
-
 -- The SyntaxExprs in here are used *only* for do-notation, which
 -- has rebindable syntax.  Otherwise they are unused.
 data StmtLR idL idR
@@ -838,16 +829,33 @@ data StmtLR idL idR
   -- After renaming, the ids are the binders bound by the stmts and used
   -- after them
 
-  | TransformStmt ([LStmt idL], [idR]) (LHsExpr idR) (Maybe (LHsExpr idR))
-  -- After renaming, the IDs are the binders occurring within this
-  -- transform statement that are used after it
-  -- "qs, then f by e" ==> TransformStmt (qs, binders) f (Just e)
-  -- "qs, then f"      ==> TransformStmt (qs, binders) f Nothing
+  -- "qs, then f by e" ==> TransformStmt qs binders f (Just e)
+  -- "qs, then f"      ==> TransformStmt qs binders f Nothing
+  | TransformStmt 
+         [LStmt idL]	-- Stmts are the ones to the left of the 'then'
 
-  | GroupStmt ([LStmt idL], [(idR, idR)]) (GroupByClause idR)
-  -- After renaming, the IDs are the binders occurring within this
-  -- transform statement that are used after it which are paired with
-  -- the names which they group over in statements
+         [idR] 		-- After renaming, the IDs are the binders occurring 
+		        -- within this transform statement that are used after it
+
+         (LHsExpr idR)		-- "then f"
+
+         (Maybe (LHsExpr idR))	-- "by e" (optional)
+
+  | GroupStmt 
+         [LStmt idL]      -- Stmts to the *left* of the 'group'
+	 	       	  -- which generates the tuples to be grouped
+
+         [(idR, idR)]	  -- After renaming, the IDs are the binders
+		    	  -- occurring within this transform statement that
+		    	  -- are used after it which are paired with the
+		    	  -- names which they group over in statements
+				
+         (Maybe (LHsExpr idR)) 	-- "by e" (optional)
+
+         (Either		-- "using f"
+             (LHsExpr idR)	--   Left f  => explicit "using f"
+             (SyntaxExpr idR))	--   Right f => implicit; filled in with 'groupWith'
+							
 
   -- Recursive statement (see Note [RecStmt] below)
   | RecStmt
@@ -959,43 +967,57 @@ pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _)       = ppr expr
 pprStmt (ParStmt stmtss)          = hsep (map doStmts stmtss)
   where doStmts stmts = ptext (sLit "| ") <> ppr stmts
-pprStmt (TransformStmt (stmts, _) usingExpr maybeByExpr)
-    = (hsep [stmtsDoc, ptext (sLit "then"), ppr usingExpr, byExprDoc])
-  where stmtsDoc = interpp'SP stmts
-        byExprDoc = maybe empty (\byExpr -> hsep [ptext (sLit "by"), ppr byExpr]) maybeByExpr
-pprStmt (GroupStmt (stmts, _) groupByClause) = (hsep [stmtsDoc, ptext (sLit "then group"), pprGroupByClause groupByClause])
-  where stmtsDoc = interpp'SP stmts
-pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids, recS_later_ids = later_ids })
+
+pprStmt (TransformStmt stmts _ using by)
+  = sep (ppr_lc_stmts stmts ++ [pprTransformStmt using by])
+
+pprStmt (GroupStmt stmts _ by using) 
+  = sep (ppr_lc_stmts stmts ++ [pprGroupStmt by using])
+
+pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
+                 , recS_later_ids = later_ids })
   = ptext (sLit "rec") <+> 
     vcat [ braces (vcat (map ppr segment))
          , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
                             , ptext (sLit "later_ids=") <> ppr later_ids])]
 
-pprGroupByClause :: (OutputableBndr id) => GroupByClause id -> SDoc
-pprGroupByClause (GroupByNothing usingExpr) = hsep [ptext (sLit "using"), ppr usingExpr]
-pprGroupByClause (GroupBySomething eitherUsingExpr byExpr) = hsep [ptext (sLit "by"), ppr byExpr, usingExprDoc]
-  where usingExprDoc = either (\usingExpr -> hsep [ptext (sLit "using"), ppr usingExpr]) (const empty) eitherUsingExpr
+pprTransformStmt :: OutputableBndr id => LHsExpr id -> Maybe (LHsExpr id) -> SDoc
+pprTransformStmt using by = sep [ ptext (sLit "then"), nest 2 (ppr using), nest 2 (pprBy by)]
+
+pprGroupStmt :: OutputableBndr id => Maybe (LHsExpr id)
+                                  -> Either (LHsExpr id) (SyntaxExpr is)
+				  -> SDoc
+pprGroupStmt by using 
+  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 (ppr_using using)]
+  where
+    ppr_using (Right _) = empty
+    ppr_using (Left e)  = ptext (sLit "using") <+> ppr e
+
+pprBy :: OutputableBndr id => Maybe (LHsExpr id) -> SDoc
+pprBy Nothing  = empty
+pprBy (Just e) = ptext (sLit "by") <+> ppr e
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
 pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
 pprDo GhciStmt    stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
 pprDo (MDoExpr _) stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
-pprDo ListComp    stmts body = pprComp brackets    stmts body
-pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
+pprDo ListComp    stmts body = brackets    $ pprComp stmts body
+pprDo PArrComp    stmts body = pa_brackets $ pprComp stmts body
 pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
 
 ppr_do_stmts :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
 ppr_do_stmts stmts body
-  = lbrace <+> pprDeeperList vcat ([ ppr s <> semi | s <- stmts] ++ [ppr body])
+  = lbrace <+> pprDeeperList vcat ([ppr s <> semi | s <- stmts] ++ [ppr body])
            <+> rbrace
 
-pprComp :: OutputableBndr id => (SDoc -> SDoc) -> [LStmt id] -> LHsExpr id -> SDoc
-pprComp brack quals body
-  = brack $
-        hang (ppr body <+> char '|')
-             4 (interpp'SP quals)
+ppr_lc_stmts :: OutputableBndr id => [LStmt id] -> [SDoc]
+ppr_lc_stmts stmts = [ppr s <> comma | s <- stmts]
+
+pprComp :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
+pprComp quals body	  -- Prints:  body | qual1, ..., qualn 
+  = hang (ppr body <+> char '|') 2 (interpp'SP quals)
 \end{code}
 
 %************************************************************************
@@ -1202,5 +1224,10 @@ pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <>
 pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR)
    	       => HsStmtContext idL -> StmtLR idL idR -> SDoc
 pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
-		    	  4 (ppr stmt)
+		    	  4 (ppr_stmt stmt)
+  where
+    -- For Group and Transform Stmts, don't print the nested stmts!
+    ppr_stmt (GroupStmt _ _ by using)     = pprGroupStmt by using
+    ppr_stmt (TransformStmt _ _ using by) = pprTransformStmt using by
+    ppr_stmt stmt                         = pprStmt stmt
 \end{code}

@@ -26,8 +26,8 @@ module RnEnv (
 	bindTyVarsRn, extendTyVarEnvFVRn,
 
 	checkDupRdrNames, checkDupAndShadowedRdrNames,
-        checkDupAndShadowedNames, 
-	mapFvRn, mapFvRnCPS,
+        checkDupNames, checkDupAndShadowedNames, 
+	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
 	dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg
@@ -989,10 +989,18 @@ checkShadowedOccs (global_env,local_env) loc_occs
 
 \begin{code}
 -- A useful utility
+addFvRn :: FreeVars -> RnM (thing, FreeVars) -> RnM (thing, FreeVars)
+addFvRn fvs1 thing_inside = do { (res, fvs2) <- thing_inside
+                               ; return (res, fvs1 `plusFV` fvs2) }
+
 mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars)
 mapFvRn f xs = do stuff <- mapM f xs
                   case unzip stuff of
                       (ys, fvs_s) -> return (ys, plusFVs fvs_s)
+
+mapMaybeFvRn :: (a -> RnM (b, FreeVars)) -> Maybe a -> RnM (Maybe b, FreeVars)
+mapMaybeFvRn _ Nothing = return (Nothing, emptyFVs)
+mapMaybeFvRn f (Just x) = do { (y, fvs) <- f x; return (Just y, fvs) }
 
 -- because some of the rename functions are CPSed:
 -- maps the function across the list from left to right; 

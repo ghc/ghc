@@ -125,7 +125,7 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
    -- bind the LHSes (and their fixities) in the global rdr environment
-   let { val_binders = map unLoc $ collectHsValBinders new_lhs ;
+   let { val_binders = collectHsValBinders new_lhs ;
 	 val_bndr_set = mkNameSet val_binders ;
 	 all_bndr_set = val_bndr_set `unionNameSets` availsToNameSet tc_avails ;
          val_avails = map Avail val_binders 
@@ -440,7 +440,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the bindings are for the right class
     let
-	meth_names  = collectHsBindLocatedBinders mbinds
+	meth_names  = collectMethodBinders mbinds
 	(inst_tyvars, _, cls,_) = splitHsInstDeclTy (unLoc inst_ty')
     in
     checkDupRdrNames meth_names 	`thenM_`
@@ -478,7 +478,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	--
 	-- But the (unqualified) method names are in scope
     let 
-	binders = collectHsBindBinders mbinds'
+	binders = collectHsBindsBinders mbinds'
 	bndr_set = mkNameSet binders
     in
     bindLocalNames binders 

@@ -233,7 +233,8 @@ rnPats ctxt pats thing_inside
 rnPat :: HsMatchContext Name -- for error messages
       -> LPat RdrName 
       -> (LPat Name -> RnM (a, FreeVars))
-      -> RnM (a, FreeVars)
+      -> RnM (a, FreeVars)     -- Variables bound by pattern do not 
+      	     	 	       -- appear in the result FreeVars 
 rnPat ctxt pat thing_inside 
   = rnPats ctxt [pat] (\[pat'] -> thing_inside pat')
 

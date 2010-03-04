@@ -24,6 +24,7 @@ import HscTypes
 import StaticFlags
 import TyCon
 import FiniteMap
+import MonadUtils
 import Maybes
 
 import Data.Array
@@ -290,7 +291,7 @@ addTickHsExpr (HsIf	 e1 e2 e3) =
 		(addTickLHsExprOptAlt True e2)
 		(addTickLHsExprOptAlt True e3)
 addTickHsExpr (HsLet binds e) =
-	bindLocals (map unLoc $ collectLocalBinders binds) $
+	bindLocals (collectLocalBinders binds) $
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsExprNeverOrAlways e)
@@ -398,7 +399,7 @@ addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
     guarded' <- mapM (liftL (addTickGRHS isOneOfMany)) guarded
     return $ GRHSs guarded' local_binds'
   where
-    binders = map unLoc (collectLocalBinders local_binds)
+    binders = collectLocalBinders local_binds
 
 addTickGRHS :: Bool -> GRHS Id -> TM (GRHS Id)
 addTickGRHS isOneOfMany (GRHS stmts expr) = do
@@ -420,7 +421,7 @@ addTickLStmts' isGuard lstmts res
         a <- res
         return (lstmts', a)
   where
-        binders = map unLoc (collectLStmtsBinders lstmts)
+        binders = collectLStmtsBinders lstmts
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
 addTickStmt _isGuard (BindStmt pat e bind fail) = do
@@ -440,25 +441,21 @@ addTickStmt _isGuard (LetStmt binds) = do
 addTickStmt isGuard (ParStmt pairs) = do
     liftM ParStmt 
         (mapM (addTickStmtAndBinders isGuard) pairs)
-addTickStmt isGuard (TransformStmt (stmts, ids) usingExpr maybeByExpr) = do
-    liftM3 TransformStmt 
-        (addTickStmtAndBinders isGuard (stmts, ids))
+
+addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr) = do
+    liftM4 TransformStmt 
+        (addTickLStmts isGuard stmts)
+        (return ids)
         (addTickLHsExprAlways usingExpr)
         (addTickMaybeByLHsExpr maybeByExpr)
-addTickStmt isGuard (GroupStmt (stmts, binderMap) groupByClause) = do
-    liftM2 GroupStmt 
-        (addTickStmtAndBinders isGuard (stmts, binderMap))
-        (case groupByClause of
-            GroupByNothing usingExpr -> addTickLHsExprAlways usingExpr >>= (return . GroupByNothing)
-            GroupBySomething eitherUsingExpr byExpr -> do
-                eitherUsingExpr' <- mapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) eitherUsingExpr
-                byExpr' <- addTickLHsExprAlways byExpr
-                return $ GroupBySomething eitherUsingExpr' byExpr')
-    where
-        mapEitherM f g x = do
-          case x of
-            Left a -> f a >>= (return . Left)
-            Right b -> g b >>= (return . Right)
+
+addTickStmt isGuard (GroupStmt stmts binderMap by using) = do
+    liftM4 GroupStmt 
+        (addTickLStmts isGuard stmts)
+        (return binderMap)
+        (fmapMaybeM  addTickLHsExprAlways by)
+	(fmapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) using)
+
 addTickStmt isGuard stmt@(RecStmt {})
   = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
        ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)

@@ -318,7 +318,7 @@ zonkValBinds env (ValBindsOut binds sigs)
 zonkRecMonoBinds :: ZonkEnv -> LHsBinds TcId -> TcM (ZonkEnv, LHsBinds Id)
 zonkRecMonoBinds env binds 
  = fixM (\ ~(_, new_binds) -> do 
-	{ let env1 = extendZonkEnv env (collectHsBindBinders new_binds)
+	{ let env1 = extendZonkEnv env (collectHsBindsBinders new_binds)
         ; binds' <- zonkMonoBinds env1 binds
         ; return (env1, binds') })
 
@@ -351,7 +351,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_dicts = dicts,
     fixM (\ ~(new_val_binds, _) ->
 	let
 	  env1 = extendZonkEnv env new_dicts
-	  env2 = extendZonkEnv env1 (collectHsBindBinders new_val_binds)
+	  env2 = extendZonkEnv env1 (collectHsBindsBinders new_val_binds)
 	in
 	zonkMonoBinds env2 val_binds 		`thenM` \ new_val_binds ->
         mappM (zonkExport env2) exports		`thenM` \ new_exports ->
@@ -710,32 +710,21 @@ zonkStmt env (ExprStmt expr then_op ty)
     zonkTcTypeToType env ty	`thenM` \ new_ty ->
     returnM (env, ExprStmt new_expr new_then new_ty)
 
-zonkStmt env (TransformStmt (stmts, binders) usingExpr maybeByExpr)
+zonkStmt env (TransformStmt stmts binders usingExpr maybeByExpr)
   = do { (env', stmts') <- zonkStmts env stmts 
     ; let binders' = zonkIdOccs env' binders
     ; usingExpr' <- zonkLExpr env' usingExpr
     ; maybeByExpr' <- zonkMaybeLExpr env' maybeByExpr
-    ; return (env', TransformStmt (stmts', binders') usingExpr' maybeByExpr') }
+    ; return (env', TransformStmt stmts' binders' usingExpr' maybeByExpr') }
     
-zonkStmt env (GroupStmt (stmts, binderMap) groupByClause)
+zonkStmt env (GroupStmt stmts binderMap by using)
   = do { (env', stmts') <- zonkStmts env stmts 
     ; binderMap' <- mappM (zonkBinderMapEntry env') binderMap
-    ; groupByClause' <- 
-        case groupByClause of
-            GroupByNothing usingExpr -> (zonkLExpr env' usingExpr) >>= (return . GroupByNothing)
-            GroupBySomething eitherUsingExpr byExpr -> do
-                eitherUsingExpr' <- mapEitherM (zonkLExpr env') (zonkExpr env') eitherUsingExpr
-                byExpr' <- zonkLExpr env' byExpr
-                return $ GroupBySomething eitherUsingExpr' byExpr'
-                
+    ; by' <- fmapMaybeM (zonkLExpr env') by
+    ; using' <- fmapEitherM (zonkLExpr env) (zonkExpr env) using
     ; let env'' = extendZonkEnv env' (map snd binderMap')
-    ; return (env'', GroupStmt (stmts', binderMap') groupByClause') }
+    ; return (env'', GroupStmt stmts' binderMap' by' using') }
   where
-    mapEitherM f g x = do
-      case x of
-        Left a -> f a >>= (return . Left)
-        Right b -> g b >>= (return . Right)
-  
     zonkBinderMapEntry env (oldBinder, newBinder) = do 
         let oldBinder' = zonkIdOcc env oldBinder
         newBinder' <- zonkIdBndr env newBinder

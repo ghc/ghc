@@ -38,8 +38,6 @@ import PrelInfo
 import SrcLoc
 import Outputable
 import FastString
-
-import Control.Monad ( liftM2 )
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
@@ -95,7 +93,7 @@ dsInnerListComp (stmts, bndrs) = do
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
 dsTransformStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsTransformStmt (TransformStmt (stmts, binders) usingExpr maybeByExpr) = do
+dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr) = do
     (expr, binders_tuple_type) <- dsInnerListComp (stmts, binders)
     usingExpr' <- dsLExpr usingExpr
     
@@ -120,7 +118,7 @@ dsTransformStmt (TransformStmt (stmts, binders) usingExpr maybeByExpr) = do
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
 dsGroupStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsGroupStmt (GroupStmt (stmts, binderMap) groupByClause) = do
+dsGroupStmt (GroupStmt stmts binderMap by using) = do
     let (fromBinders, toBinders) = unzip binderMap
         
         fromBindersTypes = map idType fromBinders
@@ -129,23 +127,19 @@ dsGroupStmt (GroupStmt (stmts, binderMap) groupByClause) = do
         toBindersTupleType = mkBigCoreTupTy toBindersTypes
     
     -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-    (expr, fromBindersTupleType) <- dsInnerListComp (stmts, fromBinders)
+    (expr, from_tup_ty) <- dsInnerListComp (stmts, fromBinders)
     
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
     -- function required? If so, create that desugared function and add to arguments
-    (usingExpr', usingArgs) <- 
-        case groupByClause of
-            GroupByNothing usingExpr -> liftM2 (,) (dsLExpr usingExpr) (return [expr])
-            GroupBySomething usingExpr byExpr -> do
-                usingExpr' <- dsLExpr (either id noLoc usingExpr)
-                
-                byExpr' <- dsLExpr byExpr
-                
-                us <- newUniqueSupply
-                [fromBindersTuple] <- newSysLocalsDs [fromBindersTupleType]
-                let byExprWrapper = mkTupleCase us fromBinders byExpr' fromBindersTuple (Var fromBindersTuple)
-                
-                return (usingExpr', [Lam fromBindersTuple byExprWrapper, expr])
+    usingExpr' <- dsLExpr (either id noLoc using)
+    usingArgs <- case by of
+                   Nothing   -> return [expr]
+ 		   Just by_e -> do { by_e' <- dsLExpr by_e
+                                   ; us <- newUniqueSupply
+                                   ; [from_tup_id] <- newSysLocalsDs [from_tup_ty]
+                                   ; let by_wrap = mkTupleCase us fromBinders by_e' 
+                                                   from_tup_id (Var from_tup_id)
+                                   ; return [Lam from_tup_id by_wrap, expr] }
     
     -- Create an unzip function for the appropriate arity and element types and find "map"
     (unzip_fn, unzip_rhs) <- mkUnzipBind fromBindersTypes
@@ -153,12 +147,12 @@ dsGroupStmt (GroupStmt (stmts, binderMap) groupByClause) = do
 
     -- Generate the expressions to build the grouped list
     let -- First we apply the grouping function to the inner list
-        inner_list_expr = mkApps usingExpr' ((Type fromBindersTupleType) : usingArgs)
+        inner_list_expr = mkApps usingExpr' ((Type from_tup_ty) : usingArgs)
         -- Then we map our "unzip" across it to turn the lists of tuples into tuples of lists
         -- We make sure we instantiate the type variable "a" to be a list of "from" tuples and
         -- the "b" to be a tuple of "to" lists!
         unzipped_inner_list_expr = mkApps (Var map_id) 
-            [Type (mkListTy fromBindersTupleType), Type toBindersTupleType, Var unzip_fn, inner_list_expr]
+            [Type (mkListTy from_tup_ty), Type toBindersTupleType, Var unzip_fn, inner_list_expr]
         -- Then finally we bind the unzip function around that expression
         bound_unzipped_inner_list_expr = Let (Rec [(unzip_fn, unzip_rhs)]) unzipped_inner_list_expr
     
@@ -270,11 +264,11 @@ deListComp (LetStmt binds : quals) body list = do
     core_rest <- deListComp quals body list
     dsLocalBinds binds core_rest
 
-deListComp (stmt@(TransformStmt _ _ _) : quals) body list = do
+deListComp (stmt@(TransformStmt {}) : quals) body list = do
     (inner_list_expr, pat) <- dsTransformStmt stmt
     deBindComp pat inner_list_expr quals body list
 
-deListComp (stmt@(GroupStmt _ _) : quals) body list = do
+deListComp (stmt@(GroupStmt {}) : quals) body list = do
     (inner_list_expr, pat) <- dsGroupStmt stmt
     deBindComp pat inner_list_expr quals body list
 
@@ -362,12 +356,12 @@ dfListComp c_id n_id (LetStmt binds : quals) body = do
     core_rest <- dfListComp c_id n_id quals body
     dsLocalBinds binds core_rest
 
-dfListComp c_id n_id (stmt@(TransformStmt _ _ _) : quals) body = do
+dfListComp c_id n_id (stmt@(TransformStmt {}) : quals) body = do
     (inner_list_expr, pat) <- dsTransformStmt stmt
     -- Anyway, we bind the newly transformed list via the generic binding function
     dfBindComp c_id n_id (pat, inner_list_expr) quals body
 
-dfListComp c_id n_id (stmt@(GroupStmt _ _) : quals) body = do
+dfListComp c_id n_id (stmt@(GroupStmt {}) : quals) body = do
     (inner_list_expr, pat) <- dsGroupStmt stmt
     -- Anyway, we bind the newly grouped list via the generic binding function
     dfBindComp c_id n_id (pat, inner_list_expr) quals body
@@ -604,7 +598,7 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
 --
 dePArrComp (LetStmt ds : qs) body pa cea = do
     mapP <- dsLookupGlobalId mapPName
-    let xs     = map unLoc (collectLocalBinders ds)
+    let xs     = collectLocalBinders ds
         ty'cea = parrElemType cea
     v <- newSysLocalDs ty'cea
     clet <- dsLocalBinds ds (mkCoreTup (map Var xs))

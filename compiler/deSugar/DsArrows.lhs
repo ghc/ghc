@@ -14,8 +14,7 @@ import Match
 import DsUtils
 import DsMonad
 
-import HsSyn	hiding (collectPatBinders, collectLocatedPatBinders, collectl,
-			collectPatsBinders, collectLocatedPatsBinders)
+import HsSyn	hiding (collectPatBinders, collectPatsBinders )
 import TcHsSyn
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -526,7 +525,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
 
 dsCmd ids local_vars env_ids stack res_ty (HsLet binds body) = do
     let
-        defined_vars = mkVarSet (map unLoc (collectLocalBinders binds))
+        defined_vars = mkVarSet (collectLocalBinders binds)
         local_vars' = local_vars `unionVarSet` defined_vars
     
     (core_body, _free_vars, env_ids') <- dsfixCmd ids local_vars' stack res_ty body
@@ -633,7 +632,7 @@ dsCmdDo ids local_vars env_ids res_ty [] body
 
 dsCmdDo ids local_vars env_ids res_ty (stmt:stmts) body = do
     let
-        bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
+        bound_vars = mkVarSet (collectLStmtBinders stmt)
         local_vars' = local_vars `unionVarSet` bound_vars
     (core_stmts, _, env_ids') <- fixDs (\ ~(_,_,env_ids') -> do
         (core_stmts, fv_stmts) <- dsCmdDo ids local_vars' env_ids' res_ty stmts body
@@ -923,7 +922,7 @@ dsCmdStmts ids local_vars env_ids out_ids [stmt]
 
 dsCmdStmts ids local_vars env_ids out_ids (stmt:stmts) = do
     let
-        bound_vars = mkVarSet (map unLoc (collectLStmtBinders stmt))
+        bound_vars = mkVarSet (collectLStmtBinders stmt)
         local_vars' = local_vars `unionVarSet` bound_vars
     (core_stmts, _fv_stmts, env_ids') <- dsfixCmdStmts ids local_vars' out_ids stmts
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids env_ids' stmt
@@ -963,10 +962,10 @@ leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
   = let
 	defined_vars = mkVarSet (collectPatsBinders pats)
 			`unionVarSet`
-		       mkVarSet (map unLoc (collectLocalBinders binds))
+		       mkVarSet (collectLocalBinders binds)
     in
     [(expr, 
-      mkVarSet (map unLoc (collectLStmtsBinders stmts)) 
+      mkVarSet (collectLStmtsBinders stmts) 
 	`unionVarSet` defined_vars) 
     | L _ (GRHS stmts expr) <- grhss]
 \end{code}
@@ -1009,6 +1008,8 @@ foldb f xs = foldb f (fold_pairs xs)
     fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
 \end{code}
 
+Note [Dictionary binders in ConPatOut] See also same Note in HsUtils
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following functions to collect value variables from patterns are
 copied from HsUtils, with one change: we also collect the dictionary
 bindings (pat_binds) from ConPatOut.  We need them for cases like
@@ -1029,29 +1030,24 @@ these bindings.
 
 \begin{code}
 collectPatBinders :: OutputableBndr a => LPat a -> [a]
-collectPatBinders pat = map unLoc (collectLocatedPatBinders pat)
-
-collectLocatedPatBinders :: OutputableBndr a => LPat a -> [Located a]
-collectLocatedPatBinders pat = collectl pat []
+collectPatBinders pat = collectl pat []
 
 collectPatsBinders :: OutputableBndr a => [LPat a] -> [a]
-collectPatsBinders pats = map unLoc (collectLocatedPatsBinders pats)
-
-collectLocatedPatsBinders :: OutputableBndr a => [LPat a] -> [Located a]
-collectLocatedPatsBinders pats = foldr collectl [] pats
+collectPatsBinders pats = foldr collectl [] pats
 
 ---------------------
-collectl :: OutputableBndr a => LPat a -> [Located a] -> [Located a]
-collectl (L l pat) bndrs
+collectl :: OutputableBndr a => LPat a -> [a] -> [a]
+-- See Note [Dictionary binders in ConPatOut]
+collectl (L _ pat) bndrs
   = go pat
   where
-    go (VarPat var)               = L l var : bndrs
-    go (VarPatOut var bs)         = L l var : collectHsBindLocatedBinders bs
+    go (VarPat var)               = var : bndrs
+    go (VarPatOut var bs)         = var : collectHsBindsBinders bs
                                     ++ bndrs
     go (WildPat _)                = bndrs
     go (LazyPat pat)              = collectl pat bndrs
     go (BangPat pat)              = collectl pat bndrs
-    go (AsPat a pat)              = a : collectl pat bndrs
+    go (AsPat (L _ a) pat)        = a : collectl pat bndrs
     go (ParPat  pat)              = collectl pat bndrs
 
     go (ListPat pats _)           = foldr collectl bndrs pats
@@ -1060,11 +1056,11 @@ collectl (L l pat) bndrs
 
     go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps, pat_binds=ds}) =
-                                    collectHsBindLocatedBinders ds
+                                    collectHsBindsBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _)                 = bndrs
     go (NPat _ _ _)               = bndrs
-    go (NPlusKPat n _ _ _)        = n : bndrs
+    go (NPlusKPat (L _ n) _ _ _)  = n : bndrs
 
     go (SigPatIn pat _)           = collectl pat bndrs
     go (SigPatOut pat _)          = collectl pat bndrs

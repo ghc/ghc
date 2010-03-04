@@ -179,7 +179,7 @@ rnTopBinds :: HsValBinds RdrName
            -> RnM (HsValBinds Name, DefUses)
 rnTopBinds b = 
   do nl <- rnTopBindsLHS emptyFsEnv b
-     let bound_names = map unLoc (collectHsValBinders nl)
+     let bound_names = collectHsValBinders nl
      bindLocalNames bound_names $ rnTopBindsRHS (mkNameSet bound_names) nl
        
 
@@ -261,7 +261,7 @@ rnValBindsLHS fix_env binds
      	 --   g = let f = ... in f
      	 -- should.
        ; binds' <- rnValBindsLHSFromDoc (localRecNameMaker fix_env) binds 
-       ; let bound_names = map unLoc $ collectHsValBinders binds'
+       ; let bound_names = collectHsValBinders binds'
        ; envs <- getRdrEnvs
        ; checkDupAndShadowedNames envs bound_names
        ; return (bound_names, binds') }
@@ -276,7 +276,7 @@ rnValBindsLHSFromDoc topP (ValBindsIn mbinds sigs)
   = do { mbinds' <- mapBagM (rnBindLHS topP doc) mbinds
        ; return $ ValBindsIn mbinds' sigs }
   where
-    bndrs = collectHsBindBinders mbinds
+    bndrs = collectHsBindsBinders mbinds
     doc   = text "In the binding group for:" <+> pprWithCommas ppr bndrs
 
 rnValBindsLHSFromDoc _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)

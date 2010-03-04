@@ -195,7 +195,7 @@ data HsRecFields id arg 	-- A bunch of record fields
 
 data HsRecField id arg = HsRecField {
 	hsRecFieldId  :: Located id,
-	hsRecFieldArg :: arg,
+	hsRecFieldArg :: arg,		-- Filled in by renamer
 	hsRecPun      :: Bool 		-- Note [Punning]
   }
 

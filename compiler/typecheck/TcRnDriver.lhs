@@ -1198,7 +1198,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 	  ]}
 
 mkPlan stmt@(L loc (BindStmt {}))
-  | [L _ v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
+  | [v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
   = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
 			          	   (HsVar thenIOName) placeHolderType
 
@@ -1229,7 +1229,7 @@ tcGhciStmts stmts
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
 	    tc_io_stmts stmts = tcStmts GhciStmt tcDoStmt stmts io_ret_ty ;
 
-	    names = map unLoc (collectLStmtsBinders stmts) ;
+	    names = collectLStmtsBinders stmts ;
 
 		-- mk_return builds the expression
 		--	returnIO @ [()] [coerce () x, ..,  coerce () z]

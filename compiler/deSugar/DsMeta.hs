@@ -106,7 +106,7 @@ repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat)
 
 repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group
- = do { let { bndrs = map unLoc (groupBinders group) } ;
+ = do { let { bndrs = groupBinders group } ;
 	ss <- mkGenSyms bndrs ;
 
 	-- Bind all the names mainly to avoid repeated use of explicit strings.
@@ -135,13 +135,13 @@ repTopDs group
 	-- Do *not* gensym top-level binders
       }
 
-groupBinders :: HsGroup Name -> [Located Name]
+groupBinders :: HsGroup Name -> [Name]
 groupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
                         hs_instds = inst_decls, hs_fords = foreign_decls })
 -- Collect the binders of a Group
   = collectHsValBinders val_decls ++
-    [n | d <- tycl_decls ++ assoc_tycl_decls, n <- tyClDeclNames (unLoc d)] ++
-    [n | L _ (ForeignImport n _ _) <- foreign_decls]
+    [n | d <- tycl_decls ++ assoc_tycl_decls, L _ n <- tyClDeclNames (unLoc d)] ++
+    [n | L _ (ForeignImport (L _ n) _ _) <- foreign_decls]
   where
     assoc_tycl_decls = concat [ats | L _ (InstDecl _ _ _ ats) <- inst_decls]
 
@@ -317,7 +317,7 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
                 -- appear in the resulting data structure
 		do { cxt1 <- repContext cxt
 		   ; inst_ty1 <- repPredTy (HsClassP cls tys)
-		   ; ss <- mkGenSyms (collectHsBindBinders binds)
+		   ; ss <- mkGenSyms (collectHsBindsBinders binds)
 		   ; binds1 <- addBinds ss (rep_binds binds)
                    ; ats1   <- repLAssocFamInst ats
 		   ; decls1 <- coreList decQTyConName (ats1 ++ binds1)
@@ -900,7 +900,7 @@ repBinds EmptyLocalBinds
 repBinds b@(HsIPBinds _) = notHandled "Implicit parameters" (ppr b)
 
 repBinds (HsValBinds decs)
- = do	{ let { bndrs = map unLoc (collectHsValBinders decs) }
+ = do	{ let { bndrs = collectHsValBinders decs }
 		-- No need to worrry about detailed scopes within
 		-- the binding group, because we are talking Names
 		-- here, so we can safely treat it as a mutually 

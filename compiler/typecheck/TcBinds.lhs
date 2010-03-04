@@ -310,7 +310,7 @@ tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragFun
 tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
   = let 
         bind_list    = bagToList binds
-        binder_names = collectHsBindBinders binds
+        binder_names = collectHsBindsBinders binds
         loc          = getLoc (head bind_list)
                 -- TODO: location a bit awkward, but the mbinds have been
                 --       dependency analysed and may no longer be adjacent
