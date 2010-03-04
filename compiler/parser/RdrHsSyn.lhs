@@ -717,10 +717,10 @@ checkAPat dynflags loc e = case e of
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
 
-placeHolderPunRhs :: HsExpr RdrName
+placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer
 -- It's better not to make it an error, in case we want to print it when debugging
-placeHolderPunRhs = HsVar pun_RDR
+placeHolderPunRhs = noLoc (HsVar pun_RDR)
 
 plus_RDR, bang_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+")	-- Hack

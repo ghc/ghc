@@ -1633,11 +1633,10 @@ fbinds1	:: { ([HsRecField RdrName (LHsExpr RdrName)], Bool) }
 	| '..'				{ ([],   True) }
   
 fbind	:: { HsRecField RdrName (LHsExpr RdrName) }
-	: qvar '=' exp	{ HsRecField $1 $3 False }
-        | qvar          { HsRecField $1 (L (getLoc $1) placeHolderPunRhs) True }
-			-- Here's where we say that plain 'x'
-			-- means exactly 'x = x'.  The pun-flag boolean is
-			-- there so we can still print it right
+	: qvar '=' exp	{ HsRecField $1 $3                False }
+        | qvar          { HsRecField $1 placeHolderPunRhs True }
+			-- In the punning case, use a place-holder
+                        -- The renamer fills in the final value
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
