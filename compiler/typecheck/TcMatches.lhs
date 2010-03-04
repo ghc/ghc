@@ -441,6 +441,7 @@ tcLcStmt m_tc ctxt (GroupStmt stmts bindersMap by using) elt_ty thing_inside
                 -- Ensure that every old binder of type b is linked up with its new binder which should have type [b]
        ; let list_bndr_ids = zipWith mk_list_bndr list_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` list_bndr_ids
+	     -- See Note [GroupStmt binder map] in HsExpr
             
        ; using' <- case using of
                      Left  e -> do { e' <- tcPolyExpr e         using_ty; return (Left  e') }

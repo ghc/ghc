@@ -818,7 +818,7 @@ data StmtLR idL idR
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
 
-  | ExprStmt (LHsExpr idR)
+  | ExprStmt (LHsExpr idR)     -- See Note [ExprStmt]
              (SyntaxExpr idR) -- The (>>) operator
              PostTcType       -- Element type of the RHS (used for arrows)
 
@@ -845,10 +845,7 @@ data StmtLR idL idR
          [LStmt idL]      -- Stmts to the *left* of the 'group'
 	 	       	  -- which generates the tuples to be grouped
 
-         [(idR, idR)]	  -- After renaming, the IDs are the binders
-		    	  -- occurring within this transform statement that
-		    	  -- are used after it which are paired with the
-		    	  -- names which they group over in statements
+         [(idR, idR)]	  -- See Note [GroupStmt binder map]
 				
          (Maybe (LHsExpr idR)) 	-- "by e" (optional)
 
@@ -857,7 +854,7 @@ data StmtLR idL idR
              (SyntaxExpr idR))	--   Right f => implicit; filled in with 'groupWith'
 							
 
-  -- Recursive statement (see Note [RecStmt] below)
+  -- Recursive statement (see Note [How RecStmt works] below)
   | RecStmt
      { recS_stmts :: [LStmtLR idL idR]
 
@@ -892,6 +889,26 @@ data StmtLR idL idR
       }
 \end{code}
 
+Note [GroupStmt binder map]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The [(idR,idR)] in a GroupStmt behaves as follows:
+
+  * Before renaming: []
+
+  * After renaming: 
+    	  [ (x27,x27), ..., (z35,z35) ]
+    These are the variables 
+        bound by the stmts to the left of the 'group'
+       and used either in the 'by' clause, 
+                or     in the stmts following the 'group'
+    Each item is a pair of identical variables.
+
+  * After typechecking: 
+    	  [ (x27:Int, x27:[Int]), ..., (z35:Bool, z35:[Bool]) ]
+    Each pair has the same unique, but different *types*.
+   
+Note [ExprStmt]
+~~~~~~~~~~~~~~~
 ExprStmts are a bit tricky, because what they mean
 depends on the context.  Consider the following contexts:
 
