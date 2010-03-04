@@ -91,9 +91,9 @@ isVarSym = isLexVarSym . occNameFS
 getMainDeclBinder :: HsDecl name -> Maybe name
 getMainDeclBinder (TyClD d) = Just (tcdName d)
 getMainDeclBinder (ValD d)
-   = case collectAcc d [] of
+   = case collectHsBindBinders d of
         []       -> Nothing 
-        (name:_) -> Just (unLoc name)
+        (name:_) -> Just name
 getMainDeclBinder (SigD d) = sigNameNoLoc d
 getMainDeclBinder (ForD (ForeignImport name _ _)) = Just (unLoc name)
 getMainDeclBinder (ForD (ForeignExport _ _ _)) = Nothing
