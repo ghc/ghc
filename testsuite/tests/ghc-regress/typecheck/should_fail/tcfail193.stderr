@@ -2,5 +2,5 @@
 tcfail193.hs:10:10:
     Occurs check: cannot construct the infinite type: a = [a]
     In the expression: inits
-    In a stmt of a list comprehension: x <- [3, 2, 1] then inits
-    In the expression: [x | x <- [3, 2, 1] then inits]
+    In a stmt of a list comprehension: then inits
+    In the expression: [x | x <- [3, 2, 1], then inits]
