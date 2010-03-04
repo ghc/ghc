@@ -19,6 +19,7 @@ module MonadUtils
         , mapSndM
         , concatMapM
         , mapMaybeM
+	, fmapMaybeM, fmapEitherM
         , anyM, allM
         , foldlM, foldlM_, foldrM
         , maybeMapM
@@ -147,6 +148,16 @@ concatMapM f xs = liftM concat (mapM f xs)
 -- | Monadic version of mapMaybe
 mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f = liftM catMaybes . mapM f
+
+-- | Monadic version of fmap
+fmapMaybeM :: (Monad m) => (a -> m b) -> Maybe a -> m (Maybe b)
+fmapMaybeM _ Nothing  = return Nothing
+fmapMaybeM f (Just x) = f x >>= (return . Just)
+
+-- | Monadic version of fmap
+fmapEitherM :: Monad m => (a -> m b) -> (c -> m d) -> Either a c -> m (Either b d)
+fmapEitherM fl _ (Left  a) = fl a >>= (return . Left)
+fmapEitherM _ fr (Right b) = fr b >>= (return . Right)
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
 anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
