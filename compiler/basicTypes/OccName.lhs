@@ -100,6 +100,7 @@ import UniqSet
 import FastString
 import Outputable
 import Binary
+import StaticFlags( opt_SuppressUniques )
 import Data.Char
 \end{code}
 
@@ -243,12 +244,26 @@ pprOccName :: OccName -> SDoc
 pprOccName (OccName sp occ) 
   = getPprStyle $ \ sty ->
     if codeStyle sty 
-	then ftext (zEncodeFS occ)
-	else ftext occ <> if debugStyle sty 
-			    then braces (pprNameSpaceBrief sp)
-			    else empty
+    then ftext (zEncodeFS occ)
+    else pp_occ <> pp_debug sty
+  where
+    pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
+	         | otherwise      = empty
+
+    pp_occ | opt_SuppressUniques = text (strip_th_unique (unpackFS occ))
+           | otherwise           = ftext occ
+
+	-- See Note [Suppressing uniques in OccNames]
+    strip_th_unique ('[' : c : _) | isAlphaNum c = []
+    strip_th_unique (c : cs) = c : strip_th_unique cs
+    strip_th_unique []       = []
 \end{code}
 
+Note [Suppressing uniques in OccNames]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is a hack to de-wobblify the OccNames that contain uniques from
+Template Haskell that have been turned into a string in the OccName.
+See Note [Unique OccNames from Template Haskell] in Convert.hs
 
 %************************************************************************
 %*									*

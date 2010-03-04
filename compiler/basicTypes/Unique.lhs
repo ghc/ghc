@@ -62,7 +62,7 @@ import BasicTypes
 import FastTypes
 import FastString
 import Outputable
-import StaticFlags
+-- import StaticFlags
 
 #if defined(__GLASGOW_HASKELL__)
 --just for implementing a fast [0,61) -> Char function
@@ -215,9 +215,9 @@ We do sometimes make strings with @Uniques@ in them:
 \begin{code}
 pprUnique :: Unique -> SDoc
 pprUnique uniq
-  | opt_SuppressUniques
-  = empty	-- Used exclusively to suppress uniques so you 
-  | otherwise	-- can compare output easily
+--   | opt_SuppressUniques
+--  = empty	-- Used exclusively to suppress uniques so you 
+--  | otherwise	-- can compare output easily
   = case unpkUnique uniq of
       (tag, u) -> finish_ppr tag u (text (iToBase62 u))
 
