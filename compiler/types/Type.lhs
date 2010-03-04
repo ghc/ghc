@@ -151,6 +151,8 @@ import FastString
 
 import Data.List
 import Data.Maybe	( isJust )
+
+infixr 3 `mkFunTy`	-- Associates to the right
 \end{code}
 
 \begin{code}
