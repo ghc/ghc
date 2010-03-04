@@ -1185,7 +1185,7 @@ def write_file(file, str):
 def check_hp_ok(name):
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = 'cd ' + getTestOpts().testdir + ' && ' + config.hp2ps + ' ' + name 
+    hp2psCmd = "cd " + getTestOpts().testdir + " && '" + config.hp2ps + "' " + name
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
