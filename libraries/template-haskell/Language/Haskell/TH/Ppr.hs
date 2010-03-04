@@ -174,12 +174,12 @@ pprPat :: Precedence -> Pat -> Doc
 pprPat i (LitP l)     = pprLit i l
 pprPat _ (VarP v)     = pprName' Applied v
 pprPat _ (TupP ps)    = parens $ sep $ punctuate comma $ map ppr ps
-pprPat i (ConP s ps)  = parensIf (i > noPrec) $ pprName' Applied s
-                                            <+> sep (map (pprPat appPrec) ps)
+pprPat i (ConP s ps)  = parensIf (i >= appPrec) $ pprName' Applied s
+                                              <+> sep (map (pprPat appPrec) ps)
 pprPat i (InfixP p1 n p2)
-                      = parensIf (i > noPrec) (pprPat opPrec p1 <+>
-                                               pprName' Infix n <+>
-                                               pprPat opPrec p2)
+                      = parensIf (i >= opPrec) (pprPat opPrec p1 <+>
+                                                pprName' Infix n <+>
+                                                pprPat opPrec p2)
 pprPat i (TildeP p)   = parensIf (i > noPrec) $ char '~' <> pprPat appPrec p
 pprPat i (BangP p)    = parensIf (i > noPrec) $ char '!' <> pprPat appPrec p
 pprPat i (AsP v p)    = parensIf (i > noPrec) $ ppr v <> text "@"
