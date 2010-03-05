@@ -26,6 +26,8 @@ $(call all-target,$1,)
 
 ifeq "$$(BUILD_DOCBOOK_HTML)" "YES"
 $(call all-target,$1,html_$1)
+INSTALL_HTML_DOC_DIRS += $1/$2
+endif
 
 html_$1 : $1/$2/index.html
 
@@ -42,16 +44,12 @@ $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
 	cp mk/fptools.css $$(dir $$@)
 endif
 
-INSTALL_HTML_DOC_DIRS += $1/$2
-else
-html_$1 :
-	@echo "*** HTML documentation is disabled; BUILD_DOCBOOK_HTML = NO"
-	@exit 1
-endif
 
 .PHONY: ps_$1
 ifeq "$$(BUILD_DOCBOOK_PS)" "YES"
 $(call all-target,$1,ps_$1)
+INSTALL_DOCS += $1/$2.ps
+endif
 
 ps_$1 : $1/$2.ps
 
@@ -60,15 +58,10 @@ $1/$2.ps: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --ps -o $$@
 endif
 
-INSTALL_DOCS += $1/$2.ps
-else
-ps_$1 :
-	@echo "*** PS documentation is disabled; BUILD_DOCBOOK_PS = NO"
-	@exit 1
-endif
-
 ifeq "$$(BUILD_DOCBOOK_PDF)" "YES"
 $(call all-target,$1,pdf_$1)
+INSTALL_DOCS += $1/$2.pdf
+endif
 
 .PHONY: pdf_$1
 pdf_$1 : $1/$2.pdf
@@ -76,13 +69,6 @@ pdf_$1 : $1/$2.pdf
 ifneq "$$(BINDIST)" "YES"
 $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --pdf -o $$@
-endif
-
-INSTALL_DOCS += $1/$2.pdf
-else
-pdf_$1 :
-	@echo "*** PDF documentation is disabled; BUILD_DOCBOOK_PDF = NO"
-	@exit 1
 endif
 
 endef
