@@ -697,6 +697,27 @@ let-float if you inline windowToViewport
 However, as usual for Gentle mode, do not inline things that are
 inactive in the intial stages.  See Note [Gentle mode].
 
+Note [InlineRule and preInlineUnconditionally]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Surprisingly, do not pre-inline-unconditionally Ids with INLINE pragmas!
+Example
+
+   {-# INLINE f #-}
+   f :: Eq a => a -> a
+   f x = ...
+   
+   fInt :: Int -> Int
+   fInt = f Int dEqInt
+
+   ...fInt...fInt...fInt...
+
+Here f occurs just once, in the RHS of f1. But if we inline it there
+we'll lose the opportunity to inline at each of fInt's call sites.
+The INLINE pragma will only inline when the application is saturated
+for exactly this reason; and we don't want PreInlineUnconditionally
+to second-guess it.  A live example is Trac #3736.
+    c.f. Note [InlineRule and postInlineUnconditionally]
+
 Note [Top-level botomming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
@@ -707,6 +728,7 @@ Inlining them won't make the program run faster!
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
 preInlineUnconditionally env top_lvl bndr rhs
   | not active 		                     = False
+  | isStableUnfolding (idUnfolding bndr)     = False    -- Note [InlineRule and preInlineUnconditionally]
   | isTopLevel top_lvl && isBottomingId bndr = False	-- Note [Top-level bottoming Ids]
   | opt_SimplNoPreInlining                   = False
   | otherwise = case idOccInfo bndr of
@@ -970,6 +992,8 @@ Then there's a danger we'll optimise to
 
 and now postInlineUnconditionally, losing the InlineRule on f.  Now f'
 won't inline because 'e' is too big.
+
+    c.f. Note [InlineRule and preInlineUnconditionally]
 
 
 %************************************************************************
