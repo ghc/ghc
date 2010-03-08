@@ -215,7 +215,7 @@ GHC note: the new thread inherits the /blocked/ state of the parent
 (see 'Control.Exception.block').
 
 The newly created thread has an exception handler that discards the
-exceptions 'BlockedOnDeadMVar', 'BlockedIndefinitely', and
+exceptions 'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM', and
 'ThreadKilled', and passes all other exceptions to the uncaught
 exception handler (see 'setUncaughtExceptionHandler').
 -}
