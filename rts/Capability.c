@@ -786,10 +786,18 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
 		       "thread(s) are involved in foreign calls, yielding");
             cap->running_task = NULL;
 	    RELEASE_LOCK(&cap->lock);
+            // The IO manager thread might have been slow to start up,
+            // so the first attempt to kill it might not have
+            // succeeded.  Just in case, try again - the kill message
+            // will only be sent once.
+            //
+            // To reproduce this deadlock: run ffi002(threaded1)
+            // repeatedly on a loaded machine.
+            ioManagerDie();
             yieldThread();
             continue;
         }
-            
+
         traceEventShutdown(cap);
 	RELEASE_LOCK(&cap->lock);
 	break;
