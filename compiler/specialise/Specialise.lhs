@@ -871,7 +871,7 @@ specDefn subst body_uds fn rhs
 	   	ty_args       = mk_ty_args call_ts
 	   	rhs_subst     = CoreSubst.extendTvSubstList subst spec_tv_binds
 
-	   ; (rhs_subst1, inst_dict_ids) <- cloneDictBndrs rhs_subst rhs_dict_ids
+	   ; (rhs_subst1, inst_dict_ids) <- newDictBndrs rhs_subst rhs_dict_ids
 	     		  -- Clone rhs_dicts, including instantiating their types
 
 	   ; let (rhs_subst2, dx_binds) = bindAuxiliaryDicts rhs_subst1 $
@@ -948,6 +948,9 @@ bindAuxiliaryDicts subst triples = go subst [] triples
     go subst binds ((d, dx_id, dx) : pairs)
       | exprIsTrivial dx = go (extendIdSubst subst d dx) binds pairs
              -- No auxiliary binding necessary
+	     -- Note that we bind the *original* dict in the substitution,
+	     -- overriding any d->dx_id binding put there by substBndrs
+
       | otherwise        = go subst_w_unf (NonRec dx_id dx : binds) pairs
       where
         dx_id1 = dx_id `setIdUnfolding` mkUnfolding False False dx
@@ -960,6 +963,9 @@ bindAuxiliaryDicts subst triples = go subst [] triples
 	     -- a consequent call (g d') with an auxiliary definition
 	     --	    d' = df dNumInt
   	     -- We want that consequent call to look interesting
+	     --
+	     -- Again, note that we bind the *original* dict in the substitution,
+	     -- overriding any d->dx_id binding put there by substBndrs
 \end{code}
 
 Note [From non-recursive to recursive]
@@ -1511,19 +1517,27 @@ cloneBindSM subst (Rec pairs) = do
     let (subst', bndrs') = cloneRecIdBndrs subst us (map fst pairs)
     return (subst', subst', Rec (bndrs' `zip` map snd pairs))
 
-cloneDictBndrs :: Subst -> [CoreBndr] -> SpecM (Subst, [CoreBndr])
-cloneDictBndrs subst bndrs 
-  = do { us <- getUniqueSupplyM
-       ; return (cloneIdBndrs subst us bndrs) }
+newDictBndrs :: Subst -> [CoreBndr] -> SpecM (Subst, [CoreBndr])
+-- Make up completely fresh binders for the dictionaries
+-- Their bindings are going to float outwards
+newDictBndrs subst bndrs 
+  = do { bndrs' <- mapM new bndrs
+       ; let subst' = extendIdSubstList subst 
+                        [(d, Var d') | (d,d') <- bndrs `zip` bndrs']
+       ; return (subst', bndrs' ) }
+  where
+    new b = do { uniq <- getUniqueM
+    	       ; let n   = idName b
+                     ty' = CoreSubst.substTy subst (idType b)
+               ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
 newSpecIdSM old_id new_ty
   = do	{ uniq <- getUniqueM
-    	; let 
-	    name    = idName old_id
-	    new_occ = mkSpecOcc (nameOccName name)
-	    new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
+    	; let name    = idName old_id
+	      new_occ = mkSpecOcc (nameOccName name)
+	      new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
         ; return new_id }
 \end{code}
 
