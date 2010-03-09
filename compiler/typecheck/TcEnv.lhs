@@ -613,13 +613,20 @@ data InstBindings a
 				-- specialised instances
 	Bool			-- True <=> This code came from a standalone deriving clause
 
-  | NewTypeDerived              -- Used for deriving instances of newtypes, where the
-	CoercionI		-- witness dictionary is identical to the argument 
-				-- dictionary.  Hence no bindings, no pragmas.
-		-- The coercion maps from newtype to the representation type
-		-- (mentioning type variables bound by the forall'd iSpec variables)
-		-- E.g.   newtype instance N [a] = N1 (Tree a)
-		-- 	  co : N [a] ~ Tree a
+  | NewTypeDerived      -- Used for deriving instances of newtypes, where the
+			-- witness dictionary is identical to the argument 
+			-- dictionary.  Hence no bindings, no pragmas.
+
+	CoercionI	-- The coercion maps from newtype to the representation type
+			-- (mentioning type variables bound by the forall'd iSpec variables)
+			-- E.g.   newtype instance N [a] = N1 (Tree a)
+			-- 	  co : N [a] ~ Tree a
+
+	TyCon		-- The TyCon is the newtype N.  If it's indexed, then it's the 
+			-- representation TyCon, so that tyConDataCons returns [N1], 
+			-- the "data constructor".
+			-- See Note [Newtype deriving and unused constructors]
+                        -- in TcDeriv
 
 pprInstInfo :: InstInfo a -> SDoc
 pprInstInfo info = vcat [ptext (sLit "InstInfo:") <+> ppr (idType (iDFunId info))]
@@ -628,7 +635,7 @@ pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
     details (VanillaInst b _ _) = pprLHsBinds b
-    details (NewTypeDerived _)  = text "Derived from the representation type"
+    details (NewTypeDerived {}) = text "Derived from the representation type"
 
 simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of

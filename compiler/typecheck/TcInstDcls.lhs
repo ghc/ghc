@@ -598,7 +598,7 @@ tc_inst_decl2 :: Id -> InstBindings Name -> TcM (LHsBinds Id)
 -- If there are no superclasses, matters are simpler, because we don't need the case
 -- see Note [Newtype deriving superclasses] in TcDeriv.lhs
 
-tc_inst_decl2 dfun_id (NewTypeDerived coi)
+tc_inst_decl2 dfun_id (NewTypeDerived coi _)
   = do  { let rigid_info = InstSkol
               origin     = SigOrigin rigid_info
               inst_ty    = idType dfun_id

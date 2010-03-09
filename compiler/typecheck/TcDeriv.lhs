@@ -354,8 +354,11 @@ renameDeriv is_boot gen_binds insts
     		       | otherwise	      = rm_dups (b:acc) bs
 
 
-    rn_inst_info (InstInfo { iSpec = inst, iBinds = NewTypeDerived co })
-	= return (InstInfo { iSpec = inst, iBinds = NewTypeDerived co }, emptyFVs)
+    rn_inst_info :: InstInfo RdrName -> TcM (InstInfo Name, FreeVars)
+    rn_inst_info info@(InstInfo { iBinds = NewTypeDerived coi tc })
+	= return ( info { iBinds = NewTypeDerived coi tc }
+                 , mkFVs (map dataConName (tyConDataCons tc)))
+	  -- See Note [Newtype deriving and unused constructors]
 
     rn_inst_info (InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs standalone_deriv })
 	= 	-- Bring the right type variables into 
@@ -383,6 +386,25 @@ mkGenericBinds is_boot tycl_decls
 		-- and then only in the ones whose 'has-generics' flag is on
 		-- The predicate tyConHasGenerics finds both of these
 \end{code}
+
+Note [Newtype deriving and unused constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (see Trac #1954):
+
+  module Bug(P) where
+  newtype P a = MkP (IO a) deriving Monad
+
+If you compile with -fwarn-unused-binds you do not expect the warning
+"Defined but not used: data consructor MkP". Yet the newtype deriving
+code does not explicitly mention MkP, but it should behave as if you
+had written
+  instance Monad P where
+     return x = MkP (return x)
+     ...etc...
+
+So we want to signal a user of the data constructor 'MkP'.  That's
+what we do in rn_inst_info, and it's the only reason we have the TyCon
+stored in NewTypeDerived.
 
 
 %************************************************************************
@@ -1375,7 +1397,7 @@ genInst :: Bool 	-- True <=> standalone deriving
 genInst standalone_deriv oflag spec
   | ds_newtype spec
   = return (InstInfo { iSpec  = mkInstance oflag (ds_theta spec) spec
-		     , iBinds = NewTypeDerived co }, [])
+		     , iBinds = NewTypeDerived co rep_tycon }, [])
 
   | otherwise
   = do	{ let loc  = getSrcSpan (ds_name spec)
