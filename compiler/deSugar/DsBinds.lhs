@@ -38,6 +38,7 @@ import TysPrim  ( anyTypeOfKind )
 import CostCentre
 import Module
 import Id
+import Name	( localiseName )
 import MkId	( seqId )
 import Var	( Var, TyVar, tyVarKind )
 import IdInfo	( vanillaIdInfo )
@@ -482,10 +483,10 @@ dsSpecs poly_id poly_rhs prags
 	   	      -- Get the INLINE pragma from SPECIALISE declaration, or,
                       -- failing that, from the original Id
 
-              	 extra_dict_bndrs = [ localiseId d  -- See Note [Constant rule dicts]
+              	 extra_dict_bndrs = [ mkLocalId (localiseName (idName d)) (idType d)
+                                            -- See Note [Constant rule dicts]
 	      	 	  	    | d <- varSetElems (exprFreeVars ds_spec_expr)
 	      	 	  	    , isDictId d]
-	      	 		-- Note [Const rule dicts]
 
               	 rule =  mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
 	    			AlwaysActive poly_name
@@ -552,7 +553,7 @@ the constraint is unused.  We could bind 'd' to (error "unused")
 but it seems better to reject the program because it's almost certainly
 a mistake.  That's what the isDeadBinder call detects.
 
-Note [Const rule dicts]
+Note [Constant rule dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~
 When the LHS of a specialisation rule, (/\as\ds. f es) has a free dict, 
 which is presumably in scope at the function definition site, we can quantify 
@@ -573,8 +574,9 @@ And from that we want the rule
 
 But be careful!  That dInt might be GHC.Base.$fOrdInt, which is an External
 Name, and you can't bind them in a lambda or forall without getting things
-confused. Hence the use of 'localiseId' to make it Internal.
-
+confused.   Likewise it might have an InlineRule or something, which would be
+utterly bogus. So we really make a fresh Id, with the same unique and type
+as the old one, but with an Internal name and no IdInfo.
 
 %************************************************************************
 %*									*
