@@ -77,6 +77,12 @@ import ZipDataflow
 
 -- Also, don't forget to stop at the old end of the stack (oldByte),
 -- which may differ depending on whether there is an update frame.
+
+type RegSlotInfo
+   = ( Int	  -- Offset from oldest byte of Old area
+     , LocalReg   -- The register
+     , Int)       -- Width of the register
+
 live_ptrs :: ByteOff -> BlockEnv SubAreaSet -> AreaMap -> BlockId -> [Maybe LocalReg]
 live_ptrs oldByte slotEnv areaMap bid =
   -- pprTrace "live_ptrs for" (ppr bid <+> text (show oldByte ++ "-" ++ show youngByte) <+>
@@ -84,12 +90,22 @@ live_ptrs oldByte slotEnv areaMap bid =
   -- pprTrace ("stack layout for " ++ show bid ++ ": ") (ppr res) $ res
   res
   where res = reverse $ slotsToList youngByte liveSlots []
+ 
+        slotsToList :: Int -> [RegSlotInfo] -> [Maybe LocalReg] -> [Maybe LocalReg]
+        -- n starts at youngByte and is decremented down to oldByte
+	-- Returns a list, one element per word, with 
+	--    (Just r) meaning 'pointer register r is saved here', 
+	--    Nothing  meaning 'non-pointer or empty'
+
         slotsToList n [] results | n == oldByte = results -- at old end of stack frame
+
         slotsToList n (s : _) _  | n == oldByte =
           pprPanic "slot left off live_ptrs" (ppr s <+> ppr oldByte <+>
                ppr n <+> ppr liveSlots <+> ppr youngByte)
+
         slotsToList n _ _ | n < oldByte =
           panic "stack slots not allocated on word boundaries?"
+
         slotsToList n l@((n', r, w) : rst) results =
           if n == (n' + w) then -- slot's young byte is at n
             ASSERT (not (isPtr r) ||
@@ -100,15 +116,20 @@ live_ptrs oldByte slotEnv areaMap bid =
                            (Nothing : results)
           where next = n - wORD_SIZE
                 stack_rep = if isPtr r then Just r else Nothing
+
         slotsToList n [] results = slotsToList (n - wORD_SIZE) [] (Nothing : results)
+
         non_ptr_younger_than next (n', r, w) =
           n' + w > next &&
             ASSERT (not (isPtr r))
             True
         isPtr = isGcPtrType . localRegType
+
+        liveSlots :: [RegSlotInfo]
         liveSlots = sortBy (\ (off,_,_) (off',_,_) -> compare off' off)
                            (foldFM (\_ -> flip $ foldl add_slot) [] slots)
                     
+        add_slot :: [RegSlotInfo] -> SubArea -> [RegSlotInfo]
         add_slot rst (a@(RegSlot r@(LocalReg _ ty)), off, w) = 
           if off == w && widthInBytes (typeWidth ty) == w then
             (expectJust "add_slot" (lookupFM areaMap a), r, w) : rst
@@ -125,6 +146,8 @@ live_ptrs oldByte slotEnv areaMap bid =
           -- IN THE CALL NODES, WHICH SHOULD EVENTUALLY HAVE LIVE REGISTER AS WELL,
           -- SO IT'S ALL GOING IN THE SAME DIRECTION.
           -- pprPanic "CallAreas must not be live across function calls" (ppr bid <+> ppr c)
+
+        slots :: SubAreaSet	 -- The SubAreaSet for 'bid'
         slots = expectJust "live_ptrs slots" $ lookupBlockEnv slotEnv bid
         youngByte = expectJust "live_ptrs bid_pos" $ lookupFM areaMap (CallArea (Young bid))
 
