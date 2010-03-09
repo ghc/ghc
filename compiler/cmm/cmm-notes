@@ -3,6 +3,9 @@ Notes on new codegen (Sept 09)
 
 Things to do:
 
+ - SDM (2010-02-26) can we remove the Foreign constructor from Convention?
+   Reason: we never generate code for a function with the Foreign
+   calling convention, and the code for calling foreign calls is generated
 
  - All dataflow analyses are in the FuelMonad, even though they
    are guarnteed to consume no fuel.  This seems silly
