@@ -56,7 +56,7 @@ struct Capability_ {
     // the suspended TSOs easily.  Hence, when migrating a Task from
     // the returning_tasks list, we must also migrate its entry from
     // this list.
-    Task *suspended_ccalling_tasks;
+    InCall *suspended_ccalls;
 
     // One mutable list per generation, so we don't need to take any
     // locks when updating an old-generation thunk.  This also lets us

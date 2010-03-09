@@ -230,8 +230,8 @@ unblockOne_ (Capability *cap, StgTSO *tso,
       // We are waking up this thread on the current Capability, which
       // might involve migrating it from the Capability it was last on.
       if (tso->bound) {
-	  ASSERT(tso->bound->cap == tso->cap);
-	  tso->bound->cap = cap;
+	  ASSERT(tso->bound->task->cap == tso->cap);
+	  tso->bound->task->cap = cap;
       }
 
       tso->cap = cap;

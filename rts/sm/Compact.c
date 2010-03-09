@@ -1014,10 +1014,14 @@ compact(StgClosure *static_objects)
     // the task list
     {
 	Task *task;
+        InCall *incall;
 	for (task = all_tasks; task != NULL; task = task->all_link) {
-	    if (task->tso) {
-		thread_(&task->tso);
-	    }
+            for (incall = task->incall; incall != NULL; 
+                 incall = incall->prev_stack) {
+                if (incall->tso) {
+                    thread_(&incall->tso);
+                }
+            }
 	}
     }
 

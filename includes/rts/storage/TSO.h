@@ -114,7 +114,7 @@ typedef struct StgTSO_ {
     StgTSOBlockInfo         block_info;
     StgThreadID             id;
     int                     saved_errno;
-    struct Task_*           bound;
+    struct InCall_*         bound;
     struct Capability_*     cap;
     struct StgTRecHeader_ * trec;       /* STM transaction record */
 

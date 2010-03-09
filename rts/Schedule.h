@@ -46,15 +46,8 @@ StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *excepti
 /* findRetryFrameHelper */
 StgWord findRetryFrameHelper (StgTSO *tso);
 
-/* workerStart()
- * 
- * Entry point for a new worker task.
- * Called from STG :  NO
- * Locks assumed   :  none
- */
-#if defined(THREADED_RTS)
-void OSThreadProcAttr workerStart(Task *task);
-#endif
+/* Entry point for a new worker */
+void scheduleWorker (Capability *cap, Task *task);
 
 /* The state of the scheduler.  This is used to control the sequence
  * of events during shutdown, and when the runtime is interrupted

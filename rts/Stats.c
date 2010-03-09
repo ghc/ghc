@@ -623,7 +623,7 @@ stat_exit(int alloc)
 		     i++, task = task->all_link) {
 		    statsPrintf("  Task %2d %-8s :  %6.2fs    (%6.2fs)     %6.2fs    (%6.2fs)\n",
 				i,
-				(task->tso == NULL) ? "(worker)" : "(bound)",
+				(task->worker) ? "(worker)" : "(bound)",
 				TICK_TO_DBL(task->mut_time),
 				TICK_TO_DBL(task->mut_etime),
 				TICK_TO_DBL(task->gc_time),
