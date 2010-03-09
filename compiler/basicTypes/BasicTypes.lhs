@@ -673,8 +673,13 @@ defaultInlinePragma = InlinePragma { inl_act = AlwaysActive
 
 alwaysInlinePragma = defaultInlinePragma { inl_inline = True }
 neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
-dfunInlinePragma   = defaultInlinePragma { inl_rule   = ConLike }
-                                    
+
+-- A DFun has an always-active inline activation so that 
+-- exprIsConApp_maybe can "see" its unfolding
+-- (However, its actual Unfolding is a DFunUnfolding, which is
+--  never inlined other than via exprIsConApp_maybe.)
+dfunInlinePragma   = defaultInlinePragma { inl_act  = AlwaysActive
+                                         , inl_rule = ConLike }
 
 isDefaultInlinePragma :: InlinePragma -> Bool
 isDefaultInlinePragma (InlinePragma { inl_act = activation
