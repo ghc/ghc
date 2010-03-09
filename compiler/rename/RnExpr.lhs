@@ -780,6 +780,7 @@ rnStmt ctxt (L loc (GroupStmt stmts _ by using)) thing_inside
 
        ; let all_fvs  = fvs1 `plusFV` fvs2 
              bndr_map = used_bndrs `zip` used_bndrs
+	     -- See Note [GroupStmt binder map] in HsExpr
 
        ; traceRn (text "rnStmt: implicitly rebound these used binders:" <+> ppr bndr_map)
        ; return (([L loc (GroupStmt stmts' bndr_map by' using')], thing), all_fvs) }
