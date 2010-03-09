@@ -442,7 +442,7 @@ It also unconditionally zaps the OccInfo.
 
 \begin{code}
 -- | Very similar to 'substBndr', but it always allocates a new 'Unique' for
--- each variable in its output and removes all 'IdInfo'
+-- each variable in its output.  It substitutes the IdInfo though.
 cloneIdBndr :: Subst -> UniqSupply -> Id -> (Subst, Id)
 cloneIdBndr subst us old_id
   = clone_id subst subst (old_id, uniqFromSupply us)
