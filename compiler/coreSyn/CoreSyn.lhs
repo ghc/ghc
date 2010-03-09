@@ -622,6 +622,7 @@ unfoldingArity _	      		   	    = panic "unfoldingArity"
 
 isClosedUnfolding :: Unfolding -> Bool		-- No free variables
 isClosedUnfolding (CoreUnfolding {}) = False
+isClosedUnfolding (DFunUnfolding {}) = False
 isClosedUnfolding _                  = True
 
 -- | Only returns False if there is no unfolding information available at all
