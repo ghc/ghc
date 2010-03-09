@@ -701,8 +701,8 @@ setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
 setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
 instance Outputable Activation where
-   ppr AlwaysActive     = ptext (sLit "ALWAYS")
-   ppr NeverActive      = ptext (sLit "NEVER")
+   ppr AlwaysActive     = brackets (ptext (sLit "ALWAYS"))
+   ppr NeverActive      = brackets (ptext (sLit "NEVER"))
    ppr (ActiveBefore n) = brackets (char '~' <> int n)
    ppr (ActiveAfter n)  = brackets (int n)
 
@@ -713,18 +713,18 @@ instance Outputable RuleMatchInfo where
 instance Outputable InlinePragma where
   ppr (InlinePragma { inl_inline = inline, inl_act = activation
                     , inl_rule = info, inl_sat = mb_arity })
-    = pp_inline <> pp_activation <+> pp_sat <+> pp_info 
+    = pp_inl_act (inline, activation) <+> pp_sat <+> pp_info 
     where
-      pp_inline | inline    = ptext (sLit "INLINE")
-                | otherwise = ptext (sLit "NOINLINE")
+      pp_inl_act (False, AlwaysActive)  = empty	-- defaultInlinePragma
+      pp_inl_act (False, NeverActive)   = ptext (sLit "NOINLINE")
+      pp_inl_act (False, act)           = ptext (sLit "NOINLINE") <> ppr act
+      pp_inl_act (True,  AlwaysActive)  = ptext (sLit "INLINE")
+      pp_inl_act (True,  act)           = ptext (sLit "INLINE") <> ppr act
+
       pp_sat | Just ar <- mb_arity = parens (ptext (sLit "sat-args=") <> int ar)
              | otherwise           = empty
       pp_info | isFunLike info = empty
               | otherwise      = ppr info
-      pp_activation 
-        | inline     && isAlwaysActive activation = empty
-        | not inline && isNeverActive  activation = empty
-        | otherwise                               = ppr activation    
 
 isActive :: CompilerPhase -> Activation -> Bool
 isActive _ NeverActive      = False
