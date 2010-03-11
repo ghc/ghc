@@ -151,3 +151,8 @@ test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
 test('conc067', ignore_output, compile_and_run, [''])
 test('conc068', exit_code(1), compile_and_run, [''])
+
+# each of these runs for about a second
+test('throwto001', extra_run_opts('1000 2000'), compile_and_run, [''])
+test('throwto002', ignore_output, compile_and_run, [''])
+test('throwto003', normal, compile_and_run, [''])
