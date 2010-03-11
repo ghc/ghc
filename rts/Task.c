@@ -280,11 +280,12 @@ boundTaskExiting (Task *task)
 void
 discardTasksExcept (Task *keep)
 {
-    Task *task;
+    Task *task, *next;
 
     // Wipe the task list, except the current Task.
     ACQUIRE_LOCK(&sched_mutex);
-    for (task = all_tasks; task != NULL; task=task->all_link) {
+    for (task = all_tasks; task != NULL; task=next) {
+        next = task->all_link;
         if (task != keep) {
             debugTrace(DEBUG_sched, "discarding task %ld", (long)TASK_ID(task));
             freeTask(task);
