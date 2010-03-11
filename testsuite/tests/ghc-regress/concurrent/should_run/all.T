@@ -23,6 +23,11 @@ test('3279', normal, compile_and_run, [''])
 # This test takes a long time with the default context switch interval
 test('3429', extra_run_opts('+RTS -i0.001 -RTS'), compile_and_run, [''])
 
+# each of these runs for about a second
+test('throwto001', extra_run_opts('1000 2000'), compile_and_run, [''])
+test('throwto002', ignore_output, compile_and_run, [''])
+test('throwto003', normal, compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
@@ -151,8 +156,3 @@ test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
 test('conc067', ignore_output, compile_and_run, [''])
 test('conc068', exit_code(1), compile_and_run, [''])
-
-# each of these runs for about a second
-test('throwto001', extra_run_opts('1000 2000'), compile_and_run, [''])
-test('throwto002', ignore_output, compile_and_run, [''])
-test('throwto003', normal, compile_and_run, [''])
