@@ -70,6 +70,9 @@ throwToSingleThreaded_(Capability *cap, StgTSO *tso, StgClosure *exception,
     if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
 	return;
     }
+    while (tso->what_next == ThreadRelocated) {
+	tso = tso->_link;
+    }
 
     // Remove it from any blocking queues
     removeFromQueues(cap,tso);
@@ -83,6 +86,9 @@ suspendComputation(Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
     // Thread already dead?
     if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
 	return;
+    }
+    while (tso->what_next == ThreadRelocated) {
+	tso = tso->_link;
     }
 
     // Remove it from any blocking queues
@@ -772,20 +778,17 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
         fprintCCS_stderr(tso->prof.CCCS);
     }
 #endif
-
-    while (tso->what_next == ThreadRelocated) {
-        tso = tso->_link;
-    }
+    // ASSUMES: the thread is not already complete or dead, or
+    // ThreadRelocated.  Upper layers should deal with that.
+    ASSERT(tso->what_next != ThreadComplete && 
+           tso->what_next != ThreadKilled && 
+           tso->what_next != ThreadRelocated);
 
     // mark it dirty; we're about to change its stack.
     dirty_TSO(cap, tso);
 
     sp = tso->sp;
     
-    // ASSUMES: the thread is not already complete or dead.  Upper
-    // layers should deal with that.
-    ASSERT(tso->what_next != ThreadComplete && tso->what_next != ThreadKilled);
-
     if (stop_here != NULL) {
         updatee = stop_here->updatee;
     } else {
