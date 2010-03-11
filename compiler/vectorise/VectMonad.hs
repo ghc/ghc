@@ -1,3 +1,5 @@
+
+-- | The Vectorisation monad.
 module VectMonad (
   Scope(..),
   VM,
@@ -64,58 +66,59 @@ import SrcLoc        ( noSrcSpan )
 
 import Control.Monad
 
+-- | Indicates what scope something (a variable) is in.
 data Scope a b = Global a | Local b
 
--- ----------------------------------------------------------------------------
--- Vectorisation monad
 
+-- | The global environment.
 data GlobalEnv = GlobalEnv {
-                  -- Mapping from global variables to their vectorised versions.
+                  -- | Mapping from global variables to their vectorised versions.
                   -- 
                   global_vars :: VarEnv Var
 
-                  -- Purely scalar variables. Code which mentions only these
-                  -- variables doesn't have to be lifted.
+                  -- | Purely scalar variables. Code which mentions only these
+                  --   variables doesn't have to be lifted.
                 , global_scalars :: VarSet
 
-                  -- Exported variables which have a vectorised version
+                  -- | Exported variables which have a vectorised version
                   --
                 , global_exported_vars :: VarEnv (Var, Var)
 
-                  -- Mapping from TyCons to their vectorised versions.
-                  -- TyCons which do not have to be vectorised are mapped to
-                  -- themselves.
+                  -- | Mapping from TyCons to their vectorised versions.
+                  --   TyCons which do not have to be vectorised are mapped to
+                  --   themselves.
                   --
                 , global_tycons :: NameEnv TyCon
 
-                  -- Mapping from DataCons to their vectorised versions
+                  -- | Mapping from DataCons to their vectorised versions
                   --
                 , global_datacons :: NameEnv DataCon
 
-                  -- Mapping from TyCons to their PA dfuns
+                  -- | Mapping from TyCons to their PA dfuns
                   --
                 , global_pa_funs :: NameEnv Var
 
-                  -- Mapping from TyCons to their PR dfuns
+                  -- | Mapping from TyCons to their PR dfuns
                 , global_pr_funs :: NameEnv Var
 
-                  -- Mapping from unboxed TyCons to their boxed versions
+                  -- | Mapping from unboxed TyCons to their boxed versions
                 , global_boxed_tycons :: NameEnv TyCon
 
-                -- External package inst-env & home-package inst-env for class
-                -- instances
+                -- | External package inst-env & home-package inst-env for class
+                --   instances
                 --
                 , global_inst_env :: (InstEnv, InstEnv)
 
-                -- External package inst-env & home-package inst-env for family
-                -- instances
+                -- | External package inst-env & home-package inst-env for family
+                --   instances
                 --
                 , global_fam_inst_env :: FamInstEnvs
 
-                -- Hoisted bindings
+                -- | Hoisted bindings
                 , global_bindings :: [(Var, CoreExpr)]
                 }
 
+-- | The local environment.
 data LocalEnv = LocalEnv {
                  -- Mapping from local variables to their vectorised and
                  -- lifted versions
@@ -133,6 +136,8 @@ data LocalEnv = LocalEnv {
                , local_bind_name :: FastString
                }
 
+
+-- | Create an initial global environment
 initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
 initGlobalEnv info instEnvs famInstEnvs
   = GlobalEnv {
@@ -149,6 +154,8 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_bindings      = []
     }
 
+
+-- Operators on Global Environments -------------------------------------------
 extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
 extendImportedVarsEnv ps genv
   = genv { global_vars = extendVarEnvList (global_vars genv) ps }
@@ -183,6 +190,8 @@ setBoxedTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
 setBoxedTyConsEnv ps genv
   = genv { global_boxed_tycons = mkNameEnv ps }
 
+
+-- | Create an empty local environment.
 emptyLocalEnv :: LocalEnv
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
@@ -206,6 +215,12 @@ updVectInfo env tyenv info
                                    , let name = getName from
                                    , Just to <- [lookupNameEnv (from_env env) name]]
 
+
+-- The Vectorisation Monad ----------------------------------------------------
+
+-- Vectorisation can either succeed with new envionment and a value,
+-- or return with failure.
+--
 data VResult a = Yes GlobalEnv LocalEnv a | No
 
 newtype VM a = VM { runVM :: Builtins -> GlobalEnv -> LocalEnv -> DsM (VResult a) }
@@ -219,6 +234,7 @@ instance Monad VM where
                                         No                -> return No
 
 
+-- | Throw an error saying we can't vectorise something
 cantVectorise :: String -> SDoc -> a
 cantVectorise s d = pgmError
                   . showSDocDump
@@ -237,16 +253,23 @@ maybeCantVectoriseM s d p
         Just x  -> return x
         Nothing -> cantVectorise s d
 
+
+-- Control --------------------------------------------------------------------
+-- | Return some result saying we've failed.
 noV :: VM a
 noV = VM $ \_ _ _ -> return No
 
 traceNoV :: String -> SDoc -> VM a
 traceNoV s d = pprTrace s d noV
 
+
+-- | If True then carry on, otherwise fail.
 ensureV :: Bool -> VM ()
 ensureV False = noV
 ensureV True  = return ()
 
+
+-- | If True then return the first argument, otherwise fail.
 onlyIfV :: Bool -> VM a -> VM a
 onlyIfV b p = ensureV b >> p
 
@@ -254,6 +277,10 @@ traceEnsureV :: String -> SDoc -> Bool -> VM ()
 traceEnsureV s d False = traceNoV s d
 traceEnsureV _ _ True  = return ()
 
+
+-- | Try some vectorisation computaton.
+--	If it succeeds then return Just the result,
+--	otherwise return Nothing.
 tryV :: VM a -> VM (Maybe a)
 tryV (VM p) = VM $ \bi genv lenv ->
   do
@@ -261,6 +288,7 @@ tryV (VM p) = VM $ \bi genv lenv ->
     case r of
       Yes genv' lenv' x -> return (Yes genv' lenv' (Just x))
       No                -> return (Yes genv  lenv  Nothing)
+
 
 maybeV :: VM (Maybe a) -> VM a
 maybeV p = maybe noV return =<< p
@@ -279,6 +307,10 @@ fixV f = VM (\bi genv lenv -> fixDs $ \r -> runVM (f (unYes r)) bi genv lenv )
     unYes (Yes _ _ x) = x
     unYes No          = panic "VectMonad.fixV: no result"
 
+
+-- Local Environments ---------------------------------------------------------
+-- | Perform a computation in its own local environment.
+--	This does not alter the environment of the current state.
 localV :: VM a -> VM a
 localV p = do
              env <- readLEnv id
@@ -286,6 +318,7 @@ localV p = do
              setLEnv env
              return x
 
+-- | Perform a computation in an empty local environment.
 closedV :: VM a -> VM a
 closedV p = do
               env <- readLEnv id
@@ -294,18 +327,29 @@ closedV p = do
               setLEnv env
               return x
 
+-- Lifting --------------------------------------------------------------------
+-- | Lift a desugaring computation into the vectorisation monad.
 liftDs :: DsM a -> VM a
 liftDs p = VM $ \_ genv lenv -> do { x <- p; return (Yes genv lenv x) }
 
+
+
+-- Builtins -------------------------------------------------------------------
+-- Operations on Builtins
 liftBuiltinDs :: (Builtins -> DsM a) -> VM a
 liftBuiltinDs p = VM $ \bi genv lenv -> do { x <- p bi; return (Yes genv lenv x)}
 
+
+-- | Project something from the set of builtins.
 builtin :: (Builtins -> a) -> VM a
 builtin f = VM $ \bi genv lenv -> return (Yes genv lenv (f bi))
 
 builtins :: (a -> Builtins -> b) -> VM (a -> b)
 builtins f = VM $ \bi genv lenv -> return (Yes genv lenv (`f` bi))
 
+
+-- Environments ---------------------------------------------------------------
+-- | Project something from the global environment.
 readGEnv :: (GlobalEnv -> a) -> VM a
 readGEnv f = VM $ \_ genv lenv -> return (Yes genv lenv (f genv))
 
@@ -315,6 +359,8 @@ setGEnv genv = VM $ \_ _ lenv -> return (Yes genv lenv ())
 updGEnv :: (GlobalEnv -> GlobalEnv) -> VM ()
 updGEnv f = VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
 
+
+-- | Project something from the local environment.
 readLEnv :: (LocalEnv -> a) -> VM a
 readLEnv f = VM $ \_ genv lenv -> return (Yes genv lenv (f lenv))
 
@@ -324,12 +370,17 @@ setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
 updLEnv :: (LocalEnv -> LocalEnv) -> VM ()
 updLEnv f = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 
+
+-- InstEnv --------------------------------------------------------------------
 getInstEnv :: VM (InstEnv, InstEnv)
 getInstEnv = readGEnv global_inst_env
 
 getFamInstEnv :: VM FamInstEnvs
 getFamInstEnv = readGEnv global_fam_inst_env
 
+
+-- Names ----------------------------------------------------------------------
+-- | Get the name of the local binding currently being vectorised.
 getBindName :: VM FastString
 getBindName = readLEnv local_bind_name
 
@@ -356,6 +407,7 @@ cloneId mk_occ id ty
               | otherwise       = Id.mkLocalId         name ty
       return id'
 
+-- Make a fresh instance of this var, with a new unique.
 cloneVar :: Var -> VM Var
 cloneVar var = liftM (setIdUnique var) (liftDs newUnique)
 
@@ -396,6 +448,10 @@ defGlobalVar v v' = updGEnv $ \env ->
     upd env | isExportedId v = extendVarEnv env v (v, v')
             | otherwise      = env
 
+-- | Lookup the vectorised and\/or lifted versions of this variable.
+--	If it's in the global environment we get the vectorised version.
+--      If it's in the local environment we get both the vectorised and lifted version.
+--	
 lookupVar :: Var -> VM (Scope Var (Var, Var))
 lookupVar v
   = do
