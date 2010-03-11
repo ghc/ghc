@@ -208,25 +208,27 @@
 #define NotBlocked          0
 #define BlockedOnMVar       1
 #define BlockedOnBlackHole  2
-#define BlockedOnException  3
-#define BlockedOnRead       4
-#define BlockedOnWrite      5
-#define BlockedOnDelay      6
-#define BlockedOnSTM        7
+#define BlockedOnRead       3
+#define BlockedOnWrite      4
+#define BlockedOnDelay      5
+#define BlockedOnSTM        6
 
 /* Win32 only: */
-#define BlockedOnDoProc     8
+#define BlockedOnDoProc     7
 
 /* Only relevant for PAR: */
   /* blocked on a remote closure represented by a Global Address: */
-#define BlockedOnGA         9
+#define BlockedOnGA         8
   /* same as above but without sending a Fetch message */
-#define BlockedOnGA_NoSend  10
+#define BlockedOnGA_NoSend  9
 /* Only relevant for THREADED_RTS: */
-#define BlockedOnCCall      11
-#define BlockedOnCCall_NoUnblockExc 12
+#define BlockedOnCCall      10
+#define BlockedOnCCall_NoUnblockExc 11
    /* same as above but don't unblock async exceptions in resumeThread() */
 
+/* Involved in a message sent to tso->msg_cap */
+#define BlockedOnMsgWakeup  12
+#define BlockedOnMsgThrowTo 13
 /*
  * These constants are returned to the scheduler by a thread that has
  * stopped for one reason or another.  See typedef StgThreadReturnCode

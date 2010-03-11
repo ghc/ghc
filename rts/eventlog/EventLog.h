@@ -59,7 +59,7 @@ INLINE_HEADER void postMsg (char *msg STG_UNUSED,
                             va_list ap STG_UNUSED)
 { /* nothing */ }
 
-INLINE_HEADER void postCapMsg (Capability *cap,
+INLINE_HEADER void postCapMsg (Capability *cap STG_UNUSED,
                                char *msg STG_UNUSED, 
                                va_list ap STG_UNUSED)
 { /* nothing */ }

@@ -74,20 +74,16 @@ StgWord16 closure_flags[] = {
  [MUT_VAR_CLEAN]	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MUT_VAR_DIRTY]	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [WEAK]		   	=  (_HNF|     _NS|              _UPT           ),
- [STABLE_NAME]	   	=  (_HNF|     _NS|              _UPT           ),
+ [PRIM]  	   	=  (_HNF|     _NS|              _UPT           ),
+ [MUT_PRIM]  	   	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [TSO]                 	=  (_HNF|     _NS|         _MUT|_UPT           ),
- [TVAR_WATCH_QUEUE]     =  (          _NS|         _MUT|_UPT           ),
- [INVARIANT_CHECK_QUEUE]=  (          _NS|         _MUT|_UPT           ),
- [ATOMIC_INVARIANT]     =  (          _NS|         _MUT|_UPT           ),
- [TVAR]                 =  (_HNF|     _NS|         _MUT|_UPT           ), 
  [TREC_CHUNK]           =  (          _NS|         _MUT|_UPT           ),
- [TREC_HEADER]          =  (          _NS|         _MUT|_UPT           ),
  [ATOMICALLY_FRAME]     =  (     _BTM                                  ),
  [CATCH_RETRY_FRAME]    =  (     _BTM                                  ),
  [CATCH_STM_FRAME]      =  (     _BTM                                  ),
  [WHITEHOLE]		=  ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 65
+#if N_CLOSURE_TYPES != 61
 #error Closure types changed: update ClosureFlags.c!
 #endif

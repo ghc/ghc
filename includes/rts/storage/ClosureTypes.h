@@ -74,18 +74,14 @@
 #define MUT_VAR_CLEAN	        50
 #define MUT_VAR_DIRTY	        51
 #define WEAK		        52
-#define STABLE_NAME	        53
-#define TSO		        54
-#define TVAR_WATCH_QUEUE        55
-#define INVARIANT_CHECK_QUEUE   56
-#define ATOMIC_INVARIANT        57
-#define TVAR                    58
-#define TREC_CHUNK              59
-#define TREC_HEADER             60
-#define ATOMICALLY_FRAME        61
-#define CATCH_RETRY_FRAME       62
-#define CATCH_STM_FRAME         63
-#define WHITEHOLE               64
-#define N_CLOSURE_TYPES         65
+#define PRIM		        53
+#define MUT_PRIM                54
+#define TSO		        55
+#define TREC_CHUNK              56
+#define ATOMICALLY_FRAME        57
+#define CATCH_RETRY_FRAME       58
+#define CATCH_STM_FRAME         59
+#define WHITEHOLE               60
+#define N_CLOSURE_TYPES         61
 
 #endif /* RTS_STORAGE_CLOSURETYPES_H */

@@ -471,7 +471,8 @@ thread_TSO (StgTSO *tso)
 
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
-	|| tso->why_blocked == BlockedOnException
+	|| tso->why_blocked == BlockedOnMsgThrowTo
+	|| tso->why_blocked == BlockedOnMsgWakeup
 	) {
 	thread_(&tso->block_info.closure);
     }
@@ -622,7 +623,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
 
     case FUN:
     case CONSTR:
-    case STABLE_NAME:
+    case PRIM:
+    case MUT_PRIM:
     case IND_PERM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
@@ -705,32 +707,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case TSO:
 	return thread_TSO((StgTSO *)p);
     
-    case TVAR_WATCH_QUEUE:
-    {
-        StgTVarWatchQueue *wq = (StgTVarWatchQueue *)p;
-	thread_(&wq->closure);
-	thread_(&wq->next_queue_entry);
-	thread_(&wq->prev_queue_entry);
-	return p + sizeofW(StgTVarWatchQueue);
-    }
-    
-    case TVAR:
-    {
-        StgTVar *tvar = (StgTVar *)p;
-	thread((void *)&tvar->current_value);
-	thread((void *)&tvar->first_watch_queue_entry);
-	return p + sizeofW(StgTVar);
-    }
-    
-    case TREC_HEADER:
-    {
-        StgTRecHeader *trec = (StgTRecHeader *)p;
-	thread_(&trec->enclosing_trec);
-	thread_(&trec->current_chunk);
-	thread_(&trec->invariants_to_check);
-	return p + sizeofW(StgTRecHeader);
-    }
-
     case TREC_CHUNK:
     {
         StgWord i;
@@ -743,23 +719,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	  thread(&e->new_value);
 	}
 	return p + sizeofW(StgTRecChunk);
-    }
-
-    case ATOMIC_INVARIANT:
-    {
-        StgAtomicInvariant *invariant = (StgAtomicInvariant *)p;
-	thread_(&invariant->code);
-	thread_(&invariant->last_execution);
-	return p + sizeofW(StgAtomicInvariant);
-    }
-
-    case INVARIANT_CHECK_QUEUE:
-    {
-        StgInvariantCheckQueue *queue = (StgInvariantCheckQueue *)p;
-	thread_(&queue->invariant);
-	thread_(&queue->my_execution);
-	thread_(&queue->next_queue_entry);
-	return p + sizeofW(StgInvariantCheckQueue);
     }
 
     default:

@@ -509,7 +509,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
 	// layout.payload.ptrs, no SRT
     case CONSTR:
-    case STABLE_NAME:
+    case PRIM:
     case BCO:
     case CONSTR_STATIC:
 	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs,
@@ -883,7 +883,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	}
 
 	case CONSTR:
-	case STABLE_NAME:
+	case PRIM:
 	case BCO:
 	case CONSTR_STATIC:
 	    // StgMutArrPtr.ptrs, no SRT
@@ -1108,7 +1108,7 @@ isRetainer( StgClosure *c )
     case CONSTR_STATIC:
     case FUN_STATIC:
 	// misc
-    case STABLE_NAME:
+    case PRIM:
     case BCO:
     case ARR_WORDS:
 	// STM

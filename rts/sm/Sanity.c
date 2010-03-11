@@ -307,7 +307,8 @@ checkClosure( StgClosure* p )
     case IND_OLDGEN_PERM:
     case BLACKHOLE:
     case CAF_BLACKHOLE:
-    case STABLE_NAME:
+    case PRIM:
+    case MUT_PRIM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case CONSTR_STATIC:
@@ -416,39 +417,6 @@ checkClosure( StgClosure* p )
         checkTSO((StgTSO *)p);
         return tso_sizeW((StgTSO *)p);
 
-    case TVAR_WATCH_QUEUE:
-      {
-        StgTVarWatchQueue *wq = (StgTVarWatchQueue *)p;
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(wq->next_queue_entry));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(wq->prev_queue_entry));
-        return sizeofW(StgTVarWatchQueue);
-      }
-
-    case INVARIANT_CHECK_QUEUE:
-      {
-        StgInvariantCheckQueue *q = (StgInvariantCheckQueue *)p;
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q->invariant));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q->my_execution));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q->next_queue_entry));
-        return sizeofW(StgInvariantCheckQueue);
-      }
-
-    case ATOMIC_INVARIANT:
-      {
-        StgAtomicInvariant *invariant = (StgAtomicInvariant *)p;
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(invariant->code));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(invariant->last_execution));
-        return sizeofW(StgAtomicInvariant);
-      }
-
-    case TVAR:
-      {
-        StgTVar *tv = (StgTVar *)p;
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(tv->current_value));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(tv->first_watch_queue_entry));
-        return sizeofW(StgTVar);
-      }
-
     case TREC_CHUNK:
       {
         nat i;
@@ -460,14 +428,6 @@ checkClosure( StgClosure* p )
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(tc->entries[i].new_value));
         }
         return sizeofW(StgTRecChunk);
-      }
-
-    case TREC_HEADER:
-      {
-        StgTRecHeader *trec = (StgTRecHeader *)p;
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(trec -> enclosing_trec));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(trec -> current_chunk));
-        return sizeofW(StgTRecHeader);
       }
       
     default:

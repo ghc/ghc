@@ -74,7 +74,7 @@ createThread(Capability *cap, nat size)
     tso->what_next = ThreadRunGHC;
 
     tso->why_blocked  = NotBlocked;
-    tso->blocked_exceptions = END_TSO_QUEUE;
+    tso->blocked_exceptions = END_BLOCKED_EXCEPTIONS_QUEUE;
     tso->flags = 0;
     tso->dirty = 1;
     
@@ -218,8 +218,9 @@ unblockOne_ (Capability *cap, StgTSO *tso,
 
   // NO, might be a WHITEHOLE: ASSERT(get_itbl(tso)->type == TSO);
   ASSERT(tso->why_blocked != NotBlocked);
+  ASSERT(tso->why_blocked != BlockedOnMsgWakeup || 
+         tso->block_info.closure->header.info == &stg_IND_info);
 
-  tso->why_blocked = NotBlocked;
   next = tso->_link;
   tso->_link = END_TSO_QUEUE;
 
@@ -235,6 +236,8 @@ unblockOne_ (Capability *cap, StgTSO *tso,
       }
 
       tso->cap = cap;
+      write_barrier();
+      tso->why_blocked = NotBlocked;
       appendToRunQueue(cap,tso);
 
       // context-switch soonish so we can migrate the new thread if
@@ -246,6 +249,7 @@ unblockOne_ (Capability *cap, StgTSO *tso,
       wakeupThreadOnCapability(cap, tso->cap, tso);
   }
 #else
+  tso->why_blocked = NotBlocked;
   appendToRunQueue(cap,tso);
 
   // context-switch soonish so we can migrate the new thread if
@@ -327,12 +331,14 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnMVar:
     debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
     break;
-  case BlockedOnException:
-    debugBelch("is blocked on delivering an exception to thread %lu",
-	       (unsigned long)tso->block_info.tso->id);
-    break;
   case BlockedOnBlackHole:
     debugBelch("is blocked on a black hole");
+    break;
+  case BlockedOnMsgWakeup:
+    debugBelch("is blocked on a wakeup message");
+    break;
+  case BlockedOnMsgThrowTo:
+    debugBelch("is blocked on a throwto message");
     break;
   case NotBlocked:
     debugBelch("is not blocked");

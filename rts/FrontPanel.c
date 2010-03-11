@@ -697,7 +697,7 @@ residencyCensus( void )
 			break;
 			
 		    case WEAK:
-		    case STABLE_NAME:
+		    case PRIM:
 		    case MVAR:
 		    case MUT_VAR:
 /*		    case MUT_CONS: FIXME: case does not exist */

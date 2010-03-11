@@ -626,7 +626,8 @@ loop:
       return;
 
   case WEAK:
-  case STABLE_NAME:
+  case PRIM:
+  case MUT_PRIM:
       copy_tag(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen,tag);
       return;
 
@@ -721,28 +722,8 @@ loop:
       }
     }
 
-  case TREC_HEADER: 
-      copy(p,info,q,sizeofW(StgTRecHeader),gen);
-      return;
-
-  case TVAR_WATCH_QUEUE:
-      copy(p,info,q,sizeofW(StgTVarWatchQueue),gen);
-      return;
-
-  case TVAR:
-      copy(p,info,q,sizeofW(StgTVar),gen);
-      return;
-    
   case TREC_CHUNK:
       copy(p,info,q,sizeofW(StgTRecChunk),gen);
-      return;
-
-  case ATOMIC_INVARIANT:
-      copy(p,info,q,sizeofW(StgAtomicInvariant),gen);
-      return;
-
-  case INVARIANT_CHECK_QUEUE:
-      copy(p,info,q,sizeofW(StgInvariantCheckQueue),gen);
       return;
 
   default:

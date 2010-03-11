@@ -88,11 +88,8 @@ struct Capability_ {
     Task *returning_tasks_hd; // Singly-linked, with head/tail
     Task *returning_tasks_tl;
 
-    // A list of threads to append to this Capability's run queue at
-    // the earliest opportunity.  These are threads that have been
-    // woken up by another Capability.
-    StgTSO *wakeup_queue_hd;
-    StgTSO *wakeup_queue_tl;
+    // Messages, or END_TSO_QUEUE.
+    Message *inbox;
 
     SparkPool *sparks;
 
@@ -285,6 +282,18 @@ void markCapabilities (evac_fn evac, void *user);
 void traverseSparkQueues (evac_fn evac, void *user);
 
 /* -----------------------------------------------------------------------------
+   Messages
+   -------------------------------------------------------------------------- */
+
+#ifdef THREADED_RTS
+
+INLINE_HEADER rtsBool emptyInbox(Capability *cap);;
+
+void sendMessage (Capability *cap, Message *msg);
+
+#endif // THREADED_RTS
+
+/* -----------------------------------------------------------------------------
  * INLINE functions... private below here
  * -------------------------------------------------------------------------- */
 
@@ -332,6 +341,15 @@ contextSwitchCapability (Capability *cap)
     // context-switch flag too:
     cap->context_switch = 1;
 }
+
+#ifdef THREADED_RTS
+
+INLINE_HEADER rtsBool emptyInbox(Capability *cap)
+{
+    return (cap->inbox == (Message*)END_TSO_QUEUE);
+}
+
+#endif
 
 END_RTS_PRIVATE
 

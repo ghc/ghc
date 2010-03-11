@@ -105,7 +105,6 @@ extern Mutex sched_mutex;
 void interruptStgRts (void);
 
 void resurrectThreads (StgTSO *);
-void performPendingThrowTos (StgTSO *);
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros/inline functions...
@@ -179,25 +178,6 @@ appendToBlockedQueue(StgTSO *tso)
 }
 #endif
 
-#if defined(THREADED_RTS)
-// Assumes: my_cap is owned by the current Task.  We hold
-// other_cap->lock, but we do not necessarily own other_cap; another
-// Task may be running on it.
-INLINE_HEADER void
-appendToWakeupQueue (Capability *my_cap, Capability *other_cap, StgTSO *tso)
-{
-    ASSERT(tso->_link == END_TSO_QUEUE);
-    if (other_cap->wakeup_queue_hd == END_TSO_QUEUE) {
-	other_cap->wakeup_queue_hd = tso;
-    } else {
-        // my_cap is passed to setTSOLink() because it may need to
-        // write to the mutable list.
-	setTSOLink(my_cap, other_cap->wakeup_queue_tl, tso);
-    }
-    other_cap->wakeup_queue_tl = tso;
-}
-#endif
-
 /* Check whether various thread queues are empty
  */
 INLINE_HEADER rtsBool
@@ -211,14 +191,6 @@ emptyRunQueue(Capability *cap)
 {
     return emptyQueue(cap->run_queue_hd);
 }
-
-#if defined(THREADED_RTS)
-INLINE_HEADER rtsBool
-emptyWakeupQueue(Capability *cap)
-{
-    return emptyQueue(cap->wakeup_queue_hd);
-}
-#endif
 
 #if !defined(THREADED_RTS)
 #define EMPTY_BLOCKED_QUEUE()  (emptyQueue(blocked_queue_hd))

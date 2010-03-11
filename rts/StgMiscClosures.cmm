@@ -419,7 +419,7 @@ CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
    Stable Names are unlifted too.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_STABLE_NAME,0,1,STABLE_NAME,"STABLE_NAME","STABLE_NAME")
+INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME")
 { foreign "C" barf("STABLE_NAME object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
@@ -439,22 +439,22 @@ INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR")
    STM
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_TVAR, 0, 0, TVAR, "TVAR", "TVAR")
+INFO_TABLE(stg_TVAR, 2, 1, MUT_PRIM, "TVAR", "TVAR")
 { foreign "C" barf("TVAR object entered!") never returns; }
 
-INFO_TABLE(stg_TVAR_WATCH_QUEUE, 0, 0, TVAR_WATCH_QUEUE, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
+INFO_TABLE(stg_TVAR_WATCH_QUEUE, 3, 0, MUT_PRIM, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
 { foreign "C" barf("TVAR_WATCH_QUEUE object entered!") never returns; }
 
-INFO_TABLE(stg_ATOMIC_INVARIANT, 0, 0, ATOMIC_INVARIANT, "ATOMIC_INVARIANT", "ATOMIC_INVARIANT")
+INFO_TABLE(stg_ATOMIC_INVARIANT, 2, 1, MUT_PRIM, "ATOMIC_INVARIANT", "ATOMIC_INVARIANT")
 { foreign "C" barf("ATOMIC_INVARIANT object entered!") never returns; }
 
-INFO_TABLE(stg_INVARIANT_CHECK_QUEUE, 0, 0, INVARIANT_CHECK_QUEUE, "INVARIANT_CHECK_QUEUE", "INVARIANT_CHECK_QUEUE")
+INFO_TABLE(stg_INVARIANT_CHECK_QUEUE, 3, 0, MUT_PRIM, "INVARIANT_CHECK_QUEUE", "INVARIANT_CHECK_QUEUE")
 { foreign "C" barf("INVARIANT_CHECK_QUEUE object entered!") never returns; }
 
 INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
 { foreign "C" barf("TREC_CHUNK object entered!") never returns; }
 
-INFO_TABLE(stg_TREC_HEADER, 0, 0, TREC_HEADER, "TREC_HEADER", "TREC_HEADER")
+INFO_TABLE(stg_TREC_HEADER, 3, 1, MUT_PRIM, "TREC_HEADER", "TREC_HEADER")
 { foreign "C" barf("TREC_HEADER object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
@@ -478,6 +478,17 @@ CLOSURE(stg_END_STM_CHUNK_LIST_closure,stg_END_STM_CHUNK_LIST);
 CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
 
 /* ----------------------------------------------------------------------------
+   Messages
+   ------------------------------------------------------------------------- */
+
+// PRIM rather than CONSTR, because PRIM objects cannot be duplicated by the GC.
+INFO_TABLE_CONSTR(stg_MSG_WAKEUP,2,0,0,PRIM,"MSG_WAKEUP","MSG_WAKEUP")
+{ foreign "C" barf("MSG_WAKEUP object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_MSG_THROWTO,4,0,0,PRIM,"MSG_THROWTO","MSG_THROWTO")
+{ foreign "C" barf("MSG_THROWTO object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
    END_TSO_QUEUE
 
    This is a static nullary constructor (like []) that we use to mark the
@@ -488,18 +499,6 @@ INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","E
 { foreign "C" barf("END_TSO_QUEUE object entered!") never returns; }
 
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
-
-/* ----------------------------------------------------------------------------
-   Exception lists
-   ------------------------------------------------------------------------- */
-
-INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_EXCEPTION_LIST","END_EXCEPTION_LIST")
-{ foreign "C" barf("END_EXCEPTION_LIST object entered!") never returns; }
-
-CLOSURE(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST);
-
-INFO_TABLE(stg_EXCEPTION_CONS,1,1,CONSTR,"EXCEPTION_CONS","EXCEPTION_CONS")
-{ foreign "C" barf("EXCEPTION_CONS object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Arrays

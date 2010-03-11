@@ -56,7 +56,7 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
     CInt r;
 
     StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
-	~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+	%lobits32(~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
 
     /* Eagerly raise a blocked exception, if there is one */
     if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
@@ -99,8 +99,8 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
 
 INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret, RET_SMALL )
 {
-    StgTSO_flags(CurrentTSO) = 
-	StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
+    StgTSO_flags(CurrentTSO) = %lobits32(
+	TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
 
     Sp_adj(1);
     jump %ENTRY_CODE(Sp(0));
@@ -113,8 +113,8 @@ stg_blockAsyncExceptionszh
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
 	
-	StgTSO_flags(CurrentTSO) = 
-	   StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
+	StgTSO_flags(CurrentTSO) = %lobits32(
+	   TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
 
 	/* avoid growing the stack unnecessarily */
 	if (Sp(0) == stg_blockAsyncExceptionszh_ret_info) {
@@ -142,8 +142,8 @@ stg_unblockAsyncExceptionszh
     /* If exceptions are already unblocked, there's nothing to do */
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
 
-	StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
-	   ~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+	StgTSO_flags(CurrentTSO) = %lobits32(
+           TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
 
 	/* avoid growing the stack unnecessarily */
 	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
@@ -252,26 +252,21 @@ stg_killThreadzh
 	}
     } else {
 	W_ out;
-	W_ retcode;
+	W_ msg;
 	out = Sp - WDS(1); /* ok to re-use stack space here */
 
-	(retcode) = foreign "C" throwTo(MyCapability() "ptr",
-				      CurrentTSO "ptr",
-				      target "ptr",
-				      exception "ptr",
-				      out "ptr") [R1,R2];
+	(msg) = foreign "C" throwTo(MyCapability() "ptr",
+                                    CurrentTSO "ptr",
+                                    target "ptr",
+                                    exception "ptr") [R1,R2];
 	
-	switch [THROWTO_SUCCESS .. THROWTO_BLOCKED] (retcode) {
-
-	case THROWTO_SUCCESS: {
+        if (msg == NULL) {
 	    jump %ENTRY_CODE(Sp(0));
-	}
-
-	case THROWTO_BLOCKED: {
-	    R3 = W_[out];
-	    // we must block, and call throwToReleaseTarget() before returning
+	} else {
+            StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
+            StgTSO_block_info(CurrentTSO) = msg;
+	    // we must block, and unlock the message before returning
 	    jump stg_block_throwto;
-	}
 	}
     }
 }
@@ -507,8 +502,8 @@ retry_pop_stack:
 
     /* Ensure that async excpetions are blocked when running the handler.
     */
-    StgTSO_flags(CurrentTSO) = 
-	StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
+    StgTSO_flags(CurrentTSO) = %lobits32(
+	TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
 
     /* Call the handler, passing the exception value and a realworld
      * token as arguments.

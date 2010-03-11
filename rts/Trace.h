@@ -135,6 +135,15 @@ void traceUserMsg(Capability *cap, char *msg);
 #define debugTrace(class, str, ...) /* nothing */
 #endif
 
+#ifdef DEBUG
+#define debugTraceCap(class, cap, msg, ...)      \
+    if (RTS_UNLIKELY(class)) {                  \
+        traceCap_(cap, msg, ##__VA_ARGS__);     \
+    }
+#else
+#define debugTraceCap(class, cap, str, ...) /* nothing */
+#endif
+
 /* 
  * Emit a message/event describing the state of a thread
  */
@@ -152,6 +161,7 @@ void traceThreadStatus_ (StgTSO *tso);
 #define traceCap(class, cap, msg, ...) /* nothing */
 #define trace(class, msg, ...) /* nothing */
 #define debugTrace(class, str, ...) /* nothing */
+#define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
 
 #endif /* TRACING */

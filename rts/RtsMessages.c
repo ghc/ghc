@@ -9,6 +9,8 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "eventlog/EventLog.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -160,6 +162,10 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
      fprintf(stderr, "    Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n");
      fflush(stderr);
   }
+
+#ifdef TRACING
+  if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG) endEventLogging();
+#endif
 
   abort();
   // stg_exit(EXIT_INTERNAL_ERROR);

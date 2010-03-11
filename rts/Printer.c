@@ -160,6 +160,12 @@ printClosure( StgClosure *obj )
 	printStdObjPayload(obj);
 	break;
 
+    case PRIM:
+	debugBelch("PRIM(");
+	printPtr((StgPtr)obj->header.info);
+	printStdObjPayload(obj);
+	break;
+
     case THUNK:
     case THUNK_1_0: case THUNK_0_1:
     case THUNK_1_1: case THUNK_0_2: case THUNK_2_0:
@@ -354,10 +360,6 @@ printClosure( StgClosure *obj )
 		    (StgPtr)(((StgWeak*)obj)->finalizer));
             debugBelch(")\n"); 
 	    /* ToDo: chase 'link' ? */
-            break;
-
-    case STABLE_NAME:
-            debugBelch("STABLE_NAME(%lu)\n", (lnat)((StgStableName*)obj)->sn); 
             break;
 
     case TSO:
@@ -1132,14 +1134,10 @@ char *closure_type_names[] = {
  [MUT_VAR_CLEAN]         = "MUT_VAR_CLEAN",
  [MUT_VAR_DIRTY]         = "MUT_VAR_DIRTY",
  [WEAK]                  = "WEAK",
- [STABLE_NAME]           = "STABLE_NAME",
+ [PRIM]	                 = "PRIM",
+ [MUT_PRIM]              = "MUT_PRIM",
  [TSO]                   = "TSO",
- [TVAR_WATCH_QUEUE]      = "TVAR_WATCH_QUEUE",
- [INVARIANT_CHECK_QUEUE] = "INVARIANT_CHECK_QUEUE",
- [ATOMIC_INVARIANT]      = "ATOMIC_INVARIANT",
- [TVAR]                  = "TVAR",
  [TREC_CHUNK]            = "TREC_CHUNK",
- [TREC_HEADER]           = "TREC_HEADER",
  [ATOMICALLY_FRAME]      = "ATOMICALLY_FRAME",
  [CATCH_RETRY_FRAME]     = "CATCH_RETRY_FRAME",
  [CATCH_STM_FRAME]       = "CATCH_STM_FRAME",

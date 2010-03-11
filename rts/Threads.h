@@ -11,6 +11,8 @@
 
 BEGIN_RTS_PRIVATE
 
+#define END_BLOCKED_EXCEPTIONS_QUEUE ((MessageThrowTo*)END_TSO_QUEUE)
+
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
 

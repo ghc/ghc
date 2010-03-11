@@ -631,9 +631,8 @@ INFO_TABLE_RET( stg_block_throwto, RET_SMALL, P_ unused, P_ unused )
 
 stg_block_throwto_finally
 {
-#ifdef THREADED_RTS
-    foreign "C" throwToReleaseTarget (R3 "ptr");
-#endif
+    // unlock the throwto message
+    unlockClosure(StgTSO_block_info(CurrentTSO), stg_MSG_THROWTO_info);
     jump StgReturn;
 }
 

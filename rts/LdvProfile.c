@@ -109,7 +109,7 @@ processHeapClosureForDead( StgClosure *c )
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case BCO:
-    case STABLE_NAME:
+    case PRIM:
     case TVAR_WATCH_QUEUE:
     case TVAR:
     case TREC_HEADER:

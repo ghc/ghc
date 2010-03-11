@@ -390,10 +390,10 @@ typedef struct StgInvariantCheckQueue_ {
 
 struct StgTRecHeader_ {
   StgHeader                  header;
-  TRecState                  state;
   struct StgTRecHeader_     *enclosing_trec;
   StgTRecChunk              *current_chunk;
   StgInvariantCheckQueue    *invariants_to_check;
+  TRecState                  state;
 };
 
 typedef struct {
@@ -415,5 +415,28 @@ typedef struct {
   StgClosure    *first_code;
   StgClosure    *alt_code;
 } StgCatchRetryFrame;
+
+/* ----------------------------------------------------------------------------
+   Messages
+   ------------------------------------------------------------------------- */
+
+typedef struct Message_ {
+    StgHeader        header;
+    struct Message_ *link;
+} Message;
+
+typedef struct MessageWakeup_ {
+    StgHeader header;
+    Message  *link;
+    StgTSO   *tso;
+} MessageWakeup;
+
+typedef struct MessageThrowTo_ {
+    StgHeader   header;
+    Message    *link;
+    StgTSO     *source;
+    StgTSO     *target;
+    StgClosure *exception;
+} MessageThrowTo;
 
 #endif /* RTS_STORAGE_CLOSURES_H */

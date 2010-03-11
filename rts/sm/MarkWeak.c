@@ -22,6 +22,7 @@
 #include "Schedule.h"
 #include "Weak.h"
 #include "Storage.h"
+#include "Threads.h"
 
 /* -----------------------------------------------------------------------------
    Weak Pointers
@@ -80,9 +81,6 @@ StgWeak *old_weak_ptr_list; // also pending finaliser list
 // List of threads found to be unreachable
 StgTSO *resurrected_threads;
 
-// List of blocked threads found to have pending throwTos
-StgTSO *exception_threads;
-
 static void resurrectUnreachableThreads (generation *gen);
 static rtsBool tidyThreadList (generation *gen);
 
@@ -93,7 +91,6 @@ initWeakForGC(void)
     weak_ptr_list = NULL;
     weak_stage = WeakPtrs;
     resurrected_threads = END_TSO_QUEUE;
-    exception_threads = END_TSO_QUEUE;
 }
 
 rtsBool 
@@ -286,35 +283,11 @@ static rtsBool tidyThreadList (generation *gen)
         
         next = t->global_link;
         
-        // This is a good place to check for blocked
-        // exceptions.  It might be the case that a thread is
-        // blocked on delivering an exception to a thread that
-        // is also blocked - we try to ensure that this
-        // doesn't happen in throwTo(), but it's too hard (or
-        // impossible) to close all the race holes, so we
-        // accept that some might get through and deal with
-        // them here.  A GC will always happen at some point,
-        // even if the system is otherwise deadlocked.
-        //
-        // If an unreachable thread has blocked
-        // exceptions, we really want to perform the
-        // blocked exceptions rather than throwing
-        // BlockedIndefinitely exceptions.  This is the
-        // only place we can discover such threads.
-        // The target thread might even be
-        // ThreadFinished or ThreadKilled.  Bugs here
-        // will only be seen when running on a
-        // multiprocessor.
-        if (t->blocked_exceptions != END_TSO_QUEUE) {
-            if (tmp == NULL) {
-                evacuate((StgClosure **)&t);
-                flag = rtsTrue;
-            }
-            t->global_link = exception_threads;
-            exception_threads = t;
-            *prev = next;
-            continue;
-        }
+        // if the thread is not masking exceptions but there are
+        // pending exceptions on its queue, then something has gone
+        // wrong:
+        ASSERT(t->blocked_exceptions == END_BLOCKED_EXCEPTIONS_QUEUE
+               || (t->flags & TSO_BLOCKEX));
         
         if (tmp == NULL) {
             // not alive (yet): leave this thread on the

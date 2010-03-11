@@ -18,6 +18,7 @@
 #else
 
 EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p);
+EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p);
 EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
 #if defined(THREADED_RTS)
@@ -43,11 +44,15 @@ EXTERN_INLINE StgInfoTable *lockClosure(StgClosure *p)
     } while (1);
 }
 
-EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info)
+EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p)
 {
-    // This is a strictly ordered write, so we need a write_barrier():
-    write_barrier();
-    p->header.info = info;
+    StgWord info;
+    info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
+    if (info != (W_)&stg_WHITEHOLE_info) {
+        return (StgInfoTable *)info;
+    } else {
+        return NULL;
+    }
 }
 
 #else /* !THREADED_RTS */
@@ -56,11 +61,18 @@ EXTERN_INLINE StgInfoTable *
 lockClosure(StgClosure *p)
 { return (StgInfoTable *)p->header.info; }
 
-EXTERN_INLINE void
-unlockClosure(StgClosure *p STG_UNUSED, const StgInfoTable *info STG_UNUSED)
-{ /* nothing */ }
+EXTERN_INLINE StgInfoTable *
+tryLockClosure(StgClosure *p)
+{ return (StgInfoTable *)p->header.info; }
 
 #endif /* THREADED_RTS */
+
+EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info)
+{
+    // This is a strictly ordered write, so we need a write_barrier():
+    write_barrier();
+    p->header.info = info;
+}
 
 // Handy specialised versions of lockClosure()/unlockClosure()
 EXTERN_INLINE void lockTSO(StgTSO *tso);

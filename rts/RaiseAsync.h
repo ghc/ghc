@@ -29,16 +29,13 @@ void suspendComputation (Capability *cap,
 			 StgTSO *tso, 
 			 StgUpdateFrame *stop_here);
 
-nat throwTo (Capability *cap,	         // the Capability we hold 
-	     StgTSO *source,	         // the TSO sending the exception
-	     StgTSO *target,             // the TSO receiving the exception
-	     StgClosure *exception,      // the exception closure
-	     /*[out]*/ void **out   // pass to throwToReleaseTarget()
-    );
+MessageThrowTo *throwTo (Capability *cap,      // the Capability we hold 
+                         StgTSO *source,
+                         StgTSO *target,
+                         StgClosure *exception); // the exception closure
 
-#ifdef THREADED_RTS
-void throwToReleaseTarget (void *tso);
-#endif
+nat throwToMsg (Capability *cap,
+                MessageThrowTo *msg);
 
 int  maybePerformBlockedException (Capability *cap, StgTSO *tso);
 void awakenBlockedExceptionQueue  (Capability *cap, StgTSO *tso);
@@ -52,7 +49,7 @@ interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {
   case BlockedOnMVar:
-  case BlockedOnException:
+  case BlockedOnMsgThrowTo:
   case BlockedOnRead:
   case BlockedOnWrite:
 #if defined(mingw32_HOST_OS)

@@ -732,7 +732,6 @@ SET_GCT(gc_threads[0]);
   // send exceptions to any threads which were about to die 
   RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
-  performPendingThrowTos(exception_threads);
   ACQUIRE_SM_LOCK;
 
   // Update the stable pointer hash table.

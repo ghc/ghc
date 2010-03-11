@@ -542,9 +542,9 @@ stg_forkzh
 				closure "ptr") [];
 
   /* start blocked if the current thread is blocked */
-  StgTSO_flags(threadid) = 
-     StgTSO_flags(threadid) |  (StgTSO_flags(CurrentTSO) & 
-                                (TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32));
+  StgTSO_flags(threadid) = %lobits16(
+     TO_W_(StgTSO_flags(threadid)) | 
+     TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
 
   foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
 
@@ -572,9 +572,9 @@ stg_forkOnzh
 				closure "ptr") [];
 
   /* start blocked if the current thread is blocked */
-  StgTSO_flags(threadid) = 
-     StgTSO_flags(threadid) |  (StgTSO_flags(CurrentTSO) & 
-                                (TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32));
+  StgTSO_flags(threadid) = %lobits16(
+     TO_W_(StgTSO_flags(threadid)) | 
+     TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
 
   foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
 

@@ -352,8 +352,7 @@ static StgBool watcher_is_tso(StgTVarWatchQueue *q) {
 
 static StgBool watcher_is_invariant(StgTVarWatchQueue *q) {
   StgClosure *c = q -> closure;
-  StgInfoTable *info = get_itbl(c);
-  return (info -> type) == ATOMIC_INVARIANT;
+  return (c->header.info == &stg_ATOMIC_INVARIANT_info);
 }
 
 /*......................................................................*/

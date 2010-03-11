@@ -114,6 +114,8 @@ RTS_INFO(stg_MUT_ARR_PTRS_FROZEN0_info);
 RTS_INFO(stg_MUT_VAR_CLEAN_info);
 RTS_INFO(stg_MUT_VAR_DIRTY_info);
 RTS_INFO(stg_END_TSO_QUEUE_info);
+RTS_INFO(stg_MSG_WAKEUP_info);
+RTS_INFO(stg_MSG_THROWTO_info);
 RTS_INFO(stg_MUT_CONS_info);
 RTS_INFO(stg_catch_info);
 RTS_INFO(stg_PAP_info);
@@ -163,6 +165,8 @@ RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN0_entry);
 RTS_ENTRY(stg_MUT_VAR_CLEAN_entry);
 RTS_ENTRY(stg_MUT_VAR_DIRTY_entry);
 RTS_ENTRY(stg_END_TSO_QUEUE_entry);
+RTS_ENTRY(stg_MSG_WAKEUP_entry);
+RTS_ENTRY(stg_MSG_THROWTO_entry);
 RTS_ENTRY(stg_MUT_CONS_entry);
 RTS_ENTRY(stg_catch_entry);
 RTS_ENTRY(stg_PAP_entry);
@@ -205,8 +209,6 @@ RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
 RTS_CLOSURE(stg_NO_TREC_closure);
 
 RTS_ENTRY(stg_NO_FINALIZER_entry);
-RTS_ENTRY(stg_END_EXCEPTION_LIST_entry);
-RTS_ENTRY(stg_EXCEPTION_CONS_entry);
 
 #if IN_STG_CODE
 extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_closure;

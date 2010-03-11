@@ -912,7 +912,8 @@ heapCensusChain( Census *census, bdescr *bd )
             case MVAR_CLEAN:
             case MVAR_DIRTY:
 	    case WEAK:
-	    case STABLE_NAME:
+	    case PRIM:
+	    case MUT_PRIM:
 	    case MUT_VAR_CLEAN:
 	    case MUT_VAR_DIRTY:
 		prim = rtsTrue;
@@ -960,31 +961,6 @@ heapCensusChain( Census *census, bdescr *bd )
 		break;
 #endif
 
-	    case TREC_HEADER: 
-		prim = rtsTrue;
-		size = sizeofW(StgTRecHeader);
-		break;
-
-	    case TVAR_WATCH_QUEUE:
-		prim = rtsTrue;
-		size = sizeofW(StgTVarWatchQueue);
-		break;
-		
-	    case INVARIANT_CHECK_QUEUE:
-		prim = rtsTrue;
-		size = sizeofW(StgInvariantCheckQueue);
-		break;
-		
-	    case ATOMIC_INVARIANT:
-		prim = rtsTrue;
-		size = sizeofW(StgAtomicInvariant);
-		break;
-		
-	    case TVAR:
-		prim = rtsTrue;
-		size = sizeofW(StgTVar);
-		break;
-		
 	    case TREC_CHUNK:
 		prim = rtsTrue;
 		size = sizeofW(StgTRecChunk);
