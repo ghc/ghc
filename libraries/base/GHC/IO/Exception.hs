@@ -64,7 +64,7 @@ blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
 
 -----
 
--- |The thread is awaiting to retry an STM transaction, but there are no
+-- |The thread is waiting to retry an STM transaction, but there are no
 -- other references to any @TVar@s involved, so it can't ever continue.
 data BlockedIndefinitelyOnSTM = BlockedIndefinitelyOnSTM
     deriving Typeable
