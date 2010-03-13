@@ -1423,7 +1423,7 @@ linkBinary dflags o_files dep_packages = do
     let no_hs_main = dopt Opt_NoHsMain dflags
     let main_lib | no_hs_main = []
                  | otherwise  = [ "-lHSrtsmain" ]
-    rtsEnabledLib <- if dopt Opt_RtsOptsEnabled dflags
+    rtsEnabledObj <- if dopt Opt_RtsOptsEnabled dflags
                      then do fn <- mkExtraCObj dflags
                                     ["#include \"Rts.h\"",
                                      "const rtsBool rtsOptsEnabled = rtsTrue;"]
@@ -1503,7 +1503,7 @@ linkBinary dflags o_files dep_packages = do
 #endif
 	 	      ++ pkg_lib_path_opts
                       ++ main_lib
-                      ++ rtsEnabledLib
+                      ++ rtsEnabledObj
 	 	      ++ pkg_link_opts
 #ifdef darwin_TARGET_OS
 	 	      ++ pkg_framework_path_opts
