@@ -484,3 +484,15 @@ shared001:
 	$(RM) 3674*.o 3674*.hi 3674_pre
 	"$(TEST_HC)" --make 3674_pre.hs
 	"$(TEST_HC)" --make 3674.hs
+
+.PHONY: rtsOpts
+rtsOpts:
+	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
+	"$(TEST_HC)" -v0 --make rtsOpts
+	echo "Normal"
+	-./rtsOpts +RTS -C0 2>&1
+	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
+	"$(TEST_HC)" -v0 --make rtsOpts -no-rtsopts
+	echo "No RTS opts"
+	-./rtsOpts +RTS -C0 2>&1
+
