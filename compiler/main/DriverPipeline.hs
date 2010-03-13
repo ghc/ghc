@@ -1299,6 +1299,20 @@ wrapper_behaviour dflags mode dep_packages =
 	putStrLn (unwords (map (packageIdString . packageConfigId) allpkg))
 	return $ 'F':s ++ ';':(seperateBySemiColon (map (packageIdString . packageConfigId) allpkg))
 
+mkExtraCObj :: DynFlags -> [String] -> IO FilePath
+mkExtraCObj dflags xs
+ = do cFile <- newTempName dflags "c"
+      oFile <- newTempName dflags "o"
+      writeFile cFile $ unlines xs
+      let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
+      SysTools.runCc dflags
+                     ([Option        "-c",
+                       FileOption "" cFile,
+                       Option        "-o",
+                       FileOption "" oFile] ++
+                      map (FileOption "-I") (includeDirs rtsDetails))
+      return oFile
+
 -- generates a Perl skript starting a parallel prg under PVM
 mk_pvm_wrapper_script :: String -> String -> String -> String
 mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
@@ -1409,6 +1423,12 @@ linkBinary dflags o_files dep_packages = do
     let no_hs_main = dopt Opt_NoHsMain dflags
     let main_lib | no_hs_main = []
                  | otherwise  = [ "-lHSrtsmain" ]
+    rtsEnabledLib <- if dopt Opt_RtsOptsEnabled dflags
+                     then do fn <- mkExtraCObj dflags
+                                    ["#include \"Rts.h\"",
+                                     "const rtsBool rtsOptsEnabled = rtsTrue;"]
+                             return [fn]
+                     else return []
 
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
@@ -1483,6 +1503,7 @@ linkBinary dflags o_files dep_packages = do
 #endif
 	 	      ++ pkg_lib_path_opts
                       ++ main_lib
+                      ++ rtsEnabledLib
 	 	      ++ pkg_link_opts
 #ifdef darwin_TARGET_OS
 	 	      ++ pkg_framework_path_opts

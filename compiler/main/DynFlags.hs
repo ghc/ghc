@@ -298,6 +298,7 @@ data DynFlag
    | Opt_EagerBlackHoling
    | Opt_ReadUserPackageConf
    | Opt_NoHsMain
+   | Opt_RtsOptsEnabled
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
@@ -690,6 +691,7 @@ defaultDynFlags =
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         haddockOptions = Nothing,
         flags = [
+            Opt_RtsOptsEnabled,
             Opt_AutoLinkPackages,
             Opt_ReadUserPackageConf,
 
@@ -1108,6 +1110,8 @@ dynamic_flags = [
         ------- Miscellaneous ----------------------------------------------
   , Flag "no-auto-link-packages" (NoArg (unSetDynFlag Opt_AutoLinkPackages)) Supported
   , Flag "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain)) Supported
+  , Flag "rtsopts"        (NoArg (setDynFlag Opt_RtsOptsEnabled)) Supported
+  , Flag "no-rtsopts"     (NoArg (unSetDynFlag Opt_RtsOptsEnabled)) Supported
   , Flag "main-is"        (SepArg setMainIs ) Supported
   , Flag "haddock"        (NoArg (setDynFlag Opt_Haddock)) Supported
   , Flag "haddock-opts"   (HasArg (upd . addHaddockOpts)) Supported

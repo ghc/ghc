@@ -10,6 +10,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "RtsOpts.h"
 #include "RtsUtils.h"
 #include "Profiling.h"
 
@@ -413,7 +414,13 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	char *ghc_rts = getenv("GHCRTS");
 
 	if (ghc_rts != NULL) {
-	    splitRtsFlags(ghc_rts, rts_argc, rts_argv);
+            if (rtsOptsEnabled) {
+                splitRtsFlags(ghc_rts, rts_argc, rts_argv);
+            }
+            else {
+                errorBelch("Warning: Ignoring GHCRTS variable");
+                // We don't actually exit, just warn
+            }
 	}
     }
 
@@ -432,7 +439,13 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	    break;
 	}
 	else if (strequal("+RTS", argv[arg])) {
-	    mode = RTS;
+            if (rtsOptsEnabled) {
+                mode = RTS;
+            }
+            else {
+                errorBelch("RTS options are disabled");
+                stg_exit(EXIT_FAILURE);
+            }
 	}
 	else if (strequal("-RTS", argv[arg])) {
 	    mode = PGM;
