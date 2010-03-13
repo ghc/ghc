@@ -1429,6 +1429,14 @@ linkBinary dflags o_files dep_packages = do
                                      "const rtsBool rtsOptsEnabled = rtsTrue;"]
                              return [fn]
                      else return []
+    rtsOptsObj <- case rtsOpts dflags of
+                  Just opts ->
+                      do fn <- mkExtraCObj dflags
+                                 -- We assume that the Haskell "show" does
+                                 -- the right thing here
+                                 ["char *ghc_rts_opts = " ++ show opts ++ ";"]
+                         return [fn]
+                  Nothing -> return []
 
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
@@ -1504,6 +1512,7 @@ linkBinary dflags o_files dep_packages = do
 	 	      ++ pkg_lib_path_opts
                       ++ main_lib
                       ++ rtsEnabledObj
+                      ++ rtsOptsObj
 	 	      ++ pkg_link_opts
 #ifdef darwin_TARGET_OS
 	 	      ++ pkg_framework_path_opts

@@ -407,6 +407,7 @@ data DynFlags = DynFlags {
 
   ghcUsagePath          :: FilePath,    -- Filled in by SysTools
   ghciUsagePath         :: FilePath,    -- ditto
+  rtsOpts               :: Maybe String,
 
   hpcDir                :: String,      -- ^ Path to store the .mix files
 
@@ -641,6 +642,7 @@ defaultDynFlags =
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
         tmpDir                  = cDEFAULT_TMPDIR,
+        rtsOpts                 = Nothing,
 
         hpcDir                  = ".hpc",
 
@@ -1110,6 +1112,7 @@ dynamic_flags = [
         ------- Miscellaneous ----------------------------------------------
   , Flag "no-auto-link-packages" (NoArg (unSetDynFlag Opt_AutoLinkPackages)) Supported
   , Flag "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain)) Supported
+  , Flag "with-rtsopts"   (HasArg setRtsOpts) Supported
   , Flag "rtsopts"        (NoArg (setDynFlag Opt_RtsOptsEnabled)) Supported
   , Flag "no-rtsopts"     (NoArg (unSetDynFlag Opt_RtsOptsEnabled)) Supported
   , Flag "main-is"        (SepArg setMainIs ) Supported
@@ -2011,6 +2014,12 @@ setTmpDir :: FilePath -> DynFlags -> DynFlags
 setTmpDir dir dflags = dflags{ tmpDir = normalise dir }
   -- we used to fix /cygdrive/c/.. on Windows, but this doesn't
   -- seem necessary now --SDM 7/2/2008
+
+-----------------------------------------------------------------------------
+-- RTS opts
+
+setRtsOpts :: String -> DynP ()
+setRtsOpts arg  = upd $ \ d -> d {rtsOpts = Just arg}
 
 -----------------------------------------------------------------------------
 -- Hpc stuff
