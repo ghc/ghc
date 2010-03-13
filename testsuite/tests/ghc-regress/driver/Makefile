@@ -496,3 +496,9 @@ rtsOpts:
 	echo "No RTS opts"
 	-./rtsOpts +RTS -C0 2>&1
 
+.PHONY: withRtsOpts
+withRtsOpts:
+	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o
+	"$(TEST_HC)" -v0 --make withRtsOpts -with-rtsopts=--info
+	./withRtsOpts | head -1
+

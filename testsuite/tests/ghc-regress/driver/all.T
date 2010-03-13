@@ -335,3 +335,6 @@ test('3674', ignore_output, run_command,
 test('rtsOpts', normal, run_command,
                 ['$MAKE -s --no-print-directory rtsOpts'])
 
+test('withRtsOpts', normal, run_command,
+                    ['$MAKE -s --no-print-directory withRtsOpts'])
+
