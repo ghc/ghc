@@ -10,7 +10,8 @@
   code and then links it with a non-trivial runtime system (RTS),
   which handles storage management, profiling, etc.</para>
 
-  <para>You have some control over the behaviour of the RTS, by giving
+  <para>If you use the <literal>-rtsopts</literal> flag when linking,
+  you have some control over the behaviour of the RTS, by giving
   special command-line arguments to your program.</para>
 
   <para>When your Haskell program starts up, its RTS extracts
@@ -68,7 +69,8 @@
     <indexterm><primary>environment variable</primary><secondary>for
     setting RTS options</secondary></indexterm>
 
-    <para>RTS options are also taken from the environment variable
+    <para>When the <literal>-rtsopts</literal> flag is used when linking,
+    RTS options are also taken from the environment variable
     <envar>GHCRTS</envar><indexterm><primary><envar>GHCRTS</envar></primary>
       </indexterm>.  For example, to set the maximum heap size
     to 128M for all GHC-compiled programs (using an
@@ -1042,6 +1044,20 @@
 	</listitem>
       </varlistentry>
     </variablelist>
+
+  </sect2>
+
+  <sect2>
+    <title>Linker flags to change RTS behaviour</title>
+
+    <indexterm><primary>RTS behaviour, changing</primary></indexterm>
+
+    <para>
+      GHC lets you exercise rudimentary control over the RTS settings
+      for any given program, by using the <literal>-with-rtsopts</literal>
+      linker flag. For example, to set <literal>-H128m -K1m</literal>,
+      link with <literal>-with-rtsopts="-H128m -K1m"</literal>.
+    </para>
 
   </sect2>
 

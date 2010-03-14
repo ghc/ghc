@@ -1819,6 +1819,21 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-rtsopts</option></entry>
+	      <entry>Allow the RTS behaviour to be tweaked via command-line
+          flags and the <literal>GHCRTS</literal> environment
+          variable.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-with-rtsopts=<replaceable>opts</replaceable></option></entry>
+	      <entry>Set the default RTS options to
+          <replaceable>opts</replaceable>.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-no-link</option></entry>
 	      <entry>Omit linking</entry>
 	      <entry>dynamic</entry>
