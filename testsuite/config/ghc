@@ -8,7 +8,7 @@ import re
 #
 config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
-config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-no-user-package-conf']
+config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-no-user-package-conf', '-rtsopts']
 
 config.hp2ps		     = 'hp2ps'
 config.hpc		     = 'hpc'
