@@ -488,11 +488,11 @@ shared001:
 .PHONY: rtsOpts
 rtsOpts:
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
-	"$(TEST_HC)" -v0 --make rtsOpts
+	"$(TEST_HC)" -v0 --make rtsOpts -rtsopts
 	echo "Normal"
 	-./rtsOpts +RTS -C0 2>&1
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
-	"$(TEST_HC)" -v0 --make rtsOpts -no-rtsopts
+	"$(TEST_HC)" -v0 --make rtsOpts
 	echo "No RTS opts"
 	-./rtsOpts +RTS -C0 2>&1
 
