@@ -693,7 +693,6 @@ defaultDynFlags =
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         haddockOptions = Nothing,
         flags = [
-            Opt_RtsOptsEnabled,
             Opt_AutoLinkPackages,
             Opt_ReadUserPackageConf,
 
