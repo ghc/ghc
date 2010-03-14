@@ -10,7 +10,7 @@ outofmem::
 	@ulimit -v 10000000 2>/dev/null; ./outofmem || echo "exit($$?)"
 
 outofmem2-prep::
-	'$(TEST_HC)' --make -fforce-recomp outofmem2.hs -o outofmem2
+	'$(TEST_HC)' -rtsopts --make -fforce-recomp outofmem2.hs -o outofmem2
 
 outofmem2::
 	@$(MAKE) outofmem2-prep >prep.out 2>prep.out
