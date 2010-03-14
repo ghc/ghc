@@ -18,6 +18,9 @@ $1_$2_HC = $$(GHC_STAGE$3)
 # configuration stuff that depends on which GHC we're building with
 ifeq "$3" "0"
 $1_$2_ghc_ge_609 = $$(ghc_ge_609)
+$1_$2_ghc_ge_6102 = $$(ghc_ge_6102)
+$1_$2_ghc_ge_611 = $$(ghc_ge_611)
+$1_$2_ghc_ge_613 = $$(ghc_ge_613)
 $1_$2_HC_CONFIG = $$(GHC_STAGE0)
 $1_$2_HC_CONFIG_DEP =
 $1_$2_GHC_PKG = $$(GHC_PKG)
@@ -30,8 +33,14 @@ $1_$2_HC_DEP =
 $1_$2_HC_PKGCONF = -package-conf $$(BOOTSTRAPPING_CONF)
 $1_$2_GHC_PKG_OPTS = --package-conf=$$(BOOTSTRAPPING_CONF)
 $1_$2_CONFIGURE_OPTS += --package-db=$$(TOP)/$$(BOOTSTRAPPING_CONF)
+ifeq "$(ghc_ge_613)" "YES"
+$1_$2_HC_OPTS += -rtsopts
+endif
 else
 $1_$2_ghc_ge_609 = YES
+$1_$2_ghc_ge_6102 = YES
+$1_$2_ghc_ge_611 = YES
+$1_$2_ghc_ge_613 = YES
 $1_$2_HC_PKGCONF = 
 $1_$2_HC_CONFIG = $$(TOP)/$$(DUMMY_GHC_INPLACE)
 $1_$2_HC_CONFIG_DEP = $$(DUMMY_GHC_INPLACE)
@@ -44,6 +53,7 @@ $1_$2_HC_MK_DEPEND = $$(GHC_STAGE1)
 $1_$2_HC_MK_DEPEND_DEP = $$($1_$2_HC_MK_DEPEND)
 $1_$2_HC_DEP = $$($1_$2_HC)
 $1_$2_HC_OPTS += -no-user-package-conf
+$1_$2_HC_OPTS += -rtsopts
 endif
 
 # Useful later
