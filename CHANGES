@@ -1,3 +1,13 @@
+Changes in version 2.7.0:
+
+  * Instances can be commented
+
+  * The Haddock API now exposes more of the internals of Haddock
+
+  * Bug fixes (most importantly #128)
+
+-----------------------------------------------------------------------------
+
 Changes in version 2.6.0:
 
   * Drop support for GHC 6.10.*

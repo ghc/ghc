@@ -1,41 +1,18 @@
 --------------------------------------------
--- Haddock 2.6.0
+-- Haddock 2.7.0
 --------------------------------------------
 
 A new version of Haddock, the Haskell documentation tool, is out!
 
-This is the version that comes with GHC 6.12.1. It contains the main results of
-Isaac Dupree's Summer of Code project, which are:
-
-  * Cross-package documentation (exporting something that comes from another
-    package is handled correctly. The full documentation of that thing shows
-    up in your documentation)
-
-  * Lexing and parsing of Haddock comment markup is moved from GHC back into
-    Haddock. This will make it easier to make changes to the markup format
-
-We have decided to drop compatibility with older GHC versions in order to speed
-up development.
-
 --------------------------------------------
--- Full list of changes in version 2.6.0
+-- Changes in version 2.7.0
 --------------------------------------------
 
-  * Drop support for GHC 6.10.*
+  * Instances can be commented
 
-  * Add support for GHC 6.12.1
+  * The Haddock API now exposes more of the internals of Haddock
 
-  * Cross-package documentation
-
-  * Move lexing and parsing of the Haddock comment markup back to Haddock
-
-  * Slightly prettier printing of instance heads
-
-  * Support platforms for which GHC has no native code generator
-
-  * Add a flag --print-ghc-libdir
-
-  * Minor bug fixes
+  * Bug fixes (most importantly #128)
 
 --------------------------------------------
 -- Links
@@ -45,7 +22,7 @@ Homepage:
  http://www.haskell.org/haddock
 
 Hackage page:
- http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.6.0
+ http://hackage.haskell.org/cgi-bin/hackage-scripts/package/haddock-2.7.0
 
 Bugtracker and wiki:
  http://trac.haskell.org/haddock
@@ -63,8 +40,7 @@ Code repository:
 The following people contributed patches to this release:
 
  Isaac Dupree
- Ian Lynagh
- Simon Peyton-Jones
+ Yitzchak Gale
  David Waern
 
 --------------------------------------------
