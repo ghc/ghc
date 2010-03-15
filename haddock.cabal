@@ -175,6 +175,7 @@ library
     Haddock.Options
     Haddock.GhcUtils
     Haddock.Convert
+    Paths_haddock
   
   if flag(in-ghc-tree)
     buildable: False
