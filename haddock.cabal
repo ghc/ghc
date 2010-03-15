@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.7.1
+version:              2.7.2
 cabal-version:        >= 1.6
 license:              BSD3
 build-type:           Simple
