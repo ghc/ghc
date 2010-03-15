@@ -1,3 +1,9 @@
+Changes in version 2.7.1:
+
+  * Fix problems with library part of .cabal file
+
+-----------------------------------------------------------------------------
+
 Changes in version 2.7.0:
 
   * Instances can be commented
