@@ -418,7 +418,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
                 splitRtsFlags(ghc_rts, rts_argc, rts_argv);
             }
             else {
-                errorBelch("Warning: Ignoring GHCRTS variable");
+                errorBelch("Warning: Ignoring GHCRTS variable as RTS options are disabled.\n         Link with -rtsopts to enable them.");
                 // We don't actually exit, just warn
             }
 	}
@@ -443,7 +443,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
                 mode = RTS;
             }
             else {
-                errorBelch("RTS options are disabled");
+                errorBelch("RTS options are disabled. Link with -rtsopts to enable them.");
                 stg_exit(EXIT_FAILURE);
             }
 	}
