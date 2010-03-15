@@ -110,12 +110,8 @@ processHeapClosureForDead( StgClosure *c )
     case MUT_VAR_DIRTY:
     case BCO:
     case PRIM:
-    case TVAR_WATCH_QUEUE:
-    case TVAR:
-    case TREC_HEADER:
+    case MUT_PRIM:
     case TREC_CHUNK:
-    case INVARIANT_CHECK_QUEUE:
-    case ATOMIC_INVARIANT:
 	return size;
 
 	/*
