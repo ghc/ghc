@@ -33,7 +33,7 @@ module Documentation.Haddock (
 
   -- * Instances
   DocInstance,
-  InstHead(..),
+  InstHead,
 
   -- * Documentation comments
   Doc(..),
