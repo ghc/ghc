@@ -1731,6 +1731,14 @@ linkDynLib dflags o_files dep_packages = do
     -----------------------------------------------------------------------------
 
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+    let buildingRts = thisPackage dflags == rtsPackageId
+    let bsymbolicFlag = if buildingRts
+                        then -- -Bsymbolic breaks the way we implement
+                             -- hooks in the RTS
+                             []
+                        else -- we need symbolic linking to resolve
+                             -- non-PIC intra-package-relocations
+                             ["-Wl,-Bsymbolic"]
 
     SysTools.runLink dflags
 	 ([ SysTools.Option verb
@@ -1740,7 +1748,8 @@ linkDynLib dflags o_files dep_packages = do
 	 ++ map SysTools.Option (
 	    md_c_flags
 	 ++ o_files
-	 ++ [ "-shared", "-Wl,-Bsymbolic" ] -- we need symbolic linking to resolve non-PIC intra-package-relocations
+	 ++ [ "-shared" ]
+	 ++ bsymbolicFlag
          ++ [ "-Wl,-soname," ++ takeFileName output_fn ] -- set the library soname
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
