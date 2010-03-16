@@ -330,6 +330,16 @@ preludeDataCons (Modules { dph_Prelude_Tuple = dph_Prelude_Tuple })
   where
     mk_tup n mod name = (tupleCon Boxed n, mod, name)
 
+
+-- | Mapping of prelude functions to vectorised versions.
+--     Functions like filterP currently have a working but naive version in GHC.PArr
+--     During vectorisation we replace these by calls to filterPA, which are
+--     defined in dph-common Data.Array.Parallel.Lifted.Combinators
+--
+--     As renamer only sees the GHC.PArr functions, if you want to add a new function
+--     to the vectoriser there has to be a definition for it in GHC.PArr, even though
+--     it will never be used at runtime.
+--
 preludeVars :: Modules -> [(Module, FastString, Module, FastString)]
 preludeVars (Modules { dph_Combinators    = dph_Combinators
                      , dph_PArray         = dph_PArray
@@ -348,6 +358,7 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk gHC_PARR (fsLit "lengthP")    dph_Combinators (fsLit "lengthPA")
     , mk gHC_PARR (fsLit "replicateP") dph_Combinators (fsLit "replicatePA")
     , mk gHC_PARR (fsLit "!:")         dph_Combinators (fsLit "indexPA")
+    , mk gHC_PARR (fsLit "sliceP")     dph_Combinators (fsLit "slicePA")
     , mk gHC_PARR (fsLit "crossMapP")  dph_Combinators (fsLit "crossMapPA")
     , mk gHC_PARR (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
     , mk gHC_PARR (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
