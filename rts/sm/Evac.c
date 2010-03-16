@@ -140,13 +140,17 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
 
     to = alloc_for_copy(size,gen);
     *p = TAG_CLOSURE(tag,(StgClosure*)to);
-    src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
-    
+
     from = (StgPtr)src;
     to[0] = (W_)info;
     for (i = 1; i < size; i++) { // unroll for small i
 	to[i] = from[i];
     }
+
+    // if somebody else reads the forwarding pointer, we better make
+    // sure there's a closure at the end of it.
+    write_barrier();
+    src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
 //      __builtin_prefetch(to + size + 2, 1);
