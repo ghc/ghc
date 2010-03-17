@@ -862,7 +862,7 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
-INSTALLED_PACKAGES = $(filter-out haskeline mtl terminfo,$(PACKAGES))
+INSTALLED_PACKAGES = $(filter-out haskeline mtl terminfo utf8-string,$(PACKAGES))
 HIDDEN_PACKAGES = binary
 
 define set_INSTALL_DISTDIR
