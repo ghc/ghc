@@ -155,6 +155,7 @@ test('T3395', normal, compile_fail, ['-v0'])
 test('T3467', normal, compile, [''])
 test('T3572', normal, compile_and_run, [''])
 test('T3100', normal, compile, ['-v0'])
+test('T3920', normal, compile_and_run, ['-v0'])
 
 test('T3600', extra_clean(['T3600a.hi','T3600a.o']), 
               multimod_compile, ['T3600','-v0'])
