@@ -181,12 +181,12 @@ Roman.foo =
 
 
 ------ Local rules for imported ids --------
-"SC:$wgo0" ALWAYS
+"SC:$wgo0" [ALWAYS]
     forall {sc :: GHC.Prim.Int# sc1 :: GHC.Prim.Int#}
       Roman.$wgo (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc))
                  (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc1))
       = Roman.foo_$s$wgo1 sc sc1
-"SC:$wgo1" ALWAYS
+"SC:$wgo1" [ALWAYS]
     forall {sc :: GHC.Prim.Int# sc1 :: GHC.Types.Int}
       Roman.$wgo (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc))
                  (Data.Maybe.Just @ GHC.Types.Int sc1)
