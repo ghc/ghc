@@ -1119,7 +1119,7 @@ reifyKind  ki
         kis_rep    = map reifyKind kis
         ki'_rep    = reifyNonArrowKind ki'
     in
-    foldl TH.ArrowK ki'_rep kis_rep
+    foldr TH.ArrowK ki'_rep kis_rep
   where
     reifyNonArrowKind k | isLiftedTypeKind k = TH.StarK
                         | otherwise          = pprPanic "Exotic form of kind" 

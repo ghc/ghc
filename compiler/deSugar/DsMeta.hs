@@ -644,7 +644,7 @@ repKind ki
   = do { let (kis, ki') = splitKindFunTys ki
        ; kis_rep <- mapM repKind kis
        ; ki'_rep <- repNonArrowKind ki'
-       ; foldlM repArrowK ki'_rep kis_rep
+       ; foldrM repArrowK ki'_rep kis_rep
        }
   where
     repNonArrowKind k | isLiftedTypeKind k = repStarK
