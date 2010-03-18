@@ -20,7 +20,11 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitSigmaTy )
 import TypeRep
+#if __GLASGOW_HASKELL__ == 612
+import Type ( splitKindFunTys )
+#else
 import Coercion ( splitKindFunTys )
+#endif
 import Name
 import Var
 import Class
@@ -226,7 +230,11 @@ synifyTyVars = map synifyTyVar
       kind = tyVarKind tv
       name = getName tv
      in if isLiftedTypeKind kind
+#if __GLASGOW_HASKELL__ == 612
+        then UserTyVar name
+#else
         then UserTyVar name placeHolderKind
+#endif
         else KindedTyVar name kind
 
 --states of what to do with foralls:
