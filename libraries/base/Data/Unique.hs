@@ -21,20 +21,20 @@ module Data.Unique (
 
 import Prelude
 
-import Control.Concurrent.MVar
 import System.IO.Unsafe (unsafePerformIO)
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
+import GHC.Conc
 #endif
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
 -- compared for equality and ordering and hashed into 'Int'.
 newtype Unique = Unique Integer deriving (Eq,Ord)
 
-uniqSource :: MVar Integer
-uniqSource = unsafePerformIO (newMVar 0)
+uniqSource :: TVar Integer
+uniqSource = unsafePerformIO (newTVarIO 0)
 {-# NOINLINE uniqSource #-}
 
 -- | Creates a new object of type 'Unique'.  The value returned will
@@ -42,11 +42,18 @@ uniqSource = unsafePerformIO (newMVar 0)
 -- previous calls to 'newUnique'.  There is no limit on the number of
 -- times 'newUnique' may be called.
 newUnique :: IO Unique
-newUnique = do
-   val <- takeMVar uniqSource
-   let next = val+1
-   putMVar uniqSource next
-   return (Unique next)
+newUnique = atomically $ do
+  val <- readTVar uniqSource
+  let next = val+1
+  writeTVar uniqSource $! val + 1
+  return (Unique next)
+
+-- SDM (18/3/2010): changed from MVar to STM.  This fixes
+--  1. there was no async exception protection
+--  2. there was a space leak (now new value is strict)
+--  3. using atomicModifyIORef would be slightly quicker, but can
+--     suffer from adverse scheduling issues (see #3838)
+--  4. also, the STM version is faster.
 
 -- | Hashes a 'Unique' into an 'Int'.  Two 'Unique's may hash to the
 -- same value, although in practice this is unlikely.  The 'Int'
