@@ -30,6 +30,8 @@ import Prelude
 
 import Control.Concurrent.MVar
 
+import Control.Exception ( block )
+
 -- |
 -- Sample variables are slightly different from a normal 'MVar':
 -- 
@@ -66,41 +68,43 @@ newSampleVar a = do
 
 -- |If the SampleVar is full, leave it empty.  Otherwise, do nothing.
 emptySampleVar :: SampleVar a -> IO ()
-emptySampleVar v = do
-   (readers, var) <- takeMVar v
+emptySampleVar v = block $ do
+   s@(readers, var) <- block $ takeMVar v
    if readers > 0 then do
      _ <- takeMVar var
      putMVar v (0,var)
     else
-     putMVar v (readers,var)
+     putMVar v s
 
 -- |Wait for a value to become available, then take it and return.
 readSampleVar :: SampleVar a -> IO a
-readSampleVar svar = do
+readSampleVar svar = block $ do
 --
 -- filled => make empty and grab sample
 -- not filled => try to grab value, empty when read val.
 --
    (readers,val) <- takeMVar svar
-   putMVar svar (readers-1,val)
+   let readers' = readers-1
+   readers' `seq` putMVar svar (readers',val)
    takeMVar val
 
 -- |Write a value into the 'SampleVar', overwriting any previous value that
 -- was there.
 writeSampleVar :: SampleVar a -> a -> IO ()
-writeSampleVar svar v = do
+writeSampleVar svar v = block $ do
 --
 -- filled => overwrite
 -- not filled => fill, write val
 --
-   (readers,val) <- takeMVar svar
+   s@(readers,val) <- takeMVar svar
    case readers of
-     1 -> 
-       swapMVar val v >> 
-       putMVar svar (1,val)
-     _ -> 
-       putMVar val v >> 
-       putMVar svar (min 1 (readers+1), val)
+     1 ->
+       swapMVar val v >>
+       putMVar svar s
+     _ ->
+       putMVar val v >>
+       let readers' = min 1 (readers+1)
+       in readers' `seq` putMVar svar (readers', val)
 
 -- | Returns 'True' if the 'SampleVar' is currently empty.
 --
