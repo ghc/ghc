@@ -329,7 +329,7 @@ test('mod180', extra_clean(['Mod180_A.hi', 'Mod180_A.o', 'Mod180_B.hi', 'Mod180_
 test('T1148', normal, compile, [''])
 test('T1074', reqlib('mtl'), compile, [''])
 test('T1074a', normal, compile, [''])
-test('T2267', normal, compile, [''])
+test('T2267', reqlib('utf8-string'), compile, [''])
 test('T414', normal, compile_fail, [''])
 test('T414a', normal, compile, [''])
 test('T414b', normal, compile, [''])
