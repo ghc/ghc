@@ -32,6 +32,8 @@ import Control.Concurrent.MVar
 
 import Control.Exception ( block )
 
+import Data.Functor ( (<$>) )
+
 -- |
 -- Sample variables are slightly different from a normal 'MVar':
 -- 
@@ -48,27 +50,29 @@ import Control.Exception ( block )
 --  * Writing to a filled 'SampleVar' overwrites the current value.
 --    (different from 'putMVar' on full 'MVar'.)
 
-type SampleVar a
- = MVar (Int,           -- 1  == full
-                        -- 0  == empty
-                        -- <0 no of readers blocked
-          MVar a)
+newtype SampleVar a = SampleVar ( MVar ( Int    -- 1  == full
+                                                -- 0  == empty
+                                                -- <0 no of readers blocked
+                                       , MVar a
+                                       )
+                                )
+    deriving (Eq)
 
 -- |Build a new, empty, 'SampleVar'
 newEmptySampleVar :: IO (SampleVar a)
 newEmptySampleVar = do
    v <- newEmptyMVar
-   newMVar (0,v)
+   SampleVar <$> newMVar (0,v)
 
 -- |Build a 'SampleVar' with an initial value.
 newSampleVar :: a -> IO (SampleVar a)
 newSampleVar a = do
    v <- newMVar a
-   newMVar (1,v)
+   SampleVar <$> newMVar (1,v)
 
 -- |If the SampleVar is full, leave it empty.  Otherwise, do nothing.
 emptySampleVar :: SampleVar a -> IO ()
-emptySampleVar v = block $ do
+emptySampleVar (SampleVar v) = block $ do
    s@(readers, var) <- block $ takeMVar v
    if readers > 0 then do
      _ <- takeMVar var
@@ -78,7 +82,7 @@ emptySampleVar v = block $ do
 
 -- |Wait for a value to become available, then take it and return.
 readSampleVar :: SampleVar a -> IO a
-readSampleVar svar = block $ do
+readSampleVar (SampleVar svar) = block $ do
 --
 -- filled => make empty and grab sample
 -- not filled => try to grab value, empty when read val.
@@ -91,7 +95,7 @@ readSampleVar svar = block $ do
 -- |Write a value into the 'SampleVar', overwriting any previous value that
 -- was there.
 writeSampleVar :: SampleVar a -> a -> IO ()
-writeSampleVar svar v = block $ do
+writeSampleVar (SampleVar svar) v = block $ do
 --
 -- filled => overwrite
 -- not filled => fill, write val
@@ -114,7 +118,7 @@ writeSampleVar svar v = block $ do
 -- you see the result of 'isEmptySampleVar'.
 --
 isEmptySampleVar :: SampleVar a -> IO Bool
-isEmptySampleVar svar = do
+isEmptySampleVar (SampleVar svar) = do
    (readers, _) <- readMVar svar
    return (readers == 0)
 
