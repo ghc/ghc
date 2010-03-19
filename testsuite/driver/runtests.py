@@ -13,6 +13,7 @@ import getopt
 import platform
 import time
 import re
+import ctypes
 
 from testutil import *
 from testglobals import *
@@ -21,28 +22,6 @@ from testglobals import *
 # which result in test failures. Thus set TERM to a nice, simple, safe
 # value.
 os.environ['TERM'] = 'vt100'
-
-# Try and find a utf8 locale to use
-# First see if we already have a UTF8 locale
-h = os.popen('locale | grep LC_CTYPE | grep -i utf', 'r')
-v = h.read()
-h.close()
-if v == '':
-    # We don't, so now see if 'locale -a' works
-    h = os.popen('locale -a', 'r')
-    v = h.read()
-    h.close()
-    if v != '':
-        # If it does then use the first utf8 locale that is available
-        h = os.popen('locale -a | grep -i "utf8\|utf-8" 2>/dev/null', 'r')
-        v = h.readline().strip()
-        h.close()
-        if v != '':
-            os.environ['LC_ALL'] = v
-            print "setting LC_ALL to", v
-        else:
-            print 'WARNING: No UTF8 locale found.'
-            print 'You may get some spurious test failures.'
 
 global config
 config = getConfig() # get it from testglobals
@@ -122,6 +101,38 @@ if config.use_threads == 1:
     if windows:
         print "Warning: Ignoring request to use threads as running on Windows"
         config.use_threads = 0
+
+# Try to use UTF8
+if windows:
+    # This actually leaves the terminal in codepage 65001 (UTF8) even
+    # after python terminates. We ought really remember the old codepage
+    # and set it back.
+    if ctypes.cdll.kernel32.SetConsoleCP(65001) == 0:
+        raise Exception("Failure calling SetConsoleCP(65001)")
+    if ctypes.cdll.kernel32.SetConsoleOutputCP(65001) == 0:
+        raise Exception("Failure calling SetConsoleOutputCP(65001)")
+else:
+    # Try and find a utf8 locale to use
+    # First see if we already have a UTF8 locale
+    h = os.popen('locale | grep LC_CTYPE | grep -i utf', 'r')
+    v = h.read()
+    h.close()
+    if v == '':
+        # We don't, so now see if 'locale -a' works
+        h = os.popen('locale -a', 'r')
+        v = h.read()
+        h.close()
+        if v != '':
+            # If it does then use the first utf8 locale that is available
+            h = os.popen('locale -a | grep -i "utf8\|utf-8" 2>/dev/null', 'r')
+            v = h.readline().strip()
+            h.close()
+            if v != '':
+                os.environ['LC_ALL'] = v
+                print "setting LC_ALL to", v
+            else:
+                print 'WARNING: No UTF8 locale found.'
+                print 'You may get some spurious test failures.'
 
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
