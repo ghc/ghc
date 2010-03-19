@@ -1575,13 +1575,11 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	// threadPaused().  We could traverse the whole stack again
 	// before GC, but that seems like overkill.
 	//
-        // So, if the frame points to an indirection, it will get
-        // shorted out when we evacuate.  If this happens, we have no
-        // closure to update any more.  In the past we solved this by
-        // replacing the IND with an IND_PERM, but a better solution
-        // is to replace the update frame with a frame that no longer
-        // does the update and just uses the value already computed by
-        // the other thread, so that is what we now do.
+	// Scavenging this update frame as normal would be disastrous;
+	// the updatee would end up pointing to the value.  So we turn
+	// the indirection into an IND_PERM, so that evacuate will
+	// copy the indirection into the old generation instead of
+	// discarding it.
         //
         // Note [upd-black-hole]
         // One slight hiccup is that the THUNK_SELECTOR machinery can
@@ -1592,16 +1590,22 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         // the updatee is never a THUNK_SELECTOR and we're ok.
         // NB. this is a new invariant: blackholing is not optional.
     {
-        StgClosure *v;
-        StgUpdateFrame *frame = (StgUpdateFrame *)p;
+        nat type;
+        const StgInfoTable *i;
+        StgClosure *updatee;
 
-        evacuate(&frame->updatee);
-        v = frame->updatee;
-        if (GET_CLOSURE_TAG(v) != 0 ||
-            (get_itbl(v)->type != BLACKHOLE &&
-             get_itbl(v)->type != CAF_BLACKHOLE)) {
-            frame->header.info = (const StgInfoTable*)&stg_gc_unpt_r1_info;
+        updatee = ((StgUpdateFrame *)p)->updatee;
+        i = updatee->header.info;
+        if (!IS_FORWARDING_PTR(i)) {
+            type = get_itbl(updatee)->type;
+            if (type == IND) {
+                updatee->header.info = &stg_IND_PERM_info;
+            } else if (type == IND_OLDGEN) {
+                updatee->header.info = &stg_IND_OLDGEN_PERM_info;
+            }            
         }
+        evacuate(&((StgUpdateFrame *)p)->updatee);
+        ASSERT(GET_CLOSURE_TAG(((StgUpdateFrame *)p)->updatee) == 0);
         p += sizeofW(StgUpdateFrame);
         continue;
     }
