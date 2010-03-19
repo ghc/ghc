@@ -45,7 +45,7 @@ newUnique :: IO Unique
 newUnique = atomically $ do
   val <- readTVar uniqSource
   let next = val+1
-  writeTVar uniqSource $! val + 1
+  writeTVar uniqSource $! next
   return (Unique next)
 
 -- SDM (18/3/2010): changed from MVar to STM.  This fixes
