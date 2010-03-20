@@ -9,6 +9,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "RtsDllMain.h"
 
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -18,9 +19,9 @@
 #if defined(__PIC__) && defined(mingw32_TARGET_OS)
 BOOL
 WINAPI
-DllMain ( HINSTANCE hInstance
+DllMain ( HINSTANCE hInstance STG_UNUSED
         , DWORD reason
-	, LPVOID reserved
+	, LPVOID reserved STG_UNUSED
 	)
 {
   /*
