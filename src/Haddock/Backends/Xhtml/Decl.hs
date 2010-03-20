@@ -597,7 +597,11 @@ ppShortConstr summary con unicode = case con_res con of
     mkFunTy a b = noLoc (HsFunTy a b)
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
+#if __GLASGOW_HASKELL__ == 612
 ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Bool -> Html
+#else
+ppConstrHdr :: HsExplicitFlag -> [Name] -> HsContext DocName -> Bool -> Html
+#endif
 ppConstrHdr forall tvs ctxt unicode
  = (if null tvs then noHtml else ppForall)
    +++
@@ -809,7 +813,11 @@ ppFunLhType  unicode ty = ppr_mono_ty pREC_FUN ty unicode
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
+#if __GLASGOW_HASKELL__ == 612
 ppForAll :: HsExplicitForAll -> [Located (HsTyVarBndr DocName)]
+#else
+ppForAll :: HsExplicitFlag -> [Located (HsTyVarBndr DocName)]
+#endif
          -> Located (HsContext DocName) -> Bool -> Html
 ppForAll expl tvs cxt unicode
   | show_forall = forall_part <+> ppLContext cxt unicode
@@ -829,7 +837,6 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode
   = maybeParen ctxt_prec pREC_FUN $
     hsep [ppForAll expl tvs ctxt unicode, ppr_mono_lty pREC_TOP ty unicode]
 
--- gaw 2004
 ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b +++ ppLParendType u ty
 ppr_mono_ty _         (HsTyVar name)      _ = ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
@@ -839,10 +846,13 @@ ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty
 ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPredTy p)        u = parens (ppPred u p)
 ppr_mono_ty _         (HsNumTy n)         _ = toHtml (show n) -- generics only
-ppr_mono_ty _         (HsSpliceTy _)      _ = error "ppr_mono_ty HsSpliceTy"
-ppr_mono_ty _         (HsSpliceTyOut _)   _ = error "ppr_mono_ty HsSpliceTyOut"
-ppr_mono_ty _         (HsRecTy _)         _ = error "ppr_mono_ty HsRecTy"
-
+ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
+#if __GLASGOW_HASKELL__ == 612
+ppr_mono_ty _         (HsSpliceTyOut {})  _ = error "ppr_mono_ty HsQuasiQuoteTy"
+#else
+ppr_mono_ty _         (HsQuasiQuoteTy {}) _ = error "ppr_mono_ty HsQuasiQuoteTy"
+#endif
+ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode 
   = maybeParen ctxt_prec pREC_CON $
