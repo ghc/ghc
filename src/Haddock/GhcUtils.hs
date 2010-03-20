@@ -31,7 +31,7 @@ import Packages
 import Module
 import RdrName (GlobalRdrEnv)
 import HscTypes
-import LazyUniqFM
+import UniqFM
 import GHC
 
 
