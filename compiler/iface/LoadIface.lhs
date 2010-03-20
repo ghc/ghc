@@ -42,7 +42,7 @@ import Module
 import Maybes
 import ErrUtils
 import Finder
-import LazyUniqFM
+import UniqFM
 import StaticFlags
 import Outputable
 import BinIface

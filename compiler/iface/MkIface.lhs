@@ -83,7 +83,7 @@ import Digraph
 import SrcLoc
 import Outputable
 import BasicTypes       hiding ( SuccessFlag(..) )
-import LazyUniqFM
+import UniqFM
 import Unique
 import Util             hiding ( eqListBy )
 import FiniteMap

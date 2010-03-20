@@ -78,7 +78,7 @@ import qualified ErrUtils as Err
 import Bag
 import Maybes
 import UniqSupply
-import LazyUniqFM       ( UniqFM, mapUFM, filterUFM )
+import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import FiniteMap
 
 import Util		( split )

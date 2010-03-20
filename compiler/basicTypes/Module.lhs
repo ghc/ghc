@@ -75,7 +75,7 @@ import Outputable
 import qualified Pretty
 import Unique
 import FiniteMap
-import LazyUniqFM
+import UniqFM
 import FastString
 import Binary
 import Util

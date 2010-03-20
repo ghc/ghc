@@ -34,7 +34,7 @@ import Util
 import PrelNames        ( gHC_PRIM )
 import DynFlags
 import Outputable
-import LazyUniqFM
+import UniqFM
 import Maybes		( expectJust )
 import Exception        ( evaluate )
 

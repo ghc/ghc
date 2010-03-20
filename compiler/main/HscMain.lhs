@@ -109,7 +109,7 @@ import HscStats		( ppSourceStats )
 import HscTypes
 import MkExternalCore	( emitExternalCore )
 import FastString
-import LazyUniqFM		( emptyUFM )
+import UniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag		( unitBag )
 import Exception

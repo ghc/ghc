@@ -59,7 +59,7 @@ import Id
 import VarEnv
 import Var
 import Module
-import LazyUniqFM
+import UniqFM
 import Name
 import NameEnv
 import NameSet

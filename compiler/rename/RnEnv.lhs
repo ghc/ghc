@@ -48,7 +48,7 @@ import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameSrcSpan, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
-import LazyUniqFM
+import UniqFM
 import DataCon		( dataConFieldLabels )
 import OccName
 import Module		( Module, ModuleName )

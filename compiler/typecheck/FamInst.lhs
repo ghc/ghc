@@ -15,7 +15,7 @@ import Name
 import Module
 import SrcLoc
 import Outputable
-import LazyUniqFM
+import UniqFM
 import FiniteMap
 import FastString
 

@@ -35,7 +35,7 @@ import Bag
 import Outputable
 import UniqSupply
 import Unique
-import LazyUniqFM
+import UniqFM
 import DynFlags
 import StaticFlags
 import FastString

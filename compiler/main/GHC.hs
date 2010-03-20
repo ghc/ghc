@@ -284,8 +284,7 @@ import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Annotations
 import Module
-import LazyUniqFM
-import qualified UniqFM as UFM
+import UniqFM
 import FiniteMap
 import Panic
 import Digraph
@@ -2533,7 +2532,7 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = UFM.eltsUFM (pkgIdMap (pkgState dflags))
+   let pkgs = eltsUFM (pkgIdMap (pkgState dflags))
    return $
      [ mkModule pid modname | p <- pkgs
                             , not only_exposed || exposed p

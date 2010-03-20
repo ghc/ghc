@@ -59,7 +59,7 @@ import Unique
 import UniqSupply
 import Module
 import Panic
-import LazyUniqFM
+import UniqFM
 import Maybes
 import ErrUtils
 import Util

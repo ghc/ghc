@@ -35,7 +35,7 @@ import Finder
 import HscTypes
 import Outputable
 import Module
-import LazyUniqFM		( eltsUFM )
+import UniqFM		( eltsUFM )
 import ErrUtils
 import DynFlags
 import StaticFlags	( v_Ld_inputs, opt_Static, WayName(..) )

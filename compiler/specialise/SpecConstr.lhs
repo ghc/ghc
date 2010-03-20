@@ -47,7 +47,6 @@ import UniqSupply
 import Outputable
 import FastString
 import UniqFM
-import qualified LazyUniqFM as L
 import MonadUtils
 import Control.Monad	( zipWithM )
 import Data.List
@@ -555,7 +554,7 @@ data ScEnv = SCE { sc_size  :: Maybe Int,	-- Size threshold
 			-- Domain is OutIds (*after* applying the substitution)
 			-- Used even for top-level bindings (but not imported ones)
 
-                   sc_annotations :: L.UniqFM SpecConstrAnnotation
+                   sc_annotations :: UniqFM SpecConstrAnnotation
 	     }
 
 ---------------------
@@ -580,7 +579,7 @@ instance Outputable Value where
    ppr LambdaVal	 = ptext (sLit "<Lambda>")
 
 ---------------------
-initScEnv :: DynFlags -> L.UniqFM SpecConstrAnnotation -> ScEnv
+initScEnv :: DynFlags -> UniqFM SpecConstrAnnotation -> ScEnv
 initScEnv dflags anns
   = SCE { sc_size = specConstrThreshold dflags,
 	  sc_count = specConstrCount dflags,
@@ -689,7 +688,7 @@ extendCaseBndrs env case_bndr con alt_bndrs
 
 ignoreTyCon :: ScEnv -> TyCon -> Bool
 ignoreTyCon env tycon
-  = L.lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
+  = lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
 
 ignoreType :: ScEnv -> Type -> Bool
 ignoreType env ty
@@ -715,7 +714,7 @@ forceSpecArgTy env ty
 forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
   , tycon /= funTyCon
-      = L.lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
+      = lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False

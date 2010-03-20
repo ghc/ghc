@@ -430,7 +430,6 @@ Library
         GraphPpr
         IOEnv
         Interval
-        LazyUniqFM
         ListSetOps
         Maybes
         MonadUtils

@@ -28,7 +28,7 @@ import Var
 import Name
 import PrelNames
 import Module
-import LazyUniqFM
+import UniqFM
 import FastString
 import UniqSupply
 import FiniteMap

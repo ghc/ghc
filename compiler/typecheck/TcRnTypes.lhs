@@ -56,7 +56,7 @@ import NameSet
 import Var
 import VarEnv
 import Module
-import LazyUniqFM
+import UniqFM
 import SrcLoc
 import VarSet
 import ErrUtils

@@ -19,7 +19,7 @@ module Annotations (
 import Name
 import Module           ( Module )
 import Outputable
-import LazyUniqFM
+import UniqFM
 import Serialized
 import Unique
 

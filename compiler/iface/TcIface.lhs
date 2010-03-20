@@ -48,7 +48,7 @@ import NameEnv
 import OccurAnal	( occurAnalyseExpr )
 import Demand		( isBottomingSig )
 import Module
-import LazyUniqFM
+import UniqFM
 import UniqSupply
 import Outputable	
 import ErrUtils
