@@ -79,6 +79,7 @@ data Flag
   | Flag_WikiBaseURL   String
   | Flag_WikiModuleURL String
   | Flag_WikiEntityURL String
+  | Flag_Xhtml
   | Flag_Help
   | Flag_Verbosity String
   | Flag_Version
@@ -114,6 +115,7 @@ options backwardsCompat =
 --	"output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
+	Option []  ["xhtml"]  (NoArg Flag_Xhtml) "use experimental XHTML rendering",
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
     "output for Hoogle",

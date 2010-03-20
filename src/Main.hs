@@ -19,7 +19,8 @@
 module Main (main) where
 
 
-import Haddock.Backends.Html
+import qualified Haddock.Backends.Html as Html
+import qualified Haddock.Backends.Xhtml as Xhtml
 import Haddock.Backends.Hoogle
 import Haddock.Interface
 import Haddock.Lex
@@ -224,6 +225,13 @@ render flags ifaces installedIfaces = do
     packageStr       = Just (modulePackageString packageMod)
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
+    -- which HTML redering to use
+    pick htmlF xhtmlF = if (Flag_Xhtml `elem` flags) then xhtmlF else htmlF
+    ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex 
+    ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles 
+    ppHtmlContents  = pick Html.ppHtmlContents  Xhtml.ppHtmlContents 
+    ppHtml          = pick Html.ppHtml          Xhtml.ppHtml 
+    copyHtmlBits    = pick Html.copyHtmlBits    Xhtml.copyHtmlBits 
 
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title packageStr maybe_html_help_format

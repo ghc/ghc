@@ -61,9 +61,9 @@ check modules strict = do
 test = do
   contents <- getDirectoryContents "tests"
   args <- getArgs
-
+  let (opts, spec) = span ("-" `isPrefixOf`) args
   let mods =
-        case args of
+        case spec of
           x:_ | x /= "all" -> [x ++ ".hs"]
           _ -> filter ((==) ".hs" . takeExtension) contents
 
@@ -86,7 +86,7 @@ test = do
   let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
 
   putStrLn "Running tests..."
-  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w", base, process] ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w", base, process] ++ opts ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
   code <- waitForProcess handle
   when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)

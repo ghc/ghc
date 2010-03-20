@@ -1,0 +1,286 @@
+* {
+	margin: 0;
+	padding: 0;	
+}
+
+body { 
+  	background-color: #ffffff;
+  	color: #000000;
+  	font-size: 100%;
+	font-family: sans-serif;
+	padding: 8px;
+}
+
+a:link    { color: #0000e0; text-decoration: none }
+a:visited { color: #0000a0; text-decoration: none }
+a:hover   { background-color: #e0e0ff; text-decoration: none }
+
+/* <tt> font is a little too small in MSIE */
+tt  { font-size: 100%; }
+pre { font-size: 100%; }
+span.keyword { text-decoration: underline; }
+
+h1 {
+  padding-top: 15px;
+  font-weight: bold;
+  font-size: 150%
+  }
+
+h2 {
+  padding-top: 10px;
+  font-weight: bold;
+  font-size: 130%
+  }
+
+h3 {
+  padding-top: 5px;
+  font-weight: bold;
+  font-size: 110%
+  }
+
+h4 {
+  font-weight: bold;
+  font-size: 100%
+  }
+
+p  { 
+	padding-top: 2px;
+	padding-left: 10px;
+	margin-bottom: 1em;
+}
+
+pre  { 
+	padding-top: 2px;
+	padding-left: 20px;
+	margin-bottom: 1em;
+}
+
+h1 + p, h2 + p, h3 + p, h4 + p {
+	margin-top: 1em;
+}
+
+p.caption {
+	margin: 0;
+	padding: 0;
+}
+
+div.package-header {
+	color: #ffffff;
+	padding: 5px 5px 5px 31px;
+	margin: 0 0 1px;
+	background: #000099 url(haskell_icon.gif) no-repeat 5px 6px;
+	position: relative;
+}
+
+div.package-header a:link    { color: #ffffff }
+div.package-header a:visited { color: #ffff00 }
+div.package-header a:hover   { background-color: #6060ff; }
+div.package-header ul.links li:hover { background-color: #6060ff; }
+
+ul.links {
+	list-style: none;
+	text-align: left;
+	position: absolute;
+	right: 5px;
+	top: 5px;
+	display: inline-table;
+}
+
+ul.links li {
+	display: inline;
+	border-left-width: 1px;
+	border-left-color: #ffffff;
+	border-left-style: solid;
+	white-space: nowrap;
+	padding: 1px 5px;
+}
+
+div.module-header {
+	background-color: #0077dd;
+	padding: 5px;
+	position: relative;
+	height: 3em;
+}
+
+div.module-header p {
+	font-size: 200%;
+	height: 1.5em;
+	padding-top: .25em;
+}
+
+dl.info {
+	color: #ffffff;
+	display: block;
+	position: absolute;
+	top: 3px;
+	right: 5px;
+}
+
+dl.info dt {
+	float: left;
+	width: 5em;
+	font-weight: bold;
+	display: block;
+}
+
+dl.info dd {
+	display: block;
+	padding-left: 6em;
+}
+
+div.table-of-contents {
+	margin-top: 1em;
+	margin-bottom: 1em;
+}
+
+div.table-of-contents p {
+	font-weight: bold;
+}
+
+div.table-of-contents ul {
+	margin-top: 1em;
+	margin-bottom: 1em;
+	list-style-type: none;
+}
+
+div.table-of-contents ul ul {
+	margin-left: 2.5em;
+}
+
+ul.synopsis {
+	margin-top: 1em;
+	margin-bottom: 1em;
+}
+ul.synopsis li {
+  background-color: #f0f0f0; 
+  font-family: monospace;
+  vertical-align: top;
+	margin-top: 8px;
+	margin-bottom: 8px;
+	padding: 2px;
+	margin-left: 10px;
+	list-style-type: none;
+}
+
+
+p.decl {
+  padding: 3px;
+  background-color: #f0f0f0;
+  font-family: monospace;
+	margin-bottom: 0;
+}
+
+
+p.decl a.link {
+	float: right;
+	border-left-width: 1px;
+	border-left-color: #000099;
+	border-left-style: solid;
+	white-space: nowrap;
+	font-size: small;
+	padding: 0 4px 2px 5px;
+}
+
+p.arg {
+	margin-bottom: 0;
+}
+p.arg span {
+  background-color: #f0f0f0; 
+  font-family: monospace;
+  white-space: nowrap;
+	float: none;
+}
+
+p.inst-header {
+	font-weight: bold;
+	margin-bottom: 0;
+}
+
+p.inst-header img {
+	width : 0.75em; height: 0.75em; margin-bottom: 0; margin-right: 0.5em 
+}
+
+ul.int {
+	margin-top: 1em;
+	margin-bottom: 1em;
+}
+ul.inst li {
+  background-color: #f0f0f0; 
+  font-family: monospace;
+  vertical-align: top;
+	margin-top: 1px;
+	margin-bottom: 1px;
+	padding: 2px;
+	margin-left: 20px;
+	list-style-type: none;
+}
+
+
+
+div.bottom {
+  background-color: #000099;
+  color: #ffffff;
+  padding: 5px
+  }
+div.bottom  a:link {
+  color: #ffffff;
+  text-decoration: underline
+  }
+div.bottom  a:visited {
+  color: #ffff00
+  }
+div.bottom  a:hover {
+  background-color: #6060ff
+  }
+
+/* @group Original Selectors */
+
+/* --------- Contents page ---------- */
+
+div.node {
+  padding-left: 3em;
+}
+
+div.cnode {
+  padding-left: 1.75em;
+}
+
+span.pkg {
+  position: absolute;
+  left: 50em;
+}
+
+/* --------- Mini Synopsis for Frame View --------- */
+
+.outer {
+  margin: 0 0;
+  padding: 0 0;
+}
+
+.mini-synopsis {
+  padding: 0.25em 0.25em;
+}
+
+.mini-synopsis h1 { font-size: 130%; }
+.mini-synopsis h2 { font-size: 110%; }
+.mini-synopsis h3 { font-size: 100%; }
+.mini-synopsis h1, .mini-synopsis h2, .mini-synopsis h3 {
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+  padding: 0 0;
+}
+
+.mini-synopsis h1 { border-bottom: 1px solid #ccc; }
+
+.mini-topbar {
+  font-size: 130%;
+  background: #0077dd;
+  padding: 0.25em;
+}
+
+/* @end */
+
+
+
+
+

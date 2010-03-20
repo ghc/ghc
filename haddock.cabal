@@ -75,6 +75,7 @@ executable haddock
     pretty,
     containers,
     array,
+    xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.5,
     ghc >= 6.12 && < 6.14
 
