@@ -45,10 +45,14 @@ do
     shift
 done
 
-if [ "$CPUS" = "" ]; then
-    threads=2
+if [ "$THREADS" = "" ]; then
+    if [ "$CPUS" = "" ]; then
+        threads=2
+    else
+        threads=$(($CPUS + 1)) # `expr $CPUS + 1`
+    fi
 else
-    threads=$(($CPUS + 1)) # `expr $CPUS + 1`
+    threads="$THREADS"
 fi
 
 if [ $testsuite_only -eq 0 ]; then
