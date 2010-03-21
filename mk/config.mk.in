@@ -587,6 +587,8 @@ INSTALL			= @INSTALL@
 # 
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 LATEX			= latex
+PDFLATEX        = pdflatex
+BIBTEX          = bibtex
 HEVEA			= hevea
 HACHA			= hacha
 LN_S			= @LN_S@
