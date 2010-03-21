@@ -10,6 +10,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
+
 module Haddock.Backends.Xhtml.Names where
 
 import Haddock.Backends.Xhtml.Util

@@ -10,6 +10,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
+
 module Haddock.Backends.Xhtml.Decl where
 
 import Haddock.Backends.Xhtml.DocMarkup

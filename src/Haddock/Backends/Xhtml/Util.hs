@@ -10,6 +10,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
+
 module Haddock.Backends.Xhtml.Util where
 
 import Haddock.GhcUtils
