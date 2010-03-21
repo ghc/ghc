@@ -12,11 +12,12 @@ cabal04:
 	'$(TEST_HC)' -v0 --make Setup
 	$(SETUP) clean
 	$(SETUP) configure --with-ghc='$(TEST_HC)' $(PROF) $(DYN)
-	$(SETUP) build
+	$(SETUP) build 2> err
+	! grep -v "Creating library file" err
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean
 endif
 
 clean :
-	$(RM) -r *.o *.hi dist Setup$(exeext)
+	$(RM) -r *.o *.hi dist Setup$(exeext) err
 
