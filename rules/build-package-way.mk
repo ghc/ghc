@@ -73,15 +73,16 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 endif
 else
 # Build the ordinary .a library
+$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
+	"$$(RM)" $$(RM_OPTS) $$@ $$@.contents
 ifeq "$$($1_$2_SplitObjs)" "YES"
-$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
-	"$$(RM)" $$(RM_OPTS) $$@
-	(echo $$($1_$2_$3_NON_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)`; $$(FIND) $$(patsubst %.$$($3_osuf),%_$$($3_osuf)_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
+	$$(FIND) $$(patsubst %.$$($3_osuf),%_$$($3_osuf)_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print >> $$@.contents
+	echo $$($1_$2_$3_NON_HS_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` >> $$@.contents
 else
-$$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
-	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$($1_$2_$3_ALL_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
+	echo $$($1_$2_$3_ALL_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` >> $$@.contents
 endif
+	"$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ @$$@.contents
+	"$$(RM)" $$(RM_OPTS) $$@.contents
 endif
 
 $(call all-target,$1_$2,all_$1_$2_$3)
