@@ -111,8 +111,6 @@ $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $@
 	@echo "cGHC_PERL             :: String" >> $@
 	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $@
-	@echo "cEnableWin32DLLs      :: String" >> $@
-	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $@
 	@echo "cCONTEXT_DIFF         :: String" >> $@
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> $@
 	@echo "cUSER_WAY_NAMES       :: String" >> $@
