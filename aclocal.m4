@@ -372,10 +372,10 @@ AC_DEFUN([FP_PROG_AR],
 if test -z "$fp_prog_ar_raw"; then
   AC_MSG_ERROR([cannot find ar in your PATH, no idea how to make a library])
 fi
-fp_prog_ar=$fp_prog_ar_raw
+fp_prog_ar="$fp_prog_ar_raw"
 case $HostPlatform in
   *mingw32) if test x${OSTYPE} != xmsys; then
- 	      fp_prog_ar="`cygpath -w ${fp_prog_ar_raw} | sed -e 's@\\\\@/@g'`"
+ 	      fp_prog_ar="`cygpath -w "${fp_prog_ar_raw}" | sed -e 's@\\\\@/@g'`"
               AC_MSG_NOTICE([normalized ar command to $fp_prog_ar])
             fi
             ;;
@@ -389,7 +389,7 @@ esac
 AC_DEFUN([FP_PROG_AR_IS_GNU],
 [AC_REQUIRE([FP_PROG_AR])
 AC_CACHE_CHECK([whether $fp_prog_ar_raw is GNU ar], [fp_cv_prog_ar_is_gnu],
-[if $fp_prog_ar_raw --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
+[if "$fp_prog_ar_raw" --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
   fp_cv_prog_ar_is_gnu=yes
 else
   fp_cv_prog_ar_is_gnu=no
@@ -474,7 +474,7 @@ AC_CACHE_CHECK([whether $fp_prog_ar_raw supports -input], [fp_cv_prog_ar_support
 if test $fp_prog_ar_is_gnu = no; then
   rm -f conftest*
   touch conftest.lst
-  if FP_EVAL_STDERR([$fp_prog_ar_raw $fp_prog_ar_args conftest.a -input conftest.lst]) >/dev/null; then
+  if FP_EVAL_STDERR(["$fp_prog_ar_raw" $fp_prog_ar_args conftest.a -input conftest.lst]) >/dev/null; then
     test -s conftest.err || fp_cv_prog_ar_supports_input=yes
   fi
   rm -f conftest*
