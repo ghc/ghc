@@ -395,6 +395,7 @@ else
   fp_cv_prog_ar_is_gnu=no
 fi])
 fp_prog_ar_is_gnu=$fp_cv_prog_ar_is_gnu
+AC_SUBST([ArIsGNUAr], [`echo $fp_prog_ar_is_gnu | tr 'a-z' 'A-Z'`])
 ])# FP_PROG_AR_IS_GNU
 
 

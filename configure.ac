@@ -576,6 +576,7 @@ dnl If you can run configure, you certainly have /bin/sh
 AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
 
 dnl ** how to invoke `ar' and `ranlib'
+FP_PROG_AR_IS_GNU
 FP_PROG_AR_NEEDS_RANLIB
 FP_PROG_AR_SUPPORTS_INPUT
 

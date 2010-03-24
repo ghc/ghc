@@ -563,6 +563,7 @@ DLLTOOL			= inplace/mingw/bin/dlltool.exe
 AR			= @ArCmd@
 AR_OPTS			= @ArArgs@
 ArSupportsInput		= @ArSupportsInput@
+ArIsGNUAr = @ArIsGNUAr@
 # Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
 BASH                    = /usr/local/bin/bash
 
