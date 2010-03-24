@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 # Bootstrapping ghc-pkg
 
-utils/ghc-pkg_dist_PROG = ghc-pkg
+utils/ghc-pkg_dist_PROG = ghc-pkg$(exeext)
 
 ifeq "$(BootingFromHc)" "YES"
 
