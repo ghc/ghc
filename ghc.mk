@@ -760,7 +760,7 @@ TAGS: TAGS_compiler
 
 install: install_packages install_libs install_libexecs install_headers \
          install_libexec_scripts install_bins install_docs \
-		 install_topdirs install_topdir_scripts
+		 install_topdirs
 
 install_bins: $(INSTALL_BINS)
 	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
@@ -808,12 +808,6 @@ else
 # messages etc.
 	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/ghc-stage2" "$(DESTDIR)$(ghclibexecdir)/ghc"
 endif
-
-install_topdir_scripts: $(INSTALL_TOPDIR_SCRIPTS)
-	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
-	for i in $(INSTALL_TOPDIR_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(topdir)"; \
-	done
 
 install_topdirs: $(INSTALL_TOPDIRS)
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
@@ -920,6 +914,7 @@ $(eval $(call bindist,.,\
     $(INPLACE_BIN)/ghc-cabal \
     utils/ghc-pwd/ghc-pwd \
 	$(BINDIST_WRAPPERS) \
+	$(BINDIST_PERL_SOURCES) \
 	$(BINDIST_LIBS) \
 	$(BINDIST_HI) \
 	$(BINDIST_EXTRAS) \
@@ -932,7 +927,6 @@ $(eval $(call bindist,.,\
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
     $(INSTALL_TOPDIRS) \
-    $(INSTALL_TOPDIR_SCRIPTS) \
     $(INSTALL_BINS) \
     $(INSTALL_MANPAGES) \
     $(INSTALL_DOCS) \

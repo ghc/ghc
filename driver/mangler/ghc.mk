@@ -13,7 +13,7 @@
 driver/mangler_PERL_SRC  = ghc-asm.lprl
 driver/mangler_dist_PROG = $(GHC_MANGLER_PGM)
 driver/mangler_dist_TOPDIR = YES
+driver/mangler_dist_INSTALL_IN = $(DESTDIR)$(topdir)
 
 $(eval $(call build-perl,driver/mangler,dist))
 
-INSTALL_TOPDIR_SCRIPTS += driver/mangler/dist/$(GHC_MANGLER_PGM)

@@ -39,17 +39,27 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$(BINDIST)" "YES"
 $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$(UNLIT) | $$$$(dir $$$$@)/.
 	"$$(UNLIT)" $$(UNLIT_OPTS) $$< $$@
+endif
 
 $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
 	"$$(RM)" $$(RM_OPTS) $$@
 	echo '#!$$(PERL)'                                  >> $$@
 	echo '$$$$TARGETPLATFORM  = "$$(TARGETPLATFORM)";' >> $$@
 	cat $$<                                            >> $$@
-	$$(EXECUTABLE_FILE) $$@
 
 $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
 	"$$(CP)" $$< $$@
 	$$(EXECUTABLE_FILE) $$@
+
+ifneq "$$($1_$2_INSTALL_IN)" ""
+BINDIST_PERL_SOURCES += $1/$2/$$($1_$2_PROG).prl
+
+install: install_$1_$2
+
+.PHONY: install_$1_$2
+install_$1_$2: $1/$2/$$($1_$2_PROG)
+	$$(INSTALL_DIR) "$$($1_$2_INSTALL_IN)"
+	$$(INSTALL_SCRIPT) $$(INSTALL_OPTS) $$< "$$($1_$2_INSTALL_IN)"
 endif
 endif
 
