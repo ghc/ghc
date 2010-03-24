@@ -109,8 +109,6 @@ $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	@echo "cGHC_SYSMAN_PGM       = \"$(GHC_SYSMAN)\"" >> $@
 	@echo "cGHC_SYSMAN_DIR       :: String" >> $@
 	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $@
-	@echo "cGHC_CP               :: String" >> $@
-	@echo "cGHC_CP               = \"$(GHC_CP)\"" >> $@
 	@echo "cGHC_PERL             :: String" >> $@
 	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $@
 	@echo "cEnableWin32DLLs      :: String" >> $@
