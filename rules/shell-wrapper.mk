@@ -40,6 +40,7 @@ $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE)
 	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'       >> $$@
 	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'        >> $$@
 	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'     >> $$@
+	echo 'pgmgcc="$$(WhatGccIsCalled)"'            >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
 	cat $$($1_$2_SHELL_WRAPPER_NAME)               >> $$@
@@ -71,6 +72,7 @@ install_$1_$2_wrapper:
 	echo 'datadir="$$(datadir)"'                             >> "$$(WRAPPER)"
 	echo 'bindir="$$(bindir)"'                               >> "$$(WRAPPER)"
 	echo 'topdir="$$(topdir)"'                               >> "$$(WRAPPER)"
+	echo 'pgmgcc="$$(WhatGccIsCalled)"'                      >> "$$(WRAPPER)"
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INSTALL_SHELL_WRAPPER_EXTRA)
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"

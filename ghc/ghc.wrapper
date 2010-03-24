@@ -1,1 +1,1 @@
-exec "$executablename" -B"$topdir" ${1+"$@"}
+exec "$executablename" -B"$topdir" -pgmc "$pgmgcc" ${1+"$@"}

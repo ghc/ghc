@@ -62,8 +62,13 @@ dnl ** Find the path to sed **
 AC_PATH_PROG(SedCmd,sed)
 
 #
-dnl ** How to invoke cpp directly **
+dnl ** How to invoke gcc/cpp **
 #
+FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
+export CC
+WhatGccIsCalled="$CC"
+AC_SUBST(WhatGccIsCalled)
+
 FP_HAVE_GCC
 AC_PROG_CPP
 
