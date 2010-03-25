@@ -604,19 +604,14 @@ getCallMethod _ _ _ (LFCon con) n_args
   = ASSERT( n_args == 0 )
     ReturnCon con
 
-getCallMethod dflags name caf (LFThunk _ _ updatable std_form_info is_fun) n_args
+getCallMethod _dflags _name _caf (LFThunk _ _ _updatable _std_form_info is_fun) _n_args
   | is_fun 	-- it *might* be a function, so we must "call" it (which is
                 -- always safe)
   = SlowCall	-- We cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || doingTickyProfiling dflags -- to catch double entry
-      {- OLD: || opt_SMP
-	 I decided to remove this, because in SMP mode it doesn't matter
-	 if we enter the same thunk multiple times, so the optimisation
-	 of jumping directly to the entry code is still valid.  --SDM
-	-}
+  | otherwise
   = EnterIt
     -- We used to have ASSERT( n_args == 0 ), but actually it is
     -- possible for the optimiser to generate
@@ -625,9 +620,16 @@ getCallMethod dflags name caf (LFThunk _ _ updatable std_form_info is_fun) n_arg
     -- This happens as a result of the case-of-error transformation
     -- So the right thing to do is just to enter the thing
 
-  | otherwise	-- Jump direct to code for single-entry thunks
-  = ASSERT( n_args == 0 )
-    JumpToIt (thunkEntryLabel name caf std_form_info updatable)
+-- Old version:
+--  | updatable || doingTickyProfiling dflags -- to catch double entry
+--  = EnterIt
+--  | otherwise	-- Jump direct to code for single-entry thunks
+--  = JumpToIt (thunkEntryLabel name caf std_form_info updatable)
+--
+-- Now we never use JumpToIt, even if the thunk is single-entry, since
+-- the thunk may have already been entered and blackholed by another
+-- processor.
+
 
 getCallMethod _ _ _ (LFUnknown True) _
   = SlowCall -- Might be a function
@@ -946,6 +948,7 @@ closureLabelFromCI _ _ = panic "closureLabelFromCI"
 -- thunkEntryLabel is a local help function, not exported.  It's used from both
 -- entryLabelFromCI and getCallMethod.
 
+{- UNUSED:
 thunkEntryLabel :: Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
 thunkEntryLabel _thunk_id _ (ApThunk arity) is_updatable
   = enterApLabel is_updatable arity
@@ -953,16 +956,21 @@ thunkEntryLabel _thunk_id _ (SelectorThunk offset) upd_flag
   = enterSelectorLabel upd_flag offset
 thunkEntryLabel thunk_id caf _ _is_updatable
   = enterIdLabel thunk_id caf
+-}
 
+{- UNUSED:
 enterApLabel :: Bool -> Int -> CLabel
 enterApLabel is_updatable arity
   | tablesNextToCode = mkApInfoTableLabel is_updatable arity
   | otherwise        = mkApEntryLabel is_updatable arity
+-}
 
+{- UNUSED:
 enterSelectorLabel :: Bool -> Int -> CLabel
 enterSelectorLabel upd_flag offset
   | tablesNextToCode = mkSelectorInfoLabel upd_flag offset
   | otherwise        = mkSelectorEntryLabel upd_flag offset
+-}
 
 enterIdLabel :: Name -> CafInfo -> CLabel
 enterIdLabel id
