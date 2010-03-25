@@ -443,22 +443,32 @@ do_checks' :: CmmExpr -> CmmExpr -> Bool -> Bool -> CmmStmts -> CmmExpr -> Code
 do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
   = do	{ doGranAllocate hp_expr
 
-	-- Emit a block for the heap-check-failure code
-	; blk_id <- forkLabelledCode $ do
-			{ whenC hp_nonzero $
-				stmtC (CmmAssign (CmmGlobal HpAlloc) hp_expr)
+        -- The failure block: this saves the registers and jumps to
+        -- the appropriate RTS stub.
+        ; exit_blk_id <- forkLabelledCode $ do {
 			; emitStmts reg_save_code
 			; stmtC (CmmJump rts_lbl []) }
+
+	-- In the case of a heap-check failure, we must also set
+	-- HpAlloc.  NB. HpAlloc is *only* set if Hp has been
+	-- incremented by the heap check, it must not be set in the
+	-- event that a stack check failed, because the RTS stub will
+	-- retreat Hp by HpAlloc.
+	; hp_blk_id <- if hp_nonzero
+                          then forkLabelledCode $ do
+				  stmtC (CmmAssign (CmmGlobal HpAlloc) hp_expr)
+				  stmtC (CmmBranch exit_blk_id)
+                          else return exit_blk_id
 
 	-- Check for stack overflow *FIRST*; otherwise
 	-- we might bumping Hp and then failing stack oflo
 	; whenC stk_nonzero
-		(stmtC (CmmCondBranch stk_oflo blk_id))
+		(stmtC (CmmCondBranch stk_oflo exit_blk_id))
 
 	; whenC hp_nonzero
 		(stmtsC [CmmAssign hpReg 
 				(cmmOffsetExprB (CmmReg hpReg) hp_expr),
-		        CmmCondBranch hp_oflo blk_id]) 
+		        CmmCondBranch hp_oflo hp_blk_id])
 		-- Bump heap pointer, and test for heap exhaustion
 		-- Note that we don't move the heap pointer unless the 
 		-- stack check succeeds.  Otherwise we might end up
