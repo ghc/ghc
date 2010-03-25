@@ -480,7 +480,7 @@ newTempName :: DynFlags -> Suffix -> IO FilePath
 newTempName dflags extn
   = do d <- getTempDir dflags
        x <- getProcessID
-       findTempName (d ++ "/ghc" ++ show x ++ "_") 0
+       findTempName (d </> "ghc" ++ show x ++ "_") 0
   where
     findTempName :: FilePath -> Integer -> IO FilePath
     findTempName prefix x
