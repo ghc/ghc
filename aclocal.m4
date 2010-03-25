@@ -264,7 +264,7 @@ if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
    test "${HappyCmd}"    != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
-    HappyCmd=`cygpath -m ${HappyCmd}`
+    HappyCmd=`cygpath -m "${HappyCmd}"`
     AC_MSG_NOTICE([normalized happy command to $HappyCmd])
 fi
 
@@ -300,7 +300,7 @@ if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
    test "${AlexCmd}"     != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
-    AlexCmd=`cygpath -m ${AlexCmd}`
+    AlexCmd=`cygpath -m "${AlexCmd}"`
 fi
 
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
