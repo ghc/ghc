@@ -21,45 +21,55 @@ import LeaveCriticalSection;
 /* Stack/Heap Check Failure
  * ------------------------
  *
- * On discovering that a stack or heap check has failed, we do the following:
+ * Both heap and stack check failures end up in the same place, so
+ * that we can share the code for the failure case when a proc needs
+ * both a stack check and a heap check (a common case).
  *
- *    - If HpLim==0, indicating that we should context-switch, we yield
- *      to the scheduler (return ThreadYielding).
+ * So when we get here, we have to tell the difference between a stack
+ * check failure and a heap check failure.  The code for the checks
+ * looks like this:
+
+        if (Sp - 16 < SpLim) goto c1Tf;
+        Hp = Hp + 16;
+        if (Hp > HpLim) goto c1Th;
+        ...
+    c1Th:
+        HpAlloc = 16;
+        goto c1Tf;
+    c1Tf: jump stg_gc_enter_1 ();
+
+ * Note that Sp is not decremented by the check, whereas Hp is.  The
+ * reasons for this seem to be largely historic, I can't think of a
+ * good reason not to decrement Sp at the check too. (--SDM)
  *
- * Note that we must leave no slop in the heap (this is a requirement
- * for LDV profiling, at least), so if we just had a heap-check
- * failure, then we must retract Hp by HpAlloc.  How do we know
- * whether there was a heap-check failure?  HpLim might be zero, and
- * yet we got here as a result of a stack-check failure.  Hence, we
- * require that HpAlloc is only non-zero if there was a heap-check
- * failure, otherwise it is zero, so we can always safely subtract
- * HpAlloc from Hp.
+ * Note that HpLim may be set to zero arbitrarily by the timer signal
+ * or another processor to trigger a context switch via heap check
+ * failure.
  *
- * Hence, HpAlloc is zeroed in LOAD_THREAD_STATE().
+ * The job of these fragments (stg_gc_enter_1 and friends) is to
+ *   1. Leave no slop in the heap, so Hp must be retreated if it was
+ *      incremented by the check.  No-slop is a requirement for LDV
+ *      profiling, at least.
+ *   2. If a heap check failed, try to grab another heap block from
+ *      the nursery and continue.
+ *   3. otherwise, return to the scheduler with StackOverflow,
+ *      HeapOverflow, or ThreadYielding as appropriate.
  *
- *    - If the context_switch flag is set (the backup plan if setting HpLim
- *      to 0 didn't trigger a context switch), we yield to the scheduler
- *	(return ThreadYielding).
+ * We can tell whether Hp was incremented, because HpAlloc is
+ * non-zero: HpAlloc is required to be zero at all times unless a
+ * heap-check just failed, which is why the stack-check failure case
+ * does not set HpAlloc (see code fragment above).  So that covers (1).
+ * HpAlloc is zeroed in LOAD_THREAD_STATE().
  *
- *    - If Hp > HpLim, we've had a heap check failure.  This means we've
- *	come to the end of the current heap block, so we try to chain
- *	another block on with ExtendNursery().  
+ * If Hp > HpLim, then either (a) we have reached the end of the
+ * current heap block, or (b) HpLim == 0 and we should yield.  Hence
+ * check Hp > HpLim first, and then HpLim == 0 to decide whether to
+ * return ThreadYielding or try to grab another heap block from the
+ * nursery.
  *
- *	     - If this succeeds, we carry on without returning to the 
- *	       scheduler.  
- *
- *	     - If it fails, we return to the scheduler claiming HeapOverflow
- *	       so that a garbage collection can be performed.
- *
- *    - If Hp <= HpLim, it must have been a stack check that failed.  In
- *	which case, we return to the scheduler claiming StackOverflow, the
- *	scheduler will either increase the size of our stack, or raise
- *	an exception if the stack is already too big.
- *
- * The effect of checking for context switch only in the heap/stack check
- * failure code is that we'll switch threads after the current thread has
- * reached the end of its heap block.  If a thread isn't allocating
- * at all, it won't yield.  Hopefully this won't be a problem in practice.
+ * If Hp <= HpLim, then this must be a StackOverflow.  The scheduler
+ * will either increase the size of our stack, or raise an exception if
+ * the stack is already too big.
  */
  
 #define PRE_RETURN(why,what_next)			\
@@ -71,35 +81,35 @@ import LeaveCriticalSection;
  * ThreadRunGHC thread.
  */
 
-#define GC_GENERIC						\
-    DEBUG_ONLY(foreign "C" heapCheckFail());			\
-    if (Hp > HpLim) {						\
-        Hp = Hp - HpAlloc/*in bytes*/;				\
-        if (HpLim == 0) { \
-                R1 = ThreadYielding;				\
-                goto sched;					\
-        }						\
-        if (HpAlloc <= BLOCK_SIZE				\
-            && bdescr_link(CurrentNursery) != NULL) {		\
-            HpAlloc = 0;                                        \
-            CLOSE_NURSERY();					\
-            CurrentNursery = bdescr_link(CurrentNursery);	\
-            OPEN_NURSERY();					\
+#define GC_GENERIC                                                      \
+    DEBUG_ONLY(foreign "C" heapCheckFail());                            \
+    if (Hp > HpLim) {                                                   \
+        Hp = Hp - HpAlloc/*in bytes*/;                                  \
+        if (HpLim == 0) {                                               \
+                R1 = ThreadYielding;                                    \
+                goto sched;                                             \
+        }                                                               \
+        if (HpAlloc <= BLOCK_SIZE                                       \
+            && bdescr_link(CurrentNursery) != NULL) {                   \
+            HpAlloc = 0;                                                \
+            CLOSE_NURSERY();                                            \
+            CurrentNursery = bdescr_link(CurrentNursery);               \
+            OPEN_NURSERY();                                             \
             if (Capability_context_switch(MyCapability()) != 0 :: CInt) { \
-                R1 = ThreadYielding;				\
-                goto sched;					\
-            } else {						\
-                jump %ENTRY_CODE(Sp(0));			\
-            }							\
-	} else {						\
-            R1 = HeapOverflow;					\
-            goto sched;						\
-        }							\
-    } else {							\
-        R1 = StackOverflow;					\
-    }								\
-  sched:							\
-    PRE_RETURN(R1,ThreadRunGHC);				\
+                R1 = ThreadYielding;                                    \
+                goto sched;                                             \
+            } else {                                                    \
+                jump %ENTRY_CODE(Sp(0));                                \
+            }                                                           \
+	} else {                                                        \
+            R1 = HeapOverflow;                                          \
+            goto sched;                                                 \
+        }                                                               \
+    } else {                                                            \
+        R1 = StackOverflow;                                             \
+    }                                                                   \
+  sched:                                                                \
+    PRE_RETURN(R1,ThreadRunGHC);                                        \
     jump stg_returnToSched;
 
 #define HP_GENERIC				\
