@@ -161,9 +161,6 @@ hGetChar handle =
 -- ---------------------------------------------------------------------------
 -- hGetLine
 
--- ToDo: the unbuffered case is wrong: it doesn't lock the handle for
--- the duration.
-
 -- | Computation 'hGetLine' @hdl@ reads a line from the file or
 -- channel managed by @hdl@.
 --
