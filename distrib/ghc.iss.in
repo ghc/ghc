@@ -18,7 +18,7 @@ LicenseFile=distrib/windows-installer-licences.txt
 Source: "bindistprep\ghc-@ProjectVersion@\*"; DestDir: "{app}"; Flags: recursesubdirs
 
 [Icons]
-Name: "{group}\@ProjectVersion@\GHCi"; Filename: "{app}\bin\ghci.exe"
+Name: "{group}\@ProjectVersion@\GHCi"; Filename: "{app}\bin\ghci.exe"; WorkingDir: "{app}\bin"
 Name: "{group}\@ProjectVersion@\GHC Documentation"; Filename: "{app}\doc\html\index.html"
 Name: "{group}\@ProjectVersion@\GHC Library Documentation"; Filename: "{app}\doc\html\libraries\index.html"
 Name: "{group}\@ProjectVersion@\GHC Flag Reference"; Filename: "{app}\doc\html\users_guide\flag-reference.html"
