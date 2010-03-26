@@ -19,9 +19,9 @@ Source: "bindistprep\ghc-@ProjectVersion@\*"; DestDir: "{app}"; Flags: recursesu
 
 [Icons]
 Name: "{group}\@ProjectVersion@\GHCi"; Filename: "{app}\bin\ghci.exe"
-Name: "{group}\@ProjectVersion@\GHC Documentation"; Filename: "{app}\doc\index.html"
-Name: "{group}\@ProjectVersion@\GHC Library Documentation"; Filename: "{app}\doc\libraries\index.html"
-Name: "{group}\@ProjectVersion@\GHC Flag Reference"; Filename: "{app}\doc\users_guide\flag-reference.html"
+Name: "{group}\@ProjectVersion@\GHC Documentation"; Filename: "{app}\doc\html\index.html"
+Name: "{group}\@ProjectVersion@\GHC Library Documentation"; Filename: "{app}\doc\html\libraries\index.html"
+Name: "{group}\@ProjectVersion@\GHC Flag Reference"; Filename: "{app}\doc\html\users_guide\flag-reference.html"
 
 [Registry]
 ; set up icon associations
