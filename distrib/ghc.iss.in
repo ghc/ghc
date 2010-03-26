@@ -11,6 +11,7 @@ SolidCompression=yes
 PrivilegesRequired=none
 ChangesAssociations=yes
 ChangesEnvironment=yes
+LicenseFile=distrib/windows-installer-licences.txt
 
 
 [Files]
