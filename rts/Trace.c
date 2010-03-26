@@ -204,7 +204,7 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         debugBelch("cap %d: GC done\n", cap->no);
         break;
     default:
-        debugBelch("cap %2d: thread %lu: event %d\n\n", 
+        debugBelch("cap %d: thread %lu: event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
         break;
     }
@@ -244,7 +244,7 @@ static void traceCap_stderr(Capability *cap, char *msg, va_list ap)
     ACQUIRE_LOCK(&trace_utx);
 
     tracePreface();
-    debugBelch("cap %2d: ", cap->no);
+    debugBelch("cap %d: ", cap->no);
     vdebugBelch(msg,ap);
     debugBelch("\n");
 
