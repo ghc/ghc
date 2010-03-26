@@ -429,6 +429,7 @@ then
     if ! test -d inplace/mingw ||
          test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-g++*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/libcrypt*.tar.bz2 ||
          test inplace/mingw -ot ghc-tarballs/mingw/mingw-runtime*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.gz
@@ -441,6 +442,7 @@ then
             cd inplace/mingw &&
             tar -zxf ../../ghc-tarballs/mingw/binutils*.tar.gz &&
             tar -zxf ../../ghc-tarballs/mingw/gcc-core*.tar.gz &&
+            tar -zxf ../../ghc-tarballs/mingw/gcc-g++*.tar.gz &&
             tar -jxf ../../ghc-tarballs/mingw/libcrypt*.tar.bz2 &&
             tar -zxf ../../ghc-tarballs/mingw/mingw-runtime*.tar.gz &&
             tar -zxf ../../ghc-tarballs/mingw/w32api*.tar.gz &&
