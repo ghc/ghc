@@ -143,8 +143,15 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define FMT_Word64 "lu"
 #define FMT_Int64  "ld"
 #else
+#if defined(mingw32_HOST_OS)
+/* mingw doesn't understand %llu/%lld - it treats them as 32-bit
+   rather than 64-bit */
+#define FMT_Word64 "I64u"
+#define FMT_Int64  "I64d"
+#else
 #define FMT_Word64 "llu"
 #define FMT_Int64  "lld"
+#endif
 #endif
 
 /* -----------------------------------------------------------------------------
