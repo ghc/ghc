@@ -177,8 +177,8 @@ initStorage( void )
   allocNurseries();
 
   weak_ptr_list = NULL;
-  caf_list = NULL;
-  revertible_caf_list = NULL;
+  caf_list = END_OF_STATIC_LIST;
+  revertible_caf_list = END_OF_STATIC_LIST;
    
   /* initialise the allocate() interface */
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
@@ -231,9 +231,8 @@ freeStorage (void)
      
       - builds a BLACKHOLE in the heap
       - pushes an update frame pointing to the BLACKHOLE
-      - invokes UPD_CAF(), which:
-          - calls newCaf, below
-	  - updates the CAF with a static indirection to the BLACKHOLE
+      - calls newCaf, below
+      - updates the CAF with a static indirection to the BLACKHOLE
       
    Why do we build an BLACKHOLE in the heap rather than just updating
    the thunk directly?  It's so that we only need one kind of update

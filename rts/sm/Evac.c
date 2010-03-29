@@ -415,8 +415,7 @@ loop:
 	   * on the CAF list, so don't do anything with it here (we'll
 	   * scavenge it later).
 	   */
-	  if (((StgIndStatic *)q)->saved_info == NULL) {
-	      if (*IND_STATIC_LINK((StgClosure *)q) == NULL) {
+          if (*IND_STATIC_LINK((StgClosure *)q) == NULL) {
 #ifndef THREADED_RTS
 		  *IND_STATIC_LINK((StgClosure *)q) = gct->static_objects;
 		  gct->static_objects = (StgClosure *)q;
@@ -429,7 +428,6 @@ loop:
                       gct->static_objects = (StgClosure *)q;
                   }
 #endif
-	      }
 	  }
 	  return;
 	  
