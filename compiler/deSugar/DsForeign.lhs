@@ -488,6 +488,19 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   cResType | res_hty_is_unit = text "void"
 	   | otherwise	     = showStgType res_hty
 
+  -- when the return type is integral and word-sized or smaller, it
+  -- must be assigned as type ffi_arg (#3516).  To see what type
+  -- libffi is expecting here, take a look in its own testsuite, e.g.
+  -- libffi/testsuite/libffi.call/cls_align_ulonglong.c
+  ffi_cResType
+     | is_ffi_arg_type = text "ffi_arg"
+     | otherwise       = cResType
+     where
+       res_ty_key = getUnique (getName (typeTyCon res_hty))
+       is_ffi_arg_type = res_ty_key `notElem`
+              [floatTyConKey, doubleTyConKey,
+               int64TyConKey, word64TyConKey]
+
   -- Now we can cook up the prototype for the exported function.
   pprCconv = case cc of
 		CCallConv   -> empty
@@ -571,7 +584,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   ptext (sLit "rts_unlock(cap);")
      ,   ppUnless res_hty_is_unit $
          if libffi 
-                  then char '*' <> parens (cResType <> char '*') <> 
+                  then char '*' <> parens (ffi_cResType <> char '*') <>
                        ptext (sLit "resp = cret;")
                   else ptext (sLit "return cret;")
      , rbrace
@@ -608,11 +621,12 @@ showStgType :: Type -> SDoc
 showStgType t = text "Hs" <> text (showFFIType t)
 
 showFFIType :: Type -> String
-showFFIType t = getOccString (getName tc)
- where
-  tc = case tcSplitTyConApp_maybe (repType t) of
-	    Just (tc,_) -> tc
-	    Nothing	-> pprPanic "showFFIType" (ppr t)
+showFFIType t = getOccString (getName (typeTyCon t))
+
+typeTyCon :: Type -> TyCon
+typeTyCon ty = case tcSplitTyConApp_maybe (repType ty) of
+                 Just (tc,_) -> tc
+	         Nothing     -> pprPanic "DsForeign.typeTyCon" (ppr ty)
 
 insertRetAddr :: CCallConv -> [(SDoc, SDoc, Type, CmmType)]
                            -> [(SDoc, SDoc, Type, CmmType)]

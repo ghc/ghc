@@ -27,6 +27,7 @@ import Util
 import Cmm		( RawCmm )
 import HscTypes
 import DynFlags
+import Config
 
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
@@ -225,6 +226,10 @@ outputForeignStubs dflags mod location stubs
 	       concatMap mk_include (includes rts_pkg)
 	    mk_include i = "#include \"" ++ i ++ "\"\n"
 
+            -- wrapper code mentions the ffi_arg type, which comes from ffi.h
+            ffi_includes | cLibFFI   = "#include \"ffi.h\"\n"
+                         | otherwise = ""
+
 	stub_h_file_exists
            <- outputForeignStubs_help stub_h stub_h_output_w
 		("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
@@ -237,6 +242,7 @@ outputForeignStubs dflags mod location stubs
 		("#define IN_STG_CODE 0\n" ++ 
 		 "#include \"Rts.h\"\n" ++
 		 rts_includes ++
+		 ffi_includes ++
 		 cplusplus_hdr)
 		 cplusplus_ftr
 	   -- We're adding the default hc_header to the stub file, but this
