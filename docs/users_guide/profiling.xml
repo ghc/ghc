@@ -458,9 +458,10 @@ x = nfib 25
     <variablelist>
       <varlistentry>
 	<term>
-          <option>-p</option> or <option>-P</option>:
+          <option>-p</option> or <option>-P</option> or <option>-pa</option>:
           <indexterm><primary><option>-p</option></primary></indexterm>
           <indexterm><primary><option>-P</option></primary></indexterm>
+          <indexterm><primary><option>-pa</option></primary></indexterm>
           <indexterm><primary>time profile</primary></indexterm>
         </term>
 	<listitem>
@@ -472,8 +473,23 @@ x = nfib 25
 	  <para>The <option>-P</option> option produces a more
           detailed report containing the actual time and allocation
           data as well.  (Not used much.)</para>
+
+          <para>The <option>-pa</option> option produces the most detailed
+          report containing all cost centres in addition to the actual time
+          and allocation data.</para>
 	</listitem>
       </varlistentry>
+
+     <varlistentry>
+       <term><option>-V<replaceable>secs</replaceable></option>
+       <indexterm><primary><option>-V</option></primary><secondary>RTS
+       option</secondary></indexterm></term>
+       <listitem>
+         <para>Sets the interval that the RTS clock ticks at, which is
+         also the sampling interval of the time and allocation profile.
+         The default is 0.02&nbsp;second.</para>
+       </listitem>
+     </varlistentry>
 
       <varlistentry>
 	<term>
@@ -740,7 +756,8 @@ x = nfib 25
             0.1&nbsp;second).  Fractions are allowed: for example
             <option>-i0.2</option> will get 5 samples per second.
             This only affects heap profiling; time profiles are always
-            sampled on a 1/50 second frequency.</para>
+            sampled with the frequency of the RTS clock. See
+            <xref linkend="prof-time-options"/> for changing that.</para>
 	  </listitem>
 	</varlistentry>
 
