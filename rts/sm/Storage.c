@@ -268,7 +268,6 @@ freeStorage (void)
 void
 newCAF(StgRegTable *reg, StgClosure* caf)
 {
-#ifdef DYNAMIC
   if(keepCAFs)
   {
     // HACK:
@@ -289,12 +288,18 @@ newCAF(StgRegTable *reg, StgClosure* caf)
     RELEASE_SM_LOCK;
   }
   else
-#endif
   {
     // Put this CAF on the mutable list for the old generation.
     ((StgIndStatic *)caf)->saved_info = NULL;
     recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
   }
+}
+
+// External API for setting the keepCAFs flag. see #3900.
+void
+setKeepCAFs (void)
+{
+    keepCAFs = 1;
 }
 
 // An alternate version of newCaf which is used for dynamically loaded
