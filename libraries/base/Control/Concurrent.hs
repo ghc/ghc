@@ -482,7 +482,7 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 withThread :: IO a -> IO a
 withThread io = do
   m <- newEmptyMVar
-  _ <- forkIO $ try io >>= putMVar m
+  _ <- block $ forkIO $ try io >>= putMVar m
   x <- takeMVar m
   case x of
     Right a -> return a
