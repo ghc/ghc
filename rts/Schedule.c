@@ -1713,6 +1713,13 @@ forkProcess(HsStablePtr *entry
 		// exception, but we do want to raiseAsync() because these
 		// threads may be evaluating thunks that we need later.
 		deleteThread_(cap,t);
+
+                // stop the GC from updating the InCall to point to
+                // the TSO.  This is only necessary because the
+                // OSThread bound to the TSO has been killed, and
+                // won't get a chance to exit in the usual way (see
+                // also scheduleHandleThreadFinished).
+                t->bound = NULL;
 	    }
           }
 	}
