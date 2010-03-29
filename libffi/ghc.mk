@@ -66,7 +66,8 @@ endif
 
 BINDIST_STAMPS = libffi/stamp.ffi.build libfii/stamp.ffi.configure
 
-INSTALL_HEADERS   += libffi/dist-install/build/ffi.h
+INSTALL_HEADERS   += libffi/dist-install/build/ffi.h \
+		     libffi/dist-install/build/ffitarget.h
 libffi_STATIC_LIB  = libffi/dist-install/build/libffi.a
 INSTALL_LIBS      += libffi/dist-install/build/libHSffi.a \
                      libffi/dist-install/build/libHSffi_p.a \
@@ -153,6 +154,8 @@ $(libffi_STAMP_CONFIGURE):
 libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
 	"$(CP)" libffi/build/include/ffi.h $@
 
+libffi/dist-install/build/ffitarget.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
+	"$(CP)" libffi/build/include/ffitarget.h $@
 
 $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE) | libffi/dist-install/build/.
 	$(MAKE) -C libffi/build MAKEFLAGS=
