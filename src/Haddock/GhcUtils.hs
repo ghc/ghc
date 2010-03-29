@@ -31,7 +31,11 @@ import Packages
 import Module
 import RdrName (GlobalRdrEnv)
 import HscTypes
+#if __GLASGOW_HASKELL__ >= 613
 import UniqFM
+#else
+import LazyUniqFM
+#endif
 import GHC
 
 
