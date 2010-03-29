@@ -292,6 +292,7 @@ discardTasksExcept (Task *keep)
         }
     }
     all_tasks = keep;
+    keep->all_link = NULL;
     RELEASE_LOCK(&sched_mutex);
 }
 
