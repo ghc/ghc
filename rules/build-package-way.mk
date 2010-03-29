@@ -81,7 +81,7 @@ ifeq "$$($1_$2_SplitObjs)" "YES"
 else
 	echo $$($1_$2_$3_ALL_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` >> $$@.contents
 endif
-ifeq "$$(ArIsGNUAr)" "YES"
+ifeq "$$(ArSupportsAtFile)" "YES"
 	"$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ @$$@.contents
 else
 	"$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ < $$@.contents
