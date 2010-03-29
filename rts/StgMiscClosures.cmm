@@ -503,6 +503,10 @@ INFO_TABLE_CONSTR(stg_MSG_THROWTO,4,0,0,PRIM,"MSG_THROWTO","MSG_THROWTO")
 INFO_TABLE_CONSTR(stg_MSG_BLACKHOLE,3,0,0,PRIM,"MSG_BLACKHOLE","MSG_BLACKHOLE")
 { foreign "C" barf("MSG_BLACKHOLE object entered!") never returns; }
 
+// used to overwrite a MSG_THROWTO when the message has been used/revoked
+INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
+{ foreign "C" barf("MSG_NULL object entered!") never returns; }
+
 /* ----------------------------------------------------------------------------
    END_TSO_QUEUE
 

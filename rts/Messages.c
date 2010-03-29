@@ -114,11 +114,9 @@ loop:
 
         switch (r) {
         case THROWTO_SUCCESS:
-            ASSERT(t->source->sp[0] == (StgWord)&stg_block_throwto_info);
-            t->source->sp += 3;
-            unblockOne(cap, t->source);
             // this message is done
-            unlockClosure((StgClosure*)m, &stg_IND_info);
+            unlockClosure((StgClosure*)m, &stg_MSG_NULL_info);
+            tryWakeupThread(cap, t->source);
             break;
         case THROWTO_BLOCKED:
             // unlock the message
@@ -137,7 +135,7 @@ loop:
         }
         return;
     }
-    else if (i == &stg_IND_info)
+    else if (i == &stg_IND_info || i == &stg_MSG_NULL_info)
     {
         // message was revoked
         return;

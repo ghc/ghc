@@ -290,12 +290,31 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
         msg->tso = tso;
         sendMessage(cap, tso->cap, (Message*)msg);
+        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
+                      (lnat)tso->id, tso->cap->no);
         return;
     }
 #endif
 
     switch (tso->why_blocked)
     {
+    case BlockedOnMsgThrowTo:
+    {
+        const StgInfoTable *i;
+        
+        i = lockClosure(tso->block_info.closure);
+        unlockClosure(tso->block_info.closure, i);
+        if (i != &stg_MSG_NULL_info) {
+            debugTraceCap(DEBUG_sched, cap, "thread %ld still blocked on throwto (%p)",
+                          (lnat)tso->id, tso->block_info.throwto->header.info);
+            break; // still blocked
+        }
+
+        // remove the block frame from the stack
+        ASSERT(tso->sp[0] == (StgWord)&stg_block_throwto_info);
+        tso->sp += 3;
+        // fall through...
+    }
     case BlockedOnBlackHole:
     case BlockedOnSTM:
     {

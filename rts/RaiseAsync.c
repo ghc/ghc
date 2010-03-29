@@ -38,8 +38,6 @@ static void throwToSendMsg (Capability *cap USED_IF_THREADS,
                             Capability *target_cap USED_IF_THREADS, 
                             MessageThrowTo *msg USED_IF_THREADS);
 
-static void performBlockedException (Capability *cap, MessageThrowTo *msg);
-
 /* -----------------------------------------------------------------------------
    throwToSingleThreaded
 
@@ -148,7 +146,7 @@ suspendComputation(Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
                       unlockClosure(msg, &stg_MSG_THROWTO_info);
                       If it decides not to raise the exception after
                       all, it can revoke it safely with
-                      unlockClosure(msg, &stg_IND_info);
+                      unlockClosure(msg, &stg_MSG_NULL_info);
 
    -------------------------------------------------------------------------- */
 
@@ -326,8 +324,17 @@ check_target:
             }
         }
 
+        if (i == &stg_MSG_NULL_info) {
+            // we know there's a MSG_TRY_WAKEUP on the way, so we
+            // might as well just do it now.  The message will
+            // be a no-op when it arrives.
+            unlockClosure((StgClosure*)m, i);
+            tryWakeupThread(cap, target);
+            goto retry;
+        }
+
         if (i != &stg_MSG_THROWTO_info) {
-            // if it's an IND, this TSO has been woken up by another Cap
+            // if it's a MSG_NULL, this TSO has been woken up by another Cap
             unlockClosure((StgClosure*)m, i);
             goto retry;
         }
@@ -340,7 +347,7 @@ check_target:
         }
 
         // nobody else can wake up this TSO after we claim the message
-        unlockClosure((StgClosure*)m, &stg_IND_info);
+        unlockClosure((StgClosure*)m, &stg_MSG_NULL_info);
 
         raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
         return THROWTO_SUCCESS;
@@ -535,21 +542,21 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
         if (msg == END_BLOCKED_EXCEPTIONS_QUEUE) return 0;
         i = lockClosure((StgClosure*)msg);
         tso->blocked_exceptions = (MessageThrowTo*)msg->link;
-        if (i == &stg_IND_info) {
+        if (i == &stg_MSG_NULL_info) {
             unlockClosure((StgClosure*)msg,i);
             goto loop;
         }
 
-        performBlockedException(cap, msg);
-        unblockOne_(cap, msg->source, rtsFalse/*no migrate*/);
-        unlockClosure((StgClosure*)msg,&stg_IND_info);
+        throwToSingleThreaded(cap, msg->target, msg->exception);
+        unlockClosure((StgClosure*)msg,&stg_MSG_NULL_info);
+        tryWakeupThread(cap, msg->source);
         return 1;
     }
     return 0;
 }
 
 // awakenBlockedExceptionQueue(): Just wake up the whole queue of
-// blocked exceptions and let them try again.
+// blocked exceptions.
 
 void
 awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
@@ -560,30 +567,15 @@ awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
     for (msg = tso->blocked_exceptions; msg != END_BLOCKED_EXCEPTIONS_QUEUE;
          msg = (MessageThrowTo*)msg->link) {
         i = lockClosure((StgClosure *)msg);
-        if (i != &stg_IND_info) {
-            unblockOne_(cap, msg->source, rtsFalse/*no migrate*/);
+        if (i != &stg_MSG_NULL_info) {
+            unlockClosure((StgClosure *)msg,&stg_MSG_NULL_info);
+            tryWakeupThread(cap, msg->source);
+        } else {
+            unlockClosure((StgClosure *)msg,i);
         }
-        unlockClosure((StgClosure *)msg,i);
     }
     tso->blocked_exceptions = END_BLOCKED_EXCEPTIONS_QUEUE;
 }    
-
-static void
-performBlockedException (Capability *cap, MessageThrowTo *msg)
-{
-    StgTSO *source;
-
-    source = msg->source;
-
-    ASSERT(source->why_blocked == BlockedOnMsgThrowTo);
-    ASSERT(source->block_info.closure == (StgClosure *)msg);
-    ASSERT(source->sp[0] == (StgWord)&stg_block_throwto_info);
-    ASSERT(((StgTSO *)source->sp[1])->id == msg->target->id);
-    // check ids not pointers, because the thread might be relocated
-
-    throwToSingleThreaded(cap, msg->target, msg->exception);
-    source->sp += 3;
-}
 
 /* -----------------------------------------------------------------------------
    Remove a thread from blocking queues.
@@ -638,7 +630,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       // ASSERT(m->header.info == &stg_WHITEHOLE_info);
 
       // unlock and revoke it at the same time
-      unlockClosure((StgClosure*)m,&stg_IND_info);
+      unlockClosure((StgClosure*)m,&stg_MSG_NULL_info);
       break;
   }
 
