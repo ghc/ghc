@@ -377,7 +377,7 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
     lockTSO(tso);
     if (tso -> why_blocked == BlockedOnSTM) {
 	TRACE("unpark_tso on tso=%p", tso);
-	unblockOne(cap,tso);
+        tryWakeupThread(cap,tso);
     } else {
 	TRACE("spurious unpark_tso on tso=%p", tso);
     }

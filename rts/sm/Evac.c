@@ -139,7 +139,6 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
     nat i;
 
     to = alloc_for_copy(size,gen);
-    *p = TAG_CLOSURE(tag,(StgClosure*)to);
 
     from = (StgPtr)src;
     to[0] = (W_)info;
@@ -150,6 +149,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
     // if somebody else reads the forwarding pointer, we better make
     // sure there's a closure at the end of it.
     write_barrier();
+    *p = TAG_CLOSURE(tag,(StgClosure*)to);
     src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
@@ -166,7 +166,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
 
 /* Special version of copy() for when we only want to copy the info
  * pointer of an object, but reserve some padding after it.  This is
- * used to optimise evacuation of BLACKHOLEs.
+ * used to optimise evacuation of TSOs.
  */
 static rtsBool
 copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, 
@@ -195,7 +195,6 @@ spin:
 #endif
 
     to = alloc_for_copy(size_to_reserve, gen);
-    *p = (StgClosure *)to;
 
     from = (StgPtr)src;
     to[0] = info;
@@ -203,10 +202,9 @@ spin:
 	to[i] = from[i];
     }
     
-#if defined(PARALLEL_GC)
     write_barrier();
-#endif
     src->header.info = (const StgInfoTable*)MK_FORWARDING_PTR(to);
+    *p = (StgClosure *)to;
     
 #ifdef PROFILING
     // We store the size of the just evacuated object in the LDV word so that
@@ -366,7 +364,7 @@ loop:
   tag = GET_CLOSURE_TAG(q);
   q = UNTAG_CLOSURE(q);
 
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+  ASSERTM(LOOKS_LIKE_CLOSURE_PTR(q), "invalid closure, info=%p", q->header.info);
 
   if (!HEAP_ALLOCED_GC(q)) {
 
@@ -629,19 +627,40 @@ loop:
       copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen,tag);
       return;
 
+  case BLACKHOLE:
+  {
+      StgClosure *r;
+      const StgInfoTable *i;
+      r = ((StgInd*)q)->indirectee;
+      if (GET_CLOSURE_TAG(r) == 0) {
+          i = r->header.info;
+          if (IS_FORWARDING_PTR(i)) {
+              r = (StgClosure *)UN_FORWARDING_PTR(i);
+              i = r->header.info;
+          }
+          if (i == &stg_TSO_info
+              || i == &stg_WHITEHOLE_info 
+              || i == &stg_BLOCKING_QUEUE_CLEAN_info
+              || i == &stg_BLOCKING_QUEUE_DIRTY_info) {
+              copy(p,info,q,sizeofW(StgInd),gen);
+              return;
+          }
+          ASSERT(i != &stg_IND_info);
+      }
+      q = r;
+      *p = r;
+      goto loop;
+  }
+
+  case BLOCKING_QUEUE:
   case WEAK:
   case PRIM:
   case MUT_PRIM:
-      copy_tag(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen,tag);
+      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen);
       return;
 
   case BCO:
       copy(p,info,q,bco_sizeW((StgBCO *)q),gen);
-      return;
-
-  case CAF_BLACKHOLE:
-  case BLACKHOLE:
-      copyPart(p,q,BLACKHOLE_sizeW(),sizeofW(StgHeader),gen);
       return;
 
   case THUNK_SELECTOR:
@@ -756,11 +775,7 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
     prev = NULL;
     while (p)
     {
-#ifdef THREADED_RTS
         ASSERT(p->header.info == &stg_WHITEHOLE_info);
-#else
-        ASSERT(p->header.info == &stg_BLACKHOLE_info);
-#endif
         // val must be in to-space.  Not always: when we recursively
         // invoke eval_thunk_selector(), the recursive calls will not 
         // evacuate the value (because we want to select on the value,
@@ -783,7 +798,13 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
             // indirection pointing to itself, and we want the program
             // to deadlock if it ever enters this closure, so
             // BLACKHOLE is correct.
-            SET_INFO(p, &stg_BLACKHOLE_info);
+
+            // XXX we do not have BLACKHOLEs any more; replace with
+            // a THUNK_SELECTOR again.  This will go into a loop if it is
+            // entered, and should result in a NonTermination exception.
+            ((StgThunk *)p)->payload[0] = val;
+            write_barrier();
+            SET_INFO(p, &stg_sel_0_upd_info);
         } else {
             ((StgInd *)p)->indirectee = val;
             write_barrier();
@@ -813,7 +834,7 @@ eval_thunk_selector (StgClosure **q, StgSelector * p, rtsBool evac)
     prev_thunk_selector = NULL;
     // this is a chain of THUNK_SELECTORs that we are going to update
     // to point to the value of the current THUNK_SELECTOR.  Each
-    // closure on the chain is a BLACKHOLE, and points to the next in the
+    // closure on the chain is a WHITEHOLE, and points to the next in the
     // chain with payload[0].
 
 selector_chain:
@@ -851,7 +872,7 @@ selector_chain:
     }
 
 
-    // BLACKHOLE the selector thunk, since it is now under evaluation.
+    // WHITEHOLE the selector thunk, since it is now under evaluation.
     // This is important to stop us going into an infinite loop if
     // this selector thunk eventually refers to itself.
 #if defined(THREADED_RTS)
@@ -884,7 +905,7 @@ selector_chain:
 #else
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = (StgWord)p->header.info;
-    SET_INFO(p,&stg_BLACKHOLE_info);
+    SET_INFO(p,&stg_WHITEHOLE_info);
 #endif
 
     field = INFO_PTR_TO_STRUCT(info_ptr)->layout.selector_offset;
@@ -936,11 +957,7 @@ selector_loop:
               // the original selector thunk, p.
               SET_INFO(p, (StgInfoTable *)info_ptr);
               LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)p);
-#if defined(THREADED_RTS)
               SET_INFO(p, &stg_WHITEHOLE_info);
-#else
-              SET_INFO(p, &stg_BLACKHOLE_info);
-#endif
 #endif
 
               // the closure in val is now the "value" of the
@@ -998,6 +1015,33 @@ selector_loop:
           selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
 	  goto selector_loop;
 
+      case BLACKHOLE:
+      {
+          StgClosure *r;
+          const StgInfoTable *i;
+          r = ((StgInd*)selectee)->indirectee;
+
+          // establish whether this BH has been updated, and is now an
+          // indirection, as in evacuate().
+          if (GET_CLOSURE_TAG(r) == 0) {
+              i = r->header.info;
+              if (IS_FORWARDING_PTR(i)) {
+                  r = (StgClosure *)UN_FORWARDING_PTR(i);
+                  i = r->header.info;
+              }
+              if (i == &stg_TSO_info
+                  || i == &stg_WHITEHOLE_info 
+                  || i == &stg_BLOCKING_QUEUE_CLEAN_info
+                  || i == &stg_BLOCKING_QUEUE_DIRTY_info) {
+                  goto bale_out;
+              }
+              ASSERT(i != &stg_IND_info);
+          }
+
+          selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
+          goto selector_loop;
+      }
+
       case THUNK_SELECTOR:
       {
 	  StgClosure *val;
@@ -1032,8 +1076,6 @@ selector_loop:
       case THUNK_1_1:
       case THUNK_0_2:
       case THUNK_STATIC:
-      case CAF_BLACKHOLE:
-      case BLACKHOLE:
 	  // not evaluated yet 
 	  goto bale_out;
     

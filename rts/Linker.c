@@ -877,7 +877,10 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stable_ptr_table)			\
       SymI_HasProto(stackOverflow)			\
       SymI_HasProto(stg_CAF_BLACKHOLE_info)		\
+      SymI_HasProto(stg_BLACKHOLE_info)			\
       SymI_HasProto(__stg_EAGER_BLACKHOLE_info)		\
+      SymI_HasProto(stg_BLOCKING_QUEUE_CLEAN_info)      \
+      SymI_HasProto(stg_BLOCKING_QUEUE_DIRTY_info)	\
       SymI_HasProto(startTimer)                         \
       SymI_HasProto(stg_MVAR_CLEAN_info)		\
       SymI_HasProto(stg_MVAR_DIRTY_info)		\
@@ -941,6 +944,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_sel_8_upd_info)			\
       SymI_HasProto(stg_sel_9_upd_info)			\
       SymI_HasProto(stg_upd_frame_info)			\
+      SymI_HasProto(stg_bh_upd_frame_info)		\
       SymI_HasProto(suspendThread)			\
       SymI_HasProto(stg_takeMVarzh)			\
       SymI_HasProto(stg_threadStatuszh)		        \

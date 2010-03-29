@@ -306,7 +306,6 @@ checkClosure( StgClosure* p )
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
     case BLACKHOLE:
-    case CAF_BLACKHOLE:
     case PRIM:
     case MUT_PRIM:
     case MUT_VAR_CLEAN:
@@ -322,6 +321,23 @@ checkClosure( StgClosure* p )
 	    }
 	    return sizeW_fromITBL(info);
 	}
+
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+
+        // NO: the BH might have been updated now
+        // ASSERT(get_itbl(bq->bh)->type == BLACKHOLE);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
+
+        ASSERT(get_itbl(bq->owner)->type == TSO);
+        ASSERT(bq->queue == END_TSO_QUEUE || get_itbl(bq->queue)->type == TSO);
+        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
+               get_itbl(bq->link)->type == IND ||
+               get_itbl(bq->link)->type == BLOCKING_QUEUE);
+
+        return sizeofW(StgBlockingQueue);
+    }
 
     case BCO: {
 	StgBCO *bco = (StgBCO *)p;
@@ -516,6 +532,11 @@ checkTSO(StgTSO *tso)
       return;
     }
 
+    ASSERT(tso->_link == END_TSO_QUEUE || get_itbl(tso->_link)->type == TSO);
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->bq));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->blocked_exceptions));
+
     ASSERT(stack <= sp && sp < stack_end);
 
     checkStackChunk(sp, stack_end);
@@ -539,9 +560,7 @@ checkGlobalTSOList (rtsBool checkTSOs)
           if (checkTSOs)
               checkTSO(tso);
 
-          while (tso->what_next == ThreadRelocated) {
-              tso = tso->_link;
-          }
+          tso = deRefTSO(tso);
 
           // If this TSO is dirty and in an old generation, it better
           // be on the mutable list.

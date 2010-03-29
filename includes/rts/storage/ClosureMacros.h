@@ -129,6 +129,12 @@
    SET_HDR(c,info,costCentreStack);			\
    (c)->words = n_words;
 
+// Use when changing a closure from one kind to another
+#define OVERWRITE_INFO(c, new_info)                             \
+   LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)(c));       \
+   SET_INFO((c), (new_info));                                  \
+   LDV_RECORD_CREATE(c);
+
 /* -----------------------------------------------------------------------------
    How to get hold of the static link field for a static closure.
    -------------------------------------------------------------------------- */
@@ -249,7 +255,7 @@ INLINE_HEADER StgOffset THUNK_SELECTOR_sizeW ( void )
 { return sizeofW(StgSelector); }
 
 INLINE_HEADER StgOffset BLACKHOLE_sizeW ( void )
-{ return sizeofW(StgHeader)+MIN_PAYLOAD_SIZE; }
+{ return sizeofW(StgInd); } // a BLACKHOLE is a kind of indirection
 
 /* --------------------------------------------------------------------------
    Sizes of closures

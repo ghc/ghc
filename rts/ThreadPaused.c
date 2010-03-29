@@ -14,6 +14,7 @@
 #include "Updates.h"
 #include "RaiseAsync.h"
 #include "Trace.h"
+#include "Threads.h"
 
 #include <string.h> // for memmove()
 
@@ -75,7 +76,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
 		 * screw us up if we don't check.
 		 */
 		if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
-		    UPD_IND(cap, upd->updatee, updatee);
+                    updateThunk(cap, tso, upd->updatee, updatee);
 		}
 
 		// now mark this update frame as a stack gap.  The gap
@@ -196,7 +197,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     maybePerformBlockedException (cap, tso);
     if (tso->what_next == ThreadKilled) { return; }
 
-    // NB. Blackholing is *not* optional, we must either do lazy
+    // NB. Blackholing is *compulsory*, we must either do lazy
     // blackholing, or eager blackholing consistently.  See Note
     // [upd-black-hole] in sm/Scav.c.
 
@@ -229,8 +230,9 @@ threadPaused(Capability *cap, StgTSO *tso)
 #ifdef THREADED_RTS
         retry:
 #endif
-	    if (closure_flags[INFO_PTR_TO_STRUCT(bh_info)->type] & _IND
-                || bh_info == &stg_BLACKHOLE_info) {
+	    if (bh_info == &stg_BLACKHOLE_info ||
+                bh_info == &stg_WHITEHOLE_info)
+            {
 		debugTrace(DEBUG_squeeze,
 			   "suspending duplicate work: %ld words of stack",
 			   (long)((StgPtr)frame - tso->sp));
@@ -245,6 +247,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 		// the value to the frame underneath:
 		tso->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - 2;
 		tso->sp[1] = (StgWord)bh;
+                ASSERT(bh->header.info != &stg_TSO_info);
 		tso->sp[0] = (W_)&stg_enter_info;
 
 		// And continue with threadPaused; there might be
@@ -254,33 +257,40 @@ threadPaused(Capability *cap, StgTSO *tso)
                 continue;
 	    }
 
-	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
-		// zero out the slop so that the sanity checker can tell
-		// where the next closure is.
-		DEBUG_FILL_SLOP(bh);
-#ifdef PROFILING
-		// @LDV profiling
-		// We pretend that bh is now dead.
-		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
-#endif
-                // an EAGER_BLACKHOLE gets turned into a BLACKHOLE here.
+            // zero out the slop so that the sanity checker can tell
+            // where the next closure is.
+            DEBUG_FILL_SLOP(bh);
+
+            // @LDV profiling
+            // We pretend that bh is now dead.
+            LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+
+            // an EAGER_BLACKHOLE or CAF_BLACKHOLE gets turned into a
+            // BLACKHOLE here.
 #ifdef THREADED_RTS
-                cur_bh_info = (const StgInfoTable *)
-                    cas((StgVolatilePtr)&bh->header.info, 
-                        (StgWord)bh_info, 
-                        (StgWord)&stg_BLACKHOLE_info);
-
-                if (cur_bh_info != bh_info) {
-                    bh_info = cur_bh_info;
-                    goto retry;
-                }
-#else
-		SET_INFO(bh,&stg_BLACKHOLE_info);
+            // first we turn it into a WHITEHOLE to claim it, and if
+            // successful we write our TSO and then the BLACKHOLE info pointer.
+            cur_bh_info = (const StgInfoTable *)
+                cas((StgVolatilePtr)&bh->header.info, 
+                    (StgWord)bh_info, 
+                    (StgWord)&stg_WHITEHOLE_info);
+            
+            if (cur_bh_info != bh_info) {
+                bh_info = cur_bh_info;
+                goto retry;
+            }
 #endif
 
-		// We pretend that bh has just been created.
-		LDV_RECORD_CREATE(bh);
-	    }
+            // The payload of the BLACKHOLE points to the TSO
+            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
+            write_barrier();
+            SET_INFO(bh,&stg_BLACKHOLE_info);
+
+            // .. and we need a write barrier, since we just mutated the closure:
+            recordClosureMutated(cap,bh);
+
+            // We pretend that bh has just been created.
+            LDV_RECORD_CREATE(bh);
 	    
 	    frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
 	    if (prev_was_update_frame) {

@@ -474,7 +474,12 @@ emitBlackHoleCode is_single_entry = do
      then do
           tickyBlackHole (not is_single_entry)
           let bh_info = CmmReg (CmmGlobal EagerBlackholeInfo)
-	  stmtC (CmmStore (CmmReg nodeReg) bh_info)
+	  stmtsC [
+              CmmStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
+                       (CmmReg (CmmGlobal CurrentTSO)),
+              CmmCall (CmmPrim MO_WriteBarrier) [] [] CmmUnsafe CmmMayReturn,
+	      CmmStore (CmmReg nodeReg) bh_info
+            ]
      else
           nopC
 \end{code}
@@ -489,17 +494,23 @@ setupUpdate closure_info code
   = code
 
   | not (isStaticClosure closure_info)
-  = if closureUpdReqd closure_info
-    then do { tickyPushUpdateFrame;  pushUpdateFrame (CmmReg nodeReg) code }
-    else do { tickyUpdateFrameOmitted; code }
- 
+  = do
+   if not (closureUpdReqd closure_info)
+      then do tickyUpdateFrameOmitted; code
+      else do
+          tickyPushUpdateFrame
+          dflags <- getDynFlags
+          if not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+              then pushBHUpdateFrame (CmmReg nodeReg) code
+              else pushUpdateFrame   (CmmReg nodeReg) code
+  
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info
 
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
 		{ upd_closure <- link_caf closure_info True
-		; pushUpdateFrame upd_closure code }
+		; pushBHUpdateFrame upd_closure code }
 	  else do
 		{ -- krc: removed some ticky-related code here.
 		; tickyUpdateFrameOmitted
@@ -553,7 +564,8 @@ link_caf cl_info _is_upd = do
   { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
         blame_cc = use_cc
-  ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc []
+        tso      = CmmReg (CmmGlobal CurrentTSO)
+  ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc [(tso,fixedHdrSize)]
   ; hp_rel    <- getHpRelOffset hp_offset
 
 	-- Call the RTS function newCAF to add the CAF to the CafList

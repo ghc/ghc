@@ -44,6 +44,7 @@
 
 /* Stack frames */
 RTS_RET_INFO(stg_upd_frame_info);
+RTS_RET_INFO(stg_bh_upd_frame_info);
 RTS_RET_INFO(stg_marked_upd_frame_info);
 RTS_RET_INFO(stg_noupd_frame_info);
 RTS_RET_INFO(stg_catch_frame_info);
@@ -54,6 +55,7 @@ RTS_RET_INFO(stg_catch_stm_frame_info);
 RTS_RET_INFO(stg_unblockAsyncExceptionszh_ret_info);
 
 RTS_ENTRY(stg_upd_frame_ret);
+RTS_ENTRY(stg_bh_upd_frame_ret);
 RTS_ENTRY(stg_marked_upd_frame_ret);
 
 // RTS_FUN(stg_interp_constr_entry);
@@ -90,12 +92,12 @@ RTS_INFO(stg_IND_STATIC_info);
 RTS_INFO(stg_IND_PERM_info);
 RTS_INFO(stg_IND_OLDGEN_info);
 RTS_INFO(stg_IND_OLDGEN_PERM_info);
-RTS_INFO(stg_CAF_UNENTERED_info);
-RTS_INFO(stg_CAF_ENTERED_info);
-RTS_INFO(stg_WHITEHOLE_info);
 RTS_INFO(stg_BLACKHOLE_info);
-RTS_INFO(__stg_EAGER_BLACKHOLE_info);
 RTS_INFO(stg_CAF_BLACKHOLE_info);
+RTS_INFO(__stg_EAGER_BLACKHOLE_info);
+RTS_INFO(stg_WHITEHOLE_info);
+RTS_INFO(stg_BLOCKING_QUEUE_CLEAN_info);
+RTS_INFO(stg_BLOCKING_QUEUE_DIRTY_info);
 
 RTS_FUN_INFO(stg_BCO_info);
 RTS_INFO(stg_EVACUATED_info);
@@ -115,7 +117,9 @@ RTS_INFO(stg_MUT_VAR_CLEAN_info);
 RTS_INFO(stg_MUT_VAR_DIRTY_info);
 RTS_INFO(stg_END_TSO_QUEUE_info);
 RTS_INFO(stg_MSG_WAKEUP_info);
+RTS_INFO(stg_MSG_TRY_WAKEUP_info);
 RTS_INFO(stg_MSG_THROWTO_info);
+RTS_INFO(stg_MSG_BLACKHOLE_info);
 RTS_INFO(stg_MUT_CONS_info);
 RTS_INFO(stg_catch_info);
 RTS_INFO(stg_PAP_info);
@@ -142,12 +146,10 @@ RTS_ENTRY(stg_IND_STATIC_entry);
 RTS_ENTRY(stg_IND_PERM_entry);
 RTS_ENTRY(stg_IND_OLDGEN_entry);
 RTS_ENTRY(stg_IND_OLDGEN_PERM_entry);
-RTS_ENTRY(stg_CAF_UNENTERED_entry);
-RTS_ENTRY(stg_CAF_ENTERED_entry);
 RTS_ENTRY(stg_WHITEHOLE_entry);
 RTS_ENTRY(stg_BLACKHOLE_entry);
-RTS_ENTRY(__stg_EAGER_BLACKHOLE_entry);
 RTS_ENTRY(stg_CAF_BLACKHOLE_entry);
+RTS_ENTRY(__stg_EAGER_BLACKHOLE_entry);
 RTS_ENTRY(stg_BCO_entry);
 RTS_ENTRY(stg_EVACUATED_entry);
 RTS_ENTRY(stg_WEAK_entry);
@@ -166,7 +168,9 @@ RTS_ENTRY(stg_MUT_VAR_CLEAN_entry);
 RTS_ENTRY(stg_MUT_VAR_DIRTY_entry);
 RTS_ENTRY(stg_END_TSO_QUEUE_entry);
 RTS_ENTRY(stg_MSG_WAKEUP_entry);
+RTS_ENTRY(stg_MSG_TRY_WAKEUP_entry);
 RTS_ENTRY(stg_MSG_THROWTO_entry);
+RTS_ENTRY(stg_MSG_BLACKHOLE_entry);
 RTS_ENTRY(stg_MUT_CONS_entry);
 RTS_ENTRY(stg_catch_entry);
 RTS_ENTRY(stg_PAP_entry);
@@ -404,6 +408,8 @@ RTS_FUN(stg_PAP_apply);
 
 RTS_RET_INFO(stg_enter_info);
 RTS_ENTRY(stg_enter_ret);
+RTS_RET_INFO(stg_enter_checkbh_info);
+RTS_ENTRY(stg_enter_checkbh_ret);
 
 RTS_RET_INFO(stg_gc_void_info);
 RTS_ENTRY(stg_gc_void_ret);

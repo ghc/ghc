@@ -58,6 +58,7 @@ module CLabel (
 	mkSplitMarkerLabel,
 	mkDirty_MUT_VAR_Label,
 	mkUpdInfoLabel,
+	mkBHUpdInfoLabel,
 	mkIndStaticInfoLabel,
         mkMainCapabilityLabel,
 	mkMAP_FROZEN_infoLabel,
@@ -400,6 +401,7 @@ mkStaticConEntryLabel name  c     = IdLabel name c StaticConEntry
 mkSplitMarkerLabel		= CmmLabel rtsPackageId (fsLit "__stg_split_marker")	CmmCode
 mkDirty_MUT_VAR_Label		= CmmLabel rtsPackageId (fsLit "dirty_MUT_VAR")		CmmCode
 mkUpdInfoLabel			= CmmLabel rtsPackageId (fsLit "stg_upd_frame")		CmmInfo
+mkBHUpdInfoLabel		= CmmLabel rtsPackageId (fsLit "stg_bh_upd_frame" )     CmmInfo
 mkIndStaticInfoLabel		= CmmLabel rtsPackageId (fsLit "stg_IND_STATIC")	CmmInfo
 mkMainCapabilityLabel		= CmmLabel rtsPackageId (fsLit "MainCapability")	CmmData
 mkMAP_FROZEN_infoLabel		= CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo

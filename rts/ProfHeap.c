@@ -878,8 +878,8 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case IND_PERM:
 	    case IND_OLDGEN:
 	    case IND_OLDGEN_PERM:
-	    case CAF_BLACKHOLE:
 	    case BLACKHOLE:
+	    case BLOCKING_QUEUE:
 	    case FUN_1_0:
 	    case FUN_0_1:
 	    case FUN_1_1:

@@ -1204,11 +1204,7 @@ stg_takeMVarzh
 	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
       }
 
-#if defined(THREADED_RTS)
       unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-      SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
       RET_P(val);
   } 
   else
@@ -1216,11 +1212,7 @@ stg_takeMVarzh
       /* No further putMVars, MVar is now empty */
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
  
-#if defined(THREADED_RTS)
       unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-      SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
 
       RET_P(val);
   }
@@ -1279,21 +1271,13 @@ stg_tryTakeMVarzh
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
-#if defined(THREADED_RTS)
         unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-        SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
     }
     else 
     {
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-#if defined(THREADED_RTS)
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-	SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
     }
     
     RET_NP(1, val);
@@ -1360,11 +1344,7 @@ stg_putMVarzh
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
-#if defined(THREADED_RTS)
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-        SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     else
@@ -1372,11 +1352,7 @@ stg_putMVarzh
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = val;
 
-#if defined(THREADED_RTS)
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-	SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     
@@ -1429,22 +1405,14 @@ stg_tryPutMVarzh
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
-#if defined(THREADED_RTS)
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-        SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
     }
     else
     {
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = R2;
 
-#if defined(THREADED_RTS)
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
-#else
-	SET_INFO(mvar,stg_MVAR_DIRTY_info);
-#endif
     }
     
     RET_N(1);

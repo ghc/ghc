@@ -17,7 +17,7 @@ module CgStackery (
 	setStackFrame, getStackFrame,
 	mkVirtStkOffsets, mkStkAmodes,
 	freeStackSlots, 
-	pushUpdateFrame, emitPushUpdateFrame,
+	pushUpdateFrame, pushBHUpdateFrame, emitPushUpdateFrame,
     ) where
 
 #include "HsVersions.h"
@@ -265,6 +265,14 @@ to reflect the frame pushed.
 \begin{code}
 pushUpdateFrame :: CmmExpr -> Code -> Code
 pushUpdateFrame updatee code
+  = pushSpecUpdateFrame mkUpdInfoLabel updatee code
+
+pushBHUpdateFrame :: CmmExpr -> Code -> Code
+pushBHUpdateFrame updatee code
+  = pushSpecUpdateFrame mkBHUpdInfoLabel updatee code
+
+pushSpecUpdateFrame :: CLabel -> CmmExpr -> Code -> Code
+pushSpecUpdateFrame lbl updatee code
   = do	{
       when debugIsOn $ do
     	{ EndOfBlockInfo _ sequel <- getEndOfBlockInfo ;
@@ -277,15 +285,25 @@ pushUpdateFrame updatee code
 		-- The location of the lowest-address
 		-- word of the update frame itself
 
-	; setEndOfBlockInfo (EndOfBlockInfo vsp UpdateCode) $
-	    do	{ emitPushUpdateFrame frame_addr updatee
+                -- NB. we used to set the Sequel to 'UpdateCode' so
+                -- that we could jump directly to the update code if
+                -- we know that the next frame on the stack is an
+                -- update frame.  However, the RTS can sometimes
+                -- change an update frame into something else (see
+                -- e.g. Note [upd-black-hole] in rts/sm/Scav.c), so we
+                -- no longer make this assumption.
+	; setEndOfBlockInfo (EndOfBlockInfo vsp OnStack) $
+	    do	{ emitSpecPushUpdateFrame lbl frame_addr updatee
 		; code }
 	}
 
 emitPushUpdateFrame :: CmmExpr -> CmmExpr -> Code
-emitPushUpdateFrame frame_addr updatee = do
+emitPushUpdateFrame = emitSpecPushUpdateFrame mkUpdInfoLabel
+
+emitSpecPushUpdateFrame :: CLabel -> CmmExpr -> CmmExpr -> Code
+emitSpecPushUpdateFrame lbl frame_addr updatee = do
 	stmtsC [  -- Set the info word
-		  CmmStore frame_addr (mkLblExpr mkUpdInfoLabel)
+		  CmmStore frame_addr (mkLblExpr lbl)
 		, -- And the updatee
 		  CmmStore (cmmOffsetB frame_addr off_updatee) updatee ]
 	initUpdFrameProf frame_addr

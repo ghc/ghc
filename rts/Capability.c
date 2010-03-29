@@ -62,9 +62,8 @@ Capability * rts_unsafeGetMyCapability (void)
 STATIC_INLINE rtsBool
 globalWorkToDo (void)
 {
-    return blackholes_need_checking
-	|| sched_state >= SCHED_INTERRUPTING
-	;
+    return sched_state >= SCHED_INTERRUPTING
+        || recent_activity == ACTIVITY_INACTIVE; // need to check for deadlock
 }
 #endif
 
@@ -637,43 +636,6 @@ yieldCapability (Capability** pCap, Task *task)
 }
 
 /* ----------------------------------------------------------------------------
- * Wake up a thread on a Capability.
- *
- * This is used when the current Task is running on a Capability and
- * wishes to wake up a thread on a different Capability.
- * ------------------------------------------------------------------------- */
-
-void
-wakeupThreadOnCapability (Capability *cap,
-                          Capability *other_cap, 
-                          StgTSO *tso)
-{
-    MessageWakeup *msg;
-
-    // ASSUMES: cap->lock is held (asserted in wakeupThreadOnCapability)
-    if (tso->bound) {
-	ASSERT(tso->bound->task->cap == tso->cap);
-    	tso->bound->task->cap = other_cap;
-    }
-    tso->cap = other_cap;
-
-    ASSERT(tso->why_blocked != BlockedOnMsgWakeup || 
-           tso->block_info.closure->header.info == &stg_IND_info);
-
-    ASSERT(tso->block_info.closure->header.info != &stg_MSG_WAKEUP_info);
-
-    msg = (MessageWakeup*) allocate(cap, sizeofW(MessageWakeup));
-    msg->header.info = &stg_MSG_WAKEUP_info;
-    msg->tso = tso;
-    tso->block_info.closure = (StgClosure *)msg;
-    dirty_TSO(cap, tso);
-    write_barrier();
-    tso->why_blocked = BlockedOnMsgWakeup;
-
-    sendMessage(other_cap, (Message*)msg);
-}
-
-/* ----------------------------------------------------------------------------
  * prodCapability
  *
  * If a Capability is currently idle, wake up a Task on it.  Used to 
@@ -906,24 +868,3 @@ markCapabilities (evac_fn evac, void *user)
    Messages
    -------------------------------------------------------------------------- */
 
-#ifdef THREADED_RTS
-
-void sendMessage(Capability *cap, Message *msg)
-{
-    ACQUIRE_LOCK(&cap->lock);
-
-    msg->link = cap->inbox;
-    cap->inbox = msg;
-
-    if (cap->running_task == NULL) {
-	cap->running_task = myTask(); 
-            // precond for releaseCapability_()
-	releaseCapability_(cap,rtsFalse);
-    } else {
-        contextSwitchCapability(cap);
-    }
-
-    RELEASE_LOCK(&cap->lock);
-}
-
-#endif // THREADED_RTS

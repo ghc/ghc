@@ -210,21 +210,6 @@ traverseWeakPtrList(void)
           }
       }
         
-      /* Finally, we can update the blackhole_queue.  This queue
-       * simply strings together TSOs blocked on black holes, it is
-       * not intended to keep anything alive.  Hence, we do not follow
-       * pointers on the blackhole_queue until now, when we have
-       * determined which TSOs are otherwise reachable.  We know at
-       * this point that all TSOs have been evacuated, however.
-       */
-      { 
-	  StgTSO **pt;
-	  for (pt = &blackhole_queue; *pt != END_TSO_QUEUE; pt = &((*pt)->_link)) {
-	      *pt = (StgTSO *)isAlive((StgClosure *)*pt);
-	      ASSERT(*pt != NULL);
-	  }
-      }
-      
       weak_stage = WeakDone;  // *now* we're done,
       return rtsTrue;         // but one more round of scavenging, please
   }
@@ -306,49 +291,6 @@ static rtsBool tidyThreadList (generation *gen)
         }
     }
 
-    return flag;
-}
-
-/* -----------------------------------------------------------------------------
-   The blackhole queue
-   
-   Threads on this list behave like weak pointers during the normal
-   phase of garbage collection: if the blackhole is reachable, then
-   the thread is reachable too.
-   -------------------------------------------------------------------------- */
-rtsBool
-traverseBlackholeQueue (void)
-{
-    StgTSO *prev, *t, *tmp;
-    rtsBool flag;
-    nat type;
-
-    flag = rtsFalse;
-    prev = NULL;
-
-    for (t = blackhole_queue; t != END_TSO_QUEUE; prev=t, t = t->_link) {
-        // if the thread is not yet alive...
-	if (! (tmp = (StgTSO *)isAlive((StgClosure*)t))) {
-            // if the closure it is blocked on is either (a) a
-            // reachable BLAKCHOLE or (b) not a BLACKHOLE, then we
-            // make the thread alive.
-	    if (!isAlive(t->block_info.closure)) {
-                type = get_itbl(t->block_info.closure)->type;
-                if (type == BLACKHOLE || type == CAF_BLACKHOLE) {
-                    continue;
-                }
-            }
-            evacuate((StgClosure **)&t);
-            if (prev) {
-                prev->_link = t;
-            } else {
-                blackhole_queue = t;
-            }
-                 // no write barrier when on the blackhole queue,
-                 // because we traverse the whole queue on every GC.
-            flag = rtsTrue;
-	}
-    }
     return flag;
 }
 

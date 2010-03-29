@@ -201,6 +201,8 @@ void waitForReturnCapability (Capability **cap/*in/out*/, Task *task);
 
 INLINE_HEADER void recordMutableCap (StgClosure *p, Capability *cap, nat gen);
 
+INLINE_HEADER void recordClosureMutated (Capability *cap, StgClosure *p);
+
 #if defined(THREADED_RTS)
 
 // Gives up the current capability IFF there is a higher-priority
@@ -221,12 +223,6 @@ void yieldCapability (Capability** pCap, Task *task);
 // On return: pCap points to the capability.
 //
 void waitForCapability (Task *task, Mutex *mutex, Capability **pCap);
-
-// Wakes up a thread on a Capability (probably a different Capability
-// from the one held by the current Task).
-//
-void wakeupThreadOnCapability (Capability *my_cap, Capability *other_cap,
-                               StgTSO *tso);
 
 // Wakes up a worker thread on just one Capability, used when we
 // need to service some global event.
@@ -289,8 +285,6 @@ void traverseSparkQueues (evac_fn evac, void *user);
 
 INLINE_HEADER rtsBool emptyInbox(Capability *cap);;
 
-void sendMessage (Capability *cap, Message *msg);
-
 #endif // THREADED_RTS
 
 /* -----------------------------------------------------------------------------
@@ -315,6 +309,15 @@ recordMutableCap (StgClosure *p, Capability *cap, nat gen)
     }
     *bd->free++ = (StgWord)p;
 }
+
+INLINE_HEADER void
+recordClosureMutated (Capability *cap, StgClosure *p)
+{
+    bdescr *bd;
+    bd = Bdescr((StgPtr)p);
+    if (bd->gen_no != 0) recordMutableCap(p,cap,bd->gen_no);
+}
+
 
 #if defined(THREADED_RTS)
 INLINE_HEADER rtsBool

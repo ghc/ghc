@@ -107,7 +107,7 @@ initStorage( void )
    * doing something reasonable.
    */
   /* We use the NOT_NULL variant or gcc warns that the test is always true */
-  ASSERT(LOOKS_LIKE_INFO_PTR_NOT_NULL((StgWord)&stg_BLACKHOLE_info));
+  ASSERT(LOOKS_LIKE_INFO_PTR_NOT_NULL((StgWord)&stg_BLOCKING_QUEUE_CLEAN_info));
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
   ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
   
@@ -229,13 +229,13 @@ freeStorage (void)
 
    The entry code for every CAF does the following:
      
-      - builds a CAF_BLACKHOLE in the heap
-      - pushes an update frame pointing to the CAF_BLACKHOLE
+      - builds a BLACKHOLE in the heap
+      - pushes an update frame pointing to the BLACKHOLE
       - invokes UPD_CAF(), which:
           - calls newCaf, below
-	  - updates the CAF with a static indirection to the CAF_BLACKHOLE
+	  - updates the CAF with a static indirection to the BLACKHOLE
       
-   Why do we build a BLACKHOLE in the heap rather than just updating
+   Why do we build an BLACKHOLE in the heap rather than just updating
    the thunk directly?  It's so that we only need one kind of update
    frame - otherwise we'd need a static version of the update frame too.
 
@@ -699,11 +699,9 @@ void
 dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
     Capability *cap = regTableToCapability(reg);
-    bdescr *bd;
     if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
 	p->header.info = &stg_MUT_VAR_DIRTY_info;
-	bd = Bdescr((StgPtr)p);
-	if (bd->gen_no > 0) recordMutableCap(p,cap,bd->gen_no);
+        recordClosureMutated(cap,p);
     }
 }
 
@@ -716,11 +714,9 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    bdescr *bd;
     if (tso->dirty == 0 && (tso->flags & TSO_LINK_DIRTY) == 0) {
         tso->flags |= TSO_LINK_DIRTY;
-	bd = Bdescr((StgPtr)tso);
-	if (bd->gen_no > 0) recordMutableCap((StgClosure*)tso,cap,bd->gen_no);
+        recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->_link = target;
 }
@@ -728,10 +724,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
-    bdescr *bd;
     if (tso->dirty == 0 && (tso->flags & TSO_LINK_DIRTY) == 0) {
-	bd = Bdescr((StgPtr)tso);
-	if (bd->gen_no > 0) recordMutableCap((StgClosure*)tso,cap,bd->gen_no);
+        recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->dirty = 1;
 }
@@ -747,10 +741,7 @@ dirty_TSO (Capability *cap, StgTSO *tso)
 void
 dirty_MVAR(StgRegTable *reg, StgClosure *p)
 {
-    Capability *cap = regTableToCapability(reg);
-    bdescr *bd;
-    bd = Bdescr((StgPtr)p);
-    if (bd->gen_no > 0) recordMutableCap(p,cap,bd->gen_no);
+    recordClosureMutated(regTableToCapability(reg),p);
 }
 
 /* -----------------------------------------------------------------------------

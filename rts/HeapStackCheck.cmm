@@ -159,6 +159,24 @@ __stg_gc_enter_1
 }
 
 /* -----------------------------------------------------------------------------
+   stg_enter_checkbh is just like stg_enter, except that we also call
+   checkBlockingQueues().  The point of this is that the GC can
+   replace an stg_marked_upd_frame with an stg_enter_checkbh if it
+   finds that the BLACKHOLE has already been updated by another
+   thread.  It would be unsafe to use stg_enter, because there might
+   be an orphaned BLOCKING_QUEUE now.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET( stg_enter_checkbh, RET_SMALL, P_ unused)
+{
+    R1 = Sp(1);
+    Sp_adj(2);
+    foreign "C" checkBlockingQueues(MyCapability() "ptr",
+                                    CurrentTSO) [R1];
+    ENTER();
+}
+
+/* -----------------------------------------------------------------------------
    Heap checks in Primitive case alternatives
 
    A primitive case alternative is entered with a value either in 
@@ -593,11 +611,7 @@ INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, P_ unused1, P_ unused2 )
 // code fragment executed just before we return to the scheduler
 stg_block_putmvar_finally
 {
-#ifdef THREADED_RTS
     unlockClosure(R3, stg_MVAR_DIRTY_info);
-#else
-    SET_INFO(R3, stg_MVAR_DIRTY_info);
-#endif
     jump StgReturn;
 }
 
@@ -611,24 +625,12 @@ stg_block_putmvar
     BLOCK_BUT_FIRST(stg_block_putmvar_finally);
 }
 
-// code fragment executed just before we return to the scheduler
-stg_block_blackhole_finally
-{
-#if defined(THREADED_RTS)
-    // The last thing we do is release sched_lock, which is
-    // preventing other threads from accessing blackhole_queue and
-    // picking up this thread before we are finished with it.
-    RELEASE_LOCK(sched_mutex "ptr");
-#endif
-    jump StgReturn;
-}
-
 stg_block_blackhole
 {
     Sp_adj(-2);
     Sp(1) = R1;
     Sp(0) = stg_enter_info;
-    BLOCK_BUT_FIRST(stg_block_blackhole_finally);
+    BLOCK_GENERIC;
 }
 
 INFO_TABLE_RET( stg_block_throwto, RET_SMALL, P_ unused, P_ unused )

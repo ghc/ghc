@@ -46,17 +46,6 @@ static void scavenge_large_bitmap (StgPtr p,
    Scavenge a TSO.
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
-scavenge_TSO_link (StgTSO *tso)
-{
-    // We don't always chase the link field: TSOs on the blackhole
-    // queue are not automatically alive, so the link field is a
-    // "weak" pointer in that case.
-    if (tso->why_blocked != BlockedOnBlackHole) {
-        evacuate((StgClosure **)&tso->_link);
-    }
-}
-
 static void
 scavengeTSO (StgTSO *tso)
 {
@@ -87,7 +76,18 @@ scavengeTSO (StgTSO *tso)
 	) {
 	evacuate(&tso->block_info.closure);
     }
+#ifdef THREADED_RTS
+    // in the THREADED_RTS, block_info.closure must always point to a
+    // valid closure, because we assume this in throwTo().  In the
+    // non-threaded RTS it might be a FD (for
+    // BlockedOnRead/BlockedOnWrite) or a time value (BlockedOnDelay)
+    else {
+        tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
+    }
+#endif
+
     evacuate((StgClosure **)&tso->blocked_exceptions);
+    evacuate((StgClosure **)&tso->bq);
     
     // scavange current transaction record
     evacuate((StgClosure **)&tso->trec);
@@ -97,10 +97,10 @@ scavengeTSO (StgTSO *tso)
 
     if (gct->failed_to_evac) {
         tso->dirty = 1;
-        scavenge_TSO_link(tso);
+        evacuate((StgClosure **)&tso->_link);
     } else {
         tso->dirty = 0;
-        scavenge_TSO_link(tso);
+        evacuate((StgClosure **)&tso->_link);
         if (gct->failed_to_evac) {
             tso->flags |= TSO_LINK_DIRTY;
         } else {
@@ -570,6 +570,7 @@ scavenge_block (bdescr *bd)
       }
 	// fall through 
     case IND_OLDGEN_PERM:
+    case BLACKHOLE:
 	evacuate(&((StgInd *)p)->indirectee);
 	p += sizeofW(StgInd);
 	break;
@@ -588,10 +589,25 @@ scavenge_block (bdescr *bd)
 	p += sizeofW(StgMutVar);
 	break;
 
-    case CAF_BLACKHOLE:
-    case BLACKHOLE:
-	p += BLACKHOLE_sizeW();
-	break;
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+        
+	gct->eager_promotion = rtsFalse;
+        evacuate(&bq->bh);
+        evacuate((StgClosure**)&bq->owner);
+        evacuate((StgClosure**)&bq->queue);
+        evacuate((StgClosure**)&bq->link);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+	} else {
+	    bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+	}
+        p += sizeofW(StgBlockingQueue);
+        break;
+    }
 
     case THUNK_SELECTOR:
     { 
@@ -884,6 +900,7 @@ scavenge_mark_stack(void)
 
 	case IND_OLDGEN:
 	case IND_OLDGEN_PERM:
+        case BLACKHOLE:
 	    evacuate(&((StgInd *)p)->indirectee);
 	    break;
 
@@ -901,8 +918,25 @@ scavenge_mark_stack(void)
 	    break;
 	}
 
-	case CAF_BLACKHOLE:
-	case BLACKHOLE:
+        case BLOCKING_QUEUE:
+        {
+            StgBlockingQueue *bq = (StgBlockingQueue *)p;
+            
+            gct->eager_promotion = rtsFalse;
+            evacuate(&bq->bh);
+            evacuate((StgClosure**)&bq->owner);
+            evacuate((StgClosure**)&bq->queue);
+            evacuate((StgClosure**)&bq->link);
+            gct->eager_promotion = saved_eager_promotion;
+            
+            if (gct->failed_to_evac) {
+                bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            } else {
+                bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+            }
+            break;
+        }
+
 	case ARR_WORDS:
 	    break;
 
@@ -1122,10 +1156,25 @@ scavenge_one(StgPtr p)
 	break;
     }
 
-    case CAF_BLACKHOLE:
-    case BLACKHOLE:
-	break;
-	
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+        
+        gct->eager_promotion = rtsFalse;
+        evacuate(&bq->bh);
+        evacuate((StgClosure**)&bq->owner);
+        evacuate((StgClosure**)&bq->queue);
+        evacuate((StgClosure**)&bq->link);
+        gct->eager_promotion = saved_eager_promotion;
+        
+        if (gct->failed_to_evac) {
+            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+        } else {
+            bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+        }
+        break;
+    }
+
     case THUNK_SELECTOR:
     { 
 	StgSelector *s = (StgSelector *)p;
@@ -1239,6 +1288,7 @@ scavenge_one(StgPtr p)
         // on the large-object list and then gets updated.  See #3424.
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
+    case BLACKHOLE:
     case IND_STATIC:
 	evacuate(&((StgInd *)p)->indirectee);
 
@@ -1300,7 +1350,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 #ifdef DEBUG	    
 	    switch (get_itbl((StgClosure *)p)->type) {
 	    case MUT_VAR_CLEAN:
-		barf("MUT_VAR_CLEAN on mutable list");
+                // can happen due to concurrent writeMutVars
 	    case MUT_VAR_DIRTY:
 		mutlist_MUTVARS++; break;
 	    case MUT_ARR_PTRS_CLEAN:
@@ -1356,7 +1406,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                     // this assertion would be invalid:
                     // ASSERT(tso->flags & TSO_LINK_DIRTY);
 
-                    scavenge_TSO_link(tso);
+                    evacuate((StgClosure **)&tso->_link);
                     if (gct->failed_to_evac) {
                         recordMutableGen_GC((StgClosure *)p,gen->no);
                         gct->failed_to_evac = rtsFalse;
@@ -1576,10 +1626,12 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	// before GC, but that seems like overkill.
 	//
 	// Scavenging this update frame as normal would be disastrous;
-	// the updatee would end up pointing to the value.  So we turn
-	// the indirection into an IND_PERM, so that evacuate will
-	// copy the indirection into the old generation instead of
-	// discarding it.
+	// the updatee would end up pointing to the value.  So we
+	// check whether the value after evacuation is a BLACKHOLE,
+	// and if not, we change the update frame to an stg_enter
+	// frame that simply returns the value.  Hence, blackholing is
+        // compulsory (otherwise we would have to check for thunks
+        // too).
         //
         // Note [upd-black-hole]
         // One slight hiccup is that the THUNK_SELECTOR machinery can
@@ -1590,22 +1642,17 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         // the updatee is never a THUNK_SELECTOR and we're ok.
         // NB. this is a new invariant: blackholing is not optional.
     {
-        nat type;
-        const StgInfoTable *i;
-        StgClosure *updatee;
+        StgUpdateFrame *frame = (StgUpdateFrame *)p;
+        StgClosure *v;
 
-        updatee = ((StgUpdateFrame *)p)->updatee;
-        i = updatee->header.info;
-        if (!IS_FORWARDING_PTR(i)) {
-            type = get_itbl(updatee)->type;
-            if (type == IND) {
-                updatee->header.info = &stg_IND_PERM_info;
-            } else if (type == IND_OLDGEN) {
-                updatee->header.info = &stg_IND_OLDGEN_PERM_info;
-            }            
+        evacuate(&frame->updatee);
+        v = frame->updatee;
+        if (GET_CLOSURE_TAG(v) != 0 ||
+            (get_itbl(v)->type != BLACKHOLE)) {
+            // blackholing is compulsory, see above.
+            frame->header.info = (const StgInfoTable*)&stg_enter_checkbh_info;
         }
-        evacuate(&((StgUpdateFrame *)p)->updatee);
-        ASSERT(GET_CLOSURE_TAG(((StgUpdateFrame *)p)->updatee) == 0);
+        ASSERT(v->header.info != &stg_TSO_info);
         p += sizeofW(StgUpdateFrame);
         continue;
     }

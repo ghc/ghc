@@ -62,7 +62,7 @@
 #define UPDATE_FRAME	        38
 #define CATCH_FRAME	        39
 #define STOP_FRAME	        40
-#define CAF_BLACKHOLE		41
+#define BLOCKING_QUEUE		41
 #define BLACKHOLE	        42
 #define MVAR_CLEAN	        43
 #define MVAR_DIRTY	        44

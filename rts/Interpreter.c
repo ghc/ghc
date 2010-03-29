@@ -21,6 +21,7 @@
 #include "Disassembler.h"
 #include "Interpreter.h"
 #include "ThreadPaused.h"
+#include "Threads.h"
 
 #include <string.h>     /* for memcpy */
 #ifdef HAVE_ERRNO_H
@@ -443,7 +444,8 @@ do_return:
         // to a PAP by the GC, violating the invariant that PAPs
         // always contain a tagged pointer to the function.
 	INTERP_TICK(it_retto_UPDATE);
-	UPD_IND(cap, ((StgUpdateFrame *)Sp)->updatee, tagged_obj); 
+        updateThunk(cap, cap->r.rCurrentTSO, 
+                    ((StgUpdateFrame *)Sp)->updatee, tagged_obj);
 	Sp += sizeofW(StgUpdateFrame);
 	goto do_return;
 

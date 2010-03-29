@@ -46,6 +46,7 @@ typedef struct {
 /* Reason for thread being blocked. See comment above struct StgTso_. */
 typedef union {
   StgClosure *closure;
+  struct MessageBlackHole_ *bh;
   struct MessageThrowTo_ *throwto;
   struct MessageWakeup_  *wakeup;
   StgInt fd;	/* StgInt instead of int, so that it's the same size as the ptrs */
@@ -78,12 +79,17 @@ typedef struct StgTSO_ {
     */
     struct StgTSO_*         _link;
     /*
+      Currently used for linking TSOs on:
+      * cap->run_queue_{hd,tl}
+      * MVAR queue
+      * (non-THREADED_RTS); the blocked_queue
+      * and pointing to the relocated version of a ThreadRelocated
+
        NOTE!!!  do not modify _link directly, it is subject to
        a write barrier for generational GC.  Instead use the
        setTSOLink() function.  Exceptions to this rule are:
 
        * setting the link field to END_TSO_QUEUE
-       * putting a TSO on the blackhole_queue
        * setting the link field of the currently running TSO, as it
          will already be dirty.
     */
@@ -127,6 +133,12 @@ typedef struct StgTSO_ {
     */
     struct MessageThrowTo_ * blocked_exceptions;
 
+    /*
+      A list of StgBlockingQueue objects, representing threads blocked
+      on thunks that are under evaluation by this thread.
+    */
+    struct StgBlockingQueue_ *bq;
+
 #ifdef TICKY_TICKY
     /* TICKY-specific stuff would go here. */
 #endif
@@ -151,6 +163,18 @@ typedef struct StgTSO_ {
 
 void dirty_TSO  (Capability *cap, StgTSO *tso);
 void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
+
+// Apply to a TSO before looking at it if you are not sure whether it
+// might be ThreadRelocated or not (basically, that's most of the time
+// unless the TSO is the current TSO).
+//
+INLINE_HEADER StgTSO * deRefTSO(StgTSO *tso)
+{
+    while (tso->what_next == ThreadRelocated) {
+	tso = tso->_link;
+    }
+    return tso;
+}
 
 /* -----------------------------------------------------------------------------
    Invariants:

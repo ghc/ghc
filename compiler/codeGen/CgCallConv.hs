@@ -284,7 +284,6 @@ getSequelAmode
 	    OnStack -> do { sp_rel <- getSpRelOffset virt_sp
 			  ; returnFC (CmmLoad sp_rel bWord) }
 
-	    UpdateCode 	      -> returnFC (CmmLit (CmmLabel mkUpdInfoLabel))
 	    CaseAlts lbl _ _  -> returnFC (CmmLit (CmmLabel lbl))
 	}
 

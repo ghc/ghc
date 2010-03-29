@@ -395,13 +395,6 @@ SET_GCT(gc_threads[0]);
       // The other threads are now stopped.  We might recurse back to
       // here, but from now on this is the only thread.
       
-      // if any blackholes are alive, make the threads that wait on
-      // them alive too.
-      if (traverseBlackholeQueue()) {
-	  inc_running(); 
-	  continue;
-      }
-  
       // must be last...  invariant is that everything is fully
       // scavenged at this point.
       if (traverseWeakPtrList()) { // returns rtsTrue if evaced something 

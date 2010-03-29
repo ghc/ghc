@@ -23,7 +23,6 @@ extern StgTSO *exception_threads;
 void    initWeakForGC          ( void );
 rtsBool traverseWeakPtrList    ( void );
 void    markWeakPtrList        ( void );
-rtsBool traverseBlackholeQueue ( void );
 
 END_RTS_PRIVATE
 

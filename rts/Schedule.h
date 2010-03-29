@@ -86,15 +86,6 @@ extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
 extern  StgTSO *sleeping_queue;
 #endif
 
-/* Set to rtsTrue if there are threads on the blackhole_queue, and
- * it is possible that one or more of them may be available to run.
- * This flag is set to rtsFalse after we've checked the queue, and
- * set to rtsTrue just before we run some Haskell code.  It is used
- * to decide whether we should yield the Capability or not.
- * Locks required  : none (see scheduleCheckBlackHoles()).
- */
-extern rtsBool blackholes_need_checking;
-
 extern rtsBool heap_overflow;
 
 #if defined(THREADED_RTS)

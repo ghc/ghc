@@ -169,7 +169,6 @@ block.
 \begin{code}
 data Sequel
   = OnStack 		-- Continuation is on the stack
-  | UpdateCode		-- Continuation is update
 
   | CaseAlts
 	  CLabel     -- Jump to this; if the continuation is for a vectored

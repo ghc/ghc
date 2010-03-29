@@ -453,8 +453,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	// no child, no SRT
     case CONSTR_0_1:
     case CONSTR_0_2:
-    case CAF_BLACKHOLE:
-    case BLACKHOLE:
     case ARR_WORDS:
 	*first_child = NULL;
 	return;
@@ -470,6 +468,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case IND_PERM:
     case IND_OLDGEN_PERM:
     case IND_OLDGEN:
+    case BLACKHOLE:
 	*first_child = ((StgInd *)c)->indirectee;
 	return;
     case CONSTR_1_0:
@@ -916,8 +915,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    // no child (fixed), no SRT
 	case CONSTR_0_1:
 	case CONSTR_0_2:
-	case CAF_BLACKHOLE:
-	case BLACKHOLE:
 	case ARR_WORDS:
 	    // one child (fixed), no SRT
 	case MUT_VAR_CLEAN:
@@ -1059,13 +1056,11 @@ isRetainer( StgClosure *c )
     case FUN_0_2:
 	// partial applications
     case PAP:
-	// blackholes
-    case CAF_BLACKHOLE:
-    case BLACKHOLE:
 	// indirection
     case IND_PERM:
     case IND_OLDGEN_PERM:
     case IND_OLDGEN:
+    case BLACKHOLE:
 	// static objects
     case CONSTR_STATIC:
     case FUN_STATIC:

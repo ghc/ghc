@@ -16,11 +16,26 @@ BEGIN_RTS_PRIVATE
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
 
-void awakenBlockedQueue (Capability *cap, StgTSO *tso);
+void checkBlockingQueues (Capability *cap, StgTSO *tso);
+void wakeBlockingQueue   (Capability *cap, StgBlockingQueue *bq);
+void tryWakeupThread     (Capability *cap, StgTSO *tso);
+
+// Wakes up a thread on a Capability (probably a different Capability
+// from the one held by the current Task).
+//
+#ifdef THREADED_RTS
+void wakeupThreadOnCapability (Capability *cap,
+                               Capability *other_cap, 
+                               StgTSO *tso);
+#endif
+
+void updateThunk         (Capability *cap, StgTSO *tso,
+                          StgClosure *thunk, StgClosure *val);
 
 void removeThreadFromMVarQueue (Capability *cap, StgMVar *mvar, StgTSO *tso);
-void removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso);
-void removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, StgTSO *tso);
+
+rtsBool removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso);
+rtsBool removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, StgTSO *tso);
 
 StgBool isThreadBound (StgTSO* tso);
 

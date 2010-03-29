@@ -127,6 +127,14 @@ typedef struct {
     StgInfoTable *saved_info;
 } StgIndStatic;
 
+typedef struct StgBlockingQueue_ {
+    StgHeader   header;
+    struct StgBlockingQueue_ *link; // here so it looks like an IND
+    StgClosure *bh;  // the BLACKHOLE
+    StgTSO     *owner;
+    struct MessageBlackHole_ *queue;
+} StgBlockingQueue;
+
 typedef struct {
     StgHeader  header;
     StgWord    words;
@@ -433,10 +441,17 @@ typedef struct MessageWakeup_ {
 
 typedef struct MessageThrowTo_ {
     StgHeader   header;
-    Message    *link;
+    struct MessageThrowTo_ *link;
     StgTSO     *source;
     StgTSO     *target;
     StgClosure *exception;
 } MessageThrowTo;
+
+typedef struct MessageBlackHole_ {
+    StgHeader   header;
+    struct MessageBlackHole_ *link;
+    StgTSO     *tso;
+    StgClosure *bh;
+} MessageBlackHole;
 
 #endif /* RTS_STORAGE_CLOSURES_H */

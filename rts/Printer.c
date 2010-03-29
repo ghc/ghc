@@ -257,6 +257,12 @@ printClosure( StgClosure *obj )
             debugBelch(")\n"); 
             break;
 
+    case BLACKHOLE:
+            debugBelch("BLACKHOLE("); 
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
+            debugBelch(")\n"); 
+            break;
+
     /* Cannot happen -- use default case.
     case RET_BCO:
     case RET_SMALL:
@@ -295,14 +301,6 @@ printClosure( StgClosure *obj )
             debugBelch(")\n"); 
             break;
         }
-
-    case CAF_BLACKHOLE:
-            debugBelch("CAF_BH"); 
-            break;
-
-    case BLACKHOLE:
-            debugBelch("BH\n"); 
-            break;
 
     case ARR_WORDS:
         {
@@ -1122,8 +1120,8 @@ char *closure_type_names[] = {
  [UPDATE_FRAME]          = "UPDATE_FRAME",
  [CATCH_FRAME]           = "CATCH_FRAME",
  [STOP_FRAME]            = "STOP_FRAME",
- [CAF_BLACKHOLE]         = "CAF_BLACKHOLE",
  [BLACKHOLE]             = "BLACKHOLE",
+ [BLOCKING_QUEUE]        = "BLOCKING_QUEUE",
  [MVAR_CLEAN]            = "MVAR_CLEAN",
  [MVAR_DIRTY]            = "MVAR_DIRTY",
  [ARR_WORDS]             = "ARR_WORDS",

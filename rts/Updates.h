@@ -48,8 +48,7 @@ BEGIN_RTS_PRIVATE
   W_ sz;								\
   W_ i;									\
   inf = %GET_STD_INFO(p);						\
-  if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)				\
-	&& %INFO_TYPE(inf) != HALF_W_(CAF_BLACKHOLE)) {			\
+  if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)) {				\
       if (%INFO_TYPE(inf) == HALF_W_(THUNK_SELECTOR)) {			\
 	  sz = BYTES_TO_WDS(SIZEOF_StgSelector_NoThunkHdr);		\
      } else {								\
@@ -82,7 +81,6 @@ FILL_SLOP(StgClosure *p)
 
     switch (inf->type) {
     case BLACKHOLE:
-    case CAF_BLACKHOLE:
 	goto no_slop;
 	// we already filled in the slop when we overwrote the thunk
 	// with BLACKHOLE, and also an evacuated BLACKHOLE is only the
@@ -127,23 +125,21 @@ no_slop:
  */
 #ifdef CMINUSMINUS
 
-#define updateWithIndirection(ind_info, p1, p2, and_then)	\
+#define updateWithIndirection(p1, p2, and_then)	\
     W_ bd;							\
 								\
     DEBUG_FILL_SLOP(p1);					\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
     StgInd_indirectee(p1) = p2;					\
     prim %write_barrier() [];					\
+    SET_INFO(p1, stg_BLACKHOLE_info);                           \
+    LDV_RECORD_CREATE(p1);                                      \
     bd = Bdescr(p1);						\
     if (bdescr_gen_no(bd) != 0 :: bits16) {			\
       recordMutableCap(p1, TO_W_(bdescr_gen_no(bd)), R1);  	\
-      SET_INFO(p1, stg_IND_OLDGEN_info);			\
-      LDV_RECORD_CREATE(p1);					\
       TICK_UPD_OLD_IND();					\
       and_then;							\
     } else {							\
-      SET_INFO(p1, ind_info);					\
-      LDV_RECORD_CREATE(p1);					\
       TICK_UPD_NEW_IND();					\
       and_then;							\
   }
@@ -151,7 +147,6 @@ no_slop:
 #else /* !CMINUSMINUS */
 
 INLINE_HEADER void updateWithIndirection (Capability *cap, 
-                                          const StgInfoTable *ind_info, 
                                           StgClosure *p1, 
                                           StgClosure *p2)
 {
@@ -164,24 +159,18 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);
     ((StgInd *)p1)->indirectee = p2;
     write_barrier();
+    SET_INFO(p1, &stg_BLACKHOLE_info);
+    LDV_RECORD_CREATE(p1);
     bd = Bdescr((StgPtr)p1);
     if (bd->gen_no != 0) {
         recordMutableCap(p1, cap, bd->gen_no);
-        SET_INFO(p1, &stg_IND_OLDGEN_info);
         TICK_UPD_OLD_IND();
     } else {
-        SET_INFO(p1, ind_info);
-        LDV_RECORD_CREATE(p1);
         TICK_UPD_NEW_IND();
     }
 }
 
 #endif /* CMINUSMINUS */
-
-#define UPD_IND(cap, updclosure, heapptr)        \
-    updateWithIndirection(cap, &stg_IND_info,    \
-                          updclosure,            \
-                          heapptr)
 
 #ifndef CMINUSMINUS
 END_RTS_PRIVATE

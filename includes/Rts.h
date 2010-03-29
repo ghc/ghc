@@ -106,10 +106,18 @@ void _assertFail(const char *filename, unsigned int linenum)
 	else					\
 	    _assertFail(__FILE__, __LINE__)
 
+#define CHECKM(predicate, msg, ...)             \
+	if (predicate)				\
+	    /*null*/;				\
+	else					\
+            barf(msg, ##__VA_ARGS__)
+
 #ifndef DEBUG
 #define ASSERT(predicate) /* nothing */
+#define ASSERTM(predicate,msg,...) /* nothing */
 #else
 #define ASSERT(predicate) CHECK(predicate)
+#define ASSERTM(predicate,msg,...) CHECKM(predicate,msg,##__VA_ARGS__)
 #endif /* DEBUG */
 
 /* 

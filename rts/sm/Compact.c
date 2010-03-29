@@ -628,8 +628,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case IND_PERM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
-    case CAF_BLACKHOLE:
     case BLACKHOLE:
+    case BLOCKING_QUEUE:
     {
 	StgPtr end;
 	
@@ -966,9 +966,6 @@ compact(StgClosure *static_objects)
 
     // any threads resurrected during this GC
     thread((void *)&resurrected_threads);
-
-    // the blackhole queue
-    thread((void *)&blackhole_queue);
 
     // the task list
     {

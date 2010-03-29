@@ -140,7 +140,7 @@ processHeapClosureForDead( StgClosure *c )
     case FUN_1_1:
     case FUN_0_2:
     case BLACKHOLE:
-    case CAF_BLACKHOLE:
+    case BLOCKING_QUEUE:
     case IND_PERM:
     case IND_OLDGEN_PERM:
 	/*

@@ -76,8 +76,6 @@ handle_tick(int unused STG_UNUSED)
               ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
                   RtsFlags.MiscFlags.tickInterval;
               recent_activity = ACTIVITY_INACTIVE;
-              blackholes_need_checking = rtsTrue;
-              /* hack: re-use the blackholes_need_checking flag */
               wakeUpRts();
           }
       }

@@ -564,8 +564,8 @@ genApply regstatus args =
 --    else:
 	text "case AP,",
 	text "     AP_STACK,",
-	text "     CAF_BLACKHOLE,",
 	text "     BLACKHOLE,",
+	text "     WHITEHOLE,",
         text "     THUNK,",
         text "     THUNK_1_0,",
         text "     THUNK_0_1,",

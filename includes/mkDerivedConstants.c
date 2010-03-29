@@ -291,6 +291,7 @@ main(int argc, char *argv[])
     closure_field(StgTSO, trec);
     closure_field(StgTSO, flags);
     closure_field(StgTSO, dirty);
+    closure_field(StgTSO, bq);
     closure_field_("StgTSO_CCCS", StgTSO, prof.CCCS);
     tso_field(StgTSO, sp);
     tso_field_offset(StgTSO, stack);
@@ -381,6 +382,17 @@ main(int argc, char *argv[])
 
     closure_size(StgStableName);
     closure_field(StgStableName,sn);
+
+    closure_size(StgBlockingQueue);
+    closure_field(StgBlockingQueue, bh);
+    closure_field(StgBlockingQueue, owner);
+    closure_field(StgBlockingQueue, queue);
+    closure_field(StgBlockingQueue, link);
+
+    closure_size(MessageBlackHole);
+    closure_field(MessageBlackHole, link);
+    closure_field(MessageBlackHole, tso);
+    closure_field(MessageBlackHole, bh);
 
     struct_field_("RtsFlags_ProfFlags_showCCSOnException",
 		  RTS_FLAGS, ProfFlags.showCCSOnException);
