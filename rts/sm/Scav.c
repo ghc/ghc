@@ -69,10 +69,24 @@ scavengeTSO (StgTSO *tso)
     saved_eager = gct->eager_promotion;
     gct->eager_promotion = rtsFalse;
 
+
+    evacuate((StgClosure **)&tso->blocked_exceptions);
+    evacuate((StgClosure **)&tso->bq);
+    
+    // scavange current transaction record
+    evacuate((StgClosure **)&tso->trec);
+    
+    // scavenge this thread's stack 
+    scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+
+    tso->dirty = gct->failed_to_evac;
+
+    evacuate((StgClosure **)&tso->_link);
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnMsgWakeup
 	|| tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == NotBlocked
 	) {
 	evacuate(&tso->block_info.closure);
     }
@@ -86,26 +100,10 @@ scavengeTSO (StgTSO *tso)
     }
 #endif
 
-    evacuate((StgClosure **)&tso->blocked_exceptions);
-    evacuate((StgClosure **)&tso->bq);
-    
-    // scavange current transaction record
-    evacuate((StgClosure **)&tso->trec);
-    
-    // scavenge this thread's stack 
-    scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
-
-    if (gct->failed_to_evac) {
-        tso->dirty = 1;
-        evacuate((StgClosure **)&tso->_link);
+    if (tso->dirty == 0 && gct->failed_to_evac) {
+        tso->flags |= TSO_LINK_DIRTY;
     } else {
-        tso->dirty = 0;
-        evacuate((StgClosure **)&tso->_link);
-        if (gct->failed_to_evac) {
-            tso->flags |= TSO_LINK_DIRTY;
-        } else {
-            tso->flags &= ~TSO_LINK_DIRTY;
-        }
+        tso->flags &= ~TSO_LINK_DIRTY;
     }
 
     gct->eager_promotion = saved_eager;
@@ -1407,6 +1405,14 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                     // ASSERT(tso->flags & TSO_LINK_DIRTY);
 
                     evacuate((StgClosure **)&tso->_link);
+                    if (   tso->why_blocked == BlockedOnMVar
+                        || tso->why_blocked == BlockedOnBlackHole
+                        || tso->why_blocked == BlockedOnMsgWakeup
+                        || tso->why_blocked == BlockedOnMsgThrowTo
+                        || tso->why_blocked == NotBlocked
+                        ) {
+                        evacuate((StgClosure **)&tso->block_info.prev);
+                    }
                     if (gct->failed_to_evac) {
                         recordMutableGen_GC((StgClosure *)p,gen->no);
                         gct->failed_to_evac = rtsFalse;

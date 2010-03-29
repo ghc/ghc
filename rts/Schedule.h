@@ -118,8 +118,10 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
     ASSERT(tso->_link == END_TSO_QUEUE);
     if (cap->run_queue_hd == END_TSO_QUEUE) {
 	cap->run_queue_hd = tso;
+        tso->block_info.prev = END_TSO_QUEUE;
     } else {
 	setTSOLink(cap, cap->run_queue_tl, tso);
+        setTSOPrev(cap, tso, cap->run_queue_tl);
     }
     cap->run_queue_tl = tso;
     traceEventThreadRunnable (cap, tso);
@@ -135,6 +137,10 @@ EXTERN_INLINE void
 pushOnRunQueue (Capability *cap, StgTSO *tso)
 {
     setTSOLink(cap, tso, cap->run_queue_hd);
+    tso->block_info.prev = END_TSO_QUEUE;
+    if (cap->run_queue_hd != END_TSO_QUEUE) {
+        setTSOPrev(cap, cap->run_queue_hd, tso);
+    }
     cap->run_queue_hd = tso;
     if (cap->run_queue_tl == END_TSO_QUEUE) {
 	cap->run_queue_tl = tso;
@@ -149,12 +155,15 @@ popRunQueue (Capability *cap)
     StgTSO *t = cap->run_queue_hd;
     ASSERT(t != END_TSO_QUEUE);
     cap->run_queue_hd = t->_link;
+    cap->run_queue_hd->block_info.prev = END_TSO_QUEUE;
     t->_link = END_TSO_QUEUE; // no write barrier req'd
     if (cap->run_queue_hd == END_TSO_QUEUE) {
 	cap->run_queue_tl = END_TSO_QUEUE;
     }
     return t;
 }
+
+extern void removeFromRunQueue (Capability *cap, StgTSO *tso);
 
 /* Add a thread to the end of the blocked queue.
  */

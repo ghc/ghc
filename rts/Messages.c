@@ -244,7 +244,21 @@ loop:
         bq->link = owner->bq;
         owner->bq = bq;
         dirty_TSO(cap, owner); // we modified owner->bq
-        
+
+        // If the owner of the blackhole is currently runnable, then
+        // bump it to the front of the run queue.  This gives the
+        // blocked-on thread a little boost which should help unblock
+        // this thread, and may avoid a pile-up of other threads
+        // becoming blocked on the same BLACKHOLE (#3838).
+        //
+        // NB. we check to make sure that the owner is not the same as
+        // the current thread, since in that case it will not be on
+        // the run queue.
+        if (owner->why_blocked == NotBlocked && owner->id != msg->tso->id) {
+            removeFromRunQueue(cap, owner);
+            pushOnRunQueue(cap,owner);
+        }
+
         // point to the BLOCKING_QUEUE from the BLACKHOLE
         write_barrier(); // make the BQ visible
         ((StgInd*)bh)->indirectee = (StgClosure *)bq;
@@ -280,11 +294,17 @@ loop:
 
         if (info == &stg_BLOCKING_QUEUE_CLEAN_info) {
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
-            recordClosureMutated(cap,bq);
+            recordClosureMutated(cap,(StgClosure*)bq);
         }
 
         debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d", 
                       (lnat)msg->tso->id, (lnat)owner->id);
+
+        // See above, #3838
+        if (owner->why_blocked == NotBlocked && owner->id != msg->tso->id) {
+            removeFromRunQueue(cap, owner);
+            pushOnRunQueue(cap,owner);
+        }
 
         return 1; // blocked
     }

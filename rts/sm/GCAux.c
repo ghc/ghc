@@ -119,7 +119,8 @@ revertCAFs( void )
 {
     StgIndStatic *c;
 
-    for (c = (StgIndStatic *)revertible_caf_list; c != NULL; 
+    for (c = (StgIndStatic *)revertible_caf_list; 
+         c != (StgIndStatic *)END_OF_STATIC_LIST; 
 	 c = (StgIndStatic *)c->static_link) 
     {
 	SET_INFO(c, c->saved_info);

@@ -331,7 +331,8 @@ checkClosure( StgClosure* p )
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
 
         ASSERT(get_itbl(bq->owner)->type == TSO);
-        ASSERT(bq->queue == END_TSO_QUEUE || get_itbl(bq->queue)->type == TSO);
+        ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE 
+               || get_itbl(bq->queue)->type == TSO);
         ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
                get_itbl(bq->link)->type == IND ||
                get_itbl(bq->link)->type == BLOCKING_QUEUE);
@@ -745,6 +746,18 @@ findMemoryLeak (void)
   reportUnmarkedBlocks();
 }
 
+void
+checkRunQueue(Capability *cap)
+{
+    StgTSO *prev, *tso;
+    prev = END_TSO_QUEUE;
+    for (tso = cap->run_queue_hd; tso != END_TSO_QUEUE; 
+         prev = tso, tso = tso->_link) {
+        ASSERT(prev == END_TSO_QUEUE || prev->_link == tso);
+        ASSERT(tso->block_info.prev == prev);
+    }
+    ASSERT(cap->run_queue_tl == prev);
+}
 
 /* -----------------------------------------------------------------------------
    Memory leak detection

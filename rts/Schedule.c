@@ -158,17 +158,6 @@ static void deleteAllThreads (Capability *cap);
 static void deleteThread_(Capability *cap, StgTSO *tso);
 #endif
 
-/* -----------------------------------------------------------------------------
- * Putting a thread on the run queue: different scheduling policies
- * -------------------------------------------------------------------------- */
-
-STATIC_INLINE void
-addToRunQueue( Capability *cap, StgTSO *t )
-{
-    // this does round-robin scheduling; good for concurrency
-    appendToRunQueue(cap,t);
-}
-
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
 
@@ -568,6 +557,30 @@ run_thread:
   } /* end of while() */
 }
 
+/* -----------------------------------------------------------------------------
+ * Run queue operations
+ * -------------------------------------------------------------------------- */
+
+void
+removeFromRunQueue (Capability *cap, StgTSO *tso)
+{
+    if (tso->block_info.prev == END_TSO_QUEUE) {
+        ASSERT(cap->run_queue_hd == tso);
+        cap->run_queue_hd = tso->_link;
+    } else {
+        setTSOLink(cap, tso->block_info.prev, tso->_link);
+    }
+    if (tso->_link == END_TSO_QUEUE) {
+        ASSERT(cap->run_queue_tl == tso);
+        cap->run_queue_tl = tso->block_info.prev;
+    } else {
+        setTSOPrev(cap, tso->_link, tso->block_info.prev);
+    }
+    tso->_link = tso->block_info.prev = END_TSO_QUEUE;
+
+    IF_DEBUG(sanity, checkRunQueue(cap));
+}
+
 /* ----------------------------------------------------------------------------
  * Setting up the scheduler loop
  * ------------------------------------------------------------------------- */
@@ -743,12 +756,14 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    || t->bound == task->incall // don't move my bound thread
 		    || tsoLocked(t)) {  // don't move a locked thread
 		    setTSOLink(cap, prev, t);
+                    setTSOPrev(cap, t, prev);
 		    prev = t;
 		} else if (i == n_free_caps) {
 		    pushed_to_all = rtsTrue;
 		    i = 0;
 		    // keep one for us
 		    setTSOLink(cap, prev, t);
+                    setTSOPrev(cap, t, prev);
 		    prev = t;
 		} else {
 		    appendToRunQueue(free_caps[i],t);
@@ -761,6 +776,8 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		}
 	    }
 	    cap->run_queue_tl = prev;
+
+            IF_DEBUG(sanity, checkRunQueue(cap));
 	}
 
 #ifdef SPARK_PUSHING
@@ -1093,7 +1110,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
         // context switch flag, and we end up waiting for a GC.
         // See #1984, and concurrent/should_run/1984
         cap->context_switch = 0;
-        addToRunQueue(cap,t);
+        appendToRunQueue(cap,t);
     } else {
         pushOnRunQueue(cap,t);
     }
@@ -1162,7 +1179,7 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
 	     //debugBelch("&& Doing sanity check on yielding TSO %ld.", t->id);
 	     checkTSO(t));
 
-    addToRunQueue(cap,t);
+    appendToRunQueue(cap,t);
 
     return rtsFalse;
 }

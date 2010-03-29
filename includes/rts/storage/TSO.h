@@ -46,6 +46,7 @@ typedef struct {
 /* Reason for thread being blocked. See comment above struct StgTso_. */
 typedef union {
   StgClosure *closure;
+  StgTSO *prev; // a back-link when the TSO is on the run queue (NotBlocked)
   struct MessageBlackHole_ *bh;
   struct MessageThrowTo_ *throwto;
   struct MessageWakeup_  *wakeup;
@@ -163,6 +164,7 @@ typedef struct StgTSO_ {
 
 void dirty_TSO  (Capability *cap, StgTSO *tso);
 void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
+void setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target);
 
 // Apply to a TSO before looking at it if you are not sure whether it
 // might be ThreadRelocated or not (basically, that's most of the time
