@@ -22,7 +22,7 @@ do
             mkdir "libraries/$p"
             (
                 cd "libraries/$p"
-                tar -zxf ../../$tarball
+                cat ../../$tarball | gzip -d | tar xf -
                 mv */* .
             )
             touch "$stamp"
