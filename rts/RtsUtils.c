@@ -138,8 +138,8 @@ static void addAllocation(void *addr, size_t len) {
         /* This doesn't actually help as we haven't looked at the flags
          * at the time that it matters (while running constructors) */
         IF_DEBUG(sanity,
-                 debugBelch("Ignoring allocation %p %zd as allocs is NULL\n",
-                            addr, len);)
+                 debugBelch("Ignoring allocation %p %d as allocs is NULL\n",
+                            addr, (int)len);)
     }
 }
 
