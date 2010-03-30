@@ -26,37 +26,39 @@
 #  define RTS_THUNK_INFO(i) extern W_(i)[]
 #  define RTS_INFO(i)       extern W_(i)[]
 #  define RTS_CLOSURE(i)    extern W_(i)[]
-#  define RTS_FUN(f)	    extern DLL_IMPORT_RTS StgFunPtr f(void)
+#  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #else
 #  define RTS_RET_INFO(i)   extern DLL_IMPORT_RTS const StgRetInfoTable i
 #  define RTS_FUN_INFO(i)   extern DLL_IMPORT_RTS const StgFunInfoTable i
 #  define RTS_THUNK_INFO(i) extern DLL_IMPORT_RTS const StgThunkInfoTable i
 #  define RTS_INFO(i)       extern DLL_IMPORT_RTS const StgInfoTable i
 #  define RTS_CLOSURE(i)    extern DLL_IMPORT_RTS StgClosure i
-#  define RTS_FUN(f)	    extern DLL_IMPORT_RTS StgFunPtr f(void)
+#  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #endif
 
 #ifdef TABLES_NEXT_TO_CODE
-#  define RTS_ENTRY(f)    /* nothing */
+#  define RTS_RET(f)      RTS_INFO(f##_info)
+#  define RTS_ENTRY(f)    RTS_INFO(f##_info)
+#  define RTS_FUN(f)      RTS_FUN_INFO(f##_info)
+#  define RTS_THUNK(f)    RTS_THUNK_INFO(f##_info)
 #else
-#  define RTS_ENTRY(f)    RTS_FUN(f)
+#  define RTS_RET(f)      RTS_INFO(f##_info)  RTS_FUN_DECL(f##_ret)
+#  define RTS_ENTRY(f)    RTS_INFO(f##_info)  RTS_FUN_DECL(f##_entry)
+#  define RTS_FUN(f)      RTS_FUN_INFO(f##_info) RTS_FUN_DECL(f##_entry)
+#  define RTS_THUNK(f)    RTS_THUNK_INFO(f##_info) RTS_FUN_DECL(f##_entry)
 #endif
 
 /* Stack frames */
-RTS_RET_INFO(stg_upd_frame_info);
-RTS_RET_INFO(stg_bh_upd_frame_info);
-RTS_RET_INFO(stg_marked_upd_frame_info);
-RTS_RET_INFO(stg_noupd_frame_info);
-RTS_RET_INFO(stg_catch_frame_info);
-RTS_RET_INFO(stg_catch_retry_frame_info);
-RTS_RET_INFO(stg_atomically_frame_info);
-RTS_RET_INFO(stg_atomically_waiting_frame_info);
-RTS_RET_INFO(stg_catch_stm_frame_info);
-RTS_RET_INFO(stg_unblockAsyncExceptionszh_ret_info);
-
-RTS_ENTRY(stg_upd_frame_ret);
-RTS_ENTRY(stg_bh_upd_frame_ret);
-RTS_ENTRY(stg_marked_upd_frame_ret);
+RTS_RET(stg_upd_frame);
+RTS_RET(stg_bh_upd_frame);
+RTS_RET(stg_marked_upd_frame);
+RTS_RET(stg_noupd_frame);
+RTS_RET(stg_catch_frame);
+RTS_RET(stg_catch_retry_frame);
+RTS_RET(stg_atomically_frame);
+RTS_RET(stg_atomically_waiting_frame);
+RTS_RET(stg_catch_stm_frame);
+RTS_RET(stg_unblockAsyncExceptionszh_ret);
 
 // RTS_FUN(stg_interp_constr_entry);
 //
@@ -67,138 +69,70 @@ RTS_ENTRY(stg_marked_upd_frame_ret);
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    or a VoidRep to the interpreter. */
-RTS_RET_INFO(stg_ctoi_R1p_info);
-RTS_RET_INFO(stg_ctoi_R1unpt_info);
-RTS_RET_INFO(stg_ctoi_R1n_info);
-RTS_RET_INFO(stg_ctoi_F1_info);
-RTS_RET_INFO(stg_ctoi_D1_info);
-RTS_RET_INFO(stg_ctoi_L1_info);
-RTS_RET_INFO(stg_ctoi_V_info);
+RTS_RET(stg_ctoi_R1p);
+RTS_RET(stg_ctoi_R1unpt);
+RTS_RET(stg_ctoi_R1n);
+RTS_RET(stg_ctoi_F1);
+RTS_RET(stg_ctoi_D1);
+RTS_RET(stg_ctoi_L1);
+RTS_RET(stg_ctoi_V);
 
-RTS_ENTRY(stg_ctoi_R1p_ret);
-RTS_ENTRY(stg_ctoi_R1unpt_ret);
-RTS_ENTRY(stg_ctoi_R1n_ret);
-RTS_ENTRY(stg_ctoi_F1_ret);
-RTS_ENTRY(stg_ctoi_D1_ret);
-RTS_ENTRY(stg_ctoi_L1_ret);
-RTS_ENTRY(stg_ctoi_V_ret);
+RTS_RET(stg_apply_interp);
 
-RTS_RET_INFO(stg_apply_interp_info);
-RTS_ENTRY(stg_apply_interp_ret);
+RTS_ENTRY(stg_IND);
+RTS_ENTRY(stg_IND_direct);
+RTS_ENTRY(stg_IND_STATIC);
+RTS_ENTRY(stg_IND_PERM);
+RTS_ENTRY(stg_IND_OLDGEN);
+RTS_ENTRY(stg_IND_OLDGEN_PERM);
+RTS_ENTRY(stg_BLACKHOLE);
+RTS_ENTRY(stg_CAF_BLACKHOLE);
+RTS_ENTRY(__stg_EAGER_BLACKHOLE);
+RTS_ENTRY(stg_WHITEHOLE);
+RTS_ENTRY(stg_BLOCKING_QUEUE_CLEAN);
+RTS_ENTRY(stg_BLOCKING_QUEUE_DIRTY);
 
-RTS_INFO(stg_IND_info);
-RTS_INFO(stg_IND_direct_info);
-RTS_INFO(stg_IND_STATIC_info);
-RTS_INFO(stg_IND_PERM_info);
-RTS_INFO(stg_IND_OLDGEN_info);
-RTS_INFO(stg_IND_OLDGEN_PERM_info);
-RTS_INFO(stg_BLACKHOLE_info);
-RTS_INFO(stg_CAF_BLACKHOLE_info);
-RTS_INFO(__stg_EAGER_BLACKHOLE_info);
-RTS_INFO(stg_WHITEHOLE_info);
-RTS_INFO(stg_BLOCKING_QUEUE_CLEAN_info);
-RTS_INFO(stg_BLOCKING_QUEUE_DIRTY_info);
-
-RTS_FUN_INFO(stg_BCO_info);
-RTS_INFO(stg_EVACUATED_info);
-RTS_INFO(stg_WEAK_info);
-RTS_INFO(stg_DEAD_WEAK_info);
-RTS_INFO(stg_STABLE_NAME_info);
-RTS_INFO(stg_MVAR_CLEAN_info);
-RTS_INFO(stg_MVAR_DIRTY_info);
-RTS_INFO(stg_TSO_info);
-RTS_INFO(stg_ARR_WORDS_info);
-RTS_INFO(stg_MUT_ARR_WORDS_info);
-RTS_INFO(stg_MUT_ARR_PTRS_CLEAN_info);
-RTS_INFO(stg_MUT_ARR_PTRS_DIRTY_info);
-RTS_INFO(stg_MUT_ARR_PTRS_FROZEN_info);
-RTS_INFO(stg_MUT_ARR_PTRS_FROZEN0_info);
-RTS_INFO(stg_MUT_VAR_CLEAN_info);
-RTS_INFO(stg_MUT_VAR_DIRTY_info);
-RTS_INFO(stg_END_TSO_QUEUE_info);
-RTS_INFO(stg_MSG_WAKEUP_info);
-RTS_INFO(stg_MSG_TRY_WAKEUP_info);
-RTS_INFO(stg_MSG_THROWTO_info);
-RTS_INFO(stg_MSG_BLACKHOLE_info);
-RTS_INFO(stg_MSG_NULL_info);
-RTS_INFO(stg_catch_info);
-RTS_INFO(stg_PAP_info);
-RTS_INFO(stg_AP_info);
-RTS_INFO(stg_AP_NOUPD_info);
-RTS_INFO(stg_AP_STACK_info);
-RTS_INFO(stg_dummy_ret_info);
-RTS_INFO(stg_raise_info);
-RTS_INFO(stg_raise_ret_info);
-RTS_INFO(stg_TVAR_WATCH_QUEUE_info);
-RTS_INFO(stg_INVARIANT_CHECK_QUEUE_info);
-RTS_INFO(stg_ATOMIC_INVARIANT_info);
-RTS_INFO(stg_TVAR_info);
-RTS_INFO(stg_TREC_CHUNK_info);
-RTS_INFO(stg_TREC_HEADER_info);
-RTS_INFO(stg_END_STM_WATCH_QUEUE_info);
-RTS_INFO(stg_END_INVARIANT_CHECK_QUEUE_info);
-RTS_INFO(stg_END_STM_CHUNK_LIST_info);
-RTS_INFO(stg_NO_TREC_info);
-
-RTS_ENTRY(stg_IND_entry);
-RTS_ENTRY(stg_IND_direct_entry);
-RTS_ENTRY(stg_IND_STATIC_entry);
-RTS_ENTRY(stg_IND_PERM_entry);
-RTS_ENTRY(stg_IND_OLDGEN_entry);
-RTS_ENTRY(stg_IND_OLDGEN_PERM_entry);
-RTS_ENTRY(stg_WHITEHOLE_entry);
-RTS_ENTRY(stg_BLACKHOLE_entry);
-RTS_ENTRY(stg_CAF_BLACKHOLE_entry);
-RTS_ENTRY(__stg_EAGER_BLACKHOLE_entry);
-RTS_ENTRY(stg_BCO_entry);
-RTS_ENTRY(stg_EVACUATED_entry);
-RTS_ENTRY(stg_WEAK_entry);
-RTS_ENTRY(stg_DEAD_WEAK_entry);
-RTS_ENTRY(stg_STABLE_NAME_entry);
-RTS_ENTRY(stg_FULL_MVAR_entry);
-RTS_ENTRY(stg_EMPTY_MVAR_entry);
-RTS_ENTRY(stg_TSO_entry);
-RTS_ENTRY(stg_ARR_WORDS_entry);
-RTS_ENTRY(stg_MUT_ARR_WORDS_entry);
-RTS_ENTRY(stg_MUT_ARR_PTRS_CLEAN_entry);
-RTS_ENTRY(stg_MUT_ARR_PTRS_DIRTY_entry);
-RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN_entry);
-RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN0_entry);
-RTS_ENTRY(stg_MUT_VAR_CLEAN_entry);
-RTS_ENTRY(stg_MUT_VAR_DIRTY_entry);
-RTS_ENTRY(stg_END_TSO_QUEUE_entry);
-RTS_ENTRY(stg_MSG_WAKEUP_entry);
-RTS_ENTRY(stg_MSG_TRY_WAKEUP_entry);
-RTS_ENTRY(stg_MSG_THROWTO_entry);
-RTS_ENTRY(stg_MSG_BLACKHOLE_entry);
-RTS_ENTRY(stg_MSG_NULL_entry);
-RTS_ENTRY(stg_catch_entry);
-RTS_ENTRY(stg_PAP_entry);
-RTS_ENTRY(stg_AP_entry);
-RTS_ENTRY(stg_AP_NOUPD_entry);
-RTS_ENTRY(stg_AP_STACK_entry);
-RTS_ENTRY(stg_dummy_ret_entry);
-RTS_ENTRY(stg_raise_entry);
-RTS_ENTRY(stg_raise_ret_ret);
-RTS_ENTRY(stg_END_STM_WATCH_QUEUE_entry);
-RTS_ENTRY(stg_END_INVARIANT_CHECK_QUEUE_entry);
-RTS_ENTRY(stg_END_STM_CHUNK_LIST_entry);
-RTS_ENTRY(stg_NO_TREC_entry);
-RTS_ENTRY(stg_TVAR_entry);
-RTS_ENTRY(stg_TVAR_WATCH_QUEUE_entry);
-RTS_ENTRY(stg_INVARIANT_CHECK_QUEUE_entry);
-RTS_ENTRY(stg_ATOMIC_INVARIANT_entry);
-RTS_ENTRY(stg_TREC_CHUNK_entry);
-RTS_ENTRY(stg_TREC_HEADER_entry);
-
-
-RTS_ENTRY(stg_unblockAsyncExceptionszh_ret_ret);
-RTS_ENTRY(stg_blockAsyncExceptionszh_ret_ret);
-RTS_ENTRY(stg_catch_frame_ret);
-RTS_ENTRY(stg_catch_retry_frame_ret);
-RTS_ENTRY(stg_atomically_frame_ret);
-RTS_ENTRY(stg_atomically_waiting_frame_ret);
-RTS_ENTRY(stg_catch_stm_frame_ret);
+RTS_FUN(stg_BCO);
+RTS_ENTRY(stg_EVACUATED);
+RTS_ENTRY(stg_WEAK);
+RTS_ENTRY(stg_DEAD_WEAK);
+RTS_ENTRY(stg_STABLE_NAME);
+RTS_ENTRY(stg_MVAR_CLEAN);
+RTS_ENTRY(stg_MVAR_DIRTY);
+RTS_ENTRY(stg_TSO);
+RTS_ENTRY(stg_ARR_WORDS);
+RTS_ENTRY(stg_MUT_ARR_WORDS);
+RTS_ENTRY(stg_MUT_ARR_PTRS_CLEAN);
+RTS_ENTRY(stg_MUT_ARR_PTRS_DIRTY);
+RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN);
+RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN0);
+RTS_ENTRY(stg_MUT_VAR_CLEAN);
+RTS_ENTRY(stg_MUT_VAR_DIRTY);
+RTS_ENTRY(stg_END_TSO_QUEUE);
+RTS_ENTRY(stg_MSG_WAKEUP);
+RTS_ENTRY(stg_MSG_TRY_WAKEUP);
+RTS_ENTRY(stg_MSG_THROWTO);
+RTS_ENTRY(stg_MSG_BLACKHOLE);
+RTS_ENTRY(stg_MSG_NULL);
+RTS_ENTRY(stg_MVAR_TSO_QUEUE);
+RTS_ENTRY(stg_catch);
+RTS_ENTRY(stg_PAP);
+RTS_ENTRY(stg_AP);
+RTS_ENTRY(stg_AP_NOUPD);
+RTS_ENTRY(stg_AP_STACK);
+RTS_ENTRY(stg_dummy_ret);
+RTS_ENTRY(stg_raise);
+RTS_ENTRY(stg_raise_ret);
+RTS_ENTRY(stg_TVAR_WATCH_QUEUE);
+RTS_ENTRY(stg_INVARIANT_CHECK_QUEUE);
+RTS_ENTRY(stg_ATOMIC_INVARIANT);
+RTS_ENTRY(stg_TVAR);
+RTS_ENTRY(stg_TREC_CHUNK);
+RTS_ENTRY(stg_TREC_HEADER);
+RTS_ENTRY(stg_END_STM_WATCH_QUEUE);
+RTS_ENTRY(stg_END_INVARIANT_CHECK_QUEUE);
+RTS_ENTRY(stg_END_STM_CHUNK_LIST);
+RTS_ENTRY(stg_NO_TREC);
 
 /* closures */
 
@@ -224,384 +158,293 @@ extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_closure[];
 
 /* StgStartup */
 
-RTS_RET_INFO(stg_forceIO_info);
-RTS_ENTRY(stg_forceIO_ret);
-
-RTS_RET_INFO(stg_noforceIO_info);
-RTS_ENTRY(stg_noforceIO_ret);
+RTS_RET(stg_forceIO);
+RTS_RET(stg_noforceIO);
 
 /* standard entry points */
 
 /* standard selector thunks */
 
-RTS_ENTRY(stg_sel_ret_0_upd_ret);
-RTS_ENTRY(stg_sel_ret_1_upd_ret);
-RTS_ENTRY(stg_sel_ret_2_upd_ret);
-RTS_ENTRY(stg_sel_ret_3_upd_ret);
-RTS_ENTRY(stg_sel_ret_4_upd_ret);
-RTS_ENTRY(stg_sel_ret_5_upd_ret);
-RTS_ENTRY(stg_sel_ret_6_upd_ret);
-RTS_ENTRY(stg_sel_ret_7_upd_ret);
-RTS_ENTRY(stg_sel_ret_8_upd_ret);
-RTS_ENTRY(stg_sel_ret_9_upd_ret);
-RTS_ENTRY(stg_sel_ret_10_upd_ret);
-RTS_ENTRY(stg_sel_ret_11_upd_ret);
-RTS_ENTRY(stg_sel_ret_12_upd_ret);
-RTS_ENTRY(stg_sel_ret_13_upd_ret);
-RTS_ENTRY(stg_sel_ret_14_upd_ret);
-RTS_ENTRY(stg_sel_ret_15_upd_ret);
+RTS_RET(stg_sel_ret_0_upd);
+RTS_RET(stg_sel_ret_1_upd);
+RTS_RET(stg_sel_ret_2_upd);
+RTS_RET(stg_sel_ret_3_upd);
+RTS_RET(stg_sel_ret_4_upd);
+RTS_RET(stg_sel_ret_5_upd);
+RTS_RET(stg_sel_ret_6_upd);
+RTS_RET(stg_sel_ret_7_upd);
+RTS_RET(stg_sel_ret_8_upd);
+RTS_RET(stg_sel_ret_9_upd);
+RTS_RET(stg_sel_ret_10_upd);
+RTS_RET(stg_sel_ret_11_upd);
+RTS_RET(stg_sel_ret_12_upd);
+RTS_RET(stg_sel_ret_13_upd);
+RTS_RET(stg_sel_ret_14_upd);
+RTS_RET(stg_sel_ret_15_upd);
 
-RTS_INFO(stg_sel_0_upd_info);
-RTS_INFO(stg_sel_1_upd_info);
-RTS_INFO(stg_sel_2_upd_info);
-RTS_INFO(stg_sel_3_upd_info);
-RTS_INFO(stg_sel_4_upd_info);
-RTS_INFO(stg_sel_5_upd_info);
-RTS_INFO(stg_sel_6_upd_info);
-RTS_INFO(stg_sel_7_upd_info);
-RTS_INFO(stg_sel_8_upd_info);
-RTS_INFO(stg_sel_9_upd_info);
-RTS_INFO(stg_sel_10_upd_info);
-RTS_INFO(stg_sel_11_upd_info);
-RTS_INFO(stg_sel_12_upd_info);
-RTS_INFO(stg_sel_13_upd_info);
-RTS_INFO(stg_sel_14_upd_info);
-RTS_INFO(stg_sel_15_upd_info);
+RTS_ENTRY(stg_sel_0_upd);
+RTS_ENTRY(stg_sel_1_upd);
+RTS_ENTRY(stg_sel_2_upd);
+RTS_ENTRY(stg_sel_3_upd);
+RTS_ENTRY(stg_sel_4_upd);
+RTS_ENTRY(stg_sel_5_upd);
+RTS_ENTRY(stg_sel_6_upd);
+RTS_ENTRY(stg_sel_7_upd);
+RTS_ENTRY(stg_sel_8_upd);
+RTS_ENTRY(stg_sel_9_upd);
+RTS_ENTRY(stg_sel_10_upd);
+RTS_ENTRY(stg_sel_11_upd);
+RTS_ENTRY(stg_sel_12_upd);
+RTS_ENTRY(stg_sel_13_upd);
+RTS_ENTRY(stg_sel_14_upd);
+RTS_ENTRY(stg_sel_15_upd);
 
-RTS_ENTRY(stg_sel_0_upd_entry);
-RTS_ENTRY(stg_sel_1_upd_entry);
-RTS_ENTRY(stg_sel_2_upd_entry);
-RTS_ENTRY(stg_sel_3_upd_entry);
-RTS_ENTRY(stg_sel_4_upd_entry);
-RTS_ENTRY(stg_sel_5_upd_entry);
-RTS_ENTRY(stg_sel_6_upd_entry);
-RTS_ENTRY(stg_sel_7_upd_entry);
-RTS_ENTRY(stg_sel_8_upd_entry);
-RTS_ENTRY(stg_sel_9_upd_entry);
-RTS_ENTRY(stg_sel_10_upd_entry);
-RTS_ENTRY(stg_sel_11_upd_entry);
-RTS_ENTRY(stg_sel_12_upd_entry);
-RTS_ENTRY(stg_sel_13_upd_entry);
-RTS_ENTRY(stg_sel_14_upd_entry);
-RTS_ENTRY(stg_sel_15_upd_entry);
-
-RTS_ENTRY(stg_sel_ret_0_noupd_ret);
-RTS_ENTRY(stg_sel_ret_1_noupd_ret);
-RTS_ENTRY(stg_sel_ret_2_noupd_ret);
-RTS_ENTRY(stg_sel_ret_3_noupd_ret);
-RTS_ENTRY(stg_sel_ret_4_noupd_ret);
-RTS_ENTRY(stg_sel_ret_5_noupd_ret);
-RTS_ENTRY(stg_sel_ret_6_noupd_ret);
-RTS_ENTRY(stg_sel_ret_7_noupd_ret);
-RTS_ENTRY(stg_sel_ret_8_noupd_ret);
-RTS_ENTRY(stg_sel_ret_9_noupd_ret);
-RTS_ENTRY(stg_sel_ret_10_noupd_ret);
-RTS_ENTRY(stg_sel_ret_11_noupd_ret);
-RTS_ENTRY(stg_sel_ret_12_noupd_ret);
-RTS_ENTRY(stg_sel_ret_13_noupd_ret);
-RTS_ENTRY(stg_sel_ret_14_noupd_ret);
-RTS_ENTRY(stg_sel_ret_15_noupd_ret);
-
-RTS_INFO(stg_sel_0_noupd_info);
-RTS_INFO(stg_sel_1_noupd_info);
-RTS_INFO(stg_sel_2_noupd_info);
-RTS_INFO(stg_sel_3_noupd_info);
-RTS_INFO(stg_sel_4_noupd_info);
-RTS_INFO(stg_sel_5_noupd_info);
-RTS_INFO(stg_sel_6_noupd_info);
-RTS_INFO(stg_sel_7_noupd_info);
-RTS_INFO(stg_sel_8_noupd_info);
-RTS_INFO(stg_sel_9_noupd_info);
-RTS_INFO(stg_sel_10_noupd_info);
-RTS_INFO(stg_sel_11_noupd_info);
-RTS_INFO(stg_sel_12_noupd_info);
-RTS_INFO(stg_sel_13_noupd_info);
-RTS_INFO(stg_sel_14_noupd_info);
-RTS_INFO(stg_sel_15_noupd_info);
-
-RTS_ENTRY(stg_sel_0_noupd_entry);
-RTS_ENTRY(stg_sel_1_noupd_entry);
-RTS_ENTRY(stg_sel_2_noupd_entry);
-RTS_ENTRY(stg_sel_3_noupd_entry);
-RTS_ENTRY(stg_sel_4_noupd_entry);
-RTS_ENTRY(stg_sel_5_noupd_entry);
-RTS_ENTRY(stg_sel_6_noupd_entry);
-RTS_ENTRY(stg_sel_7_noupd_entry);
-RTS_ENTRY(stg_sel_8_noupd_entry);
-RTS_ENTRY(stg_sel_9_noupd_entry);
-RTS_ENTRY(stg_sel_10_noupd_entry);
-RTS_ENTRY(stg_sel_11_noupd_entry);
-RTS_ENTRY(stg_sel_12_noupd_entry);
-RTS_ENTRY(stg_sel_13_noupd_entry);
-RTS_ENTRY(stg_sel_14_noupd_entry);
-RTS_ENTRY(stg_sel_15_noupd_entry);
+RTS_ENTRY(stg_sel_0_noupd);
+RTS_ENTRY(stg_sel_1_noupd);
+RTS_ENTRY(stg_sel_2_noupd);
+RTS_ENTRY(stg_sel_3_noupd);
+RTS_ENTRY(stg_sel_4_noupd);
+RTS_ENTRY(stg_sel_5_noupd);
+RTS_ENTRY(stg_sel_6_noupd);
+RTS_ENTRY(stg_sel_7_noupd);
+RTS_ENTRY(stg_sel_8_noupd);
+RTS_ENTRY(stg_sel_9_noupd);
+RTS_ENTRY(stg_sel_10_noupd);
+RTS_ENTRY(stg_sel_11_noupd);
+RTS_ENTRY(stg_sel_12_noupd);
+RTS_ENTRY(stg_sel_13_noupd);
+RTS_ENTRY(stg_sel_14_noupd);
+RTS_ENTRY(stg_sel_15_noupd);
 
 /* standard ap thunks */
 
-RTS_THUNK_INFO(stg_ap_1_upd_info);
-RTS_THUNK_INFO(stg_ap_2_upd_info);
-RTS_THUNK_INFO(stg_ap_3_upd_info);
-RTS_THUNK_INFO(stg_ap_4_upd_info);
-RTS_THUNK_INFO(stg_ap_5_upd_info);
-RTS_THUNK_INFO(stg_ap_6_upd_info);
-RTS_THUNK_INFO(stg_ap_7_upd_info);
-
-RTS_ENTRY(stg_ap_1_upd_entry);
-RTS_ENTRY(stg_ap_2_upd_entry);
-RTS_ENTRY(stg_ap_3_upd_entry);
-RTS_ENTRY(stg_ap_4_upd_entry);
-RTS_ENTRY(stg_ap_5_upd_entry);
-RTS_ENTRY(stg_ap_6_upd_entry);
-RTS_ENTRY(stg_ap_7_upd_entry);
+RTS_THUNK(stg_ap_1_upd);
+RTS_THUNK(stg_ap_2_upd);
+RTS_THUNK(stg_ap_3_upd);
+RTS_THUNK(stg_ap_4_upd);
+RTS_THUNK(stg_ap_5_upd);
+RTS_THUNK(stg_ap_6_upd);
+RTS_THUNK(stg_ap_7_upd);
 
 /* standard application routines (see also rts/gen_apply.py, 
  * and compiler/codeGen/CgStackery.lhs).
  */
-RTS_RET_INFO(stg_ap_v_info);
-RTS_RET_INFO(stg_ap_f_info);
-RTS_RET_INFO(stg_ap_d_info);
-RTS_RET_INFO(stg_ap_l_info);
-RTS_RET_INFO(stg_ap_n_info);
-RTS_RET_INFO(stg_ap_p_info);
-RTS_RET_INFO(stg_ap_pv_info);
-RTS_RET_INFO(stg_ap_pp_info);
-RTS_RET_INFO(stg_ap_ppv_info);
-RTS_RET_INFO(stg_ap_ppp_info);
-RTS_RET_INFO(stg_ap_pppv_info);
-RTS_RET_INFO(stg_ap_pppp_info);
-RTS_RET_INFO(stg_ap_ppppp_info);
-RTS_RET_INFO(stg_ap_pppppp_info);
+RTS_RET(stg_ap_v);
+RTS_RET(stg_ap_f);
+RTS_RET(stg_ap_d);
+RTS_RET(stg_ap_l);
+RTS_RET(stg_ap_n);
+RTS_RET(stg_ap_p);
+RTS_RET(stg_ap_pv);
+RTS_RET(stg_ap_pp);
+RTS_RET(stg_ap_ppv);
+RTS_RET(stg_ap_ppp);
+RTS_RET(stg_ap_pppv);
+RTS_RET(stg_ap_pppp);
+RTS_RET(stg_ap_ppppp);
+RTS_RET(stg_ap_pppppp);
 
-RTS_ENTRY(stg_ap_v_ret);
-RTS_ENTRY(stg_ap_f_ret);
-RTS_ENTRY(stg_ap_d_ret);
-RTS_ENTRY(stg_ap_l_ret);
-RTS_ENTRY(stg_ap_n_ret);
-RTS_ENTRY(stg_ap_p_ret);
-RTS_ENTRY(stg_ap_pv_ret);
-RTS_ENTRY(stg_ap_pp_ret);
-RTS_ENTRY(stg_ap_ppv_ret);
-RTS_ENTRY(stg_ap_ppp_ret);
-RTS_ENTRY(stg_ap_pppv_ret);
-RTS_ENTRY(stg_ap_pppp_ret);
-RTS_ENTRY(stg_ap_ppppp_ret);
-RTS_ENTRY(stg_ap_pppppp_ret);
-
-RTS_FUN(stg_ap_0_fast);
-RTS_FUN(stg_ap_v_fast);
-RTS_FUN(stg_ap_f_fast);
-RTS_FUN(stg_ap_d_fast);
-RTS_FUN(stg_ap_l_fast);
-RTS_FUN(stg_ap_n_fast);
-RTS_FUN(stg_ap_p_fast);
-RTS_FUN(stg_ap_pv_fast);
-RTS_FUN(stg_ap_pp_fast);
-RTS_FUN(stg_ap_ppv_fast);
-RTS_FUN(stg_ap_ppp_fast);
-RTS_FUN(stg_ap_pppv_fast);
-RTS_FUN(stg_ap_pppp_fast);
-RTS_FUN(stg_ap_ppppp_fast);
-RTS_FUN(stg_ap_pppppp_fast);
-RTS_FUN(stg_PAP_apply);
+RTS_FUN_DECL(stg_ap_0_fast);
+RTS_FUN_DECL(stg_ap_v_fast);
+RTS_FUN_DECL(stg_ap_f_fast);
+RTS_FUN_DECL(stg_ap_d_fast);
+RTS_FUN_DECL(stg_ap_l_fast);
+RTS_FUN_DECL(stg_ap_n_fast);
+RTS_FUN_DECL(stg_ap_p_fast);
+RTS_FUN_DECL(stg_ap_pv_fast);
+RTS_FUN_DECL(stg_ap_pp_fast);
+RTS_FUN_DECL(stg_ap_ppv_fast);
+RTS_FUN_DECL(stg_ap_ppp_fast);
+RTS_FUN_DECL(stg_ap_pppv_fast);
+RTS_FUN_DECL(stg_ap_pppp_fast);
+RTS_FUN_DECL(stg_ap_ppppp_fast);
+RTS_FUN_DECL(stg_ap_pppppp_fast);
+RTS_FUN_DECL(stg_PAP_apply);
 
 /* standard GC & stack check entry points, all defined in HeapStackCheck.hc */
 
-RTS_RET_INFO(stg_enter_info);
-RTS_ENTRY(stg_enter_ret);
-RTS_RET_INFO(stg_enter_checkbh_info);
-RTS_ENTRY(stg_enter_checkbh_ret);
+RTS_RET(stg_enter);
+RTS_RET(stg_enter_checkbh);
 
-RTS_RET_INFO(stg_gc_void_info);
-RTS_ENTRY(stg_gc_void_ret);
+RTS_RET(stg_gc_void);
 
-RTS_FUN(__stg_gc_enter_1);
+RTS_FUN_DECL(__stg_gc_enter_1);
+RTS_FUN_DECL(stg_gc_noregs);
 
-RTS_FUN(stg_gc_noregs);
+RTS_RET(stg_gc_unpt_r1);
+RTS_FUN_DECL(stg_gc_unpt_r1);
 
-RTS_RET_INFO(stg_gc_unpt_r1_info);
-RTS_ENTRY(stg_gc_unpt_r1_ret);
-RTS_FUN(stg_gc_unpt_r1);
+RTS_RET(stg_gc_unbx_r1);
+RTS_FUN_DECL(stg_gc_unbx_r1);
 
-RTS_RET_INFO(stg_gc_unbx_r1_info);
-RTS_ENTRY(stg_gc_unbx_r1_ret);
-RTS_FUN(stg_gc_unbx_r1);
+RTS_RET(stg_gc_f1);
+RTS_FUN_DECL(stg_gc_f1);
 
-RTS_RET_INFO(stg_gc_f1_info);
-RTS_ENTRY(stg_gc_f1_ret);
-RTS_FUN(stg_gc_f1);
+RTS_RET(stg_gc_d1);
+RTS_FUN_DECL(stg_gc_d1);
 
-RTS_RET_INFO(stg_gc_d1_info);
-RTS_ENTRY(stg_gc_d1_ret);
-RTS_FUN(stg_gc_d1);
+RTS_RET(stg_gc_l1);
+RTS_FUN_DECL(stg_gc_l1);
 
-RTS_RET_INFO(stg_gc_l1_info);
-RTS_ENTRY(stg_gc_l1_ret);
-RTS_FUN(stg_gc_l1);
+RTS_RET(stg_gc_fun);
+RTS_FUN_DECL(__stg_gc_fun);
 
-RTS_FUN(__stg_gc_fun);
-RTS_RET_INFO(stg_gc_fun_info);
-RTS_ENTRY(stg_gc_fun_ret);
+RTS_RET(stg_gc_gen);
+RTS_FUN_DECL(stg_gc_gen);
 
-RTS_RET_INFO(stg_gc_gen_info);
-RTS_ENTRY(stg_gc_gen_ret);
-RTS_FUN(stg_gc_gen);
+RTS_RET(stg_ut_1_0_unreg);
 
-RTS_ENTRY(stg_ut_1_0_unreg_ret);
-RTS_RET_INFO(stg_ut_1_0_unreg_info);
-
-RTS_FUN(stg_gc_gen_hp);
-RTS_FUN(stg_gc_ut);
-RTS_FUN(stg_gen_yield);
-RTS_FUN(stg_yield_noregs);
-RTS_FUN(stg_yield_to_interpreter);
-RTS_FUN(stg_gen_block);
-RTS_FUN(stg_block_noregs);
-RTS_FUN(stg_block_1);
-RTS_FUN(stg_block_blackhole);
-RTS_FUN(stg_block_blackhole_finally);
-RTS_FUN(stg_block_takemvar);
-RTS_ENTRY(stg_block_takemvar_ret);
-RTS_FUN(stg_block_putmvar);
-RTS_ENTRY(stg_block_putmvar_ret);
+RTS_FUN_DECL(stg_gc_gen_hp);
+RTS_FUN_DECL(stg_gc_ut);
+RTS_FUN_DECL(stg_gen_yield);
+RTS_FUN_DECL(stg_yield_noregs);
+RTS_FUN_DECL(stg_yield_to_interpreter);
+RTS_FUN_DECL(stg_gen_block);
+RTS_FUN_DECL(stg_block_noregs);
+RTS_FUN_DECL(stg_block_1);
+RTS_FUN_DECL(stg_block_blackhole);
+RTS_FUN_DECL(stg_block_blackhole_finally);
+RTS_FUN_DECL(stg_block_takemvar);
+RTS_RET(stg_block_takemvar);
+RTS_FUN_DECL(stg_block_putmvar);
+RTS_RET(stg_block_putmvar);
 #ifdef mingw32_HOST_OS
-RTS_FUN(stg_block_async);
-RTS_ENTRY(stg_block_async_ret);
-RTS_FUN(stg_block_async_void);
-RTS_ENTRY(stg_block_async_void_ret);
+RTS_FUN_DECL(stg_block_async);
+RTS_RET(stg_block_async);
+RTS_FUN_DECL(stg_block_async_void);
+RTS_RET(stg_block_async_void);
 #endif
-RTS_FUN(stg_block_stmwait);
-RTS_FUN(stg_block_throwto);
-RTS_ENTRY(stg_block_throwto_ret);
-RTS_RET_INFO(stg_block_throwto_info);
+RTS_FUN_DECL(stg_block_stmwait);
+RTS_FUN_DECL(stg_block_throwto);
+RTS_RET(stg_block_throwto);
 
 /* Entry/exit points from StgStartup.cmm */
 
-RTS_RET_INFO(stg_stop_thread_info);
-RTS_ENTRY(stg_stop_thread_ret);
+RTS_RET(stg_stop_thread);
 
-RTS_FUN(stg_returnToStackTop);
-RTS_FUN(stg_returnToSched);
-RTS_FUN(stg_returnToSchedNotPaused);
-RTS_FUN(stg_returnToSchedButFirst);
-RTS_FUN(stg_threadFinished);
+RTS_FUN_DECL(stg_returnToStackTop);
+RTS_FUN_DECL(stg_returnToSched);
+RTS_FUN_DECL(stg_returnToSchedNotPaused);
+RTS_FUN_DECL(stg_returnToSchedButFirst);
+RTS_FUN_DECL(stg_threadFinished);
 
-RTS_FUN(stg_init_finish);
-RTS_FUN(stg_init);
+RTS_FUN_DECL(stg_init_finish);
+RTS_FUN_DECL(stg_init);
 
-RTS_FUN(StgReturn);
+RTS_FUN_DECL(StgReturn);
 
 /* -----------------------------------------------------------------------------
    PrimOps
    -------------------------------------------------------------------------- */
 
-RTS_FUN(stg_plusIntegerzh);
-RTS_FUN(stg_minusIntegerzh);
-RTS_FUN(stg_timesIntegerzh);
-RTS_FUN(stg_gcdIntegerzh);
-RTS_FUN(stg_quotRemIntegerzh);
-RTS_FUN(stg_quotIntegerzh);
-RTS_FUN(stg_remIntegerzh);
-RTS_FUN(stg_divExactIntegerzh);
-RTS_FUN(stg_divModIntegerzh);
+RTS_FUN_DECL(stg_plusIntegerzh);
+RTS_FUN_DECL(stg_minusIntegerzh);
+RTS_FUN_DECL(stg_timesIntegerzh);
+RTS_FUN_DECL(stg_gcdIntegerzh);
+RTS_FUN_DECL(stg_quotRemIntegerzh);
+RTS_FUN_DECL(stg_quotIntegerzh);
+RTS_FUN_DECL(stg_remIntegerzh);
+RTS_FUN_DECL(stg_divExactIntegerzh);
+RTS_FUN_DECL(stg_divModIntegerzh);
 
-RTS_FUN(stg_cmpIntegerIntzh);
-RTS_FUN(stg_cmpIntegerzh);
-RTS_FUN(stg_integer2Intzh);
-RTS_FUN(stg_integer2Wordzh);
-RTS_FUN(stg_gcdIntegerIntzh);
-RTS_FUN(stg_gcdIntzh);
+RTS_FUN_DECL(stg_cmpIntegerIntzh);
+RTS_FUN_DECL(stg_cmpIntegerzh);
+RTS_FUN_DECL(stg_integer2Intzh);
+RTS_FUN_DECL(stg_integer2Wordzh);
+RTS_FUN_DECL(stg_gcdIntegerIntzh);
+RTS_FUN_DECL(stg_gcdIntzh);
 
-RTS_FUN(stg_int2Integerzh);
-RTS_FUN(stg_word2Integerzh);
+RTS_FUN_DECL(stg_int2Integerzh);
+RTS_FUN_DECL(stg_word2Integerzh);
 
-RTS_FUN(stg_decodeFloatzuIntzh);
-RTS_FUN(stg_decodeDoublezh);
-RTS_FUN(stg_decodeDoublezu2Intzh);
+RTS_FUN_DECL(stg_decodeFloatzuIntzh);
+RTS_FUN_DECL(stg_decodeDoublezh);
+RTS_FUN_DECL(stg_decodeDoublezu2Intzh);
 
-RTS_FUN(stg_andIntegerzh);
-RTS_FUN(stg_orIntegerzh);
-RTS_FUN(stg_xorIntegerzh);
-RTS_FUN(stg_complementIntegerzh);
+RTS_FUN_DECL(stg_andIntegerzh);
+RTS_FUN_DECL(stg_orIntegerzh);
+RTS_FUN_DECL(stg_xorIntegerzh);
+RTS_FUN_DECL(stg_complementIntegerzh);
 
 #if SIZEOF_HSINT == 4
 
-RTS_FUN(stg_int64ToIntegerzh);
-RTS_FUN(stg_word64ToIntegerzh);
+RTS_FUN_DECL(stg_int64ToIntegerzh);
+RTS_FUN_DECL(stg_word64ToIntegerzh);
 
 #endif
 
-RTS_FUN(stg_unsafeThawArrayzh);
-RTS_FUN(stg_newByteArrayzh);
-RTS_FUN(stg_newPinnedByteArrayzh);
-RTS_FUN(stg_newAlignedPinnedByteArrayzh);
-RTS_FUN(stg_newArrayzh);
+RTS_FUN_DECL(stg_unsafeThawArrayzh);
+RTS_FUN_DECL(stg_newByteArrayzh);
+RTS_FUN_DECL(stg_newPinnedByteArrayzh);
+RTS_FUN_DECL(stg_newAlignedPinnedByteArrayzh);
+RTS_FUN_DECL(stg_newArrayzh);
 
-RTS_FUN(stg_newMutVarzh);
-RTS_FUN(stg_atomicModifyMutVarzh);
+RTS_FUN_DECL(stg_newMutVarzh);
+RTS_FUN_DECL(stg_atomicModifyMutVarzh);
 
-RTS_FUN(stg_isEmptyMVarzh);
-RTS_FUN(stg_newMVarzh);
-RTS_FUN(stg_takeMVarzh);
-RTS_FUN(stg_putMVarzh);
-RTS_FUN(stg_tryTakeMVarzh);
-RTS_FUN(stg_tryPutMVarzh);
+RTS_FUN_DECL(stg_isEmptyMVarzh);
+RTS_FUN_DECL(stg_newMVarzh);
+RTS_FUN_DECL(stg_takeMVarzh);
+RTS_FUN_DECL(stg_putMVarzh);
+RTS_FUN_DECL(stg_tryTakeMVarzh);
+RTS_FUN_DECL(stg_tryPutMVarzh);
 
-RTS_FUN(stg_waitReadzh);
-RTS_FUN(stg_waitWritezh);
-RTS_FUN(stg_delayzh);
+RTS_FUN_DECL(stg_waitReadzh);
+RTS_FUN_DECL(stg_waitWritezh);
+RTS_FUN_DECL(stg_delayzh);
 #ifdef mingw32_HOST_OS
-RTS_FUN(stg_asyncReadzh);
-RTS_FUN(stg_asyncWritezh);
-RTS_FUN(stg_asyncDoProczh);
+RTS_FUN_DECL(stg_asyncReadzh);
+RTS_FUN_DECL(stg_asyncWritezh);
+RTS_FUN_DECL(stg_asyncDoProczh);
 #endif
 
-RTS_FUN(stg_catchzh);
-RTS_FUN(stg_raisezh);
-RTS_FUN(stg_raiseIOzh);
+RTS_FUN_DECL(stg_catchzh);
+RTS_FUN_DECL(stg_raisezh);
+RTS_FUN_DECL(stg_raiseIOzh);
 
-RTS_FUN(stg_makeStableNamezh);
-RTS_FUN(stg_makeStablePtrzh);
-RTS_FUN(stg_deRefStablePtrzh);
+RTS_FUN_DECL(stg_makeStableNamezh);
+RTS_FUN_DECL(stg_makeStablePtrzh);
+RTS_FUN_DECL(stg_deRefStablePtrzh);
 
-RTS_FUN(stg_forkzh);
-RTS_FUN(stg_forkOnzh);
-RTS_FUN(stg_yieldzh);
-RTS_FUN(stg_killThreadzh);
-RTS_FUN(stg_asyncExceptionsBlockedzh);
-RTS_FUN(stg_blockAsyncExceptionszh);
-RTS_FUN(stg_unblockAsyncExceptionszh);
-RTS_FUN(stg_myThreadIdzh);
-RTS_FUN(stg_labelThreadzh);
-RTS_FUN(stg_isCurrentThreadBoundzh);
-RTS_FUN(stg_threadStatuszh);
+RTS_FUN_DECL(stg_forkzh);
+RTS_FUN_DECL(stg_forkOnzh);
+RTS_FUN_DECL(stg_yieldzh);
+RTS_FUN_DECL(stg_killThreadzh);
+RTS_FUN_DECL(stg_asyncExceptionsBlockedzh);
+RTS_FUN_DECL(stg_blockAsyncExceptionszh);
+RTS_FUN_DECL(stg_unblockAsyncExceptionszh);
+RTS_FUN_DECL(stg_myThreadIdzh);
+RTS_FUN_DECL(stg_labelThreadzh);
+RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
+RTS_FUN_DECL(stg_threadStatuszh);
 
-RTS_FUN(stg_mkWeakzh);
-RTS_FUN(stg_mkWeakForeignzh);
-RTS_FUN(stg_mkWeakForeignEnvzh);
-RTS_FUN(stg_finalizzeWeakzh);
-RTS_FUN(stg_deRefWeakzh);
+RTS_FUN_DECL(stg_mkWeakzh);
+RTS_FUN_DECL(stg_mkWeakForeignzh);
+RTS_FUN_DECL(stg_mkWeakForeignEnvzh);
+RTS_FUN_DECL(stg_finalizzeWeakzh);
+RTS_FUN_DECL(stg_deRefWeakzh);
 
-RTS_FUN(stg_newBCOzh);
-RTS_FUN(stg_mkApUpd0zh);
+RTS_FUN_DECL(stg_newBCOzh);
+RTS_FUN_DECL(stg_mkApUpd0zh);
 
-RTS_FUN(stg_retryzh);
-RTS_FUN(stg_catchRetryzh);
-RTS_FUN(stg_catchSTMzh);
-RTS_FUN(stg_atomicallyzh);
-RTS_FUN(stg_newTVarzh);
-RTS_FUN(stg_readTVarzh);
-RTS_FUN(stg_readTVarIOzh);
-RTS_FUN(stg_writeTVarzh);
-RTS_FUN(stg_checkzh);
+RTS_FUN_DECL(stg_retryzh);
+RTS_FUN_DECL(stg_catchRetryzh);
+RTS_FUN_DECL(stg_catchSTMzh);
+RTS_FUN_DECL(stg_atomicallyzh);
+RTS_FUN_DECL(stg_newTVarzh);
+RTS_FUN_DECL(stg_readTVarzh);
+RTS_FUN_DECL(stg_readTVarIOzh);
+RTS_FUN_DECL(stg_writeTVarzh);
+RTS_FUN_DECL(stg_checkzh);
 
-RTS_FUN(stg_unpackClosurezh);
-RTS_FUN(stg_getApStackValzh);
-RTS_FUN(stg_getSparkzh);
+RTS_FUN_DECL(stg_unpackClosurezh);
+RTS_FUN_DECL(stg_getApStackValzh);
+RTS_FUN_DECL(stg_getSparkzh);
 
-RTS_FUN(stg_noDuplicatezh);
+RTS_FUN_DECL(stg_noDuplicatezh);
 
-RTS_FUN(stg_traceCcszh);
-RTS_FUN(stg_traceEventzh);
+RTS_FUN_DECL(stg_traceCcszh);
+RTS_FUN_DECL(stg_traceEventzh);
 
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes
