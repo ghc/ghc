@@ -36,13 +36,6 @@ static pid_t hpc_pid = 0;		// pid of this process at hpc-boot time.
 static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
 
-// This is a cruel hack, we should completely redesign the format specifier handling in the RTS.
-#if SIZEOF_LONG == 8
-#define PRIuWORD64 "lu"
-#else
-#define PRIuWORD64 "llu"
-#endif
-
 HpcModuleInfo *modules = 0;
 HpcModuleInfo *nextModule = 0;
 int totalTixes = 0;		// total number of tix boxes.
@@ -333,7 +326,7 @@ writeTix(FILE *f) {
       }
 
       if (tmpModule->tixArr) {
-	fprintf(f,"%" PRIuWORD64,tmpModule->tixArr[i]);
+	fprintf(f,"%" FMT_Word64,tmpModule->tixArr[i]);
       } else {
 	fprintf(f,"0");
       }
