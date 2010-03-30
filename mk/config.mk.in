@@ -302,14 +302,6 @@ SupportsSplitObjs=$(strip $(if $(filter YES,$(ArchSupportsSplitObjs)),\
 # By default, enable SplitObjs for the libraries if this build supports it
 SplitObjs=$(SupportsSplitObjs)
 
-# .NET interop support?
-#
-DotnetSupport=NO
-
-# Build unix package?
-#
-GhcLibsWithUnix=@GhcLibsWithUnix@
-
 CHECK_PACKAGES = NO
 
 # ----------------------------------------------------------------------------
