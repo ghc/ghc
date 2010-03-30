@@ -85,7 +85,7 @@ catchDivZero(struct _EXCEPTION_RECORD*,
    } \
   }
 #else
-#error Don't know what sort of Windows system this is
+#error Cannot determine what sort of Windows system this is
 #endif
 
 #endif /* WIN32_SEH_EXCN_H */
