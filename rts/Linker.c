@@ -33,6 +33,11 @@
 #include "posix/Signals.h"
 #endif
 
+#if defined(mingw32_HOST_OS)
+// get protos for is*()
+#include <ctype.h>
+#endif
+
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -387,17 +392,17 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(strncpy)                             \
       SymI_HasProto(abort)                               \
       SymI_NeedsProto(_alloca)                           \
-      SymI_NeedsProto(isxdigit)                          \
-      SymI_NeedsProto(isupper)                           \
-      SymI_NeedsProto(ispunct)                           \
-      SymI_NeedsProto(islower)                           \
-      SymI_NeedsProto(isspace)                           \
-      SymI_NeedsProto(isprint)                           \
-      SymI_NeedsProto(isdigit)                           \
-      SymI_NeedsProto(iscntrl)                           \
-      SymI_NeedsProto(isalpha)                           \
-      SymI_NeedsProto(isalnum)                           \
-      SymI_NeedsProto(isascii)                           \
+      SymI_HasProto(isxdigit)                          \
+      SymI_HasProto(isupper)                           \
+      SymI_HasProto(ispunct)                           \
+      SymI_HasProto(islower)                           \
+      SymI_HasProto(isspace)                           \
+      SymI_HasProto(isprint)                           \
+      SymI_HasProto(isdigit)                           \
+      SymI_HasProto(iscntrl)                           \
+      SymI_HasProto(isalpha)                           \
+      SymI_HasProto(isalnum)                           \
+      SymI_HasProto(isascii)                           \
       RTS___MINGW_VFPRINTF_SYM                           \
       SymI_HasProto(strcmp)                              \
       SymI_HasProto(memmove)                             \
@@ -1452,13 +1457,13 @@ lookupSymbol( char *lbl )
 #       elif defined(OBJFORMAT_PEi386)
         void* sym;
 
-        sym = lookupSymbolInDLLs(lbl);
+        sym = lookupSymbolInDLLs((unsigned char*)lbl);
         if (sym != NULL) { return sym; };
 
         // Also try looking up the symbol without the @N suffix.  Some
         // DLLs have the suffixes on their symbols, some don't.
-        zapTrailingAtSign ( lbl );
-        sym = lookupSymbolInDLLs(lbl);
+        zapTrailingAtSign ( (unsigned char*)lbl );
+        sym = lookupSymbolInDLLs((unsigned char*)lbl);
         if (sym != NULL) { return sym; };
         return NULL;
 
@@ -2207,7 +2212,7 @@ copyName ( UChar* name, UChar* strtab, UChar* dst, int dstSize )
 {
    if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
       UInt32 strtab_offset = * (UInt32*)(name+4);
-      strncpy ( dst, strtab+strtab_offset, dstSize );
+      strncpy ( (char*)dst, (char*)strtab+strtab_offset, dstSize );
       dst[dstSize-1] = 0;
    } else {
       int i = 0;
@@ -2242,7 +2247,7 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
    */
    newstr = stgMallocBytes(9, "cstring_from_COFF_symbol_name");
    ASSERT(newstr);
-   strncpy(newstr,name,8);
+   strncpy((char*)newstr,(char*)name,8);
    newstr[8] = 0;
    return newstr;
 }
@@ -2250,7 +2255,7 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
 
 /* Just compares the short names (first 8 chars) */
 static COFF_section *
-findPEi386SectionCalled ( ObjectCode* oc,  char* name )
+findPEi386SectionCalled ( ObjectCode* oc,  UChar* name )
 {
    int i;
    COFF_header* hdr
@@ -2308,13 +2313,13 @@ lookupSymbolInDLLs ( UChar *lbl )
                a Rule that governs whether an initial '_' *should always* be
                stripped off when mapping from import lib name to the DLL name.
             */
-            sym = GetProcAddress(o_dll->instance, (lbl+1));
+            sym = GetProcAddress(o_dll->instance, (char*)(lbl+1));
             if (sym != NULL) {
 		/*debugBelch("found %s in %s\n", lbl+1,o_dll->name);*/
 		return sym;
             }
         }
-        sym = GetProcAddress(o_dll->instance, lbl);
+        sym = GetProcAddress(o_dll->instance, (char*)lbl);
         if (sym != NULL) {
             /*debugBelch("found %s in %s\n", lbl,o_dll->name);*/
             return sym;
@@ -2545,7 +2550,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      if (0 != strcmp(sectab_i->Name, ".bss")) continue;
+      if (0 != strcmp((char*)sectab_i->Name, ".bss")) continue;
       /* sof 10/05: the PE spec text isn't too clear regarding what
        * the SizeOfRawData field is supposed to hold for object
        * file sections containing just uninitialized data -- for executables,
@@ -2598,12 +2603,12 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          kind = SECTIONKIND_CODE_OR_RODATA;
 #     endif
 
-      if (0==strcmp(".text",sectab_i->Name) ||
-          0==strcmp(".rdata",sectab_i->Name)||
-          0==strcmp(".rodata",sectab_i->Name))
+      if (0==strcmp(".text",(char*)sectab_i->Name) ||
+          0==strcmp(".rdata",(char*)sectab_i->Name)||
+          0==strcmp(".rodata",(char*)sectab_i->Name))
          kind = SECTIONKIND_CODE_OR_RODATA;
-      if (0==strcmp(".data",sectab_i->Name) ||
-          0==strcmp(".bss",sectab_i->Name))
+      if (0==strcmp(".data",(char*)sectab_i->Name) ||
+          0==strcmp(".bss",(char*)sectab_i->Name))
          kind = SECTIONKIND_RWDATA;
 
       ASSERT(sectab_i->SizeOfRawData == 0 || sectab_i->VirtualSize == 0);
@@ -2616,14 +2621,14 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (kind == SECTIONKIND_OTHER
           /* Ignore sections called which contain stabs debugging
              information. */
-          && 0 != strcmp(".stab", sectab_i->Name)
-          && 0 != strcmp(".stabstr", sectab_i->Name)
+          && 0 != strcmp(".stab", (char*)sectab_i->Name)
+          && 0 != strcmp(".stabstr", (char*)sectab_i->Name)
           /* ignore constructor section for now */
-          && 0 != strcmp(".ctors", sectab_i->Name)
+          && 0 != strcmp(".ctors", (char*)sectab_i->Name)
           /* ignore section generated from .ident */
-          && 0!= strcmp("/4", sectab_i->Name)
+          && 0!= strcmp("/4", (char*)sectab_i->Name)
 	  /* ignore unknown section that appeared in gcc 3.4.5(?) */
-          && 0!= strcmp(".reloc", sectab_i->Name)
+          && 0!= strcmp(".reloc", (char*)sectab_i->Name)
          ) {
          errorBelch("Unknown PEi386 section name `%s' (while processing: %s)", sectab_i->Name, oc->fileName);
          return 0;
@@ -2688,8 +2693,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
-         oc->symbols[i] = sname;
-         ghciInsertStrHashTable(oc->fileName, symhash, sname, addr);
+         oc->symbols[i] = (char*)sname;
+         ghciInsertStrHashTable(oc->fileName, symhash, (char*)sname, addr);
       } else {
 #        if 0
          debugBelch(
@@ -2739,7 +2744,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
    /* ToDo: should be variable-sized?  But is at least safe in the
       sense of buffer-overrun-proof. */
-   char symbol[1000];
+   UChar symbol[1000];
    /* debugBelch("resolving for %s\n", oc->fileName); */
 
    hdr = (COFF_header*)(oc->image);
@@ -2766,9 +2771,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
       /* Ignore sections called which contain stabs debugging
          information. */
-      if (0 == strcmp(".stab", sectab_i->Name)
-          || 0 == strcmp(".stabstr", sectab_i->Name)
-          || 0 == strcmp(".ctors", sectab_i->Name))
+      if (0 == strcmp(".stab", (char*)sectab_i->Name)
+          || 0 == strcmp(".stabstr", (char*)sectab_i->Name)
+          || 0 == strcmp(".ctors", (char*)sectab_i->Name))
          continue;
 
       if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
@@ -2841,7 +2846,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    + sym->Value);
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
-            S = (UInt32) lookupSymbol( symbol );
+            S = (UInt32) lookupSymbol( (char*)symbol );
             if ((void*)S != NULL) goto foundit;
             errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
             return 0;
