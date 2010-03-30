@@ -15,7 +15,7 @@
 
 -- #hide
 
-module GHC.Handle {-# DEPRECATED "use GHC.IO.Handle.Base instead" #-} (
+module GHC.Handle {-# DEPRECATED "use GHC.IO.Handle instead" #-} (
   withHandle, withHandle', withHandle_,
   wantWritableHandle, wantReadableHandle, wantSeekableHandle,
 
