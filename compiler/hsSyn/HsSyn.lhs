@@ -9,6 +9,8 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module HsSyn (
 	module HsBinds,
 	module HsDecls,
@@ -42,6 +44,9 @@ import Outputable
 import SrcLoc		( Located(..) )
 import Module		( Module, ModuleName )
 import FastString
+
+-- libraries:
+import Data.Data hiding ( Fixity )
 \end{code}
 
 \begin{code}
@@ -70,8 +75,7 @@ data HsModule name
         -- ^ reason\/explanation for warning/deprecation of this module
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
-   }
-
+   } deriving (Data, Typeable)
 
 data HsExtCore name	-- Read from Foo.hcr
   = HsExtCore

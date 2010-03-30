@@ -13,6 +13,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module HsBinds where
 
@@ -34,6 +35,8 @@ import Util
 import Var
 import Bag
 import FastString
+
+import Data.Data hiding ( Fixity )
 \end{code}
 
 %************************************************************************
@@ -58,6 +61,7 @@ data HsLocalBindsLR idL idR	-- Bindings in a 'let' expression
   = HsValBinds (HsValBindsLR idL idR)
   | HsIPBinds  (HsIPBinds idR)
   | EmptyLocalBinds
+  deriving (Data, Typeable)
 
 type HsValBinds id = HsValBindsLR id id
 
@@ -71,6 +75,7 @@ data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
                                         -- in the list may depend on earlier
                                         -- ones.
 	[LSig Name]
+  deriving (Data, Typeable)
 
 type LHsBinds id  = Bag (LHsBind id)
 type DictBinds id = LHsBinds id		-- Used for dictionary or method bindings
@@ -148,6 +153,7 @@ data HsBindLR idL idR
 						-- mixed up together; you can tell the dict bindings because
 						-- they are all VarBinds
     }
+  deriving (Data, Typeable)
 	-- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
 	-- 
 	-- Creates bindings for (polymorphic, overloaded) poly_f
@@ -317,6 +323,7 @@ data HsIPBinds id
 	[LIPBind id] 
 	(DictBinds id)	-- Only in typechecker output; binds 
 			-- uses of the implicit parameters
+  deriving (Data, Typeable)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyBag ds
@@ -328,6 +335,7 @@ data IPBind id
   = IPBind
 	(IPName id)
 	(LHsExpr id)
+  deriving (Data, Typeable)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs) 
@@ -370,6 +378,7 @@ data HsWrapper
 	-- is always exactly WpHole
   | WpLet (LHsBinds Id)		-- let binds in []
 				-- (would be nicer to be core bindings)
+  deriving (Data, Typeable)
 
 instance Outputable HsWrapper where 
   ppr co_fn = pprHsWrapper (ptext (sLit "<>")) co_fn
@@ -466,21 +475,25 @@ data Sig name	-- Signatures and pragmas
 	-- {-# SPECIALISE instance Eq [Int] #-}
   | SpecInstSig (LHsType name)	-- (Class tys); should be a specialisation of the 
 				-- current instance decl
+  deriving (Data, Typeable)
 
 
 type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity 
+  deriving (Data, Typeable)
 
 -- TsSpecPrags conveys pragmas from the type checker to the desugarer
 data TcSpecPrags 
   = IsDefaultMethod	-- Super-specialised: a default method should 
     			-- be macro-expanded at every call site
   | SpecPrags [Located TcSpecPrag]
+  deriving (Data, Typeable)
 
 data TcSpecPrag 
   = SpecPrag   
 	HsWrapper	-- An wrapper, that specialises the polymorphic function
 	InlinePragma 	-- Inlining spec for the specialised function
+  deriving (Data, Typeable)
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []

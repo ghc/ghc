@@ -6,6 +6,8 @@
 HsTypes: Abstract syntax: user-defined types
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module HsTypes (
 	HsType(..), LHsType, 
 	HsTyVarBndr(..), LHsTyVarBndr,
@@ -42,6 +44,8 @@ import SrcLoc
 import StaticFlags
 import Outputable
 import FastString
+
+import Data.Data
 \end{code}
 
 
@@ -76,6 +80,7 @@ data HsQuasiQuote id = HsQuasiQuote
 		       	   id		-- The quasi-quoter
 		       	   SrcSpan	-- The span of the enclosed string
 		       	   FastString	-- The enclosed string
+  deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsQuasiQuote id) where
     ppr = ppr_qq
@@ -101,6 +106,7 @@ data HsBang = HsNoBang	-- Only used as a return value for getBangStrictness,
 			-- never appears on a HsBangTy
 	    | HsStrict	-- ! 
 	    | HsUnbox	-- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
+  deriving (Data, Typeable)
 
 instance Outputable HsBang where
     ppr (HsNoBang) = empty
@@ -135,6 +141,7 @@ type LHsPred name = Located (HsPred name)
 data HsPred name = HsClassP name [LHsType name]		 -- class constraint
 		 | HsEqualP (LHsType name) (LHsType name)-- equality constraint
 		 | HsIParam (IPName name) (LHsType name)
+		 deriving (Data, Typeable)
 
 type LHsType name = Located (HsType name)
 
@@ -194,14 +201,15 @@ data HsType name
 
   | HsBangTy	HsBang (LHsType name)	-- Bang-style type annotations 
   | HsRecTy [ConDeclField name]	        -- Only in data type declarations
+  deriving (Data, Typeable)
 
-data HsExplicitFlag = Explicit | Implicit
+data HsExplicitFlag = Explicit | Implicit deriving (Data, Typeable)
 
 data ConDeclField name	-- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_name :: Located name,
 		   cd_fld_type :: LBangType name, 
 		   cd_fld_doc  :: Maybe LHsDocString }
-
+  deriving (Data, Typeable)
 
 -----------------------
 -- Combine adjacent for-alls. 
@@ -257,6 +265,7 @@ data HsTyVarBndr name
       --  *** NOTA BENE *** A "monotype" in a pragma can have
       -- for-alls in it, (mostly to do with dictionaries).  These
       -- must be explicitly Kinded.
+  deriving (Data, Typeable)
 
 hsTyVarName :: HsTyVarBndr name -> name
 hsTyVarName (UserTyVar n _)   = n

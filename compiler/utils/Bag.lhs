@@ -18,9 +18,12 @@ module Bag (
         mapBagM, mapAndUnzipBagM
     ) where
 
-import Outputable
-import Util ( isSingleton )
+#include "Typeable.h"
 
+import Outputable
+import Util
+
+import Data.Data
 import Data.List ( partition )
 
 infixr 3 `consBag`
@@ -188,4 +191,12 @@ bagToList b = foldrBag (:) [] b
 \begin{code}
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))
+
+INSTANCE_TYPEABLE1(Bag,bagTc,"Bag")
+
+instance Data a => Data (Bag a) where
+  gfoldl k z b = z listToBag `k` bagToList b -- traverse abstract type abstractly
+  toConstr _   = abstractConstr $ "Bag("++show (typeOf (undefined::a))++")"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "Bag"
 \end{code}

@@ -7,6 +7,7 @@
 \begin{code}
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module TypeRep (
 	TyThing(..), 
@@ -61,6 +62,9 @@ import Class
 import PrelNames
 import Outputable
 import FastString
+
+-- libraries
+import Data.Data hiding ( TyCon )
 \end{code}
 
 	----------------------
@@ -155,6 +159,7 @@ data Type
 	                -- of a 'FunTy' (unlike the 'PredType' constructors 'ClassP' or 'IParam')
 	                
 	                -- See Note [PredTy], and Note [Equality predicates]
+  deriving (Data, Typeable)
 
 -- | The key type representing kinds in the compiler.
 -- Invariant: a kind is always in one of these forms:
@@ -196,6 +201,7 @@ data PredType
   = ClassP Class [Type]		-- ^ Class predicate e.g. @Eq a@
   | IParam (IPName Name) Type	-- ^ Implicit parameter e.g. @?x :: Int@
   | EqPred Type Type		-- ^ Equality predicate e.g @ty1 ~ ty2@
+  deriving (Data, Typeable)
 
 -- | A collection of 'PredType's
 type ThetaType = [PredType]

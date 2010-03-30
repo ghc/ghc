@@ -4,11 +4,18 @@ module HsExpr where
 import SrcLoc	  ( Located )
 import Outputable ( SDoc, OutputableBndr )
 import {-# SOURCE #-} HsPat  ( LPat )
+
+import Data.Data
 	
 data HsExpr i
 data HsSplice i
 data MatchGroup a
 data GRHSs a
+
+instance Data i => Data (HsSplice i)
+instance Data i => Data (HsExpr i)
+instance Data i => Data (MatchGroup i)
+instance Data i => Data (GRHSs i)
 
 type LHsExpr a = Located (HsExpr a)
 type SyntaxExpr a = HsExpr a

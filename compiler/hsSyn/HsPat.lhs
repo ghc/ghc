@@ -11,6 +11,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module HsPat (
 	Pat(..), InPat, OutPat, LPat, 
@@ -46,6 +47,8 @@ import Outputable
 import Type
 import SrcLoc
 import FastString
+-- libraries:
+import Data.Data hiding (TyCon)
 \end{code}
 
 
@@ -151,6 +154,7 @@ data Pat id
 	    	Type			-- Type of whole pattern, t1
 	-- During desugaring a (CoPat co pat) turns into a cast with 'co' on 
 	-- the scrutinee, followed by a match on 'pat'
+  deriving (Data, Typeable)
 \end{code}
 
 HsConDetails is use for patterns/expressions *and* for data type declarations
@@ -160,6 +164,7 @@ data HsConDetails arg rec
   = PrefixCon [arg]             -- C p1 p2 p3
   | RecCon    rec		-- C { x = p1, y = p2 }
   | InfixCon  arg arg		-- p1 `C` p2
+  deriving (Data, Typeable)
 
 type HsConPatDetails id = HsConDetails (LPat id) (HsRecFields id (LPat id))
 
@@ -178,6 +183,7 @@ data HsRecFields id arg 	-- A bunch of record fields
 	-- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [HsRecField id arg],
 		  rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
+  deriving (Data, Typeable)
 
 -- Note [DotDot fields]
 -- ~~~~~~~~~~~~~~~~~~~~
@@ -197,7 +203,7 @@ data HsRecField id arg = HsRecField {
 	hsRecFieldId  :: Located id,
 	hsRecFieldArg :: arg,		-- Filled in by renamer
 	hsRecPun      :: Bool 		-- Note [Punning]
-  }
+  } deriving (Data, Typeable)
 
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~

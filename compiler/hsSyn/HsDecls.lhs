@@ -12,6 +12,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Abstract syntax of global declarations.
 --
@@ -76,6 +77,7 @@ import SrcLoc
 import FastString
 
 import Control.Monad    ( liftM )
+import Data.Data
 import Data.Maybe       ( isJust )
 \end{code}
 
@@ -103,6 +105,7 @@ data HsDecl id
   | SpliceD	(SpliceDecl id)
   | DocD	(DocDecl)
   | QuasiQuoteD	(HsQuasiQuote id)
+  deriving (Data, Typeable)
 
 
 -- NB: all top-level fixity decls are contained EITHER
@@ -138,7 +141,7 @@ data HsGroup id
 	hs_ruleds :: [LRuleDecl id],
 
 	hs_docs   :: [LDocDecl]
-  }
+  } deriving (Data, Typeable)
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
@@ -230,6 +233,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 	  ppr_ds ds = blankLine $$ vcat (map ppr ds)
 
 data SpliceDecl id = SpliceDecl (Located (HsExpr id))	-- Top level splice
+    deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
    ppr (SpliceDecl e) = ptext (sLit "$") <> parens (pprExpr (unLoc e))
@@ -480,15 +484,17 @@ data TyClDecl name
                                                         --   latter for defaults
 		tcdDocs    :: [LDocDecl]		-- ^ Haddock docs
     }
+  deriving (Data, Typeable)
 
 data NewOrData
   = NewType			-- ^ @newtype Blah ...@
   | DataType			-- ^ @data Blah ...@
-  deriving( Eq )		-- Needed because Demand derives Eq
+  deriving( Eq, Data, Typeable )		-- Needed because Demand derives Eq
 
 data FamilyFlavour
   = TypeFamily			-- ^ @type family ...@
   | DataFamily	                -- ^ @data family ...@
+  deriving (Data, Typeable)
 \end{code}
 
 Simple classifiers
@@ -726,7 +732,7 @@ data ConDecl name
 	--   	       	               GADT-style record decl   C { blah } :: T a b
 	-- Remove this when we no longer parse this stuff, and hence do not
 	-- need to report decprecated use
-    }
+    } deriving (Data, Typeable)
 
 type HsConDeclDetails name = HsConDetails (LBangType name) [ConDeclField name]
 
@@ -739,6 +745,7 @@ data ResType name
    = ResTyH98		-- Constructor was declared using Haskell 98 syntax
    | ResTyGADT (LHsType name)	-- Constructor was declared using GADT-style syntax,
 				--	and here is its result type
+   deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (ResType name) where
 	 -- Debugging only
@@ -814,6 +821,7 @@ data InstDecl name
 		[LSig name]	-- User-supplied pragmatic info
 		[LTyClDecl name]-- Associated types (ie, 'TyData' and
 				-- 'TySynonym' only)
+  deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
@@ -839,6 +847,7 @@ instDeclATs (InstDecl _ _ _ ats) = ats
 type LDerivDecl name = Located (DerivDecl name)
 
 data DerivDecl name = DerivDecl (LHsType name)
+  deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
     ppr (DerivDecl ty) 
@@ -860,6 +869,7 @@ type LDefaultDecl name = Located (DefaultDecl name)
 
 data DefaultDecl name
   = DefaultDecl	[LHsType name]
+  deriving (Data, Typeable)
 
 instance (OutputableBndr name)
 	      => Outputable (DefaultDecl name) where
@@ -887,6 +897,7 @@ type LForeignDecl name = Located (ForeignDecl name)
 data ForeignDecl name
   = ForeignImport (Located name) (LHsType name) ForeignImport  -- defines name
   | ForeignExport (Located name) (LHsType name) ForeignExport  -- uses name
+  deriving (Data, Typeable)
 
 -- Specification Of an imported external entity in dependence on the calling
 -- convention 
@@ -909,6 +920,7 @@ data ForeignImport = -- import of a C entity
 			      Safety	      -- safe or unsafe
 			      FastString      -- name of C header
 			      CImportSpec     -- details of the C entity
+  deriving (Data, Typeable)
 
 -- details of an external C entity
 --
@@ -916,11 +928,13 @@ data CImportSpec = CLabel    CLabelString     -- import address of a C label
 		 | CFunction CCallTarget      -- static or dynamic function
 		 | CWrapper		      -- wrapper to expose closures
 					      -- (former f.e.d.)
+  deriving (Data, Typeable)
 
 -- specification of an externally exported entity in dependence on the calling
 -- convention
 --
 data ForeignExport = CExport  CExportSpec    -- contains the calling convention
+  deriving (Data, Typeable)
 
 -- pretty printing of foreign declarations
 --
@@ -972,10 +986,12 @@ data RuleDecl name
         NameSet                 -- Free-vars from the LHS
 	(Located (HsExpr name))	-- RHS
         NameSet                 -- Free-vars from the RHS
+  deriving (Data, Typeable)
 
 data RuleBndr name
   = RuleBndr (Located name)
   | RuleBndrSig (Located name) (LHsType name)
+  deriving (Data, Typeable)
 
 collectRuleBndrSigTys :: [RuleBndr name] -> [LHsType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
@@ -1009,6 +1025,7 @@ data DocDecl
   | DocCommentPrev HsDocString
   | DocCommentNamed String HsDocString
   | DocGroup Int HsDocString
+  deriving (Data, Typeable)
  
 -- Okay, I need to reconstruct the document comments, but for now:
 instance Outputable DocDecl where
@@ -1034,6 +1051,7 @@ We use exported entities for things to deprecate.
 type LWarnDecl name = Located (WarnDecl name)
 
 data WarnDecl name = Warning name WarningTxt
+  deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (WarnDecl name) where
     ppr (Warning thing txt)
@@ -1050,6 +1068,7 @@ instance OutputableBndr name => Outputable (WarnDecl name) where
 type LAnnDecl name = Located (AnnDecl name)
 
 data AnnDecl name = HsAnnotation (AnnProvenance name) (Located (HsExpr name))
+  deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (AnnDecl name) where
     ppr (HsAnnotation provenance expr) 
@@ -1059,6 +1078,7 @@ instance (OutputableBndr name) => Outputable (AnnDecl name) where
 data AnnProvenance name = ValueAnnProvenance name
                         | TypeAnnProvenance name
                         | ModuleAnnProvenance
+  deriving (Data, Typeable)
 
 annProvenanceName_maybe :: AnnProvenance name -> Maybe name
 annProvenanceName_maybe (ValueAnnProvenance name) = Just name

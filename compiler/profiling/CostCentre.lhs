@@ -10,6 +10,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module CostCentre (
 	CostCentre(..), CcName, IsDupdCC(..), IsCafCC(..),
@@ -44,6 +45,8 @@ import Outputable
 import FastTypes
 import FastString
 import Util	        ( thenCmp )
+
+import Data.Data
 \end{code}
 
 A Cost Centre Stack is something that can be attached to a closure.
@@ -123,6 +126,7 @@ data CostCentre
   | AllCafsCC {	
 		cc_mod  :: Module	-- Name of module defining this CC.
     }
+  deriving (Data, Typeable)
 
 type CcName = FastString
 
@@ -141,8 +145,10 @@ data IsDupdCC
 			-- but we are trying to avoid confusion between
 			-- "subd" and "subsumed".  So we call the former
 			-- "dupd".
+  deriving (Data, Typeable)
 
 data IsCafCC = CafCC | NotCafCC
+  deriving (Data, Typeable)
 
 -- synonym for triple which describes the cost centre info in the generated
 -- code for a module.

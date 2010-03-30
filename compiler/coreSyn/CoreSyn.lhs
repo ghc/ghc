@@ -4,6 +4,7 @@
 %
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
@@ -83,6 +84,7 @@ import FastString
 import Outputable
 import Util
 
+import Data.Data
 import Data.Word
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`
@@ -218,6 +220,7 @@ data Expr b
                                         -- added to expressions in the syntax tree
   | Type  Type			        -- ^ A type: this should only show up at the top
                                         -- level of an Arg
+  deriving (Data, Typeable)
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -233,11 +236,12 @@ data AltCon = DataAlt DataCon	-- ^ A plain data constructor: @case e of { Foo x 
                                 -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
 	    | LitAlt  Literal   -- ^ A literal: @case e of { 1 -> ... }@
 	    | DEFAULT           -- ^ Trivial alternative: @case e of { _ -> ... }@
-	 deriving (Eq, Ord)
+	 deriving (Eq, Ord, Data, Typeable)
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 data Bind b = NonRec b (Expr b)
 	    | Rec [(b, (Expr b))]
+  deriving (Data, Typeable)
 \end{code}
 
 -------------------------- CoreSyn INVARIANTS ---------------------------
@@ -277,6 +281,7 @@ See #type_let#
 data Note
   = SCC CostCentre      -- ^ A cost centre annotation for profiling
   | CoreNote String     -- ^ A generic core annotation, propagated but not used by GHC
+  deriving (Data, Typeable)
 \end{code}
 
 

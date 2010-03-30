@@ -76,12 +76,16 @@ module Util (
         escapeSpaces,
         parseSearchPath,
         Direction(..), reslash,
+
+        -- * Utils for defining Data instances
+        abstractConstr, abstractDataType, mkNoRepType
     ) where
 
 #include "HsVersions.h"
 
 import Panic
 
+import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
@@ -900,5 +904,31 @@ reslash d = f
           slash = case d of
                   Forwards -> '/'
                   Backwards -> '\\'
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection[Utils-Data]{Utils for defining Data instances}
+%*                                                                      *
+%************************************************************************
+
+These functions helps us to define Data instances for abstract types.
+
+\begin{code}
+abstractConstr :: String -> Constr
+abstractConstr n = mkConstr (abstractDataType n) ("{abstract:"++n++"}") [] Prefix
+\end{code}
+
+\begin{code}
+abstractDataType :: String -> DataType
+abstractDataType n = mkDataType n [abstractConstr n]
+\end{code}
+
+\begin{code}
+-- Old GHC versions come with a base library with this function misspelled.
+#if __GLASGOW_HASKELL__ < 612
+mkNoRepType :: String -> DataType
+mkNoRepType = mkNorepType
+#endif
 \end{code}
 

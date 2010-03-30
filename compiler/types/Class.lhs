@@ -17,6 +17,8 @@ module Class (
 	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
+#include "Typeable.h"
+
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} TypeRep	( PredType )
 
@@ -24,8 +26,11 @@ import Var
 import Name
 import BasicTypes
 import Unique
+import Util
 import Outputable
 import FastString
+
+import qualified Data.Data as Data
 \end{code}
 
 %************************************************************************
@@ -178,5 +183,14 @@ pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map pprFunDep fds))
 
 pprFunDep :: Outputable a => FunDep a -> SDoc
 pprFunDep (us, vs) = hsep [interppSP us, ptext (sLit "->"), interppSP vs]
+
+instance Data.Typeable Class where
+    typeOf _ = Data.mkTyConApp (Data.mkTyCon "Class") []
+
+instance Data.Data Class where
+    -- don't traverse?
+    toConstr _   = abstractConstr "Class"
+    gunfold _ _  = error "gunfold"
+    dataTypeOf _ = mkNoRepType "Class"
 \end{code}
 

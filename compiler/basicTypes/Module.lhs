@@ -70,6 +70,8 @@ module Module
 	emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
 
+#include "Typeable.h"
+
 import Config
 import Outputable
 import qualified Pretty
@@ -80,6 +82,7 @@ import FastString
 import Binary
 import Util
 
+import Data.Data
 import System.FilePath
 \end{code}
 
@@ -171,6 +174,14 @@ instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
+INSTANCE_TYPEABLE0(ModuleName,moduleNameTc,"ModuleName")
+
+instance Data ModuleName where
+  -- don't traverse?
+  toConstr _   = abstractConstr "ModuleName"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "ModuleName"
+
 stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
 -- ^ Compares module names lexically, rather than by their 'Unique's
 stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
@@ -224,6 +235,14 @@ instance Binary Module where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
   get bh = do p <- get bh; n <- get bh; return (Module p n)
 
+INSTANCE_TYPEABLE0(Module,moduleTc,"Module")
+
+instance Data Module where
+  -- don't traverse?
+  toConstr _   = abstractConstr "Module"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "Module"
+
 -- | This gives a stable ordering, as opposed to the Ord instance which
 -- gives an ordering based on the 'Unique's of the components, which may
 -- not be stable from run to run of the compiler.
@@ -270,6 +289,14 @@ instance Uniquable PackageId where
 -- ordering.
 instance Ord PackageId where
   nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
+
+INSTANCE_TYPEABLE0(PackageId,packageIdTc,"PackageId")
+
+instance Data PackageId where
+  -- don't traverse?
+  toConstr _   = abstractConstr "PackageId"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "PackageId"
 
 stablePackageIdCmp :: PackageId -> PackageId -> Ordering
 -- ^ Compares package ids lexically, rather than by their 'Unique's

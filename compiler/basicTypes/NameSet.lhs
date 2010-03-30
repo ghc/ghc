@@ -30,9 +30,13 @@ module NameSet (
     ) where
 
 #include "HsVersions.h"
+#include "Typeable.h"
 
 import Name
 import UniqSet
+import Util
+
+import Data.Data
 \end{code}
 
 %************************************************************************
@@ -43,6 +47,14 @@ import UniqSet
 
 \begin{code}
 type NameSet = UniqSet Name
+
+INSTANCE_TYPEABLE0(NameSet,nameSetTc,"NameSet")
+
+instance Data NameSet where
+  gfoldl k z s = z mkNameSet `k` nameSetToList s -- traverse abstractly
+  toConstr _   = abstractConstr "NameSet"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "NameSet"
 
 emptyNameSet	   :: NameSet
 unitNameSet	   :: Name -> NameSet

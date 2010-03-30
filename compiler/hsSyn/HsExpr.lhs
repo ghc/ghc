@@ -3,6 +3,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -24,6 +25,9 @@ import DataCon
 import SrcLoc
 import Outputable
 import FastString
+
+-- libraries:
+import Data.Data hiding (Fixity)
 \end{code}
 
 
@@ -275,6 +279,7 @@ data HsExpr id
 
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
+  deriving (Data, Typeable)
 
 -- HsTupArg is used for tuple sections
 --  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
@@ -282,6 +287,7 @@ data HsExpr id
 data HsTupArg id
   = Present (LHsExpr id)	-- The argument
   | Missing PostTcType		-- The argument is missing, but this is its type
+  deriving (Data, Typeable)
 
 tupArgPresent :: HsTupArg id -> Bool
 tupArgPresent (Present {}) = True
@@ -587,6 +593,7 @@ type HsCmd id = HsExpr id
 type LHsCmd id = LHsExpr id
 
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
+  deriving (Data, Typeable)
 \end{code}
 
 The legal constructors for commands are:
@@ -640,6 +647,7 @@ data HsCmdTop id
              PostTcType       -- return type of the command
              (SyntaxTable id) -- after type checking:
                               -- names used in the command's desugaring
+  deriving (Data, Typeable)
 \end{code}
 
 %************************************************************************
@@ -681,6 +689,7 @@ data MatchGroup id
         PostTcType      -- The type is the type of the entire group
                         --      t1 -> ... -> tn -> tr
                         -- where there are n patterns
+  deriving (Data, Typeable)
 
 type LMatch id = Located (Match id)
 
@@ -690,6 +699,7 @@ data Match id
         (Maybe (LHsType id))    -- A type signature for the result of the match
                                 -- Nothing after typechecking
         (GRHSs id)
+  deriving (Data, Typeable)
 
 isEmptyMatchGroup :: MatchGroup id -> Bool
 isEmptyMatchGroup (MatchGroup ms _) = null ms
@@ -712,13 +722,14 @@ data GRHSs id
   = GRHSs {
       grhssGRHSs :: [LGRHS id],  -- ^ Guarded RHSs
       grhssLocalBinds :: (HsLocalBinds id) -- ^ The where clause
-    }
+    } deriving (Data, Typeable)
 
 type LGRHS id = Located (GRHS id)
 
 -- | Guarded Right Hand Side.
 data GRHS id = GRHS [LStmt id]   -- Guards
                     (LHsExpr id) -- Right hand side
+  deriving (Data, Typeable)
 \end{code}
 
 We know the list must have at least one @Match@ in it.
@@ -887,6 +898,7 @@ data StmtLR idL idR
       , recS_dicts :: DictBinds idR  -- Method bindings of Ids bound by the
                                      -- RecStmt, and used afterwards
       }
+  deriving (Data, Typeable)
 \end{code}
 
 Note [GroupStmt binder map]
@@ -1047,6 +1059,7 @@ pprComp quals body	  -- Prints:  body | qual1, ..., qualn
 data HsSplice id  = HsSplice            --  $z  or $(f 4)
                         id              -- The id is just a unique name to
                         (LHsExpr id)    -- identify this splice point
+  deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsSplice id) where
   ppr = pprSplice
@@ -1062,6 +1075,7 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | DecBrG (HsGroup id)  -- [d| decls |]; result of renamer
                   | TypBr (LHsType id)   -- [t| type  |]
                   | VarBr id             -- 'x, ''T
+  deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsBracket id) where
   ppr = pprHsBracket
@@ -1100,6 +1114,7 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
+  deriving (Data, Typeable)
 \end{code}
 
 \begin{code}
@@ -1133,7 +1148,7 @@ data HsMatchContext id  -- Context of a Match
                                 --    runtime error message to generate]
   | StmtCtxt (HsStmtContext id) -- Pattern of a do-stmt or list comprehension
   | ThPatQuote			-- A Template Haskell pattern quotation [p| (a,b) |]
-  deriving ()
+  deriving (Data, Typeable)
 
 data HsStmtContext id
   = ListComp
@@ -1146,6 +1161,7 @@ data HsStmtContext id
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
   | TransformStmtCtxt (HsStmtContext id) -- A branch of a transform stmt
+  deriving (Data, Typeable)
 \end{code}
 
 \begin{code}

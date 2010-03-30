@@ -14,6 +14,8 @@ types that
 \end{itemize}
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
@@ -67,6 +69,8 @@ module BasicTypes(
 
 import FastString
 import Outputable
+
+import Data.Data hiding (Fixity)
 \end{code}
 
 %************************************************************************
@@ -87,7 +91,7 @@ type Arity = Int
 
 \begin{code}
 data FunctionOrData = IsFunction | IsData
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Data, Typeable)
 
 instance Outputable FunctionOrData where
     ppr IsFunction = text "(function)"
@@ -122,7 +126,7 @@ initialVersion = 1
 -- reason/explanation from a WARNING or DEPRECATED pragma
 data WarningTxt = WarningTxt [FastString]
                 | DeprecatedTxt [FastString]
-    deriving Eq
+    deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
     ppr (WarningTxt    ws) = doubleQuotes (vcat (map ftext ws))
@@ -141,8 +145,9 @@ early in the hierarchy), but also in HsSyn.
 
 \begin{code}
 newtype IPName name = IPName name	-- ?x
-  deriving( Eq, Ord )	-- Ord is used in the IP name cache finite map
-			--	(used in HscTypes.OrigIParamCache)
+  deriving( Eq, Ord, Data, Typeable )
+  -- Ord is used in the IP name cache finite map
+  -- (used in HscTypes.OrigIParamCache)
 
 ipNameName :: IPName name -> name
 ipNameName (IPName n) = n
@@ -173,6 +178,7 @@ type RuleName = FastString
 \begin{code}
 ------------------------
 data Fixity = Fixity Int FixityDirection
+  deriving (Data, Typeable)
 
 instance Outputable Fixity where
     ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
@@ -182,7 +188,7 @@ instance Eq Fixity where		-- Used to determine if two fixities conflict
 
 ------------------------
 data FixityDirection = InfixL | InfixR | InfixN 
-		     deriving(Eq)
+		     deriving (Eq, Data, Typeable)
 
 instance Outputable FixityDirection where
     ppr InfixL = ptext (sLit "infixl")
@@ -263,7 +269,7 @@ instance Outputable TopLevelFlag where
 data Boxity
   = Boxed
   | Unboxed
-  deriving( Eq )
+  deriving( Eq, Data, Typeable )
 
 isBoxed :: Boxity -> Bool
 isBoxed Boxed   = True
@@ -280,7 +286,7 @@ isBoxed Unboxed = False
 \begin{code}
 data RecFlag = Recursive 
 	     | NonRecursive
-	     deriving( Eq )
+	     deriving( Eq, Data, Typeable )
 
 isRec :: RecFlag -> Bool
 isRec Recursive    = True
@@ -587,11 +593,11 @@ data Activation = NeverActive
 		| AlwaysActive
 		| ActiveBefore CompilerPhase	-- Active only *before* this phase
 		| ActiveAfter CompilerPhase	-- Active in this phase and later
-		deriving( Eq )			-- Eq used in comparing rules in HsDecls
+		deriving( Eq, Data, Typeable )			-- Eq used in comparing rules in HsDecls
 
 data RuleMatchInfo = ConLike 			-- See Note [CONLIKE pragma]
                    | FunLike
-                   deriving( Eq )
+                   deriving( Eq, Data, Typeable )
 
 data InlinePragma  	     -- Note [InlinePragma]
   = InlinePragma
@@ -601,7 +607,7 @@ data InlinePragma  	     -- Note [InlinePragma]
       		      	    	     --            explicit (non-type, non-dictionary) args
       , inl_act    :: Activation     -- Says during which phases inlining is allowed
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
-    } deriving( Eq )
+    } deriving( Eq, Data, Typeable )
 \end{code}
 
 Note [InlinePragma]

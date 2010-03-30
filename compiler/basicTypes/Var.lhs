@@ -75,6 +75,7 @@ module Var (
     ) where
 
 #include "HsVersions.h"
+#include "Typeable.h"
 
 import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
@@ -83,9 +84,12 @@ import {-# SOURCE #-}	TypeRep( isCoercionKind )
 
 import Name hiding (varName)
 import Unique
+import Util
 import FastTypes
 import FastString
 import Outputable
+
+import Data.Data
 \end{code}
 
 
@@ -188,6 +192,14 @@ instance Ord Var where
     a >= b = realUnique a >=# realUnique b
     a >	 b = realUnique a >#  realUnique b
     a `compare` b = varUnique a `compare` varUnique b
+
+INSTANCE_TYPEABLE0(Var,varTc,"Var")
+
+instance Data Var where
+  -- don't traverse?
+  toConstr _   = abstractConstr "Var"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "Var"
 \end{code}
 
 

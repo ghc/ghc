@@ -10,6 +10,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module ForeignCall (
 	ForeignCall(..),
@@ -27,6 +28,7 @@ import Outputable
 import Module
 
 import Data.Char
+import Data.Data
 \end{code}
 
 
@@ -63,7 +65,7 @@ data Safety
 
   | PlayRisky		-- None of the above can happen; the call will return
 			-- without interacting with the runtime system at all
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data, Typeable )
 	-- Show used just for Show Lex.Token, I think
   {-! derive: Binary !-}
 
@@ -89,6 +91,7 @@ data CExportSpec
   = CExportStatic		-- foreign export ccall foo :: ty
 	CLabelString		-- C Name of exported function
 	CCallConv
+  deriving (Data, Typeable)
   {-! derive: Binary !-}
 
 data CCallSpec
@@ -121,7 +124,7 @@ data CCallTarget
   --	Used when importing a label as "foreign import ccall "dynamic" ..."
   | DynamicTarget
   
-  deriving( Eq )
+  deriving( Eq, Data, Typeable )
   {-! derive: Binary !-}
 
 isDynamicTarget :: CCallTarget -> Bool
@@ -146,7 +149,7 @@ See: http://www.programmersheaven.com/2/Calling-conventions
 
 \begin{code}
 data CCallConv = CCallConv | StdCallConv | CmmCallConv | PrimCallConv
-  deriving (Eq)
+  deriving (Eq, Data, Typeable)
   {-! derive: Binary !-}
 
 instance Outputable CCallConv where

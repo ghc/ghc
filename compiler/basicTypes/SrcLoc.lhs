@@ -69,11 +69,14 @@ module SrcLoc (
         spans, isSubspanOf
     ) where
 
+#include "Typeable.h"
+
 import Util
 import Outputable
 import FastString
 
 import Data.Bits
+import Data.Data
 \end{code}
 
 %************************************************************************
@@ -181,6 +184,14 @@ instance Outputable SrcLoc where
                   char '\"', pprFastFilePath src_path, text " #-}"]
 
     ppr (UnhelpfulLoc s)  = ftext s
+
+INSTANCE_TYPEABLE0(SrcSpan,srcSpanTc,"SrcSpan")
+
+instance Data SrcSpan where
+  -- don't traverse?
+  toConstr _   = abstractConstr "SrcSpan"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "SrcSpan"
 \end{code}
 
 %************************************************************************
@@ -443,6 +454,7 @@ pprDefnLoc loc
 \begin{code}
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data Located e = L SrcSpan e
+  deriving (Typeable, Data)
 
 unLoc :: Located e -> e
 unLoc (L _ e) = e

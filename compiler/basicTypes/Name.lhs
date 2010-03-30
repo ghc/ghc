@@ -69,12 +69,15 @@ module Name (
 	module OccName
     ) where
 
+#include "Typeable.h"
+
 import {-# SOURCE #-} TypeRep( TyThing )
 
 import OccName
 import Module
 import SrcLoc
 import Unique
+import Util
 import Maybes
 import Binary
 import StaticFlags
@@ -83,6 +86,7 @@ import FastString
 import Outputable
 
 import Data.Array
+import Data.Data
 import Data.Word        ( Word32 )
 \end{code}
 
@@ -358,6 +362,14 @@ instance Uniquable Name where
 
 instance NamedThing Name where
     getName n = n
+
+INSTANCE_TYPEABLE0(Name,nameTc,"Name")
+
+instance Data Name where
+  -- don't traverse?
+  toConstr _   = abstractConstr "Name"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "Name"
 \end{code}
 
 %************************************************************************

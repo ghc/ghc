@@ -54,6 +54,7 @@ import Util
 import FastString
 import Module
 
+import qualified Data.Data as Data
 import Data.Char
 import Data.Word
 import Data.List ( partition )
@@ -454,6 +455,15 @@ instance Outputable DataCon where
 
 instance Show DataCon where
     showsPrec p con = showsPrecSDoc p (ppr con)
+
+instance Data.Typeable DataCon where
+    typeOf _ = Data.mkTyConApp (Data.mkTyCon "DataCon") []
+
+instance Data.Data DataCon where
+    -- don't traverse?
+    toConstr _   = abstractConstr "DataCon"
+    gunfold _ _  = error "gunfold"
+    dataTypeOf _ = mkNoRepType "DataCon"
 \end{code}
 
 

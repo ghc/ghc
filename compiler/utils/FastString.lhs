@@ -93,12 +93,14 @@ import Encoding
 import FastTypes
 import FastFunctions
 import Panic
+import Util
 
 import Foreign
 import Foreign.C
 import GHC.Exts
 import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
+import Data.Data
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
@@ -133,7 +135,7 @@ data FastString = FastString {
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       buf     :: {-# UNPACK #-} !(ForeignPtr Word8),
       enc     :: FSEncoding
-  }
+  } deriving Typeable
 
 data FSEncoding
     -- including strings that don't need any encoding
@@ -158,6 +160,12 @@ instance Ord FastString where
 
 instance Show FastString where
    show fs = show (unpackFS fs)
+
+instance Data FastString where
+  -- don't traverse?
+  toConstr _   = abstractConstr "FastString"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "FastString"
 
 cmpFS :: FastString -> FastString -> Ordering
 cmpFS (FastString u1 l1 _ buf1 _) (FastString u2 l2 _ buf2 _) =

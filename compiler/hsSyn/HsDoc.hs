@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module HsDoc (
   HsDocString(..),
   LHsDocString,
@@ -10,8 +12,10 @@ import Outputable
 import SrcLoc
 import FastString
 
+import Data.Data
+
 newtype HsDocString = HsDocString FastString
-  deriving (Eq, Show)
+  deriving (Eq, Show, Data, Typeable)
 
 type LHsDocString = Located HsDocString
 

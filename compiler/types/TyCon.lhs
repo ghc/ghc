@@ -95,6 +95,8 @@ import Maybes
 import Outputable
 import FastString
 import Constants
+import Util
+import qualified Data.Data as Data
 import Data.List( elemIndex )
 \end{code}
 
@@ -1251,4 +1253,13 @@ instance Outputable TyCon where
 
 instance NamedThing TyCon where
     getName = tyConName
+
+instance Data.Typeable TyCon where
+    typeOf _ = Data.mkTyConApp (Data.mkTyCon "TyCon") []
+
+instance Data.Data TyCon where
+    -- don't traverse?
+    toConstr _   = abstractConstr "TyCon"
+    gunfold _ _  = error "gunfold"
+    dataTypeOf _ = mkNoRepType "TyCon"
 \end{code}

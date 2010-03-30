@@ -11,6 +11,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Literal
 	( 
@@ -55,6 +56,7 @@ import Data.Int
 import Data.Ratio
 import Data.Word
 import Data.Char
+import Data.Data
 \end{code}
 
 
@@ -106,6 +108,7 @@ data Literal
 				--    the label expects. Only applicable with
 				--    @stdcall@ labels. @Just x@ => @\<x\>@ will
 				--    be appended to label name when emitting assembly.
+  deriving (Data, Typeable)
 \end{code}
 
 Binary instance

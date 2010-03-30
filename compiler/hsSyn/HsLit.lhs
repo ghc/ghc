@@ -5,6 +5,8 @@
 \section[HsLit]{Abstract syntax: source-language literals}
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module HsLit where
 
 #include "HsVersions.h"
@@ -14,6 +16,8 @@ import HsTypes (PostTcType)
 import Type	( Type )
 import Outputable
 import FastString
+
+import Data.Data
 \end{code}
 
 
@@ -40,6 +44,7 @@ data HsLit
 					-- 	(overloaded literals are done with HsOverLit)
   | HsFloatPrim	    Rational		-- Unboxed Float
   | HsDoublePrim    Rational		-- Unboxed Double
+  deriving (Data, Typeable)
 
 instance Eq HsLit where
   (HsChar x1)	    == (HsChar x2)	 = x1==x2
@@ -62,11 +67,13 @@ data HsOverLit id 	-- An overloaded literal
 					-- False <=> standard syntax
 	ol_witness :: SyntaxExpr id,	-- Note [Overloaded literal witnesses]
 	ol_type :: PostTcType }
+  deriving (Data, Typeable)
 
 data OverLitVal
   = HsIntegral   !Integer   	-- Integer-looking literals;
   | HsFractional !Rational   	-- Frac-looking literals
   | HsIsString   !FastString 	-- String-looking literals
+  deriving (Data, Typeable)
 
 overLitType :: HsOverLit a -> Type
 overLitType = ol_type

@@ -4,6 +4,7 @@
 %
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- |
 -- #name_types#
@@ -67,6 +68,8 @@ import SrcLoc
 import FastString
 import Outputable
 import Util
+
+import Data.Data
 \end{code}
 
 %************************************************************************
@@ -107,6 +110,7 @@ data RdrName
 	--  (2) By Template Haskell, when TH has generated a unique name
 	--
 	-- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
+  deriving (Data, Typeable)
 \end{code}
 
 

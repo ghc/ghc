@@ -2,6 +2,10 @@
 module HsPat where
 import SrcLoc( Located )
 
+import Data.Data
+
 data Pat i
 type LPat i = Located (Pat i)
+
+instance Data i => Data (Pat i)
 \end{code}

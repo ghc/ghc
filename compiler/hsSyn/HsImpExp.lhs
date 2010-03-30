@@ -12,6 +12,7 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module HsImpExp where
 
@@ -21,6 +22,8 @@ import HsDoc		( HsDocString )
 import Outputable
 import FastString
 import SrcLoc		( Located(..) )
+
+import Data.Data
 \end{code}
 
 %************************************************************************
@@ -42,7 +45,7 @@ data ImportDecl name
       ideclQualified :: Bool,               -- ^ True => qualified
       ideclAs        :: Maybe ModuleName,   -- ^ as Module
       ideclHiding    :: Maybe (Bool, [LIE name]) -- ^ (True => hiding, names)
-    }
+    } deriving (Data, Typeable)
 \end{code}
 
 \begin{code}
@@ -91,6 +94,7 @@ data IE name
   | IEGroup             Int HsDocString  -- ^ Doc section heading
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
+  deriving (Data, Typeable)
 \end{code}
 
 \begin{code}
