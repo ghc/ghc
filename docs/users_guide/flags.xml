@@ -1543,14 +1543,14 @@ phase <replaceable>n</replaceable></entry>
 	    <row>
 	      <entry><option>-auto</option></entry>
 	      <entry>Auto-add <literal>_scc_</literal>s to all
-	      exported functions</entry>
+	      exported functions not marked INLINE</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-no-auto</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-auto-all</option></entry>
 	      <entry>Auto-add <literal>_scc_</literal>s to all
-	      top-level functions</entry>
+	      top-level functions not marked INLINE</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-no-auto-all</option></entry>
 	    </row>

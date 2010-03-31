@@ -633,6 +633,7 @@ See Note [Rules for seq] in MkId for the details.
 data AutoScc = NoSccs 
 	     | AddSccs Module (Id -> Bool)
 -- The (Id->Bool) says which Ids to add SCCs to 
+-- But we never add a SCC to function marked INLINE
 
 addAutoScc :: AutoScc	
 	   -> Id	-- Binder
@@ -640,6 +641,8 @@ addAutoScc :: AutoScc
 	   -> CoreExpr	-- Scc'd Rhs
 
 addAutoScc NoSccs _ rhs
+  = rhs
+addAutoScc _ id rhs | isInlinePragma (idInlinePragma id)
   = rhs
 addAutoScc (AddSccs mod add_scc) id rhs
   | add_scc id = mkSCC (mkAutoCC id mod NotCafCC) rhs

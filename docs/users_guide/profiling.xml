@@ -249,8 +249,8 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
       <para>Cost centres are just program annotations.  When you say
       <option>-auto-all</option> to the compiler, it automatically
       inserts a cost centre annotation around every top-level function
-      in your program, but you are entirely free to add the cost
-      centre annotations yourself.</para>
+      not marked INLINE in your program, but you are entirely free to
+      add the cost centre annotations yourself.</para>
 
       <para>The syntax of a cost centre annotation is</para>
 
@@ -401,7 +401,9 @@ x = nfib 25
 	<listitem>
 	  <para> GHC will automatically add
           <function>&lowbar;scc&lowbar;</function> constructs for all
-          top-level, exported functions.</para>
+          top-level, exported functions not marked INLINE. If you
+          want a cost centre on an INLINE function, you have to add
+          it manually.</para>
 	</listitem>
       </varlistentry>
       
@@ -411,9 +413,11 @@ x = nfib 25
           <indexterm><primary><option>-auto-all</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para> <emphasis>All</emphasis> top-level functions,
-	  exported or not, will be automatically
-	  <function>&lowbar;scc&lowbar;</function>'d.</para>
+          <para> <emphasis>All</emphasis> top-level functions
+          not marked INLINE, exported or not, will be automatically
+          <function>&lowbar;scc&lowbar;</function>'d.
+          The functions marked INLINE must be given a cost centre
+          manually.</para>
 	</listitem>
       </varlistentry>
 
