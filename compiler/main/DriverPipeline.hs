@@ -1305,12 +1305,14 @@ mkExtraCObj dflags xs
       oFile <- newTempName dflags "o"
       writeFile cFile $ unlines xs
       let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
+          (md_c_flags, _) = machdepCCOpts dflags
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,
                        Option        "-o",
                        FileOption "" oFile] ++
-                      map (FileOption "-I") (includeDirs rtsDetails))
+                      map (FileOption "-I") (includeDirs rtsDetails) ++
+                      map Option md_c_flags)
       return oFile
 
 -- generates a Perl skript starting a parallel prg under PVM
