@@ -286,7 +286,7 @@
         </term>
 	<listitem>
 	  <para>Show the output of each run of the simplifier.  Used when even
-        <option>-dverbose-simpl</option> doesn't cut it.</para>
+        <option>-dverbose-core2core</option> doesn't cut it.</para>
 	</listitem>
       </varlistentry>
 
@@ -375,7 +375,7 @@
         of output!) So: when we're really desperate:</para>
 
 	  <screen>
-% ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
+% ghc -noC -O -ddump-simpl -dverbose-core2core -dcore-lint Foo.hs
 </screen>
 
 	</listitem>
