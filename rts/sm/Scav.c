@@ -550,23 +550,6 @@ scavenge_block (bdescr *bd)
     }
 
     case IND_PERM:
-      if (bd->gen_no != 0) {
-#ifdef PROFILING
-        // @LDV profiling
-        // No need to call LDV_recordDead_FILL_SLOP_DYNAMIC() because an 
-        // IND_OLDGEN_PERM closure is larger than an IND_PERM closure.
-        LDV_recordDead((StgClosure *)p, sizeofW(StgInd));
-#endif        
-        // 
-        // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
-        //
-	SET_INFO(((StgClosure *)p), &stg_IND_OLDGEN_PERM_info);
-
-        // We pretend that p has just been created.
-        LDV_RECORD_CREATE((StgClosure *)p);
-      }
-	// fall through 
-    case IND_OLDGEN_PERM:
     case BLACKHOLE:
 	evacuate(&((StgInd *)p)->indirectee);
 	p += sizeofW(StgInd);
@@ -896,8 +879,6 @@ scavenge_mark_stack(void)
 	    break;
 
 	case IND:
-	case IND_OLDGEN:
-	case IND_OLDGEN_PERM:
         case BLACKHOLE:
 	    evacuate(&((StgInd *)p)->indirectee);
 	    break;
@@ -1284,8 +1265,6 @@ scavenge_one(StgPtr p)
         // IND can happen, for example, when the interpreter allocates
         // a gigantic AP closure (more than one block), which ends up
         // on the large-object list and then gets updated.  See #3424.
-    case IND_OLDGEN:
-    case IND_OLDGEN_PERM:
     case BLACKHOLE:
     case IND_STATIC:
 	evacuate(&((StgInd *)p)->indirectee);

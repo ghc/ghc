@@ -50,9 +50,7 @@ StgWord16 closure_flags[] = {
  [PAP]		   	=  (_HNF|     _NS				 ),
  [AP_STACK]	   	=  (          	       _THU			 ),
  [IND]		   	=  (          _NS|			  _IND ),
- [IND_OLDGEN]	   	=  (          _NS|			  _IND ),
  [IND_PERM]		=  (          _NS|			  _IND ),
- [IND_OLDGEN_PERM]	=  (          _NS|			  _IND ),
  [IND_STATIC]	   	=  (          _NS|_STA|                   _IND ),
  [RET_BCO]		=  (     _BTM                                  ),
  [RET_SMALL]		=  (     _BTM|                       _SRT      ),
@@ -84,6 +82,6 @@ StgWord16 closure_flags[] = {
  [WHITEHOLE]		=  ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 61
+#if N_CLOSURE_TYPES != 59
 #error Closure types changed: update ClosureFlags.c!
 #endif

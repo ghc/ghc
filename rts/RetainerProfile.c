@@ -466,8 +466,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	*first_child = ((StgSelector *)c)->selectee;
 	return;
     case IND_PERM:
-    case IND_OLDGEN_PERM:
-    case IND_OLDGEN:
     case BLACKHOLE:
 	*first_child = ((StgInd *)c)->indirectee;
 	return;
@@ -921,8 +919,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case MUT_VAR_DIRTY:
 	case THUNK_SELECTOR:
 	case IND_PERM:
-	case IND_OLDGEN_PERM:
-	case IND_OLDGEN:
 	case CONSTR_1_1:
 	    // cannot appear
 	case PAP:
@@ -1058,8 +1054,6 @@ isRetainer( StgClosure *c )
     case PAP:
 	// indirection
     case IND_PERM:
-    case IND_OLDGEN_PERM:
-    case IND_OLDGEN:
     case BLACKHOLE:
 	// static objects
     case CONSTR_STATIC:

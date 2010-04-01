@@ -620,7 +620,6 @@ loop:
 
   case FUN:
   case IND_PERM:
-  case IND_OLDGEN_PERM:
   case CONSTR:
       copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen,tag);
       return;
@@ -666,7 +665,6 @@ loop:
       return;
 
   case IND:
-  case IND_OLDGEN:
     // follow chains of indirections, don't evacuate them 
     q = ((StgInd*)q)->indirectee;
     *p = q;
@@ -971,8 +969,6 @@ selector_loop:
                   switch (info->type) {
                   case IND:
                   case IND_PERM:
-                  case IND_OLDGEN:
-                  case IND_OLDGEN_PERM:
                   case IND_STATIC:
                       val = ((StgInd *)val)->indirectee;
                       goto val_loop;
@@ -1006,8 +1002,6 @@ selector_loop:
 
       case IND:
       case IND_PERM:
-      case IND_OLDGEN:
-      case IND_OLDGEN_PERM:
       case IND_STATIC:
           // Again, we might need to untag a constructor.
           selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );

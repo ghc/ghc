@@ -142,18 +142,16 @@ processHeapClosureForDead( StgClosure *c )
     case BLACKHOLE:
     case BLOCKING_QUEUE:
     case IND_PERM:
-    case IND_OLDGEN_PERM:
 	/*
 	  'Ingore' cases
 	*/
-	// Why can we ignore IND/IND_OLDGEN closures? We assume that
+	// Why can we ignore IND closures? We assume that
 	// any census is preceded by a major garbage collection, which
-	// IND/IND_OLDGEN closures cannot survive. Therefore, it is no
-	// use considering IND/IND_OLDGEN closures in the meanwhile
+	// IND closures cannot survive. Therefore, it is no
+	// use considering IND closures in the meanwhile
 	// because they will perish before the next census at any
 	// rate.
     case IND:
-    case IND_OLDGEN:
 	// Found a dead closure: record its size
 	LDV_recordDead(c, size);
 	return size;

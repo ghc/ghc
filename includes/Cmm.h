@@ -295,9 +295,7 @@
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {	\
   case							\
     IND,						\
-    IND_OLDGEN,						\
     IND_PERM,						\
-    IND_OLDGEN_PERM,					\
     IND_STATIC:						\
    {							\
       P1 = StgInd_indirectee(P1);			\

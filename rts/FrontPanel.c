@@ -700,7 +700,6 @@ residencyCensus( void )
 		    case MUT_VAR:
 /*		    case MUT_CONS: FIXME: case does not exist */
 		    case IND_PERM:
-		    case IND_OLDGEN_PERM:
 			size = sizeW_fromITBL(info);
 			type = Other;
 			break;

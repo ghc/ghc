@@ -235,45 +235,6 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
     jump %GET_ENTRY(R1);
 }  
 
-
-INFO_TABLE(stg_IND_OLDGEN,1,0,IND_OLDGEN,"IND_OLDGEN","IND_OLDGEN")
-{
-    TICK_ENT_STATIC_IND();	/* tick */
-    R1 = UNTAG(StgInd_indirectee(R1));
-    TICK_ENT_VIA_NODE();
-    jump %GET_ENTRY(R1);
-}
-
-INFO_TABLE(stg_IND_OLDGEN_PERM,1,0,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN_PERM")
-{
-    /* Don't: TICK_ENT_STATIC_IND(Node); for ticky-ticky; 
-       this ind is here only to help profiling */
-
-#if defined(TICKY_TICKY) && !defined(PROFILING)
-    /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, 
-       rather than being extra  */
-    TICK_ENT_PERM_IND(); /* tick */
-#endif
-
-    LDV_ENTER(R1);
-
-    /* Enter PAP cost centre -- lexical scoping only */
-    ENTER_CCS_PAP_CL(R1);
-
-    /* see comment in IND_PERM */
-#ifdef TICKY_TICKY
-#  ifdef PROFILING
-#    error Profiling and ticky-ticky do not mix at present!
-#  endif  /* PROFILING */
-    StgHeader_info(R1) = stg_IND_OLDGEN_info;
-#endif /* TICKY_TICKY */
-
-    R1 = UNTAG(StgInd_indirectee(R1));
-
-    TICK_ENT_VIA_NODE();
-    jump %GET_ENTRY(R1);
-}
-
 /* ----------------------------------------------------------------------------
    Black holes.
 

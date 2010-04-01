@@ -233,20 +233,8 @@ printClosure( StgClosure *obj )
             debugBelch(")\n"); 
             break;
 
-    case IND_OLDGEN:
-            debugBelch("IND_OLDGEN("); 
-            printPtr((StgPtr)((StgInd*)obj)->indirectee);
-            debugBelch(")\n"); 
-            break;
-
     case IND_PERM:
             debugBelch("IND("); 
-            printPtr((StgPtr)((StgInd*)obj)->indirectee);
-            debugBelch(")\n"); 
-            break;
-
-    case IND_OLDGEN_PERM:
-            debugBelch("IND_OLDGEN_PERM("); 
             printPtr((StgPtr)((StgInd*)obj)->indirectee);
             debugBelch(")\n"); 
             break;
@@ -994,9 +982,7 @@ void prettyPrintClosure_ (StgClosure *obj)
            
     while (type == IND ||
            type == IND_STATIC ||
-           type == IND_OLDGEN ||
-           type == IND_PERM ||
-           type == IND_OLDGEN_PERM) 
+           type == IND_PERM)
     {
       obj = ((StgInd *)obj)->indirectee;
       type = get_itbl(obj)->type;
@@ -1108,9 +1094,7 @@ char *closure_type_names[] = {
  [PAP]                   = "PAP",
  [AP_STACK]              = "AP_STACK",
  [IND]                   = "IND",
- [IND_OLDGEN]            = "IND_OLDGEN",
  [IND_PERM]              = "IND_PERM",
- [IND_OLDGEN_PERM]       = "IND_OLDGEN_PERM",
  [IND_STATIC]            = "IND_STATIC",
  [RET_BCO]               = "RET_BCO",
  [RET_SMALL]             = "RET_SMALL",

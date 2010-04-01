@@ -90,8 +90,6 @@ isAlive(StgClosure *p)
     case IND:
     case IND_STATIC:
     case IND_PERM:
-    case IND_OLDGEN:		// rely on compatible layout with StgInd 
-    case IND_OLDGEN_PERM:
       // follow indirections 
       p = ((StgInd *)q)->indirectee;
       continue;

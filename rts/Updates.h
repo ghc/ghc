@@ -22,8 +22,8 @@ BEGIN_RTS_PRIVATE
  * which p1 resides.
  *
  * Note: 
- *   After all, we do *NOT* need to call LDV_RECORD_CREATE() for both IND and 
- *   IND_OLDGEN closures because they are inherently used. But, it corrupts
+ *   After all, we do *NOT* need to call LDV_RECORD_CREATE() for IND
+ *   closures because they are inherently used. But, it corrupts
  *   the invariants that every closure keeps its creation time in the profiling
  *  field. So, we call LDV_RECORD_CREATE().
  */

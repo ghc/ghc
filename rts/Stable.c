@@ -188,9 +188,7 @@ removeIndirections(StgClosure* p)
 
   while (get_itbl(q)->type == IND ||
          get_itbl(q)->type == IND_STATIC ||
-         get_itbl(q)->type == IND_OLDGEN ||
-         get_itbl(q)->type == IND_PERM ||
-         get_itbl(q)->type == IND_OLDGEN_PERM ) {
+         get_itbl(q)->type == IND_PERM) {
       q = ((StgInd *)q)->indirectee;
       tag = GET_CLOSURE_TAG(q);
       q = UNTAG_CLOSURE(q);
