@@ -137,7 +137,10 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 /* Push a thread on the beginning of the run queue.
  * ASSUMES: cap->running_task is the current task.
  */
-INLINE_HEADER void
+EXTERN_INLINE void
+pushOnRunQueue (Capability *cap, StgTSO *tso);
+
+EXTERN_INLINE void
 pushOnRunQueue (Capability *cap, StgTSO *tso)
 {
     setTSOLink(cap, tso, cap->run_queue_hd);
