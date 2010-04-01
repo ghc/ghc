@@ -42,7 +42,7 @@ gen_blocks_list par maxx maxy block_size scene =
      blocks  = [ (x*block_size, y*block_size)
                | x <- [0..xblocks-1],
                  y <- [0..yblocks-1] ]
-     mapper = if par then parMap rnf else map
+     mapper = if par then parMap rdeepseq else map
      pixels  = mapper
                (\(x,y) -> gen_pixel_list x y (x+block_size) (y+block_size) maxx maxy scene)
                blocks
