@@ -123,6 +123,10 @@ void
 ioManagerDie (void)
 {
     sendIOManagerEvent(IO_MANAGER_DIE);
+    // IO_MANAGER_DIE must be idempotent, as it is called
+    // repeatedly by shutdownCapability().  Try conc059(threaded1) to
+    // illustrate the problem.
+    io_manager_event = INVALID_HANDLE_VALUE;
     // ToDo: wait for the IO manager to pick up the event, and
     // then release the Event and Mutex objects we've allocated.
 }
