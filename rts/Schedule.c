@@ -1309,9 +1309,6 @@ scheduleHandleThreadBlocked( StgTSO *t
 
     // ASSERT(t->why_blocked != NotBlocked);
     // Not true: for example,
-    //    - in THREADED_RTS, the thread may already have been woken
-    //      up by another Capability.  This actually happens: try
-    //      conc023 +RTS -N2.
     //    - the thread may have woken itself up already, because
     //      threadPaused() might have raised a blocked throwTo
     //      exception, see maybePerformBlockedException().
