@@ -227,8 +227,12 @@
    /* same as above but don't unblock async exceptions in resumeThread() */
 
 /* Involved in a message sent to tso->msg_cap */
-#define BlockedOnMsgWakeup  12
-#define BlockedOnMsgThrowTo 13
+#define BlockedOnMsgThrowTo 12
+
+/* The thread is not on any run queues, but can be woken up 
+   by tryWakeupThread() */
+#define ThreadMigrating     13
+
 /*
  * These constants are returned to the scheduler by a thread that has
  * stopped for one reason or another.  See typedef StgThreadReturnCode

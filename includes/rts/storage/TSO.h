@@ -82,7 +82,6 @@ typedef struct StgTSO_ {
     /*
       Currently used for linking TSOs on:
       * cap->run_queue_{hd,tl}
-      * MVAR queue
       * (non-THREADED_RTS); the blocked_queue
       * and pointing to the relocated version of a ThreadRelocated
 

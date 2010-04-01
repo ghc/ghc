@@ -109,7 +109,8 @@ typedef struct bdescr_ {
 
 #else
 
-INLINE_HEADER bdescr *Bdescr(StgPtr p)
+EXTERN_INLINE bdescr *Bdescr(StgPtr p);
+EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 {
   return (bdescr *)
     ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) 

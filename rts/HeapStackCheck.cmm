@@ -481,9 +481,13 @@ INFO_TABLE_RET( stg_gc_gen, RET_DYN )
 
 stg_gc_gen
 {
+    // Hack; see Note [mvar-heap-check] in PrimOps.cmm
+    if (R10 == stg_putMVarzh || R10 == stg_takeMVarzh) {
+       unlockClosure(R1, stg_MVAR_DIRTY_info)
+    }
     SAVE_EVERYTHING;
     GC_GENERIC
-}	  
+}
 
 // A heap check at an unboxed tuple return point.  The return address
 // is on the stack, and we can find it by using the offsets given
@@ -583,11 +587,7 @@ INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, P_ unused )
 // code fragment executed just before we return to the scheduler
 stg_block_takemvar_finally
 {
-#ifdef THREADED_RTS
     unlockClosure(R3, stg_MVAR_DIRTY_info);
-#else
-    SET_INFO(R3, stg_MVAR_DIRTY_info);
-#endif
     jump StgReturn;
 }
 

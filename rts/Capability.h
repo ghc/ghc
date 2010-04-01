@@ -199,9 +199,9 @@ extern volatile StgWord waiting_for_gc;
 //
 void waitForReturnCapability (Capability **cap/*in/out*/, Task *task);
 
-INLINE_HEADER void recordMutableCap (StgClosure *p, Capability *cap, nat gen);
+EXTERN_INLINE void recordMutableCap (StgClosure *p, Capability *cap, nat gen);
 
-INLINE_HEADER void recordClosureMutated (Capability *cap, StgClosure *p);
+EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 
 #if defined(THREADED_RTS)
 
@@ -291,7 +291,7 @@ INLINE_HEADER rtsBool emptyInbox(Capability *cap);;
  * INLINE functions... private below here
  * -------------------------------------------------------------------------- */
 
-INLINE_HEADER void
+EXTERN_INLINE void
 recordMutableCap (StgClosure *p, Capability *cap, nat gen)
 {
     bdescr *bd;
@@ -310,7 +310,7 @@ recordMutableCap (StgClosure *p, Capability *cap, nat gen)
     *bd->free++ = (StgWord)p;
 }
 
-INLINE_HEADER void
+EXTERN_INLINE void
 recordClosureMutated (Capability *cap, StgClosure *p)
 {
     bdescr *bd;

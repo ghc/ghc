@@ -305,11 +305,17 @@ typedef struct {
 
 /* Concurrent communication objects */
 
+typedef struct StgMVarTSOQueue_ {
+    StgHeader                header;
+    struct StgMVarTSOQueue_ *link;
+    struct StgTSO_          *tso;
+} StgMVarTSOQueue;
+
 typedef struct {
-  StgHeader       header;
-  struct StgTSO_ *head;
-  struct StgTSO_ *tail;
-  StgClosure*     value;
+    StgHeader                header;
+    struct StgMVarTSOQueue_ *head;
+    struct StgMVarTSOQueue_ *tail;
+    StgClosure*              value;
 } StgMVar;
 
 

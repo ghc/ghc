@@ -84,7 +84,6 @@ scavengeTSO (StgTSO *tso)
     evacuate((StgClosure **)&tso->_link);
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
-	|| tso->why_blocked == BlockedOnMsgWakeup
 	|| tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
 	) {
@@ -896,6 +895,7 @@ scavenge_mark_stack(void)
 	    // no "old" generation.
 	    break;
 
+	case IND:
 	case IND_OLDGEN:
 	case IND_OLDGEN_PERM:
         case BLACKHOLE:
@@ -1407,7 +1407,6 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                     evacuate((StgClosure **)&tso->_link);
                     if (   tso->why_blocked == BlockedOnMVar
                         || tso->why_blocked == BlockedOnBlackHole
-                        || tso->why_blocked == BlockedOnMsgWakeup
                         || tso->why_blocked == BlockedOnMsgThrowTo
                         || tso->why_blocked == NotBlocked
                         ) {

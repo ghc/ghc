@@ -125,7 +125,7 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 static void schedulePreLoop (void);
 static void scheduleFindWork (Capability *cap);
 #if defined(THREADED_RTS)
-static void scheduleYield (Capability **pcap, Task *task, rtsBool);
+static void scheduleYield (Capability **pcap, Task *task);
 #endif
 static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
@@ -204,7 +204,6 @@ schedule (Capability *initialCapability, Task *task)
   rtsBool ready_to_gc;
 #if defined(THREADED_RTS)
   rtsBool first = rtsTrue;
-  rtsBool force_yield = rtsFalse;
 #endif
   
   cap = initialCapability;
@@ -328,9 +327,7 @@ schedule (Capability *initialCapability, Task *task)
     //     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     }
 
-  yield:
-    scheduleYield(&cap,task,force_yield);
-    force_yield = rtsFalse;
+    scheduleYield(&cap,task);
 
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
@@ -490,19 +487,6 @@ run_thread:
 
     traceEventStopThread(cap, t, ret);
 
-#if defined(THREADED_RTS)
-    // If ret is ThreadBlocked, and this Task is bound to the TSO that
-    // blocked, we are in limbo - the TSO is now owned by whatever it
-    // is blocked on, and may in fact already have been woken up,
-    // perhaps even on a different Capability.  It may be the case
-    // that task->cap != cap.  We better yield this Capability
-    // immediately and return to normaility.
-    if (ret == ThreadBlocked) {
-        force_yield = rtsTrue;
-        goto yield;
-    }
-#endif
-
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT(t->cap == cap);
 
@@ -639,23 +623,13 @@ shouldYieldCapability (Capability *cap, Task *task)
 // and also check the benchmarks in nofib/parallel for regressions.
 
 static void
-scheduleYield (Capability **pcap, Task *task, rtsBool force_yield)
+scheduleYield (Capability **pcap, Task *task)
 {
     Capability *cap = *pcap;
 
     // if we have work, and we don't need to give up the Capability, continue.
     //
-    // The force_yield flag is used when a bound thread blocks.  This
-    // is a particularly tricky situation: the current Task does not
-    // own the TSO any more, since it is on some queue somewhere, and
-    // might be woken up or manipulated by another thread at any time.
-    // The TSO and Task might be migrated to another Capability.
-    // Certain invariants might be in doubt, such as task->bound->cap
-    // == cap.  We have to yield the current Capability immediately,
-    // no messing around.
-    //
-    if (!force_yield &&
-        !shouldYieldCapability(cap,task) && 
+    if (!shouldYieldCapability(cap,task) && 
         (!emptyRunQueue(cap) ||
          !emptyInbox(cap) ||
          sched_state >= SCHED_INTERRUPTING))
@@ -1891,8 +1865,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
     } else {
-        traceEventMigrateThread (cap, tso, capabilities[cpu].no);
-	wakeupThreadOnCapability(cap, &capabilities[cpu], tso);
+        migrateThread(cap, tso, &capabilities[cpu]);
     }
 #else
     appendToRunQueue(cap,tso);
@@ -2372,8 +2345,8 @@ deleteThread_(Capability *cap, StgTSO *tso)
 
     if (tso->why_blocked == BlockedOnCCall ||
 	tso->why_blocked == BlockedOnCCall_NoUnblockExc) {
-	unblockOne(cap,tso);
 	tso->what_next = ThreadKilled;
+	appendToRunQueue(tso->cap, tso);
     } else {
 	deleteThread(cap,tso);
     }

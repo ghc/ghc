@@ -42,10 +42,10 @@
 #  define RTS_FUN(f)      RTS_FUN_INFO(f##_info)
 #  define RTS_THUNK(f)    RTS_THUNK_INFO(f##_info)
 #else
-#  define RTS_RET(f)      RTS_INFO(f##_info)  RTS_FUN_DECL(f##_ret)
-#  define RTS_ENTRY(f)    RTS_INFO(f##_info)  RTS_FUN_DECL(f##_entry)
-#  define RTS_FUN(f)      RTS_FUN_INFO(f##_info) RTS_FUN_DECL(f##_entry)
-#  define RTS_THUNK(f)    RTS_THUNK_INFO(f##_info) RTS_FUN_DECL(f##_entry)
+#  define RTS_RET(f)      RTS_INFO(f##_info);  RTS_FUN_DECL(f##_ret)
+#  define RTS_ENTRY(f)    RTS_INFO(f##_info);  RTS_FUN_DECL(f##_entry)
+#  define RTS_FUN(f)      RTS_FUN_INFO(f##_info); RTS_FUN_DECL(f##_entry)
+#  define RTS_THUNK(f)    RTS_THUNK_INFO(f##_info); RTS_FUN_DECL(f##_entry)
 #endif
 
 /* Stack frames */
@@ -109,7 +109,6 @@ RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN0);
 RTS_ENTRY(stg_MUT_VAR_CLEAN);
 RTS_ENTRY(stg_MUT_VAR_DIRTY);
 RTS_ENTRY(stg_END_TSO_QUEUE);
-RTS_ENTRY(stg_MSG_WAKEUP);
 RTS_ENTRY(stg_MSG_TRY_WAKEUP);
 RTS_ENTRY(stg_MSG_THROWTO);
 RTS_ENTRY(stg_MSG_BLACKHOLE);

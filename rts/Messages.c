@@ -28,8 +28,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 #ifdef DEBUG    
     {
         const StgInfoTable *i = msg->header.info;
-        if (i != &stg_MSG_WAKEUP_info &&
-            i != &stg_MSG_THROWTO_info &&
+        if (i != &stg_MSG_THROWTO_info &&
             i != &stg_MSG_BLACKHOLE_info &&
             i != &stg_MSG_TRY_WAKEUP_info &&
             i != &stg_IND_info && // can happen if a MSG_BLACKHOLE is revoked
@@ -71,21 +70,7 @@ executeMessage (Capability *cap, Message *m)
 loop:
     write_barrier(); // allow m->header to be modified by another thread
     i = m->header.info;
-    if (i == &stg_MSG_WAKEUP_info)
-    {
-        // the plan is to eventually get rid of these and use
-        // TRY_WAKEUP instead.
-        MessageWakeup *w = (MessageWakeup *)m;
-        StgTSO *tso = w->tso;
-        debugTraceCap(DEBUG_sched, cap, "message: wakeup thread %ld", 
-                      (lnat)tso->id);
-        ASSERT(tso->cap == cap);
-        ASSERT(tso->why_blocked == BlockedOnMsgWakeup);
-        ASSERT(tso->block_info.closure == (StgClosure *)m);
-        tso->why_blocked = NotBlocked;
-        appendToRunQueue(cap, tso);
-    }
-    else if (i == &stg_MSG_TRY_WAKEUP_info)
+    if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld", 

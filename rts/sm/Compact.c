@@ -472,7 +472,6 @@ thread_TSO (StgTSO *tso)
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnMsgThrowTo
-	|| tso->why_blocked == BlockedOnMsgWakeup
 	) {
 	thread_(&tso->block_info.closure);
     }
@@ -625,7 +624,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case CONSTR:
     case PRIM:
     case MUT_PRIM:
-    case IND_PERM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case BLACKHOLE:
@@ -664,6 +662,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	return p + sizeofW(StgMVar);
     }
     
+    case IND:
+    case IND_PERM:
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
 	thread(&((StgInd *)p)->indirectee);

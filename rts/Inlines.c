@@ -5,3 +5,4 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "Schedule.h"
+#include "Capability.h"

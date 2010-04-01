@@ -372,6 +372,10 @@ main(int argc, char *argv[])
     closure_field(StgMVar,tail);
     closure_field(StgMVar,value);
 
+    closure_size(StgMVarTSOQueue);
+    closure_field(StgMVarTSOQueue, link);
+    closure_field(StgMVarTSOQueue, tso);
+
     closure_size(StgBCO);
     closure_field(StgBCO, instrs);
     closure_field(StgBCO, literals);

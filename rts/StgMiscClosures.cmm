@@ -491,8 +491,6 @@ CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
    ------------------------------------------------------------------------- */
 
 // PRIM rather than CONSTR, because PRIM objects cannot be duplicated by the GC.
-INFO_TABLE_CONSTR(stg_MSG_WAKEUP,2,0,0,PRIM,"MSG_WAKEUP","MSG_WAKEUP")
-{ foreign "C" barf("MSG_WAKEUP object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_MSG_TRY_WAKEUP,2,0,0,PRIM,"MSG_TRY_WAKEUP","MSG_TRY_WAKEUP")
 { foreign "C" barf("MSG_TRY_WAKEUP object entered!") never returns; }
@@ -571,6 +569,13 @@ INFO_TABLE( stg_dummy_ret, 0, 0, CONSTR_NOCAF_STATIC, "DUMMY_RET", "DUMMY_RET")
   jump %ENTRY_CODE(Sp(0));
 }
 CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
+
+/* ----------------------------------------------------------------------------
+   MVAR_TSO_QUEUE
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE")
+{ foreign "C" barf("MVAR_TSO_QUEUE object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    CHARLIKE and INTLIKE closures.  

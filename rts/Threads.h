@@ -19,6 +19,7 @@ StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
 void checkBlockingQueues (Capability *cap, StgTSO *tso);
 void wakeBlockingQueue   (Capability *cap, StgBlockingQueue *bq);
 void tryWakeupThread     (Capability *cap, StgTSO *tso);
+void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 
 // Wakes up a thread on a Capability (probably a different Capability
 // from the one held by the current Task).
@@ -31,8 +32,6 @@ void wakeupThreadOnCapability (Capability *cap,
 
 void updateThunk         (Capability *cap, StgTSO *tso,
                           StgClosure *thunk, StgClosure *val);
-
-void removeThreadFromMVarQueue (Capability *cap, StgMVar *mvar, StgTSO *tso);
 
 rtsBool removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso);
 rtsBool removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, StgTSO *tso);
