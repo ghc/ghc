@@ -3,7 +3,9 @@ set -e
 
 libraries=
 
-tarred=`ls -1 libraries/tarballs | sed "s/-[0-9.]*\(-snapshot\)\{0,1\}.tar.gz//"`
+# We do the sed in 3 steps, as the -snapshot may or may not be there,
+# and I can't see a way to optionally match it with POSIX BREs
+tarred=`ls -1 libraries/tarballs | sed -e 's/\.tar\.gz$//' -e 's/-snapshot$//' -e 's/-[0-9.]*$//'`
 
 for p in $tarred
 do
