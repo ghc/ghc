@@ -42,7 +42,8 @@ parHtmlMarkup ppId isTyCon = Markup {
   markupDefList       = dlist . concatHtml . map markupDef,
   markupCodeBlock     = pre,
   markupURL           = \url -> anchor ! [href url] << toHtml url,
-  markupAName         = \aname -> namedAnchor aname << toHtml ""
+  markupAName         = \aname -> namedAnchor aname << toHtml "",
+  markupExample       = examplesToHtml
   }
   where
     -- If an id can refer to multiple things, we give precedence to type
@@ -55,6 +56,14 @@ parHtmlMarkup ppId isTyCon = Markup {
     choose (x:y:_)
       | isTyCon x = x
       | otherwise = y
+
+    examplesToHtml l = (pre $ concatHtml $ map exampleToHtml l) ! [theclass "screen"]
+
+    exampleToHtml (Example expression result) = htmlExample
+      where
+        htmlExample = htmlPrompt +++ htmlExpression +++ (toHtml $ unlines result)
+        htmlPrompt = (thecode . toHtml $ "ghci> ") ! [theclass "prompt"]
+        htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
 
 markupDef :: (HTML a, HTML b) => (a, b) -> Html

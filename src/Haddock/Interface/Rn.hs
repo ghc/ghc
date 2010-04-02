@@ -80,3 +80,5 @@ rnDoc gre = unId . do_rn
   DocPic str -> return (DocPic str)
 
   DocAName str -> return (DocAName str)
+
+  DocExamples e -> return (DocExamples e)

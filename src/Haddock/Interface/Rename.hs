@@ -202,6 +202,7 @@ renameDoc d = case d of
   DocURL str -> return (DocURL str)
   DocPic str -> return (DocPic str)
   DocAName str -> return (DocAName str)
+  DocExamples e -> return (DocExamples e)
 
 
 renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)

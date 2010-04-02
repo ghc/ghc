@@ -240,7 +240,8 @@ markupTag = Markup {
   markupDefList       = box (TagL 'u') . map (\(a,b) -> TagInline "i" a : Str " " : b),
   markupCodeBlock     = box TagPre,
   markupURL           = box (TagInline "a") . str,
-  markupAName         = const $ str ""
+  markupAName         = const $ str "",
+  markupExample       = box TagPre . str . unlines . (map exampleToString)
   }
 
 

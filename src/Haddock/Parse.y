@@ -9,10 +9,13 @@
 module Haddock.Parse where
 
 import Haddock.Lex
-import Haddock.Types (Doc(..))
+import Haddock.Types (Doc(..), Example(Example))
 import Haddock.Doc
 import HsSyn
 import RdrName
+import Data.Char  (isSpace)
+import Data.Maybe (fromMaybe)
+import Data.List  (stripPrefix)
 }
 
 %expect 0
@@ -31,6 +34,9 @@ import RdrName
 	'-'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	'>..'	{ TokBirdTrack $$ }
+	PROMPT	{ TokExamplePrompt $$ }
+	RESULT	{ TokExampleResult $$ }
+	EXP	{ TokExampleExpression $$ }
 	IDENT   { TokIdent $$ }
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
@@ -66,10 +72,23 @@ defpara :: { (Doc RdrName, Doc RdrName) }
 para    :: { Doc RdrName }
 	: seq			{ docParagraph $1 }
 	| codepara		{ DocCodeBlock $1 }
+	| examples		{ DocExamples $1 }
 
 codepara :: { Doc RdrName }
 	: '>..' codepara	{ docAppend (DocString $1) $2 }
 	| '>..'			{ DocString $1 }
+
+examples :: { [Example] }
+	: example examples	{ $1 : $2 }
+	| example		{ [$1] }
+
+example :: { Example }
+	: PROMPT EXP result	{ makeExample $1 $2 (lines $3) }
+	| PROMPT EXP		{ makeExample $1 $2 [] }
+
+result :: { String }
+	: RESULT result		{ $1 ++ $2 }
+	| RESULT		{ $1 }
 
 seq	:: { Doc RdrName }
 	: elem seq		{ docAppend $1 $2 }
@@ -100,4 +119,24 @@ strings  :: { String }
 {
 happyError :: [Token] -> Maybe a
 happyError toks = Nothing
+
+-- | Create an 'Example', stripping superfluous characters as appropriate
+makeExample :: String -> String -> [String] -> Example
+makeExample prompt expression result =
+  Example
+	(strip expression)	-- we do not care about leading and trailing
+				-- whitespace in expressions, so drop them
+	result'
+  where
+	-- drop trailing whitespace from the prompt, remember the prefix
+	(prefix, _) = span isSpace prompt
+	-- drop, if possible, the exact same sequence of whitespace characters
+	-- from each result line
+	result' = map (tryStripPrefix prefix) result
+	  where
+		tryStripPrefix xs ys = fromMaybe ys $ stripPrefix xs ys
+
+-- | Remove all leading and trailing whitespace
+strip :: String -> String
+strip = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 }
