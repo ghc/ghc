@@ -1,0 +1,208 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--Rendered using the Haskell Html Library v0.2-->
+<HTML
+><HEAD
+><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
+><TITLE
+>Examples</TITLE
+><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
+><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
+></SCRIPT
+><SCRIPT TYPE="text/javascript"
+>window.onload = function () {setSynopsis("mini_Examples.html")};</SCRIPT
+></HEAD
+><BODY
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="topbar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><IMG SRC="haskell_icon.gif" WIDTH="16" HEIGHT="16" ALT=" "
+></TD
+><TD CLASS="title"
+></TD
+><TD CLASS="topbut"
+><A HREF="index.html"
+>Contents</A
+></TD
+><TD CLASS="topbut"
+><A HREF="doc-index.html"
+>Index</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="modulebar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><FONT SIZE="6"
+>Examples</FONT
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Synopsis</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Afib"
+>fib</A
+> :: <A HREF=" /home/sol/.install/ghc/ghc-6.12.1/lib/ghc-6.12.1/../../share/doc/ghc/html/libraries/base-4.2.0.0/Prelude.html#t%3AInteger"
+>Integer</A
+> -&gt; <A HREF=" /home/sol/.install/ghc/ghc-6.12.1/lib/ghc-6.12.1/../../share/doc/ghc/html/libraries/base-4.2.0.0/Prelude.html#t%3AInteger"
+>Integer</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Documentation</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:fib"
+><A NAME="v%3Afib"
+></A
+></A
+><B
+>fib</B
+> :: <A HREF=" /home/sol/.install/ghc/ghc-6.12.1/lib/ghc-6.12.1/../../share/doc/ghc/html/libraries/base-4.2.0.0/Prelude.html#t%3AInteger"
+>Integer</A
+> -&gt; <A HREF=" /home/sol/.install/ghc/ghc-6.12.1/lib/ghc-6.12.1/../../share/doc/ghc/html/libraries/base-4.2.0.0/Prelude.html#t%3AInteger"
+>Integer</A
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><P
+>Fibonacci number of given <TT
+><A HREF=" /home/sol/.install/ghc/ghc-6.12.1/lib/ghc-6.12.1/../../share/doc/ghc/html/libraries/base-4.2.0.0/Prelude.html#t%3AInteger"
+>Integer</A
+></TT
+>.
+</P
+><P
+>Examples:
+</P
+><PRE CLASS="screen"
+><CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>fib 5
+</CODE
+></STRONG
+>5
+<CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>fib 10
+</CODE
+></STRONG
+>55
+</PRE
+><PRE CLASS="screen"
+><CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>fib 10
+</CODE
+></STRONG
+>55
+</PRE
+><P
+>One more Example:
+</P
+><PRE CLASS="screen"
+><CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>fib 5
+</CODE
+></STRONG
+>5
+</PRE
+><P
+>One more Example:
+</P
+><PRE CLASS="screen"
+><CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>fib 5
+</CODE
+></STRONG
+>5
+</PRE
+><P
+>Example with an import:
+</P
+><PRE CLASS="screen"
+><CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>import Data.Char
+</CODE
+></STRONG
+><CODE CLASS="prompt"
+>ghci&gt; </CODE
+><STRONG CLASS="userinput"
+><CODE
+>isSpace 'a'
+</CODE
+></STRONG
+>False
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="botbar"
+>Produced by <A HREF="http://www.haskell.org/haddock/"
+>Haddock</A
+> version 2.7.2</TD
+></TR
+></TABLE
+></BODY
+></HTML
+>
