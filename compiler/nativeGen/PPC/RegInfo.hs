@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 module PPC.RegInfo (
-        JumpDest, 
+        JumpDest( DestBlockId ), 
 	canShortcut, 
 	shortcutJump, 
 
