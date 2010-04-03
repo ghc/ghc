@@ -28,22 +28,21 @@ import RdrName
 
 parHtmlMarkup :: (a -> Html) -> (a -> Bool) -> DocMarkup a Html
 parHtmlMarkup ppId isTyCon = Markup {
-  markupParagraph     = paragraph,
-  markupEmpty         = toHtml "",
+  markupEmpty         = noHtml,
   markupString        = toHtml,
+  markupParagraph     = paragraph,
   markupAppend        = (+++),
   markupIdentifier    = tt . ppId . choose,
-  markupModule        = \m -> let (mdl,ref) = break (=='#') m in ppModule (mkModuleNoPackage mdl) ref,
-  markupEmphasis      = emphasize . toHtml,
-  markupMonospaced    = tt . toHtml,
-  markupUnorderedList = ulist . concatHtml . map (li <<),
-  markupPic           = \path -> image ! [src path],
-  markupOrderedList   = olist . concatHtml . map (li <<),
-  markupDefList       = dlist . concatHtml . map markupDef,
+  markupModule        = \m -> let (mdl,ref) = break (=='#') m
+                              in ppModule (mkModuleNoPackage mdl) ref,
+  markupEmphasis      = emphasize,
+  markupMonospaced    = tt,
+  markupUnorderedList = unordList,
+  markupOrderedList   = ordList,
+  markupDefList       = defList,
   markupCodeBlock     = pre,
   markupURL           = \url -> anchor ! [href url] << toHtml url,
-  markupAName         = \aname -> namedAnchor aname << toHtml "",
-  markupExample       = examplesToHtml
+  markupAName         = \aname -> namedAnchor aname << toHtml ""
   }
   where
     -- If an id can refer to multiple things, we give precedence to type
@@ -66,43 +65,37 @@ parHtmlMarkup ppId isTyCon = Markup {
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
 
-markupDef :: (HTML a, HTML b) => (a, b) -> Html
-markupDef (a,b) = dterm << a +++ ddef << b
-
-
-htmlMarkup :: DocMarkup DocName Html
-htmlMarkup = parHtmlMarkup ppDocName (isTyConName . getName)
-
-htmlOrigMarkup :: DocMarkup Name Html
-htmlOrigMarkup = parHtmlMarkup ppName isTyConName
-
-htmlRdrMarkup :: DocMarkup RdrName Html
-htmlRdrMarkup = parHtmlMarkup ppRdrName isRdrTc
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
--- ugly extra whitespace with some browsers).
+-- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Doc DocName -> Html
-docToHtml doc = markup htmlMarkup (markup htmlCleanup doc)
+docToHtml = markup fmt . cleanup
+  where fmt = parHtmlMarkup ppDocName (isTyConName . getName)
 
 origDocToHtml :: Doc Name -> Html
-origDocToHtml doc = markup htmlOrigMarkup (markup htmlCleanup doc)
+origDocToHtml = markup fmt . cleanup
+  where fmt = parHtmlMarkup ppName isTyConName
 
 rdrDocToHtml :: Doc RdrName -> Html
-rdrDocToHtml doc = markup htmlRdrMarkup (markup htmlCleanup doc)
+rdrDocToHtml = markup fmt . cleanup
+  where fmt = parHtmlMarkup ppRdrName isRdrTc
 
--- If there is a single paragraph, then surrounding it with <P>..</P>
--- can add too much whitespace in some browsers (eg. IE).  However if
--- we have multiple paragraphs, then we want the extra whitespace to
--- separate them.  So we catch the single paragraph case and transform it
--- here.
-unParagraph :: Doc a -> Doc a
-unParagraph (DocParagraph d) = d
---NO: This eliminates line breaks in the code block:  (SDM, 6/5/2003)
---unParagraph (DocCodeBlock d) = (DocMonospaced d)
-unParagraph doc              = doc
 
-htmlCleanup :: DocMarkup a (Doc a)
-htmlCleanup = idMarkup { 
-  markupUnorderedList = DocUnorderedList . map unParagraph,
-  markupOrderedList   = DocOrderedList   . map unParagraph
-  } 
+
+cleanup :: Doc a -> Doc a
+cleanup = markup fmtUnParagraphLists
+  where
+    -- If there is a single paragraph, then surrounding it with <P>..</P>
+    -- can add too much whitespace in some browsers (eg. IE).  However if
+    -- we have multiple paragraphs, then we want the extra whitespace to
+    -- separate them.  So we catch the single paragraph case and transform it
+    -- here. We don't do this in code blocks as it eliminates line breaks.
+    unParagraph :: Doc a -> Doc a
+    unParagraph (DocParagraph d) = d
+    unParagraph doc              = doc
+
+    fmtUnParagraphLists :: DocMarkup a (Doc a)
+    fmtUnParagraphLists = idMarkup { 
+      markupUnorderedList = DocUnorderedList . map unParagraph,
+      markupOrderedList   = DocOrderedList   . map unParagraph
+      } 

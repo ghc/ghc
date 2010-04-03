@@ -70,8 +70,8 @@ spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
 
 
 renderToString :: Html -> String
--- renderToString = showHtml     -- for production
-renderToString = prettyHtml   -- for debugging
+renderToString = showHtml     -- for production
+--renderToString = prettyHtml   -- for debugging
 
 hsep :: [Html] -> Html
 hsep [] = noHtml

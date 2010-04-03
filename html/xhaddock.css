@@ -49,6 +49,12 @@ p  {
 	margin-bottom: 1em;
 }
 
+ul, ol, dl {
+	padding-top: 2px;
+	padding-left: 3em;
+	margin-bottom: 1em;
+}
+
 pre  { 
 	padding-top: 2px;
 	padding-left: 20px;
