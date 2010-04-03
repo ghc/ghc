@@ -4751,9 +4751,10 @@ static int ocResolve_MachO(ObjectCode* oc)
  * Yuck.
  */
 
+extern void* symbolsWithoutUnderscore[];
+
 static void machoInitSymbolsWithoutUnderscore()
 {
-    extern void* symbolsWithoutUnderscore[];
     void **p = symbolsWithoutUnderscore;
     __asm__ volatile(".globl _symbolsWithoutUnderscore\n.data\n_symbolsWithoutUnderscore:");
 
