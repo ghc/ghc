@@ -51,7 +51,8 @@ p  {
 
 ul, ol, dl {
 	padding-top: 2px;
-	padding-left: 3em;
+	padding-left: 10px;
+	margin-left: 2.5em;
 	margin-bottom: 1em;
 }
 
@@ -146,16 +147,14 @@ div.table-of-contents p {
 div.table-of-contents ul {
 	margin-top: 1em;
 	margin-bottom: 1em;
+	margin-left: 10px;
 	list-style-type: none;
-}
-
-div.table-of-contents ul ul {
-	margin-left: 2.5em;
 }
 
 ul.synopsis {
 	margin-top: 1em;
 	margin-bottom: 1em;
+	margin-left: 10px;
 }
 ul.synopsis li {
   background-color: #f0f0f0; 
@@ -164,7 +163,6 @@ ul.synopsis li {
 	margin-top: 8px;
 	margin-bottom: 8px;
 	padding: 2px;
-	margin-left: 10px;
 	list-style-type: none;
 }
 
