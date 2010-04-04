@@ -80,7 +80,8 @@ rdrDocToHtml :: Doc RdrName -> Html
 rdrDocToHtml = markup fmt . cleanup
   where fmt = parHtmlMarkup ppRdrName isRdrTc
 
-
+maybeDocToHtml :: Maybe (Doc DocName) -> Html
+maybeDocToHtml = maybe noHtml docToHtml
 
 cleanup :: Doc a -> Doc a
 cleanup = markup fmtUnParagraphLists

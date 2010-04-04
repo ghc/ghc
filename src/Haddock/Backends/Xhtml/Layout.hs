@@ -24,12 +24,10 @@ import FastString            ( unpackFS )
 import GHC
 
 
-declWithDoc :: Bool -> LinksInfo -> SrcSpan -> DocName -> Maybe (Doc DocName) -> Html -> HtmlTable
-declWithDoc True  _     _   _  _          html_decl = declBox html_decl
-declWithDoc False links loc nm Nothing    html_decl = topDeclBox links loc nm html_decl
-declWithDoc False links loc nm (Just doc) html_decl = 
-                topDeclBox links loc nm html_decl </> docBox (docToHtml doc)
-
+declWithDoc :: Bool -> LinksInfo -> SrcSpan -> DocName -> Maybe (Doc DocName) -> Html -> Html
+declWithDoc True  _     _   _  _   html_decl = declElem html_decl
+declWithDoc False links loc nm doc html_decl =
+  topDeclElem links loc nm html_decl +++ maybeDocToHtml doc
 
 
 {-
@@ -38,36 +36,27 @@ text   = strAttr "TEXT"
 -}
 
 -- a box for displaying code
-declBox :: Html -> HtmlTable
-declBox html = tda [theclass "decl"] << html
+declElem :: Html -> Html
+declElem = paragraph ! [theclass "decl"]
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
-topDeclBox :: LinksInfo -> SrcSpan -> DocName -> Html -> HtmlTable
-topDeclBox ((_,_,Nothing), (_,_,Nothing)) _ _ html = declBox html
-topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url))
-           loc name html =
-  tda [theclass "topdecl"] <<
-  (        table ! [theclass "declbar"] <<
-            ((tda [theclass "declname"] << html)
-             <-> srcLink
-             <-> wikiLink)
-  )
+topDeclElem :: LinksInfo -> SrcSpan -> DocName -> Html -> Html
+topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html = 
+    declElem << (html +++ srcLink +++ wikiLink)
   where srcLink =
           case maybe_source_url of
-            Nothing  -> emptyTable
-            Just url -> tda [theclass "declbut"] <<
-                          let url' = spliceURL (Just fname) (Just origMod)
+            Nothing  -> noHtml
+            Just url -> let url' = spliceURL (Just fname) (Just origMod)
                                                (Just n) (Just loc) url
-                           in anchor ! [href url'] << toHtml "Source"
+                          in anchor ! [href url', theclass "link"] << "Source"
 
         wikiLink =
           case maybe_wiki_url of
-            Nothing  -> emptyTable
-            Just url -> tda [theclass "declbut"] <<
-                          let url' = spliceURL (Just fname) (Just mdl)
+            Nothing  -> noHtml
+            Just url -> let url' = spliceURL (Just fname) (Just mdl)
                                                (Just n) (Just loc) url
-                           in anchor ! [href url'] << toHtml "Comments"
+                          in anchor ! [href url', theclass "link"] << "Comments"
   
         -- For source links, we want to point to the original module,
         -- because only that will have the source.  
@@ -81,16 +70,13 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url))
         fname = unpackFS (srcSpanFile loc)
 
 
+
 -- a box for displaying an 'argument' (some code which has text to the
 -- right of it).  Wrapping is not allowed in these boxes, whereas it is
 -- in a declBox.
 argBox :: Html -> HtmlTable
 argBox html = tda [theclass "arg"] << html
 
--- a box for displaying documentation, 
--- indented and with a little padding at the top
-docBox :: Html -> HtmlTable
-docBox html = tda [theclass "doc"] << html
 
 -- a box for displaying documentation, not indented.
 ndocBox :: Html -> HtmlTable

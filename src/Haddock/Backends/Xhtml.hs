@@ -294,7 +294,7 @@ ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> HtmlTable
 ppPrologue _ Nothing = emptyTable
 ppPrologue title (Just doc) = 
   (tda [theclass "section1"] << toHtml title) </>
-  docBox (rdrDocToHtml doc)
+  (tda [theclass "doc"] << (rdrDocToHtml doc))
 
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
@@ -736,7 +736,7 @@ processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName)
 processExport _ _ _ (ExportGroup lev id0 doc)
   = Left $ groupTag lev << namedAnchor id0 << docToHtml doc
 processExport summary links unicode (ExportDecl decl doc subdocs insts)
-  = Right $ ppDecl' summary links decl doc insts subdocs unicode
+  = Right $ ppDecl summary links decl doc insts subdocs unicode
 processExport _ _ _ (ExportNoDecl y [])
   = Right $ ppDocName y
 processExport _ _ _ (ExportNoDecl y subs)
