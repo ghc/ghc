@@ -40,7 +40,6 @@ import Control.Exception     ( bracket )
 import Control.Monad         ( when, unless )
 import Control.Monad.Instances ( ) -- for Functor Either a
 import Data.Char             ( toUpper )
-import Data.Either
 import Data.List             ( sortBy, groupBy )
 import Data.Maybe
 import Foreign.Marshal.Alloc ( allocaBytes )
@@ -628,8 +627,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
       | otherwise
       = h1 << "Synopsis" +++
         unordList (
-            rights $
-            map (processExport True linksInfo unicode) exports
+            mapMaybe (processExport True linksInfo unicode) exports
         ) ! [theclass "synopsis"]
 
         -- if the documentation doesn't begin with a section header, then
@@ -642,8 +640,8 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
 
     bdy =
       foldr (+++) noHtml $
-        map (either id (paragraph ! [theclass "decl"] <<)) $
-          map (processExport False linksInfo unicode) exports
+        map (thediv ! [theclass "decldoc"]) $
+          mapMaybe (processExport False linksInfo unicode) exports
           
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
@@ -731,20 +729,23 @@ numberSectionHeadings exports = go 1 exports
         go n (other:es)
           = other : go n es
 
-processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName)
-  -> Either Html Html -- Right is a decl, Left is a "extra" (doc or group)
-processExport _ _ _ (ExportGroup lev id0 doc)
-  = Left $ groupTag lev << namedAnchor id0 << docToHtml doc
+processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
+processExport summary _ _ (ExportGroup lev id0 doc)
+  = nothingIf summary $ groupTag lev << namedAnchor id0 << docToHtml doc
 processExport summary links unicode (ExportDecl decl doc subdocs insts)
-  = Right $ ppDecl summary links decl doc insts subdocs unicode
+  = Just $ ppDecl summary links decl doc insts subdocs unicode
 processExport _ _ _ (ExportNoDecl y [])
-  = Right $ ppDocName y
+  = Just $ ppDocName y
 processExport _ _ _ (ExportNoDecl y subs)
-  = Right $ ppDocName y +++ parenList (map ppDocName subs)
-processExport _ _ _ (ExportDoc doc)
-  = Left $ docToHtml doc
+  = Just $ ppDocName y +++ parenList (map ppDocName subs)
+processExport summary _ _ (ExportDoc doc)
+  = nothingIf summary $ docToHtml doc
 processExport _ _ _ (ExportModule mdl)
-  = Right $ toHtml "module" +++ ppModule mdl ""
+  = Just $ toHtml "module" +++ ppModule mdl ""
+
+nothingIf :: Bool -> a -> Maybe a
+nothingIf True _ = Nothing
+nothingIf False a = Just a
 
 groupTag :: Int -> Html -> Html
 groupTag lev
