@@ -131,9 +131,8 @@ my_mmap (void *addr, lnat size)
 	    (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
 	    // If we request more than 3Gig, then we get EINVAL
 	    // instead of ENOMEM (at least on Linux).
-	    barf("out of memory (requested %lu bytes)", size);
-//            abort();
-//	    stg_exit(EXIT_FAILURE);
+            errorBelch("out of memory (requested %lu bytes)", size);
+            stg_exit(EXIT_FAILURE);
 	} else {
 	    barf("getMBlock: mmap: %s", strerror(errno));
 	}
