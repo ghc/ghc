@@ -654,11 +654,13 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
     clos <- trIO $ getClosureData a
     case tipe clos of
 -- Thunks we may want to force
--- NB. this won't attempt to force a BLACKHOLE.  Even with :force, we never
--- force blackholes, because it would almost certainly result in deadlock,
--- and showing the '_' is more useful.
       t | isThunk t && force -> traceTR (text "Forcing a " <> text (show t)) >>
                                 seq a (go (pred max_depth) my_ty old_ty a)
+-- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE.  So we
+-- treat them like indirections; if the payload is TSO or BLOCKING_QUEUE, we'll end up
+-- showing '_' which is what we want.
+      Blackhole -> do traceTR (text "Following a BLACKHOLE")
+                      appArr (go max_depth my_ty old_ty) (ptrs clos) 0
 -- We always follow indirections
       Indirection i -> do traceTR (text "Following an indirection" <> parens (int i) )
                           go max_depth my_ty old_ty $! (ptrs clos ! 0)
@@ -817,6 +819,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
   go my_ty a = do
     clos <- trIO $ getClosureData a
     case tipe clos of
+      Blackhole -> appArr (go my_ty) (ptrs clos) 0 -- carefully, don't eval the TSO
       Indirection _ -> go my_ty $! (ptrs clos ! 0)
       MutVar _ -> do
          contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
