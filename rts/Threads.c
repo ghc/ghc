@@ -215,8 +215,9 @@ removeThreadFromDeQueue (Capability *cap,
    ------------------------------------------------------------------------- */
 
 void
-tryWakeupThread (Capability *cap, StgTSO *tso)
+tryWakeupThread (Capability *cap, StgTSO *tso_)
 {
+    StgTSO *tso = deRefTSO(tso_);
 
     traceEventThreadWakeup (cap, tso, tso->cap->no);
 
