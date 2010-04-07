@@ -1211,22 +1211,29 @@ loop:
     // There are putMVar(s) waiting... wake up the first thread on the queue
     
     tso = StgMVarTSOQueue_tso(q);
-    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
-    ASSERT(StgTSO_block_info(tso) == mvar);
-    // actually perform the putMVar for the thread that we just woke up
-    PerformPut(tso,StgMVar_value(mvar));
-    
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
-    
-    // indicate that the putMVar has now completed:
+
+loop2:
+    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
+        tso = StgTSO__link(tso);
+        goto loop2;
+    }
+
+    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
+    ASSERT(StgTSO_block_info(tso) == mvar);
+
+    // actually perform the putMVar for the thread that we just woke up
+    PerformPut(tso,StgMVar_value(mvar));
+
+    // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
     // no need to mark the TSO dirty, we have only written END_TSO_QUEUE.
 
-    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
+    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
     
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_P(val);
@@ -1283,22 +1290,29 @@ loop:
     // There are putMVar(s) waiting... wake up the first thread on the queue
     
     tso = StgMVarTSOQueue_tso(q);
-    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
-    ASSERT(StgTSO_block_info(tso) == mvar);
-    // actually perform the putMVar for the thread that we just woke up
-    PerformPut(tso,StgMVar_value(mvar));
-    
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
-    
-    // indicate that the putMVar has now completed:
+
+loop2:
+    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
+        tso = StgTSO__link(tso);
+        goto loop2;
+    }
+
+    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
+    ASSERT(StgTSO_block_info(tso) == mvar);
+
+    // actually perform the putMVar for the thread that we just woke up
+    PerformPut(tso,StgMVar_value(mvar));
+
+    // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
     // no need to mark the TSO dirty, we have only written END_TSO_QUEUE.
 
-    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
+    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
     
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_P(val);
@@ -1368,24 +1382,31 @@ loop:
     // There are takeMVar(s) waiting: wake up the first one
     
     tso = StgMVarTSOQueue_tso(q);
-    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
-    ASSERT(StgTSO_block_info(tso) == mvar);
-    // actually perform the takeMVar
-    PerformTake(tso, val);
-
-    if (TO_W_(StgTSO_dirty(tso)) == 0) {
-        foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
-    }
-    
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
-    
-    // indicate that the takeMVar has now completed:
+
+loop2:
+    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
+        tso = StgTSO__link(tso);
+        goto loop2;
+    }
+
+    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
+    ASSERT(StgTSO_block_info(tso) == mvar);
+
+    // actually perform the takeMVar
+    PerformTake(tso, val);
+
+    // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
-    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
+    if (TO_W_(StgTSO_dirty(tso)) == 0) {
+        foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
+    }
+    
+    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     jump %ENTRY_CODE(Sp(0));
@@ -1431,29 +1452,34 @@ loop:
         goto loop;
     }
 
-    /* There are takeMVar(s) waiting: wake up the first one
-     */
     // There are takeMVar(s) waiting: wake up the first one
     
     tso = StgMVarTSOQueue_tso(q);
-    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
-    ASSERT(StgTSO_block_info(tso) == mvar);
-    // actually perform the takeMVar
-    PerformTake(tso, val);
-
-    if (TO_W_(StgTSO_dirty(tso)) == 0) {
-        foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
-    }
-    
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
-    
-    // indicate that the takeMVar has now completed:
+
+loop2:
+    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
+        tso = StgTSO__link(tso);
+        goto loop2;
+    }
+
+    ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
+    ASSERT(StgTSO_block_info(tso) == mvar);
+
+    // actually perform the takeMVar
+    PerformTake(tso, val);
+
+    // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
-    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
+    if (TO_W_(StgTSO_dirty(tso)) == 0) {
+        foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
+    }
+    
+    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     jump %ENTRY_CODE(Sp(0));

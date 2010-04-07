@@ -21,6 +21,9 @@ void wakeBlockingQueue   (Capability *cap, StgBlockingQueue *bq);
 void tryWakeupThread     (Capability *cap, StgTSO *tso);
 void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 
+// like tryWakeupThread(), but assumes the TSO is not ThreadRelocated
+void tryWakeupThread_    (Capability *cap, StgTSO *tso);
+
 // Wakes up a thread on a Capability (probably a different Capability
 // from the one held by the current Task).
 //

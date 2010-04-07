@@ -271,7 +271,7 @@ check_target:
             // might as well just do it now.  The message will
             // be a no-op when it arrives.
             unlockClosure((StgClosure*)m, i);
-            tryWakeupThread(cap, target);
+            tryWakeupThread_(cap, target);
             goto retry;
         }
 
@@ -337,7 +337,7 @@ check_target:
             // thread now anyway and ignore the message when it
             // arrives.
 	    unlockClosure((StgClosure *)mvar, info);
-            tryWakeupThread(cap, target);
+            tryWakeupThread_(cap, target);
             goto retry;
         }
 

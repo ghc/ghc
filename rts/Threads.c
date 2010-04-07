@@ -215,10 +215,14 @@ removeThreadFromDeQueue (Capability *cap,
    ------------------------------------------------------------------------- */
 
 void
-tryWakeupThread (Capability *cap, StgTSO *tso_)
+tryWakeupThread (Capability *cap, StgTSO *tso)
 {
-    StgTSO *tso = deRefTSO(tso_);
+    tryWakeupThread_(cap, deRefTSO(tso));
+}
 
+void
+tryWakeupThread_ (Capability *cap, StgTSO *tso)
+{
     traceEventThreadWakeup (cap, tso, tso->cap->no);
 
 #ifdef THREADED_RTS
