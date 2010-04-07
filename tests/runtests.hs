@@ -14,18 +14,56 @@ import Distribution.Verbosity
 import Data.Maybe
 
 
+haddockPath = ".." </> "dist" </> "build" </> "haddock" </> "haddock"
+
+
 main = do
   test
   putStrLn "All tests passed!"
 
 
-haddockEq file1 file2 = stripLinks file1 == stripLinks file2
+test = do
+  x <- doesFileExist haddockPath
+  when (not x) $ die "you need to run 'cabal build' successfully first"
 
-stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
+  contents <- getDirectoryContents "tests"
+  args <- getArgs
+  let (opts, spec) = span ("-" `isPrefixOf`) args
+  let mods =
+        case spec of
+          x:_ | x /= "all" -> [x ++ ".hs"]
+          _ -> filter ((==) ".hs" . takeExtension) contents
 
-programOnPath p = do
-  result <- findProgramLocation silent p
-  return (isJust result)
+  let outdir = "output"
+  let mods' = map ("tests" </>) mods
+  putStrLn ""
+  putStrLn "Haddock version: "
+  h1 <- runProcess haddockPath ["--version"] Nothing
+                   (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  waitForProcess h1
+  putStrLn ""
+  putStrLn "GHC version: "
+  h2 <- runProcess haddockPath ["--ghc-version"] Nothing
+                   (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+  waitForProcess h2
+  putStrLn ""
+
+  libdir <- rawSystemStdout normal haddockPath ["--print-ghc-libdir"]
+  let basepath = init libdir ++ "/../../share/doc/ghc/html/libraries/base-4.2.0.0/"
+  let base = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
+  let processpath = init libdir ++ "/../../share/doc/ghc/html/libraries/process-1.0.1.2/"
+  let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
+
+  putStrLn "Running tests..."
+  handle <- runProcess haddockPath
+                       (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts"
+                        , "--optghc=-w", base, process] ++ opts ++ mods')
+                       Nothing (Just [("haddock_datadir", "../.")]) Nothing
+                       Nothing Nothing
+
+  code <- waitForProcess handle
+  when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
+  check mods (if not (null args) && args !! 0 == "all" then False else True)
 
 
 check modules strict = do
@@ -58,39 +96,13 @@ check modules strict = do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
 
 
-test = do
+haddockEq file1 file2 = stripLinks file1 == stripLinks file2
 
-  x <- doesFileExist (".." </> "dist" </> "build" </> "haddock" </> "haddock")
-  when (not x) $ die "you need to run 'cabal build' successfully first"
 
-  contents <- getDirectoryContents "tests"
-  args <- getArgs
-  let (opts, spec) = span ("-" `isPrefixOf`) args
-  let mods =
-        case spec of
-          x:_ | x /= "all" -> [x ++ ".hs"]
-          _ -> filter ((==) ".hs" . takeExtension) contents
+stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
 
-  let outdir = "output"
-  let mods' = map ("tests" </>) mods
-  putStrLn ""
-  putStrLn "Haddock version: "
-  h1 <- runProcess "../dist/build/haddock/haddock" ["--version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
-  waitForProcess h1
-  putStrLn ""
-  putStrLn "GHC version: "
-  h2 <- runProcess "../dist/build/haddock/haddock" ["--ghc-version"] Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
-  waitForProcess h2
-  putStrLn ""
 
-  libdir <- rawSystemStdout normal "../dist/build/haddock/haddock" ["--print-ghc-libdir"]
-  let basepath = init libdir ++ "/../../share/doc/ghc/html/libraries/base-4.2.0.0/"
-  let base = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
-  let processpath = init libdir ++ "/../../share/doc/ghc/html/libraries/process-1.0.1.2/"
-  let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
+programOnPath p = do
+  result <- findProgramLocation silent p
+  return (isJust result)
 
-  putStrLn "Running tests..."
-  handle <- runProcess "../dist/build/haddock/haddock" (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts", "--optghc=-w", base, process] ++ opts ++ mods') Nothing (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
-  code <- waitForProcess handle
-  when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
-  check mods (if not (null args) && args !! 0 == "all" then False else True)
