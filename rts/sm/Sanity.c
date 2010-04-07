@@ -531,7 +531,9 @@ checkTSO(StgTSO *tso)
       return;
     }
 
-    ASSERT(tso->_link == END_TSO_QUEUE || get_itbl(tso->_link)->type == TSO);
+    ASSERT(tso->_link == END_TSO_QUEUE || 
+           tso->_link->header.info == &stg_MVAR_TSO_QUEUE_info ||
+           tso->_link->header.info == &stg_TSO_info);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->bq));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->blocked_exceptions));
