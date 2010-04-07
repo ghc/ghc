@@ -44,7 +44,7 @@ lexParseRnHaddockComment :: HaddockCommentType ->
     GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
 lexParseRnHaddockComment hty gre (HsDocString fs) = do
    let str = unpackFS fs
-   let toks = tokenise str
+   let toks = tokenise str (0,0) -- TODO: real position
    let parse = case hty of
          NormalHaddockComment -> parseParas
          DocSectionComment -> parseString

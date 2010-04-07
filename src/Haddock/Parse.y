@@ -20,26 +20,26 @@ import Data.List  (stripPrefix)
 
 %expect 0
 
-%tokentype { Token }
+%tokentype { LToken }
 
-%token	'/'	{ TokSpecial '/' }
-	'@'	{ TokSpecial '@' }
-	'['     { TokDefStart }
-	']'     { TokDefEnd }
-	DQUO 	{ TokSpecial '\"' }
-	URL	{ TokURL $$ }
-	PIC     { TokPic $$ }
-	ANAME	{ TokAName $$ }
-	'/../'  { TokEmphasis $$ }
-	'-'	{ TokBullet }
-	'(n)'	{ TokNumber }
-	'>..'	{ TokBirdTrack $$ }
-	PROMPT	{ TokExamplePrompt $$ }
-	RESULT	{ TokExampleResult $$ }
-	EXP	{ TokExampleExpression $$ }
-	IDENT   { TokIdent $$ }
-	PARA    { TokPara }
-	STRING	{ TokString $$ }
+%token	'/'	{ (TokSpecial '/',_) }
+	'@'	{ (TokSpecial '@',_) }
+	'['     { (TokDefStart,_) }
+	']'     { (TokDefEnd,_) }
+	DQUO 	{ (TokSpecial '\"',_) }
+	URL	{ (TokURL $$,_) }
+	PIC     { (TokPic $$,_) }
+	ANAME	{ (TokAName $$,_) }
+	'/../'  { (TokEmphasis $$,_) }
+	'-'	{ (TokBullet,_) }
+	'(n)'	{ (TokNumber,_) }
+	'>..'	{ (TokBirdTrack $$,_) }
+	PROMPT	{ (TokExamplePrompt $$,_) }
+	RESULT	{ (TokExampleResult $$,_) }
+	EXP	{ (TokExampleExpression $$,_) }
+	IDENT   { (TokIdent $$,_) }
+	PARA    { (TokPara,_) }
+	STRING	{ (TokString $$,_) }
 
 %monad { Maybe }
 
@@ -117,7 +117,7 @@ strings  :: { String }
 	| STRING strings	{ $1 ++ $2 }
 
 {
-happyError :: [Token] -> Maybe a
+happyError :: [LToken] -> Maybe a
 happyError toks = Nothing
 
 -- | Create an 'Example', stripping superfluous characters as appropriate

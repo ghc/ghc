@@ -17,6 +17,7 @@
 
 module Haddock.Lex (
 	Token(..),
+  LToken,
 	tokenise
  ) where
 
@@ -31,6 +32,8 @@ import Data.Char
 import Numeric
 import System.IO.Unsafe
 }
+
+%wrapper "posn"
 
 $ws    = $white # \n
 $digit = [0-9]
@@ -105,6 +108,9 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 }
 
 {
+-- | A located token
+type LToken = (Token, AlexPosn)
+
 data Token
   = TokPara
   | TokNumber
@@ -124,55 +130,54 @@ data Token
   | TokExampleResult String
 --  deriving Show
 
+tokenPos :: LToken -> (Int, Int)
+tokenPos t = let AlexPn _ line col = snd t in (line, col)
+
 -- -----------------------------------------------------------------------------
 -- Alex support stuff
 
 type StartCode = Int
-type Action = String -> StartCode -> (StartCode -> [Token]) -> [Token]
+type Action = AlexPosn -> String -> StartCode -> (StartCode -> [LToken]) -> [LToken]
 
-type AlexInput = (Char,String)
+tokenise :: String -> (Int, Int) -> [LToken]
+tokenise str (line, col) = let toks = go (posn, '\n', eofHack str) para in {-trace (show toks)-} toks
+  where
+    posn = AlexPn 0 line col
 
-alexGetChar (_, [])   = Nothing
-alexGetChar (_, c:cs) = Just (c, (c,cs))
-
-alexInputPrevChar (c,_) = c
-
-tokenise :: String -> [Token]
-tokenise str = let toks = go ('\n', eofHack str) para in {-trace (show toks)-} toks
-  where go inp@(_,str) sc =
+    go inp@(pos, _, str) sc =
 	  case alexScan inp sc of
 		AlexEOF -> []
 		AlexError _ -> error "lexical error"
 		AlexSkip  inp' _       -> go inp' sc
-		AlexToken inp' len act -> act (take len str) sc (\sc -> go inp' sc)
+		AlexToken inp'@(pos',_,_) len act -> act pos (take len str) sc (\sc -> go inp' sc)
 
 -- NB. we add a final \n to the string, (see comment in the beginning of line
 -- production above).
 eofHack str = str++"\n"
 
 andBegin  :: Action -> StartCode -> Action
-andBegin act new_sc = \str _ cont -> act str new_sc cont
+andBegin act new_sc = \pos str _ cont -> act pos str new_sc cont
 
 token :: Token -> Action
-token t = \_ sc cont -> t : cont sc
+token t = \pos _ sc cont -> (t, pos) : cont sc
 
 strtoken, strtokenNL :: (String -> Token) -> Action
-strtoken t = \str sc cont -> t str : cont sc
-strtokenNL t = \str sc cont -> t (filter (/= '\r') str) : cont sc
+strtoken t = \pos str sc cont -> (t str, pos) : cont sc
+strtokenNL t = \pos str sc cont -> (t (filter (/= '\r') str), pos) : cont sc
 -- ^ We only want LF line endings in our internal doc string format, so we
 -- filter out all CRs.
 
 begin :: StartCode -> Action
-begin sc = \_ _ cont -> cont sc
+begin sc = \_ _ _ cont -> cont sc
 
 -- -----------------------------------------------------------------------------
 -- Lex a string as a Haskell identifier
 
 ident :: Action
-ident str sc cont = 
+ident pos str sc cont = 
   case strToHsQNames id of
-	Just names -> TokIdent names : cont sc
-	Nothing -> TokString str : cont sc
+	Just names -> (TokIdent names, pos) : cont sc
+	Nothing -> (TokString str, pos) : cont sc
  where id = init (tail str)
 
 strToHsQNames :: String -> Maybe [RdrName]

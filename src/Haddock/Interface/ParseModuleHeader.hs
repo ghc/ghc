@@ -46,13 +46,15 @@ parseModuleHeader str0 =
       description1 :: Either String (Maybe (Doc RdrName))
       description1 = case descriptionOpt of
          Nothing -> Right Nothing
-         Just description -> case parseString . tokenise $ description of
+         -- TODO: pass real file position
+         Just description -> case parseString $ tokenise description (0,0) of
             Nothing -> Left ("Cannot parse Description: " ++ description)
             Just doc -> Right (Just doc)
    in
       case description1 of
          Left mess -> Left mess
-         Right docOpt -> case parseParas . tokenise $ str8 of
+         -- TODO: pass real file position
+         Right docOpt -> case parseParas $ tokenise str8 (0,0) of
            Nothing -> Left "Cannot parse header documentation paragraphs"
            Just doc -> Right (HaddockModInfo {
             hmi_description = docOpt,
