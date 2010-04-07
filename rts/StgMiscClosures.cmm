@@ -272,7 +272,7 @@ retry:
         ("ptr" msg) = foreign "C" allocate(MyCapability() "ptr", 
                                            BYTES_TO_WDS(SIZEOF_MessageBlackHole)) [R1];
         
-        StgHeader_info(msg) = stg_MSG_BLACKHOLE_info;
+        SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = R1;
                
