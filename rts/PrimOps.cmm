@@ -1171,7 +1171,7 @@ stg_takeMVarzh
 
         q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
 
-        StgHeader_info(q) = stg_MVAR_TSO_QUEUE_info;
+        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
@@ -1330,7 +1330,7 @@ stg_putMVarzh
 
         q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
 
-        StgHeader_info(q) = stg_MVAR_TSO_QUEUE_info;
+        SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
