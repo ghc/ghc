@@ -59,6 +59,10 @@ check modules strict = do
 
 
 test = do
+
+  x <- doesFileExist (".." </> "dist" </> "build" </> "haddock" </> "haddock")
+  when (not x) $ die "you need to run 'cabal build' successfully first"
+
   contents <- getDirectoryContents "tests"
   args <- getArgs
   let (opts, spec) = span ("-" `isPrefixOf`) args
