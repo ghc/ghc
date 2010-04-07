@@ -1326,7 +1326,7 @@ stg_putMVarzh
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 
         // see Note [mvar-heap-check] above
-        HP_CHK_GEN_TICKY(SIZEOF_StgMVarTSOQueue, R1_PTR|R2_PTR, stg_putMVarzh);
+        HP_CHK_GEN_TICKY(SIZEOF_StgMVarTSOQueue, R1_PTR & R2_PTR, stg_putMVarzh);
 
         q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
 
