@@ -12,7 +12,7 @@ import Control.Exception
 
 main = do
   main_thread <- myThreadId
-  print =<< blocked
+  print =<< blocked -- False
   m <- newEmptyMVar
   m2 <- newEmptyMVar
   forkIO (do takeMVar m
@@ -23,9 +23,9 @@ main = do
   ( do
     block (do
 	putMVar m ()
-        print =<< blocked
-	sum [1..100000] `seq` -- give 'foo' a chance to be raised
-  	  (unblock (do print =<< blocked; myDelay 500000))
+        print =<< blocked -- True
+	sum [1..1] `seq` -- give 'foo' a chance to be raised
+  	  (unblock $ myDelay 500000)
 		`Control.Exception.catch` 
                     \e -> putStrLn ("caught1: " ++ show (e::SomeException))
      )
