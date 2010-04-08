@@ -58,11 +58,12 @@ test = do
 
   let base    = mkDep "base" "4.2.0.0"
       process = mkDep "process" "1.0.1.2"
+      ghcprim = mkDep "ghc-prim" "0.2.0.0"
 
   putStrLn "Running tests..."
   handle <- runProcess haddockPath
                        (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts"
-                        , "--optghc=-w", base, process] ++ opts ++ mods')
+                        , "--optghc=-w", base, process, ghcprim] ++ opts ++ mods')
                        Nothing (Just [("haddock_datadir", "../.")]) Nothing
                        Nothing Nothing
 

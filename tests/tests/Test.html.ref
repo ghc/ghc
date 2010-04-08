@@ -553,7 +553,9 @@
 > <A HREF="">Float</A
 > <A HREF="">Float</A
 > -&gt; <A HREF="">T5</A
-> () ()</TD
+> <A HREF="">()</A
+> <A HREF="">()</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="recfield"
@@ -807,7 +809,9 @@
 ><TD CLASS="decl"
 ><A HREF="">k</A
 > :: <A HREF="">T</A
-> () () -&gt; <A HREF="">T2</A
+> <A HREF="">()</A
+> <A HREF="">()</A
+> -&gt; <A HREF="">T2</A
 > <A HREF="">Int</A
 > <A HREF="">Int</A
 > -&gt; (<A HREF="">T3</A
@@ -817,8 +821,11 @@
 > <A HREF="">Float</A
 > <A HREF="">Float</A
 >) -&gt; <A HREF="">T5</A
-> () () -&gt; <A HREF="">IO</A
-> ()</TD
+> <A HREF="">()</A
+> <A HREF="">()</A
+> -&gt; <A HREF="">IO</A
+> <A HREF="">()</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -842,7 +849,8 @@
 ><A HREF="">m</A
 > :: <A HREF="">R</A
 > -&gt; <A HREF="">N1</A
-> () -&gt; <A HREF="">IO</A
+> <A HREF="">()</A
+> -&gt; <A HREF="">IO</A
 > <A HREF="">Int</A
 ></TD
 ></TR
@@ -1879,7 +1887,9 @@
 > <A HREF="">Float</A
 > <A HREF="">Float</A
 > -&gt; <A HREF="">T5</A
-> () ()</TD
+> <A HREF="">()</A
+> <A HREF="">()</A
+></TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -2822,7 +2832,9 @@ test2
 ><TR
 ><TD CLASS="arg"
 >:: <A HREF="">T</A
-> () ()</TD
+> <A HREF="">()</A
+> <A HREF="">()</A
+></TD
 ><TD CLASS="rdoc"
 >This argument has type <TT
 ><A HREF="">T</A
@@ -2858,7 +2870,9 @@ test2
 ><TR
 ><TD CLASS="arg"
 >-&gt; <A HREF="">T5</A
-> () ()</TD
+> <A HREF="">()</A
+> <A HREF="">()</A
+></TD
 ><TD CLASS="rdoc"
 >This argument has a very long description that should
  hopefully cause some wrapping to happen when it is finally
@@ -2868,7 +2882,8 @@ test2
 ><TR
 ><TD CLASS="arg"
 >-&gt; <A HREF="">IO</A
-> ()</TD
+> <A HREF="">()</A
+></TD
 ><TD CLASS="rdoc"
 >This is the result type
 </TD
@@ -2949,7 +2964,8 @@ test2
 ><TR
 ><TD CLASS="arg"
 >-&gt; <A HREF="">N1</A
-> ()</TD
+> <A HREF="">()</A
+></TD
 ><TD CLASS="rdoc"
 >one of the arguments
 </TD

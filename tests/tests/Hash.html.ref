@@ -148,7 +148,8 @@
 > :: (<A HREF="">Eq</A
 > key, <A HREF="">Hash</A
 > key) =&gt; key -&gt; val -&gt; <A HREF="">IO</A
-> ()</TD
+> <A HREF="">()</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -300,7 +301,8 @@
 > :: (<A HREF="">Eq</A
 > key, <A HREF="">Hash</A
 > key) =&gt; key -&gt; val -&gt; <A HREF="">IO</A
-> ()</TD
+> <A HREF="">()</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="doc"
