@@ -58,6 +58,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 -- beginning of a line
 <line> {
   $ws* \>		{ begin birdtrack }
+  $ws* ghci \>		{ strtoken TokExamplePrompt `andBegin` exampleexpr }
   $ws* \n		{ token TokPara `andBegin` para }
   -- Here, we really want to be able to say
   -- $ws* (\n | <eof>) 	{ token TokPara `andBegin` para}
