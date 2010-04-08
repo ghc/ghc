@@ -48,11 +48,16 @@ test = do
   waitForProcess h2
   putStrLn ""
 
+  -- TODO: use Distribution.* to get the packages instead
   libdir <- rawSystemStdout normal haddockPath ["--print-ghc-libdir"]
-  let basepath = init libdir ++ "/../../share/doc/ghc/html/libraries/base-4.2.0.0/"
-  let base = "-i " ++ basepath ++ "," ++ basepath ++ "base.haddock"
-  let processpath = init libdir ++ "/../../share/doc/ghc/html/libraries/process-1.0.1.2/"
-  let process = "-i " ++ processpath ++ "," ++ processpath ++ "process.haddock"
+  let librariesPath = ".."</>".."</>"share"</>"doc"</>"ghc"</>"html"</>"libraries"
+
+  let mkDep name version =
+        let path = init libdir </> librariesPath </> name ++ "-" ++ version
+        in  "-i " ++ path ++ "," ++ path </> name ++ ".haddock"
+
+  let base    = mkDep "base" "4.2.0.0"
+      process = mkDep "process" "1.0.1.2"
 
   putStrLn "Running tests..."
   handle <- runProcess haddockPath
