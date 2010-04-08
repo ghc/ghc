@@ -92,8 +92,8 @@ createInterfaces' verbosity modules flags instIfaceMap = do
          dflags <- getSessionDynFlags
          _ <- setSessionDynFlags dflags { hscTarget = defaultObjectTarget }
          -- we need to set defaultObjectTarget on all the ModSummaries as well
-         let addHscAsm m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = defaultObjectTarget } }
-         return (map addHscAsm modgraph)
+         let addDefTarget m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = defaultObjectTarget } }
+         return (map addDefTarget modgraph)
        else return modgraph
 
   let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph' Nothing
