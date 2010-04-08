@@ -82,9 +82,9 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 
 <string,def> {
   $special			{ strtoken $ \s -> TokSpecial (head s) }
-  \<\<.*\>\>                    { strtoken $ \s -> TokPic (init $ init $ tail $ tail s) }
-  \<.*\>			{ strtoken $ \s -> TokURL (init (tail s)) }
-  \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
+  \<\< [^\>]* \>\>              { strtoken $ \s -> TokPic (init $ init $ tail $ tail s) }
+  \< [^\>]* \>			{ strtoken $ \s -> TokURL (init (tail s)) }
+  \# [^\#]* \#			{ strtoken $ \s -> TokAName (init (tail s)) }
   \/ [^\/]* \/                  { strtoken $ \s -> TokEmphasis (init (tail s)) }
   [\'\`] $ident+ [\'\`]		{ ident }
   \\ .				{ strtoken (TokString . tail) }
