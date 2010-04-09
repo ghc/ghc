@@ -1066,5 +1066,6 @@ collectl (L _ pat) bndrs
     go (SigPatOut pat _)          = collectl pat bndrs
     go (TypePat _)                = bndrs
     go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
-    go p                          = pprPanic "collectl/go" (ppr p)
+    go (ViewPat _ pat _)          = collectl pat bndrs
+    go p@(QuasiQuotePat {})       = pprPanic "collectl/go" (ppr p)
 \end{code}
