@@ -26,7 +26,7 @@ import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
 			  lookupTopBndrRn, lookupLocatedTopBndrRn,
 			  lookupOccRn, newLocalBndrsRn, bindLocalNamesFV,
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
-			  bindTyVarsRn, extendTyVarEnvFVRn,
+			  bindTyVarsRn, bindTyVarsFV, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupRdrNames, mapFvRn
 			)
 import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn )
@@ -685,32 +685,33 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdExtName = ext_name})
 
 -- all flavours of type family declarations ("type family", "newtype fanily",
 -- and "data family")
-rnTyClDecl (tydecl@TyFamily {}) =
-  rnFamily tydecl bindTyVarsRn
+rnTyClDecl tydecl@TyFamily {} = rnFamily tydecl bindTyVarsFV
 
 -- "data", "newtype", "data instance, and "newtype instance" declarations
 rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context, 
 			   tcdLName = tycon, tcdTyVars = tyvars, 
-			   tcdTyPats = typatsMaybe, tcdCons = condecls, 
+			   tcdTyPats = typats, tcdCons = condecls, 
 			   tcdKindSig = sig, tcdDerivs = derivs}
   = do	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
 	; checkTc (h98_style || null (unLoc context)) 
                   (badGadtStupidTheta tycon)
-    	; (tyvars', context', typats', derivs', deriv_fvs)
-		<- bindTyVarsRn tyvars $ \ tyvars' -> do
+    	; ((tyvars', context', typats', derivs'), stuff_fvs)
+		<- bindTyVarsFV tyvars $ \ tyvars' -> do
 		         	 -- Checks for distinct tyvars
-		   { typats' <- rnTyPats data_doc typatsMaybe
-                   ; context' <- rnContext data_doc context
-                   ; (derivs', deriv_fvs) <- rn_derivs derivs
-		   ; return (tyvars', context', typats', derivs', deriv_fvs) }
-		-- For GADTs, the type variables in the declaration 
-		-- do not scope over the constructor signatures
-		-- 	data T a where { T1 :: forall b. b-> b }
+		   { context' <- rnContext data_doc context
+                   ; (typats', fvs1) <- rnTyPats data_doc tycon' typats
+                   ; (derivs', fvs2) <- rn_derivs derivs
+                   ; let fvs = fvs1 `plusFV` fvs2 `plusFV` 
+                               extractHsCtxtTyNames context'
+		   ; return ((tyvars', context', typats', derivs'), fvs) }
 
 	-- For the constructor declarations, bring into scope the tyvars 
 	-- bound by the header, but *only* in the H98 case
+	-- Reason: for GADTs, the type variables in the declaration 
+	--   do not scope over the constructor signatures
+	--   data T a where { T1 :: forall b. b-> b }
         ; let tc_tvs_in_scope | h98_style = hsLTyVarNames tyvars'
                               | otherwise = []
 	; (condecls', con_fvs) <- bindLocalNamesFV tc_tvs_in_scope $
@@ -722,11 +723,7 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = sig,
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
-	     	   con_fvs              `plusFV` 
-		   deriv_fvs		`plusFV`
-		   (if isFamInstDecl tydecl
-		   then unitFV (unLoc tycon')	-- type instance => use
-		   else emptyFVs))
+	     	   con_fvs `plusFV` stuff_fvs)
         }
   where
     h98_style = case condecls of	 -- Note [Stupid theta]
@@ -741,22 +738,17 @@ rnTyClDecl tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 
 -- "type" and "type instance" declarations
 rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
-			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
-  = bindTyVarsRn tyvars $ \ tyvars' -> do
+			      tcdTyPats = typats, tcdSynRhs = ty})
+  = bindTyVarsFV tyvars $ \ tyvars' -> do
     {    	 -- Checks for distinct tyvars
       name' <- if isFamInstDecl tydecl
     		  then lookupLocatedOccRn     name -- may be imported family
     		  else lookupLocatedTopBndrRn name
-    ; typats' <- rnTyPats syn_doc typatsMaybe
-    ; (ty', fvs) <- rnHsTypeFVs syn_doc ty
+    ; (typats',fvs1) <- rnTyPats syn_doc name' typats
+    ; (ty', fvs2)    <- rnHsTypeFVs syn_doc ty
     ; return (TySynonym { tcdLName = name', tcdTyVars = tyvars' 
     			, tcdTyPats = typats', tcdSynRhs = ty'},
-    	      delFVs (map hsLTyVarName tyvars') $
-    	      fvs			      `plusFV`
-    	       (if isFamInstDecl tydecl
-    	       then unitFV (unLoc name')	-- type instance => use
-    	       else emptyFVs))
-    }
+    	      fvs1 `plusFV` fvs2) }
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
@@ -766,14 +758,18 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
   = do	{ cname' <- lookupLocatedTopBndrRn cname
 
 	-- Tyvars scope over superclass context and method signatures
-	; (tyvars', context', fds', ats', ats_fvs, sigs')
-	    <- bindTyVarsRn tyvars $ \ tyvars' -> do
+	; ((tyvars', context', fds', ats', sigs'), stuff_fvs)
+	    <- bindTyVarsFV tyvars $ \ tyvars' -> do
          	 -- Checks for distinct tyvars
 	     { context' <- rnContext cls_doc context
 	     ; fds' <- rnFds cls_doc fds
-	     ; (ats', ats_fvs) <- rnATs ats
+	     ; (ats', at_fvs) <- rnATs ats
 	     ; sigs' <- renameSigs Nothing okClsDclSig sigs
-	     ; return   (tyvars', context', fds', ats', ats_fvs, sigs') }
+	     ; let fvs = at_fvs `plusFV` 
+                         extractHsCtxtTyNames context'	`plusFV`
+	                 hsSigsFVs sigs'
+			 -- The fundeps have no free variables
+	     ; return ((tyvars', context', fds', ats', sigs'), fvs) }
 
 	-- No need to check for duplicate associated type decls
 	-- since that is done by RnNames.extendGlobalRdrEnvRn
@@ -812,13 +808,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	; return (ClassDecl { tcdCtxt = context', tcdLName = cname', 
 			      tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
 			      tcdMeths = mbinds', tcdATs = ats', tcdDocs = docs'},
-
-	     	  delFVs (map hsLTyVarName tyvars')	$
-	     	  extractHsCtxtTyNames context'	    	`plusFV`
-	     	  plusFVs (map extractFunDepNames (map unLoc fds'))  `plusFV`
-	     	  hsSigsFVs sigs'		  	`plusFV`
-	     	  meth_fvs				`plusFV`
-	     	  ats_fvs) }
+	     	  meth_fvs `plusFV` stuff_fvs) }
   where
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
 
@@ -845,12 +835,17 @@ are no data constructors we allow h98_style = True
 %*********************************************************
 
 \begin{code}
-rnTyPats :: SDoc -> Maybe [LHsType RdrName] -> RnM (Maybe [LHsType Name])
+rnTyPats :: SDoc -> Located Name -> Maybe [LHsType RdrName] -> RnM (Maybe [LHsType Name], FreeVars)
 -- Although, we are processing type patterns here, all type variables will
 -- already be in scope (they are the same as in the 'tcdTyVars' field of the
 -- type declaration to which these patterns belong)
-rnTyPats _   Nothing       = return Nothing
-rnTyPats doc (Just typats) = liftM Just $ rnLHsTypes doc typats
+rnTyPats _   _  Nothing
+  = return (Nothing, emptyFVs)
+rnTyPats doc tc (Just typats) 
+  = do { typats' <- rnLHsTypes doc typats
+       ; let fvs = addOneFV (extractHsTyNames_s typats') (unLoc tc)
+       	     -- type instance => use, hence addOneFV
+       ; return (Just typats', fvs) }
 
 rnConDecls :: [LConDecl RdrName] -> RnM ([LConDecl Name], FreeVars)
 rnConDecls condecls
@@ -970,7 +965,7 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
     rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 
     lookupIdxVars tyvars cont = 
-      do { checkForDups tyvars;
+      do { checkForDups tyvars
 	 ; tyvars' <- mapM lookupIdxVar tyvars
 	 ; cont tyvars'
 	 }

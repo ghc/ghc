@@ -23,7 +23,7 @@ module RnEnv (
 	addLocalFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
-	bindTyVarsRn, extendTyVarEnvFVRn,
+	bindTyVarsRn, bindTyVarsFV, extendTyVarEnvFVRn,
 
 	checkDupRdrNames, checkDupAndShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, 
@@ -836,7 +836,7 @@ bindLocalName name enclosed_scope
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
   = do	{ (result, fvs) <- bindLocalNames names enclosed_scope
-	; return (result, delListFromNameSet fvs names) }
+	; return (result, delFVs names fvs) }
 
 
 -------------------------------------
@@ -847,9 +847,17 @@ bindLocatedLocalsFV :: [Located RdrName]
 bindLocatedLocalsFV rdr_names enclosed_scope
   = bindLocatedLocalsRn rdr_names	$ \ names ->
     enclosed_scope names		`thenM` \ (thing, fvs) ->
-    return (thing, delListFromNameSet fvs names)
+    return (thing, delFVs names fvs)
 
 -------------------------------------
+bindTyVarsFV ::  [LHsTyVarBndr RdrName]
+	      -> ([LHsTyVarBndr Name] -> RnM (a, FreeVars))
+	      -> RnM (a, FreeVars)
+bindTyVarsFV tyvars thing_inside
+  = bindTyVarsRn tyvars $ \ tyvars' ->
+    do { (res, fvs) <- thing_inside tyvars'
+       ; return (res, delFVs (map hsLTyVarName tyvars') fvs) }
+
 bindTyVarsRn ::  [LHsTyVarBndr RdrName]
 	      -> ([LHsTyVarBndr Name] -> RnM a)
 	      -> RnM a
