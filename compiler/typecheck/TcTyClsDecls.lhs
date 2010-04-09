@@ -929,7 +929,8 @@ tcConArg :: Bool		-- True <=> -funbox-strict_fields
 tcConArg unbox_strict bty
   = do  { arg_ty <- tcHsBangType bty
 	; let bang = getBangStrictness bty
-	; return (arg_ty, chooseBoxingStrategy unbox_strict arg_ty bang) }
+        ; strict_mark <- chooseBoxingStrategy unbox_strict arg_ty bang
+	; return (arg_ty, strict_mark) }
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The field is marked '!!', or
@@ -937,14 +938,16 @@ tcConArg unbox_strict bty
 --
 -- We have turned off unboxing of newtypes because coercions make unboxing 
 -- and reboxing more complicated
-chooseBoxingStrategy :: Bool -> TcType -> HsBang -> StrictnessMark
+chooseBoxingStrategy :: Bool -> TcType -> HsBang -> TcM StrictnessMark
 chooseBoxingStrategy unbox_strict_fields arg_ty bang
   = case bang of
-	HsNoBang				    -> NotMarkedStrict
+	HsNoBang			-> return NotMarkedStrict
+	HsUnbox  | can_unbox arg_ty	-> return MarkedUnboxed
+                 | otherwise            -> do { addWarnTc cant_unbox_msg
+                                              ; return MarkedStrict }
 	HsStrict | unbox_strict_fields 
-                   && can_unbox arg_ty 		    -> MarkedUnboxed
-	HsUnbox  | can_unbox arg_ty		    -> MarkedUnboxed
-	_                                           -> MarkedStrict
+                 , can_unbox arg_ty 	-> return MarkedUnboxed
+	_                               -> return MarkedStrict
   where
     -- we can unbox if the type is a chain of newtypes with a product tycon
     -- at the end
@@ -956,6 +959,8 @@ chooseBoxingStrategy unbox_strict_fields arg_ty bang
                        (if isNewTyCon arg_tycon then 
                             can_unbox (newTyConInstRhs arg_tycon tycon_args)
                         else True)
+
+    cant_unbox_msg = ptext (sLit "Ignoring unusable UNPACK pragma")
 \end{code}
 
 Note [Recursive unboxing]
