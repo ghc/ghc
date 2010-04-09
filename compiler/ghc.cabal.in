@@ -104,9 +104,6 @@ Library
 
     if flag(stage1)
         Include-Dirs: stage1
-        if impl(ghc < 6.9)
-            Build-Depends: extensible-exceptions
-            Extensions: PatternSignatures
     else
         if flag(stage2)
             Include-Dirs: stage2

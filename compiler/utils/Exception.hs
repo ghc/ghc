@@ -8,11 +8,7 @@ module Exception
 
 import Prelude hiding (catch)
 
-#if __GLASGOW_HASKELL__ < 609
-import Control.Exception.Extensible as Control.Exception
-#else
 import Control.Exception
-#endif
 
 catchIO :: IO a -> (IOException -> IO a) -> IO a
 catchIO = catch

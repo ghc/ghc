@@ -24,11 +24,7 @@ import Util
 import Data.Bits
 import Data.Word        ( Word8 )
 
-#if __GLASGOW_HASKELL__ > 609
 import Data.Data
-#else
-import Data.Generics
-#endif
 
 
 -- | Represents a serialized value of a particular type. Attempts can be made to deserialize it at certain types

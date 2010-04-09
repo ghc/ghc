@@ -50,11 +50,7 @@ import UniqFM
 import MonadUtils
 import Control.Monad	( zipWithM )
 import Data.List
-#if __GLASGOW_HASKELL__ > 609
 import Data.Data        ( Data, Typeable )
-#else
-import Data.Generics    ( Data, Typeable )
-#endif
 \end{code}
 
 -----------------------------------------------------
