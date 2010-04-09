@@ -743,7 +743,7 @@ inferConstraints :: [TyVar] -> Class -> [TcType] -> TyCon -> [TcType] -> ThetaTy
 -- Generate a sufficiently large set of constraints that typechecking the
 -- generated method definitions should succeed.   This set will be simplified
 -- before being used in the instance declaration
-inferConstraints tvs cls inst_tys rep_tc rep_tc_args
+inferConstraints _ cls inst_tys rep_tc rep_tc_args
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
     stupid_constraints ++ extra_constraints
     ++ sc_constraints ++ con_arg_constraints
@@ -784,15 +784,20 @@ inferConstraints tvs cls inst_tys rep_tc rep_tc_args
     stupid_constraints = substTheta subst (tyConStupidTheta rep_tc)
     subst = zipTopTvSubst rep_tc_tvs all_rep_tc_args
 	      
-	-- Extra constraints
+	-- Extra Data constraints
 	-- The Data class (only) requires that for 
-	--    instance (...) => Data (T a b) 
-	-- then (Data a, Data b) are among the (...) constraints
-	-- Reason: that's what you need to typecheck the method
-	-- 	       dataCast1 f = gcast1 f
+	--    instance (...) => Data (T t1 t2) 
+	-- IF   t1:*, t2:*
+	-- THEN (Data t1, Data t2) are among the (...) constraints
+	-- Reason: when the IF holds, we generate a method
+	-- 	       dataCast2 f = gcast2 f
+	--         and we need the Data constraints to typecheck the method
     extra_constraints 
-      | cls `hasKey` dataClassKey = [mkClassPred cls [mkTyVarTy tv] | tv <- tvs]
-      | otherwise    		  = []
+      | cls `hasKey` dataClassKey
+      , all (isLiftedTypeKind . typeKind) rep_tc_args 
+      = [mkClassPred cls [ty] | ty <- rep_tc_args]
+      | otherwise 
+      = []
 
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
@@ -1295,6 +1300,7 @@ inferInstanceContexts oflag infer_specs
 	         weird_preds = [pred | pred <- theta, not (tyVarsOfPred pred `subVarSet` tv_set)]  
 	   ; mapM_ (addErrTc . badDerivedPred) weird_preds	
 
+           ; traceTc (text "TcDeriv" <+> (ppr deriv_rhs $$ ppr theta))
 		-- Claim: the result instance declaration is guaranteed valid
 		-- Hence no need to call:
 		--   checkValidInstance tyvars theta clas inst_tys
