@@ -164,9 +164,8 @@ mkUsedNames
           TcGblEnv{ tcg_inst_uses = dfun_uses_var,
                     tcg_dus = dus
                   }
- = do
-        dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
-        return (allUses dus `unionNameSets` dfun_uses)
+ = do { dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
+      ; return (allUses dus `unionNameSets` dfun_uses) }
         
 mkDependencies :: TcGblEnv -> IO Dependencies
 mkDependencies
