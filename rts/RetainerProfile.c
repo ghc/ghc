@@ -1054,6 +1054,10 @@ isRetainer( StgClosure *c )
     case PAP:
 	// indirection
     case IND_PERM:
+    // IND_STATIC used to be an error, but at the moment it can happen
+    // as isAlive doesn't look through IND_STATIC as it ignores static
+    // closures. See trac #3956 for a program that hit this error.
+    case IND_STATIC:
     case BLACKHOLE:
 	// static objects
     case CONSTR_STATIC:
@@ -1069,8 +1073,6 @@ isRetainer( StgClosure *c )
 	//
 	// Error case
 	//
-	// IND_STATIC cannot be *c, *cp, *r in the retainer profiling loop.
-    case IND_STATIC:
 	// CONSTR_NOCAF_STATIC
 	// cannot be *c, *cp, *r in the retainer profiling loop.
     case CONSTR_NOCAF_STATIC:

@@ -45,6 +45,10 @@ isAlive(StgClosure *p)
 
     // ignore static closures 
     //
+    // ToDo: This means we never look through IND_STATIC, which means
+    // isRetainer needs to handle the IND_STATIC case rather than
+    // raising an error.
+    //
     // ToDo: for static closures, check the static link field.
     // Problem here is that we sometimes don't set the link field, eg.
     // for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
