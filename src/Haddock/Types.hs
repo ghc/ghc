@@ -156,7 +156,8 @@ data GhcModule = GhcModule {
    ghcExportedNames  :: [Name],
    ghcDefinedNames   :: [Name],
    ghcNamesInScope   :: [Name],
-   ghcInstances      :: [Instance]
+   ghcInstances      :: [Instance],
+   ghcDynFlags       :: DynFlags
 }
 
 

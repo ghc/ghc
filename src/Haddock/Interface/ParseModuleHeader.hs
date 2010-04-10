@@ -17,6 +17,7 @@ import Haddock.Lex
 import Haddock.Parse
 
 import RdrName
+import DynFlags
 
 import Data.Char
 
@@ -26,8 +27,8 @@ import Data.Char
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: String -> Either String (HaddockModInfo RdrName, Doc RdrName)
-parseModuleHeader str0 =
+parseModuleHeader :: DynFlags -> String -> Either String (HaddockModInfo RdrName, Doc RdrName)
+parseModuleHeader dflags str0 =
    let
       getKey :: String -> String -> (Maybe String,String)
       getKey key str = case parseKey key str of
@@ -47,14 +48,14 @@ parseModuleHeader str0 =
       description1 = case descriptionOpt of
          Nothing -> Right Nothing
          -- TODO: pass real file position
-         Just description -> case parseString $ tokenise description (0,0) of
+         Just description -> case parseString $ tokenise dflags description (0,0) of
             Nothing -> Left ("Cannot parse Description: " ++ description)
             Just doc -> Right (Just doc)
    in
       case description1 of
          Left mess -> Left mess
          -- TODO: pass real file position
-         Right docOpt -> case parseParas $ tokenise str8 (0,0) of
+         Right docOpt -> case parseParas $ tokenise dflags str8 (0,0) of
            Nothing -> Left "Cannot parse header documentation paragraphs"
            Just doc -> Right (HaddockModInfo {
             hmi_description = docOpt,

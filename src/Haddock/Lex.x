@@ -138,10 +138,10 @@ tokenPos t = let AlexPn _ line col = snd t in (line, col)
 -- Alex support stuff
 
 type StartCode = Int
-type Action = AlexPosn -> String -> StartCode -> (StartCode -> [LToken]) -> [LToken]
+type Action = AlexPosn -> String -> StartCode -> (StartCode -> [LToken]) -> DynFlags -> [LToken]
 
-tokenise :: String -> (Int, Int) -> [LToken]
-tokenise str (line, col) = let toks = go (posn, '\n', eofHack str) para in {-trace (show toks)-} toks
+tokenise :: DynFlags -> String -> (Int, Int) -> [LToken]
+tokenise dflags str (line, col) = let toks = go (posn, '\n', eofHack str) para in {-trace (show toks)-} toks
   where
     posn = AlexPn 0 line col
 
@@ -150,41 +150,41 @@ tokenise str (line, col) = let toks = go (posn, '\n', eofHack str) para in {-tra
 		AlexEOF -> []
 		AlexError _ -> error "lexical error"
 		AlexSkip  inp' _       -> go inp' sc
-		AlexToken inp'@(pos',_,_) len act -> act pos (take len str) sc (\sc -> go inp' sc)
+		AlexToken inp'@(pos',_,_) len act -> act pos (take len str) sc (\sc -> go inp' sc) dflags
 
 -- NB. we add a final \n to the string, (see comment in the beginning of line
 -- production above).
 eofHack str = str++"\n"
 
 andBegin  :: Action -> StartCode -> Action
-andBegin act new_sc = \pos str _ cont -> act pos str new_sc cont
+andBegin act new_sc = \pos str _ cont dflags -> act pos str new_sc cont dflags
 
 token :: Token -> Action
-token t = \pos _ sc cont -> (t, pos) : cont sc
+token t = \pos _ sc cont _ -> (t, pos) : cont sc
 
 strtoken, strtokenNL :: (String -> Token) -> Action
-strtoken t = \pos str sc cont -> (t str, pos) : cont sc
-strtokenNL t = \pos str sc cont -> (t (filter (/= '\r') str), pos) : cont sc
+strtoken t = \pos str sc cont _ -> (t str, pos) : cont sc
+strtokenNL t = \pos str sc cont _ -> (t (filter (/= '\r') str), pos) : cont sc
 -- ^ We only want LF line endings in our internal doc string format, so we
 -- filter out all CRs.
 
 begin :: StartCode -> Action
-begin sc = \_ _ _ cont -> cont sc
+begin sc = \_ _ _ cont _ -> cont sc
 
 -- -----------------------------------------------------------------------------
 -- Lex a string as a Haskell identifier
 
 ident :: Action
-ident pos str sc cont = 
-  case strToHsQNames id of
+ident pos str sc cont dflags = 
+  case strToHsQNames dflags id of
 	Just names -> (TokIdent names, pos) : cont sc
 	Nothing -> (TokString str, pos) : cont sc
  where id = init (tail str)
 
-strToHsQNames :: String -> Maybe [RdrName]
-strToHsQNames str0 = 
+strToHsQNames :: DynFlags -> String -> Maybe [RdrName]
+strToHsQNames dflags str0 = 
   let buffer = unsafePerformIO (stringToStringBuffer str0)
-      pstate = mkPState buffer noSrcLoc defaultDynFlags
+      pstate = mkPState buffer noSrcLoc dflags
       result = unP parseIdentifier pstate 
   in case result of 
        POk _ name -> Just [unLoc name] 

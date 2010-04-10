@@ -42,7 +42,8 @@ createInterface :: GhcModule -> [Flag] -> ModuleMap -> InstIfaceMap
                 -> ErrMsgGhc Interface
 createInterface ghcMod flags modMap instIfaceMap = do
 
-  let mdl = ghcModule ghcMod
+  let mdl    = ghcModule ghcMod
+      dflags = ghcDynFlags ghcMod
 
   -- The pattern-match should not fail, because createInterface is only
   -- done on loaded modules.
@@ -53,9 +54,10 @@ createInterface ghcMod flags modMap instIfaceMap = do
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader
+
+  (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader dflags
                                        gre (ghcMbDocHdr ghcMod)
-  decls0           <- liftErrMsg $ declInfos gre (topDecls (ghcGroup ghcMod))
+  decls0           <- liftErrMsg $ declInfos dflags gre (topDecls (ghcGroup ghcMod))
 
   let instances      = ghcInstances ghcMod
       localInsts     = filter (nameIsLocalOrFrom mdl . getName) instances
@@ -71,7 +73,7 @@ createInterface ghcMod flags modMap instIfaceMap = do
   liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
   exportItems <- mkExportItems modMap mdl gre (ghcExportedNames ghcMod) decls declMap
-                               opts exports ignoreExps instances instIfaceMap
+                               opts exports ignoreExps instances instIfaceMap dflags
 
   let visibleNames = mkVisibleNames exportItems opts
 
@@ -168,22 +170,22 @@ mkDeclMap decls = Map.fromList . concat $
   , not (isDocD d), not (isInstD d) ]
 
 
-declInfos :: GlobalRdrEnv -> [(Decl, MaybeDocStrings)] -> ErrMsgM [DeclInfo]
-declInfos gre decls =
+declInfos :: DynFlags -> GlobalRdrEnv -> [(Decl, MaybeDocStrings)] -> ErrMsgM [DeclInfo]
+declInfos dflags gre decls =
   forM decls $ \(parent@(L _ d), mbDocString) -> do
-            mbDoc <- lexParseRnHaddockCommentList NormalHaddockComment
+            mbDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment
                        gre mbDocString
             fnArgsDoc <- fmap (Map.mapMaybe id) $
                 Traversable.forM (getDeclFnArgDocs d) $
-                \doc -> lexParseRnHaddockComment NormalHaddockComment gre doc
+                \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
 
             let subs_ = subordinates d
             subs <- forM subs_ $ \(subName, mbSubDocStr, subFnArgsDocStr) -> do
-                mbSubDoc <- lexParseRnHaddockCommentList NormalHaddockComment
+                mbSubDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment
                               gre mbSubDocStr
                 subFnArgsDoc <- fmap (Map.mapMaybe id) $
                   Traversable.forM subFnArgsDocStr $
-                  \doc -> lexParseRnHaddockComment NormalHaddockComment gre doc
+                  \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
                 return (subName, (mbSubDoc, subFnArgsDoc))
 
             return (parent, (mbDoc, fnArgsDoc), subs)
@@ -431,10 +433,11 @@ mkExportItems
   -> Bool               -- --ignore-all-exports flag
   -> [Instance]
   -> InstIfaceMap
+  -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
 
 mkExportItems modMap this_mod gre exported_names decls declMap
-              opts maybe_exps ignore_all_exports _ instIfaceMap
+              opts maybe_exps ignore_all_exports _ instIfaceMap dflags
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | otherwise = liftM concat $ mapM lookupExport (fromJust maybe_exps)
@@ -442,7 +445,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
 
 
     everything_local_exported =  -- everything exported
-      liftErrMsg $ fullContentsOfThisModule gre decls
+      liftErrMsg $ fullContentsOfThisModule dflags gre decls
 
 
     lookupExport (IEVar x) = declWith x
@@ -451,15 +454,15 @@ mkExportItems modMap this_mod gre exported_names decls declMap
     lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  = fullContentsOf m
     lookupExport (IEGroup lev docStr)  = liftErrMsg $
-      ifDoc (lexParseRnHaddockComment DocSectionComment gre docStr)
+      ifDoc (lexParseRnHaddockComment dflags DocSectionComment gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
     lookupExport (IEDoc docStr)        = liftErrMsg $
-      ifDoc (lexParseRnHaddockComment NormalHaddockComment gre docStr)
+      ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
             (\doc -> return [ ExportDoc doc ])
     lookupExport (IEDocNamed str) = liftErrMsg $
       ifDoc (findNamedDoc str [ unL d | (d,_,_) <- decls ])
             (\docStr ->
-            ifDoc (lexParseRnHaddockComment NormalHaddockComment gre docStr)
+            ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
                   (\doc -> return [ ExportDoc doc ]))
 
 
@@ -618,7 +621,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
 
 
     fullContentsOf modname
-      | m == this_mod = liftErrMsg $ fullContentsOfThisModule gre decls
+      | m == this_mod = liftErrMsg $ fullContentsOfThisModule dflags gre decls
       | otherwise =
           case Map.lookup m modMap of
             Just iface
@@ -666,14 +669,14 @@ mkExportItems modMap this_mod gre exported_names decls declMap
 -- (For more information, see Trac #69)
 
 
-fullContentsOfThisModule :: GlobalRdrEnv -> [DeclInfo] -> ErrMsgM [ExportItem Name]
-fullContentsOfThisModule gre decls = liftM catMaybes $ mapM mkExportItem decls
+fullContentsOfThisModule :: DynFlags -> GlobalRdrEnv -> [DeclInfo] -> ErrMsgM [ExportItem Name]
+fullContentsOfThisModule dflags gre decls = liftM catMaybes $ mapM mkExportItem decls
   where
     mkExportItem (L _ (DocD (DocGroup lev docStr)), _, _) = do
-        mbDoc <- lexParseRnHaddockComment DocSectionComment gre docStr
+        mbDoc <- lexParseRnHaddockComment dflags DocSectionComment gre docStr
         return $ fmap (ExportGroup lev "") mbDoc
     mkExportItem (L _ (DocD (DocCommentNamed _ docStr)), _, _) = do
-        mbDoc <- lexParseRnHaddockComment NormalHaddockComment gre docStr
+        mbDoc <- lexParseRnHaddockComment dflags NormalHaddockComment gre docStr
         return $ fmap ExportDoc mbDoc
     mkExportItem (decl, doc, subs) = return $ Just $ ExportDecl decl doc subs []
 

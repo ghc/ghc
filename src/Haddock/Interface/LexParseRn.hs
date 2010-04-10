@@ -31,20 +31,20 @@ import RdrName
 
 data HaddockCommentType = NormalHaddockComment | DocSectionComment
 
-lexParseRnHaddockCommentList :: HaddockCommentType -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
-lexParseRnHaddockCommentList hty gre docStrs = do
-  docMbs <- mapM (lexParseRnHaddockComment hty gre) docStrs
+lexParseRnHaddockCommentList :: DynFlags -> HaddockCommentType -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
+lexParseRnHaddockCommentList dflags hty gre docStrs = do
+  docMbs <- mapM (lexParseRnHaddockComment dflags hty gre) docStrs
   let docs = catMaybes docMbs
   let doc = foldl docAppend DocEmpty docs
   case doc of
     DocEmpty -> return Nothing
     _ -> return (Just doc)
 
-lexParseRnHaddockComment :: HaddockCommentType ->
+lexParseRnHaddockComment :: DynFlags -> HaddockCommentType ->
     GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
-lexParseRnHaddockComment hty gre (HsDocString fs) = do
+lexParseRnHaddockComment dflags hty gre (HsDocString fs) = do
    let str = unpackFS fs
-   let toks = tokenise str (0,0) -- TODO: real position
+   let toks = tokenise dflags str (0,0) -- TODO: real position
    let parse = case hty of
          NormalHaddockComment -> parseParas
          DocSectionComment -> parseString
@@ -54,19 +54,19 @@ lexParseRnHaddockComment hty gre (HsDocString fs) = do
        return Nothing
      Just doc -> return (Just (rnDoc gre doc))
 
-lexParseRnMbHaddockComment :: HaddockCommentType -> GlobalRdrEnv -> Maybe HsDocString -> ErrMsgM (Maybe (Doc Name))
-lexParseRnMbHaddockComment _ _ Nothing = return Nothing
-lexParseRnMbHaddockComment hty gre (Just d) = lexParseRnHaddockComment hty gre d
+lexParseRnMbHaddockComment :: DynFlags -> HaddockCommentType -> GlobalRdrEnv -> Maybe HsDocString -> ErrMsgM (Maybe (Doc Name))
+lexParseRnMbHaddockComment _ _ _ Nothing = return Nothing
+lexParseRnMbHaddockComment dflags hty gre (Just d) = lexParseRnHaddockComment dflags hty gre d
 
 -- yes, you always get a HaddockModInfo though it might be empty
-lexParseRnHaddockModHeader :: GlobalRdrEnv -> GhcDocHdr -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
-lexParseRnHaddockModHeader gre mbStr = do
+lexParseRnHaddockModHeader :: DynFlags -> GlobalRdrEnv -> GhcDocHdr -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
+lexParseRnHaddockModHeader dflags gre mbStr = do
   let failure = (emptyHaddockModInfo, Nothing)
   case mbStr of
     Nothing -> return failure
     Just (L _ (HsDocString fs)) -> do
       let str = unpackFS fs
-      case parseModuleHeader str of
+      case parseModuleHeader dflags str of
         Left mess -> do
           tell ["haddock module header parse failed: " ++ mess]
           return failure

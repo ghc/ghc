@@ -153,7 +153,8 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
   ghcExportedNames  = modInfoExports modInfo,
   ghcDefinedNames   = map getName $ modInfoTyThings modInfo,
   ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo,
-  ghcInstances      = modInfoInstances modInfo
+  ghcInstances      = modInfoInstances modInfo,
+  ghcDynFlags       = dynflags
 }
   where
     mbOpts = haddockOptions dynflags
