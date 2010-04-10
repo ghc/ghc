@@ -621,32 +621,6 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     mbDoc = join $ fmap fst $ lookup name subdocs
 
-{-
-ppHsFullConstr :: HsConDecl -> Html
-ppHsFullConstr (HsConDecl _ nm tvs ctxt typeList doc) = 
-     declWithDoc False doc (
-        hsep ((ppHsConstrHdr tvs ctxt +++ 
-                ppHsBinder False nm) : map ppHsBangType typeList)
-      )
-ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
-   td << vanillaTable << (
-     case doc of
-       Nothing -> aboves [hdr, fields_html]
-       Just _  -> aboves [hdr, constr_doc, fields_html]
-   )
-
-  where hdr = declElem (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm)
-
-        constr_doc      
-          | isJust doc = docElem (docToHtml (fromJust doc))
-          | otherwise  = emptyTable
-
-        fields_html = 
-           td << 
-              table ! [width "100%", cellpadding 0, cellspacing 8] << (
-                   aboves (map ppFullField (concat (map expandField fields)))
-                )
--}
 
 ppShortField :: Bool -> Bool -> ConDeclField DocName -> HtmlTable
 ppShortField summary unicode (ConDeclField (L _ name) ltype _)
@@ -655,17 +629,6 @@ ppShortField summary unicode (ConDeclField (L _ name) ltype _)
       <+> dcolon unicode <+> ppLType unicode ltype
     )
 
-{-
-ppFullField :: HsFieldDecl -> Html
-ppFullField (HsFieldDecl [n] ty doc) 
-  = declWithDoc False doc (
-        ppHsBinder False n <+> dcolon <+> ppHsBangType ty
-    )
-ppFullField _ = error "ppFullField"
-
-expandField :: HsFieldDecl -> [HsFieldDecl]
-expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
--}
 
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
@@ -689,13 +652,6 @@ ppKind :: Outputable a => a -> Html
 ppKind k = toHtml $ showSDoc (ppr k)
 
 
-{-
-ppForAll Implicit _ lctxt = ppCtxtPart lctxt
-ppForAll Explicit ltvs lctxt = 
-  hsep (keyword "forall" : ppTyVars ltvs ++ [dot]) <+> ppCtxtPart lctxt 
--}
-
-
 ppBang :: HsBang -> Html
 ppBang HsNoBang = empty 
 ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
@@ -705,27 +661,6 @@ ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
 tupleParens :: Boxity -> [Html] -> Html
 tupleParens Boxed   = parenList
 tupleParens Unboxed = ubxParenList 
-{-
-ppType :: HsType DocName -> Html
-ppType t = case t of
-  t@(HsForAllTy expl ltvs lcontext ltype) -> ppForAllTy t <+> ppLType ltype
-  HsTyVar n -> ppDocName n
-  HsBangTy HsStrict lt -> toHtml "!" <+> ppLType lt
-  HsBangTy HsUnbox lt -> toHtml "!!" <+> ppLType lt
-  HsAppTy a b -> ppLType a <+> ppLType b 
-  HsFunTy a b -> hsep [ppLType a, toHtml "->", ppLType b]
-  HsListTy t -> brackets $ ppLType t
-  HsPArrTy t -> toHtml "[:" +++ ppLType t +++ toHtml ":]"
-  HsTupleTy Boxed ts -> parenList $ map ppLType ts
-  HsTupleTy Unboxed ts -> ubxParenList $ map ppLType ts
-  HsOpTy a n b -> ppLType a <+> ppLDocName n <+> ppLType b
-  HsParTy t -> parens $ ppLType t
-  HsNumTy n -> toHtml (show n)
-  HsPredTy p -> ppPred p
-  HsKindSig t k -> hsep [ppLType t, dcolon, ppKind k]
-  HsSpliceTy _ -> error "ppType"
-  HsDocTy t _ -> ppLType t
--}
 
 
 --------------------------------------------------------------------------------
