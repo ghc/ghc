@@ -433,17 +433,10 @@ ppShortDataDecl summary links loc dataDecl unicode
 
   | [] <- cons = ppDataHeader summary dataDecl unicode
 
-  | otherwise = vanillaTable << (
+  | otherwise = foldl (+++) dataHeader $
       case resTy of 
-        ResTyH98 -> dataHeader </> 
-          tda [theclass "body"] << vanillaTable << (
-            aboves (zipWith doConstr ('=':repeat '|') cons)
-          )
-        ResTyGADT _ -> dataHeader </> 
-          tda [theclass "body"] << vanillaTable << (
-            aboves (map doGADTConstr cons)
-          )
-    )
+        ResTyH98    -> zipWith doConstr ('=':repeat '|') cons
+        ResTyGADT _ -> map doGADTConstr cons
   
   where
     dataHeader = 
