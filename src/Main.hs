@@ -140,7 +140,7 @@ main = handleTopExceptions $ do
             liftIO exitFailure
 
       -- initialize GHC
-      startGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
+      withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
         -- get packages supplied with --read-interface
         packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
@@ -302,9 +302,9 @@ dumpInterfaceFile ifaces homeLinks flags =
 -------------------------------------------------------------------------------
 
 -- | Start a GHC session with the -haddock flag set. Also turn off
--- compilation and linking.
-startGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
-startGhc libDir flags ghcActs = do
+-- compilation and linking. Then run the given 'Ghc' action.
+withGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
+withGhc libDir flags ghcActs = do
   -- TODO: handle warnings?
   (restFlags, _) <- parseStaticFlags (map noLoc flags)
   runGhc (Just libDir) $ do
