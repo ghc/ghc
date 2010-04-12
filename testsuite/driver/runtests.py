@@ -104,12 +104,20 @@ if config.use_threads == 1:
 
 # Try to use UTF8
 if windows:
+    if sys.platform == "cygwin":
+        # Is this actually right? Which calling convention does it use?
+        # As of the time of writing, ctypes.windll doesn't exist in the
+        # cygwin python, anyway.
+        mydll = ctypes.cdll
+    else:
+        mydll = ctypes.windll
+
     # This actually leaves the terminal in codepage 65001 (UTF8) even
     # after python terminates. We ought really remember the old codepage
     # and set it back.
-    if ctypes.cdll.kernel32.SetConsoleCP(65001) == 0:
+    if mydll.kernel32.SetConsoleCP(65001) == 0:
         raise Exception("Failure calling SetConsoleCP(65001)")
-    if ctypes.cdll.kernel32.SetConsoleOutputCP(65001) == 0:
+    if mydll.kernel32.SetConsoleOutputCP(65001) == 0:
         raise Exception("Failure calling SetConsoleOutputCP(65001)")
 else:
     # Try and find a utf8 locale to use
