@@ -17,11 +17,7 @@ $1_$2_depfile_c_asm = $$($1_$2_depfile_base).c_asm
 
 $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 
-ifeq "$$($1_$2_ghc_ge_609)" "YES"
 $1_$2_MKDEPENDHS_FLAGS = -include-pkg-deps -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-dep-suffix $$(way))
-else
-$1_$2_MKDEPENDHS_FLAGS = -optdep--include-pkg-deps -optdep-f -optdep$$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-optdep-s -optdep$$(way))
-endif
 
 ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
 

@@ -625,9 +625,7 @@ include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
 GhcLibHcOpts += -fno-warn-deprecated-flags
-ifeq "$(ghc_ge_609)" "YES"
 GhcBootLibHcOpts += -fno-warn-deprecated-flags
-endif
 
 # Add $(GhcLibHcOpts) to all library builds
 $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
