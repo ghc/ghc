@@ -1409,12 +1409,15 @@ module A where
 	one of these special characters, precede it with a backslash
 	(<literal>\</literal>).</para>
 
-	<para>Additionally, the character <literal>&gt;</literal> has
-	a special meaning at the beginning of a line, and the
-	following characters have special meanings at the beginning of
-	a paragraph:
-	<literal>*</literal>, <literal>-</literal>.  These characters
-	can also be escaped using <literal>\</literal>.</para>
+	<para>Additionally, the character <literal>&gt;</literal> and
+	the character sequence <literal>ghci&gt;</literal> have special
+	meanings at the beginning of a line.  The following characters
+	have special meanings at the beginning of a paragraph:
+	<literal>*</literal>, <literal>-</literal>.  The single
+	characters can also be escaped using <literal>\</literal>.  To
+	get a literal <literal>ghci&gt;</literal> at the beginning of a
+	line, prefix the <literal>&gt;</literal> with a
+	backslash.</para>
       </section>
 
       <section>
@@ -1464,6 +1467,29 @@ module A where
         literally, whereas the <literal>@...@</literal> form
         interprets markup as normal inside the code block.</para>
       </section>
+
+      <section>
+	<title>Interactive Examples</title>
+
+	<para> Haddock has markup support for interactive examples, that
+	illustrate the use of source constructs in a
+	<emphasis>read-eval-print loop (REPL)</emphasis>.  An
+	interactive example is introduced with
+	<literal>ghci&gt;</literal> followed by an expression followed
+	by zero or more result lines:</para>
+
+<programlisting>
+-- | Two examples are given bellow:
+--
+-- ghci&gt; fib 10
+-- 55
+--
+-- ghci&gt; putStrLn "foo\nbar"
+-- foo
+-- bar
+</programlisting>
+      </section>
+
 
       <section>
 	<title>Hyperlinked Identifiers</title>
