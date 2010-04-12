@@ -1099,14 +1099,19 @@ uTys nb1 ty1 nb2 ty2
 
 
 --------------
-uTys_s :: InBox -> [TcType]     -- tys1 are the *actual*   types
+uTys_s :: Outer		
+       -> InBox -> [TcType]     -- tys1 are the *actual*   types
        -> InBox -> [TcType]     -- tys2 are the *expected* types
        -> TcM [CoercionI]
-uTys_s _   []         _   []         = return []
-uTys_s nb1 (ty1:tys1) nb2 (ty2:tys2) = do { coi <- uTys nb1 ty1 nb2 ty2
-                                          ; cois <- uTys_s nb1 tys1 nb2 tys2
-                                          ; return (coi:cois) }
-uTys_s _ _ _ _ = panic "Unify.uTys_s: mismatched type lists!"
+uTys_s outer nb1 tys1 nb2 tys2
+  = go tys1 tys2
+  where
+    go []         []         = return []
+    go (ty1:tys1) (ty2:tys2) = do { coi <- uTys nb1 ty1 nb2 ty2
+                                  ; cois <- go tys1 tys2
+                                  ; return (coi:cois) }
+    go _ _ = unifyMisMatch outer
+       -- See Note [Mismatched type lists and application decomposition]
 
 --------------
 u_tys :: Outer
@@ -1196,14 +1201,16 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
         = uPred outer nb1 p1 nb2 p2
 
         -- Non-synonym type constructors must match
-    go _ _ (TyConApp con1 tys1) _ (TyConApp con2 tys2)
+    go outer _ (TyConApp con1 tys1) _ (TyConApp con2 tys2)
       | con1 == con2 && not (isOpenSynTyCon con1)
-      = do { cois <- uTys_s nb1 tys1 nb2 tys2
+      = do { traceTc (text "utys1" <+> ppr con1 <+> (ppr tys1 $$ ppr tys2))
+           ; cois <- uTys_s outer nb1 tys1 nb2 tys2
            ; return $ mkTyConAppCoI con1 tys1 cois
            }
         -- Family synonyms See Note [TyCon app]
       | con1 == con2 && identicalOpenSynTyConApp
-      = do { cois <- uTys_s nb1 tys1' nb2 tys2'
+      = do { traceTc (text "utys2" <+> ppr con1 <+> (ppr tys1' $$ ppr tys2'))
+           ; cois <- uTys_s outer nb1 tys1' nb2 tys2'
            ; return $ mkTyConAppCoI con1 tys1 (replicate n IdCo ++ cois)
            }
       where
@@ -1224,9 +1231,10 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
         -- NB: we've already dealt with type variables and Notes,
         -- so if one type is an App the other one jolly well better be too
+        -- See Note [Mismatched type lists and application decomposition]
     go outer _ (AppTy s1 t1) _ ty2
       | Just (s2,t2) <- tcSplitAppTy_maybe ty2
-      = do { coi_s <- go outer s1 s1 s2 s2      -- NB recurse into go
+      = do { coi_s <- go outer s1 s1 s2 s2      -- NB recurse into go...
            ; coi_t <- uTys nb1 t1 nb2 t2        -- See Note [Unifying AppTy]
            ; return $ mkAppTyCoI s1 coi_s t1 coi_t }
 
@@ -1271,15 +1279,14 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 ----------
 uPred :: Outer -> InBox -> PredType -> InBox -> PredType -> TcM CoercionI
 uPred _ nb1 (IParam n1 t1) nb2 (IParam n2 t2)
-  | n1 == n2 =
-        do { coi <- uTys nb1 t1 nb2 t2
-           ; return $ mkIParamPredCoI n1 coi
-           }
-uPred _ nb1 (ClassP c1 tys1) nb2 (ClassP c2 tys2)
-  | c1 == c2 =
-        do { cois <- uTys_s nb1 tys1 nb2 tys2           -- Guaranteed equal lengths because the kinds check
-           ; return $ mkClassPPredCoI c1 tys1 cois
-           }
+  | n1 == n2
+  = do { coi <- uTys nb1 t1 nb2 t2
+       ; return $ mkIParamPredCoI n1 coi }
+uPred outer nb1 (ClassP c1 tys1) nb2 (ClassP c2 tys2)
+  | c1 == c2
+  = do { traceTc (text "utys3" <+> ppr c1 <+> (ppr tys2 $$ ppr tys2))
+       ; cois <- uTys_s outer nb1 tys1 nb2 tys2
+       ; return $ mkClassPPredCoI c1 tys1 cois }
 uPred outer _ _ _ _ = unifyMisMatch outer
 
 uPreds :: Outer -> InBox -> [PredType] -> InBox -> [PredType]
@@ -1293,15 +1300,23 @@ uPreds outer nb1 (p1:ps1) nb2 (p2:ps2) =
 uPreds _ _ _ _ _ = panic "uPreds"
 \end{code}
 
-Note [TyCon app]
-~~~~~~~~~~~~~~~~
-When we find two TyConApps, the argument lists are guaranteed equal
-length.  Reason: intially the kinds of the two types to be unified is
-the same. The only way it can become not the same is when unifying two
-AppTys (f1 a1)~(f2 a2).  In that case there can't be a TyConApp in
-the f1,f2 (because it'd absorb the app).  If we unify f1~f2 first,
-which we do, that ensures that f1,f2 have the same kind; and that
-means a1,a2 have the same kind.  And now the argument repeats.
+Note [Mismatched type lists and application decomposition]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we find two TyConApps, you might think that the argument lists 
+are guaranteed equal length.  But they aren't. Consider matching
+	w (T x) ~ Foo (T x y)
+We do match (w ~ Foo) first, but in some circumstances we simply create
+a deferred constraint; and then go ahead and match (T x ~ T x y).
+This came up in Trac #3950.
+
+So either 
+   (a) either we must check for identical argument kinds 
+       when decomposing applications,
+  
+   (b) or we must be prepared for ill-kinded unification sub-problems
+
+Currently we adopt (b) since it seems more robust -- no need to maintain
+a global invariant.
 
 Note [OpenSynTyCon app]
 ~~~~~~~~~~~~~~~~~~~~~~~
