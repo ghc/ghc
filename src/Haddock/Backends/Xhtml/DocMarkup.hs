@@ -41,8 +41,10 @@ parHtmlMarkup ppId isTyCon = Markup {
   markupOrderedList   = ordList,
   markupDefList       = defList,
   markupCodeBlock     = pre,
-  markupURL           = \url -> anchor ! [href url] << toHtml url,
-  markupAName         = \aname -> namedAnchor aname << toHtml ""
+  markupURL           = \url -> anchor ! [href url] << url,
+  markupAName         = \aname -> namedAnchor aname << "",
+  markupPic           = \path -> image ! [src path],
+  markupExample       = examplesToHtml
   }
   where
     -- If an id can refer to multiple things, we give precedence to type
