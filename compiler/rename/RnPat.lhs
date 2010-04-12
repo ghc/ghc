@@ -167,10 +167,12 @@ newName (LetMk mb_top fix_env) rdr_name
         do { name <- case mb_top of
                        Nothing  -> newLocalBndrRn rdr_name
                        Just mod -> newTopSrcBinder mod rdr_name
-	   ; bindLocalNamesFV_WithFixities [name] fix_env $
+	   ; bindLocalName name $	-- Do *not* use bindLocalNameFV here
+					-- See Note [View pattern usage]
+             addLocalFixities fix_env [name] $
 	     thing_inside name })
 			  
-    -- Note: the bindLocalNamesFV_WithFixities is somewhat suspicious 
+    -- Note: the bindLocalName is somewhat suspicious
     --       because it binds a top-level name as a local name.
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
@@ -178,6 +180,14 @@ newName (LetMk mb_top fix_env) rdr_name
     --       before going on to the RHSes (see RnSource.lhs).
 \end{code}
 
+Note [View pattern usage]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  let (r, (r -> x)) = x in ...
+Here the pattern binds 'r', and then uses it *only* in the view pattern.
+We want to "see" this use, and in let-bindings we collect all uses and
+report unused variables at the binding level. So we must use bindLocalName
+here, *not* bindLocalNameFV.  Trac #3943.
 
 %*********************************************************
 %*							*

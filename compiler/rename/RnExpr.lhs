@@ -886,7 +886,8 @@ rn_rec_stmts_and_then s cont
 
 	  --    ...bring them and their fixities into scope
 	; let bound_names = collectLStmtsBinders (map fst new_lhs_and_fv)
-	; bindLocalNamesFV_WithFixities bound_names fix_env $ do
+	; bindLocalNamesFV bound_names $
+          addLocalFixities fix_env bound_names $ do
 
 	  -- (C) do the right-hand-sides and thing-inside
 	{ segs <- rn_rec_stmts bound_names new_lhs_and_fv

@@ -314,10 +314,11 @@ rnValBindsRHSGen _ _ b = pprPanic "rnValBindsRHSGen" (ppr b)
 rnValBindsRHS :: NameSet  -- names bound by the LHSes
               -> HsValBindsLR Name RdrName
               -> RnM (HsValBinds Name, DefUses)
-rnValBindsRHS bound_names binds = 
-  rnValBindsRHSGen (\ fvs -> -- only keep the names the names from this group
-                    intersectNameSet bound_names fvs) bound_names binds
-
+rnValBindsRHS bound_names binds
+  = rnValBindsRHSGen trim bound_names binds
+  where
+    trim fvs = intersectNameSet bound_names fvs 
+	-- Only keep the names the names from this group
 
 -- for local binds
 -- wrapper that does both the left- and right-hand sides 
@@ -335,7 +336,8 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 	; (bound_names, new_lhs) <- rnValBindsLHS new_fixities binds
 
 	      --     ...and bring them (and their fixities) into scope
-	; bindLocalNamesFV_WithFixities bound_names new_fixities $ do
+	; bindLocalNamesFV bound_names              $
+          addLocalFixities new_fixities bound_names $ do
 
 	{      -- (C) Do the RHS and thing inside
 	  (binds', dus) <- rnValBindsRHS (mkNameSet bound_names) new_lhs 
@@ -464,21 +466,22 @@ rnBind :: (Name -> [Name])		-- Signature tyvar function
 rnBind _ trim (L loc (PatBind { pat_lhs = pat,
                                 pat_rhs = grhss, 
                                 -- pat fvs were stored here while
-                                -- processing the LHS          
-                                bind_fvs=pat_fvs }))
+                                -- after processing the LHS          
+                                bind_fvs = pat_fvs }))
   = setSrcSpan loc $ 
     do	{let bndrs = collectPatBinders pat
 
 	; (grhss', fvs) <- rnGRHSs PatBindRhs grhss
 		-- No scoped type variables for pattern bindings
-	; let fvs' = trim fvs
+	; let all_fvs = pat_fvs `plusFV` fvs
+              fvs'    = trim all_fvs
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
-      return (L loc (PatBind { pat_lhs = pat,
-                                  pat_rhs = grhss', 
-				     pat_rhs_ty = placeHolderType, 
-                                  bind_fvs = fvs' }),
-		  bndrs, pat_fvs `plusFV` fvs) }
+          return (L loc (PatBind { pat_lhs    = pat,
+                                   pat_rhs    = grhss', 
+				   pat_rhs_ty = placeHolderType, 
+                                   bind_fvs   = fvs' }),
+		  bndrs, all_fvs) }
 
 rnBind sig_fn 
        trim 

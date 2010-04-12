@@ -20,7 +20,7 @@ module RnEnv (
 	newLocalBndrRn, newLocalBndrsRn, newIPNameRn,
 	bindLocalName, bindLocalNames, bindLocalNamesFV, 
 	MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
-	bindLocalNamesFV_WithFixities,
+	addLocalFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
@@ -651,22 +651,17 @@ type MiniFixityEnv = FastStringEnv (Located Fixity)
 --------------------------------
 -- Used for nested fixity decls to bind names along with their fixities.
 -- the fixities are given as a UFM from an OccName's FastString to a fixity decl
-bindLocalNamesFV_WithFixities :: [Name]
-			      -> MiniFixityEnv
-			      -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-bindLocalNamesFV_WithFixities names fixities thing_inside
-  = bindLocalNamesFV names $
-    extendFixityEnv boundFixities $ 
-    thing_inside
+
+addLocalFixities :: MiniFixityEnv -> [Name] -> RnM a -> RnM a
+addLocalFixities mini_fix_env names thing_inside
+  = extendFixityEnv (mapCatMaybes find_fixity names) thing_inside
   where
-    -- find the names that have fixity decls
-    boundFixities = foldr 
-                        (\ name -> \ acc -> 
-                         -- check whether this name has a fixity decl
-                          case lookupFsEnv fixities (occNameFS (nameOccName name)) of
-                               Just (L _ fix) -> (name, FixItem (nameOccName name) fix) : acc
-                               Nothing -> acc) [] names
-    -- bind the names; extend the fixity env; do the thing inside
+    find_fixity name 
+      = case lookupFsEnv mini_fix_env (occNameFS occ) of
+          Just (L _ fix) -> Just (name, FixItem occ fix)
+          Nothing        -> Nothing
+      where
+        occ = nameOccName name
 \end{code}
 
 --------------------------------
