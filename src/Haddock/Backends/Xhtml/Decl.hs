@@ -60,7 +60,8 @@ ppFunSig summary links loc doc docname typ unicode =
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
                   DocForDecl DocName -> (Html, Html, Html) -> Bool -> Html
 ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) unicode
-  | summary || Map.null argDocs = declWithDoc summary links loc docname doc pref1
+  | summary = declElem pref1
+  | Map.null argDocs = topDeclElem links loc docname pref1 +++ maybeDocToHtml doc
   | otherwise = topDeclElem links loc docname pref2 +++
     (vanillaTable <<  (
       do_args 0 sep typ </>
@@ -162,8 +163,7 @@ ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
               TyClDecl DocName -> Bool -> Html
 ppTyFam summary associated links loc mbDoc decl unicode
   
-  | summary = declWithDoc summary links loc docname mbDoc 
-              (ppTyFamHeader True associated decl unicode)  
+  | summary   = declElem (ppTyFamHeader True associated decl unicode)  
   | otherwise = header_ +++ maybeDocToHtml mbDoc +++ instancesBit
 
   where
@@ -215,8 +215,7 @@ ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
             TyClDecl DocName -> Bool -> Html
 ppTyInst summary associated links loc mbDoc decl unicode
   
-  | summary = declWithDoc summary links loc docname mbDoc
-              (ppTyInstHeader True associated decl unicode)
+  | summary   = declElem(ppTyInstHeader True associated decl unicode)
   | otherwise = header_ +++ maybeDocToHtml mbDoc 
 
   where
@@ -425,29 +424,24 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
 
 -- TODO: print contexts
 ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> TyClDecl DocName -> Bool -> Html
-ppShortDataDecl summary links loc dataDecl unicode
+ppShortDataDecl summary _links _loc dataDecl unicode
 
-  | [lcon] <- cons, ResTyH98 <- resTy = 
-    ppDataHeader summary dataDecl unicode
-    <+> equals <+> ppShortConstr summary (unLoc lcon) unicode
+  | [] <- cons = declElem dataHeader
 
-  | [] <- cons = ppDataHeader summary dataDecl unicode
+  | [lcon] <- cons, ResTyH98 <- resTy = declElem $
+      dataHeader <+> equals <+> ppShortConstr summary (unLoc lcon) unicode
 
-  | otherwise = foldl (+++) dataHeader $
-      case resTy of 
-        ResTyH98    -> zipWith doConstr ('=':repeat '|') cons
-        ResTyGADT _ -> map doGADTConstr cons
-  
+  | ResTyH98 <- resTy = declElem dataHeader
+      +++ unordList (zipWith doConstr ('=':repeat '|') cons)
+
+  | otherwise = declElem (dataHeader <+> keyword "where")
+      +++ unordList (map doGADTConstr cons)
+      
   where
-    dataHeader = 
-      (if summary then declElem else topDeclElem links loc docname)
-      ((ppDataHeader summary dataDecl unicode) <+> 
-      case resTy of ResTyGADT _ -> keyword "where"; _ -> empty)
-
+    dataHeader = ppDataHeader summary dataDecl unicode
     doConstr c con = declElem (toHtml [c] <+> ppShortConstr summary (unLoc con) unicode)
     doGADTConstr con = declElem (ppShortConstr summary (unLoc con) unicode)
 
-    docname   = unLoc . tcdLName $ dataDecl
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
 
@@ -456,11 +450,8 @@ ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               SrcSpan -> Maybe (Doc DocName) -> TyClDecl DocName -> Bool -> Html
 ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
   
-  | summary = declWithDoc summary links loc docname mbDoc 
-              (ppShortDataDecl summary links loc dataDecl unicode)
-  
-  | otherwise
-      = header_ +++ datadoc +++ constrBit +++ instancesBit
+  | summary   = ppShortDataDecl summary links loc dataDecl unicode
+  | otherwise = header_ +++ datadoc +++ constrBit +++ instancesBit
 
   where
     docname   = unLoc . tcdLName $ dataDecl

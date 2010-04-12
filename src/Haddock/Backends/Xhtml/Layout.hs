@@ -24,17 +24,6 @@ import FastString            ( unpackFS )
 import GHC
 
 
-declWithDoc :: Bool -> LinksInfo -> SrcSpan -> DocName -> Maybe (Doc DocName) -> Html -> Html
-declWithDoc True  _     _   _  _   html_decl = declElem html_decl
-declWithDoc False links loc nm doc html_decl =
-  topDeclElem links loc nm html_decl +++ maybeDocToHtml doc
-
-
-{-
-text :: Html
-text   = strAttr "TEXT"
--}
-
 -- a box for displaying code
 declElem :: Html -> Html
 declElem = paragraph ! [theclass "decl"]
