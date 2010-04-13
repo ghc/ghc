@@ -841,7 +841,7 @@ prodServiceThread = do
   -- conditions in which prodding is left at True but the server is
   -- blocked in select().
   was_set <- atomicModifyIORef prodding $ \b -> (True,b)
-  if (not (was_set)) then  wakeupIOManager else return ()
+  unless was_set wakeupIOManager
 
 -- Machinery needed to ensure that we only have one copy of certain
 -- CAFs in this module even when the base package is present twice, as
