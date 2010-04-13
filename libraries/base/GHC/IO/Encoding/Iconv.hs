@@ -30,8 +30,6 @@ module GHC.IO.Encoding.Iconv (
 
 #if !defined(mingw32_HOST_OS)
 
-#undef DEBUG_DUMP
-
 import Foreign
 import Foreign.C
 import Data.Maybe
@@ -41,26 +39,20 @@ import GHC.IO.Encoding.Types
 import GHC.Num
 import GHC.Show
 import GHC.Real
-#ifdef DEBUG_DUMP
 import System.Posix.Internals
-#endif
+
+c_DEBUG_DUMP :: Bool
+c_DEBUG_DUMP = False
 
 iconv_trace :: String -> IO ()
-
-#ifdef DEBUG_DUMP
-
-iconv_trace s = puts s
+iconv_trace s
+ | c_DEBUG_DUMP = puts s
+ | otherwise    = return ()
 
 puts :: String -> IO ()
-puts s = do withCStringLen (s++"\n") $ \(p, len) -> 
-                c_write 1 (castPtr p) (fromIntegral len)
+puts s = do _ <- withCStringLen (s ++ "\n") $ \(p, len) ->
+                     c_write 1 (castPtr p) (fromIntegral len)
             return ()
-
-#else
-
-iconv_trace _ = return ()
-
-#endif
 
 -- -----------------------------------------------------------------------------
 -- iconv encoders/decoders

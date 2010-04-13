@@ -22,17 +22,13 @@ module GHC.IO.FD (
   stdin, stdout, stderr
   ) where
 
-#undef DEBUG_DUMP
-
 import GHC.Base
 import GHC.Num
 import GHC.Real
 import GHC.Show
 import GHC.Enum
 import Data.Maybe
-#ifndef mingw32_HOST_OS
 import Control.Monad
-#endif
 import Data.Typeable
 
 import GHC.IO
@@ -50,6 +46,9 @@ import qualified System.Posix.Internals
 import System.Posix.Internals hiding (FD, setEcho, getEcho)
 import System.Posix.Types
 -- import GHC.Ptr
+
+c_DEBUG_DUMP :: Bool
+c_DEBUG_DUMP = False
 
 -- -----------------------------------------------------------------------------
 -- The file-descriptor IO device
@@ -108,20 +107,17 @@ instance BufferedIO FD where
 
 readBuf' :: FD -> Buffer Word8 -> IO (Int, Buffer Word8)
 readBuf' fd buf = do
-#ifdef DEBUG_DUMP
-  puts ("readBuf fd=" ++ show fd ++ " " ++ summaryBuffer buf ++ "\n")
-#endif
+  when c_DEBUG_DUMP $
+      puts ("readBuf fd=" ++ show fd ++ " " ++ summaryBuffer buf ++ "\n")
   (r,buf') <- readBuf fd buf
-#ifdef DEBUG_DUMP
-  puts ("after: " ++ summaryBuffer buf' ++ "\n")
-#endif
+  when c_DEBUG_DUMP $
+      puts ("after: " ++ summaryBuffer buf' ++ "\n")
   return (r,buf')
 
 writeBuf' :: FD -> Buffer Word8 -> IO (Buffer Word8)
 writeBuf' fd buf = do
-#ifdef DEBUG_DUMP
-  puts ("writeBuf fd=" ++ show fd ++ " " ++ summaryBuffer buf ++ "\n")
-#endif
+  when c_DEBUG_DUMP $
+      puts ("writeBuf fd=" ++ show fd ++ " " ++ summaryBuffer buf ++ "\n")
   writeBuf fd buf
 
 -- -----------------------------------------------------------------------------
@@ -626,8 +622,7 @@ foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
 #endif
 
-#if defined(DEBUG_DUMP)
 puts :: String -> IO ()
-puts s = do withCStringLen s $ \(p,len) -> c_write 1 p (fromIntegral len)
+puts s = do _ <- withCStringLen s $ \(p,len) ->
+                     c_write 1 (castPtr p) (fromIntegral len)
             return ()
-#endif

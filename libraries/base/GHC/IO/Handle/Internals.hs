@@ -4,8 +4,6 @@
 {-# OPTIONS_GHC -XRecordWildCards #-}
 {-# OPTIONS_HADDOCK hide #-}
 
-#undef DEBUG_DUMP
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Handle.Internals
@@ -74,9 +72,10 @@ import Foreign
 -- import System.IO.Error
 import System.Posix.Internals hiding (FD)
 
-#ifdef DEBUG_DUMP
 import Foreign.C
-#endif
+
+c_DEBUG_DUMP :: Bool
+c_DEBUG_DUMP = False
 
 -- ---------------------------------------------------------------------------
 -- Creating a new handle
@@ -673,13 +672,12 @@ hLookAhead_ handle_@Handle__{..} = do
 -- debugging
 
 debugIO :: String -> IO ()
-#if defined(DEBUG_DUMP)
-debugIO s = do 
-  withCStringLen (s++"\n") $ \(p,len) -> c_write 1 (castPtr p) (fromIntegral len)
-  return ()
-#else
-debugIO s = return ()
-#endif
+debugIO s
+ | c_DEBUG_DUMP
+    = do _ <- withCStringLen (s ++ "\n") $
+                  \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
+         return ()
+ | otherwise = return ()
 
 -- ----------------------------------------------------------------------------
 -- Text input/output
