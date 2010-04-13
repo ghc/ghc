@@ -17,7 +17,7 @@ module Outputable (
         -- * Pretty printing combinators
 	SDoc,
 	docToSDoc,
-	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
+	interppSP, interpp'SP, pprQuotedList, pprWithCommas, quotedListWithOr,
 	empty, nest,
 	char,
 	text, ftext, ptext,
@@ -660,7 +660,15 @@ interpp'SP xs = sep (punctuate comma (map ppr xs))
 --
 -- > [x,y,z]  ==>  `x', `y', `z'
 pprQuotedList :: Outputable a => [a] -> SDoc
-pprQuotedList xs = hsep (punctuate comma (map (quotes . ppr) xs))
+pprQuotedList = quotedList . map ppr
+
+quotedList :: [SDoc] -> SDoc
+quotedList xs = hsep (punctuate comma (map quotes xs))
+
+quotedListWithOr :: [SDoc] -> SDoc
+-- [x,y,z]  ==>  `x', `y' or `z'
+quotedListWithOr xs@(_:_:_) = quotedList (init xs) <+> ptext (sLit "or") <+> quotes (last xs)
+quotedListWithOr xs = quotedList xs
 \end{code}
 
 

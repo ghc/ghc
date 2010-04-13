@@ -1003,8 +1003,7 @@ allFlags = map ('-':) $
            [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
            map ("fno-"++) flags ++
            map ("f"++) flags ++
-           map ("X"++) supportedLanguages ++
-           map ("XNo"++) supportedLanguages
+           map ("X"++) supportedLanguages
     where ok (PrefixPred _ _) = False
           ok _ = True
           flags = [ name | (name, _, _) <- fFlags ]
@@ -1553,7 +1552,7 @@ fFlags = [
   ]
 
 supportedLanguages :: [String]
-supportedLanguages = [ name | (name, _, _) <- xFlags ]
+supportedLanguages = [ name' | (name, _, _) <- xFlags, name' <- [name, "No" ++ name] ]
 
 -- This may contain duplicates
 languageOptions :: [DynFlag]
