@@ -1471,12 +1471,11 @@ module A where
       </section>
 
       <section>
-	<title>Interactive Examples</title>
+	<title>Examples</title>
 
-	<para> Haddock has markup support for interactive examples, that
-	illustrate the use of source constructs in a
-	<emphasis>read-eval-print loop (REPL)</emphasis>.  An
-	interactive example is introduced with
+	<para> Haddock has markup support for examples of interaction with a
+  <emphasis>read-eval-print loop (REPL)</emphasis>.  An
+	example is introduced with
 	<literal>ghci&gt;</literal> followed by an expression followed
 	by zero or more result lines:</para>
 
