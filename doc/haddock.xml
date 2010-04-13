@@ -1409,15 +1409,17 @@ module A where
 	one of these special characters, precede it with a backslash
 	(<literal>\</literal>).</para>
 
-	<para>Additionally, the character <literal>&gt;</literal> and
-	the character sequence <literal>ghci&gt;</literal> have special
-	meanings at the beginning of a line.  The following characters
-	have special meanings at the beginning of a paragraph:
-	<literal>*</literal>, <literal>-</literal>.  The single
-	characters can also be escaped using <literal>\</literal>.  To
-	get a literal <literal>ghci&gt;</literal> at the beginning of a
-	line, prefix the <literal>&gt;</literal> with a
-	backslash.</para>
+        <para>Additionally, the character <literal>&gt;</literal> has
+        a special meaning at the beginning of a line, and the
+        following characters have special meanings at the beginning of
+        a paragraph:
+        <literal>*</literal>, <literal>-</literal>.  These characters
+        can also be escaped using <literal>\</literal>.</para>
+
+        <para>Furthermore, the character sequence <literal>ghci&gt;</literal>
+        has a special meaning at the beginning of a line. To
+        escape it, just prefix the <literal>&gt;</literal> character with a
+        backslash.</para>
       </section>
 
       <section>
