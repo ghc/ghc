@@ -1,68 +1,105 @@
-#! /bin/sh
-set -e
+#!/usr/bin/perl -w
 
-libraries=
+use strict;
 
-# We do the sed in 3 steps, as the -snapshot may or may not be there,
-# and I can't see a way to optionally match it with POSIX BREs
-tarred=`ls -1 libraries/tarballs | sed -e 's/\.tar\.gz$//' -e 's/-snapshot$//' -e 's/-[0-9.]*$//'`
+use File::Path 'rmtree';
+use File::Basename;
 
-for p in $tarred
-do
-    libraries="$libraries libraries/$p"
-    if [ -d "libraries/$p/_darcs" ]
-    then
-        echo Ignoring libraries/$p as it looks like a darcs checkout
-    else
-        tarball=libraries/tarballs/$p-*.tar.gz
-        stamp="libraries/stamp/$p"
-        if [ ! -d "libraries/$p" ] ||
-           [ ! -f "$stamp" ] ||
-           [ "libraries/stamp/$p" -ot $tarball ]
-        then
-            rm -rf "libraries/$p"
-            mkdir "libraries/$p"
-            (
-                cd "libraries/$p"
-                cat ../../$tarball | gzip -d | tar xf -
-                mv */* .
-            )
-            touch "$stamp"
-        fi
-    fi
-done
+my @library_dirs = ();
+my @tarballs = glob("libraries/tarballs/*");
 
-for f in libraries/*; do
-  pkgs=$f/ghc-packages
-  if test -f $pkgs; then
-    for p in `cat $pkgs`; do
-      libraries="$libraries $f/$p"
-    done
-  else
-    libraries="$libraries $f"
-  fi
-done
+my $tarball;
+my $package;
+my $stamp;
 
-for f in $libraries; do
-   dir=`basename $f`
-   cabals=`echo $f/*.cabal`
-   if test -f $cabals; then
-       echo "Creating $f/ghc.mk"
-       rm -f $f/ghc.mk
-       pkg=`echo "$cabals" | sed -e 's#.*/##' -e 's#\.cabal$##'`
-       if test -f $f/ghc-stage; then
-           stage=`cat $f/ghc-stage`
-       else
-           stage=1
-       fi
-       top=`echo $f | sed 's#[^/][^/]*#..#g'`
-       echo "${f}_PACKAGE = ${pkg}" >> $f/ghc.mk
-       echo "${f}_dist-install_GROUP = libraries" >> $f/ghc.mk
-       echo "\$(eval \$(call build-package,${f},dist-install,${stage}))" >> $f/ghc.mk
-       rm -f $f/GNUmakefile
-       echo "Creating $f/GNUmakefile"
-       echo "dir = ${f}" >> $f/GNUmakefile
-       echo "TOP = ${top}" >> $f/GNUmakefile
-       echo "include \$(TOP)/mk/sub-makefile.mk" >> $f/GNUmakefile
-   fi
-done
+for $tarball (@tarballs) {
+    $package = $tarball;
+    $package =~ s#^libraries/tarballs/##;
+    $package =~ s/-[0-9.]*(-snapshot)?\.tar\.gz$//;
+
+    # Sanity check, so we don't rmtree the wrong thing below
+    if (($package eq "") || ($package =~ m#[/.\\]#)) {
+        die "Bad package name: $package";
+    }
+
+    if (-d "libraries/$package/_darcs") {
+        print "Ignoring libraries/$package as it looks like a darcs checkout\n"
+    }
+    else {
+        $stamp = "libraries/stamp/$package";
+        if ((! -d "libraries/$package") || (! -f "$stamp")
+         || ((-M "libraries/stamp/$package") > (-M $tarball))) {
+            print "Unpacking $package\n";
+            if (-d "libraries/$package") {
+                &rmtree("libraries/$package")
+                    or die "Can't remove libraries/$package: $!";
+            }
+            mkdir "libraries/$package";
+            system ("sh", "-c", "cd 'libraries/$package' && { cat ../../$tarball | gzip -d | tar xf - ; } && mv */* .") == 0
+                or die "Failed to unpack $package";
+            open STAMP, "> $stamp";
+            close STAMP;
+        }
+    }
+}
+
+for $package (glob "libraries/*/") {
+    $package =~ s/\/$//;
+    my $pkgs = "$package/ghc-packages";
+    if (-f $pkgs) {
+        open PKGS, "< $pkgs";
+        while (<PKGS>) {
+            chomp;
+            if (/.+/) {
+                push @library_dirs, "$package/$_";
+            }
+        }
+    }
+    else {
+        push @library_dirs, $package;
+    }
+}
+
+for $package (@library_dirs) {
+    my $dir = &basename($package);
+    my @cabals = glob("$package/*.cabal");
+    if ($#cabals > 0) {
+        die "Too many .cabal file in $package\n";
+    }
+    if ($#cabals eq 0) {
+        my $cabal = $cabals[0];
+        my $pkg;
+        my $stage;
+        my $top;
+        if (-f $cabal) {
+            $pkg = $cabal;
+            $pkg =~ s#.*/##;
+            $pkg =~ s/\.cabal$//;
+            if (-f "$package/ghc-stage") {
+                open STAGE, "< $package/ghc-stage";
+                $stage = int(<STAGE>);
+                close STAGE;
+            }
+            else {
+                $stage = 1;
+            }
+            $top = $package;
+            $top =~ s#[^/]+#..#g;
+
+            print "Creating $package/ghc.mk\n";
+            open GHCMK, "> $package/ghc.mk";
+            print GHCMK "${package}_PACKAGE = ${pkg}\n";
+            print GHCMK "${package}_dist-install_GROUP = libraries\n";
+            print GHCMK "\$(eval \$(call build-package,${package},dist-install,${stage}))\n";
+            close GHCMK;
+
+            print "Creating $package/GNUmakefile\n";
+            open GNUMAKEFILE, "> $package/GNUmakefile";
+            print GNUMAKEFILE "dir = ${package}\n";
+            print GNUMAKEFILE "TOP = ${top}\n";
+            print GNUMAKEFILE "include \$(TOP)/mk/sub-makefile.mk\n";
+            close GNUMAKEFILE;
+        }
+    }
+}
+
