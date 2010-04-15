@@ -327,8 +327,8 @@ setNonBlockingFD fd set = do
   let flags' | set       = flags .|. o_NONBLOCK
              | otherwise = flags .&. complement o_NONBLOCK
   unless (flags == flags') $ do
-    throwErrnoIfMinus1Retry_ "fcntl_write" $
-        c_fcntl_write fd const_f_setfl (fromIntegral flags')
+    _ <- c_fcntl_write fd const_f_setfl (fromIntegral flags')
+    return ()
 #else
 
 -- bogus defns for win32
