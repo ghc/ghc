@@ -40,7 +40,7 @@ ifeq "$(Windows)" "YES"
 	mv a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
 	cd a/b/c/$(BIN_DIST_NAME) && ./configure --prefix=$(BIN_DIST_INST_DIR)
-	cd a/b/c/$(BIN_DIST_NAME) && make install
+	cd a/b/c/$(BIN_DIST_NAME) && $(MAKE) install
 endif
 	$(BIN_DIST_INST_DIR)/bin/runghc HelloWorld > output
 	$(CONTEXT_DIFF) output expected_output
