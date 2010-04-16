@@ -911,8 +911,14 @@
 	      <entry><option>-XNoTypeOperators</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XDoRec</option></entry>
+	      <entry>Enable <link linkend="recursive-do-notation">recursive do notation</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoDoRec</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XRecursiveDo</option></entry>
-	      <entry>Enable <link linkend="mdo-notation">recursive do (mdo) notation</link>.</entry>
+	      <entry>Enable <link linkend="mdo-notation">recursive do (mdo) notation</link>. This is deprecated; please use <link linkend="recursive-do-notation">recursive do notation</link> instead.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoRecursiveDo</option></entry>
 	    </row>
