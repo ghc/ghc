@@ -932,7 +932,7 @@ justOnes = do { rec { xs &lt;- Just (1:xs) }
 As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [-1,-1,-1,...</literal>.
 </para>
 <para>
-The background and motivation for recusrive do-notation is described in
+The background and motivation for recursive do-notation is described in
 <ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>,
 by Levent Erkok, John Launchbury,
 Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania. 
