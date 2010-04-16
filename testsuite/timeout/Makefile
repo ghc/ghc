@@ -27,7 +27,9 @@ $(TIMEOUT_PROGRAM): timeout.py
 	rm -rf install-inplace
 	mkdir install-inplace
 	mkdir install-inplace/bin
-	cp $< $@
+	cp $< $@.py
+	echo '#!/bin/sh' > $@
+	echo exec ${PYTHON} \$$0.py \"\$$@\" >> $@
 	chmod +x $@
 else
 # The python timeout program doesn't work on mingw, so we still use the
