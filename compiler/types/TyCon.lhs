@@ -100,6 +100,87 @@ import qualified Data.Data as Data
 import Data.List( elemIndex )
 \end{code}
 
+-----------------------------------------------
+	Notes about type families
+-----------------------------------------------
+
+Type synonym families
+~~~~~~~~~~~~~~~~~~~~~~
+* Type synonym families, also known as "type functions", map directly
+  onto the type functions in FC:
+
+	type family F a :: *
+	type instance F Int = Bool
+	..etc...
+
+* From the user's point of view (F Int) and Bool are simply equivalent
+  types.
+
+* A Haskell 98 type synonym is a degenerate form of a type synonym
+  family.
+
+* Type functions can't appear in the LHS of a type function:
+	type instance F (F Int) = ...	-- BAD!
+
+* In the future we might want to support
+    * closed type families (esp when we have proper kinds)
+    * injective type families (allow decomposition)
+  but we don't at the moment [2010]
+
+Data type families
+~~~~~~~~~~~~~~~~~~
+* Data type families are declared thus
+	data family T a :: *
+	data instance T Int = T1 | T2 Bool
+	data instance T [a] where
+          X1 :: T [Int]
+	  X2 :: a -> T [a]
+
+* The user does not see any "equivalent types" as he did with type
+  synonym families.  He just sees constructors with types
+	T1 :: T Int
+	T2 :: Bool -> T Int
+	X1 :: T [Int]
+	X2 :: a -> T [a]
+  Note that X2 is a fully-fledged GADT constructor; that's fine
+
+* The conversion into FC is interesting, and is the point where I was
+  getting mixed up.  Here's the FC version of the above declarations:
+
+	data T a
+	data TI = T1 | T2 Bool
+	axiom ax_ti : T Int ~ TI
+
+	data TL a where
+	  X1 :: TL Int
+	  X2 :: a -> TL a
+  	axiom ax_tl :: T [a] ~ TL a
+
+* Notice that T is NOT translated to a FC type function; it just
+  becomes a "data type" with no constructors, into which TI, TL, TB
+  are cast using their respective axioms.
+
+* As a result
+  - T behaves just like a data type so far as decomposition is concerned
+  - It's fine to have T in the LHS of a type function:
+	type instance F (T a) = [a]
+
+It was this last point that confused me!  The big thing is that you
+should not think of a data family T as a *type function* at all, not
+even an injective one!  We can't allow even injective type functions
+on the LHS of a type function:
+	type family injective G a :: *
+	type instance F (G Int) = Bool
+is no good, even if G is injective, because consider
+	type instance G Int = Bool
+	type instance F Bool = Char
+
+So a data type family is not an injective type function. It's just a
+data type with some axioms that connect it to other data types. These
+axioms come into play when (and only when) you
+	- use a data constructor
+	- do pattern matching
+
 %************************************************************************
 %*									*
 \subsection{The data type}
@@ -365,17 +446,11 @@ data TyConParent
   --
   --  3) A 'CoTyCon' identifying the representation
   --  type with the type instance family
-  | FamilyTyCon
+  | FamilyTyCon	  -- See Note [Data type families]
 	TyCon
 	[Type]
 	TyCon  -- c.f. Note [Newtype coercions]
 
-	--
-	-- E.g.  data intance T [a] = ...
-	-- gives a representation tycon:
-	--	data :R7T a = ...
-	-- 	axiom co a :: T [a] ~ :R7T a
-	-- with :R7T's algTcParent = FamilyTyCon T [a] co
 
 -- | Checks the invariants of a 'TyConParent' given the appropriate type class name, if any
 okParent :: Name -> TyConParent -> Bool
@@ -485,34 +560,42 @@ so the coercion tycon CoT must have
  and	arity:   0
 
 
-Note [Indexed data types] (aka data type families)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   See also Note [Wrappers for data instance tycons] in MkId.lhs
+Note [Data type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Wrappers for data instance tycons] in MkId.lhs
 
 Consider
 	data family T a
 
 	data instance T (b,c) where
 	  T1 :: b -> c -> T (b,c)
+	  T2 :: T (Int,Bool)
 
-Then
-  * T is the "family TyCon"
+Notice that the 'data instance' can be a fully-fledged GADT
 
-  * We make "representation TyCon" :R1T, thus:
+  * T is the "family TyCon".  It is a data type 
+    whose AlgTyConRhs is OpenTyCon
+
+  * For each 'data instance' we make "representation TyCon" 
+    :R1T, thus:
 	data :R1T b c where
 	  T1 ::	forall b c. b -> c -> :R1T b c
+	  T1 ::	:R1T Int Bool
+    We have a bit of work to do, to unpick the result types of the
+    data instance declaration to get the result type in the
+    representation; e.g.  T (Int,Bool) -->  :R1T Int Bool
 
-  * It has a top-level coercion connecting it to the family TyCon
+  * We defind a top-level coercion connecting it to the family TyCon
 
 	axiom :Co:R1T b c : T (b,c) ~ :R1T b c
 
-  * The data contructor T1 has a wrapper (which is what the source-level
-    "T1" invokes):
+  * The data contructor T1 has a wrapper (which is what the 
+    source-level "T1" invokes):
 
 	$WT1 :: forall b c. b -> c -> T (b,c)
 	$WT1 b c (x::b) (y::c) = T1 b c x y `cast` sym (:Co:R1T b c)
 
-  * The representation TyCon :R1T has an AlgTyConParent of
+  * The representation TyCon, :R1T, has an AlgTyConParent of
 
 	FamilyTyCon T [(b,c)] :Co:R1T
 
