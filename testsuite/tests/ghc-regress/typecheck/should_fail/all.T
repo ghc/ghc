@@ -223,6 +223,7 @@ test('T3540', normal, compile_fail, [''])
 test('T3102', normal, compile_fail, [''])
 test('T3613', normal, compile_fail, [''])
 test('fd-loop', normal, compile_fail, [''])
+test('T3950', normal, compile_fail, [''])
 
 test('T3468', extra_clean(['T3468.hi-boot']), 
      multimod_compile_fail, ['T3468', '-v0'])
