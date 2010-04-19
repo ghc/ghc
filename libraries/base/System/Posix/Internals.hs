@@ -321,12 +321,12 @@ setNonBlockingFD :: FD -> Bool -> IO ()
 setNonBlockingFD fd set = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
                  (c_fcntl_read fd const_f_getfl)
-  -- An error when setting O_NONBLOCK isn't fatal: on some systems 
-  -- there are certain file handles on which this will fail (eg. /dev/null
-  -- on FreeBSD) so we throw away the return code from fcntl_write.
   let flags' | set       = flags .|. o_NONBLOCK
              | otherwise = flags .&. complement o_NONBLOCK
   unless (flags == flags') $ do
+    -- An error when setting O_NONBLOCK isn't fatal: on some systems
+    -- there are certain file handles on which this will fail (eg. /dev/null
+    -- on FreeBSD) so we throw away the return code from fcntl_write.
     _ <- c_fcntl_write fd const_f_setfl (fromIntegral flags')
     return ()
 #else
