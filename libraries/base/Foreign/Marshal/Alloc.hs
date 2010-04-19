@@ -70,6 +70,7 @@ import Hugs.ForeignPtr          ( FinalizerPtr )
 -- The memory may be deallocated using 'free' or 'finalizerFree' when
 -- no longer required.
 --
+{-# INLINE malloc #-}
 malloc :: Storable a => IO (Ptr a)
 malloc  = doMalloc undefined
   where
@@ -93,6 +94,7 @@ mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
 -- The memory is freed when @f@ terminates (either normally or via an
 -- exception), so the pointer passed to @f@ must /not/ be used after this.
 --
+{-# INLINE alloca #-}
 alloca :: Storable a => (Ptr a -> IO b) -> IO b
 alloca  = doAlloca undefined
   where
