@@ -662,24 +662,24 @@ stg_block_throwto
 }
 
 #ifdef mingw32_HOST_OS
-INFO_TABLE_RET( stg_block_async, RET_SMALL )
+INFO_TABLE_RET( stg_block_async, RET_SMALL, W_ unused )
 {
     W_ ares;
     W_ len, errC;
 
-    ares = StgTSO_block_info(CurrentTSO);
+    ares = Sp(1);
     len = StgAsyncIOResult_len(ares);
     errC = StgAsyncIOResult_errCode(ares);
-    StgTSO_block_info(CurrentTSO) = NULL;
     foreign "C" free(ares "ptr");
     R1 = len;
+    Sp_adj(1);
     Sp(0) = errC;
     jump %ENTRY_CODE(Sp(1));
 }
 
 stg_block_async
 {
-    Sp_adj(-1);
+    Sp_adj(-2);
     Sp(0) = stg_block_async_info;
     BLOCK_GENERIC;
 }
@@ -687,20 +687,19 @@ stg_block_async
 /* Used by threadDelay implementation; it would be desirable to get rid of
  * this free()'ing void return continuation.
  */
-INFO_TABLE_RET( stg_block_async_void, RET_SMALL )
+INFO_TABLE_RET( stg_block_async_void, RET_SMALL, W_ ares )
 {
     W_ ares;
 
-    ares = StgTSO_block_info(CurrentTSO);
-    StgTSO_block_info(CurrentTSO) = NULL;
+    ares = Sp(1);
     foreign "C" free(ares "ptr");
-    Sp_adj(1);
+    Sp_adj(2);
     jump %ENTRY_CODE(Sp(0));
 }
 
 stg_block_async_void
 {
-    Sp_adj(-1);
+    Sp_adj(-2);
     Sp(0) = stg_block_async_void_info;
     BLOCK_GENERIC;
 }
