@@ -21,6 +21,15 @@ static HANDLE io_manager_event = INVALID_HANDLE_VALUE;
 // spurios wakeups are returned as zero.
 // console events are ((event<<1) | 1)
 
+#if defined(THREADED_RTS)
+
+#define EVENT_BUFSIZ 256
+Mutex event_buf_mutex;
+StgWord32 event_buf[EVENT_BUFSIZ];
+nat next_event;
+
+#endif
+
 HANDLE
 getIOManagerEvent (void)
 {
@@ -29,6 +38,8 @@ getIOManagerEvent (void)
     // unless we're in the threaded RTS, however.
 #ifdef THREADED_RTS
     HANDLE hRes;
+
+    ACQUIRE_LOCK(&event_buf_mutex);
 
     if (io_manager_event == INVALID_HANDLE_VALUE) {
         hRes = CreateEvent ( NULL, // no security attrs
@@ -40,24 +51,17 @@ getIOManagerEvent (void)
             stg_exit(EXIT_FAILURE);
         }
         io_manager_event = hRes;
-        return hRes;
     } else {
-        return io_manager_event;
+        hRes = io_manager_event;
     }
+
+    RELEASE_LOCK(&event_buf_mutex);
+    return hRes;
 #else
     return NULL;
 #endif
 }
 
-
-#if defined(THREADED_RTS)
-
-#define EVENT_BUFSIZ 256
-Mutex event_buf_mutex;
-StgWord32 event_buf[EVENT_BUFSIZ];
-nat next_event;
-
-#endif
 
 HsWord32
 readIOManagerEvent (void)
@@ -67,8 +71,9 @@ readIOManagerEvent (void)
 #if defined(THREADED_RTS)
     HsWord32 res;
 
+    ACQUIRE_LOCK(&event_buf_mutex);
+
     if (io_manager_event != INVALID_HANDLE_VALUE) {
-        ACQUIRE_LOCK(&event_buf_mutex);
         if (next_event == 0) {
             res = 0; // no event to return
         } else {
@@ -80,10 +85,12 @@ readIOManagerEvent (void)
                 }
             }
         }
-        RELEASE_LOCK(&event_buf_mutex);
     } else {
         res = 0;
     }
+
+    RELEASE_LOCK(&event_buf_mutex);
+
     // debugBelch("readIOManagerEvent: %d\n", res);
     return res;
 #else
@@ -95,9 +102,10 @@ void
 sendIOManagerEvent (HsWord32 event)
 {
 #if defined(THREADED_RTS)
+    ACQUIRE_LOCK(&event_buf_mutex);
+
     // debugBelch("sendIOManagerEvent: %d\n", event);
     if (io_manager_event != INVALID_HANDLE_VALUE) {
-        ACQUIRE_LOCK(&event_buf_mutex);
         if (next_event == EVENT_BUFSIZ) {
             errorBelch("event buffer overflowed; event dropped");
         } else {
@@ -107,8 +115,9 @@ sendIOManagerEvent (HsWord32 event)
             }        
             event_buf[next_event++] = (StgWord32)event;
         }
-        RELEASE_LOCK(&event_buf_mutex);
     }
+
+    RELEASE_LOCK(&event_buf_mutex);
 #endif
 }    
 
@@ -126,7 +135,9 @@ ioManagerDie (void)
     // IO_MANAGER_DIE must be idempotent, as it is called
     // repeatedly by shutdownCapability().  Try conc059(threaded1) to
     // illustrate the problem.
+    ACQUIRE_LOCK(&event_buf_mutex);
     io_manager_event = INVALID_HANDLE_VALUE;
+    RELEASE_LOCK(&event_buf_mutex);
     // ToDo: wait for the IO manager to pick up the event, and
     // then release the Event and Mutex objects we've allocated.
 }
