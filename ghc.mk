@@ -980,18 +980,30 @@ else
 	"$(ISCC)" /O. /Fbindistprep/$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
 endif
 
-nTimes = set -e; for i in `seq 1 $(1)`; do echo Try "$$i: $(2)"; if $(2); then break; fi; done
+# tryTimes tries to run its third argument multiple times, until it
+# succeeds. Don't call it directly; call try10Times instead.
+# The first and second argument to tryTimes are lists of values.
+# The length of the first argument is the number of times we have
+# already tried. The length of the second argument is the number more
+# times we will try.
+tryTimes = $(if $2, \
+                { echo 'Try $(words x $1): $3' ; $3 ; } || \
+                $(call tryTimes,x $1,$(wordlist 2,$(words $2),$2),$3), \
+                )
+
+# Try to run the argument 10 times. If all 10 fail, fail.
+try10Times = $(call tryTimes,,x x x x x x x x x x,$1) { echo Failed; false; }
 
 .PHONY: publish-binary-dist
 publish-binary-dist:
-	$(call nTimes,10,$(PublishCp) $(BIN_DIST_TAR_BZ2) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(BIN_DIST_TAR_BZ2) $(PublishLocation)/dist)
 ifeq "$(mingw32_TARGET_OS)" "1"
-	$(call nTimes,10,$(PublishCp) $(WINDOWS_INSTALLER) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(WINDOWS_INSTALLER) $(PublishLocation)/dist)
 endif
 
 .PHONY: publish-docs
 publish-docs:
-	$(call nTimes,10,$(PublishCp) -r bindisttest/installed/share/doc/ghc/* $(PublishLocation)/docs)
+	$(call try10Times,$(PublishCp) -r bindisttest/installed/share/doc/ghc/* $(PublishLocation)/docs)
 
 # -----------------------------------------------------------------------------
 # Source distributions
@@ -1079,7 +1091,7 @@ sdist-manifest : $(SRC_DIST_TARBALL)
 # over SSH.
 ifneq "$(PublishLocation)" ""
 publish-sdist :
-	$(call nTimes,10,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
 endif
 
 ifeq "$(BootingFromHc)" "YES"
