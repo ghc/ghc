@@ -51,6 +51,7 @@ import qualified System.Posix.Internals as Posix
 
 -- | A handle managing input from the Haskell program's standard input channel.
 stdin :: Handle
+{-# NOINLINE stdin #-}
 stdin = unsafePerformIO $ do
    -- ToDo: acquire lock
    setBinaryMode FD.stdin
@@ -60,6 +61,7 @@ stdin = unsafePerformIO $ do
 
 -- | A handle managing output to the Haskell program's standard output channel.
 stdout :: Handle
+{-# NOINLINE stdout #-}
 stdout = unsafePerformIO $ do
    -- ToDo: acquire lock
    setBinaryMode FD.stdout
@@ -69,6 +71,7 @@ stdout = unsafePerformIO $ do
 
 -- | A handle managing output to the Haskell program's standard error channel.
 stderr :: Handle
+{-# NOINLINE stderr #-}
 stderr = unsafePerformIO $ do
     -- ToDo: acquire lock
    setBinaryMode FD.stderr
