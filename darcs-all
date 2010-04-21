@@ -322,6 +322,8 @@ sub main {
 }
 
 END {
+    my $ec = $?;
+
     message "== Checking for old bytestring repo";
     if (-d "libraries/bytestring/_darcs") {
         if ((system "darcs annotate --repodir libraries/bytestring --match 'hash 20080118173113-3fd76-d5b74c04372a297b585ebea4e16d524551ce5035' > /dev/null 2> /dev/null") == 0) {
@@ -352,6 +354,8 @@ and say yes to each patch.
 ============================
 EOF
     }
+
+    $? = $ec;
 }
 
 main(@ARGV);
