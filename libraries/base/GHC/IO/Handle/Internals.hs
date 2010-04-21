@@ -58,6 +58,7 @@ import GHC.IO.Device (IODevice, SeekMode(..))
 import qualified GHC.IO.Device as IODevice
 import qualified GHC.IO.BufferedIO as Buffered
 
+import GHC.Conc
 import GHC.Real
 import GHC.Base
 import GHC.Exception
@@ -122,11 +123,8 @@ withHandle fun h@(DuplexHandle _ m _) act = withHandle' fun h m act
 withHandle' :: String -> Handle -> MVar Handle__
    -> (Handle__ -> IO (Handle__,a)) -> IO a
 withHandle' fun h m act =
-   block $ do
-   h_ <- takeMVar m
-   checkHandleInvariants h_
-   (h',v)  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
-              `catchException` \ex -> ioError (augmentIOError ex fun h)
+ block $ do
+   (h',v)  <- do_operation fun h act m
    checkHandleInvariants h'
    putMVar m h'
    return v
@@ -137,15 +135,9 @@ withHandle_ fun h@(FileHandle _ m)     act = withHandle_' fun h m act
 withHandle_ fun h@(DuplexHandle _ m _) act = withHandle_' fun h m act
 
 withHandle_' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO a) -> IO a
-withHandle_' fun h m act =
-   block $ do
-   h_ <- takeMVar m
-   checkHandleInvariants h_
-   v  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
-         `catchException` \ex -> ioError (augmentIOError ex fun h)
-   checkHandleInvariants h_
-   putMVar m h_
-   return v
+withHandle_' fun h m act = withHandle' fun h m $ \h_ -> do
+                              a <- act h_
+                              return (h_,a)
 
 withAllHandles__ :: String -> Handle -> (Handle__ -> IO Handle__) -> IO ()
 withAllHandles__ fun h@(FileHandle _ m)     act = withHandle__' fun h m act
@@ -156,14 +148,61 @@ withAllHandles__ fun h@(DuplexHandle _ r w) act = do
 withHandle__' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO Handle__)
               -> IO ()
 withHandle__' fun h m act =
-   block $ do
-   h_ <- takeMVar m
-   checkHandleInvariants h_
-   h'  <- (act h_ `catchAny` \err -> putMVar m h_ >> throw err)
-          `catchException` \ex -> ioError (augmentIOError ex fun h)
+ block $ do
+   h'  <- do_operation fun h act m
    checkHandleInvariants h'
    putMVar m h'
    return ()
+
+do_operation :: String -> Handle -> (Handle__ -> IO a) -> MVar Handle__ -> IO a
+do_operation fun h act m = do
+  h_ <- takeMVar m
+  checkHandleInvariants h_
+  act h_ `catchException` handler h_
+  where
+    handler h_ e = do
+      putMVar m h_
+      case () of
+        _ | Just ioe <- fromException e ->
+            ioError (augmentIOError ioe fun h)
+        _ | Just async_ex <- fromException e -> do -- see Note [async]
+            let _ = async_ex :: AsyncException
+            t <- myThreadId
+            throwTo t e
+            do_operation fun h act m
+        _otherwise ->
+            throwIO e
+
+-- Note [async]
+--
+-- If an asynchronous exception is raised during an I/O operation,
+-- normally it is fine to just re-throw the exception synchronously.
+-- However, if we are inside an unsafePerformIO or an
+-- unsafeInterleaveIO, this would replace the enclosing thunk with the
+-- exception raised, which is wrong (#3997).  We have to release the
+-- lock on the Handle, but what do we replace the thunk with?  What
+-- should happen when the thunk is subsequently demanded again?
+--
+-- The only sensible choice we have is to re-do the IO operation on
+-- resumption, but then we have to be careful in the IO library that
+-- this is always safe to do.  In particular we should
+--
+--    never perform any side-effects before an interruptible operation
+--
+-- because the interruptible operation may raise an asynchronous
+-- exception, which may cause the operation and its side effects to be
+-- subsequently performed again.
+--
+-- Re-doing the IO operation is achieved by:
+--   - using throwTo to re-throw the asynchronous exception asynchronously
+--     in the current thread
+--   - on resumption, it will be as if throwTo returns.  In that case, we
+--     recursively invoke the original operation (see do_operation above).
+--
+-- Interruptible operations in the I/O library are:
+--    - threadWaitRead/threadWaitWrite
+--    - fillReadBuffer/flushWriteBuffer
+--    - readTextDevice/writeTextDevice
 
 augmentIOError :: IOException -> String -> Handle -> IOException
 augmentIOError ioe@IOError{ ioe_filename = fp } fun h
