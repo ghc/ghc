@@ -39,11 +39,11 @@ static Ticks MutElapsedStamp  = 0;
 static Ticks ExitUserTime     = 0;
 static Ticks ExitElapsedTime  = 0;
 
-static ullong GC_tot_alloc        = 0;
-static ullong GC_tot_copied       = 0;
+static StgWord64 GC_tot_alloc        = 0;
+static StgWord64 GC_tot_copied       = 0;
 
-static ullong GC_par_max_copied = 0;
-static ullong GC_par_avg_copied = 0;
+static StgWord64 GC_par_max_copied = 0;
+static StgWord64 GC_par_avg_copied = 0;
 
 static Ticks GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
 static Ticks GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
@@ -375,10 +375,10 @@ stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen,
 	GC_coll_times[gen] += gc_time;
 	GC_coll_etimes[gen] += gc_etime;
 
-	GC_tot_copied += (ullong) copied;
-	GC_tot_alloc  += (ullong) alloc;
-        GC_par_max_copied += (ullong) max_copied;
-        GC_par_avg_copied += (ullong) avg_copied;
+	GC_tot_copied += (StgWord64) copied;
+	GC_tot_alloc  += (StgWord64) alloc;
+        GC_par_max_copied += (StgWord64) max_copied;
+        GC_par_avg_copied += (StgWord64) avg_copied;
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
 	
@@ -519,7 +519,7 @@ StgInt TOTAL_CALLS=1;
 /* Report the value of a counter */
 #define REPORT(counter) \
   { \
-    ullong_format_string(counter,temp,rtsTrue/*commas*/); \
+    showStgWord64(counter,temp,rtsTrue/*commas*/); \
     statsPrintf("  (" #counter ")  : %s\n",temp);				\
   }
 
@@ -570,22 +570,22 @@ stat_exit(int alloc)
 	}
 
 	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
-	    ullong_format_string(GC_tot_alloc*sizeof(W_), 
+	    showStgWord64(GC_tot_alloc*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes allocated in the heap\n", temp);
 
-	    ullong_format_string(GC_tot_copied*sizeof(W_), 
+	    showStgWord64(GC_tot_copied*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes copied during GC\n", temp);
 
 	    if ( ResidencySamples > 0 ) {
-		ullong_format_string(MaxResidency*sizeof(W_), 
+		showStgWord64(MaxResidency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
 		statsPrintf("%16s bytes maximum residency (%ld sample(s))\n",
 			temp, ResidencySamples);
 	    }
 
-	    ullong_format_string(MaxSlop*sizeof(W_), temp, rtsTrue/*commas*/);
+	    showStgWord64(MaxSlop*sizeof(W_), temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes maximum slop\n", temp);
 
 	    statsPrintf("%16ld MB total memory in use (%ld MB lost due to fragmentation)\n\n", 
@@ -670,10 +670,10 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(GCe_tot_time)*100/TICK_TO_DBL(etime));
 
 	    if (time - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) == 0)
-		ullong_format_string(0, temp, rtsTrue/*commas*/);
+		showStgWord64(0, temp, rtsTrue/*commas*/);
 	    else
-		ullong_format_string(
-		    (ullong)((GC_tot_alloc*sizeof(W_))/
+		showStgWord64(
+		    (StgWord64)((GC_tot_alloc*sizeof(W_))/
 			     TICK_TO_DBL(time - GC_tot_time - 
 					 PROF_VAL(RP_tot_time + HC_tot_time))),
 		    temp, rtsTrue/*commas*/);
@@ -734,7 +734,7 @@ stat_exit(int alloc)
           fmt2 = "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n";
       }
 	  /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
-	  statsPrintf(fmt1, GC_tot_alloc*(ullong)sizeof(W_));
+	  statsPrintf(fmt1, GC_tot_alloc*(StgWord64)sizeof(W_));
 	  statsPrintf(fmt2,
 		    total_collections,
 		    ResidencySamples == 0 ? 0 : 

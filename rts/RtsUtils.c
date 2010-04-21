@@ -330,25 +330,74 @@ time_str(void)
    -------------------------------------------------------------------------- */
 
 char *
-ullong_format_string(ullong x, char *s, rtsBool with_commas)
+showStgWord64(StgWord64 x, char *s, rtsBool with_commas)
 {
-    if (x < (ullong)1000) 
-	sprintf(s, "%lu", (lnat)x);
-    else if (x < (ullong)1000000)
-	sprintf(s, (with_commas) ? "%lu,%3.3lu" : "%lu%3.3lu",
-		(lnat)((x)/(ullong)1000),
-		(lnat)((x)%(ullong)1000));
-    else if (x < (ullong)1000000000)
-	sprintf(s, (with_commas) ? "%lu,%3.3lu,%3.3lu" :  "%lu%3.3lu%3.3lu",
-		(lnat)((x)/(ullong)1000000),
-		(lnat)((x)/(ullong)1000%(ullong)1000),
-		(lnat)((x)%(ullong)1000));
-    else
-	sprintf(s, (with_commas) ? "%lu,%3.3lu,%3.3lu,%3.3lu" : "%lu%3.3lu%3.3lu%3.3lu",
-		(lnat)((x)/(ullong)1000000000),
-		(lnat)((x)/(ullong)1000000%(ullong)1000),
-		(lnat)((x)/(ullong)1000%(ullong)1000), 
-		(lnat)((x)%(ullong)1000));
+    if (with_commas) {
+        if (x < (StgWord64)1e3)
+                sprintf(s, "%" FMT_Word64, (StgWord64)x);
+        else if (x < (StgWord64)1e6)
+                sprintf(s, "%" FMT_Word64 ",%03" FMT_Word64,
+                        (StgWord64)(x / 1000),
+                        (StgWord64)(x % 1000));
+        else if (x < (StgWord64)1e9)
+                sprintf(s, "%"    FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64,
+                        (StgWord64)(x / 1e6),
+                        (StgWord64)((x / 1000) % 1000),
+                        (StgWord64)(x          % 1000));
+        else if (x < (StgWord64)1e12)
+                sprintf(s, "%"    FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64,
+                        (StgWord64)(x / (StgWord64)1e9),
+                        (StgWord64)((x / (StgWord64)1e6) % 1000),
+                        (StgWord64)((x / (StgWord64)1e3) % 1000),
+                        (StgWord64)(x                    % 1000));
+        else if (x < (StgWord64)1e15)
+                sprintf(s, "%"    FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64,
+                        (StgWord64)(x / (StgWord64)1e12),
+                        (StgWord64)((x / (StgWord64)1e9) % 1000),
+                        (StgWord64)((x / (StgWord64)1e6) % 1000),
+                        (StgWord64)((x / (StgWord64)1e3) % 1000),
+                        (StgWord64)(x                    % 1000));
+        else if (x < (StgWord64)1e18)
+                sprintf(s, "%"    FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64,
+                        (StgWord64)(x / (StgWord64)1e15),
+                        (StgWord64)((x / (StgWord64)1e12) % 1000),
+                        (StgWord64)((x / (StgWord64)1e9)  % 1000),
+                        (StgWord64)((x / (StgWord64)1e6)  % 1000),
+                        (StgWord64)((x / (StgWord64)1e3)  % 1000),
+                        (StgWord64)(x                     % 1000));
+        else
+                sprintf(s, "%"    FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64
+                           ",%03" FMT_Word64,
+                        (StgWord64)(x / (StgWord64)1e18),
+                        (StgWord64)((x / (StgWord64)1e15) % 1000),
+                        (StgWord64)((x / (StgWord64)1e12) % 1000),
+                        (StgWord64)((x / (StgWord64)1e9)  % 1000),
+                        (StgWord64)((x / (StgWord64)1e6)  % 1000),
+                        (StgWord64)((x / (StgWord64)1e3)  % 1000),
+                        (StgWord64)(x                     % 1000));
+    }
+    else {
+        sprintf(s, "%" FMT_Word64, x);
+    }
     return s;
 }
 

@@ -40,7 +40,7 @@ unsigned int HP_ID;
 
 /* figures for the profiling report.
  */
-static ullong total_alloc;
+static StgWord64 total_alloc;
 static lnat   total_prof_ticks;
 
 /* Globals for opening the profiling log file(s)
@@ -770,7 +770,7 @@ reportCCSProfiling( void )
         (int) RtsFlags.MiscFlags.tickInterval);
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
-	    ullong_format_string(total_alloc * sizeof(W_),
+	    showStgWord64(total_alloc * sizeof(W_),
 				 temp, rtsTrue/*commas*/));
 
 #if defined(PROFILING_DETAIL_COUNTS)

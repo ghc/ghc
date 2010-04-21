@@ -180,10 +180,10 @@ init_countable_events(void)
 
 
 static void
-papi_report_event(const char *name,  ullong value)
+papi_report_event(const char *name, StgWord64 value)
 {
     static char temp[BIG_STRING_LEN];
-    ullong_format_string(value,temp,rtsTrue/*commas*/); 
+    showStgWord64(value,temp,rtsTrue/*commas*/); 
     statsPrintf("  %15s  %15s\n", name, temp);
 }
 

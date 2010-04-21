@@ -35,7 +35,7 @@ void stgFree(void* p);
 void heapOverflow(void);
 
 char *time_str(void);
-char *ullong_format_string(ullong, char *, rtsBool);
+char *showStgWord64(StgWord64, char *, rtsBool);
 
 #ifdef DEBUG
 void heapCheckFail( void );

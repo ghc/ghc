@@ -27,8 +27,8 @@
 /* external data */
 extern double ElapsedTimeStart;
 
-extern ullong GC_tot_alloc;
-extern ullong GC_tot_copied;
+extern StgWord64 GC_tot_alloc;
+extern StgWord64 GC_tot_copied;
 
 extern lnat MaxResidency;     /* in words; for stats only */
 extern lnat ResidencySamples; /* for stats only */
@@ -304,14 +304,14 @@ globalParStat_exit(void)
 	fprintf(sf, "%11d sparks ignored\n", 
 		globalParStats.tot_sparks_ignored);
 	*/
-	ullong_format_string(globalParStats.res_tp, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.res_tp, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s thread pool residency", temp);
 	fprintf(sf, " (avg: %3.2f; %d times (%2.2f%%) of %d empty)\n", 
 		(double)globalParStats.tot_tp/(double)globalParStats.cnt_tp,
 		globalParStats.emp_tp, 
 		globalParStats.emp_tp*100.0/(double)globalParStats.cnt_tp,
 		globalParStats.cnt_tp);
-	ullong_format_string(globalParStats.res_sp, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.res_sp, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s spark pool residency", temp);
 
 	fprintf(sf, " (avg: %3.2f; %d times (%2.2f%%) of %d empty)\n", 
@@ -319,7 +319,7 @@ globalParStat_exit(void)
 		globalParStats.emp_sp, 
 		globalParStats.emp_sp*100.0/(double)globalParStats.cnt_sp,
 		globalParStats.cnt_sp);
-	//ullong_format_string(globalParStats.tot_fishes, temp, rtsTrue/*commas*/);
+	//showStgWord64(globalParStats.tot_fishes, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11d messages sent (%d fish, %d fetch, %d resume, %d schedule", 
 		globalParStats.tot_fish_mess+globalParStats.tot_fetch_mess+
 		globalParStats.tot_resume_mess+globalParStats.tot_schedule_mess,
@@ -339,33 +339,33 @@ globalParStat_exit(void)
 #endif
 	fprintf(sf,")\n\n");
 
-	ullong_format_string(globalParStats.tot_size_GA*sizeof(W_), temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_size_GA*sizeof(W_), temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytes of global heap in total ", temp);
 	fprintf(sf, "(%5.2f%% of total allocated heap)\n", 
 		globalParStats.tot_size_GA*sizeof(W_)*100.0/(double)GC_tot_alloc*sizeof(W_));
-	ullong_format_string(globalParStats.res_size_GA*sizeof(W_), temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.res_size_GA*sizeof(W_), temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytes global heap residency ", temp);
 	fprintf(sf, "(%5.2f%% of max heap residency)\n", 
 		globalParStats.res_size_GA*sizeof(W_)*100.0/(double)MaxResidency*sizeof(W_));
 
-	//ullong_format_string(globalParStats.res_mark_GA, temp, rtsTrue/*commas*/);
+	//showStgWord64(globalParStats.res_mark_GA, temp, rtsTrue/*commas*/);
 	//fprintf(sf, "%11s GAs residency in GALA table ", temp);
-	// ullong_format_string(globalParStats.tot_mark_GA, temp, rtsTrue/*commas*/);
+	// showStgWord64(globalParStats.tot_mark_GA, temp, rtsTrue/*commas*/);
 	//fprintf(sf, "(avg %5.2f; %d samples)\n", 
 	//	(double)globalParStats.tot_mark_GA/(double)globalParStats.cnt_mark_GA,
 	//	globalParStats.cnt_mark_GA);
 
-	ullong_format_string(globalParStats.local_alloc_GA, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.local_alloc_GA, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s GAs locally allocated (calls to makeGlobal)\n", temp);
 
-	ullong_format_string(globalParStats.tot_rebuild_GA, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_rebuild_GA, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s live GAs in total (after rebuilding tables)\n", temp);
-	ullong_format_string(globalParStats.res_rebuild_GA, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.res_rebuild_GA, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s GAs residency (after rebuilding tables) ", temp);
 	fprintf(sf, "(avg %5.2f; %d samples)\n", 
 		(double)globalParStats.tot_rebuild_GA/(double)globalParStats.cnt_rebuild_GA,
 		globalParStats.cnt_rebuild_GA);
-	ullong_format_string(globalParStats.res_free_GA, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.res_free_GA, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s residency of freeing GAs", temp);
 	fprintf(sf, " (avg %5.2f; %d samples)\n", 
 		(double)globalParStats.tot_free_GA/(double)globalParStats.cnt_free_GA,
@@ -379,9 +379,9 @@ globalParStat_exit(void)
 		globalParStats.time_rebuild_GA*100./time, time,
 		globalParStats.time_rebuild_GA*100./etime, etime);
 
-	ullong_format_string(globalParStats.tot_sparks_marked, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_sparks_marked, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s sparks marked\t", temp);
-	ullong_format_string(globalParStats.res_sparks_marked, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.res_sparks_marked, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%6s spark mark residency\n", temp);
 	fprintf(sf, "%11.2fs spent marking sparks (%7.2f%% of %7.2fs; %7.2f%% of %7.2fs elapsed)\n", 
 		globalParStats.time_sparks,
@@ -390,13 +390,13 @@ globalParStat_exit(void)
 
 	fprintf(sf,"\n");
 
-	ullong_format_string(globalParStats.tot_packets, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_packets, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s packets sent\n", temp);
-	ullong_format_string(globalParStats.tot_packet_size, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_packet_size, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytes of graph sent in total (max %d; avg %.2f)\n",
 		temp, globalParStats.res_packet_size,
 		(double)globalParStats.tot_packet_size/(double)globalParStats.tot_packets);
-	ullong_format_string(globalParStats.tot_thunks, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_thunks, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s thunks sent in total (max %d; avg %.2f)\n",
 		temp, globalParStats.res_thunks,
 		(double)globalParStats.tot_thunks/(double)globalParStats.tot_packets);
@@ -405,13 +405,13 @@ globalParStat_exit(void)
 		globalParStats.time_pack*100./time, time,
 		globalParStats.time_pack*100./etime, etime);
 
-	ullong_format_string(globalParStats.rec_packets, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.rec_packets, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s packets received\n", temp);
-	ullong_format_string(globalParStats.rec_packet_size, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.rec_packet_size, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytes of graph received in total (max %d; avg %.2f)\n",
 		temp, globalParStats.rec_res_packet_size,
 		(double)globalParStats.rec_packet_size/(double)globalParStats.rec_packets);
-	ullong_format_string(globalParStats.rec_thunks, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.rec_thunks, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s thunks received in total (max %d; avg %.2f)\n",
 		temp, globalParStats.rec_res_thunks,
 		(double)globalParStats.rec_thunks/(double)globalParStats.rec_packets);
@@ -422,9 +422,9 @@ globalParStat_exit(void)
 
 	fprintf(sf,"\n");
 
-	ullong_format_string(globalParStats.tot_arrs, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_arrs, temp, rtsTrue/*commas*/);
 	fprintf(sf, "%11s bytearrays sent; ", temp);
-	ullong_format_string(globalParStats.tot_arr_size, temp, rtsTrue/*commas*/);
+	showStgWord64(globalParStats.tot_arr_size, temp, rtsTrue/*commas*/);
 	fprintf(sf, " %s bytes in total (avg %.2f)\n",
 		temp, 
 		(double)globalParStats.tot_arr_size/(double)globalParStats.tot_arrs);

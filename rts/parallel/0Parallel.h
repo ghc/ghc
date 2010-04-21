@@ -42,7 +42,7 @@ are also used when simulating parallel execution, i.e. on GranSim.
 
 /* Needed for dumping routines */
 #if defined(PAR)
-# define TIME                      ullong
+# define TIME                      StgWord64
 # define CURRENT_TIME              msTime()
 # define TIME_ON_PROC(p)           msTime()
 # define CURRENT_PROC              thisPE
