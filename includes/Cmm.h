@@ -169,7 +169,7 @@
 #if SIZEOF_W == 4
 #define W_SHIFT 2
 #elif SIZEOF_W == 8
-#define W_SHIFT 4
+#define W_SHIFT 3
 #endif
 
 /* Converting quantities of words to bytes */
