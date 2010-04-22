@@ -259,6 +259,8 @@ cmmMachOpFold mop args@[CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
     	MO_Add r -> CmmLit (CmmInt (x + y) r)
     	MO_Sub r -> CmmLit (CmmInt (x - y) r)
     	MO_Mul r -> CmmLit (CmmInt (x * y) r)
+    	MO_U_Quot r | y /= 0 -> CmmLit (CmmInt (x_u `quot` y_u) r)
+    	MO_U_Rem  r | y /= 0 -> CmmLit (CmmInt (x_u `rem`  y_u) r)
     	MO_S_Quot r | y /= 0 -> CmmLit (CmmInt (x `quot` y) r)
     	MO_S_Rem  r | y /= 0 -> CmmLit (CmmInt (x `rem` y) r)
 
@@ -431,6 +433,9 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
     	MO_Mul rep
 	   | Just p <- exactLog2 n ->
                  CmmMachOp (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
+    	MO_U_Quot rep
+	   | Just p <- exactLog2 n ->
+                 CmmMachOp (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)]
     	MO_S_Quot rep
 	   | Just p <- exactLog2 n, 
 	     CmmReg _ <- x ->	-- We duplicate x below, hence require
