@@ -1010,7 +1010,7 @@ mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplM OutExpr
 
 mkLam _b [] body 
   = return body
-mkLam env bndrs body
+mkLam _env bndrs body
   = do	{ dflags <- getDOptsSmpl
 	; mkLam' dflags bndrs body }
   where
@@ -1031,9 +1031,6 @@ mkLam env bndrs body
 	   ; return etad_lam }
 
       | dopt Opt_DoLambdaEtaExpansion dflags,
-        not (inGentleMode env),	      -- In gentle mode don't eta-expansion
-	    		  	      -- because it can clutter up the code
-	    		 	      -- with casts etc that may not be removed
    	not (all isTyVar bndrs) -- Don't eta expand type abstractions
       = do { let body' = tryEtaExpansion dflags body
  	   ; return (mkLams bndrs body') }
