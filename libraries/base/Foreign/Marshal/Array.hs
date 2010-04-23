@@ -108,6 +108,9 @@ allocaArray  = doAlloca undefined
 --
 allocaArray0      :: Storable a => Int -> (Ptr a -> IO b) -> IO b
 allocaArray0 size  = allocaArray (size + 1)
+{-# INLINE allocaArray0 #-}
+  -- needed to get allocaArray to inline into withCString, for unknown
+  -- reasons --SDM 23/4/2010, see #4004 for benchmark
 
 -- |Adjust the size of an array
 --
