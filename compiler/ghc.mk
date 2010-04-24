@@ -439,24 +439,18 @@ compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
 
-# For now, bindists always use stage 2
-ifneq "$(BINDIST)" "YES"
-# stage 1 is enabled unless $(stage) is set to something other than 1
-ifeq "$(filter-out 1,$(stage))" ""
+ifeq "$(stage)" "1"
+compiler_stage2_NOT_NEEDED = YES
+endif
+ifneq "$(stage)" "3"
+compiler_stage3_NOT_NEEDED = YES
+endif
+
 $(eval $(call build-package,compiler,stage1,0))
-endif
-endif
-
-# stage 2 is enabled unless $(stage) is set to something other than 2
-ifeq "$(filter-out 2,$(stage))" ""
 $(eval $(call build-package,compiler,stage2,1))
-endif
+$(eval $(call build-package,compiler,stage3,2))
 
 ifneq "$(BINDIST)" "YES"
-# stage 3 has to be requested explicitly with stage=3
-ifeq "$(stage)" "3"
-$(eval $(call build-package,compiler,stage3,2))
-endif
 
 compiler_stage2_TAGS_HC_OPTS = -package ghc
 $(eval $(call tags-package,compiler,stage2))

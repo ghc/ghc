@@ -103,20 +103,15 @@ define ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_EXTRA
 echo 'executablename="$$exedir/ghc"' >> "$(WRAPPER)"
 endef
 
-# stage 1 is enabled unless $(stage) is set to something other than 1
-ifeq "$(filter-out 1,$(stage))" ""
+ifeq "$(stage)" "1"
+ghc_stage2_NOT_NEEDED = YES
+endif
+ifneq "$(stage)" "3"
+ghc_stage3_NOT_NEEDED = YES
+endif
 $(eval $(call build-prog,ghc,stage1,0))
-endif
-
-# stage 2 is enabled unless $(stage) is set to something other than 2
-ifeq "$(filter-out 2,$(stage))" ""
 $(eval $(call build-prog,ghc,stage2,1))
-endif
-
-# stage 3 has to be requested explicitly with stage=3
-ifeq "$(stage)" "3"
 $(eval $(call build-prog,ghc,stage3,2))
-endif
 
 ifneq "$(BINDIST)" "YES"
 

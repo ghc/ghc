@@ -37,12 +37,33 @@ ifeq "$$(findstring $3,0 1 2)" ""
 $$(error $1/$2: stage argument to build-package should be 0, 1, or 2)
 endif
 
+$(call clean-target,$1,$2,$1/$2)
+
+distclean : clean_$1_$2_config
+
+maintainer-clean : distclean
+
+.PHONY: clean_$1_$2_config
+clean_$1_$2_config:
+	"$$(RM)" $$(RM_OPTS) $1/config.log $1/config.status $1/include/Hs*Config.h
+	"$$(RM)" $$(RM_OPTS) -r $1/autom4te.cache
+
+ifneq "$$($1_$2_NOT_NEEDED)" "YES"
+$$(eval $$(call build-package-helper,$1,$2,$3))
+endif
+endef
+
+
+define build-package-helper
+# $1 = dir
+# $2 = distdir
+# $3 = GHC stage to use (0 == bootstrapping compiler)
+
 # We don't install things compiled by stage 0, so no need to put them
 # in the bindist.
 ifneq "$$(BINDIST) $3" "YES 0"
 
 $(call all-target,$1,all_$1_$2)
-$(call clean-target,$1,$2,$1/$2)
 # This give us things like
 #     all_libraries: all_libraries/base_dist-install
 ifneq "$$($1_$2_GROUP)" ""
@@ -56,15 +77,6 @@ check_packages: check_$1
 check_$1: $$(GHC_CABAL_INPLACE)
 	$$(GHC_CABAL_INPLACE) check $1
 endif
-
-distclean : clean_$1_$2_config
-
-maintainer-clean : distclean
-
-.PHONY: clean_$1_$2_config
-clean_$1_$2_config:
-	"$$(RM)" $$(RM_OPTS) $1/config.log $1/config.status $1/include/Hs*Config.h
-	"$$(RM)" $$(RM_OPTS) -r $1/autom4te.cache
 
 # --- CONFIGURATION
 

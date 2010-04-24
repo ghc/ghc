@@ -34,9 +34,20 @@ ifeq "$$(findstring $3,0 1 2)" ""
 $$(error $1/$2: stage argument to build-prog should be 0, 1, or 2)
 endif
 
-$(call all-target,$1,all_$1_$2)
-
 $(call clean-target,$1,$2,$1/$2)
+
+ifneq "$$($1_$2_NOT_NEEDED)" "YES"
+$$(eval $$(call build-prog-helper,$1,$2,$3))
+endif
+endef
+
+
+define build-prog-helper
+# $1 = dir
+# $2 = distdir
+# $3 = GHC stage to use (0 == bootstrapping compiler)
+
+$(call all-target,$1,all_$1_$2)
 
 $(call package-config,$1,$2,$3)
 
