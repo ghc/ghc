@@ -937,6 +937,7 @@ $(eval $(call bindist,.,\
 	docs/index.html \
 	compiler/stage2/doc \
 	$(wildcard libraries/*/dist-install/doc/) \
+	$(wildcard libraries/*/*/dist-install/doc/) \
     $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
 	mk/project.mk \
