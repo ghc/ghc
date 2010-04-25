@@ -92,11 +92,11 @@ spacedTable1, spacedTable5 :: Html -> Html
 spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
 spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 
-constrHdr, methHdr, atHdr :: HtmlTable
-constrHdr  = tda [ theclass "section4" ] << toHtml "Constructors"
-methHdr    = tda [ theclass "section4" ] << toHtml "Methods"
-atHdr      = tda [ theclass "section4" ] << toHtml "Associated Types"
+constrHdr, methHdr, atHdr :: Html
+constrHdr  = h5 << "Constructors"
+methHdr    = h5 << "Methods"
+atHdr      = h5 << "Associated Types"
 
-instHdr :: String -> HtmlTable
+instHdr :: String -> Html
 instHdr id_ = 
-  tda [ theclass "section4" ] << (collapsebutton id_ +++ toHtml " Instances")
+  h5 << (collapsebutton id_ +++ toHtml " Instances")

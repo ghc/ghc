@@ -175,13 +175,11 @@ ppTyFam summary associated links loc mbDoc decl unicode
 
     instancesBit
       | associated || null instances = noHtml
-      | otherwise                    = vanillaTable << (
-          instHdr instId </>
-          tda [theclass "body"] << 
-            collapsed thediv instId (
-              spacedTable1 << (
-                aboves (map (ppDocInstance unicode) instances)
-              )
+      | otherwise                    =
+          instHdr instId +++
+          collapsed thediv instId (
+            spacedTable1 << (
+              aboves (map (ppDocInstance unicode) instances)
             )
           )
 
@@ -387,13 +385,12 @@ ppClassDecl summary links instances loc mbDoc subdocs
     instId = collapseId (getName nm)
     instancesBit
       | null instances = noHtml
-      | otherwise = vanillaTable << (
-           instHdr instId </>
-           tda [theclass "body"] << 
-             collapsed thediv instId (
-               spacedTable1 << aboves (map (ppDocInstance unicode) instances)
-             )
-          )
+      | otherwise =
+           instHdr instId +++
+           collapsed thediv instId (
+             spacedTable1 << aboves (map (ppDocInstance unicode) instances)
+           )
+
 ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
@@ -451,7 +448,7 @@ ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
 ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
   
   | summary   = ppShortDataDecl summary links loc dataDecl unicode
-  | otherwise = header_ +++ datadoc +++ constrBit +++ instancesBit
+  | otherwise = header_ +++ maybeDocToHtml mbDoc +++ constrBit +++ instancesBit
 
   where
     docname   = unLoc . tcdLName $ dataDecl
@@ -471,24 +468,19 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
       | any isRecCon cons = spacedTable5
       | otherwise         = spacedTable1
 
-    datadoc = case mbDoc of
-      Just doc -> ndocBox (docToHtml doc)
-      Nothing -> emptyTable
-
     constrBit 
-      | null cons = emptyTable
-      | otherwise = constrHdr </> ( 
-          tda [theclass "body"] << constrTable << 
+      | null cons = noHtml
+      | otherwise = constrHdr +++ ( 
+          constrTable << 
           aboves (map (ppSideBySideConstr subdocs unicode) cons)
         )
 
     instId = collapseId (getName docname)
 
     instancesBit
-      | null instances = emptyTable
+      | null instances = noHtml
       | otherwise 
-        = instHdr instId </>
-          tda [theclass "body"] << 
+        = instHdr instId +++
           collapsed thediv instId (
             spacedTable1 << aboves (map (ppDocInstance unicode) instances
             )
