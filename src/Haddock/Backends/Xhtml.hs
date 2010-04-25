@@ -566,9 +566,13 @@ ppHtmlModule odir doctitle
                 styleSheet +++
                 (script ! [src jsFile, thetype "text/javascript"] $ noHtml) +++
                 (script ! [thetype "text/javascript"]
-                     -- XXX: quoting errors possible?
-                     << ("window.onload = function () {setSynopsis(\"mini_" 
-                                ++ moduleHtmlFile mdl ++ "\")};"))
+                     -- NB: Within XHTML, the content of script tags needs to be
+                     -- a CDATA section. Will break if the generated name could 
+                     -- have "]]>" in it!
+                     << primHtml (
+                      "//<![CDATA[\nwindow.onload = function () {setSynopsis(\"mini_"
+                         ++ moduleHtmlFile mdl ++ "\")};\n//]]>\n")
+                )
                ) +++
         body << (
           pageHeader mdl_str iface doctitle
