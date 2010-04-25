@@ -428,8 +428,8 @@ ppShortDataDecl summary _links _loc dataDecl unicode
 
   | [] <- cons = declElem dataHeader
 
-  | [lcon] <- cons, ResTyH98 <- resTy = declElem $
-      dataHeader <+> equals <+> ppShortConstr summary (unLoc lcon) unicode
+  | [lcon] <- cons, ResTyH98 <- resTy = declElem (dataHeader <+> equals)
+      <+> ppShortConstr summary (unLoc lcon) unicode
 
   | ResTyH98 <- resTy = declElem dataHeader
       +++ unordList (zipWith doConstr ('=':repeat '|') cons)
@@ -439,8 +439,8 @@ ppShortDataDecl summary _links _loc dataDecl unicode
       
   where
     dataHeader = ppDataHeader summary dataDecl unicode
-    doConstr c con = declElem (toHtml [c] <+> ppShortConstr summary (unLoc con) unicode)
-    doGADTConstr con = declElem (ppShortConstr summary (unLoc con) unicode)
+    doConstr c con = toHtml [c] <+> ppShortConstr summary (unLoc con) unicode
+    doGADTConstr con = ppShortConstr summary (unLoc con) unicode
 
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
@@ -525,8 +525,7 @@ ppShortConstr summary con unicode = case con_res con of
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
     
   where
-    doRecordFields fields = braces (vanillaTable <<
-                        aboves (map (ppShortField summary unicode) fields))
+    doRecordFields fields = braces $ unordList (map (ppShortField summary unicode) fields)
     doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
                              ppForAll forall ltvs lcontext unicode,
                              ppLType unicode (foldr mkFunTy resTy args) ]
@@ -613,12 +612,10 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
     mbDoc = join $ fmap fst $ lookup name subdocs
 
 
-ppShortField :: Bool -> Bool -> ConDeclField DocName -> HtmlTable
+ppShortField :: Bool -> Bool -> ConDeclField DocName -> Html
 ppShortField summary unicode (ConDeclField (L _ name) ltype _)
-  = tda [theclass "recfield"] << (
-      ppBinder summary (docNameOcc name)
-      <+> dcolon unicode <+> ppLType unicode ltype
-    )
+  = ppBinder summary (docNameOcc name)
+    <+> dcolon unicode <+> ppLType unicode ltype
 
 
 -- | Print the LHS of a data\/newtype declaration.
