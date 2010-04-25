@@ -347,18 +347,15 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
   if null sigs && null ats
     then (if summary then declElem else topDeclElem links loc nm) hdr
     else (if summary then declElem else topDeclElem links loc nm) (hdr <+> keyword "where")
-      +++ vanillaTable << 
-      (
-        bodyBox << aboves
+      +++ vanillaTable << aboves
           (
-            [ ppAssocType summary links doc at unicode | at <- ats
+            [ argBox $ ppAssocType summary links doc at unicode | at <- ats
               , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]  ++
 
-            [ ppFunSig summary links loc doc n typ unicode
+            [ argBox $ ppFunSig summary links loc doc n typ unicode
               | L _ (TypeSig (L _ n) (L _ typ)) <- sigs
               , let doc = lookupAnySubdoc n subdocs ] 
           )
-      )
   where
     hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds unicode
     nm  = unLoc lname
