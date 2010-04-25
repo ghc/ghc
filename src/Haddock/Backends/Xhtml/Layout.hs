@@ -80,9 +80,6 @@ maybeRDocBox Nothing = rdocBox (noHtml)
 maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
 
 
-bodyBox :: Html -> HtmlTable
-bodyBox html = tda [theclass "body"] << vanillaTable << html
-
 -- a vanilla table has width 100%, no border, no padding, no spacing
 vanillaTable, vanillaTable2 :: Html -> Html
 vanillaTable  = table ! [theclass "vanilla",  cellspacing 0, cellpadding 0]
