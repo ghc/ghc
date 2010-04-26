@@ -324,9 +324,6 @@ usage_text[] = {
 "  --install-signal-handlers=<yes|no>",
 "            Install signal handlers (default: yes)",
 #if defined(THREADED_RTS)
-"  -e<size>  Size of spark pools (default 100)",
-#endif
-#if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
 #if defined(x86_64_HOST_ARCH)
