@@ -33,7 +33,7 @@ ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 all_$1_$2 : $$(INPLACE_BIN)/$$($1_$2_PROG)
 
 $$(INPLACE_BIN)/$$($1_$2_PROG): WRAPPER=$$@
-$$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE)
+$$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE) $$($1_$2_SHELL_WRAPPER_NAME)
 	"$$(RM)" $$(RM_OPTS)                              $$@
 	echo '#!$$(SHELL)'                             >> $$@
 	echo 'executablename="$$(TOP)/$$<"'            >> $$@
