@@ -439,13 +439,19 @@ compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
 
+# If we "make 1" or "make 2" then we don't want the rules for the stage
+# that we haven't been asked to build
 ifeq "$(stage)" "1"
 compiler_stage2_NOT_NEEDED = YES
 endif
+ifeq "$(stage)" "2"
+compiler_stage1_NOT_NEEDED = YES
+endif
+# We don't want the rules for stage3 unless we have been explicitly
+# asked to build it
 ifneq "$(stage)" "3"
 compiler_stage3_NOT_NEEDED = YES
 endif
-
 $(eval $(call build-package,compiler,stage1,0))
 $(eval $(call build-package,compiler,stage2,1))
 $(eval $(call build-package,compiler,stage3,2))
