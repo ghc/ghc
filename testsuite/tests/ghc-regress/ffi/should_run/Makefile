@@ -10,3 +10,6 @@ ffi018_ghci_setup :
 
 2276_ghci_setup :
 	'$(TEST_HC)' -c 2276_ghci_c.c
+
+ffi002_setup :
+	'$(TEST_HC)' -c ffi002.hs
