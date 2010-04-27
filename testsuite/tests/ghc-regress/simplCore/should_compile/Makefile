@@ -10,4 +10,4 @@ T3055:
 T3772:
 	$(RM) -f rm -f T3772*.hi T3772*.o
 	'$(TEST_HC)' -c -O T3772_A.hs 
-	'$(TEST_HC)' -c -O T3772.hs -dsuppress-uniques -fno-code -ddump-simpl
+	'$(TEST_HC)' -c -O T3772.hs -dsuppress-uniques -ddump-simpl

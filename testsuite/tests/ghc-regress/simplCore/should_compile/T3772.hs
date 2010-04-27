@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -ddump-simpl -fno-code #-}
+{-# OPTIONS_GHC -ddump-simpl #-}
 module T3772 where
 
 import T3772_A

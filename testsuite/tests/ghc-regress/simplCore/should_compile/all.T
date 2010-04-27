@@ -36,7 +36,7 @@ test('spec003', normal, compile, [''])
 test('rule1', normal, compile, [''])
 test('rule2', [only_ways(['optc','optasm']),
                if_compiler_lt('ghc', '6.13', expect_fail)],
-              compile, ['-dsuppress-uniques -fno-code'])
+              compile, ['-dsuppress-uniques'])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
@@ -51,15 +51,15 @@ test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 test('T3234',
      only_ways(['optc','optasm']),
      compile,
-     ['-ddump-simpl-stats -dsuppress-uniques -fno-code'])
+     ['-ddump-simpl-stats -dsuppress-uniques'])
 
 test('T3717', only_ways(['optc','optasm']), 
               compile, 
-              ['-ddump-simpl -dsuppress-uniques -fno-code'])
+              ['-ddump-simpl -dsuppress-uniques'])
 
 test('spec-inline', only_ways(['optc','optasm']), 
               	    compile, 
-              	    ['-O2 -ddump-simpl -dsuppress-uniques -fno-code'])
+              	    ['-O2 -ddump-simpl -dsuppress-uniques'])
 
 test('T3055',
      [extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
