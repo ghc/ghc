@@ -6,6 +6,77 @@
   <indexterm><primary>using GHC</primary></indexterm>
 
   <sect1>
+    <title>Getting started: compiling programs</title>
+
+    <para>
+      In this chapter you'll find a complete reference to the GHC
+      command-line syntax, including all 400+ flags.  It's a large and
+      complex system, and there are lots of details, so it can be
+      quite hard to figure out how to get started.  With that in mind,
+      this introductory section provides a quick introduction to the
+      basic usage of GHC for compiling a Haskell program, before the
+      following sections dive into the full syntax.
+    </para>
+
+    <para>
+      Let's create a Hello World program, and compile and run it.
+      First, create a file <filename>hello.hs</filename> containing
+      the Haskell code:
+    </para>
+
+<programlisting>
+main = putStrLn "Hello, World!"
+</programlisting>
+
+    <para>To compile the program, use GHC like this:</para>
+
+<screen>
+$ ghc hello.hs</screen>
+
+     <para>(where <literal>$</literal> represents the prompt: don't
+       type it).  GHC will compile the source
+       file <filename>hello.hs</filename>, producing
+       an <firstterm>object
+       file</firstterm> <filename>hello.o</filename> and
+       an <firstterm>interface
+       file</firstterm> <filename>hello.hi</filename>, and then it
+       will link the object file to the libraries that come with GHC
+       to produce an executable called <filename>hello</filename> on
+       Unix/Linux/Mac, or <filename>hello.exe</filename> on
+       Windows.</para>
+
+    <para>
+      By default GHC will be very quiet about what it is doing, only
+      printing error messages.  If you want to see in more detail
+      what's going on behind the scenes, add <option>-v</option> to
+      the command line.
+    </para>
+
+    <para>
+      Then we can run the program like this:
+    </para>
+
+<screen>
+$ ./hello
+Hello World!</screen>
+
+    <para>
+      If your program contains multiple modules, then you only need to
+      tell GHC the name of the source file containing
+      the <filename>Main</filename> module, and GHC will examine
+      the <literal>import</literal> declarations to find the other
+      modules that make up the program and find their source files.
+      This means that, with the exception of
+      the <literal>Main</literal> module, every source file should be
+      named after the module name that it contains (with dots replaced
+      by directory separators).  For example, the
+      module <literal>Data.Person</literal> would be in the
+      file <filename>Data/Person.hs</filename> on Unix/Linux/Mac,
+      or <filename>Data\Person.hs</filename> on Windows.
+    </para>
+  </sect1>
+
+  <sect1>
     <title>Options overview</title>
     
     <para>GHC's behaviour is controlled by
@@ -110,7 +181,7 @@ module X where
       <varlistentry>
 	<term>Mode flags</term>
 	<listitem>
-	  <para>For example, <option>--make</option> or <option>-E</option>.
+	  <para>For example, <option>&ndash;&ndash;make</option> or <option>-E</option>.
 	    There may only be a single mode flag on the command line.  The
 	    available modes are listed in <xref linkend="modes"/>.</para>
 	</listitem>
@@ -220,10 +291,20 @@ module X where
   <sect1 id="modes">
     <title>Modes of operation</title>
 
-    <para>GHC's behaviour is firstly controlled by a mode flag.  Only
-    one of these flags may be given, but it does not necessarily need
-    to be the first option on the command-line.  The available modes
-    are:</para>
+    <para>
+      GHC's behaviour is firstly controlled by a mode flag.  Only one
+      of these flags may be given, but it does not necessarily need to
+      be the first option on the command-line.
+    </para>
+
+    <para>
+      If no mode flag is present, then GHC will enter make mode
+      (<xref linkend="make-mode" />) if there are any Haskell source
+      files given on the command line, or else it will link the
+      objects named on the command line to produce an executable.
+    </para>
+
+    <para>The available mode flags are:</para>
 
     <variablelist>
       <varlistentry>
@@ -242,7 +323,7 @@ module X where
       
       <varlistentry>
 	<term>
-	  <cmdsynopsis><command>ghc --make</command>
+	  <cmdsynopsis><command>ghc &ndash;&ndash;make</command>
 	  </cmdsynopsis>
           <indexterm><primary>make mode</primary></indexterm>
           <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
@@ -254,6 +335,12 @@ module X where
 	  likely to be much easier, and faster, than using
 	  <command>make</command>.  Make mode is described in <xref
 	  linkend="make-mode"/>.</para>
+
+          <para>
+            This mode is the default if there are any Haskell
+            source files mentioned on the command line, and in this case
+            the <option>&ndash;&ndash;make</option> option can be omitted.
+          </para>
 	</listitem>
       </varlistentry>
 
@@ -428,8 +515,7 @@ module X where
       <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
       <indexterm><primary>separate compilation</primary></indexterm>
       
-      <para>When given the <option>&ndash;&ndash;make</option> option,
-      GHC will build a multi-module Haskell program by following
+      <para>In this mode, GHC will build a multi-module Haskell program by following
       dependencies from one or more root modules (usually just
       <literal>Main</literal>).  For example, if your
       <literal>Main</literal> module is in a file called
@@ -440,12 +526,22 @@ module X where
 ghc &ndash;&ndash;make Main.hs
 </screen>
 
-      <para>The command line may contain any number of source file
-      names or module names; GHC will figure out all the modules in
-      the program by following the imports from these initial modules.
-      It will then attempt to compile each module which is out of
-      date, and finally, if there is a <literal>Main</literal> module,
-      the program will also be linked into an executable.</para>
+      <para>
+        In fact, GHC enters make mode automatically if there are any
+        Haskell source files on the command line and no other mode is
+        specified, so in this case we could just type
+      </para>
+
+<screen>
+ghc Main.hs
+</screen>
+
+      <para>Any number of source file names or module names may be
+      specified; GHC will figure out all the modules in the program by
+      following the imports from these initial modules.  It will then
+      attempt to compile each module which is out of date, and
+      finally, if there is a <literal>Main</literal> module, the
+      program will also be linked into an executable.</para>
 
       <para>The main advantages to using <literal>ghc
       &ndash;&ndash;make</literal> over traditional

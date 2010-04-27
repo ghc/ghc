@@ -1063,10 +1063,8 @@ dynamic_flags = [
          (Deprecated "Use -exclude-module instead")
 
         -------- Linking ----------------------------------------------------
-  , Flag "c"              (NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
-         Supported
   , Flag "no-link"        (NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
-         (Deprecated "Use -c instead")
+         Supported
   , Flag "shared"         (NoArg (upd $ \d -> d{ ghcLink=LinkDynLib } ))
          Supported
   , Flag "dynload"        (HasArg (upd . parseDynLibLoaderMode))
@@ -1387,7 +1385,9 @@ dynamic_flags = [
   , Flag "fvia-c"           (NoArg (setObjTarget HscC)) Supported
   , Flag "fvia-C"           (NoArg (setObjTarget HscC)) Supported
 
-  , Flag "fno-code"         (NoArg (setTarget HscNothing)) Supported
+  , Flag "fno-code"         (NoArg (do upd $ \d -> d{ ghcLink=NoLink }
+                                       setTarget HscNothing))
+                                   Supported
   , Flag "fbyte-code"       (NoArg (setTarget HscInterpreted)) Supported
   , Flag "fobject-code"     (NoArg (setTarget defaultHscTarget)) Supported
 

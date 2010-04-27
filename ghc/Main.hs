@@ -429,6 +429,14 @@ isDoInteractiveMode :: Mode -> Bool
 isDoInteractiveMode (Right (Right DoInteractive)) = True
 isDoInteractiveMode _ = False
 
+isStopLnMode :: Mode -> Bool
+isStopLnMode (Right (Right (StopBefore StopLn))) = True
+isStopLnMode _ = False
+
+isDoMakeMode :: Mode -> Bool
+isDoMakeMode (Right (Right DoMake)) = True
+isDoMakeMode _ = False
+
 #ifdef GHCI
 isInteractiveMode :: PostLoadMode -> Bool
 isInteractiveMode DoInteractive = True
@@ -462,7 +470,6 @@ isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
 isCompManagerMode _             = False
 
-
 -- -----------------------------------------------------------------------------
 -- Parsing the mode flag
 
@@ -475,7 +482,7 @@ parseModeFlags args = do
           runCmdLine (processArgs mode_flags args)
                      (Nothing, [], [])
       mode = case mModeFlag of
-             Nothing -> stopBeforeMode StopLn
+             Nothing     -> doMakeMode
              Just (m, _) -> m
       errs = errs1 ++ map (mkGeneralLocated "on the commandline") errs2
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
@@ -519,6 +526,9 @@ mode_flags =
          Supported
 
       ------- primary modes ------------------------------------------------
+  , Flag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+                                            addFlag "-no-link" f))
+         Supported
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
          Supported
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
@@ -536,12 +546,6 @@ mode_flags =
          Supported
   , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
          Supported
-
-       -- -fno-code says to stop after Hsc but don't generate any code.
-  , Flag "fno-code"     (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
-                                            addFlag "-fno-code" f
-                                            addFlag "-fforce-recomp" f))
-         Supported
   ]
 
 setMode :: Mode -> String -> ModeM ()
@@ -552,6 +556,11 @@ setMode newMode newFlag = do
             Nothing -> ((newMode, newFlag), errs)
             Just (oldMode, oldFlag) ->
                 case (oldMode, newMode) of
+                    -- -c/--make are allowed together, and mean --make -no-link
+                    _ |  isStopLnMode oldMode && isDoMakeMode newMode
+                      || isStopLnMode newMode && isDoMakeMode oldMode ->
+                      ((doMakeMode, "--make"), [])
+
                     -- If we have both --help and --interactive then we
                     -- want showGhciUsage
                     _ | isShowGhcUsageMode oldMode &&
@@ -593,7 +602,6 @@ addFlag s flag = do
 -- Run --make mode
 
 doMake :: [(String,Maybe Phase)] -> Ghc ()
-doMake []    = ghcError (UsageError "no input files")
 doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
@@ -603,6 +611,15 @@ doMake srcs  = do
 	  phase `notElem` [As, Cc, CmmCpp, Cmm, StopLn]
 
     hsc_env <- GHC.getSession
+
+    -- if we have no haskell sources from which to do a dependency
+    -- analysis, then just do one-shot compilation and/or linking.
+    -- This means that "ghc Foo.o Bar.o -o baz" links the program as
+    -- we expect.
+    if (null hs_srcs)
+       then oneShot hsc_env StopLn srcs >> GHC.printWarnings
+       else do
+
     o_files <- mapM (\x -> do
                         f <- compileFile hsc_env StopLn x
                         GHC.printWarnings

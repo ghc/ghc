@@ -435,7 +435,12 @@ hscOneShotCompiler =
 
   , hscRecompile = genericHscRecompile hscOneShotCompiler
 
-  , hscBackend = genericHscBackend hscOneShotCompiler
+  , hscBackend = \ tc_result mod_summary mb_old_hash -> do
+       hsc_env <- getSession
+       case hscTarget (hsc_dflags hsc_env) of
+         HscNothing -> return (HscRecomp False ())
+         _otherw    -> genericHscBackend hscOneShotCompiler 
+                                         tc_result mod_summary mb_old_hash
 
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
@@ -536,13 +541,7 @@ hscNothingCompiler =
        details <- genModDetails iface
        return (HscNoRecomp, iface, details)
 
-  , hscRecompile = \mod_summary mb_old_hash ->
-      case ms_hsc_src mod_summary of
-        ExtCoreFile ->
-          panic "hscCompileNothing: cannot do external core"
-        _otherwise -> do
-          tc_result <- hscFileFrontEnd mod_summary
-          hscBackend hscNothingCompiler tc_result mod_summary mb_old_hash
+  , hscRecompile = genericHscRecompile hscNothingCompiler
 
   , hscBackend = \tc_result _mod_summary mb_old_iface -> do
        (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface

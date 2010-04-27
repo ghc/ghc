@@ -826,6 +826,7 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
 	src_timestamp <- liftIO $ getModificationTime (basename <.> suff)
 
 	let force_recomp = dopt Opt_ForceRecomp dflags
+	    hsc_lang = hscMaybeAdjustTarget dflags stop src_flavour (hscTarget dflags)
 	source_unchanged <-
           if force_recomp || not (isStopLn stop)
 		-- Set source_unchanged to False unconditionally if
@@ -842,7 +843,6 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
 				  else return False
 
   -- get the DynFlags
-	let hsc_lang = hscMaybeAdjustTarget dflags stop src_flavour (hscTarget dflags)
 	let next_phase = hscNextPhase dflags src_flavour hsc_lang
 	output_fn  <- liftIO $ get_output_fn dflags next_phase (Just location4)
 
