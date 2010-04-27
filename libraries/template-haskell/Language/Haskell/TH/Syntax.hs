@@ -26,11 +26,11 @@ module Language.Haskell.TH.Syntax(
 	report,	recover, reify,
 	location, runIO,
 
-	-- Names
+	-- * Names
 	Name(..), mkName, newName, nameBase, nameModule,
         showName, showName', NameIs(..),
 
-	-- The algebraic data types
+	-- * The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
 	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
@@ -39,7 +39,7 @@ module Language.Haskell.TH.Syntax(
 	Info(..), Loc(..), CharPos,
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
-	-- Internal functions
+	-- * Internal functions
 	returnQ, bindQ, sequenceQ,
 	NameFlavour(..), NameSpace (..), 
 	mkNameG_v, mkNameG_d, mkNameG_tc, Uniq, mkNameL, mkNameU,
@@ -67,21 +67,22 @@ import Data.Char        ( isAlpha )
 -----------------------------------------------------
 
 class (Monad m, Functor m) => Quasi m where
-	-- Fresh names
   qNewName :: String -> m Name
+	-- ^ Fresh names
 
 	-- Error reporting and recovery
-  qReport  :: Bool -> String -> m ()	-- Report an error (True) or warning (False)
+  qReport  :: Bool -> String -> m ()	-- ^ Report an error (True) or warning (False)
 					-- ...but carry on; use 'fail' to stop
-  qRecover :: m a -> m a -> m a		-- Recover from the monadic 'fail'
-					-- The first arg is the error handler
+  qRecover :: m a -- ^ the error handler
+           -> m a -- ^ action which may fail
+           -> m a		-- ^ Recover from the monadic 'fail'
  
 	-- Inspect the type-checker's environment
   qReify :: Name -> m Info
   qLocation :: m Loc
 
-	-- Input/output (dangerous)
   qRunIO :: IO a -> m a
+  -- ^ Input/output (dangerous)
 
 
 -----------------------------------------------------
@@ -147,7 +148,9 @@ newName s = Q (qNewName s)
 report  :: Bool -> String -> Q ()
 report b s = Q (qReport b s)
 
-recover :: Q a -> Q a -> Q a
+recover :: Q a -- ^ recover with this one
+        -> Q a -- ^ failing action
+        -> Q a
 recover (Q r) (Q m) = Q (qRecover r m)
 
 -- | 'reify' looks up information about the 'Name'
@@ -311,39 +314,48 @@ occString (OccName occ) = occ
 --		 Names
 -----------------------------------------------------
 
--- For "global" names (NameG) we need a totally unique name,
+-- |
+-- For "global" names ('NameG') we need a totally unique name,
 -- so we must include the name-space of the thing
 --
--- For unique-numbered things (NameU), we've got a unique reference
+-- For unique-numbered things ('NameU'), we've got a unique reference
 -- anyway, so no need for name space
 --
--- For dynamically bound thing (NameS) we probably want them to 
+-- For dynamically bound thing ('NameS') we probably want them to
 -- in a context-dependent way, so again we don't want the name
 -- space.  For example:
---	let v = mkName "T" in [| data $v = $v |]
+--
+-- > let v = mkName "T" in [| data $v = $v |]
+--
 -- Here we use the same Name for both type constructor and data constructor
-
+--
+--
+-- NameL and NameG are bound *outside* the TH syntax tree
+-- either globally (NameG) or locally (NameL). Ex:
+--
+-- > f x = $(h [| (map, x) |])
+--
+-- The 'map' will be a NameG, and 'x' wil be a NameL
+--
+-- These Names should never appear in a binding position in a TH syntax tree
 data Name = Name OccName NameFlavour deriving (Typeable, Data)
 
 data NameFlavour
-  = NameS 			-- An unqualified name; dynamically bound
-  | NameQ ModName		-- A qualified name; dynamically bound
+  = NameS           -- ^ An unqualified name; dynamically bound
+  | NameQ ModName   -- ^ A qualified name; dynamically bound
 
-  | NameU Int#			-- A unique local name
+  | NameU Int#      -- ^ A unique local name
 
-	-- The next two are for lexically-scoped names that
-	-- are bound *outside* the TH syntax tree, 
-	-- either globally (NameG) or locally (NameL)
-	-- e.g. f x = $(h [| (map, x) |]
-	--      The 'map' will be a NameG, and 'x' wil be a NameL
-	-- These Names should never appear in a binding position in a TH syntax tree
 
-  | NameL Int#			-- 
-  | NameG NameSpace PkgName ModName	-- An original name (occurrences only, not binders)
+  | NameL Int#      -- ^ Local name bound outside of the TH AST
+  | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
+                -- An original name (occurrences only, not binders)
+                --
 				-- Need the namespace too to be sure which 
 				-- thing we are naming
   deriving ( Typeable )
 
+-- |
 -- Although the NameFlavour type is abstract, the Data instance is not. The reason for this
 -- is that currently we use Data to serialize values in annotations, and in order for that to
 -- work for Template Haskell names introduced via the 'x syntax we need gunfold on NameFlavour
@@ -386,14 +398,15 @@ ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
                             [con_NameS, con_NameQ, con_NameU,
                              con_NameL, con_NameG]
 
-data NameSpace = VarName	-- Variables
-	       | DataName	-- Data constructors 
-	       | TcClsName	-- Type constructors and classes; Haskell has them
+data NameSpace = VarName	-- ^ Variables
+	       | DataName	-- ^ Data constructors 
+	       | TcClsName	-- ^ Type constructors and classes; Haskell has them
 				-- in the same name space for now.
 	       deriving( Eq, Ord, Data, Typeable )
 
 type Uniq = Int
 
+-- | Base, unqualified name.
 nameBase :: Name -> String
 nameBase (Name occ _) = occString occ
 
@@ -403,14 +416,16 @@ nameModule (Name _ (NameG _ _ m)) = Just (modString m)
 nameModule _                      = Nothing
 
 mkName :: String -> Name
--- The string can have a '.', thus "Foo.baz",
+-- ^ The string can have a '.', thus "Foo.baz",
 -- giving a dynamically-bound qualified name,
 -- in which case we want to generate a NameQ
 --
 -- Parse the string to see if it has a "." in it
 -- so we know whether to generate a qualified or unqualified name
 -- It's a bit tricky because we need to parse 
---	Foo.Baz.x as Qual Foo.Baz x
+--
+-- > Foo.Baz.x   as    Qual Foo.Baz x
+--
 -- So we parse it from back to front
 mkName str
   = split [] (reverse str)
@@ -427,14 +442,17 @@ mkName str
 	-- This rather bizarre case actually happened; (.&.) is in Data.Bits
     split occ (c:rev)   = split (c:occ) rev
 
-mkNameU :: String -> Uniq -> Name	-- Only used internally
+-- | Only used internally
+mkNameU :: String -> Uniq -> Name
 mkNameU s (I# u) = Name (mkOccName s) (NameU u)
 
-mkNameL :: String -> Uniq -> Name	-- Only used internally
+-- | Only used internally
+mkNameL :: String -> Uniq -> Name
 mkNameL s (I# u) = Name (mkOccName s) (NameL u)
 
-mkNameG :: NameSpace -> String -> String -> String -> Name	-- Used for 'x etc, but not available
-mkNameG ns pkg modu occ 					-- to the programmer
+-- | Used for 'x etc, but not available to the programmer
+mkNameG :: NameSpace -> String -> String -> String -> Name
+mkNameG ns pkg modu occ
   = Name (mkOccName occ) (NameG ns (mkPkgName pkg) (mkModName modu))
 
 mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> String -> Name
@@ -525,8 +543,8 @@ instance Show Name where
   show = showName
 
 -- 	Tuple data and type constructors
-tupleDataName  :: Int -> Name	-- Data constructor
-tupleTypeName :: Int -> Name 	-- Type constructor
+tupleDataName :: Int -> Name    -- ^ Data constructor
+tupleTypeName :: Int -> Name    -- ^ Type constructor
 
 tupleDataName 0 = mk_tup_name 0 DataName 
 tupleDataName 1 = error "tupleDataName 1"
@@ -566,7 +584,8 @@ type CharPos = (Int, Int)	-- Line and character position
 --
 -----------------------------------------------------
 
-data Info 
+-- | Obtained from 'reify' in the 'Q' Monad.
+data Info
   = ClassI Dec
   | ClassOpI
 	Name	-- The class op itself
@@ -621,7 +640,7 @@ defaultFixity = Fixity maxPrecedence InfixL
 
 data Lit = CharL Char 
          | StringL String 
-         | IntegerL Integer     -- Used for overloaded and non-overloaded
+         | IntegerL Integer     -- ^ Used for overloaded and non-overloaded
                                 -- literals. We don't have a good way to
                                 -- represent non-overloaded literals at
                                 -- the moment. Maybe that doesn't matter?
@@ -636,60 +655,65 @@ data Lit = CharL Char
     -- but that could complicate the
     -- suppposedly-simple TH.Syntax literal type
 
+-- | Pattern in Haskell given in @{}@
 data Pat 
-  = LitP Lit                      -- { 5 or 'c' }
-  | VarP Name                     -- { x }
-  | TupP [Pat]                    -- { (p1,p2) }
-  | ConP Name [Pat]               -- data T1 = C1 t1 t2; {C1 p1 p1} = e 
-  | InfixP Pat Name Pat           -- foo ({x :+ y}) = e 
-  | TildeP Pat                    -- { ~p }
-  | BangP Pat                     -- { !p }
-  | AsP Name Pat                  -- { x @ p }
-  | WildP                         -- { _ }
-  | RecP Name [FieldPat]          -- f (Pt { pointx = x }) = g x
-  | ListP [ Pat ]                 -- { [1,2,3] }
-  | SigP Pat Type                 -- { p :: t }
+  = LitP Lit                      -- ^ @{ 5 or 'c' }@
+  | VarP Name                     -- ^ @{ x }@
+  | TupP [Pat]                    -- ^ @{ (p1,p2) }@
+  | ConP Name [Pat]               -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
+  | InfixP Pat Name Pat           -- ^ @foo ({x :+ y}) = e@
+  | TildeP Pat                    -- ^ @{ ~p }@
+  | BangP Pat                     -- ^ @{ !p }@
+  | AsP Name Pat                  -- ^ @{ x \@ p }@
+  | WildP                         -- ^ @{ _ }@
+  | RecP Name [FieldPat]          -- ^ @f (Pt { pointx = x }) = g x@
+  | ListP [ Pat ]                 -- ^ @{ [1,2,3] }@
+  | SigP Pat Type                 -- ^ @{ p :: t }@
   deriving( Show, Eq, Data, Typeable )
 
 type FieldPat = (Name,Pat)
 
-data Match = Match Pat Body [Dec]
-                                    -- case e of { pat -> body where decs } 
+data Match = Match Pat Body [Dec] -- ^ @case e of { pat -> body where decs }@
     deriving( Show, Eq, Data, Typeable )
 data Clause = Clause [Pat] Body [Dec]
-                                    -- f { p1 p2 = body where decs }
+                                  -- ^ @f { p1 p2 = body where decs }@
     deriving( Show, Eq, Data, Typeable )
  
 -- | The 'CompE' constructor represents a list comprehension, and 
 -- takes a ['Stmt'].  The result expression of the comprehension is
 -- the *last* of these, and should be a 'NoBindS'.
--- E.g. [ f x | x <- xs ] is represented by
---   CompE [BindS (VarP x) (VarE xs), NoBindS (AppE (VarE f) (VarE x))]
+--
+-- E.g. translation:
+--
+-- > [ f x | x <- xs ]
+--
+-- > CompE [BindS (VarP x) (VarE xs), NoBindS (AppE (VarE f) (VarE x))]
 data Exp 
-  = VarE Name                          -- { x }
-  | ConE Name                          -- data T1 = C1 t1 t2; p = {C1} e1 e2  
-  | LitE Lit                           -- { 5 or 'c'}
-  | AppE Exp Exp                       -- { f x }
+  = VarE Name                          -- ^ @{ x }@
+  | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
+  | LitE Lit                           -- ^ @{ 5 or 'c'}@
+  | AppE Exp Exp                       -- ^ @{ f x }@
 
-  | InfixE (Maybe Exp) Exp (Maybe Exp) -- {x + y} or {(x+)} or {(+ x)} or {(+)}
+  | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
+    --
     -- It's a bit gruesome to use an Exp as the
     -- operator, but how else can we distinguish
     -- constructors from non-constructors?
     -- Maybe there should be a var-or-con type?
     -- Or maybe we should leave it to the String itself?
 
-  | LamE [Pat] Exp                     -- { \ p1 p2 -> e }
-  | TupE [Exp]                         -- { (e1,e2) }  
-  | CondE Exp Exp Exp                  -- { if e1 then e2 else e3 }
-  | LetE [Dec] Exp                     -- { let x=e1;   y=e2 in e3 }
-  | CaseE Exp [Match]                  -- { case e of m1; m2 }
-  | DoE [Stmt]                         -- { do { p <- e1; e2 }  }
-  | CompE [Stmt]                       -- { [ (x,y) | x <- xs, y <- ys ] }
-  | ArithSeqE Range                    -- { [ 1 ,2 .. 10 ] }
-  | ListE [ Exp ]                      -- { [1,2,3] }
-  | SigE Exp Type                      -- { e :: t }
-  | RecConE Name [FieldExp]            -- { T { x = y, z = w } }
-  | RecUpdE Exp [FieldExp]             -- { (f x) { z = w } }
+  | LamE [Pat] Exp                     -- ^ @{ \ p1 p2 -> e }@
+  | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
+  | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
+  | LetE [Dec] Exp                     -- ^ @{ let x=e1;   y=e2 in e3 }@
+  | CaseE Exp [Match]                  -- ^ @{ case e of m1; m2 }@
+  | DoE [Stmt]                         -- ^ @{ do { p <- e1; e2 }  }@
+  | CompE [Stmt]                       -- ^ @{ [ (x,y) | x <- xs, y <- ys ] }@
+  | ArithSeqE Range                    -- ^ @{ [ 1 ,2 .. 10 ] }@
+  | ListE [ Exp ]                      -- ^ @{ [1,2,3] }@
+  | SigE Exp Type                      -- ^ @{ e :: t }@
+  | RecConE Name [FieldExp]            -- ^ @{ T { x = y, z = w } }@
+  | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
   deriving( Show, Eq, Data, Typeable )
 
 type FieldExp = (Name,Exp)
@@ -697,8 +721,8 @@ type FieldExp = (Name,Exp)
 -- Omitted: implicit parameters
 
 data Body
-  = GuardedB [(Guard,Exp)]   -- f p { | e1 = e2 | e3 = e4 } where ds
-  | NormalB Exp              -- f p { = e } where ds
+  = GuardedB [(Guard,Exp)]   -- ^ @f p { | e1 = e2 | e3 = e4 } where ds@
+  | NormalB Exp              -- ^ @f p { = e } where ds@
   deriving( Show, Eq, Data, Typeable )
 
 data Guard
@@ -718,35 +742,37 @@ data Range = FromR Exp | FromThenR Exp Exp
           deriving( Show, Eq, Data, Typeable )
   
 data Dec 
-  = FunD Name [Clause]            -- { f p1 p2 = b where decs }
-  | ValD Pat Body [Dec]           -- { p = b where decs }
+  = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
+  | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
   | DataD Cxt Name [TyVarBndr] 
-         [Con] [Name]             -- { data Cxt x => T x = A x | B (T x)
-                                  --       deriving (Z,W)}
+         [Con] [Name]             -- ^ @{ data Cxt x => T x = A x | B (T x)
+                                  --       deriving (Z,W)}@
   | NewtypeD Cxt Name [TyVarBndr] 
-         Con [Name]               -- { newtype Cxt x => T x = A (B x)
-                                  --       deriving (Z,W)}
-  | TySynD Name [TyVarBndr] Type  -- { type T x = (x,x) }
+         Con [Name]               -- ^ @{ newtype Cxt x => T x = A (B x)
+                                  --       deriving (Z,W)}@
+  | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr] 
-         [FunDep] [Dec]           -- { class Eq a => Ord a where ds }
-  | InstanceD Cxt Type [Dec]      -- { instance Show w => Show [w]
-                                  --       where ds }
-  | SigD Name Type                -- { length :: [a] -> Int }
+         [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
+  | InstanceD Cxt Type [Dec]      -- ^ @{ instance Show w => Show [w]
+                                  --       where ds }@
+  | SigD Name Type                -- ^ @{ length :: [a] -> Int }@
   | ForeignD Foreign
-  -- pragmas
-  | PragmaD Pragma                -- { {-# INLINE [1] foo #-} }
-  -- type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
+
+  -- | pragmas
+  | PragmaD Pragma                -- ^ @{ {-# INLINE [1] foo #-} }@
+
+  -- | type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
   | FamilyD FamFlavour Name 
-         [TyVarBndr] (Maybe Kind) -- { type family T a b c :: * }
+         [TyVarBndr] (Maybe Kind) -- ^ @{ type family T a b c :: * }@
                                  
   | DataInstD Cxt Name [Type]
-         [Con] [Name]             -- { data instance Cxt x => T [x] = A x 
+         [Con] [Name]             -- ^ @{ data instance Cxt x => T [x] = A x 
                                   --                                | B (T x)
-                                  --       deriving (Z,W)}
+                                  --       deriving (Z,W)}@
   | NewtypeInstD Cxt Name [Type]
-         Con [Name]               -- { newtype instance Cxt x => T [x] = A (B x)
-                                  --       deriving (Z,W)}
-  | TySynInstD Name [Type] Type   -- { type instance T (Maybe x) = (x,x) }
+         Con [Name]               -- ^ @{ newtype instance Cxt x => T [x] = A (B x)
+                                  --       deriving (Z,W)}@
+  | TySynInstD Name [Type] Type   -- ^ @{ type instance T (Maybe x) = (x,x) }@
   deriving( Show, Eq, Data, Typeable )
 
 data FunDep = FunDep [Name] [Name]
@@ -775,40 +801,40 @@ data InlineSpec
                (Maybe (Bool, Int))  -- False: before phase; True: from phase
   deriving( Show, Eq, Data, Typeable )
 
-type Cxt = [Pred]                 -- (Eq a, Ord b)
+type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 
-data Pred = ClassP Name [Type]    -- Eq (Int, a)
-          | EqualP Type Type      -- F a ~ Bool
+data Pred = ClassP Name [Type]    -- ^ @Eq (Int, a)@
+          | EqualP Type Type      -- ^ @F a ~ Bool@
           deriving( Show, Eq, Data, Typeable )
 
 data Strict = IsStrict | NotStrict
          deriving( Show, Eq, Data, Typeable )
 
-data Con = NormalC Name [StrictType]          -- C Int a
-         | RecC Name [VarStrictType]          -- C { v :: Int, w :: a }
-         | InfixC StrictType Name StrictType  -- Int :+ a
-         | ForallC [TyVarBndr] Cxt Con        -- forall a. Eq a => C [a]
+data Con = NormalC Name [StrictType]          -- ^ @C Int a@
+         | RecC Name [VarStrictType]          -- ^ @C { v :: Int, w :: a }@
+         | InfixC StrictType Name StrictType  -- ^ @Int :+ a@
+         | ForallC [TyVarBndr] Cxt Con        -- ^ @forall a. Eq a => C [a]@
          deriving( Show, Eq, Data, Typeable )
 
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
 
-data Type = ForallT [TyVarBndr] Cxt Type  -- forall <vars>. <ctxt> -> <type>
-          | VarT Name                     -- a
-          | ConT Name                     -- T
-          | TupleT Int                    -- (,), (,,), etc.
-          | ArrowT                        -- ->
-          | ListT                         -- []
-          | AppT Type Type                -- T a b
-          | SigT Type Kind                -- t :: k
+data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall <vars>. <ctxt> -> <type>@
+          | VarT Name                     -- ^ @a@
+          | ConT Name                     -- ^ @T@
+          | TupleT Int                    -- ^ @(,), (,,), etc.@
+          | ArrowT                        -- ^ @->@
+          | ListT                         -- ^ @[]@
+          | AppT Type Type                -- ^ @T a b@
+          | SigT Type Kind                -- ^ @t :: k@
       deriving( Show, Eq, Data, Typeable )
 
-data TyVarBndr = PlainTV  Name            -- a
-               | KindedTV Name Kind       -- (a :: k)
+data TyVarBndr = PlainTV  Name            -- ^ @a@
+               | KindedTV Name Kind       -- ^ @(a :: k)@
       deriving( Show, Eq, Data, Typeable )
 
-data Kind = StarK                         -- '*'
-          | ArrowK Kind Kind              -- k1 -> k2
+data Kind = StarK                         -- ^ @'*'@
+          | ArrowK Kind Kind              -- ^ @k1 -> k2@
       deriving( Show, Eq, Data, Typeable )
 
 -----------------------------------------------------

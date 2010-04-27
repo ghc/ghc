@@ -1,5 +1,5 @@
 
--- Monadic front-end to Text.PrettyPrint.HughesPJ
+-- | Monadic front-end to Text.PrettyPrint.HughesPJ
 
 module Language.Haskell.TH.PprLib (
 

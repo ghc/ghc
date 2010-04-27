@@ -1,3 +1,4 @@
+-- |
 -- TH.Lib contains lots of useful helper functions for
 -- generating and manipulating Template Haskell terms
 
@@ -10,7 +11,7 @@ import Language.Haskell.TH.Syntax
 import Control.Monad( liftM, liftM2 )
 
 ----------------------------------------------------------
--- Type synonyms
+-- * Type synonyms
 ----------------------------------------------------------
 
 type InfoQ          = Q Info
@@ -35,7 +36,7 @@ type FieldExpQ      = Q FieldExp
 type InlineSpecQ    = Q InlineSpec
 
 ----------------------------------------------------------
--- Lowercase pattern syntax functions
+-- * Lowercase pattern syntax functions
 ----------------------------------------------------------
 
 intPrimL    :: Integer -> Lit
@@ -96,7 +97,7 @@ fieldPat n p = do p' <- p
 
 
 -------------------------------------------------------------------------------
---     Stmt
+-- *   Stmt
 
 bindS :: PatQ -> ExpQ -> StmtQ
 bindS p e = liftM2 BindS p e
@@ -111,7 +112,7 @@ parS :: [[StmtQ]] -> StmtQ
 parS _ = fail "No parallel comprehensions yet"
 
 -------------------------------------------------------------------------------
---     Range
+-- *   Range
 
 fromR :: ExpQ -> RangeQ
 fromR x = do { a <- x; return (FromR a) }  
@@ -126,7 +127,7 @@ fromThenToR :: ExpQ -> ExpQ -> ExpQ -> RangeQ
 fromThenToR x y z = do { a <- x; b <- y; c <- z;
                          return (FromThenToR a b c) }  
 -------------------------------------------------------------------------------
---     Body
+-- *   Body
 
 normalB :: ExpQ -> BodyQ
 normalB e = do { e1 <- e; return (NormalB e1) }
@@ -135,7 +136,7 @@ guardedB :: [Q (Guard,Exp)] -> BodyQ
 guardedB ges = do { ges' <- sequence ges; return (GuardedB ges') }
 
 -------------------------------------------------------------------------------
---     Guard
+-- *   Guard
 
 normalG :: ExpQ -> GuardQ
 normalG e = do { e1 <- e; return (NormalG e1) }
@@ -152,14 +153,16 @@ patGE ss e = do { ss' <- sequence ss;
                   return (PatG ss', e') }
 
 -------------------------------------------------------------------------------
---     Match and Clause
+-- *   Match and Clause
 
+-- | Use with 'caseE'
 match :: PatQ -> BodyQ -> [DecQ] -> MatchQ
 match p rhs ds = do { p' <- p;
                       r' <- rhs;
                       ds' <- sequence ds;
                       return (Match p' r' ds') }
 
+-- | Use with 'funD'
 clause :: [PatQ] -> BodyQ -> [DecQ] -> ClauseQ
 clause ps r ds = do { ps' <- sequence ps;
                       r' <- r;
@@ -168,8 +171,9 @@ clause ps r ds = do { ps' <- sequence ps;
 
 
 ---------------------------------------------------------------------------
---     Exp
+-- *   Exp
 
+-- | Dynamically binding a variable (unhygenic)
 dyn :: String -> Q Exp 
 dyn s = return (VarE (mkName s))
 
@@ -209,7 +213,8 @@ lamE ps e = do ps' <- sequence ps
                e' <- e
                return (LamE ps' e')
 
-lam1E :: PatQ -> ExpQ -> ExpQ    -- Single-arg lambda
+-- | Single-arg lambda
+lam1E :: PatQ -> ExpQ -> ExpQ
 lam1E p e = lamE [p] e
 
 tupE :: [ExpQ] -> ExpQ
@@ -233,21 +238,6 @@ compE ss = do { ss1 <- sequence ss; return (CompE ss1) }
 arithSeqE :: RangeQ -> ExpQ
 arithSeqE r = do { r' <- r; return (ArithSeqE r') }  
 
--- arithSeqE Shortcuts
-fromE :: ExpQ -> ExpQ
-fromE x = do { a <- x; return (ArithSeqE (FromR a)) }  
-
-fromThenE :: ExpQ -> ExpQ -> ExpQ
-fromThenE x y = do { a <- x; b <- y; return (ArithSeqE (FromThenR a b)) }  
-
-fromToE :: ExpQ -> ExpQ -> ExpQ
-fromToE x y = do { a <- x; b <- y; return (ArithSeqE (FromToR a b)) }  
-
-fromThenToE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
-fromThenToE x y z = do { a <- x; b <- y; c <- z;
-                         return (ArithSeqE (FromThenToR a b c)) }  
--- End arithSeqE shortcuts
-
 listE :: [ExpQ] -> ExpQ
 listE es = do { es1 <- sequence es; return (ListE es1) }
 
@@ -266,8 +256,23 @@ stringE = litE . stringL
 fieldExp :: Name -> ExpQ -> Q (Name, Exp)
 fieldExp s e = do { e' <- e; return (s,e') }
 
+-- ** 'arithSeqE' Shortcuts
+fromE :: ExpQ -> ExpQ
+fromE x = do { a <- x; return (ArithSeqE (FromR a)) }  
+
+fromThenE :: ExpQ -> ExpQ -> ExpQ
+fromThenE x y = do { a <- x; b <- y; return (ArithSeqE (FromThenR a b)) }  
+
+fromToE :: ExpQ -> ExpQ -> ExpQ
+fromToE x y = do { a <- x; b <- y; return (ArithSeqE (FromToR a b)) }  
+
+fromThenToE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
+fromThenToE x y z = do { a <- x; b <- y; c <- z;
+                         return (ArithSeqE (FromThenToR a b c)) }  
+
+
 -------------------------------------------------------------------------------
---     Dec
+-- *   Dec
 
 valD :: PatQ -> BodyQ -> [DecQ] -> DecQ
 valD p b ds = 
@@ -403,7 +408,7 @@ forallC ns ctxt con = liftM2 (ForallC ns) ctxt con
 
 
 -------------------------------------------------------------------------------
---     Type
+-- *   Type
 
 forallT :: [TyVarBndr] -> CxtQ -> TypeQ -> TypeQ
 forallT tvars ctxt ty = do
@@ -450,7 +455,7 @@ varStrictType v st = do (s, t) <- st
                         return (v, s, t)
 
 -------------------------------------------------------------------------------
---     Kind
+-- *   Kind
 
 plainTV :: Name -> TyVarBndr
 plainTV = PlainTV
@@ -465,14 +470,14 @@ arrowK :: Kind -> Kind -> Kind
 arrowK = ArrowK
 
 -------------------------------------------------------------------------------
---     Callconv
+-- *   Callconv
 
 cCall, stdCall :: Callconv
 cCall = CCall
 stdCall = StdCall
 
 -------------------------------------------------------------------------------
---     Safety
+-- *   Safety
 
 unsafe, safe, threadsafe :: Safety
 unsafe = Unsafe
@@ -480,7 +485,7 @@ safe = Safe
 threadsafe = Threadsafe
 
 -------------------------------------------------------------------------------
---     InlineSpec
+-- *   InlineSpec
 
 inlineSpecNoPhase :: Bool -> Bool -> InlineSpecQ
 inlineSpecNoPhase inline conlike
@@ -491,20 +496,20 @@ inlineSpecPhase inline conlike beforeFrom phase
   = return $ InlineSpec inline conlike (Just (beforeFrom, phase))
 
 -------------------------------------------------------------------------------
---     FunDep
+-- *   FunDep
 
 funDep :: [Name] -> [Name] -> FunDep
 funDep = FunDep
 
 -------------------------------------------------------------------------------
---     FamFlavour
+-- *   FamFlavour
 
 typeFam, dataFam :: FamFlavour
 typeFam = TypeFam
 dataFam = DataFam
 
 --------------------------------------------------------------
--- Useful helper functions
+-- * Useful helper functions
 
 combine :: [([(Name, Name)], Pat)] -> ([(Name, Name)], [Pat])
 combine pairs = foldr f ([],[]) pairs
@@ -542,7 +547,7 @@ alpha env s = case lookup s env of
                Nothing -> varE s
 
 appsE :: [ExpQ] -> ExpQ
-appsE [] = error "appsExp []"
+appsE [] = error "appsE []"
 appsE [x] = x
 appsE (x:y:zs) = appsE ( (appE x y) : zs )
 

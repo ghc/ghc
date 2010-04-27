@@ -1,7 +1,11 @@
--- The public face of Template Haskell
+{- | The public face of Template Haskell
 
+For other documentation, refer to:
+<http://www.haskell.org/haskellwiki/Template_Haskell>
+
+-}
 module Language.Haskell.TH(
-	-- The monad and its operations
+	-- * The monad and its operations
 	Q, runQ, 
 	report,		  -- :: Bool -> String -> Q ()
 	recover, 	  -- :: Q a -> Q a -> Q a
@@ -9,7 +13,7 @@ module Language.Haskell.TH(
 	location,	  -- :: Q Location
 	runIO, 		  -- :: IO a -> Q a
 
-	-- Names
+	-- * Names
 	Name, 
 	mkName,  	-- :: String -> Name
 	newName, 	-- :: String -> Q Name
@@ -17,7 +21,10 @@ module Language.Haskell.TH(
 	nameModule,	-- :: Name -> Maybe String
 	tupleTypeName, tupleDataName,	-- Int -> Name
 	
-	-- The algebraic data types
+    -- * The algebraic data types
+    -- | The lowercase versions (/syntax operators/) of these constructors are
+    -- preferred to these constructors, since they compose better with
+    -- quotations (@[| |]@) and splices (@$( ... )@)
 	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..), Cxt,
 	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
@@ -25,32 +32,62 @@ module Language.Haskell.TH(
 	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
-	-- Library functions
+    -- * Library functions
+    -- ** Abbreviations
 	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, PredQ, MatchQ, ClauseQ, BodyQ,
 	GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
         InlineSpecQ,
+
+    -- ** Constructors lifted to 'Q'
+    -- *** Litterals
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
 	charL, stringL,
+    -- *** Patterns
 	litP, varP, tupP, conP, infixP, tildeP, bangP, asP, wildP, recP,
 	listP, sigP, 
 	fieldPat,
-	bindS, letS, noBindS, parS, 
-	fromR, fromThenR, fromToR, fromThenToR, 
-	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
-	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
-	lamE, lam1E, tupE, condE, letE, caseE, doE, compE, arithSeqE, appsE,
-	fromE, fromThenE, fromToE, fromThenToE,
-	listE, sigE, recConE, recUpdE, stringE, fieldExp,
-	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
-        pragInlD, pragSpecD, familyNoKindD, familyKindD, dataInstD,
-        newtypeInstD, tySynInstD, 
-	cxt, classP, equalP, normalC, recC, infixC,
-	forallT, varT, conT, appT, arrowT, listT, tupleT, sigT,
-	isStrict, notStrict, strictType, varStrictType,
-	cCall, stdCall, unsafe, safe, threadsafe, 
-        inlineSpecNoPhase, inlineSpecPhase, typeFam, dataFam,
 
-	-- Pretty-printer
+    -- *** Pattern Guards
+	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
+
+    -- *** Expressions
+	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
+	lamE, lam1E, tupE, condE, letE, caseE, appsE,
+	listE, sigE, recConE, recUpdE, stringE, fieldExp,
+    -- **** Ranges
+    fromE, fromThenE, fromToE, fromThenToE,
+
+    -- ***** Ranges with more indirection
+    arithSeqE,
+    fromR, fromThenR, fromToR, fromThenToR, 
+    -- **** Statements
+    doE, compE,
+    bindS, letS, noBindS, parS,
+
+    -- *** Types
+	forallT, varT, conT, appT, arrowT, listT, tupleT, sigT,
+    -- **** Strictness
+	isStrict, notStrict, strictType, varStrictType,
+    -- **** Class Contexts
+    cxt, classP, equalP, normalC, recC, infixC,
+
+    -- *** Top Level Declarations
+    -- **** Data
+	valD, funD, tySynD, dataD, newtypeD,
+    -- **** Class
+    classD, instanceD, sigD,
+    -- **** Type Family / Data Family
+    familyNoKindD, familyKindD, dataInstD,
+    newtypeInstD, tySynInstD, 
+    typeFam, dataFam,
+    -- **** Foreign Function Interface (FFI)
+    cCall, stdCall, unsafe, safe, threadsafe, forImpD,
+    -- **** Pragmas
+    -- | Just inline supported so far
+    inlineSpecNoPhase, inlineSpecPhase,
+    pragInlD, pragSpecD,
+
+	-- * Pretty-printer
 	Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
 	
    ) where

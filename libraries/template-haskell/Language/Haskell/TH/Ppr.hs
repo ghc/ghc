@@ -1,4 +1,4 @@
--- TH.Ppr contains a prettyprinter for the
+-- | contains a prettyprinter for the
 -- Template Haskell datatypes
 
 module Language.Haskell.TH.Ppr where
