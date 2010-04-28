@@ -35,6 +35,11 @@ ifeq "$(GhcDebugged)" "YES"
 ghc_HC_OPTS += -debug
 endif
 
+ifeq "$(GhcDynamic)" "YES"
+ghc_stage2_HC_OPTS += -dynamic
+ghc_stage3_HC_OPTS += -dynamic
+endif
+
 ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
 ghc_stage2_HC_OPTS += -threaded
