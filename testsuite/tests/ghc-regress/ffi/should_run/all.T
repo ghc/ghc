@@ -19,7 +19,7 @@ test('fed001', compose(only_compiler_types(['ghc']),
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi002', [ omit_ways(['ghci']),
                  extra_clean(['ffi002_c.o']),
-                 cmd_prefix('$MAKE ffi002_setup && ') ],
+                 compile_cmd_prefix('$MAKE ffi002_setup && ') ],
                  # The ffi002_setup hack is to ensure that we generate
                  # ffi002_stub.h before compiling ffi002_c.c, which
                  # needs it.

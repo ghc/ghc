@@ -377,6 +377,14 @@ def _cmd_prefix( opts, prefix ):
 
 # ----
 
+def compile_cmd_prefix( prefix ):
+    return lambda opts, p=prefix: _compile_cmd_prefix(opts, prefix)
+
+def _compile_cmd_prefix( opts, prefix ):
+    opts.compile_cmd_prefix = prefix
+
+# ----
+
 def normalise_slashes( opts ):
     opts.extra_normaliser = normalise_slashes_
 
@@ -801,7 +809,12 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
     if opts.compiler_stats_num_fields != []:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
-    cmd = 'cd ' + getTestOpts().testdir + " && '" \
+    if getTestOpts().compile_cmd_prefix == '':
+        cmd_prefix = ''
+    else:
+        cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
+
+    cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + to_do + ' ' + srcname + ' ' \

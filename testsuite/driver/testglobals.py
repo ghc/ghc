@@ -211,6 +211,9 @@ class TestOptions:
        # Prefix to put on the command before running it
        self.cmd_prefix = ''
 
+       # Prefix to put on the command before compiling it
+       self.compile_cmd_prefix = ''
+
        # Extra output normalisation
        self.extra_normaliser = lambda x: x
 
