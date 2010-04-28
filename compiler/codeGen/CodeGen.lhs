@@ -65,8 +65,6 @@ codeGen dflags this_mod data_tycons imported_mods
 	cost_centre_info stg_binds hpc_info
   = do	
   { showPass dflags "CodeGen"
-  ; let way = buildTag dflags
-        main_mod = mainModIs dflags
 
 -- Why?
 --   ; mapM_ (\x -> seq x (return ())) data_tycons
@@ -74,9 +72,8 @@ codeGen dflags this_mod data_tycons imported_mods
   ; code_stuff <- initC dflags this_mod $ do 
 		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
 		; cmm_tycons <- mapM cgTyCon data_tycons
-		; cmm_init   <- getCmm (mkModuleInit way cost_centre_info 
-					     this_mod main_mod
-				  	     imported_mods hpc_info)
+		; cmm_init   <- getCmm (mkModuleInit dflags cost_centre_info 
+					     this_mod imported_mods hpc_info)
 		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
 		}
 		-- Put datatype_stuff after code_stuff, because the
@@ -134,14 +131,13 @@ We initialise the module tree by keeping a work-stack,
 
 \begin{code}
 mkModuleInit 
-	:: String		-- the "way"
+        :: DynFlags
 	-> CollectedCCs         -- cost centre info
 	-> Module
-	-> Module		-- name of the Main module
 	-> [Module]
 	-> HpcInfo
 	-> Code
-mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
+mkModuleInit dflags cost_centre_info this_mod imported_mods hpc_info
   = do	{ -- Allocate the static boolean that records if this
           -- module has been registered already
 	  emitData Data [CmmDataLabel moduleRegdLabel, 
@@ -182,6 +178,15 @@ mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
 		(emitSimpleProc plain_main_init_lbl rec_descent_init)
     }
   where
+    -- The way string we attach to the __stginit label to catch
+    -- accidental linking of modules compiled in different ways.  We
+    -- omit "dyn" from this way, because we want to be able to load
+    -- both dynamic and non-dynamic modules into a dynamic GHC.
+    way = mkBuildTag (filter want_way (ways dflags))
+    want_way w = not (wayRTSOnly w) && wayName w /= WayDyn
+
+    main_mod = mainModIs dflags
+
     plain_init_lbl = mkPlainModuleInitLabel this_mod
     real_init_lbl  = mkModuleInitLabel this_mod way
     plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
