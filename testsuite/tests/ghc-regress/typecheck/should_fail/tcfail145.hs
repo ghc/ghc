@@ -5,6 +5,6 @@
 
 module Foo where
 
-foo :: (forall a. a -> a) -> [b]
-foo (f :: forall a. [a] -> [a]) = f undefined
+foo :: (forall c. c -> c) -> [Char]
+foo (f :: forall a. [a] -> [a]) = f "foo"
 
