@@ -340,6 +340,20 @@ EOF
         }
     }
 
+    message "== Checking for bytestring tarball";
+    if (-d "libraries/bytestring" && not -d "libraries/bytestring/_darcs") {
+        print <<EOF;
+============================
+ATTENTION!
+
+You have an old bytestring in your GHC tree!
+
+Please remove it (e.g. "rm -r libraries/bytestring"), and then run
+"./darcs-all get" to get the darcs repository.
+============================
+EOF
+    }
+
     message "== Checking for unpulled tarball patches";
     if ((system "darcs annotate --match 'hash 20090930200358-3fd76-cab3bf4a0a9e3902eb6dd41f71712ad3a6a9bcd1' > /dev/null 2> /dev/null") == 0) {
         print <<EOF;
