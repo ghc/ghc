@@ -39,7 +39,7 @@ module Language.Haskell.TH(
         InlineSpecQ,
 
     -- ** Constructors lifted to 'Q'
-    -- *** Litterals
+    -- *** Literals
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
 	charL, stringL,
     -- *** Patterns
