@@ -92,6 +92,12 @@ else
 RUNTEST_OPTS += -e windows=False
 endif
 
+ifeq "$(DARWIN)" "YES"
+RUNTEST_OPTS += -e darwin=True
+else
+RUNTEST_OPTS += -e darwin=False
+endif
+
 ifeq "$(IN_TREE_COMPILER)" "YES"
 RUNTEST_OPTS += -e in_tree_compiler=True
 else

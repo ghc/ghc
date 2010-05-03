@@ -156,21 +156,21 @@ from testlib import *
 
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
-if windows:
-    if have_subprocess:
-        libs = getStdout([config.ghc_pkg, 'list', '--simple-output'])
-        for lib in libs.split(' '):
-            path = getStdout([config.ghc_pkg, 'field', lib, 'library-dirs'])
-            # We assume there is only 1 path, and make some assumptions
-            # about what it looks like. Unquoted strings we leave alone,
-            # and we assume that a \ escapes the following char if it's
-            # quoted. The common case here is "c:\\foo bar\\baz" where
-            # we want to undouble the backslashes.
-            path = path.rstrip();
-            path = re.sub('^library-dirs: ', '', path)
-            if path.startswith('"'):
-                path = re.sub('^"(.*)"$', '\\1', path)
-                path = re.sub('\\\\(.)', '\\1', path)
+if windows or darwin:
+    libs = getStdout([config.ghc_pkg, 'list', '--simple-output'])
+    for lib in libs.split(' '):
+        path = getStdout([config.ghc_pkg, 'field', lib, 'library-dirs'])
+        # We assume there is only 1 path, and make some assumptions
+        # about what it looks like. Unquoted strings we leave alone,
+        # and we assume that a \ escapes the following char if it's
+        # quoted. The common case here is "c:\\foo bar\\baz" where
+        # we want to undouble the backslashes.
+        path = path.rstrip();
+        path = re.sub('^library-dirs: ', '', path)
+        if path.startswith('"'):
+            path = re.sub('^"(.*)"$', '\\1', path)
+            path = re.sub('\\\\(.)', '\\1', path)
+        if windows:
             if cygwin:
                 # On cygwin we can't put "c:\foo" in $PATH, as : is a
                 # field separator. So convert to /cygdrive/c/foo instead.
@@ -178,8 +178,9 @@ if windows:
                 path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
                 path = re.sub('\\\\', '/', path)
             os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
-    else:
-        raise Exception("Need subprocess on Windows, but don't have it")
+        else:
+            # darwin
+            os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
 
 global testopts_local
 testopts_local.x = TestOptions()

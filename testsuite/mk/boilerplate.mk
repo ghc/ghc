@@ -152,4 +152,9 @@ WINDOWS = YES
 else
 WINDOWS = NO
 endif
+ifeq "$(HostOS)" "darwin"
+DARWIN = YES
+else
+DARWIN = NO
+endif
 
