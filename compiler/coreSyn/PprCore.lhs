@@ -252,29 +252,27 @@ pprCoreBinder LetBind binder
 		     ppIdInfo binder (idInfo binder)
 
 -- Lambda bound type variables are preceded by "@"
-pprCoreBinder LambdaBind bndr 
-  | isDeadBinder bndr
+pprCoreBinder bind_site bndr 
   = getPprStyle $ \ sty ->
-    if debugStyle sty then
-	parens (pprTypedBinder bndr)
-    else
-	char '_'
-  | otherwise
-  = parens (pprTypedBinder bndr)
-
--- Case bound things don't get a signature or a herald, unless we have debug on
-pprCoreBinder CaseBind bndr 
-  = getPprStyle $ \ sty ->
-    if debugStyle sty then
-	parens (pprTypedBinder bndr)
-    else
-	if isDeadBinder bndr then char '_'
-	else pprUntypedBinder bndr
+    pprTypedLCBinder bind_site (debugStyle sty) bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
   | isTyVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
+
+pprTypedLCBinder :: BindingSite -> Bool -> Var -> SDoc
+-- For lambda and case binders, show the unfolding info (usually none)
+pprTypedLCBinder bind_site debug_on var
+  | not debug_on && isDeadBinder var    = char '_'
+  | not debug_on, CaseBind <- bind_site = pprUntypedBinder var  -- No parens, no kind info
+  | isTyVar var                         = parens (pprKindedTyVarBndr var)
+  | otherwise = parens (hang (pprIdBndr var) 
+                           2 (vcat [ dcolon <+> pprType (idType var), pp_unf]))
+              where
+		unf_info = unfoldingInfo (idInfo var)
+                pp_unf | hasSomeUnfolding unf_info = ptext (sLit "Unf=") <> ppr unf_info
+                       | otherwise                 = empty
 
 pprTypedBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
