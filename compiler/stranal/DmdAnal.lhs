@@ -32,7 +32,7 @@ import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlineActivation,
 			  isDataConWorkId, isGlobalId, idArity,
 			  idStrictness, idStrictness_maybe,
-			  setIdStrictness, idDemandInfo,
+			  setIdStrictness, idDemandInfo, idUnfolding,
 			  idDemandInfo_maybe,
 			  setIdDemandInfo
 			)
@@ -205,14 +205,14 @@ dmdAnal sigs dmd (Lam var body)
   = let	
 	sigs'		 = extendSigsWithLam sigs var
 	(body_ty, body') = dmdAnal sigs' body_dmd body
-	(lam_ty, var')   = annotateLamIdBndr body_ty var
+	(lam_ty, var')   = annotateLamIdBndr sigs body_ty var
     in
     (lam_ty, Lam var' body')
 
   | otherwise	-- Not enough demand on the lambda; but do the body
   = let		-- anyway to annotate it and gather free var info
 	(body_ty, body') = dmdAnal sigs evalDmd body
-	(lam_ty, var')   = annotateLamIdBndr body_ty var
+	(lam_ty, var')   = annotateLamIdBndr sigs body_ty var
     in
     (deferType lam_ty, Lam var' body')
 
@@ -728,17 +728,27 @@ annotateBndr dmd_ty@(DmdType fv ds res) var
 
 annotateBndrs = mapAccumR annotateBndr
 
-annotateLamIdBndr :: DmdType 	-- Demand type of body
+annotateLamIdBndr :: SigEnv
+                  -> DmdType 	-- Demand type of body
 		  -> Id 	-- Lambda binder
 		  -> (DmdType, 	-- Demand type of lambda
 		      Id)	-- and binder annotated with demand	
 
-annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
+annotateLamIdBndr sigs dmd_ty@(DmdType fv ds res) id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    (DmdType fv' (hacked_dmd:ds) res, setIdDemandInfo id hacked_dmd)
+    (final_ty, setIdDemandInfo id hacked_dmd)
   where
+      -- Watch out!  See note [Lambda-bound unfoldings]
+    final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
+                 Nothing  -> main_ty
+                 Just unf -> main_ty `bothType` unf_ty
+                          where
+                             (unf_ty, _) = dmdAnal sigs dmd unf
+    
+    main_ty = DmdType fv' (hacked_dmd:ds) res
+
     (fv', dmd) = removeFV fv id res
     hacked_dmd = argDemand dmd
 	-- This call to argDemand is vital, because otherwise we label
@@ -763,6 +773,16 @@ zapUnlifted id Abs = Abs
 zapUnlifted id dmd | isUnLiftedType (idType id) = lazyDmd
 		   | otherwise			= dmd
 \end{code}
+
+Note [Lamba-bound unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow a lambda-bound variable to carry an unfolding, a facility that is used
+exclusively for join points; see Note [Case binders and join points].  If so,
+we must be careful to demand-analyse the RHS of the unfolding!  Example
+   \x. \y{=Just x}. <body>
+Then if <body> uses 'y', then transitively it uses 'x', and we must not
+forget that fact, otherwise we might make 'x' absent when it isn't.
+
 
 %************************************************************************
 %*									*

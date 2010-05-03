@@ -2082,12 +2082,22 @@ An alternative plan is this:
 but that is bad if 'c' is *not* later scrutinised.  
 
 So instead we do both: we pass 'c' and 'c#' , and record in c's inlining
-that it's really I# c#, thus
+(an InlineRule) that it's really I# c#, thus
    
    $j = \c# -> \c[=I# c#] -> ...c....
 
 Absence analysis may later discard 'c'.
 
+NB: take great care when doing strictness analysis; 
+    see Note [Lamba-bound unfoldings] in DmdAnal.
+
+Also note that we can still end up passing stuff that isn't used.  Before
+strictness analysis we have
+   let $j x y c{=(x,y)} = (h c, ...)
+   in ...
+After strictness analysis we see that h is strict, we end up with
+   let $j x y c{=(x,y)} = ($wh x y, ...)
+and c is unused.
    
 Note [Duplicated env]
 ~~~~~~~~~~~~~~~~~~~~~
