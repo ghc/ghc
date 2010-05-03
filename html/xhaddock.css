@@ -38,7 +38,7 @@ h3 {
   font-size: 110%
   }
 
-h4 {
+h4, h5 {
   font-weight: bold;
   font-size: 100%
   }
@@ -62,7 +62,7 @@ pre  {
 	margin-bottom: 1em;
 }
 
-h1 + p, h2 + p, h3 + p, h4 + p {
+h2 + p, h3 + p, h4 + p {
 	margin-top: 1em;
 }
 
@@ -152,9 +152,7 @@ div.table-of-contents ul {
 }
 
 ul.synopsis {
-	margin-top: 1em;
-	margin-bottom: 1em;
-	margin-left: 10px;
+	margin-left: 0px;
 }
 ul.synopsis li {
   background-color: #f0f0f0; 
@@ -166,6 +164,28 @@ ul.synopsis li {
 	list-style-type: none;
 }
 
+ul.synopsis li ul {
+	margin: 0;
+	padding-top: 0;
+}
+
+ul.synopsis li ul li {
+	margin: 0;
+	padding: 0;
+}
+
+
+div.decldoc {
+	margin-top: 1em;
+}
+
+div.decldoc h5 {
+	margin-left: 10px;
+}
+
+div.decldoc table {
+	margin-left: 20px;
+}
 
 p.decl {
   padding: 3px;
@@ -219,13 +239,29 @@ ul.inst li {
 	list-style-type: none;
 }
 
+td.arg {
+  padding: 3px;
+  background-color: #f0f0f0;
+  font-family: monospace;
+  margin-bottom: 0;
+}
+
+td.rdoc p {
+	margin-bottom: 0;
+}
+
 
 
 div.bottom {
   background-color: #000099;
   color: #ffffff;
-  padding: 5px
+  padding: 4px
   }
+  
+div.bottom p {
+	margin-bottom: 0;
+}
+
 div.bottom  a:link {
   color: #ffffff;
   text-decoration: underline
