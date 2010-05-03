@@ -476,7 +476,7 @@ mode001:
 # Test for building DLLs with ghc -shared, see #2745
 shared001:
 	$(RM) Shared001.hi Shared001.o HSdll.dll.a HSdll.dll Shared001_stub.*
-	"$(TEST_HC)" -shared Shared001.hs
+	"$(TEST_HC)" -v0 -shared Shared001.hs
 
 # -----------------------------------------------------------------------------
 
