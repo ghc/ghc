@@ -86,7 +86,7 @@ libffi_DYNAMIC_LIBS = $(libffi_HS_DYN_LIB)
 else
 libffi_DYNAMIC_PROG =
 ifeq "$(darwin_TARGET_OS)" "1"
-libffi_DYNAMIC_LIBS = libffi/libffi$(soext) libffi/libffi.5$(soext) libffi/libffi.5.0.9$(soext)
+libffi_DYNAMIC_LIBS = libffi/dist-install/build/libffi$(soext) libffi/dist-install/build/libffi.5$(soext) libffi/dist-install/build/libffi.5.0.9$(soext)
 else
 libffi_DYNAMIC_LIBS = libffi/dist-install/build/libffi.so \
                       libffi/dist-install/build/libffi.so.5
@@ -207,8 +207,8 @@ $(libffi_DYNAMIC_LIBS): $(libffi_STAMP_BUILD)
 $(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS) | $$(dir $$@)/.
 	"$(CP)" $(word 1,$(libffi_DYNAMIC_LIBS)) $(libffi_HS_DYN_LIB)
 ifeq "$(darwin_TARGET_OS)" "1"
-       # Ensure library's install name is correct before anyone links with it.
-       install_name_tool -id $(ghclibdir)/$(libffi_HS_DYN_LIB_NAME) $(libffi_HS_DYN_LIB)
+	# Ensure library's install name is correct before anyone links with it.
+	install_name_tool -id $(ghclibdir)/$(libffi_HS_DYN_LIB_NAME) $(libffi_HS_DYN_LIB)
 endif
 
 $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB)))
