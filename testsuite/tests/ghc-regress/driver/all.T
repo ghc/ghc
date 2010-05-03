@@ -324,8 +324,7 @@ test('shared001',
      ['$MAKE -s --no-print-directory shared001'])
 
 test('dynHelloWorld',
-     [only_ways(['dyn']),
-      if_platform('i386-unknown-mingw32',expect_broken(3861))],
+     only_ways(['dyn']),
      compile_and_run,
      [''])
 

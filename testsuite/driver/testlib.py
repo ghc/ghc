@@ -1537,3 +1537,19 @@ def summary(t, file):
             file.write('   ' + test + '(' + \
                        join(t.unexpected_failures[test],',') + ')\n')
         file.write('\n')
+
+def getStdout(cmd):
+    if have_subprocess:
+        p = subprocess.Popen(cmd,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        (stdout, stderr) = p.communicate()
+        r = p.wait()
+        if r != 0:
+            raise Exception("Command failed: " + str(cmd))
+        if stderr != '':
+            raise Exception("stderr from command: " + str(cmd))
+        return stdout
+    else:
+        raise Exception("Need subprocess to get stdout, but don't have it")
+
