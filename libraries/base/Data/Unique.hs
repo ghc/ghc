@@ -27,11 +27,16 @@ import System.IO.Unsafe (unsafePerformIO)
 import GHC.Base
 import GHC.Num
 import GHC.Conc
+import Data.Typeable
 #endif
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
 -- compared for equality and ordering and hashed into 'Int'.
-newtype Unique = Unique Integer deriving (Eq,Ord)
+newtype Unique = Unique Integer deriving (Eq,Ord
+#ifdef __GLASGOW_HASKELL__
+   ,Typeable
+#endif
+   )
 
 uniqSource :: TVar Integer
 uniqSource = unsafePerformIO (newTVarIO 0)
