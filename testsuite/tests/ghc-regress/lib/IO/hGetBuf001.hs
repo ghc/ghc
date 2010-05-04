@@ -8,6 +8,7 @@ import Foreign.C
 import System.Exit
 import Control.Exception
 import Control.Monad
+import GHC.IO.Handle.Text (hGetBufSome)
 
 
 main = do
@@ -19,7 +20,7 @@ main = do
 
   zipWithM_ ($) 
 	  [ f rbuf wbuf
-	    | f <- [hGetBufTest, hGetBufNBTest],
+	    | f <- [hGetBufTest, hGetBufNBTest, hGetBufSomeTest],
 	      rbuf <- [buf1,buf2,buf3],
 	      wbuf <- [buf1,buf2,buf3]
 	    ]
@@ -172,3 +173,47 @@ writeProcNB m1 m2 h = do
     hFlush h
     putMVar m1 ()
   hClose h
+
+-- -----------------------------------------------------------------------------
+-- hGetBufSome:
+
+hGetBufSomeTest rbuf wbuf n = do
+  (read,write) <- createPipe
+  hread <- fdToHandle read
+  hwrite <- fdToHandle write
+  m1 <- newEmptyMVar
+  m2 <- newEmptyMVar
+  finished <- newEmptyMVar
+  hSetBuffering hread rbuf
+  hSetBuffering hwrite wbuf
+  forkIO (readProcSome m1 m2 finished hread)
+  writeProcNB m1 m2 hwrite
+  takeMVar finished
+  putStrLn ("test " ++ show n ++ " OK")
+
+
+readProcSome :: MVar () -> MVar () -> MVar () -> Handle -> IO ()
+readProcSome m1 m2 finished h = do
+  buf <- mallocBytes 20
+
+  let
+    loop 0 = return ()
+    loop n = do putMVar m2 (); takeMVar m1
+		r <- hGetBufSome h buf read_size
+		if (r /= msg_length) 
+			then do hPutStr stderr ("error: " ++ show r)
+			        exitFailure
+			else do s <- peekCStringLen (buf,r)
+			        hPutStr stdout (show n ++ " ")
+			        loop (n-1)
+  loop 100
+  hPutStr stdout "\n"
+  putMVar m2 (); takeMVar m1
+  r <- hGetBufSome h buf read_size -- EOF, should get short read
+  s <- peekCStringLen (buf,r)
+  putStrLn ("got " ++ show r ++  ": " ++ s)
+  r <- hGetBufSome h buf read_size -- EOF, should get zero-length read
+  s <- peekCStringLen (buf,r)
+  putStrLn ("got " ++ show r ++  ": " ++ s)
+  hClose h
+  putMVar finished ()
