@@ -9,4 +9,4 @@ config :
 	@echo "Creating $(CONFIG_HS) ... "
 	echo "module Config where" >>$(CONFIG_HS)
 	echo "cTop          :: String" >> $(CONFIG_HS)
-	echo "cTop          = \""`$(TEST_HC) --print-libdir`"\"" >> $(CONFIG_HS)
+	echo 'cTop          = "$(subst \,\\,$(shell '$(TEST_HC)' --print-libdir))"' >> $(CONFIG_HS)
