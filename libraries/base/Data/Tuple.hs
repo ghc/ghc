@@ -20,6 +20,7 @@ module Data.Tuple
   , snd         -- :: (a,b) -> a
   , curry       -- :: ((a, b) -> c) -> a -> b -> c
   , uncurry     -- :: (a -> b -> c) -> ((a, b) -> c)
+  , swap        -- :: (a,b) -> (b,a)
 #ifdef __NHC__
   , (,)(..)
   , (,,)(..)
@@ -104,3 +105,7 @@ curry f x y             =  f (x, y)
 uncurry                 :: (a -> b -> c) -> ((a, b) -> c)
 uncurry f p             =  f (fst p) (snd p)
 #endif  /* neither __HUGS__ nor __NHC__ */
+
+-- | Swap the components of a pair.
+swap                    :: (a,b) -> (b,a)
+swap (a,b)              = (b,a)
