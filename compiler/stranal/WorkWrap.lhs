@@ -226,6 +226,7 @@ tryWW is_rec fn_id rhs
   = return [ (fn_id, rhs) ]
 
   | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
+  	-- See Note [Thunk splitting]
   = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
     checkSize new_fn_id rhs $ 
     splitThunk new_fn_id rhs
@@ -356,8 +357,8 @@ get_one_shots (Note _ e) = get_one_shots e
 get_one_shots _    	 = noOneShotInfo
 \end{code}
 
-Thunk splitting
-~~~~~~~~~~~~~~~
+Note [Thunk splitting]
+~~~~~~~~~~~~~~~~~~~~~~
 Suppose x is used strictly (never mind whether it has the CPR
 property).  
 
@@ -391,6 +392,7 @@ function, so that if x's demand is deeper (say U(U(L,L),L))
 then the splitting will go deeper too.
 
 \begin{code}
+-- See Note [Thunk splitting]
 -- splitThunk converts the *non-recursive* binding
 --	x = e
 -- into
