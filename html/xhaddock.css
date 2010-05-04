@@ -183,7 +183,7 @@ div.decldoc h5 {
 	margin-left: 10px;
 }
 
-div.decldoc table {
+div.decldoc table, div.subdecl {
 	margin-left: 20px;
 }
 

@@ -367,9 +367,10 @@ ppClassDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan
             -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> Html
 ppClassDecl summary links instances loc mbDoc subdocs
-        decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ _ _) unicode
+        decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
   | summary = ppShortClassDecl summary links decl loc subdocs unicode
-  | otherwise = classheader +++ maybeDocToHtml mbDoc +++ instancesBit
+  | otherwise = classheader +++ maybeDocToHtml mbDoc
+                  +++ atBit +++ methodBit  +++ instancesBit
   where 
     classheader
       | null lsigs = topDeclElem links loc nm (hdr unicode)
@@ -378,7 +379,25 @@ ppClassDecl summary links instances loc mbDoc subdocs
     nm   = unLoc $ tcdLName decl
 
     hdr = ppClassHdr summary lctxt (unLoc lname) ltyvars lfds
-        
+    
+    atBit
+      | null ats = noHtml
+      | otherwise = atHdr +++ (
+          thediv ! [theclass "subdecl"] <<
+          concatHtml [ ppAssocType summary links doc at unicode
+                      | at <- ats
+                      , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]
+          )
+
+    methodBit
+      | null lsigs = noHtml
+      | otherwise = methHdr +++ (
+          thediv ! [theclass "subdecl"] <<
+          concatHtml [ ppFunSig summary links loc doc n typ unicode
+                      | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
+                      , let doc = lookupAnySubdoc n subdocs ]
+          )
+
     instId = collapseId (getName nm)
     instancesBit
       | null instances = noHtml
