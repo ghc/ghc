@@ -137,11 +137,15 @@ infixl 8 `App`	-- App brackets to the left
 -- The type parameter @b@ is for the type of binders in the expression tree.
 data Expr b
   = Var	  Id                            -- ^ Variables
+
   | Lit   Literal                       -- ^ Primitive literals
+
   | App   (Expr b) (Arg b)		-- ^ Applications: note that the argument may be a 'Type'.
                                         --
                                         -- See "CoreSyn#let_app_invariant" for another invariant
+
   | Lam   b (Expr b)                    -- ^ Lambda abstraction
+
   | Let   (Bind b) (Expr b)		-- ^ Recursive and non recursive @let@s. Operationally
                                         -- this corresponds to allocating a thunk for the things
                                         -- bound and then executing the sub-expression.
@@ -154,14 +158,16 @@ data Expr b
                                         -- the meaning of /lifted/ vs. /unlifted/).
                                         --
                                         -- #let_app_invariant#
-                                        -- The right hand side of of a non-recursive 'Let' _and_ the argument of an 'App',
+                                        -- The right hand side of of a non-recursive 'Let' 
+                                        -- _and_ the argument of an 'App',
                                         -- /may/ be of unlifted type, but only if the expression 
-                                        -- is ok-for-speculation.  This means that the let can be floated around 
-                                        -- without difficulty. For example, this is OK:
+                                        -- is ok-for-speculation.  This means that the let can be floated 
+                                        -- around without difficulty. For example, this is OK:
                                         --
 	                                -- > y::Int# = x +# 1#
 	                                --
-	                                -- But this is not, as it may affect termination if the expression is floated out:
+	                                -- But this is not, as it may affect termination if the 
+                                        -- expression is floated out:
 	                                --
 	                                -- > y::Int# = fac 4#
 	                                --
@@ -181,6 +187,7 @@ data Expr b
                                         -- At the moment, the rest of the compiler only deals with type-let
                                         -- in a Let expression, rather than at top level.  We may want to revist
                                         -- this choice.
+
   | Case  (Expr b) b Type [Alt b]  	-- ^ Case split. Operationally this corresponds to evaluating
                                         -- the scrutinee (expression examined) to weak head normal form
                                         -- and then examining at most one level of resulting constructor (i.e. you
@@ -190,15 +197,17 @@ data Expr b
                                         -- and the 'Type' must be that of all the case alternatives
 					--
 					-- #case_invariants#
-					-- This is one of the more complicated elements of the Core language, and comes
-					-- with a number of restrictions:
+					-- This is one of the more complicated elements of the Core language, 
+					-- and comes with a number of restrictions:
 					--
-					-- The 'DEFAULT' case alternative must be first in the list, if it occurs at all.
+					-- The 'DEFAULT' case alternative must be first in the list, 
+                                        -- if it occurs at all.
 					--
 					-- The remaining cases are in order of increasing 
 		                        --      tag	(for 'DataAlts') or
 		                        --      lit	(for 'LitAlts').
-	                                -- This makes finding the relevant constructor easy, and makes comparison easier too.
+	                                -- This makes finding the relevant constructor easy, 
+                                        -- and makes comparison easier too.
 					--
 					-- The list of alternatives must be exhaustive. An /exhaustive/ case 
 					-- does not necessarily mention all constructors:
@@ -212,12 +221,16 @@ data Expr b
                                         --                      Blue  -> ... ) ...
                                         -- @
                                         --
-                                        -- The inner case does not need a @Red@ alternative, because @x@ can't be @Red@ at
-                                        -- that program point.
-  | Cast  (Expr b) Coercion             -- ^ Cast an expression to a particular type. This is used to implement @newtype@s
-                                        -- (a @newtype@ constructor or destructor just becomes a 'Cast' in Core) and GADTs.
+                                        -- The inner case does not need a @Red@ alternative, because @x@ 
+                                        -- can't be @Red@ at that program point.
+
+  | Cast  (Expr b) Coercion             -- ^ Cast an expression to a particular type. 
+                                        -- This is used to implement @newtype@s (a @newtype@ constructor or 
+                                        -- destructor just becomes a 'Cast' in Core) and GADTs.
+
   | Note  Note (Expr b)                 -- ^ Notes. These allow general information to be
                                         -- added to expressions in the syntax tree
+
   | Type  Type			        -- ^ A type: this should only show up at the top
                                         -- level of an Arg
   deriving (Data, Typeable)
