@@ -117,10 +117,6 @@ $(libffi_STAMP_CONFIGURE):
 	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP) -d | { cd libffi && $(TAR) -xf - ; }
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
-	cd libffi/build && "$(PATCH)" -p1 < ../libffi.dllize-3.0.8.patch
-	# This patch is just the resulting delta from running
-	# automake && autoreconf && libtoolize --force --copy
-	cd libffi/build && "$(PATCH)" -p1 < ../libffi.autotools-update-3.0.8.patch
 
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
