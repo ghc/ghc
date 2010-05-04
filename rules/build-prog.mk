@@ -49,13 +49,13 @@ define build-prog-helper
 
 $(call all-target,$1,all_$1_$2)
 
-$(call package-config,$1,$2,$3)
-
 ifeq "$$($1_USES_CABAL)" "YES"
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
 include $1/$2/package-data.mk
 endif
 endif
+
+$(call package-config,$1,$2,$3)
 
 ifeq "$$($1_USES_CABAL)$$($1_$2_VERSION)" "YES"
 $1_$2_DISABLE = YES

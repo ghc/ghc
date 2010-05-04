@@ -80,11 +80,11 @@ endif
 
 # --- CONFIGURATION
 
-$(call package-config,$1,$2,$3)
-
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
 include $1/$2/package-data.mk
 endif
+
+$(call package-config,$1,$2,$3)
 
 ifeq "$$($1_$2_DISABLE)" "YES"
 
