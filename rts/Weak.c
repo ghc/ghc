@@ -21,9 +21,6 @@
 
 StgWeak *weak_ptr_list;
 
-// So that we can detect when a finalizer illegally calls back into Haskell
-rtsBool running_finalizers = rtsFalse;
-
 void
 runCFinalizer(void *fn, void *ptr, void *env, StgWord flag)
 {
@@ -37,8 +34,12 @@ void
 runAllCFinalizers(StgWeak *list)
 {
     StgWeak *w;
+    Task *task;
 
-    running_finalizers = rtsTrue;
+    task = myTask();
+    if (task != NULL) {
+        task->running_finalizers = rtsTrue;
+    }
 
     for (w = list; w; w = w->link) {
 	StgArrWords *farr;
@@ -52,7 +53,9 @@ runAllCFinalizers(StgWeak *list)
 	                  farr->payload[3]);
     }
 
-    running_finalizers = rtsFalse;
+    if (task != NULL) {
+        task->running_finalizers = rtsFalse;
+    }
 }
 
 /*
@@ -78,8 +81,12 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     StgMutArrPtrs *arr;
     StgWord size;
     nat n, i;
+    Task *task;
 
-    running_finalizers = rtsTrue;
+    task = myTask();
+    if (task != NULL) {
+        task->running_finalizers = rtsTrue;
+    }
 
     // count number of finalizers, and kill all the weak pointers first...
     n = 0;
@@ -114,7 +121,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 	
-    running_finalizers = rtsFalse;
+    if (task != NULL) {
+        task->running_finalizers = rtsFalse;
+    }
 
     // No finalizers to run?
     if (n == 0) return;

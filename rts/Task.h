@@ -134,6 +134,9 @@ typedef struct Task_ {
     rtsBool    worker;          // == rtsTrue if this is a worker Task
     rtsBool    stopped;         // this task has stopped or exited Haskell
 
+    // So that we can detect when a finalizer illegally calls back into Haskell
+    rtsBool running_finalizers;
+
     SchedulerStatus  stat;      // return status
     StgClosure **    ret;       // return value
 

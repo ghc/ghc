@@ -153,6 +153,7 @@ newTask (rtsBool worker)
     task->cap           = NULL;
     task->worker        = worker;
     task->stopped       = rtsFalse;
+    task->running_finalizers = rtsFalse;
     task->stat          = NoStatus;
     task->ret           = NULL;
     task->n_spare_incalls = 0;
