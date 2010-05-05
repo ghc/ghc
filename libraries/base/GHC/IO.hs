@@ -101,11 +101,15 @@ This is the \"back door\" into the 'IO' monad, allowing
 this to be safe, the 'IO' computation should be
 free of side effects and independent of its environment.
 
-If the I\/O computation wrapped in 'unsafePerformIO'
-performs side effects, then the relative order in which those side
-effects take place (relative to the main I\/O trunk, or other calls to
-'unsafePerformIO') is indeterminate.  You have to be careful when 
-writing and compiling modules that use 'unsafePerformIO':
+If the I\/O computation wrapped in 'unsafePerformIO' performs side
+effects, then the relative order in which those side effects take
+place (relative to the main I\/O trunk, or other calls to
+'unsafePerformIO') is indeterminate.  Furthermore, when using
+'unsafePerformIO' to cause side-effects, you should take the following
+precautions to ensure the side effects are performed as many times as
+you expect them to be.  Note that these precautions are necessary for
+GHC, but may not be sufficient, and other compilers may require
+different precautions:
 
   * Use @{\-\# NOINLINE foo \#-\}@ as a pragma on any function @foo@
         that calls 'unsafePerformIO'.  If the call is inlined,
@@ -116,7 +120,7 @@ writing and compiling modules that use 'unsafePerformIO':
         two side effects that were meant to be separate.  A good example
         is using multiple global variables (like @test@ in the example below).
 
-  * Make sure that the either you switch off let-floating, or that the 
+  * Make sure that the either you switch off let-floating (@-fno-full-laziness@), or that the 
         call to 'unsafePerformIO' cannot float outside a lambda.  For example, 
         if you say:
         @
