@@ -438,6 +438,8 @@ runGHCi paths maybe_exprs = do
             -- just evaluate the expression we were given
             enqueueCommands exprs
             let handle e = do st <- getGHCiState
+                              -- flush the interpreter's stdout/stderr on exit (#3890)
+                              flushInterpBuffers
                                    -- Jump through some hoops to get the
                                    -- current progname in the exception text:
                                    -- <progname>: <exception>
