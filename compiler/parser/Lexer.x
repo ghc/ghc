@@ -701,7 +701,6 @@ reservedSymsFM = listToUFM $
                                 explicitForallEnabled i)
        ,("→",   ITrarrow, unicodeSyntaxEnabled)
        ,("←",   ITlarrow, unicodeSyntaxEnabled)
-       ,("⋯",   ITdotdot, unicodeSyntaxEnabled)
 
        ,("⤙",   ITlarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
        ,("⤚",   ITrarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
