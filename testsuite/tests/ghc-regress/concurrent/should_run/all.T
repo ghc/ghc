@@ -147,9 +147,10 @@ test('conc058', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc059',
      [only_compiler_types(['ghc']),
       only_ways(['threaded1','threaded2']),
+      compile_cmd_prefix('$MAKE conc059_setup && '),
       extra_clean(['conc059_c.o'])],
      compile_and_run,
-     ['conc059_c.c'])
+     ['conc059_c.c -no-hs-main'])
 
 # This test sometimes just exits successfully
 # when run the threaded2 way. The problem hasn't been diagnosed yet
