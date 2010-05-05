@@ -1436,10 +1436,17 @@ argToPat env in_scope val_env (Note _ arg) arg_occ
 
 argToPat env in_scope val_env (Let _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
+	-- See Note [Matching lets] in Rule.lhs
 	-- Look through let expressions
-	-- e.g.		f (let v = rhs in \y -> ...v...)
-	-- Here we can specialise for f (\y -> ...)
+	-- e.g.		f (let v = rhs in (v,w))
+	-- Here we can specialise for f (v,w)
 	-- because the rule-matcher will look through the let.
+
+{- Disabled; see Note [Matching cases] in Rule.lhs
+argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
+  | exprOkForSpeculation scrut	-- See Note [Matching cases] in Rule.hhs
+  = argToPat env in_scope val_env rhs arg_occ
+-}
 
 argToPat env in_scope val_env (Cast arg co) arg_occ
   | not (ignoreType env ty2)

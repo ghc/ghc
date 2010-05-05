@@ -50,7 +50,6 @@ import StaticFlags	( opt_PprStyle_Debug )
 import Outputable
 import FastString
 import Maybes
-import OrdList
 import Bag
 import Util
 import Data.List
@@ -328,25 +327,9 @@ pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs)
 
 %************************************************************************
 %*									*
-\subsection{Matching}
+			Matching
 %*									*
 %************************************************************************
-
-Note [Extra args in rule matching]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we find a matching rule, we return (Just (rule, rhs)), 
-but the rule firing has only consumed as many of the input args
-as the ruleArity says.  It's up to the caller to keep track
-of any left-over args.  E.g. if you call
-	lookupRule ... f [e1, e2, e3]
-and it returns Just (r, rhs), where r has ruleArity 2
-then the real rewrite is
-	f e1 e2 e3 ==> rhs e3
-
-You might think it'd be cleaner for lookupRule to deal with the
-leftover arguments, by applying 'rhs' to them, but the main call
-in the Simplifier works better as it is.  Reason: the 'args' passed
-to lookupRule are the result of a lazy substitution
 
 \begin{code}
 -- | The main rule matching function. Attempts to apply all (active)
@@ -374,8 +357,11 @@ lookupRule is_active id_unf in_scope fn args rules
     go ms (r:rs) = case (matchRule is_active id_unf in_scope args rough_args r) of
 			Just e  -> go ((r,e):ms) rs
 			Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$ 
-				   -- 	ppr [(arg_id, unfoldingTemplate unf) | Var arg_id <- args, let unf = idUnfolding arg_id, isCheapUnfolding unf] )
-				   go ms         rs
+				   -- 	ppr [ (arg_id, unfoldingTemplate unf) 
+                                   --       | Var arg_id <- args
+                                   --       , let unf = idUnfolding arg_id
+                                   --       , isCheapUnfolding unf] )
+				   go ms rs
 
 findBest :: (Id, [CoreExpr])
 	 -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
@@ -415,7 +401,26 @@ isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 
 noBlackList :: Activation -> Bool
 noBlackList _ = False		-- Nothing is black listed
+\end{code}
 
+Note [Extra args in rule matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we find a matching rule, we return (Just (rule, rhs)), 
+but the rule firing has only consumed as many of the input args
+as the ruleArity says.  It's up to the caller to keep track
+of any left-over args.  E.g. if you call
+	lookupRule ... f [e1, e2, e3]
+and it returns Just (r, rhs), where r has ruleArity 2
+then the real rewrite is
+	f e1 e2 e3 ==> rhs e3
+
+You might think it'd be cleaner for lookupRule to deal with the
+leftover arguments, by applying 'rhs' to them, but the main call
+in the Simplifier works better as it is.  Reason: the 'args' passed
+to lookupRule are the result of a lazy substitution
+
+\begin{code}
+------------------------------------
 matchRule :: (Activation -> Bool) -> IdUnfoldingFun
           -> InScopeSet
 	  -> [CoreExpr] -> [Maybe Name]
@@ -458,30 +463,29 @@ matchRule is_active id_unf in_scope args rough_args
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
   = case matchN id_unf in_scope tpl_vars tpl_args args of
-	Nothing		       -> Nothing
-	Just (binds, tpl_vals) -> Just (mkLets binds $
-					rule_fn `mkApps` tpl_vals)
+	Nothing		               -> Nothing
+	Just (bind_wrapper, tpl_vals) -> Just (bind_wrapper $
+					       rule_fn `mkApps` tpl_vals)
   where
     rule_fn = occurAnalyseExpr (mkLams tpl_vars rhs)
 	-- We could do this when putting things into the rulebase, I guess
-\end{code}
 
-\begin{code}
--- For a given match template and context, find bindings to wrap around 
--- the entire result and what should be substituted for each template variable.
--- Fail if there are two few actual arguments from the target to match the template
+---------------------------------------
 matchN	:: IdUnfoldingFun
         -> InScopeSet           -- ^ In-scope variables
 	-> [Var]		-- ^ Match template type variables
 	-> [CoreExpr]		-- ^ Match template
 	-> [CoreExpr]		-- ^ Target; can have more elements than the template
-	-> Maybe ([CoreBind],
+	-> Maybe (BindWrapper,	-- ^ Floated bindings; see Note [Matching lets]
 		  [CoreExpr])
+-- For a given match template and context, find bindings to wrap around 
+-- the entire result and what should be substituted for each template variable.
+-- Fail if there are two few actual arguments from the target to match the template
 
 matchN id_unf in_scope tmpl_vars tmpl_es target_es
   = do	{ (tv_subst, id_subst, binds)
 		<- go init_menv emptySubstEnv tmpl_es target_es
-	; return (fromOL binds, 
+	; return (binds, 
 		  map (lookup_tmpl tv_subst id_subst) tmpl_vars') }
   where
     (init_rn_env, tmpl_vars') = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
@@ -535,15 +539,19 @@ necessary; the renamed ones are the tmpl_vars'
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.
 --
--- * The (OrdList CoreBind) in a SubstEnv are the bindings floated out
+-- * The BindWrapper in a SubstEnv are the bindings floated out
 --   from nested matches; see the Let case of match, below
 --
-type SubstEnv   = (TvSubstEnv, IdSubstEnv, OrdList CoreBind)
+type SubstEnv = (TvSubstEnv, IdSubstEnv, BindWrapper)
+                   
+type BindWrapper = CoreExpr -> CoreExpr
+  -- See Notes [Matching lets] and [Matching cases]
+  -- we represent the floated bindings as a core-to-core function
+
 type IdSubstEnv = IdEnv CoreExpr		
 
 emptySubstEnv :: SubstEnv
-emptySubstEnv = (emptyVarEnv, emptyVarEnv, nilOL)
-
+emptySubstEnv = (emptyVarEnv, emptyVarEnv, \e -> e)
 
 --	At one stage I tried to match even if there are more 
 --	template args than real args.
@@ -599,19 +607,29 @@ match id_unfolding_fun menv subst e1 (Var v2)      -- Note [Expanding variables]
 	-- because of the not-inRnEnvR
 
 match idu menv (tv_subst, id_subst, binds) e1 (Let bind e2)
-  | all freshly_bound bndrs	-- See Note [Matching lets]
-  , not (any (inRnEnvR rn_env) bind_fvs)
+  | okToFloat rn_env bndrs (bindFreeVars bind) 	-- See Note [Matching lets]
   = match idu (menv { me_env = rn_env' }) 
-	  (tv_subst, id_subst, binds `snocOL` bind')
-	  e1 e2'
+	  (tv_subst, id_subst, binds . Let bind)
+	  e1 e2
   where
     rn_env   = me_env menv
-    bndrs    = bindersOf  bind
-    bind_fvs = varSetElems (bindFreeVars bind)
-    freshly_bound x = not (x `rnInScope` rn_env)
-    bind'   = bind
-    e2'     = e2
-    rn_env' = extendRnInScopeList rn_env bndrs
+    rn_env'  = extendRnInScopeList rn_env bndrs
+    bndrs    = bindersOf bind
+
+{- Disabled: see Note [Matching cases] below
+match idu menv (tv_subst, id_subst, binds) e1 
+      (Case scrut case_bndr ty [(con, alt_bndrs, rhs)])
+  | exprOkForSpeculation scrut	-- See Note [Matching cases]
+  , okToFloat rn_env bndrs (exprFreeVars scrut)
+  = match idu (menv { me_env = rn_env' })
+          (tv_subst, id_subst, binds . case_wrap)
+          e1 rhs 
+  where
+    rn_env   = me_env menv
+    rn_env'  = extendRnInScopeList rn_env bndrs
+    bndrs    = case_bndr : alt_bndrs
+    case_wrap rhs' = Case scrut case_bndr ty [(con, alt_bndrs, rhs')]
+-}
 
 match _ _ subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
@@ -662,6 +680,15 @@ match idu menv subst (Cast e1 co1) (Cast e2 co2)
 -- Everything else fails
 match _ _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $ 
 			 Nothing
+
+------------------------------------------
+okToFloat :: RnEnv2 -> [Var] -> VarSet -> Bool
+okToFloat rn_env bndrs bind_fvs
+  = all freshly_bound bndrs 
+    && foldVarSet ((&&) . not_captured) True bind_fvs
+  where
+    freshly_bound x = not (x `rnInScope` rn_env)
+    not_captured fv = not (inRnEnvR rn_env fv)
 
 ------------------------------------------
 match_var :: IdUnfoldingFun
@@ -799,13 +826,13 @@ the match to happen.  This is the WHOLE REASON for accumulating
 bindings in the SubstEnv
 
 We can only do this if
-	(a) Widening the scope of w does not capture any variables
-	    We use a conservative test: w is not already in scope
-	    If not, we clone the binders, and substitute
-	(b) The free variables of R are not bound by the part of the
-	    target expression outside the let binding; e.g.
-		f (\v. let w = v+1 in g E)
-	    Here we obviously cannot float the let-binding for w.
+  (a) Widening the scope of w does not capture any variables
+      We use a conservative test: w is not already in scope
+      If not, we clone the binders, and substitute
+  (b) The free variables of R are not bound by the part of the
+      target expression outside the let binding; e.g.
+  	f (\v. let w = v+1 in g E)
+      Here we obviously cannot float the let-binding for w.
 
 You may think rule (a) would never apply, because rule matching is
 mostly invoked from the simplifier, when we have just run substExpr 
@@ -831,7 +858,25 @@ Other cases to think about
 	(let x=y+1 in (x,x), let x=y-1 in (x,x))
 		--> let x=y+1 in let x1=y-1 in ((x,x),(x1,x1))
 
-
+Note [Matching cases]
+~~~~~~~~~~~~~~~~~~~~~
+{- NOTE: This idea is currently disabled.  It really only works if
+         the primops involved are OkForSpeculation, and, since
+	 they have side effects readIntOfAddr and touch are not.
+	 Maybe we'll get back to this later .  -}
+  
+Consider
+   f (case readIntOffAddr# p# i# realWorld# of { (# s#, n# #) ->
+      case touch# fp s# of { _ -> 
+      I# n# } } )
+This happened in a tight loop generated by stream fusion that 
+Roman encountered.  We'd like to treat this just like the let 
+case, because the primops concerned are ok-for-speculation.
+That is, we'd like to behave as if it had been
+   case readIntOffAddr# p# i# realWorld# of { (# s#, n# #) ->
+   case touch# fp s# of { _ -> 
+   f (I# n# } } )
+  
 Note [Lookup in-scope]
 ~~~~~~~~~~~~~~~~~~~~~~
 Consider this example
