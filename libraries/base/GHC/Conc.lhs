@@ -275,16 +275,11 @@ real_handler se@(SomeException ex) =
                  Just StackOverflow     -> reportStackOverflow
                  _                      -> reportError se
 
-{- | 'killThread' terminates the given thread (GHC only).
-Any work already done by the thread isn\'t
-lost: the computation is suspended until required by another thread.
-The memory used by the thread will be garbage collected if it isn\'t
-referenced from anywhere.  The 'killThread' function is defined in
-terms of 'throwTo':
+{- | 'killThread' raises the 'ThreadKilled' exception in the given
+thread (GHC only). 
 
 > killThread tid = throwTo tid ThreadKilled
 
-Killthread is a no-op if the target thread has already completed.
 -}
 killThread :: ThreadId -> IO ()
 killThread tid = throwTo tid ThreadKilled
@@ -298,6 +293,10 @@ thread has received the exception.  This is a useful property to know
 when dealing with race conditions: eg. if there are two threads that
 can kill each other, it is guaranteed that only one of the threads
 will get to kill the other.
+
+Whatever work the target thread was doing when the exception was
+raised is not lost: the computation is suspended until required by
+another thread.
 
 If the target thread is currently making a foreign call, then the
 exception will not be raised (and hence 'throwTo' will not return)
@@ -313,12 +312,17 @@ is received by the target thread.  The trade-off is discussed in Section 9 of th
 Like any blocking operation, 'throwTo' is therefore interruptible (see Section 5.3 of
 the paper).
 
-There is currently no guarantee that the exception delivered by 'throwTo' will be
-delivered at the first possible opportunity.  In particular, a thread may 
-unblock and then re-block exceptions (using 'unblock' and 'block') without receiving
-a pending 'throwTo'.  This is arguably undesirable behaviour.
+There is no guarantee that the exception will be delivered promptly,
+although the runtime will endeavour to ensure that arbitrary
+delays don't occur.  In GHC, an exception can only be raised when a
+thread reaches a /safe point/, where a safe point is where memory
+allocation occurs.  Some loops do not perform any memory allocation
+inside the loop and therefore cannot be interrupted by a 'throwTo'.
 
- -}
+Blocked 'throwTo' is fair: if multiple threads are trying to throw an
+exception to the same target thread, they will succeed in FIFO order.
+
+  -}
 throwTo :: Exception e => ThreadId -> e -> IO ()
 throwTo (ThreadId tid) ex = IO $ \ s ->
    case (killThread# tid (toException ex) s) of s1 -> (# s1, () #)
