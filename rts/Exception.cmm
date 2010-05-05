@@ -218,6 +218,8 @@ stg_killThreadzh
     
     /* Needs 3 words because throwToSingleThreaded uses some stack */
     STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, stg_killThreadzh);
+    /* We call allocate in throwTo(), so better check for GC */
+    MAYBE_GC(R1_PTR & R2_PTR, stg_killThreadzh);
 
     /* 
      * We might have killed ourselves.  In which case, better be *very*
