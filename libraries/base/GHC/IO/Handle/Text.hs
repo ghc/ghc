@@ -911,8 +911,8 @@ hGetBufSome h ptr count
               bufReadNBEmpty h_ buf (castPtr ptr) 0 count
 
 haFD :: Handle__ -> FD
-haFD h_@Handle__{} = 
-   case cast h_ of
+haFD h_@Handle__{..} =
+   case cast haDevice of
              Nothing -> error "not an FD"
              Just fd -> fd
 
