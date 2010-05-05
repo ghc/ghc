@@ -24,3 +24,6 @@ ghc-e005:
 2636:
 	'$(TEST_HC)' -ignore-dot-ghci -e ":main" 2636.hs; if [ "$?" != 0 ]; then true; else false; fi
 
+3890:
+	'$(TEST_HC)' -ignore-dot-ghci -e ":main" 3890.hs | cat
+
