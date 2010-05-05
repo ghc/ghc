@@ -357,14 +357,20 @@ check_target:
 
     case BlockedOnBlackHole:
     {
-        // Revoke the message by replacing it with IND. We're not
-        // locking anything here, so we might still get a TRY_WAKEUP
-        // message from the owner of the blackhole some time in the
-        // future, but that doesn't matter.
-        ASSERT(target->block_info.bh->header.info == &stg_MSG_BLACKHOLE_info);
-        OVERWRITE_INFO(target->block_info.bh, &stg_IND_info);
-        raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
-        return THROWTO_SUCCESS;
+	if (target->flags & TSO_BLOCKEX) {
+            // BlockedOnBlackHole is not interruptible.
+            blockedThrowTo(cap,target,msg);
+	    return THROWTO_BLOCKED;
+	} else {
+            // Revoke the message by replacing it with IND. We're not
+            // locking anything here, so we might still get a TRY_WAKEUP
+            // message from the owner of the blackhole some time in the
+            // future, but that doesn't matter.
+            ASSERT(target->block_info.bh->header.info == &stg_MSG_BLACKHOLE_info);
+            OVERWRITE_INFO(target->block_info.bh, &stg_IND_info);
+            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            return THROWTO_SUCCESS;
+        }
     }
 
     case BlockedOnSTM:
