@@ -2551,6 +2551,12 @@ resurrectThreads (StgTSO *threads)
 	     * can wake up threads, remember...).
 	     */
 	    continue;
+        case BlockedOnMsgThrowTo:
+            // This can happen if the target is masking, blocks on a
+            // black hole, and then is found to be unreachable.  In
+            // this case, we want to let the target wake up and carry
+            // on, and do nothing to this thread.
+            continue;
 	default:
 	    barf("resurrectThreads: thread blocked in a strange way: %d",
                  tso->why_blocked);
