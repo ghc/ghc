@@ -404,15 +404,24 @@ GetString(infp)
   FILE *infp;
 {
     unsigned int i;
-    char stringbuffer[5000];
+    char *stringbuffer;
+    size_t stringbuffersize;
 
     ASSERT(ch == '\"');
 
+    stringbuffersize = 5000;
+    stringbuffer = xmalloc(stringbuffersize);
+
     ch = getc(infp);	/* skip the '\"' that begins the string */
 
-    for (i = 0; i < (sizeof stringbuffer)-1 && ch != '\"'; i++) {
-	stringbuffer[ i ] = ch;
-	ch = getc(infp);
+    i = 0;
+    while (ch != '\"') {
+        if (i == stringbuffersize - 1) {
+            stringbuffersize = 2 * stringbuffersize;
+            stringbuffer = xrealloc(stringbuffer, stringbuffersize);
+        }
+        stringbuffer[ i++ ] = ch;
+        ch = getc(infp);
     }
 
     stringbuffer[i] = '\0'; 
