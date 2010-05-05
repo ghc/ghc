@@ -745,7 +745,7 @@ callSiteInline dflags id unfolding lone_variable arg_infos cont_info
 	NoUnfolding 	 -> Nothing ;
 	OtherCon _  	 -> Nothing ;
 	DFunUnfolding {} -> Nothing ;	-- Never unfold a DFun
-	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top, uf_is_value = is_value,
+	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top, 
 		        uf_is_cheap = is_cheap, uf_arity = uf_arity, uf_guidance = guidance } ->
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
@@ -775,10 +775,10 @@ callSiteInline dflags id unfolding lone_variable arg_infos cont_info
 
 	interesting_saturated_call 
 	  = case cont_info of
-	      BoringCtxt -> not is_top && uf_arity > 0		-- Note [Nested functions]
-	      CaseCtxt   -> not (lone_variable && is_value)	-- Note [Lone variables]
-	      ArgCtxt {} -> uf_arity > 0     			-- Note [Inlining in ArgCtxt]
-	      ValAppCtxt -> True				-- Note [Cast then apply]
+	      BoringCtxt -> not is_top && uf_arity > 0	      -- Note [Nested functions]
+	      CaseCtxt   -> not (lone_variable && is_cheap)   -- Note [Lone variables]
+	      ArgCtxt {} -> uf_arity > 0     		      -- Note [Inlining in ArgCtxt]
+	      ValAppCtxt -> True			      -- Note [Cast then apply]
 
 	(yes_or_no, extra_doc)
 	  = case guidance of
@@ -805,7 +805,6 @@ callSiteInline dflags id unfolding lone_variable arg_infos cont_info
 			text "uf arity" <+> ppr uf_arity,
 			text "interesting continuation" <+> ppr cont_info,
 			text "some_benefit" <+> ppr some_benefit,
-			text "is value:" <+> ppr is_value,
                         text "is cheap:" <+> ppr is_cheap,
 			text "guidance" <+> ppr guidance,
 			extra_doc,
@@ -919,8 +918,8 @@ call is at least CONLIKE.  At least for the cases where we use ArgCtxt
 for the RHS of a 'let', we only profit from the inlining if we get a 
 CONLIKE thing (modulo lets).
 
-Note [Lone variables]
-~~~~~~~~~~~~~~~~~~~~~
+Note [Lone variables]	See also Note [Interaction of exprIsCheap and lone variables]
+~~~~~~~~~~~~~~~~~~~~~   which appears below
 The "lone-variable" case is important.  I spent ages messing about
 with unsatisfactory varaints, but this is nice.  The idea is that if a
 variable appears all alone
@@ -929,7 +928,7 @@ variable appears all alone
 	as scrutinee of a case		CaseCtxt
 	as arg of a fn			ArgCtxt
 AND
-	it is bound to a value
+	it is bound to a cheap expression
 
 then we should not inline it (unless there is some other reason,
 e.g. is is the sole occurrence).  That is what is happening at 
@@ -980,6 +979,27 @@ However, watch out:
 	g = /\a. \y.  h (f a)
    There's no advantage in inlining f here, and perhaps
    a significant disadvantage.  Hence some_val_args in the Stop case
+
+Note [Interaction of exprIsCheap and lone variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The lone-variable test says "don't inline if a case expression
+scrutines a lone variable whose unfolding is cheap".  It's very 
+important that, under these circumstances, exprIsConApp_maybe
+can spot a constructor application. So, for example, we don't
+consider
+	let x = e in (x,x)
+to be cheap, and that's good because exprIsConApp_maybe doesn't
+think that expression is a constructor application.
+
+I used to test is_value rather than is_cheap, which was utterly
+wrong, because the above expression responds True to exprIsHNF.
+
+This kind of thing can occur if you have
+
+	{-# INLINE foo #-}
+	foo = let x = e in (x,x)
+
+which Roman did.
 
 \begin{code}
 computeDiscount :: Int -> [Int] -> Int -> [ArgSummary] -> CallCtxt -> Int

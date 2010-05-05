@@ -469,8 +469,8 @@ dupAppSize = 4		-- Size of application we are prepared to duplicate
 %*									*
 %************************************************************************
 
-Note [exprIsCheap]
-~~~~~~~~~~~~~~~~~~
+Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
+~~~~~~~~~~~~~~~~~~   in CoreUnfold.lhs
 @exprIsCheap@ looks at a Core expression and returns \tr{True} if
 it is obviously in weak head normal form, or is cheap to get to WHNF.
 [Note that that's not the same as exprIsDupable; an expression might be
@@ -499,6 +499,13 @@ shared.  The main examples of things which aren't WHNF but are
 Notice that a variable is considered 'cheap': we can push it inside a lambda,
 because sharing will make sure it is only evaluated once.
 
+Note [exprIsCheap and exprIsHNF]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note that exprIsHNF does not imply exprIsCheap.  Eg
+	let x = fac 20 in Just x
+This responds True to exprIsHNF (you can discard a seq), but
+False to exprIsCheap.
+
 \begin{code}
 exprIsCheap :: CoreExpr -> Bool
 exprIsCheap = exprIsCheap' isCheapApp
@@ -524,11 +531,12 @@ exprIsCheap' good_app (Case e _ _ alts) = exprIsCheap' good_app e &&
 	-- there is only dictionary selection (no construction) involved
 
 exprIsCheap' good_app (Let (NonRec x _) e)  
-      | isUnLiftedType (idType x) = exprIsCheap' good_app e
-      | otherwise		  = False
+  | isUnLiftedType (idType x) = exprIsCheap' good_app e
+  | otherwise		      = False
 	-- Strict lets always have cheap right hand sides,
 	-- and do no allocation, so just look at the body
 	-- Non-strict lets do allocation so we don't treat them as cheap
+	-- See also 
 
 exprIsCheap' good_app other_expr 	-- Applications and variables
   = go other_expr []
@@ -625,11 +633,8 @@ it's applied only to dictionaries.
 -- Precisely, it returns @True@ iff:
 --
 --  * The expression guarantees to terminate, 
---
 --  * soon, 
---
 --  * without raising an exception,
---
 --  * without causing a side effect (e.g. writing a mutable variable)
 --
 -- Note that if @exprIsHNF e@, then @exprOkForSpecuation e@.
@@ -741,7 +746,7 @@ The inner case is redundant, and should be nuked.
 %************************************************************************
 
 \begin{code}
--- Note [exprIsHNF]
+-- Note [exprIsHNF]		See also Note [exprIsCheap and exprIsHNF]
 -- ~~~~~~~~~~~~~~~~
 -- | exprIsHNF returns true for expressions that are certainly /already/ 
 -- evaluated to /head/ normal form.  This is used to decide whether it's ok 
