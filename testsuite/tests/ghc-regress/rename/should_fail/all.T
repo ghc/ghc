@@ -75,4 +75,5 @@ test('T2723', normal, compile, [''])  # Warnings only
 test('T2993', normal, compile_fail, [''])
 test('T3265', normal, compile_fail, [''])
 test('T3792', normal, compile_fail, [''])
+test('T4042', normal, compile_fail, [''])
 
