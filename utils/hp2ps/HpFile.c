@@ -416,7 +416,10 @@ GetString(infp)
 
     i = 0;
     while (ch != '\"') {
-        if (i == stringbuffersize - 1) {
+        if (ch == EOF) {
+	        Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
+        }
+        else if (i == stringbuffersize - 1) {
             stringbuffersize = 2 * stringbuffersize;
             stringbuffer = xrealloc(stringbuffer, stringbuffersize);
         }
