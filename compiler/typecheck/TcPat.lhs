@@ -433,7 +433,11 @@ tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
             failWithTc (badSigPat pat_ty)
 	; (pat', tvs, res) <- tcExtendTyVarEnv2 tv_binds $
 			      tc_lpat pat inner_ty pstate thing_inside
-	; return (SigPatOut pat' inner_ty, tvs, res) }
+        ; return (SigPatOut pat' inner_ty, tvs, res) }
+
+-- Use this when we add pattern coercions back in
+--	  return (mkCoPatCoI (mkSymCoI coi) (SigPatOut pat' inner_ty) pat_ty
+--                 , tvs, res) }
 
 tc_pat _ pat@(TypePat _) _ _
   = failWithTc (badTypePat pat)
