@@ -128,21 +128,16 @@ printClosure( StgClosure *obj )
     case CONSTR_NOCAF_STATIC:
         {
             StgWord i, j;
+            StgConInfoTable *con_info = get_con_itbl (obj);
 
-#ifdef PROFILING
-	    debugBelch("%s(", GET_PROF_DESC(info));
-	    debugBelch("%s", obj->header.prof.ccs->cc->label);
-#else
-            debugBelch("CONSTR(");
-            printPtr((StgPtr)obj->header.info);
-            debugBelch("(tag=%d)",info->srt_bitmap);
-#endif
+            debugBelch("%s(", GET_CON_DESC(con_info));
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
-		debugBelch(", ");
+		if (i != 0) debugBelch(", ");
                 printPtr((StgPtr)obj->payload[i]);
             }
             for (j = 0; j < info->layout.payload.nptrs; ++j) {
-                debugBelch(", %p#", obj->payload[i+j]);
+		if (i != 0 || j != 0) debugBelch(", ");
+                debugBelch("%p#", obj->payload[i+j]);
             }
             debugBelch(")\n");
             break;
@@ -906,19 +901,31 @@ int searched = 0;
 static int
 findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 {
-    StgPtr q, r;
+    StgPtr q, r, end;
     for (; bd; bd = bd->link) {
         searched++;
         for (q = bd->start; q < bd->free; q++) {
             if (UNTAG_CLOSURE((StgClosure*)*q) == (StgClosure *)p) {
                 if (i < arr_size) {
-                    r = q;
-                    while (HEAP_ALLOCED((StgPtr)*r) || !LOOKS_LIKE_INFO_PTR(*r) || (P_)*r == NULL) {
-                        r--;
+                    for (r = bd->start; r < bd->free; r = end) {
+                        // skip over zeroed-out slop
+                        while (*r == 0) r++;
+                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
+                            debugBelch("%p found at %p, no closure at %p\n",
+                                       p, q, r);
+                            break;
+                        }
+                        end = r + closure_sizeW((StgClosure*)r);
+                        if (q < end) {
+                            debugBelch("%p = ", r);
+                            printClosure((StgClosure *)r);
+                            arr[i++] = r;
+                            break;
+                        }
                     }
-                    debugBelch("%p = ", r);
-                    printClosure((StgClosure *)r);
-                    arr[i++] = r;
+                    if (r >= bd->free) {
+                        debugBelch("%p found at %p, closure?", p, q);
+                    }
                 } else {
                     return i;
                 }
@@ -933,11 +940,7 @@ findPtr(P_ p, int follow)
 {
   nat g;
   bdescr *bd;
-#if defined(__GNUC__)
   const int arr_size = 1024;
-#else
-#define arr_size 1024
-#endif
   StgPtr arr[arr_size];
   int i = 0;
   searched = 0;
