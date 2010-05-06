@@ -153,8 +153,8 @@ realRegsAlias rr1 rr2
 --------------------------------------------------------------------------------
 -- | A register, either virtual or real
 data Reg
-	= RegVirtual {-# UNPACK #-} !VirtualReg
-	| RegReal    {-# UNPACK #-} !RealReg
+	= RegVirtual !VirtualReg
+	| RegReal    !RealReg
 	deriving (Eq, Ord)
 
 regSingle :: RegNo -> Reg

@@ -51,14 +51,14 @@ type BlockAssignment
 --
 data Loc 
 	-- | vreg is in a register
-	= InReg   {-# UNPACK #-}  !RealReg
+	= InReg   !RealReg
 
 	-- | vreg is held in a stack slot
 	| InMem   {-# UNPACK #-}  !StackSlot
 
 
 	-- | vreg is held in both a register and a stack slot
-	| InBoth  {-# UNPACK #-}  !RealReg
+	| InBoth   !RealReg
 		   {-# UNPACK #-} !StackSlot
 	deriving (Eq, Show, Ord)
 
