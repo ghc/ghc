@@ -627,12 +627,29 @@ include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 GhcLibHcOpts += -fno-warn-deprecated-flags
 GhcBootLibHcOpts += -fno-warn-deprecated-flags
 
+# ----------------------------------------------
+# Per-package compiler flags
+# 
+# If you want to add per-package compiler flags, this 
+# is the place to do it.  Do it like this for package <pkg>
+#   
+#   libraries/<pkg>_dist-boot_HC_OPTS += -Wwarn
+#   libraries/<pkg>_dist-install_HC_OPTS += -Wwarn
+
+
 # Add $(GhcLibHcOpts) to all library builds
 $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
 
 # XXX Hack; remove this
+# Use -Wwarn for dph
 $(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += -Wwarn))
 
+# XXX Hack; remove this
+# Use -Wwarn for 'binary' becuase it has redundant UNPACK pragmas
+libraries/binary_dist-install_HC_OPTS += -Wwarn
+libraries/binary_dist-boot_HC_OPTS += -Wwarn
+
+# ----------------------------------------------
 # A useful pseudo-target
 .PHONY: stage1_libs
 stage1_libs : $(ALL_STAGE1_LIBS)
