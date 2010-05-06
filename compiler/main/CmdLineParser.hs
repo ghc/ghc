@@ -32,7 +32,9 @@ data Flag m = Flag
         flagDeprecated :: Deprecated  -- is the flag deprecated?
     }
 
-data Deprecated = Supported | Deprecated String
+data Deprecated = Supported
+                | Deprecated String
+                | DeprecatedFullText String
 
 data OptKind m                      -- Suppose the flag is -f
  = NoArg (m ())                     -- -f all by itself
@@ -66,6 +68,8 @@ processArgs spec args = process spec args [] [] []
            let warns' = case deprecated of
                         Deprecated warning ->
                             L loc ("Warning: " ++ dash_arg ++ " is deprecated: " ++ warning) : warns
+                        DeprecatedFullText warning ->
+                            L loc ("Warning: " ++ warning) : warns
                         Supported -> warns
            in case processOneArg action rest arg args of
               Left err            -> process spec args spare (L loc err : errs) warns'

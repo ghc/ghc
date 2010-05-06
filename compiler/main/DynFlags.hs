@@ -1014,7 +1014,7 @@ dynamic_flags = [
   , Flag "cpp"            (NoArg  (setDynFlag Opt_Cpp)) Supported
   , Flag "F"              (NoArg  (setDynFlag Opt_Pp)) Supported
   , Flag "#include"       (HasArg (addCmdlineHCInclude))
-                             (Deprecated "No longer has any effect")
+                             (DeprecatedFullText "-#include and INCLUDE pragmas are deprecated: They no longer have any effect")
   , Flag "v"              (OptIntSuffix setVerbosity) Supported
 
         ------- Specific phases  --------------------------------------------
