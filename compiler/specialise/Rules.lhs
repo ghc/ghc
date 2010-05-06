@@ -476,7 +476,7 @@ matchN	:: IdUnfoldingFun
 	-> [Var]		-- ^ Match template type variables
 	-> [CoreExpr]		-- ^ Match template
 	-> [CoreExpr]		-- ^ Target; can have more elements than the template
-	-> Maybe (BindWrapper,	-- ^ Floated bindings; see Note [Matching lets]
+	-> Maybe (BindWrapper,	-- Floated bindings; see Note [Matching lets]
 		  [CoreExpr])
 -- For a given match template and context, find bindings to wrap around 
 -- the entire result and what should be substituted for each template variable.
