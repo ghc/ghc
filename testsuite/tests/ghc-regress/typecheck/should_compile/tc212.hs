@@ -5,5 +5,5 @@
 module ShouldCompile where
 
 -- A specialise pragma with no type signature
-fac n = fac n
+fac n = fac (n + 1)
 {-# SPECIALISE fac :: Int -> Int #-}
