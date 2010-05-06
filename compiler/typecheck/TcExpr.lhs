@@ -1280,7 +1280,7 @@ checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
   | null field_labels 	-- Not declared as a record;
 			-- But C{} is still valid if no strict fields
-  = if any isMarkedStrict field_strs then
+  = if any isBanged field_strs then
 	-- Illegal if any arg is strict
 	addErrTc (missingStrictFields data_con [])
     else
@@ -1297,12 +1297,12 @@ checkMissingFields data_con rbinds
   where
     missing_s_fields
 	= [ fl | (fl, str) <- field_info,
-	  	 isMarkedStrict str,
+	  	 isBanged str,
 	  	 not (fl `elem` field_names_used)
 	  ]
     missing_ns_fields
 	= [ fl | (fl, str) <- field_info,
-	  	 not (isMarkedStrict str),
+	  	 not (isBanged str),
 	  	 not (fl `elem` field_names_used)
 	  ]
 

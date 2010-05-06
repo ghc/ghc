@@ -327,7 +327,7 @@ data DataCon
 		-- The OrigResTy is T [a], but the dcRepTyCon might be :T123
 
 	-- Now the strictness annotations and field labels of the constructor
-	dcStrictMarks :: [StrictnessMark],
+	dcStrictMarks :: [HsBang],
 		-- Strictness annotations as decided by the compiler.  
 		-- Does *not* include the existential dictionaries
 		-- length = dataConSourceArity dataCon
@@ -478,7 +478,7 @@ instance Data.Data DataCon where
 -- | Build a new data constructor
 mkDataCon :: Name 
 	  -> Bool	        -- ^ Is the constructor declared infix?
-	  -> [StrictnessMark]   -- ^ Strictness annotations written in the source file
+	  -> [HsBang]           -- ^ Strictness annotations written in the source file
 	  -> [FieldLabel]       -- ^ Field labels for the constructor, if it is a record, 
 				--   otherwise empty
 	  -> [TyVar]            -- ^ Universally quantified type variables
@@ -558,9 +558,9 @@ mkDataCon name declared_infix
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
 
-mk_dict_strict_mark :: PredType -> StrictnessMark
-mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
-		         | otherwise	     = NotMarkedStrict
+mk_dict_strict_mark :: PredType -> HsBang
+mk_dict_strict_mark pred | isStrictPred pred = HsStrict
+		         | otherwise	     = HsNoBang
 \end{code}
 
 \begin{code}
@@ -663,11 +663,11 @@ dataConFieldType con label
 
 -- | The strictness markings decided on by the compiler.  Does not include those for
 -- existential dictionaries.  The list is in one-to-one correspondence with the arity of the 'DataCon'
-dataConStrictMarks :: DataCon -> [StrictnessMark]
+dataConStrictMarks :: DataCon -> [HsBang]
 dataConStrictMarks = dcStrictMarks
 
 -- | Strictness of /existential/ arguments only
-dataConExStricts :: DataCon -> [StrictnessMark]
+dataConExStricts :: DataCon -> [HsBang]
 -- Usually empty, so we don't bother to cache this
 dataConExStricts dc = map mk_dict_strict_mark $ dcDictTheta dc
 
@@ -913,7 +913,7 @@ deepSplitProductType str ty
       Nothing -> pprPanic (str ++ ": not a product") (pprType ty)
 
 -- | Compute the representation type strictness and type suitable for a 'DataCon'
-computeRep :: [StrictnessMark]		-- ^ Original argument strictness
+computeRep :: [HsBang]			-- ^ Original argument strictness
 	   -> [Type]			-- ^ Original argument types
 	   -> ([StrictnessMark],	-- Representation arg strictness
 	       [Type])			-- And type
@@ -921,10 +921,11 @@ computeRep :: [StrictnessMark]		-- ^ Original argument strictness
 computeRep stricts tys
   = unzip $ concat $ zipWithEqual "computeRep" unbox stricts tys
   where
-    unbox NotMarkedStrict ty = [(NotMarkedStrict, ty)]
-    unbox MarkedStrict    ty = [(MarkedStrict,    ty)]
-    unbox MarkedUnboxed   ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
-                               where
-                                 (_tycon, _tycon_args, arg_dc, arg_tys) 
-                                     = deepSplitProductType "unbox_strict_arg_ty" ty
+    unbox HsNoBang       ty = [(NotMarkedStrict, ty)]
+    unbox HsStrict       ty = [(MarkedStrict,    ty)]
+    unbox HsUnpackFailed ty = [(MarkedStrict,    ty)]
+    unbox HsUnpack ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
+                      where
+                        (_tycon, _tycon_args, arg_dc, arg_tys) 
+                           = deepSplitProductType "unbox_strict_arg_ty" ty
 \end{code}

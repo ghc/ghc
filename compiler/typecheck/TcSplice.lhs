@@ -1197,10 +1197,9 @@ reifyFixity name
       conv_dir BasicTypes.InfixL = TH.InfixL
       conv_dir BasicTypes.InfixN = TH.InfixN
 
-reifyStrict :: BasicTypes.StrictnessMark -> TH.Strict
-reifyStrict MarkedStrict    = TH.IsStrict
-reifyStrict MarkedUnboxed   = TH.IsStrict
-reifyStrict NotMarkedStrict = TH.NotStrict
+reifyStrict :: BasicTypes.HsBang -> TH.Strict
+reifyStrict bang | isBanged bang = TH.IsStrict
+                 | otherwise     = TH.NotStrict
 
 ------------------------------
 noTH :: LitString -> SDoc -> TcM a

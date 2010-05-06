@@ -23,7 +23,7 @@ import FamInstEnv        ( FamInst, mkLocalFamInst )
 import OccName
 import Id
 import MkId
-import BasicTypes        ( StrictnessMark(..), boolToRecFlag,
+import BasicTypes        ( HsBang(..), boolToRecFlag,
                            alwaysInlinePragma, dfunInlinePragma )
 import Var               ( Var, TyVar, varType )
 import Name              ( Name, getOccName )
@@ -202,7 +202,7 @@ vectDataCon dc
 
       liftDs $ buildDataCon name'
                             False           -- not infix
-                            (map (const NotMarkedStrict) arg_tys)
+                            (map (const HsNoBang) arg_tys)
                             []              -- no labelled fields
                             univ_tvs
                             []              -- no existential tvs for now
@@ -693,7 +693,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix
-                            (map (const NotMarkedStrict) comp_tys)
+                            (map (const HsNoBang) comp_tys)
                             []                     -- no field labels
                             tvs
                             []                     -- no existentials

@@ -102,17 +102,6 @@ ppr_qq (HsQuasiQuote quoter _ quote) =
 type LBangType name = Located (BangType name)
 type BangType name  = HsType name	-- Bangs are in the HsType data type
 
-data HsBang = HsNoBang	-- Only used as a return value for getBangStrictness,
-			-- never appears on a HsBangTy
-	    | HsStrict	-- ! 
-	    | HsUnbox	-- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
-  deriving (Data, Typeable)
-
-instance Outputable HsBang where
-    ppr (HsNoBang) = empty
-    ppr (HsStrict) = char '!'
-    ppr (HsUnbox)  = ptext (sLit "!!")
-
 getBangType :: LHsType a -> LHsType a
 getBangType (L _ (HsBangTy _ ty)) = ty
 getBangType ty                    = ty

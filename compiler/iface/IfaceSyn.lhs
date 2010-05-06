@@ -133,7 +133,7 @@ data IfaceConDecl
 	ifConCtxt    :: IfaceContext,		-- Non-stupid context
 	ifConArgTys  :: [IfaceType],		-- Arg types
 	ifConFields  :: [OccName],		-- ...ditto... (field labels)
-	ifConStricts :: [StrictnessMark]}	-- Empty (meaning all lazy),
+	ifConStricts :: [HsBang]}		-- Empty (meaning all lazy),
 						-- or 1-1 corresp with arg tys
 
 data IfaceInst 
@@ -524,10 +524,13 @@ pprIfaceConDecl tc
 	 if is_infix then ptext (sLit "Infix") else empty,
 	 if has_wrap then ptext (sLit "HasWrapper") else empty,
 	 ppUnless (null strs) $
-	    nest 4 (ptext (sLit "Stricts:") <+> hsep (map ppr strs)),
+	    nest 4 (ptext (sLit "Stricts:") <+> hsep (map ppr_bang strs)),
 	 ppUnless (null fields) $
 	    nest 4 (ptext (sLit "Fields:") <+> hsep (map ppr fields))]
   where
+    ppr_bang HsNoBang = char '_'	-- Want to see these
+    ppr_bang bang     = ppr bang
+        
     main_payload = ppr name <+> dcolon <+> 
 		   pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) pp_tau
 

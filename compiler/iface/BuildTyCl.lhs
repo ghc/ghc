@@ -191,7 +191,7 @@ setAssocFamilyPermutation _clas_tvs other
 
 ------------------------------------------------------
 buildDataCon :: Name -> Bool
-	    -> [StrictnessMark] 
+	    -> [HsBang] 
 	    -> [Name]			-- Field labels
 	    -> [TyVar] -> [TyVar]	-- Univ and ext 
             -> [(TyVar,Type)]           -- Equality spec
@@ -306,7 +306,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 
 	; dict_con <- buildDataCon datacon_name
 				   False 	-- Not declared infix
-				   (map (const NotMarkedStrict) args)
+				   (map (const HsNoBang) args)
 				   [{- No fields -}]
 				   tvs [{- no existentials -}]
                                    [{- No GADT equalities -}] [{- No theta -}]

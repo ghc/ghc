@@ -660,6 +660,24 @@ freeNamesDeclExtras IfaceOtherDeclExtras
 freeNamesSub :: (Fixity,[IfaceRule]) -> NameSet
 freeNamesSub (_,rules) = unionManyNameSets (map freeNamesIfRule rules)
 
+instance Outputable IfaceDeclExtras where
+  ppr IfaceOtherDeclExtras       = empty
+  ppr (IfaceIdExtras  fix rules) = ppr_id_extras fix rules
+  ppr (IfaceSynExtras fix)       = ppr fix
+  ppr (IfaceDataExtras fix insts stuff)  = vcat [ppr fix, ppr_insts insts,
+                                                 ppr_id_extras_s stuff]
+  ppr (IfaceClassExtras fix insts stuff) = vcat [ppr fix, ppr_insts insts,
+                                                 ppr_id_extras_s stuff]
+
+ppr_insts :: [IfaceInstABI] -> SDoc
+ppr_insts _ = ptext (sLit "<insts>")
+
+ppr_id_extras_s :: [(Fixity, [IfaceRule])] -> SDoc
+ppr_id_extras_s stuff = vcat [ppr_id_extras f r | (f,r)<- stuff]
+
+ppr_id_extras :: Fixity -> [IfaceRule] -> SDoc
+ppr_id_extras fix rules = ppr fix $$ vcat (map ppr rules)
+
 -- This instance is used only to compute fingerprints
 instance Binary IfaceDeclExtras where
   get _bh = panic "no get for IfaceDeclExtras"

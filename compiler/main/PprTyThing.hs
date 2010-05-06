@@ -197,13 +197,9 @@ pprDataConDecl _ gadt_style show_label dataCon
     pp_tau = foldr add (ppr res_ty) tys_w_strs
     add str_ty pp_ty = pprParendBangTy str_ty <+> arrow <+> pp_ty
 
-    pprParendBangTy (strict,ty)
-	| GHC.isMarkedStrict strict = char '!' <> GHC.pprParendType ty
-	| otherwise		    = GHC.pprParendType ty
+    pprParendBangTy (bang,ty) = ppr bang <> GHC.pprParendType ty
 
-    pprBangTy strict ty
-	| GHC.isMarkedStrict strict = char '!' <> ppr ty
-	| otherwise		    = ppr ty
+    pprBangTy bang ty = ppr bang <> ppr ty
 
     maybe_show_label (lbl,(strict,tp))
 	| show_label lbl = Just (ppr lbl <+> dcolon <+> pprBangTy strict tp)

@@ -244,9 +244,9 @@ mkDataConIds wrap_name wkr_name data_con
   | isNewTyCon tycon                    -- Newtype, only has a worker
   = DCIds Nothing nt_work_id                 
 
-  | any isMarkedStrict all_strict_marks      -- Algebraic, needs wrapper
-    || not (null eq_spec)                    -- NB: LoadIface.ifaceDeclSubBndrs
-    || isFamInstTyCon tycon                  --     depends on this test
+  | any isBanged all_strict_marks      -- Algebraic, needs wrapper
+    || not (null eq_spec)              -- NB: LoadIface.ifaceDeclSubBndrs
+    || isFamInstTyCon tycon            --     depends on this test
   = DCIds (Just alg_wrap_id) wrk_id
 
   | otherwise                                -- Algebraic, no wrapper
@@ -334,8 +334,8 @@ mkDataConIds wrap_name wkr_name data_con
     all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
     wrap_sig = mkStrictSig (mkTopDmdType arg_dmds cpr_info)
     arg_dmds = map mk_dmd all_strict_marks
-    mk_dmd str | isMarkedStrict str = evalDmd
-               | otherwise          = lazyDmd
+    mk_dmd str | isBanged str = evalDmd
+               | otherwise    = lazyDmd
         -- The Cpr info can be important inside INLINE rhss, where the
         -- wrapper constructor isn't inlined.
         -- And the argument strictness can be important too; we
@@ -372,23 +372,21 @@ mkDataConIds wrap_name wkr_name data_con
                              in (y:ys,j)
 
     mk_case 
-           :: (Id, StrictnessMark)      -- Arg, strictness
+           :: (Id, HsBang)      -- Arg, strictness
            -> (Int -> [Id] -> CoreExpr) -- Body
            -> Int                       -- Next rep arg id
            -> [Id]                      -- Rep args so far, reversed
            -> CoreExpr
     mk_case (arg,strict) body i rep_args
           = case strict of
-                NotMarkedStrict -> body i (arg:rep_args)
-                MarkedStrict 
-                   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
-                   | otherwise ->
-                        Case (Var arg) arg res_ty [(DEFAULT,[], body i (arg:rep_args))]
-
-                MarkedUnboxed
-                   -> unboxProduct i (Var arg) (idType arg) the_body 
+                HsNoBang -> body i (arg:rep_args)
+                HsUnpack -> unboxProduct i (Var arg) (idType arg) the_body 
                       where
                         the_body i con_args = body i (reverse con_args ++ rep_args)
+                _other  -- HsUnpackFailed and HsStrict
+                   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
+                   | otherwise -> Case (Var arg) arg res_ty 
+                                       [(DEFAULT,[], body i (arg:rep_args))]
 
 mAX_CPR_SIZE :: Arity
 mAX_CPR_SIZE = 10

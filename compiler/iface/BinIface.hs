@@ -613,16 +613,18 @@ instance Binary InlinePragma where
            d <- get bh
            return (InlinePragma a b c d)
 
-instance Binary StrictnessMark where
-    put_ bh MarkedStrict    = putByte bh 0
-    put_ bh MarkedUnboxed   = putByte bh 1
-    put_ bh NotMarkedStrict = putByte bh 2
+instance Binary HsBang where
+    put_ bh HsNoBang        = putByte bh 0
+    put_ bh HsStrict        = putByte bh 1
+    put_ bh HsUnpack        = putByte bh 2
+    put_ bh HsUnpackFailed  = putByte bh 3
     get bh = do
 	    h <- getByte bh
 	    case h of
-	      0 -> do return MarkedStrict
-	      1 -> do return MarkedUnboxed
-	      _ -> do return NotMarkedStrict
+	      0 -> do return HsNoBang
+	      1 -> do return HsStrict
+	      2 -> do return HsUnpack
+	      _ -> do return HsUnpackFailed
 
 instance Binary Boxity where
     put_ bh Boxed   = putByte bh 0

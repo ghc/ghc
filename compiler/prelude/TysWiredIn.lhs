@@ -72,8 +72,7 @@ import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName,
 			  TyConParent(NoParentTyCon) )
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed,
-			  StrictnessMark(..) )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, HsBang(..) )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys,
 			  TyThing(..) )
@@ -238,7 +237,7 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
   = data_con
   where
     data_con = mkDataCon dc_name declared_infix
-                (map (const NotMarkedStrict) arg_tys)
+                (map (const HsNoBang) arg_tys)
                 [] 	-- No labelled fields
                 tyvars
 		[] 	-- No existential type variables

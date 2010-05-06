@@ -925,11 +925,11 @@ consUseH98Syntax _                                             = True
 -------------------
 tcConArg :: Bool		-- True <=> -funbox-strict_fields
 	   -> LHsType Name
-	   -> TcM (TcType, StrictnessMark)
+	   -> TcM (TcType, HsBang)
 tcConArg unbox_strict bty
   = do  { arg_ty <- tcHsBangType bty
 	; let bang = getBangStrictness bty
-        ; strict_mark <- chooseBoxingStrategy unbox_strict arg_ty bang
+        ; let strict_mark = chooseBoxingStrategy unbox_strict arg_ty bang
 	; return (arg_ty, strict_mark) }
 
 -- We attempt to unbox/unpack a strict field when either:
@@ -938,30 +938,46 @@ tcConArg unbox_strict bty
 --
 -- We have turned off unboxing of newtypes because coercions make unboxing 
 -- and reboxing more complicated
-chooseBoxingStrategy :: Bool -> TcType -> HsBang -> TcM StrictnessMark
+chooseBoxingStrategy :: Bool -> TcType -> HsBang -> HsBang
 chooseBoxingStrategy unbox_strict_fields arg_ty bang
   = case bang of
-	HsNoBang			-> return NotMarkedStrict
-	HsUnbox  | can_unbox arg_ty	-> return MarkedUnboxed
-                 | otherwise            -> do { addWarnTc cant_unbox_msg
-                                              ; return MarkedStrict }
-	HsStrict | unbox_strict_fields 
-                 , can_unbox arg_ty 	-> return MarkedUnboxed
-	_                               -> return MarkedStrict
+	HsNoBang			-> HsNoBang
+	HsUnpack                        -> can_unbox HsUnpackFailed arg_ty
+	HsStrict | unbox_strict_fields  -> can_unbox HsStrict       arg_ty
+		 | otherwise            -> HsStrict
+	HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
+		       	  -- Source code never has shtes
   where
-    -- we can unbox if the type is a chain of newtypes with a product tycon
-    -- at the end
-    can_unbox arg_ty = case splitTyConApp_maybe arg_ty of
-		   Nothing 	       		-> False
-		   Just (arg_tycon, tycon_args) -> 
-                       not (isRecursiveTyCon arg_tycon) &&	-- Note [Recusive unboxing]
-		       isProductTyCon arg_tycon &&
-                       (if isNewTyCon arg_tycon then 
-                            can_unbox (newTyConInstRhs arg_tycon tycon_args)
-                        else True)
+    can_unbox :: HsBang -> TcType -> HsBang
+    -- Returns   HsUnpack  if we can unpack arg_ty
+    -- 		 fail_bang if we know what arg_ty is but we can't unpack it
+    -- 		 HsStrict  if it's abstract, so we don't know whether or not we can unbox it
+    can_unbox fail_bang arg_ty 
+       = case splitTyConApp_maybe arg_ty of
+	    Nothing -> fail_bang
 
-    cant_unbox_msg = ptext (sLit "Ignoring unusable UNPACK pragma")
+	    Just (arg_tycon, tycon_args) 
+              | isAbstractTyCon arg_tycon -> HsStrict	
+                      -- See Note [Don't complain about UNPACK on abstract TyCons]
+              | not (isRecursiveTyCon arg_tycon) 	-- Note [Recusive unboxing]
+	      , isProductTyCon arg_tycon 
+	      	    -- We can unbox if the type is a chain of newtypes 
+		    -- with a product tycon at the end
+              -> if isNewTyCon arg_tycon 
+                 then can_unbox fail_bang (newTyConInstRhs arg_tycon tycon_args)
+                 else HsUnpack
+
+              | otherwise -> fail_bang
 \end{code}
+
+Note [Don't complain about UNPACK on abstract TyCons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are going to complain about UnpackFailed, but if we say
+   data T = MkT {-# UNPACK #-} !Wobble
+and Wobble is a newtype imported from a module that was compiled 
+without optimisation, we don't want to complain. Because it might
+be fine when optimsation is on.  I think this happens when Haddock
+is working over (say) GHC souce files.
 
 Note [Recursive unboxing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1110,9 +1126,15 @@ checkValidDataCon tc con
 		-- Reason: it's really the argument of an equality constraint
 	; checkValidType ctxt (dataConUserType con)
 	; when (isNewTyCon tc) (checkNewDataCon con)
+        ; mapM_ check_bang (dataConStrictMarks con `zip` [1..])
     }
   where
     ctxt = ConArgCtxt (dataConName con) 
+    check_bang (HsUnpackFailed, n) = addWarnTc (cant_unbox_msg n)
+    check_bang _                   = return ()
+
+    cant_unbox_msg n = sep [ ptext (sLit "Ignoring unusable UNPACK pragma on the")
+                           , speakNth n <+> ptext (sLit "argument of") <+> quotes (ppr con)]
 
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
@@ -1124,7 +1146,7 @@ checkNewDataCon con
 		-- Return type is (T a b c)
 	; checkTc (null ex_tvs && null eq_theta && null dict_theta) (newtypeExError con)
 		-- No existentials
-	; checkTc (not (any isMarkedStrict (dataConStrictMarks con))) 
+	; checkTc (not (any isBanged (dataConStrictMarks con))) 
 		  (newtypeStrictError con)
 		-- No strictness
     }
