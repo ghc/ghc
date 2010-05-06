@@ -12,8 +12,8 @@ clean:
 
 mod175:
 	$(MAKE) clean
-	$(TEST_HC) -v0 --make -main-is Test.main  Test.hs  -o test
-	$(TEST_HC) -v0 --make -main-is Test2.main Test2.hs -o test2
+	'$(TEST_HC)' -v0 --make -main-is Test.main  Test.hs  -o test
+	'$(TEST_HC)' -v0 --make -main-is Test2.main Test2.hs -o test2
 	./test
 	./test2
 
