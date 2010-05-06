@@ -1088,7 +1088,7 @@ uTysOuter :: InBox -> TcType    -- ty1 is the *actual*   type
           -> TcM CoercionI
 -- We've just pushed a context describing ty1,ty2
 uTysOuter nb1 ty1 nb2 ty2
-        = do { traceTc (text "uTysOuter" <+> ppr ty1 <+> ppr ty2)
+        = do { traceTc (text "uTysOuter" <+> sep [ppr ty1, ppr ty2])
              ; u_tys (Unify True ty1 ty2) nb1 ty1 ty1 nb2 ty2 ty2 }
 
 uTys :: InBox -> TcType -> InBox -> TcType -> TcM CoercionI
