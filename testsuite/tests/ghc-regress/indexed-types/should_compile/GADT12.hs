@@ -1,6 +1,9 @@
 {-# LANGUAGE TypeFamilies, GADTs, ScopedTypeVariables, KindSignatures #-}
 {-# LANGUAGE EmptyDataDecls #-}
 
+-- Tests whether a type signature can refine a type
+-- See the definition of bug2a
+
 module ShouldCompile where
 
 data Typed
@@ -26,6 +29,9 @@ bug1 (Const TypeBool False) = ()
 
 bug2a :: Expr Typed Bool -> ()
 bug2a (Var2 "x" (TypeBool :: Type Bool)) = ()
+
+bug2c :: Expr Typed Bool -> ()
+bug2c (Var2 "x" TypeBool) = ()
 
 bug2b :: Expr Typed (TU Typed Bool) -> ()
 bug2b (Var2 "x" TypeBool) = ()
