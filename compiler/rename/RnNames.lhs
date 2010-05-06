@@ -394,8 +394,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
   = do	{   -- separate out the family instance declarations
           let (tyinst_decls1, tycl_decls_noinsts) 
                            = partition (isFamInstDecl . unLoc) tycl_decls
-              tyinst_decls = tyinst_decls1 ++ 
-                             concatMap (instDeclATs . unLoc) inst_decls 
+              tyinst_decls = tyinst_decls1 ++ instDeclATs inst_decls
 
             -- process all type/class decls except family instances
         ; tc_names  <- mapM new_tc tycl_decls_noinsts
@@ -433,7 +432,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
 	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
 	     ; return (AvailTC main_name (main_name : sub_names)) }
       where
-	(main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
+	(main_rdr : sub_rdrs) = hsTyClDeclBinders tc_decl
 
     new_ti tc_name_env ti_decl  -- ONLY for type/data instances
 	= do { main_name <- lookupFamInstDeclBndr tc_name_env main_rdr
@@ -441,7 +440,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
 	     ; return (AvailTC main_name sub_names) }
                 	-- main_name is not bound here!
       where
-	(main_rdr : sub_rdrs) = tyClDeclNames (unLoc ti_decl)
+	(main_rdr : sub_rdrs) = hsTyClDeclBinders ti_decl
 
 get_local_binders _ g = pprPanic "get_local_binders" (ppr g)
 \end{code}

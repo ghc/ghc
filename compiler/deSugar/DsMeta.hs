@@ -106,7 +106,7 @@ repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat)
 
 repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group
- = do { let { bndrs = groupBinders group } ;
+ = do { let { bndrs = hsGroupBinders group } ;
 	ss <- mkGenSyms bndrs ;
 
 	-- Bind all the names mainly to avoid repeated use of explicit strings.
@@ -134,16 +134,6 @@ repTopDs group
 	wrapNongenSyms ss q_decs
 	-- Do *not* gensym top-level binders
       }
-
-groupBinders :: HsGroup Name -> [Name]
-groupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
-                        hs_instds = inst_decls, hs_fords = foreign_decls })
--- Collect the binders of a Group
-  = collectHsValBinders val_decls ++
-    [n | d <- tycl_decls ++ assoc_tycl_decls, L _ n <- tyClDeclNames (unLoc d)] ++
-    [n | L _ (ForeignImport (L _ n) _ _) <- foreign_decls]
-  where
-    assoc_tycl_decls = concat [ats | L _ (InstDecl _ _ _ ats) <- inst_decls]
 
 
 {- 	Note [Binders and occurrences]

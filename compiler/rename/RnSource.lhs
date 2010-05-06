@@ -466,7 +466,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the declarations are for the right class
     let
-	at_names = map (head . tyClDeclNames . unLoc) ats
+	at_names = map (head . hsTyClDeclBinders) ats
     in
     checkDupRdrNames at_names		`thenM_`
 	-- See notes with checkDupRdrNames for methods, above
@@ -1059,8 +1059,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     all_data_cons = [con | L _ (TyData { tcdCons = cons }) <- all_tycl_decls
     		         , L _ con <- cons ]
     all_tycl_decls = at_tycl_decls ++ tycl_decls
-    at_tycl_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats]
-    		      -- Do not forget associated types!
+    at_tycl_decls = instDeclATs inst_decls  -- Do not forget associated types!
 
     get_con (ConDecl { con_name = con, con_details = RecCon flds })
 	    (RecFields env fld_set)

@@ -24,7 +24,7 @@ module HsDecls (
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl,
   isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
-  isFamInstDecl, tcdName, tyClDeclNames, tyClDeclTyVars,
+  isFamInstDecl, tcdName, tyClDeclTyVars,
   countTyClDecls,
   -- ** Instance declarations
   InstDecl(..), LInstDecl, NewOrData(..), FamilyFlavour(..),
@@ -43,7 +43,7 @@ module HsDecls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl, ResType(..), 
-  HsConDeclDetails, hsConDeclArgTys, hsConDeclsNames,
+  HsConDeclDetails, hsConDeclArgTys, 
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -544,23 +544,6 @@ Dealing with names
 tcdName :: TyClDecl name -> name
 tcdName decl = unLoc (tcdLName decl)
 
-tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
--- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.
--- The first one is guaranteed to be the name of the decl. For record fields
--- mentioned in multiple constructors, the SrcLoc will be from the first
--- occurence.  We use the equality to filter out duplicate field names
-
-tyClDeclNames (TyFamily    {tcdLName = name})    = [name]
-tyClDeclNames (TySynonym   {tcdLName = name})    = [name]
-tyClDeclNames (ForeignType {tcdLName = name})    = [name]
-
-tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
-  = cls_name : 
-    concatMap (tyClDeclNames . unLoc) ats ++ [n | L _ (TypeSig n _) <- sigs]
-
-tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
-  = tc_name : hsConDeclsNames cons
-
 tyClDeclTyVars :: TyClDecl name -> [LHsTyVarBndr name]
 tyClDeclTyVars (TyFamily    {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TySynonym   {tcdTyVars = tvs}) = tvs
@@ -757,24 +740,6 @@ instance OutputableBndr name => Outputable (ResType name) where
    ppr (ResTyGADT ty) = ptext (sLit "ResTyGADT") <+> pprParendHsType (unLoc ty)
 \end{code}
 
-\begin{code}
-hsConDeclsNames :: (Eq name) => [LConDecl name] -> [Located name]
-  -- See tyClDeclNames for what this does
-  -- The function is boringly complicated because of the records
-  -- And since we only have equality, we have to be a little careful
-hsConDeclsNames cons
-  = snd (foldl do_one ([], []) cons)
-  where
-    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname, con_details = RecCon flds }))
-	= (map unLoc new_flds ++ flds_seen, lname : new_flds ++ acc)
-	where
-	  new_flds = filterOut (\f -> unLoc f `elem` flds_seen) 
-			       (map cd_fld_name flds)
-
-    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname }))
-	= (flds_seen, lname:acc)
-\end{code}
-  
 
 \begin{code}
 instance (OutputableBndr name) => Outputable (ConDecl name) where
@@ -837,8 +802,8 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
 
 -- Extract the declarations of associated types from an instance
 --
-instDeclATs :: InstDecl name -> [LTyClDecl name]
-instDeclATs (InstDecl _ _ _ ats) = ats
+instDeclATs :: [LInstDecl name] -> [LTyClDecl name]
+instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats]
 \end{code}
 
 %************************************************************************

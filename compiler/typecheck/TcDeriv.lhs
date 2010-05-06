@@ -436,10 +436,7 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 
     all_tydata :: [(LHsType Name, LTyClDecl Name)]
 	-- Derived predicate paired with its data type declaration
-    all_tydata = extractTyDataPreds tycl_decls ++
-		 [ pd                -- Traverse assoc data families
-                 | L _ (InstDecl _ _ _ ats) <- inst_decls
-		 , pd <- extractTyDataPreds ats ]
+    all_tydata = extractTyDataPreds (instDeclATs inst_decls ++ tycl_decls)
 
     deriv_locs = map (getLoc . snd) all_tydata
 		 ++ map getLoc deriv_decls

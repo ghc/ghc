@@ -57,9 +57,13 @@ module HsUtils(
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
-  collectSigTysFromPats, collectSigTysFromPat
+  collectSigTysFromPats, collectSigTysFromPat,
+
+  hsTyClDeclBinders, hsTyClDeclsBinders, hsConDeclsBinders, 
+  hsForeignDeclsBinders, hsGroupBinders
   ) where
 
+import HsDecls
 import HsBinds
 import HsExpr
 import HsPat
@@ -554,6 +558,58 @@ Here, the pattern (C (n+1)) binds a hidden dictionary (d::Num a),
 and *also* uses that dictionary to match the (n+1) pattern.  Yet, the
 variables bound by the lazy pattern are n,m, *not* the dictionary d.
 So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
+
+\begin{code}
+hsGroupBinders :: HsGroup Name -> [Name]
+hsGroupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
+                          hs_instds = inst_decls, hs_fords = foreign_decls })
+-- Collect the binders of a Group
+  =  collectHsValBinders val_decls
+  ++ hsTyClDeclsBinders tycl_decls inst_decls
+  ++ hsForeignDeclsBinders foreign_decls
+
+hsForeignDeclsBinders :: [LForeignDecl Name] -> [Name]
+hsForeignDeclsBinders foreign_decls
+  = [n | L _ (ForeignImport (L _ n) _ _) <- foreign_decls]
+
+hsTyClDeclsBinders :: [Located (TyClDecl Name)] -> [Located (InstDecl Name)] -> [Name]
+hsTyClDeclsBinders tycl_decls inst_decls
+  = [n | d <- instDeclATs inst_decls ++ tycl_decls, L _ n <- hsTyClDeclBinders d]
+
+hsTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
+-- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.
+-- The first one is guaranteed to be the name of the decl. For record fields
+-- mentioned in multiple constructors, the SrcLoc will be from the first
+-- occurence.  We use the equality to filter out duplicate field names
+
+hsTyClDeclBinders (L _ (TyFamily    {tcdLName = name})) = [name]
+hsTyClDeclBinders (L _ (TySynonym   {tcdLName = name})) = [name]
+hsTyClDeclBinders (L _ (ForeignType {tcdLName = name})) = [name]
+
+hsTyClDeclBinders (L _ (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats}))
+  = cls_name : 
+    concatMap hsTyClDeclBinders ats ++ [n | L _ (TypeSig n _) <- sigs]
+
+hsTyClDeclBinders (L _ (TyData {tcdLName = tc_name, tcdCons = cons}))
+  = tc_name : hsConDeclsBinders cons
+
+hsConDeclsBinders :: (Eq name) => [LConDecl name] -> [Located name]
+  -- See hsTyClDeclBinders for what this does
+  -- The function is boringly complicated because of the records
+  -- And since we only have equality, we have to be a little careful
+hsConDeclsBinders cons
+  = snd (foldl do_one ([], []) cons)
+  where
+    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname, con_details = RecCon flds }))
+	= (map unLoc new_flds ++ flds_seen, lname : new_flds ++ acc)
+	where
+	  new_flds = filterOut (\f -> unLoc f `elem` flds_seen) 
+			       (map cd_fld_name flds)
+
+    do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname }))
+	= (flds_seen, lname:acc)
+\end{code}
+
 
 %************************************************************************
 %*									*
