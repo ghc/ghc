@@ -451,14 +451,12 @@ tcPrags :: RecFlag
 --    SPECIALISE prags are passed to the desugarer via TcSpecPrags
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
-tcPrags _rec_group _multi_bind _is_overloaded_id poly_id prag_sigs
+tcPrags _rec_group _multi_bind is_overloaded_id poly_id prag_sigs
   = do { poly_id' <- tc_inl inl_sigs
 
        ; spec_prags <- mapM (wrapLocM (tcSpecPrag poly_id')) spec_sigs
 
--- Commented out until bytestring library removes redundant pragmas
--- for packWith and unpackWith
---       ; unless (null spec_sigs || is_overloaded_id) warn_discarded_spec
+       ; unless (null spec_sigs || is_overloaded_id) warn_discarded_spec
 
        ; unless (null bad_sigs) warn_discarded_sigs
 
@@ -467,8 +465,8 @@ tcPrags _rec_group _multi_bind _is_overloaded_id poly_id prag_sigs
     (inl_sigs, other_sigs) = partition isInlineLSig prag_sigs
     (spec_sigs, bad_sigs)  = partition isSpecLSig   other_sigs
 
---    warn_discarded_spec = warnPrags poly_id spec_sigs $
---                          ptext (sLit "SPECIALISE pragmas for non-overloaded function")
+    warn_discarded_spec = warnPrags poly_id spec_sigs $
+                          ptext (sLit "SPECIALISE pragmas for non-overloaded function")
     warn_dup_inline 	= warnPrags poly_id inl_sigs $
                     	  ptext (sLit "Duplicate INLINE pragmas for")
     warn_discarded_sigs = warnPrags poly_id bad_sigs $
