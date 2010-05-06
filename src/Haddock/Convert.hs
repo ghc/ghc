@@ -17,7 +17,6 @@
 -- instance heads, which aren't TyThings, so just export everything.
 module Haddock.Convert where
 
-import BasicTypes
 import HsSyn
 import TcType ( tcSplitSigmaTy )
 import TypeRep
