@@ -54,25 +54,30 @@ name = Util.globalMVar (value);
 #define COMMA ,
 
 #ifdef DEBUG
-#define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
+#define ASSERT(e)      if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
-#define MASSERT(e)      ASSERT(e) return ()
-#define MASSERT2(e,msg) ASSERT2(e,msg) return ()
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
-#define ASSERTM(mbool) do { bool <- mbool; ASSERT(bool) return () }
-#define ASSERTM2(mbool,msg) do { bool <- mbool; ASSERT2(bool,msg) return () }
 #else
 -- We have to actually use all the variables we are given or we may get
 -- unused variable warnings when DEBUG is off.
 #define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
 #define ASSERT2(e,msg) if False && (const False (e,msg)) then pprPanic "ASSERT2" (msg) else
+#define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
+-- Here we deliberately don't use when as Control.Monad might not be imported
+#endif
+
+-- Examples:   Assuming   flagSet :: String -> m Bool
+-- 
+--    do { c   <- getChar; MASSERT( isUpper c ); ... }
+--    do { c   <- getChar; MASSERT2( isUpper c, text "Bad" ); ... }
+--    do { str <- getStr;  ASSERTM( flagSet str ); .. }
+--    do { str <- getStr;  ASSERTM2( flagSet str, text "Bad" ); .. }
+--    do { str <- getStr;  WARNM2( flagSet str, text "Flag is set" ); .. }
 #define MASSERT(e)      ASSERT(e) return ()
 #define MASSERT2(e,msg) ASSERT2(e,msg) return ()
-#define ASSERTM(e)       do { let { _mbool = (e) } }
--- Here we deliberately don't use when as Control.Monad might not be imported
-#define ASSERTM2(e,msg)  do { let { _mbool = (e) }; if False then panic "ASSERTM2" else return () }
-#define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
-#endif
+#define ASSERTM(e)      do { bool <- e; MASSERT(bool) }
+#define ASSERTM2(e,msg) do { bool <- e; MASSERT2(bool,msg) }
+#define WARNM2(e,msg)   do { bool <- e; WARN(bool, msg) return () }
 
 -- Useful for declaring arguments to be strict
 #define STRICT1(f) f a | a `seq` False = undefined
