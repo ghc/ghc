@@ -1,6 +1,6 @@
 
 tcfail145.hs:9:6:
-    Pattern signature must exactly match: forall a. a -> a
+    Pattern signature must exactly match: forall c. c -> c
     In the pattern: f :: forall a. [a] -> [a]
     In the definition of `foo':
         foo (f :: forall a. [a] -> [a]) = f undefined
