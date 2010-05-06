@@ -132,6 +132,11 @@ ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(compiler_stage1_v_LIB)
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_v_LIB)
 ghc/stage3/build/tmp/$(ghc_stage3_PROG) : $(compiler_stage3_v_LIB)
 
+ifeq "$(GhcProfiled)" "YES"
+ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_p_LIB)
+ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_p_LIB))
+endif
+
 # Modules here import HsVersions.h, so we need ghc_boot_platform.h
 $(ghc_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
 $(ghc_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
