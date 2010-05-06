@@ -17,6 +17,7 @@
 -- instance heads, which aren't TyThings, so just export everything.
 module Haddock.Convert where
 
+import BasicTypes
 import HsSyn
 import TcType ( tcSplitSigmaTy )
 import TypeRep
@@ -30,7 +31,6 @@ import Var
 import Class
 import TyCon
 import DataCon
-import BasicTypes
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName )
 import Bag ( emptyBag )
@@ -171,11 +171,9 @@ synifyDataCon use_gadt_syntax dc = noLoc $
   linear_tys = zipWith (\ty strict ->
             let tySyn = synifyType WithinType ty
             in case strict of
-                 MarkedStrict -> noLoc $ HsBangTy HsStrict tySyn
-                 MarkedUnboxed -> noLoc $ HsBangTy HsUnbox tySyn
-                 NotMarkedStrict ->
-                      -- HsNoBang never appears, it's implied instead.
-                      tySyn
+                 -- HsNoBang never appears, it's implied instead.
+                 HsNoBang -> tySyn
+                 _ -> noLoc $ HsBangTy strict tySyn
           )
           (dataConOrigArgTys dc) (dataConStrictMarks dc)
   field_tys = zipWith (\field synTy -> ConDeclField
