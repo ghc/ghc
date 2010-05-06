@@ -86,17 +86,17 @@ Checks the @(..)@ etc constraints in the export list.
 -- does NOT assume that anything is in scope already
 rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a HsGroup; used for normal source files *and* hs-boot files
-rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
-                                   hs_tyclds = tycl_decls,
-                                   hs_instds = inst_decls,
-                                   hs_derivds = deriv_decls,
-                                   hs_fixds  = fix_decls,
-                                   hs_warnds  = warn_decls,
-                                   hs_annds  = ann_decls,
-                                   hs_fords  = foreign_decls,
-                                   hs_defds  = default_decls,
-                                   hs_ruleds = rule_decls,
-                                   hs_docs   = docs })
+rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
+                            hs_tyclds  = tycl_decls,
+                            hs_instds  = inst_decls,
+                            hs_derivds = deriv_decls,
+                            hs_fixds   = fix_decls,
+                            hs_warnds  = warn_decls,
+                            hs_annds   = ann_decls,
+                            hs_fords   = foreign_decls,
+                            hs_defds   = default_decls,
+                            hs_ruleds  = rule_decls,
+                            hs_docs    = docs })
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
    --     FastStrings to FixItems.
@@ -178,30 +178,33 @@ rnSrcDecls group@(HsGroup {hs_valds  = val_decls,
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
    -- (I) Compute the results and return
-   let {rn_group = HsGroup { hs_valds  = rn_val_decls,
-			     hs_tyclds = rn_tycl_decls,
-			     hs_instds = rn_inst_decls,
+   let {rn_group = HsGroup { hs_valds  	= rn_val_decls,
+			     hs_tyclds 	= rn_tycl_decls,
+			     hs_instds 	= rn_inst_decls,
                              hs_derivds = rn_deriv_decls,
-			     hs_fixds  = rn_fix_decls,
-			     hs_warnds = [], -- warns are returned in the tcg_env
+			     hs_fixds   = rn_fix_decls,
+			     hs_warnds  = [], -- warns are returned in the tcg_env
 	                                     -- (see below) not in the HsGroup
 			     hs_fords  = rn_foreign_decls,
-			     hs_annds   = rn_ann_decls,
+			     hs_annds  = rn_ann_decls,
 			     hs_defds  = rn_default_decls,
 			     hs_ruleds = rn_rule_decls,
                              hs_docs   = rn_docs } ;
 
-	other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
-			     src_fvs5, src_fvs6, src_fvs7] ;
-	src_dus = bind_dus `plusDU` usesOnly other_fvs;
-		-- Note: src_dus will contain *uses* for locally-defined types
-		-- and classes, but no *defs* for them.  (Because rnTyClDecl 
-		-- returns only the uses.)  This is a little 
-		-- surprising but it doesn't actually matter at all.
+        tycl_bndrs = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
+        ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
+	other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
+        other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
+			      src_fvs5, src_fvs6, src_fvs7] ;
+		-- It is tiresome to gather the binders from type and class decls
 
-       final_tcg_env = let tcg_env' = (tcg_env `addTcgDUs` src_dus)
-                       in -- we return the deprecs in the env, not in the HsGroup above
-                         tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
+	src_dus = [other_def] `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
+		-- Instance decls may have occurrences of things bound in bind_dus
+		-- so we must put other_fvs last
+
+        final_tcg_env = let tcg_env' = (tcg_env `addTcgDUs` src_dus)
+                        in -- we return the deprecs in the env, not in the HsGroup above
+                        tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
        } ;
 
    traceRn (text "finish rnSrc" <+> ppr rn_group) ;

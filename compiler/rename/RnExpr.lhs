@@ -618,8 +618,9 @@ rnBracket (DecBrL decls)
        	 	   	      setStage thRnBrack $
 			      rnSrcDecls group      
 
-       -- Discard the tcg_env; it contains only extra info about fixity
-	; return (DecBrG group', allUses (tcg_dus tcg_env)) }
+	      -- Discard the tcg_env; it contains only extra info about fixity
+        ; traceRn (text "rnBracket dec" <+> (ppr (tcg_dus tcg_env) $$ ppr (duUses (tcg_dus tcg_env))))
+	; return (DecBrG group', duUses (tcg_dus tcg_env)) }
 
 rnBracket (DecBrG _) = panic "rnBracket: unexpected DecBrG"
 \end{code}
@@ -994,8 +995,8 @@ rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
   (binds', du_binds) <- 
       -- fixities and unused are handled above in rn_rec_stmts_and_then
       rnValBindsRHS (mkNameSet all_bndrs) binds'
-  return [(duDefs du_binds, duUses du_binds, 
-	    emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
+  return [(duDefs du_binds, allUses du_binds, 
+	   emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
 -- no RecStmt case becuase they get flattened above when doing the LHSes
 rn_rec_stmt _ stmt@(L _ (RecStmt {})) _

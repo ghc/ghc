@@ -154,6 +154,7 @@ type Uses = NameSet
 type DefUse  = (Maybe Defs, Uses)
 
 -- | A number of 'DefUse's in dependency order: earlier 'Defs' scope over later 'Uses'
+--   In a single (def, use) pair, the defs also scope over the uses
 type DefUses = [DefUse]
 
 emptyDUs :: DefUses
@@ -174,16 +175,16 @@ duDefs dus = foldr get emptyNameSet dus
     get (Nothing, _u1) d2 = d2
     get (Just d1, _u1) d2 = d1 `unionNameSets` d2
 
-duUses :: DefUses -> Uses
+allUses :: DefUses -> Uses
 -- ^ Just like 'allUses', but 'Defs' are not eliminated from the 'Uses' returned
-duUses dus = foldr get emptyNameSet dus
+allUses dus = foldr get emptyNameSet dus
   where
     get (_d1, u1) u2 = u1 `unionNameSets` u2
 
-allUses :: DefUses -> Uses
+duUses :: DefUses -> Uses
 -- ^ Collect all 'Uses', regardless of whether the group is itself used,
 -- but remove 'Defs' on the way
-allUses dus
+duUses dus
   = foldr get emptyNameSet dus
   where
     get (Nothing,   rhs_uses) uses = rhs_uses `unionNameSets` uses

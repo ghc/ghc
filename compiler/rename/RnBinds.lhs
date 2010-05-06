@@ -352,9 +352,9 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 
 	; let
             -- The variables "used" in the val binds are: 
-            --   (1) the uses of the binds (duUses)
+            --   (1) the uses of the binds (allUses)
             --   (2) the FVs of the thing-inside
-            all_uses = duUses dus `plusFV` result_fvs
+            all_uses = allUses dus `plusFV` result_fvs
 		-- Note [Unused binding hack]
 		-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 		-- Note that *in contrast* to the above reporting of
