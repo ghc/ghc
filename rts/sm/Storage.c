@@ -290,7 +290,9 @@ newCAF(StgRegTable *reg, StgClosure* caf)
   {
     // Put this CAF on the mutable list for the old generation.
     ((StgIndStatic *)caf)->saved_info = NULL;
-    recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
+    if (oldest_gen->no != 0) {
+        recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
+    }
   }
 }
 
