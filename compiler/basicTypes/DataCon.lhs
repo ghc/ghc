@@ -343,7 +343,7 @@ data DataCon
 					-- and *including* existential dictionaries
 
 	dcRepStrictness :: [StrictnessMark],
-        -- One for each *representation* *value* argument
+                -- One for each *representation* *value* argument
 		-- See also Note [Data-con worker strictness] in MkId.lhs
 
 	-- Result type of constructor is T t1..tn
