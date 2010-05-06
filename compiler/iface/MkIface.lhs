@@ -855,7 +855,7 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
         | isWiredInName name = mv_map  -- ignore wired-in names
         | otherwise
         = case nameModule_maybe name of
-             Nothing  -> pprTrace "mkUsageInfo: internal name?" (ppr name) mv_map
+             Nothing  -> pprPanic "mkUsageInfo: internal name?" (ppr name)
              Just mod -> -- We use this fiddly lambda function rather than
                          -- (++) as the argument to extendModuleEnv_C to
                          -- avoid quadratic behaviour (trac #2680)
