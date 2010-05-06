@@ -157,3 +157,5 @@ test('ffi020', [ omit_ways(prof_ways),
 
 
 test('ffi021', normal, compile_and_run, [''])
+
+test('4038', normal, compile_and_run, [''])
