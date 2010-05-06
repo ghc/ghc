@@ -605,7 +605,7 @@ rnBracket (DecBrL decls)
   = do { (group, mb_splice) <- findSplice decls
        ; case mb_splice of
            Nothing -> return ()
-           Just (SpliceDecl (L loc _), _)  
+           Just (SpliceDecl (L loc _) _, _)  
               -> setSrcSpan loc $
                  addErr (ptext (sLit "Declaration splices are not permitted inside declaration brackets"))
 		-- Why not?  See Section 7.3 of the TH paper.  

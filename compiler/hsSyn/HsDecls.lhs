@@ -232,11 +232,15 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 	  ppr_ds [] = empty
 	  ppr_ds ds = blankLine $$ vcat (map ppr ds)
 
-data SpliceDecl id = SpliceDecl (Located (HsExpr id))	-- Top level splice
+data SpliceDecl id 
+  = SpliceDecl			-- Top level splice
+        (Located (HsExpr id))
+        HsExplicitFlag		-- Explicit <=> $(f x y)
+				-- Implicit <=> f x y,  i.e. a naked top level expression
     deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
-   ppr (SpliceDecl e) = ptext (sLit "$") <> parens (pprExpr (unLoc e))
+   ppr (SpliceDecl e _) = ptext (sLit "$") <> parens (pprExpr (unLoc e))
 \end{code}
 
 

@@ -433,7 +433,7 @@ tc_rn_src_decls boot_details ds
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
 	-- If there's a splice, we must carry on
-	   Just (SpliceDecl splice_expr, rest_ds) -> do {
+	   Just (SpliceDecl splice_expr _, rest_ds) -> do {
 
 	-- Rename the splice expression, and get its supporting decls
 	(rn_splice_expr, splice_fvs) <- checkNoErrs (rnLExpr splice_expr) ;
@@ -477,8 +477,8 @@ tcRnHsBootDecls decls
 
 		-- Check for illegal declarations
 	; case group_tail of
-	     Just (SpliceDecl d, _) -> badBootDecl "splice" d
-	     Nothing                -> return ()
+	     Just (SpliceDecl d _, _) -> badBootDecl "splice" d
+	     Nothing                  -> return ()
 	; mapM_ (badBootDecl "foreign") for_decls
 	; mapM_ (badBootDecl "default") def_decls
 	; mapM_ (badBootDecl "rule")    rule_decls

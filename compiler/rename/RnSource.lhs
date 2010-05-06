@@ -1119,7 +1119,18 @@ addl gp (L l d : ds) = add gp l d ds
 add :: HsGroup RdrName -> SrcSpan -> HsDecl RdrName -> [LHsDecl RdrName]
     -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
 
-add gp _ (SpliceD e) ds = return (gp, Just (e, ds))
+add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds 
+  = do { -- We've found a top-level splice.  If it is an *implicit* one 
+         -- (i.e. a naked top level expression)
+         case flag of
+           Explicit -> return ()
+           Implicit -> do { th_on <- doptM Opt_TemplateHaskell
+                          ; unless th_on $ setSrcSpan loc $
+                            failWith badImplicitSplice }
+
+       ; return (gp, Just (splice, ds)) }
+  where
+    badImplicitSplice = ptext (sLit "Parse error: naked expression at top level")
 
 #ifndef GHCI
 add _ _ (QuasiQuoteD qq) _
