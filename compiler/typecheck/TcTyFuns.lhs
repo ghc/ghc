@@ -315,7 +315,7 @@ no further propoagation is possible.
 --
 normaliseEqs :: [Inst] -> TcM EqConfig
 normaliseEqs eqs 
-  = do { ASSERTM2( allM wantedEqInstIsUnsolved eqs, ppr eqs )
+  = do { WARNM2( anyM wantedEqInstIsUnsolved eqs, ppr eqs )
        ; traceTc $ ptext (sLit "Entering normaliseEqs")
 
        ; eqss <- mapM normEqInst eqs
