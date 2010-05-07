@@ -1516,11 +1516,7 @@ ppForAll Explicit ltvs lctxt =
 
 ppBang :: HsBang -> Html
 ppBang HsNoBang = empty 
-ppBang HsStrict = toHtml "!"
-ppBang HsUnpack = toHtml "!" -- unboxed args is an implementation detail,
-                             -- so we just show the strictness annotation
-ppBang HsUnpackFailed = toHtml "!" -- unboxed args is an implementation detail,
-
+ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
 
 tupleParens :: Boxity -> [Html] -> Html
 tupleParens Boxed   = parenList

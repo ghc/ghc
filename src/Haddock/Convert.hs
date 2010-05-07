@@ -167,12 +167,14 @@ synifyDataCon use_gadt_syntax dc = noLoc $
     else synifyTyVars (dataConExTyVars dc)
   -- skip any EqTheta, use 'orig'inal syntax
   ctx = synifyCtx (dataConDictTheta dc)
-  linear_tys = zipWith (\ty strict ->
+  linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
-            in case strict of
-                 -- HsNoBang never appears, it's implied instead.
-                 HsNoBang -> tySyn
-                 _ -> noLoc $ HsBangTy strict tySyn
+            in case bang of
+                 HsUnpackFailed -> noLoc $ HsBangTy HsStrict tySyn
+                 HsNoBang       -> tySyn
+                      -- HsNoBang never appears, it's implied instead.
+                 _              -> noLoc $ HsBangTy bang tySyn
+                      
           )
           (dataConOrigArgTys dc) (dataConStrictMarks dc)
   field_tys = zipWith (\field synTy -> ConDeclField
