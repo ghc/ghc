@@ -154,8 +154,6 @@ newTask (rtsBool worker)
     task->worker        = worker;
     task->stopped       = rtsFalse;
     task->running_finalizers = rtsFalse;
-    task->stat          = NoStatus;
-    task->ret           = NULL;
     task->n_spare_incalls = 0;
     task->spare_incalls = NULL;
     task->incall        = NULL;
@@ -211,6 +209,8 @@ newInCall (Task *task)
     incall->task = task;
     incall->suspended_tso = NULL;
     incall->suspended_cap = NULL;
+    incall->stat          = NoStatus;
+    incall->ret           = NULL;
     incall->next = NULL;
     incall->prev = NULL;
     incall->prev_stack = task->incall;

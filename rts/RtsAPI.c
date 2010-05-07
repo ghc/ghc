@@ -510,7 +510,7 @@ rts_evalLazyIO_ (Capability *cap, HaskellObj p, unsigned int stack_size,
 void
 rts_checkSchedStatus (char* site, Capability *cap)
 {
-    SchedulerStatus rc = cap->running_task->stat;
+    SchedulerStatus rc = cap->running_task->incall->stat;
     switch (rc) {
     case Success:
 	return;
@@ -529,7 +529,7 @@ rts_checkSchedStatus (char* site, Capability *cap)
 SchedulerStatus
 rts_getSchedStatus (Capability *cap)
 {
-    return cap->running_task->stat;
+    return cap->running_task->incall->stat;
 }
 
 Capability *

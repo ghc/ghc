@@ -83,6 +83,9 @@ typedef struct InCall_ {
                                 // without owning a Capability in the
                                 // first place.
 
+    SchedulerStatus  stat;      // return status
+    StgClosure **    ret;       // return value
+
     struct Task_ *task;
 
     // When a Haskell thread makes a foreign call that re-enters
@@ -136,9 +139,6 @@ typedef struct Task_ {
 
     // So that we can detect when a finalizer illegally calls back into Haskell
     rtsBool running_finalizers;
-
-    SchedulerStatus  stat;      // return status
-    StgClosure **    ret;       // return value
 
     // Stats that we collect about this task
     // ToDo: we probably want to put this in a separate TaskStats
