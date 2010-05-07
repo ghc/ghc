@@ -486,7 +486,7 @@ $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 
 # GHC itself doesn't know about the above dependencies, so we have to
 # switch off the recompilation checker for those modules:
-compiler/prelude/PrimOps_HC_OPTS += -fforce-recomp
+compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
 compiler/main/Constants_HC_OPTS  += -fforce-recomp
 
 # Workaround for #4003 in GHC 6.12.2.  It didn't happen in 6.12.1, and
