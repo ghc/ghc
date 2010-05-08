@@ -3,6 +3,8 @@ module Main (main) where
 
 import Control.Monad
 import Data.List
+import qualified Data.Set as Set
+import Data.Set (Set)
 import System.Environment
 import System.Exit
 import System.FilePath
@@ -20,20 +22,23 @@ main = do args <- getArgs
               _ ->
                   error "Bad args"
 
+readSet :: FilePath -> IO (Set FilePath)
+readSet fp = liftM (Set.fromList . lines) $ readFile fp
+
 doit :: FilePath -> FilePath -> FilePath -> IO ()
 doit contentsBeforeFile contentsAfterFile wouldBeCleanedFile
- = do contentsBefore <- liftM lines $ readFile contentsBeforeFile
-      contentsAfter  <- liftM lines $ readFile contentsAfterFile
+ = do contentsBefore <- readSet contentsBeforeFile
+      contentsAfter  <- readSet contentsAfterFile
       wouldBeCleaned <- liftM (map read . lines) $ readFile wouldBeCleanedFile
-      let newContentsAfter = contentsAfter \\ contentsBefore
+      let newContentsAfter = contentsAfter `Set.difference` contentsBefore
       let cleanedAfter = simulateCleans newContentsAfter wouldBeCleaned
-      unless (null cleanedAfter) $ do
+      unless (Set.null cleanedAfter) $ do
           hPutStrLn stderr "Files not cleaned:"
-          mapM_ (hPutStrLn stderr . show) cleanedAfter
+          mapM_ (hPutStrLn stderr . show) (Set.toList cleanedAfter)
           exitWith (ExitFailure 1)
 
-simulateCleans :: [FilePath] -> [CleanWhat] -> [FilePath]
-simulateCleans fs cws = filter (not . cleaned) fs
+simulateCleans :: Set FilePath -> [CleanWhat] -> Set FilePath
+simulateCleans fs cws = Set.filter (not . cleaned) fs
     where cleaned f = any (`willClean` f) cws
 
 willClean :: CleanWhat -> FilePath -> Bool
