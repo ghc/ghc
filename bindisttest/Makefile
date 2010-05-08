@@ -17,6 +17,7 @@ default_target: all
 # Ideally we'd just include something to give us variables
 # for paths and arguments to tools etc, and those set in mk/build.mk.
 TOP=..
+include $(TOP)/mk/tree.mk
 include $(TOP)/mk/config.mk
 
 ifeq "$(TEST_PREP)" "YES"
@@ -26,9 +27,9 @@ BIN_DIST_TEST_TAR_BZ2 = ../$(BIN_DIST_TAR_BZ2)
 endif
 
 all:
-	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
-	$(RM) -rf a/b/c/*
-	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
+	"$(RM)" $(RM_OPTS_REC) $(BIN_DIST_INST_SUBDIR)
+	"$(RM)" $(RM_OPTS_REC) a/b/c/*
+	"$(RM)" $(RM_OPTS) HelloWorld HelloWorld.o HelloWorld.hi output
 # We use the a/b/c subdirectory as configure looks for install-sh in
 # . .. ../.. and we don't want it to find the build system's install-sh.
 #
@@ -51,11 +52,14 @@ endif
 	$(BIN_DIST_INST_DIR)/bin/ghc-pkg check --no-user-package-conf
 
 clean distclean:
-	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
-	$(RM) -rf a/b/c/*
-	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
+	"$(RM)" $(RM_OPTS_REC) $(BIN_DIST_INST_SUBDIR)
+	"$(RM)" $(RM_OPTS_REC) a/b/c/*
+	"$(RM)" $(RM_OPTS) HelloWorld HelloWorld.o HelloWorld.hi output
 
 # Ignore a load of other standard targets
 install install-docs doc:
 	@:
+
+show:
+	@echo '$(VALUE)="$($(VALUE))"'
 
