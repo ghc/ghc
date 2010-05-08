@@ -167,15 +167,15 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
-ifeq "$$(darwin_TARGET_OS)" "1"
-	# Ensure library's install name is correct before anyone links with it.
-	install_name_tool -id $(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
-endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
+ifeq "$$(darwin_TARGET_OS)" "1"
+	# Ensure library's install name is correct before anyone links with it.
+	install_name_tool -id $(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
+endif
 endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS)
