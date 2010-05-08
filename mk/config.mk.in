@@ -785,12 +785,3 @@ CONFIGURE_ARGS = @CONFIGURE_ARGS@
 ICONV_INCLUDE_DIRS = @ICONV_INCLUDE_DIRS@
 ICONV_LIB_DIRS = @ICONV_LIB_DIRS@
 
-################################################################################
-#
-#    Bindist testing directory
-#
-################################################################################
-
-BIN_DIST_INST_SUBDIR = "install dir"
-BIN_DIST_INST_DIR = $(TOP)/bindisttest/$(BIN_DIST_INST_SUBDIR)
-
