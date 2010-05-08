@@ -17,5 +17,5 @@ clean : clean_$1
 clean_$1 : clean_$1_$2
 .PHONY: clean_$1_$2
 clean_$1_$2:
-	"$$(RM)" $$(RM_OPTS) -r $3
+	"$$(RM)" $$(RM_OPTS_REC) $3
 endef

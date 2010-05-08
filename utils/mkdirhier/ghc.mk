@@ -14,7 +14,7 @@ $(MKDIRHIER) : utils/mkdirhier/mkdirhier.sh
 	-mkdir $(INPLACE)
 	-mkdir $(INPLACE_BIN)
 	-mkdir $(INPLACE_LIB)
-	"$(RM)" $(RM_OPTS) -f $@
+	"$(RM)" $(RM_OPTS) $@
 	echo '#!$(SHELL)'  		 >> $@
 	cat utils/mkdirhier/mkdirhier.sh >> $@
 	$(EXECUTABLE_FILE) $@

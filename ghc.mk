@@ -897,7 +897,7 @@ ALL_INSTALLED_PACKAGES = $(addprefix libraries/,$(INSTALLED_PACKAGES)) \
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
-	"$(RM)" -r $(RM_OPTS) "$(INSTALLED_PACKAGE_CONF)"
+	"$(RM)" $(RM_OPTS_REC) "$(INSTALLED_PACKAGE_CONF)"
 	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
@@ -971,7 +971,7 @@ endif
 BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 
 unix-binary-dist-prep:
-	"$(RM)" $(RM_OPTS) -r bindistprep/
+	"$(RM)" $(RM_OPTS_REC) bindistprep/
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
 	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
@@ -987,7 +987,7 @@ unix-binary-dist-prep:
 	cd bindistprep && "$(TAR)" hcf - -T ../$(BIN_DIST_LIST) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-binary-dist-prep:
-	"$(RM)" $(RM_OPTS) -r bindistprep/
+	"$(RM)" $(RM_OPTS_REC) bindistprep/
 	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
 	cd bindistprep && "$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
@@ -1076,7 +1076,7 @@ endef
 
 .PHONY: sdist-prep
 sdist-prep :
-	"$(RM)" $(RM_OPTS) -r $(SRC_DIST_DIR)
+	"$(RM)" $(RM_OPTS_REC) $(SRC_DIST_DIR)
 	"$(RM)" $(RM_OPTS) $(SRC_DIST_TARBALL)
 	mkdir $(SRC_DIST_DIR)
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
@@ -1094,8 +1094,8 @@ sdist-prep :
 	$(call sdist_file,utils/genprimopcode,dist,,,Parser,y)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Parse,y)
-	cd $(SRC_DIST_DIR) && "$(RM)" $(RM_OPTS) -r compiler/stage[123] mk/build.mk
-	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS) -r
+	cd $(SRC_DIST_DIR) && "$(RM)" $(RM_OPTS_REC) compiler/stage[123] mk/build.mk
+	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
 
 .PHONY: sdist
 sdist : sdist-prep
@@ -1157,8 +1157,8 @@ CLEAN_FILES += libraries/integer-gmp/gmp/libgmp.a
 clean : clean_gmp
 .PHONY: clean_gmp
 clean_gmp:
-	"$(RM)" $(RM_OPTS) -r libraries/integer-gmp/gmp/objs
-	"$(RM)" $(RM_OPTS) -r libraries/integer-gmp/gmp/gmpbuild
+	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/objs
+	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/gmpbuild
 endif
 
 .PHONY: clean_libraries
@@ -1166,7 +1166,7 @@ clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES) $(PACKA
 clean_libraries: $(patsubst %,clean_libraries/%_dist-boot,$(BOOT_PKGS))
 
 clean_libraries:
-	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS_REC) $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/*.buildinfo, $(PACKAGES) $(PACKAGES_STAGE2))
 
 # We have to define a clean target for each library manually, because the
@@ -1179,7 +1179,7 @@ endif
 clean : clean_bindistprep
 .PHONY: clean_bindistprep
 clean_bindistprep:
-	"$(RM)" $(RM_OPTS) -r bindistprep/
+	"$(RM)" $(RM_OPTS_REC) bindistprep/
 
 distclean : clean
 	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
@@ -1197,11 +1197,11 @@ distclean : clean
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) -r $(patsubst %, libraries/%/autom4te.cache, $(PACKAGES) $(PACKAGES_STAGE2))
+	"$(RM)" $(RM_OPTS_REC) $(patsubst %, libraries/%/autom4te.cache, $(PACKAGES) $(PACKAGES_STAGE2))
 
 maintainer-clean : distclean
 	"$(RM)" $(RM_OPTS) configure mk/config.h.in
-	"$(RM)" $(RM_OPTS) -r autom4te.cache libraries/*/autom4te.cache
+	"$(RM)" $(RM_OPTS_REC) autom4te.cache libraries/*/autom4te.cache
 	"$(RM)" $(RM_OPTS) ghc.spec
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/GNUmakefile, \
 	        $(PACKAGES) $(PACKAGES_STAGE2))

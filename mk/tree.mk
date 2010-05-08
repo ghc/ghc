@@ -52,4 +52,5 @@ INPLACE_PERL            = $(INPLACE)/perl
 # without configuring:
 RM = rm
 RM_OPTS = -f
+RM_OPTS_REC = -rf
 
