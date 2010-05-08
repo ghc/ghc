@@ -377,6 +377,11 @@ iselExpr64 expr
 
 getRegister :: CmmExpr -> NatM Register
 
+getRegister (CmmReg (CmmGlobal PicBaseReg))
+  = do
+      reg <- getPicBaseNat archWordSize
+      return (Fixed archWordSize reg nilOL)
+
 getRegister (CmmReg reg) 
   = return (Fixed (cmmTypeSize (cmmRegType reg)) 
 		  (getRegisterReg reg) nilOL)
