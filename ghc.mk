@@ -12,7 +12,7 @@ ifneq "$(BINDIST)" "YES"
 $(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html
 
 $(INPLACE_LIB)/html:
-	"$(RM)" $(RM_OPTS) -r $@
+	"$(RM)" $(RM_OPTS_REC) $@
 	"$(CP)" -R utils/haddock/html $@
 
 endif
