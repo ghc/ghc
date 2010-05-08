@@ -50,7 +50,13 @@ INPLACE_PERL            = $(INPLACE)/perl
 # These are here, rather than in config.mk, as they need to exist in an
 # unconfigured tree so that the various clean targets can be used
 # without configuring:
+ifeq "$(ONLY_SHOW_CLEANS)" "YES"
+RM = echo
+RM_OPTS = CLEAN_FILES
+RM_OPTS_REC = CLEAN_REC
+else
 RM = rm
 RM_OPTS = -f
 RM_OPTS_REC = -rf
+endif
 
