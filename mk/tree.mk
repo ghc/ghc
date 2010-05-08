@@ -51,7 +51,7 @@ INPLACE_PERL            = $(INPLACE)/perl
 # unconfigured tree so that the various clean targets can be used
 # without configuring:
 ifeq "$(ONLY_SHOW_CLEANS)" "YES"
-RM = echo
+RM = utils/testremove/wouldrm
 RM_OPTS = CLEAN_FILES
 RM_OPTS_REC = CLEAN_REC
 else

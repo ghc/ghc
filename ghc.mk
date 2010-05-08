@@ -549,6 +549,7 @@ BUILD_DIRS += \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
+   utils/testremove \
    utils/ghctags \
    utils/hpc \
    utils/runghc \
