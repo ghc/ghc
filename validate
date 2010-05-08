@@ -77,7 +77,7 @@ echo "Validating=YES" > mk/are-validating.mk
 make -j$threads ValidateHpc=$hpc ValidateSlow=$slow
 
 make binary-dist-prep
-make -C bindisttest TEST_PREP=YES
+make test_bindist TEST_PREP=YES
 
 fi # testsuite-only
 

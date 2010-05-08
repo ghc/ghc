@@ -521,6 +521,7 @@ BUILD_DIRS += \
 
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
+   bindisttest \
    $(GHC_CABAL_DIR) \
    $(GHC_GENAPPLY_DIR)
 endif
