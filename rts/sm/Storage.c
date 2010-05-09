@@ -332,31 +332,45 @@ static bdescr *
 allocNursery (bdescr *tail, nat blocks)
 {
     bdescr *bd;
-    nat i;
+    nat i, n;
 
-    // Allocate a nursery: we allocate fresh blocks one at a time and
-    // cons them on to the front of the list, not forgetting to update
-    // the back pointer on the tail of the list to point to the new block.
-    for (i=0; i < blocks; i++) {
-	// @LDV profiling
-	/*
-	  processNursery() in LdvProfile.c assumes that every block group in
-	  the nursery contains only a single block. So, if a block group is
-	  given multiple blocks, change processNursery() accordingly.
-	*/
-	bd = allocBlock();
-	bd->link = tail;
-	// double-link the nursery: we might need to insert blocks
-	if (tail != NULL) {
-	    tail->u.back = bd;
-	}
-        initBdescr(bd, g0, g0);
-	bd->flags = 0;
-	bd->free = bd->start;
-	tail = bd;
+    // We allocate the nursery as a single contiguous block and then
+    // divide it into single blocks manually.  This way we guarantee
+    // that the nursery blocks are adjacent, so that the processor's
+    // automatic prefetching works across nursery blocks.  This is a
+    // tiny optimisation (~0.5%), but it's free.
+
+    while (blocks > 0) {
+        n = stg_min(blocks, BLOCKS_PER_MBLOCK);
+        blocks -= n;
+
+        bd = allocGroup(n);
+        for (i = 0; i < n; i++) {
+            initBdescr(&bd[i], g0, g0);
+
+            bd[i].blocks = 1;
+            bd[i].flags = 0;
+
+            if (i > 0) {
+                bd[i].u.back = &bd[i-1];
+            }
+
+            if (i+1 < n) {
+                bd[i].link = &bd[i+1];
+            } else {
+                bd[i].link = tail;
+                if (tail != NULL) {
+                    tail->u.back = &bd[i];
+                }
+            }
+
+            bd[i].free = bd[i].start;
+        }
+
+        tail = &bd[0];
     }
-    tail->u.back = NULL;
-    return tail;
+
+    return &bd[0];
 }
 
 static void
