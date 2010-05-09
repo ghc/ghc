@@ -356,6 +356,8 @@ endif
 # so we don't have to include it below.
 BOOT_PKGS = Cabal hpc extensible-exceptions binary bin-package-db
 
+BOOT_PKG_CONSTRAINTS := $(foreach p,$(BOOT_PKGS),--constraint "$p == $(shell grep -i "^Version:" libraries/$p/$p.cabal | sed "s/[^0-9.]//g")")
+
 # The actual .a and .so/.dll files: needed for dependencies.
 ALL_STAGE1_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_LIB))
 ifeq "$(BuildSharedLibs)" "YES"

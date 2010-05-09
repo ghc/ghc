@@ -42,6 +42,10 @@ ifneq "$$(ICONV_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-iconv-libraries="$$(ICONV_LIB_DIRS)"
 endif
 
+ifeq "$3" "0"
+$1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
+endif
+
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in
 # the build tree.
