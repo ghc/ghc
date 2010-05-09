@@ -133,7 +133,7 @@ $(call includes-sources,$1,$2)
 $1_$2_WAYS_DASHED = $$(subst $$(space),,$$(patsubst %,-%,$$(strip $$($1_$2_WAYS))))
 $1_$2_depfile_base = $1/$2/build/.depend$$($1_$2_WAYS_DASHED)
 
-$(call build-dependencies,$1,$2)
+$(call build-dependencies,$1,$2,$3)
 
 # --- BUILDING
 

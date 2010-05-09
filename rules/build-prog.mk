@@ -92,7 +92,7 @@ $(call c-sources,$1,$2)
 
 $1_$2_depfile_base = $1/$2/build/.depend
 
-$(call build-dependencies,$1,$2)
+$(call build-dependencies,$1,$2,$3)
 
 # --- IMPLICIT RULES
 

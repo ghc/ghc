@@ -391,7 +391,7 @@ rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
 
 endif
 
-$(eval $(call build-dependencies,rts,dist))
+$(eval $(call build-dependencies,rts,dist,1))
 
 $(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h $(DTRACEPROBES_H)
 
