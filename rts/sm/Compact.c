@@ -476,6 +476,7 @@ thread_TSO (StgTSO *tso)
 	thread_(&tso->block_info.closure);
     }
     thread_(&tso->blocked_exceptions);
+    thread_(&tso->bq);
     
     thread_(&tso->trec);
 
