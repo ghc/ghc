@@ -261,9 +261,10 @@ makeCorePair gbl_id is_default_method dict_arity rhs
   | Just arity <- inlinePragmaSat inline_prag
       	-- Add an Unfolding for an INLINE (but not for NOINLINE)
 	-- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
-  = (gbl_id `setIdUnfolding` mkInlineRule rhs (Just (dict_arity + arity)),
-    	    -- NB: The arity in the InlineRule takes account of the dictionaries
-     etaExpand arity rhs)
+  , let real_arity = dict_arity + arity
+        -- NB: The arity in the InlineRule takes account of the dictionaries
+  = (gbl_id `setIdUnfolding` mkInlineRule rhs (Just real_arity),
+     etaExpand real_arity rhs)
 
   | otherwise
   = (gbl_id `setIdUnfolding` mkInlineRule rhs Nothing, rhs)

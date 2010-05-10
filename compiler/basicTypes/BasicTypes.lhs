@@ -626,9 +626,16 @@ data InlinePragma  	     -- Note [InlinePragma]
   = InlinePragma
       { inl_inline :: Bool           -- True <=> INLINE, 
       		      		     -- False <=> no pragma at all, or NOINLINE
+
       , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n 
       		      	    	     --            explicit (non-type, non-dictionary) args
+				     --   That is, inl_sat describes the number of *source-code*
+                                     --   arguments the thing must be applied to.  We add on the 
+                                     --   number of implicit, dictionary arguments when making
+			             --   the InlineRule, and don't look at inl_sat further
+
       , inl_act    :: Activation     -- Says during which phases inlining is allowed
+
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq, Data, Typeable )
 \end{code}
