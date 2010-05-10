@@ -1,21 +1,28 @@
-This is a little output test suit for Haddock. To add a test: 
 
- 1 Create a module in the "tests" directory
- 2 Run runtests.hs
-   You should now have output/<modulename>.html but the test will always
-   pass since there is no reference output to compare with
- 3 To add reference output, do
-     runhaskell copy.hs <modulename>
+A testsuite for Haddock that uses the concept of "golden files" (compares
+output files against a set of reference files).
 
-Tips:
+To add a new test: 
 
-You can do
+ 1) Create a module in the "tests" directory.
+
+ 2) Run runtests.hs. You should now have output/<modulename>.html. The test
+    passes since there is no reference file to compare with.
+
+ 3) To make a reference file from the output file, do
+      runhaskell copy.hs <modulename>
+
+Tips and tricks:
+
+You can
   runhaskell copy.hs
-to copy all output into reference files
 
-You can do
+to copy all output files into reference files.
+
+You can
   runhaskell runtests.hs all
-to continue despite a failing test
+
+to continue despite a failing test.
 
 You can pass extra options to haddock like so
   runhaskell runtests.hs --xhtml all
