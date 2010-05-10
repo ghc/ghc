@@ -95,5 +95,5 @@ INFO_TABLE_RET( stg_marked_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 // high watermark.
 INFO_TABLE_RET (stg_bh_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 {
-    jump stg_marked_upd_frame_info;
+    jump RET_LBL(stg_marked_upd_frame);
 }
