@@ -815,7 +815,7 @@ looksLikeModuleName [] = False
 looksLikeModuleName (c:cs) = isUpper c && go cs
   where go [] = True
         go ('.':cs) = looksLikeModuleName cs
-        go (c:cs)   = (isAlphaNum c || c == '_') && go cs
+        go (c:cs)   = (isAlphaNum c || c == '_' || c == '\'') && go cs
 \end{code}
 
 Akin to @Prelude.words@, but acts like the Bourne shell, treating
