@@ -1,3 +1,9 @@
+Changes in version 2.6.1 (bug fix release from the stable branch)
+
+  * Fix #128
+
+-----------------------------------------------------------------------------
+
 Changes in version 2.7.2
 
   * Add Paths_haddock to library
