@@ -6,7 +6,7 @@
 module T3016 where
 
 newtype F = F Integer
-data P = NZ {-# UNPACK #-}!F {-# UNPACK #-}!F | Z
+data P = NZ !F !F | Z
 
 largeConsts :: [P]
 largeConsts = [
