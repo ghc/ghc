@@ -57,7 +57,7 @@ test = do
         let path = init libdir </> librariesPath </> name ++ "-" ++ version
         in  "-i " ++ path ++ "," ++ path </> name ++ ".haddock"
 
-  let base    = mkDep "base" "4.2.0.0"
+  let base    = mkDep "base" "4.2.0.1"
       process = mkDep "process" "1.0.1.2"
       ghcprim = mkDep "ghc-prim" "0.2.0.0"
 
