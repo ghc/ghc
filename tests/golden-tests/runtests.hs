@@ -14,7 +14,8 @@ import Distribution.Verbosity
 import Data.Maybe
 
 
-haddockPath = ".." </> "dist" </> "build" </> "haddock" </> "haddock"
+haddockBase = ".." </> ".."
+haddockPath = haddockBase </> "dist" </> "build" </> "haddock" </> "haddock"
 
 
 main = do
@@ -39,12 +40,12 @@ test = do
   putStrLn ""
   putStrLn "Haddock version: "
   h1 <- runProcess haddockPath ["--version"] Nothing
-                   (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+                   (Just [("haddock_datadir", haddockBase)]) Nothing Nothing Nothing
   waitForProcess h1
   putStrLn ""
   putStrLn "GHC version: "
   h2 <- runProcess haddockPath ["--ghc-version"] Nothing
-                   (Just [("haddock_datadir", "../.")]) Nothing Nothing Nothing
+                   (Just [("haddock_datadir", haddockBase)]) Nothing Nothing Nothing
   waitForProcess h2
   putStrLn ""
 
@@ -64,7 +65,7 @@ test = do
   handle <- runProcess haddockPath
                        (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts"
                         , "--optghc=-w", base, process, ghcprim] ++ opts ++ mods')
-                       Nothing (Just [("haddock_datadir", "../.")]) Nothing
+                       Nothing (Just [("haddock_datadir", haddockBase)]) Nothing
                        Nothing Nothing
 
   code <- waitForProcess handle
