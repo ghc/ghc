@@ -45,12 +45,12 @@ tests = [
 
 
 main = do
-  _ <- runTestTT $ TestList $ map testFromParseTest tests
+  _ <- runTestTT $ TestList $ map toTestCase tests
   return ();
   where
 
-    testFromParseTest :: ParseTest -> Test
-    testFromParseTest (ParseTest input result) = TestCase $ assertEqual input (parse input) result
+    toTestCase :: ParseTest -> Test
+    toTestCase (ParseTest input result) = TestCase $ assertEqual input (parse input) result
 
     parse :: String -> Maybe (Doc RdrName)
     parse input = parseParas $ tokenise defaultDynFlags input (0,0)
