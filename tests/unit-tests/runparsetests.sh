@@ -9,6 +9,6 @@ runhaskell -hide-all-packages -cpp \
     -packagexhtml \
     -packageghc-paths \
     -packageHUnit \
-    -i../dist/build/ \
-    -i../src/ \
+    -i../../dist/build/ \
+    -i../../src/ \
     parsetests.hs
