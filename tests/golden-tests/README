@@ -1,6 +1,6 @@
 
-A testsuite for Haddock that uses the concept of "golden files" (compares
-output files against a set of reference files).
+This is a testsuite for Haddock that uses the concept of "golden files". That
+is, it compares output files against a set of reference files.
 
 To add a new test: 
 
