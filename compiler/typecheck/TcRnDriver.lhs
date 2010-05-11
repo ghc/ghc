@@ -566,15 +566,19 @@ checkHiBootIface
 
 		-- Check instance declarations
 	; mb_dfun_prs <- mapM check_inst boot_insts
-	; let tcg_env' = tcg_env { tcg_binds    = binds `unionBags` dfun_binds,
-				   tcg_type_env = extendTypeEnvWithIds local_type_env boot_dfuns }
-	      dfun_prs   = catMaybes mb_dfun_prs
-	      boot_dfuns = map fst dfun_prs
-	      dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
-				     | (boot_dfun, dfun) <- dfun_prs ]
+        ; let dfun_prs   = catMaybes mb_dfun_prs
+              boot_dfuns = map fst dfun_prs
+              dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
+                                     | (boot_dfun, dfun) <- dfun_prs ]
+              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
+              tcg_env'   = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
 
         ; failIfErrsM
-	; return tcg_env' }
+	; setGlobalTypeEnv tcg_env' type_env' }
+	     -- Update the global type env *including* the knot-tied one
+             -- so that if the source module reads in an interface unfolding
+             -- mentioning one of the dfuns from the boot module, then it
+             -- can "see" that boot dfun.   See Trac #4003
   where
     check_export boot_avail	-- boot_avail is exported by the boot iface
       | name `elem` dfun_names = return ()	
