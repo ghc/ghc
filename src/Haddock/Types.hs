@@ -46,10 +46,11 @@ type GhcDocHdr     = Maybe LHsDocString
 -----------------------------------------------------------------------------
 
 
--- | The data structure used to render a Haddock page for a module - it is
--- the interface of the module. The core of Haddock lies in creating this
--- structure (see Haddock.Interface). The structure also holds intermediate
--- data needed during its creation.
+-- | 'Interface' holds all information used to render a single Haddock page.
+-- It represents the /interface/ of a module. The core business of Haddock
+-- lies in creating this structure. Note that the record contains some fields
+-- that are only used to create the final record, and that are not used by the
+-- backends.
 data Interface = Interface {
 
   -- | The module represented by this interface.
