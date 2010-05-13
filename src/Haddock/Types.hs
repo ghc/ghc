@@ -33,7 +33,7 @@ import Test.QuickCheck
 #endif
 
 
--- convenient short-hands
+-- | Convenient short-hand
 type Decl = LHsDecl Name
 
 
