@@ -20,6 +20,7 @@ module Documentation.Haddock (
 
   -- * Export items & declarations
   ExportItem(..),
+  Decl,
   DeclInfo,
   DocForDecl,
   FnArgsDoc, 
@@ -35,6 +36,7 @@ module Documentation.Haddock (
 
   -- * Documentation comments
   Doc(..),
+  Example(..),
   DocMarkup(..),
   HaddockModInfo(..),
 
