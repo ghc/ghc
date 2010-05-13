@@ -9,7 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 
 import Haddock.Types ( Doc )

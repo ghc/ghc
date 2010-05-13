@@ -27,6 +27,7 @@ docAppend d DocEmpty = d
 docAppend d1 d2
   = DocAppend d1 d2
 
+
 -- again to make parsing easier - we spot a paragraph whose only item
 -- is a DocMonospaced and make it into a DocCodeBlock
 docParagraph :: Doc id -> Doc id

@@ -13,7 +13,6 @@
 --
 -- Utils for dealing with types from the GHC API
 -----------------------------------------------------------------------------
-
 module Haddock.GhcUtils where
 
 

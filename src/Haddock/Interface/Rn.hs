@@ -1,4 +1,3 @@
-
 module Haddock.Interface.Rn ( rnDoc, rnHaddockModInfo ) where
 
 import Haddock.Types

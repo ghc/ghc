@@ -12,10 +12,9 @@
 -- Conversion between TyThing and HsDecl. This functionality may be moved into
 -- GHC at some point.
 -----------------------------------------------------------------------------
-
+module Haddock.Convert where
 -- Some other functions turned out to be useful for converting
 -- instance heads, which aren't TyThings, so just export everything.
-module Haddock.Convert where
 
 import HsSyn
 import TcType ( tcSplitSigmaTy )

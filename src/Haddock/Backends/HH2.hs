@@ -8,7 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Backends.HH2 (ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection) where
 
 import Haddock.Types

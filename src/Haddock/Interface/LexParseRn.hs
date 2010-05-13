@@ -1,4 +1,3 @@
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
@@ -9,7 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Interface.LexParseRn (
   HaddockCommentType(..),
   lexParseRnHaddockComment,

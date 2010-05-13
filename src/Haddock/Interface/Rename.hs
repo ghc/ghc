@@ -9,7 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Interface.Rename (renameInterface) where
 
 

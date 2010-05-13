@@ -1,4 +1,3 @@
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.ParseModuleHeader
@@ -9,7 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 
 import Haddock.Types

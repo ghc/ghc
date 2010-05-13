@@ -10,8 +10,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-
 module Haddock.Utils (
 
   -- * Misc utilities

@@ -11,7 +11,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Interface.AttachInstances (attachInstances) where
 
 

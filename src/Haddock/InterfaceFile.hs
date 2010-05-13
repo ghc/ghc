@@ -11,7 +11,6 @@
 --
 -- Reading and writing the .haddock interface file
 -----------------------------------------------------------------------------
-
 module Haddock.InterfaceFile (
   InterfaceFile(..),
   readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,

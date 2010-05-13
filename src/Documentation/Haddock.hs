@@ -11,8 +11,6 @@
 -- The Haddock API: A rudimentory, highly experimental API exposing some of
 -- the internals of Haddock. Don't expect it to be stable.
 -----------------------------------------------------------------------------
-
-
 module Documentation.Haddock (
 
   -- * Interface

@@ -8,7 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Backends.HaddockDB (ppDocBook) where
 
 {-

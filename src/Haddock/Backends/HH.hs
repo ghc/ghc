@@ -8,7 +8,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Backends.HH (ppHHContents, ppHHIndex, ppHHProject) where
 
 ppHHContents, ppHHIndex, ppHHProject :: a

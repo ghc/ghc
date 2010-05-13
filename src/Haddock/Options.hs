@@ -11,8 +11,6 @@
 --
 -- Definition of the command line interface of Haddock
 -----------------------------------------------------------------------------
-
-
 module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
