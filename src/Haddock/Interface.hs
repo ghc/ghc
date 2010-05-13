@@ -2,16 +2,29 @@
 -- |
 -- Module      :  Haddock.Interface
 -- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2009
+--                    David Waern  2006-2010
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Here we build the actual module interfaces. By interface we mean the
--- information that is used to render a Haddock page for a module. Parts of
--- this information are also stored in the .haddock files.
+-- This module typechecks Haskell modules using the GHC API and processes
+-- the result to create 'Interface's. The typechecking and the 'Interface'
+-- creation is interleaved, so that when a module is processed, the
+-- 'Interface's of all previously processed modules are available. The
+-- creation of an 'Interface' from a typechecked module is delegated to
+-- "Haddock.Interface.Create".
+--
+-- When all modules have been typechecked and processed, information about
+-- instances are attached to each 'Interface'. This task is delegated to
+-- "Haddock.Interface.AttachInstances". Note that this is done as a separate
+-- step because GHC can't know about all instances until all modules have been
+-- typechecked.
+--
+-- As a last step a link environment is built which maps names to the \"best\"
+-- places to link to in the documentation, and all 'Interface's are \"renamed\"
+-- using this environment.
 -----------------------------------------------------------------------------
 
 module Haddock.Interface (
