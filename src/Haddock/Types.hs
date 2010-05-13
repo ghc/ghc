@@ -28,9 +28,6 @@ import qualified Data.Map as Map
 import GHC hiding (NoLink)
 import Name
 
-#ifdef TEST
-import Test.QuickCheck
-#endif
 
 -----------------------------------------------------------------------------
 -- * Convenient synonyms
@@ -297,31 +294,6 @@ data Example = Example
 exampleToString :: Example -> String
 exampleToString (Example expression result) =
     "ghci> " ++ expression ++ "\n" ++  unlines result
-
-
-#ifdef TEST
--- TODO: use derive
-instance Arbitrary a => Arbitrary (Doc a) where
-  arbitrary =
-    oneof [ return DocEmpty
-          , do { a <- arbitrary; b <- arbitrary; return (DocAppend a b) }
-          , fmap DocString arbitrary
-          , fmap DocParagraph arbitrary
-          , fmap DocIdentifier arbitrary
-          , fmap DocModule arbitrary
-          , fmap DocEmphasis arbitrary
-          , fmap DocMonospaced arbitrary
-          , fmap DocUnorderedList arbitrary
-          , fmap DocOrderedList arbitrary
-          , fmap DocDefList arbitrary
-          , fmap DocCodeBlock arbitrary
-          , fmap DocURL arbitrary
-          , fmap DocPic arbitrary
-          , fmap DocAName arbitrary ]
-#endif
-
-
-type LDoc id = Located (Doc id)
 
 
 data DocMarkup id a = Markup {
