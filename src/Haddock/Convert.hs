@@ -22,6 +22,7 @@ import TcType ( tcSplitSigmaTy )
 import TypeRep
 #if __GLASGOW_HASKELL__ == 612
 import Type ( splitKindFunTys )
+import BasicTypes
 #else
 import Coercion ( splitKindFunTys )
 #endif
@@ -170,10 +171,17 @@ synifyDataCon use_gadt_syntax dc = noLoc $
   linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
             in case bang of
+#if __GLASGOW_HASKELL__ >= 613
                  HsUnpackFailed -> noLoc $ HsBangTy HsStrict tySyn
                  HsNoBang       -> tySyn
                       -- HsNoBang never appears, it's implied instead.
                  _              -> noLoc $ HsBangTy bang tySyn
+#else
+                 MarkedStrict    -> noLoc $ HsBangTy HsStrict tySyn
+                 MarkedUnboxed   -> noLoc $ HsBangTy HsUnbox tySyn
+                 NotMarkedStrict -> tySyn
+                      -- HsNoBang never appears, it's implied instead.
+#endif
                       
           )
           (dataConOrigArgTys dc) (dataConStrictMarks dc)
