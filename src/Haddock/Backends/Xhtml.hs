@@ -44,6 +44,7 @@ import Data.Either
 import Data.List             ( sortBy, groupBy )
 import Data.Maybe
 import Foreign.Marshal.Alloc ( allocaBytes )
+import System.FilePath hiding ( (</>) )
 import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import System.Directory hiding ( copyFile )
 import Data.Map              ( Map )
@@ -140,13 +141,13 @@ copyFile fromFPath toFPath =
 copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
 copyHtmlBits odir libdir maybe_css = do
   let 
-        libhtmldir = pathJoin [libdir, "html"]
+        libhtmldir = joinPath [libdir, "html"]
         css_file = case maybe_css of
-                        Nothing -> pathJoin [libhtmldir, 'x':cssFile]
+                        Nothing -> joinPath [libhtmldir, 'x':cssFile]
                         Just f  -> f
-        css_destination = pathJoin [odir, cssFile]
+        css_destination = joinPath [odir, cssFile]
         copyLibFile f = do
-           copyFile (pathJoin [libhtmldir, f]) (pathJoin [odir, f])
+           copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   copyFile css_file css_destination
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile, framesFile ]
 
@@ -276,7 +277,7 @@ ppHtmlContents odir doctitle
             footer
           )
   createDirectoryIfMissing True odir
-  writeFile (pathJoin [odir, contentsHtmlFile]) (renderToString html)
+  writeFile (joinPath [odir, contentsHtmlFile]) (renderToString html)
 
   -- XXX: think of a better place for this?
   ppHtmlContentsFrame odir doctitle ifaces
@@ -392,7 +393,7 @@ ppHtmlContentsFrame odir doctitle ifaces = do
         body << vanillaTable << Html.p << (
             foldr (+++) noHtml (map (+++br) mods))
   createDirectoryIfMissing True odir
-  writeFile (pathJoin [odir, frameIndexHtmlFile]) (renderToString html)
+  writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString html)
 
 -- ---------------------------------------------------------------------------
 -- Generate the index
@@ -424,7 +425,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   when split_indices $
     mapM_ (do_sub_index index) initialChars
 
-  writeFile (pathJoin [odir, indexHtmlFile]) (renderToString html)
+  writeFile (joinPath [odir, indexHtmlFile]) (renderToString html)
   
     -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
@@ -480,7 +481,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 
   do_sub_index this_ix c
     = unless (null index_part) $
-        writeFile (pathJoin [odir, subIndexHtmlFile c]) (renderToString html)
+        writeFile (joinPath [odir, subIndexHtmlFile c]) (renderToString html)
     where 
       html = header (documentCharacterEncoding +++
                 thetitle (toHtml (doctitle ++ " (Index)")) +++
@@ -578,7 +579,7 @@ ppHtmlModule odir doctitle
           footer)
          
   createDirectoryIfMissing True odir
-  writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderToString html)
+  writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
   ppHtmlModuleMiniSynopsis odir doctitle iface unicode
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> Bool -> IO ()
@@ -595,7 +596,7 @@ ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
              << toHtml (moduleString mdl)) +++
            miniSynopsis mdl iface unicode)
   createDirectoryIfMissing True odir
-  writeFile (pathJoin [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString html)
+  writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString html)
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Html
 ifaceToHtml maybe_source_url maybe_wiki_url iface unicode

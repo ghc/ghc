@@ -21,7 +21,7 @@ module Haddock.Utils (
   contentsHtmlFile, indexHtmlFile,
   frameIndexHtmlFile,
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
-  subIndexHtmlFile, pathJoin,
+  subIndexHtmlFile,
   anchorNameStr,
   cssFile, iconFile, jsFile, plusFile, minusFile, framesFile,
 
@@ -165,7 +165,7 @@ moduleHtmlFile :: Module -> FilePath
 moduleHtmlFile mdl =
   case Map.lookup mdl html_xrefs of
     Nothing  -> mdl' ++ ".html"
-    Just fp0 -> pathJoin [fp0, mdl' ++ ".html"]
+    Just fp0 -> joinPath [fp0, mdl' ++ ".html"]
   where
    mdl' = map (\c -> if c == '.' then '-' else c) 
               (moduleNameString (moduleName mdl))
@@ -202,16 +202,6 @@ subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
 anchorNameStr :: OccName -> String
 anchorNameStr name | isValOcc name = "v:" ++ occNameString name 
                    | otherwise     = "t:" ++ occNameString name
-
-
-pathJoin :: [FilePath] -> FilePath
-pathJoin = foldr join []
-  where join :: FilePath -> FilePath -> FilePath
-        join path1 ""    = path1
-	join ""    path2 = path2
-	join path1 path2
-          | isPathSeparator (last path1) = path1++path2
-          | otherwise                    = path1++pathSeparator:path2
 
 
 -- -----------------------------------------------------------------------------

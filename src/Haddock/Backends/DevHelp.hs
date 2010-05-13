@@ -20,6 +20,7 @@ import Name          ( Name, nameModule, getOccString, nameOccName )
 
 import Data.Maybe    ( fromMaybe )
 import qualified Data.Map as Map
+import System.FilePath
 import Text.PrettyPrint
 
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [Interface] -> IO ()
@@ -37,7 +38,7 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
         nest 4 (ppList index) $+$
         text "</functions>" $$
         text "</book>"
-  writeFile (pathJoin [odir, devHelpFile]) (render doc)
+  writeFile (joinPath [odir, devHelpFile]) (render doc)
   where    
     package = fromMaybe "pkg" maybe_package
 
