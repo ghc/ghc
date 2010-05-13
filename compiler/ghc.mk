@@ -480,6 +480,13 @@ $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 compiler/prelude/PrimOps_HC_OPTS += -fforce-recomp
 compiler/main/Constants_HC_OPTS  += -fforce-recomp
 
+# Workaround for #4003 in GHC 6.12.2.  It didn't happen in 6.12.1, and
+# will be fixed in 6.12.3.  Unfortunately we don't have a way to do
+# this for just stage1 in the build system.
+ifeq "$(GhcVersion)" "6.12.2"
+compiler/hsSyn/HsLit_HC_OPTS     += -fomit-interface-pragmas
+endif
+
 # Note [munge-stage1-package-config]
 # Strip the date/patchlevel from the version of stage1.  See Note
 # [fiddle-stage1-version] above.
