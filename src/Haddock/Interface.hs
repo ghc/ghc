@@ -50,25 +50,25 @@ createInterfaces
   -> Ghc ([Interface], LinkEnv)
   -- ^ Resulting list of interfaces and renaming environment
 createInterfaces verbosity modules flags extIfaces = do
-  -- part 1, create interfaces
+  -- Part 1, create interfaces
   let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
                                    , iface <- ifInstalledIfaces ext ]
   out verbosity verbose "Creating interfaces..."
   interfaces <- createInterfaces' verbosity modules flags instIfaceMap
 
-  -- part 2, build link environment
+  -- Part 2, build link environment
   out verbosity verbose "Building link environment..."
-      -- combine the link envs of the external packages into one
+      -- Combine the link envs of the external packages into one
   let extLinks  = Map.unions (map ifLinkEnv extIfaces)
-      homeLinks = buildHomeLinks interfaces -- build the environment for the home
+      homeLinks = buildHomeLinks interfaces -- Build the environment for the home
                                             -- package
       links     = homeLinks `Map.union` extLinks
 
-  -- part 3, attach instances
+  -- Part 3, attach instances
   out verbosity verbose "Attaching instances..."
   interfaces' <- attachInstances interfaces instIfaceMap
 
-  -- part 4, rename interfaces
+  -- Part 4, rename interfaces
   out verbosity verbose "Renaming interfaces..."
   let warnings = Flag_NoWarnings `notElem` flags
   let (interfaces'', msgs) =
