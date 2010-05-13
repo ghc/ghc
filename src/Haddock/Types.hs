@@ -14,7 +14,6 @@
 -- Types that are commonly used through-out Haddock. Some of the most
 -- important types are defined here, like 'Interface' and 'DocName'.
 -----------------------------------------------------------------------------
-
 module Haddock.Types (
   module Haddock.Types
   , HsDocString, LHsDocString
@@ -33,6 +32,7 @@ import Name
 import Test.QuickCheck
 #endif
 
+
 -- convenient short-hands
 type Decl = LHsDecl Name
 
@@ -46,8 +46,10 @@ type DocInstance name = (InstHead name, Maybe (Doc name))
 type FnArgsDoc name = Map Int (Doc name)
 type DocForDecl name = (Maybe (Doc name), FnArgsDoc name)
 
+
 noDocForDecl :: DocForDecl name
 noDocForDecl = (Nothing, Map.empty)
+
 
 -- | A declaration that may have documentation, including its subordinates,
 -- which may also have documentation
@@ -136,7 +138,6 @@ type InstHead name = ([HsPred name], name, [HsType name])
 type IfaceMap      = Map Module Interface
 type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (Doc DocName)
-
 -- | An environment used to create hyper-linked syntax.
 type LinkEnv       = Map Name Module
 
@@ -256,8 +257,11 @@ toInstalledIface interface = InstalledInterface {
   instSubMap         = ifaceSubMap         interface
 }
 
+
 unrenameDoc :: Doc DocName -> Doc Name
 unrenameDoc = fmap getName
+
+
 unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
 unrenameDocForDecl (mbDoc, fnArgsDoc) =
     (fmap unrenameDoc mbDoc, fmap unrenameDoc fnArgsDoc)
@@ -282,14 +286,17 @@ data Doc id
   | DocExamples [Example]
   deriving (Eq, Show, Functor)
 
-data Example = Example { exampleExpression :: String
-                       , exampleResult     :: [String]
-                       }
-                       deriving (Eq, Show)
+
+data Example = Example
+  { exampleExpression :: String
+  , exampleResult     :: [String]
+  } deriving (Eq, Show)
+
 
 exampleToString :: Example -> String
 exampleToString (Example expression result) =
     "ghci> " ++ expression ++ "\n" ++  unlines result
+
 
 #ifdef TEST
 -- TODO: use derive
@@ -355,12 +362,14 @@ emptyHaddockModInfo = HaddockModInfo {
 
 -- A monad which collects error messages, locally defined to avoid a dep on mtl
 
-type ErrMsg = String
 
+type ErrMsg = String
 newtype ErrMsgM a = Writer { runWriter :: (a, [ErrMsg]) }
+
 
 instance Functor ErrMsgM where
         fmap f (Writer (a, msgs)) = Writer (f a, msgs)
+
 
 instance Monad ErrMsgM where
         return a = Writer (a, [])
@@ -369,11 +378,13 @@ instance Monad ErrMsgM where
                 (b, w') = runWriter (k a)
                 in (b, w ++ w')
 
+
 tell :: [ErrMsg] -> ErrMsgM ()
 tell w = Writer ((), w)
 
 
 -- Exceptions
+
 
 -- | Haddock's own exception type
 data HaddockException = HaddockException String deriving Typeable
@@ -386,6 +397,7 @@ instance Show HaddockException where
 throwE :: String -> a
 instance Exception HaddockException
 throwE str = throw (HaddockException str)
+
 
 -- In "Haddock.Interface.Create", we need to gather
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
@@ -403,8 +415,12 @@ liftErrMsg = WriterGhc . return . runWriter
 --  for now, use (liftErrMsg . tell) for this
 --tell :: [ErrMsg] -> ErrMsgGhc ()
 --tell msgs = WriterGhc $ return ( (), msgs )
+
+
 instance Functor ErrMsgGhc where
   fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
+
+
 instance Monad ErrMsgGhc where
   return a = WriterGhc (return (a, []))
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
