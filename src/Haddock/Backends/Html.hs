@@ -9,7 +9,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Backends.Html ( 
   ppHtml, copyHtmlBits, 
   ppHtmlIndex, ppHtmlContents,

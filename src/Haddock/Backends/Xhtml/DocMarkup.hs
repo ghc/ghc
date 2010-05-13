@@ -10,7 +10,6 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
 module Haddock.Backends.Xhtml.DocMarkup where
 
 import Haddock.Backends.Xhtml.Names
