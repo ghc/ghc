@@ -16,6 +16,7 @@ module Haddock.Convert where
 -- Some other functions turned out to be useful for converting
 -- instance heads, which aren't TyThings, so just export everything.
 
+
 import HsSyn
 import TcType ( tcSplitSigmaTy )
 import TypeRep
@@ -34,6 +35,7 @@ import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName )
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc, unLoc )
+
 
 -- the main function here! yay!
 tyThingToLHsDecl :: TyThing -> LHsDecl Name
@@ -68,10 +70,12 @@ tyThingToLHsDecl t = noLoc $ case t of
       (map synifyClassAT (classATs cl))
       [] --we don't have any docs at this point
 
+
 -- class associated-types are a subset of TyCon
 -- (mainly only type/data-families)
 synifyClassAT :: TyCon -> LTyClDecl Name
 synifyClassAT = noLoc . synifyTyCon
+
 
 synifyTyCon :: TyCon -> TyClDecl Name
 synifyTyCon tc
@@ -148,6 +152,7 @@ synifyTyCon tc
   then TySynonym name tyvars typats syn_type
   else TyData alg_nd alg_ctx name tyvars typats alg_kindSig alg_cons alg_deriv
 
+
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
 -- result-type.
@@ -202,8 +207,10 @@ synifyDataCon use_gadt_syntax dc = noLoc $
       qvars ctx tys res_ty Nothing
       False --we don't want any "deprecated GADT syntax" warnings!
 
+
 synifyName :: NamedThing n => n -> Located Name
 synifyName = noLoc . getName
+
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig Name
 synifyIdSig s i = TypeSig (synifyName i) (synifyType s (varType i))
@@ -211,6 +218,7 @@ synifyIdSig s i = TypeSig (synifyName i) (synifyType s (varType i))
 
 synifyCtx :: [PredType] -> LHsContext Name
 synifyCtx = noLoc . map synifyPred
+
 
 synifyPred :: PredType -> LHsPred Name
 synifyPred (ClassP cls tys) =
@@ -229,6 +237,7 @@ synifyPred (EqPred ty1 ty2) =
     in noLoc $
       HsEqualP s1 s2
 
+
 synifyTyVars :: [TyVar] -> [LHsTyVarBndr Name]
 synifyTyVars = map synifyTyVar
   where
@@ -242,6 +251,7 @@ synifyTyVars = map synifyTyVar
         then UserTyVar name placeHolderKind
 #endif
         else KindedTyVar name kind
+
 
 --states of what to do with foralls:
 data SynifyTypeState
@@ -257,6 +267,7 @@ data SynifyTypeState
   --   which is rather sensible,
   --   but we want to restore things to the source-syntax situation where
   --   the defining class gets to quantify all its functions for free!
+
 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
 synifyType _ (PredTy{}) = --should never happen.
@@ -296,6 +307,7 @@ synifyType s forallty@(ForAllTy _tv _ty) =
       sTau = synifyType WithinType tau
      in noLoc $
            HsForAllTy forallPlicitness sTvs sCtx sTau
+
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
                   ([HsPred Name], Name, [HsType Name])
