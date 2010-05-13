@@ -35,10 +35,10 @@ import Bag
 import RdrName (GlobalRdrEnv)
 
 
--- | Process the data in the GhcModule to produce an interface.
+-- | Process the data in a GhcModule to produce an interface.
 -- To do this, we need access to already processed modules in the topological
--- sort. That's what's in the module map.
-createInterface :: GhcModule -> [Flag] -> ModuleMap -> InstIfaceMap
+-- sort. That's what's in the interface map.
+createInterface :: GhcModule -> [Flag] -> IfaceMap -> InstIfaceMap
                 -> ErrMsgGhc Interface
 createInterface ghcMod flags modMap instIfaceMap = do
 
@@ -422,7 +422,7 @@ finishedDoc d doc rest = (d, docStringToList doc) : rest
 -- We create the export items even if the module is hidden, since they
 -- might be useful when creating the export items for other modules.
 mkExportItems
-  :: ModuleMap
+  :: IfaceMap
   -> Module             -- this module
   -> GlobalRdrEnv
   -> [Name]             -- exported names (orig)

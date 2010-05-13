@@ -133,7 +133,7 @@ data ExportItem name
 type InstHead name = ([HsPred name], name, [HsType name])
 
 
-type ModuleMap     = Map Module Interface
+type IfaceMap      = Map Module Interface
 type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (Doc DocName)
 
