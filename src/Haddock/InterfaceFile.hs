@@ -39,6 +39,7 @@ import FastMutInt
 import FastString
 import Unique
 
+
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
   ifInstalledIfaces :: [InstalledInterface]
@@ -123,6 +124,7 @@ writeInterfaceFile filename iface = do
   writeBinMem bh filename
   return ()
 
+
 type NameCacheAccessor m = (m NameCache, NameCache -> m ())
 
 
@@ -143,6 +145,7 @@ freshNameCache = ( create_fresh_nc , \_ -> return () )
     create_fresh_nc = do
        u  <- mkSplitUniqSupply 'a' -- ??
        return (initNameCache u [])
+
 
 -- | Read a Haddock (@.haddock@) interface file. Return either an 
 -- 'InterfaceFile' or an error message.
@@ -204,6 +207,7 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
       seekBin bh1 data_p'
       return (nc', symtab)
 
+
 -------------------------------------------------------------------------------
 -- Symbol table
 -------------------------------------------------------------------------------
@@ -260,6 +264,7 @@ putSymbolTable bh next_off symtab = do
   let names = elems (array (0,next_off-1) (eltsUFM symtab))
   mapM_ (\n -> serialiseName bh n symtab) names
 
+
 getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
 getSymbolTable bh namecache = do
   sz <- get bh
@@ -271,7 +276,9 @@ getSymbolTable bh namecache = do
   --
   return (namecache', arr)
 
+
 type OnDiskName = (PackageId, ModuleName, OccName)
+
 
 fromOnDiskName
    :: Array Int Name
@@ -296,6 +303,7 @@ fromOnDiskName _ nc (pid, mod_name, occ) =
         ( nc{ nsUniqs = us', nsNames = new_cache }, name )
         }
 
+
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
   let modu = nameModule name
@@ -306,8 +314,7 @@ serialiseName bh name _ = do
 -- GhcBinary instances
 -------------------------------------------------------------------------------
 
--- Hmm, why didn't we dare to make this instance already? It makes things
--- much easier.
+
 instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
   put_ bh m = put_ bh (Map.toList m)
   get bh = fmap (Map.fromList) (get bh)
