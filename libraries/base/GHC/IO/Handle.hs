@@ -268,7 +268,7 @@ hSetBuffering handle mode =
 --
 hSetEncoding :: Handle -> TextEncoding -> IO ()
 hSetEncoding hdl encoding = do
-  withHandle "hSetEncoding" hdl $ \h_@Handle__{..} -> do
+  withAllHandles__ "hSetEncoding" hdl $ \h_@Handle__{..} -> do
     flushCharBuffer h_
     openTextEncoding (Just encoding) haType $ \ mb_encoder mb_decoder -> do
     bbuf <- readIORef haByteBuffer
@@ -276,8 +276,7 @@ hSetEncoding hdl encoding = do
     return (Handle__{ haLastDecode = ref, 
                       haDecoder = mb_decoder, 
                       haEncoder = mb_encoder,
-                      haCodec   = Just encoding, .. },
-            ())
+                      haCodec   = Just encoding, .. })
 
 -- | Return the current 'TextEncoding' for the specified 'Handle', or
 -- 'Nothing' if the 'Handle' is in binary mode.
