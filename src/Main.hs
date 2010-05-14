@@ -39,7 +39,6 @@ import qualified Data.Map as Map
 import System.IO
 import System.Exit
 import System.Environment
-import Distribution.Verbosity
 
 #if defined(mingw32_HOST_OS)
 import Foreign
@@ -120,7 +119,6 @@ main = handleTopExceptions $ do
   args <- getArgs
   (flags, fileArgs) <- parseHaddockOpts args
   handleEasyFlags flags
-  verbosity <- getVerbosity flags
 
   let renderStep packages interfaces = do
         updateHTMLXRefs packages
@@ -145,14 +143,16 @@ main = handleTopExceptions $ do
         packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
 
         -- Create the interfaces -- this is the core part of Haddock.
-        (interfaces, homeLinks) <- createInterfaces verbosity fileArgs flags
-                                                    (map fst packages)
+        (ifaces, homeLinks) <- createInterfaces (verbosity flags) fileArgs flags
+                                                (map fst packages)
         liftIO $ do
           -- Render the interfaces.
-          renderStep packages interfaces
+          renderStep packages ifaces
 
-          -- Last but not least, dump the interface file.
-          dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+          -- Dump an "interface file" (.haddock file), if requested.
+          case optDumpInterfaceFile flags of
+            Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
+            Nothing -> return ()
 
     else do
       -- Get packages supplied with --read-interface.
@@ -250,11 +250,8 @@ readInterfaceFiles name_cache_accessor pairs = do
         Right f -> return $ Just (f, html)
 
 
-dumpInterfaceFile :: [InstalledInterface] -> LinkEnv -> [Flag] -> IO ()
-dumpInterfaceFile ifaces homeLinks flags =
-  case [str | Flag_DumpInterface str <- flags] of
-    [] -> return ()
-    fs -> let filename = last fs in writeInterfaceFile filename ifaceFile
+dumpInterfaceFile :: FilePath -> [InstalledInterface] -> LinkEnv -> IO ()
+dumpInterfaceFile path ifaces homeLinks = writeInterfaceFile path ifaceFile
   where
     ifaceFile = InterfaceFile {
         ifInstalledIfaces = ifaces,
@@ -326,15 +323,6 @@ getGhcLibDir flags =
       return libdir -- from GHC.Paths
 #endif
     xs -> return $ last xs
-
-
-getVerbosity :: Monad m => [Flag] -> m Verbosity
-getVerbosity flags =
-  case [ str | Flag_Verbosity str <- flags ] of
-    [] -> return normal
-    x:_ -> case parseVerbosity x of
-      Left e -> throwE e
-      Right v -> return v
 
 
 handleEasyFlags :: [Flag] -> IO ()

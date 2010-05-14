@@ -23,12 +23,15 @@ module Haddock.Options (
   optCssFile,
   optSourceUrls,
   optWikiUrls,
+  optDumpInterfaceFile,
+  verbosity,
   ghcFlags,
   ifacePairs
 ) where
 
 
 import Data.Maybe
+import Distribution.Verbosity
 import Haddock.Utils
 import Haddock.Types
 import System.Console.GetOpt
@@ -209,19 +212,31 @@ optWikiUrls flags =
   ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
 
 
+optDumpInterfaceFile :: [Flag] -> Maybe FilePath
+optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
+
+
+verbosity :: [Flag] -> Verbosity
+verbosity flags =
+  case [ str | Flag_Verbosity str <- flags ] of
+    []  -> normal
+    x:_ -> case parseVerbosity x of
+      Left e -> throwE e
+      Right v -> v
+
+
 ghcFlags :: [Flag] -> [String]
 ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
 
 
 ifacePairs :: [Flag] -> [(FilePath, FilePath)]
 ifacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
-
-
-parseIfaceOption :: String -> (FilePath, FilePath)
-parseIfaceOption s =
-  case break (==',') s of
-  (fpath,',':file) -> (fpath, file)
-  (file, _)        -> ("", file)
+  where
+    parseIfaceOption :: String -> (FilePath, FilePath)
+    parseIfaceOption str =
+      case break (==',') str of
+        (fpath, ',':file) -> (fpath, file)
+        (file, _)         -> ("", file)
 
 
 -- | Like 'listToMaybe' but returns the last element instead of the first.

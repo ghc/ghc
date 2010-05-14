@@ -36,7 +36,7 @@ import Haddock.InterfaceFile
 import Haddock.Interface.Create
 import Haddock.Interface.AttachInstances
 import Haddock.Interface.Rename
-import Haddock.Options
+import Haddock.Options hiding (verbosity)
 import Haddock.Types
 import Haddock.Utils
 
