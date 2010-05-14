@@ -34,83 +34,6 @@ import Haddock.Types
 import System.Console.GetOpt 
 
 
-getUsage :: IO String
-getUsage = do
-  prog <- getProgramName
-  return $ usageInfo (usageHeader prog) (options False)
-  where
-    usageHeader :: String -> String
-    usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
-
-
-parseHaddockOpts :: [String] -> IO ([Flag], [String])
-parseHaddockOpts params =
-  case getOpt Permute (options True) params  of
-    (flags, args, []) -> return (flags, args)
-    (_, _, errors)    -> do 
-      usage <- getUsage
-      throwE (concat errors ++ usage)
-
-
-optTitle :: [Flag] -> Maybe String  
-optTitle flags =
-  case [str | Flag_Heading str <- flags] of
-    [] -> Nothing
-    (t:_) -> Just t
-
-
-outputDir :: [Flag] -> FilePath
-outputDir flags = 
-  case [ path | Flag_OutputDir path <- flags ] of
-    []    -> "."
-    paths -> last paths
-
-
-optContentsUrl :: [Flag] -> Maybe String
-optContentsUrl flags = optLast [ url | Flag_UseContents url <- flags ]
-
-
-optIndexUrl :: [Flag] -> Maybe String
-optIndexUrl flags = optLast [ url | Flag_UseIndex url <- flags ]
-
-
-optHtmlHelpFormat :: [Flag] -> Maybe String
-optHtmlHelpFormat flags = optLast [ hhformat | Flag_HtmlHelp hhformat <- flags ]
-
-
-optCssFile :: [Flag] -> Maybe FilePath
-optCssFile flags = optLast [ str | Flag_CSS str <- flags ]
-
-
-optSourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
-optSourceUrls flags =
-  (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
-  ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
-  ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
-
-
-optWikiUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
-optWikiUrls flags =
-  (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
-  ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
-  ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
-
-
-ghcFlags :: [Flag] -> [String]
-ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
-
-
-ifacePairs :: [Flag] -> [(FilePath, FilePath)]
-ifacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
-
-
-parseIfaceOption :: String -> (FilePath, FilePath)
-parseIfaceOption s = 
-  case break (==',') s of
-	(fpath,',':file) -> (fpath, file)
-	(file, _)        -> ("", file)
-
-
 data Flag
   = Flag_CSS String
   | Flag_Debug
@@ -222,6 +145,83 @@ options backwardsCompat =
     Option [] ["no-tmp-comp-dir"] (NoArg Flag_NoTmpCompDir)
         "don't re-direct compilation output to a temporary directory"
    ]
+
+
+getUsage :: IO String
+getUsage = do
+  prog <- getProgramName
+  return $ usageInfo (usageHeader prog) (options False)
+  where
+    usageHeader :: String -> String
+    usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
+
+
+parseHaddockOpts :: [String] -> IO ([Flag], [String])
+parseHaddockOpts params =
+  case getOpt Permute (options True) params  of
+    (flags, args, []) -> return (flags, args)
+    (_, _, errors)    -> do 
+      usage <- getUsage
+      throwE (concat errors ++ usage)
+
+
+optTitle :: [Flag] -> Maybe String  
+optTitle flags =
+  case [str | Flag_Heading str <- flags] of
+    [] -> Nothing
+    (t:_) -> Just t
+
+
+outputDir :: [Flag] -> FilePath
+outputDir flags = 
+  case [ path | Flag_OutputDir path <- flags ] of
+    []    -> "."
+    paths -> last paths
+
+
+optContentsUrl :: [Flag] -> Maybe String
+optContentsUrl flags = optLast [ url | Flag_UseContents url <- flags ]
+
+
+optIndexUrl :: [Flag] -> Maybe String
+optIndexUrl flags = optLast [ url | Flag_UseIndex url <- flags ]
+
+
+optHtmlHelpFormat :: [Flag] -> Maybe String
+optHtmlHelpFormat flags = optLast [ hhformat | Flag_HtmlHelp hhformat <- flags ]
+
+
+optCssFile :: [Flag] -> Maybe FilePath
+optCssFile flags = optLast [ str | Flag_CSS str <- flags ]
+
+
+optSourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
+optSourceUrls flags =
+  (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
+  ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
+  ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
+
+
+optWikiUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
+optWikiUrls flags =
+  (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
+  ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
+  ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
+
+
+ghcFlags :: [Flag] -> [String]
+ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
+
+
+ifacePairs :: [Flag] -> [(FilePath, FilePath)]
+ifacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
+
+
+parseIfaceOption :: String -> (FilePath, FilePath)
+parseIfaceOption s = 
+  case break (==',') s of
+	(fpath,',':file) -> (fpath, file)
+	(file, _)        -> ("", file)
 
 
 -- | Like 'listToMaybe' but returns the last element instead of the first.
