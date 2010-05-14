@@ -4,7 +4,7 @@
 -- |
 -- Module      :  Main
 -- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2009
+--                    David Waern  2006-2010
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -173,48 +173,18 @@ main = handleTopExceptions $ do
 -- | Render the interfaces with whatever backend is specified in the flags
 render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
 render flags ifaces installedIfaces = do
-  let
-    title = case [str | Flag_Heading str <- flags] of
-              [] -> ""
-              (t:_) -> t
-
-    maybe_source_urls = (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
-                        ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
-                        ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
-
-    maybe_wiki_urls = (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
-                      ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
-                      ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
-
-  libDir <- getHaddockLibDir flags
-  let unicode = Flag_UseUnicode `elem` flags
-  let css_file = case [str | Flag_CSS str <- flags] of
-                   [] -> Nothing
-                   fs -> Just (last fs)
-
-  odir <- case [str | Flag_OutputDir str <- flags] of
-            [] -> return "."
-            fs -> return (last fs)
 
   let
-    maybe_contents_url =
-      case [url | Flag_UseContents url <- flags] of
-        [] -> Nothing
-        us -> Just (last us)
+    title                = case optTitle flags of Nothing -> ""; Just t -> t
+    unicode              = Flag_UseUnicode `elem` flags
+    opt_source_urls      = optSourceUrls     flags
+    opt_wiki_urls        = optWikiUrls       flags
+    opt_contents_url     = optContentsUrl    flags
+    opt_index_url        = optIndexUrl       flags
+    opt_html_help_format = optHtmlHelpFormat flags
+    css_file             = optCssFile        flags
+    odir                 = outputDir         flags
 
-    maybe_index_url =
-      case [url | Flag_UseIndex url <- flags] of
-        [] -> Nothing
-        us -> Just (last us)
-
-    maybe_html_help_format =
-      case [hhformat | Flag_HtmlHelp hhformat <- flags] of
-        []      -> Nothing
-        formats -> Just (last formats)
-
-  prologue <- getPrologue flags
-
-  let
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
     -- *all* visible interfaces including external package modules
@@ -232,27 +202,30 @@ render flags ifaces installedIfaces = do
     ppHtmlContents  = pick Html.ppHtmlContents  Xhtml.ppHtmlContents 
     ppHtml          = pick Html.ppHtml          Xhtml.ppHtml 
     copyHtmlBits    = pick Html.copyHtmlBits    Xhtml.copyHtmlBits 
+ 
+  libDir   <- getHaddockLibDir flags
+  prologue <- getPrologue flags
 
   when (Flag_GenIndex `elem` flags) $ do
-    ppHtmlIndex odir title packageStr maybe_html_help_format
-                maybe_contents_url maybe_source_urls maybe_wiki_urls
+    ppHtmlIndex odir title packageStr opt_html_help_format
+                opt_contents_url opt_source_urls opt_wiki_urls
                 allVisibleIfaces
     copyHtmlBits odir libDir css_file
 
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $
-    ppHtmlHelpFiles title packageStr visibleIfaces odir maybe_html_help_format []
+    ppHtmlHelpFiles title packageStr visibleIfaces odir opt_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
-    ppHtmlContents odir title packageStr maybe_html_help_format
-                   maybe_index_url maybe_source_urls maybe_wiki_urls
+    ppHtmlContents odir title packageStr opt_html_help_format
+                   opt_index_url opt_source_urls opt_wiki_urls
                    allVisibleIfaces True prologue
     copyHtmlBits odir libDir css_file
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title packageStr visibleIfaces odir
-                prologue maybe_html_help_format
-                maybe_source_urls maybe_wiki_urls
-                maybe_contents_url maybe_index_url unicode
+                prologue opt_html_help_format
+                opt_source_urls opt_wiki_urls
+                opt_contents_url opt_index_url unicode
     copyHtmlBits odir libDir css_file
 
   when (Flag_Hoogle `elem` flags) $ do

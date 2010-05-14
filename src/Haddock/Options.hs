@@ -15,11 +15,20 @@ module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
   getUsage,
+  optTitle,
+  outputDir,
+  optContentsUrl,
+  optIndexUrl,
+  optHtmlHelpFormat,
+  optCssFile,
+  optSourceUrls,
+  optWikiUrls,
   ghcFlags,
   ifacePairs
 ) where
 
 
+import Data.Maybe
 import Haddock.Utils
 import Haddock.Types
 import System.Console.GetOpt 
@@ -41,6 +50,50 @@ parseHaddockOpts params =
     (_, _, errors)    -> do 
       usage <- getUsage
       throwE (concat errors ++ usage)
+
+
+optTitle :: [Flag] -> Maybe String  
+optTitle flags =
+  case [str | Flag_Heading str <- flags] of
+    [] -> Nothing
+    (t:_) -> Just t
+
+
+outputDir :: [Flag] -> FilePath
+outputDir flags = 
+  case [ path | Flag_OutputDir path <- flags ] of
+    []    -> "."
+    paths -> last paths
+
+
+optContentsUrl :: [Flag] -> Maybe String
+optContentsUrl flags = optLast [ url | Flag_UseContents url <- flags ]
+
+
+optIndexUrl :: [Flag] -> Maybe String
+optIndexUrl flags = optLast [ url | Flag_UseIndex url <- flags ]
+
+
+optHtmlHelpFormat :: [Flag] -> Maybe String
+optHtmlHelpFormat flags = optLast [ hhformat | Flag_HtmlHelp hhformat <- flags ]
+
+
+optCssFile :: [Flag] -> Maybe FilePath
+optCssFile flags = optLast [ str | Flag_CSS str <- flags ]
+
+
+optSourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
+optSourceUrls flags =
+  (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
+  ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
+  ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
+
+
+optWikiUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
+optWikiUrls flags =
+  (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
+  ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
+  ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
 
 
 ghcFlags :: [Flag] -> [String]
@@ -169,3 +222,10 @@ options backwardsCompat =
     Option [] ["no-tmp-comp-dir"] (NoArg Flag_NoTmpCompDir)
         "don't re-direct compilation output to a temporary directory"
    ]
+
+
+-- | Like 'listToMaybe' but returns the last element instead of the first.
+optLast :: [a] -> Maybe a
+optLast [] = Nothing
+optLast xs = Just (last xs)
+
