@@ -116,7 +116,7 @@ handleGhcExceptions =
 main :: IO ()
 main = handleTopExceptions $ do
 
-  -- parse command-line flags and handle some of them initially
+  -- Parse command-line flags and handle some of them initially.
   args <- getArgs
   (flags, fileArgs) <- parseHaddockOpts args
   handleEasyFlags flags
@@ -141,26 +141,24 @@ main = handleTopExceptions $ do
       -- Initialize GHC.
       withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
-        -- get packages supplied with --read-interface
+        -- Get packages supplied with --read-interface.
         packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
 
-
-        -- create the interfaces -- this is the core part of Haddock
+        -- Create the interfaces -- this is the core part of Haddock.
         (interfaces, homeLinks) <- createInterfaces verbosity fileArgs flags
                                                     (map fst packages)
-
         liftIO $ do
-          -- render the interfaces
+          -- Render the interfaces.
           renderStep packages interfaces
 
-          -- last but not least, dump the interface file
+          -- Last but not least, dump the interface file.
           dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 
     else do
-      -- get packages supplied with --read-interface
+      -- Get packages supplied with --read-interface.
       packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
 
-      -- render even though there are no input files (usually contents/index)
+      -- Render even though there are no input files (usually contents/index).
       renderStep packages []
 
 
