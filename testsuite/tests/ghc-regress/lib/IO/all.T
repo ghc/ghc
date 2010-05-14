@@ -111,6 +111,7 @@ test('concio002', reqlib('process'), compile_and_run, [''])
 test('2122', extra_clean(['2122-test']), compile_and_run, [''])
 
 test('hSetEncoding001',extra_run_opts('hSetEncoding001.in'), compile_and_run, [''])
+test('hSetEncoding002',normal, compile_and_run, [''])
 test('decodingerror001',normal, compile_and_run, [''])
 
 test('encoding001',
