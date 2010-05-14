@@ -31,7 +31,7 @@ module Haddock.Options (
 import Data.Maybe
 import Haddock.Utils
 import Haddock.Types
-import System.Console.GetOpt 
+import System.Console.GetOpt
 
 
 data Flag
@@ -76,75 +76,75 @@ data Flag
 options :: Bool -> [OptDescr Flag]
 options backwardsCompat =
   [
-   Option ['B']  []     (ReqArg Flag_GhcLibDir "DIR")
-	"path to a GHC lib dir, to override the default path",
-   Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
-	"directory in which to put the output files",
-   Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
-	"location of Haddock's auxiliary files",
-   Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
-	"read an interface from FILE",
-   Option ['D']  ["dump-interface"] (ReqArg Flag_DumpInterface "FILE") 
-  "interface file name",
+    Option ['B']  []     (ReqArg Flag_GhcLibDir "DIR")
+      "path to a GHC lib dir, to override the default path",
+    Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
+      "directory in which to put the output files",
+    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR")
+      "location of Haddock's auxiliary files",
+    Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
+      "read an interface from FILE",
+    Option ['D']  ["dump-interface"] (ReqArg Flag_DumpInterface "FILE")
+      "interface file name",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
---	"output in DocBook XML",
+--  "output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
-	"output in HTML",
-	Option []  ["xhtml"]  (NoArg Flag_Xhtml) "use experimental XHTML rendering",
+      "output in HTML",
+    Option []  ["xhtml"]  (NoArg Flag_Xhtml) "use experimental XHTML rendering",
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
-    "output for Hoogle",
+      "output for Hoogle",
     Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
-	"produce index and table of contents in\nmshelp, mshelp2 or devhelp format (with -h)",
-    Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL") 
-	"URL for a source code link on the contents\nand index pages",
+      "produce index and table of contents in\nmshelp, mshelp2 or devhelp format (with -h)",
+    Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL")
+      "URL for a source code link on the contents\nand index pages",
     Option ['s'] (if backwardsCompat then ["source", "source-module"] else ["source-module"])
-        (ReqArg Flag_SourceModuleURL "URL")
-	"URL for a source code link for each module\n(using the %{FILE} or %{MODULE} vars)",
-    Option []  ["source-entity"]  (ReqArg Flag_SourceEntityURL "URL") 
-  "URL for a source code link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
+      (ReqArg Flag_SourceModuleURL "URL")
+      "URL for a source code link for each module\n(using the %{FILE} or %{MODULE} vars)",
+    Option []  ["source-entity"]  (ReqArg Flag_SourceEntityURL "URL")
+      "URL for a source code link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
     Option []  ["comments-base"]   (ReqArg Flag_WikiBaseURL "URL")
-	"URL for a comments link on the contents\nand index pages",
-    Option []  ["comments-module"]  (ReqArg Flag_WikiModuleURL "URL") 
-	"URL for a comments link for each module\n(using the %{MODULE} var)",
-    Option []  ["comments-entity"]  (ReqArg Flag_WikiEntityURL "URL") 
-  "URL for a comments link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
-    Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE") 
-	"the CSS file to use for HTML output",
+      "URL for a comments link on the contents\nand index pages",
+    Option []  ["comments-module"]  (ReqArg Flag_WikiModuleURL "URL")
+      "URL for a comments link for each module\n(using the %{MODULE} var)",
+    Option []  ["comments-entity"]  (ReqArg Flag_WikiEntityURL "URL")
+      "URL for a comments link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
+    Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE")
+      "the CSS file to use for HTML output",
     Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
-	"file containing prologue text",
+      "file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
-	"page heading",
+      "page heading",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
-	"extra debugging output",
+      "extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)
-	"display this help and exit",
+      "display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
-	"output version information and exit",
+      "output version information and exit",
     Option ['v']  ["verbosity"]  (ReqArg Flag_Verbosity "VERBOSITY")
-        "set verbosity level",
+      "set verbosity level",
     Option [] ["use-contents"] (ReqArg Flag_UseContents "URL")
-	"use a separately-generated HTML contents page",
+      "use a separately-generated HTML contents page",
     Option [] ["gen-contents"] (NoArg Flag_GenContents)
-	"generate an HTML contents from specified\ninterfaces",
+      "generate an HTML contents from specified\ninterfaces",
     Option [] ["use-index"] (ReqArg Flag_UseIndex "URL")
-	"use a separately-generated HTML index",
+      "use a separately-generated HTML index",
     Option [] ["gen-index"] (NoArg Flag_GenIndex)
-	"generate an HTML index from specified\ninterfaces",
+      "generate an HTML index from specified\ninterfaces",
     Option [] ["ignore-all-exports"] (NoArg Flag_IgnoreAllExports)
-	"behave as if all modules have the\nignore-exports atribute",
+      "behave as if all modules have the\nignore-exports atribute",
     Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
-	"behave as if MODULE has the hide attribute",
+      "behave as if MODULE has the hide attribute",
     Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
- 	"option to be forwarded to GHC",
+      "option to be forwarded to GHC",
     Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)
-	"output GHC version in numeric format",
+      "output GHC version in numeric format",
     Option []  ["print-ghc-libdir"]  (NoArg Flag_PrintGhcLibDir)
-	"output GHC lib dir",
+      "output GHC lib dir",
     Option ['w'] ["no-warnings"] (NoArg Flag_NoWarnings) "turn off all warnings",
     Option [] ["no-tmp-comp-dir"] (NoArg Flag_NoTmpCompDir)
-        "don't re-direct compilation output to a temporary directory"
-   ]
+      "don't re-direct compilation output to a temporary directory"
+  ]
 
 
 getUsage :: IO String
@@ -160,12 +160,12 @@ parseHaddockOpts :: [String] -> IO ([Flag], [String])
 parseHaddockOpts params =
   case getOpt Permute (options True) params  of
     (flags, args, []) -> return (flags, args)
-    (_, _, errors)    -> do 
+    (_, _, errors)    -> do
       usage <- getUsage
       throwE (concat errors ++ usage)
 
 
-optTitle :: [Flag] -> Maybe String  
+optTitle :: [Flag] -> Maybe String
 optTitle flags =
   case [str | Flag_Heading str <- flags] of
     [] -> Nothing
@@ -173,7 +173,7 @@ optTitle flags =
 
 
 outputDir :: [Flag] -> FilePath
-outputDir flags = 
+outputDir flags =
   case [ path | Flag_OutputDir path <- flags ] of
     []    -> "."
     paths -> last paths
@@ -218,10 +218,10 @@ ifacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
 
 
 parseIfaceOption :: String -> (FilePath, FilePath)
-parseIfaceOption s = 
+parseIfaceOption s =
   case break (==',') s of
-	(fpath,',':file) -> (fpath, file)
-	(file, _)        -> ("", file)
+  (fpath,',':file) -> (fpath, file)
+  (file, _)        -> ("", file)
 
 
 -- | Like 'listToMaybe' but returns the last element instead of the first.
