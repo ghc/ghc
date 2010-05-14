@@ -79,7 +79,7 @@ createInterfaces verbosity modules flags extIfaces = do
       homeLinks = buildHomeLinks interfaces -- Build the environment for the home
                                             -- package
       links     = homeLinks `Map.union` extLinks
- 
+
   out verbosity verbose "Renaming interfaces..."
   let warnings = Flag_NoWarnings `notElem` flags
   let (interfaces'', msgs) =
