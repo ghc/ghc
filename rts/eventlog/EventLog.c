@@ -288,6 +288,10 @@ initEventLogging(void)
     for (c = 0; c < n_caps; ++c) {
         postBlockMarker(&capEventBuf[c]);
     }
+
+#ifdef THREADED_RTS
+    initMutex(&eventBufMutex);
+#endif
 }
 
 void
