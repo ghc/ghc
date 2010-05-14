@@ -180,7 +180,7 @@ render flags ifaces installedIfaces = do
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
-    -- *all* visible interfaces including external package modules
+    -- *All* visible interfaces including external package modules.
     allIfaces        = map toInstalledIface ifaces ++ installedIfaces
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
@@ -188,7 +188,7 @@ render flags ifaces installedIfaces = do
     packageStr       = Just (modulePackageString packageMod)
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
-    -- which HTML rendering to use
+    -- Which HTML rendering to use.
     pick htmlF xhtmlF = if (Flag_Xhtml `elem` flags) then xhtmlF else htmlF
     ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex
     ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles
