@@ -188,7 +188,7 @@ render flags ifaces installedIfaces = do
     packageStr       = Just (modulePackageString packageMod)
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
-    -- which HTML redering to use
+    -- which HTML rendering to use
     pick htmlF xhtmlF = if (Flag_Xhtml `elem` flags) then xhtmlF else htmlF
     ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex
     ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles
