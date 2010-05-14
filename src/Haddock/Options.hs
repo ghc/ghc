@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Definition of the command line interface of Haddock
+-- Definition of the command line interface of Haddock.
 -----------------------------------------------------------------------------
 module Haddock.Options (
   parseHaddockOpts,
