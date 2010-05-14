@@ -191,12 +191,12 @@ render flags ifaces installedIfaces = do
 
     -- which HTML redering to use
     pick htmlF xhtmlF = if (Flag_Xhtml `elem` flags) then xhtmlF else htmlF
-    ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex 
-    ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles 
-    ppHtmlContents  = pick Html.ppHtmlContents  Xhtml.ppHtmlContents 
-    ppHtml          = pick Html.ppHtml          Xhtml.ppHtml 
-    copyHtmlBits    = pick Html.copyHtmlBits    Xhtml.copyHtmlBits 
- 
+    ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex
+    ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles
+    ppHtmlContents  = pick Html.ppHtmlContents  Xhtml.ppHtmlContents
+    ppHtml          = pick Html.ppHtml          Xhtml.ppHtml
+    copyHtmlBits    = pick Html.copyHtmlBits    Xhtml.copyHtmlBits
+
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue flags
 
