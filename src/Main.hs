@@ -133,13 +133,12 @@ main = handleTopExceptions $ do
 
       libDir <- getGhcLibDir flags
 
-      -- We have one global error handler for all GHC source errors.  Other kinds
-      -- of exceptions will be propagated to the top-level error handler.
+      -- Catches all GHC source errors, then prints and re-throws them.
       let handleSrcErrors action = flip handleSourceError action $ \err -> do
             printExceptionAndWarnings err
             liftIO exitFailure
 
-      -- initialize GHC
+      -- Initialize GHC.
       withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
         -- get packages supplied with --read-interface
