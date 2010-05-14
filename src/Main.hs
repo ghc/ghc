@@ -120,15 +120,8 @@ main = handleTopExceptions $ do
   (flags, fileArgs) <- parseHaddockOpts args
   handleEasyFlags flags
 
-  let renderStep packages interfaces = do
-        updateHTMLXRefs packages
-        let ifaceFiles = map fst packages
-            installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-        render flags interfaces installedIfaces
-
   if not (null fileArgs)
     then do
-
       libDir <- getGhcLibDir flags
 
       -- Catches all GHC source errors, then prints and re-throws them.
@@ -147,7 +140,7 @@ main = handleTopExceptions $ do
                                                 (map fst packages)
         liftIO $ do
           -- Render the interfaces.
-          renderStep packages ifaces
+          renderStep flags packages ifaces
 
           -- Dump an "interface file" (.haddock file), if requested.
           case optDumpInterfaceFile flags of
@@ -159,7 +152,15 @@ main = handleTopExceptions $ do
       packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
 
       -- Render even though there are no input files (usually contents/index).
-      renderStep packages []
+      renderStep flags packages []
+
+
+renderStep :: [Flag] -> [(InterfaceFile, FilePath)] -> [Interface] -> IO ()
+renderStep flags packages interfaces = do
+  updateHTMLXRefs packages
+  let ifaceFiles      = map fst packages
+      installedIfaces = concatMap ifInstalledIfaces ifaceFiles
+  render flags interfaces installedIfaces
 
 
 -- | Render the interfaces with whatever backend is specified in the flags.
