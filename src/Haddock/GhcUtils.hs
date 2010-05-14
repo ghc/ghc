@@ -24,6 +24,7 @@ import Data.Traversable
 import Distribution.Compat.ReadP
 import Distribution.Text
 
+import Exception
 import Outputable
 import Name
 import Packages
@@ -227,3 +228,36 @@ parentMap d = [ (c, p) | (p, cs) <- families d, c <- cs ]
 parents :: Name -> HsDecl Name -> [Name]
 parents n (TyClD d) = [ p | (c, p) <- parentMap d, c == n ]
 parents _ _ = []
+
+
+-------------------------------------------------------------------------------
+-- Utils that work in monads defined by GHC
+-------------------------------------------------------------------------------
+
+
+modifySessionDynFlags :: (DynFlags -> DynFlags) -> Ghc ()
+modifySessionDynFlags f = do
+  dflags <- getSessionDynFlags
+  _ <- setSessionDynFlags (f dflags)
+  return ()
+
+
+-- | A variant of 'gbracket' where the return value from the first computation
+-- is not required.
+gbracket_ :: ExceptionMonad m => m a -> m b -> m c -> m c
+gbracket_ before after thing = gbracket before (const after) (const thing)
+
+
+-------------------------------------------------------------------------------
+-- DynFlags
+-------------------------------------------------------------------------------
+
+
+setObjectDir, setHiDir, setStubDir, setOutputDir :: String -> DynFlags -> DynFlags
+setObjectDir  f d = d{ objectDir  = Just f}
+setHiDir      f d = d{ hiDir      = Just f}
+setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
+  -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
+  -- \#included from the .hc file when compiling with -fvia-C.
+setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
+

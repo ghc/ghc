@@ -43,7 +43,10 @@ module Haddock.Utils (
   
   -- * Logging
   parseVerbosity,
-  out
+  out,
+
+  -- * System tools
+  getProcessID
  ) where
 
 
@@ -68,6 +71,13 @@ import System.IO.Unsafe	 ( unsafePerformIO )
 import System.FilePath
 import Distribution.Verbosity
 import Distribution.ReadE
+
+#ifndef mingw32_HOST_OS
+import qualified System.Posix.Internals
+#else /* Must be Win32 */
+import Foreign
+import Foreign.C.String
+#endif
 
 import MonadUtils ( MonadIO(..) )
 
@@ -368,36 +378,14 @@ idMarkup = Markup {
   }
 
 
------------------------------------------------------------------------------
--- put here temporarily
+-- -----------------------------------------------------------------------------
+-- System tools
 
 
-newtype FormatVersion = FormatVersion Int deriving (Eq,Ord)
+#ifdef mingw32_HOST_OS
+foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
+#else
+getProcessID :: IO Int
+getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
+#endif
 
-
-nullFormatVersion :: FormatVersion
-nullFormatVersion = mkFormatVersion 0
-
-
-mkFormatVersion :: Int -> FormatVersion
-mkFormatVersion = FormatVersion
-
-
-instance Binary FormatVersion where
-   put_ bh (FormatVersion i) =
-      case compare i 0 of
-         EQ -> return ()
-         GT -> put_ bh (-i)
-         LT -> error (
-            "Binary.hs: negative FormatVersion " ++ show i 
-               ++ " is not allowed")
-   get bh =
-      do
-         (w8 :: Word8) <- get bh   
-         if testBit w8 7
-            then
-               do
-                  i <- get bh
-                  return (FormatVersion (-i))
-            else
-               return nullFormatVersion

@@ -26,30 +26,31 @@
 -- places to link to in the documentation, and all 'Interface's are \"renamed\"
 -- using this environment.
 -----------------------------------------------------------------------------
-
 module Haddock.Interface (
   createInterfaces
 ) where
 
 
+import Haddock.GhcUtils
+import Haddock.InterfaceFile
 import Haddock.Interface.Create
 import Haddock.Interface.AttachInstances
 import Haddock.Interface.Rename
-import Haddock.Types
 import Haddock.Options
-import Haddock.GhcUtils
+import Haddock.Types
 import Haddock.Utils
-import Haddock.InterfaceFile
 
-import qualified Data.Map as Map
-import Data.List
-import Data.Maybe
 import Control.Monad
-import Control.Exception ( evaluate )
+import Data.List
+import qualified Data.Map as Map
+import Data.Maybe
 import Distribution.Verbosity
+import System.Directory
+import System.FilePath
 
-import GHC hiding (verbosity, flags)
 import Digraph
+import Exception
+import GHC hiding (verbosity, flags)
 import HscTypes
 
 
@@ -90,34 +91,61 @@ createInterfaces verbosity modules flags extIfaces = do
 
 createInterfaces' :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc [Interface]
 createInterfaces' verbosity modules flags instIfaceMap = do
+  let useTempDir = Flag_NoTmpCompDir `notElem` flags
+
+  -- Output dir needs to be set before calling depanal since it uses it to
+  -- compute output file names that are stored in the DynFlags of the
+  -- resulting ModSummaries.
+  tmp <- liftIO getTemporaryDirectory
+  x   <- liftIO getProcessID
+  let tempDir = tmp </> ".haddock-" ++ show x
+  when useTempDir $ modifySessionDynFlags (setOutputDir tempDir)
+
   targets <- mapM (\f -> guessTarget f Nothing) modules
   setTargets targets
+  -- Dependency analysis.
   modgraph <- depanal [] False
 
-  -- If template haskell is used by the package, we can not use
-  -- HscNothing as target since we might need to run code generated from
-  -- one or more of the modules during typechecking.
-  modgraph' <- if needsTemplateHaskell modgraph
-       then do
-         dflags <- getSessionDynFlags
-         _ <- setSessionDynFlags dflags { hscTarget = defaultObjectTarget }
-         -- we need to set defaultObjectTarget on all the ModSummaries as well
-         let addDefTarget m = m { ms_hspp_opts = (ms_hspp_opts m) { hscTarget = defaultObjectTarget } }
-         return (map addDefTarget modgraph)
-       else return modgraph
+  -- If template haskell is used by the package, we can't use HscNothing as
+  -- target since we might need to run code generated from one or more of the
+  -- modules during typechecking.
+  if needsTemplateHaskell modgraph
+    then
+      -- Create a temporary directory in wich to write compilation output,
+      -- unless the user has asked us not to.
+      (if useTempDir then withTempDir tempDir else id) $ do
+        -- Turn on compilation.
+        let enableComp d = d { hscTarget = defaultObjectTarget }
+        modifySessionDynFlags enableComp
+        -- We need to update the DynFlags of the ModSummaries as well.
+        let upd m = m { ms_hspp_opts = enableComp (ms_hspp_opts m) }
+        let modgraph' = map upd modgraph
 
-  let orderedMods = flattenSCCs $ topSortModuleGraph False modgraph' Nothing
-  (ifaces, _) <- foldM (\(ifaces, modMap) modsum -> do
-    x <- processModule verbosity modsum flags modMap instIfaceMap
-    case x of
-      Just interface ->
-        return $ (interface : ifaces , Map.insert (ifaceMod interface) interface modMap)
-      Nothing -> return (ifaces, modMap)
-    ) ([], Map.empty) orderedMods
+        processModules verbosity flags instIfaceMap modgraph'
+    else
+      processModules verbosity flags instIfaceMap modgraph
+
+
+withTempDir :: (ExceptionMonad m, MonadIO m) => FilePath -> m a -> m a
+withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
+                            (liftIO $ removeDirectoryRecursive dir)
+
+
+processModules :: Verbosity -> [Flag] -> InstIfaceMap -> [ModSummary]
+               -> Ghc [Interface]
+processModules verbosity flags instIfaceMap mods = do
+  let sortedMods = flattenSCCs $ topSortModuleGraph False mods Nothing
+  (ifaces, _) <- foldM f ([], Map.empty) sortedMods
   return (reverse ifaces)
+  where
+    f (ifaces, ifaceMap) modSummary = do
+      x <- processModule verbosity modSummary flags ifaceMap instIfaceMap
+      return $ case x of
+        Just iface -> (iface:ifaces, Map.insert (ifaceMod iface) iface ifaceMap)
+        Nothing    -> (ifaces, ifaceMap) -- Boot modules don't generate ifaces.
 
 
-processModule :: Verbosity -> ModSummary -> [Flag] -> ModuleMap -> InstIfaceMap -> Ghc (Maybe Interface)
+processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe Interface)
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
   tc_mod <- loadModule =<< typecheckModule =<< parseModule modsum
