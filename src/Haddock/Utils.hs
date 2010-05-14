@@ -52,7 +52,6 @@ import Haddock.GhcUtils
 
 import GHC
 import Name
-import Binary
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, ord, chr )
@@ -62,8 +61,6 @@ import qualified Data.Map as Map hiding ( Map )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( isSuffixOf )
 import Data.Maybe ( fromJust )
-import Data.Word ( Word8 )
-import Data.Bits ( testBit )
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
