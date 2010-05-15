@@ -88,7 +88,7 @@ options backwardsCompat =
     Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
       "read an interface from FILE",
     Option ['D']  ["dump-interface"] (ReqArg Flag_DumpInterface "FILE")
-      "interface file name",
+      "write the resulting interface to FILE",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
 --  "output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
