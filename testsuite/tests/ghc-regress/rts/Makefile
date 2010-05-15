@@ -21,3 +21,9 @@ T2615-prep:
 	'$(TEST_HC)' -fPIC -c libfoo_T2615.c -o libfoo_T2615.o
 	'$(TEST_HC)' -shared -no-auto-link-packages libfoo_T2615.o -o libfoo_T2615.so
 
+.PHONY: T4059
+T4059:
+	$(RM) 4059_c.o 4059.o 4059.hi
+	'$(TEST_HC)' -v0 --make 4059 4059_c.c
+	./4059
+
