@@ -146,7 +146,7 @@ options backwardsCompat =
       "output GHC lib dir",
     Option ['w'] ["no-warnings"] (NoArg Flag_NoWarnings) "turn off all warnings",
     Option [] ["no-tmp-comp-dir"] (NoArg Flag_NoTmpCompDir)
-      "don't re-direct compilation output to a temporary directory"
+      "do not re-direct compilation output to a temporary directory"
   ]
 
 
