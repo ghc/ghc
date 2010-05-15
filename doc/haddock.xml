@@ -807,6 +807,23 @@
       
       <varlistentry>
         <term>
+          <indexterm><primary><option>--no-tmp-comp-dir</option></primary></indexterm>
+          <option>--no-tmp-comp-dir</option>
+        </term>
+	<listitem>
+          <para>If the input modules use Template Haskell, Haddock has to
+          perform compilation (using GHC).  This results in .o, .hi, and stub files that
+          are written to a temporary directory by default. When this flag is specified,
+          however, the files are written to the present directory (or another path if you
+          tell GHC, for example like this: <literal>--optghc=-odir --optghc=path</literal>).
+          Note that not only will files be written to this directory, GHC will also look for
+          already existing files there, and use them in order to skip compilation.
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <indexterm><primary><option>-w</option></primary></indexterm>
           <option>-w</option>
         </term>
