@@ -45,6 +45,10 @@ import Control.Monad.Instances ()
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
 
+#ifdef __GLASGOW_HASKELL__
+import GHC.Conc (STM, retry, orElse)
+#endif
+
 infixl 3 <|>
 infixl 4 <*>, <*, *>, <**>
 
@@ -144,6 +148,16 @@ instance Alternative [] where
 instance Applicative IO where
         pure = return
         (<*>) = ap
+
+#ifdef __GLASGOW_HASKELL__
+instance Applicative STM where
+    pure = return
+    (<*>) = ap
+
+instance Alternative STM where
+    empty = retry
+    (<|>) = orElse
+#endif
 
 instance Applicative ((->) a) where
         pure = const
