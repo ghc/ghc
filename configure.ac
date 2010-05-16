@@ -197,16 +197,8 @@ AC_SUBST(ICONV_LIB_DIRS)
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
-dnl We don't use the standard autoconf macros for this, but instead
-dnl ask the bootstrapping compiler what platform it is for
-
-dnl Guess host/target/build platform(s) if necessary.
-m4_divert_once([HELP_CANON],
-[[
-System types:
-  --build=BUILD     configure for building on BUILD [guessed]
-  --host=HOST       cross-compile to build programs to run on HOST [guessed]
-  --target=TARGET   configure for building compilers for TARGET [guessed]]])dnl
+dnl If we aren't explicitly told what values to use with configure flags,
+dnl we ask the bootstrapping compiler what platform it is for
 
 if test "${WithGhc}" != ""
 then
