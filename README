@@ -80,12 +80,12 @@ dblatex.
 
 Quick start:  the following gives you a default build:
 
-    $ sh boot
+    $ perl boot
     $ ./configure
     $ make
     $ make install
 
-The "sh boot" step is only necessary if this is a tree checked out
+The "perl boot" step is only necessary if this is a tree checked out
 from darcs.  For source distributions downloaded from GHC's web site,
 this step has already been performed.
 
