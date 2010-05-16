@@ -138,3 +138,9 @@ test('T3823',
      run_command,
      ['$MAKE -s --no-print-directory T3823'])
 
+test('T4003',
+     extra_clean(['T4003A.hi-boot', 'T4003A.hi', 'T4003B.hi',
+                  'T4003A.o-boot', 'T4003A.o', 'T4003B.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T4003'])
+

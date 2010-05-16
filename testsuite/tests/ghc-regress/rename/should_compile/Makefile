@@ -12,3 +12,10 @@ T3823:
 	$(RM) T3823A.o-boot  T3823A.o  T3823B.o
 	-'$(TEST_HC)' -v0 --make T3823A.hs
 
+T4003:
+	$(RM) T4003A.hi-boot T4003A.hi T4003B.hi
+	$(RM) T4003A.o-boot  T4003A.o  T4003B.o
+	'$(TEST_HC)' -O -c T4003A.hs-boot
+	'$(TEST_HC)' -O -c T4003B.hs
+	'$(TEST_HC)' -O -c T4003A.hs
+
