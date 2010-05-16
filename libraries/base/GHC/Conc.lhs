@@ -476,6 +476,10 @@ thenSTM (STM m) k = STM ( \s ->
 returnSTM :: a -> STM a
 returnSTM x = STM (\s -> (# s, x #))
 
+instance MonadPlus STM where
+  mzero = retry
+  mplus = orElse
+
 -- | Unsafely performs IO in the STM monad.  Beware: this is a highly
 -- dangerous thing to do.  
 --
