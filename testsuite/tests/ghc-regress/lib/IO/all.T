@@ -35,6 +35,7 @@ test('hIsEOF001',   normal, compile_and_run, [''])
 test('hIsEOF002', extra_clean(['hIsEOF002.out']), compile_and_run, ['-cpp'])
 
 test('hReady001', normal, compile_and_run, ['-cpp'])
+test('hReady002', [ no_stdin, cmd_prefix('sleep 1 |') ], compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
 test('hSeek002', normal, compile_and_run, ['-cpp'])
@@ -111,7 +112,6 @@ test('concio002', reqlib('process'), compile_and_run, [''])
 test('2122', extra_clean(['2122-test']), compile_and_run, [''])
 
 test('hSetEncoding001',extra_run_opts('hSetEncoding001.in'), compile_and_run, [''])
-test('hSetEncoding002',normal, compile_and_run, [''])
 test('decodingerror001',normal, compile_and_run, [''])
 
 test('encoding001',
