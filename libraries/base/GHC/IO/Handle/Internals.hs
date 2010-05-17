@@ -35,6 +35,7 @@ module GHC.IO.Handle.Internals (
   flushCharBuffer, flushByteReadBuffer,
 
   readTextDevice, writeTextDevice, readTextDeviceNonBlocking,
+  decodeByteBuf,
 
   augmentIOError,
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
@@ -822,22 +823,28 @@ readTextDeviceNonBlocking :: Handle__ -> CharBuffer -> IO CharBuffer
 readTextDeviceNonBlocking h_@Handle__{..} cbuf = do
   --
   bbuf0 <- readIORef haByteBuffer
-  bbuf1 <- if not (isEmptyBuffer bbuf0)
-              then return bbuf0
-              else do
-                   (r,bbuf1) <- Buffered.fillReadBuffer0 haDevice bbuf0
-                   if isNothing r then ioe_EOF else do  -- raise EOF
-                   return bbuf1
+  when (isEmptyBuffer bbuf0) $ do
+     (r,bbuf1) <- Buffered.fillReadBuffer0 haDevice bbuf0
+     if isNothing r then ioe_EOF else do  -- raise EOF
+     writeIORef haByteBuffer bbuf1
+
+  decodeByteBuf h_ cbuf
+
+-- Decode bytes from the byte buffer into the supplied CharBuffer.
+decodeByteBuf :: Handle__ -> CharBuffer -> IO CharBuffer
+decodeByteBuf h_@Handle__{..} cbuf = do
+  --
+  bbuf0 <- readIORef haByteBuffer
 
   (bbuf2,cbuf') <-
       case haDecoder of
           Nothing      -> do
-               writeIORef haLastDecode (error "codec_state", bbuf1)
-               latin1_decode bbuf1 cbuf
+               writeIORef haLastDecode (error "codec_state", bbuf0)
+               latin1_decode bbuf0 cbuf
           Just decoder -> do
                state <- getState decoder
-               writeIORef haLastDecode (state, bbuf1)
-               (encode decoder) bbuf1 cbuf
+               writeIORef haLastDecode (state, bbuf0)
+               (encode decoder) bbuf0 cbuf
 
   writeIORef haByteBuffer bbuf2
   return cbuf'

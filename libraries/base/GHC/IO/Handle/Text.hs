@@ -95,7 +95,7 @@ hWaitForInput h msecs = do
                 return True
         else do
                -- there might be bytes in the byte buffer waiting to be decoded
-               cbuf' <- readTextDeviceNonBlocking handle_ cbuf
+               cbuf' <- decodeByteBuf handle_ cbuf
                writeIORef haCharBuffer cbuf'
 
                if not (isEmptyBuffer cbuf') then return True else do
