@@ -127,6 +127,9 @@ $(libffi_STAMP_CONFIGURE):
 	    export PATH; \
 	    cd build && \
 	    CC=$(WhatGccIsCalled) \
+	    LD=$(LD) \
+	    AR=$(AR) \
+	    NM=$(NM) \
         CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS) -w" \
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_LD_OPTS) -w" \
         "$(SHELL)" configure \
