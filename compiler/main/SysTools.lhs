@@ -500,7 +500,7 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
        case lookupFM mapping tmp_dir of
            Nothing ->
                do x <- getProcessID
-                  let prefix = tmp_dir ++ "/ghc" ++ show x ++ "_"
+                  let prefix = tmp_dir </> "ghc" ++ show x ++ "_"
                   let
                       mkTempDir :: Integer -> IO FilePath
                       mkTempDir x
