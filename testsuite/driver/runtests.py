@@ -13,7 +13,6 @@ import getopt
 import platform
 import time
 import re
-import ctypes
 
 from testutil import *
 from testglobals import *
@@ -109,6 +108,7 @@ if config.use_threads == 1:
 
 # Try to use UTF8
 if windows:
+    import ctypes
     if cygwin:
         # Is this actually right? Which calling convention does it use?
         # As of the time of writing, ctypes.windll doesn't exist in the
