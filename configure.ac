@@ -416,6 +416,7 @@ then
     CC="$hardtop/inplace/mingw/bin/gcc.exe"
     LD="$hardtop/inplace/mingw/bin/ld.exe"
     NM="$hardtop/inplace/mingw/bin/nm.exe"
+    fp_prog_ar_raw="$hardtop/inplace/mingw/bin/ar.exe"
     if ! test -d inplace/mingw ||
          test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.gz ||
