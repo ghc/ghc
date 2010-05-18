@@ -118,7 +118,7 @@ toInstalledDescription = hmi_description . instInfo
 -- Making abstract declarations
 
 
-restrictTo :: [Name] -> (LHsDecl Name) -> (LHsDecl Name)
+restrictTo :: [Name] -> LHsDecl Name -> LHsDecl Name
 restrictTo names (L loc decl) = L loc $ case decl of
   TyClD d | isDataDecl d && tcdND d == DataType -> 
     TyClD (d { tcdCons = restrictCons names (tcdCons d) }) 
@@ -386,6 +386,6 @@ idMarkup = Markup {
 foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #else
 getProcessID :: IO Int
-getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
+getProcessID = fmap fromIntegral System.Posix.Internals.c_getpid
 #endif
 
