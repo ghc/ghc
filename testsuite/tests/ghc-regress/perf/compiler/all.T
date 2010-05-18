@@ -27,9 +27,10 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 420000000,
-                                                      480000000)),
+                                                      550000000)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
+                                    # 17/05/2010:     519,377,728 (amd64/Linux)
       only_ways(['normal'])
       ],
      compile,
