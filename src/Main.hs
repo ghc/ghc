@@ -168,7 +168,7 @@ render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
 render flags ifaces installedIfaces = do
 
   let
-    title                = case optTitle flags of Nothing -> ""; Just t -> t
+    title                = fromMaybe "" (optTitle flags)
     unicode              = Flag_UseUnicode `elem` flags
     opt_source_urls      = optSourceUrls     flags
     opt_wiki_urls        = optWikiUrls       flags
@@ -189,7 +189,7 @@ render flags ifaces installedIfaces = do
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
     -- Which HTML rendering to use.
-    pick htmlF xhtmlF = if (Flag_Xhtml `elem` flags) then xhtmlF else htmlF
+    pick htmlF xhtmlF = if Flag_Xhtml `elem` flags then xhtmlF else htmlF
     ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex
     ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles
     ppHtmlContents  = pick Html.ppHtmlContents  Xhtml.ppHtmlContents
