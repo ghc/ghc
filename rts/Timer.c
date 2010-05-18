@@ -86,6 +86,15 @@ handle_tick(int unused STG_UNUSED)
 #endif
 }
 
+// This global counter is used to allow multiple threads to stop the
+// timer temporarily with a stopTimer()/startTimer() pair.  If 
+//      timer_enabled  == 0          timer is enabled
+//      timer_disabled == N, N > 0   timer is disabled by N threads
+// When timer_enabled makes a transition to 0, we enable the timer,
+// and when it makes a transition to non-0 we disable it.
+
+static StgWord timer_disabled;
+
 void
 initTimer(void)
 {
@@ -93,21 +102,26 @@ initTimer(void)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
+    timer_disabled = 1;
 }
 
 void
 startTimer(void)
 {
-    if (RtsFlags.MiscFlags.tickInterval != 0) {
-        startTicker();
+    if (atomic_dec(&timer_disabled) == 0) {
+        if (RtsFlags.MiscFlags.tickInterval != 0) {
+            startTicker();
+        }
     }
 }
 
 void
 stopTimer(void)
 {
-    if (RtsFlags.MiscFlags.tickInterval != 0) {
-        stopTicker();
+    if (atomic_inc(&timer_disabled) == 1) {
+        if (RtsFlags.MiscFlags.tickInterval != 0) {
+            stopTicker();
+        }
     }
 }
 

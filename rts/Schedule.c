@@ -1533,10 +1533,14 @@ forkProcess(HsStablePtr *entry
     ACQUIRE_LOCK(&cap->lock);
     ACQUIRE_LOCK(&cap->running_task->lock);
 
+    stopTimer(); // See #4074
+
     pid = fork();
     
     if (pid) { // parent
 	
+        startTimer(); // #4074
+
         RELEASE_LOCK(&sched_mutex);
         RELEASE_LOCK(&cap->lock);
         RELEASE_LOCK(&cap->running_task->lock);
