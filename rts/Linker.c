@@ -1230,11 +1230,12 @@ static OpenedDLL* opened_dlls = NULL;
 
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 
-static char *
+static const char *
 internal_dlopen(const char *dll_name)
 {
    void *hdl;
-   char *errmsg, *errmsg_copy;
+   const char *errmsg;
+   char *errmsg_copy;
 
    // omitted: RTLD_NOW
    // see http://www.haskell.org/pipermail/cvs-ghc/2007-September/038570.html
@@ -1274,7 +1275,7 @@ addDLL( char *dll_name )
 
 #define NMATCH 5
    regmatch_t match[NMATCH];
-   char *errmsg;
+   const char *errmsg;
    FILE* fp;
    size_t match_length;
 #define MAXLINE 1000
