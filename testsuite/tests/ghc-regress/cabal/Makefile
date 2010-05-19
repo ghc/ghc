@@ -145,10 +145,24 @@ shadow:
 	$(LOCAL_GHC_PKGSHADOW2) register --force shadow3.pkg >shadow3.out 2>&1
 	$(LOCAL_GHC_PKGSHADOW3) list
 	echo "main = return ()" >shadow.hs
+# 
+# In this test, shadow-1-XXX is shadowed by shadow-1-YYY, which causes
+# shadowdep-1-XXX to be unavailable:
+#
+	@echo "should FAIL:"
 	'$(TEST_HC)' -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code || true
+# 
+# Reversing the order of the package.conf files should fix the problem:
+#
+	@echo "should SUCCEED:"
+	'$(TEST_HC)' -package-conf $(PKGCONFSHADOW2) -package-conf $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code || true
+#
+# We can also fix the problem by using an explicit -package-id flag to
+# specify a package we really want to use:
+#
+	@echo "should SUCCEED:"
 	'$(TEST_HC)' -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package-id shadowdep-1-XXX -c shadow.hs -fno-code
-# The second one should succeed, by specifying -package-id we've
-# explicitly overriden the default shadowing behaviour.
+
 
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
