@@ -92,14 +92,11 @@ utf32be = unsafePerformIO (mkTextEncoding "UTF32BE")
 {-# NOINLINE localeEncoding #-}
 localeEncoding :: TextEncoding
 localeEncoding = unsafePerformIO $ do
-#if HAVE_LANGINFO_H
-   cstr <- c_localeEncoding -- use nl_langinfo(CODESET) to get the encoding
-                               -- if we have it
+   -- Use locale_charset() or nl_langinfo(CODESET) to get the encoding
+   -- if we have either of them.
+   cstr <- c_localeEncoding
    r <- peekCString cstr
    mkTextEncoding r
-#else
-   mkTextEncoding "" -- GNU iconv accepts "" to mean the -- locale encoding.
-#endif
 
 -- We hope iconv_t is a storable type.  It should be, since it has at least the
 -- value -1, which is a possible return value from iconv_open.
