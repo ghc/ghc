@@ -60,6 +60,7 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.List as List
+import qualified Data.Set as Set
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -193,7 +194,7 @@ readPackageConfigs dflags = do
 		     -- the we tack on the system paths.
 
    pkgs <- mapM (readPackageConfig dflags)
-                (reverse pkgconfs ++ reverse (extraPkgConfs dflags))
+                (pkgconfs ++ reverse (extraPkgConfs dflags))
                 -- later packages shadow earlier ones.  extraPkgConfs
                 -- is in the opposite order to the flags on the
                 -- command line.
@@ -219,7 +220,7 @@ getSystemPackageConfigs dflags = do
       if exist then return [pkgconf] else return []
     `catchIO` (\_ -> return [])
 
-   return (user_pkgconf ++ [system_pkgconf])
+   return (system_pkgconf : user_pkgconf)
 
 readPackageConfig :: DynFlags -> FilePath -> IO [PackageConfig]
 readPackageConfig dflags conf_file = do
@@ -656,15 +657,23 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   let
       flags = reverse (packageFlags dflags)
 
-      ipid_map = listToFM [ (installedPackageId p, p) | p <- pkgs0 ]
-
       -- pkgs0 with duplicate packages filtered out.  This is
-      -- important: it is possible for a package in the user package
-      -- DB to have the same IPID as a package in the global DB, and
-      -- we want the former to take precedence.  This is not the same
+      -- important: it is possible for a package in the global package
+      -- DB to have the same IPID as a package in the user DB, and
+      -- we want the latter to take precedence.  This is not the same
       -- as shadowing (below), since in this case the two packages
       -- have the same ABI and are interchangeable.
-      pkgs0_unique = eltsFM ipid_map
+      --
+      -- #4072: note that we must retain the ordering of the list here
+      -- so that shadowing behaves as expected when we apply it later.
+      pkgs0_unique = snd $ foldr del (Set.empty,[]) pkgs0
+          where del p (s,ps)
+                  | pid `Set.member` s = (s,ps)
+                  | otherwise          = (Set.insert pid s, p:ps)
+                  where pid = installedPackageId p
+          -- XXX this is just a variant of nub
+
+      ipid_map = listToFM [ (installedPackageId p, p) | p <- pkgs0 ]
 
       ipid_selected = depClosure ipid_map [ InstalledPackageId i
                                           | ExposePackageId i <- flags ]
