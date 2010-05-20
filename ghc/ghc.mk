@@ -108,16 +108,15 @@ define ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_EXTRA
 echo 'executablename="$$exedir/ghc"' >> "$(WRAPPER)"
 endef
 
-# If we "make 1" or "make 2" then we don't want the rules for the stage
-# that we haven't been asked to build
-ifeq "$(stage)" "1"
-ghc_stage2_NOT_NEEDED = YES
-endif
-ifeq "$(stage)" "2"
+# if stage is set to something other than "1" or "", disable stage 1
+ifneq "$(filter-out 1,$(stage))" ""
 ghc_stage1_NOT_NEEDED = YES
 endif
-# We don't want the rules for stage3 unless we have been explicitly
-# asked to build it
+# if stage is set to something other than "2" or "", disable stage 2
+ifneq "$(filter-out 2,$(stage))" ""
+ghc_stage2_NOT_NEEDED = YES
+endif
+# stage 3 has to be requested explicitly with stage=3
 ifneq "$(stage)" "3"
 ghc_stage3_NOT_NEEDED = YES
 endif
