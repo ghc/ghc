@@ -4,6 +4,9 @@
  *
  * Tasks
  *
+ * For details on the high-level design, see
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Scheduler
+ *
  * -------------------------------------------------------------------------*/
 
 #ifndef TASK_H
