@@ -151,6 +151,7 @@ module System.IO (
     hPutBuf,                   -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,                   -- :: Handle -> Ptr a -> Int -> IO Int
 #if !defined(__NHC__) && !defined(__HUGS__)
+    hGetBufSome,               -- :: Handle -> Ptr a -> Int -> IO Int
     hPutBufNonBlocking,        -- :: Handle -> Ptr a -> Int -> IO Int
     hGetBufNonBlocking,        -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
@@ -240,6 +241,7 @@ import GHC.IO.IOMode
 import GHC.IO.Handle.FD
 import qualified GHC.IO.FD as FD
 import GHC.IO.Handle
+import GHC.IO.Handle.Text ( hGetBufSome )
 import GHC.IORef
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
