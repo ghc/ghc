@@ -1689,10 +1689,6 @@ linkDynLib dflags o_files dep_packages = do
     --	 Build the dynamic library as a single "module", i.e. no dynamic binding
     --	 nonsense when referring to symbols from within the library. The NCG
     --	 assumes that this option is specified (on i386, at least).
-    -- -Wl,-macosx_version_min -Wl,10.3
-    --	 Tell the linker its safe to assume that the library will run on 10.3 or
-    --	 later, so that it will not complain about the use of the option
-    --	 -undefined dynamic_lookup above.
     -- -install_name
     --   Mac OS/X stores the path where a dynamic library is (to be) installed
     --   in the library itself.  It's called the "install name" of the library.
@@ -1719,7 +1715,7 @@ linkDynLib dflags o_files dep_packages = do
 	 ++ map SysTools.Option (
 	    md_c_flags
 	 ++ o_files
-	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.5",
+	 ++ [ "-undefined", "dynamic_lookup", "-single_module",
               "-Wl,-read_only_relocs,suppress", "-install_name", instName ]
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
