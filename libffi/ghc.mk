@@ -36,19 +36,6 @@
 
 PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 
-# 2007-09-26
-#     set -o igncr 
-# is not a valid command on non-Cygwin-systems.
-# Let it fail silently instead of aborting the build.
-#
-# 2007-07-05
-# We do
-#     set -o igncr; export SHELLOPTS
-# here as otherwise checking the size of limbs
-# makes the build fall over on Cygwin. See the thread
-# http://www.cygwin.com/ml/cygwin/2006-12/msg00011.html
-# for more details.
-
 # 2007-07-05
 # Passing
 #     as_ln_s='cp -p'
@@ -122,7 +109,6 @@ $(libffi_STAMP_CONFIGURE):
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
 	cd libffi && \
-	  (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd build && \
