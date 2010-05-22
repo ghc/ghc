@@ -26,6 +26,7 @@
 #include "Apply.h"
 #include "Printer.h"
 #include "Arena.h"
+#include "RetainerProfile.h"
 
 /* -----------------------------------------------------------------------------
    Forward decls.
