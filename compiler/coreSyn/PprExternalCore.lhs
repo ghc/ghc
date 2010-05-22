@@ -10,6 +10,7 @@ import ExternalCore
 
 import Pretty
 import Data.Char
+import Data.Ratio
 
 instance Show Module where
   showsPrec _ m = shows (pmodule m)
@@ -188,9 +189,12 @@ palt (Adefault e) =
 
 plit :: Lit -> Doc
 plit (Lint i t) = parens (integer i <> text "::" <> pty t)
--- we use (text (show r)) because "(rational r)" was printing out things
--- like "2.0e-2" (which isn't External Core)
-plit (Lrational r t) = parens (text (show r) <>  text "::" <> pty t)
+-- we use (text (show (numerator r))) (and the same for denominator)
+-- because "(rational r)" was printing out things like "2.0e-2" (which
+-- isn't External Core), and (text (show r)) was printing out things
+-- like "((-1)/5)" which isn't either (it should be "(-1/5)").
+plit (Lrational r t) = parens (text (show (numerator r)) <+> char '%'
+   <+> text (show (denominator r)) <>  text "::" <> pty t)
 plit (Lchar c t) = parens (text ("\'" ++ escape [c] ++ "\'") <> text "::" <> pty t)
 plit (Lstring s t) = parens (pstring s <> text "::" <> pty t)
 
