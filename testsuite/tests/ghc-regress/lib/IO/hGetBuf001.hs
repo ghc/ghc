@@ -8,7 +8,6 @@ import Foreign.C
 import System.Exit
 import Control.Exception
 import Control.Monad
-import GHC.IO.Handle.Text (hGetBufSome)
 
 
 main = do
