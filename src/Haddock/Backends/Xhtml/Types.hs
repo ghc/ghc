@@ -10,8 +10,10 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-module Haddock.Backends.Xhtml.Types where
+module Haddock.Backends.Xhtml.Types (
+  SourceURLs, WikiURLs,
+  LinksInfo
+) where
 
 
 -- the base, module and entity URLs for the source code and wiki links.

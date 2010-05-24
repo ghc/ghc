@@ -10,8 +10,12 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-module Haddock.Backends.Xhtml.Decl where
+module Haddock.Backends.Xhtml.Decl (
+  ppDecl,
+  
+  ppTyName, ppTyFamHeader, ppTypeApp,
+  tyvarNames
+) where
 
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout

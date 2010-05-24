@@ -10,8 +10,11 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-module Haddock.Backends.Xhtml.DocMarkup where
+module Haddock.Backends.Xhtml.DocMarkup (
+  docToHtml, maybeDocToHtml,
+  rdrDocToHtml,
+  origDocToHtml
+) where
 
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Util

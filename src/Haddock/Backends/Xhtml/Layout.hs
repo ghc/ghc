@@ -10,8 +10,14 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-module Haddock.Backends.Xhtml.Layout where
+module Haddock.Backends.Xhtml.Layout (
+  topDeclElem, declElem,
+  
+  instHdr, atHdr, methHdr, constrHdr,
+  argBox, ndocBox, rdocBox, maybeRDocBox,
+  
+  vanillaTable, vanillaTable2, spacedTable1, spacedTable5  
+) where
 
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Types

@@ -10,8 +10,24 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-module Haddock.Backends.Xhtml.Util where
+module Haddock.Backends.Xhtml.Util (
+  renderToString,
+  
+  namedAnchor, linkedAnchor,
+  spliceURL,
+  
+  (<+>), (<++>), char, empty,
+  keyword, punctuate,
+  
+  braces, brackets, pabrackets, parens, parenList, ubxParenList,
+  arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
+  
+  tda, emptyTable, s8,
+  abovesSep, hsep,
+  
+  collapsebutton, collapseId, collapsed,
+  documentCharacterEncoding, styleSheet
+) where
 
 import Haddock.GhcUtils
 import Haddock.Utils

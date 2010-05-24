@@ -10,8 +10,12 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-
-module Haddock.Backends.Xhtml.Names where
+module Haddock.Backends.Xhtml.Names (
+  ppName, ppDocName, ppLDocName, ppRdrName,
+  ppBinder, ppBinder',
+  ppModule,
+  linkId
+) where
 
 import Haddock.Backends.Xhtml.Util
 import Haddock.GhcUtils
