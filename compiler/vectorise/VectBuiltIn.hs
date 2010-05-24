@@ -1,7 +1,16 @@
+
+-- | The vectoriser rewrites user code to use builtin types and functions exported by the DPH library.
+--   We track the names of those things in the `Builtis` type, and provide selection functions 
+--   to help extract their names.
 module VectBuiltIn (
-  Builtins(..), sumTyCon, prodTyCon, prodDataCon,
-  selTy, selReplicate, selPick, selTags, selElements,
+  Builtins(..),
+
+  -- * Projections
+  sumTyCon, prodTyCon, prodDataCon,
+  selTy,selReplicate, selPick, selTags, selElements,
   combinePDVar, scalarZip, closureCtrFun,
+
+  -- * Initialisation
   initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
   initBuiltinBoxedTyCons, initBuiltinScalars,
@@ -43,6 +52,8 @@ import Data.Array
 import Control.Monad   ( liftM, zipWithM )
 import Data.List       ( unzip4 )
 
+
+-- Numbers of things exported by the DPH library.
 mAX_DPH_PROD :: Int
 mAX_DPH_PROD = 5
 
@@ -55,109 +66,143 @@ mAX_DPH_COMBINE = 2
 mAX_DPH_SCALAR_ARGS :: Int
 mAX_DPH_SCALAR_ARGS = 3
 
-data Modules = Modules {
-                   dph_PArray :: Module
-                 , dph_Repr :: Module
-                 , dph_Closure :: Module
-                 , dph_Unboxed :: Module
-                 , dph_Instances :: Module
-                 , dph_Combinators :: Module
-                 , dph_Scalar :: Module
-                 , dph_Selector :: Module
-                 , dph_Prelude_PArr :: Module
-                 , dph_Prelude_Int :: Module
-                 , dph_Prelude_Word8 :: Module
-                 , dph_Prelude_Double :: Module
-                 , dph_Prelude_Bool :: Module
-                 , dph_Prelude_Tuple :: Module
-               }
 
+-- | Ids of the modules that contain our DPH builtins.
+data Modules 
+	= Modules 
+	{ dph_PArray		:: Module
+        , dph_Repr		:: Module
+        , dph_Closure		:: Module
+        , dph_Unboxed		:: Module
+        , dph_Instances		:: Module
+        , dph_Combinators	:: Module
+        , dph_Scalar		:: Module
+        , dph_Selector		:: Module
+        , dph_Prelude_PArr	:: Module
+        , dph_Prelude_Int	:: Module
+        , dph_Prelude_Word8	:: Module
+        , dph_Prelude_Double	:: Module
+        , dph_Prelude_Bool	:: Module
+        , dph_Prelude_Tuple	:: Module
+	}
+
+
+-- | The locations of builtins in the current DPH library.
 dph_Modules :: PackageId -> Modules
-dph_Modules pkg = Modules {
-    dph_PArray         = mk (fsLit "Data.Array.Parallel.Lifted.PArray")
-  , dph_Repr           = mk (fsLit "Data.Array.Parallel.Lifted.Repr")
-  , dph_Closure        = mk (fsLit "Data.Array.Parallel.Lifted.Closure")
-  , dph_Unboxed        = mk (fsLit "Data.Array.Parallel.Lifted.Unboxed")
-  , dph_Instances      = mk (fsLit "Data.Array.Parallel.Lifted.Instances")
-  , dph_Combinators    = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
-  , dph_Scalar         = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
-  , dph_Selector       = mk (fsLit "Data.Array.Parallel.Lifted.Selector")
+dph_Modules pkg 
+	= Modules 
+	{ dph_PArray         = mk (fsLit "Data.Array.Parallel.Lifted.PArray")
+	, dph_Repr           = mk (fsLit "Data.Array.Parallel.Lifted.Repr")
+	, dph_Closure        = mk (fsLit "Data.Array.Parallel.Lifted.Closure")
+	, dph_Unboxed        = mk (fsLit "Data.Array.Parallel.Lifted.Unboxed")
+	, dph_Instances      = mk (fsLit "Data.Array.Parallel.Lifted.Instances")
+	, dph_Combinators    = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
+	, dph_Scalar         = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
+	, dph_Selector       = mk (fsLit "Data.Array.Parallel.Lifted.Selector")
 
-  , dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
-  , dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
-  , dph_Prelude_Word8  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Word8")
-  , dph_Prelude_Double = mk (fsLit "Data.Array.Parallel.Prelude.Base.Double")
-  , dph_Prelude_Bool   = mk (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
-  , dph_Prelude_Tuple  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
-  }
-  where
-    mk = mkModule pkg . mkModuleNameFS
+	, dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
+	, dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
+	, dph_Prelude_Word8  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Word8")
+	, dph_Prelude_Double = mk (fsLit "Data.Array.Parallel.Prelude.Base.Double")
+	, dph_Prelude_Bool   = mk (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
+	, dph_Prelude_Tuple  = mk (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
+	}
+	where	mk = mkModule pkg . mkModuleNameFS
 
+
+-- | Project out ids of modules that contain orphan instances that we need to load.
 dph_Orphans :: [Modules -> Module]
 dph_Orphans = [dph_Repr, dph_Instances]
 
-data Builtins = Builtins {
-                  dphModules       :: Modules
-                , parrayTyCon      :: TyCon
-                , parrayDataCon    :: DataCon
-                , pdataTyCon       :: TyCon
-                , paTyCon          :: TyCon
-                , paDataCon        :: DataCon
-                , preprTyCon       :: TyCon
-                , prTyCon          :: TyCon
-                , prDataCon        :: DataCon
-                , voidTyCon        :: TyCon
-                , wrapTyCon        :: TyCon
-                , selTys           :: Array Int Type
-                , selReplicates    :: Array Int CoreExpr
-                , selPicks         :: Array Int CoreExpr
-                , selTagss         :: Array Int CoreExpr
-                , selEls           :: Array (Int, Int) CoreExpr
-                , sumTyCons        :: Array Int TyCon
-                , closureTyCon     :: TyCon
-                , voidVar          :: Var
-                , pvoidVar         :: Var
-                , fromVoidVar      :: Var
-                , punitVar         :: Var
-                , closureVar       :: Var
-                , applyVar         :: Var
-                , liftedClosureVar :: Var
-                , liftedApplyVar   :: Var
-                , replicatePDVar   :: Var
-                , emptyPDVar       :: Var
-                , packByTagPDVar   :: Var
-                , combinePDVars    :: Array Int Var
-                , scalarClass      :: Class
-                , scalarZips       :: Array Int Var
-                , closureCtrFuns   :: Array Int Var
-                , liftingContext   :: Var
-                }
 
-indexBuiltin :: (Ix i, Outputable i) => String -> (Builtins -> Array i a)
-                                        -> i -> Builtins -> a
+-- | Information about what builtin stuff to use from the DPH base libraries.
+data Builtins 
+        = Builtins 
+        { dphModules       :: Modules
+
+	-- From dph-common:Data.Array.Parallel.Lifted.PArray
+        , parrayTyCon      :: TyCon			-- ^ PArray
+        , parrayDataCon    :: DataCon			-- ^ PArray
+        , pdataTyCon       :: TyCon			-- ^ PData
+        , paTyCon          :: TyCon			-- ^ PA
+        , paDataCon        :: DataCon			-- ^ PA
+        , preprTyCon       :: TyCon			-- ^ PRepr
+        , prTyCon          :: TyCon			-- ^ PR
+        , prDataCon        :: DataCon			-- ^ PR
+        , replicatePDVar   :: Var			-- ^ replicatePD
+        , emptyPDVar       :: Var			-- ^ emptyPD
+        , packByTagPDVar   :: Var			-- ^ packByTagPD
+        , combinePDVars    :: Array Int Var		-- ^ combinePD
+        , scalarClass      :: Class			-- ^ Scalar
+
+        -- From dph-common:Data.Array.Parallel.Lifted.Closure
+        , closureTyCon     :: TyCon			-- ^ :->
+        , closureVar       :: Var			-- ^ closure
+        , applyVar         :: Var			-- ^ $: 
+        , liftedClosureVar :: Var			-- ^ liftedClosure
+        , liftedApplyVar   :: Var			-- ^ liftedApply
+        , closureCtrFuns   :: Array Int Var		-- ^ closure1 .. closure2
+
+	-- From dph-common:Data.Array.Parallel.Lifted.Repr
+        , voidTyCon        :: TyCon			-- ^ Void
+        , wrapTyCon        :: TyCon			-- ^ Wrap
+        , sumTyCons        :: Array Int TyCon           -- ^ Sum2 .. Sum3
+        , voidVar          :: Var			-- ^ void
+        , pvoidVar         :: Var			-- ^ pvoid
+        , fromVoidVar      :: Var			-- ^ fromVoid
+        , punitVar         :: Var			-- ^ punit
+
+	-- From dph-common:Data.Array.Parallel.Lifted.Selector
+        , selTys           :: Array Int Type		-- ^ Sel2
+        , selReplicates    :: Array Int CoreExpr	-- ^ replicate2
+        , selPicks         :: Array Int CoreExpr	-- ^ pick2
+        , selTagss         :: Array Int CoreExpr	-- ^ tagsSel2
+        , selEls           :: Array (Int, Int) CoreExpr	-- ^ elementsSel2_0 .. elementsSel_2_1
+
+	-- From dph-common:Data.Array.Parallel.Lifted.Scalar
+	-- NOTE: map is counted as a zipWith fn with one argument array.
+        , scalarZips       :: Array Int Var		-- ^ map, zipWith, zipWith3
+
+	-- A Fresh variable
+        , liftingContext   :: Var			-- ^ lc
+        }
+
+
+-- | Get an element from one of the arrays of contained by a `Builtins`.
+--   If the indexed thing is not in the array then panic.
+indexBuiltin 
+	:: (Ix i, Outputable i) 
+	=> String 			-- ^ Name of the selector we've used, for panic messages.
+	-> (Builtins -> Array i a)	-- ^ Field selector for the `Builtins`.
+	-> i				-- ^ Index into the array.
+	-> Builtins 
+	-> a
+
 indexBuiltin fn f i bi
   | inRange (bounds xs) i = xs ! i
   | otherwise = pprPanic fn (ppr i)
   where
     xs = f bi
 
+
+-- Projections ----------------------------------------------------------------
 selTy :: Int -> Builtins -> Type
-selTy = indexBuiltin "selTy" selTys
+selTy 		= indexBuiltin "selTy" selTys
 
 selReplicate :: Int -> Builtins -> CoreExpr
-selReplicate = indexBuiltin "selReplicate" selReplicates 
+selReplicate 	= indexBuiltin "selReplicate" selReplicates 
 
 selPick :: Int -> Builtins -> CoreExpr
-selPick = indexBuiltin "selPick" selPicks
+selPick 	= indexBuiltin "selPick" selPicks
 
 selTags :: Int -> Builtins -> CoreExpr
-selTags = indexBuiltin "selTags" selTagss
+selTags 	= indexBuiltin "selTags" selTagss
 
 selElements :: Int -> Int -> Builtins -> CoreExpr
 selElements i j = indexBuiltin "selElements" selEls (i,j)
 
 sumTyCon :: Int -> Builtins -> TyCon
-sumTyCon = indexBuiltin "sumTyCon" sumTyCons
+sumTyCon 	= indexBuiltin "sumTyCon" sumTyCons
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n _
@@ -170,40 +215,58 @@ prodDataCon n bi = case tyConDataCons (prodTyCon n bi) of
                      _     -> pprPanic "prodDataCon" (ppr n)
 
 combinePDVar :: Int -> Builtins -> Var
-combinePDVar = indexBuiltin "combinePDVar" combinePDVars
+combinePDVar 	= indexBuiltin "combinePDVar" combinePDVars
 
 scalarZip :: Int -> Builtins -> Var
-scalarZip = indexBuiltin "scalarZip" scalarZips
+scalarZip 	= indexBuiltin "scalarZip" scalarZips
 
 closureCtrFun :: Int -> Builtins -> Var
-closureCtrFun = indexBuiltin "closureCtrFun" closureCtrFuns
+closureCtrFun 	= indexBuiltin "closureCtrFun" closureCtrFuns
 
-initBuiltins :: PackageId -> DsM Builtins
+
+-- Initialisation -------------------------------------------------------------
+-- | Create the initial map of builtin types and functions.
+initBuiltins 
+	:: PackageId 	-- ^ package id the builtins are in, eg dph-common
+	-> DsM Builtins
+
 initBuiltins pkg
   = do
       mapM_ load dph_Orphans
-      parrayTyCon  <- externalTyCon dph_PArray (fsLit "PArray")
-      let [parrayDataCon] = tyConDataCons parrayTyCon
-      pdataTyCon   <- externalTyCon dph_PArray (fsLit "PData")
-      paTyCon      <- externalClassTyCon dph_PArray (fsLit "PA")
-      let [paDataCon] = tyConDataCons paTyCon
-      preprTyCon   <- externalTyCon dph_PArray (fsLit "PRepr")
-      prTyCon      <- externalClassTyCon dph_PArray (fsLit "PR")
-      let [prDataCon] = tyConDataCons prTyCon
-      closureTyCon <- externalTyCon dph_Closure (fsLit ":->")
 
-      voidTyCon    <- externalTyCon dph_Repr (fsLit "Void")
-      wrapTyCon    <- externalTyCon dph_Repr (fsLit "Wrap")
+      -- From dph-common:Data.Array.Parallel.Lifted.PArray
+      parrayTyCon	<- externalTyCon dph_PArray (fsLit "PArray")
+      let [parrayDataCon] = tyConDataCons parrayTyCon
+      pdataTyCon	<- externalTyCon dph_PArray (fsLit "PData")
+      paTyCon		<- externalClassTyCon dph_PArray (fsLit "PA")
+      let [paDataCon]	= tyConDataCons paTyCon
+      preprTyCon	<- externalTyCon dph_PArray (fsLit "PRepr")
+      prTyCon		<- externalClassTyCon dph_PArray (fsLit "PR")
+      let [prDataCon]	= tyConDataCons prTyCon
+
+      -- wher
+      closureTyCon	<- externalTyCon dph_Closure (fsLit ":->")
+
+      -- From dph-common:Data.Array.Parallel.Lifted.Repr
+      voidTyCon		<- externalTyCon dph_Repr (fsLit "Void")
+      wrapTyCon		<- externalTyCon dph_Repr (fsLit "Wrap")
+
+      -- From dph-common:Data.Array.Parallel.Lifted.Selector
       sel_tys      <- mapM (externalType dph_Selector)
                            (numbered "Sel" 2 mAX_DPH_SUM)
+
       sel_replicates <- mapM (externalFun dph_Selector)
                              (numbered "replicate" 2 mAX_DPH_SUM)
+
       sel_picks    <- mapM (externalFun dph_Selector)
                            (numbered "pick" 2 mAX_DPH_SUM)
+
       sel_tags     <- mapM (externalFun dph_Selector)
                            (numbered "tagsSel" 2 mAX_DPH_SUM)
+
       sel_els      <- mapM mk_elements
                            [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
+
       sum_tcs      <- mapM (externalTyCon dph_Repr)
                            (numbered "Sum" 2 mAX_DPH_SUM)
 
@@ -213,6 +276,7 @@ initBuiltins pkg
           selTagss      = listArray (2, mAX_DPH_SUM) sel_tags
           selEls        = array ((2,0), (mAX_DPH_SUM, mAX_DPH_SUM)) sel_els
           sumTyCons     = listArray (2, mAX_DPH_SUM) sum_tcs
+
 
       voidVar          <- externalVar dph_Repr (fsLit "void")
       pvoidVar         <- externalVar dph_Repr (fsLit "pvoid")
@@ -226,20 +290,20 @@ initBuiltins pkg
       emptyPDVar       <- externalVar dph_PArray (fsLit "emptyPD")
       packByTagPDVar   <- externalVar dph_PArray (fsLit "packByTagPD")
 
-      combines <- mapM (externalVar dph_PArray)
-                       [mkFastString ("combine" ++ show i ++ "PD")
-                          | i <- [2..mAX_DPH_COMBINE]]
+      combines 		<- mapM (externalVar dph_PArray)
+                       		[mkFastString ("combine" ++ show i ++ "PD")
+                          		| i <- [2..mAX_DPH_COMBINE]]
       let combinePDVars = listArray (2, mAX_DPH_COMBINE) combines
 
-      scalarClass <- externalClass dph_PArray (fsLit "Scalar")
-      scalar_map <- externalVar dph_Scalar (fsLit "scalar_map")
-      scalar_zip2 <- externalVar dph_Scalar (fsLit "scalar_zipWith")
-      scalar_zips <- mapM (externalVar dph_Scalar)
-                          (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
-      let scalarZips = listArray (1, mAX_DPH_SCALAR_ARGS)
+      scalarClass 	<- externalClass dph_PArray (fsLit "Scalar")
+      scalar_map	<- externalVar dph_Scalar (fsLit "scalar_map")
+      scalar_zip2	<- externalVar dph_Scalar (fsLit "scalar_zipWith")
+      scalar_zips	<- mapM (externalVar dph_Scalar)
+                          	(numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
+      let scalarZips 	= listArray (1, mAX_DPH_SCALAR_ARGS)
                                  (scalar_map : scalar_zip2 : scalar_zips)
-      closures <- mapM (externalVar dph_Closure)
-                       (numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
+      closures 		<- mapM (externalVar dph_Closure)
+                       		(numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
       let closureCtrFuns = listArray (1, mAX_DPH_COMBINE) closures
 
       liftingContext <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy)
@@ -296,6 +360,7 @@ initBuiltins pkg
         mod = get_mod modules 
         doc = ppr mod <+> ptext (sLit "is a DPH module")
 
+    -- Make a list of numbered strings in some range, eg foo3, foo4, foo5
     numbered :: String -> Int -> Int -> [FastString]
     numbered pfx m n = [mkFastString (pfx ++ show i) | i <- [m..n]]
 
@@ -307,6 +372,7 @@ initBuiltins pkg
           return ((i,j), Var v)
 
 
+-- | Get the mapping of names in the Prelude to names in the DPH library.
 initBuiltinVars :: Builtins -> DsM [(Var, Var)]
 initBuiltinVars (Builtins { dphModules = mods })
   = do
@@ -318,8 +384,7 @@ initBuiltinVars (Builtins { dphModules = mods })
                ++ zip uvars vvars
   where
     (umods, ufs, vmods, vfs) = unzip4 (preludeVars mods)
-
-    (cons, cmods, cfs) = unzip3 (preludeDataCons mods)
+    (cons, cmods, cfs)       = unzip3 (preludeDataCons mods)
 
 defaultDataConWorkers :: [DataCon]
 defaultDataConWorkers = [trueDataCon, falseDataCon, unitDataCon]
@@ -349,8 +414,9 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
                      , dph_Prelude_Bool   = dph_Prelude_Bool 
                      , dph_Prelude_PArr   = dph_Prelude_PArr
                      })
-  = [
-      mk gHC_PARR (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
+
+    -- Functions that work on whole PArrays, defined in GHC.PArr
+  = [ mk gHC_PARR (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
     , mk gHC_PARR (fsLit "zipWithP")   dph_Combinators (fsLit "zipWithPA")
     , mk gHC_PARR (fsLit "zipP")       dph_Combinators (fsLit "zipPA")
     , mk gHC_PARR (fsLit "unzipP")     dph_Combinators (fsLit "unzipPA")
@@ -363,11 +429,12 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk gHC_PARR (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
     , mk gHC_PARR (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
     , mk gHC_PARR (fsLit "+:+")        dph_Combinators (fsLit "appPA")
-    , mk gHC_PARR (fsLit "emptyP")     dph_PArray (fsLit "emptyPA")
+    , mk gHC_PARR (fsLit "emptyP")     dph_PArray      (fsLit "emptyPA")
 
-    , mk' dph_Prelude_Int "div"  "divV"
-    , mk' dph_Prelude_Int "mod"  "modV"
-    , mk' dph_Prelude_Int "sqrt" "sqrtV"
+    -- Map scalar functions to versions using closures. 
+    , mk' dph_Prelude_Int "div"         "divV"
+    , mk' dph_Prelude_Int "mod"         "modV"
+    , mk' dph_Prelude_Int "sqrt"        "sqrtV"
     , mk' dph_Prelude_Int "enumFromToP" "enumFromToPA"
     -- , mk' dph_Prelude_Int "upToP" "upToPA"
     ]
@@ -377,85 +444,92 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     ++ vars_Ord dph_Prelude_Word8
     ++ vars_Num dph_Prelude_Word8
     ++
-    [ mk' dph_Prelude_Word8 "div" "divV"
-    , mk' dph_Prelude_Word8 "mod" "modV"
+    [ mk' dph_Prelude_Word8 "div"     "divV"
+    , mk' dph_Prelude_Word8 "mod"     "modV"
     , mk' dph_Prelude_Word8 "fromInt" "fromIntV"
-    , mk' dph_Prelude_Word8 "toInt" "toIntV"
+    , mk' dph_Prelude_Word8 "toInt"   "toIntV"
     ]
 
-    ++ vars_Ord dph_Prelude_Double
-    ++ vars_Num dph_Prelude_Double
+    ++ vars_Ord        dph_Prelude_Double
+    ++ vars_Num        dph_Prelude_Double
     ++ vars_Fractional dph_Prelude_Double
-    ++ vars_Floating dph_Prelude_Double
-    ++ vars_RealFrac dph_Prelude_Double
+    ++ vars_Floating   dph_Prelude_Double
+    ++ vars_RealFrac   dph_Prelude_Double
     ++
     [ mk dph_Prelude_Bool  (fsLit "andP")  dph_Prelude_Bool (fsLit "andPA")
-    , mk dph_Prelude_Bool  (fsLit "orP")  dph_Prelude_Bool (fsLit "orPA")
+    , mk dph_Prelude_Bool  (fsLit "orP")   dph_Prelude_Bool (fsLit "orPA")
 
     -- FIXME: temporary
-    , mk dph_Prelude_PArr (fsLit "fromPArrayP") dph_Prelude_PArr (fsLit "fromPArrayPA")
-    , mk dph_Prelude_PArr (fsLit "toPArrayP") dph_Prelude_PArr (fsLit "toPArrayPA")
+    , mk dph_Prelude_PArr (fsLit "fromPArrayP")       dph_Prelude_PArr (fsLit "fromPArrayPA")
+    , mk dph_Prelude_PArr (fsLit "toPArrayP")         dph_Prelude_PArr (fsLit "toPArrayPA")
     , mk dph_Prelude_PArr (fsLit "fromNestedPArrayP") dph_Prelude_PArr (fsLit "fromNestedPArrayPA")
-    , mk dph_Prelude_PArr (fsLit "combineP")    dph_Combinators (fsLit "combine2PA")
+    , mk dph_Prelude_PArr (fsLit "combineP")          dph_Combinators  (fsLit "combine2PA")
     ]
   where
     mk  = (,,,)
     mk' mod v v' = mk mod (fsLit v) mod (fsLit v')
 
-    vars_Ord mod = [mk' mod "=="  "eqV"
-                   ,mk' mod "/=" "neqV"
-                   ,mk' mod "<="  "leV"
-                   ,mk' mod "<"   "ltV"
-                   ,mk' mod ">="  "geV"
-                   ,mk' mod ">"   "gtV"
-                   ,mk' mod "min" "minV"
-                   ,mk' mod "max" "maxV"
-                   ,mk' mod "minimumP" "minimumPA"
-                   ,mk' mod "maximumP" "maximumPA"
-                   ,mk' mod "minIndexP" "minIndexPA"
-                   ,mk' mod "maxIndexP" "maxIndexPA"
-                   ]
+    vars_Ord mod 
+     = [ mk' mod "=="        "eqV"
+       , mk' mod "/="        "neqV"
+       , mk' mod "<="        "leV"
+       , mk' mod "<"         "ltV"
+       , mk' mod ">="        "geV"
+       , mk' mod ">"         "gtV"
+       , mk' mod "min"       "minV"
+       , mk' mod "max"       "maxV"
+       , mk' mod "minimumP"  "minimumPA"
+       , mk' mod "maximumP"  "maximumPA"
+       , mk' mod "minIndexP" "minIndexPA"
+       , mk' mod "maxIndexP" "maxIndexPA"
+       ]
 
-    vars_Num mod = [mk' mod "+"        "plusV"
-                   ,mk' mod "-"        "minusV"
-                   ,mk' mod "*"        "multV"
-                   ,mk' mod "negate"   "negateV"
-                   ,mk' mod "abs"      "absV"
-                   ,mk' mod "sumP"     "sumPA"
-                   ,mk' mod "productP" "productPA"
-                   ]
+    vars_Num mod 
+     = [ mk' mod "+"        "plusV"
+       , mk' mod "-"        "minusV"
+       , mk' mod "*"        "multV"
+       , mk' mod "negate"   "negateV"
+       , mk' mod "abs"      "absV"
+       , mk' mod "sumP"     "sumPA"
+       , mk' mod "productP" "productPA"
+       ]
 
-    vars_Fractional mod = [mk' mod "/"     "divideV"
-                          ,mk' mod "recip" "recipV"
-                          ]
+    vars_Fractional mod 
+     = [ mk' mod "/"     "divideV"
+       , mk' mod "recip" "recipV"
+       ]
 
-    vars_Floating mod = [mk' mod "pi" "pi"
-                        ,mk' mod "exp" "expV"
-                        ,mk' mod "sqrt" "sqrtV"
-                        ,mk' mod "log" "logV"
-                        ,mk' mod "sin" "sinV"
-                        ,mk' mod "tan" "tanV"
-                        ,mk' mod "cos" "cosV"
-                        ,mk' mod "asin" "asinV"
-                        ,mk' mod "atan" "atanV"
-                        ,mk' mod "acos" "acosV"
-                        ,mk' mod "sinh" "sinhV"
-                        ,mk' mod "tanh" "tanhV"
-                        ,mk' mod "cosh" "coshV"
-                        ,mk' mod "asinh" "asinhV"
-                        ,mk' mod "atanh" "atanhV"
-                        ,mk' mod "acosh" "acoshV"
-                        ,mk' mod "**"    "powV"
-                        ,mk' mod "logBase" "logBaseV"
-                        ]
+    vars_Floating mod 
+     = [ mk' mod "pi"      "pi"
+       , mk' mod "exp"     "expV"
+       , mk' mod "sqrt"    "sqrtV"
+       , mk' mod "log"     "logV"
+       , mk' mod "sin"     "sinV"
+       , mk' mod "tan"     "tanV"
+       , mk' mod "cos"     "cosV"
+       , mk' mod "asin"    "asinV"
+       , mk' mod "atan"    "atanV"
+       , mk' mod "acos"    "acosV"
+       , mk' mod "sinh"    "sinhV"
+       , mk' mod "tanh"    "tanhV"
+       , mk' mod "cosh"    "coshV"
+       , mk' mod "asinh"   "asinhV"
+       , mk' mod "atanh"   "atanhV"
+       , mk' mod "acosh"   "acoshV"
+       , mk' mod "**"      "powV"
+       , mk' mod "logBase" "logBaseV"
+       ]
 
-    vars_RealFrac mod = [mk' mod "fromInt" "fromIntV"
-                        ,mk' mod "truncate" "truncateV"
-                        ,mk' mod "round" "roundV"
-                        ,mk' mod "ceiling" "ceilingV"
-                        ,mk' mod "floor" "floorV"
-                        ]
+    vars_RealFrac mod
+     = [ mk' mod "fromInt"  "fromIntV"
+       , mk' mod "truncate" "truncateV"
+       , mk' mod "round"    "roundV"
+       , mk' mod "ceiling"  "ceilingV"
+       , mk' mod "floor"    "floorV"
+       ]
 
+
+-- | Get a list of names to `TyCon`s in the mock prelude.
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
@@ -475,34 +549,45 @@ defaultTyCons
       word8 <- dsLookupTyCon word8TyConName
       return [intTyCon, boolTyCon, doubleTyCon, word8]
 
+
+-- | Get a list of names to `DataCon`s in the mock prelude.
 initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
 initBuiltinDataCons _ = [(dataConName dc, dc)| dc <- defaultDataCons]
 
 defaultDataCons :: [DataCon]
 defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
 
+
+-- | Get the names of all buildin instance functions for the PA class.
 initBuiltinPAs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
 initBuiltinPAs (Builtins { dphModules = mods }) insts
   = liftM (initBuiltinDicts insts) (externalClass (dph_PArray mods) (fsLit "PA"))
 
+
+-- | Get the names of all builtin instance functions for the PR class.
 initBuiltinPRs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
 initBuiltinPRs (Builtins { dphModules = mods }) insts
   = liftM (initBuiltinDicts insts) (externalClass (dph_PArray mods) (fsLit "PR"))
 
+
+-- | Get the names of all DPH instance functions for this class.
 initBuiltinDicts :: (InstEnv, InstEnv) -> Class -> [(Name, Var)]
 initBuiltinDicts insts cls = map find $ classInstances insts cls
   where
-    find i | [Just tc] <- instanceRoughTcs i = (tc, instanceDFunId i)
-           | otherwise = pprPanic "Invalid DPH instance" (ppr i)
+    find i | [Just tc] <- instanceRoughTcs i 	= (tc, instanceDFunId i)
+           | otherwise				= pprPanic "Invalid DPH instance" (ppr i)
 
+
+-- | Get a list of boxed `TyCons` in the mock prelude. This is Int only.
 initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinBoxedTyCons = return . builtinBoxedTyCons
 
 builtinBoxedTyCons :: Builtins -> [(Name, TyCon)]
-builtinBoxedTyCons _ =
-  [(tyConName intPrimTyCon, intTyCon)]
+builtinBoxedTyCons _ 
+  = [(tyConName intPrimTyCon, intTyCon)]
 
 
+-- | Get a list of all scalar functions in the mock prelude.
 initBuiltinScalars :: Builtins -> DsM [Var]
 initBuiltinScalars bi
   = mapM (uncurry externalVar) (preludeScalars $ dphModules bi)
@@ -513,8 +598,7 @@ preludeScalars (Modules { dph_Prelude_Int    = dph_Prelude_Int
                         , dph_Prelude_Word8  = dph_Prelude_Word8
                         , dph_Prelude_Double = dph_Prelude_Double
                         })
-  = [
-      mk dph_Prelude_Int "div"
+  = [ mk dph_Prelude_Int "div"
     , mk dph_Prelude_Int "mod"
     , mk dph_Prelude_Int "sqrt"
     ]
@@ -538,82 +622,98 @@ preludeScalars (Modules { dph_Prelude_Int    = dph_Prelude_Int
   where
     mk mod s = (mod, fsLit s)
 
-    scalars_Ord mod = [mk mod "=="
-                      ,mk mod "/="
-                      ,mk mod "<="
-                      ,mk mod "<"
-                      ,mk mod ">="
-                      ,mk mod ">"
-                      ,mk mod "min"
-                      ,mk mod "max"
-                      ]
+    scalars_Ord mod 
+     = [ mk mod "=="
+       , mk mod "/="
+       , mk mod "<="
+       , mk mod "<"
+       , mk mod ">="
+       , mk mod ">"
+       , mk mod "min"
+       , mk mod "max"
+       ]
 
-    scalars_Num mod = [mk mod "+"
-                      ,mk mod "-"
-                      ,mk mod "*"
-                      ,mk mod "negate"
-                      ,mk mod "abs"
-                      ]
+    scalars_Num mod 
+     = [ mk mod "+"
+       , mk mod "-"
+       , mk mod "*"
+       , mk mod "negate"
+       , mk mod "abs"
+       ]
 
-    scalars_Fractional mod = [mk mod "/"
-                             ,mk mod "recip"
-                             ]
+    scalars_Fractional mod 
+     = [ mk mod "/"
+       , mk mod "recip"
+       ]
 
-    scalars_Floating mod = [mk mod "pi"
-                           ,mk mod "exp"
-                           ,mk mod "sqrt"
-                           ,mk mod "log"
-                           ,mk mod "sin"
-                           ,mk mod "tan"
-                           ,mk mod "cos"
-                           ,mk mod "asin"
-                           ,mk mod "atan"
-                           ,mk mod "acos"
-                           ,mk mod "sinh"
-                           ,mk mod "tanh"
-                           ,mk mod "cosh"
-                           ,mk mod "asinh"
-                           ,mk mod "atanh"
-                           ,mk mod "acosh"
-                           ,mk mod "**"
-                           ,mk mod "logBase"
-                           ]
+    scalars_Floating mod 
+     = [ mk mod "pi"
+       , mk mod "exp"
+       , mk mod "sqrt"
+       , mk mod "log"
+       , mk mod "sin"
+       , mk mod "tan"
+       , mk mod "cos"
+       , mk mod "asin"
+       , mk mod "atan"
+       , mk mod "acos"
+       , mk mod "sinh"
+       , mk mod "tanh"
+       , mk mod "cosh"
+       , mk mod "asinh"
+       , mk mod "atanh"
+       , mk mod "acosh"
+       , mk mod "**"
+       , mk mod "logBase"
+       ]
 
-    scalars_RealFrac mod = [mk mod "fromInt"
-                           ,mk mod "truncate"
-                           ,mk mod "round"
-                           ,mk mod "ceiling"
-                           ,mk mod "floor"
-                           ]
+    scalars_RealFrac mod 
+     = [ mk mod "fromInt"
+       , mk mod "truncate"
+       , mk mod "round"
+       , mk mod "ceiling"
+       , mk mod "floor"
+       ]
 
 
+-- | Lookup some variable given its name and the module that contains it.
 externalVar :: Module -> FastString -> DsM Var
 externalVar mod fs
   = dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
 
+
+-- | Like `externalVar` but wrap the `Var` in a `CoreExpr`
 externalFun :: Module -> FastString -> DsM CoreExpr
 externalFun mod fs
-  = do
-      var <- externalVar mod fs
+ = do var <- externalVar mod fs
       return $ Var var
 
+
+-- | Lookup some `TyCon` given its name and the module that contains it.
 externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs
   = dsLookupTyCon =<< lookupOrig mod (mkTcOccFS fs)
 
-externalClassTyCon :: Module -> FastString -> DsM TyCon
-externalClassTyCon mod fs = liftM classTyCon (externalClass mod fs)
 
+-- | Lookup some `Type` given its name and the module that contains it.
 externalType :: Module -> FastString -> DsM Type
 externalType mod fs
-  = do
-      tycon <- externalTyCon mod fs
-      return $ mkTyConApp tycon []
+ = do  tycon <- externalTyCon mod fs
+       return $ mkTyConApp tycon []
 
+
+-- | Lookup some `Class` given its name and the module that contains it.
 externalClass :: Module -> FastString -> DsM Class
 externalClass mod fs
   = dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
 
+
+-- | Like `externalClass`, but get the TyCon of of the class.
+externalClassTyCon :: Module -> FastString -> DsM TyCon
+externalClassTyCon mod fs = liftM classTyCon (externalClass mod fs)
+
+
+-- | Lookup a method function given its name and instance type.
 primMethod :: TyCon -> String -> Builtins -> DsM (Maybe Var)
 primMethod  tycon method (Builtins { dphModules = mods })
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
@@ -623,6 +723,7 @@ primMethod  tycon method (Builtins { dphModules = mods })
 
   | otherwise = return Nothing
 
+-- | Lookup the representation type we use for PArrays that contain a given element type.
 primPArray :: TyCon -> Builtins -> DsM (Maybe TyCon)
 primPArray tycon (Builtins { dphModules = mods })
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
