@@ -183,9 +183,10 @@ nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
         return 0;
     }
 
-    // we know at this point that the closure 
+    // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
+    // or a value.
 loop:
-    p = ((StgInd*)bh)->indirectee;
+    p = UNTAG_CLOSURE(((StgInd*)bh)->indirectee);
     info = p->header.info;
 
     if (info == &stg_IND_info)
