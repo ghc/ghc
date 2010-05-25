@@ -10,10 +10,18 @@
 #
 # -----------------------------------------------------------------------------
 
+# If the user says 'make' or 'make stage=2' here, we behave as if they were
+# in the ghc directory instead, so that the executable GHC gets built.
+.PHONY: default_to_ghc all_ghc
+default_to_ghc : all_ghc
+
 dir = compiler
 TOP = ..
 SPEC_TARGETS = 1 2 3
 include $(TOP)/mk/sub-makefile.mk
+
+all_ghc :
+	+$(TOPMAKE) all_ghc $(EXTRA_MAKE_OPTS)
 
 FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES compiler_stage2_NO_BUILD_DEPS=YES compiler_stage3_NO_BUILD_DEPS=YES
 
