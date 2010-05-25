@@ -42,6 +42,14 @@ ifneq "$$(ICONV_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-iconv-libraries="$$(ICONV_LIB_DIRS)"
 endif
 
+ifneq "$$(GMP_INCLUDE_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-includes="$$(GMP_INCLUDE_DIRS)"
+endif
+
+ifneq "$$(GMP_LIB_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
+endif
+
 ifeq "$3" "0"
 $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif

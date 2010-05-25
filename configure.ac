@@ -194,6 +194,22 @@ AC_ARG_WITH([iconv-libraries],
 AC_SUBST(ICONV_INCLUDE_DIRS)
 AC_SUBST(ICONV_LIB_DIRS)
 
+dnl Allow to specify gmp options to the toplevel configure script
+dnl so they can be properly passed to sub-builds.
+
+AC_ARG_WITH([gmp-includes],
+  [AC_HELP_STRING([--with-gmp-includes],
+    [directory containing gmp.h])],
+    [GMP_INCLUDE_DIRS=$withval])
+
+AC_ARG_WITH([gmp-libraries],
+  [AC_HELP_STRING([--with-gmp-libraries],
+    [directory containing gmp library])],
+    [GMP_LIB_DIRS=$withval])
+
+AC_SUBST(GMP_INCLUDE_DIRS)
+AC_SUBST(GMP_LIB_DIRS)
+
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
