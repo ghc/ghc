@@ -14,6 +14,17 @@
 #define _POSIX_C_SOURCE 200112L
 #define _XOPEN_SOURCE   600
 
+#if !defined(freebsd_HOST_OS)
+// FreeBSD takes a different approach to _ISOC99_SOURCE: on FreeBSD it
+// means "I want *just* C99 things", whereas on GNU libc and Solaris
+// it means "I also want C99 things".  
+//
+// On both GNU libc and FreeBSD, _ISOC99_SOURCE is implied by
+// _XOPEN_SOURCE==600, but on Solaris it is an error to omit it.
+//
+#define _ISOC99_SOURCE
+#endif
+
 #if defined(darwin_HOST_OS)
 /* If we don't define this the including sysctl breaks with things like
     /usr/include/bsm/audit.h:224:0:
