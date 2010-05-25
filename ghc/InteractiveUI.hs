@@ -32,7 +32,7 @@ import Packages
 -- import PackageConfig
 import UniqFM
 
-import HscTypes ( implicitTyThings, handleFlagWarnings )
+import HscTypes ( handleFlagWarnings )
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
@@ -824,9 +824,12 @@ info s  = handleSourceError GHC.printExceptionAndWarnings $ do
   -- constructor in the same type
 filterOutChildren :: (a -> TyThing) -> [a] -> [a]
 filterOutChildren get_thing xs 
-  = [x | x <- xs, not (getName (get_thing x) `elemNameSet` implicits)]
+  = filterOut has_parent xs
   where
-    implicits = mkNameSet [getName t | x <- xs, t <- implicitTyThings (get_thing x)]
+    all_names = mkNameSet (map (getName . get_thing) xs)
+    has_parent x = case pprTyThingParent_maybe (get_thing x) of
+                     Just p  -> getName p `elemNameSet` all_names
+                     Nothing -> False
 
 pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.Instance]) -> SDoc
 pprInfo pefas (thing, fixity, insts)
