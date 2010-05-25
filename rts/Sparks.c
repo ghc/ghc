@@ -209,7 +209,7 @@ pruneSparkQueue (Capability *cap)
               cap->sparks_pruned++;
           }
       } else if (HEAP_ALLOCED(spark) && 
-                 (Bdescr(spark)->flags & BF_EVACUATED)) {
+                 (Bdescr((P_)spark)->flags & BF_EVACUATED)) {
           if (closure_SHOULD_SPARK(spark)) {
               elements[botInd] = spark; // keep entry (new address)
               botInd++;
