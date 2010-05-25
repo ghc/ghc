@@ -427,7 +427,7 @@ it should return [x, y, f, a, b] (remember, order important).
 Note [Collect binders only after renaming]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 These functions should only be used on HsSyn *after* the renamer,
-to reuturn a [Name] or [Id].  Before renaming the record punning
+to return a [Name] or [Id].  Before renaming the record punning
 and wild-card mechanism makes it hard to know what is bound.
 So these functions should not be applied to (HsSyn RdrName)
 
