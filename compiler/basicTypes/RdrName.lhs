@@ -30,7 +30,6 @@ module RdrName (
 	mkRdrUnqual, mkRdrQual, 
 	mkUnqual, mkVarUnqual, mkQual, mkOrig,
 	nameRdrName, getRdrName, 
-	mkDerivedRdrName, 
 
 	-- ** Destruction
 	rdrNameOcc, rdrNameSpace, setRdrNameSpace,
@@ -162,14 +161,6 @@ mkRdrQual mod occ = Qual mod occ
 
 mkOrig :: Module -> OccName -> RdrName
 mkOrig mod occ = Orig mod occ
-
----------------
--- | Produce an original 'RdrName' whose module that of a parent 'Name' but its 'OccName'
--- is derived from that of it's parent using the supplied function
-mkDerivedRdrName :: Name -> (OccName -> OccName) -> RdrName
-mkDerivedRdrName parent mk_occ
-  = ASSERT2( isExternalName parent, ppr parent )
-    mkOrig (nameModule parent) (mk_occ (nameOccName parent))
 
 ---------------
 	-- These two are used when parsing source files

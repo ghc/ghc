@@ -71,7 +71,7 @@ type ClassOpItem = (Id, DefMeth)
 	-- Default-method info
 
 data DefMeth = NoDefMeth 		-- No default method
-	     | DefMeth  		-- A polymorphic default method
+	     | DefMeth Name  		-- A polymorphic default method
 	     | GenDefMeth 		-- A generic default method
              deriving Eq  
 \end{code}
@@ -173,8 +173,8 @@ instance Show Class where
     showsPrec p c = showsPrecSDoc p (ppr c)
 
 instance Outputable DefMeth where
-    ppr DefMeth     =  text "{- has default method -}"
-    ppr GenDefMeth  =  text "{- has generic method -}"
+    ppr (DefMeth n) =  ptext (sLit "Default method") <+> ppr n
+    ppr GenDefMeth  =  ptext (sLit "Generic default method")
     ppr NoDefMeth   =  empty   -- No default method
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc

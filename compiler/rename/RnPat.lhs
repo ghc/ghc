@@ -45,8 +45,8 @@ import PrelNames
 import Constants	( mAX_TUPLE_SIZE )
 import Name
 import NameSet
-import Module
 import RdrName
+import BasicTypes
 import ListSetOps	( removeDups, minusList )
 import Outputable
 import SrcLoc
@@ -135,15 +135,14 @@ data NameMaker
 
   | LetMk       -- Let bindings, incl top level
 		-- Do *not* check for unused bindings
-      (Maybe Module)   -- Just m  => top level of module m
-                       -- Nothing => not top level
+      TopLevelFlag
       MiniFixityEnv
 
-topRecNameMaker :: Module -> MiniFixityEnv -> NameMaker
-topRecNameMaker mod fix_env = LetMk (Just mod) fix_env
+topRecNameMaker :: MiniFixityEnv -> NameMaker
+topRecNameMaker fix_env = LetMk TopLevel fix_env
 
 localRecNameMaker :: MiniFixityEnv -> NameMaker
-localRecNameMaker fix_env = LetMk Nothing fix_env 
+localRecNameMaker fix_env = LetMk NotTopLevel fix_env 
 
 matchNameMaker :: HsMatchContext a -> NameMaker
 matchNameMaker ctxt = LamMk report_unused
@@ -162,11 +161,11 @@ newName (LamMk report_unused) rdr_name
 	   ; when report_unused $ warnUnusedMatches [name] fvs
 	   ; return (res, name `delFV` fvs) })
 
-newName (LetMk mb_top fix_env) rdr_name
+newName (LetMk is_top fix_env) rdr_name
   = CpsRn (\ thing_inside -> 
-        do { name <- case mb_top of
-                       Nothing  -> newLocalBndrRn rdr_name
-                       Just mod -> newTopSrcBinder mod rdr_name
+        do { name <- case is_top of
+                       NotTopLevel -> newLocalBndrRn rdr_name
+                       TopLevel    -> newTopSrcBinder rdr_name
 	   ; bindLocalName name $	-- Do *not* use bindLocalNameFV here
 					-- See Note [View pattern usage]
              addLocalFixities fix_env [name] $

@@ -23,7 +23,6 @@ import IfaceSyn
 import Module
 import Name
 import VarEnv
-import Class
 import DynFlags
 import UniqFM
 import UniqSupply
@@ -655,16 +654,16 @@ instance Binary RecFlag where
 	      0 -> do return Recursive
 	      _ -> do return NonRecursive
 
-instance Binary DefMeth where
-    put_ bh NoDefMeth  = putByte bh 0
-    put_ bh DefMeth    = putByte bh 1
-    put_ bh GenDefMeth = putByte bh 2
+instance Binary DefMethSpec where
+    put_ bh NoDM      = putByte bh 0
+    put_ bh VanillaDM = putByte bh 1
+    put_ bh GenericDM = putByte bh 2
     get bh = do
 	    h <- getByte bh
 	    case h of
-	      0 -> return NoDefMeth
-	      1 -> return DefMeth
-	      _ -> return GenDefMeth
+	      0 -> return NoDM
+	      1 -> return VanillaDM
+	      _ -> return GenericDM
 
 instance Binary FixityDirection where
     put_ bh InfixL = do

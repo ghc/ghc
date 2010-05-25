@@ -158,8 +158,7 @@ rnTopBindsLHS :: MiniFixityEnv
               -> HsValBinds RdrName 
               -> RnM (HsValBindsLR Name RdrName)
 rnTopBindsLHS fix_env binds
-  = do { mod <- getModule
-       ; rnValBindsLHSFromDoc (topRecNameMaker mod fix_env) binds }
+  = rnValBindsLHSFromDoc (topRecNameMaker fix_env) binds
 
 rnTopBindsRHS :: NameSet	-- Names bound by these binds
               -> HsValBindsLR Name RdrName 

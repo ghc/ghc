@@ -21,7 +21,6 @@ import FamInst
 import FamInstEnv
 import TcDeriv
 import TcEnv
-import RnEnv	( lookupGlobalOccRn )
 import RnSource ( addTcgDUs )
 import TcHsType
 import TcUnify
@@ -1026,7 +1025,7 @@ tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts inst_tys
                 = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id local_meth_name
                      ; tc_body meth_bind }
 		  
-	      tc_default DefMeth	-- An polymorphic default method
+	      tc_default (DefMeth dm_name)	-- An polymorphic default method
 	        = do {   -- Build the typechecked version directly, 
 			 -- without calling typecheck_method; 
 			 -- see Note [Default methods in instances]
@@ -1034,8 +1033,7 @@ tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts inst_tys
                          --                      in $dm inst_tys this
 			 -- The 'let' is necessary only because HsSyn doesn't allow
 			 -- you to apply a function to a dictionary *expression*.
-		       dm_name <- lookupGlobalOccRn (mkDefMethRdrName sel_name)
-					-- Might not be imported, but will be an OrigName
+
 		     ; dm_id <- tcLookupId dm_name
                      ; let dm_inline_prag = idInlinePragma dm_id
                            rhs = HsWrap (WpApp (instToId this_dict) <.> mkWpTyApps inst_tys) $

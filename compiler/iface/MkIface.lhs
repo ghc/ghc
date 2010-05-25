@@ -1333,7 +1333,7 @@ tyThingToIfaceDecl (AClass clas)
 
     toIfaceClassOp (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
-	  IfaceClassOp (getOccName sel_id) def_meth (toIfaceType op_ty)
+	  IfaceClassOp (getOccName sel_id) (toDmSpec def_meth) (toIfaceType op_ty)
 	where
 		-- Be careful when splitting the type, because of things
 		-- like  	class Foo a where
@@ -1342,6 +1342,10 @@ tyThingToIfaceDecl (AClass clas)
 		--		  op :: (Ord a) => a -> a
 	  (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
 	  op_ty		       = funResultTy rho_ty
+
+    toDmSpec NoDefMeth   = NoDM
+    toDmSpec GenDefMeth  = GenericDM
+    toDmSpec (DefMeth _) = VanillaDM
 
     toIfaceFD (tvs1, tvs2) = (map getFS tvs1, map getFS tvs2)
 

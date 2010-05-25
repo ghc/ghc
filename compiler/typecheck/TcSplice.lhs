@@ -338,9 +338,12 @@ tcBracket brack res_ty
 	-- it again when we actually use it.
        ; pending_splices <- newMutVar []
        ; lie_var <- getLIEVar
+       ; let brack_stage = Brack cur_stage pending_splices lie_var
 
-       ; (meta_ty, lie) <- setStage (Brack cur_stage pending_splices lie_var)
-                                    (getLIE (tc_bracket cur_stage brack))
+       ; (meta_ty, lie) <- setStage brack_stage $
+                           getLIE $
+                           tc_bracket cur_stage brack
+
        ; tcSimplifyBracket lie
 
 	-- Make the expected type have the right shape
@@ -381,6 +384,10 @@ tc_bracket _ (DecBrG decls)
   = do	{ _ <- tcTopSrcDecls emptyModDetails decls
 	       -- Typecheck the declarations, dicarding the result
 	       -- We'll get all that stuff later, when we splice it in
+
+	       -- Top-level declarations in the bracket get unqualified names
+               -- See Note [Top-level Names in Template Haskell decl quotes] in RnNames
+
 	; tcMetaTy decsQTyConName } -- Result type is Q [Dec]
 
 tc_bracket _ (PatBr pat)

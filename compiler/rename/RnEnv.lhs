@@ -51,7 +51,7 @@ import NameEnv
 import UniqFM
 import DataCon		( dataConFieldLabels )
 import OccName
-import Module		( Module, ModuleName )
+import Module		( ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, 
 			  consDataConKey, forall_tv_RDR )
 import Unique
@@ -82,8 +82,8 @@ thenM = (>>=)
 %*********************************************************
 
 \begin{code}
-newTopSrcBinder :: Module -> Located RdrName -> RnM Name
-newTopSrcBinder this_mod (L loc rdr_name)
+newTopSrcBinder :: Located RdrName -> RnM Name
+newTopSrcBinder (L loc rdr_name)
   | Just name <- isExact_maybe rdr_name
   =	-- This is here to catch 
 	--   (a) Exact-name binders created by Template Haskell
@@ -95,13 +95,15 @@ newTopSrcBinder this_mod (L loc rdr_name)
 	--	data T = (,) Int Int
 	-- unless we are in GHC.Tup
     ASSERT2( isExternalName name,  ppr name )
-    do	{ unless (this_mod == nameModule name)
+    do	{ this_mod <- getModule
+        ; unless (this_mod == nameModule name)
 	         (addErrAt loc (badOrigBinding rdr_name))
 	; return name }
 
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = do	{ unless (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
+  = do	{ this_mod <- getModule
+        ; unless (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
 	         (addErrAt loc (badOrigBinding rdr_name))
 	-- When reading External Core we get Orig names as binders, 
 	-- but they should agree with the module gotten from the monad
@@ -137,7 +139,8 @@ newTopSrcBinder this_mod (L loc rdr_name)
 	        ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) } 
 	  else	
 	  	-- Normal case
-	     newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
+             do { this_mod <- getModule
+                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc } }
 \end{code}
 
 %*********************************************************

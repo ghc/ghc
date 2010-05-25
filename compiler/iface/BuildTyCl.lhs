@@ -6,7 +6,7 @@
 \begin{code}
 module BuildTyCl (
 	buildSynTyCon, buildAlgTyCon, buildDataCon,
-	buildClass,
+	TcMethInfo, buildClass,
 	mkAbstractTyConRhs, mkOpenDataTyConRhs, 
 	mkNewTyConRhs, mkDataTyConRhs, setAssocFamilyPermutation
     ) where
@@ -246,14 +246,17 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 \begin{code}
+type TcMethInfo = (Name, DefMethSpec, Type)  -- A temporary intermediate, to communicate 
+					     -- between tcClassSigs and buildClass
+
 buildClass :: Bool			-- True <=> do not include unfoldings 
 					--	    on dict selectors
 					-- Used when importing a class without -O
 	   -> Name -> [TyVar] -> ThetaType
-	   -> [FunDep TyVar]		-- Functional dependencies
-	   -> [TyThing]			-- Associated types
-	   -> [(Name, DefMeth, Type)]	-- Method info
-	   -> RecFlag			-- Info for type constructor
+	   -> [FunDep TyVar]		   -- Functional dependencies
+	   -> [TyThing]			   -- Associated types
+	   -> [TcMethInfo]                 -- Method info
+	   -> RecFlag			   -- Info for type constructor
 	   -> TcRnIf m n Class
 
 buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
@@ -266,11 +269,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 
 	; fixM (\ rec_clas -> do {	-- Only name generation inside loop
 
-	  let { rec_tycon  = classTyCon rec_clas
-	      ; op_tys	   = [ty | (_,_,ty) <- sig_stuff]
-	      ; op_names   = [op | (op,_,_) <- sig_stuff]
-	      ; op_items   = [ (mkDictSelId no_unf op_name rec_clas, dm_info)
-			     | (op_name, dm_info, _) <- sig_stuff ] }
+	; op_items <- mapM (mk_op_item rec_clas) sig_stuff
 	  		-- Build the selector id and default method id
 
 	; let n_value_preds   = count (not . isEqPred) sc_theta
@@ -301,9 +300,12 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 		-- as ordinary arguments.  That means that in the case of
 		--     class C a => D a
 		-- we don't get a newtype with no arguments!
-	      args    = sc_sel_names ++ op_names
-	      arg_tys = map mkPredTy sc_theta ++ op_tys
-
+	      args      = sc_sel_names ++ op_names
+	      arg_tys   = map mkPredTy sc_theta ++ op_tys
+	      op_tys	= [ty | (_,_,ty) <- sig_stuff]
+	      op_names  = [op | (op,_,_) <- sig_stuff]
+              rec_tycon = classTyCon rec_clas
+               
 	; dict_con <- buildDataCon datacon_name
 				   False 	-- Not declared infix
 				   (map (const HsNoBang) args)
@@ -339,6 +341,15 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	; traceIf (text "buildClass" <+> ppr tycon) 
 	; return result
 	})}
+  where
+    mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
+    mk_op_item rec_clas (op_name, dm_spec, _) 
+      = do { dm_info <- case dm_spec of
+                          NoDM      -> return NoDefMeth
+                          GenericDM -> return GenDefMeth
+                          VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
+			  	          ; return (DefMeth dm_name) }
+           ; return (mkDictSelId no_unf op_name rec_clas, dm_info) }
 \end{code}
 
 Note [Class newtypes and equality predicates]

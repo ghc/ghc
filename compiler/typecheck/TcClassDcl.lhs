@@ -8,7 +8,7 @@ Typechecking class declarations
 \begin{code}
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
-		    mkGenericDefMethBind, getGenericInstances, mkDefMethRdrName,
+		    mkGenericDefMethBind, getGenericInstances, 
 		    tcAddDeclCtxt, badMethodErr, badATErr, omittedATWarn
 		  ) where
 
@@ -17,7 +17,6 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 import HsSyn
 import RnHsSyn
 import RnExpr
-import RnEnv
 import Inst
 import InstEnv
 import TcEnv
@@ -27,6 +26,7 @@ import TcHsType
 import TcMType
 import TcType
 import TcRnMonad
+import BuildTyCl( TcMethInfo )
 import Generics
 import Class
 import TyCon
@@ -36,7 +36,6 @@ import Name
 import Var
 import NameEnv
 import NameSet
-import RdrName
 import Outputable
 import PrelNames
 import DynFlags
@@ -99,54 +98,44 @@ tcClassSigs :: Name	    		-- Name of the class
 	    -> LHsBinds Name
 	    -> TcM [TcMethInfo]
 
-type TcMethInfo = (Name, DefMeth, Type)	-- A temporary intermediate, to communicate 
-					-- between tcClassSigs and buildClass
 tcClassSigs clas sigs def_methods
-  = do { dm_env <- checkDefaultBinds clas op_names def_methods
-       ; mapM (tcClassSig dm_env) op_sigs }
+  = do { dm_env <- mapM (addLocM (checkDefaultBind clas op_names)) 
+                        (bagToList def_methods)
+       ; mapM (tcClassSig (mkNameEnv dm_env)) op_sigs }
   where
     op_sigs  = [sig | sig@(L _ (TypeSig _ _))       <- sigs]
     op_names = [n   |     (L _ (TypeSig (L _ n) _)) <- op_sigs]
 
-
-checkDefaultBinds :: Name -> [Name] -> LHsBinds Name -> TcM (NameEnv Bool)
+checkDefaultBind :: Name -> [Name] -> HsBindLR Name Name -> TcM (Name, DefMethSpec)
   -- Check default bindings
   -- 	a) must be for a class op for this class
   --	b) must be all generic or all non-generic
-  -- and return a mapping from class-op to Bool
-  --	where True <=> it's a generic default method
-checkDefaultBinds clas ops binds
-  = do dm_infos <- mapM (addLocM (checkDefaultBind clas ops)) (bagToList binds)
-       return (mkNameEnv dm_infos)
-
-checkDefaultBind :: Name -> [Name] -> HsBindLR Name Name -> TcM (Name, Bool)
 checkDefaultBind clas ops (FunBind {fun_id = L _ op, fun_matches = MatchGroup matches _ })
   = do {  	-- Check that the op is from this class
-	checkTc (op `elem` ops) (badMethodErr clas op)
+ 	 checkTc (op `elem` ops) (badMethodErr clas op)
 
    	-- Check that all the defns ar generic, or none are
-    ;	checkTc (all_generic || none_generic) (mixedGenericErr op)
-
-    ;	return (op, all_generic)
+       ; case (none_generic, all_generic) of
+           (True, _) -> return (op, VanillaDM)
+           (_, True) -> return (op, GenericDM)
+           _         -> failWith (mixedGenericErr op)
     }
   where
     n_generic    = count (isJust . maybeGenericMatch) matches
     none_generic = n_generic == 0
     all_generic  = matches `lengthIs` n_generic
+
 checkDefaultBind _ _ b = pprPanic "checkDefaultBind" (ppr b)
 
 
-tcClassSig :: NameEnv Bool		-- Info about default methods; 
+tcClassSig :: NameEnv DefMethSpec	-- Info about default methods; 
 	   -> LSig Name
 	   -> TcM TcMethInfo
 
 tcClassSig dm_env (L loc (TypeSig (L _ op_name) op_hs_ty))
   = setSrcSpan loc $ do
     { op_ty <- tcHsKindedType op_hs_ty	-- Class tyvars already in scope
-    ; let dm = case lookupNameEnv dm_env op_name of
-		Nothing    -> NoDefMeth
-		Just False -> DefMeth
-		Just True  -> GenDefMeth
+    ; let dm = lookupNameEnv dm_env op_name `orElse` NoDM
     ; return (op_name, dm, op_ty) }
 tcClassSig _ s = pprPanic "tcClassSig" (ppr s)
 \end{code}
@@ -189,32 +178,32 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	; let tc_dm = tcDefMeth clas clas_tyvars
 				this_dict default_binds
 	      			sig_fn prag_fn
-	      	-- tc_dm is called only for a sel_id
-	      	-- that has a binding in default_binds
 
-	      dm_sel_ids  = [sel_id | (sel_id, DefMeth) <- op_items]
-	      -- Generate code for polymorphic default methods only (hence DefMeth)
-	      -- (Generic default methods have turned into instance decls by now.)
-	      -- This is incompatible with Hugs, which expects a polymorphic 
-	      -- default method for every class op, regardless of whether or not 
-	      -- the programmer supplied an explicit default decl for the class.  
-	      -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
-
-	; (dm_ids, defm_binds) <- tcExtendTyVarEnv clas_tyvars  $
-			          mapAndUnzipM tc_dm dm_sel_ids
+	; dm_stuff <- tcExtendTyVarEnv clas_tyvars $
+                      mapM tc_dm op_items
+        ; let (dm_ids, defm_binds) = unzip (catMaybes dm_stuff)
 
 	; return (dm_ids, listToBag defm_binds) }
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
     
 tcDefMeth :: Class -> [TyVar] -> Inst -> LHsBinds Name
-          -> TcSigFun -> TcPragFun -> Id
-          -> TcM (Id, LHsBind Id)
-tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn sel_id
-  = do	{ let sel_name = idName sel_id
-	; dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_name)
- 	; local_dm_name <- newLocalName sel_name
- 	  -- Base the local_dm_name on the selector name, becuase
+          -> TcSigFun -> TcPragFun -> ClassOpItem
+          -> TcM (Maybe (Id, LHsBind Id))
+-- Generate code for polymorphic default methods only (hence DefMeth)
+-- (Generic default methods have turned into instance decls by now.)
+-- This is incompatible with Hugs, which expects a polymorphic 
+-- default method for every class op, regardless of whether or not 
+-- the programmer supplied an explicit default decl for the class.  
+-- (If necessary we can fix that, but we don't have a convenient Id to hand.)
+tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
+  = case dm_info of
+      NoDefMeth       -> return Nothing
+      GenDefMeth      -> return Nothing
+      DefMeth dm_name -> do
+    	{ let sel_name = idName sel_id
+	; local_dm_name <- newLocalName sel_name
+ 	  -- Base the local_dm_name on the selector name, because
  	  -- type errors from tcInstanceMethodBody come from here
 
 		-- See Note [Silly default-method bind]
@@ -222,8 +211,7 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn sel_id
 
 	; let meth_bind = findMethodBind sel_name local_dm_name binds_in
 			  `orElse` pprPanic "tcDefMeth" (ppr sel_id)
-		-- We only call tcDefMeth on selectors for which 
-		-- there is a binding in binds_in
+		-- dm_info = DefMeth dm_name only if there is a binding in binds_in
 
 	      dm_sig_fn  _ = sig_fn sel_name
 	      dm_ty = idType sel_id
@@ -238,7 +226,8 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn sel_id
                  (ptext (sLit "Ignoring SPECIALISE pragmas on default method") 
                   <+> quotes (ppr sel_name))
 
-        ; tcInstanceMethodBody (instLoc this_dict) 
+        ; liftM Just $
+          tcInstanceMethodBody (instLoc this_dict) 
                                tyvars [this_dict]
                                ([], emptyBag)
                                dm_id_w_inline local_dm_id
@@ -282,9 +271,6 @@ tcInstanceMethodBody inst_loc tyvars dfun_dicts
 \end{code}
 
 \begin{code}
-mkDefMethRdrName :: Name -> RdrName
-mkDefMethRdrName sel_name = mkDerivedRdrName sel_name mkDefaultMethodOcc
-
 instantiateMethod :: Class -> Id -> [TcType] -> TcType
 -- Take a class operation, say  
 --	op :: forall ab. C a => forall c. Ix c => (b,c) -> a

@@ -105,7 +105,7 @@ data IfaceDecl
                                                 -- beyond .NET
 		   ifExtName :: Maybe FastString }
 
-data IfaceClassOp = IfaceClassOp OccName DefMeth IfaceType
+data IfaceClassOp = IfaceClassOp OccName DefMethSpec IfaceType
 	-- Nothing    => no default method
 	-- Just False => ordinary polymorphic default method
 	-- Just True  => generic default method

@@ -21,7 +21,7 @@ module BasicTypes(
 
 	Arity, 
 
-    FunctionOrData(..),
+        FunctionOrData(..),
 	
 	WarningTxt(..),
 
@@ -56,6 +56,8 @@ module BasicTypes(
 
 	HsBang(..), isBanged, isMarkedUnboxed, 
         StrictnessMark(..), isMarkedStrict,
+
+	DefMethSpec(..),
 
 	CompilerPhase, 
 	Activation(..), isActive, isNeverActive, isAlwaysActive, isEarlyActive,
@@ -522,7 +524,7 @@ instance Show OccInfo where
 
 %************************************************************************
 %*									*
-\subsection{Strictness indication}
+		Strictness indication
 %*									*
 %************************************************************************
 
@@ -572,6 +574,28 @@ isMarkedStrict NotMarkedStrict = False
 isMarkedStrict _               = True   -- All others are strict
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Default method specfication
+%*									*
+%************************************************************************
+
+The DefMethSpec enumeration just indicates what sort of default method
+is used for a class. It is generated from source code, and present in 
+interface files; it is converted to Class.DefMeth before begin put in a 
+Class object.
+
+\begin{code}
+data DefMethSpec = NoDM        -- No default method
+                 | VanillaDM   -- Default method given with polymorphic code
+                 | GenericDM   -- Default method given with generic code
+
+instance Outputable DefMethSpec where
+  ppr NoDM      = empty
+  ppr VanillaDM = ptext (sLit "{- Has default method -}")
+  ppr GenericDM = ptext (sLit "{- Has generic default method -}")
+\end{code}
 
 %************************************************************************
 %*									*

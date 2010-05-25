@@ -410,7 +410,6 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
 	; val_names <- mapM new_simple val_bndrs
 	; return (val_names ++ tc_names ++ ti_names) }
   where
-    mod        = tcg_mod gbl_env
     is_hs_boot = isHsBoot (tcg_src gbl_env) ;
 
     for_hs_bndrs :: [Located RdrName]
@@ -424,19 +423,19 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
 
     new_simple :: Located RdrName -> RnM (GenAvailInfo Name)
     new_simple rdr_name = do
-        nm <- newTopSrcBinder mod rdr_name
+        nm <- newTopSrcBinder rdr_name
         return (Avail nm)
 
     new_tc tc_decl              -- NOT for type/data instances
-	= do { main_name <- newTopSrcBinder mod main_rdr
-	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
+	= do { main_name <- newTopSrcBinder main_rdr
+	     ; sub_names <- mapM newTopSrcBinder sub_rdrs
 	     ; return (AvailTC main_name (main_name : sub_names)) }
       where
 	(main_rdr : sub_rdrs) = hsTyClDeclBinders tc_decl
 
     new_ti tc_name_env ti_decl  -- ONLY for type/data instances
 	= do { main_name <- lookupFamInstDeclBndr tc_name_env main_rdr
-	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
+	     ; sub_names <- mapM newTopSrcBinder sub_rdrs
 	     ; return (AvailTC main_name sub_names) }
                 	-- main_name is not bound here!
       where
