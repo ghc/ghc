@@ -411,6 +411,16 @@ SET_GCT(gc_threads[0]);
   // Now see which stable names are still alive.
   gcStablePtrTable();
 
+#ifdef THREADED_RTS
+  if (n_gc_threads == 1) {
+      for (n = 0; n < n_capabilities; n++) {
+          pruneSparkQueue(&capabilities[n]);
+      }
+  } else {
+      pruneSparkQueue(&capabilities[gct->thread_index]);
+  }
+#endif
+
 #ifdef PROFILING
   // We call processHeapClosureForDead() on every closure destroyed during
   // the current garbage collection, so we invoke LdvCensusForDead().
@@ -1072,6 +1082,16 @@ gcWorkerThread (Capability *cap)
 
     scavenge_until_all_done();
     
+#ifdef THREADED_RTS
+    // Now that the whole heap is marked, we discard any sparks that
+    // were found to be unreachable.  The main GC thread is currently
+    // marking heap reachable via weak pointers, so it is
+    // non-deterministic whether a spark will be retained if it is
+    // only reachable via weak pointers.  To fix this problem would
+    // require another GC barrier, which is too high a price.
+    pruneSparkQueue(cap);
+#endif
+
 #ifdef USE_PAPI
     // count events in this thread towards the GC totals
     papi_thread_stop_gc1_count(gct->papi_events);

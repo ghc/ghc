@@ -34,7 +34,7 @@ StgClosure * tryStealSpark     (Capability *cap);
 void         freeSparkPool     (SparkPool *pool);
 void         createSparkThread (Capability *cap);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
-void         pruneSparkQueue   (evac_fn evac, void *user, Capability *cap);
+void         pruneSparkQueue   (Capability *cap);
 
 INLINE_HEADER void discardSparks  (SparkPool *pool);
 INLINE_HEADER long sparkPoolSize  (SparkPool *pool);

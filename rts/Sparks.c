@@ -112,7 +112,7 @@ tryStealSpark (Capability *cap)
  * -------------------------------------------------------------------------- */
 
 void
-pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
+pruneSparkQueue (Capability *cap)
 { 
     SparkPool *pool;
     StgClosurePtr spark, tmp, *elements;
@@ -208,17 +208,21 @@ pruneSparkQueue (evac_fn evac, void *user, Capability *cap)
               pruned_sparks++; // discard spark
               cap->sparks_pruned++;
           }
-      } else {
-          if (!(closure_flags[INFO_PTR_TO_STRUCT(info)->type] & _NS)) {
+      } else if (HEAP_ALLOCED(spark) && 
+                 (Bdescr(spark)->flags & BF_EVACUATED)) {
+          if (closure_SHOULD_SPARK(spark)) {
               elements[botInd] = spark; // keep entry (new address)
-              evac (user, &elements[botInd]);
               botInd++;
               n++;
           } else {
               pruned_sparks++; // discard spark
               cap->sparks_pruned++;
           }
+      } else {
+          pruned_sparks++; // discard spark
+          cap->sparks_pruned++;
       }
+
       currInd++;
 
       // in the loop, we may reach the bounds, and instantly wrap around

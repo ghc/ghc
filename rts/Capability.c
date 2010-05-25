@@ -819,7 +819,7 @@ freeCapabilities (void)
 
 void
 markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
-                      rtsBool prune_sparks USED_IF_THREADS)
+                      rtsBool no_mark_sparks USED_IF_THREADS)
 {
     nat i;
     Capability *cap;
@@ -843,9 +843,7 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta,
 	}
 
 #if defined(THREADED_RTS)
-        if (prune_sparks) {
-            pruneSparkQueue (evac, user, cap);
-        } else {
+        if (!no_mark_sparks) {
             traverseSparkQueue (evac, user, cap);
         }
 #endif

@@ -276,7 +276,7 @@ void freeCapabilities (void);
 
 // For the GC:
 void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
-                           rtsBool prune_sparks);
+                           rtsBool no_mark_sparks);
 void markCapabilities (evac_fn evac, void *user);
 void traverseSparkQueues (evac_fn evac, void *user);
 
