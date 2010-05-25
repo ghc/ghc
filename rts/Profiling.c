@@ -697,7 +697,7 @@ report_per_cc_costs( void )
       
       if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
 	fprintf(prof_file, "  %5" FMT_Word64 " %9" FMT_Word64,
-		(StgWord64)(cc->time_ticks), cc->mem_alloc);
+		(StgWord64)(cc->time_ticks), cc->mem_alloc*sizeof(W_));
       }
       fprintf(prof_file, "\n");
   }
