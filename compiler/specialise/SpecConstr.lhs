@@ -36,6 +36,7 @@ import Var
 import VarEnv
 import VarSet
 import Name
+import BasicTypes
 import DynFlags		( DynFlags(..) )
 import StaticFlags	( opt_PprStyle_Debug )
 import Maybes		( orElse, catMaybes, isJust, isNothing )
@@ -1172,6 +1173,7 @@ specialise
 specialise env force_spec bind_calls (RI fn _ arg_bndrs body arg_occs) 
 			  spec_info@(SI specs spec_count mb_unspec)
   | not (isBottomingId fn)      -- Note [Do not specialise diverging functions]
+  , not (isNeverActive (idInlineActivation fn))	-- See Note [Transfer activation]
   , notNull arg_bndrs		-- Only specialise functions
   , Just all_calls <- lookupVarEnv bind_calls fn
   = do	{ (boring_call, pats) <- callsToPats env specs arg_occs all_calls
@@ -1278,6 +1280,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 	      rule_rhs   = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
 	      rule       = mkLocalRule rule_name inline_act fn_name qvars pats rule_rhs
+	      		   -- See Note [Transfer activation]
 	; return (spec_usg, OS call_pat rule spec_id spec_rhs) }
 
 calcSpecStrictness :: Id 		     -- The original function
@@ -1313,6 +1316,10 @@ specialised RHS, and that can lead directly to exponential behaviour.
 
 Note [Transfer activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  This note is for SpecConstr, but exactly the same thing
+  happens in the overloading specialiser; see
+  Note [Auto-specialisation and RULES] in Specialise.
+
 In which phase should the specialise-constructor rules be active?
 Originally I made them always-active, but Manuel found that this
 defeated some clever user-written rules.  Then I made them active only
@@ -1323,8 +1330,9 @@ simplCore/should_compile/spec-inline.
 
 So now I just use the inline-activation of the parent Id, as the
 activation for the specialiation RULE, just like the main specialiser;
-see Note [Auto-specialisation and RULES] in Specialise.
 
+This in turn means there is no point in specialising NOINLINE things,
+so we test for that.
 
 Note [Transfer strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
