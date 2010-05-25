@@ -158,7 +158,7 @@ module GHC (
 	-- ** Data constructors
 	DataCon,
 	dataConSig, dataConType, dataConTyCon, dataConFieldLabels,
-	dataConIsInfix, isVanillaDataCon,
+	dataConIsInfix, isVanillaDataCon, dataConUserType,
 	dataConStrictMarks,  
 	StrictnessMark(..), isMarkedStrict,
 
@@ -176,7 +176,7 @@ module GHC (
 	pprParendType, pprTypeApp, 
 	Kind,
 	PredType,
-	ThetaType, pprThetaArrow,
+	ThetaType, pprForAll, pprThetaArrow,
 
 	-- ** Entities
 	TyThing(..), 

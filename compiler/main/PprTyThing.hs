@@ -179,21 +179,15 @@ pprDataConDecl :: PrintExplicitForalls -> Bool -> (FieldLabel -> Bool)
 pprDataConDecl _ gadt_style show_label dataCon
   | not gadt_style = ppr_fields tys_w_strs
   | otherwise      = ppr_bndr dataCon <+> dcolon <+> 
-			sep [ ppr_tvs, GHC.pprThetaArrow theta, pp_tau ]
+			sep [ GHC.pprForAll forall_tvs, GHC.pprThetaArrow theta, pp_tau ]
+	-- Printing out the dataCon as a type signature, in GADT style
   where
-    (tyvars, theta, argTypes, res_ty) = GHC.dataConSig dataCon
-    tyCon = GHC.dataConTyCon dataCon
-    labels = GHC.dataConFieldLabels dataCon
-    qualVars = filter (flip notElem (GHC.tyConTyVars tyCon)) tyvars
-    stricts = GHC.dataConStrictMarks dataCon
-    tys_w_strs = zip stricts argTypes
+    (forall_tvs, theta, tau) = tcSplitSigmaTy (GHC.dataConUserType dataCon)
+    (arg_tys, res_ty)        = tcSplitFunTys tau
+    labels     = GHC.dataConFieldLabels dataCon
+    stricts    = GHC.dataConStrictMarks dataCon
+    tys_w_strs = zip stricts arg_tys
 
-    ppr_tvs 
-	| null qualVars = empty
-	| otherwise     = ptext (sLit "forall") <+> 
-				hsep (map ppr qualVars) <> dot
-
-	-- printing out the dataCon as a type signature, in GADT style
     pp_tau = foldr add (ppr res_ty) tys_w_strs
     add str_ty pp_ty = pprParendBangTy str_ty <+> arrow <+> pp_ty
 
