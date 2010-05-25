@@ -814,12 +814,12 @@ it &lt;- <replaceable>e</replaceable>
   ghci> reverse []
 </programlisting>
       What should GHCi do?  Strictly speaking, the program is ambiguous.  <literal>show (reverse [])</literal>
-      (which is what GHCi computes here) has type <literal>Show a => a</literal> and how that displays depends 
+      (which is what GHCi computes here) has type <literal>Show a => String</literal> and how that displays depends
       on the type <literal>a</literal>.  For example:
 <programlisting>
-  ghci> (reverse []) :: String
+  ghci> reverse ([] :: String)
   ""
-  ghci> (reverse []) :: [Int]
+  ghci> reverse ([] :: [Int])
   []
 </programlisting>
     However, it is tiresome for the user to have to specify the type, so GHCi extends Haskell's type-defaulting
