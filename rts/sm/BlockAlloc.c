@@ -71,7 +71,7 @@ static void  initMBlock(void *mblock);
   ~~~~~~~~~~
 
   Preliminaries:
-    - most allocations are for small blocks
+    - most allocations are for a small number of blocks
     - sometimes the OS gives us new memory backwards in the address
       space, sometimes forwards, so we should not be biased towards
       any particular layout in the address space
