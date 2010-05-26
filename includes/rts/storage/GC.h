@@ -63,7 +63,7 @@ typedef struct generation_ {
 
     bdescr *       blocks;	        // blocks in this gen
     unsigned int   n_blocks;	        // number of blocks
-    unsigned int   n_words;             // number of words
+    unsigned int   n_words;             // number of used words
 
     bdescr *       large_objects;	// large objects (doubly linked)
     unsigned int   n_large_blocks;      // no. of blocks used by large objs
