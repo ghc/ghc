@@ -1115,8 +1115,8 @@ gcWorkerThread (Capability *cap)
 void
 waitForGcThreads (Capability *cap USED_IF_THREADS)
 {
-    nat n_threads = RtsFlags.ParFlags.nNodes;
-    nat me = cap->no;
+    const nat n_threads = RtsFlags.ParFlags.nNodes;
+    const nat me = cap->no;
     nat i, j;
     rtsBool retry = rtsTrue;
 
@@ -1190,8 +1190,8 @@ shutdown_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
 void
 releaseGCThreads (Capability *cap USED_IF_THREADS)
 {
-    nat n_threads = RtsFlags.ParFlags.nNodes;
-    nat me = cap->no;
+    const nat n_threads = RtsFlags.ParFlags.nNodes;
+    const nat me = cap->no;
     nat i;
     for (i=0; i < n_threads; i++) {
         if (i == me) continue;
@@ -1478,8 +1478,8 @@ resize_generations (void)
 
     if (major_gc && RtsFlags.GcFlags.generations > 1) {
 	nat live, size, min_alloc, words;
-	nat max  = RtsFlags.GcFlags.maxHeapSize;
-	nat gens = RtsFlags.GcFlags.generations;
+	const nat max  = RtsFlags.GcFlags.maxHeapSize;
+	const nat gens = RtsFlags.GcFlags.generations;
 	
 	// live in the oldest generations
         if (oldest_gen->live_estimate != 0) {
@@ -1568,7 +1568,7 @@ resize_generations (void)
 static void
 resize_nursery (void)
 {
-    lnat min_nursery = RtsFlags.GcFlags.minAllocAreaSize * n_capabilities;
+    const lnat min_nursery = RtsFlags.GcFlags.minAllocAreaSize * n_capabilities;
 
     if (RtsFlags.GcFlags.generations == 1)
     {   // Two-space collector:
@@ -1628,7 +1628,7 @@ resize_nursery (void)
 	if (RtsFlags.GcFlags.heapSizeSuggestion)
 	{
 	    long blocks;
-	    nat needed = calcNeeded(); 	// approx blocks needed at next GC 
+	    const nat needed = calcNeeded(); 	// approx blocks needed at next GC 
 	    
 	    /* Guess how much will be live in generation 0 step 0 next time.
 	     * A good approximation is obtained by finding the
