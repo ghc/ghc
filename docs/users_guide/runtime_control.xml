@@ -130,6 +130,15 @@
          things like ctrl-C. This option is primarily useful for when
          you are using the Haskell code as a DLL, and want to set your
          own signal handlers.</para>
+
+         <para>Note that even
+           with <option>--install-signal-handlers=no</option>, the RTS
+           interval timer signal is still enabled.  The timer signal
+           is either SIGVTALRM or SIGALRM, depending on the RTS
+           configuration and OS capabilities.  To disable the timer
+           signal, use the <literal>-V0</literal> RTS option (see
+           above).
+         </para>
        </listitem>
      </varlistentry>
 
