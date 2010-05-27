@@ -184,14 +184,19 @@ opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 -- debugging opts
 opt_SuppressUniques :: Bool
 opt_SuppressUniques		= lookUp  (fsLit "-dsuppress-uniques")
+
 opt_SuppressCoercions :: Bool
 opt_SuppressCoercions           = lookUp  (fsLit "-dsuppress-coercions")
+
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug		= lookUp  (fsLit "-dppr-debug")
+
 opt_PprUserLength   :: Int
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
+
 opt_Fuel            :: Int
 opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
+
 opt_NoDebugOutput   :: Bool
 opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
 
