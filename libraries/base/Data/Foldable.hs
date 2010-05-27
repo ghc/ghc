@@ -96,7 +96,12 @@ import Array
 -- >    foldMap f (Node l k r) = foldMap f l `mappend` f k `mappend` foldMap f r
 --
 -- This is suitable even for abstract types, as the monoid is assumed
--- to satisfy the monoid laws.
+-- to satisfy the monoid laws.  Alternatively, one could define @foldr@:
+--
+-- > instance Foldable Tree where
+-- >    foldr f z Empty = z
+-- >    foldr f z (Leaf x) = f x z
+-- >    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l
 --
 class Foldable t where
         -- | Combine the elements of a structure using a monoid.
