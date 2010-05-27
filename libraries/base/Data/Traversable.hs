@@ -62,7 +62,7 @@ import Array
 --
 -- a suitable instance would be
 --
--- > instance Traversable Tree
+-- > instance Traversable Tree where
 -- >    traverse f Empty = pure Empty
 -- >    traverse f (Leaf x) = Leaf <$> f x
 -- >    traverse f (Node l k r) = Node <$> traverse f l <*> f k <*> traverse f r

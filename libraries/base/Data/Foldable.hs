@@ -90,7 +90,7 @@ import Array
 --
 -- a suitable instance would be
 --
--- > instance Foldable Tree
+-- > instance Foldable Tree where
 -- >    foldMap f Empty = mempty
 -- >    foldMap f (Leaf x) = f x
 -- >    foldMap f (Node l k r) = foldMap f l `mappend` f k `mappend` foldMap f r
