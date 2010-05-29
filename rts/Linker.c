@@ -136,7 +136,9 @@ static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
 
+#ifndef USE_MMAP
 static int machoGetMisalignment( FILE * );
+#endif
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 static int ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
 #endif
@@ -4797,6 +4799,7 @@ static void machoInitSymbolsWithoutUnderscore()
 }
 #endif
 
+#ifndef USE_MMAP
 /*
  * Figure out by how much to shift the entire Mach-O file in memory
  * when loading so that its single segment ends up 16-byte-aligned
@@ -4822,6 +4825,7 @@ static int machoGetMisalignment( FILE * f )
 
     return misalignment ? (16 - misalignment) : 0;
 }
+#endif
 
 #endif
 
