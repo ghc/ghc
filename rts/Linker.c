@@ -71,7 +71,7 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
+#if defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(darwin_HOST_OS)
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
