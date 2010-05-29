@@ -39,6 +39,7 @@ test('ffi004', skip, compile_and_run, [''])
 #
 test('ffi005', [ omit_ways(prof_ways), 
                  if_arch('i386', only_ways(['optc'])),
+                 if_platform('i386-apple-darwin', expect_broken(4105)),
                  exit_code(3) ],
                compile_and_run, [''])
 
