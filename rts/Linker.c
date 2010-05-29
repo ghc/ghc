@@ -4212,6 +4212,9 @@ static int relocateSection(
                 thing += value;
                 break;
             case X86_64_RELOC_SIGNED:
+            case X86_64_RELOC_SIGNED_1:
+            case X86_64_RELOC_SIGNED_2:
+            case X86_64_RELOC_SIGNED_4:
                 ASSERT(reloc->r_pcrel);
                 thing += value - baseValue;
                 break;
