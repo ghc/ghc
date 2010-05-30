@@ -56,6 +56,7 @@ ps_$1 : $1/$2.ps
 ifneq "$$(BINDIST)" "YES"
 $1/$2.ps: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --ps -o $$@
+	[ -f $$@ ]
 endif
 
 ifeq "$$(BUILD_DOCBOOK_PDF)" "YES"
@@ -69,6 +70,7 @@ pdf_$1 : $1/$2.pdf
 ifneq "$$(BINDIST)" "YES"
 $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	"$$(DBLATEX)" $$(DBLATEX_OPTS) $1/$2.xml --pdf -o $$@
+	[ -f $$@ ]
 endif
 
 endef
