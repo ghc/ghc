@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-6-14-1">
+  <title>Release notes for version 6.14.1</title>
+
+  <para>
+    The significant changes to the various parts of the compiler are
+    listed in the following sections. There have also been numerous bug
+    fixes and performance improvements over the 6.12 branch.
+  </para>
+
+  <sect2>
+    <title>Highlights</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          Due to changes in the runtime system, version 2.0 or later
+          (preferably version 2.2 or later) of the
+          <literal>parallel</literal> library should be used, or
+          parallelism will be lost.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+<!--
+  <sect2>
+    <title>Language changes</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Warnings</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Runtime system</title>
+
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Build system</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Compiler</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>GHCi</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Template Haskell</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Package Handling</title>
+    <itemizedlist>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+  </sect2>
+-->
+</sect1>
+
