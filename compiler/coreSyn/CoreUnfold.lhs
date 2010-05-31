@@ -40,6 +40,7 @@ import StaticFlags
 import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
+import TcType	 	( tcSplitSigmaTy, tcSplitDFunHead )
 import OccurAnal
 import CoreSubst hiding( substTy )
 import CoreFVs         ( exprFreeVars )
@@ -126,8 +127,16 @@ mkCoreUnfolding top_lvl src expr arity guidance
 		    uf_expandable = exprIsExpandable expr,
 		    uf_guidance   = guidance }
 
-mkDFunUnfolding :: DataCon -> [Id] -> Unfolding
-mkDFunUnfolding con ops = DFunUnfolding con (map Var ops)
+mkDFunUnfolding :: Type -> [CoreExpr] -> Unfolding
+mkDFunUnfolding dfun_ty ops 
+  = DFunUnfolding dfun_nargs data_con ops
+  where
+    (tvs, theta, head_ty) = tcSplitSigmaTy dfun_ty
+    	  -- NB: tcSplitSigmaTy: do not look through a newtype
+	  --     when the dictionary type is a newtype
+    (cls, _)   = tcSplitDFunHead head_ty
+    dfun_nargs = length tvs + length theta
+    data_con   = classDataCon cls
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
 mkWwInlineRule id expr arity
@@ -1223,13 +1232,15 @@ exprIsConApp_maybe id_unf expr
 
     analyse (Var fun) args
 	| Just con <- isDataConWorkId_maybe fun
-        , is_saturated
+        , count isValArg args == idArity fun
 	, let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars con) args
 	= Just (con, stripTypeArgs univ_ty_args, rest_args)
 
 	-- Look through dictionary functions; see Note [Unfolding DFuns]
-        | DFunUnfolding con ops <- unfolding
-        , is_saturated
+        | DFunUnfolding dfun_nargs con ops <- unfolding
+        , let sat = length args == dfun_nargs    -- See Note [DFun arity check]
+          in if sat then True else 
+             pprTrace "Unsaturated dfun" (ppr fun <+> int dfun_nargs $$ ppr args) False   
         , let (dfun_tvs, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
 	      subst = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
         = Just (con, substTys subst dfun_res_tys, 
@@ -1241,7 +1252,6 @@ exprIsConApp_maybe id_unf expr
 	= -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
           analyse rhs args
         where
-	  is_saturated = count isValArg args == idArity fun
 	  unfolding = id_unf fun
 
     analyse _ _ = Nothing
@@ -1282,3 +1292,8 @@ So to split it up we just need to apply the ops $c1, $c2 etc
 to the very same args as the dfun.  It takes a little more work
 to compute the type arguments to the dictionary constructor.
 
+Note [DFun arity check]
+~~~~~~~~~~~~~~~~~~~~~~~
+Here we check that the total number of supplied arguments (inclding 
+type args) matches what the dfun is expecting.  This may be *less*
+than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn

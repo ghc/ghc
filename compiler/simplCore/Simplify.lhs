@@ -705,8 +705,8 @@ simplUnfolding :: SimplEnv-> TopLevelFlag
 	       -> OccInfo -> OutExpr
 	       -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplUnfolding env _ _ _ _ (DFunUnfolding con ops)
-  = return (DFunUnfolding con ops')
+simplUnfolding env _ _ _ _ (DFunUnfolding ar con ops)
+  = return (DFunUnfolding ar con ops')
   where
     ops' = map (substExpr (text "simplUnfolding") env) ops
 

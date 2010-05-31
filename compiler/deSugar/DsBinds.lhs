@@ -462,6 +462,7 @@ dsSpecs poly_id poly_rhs prags
 	   ; spec_name <- newLocalName poly_name
 	   ; wrap_fn   <- dsCoercion spec_co
            ; let ds_spec_expr = wrap_fn (Var poly_id)
+                 spec_ty = exprType ds_spec_expr
 	   ; case decomposeRuleLhs ds_spec_expr of {
 	       Nothing -> do { warnDs (decomp_msg spec_co)
                              ; return Nothing } ;
@@ -473,10 +474,9 @@ dsSpecs poly_id poly_rhs prags
 	   	bs | not (null bs) -> do { warnDs (dead_msg bs); return Nothing } 
 	   	   | otherwise -> do
 
-	   { (spec_unf, unf_pairs) <- specUnfolding wrap_fn (realIdUnfolding poly_id)
+	   { (spec_unf, unf_pairs) <- specUnfolding wrap_fn spec_ty (realIdUnfolding poly_id)
 
-	   ; let spec_ty = exprType ds_spec_expr
-              	 spec_id  = mkLocalId spec_name spec_ty 
+	   ; let spec_id  = mkLocalId spec_name spec_ty 
               	            `setInlinePragma` inl_prag
 	      	 	    `setIdUnfolding`  spec_unf
               	 inl_prag | isDefaultInlinePragma spec_inl = idInlinePragma poly_id
@@ -511,12 +511,13 @@ dsSpecs poly_id poly_rhs prags
 	     2 (pprHsWrapper (ppr poly_id) spec_co)
     	     
 
-specUnfolding :: (CoreExpr -> CoreExpr) -> Unfolding -> DsM (Unfolding, [(Id,CoreExpr)])
-specUnfolding wrap_fn (DFunUnfolding con ops)
+specUnfolding :: (CoreExpr -> CoreExpr) -> Type 
+              -> Unfolding -> DsM (Unfolding, [(Id,CoreExpr)])
+specUnfolding wrap_fn spec_ty (DFunUnfolding _ _ ops)
   = do { let spec_rhss = map wrap_fn ops
        ; spec_ids <- mapM (mkSysLocalM (fsLit "spec") . exprType) spec_rhss
-       ; return (DFunUnfolding con (map Var spec_ids), spec_ids `zip` spec_rhss) }
-specUnfolding _ _
+       ; return (mkDFunUnfolding spec_ty (map Var spec_ids), spec_ids `zip` spec_rhss) }
+specUnfolding _ _ _
   = return (noUnfolding, [])
 
 mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> TyVarEnv Type

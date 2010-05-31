@@ -802,16 +802,16 @@ buildPADict vect_tc prepr_tc arr_tc repr
       method_ids <- mapM (method args) paMethods
 
       pa_tc  <- builtin paTyCon
-      pa_con <- builtin paDataCon
+      pa_dc  <- builtin paDataCon
       let dict = mkLams (tvs ++ args)
-               $ mkConApp pa_con
+               $ mkConApp pa_dc
                $ Type inst_ty : map (method_call args) method_ids
 
           dfun_ty = mkForAllTys tvs
                   $ mkFunTys (map varType args) (mkTyConApp pa_tc [inst_ty])
 
       raw_dfun <- newExportedVar dfun_name dfun_ty
-      let dfun = raw_dfun `setIdUnfolding` mkDFunUnfolding pa_con method_ids
+      let dfun = raw_dfun `setIdUnfolding` mkDFunUnfolding dfun_ty (map Var method_ids)
                           `setInlinePragma` dfunInlinePragma
 
       hoistBinding dfun dict

@@ -420,12 +420,17 @@ data Unfolding
 		       --
 		       -- Here, @f@ gets an @OtherCon []@ unfolding.
 
-  | DFunUnfolding DataCon [CoreExpr]	
-                        -- The Unfolding of a DFunId
+  | DFunUnfolding       -- The Unfolding of a DFunId  
+    			-- See Note [DFun unfoldings]
       		  	--     df = /\a1..am. \d1..dn. MkD (op1 a1..am d1..dn)
      		      	--     	    	      	       	   (op2 a1..am d1..dn)
-			-- where Arity = n, the number of dict args to the dfun
-      			-- The [CoreExpr] are the superclasses and methods [op1,op2], 
+
+        Arity 		-- Arity = m+n, the *total* number of args 
+			--   (unusually, both type and value) to the dfun
+
+        DataCon 	-- The dictionary data constructor (possibly a newtype datacon)
+
+        [CoreExpr]	-- The [CoreExpr] are the superclasses and methods [op1,op2], 
 			-- in positional order.
 			-- They are usually variables, but can be trivial expressions
 			-- instead (e.g. a type application).  
@@ -509,7 +514,34 @@ data UnfoldingGuidance
 			  -- (where there are the right number of arguments.)
 
   | UnfNever	    -- The RHS is big, so don't inline it
+\end{code}
 
+
+Note [DFun unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~
+The Arity in a DFunUnfolding is total number of args (type and value)
+that the DFun needs to produce a dictionary.  That's not necessarily 
+related to the ordinary arity of the dfun Id, esp if the class has
+one method, so the dictionary is represented by a newtype.  Example
+
+     class C a where { op :: a -> Int }
+     instance C a -> C [a] where op xs = op (head xs)
+
+The instance translates to
+
+     $dfCList :: forall a. C a => C [a]  -- Arity 2!
+     $dfCList = /\a.\d. $copList {a} d |> co
+ 
+     $copList :: forall a. C a => [a] -> Int  -- Arity 2!
+     $copList = /\a.\d.\xs. op {a} d (head xs)
+
+Now we might encounter (op (dfCList {ty} d) a1 a2)
+and we want the (op (dfList {ty} d)) rule to fire, because $dfCList
+has all its arguments, even though its (value) arity is 2.  That's
+why we cache the number of expected 
+
+
+\begin{code}
 -- Constants for the UnfWhen constructor
 needSaturated, unSaturatedOk :: Bool
 needSaturated = False

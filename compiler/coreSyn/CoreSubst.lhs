@@ -543,8 +543,8 @@ substUnfoldingSC subst unf 	 -- Short-cut version
   | isEmptySubst subst = unf
   | otherwise          = substUnfolding subst unf
 
-substUnfolding subst (DFunUnfolding con args)
-  = DFunUnfolding con (map (substExpr (text "dfun-unf") subst) args)
+substUnfolding subst (DFunUnfolding ar con args)
+  = DFunUnfolding ar con (map (substExpr (text "dfun-unf") subst) args)
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!

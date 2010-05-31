@@ -386,10 +386,11 @@ instance Outputable UnfoldingSource where
   ppr InlineRhs         = ptext (sLit "<vanilla>")
 
 instance Outputable Unfolding where
-  ppr NoUnfolding             = ptext (sLit "No unfolding")
-  ppr (OtherCon cs)           = ptext (sLit "OtherCon") <+> ppr cs
-  ppr (DFunUnfolding con ops) = ptext (sLit "DFun") <+> ppr con
-                                 <+> brackets (pprWithCommas pprParendExpr ops)
+  ppr NoUnfolding             	 = ptext (sLit "No unfolding")
+  ppr (OtherCon cs)           	 = ptext (sLit "OtherCon") <+> ppr cs
+  ppr (DFunUnfolding ar con ops) = ptext (sLit "DFun") <> parens (ptext (sLit "arity=") <> int ar)  
+                                   <+> ppr con
+                                   <+> brackets (pprWithCommas pprParendExpr ops)
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_cheap=cheap

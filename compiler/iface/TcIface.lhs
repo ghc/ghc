@@ -1053,11 +1053,9 @@ tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
   = do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
        ; return (case mb_ops1 of
        	 	    Nothing   -> noUnfolding
-                    Just ops1 -> DFunUnfolding data_con ops1) }
+                    Just ops1 -> mkDFunUnfolding dfun_ty ops1) }
   where
     doc = text "Class ops for dfun" <+> ppr name
-    (_, cls, _) = tcSplitDFunTy dfun_ty
-    data_con = classDataCon cls
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check

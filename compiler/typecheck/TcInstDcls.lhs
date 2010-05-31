@@ -32,6 +32,7 @@ import DataCon
 import Class
 import Var
 import CoreUnfold ( mkDFunUnfolding )
+import CoreSyn	  ( Expr(Var) )
 import Id
 import MkId
 import Name
@@ -704,9 +705,9 @@ tc_inst_decl2 dfun_id (NewTypeDerived coi _)
 -- Ordinary instances
 
 tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
-  = do { let rigid_info = InstSkol
-             inst_ty    = idType dfun_id
-             loc        = getSrcSpan dfun_id
+ = do { let rigid_info = InstSkol
+            inst_ty    = idType dfun_id
+            loc        = getSrcSpan dfun_id
 
         -- Instantiate the instance decl with skolem constants
        ; (inst_tyvars', dfun_theta', inst_head') <- tcSkolSigType rigid_info inst_ty
@@ -773,7 +774,8 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
        ; let dict_constr   = classDataCon clas
              this_dict_id  = instToId this_dict
 	     dict_bind     = mkVarBind this_dict_id dict_rhs
-             dict_rhs      = foldl mk_app inst_constr (sc_ids ++ meth_ids)
+             dict_rhs      = foldl mk_app inst_constr sc_meth_ids
+             sc_meth_ids   = sc_ids ++ meth_ids
  	     inst_constr   = L loc $ wrapId (mkWpTyApps inst_tys')
 	     			            (dataConWrapId dict_constr)
                      -- We don't produce a binding for the dict_constr; instead we
@@ -791,7 +793,7 @@ tc_inst_decl2 dfun_id (VanillaInst monobinds uprags standalone_deriv)
 	        -- See Note [ClassOp/DFun selection]
 		-- See also note [Single-method classes]
              dfun_id_w_fun = dfun_id  
-                             `setIdUnfolding`  mkDFunUnfolding dict_constr (sc_ids ++ meth_ids)
+                             `setIdUnfolding`  mkDFunUnfolding inst_ty (map Var sc_meth_ids)
                              `setInlinePragma` dfunInlinePragma
 
              main_bind = AbsBinds

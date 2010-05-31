@@ -709,10 +709,10 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
     mb_unfold_ids :: Maybe (IdSet, [Id])	-- Nothing => don't unfold
     mb_unfold_ids = case unfoldingInfo idinfo of
 		      CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_guidance = guide } 
-					  | show_unfolding src guide
-					  -> Just (unf_ext_ids src unf_rhs)
-		      DFunUnfolding _ ops -> Just (exprsFvsInOrder ops)
-		      _                   -> Nothing
+					    | show_unfolding src guide
+					    -> Just (unf_ext_ids src unf_rhs)
+		      DFunUnfolding _ _ ops -> Just (exprsFvsInOrder ops)
+		      _                     -> Nothing
                   where
                     unf_ext_ids (InlineWrapper v) _ = (unitVarSet v, [v])
                     unf_ext_ids _           unf_rhs = exprFvsInOrder unf_rhs
@@ -1094,8 +1094,8 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
 
 ------------ Unfolding  --------------
 tidyUnfolding :: TidyEnv -> CoreExpr -> Maybe StrictSig -> Unfolding -> Unfolding
-tidyUnfolding tidy_env _ _ (DFunUnfolding con ids)
-  = DFunUnfolding con (map (tidyExpr tidy_env) ids)
+tidyUnfolding tidy_env _ _ (DFunUnfolding ar con ids)
+  = DFunUnfolding ar con (map (tidyExpr tidy_env) ids)
 tidyUnfolding tidy_env tidy_rhs strict_sig
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
   | isInlineRuleSource src

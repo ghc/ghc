@@ -1545,7 +1545,7 @@ toIfUnfolding lb unf@(CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
 	-- have stuck in NoUnfolding.  For supercompilation we want 
 	-- to see that unfolding!
 
-toIfUnfolding lb (DFunUnfolding _con ops)
+toIfUnfolding lb (DFunUnfolding _ar _con ops)
   = Just (HsUnfold lb (IfDFunUnfold (map toIfaceExpr ops)))
       -- No need to serialise the data constructor; 
       -- we can recover it from the type of the dfun
