@@ -276,31 +276,28 @@ cpeBind top_lvl env (Rec pairs)
 ---------------
 cpePair :: TopLevelFlag -> RecFlag -> RhsDemand
 	-> CorePrepEnv -> Id -> CoreExpr
-	-> UniqSM (Floats, Id, CoreExpr)
+	-> UniqSM (Floats, Id, CpeRhs)
 -- Used for all bindings
 cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
   = do { (floats1, rhs1) <- cpeRhsE env rhs
-       ; let (rhs1_bndrs, _) = collectBinders rhs1
+
        ; (floats2, rhs2)
-       	    <- if want_float floats1 rhs1 
-       	       then return (floats1, rhs1)
+            <- if manifestArity rhs1 <= arity 
+	       then return (floats1, cpeEtaExpand arity rhs1)
+	       else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
+	       	    	       -- Note [Silly extra arguments]
+	       	    (do { v <- newVar (idType bndr)
+		        ; let float = mkFloat False False v rhs1
+		        ; return (addFloat floats1 float, cpeEtaExpand arity (Var v)) })
+
+       ; (floats3, rhs')
+       	    <- if want_float floats2 rhs2 
+       	       then return (floats2, rhs2)
        	       else -- Non-empty floats will wrap rhs1
                     -- But: rhs1 might have lambdas, and we can't
 		    --      put them inside a wrapBinds
-	       if valBndrCount rhs1_bndrs <= arity 
-	       then    -- Lambdas in rhs1 will be nuked by eta expansion
-	       	    return (emptyFloats, wrapBinds floats1 rhs1)
-	   
-	       else do { body1 <- rhsToBodyNF rhs1
-  	               ; return (emptyFloats, wrapBinds floats1 body1) } 
-
-       ; (floats3, rhs')   -- Note [Silly extra arguments]
-            <- if manifestArity rhs2 <= arity 
-	       then return (floats2, cpeEtaExpand arity rhs2)
-	       else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
-	       	    (do { v <- newVar (idType bndr)
-		        ; let float = mkFloat False False v rhs2
-		        ; return (addFloat floats2 float, cpeEtaExpand arity (Var v)) })
+	       do { body2 <- rhsToBodyNF rhs2
+  	          ; return (emptyFloats, wrapBinds floats2 body2) } 
 
 	     	-- Record if the binder is evaluated
        ; let bndr' | exprIsHNF rhs' = bndr `setIdUnfolding` evaldUnfolding
@@ -697,7 +694,7 @@ Instead CoreArity.etaExpand gives
 		f = /\a -> \y -> let s = h 3 in g s y
 
 \begin{code}
-cpeEtaExpand :: Arity -> CoreExpr -> CoreExpr
+cpeEtaExpand :: Arity -> CpeRhs -> CpeRhs
 cpeEtaExpand arity expr
   | arity == 0 = expr
   | otherwise  = etaExpand arity expr
@@ -793,7 +790,7 @@ emptyFloats = Floats OkToSpec nilOL
 isEmptyFloats :: Floats -> Bool
 isEmptyFloats (Floats _ bs) = isNilOL bs
 
-wrapBinds :: Floats -> CoreExpr -> CoreExpr
+wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
