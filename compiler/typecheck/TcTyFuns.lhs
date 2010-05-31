@@ -1622,15 +1622,20 @@ misMatchMsg env0 (ty_act, ty_exp)
         msg = sep [sep [ptext (sLit "Couldn't match expected type") <+> pp_exp, 
 			nest 7 $
                               ptext (sLit "against inferred type") <+> pp_act],
-		   nest 2 (extra_exp $$ extra_act),
-		   nest 2 (vcat (map pp_open_tc (nub open_tcs)))]
+		   nest 2 (extra_exp $$ extra_act $$ extra_tyfun) ]
 		   	-- See Note [Non-injective type functions]
     in
     (env2, msg)
 
   where
-    open_tcs = [tc | TyConApp tc _ <- [ty_act, ty_exp]
-                   , isOpenTyCon tc ]
+    extra_tyfun 
+      = case (tcSplitTyConApp_maybe ty_act, tcSplitTyConApp_maybe ty_exp) of
+          (Just (tc_act,_), Just (tc_exp,_)) | tc_act == tc_exp
+              -> if isOpenSynTyCon tc_act then pp_open_tc tc_act
+                 else WARN( True, ppr tc_act) -- If there's a mis-match, then 
+                      empty  	              -- it should be a family
+          _ -> empty
+
     pp_open_tc tc = ptext (sLit "NB:") <+> quotes (ppr tc) 
     	       	    <+> ptext (sLit "is a type function") <> pp_inj
 	where
@@ -1662,16 +1667,6 @@ It's very confusing to get a message like
             against inferred type `Depend s1'
 so pp_open_tc adds:
        NB: `Depend' is type function, and hence may not be injective
-
-Currently we add this independently for each argument, so we also get
-     Couldn't match expected type `a'
-            against inferred type `Dual (Dual a)'
-       NB: `Dual' is a (non-injective) type function
-which is arguably redundant.  But on the other hand, it's probably
-a good idea for the programmer to know the error involves type functions
-so I've left it in for now.  The obvious alternative is to only add
-this NB in the case of matching (T ...) ~ (T ...). 
-     
 
 Warn of loopy local equalities that were dropped.
 
