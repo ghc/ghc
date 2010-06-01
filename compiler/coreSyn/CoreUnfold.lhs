@@ -1265,11 +1265,7 @@ exprIsConApp_maybe id_unf expr
 	= Nothing
 
     beta fun pairs args
-        = case analyse (substExpr (text "subst-expr-is-con-app") subst fun) args of
-	    Nothing  -> -- pprTrace "Bale out! exprIsConApp_maybe" doc $
-	    	        Nothing
-	    Just ans -> -- pprTrace "Woo-hoo! exprIsConApp_maybe" doc $
-                        Just ans
+        = analyse (substExpr (text "subst-expr-is-con-app") subst fun) args
         where
           subst = mkOpenSubst (mkInScopeSet (exprFreeVars fun)) pairs
 	  -- doc = vcat [ppr fun, ppr expr, ppr pairs, ppr args]
