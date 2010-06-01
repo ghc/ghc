@@ -314,7 +314,8 @@ vectScalarLam args body
       scalars <- globalScalars
       onlyIfV (all is_scalar_ty arg_tys
                && is_scalar_ty res_ty
-               && is_scalar (extendVarSetList scalars args) body)
+               && is_scalar (extendVarSetList scalars args) body
+               && uses scalars body)
         $ do
             fn_var <- hoistExpr (fsLit "fn") (mkLams args body) DontInline
             zipf <- zipScalars arg_tys res_ty
@@ -338,6 +339,14 @@ vectScalarLam args body
     is_scalar _ e@(Lit _)    = is_scalar_ty $ exprType e
     is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2
     is_scalar _ _            = False
+
+    -- A scalar function has to actually compute something. Without the check,
+    -- we would treat (\(x :: Int) -> x) as a scalar function and lift it to
+    -- (map (\x -> x)) which is very bad. Normal lifting transforms it to
+    -- (\n# x -> x) which is what we want.
+    uses funs (Var v)     = v `elemVarSet` funs 
+    uses funs (App e1 e2) = uses funs e1 || uses funs e2
+    uses _ _              = False
 
 vectLam :: Bool -> Bool -> VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
 vectLam inline loop_breaker fvs bs body
