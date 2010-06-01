@@ -4278,7 +4278,8 @@ static int relocateSection(
 		    else if(scat->r_type == PPC_RELOC_SECTDIFF
 		        || scat->r_type == PPC_RELOC_LO16_SECTDIFF
 		        || scat->r_type == PPC_RELOC_HI16_SECTDIFF
-		        || scat->r_type == PPC_RELOC_HA16_SECTDIFF)
+		        || scat->r_type == PPC_RELOC_HA16_SECTDIFF
+		        || scat->r_type == PPC_RELOC_LOCAL_SECTDIFF)
 #else
                     else if(scat->r_type == GENERIC_RELOC_SECTDIFF
                         || scat->r_type == GENERIC_RELOC_LOCAL_SECTDIFF)
