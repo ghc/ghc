@@ -872,7 +872,7 @@ cmmExprConFold referenceKind expr
         CmmReg (CmmGlobal EagerBlackholeInfo)
           | not opt_PIC
           -> cmmExprConFold referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_INFO"))) 
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
           | not opt_PIC
           -> cmmExprConFold referenceKind $
