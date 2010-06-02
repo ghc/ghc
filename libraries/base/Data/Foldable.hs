@@ -162,6 +162,9 @@ instance Foldable [] where
 
 instance Ix i => Foldable (Array i) where
         foldr f z = Prelude.foldr f z . elems
+        foldl f z = Prelude.foldl f z . elems
+        foldr1 f = Prelude.foldr1 f . elems
+        foldl1 f = Prelude.foldl1 f . elems
 
 -- | Fold over the elements of a structure,
 -- associating to the right, but strictly.
