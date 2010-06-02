@@ -69,7 +69,7 @@ flag test
 
 executable haddock
   build-depends:
-    base >= 4.0.0.0 && < 4.3.0.0,
+    base >= 4.0.0.0 && < 4.4.0.0,
     filepath,
     directory,
     pretty,
@@ -133,7 +133,7 @@ executable haddock
    
 library
   build-depends:
-    base >= 4.0.0.0 && < 4.3.0.0,
+    base >= 4.0.0.0 && < 4.4.0.0,
     filepath,
     directory,
     pretty,
