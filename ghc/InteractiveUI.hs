@@ -622,7 +622,7 @@ runOneCommand eh getCmd = do
       maybe (liftIO (ioError collectError))
             (\l->if removeSpaces l == ":}" 
                  then return (Just $ removeSpaces c) 
-                 else collectCommand q (c++map normSpace l))
+                 else collectCommand q (c ++ "\n" ++ map normSpace l))
       where normSpace '\r' = ' '
             normSpace   c  = c
     -- QUESTION: is userError the one to use here?
