@@ -2191,6 +2191,7 @@ compilerInfo = [("Project name",                String cProjectName),
                 ("RTS ways",                    String cGhcRTSWays),
                 ("Leading underscore",          String cLeadingUnderscore),
                 ("Debug on",                    String (show debugIsOn)),
-                ("LibDir",                      FromDynFlags topDir)
+                ("LibDir",                      FromDynFlags topDir),
+                ("Global Package DB",           FromDynFlags systemPackageConfig)
                ]
 
