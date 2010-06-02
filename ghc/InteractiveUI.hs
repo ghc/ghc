@@ -572,9 +572,14 @@ runCommands = runCommands' handler
 runCommands' :: (SomeException -> GHCi Bool) -- Exception handler
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands' eh getCmd = do
-    b <- handleGhcException (\e -> case e of
-                    Interrupted -> return False
-                    _other -> liftIO (print e) >> return True)
+    b <- ghandle (\e -> case fromException e of
+                          Just UserInterrupt -> return False
+                          _ -> case fromException e of
+                                 Just ghc_e ->
+                                   do liftIO (print (ghc_e :: GhcException))
+                                      return True
+                                 _other ->
+                                   liftIO (Exception.throwIO e))
             (runOneCommand eh getCmd)
     if b then return () else runCommands' eh getCmd
 
@@ -1726,13 +1731,15 @@ handler exception = do
 showException :: SomeException -> GHCi ()
 showException se =
   io $ case fromException se of
-       Just Interrupted         -> putStrLn "Interrupted."
        -- omit the location for CmdLineError:
        Just (CmdLineError s)    -> putStrLn s
        -- ditto:
        Just ph@(PhaseFailed {}) -> putStrLn (showGhcException ph "")
        Just other_ghc_ex        -> print other_ghc_ex
-       Nothing                  -> putStrLn ("*** Exception: " ++ show se)
+       Nothing                  -> 
+         case fromException se of
+           Just UserInterrupt -> putStrLn "Interrupted."
+           _other             -> putStrLn ("*** Exception: " ++ show se)
 
 -----------------------------------------------------------------------------
 -- recursive exception handlers

@@ -380,9 +380,9 @@ rethrow dflags io = Exception.catch io $ \se -> do
                    not (dopt Opt_BreakOnException dflags)
                     then poke exceptionFlag 1
                     else case fromException se of
-                         -- If it is an "Interrupted" exception, we allow
+                         -- If it is a "UserInterrupt" exception, we allow
                          --  a possible break by way of -fbreak-on-exception
-                         Just Interrupted -> return ()
+                         Just UserInterrupt -> return ()
                          -- In any other case, we don't want to break
                          _ -> poke exceptionFlag 0
 

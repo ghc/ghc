@@ -63,7 +63,6 @@ ghcError e = Exception.throw e
 data GhcException
   = PhaseFailed String		-- name of phase 
   		ExitCode	-- an external phase (eg. cpp) failed
-  | Interrupted			-- someone pressed ^C
   | Signal Int                  -- some other fatal signal (SIGHUP,SIGTERM)
   | UsageError String		-- prints the short usage msg after the error
   | CmdLineError String		-- cmdline prob, but doesn't print usage
@@ -107,8 +106,6 @@ showGhcException (ProgramError str)
    = showString str
 showGhcException (InstallationError str)
    = showString str
-showGhcException (Interrupted)
-   = showString "interrupted"
 showGhcException (Signal n)
    = showString "signal: " . shows n
 showGhcException (Panic s)
@@ -151,7 +148,7 @@ assertPanic file line =
 \end{code}
 
 \begin{code}
--- | tryMost is like try, but passes through Interrupted and Panic
+-- | tryMost is like try, but passes through UserInterrupt and Panic
 -- exceptions.  Used when we want soft failures when reading interface
 -- files, for example.
 
@@ -162,7 +159,6 @@ tryMost action = do r <- try action
                         Left se ->
                             case fromException se of
                                 -- Some GhcException's we rethrow,
-                                Just Interrupted -> throwIO se
                                 Just (Signal _)  -> throwIO se
                                 Just (Panic _)   -> throwIO se
                                 -- others we return
@@ -189,7 +185,7 @@ installSignalHandlers = do
   modifyMVar_ interruptTargetThread (return . (main_thread :))
 
   let
-      interrupt_exn = (toException Interrupted)
+      interrupt_exn = (toException UserInterrupt)
 
       interrupt = do
 	withMVar interruptTargetThread $ \targets ->

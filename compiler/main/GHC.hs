@@ -334,6 +334,7 @@ defaultErrorHandler dflags inner =
                 Just (ioe :: IOException) ->
                   fatalErrorMsg dflags (text (show ioe))
                 _ -> case fromException exception of
+		     Just UserInterrupt -> exitWith (ExitFailure 1)
                      Just StackOverflow ->
                          fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
                      _ -> case fromException exception of
@@ -350,7 +351,6 @@ defaultErrorHandler dflags inner =
   		hFlush stdout
   		case ge of
 		     PhaseFailed _ code -> exitWith code
-		     Interrupted -> exitWith (ExitFailure 1)
 		     Signal _ -> exitWith (ExitFailure 1)
 		     _ -> do fatalErrorMsg dflags (text (show ge))
 			     exitWith (ExitFailure 1)
