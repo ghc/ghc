@@ -744,8 +744,7 @@ ppForAll Explicit ltvs lctxt =
 
 ppBang :: HsBang -> Html
 ppBang HsNoBang = empty 
-ppBang HsStrict = toHtml "!"
-ppBang HsUnbox  = toHtml "!" -- unboxed args is an implementation detail,
+ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
                              -- so we just show the strictness annotation
 
 
