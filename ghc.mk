@@ -335,6 +335,7 @@ $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,mtl))
 $(eval $(call addPackage,utf8-string))
+$(eval $(call addPackage,xhtml))
 
 $(eval $(call addPackage,terminfo,($$(Windows),NO)))
 
@@ -653,6 +654,9 @@ $(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS +=
 libraries/binary_dist-install_HC_OPTS += -Wwarn
 libraries/binary_dist-boot_HC_OPTS += -Wwarn
 
+# XXX hack: xhtml has warnings
+libraries/xhtml_dist-install_HC_OPTS += -Wwarn
+
 # ----------------------------------------------
 # A useful pseudo-target
 .PHONY: stage1_libs
@@ -876,7 +880,7 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
-INSTALLED_PACKAGES := $(filter-out haskeline mtl terminfo utf8-string,$(PACKAGES))
+INSTALLED_PACKAGES := $(filter-out haskeline mtl terminfo utf8-string xhtml,$(PACKAGES))
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALLED_PACKAGES := $(filter-out $(EXTRA_PACKAGES), $(INSTALLED_PACKAGES))
 endif

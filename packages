@@ -61,6 +61,7 @@ libraries/terminfo                      packages/terminfo               darcs
 libraries/unix                          packages/unix                   darcs
 libraries/utf8-string                   packages/utf8-string            darcs
 libraries/Win32                         packages/Win32                  darcs
+libraries/xhtml                         packages/xhtml                  darcs
 testsuite                   testsuite   testsuite                       darcs
 nofib                       nofib       nofib                           darcs
 libraries/deepseq           extra       packages/deepseq                darcs
