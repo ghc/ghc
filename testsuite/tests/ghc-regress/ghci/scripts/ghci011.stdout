@@ -1,10 +1,10 @@
 data [] a = [] | a : [a] 	-- Defined in GHC.Types
-instance (Eq a) => Eq [a] -- Defined in GHC.Classes
+instance Eq a => Eq [a] -- Defined in GHC.Classes
 instance Monad [] -- Defined in GHC.Base
 instance Functor [] -- Defined in GHC.Base
-instance (Ord a) => Ord [a] -- Defined in GHC.Classes
-instance (Read a) => Read [a] -- Defined in GHC.Read
-instance (Show a) => Show [a] -- Defined in GHC.Show
+instance Ord a => Ord [a] -- Defined in GHC.Classes
+instance Read a => Read [a] -- Defined in GHC.Read
+instance Show a => Show [a] -- Defined in GHC.Show
 data () = () 	-- Defined in GHC.Unit
 instance Bounded () -- Defined in GHC.Enum
 instance Enum () -- Defined in GHC.Enum

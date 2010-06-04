@@ -1,13 +1,14 @@
 TYPE SIGNATURES
     foo :: forall b s chain.
-           (Zork s (Z [Char]) b) =>
+           Zork s (Z [Char]) b =>
            Q s (Z [Char]) chain -> ST s ()
     s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
 TYPE CONSTRUCTORS
     data Q s a chain
         RecFlag NonRecursive
         Generics: no
-        = Node :: forall s a chain. s -> a -> chain -> Q s a chain Stricts: _ _ _
+        = Node :: forall s a chain. s -> a -> chain -> Q s a chain
+              Stricts: _ _ _
         FamilyInstance: none
     data Z a
         RecFlag NonRecursive
@@ -16,4 +17,4 @@ TYPE CONSTRUCTORS
         FamilyInstance: none
 Tycons with generics:
 Dependent modules: []
-Dependent packages: [base, ghc-prim, integer-impl]
+Dependent packages: [base, ghc-prim, integer-gmp]

@@ -3,9 +3,9 @@
 module ShouldCompile where
 test ::
   [a] <document comment>
-  -> forall b. (Ord b) =>
+  -> forall b. Ord b =>
      [b] <document comment>
-     -> forall c. (Num c) => [c] <document comment> -> [a]
+     -> forall c. Num c => [c] <document comment> -> [a]
 test xs ys zs = xs
 
 

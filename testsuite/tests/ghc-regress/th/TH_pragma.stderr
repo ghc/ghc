@@ -10,11 +10,11 @@ TH_pragma.hs:1:1:
         foo x = (x + 1)
 TH_pragma.hs:1:1:
     TH_pragma.hs:1:1: Splicing declarations
-        [d| bar :: (Num a) => a -> a
+        [d| bar :: Num a => a -> a
             {-# SPECIALIZE INLINE[~1] bar :: Float -> Float #-}
             bar x = x * 10 |]
       ======>
         TH_pragma.hs:(8,4)-(10,31)
-        bar :: forall a. (Num a) => a -> a
+        bar :: forall a. Num a => a -> a
         {-# SPECIALIZE INLINE[~1] bar :: Float -> Float #-}
         bar x = (x * 10)

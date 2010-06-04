@@ -1,2 +1,2 @@
 first :: Arrow (~>) => b~>c -> (b, d)~>(c, d)
-  :: (Arrow (~>)) => (~>) b c -> (~>) (b, d) (c, d)
+  :: Arrow (~>) => (~>) b c -> (~>) (b, d) (c, d)

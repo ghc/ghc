@@ -2,4 +2,4 @@
 tcfail196.hs:5:1:
     Illegal polymorphic or qualified type: forall a. a
     In the type signature for `bar':
-      bar :: (Num (forall a. a)) => Int -> Int
+      bar :: Num (forall a. a) => Int -> Int

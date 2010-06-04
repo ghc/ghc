@@ -61,7 +61,7 @@ newtype N5 a b = N5 {n5 :: a b <document comment>}
 newtype N6 a b = <document comment> N6 {n6 :: a b}
 <document comment>
 newtype N7 a b = <document comment> N7 {n7 :: a b}
-class (D a) => C a where { a :: IO a; b :: [a]; c :: a; }
+class D a => C a where { a :: IO a; b :: [a]; c :: a; }
 <document comment>
 class D a where { d :: T a b; e :: (a, a); }
 <document comment>
@@ -96,7 +96,7 @@ data R1
 <document comment>
 <document comment>
 <document comment>
-f :: (C a) => a -> Int
+f :: C a => a -> Int
 <document comment>
 foreign import ccall safe "static header.h g" g :: Int -> IO CInt
 <document comment>
@@ -116,9 +116,9 @@ h = 42
 <document comment>
 <document comment>
 data Ex a
-    = forall b. (C b) => Ex1 b |
+    = forall b. C b => Ex1 b |
       forall b. Ex2 b |
-      forall b. (C a) => Ex3 b |
+      forall b. C a => Ex3 b |
       Ex4 forall a. a -> a
 <document comment>
 k ::

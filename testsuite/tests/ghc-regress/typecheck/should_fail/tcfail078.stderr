@@ -1,5 +1,4 @@
 
 tcfail078.hs:5:6:
     Type constructor `Integer' used as a class
-    In the type signature for `f':
-      f :: (Integer i) => i
+    In the type signature for `f': f :: Integer i => i

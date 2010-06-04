@@ -11,5 +11,5 @@ maybeToList :: Maybe a -> [a]
 data T = A Int | B Float
 f :: Double -> Double
 g :: Double -> Double
-h :: (Integral a) => a -> a
+h :: Integral a => a -> a
 f :: Double -> Double

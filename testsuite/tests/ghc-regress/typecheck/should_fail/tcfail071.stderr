@@ -3,7 +3,7 @@ tcfail071.hs:9:1:
     Contexts differ in length
       (Use -XRelaxedPolyRec to allow this)
     When matching the contexts of the signatures for
-      f :: forall d. (Ord d) => d -> d
+      f :: forall d. Ord d => d -> d
       g :: forall e. e -> e
     The signature contexts in a mutually recursive group should all be identical
     When generalising the type(s) for f, g
