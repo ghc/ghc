@@ -331,7 +331,7 @@ newDynCAF (StgRegTable *reg STG_UNUSED, StgClosure *caf)
 static bdescr *
 allocNursery (bdescr *tail, nat blocks)
 {
-    bdescr *bd;
+    bdescr *bd = NULL;
     nat i, n;
 
     // We allocate the nursery as a single contiguous block and then
