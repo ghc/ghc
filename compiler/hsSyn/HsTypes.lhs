@@ -353,8 +353,16 @@ pprHsForAll exp tvs cxt
     forall_part = ptext (sLit "forall") <+> interppSP tvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
-pprHsContext []	 = empty
-pprHsContext cxt = ppr_hs_context cxt <+> ptext (sLit "=>")
+pprHsContext []	        = empty
+pprHsContext [L _ pred] 
+   | noParenHsPred pred = ppr pred <+> ptext (sLit "=>")
+pprHsContext cxt        = ppr_hs_context cxt <+> ptext (sLit "=>")
+
+noParenHsPred :: HsPred name -> Bool
+-- c.f. TypeRep.noParenPred
+noParenHsPred (HsClassP {}) = True
+noParenHsPred (HsEqualP {}) = True
+noParenHsPred (HsIParam {}) = False
 
 ppr_hs_context :: (OutputableBndr name) => HsContext name -> SDoc
 ppr_hs_context []  = empty

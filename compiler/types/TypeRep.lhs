@@ -452,9 +452,19 @@ pprTheta :: ThetaType -> SDoc
 pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
 
 pprThetaArrow :: ThetaType -> SDoc
-pprThetaArrow theta 
-  | null theta = empty
-  | otherwise  = parens (sep (punctuate comma (map pprPred theta))) <+> ptext (sLit "=>")
+pprThetaArrow []     = empty
+pprThetaArrow [pred] 
+  | noParenPred pred = pprPred pred <+> ptext (sLit "=>")
+pprThetaArrow preds  = parens (sep (punctuate comma (map pprPred preds))) <+> ptext (sLit "=>")
+
+noParenPred :: PredType -> Bool
+-- A predicate that can appear without parens before a "=>"
+--       C a => a -> a
+--       a~b => a -> b
+-- But   (?x::Int) => Int -> Int
+noParenPred (ClassP {}) = True
+noParenPred (EqPred {}) = True
+noParenPred (IParam {}) = False
 
 ------------------
 instance Outputable Type where
