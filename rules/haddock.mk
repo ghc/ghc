@@ -44,6 +44,7 @@ ifeq "$$(HSCOLOUR_SRCS)" "YES"
 endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \
+	  --no-tmp-comp-dir \
 	  --dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
 	  --html \
 	  --title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
@@ -54,6 +55,12 @@ endif
 	  $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS) \
 	  $$($1_$2_HS_SRCS) \
 	  $$($1_$2_EXTRA_HADDOCK_SRCS)
+
+# --no-tmp-comp-dir above is important: it saves a few minutes in a
+# validate.  This flag lets Haddock use the pre-compiled object files
+# for the package rather than rebuilding the modules of the package in
+# a temporary directory.  Haddock needs to build the package when it
+# uses the Template Haskell or Annotations extensions, for example.
 
 # Make the haddocking depend on the library .a file, to ensure
 # that we wait until the library is fully build before we haddock it
