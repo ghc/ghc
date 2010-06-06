@@ -7,5 +7,5 @@ clean:
 
 apirecomp001: clean
 	'$(TEST_HC)' --make -v0 -package ghc myghc.hs
-	./myghc "`'$(TEST_HC)' --print-libdir`"
+	./myghc "`'$(TEST_HC)' --print-libdir | tr -d '\r'`"
 
