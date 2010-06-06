@@ -572,7 +572,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
               case e_tcache of
                 Left ex -> do
                      when (verbosity > Normal) $
-                        putStrLn ("warning: cannot read cache file " ++ cache ++ ": " ++ show ex)
+                        warn ("warning: cannot read cache file " ++ cache ++ ": " ++ show ex)
                      ignore_cache
                 Right tcache
                   | tcache >= tdir -> do
@@ -583,8 +583,8 @@ readParseDatabase verbosity mb_user_conf use_cache path
                      return PackageDB { location = path, packages = pkgs' }
                   | otherwise -> do
                      when (verbosity >= Normal) $ do
-                        putStrLn ("WARNING: cache is out of date: " ++ cache)
-                        putStrLn "  use 'ghc-pkg recache' to fix."
+                        warn ("WARNING: cache is out of date: " ++ cache)
+                        warn "  use 'ghc-pkg recache' to fix."
                      ignore_cache
             where
                  ignore_cache = do
@@ -860,7 +860,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 
   when (not (null broken) && not simple_output && verbosity /= Silent) $ do
      prog <- getProgramName
-     putStrLn ("WARNING: there are broken packages.  Run '" ++ prog ++ " check' for more details.")
+     warn ("WARNING: there are broken packages.  Run '" ++ prog ++ " check' for more details.")
 
   if simple_output then show_simple stack else do
 
@@ -1348,7 +1348,7 @@ checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build
   | otherwise  = do
       m <- doesFileExistOnPath ghci_lib_file dirs
       when (isNothing m && ghci_lib_file /= "HSrts.o") $
-        hPutStrLn stderr ("warning: can't find GHCi lib " ++ ghci_lib_file)
+        warn ("warning: can't find GHCi lib " ++ ghci_lib_file)
  where
     ghci_lib_file = lib <.> "o"
 
@@ -1454,6 +1454,11 @@ dieWith ec s = do
 dieOrForceAll :: Force -> String -> IO ()
 dieOrForceAll ForceAll s = ignoreError s
 dieOrForceAll _other s   = dieForcible s
+
+warn :: String -> IO ()
+warn s = do
+  hFlush stdout
+  hPutStrLn stderr s
 
 ignoreError :: String -> IO ()
 ignoreError s = reportError (s ++ " (ignoring)")
