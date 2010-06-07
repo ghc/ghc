@@ -77,7 +77,6 @@ data Modules
         , dph_Instances		:: Module
         , dph_Combinators	:: Module
         , dph_Scalar		:: Module
-        , dph_Selector		:: Module
         , dph_Prelude_PArr	:: Module
         , dph_Prelude_Int	:: Module
         , dph_Prelude_Word8	:: Module
@@ -98,7 +97,6 @@ dph_Modules pkg
 	, dph_Instances      = mk (fsLit "Data.Array.Parallel.Lifted.Instances")
 	, dph_Combinators    = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
 	, dph_Scalar         = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
-	, dph_Selector       = mk (fsLit "Data.Array.Parallel.Lifted.Selector")
 
 	, dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
 	, dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
@@ -251,17 +249,17 @@ initBuiltins pkg
       voidTyCon		<- externalTyCon dph_Repr (fsLit "Void")
       wrapTyCon		<- externalTyCon dph_Repr (fsLit "Wrap")
 
-      -- From dph-common:Data.Array.Parallel.Lifted.Selector
-      sel_tys      <- mapM (externalType dph_Selector)
+      -- From dph-common:Data.Array.Parallel.Lifted.Unboxed
+      sel_tys      <- mapM (externalType dph_Unboxed)
                            (numbered "Sel" 2 mAX_DPH_SUM)
 
-      sel_replicates <- mapM (externalFun dph_Selector)
-                             (numbered "replicate" 2 mAX_DPH_SUM)
+      sel_replicates <- mapM (externalFun dph_Unboxed)
+                             (numbered_hash "replicateSel" 2 mAX_DPH_SUM)
 
-      sel_picks    <- mapM (externalFun dph_Selector)
-                           (numbered "pick" 2 mAX_DPH_SUM)
+      sel_picks    <- mapM (externalFun dph_Unboxed)
+                           (numbered_hash "pickSel" 2 mAX_DPH_SUM)
 
-      sel_tags     <- mapM (externalFun dph_Selector)
+      sel_tags     <- mapM (externalFun dph_Unboxed)
                            (numbered "tagsSel" 2 mAX_DPH_SUM)
 
       sel_els      <- mapM mk_elements
@@ -350,8 +348,8 @@ initBuiltins pkg
                dph_PArray         = dph_PArray
              , dph_Repr           = dph_Repr
              , dph_Closure        = dph_Closure
-             , dph_Selector       = dph_Selector
              , dph_Scalar         = dph_Scalar
+             , dph_Unboxed        = dph_Unboxed
              })
       = dph_Modules pkg
 
@@ -364,10 +362,13 @@ initBuiltins pkg
     numbered :: String -> Int -> Int -> [FastString]
     numbered pfx m n = [mkFastString (pfx ++ show i) | i <- [m..n]]
 
+    numbered_hash :: String -> Int -> Int -> [FastString]
+    numbered_hash pfx m n = [mkFastString (pfx ++ show i ++ "#") | i <- [m..n]]
+
     mk_elements :: (Int, Int) -> DsM ((Int, Int), CoreExpr)
     mk_elements (i,j)
       = do
-          v <- externalVar dph_Selector
+          v <- externalVar dph_Unboxed
              $ mkFastString ("elementsSel" ++ show i ++ "_" ++ show j ++ "#")
           return ((i,j), Var v)
 
