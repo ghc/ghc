@@ -42,7 +42,7 @@ import TysWiredIn      ( unitDataCon,
                          doubleTyCon,
                          boolTyCon, trueDataCon, falseDataCon,
                          parrTyConName )
-import PrelNames       ( word8TyConName, gHC_PARR )
+import PrelNames       ( word8TyConName, gHC_PARR, gHC_CLASSES )
 import BasicTypes      ( Boxity(..) )
 
 import FastString
@@ -459,6 +459,10 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     [ mk dph_Prelude_Bool  (fsLit "andP")  dph_Prelude_Bool (fsLit "andPA")
     , mk dph_Prelude_Bool  (fsLit "orP")   dph_Prelude_Bool (fsLit "orPA")
 
+    , mk gHC_CLASSES (fsLit "not")         dph_Prelude_Bool (fsLit "notV")
+    , mk gHC_CLASSES (fsLit "&&")          dph_Prelude_Bool (fsLit "andV")
+    , mk gHC_CLASSES (fsLit "||")          dph_Prelude_Bool (fsLit "orV")
+
     -- FIXME: temporary
     , mk dph_Prelude_PArr (fsLit "fromPArrayP")       dph_Prelude_PArr (fsLit "fromPArrayPA")
     , mk dph_Prelude_PArr (fsLit "toPArrayP")         dph_Prelude_PArr (fsLit "toPArrayPA")
@@ -466,6 +470,7 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk dph_Prelude_PArr (fsLit "combineP")          dph_Combinators  (fsLit "combine2PA")
     , mk dph_Prelude_PArr (fsLit "updateP")           dph_Combinators  (fsLit "updatePA")
     , mk dph_Prelude_PArr (fsLit "bpermuteP")         dph_Combinators  (fsLit "bpermutePA")
+    , mk dph_Prelude_PArr (fsLit "indexedP")          dph_Combinators  (fsLit "indexedPA")
     ]
   where
     mk  = (,,,)
