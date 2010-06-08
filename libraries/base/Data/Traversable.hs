@@ -107,6 +107,7 @@ instance Traversable Maybe where
         traverse f (Just x) = Just <$> f x
 
 instance Traversable [] where
+        {-# INLINE traverse #-} -- so that traverse can fuse
         traverse f = Prelude.foldr cons_f (pure [])
           where cons_f x ys = (:) <$> f x <*> ys
 
