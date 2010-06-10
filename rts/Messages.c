@@ -186,7 +186,9 @@ nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
 loop:
-    p = UNTAG_CLOSURE(((StgInd*)bh)->indirectee);
+    // NB. VOLATILE_LOAD(), because otherwise gcc hoists the load
+    // and turns this into an infinite loop.
+    p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
     info = p->header.info;
 
     if (info == &stg_IND_info)

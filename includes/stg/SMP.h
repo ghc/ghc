@@ -293,6 +293,12 @@ load_load_barrier(void) {
 #endif
 }
 
+// Load a pointer from a memory location that might be being modified
+// concurrently.  This prevents the compiler from optimising away
+// multiple loads of the memory location, as it might otherwise do in
+// a busy wait loop for example.
+#define VOLATILE_LOAD(p) (*((StgVolatilePtr)(p)))
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
@@ -330,6 +336,8 @@ atomic_dec(StgVolatilePtr p)
 {
     return --(*p);
 }
+
+#define VOLATILE_LOAD(p) ((StgWord)*((StgWord*)(p)))
 
 #endif /* !THREADED_RTS */
 
