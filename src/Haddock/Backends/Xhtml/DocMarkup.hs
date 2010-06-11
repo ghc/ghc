@@ -35,11 +35,11 @@ parHtmlMarkup ppId isTyCon = Markup {
   markupString        = toHtml,
   markupParagraph     = paragraph,
   markupAppend        = (+++),
-  markupIdentifier    = tt . ppId . choose,
+  markupIdentifier    = thecode . ppId . choose,
   markupModule        = \m -> let (mdl,ref) = break (=='#') m
                               in ppModule (mkModuleNoPackage mdl) ref,
   markupEmphasis      = emphasize,
-  markupMonospaced    = tt,
+  markupMonospaced    = thecode,
   markupUnorderedList = unordList,
   markupOrderedList   = ordList,
   markupDefList       = defList,
