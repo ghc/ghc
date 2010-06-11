@@ -154,13 +154,17 @@ div.table-of-contents ul {
 ul.synopsis {
 	margin-left: 0px;
 }
+
+ul.synopsis p.decl {
+	padding: 0;
+}
 ul.synopsis li {
   background-color: #f0f0f0; 
   font-family: monospace;
   vertical-align: top;
-	margin-top: 8px;
-	margin-bottom: 8px;
-	padding: 2px;
+	margin-top: 6px;
+	margin-bottom: 6px;
+	padding: 3px;
 	list-style-type: none;
 }
 
@@ -170,7 +174,7 @@ ul.synopsis li ul {
 }
 
 ul.synopsis li ul li {
-	margin: 0;
+	margin: 3px;
 	padding: 0;
 }
 
@@ -259,7 +263,8 @@ div.bottom {
   }
   
 div.bottom p {
-	margin-bottom: 0;
+	padding: 1px;
+	margin: 0;
 }
 
 div.bottom  a:link {
