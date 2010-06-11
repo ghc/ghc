@@ -175,17 +175,7 @@ ppTyFam summary associated links loc mbDoc decl unicode
 
     header_ = topDeclElem links loc docname (ppTyFamHeader summary associated decl unicode)
 
-    instId = collapseId (getName docname)
-
-    instancesBit
-      | associated || null instances = noHtml
-      | otherwise                    =
-          instHdr instId +++
-          collapsed thediv instId (
-            spacedTable1 << (
-              aboves (map (ppDocInstance unicode) instances)
-            )
-          )
+    instancesBit = ppInstances instances docname unicode
 
     -- TODO: get the instances
     instances = []
@@ -402,17 +392,22 @@ ppClassDecl summary links instances loc mbDoc subdocs
                       , let doc = lookupAnySubdoc n subdocs ]
           )
 
-    instId = collapseId (getName nm)
-    instancesBit
-      | null instances = noHtml
-      | otherwise =
-           instHdr instId +++
-           collapsed thediv instId (
-             spacedTable1 << aboves (map (ppDocInstance unicode) instances)
-           )
-
+    instancesBit = ppInstances instances nm unicode
+    
 ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
+
+
+ppInstances :: [DocInstance DocName] -> DocName -> Bool -> Html
+ppInstances instances baseName unicode
+  | null instances = noHtml
+  | otherwise =
+       instHdr instId +++
+       collapsed thediv instId (
+         spacedTable1 << aboves (map (ppDocInstance unicode) instances)
+       )
+  where
+    instId = collapseId (getName baseName)
 
 -- | Print a possibly commented instance. The instance header is printed inside
 -- an 'argBox'. The comment is printed to the right of the box in normal comment
@@ -495,16 +490,7 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
           aboves (map (ppSideBySideConstr subdocs unicode) cons)
         )
 
-    instId = collapseId (getName docname)
-
-    instancesBit
-      | null instances = noHtml
-      | otherwise 
-        = instHdr instId +++
-          collapsed thediv instId (
-            spacedTable1 << aboves (map (ppDocInstance unicode) instances
-            )
-          )
+    instancesBit = ppInstances instances docname unicode
 
 
 isRecCon :: Located (ConDecl a) -> Bool
