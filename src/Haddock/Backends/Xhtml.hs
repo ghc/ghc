@@ -745,7 +745,7 @@ processExport _ _ _ (ExportNoDecl y subs)
 processExport summary _ _ (ExportDoc doc)
   = nothingIf summary $ docToHtml doc
 processExport _ _ _ (ExportModule mdl)
-  = Just $ toHtml "module" +++ ppModule mdl ""
+  = Just $ toHtml "module" <+> ppModule mdl ""
 
 nothingIf :: Bool -> a -> Maybe a
 nothingIf True _ = Nothing
