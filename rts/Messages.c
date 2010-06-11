@@ -161,7 +161,7 @@ nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
     const StgInfoTable *info;
     StgClosure *p;
     StgBlockingQueue *bq;
-    StgClosure *bh = msg->bh;
+    StgClosure *bh = UNTAG_CLOSURE(msg->bh);
     StgTSO *owner;
 
     debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on blackhole %p", 
