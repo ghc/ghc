@@ -11,10 +11,10 @@ module DriverPhases (
    HscSource(..), isHsBoot, hscSourceString,
    Phase(..),
    happensBefore, eqPhase, anyHsc, isStopLn,
-   startPhase,		-- :: String -> Phase
-   phaseInputExt, 	-- :: Phase -> String
+   startPhase,          -- :: String -> Phase
+   phaseInputExt,       -- :: Phase -> String
 
-   isHaskellishSuffix, 
+   isHaskellishSuffix,
    isHaskellSrcSuffix,
    isObjectSuffix,
    isCishSuffix,
@@ -23,7 +23,7 @@ module DriverPhases (
    isHaskellUserSrcSuffix,
    isSourceSuffix,
 
-   isHaskellishFilename, 
+   isHaskellishFilename,
    isHaskellSrcFilename,
    isObjectFilename,
    isCishFilename,
@@ -35,7 +35,7 @@ module DriverPhases (
 
 #include "HsVersions.h"
 
-import Panic		( panic )
+import Panic            ( panic )
 import System.FilePath
 
 -----------------------------------------------------------------------------
@@ -44,7 +44,7 @@ import System.FilePath
 {-
    Phase of the           | Suffix saying | Flag saying   | (suffix of)
    compilation system     | ``start here''| ``stop after''| output file
-   
+
    literate pre-processor | .lhs          | -             | -
    C pre-processor (opt.) | -             | -E            | -
    Haskell compiler       | .hs           | -C, -S        | .hc, .s
@@ -56,7 +56,7 @@ import System.FilePath
 data HscSource
    = HsSrcFile | HsBootFile | ExtCoreFile
      deriving( Eq, Ord, Show )
-	-- Ord needed for the finite maps we build in CompManager
+        -- Ord needed for the finite maps we build in CompManager
 
 
 hscSourceString :: HscSource -> String
@@ -68,24 +68,24 @@ isHsBoot :: HscSource -> Bool
 isHsBoot HsBootFile = True
 isHsBoot _          = False
 
-data Phase 
-	= Unlit HscSource
-	| Cpp   HscSource
-	| HsPp  HscSource
-	| Hsc   HscSource
+data Phase
+        = Unlit HscSource
+        | Cpp   HscSource
+        | HsPp  HscSource
+        | Hsc   HscSource
         | Ccpp
-	| Cc
-	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
-	| Mangle	-- assembly mangling, now done by a separate script.
-	| SplitMangle	-- after mangler if splitting
-	| SplitAs
-	| As
-	| CmmCpp	-- pre-process Cmm source
-	| Cmm		-- parse & compile Cmm code
+        | Cc
+        | HCc           -- Haskellised C (as opposed to vanilla C) compilation
+        | Mangle        -- assembly mangling, now done by a separate script.
+        | SplitMangle   -- after mangler if splitting
+        | SplitAs
+        | As
+        | CmmCpp        -- pre-process Cmm source
+        | Cmm           -- parse & compile Cmm code
 
-	-- The final phase is a pseudo-phase that tells the pipeline to stop.
-	-- There is no runPhase case for it.
-	| StopLn	-- Stop, but linking will follow, so generate .o file
+        -- The final phase is a pseudo-phase that tells the pipeline to stop.
+        -- There is no runPhase case for it.
+        | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
 
 anyHsc :: Phase
@@ -98,47 +98,47 @@ isStopLn _      = False
 eqPhase :: Phase -> Phase -> Bool
 -- Equality of constructors, ignoring the HscSource field
 -- NB: the HscSource field can be 'bot'; see anyHsc above
-eqPhase (Unlit _)   (Unlit _) 	= True
-eqPhase (Cpp   _)   (Cpp   _) 	= True
-eqPhase (HsPp  _)   (HsPp  _) 	= True
-eqPhase (Hsc   _)   (Hsc   _) 	= True
-eqPhase Ccpp	    Ccpp        = True
-eqPhase Cc	    Cc	        = True
-eqPhase HCc	    HCc		= True
-eqPhase Mangle	    Mangle    	= True
+eqPhase (Unlit _)   (Unlit _)   = True
+eqPhase (Cpp   _)   (Cpp   _)   = True
+eqPhase (HsPp  _)   (HsPp  _)   = True
+eqPhase (Hsc   _)   (Hsc   _)   = True
+eqPhase Ccpp        Ccpp        = True
+eqPhase Cc          Cc          = True
+eqPhase HCc         HCc         = True
+eqPhase Mangle      Mangle      = True
 eqPhase SplitMangle SplitMangle = True
-eqPhase SplitAs	    SplitAs 	= True
-eqPhase As	    As 		= True
-eqPhase CmmCpp	    CmmCpp 	= True
-eqPhase Cmm	    Cmm 	= True
-eqPhase StopLn	    StopLn	= True
-eqPhase _	    _		= False
+eqPhase SplitAs     SplitAs     = True
+eqPhase As          As          = True
+eqPhase CmmCpp      CmmCpp      = True
+eqPhase Cmm         Cmm         = True
+eqPhase StopLn      StopLn      = True
+eqPhase _           _           = False
 
--- Partial ordering on phases: we want to know which phases will occur before 
+-- Partial ordering on phases: we want to know which phases will occur before
 -- which others.  This is used for sanity checking, to ensure that the
 -- pipeline will stop at some point (see DriverPipeline.runPipeline).
 happensBefore :: Phase -> Phase -> Bool
 StopLn `happensBefore` _ = False
 x      `happensBefore` y = after_x `eqPhase` y || after_x `happensBefore` y
-	where
-	  after_x = nextPhase x
+        where
+          after_x = nextPhase x
 
 nextPhase :: Phase -> Phase
 -- A conservative approximation the next phase, used in happensBefore
-nextPhase (Unlit sf)	= Cpp  sf
-nextPhase (Cpp   sf)	= HsPp sf
-nextPhase (HsPp  sf)	= Hsc  sf
-nextPhase (Hsc   _)	= HCc
-nextPhase HCc		= Mangle
-nextPhase Mangle	= SplitMangle
-nextPhase SplitMangle	= As
-nextPhase As		= SplitAs
-nextPhase SplitAs	= StopLn
-nextPhase Ccpp		= As
-nextPhase Cc		= As
-nextPhase CmmCpp	= Cmm
-nextPhase Cmm		= HCc
-nextPhase StopLn	= panic "nextPhase: nothing after StopLn"
+nextPhase (Unlit sf)    = Cpp  sf
+nextPhase (Cpp   sf)    = HsPp sf
+nextPhase (HsPp  sf)    = Hsc  sf
+nextPhase (Hsc   _)     = HCc
+nextPhase HCc           = Mangle
+nextPhase Mangle        = SplitMangle
+nextPhase SplitMangle   = As
+nextPhase As            = SplitAs
+nextPhase SplitAs       = StopLn
+nextPhase Ccpp          = As
+nextPhase Cc            = As
+nextPhase CmmCpp        = Cmm
+nextPhase Cmm           = HCc
+nextPhase StopLn        = panic "nextPhase: nothing after StopLn"
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.
@@ -163,7 +163,7 @@ startPhase "S"        = As
 startPhase "o"        = StopLn
 startPhase "cmm"      = CmmCpp
 startPhase "cmmcpp"   = Cmm
-startPhase _          = StopLn	   -- all unknown file types
+startPhase _          = StopLn     -- all unknown file types
 
 -- This is used to determine the extension for the output from the
 -- current phase (if it generates a new file).  The extension depends
@@ -172,22 +172,22 @@ phaseInputExt :: Phase -> String
 phaseInputExt (Unlit HsSrcFile)   = "lhs"
 phaseInputExt (Unlit HsBootFile)  = "lhs-boot"
 phaseInputExt (Unlit ExtCoreFile) = "lhcr"
-phaseInputExt (Cpp   _)  	  = "lpp"	-- intermediate only
-phaseInputExt (HsPp  _)		  = "hscpp"	-- intermediate only
-phaseInputExt (Hsc   _)  	  = "hspp"	-- intermediate only
-	-- NB: as things stand, phaseInputExt (Hsc x) must not evaluate x
-	--     because runPipeline uses the StopBefore phase to pick the
-	--     output filename.  That could be fixed, but watch out.
-phaseInputExt HCc         	  = "hc"  
-phaseInputExt Ccpp          	  = "cpp"
-phaseInputExt Cc          	  = "c"
-phaseInputExt Mangle      	  = "raw_s"
-phaseInputExt SplitMangle 	  = "split_s"	-- not really generated
-phaseInputExt As          	  = "s"
-phaseInputExt SplitAs     	  = "split_s"   -- not really generated
-phaseInputExt CmmCpp	  	  = "cmm"
-phaseInputExt Cmm	  	  = "cmmcpp"
-phaseInputExt StopLn          	  = "o"
+phaseInputExt (Cpp   _)           = "lpp"       -- intermediate only
+phaseInputExt (HsPp  _)           = "hscpp"     -- intermediate only
+phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
+        -- NB: as things stand, phaseInputExt (Hsc x) must not evaluate x
+        --     because runPipeline uses the StopBefore phase to pick the
+        --     output filename.  That could be fixed, but watch out.
+phaseInputExt HCc                 = "hc"
+phaseInputExt Ccpp                = "cpp"
+phaseInputExt Cc                  = "c"
+phaseInputExt Mangle              = "raw_s"
+phaseInputExt SplitMangle         = "split_s"   -- not really generated
+phaseInputExt As                  = "s"
+phaseInputExt SplitAs             = "split_s"   -- not really generated
+phaseInputExt CmmCpp              = "cmm"
+phaseInputExt Cmm                 = "cmmcpp"
+phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
     extcoreish_suffixes, haskellish_user_src_suffixes
