@@ -11,5 +11,10 @@ main = do doit ""
 
 doit :: FilePath -> IO ()
 doit fp = do fp' <- canonicalizePath fp
-             print (fp, fp')
+             print (fp, mangle fp')
     `catch` \e -> putStrLn ("Exception: " ++ show (e :: IOException))
+  where -- On Windows, "/no/such/file" -> "C:\\no\\such\\file", so
+        -- we remove the drive letter so as to get consistent output
+        mangle (_ : ':' : xs) = "drive:" ++ xs
+        mangle xs = xs
+

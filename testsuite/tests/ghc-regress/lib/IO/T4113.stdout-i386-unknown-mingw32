@@ -1,0 +1,2 @@
+Exception: getFullPathName: invalid argument (The operation completed successfully.)
+("/no/such/file","drive:\\no\\such\\file")
