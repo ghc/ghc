@@ -1066,8 +1066,16 @@ instance OutputableBndr id => Outputable (HsSplice id) where
 
 pprSplice :: OutputableBndr id => HsSplice id -> SDoc
 pprSplice (HsSplice n e)
-    = char '$' <> ifPprDebug (brackets (ppr n)) <> pprParendExpr e
-
+    = char '$' <> ifPprDebug (brackets (ppr n)) <> eDoc
+    where
+          -- We use pprLExpr to match pprParendExpr:
+          --     Using pprLExpr makes sure that we go 'deeper'
+          --     I think that is usually (always?) right
+          pp_as_was = pprLExpr e
+          eDoc = case unLoc e of
+                 HsPar _ -> pp_as_was
+                 HsVar _ -> pp_as_was
+                 _ -> parens pp_as_was
 
 data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | PatBr (LPat id)      -- [p| pat   |]
