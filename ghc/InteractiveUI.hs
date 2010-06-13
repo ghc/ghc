@@ -385,6 +385,10 @@ runGHCi paths maybe_exprs = do
       Right home -> return (Just (home </> ".ghci"))
       _ -> return Nothing
 
+   canonicalizePath' :: FilePath -> IO (Maybe FilePath)
+   canonicalizePath' fp = liftM Just (canonicalizePath fp)
+                `catchIO` \_ -> return Nothing
+
    sourceConfigFile :: FilePath -> GHCi ()
    sourceConfigFile file = do
      exists <- io $ doesFileExist file
@@ -404,9 +408,9 @@ runGHCi paths maybe_exprs = do
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
 
   when (read_dot_files) $ do
-    cfgs0 <- sequence [ current_dir, app_user_dir, home_dir ]
-    cfgs <- io $ mapM canonicalizePath (catMaybes cfgs0)
-    mapM_ sourceConfigFile (nub cfgs)
+    mcfgs0 <- sequence [ current_dir, app_user_dir, home_dir ]
+    mcfgs <- io $ mapM canonicalizePath' (catMaybes mcfgs0)
+    mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
         -- nub, because we don't want to read .ghci twice if the
         -- CWD is $HOME.
 
