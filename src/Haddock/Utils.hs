@@ -74,9 +74,6 @@ import Distribution.ReadE
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
-#else /* Must be Win32 */
-import Foreign
-import Foreign.C.String
 #endif
 
 import MonadUtils ( MonadIO(..) )
