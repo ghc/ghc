@@ -608,10 +608,11 @@ rnMethodBinds :: Name			-- Class name
 	      -> RnM (LHsBinds Name, FreeVars)
 
 rnMethodBinds cls sig_fn gen_tyvars binds
-  = foldM do_one (emptyBag,emptyFVs) (bagToList binds)
-  where do_one (binds,fvs) bind = do
-	   (bind', fvs_bind) <- rnMethodBind cls sig_fn gen_tyvars bind
-	   return (bind' `unionBags` binds, fvs_bind `plusFV` fvs)
+  = foldlM do_one (emptyBag,emptyFVs) (bagToList binds)
+  where 
+    do_one (binds,fvs) bind 
+       = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn gen_tyvars bind
+	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
 
 rnMethodBind :: Name
 	      -> (Name -> [Name])
