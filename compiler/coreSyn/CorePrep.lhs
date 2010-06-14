@@ -17,6 +17,7 @@ import CoreArity
 import CoreFVs
 import CoreMonad	( endPass, CoreToDo(..) )
 import CoreSyn
+import CoreSubst
 import Type
 import Coercion
 import TyCon
@@ -38,6 +39,7 @@ import Util
 import Outputable
 import MonadUtils
 import FastString
+import Data.List	( mapAccumL )
 import Control.Monad
 \end{code}
 
@@ -195,24 +197,38 @@ And then x will actually end up case-bound
 
 Note [CafInfo and floating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What happens to the CafInfo on the floated bindings?  By default, all
-the CafInfos will be set to MayHaveCafRefs, which is safe.
+What happense when we try to float bindings to the top level.  At this
+point all the CafInfo is supposed to be correct, and we must make certain
+that is true of the new top-level bindings.  There are two cases
+to consider
 
-This might be pessimistic, because the floated binding might not refer
-to any CAFs and the GC will end up doing more traversal than is
-necessary, but it's still better than not floating the bindings at
-all, because then the GC would have to traverse the structure in the
-heap instead.  Given this, we decided not to try to get the CafInfo on
-the floated bindings correct, because it looks difficult.
+a) The top-level binding is marked asCafRefs.  In that case we are
+   basically fine.  The floated bindings had better all be lazy lets,
+   so they can float to top level, but they'll all have HasCafRefs
+   (the default) which is safe.
 
-But that means we can't float anything out of a NoCafRefs binding.
-Consider       f = g (h x)
-If f is NoCafRefs, we don't want to convert to
-     	       sat = h x
-               f = g sat
-where sat conservatively says HasCafRefs, because now f's info
-is wrong.  I don't think this is common, so we simply switch off
-floating in this case.
+b) The top-level binding is marked NoCafRefs.  This really happens
+   Example.  CoreTidy produces
+      $fApplicativeSTM [NoCafRefs] = D:Alternative retry# ...blah...
+   Now CorePrep has to eta-expand to
+      $fApplicativeSTM = let sat = \xy. retry x y
+                         in D:Alternative sat ...blah...
+   So what we *want* is
+      sat [NoCafRefs] = \xy. retry x y
+      $fApplicativeSTM [NoCafRefs] = D:Alternative sat ...blah...
+   
+   So, gruesomely, we must set the NoCafRefs flag on the sat bindings,
+   *and* substutite the modified 'sat' into the old RHS.  
+
+   It should be the case that 'sat' is itself [NoCafRefs] (a value, no
+   cafs) else the original top-level binding would not itself have been
+   marked [NoCafRefs].  The DEBUG check in CoreToStg for
+   consistentCafInfo will find this.
+
+This is all very gruesome and horrible. It would be better to figure
+out CafInfo later, after CorePrep.  We'll do that in due course. 
+Meanwhile this horrible hack works.
+
 
 Note [Data constructor workers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -290,14 +306,7 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 		        ; let float = mkFloat False False v rhs1
 		        ; return (addFloat floats1 float, cpeEtaExpand arity (Var v)) })
 
-       ; (floats3, rhs')
-       	    <- if want_float floats2 rhs2 
-       	       then return (floats2, rhs2)
-       	       else -- Non-empty floats will wrap rhs1
-                    -- But: rhs1 might have lambdas, and we can't
-		    --      put them inside a wrapBinds
-	       do { body2 <- rhsToBodyNF rhs2
-  	          ; return (emptyFloats, wrapBinds floats2 body2) } 
+       ; (floats3, rhs') <- float_from_rhs floats2 rhs2
 
 	     	-- Record if the binder is evaluated
        ; let bndr' | exprIsHNF rhs' = bndr `setIdUnfolding` evaldUnfolding
@@ -306,9 +315,39 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
        ; return (floats3, bndr', rhs') }
   where
     arity = idArity bndr	-- We must match this arity
-    want_float floats rhs 
-     | isTopLevel top_lvl = wantFloatTop bndr floats
-     | otherwise          = wantFloatNested is_rec is_strict_or_unlifted floats rhs
+
+    ---------------------
+    float_from_rhs floats2 rhs2
+      | isEmptyFloats floats2 = return (emptyFloats, rhs2)
+      | isTopLevel top_lvl    = float_top    floats2 rhs2
+      | otherwise             = float_nested floats2 rhs2
+
+    ---------------------
+    float_nested floats2 rhs2
+      | wantFloatNested is_rec is_strict_or_unlifted floats2 rhs2
+                  = return (floats2, rhs2)
+      | otherwise = dont_float floats2 rhs2
+
+    ---------------------
+    float_top floats2 rhs2	-- Urhgh!  See Note [CafInfo and floating]
+      | mayHaveCafRefs (idCafInfo bndr)
+      = if allLazyTop floats2
+        then return (floats2, rhs2)
+        else dont_float floats2 rhs2
+
+      | otherwise
+      = case canFloatFromNoCaf floats2 rhs2 of
+          Just (floats2', rhs2') -> return (floats2', rhs2')
+          Nothing -> pprPanic "cpePair" (ppr bndr $$ ppr rhs2 $$ ppr floats2)
+
+    ---------------------
+    dont_float floats2 rhs2
+      -- Non-empty floats, but do not want to float from rhs
+      -- So wrap the rhs in the floats
+      -- But: rhs1 might have lambdas, and we can't
+      --      put them inside a wrapBinds
+      = do { body2 <- rhsToBodyNF rhs2
+  	   ; return (emptyFloats, wrapBinds floats2 body2) } 
 
 {- Note [Silly extra arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -761,18 +800,37 @@ type RhsDemand = Bool  -- True => used strictly; hence not top-level, non-recurs
 
 \begin{code}
 data FloatingBind 
-  = FloatLet CoreBind	        -- Rhs of bindings are CpeRhss
-  | FloatCase Id CpeBody Bool   -- The bool indicates "ok-for-speculation"
+  = FloatLet CoreBind	 -- Rhs of bindings are CpeRhss
+    	     		 -- They are always of lifted type;
+ 			 -- unlifted ones are done with FloatCase
+ 
+ | FloatCase 
+      Id CpeBody 
+      Bool		-- The bool indicates "ok-for-speculation"
 
 data Floats = Floats OkToSpec (OrdList FloatingBind)
 
+instance Outputable FloatingBind where
+  ppr (FloatLet b) = ppr b
+  ppr (FloatCase b r ok) = brackets (ppr ok) <+> ppr b <+> equals <+> ppr r
+
+instance Outputable Floats where
+  ppr (Floats flag fs) = ptext (sLit "Floats") <> brackets (ppr flag) <+>
+                         braces (vcat (map ppr (fromOL fs)))
+
+instance Outputable OkToSpec where
+  ppr OkToSpec    = ptext (sLit "OkToSpec")
+  ppr IfUnboxedOk = ptext (sLit "IfUnboxedOk")
+  ppr NotOkToSpec = ptext (sLit "NotOkToSpec")
+ 
 -- Can we float these binds out of the rhs of a let?  We cache this decision
 -- to avoid having to recompute it in a non-linear way when there are
 -- deeply nested lets.
 data OkToSpec
-   = NotOkToSpec 	-- definitely not
-   | OkToSpec		-- yes
-   | IfUnboxedOk	-- only if floating an unboxed binding is ok
+   = OkToSpec		-- Lazy bindings of lifted type
+   | IfUnboxedOk	-- A mixture of lazy lifted bindings and n
+     			-- ok-to-speculate unlifted bindings
+   | NotOkToSpec 	-- Some not-ok-to-speculate unlifted bindings
 
 mkFloat :: Bool -> Bool -> Id -> CpeRhs -> FloatingBind
 mkFloat is_strict is_unlifted bndr rhs
@@ -827,10 +885,6 @@ combine IfUnboxedOk _ = IfUnboxedOk
 combine _ IfUnboxedOk = IfUnboxedOk
 combine _ _           = OkToSpec
     
-instance Outputable FloatingBind where
-  ppr (FloatLet bind)        = text "FloatLet" <+> ppr bind
-  ppr (FloatCase b rhs spec) = text "FloatCase" <+> ppr b <+> ppr spec <+> equals <+> ppr rhs
-
 deFloatTop :: Floats -> [CoreBind]
 -- For top level only; we don't expect any FloatCases
 deFloatTop (Floats _ floats)
@@ -840,11 +894,37 @@ deFloatTop (Floats _ floats)
     get b            _  = pprPanic "corePrepPgm" (ppr b)
 
 -------------------------------------------
-wantFloatTop :: Id -> Floats -> Bool
+canFloatFromNoCaf ::  Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
        -- Note [CafInfo and floating]
-wantFloatTop bndr floats = isEmptyFloats floats
-	     	  	 || (mayHaveCafRefs (idCafInfo bndr)
-      			     && allLazyTop floats)
+canFloatFromNoCaf (Floats ok_to_spec fs) rhs
+  | OkToSpec <- ok_to_spec 
+  = Just (Floats OkToSpec (toOL fs'), subst_expr subst rhs)
+  | otherwise              
+  = Nothing
+  where
+    (subst, fs') = mapAccumL set_nocaf emptySubst (fromOL fs)
+
+    subst_expr = substExpr (text "CorePrep")
+
+    set_nocaf _ (FloatCase {}) 
+      = panic "canFloatFromNoCaf"
+
+    set_nocaf subst (FloatLet (NonRec b r)) 
+      = (subst', FloatLet (NonRec b' (subst_expr subst r)))
+      where
+        (subst', b') = set_nocaf_bndr subst b
+
+    set_nocaf subst (FloatLet (Rec prs))
+      = (subst', FloatLet (Rec (bs' `zip` rs')))
+      where
+        (bs,rs) = unzip prs
+        (subst', bs') = mapAccumL set_nocaf_bndr subst bs
+        rs' = map (subst_expr subst') rs
+
+    set_nocaf_bndr subst bndr 
+      = (extendIdSubst subst bndr (Var bndr'), bndr')
+      where
+        bndr' = bndr `setIdCafInfo` NoCafRefs
 
 wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec strict_or_unlifted floats rhs
