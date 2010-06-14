@@ -1174,8 +1174,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 
              ; addErrCtxtM (unifyForAllCtxt tvs phi1 phi2) $ do
              { unless (equalLength theta1 theta2) (bale_out outer)
-             ; _cois <- uPreds outer nb1 theta1 nb2 theta2 -- TOMDO: do something with these pred_cois
-             ; traceTc (text "TOMDO!")
+             ; cois <- uPreds outer nb1 theta1 nb2 theta2
              ; coi <- uTys nb1 tau1 nb2 tau2
 
                 -- Check for escape; e.g. (forall a. a->b) ~ (forall a. a->a)
@@ -1190,7 +1189,13 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
                 -- This check comes last, because the error message is
                 -- extremely unhelpful.
              ; when (nb1 && nb2) (notMonoType ty1)
-             ; return coi
+             ; let mk_fun (pred, coi_pred) (ty, coi) 
+                       = (mkFunTy pred_ty ty, mkFunTyCoI pred_ty coi_pred ty coi)
+                       where
+                         pred_ty = mkPredTy pred
+             ; return (foldr mkForAllTyCoI 
+                             (snd (foldr mk_fun (tau1,coi) (theta1 `zip` cois)))
+                             tvs)
              }}
       where
         (tvs1, body1) = tcSplitForAllTys ty1
