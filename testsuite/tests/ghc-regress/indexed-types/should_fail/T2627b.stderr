@@ -2,7 +2,6 @@
 T2627b.hs:20:14:
     Couldn't match expected type `a'
            against inferred type `Dual (Dual a)'
-      NB: `Dual' is a type function, and may not be injective
     In the pattern: Wr a r
     In the definition of `conn':
         conn (Rd k) (Wr a r) = conn undefined undefined

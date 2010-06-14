@@ -1,7 +1,6 @@
 
 SimpleFail16.hs:10:12:
     Couldn't match expected type `p a' against inferred type `F ()'
-      NB: `F' is a type function, and may not be injective
     In the first argument of `foo', namely `(undefined :: F ())'
     In the expression: foo (undefined :: F ())
     In the definition of `bar': bar = foo (undefined :: F ())
