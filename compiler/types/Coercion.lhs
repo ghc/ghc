@@ -638,7 +638,7 @@ mkAppTyCoI ty1 coi1 ty2 coi2 =
 mkFunTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
 mkFunTyCoI _   IdCo _   IdCo = IdCo
 mkFunTyCoI ty1 coi1 ty2 coi2 =
-	ACo $ FunTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
+	ACo $ mkFunTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
 
 -- | Smart constructor for quantified 'Coercion's on 'CoercionI', see also 'mkForAllCoercion'
 mkForAllTyCoI :: TyVar -> CoercionI -> CoercionI
