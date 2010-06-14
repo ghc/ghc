@@ -818,10 +818,8 @@ let {(x -> y) = e1 ;
      (y -> x) = e2 } in x
 </programlisting>
 
-(We may lift this
-restriction in the future; the only cost is that type checking patterns
-would get a little more complicated.)  
-
+(For some amplification on this design choice see 
+<ulink url="http://hackage.haskell.org/trac/ghc/ticket/4061">Trac #4061</ulink>.)
 
 </para>
 </listitem>
