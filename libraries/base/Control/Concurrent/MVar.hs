@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent.MVar
@@ -45,7 +46,12 @@ import GHC.MVar ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
                 )
 #endif
 
+#ifdef __GLASGOW_HASKELL__
+import GHC.Base
+#else
 import Prelude
+#endif
+
 import Control.Exception.Base
 
 {-|
