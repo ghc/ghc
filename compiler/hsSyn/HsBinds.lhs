@@ -66,11 +66,11 @@ data HsLocalBindsLR idL idR	-- Bindings in a 'let' expression
 type HsValBinds id = HsValBindsLR id id
 
 data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
-  = ValBindsIn             -- Before typechecking
+  = ValBindsIn             -- Before renaming
 	(LHsBindsLR idL idR) [LSig idR]	-- Not dependency analysed
 					-- Recursive by default
 
-  | ValBindsOut		       -- After renaming
+  | ValBindsOut		   -- After renaming
 	[(RecFlag, LHsBinds idL)]	-- Dependency analysed, later bindings 
                                         -- in the list may depend on earlier
                                         -- ones.

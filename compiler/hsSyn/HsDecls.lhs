@@ -221,16 +221,25 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
 		   hs_ruleds = rule_decls })
-	= vcat [ppr_ds fix_decls, ppr_ds default_decls, 
-		ppr_ds deprec_decls, ppr_ds ann_decls,
-		ppr_ds rule_decls,
-		ppr val_decls,
-		ppr_ds tycl_decls, ppr_ds inst_decls,
-                ppr_ds deriv_decls,
-		ppr_ds foreign_decls]
+	= vcat_mb empty 
+            [ppr_ds fix_decls, ppr_ds default_decls, 
+	     ppr_ds deprec_decls, ppr_ds ann_decls,
+	     ppr_ds rule_decls,
+	     if isEmptyValBinds val_decls 
+                then Nothing 
+                else Just (ppr val_decls),
+	     ppr_ds tycl_decls, ppr_ds inst_decls,
+             ppr_ds deriv_decls,
+	     ppr_ds foreign_decls]
 	where
-	  ppr_ds [] = empty
-	  ppr_ds ds = blankLine $$ vcat (map ppr ds)
+	  ppr_ds [] = Nothing
+	  ppr_ds ds = Just (vcat (map ppr ds))
+
+          vcat_mb :: SDoc -> [Maybe SDoc] -> SDoc
+	  -- Concatenate vertically with white-space between non-blanks
+          vcat_mb _    []             = empty
+          vcat_mb gap (Nothing : ds) = vcat_mb gap ds
+          vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
 data SpliceDecl id 
   = SpliceDecl			-- Top level splice
