@@ -449,19 +449,17 @@ is translated to
 The idea is to extract the commands from the case, build a balanced tree
 of choices, and replace the commands with expressions that build tagged
 tuples, obtaining a case expression that can be desugared normally.
-To build all this, we use quadruples decribing segments of the list of
+To build all this, we use triples describing segments of the list of
 case bodies, containing the following fields:
-1. an IdSet containing the environment variables free in the case bodies
-2. a list of expressions of the form (Left|Right)* ((xs)*ts), to be put
+ * a list of expressions of the form (Left|Right)* ((xs)*ts), to be put
    into the case replacing the commands
-3. a sum type that is the common type of these expressions, and also the
+ * a sum type that is the common type of these expressions, and also the
    input type of the arrow
-4. a CoreExpr for an arrow built by combining the translated command
+ * a CoreExpr for an arrow built by combining the translated command
    bodies with |||.
 
 \begin{code}
 dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_ty)) = do
-    core_exp <- dsLExpr exp
     stack_ids <- mapM newSysLocalDs stack
 
     -- Extract and desugar the leaf commands in the case, building tuple
@@ -470,10 +468,9 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
     let
         leaves = concatMap leavesMatch matches
         make_branch (leaf, bound_vars) = do
-            (core_leaf, fvs, leaf_ids) <-
+            (core_leaf, _fvs, leaf_ids) <-
                   dsfixCmd ids (local_vars `unionVarSet` bound_vars) stack res_ty leaf
-            return (fvs `minusVarSet` bound_vars,
-                    [mkHsEnvStackExpr leaf_ids stack_ids],
+            return ([mkHsEnvStackExpr leaf_ids stack_ids],
                     envStackType leaf_ids stack,
                     core_leaf)
     
@@ -490,22 +487,19 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
         -- Prefix each tuple with a distinct series of Left's and Right's,
         -- in a balanced way, keeping track of the types.
 
-        merge_branches (fvs1, builds1, in_ty1, core_exp1)
-                       (fvs2, builds2, in_ty2, core_exp2) 
-          = (fvs1 `unionVarSet` fvs2,
-             map (left_expr in_ty1 in_ty2) builds1 ++
+        merge_branches (builds1, in_ty1, core_exp1)
+                       (builds2, in_ty2, core_exp2)
+          = (map (left_expr in_ty1 in_ty2) builds1 ++
                 map (right_expr in_ty1 in_ty2) builds2,
              mkTyConApp either_con [in_ty1, in_ty2],
              do_choice ids in_ty1 in_ty2 res_ty core_exp1 core_exp2)
-        (fvs_alts, leaves', sum_ty, core_choices)
-          = foldb merge_branches branches
+        (leaves', sum_ty, core_choices) = foldb merge_branches branches
 
         -- Replace the commands in the case with these tagged tuples,
         -- yielding a HsExpr Id we can feed to dsExpr.
 
         (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
         in_ty = envStackType env_ids stack
-        fvs_exp = exprFreeVars core_exp `intersectVarSet` local_vars
 
         pat_ty    = funArgTy match_ty
         match_ty' = mkFunTy pat_ty sum_ty
@@ -515,7 +509,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
     core_body <- dsExpr (HsCase exp (MatchGroup matches' match_ty'))
     core_matches <- matchEnvStack env_ids stack_ids core_body
     return (do_map_arrow ids in_ty sum_ty res_ty core_matches core_choices,
-            fvs_exp `unionVarSet` fvs_alts)
+            exprFreeVars core_body `intersectVarSet` local_vars)
 
 --	A | ys |- c :: [ts] t
 --	----------------------------------
