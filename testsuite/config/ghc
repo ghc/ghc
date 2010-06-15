@@ -60,9 +60,9 @@ config.in_tree_compiler = in_tree_compiler
 
 config.way_flags = {
 	'normal'     : [],
-	'optc'       : ['-O -fvia-C'],
+	'optc'       : ['-O -fno-warn-deprecated-flags -fvia-C'],
 	'optasm'     : ['-O -fasm'],
-	'profc'      : ['-O -prof -auto-all -fvia-C'],
+	'profc'      : ['-O -prof -auto-all -fno-warn-deprecated-flags -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
 	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
 	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
