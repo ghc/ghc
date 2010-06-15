@@ -80,6 +80,9 @@ data Phase
         | SplitMangle   -- after mangler if splitting
         | SplitAs
         | As
+	| LlvmAs	-- LLVM assembly to bitcode file
+	| LlvmOpt	-- Run LLVM opt tool over llvm assembly
+	| LlvmLlc	-- LLVM bitcode to native assembly
         | CmmCpp        -- pre-process Cmm source
         | Cmm           -- parse & compile Cmm code
 
@@ -109,6 +112,9 @@ eqPhase Mangle      Mangle      = True
 eqPhase SplitMangle SplitMangle = True
 eqPhase SplitAs     SplitAs     = True
 eqPhase As          As          = True
+eqPhase LlvmAs	    LlvmAs 	= True
+eqPhase LlvmOpt	    LlvmOpt 	= True
+eqPhase LlvmLlc	    LlvmLlc 	= True
 eqPhase CmmCpp      CmmCpp      = True
 eqPhase Cmm         Cmm         = True
 eqPhase StopLn      StopLn      = True
@@ -133,6 +139,9 @@ nextPhase HCc           = Mangle
 nextPhase Mangle        = SplitMangle
 nextPhase SplitMangle   = As
 nextPhase As            = SplitAs
+nextPhase LlvmAs	= LlvmOpt
+nextPhase LlvmOpt	= LlvmLlc
+nextPhase LlvmLlc	= As
 nextPhase SplitAs       = StopLn
 nextPhase Ccpp          = As
 nextPhase Cc            = As
@@ -160,6 +169,9 @@ startPhase "raw_s"    = Mangle
 startPhase "split_s"  = SplitMangle
 startPhase "s"        = As
 startPhase "S"        = As
+startPhase "ll"       = LlvmAs
+startPhase "bc"       = LlvmOpt
+startPhase "opt_bc"   = LlvmLlc
 startPhase "o"        = StopLn
 startPhase "cmm"      = CmmCpp
 startPhase "cmmcpp"   = Cmm
@@ -184,6 +196,9 @@ phaseInputExt Cc                  = "c"
 phaseInputExt Mangle              = "raw_s"
 phaseInputExt SplitMangle         = "split_s"   -- not really generated
 phaseInputExt As                  = "s"
+phaseInputExt LlvmAs     	  = "ll"
+phaseInputExt LlvmOpt     	  = "bc"
+phaseInputExt LlvmLlc    	  = "opt_bc"
 phaseInputExt SplitAs             = "split_s"   -- not really generated
 phaseInputExt CmmCpp              = "cmm"
 phaseInputExt Cmm                 = "cmmcpp"
@@ -195,7 +210,7 @@ haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
                                [ "hspp", "hscpp", "hcr", "cmm" ]
 haskellish_suffixes          = haskellish_src_suffixes ++ ["hc", "raw_s"]
-cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S" ]
+cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "opt_bc" ]
 extcoreish_suffixes          = [ "hcr" ]
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]

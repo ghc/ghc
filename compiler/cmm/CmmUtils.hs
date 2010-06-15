@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module CmmUtils( 
+module CmmUtils(
 	CmmStmts, noStmts, oneStmt, mkStmts, plusStmts, stmtList,
 	isNopStmt,
 

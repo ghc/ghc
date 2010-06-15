@@ -605,6 +605,7 @@ getOutputFilename stop_phase output basename
                 keep_hc    = dopt Opt_KeepHcFiles dflags
                 keep_raw_s = dopt Opt_KeepRawSFiles dflags
                 keep_s     = dopt Opt_KeepSFiles dflags
+		keep_bc    = dopt Opt_KeepLlvmFiles dflags
 
                 myPhaseInputExt HCc    = hcsuf
                 myPhaseInputExt StopLn = osuf
@@ -615,11 +616,13 @@ getOutputFilename stop_phase output basename
                 -- sometimes, we keep output from intermediate stages
                 keep_this_output =
                      case next_phase of
-                             StopLn              -> True
-                             Mangle | keep_raw_s -> True
-                             As     | keep_s     -> True
-                             HCc    | keep_hc    -> True
-                             _other              -> False
+                             StopLn               -> True
+                             Mangle  | keep_raw_s -> True
+                             As      | keep_s     -> True
+     			     LlvmAs  | keep_bc    -> True
+     			     LlvmOpt | keep_bc    -> True
+                             HCc     | keep_hc    -> True
+                             _other               -> False
 
                 suffix = myPhaseInputExt next_phase
 
@@ -1232,6 +1235,77 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
 
         return (StopLn, dflags, maybe_loc, output_fn)
 
+
+-----------------------------------------------------------------------------
+-- LlvmAs phase
+
+runPhase LlvmAs _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+  = liftIO $ do
+	let dflags  = hsc_dflags hsc_env
+	let la_opts = getOpts dflags opt_la
+
+	output_fn <- get_output_fn dflags LlvmOpt maybe_loc
+
+	SysTools.runLlvmAs dflags
+		       (map SysTools.Option la_opts
+		       ++ [ SysTools.FileOption "" input_fn,
+		            SysTools.Option "-o", SysTools.FileOption "" output_fn])
+
+	return (LlvmOpt, dflags, maybe_loc, output_fn)
+
+
+-----------------------------------------------------------------------------
+-- LlvmOpt phase
+
+runPhase LlvmOpt _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+  = liftIO $ do
+	let dflags  = hsc_dflags hsc_env
+	let lo_opts = getOpts dflags opt_lo
+	let opt_lvl = max 0 (min 2 $ optLevel dflags)
+
+    -- only run if > 0 OR opt options given by user
+	if opt_lvl /= 0 || lo_opts /= []
+		then do
+			output_fn <- get_output_fn dflags LlvmLlc maybe_loc
+
+			SysTools.runLlvmOpt dflags
+				       (map SysTools.Option lo_opts
+				       ++ [ SysTools.FileOption "" input_fn,
+				            SysTools.Option (llvmOpts !! opt_lvl),
+				            SysTools.Option "-o",
+				            SysTools.FileOption "" output_fn])
+
+			return (LlvmLlc, dflags, maybe_loc, output_fn)
+
+		else
+			return (LlvmLlc, dflags, maybe_loc, input_fn)
+  where 
+		llvmOpts = ["-O1", "-O2", "-O3"]
+
+
+-----------------------------------------------------------------------------
+-- LlvmLlc phase
+
+runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+  = liftIO $ do
+	let dflags  = hsc_dflags hsc_env
+	let lc_opts = getOpts dflags opt_lc
+	let opt_lvl = max 0 (min 2 $ optLevel dflags)
+
+	output_fn <- get_output_fn dflags As maybe_loc
+
+	SysTools.runLlvmLlc dflags
+		       (map SysTools.Option lc_opts
+		       ++ [ -- SysTools.Option "-tailcallopt",
+                    SysTools.Option (llvmOpts !! opt_lvl),
+                    SysTools.FileOption "" input_fn,
+		            SysTools.Option "-o", SysTools.FileOption "" output_fn])
+
+	return (As, dflags, maybe_loc, output_fn)
+  where
+		llvmOpts = ["", "-O2", "-O3"]
+
+
 -- warning suppression
 runPhase other _stop _dflags _basename _suff _input_fn _get_output_fn _maybe_loc =
    panic ("runPhase: don't know how to run phase " ++ show other)
@@ -1832,6 +1906,7 @@ hscNextPhase dflags _ hsc_lang =
         HscC -> HCc
         HscAsm | dopt Opt_SplitObjs dflags -> SplitMangle
                | otherwise -> As
+        HscLlvm        -> LlvmAs
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
         _other         -> StopLn

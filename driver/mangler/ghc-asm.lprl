@@ -1445,7 +1445,8 @@ sub mangle_asm {
 
 		# If this is an entry point with an info table,
                 # eliminate the entry symbol and all directives involving it.
-		if (defined($infochk{$symb}) && $TargetPlatform !~ /^ia64-/m) {
+		if (defined($infochk{$symb}) && $TargetPlatform !~ /^ia64-/m
+				&& $TABLES_NEXT_TO_CODE ~~ "YES") {
 			@o = ();
 			foreach $l (split(/\n/m,$c)) {
 			    next if $l =~ /^.*$symb_(entry|ret)${T_POST_LBL}/m;
@@ -1880,7 +1881,8 @@ sub rev_tbl {
     # use vars '$discard1';   # Unused?
     local($symb, $tbl, $discard1) = @_;
 
-    return ($tbl) if ($TargetPlatform =~ /^ia64-/m);
+    return ($tbl) if ($TargetPlatform =~ /^ia64-/m
+                      || $TABLES_NEXT_TO_CODE ~~ "NO");
 
     local($before) = '';
     local($label) = '';

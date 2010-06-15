@@ -45,6 +45,7 @@ $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
 	"$$(RM)" $$(RM_OPTS) $$@
 	echo '#!$$(PERL)'                                  >> $$@
 	echo '$$$$TARGETPLATFORM  = "$$(TARGETPLATFORM)";' >> $$@
+	echo '$$$$TABLES_NEXT_TO_CODE  = "$(GhcEnableTablesNextToCode)";' >> $$@
 	cat $$<                                            >> $$@
 
 $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG) | $$$$(dir $$$$@)/.

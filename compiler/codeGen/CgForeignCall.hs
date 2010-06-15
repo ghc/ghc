@@ -122,9 +122,10 @@ emitForeignCall' safety results target args vols _srt ret
   | not (playSafe safety) = do
     temp_args <- load_args_into_temps args
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
+    let caller_load' = if ret == CmmNeverReturns then [] else caller_load
     stmtsC caller_save
     stmtC (CmmCall target results temp_args CmmUnsafe ret)
-    stmtsC caller_load
+    stmtsC caller_load'
 
   | otherwise = do
     -- Both 'id' and 'new_base' are GCKindNonPtr because they're

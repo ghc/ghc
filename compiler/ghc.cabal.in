@@ -130,7 +130,9 @@ Library
         ghci
         hsSyn
         iface
+        llvmGen
         main
+        nativeGen
         parser
         prelude
         profiling
@@ -153,6 +155,16 @@ Library
         Id
         IdInfo
         Literal
+        Llvm
+        Llvm.AbsSyn
+        Llvm.PpLlvm
+        Llvm.Types
+        LlvmCodeGen
+        LlvmCodeGen.Base
+        LlvmCodeGen.CodeGen
+        LlvmCodeGen.Data
+        LlvmCodeGen.Ppr
+        LlvmCodeGen.Regs
         MkId
         Module
         Name
@@ -198,6 +210,7 @@ Library
         MkZipCfg
         MkZipCfgCmm
         OptimizationFuel
+        PprBase
         PprC
         PprCmm
         PprCmmZ
@@ -447,10 +460,9 @@ Library
         VectUtils
         Vectorise
 
+    -- We only need to expose more modules as some of the ncg code is used
+    -- by the LLVM backend so its always included
     if flag(ncg)
-        hs-source-dirs:
-            nativeGen
-
         Exposed-Modules:
             AsmCodeGen
             TargetReg
@@ -459,7 +471,6 @@ Library
             Size
             Reg
             RegClass
-            PprBase
             PIC
             Platform
             Alpha.Regs

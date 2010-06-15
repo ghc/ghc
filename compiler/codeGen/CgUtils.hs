@@ -26,6 +26,7 @@ module CgUtils (
 	tagToClosure,
 
         callerSaveVolatileRegs, get_GlobalReg_addr,
+	activeStgRegs, fixStgRegisters,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
         cmmUGtWord,
@@ -422,33 +423,6 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
 			  (CmmLoad (get_GlobalReg_addr reg) (globalRegType reg))
 			: next
 	| otherwise = next
-
--- -----------------------------------------------------------------------------
--- Global registers
-
--- We map STG registers onto appropriate CmmExprs.  Either they map
--- to real machine registers or stored as offsets from BaseReg.  Given
--- a GlobalReg, get_GlobalReg_addr always produces the 
--- register table address for it.
--- (See also get_GlobalReg_reg_or_addr in MachRegs)
-
-get_GlobalReg_addr              :: GlobalReg -> CmmExpr
-get_GlobalReg_addr BaseReg = regTableOffset 0
-get_GlobalReg_addr mid     = get_Regtable_addr_from_offset 
-				(globalRegType mid) (baseRegOffset mid)
-
--- Calculate a literal representing an offset into the register table.
--- Used when we don't have an actual BaseReg to offset from.
-regTableOffset n = 
-  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
-
-get_Regtable_addr_from_offset   :: CmmType -> Int -> CmmExpr
-get_Regtable_addr_from_offset rep offset =
-#ifdef REG_Base
-  CmmRegOff (CmmGlobal BaseReg) offset
-#else
-  regTableOffset offset
-#endif
 
 
 -- | Returns @True@ if this global register is stored in a caller-saves
@@ -1010,3 +984,181 @@ clHasCafRefs (ClosureInfo {closureSRT = srt}) =
   case srt of NoC_SRT -> NoCafRefs
               _       -> MayHaveCafRefs
 clHasCafRefs (ConInfo {}) = NoCafRefs
+
+-- -----------------------------------------------------------------------------
+--
+-- STG/Cmm GlobalReg
+--
+-- -----------------------------------------------------------------------------
+
+-- | Here is where the STG register map is defined for each target arch.
+-- The order matters (for the llvm backend anyway)! We must make sure to
+-- maintain the order here with the order used in the LLVM calling conventions.
+-- Note that also, this isn't all registers, just the ones that are currently
+-- possbily mapped to real registers.
+activeStgRegs :: [GlobalReg]
+activeStgRegs = [
+#ifdef REG_Base
+    BaseReg
+#endif
+#ifdef REG_Sp
+    ,Sp
+#endif
+#ifdef REG_Hp
+    ,Hp
+#endif
+#ifdef REG_R1
+    ,VanillaReg 1 VGcPtr
+#endif
+#ifdef REG_R2
+    ,VanillaReg 2 VGcPtr
+#endif
+#ifdef REG_R3
+    ,VanillaReg 3 VGcPtr
+#endif
+#ifdef REG_R4
+    ,VanillaReg 4 VGcPtr
+#endif
+#ifdef REG_R5
+    ,VanillaReg 5 VGcPtr
+#endif
+#ifdef REG_R6
+    ,VanillaReg 6 VGcPtr
+#endif
+#ifdef REG_R7
+    ,VanillaReg 7 VGcPtr
+#endif
+#ifdef REG_R8
+    ,VanillaReg 8 VGcPtr
+#endif
+#ifdef REG_SpLim
+    ,SpLim
+#endif
+#ifdef REG_F1
+    ,FloatReg 1
+#endif
+#ifdef REG_F2
+    ,FloatReg 2
+#endif
+#ifdef REG_F3
+    ,FloatReg 3
+#endif
+#ifdef REG_F4
+    ,FloatReg 4
+#endif
+#ifdef REG_D1
+    ,DoubleReg 1
+#endif
+#ifdef REG_D2
+    ,DoubleReg 2
+#endif
+    ]
+  
+-- | We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_addr always produces the 
+-- register table address for it.
+get_GlobalReg_addr :: GlobalReg -> CmmExpr
+get_GlobalReg_addr BaseReg = regTableOffset 0
+get_GlobalReg_addr mid     = get_Regtable_addr_from_offset 
+				(globalRegType mid) (baseRegOffset mid)
+
+-- Calculate a literal representing an offset into the register table.
+-- Used when we don't have an actual BaseReg to offset from.
+regTableOffset n = 
+  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
+
+get_Regtable_addr_from_offset   :: CmmType -> Int -> CmmExpr
+get_Regtable_addr_from_offset rep offset =
+#ifdef REG_Base
+  CmmRegOff (CmmGlobal BaseReg) offset
+#else
+  regTableOffset offset
+#endif
+
+-- | Fixup global registers so that they assign to locations within the
+-- RegTable if they aren't pinned for the current target.
+fixStgRegisters :: RawCmmTop -> RawCmmTop
+fixStgRegisters top@(CmmData _ _) = top
+
+fixStgRegisters (CmmProc info lbl params (ListGraph blocks)) =
+  let blocks' = map fixStgRegBlock blocks
+  in CmmProc info lbl params $ ListGraph blocks'
+
+fixStgRegBlock :: CmmBasicBlock -> CmmBasicBlock
+fixStgRegBlock (BasicBlock id stmts) =
+  let stmts' = map fixStgRegStmt stmts
+  in BasicBlock id stmts'
+
+fixStgRegStmt :: CmmStmt -> CmmStmt
+fixStgRegStmt stmt
+  = case stmt of
+        CmmAssign (CmmGlobal reg) src ->
+            let src' = fixStgRegExpr src
+                baseAddr = get_GlobalReg_addr reg
+            in case reg `elem` activeStgRegs of
+                True  -> CmmAssign (CmmGlobal reg) src'
+                False -> CmmStore baseAddr src'   
+        
+        CmmAssign reg src ->
+            let src' = fixStgRegExpr src
+            in CmmAssign reg src'
+
+        CmmStore addr src -> CmmStore (fixStgRegExpr addr) (fixStgRegExpr src)
+
+        CmmCall target regs args srt returns ->
+            let target' = case target of
+                    CmmCallee e conv -> CmmCallee (fixStgRegExpr e) conv
+                    other            -> other
+                args' = map (\(CmmHinted arg hint) ->
+                                (CmmHinted (fixStgRegExpr arg) hint)) args
+            in CmmCall target' regs args' srt returns
+
+        CmmCondBranch test dest -> CmmCondBranch (fixStgRegExpr test) dest
+
+        CmmSwitch expr ids -> CmmSwitch (fixStgRegExpr expr) ids
+
+        CmmJump addr regs -> CmmJump (fixStgRegExpr addr) regs
+
+        -- CmmNop, CmmComment, CmmBranch, CmmReturn
+        _other -> stmt
+
+
+fixStgRegExpr :: CmmExpr ->  CmmExpr
+fixStgRegExpr expr
+  = case expr of
+        CmmLoad addr ty -> CmmLoad (fixStgRegExpr addr) ty
+
+        CmmMachOp mop args -> CmmMachOp mop args'
+            where args' = map fixStgRegExpr args
+
+        CmmReg (CmmGlobal reg) ->
+            -- Replace register leaves with appropriate StixTrees for
+            -- the given target.  MagicIds which map to a reg on this
+            -- arch are left unchanged.  For the rest, BaseReg is taken
+            -- to mean the address of the reg table in MainCapability,
+            -- and for all others we generate an indirection to its
+            -- location in the register table.
+            case reg `elem` activeStgRegs of
+                True  -> expr
+                False ->
+                    let baseAddr = get_GlobalReg_addr reg
+                    in case reg of
+                        BaseReg -> fixStgRegExpr baseAddr
+                        _other  -> fixStgRegExpr
+                                    (CmmLoad baseAddr (globalRegType reg))
+
+        CmmRegOff (CmmGlobal reg) offset ->
+            -- RegOf leaves are just a shorthand form. If the reg maps
+            -- to a real reg, we keep the shorthand, otherwise, we just
+            -- expand it and defer to the above code.
+            case reg `elem` activeStgRegs of
+                True  -> expr
+                False -> fixStgRegExpr (CmmMachOp (MO_Add wordWidth) [
+                                    CmmReg (CmmGlobal reg),
+                                    CmmLit (CmmInt (fromIntegral offset)
+                                                wordWidth)])
+
+        -- CmmLit, CmmReg (CmmLocal), CmmStackSlot
+        _other -> expr
+

@@ -9,8 +9,12 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 #include "HsVersions.h"
 
 #ifndef OMIT_NATIVE_CODEGEN
-import UniqSupply	( mkSplitUniqSupply )
 import AsmCodeGen	( nativeCodeGen )
+#endif
+
+import UniqSupply	( mkSplitUniqSupply )
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+import qualified LlvmCodeGen ( llvmCodeGen )
 #endif
 
 #ifdef JAVA
@@ -81,6 +85,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm flat_abstractC pkg_deps;
+             HscLlvm        -> outputLlvm dflags filenm flat_abstractC;
              HscJava        -> 
 #ifdef JAVA
 			       outputJava dflags filenm mod_name tycons core_binds;
@@ -162,6 +167,30 @@ outputAsm _ _ _
   = pprPanic "This compiler was built without a native code generator"
 	     (text "Use -fvia-C instead")
 
+#endif
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{LLVM}
+%*									*
+%************************************************************************
+
+\begin{code}
+outputLlvm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
+
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+outputLlvm dflags filenm flat_absC
+  = do ncg_uniqs <- mkSplitUniqSupply 'n'
+       doOutput filenm $ \f -> 
+	         LlvmCodeGen.llvmCodeGen dflags f ncg_uniqs flat_absC
+#else
+outputLlvm _ _ _
+  = pprPanic "This compiler was built with the LLVM backend disabled"
+	     (text ("This is because the TABLES_NEXT_TO_CODE optimisation is"
+         ++ " enabled, which the LLVM backend doesn't support right now.")
+         $+$ text "Use -fasm instead")
 #endif
 \end{code}
 

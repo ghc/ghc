@@ -43,6 +43,12 @@ compiler/stage2/package-data.mk : $(compiler_CONFIG_HS)
 compiler/stage3/package-data.mk : $(compiler_CONFIG_HS)
 endif
 
+ifeq "$(GhcEnableTablesNextToCode)" "NO"
+GhcWithLlvmCodeGen = YES
+else
+GhcWithLlvmCodeGen = NO
+endif
+
 $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	"$(RM)" $(RM_OPTS) $@
 	@echo "Creating $@ ... "
@@ -67,6 +73,8 @@ $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	@echo "cGhcWithInterpreter   = \"$(GhcWithInterpreter)\"" >> $@
 	@echo "cGhcWithNativeCodeGen :: String" >> $@
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $@
+	@echo "cGhcWithLlvmCodeGen   :: String" >> $@
+	@echo "cGhcWithLlvmCodeGen   = \"$(GhcWithLlvmCodeGen)\"" >> $@
 	@echo "cGhcWithSMP           :: String" >> $@
 	@echo "cGhcWithSMP           = \"$(GhcWithSMP)\"" >> $@
 	@echo "cGhcRTSWays           :: String" >> $@
@@ -313,7 +321,7 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 # or not?
 # XXX This should logically be a CPP option, but there doesn't seem to
 # be a flag for that
-compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DGHCI_TABLES_NEXT_TO_CODE
+compiler_CONFIGURE_OPTS += --ghc-option=-DGHCI_TABLES_NEXT_TO_CODE
 endif
 
 # Should the debugger commands be enabled?
@@ -338,6 +346,8 @@ ifeq "$(HOSTPLATFORM)" "ia64-unknown-linux"
 # needed for generating proper relocation in large binaries: trac #856
 compiler_CONFIGURE_OPTS += --ld-option=-Wl,--relax
 endif
+else
+compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
 endif
 
 # We need to turn on profiling either if we have been asked to

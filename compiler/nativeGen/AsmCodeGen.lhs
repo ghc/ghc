@@ -73,6 +73,7 @@ import RegClass
 import NCGMonad
 
 import BlockId
+import CgUtils		( fixStgRegisters )
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
 import PprCmm
@@ -278,9 +279,9 @@ cmmNativeGen dflags us cmm count
  = do
 
 	-- rewrite assignments to global regs
- 	let (fixed_cmm, usFix)	=
-		{-# SCC "fixAssignsTop" #-}
-		initUs us $ fixAssignsTop cmm
+ 	let fixed_cmm =
+		{-# SCC "fixStgRegisters" #-}
+		fixStgRegisters cmm
 
 	-- cmm to cmm optimisations
 	let (opt_cmm, imports) =
@@ -294,12 +295,11 @@ cmmNativeGen dflags us cmm count
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =
 		{-# SCC "genMachCode" #-}
-		initUs usFix $ genMachCode dflags opt_cmm
+		initUs us $ genMachCode dflags opt_cmm
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_native "Native code"
 		(vcat $ map (docToSDoc . pprNatCmmTop) native)
-
 
 	-- tag instructions with register liveness information
 	let (withLiveness, usLive) =
@@ -309,7 +309,6 @@ cmmNativeGen dflags us cmm count
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_liveness "Liveness annotations added"
 		(vcat $ map ppr withLiveness)
-
 		
 	-- allocate registers
 	(alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear) <-
@@ -322,7 +321,6 @@ cmmNativeGen dflags us cmm count
 					$ unitUFM (targetClassOfRealReg r) (unitUniqSet r))
 				emptyUFM
 			$ allocatableRegs
-
 
 		-- do the graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
@@ -697,44 +695,6 @@ genMachCode dflags cmm_top
           else pprPanic "genMachCode: nonzero final delta" (int final_delta)
     }
 
--- -----------------------------------------------------------------------------
--- Fixup assignments to global registers so that they assign to 
--- locations within the RegTable, if appropriate.
-
--- Note that we currently don't fixup reads here: they're done by
--- the generic optimiser below, to avoid having two separate passes
--- over the Cmm.
-
-fixAssignsTop :: RawCmmTop -> UniqSM RawCmmTop
-fixAssignsTop top@(CmmData _ _) = returnUs top
-fixAssignsTop (CmmProc info lbl params (ListGraph blocks)) =
-  mapUs fixAssignsBlock blocks `thenUs` \ blocks' ->
-  returnUs (CmmProc info lbl params (ListGraph blocks'))
-
-fixAssignsBlock :: CmmBasicBlock -> UniqSM CmmBasicBlock
-fixAssignsBlock (BasicBlock id stmts) =
-  fixAssigns stmts `thenUs` \ stmts' ->
-  returnUs (BasicBlock id stmts')
-
-fixAssigns :: [CmmStmt] -> UniqSM [CmmStmt]
-fixAssigns stmts =
-  mapUs fixAssign stmts `thenUs` \ stmtss ->
-  returnUs (concat stmtss)
-
-fixAssign :: CmmStmt -> UniqSM [CmmStmt]
-fixAssign (CmmAssign (CmmGlobal reg) src)
-  | Left  realreg <- reg_or_addr
-  = returnUs [CmmAssign (CmmGlobal reg) src]
-  | Right baseRegAddr <- reg_or_addr
-  = returnUs [CmmStore baseRegAddr src]
-           -- Replace register leaves with appropriate StixTrees for
-           -- the given target. GlobalRegs which map to a reg on this
-           -- arch are left unchanged.  Assigning to BaseReg is always
-           -- illegal, so we check for that.
-  where
-	reg_or_addr = get_GlobalReg_reg_or_addr reg
-
-fixAssign other_stmt = returnUs [other_stmt]
 
 -- -----------------------------------------------------------------------------
 -- Generic Cmm optimiser
@@ -745,10 +705,7 @@ Here we do:
   (a) Constant folding
   (b) Simple inlining: a temporary which is assigned to and then
       used, once, can be shorted.
-  (c) Replacement of references to GlobalRegs which do not have
-      machine registers by the appropriate memory load (eg.
-      Hp ==>  *(BaseReg + 34) ).
-  (d) Position independent code and dynamic linking
+  (c) Position independent code and dynamic linking
         (i)  introduce the appropriate indirections
              and position independent refs
         (ii) compile a list of imported symbols
@@ -883,42 +840,8 @@ cmmExprConFold referenceKind expr
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
 #endif
 
-        CmmReg (CmmGlobal mid)
-           -- Replace register leaves with appropriate StixTrees for
-           -- the given target.  MagicIds which map to a reg on this
-           -- arch are left unchanged.  For the rest, BaseReg is taken
-           -- to mean the address of the reg table in MainCapability,
-           -- and for all others we generate an indirection to its
-           -- location in the register table.
-           -> case get_GlobalReg_reg_or_addr mid of
-                 Left  realreg -> return expr
-                 Right baseRegAddr 
-                    -> case mid of 
-                          BaseReg -> cmmExprConFold DataReference baseRegAddr
-                          other   -> cmmExprConFold DataReference
-                                        (CmmLoad baseRegAddr (globalRegType mid))
-	   -- eliminate zero offsets
-	CmmRegOff reg 0
-	   -> cmmExprConFold referenceKind (CmmReg reg)
-
-        CmmRegOff (CmmGlobal mid) offset
-           -- RegOf leaves are just a shorthand form. If the reg maps
-           -- to a real reg, we keep the shorthand, otherwise, we just
-           -- expand it and defer to the above code. 
-           -> case get_GlobalReg_reg_or_addr mid of
-                Left  realreg -> return expr
-                Right baseRegAddr
-                   -> cmmExprConFold DataReference (CmmMachOp (MO_Add wordWidth) [
-                                        CmmReg (CmmGlobal mid),
-                                        CmmLit (CmmInt (fromIntegral offset)
-                                                       wordWidth)])
         other
            -> return other
-
--- -----------------------------------------------------------------------------
--- Utils
-
-bind f x = x $! f
 
 \end{code}
 

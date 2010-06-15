@@ -107,6 +107,8 @@ data DynFlag
    | Opt_D_dump_asm_conflicts
    | Opt_D_dump_asm_stats
    | Opt_D_dump_asm_expanded
+   | Opt_D_dump_llvm
+   | Opt_D_dump_llvm_opt
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
@@ -332,6 +334,7 @@ data DynFlag
    | Opt_KeepRawSFiles
    | Opt_KeepTmpFiles
    | Opt_KeepRawTokenStream
+   | Opt_KeepLlvmFiles
 
    deriving (Eq, Show)
 
@@ -420,6 +423,9 @@ data DynFlags = DynFlags {
   opt_a                 :: [String],
   opt_l                 :: [String],
   opt_windres           :: [String],
+  opt_la                :: [String], -- LLVM: llvm-as assembler
+  opt_lo                :: [String], -- LLVM: llvm optimiser
+  opt_lc                :: [String], -- LLVM: llc static compiler
 
   -- commands for particular phases
   pgm_L                 :: String,
@@ -434,6 +440,9 @@ data DynFlags = DynFlags {
   pgm_T                 :: String,
   pgm_sysman            :: String,
   pgm_windres           :: String,
+  pgm_la                :: (String,[Option]), -- LLVM: llvm-as assembler
+  pgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
+  pgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
 
   --  For ghc -M
   depMakefile           :: FilePath,
@@ -498,6 +507,7 @@ wayNames = map wayName . ways
 data HscTarget
   = HscC           -- ^ Generate C code.
   | HscAsm         -- ^ Generate assembly using the native code generator.
+  | HscLlvm        -- ^ Generate assembly using the llvm code generator.
   | HscJava        -- ^ Generate Java bytecode.
   | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
   | HscNothing     -- ^ Don't generate any code.  See notes above.
@@ -507,6 +517,7 @@ data HscTarget
 isObjectTarget :: HscTarget -> Bool
 isObjectTarget HscC     = True
 isObjectTarget HscAsm   = True
+isObjectTarget HscLlvm  = True
 isObjectTarget _        = False
 
 -- | The 'GhcMode' tells us whether we're doing multi-module
@@ -656,6 +667,9 @@ defaultDynFlags =
         opt_m                   = [],
         opt_l                   = [],
         opt_windres             = [],
+        opt_la                  = [],
+        opt_lo                  = [],
+        opt_lc                  = [],
 
         extraPkgConfs           = [],
         packageFlags            = [],
@@ -682,6 +696,9 @@ defaultDynFlags =
         pgm_T                   = panic "defaultDynFlags: No pgm_T",
         pgm_sysman              = panic "defaultDynFlags: No pgm_sysman",
         pgm_windres             = panic "defaultDynFlags: No pgm_windres",
+        pgm_la                  = panic "defaultDynFlags: No pgm_la",
+        pgm_lo                  = panic "defaultDynFlags: No pgm_lo",
+        pgm_lc                  = panic "defaultDynFlags: No pgm_lc",
         -- end of initSysTools values
         -- ghc -M values
         depMakefile       = "Makefile",
@@ -770,8 +787,9 @@ getVerbFlag dflags
 setObjectDir, setHiDir, setStubDir, setOutputDir, setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, setPgmL, setPgmF, setPgmc, setPgmm, setPgms, setPgma, setPgml, setPgmdll, setPgmwindres,
-         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres,
-         addCmdlineFramework, addHaddockOpts
+         setPgmla, setPgmlo, setPgmlc,
+         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres, addOptla, addOptlo,
+         addOptlc, addCmdlineFramework, addHaddockOpts
    :: String -> DynFlags -> DynFlags
 setOutputFile, setOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
@@ -815,6 +833,9 @@ setPgma   f d = d{ pgm_a   = (f,[])}
 setPgml   f d = d{ pgm_l   = (f,[])}
 setPgmdll f d = d{ pgm_dll = (f,[])}
 setPgmwindres f d = d{ pgm_windres = f}
+setPgmla  f d = d{ pgm_la  = (f,[])}
+setPgmlo  f d = d{ pgm_lo  = (f,[])}
+setPgmlc  f d = d{ pgm_lc  = (f,[])}
 
 addOptL   f d = d{ opt_L   = f : opt_L d}
 addOptP   f d = d{ opt_P   = f : opt_P d}
@@ -824,6 +845,9 @@ addOptm   f d = d{ opt_m   = f : opt_m d}
 addOpta   f d = d{ opt_a   = f : opt_a d}
 addOptl   f d = d{ opt_l   = f : opt_l d}
 addOptwindres f d = d{ opt_windres = f : opt_windres d}
+addOptla  f d = d{ opt_la  = f : opt_la d}
+addOptlo  f d = d{ opt_lo  = f : opt_lo d}
+addOptlc  f d = d{ opt_lc  = f : opt_lc d}
 
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
 setDepMakefile f d = d { depMakefile = deOptDep f }
@@ -1018,6 +1042,11 @@ dynamic_flags = [
   , Flag "v"              (OptIntSuffix setVerbosity) Supported
 
         ------- Specific phases  --------------------------------------------
+    -- need to appear before -pgmL to be parsed as LLVM flags.
+  , Flag "pgmla"         (HasArg (upd . setPgmla)) Supported
+  , Flag "pgmlo"         (HasArg (upd . setPgmlo)) Supported
+  , Flag "pgmlc"         (HasArg (upd . setPgmlc)) Supported
+
   , Flag "pgmL"           (HasArg (upd . setPgmL)) Supported
   , Flag "pgmP"           (HasArg (upd . setPgmP)) Supported
   , Flag "pgmF"           (HasArg (upd . setPgmF)) Supported
@@ -1028,6 +1057,11 @@ dynamic_flags = [
   , Flag "pgml"           (HasArg (upd . setPgml)) Supported
   , Flag "pgmdll"         (HasArg (upd . setPgmdll)) Supported
   , Flag "pgmwindres"     (HasArg (upd . setPgmwindres)) Supported
+
+    -- need to appear before -optl/-opta to be parsed as LLVM flags.
+  , Flag "optla"          (HasArg (upd . addOptla)) Supported
+  , Flag "optlo"          (HasArg (upd . addOptlo)) Supported
+  , Flag "optlc"          (HasArg (upd . addOptlc)) Supported
 
   , Flag "optL"           (HasArg (upd . addOptL)) Supported
   , Flag "optP"           (HasArg (upd . addOptP)) Supported
@@ -1102,6 +1136,8 @@ dynamic_flags = [
   , Flag "keep-s-files"     (NoArg (setDynFlag Opt_KeepSFiles)) Supported
   , Flag "keep-raw-s-file"  (NoArg (setDynFlag Opt_KeepRawSFiles)) Supported
   , Flag "keep-raw-s-files" (NoArg (setDynFlag Opt_KeepRawSFiles)) Supported
+  , Flag "keep-llvm-file"   (NoArg (setDynFlag Opt_KeepLlvmFiles)) Supported
+  , Flag "keep-llvm-files"  (NoArg (setDynFlag Opt_KeepLlvmFiles)) Supported
      -- This only makes sense as plural
   , Flag "keep-tmp-files"   (NoArg (setDynFlag Opt_KeepTmpFiles)) Supported
 
@@ -1161,6 +1197,11 @@ dynamic_flags = [
   , Flag "ddump-asm-stats"         (setDumpFlag Opt_D_dump_asm_stats)
          Supported
   , Flag "ddump-asm-expanded"      (setDumpFlag Opt_D_dump_asm_expanded)
+         Supported
+  , Flag "ddump-llvm"              (NoArg (do { setObjTarget HscLlvm
+                                              ; setDumpFlag' Opt_D_dump_llvm}))
+         Supported
+  , Flag "ddump-opt-llvm"          (setDumpFlag Opt_D_dump_llvm_opt)
          Supported
   , Flag "ddump-cpranal"           (setDumpFlag Opt_D_dump_cpranal)
          Supported
@@ -1384,6 +1425,7 @@ dynamic_flags = [
   , Flag "fasm"             (NoArg (setObjTarget HscAsm)) Supported
   , Flag "fvia-c"           (NoArg (setObjTarget HscC)) Supported
   , Flag "fvia-C"           (NoArg (setObjTarget HscC)) Supported
+  , Flag "fllvm"            (NoArg (setObjTarget HscLlvm)) Supported
 
   , Flag "fno-code"         (NoArg (do upd $ \d -> d{ ghcLink=NoLink }
                                        setTarget HscNothing))
@@ -1787,9 +1829,12 @@ unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 
 --------------------------
 setDumpFlag :: DynFlag -> OptKind DynP
-setDumpFlag dump_flag
-  = NoArg (do { setDynFlag dump_flag
-              ; when want_recomp forceRecompile })
+setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
+
+setDumpFlag' :: DynFlag -> DynP ()
+setDumpFlag' dump_flag
+  = do { setDynFlag dump_flag
+              ; when want_recomp forceRecompile }
   where
 	-- Certain dumpy-things are really interested in what's going
         -- on during recompilation checking, so in those cases we
@@ -2185,6 +2230,7 @@ compilerInfo = [("Project name",                String cProjectName),
                 ("Have interpreter",            String cGhcWithInterpreter),
                 ("Object splitting",            String cSplitObjs),
                 ("Have native code generator",  String cGhcWithNativeCodeGen),
+                ("Have llvm code generator",    String cGhcWithLlvmCodeGen),
                 ("Support SMP",                 String cGhcWithSMP),
                 ("Unregisterised",              String cGhcUnregisterised),
                 ("Tables next to code",         String cGhcEnableTablesNextToCode),

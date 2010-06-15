@@ -226,12 +226,12 @@ getRegisterReg use_sse2 (CmmLocal (LocalReg u pk))
        else RegVirtual (mkVirtualReg u sz)
 
 getRegisterReg _ (CmmGlobal mid)
-  = case get_GlobalReg_reg_or_addr mid of
-       Left reg -> RegReal $ reg
-       _other -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
-          -- By this stage, the only MagicIds remaining should be the
-          -- ones which map to a real machine register on this
-          -- platform.  Hence ...
+  = case globalRegMaybe mid of
+        Just reg -> RegReal $ reg
+        Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
+        -- By this stage, the only MagicIds remaining should be the
+        -- ones which map to a real machine register on this
+        -- platform.  Hence ...
 
 
 -- | Memory addressing modes passed up the tree.

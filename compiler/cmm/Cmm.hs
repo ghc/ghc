@@ -181,6 +181,7 @@ data ClosureTypeInfo
 
 data CmmReturnInfo = CmmMayReturn
                    | CmmNeverReturns
+    deriving ( Eq )
 
 -- TODO: These types may need refinement
 data ProfilingInfo = ProfilingInfo CmmLit CmmLit -- closure_type, closure_desc

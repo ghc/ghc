@@ -18,6 +18,7 @@ import SPARC.Instr
 import SPARC.Cond
 import SPARC.AddrMode
 import SPARC.Regs
+import SPARC.RegPlate
 import Size
 import Reg
 
@@ -95,11 +96,11 @@ getRegisterReg (CmmLocal (LocalReg u pk))
   	= RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
 
 getRegisterReg (CmmGlobal mid)
-  = case get_GlobalReg_reg_or_addr mid of
-       Left rr	-> RegReal rr
-
-       _	-> pprPanic "SPARC.CodeGen.Base.getRegisterReg: global is in memory" 
-       				(ppr $ CmmGlobal mid)
+  = case globalRegMaybe mid of
+        Just reg -> RegReal reg
+        Nothing  -> pprPanic
+                        "SPARC.CodeGen.Base.getRegisterReg: global is in memory"
+                        (ppr $ CmmGlobal mid)
 
 
 -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert

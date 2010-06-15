@@ -40,7 +40,6 @@ module PPC.Regs (
 	-- horrow show
 	freeReg,
 	globalRegMaybe,
-	get_GlobalReg_reg_or_addr,
 	allocatableRegs
 
 )
@@ -55,7 +54,6 @@ import Reg
 import RegClass
 import Size
 
-import CgUtils          ( get_GlobalReg_addr )
 import BlockId
 import Cmm
 import CLabel           ( CLabel )
@@ -593,20 +591,6 @@ freeReg _		= 0#
 globalRegMaybe _	= panic "PPC.Regs.globalRegMaybe: not defined"
 
 #endif /* powerpc_TARGET_ARCH */
-
-
--- We map STG registers onto appropriate CmmExprs.  Either they map
--- to real machine registers or stored as offsets from BaseReg.  Given
--- a GlobalReg, get_GlobalReg_reg_or_addr produces either the real
--- register it is in, on this platform, or a CmmExpr denoting the
--- address in the register table holding it.
--- (See also get_GlobalReg_addr in CgUtils.)
-
-get_GlobalReg_reg_or_addr :: GlobalReg -> Either Reg CmmExpr
-get_GlobalReg_reg_or_addr mid
-   = case globalRegMaybe mid of
-        Just rr -> Left rr
-        Nothing -> Right (get_GlobalReg_addr mid)
 
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.

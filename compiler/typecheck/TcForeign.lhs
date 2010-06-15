@@ -94,7 +94,7 @@ tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ (CLabel _))
   = ASSERT( null arg_tys )
-    do { checkCg checkCOrAsmOrInterp
+    do { checkCg checkCOrAsmOrLlvmOrInterp
        ; checkSafety safety
        ; check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
        ; return idecl }	     -- NB check res_ty not sig_ty!
@@ -106,7 +106,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
    	-- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
    	-- as ft -> IO Addr is accepted, too.  The use of the latter two forms
    	-- is DEPRECATED, though.
-    checkCg checkCOrAsmOrInterp
+    checkCg checkCOrAsmOrLlvmOrInterp
     checkCConv cconv
     checkSafety safety
     case arg_tys of
@@ -121,7 +121,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
 
 tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction target))
   | isDynamicTarget target = do -- Foreign import dynamic
-      checkCg checkCOrAsmOrInterp
+      checkCg checkCOrAsmOrLlvmOrInterp
       checkCConv cconv
       checkSafety safety
       case arg_tys of           -- The first arg must be Ptr, FunPtr, or Addr
@@ -139,7 +139,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       dflags <- getDOpts
       check (dopt Opt_GHCForeignImportPrim dflags)
             (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
-      checkCg (checkCOrAsmOrDotNetOrInterp)
+      checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
       checkCTarget target
       check (playSafe safety)
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
@@ -148,7 +148,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       checkForeignRes nonIOok (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
-      checkCg (checkCOrAsmOrDotNetOrInterp)
+      checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
       checkCConv cconv
       checkSafety safety
       checkCTarget target
@@ -163,7 +163,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
 checkCTarget (StaticTarget str _) = do
-    checkCg checkCOrAsmOrDotNetOrInterp
+    checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
     check (isCLabelString str) (badCName str)
 
 checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
@@ -247,7 +247,7 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 \begin{code}
 tcCheckFEType :: Type -> ForeignExport -> TcM ()
 tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
-    checkCg checkCOrAsm
+    checkCg checkCOrAsmOrLlvm
     check (isCLabelString str) (badCName str)
     checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
@@ -297,25 +297,28 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 \end{code}
 
 \begin{code}
-checkCOrAsm :: HscTarget -> Maybe SDoc
-checkCOrAsm HscC   = Nothing
-checkCOrAsm HscAsm = Nothing
-checkCOrAsm _
-   = Just (text "requires via-C or native code generation (-fvia-C)")
+checkCOrAsmOrLlvm :: HscTarget -> Maybe SDoc
+checkCOrAsmOrLlvm HscC    = Nothing
+checkCOrAsmOrLlvm HscAsm  = Nothing
+checkCOrAsmOrLlvm HscLlvm = Nothing
+checkCOrAsmOrLlvm _
+   = Just (text "requires via-C, llvm (-fllvm) or native code generation (-fvia-C)")
 
-checkCOrAsmOrInterp :: HscTarget -> Maybe SDoc
-checkCOrAsmOrInterp HscC           = Nothing
-checkCOrAsmOrInterp HscAsm         = Nothing
-checkCOrAsmOrInterp HscInterpreted = Nothing
-checkCOrAsmOrInterp _
-   = Just (text "requires interpreted, C or native code generation")
+checkCOrAsmOrLlvmOrInterp :: HscTarget -> Maybe SDoc
+checkCOrAsmOrLlvmOrInterp HscC           = Nothing
+checkCOrAsmOrLlvmOrInterp HscAsm         = Nothing
+checkCOrAsmOrLlvmOrInterp HscLlvm        = Nothing
+checkCOrAsmOrLlvmOrInterp HscInterpreted = Nothing
+checkCOrAsmOrLlvmOrInterp _
+   = Just (text "requires interpreted, C, Llvm or native code generation")
 
-checkCOrAsmOrDotNetOrInterp :: HscTarget -> Maybe SDoc
-checkCOrAsmOrDotNetOrInterp HscC           = Nothing
-checkCOrAsmOrDotNetOrInterp HscAsm         = Nothing
-checkCOrAsmOrDotNetOrInterp HscInterpreted = Nothing
-checkCOrAsmOrDotNetOrInterp _
-   = Just (text "requires interpreted, C or native code generation")
+checkCOrAsmOrLlvmOrDotNetOrInterp :: HscTarget -> Maybe SDoc
+checkCOrAsmOrLlvmOrDotNetOrInterp HscC           = Nothing
+checkCOrAsmOrLlvmOrDotNetOrInterp HscAsm         = Nothing
+checkCOrAsmOrLlvmOrDotNetOrInterp HscLlvm        = Nothing
+checkCOrAsmOrLlvmOrDotNetOrInterp HscInterpreted = Nothing
+checkCOrAsmOrLlvmOrDotNetOrInterp _
+   = Just (text "requires interpreted, C, Llvm or native code generation")
 
 checkCg :: (HscTarget -> Maybe SDoc) -> TcM ()
 checkCg check = do

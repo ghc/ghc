@@ -27,7 +27,6 @@ import RegsBase
 
 import BlockId
 import Cmm
-import CgUtils          ( get_GlobalReg_addr )
 import CLabel           ( CLabel, mkMainCapabilityLabel )
 import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
