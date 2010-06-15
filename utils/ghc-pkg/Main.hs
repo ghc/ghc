@@ -1075,13 +1075,16 @@ checkConsistency verbosity my_flags = do
   let pkgs = allPackagesInStack db_stack
 
       checkPackage p = do
-         (_,es) <- runValidate $ checkPackageConfig p db_stack False True
+         (_,es,ws) <- runValidate $ checkPackageConfig p db_stack False True
          if null es
-            then return []
+            then do when (not simple_output) $ do
+                      _ <- reportValidateErrors [] ws "" Nothing
+                      return ()
+                    return []
             else do
               when (not simple_output) $ do
                   reportError ("There are problems in package " ++ display (sourcePackageId p) ++ ":")
-                  _ <- reportValidateErrors es "  " Nothing
+                  _ <- reportValidateErrors es ws "  " Nothing
                   return ()
               return [p]
 
@@ -1167,26 +1170,32 @@ writeNewConfig verbosity filename ipis = do
 -- Sanity-check a new package config, and automatically build GHCi libs
 -- if requested.
 
-type ValidateError = (Force,String)
+type ValidateError   = (Force,String)
+type ValidateWarning = String
 
-newtype Validate a = V { runValidate :: IO (a, [ValidateError]) }
+newtype Validate a = V { runValidate :: IO (a, [ValidateError],[ValidateWarning]) }
 
 instance Monad Validate where
-   return a = V $ return (a, [])
+   return a = V $ return (a, [], [])
    m >>= k = V $ do
-      (a, es) <- runValidate m
-      (b, es') <- runValidate (k a)
-      return (b,es++es')
+      (a, es, ws) <- runValidate m
+      (b, es', ws') <- runValidate (k a)
+      return (b,es++es',ws++ws')
 
 verror :: Force -> String -> Validate ()
-verror f s = V (return ((),[(f,s)]))
+verror f s = V (return ((),[(f,s)],[]))
+
+vwarn :: String -> Validate ()
+vwarn s = V (return ((),[],["Warning: " ++ s]))
 
 liftIO :: IO a -> Validate a
-liftIO k = V (k >>= \a -> return (a,[]))
+liftIO k = V (k >>= \a -> return (a,[],[]))
 
 -- returns False if we should die
-reportValidateErrors :: [ValidateError] -> String -> Maybe Force -> IO Bool
-reportValidateErrors es prefix mb_force = do
+reportValidateErrors :: [ValidateError] -> [ValidateWarning]
+                     -> String -> Maybe Force -> IO Bool
+reportValidateErrors es ws prefix mb_force = do
+  mapM_ (warn . (prefix++)) ws
   oks <- mapM report es
   return (and oks)
   where
@@ -1212,8 +1221,8 @@ validatePackageConfig :: InstalledPackageInfo
                       -> Force
                       -> IO ()
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
-  (_,es) <- runValidate $ checkPackageConfig pkg db_stack auto_ghci_libs update
-  ok <- reportValidateErrors es (display (sourcePackageId pkg) ++ ": ") (Just force)
+  (_,es,ws) <- runValidate $ checkPackageConfig pkg db_stack auto_ghci_libs update
+  ok <- reportValidateErrors es ws (display (sourcePackageId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
 checkPackageConfig :: InstalledPackageInfo
@@ -1227,9 +1236,9 @@ checkPackageConfig pkg db_stack auto_ghci_libs update = do
   checkDuplicates db_stack pkg update
   mapM_ (checkDep db_stack) (depends pkg)
   checkDuplicateDepends (depends pkg)
-  mapM_ (checkDir "import-dirs") (importDirs pkg)
-  mapM_ (checkDir "library-dirs") (libraryDirs pkg)
-  mapM_ (checkDir "include-dirs") (includeDirs pkg)
+  mapM_ (checkDir False "import-dirs")  (importDirs pkg)
+  mapM_ (checkDir True  "library-dirs") (libraryDirs pkg)
+  mapM_ (checkDir True  "include-dirs") (includeDirs pkg)
   checkModules pkg
   mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
@@ -1282,15 +1291,19 @@ checkDuplicates db_stack pkg update = do
         " overlaps with: " ++ unwords (map display dups)
 
 
-checkDir :: String -> String -> Validate ()
-checkDir thisfield d
+checkDir :: Bool -> String -> String -> Validate ()
+checkDir warn_only thisfield d
  | "$topdir"     `isPrefixOf` d = return ()
  | "$httptopdir" `isPrefixOf` d = return ()
         -- can't check these, because we don't know what $(http)topdir is
  | otherwise = do
    there <- liftIO $ doesDirectoryExist d
    when (not there) $
-       verror ForceFiles (thisfield ++ ": " ++ d ++ " doesn't exist or isn't a directory")
+       let msg = thisfield ++ ": " ++ d ++ " doesn't exist or isn't a directory"
+       in
+       if warn_only 
+          then vwarn msg
+          else verror ForceFiles msg
 
 checkDep :: PackageDBStack -> InstalledPackageId -> Validate ()
 checkDep db_stack pkgid
@@ -1456,9 +1469,7 @@ dieOrForceAll ForceAll s = ignoreError s
 dieOrForceAll _other s   = dieForcible s
 
 warn :: String -> IO ()
-warn s = do
-  hFlush stdout
-  hPutStrLn stderr s
+warn = reportError
 
 ignoreError :: String -> IO ()
 ignoreError s = reportError (s ++ " (ignoring)")
