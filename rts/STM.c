@@ -1179,6 +1179,7 @@ void stmAddInvariantToCheck(Capability *cap,
   SET_HDR (invariant, &stg_ATOMIC_INVARIANT_info, CCS_SYSTEM);
   invariant -> code = code;
   invariant -> last_execution = NO_TREC;
+  invariant -> lock = 0;
 
   // 2. Allocate an StgInvariantCheckQueue entry, link it to the current trec
 
