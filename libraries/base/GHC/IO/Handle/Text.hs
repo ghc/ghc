@@ -931,6 +931,9 @@ haFD h_@Handle__{..} =
 --
 -- 'hGetBufNonBlocking' ignores the prevailing 'TextEncoding' and
 -- 'NewlineMode' on the 'Handle', and reads bytes directly.
+--
+-- NOTE: on Windows, this function does not work correctly; it
+-- behaves identically to 'hGetBuf'.
 
 hGetBufNonBlocking :: Handle -> Ptr a -> Int -> IO Int
 hGetBufNonBlocking h ptr count
