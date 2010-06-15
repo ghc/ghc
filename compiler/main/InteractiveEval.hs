@@ -18,7 +18,7 @@ module InteractiveEval (
         getHistoryModule,
         back, forward,
 	setContext, getContext,	
-        nameSetToGlobalRdrEnv,
+        availsToGlobalRdrEnv,
 	getNamesInScope,
 	getRdrNamesInScope,
 	moduleIsInterpreted,
@@ -42,6 +42,7 @@ module InteractiveEval (
 import HscMain          hiding (compileExpr)
 import HscTypes
 import TcRnDriver
+import RnNames		( gresFromAvails )
 import InstEnv
 import Type
 import TcType		hiding( typeKind )
@@ -807,25 +808,20 @@ setContext toplev_mods export_mods = do
 
 -- Make a GlobalRdrEnv based on the exports of the modules only.
 mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
-mkExportEnv hsc_env mods = do
-  stuff <- mapM (getModuleExports hsc_env) mods
-  let 
-	(_msgs, mb_name_sets) = unzip stuff
-	gres = [ nameSetToGlobalRdrEnv (availsToNameSet avails) (moduleName mod)
-  	       | (Just avails, mod) <- zip mb_name_sets mods ]
-  --
-  return $! foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
+mkExportEnv hsc_env mods
+  = do { stuff <- mapM (getModuleExports hsc_env) mods
+       ; let (_msgs, mb_name_sets) = unzip stuff
+	     envs = [ availsToGlobalRdrEnv (moduleName mod) avails
+                    | (Just avails, mod) <- zip mb_name_sets mods ]
+       ; return $! foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs }
 
-nameSetToGlobalRdrEnv :: NameSet -> ModuleName -> GlobalRdrEnv
-nameSetToGlobalRdrEnv names mod =
-  mkGlobalRdrEnv [ GRE  { gre_name = name, gre_par = NoParent, gre_prov = vanillaProv mod }
-		 | name <- nameSetToList names ]
-
-vanillaProv :: ModuleName -> Provenance
--- We're building a GlobalRdrEnv as if the user imported
--- all the specified modules into the global interactive module
-vanillaProv mod_name = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
+availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
+availsToGlobalRdrEnv mod_name avails
+  = mkGlobalRdrEnv (gresFromAvails imp_prov avails)
   where
+      -- We're building a GlobalRdrEnv as if the user imported
+      -- all the specified modules into the global interactive module
+    imp_prov = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
     decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name, 
 			 is_qual = False, 
 			 is_dloc = srcLocSpan interactiveSrcLoc }

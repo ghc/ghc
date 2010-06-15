@@ -2432,7 +2432,7 @@ getPackageModuleInfo hsc_env mdl = do
 	return (Just (ModuleInfo {
 			minf_type_env  = mkTypeEnv tys,
 			minf_exports   = names,
-			minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names (moduleName mdl),
+			minf_rdr_env   = Just $! availsToGlobalRdrEnv (moduleName mdl) avails,
 			minf_instances = error "getModuleInfo: instances for package module unimplemented",
                         minf_modBreaks = emptyModBreaks  
 		}))

@@ -6,7 +6,8 @@
 \begin{code}
 module RnNames (
 	rnImports, getLocalNonValBinders,
-	rnExports, extendGlobalRdrEnvRn,
+	rnExports, extendGlobalRdrEnvRn, 
+        gresFromAvails,
 	reportUnusedNames, finishWarnings,
     ) where
 
