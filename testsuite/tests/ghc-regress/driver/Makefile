@@ -160,7 +160,7 @@ test026:
 # -fvia-C, because we want to check that the .hc file can #include the stub.h
 test027:
 	$(RM) B027/F.hi B027/F$(OBJSUFFIX) B027/F_stub.c B027/F_stub.h
-	"$(TEST_HC)" -c B027/F.hs -fvia-C
+	"$(TEST_HC)" -c B027/F.hs -fno-warn-deprecated-flags -fvia-C
 	test -f B027/F_stub.c
 	test -f B027/F_stub.h
 
@@ -169,7 +169,7 @@ test027:
 test028:
 	$(RM) B028/F.hi B028/F$(OBJSUFFIX)
 	$(RM) stub028/B028/F_stub.c stub028/B028/F_stub.h
-	"$(TEST_HC)" -c B028/F.hs -stubdir stub028 -fvia-C
+	"$(TEST_HC)" -c B028/F.hs -stubdir stub028 -fno-warn-deprecated-flags -fvia-C
 	test -f stub028/B028/F_stub.c
 	test -f stub028/B028/F_stub.h
 
@@ -298,25 +298,25 @@ test053:
 # Test the -keep-hc-files works without --make
 test060:
 	$(RM) A060.hi A060$(OBJSUFFIX) A060.hc
-	"$(TEST_HC)" -c -keep-hc-files -fvia-C A060.hs
+	"$(TEST_HC)" -c -keep-hc-files -fno-warn-deprecated-flags -fvia-C A060.hs
 	test -f A060.hc
 
 # Test the -keep-hc-files works with --make
 test061:
 	$(RM) A061.hi A061$(OBJSUFFIX) A061.hc
-	"$(TEST_HC)" -v0 --make -keep-hc-files -fvia-C A061.hs
+	"$(TEST_HC)" -v0 --make -keep-hc-files -fno-warn-deprecated-flags -fvia-C A061.hs
 	test -f A061.hc
 
 # Test that -keep-s-files works with --make and -fvia-C
 test061a:
 	$(RM) A061a.hi A061a$(OBJSUFFIX) A061a.s
-	"$(TEST_HC)" -v0 --make -keep-s-files -fvia-C A061a.hs
+	"$(TEST_HC)" -v0 --make -keep-s-files -fno-warn-deprecated-flags -fvia-C A061a.hs
 	test -f A061a.s
 
 # Test that -keep-s-files works without --make
 test061b:
 	$(RM) A061b.hi A061b$(OBJSUFFIX) A061b.s
-	"$(TEST_HC)" -c -keep-s-files -fvia-C A061b.hs
+	"$(TEST_HC)" -c -keep-s-files -fno-warn-deprecated-flags -fvia-C A061b.hs
 	test -f A061b.s
 
 # Test that -main-is works with --make
@@ -380,13 +380,13 @@ test067:
 # Test -C
 test068:
 	$(RM) A068.hi A068.hc
-	"$(TEST_HC)" -C A068.hs
+	"$(TEST_HC)" -fno-warn-deprecated-flags -C A068.hs
 	test -f A068.hc
 
 # Test -C/-o
 test069:
 	$(RM) A069.hi A069.tmp
-	"$(TEST_HC)" -C A069.hs -o A069.tmp
+	"$(TEST_HC)" -fno-warn-deprecated-flags -C A069.hs -o A069.tmp
 	test -f A069.tmp
 
 # Test -S
@@ -407,7 +407,7 @@ test080:
 	$(RM) A080.hi A080$(OBJSUFFIX) A080.hc
 	"$(TEST_HC)" -c A080.hs
 	test -f A080$(OBJSUFFIX)
-	"$(TEST_HC)" -C A080.hs
+	"$(TEST_HC)" -fno-warn-deprecated-flags -C A080.hs
 	test -f A080.hc
 
 
