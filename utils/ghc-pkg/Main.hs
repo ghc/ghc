@@ -1296,6 +1296,9 @@ checkDir warn_only thisfield d
  | "$topdir"     `isPrefixOf` d = return ()
  | "$httptopdir" `isPrefixOf` d = return ()
         -- can't check these, because we don't know what $(http)topdir is
+ | isRelative d = verror ForceFiles $
+                     thisfield ++ ": " ++ d ++ " is a relative path"
+        -- relative paths don't make any sense; #4134
  | otherwise = do
    there <- liftIO $ doesDirectoryExist d
    when (not there) $
