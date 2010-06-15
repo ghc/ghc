@@ -310,7 +310,8 @@ In the paper, 'throwTo' is non-blocking; but the library implementation adopts
 a more synchronous design in which 'throwTo' does not return until the exception
 is received by the target thread.  The trade-off is discussed in Section 9 of the paper.
 Like any blocking operation, 'throwTo' is therefore interruptible (see Section 5.3 of
-the paper).
+the paper).  Unlike other interruptible operations, however, 'throwTo'
+is /always/ interruptible, even if it does not actually block.
 
 There is no guarantee that the exception will be delivered promptly,
 although the runtime will endeavour to ensure that arbitrary
