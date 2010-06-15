@@ -1423,8 +1423,10 @@ dynamic_flags = [
         ------ Compiler flags -----------------------------------------------
 
   , Flag "fasm"             (NoArg (setObjTarget HscAsm)) Supported
-  , Flag "fvia-c"           (NoArg (setObjTarget HscC)) Supported
-  , Flag "fvia-C"           (NoArg (setObjTarget HscC)) Supported
+  , Flag "fvia-c"           (NoArg (setObjTarget HscC))
+         (Deprecated "The -fvia-c flag will be removed in a future GHC release")
+  , Flag "fvia-C"           (NoArg (setObjTarget HscC))
+         (Deprecated "The -fvia-C flag will be removed in a future GHC release")
   , Flag "fllvm"            (NoArg (setObjTarget HscLlvm)) Supported
 
   , Flag "fno-code"         (NoArg (do upd $ \d -> d{ ghcLink=NoLink }
