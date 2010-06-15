@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -XNoImplicitPrelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Monoid
@@ -30,7 +31,17 @@ module Data.Monoid (
         Last(..)
   ) where
 
+-- Push down the module in the dependency hierarchy.
+#if defined(__GLASGOW_HASKELL__)
+import GHC.Base hiding (Any)
+import GHC.Enum
+import GHC.Num
+import GHC.Read
+import GHC.Show
+import Data.Maybe
+#else
 import Prelude
+#endif
 
 {-
 -- just for testing
