@@ -21,7 +21,7 @@ library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
 extra-libraries:
 extra-ghci-libraries:
-include-dirs:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 includes:
 depends:
 hugs-options:
@@ -52,7 +52,7 @@ library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
 extra-libraries:
 extra-ghci-libraries:
-include-dirs:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 includes:
 depends:
 hugs-options:
@@ -89,7 +89,7 @@ library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
 extra-libraries:
 extra-ghci-libraries:
-include-dirs:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 includes:
 depends:
 hugs-options:
@@ -120,7 +120,7 @@ library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
 extra-libraries:
 extra-ghci-libraries:
-include-dirs:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 includes:
 depends:
 hugs-options:
@@ -152,7 +152,7 @@ library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
 extra-libraries:
 extra-ghci-libraries:
-include-dirs:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 includes:
 depends:
 hugs-options:
@@ -190,7 +190,7 @@ library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
 extra-libraries:
 extra-ghci-libraries:
-include-dirs:
+include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 includes:
 depends:
 hugs-options:

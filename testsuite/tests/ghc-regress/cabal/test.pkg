@@ -15,4 +15,5 @@ exposed-modules: A
 hidden-modules: B, "C.D"
 import-dirs: /usr/local/lib/testpkg,  "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg, "c:/Program Files/testpkg"
+include-dirs: /usr/local/include/testpkg, "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
