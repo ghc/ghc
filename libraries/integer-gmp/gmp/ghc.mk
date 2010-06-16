@@ -109,7 +109,7 @@ GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc-patched.tar.bz2,
 
 libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(RM) -rf libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild libraries/integer-gmp/gmp/objs
-	cat $(GMP_TARBALL) | $(BZIP2) -d | { cd libraries/integer-gmp/gmp && $(TAR) -xf - ; }
+	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp/gmp && $(TAR_CMD) -xf - ; }
 	mv libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
 	chmod +x libraries/integer-gmp/gmp/ln
 	cd libraries/integer-gmp/gmp; (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
@@ -136,7 +136,7 @@ endif
 # XXX TODO:
 #stamp.gmp.shared:
 #	$(RM) -rf $(GMP_DIR) gmpbuild-shared
-#	$(TAR) -zxf $(GMP_TARBALL)
+#	$(TAR_CMD) -zxf $(GMP_TARBALL)
 #	mv $(GMP_DIR) gmpbuild-shared
 #	chmod +x ln
 #	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
