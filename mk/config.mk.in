@@ -654,14 +654,14 @@ endif
 # with REAL_SHELL set to something else than /bin/sh, for instance, your favourite
 # command shell.
 #
-REAL_SHELL=$(SHELL)
-SIZE			= size
-STRIP			= strip
-PATCH			= @PatchCmd@
-TAR			= @TarCmd@
-BZIP2                   = bzip2
-GZIP                    = gzip
-ZIP			= zip
+REAL_SHELL     = $(SHELL)
+
+SIZE_CMD       = size
+STRIP_CMD      = strip
+PATCH_CMD      = @PatchCmd@
+TAR_CMD        = @TarCmd@
+BZIP2_CMD      = bzip2
+GZIP_CMD       = gzip
 
 HSCOLOUR = @HSCOLOUR@
 

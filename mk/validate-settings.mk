@@ -18,7 +18,7 @@ GhcLibHcOpts    += -O -dcore-lint
 GhcLibWays     := $(filter v dyn,$(GhcLibWays))
 SplitObjs       = NO
 NoFibWays       =
-STRIP           = :
+STRIP_CMD       = :
 
 CHECK_PACKAGES = YES
 

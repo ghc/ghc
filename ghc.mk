@@ -913,7 +913,7 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	    "$(GHC_CABAL_INPLACE)" install \
 		 "$(INSTALLED_GHC_REAL)" \
 		 "$(INSTALLED_GHC_PKG_REAL)" \
-		 "$(STRIP)" \
+		 "$(STRIP_CMD)" \
 		 "$(DESTDIR)$(topdir)" \
 		 $p $(INSTALL_DISTDIR_$p) \
 		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
@@ -992,12 +992,12 @@ unix-binary-dist-prep:
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_PREP_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	cd bindistprep && "$(TAR)" hcf - -T ../$(BIN_DIST_LIST) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
+	cd bindistprep && "$(TAR_CMD)" hcf - -T ../$(BIN_DIST_LIST) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-binary-dist-prep:
 	"$(RM)" $(RM_OPTS_REC) bindistprep/
 	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
-	cd bindistprep && "$(TAR)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
+	cd bindistprep && "$(TAR_CMD)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-installer:
 ifeq "$(ISCC)" ""
@@ -1107,7 +1107,7 @@ sdist-prep :
 
 .PHONY: sdist
 sdist : sdist-prep
-	"$(TAR)" chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
+	"$(TAR_CMD)" chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
 
 sdist-manifest : $(SRC_DIST_TARBALL)
 	tar tjf $(SRC_DIST_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest

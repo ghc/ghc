@@ -176,14 +176,14 @@ Installing the GHC is done as follows:
     SplitObjs = NO
     GhcRtsHcOpts = 
     GhcRtsCcOpts = -g
-    STRIP =:
+    STRIP_CMD =:
 \end{code}
 @GhcLibWays@ tells the compiler to build the code for profiling as well.
 @GhcRtsHcOpts@ has additional flags for @gcc@ when compiling @.hc@ files.
 @GhcRtsCcOpts@ has additional flags for @gcc@ when compiling @.c@ files.
 Since we will implement retainer profiling in @.c@ files, we turn on the 
 debugging flag @-g@. 
-The empty setting for @STRIP@ tells the compiler not to remove source code
+The empty setting for @STRIP_CMD@ tells the compiler not to remove source code
 information (generated due to the @-g@ option) from executable files so that
 they can be examined with @gdb@.
 

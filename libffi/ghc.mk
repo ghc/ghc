@@ -102,7 +102,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
 	"$(RM)" $(RM_OPTS_REC) $(LIBFFI_DIR) libffi/build
-	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP) -d | { cd libffi && $(TAR) -xf - ; }
+	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
 

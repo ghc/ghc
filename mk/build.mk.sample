@@ -145,4 +145,4 @@ endif
 
 # NoFib settings
 NoFibWays =
-STRIP=:
+STRIP_CMD = :
