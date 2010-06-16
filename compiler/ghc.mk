@@ -397,10 +397,6 @@ compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DSTAGE=2
 compiler_stage3_CONFIGURE_OPTS += --ghc-option=-DSTAGE=3
 compiler_stage2_HADDOCK_OPTS += --optghc=-DSTAGE=2
 
-compiler_stage1_CONFIGURE_OPTS += --ghc-options='$(GhcStage1HcOpts)'
-compiler_stage2_CONFIGURE_OPTS += --ghc-options='$(GhcStage2HcOpts)'
-compiler_stage3_CONFIGURE_OPTS += --ghc-options='$(GhcStage3HcOpts)'
-
 compiler/stage1/package-data.mk : compiler/ghc.mk
 compiler/stage2/package-data.mk : compiler/ghc.mk
 compiler/stage3/package-data.mk : compiler/ghc.mk
@@ -464,6 +460,11 @@ endif
 $(eval $(call build-package,compiler,stage1,0))
 $(eval $(call build-package,compiler,stage2,1))
 $(eval $(call build-package,compiler,stage3,2))
+
+# after build-package, because that sets compiler_stage1_HC_OPTS:
+compiler_stage1_HC_OPTS += $(GhcStage1HcOpts)
+compiler_stage2_HC_OPTS += $(GhcStage2HcOpts)
+compiler_stage3_HC_OPTS += $(GhcStage3HcOpts)
 
 ifneq "$(BINDIST)" "YES"
 
