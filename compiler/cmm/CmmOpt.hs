@@ -441,7 +441,7 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
 	     CmmReg _ <- x ->	-- We duplicate x below, hence require
 				-- it is a reg.  FIXME: remove this restriction.
 		-- shift right is not the same as quot, because it rounds
-		-- to minus infinity, whereasq uot rounds toward zero.
+		-- to minus infinity, whereasq quot rounds toward zero.
 		-- To fix this up, we add one less than the divisor to the
 		-- dividend if it is a negative number.
 		--
