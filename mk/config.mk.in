@@ -592,11 +592,7 @@ INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 LATEX			= latex
 PDFLATEX        = pdflatex
 BIBTEX          = bibtex
-HEVEA			= hevea
-HACHA			= hacha
 LN_S			= @LN_S@
-MANMACROS		= -man
-MSMACROS 		= -ms
 MV			= mv
 NROFF			= nroff
 PERL 			= @PerlCmd@
@@ -697,12 +693,6 @@ BLD_DLL			= dllwrap
 # ghc-pkg
 #
 GHC_PKG		        = @GhcPkgCmd@
-
-#
-# GreenCard
-#
-GREENCARD	        = @GreenCardCmd@
-GREENCARD_VERSION	= @GreenCardVersion@		
 
 #
 # Happy
