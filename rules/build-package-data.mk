@@ -25,7 +25,7 @@ $1_$2_CONFIGURE_OPTS += --enable-shared
 endif
 
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
-$1_$2_CONFIGURE_OPTS += --with-hscolour="$$(HSCOLOUR)"
+$1_$2_CONFIGURE_OPTS += --with-hscolour="$$(HSCOLOUR_CMD)"
 endif
 
 # We filter out -Werror from SRC_CC_OPTS, because when configure tests

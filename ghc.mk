@@ -1000,10 +1000,10 @@ windows-binary-dist-prep:
 	cd bindistprep && "$(TAR_CMD)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-installer:
-ifeq "$(ISCC)" ""
-	@echo No ISCC, so not making installer
+ifeq "$(ISCC_CMD)" ""
+	@echo No ISCC_CMD, so not making installer
 else
-	"$(ISCC)" /O. /Fbindistprep/$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
+	"$(ISCC_CMD)" /O. /Fbindistprep/$(WINDOWS_INSTALLER_BASE) - < distrib/ghc.iss
 endif
 
 # tryTimes tries to run its third argument multiple times, until it

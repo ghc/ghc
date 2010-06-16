@@ -656,35 +656,22 @@ endif
 #
 REAL_SHELL     = $(SHELL)
 
-SIZE_CMD       = size
 STRIP_CMD      = strip
 PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@
 BZIP2_CMD      = bzip2
 GZIP_CMD       = gzip
 
-HSCOLOUR = @HSCOLOUR@
+HSCOLOUR_CMD   = @HSCOLOUR@
 
-#
-# This is special to literate/, ToDo: add literate-specific
-# configure setup to literate/.
-#
-TBL 			= tbl
-TEX			= tex
-TGRIND 			= tgrind
-TGRIND_HELPER 		= /usr/local/lib/tgrind/tfontedpr # XXX
-TIB			= tib
-
-TIME			= @TimeCmd@
-TROFF			= troff
-UNAME			= uname
+TIME_CMD       = @TimeCmd@
 
 # GTK+
-GTK_CONFIG = @GTK_CONFIG@
+GTK_CONFIG_CMD = @GTK_CONFIG@
 
 # Set this if you want to use Inno Setup to build a Windows installer
 # when you make a bindist
-ISCC                    =
+ISCC_CMD       =
 
 #-----------------------------------------------------------------------------
 # DocBook XML stuff
