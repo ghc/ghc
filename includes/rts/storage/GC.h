@@ -175,6 +175,13 @@ void revertCAFs (void);
 void setKeepCAFs (void);
 
 /* -----------------------------------------------------------------------------
+   Stats
+   -------------------------------------------------------------------------- */
+
+// Returns the total number of bytes allocated since the start of the program.
+HsInt64 getAllocations (void);
+
+/* -----------------------------------------------------------------------------
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
    is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
