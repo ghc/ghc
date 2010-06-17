@@ -16,7 +16,7 @@
 #include "RtsProbes.h"
 #endif /* defined(DTRACE) */
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 // -----------------------------------------------------------------------------
 // EventLog API
@@ -397,6 +397,6 @@ INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
     dtraceGcDone((EventCapNo)cap->no);
 }
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* TRACE_H */

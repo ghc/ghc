@@ -11,7 +11,7 @@
 
 #ifdef DEBUG
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 # if defined(PAR)
 # define PVM_PE_MASK    0xfffc0000
@@ -42,7 +42,7 @@ void memInventory (rtsBool show);
 
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* DEBUG */
  

@@ -11,7 +11,7 @@
 
 #include "Capability.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation
@@ -151,6 +151,6 @@ void move_TSO  (StgTSO *src, StgTSO *dest);
 extern StgClosure * caf_list;
 extern StgClosure * revertible_caf_list;
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_STORAGE_H */

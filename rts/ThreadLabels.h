@@ -10,7 +10,7 @@
 #ifndef THREADLABELS_H
 #define THREADLABELS_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 #if defined(DEBUG)
 void    initThreadLabelTable (void);
@@ -21,6 +21,6 @@ void    removeThreadLabel    (StgWord key);
 void    labelThread          (StgPtr tso, char *label);
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* THREADLABELS_H */

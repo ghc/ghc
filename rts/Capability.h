@@ -25,7 +25,7 @@
 #include "Task.h"
 #include "Sparks.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 struct Capability_ {
     // State required by the STG virtual machine when running Haskell
@@ -357,6 +357,6 @@ INLINE_HEADER rtsBool emptyInbox(Capability *cap)
 
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* CAPABILITY_H */

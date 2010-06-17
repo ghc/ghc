@@ -17,7 +17,7 @@
 
 #include "sm/GC.h" // for evac_fn below
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void    freeStablePtr         ( StgStablePtr sp );
 
@@ -33,6 +33,6 @@ void    updateStablePtrTable  ( rtsBool full );
 void    stablePtrPreGC        ( void );
 void    stablePtrPostGC       ( void );
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* STABLE_H */

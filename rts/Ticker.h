@@ -9,7 +9,7 @@
 #ifndef TICKER_H
 #define TICKER_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 typedef void (*TickProc)(int);
 
@@ -18,6 +18,6 @@ void startTicker (void);
 void stopTicker  (void);
 void exitTicker  (rtsBool wait);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* TICKER_H */

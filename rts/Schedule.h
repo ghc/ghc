@@ -14,7 +14,7 @@
 #include "Capability.h"
 #include "Trace.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* initScheduler(), exitScheduler()
  * Called from STG :  no
@@ -214,7 +214,7 @@ emptyThreadQueues(Capability *cap)
 
 #endif /* !IN_STG_CODE */
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SCHEDULE_H */
 

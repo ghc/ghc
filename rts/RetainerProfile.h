@@ -14,7 +14,7 @@
 
 #include "RetainerSet.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
@@ -43,7 +43,7 @@ retainerSetOf( StgClosure *c )
 extern lnat retainerStackBlocks ( void );
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* PROFILING */
 

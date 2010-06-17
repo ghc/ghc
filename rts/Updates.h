@@ -10,7 +10,7 @@
 #define UPDATES_H
 
 #ifndef CMINUSMINUS
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -173,7 +173,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
 #endif /* CMINUSMINUS */
 
 #ifndef CMINUSMINUS
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 #endif
 
 #endif /* UPDATES_H */

@@ -13,7 +13,7 @@
 # include <signal.h>
 #endif
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 rtsBool anyUserHandlers(void);
 
@@ -28,7 +28,7 @@ Capability *ioManagerStartCap (Capability *cap);
 
 extern StgInt *signal_handlers;
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* POSIX_SIGNALS_H */
 

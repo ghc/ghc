@@ -14,7 +14,7 @@
 
 #include "GetTime.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* 
    Definition of a Task
@@ -270,6 +270,6 @@ setMyTask (Task *task)
 #endif
 }
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* TASK_H */

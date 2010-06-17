@@ -6,7 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 nat messageBlackHole(Capability *cap, MessageBlackHole *msg);
 
@@ -15,4 +15,4 @@ void executeMessage (Capability *cap, Message *m);
 void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"

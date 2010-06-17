@@ -9,7 +9,7 @@
 #ifndef RTSUTILS_H
 #define RTSUTILS_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* -----------------------------------------------------------------------------
  * (Checked) dynamic allocation
@@ -48,6 +48,6 @@ int genericRaise(int sig);
 
 int rts_isProfiled(void);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* RTSUTILS_H */

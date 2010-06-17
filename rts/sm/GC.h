@@ -14,7 +14,7 @@
 #ifndef SM_GC_H
 #define SM_GC_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap);
 
@@ -53,6 +53,6 @@ void releaseGCThreads (Capability *cap);
 
 #define WORK_UNIT_WORDS 128
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_GC_H */

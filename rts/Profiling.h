@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void initProfiling1 (void);
 void freeProfiling1 (void);
@@ -37,6 +37,6 @@ void debugCCS( CostCentreStack *ccs );
 
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* PROFILING_H */

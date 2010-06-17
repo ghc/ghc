@@ -12,7 +12,7 @@
 #include "rts/EventLogFormat.h"
 #include "Capability.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 #ifdef TRACING
 
@@ -66,6 +66,6 @@ INLINE_HEADER void postCapMsg (Capability *cap STG_UNUSED,
 
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* TRACING_H */

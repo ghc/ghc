@@ -14,7 +14,7 @@
 
 #ifdef PROFILING
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /*
   Type 'retainer' defines the retainer identity.
@@ -199,7 +199,7 @@ void outputAllRetainerSet(FILE *);
 //       the best place to define it.
 void printRetainer(FILE *, retainer);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* PROFILING */
 #endif /* RETAINERSET_H */

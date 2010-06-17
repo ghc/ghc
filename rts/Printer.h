@@ -9,7 +9,7 @@
 #ifndef PRINTER_H
 #define PRINTER_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 extern void   	   printPtr        ( StgPtr p );
 extern void   	   printObj        ( StgClosure *obj );
@@ -34,7 +34,7 @@ extern const char *lookupGHCName( void *addr );
 extern char *what_next_strs[];
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* PRINTER_H */
 

@@ -14,7 +14,7 @@
 #ifndef SM_COMPACT_H
 #define SM_COMPACT_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 INLINE_HEADER void 
 mark(StgPtr p, bdescr *bd)
@@ -48,6 +48,6 @@ is_marked(StgPtr p, bdescr *bd)
 
 void compact (StgClosure *static_objects);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_COMPACT_H */

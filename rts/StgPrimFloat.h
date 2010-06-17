@@ -9,7 +9,7 @@
 #ifndef STGPRIMFLOAT_H
 #define STGPRIMFLOAT_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 void      __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble dbl);
@@ -21,6 +21,6 @@ StgFloat  __word_encodeFloat (W_ j, I_ e);
 // __int_encodeDouble and __int_encodeFloat are public, declared in 
 // includes/rts/PrimFloat.h.
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* STGPRIMFLOAT_H */

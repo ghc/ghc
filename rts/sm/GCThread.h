@@ -16,7 +16,7 @@
 
 #include "WSDeque.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* -----------------------------------------------------------------------------
    General scheme
@@ -276,7 +276,7 @@ extern StgWord8 the_gc_thread[];
 
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif // SM_GCTHREAD_H
 

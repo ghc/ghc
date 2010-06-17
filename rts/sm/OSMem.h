@@ -9,7 +9,7 @@
 #ifndef SM_OSMEM_H
 #define SM_OSMEM_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void osMemInit(void);
 void *osGetMBlocks(nat n);
@@ -17,6 +17,6 @@ void osFreeAllMBlocks(void);
 lnat getPageSize (void);
 void setExecutable (void *p, lnat len, rtsBool exec);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_OSMEM_H */

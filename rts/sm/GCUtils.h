@@ -14,7 +14,7 @@
 #ifndef SM_GCUTILS_H
 #define SM_GCUTILS_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
@@ -61,6 +61,6 @@ recordMutableGen_GC (StgClosure *p, nat gen_no)
     *bd->free++ = (StgWord)p;
 }
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_GCUTILS_H */

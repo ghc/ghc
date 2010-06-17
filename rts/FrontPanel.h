@@ -9,7 +9,7 @@
 #ifndef FRONTPANEL_H
 #define FRONTPANEL_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 #ifdef RTS_GTK_FRONTPANEL
 
@@ -33,7 +33,7 @@ extern gboolean continue_now, stop_now, quit;
 
 #endif /* RTS_GTK_FRONTPANEL */
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* FRONTPANEL_H */
 

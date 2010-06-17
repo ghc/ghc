@@ -9,7 +9,7 @@
 #ifndef PROFTIMER_H
 #define PROFTIMER_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void initProfTimer      ( void );
 void handleProfTick     ( void );
@@ -24,6 +24,6 @@ void startHeapProfTimer ( void );
 
 extern rtsBool performHeapProfile;
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* PROFTIMER_H */

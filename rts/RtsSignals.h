@@ -25,7 +25,7 @@
 
 #if RTS_USER_SIGNALS
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /*
  * Function: initUserSignals()
@@ -60,7 +60,7 @@ void awaitUserSignals(void);
  */
 void markSignalHandlers (evac_fn evac, void *user);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* RTS_USER_SIGNALS */
 

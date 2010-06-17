@@ -11,7 +11,7 @@
 
 #include "Capability.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 extern rtsBool running_finalizers;
 extern StgWeak * weak_ptr_list;
@@ -21,7 +21,7 @@ void runAllCFinalizers(StgWeak *w);
 void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* WEAK_H */
 

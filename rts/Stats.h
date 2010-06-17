@@ -11,7 +11,7 @@
 
 #include "GetTime.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 void      stat_startInit(void);
 void      stat_endInit(void);
@@ -63,6 +63,6 @@ void statsPrintf( char *s, ... )
 
 HsInt64 getAllocations (void);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* STATS_H */

@@ -40,7 +40,7 @@
 #define STM_UNIPROC
 #endif
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /*----------------------------------------------------------------------
 
@@ -225,7 +225,7 @@ void stmWriteTVar(Capability *cap,
 
 /*----------------------------------------------------------------------*/
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* STM_H */
 

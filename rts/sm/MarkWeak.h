@@ -14,7 +14,7 @@
 #ifndef SM_MARKWEAK_H
 #define SM_MARKWEAK_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 extern StgWeak *old_weak_ptr_list;
 extern StgTSO *resurrected_threads;
@@ -24,6 +24,6 @@ void    initWeakForGC          ( void );
 rtsBool traverseWeakPtrList    ( void );
 void    markWeakPtrList        ( void );
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_MARKWEAK_H */

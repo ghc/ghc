@@ -9,7 +9,7 @@
 #ifndef THREADS_H
 #define THREADS_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 #define END_BLOCKED_EXCEPTIONS_QUEUE ((MessageThrowTo*)END_TSO_QUEUE)
 
@@ -48,6 +48,6 @@ void printAllThreads (void);
 void printThreadQueue (StgTSO *t);
 #endif
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* THREADS_H */

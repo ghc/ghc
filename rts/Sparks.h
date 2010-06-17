@@ -11,7 +11,7 @@
 
 #include "WSDeque.h"
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* typedef for SparkPool in RtsTypes.h */
 
@@ -65,6 +65,6 @@ INLINE_HEADER void discardSparks (SparkPool *pool)
 
 #endif // THREADED_RTS
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SPARKS_H */

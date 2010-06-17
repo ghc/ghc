@@ -9,7 +9,7 @@
 #ifndef HASH_H
 #define HASH_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 typedef struct hashtable HashTable; /* abstract */
 
@@ -47,7 +47,7 @@ void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
 
 void exitHashTable ( void );
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* HASH_H */
 

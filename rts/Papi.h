@@ -8,7 +8,7 @@
 #ifndef PAPI_H
 #define PAPI_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 /* Check the error value of a PAPI call, reporting an error, if needed */
 extern int papi_error;
@@ -31,6 +31,6 @@ void papi_stop_gc1_count(void);
 void papi_thread_start_gc1_count(int event_set);
 void papi_thread_stop_gc1_count(int event_set);
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* PAPI_H */

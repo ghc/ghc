@@ -14,7 +14,7 @@
 #ifndef SM_MARKSTACK_H
 #define SM_MARKSTACk_H
 
-BEGIN_RTS_PRIVATE
+#include "BeginPrivate.h"
 
 INLINE_HEADER void
 push_mark_stack(StgPtr p)
@@ -66,6 +66,6 @@ mark_stack_empty(void)
     return (((W_)mark_sp & BLOCK_MASK) == 0 && mark_stack_bd->link == NULL);
 }
 
-END_RTS_PRIVATE
+#include "EndPrivate.h"
 
 #endif /* SM_MARKSTACK_H */
