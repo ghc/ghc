@@ -2206,7 +2206,7 @@ picCCOpts _dflags
     | otherwise
         = []
 #else
-    | opt_PIC || not opt_Static
+    | opt_PIC
         = ["-fPIC", "-U __PIC__", "-D__PIC__"]
     | otherwise
         = []
