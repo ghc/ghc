@@ -662,15 +662,15 @@ processForMiniSynopsis mdl unicode (ExportDecl (L _loc decl0) _doc _ _insts) =
   case decl0 of
     TyClD d@(TyFamily{}) -> ppTyFamHeader True False d unicode
     TyClD d@(TyData{tcdTyPats = ps})
-      | Nothing <- ps    -> keyword "data" <++> ppTyClBinderWithVarsMini mdl d
-      | Just _ <- ps     -> keyword "data" <++> keyword "instance"
-                                           <++> ppTyClBinderWithVarsMini mdl d
+      | Nothing <- ps    -> keyword "data" <+> ppTyClBinderWithVarsMini mdl d
+      | Just _ <- ps     -> keyword "data" <+> keyword "instance"
+                                           <+> ppTyClBinderWithVarsMini mdl d
     TyClD d@(TySynonym{tcdTyPats = ps})
-      | Nothing <- ps    -> keyword "type" <++> ppTyClBinderWithVarsMini mdl d
-      | Just _ <- ps     -> keyword "type" <++> keyword "instance"
-                                           <++> ppTyClBinderWithVarsMini mdl d
+      | Nothing <- ps    -> keyword "type" <+> ppTyClBinderWithVarsMini mdl d
+      | Just _ <- ps     -> keyword "type" <+> keyword "instance"
+                                           <+> ppTyClBinderWithVarsMini mdl d
     TyClD d@(ClassDecl {}) ->
-                            keyword "class" <++> ppTyClBinderWithVarsMini mdl d
+                            keyword "class" <+> ppTyClBinderWithVarsMini mdl d
     SigD (TypeSig (L _ n) (L _ _)) ->
         let nm = docNameOcc n
         in ppNameMini mdl nm

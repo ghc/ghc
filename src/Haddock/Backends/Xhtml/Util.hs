@@ -16,7 +16,7 @@ module Haddock.Backends.Xhtml.Util (
   namedAnchor, linkedAnchor,
   spliceURL,
   
-  (<+>), (<++>), char, empty,
+  (<+>), char, empty,
   keyword, punctuate,
   
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
@@ -93,12 +93,9 @@ hsep :: [Html] -> Html
 hsep [] = noHtml
 hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
 
-infixr 8 <+>, <++>
+infixr 8 <+>
 (<+>) :: Html -> Html -> Html
 a <+> b = a +++ toHtml " " +++ b
-
-(<++>) :: Html -> Html -> Html
-a <++> b = a +++ spaceHtml +++ b
 
 keyword :: String -> Html
 keyword s = thespan ! [theclass "keyword"] << toHtml s
