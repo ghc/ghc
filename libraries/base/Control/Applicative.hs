@@ -167,6 +167,11 @@ instance Monoid a => Applicative ((,) a) where
         pure x = (mempty, x)
         (u, f) <*> (v, x) = (u `mappend` v, f x)
 
+instance Applicative (Either e) where
+        pure          = Right
+        Left  e <*> _ = Left e
+        Right f <*> r = fmap f r
+
 -- new instances
 
 newtype Const a b = Const { getConst :: a }
