@@ -201,8 +201,7 @@ unregFlags = map (mkGeneralLocated "in unregFlags")
    [ "-optc-DNO_REGS"
    , "-optc-DUSE_MINIINTERPRETER"
    , "-fno-asm-mangling"
-   , "-funregisterised"
-   , "-fvia-C" ]
+   , "-funregisterised" ]
 
 -----------------------------------------------------------------------------
 -- convert sizes like "3.5M" into integers
