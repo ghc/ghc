@@ -440,8 +440,9 @@ ppShortDataDecl summary _links _loc dataDecl unicode
 
   | [] <- cons = declElem dataHeader
 
-  | [lcon] <- cons, ResTyH98 <- resTy = declElem (dataHeader <+> equals)
-      <+> ppShortConstr summary (unLoc lcon) unicode
+  | [lcon] <- cons, ResTyH98 <- resTy,
+    (cHead,cBody,cFoot) <- ppShortConstrParts summary (unLoc lcon) unicode  
+       = declElem (dataHeader <+> equals <+> cHead) +++ cBody +++ cFoot
 
   | ResTyH98 <- resTy = declElem dataHeader
       +++ unordList (zipWith doConstr ('=':repeat '|') cons)
@@ -455,7 +456,7 @@ ppShortDataDecl summary _links _loc dataDecl unicode
     doGADTConstr con = ppShortConstr summary (unLoc con) unicode
 
     cons      = tcdCons dataDecl
-    resTy     = (con_res . unLoc . head) cons 
+    resTy     = (con_res . unLoc . head) cons
 
 ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
@@ -499,31 +500,45 @@ isRecCon lcon = case con_details (unLoc lcon) of
   _ -> False
 
 
+
 ppShortConstr :: Bool -> ConDecl DocName -> Bool -> Html
-ppShortConstr summary con unicode = case con_res con of 
+ppShortConstr summary con unicode = cHead <+> cBody <+> cFoot
+  where
+    (cHead,cBody,cFoot) = ppShortConstrParts summary con unicode
+  
+
+-- returns three pieces: header, body, footer so that header & footer can be
+-- incorporated into the declaration
+ppShortConstrParts :: Bool -> ConDecl DocName -> Bool -> (Html, Html, Html)
+ppShortConstrParts summary con unicode = case con_res con of 
   ResTyH98 -> case con_details con of 
-    PrefixCon args -> header_ unicode +++ hsep (ppBinder summary occ : map (ppLParendType unicode) args)
-    RecCon fields -> header_ unicode +++ ppBinder summary occ <+>
-                                              doRecordFields fields
-    InfixCon arg1 arg2 -> header_ unicode +++ 
-      hsep [ppLParendType unicode arg1, ppBinder summary occ, ppLParendType unicode arg2]    
+    PrefixCon args -> 
+      (header_ unicode +++ hsep (ppBinder summary occ : map (ppLParendType unicode) args),
+       noHtml, noHtml)
+    RecCon fields ->
+      (header_ unicode +++ ppBinder summary occ <+> char '{',
+       doRecordFields fields,
+       char '}')
+    InfixCon arg1 arg2 ->
+      (header_ unicode +++ hsep [ppLParendType unicode arg1, ppBinder summary occ, ppLParendType unicode arg2],
+       noHtml, noHtml)
 
   ResTyGADT resTy -> case con_details con of 
     -- prefix & infix could use hsConDeclArgTys if it seemed to
     -- simplify the code.
-    PrefixCon args -> doGADTCon args resTy
+    PrefixCon args -> (doGADTCon args resTy, noHtml, noHtml)
     -- display GADT records with the new syntax,
     -- Constr :: (Context) => { field :: a, field2 :: b } -> Ty (a, b)
     -- (except each field gets its own line in docs, to match
     -- non-GADT records)
-    RecCon fields -> ppBinder summary occ <+> dcolon unicode <+> hsep [
-                            ppForAll forall ltvs lcontext unicode,
+    RecCon fields -> (ppBinder summary occ <+> dcolon unicode <+>
+                            ppForAll forall ltvs lcontext unicode <+> char '{',
                             doRecordFields fields,
-                            arrow unicode <+> ppLType unicode resTy ]
-    InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
+                            char '}' <+> arrow unicode <+> ppLType unicode resTy)
+    InfixCon arg1 arg2 -> (doGADTCon [arg1, arg2] resTy, noHtml, noHtml)
     
   where
-    doRecordFields fields = braces $ unordList (map (ppShortField summary unicode) fields)
+    doRecordFields fields = unordList (map (ppShortField summary unicode) fields)
     doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
                              ppForAll forall ltvs lcontext unicode,
                              ppLType unicode (foldr mkFunTy resTy args) ]
