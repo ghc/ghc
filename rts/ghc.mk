@@ -307,6 +307,34 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=$(DQ)$(TargetVendor_CPP)$(DQ)
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
 
+# Compile various performance-critical pieces *without* -fPIC -dynamic
+# even when building a shared library.  If we don't do this, then the
+# GC runs about 50% slower on x86 due to the overheads of PIC.  The
+# cost of doing this is a little runtime linking and less sharing, but
+# not much.
+#
+# On x86_64 this doesn't work, because all objects in a shared library
+# must be compiled with -fPIC (since the 32-bit relocations generated
+# by the default small memory can't be resolved at runtime).  So we
+# only do this on i386.
+
+ifeq "$(TargetArch_CPP)" "i386"
+rts/sm/Evac_HC_OPTS           += -fno-PIC
+rts/sm/Evac_thr_HC_OPTS       += -fno-PIC
+rts/sm/Scav_HC_OPTS           += -fno-PIC
+rts/sm/Scav_thr_HC_OPTS       += -fno-PIC
+rts/sm/Compact_HC_OPTS        += -fno-PIC
+rts/sm/GC_HC_OPTS             += -fno-PIC
+
+# -static is also necessary for these bits, otherwise the NCG
+# -generates dynamic references:
+rts/Updates_HC_OPTS += -fno-PIC -static
+rts/StgMiscClosures_HC_OPTS += -fno-PIC -static
+rts/PrimOps_HC_OPTS += -fno-PIC -static
+rts/Apply_HC_OPTS += -fno-PIC -static
+rts/dist/build/AutoApply_HC_OPTS += -fno-PIC -static
+endif
+
 # ffi.h triggers prototype warnings, so disable them here:
 rts/Interpreter_CC_OPTS += -Wno-strict-prototypes
 rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes
