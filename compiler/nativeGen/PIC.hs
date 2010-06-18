@@ -635,7 +635,7 @@ pprImportedSymbol _ OSDarwin _
 --    section.
 --    The "official" GOT mechanism (label@got) isn't intended to be used
 --    in position dependent code, so we have to create our own "fake GOT"
---    when not opt_PCI && not opt_Static.
+--    when not opt_PIC && not opt_Static.
 --
 -- 2) PowerPC Linux is just plain broken.
 --    While it's theoretically possible to use GOT offsets larger
