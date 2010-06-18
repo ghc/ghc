@@ -1129,6 +1129,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-missing-import-lists</option></entry>
+	    <entry>warn when explicit imports lack an import list</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fnowarn-missing-import-lists</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-missing-methods</option></entry>
 	    <entry>warn when class methods are undefined</entry>
 	    <entry>dynamic</entry>

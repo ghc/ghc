@@ -164,6 +164,7 @@ data DynFlag
    | Opt_WarnIncompletePatterns
    | Opt_WarnIncompletePatternsRecUpd
    | Opt_WarnMissingFields
+   | Opt_WarnMissingImportList
    | Opt_WarnMissingMethods
    | Opt_WarnMissingSigs
    | Opt_WarnNameShadowing
@@ -1493,6 +1494,7 @@ fFlags = [
   ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns, const Supported ),
   ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd, const Supported ),
   ( "warn-missing-fields",              Opt_WarnMissingFields, const Supported ),
+  ( "warn-missing-import-lists",        Opt_WarnMissingImportList, const Supported ),
   ( "warn-missing-methods",             Opt_WarnMissingMethods, const Supported ),
   ( "warn-missing-signatures",          Opt_WarnMissingSigs, const Supported ),
   ( "warn-name-shadowing",              Opt_WarnNameShadowing, const Supported ),
