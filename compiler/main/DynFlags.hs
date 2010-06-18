@@ -108,7 +108,6 @@ data DynFlag
    | Opt_D_dump_asm_stats
    | Opt_D_dump_asm_expanded
    | Opt_D_dump_llvm
-   | Opt_D_dump_llvm_opt
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
@@ -1200,8 +1199,6 @@ dynamic_flags = [
          Supported
   , Flag "ddump-llvm"              (NoArg (do { setObjTarget HscLlvm
                                               ; setDumpFlag' Opt_D_dump_llvm}))
-         Supported
-  , Flag "ddump-opt-llvm"          (setDumpFlag Opt_D_dump_llvm_opt)
          Supported
   , Flag "ddump-cpranal"           (setDumpFlag Opt_D_dump_cpranal)
          Supported
