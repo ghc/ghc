@@ -991,11 +991,11 @@ getAmode (CmmMachOp (MO_Sub rep) [x, CmmLit lit@(CmmInt i _)])
        let off = ImmInt (-(fromInteger i))
        return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
   
-getAmode (CmmMachOp (MO_Add rep) [x, CmmLit lit@(CmmInt i _)])
+getAmode (CmmMachOp (MO_Add rep) [x, CmmLit lit])
   | is32BitLit lit
   -- ASSERT(rep == II32)???
   = do (x_reg, x_code) <- getSomeReg x
-       let off = ImmInt (fromInteger i)
+       let off = litToImm lit
        return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
 -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be 
