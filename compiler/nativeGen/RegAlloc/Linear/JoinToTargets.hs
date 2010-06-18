@@ -289,7 +289,8 @@ handleComponent delta _  (AcyclicSCC (vreg, src, dsts))
 --	require a fixup.
 --
 handleComponent delta instr 
-	(CyclicSCC 	( (vreg, InReg sreg, [InReg dreg]) : rest))
+	(CyclicSCC 	( (vreg, InReg sreg, (InReg dreg: _)) : rest))
+        -- dest list may have more than one element, if the reg is also InMem.
  = do
 	-- spill the source into its slot
 	(instrSpill, slot) 
