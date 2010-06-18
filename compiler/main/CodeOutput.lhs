@@ -11,11 +11,9 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 #ifndef OMIT_NATIVE_CODEGEN
 import AsmCodeGen	( nativeCodeGen )
 #endif
+import LlvmCodeGen ( llvmCodeGen )
 
 import UniqSupply	( mkSplitUniqSupply )
-#ifndef GHCI_TABLES_NEXT_TO_CODE
-import qualified LlvmCodeGen ( llvmCodeGen )
-#endif
 
 #ifdef JAVA
 import JavaGen		( javaGen )
@@ -179,19 +177,9 @@ outputAsm _ _ _
 
 \begin{code}
 outputLlvm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
-
-#ifndef GHCI_TABLES_NEXT_TO_CODE
 outputLlvm dflags filenm flat_absC
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
-       doOutput filenm $ \f -> 
-	         LlvmCodeGen.llvmCodeGen dflags f ncg_uniqs flat_absC
-#else
-outputLlvm _ _ _
-  = pprPanic "This compiler was built with the LLVM backend disabled"
-	     (text ("This is because the TABLES_NEXT_TO_CODE optimisation is"
-         ++ " enabled, which the LLVM backend doesn't support right now.")
-         $+$ text "Use -fasm instead")
-#endif
+       doOutput filenm $ \f -> llvmCodeGen dflags f ncg_uniqs flat_absC
 \end{code}
 
 

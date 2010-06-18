@@ -122,8 +122,6 @@ stmtToInstrs env stmt = case stmt of
 
     CmmNop               -> return (env, nilOL, [])
     CmmComment _         -> return (env, nilOL, []) -- nuke comments
---  CmmComment s         -> return (env, unitOL $ Comment (lines $ unpackFS s),
---                                  [])
 
     CmmAssign reg src    -> genAssign env reg src
     CmmStore addr src    -> genStore env addr src
@@ -154,17 +152,11 @@ genCall :: LlvmEnv -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals
 -- intrinsic function.
 genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
     let fname = fsLit "llvm.memory.barrier"
-    let funSig =
-            LlvmFunctionDecl
-                fname
-                ExternallyVisible
-                CC_Ccc
-                LMVoid
-                FixedArgs
-                (Left [i1, i1, i1, i1, i1])
+    let funSig = LlvmFunctionDecl fname ExternallyVisible CC_Ccc LMVoid
+                FixedArgs (Left [i1, i1, i1, i1, i1]) llvmFunAlign
     let fty = LMFunction funSig
 
-    let fv   = LMGlobalVar fname fty (funcLinkage funSig)
+    let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing
     let tops = case funLookup fname env of
                     Just _  -> []
                     Nothing -> [CmmData Data [([],[fty])]]
@@ -183,14 +175,14 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
 genCall env target res args ret = do
 
     -- paramater types
-    let arg_type (CmmHinted _ AddrHint) = pLift i8
+    let arg_type (CmmHinted _ AddrHint) = i8Ptr
         -- cast pointers to i8*. Llvm equivalent of void*
         arg_type (CmmHinted expr _    ) = cmmToLlvmType $ cmmExprType expr
 
     -- ret type
     let ret_type ([]) = LMVoid
-        ret_type ([CmmHinted _ AddrHint]) = pLift i8
-        ret_type ([CmmHinted reg _])        = cmmToLlvmType $ localRegType reg
+        ret_type ([CmmHinted _ AddrHint]) = i8Ptr
+        ret_type ([CmmHinted reg _])      = cmmToLlvmType $ localRegType reg
         ret_type t = panic $ "genCall: Too many return values! Can only handle"
                         ++ " 0 or 1, given " ++ show (length t) ++ "."
 
@@ -226,8 +218,8 @@ genCall env target res args ret = do
     let ccTy  = StdCall -- tail calls should be done through CmmJump
     let retTy = ret_type res
     let argTy = Left $ map arg_type args
-    let funTy name = LMFunction $
-            LlvmFunctionDecl name ExternallyVisible lmconv retTy FixedArgs argTy
+    let funTy name = LMFunction $ LlvmFunctionDecl name ExternallyVisible
+                        lmconv retTy FixedArgs argTy llvmFunAlign
 
     -- get paramter values
     (env1, argVars, stmts1, top1) <- arg_vars env args ([], nilOL, [])
@@ -246,12 +238,14 @@ genCall env target res args ret = do
                     Just ty'@(LMFunction sig) -> do
                         -- Function in module in right form
                         let fun = LMGlobalVar name ty' (funcLinkage sig)
+                                        Nothing Nothing
                         return (env1, fun, nilOL, [])
 
                     Just _ -> do
                         -- label in module but not function pointer, convert
                         let fty@(LMFunction sig) = funTy name
                         let fun = LMGlobalVar name fty (funcLinkage sig)
+                                        Nothing Nothing
                         (v1, s1) <- doExpr (pLift fty)
                                         $ Cast LM_Bitcast fun (pLift fty)
                         return  (env1, v1, unitOL s1, [])
@@ -260,6 +254,7 @@ genCall env target res args ret = do
                         -- label not in module, create external reference
                         let fty@(LMFunction sig) = funTy name
                         let fun = LMGlobalVar name fty (funcLinkage sig)
+                                        Nothing Nothing
                         let top = CmmData Data [([],[fty])]
                         let env' = funInsert name fty env1
                         return (env', fun, nilOL, [top])
@@ -339,7 +334,7 @@ arg_vars env (CmmHinted e AddrHint:rest) (vars, stmts, tops)
                a  -> panic $ "genCall: Can't cast llvmType to i8*! ("
                            ++ show a ++ ")"
 
-       (v2, s1) <- doExpr (pLift i8) $ Cast op v1 (pLift i8)
+       (v2, s1) <- doExpr i8Ptr $ Cast op v1 i8Ptr
        arg_vars env' rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
 
 arg_vars env (CmmHinted e _:rest) (vars, stmts, tops)
@@ -829,7 +824,8 @@ genLit env cmm@(CmmLabel l)
             -- Referenced data exists in this module, retrieve type and make
             -- pointer to it.
             Just ty' -> do
-                let var = LMGlobalVar label (LMPointer ty') ExternallyVisible
+                let var = LMGlobalVar label (LMPointer ty')
+                            ExternallyVisible Nothing Nothing
                 (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var llvmWord
                 return (env, v1, unitOL s1, [])
 
@@ -901,17 +897,19 @@ getHsFunc env lbl
     in case ty of
         Just ty'@(LMFunction sig) -> do
         -- Function in module in right form
-            let fun = LMGlobalVar fname ty' (funcLinkage sig)
+            let fun = LMGlobalVar fname ty' (funcLinkage sig) Nothing Nothing
             return (env, fun, nilOL, [])
         Just ty' -> do
         -- label in module but not function pointer, convert
             let fun = LMGlobalVar fname (pLift ty') ExternallyVisible
-            (v1, s1) <- doExpr (pLift llvmFunTy) $ Cast LM_Bitcast fun (pLift llvmFunTy)
+                            Nothing Nothing
+            (v1, s1) <- doExpr (pLift llvmFunTy) $
+                            Cast LM_Bitcast fun (pLift llvmFunTy)
             return (env, v1, unitOL s1, [])
         Nothing  -> do
         -- label not in module, create external reference
             let ty' = LMFunction $ llvmFunSig lbl ExternallyVisible
-            let fun = LMGlobalVar fname ty' ExternallyVisible
+            let fun = LMGlobalVar fname ty' ExternallyVisible Nothing Nothing
             let top = CmmData Data [([],[ty'])]
             let env' = funInsert fname ty' env
             return (env', fun, nilOL, [top])

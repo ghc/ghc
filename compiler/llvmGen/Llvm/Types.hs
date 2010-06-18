@@ -59,18 +59,21 @@ instance Show LlvmType where
   show (LMVoid        ) = "void"
   show (LMStruct tys  ) = "{" ++ (commaCat tys) ++ "}"
 
-  show (LMFunction (LlvmFunctionDecl _ _ _ r VarArgs p))
-        = (show r) ++ " (" ++ (either commaCat commaCat p) ++ ", ...)"
-  show (LMFunction (LlvmFunctionDecl _ _ _ r FixedArgs p))
-        = (show r) ++ " (" ++ (either commaCat commaCat p) ++ ")"
+  show (LMFunction (LlvmFunctionDecl _ _ _ r VarArgs p _))
+        = show r ++ " (" ++ (either commaCat commaCat p) ++ ", ...)"
+  show (LMFunction (LlvmFunctionDecl _ _ _ r FixedArgs p _))
+        = show r ++ " (" ++ (either commaCat commaCat p) ++ ")"
 
   show (LMAlias s _   ) = "%" ++ unpackFS s
 
+-- | An LLVM section defenition. If Nothing then let LLVM decide the section
+type LMSection = Maybe LMString
+type LMAlign = Maybe Int
 
 -- | Llvm Variables
 data LlvmVar
   -- | Variables with a global scope.
-  = LMGlobalVar LMString LlvmType LlvmLinkageType
+  = LMGlobalVar LMString LlvmType LlvmLinkageType LMSection LMAlign
   -- | Variables local to a function or parameters.
   | LMLocalVar Unique LlvmType
   -- | Named local variables. Sometimes we need to be able to explicitly name
@@ -114,10 +117,10 @@ data LlvmStatic
   -- static expressions, could split out but leave
   -- for moment for ease of use. Not many of them.
 
+  | LMBitc LlvmStatic LlvmType         -- ^ Pointer to Pointer conversion
   | LMPtoI LlvmStatic LlvmType         -- ^ Pointer to Integer conversion
   | LMAdd LlvmStatic LlvmStatic        -- ^ Constant addition operation
   | LMSub LlvmStatic LlvmStatic        -- ^ Constant subtraction operation
-  deriving (Eq)
 
 instance Show LlvmStatic where
   show (LMComment       s) = "; " ++ unpackFS s
@@ -128,22 +131,21 @@ instance Show LlvmStatic where
   show (LMStaticArray d t)
       = let struc = case d of
               [] -> "[]"
-              ts -> "[" ++
-                      (show (head ts) ++ concat (map (\x -> "," ++ show x)
-                          (tail ts)))
-                      ++ "]"
+              ts -> "[" ++ show (head ts) ++
+                      concat (map (\x -> "," ++ show x) (tail ts)) ++ "]"
         in show t ++ " " ++ struc
 
   show (LMStaticStruc d t)
       = let struc = case d of
               [] -> "{}"
-              ts -> "{" ++
-                      (show (head ts) ++ concat (map (\x -> "," ++ show x)
-                          (tail ts)))
-                      ++ "}"
+              ts -> "{" ++ show (head ts) ++
+                      concat (map (\x -> "," ++ show x) (tail ts)) ++ "}"
         in show t ++ " " ++ struc
 
   show (LMStaticPointer v) = show v
+
+  show (LMBitc v t)
+      = show t ++ " bitcast (" ++ show v ++ " to " ++ show t ++ ")"
 
   show (LMPtoI v t)
       = show t ++ " ptrtoint (" ++ show v ++ " to " ++ show t ++ ")"
@@ -174,18 +176,18 @@ commaCat x  = show (head x) ++ (concat $ map (\y -> "," ++ show y) (tail x))
 -- | Return the variable name or value of the 'LlvmVar'
 -- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
 getName :: LlvmVar -> String
-getName v@(LMGlobalVar _ _ _ ) = "@" ++ getPlainName v
-getName v@(LMLocalVar  _ _   ) = "%" ++ getPlainName v
-getName v@(LMNLocalVar _ _   ) = "%" ++ getPlainName v
-getName v@(LMLitVar    _     ) = getPlainName v
+getName v@(LMGlobalVar _ _ _ _ _) = "@" ++ getPlainName v
+getName v@(LMLocalVar  _ _      ) = "%" ++ getPlainName v
+getName v@(LMNLocalVar _ _      ) = "%" ++ getPlainName v
+getName v@(LMLitVar    _        ) = getPlainName v
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in a plain textual representation (e.g. @x@, @y@ or @42@).
 getPlainName :: LlvmVar -> String
-getPlainName (LMGlobalVar x _ _) = unpackFS x
-getPlainName (LMLocalVar  x _  ) = show x
-getPlainName (LMNLocalVar x _  ) = unpackFS x
-getPlainName (LMLitVar    x    ) = getLit x
+getPlainName (LMGlobalVar x _ _ _ _) = unpackFS x
+getPlainName (LMLocalVar  x _      ) = show x
+getPlainName (LMNLocalVar x _      ) = unpackFS x
+getPlainName (LMLitVar    x        ) = getLit x
 
 -- | Print a literal value. No type.
 getLit :: LlvmLit -> String
@@ -198,10 +200,10 @@ getLit l = error $ "getLit: Usupported LlvmLit type! " ++ show (getLitType l)
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
-getVarType (LMGlobalVar _ y _) = y
-getVarType (LMLocalVar  _ y  ) = y
-getVarType (LMNLocalVar _ y  ) = y
-getVarType (LMLitVar    l    ) = getLitType l
+getVarType (LMGlobalVar _ y _ _ _) = y
+getVarType (LMLocalVar  _ y      ) = y
+getVarType (LMNLocalVar _ y      ) = y
+getVarType (LMLitVar    l        ) = getLitType l
 
 -- | Return the 'LlvmType' of a 'LlvmLit'
 getLitType :: LlvmLit -> LlvmType
@@ -216,6 +218,7 @@ getStatType (LMStaticStr   _ t) = t
 getStatType (LMStaticArray _ t) = t
 getStatType (LMStaticStruc _ t) = t
 getStatType (LMStaticPointer v) = getVarType v
+getStatType (LMBitc        _ t) = t
 getStatType (LMPtoI        _ t) = t
 getStatType (LMAdd         t _) = getStatType t
 getStatType (LMSub         t _) = getStatType t
@@ -231,8 +234,8 @@ getGlobalVar (v, _) = v
 
 -- | Return the 'LlvmLinkageType' for a 'LlvmVar'
 getLink :: LlvmVar -> LlvmLinkageType
-getLink (LMGlobalVar _ _ l) = l
-getLink _                   = ExternallyVisible
+getLink (LMGlobalVar _ _ l _ _) = l
+getLink _                       = Internal
 
 -- | Add a pointer indirection to the supplied type. 'LMLabel' and 'LMVoid'
 -- cannot be lifted.
@@ -240,6 +243,13 @@ pLift :: LlvmType -> LlvmType
 pLift (LMLabel) = error "Labels are unliftable"
 pLift (LMVoid)  = error "Voids are unliftable"
 pLift x         = LMPointer x
+
+-- | Lower a variable of 'LMPointer' type.
+pVarLift :: LlvmVar -> LlvmVar
+pVarLift (LMGlobalVar s t l x a) = LMGlobalVar s (pLift t) l x a
+pVarLift (LMLocalVar  s t      ) = LMLocalVar  s (pLift t)
+pVarLift (LMNLocalVar s t      ) = LMNLocalVar s (pLift t)
+pVarLift (LMLitVar    _        ) = error $ "Can't lower a literal type!"
 
 -- | Remove the pointer indirection of the supplied type. Only 'LMPointer'
 -- constructors can be lowered.
@@ -249,10 +259,10 @@ pLower x  = error $ show x ++ " is a unlowerable type, need a pointer"
 
 -- | Lower a variable of 'LMPointer' type.
 pVarLower :: LlvmVar -> LlvmVar
-pVarLower (LMGlobalVar s t l) = LMGlobalVar s (pLower t) l
-pVarLower (LMLocalVar  s t  ) = LMLocalVar  s (pLower t)
-pVarLower (LMNLocalVar s t  ) = LMNLocalVar s (pLower t)
-pVarLower (LMLitVar    _    ) = error $ "Can't lower a literal type!"
+pVarLower (LMGlobalVar s t l x a) = LMGlobalVar s (pLower t) l x a
+pVarLower (LMLocalVar  s t      ) = LMLocalVar  s (pLower t)
+pVarLower (LMNLocalVar s t      ) = LMNLocalVar s (pLower t)
+pVarLower (LMLitVar    _        ) = error $ "Can't lower a literal type!"
 
 -- | Test if the given 'LlvmType' is an integer
 isInt :: LlvmType -> Bool
@@ -274,47 +284,44 @@ isPointer _             = False
 
 -- | Test if a 'LlvmVar' is global.
 isGlobal :: LlvmVar -> Bool
-isGlobal (LMGlobalVar _ _ _) = True
-isGlobal _                   = False
+isGlobal (LMGlobalVar _ _ _ _ _) = True
+isGlobal _                      = False
 
 -- | Width in bits of an 'LlvmType', returns 0 if not applicable
 llvmWidthInBits :: LlvmType -> Int
-llvmWidthInBits (LMInt n)        = n
-llvmWidthInBits (LMFloat)        = 32
-llvmWidthInBits (LMDouble)       = 64
-llvmWidthInBits (LMFloat80)      = 80
-llvmWidthInBits (LMFloat128)     = 128
+llvmWidthInBits (LMInt n)       = n
+llvmWidthInBits (LMFloat)       = 32
+llvmWidthInBits (LMDouble)      = 64
+llvmWidthInBits (LMFloat80)     = 80
+llvmWidthInBits (LMFloat128)    = 128
 -- Could return either a pointer width here or the width of what
 -- it points to. We will go with the former for now.
-llvmWidthInBits (LMPointer _)    = llvmWidthInBits llvmWord
-llvmWidthInBits (LMArray _ _)    = llvmWidthInBits llvmWord
-llvmWidthInBits LMLabel          = 0
-llvmWidthInBits LMVoid           = 0
-llvmWidthInBits (LMStruct tys)   = sum $ map llvmWidthInBits tys
-llvmWidthInBits (LMFunction  _)  = 0
-llvmWidthInBits (LMAlias _ t)    = llvmWidthInBits t
+llvmWidthInBits (LMPointer _)   = llvmWidthInBits llvmWord
+llvmWidthInBits (LMArray _ _)   = llvmWidthInBits llvmWord
+llvmWidthInBits LMLabel         = 0
+llvmWidthInBits LMVoid          = 0
+llvmWidthInBits (LMStruct tys)  = sum $ map llvmWidthInBits tys
+llvmWidthInBits (LMFunction  _) = 0
+llvmWidthInBits (LMAlias _ t)   = llvmWidthInBits t
 
 
 -- -----------------------------------------------------------------------------
 -- ** Shortcut for Common Types
 --
 
-i128, i64, i32, i16, i8, i1 :: LlvmType
-i128 = LMInt 128
-i64  = LMInt  64
-i32  = LMInt  32
-i16  = LMInt  16
-i8   = LMInt   8
-i1   = LMInt   1
+i128, i64, i32, i16, i8, i1, i8Ptr :: LlvmType
+i128  = LMInt 128
+i64   = LMInt  64
+i32   = LMInt  32
+i16   = LMInt  16
+i8    = LMInt   8
+i1    = LMInt   1
+i8Ptr = pLift i8
 
 -- | The target architectures word size
-llvmWord :: LlvmType
-llvmWord = LMInt (wORD_SIZE * 8)
-
--- | The target architectures pointer size
-llvmWordPtr :: LlvmType
+llvmWord, llvmWordPtr :: LlvmType
+llvmWord    = LMInt (wORD_SIZE * 8)
 llvmWordPtr = pLift llvmWord
-
 
 -- -----------------------------------------------------------------------------
 -- * LLVM Function Types
@@ -334,21 +341,20 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
         decVarargs    :: LlvmParameterListType,
         -- | Signature of the parameters, can be just types or full vars
         -- if parameter names are required.
-        decParams     :: Either [LlvmType] [LlvmVar]
+        decParams     :: Either [LlvmType] [LlvmVar],
+        -- | Function align value, must be power of 2
+        funcAlign     :: LMAlign
   }
+  deriving (Eq)
 
 instance Show LlvmFunctionDecl where
-  show (LlvmFunctionDecl n l c r VarArgs p)
-        = (show l) ++ " " ++  (show c) ++ " " ++ (show r)
-            ++ " @" ++ unpackFS n ++ "(" ++ (either commaCat commaCat p) ++ ", ...)"
-  show (LlvmFunctionDecl n l c r FixedArgs p)
-        = (show l) ++ " " ++  (show c) ++ " " ++ (show r)
-            ++ " @" ++ unpackFS n ++ "(" ++ (either commaCat commaCat p) ++ ")"
-
-instance Eq LlvmFunctionDecl where
-  (LlvmFunctionDecl n1 l1 c1 r1 v1 p1) == (LlvmFunctionDecl n2 l2 c2 r2 v2 p2)
-        = (n1 == n2) && (l1 == l2) && (c1 == c2) && (r1 == r2)
-            && (v1 == v2) && (p1 == p2)
+  show (LlvmFunctionDecl n l c r varg p a)
+    = let varg' = if varg == VarArgs then ", ..." else ""
+          align = case a of
+                       Just a' -> " align " ++ show a'
+                       Nothing -> ""
+    in show l ++ " " ++ show c ++ " " ++ show r ++ " @" ++ unpackFS n ++
+        "(" ++ (either commaCat commaCat p) ++ varg' ++ ")" ++ align
 
 type LlvmFunctionDecls = [LlvmFunctionDecl]
 
@@ -432,19 +438,19 @@ data LlvmFuncAttr
   deriving (Eq)
 
 instance Show LlvmFuncAttr where
-  show AlwaysInline    = "alwaysinline"
-  show InlineHint      = "inlinehint"
-  show NoInline        = "noinline"
-  show OptSize         = "optsize"
-  show NoReturn        = "noreturn"
-  show NoUnwind        = "nounwind"
-  show ReadNone        = "readnon"
-  show ReadOnly        = "readonly"
-  show Ssp             = "ssp"
-  show SspReq          = "ssqreq"
-  show NoRedZone       = "noredzone"
-  show NoImplicitFloat = "noimplicitfloat"
-  show Naked           = "naked"
+  show AlwaysInline       = "alwaysinline"
+  show InlineHint         = "inlinehint"
+  show NoInline           = "noinline"
+  show OptSize            = "optsize"
+  show NoReturn           = "noreturn"
+  show NoUnwind           = "nounwind"
+  show ReadNone           = "readnon"
+  show ReadOnly           = "readonly"
+  show Ssp                = "ssp"
+  show SspReq             = "ssqreq"
+  show NoRedZone          = "noredzone"
+  show NoImplicitFloat    = "noimplicitfloat"
+  show Naked              = "naked"
 
 
 -- | Different types to call a function.
@@ -493,7 +499,7 @@ instance Show LlvmCallConvention where
   show CC_Ccc       = "ccc"
   show CC_Fastcc    = "fastcc"
   show CC_Coldcc    = "coldcc"
-  show (CC_Ncc i)   = "cc " ++ (show i)
+  show (CC_Ncc i)   = "cc " ++ show i
   show CC_X86_Stdcc = "x86_stdcallcc"
 
 
@@ -695,16 +701,15 @@ fToStr f = dToStr $ realToFrac f
 
 -- | Convert a Haskell Double to an LLVM hex encoded floating point form
 dToStr :: Double -> String
-dToStr d =
-    let bs  = doubleToBytes d
+dToStr d
+  = let bs     = doubleToBytes d
         hex d' = case showHex d' "" of
                      []    -> error "dToStr: too few hex digits for float"
                      [x]   -> ['0',x]
                      [x,y] -> [x,y]
                      _     -> error "dToStr: too many hex digits for float"
 
-        str' = concat . fixEndian . (map hex) $ bs
-        str = map toUpper str'
+        str  = map toUpper $ concat . fixEndian . (map hex) $ bs
     in  "0x" ++ str
 
 -- | Reverse or leave byte data alone to fix endianness on this

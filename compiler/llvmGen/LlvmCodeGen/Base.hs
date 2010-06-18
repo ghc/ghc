@@ -13,10 +13,10 @@ module LlvmCodeGen.Base (
         funLookup, funInsert,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
-        llvmFunSig, llvmStdFunAttrs, llvmPtrBits, llvmGhcCC,
+        llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
+        llvmPtrBits, llvmGhcCC,
 
-        strCLabel_llvm,
-        genCmmLabelRef, genStringLabelRef
+        strCLabel_llvm, genCmmLabelRef, genStringLabelRef
 
     ) where
 
@@ -52,7 +52,7 @@ type LlvmData = ([LMGlobal], [LlvmType])
 --
 -- Labels are unresolved when we haven't yet determined if they are defined in
 -- the module we are currently compiling, or an external one.
-type UnresLabel = CmmLit
+type UnresLabel  = CmmLit
 type UnresStatic = Either UnresLabel LlvmStatic
 
 -- ----------------------------------------------------------------------------
@@ -85,14 +85,22 @@ llvmFunTy :: LlvmType
 llvmFunTy
   = LMFunction $
         LlvmFunctionDecl (fsLit "a") ExternallyVisible llvmGhcCC LMVoid FixedArgs
-            (Left $ map getVarType llvmFunArgs)
+            (Left $ map getVarType llvmFunArgs) llvmFunAlign
 
 -- | Llvm Function signature
 llvmFunSig :: CLabel -> LlvmLinkageType -> LlvmFunctionDecl
 llvmFunSig lbl link
   = let n = strCLabel_llvm lbl
     in LlvmFunctionDecl n link llvmGhcCC LMVoid FixedArgs
-        (Right llvmFunArgs)
+        (Right llvmFunArgs) llvmFunAlign
+
+-- | Alignment to use for functions
+llvmFunAlign :: LMAlign
+llvmFunAlign = Just 4
+
+-- | Alignment to use for into tables
+llvmInfAlign :: LMAlign
+llvmInfAlign = Just 4
 
 -- | A Function's arguments
 llvmFunArgs :: [LlvmVar]
@@ -144,14 +152,13 @@ strCLabel_llvm l = (fsLit . show . llvmSDoc . pprCLabel) l
 
 -- | Create an external definition for a 'CLabel' defined in another module.
 genCmmLabelRef :: CLabel -> LMGlobal
-genCmmLabelRef cl =
-    let mcl = strCLabel_llvm cl
-    in (LMGlobalVar mcl (LMPointer (LMArray 0 llvmWord)) External, Nothing)
+genCmmLabelRef = genStringLabelRef . strCLabel_llvm
 
 -- | As above ('genCmmLabelRef') but taking a 'LMString', not 'CLabel'.
 genStringLabelRef :: LMString -> LMGlobal
-genStringLabelRef cl =
-    (LMGlobalVar cl (LMPointer (LMArray 0 llvmWord)) External, Nothing)
+genStringLabelRef cl
+  = let ty = LMPointer $ LMArray 0 llvmWord
+    in (LMGlobalVar cl ty External Nothing Nothing, Nothing)
 
 
 -- ----------------------------------------------------------------------------

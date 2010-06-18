@@ -6,11 +6,14 @@ module LlvmCodeGen ( llvmCodeGen ) where
 
 #include "HsVersions.h"
 
+import Llvm
+
 import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
 import LlvmCodeGen.Data
 import LlvmCodeGen.Ppr
 
+import CLabel
 import Cmm
 import CgUtils ( fixStgRegisters )
 import PprCmm
@@ -18,9 +21,11 @@ import PprCmm
 import BufWrite
 import DynFlags
 import ErrUtils
+import FastString
 import Outputable
 import qualified Pretty as Prt
 import UniqSupply
+import Util
 
 import System.IO
 
@@ -30,20 +35,18 @@ import System.IO
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 llvmCodeGen dflags h us cmms
   = do
-      let cmm = concat $ map extractRawCmm cmms
+      let cmm = concat $ map (\(Cmm top) -> top) cmms
 
       bufh <- newBufHandle h
 
       Prt.bufLeftRender bufh $ pprLlvmHeader
 
       env <- cmmDataLlvmGens dflags bufh cmm
-      cmmProcLlvmGens dflags bufh us env cmm
+      cmmProcLlvmGens dflags bufh us env cmm 1 []
 
       bFlush bufh
 
       return  ()
-
-  where extractRawCmm (Cmm tops) = tops
 
 
 -- -----------------------------------------------------------------------------
@@ -62,12 +65,13 @@ cmmDataLlvmGens dflags h cmm =
     let exData (CmmData s d) = [(s,d)]
         exData  _            = []
 
-        exProclbl (CmmProc _ l _ _) = [(strCLabel_llvm l)]
-        exProclbl  _                = []
+        exProclbl (CmmProc i l _ _)
+                | not (null i) = [strCLabel_llvm $ entryLblToInfoLbl l]
+        exProclbl (CmmProc _ l _ _) | otherwise = [strCLabel_llvm l]
+        exProclbl _                             = []
 
-        cdata = concat $ map exData cmm
-        -- put the functions into the enviornment
         cproc = concat $ map exProclbl cmm
+        cdata = concat $ map exData cmm
         env = foldl (\e l -> funInsert l llvmFunTy e) initLlvmEnv cproc
     in cmmDataLlvmGens' dflags h env cdata []
 
@@ -105,18 +109,30 @@ cmmProcLlvmGens
       -> UniqSupply
       -> LlvmEnv
       -> [RawCmmTop]
+      -> Int          -- ^ count, used for generating unique subsections
+      -> [LlvmVar]    -- ^ info tables that need to be marked as 'used'
       -> IO ()
 
-cmmProcLlvmGens _ _ _ _ []
-    = return ()
+cmmProcLlvmGens _ _ _ _ [] _ []
+  = return ()
 
-cmmProcLlvmGens dflags h us env (cmm : cmms)
+cmmProcLlvmGens dflags h _ _ [] _ ivars
+  = do
+      let cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
+      let ty = (LMArray (length ivars) i8Ptr)
+      let usedArray = LMStaticArray (map cast ivars) ty
+      let lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
+                      (Just $ fsLit "llvm.metadata") Nothing, Just usedArray)
+      Prt.bufLeftRender h $ pprLlvmData dflags ([lmUsed], [])
+
+cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars
   = do
       (us', env', llvm) <- cmmLlvmGen dflags us (clearVars env) cmm
 
-      Prt.bufLeftRender h $ Prt.vcat $ map (pprLlvmCmmTop dflags) llvm
+      let (docs, ivar) = mapAndUnzip (pprLlvmCmmTop dflags env' count) llvm
+      Prt.bufLeftRender h $ Prt.vcat docs
 
-      cmmProcLlvmGens dflags h us' env' cmms
+      cmmProcLlvmGens dflags h us' env' cmms (count + 2) (concat ivar ++ ivars)
 
 
 -- | Complete llvm code generation phase for a single top-level chunk of Cmm.
@@ -141,7 +157,7 @@ cmmLlvmGen dflags us env cmm
     let ((env', llvmBC), usGen) = initUs us $ genLlvmCode dflags env fixed_cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code"
-        (vcat $ map (docToSDoc . pprLlvmCmmTop dflags) llvmBC)
+        (vcat $ map (docToSDoc . fst . pprLlvmCmmTop dflags env' 0) llvmBC)
 
     return (usGen, env', llvmBC)
 

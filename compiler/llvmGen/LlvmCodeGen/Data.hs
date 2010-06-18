@@ -71,7 +71,7 @@ resolveLlvmData _ env (lbl, alias, unres) =
         label          = strCLabel_llvm lbl
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
-        glob           = LMGlobalVar label alias link
+        glob           = LMGlobalVar label alias link Nothing Nothing
     in (env', (refs' ++ [(glob, struct)], [alias]))
 
 
@@ -114,7 +114,8 @@ resData env (Left cmm@(CmmLabel l)) =
             -- Referenced data exists in this module, retrieve type and make
             -- pointer to it.
             Just ty' ->
-                let var = LMGlobalVar label (LMPointer ty') ExternallyVisible
+                let var = LMGlobalVar label (LMPointer ty')
+                            ExternallyVisible Nothing Nothing
                     ptr  = LMStaticPointer var
                 in (env, LMPtoI ptr lmty, [Nothing])
 
