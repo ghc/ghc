@@ -69,7 +69,7 @@ stgAllocForGMP (size_t size_in_bytes)
   nat data_size_in_words, total_size_in_words;
 
   /* round up to a whole number of words */
-  data_size_in_words  = (size_in_bytes + sizeof(W_) + 1) / sizeof(W_);
+  data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
   total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
 
   /* allocate and fill it in. */
