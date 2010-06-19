@@ -125,9 +125,9 @@
 	SET_PROF_HDR((StgClosure *)(c),ccs);		\
    }
 
-#define SET_ARR_HDR(c,info,costCentreStack,n_words)	\
+#define SET_ARR_HDR(c,info,costCentreStack,n_bytes)	\
    SET_HDR(c,info,costCentreStack);			\
-   (c)->bytes = n_words*sizeof(W_);
+   (c)->bytes = n_bytes;
 
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \

@@ -225,7 +225,7 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
   
   /* allocate and fill it in */
   arr = (StgArrWords *)allocate(total_size_in_words);
-  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
+  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, size_in_bytes);
  
   /* obtain a stable ptr */
   *stable = getStablePtr((StgPtr)arr);
