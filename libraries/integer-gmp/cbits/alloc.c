@@ -74,7 +74,7 @@ stgAllocForGMP (size_t size_in_bytes)
 
   /* allocate and fill it in. */
   arr = (StgArrWords *)allocate(rts_unsafeGetMyCapability(), total_size_in_words);
-  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
+  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, size_in_bytes);
 
   /* and return a ptr to the goods inside the array */
   return arr->payload;
