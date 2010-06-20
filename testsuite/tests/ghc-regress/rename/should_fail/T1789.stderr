@@ -1,7 +1,0 @@
-
-T1789.hs:5:1:
-    Warning: The module `Data.Set' is missing an import list
-
-<no location info>: 
-Failing due to -Werror.
-

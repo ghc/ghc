@@ -143,4 +143,6 @@ test('T4003',
                   'T4003A.o-boot', 'T4003A.o', 'T4003B.o']),
      run_command,
      ['$MAKE -s --no-print-directory T4003'])
+test('T1789', normal, compile, [''])
+test('T1789_2', normal, compile, [''])
 
