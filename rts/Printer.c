@@ -289,10 +289,6 @@ printClosure( StgClosure *obj )
         {
             StgWord i;
             debugBelch("ARR_WORDS(\"");
-            /* ToDo: we can't safely assume that this is a string! 
-            for (i = 0; arrWordsGetChar(obj,i); ++i) {
-                putchar(arrWordsGetChar(obj,i));
-		} */
 	    for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
 	      debugBelch("%lu", (lnat)((StgArrWords *)obj)->payload[i]);
             debugBelch("\")\n");
