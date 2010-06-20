@@ -70,10 +70,11 @@ rnImports imports
             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
           )
 
-         stuff1 <- mapM (rnImportDecl this_mod implicit_prelude) (prel_imports ++ ordinary)
-         stuff2 <- mapM (rnImportDecl this_mod implicit_prelude) source
-         let (decls, rdr_env, imp_avails,hpc_usage) = combine (stuff1 ++ stuff2)
-         return (decls, rdr_env, imp_avails,hpc_usage) 
+         stuff1 <- mapM (rnImportDecl this_mod True)  prel_imports
+         stuff2 <- mapM (rnImportDecl this_mod False) ordinary
+         stuff3 <- mapM (rnImportDecl this_mod False) source
+         let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2 ++ stuff3)
+         return (decls, rdr_env, imp_avails, hpc_usage)
 
     where
    combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails,AnyHpcUsage)]
@@ -105,8 +106,8 @@ rnImportDecl this_mod implicit_prelude (L loc (ImportDecl loc_imp_mod_name mb_pk
 	doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
     case imp_details of
-        (Just _) -> return ()
-        Nothing -> when (not (implicit_prelude && imp_mod_name == pRELUDE_NAME)) $
+        Just _ -> return ()
+        Nothing -> unless implicit_prelude $
             ifOptM Opt_WarnMissingImportList (addWarn (missingImportListWarn imp_mod_name))
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
