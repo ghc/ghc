@@ -105,9 +105,15 @@ rnImportDecl this_mod implicit_prelude (L loc (ImportDecl loc_imp_mod_name mb_pk
 	imp_mod_name = unLoc loc_imp_mod_name
 	doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
+    let isExplicit lie = case unLoc lie of
+                         IEThingAll _ -> False
+                         _ -> True
     case imp_details of
-        Just _ -> return ()
-        Nothing -> unless implicit_prelude $
+        Just (False, lies)
+         | all isExplicit lies ->
+            return ()
+        _ ->
+            unless implicit_prelude $
             ifOptM Opt_WarnMissingImportList (addWarn (missingImportListWarn imp_mod_name))
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
@@ -1455,7 +1461,7 @@ nullModuleExport mod
 
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
-  = ptext (sLit "The module") <+> quotes (ppr mod) <+> ptext (sLit "is missing an import list")
+  = ptext (sLit "The module") <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt txt)
