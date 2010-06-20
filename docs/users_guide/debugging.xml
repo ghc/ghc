@@ -178,8 +178,8 @@
 
 	    <varlistentry>
 	      <term>
-	        <option>-ddump-workwrap</option>:
-                <indexterm><primary><option>-ddump-workwrap</option></primary></indexterm>
+	        <option>-ddump-worker-wrapper</option>:
+                <indexterm><primary><option>-ddump-worker-wrapper</option></primary></indexterm>
 	      </term>
 	      <listitem>
 		<para>worker/wrapper split output</para>
