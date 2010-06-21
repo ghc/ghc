@@ -2205,7 +2205,12 @@ picCCOpts _dflags
     | otherwise
         = []
 #else
-    | opt_PIC
+      -- we need -fPIC for C files when we are compiling with -dynamic,
+      -- otherwise things like stub.c files don't get compiled
+      -- correctly.  They need to reference data in the Haskell
+      -- objects, but can't without -fPIC.  See
+      -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
+    | opt_PIC || not opt_Static
         = ["-fPIC", "-U __PIC__", "-D__PIC__"]
     | otherwise
         = []
