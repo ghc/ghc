@@ -95,7 +95,7 @@ data LlvmLit
   -- | Refers to an integer constant (i64 42).
   = LMIntLit Integer LlvmType
   -- | Floating point literal
-  | LMFloatLit Rational LlvmType
+  | LMFloatLit Double LlvmType
   deriving (Eq)
 
 instance Show LlvmLit where
@@ -191,12 +191,8 @@ getPlainName (LMLitVar    x        ) = getLit x
 
 -- | Print a literal value. No type.
 getLit :: LlvmLit -> String
-getLit (LMIntLit i _)   = show ((fromInteger i)::Int)
--- In Llvm float literals can be printed in a big-endian hexadecimal format,
--- regardless of underlying architecture.
-getLit (LMFloatLit r LMFloat)  = fToStr $ fromRational r
-getLit (LMFloatLit r LMDouble) = dToStr $ fromRational r
-getLit l = error $ "getLit: Usupported LlvmLit type! " ++ show (getLitType l)
+getLit (LMIntLit   i _) = show ((fromInteger i)::Int)
+getLit (LMFloatLit r _) = dToStr r
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
@@ -695,11 +691,9 @@ instance Show LlvmCastOp where
 -- * Floating point conversion
 --
 
--- | Convert a Haskell Float to an LLVM hex encoded floating point form
-fToStr :: Float -> String
-fToStr f = dToStr $ realToFrac f
-
--- | Convert a Haskell Double to an LLVM hex encoded floating point form
+-- | Convert a Haskell Double to an LLVM hex encoded floating point form. In
+-- Llvm float literals can be printed in a big-endian hexadecimal format,
+-- regardless of underlying architecture.
 dToStr :: Double -> String
 dToStr d
   = let bs     = doubleToBytes d
@@ -712,9 +706,7 @@ dToStr d
         str  = map toUpper $ concat . fixEndian . (map hex) $ bs
     in  "0x" ++ str
 
--- | Reverse or leave byte data alone to fix endianness on this
--- target. LLVM generally wants things in Big-Endian form
--- regardless of target architecture.
+-- | Reverse or leave byte data alone to fix endianness on this target.
 fixEndian :: [a] -> [a]
 #ifdef WORDS_BIGENDIAN
 fixEndian = id

@@ -168,7 +168,7 @@ genStaticLit (CmmInt i w)
     = Right $ LMStaticLit (LMIntLit i (LMInt $ widthInBits w))
 
 genStaticLit (CmmFloat r w)
-    = Right $ LMStaticLit (LMFloatLit r (widthToLlvmFloat w))
+    = Right $ LMStaticLit (LMFloatLit (fromRational r) (widthToLlvmFloat w))
 
 -- Leave unresolved, will fix later
 genStaticLit c@(CmmLabel        _    ) = Left $ c

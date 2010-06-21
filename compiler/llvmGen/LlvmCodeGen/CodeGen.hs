@@ -558,7 +558,7 @@ genMachOp env _ op [x] = case op of
         in negate (widthToLlvmInt w) all0 LM_MO_Sub
 
     MO_F_Neg w ->
-        let all0 = LMLitVar $ LMFloatLit 0 (widthToLlvmFloat w)
+        let all0 = LMLitVar $ LMFloatLit (-0) (widthToLlvmFloat w)
         in negate (widthToLlvmFloat w) all0 LM_MO_Sub
 
     MO_SF_Conv _ w -> fiConv (widthToLlvmFloat w) LM_Sitofp
@@ -807,7 +807,8 @@ genLit env (CmmInt i w)
   = return (env, mkIntLit i (LMInt $ widthInBits w), nilOL, [])
 
 genLit env (CmmFloat r w)
-  = return (env, LMLitVar $ LMFloatLit r (widthToLlvmFloat w), nilOL, [])
+  = return (env, LMLitVar $ LMFloatLit (fromRational r) (widthToLlvmFloat w),
+              nilOL, [])
 
 genLit env cmm@(CmmLabel l)
   = let label = strCLabel_llvm l
