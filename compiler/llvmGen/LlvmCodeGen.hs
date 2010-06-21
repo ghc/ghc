@@ -50,7 +50,7 @@ llvmCodeGen dflags h us cmms
 
         (cdata,env) = foldr split ([],initLlvmEnv) cmm
 
-        split (CmmData _ d'   ) (d,e) = (d':d,e)
+        split (CmmData s d'   ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _ _) (d,e) =
             let lbl = strCLabel_llvm $ if not (null i)
                    then entryLblToInfoLbl l
@@ -62,7 +62,7 @@ llvmCodeGen dflags h us cmms
 -- -----------------------------------------------------------------------------
 -- | Do llvm code generation on all these cmms data sections.
 --
-cmmDataLlvmGens :: DynFlags -> BufHandle -> LlvmEnv -> [[CmmStatic]]
+cmmDataLlvmGens :: DynFlags -> BufHandle -> LlvmEnv -> [(Section,[CmmStatic])]
                 -> [LlvmUnresData] -> IO ( LlvmEnv )
 
 cmmDataLlvmGens dflags h env [] lmdata
@@ -74,7 +74,7 @@ cmmDataLlvmGens dflags h env [] lmdata
         return env'
 
 cmmDataLlvmGens dflags h env (cmm:cmms) lmdata
-  = let lmdata'@(l, ty, _) = genLlvmData cmm
+  = let lmdata'@(l, _, ty, _) = genLlvmData cmm
         env' = funInsert (strCLabel_llvm l) ty env
     in cmmDataLlvmGens dflags h env' cmms (lmdata ++ [lmdata'])
 
@@ -95,7 +95,7 @@ cmmProcLlvmGens _ h _ _ [] _ ivars
         ty     = (LMArray (length ivars) i8Ptr)
         usedArray = LMStaticArray (map cast ivars) ty
         lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
-                  (Just $ fsLit "llvm.metadata") Nothing, Just usedArray)
+                  (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
     in do
         Prt.bufLeftRender h $ pprLlvmData ([lmUsed], [])
 
@@ -112,7 +112,6 @@ cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars
 -- | Complete llvm code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen :: DynFlags -> UniqSupply -> LlvmEnv -> RawCmmTop
             -> IO ( UniqSupply, LlvmEnv, [LlvmCmmTop] )
-
 cmmLlvmGen dflags us env cmm
   = do
     -- rewrite assignments to global regs
@@ -122,20 +121,10 @@ cmmLlvmGen dflags us env cmm
         (pprCmm $ Cmm [fixed_cmm])
 
     -- generate llvm code from cmm
-    let ((env', llvmBC), usGen) = initUs us $ genLlvmCode env fixed_cmm
+    let ((env', llvmBC), usGen) = initUs us $ genLlvmProc env fixed_cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code"
         (vcat $ map (docToSDoc . fst . pprLlvmCmmTop env' 0) llvmBC)
 
     return (usGen, env', llvmBC)
-
-
--- -----------------------------------------------------------------------------
--- | Instruction selection
---
-genLlvmCode :: LlvmEnv -> RawCmmTop
-            -> UniqSM (LlvmEnv, [LlvmCmmTop])
-genLlvmCode env (CmmData _ _                 ) = return (env, [])
-genLlvmCode env (CmmProc _ _ _ (ListGraph [])) = return (env, [])
-genLlvmCode env cp@(CmmProc _ _ _ _          ) = genLlvmProc env cp
 

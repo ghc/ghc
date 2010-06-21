@@ -28,7 +28,7 @@ module Llvm (
 
         -- * Variables and Type System
         LlvmVar(..), LlvmStatic(..), LlvmLit(..), LlvmType(..),
-        LMGlobal, LMString, LMConstant, LMSection, LMAlign,
+        LMGlobal, LMString, LMSection, LMAlign,
 
         -- ** Some basic types
         i64, i32, i16, i8, i1, i8Ptr, llvmWord, llvmWordPtr,
@@ -39,10 +39,9 @@ module Llvm (
         pLift, pLower, isInt, isFloat, isPointer, llvmWidthInBits,
 
         -- * Pretty Printing
-        ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmConstants,
-        ppLlvmConstant, ppLlvmGlobals, ppLlvmGlobal, ppLlvmFunctionDecls,
-        ppLlvmFunctionDecl, ppLlvmFunctions, ppLlvmFunction, ppLlvmType,
-        ppLlvmTypes, llvmSDoc
+        ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmGlobals,
+        ppLlvmGlobal, ppLlvmFunctionDecls, ppLlvmFunctionDecl, ppLlvmFunctions,
+        ppLlvmFunction, ppLlvmType, ppLlvmTypes, llvmSDoc
 
     ) where
 

@@ -23,8 +23,6 @@ import PprBase
 
 -- | A global mutable variable. Maybe defined or external
 type LMGlobal   = (LlvmVar, Maybe LlvmStatic)
--- | A global constant variable
-type LMConstant = (LlvmVar, LlvmStatic)
 -- | A String in LLVM
 type LMString   = FastString
 
@@ -69,11 +67,12 @@ instance Show LlvmType where
 -- | An LLVM section defenition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
 type LMAlign = Maybe Int
+type LMConst = Bool -- ^ is a variable constant or not
 
 -- | Llvm Variables
 data LlvmVar
   -- | Variables with a global scope.
-  = LMGlobalVar LMString LlvmType LlvmLinkageType LMSection LMAlign
+  = LMGlobalVar LMString LlvmType LlvmLinkageType LMSection LMAlign LMConst
   -- | Variables local to a function or parameters.
   | LMLocalVar Unique LlvmType
   -- | Named local variables. Sometimes we need to be able to explicitly name
@@ -176,18 +175,18 @@ commaCat x  = show (head x) ++ (concat $ map (\y -> "," ++ show y) (tail x))
 -- | Return the variable name or value of the 'LlvmVar'
 -- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
 getName :: LlvmVar -> String
-getName v@(LMGlobalVar _ _ _ _ _) = "@" ++ getPlainName v
-getName v@(LMLocalVar  _ _      ) = "%" ++ getPlainName v
-getName v@(LMNLocalVar _ _      ) = "%" ++ getPlainName v
-getName v@(LMLitVar    _        ) = getPlainName v
+getName v@(LMGlobalVar _ _ _ _ _ _) = "@" ++ getPlainName v
+getName v@(LMLocalVar  _ _        ) = "%" ++ getPlainName v
+getName v@(LMNLocalVar _ _        ) = "%" ++ getPlainName v
+getName v@(LMLitVar    _          ) = getPlainName v
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in a plain textual representation (e.g. @x@, @y@ or @42@).
 getPlainName :: LlvmVar -> String
-getPlainName (LMGlobalVar x _ _ _ _) = unpackFS x
-getPlainName (LMLocalVar  x _      ) = show x
-getPlainName (LMNLocalVar x _      ) = unpackFS x
-getPlainName (LMLitVar    x        ) = getLit x
+getPlainName (LMGlobalVar x _ _ _ _ _) = unpackFS x
+getPlainName (LMLocalVar  x _        ) = show x
+getPlainName (LMNLocalVar x _        ) = unpackFS x
+getPlainName (LMLitVar    x          ) = getLit x
 
 -- | Print a literal value. No type.
 getLit :: LlvmLit -> String
@@ -196,10 +195,10 @@ getLit (LMFloatLit r _) = dToStr r
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
-getVarType (LMGlobalVar _ y _ _ _) = y
-getVarType (LMLocalVar  _ y      ) = y
-getVarType (LMNLocalVar _ y      ) = y
-getVarType (LMLitVar    l        ) = getLitType l
+getVarType (LMGlobalVar _ y _ _ _ _) = y
+getVarType (LMLocalVar  _ y        ) = y
+getVarType (LMNLocalVar _ y        ) = y
+getVarType (LMLitVar    l          ) = getLitType l
 
 -- | Return the 'LlvmType' of a 'LlvmLit'
 getLitType :: LlvmLit -> LlvmType
@@ -230,8 +229,8 @@ getGlobalVar (v, _) = v
 
 -- | Return the 'LlvmLinkageType' for a 'LlvmVar'
 getLink :: LlvmVar -> LlvmLinkageType
-getLink (LMGlobalVar _ _ l _ _) = l
-getLink _                       = Internal
+getLink (LMGlobalVar _ _ l _ _ _) = l
+getLink _                         = Internal
 
 -- | Add a pointer indirection to the supplied type. 'LMLabel' and 'LMVoid'
 -- cannot be lifted.
@@ -242,10 +241,10 @@ pLift x         = LMPointer x
 
 -- | Lower a variable of 'LMPointer' type.
 pVarLift :: LlvmVar -> LlvmVar
-pVarLift (LMGlobalVar s t l x a) = LMGlobalVar s (pLift t) l x a
-pVarLift (LMLocalVar  s t      ) = LMLocalVar  s (pLift t)
-pVarLift (LMNLocalVar s t      ) = LMNLocalVar s (pLift t)
-pVarLift (LMLitVar    _        ) = error $ "Can't lower a literal type!"
+pVarLift (LMGlobalVar s t l x a c) = LMGlobalVar s (pLift t) l x a c
+pVarLift (LMLocalVar  s t        ) = LMLocalVar  s (pLift t)
+pVarLift (LMNLocalVar s t        ) = LMNLocalVar s (pLift t)
+pVarLift (LMLitVar    _          ) = error $ "Can't lower a literal type!"
 
 -- | Remove the pointer indirection of the supplied type. Only 'LMPointer'
 -- constructors can be lowered.
@@ -255,10 +254,10 @@ pLower x  = error $ show x ++ " is a unlowerable type, need a pointer"
 
 -- | Lower a variable of 'LMPointer' type.
 pVarLower :: LlvmVar -> LlvmVar
-pVarLower (LMGlobalVar s t l x a) = LMGlobalVar s (pLower t) l x a
-pVarLower (LMLocalVar  s t      ) = LMLocalVar  s (pLower t)
-pVarLower (LMNLocalVar s t      ) = LMNLocalVar s (pLower t)
-pVarLower (LMLitVar    _        ) = error $ "Can't lower a literal type!"
+pVarLower (LMGlobalVar s t l x a c) = LMGlobalVar s (pLower t) l x a c
+pVarLower (LMLocalVar  s t        ) = LMLocalVar  s (pLower t)
+pVarLower (LMNLocalVar s t        ) = LMNLocalVar s (pLower t)
+pVarLower (LMLitVar    _          ) = error $ "Can't lower a literal type!"
 
 -- | Test if the given 'LlvmType' is an integer
 isInt :: LlvmType -> Bool
@@ -280,8 +279,8 @@ isPointer _             = False
 
 -- | Test if a 'LlvmVar' is global.
 isGlobal :: LlvmVar -> Bool
-isGlobal (LMGlobalVar _ _ _ _ _) = True
-isGlobal _                      = False
+isGlobal (LMGlobalVar _ _ _ _ _ _) = True
+isGlobal _                         = False
 
 -- | Width in bits of an 'LlvmType', returns 0 if not applicable
 llvmWidthInBits :: LlvmType -> Int

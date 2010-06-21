@@ -28,9 +28,6 @@ data LlvmModule = LlvmModule  {
     -- | Comments to include at the start of the module.
     modComments  :: [LMString],
 
-    -- | Constants to include in the module.
-    modConstants :: [LMConstant],
-
     -- | Global variables to include in the module.
     modGlobals   :: [LMGlobal],
 

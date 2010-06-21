@@ -37,8 +37,8 @@ structStr = fsLit "_struct"
 -- complete this completely though as we need to pass all CmmStatic
 -- sections before all references can be resolved. This last step is
 -- done by 'resolveLlvmData'.
-genLlvmData :: [CmmStatic] -> LlvmUnresData
-genLlvmData (CmmDataLabel lbl:xs) =
+genLlvmData :: (Section, [CmmStatic]) -> LlvmUnresData
+genLlvmData (sec, CmmDataLabel lbl:xs) =
     let static  = map genData xs
         label   = strCLabel_llvm lbl
 
@@ -48,9 +48,10 @@ genLlvmData (CmmDataLabel lbl:xs) =
 
         strucTy = LMStruct types
         alias   = LMAlias (label `appendFS` structStr) strucTy
-    in (lbl, alias, static)
+    in (lbl, sec, alias, static)
 
 genLlvmData _ = panic "genLlvmData: CmmData section doesn't start with label!"
+
 
 resolveLlvmDatas ::  LlvmEnv -> [LlvmUnresData] -> [LlvmData]
                  -> (LlvmEnv, [LlvmData])
@@ -63,15 +64,27 @@ resolveLlvmDatas env (udata : rest) ldata
 
 -- | Fix up CLabel references now that we should have passed all CmmData.
 resolveLlvmData :: LlvmEnv -> LlvmUnresData -> (LlvmEnv, LlvmData)
-resolveLlvmData env (lbl, alias, unres) =
+resolveLlvmData env (lbl, sec, alias, unres) =
     let (env', static, refs) = resDatas env unres ([], [])
         refs'          = catMaybes refs
         struct         = Just $ LMStaticStruc static alias
         label          = strCLabel_llvm lbl
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
-        glob           = LMGlobalVar label alias link Nothing Nothing
+        const          = isSecConstant sec
+        glob           = LMGlobalVar label alias link Nothing Nothing const
     in (env', (refs' ++ [(glob, struct)], [alias]))
+
+
+-- | Should a data in this section be considered constant
+isSecConstant :: Section -> Bool
+isSecConstant Text                    = True
+isSecConstant Data                    = False
+isSecConstant ReadOnlyData            = True
+isSecConstant RelocatableReadOnlyData = True
+isSecConstant UninitialisedData       = False
+isSecConstant ReadOnlyData16          = True
+isSecConstant (OtherSection _)        = False
 
 
 -- ----------------------------------------------------------------------------
@@ -114,7 +127,7 @@ resData env (Left cmm@(CmmLabel l)) =
             -- pointer to it.
             Just ty' ->
                 let var = LMGlobalVar label (LMPointer ty')
-                            ExternallyVisible Nothing Nothing
+                            ExternallyVisible Nothing Nothing False
                     ptr  = LMStaticPointer var
                 in (env, LMPtoI ptr lmty, [Nothing])
 

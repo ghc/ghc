@@ -8,8 +8,6 @@ module Llvm.PpLlvm (
     ppLlvmModule,
     ppLlvmComments,
     ppLlvmComment,
-    ppLlvmConstants,
-    ppLlvmConstant,
     ppLlvmGlobals,
     ppLlvmGlobal,
     ppLlvmType,
@@ -40,10 +38,9 @@ import Unique
 
 -- | Print out a whole LLVM module.
 ppLlvmModule :: LlvmModule -> Doc
-ppLlvmModule (LlvmModule comments constants globals decls funcs)
+ppLlvmModule (LlvmModule comments globals decls funcs)
   = ppLlvmComments comments
     $+$ empty
-    $+$ ppLlvmConstants constants
     $+$ ppLlvmGlobals globals
     $+$ empty
     $+$ ppLlvmFunctionDecls decls
@@ -65,10 +62,7 @@ ppLlvmGlobals ls = vcat $ map ppLlvmGlobal ls
 
 -- | Print out a global mutable variable definition
 ppLlvmGlobal :: LMGlobal -> Doc
-ppLlvmGlobal = ppLlvmGlobal' (text "global")
-
-ppLlvmGlobal' :: Doc -> LMGlobal -> Doc
-ppLlvmGlobal' vty (var@(LMGlobalVar _ _ link x a), cont) =
+ppLlvmGlobal (var@(LMGlobalVar _ _ link x a c), dat) =
     let sect = case x of
             Just x' -> text ", section" <+> doubleQuotes (ftext x')
             Nothing -> empty
@@ -77,22 +71,15 @@ ppLlvmGlobal' vty (var@(LMGlobalVar _ _ link x a), cont) =
             Just a' -> text ", align" <+> int a'
             Nothing -> empty
 
-        rhs = case cont of
+        rhs = case dat of
             Just stat -> texts stat
             Nothing   -> texts (pLower $ getVarType var)
 
-    in ppAssignment var $ texts link <+> vty <+> rhs <> sect <> align
+        const' = if c then text "constant" else text "global"
 
-ppLlvmGlobal' _ oth = error $ "Non Global var ppr as global! " ++ show oth
+    in ppAssignment var $ texts link <+> const' <+> rhs <> sect <> align
 
-
--- | Print out a list global constant variable
-ppLlvmConstants :: [LMConstant] -> Doc
-ppLlvmConstants cons = vcat $ map ppLlvmConstant cons
-
--- | Print out a global constant variable
-ppLlvmConstant :: LMConstant -> Doc
-ppLlvmConstant (v,s) = ppLlvmGlobal' (text "constant") (v, Just s)
+ppLlvmGlobal oth = error $ "Non Global var ppr as global! " ++ show oth
 
 
 -- | Print out a list of LLVM type aliases.
@@ -196,7 +183,7 @@ ppCall ct fptr vals attrs = case fptr of
     LMLocalVar _ (LMPointer (LMFunction d)) -> ppCall' d
 
     -- should be function type otherwise
-    LMGlobalVar _ (LMFunction d) _ _ _      -> ppCall' d
+    LMGlobalVar _ (LMFunction d) _ _ _ _    -> ppCall' d
 
     -- not pointer or function, so error
     _other -> error $ "ppCall called with non LMFunction type!\nMust be "

@@ -156,7 +156,7 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
                 FixedArgs (Left [i1, i1, i1, i1, i1]) llvmFunAlign
     let fty = LMFunction funSig
 
-    let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing
+    let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing False
     let tops = case funLookup fname env of
                     Just _  -> []
                     Nothing -> [CmmData Data [([],[fty])]]
@@ -238,14 +238,14 @@ genCall env target res args ret = do
                     Just ty'@(LMFunction sig) -> do
                         -- Function in module in right form
                         let fun = LMGlobalVar name ty' (funcLinkage sig)
-                                        Nothing Nothing
+                                        Nothing Nothing False
                         return (env1, fun, nilOL, [])
 
                     Just _ -> do
                         -- label in module but not function pointer, convert
                         let fty@(LMFunction sig) = funTy name
                         let fun = LMGlobalVar name fty (funcLinkage sig)
-                                        Nothing Nothing
+                                        Nothing Nothing False
                         (v1, s1) <- doExpr (pLift fty)
                                         $ Cast LM_Bitcast fun (pLift fty)
                         return  (env1, v1, unitOL s1, [])
@@ -254,7 +254,7 @@ genCall env target res args ret = do
                         -- label not in module, create external reference
                         let fty@(LMFunction sig) = funTy name
                         let fun = LMGlobalVar name fty (funcLinkage sig)
-                                        Nothing Nothing
+                                        Nothing Nothing False
                         let top = CmmData Data [([],[fty])]
                         let env' = funInsert name fty env1
                         return (env', fun, nilOL, [top])
@@ -827,7 +827,7 @@ genLit env cmm@(CmmLabel l)
             -- pointer to it.
             Just ty' -> do
                 let var = LMGlobalVar label (LMPointer ty')
-                            ExternallyVisible Nothing Nothing
+                            ExternallyVisible Nothing Nothing False
                 (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var llvmWord
                 return (env, v1, unitOL s1, [])
 
@@ -894,26 +894,26 @@ funEpilogue = do
 -- with foreign functions.
 getHsFunc :: LlvmEnv -> CLabel -> UniqSM ExprData
 getHsFunc env lbl
-  = let fname = strCLabel_llvm lbl
-        ty    = funLookup fname env
+  = let fn = strCLabel_llvm lbl
+        ty    = funLookup fn env
     in case ty of
         Just ty'@(LMFunction sig) -> do
         -- Function in module in right form
-            let fun = LMGlobalVar fname ty' (funcLinkage sig) Nothing Nothing
+            let fun = LMGlobalVar fn ty' (funcLinkage sig) Nothing Nothing False
             return (env, fun, nilOL, [])
         Just ty' -> do
         -- label in module but not function pointer, convert
-            let fun = LMGlobalVar fname (pLift ty') ExternallyVisible
-                            Nothing Nothing
+            let fun = LMGlobalVar fn (pLift ty') ExternallyVisible
+                            Nothing Nothing False
             (v1, s1) <- doExpr (pLift llvmFunTy) $
                             Cast LM_Bitcast fun (pLift llvmFunTy)
             return (env, v1, unitOL s1, [])
         Nothing  -> do
         -- label not in module, create external reference
             let ty' = LMFunction $ llvmFunSig lbl ExternallyVisible
-            let fun = LMGlobalVar fname ty' ExternallyVisible Nothing Nothing
+            let fun = LMGlobalVar fn ty' ExternallyVisible Nothing Nothing False
             let top = CmmData Data [([],[ty'])]
-            let env' = funInsert fname ty' env
+            let env' = funInsert fn ty' env
             return (env', fun, nilOL, [top])
 
 

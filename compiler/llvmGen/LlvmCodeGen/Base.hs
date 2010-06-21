@@ -43,7 +43,7 @@ type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Unresolved code.
 -- Of the form: (data label, data type, unresovled data)
-type LlvmUnresData = (CLabel, LlvmType, [UnresStatic])
+type LlvmUnresData = (CLabel, Section, LlvmType, [UnresStatic])
 
 -- | Top level LLVM Data (globals and type aliases)
 type LlvmData = ([LMGlobal], [LlvmType])
@@ -158,7 +158,7 @@ genCmmLabelRef = genStringLabelRef . strCLabel_llvm
 genStringLabelRef :: LMString -> LMGlobal
 genStringLabelRef cl
   = let ty = LMPointer $ LMArray 0 llvmWord
-    in (LMGlobalVar cl ty External Nothing Nothing, Nothing)
+    in (LMGlobalVar cl ty External Nothing Nothing False, Nothing)
 
 
 -- ----------------------------------------------------------------------------

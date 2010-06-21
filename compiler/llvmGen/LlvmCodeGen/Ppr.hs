@@ -59,6 +59,17 @@ pprLlvmHeader :: Doc
 pprLlvmHeader = moduleLayout
 
 
+-- | Pretty print LLVM data code
+pprLlvmData :: LlvmData -> Doc
+pprLlvmData (globals, types) =
+    let tryConst (v, Just s )   = ppLlvmGlobal (v, Just s)
+        tryConst g@(_, Nothing) = ppLlvmGlobal g
+
+        types'   = ppLlvmTypes types
+        globals' = vcat $ map tryConst globals
+    in types' $+$ globals'
+
+
 -- | Pretty print LLVM code
 pprLlvmCmmTop :: LlvmEnv -> Int -> LlvmCmmTop -> (Doc, [LlvmVar])
 pprLlvmCmmTop _ _ (CmmData _ lmdata)
@@ -85,24 +96,16 @@ pprLlvmCmmTop env count (CmmProc info lbl _ (ListGraph blks))
     ), ivar)
 
 
--- | Pretty print LLVM data code
-pprLlvmData :: LlvmData -> Doc
-pprLlvmData (globals, types) =
-    let globals' = ppLlvmGlobals globals
-        types'   = ppLlvmTypes types
-    in types' $+$ globals'
-
-
 -- | Pretty print CmmStatic
 pprCmmStatic :: LlvmEnv -> Int -> [CmmStatic] -> (Doc, [LlvmVar])
 pprCmmStatic env count stat
-  = let unres = genLlvmData stat
+  = let unres = genLlvmData (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
-        setSection (gv@(LMGlobalVar s ty l _ _), d)
+        setSection (gv@(LMGlobalVar s ty l _ _ c), d)
             = let v = if l == Internal then [gv] else []
                   sec = mkLayoutSection count
-              in ((LMGlobalVar s ty l sec llvmInfAlign, d), v)
+              in ((LMGlobalVar s ty l sec llvmInfAlign c, d), v)
         setSection v = (v,[])
 
         (ldata', llvmUsed) = mapAndUnzip setSection ldata
