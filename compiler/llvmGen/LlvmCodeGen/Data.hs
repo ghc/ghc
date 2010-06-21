@@ -15,7 +15,6 @@ import BlockId
 import CLabel
 import Cmm
 
-import DynFlags
 import FastString
 import qualified Outputable
 
@@ -38,8 +37,8 @@ structStr = fsLit "_struct"
 -- complete this completely though as we need to pass all CmmStatic
 -- sections before all references can be resolved. This last step is
 -- done by 'resolveLlvmData'.
-genLlvmData :: DynFlags -> (Section, [CmmStatic]) -> LlvmUnresData
-genLlvmData _ ( _ , (CmmDataLabel lbl):xs) =
+genLlvmData :: [CmmStatic] -> LlvmUnresData
+genLlvmData (CmmDataLabel lbl:xs) =
     let static  = map genData xs
         label   = strCLabel_llvm lbl
 
@@ -51,20 +50,20 @@ genLlvmData _ ( _ , (CmmDataLabel lbl):xs) =
         alias   = LMAlias (label `appendFS` structStr) strucTy
     in (lbl, alias, static)
 
-genLlvmData _ _ = panic "genLlvmData: CmmData section doesn't start with label!"
+genLlvmData _ = panic "genLlvmData: CmmData section doesn't start with label!"
 
-resolveLlvmDatas :: DynFlags -> LlvmEnv -> [LlvmUnresData] -> [LlvmData]
+resolveLlvmDatas ::  LlvmEnv -> [LlvmUnresData] -> [LlvmData]
                  -> (LlvmEnv, [LlvmData])
-resolveLlvmDatas _ env [] ldata
+resolveLlvmDatas env [] ldata
   = (env, ldata)
 
-resolveLlvmDatas dflags env (udata : rest) ldata
-  = let (env', ndata) = resolveLlvmData dflags env udata
-    in resolveLlvmDatas dflags env' rest (ldata ++ [ndata])
+resolveLlvmDatas env (udata : rest) ldata
+  = let (env', ndata) = resolveLlvmData env udata
+    in resolveLlvmDatas env' rest (ldata ++ [ndata])
 
 -- | Fix up CLabel references now that we should have passed all CmmData.
-resolveLlvmData :: DynFlags -> LlvmEnv -> LlvmUnresData -> (LlvmEnv, LlvmData)
-resolveLlvmData _ env (lbl, alias, unres) =
+resolveLlvmData :: LlvmEnv -> LlvmUnresData -> (LlvmEnv, LlvmData)
+resolveLlvmData env (lbl, alias, unres) =
     let (env', static, refs) = resDatas env unres ([], [])
         refs'          = catMaybes refs
         struct         = Just $ LMStaticStruc static alias

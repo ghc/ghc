@@ -275,7 +275,7 @@ genCall env target res args ret = do
             CmmPrim mop -> do
                 let name = cmmPrimOpFunctions mop
                 let lbl  = mkForeignLabel name Nothing
-                                            ForeignLabelInExternalPackage IsFunction
+                                    ForeignLabelInExternalPackage IsFunction
                 getFunPtr $ CmmCallee (CmmLit (CmmLabel lbl)) CCallConv
 
     (env2, fptr, stmts2, top2) <- getFunPtr target
@@ -335,7 +335,8 @@ arg_vars env (CmmHinted e AddrHint:rest) (vars, stmts, tops)
                            ++ show a ++ ")"
 
        (v2, s1) <- doExpr i8Ptr $ Cast op v1 i8Ptr
-       arg_vars env' rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
+       arg_vars env' rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
+                               tops ++ top')
 
 arg_vars env (CmmHinted e _:rest) (vars, stmts, tops)
   = do (env', v1, stmts', top') <- exprToVar env e
