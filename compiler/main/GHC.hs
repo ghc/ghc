@@ -2016,7 +2016,10 @@ msDeps s =
 	 ++ [ (m,False) | m <- ms_home_imps s ] 
 
 home_imps :: [Located (ImportDecl RdrName)] -> [Located ModuleName]
-home_imps imps = [ ideclName i |  L _ i <- imps, isNothing (ideclPkgQual i) ]
+home_imps imps = [ ideclName i |  L _ i <- imps, isLocal (ideclPkgQual i) ]
+  where isLocal Nothing = True
+        isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
+        isLocal _ = False
 
 ms_home_allimps :: ModSummary -> [ModuleName]
 ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
