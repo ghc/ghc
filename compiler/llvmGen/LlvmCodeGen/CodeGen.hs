@@ -26,6 +26,8 @@ import UniqSupply
 import Unique
 import Util
 
+import Control.Monad ( liftM )
+
 type LlvmStatements = OrdList LlvmStatement
 
 -- -----------------------------------------------------------------------------
@@ -61,7 +63,8 @@ basicBlocksCodeGen env ([]) (blocks, tops)
   = do let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
        let ((BasicBlock id fstmts):rblocks) = blocks'
-       let fblocks = (BasicBlock id (funPrologue ++ allocs' ++ fstmts)):rblocks
+       fplog <- funPrologue
+       let fblocks = (BasicBlock id (fplog ++  allocs' ++ fstmts)):rblocks
        return (env, fblocks, tops)
 
 basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
@@ -432,16 +435,24 @@ genStore :: LlvmEnv -> CmmExpr -> CmmExpr -> UniqSM StmtData
 genStore env addr val = do
     (env1, vaddr, stmts1, top1) <- exprToVar env addr
     (env2, vval,  stmts2, top2) <- exprToVar env1 val
-    if getVarType vaddr == llvmWord
-        then do
+    case getVarType vaddr of
+        LMPointer _ -> do
+            let s1 = Store vval vaddr
+            return (env2, stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
+
+        i@(LMInt _) | i == llvmWord -> do
             let vty = pLift $ getVarType vval
             (vptr, s1) <- doExpr vty $ Cast LM_Inttoptr vaddr vty
             let s2 = Store vval vptr
             return (env2, stmts1 `appOL` stmts2 `snocOL` s1 `snocOL` s2,
                     top1 ++ top2)
 
-        else
-            panic $ "genStore: ptr not of word size! (" ++ show vaddr ++ ")"
+        other ->
+            pprPanic "genStore: ptr not right type!"
+                    (PprCmm.pprExpr addr <+> text (
+                        "Size of Ptr: " ++ show llvmPtrBits ++
+                        ", Size of var: " ++ show (llvmWidthInBits other) ++
+                        ", Var: " ++ show vaddr))
 
 
 -- | Unconditional branch
@@ -752,24 +763,22 @@ genMachOp _ _ _ _ = panic "genMachOp: More then 2 expressions in MachOp!"
 genCmmLoad :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
 genCmmLoad env e ty = do
     (env', iptr, stmts, tops) <- exprToVar env e
-    let ety = getVarType iptr
-    case (isInt ety) of
-         True | llvmPtrBits == llvmWidthInBits ety ->  do
+    case getVarType iptr of
+         LMPointer _ -> do
+                    (dvar, load) <- doExpr (cmmToLlvmType ty) $ Load iptr
+                    return (env', dvar, stmts `snocOL` load, tops)
+
+         i@(LMInt _) | i == llvmWord -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     (ptr, cast)  <- doExpr pty $ Cast LM_Inttoptr iptr pty
                     (dvar, load) <- doExpr (cmmToLlvmType ty) $ Load ptr
                     return (env', dvar, stmts `snocOL` cast `snocOL` load, tops)
 
-              | otherwise
-                -> pprPanic
-                        ("exprToVar: can't cast to pointer as int not of "
-                            ++ "pointer size!")
+         other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
                         (PprCmm.pprExpr e <+> text (
                             "Size of Ptr: " ++ show llvmPtrBits ++
-                            ", Size of var: " ++ show (llvmWidthInBits ety) ++
+                            ", Size of var: " ++ show (llvmWidthInBits other) ++
                             ", Var: " ++ show iptr))
-
-         False -> panic "exprToVar: CmmLoad expression is not of type int!"
 
 
 -- | Handle CmmReg expression
@@ -867,23 +876,35 @@ genLit _ CmmHighStackMark
 --
 
 -- | Function prologue. Load STG arguments into variables for function.
-funPrologue :: [LlvmStatement]
-funPrologue = concat $ map getReg activeStgRegs
+funPrologue :: UniqSM [LlvmStatement]
+funPrologue = liftM concat $ mapM getReg activeStgRegs
     where getReg rr =
             let reg = lmGlobalRegVar rr
                 arg = lmGlobalRegArg rr
                 alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
-                store = Store arg reg
-            in [alloc, store]
+            in if (isPointer . getVarType) arg
+                  then do
+                      (v, c) <- doExpr llvmWord (Cast LM_Ptrtoint arg llvmWord)
+                      let store = Store v reg
+                      return [alloc, c, store]
+                  else do
+                      let store = Store arg reg
+                      return [alloc, store]
 
 
 -- | Function epilogue. Load STG variables to use as argument for call.
 funEpilogue :: UniqSM ([LlvmVar], LlvmStatements)
 funEpilogue = do
     let loadExpr r = do
-        (v,s) <- doExpr (pLower $ getVarType r) $ Load r
-        return (v, unitOL s)
-    loads <- mapM (loadExpr . lmGlobalRegVar) activeStgRegs
+        let reg = lmGlobalRegVar r
+        let arg = lmGlobalRegArg r
+        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
+        case (isPointer . getVarType) arg of
+             True  -> do
+                 (v2, s2) <- doExpr llvmWordPtr $ Cast LM_Inttoptr v llvmWordPtr
+                 return (v2, unitOL s `snocOL` s2)
+             False -> return (v, unitOL s)
+    loads <- mapM loadExpr activeStgRegs
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
 

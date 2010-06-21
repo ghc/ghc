@@ -230,9 +230,12 @@ ppCmpOp op left right =
   let cmpOp
         | isInt (getVarType left) && isInt (getVarType right) = text "icmp"
         | isFloat (getVarType left) && isFloat (getVarType right) = text "fcmp"
+        | otherwise = text "icmp" -- Just continue as its much easier to debug
+        {-
         | otherwise = error ("can't compare different types, left = "
                 ++ (show $ getVarType left) ++ ", right = "
                 ++ (show $ getVarType right))
+        -}
   in cmpOp <+> texts op <+> texts (getVarType left)
         <+> (text $ getName left) <> comma <+> (text $ getName right)
 
