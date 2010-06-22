@@ -423,7 +423,6 @@ data DynFlags = DynFlags {
   opt_a                 :: [String],
   opt_l                 :: [String],
   opt_windres           :: [String],
-  opt_la                :: [String], -- LLVM: llvm-as assembler
   opt_lo                :: [String], -- LLVM: llvm optimiser
   opt_lc                :: [String], -- LLVM: llc static compiler
 
@@ -440,7 +439,6 @@ data DynFlags = DynFlags {
   pgm_T                 :: String,
   pgm_sysman            :: String,
   pgm_windres           :: String,
-  pgm_la                :: (String,[Option]), -- LLVM: llvm-as assembler
   pgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
   pgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
 
@@ -667,7 +665,6 @@ defaultDynFlags =
         opt_m                   = [],
         opt_l                   = [],
         opt_windres             = [],
-        opt_la                  = [],
         opt_lo                  = [],
         opt_lc                  = [],
 
@@ -696,7 +693,6 @@ defaultDynFlags =
         pgm_T                   = panic "defaultDynFlags: No pgm_T",
         pgm_sysman              = panic "defaultDynFlags: No pgm_sysman",
         pgm_windres             = panic "defaultDynFlags: No pgm_windres",
-        pgm_la                  = panic "defaultDynFlags: No pgm_la",
         pgm_lo                  = panic "defaultDynFlags: No pgm_lo",
         pgm_lc                  = panic "defaultDynFlags: No pgm_lc",
         -- end of initSysTools values
@@ -787,9 +783,9 @@ getVerbFlag dflags
 setObjectDir, setHiDir, setStubDir, setOutputDir, setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, setPgmL, setPgmF, setPgmc, setPgmm, setPgms, setPgma, setPgml, setPgmdll, setPgmwindres,
-         setPgmla, setPgmlo, setPgmlc,
-         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres, addOptla, addOptlo,
-         addOptlc, addCmdlineFramework, addHaddockOpts
+         setPgmlo, setPgmlc,
+         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptwindres, addOptlo, addOptlc,
+         addCmdlineFramework, addHaddockOpts
    :: String -> DynFlags -> DynFlags
 setOutputFile, setOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
@@ -833,7 +829,6 @@ setPgma   f d = d{ pgm_a   = (f,[])}
 setPgml   f d = d{ pgm_l   = (f,[])}
 setPgmdll f d = d{ pgm_dll = (f,[])}
 setPgmwindres f d = d{ pgm_windres = f}
-setPgmla  f d = d{ pgm_la  = (f,[])}
 setPgmlo  f d = d{ pgm_lo  = (f,[])}
 setPgmlc  f d = d{ pgm_lc  = (f,[])}
 
@@ -845,7 +840,6 @@ addOptm   f d = d{ opt_m   = f : opt_m d}
 addOpta   f d = d{ opt_a   = f : opt_a d}
 addOptl   f d = d{ opt_l   = f : opt_l d}
 addOptwindres f d = d{ opt_windres = f : opt_windres d}
-addOptla  f d = d{ opt_la  = f : opt_la d}
 addOptlo  f d = d{ opt_lo  = f : opt_lo d}
 addOptlc  f d = d{ opt_lc  = f : opt_lc d}
 
@@ -1043,7 +1037,6 @@ dynamic_flags = [
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
-  , Flag "pgmla"         (HasArg (upd . setPgmla)) Supported
   , Flag "pgmlo"         (HasArg (upd . setPgmlo)) Supported
   , Flag "pgmlc"         (HasArg (upd . setPgmlc)) Supported
 
@@ -1059,7 +1052,6 @@ dynamic_flags = [
   , Flag "pgmwindres"     (HasArg (upd . setPgmwindres)) Supported
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
-  , Flag "optla"          (HasArg (upd . addOptla)) Supported
   , Flag "optlo"          (HasArg (upd . addOptlo)) Supported
   , Flag "optlc"          (HasArg (upd . addOptlc)) Supported
 

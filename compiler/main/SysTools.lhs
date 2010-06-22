@@ -18,7 +18,6 @@ module SysTools (
         runAs, runLink,          -- [Option] -> IO ()
         runMkDLL,
         runWindres,
-        runLlvmAs,
         runLlvmOpt,
         runLlvmLlc,
 
@@ -223,8 +222,7 @@ initSysTools mbMinusB dflags0
                 ld_prog  = gcc_prog
 
         -- figure out llvm location. (TODO: Acutally implement).
-        ; let la_prog = "llvm-as"
-              lc_prog = "llc"
+        ; let lc_prog = "llc"
               lo_prog = "opt"
 
         ; return dflags1{
@@ -244,7 +242,6 @@ initSysTools mbMinusB dflags0
                         pgm_T   = touch_path,
                         pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
                         pgm_windres = windres_path,
-                        pgm_la  = (la_prog,[]),
                         pgm_lo  = (lo_prog,[]),
                         pgm_lc  = (lc_prog,[])
                         -- Hans: this isn't right in general, but you can
@@ -391,11 +388,6 @@ runAs dflags args = do
       args1 = args0 ++ args
   mb_env <- getGccEnv args1
   runSomethingFiltered dflags id "Assembler" p args1 mb_env
-
-runLlvmAs :: DynFlags -> [Option] -> IO ()
-runLlvmAs dflags args = do
-  let (p,args0) = pgm_la dflags
-  runSomething dflags "LLVM Assembler" p (args0++args)
 
 runLlvmOpt :: DynFlags -> [Option] -> IO ()
 runLlvmOpt dflags args = do
