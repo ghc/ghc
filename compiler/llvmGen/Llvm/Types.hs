@@ -191,7 +191,9 @@ getPlainName (LMLitVar    x          ) = getLit x
 -- | Print a literal value. No type.
 getLit :: LlvmLit -> String
 getLit (LMIntLit   i _) = show ((fromInteger i)::Int)
-getLit (LMFloatLit r _) = dToStr r
+getLit (LMFloatLit r LMFloat ) = fToStr $ realToFrac r
+getLit (LMFloatLit r LMDouble) = dToStr r
+getLit f@(LMFloatLit _ _) = error $ "Can't print this float literal!" ++ show f
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
@@ -704,6 +706,14 @@ dToStr d
 
         str  = map toUpper $ concat . fixEndian . (map hex) $ bs
     in  "0x" ++ str
+
+-- | Convert a Haskell Float to an LLVM hex encoded floating point form.
+-- LLVM uses the same encoding for both floats and doubles (16 digit hex
+-- string) but floats must have the last half all zeroes so it can fit into
+-- a float size type.
+{-# NOINLINE fToStr #-}
+fToStr :: Float -> String
+fToStr = (dToStr . realToFrac)
 
 -- | Reverse or leave byte data alone to fix endianness on this target.
 fixEndian :: [a] -> [a]
