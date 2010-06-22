@@ -354,7 +354,6 @@ type IPr = (Int, Int)
 
 -- | The type of immutable non-strict (boxed) arrays
 -- with indices in @i@ and elements in @e@.
--- The Int is the number of elements in the Array.
 data Ix i => Array i e
                  = Array !i         -- the lower bound, l
                          !i         -- the upper bound, u
