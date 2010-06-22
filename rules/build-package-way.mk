@@ -60,7 +60,7 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
          `$$($1_$2_$3_MKSTUBOBJS)` \
          -shared -dynamic -dynload deploy \
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
-         -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
+         -no-auto-link-packages $$(addprefix -package ,$$($1_$2_DEPS)) \
          -o $$@
 else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
@@ -68,7 +68,7 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
          `$$($1_$2_$3_MKSTUBOBJS)` \
          -shared -dynamic -dynload deploy \
 	     -dylib-install-name $(ghclibdir)/`basename "$$@" | sed 's/^libHS//;s/[-]ghc.*//'`/`basename "$$@"` \
-         -no-auto-link-packages $$(addprefix -package,$$($1_$2_DEPS)) \
+         -no-auto-link-packages $$(addprefix -package ,$$($1_$2_DEPS)) \
          -o $$@
 endif
 else
