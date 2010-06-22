@@ -9,6 +9,7 @@
 #include <string.h>
 
 int main(int argc, char** argv) {
+    char *binDir;
     char *exePath;
     char *preArgv[1];
 
@@ -18,7 +19,8 @@ int main(int argc, char** argv) {
         fflush(stdout);
     }
 
-    exePath = "ghc.exe";
+    binDir = getExecutablePath();
+    exePath = mkString("%s/ghc.exe", binDir);
     preArgv[0] = "--interactive";
 
     run(exePath, 1, preArgv, argc - 1, argv + 1);
