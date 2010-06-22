@@ -169,6 +169,7 @@ instance Show ArrayException where
 -- We need it here because it is used in ExitException in the
 -- Exception datatype (above).
 
+-- | Defines the exit codes that a program can return.
 data ExitCode
   = ExitSuccess -- ^ indicates successful termination;
   | ExitFailure Int
