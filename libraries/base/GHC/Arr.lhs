@@ -560,7 +560,7 @@ assocs :: Ix i => Array i e -> [(i, e)]
 assocs arr@(Array l u _ _) =
     [(i, arr ! i) | i <- range (l,u)]
 
--- | The 'accumArray' deals with repeated indices in the association
+-- | The 'accumArray' function deals with repeated indices in the association
 -- list using an /accumulating function/ which combines the values of
 -- associations with the same index.
 -- For example, given a list of values of some index type, @hist@
