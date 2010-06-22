@@ -560,8 +560,12 @@ mkExportItems modMap this_mod gre exported_names decls declMap
               -- But I might be missing something obvious.  What's important
               -- /here/ is that we behave reasonably when we run into one of
               -- those exported type-inferenced values.
-              isLocalAndTypeInferenced <- liftGhcToErrMsgGhc $
-                    isLoaded (moduleName (nameModule t))
+              isLocalAndTypeInferenced <- liftGhcToErrMsgGhc $ do
+                    let mdl = nameModule t
+                    if modulePackageId mdl == thisPackage dflags
+                       then isLoaded (moduleName mdl)
+                       else return False
+
               if isLocalAndTypeInferenced
                then do
                    -- I don't think there can be any subs in this case,
