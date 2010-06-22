@@ -25,7 +25,8 @@ config.run_ways		     = ['normal', 'optc', 'hpc']
 config.other_ways            = ['extcore','optextcore',
                                 'prof_hc_hb','prof_hb',
                                 'prof_hd','prof_hy','prof_hr',
-                                'threaded2_qw']
+                                'threaded2_qw',
+                                'llvm', 'optllvm']
 
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
@@ -62,6 +63,8 @@ config.way_flags = {
 	'normal'     : [],
 	'optc'       : ['-O -fno-warn-deprecated-flags -fvia-C'],
 	'optasm'     : ['-O -fasm'],
+	'llvm'       : ['-fllvm'],
+	'optllvm'    : ['-O -fllvm'],
 	'profc'      : ['-O -prof -auto-all -fno-warn-deprecated-flags -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
 	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
@@ -84,6 +87,8 @@ config.way_rts_flags = {
 	'normal'     : [],
 	'optc'       : [],
 	'optasm'     : [],
+	'llvm'       : [],
+	'optllvm'    : [],
 	'profc'      : ['-p'],
 	'profasm'    : ['-hc'], # test heap profiling too
 	'profthreaded' : ['-p'],
