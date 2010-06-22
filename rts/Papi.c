@@ -74,6 +74,7 @@ int papi_error;
 
 /* Arbitrary, to avoid using malloc */
 #define MAX_PAPI_EVENTS 10
+static char papiNativeEventNames[MAX_PAPI_EVENTS][PAPI_MAX_STR_LEN];
 
 static nat n_papi_events = 0;
 
@@ -86,10 +87,10 @@ long_long GC0Counters[MAX_PAPI_EVENTS];
 long_long GC1Counters[MAX_PAPI_EVENTS];
 
 long_long start_mutator_cycles;
-long_long mutator_cycles;
+long_long mutator_cycles = 0;
 long_long start_gc_cycles;
-long_long gc0_cycles;
-long_long gc1_cycles;
+long_long gc0_cycles = 0;
+long_long gc1_cycles = 0;
 
 
 
@@ -145,11 +146,20 @@ init_countable_events(void)
     } else if (RtsFlags.PapiFlags.eventType==PAPI_USER_EVENTS) {
         nat i;
         char *name;
+        char *asciiEventCode;
         int code;
         for (i = 0; i < RtsFlags.PapiFlags.numUserEvents; i++) {
+          if(RtsFlags.PapiFlags.userEventsKind[i] == PAPI_PRESET_EVENT_KIND) {
             name = RtsFlags.PapiFlags.userEvents[i];
             PAPI_CHECK(PAPI_event_name_to_code(name, &code))
-            papi_add_event(name, code);
+          }
+          else { // PAPI_NATIVE_EVENT_KIND
+            asciiEventCode = RtsFlags.PapiFlags.userEvents[i];
+            name = papiNativeEventNames[i];
+            code = strtol(asciiEventCode, NULL, 16 /* hex number expected */);
+            PAPI_CHECK(PAPI_event_code_to_name(code, name))
+          }
+          papi_add_event(name, code);
         }
     } else {
 	// PAPI_ADD_EVENT(PAPI_L1_DCA); // L1 data cache accesses

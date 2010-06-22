@@ -173,6 +173,8 @@ struct PAPI_FLAGS {
     nat     eventType;          /* The type of events to count */
     nat     numUserEvents;
     char *  userEvents[MAX_PAPI_USER_EVENTS];
+    /* Allow user to enter either PAPI preset or native events */
+    nat     userEventsKind[MAX_PAPI_USER_EVENTS];
 };
 
 #define PAPI_FLAG_CACHE_L1 1
@@ -181,6 +183,8 @@ struct PAPI_FLAGS {
 #define PAPI_FLAG_STALLS 4
 #define PAPI_FLAG_CB_EVENTS 5
 #define PAPI_USER_EVENTS 6
+#define PAPI_PRESET_EVENT_KIND 0
+#define PAPI_NATIVE_EVENT_KIND 1
 
 #endif
 

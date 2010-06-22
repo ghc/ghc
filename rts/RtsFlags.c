@@ -340,6 +340,8 @@ usage_text[] = {
 "            b - branch mispredictions",
 "            s - stalled cycles",
 "            e - cache miss and branch misprediction events",
+"            +PAPI_EVENT   - collect papi preset event PAPI_EVENT",
+"            #NATIVE_EVENT - collect native event NATIVE_EVENT (in hex)",
 #endif
 "",
 "RTS options may also be specified using the GHCRTS environment variable.",
@@ -577,12 +579,18 @@ error = rtsTrue;
 		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CB_EVENTS;
 		  break;
                 case '+':
+                case '#':
                   if (RtsFlags.PapiFlags.numUserEvents >= MAX_PAPI_USER_EVENTS) {
                       errorBelch("maximum number of PAPI events reached");
                       stg_exit(EXIT_FAILURE);
                   }
+                  nat eventNum  = RtsFlags.PapiFlags.numUserEvents++;
+                  char kind     = rts_argv[arg][2];
+                  nat eventKind = kind == '+' ? PAPI_PRESET_EVENT_KIND : PAPI_NATIVE_EVENT_KIND;
+
+                  RtsFlags.PapiFlags.userEvents[eventNum] = rts_argv[arg] + 3;
                   RtsFlags.PapiFlags.eventType = PAPI_USER_EVENTS;
-                  RtsFlags.PapiFlags.userEvents[RtsFlags.PapiFlags.numUserEvents++] = rts_argv[arg] + 3;
+                  RtsFlags.PapiFlags.userEventsKind[eventNum] = eventKind;
                   break;
 		default:
 		  bad_option( rts_argv[arg] );
