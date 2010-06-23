@@ -1,5 +1,6 @@
 \begin{code}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Integer
