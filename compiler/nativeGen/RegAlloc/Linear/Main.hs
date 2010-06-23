@@ -206,15 +206,16 @@ linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
    some reason then this function will loop. We should probably do some 
    more sanity checking to guard against this eventuality.
 -}
-		
+
 process _ _ [] []         accum _
 	= return $ reverse accum
 
 process first_id block_live [] next_round accum madeProgress
 	| not madeProgress
-	= pprPanic "RegAlloc.Linear.Main.process: no progress made, bailing out" 
-		(  text "stalled blocks:"
+	= pprTrace "RegAlloc.Linear.Main.process: no progress made, bailing out." 
+		(  text "Unreachable blocks:"
 		$$ vcat (map ppr next_round))
+	$ return $ reverse accum
 	
 	| otherwise
 	= process first_id block_live 
@@ -380,9 +381,9 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     clobber_saves 	<- saveClobberedTemps real_written r_dying
 
     -- debugging
-    freeregs <- getFreeRegsR
+{-    freeregs <- getFreeRegsR
     assig    <- getAssigR
-{-    pprTrace "genRaInsn" 
+    pprTrace "genRaInsn" 
     	(ppr instr 
 		$$ text "r_dying      = " <+> ppr r_dying 
 		$$ text "w_dying      = " <+> ppr w_dying 
