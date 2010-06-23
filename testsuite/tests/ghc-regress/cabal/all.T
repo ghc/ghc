@@ -11,9 +11,8 @@ test('ghcpkg02',
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg02'])
 test('ghcpkg03',
-     [extra_clean(['local03.package.conf',
-                   'local03.package.conf.old']),
-      normalise_slashes],
+     extra_clean(['local03.package.conf',
+                  'local03.package.conf.old']),
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg03'])
 test('ghcpkg04',

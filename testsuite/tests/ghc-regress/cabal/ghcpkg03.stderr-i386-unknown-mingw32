@@ -1,0 +1,31 @@
+testpkg-1.2.3.4: Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: import-dirs: /usr/local/lib/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory (ignoring)
+testpkg-1.2.3.4: library-dirs: /usr/local/lib/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: include-dirs: /usr/local/include/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: file A.hi is missing (ignoring)
+testpkg-1.2.3.4: file B.hi is missing (ignoring)
+testpkg-1.2.3.4: file C\D.hi is missing (ignoring)
+testpkg-1.2.3.4: cannot find libtestpkg-1.2.3.4.a on library path (ignoring)
+testpkg-2.0: Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-2.0: Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-2.0: import-dirs: /usr/local/lib/testpkg is a relative path (ignoring)
+testpkg-2.0: import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory (ignoring)
+testpkg-2.0: library-dirs: /usr/local/lib/testpkg is a relative path (ignoring)
+testpkg-2.0: include-dirs: /usr/local/include/testpkg is a relative path (ignoring)
+testpkg-2.0: file A.hi is missing (ignoring)
+testpkg-2.0: file B.hi is missing (ignoring)
+testpkg-2.0: file C\D.hi is missing (ignoring)
+testpkg-2.0: file C\E.hi is missing (ignoring)
+testpkg-2.0: cannot find libtestpkg-2.0.a on library path (ignoring)
+testpkg-1.2.3.4: Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: import-dirs: /usr/local/lib/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory (ignoring)
+testpkg-1.2.3.4: library-dirs: /usr/local/lib/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: include-dirs: /usr/local/include/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: file A.hi is missing (ignoring)
+testpkg-1.2.3.4: file B.hi is missing (ignoring)
+testpkg-1.2.3.4: file C\D.hi is missing (ignoring)
+testpkg-1.2.3.4: cannot find libtestpkg-1.2.3.4.a on library path (ignoring)
