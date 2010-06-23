@@ -1,0 +1,18 @@
+There are problems in package testpkg-2.0:
+  Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+  Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+  import-dirs: /usr/local/lib/testpkg is a relative path
+  import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+  library-dirs: /usr/local/lib/testpkg is a relative path
+  include-dirs: /usr/local/include/testpkg is a relative path
+  file A.hi is missing
+  file B.hi is missing
+  file C\D.hi is missing
+  file C\E.hi is missing
+  cannot find libtestpkg-2.0.a on library path
+
+The following packages are broken, either because they have a problem
+listed above, or because they depend on a broken package.
+testpkg-2.0
+testpkg-3.0
+ghc-pkg.exe: unregistering testpkg-2.0 would break the following packages: testpkg-3.0 (use --force to override)
