@@ -111,7 +111,7 @@ realRegSqueeze cls rr
 	RcDouble
 	 -> case rr of
 	 	RealRegSingle regNo
-			| regNo >= firstfake && regNo < lastfake -> _ILIT(1)
+			| regNo >= firstfake && regNo <= lastfake -> _ILIT(1)
 			| otherwise	-> _ILIT(0)
 			
 		RealRegPair{}		-> _ILIT(0)
