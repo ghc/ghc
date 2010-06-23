@@ -447,9 +447,8 @@ slurpReloadCoalesce live
 
 
 -- | Strip away liveness information, yielding NatCmmTop
-
 stripLive 
-	:: Instruction instr
+	:: (Outputable instr, Instruction instr)
 	=> LiveCmmTop instr 
 	-> NatCmmTop instr
 
@@ -470,8 +469,14 @@ stripLive live
 	   in	CmmProc info label params
                           (ListGraph $ map stripLiveBlock $ first' : rest')
 
-	stripCmm _
-		 = panic "RegAlloc.Liveness.stripLive: no first_id on proc"	
+	-- procs used for stg_split_markers don't contain any blocks, and have no first_id.
+	stripCmm (CmmProc (LiveInfo info Nothing _) label params [])
+	 =	CmmProc info label params (ListGraph [])
+
+	-- If the proc has blocks but we don't know what the first one was, then we're dead.
+	stripCmm proc
+		 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (ppr proc)
+			
 
 -- | Strip away liveness information from a basic block,
 --	and make real spill instructions out of SPILL, RELOAD pseudos along the way.
