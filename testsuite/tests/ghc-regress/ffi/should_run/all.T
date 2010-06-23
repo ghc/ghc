@@ -158,4 +158,10 @@ test('ffi020', [ omit_ways(prof_ways),
 
 test('ffi021', normal, compile_and_run, [''])
 
-test('4038', normal, compile_and_run, [''])
+if config.platform == 'i386-unknown-mingw32':
+    # This test needs a larger C stack than we get by default on Windows
+	flagsFor4038 = ['-optl-Wl,--stack,10485760']
+else:
+	flagsFor4038 = ['']
+test('4038', normal, compile_and_run, flagsFor4038)
+
