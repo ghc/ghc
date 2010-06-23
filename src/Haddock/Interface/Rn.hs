@@ -42,7 +42,7 @@ rnDoc gre = unId . do_rn
     let gres = concatMap (\rdrName ->
                  map gre_name (lookupGRE_RdrName rdrName gre)) choices
     case gres of
-      [] -> return (DocString (ids2string ids))
+      []   -> return (DocMonospaced (DocString (ids2string ids)))
       ids' -> return (DocIdentifier ids')
 
   DocModule str -> return (DocModule str)
