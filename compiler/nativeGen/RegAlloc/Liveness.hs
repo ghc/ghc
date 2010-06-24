@@ -686,7 +686,7 @@ checkIsReverseDependent
 checkIsReverseDependent sccs'
  = go emptyUniqSet sccs'
 
- where 	go blockssSeen []
+ where 	go _ []
 	 = Nothing
 	
 	go blocksSeen (AcyclicSCC block : sccs)
@@ -705,7 +705,7 @@ checkIsReverseDependent sccs'
 		 []		-> go blocksSeen' sccs
 		 bad : _	-> Just bad
 		
-	slurpJumpDestsOfBlock (BasicBlock blockId instrs)
+	slurpJumpDestsOfBlock (BasicBlock _ instrs)
 	 	= unionManyUniqSets
 		$ map (mkUniqSet . jumpDestsOfInstr) 
 		 	[ i | LiveInstr i _ <- instrs]
