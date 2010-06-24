@@ -26,9 +26,6 @@
 
 static void  initMBlock(void *mblock);
 
-// The free_list is kept sorted by size, smallest first.
-// In THREADED_RTS mode, the free list is protected by sm_mutex.
-
 /* -----------------------------------------------------------------------------
 
   Implementation notes
@@ -122,6 +119,8 @@ static void  initMBlock(void *mblock);
   --------------------------------------------------------------------------- */
 
 #define MAX_FREE_LIST 9
+
+// In THREADED_RTS mode, the free list is protected by sm_mutex.
 
 static bdescr *free_list[MAX_FREE_LIST];
 static bdescr *free_mblock_list;
