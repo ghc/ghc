@@ -337,5 +337,5 @@ test('rtsOpts', normal, run_command,
 
 test('withRtsOpts', normal, run_command,
                     ['$MAKE -s --no-print-directory withRtsOpts'])
-test('T3389', normal, compile_and_run, [''])
+test('T3389', expect_broken(3389), compile_and_run, [''])
 
