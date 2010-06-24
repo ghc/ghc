@@ -1043,7 +1043,18 @@ warnUnusedModules mods
 
 warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedImports gres  = ifOptM Opt_WarnUnusedImports (warnUnusedGREs gres)
-warnUnusedTopBinds gres = ifOptM Opt_WarnUnusedBinds   (warnUnusedGREs gres)
+warnUnusedTopBinds gres
+    = ifOptM Opt_WarnUnusedBinds
+    $ do isBoot <- tcIsHsBoot
+         let noParent gre = case gre_par gre of
+                            NoParent -> True
+                            ParentIs _ -> False
+             -- Don't warn about unused bindings with parents in
+             -- .hs-boot files, as you are sometimes required to give
+             -- unused bindings (trac #3449).
+             gres' = if isBoot then filter noParent gres
+                               else                 gres
+         warnUnusedGREs gres'
 
 warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> FreeVars -> RnM ()
 warnUnusedLocalBinds = check_unused Opt_WarnUnusedBinds
