@@ -502,3 +502,7 @@ withRtsOpts:
 	"$(TEST_HC)" -v0 --make withRtsOpts -with-rtsopts=--info
 	./withRtsOpts | head -1
 
+.PHONY: T3364
+T3364:
+	-"$(TEST_HC)" -H
+
