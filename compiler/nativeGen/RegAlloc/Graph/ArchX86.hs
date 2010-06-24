@@ -31,7 +31,6 @@ classOfReg reg
 
 	
 -- | Determine all the regs that make up a certain class.
---
 regsOfClass :: RegClass -> UniqSet Reg
 regsOfClass c
  = case c of
@@ -52,7 +51,6 @@ regsOfClass c
 
 -- | Determine the common name of a reg
 --	returns Nothing if this reg is not part of the machine.
-	
 regName :: Reg -> Maybe String
 regName reg
  = case reg of

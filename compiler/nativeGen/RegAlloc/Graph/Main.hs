@@ -43,7 +43,6 @@ maxSpinCount	= 10
 
 
 -- | The top level of the graph coloring register allocator.
---	
 regAlloc
 	:: (Outputable instr, Instruction instr)
 	=> DynFlags
@@ -169,9 +168,6 @@ regAlloc_spin
 		--	and rewrite SPILL/RELOAD pseudos into real instructions along the way
 		let code_final		= map stripLive code_spillclean
 
---		let spillNatTop		= mapGenBlockTop spillNatBlock
---		let code_final		= map spillNatTop code_nat
-		
 		-- record what happened in this stage for debugging
 		let stat		=
 			RegAllocStatsColored
@@ -240,9 +236,7 @@ regAlloc_spin
 			code_relive
 
 
-
 -- | Build a graph from the liveness and coalesce information in this code.
-
 buildGraph 
 	:: Instruction instr
 	=> [LiveCmmTop instr]
@@ -270,7 +264,6 @@ buildGraph code
 
 -- | Add some conflict edges to the graph.
 --	Conflicts between virtual and real regs are recorded as exclusions.
---
 graphAddConflictSet 
 	:: UniqSet Reg
 	-> Color.Graph VirtualReg RegClass RealReg
@@ -293,7 +286,6 @@ graphAddConflictSet set graph
 
 -- | Add some coalesence edges to the graph
 --	Coalesences between virtual and real regs are recorded as preferences.
---
 graphAddCoalesce 
 	:: (Reg, Reg) 
 	-> Color.Graph VirtualReg RegClass RealReg

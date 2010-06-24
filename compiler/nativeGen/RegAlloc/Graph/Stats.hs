@@ -1,8 +1,6 @@
 {-# OPTIONS -fno-warn-missing-signatures #-}
--- Carries interesting info for debugging / profiling of the 
+-- | Carries interesting info for debugging / profiling of the 
 --	graph coloring register allocator.
---
-
 module RegAlloc.Graph.Stats (
 	RegAllocStats (..),
 
@@ -89,19 +87,11 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 	$$ (ppr (raCode s))
 	$$ text ""
 
---	$$ text "#  Register conflict graph."
---	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
---	$$ text ""
-
 	$$ (if (not $ isNullUFM $ raCoalesced s)
 		then 	text "#  Registers coalesced."
 			$$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
 			$$ text ""
 		else empty)
-
---	$$ text "#  Spill costs.  reg uses defs lifetime degree cost"
---	$$ vcat (map (pprSpillCostRecord (raGraph s)) $ eltsUFM $ raSpillCosts s)
---	$$ text ""
 
 	$$ text "#  Spills inserted."
 	$$ ppr (raSpillStats s)
@@ -113,10 +103,6 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
  	=  text "#  Colored"
-
---	$$ text "#  Register conflict graph (initial)."
---	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
---	$$ text ""
 
 	$$ text "#  Code with liveness information."
 	$$ (ppr (raCode s))
@@ -267,7 +253,6 @@ pprStatsLifeConflict stats graph
 
 -- | Count spill/reload/reg-reg moves.
 --	Lets us see how well the register allocator has done.
---
 countSRMs 
 	:: Instruction instr
 	=> LiveCmmTop instr -> (Int, Int, Int)
@@ -300,18 +285,3 @@ countSRM_instr li
 addSRM (s1, r1, m1) (s2, r2, m2)
 	= (s1+s2, r1+r2, m1+m2)
 
-
-
-
-
-
-{-
-toX11Color (r, g, b)
- = let	rs	= padL 2 '0' (showHex r "")
- 	gs	= padL 2 '0' (showHex r "")
-	bs	= padL 2 '0' (showHex r "")
-
-	padL n c s
-		= replicate (n - length s) c ++ s
-  in	"#" ++ rs ++ gs ++ bs
--}

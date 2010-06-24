@@ -23,8 +23,6 @@ module RegAlloc.Graph.ArchBase (
 )
 	
 where
-
------
 import UniqSet
 import Unique
 
@@ -32,7 +30,6 @@ import Unique
 -- Some basic register classes.
 --	These aren't nessesarally in 1-to-1 correspondance with the allocatable
 --	RegClasses in MachRegs.hs
---
 data RegClass
 	-- general purpose regs
 	= ClassG32	-- 32 bit GPRs
@@ -85,7 +82,6 @@ data RegSub
 
 -- This should be hand coded/cached for each particular architecture,
 --	because the compute time is very long..
-
 worst 
 	:: (RegClass 	-> UniqSet Reg)
 	-> (Reg 	-> UniqSet Reg)
@@ -114,8 +110,6 @@ worst regsOfClass regAlias neighbors classN classC
 -- | For a node N of classN and neighbors of classesC
 --	(bound classN classesC) is the maximum number of potential 
 --	colors for N that can be lost by coloring its neighbors.
---
-
 bound 
 	:: (RegClass 	-> UniqSet Reg)
 	-> (Reg		-> UniqSet Reg)
@@ -139,8 +133,7 @@ bound regsOfClass regAlias classN classesC
 --
 --	A version of this should be constructed for each particular architecture,
 --	possibly including uses of bound, so that alised registers don't get counted
---	twice, as per the paper.
---	
+--	twice, as per the paper.	
 squeese 
 	:: (RegClass	-> UniqSet Reg)
 	-> (Reg		-> UniqSet Reg)

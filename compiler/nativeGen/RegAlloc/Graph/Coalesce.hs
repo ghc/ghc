@@ -25,7 +25,6 @@ import Data.List
 --	For Reg -> Reg moves, if the first reg dies at the same time the second reg is born
 --	then the mov only serves to join live ranges. The two regs can be renamed to be 
 --	the same and the move instruction safely erased.
-
 regCoalesce 
 	:: Instruction instr
 	=> [LiveCmmTop instr] 
@@ -60,7 +59,6 @@ sinkReg fm r
 -- | Slurp out mov instructions that only serve to join live ranges.
 --	During a mov, if the source reg dies and the destiation reg is born
 --	then we can rename the two regs to the same thing and eliminate the move.
---
 slurpJoinMovs 
 	:: Instruction instr
 	=> LiveCmmTop instr 
