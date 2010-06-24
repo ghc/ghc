@@ -212,10 +212,12 @@ process _ _ [] []         accum _
 
 process first_id block_live [] next_round accum madeProgress
 	| not madeProgress
-	= pprTrace "RegAlloc.Linear.Main.process: no progress made, bailing out." 
+	
+	  {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
+	     pprTrace "RegAlloc.Linear.Main.process: no progress made, bailing out." 
 		(  text "Unreachable blocks:"
-		$$ vcat (map ppr next_round))
-	$ return $ reverse accum
+		$$ vcat (map ppr next_round)) -}
+	= return $ reverse accum
 	
 	| otherwise
 	= process first_id block_live 
