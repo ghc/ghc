@@ -63,8 +63,8 @@ isControl               :: Char -> Bool
 -- (letters, numbers, marks, punctuation, symbols and spaces).
 isPrint                 :: Char -> Bool
 
--- | Selects white-space characters in the Latin-1 range.
--- (In Unicode terms, this includes spaces and some control characters.)
+-- | Returns 'True' for any Unicode space character, and the control
+-- characters @\t@, @\\n@, @\\r@, @\\f@, @\\v@.
 isSpace                 :: Char -> Bool
 -- isSpace includes non-breaking space
 -- Done with explicit equalities both for efficiency, and to avoid a tiresome
