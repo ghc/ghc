@@ -283,7 +283,7 @@ alloc_mega_group (nat mblocks)
     if (best)
     {
         // we take our chunk off the end here.
-        nat best_mblocks  = BLOCKS_TO_MBLOCKS(best->blocks);
+        StgWord best_mblocks  = BLOCKS_TO_MBLOCKS(best->blocks);
         bd = FIRST_BDESCR((StgWord8*)MBLOCK_ROUND_DOWN(best) + 
                           (best_mblocks-mblocks)*MBLOCK_SIZE);
 
