@@ -141,8 +141,6 @@ instance Instruction instr => Instruction (InstrSR instr) where
 -- | An instruction with liveness information.
 data LiveInstr instr
 	= LiveInstr (InstrSR instr) (Maybe Liveness)
-	
-
 
 -- | Liveness information.
 -- 	The regs which die are ones which are no longer live in the *next* instruction
@@ -651,7 +649,7 @@ sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
 -- Annotate code with register liveness information
 --
 regLiveness
-	:: Instruction instr
+	:: (Outputable instr, Instruction instr)
 	=> LiveCmmTop instr
 	-> UniqSM (LiveCmmTop instr)
 
@@ -673,24 +671,71 @@ regLiveness (CmmProc info lbl params sccs)
 
 
 
--- -----------------------------------------------------------------------------
--- Computing liveness
 
-computeLiveness
+
+-- -----------------------------------------------------------------------------
+-- | Check ordering of Blocks
+--	The computeLiveness function requires SCCs to be in reverse dependent order.
+--	If they're not the liveness information will be wrong, and we'll get a bad allocation.
+--	Better to check for this precondition explicitly or some other poor sucker will
+--	waste a day staring at bad assembly code..
+--	
+checkIsReverseDependent
 	:: Instruction instr
+	=> [SCC (LiveBasicBlock instr)]		-- ^ SCCs of blocks that we're about to run the liveness determinator on.
+	-> Maybe BlockId			-- ^ BlockIds that fail the test (if any)
+	
+checkIsReverseDependent sccs'
+ = go emptyUniqSet sccs'
+
+ where 	go blockssSeen []
+	 = Nothing
+	
+	go blocksSeen (AcyclicSCC block : sccs)
+	 = let	dests		= slurpJumpDestsOfBlock block
+		blocksSeen'	= unionUniqSets blocksSeen $ mkUniqSet [blockId block]
+		badDests	= dests `minusUniqSet` blocksSeen'
+	   in	case uniqSetToList badDests of
+		 []		-> go blocksSeen' sccs
+		 bad : _	-> Just bad
+		
+	go blocksSeen (CyclicSCC blocks : sccs)
+	 = let	dests		= unionManyUniqSets $ map slurpJumpDestsOfBlock blocks
+		blocksSeen'	= unionUniqSets blocksSeen $ mkUniqSet $ map blockId blocks
+		badDests	= dests `minusUniqSet` blocksSeen'
+	   in	case uniqSetToList badDests of
+		 []		-> go blocksSeen' sccs
+		 bad : _	-> Just bad
+		
+	slurpJumpDestsOfBlock (BasicBlock blockId instrs)
+	 	= unionManyUniqSets
+		$ map (mkUniqSet . jumpDestsOfInstr) 
+		 	[ i | LiveInstr i _ <- instrs]
+	
+
+-- | Computing liveness
+-- 	
+--  On entry, the SCCs must be in "reverse" order: later blocks may transfer
+--  control to earlier ones only, else `panic`.
+-- 
+--  The SCCs returned are in the *opposite* order, which is exactly what we
+--  want for the next pass.
+--
+computeLiveness
+	:: (Outputable instr, Instruction instr)
 	=> [SCC (LiveBasicBlock instr)]
 	-> ([SCC (LiveBasicBlock instr)],	-- instructions annotated with list of registers
 						-- which are "dead after this instruction".
 	       BlockMap RegSet)			-- blocks annontated with set of live registers
 						-- on entry to the block.
-	
-  -- NOTE: on entry, the SCCs are in "reverse" order: later blocks may transfer
-  -- control to earlier ones only.  The SCCs returned are in the *opposite* 
-  -- order, which is exactly what we want for the next pass.
 
 computeLiveness sccs
-  	= livenessSCCs emptyBlockMap [] sccs
-
+ = case checkIsReverseDependent sccs of
+	Nothing		-> livenessSCCs emptyBlockMap [] sccs
+	Just bad	-> pprPanic "RegAlloc.Liveness.computeLivenss"
+	 			(vcat 	[ text "SCCs aren't in reverse dependent order"
+					, text "bad blockId" <+> ppr bad 
+					, ppr sccs])
 
 livenessSCCs
        :: Instruction instr
