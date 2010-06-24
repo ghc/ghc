@@ -27,6 +27,7 @@ module RegAlloc.Liveness (
 	eraseDeltasLive,
 	patchEraseLive,
 	patchRegsLiveInstr,
+	reverseBlocksInTops,
 	regLiveness,
 	natCmmTopToLive
   ) where
@@ -670,9 +671,6 @@ regLiveness (CmmProc info lbl params sccs)
 			   lbl params ann_sccs
 
 
-
-
-
 -- -----------------------------------------------------------------------------
 -- | Check ordering of Blocks
 --	The computeLiveness function requires SCCs to be in reverse dependent order.
@@ -711,8 +709,17 @@ checkIsReverseDependent sccs'
 	 	= unionManyUniqSets
 		$ map (mkUniqSet . jumpDestsOfInstr) 
 		 	[ i | LiveInstr i _ <- instrs]
-	
 
+
+-- | If we've compute liveness info for this code already we have to reverse
+--   the SCCs in each top to get them back to the right order so we can do it again.
+reverseBlocksInTops :: LiveCmmTop instr -> LiveCmmTop instr
+reverseBlocksInTops top
+ = case top of
+	CmmData{}			-> top
+	CmmProc info lbl params sccs	-> CmmProc info lbl params (reverse sccs)
+
+	
 -- | Computing liveness
 -- 	
 --  On entry, the SCCs must be in "reverse" order: later blocks may transfer
