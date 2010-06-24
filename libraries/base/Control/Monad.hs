@@ -28,7 +28,7 @@ module Control.Monad
     -- ** Naming conventions
     -- $naming
 
-    -- ** Basic functions from the "Prelude"
+    -- ** Basic @Monad@ functions
 
     , mapM          -- :: (Monad m) => (a -> m b) -> [a] -> m [b]
     , mapM_         -- :: (Monad m) => (a -> m b) -> [a] -> m ()
@@ -183,7 +183,7 @@ infixr 1 <=<, >=>
 (>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g     = \x -> f x >>= g
 
--- | Right-to-left Kleisli composition of monads. '(>=>)', with the arguments flipped
+-- | Right-to-left Kleisli composition of monads. @('>=>')@, with the arguments flipped
 (<=<)       :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
 (<=<)       = flip (>=>)
 
@@ -220,7 +220,7 @@ zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
 
 {- | The 'foldM' function is analogous to 'foldl', except that its result is
 encapsulated in a monad. Note that 'foldM' works from left-to-right over
-the list arguments. This could be an issue where '(>>)' and the `folded
+the list arguments. This could be an issue where @('>>')@ and the `folded
 function' are not commutative.
 
 
