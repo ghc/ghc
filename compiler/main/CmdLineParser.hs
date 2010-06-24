@@ -184,5 +184,5 @@ putCmdLineState s = CmdLineP $ \_ -> ((),s)
 errorsToGhcException :: [Located String] -> GhcException
 errorsToGhcException errs =
    let errors = vcat [ ppr l <> text ": " <> text e | L l e <- errs ]
-   in UsageError (showSDoc errors)
+   in UsageError (showSDoc $ withPprStyle cmdlineParserStyle errors)
 

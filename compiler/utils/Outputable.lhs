@@ -56,7 +56,7 @@ module Outputable (
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, qualName, qualModule,
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
-        mkUserStyle, Depth(..),
+        mkUserStyle, cmdlineParserStyle, Depth(..),
 	
 	-- * Error handling and debugging utilities
 	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
@@ -186,6 +186,9 @@ mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
+
+cmdlineParserStyle :: PprStyle
+cmdlineParserStyle = PprUser alwaysQualify AllTheWay
 \end{code}
 
 Orthogonal to the above printing styles are (possibly) some
