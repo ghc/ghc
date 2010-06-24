@@ -19,3 +19,10 @@ T4003:
 	'$(TEST_HC)' -O -c T4003B.hs
 	'$(TEST_HC)' -O -c T4003A.hs
 
+T3449:
+	$(RM) T3449.hi-boot T3449.hi T3449A.hi
+	$(RM) T3449.o-boot  T3449.o  T3449A.o
+	'$(TEST_HC)' -Wall -c T3449.hs-boot
+	'$(TEST_HC)' -Wall -c T3449A.hs
+	'$(TEST_HC)' -Wall -c T3449.hs
+

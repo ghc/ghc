@@ -145,4 +145,9 @@ test('T4003',
      ['$MAKE -s --no-print-directory T4003'])
 test('T1789', normal, compile, [''])
 test('T1789_2', normal, compile, [''])
+test('T3449',
+     extra_clean(['T3449.hi-boot', 'T3449.hi',
+                  'T3449.o-boot',  'T3449.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T3449'])
 
