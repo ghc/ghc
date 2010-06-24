@@ -15,6 +15,11 @@
 #ifdef USE_PAPI /* ugly */
 
 #include <papi.h>
+/* The posix symbols get defined in a header included from papi.h.
+ * undefind them here to allow redefinition in PosixSource.h */
+#undef _POSIX_SOURCE
+#undef _POSIX_C_SOURCE
+#undef _XOPEN_SOURCE
 
 #include "PosixSource.h"
 #include "Rts.h"
