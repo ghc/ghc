@@ -212,8 +212,10 @@ regAlloc_spin
 			<- regSpill code_coalesced slotsFree rsSpill
 
 		-- recalculate liveness
---		let code_nat	= map stripLive code_spilled
-		code_relive	<- mapM regLiveness code_spilled
+		-- NOTE: we have to reverse the SCCs here to get them back into the reverse-dependency
+		--       order required by computeLiveness. If they're not in the correct order
+		--       that function will panic.
+		code_relive	<- mapM (regLiveness . reverseBlocksInTops) code_spilled
 
 		-- record what happened in this stage for debugging
 		let stat	=
