@@ -90,10 +90,9 @@ pprLlvmCmmTop env count (CmmProc info lbl _ (ListGraph blks))
             link = if externallyVisibleCLabel lbl'
                       then ExternallyVisible
                       else Internal
-            funDec = llvmFunSig lbl' link
             lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
-            fun = LlvmFunction funDec [NoUnwind] sec' lmblocks
+            fun = mkLlvmFunc lbl' link  sec' lmblocks
         in ppLlvmFunction fun
     ), ivar)
 

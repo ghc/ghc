@@ -14,7 +14,7 @@ module LlvmCodeGen.Base (
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, llvmGhcCC,
+        llvmPtrBits, mkLlvmFunc, tysToParams,
 
         strCLabel_llvm, genCmmLabelRef, genStringLabelRef
 
@@ -82,17 +82,22 @@ llvmGhcCC = CC_Ncc 10
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: LlvmType
-llvmFunTy
-  = LMFunction $
-        LlvmFunctionDecl (fsLit "a") ExternallyVisible llvmGhcCC LMVoid FixedArgs
-            (Left $ map getVarType llvmFunArgs) llvmFunAlign
+llvmFunTy = LMFunction $ llvmFunSig' (fsLit "a") ExternallyVisible
 
 -- | Llvm Function signature
 llvmFunSig :: CLabel -> LlvmLinkageType -> LlvmFunctionDecl
-llvmFunSig lbl link
-  = let n = strCLabel_llvm lbl
-    in LlvmFunctionDecl n link llvmGhcCC LMVoid FixedArgs
-        (Right llvmFunArgs) llvmFunAlign
+llvmFunSig lbl link = llvmFunSig' (strCLabel_llvm lbl) link
+
+llvmFunSig' :: LMString -> LlvmLinkageType -> LlvmFunctionDecl
+llvmFunSig' lbl link = LlvmFunctionDecl lbl link llvmGhcCC LMVoid FixedArgs
+                        (tysToParams $ map getVarType llvmFunArgs) llvmFunAlign
+
+-- | Create a Haskell function in LLVM.
+mkLlvmFunc :: CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks -> LlvmFunction
+mkLlvmFunc lbl link sec blks
+  = let funDec = llvmFunSig lbl link
+        funArgs = map (fsLit . getPlainName) llvmFunArgs
+    in LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
 
 -- | Alignment to use for functions
 llvmFunAlign :: LMAlign
@@ -109,6 +114,11 @@ llvmFunArgs = map lmGlobalRegArg activeStgRegs
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]
 llvmStdFunAttrs = [NoUnwind]
+
+-- | Convert a list of types to a list of function parameters
+-- (each with no parameter attributes)
+tysToParams :: [LlvmType] -> [LlvmParameter]
+tysToParams = map (\ty -> (ty, []))
 
 -- | Pointer width
 llvmPtrBits :: Int

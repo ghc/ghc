@@ -18,6 +18,7 @@ module Llvm (
         LlvmFunctions, LlvmFunctionDecls,
         LlvmStatement(..), LlvmExpression(..),
         LlvmBlocks, LlvmBlock(..), LlvmBlockId,
+        LlvmParamAttr(..), LlvmParameter,
 
         -- * Call Handling
         LlvmCallConvention(..), LlvmCallType(..), LlvmParameterListType(..),

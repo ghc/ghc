@@ -57,10 +57,11 @@ instance Show LlvmType where
   show (LMVoid        ) = "void"
   show (LMStruct tys  ) = "{" ++ (commaCat tys) ++ "}"
 
-  show (LMFunction (LlvmFunctionDecl _ _ _ r VarArgs p _))
-        = show r ++ " (" ++ (either commaCat commaCat p) ++ ", ...)"
-  show (LMFunction (LlvmFunctionDecl _ _ _ r FixedArgs p _))
-        = show r ++ " (" ++ (either commaCat commaCat p) ++ ")"
+  show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
+    = let varg' = if varg == VarArgs then ", ..." else ""
+          args = (tail.concat) $
+                  map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
+    in show r ++ " (" ++ args ++ varg' ++ ")"
 
   show (LMAlias s _   ) = "%" ++ unpackFS s
 
@@ -167,6 +168,11 @@ instance Show LlvmStatic where
 commaCat :: Show a => [a] -> String
 commaCat [] = ""
 commaCat x  = show (head x) ++ (concat $ map (\y -> "," ++ show y) (tail x))
+
+-- | Concatenate an array together, separated by commas
+spaceCat :: Show a => [a] -> String
+spaceCat [] = ""
+spaceCat x  = show (head x) ++ (concat $ map (\y -> " " ++ show y) (tail x))
 
 -- -----------------------------------------------------------------------------
 -- ** Operations on LLVM Basic Types and Variables
@@ -326,19 +332,18 @@ llvmWordPtr = pLift llvmWord
 
 -- | An LLVM Function
 data LlvmFunctionDecl = LlvmFunctionDecl {
-        -- | Unique identifier of the function.
+        -- | Unique identifier of the function
         decName       :: LMString,
-        -- | LinkageType of the function.
+        -- | LinkageType of the function
         funcLinkage   :: LlvmLinkageType,
-        -- | The calling convention of the function.
+        -- | The calling convention of the function
         funcCc        :: LlvmCallConvention,
         -- | Type of the returned value
         decReturnType :: LlvmType,
         -- | Indicates if this function uses varargs
         decVarargs    :: LlvmParameterListType,
-        -- | Signature of the parameters, can be just types or full vars
-        -- if parameter names are required.
-        decParams     :: Either [LlvmType] [LlvmVar],
+        -- | Parameter types and attributes
+        decParams     :: [LlvmParameter],
         -- | Function align value, must be power of 2
         funcAlign     :: LMAlign
   }
@@ -350,11 +355,59 @@ instance Show LlvmFunctionDecl where
           align = case a of
                        Just a' -> " align " ++ show a'
                        Nothing -> ""
+          args = (tail.concat) $
+                  map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
     in show l ++ " " ++ show c ++ " " ++ show r ++ " @" ++ unpackFS n ++
-        "(" ++ (either commaCat commaCat p) ++ varg' ++ ")" ++ align
+        "(" ++ args ++ varg' ++ ")" ++ align
 
 type LlvmFunctionDecls = [LlvmFunctionDecl]
 
+type LlvmParameter = (LlvmType, [LlvmParamAttr])
+
+-- | LLVM Parameter Attributes.
+--
+-- Parameter attributes are used to communicate additional information about
+-- the result or parameters of a function
+data LlvmParamAttr
+  -- | This indicates to the code generator that the parameter or return value
+  -- should be zero-extended to a 32-bit value by the caller (for a parameter)
+  -- or the callee (for a return value).
+  = ZeroExt
+  -- | This indicates to the code generator that the parameter or return value
+  -- should be sign-extended to a 32-bit value by the caller (for a parameter)
+  -- or the callee (for a return value).
+  | SignExt
+  -- | This indicates that this parameter or return value should be treated in
+  -- a special target-dependent fashion during while emitting code for a
+  -- function call or return (usually, by putting it in a register as opposed
+  -- to memory).
+  | InReg
+  -- | This indicates that the pointer parameter should really be passed by
+  -- value to the function.
+  | ByVal
+  -- | This indicates that the pointer parameter specifies the address of a
+  -- structure that is the return value of the function in the source program.
+  | SRet
+  -- | This indicates that the pointer does not alias any global or any other
+  -- parameter.
+  | NoAlias
+  -- | This indicates that the callee does not make any copies of the pointer
+  -- that outlive the callee itself
+  | NoCapture
+  -- | This indicates that the pointer parameter can be excised using the
+  -- trampoline intrinsics.
+  | Nest
+  deriving (Eq)
+
+instance Show LlvmParamAttr where
+  show ZeroExt   = "zeroext"
+  show SignExt   = "signext"
+  show InReg     = "inreg"
+  show ByVal     = "byval"
+  show SRet      = "sret"
+  show NoAlias   = "noalias"
+  show NoCapture = "nocapture"
+  show Nest      = "nest"
 
 -- | Llvm Function Attributes.
 --

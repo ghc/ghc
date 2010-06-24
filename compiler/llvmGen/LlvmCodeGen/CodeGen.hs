@@ -153,7 +153,7 @@ genCall :: LlvmEnv -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals
 genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
     let fname = fsLit "llvm.memory.barrier"
     let funSig = LlvmFunctionDecl fname ExternallyVisible CC_Ccc LMVoid
-                FixedArgs (Left [i1, i1, i1, i1, i1]) llvmFunAlign
+                    FixedArgs (tysToParams [i1, i1, i1, i1, i1]) llvmFunAlign
     let fty = LMFunction funSig
 
     let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing False
@@ -217,7 +217,7 @@ genCall env target res args ret = do
     -- fun type
     let ccTy  = StdCall -- tail calls should be done through CmmJump
     let retTy = ret_type res
-    let argTy = Left $ map arg_type args
+    let argTy = tysToParams $ map arg_type args
     let funTy name = LMFunction $ LlvmFunctionDecl name ExternallyVisible
                         lmconv retTy FixedArgs argTy llvmFunAlign
 

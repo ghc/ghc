@@ -43,6 +43,9 @@ data LlvmFunction = LlvmFunction {
     -- | The signature of this declared function.
     funcDecl  :: LlvmFunctionDecl,
 
+    -- | The functions arguments
+    funcArgs  :: [LMString],
+
     -- | The function attributes.
     funcAttrs :: [LlvmFuncAttr],
 
