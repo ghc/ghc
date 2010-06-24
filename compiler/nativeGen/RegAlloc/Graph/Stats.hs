@@ -23,9 +23,11 @@ import qualified GraphColor as Color
 import RegAlloc.Liveness
 import RegAlloc.Graph.Spill
 import RegAlloc.Graph.SpillCost
+import RegAlloc.Graph.TrivColorable
 import Instruction
 import RegClass
 import Reg
+import TargetReg
 
 import Cmm
 import Outputable
@@ -45,7 +47,8 @@ data RegAllocStats instr
 
 	-- a spill stage
 	| RegAllocStatsSpill
-	{ raGraph	:: Color.Graph VirtualReg RegClass RealReg	-- ^ the partially colored graph
+	{ raCode	:: [LiveCmmTop instr]				-- ^ the code we tried to allocate registers for
+	, raGraph	:: Color.Graph VirtualReg RegClass RealReg	-- ^ the partially colored graph
 	, raCoalesced	:: UniqFM VirtualReg				-- ^ the regs that were coaleced
 	, raSpillStats	:: SpillStats 					-- ^ spiller stats
 	, raSpillCosts	:: SpillCostInfo 				-- ^ number of instrs each reg lives for
@@ -53,7 +56,8 @@ data RegAllocStats instr
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raGraph	  :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
+	{ raCode	  :: [LiveCmmTop instr]				-- ^ the code we tried to allocate registers for
+	, raGraph	  :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
 	, raGraphColored  :: Color.Graph VirtualReg RegClass RealReg 	-- ^ the coalesced and colored graph
 	, raCoalesced	  :: UniqFM VirtualReg				-- ^ the regs that were coaleced
 	, raCodeCoalesced :: [LiveCmmTop instr]				-- ^ code with coalescings applied 
@@ -69,12 +73,21 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 	$$ text "#  Native code with liveness information."
 	$$ ppr (raLiveCmm s)
 	$$ text ""
---	$$ text "#  Initial register conflict graph."
---	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
+	$$ text "#  Initial register conflict graph."
+	$$ Color.dotGraph 
+		targetRegDotColor
+		(trivColorable 
+			targetVirtualRegSqueeze
+			targetRealRegSqueeze)
+		(raGraph s)
 
 
  ppr (s@RegAllocStatsSpill{})
  	=  text "#  Spill"
+
+	$$ text "#  Code with liveness information."
+	$$ (ppr (raCode s))
+	$$ text ""
 
 --	$$ text "#  Register conflict graph."
 --	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
@@ -105,9 +118,18 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 --	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 --	$$ text ""
 
---	$$ text "#  Register conflict graph (colored)."
---	$$ Color.dotGraph regDotColor trivColorable (raGraphColored s)
---	$$ text ""
+	$$ text "#  Code with liveness information."
+	$$ (ppr (raCode s))
+	$$ text ""
+
+	$$ text "#  Register conflict graph (colored)."
+	$$ Color.dotGraph 
+		targetRegDotColor
+		(trivColorable 
+			targetVirtualRegSqueeze
+			targetRealRegSqueeze)
+		(raGraphColored s)
+	$$ text ""
 
 	$$ (if (not $ isNullUFM $ raCoalesced s)
 		then 	text "#  Registers coalesced."

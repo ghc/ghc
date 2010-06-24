@@ -175,7 +175,8 @@ regAlloc_spin
 		-- record what happened in this stage for debugging
 		let stat		=
 			RegAllocStatsColored
-			{ raGraph		= graph
+			{ raCode		= code
+			, raGraph		= graph
 			, raGraphColored	= graph_colored_lint
 			, raCoalesced		= rmCoalesce
 			, raCodeCoalesced	= code_coalesced
@@ -217,7 +218,8 @@ regAlloc_spin
 		-- record what happened in this stage for debugging
 		let stat	=
 			RegAllocStatsSpill
-			{ raGraph	= graph_colored_lint
+			{ raCode	= code
+			, raGraph	= graph_colored_lint
 			, raCoalesced	= rmCoalesce
 			, raSpillStats	= spillStats
 			, raSpillCosts	= spillCosts
