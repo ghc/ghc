@@ -810,34 +810,24 @@ hGetBuf h ptr count
   | count == 0 = return 0
   | count <  0 = illegalBufferSize h "hGetBuf" count
   | otherwise = 
-      wantReadableHandle_ "hGetBuf" h $ \ h_ -> do
+      wantReadableHandle_ "hGetBuf" h $ \ h_@Handle__{..} -> do
          flushCharReadBuffer h_
-         bufRead h_ (castPtr ptr) 0 count
+         buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+            <- readIORef haByteBuffer
+         if isEmptyBuffer buf
+            then bufReadEmpty    h_ buf (castPtr ptr) 0 count
+            else bufReadNonEmpty h_ buf (castPtr ptr) 0 count
 
 -- small reads go through the buffer, large reads are satisfied by
 -- taking data first from the buffer and then direct from the file
 -- descriptor.
-bufRead :: Handle__ -> Ptr Word8 -> Int -> Int -> IO Int
-bufRead h_@Handle__{..} ptr so_far count =
-  seq so_far $ seq count $ do -- strictness hack
-  buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz } <- readIORef haByteBuffer
-  if isEmptyBuffer buf
-     then if count > sz  -- small read?
-                then do rest <- readChunk h_ ptr count
-                        return (so_far + rest)
-                else do (r,buf') <- Buffered.fillReadBuffer haDevice buf
-                        if r == 0 
-                           then return so_far
-                           else do writeIORef haByteBuffer buf'
-                                   bufRead h_ ptr so_far count
-     else do 
+
+bufReadNonEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
+bufReadNonEmpty h_@Handle__{..}
+                buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+                ptr !so_far !count 
+ = do
         let avail = w - r
-        if (count == avail)
-           then do 
-                copyFromRawBuffer ptr raw r count
-                writeIORef haByteBuffer buf{ bufR=0, bufL=0 }
-                return (so_far + count)
-           else do
         if (count < avail)
            then do 
                 copyFromRawBuffer ptr raw r count
@@ -846,29 +836,35 @@ bufRead h_@Handle__{..} ptr so_far count =
            else do
   
         copyFromRawBuffer ptr raw (fromIntegral r) (fromIntegral avail)
-        writeIORef haByteBuffer buf{ bufR=0, bufL=0 }
+        let buf' = buf{ bufR=0, bufL=0 }
+        writeIORef haByteBuffer buf'
         let remaining = count - avail
             so_far' = so_far + avail
             ptr' = ptr `plusPtr` avail
 
-        if remaining < sz
-           then bufRead h_ ptr' so_far' remaining
-           else do 
+        if remaining == 0 
+           then return so_far'
+           else bufReadEmpty h_ buf' ptr' so_far' remaining
 
-        rest <- readChunk h_ ptr' remaining
-        return (so_far' + rest)
 
-readChunk :: Handle__ -> Ptr a -> Int -> IO Int
-readChunk h_@Handle__{..} ptr bytes
- | Just fd <- cast haDevice = loop fd 0 bytes
- | otherwise = error "ToDo: hGetBuf"
+bufReadEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
+bufReadEmpty h_@Handle__{..}
+             buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+             ptr so_far count
+ | count > sz, Just fd <- cast haDevice = loop fd 0 count
+ | otherwise = do
+     (r,buf') <- Buffered.fillReadBuffer haDevice buf
+     if r == 0 
+        then return so_far
+        else do writeIORef haByteBuffer buf'
+                bufReadNonEmpty h_ buf' ptr so_far count
  where
   loop :: FD -> Int -> Int -> IO Int
   loop fd off bytes | bytes <= 0 = return off
   loop fd off bytes = do
     r <- RawIO.read (fd::FD) (ptr `plusPtr` off) (fromIntegral bytes)
     if r == 0
-        then return off
+        then return (so_far + off)
         else loop fd (off + r) (bytes - r)
 
 -- ---------------------------------------------------------------------------
@@ -940,36 +936,39 @@ hGetBufNonBlocking h ptr count
   | count == 0 = return 0
   | count <  0 = illegalBufferSize h "hGetBufNonBlocking" count
   | otherwise = 
-      wantReadableHandle_ "hGetBufNonBlocking" h $ \ h_ -> do
+      wantReadableHandle_ "hGetBufNonBlocking" h $ \ h_@Handle__{..} -> do
          flushCharReadBuffer h_
-         bufReadNonBlocking h_ (castPtr ptr) 0 count
-
-bufReadNonBlocking :: Handle__ -> Ptr Word8 -> Int -> Int -> IO Int
-bufReadNonBlocking h_@Handle__{..} ptr so_far count = 
-  seq so_far $ seq count $ do -- strictness hack
-  buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz } <- readIORef haByteBuffer
-  if isEmptyBuffer buf
-     then bufReadNBEmpty    h_ buf ptr so_far count
-     else bufReadNBNonEmpty h_ buf ptr so_far count
+         buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+            <- readIORef haByteBuffer
+         if isEmptyBuffer buf
+            then bufReadNBEmpty    h_ buf (castPtr ptr) 0 count
+            else bufReadNBNonEmpty h_ buf (castPtr ptr) 0 count
 
 bufReadNBEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNBEmpty   h_@Handle__{..}
                  buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
                  ptr so_far count
-   = if count > sz  -- large read?
-        then do rest <- readChunkNonBlocking h_ ptr count
-                return (so_far + rest)
-        else do (r,buf') <- Buffered.fillReadBuffer0 haDevice buf
-                case r of
-                  Nothing -> return so_far
-                  Just 0  -> return so_far
-                  Just r  -> do
-                    writeIORef haByteBuffer buf'
-                    bufReadNBNonEmpty h_ buf' ptr so_far (min count r)
-                          -- NOTE: new count is    min count w'
+  | count > sz, False,
+    Just fd <- cast haDevice = do
+       m <- RawIO.readNonBlocking (fd::FD) ptr count
+       case m of
+         Nothing -> return so_far
+         Just n  -> return (so_far + n)
+
+ | otherwise = do
+     buf <- readIORef haByteBuffer
+     (r,buf') <- Buffered.fillReadBuffer0 haDevice buf
+     case r of
+       Nothing -> return so_far
+       Just 0  -> return so_far
+       Just r  -> do
+         writeIORef haByteBuffer buf'
+         bufReadNBNonEmpty h_ buf' ptr so_far (min count r)
+                          -- NOTE: new count is    min count r
                           -- so we will just copy the contents of the
                           -- buffer in the recursive call, and not
                           -- loop again.
+
 
 bufReadNBNonEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNBNonEmpty h_@Handle__{..}
@@ -977,12 +976,6 @@ bufReadNBNonEmpty h_@Handle__{..}
                   ptr so_far count
   = do
         let avail = w - r
-        if (count == avail)
-           then do 
-                copyFromRawBuffer ptr raw r count
-                writeIORef haByteBuffer buf{ bufR=0, bufL=0 }
-                return (so_far + count)
-           else do
         if (count < avail)
            then do 
                 copyFromRawBuffer ptr raw r count
@@ -997,17 +990,9 @@ bufReadNBNonEmpty h_@Handle__{..}
             so_far' = so_far + avail
             ptr' = ptr `plusPtr` avail
 
-        bufReadNBEmpty h_ buf' ptr' so_far' remaining
-
-
-readChunkNonBlocking :: Handle__ -> Ptr Word8 -> Int -> IO Int
-readChunkNonBlocking h_@Handle__{..} ptr bytes
- | Just fd <- cast haDevice = do
-     m <- RawIO.readNonBlocking (fd::FD) ptr bytes
-     case m of
-       Nothing -> return 0
-       Just n  -> return n
- | otherwise = error "ToDo: hGetBuf"
+        if remaining == 0
+           then return so_far'
+           else bufReadNBEmpty h_ buf' ptr' so_far' remaining
 
 -- ---------------------------------------------------------------------------
 -- memcpy wrappers
