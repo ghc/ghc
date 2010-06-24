@@ -148,3 +148,4 @@ test('newline001', extra_clean(['newline001.out']), compile_and_run, [''])
 test('openTempFile001', normal, compile_and_run, [''])
 test('T4113', normal, compile_and_run, [''])
 
+test('T4144', normal, compile_and_run, [''])
