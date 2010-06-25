@@ -64,7 +64,7 @@ isControl               :: Char -> Bool
 isPrint                 :: Char -> Bool
 
 -- | Returns 'True' for any Unicode space character, and the control
--- characters @\t@, @\\n@, @\\r@, @\\f@, @\\v@.
+-- characters @\\t@, @\\n@, @\\r@, @\\f@, @\\v@.
 isSpace                 :: Char -> Bool
 -- isSpace includes non-breaking space
 -- Done with explicit equalities both for efficiency, and to avoid a tiresome
