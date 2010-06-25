@@ -1,7 +1,11 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.37 2005/11/25 09:46:19 simonmar Exp $
+-- 
+-- (c) 2010 The University of Glasgow
 --
 -- Primitive Operations and Types
+--
+-- For more information on PrimOps, see
+--   http://hackage.haskell.org/trac/ghc/wiki/Commentary/PrimOps
 --
 -----------------------------------------------------------------------
 
@@ -11,25 +15,10 @@
 --
 -- It should first be preprocessed.
 --
--- To add a new primop, you currently need to update the following files:
+-- Information on how PrimOps are implemented and the steps necessary to
+-- add a new one can be found in the Commentary:
 --
---	- this file (ghc/compiler/prelude/primops.txt.pp), which includes
---	  the type of the primop, and various other properties (its
---	  strictness attributes, whether it is defined as a macro
---	  or as out-of-line code, etc.)
---
---	- if the primop is inline (i.e. a macro), then:
---	  	ghc/compiler/AbsCUtils.lhs (dscCOpStmt)
---		  defines the translation of the primop into simpler
---		  abstract C operations.
---		
---	- or, for an out-of-line primop:
---	        ghc/includes/StgMiscClosures.h (just add the declaration)
---		ghc/rts/PrimOps.cmm     (define it here)
---		ghc/rts/Linker.c       (declare the symbol for GHCi)
---
---	- the User's Guide 
---
+--  http://hackage.haskell.org/trac/ghc/wiki/Commentary/PrimOps
 
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:
