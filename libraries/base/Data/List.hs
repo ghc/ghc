@@ -302,7 +302,7 @@ isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
--- | The 'nub' function removes duplicate elements from a list.
+-- | /O(n^2)/. The 'nub' function removes duplicate elements from a list.
 -- In particular, it keeps only the first occurrence of each element.
 -- (The name 'nub' means \`essence\'.)
 -- It is a special case of 'nubBy', which allows the programmer to supply
