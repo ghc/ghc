@@ -9,6 +9,10 @@ test('testblockalloc', compose(c_src,
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
      composes([
+             # LLVM Optimiser considers dereference of a null pointer
+             # undefined and marks the code as unreachable which means
+             # that later optimisations remove it altogether.
+             omit_ways(['optllvm']),
              # SIGSEGV on Linux (which we make the default)
              exit_code(139),
              # Apparently the output can be different on different
