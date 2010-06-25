@@ -1,0 +1,19 @@
+import Data.List (nub)
+:t nubBy
+import Data.List (nubBy)
+:t nub
+:m +Data.List
+:m -Data.List
+:t nub
+:t nubBy
+import Data.List hiding (nub)
+:t nub
+import qualified Data.List as L
+:t nub
+:t L.nub
+:m +Data.List
+:t L.nub
+:m -Data.List
+:t L.nub
+:m Prelude
+:t nub

@@ -1,0 +1,2 @@
+nub :: Eq a => [a] -> [a]
+L.nub :: Eq a => [a] -> [a]
