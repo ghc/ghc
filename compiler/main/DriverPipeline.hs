@@ -1328,12 +1328,14 @@ runPhase_MoveBinary dflags input_fn dep_packages
                 let behaviour' = concatMap (\x -> if x=='\\' then "\\\\" else [x]) behaviour
                 renameFile input_fn wrapped_executable
                 let rtsDetails = (getPackageDetails (pkgState dflags) rtsPackageId);
+                    (md_c_flags, _) = machdepCCOpts dflags
                 SysTools.runCc dflags
                   ([ SysTools.FileOption "" ((head (libraryDirs rtsDetails)) ++ "/dyn-wrapper.c")
                    , SysTools.Option ("-DBEHAVIOUR=\"" ++ behaviour' ++ "\"")
                    , SysTools.Option "-o"
-                   , SysTools.FileOption "" input_fn
-                   ] ++ map (SysTools.FileOption "-I") (includeDirs rtsDetails))
+                   , SysTools.FileOption "" input_fn] ++
+                   map (SysTools.FileOption "-I") (includeDirs rtsDetails) ++
+                   map Option md_c_flags)
                 return True
           _ -> return True
     | otherwise = return True
