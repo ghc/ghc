@@ -9,7 +9,7 @@
 module InteractiveEval (
 #ifdef GHCI
         RunResult(..), Status(..), Resume(..), History(..),
-	runStmt, SingleStep(..),
+	runStmt, parseImportDecl, SingleStep(..),
         resume,
         abandon, abandonAll,
         getResumeContext,
@@ -40,9 +40,11 @@ module InteractiveEval (
 #include "HsVersions.h"
 
 import HscMain          hiding (compileExpr)
+import HsSyn (ImportDecl)
 import HscTypes
 import TcRnDriver
-import RnNames		( gresFromAvails )
+import TcRnMonad (initTc)
+import RnNames		(gresFromAvails, rnImports)
 import InstEnv
 import Type
 import TcType		hiding( typeKind )
@@ -51,6 +53,7 @@ import Id
 import Name             hiding ( varName )
 import NameSet
 import RdrName
+import PrelNames (pRELUDE)
 import VarSet
 import VarEnv
 import ByteCodeInstr
@@ -74,7 +77,7 @@ import MonadUtils
 
 import System.Directory
 import Data.Dynamic
-import Data.List (find)
+import Data.List (find, partition)
 import Control.Monad
 import Foreign
 import Foreign.C
@@ -251,6 +254,8 @@ withVirtualCWD m = do
 
   gbracket set_cwd reset_cwd $ \_ -> m
 
+parseImportDecl :: GhcMonad m => String -> m (ImportDecl RdrName)
+parseImportDecl expr = withSession $ \hsc_env -> hscImport hsc_env expr
 
 emptyHistory :: BoundedList History
 emptyHistory = nilBL 50 -- keep a log of length 50
@@ -790,21 +795,31 @@ fromListBL bound l = BL (length l) bound l []
 -- we've built up in the InteractiveContext simply move to the new
 -- module.  They always shadow anything in scope in the current context.
 setContext :: GhcMonad m =>
-              [Module]	-- ^ entire top level scope of these modules
-	   -> [Module]	-- ^ exports only of these modules
-	   -> m ()
-setContext toplev_mods export_mods = do
-  hsc_env <- getSession
-  let old_ic  = hsc_IC     hsc_env
-      hpt     = hsc_HPT    hsc_env
-  --
-  export_env  <- liftIO $ mkExportEnv hsc_env export_mods
-  toplev_envs <- liftIO $ mapM (mkTopLevEnv hpt) toplev_mods
-  let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
-  modifySession $ \_ ->
-      hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
-				 ic_exports      = export_mods,
-				 ic_rn_gbl_env   = all_env }}
+        [Module]	-- ^ entire top level scope of these modules
+        -> [(Module, Maybe (ImportDecl RdrName))]	-- ^ exports of these modules
+        -> m ()
+setContext toplev_mods other_mods = do
+    hsc_env <- getSession
+    let old_ic  = hsc_IC     hsc_env
+        hpt     = hsc_HPT    hsc_env
+        (decls,mods)   = partition (isJust . snd) other_mods -- time for tracing
+        export_mods = map fst mods
+        imprt_decls = map noLoc (catMaybes (map snd decls))
+    --
+    export_env  <- liftIO $ mkExportEnv hsc_env export_mods
+    import_env  <-
+        if null imprt_decls then return emptyGlobalRdrEnv else do
+            let imports = rnImports imprt_decls
+                this_mod = if null toplev_mods then pRELUDE else head toplev_mods
+            (_, env, _,_) <-
+                ioMsgMaybe $ liftIO $ initTc hsc_env HsSrcFile False this_mod imports
+            return env
+    toplev_envs <- liftIO $ mapM (mkTopLevEnv hpt) toplev_mods
+    let all_env = foldr plusGlobalRdrEnv (plusGlobalRdrEnv export_env import_env) toplev_envs
+    modifySession $ \_ ->
+        hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
+      			 ic_exports      = other_mods,
+      			 ic_rn_gbl_env   = all_env }}
 
 -- Make a GlobalRdrEnv based on the exports of the modules only.
 mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
@@ -841,7 +856,7 @@ mkTopLevEnv hpt modl
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
 -- of modules from which we take just the exports respectively.
-getContext :: GhcMonad m => m ([Module],[Module])
+getContext :: GhcMonad m => m ([Module],[(Module, Maybe (ImportDecl RdrName))])
 getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
 	       return (ic_toplev_scope ic, ic_exports ic)
 
@@ -965,7 +980,7 @@ dynCompileExpr expr = do
     setContext full $
         (mkModule
             (stringToPackageId "base") (mkModuleName "Data.Dynamic")
-        ):exports
+        ,Nothing):exports
     let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
     Just (ids, hvals) <- withSession (flip hscStmt stmt)
     setContext full exports

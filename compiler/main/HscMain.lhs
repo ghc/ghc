@@ -14,7 +14,7 @@ module HscMain
     , hscSimplify
     , hscNormalIface, hscWriteIface, hscGenHardCode
 #ifdef GHCI
-    , hscStmt, hscTcExpr, hscKcType
+    , hscStmt, hscTcExpr, hscImport, hscKcType
     , compileExpr
 #endif
     , HsCompiler(..)
@@ -51,7 +51,7 @@ import PrelNames	( iNTERACTIVE )
 import {- Kind parts of -} Type		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
-import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan, noSrcSpan )
+import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan, noSrcSpan, unLoc )
 import VarSet
 import VarEnv		( emptyTidyEnv )
 #endif
@@ -931,6 +931,12 @@ hscStmt hsc_env stmt = do
 
 	return $ Just (ids, hval)
 
+hscImport :: GhcMonad m => HscEnv -> String -> m (ImportDecl RdrName)
+hscImport hsc_env str = do
+    (L _ (HsModule{hsmodImports=is})) <- hscParseThing parseModule (hsc_dflags hsc_env) str
+    case is of
+        [i] -> return (unLoc i)
+        _ -> throwOneError (mkPlainErrMsg noSrcSpan (ptext (sLit "parse error in import declaration")))
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
   :: GhcMonad m =>

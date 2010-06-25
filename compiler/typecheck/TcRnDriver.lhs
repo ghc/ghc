@@ -1341,7 +1341,7 @@ getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe [AvailInfo])
 getModuleExports hsc_env mod
   = let
       ic        = hsc_IC hsc_env
-      checkMods = ic_toplev_scope ic ++ ic_exports ic
+      checkMods = ic_toplev_scope ic ++ map fst (ic_exports ic)
     in
     initTc hsc_env HsSrcFile False iNTERACTIVE (tcGetModuleExports mod checkMods)
 

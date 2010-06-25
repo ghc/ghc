@@ -98,7 +98,7 @@ module GHC (
 	typeKind,
 	parseName,
 	RunResult(..),  
-	runStmt, SingleStep(..),
+	runStmt, parseImportDecl, SingleStep(..),
         resume,
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),

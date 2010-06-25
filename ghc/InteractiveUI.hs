@@ -33,7 +33,9 @@ import Packages
 import UniqFM
 
 import HscTypes ( handleFlagWarnings )
+import HsImpExp
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
+import RdrName (RdrName)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
 import Name
@@ -337,7 +339,7 @@ interactiveUI srcs maybe_exprs = do
 
    -- initial context is just the Prelude
    prel_mod <- GHC.lookupModule (GHC.mkModuleName "Prelude") Nothing
-   GHC.setContext [] [prel_mod]
+   GHC.setContext [] [(prel_mod, Nothing)]
 
    default_editor <- liftIO $ findEditor
 
@@ -541,15 +543,13 @@ mkPrompt = do
         dots | _:rs <- resumes, not (null rs) = text "... "
              | otherwise = empty
 
-        
-
         modules_bit = 
        -- ToDo: maybe...
        --  let (btoplevs, bexports) = fromMaybe ([],[]) (remembered_ctx st) in
        --  hsep (map (\m -> text "!*" <> ppr (GHC.moduleName m)) btoplevs) <+>
        --  hsep (map (\m -> char '!'  <> ppr (GHC.moduleName m)) bexports) <+>
              hsep (map (\m -> char '*'  <> ppr (GHC.moduleName m)) toplevs) <+>
-             hsep (map (ppr . GHC.moduleName) exports)
+             hsep (map (ppr . GHC.moduleName) (nub (map fst exports)))
 
         deflt_prompt = dots <> context_bit <> modules_bit
 
@@ -644,7 +644,7 @@ enqueueCommands cmds = do
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
  | null (filter (not.isSpace) stmt) = return False
- | ["import", mod] <- words stmt    = keepGoing' setContext ('+':mod)
+ | x@('i':'m':'p':'o':'r':'t':' ':_) <- stmt    = keepGoing' (importContext True) x
  | otherwise
  = do
 #if __GLASGOW_HASKELL__ >= 611
@@ -1005,6 +1005,9 @@ cmdCmd str = do
     enqueueCommands (lines cmds)
     return ()
 
+loadModuleName :: GHC.GhcMonad m => ImportDecl RdrName -> m Module
+loadModuleName = flip GHC.findModule Nothing . unLoc . ideclName
+
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
 
@@ -1061,7 +1064,7 @@ reloadModule m = do
                   else LoadUpTo (GHC.mkModuleName m)
   return ()
 
-doLoad :: Bool -> ([Module],[Module]) -> LoadHowMuch -> InputT GHCi SuccessFlag
+doLoad :: Bool -> ([Module],[(Module, Maybe (ImportDecl RdrName))]) -> LoadHowMuch -> InputT GHCi SuccessFlag
 doLoad retain_context prev_context howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
@@ -1070,7 +1073,7 @@ doLoad retain_context prev_context howmuch = do
   afterLoad ok retain_context prev_context
   return ok
 
-afterLoad :: SuccessFlag -> Bool -> ([Module],[Module]) -> InputT GHCi ()
+afterLoad :: SuccessFlag -> Bool -> ([Module],[(Module, Maybe (ImportDecl RdrName))]) -> InputT GHCi ()
 afterLoad ok retain_context prev_context = do
   lift revertCAFs  -- always revert CAFs on load.
   lift discardTickArrays
@@ -1082,10 +1085,10 @@ afterLoad ok retain_context prev_context = do
   lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
 
-setContextAfterLoad :: ([Module],[Module]) -> Bool -> [GHC.ModSummary] -> GHCi ()
+setContextAfterLoad :: ([Module],[(Module, Maybe (ImportDecl RdrName))]) -> Bool -> [GHC.ModSummary] -> GHCi ()
 setContextAfterLoad prev keep_ctxt [] = do
   prel_mod <- getPrelude
-  setContextKeepingPackageModules prev keep_ctxt ([], [prel_mod])
+  setContextKeepingPackageModules prev keep_ctxt ([], [(prel_mod, Nothing)])
 setContextAfterLoad prev keep_ctxt ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- GHC.getTargets
@@ -1113,30 +1116,37 @@ setContextAfterLoad prev keep_ctxt ms = do
 	if b then setContextKeepingPackageModules prev keep_ctxt ([m], [])
        	     else do
                 prel_mod <- getPrelude
-                setContextKeepingPackageModules prev keep_ctxt ([],[prel_mod,m])
+                setContextKeepingPackageModules prev keep_ctxt ([],[(prel_mod,Nothing),(m,Nothing)])
 
 -- | Keep any package modules (except Prelude) when changing the context.
 setContextKeepingPackageModules
-        :: ([Module],[Module])          -- previous context
+        :: ([Module],[(Module, Maybe (ImportDecl RdrName))])          -- previous context
         -> Bool                         -- re-execute :module commands
-        -> ([Module],[Module])          -- new context
+        -> ([Module],[(Module, Maybe (ImportDecl RdrName))])          -- new context
         -> GHCi ()
 setContextKeepingPackageModules prev_context keep_ctxt (as,bs) = do
   let (_,bs0) = prev_context
   prel_mod <- getPrelude
-  let pkg_modules = filter (\p -> not (isHomeModule p) && p /= prel_mod) bs0
-  let bs1 = if null as then nub (prel_mod : bs) else bs
-  GHC.setContext as (nub (bs1 ++ pkg_modules))
+  -- filter everything, not just lefts
+  let pkg_modules = filter ((\p -> not (isHomeModule p) && p /= prel_mod) . fst) bs0
+  let bs1 = if null as then nubBy sameFst ((prel_mod,Nothing) : bs) else bs
+  GHC.setContext as (nubBy sameFst (bs1 ++ pkg_modules))
   if keep_ctxt
      then do
           st <- getGHCiState
-          mapM_ (playCtxtCmd False) (remembered_ctx st)
+          let mem = remembered_ctx st
+              playCmd (Left x) = playCtxtCmd False x
+              playCmd (Right x) = importContext False x
+          mapM_ playCmd mem
      else do
           st <- getGHCiState
           setGHCiState st{ remembered_ctx = [] }
 
 isHomeModule :: Module -> Bool
 isHomeModule mod = GHC.modulePackageId mod == mainPackageId
+
+sameFst :: (Module, Maybe (ImportDecl RdrName)) -> (Module, Maybe (ImportDecl RdrName)) -> Bool
+sameFst x y = fst x == fst y
 
 modulesLoadedMsg :: SuccessFlag -> [ModuleName] -> InputT GHCi ()
 modulesLoadedMsg ok mods = do
@@ -1192,8 +1202,8 @@ browseCmd bang m =
                 -- recently-added module occurs last, it seems.
         case (as,bs) of
           (as@(_:_), _)   -> browseModule bang (last as) True
-          ([],  bs@(_:_)) -> browseModule bang (last bs) True
-          ([],  [])  -> ghcError (CmdLineError ":browse: no current module")
+          ([],  bs@(_:_)) -> browseModule bang (fst (last bs)) True
+          ([], [])  -> ghcError (CmdLineError ":browse: no current module")
     _ -> ghcError (CmdLineError "syntax:  :browse <module>")
 
 -- without bang, show items in context of their parents and omit children
@@ -1208,7 +1218,7 @@ browseModule bang modl exports_only = do
   -- just so we can get an appropriate PrintUnqualified
   (as,bs) <- GHC.getContext
   prel_mod <- lift getPrelude
-  if exports_only then GHC.setContext [] [prel_mod,modl]
+  if exports_only then GHC.setContext [] [(prel_mod,Nothing), (modl,Nothing)]
                   else GHC.setContext [modl] []
   target_unqual <- GHC.getPrintUnqual
   GHC.setContext as bs
@@ -1284,12 +1294,30 @@ browseModule bang modl exports_only = do
 -----------------------------------------------------------------------------
 -- Setting the module context
 
+importContext :: Bool -> String -> GHCi ()
+importContext fail str
+  = do
+    (as,bs) <- GHC.getContext
+    x <- do_checks fail
+    case Monad.join x of
+        Nothing -> return ()
+        (Just a) -> do
+            m <- loadModuleName a
+            GHC.setContext as (bs++[(m,Just a)])
+            st <- getGHCiState
+            let cmds = remembered_ctx st
+            setGHCiState st{ remembered_ctx = cmds++[Right str] }
+  where
+    do_checks True = liftM Just (GhciMonad.parseImportDecl str)
+    do_checks False = trymaybe (GhciMonad.parseImportDecl str)
+
 setContext :: String -> GHCi ()
 setContext str
   | all sensible strs = do
        playCtxtCmd True (cmd, as, bs)
        st <- getGHCiState
-       setGHCiState st{ remembered_ctx = remembered_ctx st ++ [(cmd,as,bs)] }
+       let cmds = remembered_ctx st
+       setGHCiState st{ remembered_ctx = cmds ++ [Left (cmd,as,bs)] }
   | otherwise = ghcError (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
   where
     (cmd, strs, as, bs) =
@@ -1317,33 +1345,38 @@ playCtxtCmd fail (cmd, as, bs)
       case cmd of
         SetContext -> do
           prel_mod <- getPrelude
-          let bs'' = if null as && prel_mod `notElem` bs' then prel_mod:bs'
+          let bs'' = if null as && prel_mod `notElem` (map fst bs') then (prel_mod,Nothing):bs'
                                                           else bs'
-          return (as',bs'')
+          return (as', bs'')
         AddModules -> do
-          let as_to_add = as' \\ (prev_as ++ prev_bs)
-              bs_to_add = bs' \\ (prev_as ++ prev_bs)
-          return (prev_as ++ as_to_add, prev_bs ++ bs_to_add)
+          -- it should replace the old stuff, not the other way around
+          -- need deleteAllBy, not deleteFirstsBy for sameFst
+          let remaining_as = prev_as \\ (as' ++ map fst bs')
+              remaining_bs = deleteAllBy sameFst prev_bs (bs' ++ map contextualize as')
+          return (remaining_as ++ as', remaining_bs ++ bs')
         RemModules -> do
-          let new_as = prev_as \\ (as' ++ bs')
-              new_bs = prev_bs \\ (as' ++ bs')
+          let new_as = prev_as \\ (as' ++ map fst bs')
+              new_bs = deleteAllBy sameFst prev_bs (map contextualize as' ++ bs')
           return (new_as, new_bs)
     GHC.setContext new_as new_bs
   where
     do_checks True = do
       as' <- mapM wantInterpretedModule as
       bs' <- mapM lookupModule bs
-      return (as',bs')
+      return (as', map contextualize bs')
     do_checks False = do
       as' <- mapM (trymaybe . wantInterpretedModule) as
       bs' <- mapM (trymaybe . lookupModule) bs
-      return (catMaybes as', catMaybes bs')
+      return (catMaybes as', map contextualize (catMaybes bs'))
+    contextualize x = (x,Nothing)
+    deleteAllBy f a b = filter (\x->(not (any (f x) b))) a
 
-    trymaybe m = do
-        r <- ghciTry m
-        case r of
-          Left _  -> return Nothing
-          Right a -> return (Just a)
+trymaybe ::GHCi a -> GHCi (Maybe a)
+trymaybe m = do
+    r <- ghciTry m
+    case r of
+      Left _  -> return Nothing
+      Right a -> return (Just a)
 
 ----------------------------------------------------------------------------
 -- Code for `:set'

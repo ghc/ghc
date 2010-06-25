@@ -1125,7 +1125,7 @@ data InteractiveContext
 	ic_toplev_scope :: [Module],	-- ^ The context includes the "top-level" scope of
 					-- these modules
 
-	ic_exports :: [Module],		-- ^ The context includes just the exports of these
+	ic_exports :: [(Module, Maybe (ImportDecl RdrName))],		-- ^ The context includes just the exported parts of these
 					-- modules
 
 	ic_rn_gbl_env :: GlobalRdrEnv,	-- ^ The contexts' cached 'GlobalRdrEnv', built from

@@ -589,10 +589,12 @@ hello
 Prelude IO>
 </screen>
 
-      <para>(Note: you can use <literal>import M</literal> as an
-      alternative to <literal>:module +M</literal>, and
+      <para>(Note: you can use conventional
+      haskell <literal>import</literal> syntax as
+      well, but this does not support
+      <literal>*</literal> forms).
       <literal>:module</literal> can also be shortened to 
-      <literal>:m</literal>). The full syntax of the
+      <literal>:m</literal>. The full syntax of the
       <literal>:module</literal> command is:</para>
 
 <screen>
