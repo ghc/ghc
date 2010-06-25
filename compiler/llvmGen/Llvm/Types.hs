@@ -58,10 +58,13 @@ instance Show LlvmType where
   show (LMStruct tys  ) = "{" ++ (commaCat tys) ++ "}"
 
   show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
-    = let varg' = if varg == VarArgs then ", ..." else ""
-          args = (tail.concat) $
+    = let args = ((drop 1).concat) $ -- use drop since it can handle empty lists
                   map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
-    in show r ++ " (" ++ args ++ varg' ++ ")"
+          varg' = case varg of
+                        VarArgs | not (null args) -> ", ..."
+                                | otherwise       -> "..."
+                        _otherwise                -> ""
+      in show r ++ " (" ++ args ++ varg' ++ ")"
 
   show (LMAlias s _   ) = "%" ++ unpackFS s
 
@@ -351,14 +354,17 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
 
 instance Show LlvmFunctionDecl where
   show (LlvmFunctionDecl n l c r varg p a)
-    = let varg' = if varg == VarArgs then ", ..." else ""
+    = let args = ((drop 1).concat) $ -- use drop since it can handle empty lists
+                  map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
+          varg' = case varg of
+                        VarArgs | not (null args) -> ", ..."
+                                | otherwise       -> "..."
+                        _otherwise                -> ""
           align = case a of
                        Just a' -> " align " ++ show a'
                        Nothing -> ""
-          args = (tail.concat) $
-                  map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
-    in show l ++ " " ++ show c ++ " " ++ show r ++ " @" ++ unpackFS n ++
-        "(" ++ args ++ varg' ++ ")" ++ align
+      in show l ++ " " ++ show c ++ " " ++ show r ++ " @" ++ unpackFS n ++
+             "(" ++ args ++ varg' ++ ")" ++ align
 
 type LlvmFunctionDecls = [LlvmFunctionDecl]
 
