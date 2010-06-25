@@ -357,7 +357,7 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- To avoid subtle coding errors, hand written marshalling code
 -- should preferably use 'Foreign.ForeignPtr.withForeignPtr' rather
 -- than combinations of 'unsafeForeignPtrToPtr' and
--- 'touchForeignPtr'.  However, the later routines
+-- 'touchForeignPtr'.  However, the latter routines
 -- are occasionally preferred in tool generated marshalling code.
 unsafeForeignPtrToPtr (ForeignPtr fo _) = Ptr fo
 
