@@ -19,7 +19,7 @@
 
 void initStorage(void);
 void exitStorage(void);
-void freeStorage(void);
+void freeStorage(rtsBool free_heap);
 
 /* -----------------------------------------------------------------------------
    Storage manager state

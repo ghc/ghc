@@ -213,10 +213,10 @@ exitStorage (void)
 }
 
 void
-freeStorage (void)
+freeStorage (rtsBool free_heap)
 {
     stgFree(generations);
-    freeAllMBlocks();
+    if (free_heap) freeAllMBlocks();
 #if defined(THREADED_RTS)
     closeMutex(&sm_mutex);
 #endif

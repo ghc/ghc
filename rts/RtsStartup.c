@@ -450,8 +450,11 @@ hs_exit_(rtsBool wait_foreign)
     /* free hash table storage */
     exitHashTable();
 
-    // Finally, free all our storage
-    freeStorage();
+    // Finally, free all our storage.  However, we only free the heap
+    // memory if we have waited for foreign calls to complete;
+    // otherwise a foreign call in progress may still be referencing
+    // heap memory (e.g. by being passed a ByteArray#).
+    freeStorage(wait_foreign);
 
 #if defined(DEBUG)
     /* and shut down the allocator debugging */
