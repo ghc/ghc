@@ -25,14 +25,14 @@ module LlvmCodeGen.Base (
 import Llvm
 import LlvmCodeGen.Regs
 
-import CgUtils ( activeStgRegs )
 import CLabel
+import CgUtils ( activeStgRegs )
 import Cmm
-
+import Constants
 import FastString
 import qualified Outputable as Outp
-import Unique
 import UniqFM
+import Unique
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -105,11 +105,11 @@ mkLlvmFunc lbl link sec blks
 
 -- | Alignment to use for functions
 llvmFunAlign :: LMAlign
-llvmFunAlign = Just 4
+llvmFunAlign = Just wORD_SIZE
 
 -- | Alignment to use for into tables
 llvmInfAlign :: LMAlign
-llvmInfAlign = Just 4
+llvmInfAlign = Just wORD_SIZE
 
 -- | A Function's arguments
 llvmFunArgs :: [LlvmVar]
