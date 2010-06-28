@@ -351,11 +351,11 @@ cmmPrimOpFunctions mop
  = case mop of
     MO_F32_Exp    -> fsLit "expf"
     MO_F32_Log    -> fsLit "logf"
-    MO_F32_Sqrt   -> fsLit "sqrtf"
-    MO_F32_Pwr    -> fsLit "powf"
+    MO_F32_Sqrt   -> fsLit "llvm.sqrt.f32"
+    MO_F32_Pwr    -> fsLit "llvm.pow.f32"
 
-    MO_F32_Sin    -> fsLit "sinf"
-    MO_F32_Cos    -> fsLit "cosf"
+    MO_F32_Sin    -> fsLit "llvm.sin.f32"
+    MO_F32_Cos    -> fsLit "llvm.cos.f32"
     MO_F32_Tan    -> fsLit "tanf"
 
     MO_F32_Asin   -> fsLit "asinf"
@@ -368,11 +368,11 @@ cmmPrimOpFunctions mop
 
     MO_F64_Exp    -> fsLit "exp"
     MO_F64_Log    -> fsLit "log"
-    MO_F64_Sqrt   -> fsLit "sqrt"
-    MO_F64_Pwr    -> fsLit "pow"
+    MO_F64_Sqrt   -> fsLit "llvm.sqrt.f64"
+    MO_F64_Pwr    -> fsLit "llvm.pow.f64"
 
-    MO_F64_Sin    -> fsLit "sin"
-    MO_F64_Cos    -> fsLit "cos"
+    MO_F64_Sin    -> fsLit "llvm.sin.f64"
+    MO_F64_Cos    -> fsLit "llvm.cos.f64"
     MO_F64_Tan    -> fsLit "tan"
 
     MO_F64_Asin   -> fsLit "asin"
