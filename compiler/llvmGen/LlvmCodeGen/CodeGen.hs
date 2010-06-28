@@ -244,10 +244,10 @@ genCall env target res args ret = do
                                         Nothing Nothing False
                         return (env1, fun, nilOL, [])
 
-                    Just _ -> do
+                    Just ty' -> do
                         -- label in module but not function pointer, convert
                         let fty@(LMFunction sig) = funTy name
-                        let fun = LMGlobalVar name fty (funcLinkage sig)
+                        let fun = LMGlobalVar name (pLift ty') (funcLinkage sig)
                                         Nothing Nothing False
                         (v1, s1) <- doExpr (pLift fty)
                                         $ Cast LM_Bitcast fun (pLift fty)
