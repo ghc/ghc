@@ -89,11 +89,15 @@ llvmFunSig :: CLabel -> LlvmLinkageType -> LlvmFunctionDecl
 llvmFunSig lbl link = llvmFunSig' (strCLabel_llvm lbl) link
 
 llvmFunSig' :: LMString -> LlvmLinkageType -> LlvmFunctionDecl
-llvmFunSig' lbl link = LlvmFunctionDecl lbl link llvmGhcCC LMVoid FixedArgs
-                        (tysToParams $ map getVarType llvmFunArgs) llvmFunAlign
+llvmFunSig' lbl link
+  = let toParams x | isPointer x = (x, [NoAlias, NoCapture])
+                   | otherwise   = (x, [])
+    in LlvmFunctionDecl lbl link llvmGhcCC LMVoid FixedArgs
+                        (map (toParams . getVarType) llvmFunArgs) llvmFunAlign
 
 -- | Create a Haskell function in LLVM.
-mkLlvmFunc :: CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks -> LlvmFunction
+mkLlvmFunc :: CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
+           -> LlvmFunction
 mkLlvmFunc lbl link sec blks
   = let funDec = llvmFunSig lbl link
         funArgs = map (fsLit . getPlainName) llvmFunArgs
