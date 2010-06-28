@@ -571,7 +571,7 @@ genMachOp env _ op [x] = case op of
 
     MO_F_Neg w ->
         let all0 = LMLitVar $ LMFloatLit (-0) (widthToLlvmFloat w)
-        in negate (widthToLlvmFloat w) all0 LM_MO_Sub
+        in negate (widthToLlvmFloat w) all0 LM_MO_FSub
 
     MO_SF_Conv _ w -> fiConv (widthToLlvmFloat w) LM_Sitofp
     MO_FS_Conv _ w -> fiConv (widthToLlvmInt w) LM_Fptosi
@@ -649,9 +649,9 @@ genMachOp env opt op [x, y] = case op of
     MO_F_Lt _ -> genBinComp opt LM_CMP_Flt
     MO_F_Le _ -> genBinComp opt LM_CMP_Fle
 
-    MO_F_Add  _ -> genBinMach LM_MO_Add
-    MO_F_Sub  _ -> genBinMach LM_MO_Sub
-    MO_F_Mul  _ -> genBinMach LM_MO_Mul
+    MO_F_Add  _ -> genBinMach LM_MO_FAdd
+    MO_F_Sub  _ -> genBinMach LM_MO_FSub
+    MO_F_Mul  _ -> genBinMach LM_MO_FMul
     MO_F_Quot _ -> genBinMach LM_MO_FDiv
 
     MO_And _   -> genBinMach LM_MO_And

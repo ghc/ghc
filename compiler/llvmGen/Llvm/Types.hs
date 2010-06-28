@@ -155,14 +155,16 @@ instance Show LlvmStatic where
 
   show (LMAdd s1 s2)
       = let ty1 = getStatType s1
+            op  = if isFloat ty1 then " fadd (" else " add ("
         in if ty1 == getStatType s2
-                then show ty1 ++ " add (" ++ show s1 ++ "," ++ show s2 ++ ")"
+                then show ty1 ++ op ++ show s1 ++ "," ++ show s2 ++ ")"
                 else error $ "LMAdd with different types! s1: "
                         ++ show s1 ++ ", s2: " ++ show s2
   show (LMSub s1 s2)
       = let ty1 = getStatType s1
+            op  = if isFloat ty1 then " fsub (" else " sub ("
         in if ty1 == getStatType s2
-                then show ty1 ++ " sub (" ++ show s1 ++ "," ++ show s2 ++ ")"
+                then show ty1 ++ op ++ show s1 ++ "," ++ show s2 ++ ")"
                 else error $ "LMSub with different types! s1: "
                         ++ show s1 ++ ", s2: " ++ show s2
 
@@ -636,10 +638,14 @@ data LlvmMachOp
   | LM_MO_Mul  -- ^ multiply ..
   | LM_MO_UDiv -- ^ unsigned integer or vector division.
   | LM_MO_SDiv -- ^ signed integer ..
-  | LM_MO_FDiv -- ^ floating point ..
   | LM_MO_URem -- ^ unsigned integer or vector remainder (mod)
   | LM_MO_SRem -- ^ signed ...
-  | LM_MO_FRem -- ^ floating point ...
+
+  | LM_MO_FAdd -- ^ add two floating point or vector values.
+  | LM_MO_FSub -- ^ subtract two ...
+  | LM_MO_FMul -- ^ multiply ...
+  | LM_MO_FDiv -- ^ divide ...
+  | LM_MO_FRem -- ^ remainder ...
 
   -- | Left shift
   | LM_MO_Shl
@@ -662,9 +668,12 @@ instance Show LlvmMachOp where
   show LM_MO_Mul  = "mul"
   show LM_MO_UDiv = "udiv"
   show LM_MO_SDiv = "sdiv"
-  show LM_MO_FDiv = "fdiv"
   show LM_MO_URem = "urem"
   show LM_MO_SRem = "srem"
+  show LM_MO_FAdd = "fadd"
+  show LM_MO_FSub = "fsub"
+  show LM_MO_FMul = "fmul"
+  show LM_MO_FDiv = "fdiv"
   show LM_MO_FRem = "frem"
   show LM_MO_Shl  = "shl"
   show LM_MO_LShr = "lshr"
