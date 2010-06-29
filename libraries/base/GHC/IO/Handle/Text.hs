@@ -73,6 +73,7 @@ import GHC.List
 -- This operation may fail with:
 --
 --  * 'isEOFError' if the end of file has been reached.
+--
 --  * a decoding error, if the input begins with an invalid byte sequence
 --    in this Handle's encoding.
 --
