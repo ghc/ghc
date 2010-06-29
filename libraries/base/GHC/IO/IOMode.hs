@@ -22,5 +22,6 @@ import GHC.Read
 import GHC.Arr
 import GHC.Enum
 
+-- | See 'System.IO.openFile'
 data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
                     deriving (Eq, Ord, Ix, Enum, Read, Show)

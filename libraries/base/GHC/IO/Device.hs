@@ -142,7 +142,7 @@ data IODeviceType
 -- -----------------------------------------------------------------------------
 -- SeekMode type
 
--- | A mode that determines the effect of 'hSeek' @hdl mode i@, as follows:
+-- | A mode that determines the effect of 'hSeek' @hdl mode i@.
 data SeekMode
   = AbsoluteSeek        -- ^ the position of @hdl@ is set to @i@.
   | RelativeSeek        -- ^ the position of @hdl@ is set to offset @i@

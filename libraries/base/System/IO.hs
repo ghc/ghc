@@ -25,6 +25,15 @@ module System.IO (
 
     Handle,             -- abstract, instance of: Eq, Show.
 
+    -- | GHC note: a 'Handle' will be automatically closed when the garbage
+    -- collector detects that it has become unreferenced by the program.
+    -- However, relying on this behaviour is not generally recommended:
+    -- the garbage collector is unpredictable.  If possible, use explicit
+    -- an explicit 'hClose' to close 'Handle's when they are no longer
+    -- required.  GHC does not currently attempt to free up file
+    -- descriptors when they have run out, it is your responsibility to
+    -- ensure that this doesn't happen.
+
     -- ** Standard handles
 
     -- | Three handles are allocated during program initialisation,
@@ -615,8 +624,7 @@ foreign import ccall "getpid" c_getpid :: IO Int
 -- $locking
 -- Implementations should enforce as far as possible, at least locally to the
 -- Haskell process, multiple-reader single-writer locking on files.
--- That is, /there may either be many handles on the same file which manage
--- input, or just one handle on the file which manages output/.  If any
+-- That is, /there may either be many handles on the same file which manage input, or just one handle on the file which manages output/.  If any
 -- open or semi-closed handle is managing a file for output, no new
 -- handle can be allocated for that file.  If any open or semi-closed
 -- handle is managing a file for input, new handles can only be allocated
