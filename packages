@@ -47,6 +47,7 @@ libraries/filepath                      packages/filepath               darcs
 libraries/ghc-prim                      packages/ghc-prim               darcs
 libraries/haskeline                     packages/haskeline              darcs
 libraries/haskell98                     packages/haskell98              darcs
+libraries/haskell2010                   packages/haskell2010            darcs
 libraries/hpc                           packages/hpc                    darcs
 libraries/integer-gmp                   packages/integer-gmp            darcs
 libraries/integer-simple                packages/integer-simple         darcs
