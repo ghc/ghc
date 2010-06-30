@@ -88,8 +88,6 @@ ppLaTeX title packageStr visible_ifaces odir prologue maybe_style libdir
    ppLaTeXTop title packageStr odir prologue maybe_style visible_ifaces
    mapM_ (ppLaTeXModule title odir) visible_ifaces
 
-
-haddockSty :: String
 haddockSty = "haddock.sty"
 
 
@@ -180,7 +178,7 @@ exportListItem (ExportDecl decl _doc subdocs _insts)
   = ppDocBinder (declName decl) <>
      case subdocs of
        [] -> empty
-       _  -> parens (sep (punctuate comma (map (ppDocBinder . fst) subdocs)))
+       xs -> parens (sep (punctuate comma (map (ppDocBinder . fst) subdocs)))
 exportListItem (ExportNoDecl y [])
   = ppDocBinder y
 exportListItem (ExportNoDecl y subs)
@@ -286,30 +284,22 @@ ppDecl (L loc decl) (mbDoc, fnArgsDoc) instances subdocs = case decl of
     | Nothing <- tcdTyPats d     -> ppTySyn loc (mbDoc, fnArgsDoc) d unicode
     | Just _  <- tcdTyPats d     -> ppTyInst False loc mbDoc d unicode
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc mbDoc subdocs d unicode
-  SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig loc (mbDoc, fnArgsDoc) n t unicode False
+  SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig loc (mbDoc, fnArgsDoc) n t unicode
   ForD d                         -> ppFor loc (mbDoc, fnArgsDoc) d unicode
   InstD _                        -> empty
   _                              -> error "declaration not supported by ppDecl"
   where
     unicode = False
 
-
-ppTyFam :: t -> t1 -> t2 -> t3 -> t4 -> a
-ppTyFam _ _ _ _ _ =
+ppTyFam _ _ _ _ _ = 
   error "type family declarations are currently not supported by --latex"
 
-
-ppDataInst :: t -> t1 -> t2 -> a
 ppDataInst _ _ _ =
   error "data instance declarations are currently not supported by --latex"
 
-
-ppTyInst :: t -> t1 -> t2 -> t3 -> t4 -> a
 ppTyInst _ _ _ _ _ =
   error "type instance declarations are currently not supported by --latex"
 
-
-ppFor :: t -> t1 -> t2 -> t3 -> a
 ppFor _ _ _ _ =
   error "foreign declarations are currently not supported by --latex"
 
@@ -323,7 +313,7 @@ ppFor _ _ _ _ =
 ppTySyn :: SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool -> LaTeX
 
 ppTySyn loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode
-  = ppTypeOrFunSig loc name (unLoc ltype) doc
+  = ppTypeOrFunSig loc name (unLoc ltype) doc 
                    (full, hdr, char '=') unicode False
   where
     hdr  = hsep (keyword "type" : ppDocBinder name : ppTyVars ltyvars)
@@ -338,21 +328,20 @@ ppTySyn _ _ _ _ = error "declaration not supported by ppTySyn"
 
 
 ppFunSig :: SrcSpan -> DocForDecl DocName -> DocName -> HsType DocName
-         -> Bool -> Bool
-         -> LaTeX
-ppFunSig loc doc docname typ unicode methods =
+         -> Bool -> LaTeX
+ppFunSig loc doc docname typ unicode =
   ppTypeOrFunSig loc docname typ doc
     (ppTypeSig name typ False, ppSymName name, dcolon unicode)
-    unicode methods
+    unicode
  where
    name = getName docname
 
 
 ppTypeOrFunSig :: SrcSpan -> DocName -> HsType DocName ->
                   DocForDecl DocName -> (LaTeX, LaTeX, LaTeX)
-               -> Bool -> Bool -> LaTeX
+               -> Bool -> LaTeX
 ppTypeOrFunSig _loc _docname typ (doc, argDocs) (pref1, pref2, sep0)
-               unicode _
+               unicode methods
   | Map.null argDocs =
       declWithDoc pref1 (fmap docToLaTeX doc)
   | otherwise        =
@@ -469,13 +458,15 @@ ppClassDecl :: [DocInstance DocName] -> SrcSpan
             -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> LaTeX
 ppClassDecl instances loc mbDoc subdocs
-  (ClassDecl lctxt lname ltyvars lfds lsigs _ _ _) unicode
+	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
   = declWithDoc classheader (if null body then Nothing else Just (vcat body)) $$
     instancesBit
   where
     classheader
       | null lsigs = hdr unicode
       | otherwise  = hdr unicode <+> keyword "where"
+
+    nm   = unLoc $ tcdLName decl
 
     hdr = ppClassHdr False lctxt (unLoc lname) ltyvars lfds
 
@@ -485,11 +476,11 @@ ppClassDecl instances loc mbDoc subdocs
       | null lsigs = Nothing
       | otherwise = Just methodTable
 
---      | otherwise = atTable $$ methodTable 
+      | otherwise = error "LaTeX.ppClassDecl"
  
     methodTable =
       text "\\haddockpremethods{}\\textbf{Methods}" $$
-      vcat  [ ppFunSig loc doc n typ unicode True
+      vcat  [ ppFunSig loc doc n typ unicode
             | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
             , let doc = lookupAnySubdoc n subdocs ]
 
@@ -538,13 +529,14 @@ ppDataDecl :: [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
               SrcSpan -> Maybe (Doc DocName) -> TyClDecl DocName -> Bool ->
               LaTeX
-ppDataDecl instances subdocs _ mbDoc dataDecl unicode
+ppDataDecl instances subdocs loc mbDoc dataDecl unicode
 
    =  declWithDoc (ppDataHeader dataDecl unicode <+> whereBit)
                   (if null body then Nothing else Just (vcat body))
    $$ instancesBit
 
   where
+    docname   = unLoc . tcdLName $ dataDecl
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons
 
@@ -568,6 +560,11 @@ ppDataDecl instances subdocs _ mbDoc dataDecl unicode
       | all (isNothing . snd) instances =
         declWithDoc (vcat (map (ppInstDecl unicode) (map fst instances))) Nothing
       | otherwise = vcat (map (ppDocInstance unicode) instances)
+
+isRecCon :: Located (ConDecl a) -> Bool
+isRecCon lcon = case con_details (unLoc lcon) of 
+  RecCon _ -> True
+  _ -> False
 
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
@@ -923,6 +920,10 @@ ppBinder n
   | isVarSym n = parens $ ppOccName n
   | otherwise  = ppOccName n
 
+ppVerbBinder :: OccName -> LaTeX
+ppVerbBinder n
+  | isVarSym n = parens $ ppVerbOccName n
+  | otherwise  = ppVerbOccName n
 
 ppSymName :: Name -> LaTeX
 ppSymName name
@@ -957,10 +958,14 @@ ppLDocName (L _ d) = ppDocName d
 ppDocBinder :: DocName -> LaTeX
 ppDocBinder = ppBinder . docNameOcc
 
+ppVerbDocBinder :: DocName -> LaTeX
+ppVerbDocBinder = ppVerbBinder . docNameOcc
 
 ppName :: Name -> LaTeX
 ppName = ppOccName . nameOccName
 
+ppVerbName :: Name -> LaTeX
+ppVerbName = ppVerbOccName . nameOccName
 
 latexFilter :: String -> String
 latexFilter = foldr latexMunge ""
@@ -969,8 +974,6 @@ latexFilter = foldr latexMunge ""
 latexMonoFilter :: String -> String
 latexMonoFilter = foldr latexMonoMunge ""
 
-
-latexMunge :: Char -> String -> String
 latexMunge '#'  s = "{\\char '43}" ++ s
 latexMunge '$'  s = "{\\char '44}" ++ s
 latexMunge '%'  s = "{\\char '45}" ++ s
@@ -985,8 +988,6 @@ latexMunge '['  s = "{\\char 91}" ++ s
 latexMunge ']'  s = "{\\char 93}" ++ s
 latexMunge c    s = c : s
 
-
-latexMonoMunge :: Char -> String -> String
 latexMonoMunge ' ' s = '\\' : ' ' : s
 latexMonoMunge '\n' s = '\\' : '\\' : s
 latexMonoMunge c   s = latexMunge c s
@@ -1005,11 +1006,11 @@ parLatexMarkup ppId isTyCon = Markup {
   markupString        = \s v -> text (fixString v s),
   markupAppend        = \l r v -> l v <> r v,
   markupIdentifier    = markupId,
-  markupModule        = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
+  markupModule        = \m v -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
   markupEmphasis      = \p v -> emph (p v),
-  markupMonospaced    = \p _ -> tt (p Mono),
+  markupMonospaced    = \p v -> tt (p Mono),
   markupUnorderedList = \p v -> itemizedList (map ($v) p) $$ text "",
-  markupPic           = \path _ -> parens (text "image: " <> text path),
+  markupPic           = \path v -> parens (text "image: " <> text path),
   markupOrderedList   = \p v -> enumeratedList (map ($v) p) $$ text "",
   markupDefList       = \l v -> descriptionList (map (\(a,b) -> (a v, b v)) l),
   markupCodeBlock     = \p _ -> quote (verb (p Verb)) $$ text "",
@@ -1074,11 +1075,13 @@ latexStripTrailingWhitespace (DocParagraph p) =
   latexStripTrailingWhitespace p
 latexStripTrailingWhitespace other = other
 
+latexStripLeadingPara :: Doc a -> Doc a
+latexStripLeadingPara (DocParagraph p) = p
+latexStripLeadingPara (DocAppend l r) = DocAppend (latexStripLeadingPara l) r
+latexStripLeadingPara d = d
 
--------------------------------------------------------------------------------
--- * LaTeX utils
--------------------------------------------------------------------------------
-
+-- -----------------------------------------------------------------------------
+-- LaTeX utils
 
 itemizedList :: [LaTeX] -> LaTeX
 itemizedList items =
