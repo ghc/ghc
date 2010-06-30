@@ -24,6 +24,7 @@ module Haddock.Options (
   optSourceUrls,
   optWikiUrls,
   optDumpInterfaceFile,
+  optLaTeXStyle,
   verbosity,
   ghcFlags,
   ifacePairs
@@ -57,6 +58,8 @@ data Flag
   | Flag_WikiModuleURL String
   | Flag_WikiEntityURL String
   | Flag_Xhtml
+  | Flag_LaTeX
+  | Flag_LaTeXStyle String
   | Flag_Help
   | Flag_Verbosity String
   | Flag_Version
@@ -94,6 +97,8 @@ options backwardsCompat =
     Option ['h']  ["html"]     (NoArg Flag_Html)
       "output in HTML",
     Option []  ["xhtml"]  (NoArg Flag_Xhtml) "use experimental XHTML rendering",
+    Option []  ["latex"]  (NoArg Flag_LaTeX) "use experimental LaTeX rendering",
+    Option []  ["latex-style"]  (ReqArg Flag_LaTeXStyle "FILE") "provide your own LaTeX style in FILE",
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
       "output for Hoogle",
@@ -215,6 +220,9 @@ optWikiUrls flags =
 optDumpInterfaceFile :: [Flag] -> Maybe FilePath
 optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
 
+
+optLaTeXStyle :: [Flag] -> Maybe String
+optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 
 verbosity :: [Flag] -> Verbosity
 verbosity flags =

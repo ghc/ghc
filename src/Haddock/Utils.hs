@@ -37,6 +37,7 @@ module Haddock.Utils (
 
   -- * List utilities
   replace,
+  spanWith,
 
   -- * MTL stuff
   MonadIO(..),
@@ -325,6 +326,11 @@ html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 replace :: Eq a => a -> a -> [a] -> [a]
 replace a b = map (\x -> if x == a then b else x) 
 
+spanWith :: (a -> Maybe b) -> [a] -> ([b],[a])
+spanWith p [] = ([],[])
+spanWith p xs@(a:as)
+  | Just b <- p a = let (bs,cs) = spanWith p as in (b:bs,cs)
+  | otherwise     = ([],xs)
 
 -----------------------------------------------------------------------------
 -- put here temporarily

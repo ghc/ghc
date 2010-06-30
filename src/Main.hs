@@ -20,6 +20,7 @@ module Main (main) where
 
 import qualified Haddock.Backends.Html as Html
 import qualified Haddock.Backends.Xhtml as Xhtml
+import qualified Haddock.Backends.LaTeX as LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Interface
 import Haddock.Lex
@@ -179,6 +180,7 @@ render flags ifaces installedIfaces = do
     opt_html_help_format = optHtmlHelpFormat flags
     css_file             = optCssFile        flags
     odir                 = outputDir         flags
+    opt_latex_style      = optLaTeXStyle     flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -227,6 +229,9 @@ render flags ifaces installedIfaces = do
     let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
     ppHoogle pkgName2 pkgVer title prologue visibleIfaces odir
 
+  when (Flag_LaTeX `elem` flags) $ do
+    LaTeX.ppLaTeX title packageStr visibleIfaces odir prologue opt_latex_style
+                  libDir
 
 -------------------------------------------------------------------------------
 -- Reading and dumping interface files
