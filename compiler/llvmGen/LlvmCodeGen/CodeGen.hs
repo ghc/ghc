@@ -426,26 +426,108 @@ genAssign :: LlvmEnv -> CmmReg -> CmmExpr -> UniqSM StmtData
 genAssign env reg val = do
     let (env1, vreg, stmts1, top1) = getCmmReg env reg
     (env2, vval, stmts2, top2) <- exprToVar env1 val
-    let s1 = Store vval vreg
-    return (env2, stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
+    let stmts = stmts1 `appOL` stmts2
+
+    let ty = (pLower . getVarType) vreg
+    case isPointer ty && getVarType vval == llvmWord of
+         -- Some registers are pointer types, so need to cast value to pointer
+         True -> do
+             (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
+             let s2 = Store v vreg
+             return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
+
+         False -> do
+             let s1 = Store vval vreg
+             return (env2, stmts `snocOL` s1, top1 ++ top2)
 
 
 -- | CmmStore operation
 genStore :: LlvmEnv -> CmmExpr -> CmmExpr -> UniqSM StmtData
-genStore env addr val = do
+
+-- First we try to detect a few common cases and produce better code for
+-- these then the default case. We are mostly trying to detect Cmm code
+-- like I32[Sp + n] and use 'getelementptr' operations instead of the
+-- generic case that uses casts and pointer arithmetic
+genStore env addr@(CmmReg (CmmGlobal r)) val
+    = genStore_fast env addr r 0 val
+
+genStore env addr@(CmmRegOff (CmmGlobal r) n) val
+    = genStore_fast env addr r n val
+
+genStore env addr@(CmmMachOp (MO_Add _) [
+                            (CmmReg (CmmGlobal r)),
+                            (CmmLit (CmmInt n _))])
+                val
+    = genStore_fast env addr r (fromInteger n) val
+
+genStore env addr@(CmmMachOp (MO_Sub _) [
+                            (CmmReg (CmmGlobal r)),
+                            (CmmLit (CmmInt n _))])
+                val
+    = genStore_fast env addr r (negate $ fromInteger n) val
+
+-- generic case
+genStore env addr val = genStore_slow env addr val
+
+-- | CmmStore operation
+-- This is a special case for storing to a global register pointer
+-- offset such as I32[Sp+8].
+genStore_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmExpr
+              -> UniqSM StmtData
+genStore_fast env addr r n val
+  = let gr  = lmGlobalRegVar r
+        grt = (pLower . getVarType) gr
+        ix  = n `div` ((llvmWidthInBits . pLower) grt  `div` 8)
+    in case isPointer grt of
+            True -> do
+                (env', vval,  stmts, top) <- exprToVar env val
+                (gv,  s1) <- doExpr grt $ Load gr
+                (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
+                -- We might need a different pointer type, so check
+                case pLower grt == getVarType vval of
+                     -- were fine
+                     True  -> do
+                         let s3 = Store vval ptr
+                         return (env',  stmts `snocOL` s1 `snocOL` s2
+                                 `snocOL` s3, top)
+
+                     -- cast to pointer type needed
+                     False -> do
+                         let ty = (pLift . getVarType) vval
+                         (ptr', s3) <- doExpr ty $ Cast LM_Bitcast ptr ty
+                         let s4 = Store vval ptr'
+                         return (env',  stmts `snocOL` s1 `snocOL` s2
+                                 `snocOL` s3 `snocOL` s4, top)
+
+            -- If its a bit type then we use the slow method since
+            -- we can't avoid casting anyway.
+            False -> genStore_slow env addr val
+
+
+-- | CmmStore operation
+-- Generic case. Uses casts and pointer arithmetic if needed.
+genStore_slow :: LlvmEnv -> CmmExpr -> CmmExpr -> UniqSM StmtData
+genStore_slow env addr val = do
     (env1, vaddr, stmts1, top1) <- exprToVar env addr
     (env2, vval,  stmts2, top2) <- exprToVar env1 val
+
+    let stmts = stmts1 `appOL` stmts2
     case getVarType vaddr of
+        -- sometimes we need to cast an int to a pointer before storing
+        LMPointer ty@(LMPointer _) | getVarType vval == llvmWord -> do
+            (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
+            let s2 = Store v vaddr
+            return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
+
         LMPointer _ -> do
             let s1 = Store vval vaddr
-            return (env2, stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
+            return (env2, stmts `snocOL` s1, top1 ++ top2)
 
         i@(LMInt _) | i == llvmWord -> do
             let vty = pLift $ getVarType vval
             (vptr, s1) <- doExpr vty $ Cast LM_Inttoptr vaddr vty
             let s2 = Store vval vptr
-            return (env2, stmts1 `appOL` stmts2 `snocOL` s1 `snocOL` s2,
-                    top1 ++ top2)
+            return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
 
         other ->
             pprPanic "genStore: ptr not right type!"
@@ -543,7 +625,14 @@ exprToVarOpt env opt e = case e of
     CmmReg r -> do
         let (env', vreg, stmts, top) = getCmmReg env r
         (v1, s1) <- doExpr (pLower $ getVarType vreg) $ Load vreg
-        return (env', v1, stmts `snocOL` s1 , top)
+        case (isPointer . getVarType) v1 of
+             True  -> do
+                 -- Cmm wants the value, so pointer types must be cast to ints
+                 -- TODO: Remove, keep as pointers as much as possible
+                 (v2, s2) <- doExpr llvmWord $ Cast LM_Ptrtoint v1 llvmWord
+                 return (env', v2, stmts `snocOL` s1 `snocOL` s2, top)
+
+             False -> return (env', v1, stmts `snocOL` s1, top)
 
     CmmMachOp op exprs
         -> genMachOp env opt op exprs
@@ -759,9 +848,73 @@ genMachOp env opt op [x, y] = case op of
 genMachOp _ _ _ _ = panic "genMachOp: More then 2 expressions in MachOp!"
 
 
--- | Handle CmmLoad expression
+-- | Handle CmmLoad expression.
 genCmmLoad :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
-genCmmLoad env e ty = do
+
+-- First we try to detect a few common cases and produce better code for
+-- these then the default case. We are mostly trying to detect Cmm code
+-- like I32[Sp + n] and use 'getelementptr' operations instead of the
+-- generic case that uses casts and pointer arithmetic
+genCmmLoad env e@(CmmReg (CmmGlobal r)) ty
+    = genCmmLoad_fast env e r 0 ty
+
+genCmmLoad env e@(CmmRegOff (CmmGlobal r) n) ty
+    = genCmmLoad_fast env e r n ty
+
+genCmmLoad env e@(CmmMachOp (MO_Add _) [
+                            (CmmReg (CmmGlobal r)),
+                            (CmmLit (CmmInt n _))])
+                ty
+    = genCmmLoad_fast env e r (fromInteger n) ty
+
+genCmmLoad env e@(CmmMachOp (MO_Sub _) [
+                            (CmmReg (CmmGlobal r)),
+                            (CmmLit (CmmInt n _))])
+                ty
+    = genCmmLoad_fast env e r (negate $ fromInteger n) ty
+
+-- generic case
+genCmmLoad env e ty = genCmmLoad_slow env e ty
+
+-- | Handle CmmLoad expression.
+-- This is a special case for loading from a global register pointer
+-- offset such as I32[Sp+8].
+genCmmLoad_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmType
+                -> UniqSM ExprData
+genCmmLoad_fast env e r n ty =
+    let gr  = lmGlobalRegVar r
+        grt = (pLower . getVarType) gr
+        ix  = n `div` ((llvmWidthInBits . pLower) grt  `div` 8)
+        ty' = cmmToLlvmType ty
+    in case isPointer grt of
+            True  -> do
+                (gv,  s1) <- doExpr grt $ Load gr
+                (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
+                -- We might need a different pointer type, so check
+                case grt == ty' of
+                     -- were fine
+                     True -> do
+                         (var, s3) <- doExpr ty' $ Load ptr
+                         return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3,
+                                     [])
+
+                     -- cast to pointer type needed
+                     False -> do
+                         let pty = pLift ty'
+                         (ptr', s3) <- doExpr pty $ Cast LM_Bitcast ptr pty
+                         (var, s4) <- doExpr ty' $ Load ptr'
+                         return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3
+                                    `snocOL` s4, [])
+
+            -- If its a bit type then we use the slow method since
+            -- we can't avoid casting anyway.
+            False -> genCmmLoad_slow env e ty
+
+
+-- | Handle Cmm load expression.
+-- Generic case. Uses casts and pointer arithmetic if needed.
+genCmmLoad_slow :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
+genCmmLoad_slow env e ty = do
     (env', iptr, stmts, tops) <- exprToVar env e
     case getVarType iptr of
          LMPointer _ -> do
@@ -832,6 +985,7 @@ genLit env cmm@(CmmLabel l)
                 let env' = funInsert label (pLower $ getVarType var) env
                 (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var llvmWord
                 return (env', v1, unitOL s1, ldata)
+
             -- Referenced data exists in this module, retrieve type and make
             -- pointer to it.
             Just ty' -> do
@@ -882,14 +1036,7 @@ funPrologue = liftM concat $ mapM getReg activeStgRegs
             let reg = lmGlobalRegVar rr
                 arg = lmGlobalRegArg rr
                 alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
-            in if (isPointer . getVarType) arg
-                  then do
-                      (v, c) <- doExpr llvmWord (Cast LM_Ptrtoint arg llvmWord)
-                      let store = Store v reg
-                      return [alloc, c, store]
-                  else do
-                      let store = Store arg reg
-                      return [alloc, store]
+            in return [alloc, Store arg reg]
 
 
 -- | Function epilogue. Load STG variables to use as argument for call.
@@ -897,13 +1044,8 @@ funEpilogue :: UniqSM ([LlvmVar], LlvmStatements)
 funEpilogue = do
     let loadExpr r = do
         let reg = lmGlobalRegVar r
-        let arg = lmGlobalRegArg r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
-        case (isPointer . getVarType) arg of
-             True  -> do
-                 (v2, s2) <- doExpr llvmWordPtr $ Cast LM_Inttoptr v llvmWordPtr
-                 return (v2, unitOL s `snocOL` s2)
-             False -> return (v, unitOL s)
+        return (v, unitOL s)
     loads <- mapM loadExpr activeStgRegs
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
@@ -918,19 +1060,21 @@ getHsFunc env lbl
   = let fn = strCLabel_llvm lbl
         ty    = funLookup fn env
     in case ty of
-        Just ty'@(LMFunction sig) -> do
         -- Function in module in right form
+        Just ty'@(LMFunction sig) -> do
             let fun = LMGlobalVar fn ty' (funcLinkage sig) Nothing Nothing False
             return (env, fun, nilOL, [])
-        Just ty' -> do
+
         -- label in module but not function pointer, convert
+        Just ty' -> do
             let fun = LMGlobalVar fn (pLift ty') ExternallyVisible
                             Nothing Nothing False
             (v1, s1) <- doExpr (pLift llvmFunTy) $
                             Cast LM_Bitcast fun (pLift llvmFunTy)
             return (env, v1, unitOL s1, [])
-        Nothing  -> do
+
         -- label not in module, create external reference
+        Nothing  -> do
             let ty' = LMFunction $ llvmFunSig lbl ExternallyVisible
             let fun = LMGlobalVar fn ty' ExternallyVisible Nothing Nothing False
             let top = CmmData Data [([],[ty'])]

@@ -16,11 +16,7 @@ import FastString
 
 -- | Get the LlvmVar function variable storing the real register
 lmGlobalRegVar :: GlobalReg -> LlvmVar
-lmGlobalRegVar reg 
-  = let reg' = lmGlobalReg "_Var" reg
-    in if (isPointer . getVarType) reg'
-          then reg'
-          else pVarLift reg'
+lmGlobalRegVar = (pVarLift . lmGlobalReg "_Var")
 
 -- | Get the LlvmVar function argument storing the real register
 lmGlobalRegArg :: GlobalReg -> LlvmVar
