@@ -373,7 +373,7 @@ replace :: Eq a => a -> a -> [a] -> [a]
 replace a b = map (\x -> if x == a then b else x)
 
 spanWith :: (a -> Maybe b) -> [a] -> ([b],[a])
-spanWith _ [] = ([],[])
+spanWith p [] = ([],[])
 spanWith p xs@(a:as)
   | Just b <- p a = let (bs,cs) = spanWith p as in (b:bs,cs)
   | otherwise     = ([],xs)
