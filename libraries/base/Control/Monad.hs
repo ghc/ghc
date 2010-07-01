@@ -224,7 +224,7 @@ the list arguments. This could be an issue where @('>>')@ and the `folded
 function' are not commutative.
 
 
->       foldM f a1 [x1, x2, ..., xm ]
+>       foldM f a1 [x1, x2, ..., xm]
 
 ==  
 
