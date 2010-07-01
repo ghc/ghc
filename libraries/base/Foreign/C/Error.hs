@@ -358,7 +358,7 @@ throwErrnoIfRetry pred loc f  =
           else throwErrno loc
       else return res
 
--- | as 'throwErrnoIfRetry', but additionlly if the operation 
+-- | as 'throwErrnoIfRetry', but additionally if the operation 
 -- yields the error code 'eAGAIN' or 'eWOULDBLOCK', an alternative
 -- action is executed before retrying.
 --
