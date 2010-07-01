@@ -26,6 +26,6 @@ f (Y x) = g maybeToInt x
 -- g :: Functor f => (f Int -> b) -> f (Y Maybe) -> b
 g h x = h $ fmap f x
 
--- 'test' calls g at two different types, f=[] and f=Maybe
-test = (g (sum :: [Int] -> Int) [], 
-        g isJust Nothing)
+-- 'test' checks that g's type is polymophic enough
+test :: Functor f => (f Int -> b) -> f (Y Maybe) -> b
+test = g
