@@ -232,7 +232,7 @@ addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
 
 addForeignPtrFinalizerEnv ::
   FinalizerEnvPtr env a -> Ptr env -> ForeignPtr a -> IO ()
--- ^ like 'addForeignPtrFinalizerEnv' but allows the finalizer to be
+-- ^ Like 'addForeignPtrFinalizerEnv' but allows the finalizer to be
 -- passed an additional environment parameter to be passed to the
 -- finalizer.  The environment passed to the finalizer is fixed by the
 -- second argument to 'addForeignPtrFinalizerEnv'
