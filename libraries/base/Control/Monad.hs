@@ -127,8 +127,6 @@ class Monad m => MonadPlus m where
    -- > mzero >>= f  =  mzero
    -- > v >> mzero   =  mzero
    --
-   -- (but the instance for 'System.IO.IO' defined in Control.Monad.Error
-   -- in the mtl package does not satisfy the second one).
    mzero :: m a 
    -- | an associative operation
    mplus :: m a -> m a -> m a
