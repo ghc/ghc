@@ -173,7 +173,7 @@ Instances of 'Functor' should satisfy the following laws:
 > fmap (f . g)  ==  fmap f . fmap g
 
 The instances of 'Functor' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
-defined in the "Prelude" satisfy these laws.
+satisfy these laws.
 -}
 
 class  Functor f  where
