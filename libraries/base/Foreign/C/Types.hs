@@ -43,6 +43,14 @@ module Foreign.C.Types
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable' and 'Storable'.
         , CClock,   CTime
 
+        -- extracted from CTime, because we don't want this comment in
+        -- the Haskell 2010 report:
+
+        -- | To convert 'CTime' to 'Data.Time.UTCTime', use the following formula:
+        --
+        -- >  posixSecondsToUTCTime (realToFrac :: POSIXTime)
+        --
+
           -- ** Floating types
           -- | These types are are represented as @newtype@s of
           -- 'Prelude.Float' and 'Prelude.Double', and are instances of
@@ -198,10 +206,6 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 -- | Haskell type representing the C @clock_t@ type.
 ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 -- | Haskell type representing the C @time_t@ type.
---
--- To convert to a @Data.Time.UTCTime@, use the following formula:
---
--- >  posixSecondsToUTCTime (realToFrac :: POSIXTime)
 --
 ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
