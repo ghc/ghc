@@ -97,7 +97,9 @@
 ></TR
 ><TR
 ><TD CLASS="doc"
->the class C
+>the class <TT
+>C</TT
+>
 </TD
 ></TR
 ><TR
