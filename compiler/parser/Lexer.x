@@ -51,7 +51,7 @@ module Lexer (
    getMessages, 
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
-   extension, standaloneDerivingEnabled, bangPatEnabled,
+   extension, bangPatEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -1735,8 +1735,6 @@ unicodeSyntaxBit :: Int
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 unboxedTuplesBit :: Int
 unboxedTuplesBit = 15 -- (# and #)
-standaloneDerivingBit :: Int
-standaloneDerivingBit = 16 -- standalone instance deriving declarations
 transformComprehensionsBit :: Int
 transformComprehensionsBit = 17
 qqBit :: Int
@@ -1780,8 +1778,6 @@ unicodeSyntaxEnabled :: Int -> Bool
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 unboxedTuplesEnabled :: Int -> Bool
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
-standaloneDerivingEnabled :: Int -> Bool
-standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
 qqEnabled :: Int -> Bool
 qqEnabled        flags = testBit flags qqBit
 -- inRulePrag :: Int -> Bool
@@ -1859,7 +1855,6 @@ mkPState buf loc flags  =
 	       .|. recBit 	     `setBitIf` dopt Opt_Arrows flags
 	       .|. unicodeSyntaxBit  `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit  `setBitIf` dopt Opt_UnboxedTuples flags
-	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags
                .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
                .|. newQualOpsBit `setBitIf` dopt Opt_NewQualifiedOperators flags
