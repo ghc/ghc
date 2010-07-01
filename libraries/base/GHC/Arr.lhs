@@ -49,13 +49,13 @@ default ()
 -- An implementation is entitled to assume the following laws about these
 -- operations:
 --
--- * @'inRange' (l,u) i == 'elem' i ('range' (l,u))@
+-- * @'inRange' (l,u) i == 'elem' i ('range' (l,u))@ @ @
 --
 -- * @'range' (l,u) '!!' 'index' (l,u) i == i@, when @'inRange' (l,u) i@
 --
--- * @'map' ('index' (l,u)) ('range' (l,u))) == [0..'rangeSize' (l,u)-1]@
+-- * @'map' ('index' (l,u)) ('range' (l,u))) == [0..'rangeSize' (l,u)-1]@ @ @
 --
--- * @'rangeSize' (l,u) == 'length' ('range' (l,u))@
+-- * @'rangeSize' (l,u) == 'length' ('range' (l,u))@ @ @
 --
 -- Minimal complete instance: 'range', 'index' and 'inRange'.
 --
