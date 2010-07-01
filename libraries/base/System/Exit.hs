@@ -86,6 +86,6 @@ exitFailure = exitWith (ExitFailure 1)
 
 -- | The computation 'exitSuccess' is equivalent to
 -- 'exitWith' 'ExitSuccess', It terminates the program
--- sucessfully.
+-- successfully.
 exitSuccess :: IO a
 exitSuccess = exitWith ExitSuccess
