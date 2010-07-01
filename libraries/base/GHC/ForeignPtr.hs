@@ -100,7 +100,7 @@ instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
 
 
--- |A Finalizer is represented as a pointer to a foreign function that, at
+-- |A finalizer is represented as a pointer to a foreign function that, at
 -- finalisation time, gets as an argument a plain pointer variant of the
 -- foreign pointer that the finalizer is associated with.
 -- 
