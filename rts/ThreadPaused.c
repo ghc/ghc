@@ -252,7 +252,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 
 		// And continue with threadPaused; there might be
 		// yet more computation to suspend.
-                frame = (StgClosure *)tso->sp + 2;
+                frame = (StgClosure *)(tso->sp + 2);
                 prev_was_update_frame = rtsFalse;
                 continue;
 	    }
