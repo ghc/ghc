@@ -411,7 +411,7 @@ arrEleBottom = error "(Array.!): undefined array element"
 --
 -- Because the indices must be checked for these errors, 'array' is
 -- strict in the bounds argument and in the indices of the association
--- list, but nonstrict in the values.  Thus, recurrences such as the
+-- list, but non-strict in the values.  Thus, recurrences such as the
 -- following are possible:
 --
 -- > a = array (1,100) ((1,1) : [(i, i * a!(i-1)) | i <- [2..100]])
