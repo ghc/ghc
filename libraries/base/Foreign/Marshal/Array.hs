@@ -129,10 +129,8 @@ reallocArray0 ptr size  = reallocArray ptr (size + 1)
 -- marshalling
 -- -----------
 
--- |Convert an array of given length into a Haskell list.  This version
--- traverses the array backwards using an accumulating parameter,
--- which uses constant stack space.  The previous version using mapM
--- needed linear stack space.
+-- |Convert an array of given length into a Haskell list.  The implementation
+-- is tail-recursive and so uses constant stack space.
 --
 peekArray          :: Storable a => Int -> Ptr a -> IO [a]
 peekArray size ptr | size <= 0 = return []
