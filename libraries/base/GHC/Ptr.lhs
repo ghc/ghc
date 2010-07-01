@@ -87,7 +87,7 @@ data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 --   using @newtype@.
 -- 
 -- * the return type is either a marshallable foreign type or has the form
---   @'Prelude.IO' t@ where @t@ is a marshallable foreign type or @()@.
+--   @'IO' t@ where @t@ is a marshallable foreign type or @()@.
 --
 -- A value of type @'FunPtr' a@ may be a pointer to a foreign function,
 -- either returned by another foreign function or imported with a
