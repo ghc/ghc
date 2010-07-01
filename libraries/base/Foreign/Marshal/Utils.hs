@@ -113,7 +113,7 @@ toBool  = (/= 0)
 -- marshalling of Maybe values
 -- ---------------------------
 
--- |Allocate storage and marshall a storable value wrapped into a 'Maybe'
+-- |Allocate storage and marshal a storable value wrapped into a 'Maybe'
 --
 -- * the 'nullPtr' is used to represent 'Nothing'
 --
