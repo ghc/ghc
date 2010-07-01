@@ -48,7 +48,7 @@ module RdrName (
 	lookupGlobalRdrEnv, extendGlobalRdrEnv,
 	pprGlobalRdrEnv, globalRdrEnvElts,
 	lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
-        hideSomeUnquals, findLocalDupsRdrEnv, pickGREs,
+        transformGREs, findLocalDupsRdrEnv, pickGREs,
 
 	-- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
 	GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
@@ -549,37 +549,17 @@ plusGRE g1 g2
 	  gre_prov = gre_prov g1 `plusProv`   gre_prov g2,
 	  gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
 
-hideSomeUnquals :: GlobalRdrEnv -> [OccName] -> GlobalRdrEnv
--- ^ Hide any unqualified bindings for the specified OccNames
--- This is used in TH, when renaming a declaration bracket
---
--- > [d| foo = ... |]
---
--- We want unqualified @foo@ in "..." to mean this @foo@, not
--- the one from the enclosing module.  But the /qualified/ name
--- from the enclosing module must certainly still be available
-
--- 	Seems like 5 times as much work as it deserves!
-hideSomeUnquals rdr_env occs
-  = foldr hide rdr_env occs
+transformGREs :: (GlobalRdrElt -> GlobalRdrElt)
+	      -> [OccName] 
+              -> GlobalRdrEnv -> GlobalRdrEnv
+-- ^ Apply a transformation function to the GREs for these OccNames
+transformGREs trans_gre occs rdr_env
+  = foldr trans rdr_env occs
   where
-    hide occ env 
-	| Just gres <- lookupOccEnv env occ = extendOccEnv env occ (map qual_gre gres)
-	| otherwise			    = env
-    qual_gre gre@(GRE { gre_name = name, gre_prov = LocalDef })
-	= gre { gre_prov = Imported [imp_spec] }
-	where	-- Local defs get transfomed to (fake) imported things
-	  mod = ASSERT2( isExternalName name, ppr name) moduleName (nameModule name)
-	  imp_spec = ImpSpec { is_item = ImpAll, is_decl = decl_spec }
-	  decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod, 
-				    is_qual = True, 
-				    is_dloc = srcLocSpan (nameSrcLoc name) }
-
-    qual_gre gre@(GRE { gre_prov = Imported specs })
-	= gre { gre_prov = Imported (map qual_spec specs) }
-
-    qual_spec spec@(ImpSpec { is_decl = decl_spec })
-  	= spec { is_decl = decl_spec { is_qual = True } }
+    trans occ env 
+      = case lookupOccEnv env occ of 
+           Just gres -> extendOccEnv env occ (map trans_gre gres)
+           Nothing   -> env
 \end{code}
 
 %************************************************************************

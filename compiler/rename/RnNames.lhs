@@ -273,23 +273,34 @@ top level binders specially in two ways
 
 2.  We make them *shadow* the outer bindings. If we don't do that,
     we'll get a complaint when extending the GlobalRdrEnv, saying that
-    there are two bindings for 'f'.
+    there are two bindings for 'f'.  There are several tricky points:
 
-    This shadowing applies even if the binding for 'f' is in a
-    where-clause, and hence is in the *local* RdrEnv not the *global*
-    RdrEnv.
+    * This shadowing applies even if the binding for 'f' is in a
+      where-clause, and hence is in the *local* RdrEnv not the *global*
+      RdrEnv.
 
-We find out whether we are inside a [d| ... |] by testing the TH
-stage. This is a slight hack, because the stage field was really meant for
-the type checker, and here we are not interested in the fields of Brack,
-hence the error thunks in thRnBrack.
+    * The *qualified* name M.f from the enclosing module must certainly 
+      still be available.  So we don't nuke it entirely; we just make 
+      it seem like qualified import.
+ 
+    * We only shadow *External* names (which come from the main module)
+      Do not shadow *Inernal* names because in the bracket
+          [d| class C a where f :: a
+              f = 4 |]
+      rnSrcDecls will first call extendGlobalRdrEnvRn with C[f] from the
+      class decl, and *separately* extend the envt with the value binding.
+
+3. We find out whether we are inside a [d| ... |] by testing the TH
+   stage. This is a slight hack, because the stage field was really
+   meant for the type checker, and here we are not interested in the
+   fields of Brack, hence the error thunks in thRnBrack.
 
 \begin{code}
 extendGlobalRdrEnvRn :: [AvailInfo]
 	       	     -> MiniFixityEnv
 	       	     -> RnM (TcGblEnv, TcLclEnv)
   -- Updates both the GlobalRdrEnv and the FixityEnv
-  -- We return a new TcLclEnv only becuase we might have to
+  -- We return a new TcLclEnv only because we might have to
   -- delete some bindings from it; 
   -- see Note [Top-level Names in Template Haskell decl quotes]
 
@@ -305,7 +316,7 @@ extendGlobalRdrEnvRn avails new_fixities
 		-- See Note [Top-level Names in Template Haskell decl quotes]
 	      shadowP  = isBrackStage stage
 	      new_occs = map (nameOccName . gre_name) gres
-	      rdr_env1 = hideSomeUnquals rdr_env new_occs
+	      rdr_env1 = transformGREs qual_gre new_occs rdr_env 
 	      lcl_env1 = lcl_env { tcl_rdr = delListFromOccEnv (tcl_rdr lcl_env) new_occs }
 	      (rdr_env2, lcl_env2) | shadowP   = (rdr_env1, lcl_env1)
 				   | otherwise = (rdr_env,  lcl_env)
@@ -332,6 +343,35 @@ extendGlobalRdrEnvRn avails new_fixities
       where
 	name = gre_name gre
         occ  = nameOccName name
+
+    qual_gre :: GlobalRdrElt -> GlobalRdrElt
+    -- Transform top-level GREs from the module being compiled
+    -- so that they are out of the way of new definitions in a Template 
+    -- Haskell bracket
+    -- See Note [Top-level Names in Template Haskell decl quotes]
+    -- Seems like 5 times as much work as it deserves!
+    --
+    -- For a LocalDef we make a (fake) qualified imported GRE for a
+    -- local GRE so that the original *qualified* name is still in scope
+    -- but the *unqualified* one no longer is.  What a hack!
+
+    qual_gre gre@(GRE { gre_prov = LocalDef, gre_name = name })
+        | isExternalName name = gre { gre_prov = Imported [imp_spec] }
+        | otherwise           = gre 				    
+	   -- Do not shadow Internal (ie Template Haskell) Names
+           -- See Note [Top-level Names in Template Haskell decl quotes]
+	where	
+	  mod = ASSERT2( isExternalName name, ppr name) moduleName (nameModule name)
+	  imp_spec = ImpSpec { is_item = ImpAll, is_decl = decl_spec }
+	  decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod, 
+				    is_qual = True, 	-- Qualified only!
+				    is_dloc = srcLocSpan (nameSrcLoc name) }
+
+    qual_gre gre@(GRE { gre_prov = Imported specs })
+	= gre { gre_prov = Imported (map qual_spec specs) }
+
+    qual_spec spec@(ImpSpec { is_decl = decl_spec })
+  	= spec { is_decl = decl_spec { is_qual = True } }
 \end{code}
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
@@ -389,8 +429,8 @@ getLocalNonValBinders :: HsGroup RdrName -> RnM [AvailInfo]
 -- Get all the top-level binders bound the group *except* 
 -- for value bindings, which are treated separately
 -- Specificaly we return AvailInfo for
---	type decls
---	class decls
+--	type decls (incl constructors and record selectors)
+--	class decls (including class ops)
 --	associated types
 --	foreign imports
 --	(in hs-boot files) value signatures
