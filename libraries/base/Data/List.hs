@@ -230,10 +230,10 @@ infix 5 \\ -- comment to fool cpp
 -- It returns 'Nothing' if the list did not start with the prefix
 -- given, or 'Just' the list after the prefix, if it does.
 --
--- > stripPrefix "foo" "foobar" -> Just "bar"
--- > stripPrefix "foo" "foo" -> Just ""
--- > stripPrefix "foo" "barfoo" -> Nothing
--- > stripPrefix "foo" "barfoobaz" -> Nothing
+-- > stripPrefix "foo" "foobar" == Just "bar"
+-- > stripPrefix "foo" "foo" == Just ""
+-- > stripPrefix "foo" "barfoo" == Nothing
+-- > stripPrefix "foo" "barfoobaz" == Nothing
 stripPrefix :: Eq a => [a] -> [a] -> Maybe [a]
 stripPrefix [] ys = Just ys
 stripPrefix (x:xs) (y:ys)
@@ -297,8 +297,8 @@ isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
 --
 -- Example:
 --
--- >isInfixOf "Haskell" "I really like Haskell." -> True
--- >isInfixOf "Ial" "I really like Haskell." -> False
+-- >isInfixOf "Haskell" "I really like Haskell." == True
+-- >isInfixOf "Ial" "I really like Haskell." == False
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
