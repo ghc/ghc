@@ -477,8 +477,8 @@ genStore_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmExpr
 genStore_fast env addr r n val
   = let gr  = lmGlobalRegVar r
         grt = (pLower . getVarType) gr
-        ix  = n `div` ((llvmWidthInBits . pLower) grt  `div` 8)
-    in case isPointer grt of
+        (ix,rem) = n `divMod` ((llvmWidthInBits . pLower) grt  `div` 8)
+    in case isPointer grt && rem == 0 of
             True -> do
                 (env', vval,  stmts, top) <- exprToVar env val
                 (gv,  s1) <- doExpr grt $ Load gr
@@ -618,7 +618,7 @@ exprToVarOpt env opt e = case e of
         -> genLit env lit
 
     CmmLoad e' ty
-        -> genCmmLoad env e' ty
+        -> genLoad env e' ty
 
     -- Cmmreg in expression is the value, so must load. If you want actual
     -- reg pointer, call getCmmReg directly.
@@ -628,7 +628,6 @@ exprToVarOpt env opt e = case e of
         case (isPointer . getVarType) v1 of
              True  -> do
                  -- Cmm wants the value, so pointer types must be cast to ints
-                 -- TODO: Remove, keep as pointers as much as possible
                  (v2, s2) <- doExpr llvmWord $ Cast LM_Ptrtoint v1 llvmWord
                  return (env', v2, stmts `snocOL` s1 `snocOL` s2, top)
 
@@ -700,9 +699,42 @@ genMachOp env _ op [x] = case op of
                  w | w > toWidth -> sameConv' reduce
                  _w              -> return x'
 
+-- handle globalregs pointers
+genMachOp env opt o@(MO_Add _) e@[(CmmReg (CmmGlobal r)), (CmmLit (CmmInt n _))]
+    = genMachOp_fast env opt o r (fromInteger n) e
+
+genMachOp env opt o@(MO_Sub _) e@[(CmmReg (CmmGlobal r)), (CmmLit (CmmInt n _))]
+    = genMachOp_fast env opt o r (negate . fromInteger $ n) e
+
+-- generic case
+genMachOp env opt op e = genMachOp_slow env opt op e
+
+
+-- | Handle CmmMachOp expressions
+-- This is a specialised method that handles Global register manipulations like
+-- 'Sp - 16', using the getelementptr instruction.
+genMachOp_fast :: LlvmEnv -> EOption -> MachOp -> GlobalReg -> Int -> [CmmExpr]
+               -> UniqSM ExprData
+genMachOp_fast env opt op r n e
+  = let gr  = lmGlobalRegVar r
+        grt = (pLower . getVarType) gr
+        (ix,rem) = n `divMod` ((llvmWidthInBits . pLower) grt  `div` 8)
+    in case isPointer grt && rem == 0 of
+            True -> do
+                (gv,  s1) <- doExpr grt $ Load gr
+                (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
+                (var, s3) <- doExpr llvmWord $ Cast LM_Ptrtoint ptr llvmWord
+                return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3, [])
+
+            False -> genMachOp_slow env opt op e
+
+
+-- | Handle CmmMachOp expressions
+-- This handles all the cases not handle by the specialised genMachOp_fast.
+genMachOp_slow :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
 
 -- Binary MachOp
-genMachOp env opt op [x, y] = case op of
+genMachOp_slow env opt op [x, y] = case op of
 
     MO_Eq _   -> genBinComp opt LM_CMP_Eq
     MO_Ne _   -> genBinComp opt LM_CMP_Ne
@@ -843,50 +875,49 @@ genMachOp env opt op [x, y] = case op of
                 else
                     panic $ "isSMulOK: Not bit type! (" ++ show word ++ ")"
 
-
 -- More then two expression, invalid!
-genMachOp _ _ _ _ = panic "genMachOp: More then 2 expressions in MachOp!"
+genMachOp_slow _ _ _ _ = panic "genMachOp: More then 2 expressions in MachOp!"
 
 
 -- | Handle CmmLoad expression.
-genCmmLoad :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
+genLoad :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
 
 -- First we try to detect a few common cases and produce better code for
 -- these then the default case. We are mostly trying to detect Cmm code
 -- like I32[Sp + n] and use 'getelementptr' operations instead of the
 -- generic case that uses casts and pointer arithmetic
-genCmmLoad env e@(CmmReg (CmmGlobal r)) ty
-    = genCmmLoad_fast env e r 0 ty
+genLoad env e@(CmmReg (CmmGlobal r)) ty
+    = genLoad_fast env e r 0 ty
 
-genCmmLoad env e@(CmmRegOff (CmmGlobal r) n) ty
-    = genCmmLoad_fast env e r n ty
+genLoad env e@(CmmRegOff (CmmGlobal r) n) ty
+    = genLoad_fast env e r n ty
 
-genCmmLoad env e@(CmmMachOp (MO_Add _) [
+genLoad env e@(CmmMachOp (MO_Add _) [
                             (CmmReg (CmmGlobal r)),
                             (CmmLit (CmmInt n _))])
                 ty
-    = genCmmLoad_fast env e r (fromInteger n) ty
+    = genLoad_fast env e r (fromInteger n) ty
 
-genCmmLoad env e@(CmmMachOp (MO_Sub _) [
+genLoad env e@(CmmMachOp (MO_Sub _) [
                             (CmmReg (CmmGlobal r)),
                             (CmmLit (CmmInt n _))])
                 ty
-    = genCmmLoad_fast env e r (negate $ fromInteger n) ty
+    = genLoad_fast env e r (negate $ fromInteger n) ty
 
 -- generic case
-genCmmLoad env e ty = genCmmLoad_slow env e ty
+genLoad env e ty = genLoad_slow env e ty
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
 -- offset such as I32[Sp+8].
-genCmmLoad_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmType
+genLoad_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmType
                 -> UniqSM ExprData
-genCmmLoad_fast env e r n ty =
+genLoad_fast env e r n ty =
     let gr  = lmGlobalRegVar r
         grt = (pLower . getVarType) gr
-        ix  = n `div` ((llvmWidthInBits . pLower) grt  `div` 8)
         ty' = cmmToLlvmType ty
-    in case isPointer grt of
+        (ix,rem) = n `divMod` ((llvmWidthInBits . pLower) grt  `div` 8)
+    in case isPointer grt && rem == 0 of
             True  -> do
                 (gv,  s1) <- doExpr grt $ Load gr
                 (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
@@ -908,13 +939,13 @@ genCmmLoad_fast env e r n ty =
 
             -- If its a bit type then we use the slow method since
             -- we can't avoid casting anyway.
-            False -> genCmmLoad_slow env e ty
+            False -> genLoad_slow env e ty
 
 
 -- | Handle Cmm load expression.
 -- Generic case. Uses casts and pointer arithmetic if needed.
-genCmmLoad_slow :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
-genCmmLoad_slow env e ty = do
+genLoad_slow :: LlvmEnv -> CmmExpr -> CmmType -> UniqSM ExprData
+genLoad_slow env e ty = do
     (env', iptr, stmts, tops) <- exprToVar env e
     case getVarType iptr of
          LMPointer _ -> do
