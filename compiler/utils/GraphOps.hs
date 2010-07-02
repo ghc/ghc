@@ -420,8 +420,7 @@ freezeNode
 freezeNode k
   = graphMapModify
   $ \fm ->
-    let
-    	-- freeze all the edges in the node to be frozen
+    let	-- freeze all the edges in the node to be frozen
     	Just node = lookupUFM fm k
 	node'	= node
 		{ nodeCoalesce		= emptyUniqSet }
@@ -431,9 +430,9 @@ freezeNode k
 	-- update back edges pointing to this node
 	freezeEdge k node
 	 = if elementOfUniqSet k (nodeCoalesce node)
-	 	then node
-			{ nodeCoalesce		= delOneFromUniqSet (nodeCoalesce node) k }
-		else	panic "GraphOps.freezeNode: edge to freeze wasn't in the coalesce set"
+	 	then node { nodeCoalesce = delOneFromUniqSet (nodeCoalesce node) k }
+		else node 	-- panic "GraphOps.freezeNode: edge to freeze wasn't in the coalesce set"
+				-- If the edge isn't actually in the coelesce set then just ignore it.
 
 	fm2	= foldUniqSet (adjustUFM (freezeEdge k)) fm1
 	   		$ nodeCoalesce node
