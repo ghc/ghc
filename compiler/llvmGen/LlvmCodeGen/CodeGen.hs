@@ -482,7 +482,7 @@ genStore_fast env addr r n val
             True -> do
                 (env', vval,  stmts, top) <- exprToVar env val
                 (gv,  s1) <- doExpr grt $ Load gr
-                (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [ix]
                 -- We might need a different pointer type, so check
                 case pLower grt == getVarType vval of
                      -- were fine
@@ -722,7 +722,7 @@ genMachOp_fast env opt op r n e
     in case isPointer grt && rem == 0 of
             True -> do
                 (gv,  s1) <- doExpr grt $ Load gr
-                (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [ix]
                 (var, s3) <- doExpr llvmWord $ Cast LM_Ptrtoint ptr llvmWord
                 return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3, [])
 
@@ -920,7 +920,7 @@ genLoad_fast env e r n ty =
     in case isPointer grt && rem == 0 of
             True  -> do
                 (gv,  s1) <- doExpr grt $ Load gr
-                (ptr, s2) <- doExpr grt $ GetElemPtr gv [ix]
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [ix]
                 -- We might need a different pointer type, so check
                 case grt == ty' of
                      -- were fine

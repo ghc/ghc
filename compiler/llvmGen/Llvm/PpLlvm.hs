@@ -177,7 +177,7 @@ ppLlvmExpression expr
         Call       tp fp args attrs -> ppCall tp fp args attrs
         Cast       op from to       -> ppCast op from to
         Compare    op left right    -> ppCmpOp op left right
-        GetElemPtr ptr indexes      -> ppGetElementPtr ptr indexes
+        GetElemPtr inb ptr indexes  -> ppGetElementPtr inb ptr indexes
         Load       ptr              -> ppLoad ptr
         Malloc     tp amount        -> ppMalloc tp amount
         Phi        tp precessors    -> ppPhi tp precessors
@@ -268,10 +268,11 @@ ppAlloca tp amount =
   in text "alloca" <+> texts tp <> comma <+> texts amount'
 
 
-ppGetElementPtr :: LlvmVar -> [Int] -> Doc
-ppGetElementPtr ptr idx =
+ppGetElementPtr :: Bool -> LlvmVar -> [Int] -> Doc
+ppGetElementPtr inb ptr idx =
   let indexes = hcat $ map ((comma <+> texts i32 <+>) . texts) idx
-  in text "getelementptr" <+> texts ptr <> indexes
+      inbound = if inb then text "inbounds" else empty
+  in text "getelementptr" <+> inbound <+> texts ptr <> indexes
 
 
 ppReturn :: Maybe LlvmVar -> Doc

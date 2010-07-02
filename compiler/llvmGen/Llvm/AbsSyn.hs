@@ -171,12 +171,13 @@ data LlvmExpression
 
   {- |
     Navigate in an structure, selecting elements
+      * inbound: Is the pointer inbounds? (computed pointer doesn't overflow)
       * ptr:     Location of the structure
       * indexes: A list of indexes to select the correct value. For example
                  the first element of the third element of the structure ptr
                  is selected with [3,1] (zero indexed)
   -}
-  | GetElemPtr LlvmVar [Int]
+  | GetElemPtr Bool LlvmVar [Int]
 
   {- |
      Cast the variable from to the to type. This is an abstraction of three
