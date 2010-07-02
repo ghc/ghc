@@ -270,6 +270,7 @@ hSetEncoding :: Handle -> TextEncoding -> IO ()
 hSetEncoding hdl encoding = do
   withAllHandles__ "hSetEncoding" hdl $ \h_@Handle__{..} -> do
     flushCharBuffer h_
+    closeTextCodecs h_
     openTextEncoding (Just encoding) haType $ \ mb_encoder mb_decoder -> do
     bbuf <- readIORef haByteBuffer
     ref <- newIORef (error "last_decode")
@@ -572,6 +573,7 @@ hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ h_@Handle__{..} ->
     do 
          flushCharBuffer h_
+         closeTextCodecs h_
 
          let mb_te | bin       = Nothing
                    | otherwise = Just localeEncoding

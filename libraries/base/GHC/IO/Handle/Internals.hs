@@ -28,7 +28,7 @@ module GHC.IO.Handle.Internals (
   wantSeekableHandle,
 
   mkHandle, mkFileHandle, mkDuplexHandle,
-  openTextEncoding, initBufferState,
+  openTextEncoding, closeTextCodecs, initBufferState,
   dEFAULT_CHAR_BUFFER_SIZE,
 
   flushBuffer, flushWriteBuffer, flushWriteBuffer_, flushCharReadBuffer,
@@ -50,7 +50,7 @@ module GHC.IO.Handle.Internals (
 
 import GHC.IO
 import GHC.IO.IOMode
-import GHC.IO.Encoding
+import GHC.IO.Encoding as Encoding
 import GHC.IO.Handle.Types
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO (BufferedIO)
@@ -632,6 +632,11 @@ openTextEncoding (Just TextEncoding{..}) ha_type cont = do
                      return Nothing
     cont mb_encoder mb_decoder
 
+closeTextCodecs :: Handle__ -> IO ()
+closeTextCodecs Handle__{..} = do
+  case haDecoder of Nothing -> return (); Just d -> Encoding.close d
+  case haEncoder of Nothing -> return (); Just d -> Encoding.close d
+
 -- ---------------------------------------------------------------------------
 -- closing Handles
 
@@ -657,7 +662,7 @@ trymaybe :: IO () -> IO (Maybe SomeException)
 trymaybe io = (do io; return Nothing) `catchException` \e -> return (Just e)
 
 hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeException)
-hClose_handle_ Handle__{..} = do
+hClose_handle_ h_@Handle__{..} = do
 
     -- close the file descriptor, but not when this is the read
     -- side of a duplex handle.
@@ -676,8 +681,7 @@ hClose_handle_ Handle__{..} = do
     writeIORef haByteBuffer noByteBuffer
   
     -- release our encoder/decoder
-    case haDecoder of Nothing -> return (); Just d -> close d
-    case haEncoder of Nothing -> return (); Just d -> close d
+    closeTextCodecs h_
 
     -- we must set the fd to -1, because the finalizer is going
     -- to run eventually and try to close/unlock it.

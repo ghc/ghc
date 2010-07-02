@@ -84,6 +84,9 @@ stdHandleFinalizer :: FilePath -> MVar Handle__ -> IO ()
 stdHandleFinalizer fp m = do
   h_ <- takeMVar m
   flushWriteBuffer h_
+  case haType h_ of 
+      ClosedHandle -> return ()
+      _other       -> closeTextCodecs h_
   putMVar m (ioe_finalizedHandle fp)
 
 -- We have to put the FDs into binary mode on Windows to avoid the newline
