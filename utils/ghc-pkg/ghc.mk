@@ -78,12 +78,10 @@ $(eval $(call clean-target,utils/ghc-pkg,dist,\
 # -----------------------------------------------------------------------------
 # Building ghc-pkg with stage 1
 
+utils/ghc-pkg_dist-install_USES_CABAL = YES
+utils/ghc-pkg_PACKAGE = ghc-pkg
+
 utils/ghc-pkg_dist-install_PROG = ghc-pkg
-utils/ghc-pkg_dist-install_MODULES = Main Version
-utils/ghc-pkg_dist-install_DEPS = Cabal bin-package-db
-ifeq "$(Windows)" "NO"
-utils/ghc-pkg_dist-install_DEPS += terminfo
-endif
 utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)

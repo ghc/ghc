@@ -21,6 +21,7 @@ Flag base3
 
 Executable ghc-pkg
     Main-Is: Main.hs
+    Other-Modules: Version
     Extensions: CPP, ForeignFunctionInterface
 
     if flag(base4)
@@ -32,14 +33,19 @@ Executable ghc-pkg
 
     if flag(base3) || flag(base4)
         Build-Depends: directory  >= 1   && < 1.1,
-                       process    >= 1   && < 1.1,
-                       pretty     >= 1   && < 1.1
+                       process    >= 1   && < 1.1
 
     if impl(ghc < 6.9)
         Build-Depends: extensible-exceptions
 
-    Build-Depends: haskell98, filepath, Cabal, bin-package-db
+    Build-Depends: haskell98,
+                   filepath,
+                   Cabal,
+                   binary,
+                   bin-package-db,
+                   bytestring
     if !os(windows)
-        Build-Depends: unix
+        Build-Depends: unix,
+                       terminfo
     if os(windows)
         c-sources: CRT_noglob.c
