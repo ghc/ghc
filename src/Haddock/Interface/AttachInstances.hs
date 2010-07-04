@@ -38,33 +38,54 @@ import FastString
 attachInstances :: [Interface] -> InstIfaceMap -> Ghc [Interface]
 attachInstances ifaces instIfaceMap = mapM attach ifaces
   where
+    -- TODO: take an IfaceMap as input
+    ifaceMap = Map.fromList [ (ifaceMod i, i) | i <- ifaces ]
+
     attach iface = do
-      newItems <- mapM attachExport $ ifaceExportItems iface
+      newItems <- mapM (attachToExportItem iface ifaceMap instIfaceMap)
+                       (ifaceExportItems iface)
       return $ iface { ifaceExportItems = newItems }
-      where
-        attachExport export@ExportDecl{expItemDecl = L _ (TyClD d)} = do
-           mb_info <- getAllInfo (unLoc (tcdLName d))
-           return $ export { expItemInstances = case mb_info of
-             Just (_, _, instances) ->
-               let insts = map (first synifyInstHead) $ sortImage (first instHead)
-                             [ (instanceHead i, getName i) | i <- instances ]
-               in [ (inst, lookupInstDoc name iface instIfaceMap)
-                  | (inst, name) <- insts ]
-             Nothing -> []
+
+
+attachToExportItem :: Interface -> IfaceMap -> InstIfaceMap -> ExportItem Name -> Ghc (ExportItem Name)
+attachToExportItem iface ifaceMap instIfaceMap export =
+  case export of
+    ExportDecl { expItemDecl = L _ (TyClD d) } -> do
+      mb_info <- getAllInfo (unLoc (tcdLName d))
+      let export' =
+            export {
+              expItemInstances =
+                case mb_info of
+                  Just (_, _, instances) ->
+                    let insts = map (first synifyInstHead) $ sortImage (first instHead)
+                                [ (instanceHead i, getName i) | i <- instances ]
+                    in [ (inst, lookupInstDoc name iface ifaceMap instIfaceMap)
+                       | (inst, name) <- insts ]
+                  Nothing -> []
             }
-        attachExport export = return export
+      return export'
+    _ -> return export
 
 
-lookupInstDoc :: Name -> Interface -> InstIfaceMap -> Maybe (Doc Name)
+lookupInstDoc :: Name -> Interface -> IfaceMap -> InstIfaceMap -> Maybe (Doc Name)
 -- TODO: capture this pattern in a function (when we have streamlined the
 -- handling of instances)
-lookupInstDoc name iface ifaceMap =
+lookupInstDoc name iface ifaceMap instIfaceMap =
   case Map.lookup name (ifaceInstanceDocMap iface) of
     Just doc -> Just doc
-    Nothing -> do -- in Maybe
-      instIface <- Map.lookup modName ifaceMap
-      (Just doc, _) <- Map.lookup name (instDocMap instIface)
-      return doc
+    Nothing ->
+      case Map.lookup modName ifaceMap of
+        Just iface2 ->
+          case Map.lookup name (ifaceInstanceDocMap iface2) of
+            Just doc -> Just doc
+            Nothing -> Nothing
+        Nothing ->
+          case Map.lookup modName instIfaceMap of
+            Just instIface ->
+              case Map.lookup name (instDocMap instIface) of
+                Just (doc, _) -> doc
+                Nothing -> Nothing
+            Nothing -> Nothing
   where
     modName = nameModule name
 
