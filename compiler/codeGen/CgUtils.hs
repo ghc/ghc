@@ -25,7 +25,7 @@ module CgUtils (
 	emitSwitch, emitLitSwitch,
 	tagToClosure,
 
-        callerSaveVolatileRegs, get_GlobalReg_addr,
+        callerSaves, callerSaveVolatileRegs, get_GlobalReg_addr,
 	activeStgRegs, fixStgRegisters,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
