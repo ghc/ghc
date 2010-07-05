@@ -99,6 +99,8 @@ data LlvmLit
   = LMIntLit Integer LlvmType
   -- | Floating point literal
   | LMFloatLit Double LlvmType
+  -- | Literal NULL, only applicable to pointer types
+  | LMNullLit LlvmType
   deriving (Eq)
 
 instance Show LlvmLit where
@@ -205,6 +207,7 @@ getLit (LMIntLit   i _) = show ((fromInteger i)::Int)
 getLit (LMFloatLit r LMFloat ) = fToStr $ realToFrac r
 getLit (LMFloatLit r LMDouble) = dToStr r
 getLit f@(LMFloatLit _ _) = error $ "Can't print this float literal!" ++ show f
+getLit (LMNullLit _) = "null"
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
@@ -217,6 +220,7 @@ getVarType (LMLitVar    l          ) = getLitType l
 getLitType :: LlvmLit -> LlvmType
 getLitType (LMIntLit   _ t) = t
 getLitType (LMFloatLit _ t) = t
+getLitType (LMNullLit    t) = t
 
 -- | Return the 'LlvmType' of the 'LlvmStatic'
 getStatType :: LlvmStatic -> LlvmType
