@@ -317,8 +317,18 @@ rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextTo
 # must be compiled with -fPIC (since the 32-bit relocations generated
 # by the default small memory can't be resolved at runtime).  So we
 # only do this on i386.
-
+#
+# This apparently doesn't work on OS X (Darwin) where we get errors of
+# the form
+#
+#  ld: absolute addressing (perhaps -mdynamic-no-pic) used in _stg_ap_0_fast from rts/dist/build/Apply.dyn_o not allowed in slidable image
+#
+# and lots of these warnings:
+#
+#  ld: warning codegen in _stg_ap_pppv_fast (offset 0x0000005E) prevents image from loading in dyld shared cache
+#
 ifeq "$(TargetArch_CPP)" "i386"
+ifneq "$(TargetOS_CPP)" "darwin"
 rts/sm/Evac_HC_OPTS           += -fno-PIC
 rts/sm/Evac_thr_HC_OPTS       += -fno-PIC
 rts/sm/Scav_HC_OPTS           += -fno-PIC
@@ -333,6 +343,7 @@ rts/StgMiscClosures_HC_OPTS += -fno-PIC -static
 rts/PrimOps_HC_OPTS += -fno-PIC -static
 rts/Apply_HC_OPTS += -fno-PIC -static
 rts/dist/build/AutoApply_HC_OPTS += -fno-PIC -static
+endif
 endif
 
 # ffi.h triggers prototype warnings, so disable them here:
