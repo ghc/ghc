@@ -643,8 +643,10 @@ enqueueCommands cmds = do
 
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
- | null (filter (not.isSpace) stmt) = return False
- | x@('i':'m':'p':'o':'r':'t':' ':_) <- stmt    = keepGoing' (importContext True) x
+ | null (filter (not.isSpace) stmt)
+ = return False
+ | "import " `isPrefixOf` stmt
+ = do newContextCmd (Import stmt); return False
  | otherwise
  = do
 #if __GLASGOW_HASKELL__ >= 611
@@ -1134,10 +1136,7 @@ setContextKeepingPackageModules prev_context keep_ctxt (as,bs) = do
   if keep_ctxt
      then do
           st <- getGHCiState
-          let mem = remembered_ctx st
-              playCmd (Left x) = playCtxtCmd False x
-              playCmd (Right x) = importContext False x
-          mapM_ playCmd mem
+          mapM_ (playCtxtCmd False) (remembered_ctx st)
      else do
           st <- getGHCiState
           setGHCiState st{ remembered_ctx = [] }
@@ -1294,39 +1293,25 @@ browseModule bang modl exports_only = do
 -----------------------------------------------------------------------------
 -- Setting the module context
 
-importContext :: Bool -> String -> GHCi ()
-importContext fail str
-  = do
-    (as,bs) <- GHC.getContext
-    x <- do_checks fail
-    case Monad.join x of
-        Nothing -> return ()
-        (Just a) -> do
-            m <- loadModuleName a
-            GHC.setContext as (bs++[(m,Just a)])
-            st <- getGHCiState
-            let cmds = remembered_ctx st
-            setGHCiState st{ remembered_ctx = cmds++[Right str] }
-  where
-    do_checks True = liftM Just (GhciMonad.parseImportDecl str)
-    do_checks False = trymaybe (GhciMonad.parseImportDecl str)
+newContextCmd :: CtxtCmd -> GHCi ()
+newContextCmd cmd = do
+  playCtxtCmd True cmd
+  st <- getGHCiState
+  let cmds = remembered_ctx st
+  setGHCiState st{ remembered_ctx = cmds ++ [cmd] }
 
 setContext :: String -> GHCi ()
 setContext str
-  | all sensible strs = do
-       playCtxtCmd True (cmd, as, bs)
-       st <- getGHCiState
-       let cmds = remembered_ctx st
-       setGHCiState st{ remembered_ctx = cmds ++ [Left (cmd,as,bs)] }
+  | all sensible strs = newContextCmd cmd
   | otherwise = ghcError (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
   where
-    (cmd, strs, as, bs) =
+    (cmd, strs) =
         case str of 
                 '+':stuff -> rest AddModules stuff
                 '-':stuff -> rest RemModules stuff
                 stuff     -> rest SetContext stuff
 
-    rest cmd stuff = (cmd, strs, as, bs)
+    rest cmd stuff = (cmd as bs, strs)
        where strs = words stuff
              (as,bs) = partitionWith starred strs
 
@@ -1336,38 +1321,51 @@ setContext str
     starred ('*':m) = Left m
     starred m       = Right m
 
-playCtxtCmd :: Bool -> (CtxtCmd, [String], [String]) -> GHCi ()
-playCtxtCmd fail (cmd, as, bs)
-  = do
-    (as',bs') <- do_checks fail
+playCtxtCmd:: Bool -> CtxtCmd -> GHCi ()
+playCtxtCmd fail cmd = do
     (prev_as,prev_bs) <- GHC.getContext
-    (new_as, new_bs) <-
-      case cmd of
-        SetContext -> do
+    case cmd of
+        SetContext as bs -> do
+          (as',bs') <- do_checks as bs
           prel_mod <- getPrelude
-          let bs'' = if null as && prel_mod `notElem` (map fst bs') then (prel_mod,Nothing):bs'
-                                                          else bs'
-          return (as', bs'')
-        AddModules -> do
+          let bs'' = if null as && prel_mod `notElem` (map fst bs')
+                        then (prel_mod,Nothing):bs'
+                        else bs'
+          GHC.setContext as' bs''
+
+        AddModules as bs -> do
+          (as',bs') <- do_checks as bs
           -- it should replace the old stuff, not the other way around
           -- need deleteAllBy, not deleteFirstsBy for sameFst
           let remaining_as = prev_as \\ (as' ++ map fst bs')
               remaining_bs = deleteAllBy sameFst prev_bs (bs' ++ map contextualize as')
-          return (remaining_as ++ as', remaining_bs ++ bs')
-        RemModules -> do
+          GHC.setContext (remaining_as ++ as') (remaining_bs ++ bs')
+
+        RemModules as bs -> do
+          (as',bs') <- do_checks as bs
           let new_as = prev_as \\ (as' ++ map fst bs')
               new_bs = deleteAllBy sameFst prev_bs (map contextualize as' ++ bs')
-          return (new_as, new_bs)
-    GHC.setContext new_as new_bs
+          GHC.setContext new_as new_bs
+
+        Import str -> do
+          m_idecl <- maybe_fail $ GHC.parseImportDecl str
+          case m_idecl of
+            Nothing    -> return ()
+            Just idecl -> do
+              m_mdl <- maybe_fail $ loadModuleName idecl
+              case m_mdl of
+                Nothing -> return ()
+                Just m -> GHC.setContext prev_as (prev_bs ++ [(m, Just idecl)])
+    
   where
-    do_checks True = do
-      as' <- mapM wantInterpretedModule as
-      bs' <- mapM lookupModule bs
-      return (as', map contextualize bs')
-    do_checks False = do
-      as' <- mapM (trymaybe . wantInterpretedModule) as
-      bs' <- mapM (trymaybe . lookupModule) bs
-      return (catMaybes as', map contextualize (catMaybes bs'))
+    maybe_fail | fail      = liftM Just
+               | otherwise = trymaybe
+
+    do_checks as bs = do
+         as' <- mapM (maybe_fail . wantInterpretedModule) as
+         bs' <- mapM (maybe_fail . lookupModule) bs
+         return (catMaybes as', map contextualize (catMaybes bs'))
+
     contextualize x = (x,Nothing)
     deleteAllBy f a b = filter (\x->(not (any (f x) b))) a
 

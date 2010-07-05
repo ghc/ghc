@@ -69,7 +69,7 @@ data GHCiState = GHCiState
         -- remember is here:
         last_command   :: Maybe Command,
         cmdqueue       :: [String],
-        remembered_ctx :: [Either (CtxtCmd, [String], [String]) String],
+        remembered_ctx :: [CtxtCmd],
              -- we remember the :module commands between :loads, so that
              -- on a :reload we can replay them.  See bugs #2049,
              -- \#1873, #1360. Previously we tried to remember modules that
@@ -80,9 +80,10 @@ data GHCiState = GHCiState
      }
 
 data CtxtCmd
-  = SetContext
-  | AddModules
-  | RemModules
+  = SetContext [String] [String]
+  | AddModules [String] [String]
+  | RemModules [String] [String]
+  | Import     String
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
 
@@ -256,10 +257,6 @@ runStmt expr step = do
         GHC.handleSourceError (\e -> do GHC.printExceptionAndWarnings e
                                         return GHC.RunFailed) $ do
           GHC.runStmt expr step
-
-parseImportDecl :: GhcMonad m => String -> m (Maybe (GHC.ImportDecl GHC.RdrName))
-parseImportDecl expr
-  = GHC.handleSourceError (\e -> GHC.printExceptionAndWarnings e >> return Nothing) (Monad.liftM Just (GHC.parseImportDecl expr))
 
 resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
 resume canLogSpan step = do
