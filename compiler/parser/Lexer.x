@@ -1828,7 +1828,6 @@ mkPState buf loc flags  =
       extsBitmap    = fromIntegral bitmap,
       context       = [],
       lex_state     = [bol, 0],
-	-- we begin in the layout state if toplev_layout is set
       alr_pending_implicit_tokens = [],
       alr_next_token = Nothing,
       alr_last_loc = noSrcSpan,
