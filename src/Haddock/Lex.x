@@ -184,7 +184,7 @@ ident pos str sc cont dflags =
 strToHsQNames :: DynFlags -> String -> Maybe [RdrName]
 strToHsQNames dflags str0 = 
   let buffer = unsafePerformIO (stringToStringBuffer str0)
-      pstate = mkPState buffer noSrcLoc dflags
+      pstate = mkPState dflags buffer noSrcLoc
       result = unP parseIdentifier pstate 
   in case result of 
        POk _ name -> Just [unLoc name] 
