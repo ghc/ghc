@@ -1816,8 +1816,8 @@ pragState dynflags buf loc =
 
 -- create a parse state
 --
-mkPState :: StringBuffer -> SrcLoc -> DynFlags -> PState
-mkPState buf loc flags  = 
+mkPState :: DynFlags -> StringBuffer -> SrcLoc -> PState
+mkPState flags buf loc =
   PState {
       buffer	      = buf,
       dflags        = flags,
@@ -2201,7 +2201,8 @@ reportLexError loc1 loc2 buf str
 
 lexTokenStream :: StringBuffer -> SrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
-    where initState = mkPState buf loc (dopt_set (dopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream)
+    where dflags' = dopt_set (dopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
+          initState = mkPState dflags' buf loc
           go = do
             ltok <- lexer return
             case ltok of

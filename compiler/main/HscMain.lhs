@@ -186,7 +186,7 @@ hscParse mod_summary = do
 
    let loc  = mkSrcLoc (mkFastString src_filename) 1 1
 
-   case unP parseModule (mkPState buf loc dflags) of
+   case unP parseModule (mkPState dflags buf loc) of
      PFailed span err ->
          throwOneError (mkPlainErrMsg span err)
 
@@ -996,7 +996,7 @@ hscParseThing parser dflags str
 
       let loc  = mkSrcLoc (fsLit "<interactive>") 1 1
 
-      case unP parser (mkPState buf loc dflags) of
+      case unP parser (mkPState dflags buf loc) of
 
 	PFailed span err -> do
           let msg = mkPlainErrMsg span err

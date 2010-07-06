@@ -57,7 +57,7 @@ getImports :: GhcMonad m =>
               -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (mkPState buf loc dflags) of
+  case unP parseHeader (mkPState dflags buf loc) of
     PFailed span err -> parseError span err
     POk pst rdr_module -> do
       let _ms@(_warns, errs) = getMessages pst
