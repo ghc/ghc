@@ -1794,25 +1794,9 @@ alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
 -- PState for parsing options pragmas
 --
 pragState :: DynFlags -> StringBuffer -> SrcLoc -> PState
-pragState dynflags buf loc =
-  PState {
-      buffer        = buf,
-      messages      = emptyMessages,
-      dflags        = dynflags,
-      last_loc      = mkSrcSpan loc loc,
-      last_len      = 0,
-      loc           = loc,
-      extsBitmap    = 0,
-      context       = [],
-      lex_state     = [bol, option_prags, 0],
-      alr_pending_implicit_tokens = [],
-      alr_next_token = Nothing,
-      alr_last_loc = noSrcSpan,
-      alr_context = [],
-      alr_expecting_ocurly = Nothing,
-      alr_justClosedExplicitLetBlock = False
-    }
-
+pragState dynflags buf loc = (mkPState dynflags buf loc) {
+                                 lex_state = [bol, option_prags, 0]
+                             }
 
 -- create a parse state
 --
