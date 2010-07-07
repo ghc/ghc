@@ -39,3 +39,4 @@ test('drvrun-foldable1',
      if_compiler_lt('ghc', '6.11', expect_fail),
      compile_and_run,
      [''])
+test('T4136', normal, compile_and_run, [''])
