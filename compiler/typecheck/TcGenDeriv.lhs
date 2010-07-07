@@ -889,14 +889,23 @@ gen_Read_binds get_fixity loc tycon
     read_nullary_cons 
       = case nullary_cons of
     	    []    -> []
-    	    [con] -> [nlHsDo DoExpr [bindLex (ident_pat (data_con_str con))]
-				    (result_expr con [])]
+    	    [con] -> [nlHsDo DoExpr [bindLex (match_con con)] (result_expr con [])]
             _     -> [nlHsApp (nlHsVar choose_RDR) 
     		   	      (nlList (map mk_pair nullary_cons))]
-    
+        -- NB For operators the parens around (:=:) are matched by the
+	-- enclosing "parens" call, so here we must match the naked
+	-- data_con_str con
+
+    match_con con | isSym con_str = symbol_pat con_str
+                  | otherwise     = ident_pat  con_str
+                  where
+                    con_str = data_con_str con
+	-- For nullary constructors we must match Ident s for normal constrs
+	-- and   Symbol s   for operators
+
     mk_pair con = mkLHsTupleExpr [nlHsLit (mkHsString (data_con_str con)), 
 			          result_expr con []]
-    
+
     read_non_nullary_con data_con
       | is_infix  = mk_parser infix_prec  infix_stmts  body
       | is_record = mk_parser record_prec record_stmts body
@@ -1032,7 +1041,7 @@ gen_Show_binds get_fixity loc tycon
 	pats_etc data_con
 	  | nullary_con =  -- skip the showParen junk...
 	     ASSERT(null bs_needed)
-	     ([nlWildPat, con_pat], mk_showString_app con_str)
+	     ([nlWildPat, con_pat], mk_showString_app op_con_str)
 	  | otherwise   =
 	     ([a_Pat, con_pat],
 		  showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR (nlHsLit (HsInt con_prec_plus_one))))
