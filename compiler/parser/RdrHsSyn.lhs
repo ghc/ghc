@@ -70,6 +70,7 @@ import FastString
 import Maybes
 
 import Control.Applicative ((<$>))       
+import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.List        ( nubBy )
 import Data.Char
@@ -172,13 +173,14 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
   
 \begin{code}
 mkClassDecl :: SrcSpan
-            -> Located (LHsContext RdrName, LHsType RdrName) 
+            -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
             -> Located [Located (FunDep RdrName)]
             -> Located (OrdList (LHsDecl RdrName))
 	    -> P (LTyClDecl RdrName)
 
-mkClassDecl loc (L _ (cxt, tycl_hdr)) fds where_cls
+mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
   = do { let (binds, sigs, ats, docs) = cvBindsAndSigs (unLoc where_cls)
+       ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tparams      -- Only type vars allowed
        ; checkKindSigs ats
@@ -189,14 +191,16 @@ mkClassDecl loc (L _ (cxt, tycl_hdr)) fds where_cls
 mkTyData :: SrcSpan
          -> NewOrData
 	 -> Bool		-- True <=> data family instance
-         -> Located (LHsContext RdrName, LHsType RdrName)
+         -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
          -> Maybe Kind
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
-mkTyData loc new_or_data is_family (L _ (cxt, tycl_hdr)) ksig data_cons maybe_deriv
+mkTyData loc new_or_data is_family (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
 
+       ; checkDatatypeContext mcxt
+       ; let cxt = fromMaybe (noLoc []) mcxt
        ; (tyvars, typats) <- checkTParams is_family tparams
        ; return (L loc (TyData { tcdND = new_or_data, tcdCtxt = cxt, tcdLName = tc,
 	                  	 tcdTyVars = tyvars, tcdTyPats = typats, 
@@ -520,6 +524,13 @@ checkTyVars tparms = mapM chk tparms
         | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
     chk (L l _)            =
 	  parseError l "Type found where type variable expected"
+
+checkDatatypeContext :: Maybe (LHsContext RdrName) -> P ()
+checkDatatypeContext Nothing = return ()
+checkDatatypeContext (Just (L loc _))
+    = do allowed <- extension datatypeContextsEnabled
+         unless allowed $
+             parseError loc "Illegal datatype context (use -XDatatypeContexts)"
 
 checkTyClHdr :: LHsType RdrName
              -> P (Located RdrName,	     -- the head symbol (type or class name)

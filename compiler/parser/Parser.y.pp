@@ -697,9 +697,9 @@ opt_kind_sig :: { Located (Maybe Kind) }
 --	(Eq a, Ord b) => T a b
 --      T Int [a]			-- for associated types
 -- Rather a lot of inlining here, else we get reduce/reduce errors
-tycl_hdr :: { Located (LHsContext RdrName, LHsType RdrName) }
-	: context '=>' type		{ LL ($1, $3) }
-	| type                          { L1 (noLoc [], $1) }
+tycl_hdr :: { Located (Maybe (LHsContext RdrName), LHsType RdrName) }
+	: context '=>' type		{ LL (Just $1, $3) }
+	| type                          { L1 (Nothing, $1) }
 
 -----------------------------------------------------------------------------
 -- Stand-alone deriving

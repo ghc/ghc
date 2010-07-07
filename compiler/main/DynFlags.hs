@@ -256,6 +256,7 @@ data DynFlag
    | Opt_ExplicitForAll
    | Opt_AlternativeLayoutRule
    | Opt_AlternativeLayoutRuleTransitional
+   | Opt_DatatypeContexts
 
    | Opt_PrintExplicitForalls
 
@@ -716,6 +717,7 @@ defaultDynFlags =
             Opt_ImplicitPrelude,
             Opt_MonomorphismRestriction,
             Opt_NPlusKPatterns,
+            Opt_DatatypeContexts,
 
             Opt_MethodSharing,
 
@@ -1646,6 +1648,8 @@ xFlags = [
   ( "ExplicitForAll",                   Opt_ExplicitForAll, const Supported ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, const Supported ),
   ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, const Supported ),
+  -- On by default:
+  ( "DatatypeContexts",                 Opt_DatatypeContexts, const Supported ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, const Supported ),

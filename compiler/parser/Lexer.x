@@ -51,7 +51,7 @@ module Lexer (
    getMessages, 
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
-   extension, bangPatEnabled,
+   extension, bangPatEnabled, datatypeContextsEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -1735,6 +1735,8 @@ unicodeSyntaxBit :: Int
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 unboxedTuplesBit :: Int
 unboxedTuplesBit = 15 -- (# and #)
+datatypeContextsBit :: Int
+datatypeContextsBit = 16
 transformComprehensionsBit :: Int
 transformComprehensionsBit = 17
 qqBit :: Int
@@ -1778,6 +1780,8 @@ unicodeSyntaxEnabled :: Int -> Bool
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 unboxedTuplesEnabled :: Int -> Bool
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
+datatypeContextsEnabled :: Int -> Bool
+datatypeContextsEnabled flags = testBit flags datatypeContextsBit
 qqEnabled :: Int -> Bool
 qqEnabled        flags = testBit flags qqBit
 -- inRulePrag :: Int -> Bool
@@ -1838,6 +1842,7 @@ mkPState flags buf loc =
 	       .|. recBit 	     `setBitIf` dopt Opt_Arrows flags
 	       .|. unicodeSyntaxBit  `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit  `setBitIf` dopt Opt_UnboxedTuples flags
+               .|. datatypeContextsBit `setBitIf` dopt Opt_DatatypeContexts flags
                .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
                .|. newQualOpsBit `setBitIf` dopt Opt_NewQualifiedOperators flags
