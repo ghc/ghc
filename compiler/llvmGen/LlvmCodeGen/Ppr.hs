@@ -67,7 +67,11 @@ pprLlvmData (globals, types) =
     let tryConst (v, Just s )   = ppLlvmGlobal (v, Just s)
         tryConst g@(_, Nothing) = ppLlvmGlobal g
 
-        types'   = ppLlvmTypes types
+        ppLlvmTys (LMAlias    a) = ppLlvmAlias a
+        ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
+        ppLlvmTys _other         = empty
+
+        types'   = vcat $ map ppLlvmTys types
         globals' = vcat $ map tryConst globals
     in types' $+$ globals'
 

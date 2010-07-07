@@ -28,6 +28,9 @@ data LlvmModule = LlvmModule  {
     -- | Comments to include at the start of the module.
     modComments  :: [LMString],
 
+    -- | LLVM Alias type defenitions.
+    modAliases   :: [LlvmAlias],
+
     -- | Global variables to include in the module.
     modGlobals   :: [LMGlobal],
 

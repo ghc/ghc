@@ -47,7 +47,7 @@ genLlvmData (sec, CmmDataLabel lbl:xs) =
         getStatTypes (Right x) = getStatType x
 
         strucTy = LMStruct types
-        alias   = LMAlias (label `appendFS` structStr) strucTy
+        alias   = LMAlias ((label `appendFS` structStr), strucTy)
     in (lbl, sec, alias, static)
 
 genLlvmData _ = panic "genLlvmData: CmmData section doesn't start with label!"
