@@ -7,7 +7,7 @@ TcTyClsDecls: Typecheck type and class declarations
 
 \begin{code}
 module TcTyClsDecls (
-	tcTyAndClassDecls, tcFamInstDecl, mkAuxBinds
+	tcTyAndClassDecls, tcFamInstDecl, mkRecSelBinds
     ) where
 
 #include "HsVersions.h"
@@ -30,7 +30,7 @@ import Class
 import TyCon
 import DataCon
 import Id
-import MkId		( rEC_SEL_ERROR_ID )
+import MkId		( rEC_SEL_ERROR_ID, mkDefaultMethodId )
 import IdInfo
 import Var
 import VarSet
@@ -136,7 +136,9 @@ indeed type families).  I think.
 tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
    	           -> TcM (TcGblEnv,   	     -- Input env extended by types and classes 
 					     -- and their implicit Ids,DataCons
-		           HsValBinds Name)  -- Renamed bindings for record selectors
+		           HsValBinds Name,  -- Renamed bindings for record selectors
+			   [Id])      	     -- Default method ids
+
 -- Fails if there are any errors
 
 tcTyAndClassDecls boot_details allDecls
@@ -202,11 +204,12 @@ tcTyAndClassDecls boot_details allDecls
 	--     second time here.  This doesn't matter as the definitions are
 	--     the same.
 	; let {	implicit_things = concatMap implicitTyThings alg_tyclss
-	      ; aux_binds       = mkAuxBinds alg_tyclss }
+	      ; rec_sel_binds   = mkRecSelBinds alg_tyclss
+              ; dm_ids          = mkDefaultMethodIds alg_tyclss }
 	; traceTc ((text "Adding" <+> ppr alg_tyclss) 
 		   $$ (text "and" <+> ppr implicit_things))
   	; env <- tcExtendGlobalEnv implicit_things getGblEnv
-	; return (env, aux_binds) }
+	; return (env, rec_sel_binds, dm_ids) }
     }
   where
     -- Pull associated types out of class declarations, to tie them into the
@@ -1228,11 +1231,36 @@ checkValidClass cls
 %************************************************************************
 
 \begin{code}
-mkAuxBinds :: [TyThing] -> HsValBinds Name
+mkDefaultMethodIds :: [TyThing] -> [Id]
+-- See Note [Default method Ids and Template Haskell]
+mkDefaultMethodIds things
+  = [ mkDefaultMethodId sel_id dm_name
+    | AClass cls <- things
+    , (sel_id, DefMeth dm_name) <- classOpItems cls ]
+\end{code}
+
+Note [Default method Ids and Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (Trac #4169):
+   class Numeric a where
+     fromIntegerNum :: a
+     fromIntegerNum = ...
+
+   ast :: Q [Dec]
+   ast = [d| instance Numeric Int |]
+
+When we typecheck 'ast' we have done the first pass over the class decl
+(in tcTyClDecls), but we have not yet typechecked the default-method
+declarations (becuase they can mention value declarations).  So we 
+must bring the default method Ids into scope first (so they can be seen
+when typechecking the [d| .. |] quote, and typecheck them later.
+
+\begin{code}
+mkRecSelBinds :: [TyThing] -> HsValBinds Name
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
-mkAuxBinds ty_things
+mkRecSelBinds ty_things
   = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
   where
     (sigs, binds) = unzip rec_sels

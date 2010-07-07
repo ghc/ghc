@@ -12,13 +12,6 @@ have a standard form, namely:
 - primitive operations
 
 \begin{code}
-{-# OPTIONS -fno-warn-missing-signatures #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---  <http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings>
--- for details
-
 module MkId (
         mkDictFunId, mkDefaultMethodId,
         mkDictSelId, 
@@ -399,6 +392,7 @@ mAX_CPR_SIZE = 10
 --         by the caller.  So doing CPR for them may in fact make
 --         things worse.
 
+mkLocals :: Int -> [Type] -> ([Id], Int)
 mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
                where
                  n = length tys
@@ -806,6 +800,7 @@ mkBreakPointOpId :: Unique -> Module -> TickBoxId -> Id
 mkBreakPointOpId uniq mod ix = mkTickBox' uniq mod ix ty
  where ty = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
 
+mkTickBox' :: Unique -> Module -> TickBoxId -> Type -> Id
 mkTickBox' uniq mod ix ty = mkGlobalId (TickBoxOpId tickbox) name ty info    
   where
     tickbox = TickBox mod ix
@@ -846,7 +841,10 @@ BUT make sure they are *exported* LocalIds (mkExportedLocalId) so
 that they aren't discarded by the occurrence analyser.
 
 \begin{code}
-mkDefaultMethodId dm_name ty = mkExportedLocalId dm_name ty
+mkDefaultMethodId :: Id		-- Selector Id
+		  -> Name	-- Default method name
+		  -> Id		-- Default method Id
+mkDefaultMethodId sel_id dm_name = mkExportedLocalId dm_name (idType sel_id)
 
 mkDictFunId :: Name      -- Name to use for the dict fun;
             -> [TyVar]
@@ -885,9 +883,14 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
+mkWiredInIdName :: Module -> FastString -> Unique -> Id -> Name
 mkWiredInIdName mod fs uniq id
  = mkWiredInName mod (mkOccNameFS varName fs) uniq (AnId id) UserSyntax
 
+unsafeCoerceName, nullAddrName, seqName, realWorldName :: Name
+lazyIdName, errorName, recSelErrorName, runtimeErrorName :: Name
+irrefutPatErrorName, recConErrorName, patErrorName :: Name
+nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 unsafeCoerceName = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName     = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
 seqName          = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
@@ -910,6 +913,7 @@ nonExhaustiveGuardsErrorName
 \begin{code}
 ------------------------------------------------
 -- unsafeCoerce# :: forall a b. a -> b
+unsafeCoerceId :: Id
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
   where
@@ -1051,6 +1055,7 @@ E.g.
 This comes up in strictness analysis
 
 \begin{code}
+realWorldPrimId :: Id
 realWorldPrimId -- :: State# RealWorld
   = pcMiscPrelId realWorldName realWorldStatePrimTy
                  (noCafIdInfo `setUnfoldingInfo` evaldUnfolding)
@@ -1103,6 +1108,8 @@ mkImpossibleExpr :: Type -> CoreExpr
 mkImpossibleExpr res_ty
   = mkRuntimeErrorApp rUNTIME_ERROR_ID res_ty "Impossible case alternative"
 
+rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
+pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
@@ -1121,6 +1128,7 @@ runtimeErrorTy = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
 \end{code}
 
 \begin{code}
+eRROR_ID :: Id
 eRROR_ID = pc_bottoming_Id errorName errorTy
 
 errorTy  :: Type

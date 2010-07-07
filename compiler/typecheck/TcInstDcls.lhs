@@ -323,7 +323,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              ; at_idx_tycons   = concat at_tycons_s ++ idx_tycons
              ; clas_decls      = filter (isClassDecl.unLoc) tycl_decls
              ; implicit_things = concatMap implicitTyThings at_idx_tycons
-	     ; aux_binds       = mkAuxBinds at_idx_tycons
+	     ; aux_binds       = mkRecSelBinds at_idx_tycons
              }
 
                 -- (2) Add the tycons of indexed types and their implicit
@@ -541,7 +541,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 
 \begin{code}
 tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo Name]
-             -> TcM (LHsBinds Id, TcLclEnv)
+             -> TcM (LHsBinds Id)
 -- (a) From each class declaration,
 --      generate any default-method bindings
 -- (b) From each instance decl
@@ -550,18 +550,14 @@ tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo Name]
 tcInstDecls2 tycl_decls inst_decls
   = do  { -- (a) Default methods from class decls
           let class_decls = filter (isClassDecl . unLoc) tycl_decls
-        ; (dm_ids_s, dm_binds_s) <- mapAndUnzipM tcClassDecl2 class_decls
+        ; dm_binds_s <- mapM tcClassDecl2 class_decls
                                     
-	; tcExtendIdEnv (concat dm_ids_s) $ do 
-
           -- (b) instance declarations
-        { inst_binds_s <- mapM tcInstDecl2 inst_decls
+        ; inst_binds_s <- mapM tcInstDecl2 inst_decls
 
           -- Done
-        ; let binds = unionManyBags dm_binds_s `unionBags`
-                      unionManyBags inst_binds_s
-        ; tcl_env <- getLclEnv -- Default method Ids in here
-        ; return (binds, tcl_env) } }
+        ; return (unionManyBags dm_binds_s `unionBags`
+                  unionManyBags inst_binds_s) }
 
 tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
@@ -1005,13 +1001,14 @@ tcInstanceMethod loc standalone_deriv clas tyvars dfun_dicts inst_tys
                 = add_meth_ctxt rn_bind $
                   do { (meth_id1, spec_prags) <- tcPrags NonRecursive False True 
                                                          meth_id (prag_fn sel_name)
-                     ; tcInstanceMethodBody (instLoc this_dict)
+                     ; bind <- tcInstanceMethodBody (instLoc this_dict)
                                     tyvars dfun_dicts
 				    ([this_dict], this_dict_bind)
                                     meth_id1 local_meth_id
 				    meth_sig_fn 
                                     (SpecPrags (spec_inst_prags ++ spec_prags))
-                                    rn_bind }
+                                    rn_bind 
+                     ; return (meth_id1, bind) }
 
     	    --------------
 	      tc_default :: DefMeth -> TcM (Id, LHsBind Id)

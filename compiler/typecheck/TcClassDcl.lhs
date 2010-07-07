@@ -149,12 +149,12 @@ tcClassSig _ s = pprPanic "tcClassSig" (ppr s)
 
 \begin{code}
 tcClassDecl2 :: LTyClDecl Name		-- The class declaration
-	     -> TcM ([Id], LHsBinds Id)
+	     -> TcM (LHsBinds Id)
 
 tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs, 
 				tcdMeths = default_binds}))
-  = recoverM (return ([], emptyLHsBinds))	$
-    setSrcSpan loc		   		$
+  = recoverM (return emptyLHsBinds)	$
+    setSrcSpan loc		   	$
     do  { clas <- tcLookupLocatedClass class_name
 
 	-- We make a separate binding for each default method.
@@ -179,17 +179,16 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 				this_dict default_binds
 	      			sig_fn prag_fn
 
-	; dm_stuff <- tcExtendTyVarEnv clas_tyvars $
+	; dm_binds <- tcExtendTyVarEnv clas_tyvars $
                       mapM tc_dm op_items
-        ; let (dm_ids, defm_binds) = unzip (catMaybes dm_stuff)
 
-	; return (dm_ids, listToBag defm_binds) }
+	; return (listToBag (catMaybes dm_binds)) }
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
     
 tcDefMeth :: Class -> [TyVar] -> Inst -> LHsBinds Name
           -> TcSigFun -> TcPragFun -> ClassOpItem
-          -> TcM (Maybe (Id, LHsBind Id))
+          -> TcM (Maybe (LHsBind Id))
 -- Generate code for polymorphic default methods only (hence DefMeth)
 -- (Generic default methods have turned into instance decls by now.)
 -- This is incompatible with Hugs, which expects a polymorphic 
@@ -213,9 +212,8 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
 			  `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 		-- dm_info = DefMeth dm_name only if there is a binding in binds_in
 
-	      dm_sig_fn  _ = sig_fn sel_name
-	      dm_ty = idType sel_id
-	      dm_id = mkDefaultMethodId dm_name dm_ty
+	      dm_sig_fn  _  = sig_fn sel_name
+	      dm_id         = mkDefaultMethodId sel_id dm_name
 	      local_dm_type = instantiateMethod clas sel_id (mkTyVarTys tyvars)
 	      local_dm_id   = mkLocalId local_dm_name local_dm_type
 
@@ -237,7 +235,7 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
 tcInstanceMethodBody :: InstLoc -> [TcTyVar] -> [Inst]
 		     -> ([Inst], LHsBinds Id) -> Id -> Id
           	     -> TcSigFun -> TcSpecPrags -> LHsBind Name 
-          	     -> TcM (Id, LHsBind Id)
+          	     -> TcM (LHsBind Id)
 tcInstanceMethodBody inst_loc tyvars dfun_dicts
 		     (this_dict, this_bind) meth_id local_meth_id
 		     meth_sig_fn spec_prags bind@(L loc _)
@@ -264,7 +262,7 @@ tcInstanceMethodBody inst_loc tyvars dfun_dicts
 
 	      dfun_lam_vars = map instToVar dfun_dicts	-- Includes equalities
 
-        ; return (meth_id, L loc full_bind) } 
+        ; return (L loc full_bind) } 
   where
     no_prag_fn  _ = []		-- No pragmas for local_meth_id; 
     		    		-- they are all for meth_id

@@ -14,7 +14,7 @@ module Class (
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classATs, classSelIds, classTyCon, classMethods,
-	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
+	classOpItems,classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
 #include "Typeable.h"
@@ -120,6 +120,9 @@ classSelIds c@(Class {classSCSels = sc_sels})
 classMethods :: Class -> [Id]
 classMethods (Class {classOpStuff = op_stuff})
   = [op_sel | (op_sel, _) <- op_stuff]
+
+classOpItems :: Class -> [ClassOpItem]
+classOpItems (Class {classOpStuff = op_stuff}) = op_stuff
 
 classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
 classTvsFds c
