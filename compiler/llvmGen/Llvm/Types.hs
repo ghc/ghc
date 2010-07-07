@@ -55,7 +55,7 @@ instance Show LlvmType where
   show (LMArray nr tp ) = "[" ++ show nr ++ " x " ++ show tp ++ "]"
   show (LMLabel       ) = "label"
   show (LMVoid        ) = "void"
-  show (LMStruct tys  ) = "{" ++ (commaCat tys) ++ "}"
+  show (LMStruct tys  ) = "<{" ++ (commaCat tys) ++ "}>"
 
   show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
     = let args = ((drop 1).concat) $ -- use drop since it can handle empty lists
@@ -144,9 +144,9 @@ instance Show LlvmStatic where
 
   show (LMStaticStruc d t)
       = let struc = case d of
-              [] -> "{}"
-              ts -> "{" ++ show (head ts) ++
-                      concat (map (\x -> "," ++ show x) (tail ts)) ++ "}"
+              [] -> "<{}>"
+              ts -> "<{" ++ show (head ts) ++
+                      concat (map (\x -> "," ++ show x) (tail ts)) ++ "}>"
         in show t ++ " " ++ struc
 
   show (LMStaticPointer v) = show v
