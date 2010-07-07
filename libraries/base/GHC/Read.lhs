@@ -314,10 +314,15 @@ choose :: [(String, ReadPrec a)] -> ReadPrec a
 -- ^ Parse the specified lexeme and continue as specified.
 -- Esp useful for nullary constructors; e.g.
 --    @choose [(\"A\", return A), (\"B\", return B)]@
+-- We match both Ident and Symbol because the constructor
+-- might be an operator eg (:=:)
 choose sps = foldr ((+++) . try_one) pfail sps
            where
-             try_one (s,p) = do { L.Ident s' <- lexP ;
-                                  if s == s' then p else pfail }
+             try_one (s,p) = do { token <- lexP ;
+                                  case token of
+                                    L.Ident s'  | s==s' -> p
+                                    L.Symbol s' | s==s' -> p
+                                    _other              -> pfail }
 \end{code}
 
 
