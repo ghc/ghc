@@ -31,7 +31,7 @@ import Control.Monad ( liftM )
 type LlvmStatements = OrdList LlvmStatement
 
 -- -----------------------------------------------------------------------------
--- | Top-level of the llvm proc codegen
+-- | Top-level of the LLVM proc Code generator
 --
 genLlvmProc :: LlvmEnv -> RawCmmTop -> UniqSM (LlvmEnv, [LlvmCmmTop])
 genLlvmProc env (CmmData _ _)
@@ -84,7 +84,7 @@ basicBlockCodeGen env (BasicBlock id stmts)
 
 
 -- | Allocations need to be extracted so they can be moved to the entry
--- of a function to make sure they dominate all posible paths in the CFG.
+-- of a function to make sure they dominate all possible paths in the CFG.
 dominateAllocs :: LlvmBasicBlock -> (LlvmBasicBlock, [LlvmStatement])
 dominateAllocs (BasicBlock id stmts)
   = (BasicBlock id allstmts, allallocs)
@@ -101,8 +101,8 @@ dominateAllocs (BasicBlock id stmts)
 --
 
 -- A statement conversion return data.
---   * LlvmEnv: The new enviornment
---   * LlvmStatements: The compiled llvm statements.
+--   * LlvmEnv: The new environment
+--   * LlvmStatements: The compiled LLVM statements.
 --   * LlvmCmmTop: Any global data needed.
 type StmtData = (LlvmEnv, LlvmStatements, [LlvmCmmTop])
 
@@ -142,7 +142,7 @@ stmtToInstrs env stmt = case stmt of
 
     -- CPS, only tail calls, no return's
     -- Actually, there are a few return statements that occur because of hand
-    -- written cmm code.
+    -- written Cmm code.
     CmmReturn _
         -> return (env, unitOL $ Return Nothing, [])
 
@@ -151,7 +151,7 @@ stmtToInstrs env stmt = case stmt of
 genCall :: LlvmEnv -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals
               -> CmmReturnInfo -> UniqSM StmtData
 
--- Write barrier needs to be handled specially as it is implemented as an llvm
+-- Write barrier needs to be handled specially as it is implemented as an LLVM
 -- intrinsic function.
 genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
     let fname = fsLit "llvm.memory.barrier"
@@ -177,7 +177,7 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
 
-    -- paramater types
+    -- parameter types
     let arg_type (CmmHinted _ AddrHint) = i8Ptr
         -- cast pointers to i8*. Llvm equivalent of void*
         arg_type (CmmHinted expr _    ) = cmmToLlvmType $ cmmExprType expr
@@ -189,12 +189,12 @@ genCall env target res args ret = do
         ret_type t = panic $ "genCall: Too many return values! Can only handle"
                         ++ " 0 or 1, given " ++ show (length t) ++ "."
 
-    -- extract cmm call convention
+    -- extract Cmm call convention
     let cconv = case target of
             CmmCallee _ conv -> conv
             CmmPrim   _      -> PrimCallConv
 
-    -- translate to llvm call convention
+    -- translate to LLVM call convention
     let lmconv = case cconv of
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
             StdCallConv  -> CC_X86_Stdcc
@@ -224,7 +224,7 @@ genCall env target res args ret = do
     let funTy name = LMFunction $ LlvmFunctionDecl name ExternallyVisible
                         lmconv retTy FixedArgs argTy llvmFunAlign
 
-    -- get paramter values
+    -- get parameter values
     (env1, argVars, stmts1, top1) <- arg_vars env args ([], nilOL, [])
 
     -- get the return register
@@ -291,7 +291,7 @@ genCall env target res args ret = do
        So this means LLVM considers them live across the entire function, when
        in reality they usually aren't. For Caller save registers across C calls
        the saving and restoring of them is done by the Cmm code generator,
-       using cmm local vars. So to stop LLVM saving them as well (and saving
+       using Cmm local vars. So to stop LLVM saving them as well (and saving
        all of them since it thinks they're always live, we trash them just
        before the call by assigning the 'undef' value to them. The ones we
        need are restored from the Cmm local var and the ones we don't need
@@ -583,7 +583,7 @@ genCondBranch env cond idT = do
 
 -- | Switch branch
 --
--- N.B. we remove Nothing's from the list of branches, as they are 'undefined'.
+-- N.B. We remove Nothing's from the list of branches, as they are 'undefined'.
 -- However, they may be defined one day, so we better document this behaviour.
 genSwitch :: LlvmEnv -> CmmExpr -> [Maybe BlockId] -> UniqSM StmtData
 genSwitch env cond maybe_ids = do
@@ -714,20 +714,20 @@ genMachOp env _ op [x] = case op of
                 return (env', v1, stmts `snocOL` s1, top)
             let toWidth = llvmWidthInBits ty
             -- LLVM doesn't like trying to convert to same width, so
-            -- need to check for that as we do get cmm code doing it.
+            -- need to check for that as we do get Cmm code doing it.
             case widthInBits from  of
                  w | w < toWidth -> sameConv' expand
                  w | w > toWidth -> sameConv' reduce
                  _w              -> return x'
 
--- handle globalregs pointers
+-- Handle GlobalRegs pointers
 genMachOp env opt o@(MO_Add _) e@[(CmmReg (CmmGlobal r)), (CmmLit (CmmInt n _))]
     = genMachOp_fast env opt o r (fromInteger n) e
 
 genMachOp env opt o@(MO_Sub _) e@[(CmmReg (CmmGlobal r)), (CmmLit (CmmInt n _))]
     = genMachOp_fast env opt o r (negate . fromInteger $ n) e
 
--- generic case
+-- Generic case
 genMachOp env opt op e = genMachOp_slow env opt op e
 
 
@@ -836,7 +836,7 @@ genMachOp_slow env opt op [x, y] = case op of
                     --         ++ "\ne2: " ++ (show.llvmSDoc.PprCmm.pprExpr $ y)
 
         -- | Need to use EOption here as Cmm expects word size results from
-        -- comparisons while llvm return i1. Need to extend to llvmWord type
+        -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected
         genBinComp opt cmp = do
             ed@(env', v1, stmts, top) <- binLlvmOp (\_ -> i1) $ Compare cmp
@@ -990,7 +990,7 @@ genLoad_slow env e ty = do
 --
 -- We allocate CmmReg on the stack. This avoids having to map a CmmReg to an
 -- equivalent SSA form and avoids having to deal with Phi node insertion.
--- This is also the approach recommended by llvm developers.
+-- This is also the approach recommended by LLVM developers.
 getCmmReg :: LlvmEnv -> CmmReg -> ExprData
 getCmmReg env r@(CmmLocal (LocalReg un _))
   = let exists = varLookup un env
@@ -1030,7 +1030,7 @@ genLit env cmm@(CmmLabel l)
         ty = funLookup label env
         lmty = cmmToLlvmType $ cmmLitType cmm
     in case ty of
-            -- Make generic external label defenition and then pointer to it
+            -- Make generic external label definition and then pointer to it
             Nothing -> do
                 let glob@(var, _) = genStringLabelRef label
                 let ldata = [CmmData Data [([glob], [])]]

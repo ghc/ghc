@@ -30,7 +30,7 @@ import Util
 import System.IO
 
 -- -----------------------------------------------------------------------------
--- | Top-level of the llvm codegen
+-- | Top-level of the LLVM Code generator
 --
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 llvmCodeGen dflags h us cmms
@@ -60,7 +60,7 @@ llvmCodeGen dflags h us cmms
 
 
 -- -----------------------------------------------------------------------------
--- | Do llvm code generation on all these cmms data sections.
+-- | Do LLVM code generation on all these Cmms data sections.
 --
 cmmDataLlvmGens :: DynFlags -> BufHandle -> LlvmEnv -> [(Section,[CmmStatic])]
                 -> [LlvmUnresData] -> IO ( LlvmEnv )
@@ -80,7 +80,7 @@ cmmDataLlvmGens dflags h env (cmm:cmms) lmdata
 
 
 -- -----------------------------------------------------------------------------
--- | Do llvm code generation on all these cmms procs.
+-- | Do LLVM code generation on all these Cmms procs.
 --
 cmmProcLlvmGens :: DynFlags -> BufHandle -> UniqSupply -> LlvmEnv -> [RawCmmTop]
       -> Int          -- ^ count, used for generating unique subsections
@@ -109,7 +109,7 @@ cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars
     cmmProcLlvmGens dflags h us' env' cmms (count + 2) (concat ivar ++ ivars)
 
 
--- | Complete llvm code generation phase for a single top-level chunk of Cmm.
+-- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen :: DynFlags -> UniqSupply -> LlvmEnv -> RawCmmTop
             -> IO ( UniqSupply, LlvmEnv, [LlvmCmmTop] )
 cmmLlvmGen dflags us env cmm

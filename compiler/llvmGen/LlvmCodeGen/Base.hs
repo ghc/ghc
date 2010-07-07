@@ -42,7 +42,7 @@ type LlvmCmmTop = GenCmmTop LlvmData [CmmStatic] (ListGraph LlvmStatement)
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Unresolved code.
--- Of the form: (data label, data type, unresovled data)
+-- Of the form: (data label, data type, unresolved data)
 type LlvmUnresData = (CLabel, Section, LlvmType, [UnresStatic])
 
 -- | Top level LLVM Data (globals and type aliases)

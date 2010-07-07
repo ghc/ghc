@@ -70,7 +70,7 @@ instance Show LlvmType where
 
   show (LMAlias (s,_)) = "%" ++ unpackFS s
 
--- | An LLVM section defenition. If Nothing then let LLVM decide the section
+-- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
 type LMAlign = Maybe Int
 type LMConst = Bool -- ^ is a variable constant or not

@@ -23,12 +23,12 @@ data LlvmBlock = LlvmBlock {
 
 type LlvmBlocks = [LlvmBlock]
 
--- | An LLVM Module. This is a top level contianer in LLVM.
+-- | An LLVM Module. This is a top level container in LLVM.
 data LlvmModule = LlvmModule  {
     -- | Comments to include at the start of the module.
     modComments  :: [LMString],
 
-    -- | LLVM Alias type defenitions.
+    -- | LLVM Alias type definitions.
     modAliases   :: [LlvmAlias],
 
     -- | Global variables to include in the module.
@@ -128,7 +128,7 @@ data LlvmStatement
 
   {- |
     Raise an expression to a statement (if don't want result or want to use
-    Llvm unamed values.
+    Llvm unnamed values.
   -}
   | Expr LlvmExpression
 
@@ -206,7 +206,7 @@ data LlvmExpression
     Merge variables from different basic blocks which are predecessors of this
     basic block in a new variable of type tp.
       * tp:         type of the merged variable, must match the types of the
-                    precessors variables.
+                    predecessor variables.
       * precessors: A list of variables and the basic block that they originate
                     from.
   -}
