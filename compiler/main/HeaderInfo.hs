@@ -228,6 +228,9 @@ getOptions' toks
           parseToks (open:xs)
               | ITlanguage_prag <- getToken open
               = parseLanguage xs
+          parseToks (x:xs)
+              | ITdocCommentNext _ <- getToken x
+              = parseToks xs
           parseToks _ = []
           parseLanguage (L loc (ITconid fs):rest)
               = checkExtension (L loc fs) :

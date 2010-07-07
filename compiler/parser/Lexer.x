@@ -285,7 +285,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- Haddock comments
 
-<0> {
+<0,option_prags> {
   "-- " $docsym      / { ifExtension haddockEnabled } { multiline_doc_comment }
   "{-" \ ? $docsym   / { ifExtension haddockEnabled } { nested_doc_comment }
 }
