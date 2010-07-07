@@ -1894,6 +1894,26 @@ not <literal>*</literal> then an explicit kind annotation must be used
 Nevertheless, they can be useful when defining "phantom types".</para>
 </sect2>
 
+<sect2 id="datatype-contexts">
+<title>Data type contexts</title>
+
+<para>Haskell allows datatypes to be given contexts, e.g.</para>
+
+<programlisting>
+data Eq a => Set a = NilSet | ConsSet a (Set a)
+</programlisting>
+
+<para>give constructors with types:</para>
+
+<programlisting>
+NilSet :: Set a
+ConsSet :: Eq a => a -> Set a -> Set a
+</programlisting>
+
+<para>In GHC this feature is an extension called
+<literal>DatatypeContexts</literal>, and on by default.</para>
+</sect2>
+
 <sect2 id="infix-tycons">
 <title>Infix type constructors, classes, and type variables</title>
 
