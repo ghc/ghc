@@ -840,9 +840,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    // top of the CATCH_FRAME ready to enter.
 	    //
 	{
-#ifdef PROFILING
 	    StgCatchFrame *cf = (StgCatchFrame *)frame;
-#endif
 	    StgThunk *raise;
 	    
 	    if (exception == NULL) break;
@@ -863,7 +861,12 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	     * a surprise exception before we get around to executing the
 	     * handler.
 	     */
-	    tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
+            tso->flags |= TSO_BLOCKEX;
+            if ((cf->exceptions_blocked & TSO_INTERRUPTIBLE) == 0) {
+                tso->flags &= ~TSO_INTERRUPTIBLE;
+            } else {
+                tso->flags |= TSO_INTERRUPTIBLE;
+            }
 
 	    /* Put the newly-built THUNK on top of the stack, ready to execute
 	     * when the thread restarts.

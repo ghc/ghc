@@ -743,8 +743,9 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(debugBelch)				\
       SymI_HasProto(errorBelch)				\
       SymI_HasProto(sysErrorBelch)                      \
-      SymI_HasProto(stg_asyncExceptionsBlockedzh)	\
-      SymI_HasProto(stg_blockAsyncExceptionszh)	        \
+      SymI_HasProto(stg_getMaskingStatezh)		\
+      SymI_HasProto(stg_maskAsyncExceptionszh)	        \
+      SymI_HasProto(stg_maskUninterruptiblezh)	        \
       SymI_HasProto(stg_catchzh)			\
       SymI_HasProto(stg_catchRetryzh)			\
       SymI_HasProto(stg_catchSTMzh)			\
@@ -950,7 +951,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_threadStatuszh)		        \
       SymI_HasProto(stg_tryPutMVarzh)			\
       SymI_HasProto(stg_tryTakeMVarzh)			\
-      SymI_HasProto(stg_unblockAsyncExceptionszh)	\
+      SymI_HasProto(stg_unmaskAsyncExceptionszh)	\
       SymI_HasProto(unloadObj)                          \
       SymI_HasProto(stg_unsafeThawArrayzh)		\
       SymI_HasProto(stg_waitReadzh)			\

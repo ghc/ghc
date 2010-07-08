@@ -1147,21 +1147,28 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop  BlockAsyncExceptionsOp "blockAsyncExceptions#" GenPrimOp
+primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
    out_of_line = True
    has_side_effects = True
 
-primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
+primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
    out_of_line = True
    has_side_effects = True
 
-primop  AsyncExceptionsBlockedOp "asyncExceptionsBlocked#" GenPrimOp
+primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
+        (State# RealWorld -> (# State# RealWorld, a #))
+     -> (State# RealWorld -> (# State# RealWorld, a #))
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop  MaskStatus "getMaskingState#" GenPrimOp
         State# RealWorld -> (# State# RealWorld, Int# #)
    with
    out_of_line = True

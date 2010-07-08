@@ -21,12 +21,12 @@ import ghczmprim_GHCziBool_True_closure;
    A thread can request that asynchronous exceptions not be delivered
    ("blocked") for the duration of an I/O computation.  The primitive
    
-	blockAsyncExceptions# :: IO a -> IO a
+	maskAsyncExceptions# :: IO a -> IO a
 
    is used for this purpose.  During a blocked section, asynchronous
    exceptions may be unblocked again temporarily:
 
-	unblockAsyncExceptions# :: IO a -> IO a
+	unmaskAsyncExceptions# :: IO a -> IO a
 
    Furthermore, asynchronous exceptions are blocked automatically during
    the execution of an exception handler.  Both of these primitives
@@ -39,34 +39,33 @@ import ghczmprim_GHCziBool_True_closure;
    the threads waiting to deliver exceptions to that thread.
 
    NB. there's a bug in here.  If a thread is inside an
-   unsafePerformIO, and inside blockAsyncExceptions# (there is an
-   unblockAsyncExceptions_ret on the stack), and it is blocked in an
+   unsafePerformIO, and inside maskAsyncExceptions# (there is an
+   unmaskAsyncExceptions_ret on the stack), and it is blocked in an
    interruptible operation, and it receives an exception, then the
    unsafePerformIO thunk will be updated with a stack object
-   containing the unblockAsyncExceptions_ret frame.  Later, when
+   containing the unmaskAsyncExceptions_ret frame.  Later, when
    someone else evaluates this thunk, the blocked exception state is
    not restored.
 
    -------------------------------------------------------------------------- */
 
-STRING(stg_unblockAsync_err_str, "unblockAsyncExceptions#_ret")
 
-INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
+INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL)
 {
     CInt r;
 
-    StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
-	%lobits32(~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
+    StgTSO_flags(CurrentTSO) = %lobits32(
+      TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
 
     /* Eagerly raise a blocked exception, if there is one */
     if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
+
+        STK_CHK_GEN( WDS(2), R1_PTR, stg_unmaskAsyncExceptionszh_ret_info);
         /* 
          * We have to be very careful here, as in killThread#, since
          * we are about to raise an async exception in the current
          * thread, which might result in the thread being killed.
          */
-
-        STK_CHK_GEN( WDS(2), R1_PTR, stg_unblockAsyncExceptionszh_ret_info);
         Sp_adj(-2);
         Sp(1) = R1;
         Sp(0) = stg_gc_unpt_r1_info;
@@ -97,44 +96,94 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
     jump %ENTRY_CODE(Sp(0));
 }
 
-INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret, RET_SMALL )
+INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL)
 {
-    StgTSO_flags(CurrentTSO) = %lobits32(
-	TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+    StgTSO_flags(CurrentTSO) = 
+       %lobits32(
+	 TO_W_(StgTSO_flags(CurrentTSO))
+          | TSO_BLOCKEX | TSO_INTERRUPTIBLE
+      );
 
     Sp_adj(1);
     jump %ENTRY_CODE(Sp(0));
 }
 
-stg_blockAsyncExceptionszh
+INFO_TABLE_RET(stg_maskUninterruptiblezh_ret, RET_SMALL)
+{
+    StgTSO_flags(CurrentTSO) = 
+       %lobits32(
+	(TO_W_(StgTSO_flags(CurrentTSO))
+          | TSO_BLOCKEX)
+          & ~TSO_INTERRUPTIBLE
+       );
+
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(0));
+}
+
+stg_maskAsyncExceptionszh
 {
     /* Args: R1 :: IO a */
-    STK_CHK_GEN( WDS(2)/* worst case */, R1_PTR, stg_blockAsyncExceptionszh);
+    STK_CHK_GEN( WDS(1)/* worst case */, R1_PTR, stg_maskAsyncExceptionszh);
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
-	
-	StgTSO_flags(CurrentTSO) = %lobits32(
-	   TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
-
-	/* avoid growing the stack unnecessarily */
-	if (Sp(0) == stg_blockAsyncExceptionszh_ret_info) {
-	    Sp_adj(1);
-	} else {
-	    Sp_adj(-1);
-	    Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
-	}
+        /* avoid growing the stack unnecessarily */
+        if (Sp(0) == stg_maskAsyncExceptionszh_ret_info) {
+            Sp_adj(1);
+        } else {
+            Sp_adj(-1);
+            Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+        }
+    } else {
+        if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) == 0) {
+            Sp_adj(-1);
+            Sp(0) = stg_maskUninterruptiblezh_ret_info;
+        }
     }
+
+    StgTSO_flags(CurrentTSO) = %lobits32(
+        TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
     jump stg_ap_v_fast;
 }
 
-stg_unblockAsyncExceptionszh
+stg_maskUninterruptiblezh
+{
+    /* Args: R1 :: IO a */
+    STK_CHK_GEN( WDS(1)/* worst case */, R1_PTR, stg_maskAsyncExceptionszh);
+
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
+        /* avoid growing the stack unnecessarily */
+        if (Sp(0) == stg_maskUninterruptiblezh_ret_info) {
+            Sp_adj(1);
+        } else {
+            Sp_adj(-1);
+            Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+        }
+    } else {
+        if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0) {
+            Sp_adj(-1);
+            Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+        }
+    }
+
+    StgTSO_flags(CurrentTSO) = %lobits32(
+        (TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX) & ~TSO_INTERRUPTIBLE);
+
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_v();
+    jump stg_ap_v_fast;
+}
+
+stg_unmaskAsyncExceptionszh
 {
     CInt r;
+    W_ level;
 
     /* Args: R1 :: IO a */
-    STK_CHK_GEN( WDS(4), R1_PTR, stg_unblockAsyncExceptionszh);
+    STK_CHK_GEN( WDS(4), R1_PTR, stg_unmaskAsyncExceptionszh);
     /* 4 words: one for the unblock frame, 3 for setting up the
      * stack to call maybePerformBlockedException() below.
      */
@@ -142,16 +191,20 @@ stg_unblockAsyncExceptionszh
     /* If exceptions are already unblocked, there's nothing to do */
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
 
-	StgTSO_flags(CurrentTSO) = %lobits32(
-           TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
-
 	/* avoid growing the stack unnecessarily */
-	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
+	if (Sp(0) == stg_unmaskAsyncExceptionszh_ret_info) {
 	    Sp_adj(1);
 	} else {
 	    Sp_adj(-1);
-	    Sp(0) = stg_blockAsyncExceptionszh_ret_info;
+            if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0) {
+                Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+            } else {
+                Sp(0) = stg_maskUninterruptiblezh_ret_info;
+            }
 	}
+
+	StgTSO_flags(CurrentTSO) = %lobits32(
+            TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
 
         /* Eagerly raise a blocked exception, if there is one */
         if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
@@ -195,14 +248,17 @@ stg_unblockAsyncExceptionszh
     jump stg_ap_v_fast;
 }
 
-stg_asyncExceptionsBlockedzh
+
+stg_getMaskingStatezh
 {
     /* args: none */
-    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
-        RET_N(1);
-    } else {
-        RET_N(0);
-    }
+    /* 
+       returns: 0 == unmasked,
+                1 == masked, non-interruptible,
+                2 == masked, interruptible
+    */
+    RET_N(((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) +
+          ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0));
 }
 
 stg_killThreadzh
@@ -321,7 +377,8 @@ stg_catchzh
     SET_HDR(Sp,stg_catch_frame_info,W_[CCCS]);
     
     StgCatchFrame_handler(Sp) = R2;
-    StgCatchFrame_exceptions_blocked(Sp) = TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX;
+    StgCatchFrame_exceptions_blocked(Sp) = 
+        TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE);
     TICK_CATCHF_PUSHED();
 
     /* Apply R1 to the realworld token */
@@ -479,7 +536,7 @@ retry_pop_stack:
      *
      * If exceptions were unblocked, arrange that they are unblocked
      * again after executing the handler by pushing an
-     * unblockAsyncExceptions_ret stack frame.
+     * unmaskAsyncExceptions_ret stack frame.
      *
      * If we've reached an STM catch frame then roll back the nested
      * transaction we were using.
@@ -488,9 +545,9 @@ retry_pop_stack:
     frame = Sp;
     if (frame_type == CATCH_FRAME) {
       Sp = Sp + SIZEOF_StgCatchFrame;
-      if (StgCatchFrame_exceptions_blocked(frame) == 0) {
-        Sp_adj(-1);
-        Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
+      if ((StgCatchFrame_exceptions_blocked(frame) & TSO_BLOCKEX) == 0) {
+          Sp_adj(-1);
+          Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
       }
     } else {
       W_ trec, outer;
@@ -503,9 +560,18 @@ retry_pop_stack:
     }
 
     /* Ensure that async excpetions are blocked when running the handler.
+     * The interruptible state is inherited from the context of the
+     * catch frame.
     */
     StgTSO_flags(CurrentTSO) = %lobits32(
-	TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+	TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX);
+    if ((StgCatchFrame_exceptions_blocked(frame) & TSO_INTERRUPTIBLE) == 0) {
+        StgTSO_flags(CurrentTSO) = %lobits32(
+            TO_W_(StgTSO_flags(CurrentTSO)) & ~TSO_INTERRUPTIBLE);
+    } else {
+        StgTSO_flags(CurrentTSO) = %lobits32(
+            TO_W_(StgTSO_flags(CurrentTSO)) | TSO_INTERRUPTIBLE);
+    }
 
     /* Call the handler, passing the exception value and a realworld
      * token as arguments.

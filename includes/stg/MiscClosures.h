@@ -58,7 +58,9 @@ RTS_RET(stg_catch_retry_frame);
 RTS_RET(stg_atomically_frame);
 RTS_RET(stg_atomically_waiting_frame);
 RTS_RET(stg_catch_stm_frame);
-RTS_RET(stg_unblockAsyncExceptionszh_ret);
+RTS_RET(stg_unmaskAsyncExceptionszh_ret);
+RTS_RET(stg_maskUninterruptiblezh_ret);
+RTS_RET(stg_maskAsyncExceptionszh_ret);
 
 // RTS_FUN(stg_interp_constr_entry);
 //
@@ -407,9 +409,10 @@ RTS_FUN_DECL(stg_forkzh);
 RTS_FUN_DECL(stg_forkOnzh);
 RTS_FUN_DECL(stg_yieldzh);
 RTS_FUN_DECL(stg_killThreadzh);
-RTS_FUN_DECL(stg_asyncExceptionsBlockedzh);
-RTS_FUN_DECL(stg_blockAsyncExceptionszh);
-RTS_FUN_DECL(stg_unblockAsyncExceptionszh);
+RTS_FUN_DECL(stg_getMaskingStatezh);
+RTS_FUN_DECL(stg_maskAsyncExceptionszh);
+RTS_FUN_DECL(stg_maskUninterruptiblezh);
+RTS_FUN_DECL(stg_unmaskAsyncExceptionszh);
 RTS_FUN_DECL(stg_myThreadIdzh);
 RTS_FUN_DECL(stg_labelThreadzh);
 RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
