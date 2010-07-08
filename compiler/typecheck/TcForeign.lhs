@@ -30,10 +30,6 @@ import TcEnv
 import ForeignCall
 import ErrUtils
 import Id
-#if alpha_TARGET_ARCH
-import Type
-import SMRep
-#endif
 import Name
 import TcType
 import DynFlags
@@ -113,7 +109,6 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO isFFIDynResultTy    res_ty
-                        checkFEDArgs arg1_tys
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
@@ -177,31 +172,6 @@ checkMissingAmpersand dflags arg_tys res_ty
   | otherwise
   = return ()
 \end{code}
-
-On an Alpha, with foreign export dynamic, due to a giant hack when
-building adjustor thunks, we only allow 4 integer arguments with
-foreign export dynamic (i.e., 32 bytes of arguments after padding each
-argument to a quadword, excluding floating-point arguments).
-
-The check is needed for both via-C and native-code routes
-
-\begin{code}
-#include "nativeGen/NCG.h"
-
-checkFEDArgs :: [Type] -> TcM ()
-#if alpha_TARGET_ARCH
-checkFEDArgs arg_tys
-  = check (integral_args <= 32) err
-  where
-    integral_args = sum [ (widthInBytes . argMachRep . primRepToCgRep) prim_rep
-			| prim_rep <- map typePrimRep arg_tys,
-			  primRepHint prim_rep /= FloatHint ]
-    err = ptext (sLit "On Alpha, I can only handle 32 bytes of non-floating-point arguments to foreign export dynamic")
-#else
-checkFEDArgs _ = return ()
-#endif
-\end{code}
-
 
 %************************************************************************
 %*									*
