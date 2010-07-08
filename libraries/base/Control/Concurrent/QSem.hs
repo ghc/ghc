@@ -22,6 +22,7 @@ module Control.Concurrent.QSem
 
 import Prelude
 import Control.Concurrent.MVar
+import Control.Exception ( block )
 import Data.Typeable
 
 #include "Typeable.h"
@@ -50,12 +51,13 @@ newQSem initial =
 
 -- |Wait for a unit to become available
 waitQSem :: QSem -> IO ()
-waitQSem (QSem sem) = do
+waitQSem (QSem sem) = block $ do
    (avail,blocked) <- takeMVar sem  -- gain ex. access
    if avail > 0 then
-     putMVar sem (avail-1,[])
+     let avail' = avail-1
+     in avail' `seq` putMVar sem (avail',[])
     else do
-     block <- newEmptyMVar
+     b <- newEmptyMVar
       {-
         Stuff the reader at the back of the queue,
         so as to preserve waiting order. A signalling
@@ -65,16 +67,17 @@ waitQSem (QSem sem) = do
         The version of waitQSem given in the paper could
         lead to starvation.
       -}
-     putMVar sem (0, blocked++[block])
-     takeMVar block
+     putMVar sem (0, blocked++[b])
+     takeMVar b
 
 -- |Signal that a unit of the 'QSem' is available
 signalQSem :: QSem -> IO ()
-signalQSem (QSem sem) = do
+signalQSem (QSem sem) = block $ do
    (avail,blocked) <- takeMVar sem
    case blocked of
-     [] -> putMVar sem (avail+1,[])
+     [] -> let avail' = avail+1
+           in avail' `seq` putMVar sem (avail',blocked)
 
-     (block:blocked') -> do
+     (b:blocked') -> do
            putMVar sem (0,blocked')
-           putMVar block ()
+           putMVar b ()
