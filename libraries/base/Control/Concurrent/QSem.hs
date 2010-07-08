@@ -22,7 +22,7 @@ module Control.Concurrent.QSem
 
 import Prelude
 import Control.Concurrent.MVar
-import Control.Exception ( block )
+import Control.Exception ( mask_ )
 import Data.Typeable
 
 #include "Typeable.h"
@@ -51,7 +51,7 @@ newQSem initial =
 
 -- |Wait for a unit to become available
 waitQSem :: QSem -> IO ()
-waitQSem (QSem sem) = block $ do
+waitQSem (QSem sem) = mask_ $ do
    (avail,blocked) <- takeMVar sem  -- gain ex. access
    if avail > 0 then
      let avail' = avail-1
@@ -72,7 +72,7 @@ waitQSem (QSem sem) = block $ do
 
 -- |Signal that a unit of the 'QSem' is available
 signalQSem :: QSem -> IO ()
-signalQSem (QSem sem) = block $ do
+signalQSem (QSem sem) = mask_ $ do
    (avail,blocked) <- takeMVar sem
    case blocked of
      [] -> let avail' = avail+1

@@ -96,7 +96,7 @@ import GHC.Err          (undefined)
 import GHC.Num          (Integer, fromInteger, (+))
 import GHC.Real         ( rem, Ratio )
 import GHC.IORef        (IORef,newIORef)
-import GHC.IO           (unsafePerformIO,block)
+import GHC.IO           (unsafePerformIO,mask_)
 
 -- These imports are so we can define Typeable instances
 -- It'd be better to give Typeable instances in the modules themselves
@@ -681,7 +681,7 @@ cache = unsafePerformIO $ do
                                         tc_tbl = empty_tc_tbl, 
                                         ap_tbl = empty_ap_tbl }
 #ifdef __GLASGOW_HASKELL__
-                block $ do
+                mask_ $ do
                         stable_ref <- newStablePtr ret
                         let ref = castStablePtrToPtr stable_ref
                         ref2 <- getOrSetTypeableStore ref

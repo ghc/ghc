@@ -124,7 +124,7 @@ withHandle fun h@(DuplexHandle _ m _) act = withHandle' fun h m act
 withHandle' :: String -> Handle -> MVar Handle__
    -> (Handle__ -> IO (Handle__,a)) -> IO a
 withHandle' fun h m act =
- block $ do
+ mask_ $ do
    (h',v)  <- do_operation fun h act m
    checkHandleInvariants h'
    putMVar m h'
@@ -149,7 +149,7 @@ withAllHandles__ fun h@(DuplexHandle _ r w) act = do
 withHandle__' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO Handle__)
               -> IO ()
 withHandle__' fun h m act =
- block $ do
+ mask_ $ do
    h'  <- do_operation fun h act m
    checkHandleInvariants h'
    putMVar m h'

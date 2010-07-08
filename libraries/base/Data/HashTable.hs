@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields -fno-warn-name-shadowing #-}
 
 -----------------------------------------------------------------------------
 -- |

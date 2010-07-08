@@ -29,7 +29,9 @@ module GHC.Conc
 
         -- * Forking and suchlike
         , forkIO        -- :: IO a -> IO ThreadId
+        , forkIOUnmasked
         , forkOnIO      -- :: Int -> IO a -> IO ThreadId
+        , forkOnIOUnmasked
         , numCapabilities -- :: Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId
@@ -211,8 +213,8 @@ thread.
 The new thread will be a lightweight thread; if you want to use a foreign
 library that uses thread-local storage, use 'Control.Concurrent.forkOS' instead.
 
-GHC note: the new thread inherits the /blocked/ state of the parent 
-(see 'Control.Exception.block').
+GHC note: the new thread inherits the /masked/ state of the parent 
+(see 'Control.Exception.mask').
 
 The newly created thread has an exception handler that discards the
 exceptions 'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM', and
@@ -224,6 +226,11 @@ forkIO action = IO $ \ s ->
    case (fork# action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
+
+-- | Like 'forkIO', but the child thread is created with asynchronous exceptions
+-- unmasked (see 'Control.Exception.mask').
+forkIOUnmasked :: IO () -> IO ThreadId
+forkIOUnmasked io = forkIO (unsafeUnmask io)
 
 {- |
 Like 'forkIO', but lets you specify on which CPU the thread is
@@ -243,6 +250,11 @@ forkOnIO (I# cpu) action = IO $ \ s ->
    case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
+
+-- | Like 'forkOnIO', but the child thread is created with
+-- asynchronous exceptions unmasked (see 'Control.Exception.mask').
+forkOnIOUnmasked :: Int -> IO () -> IO ThreadId
+forkOnIOUnmasked cpu io = forkOnIO cpu (unsafeUnmask io)
 
 -- | the value passed to the @+RTS -N@ flag.  This is the number of
 -- Haskell threads that can run truly simultaneously at any given
@@ -301,7 +313,7 @@ another thread.
 If the target thread is currently making a foreign call, then the
 exception will not be raised (and hence 'throwTo' will not return)
 until the call has completed.  This is the case regardless of whether
-the call is inside a 'block' or not.
+the call is inside a 'mask' or not.
 
 Important note: the behaviour of 'throwTo' differs from that described in
 the paper \"Asynchronous exceptions in Haskell\"
@@ -611,18 +623,18 @@ MVar utilities
 \begin{code}
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io = 
-  block $ do
+  mask $ \restore -> do
     a <- takeMVar m
-    b <- catchAny (unblock (io a))
+    b <- catchAny (restore (io a))
             (\e -> do putMVar m a; throw e)
     putMVar m a
     return b
 
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
 modifyMVar_ m io =
-  block $ do
+  mask $ \restore -> do
     a <- takeMVar m
-    a' <- catchAny (unblock (io a))
+    a' <- catchAny (restore (io a))
             (\e -> do putMVar m a; throw e)
     putMVar m a'
     return ()
@@ -861,7 +873,7 @@ prodServiceThread = do
 --
 sharedCAF :: a -> (Ptr a -> IO (Ptr a)) -> IO a
 sharedCAF a get_or_set =
-   block $ do
+   mask_ $ do
      stable_ref <- newStablePtr a
      let ref = castPtr (castStablePtrToPtr stable_ref)
      ref2 <- get_or_set ref

@@ -151,7 +151,7 @@ import Hugs.Prelude     as New (ExitCode(..))
 #endif
 
 import qualified Control.Exception as New
-import           Control.Exception ( toException, fromException, throw, block, unblock, evaluate, throwIO )
+import           Control.Exception ( toException, fromException, throw, block, unblock, mask, evaluate, throwIO )
 import System.IO.Error  hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
@@ -452,14 +452,13 @@ bracket
         -> (a -> IO c)  -- ^ computation to run in-between
         -> IO c         -- returns the value from the in-between computation
 bracket before after thing =
-  block (do
+  mask $ \restore -> do
     a <- before 
     r <- catch 
-           (unblock (thing a))
+           (restore (thing a))
            (\e -> do { _ <- after a; throw e })
     _ <- after a
     return r
- )
 #endif
 
 -- | A specialised variant of 'bracket' with just a computation to run
@@ -470,13 +469,12 @@ finally :: IO a         -- ^ computation to run first
                         -- was raised)
         -> IO a         -- returns the value from the first computation
 a `finally` sequel =
-  block (do
+  mask $ \restore -> do
     r <- catch 
-             (unblock a)
+             (restore a)
              (\e -> do { _ <- sequel; throw e })
     _ <- sequel
     return r
-  )
 
 -- | A variant of 'bracket' where the return value from the first computation
 -- is not required.
@@ -491,12 +489,11 @@ bracketOnError
         -> (a -> IO c)  -- ^ computation to run in-between
         -> IO c         -- returns the value from the in-between computation
 bracketOnError before after thing =
-  block (do
+  mask $ \restore -> do
     a <- before 
     catch 
-        (unblock (thing a))
+        (restore (thing a))
         (\e -> do { _ <- after a; throw e })
- )
 
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
@@ -523,7 +520,7 @@ easy to introduce race conditions by the over zealous use of
 -}
 
 {- $block_handler
-There\'s an implied 'block' around every exception handler in a call
+There\'s an implied 'mask_' around every exception handler in a call
 to one of the 'catch' family of functions.  This is because that is
 what you want most of the time - it eliminates a common race condition
 in starting an exception handler, because there may be no exception
@@ -533,10 +530,9 @@ handler, though, we have time to install a new exception handler
 before being interrupted.  If this weren\'t the default, one would have
 to write something like
 
->      block (
->           catch (unblock (...))
+>      mask $ \restore ->
+>           catch (restore (...))
 >                      (\e -> handler)
->      )
 
 If you need to unblock asynchronous exceptions again in the exception
 handler, just use 'unblock' as normal.
@@ -544,13 +540,13 @@ handler, just use 'unblock' as normal.
 Note that 'try' and friends /do not/ have a similar default, because
 there is no exception handler in this case.  If you want to use 'try'
 in an asynchronous-exception-safe way, you will need to use
-'block'.
+'mask'.
 -}
 
 {- $interruptible
 
 Some operations are /interruptible/, which means that they can receive
-asynchronous exceptions even in the scope of a 'block'.  Any function
+asynchronous exceptions even in the scope of a 'mask'.  Any function
 which may itself block is defined as interruptible; this includes
 'Control.Concurrent.MVar.takeMVar'
 (but not 'Control.Concurrent.MVar.tryTakeMVar'),
@@ -558,11 +554,10 @@ and most operations which perform
 some I\/O with the outside world.  The reason for having
 interruptible operations is so that we can write things like
 
->      block (
+>      mask $ \restore -> do
 >         a <- takeMVar m
->         catch (unblock (...))
+>         catch (restore (...))
 >               (\e -> ...)
->      )
 
 if the 'Control.Concurrent.MVar.takeMVar' was not interruptible,
 then this particular

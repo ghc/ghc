@@ -30,7 +30,7 @@ import Prelude
 
 import Control.Concurrent.MVar
 
-import Control.Exception ( block )
+import Control.Exception ( mask_ )
 
 import Data.Functor ( (<$>) )
 
@@ -72,8 +72,8 @@ newSampleVar a = do
 
 -- |If the SampleVar is full, leave it empty.  Otherwise, do nothing.
 emptySampleVar :: SampleVar a -> IO ()
-emptySampleVar (SampleVar v) = block $ do
-   s@(readers, var) <- block $ takeMVar v
+emptySampleVar (SampleVar v) = mask_ $ do
+   s@(readers, var) <- takeMVar v
    if readers > 0 then do
      _ <- takeMVar var
      putMVar v (0,var)
@@ -82,7 +82,7 @@ emptySampleVar (SampleVar v) = block $ do
 
 -- |Wait for a value to become available, then take it and return.
 readSampleVar :: SampleVar a -> IO a
-readSampleVar (SampleVar svar) = block $ do
+readSampleVar (SampleVar svar) = mask_ $ do
 --
 -- filled => make empty and grab sample
 -- not filled => try to grab value, empty when read val.
@@ -95,7 +95,7 @@ readSampleVar (SampleVar svar) = block $ do
 -- |Write a value into the 'SampleVar', overwriting any previous value that
 -- was there.
 writeSampleVar :: SampleVar a -> a -> IO ()
-writeSampleVar (SampleVar svar) v = block $ do
+writeSampleVar (SampleVar svar) v = mask_ $ do
 --
 -- filled => overwrite
 -- not filled => fill, write val

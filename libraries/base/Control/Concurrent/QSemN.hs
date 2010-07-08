@@ -24,7 +24,7 @@ module Control.Concurrent.QSemN
 import Prelude
 
 import Control.Concurrent.MVar
-import Control.Exception ( block )
+import Control.Exception ( mask_ )
 import Data.Typeable
 
 #include "Typeable.h"
@@ -46,7 +46,7 @@ newQSemN initial =
 
 -- |Wait for the specified quantity to become available
 waitQSemN :: QSemN -> Int -> IO ()
-waitQSemN (QSemN sem) sz = block $ do
+waitQSemN (QSemN sem) sz = mask_ $ do
   (avail,blocked) <- takeMVar sem   -- gain ex. access
   let remaining = avail - sz
   if remaining >= 0 then
@@ -60,7 +60,7 @@ waitQSemN (QSemN sem) sz = block $ do
 
 -- |Signal that a given quantity is now available from the 'QSemN'.
 signalQSemN :: QSemN -> Int  -> IO ()
-signalQSemN (QSemN sem) n = block $ do
+signalQSemN (QSemN sem) n = mask_ $ do
    (avail,blocked)   <- takeMVar sem
    (avail',blocked') <- free (avail+n) blocked
    avail' `seq` putMVar sem (avail',blocked')

@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields -XBangPatterns #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# LANGUAGE NoImplicitPrelude, BangPatterns, RankNTypes #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -27,13 +28,16 @@ module GHC.IO (
     FilePath,
 
     catchException, catchAny, throwIO,
-    block, unblock, blocked,
+    mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
+    MaskingState(..), getMaskingState,
+    block, unblock, blocked, unsafeUnmask,
     onException, finally, evaluate
   ) where
 
 import GHC.Base
 import GHC.ST
 import GHC.Exception
+import GHC.Show
 import Data.Maybe
 
 import {-# SOURCE #-} GHC.IO.Exception ( userError )
@@ -277,11 +281,14 @@ throwIO e = IO (raiseIO# (toException e))
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
 
--- | Applying 'block' to a computation will
+{-# DEPRECATED block "use Control.Exception.mask instead" #-}
+-- | Note: this function is deprecated, please use 'mask' instead.
+--
+-- Applying 'block' to a computation will
 -- execute that computation with asynchronous exceptions
 -- /blocked/.  That is, any thread which
 -- attempts to raise an exception in the current thread with 'Control.Exception.throwTo' will be
--- blocked until asynchronous exceptions are enabled again.  There\'s
+-- blocked until asynchronous exceptions are unblocked again.  There\'s
 -- no need to worry about re-enabling asynchronous exceptions; that is
 -- done automatically on exiting the scope of
 -- 'block'.
@@ -292,37 +299,142 @@ throwIO e = IO (raiseIO# (toException e))
 -- establish an exception handler in the forked thread before any
 -- asynchronous exceptions are received.
 block :: IO a -> IO a
+block (IO io) = IO $ maskAsyncExceptions# io
 
--- | To re-enable asynchronous exceptions inside the scope of
+{-# DEPRECATED unblock "use Control.Exception.mask instead" #-}
+-- | Note: this function is deprecated, please use 'mask' instead.
+--
+-- To re-enable asynchronous exceptions inside the scope of
 -- 'block', 'unblock' can be
 -- used.  It scopes in exactly the same way, so on exit from
 -- 'unblock' asynchronous exception delivery will
 -- be disabled again.
 unblock :: IO a -> IO a
+unblock = unsafeUnmask
 
-block (IO io) = IO $ blockAsyncExceptions# io
-unblock (IO io) = IO $ unblockAsyncExceptions# io
+unsafeUnmask :: IO a -> IO a
+unsafeUnmask (IO io) = IO $ unmaskAsyncExceptions# io
+
+blockUninterruptible :: IO a -> IO a
+blockUninterruptible (IO io) = IO $ maskUninterruptible# io
+
+-- | Describes the behaviour of a thread when an asynchronous
+-- exception is received.
+data MaskingState
+  = Unmasked -- ^ asynchronous exceptions are unmasked (the normal state)
+  | MaskedInterruptible 
+      -- ^ the state during 'mask': asynchronous exceptions are masked, but blocking operations may still be interrupted
+  | MaskedUninterruptible
+      -- ^ the state during 'uninterruptibleMask': asynchronous exceptions are masked, and blocking operations may not be interrupted
+ deriving (Eq,Show)
+
+-- | Returns the 'MaskingState' for the current thread.
+getMaskingState :: IO MaskingState
+getMaskingState  = IO $ \s -> 
+  case getMaskingState# s of
+     (# s', i #) -> (# s', case i of
+                             0# -> Unmasked
+                             1# -> MaskedUninterruptible
+                             _  -> MaskedInterruptible #)
 
 -- | returns True if asynchronous exceptions are blocked in the
 -- current thread.
 blocked :: IO Bool
-blocked = IO $ \s -> case asyncExceptionsBlocked# s of
-                        (# s', i #) -> (# s', i /=# 0# #)
+blocked = fmap (/= Unmasked) getMaskingState
 
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchException` \e -> do _ <- what
                                                    throw (e :: SomeException)
+
+-- | Executes an IO computation with asynchronous
+-- exceptions /masked/.  That is, any thread which attempts to raise
+-- an exception in the current thread with 'Control.Exception.throwTo'
+-- will be blocked until asynchronous exceptions are unmasked again.
+--
+-- The argument passed to 'mask' is a function that takes as its
+-- argument another function, which can be used to restore the
+-- prevailing masking state within the context of the masked
+-- computation.  For example, a common way to use 'mask' is to protect
+-- the acquisition of a resource:
+--
+-- > mask $ \restore -> do
+-- >     x <- acquire
+-- >     restore (do_something_with x) `onException` release
+-- >     release
+--
+-- This code guarantees that @acquire@ is paired with @release@, by masking
+-- asynchronous exceptions for the critical parts. (Rather than write
+-- this code yourself, it would be better to use
+-- 'Control.Exception.bracket' which abstracts the general pattern).
+--
+-- Note that the @restore@ action passed to the argument to 'mask'
+-- does not necessarily unmask asynchronous exceptions, it just
+-- restores the masking state to that of the enclosing context.  Thus
+-- if asynchronous exceptions are already masked, 'mask' cannot be used
+-- to unmask exceptions again.  This is so that if you call a library function
+-- with exceptions masked, you can be sure that the library call will not be
+-- able to unmask exceptions again.  If you are writing library code and need
+-- to use asynchronous exceptions, the only way is to create a new thread;
+-- see 'Control.Concurrent.forkIOUnmasked'.
+--
+-- Asynchronous exceptions may still be received while in the masked
+-- state if the masked thread /blocks/ in certain ways; see
+-- "Control.Exception#interruptible".
+--
+-- Threads created by 'Control.Concurrent.forkIO' inherit the masked
+-- state from the parent; that is, to start a thread in blocked mode,
+-- use @mask_ $ forkIO ...@.  This is particularly useful if you need
+-- to establish an exception handler in the forked thread before any
+-- asynchronous exceptions are received.  To create a a new thread in
+-- an unmasked state use 'Control.Concurrent.forkIOUnmasked'.
+-- 
+mask  :: ((forall a. IO a -> IO a) -> IO b) -> IO b
+
+-- | Like 'mask', but does not pass a @restore@ action to the argument.
+mask_ :: IO a -> IO a
+
+-- | Like 'mask', but the masked computation is not interruptible (see
+-- "Control.Exception#interruptible").  THIS SHOULD BE USED WITH
+-- GREAT CARE, because if a thread executing in 'uninterruptibleMask'
+-- blocks for any reason, then the thread (and possibly the program,
+-- if this is the main thread) will be unresponsive and unkillable.
+-- This function should only be necessary if you need to mask
+-- exceptions around an interruptible operation, and you can guarantee
+-- that the interruptible operation will only block for a short period
+-- of time.
+--
+uninterruptibleMask :: ((forall a. IO a -> IO a) -> IO b) -> IO b
+
+-- | Like 'uninterruptibleMask', but does not pass a @restore@ action
+-- to the argument.
+uninterruptibleMask_ :: IO a -> IO a
+
+mask_ io = mask $ \_ -> io
+
+mask io = do
+  b <- getMaskingState
+  case b of
+    Unmasked -> block $ io unblock
+    _        -> io id
+
+uninterruptibleMask_ io = uninterruptibleMask $ \_ -> io
+
+uninterruptibleMask io = do
+  b <- getMaskingState
+  case b of
+    Unmasked              -> blockUninterruptible $ io unblock
+    MaskedInterruptible   -> blockUninterruptible $ io block
+    MaskedUninterruptible -> io id
 
 finally :: IO a         -- ^ computation to run first
         -> IO b         -- ^ computation to run afterward (even if an exception
                         -- was raised)
         -> IO a         -- returns the value from the first computation
 a `finally` sequel =
-  block (do
-    r <- unblock a `onException` sequel
+  mask $ \restore -> do
+    r <- restore a `onException` sequel
     _ <- sequel
     return r
-  )
 
 -- | Forces its argument to be evaluated to weak head normal form when
 -- the resultant 'IO' action is executed. It can be used to order

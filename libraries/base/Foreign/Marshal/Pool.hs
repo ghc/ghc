@@ -48,7 +48,7 @@ module Foreign.Marshal.Pool (
 import GHC.Base              ( Int, Monad(..), (.), not )
 import GHC.Err               ( undefined )
 import GHC.Exception         ( throw )
-import GHC.IO                ( IO, block, unblock, catchAny )
+import GHC.IO                ( IO, mask, catchAny )
 import GHC.IORef             ( IORef, newIORef, readIORef, writeIORef )
 import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
@@ -97,10 +97,10 @@ freePool (Pool pool) = readIORef pool >>= freeAll
 withPool :: (Pool -> IO b) -> IO b
 #ifdef __GLASGOW_HASKELL__
 withPool act =   -- ATTENTION: cut-n-paste from Control.Exception below!
-   block (do
+   mask (\restore -> do
       pool <- newPool
       val <- catchAny
-                (unblock (act pool))
+                (restore (act pool))
                 (\e -> do freePool pool; throw e)
       freePool pool
       return val)

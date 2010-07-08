@@ -79,6 +79,15 @@ module Control.Exception.Base (
 
         -- ** Asynchronous exception control
 
+        mask,
+        mask_,
+        uninterruptibleMask,
+        uninterruptibleMask_,
+        MaskingState(..),
+        getMaskingState,
+
+        -- ** (deprecated) Asynchronous exception control
+
         block,
         unblock,
         blocked,
@@ -505,12 +514,11 @@ bracket
         -> (a -> IO c)  -- ^ computation to run in-between
         -> IO c         -- returns the value from the in-between computation
 bracket before after thing =
-  block (do
+  mask $ \restore -> do
     a <- before
-    r <- unblock (thing a) `onException` after a
+    r <- restore (thing a) `onException` after a
     _ <- after a
     return r
- )
 #endif
 
 -- | A specialised variant of 'bracket' with just a computation to run
@@ -521,11 +529,10 @@ finally :: IO a         -- ^ computation to run first
                         -- was raised)
         -> IO a         -- returns the value from the first computation
 a `finally` sequel =
-  block (do
-    r <- unblock a `onException` sequel
+  mask $ \restore -> do
+    r <- restore a `onException` sequel
     _ <- sequel
     return r
-  )
 
 -- | A variant of 'bracket' where the return value from the first computation
 -- is not required.
@@ -540,10 +547,9 @@ bracketOnError
         -> (a -> IO c)  -- ^ computation to run in-between
         -> IO c         -- returns the value from the in-between computation
 bracketOnError before after thing =
-  block (do
+  mask $ \restore -> do
     a <- before
-    unblock (thing a) `onException` after a
-  )
+    restore (thing a) `onException` after a
 
 #if !(__GLASGOW_HASKELL__ || __NHC__)
 assert :: Bool -> a -> a

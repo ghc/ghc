@@ -28,6 +28,7 @@ module Control.Concurrent (
 
         forkIO,
 #ifdef __GLASGOW_HASKELL__
+        forkIOUnmasked,
         killThread,
         throwTo,
 #endif
@@ -98,9 +99,9 @@ import Control.Exception.Base as Exception
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exception
 import GHC.Conc         ( ThreadId(..), myThreadId, killThread, yield,
-                          threadDelay, forkIO, childHandler )
+                          threadDelay, forkIO, forkIOUnmasked, childHandler )
 import qualified GHC.Conc
-import GHC.IO           ( IO(..), unsafeInterleaveIO )
+import GHC.IO           ( IO(..), unsafeInterleaveIO, unsafeUnmask )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
 import GHC.Base
 
@@ -357,13 +358,15 @@ failNonThreaded = fail $ "RTS doesn't support multiple OS threads "
 forkOS action0
     | rtsSupportsBoundThreads = do
         mv <- newEmptyMVar
-        b <- Exception.blocked
+        b <- Exception.getMaskingState
         let
-            -- async exceptions are blocked in the child if they are blocked
+            -- async exceptions are masked in the child if they are masked
             -- in the parent, as for forkIO (see #1048). forkOS_createThread
-            -- creates a thread with exceptions blocked by default.
-            action1 | b = action0
-                    | otherwise = unblock action0
+            -- creates a thread with exceptions masked by default.
+            action1 = case b of
+                        Unmasked -> unsafeUnmask action0
+                        MaskedInterruptible -> action0
+                        MaskedUninterruptible -> uninterruptibleMask_ action0
 
             action_plus = Exception.catch action1 childHandler
 
@@ -431,8 +434,8 @@ runInUnboundThread action = do
         then do
             mv <- newEmptyMVar
             b <- blocked
-            _ <- block $ forkIO $
-              Exception.try (if b then action else unblock action) >>=
+            _ <- mask $ \restore -> forkIO $
+              Exception.try (if b then action else restore action) >>=
               putMVar mv
             takeMVar mv >>= \ei -> case ei of
                 Left exception -> Exception.throw (exception :: SomeException)
@@ -482,7 +485,7 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 withThread :: IO a -> IO a
 withThread io = do
   m <- newEmptyMVar
-  _ <- block $ forkIO $ try io >>= putMVar m
+  _ <- mask_ $ forkIO $ try io >>= putMVar m
   x <- takeMVar m
   case x of
     Right a -> return a

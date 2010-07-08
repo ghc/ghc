@@ -104,8 +104,17 @@ module Control.Exception (
 
         -- ** Asynchronous exception control
 
-        -- |The following two functions allow a thread to control delivery of
+        -- |The following functions allow a thread to control delivery of
         -- asynchronous exceptions during a critical region.
+
+        mask,
+        mask_,
+        uninterruptibleMask,
+        uninterruptibleMask_,
+        MaskingState(..),
+        getMaskingState,
+
+        -- ** (deprecated) Asynchronous exception control
 
         block,
         unblock,
@@ -138,7 +147,6 @@ import Control.Exception.Base
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
--- import GHC.IO hiding ( onException, finally )
 import Data.Maybe
 #else
 import Prelude hiding (catch)
@@ -243,7 +251,7 @@ easy to introduce race conditions by the over zealous use of
 -}
 
 {- $block_handler
-There\'s an implied 'block' around every exception handler in a call
+There\'s an implied 'mask' around every exception handler in a call
 to one of the 'catch' family of functions.  This is because that is
 what you want most of the time - it eliminates a common race condition
 in starting an exception handler, because there may be no exception
@@ -253,10 +261,9 @@ handler, though, we have time to install a new exception handler
 before being interrupted.  If this weren\'t the default, one would have
 to write something like
 
->      block (
->           catch (unblock (...))
->                      (\e -> handler)
->      )
+>      block $ \restore ->
+>           catch (restore (...))
+>                 (\e -> handler)
 
 If you need to unblock asynchronous exceptions again in the exception
 handler, just use 'unblock' as normal.
@@ -268,6 +275,7 @@ recovering from an asynchronous exception.
 
 {- $interruptible
 
+ #interruptible#
 Some operations are /interruptible/, which means that they can receive
 asynchronous exceptions even in the scope of a 'block'.  Any function
 which may itself block is defined as interruptible; this includes
@@ -277,11 +285,10 @@ and most operations which perform
 some I\/O with the outside world.  The reason for having
 interruptible operations is so that we can write things like
 
->      block (
+>      mask $ \restore -> do
 >         a <- takeMVar m
->         catch (unblock (...))
+>         catch (restore (...))
 >               (\e -> ...)
->      )
 
 if the 'Control.Concurrent.MVar.takeMVar' was not interruptible,
 then this particular
