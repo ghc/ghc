@@ -22,7 +22,7 @@ test('T1969',
                                    # expected value: 11404664 (amd64/Linux)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
-                                                      250000000)),
+                                                      270000000)),
                                     # expected value: 215582916 (x86/Windows)
                                     #                 221667908 (x86/OS X)
       if_wordsize(64,
@@ -61,7 +61,7 @@ test('T3294',
                                    # we GC relative to the peak).
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 800000000,
-                                                      830000000)),
+                                                      850000000)),
                                     # expected value: 815479800  (x86/Linux)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 1200000000,
