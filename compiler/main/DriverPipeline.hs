@@ -1844,9 +1844,9 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
     cpp_prog       ([SysTools.Option verb]
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
+                    ++ map SysTools.Option target_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option cc_opts
-                    ++ map SysTools.Option target_defs
                     ++ [ SysTools.Option     "-x"
                        , SysTools.Option     "c"
                        , SysTools.Option     input_fn
