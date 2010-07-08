@@ -24,6 +24,7 @@ module Control.Concurrent.QSemN
 import Prelude
 
 import Control.Concurrent.MVar
+import Control.Exception ( block )
 import Data.Typeable
 
 #include "Typeable.h"
@@ -45,29 +46,30 @@ newQSemN initial =
 
 -- |Wait for the specified quantity to become available
 waitQSemN :: QSemN -> Int -> IO ()
-waitQSemN (QSemN sem) sz = do
+waitQSemN (QSemN sem) sz = block $ do
   (avail,blocked) <- takeMVar sem   -- gain ex. access
-  if (avail - sz) >= 0 then
+  let remaining = avail - sz
+  if remaining >= 0 then
        -- discharging 'sz' still leaves the semaphore
        -- in an 'unblocked' state.
-     putMVar sem (avail-sz,blocked)
+     putMVar sem (remaining,blocked)
    else do
-     block <- newEmptyMVar
-     putMVar sem (avail, blocked++[(sz,block)])
-     takeMVar block
+     b <- newEmptyMVar
+     putMVar sem (avail, blocked++[(sz,b)])
+     takeMVar b
 
 -- |Signal that a given quantity is now available from the 'QSemN'.
 signalQSemN :: QSemN -> Int  -> IO ()
-signalQSemN (QSemN sem) n = do
+signalQSemN (QSemN sem) n = block $ do
    (avail,blocked)   <- takeMVar sem
    (avail',blocked') <- free (avail+n) blocked
-   putMVar sem (avail',blocked')
+   avail' `seq` putMVar sem (avail',blocked')
  where
    free avail []    = return (avail,[])
-   free avail ((req,block):blocked)
+   free avail ((req,b):blocked)
      | avail >= req = do
-        putMVar block ()
+        putMVar b ()
         free (avail-req) blocked
      | otherwise    = do
         (avail',blocked') <- free avail blocked
-        return (avail',(req,block):blocked')
+        return (avail',(req,b):blocked')
