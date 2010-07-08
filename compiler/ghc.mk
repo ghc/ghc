@@ -336,10 +336,6 @@ compiler_CONFIGURE_OPTS += --ld-options=-E
 endif
 
 ifeq "$(GhcUnregisterised)" "NO"
-ifeq "$(HOSTPLATFORM)" "ia64-unknown-linux"
-# needed for generating proper relocation in large binaries: trac #856
-compiler_CONFIGURE_OPTS += --ld-option=-Wl,--relax
-endif
 else
 compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
 endif
