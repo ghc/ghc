@@ -13,9 +13,6 @@
 /* 
  * WARNING WARNING WARNING
  *
- * Keep the closure tags contiguous: rts/ClosureFlags.c relies on
- * this.
- *
  * If you add or delete any closure types, don't forget to update
  * the closure flags table in rts/ClosureFlags.c.
  */
