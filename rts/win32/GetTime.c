@@ -69,12 +69,36 @@ getProcessCPUTime(void)
     return fileTimeToTicks(userTime);
 }
 
+// getProcessElapsedTime relies on QueryPerformanceFrequency 
+// which should be available on any Windows computer thay you
+// would want to run Haskell on. Satnam Singh, 5 July 2010.
+
 Ticks
 getProcessElapsedTime(void)
 {
-    FILETIME system_time;
-    GetSystemTimeAsFileTime(&system_time);
-    return fileTimeToTicks(system_time);
+    // frequency represents the number of ticks per second
+    // used by the QueryPerformanceFrequency implementaiton
+    // and is represented by a 64-bit union type initially set to 0
+    // and updated just once (hence use of static).
+    static LARGE_INTEGER frequency = {.QuadPart = 0} ;  
+
+    // system_time is a 64-bit union type used to represent the
+    // tick count returned by QueryPerformanceCounter
+    LARGE_INTEGER system_time ;
+
+    // If this is the first time we are calling getProcessElapsedTime
+    // then record the ticks per second used by QueryPerformanceCounter
+    if (frequency.QuadPart == 0) {
+      QueryPerformanceFrequency(&frequency);
+    }
+    
+    // Get the tick count.
+    QueryPerformanceCounter(&system_time) ;
+
+    // Return the tick count as a millisecond value. 
+    // Using double to compute the intermediate value, because a 64-bit
+    // int would overflow when multiplied by TICKS_PER_SECOND in about 81 days.
+    return (Ticks)((TICKS_PER_SECOND * (double)system_time.QuadPart) / (double)frequency.QuadPart) ;
 }
 
 Ticks
