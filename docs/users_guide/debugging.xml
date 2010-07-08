@@ -651,7 +651,6 @@ Main.skip2{-r1L6-} =
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: xml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->

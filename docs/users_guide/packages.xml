@@ -1596,7 +1596,6 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: xml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->

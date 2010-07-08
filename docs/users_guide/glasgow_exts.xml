@@ -9097,7 +9097,6 @@ standard behaviour.
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: xml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***

@@ -1295,7 +1295,6 @@ $ ./a.out +RTS --info
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
-     ;;; mode: xml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->
