@@ -126,7 +126,17 @@ extern StgWord8 mblock_map[];
 
 #define MBC_LINE_BITS 0
 #define MBC_TAG_BITS 15
-typedef StgWord32 MbcCacheLine;  // could use 16, but 32 was faster
+
+#if x86_64_HOST_ARCH
+// 32bits are enough for 'entry' as modern amd64 boxes have
+// only 48bit sized virtual addres.
+typedef StgWord32 MbcCacheLine;
+#else
+// 32bits is not enough here as some arches (like ia64) use
+// upper address bits to distinct memory areas.
+typedef StgWord64 MbcCacheLine;
+#endif
+
 typedef StgWord8  MBlockMapLine;
 
 #define MBLOCK_MAP_LINE(p)  (((StgWord)p & 0xffffffff) >> (MBLOCK_SHIFT + MBC_LINE_BITS))
