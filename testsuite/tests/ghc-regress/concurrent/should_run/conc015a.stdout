@@ -1,0 +1,5 @@
+Unmasked
+MaskedInterruptible
+caught1: foo
+MaskedUninterruptible
+caught2: bar

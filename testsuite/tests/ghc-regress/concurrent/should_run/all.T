@@ -12,12 +12,14 @@ else:
    only_threaded_ways = skip
 
 test('conc069', only_threaded_ways, compile_and_run, [''])
+test('conc069a', only_threaded_ways, compile_and_run, [''])
 # this test gives slightly different results for non-threaded ways, so omit
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
+test('2910a', normal, compile_and_run, [''])
 test('3279', normal, compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
@@ -32,6 +34,12 @@ test('4030', omit_ways('ghci'), compile_and_run, ['-O'])
 test('throwto001', extra_run_opts('1000 2000'), compile_and_run, [''])
 test('throwto002', ignore_output, compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
+
+test('mask001', normal, compile_and_run, [''])
+# ghci does not generate the BlockedIndefinitely exceptions, so omit:
+test('mask002', omit_ways(['ghci']), compile_and_run, [''])
+
+test('async001', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
@@ -63,8 +71,10 @@ test('conc013', only_compiler_types(['ghc']), compile_and_run, [''])
 
 test('conc014', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc015', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc015a', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc016', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc017', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc017a', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc018', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc019', compose(only_compiler_types(['ghc']),
 			extra_run_opts('+RTS -K16m -RTS')),
@@ -162,3 +172,4 @@ test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
 test('conc067', ignore_output, compile_and_run, [''])
 test('conc068', exit_code(1), compile_and_run, [''])
+
