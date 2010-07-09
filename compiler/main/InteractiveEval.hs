@@ -359,13 +359,13 @@ foreign import ccall "&rts_breakpoint_io_action"
 -- is not responding".
 -- 
 -- Careful here: there may be ^C exceptions flying around, so we start the new
--- thread blocked (forkIO inherits block from the parent, #1048), and unblock
+-- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
 -- only while we execute the user's code.  We can't afford to lose the final
 -- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
 sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing =
-   block $ do  -- fork starts blocked
-     id <- forkIO $ do res <- Exception.try (unblock $ rethrow dflags thing)
+   mask $ \restore -> do  -- fork starts blocked
+     id <- forkIO $ do res <- Exception.try (restore $ rethrow dflags thing)
                        putMVar statusMVar (Complete res) -- empty: can't block
      withInterruptsSentTo id $ takeMVar statusMVar
 

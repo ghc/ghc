@@ -692,7 +692,7 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 linkModules :: DynFlags -> PersistentLinkerState -> [Linkable]
             -> IO (PersistentLinkerState, SuccessFlag)
 linkModules dflags pls linkables
-  = block $ do  -- don't want to be interrupted by ^C in here
+  = mask_ $ do  -- don't want to be interrupted by ^C in here
 	
 	let (objs, bcos) = partition isObjectLinkable 
                               (concatMap partitionLinkable linkables)
@@ -862,7 +862,7 @@ unload :: DynFlags
        -> [Linkable] -- ^ The linkables to *keep*.
        -> IO ()
 unload dflags linkables
-  = block $ do -- block, so we're safe from Ctrl-C in here
+  = mask_ $ do -- mask, so we're safe from Ctrl-C in here
   
 	-- Initialise the linker (if it's not been done already)
 	initDynLinker dflags

@@ -189,6 +189,12 @@ instance ExceptionMonad GHCi where
   gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
   gblock (GHCi m)   = GHCi $ \r -> gblock (m r)
   gunblock (GHCi m) = GHCi $ \r -> gunblock (m r)
+  gmask f =
+      GHCi $ \s -> gmask $ \io_restore ->
+                             let
+                                g_restore (GHCi m) = GHCi $ \s' -> io_restore (m s')
+                             in
+                                unGHCi (f g_restore) s
 
 instance WarnLogMonad GHCi where
   setWarnings warns = liftGhc $ setWarnings warns
@@ -201,11 +207,14 @@ instance Haskeline.MonadException GHCi where
   catch = gcatch
   block = gblock
   unblock = gunblock
+  -- XXX when Haskeline's MonadException changes, we can drop our 
+  -- deprecated block/unblock methods
 
 instance ExceptionMonad (InputT GHCi) where
-    gcatch = Haskeline.catch
-    gblock = Haskeline.block
-    gunblock = Haskeline.unblock
+  gcatch = Haskeline.catch
+  gmask f = Haskeline.block (f Haskeline.unblock) -- slightly wrong
+  gblock = Haskeline.block
+  gunblock = Haskeline.unblock
 
 -- for convenience...
 getPrelude :: GHCi Module

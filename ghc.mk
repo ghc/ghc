@@ -659,6 +659,9 @@ libraries/binary_dist-boot_HC_OPTS += -Wwarn
 # XXX hack: xhtml has warnings
 libraries/xhtml_dist-install_HC_OPTS += -Wwarn
 
+# XXX hack: haskeline has warnings about deprecated use of block/unblock
+libraries/haskeline_dist-install_HC_OPTS += -Wwarn
+
 # ----------------------------------------------
 # A useful pseudo-target
 .PHONY: stage1_libs

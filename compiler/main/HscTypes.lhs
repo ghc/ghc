@@ -325,6 +325,12 @@ instance ExceptionMonad Ghc where
       Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
   gblock (Ghc m)   = Ghc $ \s -> gblock (m s)
   gunblock (Ghc m) = Ghc $ \s -> gunblock (m s)
+  gmask f =
+      Ghc $ \s -> gmask $ \io_restore ->
+                             let
+                                g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
+                             in
+                                unGhc (f g_restore) s
 
 instance WarnLogMonad Ghc where
   setWarnings warns = Ghc $ \(Session _ wref) -> writeIORef wref warns
@@ -357,6 +363,12 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
       GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
   gblock (GhcT m) = GhcT $ \s -> gblock (m s)
   gunblock (GhcT m) = GhcT $ \s -> gunblock (m s)
+  gmask f =
+      GhcT $ \s -> gmask $ \io_restore ->
+                           let
+                              g_restore (GhcT m) = GhcT $ \s -> io_restore (m s)
+                           in
+                              unGhcT (f g_restore) s
 
 instance MonadIO m => WarnLogMonad (GhcT m) where
   setWarnings warns = GhcT $ \(Session _ wref) -> liftIO $ writeIORef wref warns
