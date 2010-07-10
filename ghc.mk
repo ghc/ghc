@@ -647,18 +647,6 @@ GhcBootLibHcOpts += -fno-warn-deprecated-flags
 # Add $(GhcLibHcOpts) to all library builds
 $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
 
-# XXX Hack; remove this
-# Use -Wwarn for dph
-$(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += -Wwarn))
-
-# XXX Hack; remove this
-# Use -Wwarn for 'binary' becuase it has redundant UNPACK pragmas
-libraries/binary_dist-install_HC_OPTS += -Wwarn
-libraries/binary_dist-boot_HC_OPTS += -Wwarn
-
-# XXX hack: haskeline has warnings about deprecated use of block/unblock
-libraries/haskeline_dist-install_HC_OPTS += -Wwarn
-
 # ----------------------------------------------
 # A useful pseudo-target
 .PHONY: stage1_libs

@@ -37,13 +37,29 @@ GhcStage2HcOpts += -XGenerics -DDEBUG
 GhcLibHcOpts    += -XGenerics
 endif
 
+######################################################################
+# Disable some warnings in packages we use
+
 # Temporarily turn off unused-do-bind warnings for the time package
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
 # On Windows, there are also some unused import warnings
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
+# haskeline has warnings about deprecated use of block/unblock
+libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # Temporarily turn off unused-import warnings for the binary package
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+# binary has unusable UNPACK pragmas
+libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
+libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/dph/dph-prim-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/dph/dph-prim-par_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/dph/dph-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/dph/dph-par_dist-install_EXTRA_HC_OPTS += -Wwarn
+
