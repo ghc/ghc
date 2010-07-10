@@ -185,6 +185,7 @@ library
     Haddock.Backends.Xhtml.Names
     Haddock.Backends.Xhtml.Types
     Haddock.Backends.Xhtml.Util
+    Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
     Haddock.Backends.DevHelp
     Haddock.Backends.HH
