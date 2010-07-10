@@ -108,11 +108,13 @@ module Control.Exception (
         -- asynchronous exceptions during a critical region.
 
         mask,
+#ifndef __NHC__
         mask_,
         uninterruptibleMask,
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
+#endif
 
         -- ** (deprecated) Asynchronous exception control
 

@@ -78,13 +78,14 @@ module Control.Exception.Base (
         -- * Asynchronous Exceptions
 
         -- ** Asynchronous exception control
-
         mask,
+#ifndef __NHC__
         mask_,
         uninterruptibleMask,
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
+#endif
 
         -- ** (deprecated) Asynchronous exception control
 
@@ -222,6 +223,10 @@ evaluate x = x `seq` return x
 assert :: Bool -> a -> a
 assert True  x = x
 assert False _ = throw (toException (UserError "" "Assertion failed"))
+
+mask   :: ((IO a-> IO a) -> IO a) -> IO a
+mask action = action restore
+    where restore act = act
 
 #endif
 
