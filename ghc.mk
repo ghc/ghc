@@ -656,9 +656,6 @@ $(foreach pkg,$(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS +=
 libraries/binary_dist-install_HC_OPTS += -Wwarn
 libraries/binary_dist-boot_HC_OPTS += -Wwarn
 
-# XXX hack: xhtml has warnings
-libraries/xhtml_dist-install_HC_OPTS += -Wwarn
-
 # XXX hack: haskeline has warnings about deprecated use of block/unblock
 libraries/haskeline_dist-install_HC_OPTS += -Wwarn
 
