@@ -583,7 +583,7 @@ mkFileHandle dev filepath iomode mb_codec tr_newlines = do
 
 -- | like 'mkFileHandle', except that a 'Handle' is created with two
 -- independent buffers, one for reading and one for writing.  Used for
--- full-dupliex streams, such as network sockets.
+-- full-duplex streams, such as network sockets.
 mkDuplexHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
                -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
 mkDuplexHandle dev filepath mb_codec tr_newlines = do
