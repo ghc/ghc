@@ -28,7 +28,7 @@ module System.IO (
     -- | GHC note: a 'Handle' will be automatically closed when the garbage
     -- collector detects that it has become unreferenced by the program.
     -- However, relying on this behaviour is not generally recommended:
-    -- the garbage collector is unpredictable.  If possible, use explicit
+    -- the garbage collector is unpredictable.  If possible, use
     -- an explicit 'hClose' to close 'Handle's when they are no longer
     -- required.  GHC does not currently attempt to free up file
     -- descriptors when they have run out, it is your responsibility to
