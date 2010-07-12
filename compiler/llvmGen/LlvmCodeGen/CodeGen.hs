@@ -503,7 +503,7 @@ genStore_fast env addr r n val
             True -> do
                 (env', vval,  stmts, top) <- exprToVar env val
                 (gv,  s1) <- doExpr grt $ Load gr
-                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [ix]
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [toI32 ix]
                 -- We might need a different pointer type, so check
                 case pLower grt == getVarType vval of
                      -- were fine
@@ -591,7 +591,7 @@ genSwitch env cond maybe_ids = do
     let ty = getVarType vc
 
     let pairs = [ (ix, id) | (ix,Just id) <- zip ([0..]::[Integer]) maybe_ids ]
-    let labels = map (\(ix, b) -> (mkIntLit ix ty, blockIdToLlvm b)) pairs
+    let labels = map (\(ix, b) -> (mkIntLit ty ix, blockIdToLlvm b)) pairs
     -- out of range is undefied, so lets just branch to first label
     let (_, defLbl) = head labels
 
@@ -671,11 +671,11 @@ genMachOp :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
 genMachOp env _ op [x] = case op of
 
     MO_Not w ->
-        let all1 = mkIntLit (-1::Int) (widthToLlvmInt w)
+        let all1 = mkIntLit (widthToLlvmInt w) (-1::Int)
         in negate (widthToLlvmInt w) all1 LM_MO_Xor
 
     MO_S_Neg w ->
-        let all0 = mkIntLit (0::Int) (widthToLlvmInt w)
+        let all0 = mkIntLit (widthToLlvmInt w) (0::Int)
         in negate (widthToLlvmInt w) all0 LM_MO_Sub
 
     MO_F_Neg w ->
@@ -743,7 +743,7 @@ genMachOp_fast env opt op r n e
     in case isPointer grt && rem == 0 of
             True -> do
                 (gv,  s1) <- doExpr grt $ Load gr
-                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [ix]
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [toI32 ix]
                 (var, s3) <- doExpr llvmWord $ Cast LM_Ptrtoint ptr llvmWord
                 return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3, [])
 
@@ -875,8 +875,8 @@ genMachOp_slow env opt op [x, y] = case op of
             let word  = getVarType vx
             let word2 = LMInt $ 2 * (llvmWidthInBits $ getVarType vx)
             let shift = llvmWidthInBits word
-            let shift1 = mkIntLit (shift - 1) llvmWord
-            let shift2 = mkIntLit shift llvmWord
+            let shift1 = toIWord (shift - 1)
+            let shift2 = toIWord shift
 
             if isInt word
                 then do
@@ -941,7 +941,7 @@ genLoad_fast env e r n ty =
     in case isPointer grt && rem == 0 of
             True  -> do
                 (gv,  s1) <- doExpr grt $ Load gr
-                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [ix]
+                (ptr, s2) <- doExpr grt $ GetElemPtr True gv [toI32 ix]
                 -- We might need a different pointer type, so check
                 case grt == ty' of
                      -- were fine
@@ -1019,7 +1019,7 @@ allocReg _ = panic $ "allocReg: Global reg encountered! Global registers should"
 -- | Generate code for a literal
 genLit :: LlvmEnv -> CmmLit -> UniqSM ExprData
 genLit env (CmmInt i w)
-  = return (env, mkIntLit i (LMInt $ widthInBits w), nilOL, [])
+  = return (env, mkIntLit (LMInt $ widthInBits w) i, nilOL, [])
 
 genLit env (CmmFloat r w)
   = return (env, LMLitVar $ LMFloatLit (fromRational r) (widthToLlvmFloat w),
@@ -1048,14 +1048,14 @@ genLit env cmm@(CmmLabel l)
 
 genLit env (CmmLabelOff label off) = do
     (env', vlbl, stmts, stat) <- genLit env (CmmLabel label)
-    let voff = mkIntLit off llvmWord
+    let voff = toIWord off
     (v1, s1) <- doExpr (getVarType vlbl) $ LlvmOp LM_MO_Add vlbl voff
     return (env', v1, stmts `snocOL` s1, stat)
 
 genLit env (CmmLabelDiffOff l1 l2 off) = do
     (env1, vl1, stmts1, stat1) <- genLit env (CmmLabel l1)
     (env2, vl2, stmts2, stat2) <- genLit env1 (CmmLabel l2)
-    let voff = mkIntLit off llvmWord
+    let voff = toIWord off
     let ty1 = getVarType vl1
     let ty2 = getVarType vl2
     if (isInt ty1) && (isInt ty2)
@@ -1160,10 +1160,14 @@ expandCmmReg (reg, off)
 blockIdToLlvm :: BlockId -> LlvmVar
 blockIdToLlvm bid = LMLocalVar (getUnique bid) LMLabel
 
-
 -- | Create Llvm int Literal
-mkIntLit :: Integral a => a -> LlvmType -> LlvmVar
-mkIntLit i ty = LMLitVar $ LMIntLit (toInteger i) ty
+mkIntLit :: Integral a => LlvmType -> a -> LlvmVar
+mkIntLit ty i = LMLitVar $ LMIntLit (toInteger i) ty
+
+-- | Convert int type to a LLvmVar of word or i32 size
+toI32, toIWord :: Integral a => a -> LlvmVar
+toI32 = mkIntLit i32
+toIWord = mkIntLit llvmWord
 
 
 -- | Error functions
