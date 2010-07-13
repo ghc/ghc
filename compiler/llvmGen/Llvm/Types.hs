@@ -5,7 +5,6 @@
 module Llvm.Types where
 
 #include "HsVersions.h"
-#include "ghcconfig.h"
 
 import Data.Char
 import Numeric
