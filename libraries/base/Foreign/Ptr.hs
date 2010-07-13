@@ -105,12 +105,14 @@ foreign import ccall unsafe "freeHaskellFunctionPtr"
 
 # ifdef __GLASGOW_HASKELL__
 -- | An unsigned integral type that can be losslessly converted to and from
--- @Ptr@.
+-- @Ptr@. This type is also compatible with the C99 type @uintptr_t@, and
+-- can be marshalled to and from that type safely.
 INTEGRAL_TYPE(WordPtr,tyConWordPtr,"WordPtr",Word)
         -- Word and Int are guaranteed pointer-sized in GHC
 
 -- | A signed integral type that can be losslessly converted to and from
--- @Ptr@.
+-- @Ptr@.  This type is also compatible with the C99 type @intptr_t@, and
+-- can be marshalled to and from that type safely.
 INTEGRAL_TYPE(IntPtr,tyConIntPtr,"IntPtr",Int)
         -- Word and Int are guaranteed pointer-sized in GHC
 
