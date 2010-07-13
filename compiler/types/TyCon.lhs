@@ -127,59 +127,95 @@ Type synonym families
     * injective type families (allow decomposition)
   but we don't at the moment [2010]
 
-Data type families
-~~~~~~~~~~~~~~~~~~
+Note [Data type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Wrappers for data instance tycons] in MkId.lhs
+
 * Data type families are declared thus
 	data family T a :: *
 	data instance T Int = T1 | T2 Bool
-	data instance T [a] where
-          X1 :: T [Int]
-	  X2 :: a -> T [a]
+
+  Here T is the "family TyCon".
 
 * The user does not see any "equivalent types" as he did with type
   synonym families.  He just sees constructors with types
 	T1 :: T Int
 	T2 :: Bool -> T Int
-	X1 :: T [Int]
-	X2 :: a -> T [a]
-  Note that X2 is a fully-fledged GADT constructor; that's fine
 
-* The conversion into FC is interesting, and is the point where I was
-  getting mixed up.  Here's the FC version of the above declarations:
+* Here's the FC version of the above declarations:
 
 	data T a
-	data TI = T1 | T2 Bool
-	axiom ax_ti : T Int ~ TI
+	data R:TInt = T1 | T2 Bool
+	axiom ax_ti : T Int ~ R:TInt
 
-	data TL a where
-	  X1 :: TL Int
-	  X2 :: a -> TL a
-  	axiom ax_tl :: T [a] ~ TL a
+  The R:TInt is the "representation TyCons".
+  It has an AlgTyConParent of
+	FamilyTyCon T [Int] ax_ti
+
+* The data contructor T2 has a wrapper (which is what the 
+  source-level "T2" invokes):
+
+	$WT2 :: Bool -> T Int
+	$WT2 b = T2 b `cast` sym ax_ti
+
+* A data instance can declare a fully-fledged GADT:
+
+	data instance T (a,b) where
+          X1 :: T (Int,Bool)
+	  X2 :: a -> b -> T (a,b)
+
+  Here's the FC version of the above declaration:
+
+	data R:TPair a where
+	  X1 :: R:TPair Int Bool
+	  X2 :: a -> b -> R:TPair a b
+  	axiom ax_pr :: T (a,b) ~ R:TPair a b
+
+	$WX1 :: forall a b. a -> b -> T (a,b)
+	$WX1 a b (x::a) (y::b) = X2 a b x y `cast` sym (ax_pr a b)
+
+  The R:TPair are the "representation TyCons".
+  We have a bit of work to do, to unpick the result types of the
+  data instance declaration for T (a,b), to get the result type in the
+  representation; e.g.  T (a,b) --> R:TPair a b
+
+  The representation TyCon R:TList, has an AlgTyConParent of
+
+	FamilyTyCon T [(a,b)] ax_pr
 
 * Notice that T is NOT translated to a FC type function; it just
-  becomes a "data type" with no constructors, into which TI, TL, TB
-  are cast using their respective axioms.
+  becomes a "data type" with no constructors, which can be coerced inot
+  into R:TInt, R:TPair by the axioms.  These axioms
+  axioms come into play when (and *only* when) you
+  	- use a data constructor
+    	- do pattern matching
+  Rather like newtype, in fact
 
-* As a result
+  As a result
+
   - T behaves just like a data type so far as decomposition is concerned
+
+  - (T Int) is not implicitly converted to R:TInt during type inference. 
+    Indeed the latter type is unknown to the programmer.
+
+  - There *is* an instance for (T Int) in the type-family instance 
+    environment, but it is only used for overlap checking
+
   - It's fine to have T in the LHS of a type function:
-	type instance F (T a) = [a]
+    type instance F (T a) = [a]
 
-It was this last point that confused me!  The big thing is that you
-should not think of a data family T as a *type function* at all, not
-even an injective one!  We can't allow even injective type functions
-on the LHS of a type function:
-	type family injective G a :: *
-	type instance F (G Int) = Bool
-is no good, even if G is injective, because consider
-	type instance G Int = Bool
-	type instance F Bool = Char
+  It was this last point that confused me!  The big thing is that you
+  should not think of a data family T as a *type function* at all, not
+  even an injective one!  We can't allow even injective type functions
+  on the LHS of a type function:
+  	type family injective G a :: *
+  	type instance F (G Int) = Bool
+  is no good, even if G is injective, because consider
+  	type instance G Int = Bool
+  	type instance F Bool = Char
 
-So a data type family is not an injective type function. It's just a
-data type with some axioms that connect it to other data types. These
-axioms come into play when (and only when) you
-	- use a data constructor
-	- do pattern matching
+  So a data type family is not an injective type function. It's just a
+  data type with some axioms that connect it to other data types. 
 
 %************************************************************************
 %*									*
@@ -221,12 +257,11 @@ data TyCon
 	tyConArity  :: Arity,
 
 	tyConTyVars :: [TyVar],		-- ^ The type variables used in the type constructor.
+                                        -- Invariant: length tyvars = arity
 	                                -- Precisely, this list scopes over:
 	                                --
 	                                -- 1. The 'algTcStupidTheta'
-	                                --
 					-- 2. The cached types in 'algTyConRhs.NewTyCon'
-					-- 
 					-- 3. The family instance types if present
 					--
 					-- Note that it does /not/ scope over the data constructors.
@@ -560,47 +595,6 @@ so the coercion tycon CoT must have
  and	arity:   0
 
 
-Note [Data type families]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Wrappers for data instance tycons] in MkId.lhs
-
-Consider
-	data family T a
-
-	data instance T (b,c) where
-	  T1 :: b -> c -> T (b,c)
-	  T2 :: T (Int,Bool)
-
-Notice that the 'data instance' can be a fully-fledged GADT
-
-  * T is the "family TyCon".  It is a data type 
-    whose AlgTyConRhs is OpenTyCon
-
-  * For each 'data instance' we make "representation TyCon" 
-    :R1T, thus:
-	data :R1T b c where
-	  T1 ::	forall b c. b -> c -> :R1T b c
-	  T1 ::	:R1T Int Bool
-    We have a bit of work to do, to unpick the result types of the
-    data instance declaration to get the result type in the
-    representation; e.g.  T (Int,Bool) -->  :R1T Int Bool
-
-  * We defind a top-level coercion connecting it to the family TyCon
-
-	axiom :Co:R1T b c : T (b,c) ~ :R1T b c
-
-  * The data contructor T1 has a wrapper (which is what the 
-    source-level "T1" invokes):
-
-	$WT1 :: forall b c. b -> c -> T (b,c)
-	$WT1 b c (x::b) (y::c) = T1 b c x y `cast` sym (:Co:R1T b c)
-
-  * The representation TyCon, :R1T, has an AlgTyConParent of
-
-	FamilyTyCon T [(b,c)] :Co:R1T
-
-
-
 %************************************************************************
 %*									*
 \subsection{PrimRep}
@@ -694,7 +688,7 @@ mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
-	tc_kind	 = kind,
+	tc_kind	         = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
 	algTcStupidTheta = stupid,
@@ -702,7 +696,7 @@ mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
 	algTcParent	 = ASSERT( okParent name parent ) parent,
 	algTcRec	 = is_rec,
 	algTcGadtSyntax  = gadt_syn,
-	hasGenerics = gen_info
+	hasGenerics      = gen_info
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
