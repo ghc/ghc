@@ -152,7 +152,7 @@ copyHtmlBits odir libdir maybe_css = do
 
 footer :: Html
 footer =
-  thediv ! [theclass "bottom"] << paragraph << (
+  divFooter << paragraph << (
     "Produced by " +++ 
     (anchor ! [href projectUrl] << toHtml projectName) +++
     (" version " ++ projectVersion)
@@ -194,8 +194,8 @@ simpleHeader :: String -> Maybe String -> Maybe String
              -> SourceURLs -> WikiURLs -> Html
 simpleHeader doctitle maybe_contents_url maybe_index_url
   maybe_source_url maybe_wiki_url = 
-  thediv ! [theclass "package-header"] << (
-    paragraph ! [theclass "caption"] << doctitle +++
+  divPackageHeader << (
+    sectionName << nonEmpty doctitle +++
     unordList (catMaybes [ 
       srcButton maybe_source_url Nothing,
       wikiButton maybe_wiki_url Nothing,
@@ -210,8 +210,8 @@ pageHeader :: String -> Interface -> String
 pageHeader mdl iface doctitle
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url =
-  thediv ! [theclass "package-header"] << (
-    paragraph ! [theclass "caption"] << (doctitle +++ spaceHtml) +++
+  divPackageHeader << (
+    sectionName << nonEmpty doctitle +++
     unordList (catMaybes [ 
         srcButton maybe_source_url (Just iface),
         wikiButton maybe_wiki_url (Just $ ifaceMod iface),
@@ -219,8 +219,8 @@ pageHeader mdl iface doctitle
         indexButton maybe_index_url
         ]) ! [theclass "links"]
    ) +++
-  thediv ! [theclass "module-header"] << (
-    paragraph ! [theclass "caption"] << mdl +++
+  divModuleHeader << (
+    sectionName << mdl +++
     moduleInfo iface
   )
 
@@ -606,8 +606,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
   = ppModuleContents exports +++
     description +++
     synopsis +++
-    maybe_doc_hdr +++
-    bdy
+    divInterface (maybe_doc_hdr +++ bdy)
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
@@ -623,16 +622,18 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
     description
           = case ifaceRnDoc iface of
               Nothing -> noHtml
-              Just doc -> h1 << toHtml "Description" +++ docToHtml doc
+              Just doc -> divDescription $
+                            sectionName << "Description" +++ docToHtml doc
 
         -- omit the synopsis if there are no documentation annotations at all
     synopsis
       | no_doc_at_all = noHtml
       | otherwise
-      = h1 << "Synopsis" +++
-        unordList (
-            mapMaybe (processExport True linksInfo unicode) exports
-        ) ! [theclass "synopsis"]
+      = divSynposis $
+            sectionName << "Synopsis" +++
+            shortDeclList (
+                mapMaybe (processExport True linksInfo unicode) exports
+            )
 
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").
@@ -644,8 +645,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
 
     bdy =
       foldr (+++) noHtml $
-        map (thediv ! [theclass "decldoc"]) $
-          mapMaybe (processExport False linksInfo unicode) exports
+        mapMaybe (processExport False linksInfo unicode) exports
           
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
@@ -702,8 +702,8 @@ ppModuleContents exports
   | null sections = noHtml
   | otherwise     = contentsDiv
  where
-  contentsDiv = thediv ! [theclass "table-of-contents"] << (
-    paragraph ! [theclass "caption"] << "Contents" +++
+  contentsDiv = divTableOfContents << (
+    sectionName << "Contents" +++
     unordList sections)
     
   (sections, _leftovers{-should be []-}) = process 0 exports
@@ -737,19 +737,27 @@ processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
 processExport summary _ _ (ExportGroup lev id0 doc)
   = nothingIf summary $ groupTag lev << namedAnchor id0 << docToHtml doc
 processExport summary links unicode (ExportDecl decl doc subdocs insts)
-  = Just $ ppDecl summary links decl doc insts subdocs unicode
-processExport _ _ _ (ExportNoDecl y [])
-  = Just $ ppDocName y
-processExport _ _ _ (ExportNoDecl y subs)
-  = Just $ ppDocName y +++ parenList (map ppDocName subs)
+  = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode
+processExport summary _ _ (ExportNoDecl y [])
+  = processDeclOneLiner summary $ ppDocName y
+processExport summary _ _ (ExportNoDecl y subs)
+  = processDeclOneLiner summary $ ppDocName y +++ parenList (map ppDocName subs)
 processExport summary _ _ (ExportDoc doc)
   = nothingIf summary $ docToHtml doc
-processExport _ _ _ (ExportModule mdl)
-  = Just $ toHtml "module" <+> ppModule mdl ""
+processExport summary _ _ (ExportModule mdl)
+  = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl ""
 
 nothingIf :: Bool -> a -> Maybe a
 nothingIf True _ = Nothing
 nothingIf False a = Just a
+
+processDecl :: Bool -> Html -> Maybe Html
+processDecl True = Just
+processDecl False = Just . divTopDecl
+
+processDeclOneLiner :: Bool -> Html -> Maybe Html
+processDeclOneLiner True = Just
+processDeclOneLiner False = Just . divTopDecl . declElem
 
 groupTag :: Int -> Html -> Html
 groupTag lev
@@ -757,7 +765,6 @@ groupTag lev
   | lev == 2  = h2
   | lev == 3  = h3
   | otherwise = h4
-
 
 
 

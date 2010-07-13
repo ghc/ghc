@@ -18,13 +18,18 @@ a:hover   { background-color: #e0e0ff; text-decoration: none }
 /* <tt> font is a little too small in MSIE */
 tt  { font-size: 100%; }
 pre { font-size: 100%; }
-span.keyword { text-decoration: underline; }
+.keyword { text-decoration: underline; }
+.caption {
+	font-weight: bold;
+	margin: 0;
+	padding: 0;
+}
 
 h1 {
   padding-top: 15px;
   font-weight: bold;
-  font-size: 150%
-  }
+  font-size: 150%;
+}
 
 h2 {
   padding-top: 10px;
@@ -42,6 +47,11 @@ h4, h5 {
   font-weight: bold;
   font-size: 100%
   }
+
+h1, h2, h3, h4, h5 {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
 
 p  { 
 	padding-top: 2px;
@@ -66,12 +76,8 @@ h2 + p, h3 + p, h4 + p {
 	margin-top: 1em;
 }
 
-p.caption {
-	margin: 0;
-	padding: 0;
-}
 
-div.package-header {
+#package-header {
 	color: #ffffff;
 	padding: 5px 5px 5px 31px;
 	margin: 0 0 1px;
@@ -79,10 +85,10 @@ div.package-header {
 	position: relative;
 }
 
-div.package-header a:link    { color: #ffffff }
-div.package-header a:visited { color: #ffff00 }
-div.package-header a:hover   { background-color: #6060ff; }
-div.package-header ul.links li:hover { background-color: #6060ff; }
+#package-header a:link    { color: #ffffff }
+#package-header a:visited { color: #ffff00 }
+#package-header a:hover   { background-color: #6060ff; }
+#package-header ul.links li:hover { background-color: #6060ff; }
 
 ul.links {
 	list-style: none;
@@ -102,17 +108,18 @@ ul.links li {
 	padding: 1px 5px;
 }
 
-div.module-header {
+#module-header {
 	background-color: #0077dd;
 	padding: 5px;
 	position: relative;
-	height: 3em;
 }
 
-div.module-header p {
+#module-header .caption {
 	font-size: 200%;
 	height: 1.5em;
 	padding-top: .25em;
+	font-weight: normal;
+	font-style: normal;
 }
 
 dl.info {
@@ -135,63 +142,71 @@ dl.info dd {
 	padding-left: 6em;
 }
 
-div.table-of-contents {
+#table-of-contents {
 	margin-top: 1em;
-	margin-bottom: 1em;
+	margin-bottom: 2em;
 }
 
-div.table-of-contents p {
-	font-weight: bold;
-}
-
-div.table-of-contents ul {
+#table-of-contents ul {
 	margin-top: 1em;
 	margin-bottom: 1em;
-	margin-left: 10px;
+	margin-left: 0;
 	list-style-type: none;
-}
-
-ul.synopsis {
-	margin-left: 0px;
-}
-
-ul.synopsis p.decl {
 	padding: 0;
 }
-ul.synopsis li {
+
+#table-of-contents ul ul {
+	margin-left: 2.5em;
+}
+
+#description .caption,
+#synopsis .caption {
+  padding-top: 15px;
+  font-weight: bold;
+  font-size: 150%	
+}
+
+#synopsis {
+	margin-bottom: 2em;
+}
+
+#synopsis p.src {
+	padding: 0;
+}
+#synopsis li {
   background-color: #f0f0f0; 
   font-family: monospace;
   vertical-align: top;
-	margin-top: 6px;
-	margin-bottom: 6px;
+	margin-top: 8px;
+	margin-bottom: 8px;
 	padding: 3px;
 	list-style-type: none;
 }
 
-ul.synopsis li ul {
+#synopsis ul {
 	margin: 0;
 	padding-top: 0;
 }
 
-ul.synopsis li ul li {
+#synopsis li ul li {
 	margin: 3px;
 	padding: 0;
 }
 
 
-div.decldoc {
+div.top {
 	margin-top: 1em;
 }
 
-div.decldoc h5 {
+div.top h5 {
 	margin-left: 10px;
 }
 
-div.decldoc table, div.subdecl {
+div.top table, div.subdecl {
 	margin-left: 20px;
 }
 
-p.decl {
+.src {
   padding: 3px;
   background-color: #f0f0f0;
   font-family: monospace;
@@ -199,7 +214,7 @@ p.decl {
 }
 
 
-p.decl a.link {
+.src a.link {
 	float: right;
 	border-left-width: 1px;
 	border-left-color: #000099;
@@ -256,25 +271,25 @@ td.rdoc p {
 
 
 
-div.bottom {
+#footer {
   background-color: #000099;
   color: #ffffff;
   padding: 4px
   }
   
-div.bottom p {
+#footer p {
 	padding: 1px;
 	margin: 0;
 }
 
-div.bottom  a:link {
+#footer  a:link {
   color: #ffffff;
   text-decoration: underline
   }
-div.bottom  a:visited {
+#footer  a:visited {
   color: #ffff00
   }
-div.bottom  a:hover {
+#footer  a:hover {
   background-color: #6060ff
   }
 

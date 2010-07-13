@@ -11,6 +11,14 @@
 -- Portability :  portable
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Layout (
+  divPackageHeader, divModuleHeader, divFooter,
+  divTableOfContents, divDescription, divSynposis, divInterface, 
+  
+  sectionName,
+  
+  shortDeclList,
+  divTopDecl, 
+  
   topDeclElem, declElem,
   
   instHdr, atHdr, methHdr, constrHdr,
@@ -29,10 +37,36 @@ import Text.XHtml hiding ( name, title, p, quote )
 import FastString            ( unpackFS )
 import GHC
 
+-- Sections of the document
+
+divPackageHeader, divModuleHeader, divFooter :: Html -> Html
+divPackageHeader = thediv ! [identifier "package-header"]
+divModuleHeader  = thediv ! [identifier "module-header"]
+divFooter        = thediv ! [identifier "footer"]
+
+divTableOfContents, divDescription, divSynposis, divInterface :: Html -> Html
+divTableOfContents = thediv ! [identifier "table-of-contents"]
+divDescription     = thediv ! [identifier "description"]
+divSynposis        = thediv ! [identifier "synopsis"]
+divInterface       = thediv ! [identifier "interface"]
+
+-- | The name of a section, used directly after opening a section
+sectionName :: Html -> Html
+sectionName = paragraph ! [theclass "caption"]
+
+
+-- | Declaration containers 
+
+shortDeclList :: [Html] -> Html
+shortDeclList items = ulist << map (li ! [theclass "src short"] <<) items
+
+divTopDecl :: Html -> Html
+divTopDecl = thediv ! [theclass "top"]
+
 
 -- a box for displaying code
 declElem :: Html -> Html
-declElem = paragraph ! [theclass "decl"]
+declElem = paragraph ! [theclass "src"]
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box

@@ -16,7 +16,7 @@ module Haddock.Backends.Xhtml.Util (
   namedAnchor, linkedAnchor,
   spliceURL,
   
-  (<+>), char, empty,
+  (<+>), char, empty, nonEmpty,
   keyword, punctuate,
   
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
@@ -109,6 +109,11 @@ char c = toHtml [c]
 
 empty :: Html
 empty  = noHtml
+
+-- | ensure content contains at least something (a non-breaking space)
+nonEmpty :: (HTML a) => a -> Html
+nonEmpty a = if isNoHtml h then spaceHtml else h
+    where h = toHtml a
 
 
 quote :: Html -> Html
