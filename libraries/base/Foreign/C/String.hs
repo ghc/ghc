@@ -59,6 +59,11 @@ module Foreign.C.String (   -- representation of strings in C
   castCharToCChar,   -- :: Char -> CChar
   castCCharToChar,   -- :: CChar -> Char
 
+  castCharToCUChar,  -- :: Char -> CUChar
+  castCUCharToChar,  -- :: CUChar -> Char
+  castCharToCSChar,  -- :: Char -> CSChar
+  castCSCharToChar,  -- :: CSChar -> Char
+
   peekCAString,      -- :: CString    -> IO String
   peekCAStringLen,   -- :: CStringLen -> IO String
   newCAString,       -- :: String -> IO CString
@@ -198,6 +203,26 @@ castCCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
 -- This function is only safe on the first 256 characters.
 castCharToCChar :: Char -> CChar
 castCharToCChar ch = fromIntegral (ord ch)
+
+-- | Convert a C @unsigned char@, representing a Latin-1 character, to
+-- the corresponding Haskell character.
+castCUCharToChar :: CUChar -> Char
+castCUCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
+
+-- | Convert a Haskell character to a C @unsigned char@.
+-- This function is only safe on the first 256 characters.
+castCharToCUChar :: Char -> CUChar
+castCharToCUChar ch = fromIntegral (ord ch)
+
+-- | Convert a C @signed char@, representing a Latin-1 character, to the
+-- corresponding Haskell character.
+castCSCharToChar :: CSChar -> Char
+castCSCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
+
+-- | Convert a Haskell character to a C @signed char@.
+-- This function is only safe on the first 256 characters.
+castCharToCSChar :: Char -> CSChar
+castCharToCSChar ch = fromIntegral (ord ch)
 
 -- | Marshal a NUL terminated C string into a Haskell string.
 --
