@@ -122,7 +122,7 @@ StgFunPtr StgReturn(void)
 
 #ifdef i386_HOST_ARCH
 
-#ifdef darwin_TARGET_OS
+#ifdef darwin_HOST_OS
 #define STG_GLOBAL ".globl "
 #else
 #define STG_GLOBAL ".global "

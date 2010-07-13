@@ -26,7 +26,7 @@
 //         registers EAX, EDX, and ECX instead of on the stack. Functions that
 //         take a variable number of arguments will continue to be passed all of
 //         their arguments on the stack.
-#if __GNUC__ >= 2 && (defined(x86_64_TARGET_ARCH) || defined(i386_TARGET_ARCH))
+#if __GNUC__ >= 2 && (defined(x86_64_HOST_ARCH) || defined(i386_HOST_ARCH))
 #define REGPARM1 __attribute__((regparm(1)))
 #else
 #define REGPARM1

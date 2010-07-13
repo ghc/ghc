@@ -226,7 +226,7 @@ extern __thread gc_thread* gct;
 #define DECLARE_GCT __thread gc_thread* gct;
 
 
-#elif defined(sparc_TARGET_ARCH)
+#elif defined(sparc_HOST_ARCH)
 // On SPARC we can't pin gct to a register. Names like %l1 are just offsets
 //	into the register window, which change on each function call.
 //	

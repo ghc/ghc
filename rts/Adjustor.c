@@ -111,7 +111,7 @@ createAdjustor (int cconv,
         arg_types[i] = char_to_ffi_type(typeString[i+1]);
     }
     switch (cconv) {
-#ifdef mingw32_TARGET_OS
+#ifdef mingw32_HOST_OS
     case 0: /* stdcall */
         abi = FFI_STDCALL;
         break;

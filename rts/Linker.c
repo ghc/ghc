@@ -457,7 +457,7 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(closedir)
 #endif
 
-#if defined(darwin_TARGET_OS) && HAVE_PRINTF_LDBLSTUB
+#if defined(darwin_HOST_OS) && HAVE_PRINTF_LDBLSTUB
 #define RTS_DARWIN_ONLY_SYMBOLS			            \
      SymI_NeedsProto(asprintf$LDBLStub)                     \
      SymI_NeedsProto(err$LDBLStub)                          \
@@ -1004,7 +1004,7 @@ typedef struct _RtsSymbolVal {
 
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
-#if defined(__PIC__) && defined(mingw32_TARGET_OS)
+#if defined(__PIC__) && defined(mingw32_HOST_OS)
 #define SymE_HasProto(vvv)    SymE_HasProto(vvv);
 #define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
 #else
@@ -2017,7 +2017,7 @@ static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
  * PowerPC specifics (instruction cache flushing)
  * ------------------------------------------------------------------------*/
 
-#ifdef powerpc_TARGET_ARCH
+#ifdef powerpc_HOST_ARCH
 /*
    ocFlushInstructionCache
 
@@ -4021,7 +4021,7 @@ static int ocVerifyImage_MachO(ObjectCode* oc)
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
 
-#if x86_64_TARGET_ARCH || powerpc64_TARGET_ARCH
+#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
     if(header->magic != MH_MAGIC_64)
         return 0;
 #else
@@ -4812,7 +4812,7 @@ static int machoGetMisalignment( FILE * f )
     fread(&header, sizeof(header), 1, f);
     rewind(f);
 
-#if x86_64_TARGET_ARCH || powerpc64_TARGET_ARCH
+#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
     if(header.magic != MH_MAGIC_64)
         return 0;
 #else

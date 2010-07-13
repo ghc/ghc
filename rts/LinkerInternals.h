@@ -50,7 +50,7 @@ typedef struct {
         long mtctr_r12;
         long bctr;
     } jumpIsland;
-#elif x86_64_TARGET_ARCH
+#elif x86_64_HOST_ARCH
     uint64_t    addr;
     uint8_t     jumpIsland[6];
 #endif
