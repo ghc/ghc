@@ -48,6 +48,7 @@ import Maybes           ( expectJust )
 import ParserCoreUtils  ( getCoreModuleName )
 import SrcLoc
 import FastString
+import LlvmCodeGen      ( llvmFixupAsm )
 -- import MonadUtils
 
 -- import Data.Either
@@ -1268,8 +1269,13 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
     let dflags  = hsc_dflags hsc_env
     let lc_opts = getOpts dflags opt_lc
     let opt_lvl = max 0 (min 2 $ optLevel dflags)
+#if darwin_TARGET_OS
+    let nphase = LlvmMangle
+#else
+    let nphase = As
+#endif
 
-    output_fn <- get_output_fn dflags As maybe_loc
+    output_fn <- get_output_fn dflags nphase maybe_loc
 
     SysTools.runLlvmLlc dflags
             (map SysTools.Option lc_opts
@@ -1278,9 +1284,20 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn])
 
-    return (As, dflags, maybe_loc, output_fn)
+    return (nphase, dflags, maybe_loc, output_fn)
   where
         llvmOpts = ["-O1", "-O2", "-O3"]
+
+
+-----------------------------------------------------------------------------
+-- LlvmMangle phase
+
+runPhase LlvmMangle _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+  = liftIO $ do
+    let dflags = hsc_dflags hsc_env
+    output_fn <- get_output_fn dflags As maybe_loc
+    llvmFixupAsm input_fn output_fn
+    return (As, dflags, maybe_loc, output_fn)
 
 
 -- warning suppression

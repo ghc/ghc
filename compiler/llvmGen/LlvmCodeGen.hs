@@ -2,7 +2,7 @@
 -- | This is the top-level module in the LLVM code generator.
 --
 
-module LlvmCodeGen ( llvmCodeGen ) where
+module LlvmCodeGen ( llvmCodeGen, llvmFixupAsm ) where
 
 #include "HsVersions.h"
 
@@ -12,6 +12,8 @@ import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
 import LlvmCodeGen.Data
 import LlvmCodeGen.Ppr
+
+import LlvmMangler
 
 import CLabel
 import Cmm

@@ -16,9 +16,9 @@ import CLabel
 import Cmm
 
 import FastString
+import qualified Outputable
 import Pretty
 import Unique
-import Util
 
 -- ----------------------------------------------------------------------------
 -- * Top level
@@ -84,7 +84,7 @@ pprLlvmCmmTop _ _ (CmmData _ lmdata)
 pprLlvmCmmTop env count (CmmProc info lbl _ (ListGraph blks))
   = let static = CmmDataLabel lbl : info
         (idoc, ivar) = if not (null info)
-                          then pprCmmStatic env count static
+                          then pprInfoTable env count lbl static
                           else (empty, [])
     in (idoc $+$ (
         let sec = mkLayoutSection (count + 1)
@@ -102,19 +102,24 @@ pprLlvmCmmTop env count (CmmProc info lbl _ (ListGraph blks))
 
 
 -- | Pretty print CmmStatic
-pprCmmStatic :: LlvmEnv -> Int -> [CmmStatic] -> (Doc, [LlvmVar])
-pprCmmStatic env count stat
+pprInfoTable :: LlvmEnv -> Int -> CLabel -> [CmmStatic] -> (Doc, [LlvmVar])
+pprInfoTable env count lbl stat
   = let unres = genLlvmData (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
-        setSection (gv@(LMGlobalVar s ty l _ _ c), d)
-            = let v = if l == Internal then [gv] else []
-                  sec = mkLayoutSection count
-              in ((LMGlobalVar s ty l sec llvmInfAlign c, d), v)
+        setSection ((LMGlobalVar _ ty l _ _ c), d)
+            = let sec = mkLayoutSection count
+                  ilabel = strCLabel_llvm (entryLblToInfoLbl lbl)
+                              `appendFS` (fsLit "_itable")
+                  gv = LMGlobalVar ilabel ty l sec llvmInfAlign c
+                  v = if l == Internal then [gv] else []
+              in ((gv, d), v)
         setSection v = (v,[])
 
-        (ldata', llvmUsed) = mapAndUnzip setSection ldata
-    in (pprLlvmData (ldata', ltypes), concat llvmUsed)
+        (ldata', llvmUsed) = setSection (last ldata)
+    in if length ldata /= 1
+          then Outputable.panic "LlvmCodeGen.Ppr: invalid info table!"
+          else (pprLlvmData ([ldata'], ltypes), llvmUsed)
 
 
 -- | Create an appropriate section declaration for subsection <n> of text
@@ -124,5 +129,12 @@ pprCmmStatic env count stat
 -- so we are hoping it does.
 mkLayoutSection :: Int -> LMSection
 mkLayoutSection n
-  = Just (fsLit $ ".text;.text " ++ show n ++ " #")
+#if darwin_TARGET_OS
+  -- On OSX we can't use the GNU Assembler, we must use the OSX assembler, which
+  -- doesn't support subsections. So we post process the assembly code, this
+  -- section specifier will be replaced with '.text' by the mangler.
+  = Just (fsLit $ "__STRIP,__me" ++ show n)
+#else
+  = Just (fsLit $ ".text # .text " ++ show n ++ " #")
+#endif
 

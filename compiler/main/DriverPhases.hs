@@ -82,6 +82,7 @@ data Phase
         | As
         | LlvmOpt       -- Run LLVM opt tool over llvm assembly
         | LlvmLlc       -- LLVM bitcode to native assembly
+        | LlvmMangle    -- Fix up TNTC by processing assembly produced by LLVM
         | CmmCpp        -- pre-process Cmm source
         | Cmm           -- parse & compile Cmm code
 
@@ -113,6 +114,7 @@ eqPhase SplitAs     SplitAs     = True
 eqPhase As          As          = True
 eqPhase LlvmOpt	    LlvmOpt 	= True
 eqPhase LlvmLlc	    LlvmLlc 	= True
+eqPhase LlvmMangle  LlvmMangle 	= True
 eqPhase CmmCpp      CmmCpp      = True
 eqPhase Cmm         Cmm         = True
 eqPhase StopLn      StopLn      = True
@@ -138,7 +140,12 @@ nextPhase Mangle        = SplitMangle
 nextPhase SplitMangle   = As
 nextPhase As            = SplitAs
 nextPhase LlvmOpt       = LlvmLlc
+#if darwin_TARGET_OS
+nextPhase LlvmLlc       = LlvmMangle
+#else
 nextPhase LlvmLlc       = As
+#endif
+nextPhase LlvmMangle    = As
 nextPhase SplitAs       = StopLn
 nextPhase Ccpp          = As
 nextPhase Cc            = As
@@ -168,6 +175,7 @@ startPhase "s"        = As
 startPhase "S"        = As
 startPhase "ll"       = LlvmOpt
 startPhase "bc"       = LlvmLlc
+startPhase "lm_s"     = LlvmMangle
 startPhase "o"        = StopLn
 startPhase "cmm"      = CmmCpp
 startPhase "cmmcpp"   = Cmm
@@ -194,6 +202,7 @@ phaseInputExt SplitMangle         = "split_s"   -- not really generated
 phaseInputExt As                  = "s"
 phaseInputExt LlvmOpt             = "ll"
 phaseInputExt LlvmLlc             = "bc"
+phaseInputExt LlvmMangle          = "lm_s"
 phaseInputExt SplitAs             = "split_s"   -- not really generated
 phaseInputExt CmmCpp              = "cmm"
 phaseInputExt Cmm                 = "cmmcpp"
