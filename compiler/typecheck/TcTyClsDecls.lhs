@@ -247,8 +247,8 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcFamInstDecl :: LTyClDecl Name -> TcM TyThing
-tcFamInstDecl (L loc decl)
+tcFamInstDecl :: TopLevelFlag -> LTyClDecl Name -> TcM TyThing
+tcFamInstDecl top_lvl (L loc decl)
   =	-- Prime error recovery, set source location
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
@@ -263,7 +263,25 @@ tcFamInstDecl (L loc decl)
        ; tc <- tcFamInstDecl1 decl
        ; checkValidTyCon tc	-- Remember to check validity;
 				-- no recursion to worry about here
+
+       -- Check that toplevel type instances are not for associated types.
+       ; when (isTopLevel top_lvl && isAssocFamily tc)
+              (addErr $ assocInClassErr (tcdName decl))
+
        ; return (ATyCon tc) }
+
+isAssocFamily :: TyCon -> Bool	-- Is an assocaited type
+isAssocFamily tycon
+  = case tyConFamInst_maybe tycon of
+          Nothing       -> panic "isAssocFamily: no family?!?"
+          Just (fam, _) -> isTyConAssoc fam
+
+assocInClassErr :: Name -> SDoc
+assocInClassErr name
+ = ptext (sLit "Associated type") <+> quotes (ppr name) <+>
+   ptext (sLit "must be inside a class instance")
+
+
 
 tcFamInstDecl1 :: TyClDecl Name -> TcM TyCon
 

@@ -314,9 +314,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 -- round)
 
                 -- (1) Do class and family instance declarations
-       ; let { idxty_decls = filter (isFamInstDecl . unLoc) tycl_decls }
+       ; idx_tycons        <- mapAndRecoverM (tcFamInstDecl TopLevel) $
+       	 		      filter (isFamInstDecl . unLoc) tycl_decls 
        ; local_info_tycons <- mapAndRecoverM tcLocalInstDecl1  inst_decls
-       ; idx_tycons        <- mapAndRecoverM tcIdxTyInstDeclTL idxty_decls
 
        ; let { (local_info,
                 at_tycons_s)   = unzip local_info_tycons
@@ -335,9 +335,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
                 -- Next, construct the instance environment so far, consisting
                 -- of
-                --   a) local instance decls
-                --   b) generic instances
-                --   c) local family instance decls
+                --   (a) local instance decls
+                --   (b) generic instances
+                --   (c) local family instance decls
        ; addInsts local_info         $
          addInsts generic_inst_info  $
          addFamInsts at_idx_tycons   $ do {
@@ -357,27 +357,6 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                   generic_inst_info ++ deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
     }}}
-  where
-    -- Make sure that toplevel type instance are not for associated types.
-    -- !!!TODO: Need to perform this check for the TyThing of type functions,
-    --          too.
-    tcIdxTyInstDeclTL ldecl@(L loc decl) =
-      do { tything <- tcFamInstDecl ldecl
-         ; setSrcSpan loc $
-             when (isAssocFamily tything) $
-               addErr $ assocInClassErr (tcdName decl)
-         ; return tything
-         }
-    isAssocFamily (ATyCon tycon) =
-      case tyConFamInst_maybe tycon of
-        Nothing       -> panic "isAssocFamily: no family?!?"
-        Just (fam, _) -> isTyConAssoc fam
-    isAssocFamily _ = panic "isAssocFamily: no tycon?!?"
-
-assocInClassErr :: Name -> SDoc
-assocInClassErr name =
-  ptext (sLit "Associated type") <+> quotes (ppr name) <+>
-  ptext (sLit "must be inside a class instance")
 
 addInsts :: [InstInfo Name] -> TcM a -> TcM a
 addInsts infos thing_inside
@@ -414,7 +393,8 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 
         -- Next, process any associated types.
         ; idx_tycons <- recoverM (return []) $
-	  	     do { idx_tycons <- checkNoErrs $ mapAndRecoverM tcFamInstDecl ats
+	  	     do { idx_tycons <- checkNoErrs $ 
+                                        mapAndRecoverM (tcFamInstDecl NotTopLevel) ats
 		     	; checkValidAndMissingATs clas (tyvars, inst_tys)
                           			  (zip ats idx_tycons)
 			; return idx_tycons }
