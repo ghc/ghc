@@ -548,8 +548,8 @@ When there are no type families, it's quite easy:
     newtype S a = MkS [a]
     -- :CoS :: S  ~ []	-- Eta-reduced
 
-    instance Eq [a] => Eq (S a) 	-- by coercion sym (Eq (coMkS a)) : Eq [a] ~ Eq (S a)
-    instance Monad [] => Monad S	-- by coercion sym (Monad coMkS)  : Monad [] ~ Monad S 
+    instance Eq [a] => Eq (S a) 	-- by coercion sym (Eq (:CoS a)) : Eq [a] ~ Eq (S a)
+    instance Monad [] => Monad S	-- by coercion sym (Monad :CoS)  : Monad [] ~ Monad S 
 
 When type familes are involved it's trickier:
 
