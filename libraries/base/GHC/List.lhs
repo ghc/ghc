@@ -503,11 +503,15 @@ or (x:xs)       =  x || or xs
 #endif
 
 -- | Applied to a predicate and a list, 'any' determines if any element
--- of the list satisfies the predicate.
+-- of the list satisfies the predicate.  For the result to be
+-- 'False', the list must be finite; 'True', however, results from a 'True'
+-- value for the predicate applied to an element at a finite index of a finite or infinite list.
 any                     :: (a -> Bool) -> [a] -> Bool
 
 -- | Applied to a predicate and a list, 'all' determines if all elements
--- of the list satisfy the predicate.
+-- of the list satisfy the predicate. For the result to be
+-- 'True', the list must be finite; 'False', however, results from a 'False'
+-- value for the predicate applied to an element at a finite index of a finite or infinite list.
 all                     :: (a -> Bool) -> [a] -> Bool
 #ifdef USE_REPORT_PRELUDE
 any p                   =  or . map p
@@ -527,7 +531,8 @@ all p (x:xs)    =  p x && all p xs
 #endif
 
 -- | 'elem' is the list membership predicate, usually written in infix form,
--- e.g., @x \`elem\` xs@.
+-- e.g., @x \`elem\` xs@.  For the result to be
+-- 'False', the list must be finite; 'True', however, results from an element equal to @x@ found at a finite index of a finite or infinite list.
 elem                    :: (Eq a) => a -> [a] -> Bool
 
 -- | 'notElem' is the negation of 'elem'.
