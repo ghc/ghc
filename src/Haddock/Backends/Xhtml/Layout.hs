@@ -28,9 +28,7 @@ module Haddock.Backends.Xhtml.Layout (
   topDeclElem, declElem,
   
   atHdr, methHdr,
-  argBox, ndocBox, rdocBox, maybeRDocBox,
-  
-  vanillaTable, vanillaTable2, spacedTable1, spacedTable5  
+  argBox, vanillaTable, vanillaTable2  
 ) where
 
 import Haddock.Backends.Xhtml.DocMarkup
@@ -160,27 +158,11 @@ argBox :: Html -> HtmlTable
 argBox html = tda [theclass "arg"] << html
 
 
--- a box for displaying documentation, not indented.
-ndocBox :: Html -> HtmlTable
-ndocBox html = tda [theclass "ndoc"] << html
-
--- a box for displaying documentation, padded on the left a little
-rdocBox :: Html -> HtmlTable
-rdocBox html = tda [theclass "rdoc"] << html
-
-maybeRDocBox :: Maybe (Doc DocName) -> HtmlTable
-maybeRDocBox Nothing = rdocBox (noHtml)
-maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
-
-
 -- a vanilla table has width 100%, no border, no padding, no spacing
 vanillaTable, vanillaTable2 :: Html -> Html
 vanillaTable  = table ! [theclass "vanilla",  cellspacing 0, cellpadding 0]
 vanillaTable2 = table ! [theclass "vanilla2", cellspacing 0, cellpadding 0]
 
-spacedTable1, spacedTable5 :: Html -> Html
-spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
-spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 
 methHdr, atHdr :: Html
 methHdr    = h5 << "Methods"
