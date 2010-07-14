@@ -176,6 +176,7 @@ ppLlvmExpression expr
         Load       ptr              -> ppLoad ptr
         Malloc     tp amount        -> ppMalloc tp amount
         Phi        tp precessors    -> ppPhi tp precessors
+        Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
 
 
 --------------------------------------------------------------------------------
@@ -297,6 +298,18 @@ ppSwitch scrut dflt targets =
       ppTargets  xs        = brackets $ vcat (map ppTarget xs)
   in text "switch" <+> texts scrut <> comma <+> texts dflt
         <+> ppTargets targets
+
+
+ppAsm :: LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool -> Doc
+ppAsm asm constraints rty vars sideeffect alignstack =
+  let asm'  = doubleQuotes $ ftext asm
+      cons  = doubleQuotes $ ftext constraints
+      rty'  = texts rty 
+      vars' = lparen <+> ppCommaJoin vars <+> rparen
+      side  = if sideeffect then text "sideeffect" else empty
+      align = if alignstack then text "alignstack" else empty
+  in text "call" <+> rty' <+> text "asm" <+> side <+> align <+> asm' <> comma
+        <+> cons <> vars'
 
 
 --------------------------------------------------------------------------------
