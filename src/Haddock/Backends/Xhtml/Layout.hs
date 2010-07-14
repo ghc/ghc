@@ -80,17 +80,29 @@ subDlist :: [SubDecl] -> Maybe Html
 subDlist [] = Nothing
 subDlist decls = Just $ dlist << map subEntry decls
   where
-    subEntry (decl, mdoc, subs) = Just $
+    subEntry (decl, mdoc, subs) =
       dterm ! [theclass "src"] << decl
-      +++ ddef << (fmap docToHtml mdoc `with` subs)
+      +++
+      ddef << (fmap docToHtml mdoc `with` subs)
+      
     Nothing  `with` [] = spaceHtml
     ma       `with` bs = ma +++ bs
 
+subTable :: [SubDecl] -> Maybe Html
+subTable [] = Nothing
+subTable decls = Just $ table << aboves (concatMap subRow decls)
+  where
+    subRow (decl, mdoc, subs) =
+      (td ! [theclass "src"] << decl
+       <->
+       td << nonEmpty (fmap docToHtml mdoc))
+      : map (cell . (td <<)) subs
+      
 subConstructors :: [(Html, Maybe (Doc DocName), [Html])] -> Html
-subConstructors = divSubDecls "constructors" "Constructors" . subDlist
+subConstructors = divSubDecls "constructors" "Constructors" . subTable
 
 subFields :: [(Html, Maybe (Doc DocName), [Html])] -> Html
-subFields = divSubDecls "fields" "Fields" . subDlist
+subFields = divSubDecls "fields" "Fields" . subTable
 
 
 -- a box for displaying code
