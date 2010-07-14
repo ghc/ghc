@@ -17,6 +17,8 @@ module Haddock.Backends.Xhtml.Layout (
   sectionName,
   
   shortDeclList,
+  shortSubDecls,
+  
   divTopDecl,
   
   SubDecl,
@@ -29,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   
   topDeclElem, declElem,
   
-  argBox, vanillaTable, vanillaTable2  
+  vanillaTable, vanillaTable2  
 ) where
 
 import Haddock.Backends.Xhtml.DocMarkup
@@ -64,6 +66,10 @@ sectionName = paragraph ! [theclass "caption"]
 
 shortDeclList :: [Html] -> Html
 shortDeclList items = ulist << map (li ! [theclass "src short"] <<) items
+
+shortSubDecls :: [Html] -> Html
+shortSubDecls items = ulist ! [theclass "subs"] << map (li <<) items
+
 
 divTopDecl :: Html -> Html
 divTopDecl = thediv ! [theclass "top"]
@@ -161,13 +167,6 @@ topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html =
 
         fname = unpackFS (srcSpanFile loc)
 
-
-
--- a box for displaying an 'argument' (some code which has text to the
--- right of it).  Wrapping is not allowed in these boxes, whereas it is
--- in a declBox.
-argBox :: Html -> HtmlTable
-argBox html = tda [theclass "arg"] << html
 
 
 -- a vanilla table has width 100%, no border, no padding, no spacing

@@ -64,7 +64,7 @@ ppFunSig summary links loc doc docname typ unicode =
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
                   DocForDecl DocName -> (Html, Html, Html) -> Bool -> Html
 ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) unicode
-  | summary = declElem pref1
+  | summary = pref1
   | Map.null argDocs = topDeclElem links loc docname pref1 +++ maybeDocToHtml doc
   | otherwise = topDeclElem links loc docname pref2 +++
       subArguments (do_args 0 sep typ) +++ maybeDocToHtml doc
@@ -159,7 +159,7 @@ ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
               TyClDecl DocName -> Bool -> Html
 ppTyFam summary associated links loc mbDoc decl unicode
   
-  | summary   = declElem (ppTyFamHeader True associated decl unicode)  
+  | summary   = ppTyFamHeader True associated decl unicode 
   | otherwise = header_ +++ maybeDocToHtml mbDoc +++ instancesBit
 
   where
@@ -199,7 +199,7 @@ ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
             TyClDecl DocName -> Bool -> Html
 ppTyInst summary associated links loc mbDoc decl unicode
   
-  | summary   = declElem(ppTyInstHeader True associated decl unicode)
+  | summary   = ppTyInstHeader True associated decl unicode
   | otherwise = header_ +++ maybeDocToHtml mbDoc 
 
   where
@@ -331,14 +331,14 @@ ppFds fds unicode =
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, DocForDecl DocName)] -> Bool -> Html
 ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc subdocs unicode = 
   if null sigs && null ats
-    then (if summary then declElem else topDeclElem links loc nm) hdr
-    else (if summary then declElem else topDeclElem links loc nm) (hdr <+> keyword "where")
-      +++ vanillaTable << aboves
+    then (if summary then id else topDeclElem links loc nm) hdr
+    else (if summary then id else topDeclElem links loc nm) (hdr <+> keyword "where")
+      +++ shortSubDecls
           (
-            [ argBox $ ppAssocType summary links doc at unicode | at <- ats
+            [ ppAssocType summary links doc at unicode | at <- ats
               , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]  ++
 
-            [ argBox $ ppFunSig summary links loc doc n typ unicode
+            [ ppFunSig summary links loc doc n typ unicode
               | L _ (TypeSig (L _ n) (L _ typ)) <- sigs
               , let doc = lookupAnySubdoc n subdocs ] 
           )
@@ -407,17 +407,17 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
 ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> TyClDecl DocName -> Bool -> Html
 ppShortDataDecl summary _links _loc dataDecl unicode
 
-  | [] <- cons = declElem dataHeader
+  | [] <- cons = dataHeader
 
   | [lcon] <- cons, ResTyH98 <- resTy,
     (cHead,cBody,cFoot) <- ppShortConstrParts summary (unLoc lcon) unicode  
-       = declElem (dataHeader <+> equals <+> cHead) +++ cBody +++ cFoot
+       = (dataHeader <+> equals <+> cHead) +++ cBody +++ cFoot
 
-  | ResTyH98 <- resTy = declElem dataHeader
-      +++ unordList (zipWith doConstr ('=':repeat '|') cons)
+  | ResTyH98 <- resTy = dataHeader
+      +++ shortSubDecls (zipWith doConstr ('=':repeat '|') cons)
 
-  | otherwise = declElem (dataHeader <+> keyword "where")
-      +++ unordList (map doGADTConstr cons)
+  | otherwise = (dataHeader <+> keyword "where")
+      +++ shortSubDecls (map doGADTConstr cons)
       
   where
     dataHeader = ppDataHeader summary dataDecl unicode
@@ -493,7 +493,7 @@ ppShortConstrParts summary con unicode = case con_res con of
     InfixCon arg1 arg2 -> (doGADTCon [arg1, arg2] resTy, noHtml, noHtml)
     
   where
-    doRecordFields fields = unordList (map (ppShortField summary unicode) fields)
+    doRecordFields fields = shortSubDecls (map (ppShortField summary unicode) fields)
     doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
                              ppForAll forall ltvs lcontext unicode,
                              ppLType unicode (foldr mkFunTy resTy args) ]
