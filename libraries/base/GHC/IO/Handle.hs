@@ -395,7 +395,8 @@ hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
 -- This operation may fail with:
 --
 --  * 'isIllegalOperationError' if the Handle is not seekable, or does
---    not support the requested seek mode.
+--     not support the requested seek mode.
+--
 --  * 'isPermissionError' if a system resource limit would be exceeded.
 
 hSeek :: Handle -> SeekMode -> Integer -> IO () 
