@@ -17,11 +17,12 @@ module Haddock.Backends.Xhtml.Layout (
   sectionName,
   
   shortDeclList,
-  divTopDecl, 
+  divTopDecl,
+  subDecls,
   
   topDeclElem, declElem,
   
-  instHdr, atHdr, methHdr, constrHdr,
+  instHdr, atHdr, methHdr,
   argBox, ndocBox, rdocBox, maybeRDocBox,
   
   vanillaTable, vanillaTable2, spacedTable1, spacedTable5  
@@ -32,6 +33,7 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Util
 import Haddock.Types
 
+import Data.Char (isLetter, toLower)
 import Text.XHtml hiding ( name, title, p, quote )
 
 import FastString            ( unpackFS )
@@ -63,6 +65,15 @@ shortDeclList items = ulist << map (li ! [theclass "src short"] <<) items
 divTopDecl :: Html -> Html
 divTopDecl = thediv ! [theclass "top"]
 
+subDecls :: String -> [(Html, Maybe Html)] -> Html
+subDecls _    []    = noHtml
+subDecls name decls = subSection << (subCaption +++ subList)
+  where
+    subSection = thediv ! [theclass $ unwords ["subs", subClass]]
+    subClass = map (\c -> if isLetter c then toLower c else '-') name
+    subCaption = paragraph ! [theclass "caption"] << name
+    subList = dlist << map subEntry decls
+    subEntry (dt,dd) = [dterm ! [theclass "src"] << dt, ddef << nonEmpty dd]
 
 -- a box for displaying code
 declElem :: Html -> Html
@@ -129,8 +140,7 @@ spacedTable1, spacedTable5 :: Html -> Html
 spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
 spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 
-constrHdr, methHdr, atHdr :: Html
-constrHdr  = h5 << "Constructors"
+methHdr, atHdr :: Html
 methHdr    = h5 << "Methods"
 atHdr      = h5 << "Associated Types"
 

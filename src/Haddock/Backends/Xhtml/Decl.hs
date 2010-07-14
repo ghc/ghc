@@ -480,24 +480,10 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
         ResTyGADT _ -> keyword "where"
         _ -> empty                         
 
-    constrTable
-      | any isRecCon cons = spacedTable5
-      | otherwise         = spacedTable1
-
-    constrBit 
-      | null cons = noHtml
-      | otherwise = constrHdr +++ ( 
-          constrTable << 
-          aboves (map (ppSideBySideConstr subdocs unicode) cons)
-        )
+    constrBit = subDecls "Constructors" 
+      (map (ppSideBySideConstr subdocs unicode) cons)
 
     instancesBit = ppInstances instances docname unicode
-
-
-isRecCon :: Located (ConDecl a) -> Bool
-isRecCon lcon = case con_details (unLoc lcon) of 
-  RecCon _ -> True
-  _ -> False
 
 
 
@@ -567,43 +553,45 @@ ppConstrHdr forall tvs ctxt unicode
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
       Implicit -> empty
 
-ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LConDecl DocName -> HtmlTable
+ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LConDecl DocName -> (Html, Maybe Html)
 ppSideBySideConstr subdocs unicode (L _ con) = case con_res con of 
  
   ResTyH98 -> case con_details con of 
 
     PrefixCon args -> 
-      argBox (hsep ((header_ unicode +++ ppBinder False occ) : map (ppLParendType unicode) args)) 
-      <-> maybeRDocBox mbDoc  
+      (hsep ((header_ unicode +++ ppBinder False occ)
+        : map (ppLParendType unicode) args), 
+      fmap docToHtml mbDoc)
 
     RecCon fields -> 
-      argBox (header_ unicode +++ ppBinder False occ) <->
-      maybeRDocBox mbDoc
-      </>
-      doRecordFields fields
+      (header_ unicode +++ ppBinder False occ,
+      fmap docToHtml mbDoc `with` (Just $ doRecordFields fields))
 
     InfixCon arg1 arg2 -> 
-      argBox (hsep [header_ unicode+++ppLParendType unicode arg1, ppBinder False occ, ppLParendType unicode arg2])
-      <-> maybeRDocBox mbDoc
+      (hsep [header_ unicode+++ppLParendType unicode arg1,
+        ppBinder False occ,
+        ppLParendType unicode arg2],
+      fmap docToHtml mbDoc)
  
   ResTyGADT resTy -> case con_details con of
     -- prefix & infix could also use hsConDeclArgTys if it seemed to
     -- simplify the code.
-    PrefixCon args -> doGADTCon args resTy
+    PrefixCon args -> doGADTCon args resTy Nothing
     cd@(RecCon fields) -> doGADTCon (hsConDeclArgTys cd) resTy
-                                          </> doRecordFields fields
-    InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
+                                          (Just $ doRecordFields fields)
+    InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy Nothing
 
  where 
-    doRecordFields fields =
-        (tda [theclass "body"] << spacedTable1 <<
-        aboves (map (ppSideBySideField subdocs unicode) fields))
-    doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon unicode <+> hsep [
-                               ppForAll forall ltvs (con_cxt con) unicode,
-                               ppLType unicode (foldr mkFunTy resTy args) ]
-                            ) <-> maybeRDocBox mbDoc
+    doRecordFields fields = subDecls "Fields" 
+      (map (ppSideBySideField subdocs unicode) fields)
+    doGADTCon :: [LHsType DocName] -> Located (HsType DocName) -> Maybe Html -> (Html, Maybe Html)
+    doGADTCon args resTy fieldsHtml =
+      (ppBinder False occ <+> dcolon unicode
+        <+> hsep [ppForAll forall ltvs (con_cxt con) unicode,
+                  ppLType unicode (foldr mkFunTy resTy args) ],
+       fmap docToHtml mbDoc `with` fieldsHtml)
 
-
+    with a  = maybe a (\b -> Just $ a +++ b)
     header_ = ppConstrHdr forall tyVars context
     occ     = docNameOcc . unLoc . con_name $ con
     ltvs    = con_qvars con
@@ -616,10 +604,10 @@ ppSideBySideConstr subdocs unicode (L _ con) = case con_res con of
     mbDoc = join $ fmap fst $ lookup (unLoc $ con_name con) subdocs
     mkFunTy a b = noLoc (HsFunTy a b)
 
-ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  HtmlTable
+ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  (Html, Maybe Html)
 ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
-  argBox (ppBinder False (docNameOcc name)
-    <+> dcolon unicode <+> ppLType unicode ltype) <-> maybeRDocBox mbDoc
+  (ppBinder False (docNameOcc name) <+> dcolon unicode <+> ppLType unicode ltype,
+    fmap docToHtml mbDoc)
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     mbDoc = join $ fmap fst $ lookup name subdocs

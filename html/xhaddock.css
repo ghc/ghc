@@ -1,6 +1,6 @@
 * {
 	margin: 0;
-	padding: 0;	
+	padding: 0;
 }
 
 body { 
@@ -56,24 +56,24 @@ h1, h2, h3, h4, h5 {
 p  { 
 	padding-top: 2px;
 	padding-left: 10px;
-	margin-bottom: 1em;
 }
 
 ul, ol, dl {
 	padding-top: 2px;
 	padding-left: 10px;
 	margin-left: 2.5em;
-	margin-bottom: 1em;
 }
 
 pre  { 
 	padding-top: 2px;
 	padding-left: 20px;
-	margin-bottom: 1em;
 }
 
-h2 + p, h3 + p, h4 + p {
+* + p, * + pre {
 	margin-top: 1em;
+}
+.caption + p, .src + p {
+	margin-top: 0;
 }
 
 
@@ -196,6 +196,8 @@ dl.info dd {
 
 div.top {
 	margin-top: 1em;
+	clear: left;
+	margin-bottom: 1em;
 }
 
 div.top h5 {
@@ -222,6 +224,37 @@ div.top table, div.subdecl {
 	white-space: nowrap;
 	font-size: small;
 	padding: 0 4px 2px 5px;
+}
+
+div.subs {
+	margin-left: 10px;
+	clear: both;
+	margin-top: 2px;
+}
+
+.subs dl {
+	margin-left: 0;
+}
+
+.subs dl dl {
+	padding-left: 0;
+	padding-top: 4px;
+}
+
+.subs dt {
+	float: left;
+	margin-right: 1em;
+	clear: left;
+}
+
+.subs dd
+{
+	margin-bottom: 2px;
+	margin-top: 2px;
+}
+
+.fields .caption {
+	display: none;
 }
 
 p.arg {
