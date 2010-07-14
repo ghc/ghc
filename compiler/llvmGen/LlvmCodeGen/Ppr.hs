@@ -135,6 +135,6 @@ mkLayoutSection n
   -- section specifier will be replaced with '.text' by the mangler.
   = Just (fsLit $ "__STRIP,__me" ++ show n)
 #else
-  = Just (fsLit $ ".text # .text " ++ show n ++ " #")
+  = Just (fsLit $ ".text; .text " ++ show n ++ " #")
 #endif
 
