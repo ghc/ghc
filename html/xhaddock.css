@@ -206,9 +206,9 @@ div.top h5 {
 
 
 .src {
-  padding: 3px;
-  background-color: #f0f0f0;
-  font-family: monospace;
+	padding: 3px;
+	background-color: #f0f0f0;
+	font-family: monospace;
 	margin-bottom: 0;
 }
 
@@ -261,8 +261,29 @@ div.subs {
 	margin-left: 0;
 }
 
+.arguments .caption,
 .fields .caption {
 	display: none;
+}
+
+/* need extra .subs in the selector to make it override the rules for .subs and .subs table */
+
+.subs.arguments {
+	margin: 0;
+}
+
+.subs.arguments table {
+	border-spacing: 0;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.subs.arguments td.src {
+	white-space: nowrap;
+}
+
+.subs.arguments + p {
+	margin-top: 0;
 }
 
 p.arg {

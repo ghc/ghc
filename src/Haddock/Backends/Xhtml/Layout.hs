@@ -20,6 +20,7 @@ module Haddock.Backends.Xhtml.Layout (
   divTopDecl,
   
   SubDecl,
+  subArguments,
   subConstructors, subFields,
   
   topDeclElem, declElem,
@@ -98,6 +99,10 @@ subTable decls = Just $ table << aboves (concatMap subRow decls)
        td << nonEmpty (fmap docToHtml mdoc))
       : map (cell . (td <<)) subs
       
+
+subArguments :: [(Html, Maybe (Doc DocName), [Html])] -> Html
+subArguments = divSubDecls "arguments" "Arguments" . subTable
+
 subConstructors :: [(Html, Maybe (Doc DocName), [Html])] -> Html
 subConstructors = divSubDecls "constructors" "Constructors" . subTable
 

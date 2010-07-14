@@ -67,40 +67,32 @@ ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) 
   | summary = declElem pref1
   | Map.null argDocs = topDeclElem links loc docname pref1 +++ maybeDocToHtml doc
   | otherwise = topDeclElem links loc docname pref2 +++
-    (vanillaTable <<  (
-      do_args 0 sep typ </>
-        (case doc of
-          Just d -> ndocBox (docToHtml d)
-          Nothing -> emptyTable)
-        ))
+      subArguments (do_args 0 sep typ) +++ maybeDocToHtml doc
   where 
-    argDocHtml n = case Map.lookup n argDocs of
-                    Just adoc -> docToHtml adoc
-                    Nothing -> noHtml
+    argDoc n = Map.lookup n argDocs
 
     do_largs n leader (L _ t) = do_args n leader t  
-    do_args :: Int -> Html -> (HsType DocName) -> HtmlTable
+    do_args :: Int -> Html -> (HsType DocName) -> [SubDecl]
     do_args n leader (HsForAllTy Explicit tvs lctxt ltype)
-      = (argBox (
-          leader <+> 
+      = (leader <+> 
           hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]) <+>
-          ppLContextNoArrow lctxt unicode)
-            <-> rdocBox noHtml) </> 
-            do_largs n (darrow unicode) ltype
+          ppLContextNoArrow lctxt unicode,
+          Nothing, [])
+        : do_largs n (darrow unicode) ltype
     do_args n leader (HsForAllTy Implicit _ lctxt ltype)
       | not (null (unLoc lctxt))
-      = (argBox (leader <+> ppLContextNoArrow lctxt unicode)
-          <-> rdocBox noHtml) </> 
-          do_largs n (darrow unicode) ltype
+      = (leader <+> ppLContextNoArrow lctxt unicode,
+          Nothing, [])
+        : do_largs n (darrow unicode) ltype
       -- if we're not showing any 'forall' or class constraints or
       -- anything, skip having an empty line for the context.
       | otherwise
       = do_largs n leader ltype
     do_args n leader (HsFunTy lt r)
-      = (argBox (leader <+> ppLFunLhType unicode lt) <-> rdocBox (argDocHtml n))
-          </> do_largs (n+1) (arrow unicode) r
+      = (leader <+> ppLFunLhType unicode lt, argDoc n, [])
+        : do_largs (n+1) (arrow unicode) r
     do_args n leader t
-      = argBox (leader <+> ppType unicode t) <-> rdocBox (argDocHtml n)
+      = (leader <+> ppType unicode t, argDoc n, []) : []
 
 
 ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
