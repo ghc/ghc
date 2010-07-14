@@ -449,7 +449,9 @@ hPrint hdl      =  hPutStrLn hdl . show
 -- | @'withFile' name mode act@ opens a file using 'openFile' and passes
 -- the resulting handle to the computation @act@.  The handle will be
 -- closed on exit from 'withFile', whether by normal termination or by
--- raising an exception.
+-- raising an exception.  If closing the handle raises an exception, then
+-- this exception will be raised by 'withFile' rather than any exception
+-- raised by 'act'.
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFile name mode = bracket (openFile name mode) hClose
 
