@@ -126,7 +126,7 @@ class Num a => Bits a where
                   | i>0  = (x `shift` i) .|. (x `shift` (i-bitSize x))
     -}
 
-    -- | @bit i@ is a value with the @i@th bit set
+    -- | @bit i@ is a value with the @i@th bit set and all other bits clear
     bit               :: Int -> a
 
     -- | @x \`setBit\` i@ is the same as @x .|. bit i@
