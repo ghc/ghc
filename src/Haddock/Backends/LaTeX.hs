@@ -501,7 +501,7 @@ ppClassDecl instances loc mbDoc subdocs
 ppClassDecl _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 ppDocInstances :: Bool -> [DocInstance DocName] -> LaTeX
-ppDocInstances unicode [] = empty
+ppDocInstances _unicode [] = empty
 ppDocInstances unicode (i : rest)
   | Just ihead <- isUndocdInstance i
   = declWithDoc (vcat (map (ppInstDecl unicode) (ihead:is))) Nothing $$
