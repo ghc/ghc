@@ -18,7 +18,9 @@ module Haddock.Backends.Xhtml.Layout (
   
   shortDeclList,
   divTopDecl,
-  subDecls,
+  
+  SubDecl,
+  subConstructors, subFields,
   
   topDeclElem, declElem,
   
@@ -33,7 +35,6 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Util
 import Haddock.Types
 
-import Data.Char (isLetter, toLower)
 import Text.XHtml hiding ( name, title, p, quote )
 
 import FastString            ( unpackFS )
@@ -65,15 +66,32 @@ shortDeclList items = ulist << map (li ! [theclass "src short"] <<) items
 divTopDecl :: Html -> Html
 divTopDecl = thediv ! [theclass "top"]
 
-subDecls :: String -> [(Html, Maybe Html)] -> Html
-subDecls _    []    = noHtml
-subDecls name decls = subSection << (subCaption +++ subList)
+
+type SubDecl = (Html, Maybe (Doc DocName), [Html])
+
+divSubDecls :: String -> String -> Maybe Html -> Html
+divSubDecls cssClass captionName = maybe noHtml wrap
   where
-    subSection = thediv ! [theclass $ unwords ["subs", subClass]]
-    subClass = map (\c -> if isLetter c then toLower c else '-') name
-    subCaption = paragraph ! [theclass "caption"] << name
-    subList = dlist << map subEntry decls
-    subEntry (dt,dd) = [dterm ! [theclass "src"] << dt, ddef << nonEmpty dd]
+    wrap = (subSection <<) . (subCaption +++)
+    subSection = thediv ! [theclass $ unwords ["subs", cssClass]]
+    subCaption = paragraph ! [theclass "caption"] << captionName
+
+subDlist :: [SubDecl] -> Maybe Html
+subDlist [] = Nothing
+subDlist decls = Just $ dlist << map subEntry decls
+  where
+    subEntry (decl, mdoc, subs) = Just $
+      dterm ! [theclass "src"] << decl
+      +++ ddef << (fmap docToHtml mdoc `with` subs)
+    Nothing  `with` [] = spaceHtml
+    ma       `with` bs = ma +++ bs
+
+subConstructors :: [(Html, Maybe (Doc DocName), [Html])] -> Html
+subConstructors = divSubDecls "constructors" "Constructors" . subDlist
+
+subFields :: [(Html, Maybe (Doc DocName), [Html])] -> Html
+subFields = divSubDecls "fields" "Fields" . subDlist
+
 
 -- a box for displaying code
 declElem :: Html -> Html
