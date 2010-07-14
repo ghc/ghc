@@ -182,7 +182,7 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 
    -------------------------------------------------------------------------- */
 
-#ifdef hppa1_1_hp_hpux_TARGET
+#ifdef hppa1_1_hp_hpux_HOST
 
 #define JMP_(cont)                              \
     do { void *_procedure = (void *)(cont);     \
@@ -191,7 +191,7 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
          goto *_procedure;                      \
        } while(0)
 
-#endif /* hppa1_1_hp_hpux_TARGET */
+#endif /* hppa1_1_hp_hpux_HOST */
 
 /* -----------------------------------------------------------------------------
    Tail calling on PowerPC

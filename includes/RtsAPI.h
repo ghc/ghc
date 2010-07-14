@@ -169,7 +169,7 @@ rts_getSchedStatus (Capability *cap);
 //	Note that RtsAPI.h is also included by foreign export stubs in
 //	the base package itself.
 //
-#if defined(mingw32_TARGET_OS) && defined(__PIC__) && !defined(COMPILING_BASE_PACKAGE)
+#if defined(mingw32_HOST_OS) && defined(__PIC__) && !defined(COMPILING_BASE_PACKAGE)
 __declspec(dllimport) extern StgWord base_GHCziTopHandler_runIO_closure[];
 __declspec(dllimport) extern StgWord base_GHCziTopHandler_runNonIO_closure[];
 #else

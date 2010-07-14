@@ -14,7 +14,7 @@
 #ifndef __STGDLL_H__
 #define __STGDLL_H__ 1
 
-#if defined(__PIC__) && defined(mingw32_TARGET_OS)
+#if defined(__PIC__) && defined(mingw32_HOST_OS)
 #  define DLL_IMPORT_DATA_REF(x) (_imp__##x)
 #  define DLL_IMPORT_DATA_VARNAME(x) *_imp__##x
 #  if __GNUC__ && !defined(__declspec)
@@ -45,7 +45,7 @@
 #else
 #define DLL_IMPORT
 #define DLL_IMPORT_RTS DLLIMPORT
-# if defined(__PIC__) && defined(mingw32_TARGET_OS)
+# if defined(__PIC__) && defined(mingw32_HOST_OS)
 #  define DLL_IMPORT_DATA_VAR(x) _imp__##x
 # else
 #  define DLL_IMPORT_DATA_VAR(x) x
