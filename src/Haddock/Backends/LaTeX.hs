@@ -496,14 +496,24 @@ ppClassDecl instances loc mbDoc subdocs
 --    atTable = abovesSep s8 $ [ ppAssocType summary links doc at unicode | at <- ats
 --                             , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]
 
-    instancesBit
-      | null instances = empty
-      | all (isNothing . snd) instances =
-        declWithDoc (vcat (map (ppInstDecl unicode) (map fst instances))) Nothing
-      | otherwise = vcat (map (ppDocInstance unicode) instances)
+    instancesBit = ppDocInstances unicode instances
 
 ppClassDecl _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
+ppDocInstances :: Bool -> [DocInstance DocName] -> LaTeX
+ppDocInstances unicode [] = empty
+ppDocInstances unicode (i : rest)
+  | Just ihead <- isUndocdInstance i
+  = declWithDoc (vcat (map (ppInstDecl unicode) (ihead:is))) Nothing $$
+    ppDocInstances unicode rest'
+  | otherwise 
+  = ppDocInstance unicode i $$ ppDocInstances unicode rest
+  where
+    (is, rest') = spanWith isUndocdInstance rest
+
+isUndocdInstance :: DocInstance a -> Maybe (InstHead a)
+isUndocdInstance (i,Nothing) = Just i
+isUndocdInstance _ = Nothing
 
 -- | Print a possibly commented instance. The instance header is printed inside
 -- an 'argBox'. The comment is printed to the right of the box in normal comment
@@ -563,11 +573,7 @@ ppDataDecl instances subdocs _loc mbDoc dataDecl unicode
           vcat (zipWith (ppSideBySideConstr subdocs unicode) leaders cons) $$
           text "\\end{tabulary}\\par"
 
-    instancesBit
-      | null instances = empty
-      | all (isNothing . snd) instances =
-        declWithDoc (vcat (map (ppInstDecl unicode) (map fst instances))) Nothing
-      | otherwise = vcat (map (ppDocInstance unicode) instances)
+    instancesBit = ppDocInstances unicode instances
 
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
