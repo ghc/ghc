@@ -21,13 +21,14 @@ module Haddock.Backends.Xhtml.Layout (
   
   SubDecl,
   subArguments,
+  subAssociatedTypes,
   subConstructors,
   subFields,
   subInstances,
+  subMethods,
   
   topDeclElem, declElem,
   
-  atHdr, methHdr,
   argBox, vanillaTable, vanillaTable2  
 ) where
 
@@ -98,22 +99,33 @@ subTable decls = Just $ table << aboves (concatMap subRow decls)
        <->
        td << nonEmpty (fmap docToHtml mdoc))
       : map (cell . (td <<)) subs
-      
 
-subArguments :: [(Html, Maybe (Doc DocName), [Html])] -> Html
+subBlock :: [Html] -> Maybe Html
+subBlock [] = Nothing
+subBlock hs = Just $ toHtml hs
+
+
+subArguments :: [SubDecl] -> Html
 subArguments = divSubDecls "arguments" "Arguments" . subTable
 
-subConstructors :: [(Html, Maybe (Doc DocName), [Html])] -> Html
+subAssociatedTypes :: [Html] -> Html
+subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBlock
+
+subConstructors :: [SubDecl] -> Html
 subConstructors = divSubDecls "constructors" "Constructors" . subTable
 
-subFields :: [(Html, Maybe (Doc DocName), [Html])] -> Html
+subFields :: [SubDecl] -> Html
 subFields = divSubDecls "fields" "Fields" . subTable
 
-subInstances :: String -> [(Html, Maybe (Doc DocName), [Html])] -> Html
+subInstances :: String -> [SubDecl] -> Html
 subInstances id_ = divSubDecls "instances" instCaption . instTable
   where
     instCaption = collapsebutton id_ +++ " Instances"
     instTable = (collapsed thediv id_ `fmap`) . subTable
+
+subMethods :: [Html] -> Html
+subMethods = divSubDecls "methods" "Methods" . subBlock
+
 
 -- a box for displaying code
 declElem :: Html -> Html
@@ -162,8 +174,3 @@ argBox html = tda [theclass "arg"] << html
 vanillaTable, vanillaTable2 :: Html -> Html
 vanillaTable  = table ! [theclass "vanilla",  cellspacing 0, cellpadding 0]
 vanillaTable2 = table ! [theclass "vanilla2", cellspacing 0, cellpadding 0]
-
-
-methHdr, atHdr :: Html
-methHdr    = h5 << "Methods"
-atHdr      = h5 << "Associated Types"

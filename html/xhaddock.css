@@ -286,6 +286,22 @@ div.subs {
 	margin-top: 0;
 }
 
+.subs.associated-types,
+.subs.methods {
+	margin-left: 20px;
+}
+
+.subs.associated-types .caption,
+.subs.methods .caption {
+	margin-top: 0.5em;
+	margin-left: -10px;
+}
+
+.subs.associated-types .src + .src,
+.subs.methods .src + .src {
+	margin-top: 8px;
+}
+
 p.arg {
 	margin-bottom: 0;
 }

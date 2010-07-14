@@ -366,23 +366,13 @@ ppClassDecl summary links instances loc mbDoc subdocs
 
     hdr = ppClassHdr summary lctxt (unLoc lname) ltyvars lfds
     
-    atBit
-      | null ats = noHtml
-      | otherwise = atHdr +++ (
-          thediv ! [theclass "subdecl"] <<
-          concatHtml [ ppAssocType summary links doc at unicode
+    atBit = subAssociatedTypes [ ppAssocType summary links doc at unicode
                       | at <- ats
                       , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]
-          )
 
-    methodBit
-      | null lsigs = noHtml
-      | otherwise = methHdr +++ (
-          thediv ! [theclass "subdecl"] <<
-          concatHtml [ ppFunSig summary links loc doc n typ unicode
+    methodBit = subMethods [ ppFunSig summary links loc doc n typ unicode
                       | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
                       , let doc = lookupAnySubdoc n subdocs ]
-          )
 
     instancesBit = ppInstances instances nm unicode
     
