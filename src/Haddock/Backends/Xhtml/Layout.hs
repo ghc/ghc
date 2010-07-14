@@ -21,11 +21,13 @@ module Haddock.Backends.Xhtml.Layout (
   
   SubDecl,
   subArguments,
-  subConstructors, subFields,
+  subConstructors,
+  subFields,
+  subInstances,
   
   topDeclElem, declElem,
   
-  instHdr, atHdr, methHdr,
+  atHdr, methHdr,
   argBox, ndocBox, rdocBox, maybeRDocBox,
   
   vanillaTable, vanillaTable2, spacedTable1, spacedTable5  
@@ -70,7 +72,7 @@ divTopDecl = thediv ! [theclass "top"]
 
 type SubDecl = (Html, Maybe (Doc DocName), [Html])
 
-divSubDecls :: String -> String -> Maybe Html -> Html
+divSubDecls :: (HTML a) => String -> a -> Maybe Html -> Html
 divSubDecls cssClass captionName = maybe noHtml wrap
   where
     wrap = (subSection <<) . (subCaption +++)
@@ -109,6 +111,11 @@ subConstructors = divSubDecls "constructors" "Constructors" . subTable
 subFields :: [(Html, Maybe (Doc DocName), [Html])] -> Html
 subFields = divSubDecls "fields" "Fields" . subTable
 
+subInstances :: String -> [(Html, Maybe (Doc DocName), [Html])] -> Html
+subInstances id_ = divSubDecls "instances" instCaption . instTable
+  where
+    instCaption = collapsebutton id_ +++ " Instances"
+    instTable = (collapsed thediv id_ `fmap`) . subTable
 
 -- a box for displaying code
 declElem :: Html -> Html
@@ -178,7 +185,3 @@ spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 methHdr, atHdr :: Html
 methHdr    = h5 << "Methods"
 atHdr      = h5 << "Associated Types"
-
-instHdr :: String -> Html
-instHdr id_ = 
-  h5 << (collapsebutton id_ +++ toHtml " Instances")

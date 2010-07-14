@@ -392,26 +392,13 @@ ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortCl
 
 ppInstances :: [DocInstance DocName] -> DocName -> Bool -> Html
 ppInstances instances baseName unicode
-  | null instances = noHtml
-  | otherwise =
-       instHdr instId +++
-       collapsed thediv instId (
-         spacedTable1 << aboves (map (ppDocInstance unicode) instances)
-       )
+  = subInstances instId (map instDecl instances)
   where
     instId = collapseId (getName baseName)
-
--- | Print a possibly commented instance. The instance header is printed inside
--- an 'argBox'. The comment is printed to the right of the box in normal comment
--- style.
-ppDocInstance :: Bool -> DocInstance DocName -> HtmlTable
-ppDocInstance unicode (instHead, maybeDoc) =
-  argBox (ppInstHead unicode instHead) <-> maybeRDocBox maybeDoc
-
-
-ppInstHead :: Bool -> InstHead DocName -> Html
-ppInstHead unicode ([],   n, ts) = ppAppNameTypes n ts unicode
-ppInstHead unicode (ctxt, n, ts) = ppContextNoLocs ctxt unicode <+> ppAppNameTypes n ts unicode
+    instDecl :: DocInstance DocName -> SubDecl
+    instDecl (inst, maybeDoc) = (instHead inst, maybeDoc, [])
+    instHead ([],   n, ts) = ppAppNameTypes n ts unicode
+    instHead (ctxt, n, ts) = ppContextNoLocs ctxt unicode <+> ppAppNameTypes n ts unicode
 
 
 lookupAnySubdoc :: (Eq name1) =>
