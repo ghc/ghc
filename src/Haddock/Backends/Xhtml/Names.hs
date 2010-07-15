@@ -43,9 +43,6 @@ ppDocName (Documented name mdl) =
     where occName = nameOccName name
 ppDocName (Undocumented name) = toHtml (getOccString name)
 
-linkTarget :: OccName -> Html
-linkTarget n = namedAnchor (anchorNameStr n) << toHtml "" 
-
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
 
@@ -54,7 +51,7 @@ ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
 ppBinder True n = linkedAnchor (anchorNameStr n) << ppBinder' n
-ppBinder False n = linkTarget n +++ bold << ppBinder' n
+ppBinder False n = namedAnchor (anchorNameStr n) << bold << ppBinder' n
 
 
 ppBinder' :: OccName -> Html

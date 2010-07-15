@@ -177,15 +177,21 @@ s8  = tda [ theclass "s8" ]  << noHtml
 
 -- | Generate a named anchor
 --
--- This actually generates two anchor tags, one with the name unescaped, and one
+-- This used to generate two anchor tags, one with the name unescaped, and one
 -- with the name URI-escaped. This is needed because Opera 9.52 (and later
 -- versions) needs the name to be unescaped, while IE 7 needs it to be escaped.
--- 
+-- The escaped form for IE 7 is probably erroneous and not needed...
+
 namedAnchor :: String -> Html -> Html
-namedAnchor n c = anchor ! [Html.name n] << noHtml +++
-                  anchor ! [Html.name (escapeStr n)] << c
+namedAnchor n c = anchor ! [Html.name n] << c
 
-
+linkedAnchor :: String -> Html -> Html
+linkedAnchor frag = anchor ! [href hr_]
+   where hr_ | null frag = ""
+             | otherwise = '#': escapeStr frag
+    -- this escape function is over-zealous for the fragment part of a URI
+    -- (':' for example does not need to be escaped)
+    
 --
 -- A section of HTML which is collapsible via a +/- button.
 --
@@ -206,11 +212,6 @@ collapsed fn id_ html =
 -- the ECMA script string delimiter used in collapsebutton above.
 collapseId :: Name -> String
 collapseId nm = "i:" ++ escapeStr (getOccString nm)
-
-linkedAnchor :: String -> Html -> Html
-linkedAnchor frag = anchor ! [href hr_]
-   where hr_ | null frag = ""
-             | otherwise = '#': escapeStr frag
 
 documentCharacterEncoding :: Html
 documentCharacterEncoding =
