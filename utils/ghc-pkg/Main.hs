@@ -1532,7 +1532,7 @@ installSignalHandlers = do
   _ <- installHandler sigQUIT (Catch interrupt) Nothing
   _ <- installHandler sigINT  (Catch interrupt) Nothing
   return ()
-#elif __GLASGOW_HASKELL__ >= 603
+#else
   -- GHC 6.3+ has support for console events on Windows
   -- NOTE: running GHCi under a bash shell for some reason requires
   -- you to press Ctrl-Break rather than Ctrl-C to provoke
@@ -1544,13 +1544,6 @@ installSignalHandlers = do
 
   _ <- installHandler (Catch sig_handler)
   return ()
-#else
-  return () -- nothing
-#endif
-
-#if __GLASGOW_HASKELL__ <= 604
-isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
-isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 #endif
 
 #if mingw32_HOST_OS || mingw32_TARGET_OS
@@ -1644,9 +1637,7 @@ openNewFile dir template = do
 
     oflags = rw_flags .|. o_EXCL
 
-#if __GLASGOW_HASKELL__ < 611
     withFilePath = withCString
-#endif
 
     findTempName x = do
       fd <- withFilePath filepath $ \ f ->
