@@ -17,9 +17,9 @@ $1/package.conf.inplace : $1/package.conf.in $(GHC_PKG_INPLACE)
 	$$(CPP) $$(RAWCPP_FLAGS) -P \
 		-DTOP='"$$(TOP)"' \
 		$$($1_PACKAGE_CPP_OPTS) \
-		-x c -I$$(GHC_INCLUDE_DIR) $$< | \
-	grep -v '^#pragma GCC' | \
-	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$$@
+		-x c -I$$(GHC_INCLUDE_DIR) $$< -o $$@.raw
+	grep -v '^#pragma GCC' $$@.raw | \
+	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' > $$@
 
 	"$$(GHC_PKG_INPLACE)" update --force $$@
 
@@ -32,9 +32,9 @@ $1/package.conf.install:
 		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))"' \
 		-DINCLUDE_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/include"' \
 		$$($1_PACKAGE_CPP_OPTS) \
-		-x c -I$$(GHC_INCLUDE_DIR) $1/package.conf.in | \
-	grep -v '^#pragma GCC' | \
-	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$$@
+		-x c -I$$(GHC_INCLUDE_DIR) $1/package.conf.in -o $$@.raw
+	grep -v '^#pragma GCC' $$@.raw | \
+	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$$@
 
 distclean : clean_$1_package.conf
 .PHONY: clean_$1_package.conf
