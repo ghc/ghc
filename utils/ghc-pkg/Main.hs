@@ -27,8 +27,6 @@ import Text.Printf
 
 import Prelude
 
-#include "../../includes/ghcconfig.h"
-
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
