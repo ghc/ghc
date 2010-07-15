@@ -56,11 +56,7 @@ import Foreign.C
 
 #if __GLASGOW_HASKELL__ < 612
 import System.Posix.Internals
-#if __GLASGOW_HASKELL__ >= 611
-import GHC.IO.Handle.FD (fdToHandle)
-#else
 import GHC.Handle (fdToHandle)
-#endif
 #endif
 
 #ifdef mingw32_HOST_OS
