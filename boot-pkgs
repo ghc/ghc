@@ -98,6 +98,7 @@ for $package (@library_dirs) {
             print GNUMAKEFILE "dir = ${package}\n";
             print GNUMAKEFILE "TOP = ${top}\n";
             print GNUMAKEFILE "include \$(TOP)/mk/sub-makefile.mk\n";
+            print GNUMAKEFILE "FAST_MAKE_OPTS += stage=0\n";
             close GNUMAKEFILE;
         }
     }
