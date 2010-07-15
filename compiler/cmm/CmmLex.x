@@ -22,8 +22,6 @@ module CmmLex (
    CmmToken(..), cmmlex,
   ) where
 
-#include "HsVersions.h"
-
 import Cmm
 import Lexer
 
