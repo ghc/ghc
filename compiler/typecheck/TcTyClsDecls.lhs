@@ -784,7 +784,7 @@ tcTyClDecl1 calc_isrec
 		   NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-	    (want_generic && canDoGenerics data_cons) h98_syntax Nothing
+	    (want_generic && canDoGenerics data_cons) (not h98_syntax) Nothing
 	})
   ; return [ATyCon tycon]
   }
