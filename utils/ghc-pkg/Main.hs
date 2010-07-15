@@ -30,11 +30,7 @@ import Prelude
 #include "../../includes/ghcconfig.h"
 
 import System.Console.GetOpt
-#if __GLASGOW_HASKELL__ >= 609
 import qualified Control.Exception as Exception
-#else
-import qualified Control.Exception.Extensible as Exception
-#endif
 import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
@@ -1670,11 +1666,7 @@ openNewFile dir template = do
          -- as any exceptions etc will only be able to report the
          -- fd currently
          h <-
-#if __GLASGOW_HASKELL__ >= 609
               fdToHandle fd
-#else
-              fdToHandle (fromIntegral fd)
-#endif
               `Exception.onException` c_close fd
          return (filepath, h)
       where
