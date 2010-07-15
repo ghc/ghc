@@ -1,0 +1,234 @@
+html, body {
+    height:100%;
+    margin:0;
+    padding:0;
+}
+
+body {
+    background-color:#FFFFFF;
+    color:#000000;
+    font-family:Helvetica,Arial,sans-serif;
+    font-size:small;
+    margin:3px 8px;
+
+    max-width:956px;
+    padding-left:24px;
+}
+
+#package-header {
+	background: #eaeaea url(haskell_icon.gif) no-repeat 5px 6px;
+	height: 2em;
+	margin: 0 0 0 -10px;
+	position: relative;
+}
+
+#module-header .caption {
+    background:transparent none repeat scroll 0 0;
+    border:medium none;
+    font-size: 170%;
+    line-height: 130%;
+    margin:0 0 0 -10px;
+    /* padding:0.8em 0 0; */
+
+    background-color:#E5ECF9;
+    border-top:1px solid #3366CC;
+    padding:1px 3px;
+	font-weight: bold;
+	position: relative;
+}
+
+
+dl.info {
+	position: absolute;
+	display: block;
+	right: 1em;
+	top: 3em;
+    background-color:#FAFAFA;
+    border:1px solid #BBBBBB;
+    padding:0.99em;
+}
+
+dl.info dt {
+	float: left;
+	clear: left;
+	width: 5em;
+	font-weight: bold;
+	margin: 0;
+	padding: 0;
+}
+
+dl.info dd {
+	padding-left: 6em;
+	margin: 0;
+}
+
+#description .caption,
+#synopsis .caption,
+h1 {
+    background-color:#E5ECF9;
+    border-top:1px solid #3366CC;
+    font-size:130%;
+    font-weight:bold;
+    margin:2em 0 0 -10px;
+    padding:1px 3px;
+    position:relative;
+}
+
+#table-of-contents .caption,
+h2 {
+    font-size:130%;
+    font-weight:bold;
+    margin:1.5em 0 0;
+    padding: 0;
+    top:0;
+}
+
+#synopsis li.src * {
+	display: inline;
+}
+
+#synopsis ul.subs,
+#synopsis ul.subs li {
+	padding: 0 0 0 0.25em;
+	margin: 0;
+}
+
+#footer {
+    color:#666666;
+	background-color: #eaeaea;
+	margin: 2em 0 0 -10px;
+	position: relative;
+}
+
+#footer p {
+	margin: 0;
+	padding: 0.5em;
+	border-top: 1px solid #919191;
+}
+
+ol, ul {
+    line-height:125%;
+    margin:0.5em 0 0 15px;
+    padding:0;
+}
+
+li {
+    margin:0.3em 0 0 1.5em;
+    padding:0;
+}
+
+p {
+    line-height:125%;
+    margin:0;
+    padding:0;
+}
+
+h1 + p, h2 + p, h3 + p,
+pre + p,
+p + p {
+	padding-top: 1em;
+}
+
+code, pre {
+    color:#007000;
+    font-family:monospace;
+}
+
+pre {
+    background-color:#FAFAFA;
+    border:1px solid #BBBBBB;
+    font-size:9pt;
+    line-height:125%;
+    margin:1em 0 0;
+    overflow:auto;
+    padding:0.99em;
+}
+
+code {
+    font-size:10pt;
+}
+
+a, a:link {
+    color:#0000CC;
+}
+
+ul.links {
+	list-style: none;
+	position: absolute;
+	right: 1px;
+	top: 0;
+}
+
+ul.links li {
+	display: inline;
+	white-space: nowrap;
+	padding: 0 10px;
+	border-left: 1px solid #919191;
+	margin: 0;
+}
+
+dl {
+    line-height:125%;
+    margin:0;
+    padding:0;
+}
+
+dt {
+    font-weight:normal;
+    margin:0.75em 0 0;
+    padding:0;
+}
+
+dd {
+    font-weight:normal;
+    margin:0.4em 0 0 2em;
+    padding:0;
+}
+
+.top, .subs {
+    margin:0.4em 0 0 2em;
+    padding:0;
+}
+
+.top .src {
+    font-family:monospace;
+    font-size:larger;
+    font-weight:bold;
+    margin:0.75em 0 0 -2em;
+    padding:0;
+}
+
+.top .subs .src {
+	margin-left: 0;
+}
+
+.arguments {
+	margin: 0 0 1em;
+}
+.arguments .caption,
+.fields .caption {
+	display: none;
+}
+
+.associated-types,
+.constructors,
+.methods {
+    background-color:#FAFAFA;
+    border:1px solid #BBBBBB;
+    padding:0.99em;
+}
+
+.caption {
+	margin-top: 0;
+	padding-top: 0;
+}
+
+.subs .caption {
+	font-weight: bold;
+	color: #919100;
+}
+
+.subs td {
+	padding-right: 1em;
+	padding-left: 1em;
+}

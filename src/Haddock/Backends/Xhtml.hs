@@ -138,16 +138,19 @@ copyFile fromFPath toFPath =
 
 
 copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
-copyHtmlBits odir libdir maybe_css = do
+copyHtmlBits odir libdir _maybe_css = do
   let 
         libhtmldir = joinPath [libdir, "html"]
+        {-
         css_file = case maybe_css of
                         Nothing -> joinPath [libhtmldir, 'x':cssFile]
                         Just f  -> f
         css_destination = joinPath [odir, cssFile]
+        -}
         copyLibFile f = do
            copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
-  copyFile css_file css_destination
+  --copyFile css_file css_destination
+  mapM_ copyLibFile cssFiles
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile, framesFile ]
 
 footer :: Html
@@ -201,7 +204,7 @@ simpleHeader doctitle maybe_contents_url maybe_index_url
       wikiButton maybe_wiki_url Nothing,
       contentsButton maybe_contents_url,
       indexButton maybe_index_url
-      ]) ! [theclass "links"]
+      ] ++ stylePickers) ! [theclass "links"]
   )
 
 pageHeader :: String -> Interface -> String
@@ -217,7 +220,7 @@ pageHeader mdl iface doctitle
         wikiButton maybe_wiki_url (Just $ ifaceMod iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url
-        ]) ! [theclass "links"]
+        ] ++ stylePickers) ! [theclass "links"]
    ) +++
   divModuleHeader << (
     sectionName << mdl +++

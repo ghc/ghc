@@ -1,0 +1,344 @@
+/* -------- Global things --------- */
+
+@font-face {
+	font-family: 'DroidSerif';
+	src: url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Regular.eot');
+	src: local('Droid Serif'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Regular.woff') format('woff'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Regular.ttf') format('truetype'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Regular.svg#DroidSerif') format('svg');
+}
+
+@font-face {
+	font-family: 'DroidSerif';
+        font-style: italic;
+	src: url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Italic.eot');
+	src: local('Droid Serif'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Italic.woff') format('woff'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Italic.ttf') format('truetype'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Italic.svg#DroidSerif-Italic') format('svg');
+}
+
+@font-face {
+	font-family: 'DroidSerif';
+        font-weight: bold;
+	src: url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Bold.eot');
+	src: local('Droid Serif'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Bold.woff') format('woff'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Bold.ttf') format('truetype'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-Bold.svg#DroidSerif-Bold') format('svg');
+}
+
+@font-face {
+	font-family: 'DroidSerif';
+	src: url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-BoldItalic.eot');
+        font-weight: bold;
+        font-style: italic;
+	src: local('Droid Serif'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-BoldItalic.woff') format('woff'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-BoldItalic.ttf') format('truetype'),
+             url('http://snapframework.com/docs/latest/snap-core/fonts/DroidSerif-BoldItalic.svg#DroidSerif-BoldItalic') format('svg');
+}
+
+
+
+html {
+  background-color: #f0f3ff;
+  width: 100%;
+}
+
+body { 
+  -moz-border-radius:5px;
+  -webkit-border-radius:5px;
+  width: 50em;
+  margin: 2em auto;
+  padding: 0;
+  background-color: #ffffff;
+  color: #000000;
+  font-size: 110%;
+  font-family: DroidSerif, Georgia, serif;
+  }
+
+div {
+	padding: 0 30px;
+}
+  
+
+
+a:link    { color: #5200A3; text-decoration: none }
+a:visited { color: #5200A3; text-decoration: none }
+a:hover   { color: #5200A3; text-decoration: none; border-bottom:#5200A3 dashed 1px; }
+
+table{
+	border-spacing: 1px 1px;
+}
+
+td {
+  border-width: 0px;
+  vertical-align: top;
+}
+
+p  {
+  margin-top: 0;
+  margin-bottom: 0.75em;
+  padding-left: 4px;
+  font-size: 95%;
+  line-height: 1.66;
+  }
+  
+li p { margin: 0pt } 
+
+
+tt, pre, code  {
+  font-family: Monaco,
+               "DejaVu Sans Mono",
+               "Bitstream Vera Sans Mono",
+               "Lucida Console",
+               monospace;
+  font-size: 90%;
+}
+
+.src {
+  padding: 4px 8px;
+  background-color: #f0f0f0;
+  font-size: 80%;
+  font-family: Monaco,
+               "DejaVu Sans Mono",
+               "Bitstream Vera Sans Mono",
+               "Lucida Console",
+               monospace;
+
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+ul {
+	padding: 0;
+}
+
+ul ul {
+	padding-left: 30px;
+}
+
+ul.links {
+	list-style: none;
+	position: absolute;
+	right: 1px;
+	top: 0;
+	margin: 0;
+}
+
+ul.links li {
+  display: inline;
+  white-space: nowrap;
+}
+
+
+
+/* Captions and Headers */
+
+p.caption, h1, h2, h3, h4 {
+ font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+ margin: 0;
+ padding: 0;
+ font-size: inherit;
+ line-height: inherit;
+}
+
+#module-header .caption {
+	font-weight: bold; letter-spacing: -0.02em;
+	font-size: 201%;
+	margin: 0;
+	padding: 0;
+}
+
+h1,
+#description .caption,
+#synopsis .caption {
+  padding-top: 14px;
+  margin-bottom: 0;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+  font-size: 140%
+  }
+  
+h2 {
+  padding-top: 14px;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+  font-size: 120%
+}
+
+h3 {
+  padding-top: 12px;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+  font-size: 105%
+}
+
+h4,
+#table-of-contents .caption,
+.constructors .caption,
+.instances .caption,
+.methods .caption {
+  font-weight: bold;
+  padding-top: 12px;
+  padding-bottom: 4px;
+  letter-spacing: -0.02em;
+  font-size: 90%
+}
+
+.arguments .caption,
+.fields .caption {
+	display: none;
+}
+
+/* Per Section Styling */
+
+#package-header {
+  font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+  background: #3465a4 url(haskell_icon.gif) no-repeat 4px 3px;
+  padding: 0;
+  -moz-border-radius-topleft:5px;
+  -moz-border-radius-topright:5px;
+  -webkit-border-radius-topleft:5px;
+  -webkit-border-radius-topright:5px;
+  position: relative;
+}
+
+#package-header li {
+  font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-left-width: 1px;
+  border-left-color: #ffffff;
+  border-left-style: solid;
+  letter-spacing: -0.02em;
+  font-weight: bold;
+}
+
+#package-header a { color: #ffffff }
+#package-header a:visited { color: #ffff00 }
+#package-header a:hover { background-color: #C9D3DE; }
+#package-header li:hover { background-color: #C9D3DE; }
+
+#module-header {
+  font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+  color: #141B24;
+  background-color: #C9D3DE;
+  padding: 5px;
+  border-top-width: 1px;
+  border-top-color: #ffffff;
+  border-top-style: solid;
+  -moz-border-radius-bottomleft:5px;
+  -moz-border-radius-bottomright:5px;
+  -webkit-border-radius-bottomleft:5px;
+  -webkit-border-radius-bottomright:5px;
+}
+
+#module-header .info {
+	display: none;
+}
+
+#table-of-contents,
+#description,
+#synopsis,
+#footer {
+	margin-top: 15px;
+}
+
+#table-of-contents ul {
+  font-size: 80%;
+  font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+  letter-spacing: -0.01em;
+  margin: 0;
+  list-style: none;
+}
+
+#synopsis ul {
+  list-style: none;
+}
+
+#synopsis .src,
+.instances .src {
+  background-color: #FAFAFA; 
+  border-bottom: #F2F2F2 solid 1px;
+  border-top: #FCFCFC solid 1px;
+}
+
+.top {
+  padding: 20px 0 0.5ex 0;
+}
+
+.top .src,
+#interface .subs.methods .src {
+  border-spacing: 0px;
+  border-bottom:1px solid #d7d7df;
+  border-right:1px solid #d7d7df;
+  border-top:1px solid #f4f4f9;
+  border-left:1px solid #f4f4f9;
+  padding: 4px;
+}
+
+#interface p + div {
+	margin-top: -15px
+}
+
+.subs p {
+	margin: 0;
+}
+
+#interface .subs .src {
+  padding: 2px 12px;
+  border: none; 
+}
+
+#interface .subs td + td {
+	font-style: italic;
+	font-size: 80%;
+  	font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+}
+
+#interface .methods .src {
+	margin-top: 15px;
+}
+#interface .instances div {
+	margin: 0;
+	padding: 0;
+}
+
+div.arguments {
+	padding-left: 0;
+	padding-top: 9px;
+}
+
+.arguments table {
+	border-spacing: 0;
+}
+
+#footer {
+  font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+  -moz-border-radius:5px;
+  -webkit-border-radius:5px;
+  background-color: #3465a4;
+  color: #ffffff;
+  padding: 5px
+}
+
+#footer p {
+	margin: 0;
+}
+
+#footer a:link {
+  color: #ffffff;
+  text-decoration: underline
+  }
+#footer a:visited {
+  color: #ffff00
+  }
+#footer a:hover {
+  background-color: #6060ff
+  }
+
+
+

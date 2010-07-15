@@ -26,7 +26,9 @@ module Haddock.Backends.Xhtml.Util (
   abovesSep, hsep,
   
   collapsebutton, collapseId, collapsed,
-  documentCharacterEncoding, styleSheet
+  documentCharacterEncoding,
+  
+  cssFiles, styleSheet, stylePickers
 ) where
 
 import Haddock.GhcUtils
@@ -217,6 +219,28 @@ documentCharacterEncoding :: Html
 documentCharacterEncoding =
    meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"]
 
+-- Standard set of style sheets, first is the preferred
+cssThemes :: [(String, String)]
+cssThemes = [
+    ("Classic", "xhaddock.css"),
+    ("Tibbe", "thaddock.css"),
+    ("Snappy", "shaddock.css")
+    ]
+
+cssFiles :: [String]
+cssFiles = map snd cssThemes
+
 styleSheet :: Html
-styleSheet =
-   (thelink ! [href cssFile, rel "stylesheet", thetype "text/css"]) noHtml
+styleSheet = toHtml $ zipWith mkLink cssThemes rels
+  where
+    rels = ("stylesheet" : repeat "alternate stylesheet")
+    mkLink (aTitle, aFile) aRel =
+       (thelink ! [href aFile, rel aRel, thetype "text/css", Html.title aTitle]) noHtml
+
+stylePickers :: [Html]
+stylePickers = map mkPicker cssThemes
+  where
+    mkPicker (aTitle, aFile) = 
+      let js = "setActiveStyleSheet('" ++ aFile ++ "'); return false;" in
+      anchor ! [href "#", onclick js] << aTitle
+    
