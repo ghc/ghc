@@ -103,7 +103,13 @@ $(call build-dependencies,$1,$2,$3)
 # Just the 'v' way for programs
 $(call distdir-way-opts,$1,$2,v,$3)
 
+ifeq "$3" "0"
+# For stage 0, we use GHC to compile C sources so that we don't have to
+# worry about where the RTS header files are
 $(call c-suffix-rules,$1,$2,v,YES)
+else
+$(call c-suffix-rules,$1,$2,v,NO)
+endif
 
 $(call hs-suffix-rules,$1,$2,v)
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
