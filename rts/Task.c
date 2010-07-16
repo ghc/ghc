@@ -24,7 +24,7 @@
 #endif
 
 // Task lists and global counters.
-// Locks required: sched_mutex.
+// Locks required: all_tasks_mutex.
 Task *all_tasks = NULL;
 static nat taskCount;
 static int tasksInitialized = 0;
@@ -32,6 +32,10 @@ static int tasksInitialized = 0;
 static void   freeTask  (Task *task);
 static Task * allocTask (void);
 static Task * newTask   (rtsBool);
+
+#if defined(THREADED_RTS)
+static Mutex all_tasks_mutex;
+#endif
 
 /* -----------------------------------------------------------------------------
  * Remembering the current thread's Task
@@ -61,6 +65,7 @@ initTaskManager (void)
 	tasksInitialized = 1;
 #if defined(THREADED_RTS) && !defined(MYTASK_USE_TLV)
 	newThreadLocalKey(&currentTaskKey);
+        initMutex(&all_tasks_mutex);
 #endif
     }
 }
@@ -71,7 +76,7 @@ freeTaskManager (void)
     Task *task, *next;
     nat tasksRunning = 0;
 
-    ASSERT_LOCK_HELD(&sched_mutex);
+    ACQUIRE_LOCK(&all_tasks_mutex);
 
     for (task = all_tasks; task != NULL; task = next) {
         next = task->all_link;
@@ -86,7 +91,11 @@ freeTaskManager (void)
                tasksRunning);
 
     all_tasks = NULL;
+
+    RELEASE_LOCK(&all_tasks_mutex);
+
 #if defined(THREADED_RTS) && !defined(MYTASK_USE_TLV)
+    closeMutex(&all_tasks_mutex); 
     freeThreadLocalKey(&currentTaskKey);
 #endif
 
@@ -177,14 +186,14 @@ newTask (rtsBool worker)
 
     task->next = NULL;
 
-    ACQUIRE_LOCK(&sched_mutex);
+    ACQUIRE_LOCK(&all_tasks_mutex);
 
     task->all_link = all_tasks;
     all_tasks = task;
 
     taskCount++;
 
-    RELEASE_LOCK(&sched_mutex);
+    RELEASE_LOCK(&all_tasks_mutex);
 
     return task;
 }
@@ -284,7 +293,7 @@ discardTasksExcept (Task *keep)
     Task *task, *next;
 
     // Wipe the task list, except the current Task.
-    ACQUIRE_LOCK(&sched_mutex);
+    ACQUIRE_LOCK(&all_tasks_mutex);
     for (task = all_tasks; task != NULL; task=next) {
         next = task->all_link;
         if (task != keep) {
@@ -294,7 +303,7 @@ discardTasksExcept (Task *keep)
     }
     all_tasks = keep;
     keep->all_link = NULL;
-    RELEASE_LOCK(&sched_mutex);
+    RELEASE_LOCK(&all_tasks_mutex);
 }
 
 void
