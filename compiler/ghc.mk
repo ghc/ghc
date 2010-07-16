@@ -45,87 +45,87 @@ endif
 
 $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	"$(RM)" $(RM_OPTS) $@
-	@echo "Creating $@ ... "
-	@echo "module Config where" >>$@
-	@echo "cProjectName          :: String" >> $@
-	@echo "cProjectName          = \"$(ProjectName)\"" >> $@
-	@echo "cProjectVersion       :: String" >> $@
-	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> $@
-	@echo "cProjectVersionInt    :: String" >> $@
-	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> $@
-	@echo "cProjectPatchLevel    :: String" >> $@
-	@echo "cProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> $@
-	@echo "cBooterVersion        :: String" >> $@
-	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $@
-	@echo "cStage                :: String" >> $@
-	@echo "cStage                = show (STAGE :: Int)" >> $@
-	@echo "cIntegerLibrary       :: String" >> $@
-	@echo "cIntegerLibrary       = \"$(INTEGER_LIBRARY)\"" >> $@
-	@echo "cSplitObjs            :: String" >> $@
-	@echo "cSplitObjs            = \"$(SupportsSplitObjs)\"" >> $@
-	@echo "cGhcWithInterpreter   :: String" >> $@
-	@echo "cGhcWithInterpreter   = \"$(GhcWithInterpreter)\"" >> $@
-	@echo "cGhcWithNativeCodeGen :: String" >> $@
-	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $@
-	@echo "cGhcWithLlvmCodeGen   :: String" >> $@
-	@echo "cGhcWithLlvmCodeGen   = \"YES\"" >> $@
-	@echo "cGhcWithSMP           :: String" >> $@
-	@echo "cGhcWithSMP           = \"$(GhcWithSMP)\"" >> $@
-	@echo "cGhcRTSWays           :: String" >> $@
-	@echo "cGhcRTSWays           = \"$(GhcRTSWays)\"" >> $@
-	@echo "cGhcUnregisterised    :: String" >> $@
-	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $@
-	@echo "cGhcEnableTablesNextToCode :: String" >> $@
-	@echo "cGhcEnableTablesNextToCode = \"$(GhcEnableTablesNextToCode)\"" >> $@
-	@echo "cLeadingUnderscore    :: String" >> $@
-	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $@
-	@echo "cRAWCPP_FLAGS         :: String" >> $@
-	@echo "cRAWCPP_FLAGS         = \"$(RAWCPP_FLAGS)\"" >> $@
-	@echo "cGCC                  :: String" >> $@
-	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $@
-	@echo "cMKDLL                :: String" >> $@
-	@echo "cMKDLL                = \"$(BLD_DLL)\"" >> $@
-	@echo "cLdIsGNULd            :: String" >> $@
-	@echo "cLdIsGNULd            = \"$(LdIsGNULd)\"" >> $@
-	@echo "cLD_X                 :: String" >> $@
-	@echo "cLD_X                 = \"$(LD_X)\"" >> $@
-	@echo "cGHC_DRIVER_DIR       :: String" >> $@
-	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $@
-	@echo "cGHC_TOUCHY_PGM       :: String" >> $@
-	@echo "cGHC_TOUCHY_PGM       = \"$(GHC_TOUCHY_PGM)\"" >> $@
-	@echo "cGHC_TOUCHY_DIR       :: String" >> $@
-	@echo "cGHC_TOUCHY_DIR       = \"$(GHC_TOUCHY_DIR)\"" >> $@
-	@echo "cGHC_UNLIT_PGM        :: String" >> $@
-	@echo "cGHC_UNLIT_PGM        = \"$(GHC_UNLIT_PGM)\"" >> $@
-	@echo "cGHC_UNLIT_DIR        :: String" >> $@
-	@echo "cGHC_UNLIT_DIR        = \"$(GHC_UNLIT_DIR)\"" >> $@
-	@echo "cGHC_MANGLER_PGM      :: String" >> $@
-	@echo "cGHC_MANGLER_PGM      = \"$(GHC_MANGLER_PGM)\"" >> $@
-	@echo "cGHC_MANGLER_DIR      :: String" >> $@
-	@echo "cGHC_MANGLER_DIR      = \"$(GHC_MANGLER_DIR)\"" >> $@
-	@echo "cGHC_SPLIT_PGM        :: String" >> $@
-	@echo "cGHC_SPLIT_PGM        = \"$(GHC_SPLIT_PGM)\"" >> $@
-	@echo "cGHC_SPLIT_DIR        :: String" >> $@
-	@echo "cGHC_SPLIT_DIR        = \"$(GHC_SPLIT_DIR)\"" >> $@
-	@echo "cGHC_SYSMAN_PGM       :: String" >> $@
-	@echo "cGHC_SYSMAN_PGM       = \"$(GHC_SYSMAN)\"" >> $@
-	@echo "cGHC_SYSMAN_DIR       :: String" >> $@
-	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $@
-	@echo "cGHC_PERL             :: String" >> $@
-	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $@
-	@echo "cDEFAULT_TMPDIR       :: String" >> $@
-	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $@
-	@echo "cRelocatableBuild     :: Bool"                 >> $@
+	@echo 'Creating $@ ... '
+	@echo 'module Config where'                                         >> $@
+	@echo 'cProjectName          :: String'                             >> $@
+	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
+	@echo 'cProjectVersion       :: String'                             >> $@
+	@echo 'cProjectVersion       = "$(ProjectVersion)"'                 >> $@
+	@echo 'cProjectVersionInt    :: String'                             >> $@
+	@echo 'cProjectVersionInt    = "$(ProjectVersionInt)"'              >> $@
+	@echo 'cProjectPatchLevel    :: String'                             >> $@
+	@echo 'cProjectPatchLevel    = "$(ProjectPatchLevel)"'              >> $@
+	@echo 'cBooterVersion        :: String'                             >> $@
+	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
+	@echo 'cStage                :: String'                             >> $@
+	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
+	@echo 'cIntegerLibrary       :: String'                             >> $@
+	@echo 'cIntegerLibrary       = "$(INTEGER_LIBRARY)"'                >> $@
+	@echo 'cSplitObjs            :: String'                             >> $@
+	@echo 'cSplitObjs            = "$(SupportsSplitObjs)"'              >> $@
+	@echo 'cGhcWithInterpreter   :: String'                             >> $@
+	@echo 'cGhcWithInterpreter   = "$(GhcWithInterpreter)"'             >> $@
+	@echo 'cGhcWithNativeCodeGen :: String'                             >> $@
+	@echo 'cGhcWithNativeCodeGen = "$(GhcWithNativeCodeGen)"'           >> $@
+	@echo 'cGhcWithLlvmCodeGen   :: String'                             >> $@
+	@echo 'cGhcWithLlvmCodeGen   = "YES"'                               >> $@
+	@echo 'cGhcWithSMP           :: String'                             >> $@
+	@echo 'cGhcWithSMP           = "$(GhcWithSMP)"'                     >> $@
+	@echo 'cGhcRTSWays           :: String'                             >> $@
+	@echo 'cGhcRTSWays           = "$(GhcRTSWays)"'                     >> $@
+	@echo 'cGhcUnregisterised    :: String'                             >> $@
+	@echo 'cGhcUnregisterised    = "$(GhcUnregisterised)"'              >> $@
+	@echo 'cGhcEnableTablesNextToCode :: String'                        >> $@
+	@echo 'cGhcEnableTablesNextToCode = "$(GhcEnableTablesNextToCode)"' >> $@
+	@echo 'cLeadingUnderscore    :: String'                             >> $@
+	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
+	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
+	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
+	@echo 'cGCC                  :: String'                             >> $@
+	@echo 'cGCC                  = "$(WhatGccIsCalled)"'                >> $@
+	@echo 'cMKDLL                :: String'                             >> $@
+	@echo 'cMKDLL                = "$(BLD_DLL)"'                        >> $@
+	@echo 'cLdIsGNULd            :: String'                             >> $@
+	@echo 'cLdIsGNULd            = "$(LdIsGNULd)"'                      >> $@
+	@echo 'cLD_X                 :: String'                             >> $@
+	@echo 'cLD_X                 = "$(LD_X)"'                           >> $@
+	@echo 'cGHC_DRIVER_DIR       :: String'                             >> $@
+	@echo 'cGHC_DRIVER_DIR       = "$(GHC_DRIVER_DIR)"'                 >> $@
+	@echo 'cGHC_TOUCHY_PGM       :: String'                             >> $@
+	@echo 'cGHC_TOUCHY_PGM       = "$(GHC_TOUCHY_PGM)"'                 >> $@
+	@echo 'cGHC_TOUCHY_DIR       :: String'                             >> $@
+	@echo 'cGHC_TOUCHY_DIR       = "$(GHC_TOUCHY_DIR)"'                 >> $@
+	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
+	@echo 'cGHC_UNLIT_PGM        = "$(GHC_UNLIT_PGM)"'                  >> $@
+	@echo 'cGHC_UNLIT_DIR        :: String'                             >> $@
+	@echo 'cGHC_UNLIT_DIR        = "$(GHC_UNLIT_DIR)"'                  >> $@
+	@echo 'cGHC_MANGLER_PGM      :: String'                             >> $@
+	@echo 'cGHC_MANGLER_PGM      = "$(GHC_MANGLER_PGM)"'                >> $@
+	@echo 'cGHC_MANGLER_DIR      :: String'                             >> $@
+	@echo 'cGHC_MANGLER_DIR      = "$(GHC_MANGLER_DIR)"'                >> $@
+	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
+	@echo 'cGHC_SPLIT_PGM        = "$(GHC_SPLIT_PGM)"'                  >> $@
+	@echo 'cGHC_SPLIT_DIR        :: String'                             >> $@
+	@echo 'cGHC_SPLIT_DIR        = "$(GHC_SPLIT_DIR)"'                  >> $@
+	@echo 'cGHC_SYSMAN_PGM       :: String'                             >> $@
+	@echo 'cGHC_SYSMAN_PGM       = "$(GHC_SYSMAN)"'                     >> $@
+	@echo 'cGHC_SYSMAN_DIR       :: String'                             >> $@
+	@echo 'cGHC_SYSMAN_DIR       = "$(GHC_SYSMAN_DIR)"'                 >> $@
+	@echo 'cGHC_PERL             :: String'                             >> $@
+	@echo 'cGHC_PERL             = "$(GHC_PERL)"'                       >> $@
+	@echo 'cDEFAULT_TMPDIR       :: String'                             >> $@
+	@echo 'cDEFAULT_TMPDIR       = "$(DEFAULT_TMPDIR)"'                 >> $@
+	@echo 'cRelocatableBuild     :: Bool'                               >> $@
 ifeq "$(RelocatableBuild)" "YES"
-	@echo "cRelocatableBuild     = True"                  >> $@
+	@echo 'cRelocatableBuild     = True'                                >> $@
 else
-	@echo "cRelocatableBuild     = False"                 >> $@
+	@echo 'cRelocatableBuild     = False'                               >> $@
 endif
-	@echo "cLibFFI               :: Bool"                 >> $@
+	@echo 'cLibFFI               :: Bool'                               >> $@
 ifeq "$(UseLibFFIForAdjustors)" "YES"
-	@echo "cLibFFI               = True"                  >> $@
+	@echo 'cLibFFI               = True'                                >> $@
 else
-	@echo "cLibFFI               = False"                 >> $@
+	@echo 'cLibFFI               = False'                               >> $@
 endif
 	@echo done.
 
