@@ -33,7 +33,6 @@ import Haddock.Types
 import Haddock.Version
 import Haddock.Utils
 import Text.XHtml hiding ( name, title, p, quote )
-import qualified Text.XHtml as Html
 import Haddock.GhcUtils
 
 import Control.Exception     ( bracket )
@@ -392,8 +391,8 @@ ppHtmlContentsFrame odir doctitle ifaces = do
              thetitle (toHtml doctitle) +++
              styleSheet +++
              (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
-        body << vanillaTable << Html.p << (
-            foldr (+++) noHtml (map (+++br) mods))
+        miniBody << divModuleList << 
+          (sectionName << "Modules" +++ shortDeclList mods)
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString html)
 
