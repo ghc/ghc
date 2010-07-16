@@ -133,7 +133,8 @@ ul.links li {
   white-space: nowrap;
 }
 
-
+.hide {	display: none; }
+.show { }
 
 /* Captions and Headers */
 
@@ -143,6 +144,14 @@ p.caption, h1, h2, h3, h4 {
  padding: 0;
  font-size: inherit;
  line-height: inherit;
+}
+
+#package-header .caption {
+	font-size: 80%;
+	font-weight: bold;
+	padding-left: 26px;
+	padding-top: 2px;
+	padding-bottom: 3px;
 }
 
 #module-header .caption {
@@ -221,6 +230,42 @@ h4,
 #package-header a:visited { color: #ffff00 }
 #package-header a:hover { background-color: #C9D3DE; }
 #package-header li:hover { background-color: #C9D3DE; }
+
+div#style-menu-holder {
+	position: relative;
+	z-index: 2;
+	display: inline;
+	margin: 0;
+	padding: 0;
+}
+
+#style-menu {
+	position: absolute;
+	z-index: 1;
+	overflow: visible;
+	background-color: #3465a4;
+	margin: 0;
+	width: 6em;
+	text-align: center;
+	right: 0;
+	padding: 0 2px 1px;
+	border-left: 1px solid #fffffff;
+	border-right: 1px solid #fffffff;
+	border-bottom: 1px solid #fffffff;
+}
+
+#style-menu li {
+	display: list-item;
+	border-style: none;
+	margin: 0;
+	padding: 3px;
+	color: #000;
+	list-style-type: none;
+}
+
+#style-menu li + li {
+	border-top: 1px solid #ffffff;
+}
 
 #module-header {
   font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;

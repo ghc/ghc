@@ -22,6 +22,47 @@ body {
 	position: relative;
 }
 
+#package-header .caption {
+	margin-left: 30px;
+	padding-top: 6px;
+}
+
+
+
+div#style-menu-holder {
+	position: relative;
+	z-index: 2;
+	display: inline;
+}
+
+#style-menu {
+	position: absolute;
+	z-index: 1;
+	overflow: visible;
+	background-color: #eaeaea;
+	margin: 0;
+	width: 6em;
+	text-align: center;
+	right: 0;
+	padding: 0 2px 1px;
+	border-left: 1px solid #919191;
+	border-right: 1px solid #919191;
+	border-bottom: 1px solid #919191;
+}
+
+#style-menu li {
+	display: list-item;
+	border-style: none;
+	margin: 0;
+	padding: 3px;
+	color: #000;
+	list-style-type: none;
+}
+
+#style-menu li + li {
+	border-top: 1px solid #919191;
+}
+
 #module-header .caption {
     background:transparent none repeat scroll 0 0;
     border:medium none;
@@ -184,6 +225,9 @@ dd {
     margin:0.4em 0 0 2em;
     padding:0;
 }
+
+.hide {	display: none; }
+.show { }
 
 .top, .subs {
     margin:0.4em 0 0 2em;

@@ -136,17 +136,44 @@ function setSynopsis(filename) {
     if (parent.window.synopsis) {
       parent.window.synopsis.location = filename;
     }
+    resetStyle();   // ugly: we are using setSynopsis as a hook!
 }
 
 
 function setActiveStyleSheet(href) {
-   var i, a, main;
-   for(i=0; (a = document.getElementsByTagName("link")[i]); i++) {
-     if(a.getAttribute("rel").indexOf("style") != -1
-        && a.getAttribute("title")) {
-       a.disabled = true;
-       if(a.getAttribute("href") == href) a.disabled = false;
-       //a.disabled = a.getAttribute("title") != title;
-     }
-   }
+  var i, a, found = false;
+  for(i=0; (a = document.getElementsByTagName("link")[i]); i++) {
+    if(a.getAttribute("rel").indexOf("style") != -1
+       && a.getAttribute("title")) {
+      a.disabled = true;
+            // need to do this always, some browsers are edge triggered
+      if(a.getAttribute("href") == href) {
+        a.disabled = false;
+        found = true;
+      }
+    }
+  }
+  if (!found) href = "";
+  document.cookie = "style=" + href + ";path=/";
+  styleMenu(false);
 }
+
+function resetStyle() {
+  var nameEQ = "style=";
+  var s;
+  var ca = document.cookie.split(';');
+  for(var i=0;i < ca.length;i++) {
+    var c = ca[i];
+    while (c.charAt(0)==' ') c = c.substring(1,c.length);
+    if (c.indexOf(nameEQ) == 0) s = c.substring(nameEQ.length,c.length);
+  }
+  if (s) setActiveStyleSheet(s);
+}
+
+
+function styleMenu(show) {
+  var m = document.getElementById('style-menu');
+  if (show == null) { show = m.className == "hide"; }
+  m.className = show ? "show" : "hide";
+}
+

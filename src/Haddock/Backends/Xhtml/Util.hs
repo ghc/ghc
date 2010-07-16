@@ -28,7 +28,7 @@ module Haddock.Backends.Xhtml.Util (
   collapsebutton, collapseId, collapsed,
   documentCharacterEncoding,
   
-  cssFiles, styleSheet, stylePickers
+  cssFiles, styleSheet, stylePickers, styleMenu
 ) where
 
 import Haddock.GhcUtils
@@ -243,4 +243,12 @@ stylePickers = map mkPicker cssThemes
     mkPicker (aTitle, aFile) = 
       let js = "setActiveStyleSheet('" ++ aFile ++ "'); return false;" in
       anchor ! [href "#", onclick js] << aTitle
-    
+
+styleMenu :: Html
+styleMenu = thediv ! [identifier "style-menu-holder"] << [
+    anchor ! [ href "#", onclick js ] << "Style\9662",
+    unordList stylePickers ! [ identifier "style-menu", theclass "hide" ]
+  ]
+  where
+    js = "styleMenu(); return false;"
+        

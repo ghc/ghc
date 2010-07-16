@@ -76,20 +76,6 @@ pre  {
 	margin-top: 0;
 }
 
-
-#package-header {
-	color: #ffffff;
-	padding: 5px 5px 5px 31px;
-	margin: 0 0 1px;
-	background: #000099 url(haskell_icon.gif) no-repeat 5px 6px;
-	position: relative;
-}
-
-#package-header a:link    { color: #ffffff }
-#package-header a:visited { color: #ffff00 }
-#package-header a:hover   { background-color: #6060ff; }
-#package-header ul.links li:hover { background-color: #6060ff; }
-
 ul.links {
 	list-style: none;
 	text-align: left;
@@ -106,6 +92,54 @@ ul.links li {
 	border-left-style: solid;
 	white-space: nowrap;
 	padding: 1px 5px;
+}
+
+.hide {	display: none; }
+.show { }
+
+#package-header {
+	color: #ffffff;
+	padding: 5px 5px 5px 31px;
+	margin: 0 0 1px;
+	background: #000099 url(haskell_icon.gif) no-repeat 5px 6px;
+	position: relative;
+}
+
+#package-header .caption {
+	font-weight: normal;
+	font-style: normal;
+}
+#package-header a:link    { color: #ffffff }
+#package-header a:visited { color: #ffff00 }
+#package-header a:hover   { background-color: #6060ff; }
+#package-header ul.links li:hover { background-color: #6060ff; }
+
+div#style-menu-holder {
+	position: relative;
+	z-index: 2;
+	display: inline;
+}
+
+#style-menu {
+	position: absolute;
+	z-index: 1;
+	overflow: visible;
+	background-color: #000099;
+	margin: 0;
+	width: 6em;
+	text-align: center;
+	right: 0;
+	padding: 2px 2px 1px;
+}
+
+#style-menu li {
+	display: list-item;
+	border-style: none;
+	margin: 0;
+	padding: 3px;
+	color: #000;
+	list-style-type: none;
+	border-top: 1px solid #ffffff;
 }
 
 #module-header {

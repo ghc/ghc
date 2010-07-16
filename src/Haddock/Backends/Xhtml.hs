@@ -204,7 +204,7 @@ simpleHeader doctitle maybe_contents_url maybe_index_url
       wikiButton maybe_wiki_url Nothing,
       contentsButton maybe_contents_url,
       indexButton maybe_index_url
-      ] ++ stylePickers) ! [theclass "links"]
+      ] ++ [styleMenu]) ! [theclass "links"]
   )
 
 pageHeader :: String -> Interface -> String
@@ -220,7 +220,7 @@ pageHeader mdl iface doctitle
         wikiButton maybe_wiki_url (Just $ ifaceMod iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url
-        ] ++ stylePickers) ! [theclass "links"]
+        ] ++ [styleMenu]) ! [theclass "links"]
    ) +++
   divModuleHeader << (
     sectionName << mdl +++
