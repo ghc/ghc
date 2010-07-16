@@ -597,9 +597,8 @@ ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
            thetitle (toHtml $ moduleString mdl) +++
            styleSheet +++
            (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
-        body << thediv ! [ theclass "outer" ] << (
-           (thediv ! [theclass "mini-topbar"]
-             << toHtml (moduleString mdl)) +++
+        miniBody << 
+          (divModuleHeader << sectionName << moduleString mdl +++
            miniSynopsis mdl iface unicode)
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString html)
@@ -654,38 +653,29 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
 
 miniSynopsis :: Module -> Interface -> Bool -> Html
 miniSynopsis mdl iface unicode =
-    thediv ! [ theclass "mini-synopsis" ]
-      << hsep (map (processForMiniSynopsis mdl unicode) $ exports)
+    divInterface << mapMaybe (processForMiniSynopsis mdl unicode) exports
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
-processForMiniSynopsis :: Module -> Bool -> ExportItem DocName ->  Html
+processForMiniSynopsis :: Module -> Bool -> ExportItem DocName -> Maybe Html
 processForMiniSynopsis mdl unicode (ExportDecl (L _loc decl0) _doc _ _insts) =
-  thediv ! [theclass "decl" ] <<
-  case decl0 of
-    TyClD d@(TyFamily{}) -> ppTyFamHeader True False d unicode
-    TyClD d@(TyData{tcdTyPats = ps})
-      | Nothing <- ps    -> keyword "data" <+> ppTyClBinderWithVarsMini mdl d
-      | Just _ <- ps     -> keyword "data" <+> keyword "instance"
-                                           <+> ppTyClBinderWithVarsMini mdl d
-    TyClD d@(TySynonym{tcdTyPats = ps})
-      | Nothing <- ps    -> keyword "type" <+> ppTyClBinderWithVarsMini mdl d
-      | Just _ <- ps     -> keyword "type" <+> keyword "instance"
-                                           <+> ppTyClBinderWithVarsMini mdl d
-    TyClD d@(ClassDecl {}) ->
-                            keyword "class" <+> ppTyClBinderWithVarsMini mdl d
+  ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
+    TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
+        (TyFamily{}) -> Just $ ppTyFamHeader True False d unicode
+        (TyData{tcdTyPats = ps})
+          | Nothing <- ps -> Just $ keyword "data" <+> b
+          | Just _ <- ps  -> Just $ keyword "data" <+> keyword "instance" <+> b
+        (TySynonym{tcdTyPats = ps})
+          | Nothing <- ps -> Just $ keyword "type" <+> b
+          | Just _ <- ps  -> Just $ keyword "type" <+> keyword "instance" <+> b
+        (ClassDecl {})    -> Just $ keyword "class" <+> b
+        _ -> Nothing
     SigD (TypeSig (L _ n) (L _ _)) ->
-        let nm = docNameOcc n
-        in ppNameMini mdl nm
-    _ -> noHtml
+         Just $ ppNameMini mdl (docNameOcc n)
+    _ -> Nothing
 processForMiniSynopsis _ _ (ExportGroup lvl _id txt) =
-  let heading
-        | lvl == 1 = h1
-        | lvl == 2 = h2
-        | lvl >= 3 = h3
-        | otherwise = error "bad group level"
-  in heading << docToHtml txt
-processForMiniSynopsis _ _ _ = noHtml
+  Just $ groupTag lvl << docToHtml txt
+processForMiniSynopsis _ _ _ = Nothing
 
 ppNameMini :: Module -> OccName -> Html
 ppNameMini mdl nm =

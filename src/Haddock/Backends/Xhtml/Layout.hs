@@ -11,6 +11,8 @@
 -- Portability :  portable
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Layout (
+  miniBody,
+  
   divPackageHeader, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynposis, divInterface, 
   
@@ -45,6 +47,9 @@ import FastString            ( unpackFS )
 import GHC
 
 -- Sections of the document
+
+miniBody :: Html -> Html
+miniBody = body ! [identifier "mini"]
 
 divPackageHeader, divModuleHeader, divFooter :: Html -> Html
 divPackageHeader = thediv ! [identifier "package-header"]
