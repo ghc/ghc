@@ -118,7 +118,15 @@ $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
 $(call c-objs,$1,$2,v)
 $(call hs-objs,$1,$2,v)
 
-ifeq "$$(BootingFromHc)" "NO"
+$1_$2_LINK_WITH_GCC = NO
+ifeq "$$(BootingFromHc)" "YES"
+$1_$2_LINK_WITH_GCC = YES
+endif
+ifeq "$$($1_$2_v_HS_OBJS)" ""
+$1_$2_LINK_WITH_GCC = YES
+endif
+
+ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS)
 else
