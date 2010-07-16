@@ -47,6 +47,7 @@ import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import System.Directory hiding ( copyFile )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
+import Data.List             ( intercalate )
 import Data.Function
 import Data.Ord              ( comparing )
 
@@ -270,12 +271,11 @@ ppHtmlContents odir doctitle
                  styleSheet +++
                  (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << (
-            simpleHeader doctitle Nothing maybe_index_url
-                             maybe_source_url maybe_wiki_url +++
-            vanillaTable << (
-               ppPrologue doctitle prologue </>
-               ppModuleTree doctitle tree) +++
-            footer
+          simpleHeader doctitle Nothing maybe_index_url
+                           maybe_source_url maybe_wiki_url +++
+          ppPrologue doctitle prologue +++
+          ppModuleTree tree +++
+          footer
           )
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString html)
@@ -291,75 +291,41 @@ ppHtmlContents odir doctitle
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 
-ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> HtmlTable
-ppPrologue _ Nothing = emptyTable
-ppPrologue title (Just doc) = 
-  (tda [theclass "section1"] << toHtml title) </>
-  (tda [theclass "doc"] << (rdrDocToHtml doc))
+ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
+ppPrologue _ Nothing = noHtml
+ppPrologue title (Just doc) =
+  divDescription << (h1 << title +++ rdrDocToHtml doc)
 
-ppModuleTree :: String -> [ModuleTree] -> HtmlTable
-ppModuleTree _ ts = 
-  tda [theclass "section1"] << toHtml "Modules" </>
-  td << vanillaTable2 << htmlTable
+ppModuleTree :: [ModuleTree] -> Html
+ppModuleTree ts =
+  divModuleList << (sectionName << "Modules" +++ mkNodeList [] "n" ts)
+
+mkNodeList :: [String] -> String -> [ModuleTree] -> Html
+mkNodeList ss p ts = case ts of
+  [] -> noHtml
+  _ -> unordList (zipWith (mkNode ss) ps ts)
   where
-    genTable tbl id_ []     = (tbl, id_)
-    genTable tbl id_ (x:xs) = genTable (tbl </> u) id' xs      
-      where
-        (u,id') = mkNode [] x 0 id_
-
-    (htmlTable,_) = genTable emptyTable 0 ts
-
-mkNode :: [String] -> ModuleTree -> Int -> Int -> (HtmlTable,Int)
-mkNode ss (Node s leaf pkg short ts) depth id_ = htmlNode
+    ps = [ p ++ '.' : show i | i <- [(1::Int)..]]
+    
+mkNode :: [String] -> String -> ModuleTree -> Html
+mkNode ss p (Node s leaf pkg short ts) = 
+  collBtn +++ htmlModule +++ shortDescr +++ htmlPkg +++ subtree
   where
-    htmlNode = case ts of
-      [] -> (td_pad_w 1.25 depth << htmlModule  <-> shortDescr <-> htmlPkg,id_)
-      _  -> (td_w depth << (collapsebutton id_s +++ htmlModule) <-> shortDescr <-> htmlPkg </> 
-                (td_subtree << sub_tree), id')
-
-    mod_width = 50::Int {-em-}
-
-    td_pad_w :: Double -> Int -> Html -> HtmlTable
-    td_pad_w pad depth_ = 
-        tda [thestyle ("padding-left: " ++ show pad ++ "em;" ++
-                       "width: " ++ show (mod_width - depth_*2) ++ "em")]
-
-    td_w depth_ = 
-        tda [thestyle ("width: " ++ show (mod_width - depth_*2) ++ "em")]
-
-    td_subtree =
-        tda [thestyle ("padding: 0; padding-left: 2em")]
-
-    shortDescr :: HtmlTable
-    shortDescr = case short of
-        Nothing -> cell $ td empty
-        Just doc -> tda [theclass "rdoc"] (origDocToHtml doc)
-
+    collBtn = case ts of
+      [] -> noHtml
+      _ -> collapsebutton p
+  
     htmlModule 
-      | leaf      = ppModule (mkModule (stringToPackageId pkgName) 
+      | leaf      = ppModule (mkModule (stringToPackageId (fromMaybe "" pkg)) 
                                        (mkModuleName mdl)) ""
       | otherwise = toHtml s
 
-    -- ehm.. TODO: change the ModuleTree type
-    (htmlPkg, pkgName) = case pkg of
-      Nothing -> (td << empty, "")
-      Just p  -> (td << toHtml p, p)
+    mdl = intercalate "." (reverse (s:ss))
+    
+    shortDescr = maybe noHtml origDocToHtml short
+    htmlPkg = maybe noHtml toHtml pkg
 
-    mdl = foldr (++) "" (s' : map ('.':) ss')
-    (s':ss') = reverse (s:ss)
-         -- reconstruct the module name
-    
-    id_s = "n." ++ show id_
-    
-    (sub_tree,id') = genSubTree emptyTable (id_+1) ts
-    
-    genSubTree :: HtmlTable -> Int -> [ModuleTree] -> (Html,Int)
-    genSubTree htmlTable id__ [] = (sub_tree_, id__)
-      where
-        sub_tree_ = collapsed vanillaTable2 id_s htmlTable
-    genSubTree htmlTable id__ (x:xs) = genSubTree (htmlTable </> u) id__' xs      
-      where
-        (u,id__') = mkNode (s:ss) x (depth+1) id__
+    subtree = mkNodeList (s:ss) p ts ! [identifier p]
 
 
 -- | Turn a module tree into a flat list of full module names.  E.g.,
@@ -392,7 +358,7 @@ ppHtmlContentsFrame odir doctitle ifaces = do
              styleSheet +++
              (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         miniBody << divModuleList << 
-          (sectionName << "Modules" +++ shortDeclList mods)
+          (sectionName << "Modules" +++ unordList mods)
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString html)
 

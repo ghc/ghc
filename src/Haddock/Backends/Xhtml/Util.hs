@@ -25,7 +25,7 @@ module Haddock.Backends.Xhtml.Util (
   tda, emptyTable, s8,
   abovesSep, hsep,
   
-  collapsebutton, collapseId, collapsed,
+  collapsebutton, collapseId,
   documentCharacterEncoding,
   
   cssFiles, styleSheet, stylePickers, styleMenu
@@ -205,10 +205,6 @@ linkedAnchor frag = anchor ! [href hr_]
 collapsebutton :: String -> Html
 collapsebutton id_ = 
   image ! [ src minusFile, theclass "coll", onclick ("toggle(this,'" ++ id_ ++ "')"), alt "show/hide" ]
-
-collapsed :: (HTML a) => (Html -> Html) -> String -> a -> Html
-collapsed fn id_ html =
-  fn ! [identifier id_, thestyle "display:block;"] << html
 
 -- A quote is a valid part of a Haskell identifier, but it would interfere with
 -- the ECMA script string delimiter used in collapsebutton above.

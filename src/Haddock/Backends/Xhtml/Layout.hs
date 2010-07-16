@@ -135,7 +135,7 @@ subInstances :: String -> [SubDecl] -> Html
 subInstances id_ = divSubDecls "instances" instCaption . instTable
   where
     instCaption = collapsebutton id_ +++ " Instances"
-    instTable = (collapsed thediv id_ `fmap`) . subTable
+    instTable = fmap (thediv ! [identifier id_] <<) . subTable
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock
