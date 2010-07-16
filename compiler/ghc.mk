@@ -46,7 +46,18 @@ endif
 $(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
 	"$(RM)" $(RM_OPTS) $@
 	@echo 'Creating $@ ... '
+	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
 	@echo 'module Config where'                                         >> $@
+	@echo                                                               >> $@
+	@echo '#include "ghc_boot_platform.h"'                              >> $@
+	@echo                                                               >> $@
+	@echo 'cBuildPlatform :: String'                                    >> $@
+	@echo 'cBuildPlatform = BuildPlatform_NAME'                         >> $@
+	@echo 'cHostPlatform :: String'                                     >> $@
+	@echo 'cHostPlatform = HostPlatform_NAME'                           >> $@
+	@echo 'cTargetPlatform :: String'                                   >> $@
+	@echo 'cTargetPlatform = TargetPlatform_NAME'                       >> $@
+	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
 	@echo 'cProjectVersion       :: String'                             >> $@
