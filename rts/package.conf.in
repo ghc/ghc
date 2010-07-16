@@ -142,7 +142,7 @@ ld-options:
  *  path.  This is important to use the static gmp in preference on Mac OS.
  *  The used option is specific to the Darwin linker.
  */
-#ifdef darwin_BUILD_OS
+#ifdef darwin_HOST_OS
 	 , "-Wl,-search_paths_first"
 #endif
 
