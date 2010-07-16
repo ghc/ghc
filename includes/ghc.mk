@@ -46,7 +46,7 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 
-ifneq "$(TARGETPLATFORM)"  "$(HOSTPLATFORM)"
+ifeq "$(PORTING_HOST)" "YES"
 
 $(includes_H_CONFIG) :
 	@echo "*** Cross-compiling: please copy $(includes_H_CONFIG) from the target system"
@@ -116,7 +116,7 @@ endif
 
 includes_DERIVEDCONSTANTS = includes/DerivedConstants.h
 
-ifneq "$(TARGETPLATFORM)" "$(HOSTPLATFORM)"
+ifeq "$(PORTING_HOST)" "YES"
 
 DerivedConstants.h :
 	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
@@ -144,7 +144,7 @@ endif
 
 includes_GHCCONSTANTS = includes/GHCConstants.h
 
-ifneq "$(TARGETPLATFORM)" "$(HOSTPLATFORM)"
+ifeq "$(PORTING_HOST)" "YES"
 
 $(includes_GHCCONSTANTS) :
 	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"

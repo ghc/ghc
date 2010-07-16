@@ -44,7 +44,7 @@ rts_C_SRCS = $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(AL
 rts_CMM_SRCS = $(wildcard rts/*.cmm)
 
 # Don't compile .S files when bootstrapping a new arch
-ifeq "$(TARGETPLATFORM)" "$(HOSTPLATFORM)"
+ifneq "$(PORTING_HOST)" "YES"
 ifneq "$(findstring $(TargetArch_CPP), powerpc powerpc64)" ""
 rts_S_SRCS += rts/AdjustorAsm.S
 else
