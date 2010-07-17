@@ -173,14 +173,6 @@ headHtml docTitle miniPage =
     setSynopsis = maybe "" (\p -> "setSynopsis(\"" ++ p ++ "\");") miniPage
 
 
-footer :: Html
-footer =
-  divFooter << paragraph << (
-    "Produced by " +++ 
-    (anchor ! [href projectUrl] << toHtml projectName) +++
-    (" version " ++ projectVersion)
-    )
-   
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _) Nothing =
   Just (anchor ! [href src_base_url] << "Source code")
@@ -233,7 +225,11 @@ bodyHtml doctitle iface
         ] ++ [styleMenu]) ! [theclass "links"]
       ],
     pageContent,
-    footer
+    divFooter << paragraph << (
+      "Produced by " +++ 
+      (anchor ! [href projectUrl] << toHtml projectName) +++
+      (" version " ++ projectVersion)
+      )
     ]
 
 moduleInfo :: Interface -> Html
