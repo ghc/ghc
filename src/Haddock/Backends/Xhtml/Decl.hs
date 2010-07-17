@@ -152,7 +152,7 @@ ppTyFamHeader summary associated decl unicode =
 
   case tcdKind decl of
     Just kind -> dcolon unicode  <+> ppKind kind 
-    Nothing -> empty
+    Nothing -> noHtml
 
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
@@ -279,12 +279,12 @@ ppLContextNoArrow = ppContextNoArrow . unLoc
 
 
 ppContextNoArrow :: HsContext DocName -> Bool -> Html
-ppContextNoArrow []  _ = empty
+ppContextNoArrow []  _ = noHtml
 ppContextNoArrow cxt unicode = pp_hs_context (map unLoc cxt) unicode
 
 
 ppContextNoLocs :: [HsPred DocName] -> Bool -> Html
-ppContextNoLocs []  _ = empty
+ppContextNoLocs []  _ = noHtml
 ppContextNoLocs cxt unicode = pp_hs_context cxt unicode <+> darrow unicode
 
 
@@ -293,7 +293,7 @@ ppContext cxt unicode = ppContextNoLocs (map unLoc cxt) unicode
 
 
 pp_hs_context :: [HsPred DocName] -> Bool -> Html
-pp_hs_context []  _       = empty
+pp_hs_context []  _       = noHtml
 pp_hs_context [p] unicode = ppPred unicode p
 pp_hs_context cxt unicode = parenList (map (ppPred unicode) cxt)
 
@@ -315,7 +315,7 @@ ppClassHdr :: Bool -> Located [LHsPred DocName] -> DocName
            -> Bool -> Html
 ppClassHdr summ lctxt n tvs fds unicode = 
   keyword "class" 
-  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt unicode else empty)
+  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt unicode else noHtml)
   <+> ppAppDocNameNames summ n (tyvarNames $ tvs)
         <+> ppFds fds unicode
 
@@ -444,10 +444,10 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
              <+> whereBit)
 
     whereBit 
-      | null cons = empty 
+      | null cons = noHtml 
       | otherwise = case resTy of 
         ResTyGADT _ -> keyword "where"
-        _ -> empty                         
+        _ -> noHtml                         
 
     constrBit = subConstructors 
       (map (ppSideBySideConstr subdocs unicode) cons)
@@ -520,7 +520,7 @@ ppConstrHdr forall tvs ctxt unicode
   where
     ppForall = case forall of 
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
-      Implicit -> empty
+      Implicit -> noHtml
 
 ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LConDecl DocName -> SubDecl
 ppSideBySideConstr subdocs unicode (L _ con) = (decl, mbDoc, fieldPart)
@@ -608,7 +608,7 @@ ppKind k = toHtml $ showSDoc (ppr k)
 
 
 ppBang :: HsBang -> Html
-ppBang HsNoBang = empty 
+ppBang HsNoBang = noHtml 
 ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
                              -- so we just show the strictness annotation
 

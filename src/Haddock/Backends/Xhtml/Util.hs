@@ -16,14 +16,13 @@ module Haddock.Backends.Xhtml.Util (
   namedAnchor, linkedAnchor,
   spliceURL,
   
-  (<+>), char, empty, nonEmpty,
+  (<+>), char, nonEmpty,
   keyword, punctuate,
   
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
   
-  tda, emptyTable, s8,
-  abovesSep, hsep,
+  hsep,
   
   collapsebutton, collapseId,
   documentCharacterEncoding,
@@ -109,9 +108,6 @@ comma  = char ','
 char :: Char -> Html
 char c = toHtml [c]
 
-empty :: Html
-empty  = noHtml
-
 -- | ensure content contains at least something (a non-breaking space)
 nonEmpty :: (HTML a) => a -> Html
 nonEmpty a = if isNoHtml h then spaceHtml else h
@@ -135,13 +131,6 @@ punctuate h (d0:ds) = go d0 ds
                      go d [] = [d]
                      go d (e:es) = (d +++ h) : go e es
 
-abovesSep :: HtmlTable -> [HtmlTable] -> HtmlTable
-abovesSep _ []      = emptyTable
-abovesSep h (d0:ds) = go d0 ds
-                   where
-                     go d [] = d
-                     go d (e:es) = d </> h </> go e es
-
 parenList :: [Html] -> Html
 parenList = parens . hsep . punctuate comma
 
@@ -151,12 +140,6 @@ ubxParenList = ubxparens . hsep . punctuate comma
 ubxparens :: Html -> Html
 ubxparens h = toHtml "(#" +++ h +++ toHtml "#)"
 
-
-tda :: [HtmlAttr] -> Html -> HtmlTable
-tda as = cell . (td ! as)
-
-emptyTable :: HtmlTable
-emptyTable = cell noHtml
 
 onclick :: String -> HtmlAttr
 onclick = strAttr "onclick"
@@ -172,9 +155,6 @@ forallSymbol unicode = if unicode then toHtml "∀" else keyword "forall"
 dot :: Html
 dot = toHtml "."
 
-
-s8 :: HtmlTable
-s8  = tda [ theclass "s8" ]  << noHtml
 
 
 -- | Generate a named anchor
