@@ -33,8 +33,6 @@ module Haddock.Backends.Xhtml.Layout (
   subMethods,
   
   topDeclElem, declElem,
-  
-  vanillaTable, vanillaTable2  
 ) where
 
 import Haddock.Backends.Xhtml.DocMarkup
@@ -94,6 +92,9 @@ divSubDecls cssClass captionName = maybe noHtml wrap
     subSection = thediv ! [theclass $ unwords ["subs", cssClass]]
     subCaption = paragraph ! [theclass "caption"] << captionName
 
+{-
+  if we ever decide to style sub-declarations with dl lists, this code does it
+  
 subDlist :: [SubDecl] -> Maybe Html
 subDlist [] = Nothing
 subDlist decls = Just $ dlist << map subEntry decls
@@ -105,6 +106,7 @@ subDlist decls = Just $ dlist << map subEntry decls
       
     Nothing  `with` [] = spaceHtml
     ma       `with` bs = ma +++ bs
+-}
 
 subTable :: [SubDecl] -> Maybe Html
 subTable [] = Nothing
@@ -177,9 +179,3 @@ topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html =
 
         fname = unpackFS (srcSpanFile loc)
 
-
-
--- a vanilla table has width 100%, no border, no padding, no spacing
-vanillaTable, vanillaTable2 :: Html -> Html
-vanillaTable  = table ! [theclass "vanilla",  cellspacing 0, cellpadding 0]
-vanillaTable2 = table ! [theclass "vanilla2", cellspacing 0, cellpadding 0]
