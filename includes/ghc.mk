@@ -127,7 +127,7 @@ else
 includes_dist-derivedconstants_C_SRCS = mkDerivedConstants.c
 includes_dist-derivedconstants_PROG   = mkDerivedConstants$(exeext)
 
-$(eval $(call build-prog,includes,dist-derivedconstants,0))
+$(eval $(call build-prog,includes,dist-derivedconstants,1))
 
 $(includes_dist-derivedconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(wildcard includes/*.h) $(wildcard rts/*.h)
 includes/dist-derivedconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
@@ -156,7 +156,7 @@ includes_dist-ghcconstants_C_SRCS = mkDerivedConstants.c
 includes_dist-ghcconstants_PROG   = mkGHCConstants$(exeext)
 includes_dist-ghcconstants_CC_OPTS = -DGEN_HASKELL
 
-$(eval $(call build-prog,includes,dist-ghcconstants,0))
+$(eval $(call build-prog,includes,dist-ghcconstants,1))
 
 ifneq "$(BINDIST)" "YES"
 $(includes_dist-ghcconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(wildcard includes/*.h) $(wildcard rts/*.h)
