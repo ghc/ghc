@@ -213,39 +213,28 @@ indexButton maybe_index_url
   = Just (anchor ! [href url] << "Index")
   where url = maybe indexHtmlFile id maybe_index_url
 
-simpleHeader :: String -> Maybe String -> Maybe String
-             -> SourceURLs -> WikiURLs -> Html
-simpleHeader doctitle maybe_contents_url maybe_index_url
-  maybe_source_url maybe_wiki_url = 
-  divPackageHeader << (
-    sectionName << nonEmpty doctitle +++
-    unordList (catMaybes [ 
-      srcButton maybe_source_url Nothing,
-      wikiButton maybe_wiki_url Nothing,
-      contentsButton maybe_contents_url,
-      indexButton maybe_index_url
-      ] ++ [styleMenu]) ! [theclass "links"]
-  )
 
-pageHeader :: String -> Interface -> String
+bodyHtml :: String -> Maybe Interface
     -> SourceURLs -> WikiURLs
-    -> Maybe String -> Maybe String -> Html
-pageHeader mdl iface doctitle
+    -> Maybe String -> Maybe String
+    -> Html -> Html
+bodyHtml doctitle iface 
            maybe_source_url maybe_wiki_url
-           maybe_contents_url maybe_index_url =
-  divPackageHeader << (
-    sectionName << nonEmpty doctitle +++
-    unordList (catMaybes [ 
-        srcButton maybe_source_url (Just iface),
-        wikiButton maybe_wiki_url (Just $ ifaceMod iface),
+           maybe_contents_url maybe_index_url
+           pageContent =
+  body << [
+    divPackageHeader << [
+      sectionName << nonEmpty doctitle,
+      unordList (catMaybes [ 
+        srcButton maybe_source_url iface,
+        wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url
         ] ++ [styleMenu]) ! [theclass "links"]
-   ) +++
-  divModuleHeader << (
-    sectionName << mdl +++
-    moduleInfo iface
-  )
+      ],
+    pageContent,
+    footer
+    ]
 
 moduleInfo :: Interface -> Html
 moduleInfo iface = 
@@ -286,13 +275,12 @@ ppHtmlContents odir doctitle
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html = 
         headHtml doctitle Nothing +++
-        body << (
-          simpleHeader doctitle Nothing maybe_index_url
-                           maybe_source_url maybe_wiki_url +++
-          ppPrologue doctitle prologue +++
-          ppModuleTree tree +++
-          footer
-          )
+        bodyHtml doctitle Nothing
+          maybe_source_url maybe_wiki_url
+          Nothing maybe_index_url << [
+            ppPrologue doctitle prologue,
+            ppModuleTree tree
+          ]
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString html)
 
@@ -412,15 +400,14 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   where
     indexPage showLetters ch items =
       headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing +++
-       body <<
-        (simpleHeader doctitle maybe_contents_url Nothing
-                      maybe_source_url maybe_wiki_url +++
-         divIndex <<
+      bodyHtml doctitle Nothing
+        maybe_source_url maybe_wiki_url
+        maybe_contents_url Nothing << 
+          divIndex <<
             (sectionName << indexName ch +++
              (if showLetters then indexInitialLetterLinks else noHtml) +++
              (if null items then noHtml else buildIndex items)
             )
-        )
     
     indexName ch = "Index" ++ maybe "" (\c -> " - " ++ [c]) ch
  
@@ -516,12 +503,12 @@ ppHtmlModule odir doctitle
       mdl_str = moduleString mdl
       html = 
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) +++
-        body << (
-          pageHeader mdl_str iface doctitle
-                maybe_source_url maybe_wiki_url
-                maybe_contents_url maybe_index_url +++
-          ifaceToHtml maybe_source_url maybe_wiki_url iface unicode +++
-          footer)
+        bodyHtml doctitle (Just iface)
+          maybe_source_url maybe_wiki_url
+          maybe_contents_url maybe_index_url << [
+            divModuleHeader << (sectionName << mdl_str +++ moduleInfo iface),
+            ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
+          ]
          
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
