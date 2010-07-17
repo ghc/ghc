@@ -315,15 +315,17 @@ mkNode ss p (Node s leaf pkg short ts) =
       [] -> noHtml
       _ -> collapsebutton p
   
-    htmlModule 
-      | leaf      = ppModule (mkModule (stringToPackageId (fromMaybe "" pkg)) 
+    htmlModule = thespan ! [theclass "module" ] <<
+      (if leaf
+        then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg)) 
                                        (mkModuleName mdl)) ""
-      | otherwise = toHtml s
-
+        else toHtml s
+      )
+      
     mdl = intercalate "." (reverse (s:ss))
     
     shortDescr = maybe noHtml origDocToHtml short
-    htmlPkg = maybe noHtml toHtml pkg
+    htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) pkg
 
     subtree = mkNodeList (s:ss) p ts ! [identifier p]
 
@@ -358,7 +360,8 @@ ppHtmlContentsFrame odir doctitle ifaces = do
              styleSheet +++
              (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         miniBody << divModuleList << 
-          (sectionName << "Modules" +++ unordList mods)
+          (sectionName << "Modules" +++
+           ulist << [ li ! [theclass "module"] << m | m <- mods ])
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString html)
 
@@ -376,16 +379,8 @@ ppHtmlIndex :: FilePath
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
-  let html = 
-        header (documentCharacterEncoding +++
-                thetitle (toHtml (doctitle ++ " (Index)")) +++
-        styleSheet +++
-        (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
-        body << (
-            simpleHeader doctitle maybe_contents_url Nothing
-                         maybe_source_url maybe_wiki_url +++
-            vanillaTable << index_html
-           )
+  let html = indexPage split_indices Nothing
+              (if split_indices then [] else index)
 
   createDirectoryIfMissing True odir
 
@@ -401,118 +396,101 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
- where
 
-  index_html
-    | split_indices = 
-        tda [theclass "section1"] << 
-                toHtml ("Index") </>
-        indexInitialLetterLinks
-    | otherwise =
-        cell $ td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
-          aboves (map indexElt index))
+  where
+    indexPage showLetters ch items =
+      header (documentCharacterEncoding +++
+              thetitle (toHtml (doctitle ++ " (" ++ indexName ch ++ ")")) +++
+              styleSheet +++
+              (script ! [src jsFile, thetype "text/javascript"] $ noHtml)
+              ) +++
+       body <<
+        (simpleHeader doctitle maybe_contents_url Nothing
+                      maybe_source_url maybe_wiki_url +++
+         divIndex <<
+            (sectionName << indexName ch +++
+             (if showLetters then indexInitialLetterLinks else noHtml) +++
+             (if null items then noHtml else buildIndex items)
+            )
+        )
+    
+    indexName ch = "Index" ++ maybe "" (\c -> " - " ++ [c]) ch
+ 
+    buildIndex items = table << aboves (map indexElt items)
 
-  -- an arbitrary heuristic:
-  -- too large, and a single-page will be slow to load
-  -- too small, and we'll have lots of letter-indexes with only one
-  --   or two members in them, which seems inefficient or
-  --   unnecessarily hard to use.
-  split_indices = length index > 150
-
-  setTrClass :: Html -> Html
-  setTrClass = id
-  -- XHtml is more strict about not allowing you to poke inside a structure
-  -- hence this approach won't work for now -- since the whole table is
-  -- going away soon, this is just disabled for now.
-{-
-  setTrClass (Html xs) = Html $ map f xs
-      where
-          f (HtmlTag name attrs inner)
-               | map toUpper name == "TR" = HtmlTag name (theclass "indexrow":attrs) inner
-               | otherwise = HtmlTag name attrs (setTrClass inner)
-          f x = x
--}      
-  indexInitialLetterLinks = 
-        td << setTrClass (table ! [cellpadding 0, cellspacing 5] <<
-            besides [ td << anchor ! [href (subIndexHtmlFile c)] <<
-                         toHtml [c]
-                    | c <- initialChars
-                    , any ((==c) . toUpper . head . fst) index ])
-
-  -- todo: what about names/operators that start with Unicode
-  -- characters?
-  -- Exports beginning with '_' can be listed near the end,
-  -- presumably they're not as important... but would be listed
-  -- with non-split index!
-  initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~" ++ "_"
-
-  do_sub_index this_ix c
-    = unless (null index_part) $
-        writeFile (joinPath [odir, subIndexHtmlFile c]) (renderToString html)
-    where 
-      html = header (documentCharacterEncoding +++
-                thetitle (toHtml (doctitle ++ " (Index)")) +++
-                styleSheet) +++
-             body << (
-                simpleHeader doctitle maybe_contents_url Nothing
-                             maybe_source_url maybe_wiki_url +++
-                vanillaTable << (
-                          indexInitialLetterLinks </>
-                tda [theclass "section1"] << 
-                toHtml ("Index (" ++ c:")") </>
-                td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
-                  aboves (map indexElt index_part) )
-               ))
-
-      index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
-
-
-  index :: [(String, Map GHC.Name [(Module,Bool)])]
-  index = sortBy cmp (Map.toAscList full_index)
-    where cmp (n1,_) (n2,_) = map toUpper n1 `compare` map toUpper n2
-
-  -- for each name (a plain string), we have a number of original HsNames that
-  -- it can refer to, and for each of those we have a list of modules
-  -- that export that entity.  Each of the modules exports the entity
-  -- in a visible or invisible way (hence the Bool).
-  full_index :: Map String (Map GHC.Name [(Module,Bool)])
-  full_index = Map.fromListWith (flip (Map.unionWith (++)))
-               (concat (map getIfaceIndex ifaces))
-
-  getIfaceIndex iface = 
-    [ (getOccString name
-       , Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
-       | name <- instExports iface ]
-    where mdl = instMod iface
-
-  indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
-  indexElt (str, entities) = 
-     case Map.toAscList entities of
-        [(nm,entries)] ->  
-            tda [ theclass "indexentry" ] << toHtml str <-> 
-                        indexLinks nm entries
-        many_entities ->
-            tda [ theclass "indexentry" ] << toHtml str </> 
-                aboves (map doAnnotatedEntity (zip [1..] many_entities))
-
-  doAnnotatedEntity :: (Integer, (Name, [(Module, Bool)])) -> HtmlTable
-  doAnnotatedEntity (j,(nm,entries))
-        = tda [ theclass "indexannot" ] << 
-                toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
-                 indexLinks nm entries
-
-  ppAnnot n | not (isValOcc n) = toHtml "Type/Class"
-            | isDataOcc n      = toHtml "Data Constructor"
-            | otherwise        = toHtml "Function"
-
-  indexLinks nm entries = 
-     tda [ theclass "indexlinks" ] << 
-        hsep (punctuate comma 
-        [ if visible then
-             linkId mdl (Just nm) << toHtml (moduleString mdl)
-          else
-             toHtml (moduleString mdl)
-        | (mdl, visible) <- entries ])
+    -- an arbitrary heuristic:
+    -- too large, and a single-page will be slow to load
+    -- too small, and we'll have lots of letter-indexes with only one
+    --   or two members in them, which seems inefficient or
+    --   unnecessarily hard to use.
+    split_indices = length index > 150
+  
+    indexInitialLetterLinks = 
+          unordList [ anchor ! [href (subIndexHtmlFile c)] << [c]
+                      | c <- initialChars
+                      , any ((==c) . toUpper . head . fst) index ]
+  
+    -- todo: what about names/operators that start with Unicode
+    -- characters?
+    -- Exports beginning with '_' can be listed near the end,
+    -- presumably they're not as important... but would be listed
+    -- with non-split index!
+    initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~" ++ "_"
+  
+    do_sub_index this_ix c
+      = unless (null index_part) $
+          writeFile (joinPath [odir, subIndexHtmlFile c]) (renderToString html)
+      where 
+        html = indexPage True (Just c) index_part
+        index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
+  
+  
+    index :: [(String, Map GHC.Name [(Module,Bool)])]
+    index = sortBy cmp (Map.toAscList full_index)
+      where cmp (n1,_) (n2,_) = map toUpper n1 `compare` map toUpper n2
+  
+    -- for each name (a plain string), we have a number of original HsNames that
+    -- it can refer to, and for each of those we have a list of modules
+    -- that export that entity.  Each of the modules exports the entity
+    -- in a visible or invisible way (hence the Bool).
+    full_index :: Map String (Map GHC.Name [(Module,Bool)])
+    full_index = Map.fromListWith (flip (Map.unionWith (++)))
+                 (concat (map getIfaceIndex ifaces))
+  
+    getIfaceIndex iface = 
+      [ (getOccString name
+         , Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
+         | name <- instExports iface ]
+      where mdl = instMod iface
+  
+    indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
+    indexElt (str, entities) = 
+       case Map.toAscList entities of
+          [(nm,entries)] -> 
+              td ! [ theclass "src" ] << toHtml str <-> 
+                          indexLinks nm entries
+          many_entities ->
+              td ! [ theclass "src" ] << toHtml str <-> td << spaceHtml </> 
+                  aboves (map doAnnotatedEntity (zip [1..] many_entities))
+  
+    doAnnotatedEntity :: (Integer, (Name, [(Module, Bool)])) -> HtmlTable
+    doAnnotatedEntity (j,(nm,entries))
+          = td ! [ theclass "alt" ] << 
+                  toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
+                   indexLinks nm entries
+  
+    ppAnnot n | not (isValOcc n) = toHtml "Type/Class"
+              | isDataOcc n      = toHtml "Data Constructor"
+              | otherwise        = toHtml "Function"
+  
+    indexLinks nm entries = 
+       td ! [ theclass "module" ] << 
+          hsep (punctuate comma 
+          [ if visible then
+               linkId mdl (Just nm) << toHtml (moduleString mdl)
+            else
+               toHtml (moduleString mdl)
+          | (mdl, visible) <- entries ])
 
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
