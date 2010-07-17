@@ -153,6 +153,26 @@ copyHtmlBits odir libdir _maybe_css = do
   mapM_ copyLibFile cssFiles
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile, framesFile ]
 
+
+headHtml :: String -> Maybe String -> Html
+headHtml docTitle miniPage =
+  header << [
+    meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
+    thetitle << docTitle,
+    styleSheet,
+    script ! [src jsFile, thetype "text/javascript"] << noHtml,
+    script ! [thetype "text/javascript"]
+        -- NB: Within XHTML, the content of script tags needs to be
+        -- a <![CDATA[ section. Will break if the miniPage name could 
+        -- have "]]>" in it!
+      << primHtml (
+          "//<![CDATA[\nwindow.onload = function () {resetStyle();"
+          ++ setSynopsis ++ "};\n//]]>\n")
+    ]
+  where
+    setSynopsis = maybe "" (\p -> "setSynopsis(\"" ++ p ++ "\");") miniPage
+
+
 footer :: Html
 footer =
   divFooter << paragraph << (
@@ -265,11 +285,7 @@ ppHtmlContents odir doctitle
   let tree = mkModuleTree showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html = 
-        header 
-                (documentCharacterEncoding +++
-                 thetitle (toHtml doctitle) +++
-                 styleSheet +++
-                 (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
+        headHtml doctitle Nothing +++
         body << (
           simpleHeader doctitle Nothing maybe_index_url
                            maybe_source_url maybe_wiki_url +++
@@ -354,11 +370,7 @@ ppHtmlContentsFrame :: FilePath -> String -> [InstalledInterface] -> IO ()
 ppHtmlContentsFrame odir doctitle ifaces = do
   let mods = flatModuleTree ifaces
       html =
-        header
-            (documentCharacterEncoding +++
-             thetitle (toHtml doctitle) +++
-             styleSheet +++
-             (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
+        headHtml doctitle Nothing +++
         miniBody << divModuleList << 
           (sectionName << "Modules" +++
            ulist << [ li ! [theclass "module"] << m | m <- mods ])
@@ -399,11 +411,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 
   where
     indexPage showLetters ch items =
-      header (documentCharacterEncoding +++
-              thetitle (toHtml (doctitle ++ " (" ++ indexName ch ++ ")")) +++
-              styleSheet +++
-              (script ! [src jsFile, thetype "text/javascript"] $ noHtml)
-              ) +++
+      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing +++
        body <<
         (simpleHeader doctitle maybe_contents_url Nothing
                       maybe_source_url maybe_wiki_url +++
@@ -507,19 +515,7 @@ ppHtmlModule odir doctitle
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
       html = 
-        header (documentCharacterEncoding +++
-                thetitle (toHtml mdl_str) +++
-                styleSheet +++
-                (script ! [src jsFile, thetype "text/javascript"] $ noHtml) +++
-                (script ! [thetype "text/javascript"]
-                     -- NB: Within XHTML, the content of script tags needs to be
-                     -- a CDATA section. Will break if the generated name could 
-                     -- have "]]>" in it!
-                     << primHtml (
-                      "//<![CDATA[\nwindow.onload = function () {setSynopsis(\"mini_"
-                         ++ moduleHtmlFile mdl ++ "\")};\n//]]>\n")
-                )
-               ) +++
+        headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) +++
         body << (
           pageHeader mdl_str iface doctitle
                 maybe_source_url maybe_wiki_url
@@ -535,11 +531,7 @@ ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> Bool -> IO ()
 ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
   let mdl = ifaceMod iface
       html =
-        header
-          (documentCharacterEncoding +++
-           thetitle (toHtml $ moduleString mdl) +++
-           styleSheet +++
-           (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
+        headHtml (moduleString mdl) Nothing +++
         miniBody << 
           (divModuleHeader << sectionName << moduleString mdl +++
            miniSynopsis mdl iface unicode)

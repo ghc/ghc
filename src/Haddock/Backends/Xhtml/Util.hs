@@ -25,7 +25,6 @@ module Haddock.Backends.Xhtml.Util (
   hsep,
   
   collapsebutton, collapseId,
-  documentCharacterEncoding,
   
   cssFiles, styleSheet, stylePickers, styleMenu
 ) where
@@ -191,9 +190,6 @@ collapsebutton id_ =
 collapseId :: Name -> String
 collapseId nm = "i:" ++ escapeStr (getOccString nm)
 
-documentCharacterEncoding :: Html
-documentCharacterEncoding =
-   meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"]
 
 -- Standard set of style sheets, first is the preferred
 cssThemes :: [(String, String)]

@@ -136,7 +136,6 @@ function setSynopsis(filename) {
     if (parent.window.synopsis) {
       parent.window.synopsis.location = filename;
     }
-    resetStyle();   // ugly: we are using setSynopsis as a hook!
 }
 
 
