@@ -67,7 +67,9 @@ endif # $1_$2_NO_BUILD_DEPS
 $$($1_$2_depfile_haskell) : $$(UNLIT)
 
 ifneq "$$(NO_INCLUDE_DEPS)" "YES"
+ifneq "$$(strip $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS))" ""
 include $$($1_$2_depfile_haskell)
+endif
 include $$($1_$2_depfile_c_asm)
 else
 ifeq "$$(DEBUG)" "YES"
