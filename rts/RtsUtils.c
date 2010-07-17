@@ -441,14 +441,14 @@ void printRtsInfo(void) {
     printf(" [(\"GHC RTS\", \"YES\")\n");
     mkRtsInfoPair("GHC version",             ProjectVersion);
     mkRtsInfoPair("RTS way",                 RtsWay);
-    mkRtsInfoPair("Host platform",           HostPlatform);
-    mkRtsInfoPair("Host architecture",       HostArch);
-    mkRtsInfoPair("Host OS",                 HostOS);
-    mkRtsInfoPair("Host vendor",             HostVendor);
     mkRtsInfoPair("Build platform",          BuildPlatform);
     mkRtsInfoPair("Build architecture",      BuildArch);
     mkRtsInfoPair("Build OS",                BuildOS);
     mkRtsInfoPair("Build vendor",            BuildVendor);
+    mkRtsInfoPair("Host platform",           HostPlatform);
+    mkRtsInfoPair("Host architecture",       HostArch);
+    mkRtsInfoPair("Host OS",                 HostOS);
+    mkRtsInfoPair("Host vendor",             HostVendor);
     mkRtsInfoPair("Target platform",         TargetPlatform);
     mkRtsInfoPair("Target architecture",     TargetArch);
     mkRtsInfoPair("Target OS",               TargetOS);
