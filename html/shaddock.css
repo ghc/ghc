@@ -163,7 +163,9 @@ p.caption, h1, h2, h3, h4 {
 
 h1,
 #description .caption,
-#synopsis .caption {
+#synopsis .caption,
+#index .caption,
+#module-list .caption {
   padding-top: 14px;
   margin-bottom: 0;
   font-weight: bold;
@@ -171,14 +173,16 @@ h1,
   font-size: 140%
   }
   
-h2 {
+h2
+{
   padding-top: 14px;
   font-weight: bold;
   letter-spacing: -0.02em;
   font-size: 120%
 }
 
-h3 {
+h3,
+#mini #module-list .caption {
   padding-top: 12px;
   font-weight: bold;
   letter-spacing: -0.02em;
@@ -385,5 +389,34 @@ div.arguments {
   background-color: #6060ff
   }
 
+#index td {
+  background-color: #f0f0f0;
+	padding-left: 1em;
+	padding-right: 1em;
+}
+#index td.alt {
+	font-size: 70%;
+	font-style: italic;
+	padding-left: 3em;
+}
 
 
+
+body#mini {
+  width: auto;
+  padding: 0;
+  background-color: #ffffff;
+  color: #000000;
+  font-size: 90%;
+  font-family: DroidSerif, Georgia, serif;
+	margin: 0.5em;
+}
+
+#mini div {
+	padding: 0 10px;
+}
+
+#module-list ul {
+	list-style: none;
+	margin-top: 0.5em;
+}

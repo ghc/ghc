@@ -276,3 +276,70 @@ dd {
 	padding-right: 1em;
 	padding-left: 1em;
 }
+
+#index .caption,
+#module-list .caption {
+    font-size:130%;
+    font-weight:bold;
+    padding: 0;
+    top:0;
+	margin: 0.5em 0;
+}
+
+#index table {
+	border-spacing: 0;
+}
+#index td {
+	padding-right: 1em;
+	border-top: 1px solid #eaeaea;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+
+#index td.alt {
+	padding-left: 2em;
+	font-style: italic;
+	font-size: 80%;
+}
+
+.module {
+}
+
+#mini {
+	padding: 0;
+	margin: 0 0 0 10px;
+}
+
+#mini h1, #mini h2, #mini h3, #mini h4 {
+	margin-top: 0.5em;
+	color: #a9a9a9;
+}
+
+#mini h1 {
+	background-color: #eff2f9;
+}
+
+#module-list ul {
+	list-style: none;
+	margin: 0 0 0 -10px;
+	padding: 0;
+}
+
+#module-list li {
+	margin: 0;
+	border-top: 1px solid #eaeaea;
+	padding-top: 2px;
+	padding-bottom: 2px;
+	padding-left: 10px;
+}
+
+#mini #interface .top,
+#mini #interface .src {
+	margin-top: 2px;
+	font-weight: normal;
+	font-style: normal;
+}
+
+#mini #interface .src a {
+	font-weight: bold;
+}
