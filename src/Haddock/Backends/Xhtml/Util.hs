@@ -36,7 +36,7 @@ import Haddock.Utils
 import Data.Maybe
 
 import Text.XHtml hiding ( name, title, p, quote )
-import qualified Text.XHtml as Html
+import qualified Text.XHtml as XHtml
 
 import GHC      ( SrcSpan, srcSpanStartLine, Name )
 import Module   ( Module )
@@ -165,7 +165,7 @@ dot = toHtml "."
 -- The escaped form for IE 7 is probably erroneous and not needed...
 
 namedAnchor :: String -> Html -> Html
-namedAnchor n c = anchor ! [Html.name n] << c
+namedAnchor n c = anchor ! [XHtml.name n] << c
 
 linkedAnchor :: String -> Html -> Html
 linkedAnchor frag = anchor ! [href hr_]
@@ -211,7 +211,7 @@ styleSheet = toHtml $ zipWith mkLink cssThemes rels
   where
     rels = ("stylesheet" : repeat "alternate stylesheet")
     mkLink (aTitle, aFile) aRel =
-       (thelink ! [href aFile, rel aRel, thetype "text/css", Html.title aTitle]) noHtml
+       (thelink ! [href aFile, rel aRel, thetype "text/css", XHtml.title aTitle]) noHtml
 
 stylePickers :: [Html]
 stylePickers = map mkPicker cssThemes
