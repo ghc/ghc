@@ -194,7 +194,8 @@ dl.info dd {
 }
 
 #description .caption,
-#synopsis .caption {
+#synopsis .caption,
+#module-list .caption {
   padding-top: 15px;
   font-weight: bold;
   font-size: 150%	
@@ -383,53 +384,70 @@ td.rdoc p {
   background-color: #6060ff
   }
 
-/* @group Original Selectors */
 
-/* --------- Contents page ---------- */
-
-div.node {
-  padding-left: 3em;
+#module-list ul {
+	list-style: none;
+	margin-left: 10px;
+	padding-bottom: 15px;
 }
 
-div.cnode {
-  padding-left: 1.75em;
+#mini #module-list .caption {
+	display: none;
 }
 
-span.pkg {
-  position: absolute;
-  left: 50em;
+#index .caption {
+	display: none;
 }
 
-/* --------- Mini Synopsis for Frame View --------- */
-
-.outer {
-  margin: 0 0;
-  padding: 0 0;
+#index .src {
+	background: none;
+	font-family: inherit;
 }
 
-.mini-synopsis {
-  padding: 0.25em 0.25em;
+#index td.alt {
+	padding-left: 2em;
 }
 
-.mini-synopsis h1 { font-size: 130%; }
-.mini-synopsis h2 { font-size: 110%; }
-.mini-synopsis h3 { font-size: 100%; }
-.mini-synopsis h1, .mini-synopsis h2, .mini-synopsis h3 {
+#index td {
+	padding-top: 2px;
+	padding-bottom: 1px;
+	padding-right: 1em;
+}
+
+
+#mini h1 { font-size: 130%; }
+#mini h2 { font-size: 110%; }
+#mini h3 { font-size: 100%; }
+#mini h1, #mini h2, #mini h3 {
   margin-top: 0.5em;
   margin-bottom: 0.25em;
   padding: 0 0;
 }
 
-.mini-synopsis h1 { border-bottom: 1px solid #ccc; }
+#mini h1 { border-bottom: 1px solid #ccc; }
 
-.mini-topbar {
+#mini #module-header {
+	margin: 0;
+	padding: 0;
+}
+#mini #module-header .caption {
   font-size: 130%;
   background: #0077dd;
   padding: 0.25em;
+  height: inherit;
+  margin: 0;
 }
 
-/* @end */
-
+#mini #interface .top {
+	margin: 0;
+	padding: 0;
+}
+#mini #interface .src {
+	margin: 0;
+	padding: 0;
+	font-family: inherit;
+	background: inherit;
+}
 
 
 
