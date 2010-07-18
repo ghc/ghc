@@ -473,16 +473,18 @@ checkHeap(bdescr *bd)
 #endif
 
     for (; bd != NULL; bd = bd->link) {
-	p = bd->start;
-	while (p < bd->free) {
-	    nat size = checkClosure((StgClosure *)p);
-	    /* This is the smallest size of closure that can live in the heap */
-	    ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
-	    p += size;
+        if(!(bd->flags & BF_SWEPT)) {
+            p = bd->start;
+            while (p < bd->free) {
+                nat size = checkClosure((StgClosure *)p);
+                /* This is the smallest size of closure that can live in the heap */
+                ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
+                p += size;
 	    
-	    /* skip over slop */
-	    while (p < bd->free &&
-		   (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; } 
+                /* skip over slop */
+                while (p < bd->free &&
+                       (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
+            }
 	}
     }
 }

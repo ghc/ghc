@@ -67,6 +67,8 @@ sweep(generation *gen)
                 fragd++;
                 bd->flags |= BF_FRAGMENTED;
             }
+
+            bd->flags |= BF_SWEPT;
         }
     }
 

@@ -1309,6 +1309,10 @@ init_collected_gen (nat g, nat n_threads)
                 if (!(bd->flags & BF_FRAGMENTED)) {
                     bd->flags |= BF_MARKED;
                 }
+
+                // BF_SWEPT should be marked only for blocks that are being
+                // collected in sweep()
+                bd->flags &= ~BF_SWEPT;
             }
         }
     }
