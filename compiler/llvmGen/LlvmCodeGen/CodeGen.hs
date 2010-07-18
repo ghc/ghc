@@ -30,6 +30,7 @@ import Control.Monad ( liftM )
 
 type LlvmStatements = OrdList LlvmStatement
 
+
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM proc Code generator
 --
@@ -62,9 +63,9 @@ basicBlocksCodeGen :: LlvmEnv
 basicBlocksCodeGen env ([]) (blocks, tops)
   = do let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
-       let ((BasicBlock id fstmts):rblocks) = blocks'
+       let ((BasicBlock id fstmts):rblks) = blocks'
        fplog <- funPrologue
-       let fblocks = (BasicBlock id (fplog ++  allocs' ++ fstmts)):rblocks
+       let fblocks = (BasicBlock id (fplog ++  allocs' ++ fstmts)):rblks
        return (env, fblocks, tops)
 
 basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
@@ -72,15 +73,6 @@ basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
        let lblocks = lblocks' ++ lb
        let ltops   = ltops' ++ lt
        basicBlocksCodeGen env' blocks (lblocks, ltops)
-
-
--- | Generate code for one block
-basicBlockCodeGen ::  LlvmEnv
-                  -> CmmBasicBlock
-                  -> UniqSM ( LlvmEnv, [LlvmBasicBlock], [LlvmCmmTop] )
-basicBlockCodeGen env (BasicBlock id stmts)
-  = do (env', instrs, top) <- stmtsToInstrs env stmts (nilOL, [])
-       return (env', [BasicBlock id (fromOL instrs)], top)
 
 
 -- | Allocations need to be extracted so they can be moved to the entry
@@ -91,9 +83,18 @@ dominateAllocs (BasicBlock id stmts)
     where
         (allstmts, allallocs) = foldl split ([],[]) stmts
         split (stmts', allocs) s@(Assignment _ (Alloca _ _))
-            = (stmts', allocs ++ [s])
+                = (stmts', allocs ++ [s])
         split (stmts', allocs) other
-            = (stmts' ++ [other], allocs)
+                = (stmts' ++ [other], allocs)
+
+
+-- | Generate code for one block
+basicBlockCodeGen ::  LlvmEnv
+                  -> CmmBasicBlock
+                  -> UniqSM ( LlvmEnv, [LlvmBasicBlock], [LlvmCmmTop] )
+basicBlockCodeGen env (BasicBlock id stmts)
+  = do (env', instrs, top) <- stmtsToInstrs env stmts (nilOL, [])
+       return (env', [BasicBlock id (fromOL instrs)], top)
 
 
 -- -----------------------------------------------------------------------------

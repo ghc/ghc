@@ -36,22 +36,8 @@ import System.IO
 --
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 llvmCodeGen dflags h us cmms
-  = do
-      bufh <- newBufHandle h
-
-      Prt.bufLeftRender bufh $ pprLlvmHeader
-
-      env' <- cmmDataLlvmGens dflags bufh env cdata []
-      cmmProcLlvmGens dflags bufh us env' cmm 1 []
-
-      bFlush bufh
-
-      return  ()
-  where
-        cmm = concat $ map (\(Cmm top) -> top) cmms
-
+  = let cmm = concat $ map (\(Cmm top) -> top) cmms
         (cdata,env) = foldr split ([],initLlvmEnv) cmm
-
         split (CmmData s d'   ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _ _) (d,e) =
             let lbl = strCLabel_llvm $ if not (null i)
@@ -59,6 +45,15 @@ llvmCodeGen dflags h us cmms
                    else l
                 env' = funInsert lbl llvmFunTy e
             in (d,env')
+    in do
+        bufh <- newBufHandle h
+        Prt.bufLeftRender bufh $ pprLlvmHeader
+
+        env' <- cmmDataLlvmGens dflags bufh env cdata []
+        cmmProcLlvmGens dflags bufh us env' cmm 1 []
+
+        bFlush bufh
+        return  ()
 
 
 -- -----------------------------------------------------------------------------
@@ -98,8 +93,7 @@ cmmProcLlvmGens _ h _ _ [] _ ivars
         usedArray = LMStaticArray (map cast ivars) ty
         lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
                   (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
-    in do
-        Prt.bufLeftRender h $ pprLlvmData ([lmUsed], [])
+    in Prt.bufLeftRender h $ pprLlvmData ([lmUsed], [])
 
 cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars
   = do

@@ -3,7 +3,7 @@
 --
 
 module LlvmCodeGen.Ppr (
-        pprLlvmHeader, pprLlvmCmmTop, pprLlvmData
+        pprLlvmHeader, pprLlvmCmmTop, pprLlvmData, infoSection, iTableSuf
     ) where
 
 #include "HsVersions.h"
@@ -19,6 +19,7 @@ import FastString
 import qualified Outputable
 import Pretty
 import Unique
+
 
 -- ----------------------------------------------------------------------------
 -- * Top level
@@ -110,7 +111,7 @@ pprInfoTable env count lbl stat
         setSection ((LMGlobalVar _ ty l _ _ c), d)
             = let sec = mkLayoutSection count
                   ilabel = strCLabel_llvm (entryLblToInfoLbl lbl)
-                              `appendFS` (fsLit "_itable")
+                              `appendFS` fsLit iTableSuf
                   gv = LMGlobalVar ilabel ty l sec llvmInfAlign c
                   v = if l == Internal then [gv] else []
               in ((gv, d), v)
@@ -121,6 +122,11 @@ pprInfoTable env count lbl stat
           then Outputable.panic "LlvmCodeGen.Ppr: invalid info table!"
           else (pprLlvmData ([ldata'], ltypes), llvmUsed)
 
+-- | We generate labels for info tables by converting them to the same label
+-- as for the entry code but adding this string as a suffix.
+iTableSuf :: String
+iTableSuf = "_itable"
+
 
 -- | Create an appropriate section declaration for subsection <n> of text
 -- WARNING: This technique could fail as gas documentation says it only
@@ -129,12 +135,21 @@ pprInfoTable env count lbl stat
 -- so we are hoping it does.
 mkLayoutSection :: Int -> LMSection
 mkLayoutSection n
-#if darwin_TARGET_OS
   -- On OSX we can't use the GNU Assembler, we must use the OSX assembler, which
   -- doesn't support subsections. So we post process the assembly code, this
   -- section specifier will be replaced with '.text' by the mangler.
-  = Just (fsLit $ "__STRIP,__me" ++ show n)
+  = Just (fsLit $ infoSection ++ show n
+#if darwin_TARGET_OS
+      )
 #else
-  = Just (fsLit $ ".text; .text " ++ show n ++ " #")
+      ++ "#")
+#endif
+
+-- | The section we are putting info tables and their entry code into
+infoSection :: String
+#if darwin_TARGET_OS
+infoSection = "__STRIP,__me"
+#else
+infoSection = ".text; .text "
 #endif
 
