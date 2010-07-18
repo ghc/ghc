@@ -224,7 +224,7 @@ bodyHtml doctitle iface
         indexButton maybe_index_url
         ] ++ [styleMenu]) ! [theclass "links"]
       ],
-    pageContent,
+    divContent << pageContent,
     divFooter << paragraph << (
       "Produced by " +++ 
       (anchor ! [href projectUrl] << toHtml projectName) +++

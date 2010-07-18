@@ -13,7 +13,7 @@
 module Haddock.Backends.Xhtml.Layout (
   miniBody,
   
-  divPackageHeader, divModuleHeader, divFooter,
+  divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynposis, divInterface,
   divIndex, divAlphabet, divModuleList,
 
@@ -58,12 +58,13 @@ sectionName :: Html -> Html
 sectionName = paragraph ! [theclass "caption"]
 
 
-divPackageHeader, divModuleHeader, divFooter,
+divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynposis, divInterface,
   divIndex, divAlphabet, divModuleList
     :: Html -> Html
 
 divPackageHeader    = sectionDiv "package-header"
+divContent          = sectionDiv "content"
 divModuleHeader     = sectionDiv "module-header"
 divFooter           = sectionDiv "footer"
 divTableOfContents  = sectionDiv "table-of-contents"

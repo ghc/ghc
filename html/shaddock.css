@@ -59,10 +59,13 @@ body {
   font-family: DroidSerif, Georgia, serif;
   }
 
-div {
+div#content {
 	padding: 0 30px;
 }
-  
+
+div#module-header {
+	margin: 0 -30px;
+}
 
 
 a:link    { color: #5200A3; text-decoration: none }
