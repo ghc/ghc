@@ -14,8 +14,8 @@ module Haddock.Backends.Xhtml.Layout (
   miniBody,
   
   divPackageHeader, divModuleHeader, divFooter,
-  divIndex, divAlphabet, divModuleList, divTableOfContents,
-  divDescription, divSynposis, divInterface,
+  divTableOfContents, divDescription, divSynposis, divInterface,
+  divIndex, divAlphabet, divModuleList,
 
   sectionName,
   
@@ -50,25 +50,30 @@ import GHC
 miniBody :: Html -> Html
 miniBody = body ! [identifier "mini"]
 
-divPackageHeader, divModuleHeader, divFooter :: Html -> Html
-divPackageHeader = thediv ! [identifier "package-header"]
-divModuleHeader  = thediv ! [identifier "module-header"]
-divFooter        = thediv ! [identifier "footer"]
 
-divIndex, divAlphabet, divModuleList, divTableOfContents :: Html -> Html
-divIndex           = thediv ! [identifier "index"]
-divAlphabet        = thediv ! [identifier "alphabet"]
-divModuleList      = thediv ! [identifier "module-list"]
-divTableOfContents = thediv ! [identifier "table-of-contents"]
+sectionDiv :: String -> Html -> Html
+sectionDiv i = thediv ! [identifier i]
 
-divDescription, divSynposis, divInterface :: Html -> Html
-divDescription     = thediv ! [identifier "description"]
-divSynposis        = thediv ! [identifier "synopsis"]
-divInterface       = thediv ! [identifier "interface"]
-
--- | The name of a section, used directly after opening a section
 sectionName :: Html -> Html
 sectionName = paragraph ! [theclass "caption"]
+
+
+divPackageHeader, divModuleHeader, divFooter,
+  divTableOfContents, divDescription, divSynposis, divInterface,
+  divIndex, divAlphabet, divModuleList
+    :: Html -> Html
+
+divPackageHeader    = sectionDiv "package-header"
+divModuleHeader     = sectionDiv "module-header"
+divFooter           = sectionDiv "footer"
+divTableOfContents  = sectionDiv "table-of-contents"
+divDescription      = sectionDiv "description"
+divSynposis         = sectionDiv "synopsis"
+divInterface        = sectionDiv "interface"
+divIndex            = sectionDiv "index"
+divAlphabet         = sectionDiv "alphabet"
+divModuleList       = sectionDiv "module-list"
+
 
 
 -- | Declaration containers 
