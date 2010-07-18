@@ -14,7 +14,7 @@ module Haddock.Backends.Xhtml.Layout (
   miniBody,
   
   divPackageHeader, divModuleHeader, divFooter,
-  divIndex, divModuleList, divTableOfContents,
+  divIndex, divAlphabet, divModuleList, divTableOfContents,
   divDescription, divSynposis, divInterface,
 
   sectionName,
@@ -55,8 +55,9 @@ divPackageHeader = thediv ! [identifier "package-header"]
 divModuleHeader  = thediv ! [identifier "module-header"]
 divFooter        = thediv ! [identifier "footer"]
 
-divIndex, divModuleList, divTableOfContents :: Html -> Html
+divIndex, divAlphabet, divModuleList, divTableOfContents :: Html -> Html
 divIndex           = thediv ! [identifier "index"]
+divAlphabet        = thediv ! [identifier "alphabet"]
 divModuleList      = thediv ! [identifier "module-list"]
 divTableOfContents = thediv ! [identifier "table-of-contents"]
 

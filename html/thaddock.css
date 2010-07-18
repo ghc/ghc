@@ -302,6 +302,22 @@ dd {
 	font-size: 80%;
 }
 
+#alphabet ul {
+	list-style: none;
+	padding: 0;
+	margin: 0.5em 0 0;
+}
+
+#alphabet li {
+	display: inline;
+	margin: 0 0.25em;
+}
+
+#alphabet a {
+	text-decoration: none;
+	font-weight: bold;
+}
+
 .module {
 }
 
@@ -321,16 +337,18 @@ dd {
 
 #module-list ul {
 	list-style: none;
-	margin: 0 0 0 -10px;
 	padding: 0;
+	margin: 0;
 }
 
 #module-list li {
 	margin: 0;
 	border-top: 1px solid #eaeaea;
-	padding-top: 2px;
-	padding-bottom: 2px;
-	padding-left: 10px;
+	padding: 2px 0 2px 1.4em;
+}
+
+#module-list li .package {
+	float: right;
 }
 
 #mini #interface .top,

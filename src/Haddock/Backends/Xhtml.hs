@@ -398,12 +398,11 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
       headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing +++
       bodyHtml doctitle Nothing
         maybe_source_url maybe_wiki_url
-        maybe_contents_url Nothing << 
-          divIndex <<
-            (sectionName << indexName ch +++
-             (if showLetters then indexInitialLetterLinks else noHtml) +++
-             (if null items then noHtml else buildIndex items)
-            )
+        maybe_contents_url Nothing << [
+          if showLetters then indexInitialLetterLinks else noHtml,
+          if null items then noHtml else 
+            divIndex << [sectionName << indexName ch, buildIndex items]
+          ]
     
     indexName ch = "Index" ++ maybe "" (\c -> " - " ++ [c]) ch
  
@@ -416,7 +415,8 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     --   unnecessarily hard to use.
     split_indices = length index > 150
   
-    indexInitialLetterLinks = 
+    indexInitialLetterLinks =
+      divAlphabet << 
           unordList [ anchor ! [href (subIndexHtmlFile c)] << [c]
                       | c <- initialChars
                       , any ((==c) . toUpper . head . fst) index ]

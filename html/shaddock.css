@@ -389,6 +389,24 @@ div.arguments {
   background-color: #6060ff
   }
 
+
+#alphabet ul {
+	list-style: none;
+	padding: 0;
+	margin: 0.5em 0 0;
+ 	font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
+	font-weight: bold;
+}
+
+#alphabet li {
+	display: inline;
+	margin: 0 0.25em;
+}
+
+#alphabet a {
+	text-decoration: none;
+}
+
 #index td {
   background-color: #f0f0f0;
 	padding-left: 1em;
@@ -419,4 +437,8 @@ body#mini {
 #module-list ul {
 	list-style: none;
 	margin-top: 0.5em;
+}
+
+#module-list .package {
+	float: right;
 }
