@@ -294,7 +294,7 @@ ppHtmlContents odir doctitle
 ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
 ppPrologue _ Nothing = noHtml
 ppPrologue title (Just doc) =
-  divDescription << (h1 << title +++ rdrDocToHtml doc)
+  docElement divDescription << (h1 << title +++ rdrDocToHtml doc)
 
 ppModuleTree :: [ModuleTree] -> Html
 ppModuleTree ts =
@@ -543,7 +543,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
           = case ifaceRnDoc iface of
               Nothing -> noHtml
               Just doc -> divDescription $
-                            sectionName << "Description" +++ docToHtml doc
+                            sectionName << "Description" +++ docSection doc
 
         -- omit the synopsis if there are no documentation annotations at all
     synopsis
@@ -654,7 +654,7 @@ processExport summary _ _ (ExportNoDecl y [])
 processExport summary _ _ (ExportNoDecl y subs)
   = processDeclOneLiner summary $ ppDocName y +++ parenList (map ppDocName subs)
 processExport summary _ _ (ExportDoc doc)
-  = nothingIf summary $ docToHtml doc
+  = nothingIf summary $ docSection doc
 processExport summary _ _ (ExportModule mdl)
   = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl ""
 

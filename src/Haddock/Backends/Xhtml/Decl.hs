@@ -65,9 +65,9 @@ ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
                   DocForDecl DocName -> (Html, Html, Html) -> Bool -> Html
 ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) unicode
   | summary = pref1
-  | Map.null argDocs = topDeclElem links loc docname pref1 +++ maybeDocToHtml doc
+  | Map.null argDocs = topDeclElem links loc docname pref1 +++ maybeDocSection doc
   | otherwise = topDeclElem links loc docname pref2 +++
-      subArguments (do_args 0 sep typ) +++ maybeDocToHtml doc
+      subArguments (do_args 0 sep typ) +++ maybeDocSection doc
   where 
     argDoc n = Map.lookup n argDocs
 
@@ -160,7 +160,7 @@ ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
 ppTyFam summary associated links loc mbDoc decl unicode
   
   | summary   = ppTyFamHeader True associated decl unicode 
-  | otherwise = header_ +++ maybeDocToHtml mbDoc +++ instancesBit
+  | otherwise = header_ +++ maybeDocSection mbDoc +++ instancesBit
 
   where
     docname = tcdName decl
@@ -200,7 +200,7 @@ ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
 ppTyInst summary associated links loc mbDoc decl unicode
   
   | summary   = ppTyInstHeader True associated decl unicode
-  | otherwise = header_ +++ maybeDocToHtml mbDoc 
+  | otherwise = header_ +++ maybeDocSection mbDoc 
 
   where
     docname = tcdName decl
@@ -355,7 +355,7 @@ ppClassDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan
 ppClassDecl summary links instances loc mbDoc subdocs
         decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
   | summary = ppShortClassDecl summary links decl loc subdocs unicode
-  | otherwise = classheader +++ maybeDocToHtml mbDoc
+  | otherwise = classheader +++ maybeDocSection mbDoc
                   +++ atBit +++ methodBit  +++ instancesBit
   where 
     classheader
@@ -433,7 +433,7 @@ ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
 ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode
   
   | summary   = ppShortDataDecl summary links loc dataDecl unicode
-  | otherwise = header_ +++ maybeDocToHtml mbDoc +++ constrBit +++ instancesBit
+  | otherwise = header_ +++ maybeDocSection mbDoc +++ constrBit +++ instancesBit
 
   where
     docname   = unLoc . tcdLName $ dataDecl

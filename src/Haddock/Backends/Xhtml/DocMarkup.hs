@@ -11,9 +11,11 @@
 -- Portability :  portable
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.DocMarkup (
-  docToHtml, maybeDocToHtml,
+  docToHtml,
   rdrDocToHtml,
-  origDocToHtml
+  origDocToHtml,
+  
+  docElement, docSection, maybeDocSection,
 ) where
 
 import Haddock.Backends.Xhtml.Names
@@ -85,8 +87,17 @@ rdrDocToHtml :: Doc RdrName -> Html
 rdrDocToHtml = markup fmt . cleanup
   where fmt = parHtmlMarkup ppRdrName isRdrTc
 
-maybeDocToHtml :: Maybe (Doc DocName) -> Html
-maybeDocToHtml = maybe noHtml docToHtml
+
+
+docElement :: (ADDATTRS a) => a -> a
+docElement = (! [theclass "doc"])
+
+docSection :: Doc DocName -> Html
+docSection = (docElement thediv <<) . docToHtml
+
+maybeDocSection :: Maybe (Doc DocName) -> Html
+maybeDocSection = maybe noHtml docSection
+
 
 cleanup :: Doc a -> Doc a
 cleanup = markup fmtUnParagraphLists
