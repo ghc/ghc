@@ -98,7 +98,7 @@ Library
                 ForeignFunctionInterface, EmptyDataDecls,
                 TypeSynonymInstances, MultiParamTypeClasses,
                 FlexibleInstances, Rank2Types, ScopedTypeVariables,
-                DeriveDataTypeable, RelaxedPolyRec
+                DeriveDataTypeable
 
     Include-Dirs: . parser utils
 
