@@ -157,7 +157,7 @@ fixupStack fun nfun | BS.null nfun =
     let -- fixup sub op
         (a, b) = BS.breakSubstring (BS.pack ", %esp\n") fun
         (a', num) = BS.breakEnd dollarPred a
-        num' = BS.pack $ show (read (BS.unpack num) + 4)
+        num' = BS.pack $ show (read (BS.unpack num) + 4:Int)
         fix = a' `BS.append` num'
     in if BS.null b
           then nfun `BS.append` a
@@ -172,7 +172,7 @@ fixupStack fun nfun =
         (jmp, b') = BS.break eolPred b
         (a', numx) = BS.breakEnd dollarPred a
         (num, x) = BS.break commaPred numx
-        num' = BS.pack $ show (read (BS.unpack num) + 4)
+        num' = BS.pack $ show (read (BS.unpack num) + 4:Int)
         fix = a' `BS.append` num' `BS.append` x `BS.append` jmp
     in if BS.null b
           then nfun `BS.append` a
