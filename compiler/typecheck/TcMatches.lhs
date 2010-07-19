@@ -65,7 +65,8 @@ tcMatchesFun fun_name inf matches exp_ty
 	   -- sensible location.	Note: we have to do this odd
 	   -- ann-grabbing, because we don't always have annotations in
 	   -- hand when we call tcMatchesFun...
-	  checkArgs fun_name matches
+          traceTc (text "tcMatchesFun" <+> (ppr fun_name $$ ppr exp_ty))
+	; checkArgs fun_name matches
 
 	-- ToDo: Don't use "expected" stuff if there ain't a type signature
 	-- because inconsistency between branches
