@@ -76,6 +76,10 @@ pre  {
 	margin-top: 0;
 }
 
+.def {
+	font-weight: bold;
+}
+
 ul.links {
 	list-style: none;
 	text-align: left;

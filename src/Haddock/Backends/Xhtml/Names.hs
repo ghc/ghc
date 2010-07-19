@@ -51,7 +51,8 @@ ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
 ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' n
-ppBinder False n = namedAnchor (nameAnchorId n) << bold << ppBinder' n
+ppBinder False n = namedAnchor (nameAnchorId n) ! [theclass "def"]
+                        << ppBinder' n
 
 
 ppBinder' :: OccName -> Html

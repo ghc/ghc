@@ -115,6 +115,10 @@ tt, pre, code  {
   white-space: nowrap;
 }
 
+.def {
+	font-weight: bold;
+}
+
 ul {
 	padding: 0;
 }
