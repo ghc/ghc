@@ -17,7 +17,7 @@ module Haddock.Backends.Xhtml.Names (
   linkId
 ) where
 
-import Haddock.Backends.Xhtml.Util
+import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils

@@ -27,7 +27,7 @@ import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Types
-import Haddock.Backends.Xhtml.Util
+import Haddock.Backends.Xhtml.Utils
 import Haddock.ModuleTree
 import Haddock.Types
 import Haddock.Version

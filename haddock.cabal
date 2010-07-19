@@ -117,7 +117,7 @@ executable haddock
     Haddock.Backends.Xhtml.Layout
     Haddock.Backends.Xhtml.Names
     Haddock.Backends.Xhtml.Types
-    Haddock.Backends.Xhtml.Util
+    Haddock.Backends.Xhtml.Utils
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
     Haddock.Backends.DevHelp
@@ -184,7 +184,7 @@ library
     Haddock.Backends.Xhtml.Layout
     Haddock.Backends.Xhtml.Names
     Haddock.Backends.Xhtml.Types
-    Haddock.Backends.Xhtml.Util
+    Haddock.Backends.Xhtml.Utils
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
     Haddock.Backends.DevHelp

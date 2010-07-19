@@ -10,7 +10,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-module Haddock.Backends.Xhtml.Util (
+module Haddock.Backends.Xhtml.Utils (
   renderToString,
   
   namedAnchor, linkedAnchor,

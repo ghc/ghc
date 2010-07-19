@@ -19,7 +19,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
 ) where
 
 import Haddock.Backends.Xhtml.Names
-import Haddock.Backends.Xhtml.Util
+import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils
