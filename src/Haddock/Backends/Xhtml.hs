@@ -318,7 +318,7 @@ mkNode ss p (Node s leaf pkg short ts) =
     htmlModule = thespan ! [theclass "module" ] <<
       (if leaf
         then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg)) 
-                                       (mkModuleName mdl)) ""
+                                       (mkModuleName mdl))
         else toHtml s
       )
       
@@ -597,8 +597,7 @@ processForMiniSynopsis _ _ _ = Nothing
 
 ppNameMini :: Module -> OccName -> Html
 ppNameMini mdl nm =
-    anchor ! [ href ( moduleHtmlFile mdl ++ "#"
-                      ++ (escapeStr (anchorNameStr nm)))
+    anchor ! [ href (moduleNameUrl mdl nm)
              , target mainFrameName ]
       << ppBinder' nm
 
@@ -656,7 +655,7 @@ processExport summary _ _ (ExportNoDecl y subs)
 processExport summary _ _ (ExportDoc doc)
   = nothingIf summary $ docSection doc
 processExport summary _ _ (ExportModule mdl)
-  = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl ""
+  = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
 
 nothingIf :: Bool -> a -> Maybe a
 nothingIf True _ = Nothing

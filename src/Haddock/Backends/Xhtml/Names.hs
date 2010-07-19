@@ -13,7 +13,7 @@
 module Haddock.Backends.Xhtml.Names (
   ppName, ppDocName, ppLDocName, ppRdrName,
   ppBinder, ppBinder',
-  ppModule,
+  ppModule, ppModuleRef,
   linkId
 ) where
 
@@ -50,8 +50,8 @@ ppName name = toHtml (getOccString name)
 ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppBinder True n = linkedAnchor (anchorNameStr n) << ppBinder' n
-ppBinder False n = namedAnchor (anchorNameStr n) << bold << ppBinder' n
+ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' n
+ppBinder False n = namedAnchor (nameAnchorId n) << bold << ppBinder' n
 
 
 ppBinder' :: OccName -> Html
@@ -65,13 +65,19 @@ linkId mdl mbName = linkIdOcc mdl (fmap nameOccName mbName)
 
 
 linkIdOcc :: Module -> Maybe OccName -> Html -> Html
-linkIdOcc mdl mbName = anchor ! [href uri]
+linkIdOcc mdl mbName = anchor ! [href url]
   where 
-    uri = case mbName of
-      Nothing   -> moduleHtmlFile mdl
-      Just name -> nameHtmlRef mdl name
+    url = case mbName of
+      Nothing   -> moduleUrl mdl
+      Just name -> moduleNameUrl mdl name
 
-ppModule :: Module -> String -> Html
-ppModule mdl ref = anchor ! [href ((moduleHtmlFile mdl) ++ ref)] 
-                   << toHtml (moduleString mdl)
+ppModule :: Module -> Html
+ppModule mdl = anchor ! [href (moduleUrl mdl)]
+               << toHtml (moduleString mdl)
 
+ppModuleRef :: Module -> String -> Html
+ppModuleRef mdl ref = anchor ! [href (moduleUrl mdl ++ ref)]
+                      << toHtml (moduleString mdl)
+    -- NB: The ref paramaeter already includes the '#'.
+    -- This function is only called from markupModule expanding a
+    -- DocModule, which doesn't seem to be ever be used.

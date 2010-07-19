@@ -82,5 +82,5 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
     ppReference :: Name -> [Module] -> Doc
     ppReference _ [] = empty
     ppReference name (mdl:refs) =  
-      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef mdl (nameOccName name))<>text"\"/>" $$
+      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (moduleNameUrl mdl (nameOccName name))<>text"\"/>" $$
       ppReference name refs

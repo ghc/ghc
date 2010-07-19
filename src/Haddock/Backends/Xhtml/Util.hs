@@ -157,21 +157,11 @@ dot = toHtml "."
 
 
 -- | Generate a named anchor
---
--- This used to generate two anchor tags, one with the name unescaped, and one
--- with the name URI-escaped. This is needed because Opera 9.52 (and later
--- versions) needs the name to be unescaped, while IE 7 needs it to be escaped.
--- The escaped form for IE 7 is probably erroneous and not needed...
-
 namedAnchor :: String -> Html -> Html
-namedAnchor n c = anchor ! [XHtml.name n] << c
+namedAnchor n = anchor ! [XHtml.name n]
 
 linkedAnchor :: String -> Html -> Html
-linkedAnchor frag = anchor ! [href hr_]
-   where hr_ | null frag = ""
-             | otherwise = '#': escapeStr frag
-    -- this escape function is over-zealous for the fragment part of a URI
-    -- (':' for example does not need to be escaped)
+linkedAnchor n = anchor ! [href ('#':n)]
     
 --
 -- A section of HTML which is collapsible via a +/- button.

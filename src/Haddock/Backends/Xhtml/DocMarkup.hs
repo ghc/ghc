@@ -39,7 +39,7 @@ parHtmlMarkup ppId isTyCon = Markup {
   markupAppend        = (+++),
   markupIdentifier    = thecode . ppId . choose,
   markupModule        = \m -> let (mdl,ref) = break (=='#') m
-                              in ppModule (mkModuleNoPackage mdl) ref,
+                              in ppModuleRef (mkModuleNoPackage mdl) ref,
   markupEmphasis      = emphasize,
   markupMonospaced    = thecode,
   markupUnorderedList = unordList,

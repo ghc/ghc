@@ -114,7 +114,7 @@ ppHH2Index odir maybe_package ifaces = do
 		text "</Keyword>" $$
 		ppList vs
 
-	ppJump name (Module mdl) = text "<Jump Url=\"" <> text (nameHtmlRef mdl name) <> text "\"/>"
+	ppJump name (Module mdl) = text "<Jump Url=\"" <> text (moduleNameUrl mdl name) <> text "\"/>"
 
 
 -----------------------------------------------------------------------------------

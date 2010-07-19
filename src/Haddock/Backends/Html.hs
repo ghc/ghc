@@ -729,8 +729,7 @@ processForMiniSynopsis _ _ _ = noHtml
 
 ppNameMini :: Module -> OccName -> Html
 ppNameMini mdl nm =
-    anchor ! [ href ( moduleHtmlFile mdl ++ "#"
-                      ++ (escapeStr (anchorNameStr nm)))
+    anchor ! [ href (moduleNameUrl mdl nm)
              , target mainFrameName ]
       << ppBinder' nm
 
@@ -1669,7 +1668,7 @@ ppDocName (Documented name mdl) =
 ppDocName (Undocumented name) = toHtml (getOccString name)
 
 linkTarget :: OccName -> Html
-linkTarget n = namedAnchor (anchorNameStr n) << toHtml "" 
+linkTarget n = namedAnchor (nameAnchorId n) << toHtml "" 
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
@@ -1678,7 +1677,7 @@ ppName name = toHtml (getOccString name)
 ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppBinder True n = linkedAnchor (anchorNameStr n) << ppBinder' n
+ppBinder True n = linkedAnchor (nameAnchorId n) << ppBinder' n
 ppBinder False n = linkTarget n +++ bold << ppBinder' n
 
 
@@ -1696,8 +1695,8 @@ linkIdOcc :: Module -> Maybe OccName -> Html -> Html
 linkIdOcc mdl mbName = anchor ! [href uri]
   where 
     uri = case mbName of
-      Nothing   -> moduleHtmlFile mdl
-      Just name -> nameHtmlRef mdl name
+      Nothing   -> moduleUrl mdl
+      Just name -> moduleNameUrl mdl name
 
 ppModule :: Module -> String -> Html
 ppModule mdl ref = anchor ! [href ((moduleHtmlFile mdl) ++ ref)] 

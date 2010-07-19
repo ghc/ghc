@@ -17,13 +17,17 @@ module Haddock.Utils (
   toDescription, toInstalledDescription,
 
   -- * Filename utilities
-  moduleHtmlFile, nameHtmlRef,
+  moduleHtmlFile,
   contentsHtmlFile, indexHtmlFile,
   frameIndexHtmlFile,
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
   subIndexHtmlFile,
-  anchorNameStr,
   cssFile, iconFile, jsFile, plusFile, minusFile, framesFile,
+
+  -- * Anchor and URL utilities
+  moduleNameUrl, moduleUrl,
+  nameAnchorId,
+  makeAnchorId,
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
@@ -58,7 +62,7 @@ import GHC
 import Name
 
 import Control.Monad ( liftM )
-import Data.Char ( isAlpha, ord, chr )
+import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )
 import Numeric ( showIntAtBase )
 import Data.Map ( Map )
 import qualified Data.Map as Map hiding ( Map )
@@ -176,9 +180,6 @@ moduleHtmlFile mdl =
               (moduleNameString (moduleName mdl))
 
 
-nameHtmlRef :: Module -> OccName -> String	
-nameHtmlRef mdl n = moduleHtmlFile mdl ++ '#':escapeStr (anchorNameStr n)
-
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
@@ -204,10 +205,42 @@ subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
            | otherwise = show (ord a)
 
 
-anchorNameStr :: OccName -> String
-anchorNameStr name | isValOcc name = "v:" ++ occNameString name 
-                   | otherwise     = "t:" ++ occNameString name
+-- -----------------------------------------------------------------------------
+-- Anchor and URL utilities
+--
+-- NB: Anchor IDs, used as the destination of a link within a document must
+-- conform to XML's NAME production. That, taken with XHTML and HTML 4.01's
+-- various needs and compatibility constraints, means these IDs have to match:
+--      [A-Za-z][A-Za-z0-9:_.-]*
+-- Such IDs do not need to be escaped in any way when used as the fragment part
+-- of a URL. Indeed, %-escaping them can lead to compatibility issues as it
+-- isn't clear if such fragment identifiers should, or should not be unescaped
+-- before being matched with IDs in the target document.
+ 
+moduleUrl :: Module -> String
+moduleUrl = moduleHtmlFile
 
+moduleNameUrl :: Module -> OccName -> String	
+moduleNameUrl mdl n = moduleUrl mdl ++ '#' : nameAnchorId n
+
+nameAnchorId :: OccName -> String
+nameAnchorId name = makeAnchorId (prefix : ':' : occNameString name)
+ where prefix | isValOcc name = 'v' 
+              | otherwise     = 't'
+
+-- | Takes an arbitrary string and makes it a valid anchor ID. The mapping is
+-- identity preserving.
+makeAnchorId :: String -> String
+makeAnchorId [] = []
+makeAnchorId (f:r) = escape isAlpha f ++ concatMap (escape isLegal) r
+  where
+    escape p c | p c = [c]
+               | otherwise = '-' : (show (ord c)) ++ "-"
+    isLegal ':' = True
+    isLegal '_' = True
+    isLegal '.' = True
+    isLegal c = isAscii c && isAlphaNum c
+       -- NB: '-' is legal in IDs, but we use it as the escape char
 
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir
@@ -267,7 +300,7 @@ escapeStr = escapeURIString isUnreserved
 -- to avoid depending on the network lib, since doing so gives a
 -- circular build dependency between haddock and network
 -- (at least if you want to build network with haddock docs)
-
+-- NB: These functions do NOT escape Unicode strings for URLs as per the RFCs
 escapeURIChar :: (Char -> Bool) -> Char -> String
 escapeURIChar p c
     | p c       = [c]

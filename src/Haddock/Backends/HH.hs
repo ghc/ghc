@@ -125,7 +125,7 @@ ppHHIndex odir maybe_package ifaces = do
 
 	ppReference name [] = empty
 	ppReference name (Module mdl:refs) =
-		text "<PARAM name=\"Local\" value=\"" <> text (nameHtmlRef mdl name) <> text "\">" $$
+		text "<PARAM name=\"Local\" value=\"" <> text (moduleNameURL mdl name) <> text "\">" $$
 		ppReference name refs
 
 
