@@ -1676,7 +1676,8 @@ xFlags = [
   ( "UndecidableInstances",             Opt_UndecidableInstances, const Supported ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, const Supported ),
   ( "PackageImports",                   Opt_PackageImports, const Supported ),
-  ( "NewQualifiedOperators",            Opt_NewQualifiedOperators, const Supported )
+  ( "NewQualifiedOperators",            Opt_NewQualifiedOperators,
+    const $ Deprecated "The new qualified operator syntax was rejected by Haskell'" )
   ]
 
 impliedFlags :: [(DynFlag, DynFlag)]
