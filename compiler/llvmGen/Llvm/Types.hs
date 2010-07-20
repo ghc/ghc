@@ -200,7 +200,8 @@ getName v@(LMLitVar    _          ) = getPlainName v
 -- in a plain textual representation (e.g. @x@, @y@ or @42@).
 getPlainName :: LlvmVar -> String
 getPlainName (LMGlobalVar x _ _ _ _ _) = unpackFS x
-getPlainName (LMLocalVar  x _        ) = show x
+getPlainName (LMLocalVar  x LMLabel  ) = show x
+getPlainName (LMLocalVar  x _        ) = "l" ++ show x
 getPlainName (LMNLocalVar x _        ) = unpackFS x
 getPlainName (LMLitVar    x          ) = getLit x
 
