@@ -19,12 +19,13 @@ import qualified Data.ByteString.Char8 as BS
 
 import LlvmCodeGen.Ppr ( infoSection, iTableSuf )
 
+import Util
 
 {- Configuration. -}
 newSection, oldSection, functionSuf, tableSuf, funDivider, eol :: ByteString
 newSection  = BS.pack "\n.text\n"
 oldSection  = BS.pack infoSection
-functionSuf = BS.pack "_info:"
+functionSuf = BS.pack $ if ghciTablesNextToCode then "_info:" else "\n_"
 tableSuf    = BS.pack $ "_info" ++ iTableSuf ++ ":"
 funDivider  = BS.pack "\n\n"
 eol         = BS.pack "\n"
@@ -124,13 +125,18 @@ oneTable f str =
               BS.appendFile f bl
               return BS.empty
 
-          else if BS.null itable
-                  then error $ "Function without matching info table! ("
-                              ++ (BS.unpack label) ++ ")"
+          else if ghciTablesNextToCode
+                  then if BS.null itable
+                          then error $ "Function without matching info table! ("
+                                      ++ (BS.unpack label) ++ ")"
+                          else do
+                              mapM_ (BS.appendFile f) function
+                              return remainder
 
                   else do
-                      mapM_ (BS.appendFile f) function
-                      return remainder
+                      -- TNTC not turned on so just fix up stack
+                      mapM_ (BS.appendFile f) [before, fheader, fun']
+                      return after
 
 -- | Replace the current section in a function or table header with the
 -- text section specifier.
