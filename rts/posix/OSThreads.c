@@ -14,6 +14,13 @@
 #endif
 
 #include "PosixSource.h"
+
+#if defined(freebsd_HOST_OS)
+/* Inclusion of system headers usually requires __BSD_VISIBLE on FreeBSD,
+ * because of some specific types, like u_char, u_int, etc. */
+#define __BSD_VISIBLE	1
+#endif
+
 #include "Rts.h"
 
 #if defined(THREADED_RTS)
@@ -24,7 +31,7 @@
 #include <string.h>
 #endif
 
-#if defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
@@ -35,6 +42,11 @@
 
 #if defined(HAVE_SCHED_H)
 #include <sched.h>
+#endif
+
+#if defined(HAVE_SYS_CPUSET_H)
+#include <sys/param.h>
+#include <sys/cpuset.h>
 #endif
 
 #ifdef HAVE_UNISTD_H
@@ -208,7 +220,7 @@ getNumberOfProcessors (void)
         nproc = sysconf(_SC_NPROCESSORS_ONLN);
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
         nproc = sysconf(_SC_NPROCESSORS_CONF);
-#elif defined(darwin_HOST_OS)
+#elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
         size_t size = sizeof(nat);
         if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
             nproc = 1;
@@ -251,6 +263,23 @@ setThreadAffinity (nat n, nat m GNUC3_ATTRIBUTE(__unused__))
 		      THREAD_AFFINITY_POLICY,
 		      (thread_policy_t) &policy,
 		      THREAD_AFFINITY_POLICY_COUNT);
+}
+
+#elif defined(HAVE_SYS_CPUSET_H) /* FreeBSD 7.1+ */
+void
+setThreadAffinity(nat n, nat m)
+{
+	nat nproc;
+	cpuset_t cs;
+	nat i;
+
+	nproc = getNumberOfProcessors();
+	CPU_ZERO(&cs);
+
+	for (i = n; i < nproc; i += m)
+		CPU_SET(i, &cs);
+
+	cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, sizeof(cpuset_t), &cs);
 }
 
 #else
