@@ -24,8 +24,10 @@ module Foreign
         , module Foreign.Storable
         , module Foreign.Marshal
 
-        -- | For compatibility with the FFI addendum only.  The recommended
-        -- place to get this from is "System.IO.Unsafe".
+        -- | 'unsafePerformIO' is exported here for backwards
+        -- compatibility reasons only.  For doing local marshalling in
+        -- the FFI, use 'unsafeLocalState'.  For other uses, see
+        -- 'System.IO.Unsafe.unsafePerformIO'.
         , unsafePerformIO
         ) where
 
