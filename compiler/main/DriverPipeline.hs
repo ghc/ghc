@@ -1286,7 +1286,11 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 
     return (nphase, dflags, maybe_loc, output_fn)
   where
+#if darwin_TARGET_OS
+        llvmOpts = ["-O1", "-O2", "-O2"]
+#else
         llvmOpts = ["-O1", "-O2", "-O3"]
+#endif
 
 
 -----------------------------------------------------------------------------
