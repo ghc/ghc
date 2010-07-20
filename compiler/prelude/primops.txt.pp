@@ -1544,6 +1544,13 @@ primop GetSparkOp "getSpark#" GenPrimOp
    has_side_effects = True
    out_of_line = True
 
+primop NumSparks "numSparks#" GenPrimOp
+   State# s -> (# State# s, Int# #)
+   { Returns the number of sparks in the local spark pool. }
+   with
+   has_side_effects = True
+   out_of_line = True
+
 -- HWL: The first 4 Int# in all par... annotations denote:
 --   name, granularity info, size of result, degree of parallelism
 --      Same  structure as _seq_ i.e. returns Int#

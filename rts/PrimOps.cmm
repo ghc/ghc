@@ -2020,6 +2020,17 @@ stg_getSparkzh
 #endif
 }
 
+stg_numSparkszh
+{
+  W_ n;
+#ifdef THREADED_RTS
+  (n) = foreign "C" dequeElements(Capability_sparks(MyCapability()));
+#else
+  n = 0;
+#endif
+  RET_N(n);
+}
+
 stg_traceEventzh
 {
    W_ msg;

@@ -440,6 +440,7 @@ RTS_FUN_DECL(stg_checkzh);
 RTS_FUN_DECL(stg_unpackClosurezh);
 RTS_FUN_DECL(stg_getApStackValzh);
 RTS_FUN_DECL(stg_getSparkzh);
+RTS_FUN_DECL(stg_numSparkszh);
 
 RTS_FUN_DECL(stg_noDuplicatezh);
 

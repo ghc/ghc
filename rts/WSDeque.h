@@ -79,7 +79,7 @@ void* popWSDeque (WSDeque *q);
 rtsBool pushWSDeque (WSDeque *q, void *elem);
 
 // Removes all elements from the deque
-INLINE_HEADER void discardElements (WSDeque *q);
+EXTERN_INLINE void discardElements (WSDeque *q);
 
 // Removes an element of the deque from the "read" end, or returns
 // NULL if the pool is empty, or if there was a collision with another
@@ -93,15 +93,15 @@ void * stealWSDeque (WSDeque *q);
 // "guesses" whether a deque is empty. Can return false negatives in
 //  presence of concurrent steal() calls, and false positives in
 //  presence of a concurrent pushBottom().
-INLINE_HEADER rtsBool looksEmptyWSDeque (WSDeque* q);
+EXTERN_INLINE rtsBool looksEmptyWSDeque (WSDeque* q);
 
-INLINE_HEADER long dequeElements   (WSDeque *q);
+EXTERN_INLINE long dequeElements   (WSDeque *q);
 
 /* -----------------------------------------------------------------------------
  * PRIVATE below here
  * -------------------------------------------------------------------------- */
 
-INLINE_HEADER long
+EXTERN_INLINE long
 dequeElements (WSDeque *q)
 {
     StgWord t = q->top;
@@ -110,13 +110,13 @@ dequeElements (WSDeque *q)
     return ((long)b - (long)t);
 }
 
-INLINE_HEADER rtsBool
+EXTERN_INLINE rtsBool
 looksEmptyWSDeque (WSDeque *q)
 {
     return (dequeElements(q) <= 0);
 }
 
-INLINE_HEADER void
+EXTERN_INLINE void
 discardElements (WSDeque *q)
 {
     q->top = q->bottom;

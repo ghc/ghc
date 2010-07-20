@@ -789,6 +789,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_unpackClosurezh)                \
       SymI_HasProto(stg_getApStackValzh)                \
       SymI_HasProto(stg_getSparkzh)                     \
+      SymI_HasProto(stg_numSparkszh)                    \
       SymI_HasProto(stg_isCurrentThreadBoundzh)	        \
       SymI_HasProto(stg_isEmptyMVarzh)			\
       SymI_HasProto(stg_killThreadzh)			\
