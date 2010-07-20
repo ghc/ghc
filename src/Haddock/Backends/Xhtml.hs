@@ -26,6 +26,7 @@ import Haddock.Backends.Xhtml.Decl
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
+import Haddock.Backends.Xhtml.Themes
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.ModuleTree
@@ -154,7 +155,7 @@ copyHtmlBits odir libdir _maybe_css = do
            copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   --copyFile css_file css_destination
   mapM_ copyLibFile cssFiles
-  mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile, framesFile ]
+  mapM_ copyLibFile [ plusFile, minusFile, jsFile, framesFile ]
 
 
 headHtml :: String -> Maybe String -> Html

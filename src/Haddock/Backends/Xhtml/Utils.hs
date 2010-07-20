@@ -23,9 +23,9 @@ module Haddock.Backends.Xhtml.Utils (
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
 
   hsep,
-
+  
   collapsebutton, collapseId,
-
+  
   cssFiles, styleSheet, stylePickers, styleMenu
 ) where
 
@@ -202,10 +202,8 @@ cssThemes = [
     ("Snappy", "shaddock.css")
     ]
 
-
 cssFiles :: [String]
 cssFiles = map snd cssThemes
-
 
 styleSheet :: Html
 styleSheet = toHtml $ zipWith mkLink cssThemes rels
@@ -214,14 +212,12 @@ styleSheet = toHtml $ zipWith mkLink cssThemes rels
     mkLink (aTitle, aFile) aRel =
        (thelink ! [href aFile, rel aRel, thetype "text/css", XHtml.title aTitle]) noHtml
 
-
 stylePickers :: [Html]
 stylePickers = map mkPicker cssThemes
   where
-    mkPicker (aTitle, aFile) =
+    mkPicker (aTitle, aFile) = 
       let js = "setActiveStyleSheet('" ++ aFile ++ "'); return false;" in
       anchor ! [href "#", onclick js] << aTitle
-
 
 styleMenu :: Html
 styleMenu = thediv ! [identifier "style-menu-holder"] << [
@@ -230,4 +226,4 @@ styleMenu = thediv ! [identifier "style-menu-holder"] << [
   ]
   where
     js = "styleMenu(); return false;"
-
+        
