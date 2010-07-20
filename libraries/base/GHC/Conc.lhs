@@ -33,6 +33,7 @@ module GHC.Conc
         , forkOnIO      -- :: Int -> IO a -> IO ThreadId
         , forkOnIOUnmasked
         , numCapabilities -- :: Int
+        , numSparks      -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId
         , killThread    -- :: ThreadId -> IO ()
@@ -264,6 +265,10 @@ numCapabilities :: Int
 numCapabilities = unsafePerformIO $  do 
                     n <- peek n_capabilities
                     return (fromIntegral n)
+
+-- | Returns the number of sparks currently in the local spark pool
+numSparks :: IO Int
+numSparks = IO $ \s -> case numSparks# s of (# s', n #) -> (# s', I# n #)
 
 #if defined(mingw32_HOST_OS) && defined(__PIC__)
 foreign import ccall "_imp__n_capabilities" n_capabilities :: Ptr CInt
