@@ -41,6 +41,8 @@ test('mask002', omit_ways(['ghci']), compile_and_run, [''])
 
 test('async001', normal, compile_and_run, [''])
 
+test('numsparks001', only_ways(['threaded1']), compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
