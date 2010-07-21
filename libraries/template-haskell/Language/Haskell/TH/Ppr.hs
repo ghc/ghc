@@ -242,15 +242,15 @@ ppr_dec isTop (TySynInstD tc tys rhs)
 
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
-  = text "data" <+> maybeInst
-    <+> pprCxt ctxt
-    <+> ppr t <+> argsDoc
-    <+> sep (pref $ map ppr cs)
-    $$ if null decs
-       then empty
-       else nest nestDepth
-            $ text "deriving"
-              <+> parens (hsep $ punctuate comma $ map ppr decs)
+  = sep [text "data" <+> maybeInst
+    	    <+> pprCxt ctxt
+    	    <+> ppr t <+> argsDoc,
+         nest nestDepth (sep (pref $ map ppr cs)),
+         if null decs
+           then empty
+           else nest nestDepth
+              $ text "deriving"
+                <+> parens (hsep $ punctuate comma $ map ppr decs)]
   where 
     pref :: [Doc] -> [Doc]
     pref []     = []      -- No constructors; can't happen in H98
@@ -258,15 +258,15 @@ ppr_data maybeInst ctxt t argsDoc cs decs
 
 ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Con -> [Name] -> Doc
 ppr_newtype maybeInst ctxt t argsDoc c decs
-  = text "newtype" <+> maybeInst
-    <+> pprCxt ctxt
-    <+> ppr t <+> argsDoc
-    <+> char '=' <+> ppr c
-    $$ if null decs
-       then empty
-       else nest nestDepth
-            $ text "deriving"
-              <+> parens (hsep $ punctuate comma $ map ppr decs)
+  = sep [text "newtype" <+> maybeInst
+    	    <+> pprCxt ctxt
+    	    <+> ppr t <+> argsDoc,
+         nest 2 (char '=' <+> ppr c),
+         if null decs
+       	   then empty
+       	   else nest nestDepth
+       	        $ text "deriving"
+       	          <+> parens (hsep $ punctuate comma $ map ppr decs)]
 
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs
@@ -343,7 +343,7 @@ instance Ppr Con where
                          <+> pprName' Infix c
                          <+> pprStrictType st2
     ppr (ForallC ns ctxt con) = text "forall" <+> hsep (map ppr ns)
-                            <+> char '.' <+> pprCxt ctxt <+> ppr con
+                            <+> char '.' <+> sep [pprCxt ctxt, ppr con]
 
 ------------------------------
 pprVarStrictType :: (Name, Strict, Type) -> Doc
@@ -369,7 +369,7 @@ pprParendType other      = parens (ppr other)
 instance Ppr Type where
     ppr (ForallT tvars ctxt ty)
       = text "forall" <+> hsep (map ppr tvars) <+> text "."
-                      <+> pprCxt ctxt <+> ppr ty
+                      <+> sep [pprCxt ctxt, ppr ty]
     ppr (SigT ty k) = ppr ty <+> text "::" <+> ppr k
     ppr ty          = pprTyApp (split ty)
 
@@ -409,7 +409,7 @@ pprArrowArgKind k              = ppr k
 pprCxt :: Cxt -> Doc
 pprCxt [] = empty
 pprCxt [t] = ppr t <+> text "=>"
-pprCxt ts = parens (hsep $ punctuate comma $ map ppr ts) <+> text "=>"
+pprCxt ts = parens (sep $ punctuate comma $ map ppr ts) <+> text "=>"
 
 ------------------------------
 instance Ppr Pred where
