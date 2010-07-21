@@ -13,7 +13,7 @@
 module Haddock.Utils (
 
   -- * Misc utilities
-  restrictTo, 
+  restrictTo,
   toDescription, toInstalledDescription,
 
   -- * Filename utilities
@@ -31,12 +31,12 @@ module Haddock.Utils (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
- 
+
   -- * HTML cross reference mapping
   html_xrefs_ref,
 
   -- * Doc markup 
-  markup, 
+  markup,
   idMarkup,
 
   -- * List utilities
@@ -45,7 +45,7 @@ module Haddock.Utils (
 
   -- * MTL stuff
   MonadIO(..),
-  
+
   -- * Logging
   parseVerbosity,
   out,
@@ -72,7 +72,7 @@ import Data.Maybe ( fromJust )
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
-import System.IO.Unsafe	 ( unsafePerformIO )
+import System.IO.Unsafe ( unsafePerformIO )
 import System.FilePath
 import Distribution.Verbosity
 import Distribution.ReadE
@@ -84,8 +84,9 @@ import qualified System.Posix.Internals
 import MonadUtils ( MonadIO(..) )
 
 
--- -----------------------------------------------------------------------------
--- Logging
+--------------------------------------------------------------------------------
+-- * Logging
+--------------------------------------------------------------------------------
 
 
 parseVerbosity :: String -> Either String Verbosity
@@ -102,8 +103,9 @@ out progVerbosity msgVerbosity msg
   | otherwise = return ()
 
 
--- -----------------------------------------------------------------------------
--- Some Utilities
+--------------------------------------------------------------------------------
+-- * Some Utilities
+--------------------------------------------------------------------------------
 
 
 -- | Extract a module's short description.
@@ -116,32 +118,33 @@ toInstalledDescription :: InstalledInterface -> Maybe (Doc Name)
 toInstalledDescription = hmi_description . instInfo
 
 
--- ---------------------------------------------------------------------------
--- Making abstract declarations
+--------------------------------------------------------------------------------
+-- * Making abstract declarations
+--------------------------------------------------------------------------------
 
 
 restrictTo :: [Name] -> LHsDecl Name -> LHsDecl Name
 restrictTo names (L loc decl) = L loc $ case decl of
-  TyClD d | isDataDecl d && tcdND d == DataType -> 
-    TyClD (d { tcdCons = restrictCons names (tcdCons d) }) 
-  TyClD d | isDataDecl d && tcdND d == NewType -> 
+  TyClD d | isDataDecl d && tcdND d == DataType ->
+    TyClD (d { tcdCons = restrictCons names (tcdCons d) })
+  TyClD d | isDataDecl d && tcdND d == NewType ->
     case restrictCons names (tcdCons d) of
-      []    -> TyClD (d { tcdND = DataType, tcdCons = [] }) 
+      []    -> TyClD (d { tcdND = DataType, tcdCons = [] })
       [con] -> TyClD (d { tcdCons = [con] })
       _ -> error "Should not happen"
-  TyClD d | isClassDecl d -> 
+  TyClD d | isClassDecl d ->
     TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
                tcdATs = restrictATs names (tcdATs d) })
   _ -> decl
 
-   
+
 restrictCons :: [Name] -> [LConDecl Name] -> [LConDecl Name]
-restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]  
-  where 
-    keep d | unLoc (con_name d) `elem` names = 
+restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
+  where
+    keep d | unLoc (con_name d) `elem` names =
       case con_details d of
         PrefixCon _ -> Just d
-        RecCon fields  
+        RecCon fields
           | all field_avail fields -> Just d
           | otherwise -> Just (d { con_details = PrefixCon (field_types fields) })
           -- if we have *all* the field names available, then
@@ -151,8 +154,8 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         InfixCon _ _ -> Just d
       where
         field_avail (ConDeclField n _ _) = unLoc n `elem` names
-        field_types flds = [ t | ConDeclField _ t _ <- flds ] 
-      
+        field_types flds = [ t | ConDeclField _ t _ <- flds ]
+
     keep _ | otherwise = Nothing
 
 
@@ -166,8 +169,9 @@ restrictATs :: [Name] -> [LTyClDecl Name] -> [LTyClDecl Name]
 restrictATs names ats = [ at | at <- ats , tcdName (unL at) `elem` names ]
 
 
--- -----------------------------------------------------------------------------
--- Filename mangling functions stolen from s main/DriverUtil.lhs.
+--------------------------------------------------------------------------------
+-- * Filename mangling functions stolen from s main/DriverUtil.lhs.
+--------------------------------------------------------------------------------
 
 
 moduleHtmlFile :: Module -> FilePath
@@ -176,7 +180,7 @@ moduleHtmlFile mdl =
     Nothing  -> mdl' ++ ".html"
     Just fp0 -> joinPath [fp0, mdl' ++ ".html"]
   where
-   mdl' = map (\c -> if c == '.' then '-' else c) 
+   mdl' = map (\c -> if c == '.' then '-' else c)
               (moduleNameString (moduleName mdl))
 
 
@@ -205,8 +209,8 @@ subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
            | otherwise = show (ord a)
 
 
--- -----------------------------------------------------------------------------
--- Anchor and URL utilities
+-------------------------------------------------------------------------------
+-- * Anchor and URL utilities
 --
 -- NB: Anchor IDs, used as the destination of a link within a document must
 -- conform to XML's NAME production. That, taken with XHTML and HTML 4.01's
@@ -216,17 +220,22 @@ subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
 -- of a URL. Indeed, %-escaping them can lead to compatibility issues as it
 -- isn't clear if such fragment identifiers should, or should not be unescaped
 -- before being matched with IDs in the target document.
+-------------------------------------------------------------------------------
  
+
 moduleUrl :: Module -> String
 moduleUrl = moduleHtmlFile
 
-moduleNameUrl :: Module -> OccName -> String	
+
+moduleNameUrl :: Module -> OccName -> String
 moduleNameUrl mdl n = moduleUrl mdl ++ '#' : nameAnchorId n
+
 
 nameAnchorId :: OccName -> String
 nameAnchorId name = makeAnchorId (prefix : ':' : occNameString name)
- where prefix | isValOcc name = 'v' 
+ where prefix | isValOcc name = 'v'
               | otherwise     = 't'
+
 
 -- | Takes an arbitrary string and makes it a valid anchor ID. The mapping is
 -- identity preserving.
@@ -242,8 +251,10 @@ makeAnchorId (f:r) = escape isAlpha f ++ concatMap (escape isLegal) r
     isLegal c = isAscii c && isAlphaNum c
        -- NB: '-' is legal in IDs, but we use it as the escape char
 
--- -----------------------------------------------------------------------------
--- Files we need to copy from our $libdir
+
+-------------------------------------------------------------------------------
+-- * Files we need to copy from our $libdir
+-------------------------------------------------------------------------------
 
 
 cssFile, iconFile, jsFile, plusFile, minusFile, framesFile :: String
@@ -255,8 +266,9 @@ minusFile = "minus.gif"
 framesFile = "frames.html"
 
 
------------------------------------------------------------------------------
--- misc.
+-------------------------------------------------------------------------------
+-- * Misc. 
+-------------------------------------------------------------------------------
 
 
 getProgramName :: IO String
@@ -331,14 +343,15 @@ isAlphaNumChar c = isAlphaChar c || isDigitChar c
 
 
 -----------------------------------------------------------------------------
--- HTML cross references
-
+-- * HTML cross references
+--
 -- For each module, we need to know where its HTML documentation lives
 -- so that we can point hyperlinks to it.  It is extremely
 -- inconvenient to plumb this information to all the places that need
 -- it (basically every function in HaddockHtml), and furthermore the
 -- mapping is constant for any single run of Haddock.  So for the time
 -- being I'm going to use a write-once global variable.
+-----------------------------------------------------------------------------
 
 
 {-# NOINLINE html_xrefs_ref #-}
@@ -352,12 +365,12 @@ html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 
 
 -----------------------------------------------------------------------------
--- List utils
+-- * List utils
 -----------------------------------------------------------------------------
 
 
 replace :: Eq a => a -> a -> [a] -> [a]
-replace a b = map (\x -> if x == a then b else x) 
+replace a b = map (\x -> if x == a then b else x)
 
 spanWith :: (a -> Maybe b) -> [a] -> ([b],[a])
 spanWith _ [] = ([],[])
@@ -365,8 +378,10 @@ spanWith p xs@(a:as)
   | Just b <- p a = let (bs,cs) = spanWith p as in (b:bs,cs)
   | otherwise     = ([],xs)
 
+
 -----------------------------------------------------------------------------
--- put here temporarily
+-- * Put here temporarily
+-----------------------------------------------------------------------------
 
 
 markup :: DocMarkup id a -> Doc id -> a
@@ -414,8 +429,9 @@ idMarkup = Markup {
   }
 
 
--- -----------------------------------------------------------------------------
--- System tools
+-----------------------------------------------------------------------------
+-- * System tools
+-----------------------------------------------------------------------------
 
 
 #ifdef mingw32_HOST_OS
