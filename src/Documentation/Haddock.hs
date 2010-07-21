@@ -23,8 +23,8 @@ module Documentation.Haddock (
   Decl,
   DeclInfo,
   DocForDecl,
-  FnArgsDoc, 
- 
+  FnArgsDoc,
+
   -- * Hyperlinking
   LinkEnv,
   DocName(..),
@@ -47,7 +47,7 @@ module Documentation.Haddock (
   nameCacheFromGhc,
   freshNameCache,
   NameCacheAccessor,
-  
+
   -- * Flags and options
   Flag(..),
   DocOption(..)
