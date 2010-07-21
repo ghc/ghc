@@ -6,15 +6,17 @@ TH_reifyDecl1.hs:33:10:
     data TH_reifyDecl1.R a_0 = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
 
 TH_reifyDecl1.hs:33:10:
-    data TH_reifyDecl1.List a_0 = TH_reifyDecl1.Nil
-                            | TH_reifyDecl1.Cons a_0 (TH_reifyDecl1.List a_0)
+    data TH_reifyDecl1.List a_0
+    = TH_reifyDecl1.Nil
+    | TH_reifyDecl1.Cons a_0 (TH_reifyDecl1.List a_0)
 
 TH_reifyDecl1.hs:33:10:
-    data TH_reifyDecl1.Tree a_0 = TH_reifyDecl1.Leaf
-                            | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
+    data TH_reifyDecl1.Tree a_0
+    = TH_reifyDecl1.Leaf
+    | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 
 TH_reifyDecl1.hs:33:10:
-    type TH_reifyDecl1.IntList = GHC.Types.[] GHC.Types.Int
+    type TH_reifyDecl1.IntList = [GHC.Types.Int]
 
 TH_reifyDecl1.hs:33:10:
     newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Types.Int
@@ -23,6 +25,6 @@ TH_reifyDecl1.hs:33:10:
     Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall a_0 . TH_reifyDecl1.Tree a_0
 
 TH_reifyDecl1.hs:33:10:
-    Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_0 . TH_reifyDecl1.C a_0 => a_0 ->
-                                                                                      GHC.Types.Int
+    Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_0 . TH_reifyDecl1.C a_0 =>
+                                                               a_0 -> GHC.Types.Int
                                infixl 3 TH_reifyDecl1.m
