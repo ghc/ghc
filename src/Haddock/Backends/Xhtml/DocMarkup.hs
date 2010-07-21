@@ -18,6 +18,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docElement, docSection, maybeDocSection,
 ) where
 
+
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
@@ -72,28 +73,30 @@ parHtmlMarkup ppId isTyCon = Markup {
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
 
-
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Doc DocName -> Html
 docToHtml = markup fmt . cleanup
   where fmt = parHtmlMarkup ppDocName (isTyConName . getName)
 
+
 origDocToHtml :: Doc Name -> Html
 origDocToHtml = markup fmt . cleanup
   where fmt = parHtmlMarkup ppName isTyConName
+
 
 rdrDocToHtml :: Doc RdrName -> Html
 rdrDocToHtml = markup fmt . cleanup
   where fmt = parHtmlMarkup ppRdrName isRdrTc
 
 
-
 docElement :: (ADDATTRS a) => a -> a
 docElement = (! [theclass "doc"])
 
+
 docSection :: Doc DocName -> Html
 docSection = (docElement thediv <<) . docToHtml
+
 
 maybeDocSection :: Maybe (Doc DocName) -> Html
 maybeDocSection = maybe noHtml docSection
