@@ -23,10 +23,9 @@ module Haddock.Backends.Xhtml.Utils (
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
 
   hsep,
-  
+
+  onclick,
   collapsebutton, collapseId,
-  
-  cssFiles, styleSheet, stylePickers, styleMenu
 ) where
 
 
@@ -192,38 +191,3 @@ collapsebutton id_ =
 -- the ECMA script string delimiter used in collapsebutton above.
 collapseId :: Name -> String
 collapseId nm = "i:" ++ escapeStr (getOccString nm)
-
-
--- Standard set of style sheets, first is the preferred
-cssThemes :: [(String, String)]
-cssThemes = [
-    ("Classic", "xhaddock.css"),
-    ("Tibbe", "thaddock.css"),
-    ("Snappy", "shaddock.css")
-    ]
-
-cssFiles :: [String]
-cssFiles = map snd cssThemes
-
-styleSheet :: Html
-styleSheet = toHtml $ zipWith mkLink cssThemes rels
-  where
-    rels = ("stylesheet" : repeat "alternate stylesheet")
-    mkLink (aTitle, aFile) aRel =
-       (thelink ! [href aFile, rel aRel, thetype "text/css", XHtml.title aTitle]) noHtml
-
-stylePickers :: [Html]
-stylePickers = map mkPicker cssThemes
-  where
-    mkPicker (aTitle, aFile) = 
-      let js = "setActiveStyleSheet('" ++ aFile ++ "'); return false;" in
-      anchor ! [href "#", onclick js] << aTitle
-
-styleMenu :: Html
-styleMenu = thediv ! [identifier "style-menu-holder"] << [
-    anchor ! [ href "#", onclick js ] << "Style\9662",
-    unordList stylePickers ! [ identifier "style-menu", theclass "hide" ]
-  ]
-  where
-    js = "styleMenu(); return false;"
-        
