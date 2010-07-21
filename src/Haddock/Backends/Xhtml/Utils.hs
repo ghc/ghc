@@ -12,20 +12,20 @@
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Utils (
   renderToString,
-  
+
   namedAnchor, linkedAnchor,
   spliceURL,
-  
+
   (<+>), char, nonEmpty,
   keyword, punctuate,
-  
+
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
-  
+
   hsep,
-  
+
   collapsebutton, collapseId,
-  
+
   cssFiles, styleSheet, stylePickers, styleMenu
 ) where
 
@@ -42,7 +42,7 @@ import Module   ( Module )
 import Name     ( getOccString, nameOccName, isValOcc )
 
 
-spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name -> 
+spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name ->
              Maybe SrcSpan -> String -> String
 spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
  where
@@ -50,7 +50,7 @@ spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
   mdl = case maybe_mod of
           Nothing           -> ""
           Just m -> moduleString m
-  
+
   (name, kind) =
     case maybe_name of
       Nothing             -> ("","")
@@ -162,7 +162,7 @@ namedAnchor n = anchor ! [XHtml.name n]
 
 linkedAnchor :: String -> Html -> Html
 linkedAnchor n = anchor ! [href ('#':n)]
-    
+
 --
 -- A section of HTML which is collapsible via a +/- button.
 --
@@ -172,7 +172,7 @@ linkedAnchor n = anchor ! [href ('#':n)]
 -- use cookies from JavaScript to have a more persistent state.
 
 collapsebutton :: String -> Html
-collapsebutton id_ = 
+collapsebutton id_ =
   image ! [ src minusFile, theclass "coll", onclick ("toggle(this,'" ++ id_ ++ "')"), alt "show/hide" ]
 
 -- A quote is a valid part of a Haskell identifier, but it would interfere with
@@ -202,7 +202,7 @@ styleSheet = toHtml $ zipWith mkLink cssThemes rels
 stylePickers :: [Html]
 stylePickers = map mkPicker cssThemes
   where
-    mkPicker (aTitle, aFile) = 
+    mkPicker (aTitle, aFile) =
       let js = "setActiveStyleSheet('" ++ aFile ++ "'); return false;" in
       anchor ! [href "#", onclick js] << aTitle
 
@@ -213,4 +213,4 @@ styleMenu = thediv ! [identifier "style-menu-holder"] << [
   ]
   where
     js = "styleMenu(); return false;"
-        
+

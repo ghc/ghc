@@ -38,7 +38,7 @@ ppLDocName :: Located DocName -> Html
 ppLDocName (L _ d) = ppDocName d
 
 ppDocName :: DocName -> Html
-ppDocName (Documented name mdl) = 
+ppDocName (Documented name mdl) =
   linkIdOcc mdl (Just occName) << ppOccName occName
     where occName = nameOccName name
 ppDocName (Undocumented name) = toHtml (getOccString name)
@@ -67,7 +67,7 @@ linkId mdl mbName = linkIdOcc mdl (fmap nameOccName mbName)
 
 linkIdOcc :: Module -> Maybe OccName -> Html -> Html
 linkIdOcc mdl mbName = anchor ! [href url]
-  where 
+  where
     url = case mbName of
       Nothing   -> moduleUrl mdl
       Just name -> moduleNameUrl mdl name

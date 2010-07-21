@@ -12,18 +12,18 @@
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Layout (
   miniBody,
-  
+
   divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynposis, divInterface,
   divIndex, divAlphabet, divModuleList,
 
   sectionName,
-  
+
   shortDeclList,
   shortSubDecls,
-  
+
   divTopDecl,
-  
+
   SubDecl,
   subArguments,
   subAssociatedTypes,
@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   subFields,
   subInstances,
   subMethods,
-  
+
   topDeclElem, declElem,
 ) where
 
@@ -101,7 +101,7 @@ divSubDecls cssClass captionName = maybe noHtml wrap
 
 {-
   if we ever decide to style sub-declarations with dl lists, this code does it
-  
+
 subDlist :: [SubDecl] -> Maybe Html
 subDlist [] = Nothing
 subDlist decls = Just $ dlist << map subEntry decls
@@ -110,7 +110,7 @@ subDlist decls = Just $ dlist << map subEntry decls
       dterm ! [theclass "src"] << decl
       +++
       docElement ddef << (fmap docToHtml mdoc `with` subs)
-      
+
     Nothing  `with` [] = spaceHtml
     ma       `with` bs = ma +++ bs
 -}
@@ -159,7 +159,7 @@ declElem = paragraph ! [theclass "src"]
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> DocName -> Html -> Html
-topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html = 
+topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html =
     declElem << (html +++ srcLink +++ wikiLink)
   where srcLink =
           case maybe_source_url of
@@ -174,9 +174,9 @@ topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html =
             Just url -> let url' = spliceURL (Just fname) (Just mdl)
                                                (Just n) (Just loc) url
                           in anchor ! [href url', theclass "link"] << "Comments"
-  
+
         -- For source links, we want to point to the original module,
-        -- because only that will have the source.  
+        -- because only that will have the source.
         -- TODO: do something about type instances. They will point to
         -- the module defining the type family, which is wrong.
         origMod = nameModule n

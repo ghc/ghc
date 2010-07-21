@@ -14,7 +14,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docToHtml,
   rdrDocToHtml,
   origDocToHtml,
-  
+
   docElement, docSection, maybeDocSection,
 ) where
 
@@ -112,7 +112,7 @@ cleanup = markup fmtUnParagraphLists
     unParagraph doc              = doc
 
     fmtUnParagraphLists :: DocMarkup a (Doc a)
-    fmtUnParagraphLists = idMarkup { 
+    fmtUnParagraphLists = idMarkup {
       markupUnorderedList = DocUnorderedList . map unParagraph,
       markupOrderedList   = DocOrderedList   . map unParagraph
-      } 
+      }
