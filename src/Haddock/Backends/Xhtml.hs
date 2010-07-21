@@ -60,18 +60,18 @@ import Module
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
 
-ppHtml  :: String
-        -> Maybe String                         -- package
-        -> [Interface]
-        -> FilePath                     -- destination directory
-        -> Maybe (Doc GHC.RdrName)    -- prologue text, maybe
-        -> Maybe String                 -- the Html Help format (--html-help)
-        -> SourceURLs                   -- the source URL (--source)
-        -> WikiURLs                     -- the wiki URL (--wiki)
-        -> Maybe String                 -- the contents URL (--use-contents)
-        -> Maybe String                 -- the index URL (--use-index)
-        -> Bool                         -- whether to use unicode in output (--use-unicode)
-        -> IO ()
+ppHtml :: String
+       -> Maybe String                 -- package
+       -> [Interface]
+       -> FilePath                     -- destination directory
+       -> Maybe (Doc GHC.RdrName)      -- prologue text, maybe
+       -> Maybe String                 -- the Html Help format (--html-help)
+       -> SourceURLs                   -- the source URL (--source)
+       -> WikiURLs                     -- the wiki URL (--wiki)
+       -> Maybe String                 -- the contents URL (--use-contents)
+       -> Maybe String                 -- the index URL (--use-index)
+       -> Bool                         -- whether to use unicode in output (--use-unicode)
+       -> IO ()
 
 ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
         maybe_source_url maybe_wiki_url
@@ -100,12 +100,12 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
 
 ppHtmlHelpFiles
     :: String                   -- doctitle
-    -> Maybe String                             -- package
-        -> [Interface]
-        -> FilePath                 -- destination directory
-        -> Maybe String             -- the Html Help format (--html-help)
-        -> [FilePath]               -- external packages paths
-        -> IO ()
+    -> Maybe String             -- package
+    -> [Interface]
+    -> FilePath                 -- destination directory
+    -> Maybe String             -- the Html Help format (--html-help)
+    -> [FilePath]               -- external packages paths
+    -> IO ()
 ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_paths =  do
   let
         visible_ifaces = filter visible ifaces
