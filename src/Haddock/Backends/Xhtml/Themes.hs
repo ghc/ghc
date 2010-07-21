@@ -60,7 +60,7 @@ stylePickers = map mkPicker themes
 
 styleMenu :: Html
 styleMenu = thediv ! [identifier "style-menu-holder"] << [
-    anchor ! [ href "#", onclick js ] << "Style\9662",
+    anchor ! [ href "#", onclick js ] << "Style \9662",
     unordList stylePickers ! [ identifier "style-menu", theclass "hide" ]
   ]
   where
