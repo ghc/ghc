@@ -43,7 +43,7 @@ import Data.List
 \hrulefill
 {\haddockverb\begin{verbatim}
 module Data.List (
-    (++),  head,  last,  tail,  init,  null,  length,  map,  reverse, 
+    (++),  head,  last,  tail,  init,  null,  length,  map,  reverse,
   ) where\end{verbatim}}
 \hrulefill
 
@@ -95,6 +95,7 @@ haddockSty = "haddock.sty"
 
 type LaTeX = Pretty.Doc
 
+
 ppLaTeXTop
    :: String
    -> Maybe String
@@ -130,6 +131,7 @@ ppLaTeXTop doctitle packageStr odir prologue maybe_style ifaces = do
       filename = odir </> (fromMaybe "haddock" packageStr <.> "tex")
 
   writeFile filename (render tex)
+
 
 ppLaTeXModule :: String -> FilePath -> Interface -> IO ()
 ppLaTeXModule _title odir iface = do
@@ -172,6 +174,7 @@ string_txt (Str s1)  s2 = s1 ++ s2
 string_txt (PStr s1) s2 = unpackFS s1 ++ s2
 string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
 
+
 exportListItem :: ExportItem DocName -> LaTeX
 exportListItem (ExportDecl decl _doc subdocs _insts)
   = ppDocBinder (declName decl) <>
@@ -186,6 +189,7 @@ exportListItem (ExportModule mdl)
   = text "module" <+> text (moduleString mdl)
 exportListItem _
   = error "exportListItem"
+
 
 -- Deal with a group of undocumented exports together, to avoid lots
 -- of blank vertical space between them.
@@ -204,15 +208,18 @@ processExports (ExportModule mdl : es)
 processExports (e : es) =
   processExport e $$ processExports es
 
+
 isSimpleSig :: ExportItem DocName -> Maybe (DocName, HsType DocName)
 isSimpleSig (ExportDecl (L _ (SigD (TypeSig (L _ n) (L _ t))))
                         (Nothing, argDocs) _ _)
   | Map.null argDocs = Just (n, t)
 isSimpleSig _ = Nothing
 
+
 isExportModule :: ExportItem DocName -> Maybe Module
 isExportModule (ExportModule m) = Just m
 isExportModule _ = Nothing
+
 
 processExport :: ExportItem DocName -> LaTeX
 processExport (ExportGroup lev _id0 doc)
@@ -228,6 +235,7 @@ processExport (ExportModule mdl)
 processExport (ExportDoc doc)
   = docToLaTeX doc
 
+
 ppDocGroup :: Int -> LaTeX -> LaTeX
 ppDocGroup lev doc = sec lev <> braces doc
   where sec 1 = text "\\section"
@@ -235,26 +243,33 @@ ppDocGroup lev doc = sec lev <> braces doc
         sec 3 = text "\\subsubsection"
         sec _ = text "\\paragraph"
 
+
 declName :: LHsDecl DocName -> DocName
 declName (L _ decl) = case decl of
   TyClD d  -> unLoc $ tcdLName d
   SigD (TypeSig (L _ n) _) -> n
   _ -> error "declaration not supported by declName"
 
+
 forSummary :: (ExportItem DocName) -> Bool
 forSummary (ExportGroup _ _ _) = False
 forSummary (ExportDoc _)       = False
 forSummary _                    = True
 
+
 moduleLaTeXFile :: Module -> FilePath
 moduleLaTeXFile mdl = moduleBasename mdl ++ ".tex"
+
 
 moduleBasename :: Module -> FilePath
 moduleBasename mdl = map (\c -> if c == '.' then '-' else c)
                          (moduleNameString (moduleName mdl))
 
--- -----------------------------------------------------------------------------
--- Decls
+
+-------------------------------------------------------------------------------
+-- * Decls
+-------------------------------------------------------------------------------
+
 
 ppDecl :: LHsDecl DocName
        -> DocForDecl DocName
@@ -278,24 +293,31 @@ ppDecl (L loc decl) (mbDoc, fnArgsDoc) instances subdocs = case decl of
   where
     unicode = False
 
+
 ppTyFam :: t -> t1 -> t2 -> t3 -> t4 -> a
 ppTyFam _ _ _ _ _ =
   error "type family declarations are currently not supported by --latex"
+
 
 ppDataInst :: t -> t1 -> t2 -> a
 ppDataInst _ _ _ =
   error "data instance declarations are currently not supported by --latex"
 
+
 ppTyInst :: t -> t1 -> t2 -> t3 -> t4 -> a
 ppTyInst _ _ _ _ _ =
   error "type instance declarations are currently not supported by --latex"
+
 
 ppFor :: t -> t1 -> t2 -> t3 -> a
 ppFor _ _ _ _ =
   error "foreign declarations are currently not supported by --latex"
 
--- -----------------------------------------------------------------------------
--- Type Synonyms
+
+-------------------------------------------------------------------------------
+-- * Type Synonyms
+-------------------------------------------------------------------------------
+
 
 -- we skip type patterns for now
 ppTySyn :: SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool -> LaTeX
@@ -309,8 +331,11 @@ ppTySyn loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode
 
 ppTySyn _ _ _ _ = error "declaration not supported by ppTySyn"
 
--- -----------------------------------------------------------------------------
--- Function signatures
+
+-------------------------------------------------------------------------------
+-- * Function signatures
+-------------------------------------------------------------------------------
+
 
 ppFunSig :: SrcSpan -> DocForDecl DocName -> DocName -> HsType DocName
          -> Bool -> Bool
@@ -321,6 +346,7 @@ ppFunSig loc doc docname typ unicode methods =
     unicode methods
  where
    name = getName docname
+
 
 ppTypeOrFunSig :: SrcSpan -> DocName -> HsType DocName ->
                   DocForDecl DocName -> (LaTeX, LaTeX, LaTeX)
@@ -361,15 +387,19 @@ ppTypeOrFunSig _loc _docname typ (doc, argDocs) (pref1, pref2, sep0)
      do_args n leader t
        = decltt leader <-> decltt (ppType unicode t) <-> arg_doc n <+> nl
 
+
 ppTypeSig :: Name -> HsType DocName  -> Bool -> LaTeX
 ppTypeSig nm ty unicode =
   ppSymName nm <+> dcolon unicode <+> ppType unicode ty
 
+
 ppTyVars :: [LHsTyVarBndr DocName] -> [LaTeX]
 ppTyVars tvs = map ppSymName (tyvarNames tvs)
 
+
 tyvarNames :: [LHsTyVarBndr DocName] -> [Name]
 tyvarNames = map (getName . hsTyVarName . unLoc)
+
 
 declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
 declWithDoc decl doc =
@@ -380,6 +410,7 @@ declWithDoc decl doc =
        (if isNothing doc then empty else text "\\haddockbegindoc") $$
    maybe empty id doc $$
    text "\\end{haddockdesc}"
+
 
 -- in a group of decls, we don't put them all in the same tabular,
 -- because that would prevent the group being broken over a page
@@ -394,20 +425,26 @@ multiDecl decls =
       | decl <- decls ] $$
    text "\\end{haddockdesc}"
 
+
 -------------------------------------------------------------------------------
--- Rendering Doc
+-- * Rendering Doc
+-------------------------------------------------------------------------------
+
 
 maybeDoc :: Maybe (Doc DocName) -> LaTeX
 maybeDoc = maybe empty docToLaTeX
+
 
 -- for table cells, we strip paragraphs out to avoid extra vertical space
 -- and don't add a quote environment.
 rDoc  :: Maybe (Doc DocName) -> LaTeX
 rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 
+
 -------------------------------------------------------------------------------
--- Class declarations
+-- * Class declarations
 -------------------------------------------------------------------------------
+
 
 ppClassHdr :: Bool -> Located [LHsPred DocName] -> DocName
            -> [Located (HsTyVarBndr DocName)] -> [Located ([DocName], [DocName])]
@@ -475,12 +512,15 @@ ppDocInstance :: Bool -> DocInstance DocName -> LaTeX
 ppDocInstance unicode (instHead, mbDoc) =
   declWithDoc (ppInstDecl unicode instHead) (fmap docToLaTeX mbDoc)
 
+
 ppInstDecl :: Bool -> InstHead DocName -> LaTeX
 ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
+
 
 ppInstHead :: Bool -> InstHead DocName -> LaTeX
 ppInstHead unicode ([],   n, ts) = ppAppNameTypes n ts unicode
 ppInstHead unicode (ctxt, n, ts) = ppContextNoLocs ctxt unicode <+> ppAppNameTypes n ts unicode
+
 
 lookupAnySubdoc :: (Eq name1) =>
                    name1 -> [(name1, DocForDecl name2)] -> DocForDecl name2
@@ -488,8 +528,10 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
   Nothing -> noDocForDecl
   Just docs -> docs
 
--- -----------------------------------------------------------------------------
--- Data & newtype declarations
+
+-------------------------------------------------------------------------------
+-- * Data & newtype declarations
+-------------------------------------------------------------------------------
 
 
 ppDataDecl :: [DocInstance DocName] ->
@@ -542,6 +584,7 @@ ppConstrHdr forall tvs ctxt unicode
     ppForall = case forall of
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> text ". "
       Implicit -> empty
+
 
 ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LaTeX
                    -> LConDecl DocName -> LaTeX
@@ -597,6 +640,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     mbDoc = join $ fmap fst $ lookup (unLoc $ con_name con) subdocs
     mkFunTy a b = noLoc (HsFunTy a b)
 
+
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
   decltt (ppBinder (docNameOcc name)
@@ -651,6 +695,7 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
 -- expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 -- -}
 
+
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: TyClDecl DocName -> Bool -> LaTeX
@@ -666,7 +711,7 @@ ppDataHeader decl unicode
 
 
 --------------------------------------------------------------------------------
--- TyClDecl helpers
+-- * TyClDecl helpers
 --------------------------------------------------------------------------------
 
 
@@ -677,7 +722,7 @@ ppTyClBinderWithVars summ decl =
 
 
 --------------------------------------------------------------------------------
--- Type applications
+-- * Type applications
 --------------------------------------------------------------------------------
 
 
@@ -705,7 +750,7 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 
 
 -------------------------------------------------------------------------------
--- Contexts
+-- * Contexts
 -------------------------------------------------------------------------------
 
 
@@ -741,24 +786,31 @@ ppPred unicode (HsIParam (IPName n) t)
   = char '?' <> ppDocName n <> dcolon unicode <> ppLType unicode t
 
 
--- ----------------------------------------------------------------------------
--- Types and contexts
+-------------------------------------------------------------------------------
+-- * Types and contexts
+-------------------------------------------------------------------------------
+
 
 ppKind :: Outputable a => a -> LaTeX
 ppKind k = text (showSDoc (ppr k))
+
 
 ppBang :: HsBang -> LaTeX
 ppBang HsNoBang = empty
 ppBang _        = char '!' -- Unpacked args is an implementation detail,
 
+
 tupleParens :: Boxity -> [LaTeX] -> LaTeX
 tupleParens Boxed   = parenList
 tupleParens Unboxed = ubxParenList
 
--- -----------------------------------------------------------------------------
--- Rendering of HsType
+
+-------------------------------------------------------------------------------
+-- * Rendering of HsType
 --
 -- Stolen from Html and tweaked for LaTeX generation
+-------------------------------------------------------------------------------
+
 
 pREC_TOP, pREC_FUN, pREC_OP, pREC_CON :: Int
 
@@ -860,48 +912,63 @@ ppr_fun_ty ctxt_prec ty1 ty2 unicode
     maybeParen ctxt_prec pREC_FUN $
     sep [p1, arrow unicode <+> p2]
 
--- -----------------------------------------------------------------------------
--- Names
+
+-------------------------------------------------------------------------------
+-- * Names
+-------------------------------------------------------------------------------
+
 
 ppBinder :: OccName -> LaTeX
 ppBinder n
   | isVarSym n = parens $ ppOccName n
   | otherwise  = ppOccName n
 
+
 ppSymName :: Name -> LaTeX
 ppSymName name
   | isNameSym name = parens $ ppName name
   | otherwise = ppName name
 
+
 ppVerbOccName :: OccName -> LaTeX
 ppVerbOccName = text . latexFilter . occNameString
+
 
 ppOccName :: OccName -> LaTeX
 ppOccName = text . occNameString
 
+
 ppVerbDocName :: DocName -> LaTeX
 ppVerbDocName = ppVerbOccName . docNameOcc
+
 
 ppVerbRdrName :: RdrName -> LaTeX
 ppVerbRdrName = ppVerbOccName . rdrNameOcc
 
+
 ppDocName :: DocName -> LaTeX
 ppDocName = ppOccName . docNameOcc
+
 
 ppLDocName :: Located DocName -> LaTeX
 ppLDocName (L _ d) = ppDocName d
 
+
 ppDocBinder :: DocName -> LaTeX
 ppDocBinder = ppBinder . docNameOcc
+
 
 ppName :: Name -> LaTeX
 ppName = ppOccName . nameOccName
 
+
 latexFilter :: String -> String
 latexFilter = foldr latexMunge ""
 
+
 latexMonoFilter :: String -> String
 latexMonoFilter = foldr latexMonoMunge ""
+
 
 latexMunge :: Char -> String -> String
 latexMunge '#'  s = "{\\char '43}" ++ s
@@ -918,13 +985,17 @@ latexMunge '['  s = "{\\char 91}" ++ s
 latexMunge ']'  s = "{\\char 93}" ++ s
 latexMunge c    s = c : s
 
+
 latexMonoMunge :: Char -> String -> String
 latexMonoMunge ' ' s = '\\' : ' ' : s
 latexMonoMunge '\n' s = '\\' : '\\' : s
 latexMonoMunge c   s = latexMunge c s
 
--- -----------------------------------------------------------------------------
--- Doc Markup
+
+-------------------------------------------------------------------------------
+-- * Doc Markup
+-------------------------------------------------------------------------------
+
 
 parLatexMarkup :: (a -> LaTeX) -> (a -> Bool)
                -> DocMarkup a (StringContext -> LaTeX)
@@ -969,19 +1040,25 @@ parLatexMarkup ppId isTyCon = Markup {
       | isTyCon x = x
       | otherwise = y
 
+
 latexMarkup :: DocMarkup DocName (StringContext -> LaTeX)
 latexMarkup = parLatexMarkup ppVerbDocName (isTyConName . getName)
+
 
 rdrLatexMarkup :: DocMarkup RdrName (StringContext -> LaTeX)
 rdrLatexMarkup = parLatexMarkup ppVerbRdrName isRdrTc
 
+
 docToLaTeX :: Doc DocName -> LaTeX
 docToLaTeX doc = markup latexMarkup doc Plain
+
 
 rdrDocToLaTeX :: Doc RdrName -> LaTeX
 rdrDocToLaTeX doc = markup rdrLatexMarkup doc Plain
 
+
 data StringContext = Plain | Verb | Mono
+
 
 latexStripTrailingWhitespace :: Doc a -> Doc a
 latexStripTrailingWhitespace (DocString s)
@@ -997,8 +1074,11 @@ latexStripTrailingWhitespace (DocParagraph p) =
   latexStripTrailingWhitespace p
 latexStripTrailingWhitespace other = other
 
--- -----------------------------------------------------------------------------
--- LaTeX utils
+
+-------------------------------------------------------------------------------
+-- * LaTeX utils
+-------------------------------------------------------------------------------
+
 
 itemizedList :: [LaTeX] -> LaTeX
 itemizedList items =
@@ -1006,11 +1086,13 @@ itemizedList items =
   vcat (map (text "\\item" $$) items) $$
   text "\\end{itemize}"
 
+
 enumeratedList :: [LaTeX] -> LaTeX
 enumeratedList items =
   text "\\begin{enumerate}" $$
   vcat (map (text "\\item " $$) items) $$
   text "\\end{enumerate}"
+
 
 descriptionList :: [(LaTeX,LaTeX)] -> LaTeX
 descriptionList items =
@@ -1018,14 +1100,18 @@ descriptionList items =
   vcat (map (\(a,b) -> text "\\item" <> brackets a <+> b) items) $$
   text "\\end{description}"
 
+
 tt :: LaTeX -> LaTeX
 tt ltx = text "\\haddocktt" <> braces ltx
+
 
 decltt :: LaTeX -> LaTeX
 decltt ltx = text "\\haddockdecltt" <> braces ltx
 
+
 emph :: LaTeX -> LaTeX
 emph ltx = text "\\emph" <> braces ltx
+
 
 verb :: LaTeX -> LaTeX
 verb doc = text "{\\haddockverb\\begin{verbatim}" $$ doc <> text "\\end{verbatim}}"
@@ -1033,8 +1119,10 @@ verb doc = text "{\\haddockverb\\begin{verbatim}" $$ doc <> text "\\end{verbatim
    -- \end{verbatim} directly, otherwise we get spurious blank lines at the
    -- end of code blocks.
 
+
 quote :: LaTeX -> LaTeX
 quote doc = text "\\begin{quote}" $$ doc $$ text "\\end{quote}"
+
 
 dcolon, arrow, darrow, forallSymbol :: Bool -> LaTeX
 dcolon unicode = text (if unicode then "∷" else "::")
@@ -1042,26 +1130,34 @@ arrow  unicode = text (if unicode then "→" else "->")
 darrow unicode = text (if unicode then "⇒" else "=>")
 forallSymbol unicode = text (if unicode then "∀" else "forall")
 
+
 dot :: LaTeX
 dot = char '.'
+
 
 parenList :: [LaTeX] -> LaTeX
 parenList = parens . hsep . punctuate comma
 
+
 ubxParenList :: [LaTeX] -> LaTeX
 ubxParenList = ubxparens . hsep . punctuate comma
+
 
 ubxparens :: LaTeX -> LaTeX
 ubxparens h = text "(#" <> h <> text "#)"
 
+
 pabrackets :: LaTeX -> LaTeX
 pabrackets h = text "[:" <> h <> text ":]"
+
 
 nl :: LaTeX
 nl = text "\\\\"
 
+
 keyword :: String -> LaTeX
 keyword = text
+
 
 infixr 4 <->  -- combining table cells
 (<->) :: LaTeX -> LaTeX -> LaTeX
