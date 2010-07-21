@@ -60,3 +60,6 @@ test('T3751', normal, compile_fail, [''])
 test('position001', normal, compile_fail, [''])
 test('position002', normal, compile_fail, [''])
 
+test('T1344a', normal, compile_fail, [''])
+test('T1344b', normal, compile_fail, [''])
+test('T1344c', normal, compile_fail, [''])
