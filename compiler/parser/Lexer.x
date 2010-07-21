@@ -1349,11 +1349,13 @@ readNum2 is_digit base conv i = do
   where read i input = do
 	  case alexGetChar' input of
 	    Just (c,input') | is_digit c -> do
-		read (i*base + conv c) input'
+               let i' = i*base + conv c
+               if i' > 0x10ffff
+                  then setInput input >> lexError "numeric escape sequence out of range"
+                  else read i' input'
 	    _other -> do
-		if i >= 0 && i <= 0x10FFFF
-		   then do setInput input; return (chr i)
-		   else lit_error input
+              setInput input; return (chr i)
+
 
 silly_escape_chars :: [(String, Char)]
 silly_escape_chars = [
