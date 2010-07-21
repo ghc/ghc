@@ -56,9 +56,10 @@ import Name
 import Module
 
 
+--------------------------------------------------------------------------------
+-- * Generating HTML documentation
+--------------------------------------------------------------------------------
 
--- -----------------------------------------------------------------------------
--- Generating HTML documentation
 
 ppHtml :: String
        -> Maybe String                 -- package
@@ -98,6 +99,7 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode) visible_ifaces
 
+
 ppHtmlHelpFiles
     :: String                   -- doctitle
     -> Maybe String             -- package
@@ -120,6 +122,7 @@ ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_pa
                 ppHH2Collection odir doctitle maybe_package
     Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_ifaces
     Just format    -> fail ("The "++format++" format is not implemented")
+
 
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
@@ -195,10 +198,12 @@ wikiButton (_, Just wiki_module_url, _) (Just mdl) =
 wikiButton _ _ =
   Nothing
 
+
 contentsButton :: Maybe String -> Maybe Html
 contentsButton maybe_contents_url
   = Just (anchor ! [href url] << "Contents")
   where url = maybe contentsHtmlFile id maybe_contents_url
+
 
 indexButton :: Maybe String -> Maybe Html
 indexButton maybe_index_url
@@ -232,6 +237,7 @@ bodyHtml doctitle iface
       )
     ]
 
+
 moduleInfo :: Interface -> Html
 moduleInfo iface =
    let
@@ -251,8 +257,11 @@ moduleInfo iface =
          [] -> noHtml
          _ -> defList entries ! [theclass "info"]
 
--- ---------------------------------------------------------------------------
--- Generate the module contents
+
+--------------------------------------------------------------------------------
+-- * Generate the module contents
+--------------------------------------------------------------------------------
+
 
 ppHtmlContents
    :: FilePath
@@ -291,14 +300,17 @@ ppHtmlContents odir doctitle
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 
+
 ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
 ppPrologue _ Nothing = noHtml
 ppPrologue title (Just doc) =
   docElement divDescription << (h1 << title +++ rdrDocToHtml doc)
 
+
 ppModuleTree :: [ModuleTree] -> Html
 ppModuleTree ts =
   divModuleList << (sectionName << "Modules" +++ mkNodeList [] "n" ts)
+
 
 mkNodeList :: [String] -> String -> [ModuleTree] -> Html
 mkNodeList ss p ts = case ts of
@@ -306,6 +318,7 @@ mkNodeList ss p ts = case ts of
   _ -> unordList (zipWith (mkNode ss) ps ts)
   where
     ps = [ p ++ '.' : show i | i <- [(1::Int)..]]
+
 
 mkNode :: [String] -> String -> ModuleTree -> Html
 mkNode ss p (Node s leaf pkg short ts) =
@@ -350,6 +363,7 @@ flatModuleTree ifaces =
       anchor ! [href ((moduleHtmlFile mdl)), target mainFrameName]
         << toHtml txt
 
+
 ppHtmlContentsFrame :: FilePath -> String -> [InstalledInterface] -> IO ()
 ppHtmlContentsFrame odir doctitle ifaces = do
   let mods = flatModuleTree ifaces
@@ -361,8 +375,11 @@ ppHtmlContentsFrame odir doctitle ifaces = do
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString html)
 
--- ---------------------------------------------------------------------------
--- Generate the index
+
+--------------------------------------------------------------------------------
+-- * Generate the index
+--------------------------------------------------------------------------------
+
 
 ppHtmlIndex :: FilePath
             -> String
@@ -483,8 +500,11 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
                toHtml (moduleString mdl)
           | (mdl, visible) <- entries ])
 
--- ---------------------------------------------------------------------------
--- Generate the HTML page for a module
+
+--------------------------------------------------------------------------------
+-- * Generate the HTML page for a module
+--------------------------------------------------------------------------------
+
 
 ppHtmlModule
         :: FilePath -> String
@@ -510,6 +530,7 @@ ppHtmlModule odir doctitle
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
   ppHtmlModuleMiniSynopsis odir doctitle iface unicode
 
+
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> Bool -> IO ()
 ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
   let mdl = ifaceMod iface
@@ -520,6 +541,7 @@ ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
            miniSynopsis mdl iface unicode)
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString html)
+
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Html
 ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
@@ -569,11 +591,13 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
 
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
+
 miniSynopsis :: Module -> Interface -> Bool -> Html
 miniSynopsis mdl iface unicode =
     divInterface << mapMaybe (processForMiniSynopsis mdl unicode) exports
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
+
 
 processForMiniSynopsis :: Module -> Bool -> ExportItem DocName -> Maybe Html
 processForMiniSynopsis mdl unicode (ExportDecl (L _loc decl0) _doc _ _insts) =
@@ -595,17 +619,20 @@ processForMiniSynopsis _ _ (ExportGroup lvl _id txt) =
   Just $ groupTag lvl << docToHtml txt
 processForMiniSynopsis _ _ _ = Nothing
 
+
 ppNameMini :: Module -> OccName -> Html
 ppNameMini mdl nm =
     anchor ! [ href (moduleNameUrl mdl nm)
              , target mainFrameName ]
       << ppBinder' nm
 
+
 ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
 ppTyClBinderWithVarsMini mdl decl =
   let n = unLoc $ tcdLName decl
       ns = tyvarNames $ tcdTyVars decl
   in ppTypeApp n ns (ppNameMini mdl . docNameOcc) ppTyName
+
 
 ppModuleContents :: [ExportItem DocName] -> Html
 ppModuleContents exports
@@ -632,6 +659,7 @@ ppModuleContents exports
   mk_subsections [] = noHtml
   mk_subsections ss = unordList ss
 
+
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
 numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
@@ -642,6 +670,7 @@ numberSectionHeadings exports = go 1 exports
           = ExportGroup lev (show n) doc : go (n+1) es
         go n (other:es)
           = other : go n es
+
 
 processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
 processExport summary _ _ (ExportGroup lev id0 doc)
@@ -657,17 +686,21 @@ processExport summary _ _ (ExportDoc doc)
 processExport summary _ _ (ExportModule mdl)
   = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
 
+
 nothingIf :: Bool -> a -> Maybe a
 nothingIf True _ = Nothing
 nothingIf False a = Just a
+
 
 processDecl :: Bool -> Html -> Maybe Html
 processDecl True = Just
 processDecl False = Just . divTopDecl
 
+
 processDeclOneLiner :: Bool -> Html -> Maybe Html
 processDeclOneLiner True = Just
 processDeclOneLiner False = Just . divTopDecl . declElem
+
 
 groupTag :: Int -> Html -> Html
 groupTag lev
