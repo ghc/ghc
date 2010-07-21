@@ -17,6 +17,7 @@ module Haddock.Backends.Xhtml.Decl (
   tyvarNames
 ) where
 
+
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
@@ -53,6 +54,7 @@ ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances subdocs unicode = ca
   InstD _                        -> noHtml
   _                              -> error "declaration not supported by ppDecl"
 
+
 ppFunSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
             DocName -> HsType DocName -> Bool -> Html
 ppFunSig summary links loc doc docname typ unicode =
@@ -60,6 +62,7 @@ ppFunSig summary links loc doc docname typ unicode =
     (ppTypeSig summary occname typ unicode, ppBinder False occname, dcolon unicode) unicode
   where
     occname = docNameOcc docname
+
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
                   DocForDecl DocName -> (Html, Html, Html) -> Bool -> Html
@@ -132,7 +135,7 @@ ppTyName name
 
 
 --------------------------------------------------------------------------------
--- Type families
+-- * Type families
 --------------------------------------------------------------------------------
 
 
@@ -174,7 +177,7 @@ ppTyFam summary associated links loc mbDoc decl unicode
 
 
 --------------------------------------------------------------------------------
--- Indexed data types
+-- * Indexed data types
 --------------------------------------------------------------------------------
 
 
@@ -183,7 +186,7 @@ ppDataInst = undefined
 
 
 --------------------------------------------------------------------------------
--- Indexed newtypes
+-- * Indexed newtypes
 --------------------------------------------------------------------------------
 
 -- TODO
@@ -191,7 +194,7 @@ ppDataInst = undefined
 
 
 --------------------------------------------------------------------------------
--- Indexed types
+-- * Indexed types
 --------------------------------------------------------------------------------
 
 
@@ -217,7 +220,7 @@ ppTyInstHeader _ _ decl unicode =
 
 
 --------------------------------------------------------------------------------
--- Associated Types
+-- * Associated Types
 --------------------------------------------------------------------------------
 
 
@@ -230,7 +233,7 @@ ppAssocType summ links doc (L loc decl) unicode =
 
 
 --------------------------------------------------------------------------------
--- TyClDecl helpers
+-- * TyClDecl helpers
 --------------------------------------------------------------------------------
 
 
@@ -241,7 +244,7 @@ ppTyClBinderWithVars summ decl =
 
 
 --------------------------------------------------------------------------------
--- Type applications
+-- * Type applications
 --------------------------------------------------------------------------------
 
 
@@ -269,7 +272,7 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 
 
 -------------------------------------------------------------------------------
--- Contexts
+-- * Contexts
 -------------------------------------------------------------------------------
 
 
@@ -306,7 +309,7 @@ ppPred unicode (HsIParam (IPName n) t)
 
 
 -------------------------------------------------------------------------------
--- Class declarations
+-- * Class declarations
 -------------------------------------------------------------------------------
 
 
@@ -327,6 +330,7 @@ ppFds fds unicode =
   where
         fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> arrow unicode <+>
                                hsep (map ppDocName vars2)
+
 
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> [(DocName, DocForDecl DocName)] -> Bool -> Html
 ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc subdocs unicode = 
@@ -379,7 +383,6 @@ ppClassDecl summary links instances loc mbDoc subdocs
 ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
-
 ppInstances :: [DocInstance DocName] -> DocName -> Bool -> Html
 ppInstances instances baseName unicode
   = subInstances instId (map instDecl instances)
@@ -398,9 +401,9 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
   Just docs -> docs
 
 
-
--- -----------------------------------------------------------------------------
--- Data & newtype declarations
+-------------------------------------------------------------------------------
+-- * Data & newtype declarations
+-------------------------------------------------------------------------------
 
 
 -- TODO: print contexts
@@ -426,6 +429,7 @@ ppShortDataDecl summary _links _loc dataDecl unicode
 
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons
+
 
 ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
@@ -507,6 +511,7 @@ ppShortConstrParts summary con unicode = case con_res con of
     forall   = con_explicit con
     mkFunTy a b = noLoc (HsFunTy a b)
 
+
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
 #if __GLASGOW_HASKELL__ == 612
 ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Bool -> Html
@@ -521,6 +526,7 @@ ppConstrHdr forall tvs ctxt unicode
     ppForall = case forall of
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> toHtml ". "
       Implicit -> noHtml
+
 
 ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LConDecl DocName -> SubDecl
 ppSideBySideConstr subdocs unicode (L _ con) = (decl, mbDoc, fieldPart)
@@ -569,6 +575,7 @@ ppSideBySideConstr subdocs unicode (L _ con) = (decl, mbDoc, fieldPart)
     mbDoc = join $ fmap fst $ lookup (unLoc $ con_name con) subdocs
     mkFunTy a b = noLoc (HsFunTy a b)
 
+
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  SubDecl
 ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
   (ppBinder False (docNameOcc name) <+> dcolon unicode <+> ppLType unicode ltype,
@@ -599,8 +606,9 @@ ppDataHeader summary decl unicode
     ppTyClBinderWithVars summary decl
 
 
--- ----------------------------------------------------------------------------
--- Types and contexts
+--------------------------------------------------------------------------------
+-- * Types and contexts
+--------------------------------------------------------------------------------
 
 
 ppKind :: Outputable a => a -> Html
@@ -619,7 +627,7 @@ tupleParens Unboxed = ubxParenList
 
 
 --------------------------------------------------------------------------------
--- Rendering of HsType
+-- * Rendering of HsType
 --------------------------------------------------------------------------------
 
 
