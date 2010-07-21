@@ -43,7 +43,7 @@ import Unique
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
   ifInstalledIfaces :: [InstalledInterface]
-} 
+}
 
 
 binaryInterfaceMagic :: Word32
@@ -209,7 +209,7 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
 
 
 -------------------------------------------------------------------------------
--- Symbol table
+-- * Symbol table
 -------------------------------------------------------------------------------
 
 
@@ -269,9 +269,9 @@ getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
 getSymbolTable bh namecache = do
   sz <- get bh
   od_names <- sequence (replicate sz (get bh))
-  let 
+  let
         arr = listArray (0,sz-1) names
-        (namecache', names) =    
+        (namecache', names) =
                 mapAccumR (fromOnDiskName arr) namecache od_names
   --
   return (namecache', arr)
@@ -286,20 +286,20 @@ fromOnDiskName
    -> OnDiskName
    -> (NameCache, Name)
 fromOnDiskName _ nc (pid, mod_name, occ) =
-  let 
+  let
         modu  = mkModule pid mod_name
         cache = nsNames nc
   in
   case lookupOrigNameCache cache modu occ of
      Just name -> (nc, name)
-     Nothing   -> 
-        let 
+     Nothing   ->
+        let
                 us        = nsUniqs nc
                 u         = uniqFromSupply us
                 name      = mkExternalName u modu occ noSrcSpan
                 new_cache = extendNameCache cache modu occ name
-        in        
-        case splitUniqSupply us of { (us',_) -> 
+        in
+        case splitUniqSupply us of { (us',_) ->
         ( nc{ nsUniqs = us', nsNames = new_cache }, name )
         }
 
@@ -311,7 +311,7 @@ serialiseName bh name _ = do
 
 
 -------------------------------------------------------------------------------
--- GhcBinary instances
+-- * GhcBinary instances
 -------------------------------------------------------------------------------
 
 
@@ -349,7 +349,7 @@ instance Binary InstalledInterface where
     visExps <- get bh
     opts    <- get bh
     subMap  <- get bh
-    
+
     return (InstalledInterface modu info docMap
             exps visExps opts subMap)
 
@@ -497,7 +497,7 @@ instance Binary name => Binary (HaddockModInfo name) where
     put_ bh (hmi_portability hmi)
     put_ bh (hmi_stability   hmi)
     put_ bh (hmi_maintainer  hmi)
-  
+
   get bh = do
     descr <- get bh
     porta <- get bh
