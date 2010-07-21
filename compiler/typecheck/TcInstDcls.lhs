@@ -531,13 +531,17 @@ tcInstDecls2 tycl_decls inst_decls
   = do  { -- (a) Default methods from class decls
           let class_decls = filter (isClassDecl . unLoc) tycl_decls
         ; dm_binds_s <- mapM tcClassDecl2 class_decls
+        ; let dm_binds = unionManyBags dm_binds_s
                                     
           -- (b) instance declarations
-        ; inst_binds_s <- mapM tcInstDecl2 inst_decls
+	; let dm_ids = collectHsBindsBinders dm_binds
+	      -- Add the default method Ids (again)
+	      -- See Note [Default methods and instances]
+        ; inst_binds_s <- tcExtendIdEnv dm_ids $
+                          mapM tcInstDecl2 inst_decls
 
           -- Done
-        ; return (unionManyBags dm_binds_s `unionBags`
-                  unionManyBags inst_binds_s) }
+        ; return (dm_binds `unionBags` unionManyBags inst_binds_s) }
 
 tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
@@ -550,6 +554,18 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
     loc     = getSrcSpan dfun_id
 \end{code}
 
+See Note [Default methods and instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The default method Ids are already in the type environment (see Note
+[Default method Ids and Template Haskell] in TcTyClsDcls), BUT they
+don't have their InlinePragmas yet.  Usually that would not matter,
+because the simplifier propagates information from binding site to
+use.  But, unusually, when compiling instance decls we *copy* the
+INLINE pragma from the default method to the method for that
+particular operation (see Note [INLINE and default methods] below).
+
+So right here in tcInstDecl2 we must re-extend the type envt with
+the default method Ids replete with their INLINE pragmas.  Urk.
 
 \begin{code}
 tc_inst_decl2 :: Id -> InstBindings Name -> TcM (LHsBinds Id)
