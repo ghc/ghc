@@ -10,8 +10,8 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-module Haddock.Backends.Xhtml ( 
-  ppHtml, copyHtmlBits, 
+module Haddock.Backends.Xhtml (
+  ppHtml, copyHtmlBits,
   ppHtmlIndex, ppHtmlContents,
   ppHtmlHelpFiles
 ) where
@@ -79,26 +79,26 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
   let
         visible_ifaces = filter visible ifaces
         visible i = OptHide `notElem` ifaceOptions i
-  when (not (isJust maybe_contents_url)) $ 
+  when (not (isJust maybe_contents_url)) $
     ppHtmlContents odir doctitle maybe_package
         maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
         prologue
 
-  when (not (isJust maybe_index_url)) $ 
+  when (not (isJust maybe_index_url)) $
     ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
-      maybe_contents_url maybe_source_url maybe_wiki_url 
+      maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces)
-    
-  when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
+
+  when (not (isJust maybe_contents_url && isJust maybe_index_url)) $
         ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
 
   mapM_ (ppHtmlModule odir doctitle
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode) visible_ifaces
 
-ppHtmlHelpFiles 
+ppHtmlHelpFiles
     :: String                   -- doctitle
     -> Maybe String                             -- package
         -> [Interface]
@@ -129,7 +129,7 @@ copyFile fromFPath toFPath =
                 copyContents hFrom hTo buffer)
         where
                 bufferSize = 1024
-                
+
                 copyContents hFrom hTo buffer = do
                         count <- hGetBuf hFrom buffer bufferSize
                         when (count > 0) $ do
@@ -139,7 +139,7 @@ copyFile fromFPath toFPath =
 
 copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
 copyHtmlBits odir libdir _maybe_css = do
-  let 
+  let
         libhtmldir = joinPath [libdir, "html"]
         {-
         css_file = case maybe_css of
@@ -163,7 +163,7 @@ headHtml docTitle miniPage =
     script ! [src jsFile, thetype "text/javascript"] << noHtml,
     script ! [thetype "text/javascript"]
         -- NB: Within XHTML, the content of script tags needs to be
-        -- a <![CDATA[ section. Will break if the miniPage name could 
+        -- a <![CDATA[ section. Will break if the miniPage name could
         -- have "]]>" in it!
       << primHtml (
           "//<![CDATA[\nwindow.onload = function () {resetStyle();"
@@ -182,8 +182,8 @@ srcButton (_, Just src_module_url, _) (Just iface) =
    in Just (anchor ! [href url] << "Source code")
 srcButton _ _ =
   Nothing
- 
-  
+
+
 wikiButton :: WikiURLs -> Maybe Module -> Maybe Html
 wikiButton (Just wiki_base_url, _, _) Nothing =
   Just (anchor ! [href wiki_base_url] << "User Comments")
@@ -196,12 +196,12 @@ wikiButton _ _ =
   Nothing
 
 contentsButton :: Maybe String -> Maybe Html
-contentsButton maybe_contents_url 
+contentsButton maybe_contents_url
   = Just (anchor ! [href url] << "Contents")
   where url = maybe contentsHtmlFile id maybe_contents_url
 
 indexButton :: Maybe String -> Maybe Html
-indexButton maybe_index_url 
+indexButton maybe_index_url
   = Just (anchor ! [href url] << "Index")
   where url = maybe indexHtmlFile id maybe_index_url
 
@@ -210,14 +210,14 @@ bodyHtml :: String -> Maybe Interface
     -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String
     -> Html -> Html
-bodyHtml doctitle iface 
+bodyHtml doctitle iface
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url
            pageContent =
   body << [
     divPackageHeader << [
       sectionName << nonEmpty doctitle,
-      unordList (catMaybes [ 
+      unordList (catMaybes [
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
@@ -226,14 +226,14 @@ bodyHtml doctitle iface
       ],
     divContent << pageContent,
     divFooter << paragraph << (
-      "Produced by " +++ 
+      "Produced by " +++
       (anchor ! [href projectUrl] << toHtml projectName) +++
       (" version " ++ projectVersion)
       )
     ]
 
 moduleInfo :: Interface -> Html
-moduleInfo iface = 
+moduleInfo iface =
    let
       info = ifaceInfo iface
 
@@ -269,7 +269,7 @@ ppHtmlContents odir doctitle
   maybe_source_url maybe_wiki_url ifaces showPkgs prologue = do
   let tree = mkModuleTree showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
-      html = 
+      html =
         headHtml doctitle Nothing +++
         bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
@@ -282,7 +282,7 @@ ppHtmlContents odir doctitle
 
   -- XXX: think of a better place for this?
   ppHtmlContentsFrame odir doctitle ifaces
-  
+
   -- Generate contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
@@ -306,24 +306,24 @@ mkNodeList ss p ts = case ts of
   _ -> unordList (zipWith (mkNode ss) ps ts)
   where
     ps = [ p ++ '.' : show i | i <- [(1::Int)..]]
-    
+
 mkNode :: [String] -> String -> ModuleTree -> Html
-mkNode ss p (Node s leaf pkg short ts) = 
+mkNode ss p (Node s leaf pkg short ts) =
   collBtn +++ htmlModule +++ shortDescr +++ htmlPkg +++ subtree
   where
     collBtn = case ts of
       [] -> noHtml
       _ -> collapsebutton p
-  
+
     htmlModule = thespan ! [theclass "module" ] <<
       (if leaf
-        then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg)) 
+        then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg))
                                        (mkModuleName mdl))
         else toHtml s
       )
-      
+
     mdl = intercalate "." (reverse (s:ss))
-    
+
     shortDescr = maybe noHtml origDocToHtml short
     htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) pkg
 
@@ -355,7 +355,7 @@ ppHtmlContentsFrame odir doctitle ifaces = do
   let mods = flatModuleTree ifaces
       html =
         headHtml doctitle Nothing +++
-        miniBody << divModuleList << 
+        miniBody << divModuleList <<
           (sectionName << "Modules" +++
            ulist << [ li ! [theclass "module"] << m | m <- mods ])
   createDirectoryIfMissing True odir
@@ -365,13 +365,13 @@ ppHtmlContentsFrame odir doctitle ifaces = do
 -- Generate the index
 
 ppHtmlIndex :: FilePath
-            -> String 
+            -> String
             -> Maybe String
             -> Maybe String
             -> Maybe String
             -> SourceURLs
             -> WikiURLs
-            -> [InstalledInterface] 
+            -> [InstalledInterface]
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
@@ -384,7 +384,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     mapM_ (do_sub_index index) initialChars
 
   writeFile (joinPath [odir, indexHtmlFile]) (renderToString html)
-  
+
     -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
@@ -400,12 +400,12 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
         maybe_source_url maybe_wiki_url
         maybe_contents_url Nothing << [
           if showLetters then indexInitialLetterLinks else noHtml,
-          if null items then noHtml else 
+          if null items then noHtml else
             divIndex << [sectionName << indexName ch, buildIndex items]
           ]
-    
+
     indexName ch = "Index" ++ maybe "" (\c -> " - " ++ [c]) ch
- 
+
     buildIndex items = table << aboves (map indexElt items)
 
     -- an arbitrary heuristic:
@@ -414,32 +414,32 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     --   or two members in them, which seems inefficient or
     --   unnecessarily hard to use.
     split_indices = length index > 150
-  
+
     indexInitialLetterLinks =
-      divAlphabet << 
+      divAlphabet <<
           unordList [ anchor ! [href (subIndexHtmlFile c)] << [c]
                       | c <- initialChars
                       , any ((==c) . toUpper . head . fst) index ]
-  
+
     -- todo: what about names/operators that start with Unicode
     -- characters?
     -- Exports beginning with '_' can be listed near the end,
     -- presumably they're not as important... but would be listed
     -- with non-split index!
     initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~" ++ "_"
-  
+
     do_sub_index this_ix c
       = unless (null index_part) $
           writeFile (joinPath [odir, subIndexHtmlFile c]) (renderToString html)
-      where 
+      where
         html = indexPage True (Just c) index_part
         index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
-  
-  
+
+
     index :: [(String, Map GHC.Name [(Module,Bool)])]
     index = sortBy cmp (Map.toAscList full_index)
       where cmp (n1,_) (n2,_) = map toUpper n1 `compare` map toUpper n2
-  
+
     -- for each name (a plain string), we have a number of original HsNames that
     -- it can refer to, and for each of those we have a list of modules
     -- that export that entity.  Each of the modules exports the entity
@@ -447,36 +447,36 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     full_index :: Map String (Map GHC.Name [(Module,Bool)])
     full_index = Map.fromListWith (flip (Map.unionWith (++)))
                  (concat (map getIfaceIndex ifaces))
-  
-    getIfaceIndex iface = 
+
+    getIfaceIndex iface =
       [ (getOccString name
          , Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
          | name <- instExports iface ]
       where mdl = instMod iface
-  
+
     indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
-    indexElt (str, entities) = 
+    indexElt (str, entities) =
        case Map.toAscList entities of
-          [(nm,entries)] -> 
-              td ! [ theclass "src" ] << toHtml str <-> 
+          [(nm,entries)] ->
+              td ! [ theclass "src" ] << toHtml str <->
                           indexLinks nm entries
           many_entities ->
-              td ! [ theclass "src" ] << toHtml str <-> td << spaceHtml </> 
+              td ! [ theclass "src" ] << toHtml str <-> td << spaceHtml </>
                   aboves (map doAnnotatedEntity (zip [1..] many_entities))
-  
+
     doAnnotatedEntity :: (Integer, (Name, [(Module, Bool)])) -> HtmlTable
     doAnnotatedEntity (j,(nm,entries))
-          = td ! [ theclass "alt" ] << 
+          = td ! [ theclass "alt" ] <<
                   toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
                    indexLinks nm entries
-  
+
     ppAnnot n | not (isValOcc n) = toHtml "Type/Class"
               | isDataOcc n      = toHtml "Data Constructor"
               | otherwise        = toHtml "Function"
-  
-    indexLinks nm entries = 
-       td ! [ theclass "module" ] << 
-          hsep (punctuate comma 
+
+    indexLinks nm entries =
+       td ! [ theclass "module" ] <<
+          hsep (punctuate comma
           [ if visible then
                linkId mdl (Just nm) << toHtml (moduleString mdl)
             else
@@ -494,10 +494,10 @@ ppHtmlModule
 ppHtmlModule odir doctitle
   maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url unicode iface = do
-  let 
+  let
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
-      html = 
+      html =
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
@@ -505,7 +505,7 @@ ppHtmlModule odir doctitle
             divModuleHeader << (sectionName << mdl_str +++ moduleInfo iface),
             ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
           ]
-         
+
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
   ppHtmlModuleMiniSynopsis odir doctitle iface unicode
@@ -515,7 +515,7 @@ ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
   let mdl = ifaceMod iface
       html =
         headHtml (moduleString mdl) Nothing +++
-        miniBody << 
+        miniBody <<
           (divModuleHeader << sectionName << moduleString mdl +++
            miniSynopsis mdl iface unicode)
   createDirectoryIfMissing True odir
@@ -558,7 +558,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").
     maybe_doc_hdr
-      = case exports of            
+      = case exports of
           [] -> noHtml
           ExportGroup _ _ _ : _ -> noHtml
           _ -> h1 << "Documentation"
@@ -566,7 +566,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
     bdy =
       foldr (+++) noHtml $
         mapMaybe (processExport False linksInfo unicode) exports
-          
+
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
 miniSynopsis :: Module -> Interface -> Bool -> Html
@@ -615,12 +615,12 @@ ppModuleContents exports
   contentsDiv = divTableOfContents << (
     sectionName << "Contents" +++
     unordList sections)
-    
+
   (sections, _leftovers{-should be []-}) = process 0 exports
 
   process :: Int -> [ExportItem DocName] -> ([Html],[ExportItem DocName])
   process _ [] = ([], [])
-  process n items@(ExportGroup lev id0 doc : rest) 
+  process n items@(ExportGroup lev id0 doc : rest)
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
@@ -638,7 +638,7 @@ numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
 numberSectionHeadings exports = go 1 exports
   where go :: Int -> [ExportItem DocName] -> [ExportItem DocName]
         go _ [] = []
-        go n (ExportGroup lev _ doc : es) 
+        go n (ExportGroup lev _ doc : es)
           = ExportGroup lev (show n) doc : go (n+1) es
         go n (other:es)
           = other : go n es
@@ -675,6 +675,5 @@ groupTag lev
   | lev == 2  = h2
   | lev == 3  = h3
   | otherwise = h4
-
 
 
