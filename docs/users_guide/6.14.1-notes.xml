@@ -19,6 +19,13 @@
           parallelism will be lost.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          The full Haskell <literal>import</literal> syntax can now been
+          used to bring modules into scope in GHCi.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
