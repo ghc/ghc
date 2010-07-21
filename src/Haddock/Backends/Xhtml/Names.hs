@@ -17,6 +17,7 @@ module Haddock.Backends.Xhtml.Names (
   linkId
 ) where
 
+
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
@@ -28,20 +29,25 @@ import GHC
 import Name
 import RdrName
 
+
 ppOccName :: OccName -> Html
 ppOccName = toHtml . occNameString
+
 
 ppRdrName :: RdrName -> Html
 ppRdrName = ppOccName . rdrNameOcc
 
+
 ppLDocName :: Located DocName -> Html
 ppLDocName (L _ d) = ppDocName d
+
 
 ppDocName :: DocName -> Html
 ppDocName (Documented name mdl) =
   linkIdOcc mdl (Just occName) << ppOccName occName
     where occName = nameOccName name
 ppDocName (Undocumented name) = toHtml (getOccString name)
+
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
@@ -72,13 +78,15 @@ linkIdOcc mdl mbName = anchor ! [href url]
       Nothing   -> moduleUrl mdl
       Just name -> moduleNameUrl mdl name
 
+
 ppModule :: Module -> Html
 ppModule mdl = anchor ! [href (moduleUrl mdl)]
                << toHtml (moduleString mdl)
 
+
 ppModuleRef :: Module -> String -> Html
 ppModuleRef mdl ref = anchor ! [href (moduleUrl mdl ++ ref)]
                       << toHtml (moduleString mdl)
-    -- NB: The ref paramaeter already includes the '#'.
+    -- NB: The ref parameter already includes the '#'.
     -- This function is only called from markupModule expanding a
     -- DocModule, which doesn't seem to be ever be used.

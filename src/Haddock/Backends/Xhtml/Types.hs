@@ -20,5 +20,6 @@ module Haddock.Backends.Xhtml.Types (
 type SourceURLs = (Maybe String, Maybe String, Maybe String)
 type WikiURLs = (Maybe String, Maybe String, Maybe String)
 
+
 -- The URL for source and wiki links, and the current module
 type LinksInfo = (SourceURLs, WikiURLs)

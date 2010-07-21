@@ -29,6 +29,7 @@ module Haddock.Backends.Xhtml.Utils (
   cssFiles, styleSheet, stylePickers, styleMenu
 ) where
 
+
 import Haddock.GhcUtils
 import Haddock.Utils
 
@@ -89,25 +90,31 @@ renderToString :: Html -> String
 renderToString = showHtml     -- for production
 --renderToString = prettyHtml   -- for debugging
 
+
 hsep :: [Html] -> Html
 hsep [] = noHtml
 hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
+
 
 infixr 8 <+>
 (<+>) :: Html -> Html -> Html
 a <+> b = a +++ toHtml " " +++ b
 
+
 keyword :: String -> Html
 keyword s = thespan ! [theclass "keyword"] << toHtml s
+
 
 equals, comma :: Html
 equals = char '='
 comma  = char ','
 
+
 char :: Char -> Html
 char c = toHtml [c]
 
--- | ensure content contains at least something (a non-breaking space)
+
+-- | Ensure content contains at least something (a non-breaking space)
 nonEmpty :: (HTML a) => a -> Html
 nonEmpty a = if isNoHtml h then spaceHtml else h
     where h = toHtml a
@@ -123,6 +130,7 @@ brackets h      = char '[' +++ h +++ char ']'
 pabrackets h    = toHtml "[:" +++ h +++ toHtml ":]"
 braces h        = char '{' +++ h +++ char '}'
 
+
 punctuate :: Html -> [Html] -> [Html]
 punctuate _ []     = []
 punctuate h (d0:ds) = go d0 ds
@@ -130,11 +138,14 @@ punctuate h (d0:ds) = go d0 ds
                      go d [] = [d]
                      go d (e:es) = (d +++ h) : go e es
 
+
 parenList :: [Html] -> Html
 parenList = parens . hsep . punctuate comma
 
+
 ubxParenList :: [Html] -> Html
 ubxParenList = ubxparens . hsep . punctuate comma
+
 
 ubxparens :: Html -> Html
 ubxparens h = toHtml "(#" +++ h +++ toHtml "#)"
@@ -155,13 +166,14 @@ dot :: Html
 dot = toHtml "."
 
 
-
 -- | Generate a named anchor
 namedAnchor :: String -> Html -> Html
 namedAnchor n = anchor ! [XHtml.name n]
 
+
 linkedAnchor :: String -> Html -> Html
 linkedAnchor n = anchor ! [href ('#':n)]
+
 
 --
 -- A section of HTML which is collapsible via a +/- button.
@@ -174,6 +186,7 @@ linkedAnchor n = anchor ! [href ('#':n)]
 collapsebutton :: String -> Html
 collapsebutton id_ =
   image ! [ src minusFile, theclass "coll", onclick ("toggle(this,'" ++ id_ ++ "')"), alt "show/hide" ]
+
 
 -- A quote is a valid part of a Haskell identifier, but it would interfere with
 -- the ECMA script string delimiter used in collapsebutton above.
@@ -189,8 +202,10 @@ cssThemes = [
     ("Snappy", "shaddock.css")
     ]
 
+
 cssFiles :: [String]
 cssFiles = map snd cssThemes
+
 
 styleSheet :: Html
 styleSheet = toHtml $ zipWith mkLink cssThemes rels
@@ -199,12 +214,14 @@ styleSheet = toHtml $ zipWith mkLink cssThemes rels
     mkLink (aTitle, aFile) aRel =
        (thelink ! [href aFile, rel aRel, thetype "text/css", XHtml.title aTitle]) noHtml
 
+
 stylePickers :: [Html]
 stylePickers = map mkPicker cssThemes
   where
     mkPicker (aTitle, aFile) =
       let js = "setActiveStyleSheet('" ++ aFile ++ "'); return false;" in
       anchor ! [href "#", onclick js] << aTitle
+
 
 styleMenu :: Html
 styleMenu = thediv ! [identifier "style-menu-holder"] << [
