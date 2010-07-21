@@ -37,7 +37,7 @@ themes :: [CssTheme]
 themes = [
     CssTheme "Classic" "xhaddock.css" ["xhaddock.css", iconFile],
     CssTheme "Tibbe"   "thaddock.css" ["thaddock.css", iconFile],
-    CssTheme "Snappy"  "shaddock.css" ["shaddock.css", iconFile],
+    CssTheme "Snappy"  "shaddock.css" ["shaddock.css", "s_haskell_icon.gif"],
     CssTheme "Nomi"    "nhaddock.css" ["nhaddock.css", "hslogo-16.png"]
     ]
 
