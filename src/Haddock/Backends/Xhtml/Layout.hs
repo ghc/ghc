@@ -35,6 +35,7 @@ module Haddock.Backends.Xhtml.Layout (
   topDeclElem, declElem,
 ) where
 
+
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
@@ -45,7 +46,11 @@ import Text.XHtml hiding ( name, title, p, quote )
 import FastString            ( unpackFS )
 import GHC
 
--- Sections of the document
+
+--------------------------------------------------------------------------------
+-- * Sections of the document
+--------------------------------------------------------------------------------
+
 
 miniBody :: Html -> Html
 miniBody = body ! [identifier "mini"]
@@ -53,6 +58,7 @@ miniBody = body ! [identifier "mini"]
 
 sectionDiv :: String -> Html -> Html
 sectionDiv i = thediv ! [identifier i]
+
 
 sectionName :: Html -> Html
 sectionName = paragraph ! [theclass "caption"]
@@ -76,11 +82,14 @@ divAlphabet         = sectionDiv "alphabet"
 divModuleList       = sectionDiv "module-list"
 
 
+--------------------------------------------------------------------------------
+-- * Declaration containers
+--------------------------------------------------------------------------------
 
--- | Declaration containers 
 
 shortDeclList :: [Html] -> Html
 shortDeclList items = ulist << map (li ! [theclass "src short"] <<) items
+
 
 shortSubDecls :: [Html] -> Html
 shortSubDecls items = ulist ! [theclass "subs"] << map (li <<) items
@@ -91,6 +100,7 @@ divTopDecl = thediv ! [theclass "top"]
 
 
 type SubDecl = (Html, Maybe (Doc DocName), [Html])
+
 
 divSubDecls :: (HTML a) => String -> a -> Maybe Html -> Html
 divSubDecls cssClass captionName = maybe noHtml wrap
@@ -115,6 +125,7 @@ subDlist decls = Just $ dlist << map subEntry decls
     ma       `with` bs = ma +++ bs
 -}
 
+
 subTable :: [SubDecl] -> Maybe Html
 subTable [] = Nothing
 subTable decls = Just $ table << aboves (concatMap subRow decls)
@@ -125,6 +136,7 @@ subTable decls = Just $ table << aboves (concatMap subRow decls)
        docElement td << nonEmpty (fmap docToHtml mdoc))
       : map (cell . (td <<)) subs
 
+
 subBlock :: [Html] -> Maybe Html
 subBlock [] = Nothing
 subBlock hs = Just $ toHtml hs
@@ -133,20 +145,25 @@ subBlock hs = Just $ toHtml hs
 subArguments :: [SubDecl] -> Html
 subArguments = divSubDecls "arguments" "Arguments" . subTable
 
+
 subAssociatedTypes :: [Html] -> Html
 subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBlock
+
 
 subConstructors :: [SubDecl] -> Html
 subConstructors = divSubDecls "constructors" "Constructors" . subTable
 
+
 subFields :: [SubDecl] -> Html
 subFields = divSubDecls "fields" "Fields" . subTable
+
 
 subInstances :: String -> [SubDecl] -> Html
 subInstances id_ = divSubDecls "instances" instCaption . instTable
   where
     instCaption = collapsebutton id_ +++ " Instances"
     instTable = fmap (thediv ! [identifier id_] <<) . subTable
+
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock
@@ -155,6 +172,7 @@ subMethods = divSubDecls "methods" "Methods" . subBlock
 -- a box for displaying code
 declElem :: Html -> Html
 declElem = paragraph ! [theclass "src"]
+
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
