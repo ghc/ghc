@@ -68,6 +68,8 @@ import Serialized
 import ErrUtils
 import SrcLoc
 import Outputable
+import Util		( dropList )
+import Data.List	( mapAccumL )
 import Unique
 import Data.Maybe
 import BasicTypes
@@ -1068,26 +1070,35 @@ reifyTyCon tc
 	; return (TH.TyConI decl) }
 
 reifyDataCon :: [Type] -> DataCon -> TcM TH.Con
+-- For GADTs etc, see Note [Reifying data constructors]
 reifyDataCon tys dc
-  | isVanillaDataCon dc
-  = do 	{ arg_tys <- reifyTypes (dataConInstOrigArgTys dc tys)
-	; let stricts = map reifyStrict (dataConStrictMarks dc)
-	      fields  = dataConFieldLabels dc
-	      name    = reifyName dc
-	      [a1,a2] = arg_tys
-	      [s1,s2] = stricts
-	; ASSERT( length arg_tys == length stricts )
-          if not (null fields) then
-	     return (TH.RecC name (zip3 (map reifyName fields) stricts arg_tys))
-	  else
-	  if dataConIsInfix dc then
-	     ASSERT( length arg_tys == 2 )
-	     return (TH.InfixC (s1,a1) name (s2,a2))
-	  else
-	     return (TH.NormalC name (stricts `zip` arg_tys)) }
-  | otherwise
-  = failWithTc (ptext (sLit "Can't reify a GADT data constructor:") 
-		<+> quotes (ppr dc))
+  = do { let (tvs, theta, arg_tys, _) = dataConSig dc
+             subst             = mkTopTvSubst (tvs `zip` tys)	-- Dicard ex_tvs
+             (subst', ex_tvs') = mapAccumL substTyVarBndr subst (dropList tys tvs)
+             theta'   = substTheta subst' theta
+             arg_tys' = substTys subst' arg_tys
+             stricts  = map reifyStrict (dataConStrictMarks dc)
+	     fields   = dataConFieldLabels dc
+	     name     = reifyName dc
+
+       ; r_arg_tys <- reifyTypes arg_tys'
+
+       ; let main_con | not (null fields) 
+                      = TH.RecC name (zip3 (map reifyName fields) stricts r_arg_tys)
+                      | dataConIsInfix dc
+                      = ASSERT( length arg_tys == 2 )
+	                TH.InfixC (s1,r_a1) name (s2,r_a2)
+                      | otherwise
+                      = TH.NormalC name (stricts `zip` r_arg_tys)
+	     [r_a1, r_a2] = r_arg_tys
+	     [s1,   s2]   = stricts
+
+       ; ASSERT( length arg_tys == length stricts )
+         if null ex_tvs' && null theta then
+	     return main_con
+         else do
+         { cxt <- reifyCxt theta'
+	 ; return (TH.ForallC (reifyTyVars ex_tvs') cxt main_con) } }
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Info
@@ -1106,7 +1117,7 @@ reifyType :: TypeRep.Type -> TcM TH.Type
 reifyType ty@(ForAllTy _ _)        = reify_for_all ty
 reifyType ty@(PredTy {} `FunTy` _) = reify_for_all ty	        -- Types like ((?x::Int) => Char -> Char)
 reifyType (TyVarTy tv)	    = return (TH.VarT (reifyName tv))
-reifyType (TyConApp tc tys) = reify_tc_app (reifyName tc) tys   -- Do not expand type synonyms here
+reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
 reifyType (FunTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(PredTy {})    = pprPanic "reifyType PredTy" (ppr ty)
@@ -1155,15 +1166,21 @@ reifyTyVars = map reifyTyVar
         kind = tyVarKind tv
         name = reifyName tv
 
-reify_tc_app :: TH.Name -> [TypeRep.Type] -> TcM TH.Type
-reify_tc_app tc tys = do { tys' <- reifyTypes tys 
-			 ; return (foldl TH.AppT (TH.ConT tc) tys') }
+reify_tc_app :: TyCon -> [TypeRep.Type] -> TcM TH.Type
+reify_tc_app tc tys 
+  = do { tys' <- reifyTypes tys 
+       ; return (foldl TH.AppT r_tc tys') }
+  where
+    n_tys = length tys
+    r_tc | isTupleTyCon tc          = TH.TupleT n_tys
+         | tc `hasKey` listTyConKey = TH.ListT
+         | otherwise                = TH.ConT (reifyName tc)
 
 reifyPred :: TypeRep.PredType -> TcM TH.Pred
 reifyPred (ClassP cls tys) 
   = do { tys' <- reifyTypes tys 
-       ; return $ TH.ClassP (reifyName cls) tys'
-       }
+       ; return $ TH.ClassP (reifyName cls) tys' }
+
 reifyPred p@(IParam _ _)   = noTH (sLit "implicit parameters") (ppr p)
 reifyPred (EqPred ty1 ty2) 
   = do { ty1' <- reifyType ty1
@@ -1214,3 +1231,19 @@ noTH s d = failWithTc (hsep [ptext (sLit "Can't represent") <+> ptext s <+>
 				ptext (sLit "in Template Haskell:"),
 		 	     nest 2 d])
 \end{code}
+
+Note [Reifying data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Template Haskell syntax is rich enough to express even GADTs, 
+provided we do so in the equality-predicate form.  So a GADT
+like
+
+  data T a where
+     MkT1 :: a -> T [a]
+     MkT2 :: T Int
+
+will appear in TH syntax like this
+
+  data T a = forall b. (a ~ [b]) => MkT1 b
+           | (a ~ Int) => MkT2
+
