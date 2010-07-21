@@ -446,7 +446,7 @@ tcPrags :: RecFlag
         -> Bool     -- True <=> function is overloaded
         -> Id -> [LSig Name]
         -> TcM (Id, [Located TcSpecPrag])
--- Add INLINE and SPECLIASE pragmas
+-- Add INLINE and SPECIALSE pragmas
 --    INLINE prags are added to the (polymorphic) Id directly
 --    SPECIALISE prags are passed to the desugarer via TcSpecPrags
 -- Pre-condition: the poly_id is zonked
