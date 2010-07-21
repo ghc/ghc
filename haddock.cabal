@@ -94,7 +94,7 @@ executable haddock
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
-  ghc-options:          -funbox-strict-fields -O2 -Wall
+  ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
   other-modules:
     Haddock.Interface
@@ -158,7 +158,7 @@ library
   hs-source-dirs:       src
   extensions:           CPP, PatternGuards, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
-  ghc-options:          -funbox-strict-fields -O2 -Wall
+  ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
   exposed-modules:
     Documentation.Haddock
