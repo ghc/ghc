@@ -186,7 +186,7 @@ synifyDataCon use_gadt_syntax dc = noLoc $
                  NotMarkedStrict -> tySyn
                       -- HsNoBang never appears, it's implied instead.
 #endif
-                      
+ 
           )
           (dataConOrigArgTys dc) (dataConStrictMarks dc)
   field_tys = zipWith (\field synTy -> ConDeclField
