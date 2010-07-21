@@ -26,6 +26,7 @@ import UniqSupply
 import Unique
 import Util
 
+import Data.List ( partition )
 import Control.Monad ( liftM )
 
 type LlvmStatements = OrdList LlvmStatement
@@ -79,13 +80,10 @@ basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
 -- of a function to make sure they dominate all possible paths in the CFG.
 dominateAllocs :: LlvmBasicBlock -> (LlvmBasicBlock, [LlvmStatement])
 dominateAllocs (BasicBlock id stmts)
-  = (BasicBlock id allstmts, allallocs)
-    where
-        (allstmts, allallocs) = foldl split ([],[]) stmts
-        split (stmts', allocs) s@(Assignment _ (Alloca _ _))
-                = (stmts', allocs ++ [s])
-        split (stmts', allocs) other
-                = (stmts' ++ [other], allocs)
+  = let (allocs, stmts') = partition isAlloc stmts
+        isAlloc (Assignment _ (Alloca _ _)) = True
+        isAlloc _other                      = False
+    in (BasicBlock id stmts', allocs)
 
 
 -- | Generate code for one block
