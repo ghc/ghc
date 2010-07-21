@@ -69,7 +69,6 @@ div#style-menu-holder {
     font-size: 170%;
     line-height: 130%;
     margin:0 0 0 -10px;
-    /* padding:0.8em 0 0; */
 
     background-color:#E5ECF9;
     border-top:1px solid #3366CC;
@@ -161,7 +160,7 @@ li {
 p {
     line-height:125%;
     margin:0;
-    padding:0;
+    padding:1em 0 0;
 }
 
 h1 + p, h2 + p, h3 + p,
@@ -189,7 +188,7 @@ code {
     font-size:10pt;
 }
 
-a, a:link {
+a:link {
     color:#0000CC;
 }
 
@@ -229,15 +228,12 @@ dd {
 .hide {	display: none; }
 .show { }
 
-.top, .subs {
+.top {
     margin:0.4em 0 0 2em;
     padding:0;
 }
 
 .top .src {
-    font-family:monospace;
-    font-size:larger;
-    font-weight:bold;
     margin:0.75em 0 0 -2em;
     padding:0;
 }
@@ -246,9 +242,6 @@ dd {
 	margin-left: 0;
 }
 
-.arguments {
-	margin: 0 0 1em;
-}
 .arguments .caption,
 .fields .caption {
 	display: none;
@@ -262,14 +255,8 @@ dd {
     padding:0.99em;
 }
 
-.caption {
-	margin-top: 0;
-	padding-top: 0;
-}
-
 .subs .caption {
 	font-weight: bold;
-	color: #919100;
 }
 
 .subs td {
@@ -360,4 +347,26 @@ dd {
 
 #mini #interface .src a {
 	font-weight: bold;
+}
+
+.keyword {
+    font-weight: bold;
+    font-family: monospace;
+}
+
+#synopsis {
+    display: none;
+}
+
+td p {
+    padding-top: 0;
+}
+
+.src {
+    font-family: monospace;
+    font-size: larger;
+}
+
+.def {
+    font-weight: bold;
 }
