@@ -151,6 +151,9 @@ main = handleTopExceptions $ do
             Nothing -> return ()
 
     else do
+      when (any (`elem` [Flag_Html, Flag_Xhtml, Flag_Hoogle, Flag_LaTeX]) flags) $
+        throwE "No input file(s)."
+
       -- Get packages supplied with --read-interface.
       packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
 
@@ -351,6 +354,18 @@ handleEasyFlags flags = do
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
     throwE "-h cannot be used with --gen-index or --gen-contents"
+
+  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
+        && Flag_Xhtml `elem` flags) $
+    throwE "--xhtml cannot be used with --gen-index or --gen-contents"
+
+  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
+        && Flag_Hoogle `elem` flags) $
+    throwE "--hoogle cannot be used with --gen-index or --gen-contents"
+
+  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
+        && Flag_LaTeX `elem` flags) $
+    throwE "--latex cannot be used with --gen-index or --gen-contents"
   where
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
