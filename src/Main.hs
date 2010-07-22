@@ -121,7 +121,7 @@ main = handleTopExceptions $ do
   -- Parse command-line flags and handle some of them initially.
   args <- getArgs
   (flags, fileArgs) <- parseHaddockOpts args
-  handleEasyFlags flags
+  shortcutFlags flags
 
   if not (null fileArgs)
     then do
@@ -336,8 +336,8 @@ getGhcLibDir flags =
     xs -> return $ last xs
 
 
-handleEasyFlags :: [Flag] -> IO ()
-handleEasyFlags flags = do
+shortcutFlags :: [Flag] -> IO ()
+shortcutFlags flags = do
   usage <- getUsage
 
   when (Flag_Help           `elem` flags) (bye usage)
