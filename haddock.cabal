@@ -107,10 +107,7 @@ executable haddock
     Haddock.Interface.ParseModuleHeader
     Haddock.Lex
     Haddock.Parse
-    Haddock.Utils.BlockTable
-    Haddock.Utils.Html
     Haddock.Utils
-    Haddock.Backends.Html
     Haddock.Backends.Xhtml
     Haddock.Backends.Xhtml.Decl
     Haddock.Backends.Xhtml.DocMarkup
@@ -174,10 +171,7 @@ library
     Haddock.Interface.ParseModuleHeader
     Haddock.Lex
     Haddock.Parse
-    Haddock.Utils.BlockTable
-    Haddock.Utils.Html
     Haddock.Utils
-    Haddock.Backends.Html
     Haddock.Backends.Xhtml
     Haddock.Backends.Xhtml.Decl
     Haddock.Backends.Xhtml.DocMarkup

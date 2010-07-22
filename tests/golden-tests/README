@@ -25,4 +25,4 @@ You can
 to continue despite a failing test.
 
 You can pass extra options to haddock like so
-  runhaskell runtests.hs --xhtml all
+  runhaskell runtests.hs --title="All Tests" all

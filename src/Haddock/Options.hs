@@ -57,7 +57,6 @@ data Flag
   | Flag_WikiBaseURL   String
   | Flag_WikiModuleURL String
   | Flag_WikiEntityURL String
-  | Flag_Xhtml
   | Flag_LaTeX
   | Flag_LaTeXStyle String
   | Flag_Help
@@ -94,9 +93,8 @@ options backwardsCompat =
       "write the resulting interface to FILE",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
 --  "output in DocBook XML",
-    Option ['h']  ["html"]     (NoArg Flag_Html)
-      "output in HTML",
-    Option []  ["xhtml"]  (NoArg Flag_Xhtml) "use experimental XHTML rendering",
+    Option ['h']  ["html", "xhtml"]     (NoArg Flag_Html)
+      "output in HTML (XHTML 1.0)",
     Option []  ["latex"]  (NoArg Flag_LaTeX) "use experimental LaTeX rendering",
     Option []  ["latex-style"]  (ReqArg Flag_LaTeXStyle "FILE") "provide your own LaTeX style in FILE",
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",

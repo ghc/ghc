@@ -18,9 +18,8 @@
 module Main (main) where
 
 
-import qualified Haddock.Backends.Html as Html
-import qualified Haddock.Backends.Xhtml as Xhtml
-import qualified Haddock.Backends.LaTeX as LaTeX
+import Haddock.Backends.Xhtml
+import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Interface
 import Haddock.Lex
@@ -195,14 +194,6 @@ render flags ifaces installedIfaces = do
     packageStr       = Just (modulePackageString packageMod)
     (pkgName,pkgVer) = modulePackageInfo packageMod
 
-    -- Which HTML rendering to use.
-    pick htmlF xhtmlF = if Flag_Xhtml `elem` flags then xhtmlF else htmlF
-    ppHtmlIndex     = pick Html.ppHtmlIndex     Xhtml.ppHtmlIndex
-    ppHtmlHelpFiles = pick Html.ppHtmlHelpFiles Xhtml.ppHtmlHelpFiles
-    ppHtmlContents  = pick Html.ppHtmlContents  Xhtml.ppHtmlContents
-    ppHtml          = pick Html.ppHtml          Xhtml.ppHtml
-    copyHtmlBits    = pick Html.copyHtmlBits    Xhtml.copyHtmlBits
-
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue flags
 
@@ -233,7 +224,7 @@ render flags ifaces installedIfaces = do
     ppHoogle pkgName2 pkgVer title prologue visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
-    LaTeX.ppLaTeX title packageStr visibleIfaces odir prologue opt_latex_style
+    ppLaTeX title packageStr visibleIfaces odir prologue opt_latex_style
                   libDir
 
 -------------------------------------------------------------------------------

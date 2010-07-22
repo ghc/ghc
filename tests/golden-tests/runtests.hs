@@ -63,7 +63,7 @@ test = do
 
   putStrLn "Running tests..."
   handle <- runProcess haddockPath
-                       (["-w", "-o", outdir, "-h", "--xhtml", "--optghc=-fglasgow-exts"
+                       (["-w", "-o", outdir, "-h", "--optghc=-fglasgow-exts"
                         , "--optghc=-w", base, process, ghcprim] ++ opts ++ mods')
                        Nothing (Just [("haddock_datadir", haddockBase)]) Nothing
                        Nothing Nothing
