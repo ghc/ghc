@@ -1248,11 +1248,11 @@ runPhase LlvmOpt _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
     output_fn <- get_output_fn dflags LlvmLlc maybe_loc
 
     SysTools.runLlvmOpt dflags
-               (map SysTools.Option lo_opts
-               ++ [ SysTools.FileOption "" input_fn,
+               ([ SysTools.FileOption "" input_fn,
                     SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.Option "-o",
-                    SysTools.FileOption "" output_fn])
+                    SysTools.FileOption "" output_fn]
+               ++ map SysTools.Option lo_opts)
 
     return (LlvmLlc, dflags, maybe_loc, output_fn)
   where 
@@ -1278,11 +1278,10 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
     output_fn <- get_output_fn dflags nphase maybe_loc
 
     SysTools.runLlvmLlc dflags
-            (map SysTools.Option lc_opts
-                ++ [ -- SysTools.Option "-tailcallopt",
-                    SysTools.Option (llvmOpts !! opt_lvl),
+                ([ SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.FileOption "" input_fn,
-                    SysTools.Option "-o", SysTools.FileOption "" output_fn])
+                    SysTools.Option "-o", SysTools.FileOption "" output_fn]
+                ++ map SysTools.Option lc_opts)
 
     return (nphase, dflags, maybe_loc, output_fn)
   where
