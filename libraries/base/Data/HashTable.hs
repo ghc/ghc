@@ -19,7 +19,7 @@
 
 module Data.HashTable (
         -- * Basic hash table operations
-        HashTable, new, insert, delete, lookup, update,
+        HashTable, new, newHint, insert, delete, lookup, update,
         -- * Converting to and from lists
         fromList, toList,
         -- * Hash functions
@@ -274,6 +274,55 @@ new cmpr hash = do
   recordNew
   -- make a new hash table with a single, empty, segment
   let mask = tABLE_MIN-1
+  bkts <- newMutArray (0,mask) []
+
+  let
+    kcnt = 0
+    ht = HT {  buckets=bkts, kcount=kcnt, bmask=mask }
+
+  table <- newIORef ht
+  return (HashTable { tab=table, hash_fn=hash, cmp=cmpr })
+
+{- 
+   bitTwiddleSameAs takes as arguments positive Int32s less than maxBound/2 and 
+   returns the smallest power of 2 that is greater than or equal to the 
+   argument.
+   http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+-}
+bitTwiddleSameAs :: Int32 -> Int32
+bitTwiddleSameAs v0 = 
+    let v1 = v0-1
+        v2 = v1 .|. (v1`shiftR`1)
+        v3 = v2 .|. (v2`shiftR`2)
+        v4 = v3 .|. (v3`shiftR`4)
+        v5 = v4 .|. (v4`shiftR`8)
+        v6 = v5 .|. (v5`shiftR`16)
+    in v6+1
+
+{-
+  powerOver takes as arguments Int32s and returns the smallest power of 2 
+  that is greater than or equal to the argument if that power of 2 is 
+  within [tABLE_MIN,tABLE_MAX]
+-}
+powerOver :: Int32 -> Int32
+powerOver n = 
+    if n <= tABLE_MIN
+    then tABLE_MIN
+    else if n >= tABLE_MAX
+         then tABLE_MAX
+         else bitTwiddleSameAs n 
+
+-- | Creates a new hash table with the given minimum size.
+newHint
+  :: (key -> key -> Bool)    -- ^ @eq@: An equality comparison on keys
+  -> (key -> Int32)          -- ^ @hash@: A hash function on keys
+  -> Int                     -- ^ @minSize@: initial table size
+  -> IO (HashTable key val)  -- ^ Returns: an empty hash table
+
+newHint cmpr hash minSize = do
+  recordNew
+  -- make a new hash table with a single, empty, segment
+  let mask = powerOver $ fromIntegral minSize
   bkts <- newMutArray (0,mask) []
 
   let
