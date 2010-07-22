@@ -13,15 +13,11 @@
 module Haddock.Backends.Xhtml (
   ppHtml, copyHtmlBits,
   ppHtmlIndex, ppHtmlContents,
-  ppHtmlHelpFiles
 ) where
 
 
 import Prelude hiding (div)
 
-import Haddock.Backends.DevHelp
-import Haddock.Backends.HH
-import Haddock.Backends.HH2
 import Haddock.Backends.Xhtml.Decl
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
@@ -67,7 +63,6 @@ ppHtml :: String
        -> [Interface]
        -> FilePath                     -- destination directory
        -> Maybe (Doc GHC.RdrName)      -- prologue text, maybe
-       -> Maybe String                 -- the Html Help format (--html-help)
        -> SourceURLs                   -- the source URL (--source)
        -> WikiURLs                     -- the wiki URL (--wiki)
        -> Maybe String                 -- the contents URL (--use-contents)
@@ -75,7 +70,7 @@ ppHtml :: String
        -> Bool                         -- whether to use unicode in output (--use-unicode)
        -> IO ()
 
-ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
+ppHtml doctitle maybe_package ifaces odir prologue
         maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode =  do
   let
@@ -83,46 +78,19 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
         visible i = OptHide `notElem` ifaceOptions i
   when (not (isJust maybe_contents_url)) $
     ppHtmlContents odir doctitle maybe_package
-        maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
+        maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
         prologue
 
   when (not (isJust maybe_index_url)) $
-    ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
+    ppHtmlIndex odir doctitle maybe_package
       maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces)
-
-  when (not (isJust maybe_contents_url && isJust maybe_index_url)) $
-        ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
 
   mapM_ (ppHtmlModule odir doctitle
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode) visible_ifaces
-
-
-ppHtmlHelpFiles
-    :: String                   -- doctitle
-    -> Maybe String             -- package
-    -> [Interface]
-    -> FilePath                 -- destination directory
-    -> Maybe String             -- the Html Help format (--html-help)
-    -> [FilePath]               -- external packages paths
-    -> IO ()
-ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_paths =  do
-  let
-        visible_ifaces = filter visible ifaces
-        visible i = OptHide `notElem` ifaceOptions i
-
-  -- Generate index and contents page for Html Help if requested
-  case maybe_html_help_format of
-    Nothing        -> return ()
-    Just "mshelp"  -> ppHHProject odir doctitle maybe_package visible_ifaces pkg_paths
-    Just "mshelp2" -> do
-                ppHH2Files      odir maybe_package visible_ifaces pkg_paths
-                ppHH2Collection odir doctitle maybe_package
-    Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_ifaces
-    Just format    -> fail ("The "++format++" format is not implemented")
 
 
 copyFile :: FilePath -> FilePath -> IO ()
@@ -269,13 +237,12 @@ ppHtmlContents
    -> String
    -> Maybe String
    -> Maybe String
-   -> Maybe String
    -> SourceURLs
    -> WikiURLs
    -> [InstalledInterface] -> Bool -> Maybe (Doc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
-  maybe_package maybe_html_help_format maybe_index_url
+  _maybe_package maybe_index_url
   maybe_source_url maybe_wiki_url ifaces showPkgs prologue = do
   let tree = mkModuleTree showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
@@ -292,14 +259,6 @@ ppHtmlContents odir doctitle
 
   -- XXX: think of a better place for this?
   ppHtmlContentsFrame odir doctitle ifaces
-
-  -- Generate contents page for Html Help if requested
-  case maybe_html_help_format of
-    Nothing        -> return ()
-    Just "mshelp"  -> ppHHContents  odir doctitle maybe_package tree
-    Just "mshelp2" -> ppHH2Contents odir doctitle maybe_package tree
-    Just "devhelp" -> return ()
-    Just format    -> fail ("The "++format++" format is not implemented")
 
 
 ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
@@ -386,12 +345,11 @@ ppHtmlIndex :: FilePath
             -> String
             -> Maybe String
             -> Maybe String
-            -> Maybe String
             -> SourceURLs
             -> WikiURLs
             -> [InstalledInterface]
             -> IO ()
-ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
+ppHtmlIndex odir doctitle _maybe_package
   maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
   let html = indexPage split_indices Nothing
               (if split_indices then [] else index)
@@ -402,14 +360,6 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     mapM_ (do_sub_index index) initialChars
 
   writeFile (joinPath [odir, indexHtmlFile]) (renderToString html)
-
-    -- Generate index and contents page for Html Help if requested
-  case maybe_html_help_format of
-    Nothing        -> return ()
-    Just "mshelp"  -> ppHHIndex  odir maybe_package ifaces
-    Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
-    Just "devhelp" -> return ()
-    Just format    -> fail ("The "++format++" format is not implemented")
 
   where
     indexPage showLetters ch items =

@@ -179,7 +179,6 @@ render flags ifaces installedIfaces = do
     opt_wiki_urls        = optWikiUrls       flags
     opt_contents_url     = optContentsUrl    flags
     opt_index_url        = optIndexUrl       flags
-    opt_html_help_format = optHtmlHelpFormat flags
     css_file             = optCssFile        flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
@@ -198,23 +197,20 @@ render flags ifaces installedIfaces = do
   prologue <- getPrologue flags
 
   when (Flag_GenIndex `elem` flags) $ do
-    ppHtmlIndex odir title packageStr opt_html_help_format
+    ppHtmlIndex odir title packageStr
                 opt_contents_url opt_source_urls opt_wiki_urls
                 allVisibleIfaces
     copyHtmlBits odir libDir css_file
 
-  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $
-    ppHtmlHelpFiles title packageStr visibleIfaces odir opt_html_help_format []
-
   when (Flag_GenContents `elem` flags) $ do
-    ppHtmlContents odir title packageStr opt_html_help_format
+    ppHtmlContents odir title packageStr
                    opt_index_url opt_source_urls opt_wiki_urls
                    allVisibleIfaces True prologue
     copyHtmlBits odir libDir css_file
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title packageStr visibleIfaces odir
-                prologue opt_html_help_format
+                prologue
                 opt_source_urls opt_wiki_urls
                 opt_contents_url opt_index_url unicode
     copyHtmlBits odir libDir css_file

@@ -117,9 +117,6 @@ executable haddock
     Haddock.Backends.Xhtml.Utils
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
-    Haddock.Backends.DevHelp
-    Haddock.Backends.HH
-    Haddock.Backends.HH2
     Haddock.Backends.Hoogle
     Haddock.ModuleTree
     Haddock.Types
@@ -181,9 +178,6 @@ library
     Haddock.Backends.Xhtml.Utils
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
-    Haddock.Backends.DevHelp
-    Haddock.Backends.HH
-    Haddock.Backends.HH2
     Haddock.Backends.Hoogle
     Haddock.ModuleTree
     Haddock.Types

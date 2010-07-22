@@ -19,7 +19,6 @@ module Haddock.Options (
   outputDir,
   optContentsUrl,
   optIndexUrl,
-  optHtmlHelpFormat,
   optCssFile,
   optSourceUrls,
   optWikiUrls,
@@ -47,7 +46,6 @@ data Flag
   | Flag_Heading String
   | Flag_Html
   | Flag_Hoogle
-  | Flag_HtmlHelp String
   | Flag_Lib String
   | Flag_OutputDir FilePath
   | Flag_Prologue FilePath
@@ -100,8 +98,6 @@ options backwardsCompat =
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",
     Option []  ["hoogle"]     (NoArg Flag_Hoogle)
       "output for Hoogle",
-    Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
-      "produce index and table of contents in\nmshelp, mshelp2 or devhelp format (with -h)",
     Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL")
       "URL for a source code link on the contents\nand index pages",
     Option ['s'] (if backwardsCompat then ["source", "source-module"] else ["source-module"])
@@ -191,10 +187,6 @@ optContentsUrl flags = optLast [ url | Flag_UseContents url <- flags ]
 
 optIndexUrl :: [Flag] -> Maybe String
 optIndexUrl flags = optLast [ url | Flag_UseIndex url <- flags ]
-
-
-optHtmlHelpFormat :: [Flag] -> Maybe String
-optHtmlHelpFormat flags = optLast [ hhformat | Flag_HtmlHelp hhformat <- flags ]
 
 
 optCssFile :: [Flag] -> Maybe FilePath
