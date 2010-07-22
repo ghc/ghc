@@ -32,7 +32,11 @@ import Foreign.Marshal.Error
 import Foreign.Marshal.Pool
 import Foreign.Marshal.Utils
 
+#ifdef __GLASGOW_HASKELL__
 import GHC.IO
+#else
+import System.IO.Unsafe
+#endif
 
 {- |
 Sometimes an external entity is a pure function, except that it passes
