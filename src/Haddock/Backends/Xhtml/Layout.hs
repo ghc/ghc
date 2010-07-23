@@ -114,7 +114,7 @@ divSubDecls cssClass captionName = maybe noHtml wrap
 
 subDlist :: [SubDecl] -> Maybe Html
 subDlist [] = Nothing
-subDlist decls = Just $ dlist << map subEntry decls
+subDlist decls = Just $ dlist << map subEntry decls +++ clearDiv
   where
     subEntry (decl, mdoc, subs) =
       dterm ! [theclass "src"] << decl
@@ -123,6 +123,8 @@ subDlist decls = Just $ dlist << map subEntry decls
 
     Nothing  `with` [] = spaceHtml
     ma       `with` bs = ma +++ bs
+    
+    clearDiv = thediv ! [ theclass "clear" ] << noHtml
 -}
 
 

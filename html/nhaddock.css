@@ -74,7 +74,8 @@ ul.links li {
 ul.links li a { padding: 5px 10px; }
 
 .hide { display: none; }
-.show { }
+.show { display: inherit; }
+.clear { clear: both; }
 
 pre {
   padding: 0.5em;
@@ -260,6 +261,25 @@ div#style-menu-holder {
   margin-top: 0.5em;
 }
 
+#interface dt {
+  float: left;
+  clear: left;
+  display: block;
+  margin: 1px 0;
+}
+
+#interface dd {
+  float: right;
+  width: 90%;
+  display: block;
+  margin: 1px 0;
+  padding-left: 0.5em;
+}
+
+#interface dd p {
+  margin: 0;
+}
+
 /* div.top code { border: 1px solid #ddd; } */
 .top p.src {
   border-top: 1px solid #ccc;
@@ -288,10 +308,12 @@ div.top .subs, div.top .doc {
 
 .fields p { margin: 0 0; }
 
+/* this seems bulky to me
 .methods, .constructors {
   background: #f8f8f8;
   border: 1px solid #eee;
 }
+*/
 
 .fields { padding-left: 1em; }
 
