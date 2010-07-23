@@ -38,11 +38,11 @@ import System.Console.GetOpt
 
 
 data Flag
-  = Flag_CSS String
+  = Flag_BuiltInThemes
+  | Flag_CSS String
   | Flag_Debug
 --  | Flag_DocBook
   | Flag_ReadInterface String
-  | Flag_DefaultThemes
   | Flag_DumpInterface String
   | Flag_Heading String
   | Flag_Html
@@ -114,7 +114,7 @@ options backwardsCompat =
       "URL for a comments link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
     Option ['c']  ["css", "theme"] (ReqArg Flag_CSS "PATH")
       "the CSS file or theme directory to use for HTML output",
-    Option []  ["default-themes"] (NoArg Flag_DefaultThemes)
+    Option []  ["built-in-themes"] (NoArg Flag_BuiltInThemes)
       "include all the built-in haddock themes",
     Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
       "file containing prologue text",

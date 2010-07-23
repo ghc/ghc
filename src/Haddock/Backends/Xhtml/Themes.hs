@@ -93,7 +93,7 @@ getThemes libDir flags =
   where
     themeFlag :: Flag -> IO (Either String Themes)
     themeFlag (Flag_CSS path) = (liftM . liftEither) (:[]) (theme path)
-    themeFlag (Flag_DefaultThemes) = retRight builtIns
+    themeFlag (Flag_BuiltInThemes) = retRight builtIns
     themeFlag _ = retRight []
 
     theme :: FilePath -> IO PossibleTheme
