@@ -1608,6 +1608,7 @@ loadObj( char *path )
 #else
    FILE *f;
 #endif
+   IF_DEBUG(linker, debugBelch("loadObj %s\n", path));
    initLinker();
 
    /* debugBelch("loadObj %s\n", path ); */
@@ -1648,7 +1649,10 @@ loadObj( char *path )
 #  endif
 
    r = stat(path, &st);
-   if (r == -1) { return 0; }
+   if (r == -1) {
+       IF_DEBUG(linker, debugBelch("File doesn't exist\n"));
+       return 0;
+   }
 
    /* sigh, strdup() isn't a POSIX function, so do it the long way */
    oc->fileName = stgMallocBytes( strlen(path)+1, "loadObj" );
@@ -1717,10 +1721,16 @@ loadObj( char *path )
 
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );
-   if (!r) { return r; }
+   if (!r) {
+       IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO failed\n"));
+       return r;
+   }
 #  elif defined(OBJFORMAT_ELF) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_ELF ( oc );
-   if (!r) { return r; }
+   if (!r) {
+       IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_ELF failed\n"));
+       return r;
+   }
 #endif
 
    /* verify the in-memory image */
@@ -1733,7 +1743,10 @@ loadObj( char *path )
 #  else
    barf("loadObj: no verify method");
 #  endif
-   if (!r) { return r; }
+   if (!r) {
+       IF_DEBUG(linker, debugBelch("ocVerifyImage_* failed\n"));
+       return r;
+   }
 
    /* build the symbol list for this image */
 #  if defined(OBJFORMAT_ELF)
@@ -1745,7 +1758,10 @@ loadObj( char *path )
 #  else
    barf("loadObj: no getNames method");
 #  endif
-   if (!r) { return r; }
+   if (!r) {
+       IF_DEBUG(linker, debugBelch("ocGetNames_* failed\n"));
+       return r;
+   }
 
    /* loaded, but not resolved yet */
    oc->status = OBJECT_LOADED;
