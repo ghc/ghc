@@ -4039,11 +4039,17 @@ static int ocVerifyImage_MachO(ObjectCode* oc)
     struct mach_header *header = (struct mach_header*) image;
 
 #if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
-    if(header->magic != MH_MAGIC_64)
+    if(header->magic != MH_MAGIC_64) {
+        errorBelch("%s: Bad magic. Expected: %08x, got: %08x.\n",
+                   oc->fileName, MH_MAGIC_64, header->magic);
         return 0;
+    }
 #else
-    if(header->magic != MH_MAGIC)
+    if(header->magic != MH_MAGIC) {
+        errorBelch("%s: Bad magic. Expected: %08x, got: %08x.\n",
+                   oc->fileName, MH_MAGIC, header->magic);
         return 0;
+    }
 #endif
     // FIXME: do some more verifying here
     return 1;
@@ -4830,11 +4836,17 @@ static int machoGetMisalignment( FILE * f )
     rewind(f);
 
 #if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
-    if(header.magic != MH_MAGIC_64)
+    if(header.magic != MH_MAGIC_64) {
+        errorBelch("Bad magic. Expected: %08x, got: %08x.\n",
+                   MH_MAGIC_64, header->magic);
         return 0;
+    }
 #else
-    if(header.magic != MH_MAGIC)
+    if(header.magic != MH_MAGIC) {
+        errorBelch("Bad magic. Expected: %08x, got: %08x.\n",
+                   MH_MAGIC, header->magic);
         return 0;
+    }
 #endif
 
     misalignment = (header.sizeofcmds + sizeof(header))
