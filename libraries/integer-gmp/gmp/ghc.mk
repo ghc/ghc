@@ -20,7 +20,7 @@ libraries/integer-gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
 libraries/integer-gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 
 libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/cbits/mkGmpDerivedConstants.c
-	"$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS) $(libraries/integer-gmp_CC_OPTS) $< -o $@
+	"$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) $(libraries/integer-gmp_CC_OPTS) $< -o $@
 
 libraries/integer-gmp/cbits/GmpDerivedConstants.h: libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext)
 	$< > $@
