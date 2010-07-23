@@ -51,6 +51,10 @@ h5 { font-size: 105%; }
   margin-top: 4em;
 }
 
+h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6 {
+  margin-top: inherit;
+}
+
 ul.links {
   list-style: none;
   text-align: left;
@@ -131,16 +135,29 @@ img.coll {
   border-bottom: 1px solid #ddd;
 }
 
-.info {
+dl.info {
   float: right;
- background: rgb(239,238,209);
   padding: 0.5em 1em;
-  margin-right: 0.5em;
-  margin-top: 1.5em;
-  border: 1px solid rgba(196,69,29,0.2);
+  border: 1px solid #ddd;
+  font-size: 75%;
+  color: rgb(78,98,114);
+  background-color: #fff;
+  max-width: 20em;
+  margin-top: -6em;
+  margin-bottom: 1em;
 }
 
-.info dd { margin-left: 2em; }
+dl.info dt {
+	float: left;
+	width: 5em;
+	font-weight: bold;
+	display: block;
+}
+
+dl.info dd {
+	display: block;
+	padding-left: 6em;
+}
 
 div#style-menu-holder {
   position: relative;
@@ -192,6 +209,7 @@ div#style-menu-holder {
 
 #table-of-contents {
   float: right;
+  clear: right;
   background: rgb(239,238,209);
   border: 1px solid rgba(196,69,29,0.2);
   font-size: 75%;
@@ -199,6 +217,7 @@ div#style-menu-holder {
   position: relative;
   top: 0em; /* use -5em to pull up into title area */
   margin: 0 0 1em 1em;
+  max-width: 20em;
 }
 
 #table-of-contents .caption {
@@ -230,7 +249,10 @@ div#style-menu-holder {
 #interface div.top { margin: 1em 0 0.5em 0; }
 
 #interface table { border-spacing: 2px; }
-#interface td { vertical-align: top; }
+#interface td {
+  vertical-align: top;
+  padding-left: 0.5em;
+}
 #interface td.doc p {
   margin: 0;
 }
