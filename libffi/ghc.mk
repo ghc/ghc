@@ -116,8 +116,8 @@ $(libffi_STAMP_CONFIGURE):
 	    LD=$(LD) \
 	    AR=$(AR) \
 	    NM=$(NM) \
-        CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS) -w" \
-        LDFLAGS="$(SRC_LD_OPTS) $(CONF_LD_OPTS) -w" \
+        CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -w" \
+        LDFLAGS="$(SRC_LD_OPTS) $(CONF_LD_OPTS_STAGE1) -w" \
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
@@ -173,7 +173,7 @@ $(eval $(call all-target,libffi,$(INSTALL_HEADERS) $(INSTALL_LIBS)))
 libffi/dist-install/build/HSffi.o: libffi/dist-install/build/libHSffi.a
 	cd libffi/dist-install/build && \
 	  touch empty.c && \
-	  "$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS) -c empty.c -o HSffi.o
+	  "$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -c empty.c -o HSffi.o
 
 $(eval $(call all-target,libffi,libffi/dist-install/build/HSffi.o))
 

@@ -313,19 +313,17 @@ case $host in
     ;;
 i386-apple-darwin|powerpc-apple-darwin)
     soext='.dylib'
-    CFLAGS="$CFLAGS -m32"
-    LDFLAGS="$LDFLAGS -m32"
-    CONF_CC_OPTS="$CONF_CC_OPTS -m32"
-    CONF_LD_OPTS="$CONF_LD_OPTS -m32"
     ;;
 x86_64-apple-darwin)
     soext='.dylib'
-    CFLAGS="$CFLAGS -m64"
-    LDFLAGS="$LDFLAGS -m64"
-    CONF_CC_OPTS="$CONF_CC_OPTS -m64"
-    CONF_LD_OPTS="$CONF_LD_OPTS -m64"
     ;;
 esac
+
+FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS])
+FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_LD_OPTS_STAGE0])
+FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_LD_OPTS_STAGE1])
+# Stage 3 won't be supported by cross-compilation
+FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_LD_OPTS_STAGE2])
 
 checkArch() {
     case $1 in
@@ -569,8 +567,12 @@ FP_GCC_EXTRA_FLAGS
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
 
-AC_SUBST(CONF_CC_OPTS)
-AC_SUBST(CONF_LD_OPTS)
+AC_SUBST(CONF_CC_OPTS_STAGE0)
+AC_SUBST(CONF_CC_OPTS_STAGE1)
+AC_SUBST(CONF_CC_OPTS_STAGE2)
+AC_SUBST(CONF_LD_OPTS_STAGE0)
+AC_SUBST(CONF_LD_OPTS_STAGE1)
+AC_SUBST(CONF_LD_OPTS_STAGE2)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

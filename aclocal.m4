@@ -4,6 +4,24 @@
 # ensure we don't clash with any pre-supplied autoconf ones.
 
 
+# FPTOOLS_SET_C_LD_FLAGS
+# ----------------------------------
+# Set the C and LD flags for a given platform
+AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
+[
+    case $$1 in
+    i386-apple-darwin|powerpc-apple-darwin)
+        $2="$$2 -m32"
+        $3="$$3 -m32"
+        ;;
+    x86_64-apple-darwin)
+        $2="$$2 -m64"
+        $3="$$3 -m64"
+        ;;
+    esac
+])
+
+
 # FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 # ----------------------------------
 # Little endian Arm on Linux with some ABIs has big endian word order

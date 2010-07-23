@@ -82,7 +82,7 @@ $1_$2_CC_INC_FLAGS:=$$(shell for i in $$($1_$2_DEP_INCLUDE_DIRS); do echo $$($1_
 endif
 
 $1_$2_DIST_CC_OPTS = \
- $$(CONF_CC_OPTS) \
+ $$(CONF_CC_OPTS_STAGE$4) \
  $$(SRC_CC_OPTS) \
  $$($1_CC_OPTS) \
  $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
@@ -97,7 +97,7 @@ $1_$2_DIST_LD_LIB_DIRS:=$$(shell for i in $$($1_$2_DEP_LIB_DIRS); do echo \"-L$$
 endif
 
 $1_$2_DIST_LD_OPTS = \
- $$(CONF_LD_OPTS) \
+ $$(CONF_LD_OPTS_STAGE$4) \
  $$(SRC_LD_OPTS) \
  $$($1_LD_OPTS) \
  $$($1_$2_LD_OPTS) \

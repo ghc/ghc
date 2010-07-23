@@ -535,14 +535,18 @@ endif
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend).
-CONF_CC_OPTS = @CONF_CC_OPTS@
-CONF_LD_OPTS = @CONF_LD_OPTS@
+CONF_CC_OPTS_STAGE0 = @CONF_CC_OPTS_STAGE0@
+CONF_CC_OPTS_STAGE1 = @CONF_CC_OPTS_STAGE1@
+CONF_CC_OPTS_STAGE2 = @CONF_CC_OPTS_STAGE2@
+CONF_LD_OPTS_STAGE0 = @CONF_LD_OPTS_STAGE0@
+CONF_LD_OPTS_STAGE1 = @CONF_LD_OPTS_STAGE1@
+CONF_LD_OPTS_STAGE2 = @CONF_LD_OPTS_STAGE2@
 
 ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
 CONF_CC_OPTS += -G0
 endif
 
-SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS)))
+SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)))
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
 
 #-----------------------------------------------------------------------------
