@@ -20,9 +20,10 @@ import Haddock.Backends.Xhtml.Utils (onclick)
 import Haddock.Options
 
 import Control.Monad (liftM)
+import Data.Char (toLower)
 import Data.Either (lefts, rights)
 import Data.List (nub)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (isJust, listToMaybe)
 
 import System.Directory
 import System.FilePath
@@ -59,13 +60,31 @@ defaultThemes libDir = standardTheme libDir :
     ]
   )
 
+
 locateIn :: FilePath -> CssTheme -> CssTheme
 locateIn libDir t = t { themeFiles = map loc (themeFiles t) }
   where loc = combine libDir . combine "html"
 
+
+findTheme :: Themes -> String -> Maybe CssTheme
+findTheme ts s = listToMaybe $ filter ((== ls).lower.themeName) ts
+  where lower = map toLower
+        ls = lower s
+
+
+isThemeName :: Themes -> String ->  Bool
+isThemeName ts = isJust . findTheme ts
+
+
+builtInTheme :: Themes -> String -> Either String CssTheme
+builtInTheme ts = maybe (Left "not found") Right . findTheme ts
+
+
 --------------------------------------------------------------------------------
 -- * CSS Theme Arguments
 --------------------------------------------------------------------------------
+
+type PossibleTheme = Either String CssTheme
 
 -- | Process input flags for CSS Theme arguments
 getThemes :: FilePath -> [Flag] -> IO (Either String Themes)
@@ -73,37 +92,31 @@ getThemes libDir flags =
   liftM (someTheme . concatEither) (mapM themeFlag flags)
   where
     themeFlag :: Flag -> IO (Either String Themes)
-
     themeFlag (Flag_CSS path) = (liftM . liftEither) (:[]) (theme path)
-
-    themeFlag (Flag_Themes path) = do
-      itsADirectory <- doesDirectoryExist path
-      if itsADirectory
-        then do
-          items <- getDirectoryItems path
-          themes <- mapM theme items
-          case rights themes of
-            [] -> errMessage "no themes found in" path
-            ts -> retRight ts
-        else errMessage "not a valid theme directory" path
-
-    themeFlag (Flag_DefaultThemes) = retRight (defaultThemes libDir)
+    themeFlag (Flag_DefaultThemes) = retRight builtIns
     themeFlag _ = retRight []
 
-    theme :: FilePath -> IO (Either String CssTheme)
-    theme path = do
-      itsAFile <- doesFileExist path
-      if itsAFile
-        then singleFileTheme path
-        else do
-          itsADirectory <- doesDirectoryExist path
-          if itsADirectory
-            then directoryTheme path
-            else errMessage "css path doesn't exist" path
+    theme :: FilePath -> IO PossibleTheme
+    theme path = pick path
+      [(doesFileExist,                 singleFileTheme),
+       (doesDirectoryExist,            directoryTheme),
+       (return . isThemeName builtIns, return . builtInTheme builtIns)]
+      "css theme path not found"
+
+    pick :: FilePath
+      -> [(FilePath -> IO Bool, FilePath -> IO PossibleTheme)] -> String
+      -> IO PossibleTheme
+    pick path [] msg = errMessage msg path
+    pick path ((test,build):opts) msg = do
+      pass <- test path
+      if pass then build path else pick path opts msg
 
     someTheme :: Either String Themes -> Either String Themes
     someTheme (Right []) = Right [standardTheme libDir]
     someTheme est = est
+
+    builtIns = defaultThemes libDir
+
 
 errMessage :: String -> FilePath -> IO (Either String a)
 errMessage msg path = return (Left (msg ++ ": \"" ++ path ++ "\""))
@@ -150,7 +163,7 @@ cssFiles ts = nub $ concatMap themeFiles ts
 
 
 styleSheet :: Themes -> Html
-styleSheet ts = toHtml $ zipWith mkLink rels ts 
+styleSheet ts = toHtml $ zipWith mkLink rels ts
   where
     rels = ("stylesheet" : repeat "alternate stylesheet")
     mkLink aRel t =

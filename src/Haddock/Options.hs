@@ -53,7 +53,6 @@ data Flag
   | Flag_SourceBaseURL   String
   | Flag_SourceModuleURL String
   | Flag_SourceEntityURL String
-  | Flag_Themes String
   | Flag_WikiBaseURL   String
   | Flag_WikiModuleURL String
   | Flag_WikiEntityURL String
@@ -113,12 +112,10 @@ options backwardsCompat =
       "URL for a comments link for each module\n(using the %{MODULE} var)",
     Option []  ["comments-entity"]  (ReqArg Flag_WikiEntityURL "URL")
       "URL for a comments link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
-    Option ['c']  ["css"]         (ReqArg Flag_CSS "PATH")
+    Option ['c']  ["css", "theme"] (ReqArg Flag_CSS "PATH")
       "the CSS file or theme directory to use for HTML output",
-    Option []  ["themes"]         (ReqArg Flag_Themes "DIR")
-      "a directory of CSS files or themes to use for HTML output",
     Option []  ["default-themes"] (NoArg Flag_DefaultThemes)
-      "include all the available haddock themes",
+      "include all the built-in haddock themes",
     Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
       "file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
