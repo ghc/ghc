@@ -69,13 +69,13 @@ loadObj :: String -> IO ()
 loadObj str = do
    withCString str $ \c_str -> do
      r <- c_loadObj c_str
-     when (r == 0) (panic "loadObj: failed")
+     when (r == 0) (panic ("loadObj " ++ show str ++ ": failed"))
 
 unloadObj :: String -> IO ()
 unloadObj str =
    withCString str $ \c_str -> do
      r <- c_unloadObj c_str
-     when (r == 0) (panic "unloadObj: failed")
+     when (r == 0) (panic ("unloadObj " ++ show str ++ ": failed"))
 
 resolveObjs :: IO SuccessFlag
 resolveObjs = do
