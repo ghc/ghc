@@ -81,6 +81,7 @@ pre {
   padding: 0.5em;
   margin: 0.5em 5em 0.5em 3em;
   background: rgb(229,237,244);
+  overflow: auto;
 }
 
 code { /* background: #f0f0f0; */ }
@@ -88,7 +89,6 @@ code { /* background: #f0f0f0; */ }
 .src {
   font-family: monospace;
   line-height: normal;
-  white-space: nowrap;
   background: #f0f0f0;
   padding: 0.2em 0.5em;
 }
@@ -97,7 +97,7 @@ code { /* background: #f0f0f0; */ }
   margin-top: 1em;
 }
 
-.keyword { font-weight: bold; }
+.keyword { font-weight: normal; }
 .def { font-weight: bold; }
 
 img.coll {
@@ -254,6 +254,9 @@ div#style-menu-holder {
   vertical-align: top;
   padding-left: 0.5em;
 }
+#interface td.src {
+  white-space: nowrap;
+}
 #interface td.doc p {
   margin: 0;
 }
@@ -321,16 +324,29 @@ div.top .subs, div.top .doc {
 
 /* @group Auxillary Pages */
 
+#mini {
+  font-size: 75%;
+}
+
+#mini #module-header .caption {
+  font-size: 160%;
+}
+
 #mini #interface h1,
 #mini #interface h2,
 #mini #interface h3,
-#mini #interface h4
-{
-  margin-bottom: 0;
+#mini #interface h4 {
+  font-size: 130%;
+  margin: 1em 0 0;
 }
+
 #mini #interface .top,
 #mini #interface .src {
   margin: 0;
+}
+
+#mini #interface .src {
+  font-size: 120%;
 }
 
 #mini #module-list ul {
