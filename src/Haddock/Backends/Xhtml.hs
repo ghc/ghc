@@ -63,6 +63,7 @@ ppHtml :: String
        -> [Interface]
        -> FilePath                     -- destination directory
        -> Maybe (Doc GHC.RdrName)      -- prologue text, maybe
+       -> Themes                       -- themes
        -> SourceURLs                   -- the source URL (--source)
        -> WikiURLs                     -- the wiki URL (--wiki)
        -> Maybe String                 -- the contents URL (--use-contents)
@@ -71,24 +72,24 @@ ppHtml :: String
        -> IO ()
 
 ppHtml doctitle maybe_package ifaces odir prologue
-        maybe_source_url maybe_wiki_url
+        themes maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode =  do
   let
         visible_ifaces = filter visible ifaces
         visible i = OptHide `notElem` ifaceOptions i
   when (not (isJust maybe_contents_url)) $
     ppHtmlContents odir doctitle maybe_package
-        maybe_index_url maybe_source_url maybe_wiki_url
+        themes maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
         prologue
 
   when (not (isJust maybe_index_url)) $
     ppHtmlIndex odir doctitle maybe_package
-      maybe_contents_url maybe_source_url maybe_wiki_url
+      themes maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces)
 
-  mapM_ (ppHtmlModule odir doctitle
+  mapM_ (ppHtmlModule odir doctitle themes
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode) visible_ifaces
 
@@ -109,29 +110,24 @@ copyFile fromFPath toFPath =
                                 copyContents hFrom hTo buffer
 
 
-copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
-copyHtmlBits odir libdir _maybe_css = do
+copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
+copyHtmlBits odir libdir themes = do
   let
         libhtmldir = joinPath [libdir, "html"]
-        {-
-        css_file = case maybe_css of
-                        Nothing -> joinPath [libhtmldir, 'x':cssFile]
-                        Just f  -> f
-        css_destination = joinPath [odir, cssFile]
-        -}
+        copyCssFile f = do
+           copyFile f (combine odir (takeFileName f))
         copyLibFile f = do
            copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
-  --copyFile css_file css_destination
-  mapM_ copyLibFile cssFiles
+  mapM_ copyCssFile (cssFiles themes)
   mapM_ copyLibFile [ plusFile, minusFile, jsFile, framesFile ]
 
 
-headHtml :: String -> Maybe String -> Html
-headHtml docTitle miniPage =
+headHtml :: String -> Maybe String -> Themes -> Html
+headHtml docTitle miniPage themes =
   header << [
     meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
     thetitle << docTitle,
-    styleSheet,
+    styleSheet themes,
     script ! [src jsFile, thetype "text/javascript"] << noHtml,
     script ! [thetype "text/javascript"]
         -- NB: Within XHTML, the content of script tags needs to be
@@ -180,11 +176,11 @@ indexButton maybe_index_url
   where url = maybe indexHtmlFile id maybe_index_url
 
 
-bodyHtml :: String -> Maybe Interface
+bodyHtml :: String -> Maybe Interface -> Themes
     -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String
     -> Html -> Html
-bodyHtml doctitle iface
+bodyHtml doctitle iface themes
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url
            pageContent =
@@ -196,7 +192,7 @@ bodyHtml doctitle iface
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url
-        ] ++ [styleMenu]) ! [theclass "links"]
+        ] ++ [styleMenu themes]) ! [theclass "links"]
       ],
     divContent << pageContent,
     divFooter << paragraph << (
@@ -236,19 +232,20 @@ ppHtmlContents
    :: FilePath
    -> String
    -> Maybe String
+   -> Themes
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
    -> [InstalledInterface] -> Bool -> Maybe (Doc GHC.RdrName)
    -> IO ()
-ppHtmlContents odir doctitle
-  _maybe_package maybe_index_url
+ppHtmlContents odir doctitle _maybe_package
+  themes maybe_index_url
   maybe_source_url maybe_wiki_url ifaces showPkgs prologue = do
   let tree = mkModuleTree showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html =
-        headHtml doctitle Nothing +++
-        bodyHtml doctitle Nothing
+        headHtml doctitle Nothing themes +++
+        bodyHtml doctitle Nothing themes
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
             ppPrologue doctitle prologue,
@@ -258,7 +255,7 @@ ppHtmlContents odir doctitle
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString html)
 
   -- XXX: think of a better place for this?
-  ppHtmlContentsFrame odir doctitle ifaces
+  ppHtmlContentsFrame odir doctitle themes ifaces
 
 
 ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
@@ -324,11 +321,12 @@ flatModuleTree ifaces =
         << toHtml txt
 
 
-ppHtmlContentsFrame :: FilePath -> String -> [InstalledInterface] -> IO ()
-ppHtmlContentsFrame odir doctitle ifaces = do
+ppHtmlContentsFrame :: FilePath -> String -> Themes
+  -> [InstalledInterface] -> IO ()
+ppHtmlContentsFrame odir doctitle themes ifaces = do
   let mods = flatModuleTree ifaces
       html =
-        headHtml doctitle Nothing +++
+        headHtml doctitle Nothing themes +++
         miniBody << divModuleList <<
           (sectionName << "Modules" +++
            ulist << [ li ! [theclass "module"] << m | m <- mods ])
@@ -344,12 +342,13 @@ ppHtmlContentsFrame odir doctitle ifaces = do
 ppHtmlIndex :: FilePath
             -> String
             -> Maybe String
+            -> Themes
             -> Maybe String
             -> SourceURLs
             -> WikiURLs
             -> [InstalledInterface]
             -> IO ()
-ppHtmlIndex odir doctitle _maybe_package
+ppHtmlIndex odir doctitle _maybe_package themes
   maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
   let html = indexPage split_indices Nothing
               (if split_indices then [] else index)
@@ -363,8 +362,8 @@ ppHtmlIndex odir doctitle _maybe_package
 
   where
     indexPage showLetters ch items =
-      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing +++
-      bodyHtml doctitle Nothing
+      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing themes +++
+      bodyHtml doctitle Nothing themes
         maybe_source_url maybe_wiki_url
         maybe_contents_url Nothing << [
           if showLetters then indexInitialLetterLinks else noHtml,
@@ -458,19 +457,19 @@ ppHtmlIndex odir doctitle _maybe_package
 
 
 ppHtmlModule
-        :: FilePath -> String
+        :: FilePath -> String -> Themes
         -> SourceURLs -> WikiURLs
         -> Maybe String -> Maybe String -> Bool
         -> Interface -> IO ()
-ppHtmlModule odir doctitle
+ppHtmlModule odir doctitle themes
   maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url unicode iface = do
   let
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
       html =
-        headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) +++
-        bodyHtml doctitle (Just iface)
+        headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes +++
+        bodyHtml doctitle (Just iface) themes
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
             divModuleHeader << (sectionName << mdl_str +++ moduleInfo iface),
@@ -479,14 +478,15 @@ ppHtmlModule odir doctitle
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
-  ppHtmlModuleMiniSynopsis odir doctitle iface unicode
+  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode
 
 
-ppHtmlModuleMiniSynopsis :: FilePath -> String -> Interface -> Bool -> IO ()
-ppHtmlModuleMiniSynopsis odir _doctitle iface unicode = do
+ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
+  -> Interface -> Bool -> IO ()
+ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode = do
   let mdl = ifaceMod iface
       html =
-        headHtml (moduleString mdl) Nothing +++
+        headHtml (moduleString mdl) Nothing themes +++
         miniBody <<
           (divModuleHeader << sectionName << moduleString mdl +++
            miniSynopsis mdl iface unicode)

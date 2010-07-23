@@ -19,6 +19,7 @@ module Main (main) where
 
 
 import Haddock.Backends.Xhtml
+import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Interface
@@ -179,7 +180,6 @@ render flags ifaces installedIfaces = do
     opt_wiki_urls        = optWikiUrls       flags
     opt_contents_url     = optContentsUrl    flags
     opt_index_url        = optIndexUrl       flags
-    css_file             = optCssFile        flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
 
@@ -195,25 +195,26 @@ render flags ifaces installedIfaces = do
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue flags
+  themes <- getThemes libDir flags >>= either bye return
 
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title packageStr
-                opt_contents_url opt_source_urls opt_wiki_urls
+                themes opt_contents_url opt_source_urls opt_wiki_urls
                 allVisibleIfaces
-    copyHtmlBits odir libDir css_file
+    copyHtmlBits odir libDir themes
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title packageStr
-                   opt_index_url opt_source_urls opt_wiki_urls
+                   themes opt_index_url opt_source_urls opt_wiki_urls
                    allVisibleIfaces True prologue
-    copyHtmlBits odir libDir css_file
+    copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title packageStr visibleIfaces odir
                 prologue
-                opt_source_urls opt_wiki_urls
+                themes opt_source_urls opt_wiki_urls
                 opt_contents_url opt_index_url unicode
-    copyHtmlBits odir libDir css_file
+    copyHtmlBits odir libDir themes
 
   when (Flag_Hoogle `elem` flags) $ do
     let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
