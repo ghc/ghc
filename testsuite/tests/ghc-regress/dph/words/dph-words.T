@@ -1,6 +1,7 @@
 
 test    ('dph-words' 
         , [ alone
+          , skip_if_fast
           , reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 

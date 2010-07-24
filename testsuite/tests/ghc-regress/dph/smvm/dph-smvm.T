@@ -17,6 +17,7 @@ elif config.platform.startswith('sparc-'):
 if testFile != 'nothing':
  test   ('dph-smvm' 
         , [ alone
+          , skip_if_fast
           , reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) 
