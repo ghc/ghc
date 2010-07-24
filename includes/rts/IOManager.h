@@ -26,8 +26,8 @@ void     sendIOManagerEvent (HsWord32 event);
 
 #else
 
-void     setIOManagerPipe   (int fd);
-void     ioManagerSync (void);
+void     setIOManagerControlFd   (int fd);
+void     setIOManagerWakeupFd   (int fd);
 
 #endif
 

@@ -878,6 +878,10 @@ AC_TRY_LINK_FUNC(printf\$LDBLStub,
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
+dnl ** check for eventfd which is needed by the I/O manager
+AC_CHECK_HEADERS([sys/eventfd.h])
+AC_CHECK_FUNCS([eventfd])
+
 # test for GTK+
 AC_PATH_PROGS([GTK_CONFIG], [pkg-config])
 if test -n "$GTK_CONFIG"; then

@@ -43,9 +43,9 @@ PRELUDE_CLOSURE(base_GHCziIOziException_blockedIndefinitelyOnSTM_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nonTermination_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nestedAtomically_closure);
 
-PRELUDE_CLOSURE(base_GHCziConc_runSparks_closure);
-PRELUDE_CLOSURE(base_GHCziConc_ensureIOManagerIsRunning_closure);
-PRELUDE_CLOSURE(base_GHCziConc_runHandlers_closure);
+PRELUDE_CLOSURE(base_GHCziConcziSync_runSparks_closure);
+PRELUDE_CLOSURE(base_GHCziConcziIO_ensureIOManagerIsRunning_closure);
+PRELUDE_CLOSURE(base_GHCziConcziSignal_runHandlers_closure);
 
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_static_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_static_info);
@@ -88,9 +88,9 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define runFinalizerBatch_closure DLL_IMPORT_DATA_REF(base_GHCziWeak_runFinalizzerBatch_closure)
 #define mainIO_closure            (&ZCMain_main_closure)
 
-#define runSparks_closure         DLL_IMPORT_DATA_REF(base_GHCziConc_runSparks_closure)
-#define ensureIOManagerIsRunning_closure DLL_IMPORT_DATA_REF(base_GHCziConc_ensureIOManagerIsRunning_closure)
-#define runHandlers_closure       DLL_IMPORT_DATA_REF(base_GHCziConc_runHandlers_closure)
+#define runSparks_closure         DLL_IMPORT_DATA_REF(base_GHCziConcziSync_runSparks_closure)
+#define ensureIOManagerIsRunning_closure DLL_IMPORT_DATA_REF(base_GHCziConcziIO_ensureIOManagerIsRunning_closure)
+#define runHandlers_closure       DLL_IMPORT_DATA_REF(base_GHCziConcziSignal_runHandlers_closure)
 
 #define stackOverflow_closure     DLL_IMPORT_DATA_REF(base_GHCziIOziException_stackOverflow_closure)
 #define heapOverflow_closure      DLL_IMPORT_DATA_REF(base_GHCziIOziException_heapOverflow_closure)

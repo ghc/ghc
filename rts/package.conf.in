@@ -95,9 +95,9 @@ ld-options:
          , "-u", "_base_GHCziWeak_runFinalizzerBatch_closure"
          , "-u", "_base_GHCziTopHandler_runIO_closure"
          , "-u", "_base_GHCziTopHandler_runNonIO_closure"
-	 , "-u", "_base_GHCziConc_ensureIOManagerIsRunning_closure"
-	 , "-u", "_base_GHCziConc_runSparks_closure"
-	 , "-u", "_base_GHCziConc_runHandlers_closure"
+	 , "-u", "_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+	 , "-u", "_base_GHCziConcziSync_runSparks_closure"
+	 , "-u", "_base_GHCziConcziSignal_runHandlers_closure"
 #else
            "-u", "ghczmprim_GHCziTypes_Izh_static_info"
          , "-u", "ghczmprim_GHCziTypes_Czh_static_info"
@@ -133,9 +133,9 @@ ld-options:
          , "-u", "base_GHCziWeak_runFinalizzerBatch_closure"
          , "-u", "base_GHCziTopHandler_runIO_closure"
          , "-u", "base_GHCziTopHandler_runNonIO_closure"
-	 , "-u", "base_GHCziConc_ensureIOManagerIsRunning_closure"
-	 , "-u", "base_GHCziConc_runSparks_closure"
-	 , "-u", "base_GHCziConc_runHandlers_closure"
+	 , "-u", "base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+	 , "-u", "base_GHCziConcziSync_runSparks_closure"
+	 , "-u", "base_GHCziConcziSignal_runHandlers_closure"
 #endif
 
 /*  Pick up static libraries in preference over dynamic if in earlier search

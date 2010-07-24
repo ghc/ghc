@@ -20,11 +20,12 @@
 
 typedef enum {
     TypeableStore,
-    GHCConcSignalHandlerStore,
-    GHCConcPendingEventsStore,
-    GHCConcPendingDelaysStore,
-    GHCConcIOManagerThreadStore,
-    GHCConcProddingStore,
+    GHCConcSignalSignalHandlerStore,
+    GHCConcWindowsPendingDelaysStore,
+    GHCConcWindowsIOManagerThreadStore,
+    GHCConcWindowsProddingStore,
+    SystemEventThreadEventManagerStore,
+    SystemEventThreadIOManagerThreadStore,
     MaxStoreKey
 } StoreKey;
 
@@ -87,31 +88,37 @@ getOrSetTypeableStore(StgStablePtr ptr)
 }
 
 StgStablePtr
-getOrSetGHCConcSignalHandlerStore(StgStablePtr ptr)
+getOrSetGHCConcSignalSignalHandlerStore(StgStablePtr ptr)
 {
-    return getOrSetKey(GHCConcSignalHandlerStore,ptr);
+    return getOrSetKey(GHCConcSignalSignalHandlerStore,ptr);
 }
 
 StgStablePtr
-getOrSetGHCConcPendingEventsStore(StgStablePtr ptr)
+getOrSetGHCConcWindowsPendingDelaysStore(StgStablePtr ptr)
 {
-    return getOrSetKey(GHCConcPendingEventsStore,ptr);
+    return getOrSetKey(GHCConcWindowsPendingDelaysStore,ptr);
 }
 
 StgStablePtr
-getOrSetGHCConcPendingDelaysStore(StgStablePtr ptr)
+getOrSetGHCConcWindowsIOManagerThreadStore(StgStablePtr ptr)
 {
-    return getOrSetKey(GHCConcPendingDelaysStore,ptr);
+    return getOrSetKey(GHCConcWindowsIOManagerThreadStore,ptr);
 }
 
 StgStablePtr
-getOrSetGHCConcIOManagerThreadStore(StgStablePtr ptr)
+getOrSetGHCConcWindowsProddingStore(StgStablePtr ptr)
 {
-    return getOrSetKey(GHCConcIOManagerThreadStore,ptr);
+    return getOrSetKey(GHCConcWindowsProddingStore,ptr);
 }
 
 StgStablePtr
-getOrSetGHCConcProddingStore(StgStablePtr ptr)
+getOrSetSystemEventThreadEventManagerStore(StgStablePtr ptr)
 {
-    return getOrSetKey(GHCConcProddingStore,ptr);
+    return getOrSetKey(SystemEventThreadEventManagerStore,ptr);
+}
+
+StgStablePtr
+getOrSetSystemEventThreadIOManagerThreadStore(StgStablePtr ptr)
+{
+    return getOrSetKey(SystemEventThreadIOManagerThreadStore,ptr);
 }

@@ -36,6 +36,10 @@
 # include <errno.h>
 #endif
 
+#ifdef HAVE_EVENTFD_H
+# include <sys/eventfd.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -82,18 +86,27 @@ more_handlers(int sig)
 }
 
 // Here's the pipe into which we will send our signals
-static int io_manager_pipe = -1;
+static int io_manager_wakeup_fd = -1;
+static int io_manager_control_fd = -1;
 
 #define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
 #define IO_MANAGER_SYNC   0xfd
 
 void
-setIOManagerPipe (int fd)
+setIOManagerWakeupFd (int fd)
 {
     // only called when THREADED_RTS, but unconditionally
-    // compiled here because GHC.Conc depends on it.
-    io_manager_pipe = fd;
+    // compiled here because System.Event.Control depends on it.
+    io_manager_wakeup_fd = fd;
+}
+
+void
+setIOManagerControlFd (int fd)
+{
+    // only called when THREADED_RTS, but unconditionally
+    // compiled here because System.Event.Control depends on it.
+    io_manager_control_fd = fd;
 }
 
 void
@@ -101,22 +114,15 @@ ioManagerWakeup (void)
 {
     int r;
     // Wake up the IO Manager thread by sending a byte down its pipe
-    if (io_manager_pipe >= 0) {
+    if (io_manager_wakeup_fd >= 0) {
+#if defined(HAVE_EVENTFD)
+	StgWord64 n = (StgWord64)IO_MANAGER_WAKEUP;
+	r = write(io_manager_wakeup_fd, (char *) &n, 8);
+#else
 	StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
-	r = write(io_manager_pipe, &byte, 1);
+	r = write(io_manager_wakeup_fd, &byte, 1);
+#endif
         if (r == -1) { sysErrorBelch("ioManagerWakeup: write"); }
-    }
-}
-
-void
-ioManagerSync (void)
-{
-    int r;
-    // Wake up the IO Manager thread by sending a byte down its pipe
-    if (io_manager_pipe >= 0) {
-	StgWord8 byte = (StgWord8)IO_MANAGER_SYNC;
-	r = write(io_manager_pipe, &byte, 1);
-        if (r == -1) { sysErrorBelch("ioManagerSync: write"); }
     }
 }
 
@@ -126,19 +132,20 @@ ioManagerDie (void)
 {
     int r;
     // Ask the IO Manager thread to exit
-    if (io_manager_pipe >= 0) {
+    if (io_manager_control_fd >= 0) {
 	StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
-	r = write(io_manager_pipe, &byte, 1);
+	r = write(io_manager_control_fd, &byte, 1);
         if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-        close(io_manager_pipe);
-        io_manager_pipe = -1;
+        io_manager_control_fd = -1;
+        io_manager_wakeup_fd = -1;
     }
 }
 
 Capability *
 ioManagerStartCap (Capability *cap)
 {
-    return rts_evalIO(cap,&base_GHCziConc_ensureIOManagerIsRunning_closure,NULL);
+    return rts_evalIO(
+        cap,&base_GHCziConcziIO_ensureIOManagerIsRunning_closure,NULL);
 }
 
 void
@@ -146,7 +153,7 @@ ioManagerStart (void)
 {
     // Make sure the IO manager thread is running
     Capability *cap;
-    if (io_manager_pipe < 0) {
+    if (io_manager_control_fd < 0 || io_manager_wakeup_fd < 0) {
 	cap = rts_lock();
 	cap = ioManagerStartCap(cap);
 	rts_unlock(cap);
@@ -177,7 +184,7 @@ generic_handler(int sig USED_IF_THREADS,
 {
 #if defined(THREADED_RTS)
 
-    if (io_manager_pipe != -1)
+    if (io_manager_control_fd != -1)
     {
         StgWord8 buf[sizeof(siginfo_t) + 1];
         int r;
@@ -191,7 +198,7 @@ generic_handler(int sig USED_IF_THREADS,
 	    memcpy(buf+1, info, sizeof(siginfo_t));
 	}
 
-	r = write(io_manager_pipe, buf, sizeof(siginfo_t)+1);
+	r = write(io_manager_control_fd, buf, sizeof(siginfo_t)+1);
         if (r == -1 && errno == EAGAIN)
         {
             errorBelch("lost signal due to full pipe: %d\n", sig);
@@ -258,7 +265,7 @@ initUserSignals(void)
 {
     sigemptyset(&userSignals);
 #ifndef THREADED_RTS
-    getStablePtr((StgPtr)&base_GHCziConc_runHandlers_closure); 
+    getStablePtr((StgPtr)&base_GHCziConcziSignal_runHandlers_closure);
     // needed to keep runHandler alive
 #endif
 }
@@ -412,7 +419,7 @@ startSignalHandlers(Capability *cap)
 		       RtsFlags.GcFlags.initialStkSize, 
                        rts_apply(cap,
                                  rts_apply(cap,
-                                           &base_GHCziConc_runHandlers_closure,
+                                           &base_GHCziConcziSignal_runHandlers_closure,
                                            rts_mkPtr(cap, info)),
                                  rts_mkInt(cap, info->si_signo))));
   }
