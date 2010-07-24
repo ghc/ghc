@@ -105,7 +105,7 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedLanguages  -> showSupportedLanguages
+                   ShowSupportedExtensions -> showSupportedExtensions
                    ShowVersion             -> showVersion
                    ShowNumVersion          -> putStrLn cProjectVersion
                    Print str               -> putStrLn str
@@ -351,13 +351,13 @@ type PostStartupMode = Either PreLoadMode PostLoadMode
 data PreStartupMode
   = ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
-  | ShowSupportedLanguages  -- ghc --supported-languages
+  | ShowSupportedExtensions -- ghc --supported-extensions
   | Print String            -- ghc --print-foo
 
-showVersionMode, showNumVersionMode, showSupportedLanguagesMode :: Mode
-showVersionMode            = mkPreStartupMode ShowVersion
-showNumVersionMode         = mkPreStartupMode ShowNumVersion
-showSupportedLanguagesMode = mkPreStartupMode ShowSupportedLanguages
+showVersionMode, showNumVersionMode, showSupportedExtensionsMode :: Mode
+showVersionMode             = mkPreStartupMode ShowVersion
+showNumVersionMode          = mkPreStartupMode ShowNumVersion
+showSupportedExtensionsMode = mkPreStartupMode ShowSupportedExtensions
 
 printMode :: String -> Mode
 printMode str              = mkPreStartupMode (Print str)
@@ -496,19 +496,21 @@ type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    Flag "?"                    (PassFlag (setMode showGhcUsageMode))
+    Flag "?"                     (PassFlag (setMode showGhcUsageMode))
          Supported
-  , Flag "-help"                (PassFlag (setMode showGhcUsageMode))
+  , Flag "-help"                 (PassFlag (setMode showGhcUsageMode))
          Supported
-  , Flag "V"                    (PassFlag (setMode showVersionMode))
+  , Flag "V"                     (PassFlag (setMode showVersionMode))
          Supported
-  , Flag "-version"             (PassFlag (setMode showVersionMode))
+  , Flag "-version"              (PassFlag (setMode showVersionMode))
          Supported
-  , Flag "-numeric-version"     (PassFlag (setMode showNumVersionMode))
+  , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
          Supported
-  , Flag "-info"                (PassFlag (setMode showInfoMode))
+  , Flag "-info"                 (PassFlag (setMode showInfoMode))
          Supported
-  , Flag "-supported-languages" (PassFlag (setMode showSupportedLanguagesMode))
+  , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
+         Supported
+  , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
          Supported
   ] ++
   [ Flag k'                     (PassFlag (setMode mode))
@@ -674,8 +676,8 @@ showInfo dflags = do
     where flatten (k, String v)       = (k, v)
           flatten (k, FromDynFlags f) = (k, f dflags)
 
-showSupportedLanguages :: IO ()
-showSupportedLanguages = mapM_ putStrLn supportedLanguages
+showSupportedExtensions :: IO ()
+showSupportedExtensions = mapM_ putStrLn supportedExtensions
 
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)

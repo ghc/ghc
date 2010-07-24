@@ -1193,7 +1193,7 @@ shellEscape str = io (system str >> return False)
 withFlattenedDynflags :: GHC.GhcMonad m => m a -> m a
 withFlattenedDynflags m
     = do dflags <- GHC.getSessionDynFlags
-         gbracket (GHC.setSessionDynFlags (ensureFlattenedLanguageFlags dflags))
+         gbracket (GHC.setSessionDynFlags (ensureFlattenedExtensionFlags dflags))
                   (\_ -> GHC.setSessionDynFlags dflags)
                   (\_ -> m)
 

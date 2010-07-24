@@ -13,9 +13,9 @@ module DynFlags (
         -- * Dynamic flags and associated configuration types
         DOpt(..),
         DynFlag(..),
-        LanguageFlag(..),
-        flattenLanguageFlags,
-        ensureFlattenedLanguageFlags,
+        ExtensionFlag(..),
+        flattenExtensionFlags,
+        ensureFlattenedExtensionFlags,
         lopt_set_flattened,
         lopt_unset_flattened,
         DynFlags(..),
@@ -45,7 +45,7 @@ module DynFlags (
         parseDynamicNoPackageFlags,
         allFlags,
 
-        supportedLanguages, languageOptions,
+        supportedExtensions, extensionOptions,
 
         -- ** DynFlag C compiler options
         machdepCCOpts, picCCOpts,
@@ -272,7 +272,7 @@ data DynFlag
 
    deriving (Eq, Show)
 
-data LanguageFlag
+data ExtensionFlag
    = Opt_Cpp
    | Opt_OverlappingInstances
    | Opt_UndecidableInstances
@@ -477,8 +477,8 @@ data DynFlags = DynFlags {
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
-  languageFlags         :: Either [OnOff LanguageFlag]
-                                  [LanguageFlag],
+  extensionFlags        :: Either [OnOff ExtensionFlag]
+                                  [ExtensionFlag],
 
   -- | Message output action: use "ErrUtils" instead of this if you can
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
@@ -730,7 +730,7 @@ defaultDynFlags =
                     -- The default -O0 options
             ++ standardWarnings,
 
-        languageFlags = Left [],
+        extensionFlags = Left [],
 
         log_action = \severity srcSpan style msg ->
                         case severity of
@@ -758,33 +758,33 @@ Note [Verbosity levels]
 data OnOff a = On a
              | Off a
 
-flattenLanguageFlags :: DynFlags -> DynFlags
-flattenLanguageFlags dflags
-    = case languageFlags dflags of
+flattenExtensionFlags :: DynFlags -> DynFlags
+flattenExtensionFlags dflags
+    = case extensionFlags dflags of
       Left onoffs ->
           dflags {
-              languageFlags = Right $ flattenLanguageFlags' onoffs
+              extensionFlags = Right $ flattenExtensionFlags' onoffs
           }
       Right _ ->
-          panic "Flattening already-flattened language flags"
+          panic "Flattening already-flattened extension flags"
 
-ensureFlattenedLanguageFlags :: DynFlags -> DynFlags
-ensureFlattenedLanguageFlags dflags
-    = case languageFlags dflags of
+ensureFlattenedExtensionFlags :: DynFlags -> DynFlags
+ensureFlattenedExtensionFlags dflags
+    = case extensionFlags dflags of
       Left onoffs ->
           dflags {
-              languageFlags = Right $ flattenLanguageFlags' onoffs
+              extensionFlags = Right $ flattenExtensionFlags' onoffs
           }
       Right _ ->
           dflags
 
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
-flattenLanguageFlags' :: [OnOff LanguageFlag] -> [LanguageFlag]
-flattenLanguageFlags' = foldr f defaultLanguageFlags
+flattenExtensionFlags' :: [OnOff ExtensionFlag] -> [ExtensionFlag]
+flattenExtensionFlags' = foldr f defaultExtensionFlags
     where f (On f)  flags = f : delete f flags
           f (Off f) flags =     delete f flags
-          defaultLanguageFlags = [
+          defaultExtensionFlags = [
             Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
                                 -- behaviour the default, to see if anyone notices
                                 -- SLPJ July 06
@@ -807,7 +807,7 @@ instance DOpt DynFlag where
     dopt_set = dopt_set'
     dopt_unset = dopt_unset'
 
-instance DOpt LanguageFlag where
+instance DOpt ExtensionFlag where
     dopt = lopt
     dopt_set = lopt_set
     dopt_unset = lopt_unset
@@ -824,39 +824,39 @@ dopt_set' dfs f = dfs{ flags = f : flags dfs }
 dopt_unset' :: DynFlags -> DynFlag -> DynFlags
 dopt_unset' dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
--- | Test whether a 'LanguageFlag' is set
-lopt :: LanguageFlag -> DynFlags -> Bool
-lopt f dflags = case languageFlags dflags of
-                Left _ -> panic ("Testing for language flag " ++ show f ++ " before flattening")
+-- | Test whether a 'ExtensionFlag' is set
+lopt :: ExtensionFlag -> DynFlags -> Bool
+lopt f dflags = case extensionFlags dflags of
+                Left _ -> panic ("Testing for extension flag " ++ show f ++ " before flattening")
                 Right flags -> f `elem` flags
 
--- | Set a 'LanguageFlag'
-lopt_set :: DynFlags -> LanguageFlag -> DynFlags
-lopt_set dfs f = case languageFlags dfs of
-                 Left onoffs -> dfs { languageFlags = Left (On f : onoffs) }
-                 Right _ -> panic ("Setting language flag " ++ show f ++ " after flattening")
+-- | Set a 'ExtensionFlag'
+lopt_set :: DynFlags -> ExtensionFlag -> DynFlags
+lopt_set dfs f = case extensionFlags dfs of
+                 Left onoffs -> dfs { extensionFlags = Left (On f : onoffs) }
+                 Right _ -> panic ("Setting extension flag " ++ show f ++ " after flattening")
 
--- | Set a 'LanguageFlag'
-lopt_set_flattened :: DynFlags -> LanguageFlag -> DynFlags
-lopt_set_flattened dfs f = case languageFlags dfs of
+-- | Set a 'ExtensionFlag'
+lopt_set_flattened :: DynFlags -> ExtensionFlag -> DynFlags
+lopt_set_flattened dfs f = case extensionFlags dfs of
                            Left _ ->
-                               panic ("Setting language flag " ++ show f ++ " before flattening, but expected flattened")
+                               panic ("Setting extension flag " ++ show f ++ " before flattening, but expected flattened")
                            Right flags ->
-                               dfs { languageFlags = Right (f : delete f flags) }
+                               dfs { extensionFlags = Right (f : delete f flags) }
 
--- | Unset a 'LanguageFlag'
-lopt_unset :: DynFlags -> LanguageFlag -> DynFlags
-lopt_unset dfs f = case languageFlags dfs of
-                   Left onoffs -> dfs { languageFlags = Left (Off f : onoffs) }
-                   Right _ -> panic ("Unsetting language flag " ++ show f ++ " after flattening")
+-- | Unset a 'ExtensionFlag'
+lopt_unset :: DynFlags -> ExtensionFlag -> DynFlags
+lopt_unset dfs f = case extensionFlags dfs of
+                   Left onoffs -> dfs { extensionFlags = Left (Off f : onoffs) }
+                   Right _ -> panic ("Unsetting extension flag " ++ show f ++ " after flattening")
 
--- | Unset a 'LanguageFlag'
-lopt_unset_flattened :: DynFlags -> LanguageFlag -> DynFlags
-lopt_unset_flattened dfs f = case languageFlags dfs of
+-- | Unset a 'ExtensionFlag'
+lopt_unset_flattened :: DynFlags -> ExtensionFlag -> DynFlags
+lopt_unset_flattened dfs f = case extensionFlags dfs of
                              Left _ ->
-                                 panic ("Unsetting language flag " ++ show f ++ " before flattening, but expected flattened")
+                                 panic ("Unsetting extension flag " ++ show f ++ " before flattening, but expected flattened")
                              Right flags ->
-                                 dfs { languageFlags = Right (delete f flags) }
+                                 dfs { extensionFlags = Right (delete f flags) }
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -1114,7 +1114,7 @@ allFlags = map ('-':) $
            map ("fno-"++) flags ++
            map ("f"++) flags ++
            map ("f"++) flags' ++
-           map ("X"++) supportedLanguages
+           map ("X"++) supportedExtensions
     where ok (PrefixPred _ _) = False
           ok _ = True
           flags = [ name | (name, _, _) <- fFlags ]
@@ -1123,7 +1123,7 @@ allFlags = map ('-':) $
 dynamic_flags :: [Flag DynP]
 dynamic_flags = [
     Flag "n"              (NoArg  (setDynFlag Opt_DryRun)) Supported
-  , Flag "cpp"            (NoArg  (setLanguageFlag Opt_Cpp)) Supported
+  , Flag "cpp"            (NoArg  (setExtensionFlag Opt_Cpp)) Supported
   , Flag "F"              (NoArg  (setDynFlag Opt_Pp)) Supported
   , Flag "#include"       (HasArg (addCmdlineHCInclude))
                              (DeprecatedFullText "-#include and INCLUDE pragmas are deprecated: They no longer have any effect")
@@ -1526,10 +1526,10 @@ dynamic_flags = [
  ]
  ++ map (mkFlag True  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag False "fno-" unSetDynFlag) fFlags
- ++ map (mkFlag True  "f"    setLanguageFlag  ) fLangFlags
- ++ map (mkFlag False "fno-" unSetLanguageFlag) fLangFlags
- ++ map (mkFlag True  "X"    setLanguageFlag  ) xFlags
- ++ map (mkFlag False "XNo"  unSetLanguageFlag) xFlags
+ ++ map (mkFlag True  "f"    setExtensionFlag  ) fLangFlags
+ ++ map (mkFlag False "fno-" unSetExtensionFlag) fLangFlags
+ ++ map (mkFlag True  "X"    setExtensionFlag  ) xFlags
+ ++ map (mkFlag False "XNo"  unSetExtensionFlag) xFlags
 
 package_flags :: [Flag DynP]
 package_flags = [
@@ -1557,8 +1557,8 @@ mkFlag :: Bool                  -- ^ True <=> it should be turned on
 mkFlag turnOn flagPrefix f (name, flag, deprecated)
     = Flag (flagPrefix ++ name) (NoArg (f flag)) (deprecated turnOn)
 
-deprecatedForLanguage :: String -> Bool -> Deprecated
-deprecatedForLanguage lang turn_on
+deprecatedForExtension :: String -> Bool -> Deprecated
+deprecatedForExtension lang turn_on
     = Deprecated ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ " #-} instead")
     where 
       flag | turn_on    = lang
@@ -1651,51 +1651,51 @@ fFlags = [
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
-fLangFlags :: [(String, LanguageFlag, Bool -> Deprecated)]
+fLangFlags :: [(String, ExtensionFlag, Bool -> Deprecated)]
 fLangFlags = [
   ( "th",                               Opt_TemplateHaskell,
-    deprecatedForLanguage "TemplateHaskell" ),
+    deprecatedForExtension "TemplateHaskell" ),
   ( "fi",                               Opt_ForeignFunctionInterface,
-    deprecatedForLanguage "ForeignFunctionInterface" ),
+    deprecatedForExtension "ForeignFunctionInterface" ),
   ( "ffi",                              Opt_ForeignFunctionInterface,
-    deprecatedForLanguage "ForeignFunctionInterface" ),
+    deprecatedForExtension "ForeignFunctionInterface" ),
   ( "arrows",                           Opt_Arrows,
-    deprecatedForLanguage "Arrows" ),
+    deprecatedForExtension "Arrows" ),
   ( "generics",                         Opt_Generics,
-    deprecatedForLanguage "Generics" ),
+    deprecatedForExtension "Generics" ),
   ( "implicit-prelude",                 Opt_ImplicitPrelude,
-    deprecatedForLanguage "ImplicitPrelude" ),
+    deprecatedForExtension "ImplicitPrelude" ),
   ( "bang-patterns",                    Opt_BangPatterns,
-    deprecatedForLanguage "BangPatterns" ),
+    deprecatedForExtension "BangPatterns" ),
   ( "monomorphism-restriction",         Opt_MonomorphismRestriction,
-    deprecatedForLanguage "MonomorphismRestriction" ),
+    deprecatedForExtension "MonomorphismRestriction" ),
   ( "mono-pat-binds",                   Opt_MonoPatBinds,
-    deprecatedForLanguage "MonoPatBinds" ),
+    deprecatedForExtension "MonoPatBinds" ),
   ( "extended-default-rules",           Opt_ExtendedDefaultRules,
-    deprecatedForLanguage "ExtendedDefaultRules" ),
+    deprecatedForExtension "ExtendedDefaultRules" ),
   ( "implicit-params",                  Opt_ImplicitParams,
-    deprecatedForLanguage "ImplicitParams" ),
+    deprecatedForExtension "ImplicitParams" ),
   ( "scoped-type-variables",            Opt_ScopedTypeVariables,
-    deprecatedForLanguage "ScopedTypeVariables" ),
+    deprecatedForExtension "ScopedTypeVariables" ),
   ( "parr",                             Opt_PArr,
-    deprecatedForLanguage "PArr" ),
+    deprecatedForExtension "PArr" ),
   ( "allow-overlapping-instances",      Opt_OverlappingInstances,
-    deprecatedForLanguage "OverlappingInstances" ),
+    deprecatedForExtension "OverlappingInstances" ),
   ( "allow-undecidable-instances",      Opt_UndecidableInstances,
-    deprecatedForLanguage "UndecidableInstances" ),
+    deprecatedForExtension "UndecidableInstances" ),
   ( "allow-incoherent-instances",       Opt_IncoherentInstances,
-    deprecatedForLanguage "IncoherentInstances" )
+    deprecatedForExtension "IncoherentInstances" )
   ]
 
-supportedLanguages :: [String]
-supportedLanguages = [ name' | (name, _, _) <- xFlags, name' <- [name, "No" ++ name] ]
+supportedExtensions :: [String]
+supportedExtensions = [ name' | (name, _, _) <- xFlags, name' <- [name, "No" ++ name] ]
 
 -- This may contain duplicates
-languageOptions :: [LanguageFlag]
-languageOptions = [ langFlag | (_, langFlag, _) <- xFlags ]
+extensionOptions :: [ExtensionFlag]
+extensionOptions = [ langFlag | (_, langFlag, _) <- xFlags ]
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
-xFlags :: [(String, LanguageFlag, Bool -> Deprecated)]
+xFlags :: [(String, ExtensionFlag, Bool -> Deprecated)]
 xFlags = [
   ( "CPP",                              Opt_Cpp, const Supported ),
   ( "PostfixOperators",                 Opt_PostfixOperators, const Supported ),
@@ -1719,7 +1719,7 @@ xFlags = [
         const $ Deprecated "impredicative polymorphism will be simplified or removed in GHC 6.14" ),
   ( "TypeOperators",                    Opt_TypeOperators, const Supported ),
   ( "RecursiveDo",                      Opt_RecursiveDo,
-    deprecatedForLanguage "DoRec"),
+    deprecatedForExtension "DoRec"),
   ( "DoRec",                            Opt_DoRec, const Supported ),
   ( "Arrows",                           Opt_Arrows, const Supported ),
   ( "PArr",                             Opt_PArr, const Supported ),
@@ -1731,7 +1731,7 @@ xFlags = [
   ( "RecordWildCards",                  Opt_RecordWildCards, const Supported ),
   ( "NamedFieldPuns",                   Opt_RecordPuns, const Supported ),
   ( "RecordPuns",                       Opt_RecordPuns,
-    deprecatedForLanguage "NamedFieldPuns" ),
+    deprecatedForExtension "NamedFieldPuns" ),
   ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, const Supported ),
   ( "OverloadedStrings",                Opt_OverloadedStrings, const Supported ),
   ( "GADTs",                            Opt_GADTs, const Supported ),
@@ -1756,7 +1756,7 @@ xFlags = [
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, const Supported ),
 
   ( "PatternSignatures",                Opt_ScopedTypeVariables, 
-    deprecatedForLanguage "ScopedTypeVariables" ),
+    deprecatedForExtension "ScopedTypeVariables" ),
 
   ( "UnboxedTuples",                    Opt_UnboxedTuples, const Supported ),
   ( "StandaloneDeriving",               Opt_StandaloneDeriving, const Supported ),
@@ -1779,7 +1779,7 @@ xFlags = [
     const $ Deprecated "The new qualified operator syntax was rejected by Haskell'" )
   ]
 
-impliedFlags :: [(LanguageFlag, LanguageFlag)]
+impliedFlags :: [(ExtensionFlag, ExtensionFlag)]
 impliedFlags
   = [ (Opt_RankNTypes,                Opt_ExplicitForAll)
     , (Opt_Rank2Types,                Opt_ExplicitForAll)
@@ -1808,13 +1808,13 @@ impliedFlags
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setDynFlag Opt_PrintExplicitForalls
-                       mapM_ setLanguageFlag glasgowExtsFlags
+                       mapM_ setExtensionFlag glasgowExtsFlags
 
 disableGlasgowExts :: DynP ()
 disableGlasgowExts = do unSetDynFlag Opt_PrintExplicitForalls
-                        mapM_ unSetLanguageFlag glasgowExtsFlags
+                        mapM_ unSetExtensionFlag glasgowExtsFlags
 
-glasgowExtsFlags :: [LanguageFlag]
+glasgowExtsFlags :: [ExtensionFlag]
 glasgowExtsFlags = [
              Opt_ForeignFunctionInterface
            , Opt_UnliftedFFITypes
@@ -1923,18 +1923,18 @@ setDynFlag f = upd (\dfs -> dopt_set dfs f)
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 
 --------------------------
-setLanguageFlag, unSetLanguageFlag :: LanguageFlag -> DynP ()
-setLanguageFlag f = do { upd (\dfs -> lopt_set dfs f)
-                       ; mapM_ setLanguageFlag deps }
+setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
+setExtensionFlag f = do { upd (\dfs -> lopt_set dfs f)
+                        ; mapM_ setExtensionFlag deps }
   where
     deps = [ d | (f', d) <- impliedFlags, f' == f ]
         -- When you set f, set the ones it implies
-        -- NB: use setLanguageFlag recursively, in case the implied flags
+        -- NB: use setExtensionFlag recursively, in case the implied flags
         --     implies further flags
         -- When you un-set f, however, we don't un-set the things it implies
         --      (except for -fno-glasgow-exts, which is treated specially)
 
-unSetLanguageFlag f = upd (\dfs -> lopt_unset dfs f)
+unSetExtensionFlag f = upd (\dfs -> lopt_unset dfs f)
 
 --------------------------
 setDumpFlag :: DynFlag -> OptKind DynP

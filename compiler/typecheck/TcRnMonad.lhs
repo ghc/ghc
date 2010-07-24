@@ -235,7 +235,7 @@ doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
 -- XXX setOptM and unsetOptM operate on different types. One should be renamed.
 
-setOptM :: LanguageFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = lopt_set_flattened (hsc_dflags top) flag}} )
 
