@@ -485,7 +485,7 @@ ppClassDecl instances loc mbDoc subdocs
       | null lsigs, null ats = Nothing
       | null ats  = Just methodTable
 ---     | otherwise = atTable $$ methodTable
-+     | otherwise = error "LaTeX.ppClassDecl"
+      | otherwise = error "LaTeX.ppClassDecl"
 
     methodTable =
       text "\\haddockpremethods{}\\textbf{Methods}" $$
