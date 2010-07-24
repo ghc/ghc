@@ -240,7 +240,51 @@ div#style-menu-holder {
 }
 
 #synopsis {
-  display: none;
+  position: fixed;
+  right: -21.5em;
+  font-size: 90%;
+  width: 22em;
+  height: 80%;
+  top: 5em;
+  padding: 0;
+  background-color: #fcfcb0;
+}
+
+#synopsis:hover {
+  right: 0;
+  background: none;
+}
+
+#synopsis .caption,
+#synopsis ul,
+#synopsis ul li.src {
+  background-color: #fcfcb0;
+  white-space: nowrap;
+}
+
+#synopsis > * {
+  margin: 0 0 0 8px;
+  border-left: 1px solid rgb(196,69,29); 
+}
+
+#synopsis .caption {
+  border-top: 1px solid rgb(196,69,29);
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  text-align: center;
+}
+
+#synopsis ul {
+  list-style: none;
+  height: 100%;
+  overflow: auto;
+  border-bottom: 1px solid rgb(196,69,29);
+  padding-left: 0.5em;
+}
+
+#synopsis ul ul {
+  border: none;
+  overflow: hidden;
 }
 
 /* @end */
