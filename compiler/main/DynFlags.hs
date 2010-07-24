@@ -14,6 +14,10 @@ module DynFlags (
         DOpt(..),
         DynFlag(..),
         LanguageFlag(..),
+        flattenLanguageFlags,
+        ensureFlattenedLanguageFlags,
+        lopt_set_flattened,
+        lopt_unset_flattened,
         DynFlags(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         GhcMode(..), isOneShot,
@@ -473,7 +477,8 @@ data DynFlags = DynFlags {
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
-  languageFlags         :: [LanguageFlag],
+  languageFlags         :: Either [OnOff LanguageFlag]
+                                  [LanguageFlag],
 
   -- | Message output action: use "ErrUtils" instead of this if you can
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
@@ -725,16 +730,7 @@ defaultDynFlags =
                     -- The default -O0 options
             ++ standardWarnings,
 
-        languageFlags = [
-            Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
-                                -- behaviour the default, to see if anyone notices
-                                -- SLPJ July 06
-
-            Opt_ImplicitPrelude,
-            Opt_MonomorphismRestriction,
-            Opt_NPlusKPatterns,
-            Opt_DatatypeContexts
-            ],
+        languageFlags = Left [],
 
         log_action = \severity srcSpan style msg ->
                         case severity of
@@ -758,6 +754,46 @@ Note [Verbosity levels]
     4   |   "ghc -v -ddump-most"
     5   |   "ghc -v -ddump-all"
 -}
+
+data OnOff a = On a
+             | Off a
+
+flattenLanguageFlags :: DynFlags -> DynFlags
+flattenLanguageFlags dflags
+    = case languageFlags dflags of
+      Left onoffs ->
+          dflags {
+              languageFlags = Right $ flattenLanguageFlags' onoffs
+          }
+      Right _ ->
+          panic "Flattening already-flattened language flags"
+
+ensureFlattenedLanguageFlags :: DynFlags -> DynFlags
+ensureFlattenedLanguageFlags dflags
+    = case languageFlags dflags of
+      Left onoffs ->
+          dflags {
+              languageFlags = Right $ flattenLanguageFlags' onoffs
+          }
+      Right _ ->
+          dflags
+
+-- OnOffs accumulate in reverse order, so we use foldr in order to
+-- process them in the right order
+flattenLanguageFlags' :: [OnOff LanguageFlag] -> [LanguageFlag]
+flattenLanguageFlags' = foldr f defaultLanguageFlags
+    where f (On f)  flags = f : delete f flags
+          f (Off f) flags =     delete f flags
+          defaultLanguageFlags = [
+            Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
+                                -- behaviour the default, to see if anyone notices
+                                -- SLPJ July 06
+
+            Opt_ImplicitPrelude,
+            Opt_MonomorphismRestriction,
+            Opt_NPlusKPatterns,
+            Opt_DatatypeContexts
+            ]
 
 -- The DOpt class is a temporary workaround, to avoid having to do
 -- a mass-renaming dopt->lopt at the moment
@@ -790,15 +826,37 @@ dopt_unset' dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
 -- | Test whether a 'LanguageFlag' is set
 lopt :: LanguageFlag -> DynFlags -> Bool
-lopt f dflags  = f `elem` languageFlags dflags
+lopt f dflags = case languageFlags dflags of
+                Left _ -> panic ("Testing for language flag " ++ show f ++ " before flattening")
+                Right flags -> f `elem` flags
 
 -- | Set a 'LanguageFlag'
 lopt_set :: DynFlags -> LanguageFlag -> DynFlags
-lopt_set dfs f = dfs{ languageFlags = f : languageFlags dfs }
+lopt_set dfs f = case languageFlags dfs of
+                 Left onoffs -> dfs { languageFlags = Left (On f : onoffs) }
+                 Right _ -> panic ("Setting language flag " ++ show f ++ " after flattening")
+
+-- | Set a 'LanguageFlag'
+lopt_set_flattened :: DynFlags -> LanguageFlag -> DynFlags
+lopt_set_flattened dfs f = case languageFlags dfs of
+                           Left _ ->
+                               panic ("Setting language flag " ++ show f ++ " before flattening, but expected flattened")
+                           Right flags ->
+                               dfs { languageFlags = Right (f : delete f flags) }
 
 -- | Unset a 'LanguageFlag'
 lopt_unset :: DynFlags -> LanguageFlag -> DynFlags
-lopt_unset dfs f = dfs{ languageFlags = filter (/= f) (languageFlags dfs) }
+lopt_unset dfs f = case languageFlags dfs of
+                   Left onoffs -> dfs { languageFlags = Left (Off f : onoffs) }
+                   Right _ -> panic ("Unsetting language flag " ++ show f ++ " after flattening")
+
+-- | Unset a 'LanguageFlag'
+lopt_unset_flattened :: DynFlags -> LanguageFlag -> DynFlags
+lopt_unset_flattened dfs f = case languageFlags dfs of
+                             Left _ ->
+                                 panic ("Unsetting language flag " ++ show f ++ " before flattening, but expected flattened")
+                             Right flags ->
+                                 dfs { languageFlags = Right (delete f flags) }
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from

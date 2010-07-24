@@ -698,27 +698,30 @@ runPhase (Unlit sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_l
 
 runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
   = do let dflags0 = hsc_dflags hsc_env
-       src_opts <- liftIO $ getOptionsFromFile dflags0 input_fn
+       let dflags0' = flattenLanguageFlags dflags0
+       src_opts <- liftIO $ getOptionsFromFile dflags0' input_fn
        (dflags1, unhandled_flags, warns)
            <- liftIO $ parseDynamicNoPackageFlags dflags0 src_opts
        checkProcessArgsResult unhandled_flags
+       let dflags1' = flattenLanguageFlags dflags1
 
-       if not (dopt Opt_Cpp dflags1) then do
+       if not (dopt Opt_Cpp dflags1') then do
            -- we have to be careful to emit warnings only once.
-           unless (dopt Opt_Pp dflags1) $ handleFlagWarnings dflags1 warns
+           unless (dopt Opt_Pp dflags1') $ handleFlagWarnings dflags1' warns
 
            -- no need to preprocess CPP, just pass input file along
            -- to the next phase of the pipeline.
            return (HsPp sf, dflags1, maybe_loc, input_fn)
         else do
-            output_fn <- liftIO $ get_output_fn dflags1 (HsPp sf) maybe_loc
-            liftIO $ doCpp dflags1 True{-raw-} False{-no CC opts-} input_fn output_fn
+            output_fn <- liftIO $ get_output_fn dflags1' (HsPp sf) maybe_loc
+            liftIO $ doCpp dflags1' True{-raw-} False{-no CC opts-} input_fn output_fn
             -- re-read the pragmas now that we've preprocessed the file
             -- See #2464,#3457
-            src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
+            src_opts <- liftIO $ getOptionsFromFile dflags0' output_fn
             (dflags2, unhandled_flags, warns)
                 <- liftIO $ parseDynamicNoPackageFlags dflags0 src_opts
-            unless (dopt Opt_Pp dflags2) $ handleFlagWarnings dflags2 warns
+            let dflags2' = flattenLanguageFlags dflags2
+            unless (dopt Opt_Pp dflags2') $ handleFlagWarnings dflags2' warns
             -- the HsPp pass below will emit warnings
             checkProcessArgsResult unhandled_flags
 
@@ -729,10 +732,11 @@ runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 
 runPhase (HsPp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
   = do let dflags = hsc_dflags hsc_env
+           dflags' = flattenLanguageFlags dflags
        if not (dopt Opt_Pp dflags) then
            -- no need to preprocess, just pass input file along
            -- to the next phase of the pipeline.
-          return (Hsc sf, dflags, maybe_loc, input_fn)
+          return (Hsc sf, dflags', maybe_loc, input_fn)
         else do
             let hspp_opts = getOpts dflags opt_F
             let orig_fn = basename <.> suff
@@ -746,13 +750,14 @@ runPhase (HsPp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
                            )
 
             -- re-read pragmas now that we've parsed the file (see #3674)
-            src_opts <- liftIO $ getOptionsFromFile dflags output_fn
+            src_opts <- liftIO $ getOptionsFromFile dflags' output_fn
             (dflags1, unhandled_flags, warns)
                 <- liftIO $ parseDynamicNoPackageFlags dflags src_opts
-            handleFlagWarnings dflags1 warns
+            let dflags1' = flattenLanguageFlags dflags1
+            handleFlagWarnings dflags1' warns
             checkProcessArgsResult unhandled_flags
 
-            return (Hsc sf, dflags1, maybe_loc, output_fn)
+            return (Hsc sf, dflags1', maybe_loc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Hsc phase
@@ -900,9 +905,10 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
 runPhase CmmCpp _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
   = do
        let dflags = hsc_dflags hsc_env
-       output_fn <- liftIO $ get_output_fn dflags Cmm maybe_loc
-       liftIO $ doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn
-       return (Cmm, dflags, maybe_loc, output_fn)
+           dflags' = flattenLanguageFlags dflags
+       output_fn <- liftIO $ get_output_fn dflags' Cmm maybe_loc
+       liftIO $ doCpp dflags' False{-not raw-} True{-include CC opts-} input_fn output_fn
+       return (Cmm, dflags', maybe_loc, output_fn)
 
 runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
   = do

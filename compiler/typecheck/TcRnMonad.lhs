@@ -233,11 +233,13 @@ getDOpts = do { env <- getTopEnv; return (hsc_dflags env) }
 doptM :: DOpt d => d -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
-setOptM :: DOpt d => d -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = dopt_set (hsc_dflags top) flag}} )
+-- XXX setOptM and unsetOptM operate on different types. One should be renamed.
 
-unsetOptM :: DOpt d => d -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setOptM :: LanguageFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+			 env { env_top = top { hsc_dflags = lopt_set_flattened (hsc_dflags top) flag}} )
+
+unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 

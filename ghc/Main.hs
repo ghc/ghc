@@ -76,8 +76,9 @@ import Data.Maybe
 -- GHC's command-line interface
 
 main :: IO ()
-main =
-    GHC.defaultErrorHandler defaultDynFlags $ do
+main = do
+   hSetBuffering stdout NoBuffering
+   GHC.defaultErrorHandler defaultDynFlags $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 

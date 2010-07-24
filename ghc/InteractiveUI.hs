@@ -657,7 +657,7 @@ runStmt stmt step
       -- a file, otherwise the read buffer can't be flushed).
       _ <- liftIO $ IO.try $ hFlushAll stdin
 #endif
-      result <- GhciMonad.runStmt stmt step
+      result <- withFlattenedDynflags $ GhciMonad.runStmt stmt step
       afterRunStmt (const True) result
 
 --afterRunStmt :: GHC.RunResult -> GHCi Bool
@@ -815,7 +815,8 @@ help _ = io (putStr helpText)
 
 info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
-info s  = handleSourceError GHC.printExceptionAndWarnings $ do
+info s  = handleSourceError GHC.printExceptionAndWarnings $
+          withFlattenedDynflags $ do
              { let names = words s
 	     ; dflags <- getDynFlags
 	     ; let pefas = dopt Opt_PrintExplicitForalls dflags
@@ -856,7 +857,8 @@ runMain :: String -> GHCi ()
 runMain s = case toArgs s of
             Left err   -> io (hPutStrLn stderr err)
             Right args ->
-                do dflags <- getDynFlags
+                withFlattenedDynflags $ do
+                   dflags <- getDynFlags
                    case mainFunIs dflags of
                        Nothing -> doWithArgs args "main"
                        Just f  -> doWithArgs args f
@@ -974,7 +976,8 @@ defineMacro overwrite s = do
   let new_expr = '(' : definition ++ ") :: String -> IO String"
 
   -- compile the expression
-  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $
+   withFlattenedDynflags $ do
     hv <- GHC.compileExpr new_expr
     io (writeIORef macros_ref --
 	(filtered ++ [(macro_name, lift . runMacro hv, noCompletion)]))
@@ -1001,7 +1004,8 @@ undefineMacro str = mapM_ undef (words str)
 cmdCmd :: String -> GHCi ()
 cmdCmd str = do
   let expr = '(' : str ++ ") :: IO String"
-  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $
+   withFlattenedDynflags $ do
     hv <- GHC.compileExpr expr
     cmds <- io $ (unsafeCoerce# hv :: IO String)
     enqueueCommands (lines cmds)
@@ -1084,7 +1088,7 @@ afterLoad ok retain_context prev_context = do
       loaded_mod_names = map GHC.moduleName loaded_mods
   modulesLoadedMsg ok loaded_mod_names
 
-  lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
+  withFlattenedDynflags $ lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
 
 setContextAfterLoad :: ([Module],[(Module, Maybe (ImportDecl RdrName))]) -> Bool -> [GHC.ModSummary] -> GHCi ()
@@ -1164,7 +1168,9 @@ modulesLoadedMsg ok mods = do
 
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str 
-  = handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+  = handleSourceError (\e -> GHC.printExceptionAndWarnings e)
+  $ withFlattenedDynflags
+  $ do
        ty <- GHC.exprType str
        dflags <- getDynFlags
        let pefas = dopt Opt_PrintExplicitForalls dflags
@@ -1172,7 +1178,9 @@ typeOfExpr str
 
 kindOfType :: String -> InputT GHCi ()
 kindOfType str 
-  = handleSourceError (\e -> GHC.printExceptionAndWarnings e) $ do
+  = handleSourceError (\e -> GHC.printExceptionAndWarnings e)
+  $ withFlattenedDynflags
+  $ do
        ty <- GHC.typeKind str
        printForUser $ text str <+> dcolon <+> ppr ty
 
@@ -1181,6 +1189,13 @@ quit _ = return True
 
 shellEscape :: String -> GHCi Bool
 shellEscape str = io (system str >> return False)
+
+withFlattenedDynflags :: GHC.GhcMonad m => m a -> m a
+withFlattenedDynflags m
+    = do dflags <- GHC.getSessionDynFlags
+         gbracket (GHC.setSessionDynFlags (ensureFlattenedLanguageFlags dflags))
+                  (\_ -> GHC.setSessionDynFlags dflags)
+                  (\_ -> m)
 
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
@@ -1210,7 +1225,7 @@ browseCmd bang m =
 --            indicate import modules, to aid qualifying unqualified names
 -- with sorted, sort items alphabetically
 browseModule :: Bool -> Module -> Bool -> InputT GHCi ()
-browseModule bang modl exports_only = do
+browseModule bang modl exports_only = withFlattenedDynflags $ do
   -- :browse! reports qualifiers wrt current context
   current_unqual <- GHC.getPrintUnqual
   -- Temporarily set the context to the module we're interested in,
@@ -1323,6 +1338,7 @@ setContext str
 
 playCtxtCmd:: Bool -> CtxtCmd -> GHCi ()
 playCtxtCmd fail cmd = do
+  withFlattenedDynflags $ do
     (prev_as,prev_bs) <- GHC.getContext
     case cmd of
         SetContext as bs -> do
@@ -1850,7 +1866,7 @@ forceCmd  = pprintCommand False True
 
 pprintCommand :: Bool -> Bool -> String -> GHCi ()
 pprintCommand bind force str = do
-  pprintClosureCommand bind force str
+  withFlattenedDynflags $ pprintClosureCommand bind force str
 
 stepCmd :: String -> GHCi ()
 stepCmd []         = doContinue (const True) GHC.SingleStep
@@ -1981,7 +1997,7 @@ forwardCmd = noArgs $ do
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
 breakCmd argLine = do
-   breakSwitch $ words argLine
+   withFlattenedDynflags $ breakSwitch $ words argLine
 
 breakSwitch :: [String] -> GHCi ()
 breakSwitch [] = do
@@ -2114,7 +2130,10 @@ end_bold :: String
 end_bold   = "\ESC[0m"
 
 listCmd :: String -> InputT GHCi ()
-listCmd "" = do
+listCmd c = withFlattenedDynflags $ listCmd' c
+
+listCmd' :: String -> InputT GHCi ()
+listCmd' "" = do
    mb_span <- lift getCurrentBreakSpan
    case mb_span of
       Nothing ->
@@ -2133,7 +2152,7 @@ listCmd "" = do
                         printForUser (text "Unable to list source for" <+>
                                       ppr span
                                    $$ text "Try" <+> doWhat)
-listCmd str = list2 (words str)
+listCmd' str = list2 (words str)
 
 list2 :: [String] -> InputT GHCi ()
 list2 [arg] | all isDigit arg = do
