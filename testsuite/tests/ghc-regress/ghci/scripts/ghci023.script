@@ -1,10 +1,10 @@
 putStrLn "-- testing ghci multiline commands :{ .. :}"
 putStrLn "-- via stdin"
 :{
-  let 
+  let
   { f 0 = 1
   ; f 1 = w
-    where { w = 2 } 
+    where { w = 2 }
   ; y = 3
   }
 :}
