@@ -1,7 +1,7 @@
 
 tcfail126.hs:20:15:
     Couldn't match expected type `forall (m :: * -> *).
-				  (Monad m) =>
+				  Monad m =>
 				  Bar m'
 	   against inferred type `Bar m'
     In the pattern: Bar run op
