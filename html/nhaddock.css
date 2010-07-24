@@ -177,29 +177,31 @@ div#style-menu-holder {
   position: absolute;
   z-index: 1;
   overflow: visible;
-  background: rgb(41,56,69);
-/* 	background-color: #eaeaea; */
+  background: #374c5e;
   margin: 0;
-  width: 6em;
   text-align: center;
   right: 0;
-  padding: 0 2px 1px;
-  border-left: 1px solid #919191;
-  border-right: 1px solid #919191;
-  border-bottom: 1px solid #919191;
+  padding: 0;
+  top: 1.25em;
 }
 
 #style-menu li {
 	display: list-item;
 	border-style: none;
 	margin: 0;
-	padding: 3px;
+	padding: 0;
 	color: #000;
 	list-style-type: none;
 }
 
 #style-menu li + li {
 	border-top: 1px solid #919191;
+}
+
+#style-menu a {
+  width: 6em;
+  padding: 3px;
+  display: block;
 }
 
 #footer {
@@ -220,7 +222,7 @@ div#style-menu-holder {
   clear: right;
   background: rgb(239,238,209);
   border: 1px solid rgba(196,69,29,0.2);
-  font-size: 75%;
+  font-size: 80%;
   padding: 0.5em 1em;
   position: relative;
   top: 0em; /* use -5em to pull up into title area */
@@ -254,7 +256,7 @@ div#style-menu-holder {
   height: 80%;
   top: 5em;
   padding: 0;
-  background-color: #fcfcb0;
+  background-color: #fff2b2;
 }
 
 #synopsis:hover {
@@ -265,7 +267,7 @@ div#style-menu-holder {
 #synopsis .caption,
 #synopsis ul,
 #synopsis ul li.src {
-  background-color: #fcfcb0;
+  background-color: #fff2b2;
   white-space: nowrap;
 }
 
@@ -326,8 +328,8 @@ div#style-menu-holder {
   float: right;
   width: 90%;
   display: block;
-  margin: 1px 0;
   padding-left: 0.5em;
+  margin-bottom: 0.5em;
 }
 
 #interface dd p {
@@ -358,6 +360,15 @@ div.top .subs, div.top .doc {
 */
 /* @end */
 
+.arguments {
+  margin-top: -0.4em;
+}
+.arguments .caption {
+  display: none;
+}
+
+.fields { padding-left: 1em; }
+
 .fields .caption { display: none; }
 
 .fields p { margin: 0 0; }
@@ -369,14 +380,14 @@ div.top .subs, div.top .doc {
 }
 */
 
-.fields { padding-left: 1em; }
-
 /* @end */
 
 /* @group Auxillary Pages */
 
 #mini {
   font-size: 75%;
+  margin: 0 auto;
+  padding: 0 1em;
 }
 
 #mini #module-header .caption {

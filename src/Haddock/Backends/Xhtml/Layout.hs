@@ -109,8 +109,6 @@ divSubDecls cssClass captionName = maybe noHtml wrap
     subSection = thediv ! [theclass $ unwords ["subs", cssClass]]
     subCaption = paragraph ! [theclass "caption"] << captionName
 
-{-
-  if we ever decide to style sub-declarations with dl lists, this code does it
 
 subDlist :: [SubDecl] -> Maybe Html
 subDlist [] = Nothing
@@ -125,7 +123,6 @@ subDlist decls = Just $ dlist << map subEntry decls +++ clearDiv
     ma       `with` bs = ma +++ bs
     
     clearDiv = thediv ! [ theclass "clear" ] << noHtml
--}
 
 
 subTable :: [SubDecl] -> Maybe Html
@@ -157,7 +154,7 @@ subConstructors = divSubDecls "constructors" "Constructors" . subTable
 
 
 subFields :: [SubDecl] -> Html
-subFields = divSubDecls "fields" "Fields" . subTable
+subFields = divSubDecls "fields" "Fields" . subDlist
 
 
 subInstances :: String -> [SubDecl] -> Html
