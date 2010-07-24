@@ -45,7 +45,7 @@ module DynFlags (
         parseDynamicNoPackageFlags,
         allFlags,
 
-        supportedExtensions, extensionOptions,
+        supportedLanguagesAndExtensions,
 
         -- ** DynFlag C compiler options
         machdepCCOpts, picCCOpts,
@@ -272,6 +272,8 @@ data DynFlag
 
    deriving (Eq, Show)
 
+data Language = Haskell98 | Haskell2010
+
 data ExtensionFlag
    = Opt_Cpp
    | Opt_OverlappingInstances
@@ -477,6 +479,7 @@ data DynFlags = DynFlags {
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
+  language              :: Maybe Language,
   extensionFlags        :: Either [OnOff ExtensionFlag]
                                   [ExtensionFlag],
 
@@ -730,6 +733,7 @@ defaultDynFlags =
                     -- The default -O0 options
             ++ standardWarnings,
 
+        language = Nothing,
         extensionFlags = Left [],
 
         log_action = \severity srcSpan style msg ->
@@ -763,7 +767,7 @@ flattenExtensionFlags dflags
     = case extensionFlags dflags of
       Left onoffs ->
           dflags {
-              extensionFlags = Right $ flattenExtensionFlags' onoffs
+              extensionFlags = Right $ flattenExtensionFlags' (language dflags) onoffs
           }
       Right _ ->
           panic "Flattening already-flattened extension flags"
@@ -773,27 +777,39 @@ ensureFlattenedExtensionFlags dflags
     = case extensionFlags dflags of
       Left onoffs ->
           dflags {
-              extensionFlags = Right $ flattenExtensionFlags' onoffs
+              extensionFlags = Right $ flattenExtensionFlags' (language dflags) onoffs
           }
       Right _ ->
           dflags
 
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
-flattenExtensionFlags' :: [OnOff ExtensionFlag] -> [ExtensionFlag]
-flattenExtensionFlags' = foldr f defaultExtensionFlags
+flattenExtensionFlags' :: Maybe Language -> [OnOff ExtensionFlag]
+                       -> [ExtensionFlag]
+flattenExtensionFlags' ml = foldr f defaultExtensionFlags
     where f (On f)  flags = f : delete f flags
           f (Off f) flags =     delete f flags
-          defaultExtensionFlags = [
-            Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
-                                -- behaviour the default, to see if anyone notices
-                                -- SLPJ July 06
+          defaultExtensionFlags = languageExtensions ml
 
-            Opt_ImplicitPrelude,
-            Opt_MonomorphismRestriction,
-            Opt_NPlusKPatterns,
-            Opt_DatatypeContexts
-            ]
+languageExtensions :: Maybe Language -> [ExtensionFlag]
+languageExtensions Nothing
+    = Opt_MonoPatBinds   -- Experimentally, I'm making this non-standard
+                         -- behaviour the default, to see if anyone notices
+                         -- SLPJ July 06
+    : languageExtensions (Just Haskell2010)
+languageExtensions (Just Haskell98)
+    = [Opt_ImplicitPrelude,
+       Opt_MonomorphismRestriction,
+       Opt_NPlusKPatterns,
+       Opt_DatatypeContexts]
+languageExtensions (Just Haskell2010)
+    = [Opt_ImplicitPrelude,
+       Opt_MonomorphismRestriction,
+       Opt_DatatypeContexts,
+       Opt_EmptyDataDecls,
+       Opt_ForeignFunctionInterface,
+       Opt_PatternGuards,
+       Opt_RelaxedPolyRec]
 
 -- The DOpt class is a temporary workaround, to avoid having to do
 -- a mass-renaming dopt->lopt at the moment
@@ -1530,6 +1546,7 @@ dynamic_flags = [
  ++ map (mkFlag False "fno-" unSetExtensionFlag) fLangFlags
  ++ map (mkFlag True  "X"    setExtensionFlag  ) xFlags
  ++ map (mkFlag False "XNo"  unSetExtensionFlag) xFlags
+ ++ map (mkFlag True  "X"    setLanguage  ) languageFlags
 
 package_flags :: [Flag DynP]
 package_flags = [
@@ -1687,12 +1704,21 @@ fLangFlags = [
     deprecatedForExtension "IncoherentInstances" )
   ]
 
+supportedLanguages :: [String]
+supportedLanguages = [ name | (name, _, _) <- languageFlags ]
+
 supportedExtensions :: [String]
 supportedExtensions = [ name' | (name, _, _) <- xFlags, name' <- [name, "No" ++ name] ]
 
--- This may contain duplicates
-extensionOptions :: [ExtensionFlag]
-extensionOptions = [ langFlag | (_, langFlag, _) <- xFlags ]
+supportedLanguagesAndExtensions :: [String]
+supportedLanguagesAndExtensions = supportedLanguages ++ supportedExtensions
+
+-- | These -X<blah> flags cannot be reversed with -XNo<blah>
+languageFlags :: [(String, Language, Bool -> Deprecated)]
+languageFlags = [
+  ( "Haskell98",                        Haskell98, const Supported ),
+  ( "Haskell2010",                      Haskell2010, const Supported )
+  ]
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [(String, ExtensionFlag, Bool -> Deprecated)]
@@ -1921,6 +1947,10 @@ upd f = do
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
 setDynFlag f = upd (\dfs -> dopt_set dfs f)
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
+
+--------------------------
+setLanguage :: Language -> DynP ()
+setLanguage l = upd (\dfs -> dfs { language = Just l })
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()

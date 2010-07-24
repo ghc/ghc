@@ -266,7 +266,7 @@ checkExtension (L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
  =  let ext' = unpackFS ext in
-    if ext' `elem` supportedExtensions
+    if ext' `elem` supportedLanguagesAndExtensions
     then L l ("-X"++ext')
     else unsupportedExtnError l ext'
 
@@ -285,7 +285,7 @@ unsupportedExtnError loc unsup =
     mkPlainErrMsg loc $
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
-  where suggestions = fuzzyMatch unsup supportedExtensions
+  where suggestions = fuzzyMatch unsup supportedLanguagesAndExtensions
 
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages

@@ -677,7 +677,7 @@ showInfo dflags = do
           flatten (k, FromDynFlags f) = (k, f dflags)
 
 showSupportedExtensions :: IO ()
-showSupportedExtensions = mapM_ putStrLn supportedExtensions
+showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
 
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
