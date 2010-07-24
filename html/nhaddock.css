@@ -13,11 +13,8 @@ body {
   font-family: sans-serif;
   background: white;
   color: black;
-  margin: 0 auto;
-  max-width: 50em;
   text-align: left;
   line-height: 1.4;
-  padding: 0 1em;
 }
 
 p { margin: 0.5em 0; }
@@ -111,8 +108,14 @@ img.coll {
 
 /* @group Page Structure */
 
+#content {
+  max-width: 50em;
+  margin: 0 auto;
+  padding: 0 1em;
+}
+
 #package-header {
-  background: rgb(41,56,69) url(hslogo-16.png) no-repeat 5px;
+  background: rgb(41,56,69);
   border-top: 5px solid rgb(78,98,114);
   color: #ddd;
   padding: 5px;
@@ -120,14 +123,18 @@ img.coll {
   text-align: left;
 }
 
-#package-header a:link, #package-header a:visited { color: white; }
-#package-header a:hover { background: rgb(78,98,114); }
 #package-header .caption {
+  background: url(hslogo-16.png) no-repeat 0em;
   color: white;
-  margin: 0 0 0 30px;
+  max-width: 48em;
+  margin: 0 auto;
   font-weight: normal;
   font-style: normal;
+  padding-left: 2em;
 }
+
+#package-header a:link, #package-header a:visited { color: white; }
+#package-header a:hover { background: rgb(78,98,114); }
 
 #module-header .caption {
   color: rgb(78,98,114);
