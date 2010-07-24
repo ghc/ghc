@@ -1,4 +1,6 @@
--- Both sets should fail, without -fglasgow-exts
+-- Both sets should fail in Haskell98
+
+{-# LANGUAGE Haskell98 #-}
 
 module ShouldCompile where
 
