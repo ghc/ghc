@@ -36,7 +36,7 @@ import TyCon
 import DataCon
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
-import DynFlags	( DynFlag( Opt_GADTs ) )
+import DynFlags
 import SrcLoc
 import ErrUtils
 import Util

@@ -28,7 +28,7 @@ import RnPat          (rnPats, rnBindPat,
                       )
                       
 import RnEnv
-import DynFlags	( DynFlag(..) )
+import DynFlags
 import Name
 import NameEnv
 import NameSet

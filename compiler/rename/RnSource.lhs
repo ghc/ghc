@@ -46,7 +46,7 @@ import Bag
 import FastString
 import Util		( filterOut )
 import SrcLoc
-import DynFlags	        ( DynFlag(..), DynFlags, thisPackage )
+import DynFlags
 import HscTypes		( HscEnv, hsc_dflags )
 import BasicTypes       ( Boxity(..) )
 import ListSetOps       ( findDupsEq )

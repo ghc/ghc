@@ -40,7 +40,7 @@ import TcRnMonad
 import TcHsSyn		( hsOverLitName )
 import RnEnv
 import RnTypes
-import DynFlags		( DynFlag(..) )
+import DynFlags
 import PrelNames
 import Constants	( mAX_TUPLE_SIZE )
 import Name

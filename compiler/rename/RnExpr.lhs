@@ -30,7 +30,7 @@ import RnEnv
 import RnTypes		( rnHsTypeFVs, rnSplice, checkTH,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
 import RnPat
-import DynFlags		( DynFlag(..) )
+import DynFlags
 import BasicTypes	( FixityDirection(..) )
 import PrelNames
 

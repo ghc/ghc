@@ -977,7 +977,7 @@ cond_functorOK allowFunctions (dflags, rep_tc)
     functions 	= ptext (sLit "contains function types")
     wrong_arg 	= ptext (sLit "uses the type variable in an argument other than the last")
 
-checkFlag :: DynFlag -> Condition
+checkFlag :: LanguageFlag -> Condition
 checkFlag flag (dflags, _)
   | dopt flag dflags = Nothing
   | otherwise        = Just why

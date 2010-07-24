@@ -1403,15 +1403,13 @@ setCmd ""
           ))
        io $ putStrLn (showSDoc (
           vcat (text "other dynamic, non-language, flag settings:" 
-               :map (flagSetting dflags) nonLanguageDynFlags)
+               :map (flagSetting dflags) others)
           ))
   where flagSetting dflags (str, f, _)
           | dopt f dflags = text "  " <> text "-f"    <> text str
           | otherwise     = text "  " <> text "-fno-" <> text str
         (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flags)
                                         DynFlags.fFlags
-        nonLanguageDynFlags = filterOut (\(_, f, _) -> f `elem` languageOptions)
-                                        others
         flags = [Opt_PrintExplicitForalls
                 ,Opt_PrintBindResult
                 ,Opt_BreakOnException

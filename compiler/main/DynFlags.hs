@@ -11,7 +11,9 @@
 -- flags.  Dynamic flags can also be set at the prompt in GHCi.
 module DynFlags (
         -- * Dynamic flags and associated configuration types
+        DOpt(..),
         DynFlag(..),
+        LanguageFlag(..),
         DynFlags(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         GhcMode(..), isOneShot,
@@ -19,7 +21,7 @@ module DynFlags (
         PackageFlag(..),
         Option(..), showOpt,
         DynLibLoader(..),
-        fFlags, xFlags,
+        fFlags, fLangFlags, xFlags,
         dphPackage,
         wayNames,
 
@@ -27,8 +29,6 @@ module DynFlags (
         defaultDynFlags,                -- DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
 
-        dopt,                           -- DynFlag -> DynFlags -> Bool
-        dopt_set, dopt_unset,           -- DynFlags -> DynFlag -> DynFlags
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlag,
         updOptLevel,
@@ -188,8 +188,88 @@ data DynFlag
    | Opt_WarnWrongDoBind
    | Opt_WarnAlternativeLayoutRuleTransitional
 
+   | Opt_PrintExplicitForalls
 
-   -- language opts
+   -- optimisation opts
+   | Opt_Strictness
+   | Opt_FullLaziness
+   | Opt_FloatIn
+   | Opt_Specialise
+   | Opt_StaticArgumentTransformation
+   | Opt_CSE
+   | Opt_LiberateCase
+   | Opt_SpecConstr
+   | Opt_DoLambdaEtaExpansion
+   | Opt_IgnoreAsserts
+   | Opt_DoEtaReduction
+   | Opt_CaseMerge
+   | Opt_UnboxStrictFields
+   | Opt_MethodSharing
+   | Opt_DictsCheap
+   | Opt_EnableRewriteRules		-- Apply rewrite rules during simplification
+   | Opt_Vectorise
+   | Opt_RegsGraph                      -- do graph coloring register allocation
+   | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
+
+   -- Interface files
+   | Opt_IgnoreInterfacePragmas
+   | Opt_OmitInterfacePragmas
+   | Opt_ExposeAllUnfoldings
+
+   -- profiling opts
+   | Opt_AutoSccsOnAllToplevs
+   | Opt_AutoSccsOnExportedToplevs
+   | Opt_AutoSccsOnIndividualCafs
+
+   -- misc opts
+   | Opt_Pp
+   | Opt_ForceRecomp
+   | Opt_DryRun
+   | Opt_DoAsmMangling
+   | Opt_ExcessPrecision
+   | Opt_EagerBlackHoling
+   | Opt_ReadUserPackageConf
+   | Opt_NoHsMain
+   | Opt_RtsOptsEnabled
+   | Opt_SplitObjs
+   | Opt_StgStats
+   | Opt_HideAllPackages
+   | Opt_PrintBindResult
+   | Opt_Haddock
+   | Opt_HaddockOptions
+   | Opt_Hpc_No_Auto
+   | Opt_BreakOnException
+   | Opt_BreakOnError
+   | Opt_PrintEvldWithShow
+   | Opt_PrintBindContents
+   | Opt_GenManifest
+   | Opt_EmbedManifest
+   | Opt_EmitExternalCore
+   | Opt_SharedImplib
+   | Opt_BuildingCabalPackage
+   | Opt_SSE2
+
+	-- temporary flags
+   | Opt_RunCPS
+   | Opt_RunCPSZ
+   | Opt_ConvertToZipCfgAndBack
+   | Opt_AutoLinkPackages
+   | Opt_ImplicitImportQualified
+   | Opt_TryNewCodeGen
+
+   -- keeping stuff
+   | Opt_KeepHiDiffs
+   | Opt_KeepHcFiles
+   | Opt_KeepSFiles
+   | Opt_KeepRawSFiles
+   | Opt_KeepTmpFiles
+   | Opt_KeepRawTokenStream
+   | Opt_KeepLlvmFiles
+
+   deriving (Eq, Show)
+
+data LanguageFlag
+   = Opt_Cpp
    | Opt_OverlappingInstances
    | Opt_UndecidableInstances
    | Opt_IncoherentInstances
@@ -257,86 +337,6 @@ data DynFlag
    | Opt_AlternativeLayoutRule
    | Opt_AlternativeLayoutRuleTransitional
    | Opt_DatatypeContexts
-
-   | Opt_PrintExplicitForalls
-
-   -- optimisation opts
-   | Opt_Strictness
-   | Opt_FullLaziness
-   | Opt_FloatIn
-   | Opt_Specialise
-   | Opt_StaticArgumentTransformation
-   | Opt_CSE
-   | Opt_LiberateCase
-   | Opt_SpecConstr
-   | Opt_DoLambdaEtaExpansion
-   | Opt_IgnoreAsserts
-   | Opt_DoEtaReduction
-   | Opt_CaseMerge
-   | Opt_UnboxStrictFields
-   | Opt_MethodSharing
-   | Opt_DictsCheap
-   | Opt_EnableRewriteRules		-- Apply rewrite rules during simplification
-   | Opt_Vectorise
-   | Opt_RegsGraph                      -- do graph coloring register allocation
-   | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
-
-   -- Interface files
-   | Opt_IgnoreInterfacePragmas
-   | Opt_OmitInterfacePragmas
-   | Opt_ExposeAllUnfoldings
-
-   -- profiling opts
-   | Opt_AutoSccsOnAllToplevs
-   | Opt_AutoSccsOnExportedToplevs
-   | Opt_AutoSccsOnIndividualCafs
-
-   -- misc opts
-   | Opt_Cpp
-   | Opt_Pp
-   | Opt_ForceRecomp
-   | Opt_DryRun
-   | Opt_DoAsmMangling
-   | Opt_ExcessPrecision
-   | Opt_EagerBlackHoling
-   | Opt_ReadUserPackageConf
-   | Opt_NoHsMain
-   | Opt_RtsOptsEnabled
-   | Opt_SplitObjs
-   | Opt_StgStats
-   | Opt_HideAllPackages
-   | Opt_PrintBindResult
-   | Opt_Haddock
-   | Opt_HaddockOptions
-   | Opt_Hpc_No_Auto
-   | Opt_BreakOnException
-   | Opt_BreakOnError
-   | Opt_PrintEvldWithShow
-   | Opt_PrintBindContents
-   | Opt_GenManifest
-   | Opt_EmbedManifest
-   | Opt_EmitExternalCore
-   | Opt_SharedImplib
-   | Opt_BuildingCabalPackage
-   | Opt_SSE2
-
-	-- temporary flags
-   | Opt_RunCPS
-   | Opt_RunCPSZ
-   | Opt_ConvertToZipCfgAndBack
-   | Opt_AutoLinkPackages
-   | Opt_ImplicitImportQualified
-   | Opt_TryNewCodeGen
-
-   -- keeping stuff
-   | Opt_KeepHiDiffs
-   | Opt_KeepHcFiles
-   | Opt_KeepSFiles
-   | Opt_KeepRawSFiles
-   | Opt_KeepTmpFiles
-   | Opt_KeepRawTokenStream
-   | Opt_KeepLlvmFiles
-
    deriving (Eq, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -473,6 +473,7 @@ data DynFlags = DynFlags {
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
+  languageFlags         :: [LanguageFlag],
 
   -- | Message output action: use "ErrUtils" instead of this if you can
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
@@ -710,15 +711,6 @@ defaultDynFlags =
             Opt_AutoLinkPackages,
             Opt_ReadUserPackageConf,
 
-            Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
-                                -- behaviour the default, to see if anyone notices
-                                -- SLPJ July 06
-
-            Opt_ImplicitPrelude,
-            Opt_MonomorphismRestriction,
-            Opt_NPlusKPatterns,
-            Opt_DatatypeContexts,
-
             Opt_MethodSharing,
 
             Opt_DoAsmMangling,
@@ -732,6 +724,17 @@ defaultDynFlags =
             ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
                     -- The default -O0 options
             ++ standardWarnings,
+
+        languageFlags = [
+            Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
+                                -- behaviour the default, to see if anyone notices
+                                -- SLPJ July 06
+
+            Opt_ImplicitPrelude,
+            Opt_MonomorphismRestriction,
+            Opt_NPlusKPatterns,
+            Opt_DatatypeContexts
+            ],
 
         log_action = \severity srcSpan style msg ->
                         case severity of
@@ -756,17 +759,46 @@ Note [Verbosity levels]
     5   |   "ghc -v -ddump-all"
 -}
 
+-- The DOpt class is a temporary workaround, to avoid having to do
+-- a mass-renaming dopt->lopt at the moment
+class DOpt a where
+    dopt :: a -> DynFlags -> Bool
+    dopt_set :: DynFlags -> a -> DynFlags
+    dopt_unset :: DynFlags -> a -> DynFlags
+
+instance DOpt DynFlag where
+    dopt = dopt'
+    dopt_set = dopt_set'
+    dopt_unset = dopt_unset'
+
+instance DOpt LanguageFlag where
+    dopt = lopt
+    dopt_set = lopt_set
+    dopt_unset = lopt_unset
+
 -- | Test whether a 'DynFlag' is set
-dopt :: DynFlag -> DynFlags -> Bool
-dopt f dflags  = f `elem` (flags dflags)
+dopt' :: DynFlag -> DynFlags -> Bool
+dopt' f dflags  = f `elem` (flags dflags)
 
 -- | Set a 'DynFlag'
-dopt_set :: DynFlags -> DynFlag -> DynFlags
-dopt_set dfs f = dfs{ flags = f : flags dfs }
+dopt_set' :: DynFlags -> DynFlag -> DynFlags
+dopt_set' dfs f = dfs{ flags = f : flags dfs }
 
 -- | Unset a 'DynFlag'
-dopt_unset :: DynFlags -> DynFlag -> DynFlags
-dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
+dopt_unset' :: DynFlags -> DynFlag -> DynFlags
+dopt_unset' dfs f = dfs{ flags = filter (/= f) (flags dfs) }
+
+-- | Test whether a 'LanguageFlag' is set
+lopt :: LanguageFlag -> DynFlags -> Bool
+lopt f dflags  = f `elem` languageFlags dflags
+
+-- | Set a 'LanguageFlag'
+lopt_set :: DynFlags -> LanguageFlag -> DynFlags
+lopt_set dfs f = dfs{ languageFlags = f : languageFlags dfs }
+
+-- | Unset a 'LanguageFlag'
+lopt_unset :: DynFlags -> LanguageFlag -> DynFlags
+lopt_unset dfs f = dfs{ languageFlags = filter (/= f) (languageFlags dfs) }
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -1023,15 +1055,17 @@ allFlags = map ('-':) $
            [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
            map ("fno-"++) flags ++
            map ("f"++) flags ++
+           map ("f"++) flags' ++
            map ("X"++) supportedLanguages
     where ok (PrefixPred _ _) = False
           ok _ = True
           flags = [ name | (name, _, _) <- fFlags ]
+          flags' = [ name | (name, _, _) <- fLangFlags ]
 
 dynamic_flags :: [Flag DynP]
 dynamic_flags = [
     Flag "n"              (NoArg  (setDynFlag Opt_DryRun)) Supported
-  , Flag "cpp"            (NoArg  (setDynFlag Opt_Cpp)) Supported
+  , Flag "cpp"            (NoArg  (setLanguageFlag Opt_Cpp)) Supported
   , Flag "F"              (NoArg  (setDynFlag Opt_Pp)) Supported
   , Flag "#include"       (HasArg (addCmdlineHCInclude))
                              (DeprecatedFullText "-#include and INCLUDE pragmas are deprecated: They no longer have any effect")
@@ -1427,15 +1461,17 @@ dynamic_flags = [
   , Flag "fbyte-code"       (NoArg (setTarget HscInterpreted)) Supported
   , Flag "fobject-code"     (NoArg (setTarget defaultHscTarget)) Supported
 
-  , Flag "fglasgow-exts"    (NoArg (mapM_ setDynFlag   glasgowExtsFlags))
+  , Flag "fglasgow-exts"    (NoArg enableGlasgowExts)
          Supported
-  , Flag "fno-glasgow-exts" (NoArg (mapM_ unSetDynFlag glasgowExtsFlags))
+  , Flag "fno-glasgow-exts" (NoArg disableGlasgowExts)
          Supported
  ]
  ++ map (mkFlag True  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag False "fno-" unSetDynFlag) fFlags
- ++ map (mkFlag True  "X"    setDynFlag  ) xFlags
- ++ map (mkFlag False "XNo"  unSetDynFlag) xFlags
+ ++ map (mkFlag True  "f"    setLanguageFlag  ) fLangFlags
+ ++ map (mkFlag False "fno-" unSetLanguageFlag) fLangFlags
+ ++ map (mkFlag True  "X"    setLanguageFlag  ) xFlags
+ ++ map (mkFlag False "XNo"  unSetLanguageFlag) xFlags
 
 package_flags :: [Flag DynP]
 package_flags = [
@@ -1457,11 +1493,11 @@ package_flags = [
 
 mkFlag :: Bool                  -- ^ True <=> it should be turned on
        -> String                -- ^ The flag prefix
-       -> (DynFlag -> DynP ())
-       -> (String, DynFlag, Bool -> Deprecated)
+       -> (flag -> DynP ())
+       -> (String, flag, Bool -> Deprecated)
        -> Flag DynP
-mkFlag turnOn flagPrefix f (name, dynflag, deprecated)
-    = Flag (flagPrefix ++ name) (NoArg (f dynflag)) (deprecated turnOn)
+mkFlag turnOn flagPrefix f (name, flag, deprecated)
+    = Flag (flagPrefix ++ name) (NoArg (f flag)) (deprecated turnOn)
 
 deprecatedForLanguage :: String -> Bool -> Deprecated
 deprecatedForLanguage lang turn_on
@@ -1548,6 +1584,17 @@ fFlags = [
   ( "vectorise",                        Opt_Vectorise, const Supported ),
   ( "regs-graph",                       Opt_RegsGraph, const Supported ),
   ( "regs-iterative",                   Opt_RegsIterative, const Supported ),
+  ( "gen-manifest",                     Opt_GenManifest, const Supported ),
+  ( "embed-manifest",                   Opt_EmbedManifest, const Supported ),
+  ( "ext-core",                         Opt_EmitExternalCore, const Supported ),
+  ( "shared-implib",                    Opt_SharedImplib, const Supported ),
+  ( "building-cabal-package",           Opt_BuildingCabalPackage, const Supported ),
+  ( "implicit-import-qualified",        Opt_ImplicitImportQualified, const Supported )
+  ]
+
+-- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
+fLangFlags :: [(String, LanguageFlag, Bool -> Deprecated)]
+fLangFlags = [
   ( "th",                               Opt_TemplateHaskell,
     deprecatedForLanguage "TemplateHaskell" ),
   ( "fi",                               Opt_ForeignFunctionInterface,
@@ -1579,24 +1626,18 @@ fFlags = [
   ( "allow-undecidable-instances",      Opt_UndecidableInstances,
     deprecatedForLanguage "UndecidableInstances" ),
   ( "allow-incoherent-instances",       Opt_IncoherentInstances,
-    deprecatedForLanguage "IncoherentInstances" ),
-  ( "gen-manifest",                     Opt_GenManifest, const Supported ),
-  ( "embed-manifest",                   Opt_EmbedManifest, const Supported ),
-  ( "ext-core",                         Opt_EmitExternalCore, const Supported ),
-  ( "shared-implib",                    Opt_SharedImplib, const Supported ),
-  ( "building-cabal-package",           Opt_BuildingCabalPackage, const Supported ),
-  ( "implicit-import-qualified",        Opt_ImplicitImportQualified, const Supported )
+    deprecatedForLanguage "IncoherentInstances" )
   ]
 
 supportedLanguages :: [String]
 supportedLanguages = [ name' | (name, _, _) <- xFlags, name' <- [name, "No" ++ name] ]
 
 -- This may contain duplicates
-languageOptions :: [DynFlag]
-languageOptions = [ dynFlag | (_, dynFlag, _) <- xFlags ]
+languageOptions :: [LanguageFlag]
+languageOptions = [ langFlag | (_, langFlag, _) <- xFlags ]
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
-xFlags :: [(String, DynFlag, Bool -> Deprecated)]
+xFlags :: [(String, LanguageFlag, Bool -> Deprecated)]
 xFlags = [
   ( "CPP",                              Opt_Cpp, const Supported ),
   ( "PostfixOperators",                 Opt_PostfixOperators, const Supported ),
@@ -1680,7 +1721,7 @@ xFlags = [
     const $ Deprecated "The new qualified operator syntax was rejected by Haskell'" )
   ]
 
-impliedFlags :: [(DynFlag, DynFlag)]
+impliedFlags :: [(LanguageFlag, LanguageFlag)]
 impliedFlags
   = [ (Opt_RankNTypes,                Opt_ExplicitForAll)
     , (Opt_Rank2Types,                Opt_ExplicitForAll)
@@ -1707,10 +1748,17 @@ impliedFlags
     , (Opt_RecordWildCards,     Opt_DisambiguateRecordFields)
   ]
 
-glasgowExtsFlags :: [DynFlag]
+enableGlasgowExts :: DynP ()
+enableGlasgowExts = do setDynFlag Opt_PrintExplicitForalls
+                       mapM_ setLanguageFlag glasgowExtsFlags
+
+disableGlasgowExts :: DynP ()
+disableGlasgowExts = do unSetDynFlag Opt_PrintExplicitForalls
+                        mapM_ unSetLanguageFlag glasgowExtsFlags
+
+glasgowExtsFlags :: [LanguageFlag]
 glasgowExtsFlags = [
-             Opt_PrintExplicitForalls
-           , Opt_ForeignFunctionInterface
+             Opt_ForeignFunctionInterface
            , Opt_UnliftedFFITypes
            , Opt_GADTs
            , Opt_ImplicitParams
@@ -1813,17 +1861,22 @@ upd f = do
 
 --------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
-setDynFlag f = do { upd (\dfs -> dopt_set dfs f)
-		  ; mapM_ setDynFlag deps }
+setDynFlag f = upd (\dfs -> dopt_set dfs f)
+unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
+
+--------------------------
+setLanguageFlag, unSetLanguageFlag :: LanguageFlag -> DynP ()
+setLanguageFlag f = do { upd (\dfs -> lopt_set dfs f)
+                       ; mapM_ setLanguageFlag deps }
   where
     deps = [ d | (f', d) <- impliedFlags, f' == f ]
         -- When you set f, set the ones it implies
-	-- NB: use setDynFlag recursively, in case the implied flags
-	--     implies further flags
+        -- NB: use setLanguageFlag recursively, in case the implied flags
+        --     implies further flags
         -- When you un-set f, however, we don't un-set the things it implies
         --      (except for -fno-glasgow-exts, which is treated specially)
 
-unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
+unSetLanguageFlag f = upd (\dfs -> lopt_unset dfs f)
 
 --------------------------
 setDumpFlag :: DynFlag -> OptKind DynP

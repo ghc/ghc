@@ -230,19 +230,19 @@ Command-line flags
 getDOpts :: TcRnIf gbl lcl DynFlags
 getDOpts = do { env <- getTopEnv; return (hsc_dflags env) }
 
-doptM :: DynFlag -> TcRnIf gbl lcl Bool
+doptM :: DOpt d => d -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
-setOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setOptM :: DOpt d => d -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_set (hsc_dflags top) flag}} )
 
-unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetOptM :: DOpt d => d -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
-ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifOptM :: DOpt d => d -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 ifOptM flag thing_inside = do { b <- doptM flag; 
 				if b then thing_inside else return () }
 
