@@ -70,7 +70,7 @@ shiftLeft (x, (y:ys)) = (x++ [y], ys)
 shiftRight :: Trit -> Integer -> Trit
 shiftRight (x, xs) 1 = (init x, (u:xs))
 		    where u = last x
-shiftRight (x, xs) (n+1) = shiftRight (init x, (u:xs)) n
+shiftRight (x, xs) n = shiftRight (init x, (u:xs)) (n-1)
  		    where u = last x		    
 		  
 		  

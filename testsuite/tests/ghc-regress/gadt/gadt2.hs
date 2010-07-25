@@ -11,7 +11,7 @@ f (T 0) = True
 f (T n) = False
 
 g :: T -> Ordering
-g (T (n+3)) = if n>0 then GT else EQ
+g (T n) | n >= 3 = if n>3 then GT else EQ
 g (T n)     = LT
 
 main = do   print [f (T 0), f (T 1)]
