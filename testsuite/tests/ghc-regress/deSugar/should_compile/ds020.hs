@@ -1,5 +1,8 @@
 -- !!! ds020 -- lazy patterns (in detail)
 --
+
+{-# LANGUAGE NPlusKPatterns #-}
+
 module ShouldCompile where
 
 a ~([],[],[])    = []
