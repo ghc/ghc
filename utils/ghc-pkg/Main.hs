@@ -38,7 +38,7 @@ import System.Directory ( doesDirectoryExist, getDirectoryContents,
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
-import System.IO.Error (try)
+import System.IO.Error (try, isDoesNotExistError)
 import Data.List
 import Control.Concurrent
 
@@ -719,7 +719,7 @@ changeDBDir verbosity cmds db = do
   do_cmd (RemovePackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
     when (verbosity > Normal) $ putStrLn ("removing " ++ file)
-    removeFile file
+    removeFileSafe file
   do_cmd (AddPackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
     when (verbosity > Normal) $ putStrLn ("writing " ++ file)
@@ -1584,7 +1584,7 @@ withFileAtomic targetFile write_content = do
         `catchIO` \err -> do
           exists <- doesFileExist targetFile
           if exists
-            then do removeFile targetFile
+            then do removeFileSafe targetFile
                     -- Big fat hairy race condition
                     renameFile newFile targetFile
                     -- If the removeFile succeeds and the renameFile fails
@@ -1594,7 +1594,7 @@ withFileAtomic targetFile write_content = do
       renameFile newFile targetFile
 #endif
    `Exception.onException` do hClose newHandle
-                              removeFile newFile
+                              removeFileSafe newFile
   where
     template = targetName <.> "tmp"
     targetDir | null targetDir_ = "."
@@ -1693,3 +1693,9 @@ readUTF8File file = do
   hSetEncoding h utf8
 #endif
   hGetContents h
+
+-- removeFileSave doesn't throw an exceptions, if the file is already deleted
+removeFileSafe :: FilePath -> IO ()
+removeFileSafe fn =
+  removeFile fn `catch` \ e ->
+    when (not $ isDoesNotExistError e) $ ioError e
