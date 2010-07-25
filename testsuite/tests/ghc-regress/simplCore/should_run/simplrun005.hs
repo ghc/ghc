@@ -28,7 +28,7 @@ fib'             =  memo fib
 
 instance Num Nat where
   fromInteger 0        =  Z
-  fromInteger (n + 1)  =  S (fromInteger n)
+  fromInteger n        =  S (fromInteger (n - 1))
   Z + n                =  n
   S m + n              =  S (m + n)
   Z * n                =  Z

@@ -5,6 +5,8 @@
 --         [x <- ((1 * 2) + 3) * 4, undefined]
 -- Note the wrongly-parenthesised expression
 
+{-# LANGUAGE Haskell98 #-}
+
 module ShouldCompile where
 
 main | x <- 1*2+3*4 = x
