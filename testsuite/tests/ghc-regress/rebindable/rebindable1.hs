@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude #-}
+{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude -XNPlusKPatterns #-}
 
 module RebindableCase1 where
 	{
