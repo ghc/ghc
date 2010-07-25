@@ -1,17 +1,26 @@
 // Haddock JavaScript utilities
-function toggle(button,id)
+
+function makeClassToggle(cOn, cOff)
 {
-   var n = document.getElementById(id).style;
-   if (n.display == "none")
-   {
-    button.src = "minus.gif";
-    n.display = "block";
-   }
-   else
-   {
-    button.src = "plus.gif";
-    n.display = "none";
-   }
+  var rOn = new RegExp('\\b'+cOn+'\\b');
+  var rOff = new RegExp('\\b'+cOff+'\\b');
+    
+  return function(e, a) {
+    var c = e.className;
+    if (a == null) { a = rOff.test(c); }
+    if (a) { c = c.replace(rOff, cOn); }
+    else   { c = c.replace(rOn, cOff); }
+    e.className = c;
+  }
+}
+
+toggleClassShow = makeClassToggle("show", "hide");
+toggleClassCollapser = makeClassToggle("collapser", "expander");
+
+function toggleSection(toggler,id)
+{
+  toggleClassShow(document.getElementById(id))
+  toggleClassCollapser(toggler);
 }
 
 
@@ -172,7 +181,6 @@ function resetStyle() {
 
 function styleMenu(show) {
   var m = document.getElementById('style-menu');
-  if (show == null) { show = m.className == "hide"; }
-  m.className = show ? "show" : "hide";
+  toggleClassShow(m, show);
 }
 

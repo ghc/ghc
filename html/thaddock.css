@@ -227,6 +227,17 @@ dd {
 
 .hide {	display: none; }
 .show { }
+.collapser {
+  background: url(minus.gif) no-repeat 0 1.3em;
+}
+.expander {
+  background: url(plus.gif) no-repeat 0 1.3em;
+}
+.collapser, .expander {
+  padding-left: 14px;
+  margin-left: -14px;
+  cursor: pointer;
+}
 
 .top {
     margin:0.4em 0 0 2em;

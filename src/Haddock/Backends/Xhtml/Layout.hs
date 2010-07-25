@@ -158,10 +158,14 @@ subFields = divSubDecls "fields" "Fields" . subDlist
 
 
 subInstances :: String -> [SubDecl] -> Html
-subInstances id_ = divSubDecls "instances" instCaption . instTable
+subInstances id_ = maybe noHtml wrap . instTable
   where
-    instCaption = collapsebutton id_ +++ " Instances"
-    instTable = fmap (thediv ! [identifier id_] <<) . subTable
+    wrap = (subSection <<) . (subCaption +++)
+    instTable = fmap (thediv ! [identifier id_, theclass "show"] <<) . subTable
+    subSection = thediv ! [theclass $ "subs instances"]
+    subCaption = paragraph ! [theclass cs, onclick js] << "Instances"
+    cs = "caption collapser"
+    js = "toggleSection(this,'" ++ id_ ++ "')"
 
 
 subMethods :: [Html] -> Html
