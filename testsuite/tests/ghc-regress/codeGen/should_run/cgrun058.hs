@@ -1,5 +1,5 @@
 -- Not really a code-gen test, but this program gave
--- incorrect results in Hugs (Husg Trac #37), so I 
+-- incorrect results in Hugs (Hugs Trac #37), so I
 -- thought I'd add it to GHC's test suite.
 
 module Main where
@@ -9,7 +9,7 @@ data MInt = Zero | Succ MInt | Pred MInt deriving Show
 tn :: Int -> MInt
 tn x | x<0 = Pred (tn (x+1))
 tn 0     =  Zero
-tn (n+1) = Succ (tn n)
+tn n     = Succ (tn (n - 1))
 
 ti :: MInt -> Int
 ti Zero = 0
