@@ -104,7 +104,7 @@ expr a b c d
   + [4,8..999]
 
 -- HsPat stuff
-f _ x 1 1.93 'c' "dog" ~y z@(Foo a b) (c `Bar` d) [1,2] (3,4) (n+42) = y
+f _ x 1 1.93 'c' "dog" ~y z@(Foo a b) (c `Bar` d) [1,2] (3,4) = y
 
 -- HsLit stuff -- done above
 
