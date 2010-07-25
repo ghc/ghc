@@ -10,6 +10,7 @@
 module Main where
 
 import GHC
+import DynFlags
 import MonadUtils ( MonadIO(..) )
 import BasicTypes ( failed )
 import Bag        ( bagToList )
@@ -43,6 +44,8 @@ main = do
     setContext [mod] []
     liftIO $ hFlush stdout  -- make sure things above are printed before
                             -- interactive output
+    dflags <- getSessionDynFlags
+    setSessionDynFlags $ flattenExtensionFlags dflags
     r <- runStmt "main" RunToCompletion
     case r of
       RunOk _        -> prn "ok"
