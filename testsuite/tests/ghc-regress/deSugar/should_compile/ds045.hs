@@ -1,3 +1,6 @@
+
+{-# LANGUAGE NPlusKPatterns #-}
+
 -- !!! N-plus-K pattern in binding
 
 -- From: Andreas Marth

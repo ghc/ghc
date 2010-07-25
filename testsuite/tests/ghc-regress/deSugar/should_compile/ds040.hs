@@ -1,3 +1,6 @@
+
+{-# LANGUAGE NPlusKPatterns #-}
+
 module ShouldCompile where
 
 -- !!! Another bug in overloaded n+k patts

@@ -13,6 +13,8 @@ error in the code below which disappears when the last line is
 commented out
 -}
 
+{-# LANGUAGE NPlusKPatterns #-}
+
 module ShouldCompile where
 
 --brack :: (Eq a) => a -> a -> [a] -> ([a],[a])

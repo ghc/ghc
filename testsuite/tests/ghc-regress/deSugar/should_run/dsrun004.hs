@@ -1,5 +1,7 @@
 -- Test n+k patterns
 
+{-# LANGUAGE NPlusKPatterns #-}
+
 module Main where
 
 f (n+1) = n

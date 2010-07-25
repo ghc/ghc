@@ -1,5 +1,7 @@
 -- Check overlap in n+k patterns
 
+{-# LANGUAGE NPlusKPatterns #-}
+
 module Foo where
 
 g :: Int -> Int

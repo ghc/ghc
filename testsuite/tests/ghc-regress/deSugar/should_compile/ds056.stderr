@@ -1,4 +1,4 @@
 
-ds056.hs:6:1:
+ds056.hs:8:1:
     Warning: Pattern match(es) are overlapped
 	     In the definition of `g': g _ = ...
