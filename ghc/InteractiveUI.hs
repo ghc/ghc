@@ -1580,7 +1580,7 @@ optToStr RevertCAFs = "r"
 -- code for `:show'
 
 showCmd :: String -> GHCi ()
-showCmd str = do
+showCmd str = withFlattenedDynflags $ do
   st <- getGHCiState
   case words str of
         ["args"]     -> io $ putStrLn (show (args st))
