@@ -1,5 +1,5 @@
 
-tcfail071.hs:9:1:
+tcfail071.hs:11:1:
     Contexts differ in length
       (Use -XRelaxedPolyRec to allow this)
     When matching the contexts of the signatures for
