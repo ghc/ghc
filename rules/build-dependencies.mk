@@ -67,6 +67,12 @@ endif # $1_$2_NO_BUILD_DEPS
 $$($1_$2_depfile_haskell) : $$(UNLIT)
 
 ifneq "$$(NO_INCLUDE_DEPS)" "YES"
+# This next test stops us rebuilding all the dep files when doing e.g.
+# "make 1" in compiler or ghc. If stage is blank (just building normally.
+# so we want all deps), or if $3 is stage-1 (when building stage n, we
+# use stage n-1, so we want any dependencies used by the stage n-1
+# compiler), then we want to include the dependencies.
+ifneq "$$(or $$(if $$(stage),,YES),$$(findstring $3,$$(word $$(stage),0 1 2 3)))" ""
 ifneq "$$(strip $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS))" ""
 include $$($1_$2_depfile_haskell)
 endif
@@ -74,6 +80,7 @@ include $$($1_$2_depfile_c_asm)
 else
 ifeq "$$(DEBUG)" "YES"
 $$(warning not building dependencies in $1)
+endif
 endif
 endif
 
