@@ -1250,20 +1250,27 @@ runPhase LlvmOpt _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
     let dflags  = hsc_dflags hsc_env
     let lo_opts = getOpts dflags opt_lo
     let opt_lvl = max 0 (min 2 $ optLevel dflags)
+    -- don't specify anything if user has specified commands. We do this for
+    -- opt but not llc since opt is very specifically for optimisation passes
+    -- only, so if the user is passing us extra options we assume they know
+    -- what they are doing and don't get in the way.
+    let optFlag = if null lo_opts
+                     then [SysTools.Option (llvmOpts !! opt_lvl)]
+                     else []
 
     output_fn <- get_output_fn dflags LlvmLlc maybe_loc
 
     SysTools.runLlvmOpt dflags
                ([ SysTools.FileOption "" input_fn,
-                    SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.Option "-o",
                     SysTools.FileOption "" output_fn]
-               ++ map SysTools.Option lo_opts)
+                ++ optFlag
+                ++ map SysTools.Option lo_opts)
 
     return (LlvmLlc, dflags, maybe_loc, output_fn)
   where 
-        -- we always run Opt since we rely on it to fix up some pretty
-        -- big deficiencies in the code we generate
+        -- we always (unless -optlo specified) run Opt since we rely on it to
+        -- fix up some pretty big deficiencies in the code we generate
         llvmOpts = ["-mem2reg", "-O1", "-O2"]
 
 
