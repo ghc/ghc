@@ -25,7 +25,7 @@ module Haddock.Backends.Xhtml.Utils (
   hsep,
 
   onclick,
-  collapsebutton, collapseId,
+  collapser, collapseId,
 ) where
 
 
@@ -182,9 +182,11 @@ linkedAnchor n = anchor ! [href ('#':n)]
 -- below to a 'plusFile' and the 'display:block;' to a 'display:none;' when we
 -- use cookies from JavaScript to have a more persistent state.
 
-collapsebutton :: String -> Html
-collapsebutton id_ =
-  image ! [ src "minus.gif", theclass "coll", onclick ("toggle(this,'" ++ id_ ++ "')"), alt "show/hide" ]
+collapser :: String -> String -> [HtmlAttr]
+collapser id_ classes = [ theclass cs, onclick js ]
+  where
+    cs = unwords (words classes ++ ["collapser"])
+    js = "toggleSection(this,'" ++ id_ ++ "')"
 
 
 -- A quote is a valid part of a Haskell identifier, but it would interfere with

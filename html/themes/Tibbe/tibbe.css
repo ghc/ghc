@@ -227,11 +227,22 @@ dd {
 
 .hide {	display: none; }
 .show { }
+
 .collapser {
-  background: url(minus.gif) no-repeat 0 1.3em;
+  background-image: url(minus.gif);
+  background-repeat: no-repeat;
 }
 .expander {
-  background: url(plus.gif) no-repeat 0 1.3em;
+  background-image: url(plus.gif);
+  background-repeat: no-repeat;
+}
+span.module.collapser,
+span.module.expander {
+  background-position: 0 0.3em;
+}
+p.caption.collapser,
+p.caption.expander {
+  background-position: 0 1.3em;
 }
 .collapser, .expander {
   padding-left: 14px;

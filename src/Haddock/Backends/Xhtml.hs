@@ -279,13 +279,13 @@ mkNodeList ss p ts = case ts of
 
 mkNode :: [String] -> String -> ModuleTree -> Html
 mkNode ss p (Node s leaf pkg short ts) =
-  collBtn +++ htmlModule +++ shortDescr +++ htmlPkg +++ subtree
+  htmlModule +++ shortDescr +++ htmlPkg +++ subtree
   where
-    collBtn = case ts of
-      [] -> noHtml
-      _ -> collapsebutton p
+    modAttrs = case ts of
+      [] -> [theclass "module"]
+      _ -> collapser p "module"
 
-    htmlModule = thespan ! [theclass "module" ] <<
+    htmlModule = thespan ! modAttrs <<
       (if leaf
         then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg))
                                        (mkModuleName mdl))
@@ -297,7 +297,7 @@ mkNode ss p (Node s leaf pkg short ts) =
     shortDescr = maybe noHtml origDocToHtml short
     htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) pkg
 
-    subtree = mkNodeList (s:ss) p ts ! [identifier p]
+    subtree = mkNodeList (s:ss) p ts ! [identifier p, theclass "show"]
 
 
 -- | Turn a module tree into a flat list of full module names.  E.g.,

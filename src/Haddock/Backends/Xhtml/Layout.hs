@@ -163,9 +163,7 @@ subInstances id_ = maybe noHtml wrap . instTable
     wrap = (subSection <<) . (subCaption +++)
     instTable = fmap (thediv ! [identifier id_, theclass "show"] <<) . subTable
     subSection = thediv ! [theclass $ "subs instances"]
-    subCaption = paragraph ! [theclass cs, onclick js] << "Instances"
-    cs = "caption collapser"
-    js = "toggleSection(this,'" ++ id_ ++ "')"
+    subCaption = paragraph ! collapser id_ "caption" << "Instances"
 
 
 subMethods :: [Html] -> Html

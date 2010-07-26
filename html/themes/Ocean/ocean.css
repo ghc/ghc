@@ -75,10 +75,20 @@ ul.links li a { padding: 5px 10px; }
 .clear { clear: both; }
 
 .collapser {
-  background: url(minus.gif) no-repeat 0 0.4em;
+  background-image: url(minus.gif);
+  background-repeat: no-repeat;
 }
 .expander {
-  background: url(plus.gif) no-repeat 0 0.4em;
+  background-image: url(plus.gif);
+  background-repeat: no-repeat;
+}
+span.module.collapser,
+span.module.expander {
+  background-position: 0 0.3em;
+}
+p.caption.collapser,
+p.caption.expander {
+  background-position: 0 0.4em;
 }
 .collapser, .expander {
   padding-left: 14px;
