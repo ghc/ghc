@@ -35,18 +35,23 @@ import qualified Text.XHtml as XHtml
 -- * CSS Themes
 --------------------------------------------------------------------------------
 
-data CssTheme = CssTheme {
+data Theme = Theme {
   themeName :: String,
   themeHref :: String,
   themeFiles :: [FilePath]
   }
 
+type Themes = [Theme]
 
-type Themes = [CssTheme]
-
-
-type PossibleTheme = Either String CssTheme
+type PossibleTheme = Either String Theme
 type PossibleThemes = Either String Themes
+
+
+-- | Find a theme by name (case insensitive match)
+findTheme :: String -> Themes -> Maybe Theme
+findTheme s = listToMaybe . filter ((== ls).lower.themeName)
+  where lower = map toLower
+        ls = lower s
 
 
 -- | Standard theme used by default
@@ -55,6 +60,8 @@ standardTheme libDir = liftM (liftEither (take 1)) (defaultThemes libDir)
 
 
 -- | Default themes that are part of Haddock; added with --default-themes
+-- First default theme is the standard theme. At present, hard coded to "Ocean"
+-- if present.
 defaultThemes :: FilePath -> IO PossibleThemes
 defaultThemes libDir = do
   themeDirs <- getDirectoryItems (libDir </> "html" </> "themes")
@@ -65,19 +72,45 @@ defaultThemes libDir = do
     isStd c = themeName c == "Ocean"
 
 
-findTheme :: String -> Themes -> Maybe CssTheme
-findTheme s = listToMaybe . filter ((== ls).lower.themeName)
-  where lower = map toLower
-        ls = lower s
+-- | Build a theme from a single .css file
+singleFileTheme :: FilePath -> IO PossibleTheme
+singleFileTheme path =
+  if isCssFilePath path
+      then retRight $ Theme name file [path]
+      else errMessage "File extension isn't .css" path
+  where
+    name = takeBaseName path
+    file = takeFileName path
+
+
+-- | Build a theme from a directory
+directoryTheme :: FilePath -> IO PossibleTheme
+directoryTheme path = do
+  items <- getDirectoryItems path
+  case filter isCssFilePath items of
+    [cf] -> retRight $ Theme (takeBaseName path) (takeFileName cf) items
+    [] -> errMessage "No .css file in theme directory" path
+    _ -> errMessage "More than one .css file in theme directory" path
+
+
+-- | Check if we have a built in theme
+doesBuiltInExist :: IO PossibleThemes -> String -> IO Bool
+doesBuiltInExist pts s = pts >>= return . either (const False) test 
+  where test = isJust . findTheme s
+
+
+-- | Find a built in theme
+builtInTheme :: IO PossibleThemes -> String -> IO PossibleTheme
+builtInTheme pts s = pts >>= return . either Left fetch
+  where fetch = maybe (Left ("Unknown theme: " ++ s)) Right . findTheme s
 
 
 --------------------------------------------------------------------------------
 -- * CSS Theme Arguments
 --------------------------------------------------------------------------------
 
-
 -- | Process input flags for CSS Theme arguments
-getThemes :: FilePath -> [Flag] -> IO (Either String Themes)
+getThemes :: FilePath -> [Flag] -> IO PossibleThemes
 getThemes libDir flags =
   liftM concatEither (mapM themeFlag flags) >>= someTheme
   where
@@ -88,9 +121,9 @@ getThemes libDir flags =
 
     theme :: FilePath -> IO PossibleTheme
     theme path = pick path
-      [(doesFileExist,                 singleFileTheme),
-       (doesDirectoryExist,            directoryTheme),
-       (doesBuiltInExist builtIns,     builtInTheme builtIns)]
+      [(doesFileExist,              singleFileTheme),
+       (doesDirectoryExist,         directoryTheme),
+       (doesBuiltInExist builtIns,  builtInTheme builtIns)]
       "Theme not found"
 
     pick :: FilePath
@@ -118,34 +151,9 @@ retRight :: a -> IO (Either String a)
 retRight = return . Right
 
 
-singleFileTheme :: FilePath -> IO PossibleTheme
-singleFileTheme path =
-  if isCssFilePath path
-      then retRight $ CssTheme name file [path]
-      else errMessage "File extension isn't .css" path
-  where
-    name = takeBaseName path
-    file = takeFileName path
-
-
-directoryTheme :: FilePath -> IO PossibleTheme
-directoryTheme path = do
-  items <- getDirectoryItems path
-  case filter isCssFilePath items of
-    [cf] -> retRight $ CssTheme (takeBaseName path) (takeFileName cf) items
-    [] -> errMessage "No .css file in theme directory" path
-    _ -> errMessage "More than one .css file in theme directory" path
-
-
-doesBuiltInExist :: IO PossibleThemes -> String -> IO Bool
-doesBuiltInExist pts s = pts >>= return . either (const False) test
-  where test = isJust . findTheme s
-
-
-builtInTheme :: IO PossibleThemes -> String -> IO PossibleTheme
-builtInTheme pts s = pts >>= return . either Left fetch
-  where fetch = maybe (Left ("Unknown theme: " ++ s)) Right . findTheme s
-
+--------------------------------------------------------------------------------
+-- * File Utilities
+--------------------------------------------------------------------------------
 
 getDirectoryItems :: FilePath -> IO [FilePath]
 getDirectoryItems path =
@@ -207,8 +215,10 @@ styleMenu ts = thediv ! [identifier "style-menu-holder"] << [
 sequenceEither :: [Either a b] -> Either a [b]
 sequenceEither es = maybe (Right $ rights es) Left (listToMaybe (lefts es))
 
+
 liftEither :: (b -> c) -> Either a b -> Either a c
 liftEither f = either Left (Right . f)
+
 
 concatEither :: [Either a [b]] -> Either a [b]
 concatEither = liftEither concat . sequenceEither
