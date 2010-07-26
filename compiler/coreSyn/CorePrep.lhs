@@ -463,7 +463,7 @@ rhsToBody (Cast e co)
        ; return (floats, Cast e' co) }
 
 rhsToBody expr@(Lam {})
-  | Just no_lam_result <- tryEtaReduce bndrs body
+  | Just no_lam_result <- tryEtaReducePrep bndrs body
   = return (emptyFloats, no_lam_result)
   | all isTyVar bndrs		-- Type lambdas are ok
   = return (emptyFloats, expr)
@@ -751,8 +751,8 @@ get to a partial application:
     ==> case x of { p -> map f }
 
 \begin{code}
-tryEtaReduce :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
-tryEtaReduce bndrs expr@(App _ _)
+tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
+tryEtaReducePrep bndrs expr@(App _ _)
   | ok_to_eta_reduce f &&
     n_remaining >= 0 &&
     and (zipWith ok bndrs last_args) &&
@@ -772,15 +772,15 @@ tryEtaReduce bndrs expr@(App _ _)
     ok_to_eta_reduce (Var f) = not (hasNoBinding f)
     ok_to_eta_reduce _       = False --safe. ToDo: generalise
 
-tryEtaReduce bndrs (Let bind@(NonRec _ r) body)
+tryEtaReducePrep bndrs (Let bind@(NonRec _ r) body)
   | not (any (`elemVarSet` fvs) bndrs)
-  = case tryEtaReduce bndrs body of
+  = case tryEtaReducePrep bndrs body of
 	Just e -> Just (Let bind e)
 	Nothing -> Nothing
   where
     fvs = exprFreeVars r
 
-tryEtaReduce _ _ = Nothing
+tryEtaReducePrep _ _ = Nothing
 \end{code}
 
 
