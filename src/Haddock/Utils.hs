@@ -22,7 +22,7 @@ module Haddock.Utils (
   frameIndexHtmlFile,
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
   subIndexHtmlFile,
-  jsFile, plusFile, minusFile, framesFile,
+  jsFile, framesFile,
 
   -- * Anchor and URL utilities
   moduleNameUrl, moduleUrl,
@@ -257,10 +257,8 @@ makeAnchorId (f:r) = escape isAlpha f ++ concatMap (escape isLegal) r
 -------------------------------------------------------------------------------
 
 
-jsFile, plusFile, minusFile, framesFile :: String
+jsFile, framesFile :: String
 jsFile    = "haddock-util.js"
-plusFile  = "plus.gif"
-minusFile = "minus.gif"
 framesFile = "frames.html"
 
 

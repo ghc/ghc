@@ -22,12 +22,12 @@ import Haddock.Options
 import Control.Monad (liftM)
 import Data.Char (toLower)
 import Data.Either (lefts, rights)
-import Data.List (nub)
+import Data.List (nub, partition)
 import Data.Maybe (isJust, listToMaybe)
 
 import System.Directory
 import System.FilePath
-import Text.XHtml hiding ( name, title, p, quote )
+import Text.XHtml hiding ( name, title, p, quote, (</>) )
 import qualified Text.XHtml as XHtml
 
 
@@ -41,67 +41,57 @@ data CssTheme = CssTheme {
   themeFiles :: [FilePath]
   }
 
+
 type Themes = [CssTheme]
 
 
+type PossibleTheme = Either String CssTheme
+type PossibleThemes = Either String Themes
+
+
 -- | Standard theme used by default
-standardTheme :: FilePath -> CssTheme
-standardTheme libDir = locateIn libDir $
-  CssTheme "Ocean"   "nhaddock.css" ["nhaddock.css", "hslogo-16.png"]
+standardTheme :: FilePath -> IO PossibleThemes
+standardTheme libDir = liftM (liftEither (take 1)) (defaultThemes libDir)
 
 
 -- | Default themes that are part of Haddock; added with --default-themes
-defaultThemes :: FilePath -> Themes
-defaultThemes libDir = standardTheme libDir :
-  (map (locateIn libDir) $ [
-    CssTheme "Classic" "xhaddock.css" ["xhaddock.css", "haskell_icon.gif"],
-    CssTheme "Tibbe"   "thaddock.css" ["thaddock.css", "haskell_icon.gif"],
-    CssTheme "Snappy"  "shaddock.css" ["shaddock.css", "s_haskell_icon.gif"]
-    ]
-  )
+defaultThemes :: FilePath -> IO PossibleThemes
+defaultThemes libDir = do
+  themeDirs <- getDirectoryItems (libDir </> "html" </> "themes")
+  themes <- mapM directoryTheme themeDirs
+  return $ liftEither shuffle $ sequenceEither themes
+  where
+    shuffle ts = let (a,b) = partition isStd ts in a ++ b
+    isStd c = themeName c == "Ocean"
 
 
-locateIn :: FilePath -> CssTheme -> CssTheme
-locateIn libDir t = t { themeFiles = map loc (themeFiles t) }
-  where loc = combine libDir . combine "html"
-
-
-findTheme :: Themes -> String -> Maybe CssTheme
-findTheme ts s = listToMaybe $ filter ((== ls).lower.themeName) ts
+findTheme :: String -> Themes -> Maybe CssTheme
+findTheme s = listToMaybe . filter ((== ls).lower.themeName)
   where lower = map toLower
         ls = lower s
-
-
-isThemeName :: Themes -> String ->  Bool
-isThemeName ts = isJust . findTheme ts
-
-
-builtInTheme :: Themes -> String -> Either String CssTheme
-builtInTheme ts = maybe (Left "not found") Right . findTheme ts
 
 
 --------------------------------------------------------------------------------
 -- * CSS Theme Arguments
 --------------------------------------------------------------------------------
 
-type PossibleTheme = Either String CssTheme
 
 -- | Process input flags for CSS Theme arguments
 getThemes :: FilePath -> [Flag] -> IO (Either String Themes)
 getThemes libDir flags =
-  liftM (someTheme . concatEither) (mapM themeFlag flags)
+  liftM concatEither (mapM themeFlag flags) >>= someTheme
   where
     themeFlag :: Flag -> IO (Either String Themes)
     themeFlag (Flag_CSS path) = (liftM . liftEither) (:[]) (theme path)
-    themeFlag (Flag_BuiltInThemes) = retRight builtIns
+    themeFlag (Flag_BuiltInThemes) = builtIns
     themeFlag _ = retRight []
 
     theme :: FilePath -> IO PossibleTheme
     theme path = pick path
       [(doesFileExist,                 singleFileTheme),
        (doesDirectoryExist,            directoryTheme),
-       (return . isThemeName builtIns, return . builtInTheme builtIns)]
-      "css theme path not found"
+       (doesBuiltInExist builtIns,     builtInTheme builtIns)]
+      "Theme not found"
 
     pick :: FilePath
       -> [(FilePath -> IO Bool, FilePath -> IO PossibleTheme)] -> String
@@ -111,43 +101,56 @@ getThemes libDir flags =
       pass <- test path
       if pass then build path else pick path opts msg
 
-    someTheme :: Either String Themes -> Either String Themes
-    someTheme (Right []) = Right [standardTheme libDir]
-    someTheme est = est
+
+    someTheme :: Either String Themes -> IO (Either String Themes)
+    someTheme (Right []) = standardTheme libDir
+    someTheme est = return est
 
     builtIns = defaultThemes libDir
 
 
 errMessage :: String -> FilePath -> IO (Either String a)
-errMessage msg path = return (Left (msg ++ ": \"" ++ path ++ "\""))
+errMessage msg path = return (Left msg')
+  where msg' = "Error: " ++ msg ++ ": \"" ++ path ++ "\"\n"
 
 
 retRight :: a -> IO (Either String a)
 retRight = return . Right
 
 
-singleFileTheme :: FilePath -> IO (Either String CssTheme)
+singleFileTheme :: FilePath -> IO PossibleTheme
 singleFileTheme path =
   if isCssFilePath path
       then retRight $ CssTheme name file [path]
-      else errMessage "file extension isn't .css" path
+      else errMessage "File extension isn't .css" path
   where
     name = takeBaseName path
     file = takeFileName path
 
 
-directoryTheme :: FilePath -> IO (Either String CssTheme)
+directoryTheme :: FilePath -> IO PossibleTheme
 directoryTheme path = do
   items <- getDirectoryItems path
   case filter isCssFilePath items of
-    [] -> errMessage "no .css file in theme directory" path
     [cf] -> retRight $ CssTheme (takeBaseName path) (takeFileName cf) items
-    _ -> errMessage "more than one .css file in theme directory" path
+    [] -> errMessage "No .css file in theme directory" path
+    _ -> errMessage "More than one .css file in theme directory" path
+
+
+doesBuiltInExist :: IO PossibleThemes -> String -> IO Bool
+doesBuiltInExist pts s = pts >>= return . either (const False) test
+  where test = isJust . findTheme s
+
+
+builtInTheme :: IO PossibleThemes -> String -> IO PossibleTheme
+builtInTheme pts s = pts >>= return . either Left fetch
+  where fetch = maybe (Left ("Unknown theme: " ++ s)) Right . findTheme s
 
 
 getDirectoryItems :: FilePath -> IO [FilePath]
 getDirectoryItems path =
-  getDirectoryContents path >>= return . map (combine path)
+  getDirectoryContents path >>= return . map (combine path) . filter notDot
+  where notDot s = s /= "." && s /= ".."
 
 
 isCssFilePath :: FilePath -> Bool

@@ -50,13 +50,24 @@ extra-source-files:
   src/haddock.sh
 
 data-files:
-  html/haddock-DEBUG.css
-  html/haddock.css
-  html/haddock-util.js
-  html/haskell_icon.gif
-  html/minus.gif
-  html/plus.gif
   html/frames.html
+  html/haddock-util.js
+  html/themes/Classic/haskell_icon.gif
+  html/themes/Classic/minus.gif
+  html/themes/Classic/plus.gif
+  html/themes/Classic/xhaddock.css
+  html/themes/Ocean/hslogo-16.png
+  html/themes/Ocean/minus.gif
+  html/themes/Ocean/ocean.css
+  html/themes/Ocean/plus.gif
+  html/themes/Snappy/minus.gif
+  html/themes/Snappy/plus.gif
+  html/themes/Snappy/s_haskell_icon.gif
+  html/themes/Snappy/snappy.css
+  html/themes/Tibbe/haskell_icon.gif
+  html/themes/Tibbe/minus.gif
+  html/themes/Tibbe/plus.gif
+  html/themes/Tibbe/tibbe.css
   latex/haddock.sty
 
 flag in-ghc-tree

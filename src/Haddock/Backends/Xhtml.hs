@@ -119,7 +119,7 @@ copyHtmlBits odir libdir themes = do
         copyLibFile f = do
            copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
-  mapM_ copyLibFile [ plusFile, minusFile, jsFile, framesFile ]
+  mapM_ copyLibFile [ jsFile, framesFile ]
 
 
 headHtml :: String -> Maybe String -> Themes -> Html

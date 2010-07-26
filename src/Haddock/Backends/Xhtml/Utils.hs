@@ -184,7 +184,7 @@ linkedAnchor n = anchor ! [href ('#':n)]
 
 collapsebutton :: String -> Html
 collapsebutton id_ =
-  image ! [ src minusFile, theclass "coll", onclick ("toggle(this,'" ++ id_ ++ "')"), alt "show/hide" ]
+  image ! [ src "minus.gif", theclass "coll", onclick ("toggle(this,'" ++ id_ ++ "')"), alt "show/hide" ]
 
 
 -- A quote is a valid part of a Haskell identifier, but it would interfere with
