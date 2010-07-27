@@ -22,7 +22,7 @@ import Haddock.Options
 import Control.Monad (liftM)
 import Data.Char (toLower)
 import Data.Either (lefts, rights)
-import Data.List (nub, partition)
+import Data.List (nub)
 import Data.Maybe (isJust, listToMaybe)
 
 import System.Directory
@@ -60,16 +60,19 @@ standardTheme libDir = liftM (liftEither (take 1)) (defaultThemes libDir)
 
 
 -- | Default themes that are part of Haddock; added with --default-themes
--- First default theme is the standard theme. At present, hard coded to "Ocean"
--- if present.
+-- The first theme in this list is considered the standard theme.
+-- Themes are "discovered" by scanning the html sub-dir of the libDir,
+-- and looking for directories with the extension .theme or .std-theme.
+-- The later is, obviously, the standard theme.
 defaultThemes :: FilePath -> IO PossibleThemes
 defaultThemes libDir = do
-  themeDirs <- getDirectoryItems (libDir </> "html" </> "themes")
-  themes <- mapM directoryTheme themeDirs
-  return $ liftEither shuffle $ sequenceEither themes
+  themeDirs <- getDirectoryItems (libDir </> "html")
+  themes <- mapM directoryTheme $ discoverThemes themeDirs
+  return $ sequenceEither themes
   where
-    shuffle ts = let (a,b) = partition isStd ts in a ++ b
-    isStd c = themeName c == "Ocean"
+    discoverThemes paths =
+      filterExt ".std-theme" paths ++ filterExt ".theme" paths
+    filterExt ext = filter ((== ext).takeExtension)
 
 
 -- | Build a theme from a single .css file
