@@ -166,6 +166,11 @@ displayLintResults dflags pass warns errs binds
        ; Err.ghcExit dflags 1 }
 
   | not (isEmptyBag warns)
+  , not (case pass of { CoreDesugar -> True; _ -> False })
+    	-- Suppress warnings after desugaring pass because some
+	-- are legitimate. Notably, the desugarer generates instance
+	-- methods with INLINE pragmas that form a mutually recursive
+	-- group.  Only afer a round of simplification are they unravelled.
   , not opt_NoDebugOutput
   , showLintWarnings pass
   = printDump (banner "warnings" $$ Err.pprMessageBag warns)
