@@ -920,11 +920,11 @@ unsafeCoerceId
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
            
 
-    ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
-                      (mkFunTy openAlphaTy openBetaTy)
-    [x] = mkTemplateLocals [openAlphaTy]
-    rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
-          Cast (Var x) (mkUnsafeCoercion openAlphaTy openBetaTy)
+    ty  = mkForAllTys [argAlphaTyVar,openBetaTyVar]
+                      (mkFunTy argAlphaTy openBetaTy)
+    [x] = mkTemplateLocals [argAlphaTy]
+    rhs = mkLams [argAlphaTyVar,openBetaTyVar,x] $
+          Cast (Var x) (mkUnsafeCoercion argAlphaTy openBetaTy)
 
 ------------------------------------------------
 nullAddrId :: Id
