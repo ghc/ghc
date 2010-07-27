@@ -4,7 +4,6 @@
 
 /* Is this portable? */
 html {
-/*   background-color: #f4f7f9; */
   background-color: white;
   width: 100%;
 }
@@ -32,8 +31,6 @@ h3 { font-size: 120%; }
 h4 { font-size: 110%; }
 h5 { font-size: 105%; }
 
-/* a:hover { background: #D9CBB8; } */
-
 /* @end */
 
 /* @group Common */
@@ -45,7 +42,7 @@ h5 { font-size: 105%; }
 }
 
 * + h1, * + h2, * + h3, * + h4, * + h5, * + h6 {
-  margin-top: 4em;
+  margin-top: 2em;
 }
 
 h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6 {
@@ -63,7 +60,7 @@ ul.links {
 
 ul.links li {
   display: inline;
-/*   border-left: 1px solid rgb(78,98,114); */
+  border-left: 1px solid rgb(78,98,114); 
   white-space: nowrap;
   padding: 0;
 }
@@ -98,7 +95,8 @@ p.caption.expander {
 
 pre {
   padding: 0.5em;
-  margin: 0.5em 5em 0.5em 3em;
+/*  margin: 0.5em 5em 0.5em 3em; */
+  margin: 0.5em 0 0.5em;
   background: rgb(229,237,244);
   overflow: auto;
 }
@@ -247,7 +245,7 @@ div#style-menu-holder {
   font-size: 80%;
   padding: 0.5em 1em;
   position: relative;
-  top: 0em; /* use -5em to pull up into title area */
+  top: 0em;
   margin: 0 0 1em 1em;
   max-width: 20em;
 }
@@ -362,7 +360,6 @@ div#style-menu-holder {
   margin: 0;
 }
 
-/* div.top code { border: 1px solid #ddd; } */
 .top p.src {
   border-top: 1px solid #ccc;
 }
