@@ -103,18 +103,18 @@ data PersistentLinkerState
 	-- When a new Unlinked is linked into the running image, or an existing
 	-- module in the image is replaced, the itbl_env must be updated
 	-- appropriately.
-        itbl_env    :: ItblEnv,
+        itbl_env    :: !ItblEnv,
 
 	-- The currently loaded interpreted modules (home package)
-	bcos_loaded :: [Linkable],
+	bcos_loaded :: ![Linkable],
 
 	-- And the currently-loaded compiled modules (home package)
-	objs_loaded :: [Linkable],
+	objs_loaded :: ![Linkable],
 
 	-- The currently-loaded packages; always object code
 	-- Held, as usual, in dependency order; though I am not sure if
 	-- that is really important
-	pkgs_loaded :: [PackageId]
+	pkgs_loaded :: ![PackageId]
      }
 
 emptyPLS :: DynFlags -> PersistentLinkerState
