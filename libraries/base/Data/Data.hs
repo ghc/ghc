@@ -451,13 +451,16 @@ fromConstrB f = unID . gunfold k z
 
 
 -- | Monadic variation on 'fromConstrB'
-fromConstrM :: (Monad m, Data a)
+fromConstrM :: forall m a. (Monad m, Data a)
             => (forall d. Data d => m d)
             -> Constr
             -> m a
 fromConstrM f = gunfold k z
  where
+  k :: (forall b r. Data b => m (b -> r) -> m r)
   k c = do { c' <- c; b <- f; return (c' b) }
+
+  z :: forall r. r -> m r
   z = return
 
 
