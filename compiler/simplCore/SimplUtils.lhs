@@ -1027,6 +1027,11 @@ mkLam _env bndrs body
 	co_vars  = tyVarsOfType co
 	bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars      
 
+    mkLam' dflags bndrs body@(Lam {})
+      = mkLam' dflags (bndrs ++ bndrs1) body1
+      where
+        (bndrs1, body1) = collectBinders body
+
     mkLam' dflags bndrs body
       | dopt Opt_DoEtaReduction dflags,
         Just etad_lam <- tryEtaReduce bndrs body
