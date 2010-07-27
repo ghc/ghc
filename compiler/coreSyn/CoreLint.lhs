@@ -213,8 +213,7 @@ lintCoreExpr (Var var)
 
 	; checkDeadIdOcc var
 	; var' <- lookupIdInScope var
-        ; return (idType var')
-        }
+        ; return (idType var') }
 
 lintCoreExpr (Lit lit)
   = return (literalType lit)
