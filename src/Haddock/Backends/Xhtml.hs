@@ -186,7 +186,7 @@ bodyHtml doctitle iface themes
            pageContent =
   body << [
     divPackageHeader << [
-      sectionName << nonEmpty doctitle,
+      nonEmpty sectionName << doctitle,
       unordList (catMaybes [
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),

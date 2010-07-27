@@ -90,8 +90,11 @@ rdrDocToHtml = markup fmt . cleanup
   where fmt = parHtmlMarkup ppRdrName isRdrTc
 
 
-docElement :: (ADDATTRS a) => a -> a
-docElement = (! [theclass "doc"])
+docElement :: (Html -> Html) -> Html -> Html
+docElement el content_ =
+  if isNoHtml content_
+    then el ! [theclass "doc empty"] << spaceHtml
+    else el ! [theclass "doc"] << content_
 
 
 docSection :: Doc DocName -> Html

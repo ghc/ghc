@@ -117,11 +117,7 @@ subDlist decls = Just $ dlist << map subEntry decls +++ clearDiv
     subEntry (decl, mdoc, subs) =
       dterm ! [theclass "src"] << decl
       +++
-      docElement ddef << (fmap docToHtml mdoc `with` subs)
-
-    Nothing  `with` [] = spaceHtml
-    ma       `with` bs = ma +++ bs
-    
+      docElement ddef << (fmap docToHtml mdoc +++ subs)    
     clearDiv = thediv ! [ theclass "clear" ] << noHtml
 
 
@@ -132,7 +128,7 @@ subTable decls = Just $ table << aboves (concatMap subRow decls)
     subRow (decl, mdoc, subs) =
       (td ! [theclass "src"] << decl
        <->
-       docElement td << nonEmpty (fmap docToHtml mdoc))
+       docElement td << fmap docToHtml mdoc)
       : map (cell . (td <<)) subs
 
 

@@ -113,10 +113,13 @@ char :: Char -> Html
 char c = toHtml [c]
 
 
--- | Ensure content contains at least something (a non-breaking space)
-nonEmpty :: (HTML a) => a -> Html
-nonEmpty a = if isNoHtml h then spaceHtml else h
-    where h = toHtml a
+-- | Make an element that always has at least something (a non-breaking space)
+-- If it would have otherwise been empty, then give it the class ".empty"
+nonEmpty :: (Html -> Html) -> Html -> Html
+nonEmpty el content_ =
+  if isNoHtml content_
+    then el ! [theclass "empty"] << spaceHtml
+    else el << content_
 
 
 quote :: Html -> Html

@@ -354,6 +354,10 @@ div#style-menu-holder {
   margin-bottom: 0.5em;
 }
 
+#interface dd.empty {
+  display: none;
+}
+
 #interface dd p {
   margin: 0;
 }
