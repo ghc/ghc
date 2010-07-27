@@ -32,16 +32,13 @@ import Haddock.Utils
 import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
-import Control.Exception     ( bracket )
 import Control.Monad         ( when, unless )
 import Control.Monad.Instances ( ) -- for Functor Either a
 import Data.Char             ( toUpper )
 import Data.List             ( sortBy, groupBy )
 import Data.Maybe
-import Foreign.Marshal.Alloc ( allocaBytes )
 import System.FilePath hiding ( (</>) )
-import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
-import System.Directory hiding ( copyFile )
+import System.Directory
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import Data.List             ( intercalate )
@@ -92,22 +89,6 @@ ppHtml doctitle maybe_package ifaces odir prologue
   mapM_ (ppHtmlModule odir doctitle themes
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode) visible_ifaces
-
-
-copyFile :: FilePath -> FilePath -> IO ()
-copyFile fromFPath toFPath =
-        (bracket (openFile fromFPath ReadMode) hClose $ \hFrom ->
-         bracket (openFile toFPath WriteMode) hClose $ \hTo ->
-         allocaBytes bufferSize $ \buffer ->
-                copyContents hFrom hTo buffer)
-        where
-                bufferSize = 1024
-
-                copyContents hFrom hTo buffer = do
-                        count <- hGetBuf hFrom buffer bufferSize
-                        when (count > 0) $ do
-                                hPutBuf hTo buffer count
-                                copyContents hFrom hTo buffer
 
 
 copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
