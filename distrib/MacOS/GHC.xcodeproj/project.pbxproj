@@ -152,7 +152,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# We need to be at the top of the ghc tree\ncd ../..\n\nPREFIX=${INSTALL_PATH}/${CONTENTS_FOLDER_PATH}/usr\n\nif [ ${ACTION} = build ]; then\n  # put explicit --prefix last, in case the extra configure args contain a prefix\n  ./configure ${XCODE_EXTRA_CONFIGURE_ARGS} --prefix=${PREFIX} || exit 1\n  MAKE_ACTION=\nelse\n  MAKE_ACTION=${ACTION}\nfi\n\n# - We must explictly force the creation of a symbol table in .a files on BSD, and not all versions of Cabal\n#   do that consistently; hence, the EXTRA_AR_ARGS.\nmake DESTDIR=${DSTROOT} HADDOCK_DOCS=YES EXTRA_AR_ARGS=-s ${MAKE_ACTION} < /dev/null || exit 1\nmake DESTDIR=${DSTROOT} || exit 1";
+			shellScript = "# We need to be at the top of the ghc tree\ncd ../..\n\nPREFIX=${INSTALL_PATH}/${CONTENTS_FOLDER_PATH}/usr\n\nif [ ${ACTION} = build ]; then\n  # put explicit --prefix last, in case the extra configure args contain a prefix\n  ./configure ${XCODE_EXTRA_CONFIGURE_ARGS} --prefix=${PREFIX} || exit 1\n  MAKE_ACTION=\nelse\n  MAKE_ACTION=${ACTION}\nfi\n\n# - We must explictly force the creation of a symbol table in .a files on BSD, and not all versions of Cabal\n#   do that consistently; hence, the EXTRA_AR_ARGS.\nmake DESTDIR=${DSTROOT} HADDOCK_DOCS=YES EXTRA_AR_ARGS=-s PERL=/usr/bin/perl ${MAKE_ACTION} < /dev/null || exit 1\nmake DESTDIR=${DSTROOT} || exit 1";
 		};
 		E76B00450D52DFDB00A05A2F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
