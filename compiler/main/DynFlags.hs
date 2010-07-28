@@ -314,7 +314,8 @@ data ExtensionFlag
    | Opt_RecordPuns
    | Opt_ViewPatterns
    | Opt_GADTs
-   | Opt_RelaxedPolyRec
+   | Opt_OutsideIn
+   | Opt_RelaxedPolyRec		-- Deprecated
    | Opt_NPlusKPatterns
    | Opt_DoAndIfThenElse
 
@@ -1751,14 +1752,14 @@ impliedFlags
     , (Opt_ExistentialQuantification, Opt_ExplicitForAll)
     , (Opt_PolymorphicComponents,     Opt_ExplicitForAll)
 
-    , (Opt_GADTs,               Opt_RelaxedPolyRec)  -- We want type-sig variables to
+    , (Opt_GADTs,               Opt_OutsideIn)       -- We want type-sig variables to
                                                      --      be completely rigid for GADTs
 
-    , (Opt_TypeFamilies,        Opt_RelaxedPolyRec)  -- Trac #2944 gives a nice example
+    , (Opt_TypeFamilies,        Opt_OutsideIn)       -- Trac #2944 gives a nice example
     , (Opt_TypeFamilies,        Opt_KindSignatures)  -- Type families use kind signatures
       						     -- all over the place
 
-    , (Opt_ScopedTypeVariables, Opt_RelaxedPolyRec)  -- Ditto for scoped type variables; see
+    , (Opt_ScopedTypeVariables, Opt_OutsideIn)       -- Ditto for scoped type variables; see
                                                      --      Note [Scoped tyvars] in TcBinds
     , (Opt_ImpredicativeTypes,  Opt_RankNTypes)
 
