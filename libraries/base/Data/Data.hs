@@ -310,20 +310,24 @@ class Typeable a => Data a where
   --
   gmapT f x0 = unID (gfoldl k ID x0)
     where
+      k :: Data d => ID (d->b) -> d -> ID b
       k (ID c) x = ID (c (f x))
 
 
   -- | A generic query with a left-associative binary operator
-  gmapQl :: (r -> r' -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
+  gmapQl :: forall r r'. (r -> r' -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
   gmapQl o r f = unCONST . gfoldl k z
     where
+      k :: Data d => CONST r (d->b) -> d -> CONST r b
       k c x = CONST $ (unCONST c) `o` f x
+      z :: g -> CONST r g
       z _   = CONST r
 
   -- | A generic query with a right-associative binary operator
-  gmapQr :: (r' -> r -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
+  gmapQr :: forall r r'. (r' -> r -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
   gmapQr o r0 f x0 = unQr (gfoldl k (const (Qr id)) x0) r0
     where
+      k :: Data d => Qr r (d->b) -> d -> Qr r b
       k (Qr c) x = Qr (\r -> c (f x `o` r))
 
 
@@ -335,10 +339,12 @@ class Typeable a => Data a where
 
 
   -- | A generic query that processes one child by index (zero-based)
-  gmapQi :: Int -> (forall d. Data d => d -> u) -> a -> u
+  gmapQi :: forall u. Int -> (forall d. Data d => d -> u) -> a -> u
   gmapQi i f x = case gfoldl k z x of { Qi _ q -> fromJust q }
     where
+      k :: Data d => Qi u (d -> b) -> d -> Qi u b
       k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q)
+      z :: g -> Qi q g
       z _           = Qi 0 Nothing
 
 
@@ -347,7 +353,7 @@ class Typeable a => Data a where
   -- The default definition instantiates the type constructor @c@ in
   -- the type of 'gfoldl' to the monad datatype constructor, defining
   -- injection and projection using 'return' and '>>='.
-  gmapM   :: Monad m => (forall d. Data d => d -> m d) -> a -> m a
+  gmapM :: forall m. Monad m => (forall d. Data d => d -> m d) -> a -> m a
 
   -- Use immediately the monad datatype constructor 
   -- to instantiate the type constructor c in the type of gfoldl,
@@ -355,13 +361,14 @@ class Typeable a => Data a where
   --  
   gmapM f = gfoldl k return
     where
+      k :: Data d => m (d -> b) -> d -> m b
       k c x = do c' <- c
                  x' <- f x
                  return (c' x')
 
 
   -- | Transformation of at least one immediate subterm does not fail
-  gmapMp :: MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
+  gmapMp :: forall m. MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
 
 {-
 
@@ -374,7 +381,9 @@ this end, we couple the monadic computation with a Boolean.
   gmapMp f x = unMp (gfoldl k z x) >>= \(x',b) ->
                 if b then return x' else mzero
     where
+      z :: g -> Mp m g
       z g = Mp (return (g,False))
+      k :: Data d => Mp m (d -> b) -> d -> Mp m b
       k (Mp c) y
         = Mp ( c >>= \(h, b) ->
                  (f y >>= \y' -> return (h y', True))
@@ -382,7 +391,7 @@ this end, we couple the monadic computation with a Boolean.
              )
 
   -- | Transformation of one immediate subterm with success
-  gmapMo :: MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
+  gmapMo :: forall m. MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
 
 {-
 
@@ -397,7 +406,9 @@ was transformed successfully.
   gmapMo f x = unMp (gfoldl k z x) >>= \(x',b) ->
                 if b then return x' else mzero
     where
+      z :: g -> Mp m g
       z g = Mp (return (g,False))
+      k :: Data d => Mp m (d -> b) -> d -> Mp m b
       k (Mp c) y
         = Mp ( c >>= \(h,b) -> if b
                         then return (h y, b)
@@ -446,7 +457,10 @@ fromConstrB :: Data a
             -> a
 fromConstrB f = unID . gunfold k z
  where
+  k :: forall b r. Data b => ID (b -> r) -> ID r
   k c = ID (unID c f)
+ 
+  z :: forall r. r -> ID r
   z = ID
 
 
@@ -457,7 +471,7 @@ fromConstrM :: forall m a. (Monad m, Data a)
             -> m a
 fromConstrM f = gunfold k z
  where
-  k :: (forall b r. Data b => m (b -> r) -> m r)
+  k :: forall b r. Data b => m (b -> r) -> m r
   k c = do { c' <- c; b <- f; return (c' b) }
 
   z :: forall r. r -> m r

@@ -74,7 +74,8 @@ class Category a => Arrow a where
         --   version if desired.
         second :: a b c -> a (d,b) (d,c)
         second f = arr swap >>> first f >>> arr swap
-                        where   swap ~(x,y) = (y,x)
+                        where   swap :: (x,y) -> (y,x)
+                                swap ~(x,y) = (y,x)
 
         -- | Split the input between the two argument arrows and combine
         --   their output.  Note that this is in general not a functor.
@@ -182,7 +183,8 @@ class Arrow a => ArrowChoice a where
         --   version if desired.
         right :: a b c -> a (Either d b) (Either d c)
         right f = arr mirror >>> left f >>> arr mirror
-                        where   mirror (Left x) = Right x
+                        where   mirror :: Either x y -> Either y x
+                                mirror (Left x) = Right x
                                 mirror (Right y) = Left y
 
         -- | Split the input between the two argument arrows, retagging

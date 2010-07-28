@@ -255,9 +255,10 @@ gather :: ReadP a -> ReadP (String, a)
 --   in addition returns the exact characters read.
 --   IMPORTANT NOTE: 'gather' gives a runtime error if its first argument
 --   is built using any occurrences of readS_to_P. 
-gather (R m) =
-  R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))  
+gather (R m)
+  = R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))  
  where
+  gath :: (String -> String) -> P (String -> P b) -> P b
   gath l (Get f)      = Get (\c -> gath (l.(c:)) (f c))
   gath _ Fail         = Fail
   gath l (Look f)     = Look (\s -> gath l (f s))
