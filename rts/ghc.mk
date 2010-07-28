@@ -252,11 +252,6 @@ rts_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
 rts_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
 rts_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
-# Otherwise the stack-smash handler gets triggered.
-ifneq "$(findstring $(TargetOS_CPP), darwin openbsd)" ""
-rts_HC_OPTS += -optc-fno-stack-protector
-endif
-
 # We *want* type-checking of hand-written cmm.
 rts_HC_OPTS += -dcmm-lint 
 
