@@ -322,6 +322,15 @@ div#style-menu-holder {
 
 #interface div.top { margin: 1em 0 0.5em 0; }
 
+#interface p.src .link {
+  float: right;
+  color: #919191;
+  border-left: 1px solid #919191;
+  background: #f0f0f0;
+  padding: 0 0.5em 0.2em;
+  margin: 0 -0.5em 0 0.5em;
+}
+
 #interface table { border-spacing: 2px; }
 #interface td {
   vertical-align: top;
