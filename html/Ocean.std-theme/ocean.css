@@ -52,10 +52,9 @@ h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6 {
 ul.links {
   list-style: none;
   text-align: left;
-  position: absolute;
-  right: 5px;
-  top: 5px;
+  float: right;
   display: inline-table;
+  margin-left: 1em;
 }
 
 ul.links li {
@@ -65,7 +64,9 @@ ul.links li {
   padding: 0;
 }
 
-ul.links li a { padding: 5px 10px; }
+ul.links li a {
+  padding: 0.2em 0.5em;
+}
 
 .hide { display: none; }
 .show { display: inherit; }
@@ -138,7 +139,7 @@ img.coll {
   background: rgb(41,56,69);
   border-top: 5px solid rgb(78,98,114);
   color: #ddd;
-  padding: 5px;
+  padding: 0.2em;
   position: relative;
   text-align: left;
 }
@@ -170,9 +171,8 @@ dl.info {
   font-size: 75%;
   color: rgb(78,98,114);
   background-color: #fff;
-  max-width: 20em;
-  margin-top: -6em;
-  margin-bottom: 1em;
+  max-width: 40%;
+  margin: -1em 0 1em 1em;
 }
 
 dl.info dt {

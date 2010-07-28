@@ -167,13 +167,13 @@ bodyHtml doctitle iface themes
            pageContent =
   body << [
     divPackageHeader << [
-      nonEmpty sectionName << doctitle,
       unordList (catMaybes [
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url
-        ] ++ [styleMenu themes]) ! [theclass "links"]
+        ] ++ [styleMenu themes]) ! [theclass "links"],
+      nonEmpty sectionName << doctitle
       ],
     divContent << pageContent,
     divFooter << paragraph << (
@@ -453,7 +453,7 @@ ppHtmlModule odir doctitle themes
         bodyHtml doctitle (Just iface) themes
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
-            divModuleHeader << (sectionName << mdl_str +++ moduleInfo iface),
+            divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str)),
             ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
           ]
 
