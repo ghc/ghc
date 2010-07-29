@@ -9,7 +9,7 @@
 #      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
-
+ 
 ifeq "$(wildcard distrib/)" ""
 
 # We're in a bindist
