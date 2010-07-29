@@ -78,8 +78,15 @@ instance MonadFix [] where
 instance MonadFix IO where
     mfix = fixIO 
 
+-- Prelude types with Monad instances in Control.Monad.Instances
+
 instance MonadFix ((->) r) where
     mfix f = \ r -> let a = f a r in a
+
+instance MonadFix (Either e) where
+    mfix f = let a = f (unRight a) in a
+             where unRight (Right x) = x
+                   unRight (Left  _) = error "mfix Either: Left"
 
 #if defined(__GLASGOW_HASKELL__)
 instance MonadFix (ST s) where
