@@ -35,7 +35,7 @@ module DriverPhases (
 
 #include "HsVersions.h"
 
-import Panic            ( panic )
+import Outputable
 import System.FilePath
 
 -----------------------------------------------------------------------------
@@ -90,6 +90,9 @@ data Phase
         -- There is no runPhase case for it.
         | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
+
+instance Outputable Phase where
+    ppr p = text (show p)
 
 anyHsc :: Phase
 anyHsc = Hsc (panic "anyHsc")

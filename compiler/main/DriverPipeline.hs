@@ -581,7 +581,9 @@ pipeLoop hsc_env phase stop_phase
            " but I wanted to stop at phase " ++ show stop_phase)
 
   | otherwise
-  = do (next_phase, dflags', maybe_loc, output_fn)
+  = do liftIO $ debugTraceMsg (hsc_dflags hsc_env) 4
+                              (ptext (sLit "Running phase") <+> ppr phase)
+       (next_phase, dflags', maybe_loc, output_fn)
           <- runPhase phase stop_phase hsc_env orig_basename
                       orig_suff input_fn orig_get_output_fn maybe_loc
        let hsc_env' = hsc_env {hsc_dflags = dflags'}
