@@ -265,6 +265,8 @@ pprStmt stmt = case stmt of
 	  pp_lhs | null results = empty
 		 | otherwise    = commafy (map ppr_ar results) <+> equals
 		-- Don't print the hints on a native C-- call
+
+          ppr_ar :: Outputable a => CmmHinted a -> SDoc
 	  ppr_ar (CmmHinted ar k) = case cconv of
 			    CmmCallConv -> ppr ar
 			    _           -> ppr (ar,k)

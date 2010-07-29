@@ -258,18 +258,22 @@ data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
 
 -- | enable us to fold used registers over 'CmmActuals' and 'CmmFormals'
 instance UserOfLocalRegs CmmStmt where
-  foldRegsUsed f set s = stmt s set
-    where stmt (CmmNop)                  = id
-          stmt (CmmComment {})           = id
-          stmt (CmmAssign _ e)           = gen e
-          stmt (CmmStore e1 e2)          = gen e1 . gen e2
-          stmt (CmmCall target _ es _ _) = gen target . gen es
-          stmt (CmmBranch _)             = id
-          stmt (CmmCondBranch e _)       = gen e
-          stmt (CmmSwitch e _)           = gen e
-          stmt (CmmJump e es)            = gen e . gen es
-          stmt (CmmReturn es)            = gen es
-          gen a set = foldRegsUsed f set a
+  foldRegsUsed f (set::b) s = stmt s set
+    where 
+      stmt :: CmmStmt -> b -> b
+      stmt (CmmNop)                  = id
+      stmt (CmmComment {})           = id
+      stmt (CmmAssign _ e)           = gen e
+      stmt (CmmStore e1 e2)          = gen e1 . gen e2
+      stmt (CmmCall target _ es _ _) = gen target . gen es
+      stmt (CmmBranch _)             = id
+      stmt (CmmCondBranch e _)       = gen e
+      stmt (CmmSwitch e _)           = gen e
+      stmt (CmmJump e es)            = gen e . gen es
+      stmt (CmmReturn es)            = gen es
+
+      gen :: UserOfLocalRegs a => a -> b -> b
+      gen a set = foldRegsUsed f set a
 
 instance UserOfLocalRegs CmmCallTarget where
     foldRegsUsed f set (CmmCallee e _) = foldRegsUsed f set e
