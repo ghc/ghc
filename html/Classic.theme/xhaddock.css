@@ -83,10 +83,9 @@ pre  {
 ul.links {
 	list-style: none;
 	text-align: left;
-	position: absolute;
-	right: 5px;
-	top: 5px;
+	float: right;
 	display: inline-table;
+	padding: 0;
 }
 
 ul.links li {
@@ -159,13 +158,11 @@ div#style-menu-holder {
 #module-header {
 	background-color: #0077dd;
 	padding: 5px;
-	position: relative;
 }
 
 #module-header .caption {
 	font-size: 200%;
-	height: 1.5em;
-	padding-top: .25em;
+	padding: .25em 0;
 	font-weight: normal;
 	font-style: normal;
 }
@@ -173,9 +170,8 @@ div#style-menu-holder {
 dl.info {
 	color: #ffffff;
 	display: block;
-	position: absolute;
-	top: 3px;
-	right: 5px;
+	float: right;
+	width: 50%;
 }
 
 dl.info dt {
@@ -266,7 +262,9 @@ div.top h5 {
 	border-left-style: solid;
 	white-space: nowrap;
 	font-size: small;
-	padding: 0 4px 2px 5px;
+	padding: 0 8px 2px 5px;
+	margin-right: -3px;
+	background-color: #f0f0f0;
 }
 
 div.subs {
@@ -284,16 +282,13 @@ div.subs {
 	padding-top: 4px;
 }
 
-.subs dt {
-	float: left;
-	margin-right: 1em;
-	clear: left;
-}
-
 .subs dd
 {
-	margin-bottom: 2px;
-	margin-top: 2px;
+  margin: 2px 0 9px 2em;
+}
+
+.subs dd.empty {
+  display: none;
 }
 
 .subs table {

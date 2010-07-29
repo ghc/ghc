@@ -171,8 +171,8 @@ bodyHtml doctitle iface themes
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
-        indexButton maybe_index_url
-        ] ++ [styleMenu themes]) ! [theclass "links"],
+        indexButton maybe_index_url,
+        styleMenu themes]) ! [theclass "links"],
       nonEmpty sectionName << doctitle
       ],
     divContent << pageContent,

@@ -196,10 +196,10 @@ stylePickers ts = map mkPicker ts
       anchor ! [href "#", onclick js] << themeName t
 
 
-styleMenu :: Themes -> Html
-styleMenu [] = noHtml
-styleMenu [_] = noHtml
-styleMenu ts = thediv ! [identifier "style-menu-holder"] << [
+styleMenu :: Themes -> Maybe Html
+styleMenu [] = Nothing
+styleMenu [_] = Nothing
+styleMenu ts = Just $ thediv ! [identifier "style-menu-holder"] << [
     anchor ! [ href "#", onclick js ] << "Style \9662",
     unordList (stylePickers ts) ! [ identifier "style-menu", theclass "hide" ]
   ]

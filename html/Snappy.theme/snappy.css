@@ -128,11 +128,10 @@ ul ul {
 }
 
 ul.links {
-	list-style: none;
-	position: absolute;
-	right: 1px;
-	top: 0;
-	margin: 0;
+  list-style: none;
+  float: right;
+  margin: 0 0 0 0.5em;
+	font-size: 80%;
 }
 
 ul.links li {
@@ -319,7 +318,19 @@ div#style-menu-holder {
 }
 
 #module-header .info {
-	display: none;
+  float: right;
+  margin: 0;
+  font-size: 80%;
+}
+
+#module-header .info dt {
+  float: left;
+  width: 6em;
+  font-weight: bold;
+}
+
+#module-header .info dd {
+  margin-left: 6em;
 }
 
 #table-of-contents,
@@ -362,14 +373,28 @@ div#style-menu-holder {
   padding: 4px;
 }
 
-#interface p + div {
-	margin-top: -15px
+.src a.link {
+	float: right;
+	border-left-width: 1px;
+	border-left-color: #000099;
+	border-left-style: solid;
+	white-space: nowrap;
+	padding: 0 4px;;
 }
+#interface p + div {
+	margin-top: -8px}
 
 .subs p {
 	margin: 0;
 }
 
+dd.empty {
+  display: none;
+}
+
+.subs .subs {
+  margin-left: 2em;
+}
 #interface .subs .src {
   padding: 2px 12px;
   border: none; 
@@ -380,7 +405,6 @@ div#style-menu-holder {
 	font-size: 80%;
   	font-family: "Gill Sans", "Helvetica Neue","Arial",sans-serif;
 }
-
 #interface .methods .src {
 	margin-top: 15px;
 }
