@@ -504,10 +504,10 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
       | no_doc_at_all = noHtml
       | otherwise
       = divSynposis $
-            sectionName << "Synopsis" +++
+            paragraph ! collapser "syn" "caption" << "Synopsis" +++ 
             shortDeclList (
                 mapMaybe (processExport True linksInfo unicode) exports
-            )
+            ) ! ([identifier "syn"] ++ collapser "syn" "hide")
 
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").

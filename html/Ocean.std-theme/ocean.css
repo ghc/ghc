@@ -270,49 +270,47 @@ div#style-menu-holder {
 
 #synopsis {
   position: fixed;
-  right: -21.5em;
-  font-size: 90%;
-  width: 22em;
-  height: 80%;
-  top: 5em;
-  padding: 0;
-  background-color: #fff2b2;
-}
-
-#synopsis:hover {
   right: 0;
-  background: none;
-}
-
-#synopsis .caption,
-#synopsis ul,
-#synopsis ul li.src {
-  background-color: #fff2b2;
-  white-space: nowrap;
-}
-
-#synopsis > * {
-  margin: 0 0 0 8px;
-  border-left: 1px solid rgb(196,69,29); 
+  font-size: 90%;
+  height: 80%;
+  top: 10%;
+  padding: 0;
 }
 
 #synopsis .caption {
-  border-top: 1px solid rgb(196,69,29);
-  padding-top: 0.5em;
-  padding-bottom: 0.5em;
-  text-align: center;
+  text-align: right;
+  float: left;
+  width: 29px;
+  color: rgba(255,255,255,0);
+  height: 110px;
+  margin: 0;
+  font-size: 1px;
+  padding: 0;
 }
 
-#synopsis ul {
+#synopsis p.caption.collapser,
+#synopsis p.caption.expander {
+  background: url(synopsis.png) no-repeat 0 -8px;
+}
+
+#synopsis ul,
+#synopsis ul li.src {
+  background-color: #f9f8db;
+  white-space: nowrap;
+}
+
+#synopsis ul.collapser,
+#synopsis ul.expander {
+  background-image: none;
   list-style: none;
+  width: 22em;
   height: 100%;
   overflow: auto;
-  border-bottom: 1px solid rgb(196,69,29);
-  padding-left: 0.5em;
+  padding: 0.5em;
+  margin: 0;
 }
 
 #synopsis ul ul {
-  border: none;
   overflow: hidden;
 }
 
