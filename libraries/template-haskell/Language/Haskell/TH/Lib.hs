@@ -53,6 +53,8 @@ charL       :: Char -> Lit
 charL       = CharL
 stringL     :: String -> Lit
 stringL     = StringL
+stringPrimL :: String -> Lit
+stringPrimL = StringPrimL
 rationalL   :: Rational -> Lit
 rationalL   = RationalL
 

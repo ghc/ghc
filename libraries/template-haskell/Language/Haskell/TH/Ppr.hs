@@ -164,6 +164,7 @@ pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)
 pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
 pprLit _ (StringL s)     = text (show s)
+pprLit _ (StringPrimL s) = text (show s) <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $ rational rat
 
 ------------------------------

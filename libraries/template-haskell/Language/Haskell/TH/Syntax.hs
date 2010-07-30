@@ -649,6 +649,7 @@ data Lit = CharL Char
          | WordPrimL Integer
          | FloatPrimL Rational
          | DoublePrimL Rational
+         | StringPrimL String	-- ^ A primitive C-style string, type Addr#
     deriving( Show, Eq, Data, Typeable )
 
     -- We could add Int, Float, Double etc, as we do in HsLit, 
