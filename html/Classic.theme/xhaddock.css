@@ -216,6 +216,16 @@ dl.info dd {
 	margin-bottom: 2em;
 }
 
+#synopsis .expander,
+#synopsis .collapser {
+  background: none;
+  padding-left: inherit;
+}
+
+#synopsis .hide {
+  display: inherit;
+}
+
 #synopsis ul {
 	margin: 0;
 	padding-top: 0;

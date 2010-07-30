@@ -352,6 +352,16 @@ div#style-menu-holder {
   list-style: none;
 }
 
+#synopsis .caption.expander,
+#synopsis .caption.collapser {
+	background: inherit;
+}
+
+#synopsis ul.hide {
+  display: inherit;
+}
+
+
 #synopsis .src,
 .instances .src {
   background-color: #FAFAFA; 
