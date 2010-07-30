@@ -589,11 +589,12 @@ cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim f }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim f }
 cvtLit (CharL c)       = do { force c; return $ HsChar c }
-cvtLit (StringL s)     
-  = do { let { s' = mkFastString s }
-       ; force s'
-       ; return $ HsString s' 
-       }
+cvtLit (StringL s)     = do { let { s' = mkFastString s }
+       		       	    ; force s'      
+       		       	    ; return $ HsString s' }
+cvtLit (StringPrimL s) = do { let { s' = mkFastString s }
+       			    ; force s'           
+       			    ; return $ HsStringPrim s' }
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 	-- cvtLit should not be called on IntegerL, RationalL
 	-- That precondition is established right here in
