@@ -725,7 +725,7 @@ SRC_ALEX_OPTS		= -g
 HSTAGS = @HstagsCmd@
 
 # Should we build haddock docs?
-HADDOCK_DOCS = $(GhcWithInterpreter)
+HADDOCK_DOCS = YES
 # And HsColour the sources?
 ifeq "$(HSCOLOUR)" ""
 HSCOLOUR_SRCS = NO

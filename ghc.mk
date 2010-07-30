@@ -531,11 +531,9 @@ BUILD_DIRS += \
    $(GHC_GENAPPLY_DIR)
 endif
 
-ifneq "$(HADDOCK_DOCS)" "NO"
 BUILD_DIRS += \
    utils/haddock \
    utils/haddock/doc
-endif
 
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
