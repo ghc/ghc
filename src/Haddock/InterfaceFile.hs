@@ -103,7 +103,7 @@ writeInterfaceFile filename iface = do
   -- write the symtab pointer at the front of the file
   symtab_p <- tellBin bh
   putAt bh symtab_p_p symtab_p
-  seekBin bh symtab_p		
+  seekBin bh symtab_p
 
   -- write the symbol table itself
   symtab_next' <- readFastMutInt symtab_next

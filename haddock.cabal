@@ -124,6 +124,7 @@ executable haddock
     Haddock.Backends.Xhtml.DocMarkup
     Haddock.Backends.Xhtml.Layout
     Haddock.Backends.Xhtml.Names
+    Haddock.Backends.Xhtml.Themes
     Haddock.Backends.Xhtml.Types
     Haddock.Backends.Xhtml.Utils
     Haddock.Backends.LaTeX
