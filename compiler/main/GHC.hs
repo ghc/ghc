@@ -111,13 +111,13 @@ module GHC (
 	showModule,
         isModuleInterpreted,
 	InteractiveEval.compileExpr, HValue, dynCompileExpr,
-	lookupName,
         GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
         BreakArray, setBreakOn, setBreakOff, getBreak,
 #endif
+        lookupName,
 
 	-- * Abstract syntax elements
 
@@ -243,9 +243,9 @@ import Linker           ( HValue )
 import ByteCodeInstr
 import BreakArray
 import InteractiveEval
-import TcRnDriver
 #endif
 
+import TcRnDriver
 import TcIface
 import TcRnTypes        hiding (LIE)
 import TcRnMonad        ( initIfaceCheck )
@@ -2723,3 +2723,12 @@ obtainTermFromId bound force id =
       liftIO $ InteractiveEval.obtainTermFromId hsc_env bound force id
 
 #endif
+
+-- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
+-- entity known to GHC, including 'Name's defined using 'runStmt'.
+lookupName :: GhcMonad m => Name -> m (Maybe TyThing)
+lookupName name = withSession $ \hsc_env -> do
+  mb_tything <- ioMsg $ tcRnLookupName hsc_env name
+  return mb_tything
+  -- XXX: calls panic in some circumstances;  is that ok?
+

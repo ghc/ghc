@@ -9,10 +9,10 @@ module TcRnDriver (
 #ifdef GHCI
 	tcRnStmt, tcRnExpr, tcRnType,
 	tcRnLookupRdrName,
-	tcRnLookupName,
-	tcRnGetInfo,
 	getModuleExports, 
 #endif
+	tcRnLookupName,
+	tcRnGetInfo,
 	tcRnModule, 
 	tcTopSrcDecls,
 	tcRnExtCore
@@ -72,6 +72,7 @@ import Outputable
 import DataCon
 import Type
 import Class
+import TcType
 import Data.List ( sortBy )
 
 #ifdef GHCI
@@ -84,7 +85,6 @@ import IfaceEnv
 import MkId
 import BasicTypes
 import TidyPgm	  ( globaliseAndTidyId )
-import TcType	  ( isUnitTy, isTauTy, tyClsNamesOfDFunHead )
 import TysWiredIn ( unitTy, mkListTy )
 #endif
 
@@ -1018,7 +1018,6 @@ get two defns for 'main' in the interface file!
 %*********************************************************
 
 \begin{code}
-#ifdef GHCI
 setInteractiveContext :: HscEnv -> InteractiveContext -> TcRn a -> TcRn a
 setInteractiveContext hsc_env icxt thing_inside 
   = let -- Initialise the tcg_inst_env with instances from all home modules.  
@@ -1049,6 +1048,7 @@ setInteractiveContext hsc_env icxt thing_inside
 
 
 \begin{code}
+#ifdef GHCI
 tcRnStmt :: HscEnv
 	 -> InteractiveContext
 	 -> LStmt RdrName
@@ -1404,6 +1404,7 @@ lookup_rdr_name rdr_name = do {
     
     return good_names
  }
+#endif
 
 tcRnLookupName :: HscEnv -> Name -> IO (Messages, Maybe TyThing)
 tcRnLookupName hsc_env name
@@ -1424,8 +1425,8 @@ tcRnLookupName' name = do
      _ -> panic "tcRnLookupName'"
 
 tcRnGetInfo :: HscEnv
-	    -> Name
-	    -> IO (Messages, Maybe (TyThing, Fixity, [Instance]))
+            -> Name
+            -> IO (Messages, Maybe (TyThing, Fixity, [Instance]))
 
 -- Used to implement :info in GHCi
 --
@@ -1435,8 +1436,14 @@ tcRnGetInfo :: HscEnv
 --  *and* as a type or class constructor; 
 -- hence the call to dataTcOccs, and we return up to two results
 tcRnGetInfo hsc_env name
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    let ictxt = hsc_IC hsc_env in
+  = initTcPrintErrors hsc_env iNTERACTIVE $
+    tcRnGetInfo' hsc_env name
+
+tcRnGetInfo' :: HscEnv
+             -> Name
+             -> TcRn (TyThing, Fixity, [Instance])
+tcRnGetInfo' hsc_env name
+  = let ictxt = hsc_IC hsc_env in
     setInteractiveContext hsc_env ictxt $ do
 
 	-- Load the interface for all unqualified types and classes
@@ -1485,7 +1492,6 @@ loadUnqualIfaces ictxt
 		    isTcOcc (nameOccName name),  -- Types and classes only
 		    unQualOK gre ]		 -- In scope unqualified
     doc = ptext (sLit "Need interface for module whose export(s) are in scope unqualified")
-#endif /* GHCI */
 \end{code}
 
 %************************************************************************

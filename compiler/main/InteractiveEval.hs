@@ -29,7 +29,6 @@ module InteractiveEval (
 	showModule,
         isModuleInterpreted,
 	compileExpr, dynCompileExpr,
-	lookupName,
         Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
         skolemiseSubst, skolemiseTy
 #endif
@@ -932,14 +931,6 @@ parseName :: GhcMonad m => String -> m [Name]
 parseName str = withSession $ \hsc_env -> do
    (L _ rdr_name) <- hscParseIdentifier (hsc_dflags hsc_env) str
    ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name
-
--- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
--- entity known to GHC, including 'Name's defined using 'runStmt'.
-lookupName :: GhcMonad m => Name -> m (Maybe TyThing)
-lookupName name = withSession $ \hsc_env -> do
-  mb_tything <- ioMsg $ tcRnLookupName hsc_env name
-  return mb_tything
-  -- XXX: calls panic in some circumstances;  is that ok?
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression
