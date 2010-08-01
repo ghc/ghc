@@ -520,6 +520,7 @@ BUILD_DIRS += \
    driver \
    driver/ghci \
    driver/ghc \
+   driver/haddock \
    libffi \
    includes \
    rts
