@@ -464,6 +464,7 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
+	"$(RM)" $(RM_OPTS) $@
 	"$(AR)" $(AR_OPTS) $(EXTRA_AR_ARGS) $@ $<
 endif
 
