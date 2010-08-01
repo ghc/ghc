@@ -54,7 +54,7 @@ foreach $dir (".", glob("libraries/*/")) {
 }
 
 # Alas, darcs doesn't handle file permissions, so fix a few of them.
-for my $file ("boot", "darcs-all", "push-all", "validate") {
+for my $file ("boot", "darcs-all", "validate") {
     chmod 0755, $file if -f $file
         or die "Can't chmod 0755 $file: $!";
 }
