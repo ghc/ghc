@@ -11,7 +11,8 @@ system("/usr/bin/perl", "-w", "boot-pkgs") == 0
 my $dir;
 my $curdir;
 
-$curdir = &cwd();
+$curdir = &cwd()
+    or die "Can't find current directory: $!";
 
 # Check that we have all boot packages.
 open PACKAGES, "< packages";
@@ -45,13 +46,15 @@ close PACKAGES;
 foreach $dir (".", glob("libraries/*/")) {
     if (-f "$dir/configure.ac") {
         print "Booting $dir\n";
-        chdir $dir;
-        system "autoreconf";
-        chdir $curdir;
+        chdir $dir or die "can't change to $dir: $!";
+        system("autoreconf") == 0
+            or die "Running autoreconf failed with exitcode $?";
+        chdir $curdir or die "can't change to $curdir: $!";
     }
 }
 
 # Alas, darcs doesn't handle file permissions, so fix a few of them.
 for my $file ("boot", "darcs-all", "push-all", "validate") {
-    chmod 0755, $file if -f $file;
+    chmod 0755, $file if -f $file
+        or die "Can't chmod 0755 $file: $!";
 }
