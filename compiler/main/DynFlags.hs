@@ -1752,7 +1752,6 @@ xFlags = [
   ( "TemplateHaskell",                  Opt_TemplateHaskell, const Supported ),
   ( "QuasiQuotes",                      Opt_QuasiQuotes, const Supported ),
   ( "Generics",                         Opt_Generics, const Supported ),
-  -- On by default:
   ( "ImplicitPrelude",                  Opt_ImplicitPrelude, const Supported ),
   ( "RecordWildCards",                  Opt_RecordWildCards, const Supported ),
   ( "NamedFieldPuns",                   Opt_RecordPuns, const Supported ),
@@ -1764,16 +1763,12 @@ xFlags = [
   ( "ViewPatterns",                     Opt_ViewPatterns, const Supported ),
   ( "TypeFamilies",                     Opt_TypeFamilies, const Supported ),
   ( "BangPatterns",                     Opt_BangPatterns, const Supported ),
-  -- On by default:
   ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, const Supported ),
-  -- On by default:
   ( "NPlusKPatterns",                   Opt_NPlusKPatterns, const Supported ),
-  -- On by default (which is not strictly H98):
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, const Supported ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, const Supported ),
   ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, const Supported ),
-  -- On by default:
   ( "DatatypeContexts",                 Opt_DatatypeContexts, const Supported ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, const Supported ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, const Supported ),
