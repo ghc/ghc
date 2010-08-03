@@ -52,22 +52,18 @@ extra-source-files:
 data-files:
   html/frames.html
   html/haddock-util.js
-  html/themes/Classic/haskell_icon.gif
-  html/themes/Classic/minus.gif
-  html/themes/Classic/plus.gif
-  html/themes/Classic/xhaddock.css
-  html/themes/Ocean/hslogo-16.png
-  html/themes/Ocean/minus.gif
-  html/themes/Ocean/ocean.css
-  html/themes/Ocean/plus.gif
-  html/themes/Snappy/minus.gif
-  html/themes/Snappy/plus.gif
-  html/themes/Snappy/s_haskell_icon.gif
-  html/themes/Snappy/snappy.css
-  html/themes/Tibbe/haskell_icon.gif
-  html/themes/Tibbe/minus.gif
-  html/themes/Tibbe/plus.gif
-  html/themes/Tibbe/tibbe.css
+  html/Classic.theme/haskell_icon.gif
+  html/Classic.theme/minus.gif
+  html/Classic.theme/plus.gif
+  html/Classic.theme/xhaddock.css
+  html/Ocean.std-theme/hslogo-16.png
+  html/Ocean.std-theme/minus.gif
+  html/Ocean.std-theme/ocean.css
+  html/Ocean.std-theme/plus.gif
+  html/Snappy.theme/minus.gif
+  html/Snappy.theme/plus.gif
+  html/Snappy.theme/s_haskell_icon.gif
+  html/Snappy.theme/snappy.css
   latex/haddock.sty
 
 flag in-ghc-tree
