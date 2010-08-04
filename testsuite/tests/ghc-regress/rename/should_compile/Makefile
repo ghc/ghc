@@ -26,3 +26,10 @@ T3449:
 	'$(TEST_HC)' -Wall -c T3449A.hs
 	'$(TEST_HC)' -Wall -c T3449.hs
 
+T4239:
+	$(RM) T4239A.hi T4239A.o
+	$(RM) T4239.hi  T4239.o T4239.imports
+	'$(TEST_HC)' -c T4239A.hs
+	'$(TEST_HC)' -c T4239.hs -ddump-minimal-imports
+	cat T4239.imports
+
