@@ -164,3 +164,4 @@ test('T3899', extra_clean(['T3899a.hi','T3899a.o']),
               multimod_compile, ['T3899','-v0 -ddump-splices -dsuppress-uniques'])
 test('T4056', normal, compile, ['-v0'])
 test('T4188', normal, compile, ['-v0'])
+test('T4233', normal, compile, ['-v0'])
