@@ -33,3 +33,12 @@ T4239:
 	'$(TEST_HC)' -c T4239.hs -ddump-minimal-imports
 	cat T4239.imports
 
+T4240:
+	$(RM) T4240A.hi T4240A.o
+	$(RM) T4240B.hi T4240B.o
+	$(RM) T4240.hi  T4240.o T4240.imports
+	'$(TEST_HC)' -c T4240A.hs
+	'$(TEST_HC)' -c T4240B.hs
+	'$(TEST_HC)' -c T4240.hs -ddump-minimal-imports
+	cat T4240.imports
+
