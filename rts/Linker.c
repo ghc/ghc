@@ -107,6 +107,10 @@
 #endif
 #endif
 
+#if defined(x86_64_HOST_ARCH) && defined(darwin_HOST_OS)
+#define ALWAYS_PIC
+#endif
+
 /* Hash table mapping symbol names to Symbol */
 static /*Str*/HashTable *symhash;
 
@@ -208,7 +212,7 @@ static void machoInitSymbolsWithoutUnderscore( void );
  * We pick a default address based on the OS, but also make this
  * configurable via an RTS flag (+RTS -xm)
  */
-#if defined(x86_64_HOST_ARCH)
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
 
 #if defined(MAP_32BIT)
 // Try to use MAP_32BIT
@@ -1164,7 +1168,7 @@ initLinker( void )
     ASSERT( compileResult == 0 );
 #   endif
 
-#if defined(x86_64_HOST_ARCH)
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
     if (RtsFlags.MiscFlags.linkerMemBase != 0) {
         // User-override for mmap_32bit_base
         mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
@@ -1533,7 +1537,7 @@ mmapForLinker (size_t bytes, nat flags, int fd)
    pagesize = getpagesize();
    size = ROUND_UP(bytes, pagesize);
 
-#if defined(x86_64_HOST_ARCH)
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
 mmap_again:
 
    if (mmap_32bit_base != 0) {
@@ -1550,7 +1554,7 @@ mmap_again:
        stg_exit(EXIT_FAILURE);
    }
    
-#if defined(x86_64_HOST_ARCH)
+#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
    if (mmap_32bit_base != 0) {
        if (result == map_addr) {
            mmap_32bit_base = (StgWord8*)map_addr + size;
@@ -3777,6 +3781,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
       case R_X86_64_PC32:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_PC32 relocation, but ALWAYS_PIC.");
+#else
 	  StgInt64 off = value - P;
 	  if (off >= 0x7fffffffL || off < -0x80000000L) {
 #if X86_64_ELF_NONPIC_HACK
@@ -3789,6 +3796,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
           }
 	  *(Elf64_Word *)P = (Elf64_Word)off;
+#endif
 	  break;
       }
 
@@ -3800,6 +3808,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       }
 
       case R_X86_64_32:
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_32 relocation, but ALWAYS_PIC.");
+#else
 	  if (value >= 0x7fffffffL) {
 #if X86_64_ELF_NONPIC_HACK	      
               StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
@@ -3811,9 +3822,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
           }
 	  *(Elf64_Word *)P = (Elf64_Word)value;
+#endif
 	  break;
 
       case R_X86_64_32S:
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_32S relocation, but ALWAYS_PIC.");
+#else
 	  if ((StgInt64)value > 0x7fffffffL || (StgInt64)value < -0x80000000L) {
 #if X86_64_ELF_NONPIC_HACK	      
               StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
@@ -3825,6 +3840,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 	  }
 	  *(Elf64_Sword *)P = (Elf64_Sword)value;
+#endif
 	  break;
 	  
       case R_X86_64_GOTPCREL:
@@ -3837,6 +3853,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       
       case R_X86_64_PLT32:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_PLT32 relocation, but ALWAYS_PIC.");
+#else
 	  StgInt64 off = value - P;
 	  if (off >= 0x7fffffffL || off < -0x80000000L) {
               StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
@@ -3844,6 +3863,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
               off = pltAddress + A - P;
 	  }
 	  *(Elf64_Word *)P = (Elf64_Word)off;
+#endif
 	  break;
       }
 #endif
