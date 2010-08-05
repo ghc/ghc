@@ -74,7 +74,7 @@ $white_no_nl+		;
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
 <line_prag> $digit+			{ setLine line_prag1 }
-<line_prag1> \" ($printable # \")* \"	{ setFile line_prag2 }
+<line_prag1> \" [^\"]* \"	{ setFile line_prag2 }
 <line_prag2> .*				{ pop }
 
 <0> {
