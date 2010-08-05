@@ -1513,12 +1513,16 @@ linkBinary dflags o_files dep_packages = do
     let no_hs_main = dopt Opt_NoHsMain dflags
     let main_lib | no_hs_main = []
                  | otherwise  = [ "-lHSrtsmain" ]
-    rtsEnabledObj <- if dopt Opt_RtsOptsEnabled dflags
-                     then do fn <- mkExtraCObj dflags
-                                    ["#include \"Rts.h\"",
-                                     "const rtsBool rtsOptsEnabled = rtsTrue;"]
-                             return [fn]
-                     else return []
+    let mkRtsEnabledObj val = do fn <- mkExtraCObj dflags
+                                           ["#include \"Rts.h\"",
+                                            "#include \"RtsOpts.h\"",
+                                            "const rtsOptsEnabledEnum rtsOptsEnabled = "
+                                                ++ val ++ ";"]
+                                 return [fn]
+    rtsEnabledObj <- case rtsOptsEnabled dflags of
+                     RtsOptsNone     -> mkRtsEnabledObj "rtsOptsNone"
+                     RtsOptsSafeOnly -> return []
+                     RtsOptsAll      -> mkRtsEnabledObj "rtsOptsAll"
     rtsOptsObj <- case rtsOpts dflags of
                   Just opts ->
                       do fn <- mkExtraCObj dflags

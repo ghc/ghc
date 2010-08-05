@@ -19,6 +19,7 @@ module DynFlags (
         lopt_set_flattened,
         lopt_unset_flattened,
         DynFlags(..),
+        RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
@@ -234,7 +235,6 @@ data DynFlag
    | Opt_EagerBlackHoling
    | Opt_ReadUserPackageConf
    | Opt_NoHsMain
-   | Opt_RtsOptsEnabled
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
@@ -418,6 +418,7 @@ data DynFlags = DynFlags {
   ghcUsagePath          :: FilePath,    -- Filled in by SysTools
   ghciUsagePath         :: FilePath,    -- ditto
   rtsOpts               :: Maybe String,
+  rtsOptsEnabled        :: RtsOptsEnabled,
 
   hpcDir                :: String,      -- ^ Path to store the .mix files
 
@@ -592,6 +593,8 @@ data DynLibLoader
   | SystemDependent
   deriving Eq
 
+data RtsOptsEnabled = RtsOptsNone | RtsOptsSafeOnly | RtsOptsAll
+
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
@@ -662,6 +665,7 @@ defaultDynFlags =
         cmdlineFrameworks       = [],
         tmpDir                  = cDEFAULT_TMPDIR,
         rtsOpts                 = Nothing,
+        rtsOptsEnabled          = RtsOptsSafeOnly,
 
         hpcDir                  = ".hpc",
 
@@ -1247,8 +1251,11 @@ dynamic_flags = [
   , Flag "no-auto-link-packages" (NoArg (unSetDynFlag Opt_AutoLinkPackages)) Supported
   , Flag "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain)) Supported
   , Flag "with-rtsopts"   (HasArg setRtsOpts) Supported
-  , Flag "rtsopts"        (NoArg (setDynFlag Opt_RtsOptsEnabled)) Supported
-  , Flag "no-rtsopts"     (NoArg (unSetDynFlag Opt_RtsOptsEnabled)) Supported
+  , Flag "rtsopts"        (NoArg (setRtsOptsEnabled RtsOptsAll)) Supported
+  , Flag "rtsopts=all"    (NoArg (setRtsOptsEnabled RtsOptsAll)) Supported
+  , Flag "rtsopts=some"   (NoArg (setRtsOptsEnabled RtsOptsSafeOnly)) Supported
+  , Flag "rtsopts=none"   (NoArg (setRtsOptsEnabled RtsOptsNone)) Supported
+  , Flag "no-rtsopts"     (NoArg (setRtsOptsEnabled RtsOptsNone)) Supported
   , Flag "main-is"        (SepArg setMainIs ) Supported
   , Flag "haddock"        (NoArg (setDynFlag Opt_Haddock)) Supported
   , Flag "haddock-opts"   (HasArg (upd . addHaddockOpts)) Supported
@@ -2197,6 +2204,9 @@ setTmpDir dir dflags = dflags{ tmpDir = normalise dir }
 
 setRtsOpts :: String -> DynP ()
 setRtsOpts arg  = upd $ \ d -> d {rtsOpts = Just arg}
+
+setRtsOptsEnabled :: RtsOptsEnabled -> DynP ()
+setRtsOptsEnabled arg  = upd $ \ d -> d {rtsOptsEnabled = arg}
 
 -----------------------------------------------------------------------------
 -- Hpc stuff

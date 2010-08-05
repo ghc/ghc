@@ -1832,10 +1832,10 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-rtsopts</option></entry>
-	      <entry>Allow the RTS behaviour to be tweaked via command-line
+	      <entry><option>-rtsopts</option>, <option>-rtsopts={none,some,all}</option></entry>
+	      <entry>Control whether the RTS behaviour can be tweaked via command-line
           flags and the <literal>GHCRTS</literal> environment
-          variable.</entry>
+          variable. Using <literal>none</literal> means no RTS flags can be given; <literal>some</literal> means only a minimum of safe options can be given (the default), and <literal>all</literal> (or no argument at all) means that all RTS flags are permitted.</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>

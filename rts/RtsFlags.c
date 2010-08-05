@@ -413,7 +413,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	char *ghc_rts = getenv("GHCRTS");
 
 	if (ghc_rts != NULL) {
-            if (rtsOptsEnabled) {
+            if (rtsOptsEnabled != rtsOptsNone) {
                 splitRtsFlags(ghc_rts, rts_argc, rts_argv);
             }
             else {
@@ -438,7 +438,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	    break;
 	}
 	else if (strequal("+RTS", argv[arg])) {
-            if (rtsOptsEnabled) {
+            if (rtsOptsEnabled != rtsOptsNone) {
                 mode = RTS;
             }
             else {
@@ -450,7 +450,14 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	    mode = PGM;
 	}
 	else if (mode == RTS && *rts_argc < MAX_RTS_ARGS-1) {
-	    rts_argv[(*rts_argc)++] = argv[arg];
+	    if ((rtsOptsEnabled == rtsOptsAll) ||
+            strequal(argv[arg], "--info")) {
+            rts_argv[(*rts_argc)++] = argv[arg];
+        }
+        else {
+            errorBelch("Most RTS options are disabled. Link with -rtsopts to enable them.");
+            stg_exit(EXIT_FAILURE);
+        }
 	}
 	else if (mode == PGM) {
 	    argv[(*argc)++] = argv[arg];

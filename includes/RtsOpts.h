@@ -9,6 +9,8 @@
 #ifndef RTSOPTS_H
 #define RTSOPTS_H
 
-extern const rtsBool rtsOptsEnabled;
+typedef enum {rtsOptsNone, rtsOptsSafeOnly, rtsOptsAll} rtsOptsEnabledEnum;
+
+extern const rtsOptsEnabledEnum rtsOptsEnabled;
 
 #endif /* RTSOPTS_H */
