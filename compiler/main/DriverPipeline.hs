@@ -914,7 +914,7 @@ runPhase CmmCpp _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 
 runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
   = do
-        let dflags = hsc_dflags hsc_env
+        let dflags = ensureFlattenedExtensionFlags $ hsc_dflags hsc_env
         let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
         let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
         output_fn <- liftIO $ get_output_fn dflags next_phase maybe_loc
