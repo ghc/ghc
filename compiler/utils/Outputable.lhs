@@ -34,7 +34,7 @@ module Outputable (
 	speakNth, speakNTimes, speakN, speakNOf, plural,
 
         -- * Converting 'SDoc' into strings and outputing it
-	printSDoc, printErrs, hPrintDump, printDump,
+	printSDoc, printErrs, printOutput, hPrintDump, printDump,
 	printForC, printForAsm, printForUser, printForUserPartWay,
 	pprCode, mkCodeStyle,
 	showSDoc, showSDocOneLine,
@@ -286,6 +286,9 @@ printSDoc d sty = do
 printErrs :: Doc -> IO ()
 printErrs doc = do Pretty.printDoc PageMode stderr doc
 		   hFlush stderr
+
+printOutput :: Doc -> IO ()
+printOutput doc = Pretty.printDoc PageMode stdout doc
 
 printDump :: SDoc -> IO ()
 printDump doc = hPrintDump stdout doc

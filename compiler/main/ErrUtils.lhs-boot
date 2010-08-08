@@ -5,7 +5,8 @@ import Outputable (SDoc)
 import SrcLoc (SrcSpan)
 
 data Severity
-  = SevInfo
+  = SevOutput
+  | SevInfo
   | SevWarning
   | SevError
   | SevFatal

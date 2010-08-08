@@ -53,7 +53,8 @@ pprMessageBag :: Bag Message -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
 data Severity
-  = SevInfo
+  = SevOutput
+  | SevInfo
   | SevWarning
   | SevError
   | SevFatal
@@ -310,7 +311,7 @@ fatalErrorMsg dflags msg = log_action dflags SevFatal noSrcSpan defaultErrStyle 
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 (log_action dflags SevInfo noSrcSpan defaultUserStyle (text msg))
+  = ifVerbose dflags 1 (log_action dflags SevOutput noSrcSpan defaultUserStyle (text msg))
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what 

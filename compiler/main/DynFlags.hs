@@ -742,9 +742,10 @@ defaultDynFlags =
 
         log_action = \severity srcSpan style msg ->
                         case severity of
-                          SevInfo  -> printErrs (msg style)
-                          SevFatal -> printErrs (msg style)
-                          _        -> do 
+                          SevOutput -> printOutput (msg style)
+                          SevInfo   -> printErrs (msg style)
+                          SevFatal  -> printErrs (msg style)
+                          _         -> do 
                                 hPutChar stderr '\n'
                                 printErrs ((mkLocMessage srcSpan msg) style)
                      -- careful (#2302): printErrs prints in UTF-8, whereas
