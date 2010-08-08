@@ -1,0 +1,4 @@
+
+T3811.hs:4:1:
+    Invalid type signature: f x :: Char
+    Should be of form <variable> :: <type>
