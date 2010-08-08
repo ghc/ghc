@@ -1,6 +1,2 @@
-[1 of 2] Compiling T1914B           ( T1914B.hs, interpreted )
-[2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
-[2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
 
 T1914A.hs:1:38: Parse error: naked expression at top level
-[2 of 2] Compiling T1914A           ( T1914A.hs, interpreted )
