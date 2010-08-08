@@ -1290,9 +1290,6 @@ def normalise_whitespace( str ):
     return str
 
 def normalise_errmsg( str ):
-    # Look for file names and zap the directory part:
-    #    foo/var/xyzzy/somefile  -->  somefile
-    str = re.sub('([^\\s/]+/)*([^\\s/])', '\\2', str)
     # If somefile ends in ".exe" or ".exe:", zap ".exe" (for Windows)
     #    the colon is there because it appears in error messages; this
     #    hacky solution is used in place of more sophisticated filename
