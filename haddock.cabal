@@ -167,6 +167,7 @@ library
     Documentation.Haddock
 
   other-modules:
+    Main
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create

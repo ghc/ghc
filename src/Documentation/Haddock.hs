@@ -17,6 +17,7 @@ module Documentation.Haddock (
   Interface(..),
   InstalledInterface(..),
   createInterfaces,
+  createInterfaces',
 
   -- * Export items & declarations
   ExportItem(..),
@@ -39,6 +40,7 @@ module Documentation.Haddock (
   Example(..),
   DocMarkup(..),
   HaddockModInfo(..),
+  markup,
 
   -- * Interface files
   -- | (.haddock files)
@@ -59,3 +61,5 @@ import Haddock.InterfaceFile
 import Haddock.Interface
 import Haddock.Types
 import Haddock.Options
+import Haddock.Utils
+import Main

@@ -15,7 +15,7 @@
 --
 -- Program entry point and top-level code.
 -----------------------------------------------------------------------------
-module Main (main) where
+module Main (main, createInterfaces') where
 
 
 import Haddock.Backends.Xhtml
@@ -115,6 +115,48 @@ handleGhcExceptions =
 -------------------------------------------------------------------------------
 
 
+-- | Create 'Interface' structures from a given list of Haddock command-line
+-- flags and file or module names (as accepted by 'haddock' executable).  Flags
+-- that control documentation generation or show help or version information
+-- are ignored.
+--
+-- This is a more high-level alternative to 'createInterfaces'.
+createInterfaces'
+  :: [String]       -- ^ A list of command-line flags and file or module names
+  -> IO [Interface] -- ^ Resulting list of interfaces
+createInterfaces' args = do
+  (flags, fileArgs) <- parseHaddockOpts args
+  (_, ifaces) <- readPackagesAndCreateInterfaces flags fileArgs
+  return ifaces
+
+
+readPackagesAndCreateInterfaces :: [Flag] -> [String] -> IO ([(InterfaceFile, FilePath)], [Interface])
+readPackagesAndCreateInterfaces flags fileArgs = do
+  libDir <- getGhcLibDir flags
+
+  -- Catches all GHC source errors, then prints and re-throws them.
+  let handleSrcErrors action' = flip handleSourceError action' $ \err -> do
+        printExceptionAndWarnings err
+        liftIO exitFailure
+
+  -- Initialize GHC.
+  withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
+
+    -- Get packages supplied with --read-interface.
+    packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
+
+    -- Create the interfaces -- this is the core part of Haddock.
+    (ifaces, homeLinks) <- createInterfaces (verbosity flags) fileArgs flags
+                                            (map fst packages)
+
+    -- Dump an "interface file" (.haddock file), if requested.
+    liftIO $ case optDumpInterfaceFile flags of
+      Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
+      Nothing -> return ()
+
+    return (packages, ifaces)
+
+
 main :: IO ()
 main = handleTopExceptions $ do
 
@@ -125,30 +167,10 @@ main = handleTopExceptions $ do
 
   if not (null fileArgs)
     then do
-      libDir <- getGhcLibDir flags
+      (packages, ifaces) <- readPackagesAndCreateInterfaces flags fileArgs
 
-      -- Catches all GHC source errors, then prints and re-throws them.
-      let handleSrcErrors action = flip handleSourceError action $ \err -> do
-            printExceptionAndWarnings err
-            liftIO exitFailure
-
-      -- Initialize GHC.
-      withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
-
-        -- Get packages supplied with --read-interface.
-        packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
-
-        -- Create the interfaces -- this is the core part of Haddock.
-        (ifaces, homeLinks) <- createInterfaces (verbosity flags) fileArgs flags
-                                                (map fst packages)
-        liftIO $ do
-          -- Render the interfaces.
-          renderStep flags packages ifaces
-
-          -- Dump an "interface file" (.haddock file), if requested.
-          case optDumpInterfaceFile flags of
-            Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
-            Nothing -> return ()
+      -- Render the interfaces.
+      renderStep flags packages ifaces
 
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
