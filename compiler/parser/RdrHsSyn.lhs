@@ -799,12 +799,14 @@ checkValSig
 checkValSig (L l (HsVar v)) ty 
   | isUnqual v && not (isDataOcc (rdrNameOcc v))
   = return (TypeSig (L l v) ty)
-checkValSig lhs@(L l _)         _
-  | looks_like_foreign lhs
-  = parseError l "Invalid type signature; perhaps you meant to use -XForeignFunctionInterface?"
-  | otherwise
-  = parseError l "Invalid type signature: should be of form <variable> :: <type>"
+checkValSig lhs@(L l _) ty
+  = parseErrorSDoc l ((text "Invalid type signature:" <+>
+                       ppr lhs <+> text "::" <+> ppr ty)
+                   $$ text hint)
   where
+    hint = if looks_like_foreign lhs
+           then "Perhaps you meant to use -XForeignFunctionInterface?"
+           else "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
