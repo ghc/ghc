@@ -305,6 +305,7 @@ data ExtensionFlag
    | Opt_GADTs
    | Opt_RelaxedPolyRec
    | Opt_NPlusKPatterns
+   | Opt_DoAndIfThenElse
 
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
@@ -814,6 +815,7 @@ languageExtensions (Just Haskell2010)
        Opt_EmptyDataDecls,
        Opt_ForeignFunctionInterface,
        Opt_PatternGuards,
+       Opt_DoAndIfThenElse,
        Opt_RelaxedPolyRec]
 
 -- The DOpt class is a temporary workaround, to avoid having to do
@@ -1773,6 +1775,7 @@ xFlags = [
   ( "BangPatterns",                     Opt_BangPatterns, const Supported ),
   ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, const Supported ),
   ( "NPlusKPatterns",                   Opt_NPlusKPatterns, const Supported ),
+  ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, const Supported ),
   ( "MonoPatBinds",                     Opt_MonoPatBinds, const Supported ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, const Supported ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, const Supported ),

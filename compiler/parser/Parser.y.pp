@@ -1269,7 +1269,9 @@ exp10 :: { LHsExpr RdrName }
 							   	(unguardedGRHSs $6)
 							    ]) }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
-	| 'if' exp 'then' exp 'else' exp	{ LL $ HsIf $2 $4 $6 }
+	| 'if' exp optSemi 'then' exp optSemi 'else' exp
+                                        {% checkDoAndIfThenElse $2 $3 $5 $6 $8 >>
+                                           return (LL $ HsIf $2 $5 $8) }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
 	| '-' fexp				{ LL $ NegApp $2 noSyntaxExpr }
 
@@ -1295,6 +1297,10 @@ exp10 :: { LHsExpr RdrName }
         | '{-# CORE' STRING '#-}' exp           { LL $ HsCoreAnn (getSTRING $2) $4 }
 						    -- hdaume: core annotation
 	| fexp					{ $1 }
+
+optSemi :: { Bool }
+	: ';'         { True }
+	| {- empty -} { False }
 
 scc_annot :: { Located FastString }
 	: '_scc_' STRING			{% (addWarning Opt_WarnWarningsDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->

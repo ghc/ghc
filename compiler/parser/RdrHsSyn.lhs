@@ -44,6 +44,7 @@ module RdrHsSyn (
 	checkMDo,	      -- [Stmt] -> P [Stmt]
 	checkValDef,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	checkValSig,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+	checkDoAndIfThenElse,
 	parseError,	    
 	parseErrorSDoc,	    
     ) where
@@ -815,6 +816,27 @@ checkValSig lhs@(L l _) ty
     looks_like_foreign _                   = False
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
+
+checkDoAndIfThenElse :: LHsExpr RdrName
+                     -> Bool
+                     -> LHsExpr RdrName
+                     -> Bool
+                     -> LHsExpr RdrName
+                     -> P ()
+checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
+ | semiThen || semiElse
+    = do pState <- getPState
+         unless (dopt Opt_DoAndIfThenElse (dflags pState)) $ do
+             parseErrorSDoc (combineLocs guardExpr elseExpr)
+                            (text "Unexpected semi-colons in conditional:"
+                          $$ nest 4 expr
+                          $$ text "Perhaps you meant to use -XDoAndIfThenElse?")
+ | otherwise            = return ()
+    where pprOptSemi True  = semi
+          pprOptSemi False = empty
+          expr = text "if"   <+> ppr guardExpr <> pprOptSemi semiThen <+>
+                 text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
+                 text "else" <+> ppr elseExpr
 \end{code}
 
 
