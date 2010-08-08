@@ -362,7 +362,7 @@ splitCon ty
    split (L _ (HsAppTy t u)) ts = split t (u : ts)
    split (L l (HsTyVar tc))  ts = do data_con <- tyConToDataCon l tc
  				     return (data_con, mk_rest ts)
-   split (L l _) _ 	        = parseError l "parse error in data/newtype declaration"
+   split (L l _) _ 	        = parseErrorSDoc l (text "parse error in constructor in data/newtype declaration:" <+> ppr ty)
 
    mk_rest [L _ (HsRecTy flds)] = RecCon flds
    mk_rest ts                   = PrefixCon ts
