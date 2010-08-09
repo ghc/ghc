@@ -480,7 +480,7 @@ checkDictTy (L spn ty) = check ty []
   check (HsOpTy t1 (L _ tc) t2) args | isRdrTc tc = done tc (t1:t2:args)
   check (HsAppTy l r) args = check (unLoc l) (r:args)
   check (HsParTy t)   args = check (unLoc t) args
-  check _ _ = parseError spn "Malformed instance header"
+  check _ _ = parseErrorSDoc spn (text "Malformed instance header:" <+> ppr ty)
 
   done tc args = return (L spn (HsPredTy (HsClassP tc args)))
 
@@ -523,15 +523,19 @@ checkTyVars tparms = mapM chk tparms
 	| isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
-    chk (L l _)            =
-	  parseError l "Type found where type variable expected"
+    chk t@(L l _)            =
+	  parseErrorSDoc l (text "Type found:" <+> ppr t
+                     $$ text "where type variable expected, in:" <+>
+                        sep (map (pprParendHsType . unLoc) tparms))
 
 checkDatatypeContext :: Maybe (LHsContext RdrName) -> P ()
 checkDatatypeContext Nothing = return ()
-checkDatatypeContext (Just (L loc _))
+checkDatatypeContext (Just (L loc c))
     = do allowed <- extension datatypeContextsEnabled
          unless allowed $
-             parseError loc "Illegal datatype context (use -XDatatypeContexts)"
+             parseErrorSDoc loc
+                 (text "Illegal datatype context (use -XDatatypeContexts):" <+>
+                  pprHsContext c)
 
 checkTyClHdr :: LHsType RdrName
              -> P (Located RdrName,	     -- the head symbol (type or class name)
@@ -552,7 +556,7 @@ checkTyClHdr ty
 	| isRdrTc tc	     = return (ltc, t1:t2:acc)
     go _ (HsParTy ty)    acc = goL ty acc
     go _ (HsAppTy t1 t2) acc = goL t1 (t2:acc)
-    go l _               _   = parseError l "Malformed head of type or class declaration"
+    go l _               _   = parseErrorSDoc l (text "Malformed head of type or class declaration:" <+> ppr ty)
 
 -- Check that associated type declarations of a class are all kind signatures.
 --
@@ -563,7 +567,7 @@ checkKindSigs = mapM_ check
       | isFamilyDecl tydecl
         || isSynDecl tydecl  = return ()
       | otherwise	     = 
-	parseError l "Type declaration in a class must be a kind signature or synonym default"
+	parseErrorSDoc l (text "Type declaration in a class must be a kind signature or synonym default:" $$ ppr tydecl)
 
 checkContext :: LHsType RdrName -> P (LHsContext RdrName)
 checkContext (L l t)
@@ -603,8 +607,8 @@ checkPred (L spn ty)
     check _loc (HsAppTy l r)           args = checkl l (r:args)
     check _loc (HsOpTy l (L loc tc) r) args = check loc (HsTyVar tc) (l:r:args)
     check _loc (HsParTy t)  	       args = checkl t args
-    check loc _                        _    = parseError loc  
-					        "malformed class assertion"
+    check loc _                        _    = parseErrorSDoc loc
+                                (text "malformed class assertion:" <+> ppr ty)
 
 ---------------------------------------------------------------------------
 -- Checking statements in a do-expression
@@ -620,14 +624,16 @@ checkDo	 = checkDoMDo "a " "'do'"
 checkMDo = checkDoMDo "an " "'mdo'"
 
 checkDoMDo :: String -> String -> SrcSpan -> [LStmt RdrName] -> P ([LStmt RdrName], LHsExpr RdrName)
-checkDoMDo _   nm loc []   = parseError loc ("Empty " ++ nm ++ " construct")
+checkDoMDo _   nm loc []   = parseErrorSDoc loc (text ("Empty " ++ nm ++ " construct"))
 checkDoMDo pre nm _   ss   = do
   check ss
   where 
 	check  []                     = panic "RdrHsSyn:checkDoMDo"
 	check  [L _ (ExprStmt e _ _)] = return ([], e)
-	check  [L l _] = parseError l ("The last statement in " ++ pre ++ nm ++
-					 " construct must be an expression")
+	check  [L l e] = parseErrorSDoc l
+                         (text ("The last statement in " ++ pre ++ nm ++
+					            " construct must be an expression:")
+                       $$ ppr e)
 	check (s:ss) = do
 	  (ss',e') <-  check ss
 	  return ((s:ss'),e')
@@ -662,11 +668,11 @@ checkPat loc (L _ e) []
   = do { pState <- getPState
        ; p <- checkAPat (dflags pState) loc e
        ; return (L loc p) }
-checkPat loc _ _
-  = patFail loc
+checkPat loc e _
+  = patFail loc (unLoc e)
 
 checkAPat :: DynFlags -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
-checkAPat dynflags loc e = case e of
+checkAPat dynflags loc e0 = case e0 of
    EWildPat -> return (WildPat placeHolderType)
    HsVar x  -> return (VarPat x)
    HsLit l  -> return (LitPat l)
@@ -682,7 +688,7 @@ checkAPat dynflags loc e = case e of
  	| bang == bang_RDR 
 	-> do { bang_on <- extension bangPatEnabled
 	      ; if bang_on then checkLPat e >>= (return . BangPat)
-		else parseError loc "Illegal bang-pattern (use -XBangPatterns)" }
+		else parseErrorSDoc loc (text "Illegal bang-pattern (use -XBangPatterns):" $$ ppr e0) }
 
    ELazyPat e	      -> checkLPat e >>= (return . LazyPat)
    EAsPat n e	      -> checkLPat e >>= (return . AsPat n)
@@ -708,7 +714,7 @@ checkAPat dynflags loc e = case e of
                             case op of
                                L cl (HsVar c) | isDataOcc (rdrNameOcc c)
                                       -> return (ConPatIn (L cl c) (InfixCon l r))
-                               _ -> patFail loc
+                               _ -> patFail loc e0
    
    HsPar e	      -> checkLPat e >>= (return . ParPat)
    ExplicitList _ es  -> do ps <- mapM checkLPat es
@@ -719,7 +725,7 @@ checkAPat dynflags loc e = case e of
    ExplicitTuple es b 
      | all tupArgPresent es  -> do ps <- mapM checkLPat [e | Present e <- es]
                                    return (TuplePat ps b placeHolderType)
-     | otherwise -> parseError loc "Illegal tuple section in pattern"
+     | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
    
    RecordCon c _ (HsRecFields fs dd)
                       -> do fs <- mapM checkPatField fs
@@ -727,7 +733,7 @@ checkAPat dynflags loc e = case e of
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
 -- Generics 
    HsType ty          -> return (TypePat ty) 
-   _                  -> patFail loc
+   _                  -> patFail loc e0
 
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer
@@ -743,8 +749,8 @@ checkPatField :: HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (
 checkPatField fld = do	{ p <- checkLPat (hsRecFieldArg fld)
 			; return (fld { hsRecFieldArg = p }) }
 
-patFail :: SrcSpan -> P a
-patFail loc = parseError loc "Parse error in pattern"
+patFail :: SrcSpan -> HsExpr RdrName -> P a
+patFail loc e = parseErrorSDoc loc (text "Parse error in pattern:" <+> ppr e)
 
 
 ---------------------------------------------------------------------------
@@ -911,7 +917,8 @@ isFunLhs e = go e []
 checkPrecP :: Located Int -> P Int
 checkPrecP (L l i)
  | 0 <= i && i <= maxPrecedence = return i
- | otherwise     	        = parseError l "Precedence out of range"
+ | otherwise
+    = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
 
 mkRecConstrOrUpdate 
 	:: LHsExpr RdrName 
@@ -922,7 +929,7 @@ mkRecConstrOrUpdate
 mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd) | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp loc (fs,dd)
-  | null fs   = parseError loc "Empty record update"
+  | null fs   = parseErrorSDoc loc (text "Empty record update of:" <+> ppr exp)
   | otherwise = return (RecordUpd exp (mk_rec_fields fs dd) [] [] [])
 
 mk_rec_fields :: [HsRecField id arg] -> Bool -> HsRecFields id arg
@@ -962,7 +969,7 @@ mkImport cconv safety (L loc entity, v, ty)
 
   | otherwise = do
     case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
-      Nothing         -> parseError loc "Malformed entity string"
+      Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
       Just importSpec -> return (ForD (ForeignImport v ty importSpec))
 
 -- the string "foo" is ambigous: either a header or a C identifier.  The
