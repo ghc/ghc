@@ -1,2 +1,2 @@
 
-readFail007.hs:6:4: Parse error in pattern
+readFail007.hs:6:4: Parse error in pattern: 2 + 2

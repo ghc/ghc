@@ -1,2 +1,3 @@
 
-tcfail173.hs:5:10: Malformed head of type or class declaration
+tcfail173.hs:5:10:
+    Malformed head of type or class declaration: (f <.> g) a

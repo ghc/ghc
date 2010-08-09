@@ -1,3 +1,4 @@
 
 readFail028.hs:4:11:
-    The last statement in a 'do' construct must be an expression
+    The last statement in a 'do' construct must be an expression:
+    x <- return ()
