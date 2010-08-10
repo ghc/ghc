@@ -1,3 +1,1 @@
-[1 of 2] Compiling B                ( B.hs, dist/build/test/test-tmp/B.o )
-[2 of 2] Compiling Main             ( Main.hs, dist/build/test/test-tmp/Main.o )
 Linking dist/build/test/test ...
