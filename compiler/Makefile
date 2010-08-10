@@ -28,13 +28,13 @@ FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES compiler_stage2_NO_BUILD_DEP
 .PHONY: 1 2 3
 
 1:
-	+$(TOPMAKE) stage=1 all_ghc_stage1 $(FAST_MAKE_OPTS)
+	+$(TOPMAKE) stage=1 all_ghc_stage1 $(FAST_MAKE_OPTS) NO_STAGE1_DEPS=YES NO_STAGE2_DEPS=YES
 
 2:
-	+$(TOPMAKE) stage=2 all_ghc_stage2 $(FAST_MAKE_OPTS)
+	+$(TOPMAKE) stage=2 all_ghc_stage2 $(FAST_MAKE_OPTS) NO_STAGE2_DEPS=YES
 
 3:
-	+$(TOPMAKE) stage=3 all_ghc_stage3 $(FAST_MAKE_OPTS)
+	+$(TOPMAKE) stage=3 all_ghc_stage3 $(FAST_MAKE_OPTS) NO_STAGE3_DEPS=YES
 
 .PHONY: extra-help
 help : extra-help
