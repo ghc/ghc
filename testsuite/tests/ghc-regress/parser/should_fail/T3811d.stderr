@@ -1,0 +1,5 @@
+
+T3811d.hs:6:11:
+    Type found: D Char
+    where type variable expected, in: b (D Char) b
+
