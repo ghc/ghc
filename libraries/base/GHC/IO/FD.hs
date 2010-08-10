@@ -37,7 +37,7 @@ import GHC.IO.Buffer
 import GHC.IO.BufferedIO
 import qualified GHC.IO.Device
 import GHC.IO.Device (SeekMode(..), IODeviceType(..))
-import GHC.Conc
+import GHC.Conc.IO
 import GHC.IO.Exception
 
 import Foreign

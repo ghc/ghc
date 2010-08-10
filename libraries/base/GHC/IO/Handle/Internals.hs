@@ -59,7 +59,7 @@ import GHC.IO.Device (IODevice, SeekMode(..))
 import qualified GHC.IO.Device as IODevice
 import qualified GHC.IO.BufferedIO as Buffered
 
-import GHC.Conc
+import GHC.Conc.Sync
 import GHC.Real
 import GHC.Base
 import GHC.Exception

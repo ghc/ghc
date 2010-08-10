@@ -13,7 +13,7 @@ cabal-version:  >=1.6
 build-type: Configure
 extra-tmp-files:
                 config.log config.status autom4te.cache
-                include/HsBaseConfig.h
+                include/HsBaseConfig.h include/EventConfig.h
 extra-source-files:
                 config.guess config.sub install-sh
                 aclocal.m4 configure.ac configure
@@ -40,6 +40,9 @@ Library {
             GHC.Base,
             GHC.Classes,
             GHC.Conc,
+            GHC.Conc.IO,
+            GHC.Conc.Signal,
+            GHC.Conc.Sync,
             GHC.ConsoleHandler,
             GHC.Constants,
             GHC.Desugar,
@@ -95,6 +98,7 @@ Library {
             System.Timeout
         if os(windows)
             exposed-modules: GHC.IO.Encoding.CodePage.Table
+                             GHC.Conc.Windows
         extensions: MagicHash, ExistentialQuantification, Rank2Types,
                     ScopedTypeVariables, UnboxedTuples,
                     ForeignFunctionInterface, UnliftedFFITypes,
@@ -102,7 +106,7 @@ Library {
                     FlexibleInstances, StandaloneDeriving,
                     PatternGuards, EmptyDataDecls, NoImplicitPrelude
 
-        if impl(ghc < 6.10) 
+        if impl(ghc < 6.10)
            -- PatternSignatures was deprecated in 6.10
            extensions: PatternSignatures
     }
@@ -206,9 +210,26 @@ Library {
         cbits/primFloat.c
     include-dirs: include
     includes:    HsBase.h
-    install-includes:    HsBase.h HsBaseConfig.h WCsubst.h consUtils.h Typeable.h
+    install-includes:    HsBase.h HsBaseConfig.h EventConfig.h WCsubst.h consUtils.h Typeable.h
     if os(windows) {
         extra-libraries: wsock32, user32, shell32
+    }
+    if !os(windows) {
+        exposed-modules:
+            System.Event
+        other-modules:
+            System.Event.Array
+            System.Event.Clock
+            System.Event.Control
+            System.Event.EPoll
+            System.Event.IntMap
+            System.Event.Internal
+            System.Event.KQueue
+            System.Event.Manager
+            System.Event.PSQ
+            System.Event.Poll
+            System.Event.Thread
+            System.Event.Unique
     }
     extensions: CPP
     -- We need to set the package name to base (without a version number)

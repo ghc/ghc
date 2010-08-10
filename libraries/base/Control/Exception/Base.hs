@@ -120,7 +120,7 @@ import GHC.IO.Exception
 import GHC.Exception
 import GHC.Show
 -- import GHC.Exception hiding ( Exception )
-import GHC.Conc
+import GHC.Conc.Sync
 #endif
 
 #ifdef __HUGS__
