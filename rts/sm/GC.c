@@ -727,11 +727,6 @@ SET_GCT(gc_threads[0]);
   // Reset the nursery
   resetNurseries();
 
-  // start any pending finalizers 
-  RELEASE_SM_LOCK;
-  scheduleFinalizers(cap, old_weak_ptr_list);
-  ACQUIRE_SM_LOCK;
-  
   // send exceptions to any threads which were about to die 
   RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
@@ -739,6 +734,17 @@ SET_GCT(gc_threads[0]);
 
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
+
+  // unlock the StablePtr table.  Must be before scheduleFinalizers(),
+  // because a finalizer may call hs_free_fun_ptr() or
+  // hs_free_stable_ptr(), both of which access the StablePtr table.
+  stablePtrPostGC();
+
+  // Start any pending finalizers.  Must be after
+  // updateStablePtrTable() and stablePtrPostGC() (see #4221).
+  RELEASE_SM_LOCK;
+  scheduleFinalizers(cap, old_weak_ptr_list);
+  ACQUIRE_SM_LOCK;
 
   // check sanity after GC
   IF_DEBUG(sanity, checkSanity(rtsTrue));
@@ -770,9 +776,6 @@ SET_GCT(gc_threads[0]);
   // ok, GC over: tell the stats department what happened. 
   slop = calcLiveBlocks() * BLOCK_SIZE_W - live;
   stat_endGC(allocated, live, copied, N, max_copied, avg_copied, slop);
-
-  // unlock the StablePtr table
-  stablePtrPostGC();
 
   // Guess which generation we'll collect *next* time
   initialise_N(force_major_gc);
