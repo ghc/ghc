@@ -288,9 +288,12 @@ div#style-menu-holder {
   padding: 0;
 }
 
-#synopsis p.caption.collapser,
-#synopsis p.caption.expander {
+#synopsis p.caption.collapser {
   background: url(synopsis.png) no-repeat 0 -8px;
+}
+
+#synopsis p.caption.expander {
+  background: url(synopsis.png) no-repeat -64px -8px;
 }
 
 #synopsis ul,
