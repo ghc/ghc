@@ -28,9 +28,9 @@ main = do
 	putMVar m ()
         print =<< getMaskingState
 	sum [1..100000] `seq` -- give 'foo' a chance to be raised
-  	  (restore (do print =<< getMaskingState; myDelay 500000))
+  	  (restore (myDelay 500000)
 		`Control.Exception.catch` 
-                    \e -> putStrLn ("caught1: " ++ show (e::SomeException))
+                    \e -> putStrLn ("caught1: " ++ show (e::SomeException)))
      
     threadDelay 10000
     takeMVar m2
