@@ -946,14 +946,14 @@ zonkType unbound_var_fn ty
 zonk_tc_tyvar :: (TcTyVar -> TcM Type)	-- What to do for an unbound mutable var
  	      -> TcTyVar -> TcM TcType
 zonk_tc_tyvar unbound_var_fn tyvar 
-  | not (isMetaTyVar tyvar)	-- Skolems
-  = return (TyVarTy tyvar)
-
-  | otherwise			-- Mutables
-  = do	{ cts <- readMetaTyVar tyvar
-	; case cts of
-	    Flexi       -> unbound_var_fn tyvar    -- Unbound meta type variable
-	    Indirect ty -> zonkType unbound_var_fn ty  }
+  = ASSERT( isTcTyVar tyvar )
+    case tcTyVarDetails tyvar of
+      SkolemTv {}  -> return (TyVarTy tyvar)
+      FlatSkol ty  -> zonkType unbound_var_fn ty
+      MetaTv _ ref -> do { cts <- readMutVar ref
+			 ; case cts of    
+			     Flexi       -> unbound_var_fn tyvar  
+			     Indirect ty -> zonkType unbound_var_fn ty  }
 
 -- Zonk the kind of a non-TC tyvar in case it is a coercion variable (their
 -- kind contains types).
