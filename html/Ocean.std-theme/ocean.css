@@ -9,11 +9,10 @@ html {
 }
 
 body {
-  font-family: sans-serif;
   background: white;
   color: black;
   text-align: left;
-  line-height: 1.4;
+  font: 87.5%/1.4 sans-serif;
 }
 
 p { margin: 0.5em 0; }
@@ -25,11 +24,11 @@ a:link { color: rgb(196,69,29); }
 a:visited { color: rgb(171,105,84); }
 a:hover { text-decoration:underline; }
 
-h1 { font-size: 150%; }
+h1 { font-size: 145%; }
 h2 { font-size: 130%; }
-h3 { font-size: 120%; }
+h3 { font-size: 115%; }
 h4 { font-size: 110%; }
-h5 { font-size: 105%; }
+h5 { font-size: 100%; }
 
 /* @end */
 
@@ -100,12 +99,22 @@ pre {
   margin: 0.5em 0 0.5em;
   background: rgb(229,237,244);
   overflow: auto;
+  font-family: monospace;
+  font-size: 115%;
 }
 
-code { /* background: #f0f0f0; */ }
+code {
+  font-family: monospace;
+  font-size: 125%;
+}
+
+code code {
+  font-size: inherit;
+}
 
 .src {
   font-family: monospace;
+  font-size: 125%;
   line-height: normal;
   background: #f0f0f0;
   padding: 0.2em 0.5em;
@@ -130,7 +139,6 @@ img.coll {
 /* @group Page Structure */
 
 #content {
-  max-width: 50em;
   margin: 0 auto;
   padding: 0 1em;
 }
@@ -147,8 +155,7 @@ img.coll {
 #package-header .caption {
   background: url(hslogo-16.png) no-repeat 0em;
   color: white;
-  max-width: 48em;
-  margin: 0 auto;
+  margin: 0 1em;
   font-weight: normal;
   font-style: normal;
   padding-left: 2em;
@@ -159,7 +166,7 @@ img.coll {
 
 #module-header .caption {
   color: rgb(78,98,114);
-  font-size: 200%;
+  font-size: 175%;
   font-weight: bold;
   border-bottom: 1px solid #ddd;
 }
@@ -168,7 +175,7 @@ dl.info {
   float: right;
   padding: 0.5em 1em;
   border: 1px solid #ddd;
-  font-size: 75%;
+  font-size: 85%;
   color: rgb(78,98,114);
   background-color: #fff;
   max-width: 40%;
@@ -242,7 +249,7 @@ div#style-menu-holder {
   clear: right;
   background: rgb(239,238,209);
   border: 1px solid rgba(196,69,29,0.2);
-  font-size: 80%;
+  font-size: 85%;
   padding: 0.5em 1em;
   position: relative;
   top: 0em;
@@ -271,7 +278,7 @@ div#style-menu-holder {
 #synopsis {
   position: fixed;
   right: 0;
-  font-size: 90%;
+  font-size: 85%;
   height: 80%;
   top: 10%;
   padding: 0;
@@ -306,7 +313,6 @@ div#style-menu-holder {
 #synopsis ul.expander {
   background-image: none;
   list-style: none;
-  width: 22em;
   height: 100%;
   overflow: auto;
   padding: 0.5em;
