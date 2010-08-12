@@ -381,17 +381,11 @@ getCoreToDo dflags
         -- initial simplify: mk specialiser happy: minimum effort please
     simpl_gently = CoreDoSimplify 
                        (SimplGently { sm_rules = True, sm_inline = False })
+			  -- See Note [Gentle mode] and
+			  -- Note [RULEs enabled in SimplGently] in SimplUtils
                        max_iter
                        [
-                        --      Simplify "gently"
-                        -- Don't inline anything till full laziness has bitten
-                        -- In particular, inlining wrappers inhibits floating
-                        -- e.g. ...(case f x of ...)...
-                        --  ==> ...(case (case x of I# x# -> fw x#) of ...)...
-                        --  ==> ...(case x of I# x# -> case fw x# of ...)...
-                        -- and now the redex (f x) isn't floatable any more
-                        -- Similarly, don't apply any rules until after full
-                        -- laziness.  Notably, list fusion can prevent floating.
+
 
             NoCaseOfCase        -- Don't do case-of-case transformations.
                                 -- This makes full laziness work better
