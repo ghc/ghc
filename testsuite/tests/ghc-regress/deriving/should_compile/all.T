@@ -21,6 +21,7 @@ test('T2856', normal, compile, [''])
 test('T3057', if_compiler_lt('ghc', '6.11', expect_fail), compile, [''])
 test('T3012', normal, compile, [''])
 test('T3965', normal, compile, [''])
+test('T4220', normal, compile, [''])
 
 test('drv-functor1',
      if_compiler_lt('ghc', '6.11', expect_fail),
