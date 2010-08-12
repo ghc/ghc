@@ -1,2 +1,2 @@
-Exception: getFullPathName: invalid argument (The operation completed successfully.)
+Exception: getFullPathName: invalid argument (The filename, directory name, or volume label syntax is incorrect.)
 ("/no/such/file","drive:\\no\\such\\file")
