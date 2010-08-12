@@ -41,6 +41,7 @@ test('rule2', [only_ways(['optc','optasm']),
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
 test('T3118', normal, compile, [''])
+test('T4203', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
 # testsuite driver times out.
