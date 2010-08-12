@@ -319,38 +319,53 @@ The basic version of these functions checks that the argument is a
 subtype of the required type, as one would expect.
 
 \begin{code}
-lintCoreArgs :: OutType -> [CoreArg] -> LintM OutType
-lintCoreArg  :: OutType -> CoreArg   -> LintM OutType
--- First argument has already had substitution applied to it
-\end{code}
-
-\begin{code}
-lintCoreArgs ty [] = return ty
-lintCoreArgs ty (a : args) = 
-  do { res <- lintCoreArg ty a
-     ; lintCoreArgs res args }
-
+lintCoreArg  :: OutType -> CoreArg -> LintM OutType
 lintCoreArg fun_ty (Type arg_ty)
-  | Just (tyvar,body) <- splitForAllTy_maybe fun_ty
   = do	{ arg_ty' <- applySubst arg_ty
-        ; checkKinds tyvar arg_ty'
-	; if isCoVar tyvar then 
-             return body   -- Co-vars don't appear in body!
-          else 
-             return (substTyWith [tyvar] [arg_ty'] body) }
-  | otherwise
-  = failWithL (mkTyAppMsg fun_ty arg_ty)
+        ; lintTyApp fun_ty arg_ty' }
 
 lintCoreArg fun_ty arg
-       -- Make sure function type matches argument
  = do { arg_ty <- lintCoreExpr arg
-      ; let err1 = mkAppMsg fun_ty arg_ty arg
-            err2 = mkNonFunAppMsg fun_ty arg_ty arg
-      ; case splitFunTy_maybe fun_ty of
-          Just (arg,res) -> 
-            do { checkTys arg arg_ty err1
-               ; return res }
-          _ -> failWithL err2 }
+      ; lintValApp arg fun_ty arg_ty }
+
+-----------------
+lintAltBinders :: OutType     -- Scrutinee type
+	       -> OutType     -- Constructor type
+               -> [OutVar]    -- Binders
+               -> LintM ()
+lintAltBinders scrut_ty con_ty [] 
+  = checkTys con_ty scrut_ty (mkBadPatMsg con_ty scrut_ty) 
+lintAltBinders scrut_ty con_ty (bndr:bndrs)
+  | isTyVar bndr
+  = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
+       ; lintAltBinders scrut_ty con_ty' bndrs }
+  | otherwise
+  = do { con_ty' <- lintValApp (Var bndr) con_ty (idType bndr)
+       ; lintAltBinders scrut_ty con_ty' bndrs } 
+
+-----------------
+lintTyApp :: OutType -> OutType -> LintM OutType
+lintTyApp fun_ty arg_ty
+  | Just (tyvar,body_ty) <- splitForAllTy_maybe fun_ty
+  = do	{ checkKinds tyvar arg_ty
+	; if isCoVar tyvar then 
+             return body_ty   -- Co-vars don't appear in body_ty!
+          else 
+             return (substTyWith [tyvar] [arg_ty] body_ty) }
+  | otherwise
+  = failWithL (mkTyAppMsg fun_ty arg_ty)
+   
+-----------------
+lintValApp :: CoreExpr -> OutType -> OutType -> LintM OutType
+lintValApp arg fun_ty arg_ty
+  | Just (arg,res) <- splitFunTy_maybe fun_ty
+  = do { checkTys arg arg_ty err1
+       ; return res }
+  | otherwise
+  = failWithL err2
+  where
+    err1 = mkAppMsg       fun_ty arg_ty arg
+    err2 = mkNonFunAppMsg fun_ty arg_ty arg
 \end{code}
 
 \begin{code}
@@ -446,7 +461,8 @@ lintCoreAlt scrut_ty alt_ty (LitAlt lit, args, rhs) =
     lit_ty = literalType lit
 
 lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
-  | isNewTyCon (dataConTyCon con) = addErrL (mkNewTyDataConAltMsg scrut_ty alt)
+  | isNewTyCon (dataConTyCon con) 
+  = addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
   = addLoc (CaseAlt alt) $  do
     {   -- First instantiate the universally quantified 
@@ -456,19 +472,8 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
     ; let con_payload_ty = applyTys (dataConRepType con) tycon_arg_tys
 
 	-- And now bring the new binders into scope
-    ; lintBinders args $ \ args -> do
-    { addLoc (CasePat alt) $ do
-	  {    -- Check the pattern
-		 -- Scrutinee type must be a tycon applicn; checked by caller
-		 -- This code is remarkably compact considering what it does!
-		 -- NB: args must be in scope here so that the lintCoreArgs
-		 --     line works. 
-	         -- NB: relies on existential type args coming *after*
-	         --     ordinary type args 
-	  ; con_result_ty <- lintCoreArgs con_payload_ty (varsToCoreExprs args)
-	  ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
- 	  }
-	       -- Check the RHS
+    ; lintBinders args $ \ args' -> do
+    { addLoc (CasePat alt) (lintAltBinders scrut_ty con_payload_ty args')
     ; checkAltExpr rhs alt_ty } }
 
   | otherwise	-- Scrut-ty is wrong shape
@@ -943,7 +948,7 @@ checkInScope loc_msg var =
     ; checkL (not (mustHaveLocalBinding var) || (var `isInScope` subst))
              (hsep [ppr var, loc_msg]) }
 
-checkTys :: Type -> Type -> Message -> LintM ()
+checkTys :: OutType -> OutType -> Message -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have alrady had the substitution applied
