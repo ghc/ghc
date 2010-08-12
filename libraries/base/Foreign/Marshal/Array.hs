@@ -63,8 +63,8 @@ module Foreign.Marshal.Array (
 ) where
 
 import Foreign.Ptr      (Ptr, plusPtr)
-import Foreign.Storable (Storable(sizeOf,peekElemOff,pokeElemOff))
-import Foreign.Marshal.Alloc (mallocBytes, allocaBytes, reallocBytes)
+import Foreign.Storable (Storable(alignment,sizeOf,peekElemOff,pokeElemOff))
+import Foreign.Marshal.Alloc (mallocBytes, allocaBytesAligned, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
 #ifdef __GLASGOW_HASKELL__
@@ -101,7 +101,8 @@ allocaArray :: Storable a => Int -> (Ptr a -> IO b) -> IO b
 allocaArray  = doAlloca undefined
   where
     doAlloca            :: Storable a' => a' -> Int -> (Ptr a' -> IO b') -> IO b'
-    doAlloca dummy size  = allocaBytes (size * sizeOf dummy)
+    doAlloca dummy size  = allocaBytesAligned (size * sizeOf dummy)
+                                              (alignment dummy)
 
 -- |Like 'allocaArray', but add an extra position to hold a special
 -- termination element.

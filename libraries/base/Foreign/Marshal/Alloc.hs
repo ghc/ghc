@@ -40,6 +40,7 @@ module Foreign.Marshal.Alloc (
   -- ** Local allocation
   alloca,       -- :: Storable a =>        (Ptr a -> IO b) -> IO b
   allocaBytes,  -- ::               Int -> (Ptr a -> IO b) -> IO b
+  allocaBytesAligned,  -- ::        Int -> Int -> (Ptr a -> IO b) -> IO b
 
   -- ** Dynamic allocation
   malloc,       -- :: Storable a =>        IO (Ptr a)
