@@ -1379,11 +1379,17 @@ gen_Functor_binds loc tycon
   = (unitBag fmap_bind, [])
   where
     data_cons = tyConDataCons tycon
-
-    fmap_bind = L loc $ mkFunBind (L loc fmap_RDR) (map fmap_eqn data_cons)
+    fmap_bind = L loc $ mkFunBind (L loc fmap_RDR) eqns
+                                  
     fmap_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_fmap con
+
+	-- Catch-all eqn looks like   fmap _ _ = error "impossible"
+	-- It's needed if there no data cons at all 
+    eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat] 
+                                           (error_Expr "Void fmap")]
+         | otherwise      = map fmap_eqn data_cons
 
     ft_fmap :: FFoldType (LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName))
     -- Tricky higher order type; I can't say I fully understand this code :-(
@@ -1545,7 +1551,10 @@ gen_Foldable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    foldr_bind = L loc $ mkFunBind (L loc foldable_foldr_RDR) (map foldr_eqn data_cons)
+    foldr_bind = L loc $ mkFunBind (L loc foldable_foldr_RDR) eqns
+    eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat, nlWildPat] 
+                                           (error_Expr "Void foldr")]
+         | otherwise      = map foldr_eqn data_cons
     foldr_eqn con = evalState (match_for_con z_Expr [f_Pat,z_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_foldr con
@@ -1596,7 +1605,10 @@ gen_Traversable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    traverse_bind = L loc $ mkFunBind (L loc traverse_RDR) (map traverse_eqn data_cons)
+    traverse_bind = L loc $ mkFunBind (L loc traverse_RDR) eqns
+    eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat] 
+                                           (error_Expr "Void traverse")]
+         | otherwise      = map traverse_eqn data_cons
     traverse_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_trav con
@@ -1834,8 +1846,8 @@ nested_compose_Expr (e:es)
 
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
--- impossible_Expr :: LHsExpr RdrName
--- impossible_Expr = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString "Urk! in TcGenDeriv"))
+error_Expr :: String -> LHsExpr RdrName
+error_Expr string = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString string))
 
 -- illegal_Expr is used when signalling error conditions in the RHS of a derived
 -- method. It is currently only used by Enum.{succ,pred}
