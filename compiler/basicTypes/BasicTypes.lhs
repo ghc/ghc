@@ -640,7 +640,7 @@ data Activation = NeverActive
 		| AlwaysActive
 		| ActiveBefore CompilerPhase	-- Active only *before* this phase
 		| ActiveAfter CompilerPhase	-- Active in this phase and later
-		deriving( Eq, Data, Typeable )			-- Eq used in comparing rules in HsDecls
+		deriving( Eq, Data, Typeable )	-- Eq used in comparing rules in HsDecls
 
 data RuleMatchInfo = ConLike 			-- See Note [CONLIKE pragma]
                    | FunLike
