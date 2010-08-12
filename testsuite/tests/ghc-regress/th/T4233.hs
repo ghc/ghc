@@ -1,9 +1,9 @@
-
-{-# LANGUAGE TypeFamilies, TypeOperators, TemplateHaskell #-}
-
-module Q where
-
+{-# LANGUAGE TemplateHaskell #-}
+module T4233 where
 import Language.Haskell.TH
-type family a :<=: b
+
+w :: Q Type
 w = varT (mkName "w")
-f = [t|Maybe $w :<=: Int|]
+
+f :: Q Type
+f = [t| $w -> $w |]
