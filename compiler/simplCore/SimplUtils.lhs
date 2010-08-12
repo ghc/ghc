@@ -475,9 +475,9 @@ On the other hand, it is bad not to do ANY inlining into an
 InlineRule, because then recursive knots in instance declarations
 don't get unravelled.
 
-However, *sometimes* SimplGently must do no call-site inlining at all.
-Before full laziness we must be careful not to inline wrappers,
-because doing so inhibits floating
+However, *sometimes* SimplGently must do no call-site inlining at all
+(hence sm_inline = False).  Before full laziness we must be careful
+not to inline wrappers, because doing so inhibits floating
     e.g. ...(case f x of ...)...
     ==> ...(case (case x of I# x# -> fw x#) of ...)...
     ==> ...(case x of I# x# -> case fw x# of ...)...
@@ -501,6 +501,9 @@ RULES are enabled when doing "gentle" simplification.  Two reasons:
         lift String ===> ...
     to work in Template Haskell when simplifying
     splices, so we get simpler code for literal strings
+
+But watch out: list fusion can prevent floating.  So use phase control
+to switch off those rules until after floating.
 
 Note [Simplifying inside InlineRules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
