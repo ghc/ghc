@@ -165,3 +165,4 @@ test('T3899', extra_clean(['T3899a.hi','T3899a.o']),
 test('T4056', normal, compile, ['-v0'])
 test('T4188', normal, compile, ['-v0'])
 test('T4233', normal, compile, ['-v0'])
+test('T4169', normal, compile, ['-v0'])
