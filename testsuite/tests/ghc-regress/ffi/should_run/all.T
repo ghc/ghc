@@ -165,3 +165,6 @@ else:
 	flagsFor4038 = ['']
 test('4038', normal, compile_and_run, flagsFor4038)
 
+test('4221', [ omit_ways(['ghci']), extra_clean(['4221_c.o']) ],
+               compile_and_run, ['4221_c.c'])
+
