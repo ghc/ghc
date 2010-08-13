@@ -197,14 +197,15 @@ a top-level axiom:
 
    df :: forall a. C a => C [a]
    {-# NOINLINE df   DFun[ $cop_list ] #-}
-   df = /\a. \d. MkD ($cop_list a d)
+   df = /\a. \d. MkC ($cop_list a d)
 
-   $cop_list :: forall a. C a => a -> a
+   $cop_list :: forall a. C a => [a] -> [a]
    $cop_list = <blah>
 
-The "constructor" MkD expands to a cast, as does the class-op selector.
+The "constructor" MkC expands to a cast, as does the class-op selector.
 The RULE works just like for multi-field dictionaries:
-  * (df a d) returns (Just (MkD,..,[$cop_list a d])) 
+
+  * (df a d) returns (Just (MkC,..,[$cop_list a d])) 
     to exprIsConApp_Maybe
 
   * The RULE for op picks the right result
@@ -214,17 +215,24 @@ application.  But it works just fine in this case, exprIsConApp_maybe
 is otherwise used only when we hit a case expression which will have
 a real data constructor in it.
 
-The biggest reason for doing it this way, apart form uniformity, is
+The biggest reason for doing it this way, apart from uniformity, is
 that we want to be very careful when we have
     instance C a => C [a] where
       {-# INLINE op #-}
       op = ...
-then we'll get an INLINE pragma on $cop_list.  The danger is that
-we'll get something like
-      foo = /\a.\d. $cop_list a d
+then we'll get an INLINE pragma on $cop_list but it's important that
+$cop_list only inlines when it's applied to *two* arguments (the
+dictionary and the list argument
+
+The danger is that we'll get something like
+      op_list :: C a => [a] -> [a]
+      op_list = /\a.\d. $cop_list a d
 and then we'll eta expand, and then we'll inline TOO EARLY. This happened in 
-Trac #3772 and I spent far too long fiddling arond trying to fix it.
+Trac #3772 and I spent far too long fiddling around trying to fix it.
 Look at the test for Trac #3772.
+
+     (Note: re-reading the above, I can't see how using the
+            uniform story solves the problem.)
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
