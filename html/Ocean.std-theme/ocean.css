@@ -12,7 +12,6 @@ body {
   background: white;
   color: black;
   text-align: left;
-  font: 87.5%/1.4 sans-serif;
 }
 
 p { margin: 0.5em 0; }
@@ -24,11 +23,58 @@ a:link { color: rgb(196,69,29); }
 a:visited { color: rgb(171,105,84); }
 a:hover { text-decoration:underline; }
 
-h1 { font-size: 145%; }
-h2 { font-size: 130%; }
-h3 { font-size: 115%; }
-h4 { font-size: 110%; }
-h5 { font-size: 100%; }
+/* @end */
+
+/* @group Fonts & Sizes */
+
+/* Basic technique & IE workarounds from YUI 3
+   For reasons, see:
+      http://yui.yahooapis.com/3.1.1/build/cssfonts/fonts.css
+ */
+ 
+body {
+	font:13px/1.4 sans-serif;
+	*font-size:small; /* for IE */
+	*font:x-small; /* for IE in quirks mode */
+}
+
+h1 { font-size: 146.5%; /* 19pt */ } 
+h2 { font-size: 131%;   /* 17pt */ }
+h3 { font-size: 116%;   /* 15pt */ }
+h4 { font-size: 100%;   /* 13pt */ }
+h5 { font-size: 100%;   /* 13pt */ }
+
+select, input, button, textarea {
+	font:99% sans-serif;
+}
+
+table {
+	font-size:inherit;
+	font:100%;
+}
+
+pre, code, kbd, samp, tt, .src {
+	font-family:monospace;
+	*font-size:108%;
+	line-height:116%;
+}
+
+.top > .src {
+  font-size: 116%; /* 15pt */
+}
+
+.top .src .link {
+  font-size: 86.2%; /* 13pt */
+}
+
+#module-header .caption {
+  font-size: 182%; /* 24pt */
+}
+
+dl.info, #table-of-contents, #synopsis  {
+  font-size: 85%; /* 11pt */
+}
+
 
 /* @end */
 
@@ -99,23 +145,9 @@ pre {
   margin: 0.5em 0 0.5em;
   background: rgb(229,237,244);
   overflow: auto;
-  font-family: monospace;
-  font-size: 115%;
-}
-
-code {
-  font-family: monospace;
-  font-size: 125%;
-}
-
-code code {
-  font-size: inherit;
 }
 
 .src {
-  font-family: monospace;
-  font-size: 125%;
-  line-height: normal;
   background: #f0f0f0;
   padding: 0.2em 0.5em;
 }
@@ -166,7 +198,6 @@ img.coll {
 
 #module-header .caption {
   color: rgb(78,98,114);
-  font-size: 175%;
   font-weight: bold;
   border-bottom: 1px solid #ddd;
 }
@@ -175,7 +206,6 @@ dl.info {
   float: right;
   padding: 0.5em 1em;
   border: 1px solid #ddd;
-  font-size: 85%;
   color: rgb(78,98,114);
   background-color: #fff;
   max-width: 40%;
@@ -249,7 +279,6 @@ div#style-menu-holder {
   clear: right;
   background: rgb(239,238,209);
   border: 1px solid rgba(196,69,29,0.2);
-  font-size: 85%;
   padding: 0.5em 1em;
   position: relative;
   top: 0em;
@@ -278,7 +307,6 @@ div#style-menu-holder {
 #synopsis {
   position: fixed;
   right: 0;
-  font-size: 85%;
   height: 80%;
   top: 10%;
   padding: 0;
