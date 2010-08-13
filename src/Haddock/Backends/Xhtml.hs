@@ -606,7 +606,7 @@ numberSectionHeadings exports = go 1 exports
 
 processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
 processExport summary _ _ (ExportGroup lev id0 doc)
-  = nothingIf summary $ groupTag lev << namedAnchor id0 << docToHtml doc
+  = nothingIf summary $ groupTag lev ! [identifier id0] << docToHtml doc
 processExport summary links unicode (ExportDecl decl doc subdocs insts)
   = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode
 processExport summary _ _ (ExportNoDecl y [])

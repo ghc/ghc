@@ -19,9 +19,9 @@ p { margin: 0.5em 0; }
 ul { margin-left: 2em; }
 
 a { text-decoration: none; }
-a:link { color: rgb(196,69,29); }
-a:visited { color: rgb(171,105,84); }
-a:hover { text-decoration:underline; }
+a[href]:link { color: rgb(196,69,29); }
+a[href]:visited { color: rgb(171,105,84); }
+a[href]:hover { text-decoration:underline; }
 
 /* @end */
 
