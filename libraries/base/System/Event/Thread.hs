@@ -17,8 +17,6 @@ import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, newTVar, sharedCAF,
                       threadStatus, writeTVar)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
-import GHC.Num (fromInteger)
-import GHC.Real (div)
 import System.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_, registerTimeout)
 import System.IO.Unsafe (unsafePerformIO)
@@ -34,7 +32,7 @@ threadDelay :: Int -> IO ()
 threadDelay usecs = do
   Just mgr <- readIORef eventManager
   m <- newEmptyMVar
-  _ <- registerTimeout mgr (usecs `div` 1000) (putMVar m ())
+  _ <- registerTimeout mgr usecs (putMVar m ())
   takeMVar m
 
 -- | Set the value of returned TVar to True after a given number of
@@ -44,7 +42,7 @@ registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs = do
   t <- atomically $ newTVar False
   Just mgr <- readIORef eventManager
-  _ <- registerTimeout mgr (usecs `div` 1000) . atomically $ writeTVar t True
+  _ <- registerTimeout mgr usecs . atomically $ writeTVar t True
   return t
 
 -- | Block the current thread until data is available to read from the

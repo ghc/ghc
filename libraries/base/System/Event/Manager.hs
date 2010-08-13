@@ -344,14 +344,14 @@ fdWasClosed mgr fd =
 ------------------------------------------------------------------------
 -- Registering interest in timeout events
 
--- | Register a timeout in the given number of milliseconds.
+-- | Register a timeout in the given number of microseconds.
 registerTimeout :: EventManager -> Int -> TimeoutCallback -> IO TimeoutKey
-registerTimeout mgr ms cb = do
+registerTimeout mgr us cb = do
   !key <- newUnique (emUniqueSource mgr)
-  if ms <= 0 then cb
+  if us <= 0 then cb
     else do
       now <- getCurrentTime
-      let expTime = fromIntegral ms / 1000.0 + now
+      let expTime = fromIntegral us / 1000000.0 + now
 
       -- We intentionally do not evaluate the modified map to WHNF here.
       -- Instead, we leave a thunk inside the IORef and defer its
@@ -370,9 +370,9 @@ unregisterTimeout mgr (TK key) = do
   wakeManager mgr
 
 updateTimeout :: EventManager -> TimeoutKey -> Int -> IO ()
-updateTimeout mgr (TK key) ms = do
+updateTimeout mgr (TK key) us = do
   now <- getCurrentTime
-  let expTime = fromIntegral ms / 1000.0 + now
+  let expTime = fromIntegral us / 1000000.0 + now
 
   atomicModifyIORef (emTimeouts mgr) $ \f ->
       let f' = (Q.adjust (const expTime) key) . f in (f', ())
