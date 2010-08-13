@@ -355,7 +355,7 @@ div#style-menu-holder {
 
 /* @group Main Content */
 
-#interface div.top { margin: 1em 0 0.5em 0; }
+#interface div.top { margin: 1em 0 2em 0; }
 
 #interface p.src .link {
   float: right;
