@@ -452,30 +452,26 @@ div.top .subs, div.top .doc {
 /* @group Auxillary Pages */
 
 #mini {
-  font-size: 75%;
+  font-size: 77%; /* 10pt */
   margin: 0 auto;
   padding: 0 1em;
 }
 
 #mini #module-header .caption {
-  font-size: 160%;
+  font-size: 130%;
 }
 
 #mini #interface h1,
 #mini #interface h2,
 #mini #interface h3,
 #mini #interface h4 {
-  font-size: 130%;
+  font-size: 100%;
   margin: 1em 0 0;
 }
 
 #mini #interface .top,
 #mini #interface .src {
   margin: 0;
-}
-
-#mini #interface .src {
-  font-size: 120%;
 }
 
 #mini #module-list ul {
@@ -500,7 +496,7 @@ div.top .subs, div.top .doc {
 }
 
 #index .caption,
-#module-list .caption { font-size: 130%; }
+#module-list .caption { font-size: 131%; /* 17pt */ }
 
 #index table {
   margin-left: 2em;
@@ -510,7 +506,7 @@ div.top .subs, div.top .doc {
   font-weight: bold;
 }
 #index .alt {
-  font-size: 70%;
+  font-size: 77%; /* 10pt */
   font-style: italic;
   padding-left: 2em;
 }
