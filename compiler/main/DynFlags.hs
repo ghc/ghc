@@ -1934,11 +1934,16 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
   -- unless there is no NCG on this platform.  The latter case is
   -- checked when the -fPIC flag is parsed.
   --
-  let (pic_warns, dflags2) =
-        if opt_PIC && hscTarget dflags1 == HscC && cGhcUnregisterised == "NO"
-          then ([L noSrcSpan $ "Warning: -fvia-C is incompatible with -fPIC; ignoring -fvia-C"],
+  let (pic_warns, dflags2)
+        | opt_PIC && hscTarget dflags1 == HscC && cGhcUnregisterised == "NO"
+        = ([L noSrcSpan $ "Warning: -fvia-C is incompatible with -fPIC; ignoring -fvia-C"],
                 dflags1{ hscTarget = HscAsm })
-          else ([], dflags1)
+#if !(x86_64_TARGET_ARCH && linux_TARGET_OS)
+        | (not opt_Static || opt_PIC) && hscTarget dflags1 == HscLlvm
+        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -dynamic on this"
+                ++ "platform; ignoring -fllvm"], dflags1{ hscTarget = HscAsm })
+#endif
+        | otherwise = ([], dflags1)
 
   return (dflags2, leftover, pic_warns ++ warns)
 

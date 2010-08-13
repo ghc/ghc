@@ -38,7 +38,7 @@ import Module
 import UniqFM           ( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags      ( v_Ld_inputs, opt_Static, WayName(..) )
+import StaticFlags      ( v_Ld_inputs, opt_PIC, opt_Static, WayName(..) )
 import Config
 import Panic
 import Util
@@ -1289,11 +1289,15 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 #else
     let nphase = As
 #endif
+    let rmodel | opt_PIC        = "pic"
+               | not opt_Static = "dynamic-no-pic"
+               | otherwise      = "static"
 
     output_fn <- get_output_fn dflags nphase maybe_loc
 
     SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
+                    SysTools.Option $ "-relocation-model=" ++ rmodel,
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts)
