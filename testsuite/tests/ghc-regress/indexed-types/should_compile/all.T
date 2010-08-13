@@ -144,3 +144,5 @@ test('IndTypesPerf',
                   'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi']),
      run_command,
      ['$MAKE -s --no-print-directory IndTypesPerf'])
+
+test('T4120', normal, compile, [''])
