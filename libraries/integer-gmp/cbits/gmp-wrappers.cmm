@@ -509,44 +509,6 @@ integer_cmm_cmpIntegerzh
     jump %ENTRY_CODE(Sp(0));
 }
 
-integer_cmm_integer2Intzh
-{
-    /* R1 = s; R2 = d */
-    W_ r, s;
-
-    s = R1;
-    if (s == 0) {
-        r = 0;
-    } else {
-        r = W_[R2 + SIZEOF_StgArrWords];
-        if (%lt(s,0)) {
-            r = -r;
-        }
-    }
-    /* Result parked in R1, return via info-pointer at TOS */
-    R1 = r;
-    jump %ENTRY_CODE(Sp(0));
-}
-
-integer_cmm_integer2Wordzh
-{
-  /* R1 = s; R2 = d */
-  W_ r, s;
-
-  s = R1;
-  if (s == 0) {
-    r = 0;
-  } else {
-    r = W_[R2 + SIZEOF_StgArrWords];
-    if (%lt(s,0)) {
-        r = -r;
-    }
-  }
-  /* Result parked in R1, return via info-pointer at TOS */
-  R1 = r;
-  jump %ENTRY_CODE(Sp(0));
-}
-
 #define DOUBLE_MANTISSA_SIZE SIZEOF_DOUBLE
 #define ARR_SIZE (SIZEOF_StgArrWords + DOUBLE_MANTISSA_SIZE)
 
