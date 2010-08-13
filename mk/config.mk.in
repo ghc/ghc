@@ -97,10 +97,11 @@ GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
 
-GhcProfiled=NO
 GhcDebugged=NO
 GhcDynamic=NO
-GhcLibProfiled=$(if $(filter p,$(GhcLibWays)),YES,NO)
+
+# GhcProfiled=YES means compile a profiled stage-2 compiler
+GhcProfiled=NO
 
 # Do we support shared libs?
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),i386-unknown-linux x86_64-unknown-linux i386-unknown-freebsd x86_64-unknown-freebsd i386-unknown-mingw32 i386-apple-darwin powerpc-apple-darwin),YES,NO)

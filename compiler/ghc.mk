@@ -351,12 +351,7 @@ else
 compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
 endif
 
-# We need to turn on profiling either if we have been asked to
-# (GhcLibProfiled = YES) or if we want GHC itself to be compiled with
-# profiling enabled (GhcProfiled = YES).
-ifneq "$(GhcLibProfiled) $(GhcProfiled)" "NO NO"
-compiler_stage2_CONFIGURE_OPTS += --enable-library-profiling
-# And if we're profiling GHC then we want lots of SCCs.
+# If we're profiling GHC then we want lots of SCCs, so -auto-all
 # We also don't want to waste time building the non-profiling library,
 # either normally or for ghci. Unfortunately this means that we have to
 # tell ghc-pkg --force as it gets upset when libHSghc-6.9.a doesn't
@@ -366,7 +361,6 @@ compiler_stage2_CONFIGURE_OPTS += --ghc-option=-auto-all
 compiler_stage2_CONFIGURE_OPTS += --disable-library-vanilla
 compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
-endif
 endif
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
