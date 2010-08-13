@@ -54,8 +54,7 @@ import GHC.Prim (
     quotInt#, remInt#, negateInt#,
     (==#), (/=#), (<=#), (>=#), (<#), (>#), (*#), (-#), (+#),
     mulIntMayOflo#, addIntC#, subIntC#,
-    and#, or#, xor#,
-    indexIntArray#,
+    and#, or#, xor#
  )
 
 import GHC.Integer.GMP.Internals (
@@ -539,10 +538,12 @@ shiftRInteger (J# s d) i = case fdivQ2ExpInteger# s d i of
 \begin{code}
 -- This is used by hashUnique
 
+-- | hashInteger returns the same value as 'fromIntegral', although in
+-- unboxed form.  It might be a reasonable hash function for 'Integer', 
+-- given a suitable distribution of 'Integer' values.
+
 hashInteger :: Integer -> Int#
-hashInteger (S# i) = i
-hashInteger (J# s d) = if s ==# 0#
-                       then 0#
-                       else indexIntArray# d 0#
+hashInteger = toInt#
+                              
 \end{code}
 
