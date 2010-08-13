@@ -11,8 +11,10 @@ clean:
 	rm -fr install
 	rm -f .setup-config .installed-pkg-config
 #	unregister if pakage 'test' already exists
-	if '$(GHC_PKG)' --user list | grep test-; then \
-	  '$(GHC_PKG)' --user unregister test; \
+# 	-v0 suppresses "WARNING: there are broken packages" which can 
+#  	happen if you user database is broken
+	if '$(GHC_PKG)' -v0 --user list | grep test-; then \
+	  '$(GHC_PKG)' -v0 --user unregister test; \
 	fi
 
 # We use the global package database as there's no easy way to tell
