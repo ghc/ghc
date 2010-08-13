@@ -19,7 +19,7 @@ import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType, idArity, isBottomingId )
 import Type		( isUnLiftedType )
 import SetLevels	( Level(..), LevelledExpr, LevelledBind,
-			  setLevels, isTopLvl, tOP_LEVEL )
+			  setLevels, isTopLvl )
 import UniqSupply       ( UniqSupply )
 import Bag
 import Util
@@ -136,8 +136,7 @@ floatOutwards float_sws dflags us pgm
 floatTopBind :: LevelledBind -> (FloatStats, [CoreBind])
 floatTopBind bind
   = case (floatBind bind) of { (fs, floats) ->
-    (fs, bagToList (flattenFloats floats))
-    }
+    (fs, bagToList (flattenFloats floats)) }
 \end{code}
 
 %************************************************************************
@@ -148,7 +147,6 @@ floatTopBind bind
 
 \begin{code}
 floatBind :: LevelledBind -> (FloatStats, FloatBinds)
-
 floatBind (NonRec (TB var level) rhs)
   = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
 
@@ -159,46 +157,43 @@ floatBind (NonRec (TB var level) rhs)
 
     in (fs, rhs_floats `plusFloats` unitFloat level (NonRec var rhs'')) }
 
-floatBind bind@(Rec pairs)
-  = case (unzip3 (map do_pair pairs)) of { (fss, rhss_floats, new_pairs) ->
-    let rhs_floats = foldr1 plusFloats rhss_floats in
-
-    if not (isTopLvl bind_dest_lvl) then
+floatBind (Rec pairs)
+  = case floatList do_pair pairs of { (fs, rhs_floats, new_pairs) ->
+        -- NB: the rhs floats may contain references to the 
+	-- bound things.  For example
+	--	f = ...(let v = ...f... in b) ...
+    if not (isTopLvl dest_lvl) then
 	-- Find which bindings float out at least one lambda beyond this one
 	-- These ones can't mention the binders, because they couldn't 
 	-- be escaping a major level if so.
 	-- The ones that are not going further can join the letrec;
 	-- they may not be mutually recursive but the occurrence analyser will
-	-- find that out.
-	case (partitionByMajorLevel bind_dest_lvl rhs_floats) of { (floats', heres) ->
-	(sum_stats fss, 
-         floats' `plusFloats` unitFloat bind_dest_lvl 
-	 	 	        (Rec (floatsToBindPairs heres new_pairs))) }
-    else
-	-- In a recursive binding, *destined for* the top level
-	-- (only), the rhs floats may contain references to the 
-	-- bound things.  For example
-	--	f = ...(let v = ...f... in b) ...
-	--  might get floated to
+	-- find that out. In our example we make a Rec thus:
 	--	v = ...f...
 	--	f = ... b ...
-	-- and hence we must (pessimistically) make all the floats recursive
-	-- with the top binding.  Later dependency analysis will unravel it.
-	--
-	-- This can only happen for bindings destined for the top level,
-	-- because only then will partitionByMajorLevel allow through a binding
-	-- that only differs in its minor level
-	(sum_stats fss, unitFloat tOP_LEVEL
-		   	   (Rec (floatsToBindPairs (flattenFloats rhs_floats) new_pairs)))
-    }
+	case (partitionByMajorLevel dest_lvl rhs_floats) of { (floats', heres) ->
+	(fs, floats' `plusFloats` unitFloat dest_lvl 
+	         (Rec (floatsToBindPairs heres new_pairs))) }
+    else
+	-- For top level, no need to partition; just make them all recursive
+	-- (And the partition wouldn't work because they'd all end up in floats')
+	(fs, unitFloat dest_lvl
+	         (Rec (floatsToBindPairs (flattenFloats rhs_floats) new_pairs)))  }
   where
-    bind_dest_lvl = getBindLevel bind
+    (((TB _ dest_lvl), _) : _) = pairs
 
     do_pair (TB name level, rhs)
       = case (floatRhs level rhs) of { (fs, rhs_floats, rhs') ->
-	(fs, rhs_floats, (name, rhs'))
-	}
+	(fs, rhs_floats, (name, rhs')) }
+
+---------------
+floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
+floatList _ [] = (zeroStats, emptyFloats, [])
+floatList f (a:as) = case f a		 of { (fs_a,  binds_a,  b)  ->
+		     case floatList f as of { (fs_as, binds_as, bs) ->
+		     (fs_a `add_stats` fs_as, binds_a `plusFloats`  binds_as, b:bs) }}
 \end{code}
+
 
 %************************************************************************
 
@@ -220,39 +215,12 @@ floatCaseAlt lvl arg	-- Used rec rhss, and case-alternative rhss
 	-- the rec or case alternative
     (fsa, floats', install heres arg') }}
 
+-----------------
 floatRhs lvl arg	-- Used for nested non-rec rhss, and fn args
 			-- See Note [Floating out of RHS]
-  = case (floatExpr lvl arg) of { (fsa, floats, arg') ->
-    if exprIsCheap arg' then	
-	(fsa, floats, arg')
-    else
-    case (partitionByMajorLevel lvl floats) of { (floats', heres) ->
-    (fsa, floats', install heres arg') }}
+  = floatExpr lvl arg
 
--- Note [Floating out of RHSs]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Dump bindings that aren't going to escape from a lambda
--- This isn't a scoping issue (the binder isn't in scope in the RHS 
---	of a non-rec binding)
--- Rather, it is to avoid floating the x binding out of
---	f (let x = e in b)
--- unnecessarily.  But we first test for values or trival rhss,
--- because (in particular) we don't want to insert new bindings between
--- the "=" and the "\".  E.g.
---	f = \x -> let <bind> in <body>
--- We do not want
---	f = let <bind> in \x -> <body>
--- (a) The simplifier will immediately float it further out, so we may
---	as well do so right now; in general, keeping rhss as manifest 
---	values is good
--- (b) If a float-in pass follows immediately, it might add yet more
---	bindings just after the '='.  And some of them might (correctly)
---	be strict even though the 'let f' is lazy, because f, being a value,
---	gets its demand-info zapped by the simplifier.
---
--- We use exprIsCheap because that is also what's used by the simplifier
--- to decide whether to float a let out of a let
-
+-----------------
 floatExpr _ (Var v)   = (zeroStats, emptyFloats, Var v)
 floatExpr _ (Type ty) = (zeroStats, emptyFloats, Type ty)
 floatExpr _ (Lit lit) = (zeroStats, emptyFloats, Lit lit)
@@ -313,9 +281,10 @@ floatExpr lvl (Let (NonRec (TB bndr bndr_lvl) rhs) body)
 floatExpr lvl (Let bind body)
   = case (floatBind bind)     of { (fsb, bind_floats) ->
     case (floatExpr lvl body) of { (fse, body_floats, body') ->
-    (add_stats fsb fse,
-     bind_floats `plusFloats` body_floats,
-     body')  }}
+    case partitionByMajorLevel lvl (bind_floats `plusFloats` body_floats) 
+                              of { (floats, heres) ->
+	-- See Note [Avoiding unnecessary floating]
+    (add_stats fsb fse, floats, install heres body')  } } }
 
 floatExpr lvl (Case scrut (TB case_bndr case_lvl) ty alts)
   = case floatExpr lvl scrut	of { (fse, fde, scrut') ->
@@ -328,19 +297,42 @@ floatExpr lvl (Case scrut (TB case_bndr case_lvl) ty alts)
     float_alt (con, bs, rhs)
 	= case (floatCaseAlt case_lvl rhs)	of { (fs, rhs_floats, rhs') ->
 	  (fs, rhs_floats, (con, [b | TB b _ <- bs], rhs')) }
-
-
-floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
-floatList _ [] = (zeroStats, emptyFloats, [])
-floatList f (a:as) = case f a		 of { (fs_a,  binds_a,  b)  ->
-		     case floatList f as of { (fs_as, binds_as, bs) ->
-		     (fs_a `add_stats` fs_as, binds_a `plusFloats`  binds_as, b:bs) }}
-
-getBindLevel :: Bind (TaggedBndr Level) -> Level
-getBindLevel (NonRec (TB _ lvl) _)       = lvl
-getBindLevel (Rec (((TB _ lvl), _) : _)) = lvl
-getBindLevel (Rec [])                    = panic "getBindLevel Rec []"
 \end{code}
+
+Note [Avoiding unnecessary floating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we want to avoid floating a let unnecessarily, because
+it might worsen strictness:
+    let 
+       x = ...(let y = e in y+y)....
+Here y is demanded.  If we float it outside the lazy 'x=..' then
+we'd have to zap its demand info, and it may never be restored.
+
+So at a 'let' we leave the binding right where the are unless
+the binding will escape a value lambda.  That's what the 
+partitionByMajorLevel does in the floatExpr (Let ...) case.
+
+Notice, though, that we must take care to drop any bindings
+from the body of the let that depend on the staying-put bindings.
+
+We used instead to do the partitionByMajorLevel on the RHS of an '=',
+in floatRhs.  But that was quite tiresome.  We needed to test for
+values or trival rhss, because (in particular) we don't want to insert
+new bindings between the "=" and the "\".  E.g.
+	f = \x -> let <bind> in <body>
+We do not want
+	f = let <bind> in \x -> <body>
+(a) The simplifier will immediately float it further out, so we may
+	as well do so right now; in general, keeping rhss as manifest 
+	values is good
+(b) If a float-in pass follows immediately, it might add yet more
+	bindings just after the '='.  And some of them might (correctly)
+	be strict even though the 'let f' is lazy, because f, being a value,
+	gets its demand-info zapped by the simplifier.
+And even all that turned out to be very fragile, and broke
+altogether when profiling got in the way.
+
+So now we do the partition right at the (Let..) itself.
 
 %************************************************************************
 %*									*
@@ -493,4 +485,3 @@ wrapCostCentre cc (FB tops defns)
     wrap_one (NonRec binder rhs) = NonRec binder (mkSCC cc rhs)
     wrap_one (Rec pairs)         = Rec (mapSnd (mkSCC cc) pairs)
 \end{code}
-
