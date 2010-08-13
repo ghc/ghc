@@ -164,6 +164,17 @@ function perform_search(full)
     }
 }
 
+function addFramesButton() {
+  if (parent.location.href == window.location.href) {
+    var menu = document.getElementById("page-menu");
+    if (menu) {
+      var btn = menu.lastChild.cloneNode(false);
+      btn.innerHTML = "<a href='#' onclick='reframe();return true;'>Frames</a>";
+      menu.appendChild(btn);
+    }
+  }
+}
+
 function setSynopsis(filename) {
     if (parent.window.synopsis) {
       parent.window.synopsis.location = filename;
@@ -171,10 +182,8 @@ function setSynopsis(filename) {
 }
 
 function reframe() {
-  if (parent.location.href == window.location.href) {
-    setCookie("haddock-reframe", document.URL);
-    window.location = "frames.html";
-  }
+  setCookie("haddock-reframe", document.URL);
+  window.location = "frames.html";
 }
 
 function postReframe() {

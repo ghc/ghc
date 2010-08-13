@@ -115,7 +115,7 @@ headHtml docTitle miniPage themes =
         -- a <![CDATA[ section. Will break if the miniPage name could
         -- have "]]>" in it!
       << primHtml (
-          "//<![CDATA[\nwindow.onload = function () {resetStyle();"
+          "//<![CDATA[\nwindow.onload = function () {addFramesButton();resetStyle();"
           ++ setSynopsis ++ "};\n//]]>\n")
     ]
   where
@@ -172,9 +172,8 @@ bodyHtml doctitle iface themes
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url,
-        styleMenu themes,
-        Just (anchor ! [ href "#", onclick "reframe();"] << "Frames")])
-            ! [theclass "links"],
+        styleMenu themes])
+            ! [theclass "links", identifier "page-menu"],
       nonEmpty sectionName << doctitle
       ],
     divContent << pageContent,
