@@ -30,7 +30,7 @@ module Type (
 
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, 
 	splitFunTys, splitFunTysN,
-	funResultTy, funArgTy, zipFunTys, typeArity,
+	funResultTy, funArgTy, zipFunTys, 
 
 	mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
@@ -141,7 +141,6 @@ import VarSet
 import Name
 import Class
 import TyCon
-import BasicTypes	( Arity )
 
 -- others
 import StaticFlags
@@ -498,14 +497,6 @@ funArgTy :: Type -> Type
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (FunTy arg _res)  = arg
 funArgTy ty                = pprPanic "funArgTy" (ppr ty)
-
-typeArity :: Type -> Arity
--- How many value arrows are visible in the type?
--- We look through foralls, but not through newtypes, dictionaries etc
-typeArity ty | Just ty' <- coreView ty = typeArity ty'
-typeArity (FunTy _ ty)    = 1 + typeArity ty
-typeArity (ForAllTy _ ty) = typeArity ty
-typeArity _               = 0
 \end{code}
 
 ---------------------------------------------------------------------
