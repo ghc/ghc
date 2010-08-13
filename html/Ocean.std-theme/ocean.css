@@ -172,7 +172,7 @@ img.coll {
 
 #content {
   margin: 0 auto;
-  padding: 0 1em;
+  padding: 0 2em;
 }
 
 #package-header {
@@ -187,7 +187,7 @@ img.coll {
 #package-header .caption {
   background: url(hslogo-16.png) no-repeat 0em;
   color: white;
-  margin: 0 1em;
+  margin: 0 2em;
   font-weight: normal;
   font-style: normal;
   padding-left: 2em;
