@@ -33,3 +33,9 @@ test('SeqRule', only_ways(['optc','optasm']), compile_and_run, [''])
 
 test('T3403', normal, compile_and_run, ['-package containers'])
 test('T3591', normal, compile_and_run, [''])
+
+# Run this test *without* optimisation too
+test('T3983', [only_ways(['normal','optc','optasm']),
+               extra_clean(['T3983_Foo.hi','T3983_Foo.o','T3983_Bar.hi','T3983_Bar.o',])], 
+              multimod_compile_and_run, 
+              ['T3983',''])
