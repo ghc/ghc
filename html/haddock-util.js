@@ -24,6 +24,29 @@ function toggleSection(toggler,id)
 }
 
 
+function setCookie(name, value) {
+  document.cookie = name + "=" + escape(value) + ";path=/;";
+}
+
+function clearCookie(name) {
+  document.cookie = name + "=;path=/;expires=Thu, 01-Jan-1970 00:00:01 GMT;";
+}
+
+function getCookie(name) {
+  var nameEQ = name + "=";
+  var ca = document.cookie.split(';');
+  for(var i=0;i < ca.length;i++) {
+    var c = ca[i];
+    while (c.charAt(0)==' ') c = c.substring(1,c.length);
+    if (c.indexOf(nameEQ) == 0) {
+      return unescape(c.substring(nameEQ.length,c.length));
+    }
+  }
+  return null;
+}
+
+
+
 var max_results = 75; // 50 is not enough to search for map in the base libraries
 var shown_range = null;
 var last_search = null;
@@ -147,6 +170,20 @@ function setSynopsis(filename) {
     }
 }
 
+function reframe() {
+  if (parent.location.href == window.location.href) {
+    setCookie("haddock-reframe", document.URL);
+    window.location = "frames.html";
+  }
+}
+
+function postReframe() {
+  var s = getCookie("haddock-reframe");
+  if (s) {
+    parent.window.main.location = s;
+    clearCookie("haddock-reframe");
+  }
+}
 
 function setActiveStyleSheet(href) {
   var i, a, found = false;
@@ -162,19 +199,12 @@ function setActiveStyleSheet(href) {
     }
   }
   if (!found) href = "";
-  document.cookie = "style=" + href + ";path=/";
+  setCookie("haddock-style", href);
   styleMenu(false);
 }
 
 function resetStyle() {
-  var nameEQ = "style=";
-  var s;
-  var ca = document.cookie.split(';');
-  for(var i=0;i < ca.length;i++) {
-    var c = ca[i];
-    while (c.charAt(0)==' ') c = c.substring(1,c.length);
-    if (c.indexOf(nameEQ) == 0) s = c.substring(nameEQ.length,c.length);
-  }
+  var s = getCookie("haddock-style");
   if (s) setActiveStyleSheet(s);
 }
 

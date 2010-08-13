@@ -172,7 +172,9 @@ bodyHtml doctitle iface themes
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url,
-        styleMenu themes]) ! [theclass "links"],
+        styleMenu themes,
+        Just (anchor ! [ href "#", onclick "reframe();"] << "Frames")])
+            ! [theclass "links"],
       nonEmpty sectionName << doctitle
       ],
     divContent << pageContent,
