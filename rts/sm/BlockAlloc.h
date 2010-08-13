@@ -15,6 +15,7 @@
 
 extern nat countBlocks       (bdescr *bd);
 extern nat countAllocdBlocks (bdescr *bd);
+extern void returnMemoryToOS(nat n);
 
 #ifdef DEBUG
 void checkFreeListSanity(void);

@@ -741,7 +741,7 @@ stat_exit(int alloc)
 		        AvgResidency*sizeof(W_)/ResidencySamples, 
 		    MaxResidency*sizeof(W_), 
 		    ResidencySamples,
-		    (unsigned long)(mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
+		    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
 		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime),
 		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime),
 		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));

@@ -746,6 +746,19 @@ SET_GCT(gc_threads[0]);
   scheduleFinalizers(cap, old_weak_ptr_list);
   ACQUIRE_SM_LOCK;
 
+  if (major_gc) {
+      nat need, got;
+      need = BLOCKS_TO_MBLOCKS(n_alloc_blocks);
+      got = mblocks_allocated;
+      /* If the amount of data remains constant, next major GC we'll
+         require (F+1)*need. We leave (F+2)*need in order to reduce
+         repeated deallocation and reallocation. */
+      need = (RtsFlags.GcFlags.oldGenFactor + 2) * need;
+      if (got > need) {
+          returnMemoryToOS(got - need);
+      }
+  }
+
   // check sanity after GC
   IF_DEBUG(sanity, checkSanity(rtsTrue));
 

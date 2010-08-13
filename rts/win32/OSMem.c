@@ -203,6 +203,42 @@ osGetMBlocks(nat n) {
     return ret;
 }
 
+void osFreeMBlocks(char *addr, nat n)
+{
+    alloc_rec *p;
+    lnat nBytes = (lnat)n * MBLOCK_SIZE;
+
+    insertFree(addr, nBytes);
+
+    p = allocs;
+    while ((p != NULL) && (addr >= (p->base + p->size))) {
+        p = p->next;
+    }
+    while (nBytes > 0) {
+        if ((p == NULL) || (p->base > addr)) {
+            errorBelch("Memory to be freed isn't allocated\n");
+            stg_exit(EXIT_FAILURE);
+        }
+        if (p->base + p->size >= addr + nBytes) {
+            if (!VirtualFree(addr, nBytes, MEM_DECOMMIT)) {
+                sysErrorBelch("osFreeMBlocks: VirtualFree MEM_DECOMMIT failed");
+                stg_exit(EXIT_FAILURE);
+            }
+            nBytes = 0;
+        }
+        else {
+            lnat bytesToFree = p->base + p->size - addr;
+            if (!VirtualFree(addr, bytesToFree, MEM_DECOMMIT)) {
+                sysErrorBelch("osFreeMBlocks: VirtualFree MEM_DECOMMIT failed");
+                stg_exit(EXIT_FAILURE);
+            }
+            addr += bytesToFree;
+            nBytes -= bytesToFree;
+            p = p->next;
+        }
+    }
+}
+
 void
 osFreeAllMBlocks(void)
 {

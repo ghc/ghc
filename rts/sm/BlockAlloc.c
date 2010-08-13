@@ -21,6 +21,7 @@
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
+#include "OSMem.h"
 
 #include <string.h>
 
@@ -669,6 +670,39 @@ countAllocdBlocks(bdescr *bd)
 	}
     }
     return n;
+}
+
+void returnMemoryToOS(nat n /* megablocks */)
+{
+    static bdescr *bd;
+    nat size;
+
+    bd = free_mblock_list;
+    while ((n > 0) && (bd != NULL)) {
+        size = BLOCKS_TO_MBLOCKS(bd->blocks);
+        if (size > n) {
+            nat newSize = size - n;
+            char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
+            freeAddr += newSize * MBLOCK_SIZE;
+            bd->blocks = MBLOCK_GROUP_BLOCKS(newSize);
+            freeMBlocks(freeAddr, n);
+            n = 0;
+        }
+        else {
+            char *freeAddr = MBLOCK_ROUND_DOWN(bd->start);
+            n -= size;
+            bd = bd->link;
+            freeMBlocks(freeAddr, size);
+        }
+    }
+    free_mblock_list = bd;
+
+    IF_DEBUG(gc,
+        if (n != 0) {
+            debugBelch("Wanted to free %d more MBlocks than are freeable\n",
+                       n);
+        }
+    );
 }
 
 /* -----------------------------------------------------------------------------

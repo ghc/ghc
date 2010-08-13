@@ -12,17 +12,17 @@
 #ifndef RTS_STORAGE_MBLOCK_H
 #define RTS_STORAGE_MBLOCK_H
 
+extern lnat peak_mblocks_allocated;
 extern lnat mblocks_allocated;
 
 extern void initMBlocks(void);
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);
+extern void freeMBlocks(void *addr, nat n);
 extern void freeAllMBlocks(void);
 
-#ifdef DEBUG
 extern void *getFirstMBlock(void);
 extern void *getNextMBlock(void *mblock);
-#endif
 
 #ifdef THREADED_RTS
 // needed for HEAP_ALLOCED below

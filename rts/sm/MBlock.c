@@ -18,6 +18,7 @@
 
 #include <string.h>
 
+lnat peak_mblocks_allocated = 0;
 lnat mblocks_allocated = 0;
 lnat mpc_misses = 0;
 
@@ -29,9 +30,9 @@ lnat mpc_misses = 0;
 StgWord8 mblock_map[MBLOCK_MAP_SIZE]; // initially all zeros
 
 static void
-markHeapAlloced(void *p)
+setHeapAlloced(void *p, StgWord8 i)
 {
-    mblock_map[MBLOCK_MAP_ENTRY(p)] = 1;
+    mblock_map[MBLOCK_MAP_ENTRY(p)] = i;
 }
 
 #elif SIZEOF_VOID_P == 8
@@ -81,7 +82,7 @@ StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p)
 }
 
 static void
-markHeapAlloced(void *p)
+setHeapAlloced(void *p, StgWord8 i)
 {
     MBlockMap *map = findMBlockMap(p);
     if(map == NULL)
@@ -95,7 +96,7 @@ markHeapAlloced(void *p)
 	map->addrHigh32 = (StgWord32) (((StgWord)p) >> 32);
     }
 
-    map->lines[MBLOCK_MAP_LINE(p)] = 1;
+    map->lines[MBLOCK_MAP_LINE(p)] = i;
 
     {
         StgWord mblock;
@@ -103,19 +104,22 @@ markHeapAlloced(void *p)
         
         mblock   = (StgWord)p >> MBLOCK_SHIFT;
         entry_no = mblock & (MBC_ENTRIES-1);
-        mblock_cache[entry_no] = (mblock << 1) + 1;
+        mblock_cache[entry_no] = (mblock << 1) + i;
     }
 }
 #endif
 
-/* ----------------------------------------------------------------------------
-   Debugging code for traversing the allocated MBlocks
-   
-   This is used for searching for lost blocks when a memory leak is
-   detected; see Blocks.c:findUnmarkedBlock().
-   ------------------------------------------------------------------------ */
+static void
+markHeapAlloced(void *p)
+{
+    setHeapAlloced(p, 1);
+}
 
-#ifdef DEBUG
+static void
+markHeapUnalloced(void *p)
+{
+    setHeapAlloced(p, 0);
+}
 
 #if SIZEOF_VOID_P == 4
 
@@ -207,8 +211,6 @@ void * getFirstMBlock(void)
 
 #endif // SIZEOF_VOID_P
 
-#endif // DEBUG
-
 /* -----------------------------------------------------------------------------
    Allocate new mblock(s)
    -------------------------------------------------------------------------- */
@@ -238,13 +240,31 @@ getMBlocks(nat n)
     }
     
     mblocks_allocated += n;
+    peak_mblocks_allocated = stg_max(peak_mblocks_allocated, mblocks_allocated);
 
     return ret;
 }
 
 void
+freeMBlocks(void *addr, nat n)
+{
+    nat i;
+
+    debugTrace(DEBUG_gc, "freeing %d megablock(s) at %p",n,addr);
+
+    mblocks_allocated -= n;
+
+    for (i = 0; i < n; i++) {
+        markHeapUnalloced( (StgWord8*)addr + i * MBLOCK_SIZE );
+    }
+
+    osFreeMBlocks(addr, n);
+}
+
+void
 freeAllMBlocks(void)
 {
+    debugTrace(DEBUG_gc, "freeing all megablocks");
     osFreeAllMBlocks();
 }
 
