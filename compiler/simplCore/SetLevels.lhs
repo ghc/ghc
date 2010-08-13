@@ -449,7 +449,7 @@ notWorthFloating :: CoreExprWithFVs -> [Var] -> Bool
 --   abs_vars = tvars only:  return True if e is trivial, 
 --                           but False for anything bigger
 --   abs_vars = [x] (an Id): return True for trivial, or an application (f x)
---   	      	    	     but False for (f x x) 
+--   	      	    	     but False for (f x x)
 --
 -- One big goal is that floating should be idempotent.  Eg if
 -- we replace e with (lvl79 x y) and then run FloatOut again, don't want
@@ -458,8 +458,8 @@ notWorthFloating :: CoreExprWithFVs -> [Var] -> Bool
 notWorthFloating e abs_vars
   = go e (count isId abs_vars)
   where
-    go (_, AnnVar {}) n    = n == 0
-    go (_, AnnLit {}) n    = n == 0
+    go (_, AnnVar {}) n    = n >= 0
+    go (_, AnnLit {}) n    = n >= 0
     go (_, AnnCast e _)  n = go e n
     go (_, AnnApp e arg) n 
        | (_, AnnType {}) <- arg = go e n
@@ -615,7 +615,7 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
     abs_vars = abstractVars dest_lvl env bind_fvs
 
 ----------------------------------------------------
--- Three help functons for the type-abstraction case
+-- Three help functions for the type-abstraction case
 
 lvlFloatRhs :: [CoreBndr] -> Level -> LevelEnv -> CoreExprWithFVs
             -> UniqSM (Expr (TaggedBndr Level))
