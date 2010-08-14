@@ -115,7 +115,7 @@ headHtml docTitle miniPage themes =
         -- a <![CDATA[ section. Will break if the miniPage name could
         -- have "]]>" in it!
       << primHtml (
-          "//<![CDATA[\nwindow.onload = function () {addFramesButton();resetStyle();"
+          "//<![CDATA[\nwindow.onload = function () {pageLoad();"
           ++ setSynopsis ++ "};\n//]]>\n")
     ]
   where
@@ -124,11 +124,11 @@ headHtml docTitle miniPage themes =
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _) Nothing =
-  Just (anchor ! [href src_base_url] << "Source code")
+  Just (anchor ! [href src_base_url] << "Source")
 srcButton (_, Just src_module_url, _) (Just iface) =
   let url = spliceURL (Just $ ifaceOrigFilename iface)
                       (Just $ ifaceMod iface) Nothing Nothing src_module_url
-   in Just (anchor ! [href url] << "Source code")
+   in Just (anchor ! [href url] << "Source")
 srcButton _ _ =
   Nothing
 
@@ -157,11 +157,11 @@ indexButton maybe_index_url
   where url = maybe indexHtmlFile id maybe_index_url
 
 
-bodyHtml :: String -> Maybe Interface -> Themes
+bodyHtml :: String -> Maybe Interface
     -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String
     -> Html -> Html
-bodyHtml doctitle iface themes
+bodyHtml doctitle iface
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url
            pageContent =
@@ -171,8 +171,7 @@ bodyHtml doctitle iface themes
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod `fmap` iface),
         contentsButton maybe_contents_url,
-        indexButton maybe_index_url,
-        styleMenu themes])
+        indexButton maybe_index_url])
             ! [theclass "links", identifier "page-menu"],
       nonEmpty sectionName << doctitle
       ],
@@ -227,7 +226,7 @@ ppHtmlContents odir doctitle _maybe_package
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html =
         headHtml doctitle Nothing themes +++
-        bodyHtml doctitle Nothing themes
+        bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
             ppPrologue doctitle prologue,
@@ -345,7 +344,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
   where
     indexPage showLetters ch items =
       headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing themes +++
-      bodyHtml doctitle Nothing themes
+      bodyHtml doctitle Nothing
         maybe_source_url maybe_wiki_url
         maybe_contents_url Nothing << [
           if showLetters then indexInitialLetterLinks else noHtml,
@@ -451,7 +450,7 @@ ppHtmlModule odir doctitle themes
       mdl_str = moduleString mdl
       html =
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes +++
-        bodyHtml doctitle (Just iface) themes
+        bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
             divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str)),

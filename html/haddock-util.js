@@ -164,21 +164,25 @@ function perform_search(full)
     }
 }
 
-function addFramesButton() {
-  if (parent.location.href == window.location.href) {
-    var menu = document.getElementById("page-menu");
-    if (menu) {
-      var btn = menu.lastChild.cloneNode(false);
-      btn.innerHTML = "<a href='#' onclick='reframe();return true;'>Frames</a>";
-      menu.appendChild(btn);
-    }
-  }
-}
-
 function setSynopsis(filename) {
     if (parent.window.synopsis) {
       parent.window.synopsis.location = filename;
     }
+}
+
+function addMenuItem(html) {
+  var menu = document.getElementById("page-menu");
+  if (menu) {
+    var btn = menu.firstChild.cloneNode(false);
+    btn.innerHTML = html;
+    menu.appendChild(btn);
+  }
+}
+
+function addFramesButton() {
+  if (parent.location.href == window.location.href) {
+    addMenuItem("<a href='#' onclick='reframe();return true;'>Frames</a>");
+  }
 }
 
 function reframe() {
@@ -191,6 +195,26 @@ function postReframe() {
   if (s) {
     parent.window.main.location = s;
     clearCookie("haddock-reframe");
+  }
+}
+
+function addStyleMenu() {
+  var i, a, c = 0, btns = "";
+  for(i=0; (a = document.getElementsByTagName("link")[i]); i++) {
+    if(a.getAttribute("rel").indexOf("style") != -1
+       && a.getAttribute("title")) {
+      btns += "<li><a href='#' onclick=\"setActiveStyleSheet('"
+        + a.getAttribute("href") + "'); return false;\">"
+        + a.getAttribute("title") + "</a></li>"
+      c += 1;
+    }
+  }
+  if (c > 1) {
+    var h = "<div id='style-menu-holder'>"
+      + "<a href='#' onclick='styleMenu(); return false;'>Style &#9662;</a>"
+      + "<ul id='style-menu' class='hide'>" + btns + "</ul>"
+      + "</div>";
+    addMenuItem(h);
   }
 }
 
@@ -221,5 +245,12 @@ function resetStyle() {
 function styleMenu(show) {
   var m = document.getElementById('style-menu');
   toggleClassShow(m, show);
+}
+
+
+function pageLoad() {
+  addStyleMenu();
+  addFramesButton();
+  resetStyle();
 }
 

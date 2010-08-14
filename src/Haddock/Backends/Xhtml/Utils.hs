@@ -24,7 +24,6 @@ module Haddock.Backends.Xhtml.Utils (
 
   hsep,
 
-  onclick,
   collapser, collapseId,
 ) where
 
@@ -153,10 +152,6 @@ ubxparens :: Html -> Html
 ubxparens h = toHtml "(#" +++ h +++ toHtml "#)"
 
 
-onclick :: String -> HtmlAttr
-onclick = strAttr "onclick"
-
-
 dcolon, arrow, darrow, forallSymbol :: Bool -> Html
 dcolon unicode = toHtml (if unicode then "∷" else "::")
 arrow  unicode = toHtml (if unicode then "→" else "->")
@@ -186,7 +181,7 @@ linkedAnchor n = anchor ! [href ('#':n)]
 -- use cookies from JavaScript to have a more persistent state.
 
 collapser :: String -> String -> [HtmlAttr]
-collapser id_ classes = [ theclass cs, onclick js ]
+collapser id_ classes = [ theclass cs, strAttr "onclick" js ]
   where
     cs = unwords (words classes ++ ["collapser"])
     js = "toggleSection(this,'" ++ id_ ++ "')"

@@ -12,11 +12,10 @@ module Haddock.Backends.Xhtml.Themes (
     Themes,
     getThemes,
 
-    cssFiles, styleSheet, stylePickers, styleMenu
+    cssFiles, styleSheet
     )
     where
 
-import Haddock.Backends.Xhtml.Utils (onclick)
 import Haddock.Options
 
 import Control.Monad (liftM)
@@ -186,26 +185,6 @@ styleSheet ts = toHtml $ zipWith mkLink rels ts
             XHtml.title (themeName t)
           ]
         << noHtml
-
-
-stylePickers :: Themes -> [Html]
-stylePickers ts = map mkPicker ts
-  where
-    mkPicker t =
-      let js = "setActiveStyleSheet('" ++ themeHref t ++ "'); return false;" in
-      anchor ! [href "#", onclick js] << themeName t
-
-
-styleMenu :: Themes -> Maybe Html
-styleMenu [] = Nothing
-styleMenu [_] = Nothing
-styleMenu ts = Just $ thediv ! [identifier "style-menu-holder"] << [
-    anchor ! [ href "#", onclick js ] << "Style \9662",
-    unordList (stylePickers ts) ! [ identifier "style-menu", theclass "hide" ]
-  ]
-  where
-    js = "styleMenu(); return false;"
-
 
 --------------------------------------------------------------------------------
 -- * Either Utilities
