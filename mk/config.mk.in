@@ -291,15 +291,16 @@ PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
 #		doing object-file splitting
 
 ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO))
+# Object splitting is disabled on darwin due to #4013
+OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
 
 # lazy test, so that $(GhcUnregisterised) can be set in build.mk
-SupportsSplitObjs=$(strip $(if $(filter YES,$(ArchSupportsSplitObjs)),\
-	            $(if $(filter NO,$(BootingFromHc)),\
-		      $(if $(filter NO,$(GhcUnregisterised)),\
-	                YES,\
-			NO),\
-                      NO),\
-                    NO))
+SupportsSplitObjs=$(strip \
+                    $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
+                               $(filter YES,$(OsSupportsSplitObjs)),\
+                               $(filter NO,$(BootingFromHc)),\
+                               $(filter NO,$(GhcUnregisterised))),\
+                          YES,NO))
 
 # By default, enable SplitObjs for the libraries if this build supports it
 SplitObjs=$(SupportsSplitObjs)
