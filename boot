@@ -21,7 +21,7 @@ while (<PACKAGES>) {
     if (/^#/) {
         # Comment; do nothing
     }
-    elsif (/^([a-zA-Z0-9\/.-]+) *([^ ]+) *[^ ]+ *[^ ]+$/) {
+    elsif (/^([a-zA-Z0-9\/.-]+) +([^ ]+) +[^ ]+ +[^ ]+ +[^ ]+$/) {
         $dir = $1;
         $tag = $2;
         

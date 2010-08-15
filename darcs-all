@@ -166,7 +166,7 @@ sub darcsall {
 
     foreach (@repos) {
         chomp;
-        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = $2;
             $remotepath = $3;
@@ -227,7 +227,7 @@ sub darcsget {
 
     foreach (@repos) {
         chomp;
-        if (/^([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
+        if (/^([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = $2;
             $remotepath = $3;
