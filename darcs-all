@@ -166,9 +166,9 @@ sub darcsall {
 
     foreach (@repos) {
         chomp;
-        if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
-            $tag = defined($2) ? $2 : "";
+            $tag = $2;
             $remotepath = $3;
 
             if ($checked_out_tree) {
@@ -190,7 +190,7 @@ sub darcsall {
                     darcs (@_, "--repodir", $localpath);
                 }
             }
-            elsif ($tag eq "") {
+            elsif ($tag eq "-") {
                 message "== Required repo $localpath is missing! Skipping";
             }
             else {
@@ -227,9 +227,9 @@ sub darcsget {
 
     foreach (@repos) {
         chomp;
-        if (/^([^ ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
+        if (/^([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
-            $tag = defined($2) ? $2 : "";
+            $tag = $2;
             $remotepath = $3;
 
             if ($checked_out_tree) {
@@ -239,7 +239,7 @@ sub darcsget {
                 $path = "$repo_base/$remotepath";
             }
 
-            if (($tag eq "") || defined($tags{$tag})) {
+            if (($tag eq "-") || defined($tags{$tag})) {
                 if (-d $localpath) {
                     warning("$localpath already present; omitting");
                 }
