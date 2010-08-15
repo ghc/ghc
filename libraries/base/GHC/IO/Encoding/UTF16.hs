@@ -48,10 +48,11 @@ import GHC.IORef
 import System.Posix.Internals
 import Foreign.C
 import GHC.Show
+import GHC.Ptr
 
 puts :: String -> IO ()
 puts s = do withCStringLen (s++"\n") $ \(p,len) -> 
-                c_write 1 p (fromIntegral len)
+                c_write 1 (castPtr p) (fromIntegral len)
             return ()
 #endif
 
