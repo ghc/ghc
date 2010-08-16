@@ -13,7 +13,9 @@ module StaticFlagParser (parseStaticFlags) where
 
 #include "HsVersions.h"
 
-import StaticFlags
+import qualified StaticFlags as SF
+import StaticFlags ( v_opt_C_ready, getWayFlags, tablesNextToCode, WayName(..)
+                   , opt_SimplExcessPrecision )
 import CmdLineParser
 import Config
 import SrcLoc
@@ -101,61 +103,60 @@ static_flags :: [Flag IO]
 
 static_flags = [
         ------- GHCi -------------------------------------------------------
-    Flag "ignore-dot-ghci" (PassFlag addOpt) Supported
-  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci")) Supported
+    Flag "ignore-dot-ghci" (PassFlag addOpt) 
+  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
 
         ------- ways --------------------------------------------------------
-  , Flag "prof"           (NoArg (addWay WayProf)) Supported
-  , Flag "eventlog"       (NoArg (addWay WayEventLog)) Supported
-  , Flag "parallel"       (NoArg (addWay WayPar)) Supported
-  , Flag "gransim"        (NoArg (addWay WayGran)) Supported
-  , Flag "smp"            (NoArg (addWay WayThreaded))
-         (Deprecated "Use -threaded instead")
-  , Flag "debug"          (NoArg (addWay WayDebug)) Supported
-  , Flag "ndp"            (NoArg (addWay WayNDP)) Supported
-  , Flag "threaded"       (NoArg (addWay WayThreaded)) Supported
+  , Flag "prof"           (NoArg (addWay WayProf)) 
+  , Flag "eventlog"       (NoArg (addWay WayEventLog))
+  , Flag "parallel"       (NoArg (addWay WayPar))
+  , Flag "gransim"        (NoArg (addWay WayGran))
+  , Flag "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
+  , Flag "debug"          (NoArg (addWay WayDebug))
+  , Flag "ndp"            (NoArg (addWay WayNDP))
+  , Flag "threaded"       (NoArg (addWay WayThreaded))
 
-  , Flag "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug)) Supported
+  , Flag "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug))
     -- -ticky enables ticky-ticky code generation, and also implies -debug which
     -- is required to get the RTS ticky support.
 
         ------ Debugging ----------------------------------------------------
-  , Flag "dppr-debug"        (PassFlag addOpt) Supported
-  , Flag "dsuppress-uniques" (PassFlag addOpt) Supported
-  , Flag "dsuppress-coercions" (PassFlag addOpt) Supported
-  , Flag "dppr-user-length"  (AnySuffix addOpt) Supported
-  , Flag "dopt-fuel"         (AnySuffix addOpt) Supported
-  , Flag "dno-debug-output"  (PassFlag addOpt) Supported
-  , Flag "dstub-dead-values" (PassFlag addOpt) Supported
+  , Flag "dppr-debug"        (PassFlag addOpt)
+  , Flag "dsuppress-uniques" (PassFlag addOpt)
+  , Flag "dsuppress-coercions" (PassFlag addOpt)
+  , Flag "dppr-user-length"  (AnySuffix addOpt)
+  , Flag "dopt-fuel"         (AnySuffix addOpt)
+  , Flag "dno-debug-output"  (PassFlag addOpt)
+  , Flag "dstub-dead-values" (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
         ----- Linker --------------------------------------------------------
-  , Flag "static"         (PassFlag addOpt) Supported
-  , Flag "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn)) Supported
+  , Flag "static"         (PassFlag addOpt)
+  , Flag "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn))
     -- ignored for compat w/ gcc:
-  , Flag "rdynamic"       (NoArg (return ())) Supported
+  , Flag "rdynamic"       (NoArg (return ()))
 
         ----- RTS opts ------------------------------------------------------
-  , Flag "H"              (HasArg (setHeapSize . fromIntegral . decodeSize))
-         Supported
-  , Flag "Rghc-timing"    (NoArg  (enableTimingStats)) Supported
+  , Flag "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
+        
+  , Flag "Rghc-timing"    (NoArg (liftEwM enableTimingStats))
 
         ------ Compiler flags -----------------------------------------------
 
         -- -fPIC requires extra checking: only the NCG supports it.
         -- See also DynFlags.parseDynamicFlags.
-  , Flag "fPIC" (PassFlag setPIC) Supported
+  , Flag "fPIC" (PassFlag setPIC)
 
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   , Flag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
-         Supported
+        
 
         -- Pass all remaining "-f<blah>" options to hsc
-  , Flag "f" (AnySuffixPred isStaticFlag addOpt) Supported
+  , Flag "f" (AnySuffixPred isStaticFlag addOpt)
   ]
 
-setPIC :: String -> IO ()
+setPIC :: String -> StaticP ()
 setPIC | cGhcWithNativeCodeGen == "YES" || cGhcUnregisterised == "YES"
        = addOpt
        | otherwise
@@ -216,6 +217,18 @@ decodeSize str
   where (m, c) = span pred str
         n      = readRational m
         pred c = isDigit c || c == '.'
+
+
+type StaticP = EwM IO
+
+addOpt :: String -> StaticP ()
+addOpt = liftEwM . SF.addOpt
+
+addWay :: WayName -> StaticP ()
+addWay = liftEwM . SF.addWay
+
+removeOpt :: String -> StaticP ()
+removeOpt = liftEwM . SF.removeOpt
 
 -----------------------------------------------------------------------------
 -- RTS Hooks

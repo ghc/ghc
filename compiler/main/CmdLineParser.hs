@@ -12,8 +12,10 @@
 module CmdLineParser (
         processArgs, OptKind(..),
         CmdLineP(..), getCmdLineState, putCmdLineState,
-        Flag(..), Deprecated(..),
-        errorsToGhcException
+        Flag(..), 
+        errorsToGhcException,
+
+        EwM, addErr, addWarn, getArg, liftEwM, deprecate
   ) where
 
 #include "HsVersions.h"
@@ -21,33 +23,98 @@ module CmdLineParser (
 import Util
 import Outputable
 import Panic
+import Bag
 import SrcLoc
 
 import Data.List
 
+--------------------------------------------------------
+--	   The Flag and OptKind types
+--------------------------------------------------------
+
 data Flag m = Flag
-    {
-        flagName :: String,           -- flag, without the leading -
-        flagOptKind :: (OptKind m),   -- what to do if we see it
-        flagDeprecated :: Deprecated  -- is the flag deprecated?
+    {   flagName    :: String,       -- Flag, without the leading "-"
+        flagOptKind :: OptKind m     -- What to do if we see it
     }
 
-data Deprecated = Supported
-                | Deprecated String
-                | DeprecatedFullText String
-
+-------------------------------
 data OptKind m                      -- Suppose the flag is -f
- = NoArg (m ())                     -- -f all by itself
- | HasArg    (String -> m ())       -- -farg or -f arg
- | SepArg    (String -> m ())       -- -f arg
- | Prefix    (String -> m ())       -- -farg
- | OptPrefix (String -> m ())       -- -f or -farg (i.e. the arg is optional)
- | OptIntSuffix (Maybe Int -> m ()) -- -f or -f=n; pass n to fn
- | IntSuffix (Int -> m ())          -- -f or -f=n; pass n to fn
- | PassFlag  (String -> m ())       -- -f; pass "-f" fn
- | AnySuffix (String -> m ())       -- -f or -farg; pass entire "-farg" to fn
- | PrefixPred    (String -> Bool) (String -> m ())
- | AnySuffixPred (String -> Bool) (String -> m ())
+ = NoArg     (EwM m ())                 -- -f all by itself
+ | HasArg    (String -> EwM m ())       -- -farg or -f arg
+ | SepArg    (String -> EwM m ())       -- -f arg
+ | Prefix    (String -> EwM m ())       -- -farg
+ | OptPrefix (String -> EwM m ())       -- -f or -farg (i.e. the arg is optional)
+ | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -f=n; pass n to fn
+ | IntSuffix (Int -> EwM m ())          -- -f or -f=n; pass n to fn
+ | PassFlag  (String -> EwM m ())       -- -f; pass "-f" fn
+ | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
+ | PrefixPred    (String -> Bool) (String -> EwM m ())
+ | AnySuffixPred (String -> Bool) (String -> EwM m ())
+
+
+--------------------------------------------------------
+--	   The EwM monad 
+--------------------------------------------------------
+
+type Err   = Located String
+type Warn  = Located String
+type Errs  = Bag Err
+type Warns = Bag Warn
+
+-- EwM (short for "errors and warnings monad") is a
+-- monad transformer for m that adds an (err, warn) state
+newtype EwM m a = EwM { unEwM :: Located String	    -- Current arg
+                              -> Errs -> Warns
+                              -> m (Errs, Warns, a) }
+
+instance Monad m => Monad (EwM m) where
+  (EwM f) >>= k = EwM (\l e w -> do { (e', w', r) <- f l e w 
+                                    ; unEwM (k r) l e' w' })
+  return v = EwM (\_ e w -> return (e, w, v))
+
+setArg :: Located String -> EwM m a -> EwM m a
+setArg l (EwM f) = EwM (\_ es ws -> f l es ws)
+
+addErr :: Monad m => String -> EwM m ()
+addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` L loc e, ws, ()))
+
+addWarn :: Monad m => String -> EwM m ()
+addWarn msg = EwM (\(L loc _) es ws -> return (es, ws `snocBag` L loc w, ()))
+  where
+    w = "Warning: " ++ msg
+
+deprecate :: Monad m => String -> EwM m ()
+deprecate s 
+  = do { arg <- getArg
+       ; addWarn (arg ++ " is deprecated: " ++ s) }
+
+getArg :: Monad m => EwM m String
+getArg = EwM (\(L _ arg) es ws -> return (es, ws, arg))
+
+liftEwM :: Monad m => m a -> EwM m a
+liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
+
+-- -----------------------------------------------------------------------------
+-- A state monad for use in the command-line parser
+-- (CmdLineP s) typically instantiates the 'm' in (EwM m) and (OptKind m)
+
+newtype CmdLineP s a = CmdLineP { runCmdLine :: s -> (a, s) }
+
+instance Monad (CmdLineP s) where
+        return a = CmdLineP $ \s -> (a, s)
+        m >>= k  = CmdLineP $ \s -> let
+                (a, s') = runCmdLine m s
+                in runCmdLine (k a) s'
+
+getCmdLineState :: CmdLineP s s
+getCmdLineState   = CmdLineP $ \s -> (s,s)
+putCmdLineState :: s -> CmdLineP s ()
+putCmdLineState s = CmdLineP $ \_ -> ((),s)
+
+
+--------------------------------------------------------
+--	   Processing arguments
+--------------------------------------------------------
 
 processArgs :: Monad m
             => [Flag m] -- cmdline parser spec
@@ -57,36 +124,34 @@ processArgs :: Monad m
                   [Located String],  -- errors
                   [Located String]   -- warnings
                  )
-processArgs spec args = process spec args [] [] []
+processArgs spec args 
+  = do { (errs, warns, spare) <- unEwM (process args []) 
+                                       (panic "processArgs: no arg yet")
+                                       emptyBag emptyBag 
+       ; return (spare, bagToList errs, bagToList warns) }
   where
-    process _spec [] spare errs warns =
-      return (reverse spare, reverse errs, reverse warns)
+    -- process :: [Located String] -> [Located String] -> EwM m [Located String]
+    process [] spare = return (reverse spare)
 
-    process spec (locArg@(L loc dash_arg@('-' : arg)) : args) spare errs warns =
+    process (locArg@(L _ ('-' : arg)) : args) spare =
       case findArg spec arg of
-        Just (rest, action, deprecated) ->
-           let warns' = case deprecated of
-                        Deprecated warning ->
-                            L loc ("Warning: " ++ dash_arg ++ " is deprecated: " ++ warning) : warns
-                        DeprecatedFullText warning ->
-                            L loc ("Warning: " ++ warning) : warns
-                        Supported -> warns
-           in case processOneArg action rest arg args of
-              Left err            -> process spec args spare (L loc err : errs) warns'
-              Right (action,rest) -> do action
-                                        process spec rest spare errs warns'
-        Nothing -> process spec args (locArg : spare) errs warns
+        Just (rest, opt_kind) ->
+           case processOneArg opt_kind rest arg args of
+              Left err            -> do { setArg locArg $ addErr err
+                                        ; process args spare }
+              Right (action,rest) -> do { setArg locArg $ action
+                                        ; process rest spare }
+        Nothing -> process args (locArg : spare) 
 
-    process spec (arg : args) spare errs warns =
-      process spec args (arg : spare) errs warns
+    process (arg : args) spare = process args (arg : spare) 
 
 
 processOneArg :: OptKind m -> String -> String -> [Located String]
-              -> Either String (m (), [Located String])
-processOneArg action rest arg args
+              -> Either String (EwM m (), [Located String])
+processOneArg opt_kind rest arg args
   = let dash_arg = '-' : arg
         rest_no_eq = dropEq rest
-    in case action of
+    in case opt_kind of
         NoArg  a -> ASSERT(null rest) Right (a, args)
 
         HasArg f | notNull rest_no_eq -> Right (f rest_no_eq, args)
@@ -119,9 +184,9 @@ processOneArg action rest arg args
         AnySuffixPred _ f -> Right (f dash_arg, args)
 
 
-findArg :: [Flag m] -> String -> Maybe (String, OptKind m, Deprecated)
+findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
 findArg spec arg
-  = case [ (removeSpaces rest, optKind, flagDeprecated flag)
+  = case [ (removeSpaces rest, optKind)
          | flag <- spec,
            let optKind = flagOptKind flag,
            Just rest <- [stripPrefix (flagName flag) arg],
@@ -161,22 +226,6 @@ unknownFlagErr f = Left ("unrecognised flag: " ++ f)
 
 missingArgErr :: String -> Either String a
 missingArgErr f = Left ("missing argument for flag: " ++ f)
-
--- -----------------------------------------------------------------------------
--- A state monad for use in the command-line parser
-
-newtype CmdLineP s a = CmdLineP { runCmdLine :: s -> (a, s) }
-
-instance Monad (CmdLineP s) where
-        return a = CmdLineP $ \s -> (a, s)
-        m >>= k  = CmdLineP $ \s -> let
-                (a, s') = runCmdLine m s
-                in runCmdLine (k a) s'
-
-getCmdLineState :: CmdLineP s s
-getCmdLineState   = CmdLineP $ \s -> (s,s)
-putCmdLineState :: s -> CmdLineP s ()
-putCmdLineState s = CmdLineP $ \_ -> ((),s)
 
 -- ---------------------------------------------------------------------
 -- Utils

@@ -497,24 +497,15 @@ mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
     Flag "?"                     (PassFlag (setMode showGhcUsageMode))
-         Supported
   , Flag "-help"                 (PassFlag (setMode showGhcUsageMode))
-         Supported
   , Flag "V"                     (PassFlag (setMode showVersionMode))
-         Supported
   , Flag "-version"              (PassFlag (setMode showVersionMode))
-         Supported
   , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
-         Supported
   , Flag "-info"                 (PassFlag (setMode showInfoMode))
-         Supported
   , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
-         Supported
   , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
-         Supported
   ] ++
   [ Flag k'                     (PassFlag (setMode mode))
-         Supported
   | (k, v) <- compilerInfo,
     let k' = "-print-" ++ map (replaceSpace . toLower) k
         replaceSpace ' ' = '-'
@@ -526,33 +517,23 @@ mode_flags =
       ------- interfaces ----------------------------------------------------
   [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
-         Supported
 
       ------- primary modes ------------------------------------------------
   , Flag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
                                             addFlag "-no-link" f))
-         Supported
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
-         Supported
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-         Supported
   , Flag "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
                                             addFlag "-fvia-C" f))
-         Supported
   , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
-         Supported
   , Flag "-make"        (PassFlag (setMode doMakeMode))
-         Supported
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
-         Supported
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
-         Supported
   , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
-         Supported
   ]
 
-setMode :: Mode -> String -> ModeM ()
-setMode newMode newFlag = do
+setMode :: Mode -> String -> EwM ModeM ()
+setMode newMode newFlag = liftEwM $ do
     (mModeFlag, errs, flags') <- getCmdLineState
     let (modeFlag', errs') =
             case mModeFlag of
@@ -595,8 +576,8 @@ flagMismatchErr :: String -> String -> String
 flagMismatchErr oldFlag newFlag
     = "cannot use `" ++ oldFlag ++  "' with `" ++ newFlag ++ "'"
 
-addFlag :: String -> String -> ModeM ()
-addFlag s flag = do
+addFlag :: String -> String -> EwM ModeM ()
+addFlag s flag = liftEwM $ do
   (m, e, flags') <- getCmdLineState
   putCmdLineState (m, e, mkGeneralLocated loc s : flags')
     where loc = "addFlag by " ++ flag ++ " on the commandline"

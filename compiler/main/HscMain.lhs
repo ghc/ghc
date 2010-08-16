@@ -1026,6 +1026,11 @@ hscParseThing parser dflags str
 compileExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
 
 compileExpr hsc_env srcspan ds_expr
+  | rtsIsProfiled
+  = panic "You can't call compileExpr in a profiled compiler"
+    	  -- Otherwise you get a seg-fault when you run it
+
+  | otherwise
   = do	{ let { dflags  = hsc_dflags hsc_env ;
 		lint_on = dopt Opt_DoCoreLinting dflags }
 	      
