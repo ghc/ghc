@@ -198,4 +198,4 @@ instance  (RealFloat a) => Floating (Complex a) where
 
     asinh z        =  log (z + sqrt (1+z*z))
     acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
-    atanh z        =  log ((1+z) / sqrt (1-z*z))
+    atanh z        =  0.5 * log ((1.0+z) / (1.0-z))

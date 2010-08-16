@@ -249,7 +249,7 @@ instance  Floating Float  where
 
     asinh x = log (x + sqrt (1.0+x*x))
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
-    atanh x = log ((x+1.0) / sqrt (1.0-x*x))
+    atanh x = 0.5 * log ((1.0+x) / (1.0-x))
 
 instance  RealFloat Float  where
     floatRadix _        =  FLT_RADIX        -- from float.h
@@ -331,7 +331,7 @@ instance  Floating Double  where
 
     asinh x = log (x + sqrt (1.0+x*x))
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
-    atanh x = log ((x+1.0) / sqrt (1.0-x*x))
+    atanh x = 0.5 * log ((1.0+x) / (1.0-x))
 
 {-# RULES "truncate/Double->Int" truncate = double2Int #-}
 instance  RealFrac Double  where
