@@ -59,20 +59,20 @@ pre, code, kbd, samp, tt, .src {
 	line-height:116%;
 }
 
-.top > .src {
-  font-size: 116%; /* 15pt */
-}
-
-.top .src .link {
-  font-size: 86.2%; /* 13pt */
+.links, .link {
+  font-size: 85%; /* 11pt */
 }
 
 #module-header .caption {
   font-size: 182%; /* 24pt */
 }
 
-dl.info, #table-of-contents, #synopsis  {
+dl.info  {
   font-size: 85%; /* 11pt */
+}
+
+#table-of-contents, #synopsis  {
+  /* font-size: 85%; /* 11pt */
 }
 
 
@@ -104,7 +104,7 @@ ul.links {
 
 ul.links li {
   display: inline;
-  border-left: 1px solid rgb(78,98,114); 
+  border-left: 1px solid #d5d5d5; 
   white-space: nowrap;
   padding: 0;
 }
@@ -140,11 +140,15 @@ p.caption.expander {
 }
 
 pre {
-  padding: 0.5em;
+  padding: 0.25em;
 /*  margin: 0.5em 5em 0.5em 3em; */
   margin: 0.5em 0 0.5em;
   background: rgb(229,237,244);
   overflow: auto;
+  border-bottom: 0.25em solid white;
+  /* white border adds some space below the box to compensate
+     for visual extra space that paragraphs have between baseline
+     and the bounding box */
 }
 
 .src {
@@ -355,8 +359,14 @@ div#style-menu-holder {
 
 /* @group Main Content */
 
-#interface div.top { margin: 1em 0 2em 0; }
-
+#interface div.top { margin: 2em 0; }
+#interface h1 + div.top,
+#interface h2 + div.top,
+#interface h3 + div.top,
+#interface h4 + div.top,
+#interface h5 + div.top {
+ 	margin-top: 1em;
+}
 #interface p.src .link {
   float: right;
   color: #919191;
