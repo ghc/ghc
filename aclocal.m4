@@ -141,7 +141,7 @@ AC_DEFUN([FP_COMPUTE_INT],
 # A variation of AC_CHECK_SIZEOF for computing the alignment restrictions of a
 # given type. Defines ALIGNMENT_TYPE.
 AC_DEFUN([FP_CHECK_ALIGNMENT],
-[AS_LITERAL_IF([$1], [],
+[AS_LITERAL_IF(m4_translit([[$1]], [*], [p]), [],
                [AC_FATAL([$0: requires literal arguments])])[]dnl
 AC_CHECK_TYPE([$1], [], [], [$3])[]dnl
 m4_pushdef([fp_Cache], [AS_TR_SH([fp_cv_alignment_$1])])[]dnl
