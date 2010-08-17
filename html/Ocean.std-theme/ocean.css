@@ -125,10 +125,6 @@ ul.links li a {
   background-image: url(plus.gif);
   background-repeat: no-repeat;
 }
-span.module.collapser,
-span.module.expander {
-  background-position: 0 0.3em;
-}
 p.caption.collapser,
 p.caption.expander {
   background-position: 0 0.4em;
@@ -516,6 +512,11 @@ div#style-menu-holder {
 
 #module-list li {
   clear: right;
+}
+
+#module-list span.collapser,
+#module-list span.expander {
+  background-position: 0 0.3em;
 }
 
 #module-list .package {

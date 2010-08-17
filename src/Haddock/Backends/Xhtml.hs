@@ -262,12 +262,19 @@ mkNode :: [String] -> String -> ModuleTree -> Html
 mkNode ss p (Node s leaf pkg short ts) =
   htmlModule +++ shortDescr +++ htmlPkg +++ subtree
   where
-    modAttrs = case ts of
-      [] -> [theclass "module"]
-      _ -> collapseControl p True "module"
+    modAttrs = case (ts, leaf) of
+      (_:_, False) -> collapseControl p True "module"
+      (_,   _    ) -> [theclass "module"]
 
-    htmlModule = thespan ! modAttrs <<
-      (if leaf
+    cBtn = case (ts, leaf) of
+      (_:_, True) -> thespan ! collapseControl p True "" << spaceHtml
+      (_,   _   ) -> noHtml
+      -- We only need an explicit collapser button when the module name
+      -- is also a leaf, and so is a link to a module page. Indeed, the
+      -- spaceHtml is a minor hack and does upset the layout a fraction.
+      
+    htmlModule = thespan ! modAttrs << (cBtn +++
+      if leaf
         then ppModule (mkModule (stringToPackageId (fromMaybe "" pkg))
                                        (mkModuleName mdl))
         else toHtml s
