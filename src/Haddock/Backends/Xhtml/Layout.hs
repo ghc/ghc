@@ -40,6 +40,7 @@ import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
+import Haddock.Utils (makeAnchorId)
 
 import Text.XHtml hiding ( name, title, p, quote )
 
@@ -154,13 +155,13 @@ subFields = divSubDecls "fields" "Fields" . subDlist
 
 
 subInstances :: String -> [SubDecl] -> Html
-subInstances id_ = maybe noHtml wrap . instTable
+subInstances nm = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! [identifier id_, theclass "show"] <<) . subTable
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTable
     subSection = thediv ! [theclass $ "subs instances"]
-    subCaption = paragraph ! collapser id_ "caption" << "Instances"
-
+    subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
+    id_ = makeAnchorId $ "i:" ++ nm
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock

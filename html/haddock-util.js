@@ -1,26 +1,58 @@
 // Haddock JavaScript utilities
 
-function makeClassToggle(cOn, cOff)
-{
-  var rOn = new RegExp('\\b'+cOn+'\\b');
-  var rOff = new RegExp('\\b'+cOff+'\\b');
-    
-  return function(e, a) {
-    var c = e.className;
-    if (a == null) { a = rOff.test(c); }
-    if (a) { c = c.replace(rOff, cOn); }
-    else   { c = c.replace(rOn, cOff); }
-    e.className = c;
+var rspace = /\s\s+/g,
+	  rtrim = /^\s+|\s+$/g;
+
+function spaced(s) { return (" " + s + " ").replace(rspace, " "); }
+function trim(s)   { return s.replace(rtrim, ""); }
+
+function hasClass(elem, value) {
+  var className = spaced(elem.className || "");
+  return className.indexOf( " " + value + " " ) >= 0;
+}
+
+function addClass(elem, value) {
+  var className = spaced(elem.className || "");
+  if ( className.indexOf( " " + value + " " ) < 0 ) {
+    elem.className = trim(className + " " + value);
   }
 }
 
-toggleClassShow = makeClassToggle("show", "hide");
-toggleClassCollapser = makeClassToggle("collapser", "expander");
+function removeClass(elem, value) {
+  var className = spaced(elem.className || "");
+  className = className.replace(" " + value + " ", " ");
+  elem.className = trim(className);
+}
 
-function toggleSection(toggler,id)
+function toggleClass(elem, valueOn, valueOff, bool) {
+  if (bool == null) { bool = ! hasClass(elem, valueOn); }
+  if (bool) {
+    removeClass(elem, valueOff);
+    addClass(elem, valueOn);
+  }
+  else {
+    removeClass(elem, valueOn);
+    addClass(elem, valueOff);
+  }
+  return bool;
+}
+
+
+function makeClassToggle(valueOn, valueOff)
 {
-  toggleClassShow(document.getElementById(id))
-  toggleClassCollapser(toggler);
+  return function(elem, bool) {
+    return toggleClass(elem, valueOn, valueOff, bool);
+  }
+}
+
+toggleShow = makeClassToggle("show", "hide");
+toggleCollapser = makeClassToggle("collapser", "expander");
+
+function toggleSection(id)
+{
+  var b = toggleShow(document.getElementById("section." + id))
+  toggleCollapser(document.getElementById("control." + id), b)
+  return b;
 }
 
 
@@ -244,7 +276,7 @@ function resetStyle() {
 
 function styleMenu(show) {
   var m = document.getElementById('style-menu');
-  toggleClassShow(m, show);
+  if (m) toggleClassShow(m, show);
 }
 
 

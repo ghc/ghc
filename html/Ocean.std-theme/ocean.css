@@ -281,8 +281,8 @@ div#style-menu-holder {
 #table-of-contents {
   float: right;
   clear: right;
-  background: rgb(239,238,209);
-  border: 1px solid rgba(196,69,29,0.2);
+  background: #f9f8db;
+  border: 1px solid #d8d7ad;
   padding: 0.5em 1em;
   position: relative;
   top: 0em;
@@ -317,7 +317,6 @@ div#style-menu-holder {
 }
 
 #synopsis .caption {
-  text-align: right;
   float: left;
   width: 29px;
   color: rgba(255,255,255,0);
@@ -328,23 +327,14 @@ div#style-menu-holder {
 }
 
 #synopsis p.caption.collapser {
-  background: url(synopsis.png) no-repeat 0 -8px;
-}
-
-#synopsis p.caption.expander {
   background: url(synopsis.png) no-repeat -64px -8px;
 }
 
-#synopsis ul,
-#synopsis ul li.src {
-  background-color: #f9f8db;
-  white-space: nowrap;
+#synopsis p.caption.expander {
+  background: url(synopsis.png) no-repeat 0px -8px;
 }
 
-#synopsis ul.collapser,
-#synopsis ul.expander {
-  background-image: none;
-  list-style: none;
+#synopsis ul {
   height: 100%;
   overflow: auto;
   padding: 0.5em;
@@ -353,6 +343,14 @@ div#style-menu-holder {
 
 #synopsis ul ul {
   overflow: hidden;
+}
+
+#synopsis ul,
+#synopsis ul li.src {
+  background-color: #f9f8db;
+  white-space: nowrap;
+  list-style: none;
+  margin-left: 0;
 }
 
 /* @end */
@@ -418,24 +416,10 @@ div#style-menu-holder {
   border-top: 1px solid #ccc;
 }
 
-/* @group Left Margin */
-
 .subs, .doc {
   /* use this selector for one level of indent */
   padding-left: 2em;
 }
-
-/* use these two for two levels of indent */
-/*
-#description .doc, #interface div.top {
-  padding-left: 1.25em;
-}
-
-div.top .subs, div.top .doc {
-  padding-left: 1.875em;
-}
-*/
-/* @end */
 
 .arguments {
   margin-top: -0.4em;
@@ -528,6 +512,10 @@ div.top .subs, div.top .doc {
 #module-list ul {
   list-style: none;
   margin: 0 0 0 2em;
+}
+
+#module-list li {
+  clear: right;
 }
 
 #module-list .package {

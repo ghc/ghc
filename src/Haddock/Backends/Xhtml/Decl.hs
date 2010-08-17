@@ -385,9 +385,9 @@ ppClassDecl _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortCl
 
 ppInstances :: [DocInstance DocName] -> DocName -> Bool -> Html
 ppInstances instances baseName unicode
-  = subInstances instId (map instDecl instances)
+  = subInstances instName (map instDecl instances)
   where
-    instId = collapseId (getName baseName)
+    instName = getOccString $ getName baseName
     instDecl :: DocInstance DocName -> SubDecl
     instDecl (inst, maybeDoc) = (instHead inst, maybeDoc, [])
     instHead ([],   n, ts) = ppAppNameTypes n ts unicode

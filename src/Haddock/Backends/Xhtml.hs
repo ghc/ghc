@@ -264,7 +264,7 @@ mkNode ss p (Node s leaf pkg short ts) =
   where
     modAttrs = case ts of
       [] -> [theclass "module"]
-      _ -> collapser p "module"
+      _ -> collapseControl p True "module"
 
     htmlModule = thespan ! modAttrs <<
       (if leaf
@@ -278,7 +278,7 @@ mkNode ss p (Node s leaf pkg short ts) =
     shortDescr = maybe noHtml origDocToHtml short
     htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) pkg
 
-    subtree = mkNodeList (s:ss) p ts ! [identifier p, theclass "show"]
+    subtree = mkNodeList (s:ss) p ts ! collapseSection p True ""
 
 
 -- | Turn a module tree into a flat list of full module names.  E.g.,
@@ -504,10 +504,10 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
       | no_doc_at_all = noHtml
       | otherwise
       = divSynposis $
-            paragraph ! collapser "syn" "caption" << "Synopsis" +++ 
+            paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++ 
             shortDeclList (
                 mapMaybe (processExport True linksInfo unicode) exports
-            ) ! ([identifier "syn"] ++ collapser "syn" "hide")
+            ) ! (collapseSection "syn" False "" ++ collapseToggle "syn")
 
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").

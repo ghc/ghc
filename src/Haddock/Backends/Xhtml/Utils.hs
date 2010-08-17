@@ -24,7 +24,7 @@ module Haddock.Backends.Xhtml.Utils (
 
   hsep,
 
-  collapser, collapseId,
+  collapseSection, collapseToggle, collapseControl,
 ) where
 
 
@@ -173,21 +173,29 @@ linkedAnchor n = anchor ! [href ('#':n)]
 
 
 --
--- A section of HTML which is collapsible via a +/- button.
+-- A section of HTML which is collapsible.
 --
 
--- TODO: Currently the initial state is non-collapsed. Change the 'minusFile'
--- below to a 'plusFile' and the 'display:block;' to a 'display:none;' when we
--- use cookies from JavaScript to have a more persistent state.
+-- | Attributes for an area that can be collapsed
+collapseSection :: String -> Bool -> String -> [HtmlAttr]
+collapseSection id_ state classes = [ identifier sid, theclass cs ]
+  where cs = unwords (words classes ++ [pick state "show" "hide"])
+        sid = "section." ++ id_
 
-collapser :: String -> String -> [HtmlAttr]
-collapser id_ classes = [ theclass cs, strAttr "onclick" js ]
-  where
-    cs = unwords (words classes ++ ["collapser"])
-    js = "toggleSection(this,'" ++ id_ ++ "')"
+-- | Attributes for an area that toggles a collapsed area
+collapseToggle :: String -> [HtmlAttr]
+collapseToggle id_ = [ strAttr "onclick" js ]
+  where js = "toggleSection('" ++ id_ ++ "')";
+  
+-- | Attributes for an area that toggles a collapsed area,
+-- and displays a control.
+collapseControl :: String -> Bool -> String -> [HtmlAttr]
+collapseControl id_ state classes =
+  [ identifier cid, theclass cs ] ++ collapseToggle id_
+  where cs = unwords (words classes ++ [pick state "collapser" "expander"])
+        cid = "control." ++ id_
 
 
--- A quote is a valid part of a Haskell identifier, but it would interfere with
--- the ECMA script string delimiter used in collapsebutton above.
-collapseId :: Name -> String
-collapseId nm = "i:" ++ escapeStr (getOccString nm)
+pick :: Bool -> a -> a -> a
+pick True  t _ = t
+pick False _ f = f
