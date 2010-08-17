@@ -219,7 +219,7 @@ stgReallocBytes (void *p, int n, char *msg)
       stg_exit(EXIT_INTERNAL_ERROR);
     }
 #if defined(DEBUG)
-    removeAllocation(p, 0);
+    if (p != NULL) { removeAllocation(p, 0); }
     addAllocation(space, n2);
 #endif
     return space;
