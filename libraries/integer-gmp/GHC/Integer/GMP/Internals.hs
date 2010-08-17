@@ -54,10 +54,6 @@ module GHC.Integer.GMP.Internals (
 import GHC.Prim
 import GHC.Integer.Type
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.Prim (Int64#, Word64#)
-#endif
-
 -- Double isn't available yet, and we shouldn't be using defaults anyway:
 default ()
 
