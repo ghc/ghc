@@ -1176,8 +1176,9 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
                 dflags1{ hscTarget = HscAsm })
 #if !(x86_64_TARGET_ARCH && linux_TARGET_OS)
         | (not opt_Static || opt_PIC) && hscTarget dflags1 == HscLlvm
-        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -dynamic on this"
-                ++ "platform; ignoring -fllvm"], dflags1{ hscTarget = HscAsm })
+        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -"
+                ++ "dynamic on this platform;\n              ignoring -fllvm"],
+                dflags1{ hscTarget = HscAsm })
 #endif
         | otherwise = ([], dflags1)
 
