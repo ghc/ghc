@@ -1,4 +1,4 @@
 
-./B.hs:7:10:
+B.hs:7:10:
     Warning: No explicit method nor default method for `row'
-	     In the instance declaration for `Matrix Bool Val'
+    In the instance declaration for `Matrix Bool Val'
