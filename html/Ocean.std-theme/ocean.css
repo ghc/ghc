@@ -14,7 +14,9 @@ body {
   text-align: left;
 }
 
-p { margin: 0.5em 0; }
+p {
+  margin: 0.8em 0;
+}
 
 ul { margin-left: 2em; }
 
@@ -83,7 +85,7 @@ dl.info  {
 .caption, h1, h2, h3, h4, h5, h6 { 
   font-weight: bold;
   color: rgb(78,98,114);
-  margin: 0.8em 0 0.5em;
+  margin: 0.8em 0 0.4em;
 }
 
 * + h1, * + h2, * + h3, * + h4, * + h5, * + h6 {
@@ -137,8 +139,7 @@ p.caption.expander {
 
 pre {
   padding: 0.25em;
-/*  margin: 0.5em 5em 0.5em 3em; */
-  margin: 0.5em 0 0.5em;
+  margin: 0.8em 0;
   background: rgb(229,237,244);
   overflow: auto;
   border-bottom: 0.25em solid white;
@@ -154,12 +155,6 @@ pre {
 
 .keyword { font-weight: normal; }
 .def { font-weight: bold; }
-
-img.coll {
-	width : 0.75em;
-	height: 0.75em;
-	margin: 0 0.5em 0 0;
-}
 
 
 /* @end */
@@ -378,7 +373,7 @@ div#style-menu-holder {
   margin: 0;
 }
 #interface td.doc p + p {
-  margin-top: 0.5em;
+  margin-top: 0.8em;
 }
 
 #interface dt {
