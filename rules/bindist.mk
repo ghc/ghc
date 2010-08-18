@@ -23,14 +23,10 @@ define bindist
 bindist: bindist_$1
 
 bindist_$1:
-$(foreach i,$2,$(call bindist_item,$i))
-endef
-
-define bindist_item
-
-# $1 = the line
-# The formatting of this definition (e.g. the blank line above) is
-# important, in order to get make to generate the right makefile code.
-	for f in $1; do echo $(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done
+	$(foreach i,$2,\
+	    $(call make-command,\
+	        for f in $i; do echo $(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done \
+	    ) \
+	    )
 endef
 
