@@ -908,18 +908,23 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
-	$(foreach p, $(ALL_INSTALLED_PACKAGES),\
-	    "$(GHC_CABAL_INPLACE)" install \
-		 "$(INSTALLED_GHC_REAL)" \
-		 "$(INSTALLED_GHC_PKG_REAL)" \
-		 "$(STRIP_CMD)" \
-		 "$(DESTDIR)$(topdir)" \
-		 $p $(INSTALL_DISTDIR_$p) \
-		 '$(DESTDIR)' '$(prefix)' '$(ghclibdir)' '$(docdir)/html/libraries' \
-		 $(RelocatableBuild) &&) true
-	$(foreach p, $(HIDDEN_PACKAGES),\
-	    "$(INSTALLED_GHC_PKG_REAL)" --global-conf "$(INSTALLED_PACKAGE_CONF)" \
-	                              hide $p &&) true
+	$(foreach p, $(ALL_INSTALLED_PACKAGES),                       \
+	    $(call make-command,                                      \
+	           "$(GHC_CABAL_INPLACE)" install                     \
+	                                  "$(INSTALLED_GHC_REAL)"     \
+	                                  "$(INSTALLED_GHC_PKG_REAL)" \
+	                                  "$(STRIP_CMD)"              \
+	                                  "$(DESTDIR)$(topdir)"       \
+	                                  $p $(INSTALL_DISTDIR_$p)    \
+	                                  '$(DESTDIR)'                \
+	                                  '$(prefix)'                 \
+	                                  '$(ghclibdir)'              \
+	                                  '$(docdir)/html/libraries'  \
+	                                  $(RelocatableBuild)))
+	$(foreach p, $(HIDDEN_PACKAGES),                                   \
+	    $(call make-command,                                           \
+	           "$(INSTALLED_GHC_PKG_REAL)"                             \
+	               --global-conf "$(INSTALLED_PACKAGE_CONF)" hide $p))
 
 # -----------------------------------------------------------------------------
 # Binary distributions
