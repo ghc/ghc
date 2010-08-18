@@ -147,6 +147,11 @@ endif
 endif
 
 # -----------------------------------------------------------------------------
+# Utility definitions
+
+include rules/make-command.mk
+
+# -----------------------------------------------------------------------------
 # Macros for standard targets
 
 include rules/all-target.mk
