@@ -35,10 +35,10 @@ install_utils/haddock_html:
 install: install_utils/haddock_data
 .PHONY: install_utils/haddock_data
 install_utils/haddock_data:
-	$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)/html"
-	for i in utils/haddock/html/*; do \
-	    $(INSTALL_DATA) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)/html"; \
-	done
+	$(foreach i,$(sort $(dir $(utils/haddock_dist_DATA_FILES))), \
+	    $(call make-command,$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)/$i"))
+	$(foreach i,$(utils/haddock_dist_DATA_FILES), \
+	    $(call make-command,$(INSTALL_DATA) $(INSTALL_OPTS) utils/haddock/$i "$(DESTDIR)$(ghclibdir)/$(dir $i)"))
 
 ifeq "$(Windows)" "NO"
 install: install_haddock_link
