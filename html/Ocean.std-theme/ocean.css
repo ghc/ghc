@@ -56,7 +56,7 @@ table {
 pre, code, kbd, samp, tt, .src {
 	font-family:monospace;
 	*font-size:108%;
-	line-height:116%;
+	line-height: 120%;
 }
 
 .links, .link {
@@ -150,10 +150,6 @@ pre {
 .src {
   background: #f0f0f0;
   padding: 0.2em 0.5em;
-}
-
-.doc p, .doc pre {
-  margin-top: 1em;
 }
 
 .keyword { font-weight: normal; }
@@ -277,7 +273,7 @@ div#style-menu-holder {
 #table-of-contents {
   float: right;
   clear: right;
-  background: #f9f8db;
+  background: #faf9dc;
   border: 1px solid #d8d7ad;
   padding: 0.5em 1em;
   position: relative;
@@ -343,7 +339,7 @@ div#style-menu-holder {
 
 #synopsis ul,
 #synopsis ul li.src {
-  background-color: #f9f8db;
+  background-color: #faf9dc;
   white-space: nowrap;
   list-style: none;
   margin-left: 0;
@@ -442,20 +438,23 @@ div#style-menu-holder {
 /* @group Auxillary Pages */
 
 #mini {
-  font-size: 77%; /* 10pt */
   margin: 0 auto;
   padding: 0 1em;
 }
 
+#mini > * {
+  font-size: 93%; /* 12pt */  
+}
+
 #mini #module-header .caption {
-  font-size: 130%;
+  font-size: 117%; /* 14pt */
 }
 
 #mini #interface h1,
 #mini #interface h2,
 #mini #interface h3,
 #mini #interface h4 {
-  font-size: 100%;
+  font-size: 109%; /* 13pt */
   margin: 1em 0 0;
 }
 

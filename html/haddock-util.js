@@ -282,7 +282,7 @@ function resetStyle() {
 
 function styleMenu(show) {
   var m = document.getElementById('style-menu');
-  if (m) toggleClassShow(m, show);
+  if (m) toggleShow(m, show);
 }
 
 
