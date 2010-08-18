@@ -449,7 +449,8 @@ pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = ppr_type_app TopPrec (getName clas) tys
 
 pprTheta :: ThetaType -> SDoc
-pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
+pprTheta [pred] = pprPred pred
+pprTheta theta  = parens (sep (punctuate comma (map pprPred theta)))
 
 pprThetaArrow :: ThetaType -> SDoc
 pprThetaArrow []     = empty
