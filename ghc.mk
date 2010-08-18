@@ -48,5 +48,5 @@ install_haddock_link:
 	$(LN_S) haddock-$(ProjectVersion) "$(DESTDIR)$(bindir)/haddock"
 endif
 
-BINDIST_EXTRAS += $(addprefix utils/haddock/,html/*)
+BINDIST_EXTRAS += $(addprefix utils/haddock/,$(utils/haddock_dist_DATA_FILES))
 
