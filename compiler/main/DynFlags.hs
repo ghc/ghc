@@ -2138,7 +2138,12 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 
 machdepCCOpts :: DynFlags -> ([String], -- flags for all C compilations
                               [String]) -- for registerised HC compilations
-machdepCCOpts _dflags
+machdepCCOpts dflags = let (flagsAll, flagsRegHc) = machdepCCOpts' dflags
+                       in (cCcOpts ++ flagsAll, flagsRegHc)
+
+machdepCCOpts' :: DynFlags -> ([String], -- flags for all C compilations
+                               [String]) -- for registerised HC compilations
+machdepCCOpts' _dflags
 #if alpha_TARGET_ARCH
         =       ( ["-w", "-mieee"
 #ifdef HAVE_THREADED_RTS_SUPPORT
@@ -2173,19 +2178,9 @@ machdepCCOpts _dflags
       --   the fp (%ebp) for our register maps.
         =  let n_regs = stolen_x86_regs _dflags
            in
-                    ( 
-#if darwin_TARGET_OS
-                      -- By default, gcc on OS X will generate SSE
-                      -- instructions, which need things 16-byte aligned,
-                      -- but we don't 16-byte align things. Thus drop
-                      -- back to generic i686 compatibility. Trac #2983.
-                      --
-                      -- Since Snow Leopard (10.6), gcc defaults to x86_64.
-                      ["-march=i686", "-m32"],
-#else
+                    (
                       [ if opt_Static then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
                       ],
-#endif
                       [ "-fno-defer-pop",
                         "-fomit-frame-pointer",
                         -- we want -fno-builtin, because when gcc inlines
@@ -2200,11 +2195,7 @@ machdepCCOpts _dflags
 
 #elif x86_64_TARGET_ARCH
         = (
-#if darwin_TARGET_OS
-            ["-m64"],
-#else
-            [],
-#endif
+                [],
                 ["-fomit-frame-pointer",
                  "-fno-asynchronous-unwind-tables",
                         -- the unwind tables are unnecessary for HC code,

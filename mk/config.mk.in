@@ -536,7 +536,8 @@ endif
 endif
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
-# correct C compiler backend).
+# correct C compiler backend). The stage number is the stage of GHC
+# that is being used to compile with.
 CONF_CC_OPTS_STAGE0 = @CONF_CC_OPTS_STAGE0@
 CONF_CC_OPTS_STAGE1 = @CONF_CC_OPTS_STAGE1@
 CONF_CC_OPTS_STAGE2 = @CONF_CC_OPTS_STAGE2@
