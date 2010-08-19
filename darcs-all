@@ -157,6 +157,7 @@ sub darcsall {
     my $tag;
     my @repos;
     my $command = $_[0];
+    my $line;
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
@@ -164,8 +165,10 @@ sub darcsall {
     @repos = <IN>;
     close IN;
 
+    $line = 0;
     foreach (@repos) {
         chomp;
+        $line++;
         if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = $2;
@@ -198,7 +201,7 @@ sub darcsall {
             }
         }
         elsif (! /^(#.*)?$/) {
-            die "Bad line: $_";
+            die "Bad content on line $line of packages file: $_";
         }
     }
 }
@@ -210,6 +213,7 @@ sub darcsget {
     my $path;
     my $tag;
     my @repos;
+    my $line;
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
@@ -225,8 +229,10 @@ sub darcsget {
     @repos = <IN>;
     close IN;
 
+    $line = 0;
     foreach (@repos) {
         chomp;
+        $line++;
         if (/^([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = $2;
@@ -249,7 +255,7 @@ sub darcsget {
             }
         }
         elsif (! /^(#.*)?$/) {
-            die "Bad line: $_";
+            die "Bad content on line $line of packages file: $_";
         }
     }
 }
