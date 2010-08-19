@@ -25,4 +25,5 @@ or to write:
 f3 x = (x+1, x<3, g3 True, g3 'c')
 	where
 	-- NB: this line:
+        g3 :: a -> [a]
 	g3 = (\ y -> if x>2 then [] else [y])::(a -> [a])
