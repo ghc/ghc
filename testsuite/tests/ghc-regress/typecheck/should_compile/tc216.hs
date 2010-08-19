@@ -20,6 +20,10 @@ If instead we'd had
    class (F x ~ y) => Foo x y where
      type F x
      foo :: x -> y
+
+Then after canonicalising we get
+     Given: Foo x y, Bar y z, F x ~ y
+     Wanted: Foo x beta, Bar beta z
 -}
 
 module ShouldCompile where

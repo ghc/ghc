@@ -58,7 +58,7 @@ lam,lam2 :: Arrow (~>) => (e,b)~>c -> e~>(b~>c)
 
 lam f = arr $ \ e -> arr (pair e) >>> f
 
-pair = (,)
+pair a b = (a,b)
 
 -- I got the definition lam above by starting with
 
