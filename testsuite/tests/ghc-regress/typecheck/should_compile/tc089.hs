@@ -4,11 +4,12 @@ module ShouldSucceed where
 
 import Prelude hiding (head)
 
+one :: a
 one = one
 
 head (x:xs) = x
 
-bottom = head
+bottom xs = head xs
 
 absIf a b c = a
 
@@ -36,8 +37,7 @@ s_3_0 (v0,v1,v2)   = v0
 s_3_1 (v0,v1,v2)   = v1
 s_3_2 (v0,v1,v2)   = v2
 
-fac n a 
-  = (fac_rec fac_rec4 n a)
+fac n a = fac_rec fac_rec4 n a
 
 fac_rec4 n a  = (fac_rec fac_rec3 n a)
 fac_rec3 n a  = (fac_rec fac_rec2 n a)
@@ -45,8 +45,7 @@ fac_rec2 n a  = (fac_rec fac_rec1 n a)
 fac_rec1 n a  = (fac_rec fac_rec0 n a)
 fac_rec0 n a  = (bottom [n,a])
 
-f a 
-  = (f_rec f_rec2 a)
+f a = (f_rec f_rec2 a)
 
 f_rec2 a  = (f_rec f_rec1 a)
 f_rec1 a  = (f_rec f_rec0 a)
