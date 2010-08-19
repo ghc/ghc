@@ -11,8 +11,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
     case $$1 in
     i386-apple-darwin|powerpc-apple-darwin)
-        $2="$$2 -m32"
-        $3="$$3 -m32"
+        # By default, gcc on OS X will generate SSE
+        # instructions, which need things 16-byte aligned,
+        # but we don't 16-byte align things. Thus drop
+        # back to generic i686 compatibility. Trac #2983.
+        $2="$$2 -march=i686 -m32"
+        $3="$$3 -march=i686 -m32"
         ;;
     x86_64-apple-darwin)
         $2="$$2 -m64"
