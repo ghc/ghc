@@ -826,7 +826,7 @@ occAnal env (Note note body)
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
-    (markRhsUds env True usage, Cast expr' co)
+      (markManyIf (isRhsEnv env) usage, Cast expr' co)
         -- If we see let x = y `cast` co
         -- then mark y as 'Many' so that we don't
         -- immediately inline y again.
@@ -940,7 +940,14 @@ occAnalApp :: OccEnv
 occAnalApp env (Var fun, args)
   = case args_stuff of { (args_uds, args') ->
     let
-        final_args_uds = markRhsUds env is_exp args_uds
+       final_args_uds = markManyIf (isRhsEnv env && is_exp) args_uds
+	  -- We mark the free vars of the argument of a constructor or PAP
+	  -- as "many", if it is the RHS of a let(rec).
+	  -- This means that nothing gets inlined into a constructor argument
+	  -- position, which is what we want.  Typically those constructor
+	  -- arguments are just variables, or trivial expressions.
+	  --
+	  -- This is the *whole point* of the isRhsEnv predicate
     in
     (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
@@ -981,21 +988,11 @@ occAnalApp env (fun, args)
     (final_uds, mkApps fun' args') }}
 
 
-markRhsUds :: OccEnv            -- Check if this is a RhsEnv
-           -> Bool              -- and this is true
-           -> UsageDetails      -- The do markMany on this
+markManyIf :: Bool              -- If this is true
+           -> UsageDetails      -- Then do markMany on this
            -> UsageDetails
--- We mark the free vars of the argument of a constructor or PAP
--- as "many", if it is the RHS of a let(rec).
--- This means that nothing gets inlined into a constructor argument
--- position, which is what we want.  Typically those constructor
--- arguments are just variables, or trivial expressions.
---
--- This is the *whole point* of the isRhsEnv predicate
-markRhsUds env is_pap arg_uds
-  | isRhsEnv env && is_pap = mapVarEnv markMany arg_uds
-  | otherwise              = arg_uds
-
+markManyIf True  uds = mapVarEnv markMany uds
+markManyIf False uds = uds
 
 appSpecial :: OccEnv
            -> Int -> CtxtTy     -- Argument number, and context to use for it
