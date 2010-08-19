@@ -23,6 +23,15 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -m64"
         ;;
     esac
+
+    # If gcc knows about the stack protector, turn it off.
+    # Otherwise the stack-smash handler gets triggered.
+    echo 'int main(void) {return 0;}' > conftest.c
+    if $CC -c conftest.c -fno-stack-protector > /dev/null 2>&1
+    then
+        $2="$$2 -fno-stack-protector"
+    fi
+    rm conftest.c conftest.o
 ])
 
 
@@ -966,9 +975,6 @@ AC_SUBST([GhcPkgCmd])
 # reordering things in the module and confusing the manger and/or splitter.
 # (eg. Trac #1427)
 #
-# If gcc knows about the stack protector, turn it off.
-# Otherwise the stack-smash handler gets triggered.
-#
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_HAVE_GCC])
 AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
@@ -994,12 +1000,6 @@ AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_
       [])
   ;;
  esac
- echo 'int main(void) {return 0;}' > conftest.c
- if $CC -c conftest.c -fno-stack-protector > /dev/null 2>&1
- then
-     fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-stack-protector"
- fi
- rm conftest.c conftest.o
 ])
 AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
 ])
