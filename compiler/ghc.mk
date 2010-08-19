@@ -38,12 +38,12 @@ compiler_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
 
 ifneq "$(BINDIST)" "YES"
-compiler/stage1/package-data.mk : $(compiler_CONFIG_HS)
-compiler/stage2/package-data.mk : $(compiler_CONFIG_HS)
-compiler/stage3/package-data.mk : $(compiler_CONFIG_HS)
+compiler/stage1/package-data.mk : compiler/stage1/build/Config.hs
+compiler/stage2/package-data.mk : compiler/stage2/build/Config.hs
+compiler/stage3/package-data.mk : compiler/stage3/build/Config.hs
 endif
 
-$(compiler_CONFIG_HS) : mk/config.mk mk/project.mk
+compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	"$(RM)" $(RM_OPTS) $@
 	@echo 'Creating $@ ... '
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
@@ -140,7 +140,8 @@ else
 endif
 	@echo done.
 
-$(eval $(call clean-target,compiler,config_hs,$(compiler_CONFIG_HS)))
+# XXX 2010-08-19: This is a legacy clean. Remove later.
+$(eval $(call clean-target,compiler,config_hs,compiler/main/Config.hs))
 
 # -----------------------------------------------------------------------------
 # Create platform includes
