@@ -2,6 +2,5 @@
 tcfail109.hs:16:10:
     No instance for (Eq Stupid)
       arising from the superclasses of an instance declaration
-                   at tcfail109.hs:16:10-29
     Possible fix: add an instance declaration for (Eq Stupid)
     In the instance declaration for `Collects Bool Stupid'

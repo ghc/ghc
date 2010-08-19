@@ -1,8 +1,8 @@
 
 tcfail008.hs:3:7:
-    No instance for (Num [t])
-      arising from the literal `2' at tcfail008.hs:3:7
-    Possible fix: add an instance declaration for (Num [t])
+    No instance for (Num [a])
+      arising from the literal `2'
+    Possible fix: add an instance declaration for (Num [a])
     In the second argument of `(:)', namely `2'
     In the expression: 1 : 2
     In the definition of `o': o = 1 : 2

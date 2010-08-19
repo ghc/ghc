@@ -1,17 +1,17 @@
 
 tcfail067.hs:12:16:
     Could not deduce (Ord a) from the context ()
-      arising from a use of `SubRange' at tcfail067.hs:12:16-23
+      arising from a use of `SubRange'
     Possible fix:
-      add (Ord a) to the context of
-        the type signature for `subRangeValue'
+      add (Ord a)
+        to the context of the type signature for `subRangeValue'
     In the pattern: SubRange (lower, upper) value
     In the definition of `subRangeValue':
         subRangeValue (SubRange (lower, upper) value) = value
 
 tcfail067.hs:15:11:
     Could not deduce (Ord a) from the context ()
-      arising from a use of `SubRange' at tcfail067.hs:15:11-18
+      arising from a use of `SubRange'
     Possible fix:
       add (Ord a) to the context of the type signature for `subRange'
     In the pattern: SubRange r value
@@ -19,7 +19,7 @@ tcfail067.hs:15:11:
 
 tcfail067.hs:46:12:
     Could not deduce (Ord a) from the context (Show a)
-      arising from a use of `SubRange' at tcfail067.hs:46:12-19
+      arising from a use of `SubRange'
     Possible fix:
       add (Ord a) to the context of the type signature for `showRange'
     In the pattern: SubRange (lower, upper) value
@@ -30,15 +30,14 @@ tcfail067.hs:46:12:
 tcfail067.hs:60:10:
     Could not deduce (Show (SubRange a)) from the context (Num a)
       arising from the superclasses of an instance declaration
-                   at tcfail067.hs:60:10-34
     Possible fix:
       add (Show (SubRange a)) to the context of the instance declaration
       or add an instance declaration for (Show (SubRange a))
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:61:12:
-    Could not deduce (Ord a) from the context (Num (SubRange a), Num a)
-      arising from a use of `numSubRangeNegate' at tcfail067.hs:61:12-28
+    Could not deduce (Ord a) from the context (Num a)
+      arising from a use of `numSubRangeNegate'
     Possible fix:
       add (Ord a) to the context of the instance declaration
     In the expression: numSubRangeNegate
@@ -46,8 +45,8 @@ tcfail067.hs:61:12:
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:65:19:
-    Could not deduce (Ord a) from the context (Num (SubRange a), Num a)
-      arising from a use of `SubRange' at tcfail067.hs:65:19-73
+    Could not deduce (Ord a) from the context (Num a)
+      arising from a use of `SubRange'
     Possible fix:
       add (Ord a) to the context of the instance declaration
     In the expression:
@@ -59,10 +58,10 @@ tcfail067.hs:65:19:
 
 tcfail067.hs:74:5:
     Could not deduce (Ord a) from the context (Num a)
-      arising from a use of `SubRange' at tcfail067.hs:74:5-36
+      arising from a use of `SubRange'
     Possible fix:
-      add (Ord a) to the context of
-        the type signature for `numSubRangeBinOp'
+      add (Ord a)
+        to the context of the type signature for `numSubRangeBinOp'
     In the expression: SubRange (result, result) result
     In the definition of `numSubRangeBinOp':
         numSubRangeBinOp op a b

@@ -2,7 +2,6 @@
 tcfail019.hs:18:10:
     Could not deduce (B [a]) from the context ()
       arising from the superclasses of an instance declaration
-                   at tcfail019.hs:18:10-14
     Possible fix:
       add (B [a]) to the context of the instance declaration
       or add an instance declaration for (B [a])
@@ -11,7 +10,6 @@ tcfail019.hs:18:10:
 tcfail019.hs:18:10:
     Could not deduce (C [a]) from the context ()
       arising from the superclasses of an instance declaration
-                   at tcfail019.hs:18:10-14
     Possible fix:
       add (C [a]) to the context of the instance declaration
       or add an instance declaration for (C [a])

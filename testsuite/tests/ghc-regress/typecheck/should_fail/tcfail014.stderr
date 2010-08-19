@@ -1,6 +1,6 @@
 
-tcfail014.hs:5:31:
+tcfail014.hs:5:33:
     Occurs check: cannot construct the infinite type: t = t -> t1
-    Probable cause: `z' is applied to too many arguments
+    In the first argument of `z', namely `z'
     In the expression: z z
     In the definition of `h': h z = z z

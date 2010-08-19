@@ -1,7 +1,7 @@
 
 tcfail003.hs:3:10:
     No instance for (Num Char)
-      arising from the literal `1' at tcfail003.hs:3:10
+      arising from the literal `1'
     Possible fix: add an instance declaration for (Num Char)
     In the expression: 1
     In the expression: [1, 'a']

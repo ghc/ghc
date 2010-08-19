@@ -1,5 +1,8 @@
 
 tcfail040.hs:19:5:
     Ambiguous type variable `a' in the constraint:
-      `ORD a' arising from a use of `<<' at tcfail040.hs:19:5-8
+      (ORD a) arising from a use of `<<'
     Probable fix: add a type signature that fixes these type variable(s)
+    In the first argument of `(===)', namely `(<<)'
+    In the expression: (<<) === (<<)
+    In the definition of `f': f = (<<) === (<<)

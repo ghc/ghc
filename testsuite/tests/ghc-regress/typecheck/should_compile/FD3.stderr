@@ -1,4 +1,5 @@
 
-FD3.hs:15:1:
+FD3.hs:15:15:
     Occurs check: cannot construct the infinite type: a = (String, a)
-    When generalising the type(s) for `translate'
+    In the expression: mkA a
+    In the definition of `translate': translate a = mkA a
