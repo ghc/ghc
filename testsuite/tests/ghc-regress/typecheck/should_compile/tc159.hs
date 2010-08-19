@@ -1,11 +1,21 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Don't do the cunning new newtype-deriving thing
 -- when the type constructor is recursive
 
-module ShouldCompile where
+module Main where
+
 
 newtype A = A [A] deriving (Eq)
 
-test :: A -> A -> Bool
-test x y = x == y
+-- The derived instance would be:
+-- instance Eq A where
+--      (A xs) == (A ys) = xs==ys
+--   $df :: Eq [A] => Eq A
+--   $df d = d |> Eq (sym co)
+
+x :: A
+x = A [A [], A [A []]]
+
+main = print (x == x)
+
