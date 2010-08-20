@@ -334,9 +334,10 @@ renameDeriv is_boot gen_binds insts
 		-- notably "con2tag" and/or "tag2con" functions.  
 		-- Bring those names into scope before renaming the instances themselves
 	; loc <- getSrcSpanM	-- Generic loc for shared bindings
-	; let aux_binds = listToBag $ map (genAuxBind loc) $ 
-			  rm_dups [] $ concat deriv_aux_binds
-	; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv (ValBindsIn aux_binds [])
+	; let (aux_binds, aux_sigs) = unzip $ map (genAuxBind loc) $ 
+	                              rm_dups [] $ concat deriv_aux_binds
+              aux_val_binds = ValBindsIn (listToBag aux_binds) aux_sigs
+	; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
 	; let aux_names = collectHsValBinders rn_aux_lhs
 
 	; bindLocalNames aux_names $ 
