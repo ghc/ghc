@@ -238,18 +238,25 @@ function postReframe() {
   }
 }
 
-function addStyleMenu() {
-  var i, a, c = 0, btns = "";
-  for(i=0; (a = document.getElementsByTagName("link")[i]); i++) {
-    if(a.getAttribute("rel").indexOf("style") != -1
-       && a.getAttribute("title")) {
-      btns += "<li><a href='#' onclick=\"setActiveStyleSheet('"
-        + a.getAttribute("href") + "'); return false;\">"
-        + a.getAttribute("title") + "</a></li>"
-      c += 1;
+function styles() {
+  var i, a, es = document.getElementsByTagName("link"), rs = [];
+  for (i = 0; a = es[i]; i++) {
+    if(a.rel.indexOf("style") != -1 && a.title) {
+      rs.push(a);
     }
   }
-  if (c > 1) {
+  return rs;
+}
+
+function addStyleMenu() {
+  var as = styles();
+  var i, a, btns = "";
+  for(i=0; a = as[i]; i++) {
+    btns += "<li><a href='#' onclick=\"setActiveStyleSheet('"
+      + a.title + "'); return false;\">"
+      + a.title + "</a></li>"
+  }
+  if (as.length > 1) {
     var h = "<div id='style-menu-holder'>"
       + "<a href='#' onclick='styleMenu(); return false;'>Style &#9662;</a>"
       + "<ul id='style-menu' class='hide'>" + btns + "</ul>"
@@ -258,21 +265,24 @@ function addStyleMenu() {
   }
 }
 
-function setActiveStyleSheet(href) {
-  var i, a, found = false;
-  for(i=0; (a = document.getElementsByTagName("link")[i]); i++) {
-    if(a.getAttribute("rel").indexOf("style") != -1
-       && a.getAttribute("title")) {
-      a.disabled = true;
-            // need to do this always, some browsers are edge triggered
-      if(a.getAttribute("href") == href) {
-        a.disabled = false;
-        found = true;
-      }
+function setActiveStyleSheet(title) {
+  var as = styles();
+  var i, a, found;
+  for(i=0; a = as[i]; i++) {
+    a.disabled = true;
+          // need to do this always, some browsers are edge triggered
+    if(a.title == title) {
+      found = a;
     }
   }
-  if (!found) href = "";
-  setCookie("haddock-style", href);
+  if (found) {
+    found.disabled = false;
+    setCookie("haddock-style", title);
+  }
+  else {
+    as[0].disabled = false;
+    clearCookie("haddock-style");
+  }
   styleMenu(false);
 }
 
