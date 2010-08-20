@@ -205,14 +205,14 @@ dl.info {
 
 dl.info dt {
 	float: left;
-	width: 5em;
 	font-weight: bold;
 	display: block;
+	margin-right: 1em;
 }
 
 dl.info dd {
 	display: block;
-	padding-left: 6em;
+	margin-left: 6em;
 }
 
 div#style-menu-holder {
@@ -446,8 +446,9 @@ div#style-menu-holder {
   font-size: 93%; /* 12pt */  
 }
 
+#mini #module-list .caption,
 #mini #module-header .caption {
-  font-size: 117%; /* 14pt */
+  font-size: 125%; /* 15pt */
 }
 
 #mini #interface h1,
