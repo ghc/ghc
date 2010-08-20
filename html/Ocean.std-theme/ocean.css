@@ -296,6 +296,11 @@ div#style-menu-holder {
 }
 
 #synopsis {
+  display: none;
+}
+
+.no-frame #synopsis {
+  display: block;
   position: fixed;
   right: 0;
   height: 80%;

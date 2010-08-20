@@ -212,15 +212,17 @@ function addMenuItem(html) {
 }
 
 function adjustForFrames() {
+  var bodyCls;
+  
   if (parent.location.href == window.location.href) {
     // not in frames, so add Frames button
     addMenuItem("<a href='#' onclick='reframe();return true;'>Frames</a>");
+    bodyCls = "no-frame";
   }
   else {
-    // in frames, remove synopsis
-    var syn = document.getElementById("synopsis");
-    if (syn) { syn.parentNode.removeChild(syn); }
+    bodyCls = "in-frame";
   }
+  addClass(document.body, bodyCls);
 }
 
 function reframe() {
