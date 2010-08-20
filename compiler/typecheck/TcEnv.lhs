@@ -55,12 +55,12 @@ import TcRnMonad
 import TcMType
 import TcType
 -- import TcSuspension
-import qualified Type
+-- import qualified Type
 import Id
 import Coercion
 import Var
 import VarSet
-import VarEnv
+-- import VarEnv
 import RdrName
 import InstEnv
 import FamInstEnv
