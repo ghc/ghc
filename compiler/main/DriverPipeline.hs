@@ -1706,19 +1706,9 @@ linkDynLib dflags o_files dep_packages = do
     let verb = getVerbFlag dflags
     let o_file = outputFile dflags
 
-    -- We don't want to link our dynamic libs against the RTS package,
-    -- because the RTS lib comes in several flavours and we want to be
-    -- able to pick the flavour when a binary is linked.
     pkgs <- getPreloadPackagesAnd dflags dep_packages
 
-    -- On Windows we need to link the RTS import lib as Windows does
-    -- not allow undefined symbols.
-#if !defined(mingw32_HOST_OS)
-    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
-#else
-    let pkgs_no_rts = pkgs
-#endif
-    let pkg_lib_paths = collectLibraryPaths pkgs_no_rts
+    let pkg_lib_paths = collectLibraryPaths pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
 #ifdef elf_OBJ_FORMAT
         get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
@@ -1730,6 +1720,18 @@ linkDynLib dflags o_files dep_packages = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
+    -- We don't want to link our dynamic libs against the RTS package,
+    -- because the RTS lib comes in several flavours and we want to be
+    -- able to pick the flavour when a binary is linked.
+    -- On Windows we need to link the RTS import lib as Windows does
+    -- not allow undefined symbols.
+    -- The RTS library path is still added to the library search path
+    -- above in case the RTS is being explicitly linked in (see #3807).
+#if !defined(mingw32_HOST_OS)
+    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
+#else
+    let pkgs_no_rts = pkgs
+#endif
     let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
 
         -- probably _stub.o files
