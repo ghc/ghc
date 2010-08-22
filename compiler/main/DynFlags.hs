@@ -17,6 +17,7 @@ module DynFlags (
         DOpt(..),
         DynFlag(..),
         ExtensionFlag(..),
+        glasgowExtsFlags,
         flattenExtensionFlags,
         ensureFlattenedExtensionFlags,
         lopt_set_flattened,

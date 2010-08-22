@@ -56,38 +56,7 @@ documentation</ulink> describes all the libraries that come with GHC.
     <para>The flag <option>-fglasgow-exts</option>
           <indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
 	  is equivalent to enabling the following extensions: 
-          <option>-XPrintExplicitForalls</option>,
-          <option>-XForeignFunctionInterface</option>,
-          <option>-XUnliftedFFITypes</option>,
-          <option>-XGADTs</option>,
-          <option>-XImplicitParams</option>,
-          <option>-XScopedTypeVariables</option>,
-          <option>-XUnboxedTuples</option>,
-          <option>-XTypeSynonymInstances</option>,
-          <option>-XStandaloneDeriving</option>,
-          <option>-XDeriveDataTypeable</option>,
-          <option>-XFlexibleContexts</option>,
-          <option>-XFlexibleInstances</option>,
-          <option>-XConstrainedClassMethods</option>,
-          <option>-XMultiParamTypeClasses</option>,
-          <option>-XFunctionalDependencies</option>,
-          <option>-XMagicHash</option>,
-          <option>-XPolymorphicComponents</option>,
-          <option>-XExistentialQuantification</option>,
-          <option>-XUnicodeSyntax</option>,
-          <option>-XPostfixOperators</option>,
-          <option>-XPatternGuards</option>,
-          <option>-XLiberalTypeSynonyms</option>,
-          <option>-XExplicitForAll</option>,
-          <option>-XRankNTypes</option>,
-          <option>-XImpredicativeTypes</option>,
-          <option>-XTypeOperators</option>,
-          <option>-XDoRec</option>,
-          <option>-XParallelListComp</option>,
-          <option>-XEmptyDataDecls</option>,
-          <option>-XKindSignatures</option>,
-          <option>-XGeneralizedNewtypeDeriving</option>,
-          <option>-XTypeFamilies</option>.
+          &what_glasgow_exts_does;
 	    Enabling these options is the <emphasis>only</emphasis> 
 	    effect of <option>-fglasgow-exts</option>.
           We are trying to move away from this portmanteau flag, 

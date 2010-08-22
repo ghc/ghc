@@ -10,9 +10,17 @@
 #
 # -----------------------------------------------------------------------------
 
-docs/users_guide_DOCBOOK_SOURCES := \
-    $(wildcard docs/users_guide/*.xml) \
-    $(basename $(wildcard docs/users_guide/*.xml.in))
+docs/users_guide_GENERATED_DOCBOOK_SOURCES := \
+	docs/users_guide/what_glasgow_exts_does.gen.xml
+
+# sort remove duplicates
+docs/users_guide_DOCBOOK_SOURCES :=                           \
+    $(sort $(docs/users_guide_GENERATED_DOCBOOK_SOURCES)      \
+           $(wildcard docs/users_guide/*.xml)                 \
+           $(basename $(wildcard docs/users_guide/*.xml.in)))
+
+$(docs/users_guide_GENERATED_DOCBOOK_SOURCES): %.gen.xml: inplace/bin/mkUserGuidePart
+	inplace/bin/mkUserGuidePart $@
 
 $(eval $(call docbook,docs/users_guide,users_guide))
 

@@ -21,6 +21,7 @@
 <!ENTITY win32-dll      SYSTEM "win32-dlls.xml">
 <!ENTITY ffi-chap       SYSTEM "ffi-chap.xml">
 <!ENTITY shared_libs    SYSTEM "shared_libs.xml">
+<!ENTITY what_glasgow_exts_does SYSTEM "what_glasgow_exts_does.gen.xml">
 <!ENTITY libraryBaseLocation    "../libraries/base-@LIBRARY_base_VERSION@">
 <!ENTITY libraryCabalLocation   "../libraries/Cabal-@LIBRARY_Cabal_VERSION@">
 <!ENTITY libraryGhcPrimLocation "../libraries/ghc-prim-@LIBRARY_ghc_prim_VERSION@">

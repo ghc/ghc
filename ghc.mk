@@ -574,6 +574,11 @@ BUILD_DIRS += \
    $(GHC_TOUCHY_DIR)
 endif
 
+ifneq "$(BINDIST)" "YES"
+BUILD_DIRS += \
+   utils/mkUserGuidePart
+endif
+
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
 
@@ -608,6 +613,7 @@ utils/ghctags_dist_DISABLE = YES
 utils/hpc_dist_DISABLE = YES
 utils/hsc2hs_dist-install_DISABLE = YES
 utils/ghc-pkg_dist-install_DISABLE = YES
+utils/mkUserGuidePart_dist_DISABLE = YES
 utils/compare_sizes_dist_DISABLE = YES
 compiler_stage2_DISABLE = YES
 compiler_stage3_DISABLE = YES
