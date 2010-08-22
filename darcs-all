@@ -341,7 +341,7 @@ sub main {
     if ($command eq "get") {
         darcsget @_;
     }
-    if ($command eq "upstreampull") {
+    elsif ($command eq "upstreampull") {
         shift;
         darcsupstreampull @_;
     }
