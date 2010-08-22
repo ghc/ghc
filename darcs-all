@@ -82,6 +82,8 @@ my $checked_out_flag = 0;
 
 my %tags;
 
+my @packages;
+
 # Figure out where to get the other repositories from.
 sub getrepo {
     my $basedir = ".";
@@ -150,6 +152,36 @@ sub darcs {
        or die "darcs failed: $?";
 }
 
+sub parsePackages {
+    my @repos;
+    my $lineNum;
+
+    my ($repo_base, $checked_out_tree) = getrepo();
+
+    open IN, "< packages" or die "Can't open packages file";
+    @repos = <IN>;
+    close IN;
+
+    @packages = ();
+    $lineNum = 0;
+    foreach (@repos) {
+        chomp;
+        $lineNum++;
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
+            my %line;
+            $line{"localpath"}  = $1;
+            $line{"tag"}        = $2;
+            $line{"remotepath"} = $3;
+            $line{"vcs"}        = $4;
+            $line{"upstream"}   = $5;
+            push @packages, \%line;
+        }
+        elsif (! /^(#.*)?$/) {
+            die "Bad content on line $lineNum of packages file: $_";
+        }
+    }
+}
+
 sub darcsall {
     my $localpath;
     my $remotepath;
@@ -161,47 +193,35 @@ sub darcsall {
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
-    open IN, "< packages" or die "Can't open packages file";
-    @repos = <IN>;
-    close IN;
+    for $line (@packages) {
+        $localpath  = $$line{"localpath"};
+        $tag        = $$line{"tag"};
+        $remotepath = $$line{"remotepath"};
 
-    $line = 0;
-    foreach (@repos) {
-        chomp;
-        $line++;
-        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
-            $localpath = $1;
-            $tag = $2;
-            $remotepath = $3;
+        if ($checked_out_tree) {
+            $path = "$repo_base/$localpath";
+        }
+        else {
+            $path = "$repo_base/$remotepath";
+        }
 
-            if ($checked_out_tree) {
-                $path = "$repo_base/$localpath";
-            }
-            else {
-                $path = "$repo_base/$remotepath";
-            }
-
-            if (-d "$localpath/_darcs") {
-                if ($want_remote_repo) {
-                    if ($command =~ /^opt/) {
-                        # Allows ./darcs-all optimize --relink
-                        darcs (@_, "--repodir", $localpath, "--sibling=$path");
-                    } else {
-                        darcs (@_, "--repodir", $localpath, $path);
-                    }
+        if (-d "$localpath/_darcs") {
+            if ($want_remote_repo) {
+                if ($command =~ /^opt/) {
+                    # Allows ./darcs-all optimize --relink
+                    darcs (@_, "--repodir", $localpath, "--sibling=$path");
                 } else {
-                    darcs (@_, "--repodir", $localpath);
+                    darcs (@_, "--repodir", $localpath, $path);
                 }
-            }
-            elsif ($tag eq "-") {
-                message "== Required repo $localpath is missing! Skipping";
-            }
-            else {
-                message "== $localpath repo not present; skipping";
+            } else {
+                darcs (@_, "--repodir", $localpath);
             }
         }
-        elsif (! /^(#.*)?$/) {
-            die "Bad content on line $line of packages file: $_";
+        elsif ($tag eq "-") {
+            message "== Required repo $localpath is missing! Skipping";
+        }
+        else {
+            message "== $localpath repo not present; skipping";
         }
     }
 }
@@ -225,37 +245,25 @@ sub darcsget {
         $r_flags = \@_;
     }
 
-    open IN, "< packages" or die "Can't open packages file";
-    @repos = <IN>;
-    close IN;
+    for $line (@packages) {
+        $localpath  = $$line{"localpath"};
+        $tag        = $$line{"tag"};
+        $remotepath = $$line{"remotepath"};
 
-    $line = 0;
-    foreach (@repos) {
-        chomp;
-        $line++;
-        if (/^([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
-            $localpath = $1;
-            $tag = $2;
-            $remotepath = $3;
+        if ($checked_out_tree) {
+            $path = "$repo_base/$localpath";
+        }
+        else {
+            $path = "$repo_base/$remotepath";
+        }
 
-            if ($checked_out_tree) {
-                $path = "$repo_base/$localpath";
+        if (($tag eq "-") || defined($tags{$tag})) {
+            if (-d $localpath) {
+                warning("$localpath already present; omitting");
             }
             else {
-                $path = "$repo_base/$remotepath";
+                darcs (@$r_flags, $path, $localpath);
             }
-
-            if (($tag eq "-") || defined($tags{$tag})) {
-                if (-d $localpath) {
-                    warning("$localpath already present; omitting");
-                }
-                else {
-                    darcs (@$r_flags, $path, $localpath);
-                }
-            }
-        }
-        elsif (! /^(#.*)?$/) {
-            die "Bad content on line $line of packages file: $_";
         }
     }
 }
@@ -312,6 +320,7 @@ sub main {
         die "What do you want to do?";
     }
     my $command = $_[0];
+    parsePackages;
     if ($command eq "get") {
         darcsget @_;
     }
