@@ -60,8 +60,8 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>&ndash;&ndash;supported-languages</option></entry>
-	      <entry>display the supported language extensions</entry>
+	      <entry><option>&ndash;&ndash;supported-extensions</option> or <option>&ndash;&ndash;supported-languages</option></entry>
+	      <entry>display the supported languages and language extensions</entry>
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>

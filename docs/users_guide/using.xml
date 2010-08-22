@@ -442,9 +442,10 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
+            <command>ghc --supported-extensions</command>
             <command>ghc --supported-languages</command>
           </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;supported-languages</option></primary></indexterm>
+          <indexterm><primary><option>&ndash;&ndash;supported-extensions</option></primary><primary><option>&ndash;&ndash;supported-languages</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Print the supported language extensions.</para>

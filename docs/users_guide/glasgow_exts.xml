@@ -7495,7 +7495,7 @@ Assertion failures can be caught, see the documentation for the
       </para>
 
       <para>A list of all supported language extensions can be obtained by invoking
-	<literal>ghc --supported-languages</literal> (see <xref linkend="modes"/>).</para>
+	<literal>ghc --supported-extensions</literal> (see <xref linkend="modes"/>).</para>
 
       <para>Any extension from the <literal>Extension</literal> type defined in
 	<ulink
