@@ -149,7 +149,7 @@ mkCorePairExpr e1 e2 = mkCoreTup [e1, e2]
 
 The input is divided into a local environment, which is a flat tuple
 (unless it's too big), and a stack, each element of which is paired
-with the stack in turn.  In general, the input has the form
+with the environment in turn.  In general, the input has the form
 
 	(...((x1,...,xn),s1),...sk)
 
