@@ -294,14 +294,13 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 
     unscramble :: TcType -> (TcType, [TcType])
     -- unscramble ((w,s1) .. sn)	=  (w, [s1..sn])
-    unscramble ty
+    unscramble ty = unscramble' ty []
+
+    unscramble' ty ss
        = case tcSplitTyConApp_maybe ty of
 	    Just (tc, [t,s]) | tc == pairTyCon 
-	       ->  let 
-		      (w,ss) = unscramble t  
-		   in (w, s:ss)
-				    
-	    _ -> (ty, [])
+	       ->  unscramble' t (s:ss)
+	    _ -> (ty, ss)
 
 -----------------------------------------------------------------
 --		Base case for illegal commands
