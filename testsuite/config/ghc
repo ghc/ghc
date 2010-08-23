@@ -57,6 +57,9 @@ if (ghc_with_dynamic_rts == 1):
 if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
         config.run_ways.append('profthreaded')
 
+if (ghc_with_llvm == 1):
+        config.run_ways.append('optllvm')
+
 config.in_tree_compiler = in_tree_compiler
 
 config.way_flags = {

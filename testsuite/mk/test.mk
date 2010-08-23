@@ -86,6 +86,12 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
+ifneq "$(shell llvmc --version | grep version)" ""
+RUNTEST_OPTS += -e ghc_with_llvm=1
+else
+RUNTEST_OPTS += -e ghc_with_llvm=0
+endif
+
 ifeq "$(WINDOWS)" "YES"
 RUNTEST_OPTS += -e windows=True
 else
