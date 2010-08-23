@@ -1689,7 +1689,7 @@ genAuxBind loc (GenTag2Con tycon)
 	   nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
      L loc (TypeSig (L loc rdr_name) sig_ty))
   where
-    sig_ty = nlHsTyVar (getRdrName intPrimTyCon) 
+    sig_ty = nlHsTyVar (getRdrName intTyCon) 
              `nlHsFunTy` (nlHsTyVar (getRdrName tycon))
 
     rdr_name = tag2con_RDR tycon
@@ -1699,7 +1699,7 @@ genAuxBind loc (GenMaxTag tycon)
      L loc (TypeSig (L loc rdr_name) sig_ty))
   where
     rdr_name = maxtag_RDR tycon
-    sig_ty = nlHsTyVar (getRdrName intPrimTyCon) 
+    sig_ty = nlHsTyVar (getRdrName intTyCon) 
     rhs = nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim max_tag))
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
