@@ -218,10 +218,8 @@ It's a bit more complicated if the data instance is a GADT as well!
 
    data instance T [a] where
         T1 :: forall b. b -> T [Maybe b]
-Hence
-   Co7T a :: T [a] ~ :R7T a
 
-Now we want
+Hence we translate to
 
         -- Wrapper
   $WT1 :: forall b. b -> T [Maybe b]
@@ -230,6 +228,9 @@ Now we want
 
         -- Worker
   T1 :: forall c b. (c ~ Maybe b) => b -> :R7T c
+
+        -- Coercion from family type to representation type
+  Co7T a :: T [a] ~ :R7T a
 
 \begin{code}
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
