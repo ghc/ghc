@@ -351,7 +351,7 @@ $(foreach pkg,$(EXTRA_PACKAGES),$(eval $(call addPackage,$(pkg))))
 
 ifneq "$(BootingFromHc)" "YES"
 
-ifneq "$(CLEANING) $(GhcProfiled)" "NO YES"
+ifneq "$(GhcProfiled)" "YES"
 # DPH uses Template Haskell, and Template Haskell doesn't work
 # with a profiled compiler. So if stage-2 is profile, don't build DPH
 PACKAGES_STAGE2 += \
