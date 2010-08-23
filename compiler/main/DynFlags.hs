@@ -61,7 +61,12 @@ module DynFlags (
 
         -- * Compiler configuration suitable for display to the user
         Printable(..),
-        compilerInfo, rtsIsProfiled
+        compilerInfo
+#ifdef GHCI
+-- Only in stage 2 can we be sure that the RTS 
+-- exposes the appropriate runtime boolean
+        , rtsIsProfiled
+#endif
   ) where
 
 #include "HsVersions.h"
@@ -1810,12 +1815,13 @@ glasgowExtsFlags = [
            , Opt_GeneralizedNewtypeDeriving
            , Opt_TypeFamilies ]
 
+#ifdef GHCI
 -- Consult the RTS to find whether GHC itself has been built profiled
 -- If so, you can't use Template Haskell
 foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 
 rtsIsProfiled :: Bool
-rtsIsProfiled = False -- unsafePerformIO rtsIsProfiledIO /= 0
+rtsIsProfiled = unsafePerformIO rtsIsProfiledIO /= 0
 
 checkTemplateHaskellOk :: Bool -> DynP ()
 checkTemplateHaskellOk turn_on 
@@ -1823,6 +1829,12 @@ checkTemplateHaskellOk turn_on
   = addErr "You can't use Template Haskell with a profiled compiler"
   | otherwise
   = return ()
+#else
+-- In stage 1 we don't know that the RTS has rts_isProfiled, 
+-- so we simply say "ok".  It doesn't matter because TH isn't
+-- available in stage 1 anyway.
+checkTemplateHaskellOk turn_on = return ()
+#endif
 
 {- **********************************************************************
 %*									*
