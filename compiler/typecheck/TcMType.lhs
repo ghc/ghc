@@ -1530,7 +1530,8 @@ dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas p
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
 arityErr kind name n m
   = hsep [ text kind, quotes (ppr name), ptext (sLit "should have"),
-	   n_arguments <> comma, text "but has been given", int m]
+	   n_arguments <> comma, text "but has been given", 
+           if m==0 then text "none" else int m]
     where
 	n_arguments | n == 0 = ptext (sLit "no arguments")
 		    | n == 1 = ptext (sLit "1 argument")
