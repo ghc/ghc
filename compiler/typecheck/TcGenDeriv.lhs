@@ -1288,7 +1288,8 @@ kind2 = liftedTypeKind `mkArrowKind` kind1
 
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
-    dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR :: RdrName
+    dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR,
+    constr_RDR, dataType_RDR :: RdrName
 gfoldl_RDR     = varQual_RDR  gENERICS (fsLit "gfoldl")
 gunfold_RDR    = varQual_RDR  gENERICS (fsLit "gunfold")
 toConstr_RDR   = varQual_RDR  gENERICS (fsLit "toConstr")
