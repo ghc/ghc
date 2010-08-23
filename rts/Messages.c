@@ -175,6 +175,7 @@ nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
     // all.
     if (info != &stg_BLACKHOLE_info && 
         info != &stg_CAF_BLACKHOLE_info && 
+        info != &__stg_EAGER_BLACKHOLE_info &&
         info != &stg_WHITEHOLE_info) {
         // if it is a WHITEHOLE, then a thread is in the process of
         // trying to BLACKHOLE it.  But we know that it was once a

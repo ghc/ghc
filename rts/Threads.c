@@ -388,6 +388,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
     i = thunk->header.info;
     if (i != &stg_BLACKHOLE_info &&
         i != &stg_CAF_BLACKHOLE_info &&
+        i != &__stg_EAGER_BLACKHOLE_info &&
         i != &stg_WHITEHOLE_info) {
         updateWithIndirection(cap, thunk, val);
         return;
