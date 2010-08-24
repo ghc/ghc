@@ -24,6 +24,8 @@ $(docs/users_guide_GENERATED_DOCBOOK_SOURCES): %.gen.xml: inplace/bin/mkUserGuid
 
 $(eval $(call docbook,docs/users_guide,users_guide))
 
+$(eval $(call clean-target,docs/users_guide,gen,$(docs/users_guide_GENERATED_DOCBOOK_SOURCES)))
+
 # Hack: dblatex normalises the name of the input file using
 # os.path.realpath, which means that if we're in a linked build tree,
 # it won't be able to find ug-book.xml which is in the build tree but
