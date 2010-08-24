@@ -62,7 +62,7 @@
   <literal>+RTS -M128m -RTS</literal>
   to the command line.</para>
 
-  <sect2 id="rts-optinos-environment">
+  <sect2 id="rts-options-environment">
     <title>Setting global RTS options</title>
 
     <indexterm><primary>RTS options</primary><secondary>from the environment</secondary></indexterm>
