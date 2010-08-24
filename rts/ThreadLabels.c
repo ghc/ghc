@@ -33,12 +33,12 @@ void
 freeThreadLabelTable(void)
 {
     if (threadLabels != NULL) {
-        freeHashTable(threadLabels, NULL);
+        freeHashTable(threadLabels, stgFree);
         threadLabels = NULL;
     }
 }
 
-void
+static void
 updateThreadLabel(StgWord key, void *data)
 {
   removeThreadLabel(key);

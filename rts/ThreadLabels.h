@@ -15,7 +15,6 @@
 #if defined(DEBUG)
 void    initThreadLabelTable (void);
 void    freeThreadLabelTable (void);
-void    updateThreadLabel    (StgWord key, void *data);
 void *  lookupThreadLabel    (StgWord key);
 void    removeThreadLabel    (StgWord key);
 void    labelThread          (StgPtr tso, char *label);
