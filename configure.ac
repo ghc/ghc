@@ -319,12 +319,6 @@ x86_64-apple-darwin)
     ;;
 esac
 
-FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS])
-FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_LD_OPTS_STAGE0])
-FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_LD_OPTS_STAGE1])
-# Stage 3 won't be supported by cross-compilation
-FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_LD_OPTS_STAGE2])
-
 checkArch() {
     case $1 in
     alpha|arm|hppa|hppa1_1|i386|ia64|m68k|mips|mipseb|mipsel|powerpc|powerpc64|rs6000|s390|sparc|sparc64|vax|x86_64)
@@ -562,6 +556,13 @@ dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 2.1
 dnl
 FP_HAVE_GCC
+
+FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS])
+FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_LD_OPTS_STAGE0])
+FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_LD_OPTS_STAGE1])
+# Stage 3 won't be supported by cross-compilation
+FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_LD_OPTS_STAGE2])
+
 FP_GCC_EXTRA_FLAGS
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
