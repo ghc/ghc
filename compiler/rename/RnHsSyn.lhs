@@ -77,6 +77,8 @@ extractHsTyNames ty
                                             `minusNameSet`
                                   mkNameSet (hsLTyVarNames tvs)
     get (HsDocTy ty _)         = getl ty
+    get (HsCoreTy {})          = emptyNameSet	-- This probably isn't quite right
+    		  	       	 		-- but I don't think it matters
 
 extractHsTyNames_s  :: [LHsType Name] -> NameSet
 extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys

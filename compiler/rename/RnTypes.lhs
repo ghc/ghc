@@ -200,7 +200,9 @@ rnHsType _ ty@(HsQuasiQuoteTy _) = pprPanic "Can't do quasiquotation without GHC
 rnHsType doc (HsQuasiQuoteTy qq) = do { ty <- runQuasiQuoteType qq
                                       ; rnHsType doc (unLoc ty) }
 #endif
+rnHsType _ (HsCoreTy ty) = return (HsCoreTy ty)
 
+--------------
 rnLHsTypes :: SDoc -> [LHsType RdrName]
            -> IOEnv (Env TcGblEnv TcLclEnv) [LHsType Name]
 rnLHsTypes doc tys = mapM (rnLHsType doc) tys

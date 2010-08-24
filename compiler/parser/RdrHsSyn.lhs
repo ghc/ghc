@@ -127,7 +127,8 @@ extract_lty (L loc ty) acc
       HsPredTy p		-> extract_pred p acc
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty               	-> extract_lty ty acc
-      HsNumTy _                 -> acc
+      HsNumTy {}                -> acc
+      HsCoreTy {}               -> acc  -- The type is closed
       HsQuasiQuoteTy {}	        -> acc  -- Quasi quotes mention no type variables
       HsSpliceTy {}           	-> acc	-- Type splices mention no type variables
       HsKindSig ty _            -> extract_lty ty acc

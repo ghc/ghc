@@ -394,6 +394,9 @@ kc_hs_type (HsAppTy ty1 ty2) = do
 kc_hs_type (HsPredTy pred)
   = wrongPredErr pred
 
+kc_hs_type (HsCoreTy ty)
+  = return (HsCoreTy ty, typeKind ty)
+
 kc_hs_type (HsForAllTy exp tv_names context ty)
   = kcHsTyVars tv_names         $ \ tv_names' ->
     do	{ ctxt' <- kcHsContext context
@@ -628,6 +631,7 @@ ds_type (HsSpliceTy _ _ kind)
        ; newFlexiTyVarTy kind' }
 
 ds_type (HsQuasiQuoteTy {}) = panic "ds_type"	-- Eliminated by renamer
+ds_type (HsCoreTy ty)       = return ty
 
 dsHsTypes :: [LHsType Name] -> TcM [Type]
 dsHsTypes arg_tys = mapM dsHsType arg_tys

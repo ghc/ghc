@@ -175,7 +175,7 @@ data HsType name
 					--			       ^^^^
 					--                            HsPredTy
 					-- Note no need for location info on the
-					-- enclosed HsPred; the one on the type will do
+					-- Enclosed HsPred; the one on the type will do
 
   | HsKindSig		(LHsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
@@ -190,6 +190,10 @@ data HsType name
 
   | HsBangTy	HsBang (LHsType name)	-- Bang-style type annotations 
   | HsRecTy [ConDeclField name]	        -- Only in data type declarations
+
+  | HsCoreTy Type	-- An escape hatch for tunnelling a *closed* 
+    	       		-- Core Type through HsSyn.  
+					 
   deriving (Data, Typeable)
 
 data HsExplicitFlag = Explicit | Implicit deriving (Data, Typeable)
@@ -438,6 +442,7 @@ ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPredTy pred)     = ppr pred
 ppr_mono_ty _    (HsNumTy n)         = integer n  -- generics only
 ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
+ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $

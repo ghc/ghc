@@ -1662,12 +1662,13 @@ fiddling around.
 genAuxBind :: SrcSpan -> DerivAuxBind -> (LHsBind RdrName, LSig RdrName)
 genAuxBind loc (GenCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns, 
-     L loc (TypeSig (L loc rdr_name) sig_ty))
+     L loc (TypeSig (L loc rdr_name) (L loc sig_ty)))
   where
     rdr_name = con2tag_RDR tycon
 
-    sig_ty = genForAllTy loc tycon $ \hs_tc_app ->
-             hs_tc_app `nlHsFunTy` nlHsTyVar (getRdrName intPrimTyCon)
+    sig_ty = HsCoreTy $ 
+             mkForAllTys (tyConTyVars tycon) $
+             mkParentType tycon `mkFunTy` intPrimTy
 
     lots_of_constructors = tyConFamilySize tycon > 8
                         -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
@@ -1687,19 +1688,18 @@ genAuxBind loc (GenTag2Con tycon)
     (mk_FunBind loc rdr_name 
 	[([nlConVarPat intDataCon_RDR [a_RDR]], 
 	   nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig (L loc rdr_name) sig_ty))
+     L loc (TypeSig (L loc rdr_name) (L loc sig_ty)))
   where
-    sig_ty = nlHsTyVar (getRdrName intTyCon) 
-             `nlHsFunTy` (nlHsTyVar (getRdrName tycon))
+    sig_ty = HsCoreTy $ intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR tycon
 
 genAuxBind loc (GenMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig (L loc rdr_name) sig_ty))
+     L loc (TypeSig (L loc rdr_name) (L loc sig_ty)))
   where
     rdr_name = maxtag_RDR tycon
-    sig_ty = nlHsTyVar (getRdrName intTyCon) 
+    sig_ty = HsCoreTy intTy
     rhs = nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim max_tag))
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
@@ -1743,17 +1743,13 @@ mk_data_type_name tycon = mkAuxBinderName (tyConName tycon) mkDataTOcc
 mk_constr_name :: DataCon -> RdrName	-- "$cC"
 mk_constr_name con = mkAuxBinderName (dataConName con) mkDataCOcc
 
-genForAllTy :: SrcSpan -> TyCon
-            -> (LHsType RdrName -> LHsType RdrName)
-            -> LHsType RdrName
--- Wrap a forall type for the variables of the TyCOn
-genForAllTy loc tc thing_inside
-  = L loc $ mkExplicitHsForAllTy (userHsTyVarBndrs (map (L loc) tvs)) (L loc []) $
-    thing_inside (nlHsTyConApp (getRdrName tc) (map nlHsTyVar tvs))
-  where
-    tvs = map (mkRdrUnqual . getOccName) (tyConTyVars tc)
-	-- We can't use getRdrName because that makes an Exact RdrName
-	-- and we can't put them in the LocalRdrEnv
+mkParentType :: TyCon -> Type
+-- Turn the representation tycon of a family into
+-- a use of its family constructor
+mkParentType tc
+  = case tyConFamInst_maybe tc of
+       Nothing  -> mkTyConApp tc (mkTyVarTys (tyConTyVars tc))
+       Just (fam_tc,tys) -> mkTyConApp fam_tc tys
 \end{code}
 
 %************************************************************************
