@@ -119,12 +119,6 @@ hs_init(int *argc, char **argv[])
      */
     stat_startInit();
 
-#if defined(DEBUG)
-    /* Start off by initialising the allocator debugging so we can
-     * use it anywhere */
-    initAllocator();
-#endif
-
     /* Set the RTS flags to default values. */
 
     initRtsFlagsDefaults();
@@ -455,11 +449,6 @@ hs_exit_(rtsBool wait_foreign)
     // otherwise a foreign call in progress may still be referencing
     // heap memory (e.g. by being passed a ByteArray#).
     freeStorage(wait_foreign);
-
-#if defined(DEBUG)
-    /* and shut down the allocator debugging */
-    shutdownAllocator();
-#endif
 
 }
 
