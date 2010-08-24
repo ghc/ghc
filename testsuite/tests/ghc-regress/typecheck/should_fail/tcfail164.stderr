@@ -1,12 +1,12 @@
 
-tcfail164.hs:11:5:
+tcfail164.hs:11:4:
     Bad call to tagToEnum# at type a
       Specify the type by giving a type signature
       e.g. (tagToEnum# x) :: Bool
     In the expression: tagToEnum# 0#
     In the definition of `f': f = tagToEnum# 0#
 
-tcfail164.hs:17:34:
+tcfail164.hs:17:30:
     Bad call to tagToEnum# at type Int
       Specify the type by giving a type signature
       e.g. (tagToEnum# x) :: Bool
