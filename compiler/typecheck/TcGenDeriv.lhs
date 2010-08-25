@@ -1684,13 +1684,13 @@ genAuxBind loc (GenCon2Tag tycon)
 		  nlHsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
 
 genAuxBind loc (GenTag2Con tycon)
-  = ASSERT( null (tyConTyVars tycon) )
-    (mk_FunBind loc rdr_name 
+  = (mk_FunBind loc rdr_name 
 	[([nlConVarPat intDataCon_RDR [a_RDR]], 
 	   nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
      L loc (TypeSig (L loc rdr_name) (L loc sig_ty)))
   where
-    sig_ty = HsCoreTy $ intTy `mkFunTy` mkParentType tycon
+    sig_ty = HsCoreTy $ mkForAllTys (tyConTyVars tycon) $
+             intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR tycon
 
