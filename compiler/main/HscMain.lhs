@@ -54,6 +54,7 @@ import DsMeta		( templateHaskellNames )
 import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan, noSrcSpan, unLoc )
 import VarSet
 import VarEnv		( emptyTidyEnv )
+import Panic
 #endif
 
 import Id		( Id )
@@ -1027,7 +1028,7 @@ compileExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
 
 compileExpr hsc_env srcspan ds_expr
   | rtsIsProfiled
-  = panic "You can't call compileExpr in a profiled compiler"
+  = throwIO (InstallationError "You can't call compileExpr in a profiled compiler")
     	  -- Otherwise you get a seg-fault when you run it
 
   | otherwise
