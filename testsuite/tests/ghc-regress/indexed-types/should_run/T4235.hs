@@ -1,6 +1,11 @@
 {-# LANGUAGE TypeFamilies, StandaloneDeriving, FlexibleInstances, GADTs #-}
 module Main where
 
+import Ix
+
+-- Deriving Enum with phantom type parameter
+data T a = R | S | T deriving( Enum, Show, Ix )
+
 -- Tests that deriving works for data families
 data family Foo a
 
@@ -20,5 +25,6 @@ data Bar a where
 
 deriving instance (Eq (Bar Int))
 
-main = do { print (map f [B .. D])
+main = do { print [R .. T]
+          ; print (map f [B .. D])
           ; print [P 3 == P 3, P 4 == Q] }
