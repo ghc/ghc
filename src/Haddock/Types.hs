@@ -351,29 +351,6 @@ data DocOption
 
 
 -----------------------------------------------------------------------------
--- * Misc.
------------------------------------------------------------------------------
-
-
--- TODO: remove?
--- | This structure holds the module information we get from GHC's
--- type checking phase
-data GhcModule = GhcModule {
-   ghcModule         :: Module,
-   ghcFilename       :: FilePath,
-   ghcMbDocOpts      :: Maybe String,
-   ghcMbDocHdr       :: GhcDocHdr,
-   ghcGroup          :: HsGroup Name,
-   ghcMbExports      :: Maybe [LIE Name],
-   ghcExportedNames  :: [Name],
-   ghcDefinedNames   :: [Name],
-   ghcNamesInScope   :: [Name],
-   ghcInstances      :: [Instance],
-   ghcDynFlags       :: DynFlags
-}
-  
-
------------------------------------------------------------------------------
 -- * Error handling
 -----------------------------------------------------------------------------
 

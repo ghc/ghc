@@ -29,6 +29,7 @@ import Control.Monad
 import qualified Data.Traversable as Traversable
 
 import GHC hiding (flags)
+import HscTypes
 import Name
 import Bag
 import RdrName (GlobalRdrEnv)
@@ -37,41 +38,43 @@ import RdrName (GlobalRdrEnv)
 -- | Process the data in a GhcModule to produce an interface.
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the interface map.
-createInterface :: GhcModule -> [Flag] -> IfaceMap -> InstIfaceMap
+createInterface :: TypecheckedModule -> [Flag] -> IfaceMap -> InstIfaceMap
                 -> ErrMsgGhc Interface
-createInterface ghcMod flags modMap instIfaceMap = do
+createInterface tm flags modMap instIfaceMap = do
 
-  let mdl    = ghcModule ghcMod
-      dflags = ghcDynFlags ghcMod
+  let ms                  = pm_mod_summary . tm_parsed_module $ tm
+      mi                  = moduleInfo tm
+      mdl                 = ms_mod ms
+      dflags              = ms_hspp_opts ms
+      instances           = modInfoInstances mi
+      exportedNames       = modInfoExports mi
+      -- XXX: confirm always a Just.
+      Just (group_, _, optExports, optDocHeader) = renamedSource tm
 
   -- The pattern-match should not fail, because createInterface is only
   -- done on loaded modules.
   Just gre <- liftGhcToErrMsgGhc $ lookupLoadedHomeModuleGRE (moduleName mdl)
 
-  opts0 <- liftErrMsg $ mkDocOpts (ghcMbDocOpts ghcMod) flags mdl
+  opts0 <- liftErrMsg $ mkDocOpts (haddockOptions dflags) flags mdl
   let opts
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
+  (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre optDocHeader
+  decls0           <- liftErrMsg $ declInfos dflags gre (topDecls group_)
 
-  (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader dflags
-                                       gre (ghcMbDocHdr ghcMod)
-  decls0           <- liftErrMsg $ declInfos dflags gre (topDecls (ghcGroup ghcMod))
-
-  let instances      = ghcInstances ghcMod
-      localInsts     = filter (nameIsLocalOrFrom mdl . getName) instances
+  let localInsts     = filter (nameIsLocalOrFrom mdl . getName) instances
       declDocs       = [ (decl, doc) | (L _ decl, (Just doc, _), _) <- decls0 ]
       instanceDocMap = mkInstanceDocMap localInsts declDocs
 
       decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
-      exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
+      exports       = fmap (reverse . map unLoc) optExports
       ignoreExps    = Flag_IgnoreAllExports `elem` flags
-      exportedNames = ghcExportedNames ghcMod
 
   liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
-  exportItems <- mkExportItems modMap mdl gre (ghcExportedNames ghcMod) decls declMap
+  exportItems <- mkExportItems modMap mdl gre exportedNames decls declMap
                                opts exports ignoreExps instances instIfaceMap dflags
 
   let visibleNames = mkVisibleNames exportItems opts
@@ -85,7 +88,7 @@ createInterface ghcMod flags modMap instIfaceMap = do
 
   return Interface {
     ifaceMod             = mdl,
-    ifaceOrigFilename    = ghcFilename ghcMod,
+    ifaceOrigFilename    = msHsFilePath ms,
     ifaceInfo            = info,
     ifaceDoc             = mbDoc,
     ifaceRnDoc           = Nothing,

@@ -146,6 +146,8 @@ main = handleTopExceptions $ do
       renderStep flags packages []
 
 
+readPackagesAndProcessModules :: [Flag] -> [String] -> IO ([(InterfaceFile, FilePath)],
+                                                           [Interface], LinkEnv)
 readPackagesAndProcessModules flags files = do
   libDir <- getGhcLibDir flags
 

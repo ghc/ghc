@@ -43,7 +43,6 @@ import Haddock.Utils
 import Control.Monad
 import Data.List
 import qualified Data.Map as Map
-import Data.Maybe
 import Distribution.Verbosity
 import System.Directory
 import System.FilePath
@@ -156,56 +155,16 @@ createIfaces verbosity flags instIfaceMap mods = do
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe Interface)
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
-  tc_mod <- loadModule =<< typecheckModule =<< parseModule modsum
+  tm <- loadModule =<< typecheckModule =<< parseModule modsum
   if not $ isBootSummary modsum
     then do
-      let filename = msHsFilePath modsum
-      let dynflags = ms_hspp_opts modsum
-      let Just renamed_src = renamedSource tc_mod
-      let ghcMod = mkGhcModule (ms_mod modsum,
-                            filename,
-                            (parsedSource tc_mod,
-                             renamed_src,
-                             typecheckedSource tc_mod,
-                             moduleInfo tc_mod))
-                            dynflags
       out verbosity verbose "Creating interface..."
-      (interface, msg) <- runWriterGhc $ createInterface ghcMod flags modMap instIfaceMap
+      (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
       liftIO $ mapM_ putStrLn msg
       interface' <- liftIO $ evaluate interface
       return (Just interface')
     else
       return Nothing
-
-
-type CheckedMod = (Module, FilePath, FullyCheckedMod)
-
-
-type FullyCheckedMod = (ParsedSource,
-                        RenamedSource,
-                        TypecheckedSource,
-                        ModuleInfo)
-
-
--- | Dig out what we want from the typechecker output
-mkGhcModule :: CheckedMod -> DynFlags -> GhcModule
-mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
-  ghcModule         = mdl,
-  ghcFilename       = file,
-  ghcMbDocOpts      = mbOpts,
-  ghcMbDocHdr       = mbDocHdr,
-  ghcGroup          = group_,
-  ghcMbExports      = mbExports,
-  ghcExportedNames  = modInfoExports modInfo,
-  ghcDefinedNames   = map getName $ modInfoTyThings modInfo,
-  ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo,
-  ghcInstances      = modInfoInstances modInfo,
-  ghcDynFlags       = dynflags
-}
-  where
-    mbOpts = haddockOptions dynflags
-    (group_, _, mbExports, mbDocHdr) = renamed
-    (_, renamed, _, modInfo) = checkedMod
 
 
 --------------------------------------------------------------------------------
