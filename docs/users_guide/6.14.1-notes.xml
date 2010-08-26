@@ -29,16 +29,168 @@
     </itemizedlist>
   </sect2>
 
-<!--
   <sect2>
     <title>Language changes</title>
     <itemizedlist>
+      <listitem>
+        <para>
+          GHC now understands the <literal>Haskell98</literal> and
+          <literal>Haskell2010</literal> languages.
+        </para>
+
+        <para>
+          These get processed before the language extension pragmas,
+          and define the default sets of extensions that are enabled.
+          If neither is specified, then the default is
+          <literal>Haskell2010</literal> plus the
+          <literal>MonoPatBinds</literal> extension.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC now supports the <literal>DoAndIfThenElse</literal>
+          extension, which is part of the Haskell 2010 standard.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Datatype contexts, such as the <literal>Eq a</literal> in
+        </para>
+<programlisting>
+data Eq a => Set a = NilSet | ConsSet a (Set a)
+</programlisting>
+        <para>
+          are now treated as an extension
+          <literal>DatatypeContexts</literal> (on by default) by GHC.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC's support for unicode source has been improved, including
+          removing support for U+22EF for the <literal>..</literal>
+          symbol. See <xref linkend="unicode-syntax" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Pragmas are now reread after preprocessing. In particular,
+          this means that if a pragma is used to turn CPP on, then other
+          pragmas can be put in CPP conditionals.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>TypeOperators</literal> extension now allows
+          instance heads to use infix syntax.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>PackageImports</literal> extension now understands
+          <literal>this</literal> to mean the current package.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>INLINE</literal> and <literal>NOINLINE</literal>
+          pragmas can now take a <literal>CONLIKE</literal> modifier,
+          which indicates that the right hand side is cheap to compute,
+          and can thus be duplicated more freely.
+          See <xref linkend="conlike" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A <literal>ForceSpecConstr</literal> annotation on a type, e.g.
+        </para>
+<programlisting>
+import SpecConstr
+{-# ANN type SPEC ForceSpecConstr #-}
+</programlisting>
+        <para>
+          can be used to force GHC to fully specialise argument of that
+          type.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A <literal>NoSpecConstr</literal> annotation on a type, e.g.
+        </para>
+<programlisting>
+import SpecConstr
+{-# ANN type T NoSpecConstr #-}
+</programlisting>
+        <para>
+          can be used to prevent SpecConstr from specialising on
+          arguments of that type.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is are two experimental new extensions
+          <literal>AlternativeLayoutRule</literal> and
+          <literal>AlternativeLayoutRuleTransitional</literal>,
+          which are for exploring alternative layout rules in Haskell'.
+          The details are subject to change, so we advise against using
+          them in real code for now.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>NewQualifiedOperators</literal> extension has
+          been deprecated, as it was rejected by the Haskell' committee.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
     <title>Warnings</title>
     <itemizedlist>
+      <listitem>
+        <para>
+          There is now a warning for missing import lists, controlled
+          by the new <literal>-fwarn-missing-import-lists</literal> flag.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC will now warn about <literal>SPECIALISE</literal> and
+          <literal>UNPACK</literal> pragmas that have no effect.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>DLLs</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          Shared libraries are once again supported on Windows.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Shared libraries are now supported on OS X, both on x86 and on
+          PowerPC. The new <literal>-dylib-install-name</literal> GHC
+          flag is used to set the location of the dynamic library.
+          See <xref linkend="finding-shared-libs" /> for more details.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
@@ -46,41 +198,344 @@
     <title>Runtime system</title>
 
     <itemizedlist>
-    </itemizedlist>
-  </sect2>
+      <listitem>
+        <para>
+          For security reasons, by default, the only RTS flag that
+          programs accept is <literal>+RTS --info</literal>. If you want
+          the full range of RTS flags then you need to link with the new
+          <literal>-rtsopts</literal> flag. See
+          <xref linkend="options-linker" /> for more details.
+        </para>
+      </listitem>
 
-  <sect2>
-    <title>Build system</title>
-    <itemizedlist>
+      <listitem>
+        <para>
+          The RTS now exports a function <literal>setKeepCAFs</literal>
+          which is important when loading Haskell DLLs dynamically, as
+          a DLL may refer to CAFs that hae already been GCed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The garbage collector no longer allows you to specify a number
+          of steps; there are now always 2. The <literal>-T</literal>
+          RTS flag has thus been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A new RTS flag <literal>-H</literal> causes the RTS to use a
+          larger nursery, but without exceeding the amount of memory
+          that the application is already using. It makes some programs
+          go slower, but others go faster.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC now returns memory to the OS, if memory usage peaks and
+          then drops again. This is mainly useful for long running
+          processes which normally use very little memory, but
+          occasionally need a lot of memory for a short period of time.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          On OS X, eventLog events are now available as DTrace probes.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The PAPI support has been improved. The new RTS flag
+          <literal>-a#0x40000000</literal> can be used to tell the RTS
+          to collect the native PAPI event <literal>0x40000000</literal>.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
     <title>Compiler</title>
     <itemizedlist>
+      <listitem>
+        <para>
+          GHC now defaults to <literal>--make</literal> mode, i.e. GHC
+          will chase dependencies for you automatically by default.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC now includes an LLVM code generator.
+        </para>
+        <para>
+          This includes a number of new flags:
+          a flag to tell GHC to use LLVM, <literal>-fllvm</literal>;
+          a flag to dump the LLVM input ,<literal>-ddump-llvm</literal>;
+          flags to keep the LLVM intermediate files,
+          <literal>-keep-llvm-file</literal> and
+          <literal>-keep-llvm-files</literal>;
+          flags to set the location and options for the LLVM assembler,
+          optimiser and compiler,
+          <literal>-pgmla</literal>,
+          <literal>-pgmlo</literal>,
+          <literal>-pgmlc</literal>,
+          <literal>-optla</literal>,
+          <literal>-optlo</literal> and
+          <literal>-optlc</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to use <literal>-fno-code</literal> with
+          <literal>--make</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new flag <literal>-dsuppress-coercions</literal> controls
+          whether GHC prints coercions in core dumps.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The inliner has been overhauled. The most significant
+          user-visible change is that only saturated functions are
+          inlined, e.g.
+        </para>
+<programlisting>
+(.) f g x = f (g x)
+</programlisting>
+        <para>
+          would only be inlined if <literal>(.)</literal> is applied to 3
+          arguments, while
+        </para>
+<programlisting>
+(.) f g = \x -> f (g x)
+</programlisting>
+        <para>
+          will be inlined if only aplpied to 2 arguments.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-finline-if-enough-args</literal> flag is no
+          longer supported.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Column numbers in warnings and error messages now start at 1,
+          as is more standard, rather than 0.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHCi now understands most linker scripts. In particular, this
+          means that GHCi is able to load the C pthread library.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>ghc --info</literal> output has been updated:
+        </para>
+        <para>
+          It now includes the
+          location of the global package database, in the
+          <literal>Global Package DB</literal> field.
+        </para>
+        <para>
+          It now includes the build, host and target platforms, in the
+          <literal>Build platform</literal>,
+          <literal>Host platform</literal> and
+          <literal>Target platform</literal> fields.
+        </para>
+        <para>
+          It now includes a <literal>Have llvm code generator</literal>
+          field.
+        </para>
+        <para>
+          The <literal>Win32 DLLs</literal> field has been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The registerised via-C backend, and the
+          <literal>-fvia-C</literal>, have been deprecated. The poor
+          floating-point performance in the x86 native code generator
+          has now been fixed, so we don't believe there is still any
+          reason to use the via-C backend.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is now a new flag <literal>--supported-extensions</literal>,
+          which currently behaves the same as
+          <literal>--supported-languages</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC progress output such as
+        </para>
+<programlisting>
+[ 1 of 5] Compiling Foo              ( Foo.hs, Foo.o )
+</programlisting>
+        <para>
+          is now sent to stdout rather than stderr.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new flag <literal>-fexpose-all-unfoldings</literal>
+          makes GHC put unfoldings for <emphasis>everything</emphasis>
+          in the interface file.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There are two new flags, <literal>-fno-specialise</literal>
+          and <literal>-fno-float-in</literal>, for disabling the
+          specialise and float-in passes.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new flag <literal>-fstrictness-before=<replaceable>n</replaceable></literal> tells
+          GHC to run an additional strictness analysis pass
+          before simplifier phase <replaceable>n</replaceable>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new flag
+          <literal>-funfolding-dict-discount</literal>
+          for tweaking the optimiser's behaviour.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-fspec-inline-join-points</literal> flag has been
+          removed.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
     <title>GHCi</title>
     <itemizedlist>
+      <listitem>
+        <para>
+          GHCi now supports full import syntax, e.g.
+        </para>
+<programlisting>
+Prelude> import Data.List as L
+Prelude Data.List> L.length "foo"
+3
+</programlisting>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHCi now understands the layout of multiline-commands, so
+          this now works:
+        </para>
+<programlisting>
+Prelude> :{
+Prelude| let x = 1
+Prelude|     y = 2 in x + y
+Prelude| :}
+3
+</programlisting>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
-    <title>Template Haskell</title>
+    <title>Template Haskell and Quasi-Quoters</title>
     <itemizedlist>
+      <listitem>
+        <para>
+          It is now possible to quasi-quote patterns with
+          <literal>[p| ... |]</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is no longer to use a <literal>$</literal> before the
+          name of a quasi-quoter, e.g. one can now say
+          <literal>[expr| ... |]</literal> rather than
+          <literal>[$expr| ... |]</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to use a quasi-quoter for types, e.g.
+          <literal>f :: [$qq| ... |]</literal>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to quasi-quote existentials and GADTs.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
-    <title>Package Handling</title>
+    <title>GHC API</title>
     <itemizedlist>
+      <listitem>
+        <para>
+          There are now <literal>Data</literal> and
+          <literal>Typeable</literal> instances for the
+          HsSyn typed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          As language extensions are not applied until after the base
+          language (Haskell98, Haskell2010 or the default) has been
+          selected, it is now necessary to tell the GHC API the point
+          at which the extension flags should be processed. Normally
+          this is done by calling
+          <literal>DynFlags.flattenExtensionFlags</literal> once all
+          the flags and pragmas have been read.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
+<!--
   <sect2>
     <title>Libraries</title>
+
+    <itemizedlist>
+    </itemizedlist>
   </sect2>
 -->
 </sect1>
