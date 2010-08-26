@@ -101,6 +101,10 @@ endif
 just-makefiles:
 	@:
 
+ifneq "$(CLEANING)" "YES"
+CLEANING = NO
+endif
+
 # -----------------------------------------------------------------------------
 # Misc GNU make utils
 
@@ -351,26 +355,26 @@ $(foreach pkg,$(EXTRA_PACKAGES),$(eval $(call addPackage,$(pkg))))
 
 
 # -------------------  Adding DPH packaes ---------------
-DPH_PACKAGES = 	dph/dph-base \
+
+# The DPH packages are added when:
+#   * not BootingFromHc (they aren't necessary for bootstrapping), and
+#     * not GhcProfiled (they need TH, so can't be compiled by a -prof GHC), or
+#     * CLEANING: when cleaning we always enable everything
+
+# if !BootingFromHc && (!GhcProfiled || CLEANING)
+
+ifneq "$(BootingFromHc)" "YES"
+ifneq "$(GhcProfiled) $(CLEANING)" "NO YES"
+PACKAGES_STAGE2 += dph/dph-base \
 	dph/dph-prim-interface \
 	dph/dph-prim-seq \
 	dph/dph-prim-par \
 	dph/dph-seq \
 	dph/dph-par
-ifneq "$(BootingFromHc)" "YES"
-ifeq "$(CLEANING)" "YES"
-# If we are cleaning we must add DPH packages regardless,
-# for reasons we now forget
-PACKAGES_STAGE2 += $(DPH_PACKAGES)
-else # not CLEANING
-ifneq "$(GhcProfiled)" "YES"
-# DPH uses Template Haskell, and Template Haskell doesn't work
-# with a profiled compiler. So if stage-2 is profile, don't build DPH
-PACKAGES_STAGE2 += $(DPH_PACKAGES)
-endif  # GhcProfiled
-endif  # Cleaning
+endif
 endif  # BootingFromHc
 # ------------------------------------------------------- 
+
 
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
