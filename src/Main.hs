@@ -15,7 +15,7 @@
 --
 -- Program entry point and top-level code.
 -----------------------------------------------------------------------------
-module Main (main, createInterfaces') where
+module Main (main, readPackagesAndProcessModules) where
 
 
 import Haddock.Backends.Xhtml
@@ -115,23 +115,38 @@ handleGhcExceptions =
 -------------------------------------------------------------------------------
 
 
--- | Create 'Interface' structures from a given list of Haddock command-line
--- flags and file or module names (as accepted by 'haddock' executable).  Flags
--- that control documentation generation or show help or version information
--- are ignored.
---
--- This is a more high-level alternative to 'createInterfaces'.
-createInterfaces'
-  :: [String]       -- ^ A list of command-line flags and file or module names
-  -> IO [Interface] -- ^ Resulting list of interfaces
-createInterfaces' args = do
-  (flags, fileArgs) <- parseHaddockOpts args
-  (_, ifaces) <- readPackagesAndCreateInterfaces flags fileArgs
-  return ifaces
+main :: IO ()
+main = handleTopExceptions $ do
+
+  -- Parse command-line flags and handle some of them initially.
+  args <- getArgs
+  (flags, files) <- parseHaddockOpts args
+  shortcutFlags flags
+
+  if not (null files)
+    then do
+      (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
+
+      -- Dump an "interface file" (.haddock file), if requested.
+      case optDumpInterfaceFile flags of
+        Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
+        Nothing -> return ()
+
+      -- Render the interfaces.
+      renderStep flags packages ifaces
+
+    else do
+      when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
+        throwE "No input file(s)."
+
+      -- Get packages supplied with --read-interface.
+      packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
+
+      -- Render even though there are no input files (usually contents/index).
+      renderStep flags packages []
 
 
-readPackagesAndCreateInterfaces :: [Flag] -> [String] -> IO ([(InterfaceFile, FilePath)], [Interface])
-readPackagesAndCreateInterfaces flags fileArgs = do
+readPackagesAndProcessModules flags files = do
   libDir <- getGhcLibDir flags
 
   -- Catches all GHC source errors, then prints and re-throws them.
@@ -146,41 +161,10 @@ readPackagesAndCreateInterfaces flags fileArgs = do
     packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
 
     -- Create the interfaces -- this is the core part of Haddock.
-    (ifaces, homeLinks) <- createInterfaces (verbosity flags) fileArgs flags
-                                            (map fst packages)
+    let ifaceFiles = map fst packages
+    (ifaces, homeLinks) <- processModules (verbosity flags) files flags ifaceFiles
 
-    -- Dump an "interface file" (.haddock file), if requested.
-    liftIO $ case optDumpInterfaceFile flags of
-      Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
-      Nothing -> return ()
-
-    return (packages, ifaces)
-
-
-main :: IO ()
-main = handleTopExceptions $ do
-
-  -- Parse command-line flags and handle some of them initially.
-  args <- getArgs
-  (flags, fileArgs) <- parseHaddockOpts args
-  shortcutFlags flags
-
-  if not (null fileArgs)
-    then do
-      (packages, ifaces) <- readPackagesAndCreateInterfaces flags fileArgs
-
-      -- Render the interfaces.
-      renderStep flags packages ifaces
-
-    else do
-      when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
-        throwE "No input file(s)."
-
-      -- Get packages supplied with --read-interface.
-      packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
-
-      -- Render even though there are no input files (usually contents/index).
-      renderStep flags packages []
+    return (packages, ifaces, homeLinks)
 
 
 renderStep :: [Flag] -> [(InterfaceFile, FilePath)] -> [Interface] -> IO ()

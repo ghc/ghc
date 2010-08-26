@@ -27,7 +27,7 @@
 -- using this environment.
 -----------------------------------------------------------------------------
 module Haddock.Interface (
-  createInterfaces
+  processModules
 ) where
 
 
@@ -54,26 +54,27 @@ import GHC hiding (verbosity, flags)
 import HscTypes
 
 
--- | Create 'Interface' structures by typechecking the list of modules
--- using the GHC API and processing the resulting syntax trees.
-createInterfaces
-  :: Verbosity -- ^ Verbosity of logging to 'stdout'
-  -> [String] -- ^ A list of file or module names sorted by module topology
-  -> [Flag] -- ^ Command-line flags
-  -> [InterfaceFile] -- ^ Interface files of package dependencies
-  -> Ghc ([Interface], LinkEnv)
-  -- ^ Resulting list of interfaces and renaming environment
-createInterfaces verbosity modules flags extIfaces = do
+-- | Create 'Interface's and a link environment by typechecking the list of
+-- modules using the GHC API and processing the resulting syntax trees.
+processModules
+  :: Verbosity                  -- ^ Verbosity of logging to 'stdout'
+  -> [String]                   -- ^ A list of file or module names sorted by
+                                -- module topology
+  -> [Flag]                     -- ^ Command-line flags
+  -> [InterfaceFile]            -- ^ Interface files of package dependencies
+  -> Ghc ([Interface], LinkEnv) -- ^ Resulting list of interfaces and renaming
+                                -- environment
+processModules verbosity modules flags extIfaces = do
 
   out verbosity verbose "Creating interfaces..."
   let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
                                    , iface <- ifInstalledIfaces ext ]
-  interfaces <- createInterfaces' verbosity modules flags instIfaceMap
+  interfaces <- createIfaces0 verbosity modules flags instIfaceMap
 
   out verbosity verbose "Attaching instances..."
   interfaces' <- attachInstances interfaces instIfaceMap
 
-  out verbosity verbose "Building link environment..."
+  out verbosity verbose "Building cross-linking environment..."
   -- Combine the link envs of the external packages into one
   let extLinks  = Map.unions (map ifLinkEnv extIfaces)
       homeLinks = buildHomeLinks interfaces -- Build the environment for the home
@@ -89,51 +90,58 @@ createInterfaces verbosity modules flags extIfaces = do
   return (interfaces'', homeLinks)
 
 
-createInterfaces' :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc [Interface]
-createInterfaces' verbosity modules flags instIfaceMap = do
-  let useTempDir = Flag_NoTmpCompDir `notElem` flags
+--------------------------------------------------------------------------------
+-- * Module typechecking and Interface creation
+--------------------------------------------------------------------------------
 
-  -- Output dir needs to be set before calling depanal since it uses it to
+
+createIfaces0 :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc [Interface]
+createIfaces0 verbosity modules flags instIfaceMap =
+  -- Output dir needs to be set before calling depanal since depanal uses it to
   -- compute output file names that are stored in the DynFlags of the
   -- resulting ModSummaries.
-  tmp <- liftIO getTemporaryDirectory
-  x   <- liftIO getProcessID
-  let tempDir = tmp </> ".haddock-" ++ show x
-  when useTempDir $ modifySessionDynFlags (setOutputDir tempDir)
+  (if useTempDir then withTempOutputDir else id) $ do
+    modGraph <- depAnalysis
+    if needsTemplateHaskell modGraph
+      then do
+        modGraph' <- enableCompilation modGraph
+        createIfaces verbosity flags instIfaceMap modGraph'
+      else
+        createIfaces verbosity flags instIfaceMap modGraph
 
-  targets <- mapM (\f -> guessTarget f Nothing) modules
-  setTargets targets
-  -- Dependency analysis.
-  modgraph <- depanal [] False
-
-  -- If template haskell is used by the package, we can't use HscNothing as
-  -- target since we might need to run code generated from one or more of the
-  -- modules during typechecking.
-  if needsTemplateHaskell modgraph
-    then
-      -- Create a temporary directory in wich to write compilation output,
-      -- unless the user has asked us not to.
-      (if useTempDir then withTempDir tempDir else id) $ do
-        -- Turn on compilation.
-        let enableComp d = d { hscTarget = defaultObjectTarget }
-        modifySessionDynFlags enableComp
-        -- We need to update the DynFlags of the ModSummaries as well.
-        let upd m = m { ms_hspp_opts = enableComp (ms_hspp_opts m) }
-        let modgraph' = map upd modgraph
-
-        processModules verbosity flags instIfaceMap modgraph'
-    else
-      processModules verbosity flags instIfaceMap modgraph
+  where
+    useTempDir :: Bool
+    useTempDir = Flag_NoTmpCompDir `notElem` flags
 
 
-withTempDir :: (ExceptionMonad m, MonadIO m) => FilePath -> m a -> m a
-withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
-                            (liftIO $ removeDirectoryRecursive dir)
+    withTempOutputDir :: Ghc a -> Ghc a
+    withTempOutputDir action = do
+      tmp <- liftIO getTemporaryDirectory
+      x   <- liftIO getProcessID
+      let dir = tmp </> ".haddock-" ++ show x
+      modifySessionDynFlags (setOutputDir dir)
+      withTempDir dir action
 
 
-processModules :: Verbosity -> [Flag] -> InstIfaceMap -> [ModSummary]
-               -> Ghc [Interface]
-processModules verbosity flags instIfaceMap mods = do
+    depAnalysis :: Ghc ModuleGraph
+    depAnalysis = do
+      targets <- mapM (\f -> guessTarget f Nothing) modules
+      setTargets targets
+      depanal [] False
+
+
+    enableCompilation :: ModuleGraph -> Ghc ModuleGraph
+    enableCompilation modGraph = do
+      let enableComp d = d { hscTarget = defaultObjectTarget }
+      modifySessionDynFlags enableComp
+      -- We need to update the DynFlags of the ModSummaries as well.
+      let upd m = m { ms_hspp_opts = enableComp (ms_hspp_opts m) }
+      let modGraph' = map upd modGraph
+      return modGraph'
+
+
+createIfaces :: Verbosity -> [Flag] -> InstIfaceMap -> ModuleGraph -> Ghc [Interface]
+createIfaces verbosity flags instIfaceMap mods = do
   let sortedMods = flattenSCCs $ topSortModuleGraph False mods Nothing
   (ifaces, _) <- foldM f ([], Map.empty) sortedMods
   return (reverse ifaces)
@@ -200,6 +208,11 @@ mkGhcModule (mdl, file, checkedMod) dynflags = GhcModule {
     (_, renamed, _, modInfo) = checkedMod
 
 
+--------------------------------------------------------------------------------
+-- * Building of cross-linking environment  
+--------------------------------------------------------------------------------
+
+
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of
 -- "best", we use "the module nearest the bottom of the dependency
@@ -221,3 +234,14 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
+
+
+--------------------------------------------------------------------------------
+-- * Utils
+--------------------------------------------------------------------------------
+
+
+withTempDir :: (ExceptionMonad m, MonadIO m) => FilePath -> m a -> m a
+withTempDir dir = gbracket_ (liftIO $ createDirectory dir)
+                            (liftIO $ removeDirectoryRecursive dir)
+

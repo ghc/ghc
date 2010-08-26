@@ -17,7 +17,7 @@ module Documentation.Haddock (
   Interface(..),
   InstalledInterface(..),
   createInterfaces,
-  createInterfaces',
+  processModules,
 
   -- * Export items & declarations
   ExportItem(..),
@@ -63,3 +63,17 @@ import Haddock.Types
 import Haddock.Options
 import Haddock.Utils
 import Main
+
+
+-- | Create 'Interface' structures from a given list of Haddock command-line
+-- flags and file or module names (as accepted by 'haddock' executable).  Flags
+-- that control documentation generation or show help or version information
+-- are ignored.
+createInterfaces
+  :: [Flag]         -- ^ A list of command-line flags
+  -> [String]       -- ^ File or module names
+  -> IO [Interface] -- ^ Resulting list of interfaces
+createInterfaces flags modules = do
+  (_, ifaces, _) <- readPackagesAndProcessModules flags modules
+  return ifaces
+
