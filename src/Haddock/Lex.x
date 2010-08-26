@@ -52,6 +52,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
  $ws* [\*\-]		{ token TokBullet `andBegin` string }
  $ws* \[		{ token TokDefStart `andBegin` def }
  $ws* \( $digit+ \) 	{ token TokNumber `andBegin` string }
+ $ws* $digit+ \. 	{ token TokNumber `andBegin` string }
  $ws*			{ begin string }		
 }
 
