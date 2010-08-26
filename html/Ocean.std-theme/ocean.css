@@ -18,7 +18,21 @@ p {
   margin: 0.8em 0;
 }
 
-ul { margin-left: 2em; }
+ul, ol {
+  margin: 0.8em 0 0.8em 2em;
+}
+
+dl {
+  margin: 0.8em 0;
+}
+
+dt {
+  margin-top: 0.8em;
+  font-weight: bold;
+}
+dd {
+  margin-left: 2em;
+}
 
 a { text-decoration: none; }
 a[href]:link { color: rgb(196,69,29); }
@@ -381,14 +395,18 @@ div#style-menu-holder {
   margin-top: 0.8em;
 }
 
-#interface dt {
+.subs dl {
+  margin: 0;
+}
+
+.subs dt {
   float: left;
   clear: left;
   display: block;
   margin: 1px 0;
 }
 
-#interface dd {
+.subs dd {
   float: right;
   width: 90%;
   display: block;
@@ -396,11 +414,11 @@ div#style-menu-holder {
   margin-bottom: 0.5em;
 }
 
-#interface dd.empty {
+.subs dd.empty {
   display: none;
 }
 
-#interface dd p {
+.subs dd p {
   margin: 0;
 }
 

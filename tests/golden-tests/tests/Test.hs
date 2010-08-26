@@ -240,6 +240,10 @@ using double quotes: "Foo".  We can add emphasis /like this/.
    (1) This is an ordered list
  
    2. This is the next item (different kind of bullet)
+   
+   [cat] a small, furry, domesticated mammal
+   
+   [pineapple] a fruit grown in the tropics
 
 @
      This is a block of code, which can include other markup: 'R'
