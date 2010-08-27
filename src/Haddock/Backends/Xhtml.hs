@@ -66,11 +66,13 @@ ppHtml :: String
        -> Maybe String                 -- the contents URL (--use-contents)
        -> Maybe String                 -- the index URL (--use-index)
        -> Bool                         -- whether to use unicode in output (--use-unicode)
+       -> Qualification                -- how to qualify names
        -> IO ()
 
 ppHtml doctitle maybe_package ifaces odir prologue
         themes maybe_source_url maybe_wiki_url
-        maybe_contents_url maybe_index_url unicode =  do
+        maybe_contents_url maybe_index_url unicode 
+        quali =  do
   let
         visible_ifaces = filter visible ifaces
         visible i = OptHide `notElem` ifaceOptions i
@@ -88,7 +90,7 @@ ppHtml doctitle maybe_package ifaces odir prologue
 
   mapM_ (ppHtmlModule odir doctitle themes
            maybe_source_url maybe_wiki_url
-           maybe_contents_url maybe_index_url unicode) visible_ifaces
+           maybe_contents_url maybe_index_url unicode quali) visible_ifaces
 
 
 copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
@@ -448,11 +450,11 @@ ppHtmlIndex odir doctitle _maybe_package themes
 ppHtmlModule
         :: FilePath -> String -> Themes
         -> SourceURLs -> WikiURLs
-        -> Maybe String -> Maybe String -> Bool
+        -> Maybe String -> Maybe String -> Bool -> Qualification
         -> Interface -> IO ()
 ppHtmlModule odir doctitle themes
   maybe_source_url maybe_wiki_url
-  maybe_contents_url maybe_index_url unicode iface = do
+  maybe_contents_url maybe_index_url unicode quali iface = do
   let
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
@@ -462,30 +464,30 @@ ppHtmlModule odir doctitle themes
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
             divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str)),
-            ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
+            ifaceToHtml maybe_source_url maybe_wiki_url iface unicode quali
           ]
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
-  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode
+  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode quali
 
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
-  -> Interface -> Bool -> IO ()
-ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode = do
+  -> Interface -> Bool -> Qualification -> IO ()
+ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode quali = do
   let mdl = ifaceMod iface
       html =
         headHtml (moduleString mdl) Nothing themes +++
         miniBody <<
           (divModuleHeader << sectionName << moduleString mdl +++
-           miniSynopsis mdl iface unicode)
+           miniSynopsis mdl iface unicode quali)
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString html)
 
 
-ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Html
-ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
-  = ppModuleContents exports +++
+ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html
+ifaceToHtml maybe_source_url maybe_wiki_url iface unicode quali
+  = ppModuleContents quali exports +++
     description +++
     synopsis +++
     divInterface (maybe_doc_hdr +++ bdy)
@@ -505,7 +507,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
           = case ifaceRnDoc iface of
               Nothing -> noHtml
               Just doc -> divDescription $
-                            sectionName << "Description" +++ docSection doc
+                            sectionName << "Description" +++ docSection quali doc
 
         -- omit the synopsis if there are no documentation annotations at all
     synopsis
@@ -514,7 +516,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
       = divSynposis $
             paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++ 
             shortDeclList (
-                mapMaybe (processExport True linksInfo unicode) exports
+                mapMaybe (processExport True linksInfo unicode quali) exports
             ) ! (collapseSection "syn" False "" ++ collapseToggle "syn")
 
         -- if the documentation doesn't begin with a section header, then
@@ -527,20 +529,21 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode
 
     bdy =
       foldr (+++) noHtml $
-        mapMaybe (processExport False linksInfo unicode) exports
+        mapMaybe (processExport False linksInfo unicode quali) exports
 
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
 
-miniSynopsis :: Module -> Interface -> Bool -> Html
-miniSynopsis mdl iface unicode =
-    divInterface << mapMaybe (processForMiniSynopsis mdl unicode) exports
+miniSynopsis :: Module -> Interface -> Bool -> Qualification -> Html
+miniSynopsis mdl iface unicode quali =
+    divInterface << mapMaybe (processForMiniSynopsis mdl unicode quali) exports
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
 
-processForMiniSynopsis :: Module -> Bool -> ExportItem DocName -> Maybe Html
-processForMiniSynopsis mdl unicode (ExportDecl (L _loc decl0) _doc _ _insts) =
+processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
+                       -> Maybe Html
+processForMiniSynopsis mdl unicode _ (ExportDecl (L _loc decl0) _doc _ _insts) =
   ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
     TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
         (TyFamily{}) -> Just $ ppTyFamHeader True False d unicode
@@ -555,9 +558,9 @@ processForMiniSynopsis mdl unicode (ExportDecl (L _loc decl0) _doc _ _insts) =
     SigD (TypeSig (L _ n) (L _ _)) ->
          Just $ ppNameMini mdl (docNameOcc n)
     _ -> Nothing
-processForMiniSynopsis _ _ (ExportGroup lvl _id txt) =
-  Just $ groupTag lvl << docToHtml txt
-processForMiniSynopsis _ _ _ = Nothing
+processForMiniSynopsis _ _ quali (ExportGroup lvl _id txt) =
+  Just $ groupTag lvl << docToHtml quali txt
+processForMiniSynopsis _ _ _ _ = Nothing
 
 
 ppNameMini :: Module -> OccName -> Html
@@ -574,8 +577,8 @@ ppTyClBinderWithVarsMini mdl decl =
   in ppTypeApp n ns (ppNameMini mdl . docNameOcc) ppTyName
 
 
-ppModuleContents :: [ExportItem DocName] -> Html
-ppModuleContents exports
+ppModuleContents :: Qualification -> [ExportItem DocName] -> Html
+ppModuleContents quali exports
   | null sections = noHtml
   | otherwise     = contentsDiv
  where
@@ -591,8 +594,7 @@ ppModuleContents exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-        html = linkedAnchor (groupId id0)
-                << docToHtml doc +++ mk_subsections ssecs
+        html = linkedAnchor id0 << docToHtml doc +++ mk_subsections ssecs
         (ssecs, rest1) = process lev rest
         (secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
@@ -615,7 +617,7 @@ numberSectionHeadings exports = go 1 exports
 
 processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
 processExport summary _ _ (ExportGroup lev id0 doc)
-  = nothingIf summary $ groupHeading lev id0 << docToHtml doc
+  = nothingIf summary $ groupTag lev ! [identifier id0] << docToHtml doc
 processExport summary links unicode (ExportDecl decl doc subdocs insts)
   = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode
 processExport summary _ _ (ExportNoDecl y [])

@@ -24,6 +24,7 @@ module Haddock.Options (
   wikiUrls,
   optDumpInterfaceFile,
   optLaTeXStyle,
+  optQualification,
   verbosity,
   ghcFlags,
   readIfaceArgs
@@ -74,6 +75,7 @@ data Flag
   | Flag_NoWarnings
   | Flag_UseUnicode
   | Flag_NoTmpCompDir
+  | Flag_Qualification String
   deriving (Eq)
 
 
@@ -120,6 +122,8 @@ options backwardsCompat =
       "file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
       "page heading",
+    Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUALI")
+      "qualification of names, either \n'none' (default) or 'full'",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
       "extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)
@@ -216,7 +220,6 @@ optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
 
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
-
 
 verbosity :: [Flag] -> Verbosity
 verbosity flags =

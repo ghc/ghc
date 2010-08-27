@@ -38,16 +38,21 @@ ppRdrName :: RdrName -> Html
 ppRdrName = ppOccName . rdrNameOcc
 
 
-ppLDocName :: Located DocName -> Html
-ppLDocName (L _ d) = ppDocName d
+ppLDocName :: Qualification -> Located DocName -> Html
+ppLDocName quali (L _ d) = ppDocName quali d
 
 
-ppDocName :: DocName -> Html
-ppDocName (Documented name mdl) =
-  linkIdOcc mdl (Just occName) << ppOccName occName
+ppDocName :: Qualification -> DocName -> Html
+ppDocName quali (Documented name mdl) =
+  linkIdOcc mdl (Just occName) << theName
     where occName = nameOccName name
-ppDocName (Undocumented name) = toHtml (getOccString name)
+          theName = case quali of
+              NoQuali   -> ppName name
+              FullQuali -> ppQualName mdl name
+ppDocName _ (Undocumented name) = ppName name
 
+ppQualName :: Module -> Name -> Html
+ppQualName mdl name = toHtml $ moduleString mdl ++ '.' : getOccString name
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)

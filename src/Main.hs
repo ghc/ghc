@@ -192,6 +192,7 @@ render flags ifaces installedIfaces srcMap = do
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
+    opt_qualification    = optQualification  flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -228,7 +229,7 @@ render flags ifaces installedIfaces srcMap = do
     ppHtml title pkgStr visibleIfaces odir
                 prologue
                 themes sourceUrls' opt_wiki_urls
-                opt_contents_url opt_index_url unicode
+                opt_contents_url opt_index_url unicode opt_qualification
     copyHtmlBits odir libDir themes
 
   when (Flag_Hoogle `elem` flags) $ do

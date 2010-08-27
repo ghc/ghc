@@ -354,6 +354,8 @@ data DocOption
                       -- exported by this module.
   deriving (Eq, Show)
 
+-- | Option controlling how to qualify names
+data Qualification = NoQuali | FullQuali
 
 -----------------------------------------------------------------------------
 -- * Error handling
