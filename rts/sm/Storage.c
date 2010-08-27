@@ -353,6 +353,8 @@ allocNursery (bdescr *tail, nat blocks)
 
             if (i > 0) {
                 bd[i].u.back = &bd[i-1];
+            } else {
+                bd[i].u.back = NULL;
             }
 
             if (i+1 < n) {
