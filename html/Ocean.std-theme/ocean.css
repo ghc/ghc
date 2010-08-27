@@ -115,7 +115,7 @@ ul.links {
   text-align: left;
   float: right;
   display: inline-table;
-  margin-left: 1em;
+  margin: 0 0 0 1em;
 }
 
 ul.links li {
