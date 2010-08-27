@@ -36,6 +36,7 @@ import Distribution.Verbosity
 import Haddock.Utils
 import Haddock.Types
 import System.Console.GetOpt
+import qualified Data.Char as Char
 
 
 data Flag
@@ -123,7 +124,8 @@ options backwardsCompat =
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
       "page heading",
     Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUALI")
-      "qualification of names, either \n'none' (default) or 'full'",
+      "qualification of names, one of \n'none' (default), 'full', 'local'\
+      \\nor 'relative'",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
       "extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)

@@ -458,13 +458,17 @@ ppHtmlModule odir doctitle themes
   let
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
+      real_quali = case quali of
+          LocalQuali Nothing    -> LocalQuali (Just mdl)
+          RelativeQuali Nothing -> RelativeQuali (Just mdl)
+          _                     -> quali
       html =
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
             divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str)),
-            ifaceToHtml maybe_source_url maybe_wiki_url iface unicode quali
+            ifaceToHtml maybe_source_url maybe_wiki_url iface unicode real_quali
           ]
 
   createDirectoryIfMissing True odir

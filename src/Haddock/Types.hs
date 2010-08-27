@@ -355,7 +355,12 @@ data DocOption
   deriving (Eq, Show)
 
 -- | Option controlling how to qualify names
-data Qualification = NoQuali | FullQuali
+data Qualification
+    = NoQuali                      -- ^ Never qualify any names
+    | FullQuali                    -- ^ Qualify all names fully
+    | LocalQuali (Maybe Module)    -- ^ Qualify all imported names fully
+    | RelativeQuali (Maybe Module) -- ^ Like local, but strip module prefix
+                                   --   from modules in the same hierarchy
 
 -----------------------------------------------------------------------------
 -- * Error handling
