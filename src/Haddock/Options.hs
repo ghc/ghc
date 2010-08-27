@@ -124,8 +124,7 @@ options backwardsCompat =
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
       "page heading",
     Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUALI")
-      "qualification of names, one of \n'none' (default), 'full', 'local'\
-      \\nor 'relative'",
+      "qualification of names, one of \n'none' (default), 'full', 'local'\nor 'relative'",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
       "extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)
