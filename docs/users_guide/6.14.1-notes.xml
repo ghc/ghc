@@ -321,7 +321,7 @@ import SpecConstr
 (.) f g = \x -> f (g x)
 </programlisting>
         <para>
-          will be inlined if only aplpied to 2 arguments.
+          will be inlined if only applied to 2 arguments.
         </para>
       </listitem>
 
