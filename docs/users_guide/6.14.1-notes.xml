@@ -23,8 +23,13 @@
       <listitem>
         <para>
           The full Haskell <literal>import</literal> syntax can now been
-          used to bring modules into scope in GHCi.
+          used to bring modules into scope in GHCi, e.g.
         </para>
+<programlisting>
+Prelude> import Data.List as L
+Prelude Data.List> L.length "foo"
+3
+</programlisting>
       </listitem>
     </itemizedlist>
   </sect2>
@@ -444,17 +449,6 @@ import SpecConstr
   <sect2>
     <title>GHCi</title>
     <itemizedlist>
-      <listitem>
-        <para>
-          GHCi now supports full import syntax, e.g.
-        </para>
-<programlisting>
-Prelude> import Data.List as L
-Prelude Data.List> L.length "foo"
-3
-</programlisting>
-      </listitem>
-
       <listitem>
         <para>
           GHCi now understands the layout of multiline-commands, so
