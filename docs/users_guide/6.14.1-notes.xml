@@ -215,6 +215,14 @@ import SpecConstr
 
       <listitem>
         <para>
+          On POSIX platforms, the RTS now has a new I/O manager based
+          on epoll/kqueue/poll, which allows it to scale to a much
+          larger number (100k+) of open file descriptors.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
           The RTS now exports a function <literal>setKeepCAFs</literal>
           which is important when loading Haskell DLLs dynamically, as
           a DLL may refer to CAFs that hae already been GCed.
