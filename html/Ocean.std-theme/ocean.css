@@ -27,7 +27,6 @@ dl {
 }
 
 dt {
-  margin-top: 0.8em;
   font-weight: bold;
 }
 dd {
@@ -221,12 +220,12 @@ dl.info dt {
 	float: left;
 	font-weight: bold;
 	display: block;
-	margin-right: 1em;
+	margin: 0 1em 0 0;
 }
 
 dl.info dd {
 	display: block;
-	margin-left: 6em;
+	margin: 0 0 0 6em;
 }
 
 div#style-menu-holder {
