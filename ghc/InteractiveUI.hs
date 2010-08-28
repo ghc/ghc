@@ -497,7 +497,7 @@ checkPerms name =
    	putStrLn $ "WARNING: " ++ name ++ " is owned by someone else, IGNORING!"
    	return False
       else do
-   	let mode =  fileMode st
+   	let mode =  System.Posix.fileMode st
    	if (groupWriteMode == (mode `intersectFileModes` groupWriteMode))
    	   || (otherWriteMode == (mode `intersectFileModes` otherWriteMode)) 
    	   then do
