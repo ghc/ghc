@@ -6,12 +6,15 @@
 html {
   background-color: white;
   width: 100%;
+  height: 100%;
 }
 
 body {
   background: white;
   color: black;
   text-align: left;
+  min-height: 100%;
+  position: relative;
 }
 
 p {
@@ -176,7 +179,7 @@ pre {
 
 #content {
   margin: 0 auto;
-  padding: 0 2em;
+  padding: 0 2em 6em;
 }
 
 #package-header {
@@ -266,12 +269,15 @@ div#style-menu-holder {
 }
 
 #footer {
-  margin: 1em 0 0 0;
   background: #ddd;
   border-top: 1px solid #aaa;
-  padding: 0.5em;
+  padding: 0.5em 0;
   color: #666;
   text-align: center;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 3em;
 }
 
 /* @end */
@@ -456,7 +462,7 @@ div#style-menu-holder {
 
 #mini {
   margin: 0 auto;
-  padding: 0 1em;
+  padding: 0 1em 1em;
 }
 
 #mini > * {
