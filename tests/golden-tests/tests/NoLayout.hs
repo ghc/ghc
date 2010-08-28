@@ -4,7 +4,7 @@
 -- This should probably be changed.
 
 module NoLayout where {
-  -- | the class 'C'
+  -- | the function 'g'
   ;
   g :: Int;
   g = undefined
