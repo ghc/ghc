@@ -61,10 +61,6 @@ data-files:
   html/Ocean.std-theme/ocean.css
   html/Ocean.std-theme/plus.gif
   html/Ocean.std-theme/synopsis.png
-  html/Snappy.theme/minus.gif
-  html/Snappy.theme/plus.gif
-  html/Snappy.theme/s_haskell_icon.gif
-  html/Snappy.theme/snappy.css
   latex/haddock.sty
 
 flag in-ghc-tree
