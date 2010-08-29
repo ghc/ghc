@@ -216,8 +216,10 @@ table.info {
   color: rgb(78,98,114);
   background-color: #fff;
   max-width: 40%;
-  margin: -1em 0 1em 1em;
   border-spacing: 0;
+  position: relative;
+  top: -0.5em;
+  margin: 0 0 0 2em;
 }
 
 .info th {
@@ -283,10 +285,8 @@ div#style-menu-holder {
   background: #faf9dc;
   border: 1px solid #d8d7ad;
   padding: 0.5em 1em;
-  position: relative;
-  top: 0em;
-  margin: 0 0 1em 1em;
   max-width: 20em;
+  margin: 0.5em 0 1em 1em;
 }
 
 #table-of-contents .caption {
