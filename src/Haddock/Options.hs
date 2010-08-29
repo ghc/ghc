@@ -20,13 +20,13 @@ module Haddock.Options (
   optContentsUrl,
   optIndexUrl,
   optCssFile,
-  optSourceUrls,
-  optWikiUrls,
+  sourceUrls,
+  wikiUrls,
   optDumpInterfaceFile,
   optLaTeXStyle,
   verbosity,
   ghcFlags,
-  ifaceTriples
+  readIfaceArgs
 ) where
 
 
@@ -196,15 +196,15 @@ optCssFile :: [Flag] -> Maybe FilePath
 optCssFile flags = optLast [ str | Flag_CSS str <- flags ]
 
 
-optSourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
-optSourceUrls flags =
+sourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
+sourceUrls flags =
   (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
   ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
   ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
 
 
-optWikiUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
-optWikiUrls flags =
+wikiUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
+wikiUrls flags =
   (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
   ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
   ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
@@ -216,6 +216,7 @@ optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
 
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
+
 
 verbosity :: [Flag] -> Verbosity
 verbosity flags =
@@ -230,8 +231,8 @@ ghcFlags :: [Flag] -> [String]
 ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
 
 
-ifaceTriples :: [Flag] -> [(DocPaths, FilePath)]
-ifaceTriples flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
+readIfaceArgs :: [Flag] -> [(DocPaths, FilePath)]
+readIfaceArgs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
   where
     parseIfaceOption :: String -> (DocPaths, FilePath)
     parseIfaceOption str =

@@ -141,7 +141,7 @@ main = handleTopExceptions $ do
         throwE "No input file(s)."
 
       -- Get packages supplied with --read-interface.
-      packages <- readInterfaceFiles freshNameCache (ifaceTriples flags)
+      packages <- readInterfaceFiles freshNameCache (readIfaceArgs flags)
 
       -- Render even though there are no input files (usually contents/index).
       renderStep flags packages []
@@ -161,7 +161,7 @@ readPackagesAndProcessModules flags files = do
   withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
     -- Get packages supplied with --read-interface.
-    packages <- readInterfaceFiles nameCacheFromGhc (ifaceTriples flags)
+    packages <- readInterfaceFiles nameCacheFromGhc (readIfaceArgs flags)
 
     -- Create the interfaces -- this is the core part of Haddock.
     let ifaceFiles = map snd packages
@@ -187,7 +187,7 @@ render flags ifaces installedIfaces srcMap = do
   let
     title                = fromMaybe "" (optTitle flags)
     unicode              = Flag_UseUnicode `elem` flags
-    opt_wiki_urls        = optWikiUrls       flags
+    opt_wiki_urls        = wikiUrls          flags
     opt_contents_url     = optContentsUrl    flags
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
@@ -204,9 +204,9 @@ render flags ifaces installedIfaces srcMap = do
     pkgStr           = Just (packageIdString pkgId)
     (pkgName,pkgVer) = modulePackageInfo pkgMod
 
-    (src_base, src_module, src_entity) = optSourceUrls flags
-    srcMap' = maybe srcMap (\path -> Map.insert pkgId path srcMap) src_entity
-    sourceUrls = (src_base, src_module, srcMap')
+    (srcBase, srcModule, srcEntity) = sourceUrls flags
+    srcMap' = maybe srcMap (\path -> Map.insert pkgId path srcMap) srcEntity
+    sourceUrls' = (srcBase, srcModule, srcMap')
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue flags
@@ -214,20 +214,20 @@ render flags ifaces installedIfaces srcMap = do
 
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title pkgStr
-                themes opt_contents_url sourceUrls opt_wiki_urls
+                themes opt_contents_url sourceUrls' opt_wiki_urls
                 allVisibleIfaces
     copyHtmlBits odir libDir themes
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title pkgStr
-                   themes opt_index_url sourceUrls opt_wiki_urls
+                   themes opt_index_url sourceUrls' opt_wiki_urls
                    allVisibleIfaces True prologue
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title pkgStr visibleIfaces odir
                 prologue
-                themes sourceUrls opt_wiki_urls
+                themes sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode
     copyHtmlBits odir libDir themes
 
