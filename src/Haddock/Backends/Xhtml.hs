@@ -189,10 +189,11 @@ moduleInfo iface =
    let
       info = ifaceInfo iface
 
-      doOneEntry :: (String, (HaddockModInfo GHC.Name) -> Maybe String) -> Maybe (String, String)
-      doOneEntry (fieldName, field) = field info >>= \a -> return (fieldName, a)
+      doOneEntry :: (String, (HaddockModInfo GHC.Name) -> Maybe String) -> Maybe HtmlTable
+      doOneEntry (fieldName, field) =
+        field info >>= \a -> return (th << fieldName <-> td << a)
 
-      entries :: [(String, String)]
+      entries :: [HtmlTable]
       entries = mapMaybe doOneEntry [
          ("Portability",hmi_portability),
          ("Stability",hmi_stability),
@@ -201,7 +202,7 @@ moduleInfo iface =
    in
       case entries of
          [] -> noHtml
-         _ -> defList entries ! [theclass "info"]
+         _ -> table ! [theclass "info"] << aboves entries
 
 
 --------------------------------------------------------------------------------

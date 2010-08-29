@@ -85,7 +85,7 @@ pre, code, kbd, samp, tt, .src {
   font-size: 182%; /* 24pt */
 }
 
-dl.info  {
+.info  {
   font-size: 85%; /* 11pt */
 }
 
@@ -209,7 +209,7 @@ pre {
   border-bottom: 1px solid #ddd;
 }
 
-dl.info {
+table.info {
   float: right;
   padding: 0.5em 1em;
   border: 1px solid #ddd;
@@ -217,18 +217,11 @@ dl.info {
   background-color: #fff;
   max-width: 40%;
   margin: -1em 0 1em 1em;
+  border-spacing: 0;
 }
 
-dl.info dt {
-	float: left;
-	font-weight: bold;
-	display: block;
-	margin: 0 1em 0 0;
-}
-
-dl.info dd {
-	display: block;
-	margin: 0 0 0 6em;
+.info th {
+	padding: 0 1em 0 0;
 }
 
 div#style-menu-holder {

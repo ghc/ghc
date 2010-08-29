@@ -162,29 +162,23 @@ div#style-menu-holder {
 
 #module-header .caption {
 	font-size: 200%;
-	padding: .25em 0;
+	padding: .35em 0;
 	font-weight: normal;
 	font-style: normal;
 }
 
-dl.info {
+table.info {
 	color: #ffffff;
 	display: block;
 	float: right;
-	width: 50%;
+	max-width: 50%;
 }
 
-dl.info dt {
-	float: left;
-	width: 5em;
-	font-weight: bold;
-	display: block;
+.info th, .info td {
+	text-align: left;
+	padding: 0 10px 0 0;
 }
 
-dl.info dd {
-	display: block;
-	padding-left: 6em;
-}
 
 #table-of-contents {
 	margin-top: 1em;
