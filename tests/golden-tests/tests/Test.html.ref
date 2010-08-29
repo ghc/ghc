@@ -1,7 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>Test</title><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean" /><script src="haddock-util.js" type="text/javascript"></script><script type="text/javascript">//<![CDATA[
 window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 //]]>
-</script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><A HREF="">Contents</a></li><li><A HREF="">Index</a></li></ul><p class="caption" class="empty">&nbsp;</p></div><div id="content"><div id="module-header"><dl class="info"><dt>Portability</dt><dd>portable</dd><dt>Stability</dt><dd>provisional</dd><dt>Maintainer</dt><dd>libraries@haskell.org</dd></dl><p class="caption">Test</p></div><div id="table-of-contents"><p class="caption">Contents</p><ul><li><A HREF="">Type declarations
+</script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><A HREF="">Contents</a></li><li><A HREF="">Index</a></li></ul><p class="caption" class="empty">&nbsp;</p></div><div id="content"><div id="module-header"><table class="info"><tr><th>Portability</th><td>portable</td></tr><tr><th>Stability</th><td>provisional</td></tr><tr><th>Maintainer</th><td>libraries@haskell.org</td></tr></table><p class="caption">Test</p></div><div id="table-of-contents"><p class="caption">Contents</p><ul><li><A HREF="">Type declarations
 </a><ul><li><A HREF="">Data types
 </a></li><li><A HREF="">Records
 </a></li></ul></li><li><A HREF="">Class declarations
