@@ -37,8 +37,10 @@ import Name
 type IfaceMap      = Map Module Interface
 type InstIfaceMap  = Map Module InstalledInterface
 type DocMap        = Map Name (Doc DocName)
+type SrcMap        = Map PackageId FilePath
 type Decl          = LHsDecl Name
 type GhcDocHdr     = Maybe LHsDocString
+type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
 
 -----------------------------------------------------------------------------

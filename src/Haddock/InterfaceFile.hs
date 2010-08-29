@@ -12,7 +12,7 @@
 -- Reading and writing the .haddock interface file
 -----------------------------------------------------------------------------
 module Haddock.InterfaceFile (
-  InterfaceFile(..),
+  InterfaceFile(..), ifPackageId,
   readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
   writeInterfaceFile
 ) where
@@ -44,6 +44,13 @@ data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
   ifInstalledIfaces :: [InstalledInterface]
 }
+
+
+ifPackageId :: InterfaceFile -> PackageId
+ifPackageId if_ =
+  case ifInstalledIfaces if_ of
+    [] -> error "empty InterfaceFile"
+    iface:_ -> modulePackageId $ instMod iface
 
 
 binaryInterfaceMagic :: Word32

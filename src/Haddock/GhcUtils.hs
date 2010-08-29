@@ -40,12 +40,7 @@ import GHC
 
 
 moduleString :: Module -> String
-moduleString = moduleNameString . moduleName 
-
-
--- return the name of the package, with version info
-modulePackageString :: Module -> String
-modulePackageString = packageIdString . modulePackageId
+moduleString = moduleNameString . moduleName
 
 
 -- return the (name,version) of the package

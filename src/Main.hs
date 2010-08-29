@@ -58,6 +58,7 @@ import GHC hiding (flags, verbosity)
 import Config
 import DynFlags hiding (flags, verbosity)
 import Panic (handleGhcException)
+import Module
 
 
 --------------------------------------------------------------------------------
@@ -140,14 +141,14 @@ main = handleTopExceptions $ do
         throwE "No input file(s)."
 
       -- Get packages supplied with --read-interface.
-      packages <- readInterfaceFiles freshNameCache (ifacePairs flags)
+      packages <- readInterfaceFiles freshNameCache (ifaceTriples flags)
 
       -- Render even though there are no input files (usually contents/index).
       renderStep flags packages []
 
 
-readPackagesAndProcessModules :: [Flag] -> [String] -> IO ([(InterfaceFile, FilePath)],
-                                                           [Interface], LinkEnv)
+readPackagesAndProcessModules :: [Flag] -> [String]
+                              -> IO ([(DocPaths, InterfaceFile)], [Interface], LinkEnv)
 readPackagesAndProcessModules flags files = do
   libDir <- getGhcLibDir flags
 
@@ -160,31 +161,32 @@ readPackagesAndProcessModules flags files = do
   withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
     -- Get packages supplied with --read-interface.
-    packages <- readInterfaceFiles nameCacheFromGhc (ifacePairs flags)
+    packages <- readInterfaceFiles nameCacheFromGhc (ifaceTriples flags)
 
     -- Create the interfaces -- this is the core part of Haddock.
-    let ifaceFiles = map fst packages
+    let ifaceFiles = map snd packages
     (ifaces, homeLinks) <- processModules (verbosity flags) files flags ifaceFiles
 
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: [Flag] -> [(InterfaceFile, FilePath)] -> [Interface] -> IO ()
-renderStep flags packages interfaces = do
-  updateHTMLXRefs packages
-  let ifaceFiles      = map fst packages
-      installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-  render flags interfaces installedIfaces
+renderStep :: [Flag] -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
+renderStep flags pkgs interfaces = do
+  updateHTMLXRefs pkgs
+  let
+    ifaceFiles = map snd pkgs
+    installedIfaces = concatMap ifInstalledIfaces ifaceFiles
+    srcMap = Map.fromList [ (ifPackageId if_, x) | ((_, Just x), if_) <- pkgs ]
+  render flags interfaces installedIfaces srcMap
 
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
-render flags ifaces installedIfaces = do
+render :: [Flag] -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
+render flags ifaces installedIfaces srcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
     unicode              = Flag_UseUnicode `elem` flags
-    opt_source_urls      = optSourceUrls     flags
     opt_wiki_urls        = optWikiUrls       flags
     opt_contents_url     = optContentsUrl    flags
     opt_index_url        = optIndexUrl       flags
@@ -197,30 +199,35 @@ render flags ifaces installedIfaces = do
     allIfaces        = map toInstalledIface ifaces ++ installedIfaces
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
-    packageMod       = ifaceMod (head ifaces)
-    packageStr       = Just (modulePackageString packageMod)
-    (pkgName,pkgVer) = modulePackageInfo packageMod
+    pkgMod           = ifaceMod (head ifaces)
+    pkgId            = modulePackageId pkgMod
+    pkgStr           = Just (packageIdString pkgId)
+    (pkgName,pkgVer) = modulePackageInfo pkgMod
+
+    (src_base, src_module, src_entity) = optSourceUrls flags
+    srcMap' = maybe srcMap (\path -> Map.insert pkgId path srcMap) src_entity
+    sourceUrls = (src_base, src_module, srcMap')
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue flags
   themes <- getThemes libDir flags >>= either bye return
 
   when (Flag_GenIndex `elem` flags) $ do
-    ppHtmlIndex odir title packageStr
-                themes opt_contents_url opt_source_urls opt_wiki_urls
+    ppHtmlIndex odir title pkgStr
+                themes opt_contents_url sourceUrls opt_wiki_urls
                 allVisibleIfaces
     copyHtmlBits odir libDir themes
 
   when (Flag_GenContents `elem` flags) $ do
-    ppHtmlContents odir title packageStr
-                   themes opt_index_url opt_source_urls opt_wiki_urls
+    ppHtmlContents odir title pkgStr
+                   themes opt_index_url sourceUrls opt_wiki_urls
                    allVisibleIfaces True prologue
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title packageStr visibleIfaces odir
+    ppHtml title pkgStr visibleIfaces odir
                 prologue
-                themes opt_source_urls opt_wiki_urls
+                themes sourceUrls opt_wiki_urls
                 opt_contents_url opt_index_url unicode
     copyHtmlBits odir libDir themes
 
@@ -229,7 +236,7 @@ render flags ifaces installedIfaces = do
     ppHoogle pkgName2 pkgVer title prologue visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
-    ppLaTeX title packageStr visibleIfaces odir prologue opt_latex_style
+    ppLaTeX title pkgStr visibleIfaces odir prologue opt_latex_style
                   libDir
 
 -------------------------------------------------------------------------------
@@ -239,22 +246,22 @@ render flags ifaces installedIfaces = do
 
 readInterfaceFiles :: MonadIO m =>
                       NameCacheAccessor m
-                   -> [(FilePath, FilePath)] ->
-                      m [(InterfaceFile, FilePath)]
+                   -> [(DocPaths, FilePath)] ->
+                      m [(DocPaths, InterfaceFile)]
 readInterfaceFiles name_cache_accessor pairs = do
   mbPackages <- mapM tryReadIface pairs
   return (catMaybes mbPackages)
   where
     -- try to read an interface, warn if we can't
-    tryReadIface (html, iface) = do
-      eIface <- readInterfaceFile name_cache_accessor iface
+    tryReadIface (paths, file) = do
+      eIface <- readInterfaceFile name_cache_accessor file
       case eIface of
         Left err -> liftIO $ do
-          putStrLn ("Warning: Cannot read " ++ iface ++ ":")
+          putStrLn ("Warning: Cannot read " ++ file ++ ":")
           putStrLn ("   " ++ err)
           putStrLn "Skipping this interface."
           return Nothing
-        Right f -> return $ Just (f, html)
+        Right f -> return $ Just (paths, f)
 
 
 dumpInterfaceFile :: FilePath -> [InstalledInterface] -> LinkEnv -> IO ()
@@ -366,10 +373,10 @@ shortcutFlags flags = do
     byeGhcVersion = bye (cProjectVersion ++ "\n")
 
 
-updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()
+updateHTMLXRefs :: [(DocPaths, InterfaceFile)] -> IO ()
 updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
   where
-    mapping = [ (instMod iface, html) | (ifaces, html) <- packages
+    mapping = [ (instMod iface, html) | ((html, _), ifaces) <- packages
               , iface <- ifInstalledIfaces ifaces ]
 
 

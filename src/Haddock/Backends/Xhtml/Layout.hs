@@ -42,6 +42,7 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils (makeAnchorId)
 
+import qualified Data.Map as Map
 import Text.XHtml hiding ( name, title, p, quote )
 
 import FastString            ( unpackFS )
@@ -175,10 +176,10 @@ declElem = paragraph ! [theclass "src"]
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> DocName -> Html -> Html
-topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html =
+topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc name html =
     declElem << (html +++ srcLink +++ wikiLink)
   where srcLink =
-          case maybe_source_url of
+          case Map.lookup origPkg sourceMap of
             Nothing  -> noHtml
             Just url -> let url' = spliceURL (Just fname) (Just origMod)
                                                (Just n) (Just loc) url
@@ -196,6 +197,7 @@ topDeclElem ((_,_,maybe_source_url), (_,_,maybe_wiki_url)) loc name html =
         -- TODO: do something about type instances. They will point to
         -- the module defining the type family, which is wrong.
         origMod = nameModule n
+        origPkg = modulePackageId origMod
 
         -- Name must be documented, otherwise we wouldn't get here
         Documented n mdl = name

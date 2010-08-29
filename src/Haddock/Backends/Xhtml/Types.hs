@@ -16,10 +16,14 @@ module Haddock.Backends.Xhtml.Types (
 ) where
 
 
+import Data.Map
+import GHC
+
+
 -- the base, module and entity URLs for the source code and wiki links.
-type SourceURLs = (Maybe String, Maybe String, Maybe String)
-type WikiURLs = (Maybe String, Maybe String, Maybe String)
+type SourceURLs = (Maybe FilePath, Maybe FilePath, Map PackageId FilePath)
+type WikiURLs = (Maybe FilePath, Maybe FilePath, Maybe FilePath)
 
 
--- The URL for source and wiki links, and the current module
+-- The URL for source and wiki links
 type LinksInfo = (SourceURLs, WikiURLs)

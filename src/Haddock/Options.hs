@@ -26,7 +26,7 @@ module Haddock.Options (
   optLaTeXStyle,
   verbosity,
   ghcFlags,
-  ifacePairs
+  ifaceTriples
 ) where
 
 
@@ -230,14 +230,17 @@ ghcFlags :: [Flag] -> [String]
 ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
 
 
-ifacePairs :: [Flag] -> [(FilePath, FilePath)]
-ifacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
+ifaceTriples :: [Flag] -> [(DocPaths, FilePath)]
+ifaceTriples flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
   where
-    parseIfaceOption :: String -> (FilePath, FilePath)
+    parseIfaceOption :: String -> (DocPaths, FilePath)
     parseIfaceOption str =
       case break (==',') str of
-        (fpath, ',':file) -> (fpath, file)
-        (file, _)         -> ("", file)
+        (fpath, ',':rest) ->
+          case break (==',') rest of
+            (src, ',':file) -> ((fpath, Just src), file)
+            (file, _) -> ((fpath, Nothing), file)
+        (file, _) -> (("", Nothing), file)
 
 
 -- | Like 'listToMaybe' but returns the last element instead of the first.
