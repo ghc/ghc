@@ -365,9 +365,11 @@ updGEnv f = VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
 readLEnv :: (LocalEnv -> a) -> VM a
 readLEnv f = VM $ \_ genv lenv -> return (Yes genv lenv (f lenv))
 
+-- | Set the local environment.
 setLEnv :: LocalEnv -> VM ()
 setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
 
+-- | Update the enviroment using a provided function.
 updLEnv :: (LocalEnv -> LocalEnv) -> VM ()
 updLEnv f = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 
