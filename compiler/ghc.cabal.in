@@ -461,6 +461,8 @@ Library
         VectVar
         Vectorise.Env
         Vectorise.Vect
+        Vectorise.Builtins.Base
+        Vectorise.Builtins.Modules
         Vectorise
 
     -- We only need to expose more modules as some of the ncg code is used
