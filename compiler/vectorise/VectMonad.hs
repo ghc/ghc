@@ -474,7 +474,7 @@ maybeCantVectoriseVarM v p
 
 dumpVar :: Var -> a
 dumpVar var
-	| Just cls		<- isClassOpId_maybe var
+	| Just _		<- isClassOpId_maybe var
 	= cantVectorise "ClassOpId not vectorised:" (ppr var)
 
 	| otherwise
