@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module Vectorise( vectorise )
 where
@@ -37,10 +38,17 @@ import Util                 ( zipLazy )
 import Control.Monad
 import Data.List            ( sortBy, unzip4 )
 
+
+debug		= False
+dtrace s x	= if debug then pprTrace "Vectorise" s x else x
+
+-- | Vectorise a single module.
+--   Takes the package containing the DPH backend we're using. Eg either dph-par or dph-seq.
 vectorise :: PackageId -> ModGuts -> CoreM ModGuts
-vectorise backend guts = do
-    hsc_env <- getHscEnv
-    liftIO $ vectoriseIO backend hsc_env guts
+vectorise backend guts 
+ = do hsc_env <- getHscEnv
+      liftIO $ vectoriseIO backend hsc_env guts
+
 
 -- | Vectorise a single monad, given its HscEnv (code gen environment).
 vectoriseIO :: PackageId -> HscEnv -> ModGuts -> IO ModGuts
@@ -170,8 +178,14 @@ vectTopBinder var inline expr
  = do
       -- Vectorise the type attached to the var.
       vty  <- vectType (idType var)
-      var' <- liftM (`setIdUnfolding` unfolding) $ cloneId mkVectOcc var vty
+
+      -- Make the vectorised version of binding's name, and set the unfolding used for inlining.
+      var' <- liftM (`setIdUnfolding` unfolding) 
+           $  cloneId mkVectOcc var vty
+
+      -- Add the mapping between the plain and vectorised name to the state.
       defGlobalVar var var'
+
       return var'
   where
     unfolding = case inline of
@@ -204,6 +218,7 @@ tryConvert
 
 tryConvert var vect_var rhs
   = fromVect (idType var) (Var vect_var) `orElseV` return rhs
+
 
 -- ----------------------------------------------------------------------------
 -- Bindings
@@ -274,11 +289,16 @@ vectVar v
       r <- lookupVar v
 
       case r of
-        Local (vv,lv) -> return (Var vv, Var lv)
-        Global vv     -> do
-                           let vexpr = Var vv
-                           lexpr <- liftPD vexpr
-                           return (vexpr, lexpr)
+        -- If it's been locally bound then we'll already have both versions available.
+        Local (vv,lv) 
+         -> return (Var vv, Var lv)
+
+        -- To create the lifted version of a global variable we replicate it.
+        Global vv     
+         -> do let vexpr = Var vv
+               lexpr <- liftPD vexpr
+               return (vexpr, lexpr)
+
 
 -- | Like `vectVar` but also add type applications to the variables.
 vectPolyVar :: Var -> [Type] -> VM VExpr
@@ -317,7 +337,8 @@ vectPolyExpr loop_breaker (_, AnnNote note expr)
       return (inline, vNote note expr')
 
 vectPolyExpr loop_breaker expr
-  = do
+ = dtrace (vcat [text "vectPolyExpr", ppr (deAnnotate expr)])
+ $ do
       arity <- polyArity tvs
       polyAbstract tvs $ \args ->
         do
@@ -369,10 +390,15 @@ vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
 --      lift the result of the selection, not sub and dNumber seprately. 
 
 vectExpr (_, AnnApp fn arg)
-  = do
+ = dtrace (text "AnnApp" <+> ppr (deAnnotate fn) <+> ppr (deAnnotate arg))
+ $ do
       arg_ty' <- vectType arg_ty
       res_ty' <- vectType res_ty
+
+      dtrace (text "vectorising fn " <> ppr (deAnnotate fn))  $ return ()
       fn'     <- vectExpr fn
+      dtrace (text "fn' = "       <> ppr fn') $ return ()
+
       arg'    <- vectExpr arg
 
       mkClosureApp arg_ty' res_ty' fn' arg'
@@ -432,6 +458,7 @@ vectFnExpr inline loop_breaker e@(fvs, AnnLam bndr _)
                 `orElseV` mark inlineMe (vectLam inline loop_breaker fvs bs body)
   where
     (bs,body) = collectAnnValBinders e
+
 vectFnExpr _ _ e = mark DontInline $ vectExpr e
 
 mark :: Inline -> VM a -> VM (Inline, a)
@@ -444,8 +471,8 @@ vectScalarLam
 	-> CoreExpr	-- ^ Function body.
 	-> VM VExpr
 vectScalarLam args body
-  = do
-      scalars <- globalScalars
+ = dtrace (vcat [text "vectScalarLam ", ppr args, ppr body])
+ $ do scalars <- globalScalars
       onlyIfV (all is_scalar_ty arg_tys
                && is_scalar_ty res_ty
                && is_scalar (extendVarSetList scalars args) body
@@ -493,21 +520,32 @@ vectLam
 	-> VM VExpr
 
 vectLam inline loop_breaker fvs bs body
-  = do
-      tyvars <- localTyVars
+ = dtrace (vcat [ text "vectLam "
+		, text "free vars    = " <> ppr fvs
+		, text "binding vars = " <> ppr bs
+		, text "body         = " <> ppr (deAnnotate body)])
+
+ $ do tyvars    <- localTyVars
       (vs, vvs) <- readLEnv $ \env ->
                    unzip [(var, vv) | var <- varSetElems fvs
                                     , Just vv <- [lookupVarEnv (local_vars env) var]]
 
-      arg_tys <- mapM (vectType . idType) bs
-      res_ty  <- vectType (exprType $ deAnnotate body)
+      arg_tys   <- mapM (vectType . idType) bs
+
+      dtrace (text "arg_tys = " <> ppr arg_tys) $ return ()
+
+      res_ty    <- vectType (exprType $ deAnnotate body)
+
+      dtrace (text "res_ty = " <> ppr res_ty) $ return ()
 
       buildClosures tyvars vvs arg_tys res_ty
         . hoistPolyVExpr tyvars (maybe_inline (length vs + length bs))
         $ do
-            lc <- builtin liftingContext
-            (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)
-                                           (vectExpr body)
+            lc              <- builtin liftingContext
+            (vbndrs, vbody) <- vectBndrsIn (vs ++ bs) (vectExpr body)
+
+            dtrace (text "vbody = " <> ppr vbody) $ return ()
+
             vbody' <- break_loop lc res_ty vbody
             return $ vLams lc vbndrs vbody'
   where

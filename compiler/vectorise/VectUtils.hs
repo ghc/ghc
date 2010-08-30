@@ -163,6 +163,7 @@ prDFunOfTyCon tycon
   . maybeCantVectoriseM "No PR dictionary for tycon" (ppr tycon)
   $ lookupTyConPR tycon
 
+
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
   where
@@ -183,25 +184,39 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
 
     go _ _ = return Nothing
 
-paDictOfType :: Type -> VM CoreExpr
-paDictOfType ty = paDictOfTyApp ty_fn ty_args
+
+-- | Get the PA dictionary for some type, or `Nothing` if there isn't one.
+paDictOfType :: Type -> VM (Maybe CoreExpr)
+paDictOfType ty 
+  = paDictOfTyApp ty_fn ty_args
   where
     (ty_fn, ty_args) = splitAppTys ty
 
-paDictOfTyApp :: Type -> [Type] -> VM CoreExpr
-paDictOfTyApp ty_fn ty_args
-  | Just ty_fn' <- coreView ty_fn = paDictOfTyApp ty_fn' ty_args
-paDictOfTyApp (TyVarTy tv) ty_args
-  = do
-      dfun <- maybeV (lookupTyVarPA tv)
-      paDFunApply dfun ty_args
-paDictOfTyApp (TyConApp tc _) ty_args
-  = do
-      dfun <- maybeCantVectoriseM "No PA dictionary for tycon" (ppr tc)
-            $ lookupTyConPA tc
-      paDFunApply (Var dfun) ty_args
-paDictOfTyApp ty _
-  = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
+    paDictOfTyApp :: Type -> [Type] -> VM (Maybe CoreExpr)
+    paDictOfTyApp ty_fn ty_args
+        | Just ty_fn' <- coreView ty_fn 
+        = paDictOfTyApp ty_fn' ty_args
+
+    paDictOfTyApp (TyVarTy tv) ty_args
+     = do dfun <- maybeV (lookupTyVarPA tv)
+          liftM Just $ paDFunApply dfun ty_args
+
+    paDictOfTyApp (TyConApp tc _) ty_args
+     = do mdfun <- lookupTyConPA tc
+          case mdfun of
+	    Nothing	
+	     -> pprTrace "VectUtils.paDictOfType"
+	                 (vcat [ text "No PA dictionary"
+			       , text "for tycon: " <> ppr tc
+			       , text "in type:   " <> ppr ty])
+	     $ return Nothing
+
+	    Just dfun	-> liftM Just $ paDFunApply (Var dfun) ty_args
+
+    paDictOfTyApp ty _
+     = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
+
+
 
 paDFunType :: TyCon -> VM Type
 paDFunType tc
@@ -216,9 +231,9 @@ paDFunType tc
 
 paDFunApply :: CoreExpr -> [Type] -> VM CoreExpr
 paDFunApply dfun tys
-  = do
-      dicts <- mapM paDictOfType tys
+ = do Just dicts <- liftM sequence $ mapM paDictOfType tys
       return $ mkApps (mkTyApps dfun tys) dicts
+
 
 paMethod :: (Builtins -> Var) -> String -> Type -> VM CoreExpr
 paMethod _ name ty
@@ -229,8 +244,8 @@ paMethod _ name ty
 
 paMethod method _ ty
   = do
-      fn   <- builtin method
-      dict <- paDictOfType ty
+      fn        <- builtin method
+      Just dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
 
 prDictOfType :: Type -> VM CoreExpr
@@ -256,8 +271,8 @@ prDFunApply dfun tys
 wrapPR :: Type -> VM CoreExpr
 wrapPR ty
   = do
-      pa_dict <- paDictOfType ty
-      pr_dfun <- prDFunOfTyCon =<< builtin wrapTyCon
+      Just  pa_dict <- paDictOfType ty
+      pr_dfun       <- prDFunOfTyCon =<< builtin wrapTyCon
       return $ mkApps pr_dfun [Type ty, pa_dict]
 
 replicatePD :: CoreExpr -> CoreExpr -> VM CoreExpr
@@ -301,8 +316,8 @@ zipScalars arg_tys res_ty
 scalarClosure :: [Type] -> Type -> CoreExpr -> CoreExpr -> VM CoreExpr
 scalarClosure arg_tys res_ty scalar_fun array_fun
   = do
-      ctr <- builtin (closureCtrFun $ length arg_tys)
-      pas <- mapM paDictOfType (init arg_tys)
+      ctr      <- builtin (closureCtrFun $ length arg_tys)
+      Just pas <- liftM sequence $ mapM paDictOfType (init arg_tys)
       return $ Var ctr `mkTyApps` (arg_tys ++ [res_ty])
                        `mkApps`   (pas ++ [scalar_fun, array_fun])
 
@@ -338,24 +353,26 @@ polyArity tvs = do
 
 polyApply :: CoreExpr -> [Type] -> VM CoreExpr
 polyApply expr tys
-  = do
-      dicts <- mapM paDictOfType tys
+ = do Just dicts <- liftM sequence $ mapM paDictOfType tys
       return $ expr `mkTyApps` tys `mkApps` dicts
 
 polyVApply :: VExpr -> [Type] -> VM VExpr
 polyVApply expr tys
-  = do
-      dicts <- mapM paDictOfType tys
-      return $ mapVect (\e -> e `mkTyApps` tys `mkApps` dicts) expr
+ = do Just dicts <- liftM sequence $ mapM paDictOfType tys
+      return     $ mapVect (\e -> e `mkTyApps` tys `mkApps` dicts) expr
 
+-- Inline ---------------------------------------------------------------------
+-- | Records whether we should inline a particular binding.
+data Inline 
+        = Inline Arity
+        | DontInline
 
-data Inline = Inline Arity
-            | DontInline
-
+-- | Add to the arity contained within an `Inline`, if any.
 addInlineArity :: Inline -> Int -> Inline
 addInlineArity (Inline m) n = Inline (m+n)
 addInlineArity DontInline _ = DontInline
 
+-- | Says to always inline a binding.
 inlineMe :: Inline
 inlineMe = Inline 0
 
@@ -423,6 +440,7 @@ mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
       mkl       <- builtin liftedClosureVar
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
+
 
 mkClosureApp :: Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)

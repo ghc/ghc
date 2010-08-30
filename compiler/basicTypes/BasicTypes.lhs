@@ -324,6 +324,7 @@ data OverlapFlag
 		--
 		-- Example: constraint (Foo [Int])
 		-- 	    instances  (Foo [Int])
+	
 		--		       (Foo [a])	OverlapOk
 		-- Since the second instance has the OverlapOk flag,
 		-- the first instance will be chosen (otherwise 

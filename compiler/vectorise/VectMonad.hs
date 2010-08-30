@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- | The Vectorisation monad.
 module VectMonad (
@@ -461,9 +462,25 @@ lookupVar v
       case r of
         Just e  -> return (Local e)
         Nothing -> liftM Global
-                . maybeCantVectoriseM "Variable not vectorised:" (ppr v)
+                . maybeCantVectoriseVarM v
                 . readGEnv $ \env -> lookupVarEnv (global_vars env) v
 
+maybeCantVectoriseVarM :: Monad m => Var -> m (Maybe Var) -> m Var
+maybeCantVectoriseVarM v p
+ = do r <- p
+      case r of
+        Just x  -> return x
+        Nothing -> dumpVar v
+
+dumpVar :: Var -> a
+dumpVar var
+	| Just cls		<- isClassOpId_maybe var
+	= cantVectorise "ClassOpId not vectorised:" (ppr var)
+
+	| otherwise
+	= cantVectorise "Variable not vectorised:" (ppr var)
+
+-------------------------------------------------------------------------------
 globalScalars :: VM VarSet
 globalScalars = readGEnv global_scalars
 

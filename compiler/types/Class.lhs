@@ -9,11 +9,12 @@ The @Class@ datatype
 module Class (
 	Class, ClassOpItem, 
 	DefMeth (..),
+	defMethSpecOfDefMeth,
 
 	FunDep,	pprFundeps, pprFunDep,
 
 	mkClass, classTyVars, classArity,
-	classKey, className, classATs, classSelIds, classTyCon, classMethods,
+	classKey, className, classATs, classSelIds, classTyCon, classMethods, classOpItems,
 	classOpItems,classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
@@ -74,6 +75,16 @@ data DefMeth = NoDefMeth 		-- No default method
 	     | DefMeth Name  		-- A polymorphic default method
 	     | GenDefMeth 		-- A generic default method
              deriving Eq  
+
+-- | Convert a `DefMethSpec` to a `DefMeth`, which discards the name field in
+--   the `DefMeth` constructor of the `DefMeth`.
+defMethSpecOfDefMeth :: DefMeth -> DefMethSpec
+defMethSpecOfDefMeth meth
+ = case meth of
+	NoDefMeth	-> NoDM
+	DefMeth _	-> VanillaDM
+	GenDefMeth	-> GenericDM
+
 \end{code}
 
 The @mkClass@ function fills in the indirect superclasses.
@@ -122,7 +133,8 @@ classMethods (Class {classOpStuff = op_stuff})
   = [op_sel | (op_sel, _) <- op_stuff]
 
 classOpItems :: Class -> [ClassOpItem]
-classOpItems (Class {classOpStuff = op_stuff}) = op_stuff
+classOpItems (Class { classOpStuff = op_stuff})
+  = op_stuff
 
 classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
 classTvsFds c
