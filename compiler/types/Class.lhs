@@ -15,7 +15,7 @@ module Class (
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classATs, classSelIds, classTyCon, classMethods, classOpItems,
-	classOpItems,classBigSig, classExtraBigSig, classTvsFds, classSCTheta
+	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
 #include "Typeable.h"
