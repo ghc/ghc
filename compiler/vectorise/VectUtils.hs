@@ -24,6 +24,7 @@ module VectUtils (
 
 import VectCore
 import VectMonad
+import Vectorise.Env
 
 import MkCore ( mkCoreTup, mkWildCase )
 import CoreSyn
@@ -40,6 +41,7 @@ import Id                 ( setIdUnfolding )
 import TysWiredIn
 import BasicTypes         ( Boxity(..), Arity )
 import Literal            ( Literal, mkMachInt )
+
 
 import Outputable
 import FastString

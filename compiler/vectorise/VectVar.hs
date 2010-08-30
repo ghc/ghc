@@ -14,6 +14,7 @@ import VectUtils
 import VectCore
 import VectMonad
 import VectType
+import Vectorise.Env
 import CoreSyn
 import Type
 import Var
