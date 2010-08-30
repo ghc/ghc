@@ -36,8 +36,8 @@ import Outputable
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
               -> SynTyConRhs 
-	      -> Kind			-- Kind of the RHS
-	      -> Maybe (TyCon, [Type])  -- family instance if applicable
+	      -> Kind			-- ^ Kind of the RHS
+	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
               -> TcRnIf m n TyCon
 
 buildSynTyCon tc_name tvs rhs@(OpenSynTyCon {}) rhs_kind _
@@ -61,12 +61,12 @@ buildSynTyCon tc_name tvs rhs@(SynonymTyCon {}) rhs_kind mb_family
 
 ------------------------------------------------------
 buildAlgTyCon :: Name -> [TyVar] 
-	      -> ThetaType		-- Stupid theta
+	      -> ThetaType		-- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
-	      -> Bool			-- True <=> want generics functions
-	      -> Bool			-- True <=> was declared in GADT syntax
-	      -> Maybe (TyCon, [Type])  -- family instance if applicable
+	      -> Bool			-- ^ True <=> want generics functions
+	      -> Bool			-- ^ True <=> was declared in GADT syntax
+	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
 	      -> TcRnIf m n TyCon
 
 buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
@@ -84,7 +84,7 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
        ; return tycon 
        }
 
--- If a family tycon with instance types is given, the current tycon is an
+-- | If a family tycon with instance types is given, the current tycon is an
 -- instance of that family and we need to
 --
 -- (1) create a coercion that identifies the family instance type and the
@@ -132,9 +132,9 @@ mkDataTyConRhs cons
     }
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
--- Monadic because it makes a Name for the coercion TyCon
--- We pass the Name of the parent TyCon, as well as the TyCon itself,
--- because the latter is part of a knot, whereas the former is not.
+-- ^ Monadic because it makes a Name for the coercion TyCon
+--   We pass the Name of the parent TyCon, as well as the TyCon itself,
+--   because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con 
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
 	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon etad_tvs etad_rhs

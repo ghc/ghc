@@ -42,51 +42,109 @@ vectorise backend guts = do
     hsc_env <- getHscEnv
     liftIO $ vectoriseIO backend hsc_env guts
 
+-- | Vectorise a single monad, given its HscEnv (code gen environment).
 vectoriseIO :: PackageId -> HscEnv -> ModGuts -> IO ModGuts
 vectoriseIO backend hsc_env guts
-  = do
+ = do -- Get information about currently loaded external packages.
       eps <- hscEPS hsc_env
+
+      -- Combine vectorisation info from the current module, and external ones.
       let info = hptVectInfo hsc_env `plusVectInfo` eps_vect_info eps
+
+      -- Run the main VM computation.
       Just (info', guts') <- initV backend hsc_env guts info (vectModule guts)
       return (guts' { mg_vect_info = info' })
 
+
+-- | Vectorise a single module, in the VM monad.
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
-  = do
+ = do -- Vectorise the type environment.
+      -- This may add new TyCons and DataCons.
+      -- TODO: What new binds do we get back here?
       (types', fam_insts, tc_binds) <- vectTypeEnv (mg_types guts)
 
+      -- TODO: What is this?
       let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
       updGEnv (setFamInstEnv fam_inst_env')
 
       -- dicts   <- mapM buildPADict pa_insts
       -- workers <- mapM vectDataConWorkers pa_insts
+
+      -- Vectorise all the top level bindings.
       binds'  <- mapM vectTopBind (mg_binds guts)
+
       return $ guts { mg_types        = types'
                     , mg_binds        = Rec tc_binds : binds'
                     , mg_fam_inst_env = fam_inst_env'
                     , mg_fam_insts    = mg_fam_insts guts ++ fam_insts
                     }
 
+
+-- | Try to vectorise a top-level binding.
+--   If it doesn't vectorise then return it unharmed.
+--
+--   For example, for the binding 
+--
+--   @  
+--      foo :: Int -> Int
+--      foo = \x -> x + x
+--   @
+--  
+--   we get
+--   @
+--      foo  :: Int -> Int
+--      foo  = \x -> vfoo $: x                  
+-- 
+--      v_foo :: Closure void vfoo lfoo
+--      v_foo = closure vfoo lfoo void        
+-- 
+--      vfoo :: Void -> Int -> Int
+--      vfoo = ...
+--
+--      lfoo :: PData Void -> PData Int -> PData Int
+--      lfoo = ...
+--   @ 
+--
+--   @vfoo@ is the "vectorised", or scalar, version that does the same as the original
+--   function foo, but takes an explicit environment.
+-- 
+--   @lfoo@ is the "lifted" version that works on arrays.
+--
+--   @v_foo@ combines both of these into a `Closure` that also contains the
+--   environment.
+--
+--   The original binding @foo@ is rewritten to call the vectorised version
+--   present in the closure.
+--
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
-  = do
-      (inline, expr') <- vectTopRhs var expr
-      var' <- vectTopBinder var inline expr'
-      hs    <- takeHoisted
-      cexpr <- tryConvert var var' expr
+ = do
+      (inline, expr') 	<- vectTopRhs var expr
+      var' 		<- vectTopBinder var inline expr'
+
+      -- Vectorising the body may create other top-level bindings.
+      hs	<- takeHoisted
+
+      -- To get the same functionality as the original body we project
+      -- out its vectorised version from the closure.
+      cexpr	<- tryConvert var var' expr
+
       return . Rec $ (var, cexpr) : (var', expr') : hs
   `orElseV`
     return b
 
 vectTopBind b@(Rec bs)
-  = do
-      (vars', _, exprs') <- fixV $ \ ~(_, inlines, rhss) ->
-        do
-          vars' <- sequence [vectTopBinder var inline rhs
-                               | (var, ~(inline, rhs))
-                                 <- zipLazy vars (zip inlines rhss)]
-          (inlines', exprs') <- mapAndUnzipM (uncurry vectTopRhs) bs
-          return (vars', inlines', exprs')
+ = do
+      (vars', _, exprs') 
+	<- fixV $ \ ~(_, inlines, rhss) ->
+            do vars' <- sequence [vectTopBinder var inline rhs
+                                      | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
+               (inlines', exprs') 
+                     <- mapAndUnzipM (uncurry vectTopRhs) bs
+
+               return (vars', inlines', exprs')
+
       hs     <- takeHoisted
       cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
       return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
@@ -95,11 +153,22 @@ vectTopBind b@(Rec bs)
   where
     (vars, exprs) = unzip bs
 
--- NOTE: vectTopBinder *MUST* be lazy in inline and expr because of how it is
--- used inside of fixV in vectTopBind
-vectTopBinder :: Var -> Inline -> CoreExpr -> VM Var
+
+-- | Make the vectorised version of this top level binder, and add the mapping
+--   between it and the original to the state. For some binder @foo@ the vectorised
+--   version is @$v_foo@
+--
+--   NOTE: vectTopBinder *MUST* be lazy in inline and expr because of how it is
+--   used inside of fixV in vectTopBind
+vectTopBinder 
+	:: Var 		-- ^ Name of the binding.
+	-> Inline 	-- ^ Whether it should be inlined, used to annotate it.
+	-> CoreExpr 	-- ^ RHS of the binding, used to set the `Unfolding` of the returned `Var`.
+	-> VM Var	-- ^ Name of the vectorised binding.
+
 vectTopBinder var inline expr
-  = do
+ = do
+      -- Vectorise the type attached to the var.
       vty  <- vectType (idType var)
       var' <- liftM (`setIdUnfolding` unfolding) $ cloneId mkVectOcc var vty
       defGlobalVar var var'
@@ -109,22 +178,37 @@ vectTopBinder var inline expr
                   Inline arity -> mkInlineRule expr (Just arity)
                   DontInline   -> noUnfolding
 
-vectTopRhs :: Var -> CoreExpr -> VM (Inline, CoreExpr)
+
+-- | Vectorise the RHS of a top-level binding, in an empty local environment.
+vectTopRhs 
+	:: Var 		-- ^ Name of the binding.
+	-> CoreExpr	-- ^ Body of the binding.
+	-> VM (Inline, CoreExpr)
+
 vectTopRhs var expr
-  = closedV
-  $ do
-      (inline, vexpr) <- inBind var
-                       $ vectPolyExpr (isLoopBreaker $ idOccInfo var)
+ = dtrace (vcat [text "vectTopRhs", ppr expr])
+ $ closedV
+ $ do (inline, vexpr) <- inBind var
+                      $ vectPolyExpr (isLoopBreaker $ idOccInfo var)
                                       (freeVars expr)
       return (inline, vectorised vexpr)
 
-tryConvert :: Var -> Var -> CoreExpr -> VM CoreExpr
+
+-- | Project out the vectorised version of a binding from some closure,
+--	or return the original body if that doesn't work.	
+tryConvert 
+	:: Var	 	-- ^ Name of the original binding (eg @foo@)
+	-> Var 		-- ^ Name of vectorised version of binding (eg @$vfoo@)
+	-> CoreExpr	-- ^ The original body of the binding.
+	-> VM CoreExpr
+
 tryConvert var vect_var rhs
   = fromVect (idType var) (Var vect_var) `orElseV` return rhs
 
 -- ----------------------------------------------------------------------------
 -- Bindings
 
+-- | Vectorise a binder variable, along with its attached type.
 vectBndr :: Var -> VM VVar
 vectBndr v
   = do
@@ -136,6 +220,9 @@ vectBndr v
   where
     mapTo vv lv env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv) }
 
+
+-- | Vectorise a binder variable, along with its attached type, 
+--   but give the result a new name.
 vectBndrNew :: Var -> FastString -> VM VVar
 vectBndrNew v fs
   = do
@@ -146,6 +233,8 @@ vectBndrNew v fs
   where
     upd vv env = env { local_vars = extendVarEnv (local_vars env) v vv }
 
+
+-- | Vectorise a binder then run a computation with that binder in scope.
 vectBndrIn :: Var -> VM a -> VM (VVar, a)
 vectBndrIn v p
   = localV
@@ -154,6 +243,8 @@ vectBndrIn v p
       x <- p
       return (vv, x)
 
+
+-- | Vectorise a binder, give it a new name, then run a computation with that binder in scope.
 vectBndrNewIn :: Var -> FastString -> VM a -> VM (VVar, a)
 vectBndrNewIn v fs p
   = localV
@@ -162,6 +253,7 @@ vectBndrNewIn v fs p
       x  <- p
       return (vv, x)
 
+-- | Vectorise some binders, then run a computation with them in scope.
 vectBndrsIn :: [Var] -> VM a -> VM ([VVar], a)
 vectBndrsIn vs p
   = localV
@@ -170,13 +262,17 @@ vectBndrsIn vs p
       x <- p
       return (vvs, x)
 
+
 -- ----------------------------------------------------------------------------
 -- Expressions
 
+-- | Vectorise a variable, producing the vectorised and lifted versions.
 vectVar :: Var -> VM VExpr
 vectVar v
-  = do
+ = do 
+      -- lookup the variable from the environment.
       r <- lookupVar v
+
       case r of
         Local (vv,lv) -> return (Var vv, Var lv)
         Global vv     -> do
@@ -184,30 +280,42 @@ vectVar v
                            lexpr <- liftPD vexpr
                            return (vexpr, lexpr)
 
+-- | Like `vectVar` but also add type applications to the variables.
 vectPolyVar :: Var -> [Type] -> VM VExpr
 vectPolyVar v tys
   = do
-      vtys <- mapM vectType tys
-      r <- lookupVar v
+      vtys	<- mapM vectType tys
+      r		<- lookupVar v
       case r of
-        Local (vv, lv) -> liftM2 (,) (polyApply (Var vv) vtys)
-                                     (polyApply (Var lv) vtys)
-        Global poly    -> do
-                            vexpr <- polyApply (Var poly) vtys
-                            lexpr <- liftPD vexpr
-                            return (vexpr, lexpr)
+        Local (vv, lv) 
+         -> liftM2 (,) (polyApply (Var vv) vtys)
+                       (polyApply (Var lv) vtys)
 
+        Global poly    
+         -> do vexpr <- polyApply (Var poly) vtys
+               lexpr <- liftPD vexpr
+               return (vexpr, lexpr)
+
+
+-- | Lifted literals are created by replicating them.
 vectLiteral :: Literal -> VM VExpr
 vectLiteral lit
   = do
       lexpr <- liftPD (Lit lit)
       return (Lit lit, lexpr)
 
-vectPolyExpr :: Bool -> CoreExprWithFVs -> VM (Inline, VExpr)
+
+-- | Vectorise a polymorphic expression
+vectPolyExpr 
+	:: Bool 		-- ^ When vectorising the RHS of a binding, whether that
+				--   binding is a loop breaker.
+	-> CoreExprWithFVs
+	-> VM (Inline, VExpr)
+
 vectPolyExpr loop_breaker (_, AnnNote note expr)
-  = do
-      (inline, expr') <- vectPolyExpr loop_breaker expr
+ = do (inline, expr') <- vectPolyExpr loop_breaker expr
       return (inline, vNote note expr')
+
 vectPolyExpr loop_breaker expr
   = do
       arity <- polyArity tvs
@@ -219,13 +327,17 @@ vectPolyExpr loop_breaker expr
   where
     (tvs, mono) = collectAnnTypeBinders expr
 
+
+-- | Vectorise a core expression.
 vectExpr :: CoreExprWithFVs -> VM VExpr
 vectExpr (_, AnnType ty)
   = liftM vType (vectType ty)
 
-vectExpr (_, AnnVar v) = vectVar v
+vectExpr (_, AnnVar v) 
+  = vectVar v
 
-vectExpr (_, AnnLit lit) = vectLiteral lit
+vectExpr (_, AnnLit lit) 
+  = vectLiteral lit
 
 vectExpr (_, AnnNote note expr)
   = liftM (vNote note) (vectExpr expr)
@@ -247,12 +359,22 @@ vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
     is_special_con con = con `elem` [intDataCon, floatDataCon, doubleDataCon]
 
 
+-- TODO: Avoid using closure application for dictionaries.
+-- vectExpr (_, AnnApp fn arg)
+--  | if is application of dictionary 
+--    just use regular app instead of closure app.
+
+-- for lifted version. 
+--      do liftPD (sub a dNumber)
+--      lift the result of the selection, not sub and dNumber seprately. 
+
 vectExpr (_, AnnApp fn arg)
   = do
       arg_ty' <- vectType arg_ty
       res_ty' <- vectType res_ty
       fn'     <- vectExpr fn
       arg'    <- vectExpr arg
+
       mkClosureApp arg_ty' res_ty' fn' arg'
   where
     (arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
@@ -296,7 +418,14 @@ onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
 
 vectExpr e = cantVectorise "Can't vectorise expression" (ppr $ deAnnotate e)
 
-vectFnExpr :: Bool -> Bool -> CoreExprWithFVs -> VM (Inline, VExpr)
+
+-- | Vectorise an expression with an outer lambda abstraction.
+vectFnExpr 
+	:: Bool 		-- ^ When the RHS of a binding, whether that binding should be inlined.
+	-> Bool 		-- ^ Whether the binding is a loop breaker.
+	-> CoreExprWithFVs 	-- ^ Expression to vectorise. Must have an outer `AnnLam`.
+	-> VM (Inline, VExpr)
+
 vectFnExpr inline loop_breaker e@(fvs, AnnLam bndr _)
   | isId bndr = onlyIfV (isEmptyVarSet fvs)
                         (mark DontInline . vectScalarLam bs $ deAnnotate body)
@@ -308,7 +437,12 @@ vectFnExpr _ _ e = mark DontInline $ vectExpr e
 mark :: Inline -> VM a -> VM (Inline, a)
 mark b p = do { x <- p; return (b,x) }
 
-vectScalarLam :: [Var] -> CoreExpr -> VM VExpr
+
+-- | Vectorise a function where are the args have scalar type, that is Int, Float or Double.
+vectScalarLam 
+	:: [Var]	-- ^ Bound variables of function.
+	-> CoreExpr	-- ^ Function body.
+	-> VM VExpr
 vectScalarLam args body
   = do
       scalars <- globalScalars
@@ -317,23 +451,24 @@ vectScalarLam args body
                && is_scalar (extendVarSetList scalars args) body
                && uses scalars body)
         $ do
-            fn_var <- hoistExpr (fsLit "fn") (mkLams args body) DontInline
-            zipf <- zipScalars arg_tys res_ty
-            clo <- scalarClosure arg_tys res_ty (Var fn_var)
+            fn_var  <- hoistExpr (fsLit "fn") (mkLams args body) DontInline
+            zipf    <- zipScalars arg_tys res_ty
+            clo     <- scalarClosure arg_tys res_ty (Var fn_var)
                                                 (zipf `App` Var fn_var)
             clo_var <- hoistExpr (fsLit "clo") clo DontInline
-            lclo <- liftPD (Var clo_var)
+            lclo    <- liftPD (Var clo_var)
             return (Var clo_var, lclo)
   where
     arg_tys = map idType args
     res_ty  = exprType body
 
-    is_scalar_ty ty | Just (tycon, []) <- splitTyConApp_maybe ty
-                    = tycon == intTyCon
-                      || tycon == floatTyCon
-                      || tycon == doubleTyCon
+    is_scalar_ty ty 
+        | Just (tycon, [])   <- splitTyConApp_maybe ty
+        =    tycon == intTyCon
+          || tycon == floatTyCon
+          || tycon == doubleTyCon
 
-                    | otherwise = False
+        | otherwise = False
 
     is_scalar vs (Var v)     = v `elemVarSet` vs
     is_scalar _ e@(Lit _)    = is_scalar_ty $ exprType e
@@ -348,7 +483,15 @@ vectScalarLam args body
     uses funs (App e1 e2) = uses funs e1 || uses funs e2
     uses _ _              = False
 
-vectLam :: Bool -> Bool -> VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
+
+vectLam 
+	:: Bool			-- ^ When the RHS of a binding, whether that binding should be inlined.
+	-> Bool			-- ^ Whether the binding is a loop breaker.
+	-> VarSet		-- ^ The free variables in the body.
+	-> [Var]		-- 
+	-> CoreExprWithFVs
+	-> VM VExpr
+
 vectLam inline loop_breaker fvs bs body
   = do
       tyvars <- localTyVars

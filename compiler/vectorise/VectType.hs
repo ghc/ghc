@@ -45,13 +45,16 @@ import Data.List      ( inits, tails, zipWith4, zipWith5 )
 -- ----------------------------------------------------------------------------
 -- Types
 
+-- | Vectorise a type constructor.
 vectTyCon :: TyCon -> VM TyCon
 vectTyCon tc
   | isFunTyCon tc        = builtin closureTyCon
   | isBoxedTupleTyCon tc = return tc
   | isUnLiftedTyCon tc   = return tc
-  | otherwise            = maybeCantVectoriseM "Tycon not vectorised:" (ppr tc)
-                         $ lookupTyCon tc
+  | otherwise            
+  = maybeCantVectoriseM "Tycon not vectorised: " (ppr tc)
+	$ lookupTyCon tc
+
 
 vectAndLiftType :: Type -> VM (Type, Type)
 vectAndLiftType ty | Just ty' <- coreView ty = vectAndLiftType ty'
@@ -67,6 +70,7 @@ vectAndLiftType ty
     (tyvars, mono_ty) = splitForAllTys ty
 
 
+-- | Vectorise a type.
 vectType :: Type -> VM Type
 vectType ty | Just ty' <- coreView ty = vectType ty'
 vectType (TyVarTy tv) = return $ TyVarTy tv
@@ -87,6 +91,7 @@ vectType ty = cantVectorise "Can't vectorise type" (ppr ty)
 vectAndBoxType :: Type -> VM Type
 vectAndBoxType ty = vectType ty >>= boxType
 
+-- | Add quantified vars and dictionary parameters to the front of a type.
 abstractType :: [TyVar] -> [Type] -> Type -> Type
 abstractType tyvars dicts = mkForAllTys tyvars . mkFunTys dicts
 
@@ -102,6 +107,7 @@ boxType ty
       case r of
         Just tycon' -> return $ mkTyConApp tycon' []
         Nothing     -> return ty
+
 boxType ty = return ty
 
 -- ----------------------------------------------------------------------------
@@ -109,14 +115,21 @@ boxType ty = return ty
 
 type TyConGroup = ([TyCon], UniqSet TyCon)
 
+-- | Vectorise a type environment.
+--   The type environment contains all the type things defined in a module.
 vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [(Var, CoreExpr)])
 vectTypeEnv env
   = do
       cs <- readGEnv $ mk_map . global_tycons
+
+      -- Split the list of TyCons into the ones we have to vectorise vs the
+      -- ones we can pass through unchanged. We also pass through algebraic 
+      -- types that use non Haskell98 features, as we don't handle those.
       let (conv_tcs, keep_tcs) = classifyTyCons cs groups
           keep_dcs             = concatMap tyConDataCons keep_tcs
       zipWithM_ defTyCon   keep_tcs keep_tcs
       zipWithM_ defDataCon keep_dcs keep_dcs
+
       new_tcs <- vectTyConDecls conv_tcs
 
       let orig_tcs = keep_tcs ++ conv_tcs
@@ -151,6 +164,7 @@ vectTypeEnv env
     mk_map env = listToUFM_Directly [(u, getUnique n /= u) | (u,n) <- nameEnvUniqueElts env]
 
 
+-- | Vectorise some (possibly recursively defined) type constructors.
 vectTyConDecls :: [TyCon] -> VM [TyCon]
 vectTyConDecls tcs = fixV $ \tcs' ->
   do
@@ -848,8 +862,8 @@ paMethods = [("dictPRepr",    buildPRDict),
              ("fromArrPRepr", buildFromArrPRepr)]
 
 -- | Split the given tycons into two sets depending on whether they have to be
--- converted (first list) or not (second list). The first argument contains
--- information about the conversion status of external tycons:
+--   converted (first list) or not (second list). The first argument contains
+--   information about the conversion status of external tycons:
 --
 --   * tycons which have converted versions are mapped to True
 --   * tycons which are not changed by vectorisation are mapped to False

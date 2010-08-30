@@ -281,6 +281,7 @@ combinePD ty len sel xs
   where
     n = length xs
 
+-- | Like `replicatePD` but use the lifting context in the vectoriser state.
 liftPD :: CoreExpr -> VM CoreExpr
 liftPD x
   = do
@@ -358,6 +359,8 @@ addInlineArity DontInline _ = DontInline
 inlineMe :: Inline
 inlineMe = Inline 0
 
+
+-- Hoising --------------------------------------------------------------------
 hoistBinding :: Var -> CoreExpr -> VM ()
 hoistBinding v e = updGEnv $ \env ->
   env { global_bindings = (v,e) : global_bindings env }
@@ -412,23 +415,23 @@ boxExpr ty (vexpr, lexpr)
         Nothing     -> return (vexpr, lexpr)
 -}
 
+-- Closures -------------------------------------------------------------------
 mkClosure :: Type -> Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
-  = do
-      dict <- paDictOfType env_ty
-      mkv  <- builtin closureVar
-      mkl  <- builtin liftedClosureVar
+ = do Just dict <- paDictOfType env_ty
+      mkv       <- builtin closureVar
+      mkl       <- builtin liftedClosureVar
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
 
 mkClosureApp :: Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
-  = do
-      vapply <- builtin applyVar
+ = do vapply <- builtin applyVar
       lapply <- builtin liftedApplyVar
       lc     <- builtin liftingContext
       return (Var vapply `mkTyApps` [arg_ty, res_ty] `mkApps` [vclo, varg],
               Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [Var lc, lclo, larg])
+
 
 buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
 buildClosures _   _    [] _ mk_body
@@ -471,6 +474,8 @@ buildClosure tvs vars arg_ty res_ty mk_body
 
       mkClosure arg_ty res_ty env_ty fn env
 
+
+-- Environments ---------------------------------------------------------------
 buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VExpr)
 buildEnv [] = do
              ty    <- voidType

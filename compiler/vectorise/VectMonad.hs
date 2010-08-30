@@ -439,6 +439,8 @@ newTyVar fs k
       u <- liftDs newUnique
       return $ mkTyVar (mkSysTvName u fs) k
 
+
+-- | Add a mapping between a global var and its vectorised version to the state.
 defGlobalVar :: Var -> Var -> VM ()
 defGlobalVar v v' = updGEnv $ \env ->
   env { global_vars = extendVarEnv (global_vars env) v v'
@@ -448,14 +450,14 @@ defGlobalVar v v' = updGEnv $ \env ->
     upd env | isExportedId v = extendVarEnv env v (v, v')
             | otherwise      = env
 
+-- Var ------------------------------------------------------------------------
 -- | Lookup the vectorised and\/or lifted versions of this variable.
 --	If it's in the global environment we get the vectorised version.
 --      If it's in the local environment we get both the vectorised and lifted version.
 --	
 lookupVar :: Var -> VM (Scope Var (Var, Var))
 lookupVar v
-  = do
-      r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v
+ = do r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v
       case r of
         Just e  -> return (Local e)
         Nothing -> liftM Global
@@ -581,6 +583,8 @@ lookupFamInst tycon tys
                       (ppr $ mkTyConApp tycon tys)
        }
 
+
+-- | Run a vectorisation computation.
 initV :: PackageId -> HscEnv -> ModGuts -> VectInfo -> VM a -> IO (Maybe (VectInfo, a))
 initV pkg hsc_env guts info p
   = do
