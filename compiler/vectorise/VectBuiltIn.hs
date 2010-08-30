@@ -40,7 +40,7 @@ import TypeRep         ( funTyCon )
 import Type            ( Type, mkTyConApp )
 import TysPrim
 import TysWiredIn      ( unitDataCon,
-                         tupleTyCon, tupleCon,
+                         tupleCon,
                          intTyCon,
                          doubleTyCon,
                          boolTyCon, trueDataCon, falseDataCon,

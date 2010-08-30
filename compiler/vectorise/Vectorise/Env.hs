@@ -25,7 +25,6 @@ import FamInstEnv
 import CoreSyn
 import TyCon
 import DataCon
-import Type
 import VarEnv
 import VarSet
 import Var
