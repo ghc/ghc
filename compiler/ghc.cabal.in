@@ -455,10 +455,12 @@ Library
         UniqSet
         Util
         VectBuiltIn
-        VectCore
         VectMonad
         VectType
         VectUtils
+        VectVar
+        Vectorise.Env
+        Vectorise.Vect
         Vectorise
 
     -- We only need to expose more modules as some of the ncg code is used

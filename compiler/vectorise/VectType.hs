@@ -8,8 +8,8 @@ where
 
 import VectMonad
 import VectUtils
-import VectCore
 import Vectorise.Env
+import Vectorise.Vect
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import BasicTypes

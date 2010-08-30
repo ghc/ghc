@@ -11,10 +11,10 @@ module VectVar (
 	vectLiteral
 ) where
 import VectUtils
-import VectCore
 import VectMonad
 import VectType
 import Vectorise.Env
+import Vectorise.Vect
 import CoreSyn
 import Type
 import Var

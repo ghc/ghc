@@ -7,7 +7,7 @@ import VectMonad
 import VectUtils
 import VectVar
 import VectType
-import VectCore
+import Vectorise.Vect
 import Vectorise.Env
 
 import HscTypes hiding      ( MonadThings(..) )

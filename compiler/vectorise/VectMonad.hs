@@ -39,6 +39,7 @@ module VectMonad (
 
 import VectBuiltIn
 import Vectorise.Env
+import Vectorise.Vect
 
 import HscTypes hiding  ( MonadThings(..) )
 import Module           ( PackageId )

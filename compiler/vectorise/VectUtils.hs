@@ -21,10 +21,9 @@ module VectUtils (
   buildClosure, buildClosures,
   mkClosureApp
 ) where
-
-import VectCore
 import VectMonad
 import Vectorise.Env
+import Vectorise.Vect
 
 import MkCore ( mkCoreTup, mkWildCase )
 import CoreSyn

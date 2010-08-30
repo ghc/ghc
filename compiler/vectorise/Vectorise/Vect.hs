@@ -1,22 +1,24 @@
 
 -- | Simple vectorised constructors and projections.
-module VectCore (
-  Vect, VVar, VExpr, VBind,
+module Vectorise.Vect (
+	Vect, VVar, VExpr, VBind,
 
-  vectorised, lifted,
-  mapVect,
+	vectorised,
+	lifted,
+	mapVect,
 
-  vVarType,
-
-  vNonRec, vRec,
-
-  vVar, vType, vNote, vLet,
-  vLams, vLamsWithoutLC, vVarApps,
-  vCaseDEFAULT
+	vVarType,
+	vNonRec,
+	vRec,
+	vVar,
+	vType,
+	vNote,
+	vLet,
+	vLams,
+	vLamsWithoutLC,
+	vVarApps,
+	vCaseDEFAULT
 ) where
-
-#include "HsVersions.h"
-
 import CoreSyn
 import Type           ( Type )
 import Var
