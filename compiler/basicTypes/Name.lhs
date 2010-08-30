@@ -451,6 +451,9 @@ pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
 -- See Note [Printing original names] in HscTypes
 pprModulePrefix sty mod occ
+  | opt_SuppressModulePrefixes = empty
+  
+  | otherwise
   = case qualName sty mod occ of	           -- See Outputable.QualifyName:
       NameQual modname -> ppr modname <> dot       -- Name is in scope       
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope

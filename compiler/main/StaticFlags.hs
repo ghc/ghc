@@ -23,6 +23,7 @@ module StaticFlags (
 	opt_PprUserLength,
 	opt_SuppressUniques,
         opt_SuppressCoercions,
+	opt_SuppressModulePrefixes,
 	opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
@@ -188,6 +189,9 @@ opt_SuppressUniques		= lookUp  (fsLit "-dsuppress-uniques")
 opt_SuppressCoercions :: Bool
 opt_SuppressCoercions           = lookUp  (fsLit "-dsuppress-coercions")
 
+opt_SuppressModulePrefixes :: Bool
+opt_SuppressModulePrefixes	= lookUp  (fsLit "-dsuppress-module-prefixes")
+
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug		= lookUp  (fsLit "-dppr-debug")
 
@@ -212,8 +216,10 @@ opt_Hpc				= lookUp (fsLit "-fhpc")
 -- language opts
 opt_DictsStrict :: Bool
 opt_DictsStrict			= lookUp  (fsLit "-fdicts-strict")
+
 opt_IrrefutableTuples :: Bool
 opt_IrrefutableTuples		= lookUp  (fsLit "-firrefutable-tuples")
+
 opt_Parallel :: Bool
 opt_Parallel			= lookUp  (fsLit "-fparallel")
 
@@ -236,12 +242,16 @@ opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_GranMacros :: Bool
 opt_GranMacros			= lookUp  (fsLit "-fgransim")
+
 opt_HiVersion :: Integer
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
+
 opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
+
 opt_OmitBlackHoling :: Bool
 opt_OmitBlackHoling		= lookUp  (fsLit "-dno-black-holing")
+
 opt_StubDeadValues  :: Bool
 opt_StubDeadValues		= lookUp  (fsLit "-dstub-dead-values")
 
