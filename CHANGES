@@ -1,3 +1,37 @@
+Changes in version 2.8.0
+
+  * HTML backend completely rewritten to generate semantically rich XHTML
+    using the xhtml package.
+
+  * New default CSS based on the color scheme chosen for the new Haskell
+    wiki, with a pull-out tab for the synopsis.
+
+  * Theme engine based on CSS files. Themes can be switched from the
+    header menu. (New flags --built-in-themes and --theme. The latter
+    is an alias for --css which now has extended semantics).
+
+  * Markup support for executable examples/unit-tests. To be used with an
+    upcoming version of the DocTest program.
+
+  * Addition of a LaTeX backend.
+
+  * Frames-mode can be turned on/off from the header menu.
+
+  * Path to source entities can be specified per package, so that source
+    links work for cross-package documentation.
+
+  * Support for a second form of enumerated lists (1. 2. etc).
+
+  * Additions and changes to the Haddock API.
+
+  * New flag --no-tmp-comp-dir to tell Haddock to write and pick up
+    compilation files (.o, .hi, etc) to/from GHC's output directory instead
+    of a temporary directory.
+
+  * Various bug fixes.
+
+-----------------------------------------------------------------------------
+
 Changes in version 2.6.1 (bug fix release from the stable branch)
 
   * Fix #128
