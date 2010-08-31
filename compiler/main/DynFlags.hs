@@ -781,7 +781,9 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
           defaultExtensionFlags = languageExtensions ml
 
 languageExtensions :: Maybe Language -> [ExtensionFlag]
+
 languageExtensions Nothing
+    -- Nothing => the default case
     = Opt_MonoPatBinds   -- Experimentally, I'm making this non-standard
                          -- behaviour the default, to see if anyone notices
                          -- SLPJ July 06
@@ -789,11 +791,13 @@ languageExtensions Nothing
       -- But NB it's implied by GADTs etc
       -- SLPJ September 2010
     : languageExtensions (Just Haskell2010)
+
 languageExtensions (Just Haskell98)
     = [Opt_ImplicitPrelude,
        Opt_MonomorphismRestriction,
        Opt_NPlusKPatterns,
        Opt_DatatypeContexts]
+
 languageExtensions (Just Haskell2010)
     = [Opt_ImplicitPrelude,
        Opt_MonomorphismRestriction,
