@@ -2,4 +2,4 @@
 window.onload = function () {pageLoad();setSynopsis("mini_NamedDoc.html");};
 //]]>
 </script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><A HREF="">Contents</a></li><li><A HREF="">Index</a></li></ul><p class="caption" class="empty">&nbsp;</p></div><div id="content"><div id="module-header"><p class="caption">NamedDoc</p></div><div id="synopsis"><p id="control.syn" class="caption expander" onclick="toggleSection('syn')">Synopsis</p><ul id="section.syn" class="hide" onclick="toggleSection('syn')"></ul></div><div id="interface"><h1>Documentation</h1><div class="doc"><p>bar
-</p></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.7.2</p></div></body></html>
+</p></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.0</p></div></body></html>

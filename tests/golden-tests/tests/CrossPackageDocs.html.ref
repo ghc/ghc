@@ -40,4 +40,4 @@ defined in the <A HREF="">Prelude</a> satisfy these laws.
    forkIO (hPutStr inp str)
 </code><p>The <code><A HREF="">Handle</a></code>s are initially in binary mode; if you need them to be
     in text mode then use <code><A HREF="">hSetBinaryMode</a></code>.
-</p></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.7.2</p></div></body></html>
+</p></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.0</p></div></body></html>

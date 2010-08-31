@@ -145,4 +145,4 @@ test2
 </pre><p>$ a non <em>literal</em> line $
 </p></div><div class="top"><p class="src"><a name="v:f-39-" class="def">f'</a> :: <A HREF="">Int</a></p><div class="doc"><p>a function with a prime can be referred to as <code><A HREF="">f'</a></code> 
  but f' doesn't get link'd 'f\''
-</p></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.7.2</p></div></body></html>
+</p></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.0</p></div></body></html>

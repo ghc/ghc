@@ -19,4 +19,4 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
 </p><pre class="screen"><code class="prompt">ghci&gt; </code><strong class="userinput"><code>import Data.Char
 </code></strong><code class="prompt">ghci&gt; </code><strong class="userinput"><code>isSpace 'a'
 </code></strong>False
-</pre></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.7.2</p></div></body></html>
+</pre></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.0</p></div></body></html>
