@@ -1,5 +1,5 @@
 {-# LANGUAGE PArr #-}
-{-# OPTIONS -fvectorise -Odph -XParallelListComp #-}
+{-# OPTIONS -fvectorise -XParallelListComp #-}
 module DiophantineVect (solution3) where
 
 import Data.Array.Parallel.Prelude
