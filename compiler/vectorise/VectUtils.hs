@@ -21,9 +21,10 @@ module VectUtils (
   buildClosure, buildClosures,
   mkClosureApp
 ) where
-import VectMonad
+import Vectorise.Monad
 import Vectorise.Env
 import Vectorise.Vect
+import Vectorise.Builtins
 
 import MkCore ( mkCoreTup, mkWildCase )
 import CoreSyn
@@ -101,7 +102,7 @@ mkBuiltinTyConApps get_tc tys ty
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
 voidType :: VM Type
-voidType = mkBuiltinTyConApp VectMonad.voidTyCon []
+voidType = mkBuiltinTyConApp voidTyCon []
 
 mkWrapType :: Type -> VM Type
 mkWrapType ty = mkBuiltinTyConApp wrapTyCon [ty]

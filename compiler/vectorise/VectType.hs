@@ -6,10 +6,11 @@ module VectType ( vectTyCon, vectAndLiftType, vectType, vectTypeEnv,
                   fromVect )
 where
 
-import VectMonad
 import VectUtils
 import Vectorise.Env
 import Vectorise.Vect
+import Vectorise.Monad
+import Vectorise.Builtins
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import BasicTypes

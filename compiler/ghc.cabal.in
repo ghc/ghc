@@ -454,15 +454,22 @@ Library
         UniqFM
         UniqSet
         Util
-        VectBuiltIn
-        VectMonad
         VectType
         VectUtils
         VectVar
         Vectorise.Env
         Vectorise.Vect
         Vectorise.Builtins.Base
+        Vectorise.Builtins.Initialise
         Vectorise.Builtins.Modules
+        Vectorise.Builtins.Prelude
+        Vectorise.Builtins
+        Vectorise.Monad.Base
+        Vectorise.Monad.Naming
+        Vectorise.Monad.Local
+        Vectorise.Monad.Global
+        Vectorise.Monad.InstEnv
+        Vectorise.Monad
         Vectorise
 
     -- We only need to expose more modules as some of the ncg code is used

@@ -11,8 +11,8 @@ module VectVar (
 	vectLiteral
 ) where
 import VectUtils
-import VectMonad
 import VectType
+import Vectorise.Monad
 import Vectorise.Env
 import Vectorise.Vect
 import CoreSyn

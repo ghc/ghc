@@ -3,12 +3,13 @@
 module Vectorise( vectorise )
 where
 
-import VectMonad
 import VectUtils
 import VectVar
 import VectType
 import Vectorise.Vect
 import Vectorise.Env
+import Vectorise.Monad
+import Vectorise.Builtins
 
 import HscTypes hiding      ( MonadThings(..) )
 
