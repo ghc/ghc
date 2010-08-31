@@ -33,7 +33,7 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
-  tcInstSigType,
+  tcInstType, tcInstSigType,
   tcInstSkolTyVars, tcInstSkolType, 
   tcSkolSigType, tcSkolSigTyVars, occurCheckErr, execTcTyVarBinds,
 
