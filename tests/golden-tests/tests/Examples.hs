@@ -4,28 +4,28 @@ module Examples where
 --
 -- Examples:
 --
--- ghci> fib 5
+-- >>> fib 5
 -- 5
--- ghci> fib 10
+-- >>> fib 10
 -- 55
 --
--- ghci> fib 10
+-- >>> fib 10
 -- 55
 --
 -- One more Example:
 --
--- ghci> fib 5
+-- >>> fib 5
 -- 5
 --
 -- One more Example:
 --
--- ghci> fib 5
+-- >>> fib 5
 -- 5
 --
 -- Example with an import:
 --
--- ghci> import Data.Char
--- ghci> isSpace 'a'
+-- >>> import Data.Char
+-- >>> isSpace 'a'
 -- False
 --
 fib :: Integer -> Integer

@@ -296,7 +296,7 @@ data Example = Example
 
 exampleToString :: Example -> String
 exampleToString (Example expression result) =
-    "ghci> " ++ expression ++ "\n" ++  unlines result
+    ">>> " ++ expression ++ "\n" ++  unlines result
 
 
 data DocMarkup id a = Markup {

@@ -69,7 +69,7 @@ parHtmlMarkup ppId isTyCon = Markup {
     exampleToHtml (Example expression result) = htmlExample
       where
         htmlExample = htmlPrompt +++ htmlExpression +++ (toHtml $ unlines result)
-        htmlPrompt = (thecode . toHtml $ "ghci> ") ! [theclass "prompt"]
+        htmlPrompt = (thecode . toHtml $ ">>> ") ! [theclass "prompt"]
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
 

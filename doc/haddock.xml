@@ -1508,9 +1508,9 @@ module A where
         <literal>*</literal>, <literal>-</literal>.  These characters
         can also be escaped using <literal>\</literal>.</para>
 
-        <para>Furthermore, the character sequence <literal>ghci&gt;</literal>
+        <para>Furthermore, the character sequence <literal>&gt;&gt;&gt;</literal>
         has a special meaning at the beginning of a line. To
-        escape it, just prefix the <literal>&gt;</literal> character with a
+        escape it, just prefix the characters in the sequence with a
         backslash.</para>
       </section>
 
@@ -1568,16 +1568,16 @@ module A where
 	<para> Haddock has markup support for examples of interaction with a
   <emphasis>read-eval-print loop (REPL)</emphasis>.  An
 	example is introduced with
-	<literal>ghci&gt;</literal> followed by an expression followed
+	<literal>&gt;&gt;&gt;</literal> followed by an expression followed
 	by zero or more result lines:</para>
 
 <programlisting>
 -- | Two examples are given bellow:
 --
--- ghci&gt; fib 10
+-- &gt;&gt;&gt; fib 10
 -- 55
 --
--- ghci&gt; putStrLn "foo\nbar"
+-- &gt;&gt;&gt; putStrLn "foo\nbar"
 -- foo
 -- bar
 </programlisting>

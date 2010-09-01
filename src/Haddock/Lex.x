@@ -48,7 +48,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 <0,para> {
  $ws* \n		;
  $ws* \>		{ begin birdtrack }
- $ws* ghci \>	        { strtoken TokExamplePrompt `andBegin` exampleexpr }
+ $ws* \>\>\>            { strtoken TokExamplePrompt `andBegin` exampleexpr }
  $ws* [\*\-]		{ token TokBullet `andBegin` string }
  $ws* \[		{ token TokDefStart `andBegin` def }
  $ws* \( $digit+ \) 	{ token TokNumber `andBegin` string }
@@ -59,7 +59,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 -- beginning of a line
 <line> {
   $ws* \>		{ begin birdtrack }
-  $ws* ghci \>		{ strtoken TokExamplePrompt `andBegin` exampleexpr }
+  $ws* \>\>\>		{ strtoken TokExamplePrompt `andBegin` exampleexpr }
   $ws* \n		{ token TokPara `andBegin` para }
   -- Here, we really want to be able to say
   -- $ws* (\n | <eof>) 	{ token TokPara `andBegin` para}
@@ -74,7 +74,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 
 <example> {
   $ws*	\n		{ token TokPara `andBegin` para }
-  $ws* ghci \>	        { strtoken TokExamplePrompt `andBegin` exampleexpr }
+  $ws* \>\>\>	        { strtoken TokExamplePrompt `andBegin` exampleexpr }
   ()			{ begin exampleresult }
 }
 

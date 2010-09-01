@@ -3,20 +3,20 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
 //]]>
 </script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><A HREF="">Contents</a></li><li><A HREF="">Index</a></li></ul><p class="caption" class="empty">&nbsp;</p></div><div id="content"><div id="module-header"><p class="caption">Examples</p></div><div id="synopsis"><p id="control.syn" class="caption expander" onclick="toggleSection('syn')">Synopsis</p><ul id="section.syn" class="hide" onclick="toggleSection('syn')"><li class="src short"><A HREF="">fib</a> :: <A HREF="">Integer</a> -&gt; <A HREF="">Integer</a></li></ul></div><div id="interface"><h1>Documentation</h1><div class="top"><p class="src"><a name="v:fib" class="def">fib</a> :: <A HREF="">Integer</a> -&gt; <A HREF="">Integer</a></p><div class="doc"><p>Fibonacci number of given <code><A HREF="">Integer</a></code>.
 </p><p>Examples:
-</p><pre class="screen"><code class="prompt">ghci&gt; </code><strong class="userinput"><code>fib 5
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>fib 5
 </code></strong>5
-<code class="prompt">ghci&gt; </code><strong class="userinput"><code>fib 10
+<code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>fib 10
 </code></strong>55
-</pre><pre class="screen"><code class="prompt">ghci&gt; </code><strong class="userinput"><code>fib 10
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>fib 10
 </code></strong>55
 </pre><p>One more Example:
-</p><pre class="screen"><code class="prompt">ghci&gt; </code><strong class="userinput"><code>fib 5
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>fib 5
 </code></strong>5
 </pre><p>One more Example:
-</p><pre class="screen"><code class="prompt">ghci&gt; </code><strong class="userinput"><code>fib 5
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>fib 5
 </code></strong>5
 </pre><p>Example with an import:
-</p><pre class="screen"><code class="prompt">ghci&gt; </code><strong class="userinput"><code>import Data.Char
-</code></strong><code class="prompt">ghci&gt; </code><strong class="userinput"><code>isSpace 'a'
+</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Data.Char
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isSpace 'a'
 </code></strong>False
 </pre></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.0</p></div></body></html>
