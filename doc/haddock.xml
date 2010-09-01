@@ -900,13 +900,16 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <option>--no-tmp-comp-dir</option>
         </term>
 	<listitem>
-          <para>If the input modules use Template Haskell, Haddock has to
-          perform compilation (using GHC).  This results in .o, .hi, and stub files that
-          are written to a temporary directory by default. When this flag is specified,
-          however, the files are written to the present directory (or another path if you
-          tell GHC, for example like this: <literal>--optghc=-odir --optghc=path</literal>).
-          Note that not only will files be written to this directory, GHC will also look for
-          already existing files there, and use them in order to skip compilation.
+          <para>
+          Do not use a temporary directory for reading and writing compilation output files
+          (<literal>.o</literal>, <literal>.hi</literal>, and stub files). Instead, use the
+          present directory or another directory that you have explicitly told GHC to use
+          via the <literal>--optghc</literal> flag.
+          </para>
+          <para>
+          This flag can be used to avoid recompilation if compilation files already exist.
+          Compilation files are produced when Haddock has to process modules that make use of
+          Template Haskell, in which case Haddock compiles the modules using the GHC API.  
           </para>
 	</listitem>
       </varlistentry>
