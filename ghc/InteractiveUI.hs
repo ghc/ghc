@@ -140,7 +140,7 @@ builtin_commands = [
   ("kind",      keepGoing' kindOfType,          completeIdentifier),
   ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
   ("list",      keepGoing' listCmd,             noCompletion),
-  ("module",    keepGoing setContext,           completeModule),
+  ("module",    keepGoing setContext,           completeSetModule),
   ("main",      keepGoing runMain,              completeFilename),
   ("print",     keepGoing printCmd,             completeExpression),
   ("quit",      quit,                           noCompletion),
@@ -1711,6 +1711,18 @@ completeModule = wrapIdentCompleter $ \w -> do
   return $ filter (w `isPrefixOf`)
         $ map (showSDoc.ppr) $ loaded_mods ++ pkg_mods
 
+completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
+  modules <- case m of
+    Just '-' -> do
+      (toplevs, exports) <- GHC.getContext
+      return $ map GHC.moduleName (nub (map fst exports) ++ toplevs)
+    otherwise -> do
+      dflags <- GHC.getSessionDynFlags
+      let pkg_mods = allExposedModules dflags
+      loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
+      return $ loaded_mods ++ pkg_mods
+  return $ filter (w `isPrefixOf`) $ map (showSDoc.ppr) modules
+
 completeHomeModule = wrapIdentCompleter listHomeModules
 
 listHomeModules :: String -> GHCi [String]
@@ -1747,6 +1759,12 @@ wrapCompleter breakChars fun = completeWord Nothing breakChars
 
 wrapIdentCompleter :: (String -> GHCi [String]) -> CompletionFunc GHCi
 wrapIdentCompleter = wrapCompleter word_break_chars
+
+wrapIdentCompleterWithModifier :: String -> (Maybe Char -> String -> GHCi [String]) -> CompletionFunc GHCi
+wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing word_break_chars
+    $ \rest -> fmap (map simpleCompletion) . fmap sort . fun (getModifier rest)
+ where
+  getModifier = find (`elem` modifChars)
 
 allExposedModules :: DynFlags -> [ModuleName]
 allExposedModules dflags 
