@@ -17,7 +17,7 @@
 
 module Haddock.Lex (
 	Token(..),
-  LToken,
+	LToken,
 	tokenise
  ) where
 
