@@ -15,7 +15,7 @@ Changes in version 2.8.0
 
   * Addition of a LaTeX backend.
 
-  * Frames-mode can be turned on/off from the header menu.
+  * Frames-mode can be enabled from the header menu.
 
   * Path to source entities can be specified per package, so that source
     links work for cross-package documentation.
