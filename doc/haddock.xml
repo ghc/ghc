@@ -351,6 +351,15 @@
 	  given), including the following:</para>
 	  <variablelist>
 	    <varlistentry>
+	      <term><filename><replaceable>module</replaceable>.html</filename></term>
+	      <term><filename>mini_<replaceable>module</replaceable>.html</filename></term>
+	      <listitem>
+		<para>An HTML page for each
+		<replaceable>module</replaceable>, and a "mini" page for
+		each used when viewing in frames.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
 	      <term><filename>index.html</filename></term>
 	      <listitem>
 		<para>The top level page of the documentation: lists
@@ -359,36 +368,33 @@
 	      </listitem>
 	    </varlistentry>
 	    <varlistentry>
-	      <term><filename>haddock.css</filename></term>
+	      <term><filename>doc-index.html</filename></term>
+	      <term><filename>doc-index-<replaceable>X</replaceable>.html</filename></term>
 	      <listitem>
-		<para>The stylesheet used by the generated HTML.  Feel
-		free to modify this to change the colors or
-		layout, or even specify your own stylesheet using the
-		<option>--css</option> option.</para>
+		<para>The alphabetic index, possibly split into multiple
+		pages if big enough.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><filename>frames.html</filename></term>
+	      <listitem>
+		<para>The top level document when viewing in frames.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><filename><replaceable>some</replaceable>.css</filename></term>
+	      <term><filename><replaceable>etc...</replaceable></filename></term>
+	      <listitem>
+		<para>Files needed for the themes used. Specify your themes
+		using the <option>--theme</option> option.</para>
 	      </listitem>
 	    </varlistentry>
 	    <varlistentry>
 	      <term><filename>haddock-util.js</filename></term>
 	      <listitem>
-		<para>A small piece of JavaScript for collapsing sections
-		of the generated HTML.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename><replaceable>module</replaceable>.html</filename></term>
-	      <listitem>
-		<para>An HTML page for each
-		<replaceable>module</replaceable>.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename>doc-index.html</filename></term>
-	      <term><filename>doc-index-XX.html</filename></term>
-	      <listitem>
-		<para>The index, split into two
-		(functions/constructors and types/classes, as per
-		Haskell namespaces) and further split
-		alphabetically.</para>
+		<para>Some JavaScript utilities used to implement some of the
+		dynamic features like collapsable sections, and switching to
+		frames view.</para>
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
@@ -636,6 +642,59 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
 	<term>
+	  <indexterm><primary><option>--theme</option></primary></indexterm>
+          <option>--theme</option>=<replaceable>path</replaceable>
+        </term>
+	<listitem>
+	  <para>Specify a theme to be used for HTML (<option>--html</option>)
+	  documentation. If given multiple times then the pages will use the
+	  first theme given by default, and have alternate style sheets for
+	  the others. The reader can switch between themes with browsers that
+	  support alternate style sheets, or with the "Style" menu that gets 
+	  added when the page is loaded. If
+	  no themes are specified, then just the default built-in theme
+	  ("Ocean") is used.
+	  </para>
+	  
+	  <para>The <replaceable>path</replaceable> parameter can be one of:
+	  </para>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para>A <emphasis>directory</emphasis>: The base name of
+	      the directory becomes the name of the theme. The directory
+	      must contain exactly one
+	      <filename><replaceable>some</replaceable>.css</filename> file.
+	      Other files, usually image files, will be copied, along with
+	      the <filename><replaceable>some</replaceable>.css</filename>
+	      file, into the generated output directory.</para>
+	    </listitem>
+	    <listitem>
+	      <para>A <emphasis>CSS file</emphasis>: The base name of
+	      the file becomes the name of the theme.</para>
+	    </listitem>
+	    <listitem>
+	      <para>The <emphasis>name</emphasis> of a built-in theme
+	      ("Ocean" or "Classic").</para>
+	    </listitem>
+	  </itemizedlist>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <indexterm><primary><option>--built-in-themes</option></primary></indexterm>
+          <option>--built-in-themes</option>
+        </term>
+	<listitem>
+	  <para>Includes the built-in themes ("Ocean" and "Classic").
+	  Can be combined with <option>--theme</option>. Note that order
+	  matters: The first specified theme will be the default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
 	  <indexterm><primary><option>-c</option></primary></indexterm>
           <option>-c</option> <replaceable>file</replaceable>
         </term>
@@ -644,9 +703,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <option>--css</option>=<replaceable>file</replaceable>
         </term>
 	<listitem>
-	  <para>Specify a CSS stylesheet to use instead of the default one
-	  that comes with Haddock.  It should specify certain classes:
-	  see the default stylesheet for details.</para>
+	  <para>Deprecated aliases for <option>--theme</option></para>
 	</listitem>
       </varlistentry>
 
@@ -749,30 +806,39 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
         <term>
+          <indexterm><primary><option>--use-contents</option></primary></indexterm>
+          <option>--use-contents=<replaceable>URL</replaceable></option>
+        </term>
+        <term>
           <indexterm><primary><option>--use-index</option></primary></indexterm>
           <option>--use-index=<replaceable>URL</replaceable></option>
         </term>
 	<listitem>
 	  <para>When generating HTML, do not generate an index.
-	  Instead, redirect the Index link on each page to
+	  Instead, redirect the Contents and/or Index link on each page to
 	  <replaceable>URL</replaceable>.  This option is intended for
-	  use in conjuction with <option>--gen-index</option> for
-	  generating a separate index covering multiple
+	  use in conjuction with <option>--gen-contents</option> and/or 
+	  <option>--gen-index</option> for
+	  generating a separate contents and/or index covering multiple
 	  libraries.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
         <term>
+          <indexterm><primary><option>--gen-contents</option></primary></indexterm>
+          <option>--gen-contents</option>
+        </term>
+        <term>
           <indexterm><primary><option>--gen-index</option></primary></indexterm>
           <option>--gen-index</option>
         </term>
 	<listitem>
-	  <para>Generate an HTML index containing entries pulled from
-	  all the specified interfaces (interfaces are specified using
+	  <para>Generate an HTML contents and/or index containing entries pulled 
+	  from all the specified interfaces (interfaces are specified using
 	  <option>-i</option> or <option>--read-interface</option>).
-	  This is used to generate a single index for multiple sets of
-	  Haddock documentation.</para>
+	  This is used to generate a single contents and/or index for multiple 
+	  sets of Haddock documentation.</para>
 	</listitem>
       </varlistentry>
 
