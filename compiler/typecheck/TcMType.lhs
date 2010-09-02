@@ -40,7 +40,7 @@ module TcMType (
   --------------------------------
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  SourceTyCtxt(..), checkValidTheta, checkFreeness,
+  SourceTyCtxt(..), checkValidTheta, 
   checkValidInstHead, checkValidInstance, 
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness, checkKinds,
   checkUpdateMeta, updateMeta, checkTauTvUpdate, fillBoxWithTau, unifyKindCtxt,
@@ -1136,7 +1136,6 @@ check_type rank ubx_tup ty
 		-- with a decent error message
 	; check_valid_theta SigmaCtxt theta
 	; check_type rank ubx_tup tau	-- Allow foralls to right of arrow
-	; checkFreeness tvs theta
 	; checkAmbiguity tvs theta (tyVarsOfType tau) }
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
@@ -1488,28 +1487,6 @@ In addition, GHC insists that at least one type variable
 in each constraint is in V.  So we disallow a type like
 	forall a. Eq b => b -> b
 even in a scope where b is in scope.
-
-\begin{code}
-checkFreeness :: [Var] -> [PredType] -> TcM ()
-checkFreeness forall_tyvars theta
-  = do	{ flexible_contexts <- doptM Opt_FlexibleContexts
-	; unless flexible_contexts $ mapM_ complain (filter is_free theta) }
-  where    
-    is_free pred     =  not (isIPPred pred)
-		     && not (any bound_var (varSetElems (tyVarsOfPred pred)))
-    bound_var ct_var = ct_var `elem` forall_tyvars
-    complain pred    = addErrTc (freeErr pred)
-
-freeErr :: PredType -> SDoc
-freeErr pred
-  = sep [ ptext (sLit "All of the type variables in the constraint") <+> 
-          quotes (pprPred pred)
-	, ptext (sLit "are already in scope") <+>
-          ptext (sLit "(at least one must be universally quantified here)")
-	, nest 4 $
-            ptext (sLit "(Use -XFlexibleContexts to lift this restriction)")
-        ]
-\end{code}
 
 \begin{code}
 checkThetaCtxt :: SourceTyCtxt -> ThetaType -> SDoc
