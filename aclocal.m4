@@ -1266,7 +1266,7 @@ if test ! -f utils/ghc-pwd/ghc-pwd && test ! -f utils/ghc-pwd/ghc-pwd.exe; then
   rm -f *.hi
   rm -f ghc-pwd
   rm -f ghc-pwd.exe
-  "$WithGhc" -v0 --make ghc-pwd -o ghc-pwd
+  "$WithGhc" -v0 -no-user-package-conf --make ghc-pwd -o ghc-pwd
   cd ../..
 fi
 

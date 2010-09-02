@@ -32,6 +32,7 @@ $1_$2_HC_DEP =
 $1_$2_HC_PKGCONF = -package-conf $$(BOOTSTRAPPING_CONF)
 $1_$2_GHC_PKG_OPTS = --package-conf=$$(BOOTSTRAPPING_CONF)
 $1_$2_CONFIGURE_OPTS += --package-db=$$(TOP)/$$(BOOTSTRAPPING_CONF)
+$1_$2_HC_OPTS += -no-user-package-conf
 ifeq "$(ghc_ge_613)" "YES"
 $1_$2_HC_OPTS += -rtsopts
 endif

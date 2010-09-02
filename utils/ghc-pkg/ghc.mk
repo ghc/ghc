@@ -48,6 +48,7 @@ endif
 # The binary package is not warning-clean, so we need a few -fno-warns here.
 utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs $(GHC_CABAL_INPLACE) | bootstrapping/. $$(dir $$@)/.
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
+	       -no-user-package-conf \
 	       -Wall -fno-warn-unused-imports \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -DBOOTSTRAPPING \
