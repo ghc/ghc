@@ -16,7 +16,6 @@ import Vectorise.Monad.Base
 import DsMonad
 import Type
 import Var
-import OccName
 import Name
 import SrcLoc
 import Id

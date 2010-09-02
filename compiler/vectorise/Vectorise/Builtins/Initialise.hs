@@ -22,7 +22,6 @@ import TyCon
 import Class
 import CoreSyn
 import Type
-import OccName
 import Name
 import Module
 import Var

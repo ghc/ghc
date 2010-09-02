@@ -16,8 +16,6 @@ import Vectorise.Monad.Base
 import Vectorise.Env
 
 import CoreSyn
-import Id
-import OccName
 import Name
 import VarEnv
 import Var
