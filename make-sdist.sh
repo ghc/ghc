@@ -27,7 +27,7 @@ tar cvzf haddock-*.tar.gz haddock-*/
 #    - make html
 #    - mv haddock haddock-html
 #    - tar cvzf haddock-doc-html-${version}.tar.gz haddock-html
-#    - scp haddock-doc-html-${version}.tar.gz haskell.org:haddock/doc
+#    - scp haddock-doc-html-${version}.tar.gz www.haskell.org:../haskell/haddock/doc
 #    - ssh haskell.org
 #        - cd haddock/doc
 #        - tar xvzf haddock-doc-html-${version}.tar.gz
