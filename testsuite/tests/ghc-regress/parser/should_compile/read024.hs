@@ -22,6 +22,9 @@ dynamic = [head dynamic]
 unsafe :: [unsafe]
 unsafe = [head unsafe]
 
+interruptible :: [interruptible]
+interruptible = [head interruptible]
+
 stdcall :: [stdcall]
 stdcall = [head stdcall]
 

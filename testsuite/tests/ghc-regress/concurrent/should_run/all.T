@@ -133,6 +133,10 @@ test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc036', compose(skip_if_fast,
 		  compose(omit_ways(['ghci','threaded2']),
 		    only_compiler_types(['ghc']))), compile_and_run, [''])
+# Interrupting foreign calls only makes sense if we are threaded
+test('foreignInterruptible', composes([skip_if_fast,
+			               only_threaded_ways,
+				       only_compiler_types(['ghc'])]), compile_and_run, [''])
 
 test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
