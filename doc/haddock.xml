@@ -162,6 +162,51 @@
     </section>
 
     <section>
+      <title>Contributors</title>
+      <para>Haddock was originally written by Simon Marlow. Since it is an open source
+      project, many people have contributed to its development over the years.
+      Below is a list of contributors in alphabetical order that we hope is
+      somewhat complete. If you think you are missing from this list, please contact
+      us.
+      </para>
+      <itemizedlist>
+	<listitem>Ashley Yakeley</listitem>
+	<listitem>Benjamin Franksen</listitem>
+	<listitem>Brett Letner</listitem>
+        <listitem>Clemens Fruhwirth</listitem>
+        <listitem>Conal Elliott</listitem>
+        <listitem>David Waern</listitem> 
+        <listitem>Duncan Coutts</listitem>
+        <listitem>George Pollard</listitem>
+        <listitem>George Russel</listitem>
+        <listitem>Hal Daume</listitem>
+        <listitem>Ian Lynagh</listitem>
+        <listitem>Isaac Dupree</listitem>
+        <listitem>Joachim Breitner</listitem>
+        <listitem>Krasimir Angelov</listitem>
+        <listitem>Lennart Augustsson</listitem>
+        <listitem>Luke Plant</listitem>
+        <listitem>Malcolm Wallace</listitem>
+        <listitem>Mark Lentczner</listitem>
+        <listitem>Mark Shields</listitem>
+        <listitem>Neil Mitchell</listitem>
+        <listitem>Mike Thomas</listitem>
+        <listitem>Manuel Chakravarty</listitem>
+        <listitem>Oliver Brown</listitem>
+        <listitem>Roman Cheplyaka</listitem>
+        <listitem>Ross Paterson</listitem>
+        <listitem>Simon Hengel</listitem>
+        <listitem>Simon Marlow</listitem>
+        <listitem>Simon Peyton-Jones</listitem>
+        <listitem>Sigbjorn Finne</listitem>
+        <listitem>Stefan O'Rear</listitem>
+        <listitem>Sven Panne</listitem>
+        <listitem>Thomas Schilling</listitem>
+        <listitem>Wolfgang Jeltsch</listitem>
+        <listitem>Yitzchak Gale</listitem>
+      </itemizedlist>
+    </section>
+    <section>
       <title>Acknowledgements</title>
 
       <para>Several documentation systems provided the inspiration for
@@ -185,12 +230,9 @@
 
       <para>and probably several others I've forgotten.</para>
 
-      <para>Thanks to the following people for useful feedback,
-      discussion, patches, packaging, and moral support: Simon Peyton
-      Jones, Mark Shields, Manuel Chakravarty, Ross Patterson, Brett
-      Letner, Sven Panne, Hal Daume, George Russell, Oliver Braun,
-      Ashley Yakeley, Malcolm Wallace, Krasimir Angelov, the members
-      of <email>haskelldoc@haskell.org</email>, and everyone who
+      <para>Thanks to the the members
+      of <email>haskelldoc@haskell.org</email>,
+      <email>haddock@projects.haskell.org</email> and everyone who
       contributed to the many libraries that Haddock makes use
       of.</para>
     </section>
