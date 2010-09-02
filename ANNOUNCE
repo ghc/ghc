@@ -24,6 +24,9 @@ Last but not least, we now also have a LaTeX backend. It was written by Simon
 Marlow and it was used to generate the libraries section of the Haskell 2010
 report.
 
+This version is compatible with .haddock files produced by Haddock 2.6.1 and
+above, provided that the version of GHC used to build Haddock stays the same.
+
 --------------------------------------------
 -- Changes in version 2.8.0
 --------------------------------------------
