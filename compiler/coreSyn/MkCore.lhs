@@ -52,12 +52,12 @@ import Type
 import TysPrim          ( alphaTyVar )
 import DataCon          ( DataCon, dataConWorkId )
 
+import Outputable
 import FastString
 import UniqSupply
 import Unique		( mkBuiltinUnique )
 import BasicTypes
 import Util             ( notNull, zipEqual )
-import Panic
 import Constants
 
 import Data.Char        ( ord )
@@ -93,20 +93,23 @@ mkCoreApp :: CoreExpr -> CoreExpr -> CoreExpr
 -- Check the invariant that the arg of an App is ok-for-speculation if unlifted
 -- See CoreSyn Note [CoreSyn let/app invariant]
 mkCoreApp fun (Type ty) = App fun (Type ty)
-mkCoreApp fun arg       = mk_val_app fun arg arg_ty res_ty
+mkCoreApp fun arg       = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg )
+                          mk_val_app fun arg arg_ty res_ty
                       where
-                        (arg_ty, res_ty) = splitFunTy (exprType fun)
+                        fun_ty = exprType fun
+                        (arg_ty, res_ty) = splitFunTy fun_ty
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
 mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
 -- Slightly more efficient version of (foldl mkCoreApp)
-mkCoreApps fun args
-  = go fun (exprType fun) args
+mkCoreApps orig_fun orig_args
+  = go orig_fun (exprType orig_fun) orig_args
   where
     go fun _      []               = fun
     go fun fun_ty (Type ty : args) = go (App fun (Type ty)) (applyTy fun_ty ty) args
-    go fun fun_ty (arg     : args) = go (mk_val_app fun arg arg_ty res_ty) res_ty args
+    go fun fun_ty (arg     : args) = ASSERT2( isFunTy fun_ty, ppr fun_ty $$ ppr orig_fun $$ ppr orig_args )
+                                     go (mk_val_app fun arg arg_ty res_ty) res_ty args
                                    where
                                      (arg_ty, res_ty) = splitFunTy fun_ty
 
