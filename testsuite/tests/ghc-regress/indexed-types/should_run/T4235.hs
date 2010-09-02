@@ -4,7 +4,7 @@ module Main where
 import Ix
 
 -- Deriving Enum with phantom type parameter
-data T a = R | S | T deriving( Enum, Show, Ix )
+data T a = R | S | T deriving( Enum, Show )
 
 -- Tests that deriving works for data families
 data family Foo a

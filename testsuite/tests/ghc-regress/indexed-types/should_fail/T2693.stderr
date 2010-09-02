@@ -1,7 +1,6 @@
 
 T2693.hs:10:15:
-    Couldn't match expected type `(a1, b)'
-           against inferred type `TFn a'
+    Could not deduce (TFn a ~ (a1, b)) from the context ()
     In the first argument of `fst', namely `x'
     In the first argument of `(+)', namely `fst x'
     In the expression: fst x + fst x
