@@ -23,7 +23,7 @@ test('dynamic002', 	[skip_if_fast,reqlib('packedstring')], compile_and_run, ['-p
 test('enum01', 		skip_if_fast, compile_and_run, ['-cpp'])
 test('enum02', 		skip_if_fast, compile_and_run, ['-cpp'])
 test('enum03', 		skip_if_fast, compile_and_run, ['-cpp'])
-test('enum04', 		expect_fail, compile_and_run, [''])
+test('enum04', 		normal, compile_and_run, [''])
 test('exceptionsrun001', 	normal, compile_and_run, [''])
 test('exceptionsrun002', 	normal, compile_and_run, [''])
 test('list001'	,	skip_if_fast, compile_and_run, [''])
