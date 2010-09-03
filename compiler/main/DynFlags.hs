@@ -1502,7 +1502,7 @@ type FlagSpec flag
      , Bool -> DynP ())	 -- Extra action to run when the flag is found
        	       	    	 -- Typically, emit a warning or error
        	       	    	 -- True  <=> we are turning the flag on
-       	       	    	 -- False <=> we are turning the flag on
+       	       	    	 -- False <=> we are turning the flag off
 
 
 mkFlag :: Bool                  -- ^ True <=> it should be turned on
@@ -1714,7 +1714,10 @@ xFlags = [
   ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, nop ),
   ( "DatatypeContexts",                 Opt_DatatypeContexts, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
-  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, nop ),
+  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, 
+    \ turn_on -> if not turn_on 
+                 then deprecate "You can't turn off RelaxedPolyRec any more"
+                 else return () ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
   ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
