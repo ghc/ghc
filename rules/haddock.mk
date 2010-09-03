@@ -50,7 +50,7 @@ endif
 	  --title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
 	  --prologue="$1/$2/haddock-prologue.txt" \
 	  $$(foreach mod,$$($1_$2_HIDDEN_MODULES),--hide=$$(mod)) \
-	  $$(foreach pkg,$$($1_$2_DEPS),$$(if $$($$(pkg)_HADDOCK_FILE),--read-interface=../$$(pkg)$$(comma)$$($$(pkg)_HADDOCK_FILE))) \
+	  $$(foreach pkg,$$($1_$2_DEPS),$$(if $$($$(pkg)_HADDOCK_FILE),--read-interface=../$$(pkg)$$(comma)../$$(pkg)/src/%{MODULE/./-}.html\#%{NAME}$$(comma)$$($$(pkg)_HADDOCK_FILE))) \
 	  $$(foreach opt,$$($1_$2_v_ALL_HC_OPTS),--optghc=$$(opt)) \
 	  $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS) \
 	  $$($1_$2_HS_SRCS) \
