@@ -170,7 +170,11 @@ delListFromFM = foldl delFromFM
 plusFM (FM x) (FM y) = FM (M.union y x)
 plusFM_C f (FM x) (FM y) = FM (M.unionWith f x y)
 minusFM (FM x) (FM y) = FM (M.difference x y)
+#if MIN_VERSION_containers(0,4,0)
+foldFM k z (FM m) = M.foldrWithKey k z m
+#else
 foldFM k z (FM m) = M.foldWithKey k z m
+#endif
 
 intersectFM (FM x) (FM y) = FM (M.intersection x y)
 intersectFM_C f (FM x) (FM y) = FM (M.intersectionWith f x y)
