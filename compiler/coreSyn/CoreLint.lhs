@@ -335,7 +335,7 @@ lintAltBinders :: OutType     -- Scrutinee type
 lintAltBinders scrut_ty con_ty [] 
   = checkTys con_ty scrut_ty (mkBadPatMsg con_ty scrut_ty) 
 lintAltBinders scrut_ty con_ty (bndr:bndrs)
-  | isTyVar bndr
+  | isTyCoVar bndr
   = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
        ; lintAltBinders scrut_ty con_ty' bndrs }
   | otherwise
