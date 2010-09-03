@@ -183,16 +183,6 @@ intDataCon_RDR	= nameRdrName intDataConName
 listTyCon_RDR	= nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
 parrTyCon_RDR	= nameRdrName parrTyConName
-{-
-tySuperKindTyCon_RDR     = nameRdrName tySuperKindTyConName
-coSuperKindTyCon_RDR = nameRdrName coSuperKindTyConName
-liftedTypeKindTyCon_RDR   = nameRdrName liftedTypeKindTyConName
-openTypeKindTyCon_RDR     = nameRdrName openTypeKindTyConName
-unliftedTypeKindTyCon_RDR = nameRdrName unliftedTypeKindTyConName
-ubxTupleKindTyCon_RDR     = nameRdrName ubxTupleKindTyConName
-argTypeKindTyCon_RDR      = nameRdrName argTypeKindTyConName
-funKindTyCon_RDR          = nameRdrName funKindTyConName
--}
 \end{code}
 
 
