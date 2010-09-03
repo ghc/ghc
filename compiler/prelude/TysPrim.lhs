@@ -12,7 +12,7 @@ module TysPrim(
 	alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 	alphaTy, betaTy, gammaTy, deltaTy,
 	openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar, openAlphaTyVars,
-        argAlphaTy, argAlphaTyVar,
+        argAlphaTy, argAlphaTyVar, argBetaTy, argBetaTyVar,
 
 	primTyCons,
 
@@ -183,10 +183,11 @@ openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
-argAlphaTyVar :: TyVar
-(argAlphaTyVar : _) = tyVarList argTypeKind
-argAlphaTy :: Type
+argAlphaTyVar, argBetaTyVar :: TyVar
+(argAlphaTyVar : argBetaTyVar : _) = tyVarList argTypeKind
+argAlphaTy, argBetaTy :: Type
 argAlphaTy = mkTyVarTy argAlphaTyVar
+argBetaTy  = mkTyVarTy argBetaTyVar
 \end{code}
 
 

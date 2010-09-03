@@ -945,10 +945,10 @@ seqId = pcMiscPrelId seqName ty info
                        `setSpecInfo` mkSpecInfo [seq_cast_rule]
            
 
-    ty  = mkForAllTys [alphaTyVar,openBetaTyVar]
-                      (mkFunTy alphaTy (mkFunTy openBetaTy openBetaTy))
-    [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
-    rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
+    ty  = mkForAllTys [alphaTyVar,argBetaTyVar]
+                      (mkFunTy alphaTy (mkFunTy argBetaTy argBetaTy))
+    [x,y] = mkTemplateLocals [alphaTy, argBetaTy]
+    rhs = mkLams [alphaTyVar,argBetaTyVar,x,y] (Case (Var x) x argBetaTy [(DEFAULT, [], Var y)])
 
     -- See Note [Built-in RULES for seq]
     seq_cast_rule = BuiltinRule { ru_name  = fsLit "seq of cast"
