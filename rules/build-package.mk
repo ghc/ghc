@@ -161,7 +161,9 @@ $$(foreach way,$$($1_$2_WAYS),$$(eval \
     $$(call build-package-way,$1,$2,$$(way),$3) \
   ))
 
+ifneq "$$($1_$2_HADDOCK_ME)" "NO"
 $(call haddock,$1,$2)
+endif
 
 endif # package-data.mk exists
 

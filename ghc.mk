@@ -312,6 +312,10 @@ define addPackage # args: $1 = package, $2 = condition
     endif
 endef
 
+INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
+
+$(foreach p,$(INTREE_ONLY_PACKAGES),$(eval libraries/$p_dist-install_HADDOCK_ME = NO))
+
 $(eval $(call addPackage,ghc-prim))
 ifeq "$(CLEANING)" "YES"
 $(eval $(call addPackage,integer-gmp))
@@ -897,7 +901,7 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
-INSTALLED_PACKAGES := $(filter-out haskeline mtl terminfo utf8-string xhtml,$(PACKAGES))
+INSTALLED_PACKAGES := $(filter-out $(INTREE_ONLY_PACKAGES),$(PACKAGES))
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALLED_PACKAGES := $(filter-out $(EXTRA_PACKAGES), $(INSTALLED_PACKAGES))
 endif
