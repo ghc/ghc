@@ -19,13 +19,6 @@ lib/net/net001 [Windows]
 lib/system/system001 [Windows]
 		-- probably a failure due to System.system using Cmd.exe?
 
-lib/should_run/enum04
-		-- enumFrom on basic numeric types should be strict
-		-- (possibly a bug in the Haskell Report: it specifies that
-		-- these ops should be strict in the section on Enum, but the
- 		-- sample code in the Prelude doesn't agree, at least for
-		-- Float and Double).
-
 parser/should_fail/read002
 		-- we don't disallow certain characters in strings (eg. newline)
 
