@@ -1,15 +1,8 @@
 
 T3621.hs:21:22:
-    Couldn't match expected type `state' against inferred type `s'
-      `state' is a rigid type variable bound by
-              the instance declaration at T3621.hs:21:33
+    Couldn't match type `s' with `state'
       `s' is a rigid type variable bound by
-          the instance declaration at T3621.hs:20:22
-    When using functional dependencies to combine
-      MonadState s (State s),
-        arising from the dependency `m -> s'
-        in the instance declaration at T3621.hs:18:10
-      MonadState state (State s),
-        arising from the instance declaration at T3621.hs:21:22-37
-    When checking the super-classes of an instance declaration
-    In the instance declaration for `MonadState state (WrappedState s)'
+          the instance declaration at T3621.hs:21:22
+      `state' is a rigid type variable bound by
+              the instance declaration at T3621.hs:21:22
+    When deriving the instance for (MonadState state (WrappedState s))

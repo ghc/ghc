@@ -9,10 +9,10 @@ data T = C { x :: Int, y :: Int }
        | D { x :: Int, b :: Bool }
 
 select :: T -> Int
-select = Foo.x
+select = x
 
 f :: (T,T) -> Int
-f v = let (C {..}, d) = v in Foo.x d
+f v = let (C {..}, d) = v in Main.x d
 
 mkC a =
     let x = a + 1

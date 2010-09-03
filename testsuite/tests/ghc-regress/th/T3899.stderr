@@ -2,4 +2,4 @@ T3899.hs:6:7:
     T3899.hs:6:7-19: Splicing expression
         nestedTuple 3 ======> \ (Cons x (Cons x (Cons x Nil))) -> (x, x, x)
     In the expression: $(nestedTuple 3)
-    In the definition of `f': f = $(nestedTuple 3)
+    In an equation for `f': f = $(nestedTuple 3)
