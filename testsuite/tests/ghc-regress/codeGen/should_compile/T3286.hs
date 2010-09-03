@@ -21,7 +21,7 @@ learn_observations state_prob = M.mapWithKey f . histogram
 
 histogram :: (Ord a) => [a] -> M.Map a Prob
 histogram xs = let hist = foldl' undefined M.empty xs in
-                M.map (/ M.fold (+) 0 hist) hist
+                M.map (/ M.foldrWithKey (\_ a b -> a + b) 0 hist) hist
 
 train :: (Ord observation, Ord state) =>
             [(observation, state)]
