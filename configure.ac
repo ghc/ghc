@@ -426,12 +426,11 @@ then
     NM="$hardtop/inplace/mingw/bin/nm.exe"
     fp_prog_ar_raw="$hardtop/inplace/mingw/bin/ar.exe"
     if ! test -d inplace/mingw ||
-         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/gcc-g++*.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/libcrypt*.tar.bz2 ||
-         test inplace/mingw -ot ghc-tarballs/mingw/mingw-runtime*.tar.gz ||
-         test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.gz
+         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma  ||
+         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*.tar.gz    ||
+         test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
     then
         AC_MSG_NOTICE([Making in-tree mingw tree])
         rm -rf inplace/mingw
@@ -439,12 +438,11 @@ then
         mkdir inplace/mingw
         (
             cd inplace/mingw &&
-            tar -zxf ../../ghc-tarballs/mingw/binutils*.tar.gz &&
-            tar -zxf ../../ghc-tarballs/mingw/gcc-core*.tar.gz &&
-            tar -zxf ../../ghc-tarballs/mingw/gcc-g++*.tar.gz &&
-            tar -jxf ../../ghc-tarballs/mingw/libcrypt*.tar.bz2 &&
-            tar -zxf ../../ghc-tarballs/mingw/mingw-runtime*.tar.gz &&
-            tar -zxf ../../ghc-tarballs/mingw/w32api*.tar.gz &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma  &&
+            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*.tar.gz    &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma   &&
             mv bin/gcc.exe bin/realgcc.exe
         )
         inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
