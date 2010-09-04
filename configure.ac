@@ -426,10 +426,14 @@ then
     NM="$hardtop/inplace/mingw/bin/nm.exe"
     fp_prog_ar_raw="$hardtop/inplace/mingw/bin/ar.exe"
     if ! test -d inplace/mingw ||
-         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma ||
-         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma ||
-         test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma  ||
-         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*.tar.gz    ||
+         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
+         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
     then
         AC_MSG_NOTICE([Making in-tree mingw tree])
@@ -438,11 +442,15 @@ then
         mkdir inplace/mingw
         (
             cd inplace/mingw &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma  &&
-            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*.tar.gz    &&
-            tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma   &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
+            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
+            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
             mv bin/gcc.exe bin/realgcc.exe
         )
         inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
