@@ -52,9 +52,6 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 # Temporarily turn off unused-import warnings for the binary package
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
-# binary has unusable UNPACK pragmas
-libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
-libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn
