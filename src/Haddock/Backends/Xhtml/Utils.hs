@@ -15,6 +15,7 @@ module Haddock.Backends.Xhtml.Utils (
 
   namedAnchor, linkedAnchor,
   spliceURL,
+  groupId,
 
   (<+>), char, nonEmpty,
   keyword, punctuate,
@@ -171,6 +172,10 @@ namedAnchor n = anchor ! [XHtml.name n]
 linkedAnchor :: String -> Html -> Html
 linkedAnchor n = anchor ! [href ('#':n)]
 
+
+-- | generate an anchor identifier for a group
+groupId :: String -> String
+groupId g = makeAnchorId ("g:" ++ g)
 
 --
 -- A section of HTML which is collapsible.

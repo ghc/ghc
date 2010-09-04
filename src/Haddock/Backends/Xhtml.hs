@@ -591,7 +591,8 @@ ppModuleContents exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-        html = linkedAnchor id0 << docToHtml doc +++ mk_subsections ssecs
+        html = linkedAnchor (groupId id0)
+                << docToHtml doc +++ mk_subsections ssecs
         (ssecs, rest1) = process lev rest
         (secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
@@ -614,7 +615,7 @@ numberSectionHeadings exports = go 1 exports
 
 processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
 processExport summary _ _ (ExportGroup lev id0 doc)
-  = nothingIf summary $ groupTag lev ! [identifier id0] << docToHtml doc
+  = nothingIf summary $ groupHeading lev id0 << docToHtml doc
 processExport summary links unicode (ExportDecl decl doc subdocs insts)
   = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode
 processExport summary _ _ (ExportNoDecl y [])
@@ -641,6 +642,8 @@ processDeclOneLiner :: Bool -> Html -> Maybe Html
 processDeclOneLiner True = Just
 processDeclOneLiner False = Just . divTopDecl . declElem
 
+groupHeading :: Int -> String -> Html -> Html
+groupHeading lev id0 = groupTag lev ! [identifier (groupId id0)]
 
 groupTag :: Int -> Html -> Html
 groupTag lev
