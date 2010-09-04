@@ -45,6 +45,8 @@ import qualified System.Event.Array as A
 import Data.Int (Int64)
 import Data.Word (Word64)
 import Foreign.C.Types (CUInt)
+#else
+import Foreign.C.Types (CIntPtr, CUIntPtr)
 #endif
 
 #include <sys/types.h>
