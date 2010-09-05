@@ -453,7 +453,11 @@ then
             tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
             mv bin/gcc.exe bin/realgcc.exe
         )
-        inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
+        PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
+        if ! test -e inplace/mingw/bin/gcc.exe
+        then
+            AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
+        fi
         AC_MSG_NOTICE([In-tree mingw tree created])
     fi
     if ! test -d inplace/perl ||
