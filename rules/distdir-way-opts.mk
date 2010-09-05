@@ -81,8 +81,16 @@ ifneq ($$(strip $$($1_$2_DEP_INCLUDE_DIRS)),)
 $1_$2_CC_INC_FLAGS:=$$(shell for i in $$($1_$2_DEP_INCLUDE_DIRS); do echo $$($1_$2_DEP_INCLUDE_DIRS_FLAG)\"$$$$i\"; done)
 endif
 
-$1_$2_DIST_CC_OPTS = \
+# The CONF_CC_OPTS_STAGE$4 options are what we use to get gcc to
+# behave correctly, but they are specific to the gcc that we are using.
+# If GHC is compiling C code then it will take care of that for us,
+# and in the case of the stage 0 compiler it may be using a different
+# gcc, so we don't want to use our gcc-specific options.
+$1_$2_DIST_GCC_CC_OPTS = \
  $$(CONF_CC_OPTS_STAGE$4) \
+ $$($1_$2_DIST_CC_OPTS)
+
+$1_$2_DIST_CC_OPTS = \
  $$(SRC_CC_OPTS) \
  $$($1_CC_OPTS) \
  $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
@@ -108,8 +116,8 @@ $1_$2_DIST_LD_OPTS = \
 # c.f. Cabal's Distribution.Simple.PreProcess.ppHsc2hs
 # We use '' around cflags and lflags to handle paths with backslashes in
 # on Windows
-ifneq ($$(strip $$($1_$2_DIST_CC_OPTS)),)
-$1_$2_$3_HSC2HS_CC_OPTS:=$$(shell for i in $$($1_$2_DIST_CC_OPTS); do echo \'--cflag=$$$$i\'; done)
+ifneq ($$(strip $$($1_$2_DIST_GCC_CC_OPTS)),)
+$1_$2_$3_HSC2HS_CC_OPTS:=$$(shell for i in $$($1_$2_DIST_GCC_CC_OPTS); do echo \'--cflag=$$$$i\'; done)
 endif
 ifneq ($$(strip $$($1_$2_DIST_LD_OPTS)),)
 $1_$2_$3_HSC2HS_LD_OPTS:=$$(shell for i in $$($1_$2_DIST_LD_OPTS); do echo \'--lflag=$$$$i\'; done)
@@ -129,13 +137,18 @@ $1_$2_$3_ALL_HSC2HS_OPTS = \
 
 $1_$2_$3_ALL_CC_OPTS = \
  $$(WAY_$3_CC_OPTS) \
- $$($1_$2_DIST_CC_OPTS) \
+ $$($1_$2_DIST_GCC_CC_OPTS) \
  $$($1_$2_$3_CC_OPTS) \
  $$($$(basename $$<)_CC_OPTS) \
  $$(EXTRA_CC_OPTS)
 
 $1_$2_$3_GHC_CC_OPTS = \
- $$(addprefix -optc, $$($1_$2_$3_ALL_CC_OPTS)) \
+ $$(addprefix -optc, \
+     $$(WAY_$3_CC_OPTS) \
+     $$($1_$2_DIST_CC_OPTS) \
+     $$($1_$2_$3_CC_OPTS) \
+     $$($$(basename $$<)_CC_OPTS) \
+     $$(EXTRA_CC_OPTS)) \
  $$($1_$2_$3_MOST_HC_OPTS)
 
 $1_$2_$3_ALL_AS_OPTS = \
