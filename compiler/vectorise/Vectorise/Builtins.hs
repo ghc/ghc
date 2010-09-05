@@ -73,6 +73,3 @@ prim_ty_cons = mkNameEnv [mk_prim intPrimTyCon]
   where
     mk_prim tycon = (tyConName tycon, '_' : getOccString tycon)
 
-	
-
-	
