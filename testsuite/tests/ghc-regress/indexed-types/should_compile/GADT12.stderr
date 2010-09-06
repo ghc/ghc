@@ -1,7 +1,0 @@
-
-GADT12.hs:31:18:
-    Pattern signature must exactly match: TU Typed (Type a)
-    In the pattern: TypeBool :: Type Bool
-    In the pattern: Var2 "x" (TypeBool :: Type Bool)
-    In the definition of `bug2a':
-        bug2a (Var2 "x" (TypeBool :: Type Bool)) = ()

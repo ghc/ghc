@@ -70,7 +70,7 @@ test('GADT8', normal, compile, [''])
 test('GADT9', normal, compile, [''])
 test('GADT10', expect_fail, compile, [''])
 test('GADT11', normal, compile, [''])
-test('GADT12', normal, compile_fail, [''])
+test('GADT12', normal, compile, [''])
 test('GADT13', normal, compile, [''])
 test('GADT14', normal, compile, [''])
 
