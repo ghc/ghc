@@ -1655,10 +1655,11 @@ templateHaskellNames :: [Name]
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName, 
-
+    liftStringName,
+ 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
-    floatPrimLName, doublePrimLName, rationalLName,
+    floatPrimLName, doublePrimLName, rationalLName, 
     -- Pat
     litPName, varPName, tupPName, conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName,
