@@ -459,6 +459,7 @@ Library
         VectVar
         Vectorise.Env
         Vectorise.Vect
+        Vectorise.Type.Type
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins.Modules
