@@ -17,4 +17,10 @@ instance Foo t => Sat (FooD t)
 
 instance Data FooD a => Foo a
 instance Foo a       => Foo [a]
+  -- Have: Foo a, Data FooD a, Foo [a]
+  --
+  -- Want superclasses: (Data FooD [a])
+  -- and hence: Sat (FooD [a]), Data FooD a
+  -- and hence: Foo [a]
+
 instance                Foo [Char]
