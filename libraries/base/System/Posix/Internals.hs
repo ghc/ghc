@@ -311,6 +311,9 @@ foreign import ccall unsafe "consUtils.h set_console_echo__"
 foreign import ccall unsafe "consUtils.h get_console_echo__"
    get_console_echo :: CInt -> IO CInt
 
+foreign import ccall unsafe "consUtils.h is_console__"
+   is_console :: CInt -> IO CInt
+
 #endif
 
 -- ---------------------------------------------------------------------------

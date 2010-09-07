@@ -14,6 +14,29 @@
 #define _get_osfhandle get_osfhandle
 #endif
 
+int is_console__(int fd) {
+    DWORD st;
+    HANDLE h;
+    if (!_isatty(fd)) {
+        /* TTY must be a character device */
+        return 0;
+    }
+    h = get_osfhandle(fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        /* Broken handle can't be terminal */
+        return 0;
+    }
+    if (GetConsoleMode(h, &st) == INVALID_HANDLE_VALUE) {
+        /* GetConsoleMode appears to fail when it's not a TTY.  In
+           particular, it's what most of our terminal functions
+           assume works, so if it doesn't work for all intents
+           and purposes we're not dealing with a terminal. */
+        return 0;
+    }
+    return 1;
+}
+
+
 int
 set_console_buffering__(int fd, int cooked)
 {

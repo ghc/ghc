@@ -374,7 +374,12 @@ foreign import ccall safe "fdReady"
 -- Terminal-related stuff
 
 isTerminal :: FD -> IO Bool
-isTerminal fd = c_isatty (fdFD fd) >>= return.toBool
+isTerminal fd =
+#if defined(mingw32_HOST_OS)
+    is_console (fdFD fd) >>= return.toBool
+#else
+    c_isatty (fdFD fd) >>= return.toBool
+#endif
 
 setEcho :: FD -> Bool -> IO () 
 setEcho fd on = System.Posix.Internals.setEcho (fdFD fd) on
