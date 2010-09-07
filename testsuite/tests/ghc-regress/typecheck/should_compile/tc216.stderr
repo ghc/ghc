@@ -1,0 +1,28 @@
+
+tc216.hs:38:12:
+    Context reduction stack overflow; size = 21
+    Use -fcontext-stack=N to increase stack size to N
+      $dBar :: Bar y20 z
+      $dBar :: Bar y19 z
+      $dBar :: Bar y18 z
+      $dBar :: Bar y17 z
+      $dBar :: Bar y16 z
+      $dBar :: Bar y15 z
+      $dBar :: Bar y14 z
+      $dBar :: Bar y13 z
+      $dBar :: Bar y12 z
+      $dBar :: Bar y11 z
+      $dBar :: Bar y10 z
+      $dBar :: Bar y9 z
+      $dBar :: Bar y8 z
+      $dBar :: Bar y7 z
+      $dBar :: Bar y6 z
+      $dBar :: Bar y5 z
+      $dBar :: Bar y4 z
+      $dBar :: Bar y3 z
+      $dBar :: Bar y2 z
+      $dBar :: Bar y1 z
+      $dBar :: Bar y z
+    In the expression: bar (foo x) z
+    In an equation for `bar': bar x z = bar (foo x) z
+    In the instance declaration for `Bar x z'
