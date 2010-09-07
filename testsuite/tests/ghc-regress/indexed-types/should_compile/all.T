@@ -145,4 +145,4 @@ test('IndTypesPerf',
      run_command,
      ['$MAKE -s --no-print-directory IndTypesPerf'])
 
-test('T4120', normal, compile, [''])
+test('T4120', normal, compile_fail, [''])
