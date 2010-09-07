@@ -461,41 +461,42 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
               hsc_env us hpt_rule_base 
               guts@(ModGuts { mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
-  = do {
-	(termination_msg, it_count, counts_out, guts') 
-	   <- do_iteration us 1 (zeroSimplCount dflags) binds rules ;
+  = do { (termination_msg, it_count, counts_out, guts') 
+	   <- do_iteration us 1 [] binds rules 
 
-	Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
+	; Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
 		  "Simplifier statistics for following pass"
 		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
 			 blankLine,
-			 pprSimplCount counts_out]);
+			 pprSimplCount counts_out])
 
-	return (counts_out, guts')
+	; return (counts_out, guts')
     }
   where
     dflags     	 = hsc_dflags hsc_env
     dump_phase 	 = dumpSimplPhase dflags mode
     sw_chkr	 = isAmongSimpl switches
     do_iteration :: UniqSupply
-                 -> Int		-- Counts iterations
-		 -> SimplCount	-- Logs optimisations performed
-		 -> [CoreBind]	-- Bindings in
-		 -> [CoreRule]	-- and orphan rules
+                 -> Int		 -- Counts iterations
+		 -> [SimplCount] -- Counts from earlier iterations, reversed
+		 -> [CoreBind]	 -- Bindings in
+		 -> [CoreRule]	 -- and orphan rules
 		 -> IO (String, Int, SimplCount, ModGuts)
 
-    do_iteration us iteration_no counts binds rules
+    do_iteration us iteration_no counts_so_far binds rules
 	-- iteration_no is the number of the iteration we are
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
-      =  WARN(debugIsOn && (max_iterations > 2),
-                text ("Simplifier still going after " ++
-				show max_iterations ++
-			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) ++ "\n" ))
+      = WARN( debugIsOn && (max_iterations > 2)
+            , ptext (sLit "Simplifier baling out after") <+> int max_iterations
+              <+> ptext (sLit "iterations") 
+              <+> brackets (pprWithCommas (int . simplCountN) (reverse counts_so_far))
+              <+> ptext (sLit "Size =") <+> int (coreBindsSize binds) )
+
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    return ("Simplifier bailed out", iteration_no - 1, counts, 
-                    guts { mg_binds = binds, mg_rules = rules })
+	return ("Simplifier baled out", iteration_no - 1, total_counts, 
+                 guts { mg_binds = binds, mg_rules = rules })
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
@@ -526,22 +527,21 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 		-- With a let, we ended up with
 		--   let
 		--	t = initSmpl ...
-		--	counts' = snd t
+		--	counts1 = snd t
 		--   in
-		-- 	case t of {(_,counts') -> if counts'=0 then ... }
-		-- So the conditional didn't force counts', because the
+		-- 	case t of {(_,counts1) -> if counts1=0 then ... }
+		-- So the conditional didn't force counts1, because the
 		-- selection got duplicated.  Sigh!
 	   case initSmpl dflags rule_base2 fam_envs us1 simpl_binds of {
 	  	(env1, counts1) -> do {
 
-	   let	{ all_counts = counts `plusSimplCount` counts1
-	   	; binds1 = getFloats env1
+	   let	{ binds1 = getFloats env1
                 ; rules1 = substRulesForImportedIds (mkCoreSubst (text "imp-rules") env1) rules
 	        } ;
 
 		-- Stop if nothing happened; don't dump output
 	   if isZeroSimplCount counts1 then
-		return ("Simplifier reached fixed point", iteration_no, all_counts,
+		return ("Simplifier reached fixed point", iteration_no, total_counts,
 			guts { mg_binds = binds1, mg_rules = rules1 })
 	   else do {
 		-- Short out indirections
@@ -558,10 +558,14 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 	   end_iteration dflags pass iteration_no counts1 binds2 rules1 ;
 
 		-- Loop
-  	   do_iteration us2 (iteration_no + 1) all_counts binds2 rules1
+  	   do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
 	}  } } }
       where
-  	  (us1, us2) = splitUniqSupply us
+  	(us1, us2) = splitUniqSupply us
+
+	-- Remember the counts_so_far are reversed
+        total_counts = foldr (\c acc -> acc `plusSimplCount` c) 
+                             (zeroSimplCount dflags) counts_so_far
 
 -------------------
 end_iteration :: DynFlags -> CoreToDo -> Int 

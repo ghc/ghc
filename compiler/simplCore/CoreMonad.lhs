@@ -15,7 +15,7 @@ module CoreMonad (
     getCoreToDo, dumpSimplPhase,
 
     -- * Counting
-    SimplCount, doSimplTick, doFreeSimplTick,
+    SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
     pprSimplCount, plusSimplCount, zeroSimplCount, isZeroSimplCount, Tick(..),
 
     -- * The monad
@@ -545,9 +545,7 @@ plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
 
 \begin{code}
 data SimplCount 
-   = VerySimplZero		-- These two are used when 
-   | VerySimplNonZero	-- we are only interested in 
-				-- termination info
+   = VerySimplCount !Int	-- Used when don't want detailed stats
 
    | SimplCount	{
 	ticks   :: !Int,	-- Total ticks
@@ -563,6 +561,10 @@ data SimplCount
 
 type TickCounts = FiniteMap Tick Int
 
+simplCountN :: SimplCount -> Int
+simplCountN (VerySimplCount n)         = n
+simplCountN (SimplCount { ticks = n }) = n
+
 zeroSimplCount dflags
 		-- This is where we decide whether to do
 		-- the VerySimpl version or the full-stats version
@@ -570,11 +572,10 @@ zeroSimplCount dflags
   = SimplCount {ticks = 0, details = emptyFM,
                 n_log = 0, log1 = [], log2 = []}
   | otherwise
-  = VerySimplZero
+  = VerySimplCount 0
 
-isZeroSimplCount VerySimplZero    	    = True
-isZeroSimplCount (SimplCount { ticks = 0 }) = True
-isZeroSimplCount _    			    = False
+isZeroSimplCount (VerySimplCount n)    	    = n==0
+isZeroSimplCount (SimplCount { ticks = n }) = n==0
 
 doFreeSimplTick tick sc@SimplCount { details = dts } 
   = sc { details = dts `addTick` tick }
@@ -586,7 +587,7 @@ doSimplTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = 
   where
     sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
 
-doSimplTick _ _ = VerySimplNonZero -- The very simple case
+doSimplTick _ (VerySimplCount n) = VerySimplCount (n+1)
 
 
 -- Don't use plusFM_C because that's lazy, and we want to 
@@ -608,11 +609,11 @@ plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
 	     | null (log2 sc2) = sc2 { log2 = log1 sc1 }
 	     | otherwise       = sc2
 
-plusSimplCount VerySimplZero VerySimplZero = VerySimplZero
-plusSimplCount _             _             = VerySimplNonZero
+plusSimplCount (VerySimplCount n) (VerySimplCount m) = VerySimplCount (n+m)
+plusSimplCount _                  _                  = panic "plusSimplCount"
+       -- We use one or the other consistently
 
-pprSimplCount VerySimplZero    = ptext (sLit "Total ticks: ZERO!")
-pprSimplCount VerySimplNonZero = ptext (sLit "Total ticks: NON-ZERO!")
+pprSimplCount (VerySimplCount n) = ptext (sLit "Total ticks:") <+> int n
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
   = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
 	  blankLine,
