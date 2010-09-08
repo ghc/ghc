@@ -37,7 +37,6 @@ endif
 
 EXCLUDED_SRCS += rts/Main.c
 EXCLUDED_SRCS += rts/parallel/SysMan.c
-EXCLUDED_SRCS += rts/dyn-wrapper.c
 EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
 
 rts_C_SRCS = $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
@@ -436,14 +435,6 @@ rts_CC_OPTS     += -Ilibffi/build/include
 rts_HC_OPTS     += -Ilibffi/build/include
 rts_HSC2HS_OPTS += -Ilibffi/build/include
 rts_LD_OPTS     += -Llibffi/build/include
-
-# -----------------------------------------------------------------------------
-# compile generic patchable dyn-wrapper
-
-DYNWRAPPER_SRC = rts/dyn-wrapper.c
-DYNWRAPPER_PROG = rts/dyn-wrapper$(exeext)
-$(DYNWRAPPER_PROG): $(DYNWRAPPER_SRC)
-	"$(HC)" -cpp -optc-include -optcdyn-wrapper-patchable-behaviour.h $(INPLACE_EXTRA_FLAGS) $< -o $@
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported

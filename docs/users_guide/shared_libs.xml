@@ -218,17 +218,6 @@ ghc -dynamic -shared Foo.o -o libfoo.so
 	    </para>
 	  </listitem>
 	</varlistentry>
-	<varlistentry>
-	  <term>wrapped</term>
-	  <listitem>
-	    <para>
-	      This mode generates a wrapper program which in turn calls the
-	      real program (in the same directory but with a .dyn extension)
-	      in such a way that it can find the shared libraries that it
-	      needs. At the current time this mode is somewhat experimental.
-	    </para>
-	  </listitem>
-	</varlistentry>
       </variablelist>
       To use relative paths for dependent libraries on Linux and Solaris you
       can use the <literal>deploy</literal> mode and pass suitable a -rpath

@@ -1336,8 +1336,8 @@ runPhase other _stop _dflags _basename _suff _input_fn _get_output_fn _maybe_loc
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
 
-runPhase_MoveBinary :: DynFlags -> FilePath -> [PackageId] -> IO Bool
-runPhase_MoveBinary dflags input_fn dep_packages
+runPhase_MoveBinary :: DynFlags -> FilePath -> IO Bool
+runPhase_MoveBinary dflags input_fn
     | WayPar `elem` (wayNames dflags) && not opt_Static =
         panic ("Don't know how to combine PVM wrapper and dynamic wrapper")
     | WayPar `elem` (wayNames dflags) = do
@@ -1354,42 +1354,7 @@ runPhase_MoveBinary dflags input_fn dep_packages
         -- generate a wrapper script for running a parallel prg under PVM
         writeFile input_fn (mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan)
         return True
-    | not opt_Static =
-        case (dynLibLoader dflags) of
-          Wrapped wrapmode ->
-              do
-                let (o_base, o_ext) = splitExtension input_fn
-                let wrapped_executable | o_ext == "exe" = (o_base ++ ".dyn") <.> o_ext
-                                       | otherwise = input_fn ++ ".dyn"
-                behaviour <- wrapper_behaviour dflags wrapmode dep_packages
-
-                -- THINKME isn't this possible to do a bit nicer?
-                let behaviour' = concatMap (\x -> if x=='\\' then "\\\\" else [x]) behaviour
-                renameFile input_fn wrapped_executable
-                let rtsDetails = (getPackageDetails (pkgState dflags) rtsPackageId);
-                    (md_c_flags, _) = machdepCCOpts dflags
-                SysTools.runCc dflags
-                  ([ SysTools.FileOption "" ((head (libraryDirs rtsDetails)) ++ "/dyn-wrapper.c")
-                   , SysTools.Option ("-DBEHAVIOUR=\"" ++ behaviour' ++ "\"")
-                   , SysTools.Option "-o"
-                   , SysTools.FileOption "" input_fn] ++
-                   map (SysTools.FileOption "-I") (includeDirs rtsDetails) ++
-                   map Option md_c_flags)
-                return True
-          _ -> return True
     | otherwise = return True
-
-wrapper_behaviour :: DynFlags -> Maybe [Char] -> [PackageId] -> IO [Char]
-wrapper_behaviour dflags mode dep_packages =
-    let seperateBySemiColon strs = tail $ concatMap (';':) strs
-    in case mode of
-      Nothing -> do
-                pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
-                return ('H' : (seperateBySemiColon pkg_lib_paths))
-      Just s -> do
-        allpkg <- getPreloadPackagesAnd dflags dep_packages
-        putStrLn (unwords (map (packageIdString . packageConfigId) allpkg))
-        return $ 'F':s ++ ';':(seperateBySemiColon (map (packageIdString . packageConfigId) allpkg))
 
 mkExtraCObj :: DynFlags -> [String] -> IO FilePath
 mkExtraCObj dflags xs
@@ -1621,7 +1586,7 @@ linkBinary dflags o_files dep_packages = do
                     ))
 
     -- parallel only: move binary to another dir -- HWL
-    success <- runPhase_MoveBinary dflags output_fn dep_packages
+    success <- runPhase_MoveBinary dflags output_fn
     if success then return ()
                else ghcError (InstallationError ("cannot move binary"))
 

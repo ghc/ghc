@@ -601,7 +601,6 @@ defaultObjectTarget
 
 data DynLibLoader
   = Deployable
-  | Wrapped (Maybe String)
   | SystemDependent
   deriving Eq
 
@@ -933,9 +932,6 @@ parseDynLibLoaderMode f d =
  case splitAt 8 f of
    ("deploy", "")       -> d{ dynLibLoader = Deployable }
    ("sysdep", "")       -> d{ dynLibLoader = SystemDependent }
-   ("wrapped", "")      -> d{ dynLibLoader = Wrapped Nothing }
-   ("wrapped:", "hard") -> d{ dynLibLoader = Wrapped Nothing }
-   ("wrapped:", flex)   -> d{ dynLibLoader = Wrapped (Just flex) }
    _                    -> ghcError (CmdLineError ("Unknown dynlib loader: " ++ f))
 
 setDumpPrefixForce f d = d { dumpPrefixForce = f}
