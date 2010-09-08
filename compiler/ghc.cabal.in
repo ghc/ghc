@@ -459,6 +459,7 @@ Library
         VectVar
         Vectorise.Env
         Vectorise.Vect
+        Vectorise.Exp
         Vectorise.Type.Type
         Vectorise.Type.TyConDecl
         Vectorise.Type.Classify
