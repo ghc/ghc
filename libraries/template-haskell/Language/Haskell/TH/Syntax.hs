@@ -819,7 +819,7 @@ data Foreign = ImportF Callconv Safety String Name Type
 data Callconv = CCall | StdCall
           deriving( Show, Eq, Data, Typeable )
 
-data Safety = Unsafe | Safe | Threadsafe
+data Safety = Unsafe | Safe | Threadsafe | Interruptible
         deriving( Show, Eq, Data, Typeable )
 
 data Pragma = InlineP     Name InlineSpec

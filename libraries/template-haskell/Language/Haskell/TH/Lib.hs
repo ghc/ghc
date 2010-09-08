@@ -481,10 +481,11 @@ stdCall = StdCall
 -------------------------------------------------------------------------------
 -- *   Safety
 
-unsafe, safe, threadsafe :: Safety
+unsafe, safe, threadsafe, interruptible :: Safety
 unsafe = Unsafe
 safe = Safe
 threadsafe = Threadsafe
+interruptible = Interruptible
 
 -------------------------------------------------------------------------------
 -- *   InlineSpec
