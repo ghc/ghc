@@ -13,6 +13,7 @@ import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Type
 import Vectorise.Type.TyConDecl
+import Vectorise.Type.Classify
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import BasicTypes
@@ -36,9 +37,7 @@ import NameEnv
 
 import Unique
 import UniqFM
-import UniqSet
 import Util
-import Digraph           ( SCC(..), stronglyConnCompFromEdgedVertices )
 
 import Outputable
 import FastString
@@ -50,14 +49,10 @@ import Data.List
 debug		= False
 dtrace s x	= if debug then pprTrace "VectType" s x else x
 
--- ----------------------------------------------------------------------------
--- Types
-
 
 -- ----------------------------------------------------------------------------
 -- Type definitions
 
-type TyConGroup = ([TyCon], UniqSet TyCon)
 
 -- | Vectorise a type environment.
 --   The type environment contains all the type things defined in a module.
@@ -751,71 +746,6 @@ paMethods = [("dictPRepr",    buildPRDict),
              ("fromArrPRepr", buildFromArrPRepr)]
 
 
--- | Split the given tycons into two sets depending on whether they have to be
---   converted (first list) or not (second list). The first argument contains
---   information about the conversion status of external tycons:
---
---   * tycons which have converted versions are mapped to True
---   * tycons which are not changed by vectorisation are mapped to False
---   * tycons which can't be converted are not elements of the map
---
-classifyTyCons :: UniqFM Bool -> [TyConGroup] -> ([TyCon], [TyCon])
-classifyTyCons = classify [] []
-  where
-    classify conv keep _  [] = (conv, keep)
-    classify conv keep cs ((tcs, ds) : rs)
-      | can_convert && must_convert
-        = classify (tcs ++ conv) keep (cs `addListToUFM` [(tc,True) | tc <- tcs]) rs
-      | can_convert
-        = classify conv (tcs ++ keep) (cs `addListToUFM` [(tc,False) | tc <- tcs]) rs
-      | otherwise
-        = classify conv keep cs rs
-      where
-        refs = ds `delListFromUniqSet` tcs
-
-        can_convert  = isNullUFM (refs `minusUFM` cs) && all convertable tcs
-        must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
-
-        convertable tc = isDataTyCon tc && all isVanillaDataCon (tyConDataCons tc)
-
--- | Compute mutually recursive groups of tycons in topological order
---
-tyConGroups :: [TyCon] -> [TyConGroup]
-tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVertices edges)
-  where
-    edges = [((tc, ds), tc, uniqSetToList ds) | tc <- tcs
-                                , let ds = tyConsOfTyCon tc]
-
-    mk_grp (AcyclicSCC (tc, ds)) = ([tc], ds)
-    mk_grp (CyclicSCC els)       = (tcs, unionManyUniqSets dss)
-      where
-        (tcs, dss) = unzip els
-
-tyConsOfTyCon :: TyCon -> UniqSet TyCon
-tyConsOfTyCon
-  = tyConsOfTypes . concatMap dataConRepArgTys . tyConDataCons
-
-tyConsOfType :: Type -> UniqSet TyCon
-tyConsOfType ty
-  | Just ty' <- coreView ty    = tyConsOfType ty'
-tyConsOfType (TyVarTy _)       = emptyUniqSet
-tyConsOfType (TyConApp tc tys) = extend (tyConsOfTypes tys)
-  where
-    extend | isUnLiftedTyCon tc
-           || isTupleTyCon   tc = id
-
-           | otherwise          = (`addOneToUniqSet` tc)
-
-tyConsOfType (AppTy a b)       = tyConsOfType a `unionUniqSets` tyConsOfType b
-tyConsOfType (FunTy a b)       = (tyConsOfType a `unionUniqSets` tyConsOfType b)
-                                 `addOneToUniqSet` funTyCon
-tyConsOfType (ForAllTy _ ty)   = tyConsOfType ty
-tyConsOfType other             = pprPanic "ClosureConv.tyConsOfType" $ ppr other
-
-tyConsOfTypes :: [Type] -> UniqSet TyCon
-tyConsOfTypes = unionManyUniqSets . map tyConsOfType
-
-
 -- ----------------------------------------------------------------------------
 -- Conversions
 
@@ -860,23 +790,32 @@ fromVect ty expr
   = identityConv ty >> return expr
 
 
+-- TODO: What is this really doing?
 toVect :: Type -> CoreExpr -> VM CoreExpr
 toVect ty expr = identityConv ty >> return expr
 
 
+-- | Check that we have the vectorised versions of all the
+--   type constructors in this type.
 identityConv :: Type -> VM ()
-identityConv ty | Just ty' <- coreView ty = identityConv ty'
+identityConv ty 
+  | Just ty' <- coreView ty 
+  = identityConv ty'
+
 identityConv (TyConApp tycon tys)
-  = do
-      mapM_ identityConv tys
+ = do mapM_ identityConv tys
       identityConvTyCon tycon
+
 identityConv _ = noV
 
+
+-- | Check that we have the vectorised version of this type constructor.
 identityConvTyCon :: TyCon -> VM ()
 identityConvTyCon tc
   | isBoxedTupleTyCon tc = return ()
   | isUnLiftedTyCon tc   = return ()
-  | otherwise            = do
-                             tc' <- maybeV (lookupTyCon tc)
-                             if tc == tc' then return () else noV
+  | otherwise 
+  = do tc' <- maybeV (lookupTyCon tc)
+       if tc == tc' then return () else noV
+
 

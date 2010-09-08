@@ -461,6 +461,7 @@ Library
         Vectorise.Vect
         Vectorise.Type.Type
         Vectorise.Type.TyConDecl
+        Vectorise.Type.Classify
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins.Modules
