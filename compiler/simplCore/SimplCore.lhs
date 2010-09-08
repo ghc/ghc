@@ -490,7 +490,8 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
       = WARN( debugIsOn && (max_iterations > 2)
             , ptext (sLit "Simplifier baling out after") <+> int max_iterations
               <+> ptext (sLit "iterations") 
-              <+> brackets (pprWithCommas (int . simplCountN) (reverse counts_so_far))
+              <+> (brackets $ hsep $ punctuate comma $ 
+                   map (int . simplCountN) (reverse counts_so_far))
               <+> ptext (sLit "Size =") <+> int (coreBindsSize binds) )
 
 		-- Subtract 1 from iteration_no to get the
