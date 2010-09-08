@@ -5,6 +5,7 @@ module Vectorise.Exp
 where
 import VectUtils
 import VectType
+import Vectorise.Utils.Closure
 import Vectorise.Var
 import Vectorise.Vect
 import Vectorise.Env

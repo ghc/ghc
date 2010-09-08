@@ -14,6 +14,7 @@ import Vectorise.Builtins
 import Vectorise.Type.Type
 import Vectorise.Type.TyConDecl
 import Vectorise.Type.Classify
+import Vectorise.Utils.Closure
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import BasicTypes
