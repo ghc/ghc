@@ -1,6 +1,6 @@
 
 -- | Vectorise variables and literals.
-module VectVar (
+module Vectorise.Var (
 	vectBndr,
 	vectBndrNew,
 	vectBndrIn,

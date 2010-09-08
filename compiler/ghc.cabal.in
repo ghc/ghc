@@ -456,7 +456,7 @@ Library
         Util
         VectType
         VectUtils
-        VectVar
+        Vectorise.Var
         Vectorise.Env
         Vectorise.Vect
         Vectorise.Exp

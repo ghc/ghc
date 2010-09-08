@@ -4,8 +4,8 @@ module Vectorise.Exp
 	(vectPolyExpr)
 where
 import VectUtils
-import VectVar
 import VectType
+import Vectorise.Var
 import Vectorise.Vect
 import Vectorise.Env
 import Vectorise.Monad
