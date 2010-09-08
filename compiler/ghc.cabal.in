@@ -460,6 +460,7 @@ Library
         Vectorise.Env
         Vectorise.Vect
         Vectorise.Type.Type
+        Vectorise.Type.TyConDecl
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins.Modules
