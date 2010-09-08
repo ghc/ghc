@@ -37,7 +37,7 @@ import UniqFM           ( keysUFM, intersectUFM_C, foldUFM_Directly )
 import Util             ( mapAndUnzip, filterOut )
 import Bag
 import Outputable
-
+import FastString
 import Data.List
 \end{code}
 
@@ -1089,6 +1089,10 @@ data OccEncl
                         -- Don't inline into constructor args here
   | OccVanilla          -- Argument of function, body of lambda, scruintee of case etc.
                         -- Do inline into constructor args here
+
+instance Outputable OccEncl where
+  ppr OccRhs     = ptext (sLit "occRhs")
+  ppr OccVanilla = ptext (sLit "occVanilla")
 
 type CtxtTy = [Bool]
         -- []           No info
