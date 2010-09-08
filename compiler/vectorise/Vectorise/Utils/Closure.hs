@@ -8,6 +8,7 @@ module Vectorise.Utils.Closure (
 )
 where
 import VectUtils
+import Vectorise.Utils.Hoisting
 import Vectorise.Builtins
 import Vectorise.Vect
 import Vectorise.Monad

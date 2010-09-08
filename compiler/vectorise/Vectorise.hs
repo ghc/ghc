@@ -3,8 +3,8 @@
 module Vectorise( vectorise )
 where
 
-import VectUtils
 import VectType
+import Vectorise.Utils.Hoisting
 import Vectorise.Exp
 import Vectorise.Vect
 import Vectorise.Env

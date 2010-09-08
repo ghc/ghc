@@ -15,6 +15,7 @@ import Vectorise.Type.Type
 import Vectorise.Type.TyConDecl
 import Vectorise.Type.Classify
 import Vectorise.Utils.Closure
+import Vectorise.Utils.Hoisting
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import BasicTypes

@@ -6,6 +6,7 @@ where
 import VectUtils
 import VectType
 import Vectorise.Utils.Closure
+import Vectorise.Utils.Hoisting
 import Vectorise.Var
 import Vectorise.Vect
 import Vectorise.Env
