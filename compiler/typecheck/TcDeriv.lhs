@@ -743,6 +743,7 @@ inferConstraints :: [TyVar] -> Class -> [TcType] -> TyCon -> [TcType] -> ThetaTy
 -- before being used in the instance declaration
 inferConstraints _ cls inst_tys rep_tc rep_tc_args
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
+    pprTrace "ic" (ppr rep_tc $$ ppr rep_tc_tvs $$ ppr (tyConStupidTheta rep_tc) $$ ppr stupid_constraints) $
     stupid_constraints ++ extra_constraints
     ++ sc_constraints ++ con_arg_constraints
   where
