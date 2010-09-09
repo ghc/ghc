@@ -1,6 +1,6 @@
 
 <interactive>:1:1:
     No instance for (Show (t -> a))
-      arising from a use of `print' at <interactive>:1:1
+      arising from a use of `print'
     Possible fix: add an instance declaration for (Show (t -> a))
     In a stmt of an interactive GHCi command: print it

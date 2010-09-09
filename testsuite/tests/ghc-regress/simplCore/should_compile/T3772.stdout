@@ -1,25 +1,43 @@
 
 ==================== Tidy Core ====================
 Rec {
-xs :: GHC.Prim.Int# -> ()
+T3772.foo_xs [Occ=LoopBreaker] :: GHC.Prim.Int# -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType L]
-xs =
+T3772.foo_xs =
   \ (m :: GHC.Prim.Int#) ->
     case GHC.Prim.<=# m 1 of _ {
-      GHC.Bool.False -> xs (GHC.Prim.-# m 1);
+      GHC.Bool.False -> T3772.foo_xs (GHC.Prim.-# m 1);
       GHC.Bool.True -> GHC.Unit.()
     }
 end Rec }
 
-T3772.foo [InlPrag=NOINLINE (sat-args=1)] :: GHC.Types.Int -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType U(L)]
+T3772.$wfoo :: GHC.Prim.Int# -> ()
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType L,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [0] 5 1}]
+T3772.$wfoo =
+  \ (ww :: GHC.Prim.Int#) ->
+    case GHC.Prim.<=# ww 0 of _ {
+      GHC.Bool.False -> T3772.foo_xs ww; GHC.Bool.True -> GHC.Unit.()
+    }
+
+T3772.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> ()
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType U(L),
+ Unf=Unf{Src=Worker=T3772.$wfoo, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int) ->
+                 case w of _ { GHC.Types.I# ww [Occ=Once] -> T3772.$wfoo ww }}]
 T3772.foo =
-  \ (n :: GHC.Types.Int) ->
-    case n of _ { GHC.Types.I# n# ->
-    case GHC.Prim.<=# n# 0 of _ {
-      GHC.Bool.False -> xs n#; GHC.Bool.True -> GHC.Unit.()
-    }
-    }
+  \ (w :: GHC.Types.Int) ->
+    case w of _ { GHC.Types.I# ww -> T3772.$wfoo ww }
 
 
 
