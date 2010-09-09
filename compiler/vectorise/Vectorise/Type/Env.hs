@@ -47,7 +47,6 @@ import Data.List
 debug		= False
 dtrace s x	= if debug then pprTrace "VectType" s x else x
 
-
 -- | Vectorise a type environment.
 --   The type environment contains all the type things defined in a module.
 vectTypeEnv 
@@ -64,23 +63,30 @@ vectTypeEnv env
       -- Split the list of TyCons into the ones we have to vectorise vs the
       -- ones we can pass through unchanged. We also pass through algebraic 
       -- types that use non Haskell98 features, as we don't handle those.
+      let tycons               = typeEnvTyCons env
+          groups               = tyConGroups tycons
+
       let (conv_tcs, keep_tcs) = classifyTyCons cs groups
+          orig_tcs             = keep_tcs ++ conv_tcs
           keep_dcs             = concatMap tyConDataCons keep_tcs
 
+      -- Just use the unvectorised versions of these constructors in vectorised code.
       zipWithM_ defTyCon   keep_tcs keep_tcs
       zipWithM_ defDataCon keep_dcs keep_dcs
 
-      new_tcs <- vectTyConDecls conv_tcs
-
-      let orig_tcs = keep_tcs ++ conv_tcs
+      -- Vectorise all the declarations.
+      new_tcs      <- vectTyConDecls conv_tcs
 
       -- We don't need to make new representation types for dictionary
       -- constructors. The constructors are always fully applied, and we don't 
       -- need to lift them to arrays as a dictionary of a particular type
       -- always has the same value.
-      let vect_tcs = filter (not . isClassTyCon) 
-                   $ keep_tcs ++ new_tcs
+      let vect_tcs  = filter (not . isClassTyCon) 
+                    $ keep_tcs ++ new_tcs
 
+      -- Create PRepr and PData instances for the vectorised types.
+      -- We get back the binds for the instance functions, 
+      -- and some new type constructors for the representation types.
       (_, binds, inst_tcs) <- fixV $ \ ~(dfuns', _, _) ->
         do
           defTyConPAs (zipLazy vect_tcs dfuns')
@@ -99,18 +105,18 @@ vectTypeEnv env
           binds     <- takeHoisted
           return (dfuns, binds, repr_tcs ++ pdata_tcs)
 
+      -- The new type constructors are the vectorised versions of the originals, 
+      -- plus the new type constructors that we use for the representations.
       let all_new_tcs = new_tcs ++ inst_tcs
 
-      let new_env = extendTypeEnvList env
-                       (map ATyCon all_new_tcs
-                        ++ [ADataCon dc | tc <- all_new_tcs
-                                        , dc <- tyConDataCons tc])
+      let new_env     =  extendTypeEnvList env
+                      $  map ATyCon all_new_tcs
+                      ++ [ADataCon dc | tc <- all_new_tcs
+                                      , dc <- tyConDataCons tc]
 
       return (new_env, map mkLocalFamInst inst_tcs, binds)
-  where
-    tycons = typeEnvTyCons env
-    groups = tyConGroups tycons
 
+   where
     mk_map env = listToUFM_Directly [(u, getUnique n /= u) | (u,n) <- nameEnvUniqueElts env]
 
 
