@@ -28,7 +28,7 @@ module RnEnv (
 	checkDupRdrNames, checkDupAndShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, 
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
-	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
+	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
 	dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg
     ) where
@@ -51,7 +51,6 @@ import NameEnv
 import UniqFM
 import DataCon		( dataConFieldLabels )
 import OccName
-import Module		( ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, 
 			  consDataConKey, forall_tv_RDR )
 import Unique
@@ -1028,21 +1027,7 @@ mapFvRnCPS f (x:xs) cont = f x 		   $ \ x' ->
 %************************************************************************
 
 \begin{code}
-warnUnusedModules :: [(ModuleName,SrcSpan)] -> RnM ()
-warnUnusedModules mods
-  = ifOptM Opt_WarnUnusedImports (mapM_ bleat mods)
-  where
-    bleat (mod,loc) = addWarnAt loc (mk_warn mod)
-    mk_warn m = vcat [ptext (sLit "Module") <+> quotes (ppr m)
-			<+> text "is imported, but nothing from it is used,",
-		      nest 2 (ptext (sLit "except perhaps instances visible in") 
-			<+> quotes (ppr m)),
-		      ptext (sLit "To suppress this warning, use:") 
-			<+> ptext (sLit "import") <+> ppr m <> parens empty ]
-
-
-warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
-warnUnusedImports gres  = ifOptM Opt_WarnUnusedImports (warnUnusedGREs gres)
+warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
     = ifOptM Opt_WarnUnusedBinds
     $ do isBoot <- tcIsHsBoot
