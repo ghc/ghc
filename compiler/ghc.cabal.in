@@ -454,21 +454,21 @@ Library
         UniqFM
         UniqSet
         Util
-        VectType
         VectUtils
         Vectorise.Var
         Vectorise.Convert
         Vectorise.Env
         Vectorise.Vect
         Vectorise.Exp
-        Vectorise.Type.Type
-        Vectorise.Type.TyConDecl
-        Vectorise.Type.Classify
+        Vectorise.Type.Env
         Vectorise.Type.Repr
         Vectorise.Type.PData
         Vectorise.Type.PRepr
         Vectorise.Type.PADict
         Vectorise.Type.PRDict
+        Vectorise.Type.Type
+        Vectorise.Type.TyConDecl
+        Vectorise.Type.Classify
         Vectorise.Utils.Closure
         Vectorise.Utils.Hoisting
         Vectorise.Builtins.Base

@@ -3,7 +3,9 @@
 module Vectorise( vectorise )
 where
 
-import VectType
+import Vectorise.Type.Env
+import Vectorise.Type.Type
+import Vectorise.Convert
 import Vectorise.Utils.Hoisting
 import Vectorise.Exp
 import Vectorise.Vect

@@ -1,21 +1,14 @@
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
-module VectType ( 
-	vectTyCon,
-	vectAndLiftType,
-	vectType,
+module Vectorise.Type.Env ( 
 	vectTypeEnv,
-        buildPADict,
-        fromVect
 )
 where
 import VectUtils
 import Vectorise.Env
-import Vectorise.Convert
 import Vectorise.Vect
 import Vectorise.Monad
 import Vectorise.Builtins
-import Vectorise.Type.Type
 import Vectorise.Type.TyConDecl
 import Vectorise.Type.Classify
 import Vectorise.Type.PADict

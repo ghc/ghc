@@ -4,7 +4,7 @@ module Vectorise.Exp
 	(vectPolyExpr)
 where
 import VectUtils
-import VectType
+import Vectorise.Type.Type
 import Vectorise.Utils.Closure
 import Vectorise.Utils.Hoisting
 import Vectorise.Var
