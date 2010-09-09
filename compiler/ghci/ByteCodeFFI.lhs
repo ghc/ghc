@@ -9,7 +9,7 @@ module ByteCodeFFI ( moan64 ) where
 
 import Outputable
 import System.IO
-import Foreign
+import System.IO.Unsafe
 
 moan64 :: String -> SDoc -> a
 moan64 msg pp_rep

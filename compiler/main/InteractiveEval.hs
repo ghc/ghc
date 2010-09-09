@@ -78,7 +78,7 @@ import System.Directory
 import Data.Dynamic
 import Data.List (find, partition)
 import Control.Monad
-import Foreign
+import Foreign hiding (unsafePerformIO)
 import Foreign.C
 import GHC.Exts
 import Data.Array
@@ -87,6 +87,7 @@ import Control.Concurrent
 import Data.List (sortBy)
 -- import Foreign.StablePtr
 import System.IO
+import System.IO.Unsafe
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively

@@ -75,8 +75,8 @@ import Data.List
 import qualified Data.Sequence as Seq
 import Data.Monoid
 import Data.Sequence (viewl, ViewL(..))
-import Foreign
--- import System.IO.Unsafe
+import Foreign hiding (unsafePerformIO)
+import System.IO.Unsafe
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
