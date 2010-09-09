@@ -2,13 +2,12 @@
 module Vectorise.Type.PADict
 	(buildPADict)
 where
-import VectUtils
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Repr
 import Vectorise.Type.PRepr
 import Vectorise.Type.PRDict
-import Vectorise.Utils.Hoisting
+import Vectorise.Utils
 
 import BasicTypes
 import CoreSyn

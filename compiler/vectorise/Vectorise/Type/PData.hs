@@ -2,10 +2,10 @@
 module Vectorise.Type.PData
 	(buildPDataTyCon)
 where
-import VectUtils
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Repr
+import Vectorise.Utils
 
 import BasicTypes
 import BuildTyCl

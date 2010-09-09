@@ -12,7 +12,7 @@ module Vectorise.Type.Repr
 	, compReprType
 	, compOrigType)
 where
-import VectUtils
+import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
 

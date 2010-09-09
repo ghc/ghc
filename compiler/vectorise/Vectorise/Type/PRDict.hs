@@ -2,7 +2,7 @@
 module Vectorise.Type.PRDict 
 	(buildPRDict)
 where
-import VectUtils
+import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Repr

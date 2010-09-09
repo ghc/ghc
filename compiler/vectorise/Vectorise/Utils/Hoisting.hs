@@ -11,10 +11,10 @@ module Vectorise.Utils.Hoisting (
 	takeHoisted
 )
 where
-import VectUtils
 import Vectorise.Monad
 import Vectorise.Env
 import Vectorise.Vect
+import Vectorise.Utils.Poly
 
 import CoreSyn
 import CoreUtils

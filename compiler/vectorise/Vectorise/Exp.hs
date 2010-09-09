@@ -3,10 +3,8 @@
 module Vectorise.Exp
 	(vectPolyExpr)
 where
-import VectUtils
+import Vectorise.Utils
 import Vectorise.Type.Type
-import Vectorise.Utils.Closure
-import Vectorise.Utils.Hoisting
 import Vectorise.Var
 import Vectorise.Vect
 import Vectorise.Env

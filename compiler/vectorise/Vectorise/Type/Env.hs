@@ -4,7 +4,6 @@ module Vectorise.Type.Env (
 	vectTypeEnv,
 )
 where
-import VectUtils
 import Vectorise.Env
 import Vectorise.Vect
 import Vectorise.Monad
@@ -15,8 +14,7 @@ import Vectorise.Type.PADict
 import Vectorise.Type.PData
 import Vectorise.Type.PRepr
 import Vectorise.Type.Repr
-import Vectorise.Utils.Closure
-import Vectorise.Utils.Hoisting
+import Vectorise.Utils
 
 import HscTypes
 import CoreSyn

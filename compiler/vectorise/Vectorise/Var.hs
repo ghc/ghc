@@ -10,7 +10,7 @@ module Vectorise.Var (
 	vectPolyVar,
 	vectLiteral
 ) where
-import VectUtils
+import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Env
 import Vectorise.Vect

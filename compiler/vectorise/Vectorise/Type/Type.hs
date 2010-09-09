@@ -4,7 +4,7 @@ module Vectorise.Type.Type
 	, vectAndLiftType
 	, vectType)
 where
-import VectUtils
+import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
 import TypeRep

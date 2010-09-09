@@ -8,11 +8,12 @@ module Vectorise.Utils.Closure (
 	buildEnv
 )
 where
-import VectUtils
-import Vectorise.Utils.Hoisting
 import Vectorise.Builtins
 import Vectorise.Vect
 import Vectorise.Monad
+import Vectorise.Utils.Base
+import Vectorise.Utils.PADict
+import Vectorise.Utils.Hoisting
 
 import CoreSyn
 import Type

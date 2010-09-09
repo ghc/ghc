@@ -6,7 +6,7 @@ module Vectorise.Type.PRepr
 	, buildToArrPRepr
 	, buildFromArrPRepr)
 where
-import VectUtils
+import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Repr
