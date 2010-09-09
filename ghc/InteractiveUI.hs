@@ -1666,6 +1666,7 @@ showLanguages = do
 -- Completion
 
 completeCmd, completeMacro, completeIdentifier, completeModule,
+    completeSetModule,
     completeHomeModule, completeSetOptions, completeShowOptions,
     completeHomeModuleOrFile, completeExpression
     :: CompletionFunc GHCi
@@ -1716,7 +1717,7 @@ completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
     Just '-' -> do
       (toplevs, exports) <- GHC.getContext
       return $ map GHC.moduleName (nub (map fst exports) ++ toplevs)
-    otherwise -> do
+    _ -> do
       dflags <- GHC.getSessionDynFlags
       let pkg_mods = allExposedModules dflags
       loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
