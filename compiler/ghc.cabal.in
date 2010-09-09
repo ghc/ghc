@@ -464,6 +464,8 @@ Library
         Vectorise.Type.Type
         Vectorise.Type.TyConDecl
         Vectorise.Type.Classify
+        Vectorise.Type.Repr
+        Vectorise.Type.PADict
         Vectorise.Utils.Closure
         Vectorise.Utils.Hoisting
         Vectorise.Builtins.Base
