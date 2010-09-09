@@ -949,7 +949,7 @@ bufReadNBEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNBEmpty   h_@Handle__{..}
                  buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
                  ptr so_far count
-  | count > sz, False,
+  | count > sz,
     Just fd <- cast haDevice = do
        m <- RawIO.readNonBlocking (fd::FD) ptr count
        case m of
