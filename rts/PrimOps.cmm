@@ -109,6 +109,11 @@ stg_newAlignedPinnedByteArrayzh
     n = R1;
     alignment = R2;
 
+    /* we always supply at least word-aligned memory, so there's no
+       need to allow extra space for alignment if the requirement is less
+       than a word.  This also prevents mischief with alignment == 0. */
+    if (alignment <= SIZEOF_W) { alignment = 1; }
+
     bytes = n;
 
     /* payload_words is what we will tell the profiler we had to allocate */
