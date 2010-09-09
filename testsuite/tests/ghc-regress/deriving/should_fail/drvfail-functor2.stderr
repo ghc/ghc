@@ -15,10 +15,9 @@ drvfail-functor2.hs:15:14:
     In the newtype declaration for `NoArguments'
 
 drvfail-functor2.hs:20:14:
-    Can't derive instances where the instance context mentions
-    type variables that are not data type parameters
-      Offending constraint: Eq a
-    When deriving the instance for (Functor StupidConstraint)
+    Can't make a derived instance of `Functor StupidConstraint':
+      Data type `StupidConstraint' has a class context (Eq a)
+    In the data type declaration for `StupidConstraint'
 
 drvfail-functor2.hs:26:14:
     No instance for (Functor NoFunctor)
