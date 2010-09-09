@@ -13,7 +13,6 @@ import Vectorise.Builtins
 import Vectorise.Utils.Base
 
 import CoreSyn
-import Coercion
 import Type
 import TypeRep
 import TyCon

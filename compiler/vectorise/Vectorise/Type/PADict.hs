@@ -15,7 +15,6 @@ import CoreUtils
 import CoreUnfold
 import TyCon
 import Type
-import OccName
 import Id
 import Var
 import Name

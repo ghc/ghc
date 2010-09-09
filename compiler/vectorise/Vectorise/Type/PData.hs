@@ -12,7 +12,6 @@ import BuildTyCl
 import DataCon
 import TyCon
 import Type
-import OccName
 import Name
 import Util
 import MonadUtils
