@@ -1,7 +1,9 @@
-{-# OPTIONS -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs -XLiberalTypeSynonyms -XFlexibleInstances #-}
+{-# OPTIONS -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs -XLiberalTypeSynonyms -XFlexibleInstances -XScopedTypeVariables #-}
 
 -- See Trac #1627.  The point is that we should get nice
 -- 		    compact code for Foo
+
+-- In GHC 7.0 this fails, and rightly so.
 
 module M(foo) where
 
@@ -56,7 +58,7 @@ plus = liftE2 (+)
 foo :: forall s . STArray s Int Int -> ST s Int
 foo ma = runE $ do
     a <- liftArray ma
-    let one :: E (ST s) Int
+    let one :: E (ST t) Int
         one = return 1
     a[one] `plus` a[one]
 

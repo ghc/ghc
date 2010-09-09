@@ -17,7 +17,7 @@ test('simpl013', normal, compile, [''])
 test('simpl014', normal, compile, [''])
 test('simpl015', only_ways(['optc','optasm']), compile, [''])
 test('simpl016', normal, compile, [''])
-test('simpl017', normal, compile, [''])
+test('simpl017', normal, compile_fail, [''])
 test('simpl018', normal, compile, [''])
 test('simpl019', normal, compile, [''])
 test('simpl020',
