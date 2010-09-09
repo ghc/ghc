@@ -496,8 +496,9 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	return ("Simplifier baled out", iteration_no - 1, total_counts, 
-                 guts { mg_binds = binds, mg_rules = rules })
+	return ( "Simplifier baled out", iteration_no - 1 
+               , totalise counts_so_far
+               , guts { mg_binds = binds, mg_rules = rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
@@ -542,8 +543,9 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 
 		-- Stop if nothing happened; don't dump output
 	   if isZeroSimplCount counts1 then
-		return ("Simplifier reached fixed point", iteration_no, total_counts,
-			guts { mg_binds = binds1, mg_rules = rules1 })
+		return ( "Simplifier reached fixed point", iteration_no
+                       , totalise (counts1 : counts_so_far)  -- Include "free" ticks	
+		       , guts { mg_binds = binds1, mg_rules = rules1 } )
 	   else do {
 		-- Short out indirections
 		-- We do this *after* at least one run of the simplifier 
@@ -565,8 +567,9 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
   	(us1, us2) = splitUniqSupply us
 
 	-- Remember the counts_so_far are reversed
-        total_counts = foldr (\c acc -> acc `plusSimplCount` c) 
-                             (zeroSimplCount dflags) counts_so_far
+        totalise :: [SimplCount] -> SimplCount
+        totalise = foldr (\c acc -> acc `plusSimplCount` c) 
+                         (zeroSimplCount dflags) 
 
 -------------------
 end_iteration :: DynFlags -> CoreToDo -> Int 
