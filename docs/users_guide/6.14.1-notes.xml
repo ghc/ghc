@@ -13,10 +13,70 @@
     <itemizedlist>
       <listitem>
         <para>
-          Due to changes in the runtime system, version 2.0 or later
-          (preferably version 2.2 or later) of the
-          <literal>parallel</literal> library should be used, or
-          parallelism will be lost.
+          GHC now defaults to the Haskell 2010 language standard.
+        </para>
+
+        <para>
+          Libraries are not quite so straightforward.  By default, GHC
+          provides access to the <literal>base</literal> package,
+          which includes the Haskell 2010 libraries, albeit with a few
+          minor differences.  For those who want to write strictly
+          standards-conforming code we also provide
+          the <literal>haskell2010</literal> package which provides
+          the precise APIs specified by Haskell 2010, but because the
+          module names in this package overlap with those in
+          the <literal>base</literal> package it is not possible to
+          use both <literal>haskell2010</literal>
+          and <literal>base</literal> at the same time (this also
+          applies to the <literal>array</literal> package).  Hence to use
+          the Haskell 2010 libraries you should hide
+          the <literal>base</literal> and <literal>array</literal>
+          packages, for example with GHCi:
+<screen>
+$ ghci -package haskell2010 -hide-package base -hide-package array
+</screen>
+          If you are using Cabal it isn't necessary to
+          hide <literal>base</literal> and <literal>array</literal>
+          explicitly, just don't include them in your <literal>build-depends</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          On POSIX platforms, there is a new I/O manager based on
+          epoll/kqueue/poll, which allows multithreaded I/O code to
+          scale to a much larger number (100k+) of threads.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The inliner has been overhauled, which should in general
+          give better performance while reducing unnecessary code-size
+          explosion.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Large parts of the runtime system have been overhauled, in
+          particular the machinery related to blocking and wakeup of
+          threads and exception throwing (<literal>throwTo</literal>).
+          Several instances of pathological performance have been
+          fixed, especially where large numbers of threads are
+          involved.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Due to changes in the runtime system, if you are
+          using <literal>Control.Parallel.Strategies</literal> from
+          the <literal>parallel</literal> package, please upgrade to
+          at least version 2 (preferably version 3).  The
+          implementation of Strategies
+          in <literal>parallel-1.x</literal> will lose parallelism
+          with GHC 6.14.1.
         </para>
       </listitem>
 
@@ -215,14 +275,6 @@ import SpecConstr
 
       <listitem>
         <para>
-          On POSIX platforms, the RTS now has a new I/O manager based
-          on epoll/kqueue/poll, which allows it to scale to a much
-          larger number (100k+) of open file descriptors.
-        </para>
-      </listitem>
-
-      <listitem>
-        <para>
           The RTS now exports a function <literal>setKeepCAFs</literal>
           which is important when loading Haskell DLLs dynamically, as
           a DLL may refer to CAFs that hae already been GCed.
@@ -386,7 +438,7 @@ import SpecConstr
       <listitem>
         <para>
           The registerised via-C backend, and the
-          <literal>-fvia-C</literal>, have been deprecated. The poor
+          <literal>-fvia-C</literal> flag, have been deprecated. The poor
           floating-point performance in the x86 native code generator
           has now been fixed, so we don't believe there is still any
           reason to use the via-C backend.
@@ -459,7 +511,7 @@ import SpecConstr
     <itemizedlist>
       <listitem>
         <para>
-          GHCi now understands the layout of multiline-commands, so
+          GHCi now understands layout in multi-line commands, so
           this now works:
         </para>
 <programlisting>
