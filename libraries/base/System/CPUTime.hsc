@@ -31,8 +31,9 @@ import CPUTime ( getCPUTime, cpuTimePrecision )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import Foreign
+import Foreign hiding (unsafePerformIO)
 import Foreign.C
+import System.IO.Unsafe (unsafePerformIO)
 
 #include "HsBaseConfig.h"
 

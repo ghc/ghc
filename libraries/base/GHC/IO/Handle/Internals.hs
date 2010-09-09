@@ -70,7 +70,7 @@ import GHC.MVar
 import Data.Typeable
 import Control.Monad
 import Data.Maybe
-import Foreign
+import Foreign hiding (unsafePerformIO)
 -- import System.IO.Error
 import System.Posix.Internals hiding (FD)
 

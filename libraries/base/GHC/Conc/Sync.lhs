@@ -75,7 +75,7 @@ module GHC.Conc.Sync
         , sharedCAF
         ) where
 
-import Foreign
+import Foreign hiding (unsafePerformIO)
 import Foreign.C
 
 #ifdef mingw32_HOST_OS

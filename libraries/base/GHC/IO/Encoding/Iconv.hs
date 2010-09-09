@@ -30,7 +30,7 @@ module GHC.IO.Encoding.Iconv (
 
 #if !defined(mingw32_HOST_OS)
 
-import Foreign
+import Foreign hiding (unsafePerformIO)
 import Foreign.C
 import Data.Maybe
 import GHC.Base
@@ -39,6 +39,7 @@ import GHC.IO.Encoding.Types
 import GHC.Num
 import GHC.Show
 import GHC.Real
+import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Internals
 
 c_DEBUG_DUMP :: Bool
