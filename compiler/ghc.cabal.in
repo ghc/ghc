@@ -465,7 +465,10 @@ Library
         Vectorise.Type.TyConDecl
         Vectorise.Type.Classify
         Vectorise.Type.Repr
+        Vectorise.Type.PData
+        Vectorise.Type.PRepr
         Vectorise.Type.PADict
+        Vectorise.Type.PRDict
         Vectorise.Utils.Closure
         Vectorise.Utils.Hoisting
         Vectorise.Builtins.Base
