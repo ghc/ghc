@@ -1021,6 +1021,7 @@ optLevelFlags
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
+    , ([2],     Opt_RegsGraph)
 
 --     , ([2],     Opt_StaticArgumentTransformation)
 -- Max writes: I think it's probably best not to enable SAT with -O2 for the
