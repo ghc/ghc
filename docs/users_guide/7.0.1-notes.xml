@@ -518,6 +518,13 @@ import SpecConstr
           removed.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-dynload wrapper</literal> flag has been
+          removed.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
