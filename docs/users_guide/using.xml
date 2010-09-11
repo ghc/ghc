@@ -1123,7 +1123,7 @@ foreign import "&amp;f" f :: FunPtr t
       is bound in a way that looks lazy, e.g.
       <literal>where (I# x) = ...</literal>. Use
       <literal>where !(I# x) = ...</literal> instead. This will be an
-      error, rather than a warning, in GHC 7.0.
+      error, rather than a warning, in GHC 7.2.
       </para>
 	</listitem>
       </varlistentry>

@@ -580,7 +580,7 @@ unliftedMustBeBang :: LHsBindsLR Var Var -> SDoc
 unliftedMustBeBang mbind
   = hang (text "Bindings containing unlifted types must use an outermost bang pattern:")
          4 (pprLHsBinds mbind)
- $$ text "*** This will be an error in GHC 6.14! Fix your code now!"
+ $$ text "*** This will be an error in GHC 7.2! Fix your code now!"
 
 strictBindErr :: String -> Bool -> LHsBindsLR Var Var -> SDoc
 strictBindErr flavour unlifted mbind
