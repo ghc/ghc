@@ -1123,7 +1123,7 @@ foreign import "&amp;f" f :: FunPtr t
       is bound in a way that looks lazy, e.g.
       <literal>where (I# x) = ...</literal>. Use
       <literal>where !(I# x) = ...</literal> instead. This will be an
-      error, rather than a warning, in GHC 6.14.
+      error, rather than a warning, in GHC 7.0.
       </para>
 	</listitem>
       </varlistentry>
@@ -2174,7 +2174,7 @@ f "2"    = 2
 	<term><option>-msse2</option>:</term>
 	<listitem>
           <para>
-            (x86 only, added in GHC 6.14.1) Use the SSE2 registers and
+            (x86 only, added in GHC 7.0.1) Use the SSE2 registers and
             instruction set to implement floating point operations
             when using the native code generator.  This gives a
             substantial performance improvement for floating point,

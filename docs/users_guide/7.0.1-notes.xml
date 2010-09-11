@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<sect1 id="release-6-14-1">
-  <title>Release notes for version 6.14.1</title>
+<sect1 id="release-7-0-1">
+  <title>Release notes for version 7.0.1</title>
 
   <para>
     The significant changes to the various parts of the compiler are
@@ -76,7 +76,7 @@ $ ghci -package haskell2010 -hide-package base -hide-package array
           at least version 2 (preferably version 3).  The
           implementation of Strategies
           in <literal>parallel-1.x</literal> will lose parallelism
-          with GHC 6.14.1.
+          with GHC 7.0.1.
         </para>
       </listitem>
 
