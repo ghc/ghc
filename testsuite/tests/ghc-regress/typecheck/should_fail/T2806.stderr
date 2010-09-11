@@ -2,7 +2,7 @@
 T2806.hs:13:11:
     Warning: Bindings containing unlifted types must use an outermost bang pattern:
                  { (I# _x) = 4 }
-             *** This will be an error in GHC 6.14! Fix your code now!
+             *** This will be an error in GHC 7.2! Fix your code now!
     In the definition of `foo':
         foo = 3
             where
