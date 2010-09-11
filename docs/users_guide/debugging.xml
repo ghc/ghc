@@ -449,6 +449,16 @@ shorter.</para>
 
       <varlistentry>
 	<term>
+          <option>-dsuppress-module-prefixes</option>
+          <indexterm><primary><option>-dsuppress-module-prefixes</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Suppress the printing of module qualification prefixes in Core dumps to make them easier to read.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-dppr-user-length</option>
           <indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
         </term>
