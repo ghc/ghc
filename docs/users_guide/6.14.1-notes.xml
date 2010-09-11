@@ -91,6 +91,13 @@ Prelude Data.List> L.length "foo"
 3
 </programlisting>
       </listitem>
+
+      <listitem>
+        <para>
+          GHC now comes with a more recent mingw bundled on Windows,
+          which includes a fix for windres on Windows 7.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
@@ -366,6 +373,14 @@ import SpecConstr
         <para>
           The new flag <literal>-dsuppress-coercions</literal> controls
           whether GHC prints coercions in core dumps.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new flag <literal>-dsuppress-module-prefixes</literal>
+          controls whether GHC prints module qualification prefixes
+          in core dumps.
         </para>
       </listitem>
 
