@@ -156,7 +156,7 @@ endif
 	touch $@
 
 $(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
-	@test -f $@
+	test -f $@
 
 # Rename libffi.a to libHSffi.a
 libffi/dist-install/build/libHSffi.a libffi/dist-install/build/libHSffi_p.a: $(libffi_STATIC_LIB)
@@ -180,7 +180,7 @@ $(eval $(call all-target,libffi,libffi/dist-install/build/HSffi.o))
 ifeq "$(BuildSharedLibs)" "YES"
 ifeq "$(Windows)" "YES"
 libffi/libffi.dll.a $(libffi_HS_DYN_LIB): $(libffi_STAMP_BUILD)
-	@test -f $@
+	test -f $@
 
 # Windows libtool creates <soname>.dll, and as we already patched that
 # there is no need to copy from libffi.dll to libHSffi...dll.
@@ -193,7 +193,7 @@ $(eval $(call all-target,libffi,$(libffi_HS_DYN_LIB).a))
 
 else
 $(libffi_DYNAMIC_LIBS): $(libffi_STAMP_BUILD)
-	@test -f $@
+	test -f $@
 
 # Rename libffi.so to libHSffi...so
 $(libffi_HS_DYN_LIB): $(libffi_DYNAMIC_LIBS) | $$(dir $$@)/.
