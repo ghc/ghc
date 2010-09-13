@@ -46,10 +46,32 @@
 
 Ticks getProcessCPUTime(void)
 {
-    struct rusage t;
-    getrusage(RUSAGE_SELF, &t);
-    return ((Ticks)t.ru_utime.tv_sec * TICKS_PER_SECOND +
-	    ((Ticks)t.ru_utime.tv_usec * TICKS_PER_SECOND)/1000000);
+#if !defined(BE_CONSERVATIVE) && defined(HAVE_CLOCK_GETTIME) && defined (_SC_CPUTIME) && defined(CLOCK_PROCESS_CPUTIME_ID) && defined(HAVE_SYSCONF)
+    static int checked_sysconf = 0;
+    static int sysconf_result = 0;
+
+    if (!checked_sysconf) {
+        sysconf_result = sysconf(_SC_CPUTIME);
+        checked_sysconf = 1;
+    }
+    if (sysconf_result != -1) {
+        struct timespec ts;
+        int res;
+        res = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+        if (res == 0) {
+            return ((Ticks)ts.tv_sec * TICKS_PER_SECOND +
+                    ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
+        }
+    }
+#endif
+
+    // fallback to getrusage
+    {
+        struct rusage t;
+        getrusage(RUSAGE_SELF, &t);
+        return ((Ticks)t.ru_utime.tv_sec * TICKS_PER_SECOND +
+                ((Ticks)t.ru_utime.tv_usec * TICKS_PER_SECOND)/1000000);
+    }
 }
 
 Ticks getProcessElapsedTime(void)
