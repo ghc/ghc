@@ -451,28 +451,28 @@ instance Read L.Lexeme where
 %*********************************************************
 
 \begin{code}
-readNumber :: Num a => (L.Lexeme -> Maybe a) -> ReadPrec a
+readNumber :: Num a => (L.Lexeme -> ReadPrec a) -> ReadPrec a
 -- Read a signed number
 readNumber convert =
   parens
   ( do x <- lexP
        case x of
-         L.Symbol "-" -> do n <- readNumber convert
+         L.Symbol "-" -> do y <- lexP
+                            n <- convert y
                             return (negate n)
-       
-         _   -> case convert x of
-                   Just n  -> return n
-                   Nothing -> pfail
+
+         _   -> convert x
   )
 
-convertInt :: Num a => L.Lexeme -> Maybe a
-convertInt (L.Int i) = Just (fromInteger i)
-convertInt _         = Nothing
 
-convertFrac :: Fractional a => L.Lexeme -> Maybe a
-convertFrac (L.Int i) = Just (fromInteger i)
-convertFrac (L.Rat r) = Just (fromRational r)
-convertFrac _         = Nothing
+convertInt :: Num a => L.Lexeme -> ReadPrec a
+convertInt (L.Int i) = return (fromInteger i)
+convertInt _         = pfail
+
+convertFrac :: Fractional a => L.Lexeme -> ReadPrec a
+convertFrac (L.Int i) = return (fromInteger i)
+convertFrac (L.Rat r) = return (fromRational r)
+convertFrac _         = pfail
 
 instance Read Int where
   readPrec     = readNumber convertInt
