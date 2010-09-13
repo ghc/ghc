@@ -33,7 +33,9 @@ import CPUTime ( getCPUTime, cpuTimePrecision )
 #ifdef __GLASGOW_HASKELL__
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
+#if !defined(CLK_TCK)
 import System.IO.Unsafe (unsafePerformIO)
+#endif
 
 #include "HsBaseConfig.h"
 
