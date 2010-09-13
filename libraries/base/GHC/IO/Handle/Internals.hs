@@ -360,18 +360,25 @@ ioe_bufsiz n = ioException
 -- has become unreferenced and then resurrected (arguably in the
 -- latter case we shouldn't finalize the Handle...).  Anyway,
 -- we try to emit a helpful message which is better than nothing.
+--
+-- [later; 8/2010] However, a program like this can yield a strange
+-- error message:
+--
+--   main = writeFile "out" loop
+--   loop = let x = x in x
+--
+-- because the main thread and the Handle are both unreachable at the
+-- same time, the Handle may get finalized before the main thread
+-- receives the NonTermination exception, and the exception handler
+-- will then report an error.  We'd rather this was not an error and
+-- the program just prints "<<loop>>".
 
 handleFinalizer :: FilePath -> MVar Handle__ -> IO ()
 handleFinalizer fp m = do
   handle_ <- takeMVar m
-  case haType handle_ of
-      ClosedHandle -> return ()
-      _ -> do flushWriteBuffer handle_ `catchAny` \_ -> return ()
-                -- ignore errors and async exceptions, and close the
-                -- descriptor anyway...
-              _ <- hClose_handle_ handle_
-              return ()
-  putMVar m (ioe_finalizedHandle fp)
+  (handle_', _) <- hClose_help handle_
+  putMVar m handle_'
+  return ()
 
 -- ---------------------------------------------------------------------------
 -- Allocating buffers
