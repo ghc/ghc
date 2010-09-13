@@ -316,7 +316,7 @@ and hence it is only possible on a seekable Handle.
 -- | The representation of a newline in the external file or stream.
 data Newline = LF    -- ^ '\n'
              | CRLF  -- ^ '\r\n'
-             deriving Eq
+             deriving (Eq, Ord, Read, Show)
 
 -- | Specifies the translation, if any, of newline characters between
 -- internal Strings and the external file or stream.  Haskell Strings
@@ -329,7 +329,7 @@ data NewlineMode
                   outputNL :: Newline
                     -- ^ the representation of newlines on output
                  }
-             deriving Eq
+             deriving (Eq, Ord, Read, Show)
 
 -- | The native newline representation for the current platform: 'LF'
 -- on Unix systems, 'CRLF' on Windows.
