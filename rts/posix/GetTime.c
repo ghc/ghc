@@ -156,16 +156,25 @@ Ticks getThreadCPUTime(void)
     }
     return ((usec * TICKS_PER_SECOND) / 1000000);
 
-#elif !defined(BE_CONSERVATIVE) && defined(HAVE_CLOCK_GETTIME) && defined (_POSIX_THREAD_CPUTIME) && defined(CLOCK_THREAD_CPUTIME_ID) && defined(HAVE_SYSCONF)
-    if (sysconf(_POSIX_THREAD_CPUTIME) != -1) {
-        // clock_gettime() gives us per-thread CPU time.  It isn't
-        // reliable on Linux, but it's the best we have.
-        struct timespec ts;
-        int res;
-        res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        if (res == 0) {
-            return ((Ticks)ts.tv_sec * TICKS_PER_SECOND +
-                    ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
+#elif !defined(BE_CONSERVATIVE) && defined(HAVE_CLOCK_GETTIME) && defined (_SC_THREAD_CPUTIME) && defined(CLOCK_THREAD_CPUTIME_ID) && defined(HAVE_SYSCONF)
+    {
+        static int checked_sysconf = 0;
+        static int sysconf_result = 0;
+        
+        if (!checked_sysconf) {
+            sysconf_result = sysconf(_SC_THREAD_CPUTIME);
+            checked_sysconf = 1;
+        }
+        if (sysconf_result != -1) {
+            // clock_gettime() gives us per-thread CPU time.  It isn't
+            // reliable on Linux, but it's the best we have.
+            struct timespec ts;
+            int res;
+            res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+            if (res == 0) {
+                return ((Ticks)ts.tv_sec * TICKS_PER_SECOND +
+                        ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
+            }
         }
     }
 #endif
