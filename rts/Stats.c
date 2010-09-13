@@ -258,7 +258,8 @@ stat_startExit(void)
 	PROF_VAL(RPe_tot_time + HCe_tot_time) - InitElapsedStamp;
     if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
 
-    MutUserTime = user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
+    MutUserTime = user - GC_tot_time - 
+        PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
     if (MutUserTime < 0) { MutUserTime = 0; }
 
 #if USE_PAPI
@@ -314,15 +315,11 @@ stat_startGC(void)
 	}
     }
 
-#if defined(PROFILING) || defined(DEBUG)
-    GC_start_time = getProcessCPUTime();  // needed in mut_user_time_during_GC()
-#endif
-
-    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
-#if !defined(PROFILING) && !defined(DEBUG)
-        GC_start_time = getProcessCPUTime();
-#endif
-	GCe_start_time = getProcessElapsedTime();
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS
+        || RtsFlags.ProfFlags.doHeapProfile)
+        // heap profiling needs GC_tot_time
+    {
+        getProcessTimes(&GC_start_time, &GCe_start_time);
 	if (RtsFlags.GcFlags.giveStats) {
 	    GC_start_faults = getPageFaults();
 	}
@@ -346,7 +343,10 @@ void
 stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen,
             lnat max_copied, lnat avg_copied, lnat slop)
 {
-    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
+        RtsFlags.ProfFlags.doHeapProfile)
+        // heap profiling needs GC_tot_time
+    {
 	Ticks time, etime, gc_time, gc_etime;
 	
 	getProcessTimes(&time, &etime);
