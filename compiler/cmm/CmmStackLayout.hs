@@ -1,4 +1,6 @@
+#if __GLASGOW_HASKELL__ >= 611
 {-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+#endif
 -- Norman likes local bindings
 -- If this module lives on I'd like to get rid of this flag in due course
 

@@ -8,7 +8,6 @@ module FamInst (
 import HscTypes
 import FamInstEnv
 import TcMType
-import TcType
 import TcRnMonad
 import TyCon
 import Name

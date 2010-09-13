@@ -1,4 +1,6 @@
+#if __GLASGOW_HASKELL__ >= 611
 {-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+#endif
 -- Norman likes local bindings
 
 -- This module is pure representation and should be imported only by

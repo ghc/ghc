@@ -64,7 +64,6 @@ module TcSMonad (
 import HscTypes
 import BasicTypes 
 import Type
-import TcRnTypes
 
 import Inst
 import InstEnv 
@@ -95,6 +94,8 @@ import FastString
 import HsBinds               -- for TcEvBinds stuff 
 import Id 
 import FunDeps
+
+import TcRnTypes
 
 import Control.Monad
 import Data.IORef
