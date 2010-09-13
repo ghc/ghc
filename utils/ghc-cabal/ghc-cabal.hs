@@ -328,7 +328,16 @@ generate config_args distdir directory
           -- GHC's rts package:
           hackRtsPackage index =
             case PackageIndex.lookupPackageName index (PackageName "rts") of
-              [(_,[rts])] -> PackageIndex.insert rts{ Installed.ldOptions = [] } index
+              [(_,[rts])] ->
+                 PackageIndex.insert rts{
+                     Installed.ldOptions = [],
+                     Installed.libraryDirs = filter (not . ("gcc-lib" `isSuffixOf`)) (Installed.libraryDirs rts)} index
+                        -- GHC <= 6.12 had $topdir/gcc-lib in their
+                        -- library-dirs for the rts package, which causes
+                        -- problems when we try to use the in-tree mingw,
+                        -- due to accidentally picking up the incompatible
+                        -- libraries there.  So we filter out gcc-lib from
+                        -- the RTS's library-dirs here.
               _ -> error "No (or multiple) ghc rts package is registered!!"
 
           dep_ids = map snd (externalPackageDeps lbi)
