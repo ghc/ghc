@@ -23,7 +23,4 @@ extern RTS_PRIVATE StgWord stg_stack_save_entries[];
 extern RTS_PRIVATE StgFun *stg_stack_save_entries[];
 #endif
 
-// canned bitmap for each arg type
-extern RTS_PRIVATE StgWord stg_arg_bitmaps[];
-
 #endif /* APPLY_H */
