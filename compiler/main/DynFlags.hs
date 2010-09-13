@@ -732,7 +732,7 @@ defaultDynFlags =
         haddockOptions = Nothing,
         flags = defaultFlags,
         language = Nothing,
-        extensionFlags = Left defaultExtensionFlags,
+        extensionFlags = Left [],
 
         log_action = \severity srcSpan style msg ->
                         case severity of
@@ -795,6 +795,8 @@ languageExtensions Nothing
     = Opt_MonoPatBinds   -- Experimentally, I'm making this non-standard
                          -- behaviour the default, to see if anyone notices
                          -- SLPJ July 06
+      -- In due course I'd like Opt_MonoLocalBinds to be on by default
+      -- SLPJ September 2010
     : languageExtensions (Just Haskell2010)
 languageExtensions (Just Haskell98)
     = [Opt_ImplicitPrelude,
@@ -1658,10 +1660,6 @@ defaultFlags
              -- The default -O0 options
 
     ++ standardWarnings
-
-defaultExtensionFlags :: [OnOff ExtensionFlag]
-defaultExtensionFlags 
-  = []		-- In due course I'd like Opt_MonoLocalBinds to be on by default
 
 impliedFlags :: [(ExtensionFlag, ExtensionFlag)]
 impliedFlags
