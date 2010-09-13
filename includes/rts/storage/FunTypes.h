@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------------------*/
 
 #ifndef RTS_STORAGE_FUNTYPES_H
-#define RTS_STORAGE_FUNTYPES_
+#define RTS_STORAGE_FUNTYPES_H
 
 /* generic - function comes with a small bitmap */
 #define ARG_GEN      0   
