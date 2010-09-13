@@ -28,7 +28,7 @@ module HsUtils(
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
 
   -- Bindigns
-  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mk_FunBind,
+  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, 
 
   -- Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, 
@@ -81,7 +81,6 @@ import NameSet
 import BasicTypes
 import SrcLoc
 import FastString
-import Outputable
 import Util
 import Bag
 \end{code}
@@ -392,17 +391,6 @@ mk_easy_FunBind :: SrcSpan -> id -> [LPat id]
 
 mk_easy_FunBind loc fun pats expr
   = L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds]
-
-------------
-mk_FunBind :: SrcSpan -> id
-	   -> [([LPat id], LHsExpr id)]
-	   -> LHsBind id
-
-mk_FunBind _   _   [] = panic "TcGenDeriv:mk_FunBind"
-mk_FunBind loc fun pats_and_exprs
-  = L loc $ mkFunBind (L loc fun) matches
-  where
-    matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
 
 ------------
 mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id

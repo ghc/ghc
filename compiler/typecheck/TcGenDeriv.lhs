@@ -184,10 +184,10 @@ gen_Eq_binds loc tycon
     aux_binds | no_nullary_cons = []
 	      | otherwise       = [GenCon2Tag tycon]
 
-    method_binds = listToBag [
-			mk_FunBind loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest),
-			mk_easy_FunBind loc ne_RDR [a_Pat, b_Pat] (
-			nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))]
+    method_binds = listToBag [eq_bind, ne_bind]
+    eq_bind = mk_FunBind loc eq_RDR (map pats_etc nonnullary_cons ++ rest)
+    ne_bind = mk_easy_FunBind loc ne_RDR [a_Pat, b_Pat] (
+			nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
 
     ------------------------------------------------------------------
     pats_etc data_con
@@ -321,6 +321,9 @@ gtResult OrdGT      = true_Expr
 ------------
 gen_Ord_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 gen_Ord_binds loc tycon
+  | null tycon_data_cons	-- No data-cons => invoke bale-out case
+  = (unitBag $ mk_FunBind loc compare_RDR [], [])
+  | otherwise
   = (unitBag (mkOrdOp OrdCompare) `unionBags` other_ops, aux_binds)
   where
     aux_binds | single_con_type = []
@@ -1036,17 +1039,18 @@ gen_Show_binds get_fixity loc tycon
     show_list = mkHsVarBind loc showList_RDR
 		  (nlHsApp (nlHsVar showList___RDR) (nlHsPar (nlHsApp (nlHsVar showsPrec_RDR) (nlHsIntLit 0))))
     -----------------------------------------------------------------------
-    shows_prec = mk_FunBind loc showsPrec_RDR (map pats_etc (tyConDataCons tycon))
-      where
-	pats_etc data_con
-	  | nullary_con =  -- skip the showParen junk...
-	     ASSERT(null bs_needed)
-	     ([nlWildPat, con_pat], mk_showString_app op_con_str)
-	  | otherwise   =
-	     ([a_Pat, con_pat],
-		  showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR (nlHsLit (HsInt con_prec_plus_one))))
-				 (nlHsPar (nested_compose_Expr show_thingies)))
-	    where
+    data_cons = tyConDataCons tycon
+    shows_prec = mk_FunBind loc showsPrec_RDR (map pats_etc data_cons)
+
+    pats_etc data_con
+      | nullary_con =  -- skip the showParen junk...
+         ASSERT(null bs_needed)
+         ([nlWildPat, con_pat], mk_showString_app op_con_str)
+      | otherwise   =
+         ([a_Pat, con_pat],
+      	  showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR (nlHsLit (HsInt con_prec_plus_one))))
+      			 (nlHsPar (nested_compose_Expr show_thingies)))
+        where
 	     data_con_RDR  = getRdrName data_con
 	     con_arity     = dataConSourceArity data_con
 	     bs_needed     = take con_arity bs_RDRs
@@ -1230,7 +1234,9 @@ gen_Data_binds loc tycon
 
 	------------ gfoldl
     gfoldl_bind = mk_FunBind loc gfoldl_RDR (map gfoldl_eqn data_cons)
-    gfoldl_eqn con = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed], 
+          
+    gfoldl_eqn con 
+      = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed], 
 		       foldl mk_k_app (nlHsVar z_RDR `nlHsApp` nlHsVar con_name) as_needed)
 		   where
 		     con_name ::  RdrName
@@ -1382,14 +1388,12 @@ gen_Functor_binds loc tycon
   = (unitBag fmap_bind, [])
   where
     data_cons = tyConDataCons tycon
-    fmap_bind = L loc $ mkFunBind (L loc fmap_RDR) eqns
+    fmap_bind = L loc $ mkRdrFunBind (L loc fmap_RDR) eqns
                                   
     fmap_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_fmap con
 
-	-- Catch-all eqn looks like   fmap _ _ = error "impossible"
-	-- It's needed if there no data cons at all 
     eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat] 
                                            (error_Expr "Void fmap")]
          | otherwise      = map fmap_eqn data_cons
@@ -1554,10 +1558,8 @@ gen_Foldable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    foldr_bind = L loc $ mkFunBind (L loc foldable_foldr_RDR) eqns
-    eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat, nlWildPat] 
-                                           (error_Expr "Void foldr")]
-         | otherwise      = map foldr_eqn data_cons
+    foldr_bind = L loc $ mkRdrFunBind (L loc foldable_foldr_RDR) eqns
+    eqns = map foldr_eqn data_cons
     foldr_eqn con = evalState (match_for_con z_Expr [f_Pat,z_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_foldr con
@@ -1608,10 +1610,8 @@ gen_Traversable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    traverse_bind = L loc $ mkFunBind (L loc traverse_RDR) eqns
-    eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat] 
-                                           (error_Expr "Void traverse")]
-         | otherwise      = map traverse_eqn data_cons
+    traverse_bind = L loc $ mkRdrFunBind (L loc traverse_RDR) eqns
+    eqns = map traverse_eqn data_cons
     traverse_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
       where 
         parts = foldDataConArgs ft_trav con
@@ -1759,7 +1759,27 @@ mkParentType tc
 %************************************************************************
 
 
-ToDo: Better SrcLocs.
+\begin{code}
+mk_FunBind :: SrcSpan -> RdrName
+	   -> [([LPat RdrName], LHsExpr RdrName)]
+	   -> LHsBind RdrName
+mk_FunBind loc fun pats_and_exprs
+  = L loc $ mkRdrFunBind (L loc fun) matches
+  where
+    matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
+
+mkRdrFunBind :: Located RdrName -> [LMatch RdrName] -> HsBind RdrName
+mkRdrFunBind fun@(L _ fun_rdr) matches
+ | null matches = mkFunBind fun [mkMatch [] (error_Expr str) emptyLocalBinds]
+	-- Catch-all eqn looks like   
+        --     fmap = error "Void fmap"
+	-- It's needed if there no data cons at all,
+        -- which can happen with -XEmptyDataDecls
+	-- See Trac #4302
+ | otherwise    = mkFunBind fun matches
+ where
+   str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
+\end{code}
 
 \begin{code}
 box_if_necy :: String		-- The class involved

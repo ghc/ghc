@@ -830,11 +830,15 @@ type Condition = (DynFlags, TyCon) -> Maybe SDoc
 orCond :: Condition -> Condition -> Condition
 orCond c1 c2 tc 
   = case c1 tc of
-	Nothing -> Nothing		-- c1 succeeds
-	Just x  -> case c2 tc of	-- c1 fails
-		     Nothing -> Nothing
-		     Just y  -> Just (x $$ ptext (sLit "  and") $$ y)
-					-- Both fail
+	Nothing -> Nothing	-- c1 succeeds
+	Just {} -> c2 tc	-- c1 fails, try c2
+-- orCond produced just one error message, namely from c2
+-- Getting two can be confusing.  For a zero-constructor
+-- type with a standalone isntance decl, we previously got:
+--    Can't make a derived instance of `Bounded (Test a)':
+--      `Test' has no data constructors
+--        and
+--      `Test' does not have precisely one constructor
 
 andCond :: Condition -> Condition -> Condition
 andCond c1 c2 tc = case c1 tc of
@@ -845,16 +849,14 @@ cond_stdOK :: DerivContext -> Condition
 cond_stdOK (Just _) _
   = Nothing	-- Don't check these conservative conditions for
 		-- standalone deriving; just generate the code
+		-- and let the typechecker handle the result
 cond_stdOK Nothing (_, rep_tc)
-  | null data_cons      = Just (no_cons_why $$ suggestion)
+  | null data_cons      = Just (no_cons_why rep_tc $$ suggestion)
   | not (null con_whys) = Just (vcat con_whys $$ suggestion)
   | otherwise      	= Nothing
   where
     suggestion  = ptext (sLit "Possible fix: use a standalone deriving declaration instead")
     data_cons   = tyConDataCons rep_tc
-    no_cons_why	= quotes (pprSourceTyCon rep_tc) <+> 
-		  ptext (sLit "has no data constructors")
-
     con_whys = mapCatMaybes check_con data_cons
 
     check_con :: DataCon -> Maybe SDoc
@@ -863,6 +865,10 @@ cond_stdOK Nothing (_, rep_tc)
       , all isTauTy (dataConOrigArgTys con) = Nothing
       | otherwise = Just (badCon con (ptext (sLit "does not have a Haskell-98 type")))
   
+no_cons_why :: TyCon -> SDoc
+no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+> 
+		     ptext (sLit "has no data constructors")
+
 cond_enumOrProduct :: Condition
 cond_enumOrProduct = cond_isEnumeration `orCond` 
 		       (cond_isProduct `andCond` cond_noUnliftedArgs)
@@ -880,8 +886,9 @@ cond_noUnliftedArgs (_, tc)
 
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
-  | isEnumerationTyCon rep_tc = Nothing
-  | otherwise		      = Just why
+  | null (tyConDataCons rep_tc) = Just (no_cons_why rep_tc)
+  | isEnumerationTyCon rep_tc   = Nothing
+  | otherwise		        = Just why
   where
     why = quotes (pprSourceTyCon rep_tc) <+> 
 	  ptext (sLit "has non-nullary constructors")
@@ -892,7 +899,7 @@ cond_isProduct (_, rep_tc)
   | otherwise	          = Just why
   where
     why = quotes (pprSourceTyCon rep_tc) <+> 
-	  ptext (sLit "has more than one constructor")
+	  ptext (sLit "does not have precisely one constructor")
 
 cond_typeableOK :: Condition
 -- OK for Typeable class
