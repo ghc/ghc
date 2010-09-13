@@ -7,4 +7,4 @@ tcfail103.hs:15:23:
           the type signature for `g' at tcfail103.hs:13:17
     In the first argument of `readSTRef', namely `v'
     In the expression: readSTRef v
-    In the definition of `g': g = readSTRef v
+    In an equation for `g': g = readSTRef v

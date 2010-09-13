@@ -4,4 +4,4 @@ tcfail029.hs:6:9:
       arising from a use of `>'
     Possible fix: add an instance declaration for (Ord Foo)
     In the expression: x > Bar
-    In the definition of `f': f x = x > Bar
+    In an equation for `f': f x = x > Bar

@@ -2,4 +2,4 @@
 tcfail085.hs:9:5:
     Constructor `F' does not have the required strict field(s): y
     In the expression: F {x = 2}
-    In the definition of `z': z = F {x = 2}
+    In an equation for `z': z = F {x = 2}

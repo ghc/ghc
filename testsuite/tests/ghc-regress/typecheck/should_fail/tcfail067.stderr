@@ -1,21 +1,16 @@
 
 tcfail067.hs:12:16:
-    Could not deduce (Ord a) from the context ()
+    No instance for (Ord a)
       arising from a use of `SubRange'
-    Possible fix:
-      add (Ord a)
-        to the context of the type signature for `subRangeValue'
     In the pattern: SubRange (lower, upper) value
-    In the definition of `subRangeValue':
+    In an equation for `subRangeValue':
         subRangeValue (SubRange (lower, upper) value) = value
 
 tcfail067.hs:15:11:
-    Could not deduce (Ord a) from the context ()
+    No instance for (Ord a)
       arising from a use of `SubRange'
-    Possible fix:
-      add (Ord a) to the context of the type signature for `subRange'
     In the pattern: SubRange r value
-    In the definition of `subRange': subRange (SubRange r value) = r
+    In an equation for `subRange': subRange (SubRange r value) = r
 
 tcfail067.hs:46:12:
     Could not deduce (Ord a) from the context (Show a)
@@ -23,7 +18,7 @@ tcfail067.hs:46:12:
     Possible fix:
       add (Ord a) to the context of the type signature for `showRange'
     In the pattern: SubRange (lower, upper) value
-    In the definition of `showRange':
+    In an equation for `showRange':
         showRange (SubRange (lower, upper) value)
                     = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
@@ -41,7 +36,7 @@ tcfail067.hs:61:12:
     Possible fix:
       add (Ord a) to the context of the instance declaration
     In the expression: numSubRangeNegate
-    In the definition of `negate': negate = numSubRangeNegate
+    In an equation for `negate': negate = numSubRangeNegate
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:65:19:
@@ -51,7 +46,7 @@ tcfail067.hs:65:19:
       add (Ord a) to the context of the instance declaration
     In the expression:
         SubRange (fromInteger a, fromInteger a) (fromInteger a)
-    In the definition of `fromInteger':
+    In an equation for `fromInteger':
         fromInteger a = SubRange
                           (fromInteger a, fromInteger a) (fromInteger a)
     In the instance declaration for `Num (SubRange a)'
@@ -60,10 +55,10 @@ tcfail067.hs:74:5:
     Could not deduce (Ord a) from the context (Num a)
       arising from a use of `SubRange'
     Possible fix:
-      add (Ord a)
-        to the context of the type signature for `numSubRangeBinOp'
+      add (Ord a) to the context of
+        the type signature for `numSubRangeBinOp'
     In the expression: SubRange (result, result) result
-    In the definition of `numSubRangeBinOp':
+    In an equation for `numSubRangeBinOp':
         numSubRangeBinOp op a b
                            = SubRange (result, result) result
                            where

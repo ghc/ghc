@@ -6,5 +6,5 @@ T3406.hs:11:6:
     To fix this, expand the type synonym
     [Note: I hope to lift this restriction in due course]
     In the pattern: x :: ItemColID a b
-    In the definition of `get':
+    In an equation for `get':
         get (x :: ItemColID a b) = x :: ItemColID a b

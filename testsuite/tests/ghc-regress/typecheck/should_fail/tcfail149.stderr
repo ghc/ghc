@@ -1,8 +1,0 @@
-
-tcfail149.hs:3:1:
-    All of the type variables in the constraint `Show a'
-    are already in scope (at least one must be universally quantified here)
-	(Use -XFlexibleContexts to lift this restriction)
-    When checking the class method:
-      op :: forall b. (Show a, Show b) => a -> b -> String
-    In the class declaration for `C'

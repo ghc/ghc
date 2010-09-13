@@ -1,13 +1,13 @@
 
 T4099.hs:11:14:
-    Couldn't match expected type `T a' against inferred type `T b'
-      NB: `T' is a type function, and may not be injective
+    Couldn't match type `T b' with `T a'
+    NB: `T' is a type function, and may not be injective
     In the first argument of `foo', namely `x'
     In the expression: foo x
-    In the definition of `bar1': bar1 x = foo x
+    In an equation for `bar1': bar1 x = foo x
 
 T4099.hs:14:14:
-    Couldn't match expected type `T a1' against inferred type `Maybe b'
+    Couldn't match type `T a1' with `Maybe b'
     In the first argument of `foo', namely `x'
     In the expression: foo x
-    In the definition of `bar2': bar2 x = foo x
+    In an equation for `bar2': bar2 x = foo x

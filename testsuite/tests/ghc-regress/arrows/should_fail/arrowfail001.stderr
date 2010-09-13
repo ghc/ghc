@@ -1,5 +1,9 @@
 
 arrowfail001.hs:16:36:
     Ambiguous type variable `a' in the constraint:
-      `Foo a' arising from a use of `foo' at arrowfail001.hs:16:36-38
+      (Foo a) arising from a use of `foo'
     Probable fix: add a type signature that fixes these type variable(s)
+    In the expression: foo
+    In the expression: proc x -> case x of { Bar a -> foo -< a }
+    In an equation for `get':
+        get = proc x -> case x of { Bar a -> foo -< a }

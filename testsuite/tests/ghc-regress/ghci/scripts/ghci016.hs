@@ -1,4 +1,3 @@
-
 -- Test for trac #552
 
 module Test where
@@ -10,6 +9,10 @@ data T = T
 
 instance Num T where
     fromInteger _ = T
+    (+)    = error "urk"
+    (*)    = error "urk"
+    abs    = error "urk"
+    signum = error "urk"
 
 -- Typing 3 at the ghci prompt should print T
 

@@ -1,6 +1,7 @@
 
 tcfail120.hs:13:26:
-    A wild-card pattern cannot be bound to an unboxed tuple
+    A wild-card pattern cannot have an unboxed tuple type:
+      (# Int, Int #)
     In the pattern: _
     In a case alternative: _ -> (# 3, 4 #)
     In the expression: case t x of { _ -> (# 3, 4 #) }

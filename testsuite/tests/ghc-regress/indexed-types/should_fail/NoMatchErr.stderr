@@ -1,8 +1,7 @@
 
-NoMatchErr.hs:20:12:
-    Couldn't match expected type `Memo d'
-           against inferred type `Memo d1'
-      NB: `Memo' is a type function, and may not be injective
-    In the second argument of `(.)', namely `appl'
+NoMatchErr.hs:20:5:
+    Could not deduce (Memo d ~ Memo d1) from the context (Fun d1)
+    NB: `Memo' is a type function, and may not be injective
+    In the first argument of `(.)', namely `abst'
     In the expression: abst . appl
-    In the definition of `f': f = abst . appl
+    In an equation for `f': f = abst . appl

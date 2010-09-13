@@ -1,7 +1,0 @@
-
-tcrun026.hs:17:29:
-    Couldn't match expected type `forall x. L x'
-	   against inferred type `L x'
-    In the pattern: L x
-    In the pattern: FA (L x)
-    In a case alternative: FA (L x) -> "foo" ++ x

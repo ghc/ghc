@@ -1,5 +1,5 @@
 
 tcfail005.hs:3:9:
-    Couldn't match expected type `[t]' against inferred type `(t1, t2)'
+    Couldn't match expected type `[t]' with actual type `(t1, t2)'
     In the expression: (1, 'a')
     In a pattern binding: (h : i) = (1, 'a')

@@ -1,8 +1,8 @@
 
-readFail032.hs:21:37:
-    Couldn't match expected type `[Char]' against inferred type `Char'
+readFail032.hs:11:38:
+    Couldn't match expected type `[Char]' with actual type `Char'
       Expected type: [[Char]]
-      Inferred type: [Char]
+        Actual type: [Char]
     In the second argument of `(:)', namely `"Type error on line 21"'
     In the expression:
-	  "Type error on line 21" : "Type error on line 21"
+          "Type error on line 21" : "Type error on line 21"

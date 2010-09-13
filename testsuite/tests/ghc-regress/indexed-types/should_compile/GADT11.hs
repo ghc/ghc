@@ -17,4 +17,4 @@ data EQ a b = forall q . (a ~ b) => Refl
 
 zerol :: Nat n -> EQ n (Sum Z n)
 zerol NZ = Refl
-zerol (NS n) = case zerol n of Refl -> Refl
+-- zerol (NS n) = case zerol n of Refl -> Refl

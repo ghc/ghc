@@ -1,6 +1,14 @@
 
+A.hs:8:6:
+    No instance for (Num (Int :- Int))
+      arising from the literal `1'
+    Possible fix: add an instance declaration for (Num (Int :- Int))
+    In the expression: 1
+    In the expression: (1, (2, 3))
+    In an equation for `f': f = (1, (2, 3))
+
 A.hs:8:8:
-    Couldn't match expected type `Int' against inferred type `(t, t1)'
+    Couldn't match expected type `Int' with actual type `(t, t1)'
     In the expression: (2, 3)
     In the expression: (1, (2, 3))
-    In the definition of `f': f = (1, (2, 3))
+    In an equation for `f': f = (1, (2, 3))

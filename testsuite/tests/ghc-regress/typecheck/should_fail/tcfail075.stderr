@@ -1,24 +1,6 @@
 
-tcfail075.hs:11:1:
-    Top-level bindings for unlifted types aren't allowed: { x = 1# }
+tcfail075.hs:10:1:
+    Top-level bindings for unlifted types aren't allowed: x = 1#
 
-tcfail075.hs:14:5:
-    Couldn't match kind `*' against `#'
-    When matching the kinds of `a :: *' and `Int# :: #'
-      Expected type: Int#
-      Inferred type: a
-    In the first argument of `(+#)', namely `x'
-
-tcfail075.hs:17:15:
-    Couldn't match kind `*' against `#'
-    When matching the kinds of `a :: *' and `Int# :: #'
-      Expected type: Int#
-      Inferred type: a
-    In the first argument of `(-#)', namely `x'
-
-tcfail075.hs:19:12:
-    Couldn't match kind `*' against `#'
-    When matching the kinds of `a :: *' and `Int# :: #'
-      Expected type: Int#
-      Inferred type: a
-    In the first argument of `(>#)', namely `z'
+tcfail075.hs:13:1:
+    Top-level bindings for unlifted types aren't allowed: y = x +# 1#

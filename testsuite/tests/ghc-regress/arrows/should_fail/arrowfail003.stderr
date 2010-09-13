@@ -4,11 +4,11 @@ arrowfail003.hs:8:7:
       returnA -< []
     was found where an expression was expected
     In the expression: returnA -< []
-    In the definition of `foo': foo = returnA -< []
+    In an equation for `foo': foo = returnA -< []
 
 arrowfail003.hs:9:7:
     The arrow command
       (|zeroArrow |)
     was found where an expression was expected
     In the expression: (|zeroArrow |)
-    In the definition of `bar': bar = (|zeroArrow |)
+    In an equation for `bar': bar = (|zeroArrow |)

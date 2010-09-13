@@ -2,4 +2,4 @@
 tcfail002.hs:4:7:
     Occurs check: cannot construct the infinite type: t = [t]
     In the expression: z
-    In the definition of `c': c z = z
+    In an equation for `c': c z = z

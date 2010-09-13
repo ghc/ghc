@@ -1,5 +1,5 @@
 
-tcfail193.hs:10:10:
+tcfail193.hs:10:31:
     Occurs check: cannot construct the infinite type: a = [a]
     In the expression: inits
     In a stmt of a list comprehension: then inits

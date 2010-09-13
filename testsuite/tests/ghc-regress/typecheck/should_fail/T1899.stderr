@@ -1,7 +1,6 @@
 
 T1899.hs:12:29:
-    Couldn't match expected type `a1'
-           against inferred type `Proposition a'
+    Couldn't match type `a1' with `Proposition a'
       `a1' is a rigid type variable bound by
            the type signature for `transRHS' at T1899.hs:9:15
     In the first argument of `Prop', namely `(Auxiliary undefined)'

@@ -1,7 +1,7 @@
 
 SimpleFail5a.hs:31:11:
-    Couldn't match expected type `a' against inferred type `Int'
+    Couldn't match type `a' with `Int'
       `a' is a rigid type variable bound by
           the type signature for `bar3wrong' at SimpleFail5a.hs:30:17
     In the pattern: D3Int
-    In the definition of `bar3wrong': bar3wrong D3Int = 1
+    In an equation for `bar3wrong': bar3wrong D3Int = 1

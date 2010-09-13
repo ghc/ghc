@@ -1,6 +1,0 @@
-
-tcfail172.hs:19:11:
-    GADT pattern match in non-rigid context for `Nil'
-      Probable solution: add a type signature for `is_normal'
-    In the pattern: Nil
-    In the definition of `is_normal': is_normal Nil = True

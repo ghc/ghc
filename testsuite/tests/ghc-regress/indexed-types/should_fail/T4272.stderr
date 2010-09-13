@@ -1,0 +1,9 @@
+
+T4272.hs:11:26:
+    Occurs check: cannot construct the infinite type:
+      a = TermFamily a a
+    In the first argument of `terms', namely
+        `(undefined :: TermFamily a a)'
+    In the second argument of `prune', namely
+        `(terms (undefined :: TermFamily a a))'
+    In the expression: prune t (terms (undefined :: TermFamily a a))

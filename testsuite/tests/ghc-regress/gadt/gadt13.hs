@@ -10,5 +10,5 @@ data Term a where
    I :: Int  -> Term Int
 
 shw (I t) = ("I "++) . shows t
-shw (B t) = ("B "++) . shows t
+-- shw (B t) = ("B "++) . shows t
 

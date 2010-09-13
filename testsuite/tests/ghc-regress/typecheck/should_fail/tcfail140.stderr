@@ -3,20 +3,20 @@ tcfail140.hs:10:7:
     The function `f' is applied to two arguments,
     but its type `Int -> Int' has only one
     In the expression: f 3 9
-    In the definition of `bar': bar = f 3 9
+    In an equation for `bar': bar = f 3 9
 
 tcfail140.hs:12:10:
     The operator `f' takes two arguments,
     but its type `Int -> Int' has only one
     In the expression: 3 `f` 4
-    In the definition of `rot': rot xs = 3 `f` 4
+    In an equation for `rot': rot xs = 3 `f` 4
 
 tcfail140.hs:14:15:
     The operator `f' takes two arguments,
     but its type `Int -> Int' has only one
     In the first argument of `map', namely `(3 `f`)'
     In the expression: map (3 `f`) xs
-    In the definition of `bot': bot xs = map (3 `f`) xs
+    In an equation for `bot': bot xs = map (3 `f`) xs
 
 tcfail140.hs:16:8:
     Constructor `Just' should have 1 argument, but has been given none

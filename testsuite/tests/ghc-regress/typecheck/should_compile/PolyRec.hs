@@ -1,5 +1,3 @@
-{-# LANGUAGE RelaxedPolyRec #-}
-
 -- An example of RelaxedPolyRec in action which came up
 -- on Haskell Cafe June 2010 (Job Vranish)
 

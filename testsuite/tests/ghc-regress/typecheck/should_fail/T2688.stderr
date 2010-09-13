@@ -1,41 +1,29 @@
 
-T2688.hs:1:1:
-    Couldn't match expected type `s' against inferred type `v'
-      `s' is a rigid type variable bound by
-          the class declaration for `VectorSpace' at T2688.hs:5:21
-      `v' is a rigid type variable bound by
-          the class declaration for `VectorSpace' at T2688.hs:5:19
-    When using functional dependencies to combine
-      VectorSpace v v, arising from a use of `*^' at T2688.hs:8:14-23
-      VectorSpace v s,
-        arising from the class declaration for `VectorSpace'
-                     at T2688.hs:(5,1)-(8,23)
-
-T2688.hs:8:14:
-    Could not deduce (VectorSpace v v)
+T2688.hs:8:16:
+    Could not deduce (VectorSpace s s)
       from the context (VectorSpace v s)
-      arising from a use of `*^' at T2688.hs:8:14-23
+      arising from a use of `*^'
     Possible fix:
-      add (VectorSpace v v) to the context of
+      add (VectorSpace s s) to the context of
         the class declaration for `VectorSpace'
     In the expression: v *^ (1 / s)
-    In the definition of `^/': v ^/ s = v *^ (1 / s)
+    In an equation for `^/': v ^/ s = v *^ (1 / s)
 
-T2688.hs:8:14:
-    Couldn't match expected type `v' against inferred type `s'
+T2688.hs:8:16:
+    Couldn't match type `v' with `s'
       `v' is a rigid type variable bound by
           the class declaration for `VectorSpace' at T2688.hs:5:19
       `s' is a rigid type variable bound by
           the class declaration for `VectorSpace' at T2688.hs:5:21
     In the expression: v *^ (1 / s)
-    In the definition of `^/': v ^/ s = v *^ (1 / s)
+    In an equation for `^/': v ^/ s = v *^ (1 / s)
 
-T2688.hs:8:20:
-    Could not deduce (Fractional v) from the context (VectorSpace v s)
-      arising from a use of `/' at T2688.hs:8:20-22
+T2688.hs:8:21:
+    Could not deduce (Fractional s) from the context (VectorSpace v s)
+      arising from a use of `/'
     Possible fix:
-      add (Fractional v) to the context of
+      add (Fractional s) to the context of
         the class declaration for `VectorSpace'
     In the second argument of `(*^)', namely `(1 / s)'
     In the expression: v *^ (1 / s)
-    In the definition of `^/': v ^/ s = v *^ (1 / s)
+    In an equation for `^/': v ^/ s = v *^ (1 / s)

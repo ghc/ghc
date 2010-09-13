@@ -1,5 +1,8 @@
 
 tcfail181.hs:17:9:
     Ambiguous type variable `m' in the constraint:
-      `Monad m' arising from a use of `foo' at tcfail181.hs:17:9-11
+      (Monad m) arising from a use of `foo'
     Probable fix: add a type signature that fixes these type variable(s)
+    In the expression: foo
+    In the expression: foo {bar = return True}
+    In an equation for `wog': wog x = foo {bar = return True}

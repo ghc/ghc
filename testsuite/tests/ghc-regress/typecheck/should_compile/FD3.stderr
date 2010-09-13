@@ -2,4 +2,4 @@
 FD3.hs:15:15:
     Occurs check: cannot construct the infinite type: a = (String, a)
     In the expression: mkA a
-    In the definition of `translate': translate a = mkA a
+    In an equation for `translate': translate a = mkA a

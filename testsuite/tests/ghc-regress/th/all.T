@@ -146,7 +146,7 @@ test('TH_tf3', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
 test('TH_pragma',
      if_compiler_lt('ghc', '6.11', expect_fail),
      compile,
-     ['-v0 -ddump-splices -dsuppress-uniques'])
+     ['-v0 -dsuppress-uniques'])
 test('T3177', normal, compile, ['-v0'])
 test('T3177a', normal, compile_fail, ['-v0'])
 

@@ -2,8 +2,9 @@
 tcfail118.hs:10:29:
     Overlapping instances for Eq Foo
       arising from the 'deriving' clause of a data type declaration
-                   at tcfail118.hs:10:29-30
     Matching instances:
       instance Eq Foo -- Defined at tcfail118.hs:11:25-26
       instance Eq Foo -- Defined at tcfail118.hs:13:10-15
+    Alternatively, use a standalone 'deriving instance' declaration,
+      so you can specify the instance context yourself
     When deriving the instance for (Eq Bar)

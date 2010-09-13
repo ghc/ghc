@@ -1,10 +1,10 @@
 
-FD2.hs:26:36:
-    Couldn't match expected type `e' against inferred type `e1'
+FD2.hs:26:34:
+    Couldn't match type `e' with `e1'
       `e' is a rigid type variable bound by
           the type signature for `foldr1' at FD2.hs:21:20
       `e1' is a rigid type variable bound by
            the type signature for `mf' at FD2.hs:24:25
-    In the first argument of `f', namely `x'
     In the first argument of `Just', namely `(f x y)'
     In the expression: Just (f x y)
+    In an equation for `mf': mf x (Just y) = Just (f x y)

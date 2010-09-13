@@ -1,7 +1,7 @@
 
 mdofail004.hs:17:5:
     No instance for (MonadFix X)
-      arising from a do statement at mdofail004.hs:17:5-24
+      arising from a do statement
     Possible fix: add an instance declaration for (MonadFix X)
     In the expression: mdo { return [1, 2, ....] }
-    In the definition of `z': z = mdo { return [1, ....] }
+    In an equation for `z': z = mdo { return [1, ....] }

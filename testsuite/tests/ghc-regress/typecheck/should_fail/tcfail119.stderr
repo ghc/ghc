@@ -1,5 +1,5 @@
 
 tcfail119.hs:11:8:
-    Couldn't match expected type `Bool' against inferred type `[Char]'
+    Couldn't match expected type `Bool' with actual type `[Char]'
     In the pattern: "Foo"
-    In the definition of `b': b x "Foo" = ()
+    In an equation for `b': b x "Foo" = ()

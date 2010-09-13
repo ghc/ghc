@@ -1,7 +1,10 @@
 
 T2627b.hs:20:14:
-    Couldn't match expected type `a'
-           against inferred type `Dual (Dual a)'
+    Couldn't match type `a' with `Dual (Dual a)'
+    because a is untouchable
+    inside the constraints (b ~ W a3 b2)
+      bound at a pattern with constructor
+               Wr :: forall a b. a -> Comm b -> Comm (W a b)
     In the pattern: Wr a r
-    In the definition of `conn':
+    In an equation for `conn':
         conn (Rd k) (Wr a r) = conn undefined undefined

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
 
 -- Helper for simpl009.hs (see comments there)
 
@@ -27,12 +27,13 @@ instance MonadPlus (Parser s) where
   mplus = error "urk"
   mzero = Parser (\fut exp -> Fail exp [])
 
-lookAhead :: Parser s s
+lookAhead :: forall s. Parser s s
 lookAhead =
   Parser (\fut exp -> Symbol (\c ->
     feed c (fut c [])
   ))
  where
+  feed :: forall res. s -> P s res -> P s res
   feed c (Symbol sym)     = sym c
   feed c (Result res fut) = Result res (feed c fut)
   feed c p@(Fail _ _)     = p

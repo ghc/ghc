@@ -1,3 +1,5 @@
+{-# OPTIONS -ddump-splices #-}
+{-# LANGUAGE TemplateHaskell #-}
 module TH_pragma where
 
 

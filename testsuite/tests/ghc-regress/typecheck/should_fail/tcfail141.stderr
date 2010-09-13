@@ -1,6 +1,7 @@
 
 tcfail141.hs:10:12:
-    Illegal binding of unboxed tuple f :: (# Int#, ByteArray# #)
+    The variable `f' cannot have an unboxed tuple type:
+      (# Int#, ByteArray# #)
     In the expression: let f = int2Integer# 0# in putStrLn ""
-    In the definition of `main':
-	main = let f = int2Integer# 0# in putStrLn ""
+    In an equation for `main':
+        main = let f = int2Integer# 0# in putStrLn ""

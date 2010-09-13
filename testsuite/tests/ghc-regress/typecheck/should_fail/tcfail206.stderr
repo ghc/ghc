@@ -1,38 +1,44 @@
 
 tcfail206.hs:5:5:
-    Couldn't match expected type `Bool' against inferred type `Int'
+    Couldn't match expected type `Int' with actual type `Bool'
+      Expected type: Bool -> (Int, Bool)
+        Actual type: Bool -> (Bool, t)
     In the expression: (, True)
-    In the definition of `a': a = (, True)
+    In an equation for `a': a = (, True)
 
 tcfail206.hs:8:5:
     Couldn't match expected type `Bool -> (Int, Bool)'
-           against inferred type `(t, Int)'
+                with actual type `(t, Int)'
+      Expected type: Int -> Bool -> (Int, Bool)
+        Actual type: Int -> (t, Int)
     In the expression: (1,)
-    In the definition of `b': b = (1,)
+    In an equation for `b': b = (1,)
 
-tcfail206.hs:11:6:
-    Couldn't match expected type `a' against inferred type `Bool'
+tcfail206.hs:11:5:
+    Couldn't match type `a' with `Bool'
       `a' is a rigid type variable bound by
           the type signature for `c' at tcfail206.hs:10:6
-    In the expression: True || False
     In the expression: (True || False,)
-    In the definition of `c': c = (True || False,)
+    In an equation for `c': c = (True || False,)
 
 tcfail206.hs:14:5:
-    Couldn't match expected type `Bool' against inferred type `Int'
+    Couldn't match expected type `Int' with actual type `Bool'
+      Expected type: Bool -> (# Int, Bool #)
+        Actual type: Bool -> (# Bool, t #)
     In the expression: (# , True #)
-    In the definition of `d': d = (# , True #)
+    In an equation for `d': d = (# , True #)
 
 tcfail206.hs:17:5:
     Couldn't match expected type `Bool -> (# Int, Bool #)'
-           against inferred type `(# t, Int #)'
+                with actual type `(# t, Int #)'
+      Expected type: Int -> Bool -> (# Int, Bool #)
+        Actual type: Int -> (# t, Int #)
     In the expression: (# 1, #)
-    In the definition of `e': e = (# 1, #)
+    In an equation for `e': e = (# 1, #)
 
-tcfail206.hs:20:7:
-    Couldn't match expected type `a' against inferred type `Bool'
+tcfail206.hs:20:5:
+    Couldn't match type `a' with `Bool'
       `a' is a rigid type variable bound by
           the type signature for `f' at tcfail206.hs:19:6
-    In the expression: True || False
     In the expression: (# True || False, #)
-    In the definition of `f': f = (# True || False, #)
+    In an equation for `f': f = (# True || False, #)

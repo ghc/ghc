@@ -1,7 +1,7 @@
 
 tcfail090.hs:8:9:
-    Couldn't match kind `*' against `#'
-    When matching the kinds of `a :: *' and `ByteArray# :: #'
-      Expected type: ByteArray#
-      Inferred type: a
+    Kind incompatibility when matching types:
+      a :: *
+      ByteArray# :: #
     In the expression: undefined
+    In an equation for `die': die _ = undefined

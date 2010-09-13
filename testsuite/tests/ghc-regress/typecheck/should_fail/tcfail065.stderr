@@ -1,10 +1,10 @@
 
 tcfail065.hs:29:20:
-    Couldn't match expected type `x' against inferred type `x1'
-      `x' is a rigid type variable bound by
-          the instance declaration at tcfail065.hs:28:18
+    Couldn't match type `x1' with `x'
       `x1' is a rigid type variable bound by
            the type signature for `setX' at tcfail065.hs:25:11
+      `x' is a rigid type variable bound by
+          the instance declaration at tcfail065.hs:28:18
     In the first argument of `X', namely `x'
     In the expression: X x
-    In the definition of `setX': setX x (X _) = X x
+    In an equation for `setX': setX x (X _) = X x

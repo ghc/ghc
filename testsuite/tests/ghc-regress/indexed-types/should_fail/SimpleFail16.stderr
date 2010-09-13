@@ -1,6 +1,6 @@
 
 SimpleFail16.hs:10:12:
-    Couldn't match expected type `p a' against inferred type `F ()'
+    Couldn't match type `F ()' with `p a'
     In the first argument of `foo', namely `(undefined :: F ())'
     In the expression: foo (undefined :: F ())
-    In the definition of `bar': bar = foo (undefined :: F ())
+    In an equation for `bar': bar = foo (undefined :: F ())

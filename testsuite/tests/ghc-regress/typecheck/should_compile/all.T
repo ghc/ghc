@@ -162,7 +162,7 @@ test('tc158', only_compiler_types(['ghc']), compile, [''])
 test('tc159', normal, compile_and_run, [''])
 test('tc160', only_compiler_types(['ghc']), compile, [''])
 test('tc161', normal, compile, [''])
-test('tc162', only_compiler_types(['ghc']), compile_fail, [''])
+test('tc162', only_compiler_types(['ghc']), compile, [''])
 test('tc163', only_compiler_types(['ghc']), compile, [''])
 test('tc164', normal, compile, [''])
 test('tc165', normal, compile, [''])
@@ -314,4 +314,6 @@ test('T2412',
      run_command,
      ['$MAKE --no-print-directory -s T2412'])
 
+test('T2846', normal, compile, [''])
+test('T4284', normal, compile, [''])
      

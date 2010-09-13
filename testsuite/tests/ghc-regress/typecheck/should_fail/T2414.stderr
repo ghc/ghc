@@ -1,7 +1,6 @@
 
 T2414.hs:9:13:
-    Occurs check: cannot construct the infinite type: b = (Bool, b)
-      Expected type: b
-      Inferred type: (Bool, b)
+    Occurs check: cannot construct the infinite type: a = (Bool, a)
     In the first argument of `unfoldr', namely `Just'
     In the expression: unfoldr Just
+    In an equation for `f': f = unfoldr Just

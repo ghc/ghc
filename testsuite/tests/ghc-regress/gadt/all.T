@@ -9,12 +9,12 @@ test('gadt3', normal, compile, [''])
 test('gadt4', skip_if_fast, compile_and_run, [''])
 test('gadt5', skip_if_fast, compile_and_run, [''])
 test('gadt6', normal, compile, [''])
-test('gadt7', normal, compile_fail, [''])
+test('gadt7', normal, compile, [''])
 test('gadt8', normal, compile, [''])
 test('gadt9', normal, compile, [''])
 test('gadt10', normal, compile_fail, [''])
 test('gadt11', normal, compile_fail, [''])
-test('gadt13', normal, compile_fail, [''])
+test('gadt13', normal, compile, [''])
 test('gadt14', normal, compile, [''])
 test('gadt15', normal, compile, [''])
 test('gadt16', normal, compile, [''])
@@ -70,10 +70,8 @@ test('data2', normal, compile, [''])
 
 test('termination', normal, compile, [''])
 test('set', normal, compile, [''])
-
-test('scoped', expect_broken(1823), compile, [''])
-
-test('gadt-escape1', normal, compile_fail, [''])
+test('scoped', normal, compile, [''])
+test('gadt-escape1', normal, compile, [''])
 
 # New ones from Dimitrios
 

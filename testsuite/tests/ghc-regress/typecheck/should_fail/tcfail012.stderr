@@ -1,5 +1,5 @@
 
 tcfail012.hs:3:8:
-    Couldn't match expected type `Bool' against inferred type `[a]'
+    Couldn't match expected type `Bool' with actual type `[a]'
     In the expression: []
     In a pattern binding: True = []

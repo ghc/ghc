@@ -47,7 +47,8 @@ fail8 = 'a'
 
 fail9 = 'a'
     where (# b, !x #) = (# True, 5# #)
-
+{-
+-- Now in tcfail203a.hs, because it's an error
 fail10 = 'a'
     where !(b, ~(c, (I# x))) = (True, (False, 5))
-
+-}

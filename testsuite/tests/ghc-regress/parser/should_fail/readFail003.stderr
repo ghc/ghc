@@ -1,8 +1,7 @@
 
 readFail003.hs:4:27:
-    Occurs check: cannot construct the infinite type: t = (t, [a], t1)
-      Expected type: (t, [a], t1)
-      Inferred type: t
+    Occurs check: cannot construct the infinite type:
+      t = (t, [a], [a1])
     In the expression: a
     In a pattern binding:
         ~(a, b, c)

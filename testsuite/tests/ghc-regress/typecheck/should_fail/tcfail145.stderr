@@ -1,8 +1,0 @@
-
-tcfail145.hs:9:6:
-    Occurs check: cannot construct the infinite type: a = [a]
-    When matching `forall a. [a] -> [a]'
-              and `forall a. a -> a'
-    In the pattern: f :: forall a. [a] -> [a]
-    In the definition of `foo':
-        foo (f :: forall a. [a] -> [a]) = f undefined

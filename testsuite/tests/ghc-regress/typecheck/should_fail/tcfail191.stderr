@@ -1,5 +1,5 @@
 
-tcfail191.hs:11:9:
+tcfail191.hs:11:26:
     Occurs check: cannot construct the infinite type: a = [a]
     In the expression: take 5
     In a stmt of a list comprehension: then group using take 5

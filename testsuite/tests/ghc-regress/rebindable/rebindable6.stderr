@@ -1,73 +1,46 @@
 
 rebindable6.hs:106:17:
-    Could not deduce (HasSeq (IO a -> t -> IO b)) from the context ()
-      arising from a do statement at rebindable6.hs:106:17
+    No instance for (HasSeq (IO a -> t -> IO b))
+      arising from a do statement
     Possible fix:
-      add (HasSeq (IO a -> t -> IO b)) to the context of
-        the type signature for `test_do'
-      or add an instance declaration for (HasSeq (IO a -> t -> IO b))
+      add an instance declaration for (HasSeq (IO a -> t -> IO b))
     In a stmt of a 'do' expression: f
     In the expression:
         do { f;
              Just (b :: b) <- g;
              return b }
-    In the definition of `test_do':
+    In an equation for `test_do':
         test_do f g
                   = do { f;
                          Just (b :: b) <- g;
                          return b }
 
 rebindable6.hs:107:17:
-    No instance for (HasFail ([Prelude.Char] -> t1))
-      arising from a do statement at rebindable6.hs:107:17-32
+    No instances for (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t),
+                      HasFail ([Prelude.Char] -> t1))
+      arising from a do statement
     Possible fix:
-      add an instance declaration for (HasFail ([Prelude.Char] -> t1))
+      add an instance declaration for
+      (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t),
+       HasFail ([Prelude.Char] -> t1))
     In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
         do { f;
              Just (b :: b) <- g;
              return b }
-    In the definition of `test_do':
-        test_do f g
-                  = do { f;
-                         Just (b :: b) <- g;
-                         return b }
-
-rebindable6.hs:107:17:
-    Could not deduce (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
-      from the context ()
-      arising from a do statement at rebindable6.hs:107:17-32
-    Possible fix:
-      add (HasBind
-             (IO (Maybe b) -> (Maybe b -> t1) -> t)) to the context of
-        the type signature for `test_do'
-      or add an instance declaration for
-         (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
-    In a stmt of a 'do' expression: Just (b :: b) <- g
-    In the expression:
-        do { f;
-             Just (b :: b) <- g;
-             return b }
-    In the definition of `test_do':
+    In an equation for `test_do':
         test_do f g
                   = do { f;
                          Just (b :: b) <- g;
                          return b }
 
 rebindable6.hs:108:17:
-    Could not deduce (HasReturn (b -> t1)) from the context ()
-      arising from a use of `return' at rebindable6.hs:108:17-24
-    Possible fix:
-      add (HasReturn (b -> t1)) to the context of
-        the type signature for `test_do'
-      or add an instance declaration for (HasReturn (b -> t1))
+    No instance for (HasReturn (b -> t1))
+      arising from a use of `return'
+    Possible fix: add an instance declaration for (HasReturn (b -> t1))
     In the expression: return b
+    In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
         do { f;
              Just (b :: b) <- g;
              return b }
-    In the definition of `test_do':
-        test_do f g
-                  = do { f;
-                         Just (b :: b) <- g;
-                         return b }

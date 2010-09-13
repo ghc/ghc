@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XGADTs -XScopedTypeVariables -XPatternSignatures #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables #-}
 
 -- Tests for scoped type variables and GADTs
 

@@ -1,5 +1,5 @@
 
 tcfail013.hs:4:3:
-    Couldn't match expected type `[t]' against inferred type `Bool'
+    Couldn't match expected type `[t]' with actual type `Bool'
     In the pattern: True
-    In the definition of `f': f True = 2
+    In an equation for `f': f True = 2

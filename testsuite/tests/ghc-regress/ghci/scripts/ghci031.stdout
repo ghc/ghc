@@ -1,1 +1,1 @@
-data Eq a => D a = C a         -- Defined at ghci031.hs:6:13
+data Eq a => D a = C a 	-- Defined at ghci031.hs:6:14

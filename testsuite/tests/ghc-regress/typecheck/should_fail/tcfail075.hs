@@ -1,10 +1,9 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 
 -- !!! Test top-level unboxed types
 
 module ShouldFail where
 
---import PrelGHC
 import GHC.Base
 import GHC.Prim
 

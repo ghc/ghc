@@ -1,10 +1,10 @@
 
-tcfail198.hs:6:38:
-    Couldn't match expected type `a1' against inferred type `a'
-      `a1' is a rigid type variable bound by
-           an expression type signature at tcfail198.hs:6:43
-      `a' is a rigid type variable bound by
-          the polymorphic type `forall a. [a] -> [a]' at tcfail198.hs:6:19
-    In the expression: x :: a
-    In the second argument of `(++)', namely `[x :: a]'
-    In the expression: xs ++ [x :: a]
+tcfail198.hs:6:17:
+    Couldn't match expected type `t -> t1'
+                with actual type `forall a. [a] -> [a]'
+    The lambda expression `\ (x : xs) -> xs ++ ...'
+    has one argument one argument,
+    but its type `forall a. [a] -> [a]' has none
+    In the first argument of `Just', namely
+      `(\ (x : xs) -> xs ++ [x :: a])'
+    In the expression: Just (\ (x : xs) -> xs ++ [x :: a])

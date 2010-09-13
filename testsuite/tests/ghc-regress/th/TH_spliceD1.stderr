@@ -3,4 +3,4 @@ TH_spliceD1.hs:10:3:
     Conflicting definitions for `c'
     Bound at: TH_spliceD1.hs:10:3-5
               TH_spliceD1.hs:10:3-5
-    In the definition of `f'
+    In an equation for `f'

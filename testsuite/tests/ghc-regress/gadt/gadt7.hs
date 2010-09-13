@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, RankNTypes, ScopedTypeVariables #-}
 
 -- From Yann Regis-Gianas at INRIA
 

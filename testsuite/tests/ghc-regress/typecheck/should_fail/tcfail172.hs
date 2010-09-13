@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- This one made GHC 6.6 give the very unhelpful error
 -- Foo8.hs:11:10:

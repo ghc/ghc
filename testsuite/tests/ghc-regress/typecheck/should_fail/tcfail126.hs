@@ -1,10 +1,12 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE RankNTypes, ExistentialQuantification #-}
 
 -- An interesting interaction of universals and existentials, prompted by 
 -- http://www.haskell.org/pipermail/haskell-cafe/2004-October/007160.html
 --
 -- Note the nested pattern-match in runProg; tc183 checks the
 -- non-nested version
+
+-- 3 Sept 2010: with the new typechecker, this one succeeds
 
 module Foo  where
 

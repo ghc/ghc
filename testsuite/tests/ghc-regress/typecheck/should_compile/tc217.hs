@@ -12,7 +12,7 @@ instance Eq (a -> b) where
 instance Show (a -> b) where
      show = const "<fun>"
 
--- This is the exmaple from Trac #179
+-- This is the example from Trac #179
 foo x = show (\_ -> True)
 
 -- This is the example from Trac #963

@@ -1,8 +1,8 @@
 
-tcfail010.hs:3:17:
+tcfail010.hs:3:18:
     No instance for (Num [t])
-      arising from a use of `+'
+      arising from the literal `2'
     Possible fix: add an instance declaration for (Num [t])
+    In the second argument of `(+)', namely `2'
     In the expression: z + 2
     In the expression: \ (y : z) -> z + 2
-    In the definition of `q': q = \ (y : z) -> z + 2

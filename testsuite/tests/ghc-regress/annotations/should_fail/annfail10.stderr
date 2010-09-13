@@ -1,9 +1,9 @@
 
 annfail10.hs:9:11:
-    Ambiguous type variable `t' in the constraints:
-      `Num t' arising from the literal `1' at annfail10.hs:9:11
-      `Data.Data.Data t'
-        arising from an annotation at annfail10.hs:9:1-15
+    Ambiguous type variable `a' in the constraints:
+      (Num a) arising from the literal `1' at annfail10.hs:9:11
+      (Data.Data.Data a) arising from an annotation
+                         at annfail10.hs:9:1-15
     Probable fix: add a type signature that fixes these type variable(s)
     In the expression: 1
     In the annotation: {-# ANN f 1 #-}

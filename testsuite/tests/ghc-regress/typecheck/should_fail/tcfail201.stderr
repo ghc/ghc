@@ -1,6 +1,6 @@
 
 tcfail201.hs:17:27:
-    Couldn't match expected type `a' against inferred type `HsDoc id'
+    Couldn't match type `a' with `HsDoc id'
       `a' is a rigid type variable bound by
           the type signature for `gfoldl'' at tcfail201.hs:15:78
     In the pattern: DocEmpty

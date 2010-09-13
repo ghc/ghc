@@ -3,4 +3,4 @@ rnfail001.hs:3:3:
     Conflicting definitions for `x'
     Bound at: rnfail001.hs:3:3
               rnfail001.hs:3:5
-    In the definition of `f'
+    In an equation for `f'

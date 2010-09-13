@@ -1,6 +1,8 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE RankNTypes #-}
 
 module ShouldFail where
+
+-- With the new typechecker (GHC 7.1), these now all pass
 
 f1 :: (forall a. Eq a => [a]) -> Bool
 f1 xs@(x:_)  = x

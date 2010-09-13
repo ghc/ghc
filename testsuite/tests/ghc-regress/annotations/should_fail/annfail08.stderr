@@ -1,7 +1,7 @@
 
 annfail08.hs:9:1:
     No instance for (Data.Data.Data (a -> a))
-      arising from an annotation at annfail08.hs:9:1-22
+      arising from an annotation
     Possible fix:
       add an instance declaration for (Data.Data.Data (a -> a))
     In the expression: (id + 1)
@@ -9,7 +9,7 @@ annfail08.hs:9:1:
 
 annfail08.hs:9:17:
     No instance for (Num (a -> a))
-      arising from the literal `1' at annfail08.hs:9:17
+      arising from the literal `1'
     Possible fix: add an instance declaration for (Num (a -> a))
     In the second argument of `(+)', namely `1'
     In the expression: (id + 1)

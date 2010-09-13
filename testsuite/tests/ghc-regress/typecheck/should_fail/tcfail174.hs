@@ -6,7 +6,7 @@ data Capture a = Base a
                | Capture (Capture (forall x . x -> a))
 
 g :: Capture (forall a . a ->  a)
-g = Base id
+g = Base id  -- Fails; need a rigid signature on 'id'
 
 -- This function should definitely be rejected, with or without type signature
 

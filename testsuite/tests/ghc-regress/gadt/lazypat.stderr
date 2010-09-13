@@ -1,7 +1,7 @@
 
-lazypat.hs:7:3:
-    A lazy (~) pattern cannot match existential or GADT data constructors
-      `a' is a rigid type variable bound by
-          the constructor `T' at lazypat.hs:7:5
+lazypat.hs:7:5:
+    An existential or GADT data constructor cannot be used
+      inside a lazy (~) pattern
+    In the pattern: T x f
     In the pattern: ~(T x f)
-    In the definition of `f': f ~(T x f) = f x
+    In an equation for `f': f ~(T x f) = f x

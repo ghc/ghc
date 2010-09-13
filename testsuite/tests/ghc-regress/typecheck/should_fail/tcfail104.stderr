@@ -1,18 +1,16 @@
 
-tcfail104.hs:11:14:
-    Cannot match a monotype with `forall a. a -> a'
+tcfail104.hs:16:19:
+    Couldn't match expected type `a -> a'
+                with actual type `forall a1. a1 -> a1'
+    In the expression: x
     In the expression: (\ x -> x)
     In the expression:
-        (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
-    In the definition of `f':
-        f v = (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x))
-                id 'c'
+      if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)
 
-tcfail104.hs:17:14:
-    Cannot match a monotype with `forall a. a -> a'
-    In the expression: (\ x -> x)
+tcfail104.hs:22:39:
+    Couldn't match expected type `forall a. a -> a'
+                with actual type `a -> a'
+    In the expression: x
+    In the expression: (\ (x :: forall a. a -> a) -> x)
     In the expression:
-        (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
-    In the definition of `g':
-        g v = (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x))
-                id 'c'
+      if v then (\ x -> x) else (\ (x :: forall a. a -> a) -> x)

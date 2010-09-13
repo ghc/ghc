@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams, RankNTypes #-}
 
 -- GHC 5.02 got this one wrong.
 

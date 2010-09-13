@@ -1,8 +1,6 @@
 
 tcfail152.hs:10:14:
-    Could not deduce (Integral a) from the context ()
-      arising from a use of `toInteger' at tcfail152.hs:10:14-24
-    Possible fix:
-      add (Integral a) to the context of the constructor `C'
+    No instance for (Integral a)
+      arising from a use of `toInteger'
     In the expression: toInteger x
-    In the definition of `test': test (C x) = toInteger x
+    In an equation for `test': test (C x) = toInteger x
