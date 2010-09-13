@@ -500,7 +500,24 @@ data TyConParent
 
   -- | An *associated* type of a class.  
   | AssocFamilyTyCon   
-        Class			-- The class in whose declaration the family is declared
+        Class		-- The class in whose declaration the family is declared
+                        -- The 'tyConTyVars' of this 'TyCon' may mention some
+                        -- of the same type variables as the classTyVars of the
+                        -- parent 'Class'.  E.g.
+                        --
+                        -- @
+                        --    class C a b where
+                        --      data T c a
+                        -- @
+                        --
+                        -- Here the 'a' is shared with the 'Class', and that is
+                        -- important. In an instance declaration we expect the
+                        -- two to be instantiated the same way.  Eg.
+                        --
+                        -- @
+                        --    instanc C [x] (Tree y) where
+                        --      data T c [x] = T1 x | T2 c
+                        -- @
 
   -- | Type constructors representing an instance of a type family. Parameters:
   --
@@ -539,12 +556,14 @@ isNoParent _             = False
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
 data SynTyConRhs
-  = SynonymTyCon      -- ^ An ordinary type synony
-       Type	      -- ^ The rhs, which mentions head type variables. It acts as a
-		      -- template for the expansion when the 'TyCon' is applied to some
-		      -- types.
+  = -- | An ordinary type synonyn.
+    SynonymTyCon      
+       Type	      -- This 'Type' is the rhs, and may mention from 'tyConTyVars'. 
+		      -- It acts as a template for the expansion when the 'TyCon' 
+                      -- is applied to some types.
 
-   | SynFamilyTyCon   -- A type synonym family  e.g. type family F x y :: * -> *
+   -- | A type synonym family  e.g. @type family F x y :: * -> *@
+   | SynFamilyTyCon
 
 --------------------
 data CoTyConDesc

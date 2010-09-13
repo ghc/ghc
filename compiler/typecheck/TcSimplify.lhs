@@ -816,7 +816,7 @@ findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults))
   | otherwise = filter is_defaultable_group (equivClasses cmp_tv unaries)
   where 
     unaries     :: [(CanonicalCt, TcTyVar)]  -- (C tv) constraints
-    non_unaries :: [CanonicalCt]             -- *other* constraints
+    non_unaries :: [CanonicalCt]             -- and *other* constraints
     
     (unaries, non_unaries) = partitionWith find_unary (bagToList wanteds)
         -- Finds unary type-class constraints
