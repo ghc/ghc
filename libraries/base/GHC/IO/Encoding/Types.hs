@@ -22,6 +22,7 @@ module GHC.IO.Encoding.Types (
 
 import GHC.Base
 import GHC.Word
+import GHC.Show
 -- import GHC.IO
 import GHC.IO.Buffer
 
@@ -84,6 +85,13 @@ type TextEncoder state = BufferCodec CharBufElem Word8 state
 -- of bytes.  The 'TextEncoding' for UTF-8 is 'utf8'.
 data TextEncoding
   = forall dstate estate . TextEncoding  {
+        textEncodingName :: String,
+                   -- ^ a string that can be passed to 'mkTextEncoding' to
+                   -- create an equivalent 'TextEncoding'.
 	mkTextDecoder :: IO (TextDecoder dstate),
 	mkTextEncoder :: IO (TextEncoder estate)
   }
+
+instance Show TextEncoding where
+  -- | Returns the value of 'textEncodingName'
+  show te = textEncodingName te

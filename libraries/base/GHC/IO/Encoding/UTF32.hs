@@ -48,7 +48,8 @@ import GHC.IORef
 -- The UTF-32 codec: either UTF-32BE or UTF-32LE with a BOM
 
 utf32  :: TextEncoding
-utf32 = TextEncoding { mkTextDecoder = utf32_DF,
+utf32 = TextEncoding { textEncodingName = "UTF-32",
+                       mkTextDecoder = utf32_DF,
  	               mkTextEncoder = utf32_EF }
 
 utf32_DF :: IO (TextDecoder (Maybe DecodeBuffer))
@@ -130,7 +131,8 @@ utf32_native_encode = utf32be_encode
 -- UTF32LE and UTF32BE
 
 utf32be :: TextEncoding
-utf32be = TextEncoding { mkTextDecoder = utf32be_DF,
+utf32be = TextEncoding { textEncodingName = "UTF-32BE",
+                         mkTextDecoder = utf32be_DF,
  	                 mkTextEncoder = utf32be_EF }
 
 utf32be_DF :: IO (TextDecoder ())
@@ -153,7 +155,8 @@ utf32be_EF =
 
 
 utf32le :: TextEncoding
-utf32le = TextEncoding { mkTextDecoder = utf32le_DF,
+utf32le = TextEncoding { textEncodingName = "UTF-32LE",
+                         mkTextDecoder = utf32le_DF,
  	                 mkTextEncoder = utf32le_EF }
 
 utf32le_DF :: IO (TextDecoder ())

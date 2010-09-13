@@ -36,7 +36,8 @@ import Data.Bits
 import Data.Maybe
 
 utf8 :: TextEncoding
-utf8 = TextEncoding { mkTextDecoder = utf8_DF,
+utf8 = TextEncoding { textEncodingName = "UTF-8",
+                      mkTextDecoder = utf8_DF,
  	              mkTextEncoder = utf8_EF }
 
 utf8_DF :: IO (TextDecoder ())
@@ -58,7 +59,8 @@ utf8_EF =
           })
 
 utf8_bom :: TextEncoding
-utf8_bom = TextEncoding { mkTextDecoder = utf8_bom_DF,
+utf8_bom = TextEncoding { textEncodingName = "UTF-8BOM",
+                          mkTextDecoder = utf8_bom_DF,
                           mkTextEncoder = utf8_bom_EF }
 
 utf8_bom_DF :: IO (TextDecoder Bool)

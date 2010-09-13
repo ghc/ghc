@@ -53,11 +53,12 @@ codePageEncoding 1200 = utf16le
 codePageEncoding 1201 = utf16be
 codePageEncoding 12000 = utf32le
 codePageEncoding 12001 = utf32be
-codePageEncoding cp = maybe latin1 buildEncoding (lookup cp codePageMap)
+codePageEncoding cp = maybe latin1 (buildEncoding cp) (lookup cp codePageMap)
 
-buildEncoding :: CodePageArrays -> TextEncoding
-buildEncoding SingleByteCP {decoderArray = dec, encoderArray = enc}
+buildEncoding :: Word32 -> CodePageArrays -> TextEncoding
+buildEncoding cp SingleByteCP {decoderArray = dec, encoderArray = enc}
   = TextEncoding {
+    textEncodingName = "CP" ++ show cp,
     mkTextDecoder = return $ simpleCodec
         $ decodeFromSingleByte dec
     , mkTextEncoder = return $ simpleCodec $ encodeToSingleByte enc

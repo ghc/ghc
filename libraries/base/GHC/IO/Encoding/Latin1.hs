@@ -39,7 +39,8 @@ import Data.Maybe
 -- Latin1
 
 latin1 :: TextEncoding
-latin1 = TextEncoding { mkTextDecoder = latin1_DF,
+latin1 = TextEncoding { textEncodingName = "ISO8859-1",
+                        mkTextDecoder = latin1_DF,
                         mkTextEncoder = latin1_EF }
 
 latin1_DF :: IO (TextDecoder ())
@@ -61,7 +62,8 @@ latin1_EF =
           })
 
 latin1_checked :: TextEncoding
-latin1_checked = TextEncoding { mkTextDecoder = latin1_DF,
+latin1_checked = TextEncoding { textEncodingName = "ISO8859-1(checked)",
+                                mkTextDecoder = latin1_DF,
                                 mkTextEncoder = latin1_checked_EF }
 
 latin1_checked_EF :: IO (TextEncoder ())

@@ -132,6 +132,7 @@ char_shift | charSize == 2 = 1
 mkTextEncoding :: String -> IO TextEncoding
 mkTextEncoding charset = do
   return (TextEncoding { 
+                textEncodingName = charset,
 		mkTextDecoder = newIConv charset haskellChar iconvDecode,
 		mkTextEncoder = newIConv haskellChar charset iconvEncode})
 
