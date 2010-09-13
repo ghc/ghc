@@ -456,15 +456,18 @@ unsafeArray' (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
 
 {-# INLINE fill #-}
 fill :: MutableArray# s e -> (Int, e) -> STRep s a -> STRep s a
-fill marr# (I# i#, e) next s1# =
-    case writeArray# marr# i# e s1#     of { s2# ->
-    next s2# }
+-- NB: put the \s after the "=" so that 'fill' 
+--     inlines when applied to three args 
+fill marr# (I# i#, e) next 
+ = \s1# -> case writeArray# marr# i# e s1# of 
+             s2# -> next s2# 
 
 {-# INLINE done #-}
 done :: Ix i => i -> i -> Int -> MutableArray# s e -> STRep s (Array i e)
-done l u n marr# s1# =
-    case unsafeFreezeArray# marr# s1# of
-        (# s2#, arr# #) -> (# s2#, Array l u n arr# #)
+-- See NB on 'fill'
+done l u n marr# 
+  = \s1# -> case unsafeFreezeArray# marr# s1# of
+              (# s2#, arr# #) -> (# s2#, Array l u n arr# #)
 
 -- This is inefficient and I'm not sure why:
 -- listArray (l,u) es = unsafeArray (l,u) (zip [0 .. rangeSize (l,u) - 1] es)
@@ -598,11 +601,12 @@ unsafeAccumArray' f initial (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
 
 {-# INLINE adjust #-}
 adjust :: (e -> a -> e) -> MutableArray# s e -> (Int, a) -> STRep s b -> STRep s b
-adjust f marr# (I# i#, new) next s1# =
-    case readArray# marr# i# s1# of
-        (# s2#, old #) ->
-            case writeArray# marr# i# (f old new) s2# of
-                s3# -> next s3#
+-- See NB on 'fill'
+adjust f marr# (I# i#, new) next
+  = \s1# -> case readArray# marr# i# s1# of
+        	(# s2#, old #) ->
+        	    case writeArray# marr# i# (f old new) s2# of
+        	        s3# -> next s3#
 
 -- | Constructs an array identical to the first argument except that it has
 -- been updated by the associations in the right argument.
