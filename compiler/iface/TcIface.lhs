@@ -414,16 +414,21 @@ the forkM stuff.
 tcIfaceDecl :: Bool	-- True <=> discard IdInfo on IfaceId bindings
 	    -> IfaceDecl
 	    -> IfL TyThing
+tcIfaceDecl = tc_iface_decl NoParentTyCon
 
-tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, 
- 	    		 	   ifIdDetails = details, ifIdInfo = info})
+tc_iface_decl :: TyConParent	-- For nested declarations
+              -> Bool	-- True <=> discard IdInfo on IfaceId bindings
+	      -> IfaceDecl
+	      -> IfL TyThing
+tc_iface_decl _ ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, 
+ 	                               ifIdDetails = details, ifIdInfo = info})
   = do	{ name <- lookupIfaceTop occ_name
 	; ty <- tcIfaceType iface_type
 	; details <- tcIdDetails ty details
 	; info <- tcIdInfo ignore_prags name ty info
 	; return (AnId (mkGlobalId details name ty info)) }
 
-tcIfaceDecl _ (IfaceData {ifName = occ_name, 
+tc_iface_decl parent _ (IfaceData {ifName = occ_name, 
 			  ifTyVars = tv_bndrs, 
 			  ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
 			  ifCons = rdr_cons, 
@@ -434,34 +439,33 @@ tcIfaceDecl _ (IfaceData {ifName = occ_name,
     { tc_name <- lookupIfaceTop occ_name
     ; tycon <- fixM ( \ tycon -> do
 	    { stupid_theta <- tcIfaceCtxt ctxt
-	    ; mb_fam_inst  <- tcFamInst mb_family
 	    ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
-	    ; buildAlgTyCon tc_name tyvars stupid_theta
-			    cons is_rec want_generic gadt_syn mb_fam_inst
+	    ; mb_fam_inst  <- tcFamInst mb_family
+	    ; buildAlgTyCon tc_name tyvars stupid_theta cons is_rec
+			    want_generic gadt_syn parent mb_fam_inst
 	    })
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
 
-tcIfaceDecl _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
-		         ifSynRhs = mb_rhs_ty,
-		         ifSynKind = kind, ifFamInst = mb_family})
+tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
+		         	  ifSynRhs = mb_rhs_ty,
+		         	  ifSynKind = kind, ifFamInst = mb_family})
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
-     { tc_name <- lookupIfaceTop occ_name
+     { tc_name  <- lookupIfaceTop occ_name
      ; rhs_kind <- tcIfaceType kind	-- Note [Synonym kind loop]
-     ; ~(rhs, fam) <- forkM (mk_doc tc_name) $ 
-       	      	      do { rhs <- tc_syn_rhs rhs_kind mb_rhs_ty
-			 ; fam <- tcFamInst mb_family
-			 ; return (rhs, fam) }
-     ; tycon <- buildSynTyCon tc_name tyvars rhs rhs_kind fam
-     ; return $ ATyCon tycon
+     ; rhs      <- forkM (mk_doc tc_name) $ 
+       	      	   tc_syn_rhs mb_rhs_ty
+     ; fam_info <- tcFamInst mb_family
+     ; tycon <- buildSynTyCon tc_name tyvars rhs rhs_kind parent fam_info
+     ; return (ATyCon tycon)
      }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
-     tc_syn_rhs kind Nothing   = return (OpenSynTyCon kind Nothing)
-     tc_syn_rhs _    (Just ty) = do { rhs_ty <- tcIfaceType ty
-		   		    ; return (SynonymTyCon rhs_ty) }
+     tc_syn_rhs Nothing   = return SynFamilyTyCon
+     tc_syn_rhs (Just ty) = do { rhs_ty <- tcIfaceType ty
+		               ; return (SynonymTyCon rhs_ty) }
 
-tcIfaceDecl ignore_prags
+tc_iface_decl _parent ignore_prags
 	    (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, 
 			 ifTyVars = tv_bndrs, ifFDs = rdr_fds, 
 			 ifATs = rdr_ats, ifSigs = rdr_sigs, 
@@ -473,9 +477,9 @@ tcIfaceDecl ignore_prags
     ; ctxt <- tcIfaceCtxt rdr_ctxt
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
-    ; ats' <- mapM (tcIfaceDecl ignore_prags) rdr_ats
-    ; let ats = map (setAssocFamilyPermutation tyvars) ats'
-    ; cls  <- buildClass ignore_prags cls_name tyvars ctxt fds ats sigs tc_isrec
+    ; cls  <- fixM $ \ cls -> do
+              { ats  <- mapM (tc_iface_decl (AssocFamilyTyCon cls) ignore_prags) rdr_ats
+              ; buildClass ignore_prags cls_name tyvars ctxt fds ats sigs tc_isrec }
     ; return (AClass cls) }
   where
    tc_sig (IfaceClassOp occ dm rdr_ty)
@@ -492,7 +496,7 @@ tcIfaceDecl ignore_prags
 			   ; tvs2' <- mapM tcIfaceTyVar tvs2
 			   ; return (tvs1', tvs2') }
 
-tcIfaceDecl _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
+tc_iface_decl _ _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do	{ name <- lookupIfaceTop rdr_name
 	; return (ATyCon (mkForeignTyCon name ext_name 
 					 liftedTypeKind 0)) }
@@ -507,7 +511,7 @@ tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon _ if_cons
   = case if_cons of
 	IfAbstractTyCon	 -> return mkAbstractTyConRhs
-	IfOpenDataTyCon	 -> return mkOpenDataTyConRhs
+	IfOpenDataTyCon	 -> return DataFamilyTyCon
 	IfDataTyCon cons -> do 	{ data_cons <- mapM tc_con_decl cons
 				; return (mkDataTyConRhs data_cons) }
 	IfNewTyCon con	 -> do 	{ data_con <- tc_con_decl con

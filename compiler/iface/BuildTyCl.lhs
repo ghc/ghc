@@ -5,10 +5,12 @@
 
 \begin{code}
 module BuildTyCl (
-	buildSynTyCon, buildAlgTyCon, buildDataCon,
+	buildSynTyCon, 
+        buildAlgTyCon, 
+        buildDataCon,
 	TcMethInfo, buildClass,
-	mkAbstractTyConRhs, mkOpenDataTyConRhs, 
-	mkNewTyConRhs, mkDataTyConRhs, setAssocFamilyPermutation
+	mkAbstractTyConRhs, 
+	mkNewTyConRhs, mkDataTyConRhs
     ) where
 
 #include "HsVersions.h"
@@ -27,7 +29,7 @@ import Type
 import Coercion
 
 import TcRnMonad
-import Util		( count )
+import Data.List	( partition )
 import Outputable
 \end{code}
 	
@@ -35,29 +37,22 @@ import Outputable
 \begin{code}
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
-              -> SynTyConRhs 
+              -> SynTyConRhs
 	      -> Kind			-- ^ Kind of the RHS
-	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
+	      -> TyConParent
+	      -> Maybe (TyCon, [Type])    -- ^ family instance if applicable
               -> TcRnIf m n TyCon
+buildSynTyCon tc_name tvs rhs rhs_kind parent mb_family 
+  | Just fam_inst_info <- mb_family
+  = ASSERT( isNoParent parent )
+    fixM $ \ tycon_rec -> do 
+    { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec 
+    ; return (mkSynTyCon tc_name kind tvs rhs fam_parent) }
 
-buildSynTyCon tc_name tvs rhs@(OpenSynTyCon {}) rhs_kind _
-  = let
-      kind = mkArrowKinds (map tyVarKind tvs) rhs_kind
-    in
-    return $ mkSynTyCon tc_name kind tvs rhs NoParentTyCon
-    
-buildSynTyCon tc_name tvs rhs@(SynonymTyCon {}) rhs_kind mb_family
-  = do { -- We need to tie a knot as the coercion of a data instance depends
-	 -- on the instance representation tycon and vice versa.
-       ; tycon <- fixM (\ tycon_rec -> do 
-	 { parent <- mkParentInfo mb_family tc_name tvs tycon_rec
-	 ; let { tycon   = mkSynTyCon tc_name kind tvs rhs parent
-	       ; kind    = mkArrowKinds (map tyVarKind tvs) rhs_kind
-	       }
-         ; return tycon
-         })
-       ; return tycon 
-       }
+  | otherwise
+  = return (mkSynTyCon tc_name kind tvs rhs parent)
+  where
+    kind = mkArrowKinds (map tyVarKind tvs) rhs_kind
 
 ------------------------------------------------------
 buildAlgTyCon :: Name -> [TyVar] 
@@ -66,23 +61,26 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> RecFlag
 	      -> Bool			-- ^ True <=> want generics functions
 	      -> Bool			-- ^ True <=> was declared in GADT syntax
+              -> TyConParent
 	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
 	      -> TcRnIf m n TyCon
 
 buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
-	      mb_family
-  = do { -- We need to tie a knot as the coercion of a data instance depends
-	 -- on the instance representation tycon and vice versa.
-       ; tycon <- fixM (\ tycon_rec -> do 
-	 { parent <- mkParentInfo mb_family tc_name tvs tycon_rec
-	 ; let { tycon = mkAlgTyCon tc_name kind tvs stupid_theta rhs
-				    parent is_rec want_generics gadt_syn
-	       ; kind  = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
-	       }
-         ; return tycon
-         })
-       ; return tycon 
-       }
+	      parent mb_family
+  | Just fam_inst_info <- mb_family
+  = -- We need to tie a knot as the coercion of a data instance depends
+     -- on the instance representation tycon and vice versa.
+    ASSERT( isNoParent parent )
+    fixM $ \ tycon_rec -> do 
+    { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec
+    ; return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
+		         fam_parent is_rec want_generics gadt_syn) }
+
+  | otherwise
+  = return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
+	               parent is_rec want_generics gadt_syn)
+  where
+    kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
 -- | If a family tycon with instance types is given, the current tycon is an
 -- instance of that family and we need to
@@ -95,26 +93,20 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
 -- (2) produce a `TyConParent' value containing the parent and coercion
 --     information.
 --
-mkParentInfo :: Maybe (TyCon, [Type]) 
-             -> Name -> [TyVar] 
-             -> TyCon 
-             -> TcRnIf m n TyConParent
-mkParentInfo Nothing                  _       _   _         =
-  return NoParentTyCon
-mkParentInfo (Just (family, instTys)) tc_name tvs rep_tycon =
-  do { -- Create the coercion
-     ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
-     ; let co_tycon = mkFamInstCoercion co_tycon_name tvs
+mkFamInstParentInfo :: Name -> [TyVar] 
+             	    -> (TyCon, [Type]) 
+             	    -> TyCon 
+             	    -> TcRnIf m n TyConParent
+mkFamInstParentInfo tc_name tvs (family, instTys) rep_tycon
+  = do { -- Create the coercion
+       ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
+       ; let co_tycon = mkFamInstCoercion co_tycon_name tvs
                                         family instTys rep_tycon
-     ; return $ FamilyTyCon family instTys co_tycon
-     }
+       ; return $ FamInstTyCon family instTys co_tycon }
     
 ------------------------------------------------------
 mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon
-
-mkOpenDataTyConRhs :: AlgTyConRhs
-mkOpenDataTyConRhs = OpenTyCon Nothing
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons
@@ -182,13 +174,6 @@ mkNewTyConRhs tycon_name tycon con
     eta_reduce tvs ty = (reverse tvs, ty)
 				
 
-setAssocFamilyPermutation :: [TyVar] -> TyThing -> TyThing
-setAssocFamilyPermutation clas_tvs (ATyCon tc) 
-  = ATyCon (setTyConArgPoss clas_tvs tc)
-setAssocFamilyPermutation _clas_tvs other
-  = pprPanic "setAssocFamilyPermutation" (ppr other)
-
-
 ------------------------------------------------------
 buildDataCon :: Name -> Bool
 	    -> [HsBang] 
@@ -249,9 +234,9 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 type TcMethInfo = (Name, DefMethSpec, Type)  -- A temporary intermediate, to communicate 
 					     -- between tcClassSigs and buildClass
 
-buildClass :: Bool			-- True <=> do not include unfoldings 
-					--	    on dict selectors
-					-- Used when importing a class without -O
+buildClass :: Bool		-- True <=> do not include unfoldings 
+				--	    on dict selectors
+				-- Used when importing a class without -O
 	   -> Name -> [TyVar] -> ThetaType
 	   -> [FunDep TyVar]		   -- Functional dependencies
 	   -> [TyThing]			   -- Associated types
@@ -272,14 +257,14 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	; op_items <- mapM (mk_op_item rec_clas) sig_stuff
 	  		-- Build the selector id and default method id
 
-	; let n_value_preds   = count (not . isEqPred) sc_theta
-	      all_value_preds = n_value_preds == length sc_theta
+	; let (eq_theta, dict_theta) = partition isEqPred sc_theta
+
 	      -- We only make selectors for the *value* superclasses, 
 	      -- not equality predicates 
-
 	; sc_sel_names <- mapM  (newImplicitBinder class_name . mkSuperDictSelOcc) 
-				[1..n_value_preds]
-        ; let sc_sel_ids = [mkDictSelId no_unf sc_name rec_clas | sc_name <- sc_sel_names]
+				[1..length dict_theta]
+        ; let sc_sel_ids = [ mkDictSelId no_unf sc_name rec_clas 
+                           | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
 	      -- can construct names for the selectors. Thus
 	      --      class (C a, C b) => D a b where ...
@@ -287,23 +272,23 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      --      D_sc1, D_sc2
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
-	      --
 	
-	; let use_newtype = (n_value_preds + length sig_stuff == 1) && all_value_preds
+	; let use_newtype = null eq_theta && (length dict_theta + length sig_stuff == 1)
 		-- Use a newtype if the data constructor has 
 		-- 	(a) exactly one value field
 		--	(b) no existential or equality-predicate fields
 		-- i.e. exactly one operation or superclass taken together
 		-- See note [Class newtypes and equality predicates]
 
-		-- We play a bit fast and loose by treating the superclasses
-		-- as ordinary arguments.  That means that in the case of
+		-- We play a bit fast and loose by treating the dictionary
+		-- superclasses as ordinary arguments.  That means that in 
+                -- the case of
 		--     class C a => D a
 		-- we don't get a newtype with no arguments!
 	      args      = sc_sel_names ++ op_names
-	      arg_tys   = map mkPredTy sc_theta ++ op_tys
 	      op_tys	= [ty | (_,_,ty) <- sig_stuff]
 	      op_names  = [op | (op,_,_) <- sig_stuff]
+	      arg_tys   = map mkPredTy dict_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
                
 	; dict_con <- buildDataCon datacon_name
@@ -311,7 +296,8 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 				   (map (const HsNoBang) args)
 				   [{- No fields -}]
 				   tvs [{- no existentials -}]
-                                   [{- No GADT equalities -}] [{- No theta -}]
+                                   [{- No GADT equalities -}] 
+                                   eq_theta
                                    arg_tys
 				   (mkTyConApp rec_tycon (mkTyVarTys tvs))
 				   rec_tycon
@@ -335,7 +321,9 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      ; atTyCons = [tycon | ATyCon tycon <- ats]
 
 	      ; result = mkClass class_name tvs fds 
-			         sc_theta sc_sel_ids atTyCons
+			         (eq_theta ++ dict_theta)  -- Equalities first
+                                 (length eq_theta)	   -- Number of equalities
+                                 sc_sel_ids atTyCons
 				 op_items tycon
 	      }
 	; traceIf (text "buildClass" <+> ppr tycon) 

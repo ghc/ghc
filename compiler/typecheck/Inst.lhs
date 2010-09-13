@@ -7,397 +7,191 @@ The @Inst@ type: dictionaries or method instances
 
 \begin{code}
 module Inst ( 
-	Inst,
+       deeplySkolemise, 
+       deeplyInstantiate, instCall, instStupidTheta,
+       emitWanted, emitWanteds,
 
-	pprInstances, pprDictsTheta, pprDictsInFull,	-- User error messages
-	showLIE, pprInst, pprInsts, pprInstInFull,	-- Debugging messages
+       newOverloadedLit, mkOverLit, 
+     
+       tcGetInstEnvs, getOverlapFlag, tcExtendLocalInstEnv,
+       instCallConstraints, newMethodFromName,
+       tcSyntaxName,
 
-	tidyInsts, tidyMoreInsts,
+       -- Simple functions over evidence variables
+       hasEqualities,
+       
+       tyVarsOfWanteds, tyVarsOfWanted, tyVarsOfWantedEvVar, tyVarsOfWantedEvVars, 
+       tyVarsOfEvVar, tyVarsOfEvVars, tyVarsOfImplication,
+       tidyWanteds, tidyWanted, tidyWantedEvVar, tidyWantedEvVars,
+       tidyEvVar, tidyImplication
 
-	newDictBndr, newDictBndrs, newDictBndrsO,
-	newDictOccs, newDictOcc,
-	instCall, instStupidTheta,
-	cloneDict, mkOverLit,
-	newIPDict, newMethod, newMethodFromName, newMethodWithGivenTy, 
-	tcInstClassOp, 
-	tcSyntaxName, 
-
-	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, tcTyVarsOfInst,
-	tcTyVarsOfInsts, ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst,
-	fdPredsOfInsts, growInstsTyVars, getDictClassTys, dictPred,
-
-	lookupSimpleInst, LookupInstResult(..), 
-	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
-
-	isAbstractableInst, isEqInst,
-	isDict, isClassDict, isMethod, isImplicInst,
-	isIPDict, isInheritableInst, isMethodOrLit,
-	isTyVarDict, isMethodFor, 
-
-	zonkInst, zonkInsts,
-	instToId, instToVar, instType, instName, instToDictBind,
-	addInstToDictBind,
-
-	InstOrigin(..), InstLoc, pprInstLoc,
-
-	mkWantedCo, mkGivenCo, isWantedCo, eqInstCoType, mkIdEqInstCo, 
-        mkSymEqInstCo, mkLeftTransEqInstCo, mkRightTransEqInstCo, mkAppEqInstCo,
-        mkTyConEqInstCo, mkFunEqInstCo,
-        wantedEqInstIsUnsolved, eitherEqInst, mkEqInst, mkWantedEqInst,
-        wantedToLocalEqInst, finalizeEqInst, eqInstType, eqInstCoercion,
-        eqInstTys
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcPolyExpr )
-import {-# SOURCE #-}	TcUnify( boxyUnify {- , unifyType -} )
+import {-# SOURCE #-}	TcExpr( tcPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}	TcUnify( unifyType )
 
 import FastString
 import HsSyn
 import TcHsSyn
 import TcRnMonad
 import TcEnv
+import TcRnTypes
 import InstEnv
 import FunDeps
 import TcMType
 import TcType
-import MkCore ( mkBigCoreTupTy )
-import TyCon
-import Type
-import TypeRep
 import Class
 import Unify
-import Module
 import Coercion
 import HscTypes
-import CoreFVs
 import Id
 import Name
-import NameSet
-import Var      ( Var, TyVar )
-import qualified Var
+import Var      ( Var, TyVar, EvVar, varType, setVarType )
 import VarEnv
 import VarSet
 import PrelNames
-import BasicTypes
 import SrcLoc
 import DynFlags
 import Bag
 import Maybes
 import Util
-import Unique
 import Outputable
 import Data.List
-
-import Control.Monad
 \end{code}
 
-
-
-Selection
-~~~~~~~~~
-\begin{code}
-instName :: Inst -> Name
-instName (EqInst {tci_name = name}) = name
-instName inst = Var.varName (instToVar inst)
-
-instToId :: Inst -> TcId
-instToId inst = WARN( not (isId id), ppr inst ) 
-	      id 
-	      where
-		id = instToVar inst
-
-instToVar :: Inst -> Var
-instToVar (LitInst {tci_name = nm, tci_ty = ty})
-  = mkLocalId nm ty
-instToVar (Method {tci_id = id}) 
-  = id
-instToVar (Dict {tci_name = nm, tci_pred = pred})    
-  | isEqPred pred = Var.mkCoVar nm (mkPredTy pred)
-  | otherwise	  = mkLocalId nm (mkPredTy pred)
-instToVar (ImplicInst {tci_name = nm, tci_tyvars = tvs, tci_given = givens,
-		       tci_wanted = wanteds})
-  = mkLocalId nm (mkImplicTy tvs givens wanteds)
-instToVar inst@(EqInst {})
-  = eitherEqInst inst id assertCoVar
-  where
-    assertCoVar (TyVarTy cotv) = cotv
-    assertCoVar coty           = pprPanic "Inst.instToVar" (ppr coty)
-
-instType :: Inst -> Type
-instType (LitInst {tci_ty = ty})  = ty
-instType (Method {tci_id = id})   = idType id
-instType (Dict {tci_pred = pred}) = mkPredTy pred
-instType imp@(ImplicInst {})      = mkImplicTy (tci_tyvars imp) (tci_given imp)	
-					       (tci_wanted imp)
--- instType i@(EqInst {tci_co = co}) = eitherEqInst i TyVarTy id
-instType (EqInst {tci_left = ty1, tci_right = ty2}) = mkPredTy (EqPred ty1 ty2)
-
-mkImplicTy :: [TyVar] -> [Inst] -> [Inst] -> Type
-mkImplicTy tvs givens wanteds	-- The type of an implication constraint
-  = ASSERT( all isAbstractableInst givens )
-    -- pprTrace "mkImplicTy" (ppr givens) $
-    -- See [Equational Constraints in Implication Constraints]
-    let dict_wanteds = filter (not . isEqInst) wanteds
-    in 
-      mkForAllTys tvs $ 
-      mkPhiTy (map dictPred givens) $
-      mkBigCoreTupTy (map instType dict_wanteds)
-
-dictPred :: Inst -> TcPredType
-dictPred (Dict {tci_pred = pred}) = pred
-dictPred (EqInst {tci_left=ty1,tci_right=ty2}) = EqPred ty1 ty2
-dictPred inst		          = pprPanic "dictPred" (ppr inst)
-
-getDictClassTys :: Inst -> (Class, [Type])
-getDictClassTys (Dict {tci_pred = pred}) = getClassPredTys pred
-getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
-
---------------------------------
--- fdPredsOfInst is used to get predicates that contain functional 
--- dependencies *or* might do so.  The "might do" part is because
--- a constraint (C a b) might have a superclass with FDs
--- Leaving these in is really important for the call to fdPredsOfInsts
--- in TcSimplify.inferLoop, because the result is fed to 'grow',
--- which is supposed to be conservative
-fdPredsOfInst :: Inst -> [TcPredType]
-fdPredsOfInst (Dict {tci_pred = pred}) 	     = [pred]
-fdPredsOfInst (Method {tci_theta = theta})   = theta
-fdPredsOfInst (ImplicInst {tci_wanted = ws}) = fdPredsOfInsts ws
-   -- The ImplicInst case doesn't look right;
-   -- what if ws mentions skolem variables?
-fdPredsOfInst (LitInst {})		     = []
-fdPredsOfInst (EqInst {})		     = []
-
-fdPredsOfInsts :: [Inst] -> [PredType]
-fdPredsOfInsts insts = concatMap fdPredsOfInst insts
-
----------------------------------
-isInheritableInst :: Inst -> Bool
-isInheritableInst (Dict {tci_pred = pred})     = isInheritablePred pred
-isInheritableInst (Method {tci_theta = theta}) = all isInheritablePred theta
-isInheritableInst _                            = True
-
-
----------------------------------
--- Get the implicit parameters mentioned by these Insts
--- NB: the results of these functions are insensitive to zonking
-
-ipNamesOfInsts :: [Inst] -> [Name]
-ipNamesOfInst  :: Inst   -> [Name]
-ipNamesOfInsts insts = [n | inst <- insts, n <- ipNamesOfInst inst]
-
-ipNamesOfInst (Dict {tci_pred = IParam n _}) = [ipNameName n]
-ipNamesOfInst (Method {tci_theta = theta})   = [ipNameName n | IParam n _ <- theta]
-ipNamesOfInst _                              = []
-
----------------------------------
-
--- |All free type variables (not including the coercion variables of
--- equalities)
---
-tyVarsOfInst :: Inst -> TyVarSet
-tyVarsOfInst (LitInst {tci_ty = ty})  = tyVarsOfType  ty
-tyVarsOfInst (Dict {tci_pred = pred}) = tyVarsOfPred pred
-tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) 
-  = tyVarsOfTypes tys `unionVarSet` varTypeTyVars id
-    -- The id might have free type variables; in the case of
-    -- locally-overloaded class methods, for example
-tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, 
-                          tci_wanted = wanteds})
-  = (tyVarsOfInsts givens `unionVarSet` tyVarsOfInsts wanteds) 
-    `minusVarSet` mkVarSet tvs
-    `unionVarSet` unionVarSets (map varTypeTyVars tvs)
-		-- Remember the free tyvars of a coercion
-tyVarsOfInst (EqInst {tci_left = ty1, tci_right = ty2}) 
-  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
-
--- |All free meta type variables *including* the coercion variables of
--- equalities
---
-tcTyVarsOfInst :: Inst -> TyVarSet
-tcTyVarsOfInst (LitInst {tci_ty = ty})  = tcTyVarsOfType  ty
-tcTyVarsOfInst (Dict {tci_pred = pred}) = tcTyVarsOfPred pred
-tcTyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) 
-  = tcTyVarsOfTypes tys `unionVarSet` varTypeTcTyVars id
-    -- The id might have free type variables; in the case of
-    -- locally-overloaded class methods, for example
-tcTyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, 
-                            tci_wanted = wanteds})
-  = (tcTyVarsOfInsts givens `unionVarSet` tcTyVarsOfInsts wanteds) 
-    `minusVarSet` mkVarSet tvs
-    `unionVarSet` unionVarSets (map varTypeTcTyVars tvs)
-		-- Remember the free tyvars of a coercion
-tcTyVarsOfInst (EqInst {tci_co = co, tci_left = ty1, tci_right = ty2}) 
-  = either unitVarSet tcTyVarsOfType co `unionVarSet`   -- include covars
-    tcTyVarsOfType ty1 `unionVarSet` tcTyVarsOfType ty2
-
-tyVarsOfInsts :: [Inst] -> TyVarSet
-tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
-
-tcTyVarsOfInsts :: [Inst] -> TcTyVarSet
-tcTyVarsOfInsts insts = foldr (unionVarSet . tcTyVarsOfInst) emptyVarSet insts
-
-tyVarsOfLIE :: Bag Inst -> TyVarSet
-tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
-
-
---------------------------
-instToDictBind :: Inst -> LHsExpr TcId -> TcDictBinds
-instToDictBind inst rhs 
-  = unitBag (L (instSpan inst) (VarBind { var_id = instToId inst
-					, var_rhs = rhs
-					, var_inline = False }))
-
-addInstToDictBind :: TcDictBinds -> Inst -> LHsExpr TcId -> TcDictBinds
-addInstToDictBind binds inst rhs = binds `unionBags` instToDictBind inst rhs
-\end{code}
-
-Note [Growing the tau-tvs using constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(growInstsTyVars insts tvs) is the result of extending the set 
-    of tyvars tvs using all conceivable links from pred
-
-E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
-Then grow precs tvs = {a,b,c}
-
-All the type variables from an implicit parameter are added, whether or
-not they are mentioned in tvs; see Note [Implicit parameters and ambiguity] 
-in TcSimplify.
-
-See also Note [Ambiguity] in TcSimplify
-
-\begin{code}
-growInstsTyVars :: [Inst] -> TyVarSet -> TyVarSet
-growInstsTyVars insts tvs
-  | null insts = tvs
-  | otherwise  = fixVarSet mk_next tvs
-  where
-    mk_next tvs = foldr grow_inst_tvs tvs insts
-
-grow_inst_tvs :: Inst -> TyVarSet -> TyVarSet
-grow_inst_tvs (Dict {tci_pred = pred})     tvs = growPredTyVars pred tvs
-grow_inst_tvs (Method {tci_theta = theta}) tvs = foldr growPredTyVars tvs theta
-grow_inst_tvs (ImplicInst {tci_tyvars = tvs1, tci_wanted = ws}) tvs
-  = tvs `unionVarSet` (foldr grow_inst_tvs (tvs `delVarSetList` tvs1) ws
-    		          `delVarSetList` tvs1)
-grow_inst_tvs inst tvs   -- EqInst, LitInst
-  = growTyVars (tyVarsOfInst inst) tvs
-\end{code}
 
 
 %************************************************************************
 %*									*
-		Predicates
+		Emitting constraints
 %*									*
 %************************************************************************
 
 \begin{code}
+emitWanteds :: CtOrigin -> TcThetaType -> TcM [EvVar]
+emitWanteds origin theta = mapM (emitWanted origin) theta
 
-isAbstractableInst :: Inst -> Bool
-isAbstractableInst inst = isDict inst || isEqInst inst
+emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
+emitWanted origin pred = do { loc <- getCtLoc origin
+                            ; ev  <- newWantedEvVar pred
+                            ; emitConstraint (WcEvVar (WantedEvVar ev loc))
+                            ; return ev }
 
-isEqInst :: Inst -> Bool
-isEqInst (EqInst {}) = True
-isEqInst _           = False
+newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
+-- Used when Name is the wired-in name for a wired-in class method,
+-- so the caller knows its type for sure, which should be of form
+--    forall a. C a => <blah>
+-- newMethodFromName is supposed to instantiate just the outer 
+-- type variable and constraint
 
-isDict :: Inst -> Bool
-isDict (Dict {}) = True
-isDict _         = False
+newMethodFromName origin name inst_ty
+  = do { id <- tcLookupId name
+ 	      -- Use tcLookupId not tcLookupGlobalId; the method is almost
+	      -- always a class op, but with -XNoImplicitPrelude GHC is
+	      -- meant to find whatever thing is in scope, and that may
+	      -- be an ordinary function. 
 
-isClassDict :: Inst -> Bool
-isClassDict (Dict {tci_pred = pred}) = isClassPred pred
-isClassDict _                        = False
+       ; let (tvs, theta, _caller_knows_this) = tcSplitSigmaTy (idType id)
+             (the_tv:rest) = tvs
+             subst = zipOpenTvSubst [the_tv] [inst_ty]
 
-isTyVarDict :: Inst -> Bool
-isTyVarDict (Dict {tci_pred = pred}) = isTyVarClassPred pred
-isTyVarDict _                        = False
-
-isIPDict :: Inst -> Bool
-isIPDict (Dict {tci_pred = pred}) = isIPPred pred
-isIPDict _                        = False
-
-isImplicInst :: Inst -> Bool
-isImplicInst (ImplicInst {}) = True
-isImplicInst _               = False
-
-isMethod :: Inst -> Bool
-isMethod (Method {}) = True
-isMethod _           = False
-
-isMethodFor :: TcIdSet -> Inst -> Bool
-isMethodFor ids (Method {tci_oid = id}) = id `elemVarSet` ids
-isMethodFor _   _                       = False
-
-isMethodOrLit :: Inst -> Bool
-isMethodOrLit (Method {})  = True
-isMethodOrLit (LitInst {}) = True
-isMethodOrLit _            = False
+       ; wrap <- ASSERT( null rest && isSingleton theta )
+                 instCall origin [inst_ty] (substTheta subst theta)
+       ; return (mkHsWrap wrap (HsVar id)) }
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Building dictionaries}
+	Deep instantiation and skolemisation
 %*									*
 %************************************************************************
 
--- newDictBndrs makes a dictionary at a binding site
--- instCall makes a dictionary at an occurrence site
---	and throws it into the LIE
+Note [Deep skolemisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+deeplySkolemise decomposes and skolemises a type, returning a type
+with all its arrows visible (ie not buried under foralls)
+
+Examples:
+
+  deeplySkolemise (Int -> forall a. Ord a => blah)  
+    =  ( wp, [a], [d:Ord a], Int -> blah )
+    where wp = \x:Int. /\a. \(d:Ord a). <hole> x
+
+  deeplySkolemise  (forall a. Ord a => Maybe a -> forall b. Eq b => blah)  
+    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], Maybe a -> blah )
+    where wp = /\a.\(d1:Ord a).\(x:Maybe a)./\b.\(d2:Ord b). <hole> x
+
+In general,
+  if      deeplySkolemise ty = (wrap, tvs, evs, rho)
+    and   e :: rho
+  then    wrap e :: ty
+    and   'wrap' binds tvs, evs
+
+ToDo: this eta-abstraction plays fast and loose with termination,
+      because it can introduce extra lambdas.  Maybe add a `seq` to
+      fix this
+
+
+\begin{code}
+deeplySkolemise
+  :: SkolemInfo
+  -> TcSigmaType 
+  -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
+
+deeplySkolemise skol_info ty
+  | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
+  = do { ids1 <- newSysLocalIds (fsLit "dsk") arg_tys
+       ; tvs1 <- mapM (tcInstSkolTyVar skol_info) tvs
+       ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs1)
+       ; ev_vars1 <- newEvVars (substTheta subst theta)
+       ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise skol_info (substTy subst ty')
+       ; return ( mkWpLams ids1
+                   <.> mkWpTyLams tvs1
+                   <.> mkWpLams ev_vars1
+                   <.> wrap
+                   <.> mkWpEvVarApps ids1
+                , tvs1     ++ tvs2
+                , ev_vars1 ++ ev_vars2
+                , mkFunTys arg_tys rho ) }
+
+  | otherwise
+  = return (idHsWrapper, [], [], ty)
+
+deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+--   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
+-- In general if
+-- if    deeplyInstantiate ty = (wrap, rho)
+-- and   e :: ty
+-- then  wrap e :: rho
+
+deeplyInstantiate orig ty
+  | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
+  = do { (_, tys, subst) <- tcInstTyVars tvs
+       ; ids1  <- newSysLocalIds (fsLit "dsk") (substTys subst arg_tys)
+       ; wrap1 <- instCall orig tys (substTheta subst theta)
+       ; (wrap2, rho) <- deeplyInstantiate orig (substTy subst rho)
+       ; return (mkWpLams ids1 
+                    <.> wrap1 
+                    <.> mkWpEvVarApps ids1
+                    <.> wrap2,
+                 mkFunTys arg_tys rho) }
+
+  | otherwise = return (idHsWrapper, ty)
+\end{code}
+
+
+%************************************************************************
+%*									*
+            Instantiating a call
+%*									*
+%************************************************************************
 
 \begin{code}
 ----------------
-newDictBndrsO :: InstOrigin -> TcThetaType -> TcM [Inst]
-newDictBndrsO orig theta = do { loc <- getInstLoc orig
-			      ; newDictBndrs loc theta }
-
-newDictBndrs :: InstLoc -> TcThetaType -> TcM [Inst]
-newDictBndrs inst_loc theta = mapM (newDictBndr inst_loc) theta
-
-newDictBndr :: InstLoc -> TcPredType -> TcM Inst
--- Makes a "given"
-newDictBndr inst_loc pred@(EqPred ty1 ty2)
-  = do { uniq <- newUnique 
-	; let name = mkPredName uniq inst_loc pred 
-	      co   = mkGivenCo $ TyVarTy (Var.mkCoVar name (PredTy pred))
-	; return (EqInst {tci_name  = name, 
-			  tci_loc   = inst_loc, 
-			  tci_left  = ty1, 
-			  tci_right = ty2, 
-			  tci_co    = co }) }
-
-newDictBndr inst_loc pred = newDict inst_loc pred
-
--------------------
-newDictOccs :: InstLoc -> TcThetaType -> TcM [Inst]
-newDictOccs inst_loc theta = mapM (newDictOcc inst_loc) theta
-
-newDictOcc :: InstLoc -> TcPredType -> TcM Inst
--- Makes a "wanted"
-newDictOcc inst_loc pred@(EqPred ty1 ty2)
-  = do	{ uniq <- newUnique 
-	; cotv <- newMetaCoVar ty1 ty2
-	; let name = mkPredName uniq inst_loc pred 
-	; return (EqInst {tci_name  = name, 
-			  tci_loc   = inst_loc, 
-			  tci_left  = ty1, 
-			  tci_right = ty2, 
-			  tci_co    = Left cotv }) }
-
-newDictOcc inst_loc pred = newDict inst_loc pred
-
-----------------
-newDict :: InstLoc -> TcPredType -> TcM Inst
--- Always makes a Dict, not an EqInst
-newDict inst_loc pred
-  = do 	{ uniq <- newUnique 
-	; let name = mkPredName uniq inst_loc pred 
-	; return (Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}) }
-
-----------------
-instCall :: InstOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
+instCall :: CtOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
 -- Instantiate the constraints of a call
 --	(instCall o tys theta)
 -- (a) Makes fresh dictionaries as necessary for the constraints (theta)
@@ -405,163 +199,79 @@ instCall :: InstOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
 -- (c) Returns an HsWrapper ([.] tys dicts)
 
 instCall orig tys theta 
-  = do	{ loc <- getInstLoc orig
-	; dict_app <- instCallDicts loc theta
+  = do	{ dict_app <- instCallConstraints orig theta
 	; return (dict_app <.> mkWpTyApps tys) }
 
 ----------------
-instStupidTheta :: InstOrigin -> TcThetaType -> TcM ()
+instCallConstraints :: CtOrigin -> TcThetaType -> TcM HsWrapper
+-- Instantiates the TcTheta, puts all constraints thereby generated
+-- into the LIE, and returns a HsWrapper to enclose the call site.
+
+instCallConstraints _ [] = return idHsWrapper
+
+instCallConstraints origin (EqPred ty1 ty2 : preds)	-- Try short-cut
+  = do  { traceTc "instCallConstraints" $ ppr (EqPred ty1 ty2)
+	; coi   <- unifyType ty1 ty2
+	; co_fn <- instCallConstraints origin preds
+	; let co = case coi of
+                       IdCo ty -> ty
+                       ACo  co -> co
+        ; return (co_fn <.> WpEvApp (EvCoercion co)) }
+
+instCallConstraints origin (pred : preds)
+  = do	{ ev_var <- emitWanted origin pred
+	; co_fn <- instCallConstraints origin preds
+	; return (co_fn <.> WpEvApp (EvId ev_var)) }
+
+----------------
+instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()
 -- Similar to instCall, but only emit the constraints in the LIE
 -- Used exclusively for the 'stupid theta' of a data constructor
 instStupidTheta orig theta
-  = do	{ loc <- getInstLoc orig
-	; _co <- instCallDicts loc theta	-- Discard the coercion
+  = do	{ _co <- instCallConstraints orig theta -- Discard the coercion
 	; return () }
-
-----------------
-instCallDicts :: InstLoc -> TcThetaType -> TcM HsWrapper
--- Instantiates the TcTheta, puts all constraints thereby generated
--- into the LIE, and returns a HsWrapper to enclose the call site.
--- This is the key place where equality predicates 
--- are unleashed into the world
-instCallDicts _ [] = return idHsWrapper
-
--- instCallDicts loc (EqPred ty1 ty2 : preds)
---   = do  { unifyType ty1 ty2	-- For now, we insist that they unify right away 
--- 				-- Later on, when we do associated types, 
--- 				-- unifyType :: Type -> Type -> TcM ([Inst], Coercion)
--- 	; (dicts, co_fn) <- instCallDicts loc preds
--- 	; return (dicts, co_fn <.> WpTyApp ty1) }
--- 	-- We use type application to apply the function to the 
--- 	-- coercion; here ty1 *is* the appropriate identity coercion
-
-instCallDicts loc (EqPred ty1 ty2 : preds)
-  = do  { traceTc (text "instCallDicts" <+> ppr (EqPred ty1 ty2))
-	; coi <- boxyUnify ty1 ty2
-	; let co = fromCoI coi ty1
-	; co_fn <- instCallDicts loc preds
-	; return (co_fn <.> WpTyApp co) }
-
-instCallDicts loc (pred : preds)
-  = do	{ dict <- newDict loc pred
-	; extendLIE dict
-	; co_fn <- instCallDicts loc preds
-	; return (co_fn <.> WpApp (instToId dict)) }
-
--------------
-cloneDict :: Inst -> TcM Inst
-cloneDict dict@(Dict nm _ _) = do { uniq <- newUnique
-				  ; return (dict {tci_name = setNameUnique nm uniq}) }
-cloneDict eq@(EqInst {})     = return eq
-cloneDict other = pprPanic "cloneDict" (ppr other)
-
--- For vanilla implicit parameters, there is only one in scope
--- at any time, so we used to use the name of the implicit parameter itself
--- But with splittable implicit parameters there may be many in 
--- scope, so we make up a new namea.
-newIPDict :: InstOrigin -> IPName Name -> Type 
-	  -> TcM (IPName Id, Inst)
-newIPDict orig ip_name ty
-  = do	{ inst_loc <- getInstLoc orig
-	; dict <- newDict inst_loc (IParam ip_name ty)
-	; return (mapIPName (\_ -> instToId dict) ip_name, dict) }
-\end{code}
-
-
-\begin{code}
-mkPredName :: Unique -> InstLoc -> PredType -> Name
-mkPredName uniq loc pred_ty
-  = mkInternalName uniq occ (instLocSpan loc)
-  where
-    occ = case pred_ty of
-	    ClassP cls _ -> mkDictOcc (getOccName cls)
-	    IParam ip  _ -> getOccName (ipNameName ip)
-	    EqPred ty  _ -> mkEqPredCoOcc baseOcc
-	      where
-		-- we use the outermost tycon of the lhs, if there is one, to
-		-- improve readability of Core code
-	        baseOcc = case splitTyConApp_maybe ty of
-			    Nothing      -> mkTcOcc "$"
-                            Just (tc, _) -> getOccName tc
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Building methods (calls of overloaded functions)}
+		Literals
 %*									*
 %************************************************************************
 
+In newOverloadedLit we convert directly to an Int or Integer if we
+know that's what we want.  This may save some time, by not
+temporarily generating overloaded literals, but it won't catch all
+cases (the rest are caught in lookupInst).
 
 \begin{code}
-newMethodFromName :: InstOrigin -> BoxyRhoType -> Name -> TcM TcId
-newMethodFromName origin ty name = do
-    id <- tcLookupId name
-	-- Use tcLookupId not tcLookupGlobalId; the method is almost
-	-- always a class op, but with -XNoImplicitPrelude GHC is
-	-- meant to find whatever thing is in scope, and that may
-	-- be an ordinary function. 
-    loc <- getInstLoc origin
-    inst <- tcInstClassOp loc id [ty]
-    extendLIE inst
-    return (instToId inst)
+newOverloadedLit :: CtOrigin
+		 -> HsOverLit Name
+		 -> TcRhoType
+		 -> TcM (HsOverLit TcId)
+newOverloadedLit orig 
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindable
+	       , ol_witness = meth_name }) res_ty
 
-newMethodWithGivenTy :: InstOrigin -> Id -> [Type] -> TcRn TcId
-newMethodWithGivenTy orig id tys = do
-    loc <- getInstLoc orig
-    inst <- newMethod loc id tys
-    extendLIE inst
-    return (instToId inst)
+  | not rebindable
+  , Just expr <- shortCutLit val res_ty 
+	-- Do not generate a LitInst for rebindable syntax.  
+	-- Reason: If we do, tcSimplify will call lookupInst, which
+	--	   will call tcSyntaxName, which does unification, 
+	--	   which tcSimplify doesn't like
+  = return (lit { ol_witness = expr, ol_type = res_ty })
 
---------------------------------------------
--- tcInstClassOp, and newMethod do *not* drop the 
--- Inst into the LIE; they just returns the Inst
--- This is important because they are used by TcSimplify
--- to simplify Insts
+  | otherwise
+  = do	{ hs_lit <- mkOverLit val
+	; let lit_ty = hsLitType hs_lit
+	; fi' <- tcSyntaxOp orig meth_name (mkFunTy lit_ty res_ty)
+	 	-- Overloaded literals must have liftedTypeKind, because
+	 	-- we're instantiating an overloaded function here,
+	 	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
+		-- However this'll be picked up by tcSyntaxOp if necessary
+	; let witness = HsApp (noLoc fi') (noLoc (HsLit hs_lit))
+	; return (lit { ol_witness = witness, ol_type = res_ty }) }
 
--- NB: the kind of the type variable to be instantiated
---     might be a sub-kind of the type to which it is applied,
---     notably when the latter is a type variable of kind ??
---     Hence the call to checkKind
--- A worry: is this needed anywhere else?
-tcInstClassOp :: InstLoc -> Id -> [TcType] -> TcM Inst
-tcInstClassOp inst_loc sel_id tys = do
-    let
-	(tyvars, _rho) = tcSplitForAllTys (idType sel_id)
-    zipWithM_ checkKind tyvars tys
-    newMethod inst_loc sel_id tys
-
-checkKind :: TyVar -> TcType -> TcM ()
--- Ensure that the type has a sub-kind of the tyvar
-checkKind tv ty
-  = do	{ let ty1 = ty 
-		-- ty1 <- zonkTcType ty
-	; if typeKind ty1 `isSubKind` Var.tyVarKind tv
-	  then return ()
-	  else 
-
-    pprPanic "checkKind: adding kind constraint" 
-	     (vcat [ppr tv <+> ppr (Var.tyVarKind tv), 
-	            ppr ty <+> ppr ty1 <+> ppr (typeKind ty1)])
-	}
---    do	{ tv1 <- tcInstTyVar tv
---	; unifyType ty1 (mkTyVarTy tv1) } }
-
-
----------------------------
-newMethod :: InstLoc -> Id -> [Type] -> TcRn Inst
-newMethod inst_loc id tys = do
-    new_uniq <- newUnique
-    let
-	(theta,tau) = tcSplitPhiTy (applyTys (idType id) tys)
-	meth_id	    = mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
-	inst        = Method {tci_id = meth_id, tci_oid = id, tci_tys = tys,
-			      tci_theta = theta, tci_loc = inst_loc}
-	loc         = instLocSpan inst_loc
-    
-    return inst
-\end{code}
-
-\begin{code}
+------------
 mkOverLit :: OverLitVal -> TcM HsLit
 mkOverLit (HsIntegral i) 
   = do	{ integer_ty <- tcMetaTy integerTyConName
@@ -575,144 +285,107 @@ mkOverLit (HsIsString s) = return (HsString s)
 \end{code}
 
 
+
+
 %************************************************************************
 %*									*
-\subsection{Zonking}
+		Re-mappable syntax
+    
+     Used only for arrow syntax -- find a way to nuke this
 %*									*
 %************************************************************************
 
-Zonking makes sure that the instance types are fully zonked.
+Suppose we are doing the -XNoImplicitPrelude thing, and we encounter
+a do-expression.  We have to find (>>) in the current environment, which is
+done by the rename. Then we have to check that it has the same type as
+Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had
+this:
+
+  (>>) :: HB m n mn => m a -> n b -> mn b
+
+So the idea is to generate a local binding for (>>), thus:
+
+	let then72 :: forall a b. m a -> m b -> m b
+	    then72 = ...something involving the user's (>>)...
+	in
+	...the do-expression...
+
+Now the do-expression can proceed using then72, which has exactly
+the expected type.
+
+In fact tcSyntaxName just generates the RHS for then72, because we only
+want an actual binding in the do-expression case. For literals, we can 
+just use the expression inline.
 
 \begin{code}
-zonkInst :: Inst -> TcM Inst
-zonkInst dict@(Dict {tci_pred = pred}) = do
-    new_pred <- zonkTcPredType pred
-    return (dict {tci_pred = new_pred})
+tcSyntaxName :: CtOrigin
+	     -> TcType			-- Type to instantiate it at
+	     -> (Name, HsExpr Name)	-- (Standard name, user name)
+	     -> TcM (Name, HsExpr TcId)	-- (Standard name, suitable expression)
+--	*** NOW USED ONLY FOR CmdTop (sigh) ***
+-- NB: tcSyntaxName calls tcExpr, and hence can do unification.
+-- So we do not call it from lookupInst, which is called from tcSimplify
 
-zonkInst meth@(Method {tci_oid = id, tci_tys = tys, tci_theta = theta}) = do
-    new_id <- zonkId id
-	-- Essential to zonk the id in case it's a local variable
-	-- Can't use zonkIdOcc because the id might itself be
-	-- an InstId, in which case it won't be in scope
+tcSyntaxName orig ty (std_nm, HsVar user_nm)
+  | std_nm == user_nm
+  = do rhs <- newMethodFromName orig std_nm ty
+       return (std_nm, rhs)
 
-    new_tys <- zonkTcTypes tys
-    new_theta <- zonkTcThetaType theta
-    return (meth { tci_oid = new_id, tci_tys = new_tys, tci_theta = new_theta })
-	-- No need to zonk the tci_id
+tcSyntaxName orig ty (std_nm, user_nm_expr) = do
+    std_id <- tcLookupId std_nm
+    let	
+	-- C.f. newMethodAtLoc
+	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
+ 	sigma1		= substTyWith [tv] [ty] tau
+	-- Actually, the "tau-type" might be a sigma-type in the
+	-- case of locally-polymorphic methods.
 
-zonkInst lit@(LitInst {tci_ty = ty}) = do
-    new_ty <- zonkTcType ty
-    return (lit {tci_ty = new_ty})
+    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1) $ do
 
-zonkInst implic@(ImplicInst {})
-  = ASSERT( all isImmutableTyVar (tci_tyvars implic) )
-    do 	{ givens'  <- zonkInsts (tci_given  implic)
-	; wanteds' <- zonkInsts (tci_wanted implic)
-	; return (implic {tci_given = givens',tci_wanted = wanteds'}) }
+	-- Check that the user-supplied thing has the
+	-- same type as the standard one.  
+	-- Tiresome jiggling because tcCheckSigma takes a located expression
+     span <- getSrcSpanM
+     expr <- tcPolyExpr (L span user_nm_expr) sigma1
+     return (std_nm, unLoc expr)
 
-zonkInst eqinst@(EqInst {tci_left = ty1, tci_right = ty2})
-  = do { co' <- eitherEqInst eqinst 
-		  (\covar -> return (mkWantedCo covar)) 
-		  (\co    -> liftM mkGivenCo $ zonkTcType co)
-       ; ty1' <- zonkTcType ty1
-       ; ty2' <- zonkTcType ty2
-       ; return (eqinst {tci_co = co', tci_left = ty1', tci_right = ty2' })
-       }
-
-zonkInsts :: [Inst] -> TcRn [Inst]
-zonkInsts insts = mapM zonkInst insts
+syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
+               -> TcRn (TidyEnv, SDoc)
+syntaxNameCtxt name orig ty tidy_env = do
+    inst_loc <- getCtLoc orig
+    let
+	msg = vcat [ptext (sLit "When checking that") <+> quotes (ppr name) <+> 
+				ptext (sLit "(needed by a syntactic construct)"),
+		    nest 2 (ptext (sLit "has the required type:") <+> ppr (tidyType tidy_env ty)),
+		    nest 2 (pprArisingAt inst_loc)]
+    return (tidy_env, msg)
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Printing}
-%*									*
-%************************************************************************
-
-ToDo: improve these pretty-printing things.  The ``origin'' is really only
-relevant in error messages.
-
-\begin{code}
-instance Outputable Inst where
-    ppr inst = pprInst inst
-
-pprDictsTheta :: [Inst] -> SDoc
--- Print in type-like fashion (Eq a, Show b)
--- The Inst can be an implication constraint, but not a Method or LitInst
-pprDictsTheta insts = parens (sep (punctuate comma (map (ppr . instType) insts)))
-
-pprDictsInFull :: [Inst] -> SDoc
--- Print in type-like fashion, but with source location
-pprDictsInFull dicts 
-  = vcat (map go dicts)
-  where
-    go dict = sep [quotes (ppr (instType dict)), nest 2 (pprInstArising dict)]
-
-pprInsts :: [Inst] -> SDoc
--- Debugging: print the evidence :: type
-pprInsts insts = brackets (interpp'SP insts)
-
-pprInst, pprInstInFull :: Inst -> SDoc
--- Debugging: print the evidence :: type
-pprInst i@(EqInst {tci_left = ty1, tci_right = ty2}) 
-	= eitherEqInst i
-		(\covar -> text "Wanted" <+> ppr (TyVarTy covar) <+> dcolon <+> ppr (EqPred ty1 ty2))
-		(\co    -> text "Given"  <+> ppr co              <+> dcolon <+> ppr (EqPred ty1 ty2))
-pprInst inst = ppr name <> braces (pprUnique (getUnique name)) <+> dcolon 
-		<+> braces (ppr (instType inst) <> implicWantedEqs)
-  where
-    name = instName inst
-    implicWantedEqs
-      | isImplicInst inst = text " &" <+> 
-                            ppr (filter isEqInst (tci_wanted inst))
-      | otherwise	  = empty
-
-pprInstInFull inst@(EqInst {}) = pprInst inst
-pprInstInFull inst = sep [quotes (pprInst inst), nest 2 (pprInstArising inst)]
-
-tidyInst :: TidyEnv -> Inst -> Inst
-tidyInst env eq@(EqInst {tci_left = lty, tci_right = rty, tci_co = co}) =
-  eq { tci_left  = tidyType env lty
-     , tci_right = tidyType env rty
-     , tci_co    = either Left (Right . tidyType env) co
-     }
-tidyInst env lit@(LitInst {tci_ty = ty})   = lit {tci_ty = tidyType env ty}
-tidyInst env dict@(Dict {tci_pred = pred}) = dict {tci_pred = tidyPred env pred}
-tidyInst env meth@(Method {tci_tys = tys}) = meth {tci_tys = tidyTypes env tys}
-tidyInst env implic@(ImplicInst {})
-  = implic { tci_tyvars = tvs' 
-	   , tci_given  = map (tidyInst env') (tci_given  implic)
-	   , tci_wanted = map (tidyInst env') (tci_wanted implic) }
-  where
-    (env', tvs') = mapAccumL tidyTyVarBndr env (tci_tyvars implic)
-
-tidyMoreInsts :: TidyEnv -> [Inst] -> (TidyEnv, [Inst])
--- This function doesn't assume that the tyvars are in scope
--- so it works like tidyOpenType, returning a TidyEnv
-tidyMoreInsts env insts
-  = (env', map (tidyInst env') insts)
-  where
-    env' = tidyFreeTyVars env (tyVarsOfInsts insts)
-
-tidyInsts :: [Inst] -> (TidyEnv, [Inst])
-tidyInsts insts = tidyMoreInsts emptyTidyEnv insts
-
-showLIE :: SDoc -> TcM ()	-- Debugging
-showLIE str
-  = do { lie_var <- getLIEVar ;
-	 lie <- readMutVar lie_var ;
-	 traceTc (str <+> vcat (map pprInstInFull (lieToList lie))) }
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Extending the instance environment
+		Instances
 %*									*
 %************************************************************************
 
 \begin{code}
+getOverlapFlag :: TcM OverlapFlag
+getOverlapFlag 
+  = do 	{ dflags <- getDOpts
+	; let overlap_ok    = dopt Opt_OverlappingInstances dflags
+	      incoherent_ok = dopt Opt_IncoherentInstances  dflags
+	      overlap_flag | incoherent_ok = Incoherent
+			   | overlap_ok    = OverlapOk
+			   | otherwise     = NoOverlap
+			   
+	; return overlap_flag }
+
+tcGetInstEnvs :: TcM (InstEnv, InstEnv)
+-- Gets both the external-package inst-env
+-- and the home-pkg inst env (includes module being compiled)
+tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
+		     return (eps_inst_env eps, tcg_inst_env env) }
+
 tcExtendLocalInstEnv :: [Instance] -> TcM a -> TcM a
   -- Add new locally-defined instances
 tcExtendLocalInstEnv dfuns thing_inside
@@ -765,20 +438,9 @@ addLocalInst home_ie ispec
 		-- OK, now extend the envt
 	; return (extendInstEnv home_ie ispec') }
 
-getOverlapFlag :: TcM OverlapFlag
-getOverlapFlag 
-  = do 	{ dflags <- getDOpts
-	; let overlap_ok    = dopt Opt_OverlappingInstances dflags
-	      incoherent_ok = dopt Opt_IncoherentInstances  dflags
-	      overlap_flag | incoherent_ok = Incoherent
-			   | overlap_ok    = OverlapOk
-			   | otherwise     = NoOverlap
-			   
-	; return overlap_flag }
-
 traceDFuns :: [Instance] -> TcRn ()
 traceDFuns ispecs
-  = traceTc (hang (text "Adding instances:") 2 (vcat (map pp ispecs)))
+  = traceTc "Adding instances:" (vcat (map pp ispecs))
   where
     pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
 	-- Print the dfun name itself too
@@ -800,427 +462,71 @@ addDictLoc ispec thing_inside
   where
    loc = getSrcLoc ispec
 \end{code}
-    
 
 %************************************************************************
 %*									*
-\subsection{Looking up Insts}
+	Simple functions over evidence variables
 %*									*
 %************************************************************************
 
 \begin{code}
-data LookupInstResult
-  = NoInstance
-  | GenInst [Inst] (LHsExpr TcId)	-- The expression and its needed insts
-
-lookupSimpleInst :: Inst -> TcM LookupInstResult
--- This is "simple" in that it returns NoInstance for implication constraints
-
--- It's important that lookupInst does not put any new stuff into
--- the LIE.  Instead, any Insts needed by the lookup are returned in
--- the LookupInstResult, where they can be further processed by tcSimplify
-
-lookupSimpleInst (EqInst {}) = return NoInstance
-
---------------------- Implications ------------------------
-lookupSimpleInst (ImplicInst {}) = return NoInstance
-
---------------------- Methods ------------------------
-lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_loc = loc})
-  = do	{ (dict_app, dicts) <- getLIE $ instCallDicts loc theta
-	; let co_fn = dict_app <.> mkWpTyApps tys
-	; return (GenInst dicts (L span $ HsWrap co_fn (HsVar id))) }
+hasEqualities :: [EvVar] -> Bool
+-- Has a bunch of canonical constraints (all givens) got any equalities in it?
+hasEqualities givens = any (has_eq . evVarPred) givens
   where
-    span = instLocSpan loc
+    has_eq (EqPred {}) 	    = True
+    has_eq (IParam {}) 	    = False
+    has_eq (ClassP cls tys) = any has_eq (substTheta subst (classSCTheta cls))
+      where
+        subst = zipOpenTvSubst (classTyVars cls) tys
 
---------------------- Literals ------------------------
--- Look for short cuts first: if the literal is *definitely* a 
--- int, integer, float or a double, generate the real thing here.
--- This is essential (see nofib/spectral/nucleic).
--- [Same shortcut as in newOverloadedLit, but we
---  may have done some unification by now] 		
+----------------
+tyVarsOfWanteds :: WantedConstraints -> TyVarSet
+tyVarsOfWanteds = foldrBag (unionVarSet . tyVarsOfWanted) emptyVarSet
 
-lookupSimpleInst (LitInst { tci_lit = lit@OverLit { ol_val = lit_val
-					          , ol_rebindable = rebindable }
-			  , tci_ty = ty, tci_loc = iloc})
-  | debugIsOn && rebindable = panic "lookupSimpleInst" -- A LitInst invariant
-  | Just witness <- shortCutLit lit_val ty
-  = do	{ let lit' = lit { ol_witness = witness, ol_type = ty }
-	; return (GenInst [] (L loc (HsOverLit lit'))) }
+tyVarsOfWanted :: WantedConstraint -> TyVarSet
+tyVarsOfWanted (WcEvVar wev)   = tyVarsOfWantedEvVar wev
+tyVarsOfWanted (WcImplic impl) = tyVarsOfImplication impl
 
-  | otherwise
-  = do	{ hs_lit <- mkOverLit lit_val
-	; from_thing <- tcLookupId (hsOverLitName lit_val)
-		  -- Not rebindable, so hsOverLitName is the right thing
-    	; method_inst <- tcInstClassOp iloc from_thing [ty]
-	; let witness = HsApp (L loc (HsVar (instToId method_inst))) 
-			      (L loc (HsLit hs_lit))
-	      lit' = lit { ol_witness = witness, ol_type = ty }
-	; return (GenInst [method_inst] (L loc (HsOverLit lit'))) }
-  where
-    loc = instLocSpan iloc
+tyVarsOfImplication :: Implication -> TyVarSet
+tyVarsOfImplication implic = tyVarsOfWanteds (ic_wanted implic)
+                             `minusVarSet` (ic_skols implic)
 
---------------------- Dictionaries ------------------------
-lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
-  = do 	{ mb_result <- lookupPred pred
-	; case mb_result of {
-	    Nothing -> return NoInstance ;
-	    Just (dfun_id, mb_inst_tys) -> do
+tyVarsOfWantedEvVar :: WantedEvVar -> TyVarSet
+tyVarsOfWantedEvVar (WantedEvVar ev _) = tyVarsOfEvVar ev
 
-    { use_stage <- getStage
-    ; checkWellStaged (ptext (sLit "instance for") <+> quotes (ppr pred))
-    		      (topIdLvl dfun_id) (thLevel use_stage)
+tyVarsOfWantedEvVars :: Bag WantedEvVar -> TyVarSet
+tyVarsOfWantedEvVars = foldrBag (unionVarSet . tyVarsOfWantedEvVar) emptyVarSet
 
- 	-- It's possible that not all the tyvars are in
-	-- the substitution, tenv. For example:
-	--	instance C X a => D X where ...
-	-- (presumably there's a functional dependency in class C)
-	-- Hence mb_inst_tys :: Either TyVar TcType 
+tyVarsOfEvVar :: EvVar -> TyVarSet
+tyVarsOfEvVar ev = tyVarsOfPred $ evVarPred ev
 
-    ; let inst_tv (Left tv)  = do { tv' <- tcInstTyVar tv; return (mkTyVarTy tv') }
-	  inst_tv (Right ty) = return ty
-    ; tys <- mapM inst_tv mb_inst_tys
-    ; let
-    	(theta, _) = tcSplitPhiTy (applyTys (idType dfun_id) tys)
-	src_loc	   = instLocSpan loc
-	dfun	   = HsVar dfun_id
-    ; if null theta then
-        return (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
-      else do
-    { (dict_app, dicts) <- getLIE $ instCallDicts loc theta -- !!!
-    ; let co_fn = dict_app <.> mkWpTyApps tys
-    ; return (GenInst dicts (L src_loc $ HsWrap co_fn dfun))
-    }}}}
+tyVarsOfEvVars :: [EvVar] -> TyVarSet
+tyVarsOfEvVars = foldr (unionVarSet . tyVarsOfEvVar) emptyVarSet
 
 ---------------
-lookupPred :: TcPredType -> TcM (Maybe (DFunId, [Either TyVar TcType]))
--- Look up a class constraint in the instance environment
-lookupPred pred@(ClassP clas tys)
-  = do	{ eps     <- getEps
-	; tcg_env <- getGblEnv
-	; let inst_envs = (eps_inst_env eps, tcg_inst_env tcg_env)
-	; case lookupInstEnv inst_envs clas tys of {
-	    ([(ispec, inst_tys)], []) 
-		-> do	{ let dfun_id = is_dfun ispec
-			; traceTc (text "lookupInst success" <+> 
-				   vcat [text "dict" <+> ppr pred, 
-				         text "witness" <+> ppr dfun_id
-					 <+> ppr (idType dfun_id) ])
-				-- Record that this dfun is needed
-			; record_dfun_usage dfun_id
-			; return (Just (dfun_id, inst_tys)) } ;
+tidyWanteds :: TidyEnv -> WantedConstraints -> WantedConstraints
+tidyWanteds env = mapBag (tidyWanted env) 
 
-     	    (matches, unifs)
-		-> do	{ traceTc (text "lookupInst fail" <+> 
-				   vcat [text "dict" <+> ppr pred,
-				   	 text "matches" <+> ppr matches,
-				   	 text "unifs" <+> ppr unifs])
-		-- In the case of overlap (multiple matches) we report
-		-- NoInstance here.  That has the effect of making the 
-		-- context-simplifier return the dict as an irreducible one.
-		-- Then it'll be given to addNoInstanceErrs, which will do another
-		-- lookupInstEnv to get the detailed info about what went wrong.
-			; return Nothing }
-	}}
+tidyWanted :: TidyEnv -> WantedConstraint -> WantedConstraint
+tidyWanted env (WcEvVar wev)     = WcEvVar (tidyWantedEvVar env wev)
+tidyWanted env (WcImplic implic) = WcImplic (tidyImplication env implic)
 
-lookupPred (IParam {}) = return Nothing	-- Implicit parameters
-lookupPred (EqPred {}) = panic "lookupPred EqPred"
+tidyWantedEvVar :: TidyEnv -> WantedEvVar -> WantedEvVar
+tidyWantedEvVar env (WantedEvVar ev loc) = WantedEvVar (tidyEvVar env ev) loc
 
-record_dfun_usage :: Id -> TcRn ()
-record_dfun_usage dfun_id 
-  = do	{ hsc_env <- getTopEnv
-	; let  dfun_name = idName dfun_id
-	       dfun_mod  = ASSERT( isExternalName dfun_name ) 
-	         	   nameModule dfun_name
-	; if isInternalName dfun_name ||    -- Internal name => defined in this module
-	     modulePackageId dfun_mod /= thisPackage (hsc_dflags hsc_env)
-	  then return () -- internal, or in another package
-	   else do { tcg_env <- getGblEnv
-	  	   ; updMutVar (tcg_inst_uses tcg_env)
-			       (`addOneToNameSet` idName dfun_id) }}
+tidyWantedEvVars :: TidyEnv -> Bag WantedEvVar -> Bag WantedEvVar
+tidyWantedEvVars env = mapBag (tidyWantedEvVar env)
 
+tidyEvVar :: TidyEnv -> EvVar -> EvVar
+tidyEvVar env v = setVarType v (tidyType env (varType v))
 
-tcGetInstEnvs :: TcM (InstEnv, InstEnv)
--- Gets both the external-package inst-env
--- and the home-pkg inst env (includes module being compiled)
-tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
-		     return (eps_inst_env eps, tcg_inst_env env) }
-\end{code}
-
-
-
-%************************************************************************
-%*									*
-		Re-mappable syntax
-%*									*
-%************************************************************************
-
-Suppose we are doing the -XNoImplicitPrelude thing, and we encounter
-a do-expression.  We have to find (>>) in the current environment, which is
-done by the rename. Then we have to check that it has the same type as
-Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had
-this:
-
-  (>>) :: HB m n mn => m a -> n b -> mn b
-
-So the idea is to generate a local binding for (>>), thus:
-
-	let then72 :: forall a b. m a -> m b -> m b
-	    then72 = ...something involving the user's (>>)...
-	in
-	...the do-expression...
-
-Now the do-expression can proceed using then72, which has exactly
-the expected type.
-
-In fact tcSyntaxName just generates the RHS for then72, because we only
-want an actual binding in the do-expression case. For literals, we can 
-just use the expression inline.
-
-\begin{code}
-tcSyntaxName :: InstOrigin
-	     -> TcType			-- Type to instantiate it at
-	     -> (Name, HsExpr Name)	-- (Standard name, user name)
-	     -> TcM (Name, HsExpr TcId)	-- (Standard name, suitable expression)
---	*** NOW USED ONLY FOR CmdTop (sigh) ***
--- NB: tcSyntaxName calls tcExpr, and hence can do unification.
--- So we do not call it from lookupInst, which is called from tcSimplify
-
-tcSyntaxName orig ty (std_nm, HsVar user_nm)
-  | std_nm == user_nm
-  = do id <- newMethodFromName orig ty std_nm
-       return (std_nm, HsVar id)
-
-tcSyntaxName orig ty (std_nm, user_nm_expr) = do
-    std_id <- tcLookupId std_nm
-    let	
-	-- C.f. newMethodAtLoc
-	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
- 	sigma1		= substTyWith [tv] [ty] tau
-	-- Actually, the "tau-type" might be a sigma-type in the
-	-- case of locally-polymorphic methods.
-
-    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1) $ do
-
-	-- Check that the user-supplied thing has the
-	-- same type as the standard one.  
-	-- Tiresome jiggling because tcCheckSigma takes a located expression
-     span <- getSrcSpanM
-     expr <- tcPolyExpr (L span user_nm_expr) sigma1
-     return (std_nm, unLoc expr)
-
-syntaxNameCtxt :: HsExpr Name -> InstOrigin -> Type -> TidyEnv
-               -> TcRn (TidyEnv, SDoc)
-syntaxNameCtxt name orig ty tidy_env = do
-    inst_loc <- getInstLoc orig
-    let
-	msg = vcat [ptext (sLit "When checking that") <+> quotes (ppr name) <+> 
-				ptext (sLit "(needed by a syntactic construct)"),
-		    nest 2 (ptext (sLit "has the required type:") <+> ppr (tidyType tidy_env ty)),
-		    nest 2 (ptext (sLit "arising from") <+> pprInstLoc inst_loc)]
-    
-    return (tidy_env, msg)
-\end{code}
-
-%************************************************************************
-%*									*
-		EqInsts
-%*									*
-%************************************************************************
-
-Operations on EqInstCo.
-
-\begin{code}
-mkGivenCo   :: Coercion -> EqInstCo
-mkGivenCo   =  Right
-
-mkWantedCo  :: TcTyVar  -> EqInstCo
-mkWantedCo  =  Left
-
-isWantedCo :: EqInstCo -> Bool
-isWantedCo (Left _) = True
-isWantedCo _        = False
-
-eqInstCoType :: EqInstCo -> TcType
-eqInstCoType (Left cotv) = mkTyVarTy cotv
-eqInstCoType (Right co)  = co
-\end{code}
-
-Coercion transformations on EqInstCo.  These transformations work differently
-depending on whether a EqInstCo is for a wanted or local equality:
-
-  Local : apply the inverse of the specified coercion
-  Wanted: obtain a fresh coercion hole (meta tyvar) and update the old hole
-          to be the specified coercion applied to the new coercion hole
-
-\begin{code}
--- Coercion transformation: co = id
---
-mkIdEqInstCo :: EqInstCo -> Type -> TcM ()
-mkIdEqInstCo (Left cotv) t
-  = bindMetaTyVar cotv t
-mkIdEqInstCo (Right _) _
-  = return ()
-
--- Coercion transformation: co = sym co'
---
-mkSymEqInstCo :: EqInstCo -> (Type, Type) -> TcM EqInstCo
-mkSymEqInstCo (Left cotv) (ty1, ty2)
-  = do { cotv' <- newMetaCoVar ty1 ty2
-       ; bindMetaTyVar cotv (mkSymCoercion (TyVarTy cotv'))
-       ; return $ Left cotv'
-       }
-mkSymEqInstCo (Right co) _ 
-  = return $ Right (mkSymCoercion co)
-
--- Coercion transformation: co = co' |> given_co
---
-mkLeftTransEqInstCo :: EqInstCo -> Coercion -> (Type, Type) -> TcM EqInstCo
-mkLeftTransEqInstCo (Left cotv) given_co (ty1, ty2)
-  = do { cotv' <- newMetaCoVar ty1 ty2
-       ; bindMetaTyVar cotv (TyVarTy cotv' `mkTransCoercion` given_co)
-       ; return $ Left cotv'
-       }
-mkLeftTransEqInstCo (Right co) given_co _ 
-  = return $ Right (co `mkTransCoercion` mkSymCoercion given_co)
-
--- Coercion transformation: co = given_co |> co'
---
-mkRightTransEqInstCo :: EqInstCo -> Coercion -> (Type, Type) -> TcM EqInstCo
-mkRightTransEqInstCo (Left cotv) given_co (ty1, ty2)
-  = do { cotv' <- newMetaCoVar ty1 ty2
-       ; bindMetaTyVar cotv (given_co `mkTransCoercion` TyVarTy cotv')
-       ; return $ Left cotv'
-       }
-mkRightTransEqInstCo (Right co) given_co _ 
-  = return $ Right (mkSymCoercion given_co `mkTransCoercion` co)
-
--- Coercion transformation: co = col cor
---
-mkAppEqInstCo :: EqInstCo -> (Type, Type) -> (Type, Type)
-              -> TcM (EqInstCo, EqInstCo)
-mkAppEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
-  = do { cotv_l <- newMetaCoVar ty1_l ty2_l
-       ; cotv_r <- newMetaCoVar ty1_r ty2_r
-       ; bindMetaTyVar cotv (mkAppCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
-       ; return (Left cotv_l, Left cotv_r)
-       }
-mkAppEqInstCo (Right co) _ _
-  = return (Right $ mkLeftCoercion co, Right $ mkRightCoercion co)
-
--- Coercion transformation: co = con col -> cor
---
-mkTyConEqInstCo :: EqInstCo -> TyCon -> [(Type, Type)] -> TcM ([EqInstCo])
-mkTyConEqInstCo (Left cotv) con ty12s
-  = do { cotvs <- mapM (uncurry newMetaCoVar) ty12s
-       ; bindMetaTyVar cotv (mkTyConCoercion con (mkTyVarTys cotvs))
-       ; return (map Left cotvs)
-       }
-mkTyConEqInstCo (Right co) _ args
-  = return $ map (\mkCoes -> Right $ foldl (.) id mkCoes co) mkCoes
-    -- make cascades of the form 
-    --   mkRightCoercion (mkLeftCoercion .. (mkLeftCoercion co)..)
+tidyImplication :: TidyEnv -> Implication -> Implication
+tidyImplication env implic@(Implic { ic_skols = skols, ic_given = given
+                                   , ic_wanted = wanted })
+  = implic { ic_skols  = mkVarSet skols'
+           , ic_given  = map (tidyEvVar env') given
+           , ic_wanted = tidyWanteds env' wanted }
   where
-    n      = length args
-    mkCoes = [mkRightCoercion : replicate i mkLeftCoercion | i <- [n-1, n-2..0]]
-
--- Coercion transformation: co = col -> cor
---
-mkFunEqInstCo :: EqInstCo -> (Type, Type) -> (Type, Type)
-              -> TcM (EqInstCo, EqInstCo)
-mkFunEqInstCo (Left cotv) (ty1_l, ty2_l) (ty1_r, ty2_r)
-  = do { cotv_l <- newMetaCoVar ty1_l ty2_l
-       ; cotv_r <- newMetaCoVar ty1_r ty2_r
-       ; bindMetaTyVar cotv (mkFunCoercion (TyVarTy cotv_l) (TyVarTy cotv_r))
-       ; return (Left cotv_l, Left cotv_r)
-       }
-mkFunEqInstCo (Right co) _ _
-  = return (Right $ mkRightCoercion (mkLeftCoercion co), 
-            Right $ mkRightCoercion co)
-\end{code}
-
-Operations on entire EqInst.
-
-\begin{code}
--- |A wanted equality is unsolved as long as its cotv is unfilled.
---
-wantedEqInstIsUnsolved :: Inst -> TcM Bool
-wantedEqInstIsUnsolved (EqInst {tci_co = Left cotv})
-  = liftM not $ isFilledMetaTyVar cotv
-wantedEqInstIsUnsolved _ = return True
-
-eitherEqInst :: Inst 	            -- given or wanted EqInst
-	     -> (TcTyVar  -> a)     -- 	result if wanted
-	     -> (Coercion -> a)     --	result if given
-	     -> a		
-eitherEqInst (EqInst {tci_co = either_co}) withWanted withGiven
-	= case either_co of
-		Left  covar -> withWanted covar
-		Right co    -> withGiven  co
-eitherEqInst i _ _ = pprPanic "eitherEqInst" (ppr i)
-
-mkEqInst :: PredType -> EqInstCo -> TcM Inst
-mkEqInst (EqPred ty1 ty2) co
-	= do { uniq <- newUnique
-	     ; src_span <- getSrcSpanM
-	     ; err_ctxt <- getErrCtxt
-	     ; let loc  = InstLoc EqOrigin src_span err_ctxt
-	           name = mkName uniq src_span
-	           inst = EqInst { tci_left = ty1
-                                 , tci_right = ty2
-                                 , tci_co = co
-                                 , tci_loc = loc
-                                 , tci_name = name
-                                 } 
-	     ; return inst
-	     }
-	where 
-          mkName uniq src_span = mkInternalName uniq (mkVarOcc "co_ei") src_span
-mkEqInst pred _ = pprPanic "mkEqInst" (ppr pred)
-
-mkWantedEqInst :: PredType -> TcM Inst
-mkWantedEqInst pred@(EqPred ty1 ty2)
-  = do { cotv <- newMetaCoVar ty1 ty2
-       ; mkEqInst pred (Left cotv)
-       }
-mkWantedEqInst pred = pprPanic "mkWantedEqInst" (ppr pred)
-
--- Turn a wanted equality into a local that propagates the uninstantiated
--- coercion variable as witness.  We need this to propagate wanted irreds into
--- attempts to solve implication constraints.
---
-wantedToLocalEqInst :: Inst -> Inst
-wantedToLocalEqInst eq@(EqInst {tci_co = Left cotv})
-  = eq {tci_co = Right (mkTyVarTy cotv)}
-wantedToLocalEqInst eq = eq
-
--- Turn a wanted into a local EqInst (needed during type inference for
--- signatures) 
---
--- * Give it a name and change the coercion around.
---
-finalizeEqInst :: Inst			-- wanted
-	       -> TcM Inst		-- given
-finalizeEqInst wanted@(EqInst{tci_left = ty1, tci_right = ty2, 
-                              tci_name = name, tci_co = Left cotv})
-  = do { let var = Var.mkCoVar name (PredTy $ EqPred ty1 ty2)
-
-         -- fill the coercion hole
-       ; writeMetaTyVar cotv (TyVarTy var)
-
-         -- set the new coercion
-       ; let given = wanted { tci_co = mkGivenCo $ TyVarTy var }
-       ; return given
-       }
-
-finalizeEqInst i = pprPanic "finalizeEqInst" (ppr i)
-
-eqInstType :: Inst -> TcType
-eqInstType inst = eitherEqInst inst mkTyVarTy id
-
-eqInstCoercion :: Inst -> EqInstCo
-eqInstCoercion = tci_co
-
-eqInstTys :: Inst -> (TcType, TcType)
-eqInstTys inst = (tci_left inst, tci_right inst)
+    (env', skols') = mapAccumL tidyTyVarBndr env (varSetElems skols)
 \end{code}

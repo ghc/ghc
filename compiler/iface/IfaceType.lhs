@@ -265,7 +265,7 @@ instance Outputable IfaceTyCon where
 pprIfaceContext :: IfaceContext -> SDoc
 -- Prints "(C a, D b) =>", including the arrow
 pprIfaceContext []     = empty
-pprIfaceContext theta = ppr_preds theta <+> ptext (sLit "=>")
+pprIfaceContext theta = ppr_preds theta <+> darrow
 
 ppr_preds :: [IfacePredType] -> SDoc
 ppr_preds [pred] = ppr pred	-- No parens

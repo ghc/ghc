@@ -20,7 +20,7 @@ import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import IfaceEnv		( ifaceExportNames )
 import LoadIface	( loadSrcInterface, loadSysInterface )
-import TcRnMonad hiding (LIE)
+import TcRnMonad
 
 import HeaderInfo       ( mkPrelImports )
 import PrelNames
@@ -600,7 +600,8 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 	-- different parents).  See the discussion at occ_env.
     lookup_ie :: Bool -> IE RdrName -> MaybeErr Message [(IE Name,AvailInfo)]
     lookup_ie opt_typeFamilies ie 
-      = let bad_ie = Failed (badImportItemErr iface decl_spec ie)
+      = let bad_ie :: MaybeErr Message a
+            bad_ie = Failed (badImportItemErr iface decl_spec ie)
 
             lookup_name rdr 
 	      | isQual rdr = Failed (qualImportItemErr rdr)

@@ -46,6 +46,6 @@ annProvenanceToTarget mod ModuleAnnProvenance       = ModuleTarget mod
 
 annCtxt :: OutputableBndr id => LAnnDecl id -> SDoc
 annCtxt ann
-  = hang (ptext (sLit "In the annotation:")) 4 (ppr ann)
+  = hang (ptext (sLit "In the annotation:")) 2 (ppr ann)
 #endif
 \end{code}

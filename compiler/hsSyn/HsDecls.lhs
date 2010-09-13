@@ -232,6 +232,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
              ppr_ds deriv_decls,
 	     ppr_ds foreign_decls]
 	where
+          ppr_ds :: Outputable a => [a] -> Maybe SDoc
 	  ppr_ds [] = Nothing
 	  ppr_ds ds = Just (vcat (map ppr ds))
 
@@ -636,6 +637,7 @@ instance OutputableBndr name
         top_matter    =     ptext (sLit "class") 
 		        <+> pp_decl_head (unLoc context) lclas tyvars Nothing
 		        <+> pprFundeps (map unLoc fds)
+        ppr_semi :: Outputable a => a -> SDoc
 	ppr_semi decl = ppr decl <> semi
 
 pp_decl_head :: OutputableBndr name

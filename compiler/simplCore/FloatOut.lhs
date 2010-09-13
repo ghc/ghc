@@ -242,7 +242,7 @@ floatExpr _ lam@(Lam _ _)
 	-- going to escape a value lambda.
 	-- In particular, for one-shot lambdas we don't float things
 	-- out; we get no saving by so doing.
-	partition_fn | all isTyVar bndrs = partitionByLevel
+	partition_fn | all isTyCoVar bndrs = partitionByLevel
 		     | otherwise	 = partitionByMajorLevel
     in
     case (floatExpr (last lvls) body) of { (fs, floats, body') ->

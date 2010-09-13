@@ -20,11 +20,10 @@ module HsPat (
 	HsConPatDetails, hsConPatArgs, 
 	HsRecFields(..), HsRecField(..), hsRecFields,
 
-	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat, mkCoPatCoI,
+	mkPrefixConPat, mkCharLitPat, mkNilPat, 
 
-	isBangHsBind, hsPatNeedsParens,
-	patsAreAllCons, isConPat, isSigPat, isWildPat,
-	patsAreAllLits,	isLitPat, isIrrefutableHsPat,
+	isBangHsBind, isBangLPat, hsPatNeedsParens,
+	isIrrefutableHsPat,
 
 	pprParendLPat
     ) where
@@ -37,7 +36,6 @@ import HsLit
 import HsTypes
 import BasicTypes
 -- others:
-import Coercion
 import PprCore		( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
@@ -65,7 +63,7 @@ data Pat id
 	-- support hsPatType :: Pat Id -> Type
 
   | VarPat	id			-- Variable
-  | VarPatOut	id (DictBinds id)	-- Used only for overloaded Ids; the 
+  | VarPatOut	id TcEvBinds		-- Used only for overloaded Ids; the 
 					-- bindings give its overloaded instances
   | LazyPat	(LPat id)		-- Lazy pattern
   | AsPat	(Located id) (LPat id)  -- As pattern
@@ -101,10 +99,10 @@ data Pat id
   | ConPatOut {
 	pat_con   :: Located DataCon,
 	pat_tvs   :: [TyVar],		-- Existentially bound type variables (tyvars only)
-	pat_dicts :: [id],		-- Ditto *coercion variables* and *dictionaries*
+	pat_dicts :: [EvVar],		-- Ditto *coercion variables* and *dictionaries*
 					-- One reason for putting coercion variable here, I think,
 					-- 	is to ensure their kinds are zonked
-	pat_binds :: DictBinds id,	-- Bindings involving those dictionaries
+	pat_binds :: TcEvBinds,		-- Bindings involving those dictionaries
 	pat_args  :: HsConPatDetails id,
 	pat_ty	  :: Type   		-- The type of the pattern
     }
@@ -148,7 +146,7 @@ data Pat id
 		    Type
 
 	------------ Pattern coercions (translation only) ---------------
-  | CoPat 	HsWrapper		-- If co::t1 -> t2, p::t2, 
+  | CoPat 	HsWrapper		-- If co :: t1 ~ t2, p :: t2, 
 					-- then (CoPat co p) :: t1
 		(Pat id)		-- Why not LPat?  Ans: existing locn will do
 	    	Type			-- Type of whole pattern, t1
@@ -276,7 +274,7 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
     if debugStyle sty then 	-- typechecked Pat in an error message, 
 				-- and we want to make sure it prints nicely
 	ppr con <+> sep [ hsep (map pprPatBndr tvs) <+> hsep (map pprPatBndr dicts),
-		   	  pprLHsBinds binds, pprConArgs details]
+		   	  ppr binds, pprConArgs details]
     else pprUserCon con details
 
 pprPat (LitPat s)	    = ppr s
@@ -331,7 +329,7 @@ mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats ty 
   = noLoc $ ConPatOut { pat_con = noLoc dc, pat_tvs = [], pat_dicts = [],
-			pat_binds = emptyLHsBinds, pat_args = PrefixCon pats, 
+			pat_binds = emptyTcEvBinds, pat_args = PrefixCon pats, 
 			pat_ty = ty }
 
 mkNilPat :: Type -> OutPat id
@@ -339,15 +337,6 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] ty
 
 mkCharLitPat :: Char -> OutPat id
 mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] charTy
-
-mkCoPat :: HsWrapper -> Pat id -> Type -> Pat id
-mkCoPat co pat ty
-  | isIdHsWrapper co = pat
-  | otherwise        = CoPat co pat ty
-
-mkCoPatCoI :: CoercionI -> Pat id -> Type -> Pat id
-mkCoPatCoI IdCo     pat _  = pat
-mkCoPatCoI (ACo co) pat ty = mkCoPat (WpCast co) pat ty
 \end{code}
 
 
@@ -381,41 +370,15 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
-isWildPat :: Pat id -> Bool
-isWildPat (WildPat _) = True
-isWildPat _           = False
-
-patsAreAllCons :: [Pat id] -> Bool
-patsAreAllCons pat_list = all isConPat pat_list
-
-isConPat :: Pat id -> Bool
-isConPat (AsPat _ pat)	 = isConPat (unLoc pat)
-isConPat (ConPatIn {})	 = True
-isConPat (ConPatOut {})  = True
-isConPat (ListPat {})	 = True
-isConPat (PArrPat {})	 = True
-isConPat (TuplePat {})	 = True
-isConPat _               = False
-
-isSigPat :: Pat id -> Bool
-isSigPat (SigPatIn _ _)  = True
-isSigPat (SigPatOut _ _) = True
-isSigPat _               = False
-
-patsAreAllLits :: [Pat id] -> Bool
-patsAreAllLits pat_list = all isLitPat pat_list
-
-isLitPat :: Pat id -> Bool
-isLitPat (AsPat _ pat)	        = isLitPat (unLoc pat)
-isLitPat (LitPat _)	        = True
-isLitPat (NPat _ _ _)	        = True
-isLitPat (NPlusKPat _ _ _ _)    = True
-isLitPat _                      = False
+isBangLPat :: LPat id -> Bool
+isBangLPat (L _ (BangPat {})) = True
+isBangLPat (L _ (ParPat p))   = isBangLPat p
+isBangLPat _                  = False
 
 isBangHsBind :: HsBind id -> Bool
 -- In this module because HsPat is above HsBinds in the import graph
-isBangHsBind (PatBind { pat_lhs = L _ (BangPat _) }) = True
-isBangHsBind _                                       = False
+isBangHsBind (PatBind { pat_lhs = p }) = isBangLPat p
+isBangHsBind _                         = False
 
 isIrrefutableHsPat :: OutputableBndr id => LPat id -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,

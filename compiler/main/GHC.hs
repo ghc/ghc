@@ -148,7 +148,7 @@ module GHC (
 	TyCon, 
 	tyConTyVars, tyConDataCons, tyConArity,
 	isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
-	isOpenTyCon,
+	isFamilyTyCon,
 	synTyConDefn, synTyConType, synTyConResKind,
 
 	-- ** Type variables
@@ -247,7 +247,7 @@ import InteractiveEval
 
 import TcRnDriver
 import TcIface
-import TcRnTypes        hiding (LIE)
+import TcRnTypes
 import TcRnMonad        ( initIfaceCheck )
 import Packages
 import NameSet
@@ -255,6 +255,7 @@ import RdrName
 import qualified HsSyn -- hack as we want to reexport the whole module
 import HsSyn hiding ((<.>))
 import Type
+import Coercion		( synTyConResKind )
 import TcType		hiding( typeKind )
 import Id
 import Var

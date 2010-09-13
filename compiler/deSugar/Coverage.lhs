@@ -138,9 +138,9 @@ addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
 addTickLHsBinds binds = mapBagM addTickLHsBind binds
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
-addTickLHsBind (L pos (AbsBinds abs_tvs abs_dicts abs_exports abs_binds)) = do
-  abs_binds' <- addTickLHsBinds abs_binds
-  return $ L pos $ AbsBinds abs_tvs abs_dicts abs_exports abs_binds'
+addTickLHsBind (L pos bind@(AbsBinds { abs_binds = binds })) = do
+  binds' <- addTickLHsBinds binds
+  return $ L pos $ bind { abs_binds = binds' }
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do 
   let name = getOccString id
   decl_path <- getPathEntry
@@ -461,7 +461,7 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)
        ; mfix'  <- addTickSyntaxExpr hpcSrcSpan (recS_mfix_fn stmt)
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
-       ; dicts' <- addTickDictBinds (recS_dicts stmt)
+       ; dicts' <- addTickEvBinds (recS_dicts stmt)
        ; return (stmt { recS_stmts = stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind'
                       , recS_dicts = dicts' }) }
@@ -507,7 +507,7 @@ addTickHsIPBinds :: HsIPBinds Id -> TM (HsIPBinds Id)
 addTickHsIPBinds (IPBinds ipbinds dictbinds) =
 	liftM2 IPBinds
 		(mapM (liftL (addTickIPBind)) ipbinds)
-		(addTickDictBinds dictbinds)
+		(return dictbinds)
 
 addTickIPBind :: IPBind Id -> TM (IPBind Id)
 addTickIPBind (IPBind nm e) =
@@ -535,8 +535,8 @@ addTickHsCmdTop (HsCmdTop cmd tys ty syntaxtable) =
 addTickLHsCmd ::  LHsCmd Id -> TM (LHsCmd Id)
 addTickLHsCmd x = addTickLHsExpr x
 
-addTickDictBinds :: DictBinds Id -> TM (DictBinds Id)
-addTickDictBinds x = addTickLHsBinds x
+addTickEvBinds :: TcEvBinds -> TM TcEvBinds
+addTickEvBinds x = return x   -- No coverage testing for dictionary binding
 
 addTickHsRecordBinds :: HsRecordBinds Id -> TM (HsRecordBinds Id)
 addTickHsRecordBinds (HsRecFields fields dd) 

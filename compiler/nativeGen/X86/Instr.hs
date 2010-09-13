@@ -530,7 +530,9 @@ x86_patchRegsOfInstr instr env
     _other		-> panic "patchRegs: unrecognised instr"
 
   where
+    patch1 :: (Operand -> a) -> Operand -> a
     patch1 insn op      = insn $! patchOp op
+    patch2 :: (Operand -> Operand -> a) -> Operand -> Operand -> a
     patch2 insn src dst = (insn $! patchOp src) $! patchOp dst
 
     patchOp (OpReg  reg) = OpReg $! env reg

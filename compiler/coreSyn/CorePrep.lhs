@@ -465,7 +465,7 @@ rhsToBody (Cast e co)
 rhsToBody expr@(Lam {})
   | Just no_lam_result <- tryEtaReducePrep bndrs body
   = return (emptyFloats, no_lam_result)
-  | all isTyVar bndrs		-- Type lambdas are ok
+  | all isTyCoVar bndrs		-- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise			-- Some value lambdas
   = do { fn <- newVar (exprType expr)
@@ -688,7 +688,7 @@ cpe_ExprIsTrivial (App e arg)              = isTypeArg arg && cpe_ExprIsTrivial 
 cpe_ExprIsTrivial (Note (SCC _) _)         = False
 cpe_ExprIsTrivial (Note _ e)               = cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Cast e _)               = cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Lam b body) | isTyVar b = cpe_ExprIsTrivial body
+cpe_ExprIsTrivial (Lam b body) | isTyCoVar b = cpe_ExprIsTrivial body
 cpe_ExprIsTrivial _                        = False
 \end{code}
 

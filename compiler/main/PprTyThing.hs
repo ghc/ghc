@@ -112,7 +112,7 @@ pprTyConHdr _ tyCon
             | otherwise            = sLit "data"
 
     opt_family
-      | GHC.isOpenTyCon tyCon = ptext (sLit "family")
+      | GHC.isFamilyTyCon tyCon = ptext (sLit "family")
       | otherwise             = empty
 
     opt_stupid 	-- The "stupid theta" part of the declaration
@@ -149,15 +149,15 @@ pprTypeForUser :: PrintExplicitForalls -> GHC.Type -> SDoc
 --	(C a, Ord b) => stuff
 pprTypeForUser print_foralls ty 
   | print_foralls = ppr tidy_ty
-  | otherwise     = ppr (mkPhiTy [p | (_tvs, ps) <- ctxt, p <- ps] ty')
+  | otherwise     = ppr (mkPhiTy ctxt ty')
   where
     tidy_ty     = tidyTopType ty
-    (ctxt, ty') = tcMultiSplitSigmaTy tidy_ty
+    (_, ctxt, ty') = tcSplitSigmaTy tidy_ty
 
 pprTyCon :: PrintExplicitForalls -> ShowMe -> TyCon -> SDoc
 pprTyCon pefas show_me tyCon
   | GHC.isSynTyCon tyCon
-  = if GHC.isOpenTyCon tyCon
+  = if GHC.isFamilyTyCon tyCon
     then pprTyConHdr pefas tyCon <+> dcolon <+> 
 	 pprTypeForUser pefas (GHC.synTyConResKind tyCon)
     else 

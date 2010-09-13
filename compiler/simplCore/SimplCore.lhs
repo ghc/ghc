@@ -41,7 +41,6 @@ import FamInstEnv
 import Id
 import DataCon
 import TyCon		( tyConDataCons )
-import Class		( classSelIds )
 import BasicTypes       ( CompilerPhase, isActive, isDefaultInlinePragma )
 import VarSet
 import VarEnv
@@ -71,63 +70,30 @@ import Maybes
 %************************************************************************
 
 \begin{code}
-core2core :: HscEnv
-	  -> ModGuts
-	  -> IO ModGuts
+core2core :: HscEnv -> ModGuts -> IO ModGuts
+core2core hsc_env guts 
+  = do { us <- mkSplitUniqSupply 's'
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod $ 
+                           doCorePasses (getCoreToDo dflags) guts
 
-core2core hsc_env guts = do
-    let dflags = hsc_dflags hsc_env
+       ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
+             "Grand total simplifier statistics"
+             (pprSimplCount stats)
 
-    us <- mkSplitUniqSupply 's'
-    let (cp_us, ru_us) = splitUniqSupply us
-
-    -- COMPUTE THE RULE BASE TO USE
-    -- See Note [Overall plumbing for rules] in Rules.lhs
-    (hpt_rule_base, guts1) <- prepareRules hsc_env guts ru_us
-
-    -- Get the module out of the current HscEnv so we can retrieve it from the monad.
+       ; return guts2 }
+  where
+    dflags         = hsc_dflags hsc_env
+    home_pkg_rules = hptRules hsc_env (dep_mods (mg_deps guts))
+    hpt_rule_base  = mkRuleBase home_pkg_rules
+    mod            = mg_module guts
+    -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
-    let mod = mg_module guts
-    (guts2, stats) <- runCoreM hsc_env hpt_rule_base cp_us mod $ do
-        -- FIND BUILT-IN PASSES
-        let builtin_core_todos = getCoreToDo dflags
-
-        -- DO THE BUSINESS
-        doCorePasses builtin_core_todos guts1
-
-    Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
-        "Grand total simplifier statistics"
-        (pprSimplCount stats)
-
-    return guts2
 
 
 type CorePass = CoreToDo
-
-simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
-	     -> CoreExpr
-	     -> IO CoreExpr
--- simplifyExpr is called by the driver to simplify an
--- expression typed in at the interactive prompt
---
--- Also used by Template Haskell
-simplifyExpr dflags expr
-  = do	{
-	; Err.showPass dflags "Simplify"
-
-	; us <-  mkSplitUniqSupply 's'
-
-	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 simplExprGently simplEnvForGHCi expr
-
-	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
-			(pprCoreExpr expr')
-
-	; return expr'
-	}
 
 doCorePasses :: [CorePass] -> ModGuts -> CoreM ModGuts
 doCorePasses passes guts 
@@ -250,125 +216,33 @@ observe do_pass = doPassM $ \binds -> do
 
 %************************************************************************
 %*									*
-	Dealing with rules
+	Gentle simplification
 %*									*
 %************************************************************************
 
--- prepareLocalRuleBase takes the CoreBinds and rules defined in this module.
--- It attaches those rules that are for local Ids to their binders, and
--- returns the remainder attached to Ids in an IdSet.  
-
 \begin{code}
-prepareRules :: HscEnv 
-	     -> ModGuts
-	     -> UniqSupply
-	     -> IO (RuleBase, 		-- Rule base for imported things, incl
-					-- (a) rules defined in this module (orphans)
-					-- (b) rules from other modules in home package
-					-- but not things from other packages
+simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
+	     -> CoreExpr
+	     -> IO CoreExpr
+-- simplifyExpr is called by the driver to simplify an
+-- expression typed in at the interactive prompt
+--
+-- Also used by Template Haskell
+simplifyExpr dflags expr
+  = do	{
+	; Err.showPass dflags "Simplify"
 
-		    ModGuts)		-- Modified fields are 
-					--	(a) Bindings have rules attached,
-					--		and INLINE rules simplified
-					-- 	(b) Rules are now just orphan rules
+	; us <-  mkSplitUniqSupply 's'
 
-prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
-	     guts@(ModGuts { mg_binds = binds, mg_deps = deps 
-	     		   , mg_rules = local_rules, mg_rdr_env = rdr_env })
-	     us 
-  = do	{ us <- mkSplitUniqSupply 'w'
+	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
+				 simplExprGently simplEnvForGHCi expr
 
-	; let 	-- Simplify the local rules; boringly, we need to make an in-scope set
-		-- from the local binders, to avoid warnings from Simplify.simplVar
-	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
-	      env	       = setInScopeSet simplEnvForRules local_ids 
-	      (simpl_rules, _) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 mapM (simplRule env) local_rules
+	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+			(pprCoreExpr expr')
 
-	; let (rules_for_locals, rules_for_imps) = partition isLocalRule simpl_rules
+	; return expr'
+	}
 
-	      home_pkg_rules = hptRules hsc_env (dep_mods deps)
-	      hpt_rule_base  = mkRuleBase home_pkg_rules
-	      binds_w_rules  = updateBinders rules_for_locals binds
-
-
-	; Err.dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
-		(withPprStyle (mkUserStyle (mkPrintUnqualified dflags rdr_env) AllTheWay) $
-		 vcat [text "Local rules for local Ids", pprRules simpl_rules,
-		       blankLine,
-		       text "Local rules for imported Ids", pprRuleBase hpt_rule_base])
-
-	; return (hpt_rule_base, guts { mg_binds = binds_w_rules, 
-					mg_rules = rules_for_imps })
-    }
-
--- Note [Attach rules to local ids]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Find the rules for locally-defined Ids; then we can attach them
--- to the binders in the top-level bindings
--- 
--- Reason
--- 	- It makes the rules easier to look up
---	- It means that transformation rules and specialisations for
---	  locally defined Ids are handled uniformly
---	- It keeps alive things that are referred to only from a rule
---	  (the occurrence analyser knows about rules attached to Ids)
---	- It makes sure that, when we apply a rule, the free vars
---	  of the RHS are more likely to be in scope
---	- The imported rules are carried in the in-scope set
---	  which is extended on each iteration by the new wave of
---	  local binders; any rules which aren't on the binding will
---	  thereby get dropped
-
-updateBinders :: [CoreRule] -> [CoreBind] -> [CoreBind]
-updateBinders rules_for_locals binds
-  = map update_bind binds
-  where
-    local_rules = extendRuleBaseList emptyRuleBase rules_for_locals
-
-    update_bind (NonRec b r) = NonRec (add_rules b) r
-    update_bind (Rec prs)    = Rec (mapFst add_rules prs)
-
-	-- See Note [Attach rules to local ids]
-	-- NB: the binder might have some existing rules,
-	-- arising from specialisation pragmas
-    add_rules bndr
-	| Just rules <- lookupNameEnv local_rules (idName bndr)
-	= bndr `addIdSpecialisations` rules
-	| otherwise
-	= bndr
-\end{code}
-
-Note [Simplifying the left-hand side of a RULE]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must do some gentle simplification on the lhs (template) of each
-rule.  The case that forced me to add this was the fold/build rule,
-which without simplification looked like:
-	fold k z (build (/\a. g a))  ==>  ...
-This doesn't match unless you do eta reduction on the build argument.
-Similarly for a LHS like
-	augment g (build h) 
-we do not want to get
-	augment (\a. g a) (build h)
-otherwise we don't match when given an argument like
-	augment (\a. h a a) (build h)
-
-The simplifier does indeed do eta reduction (it's in
-Simplify.completeLam) but only if -O is on.
-
-\begin{code}
-simplRule :: SimplEnv -> CoreRule -> SimplM CoreRule
-simplRule env rule@(BuiltinRule {})
-  = return rule
-simplRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
-  = do (env, bndrs') <- simplBinders env bndrs
-       args' <- mapM (simplExprGently env) args
-       rhs' <- simplExprGently env rhs
-       return (rule { ru_bndrs = bndrs', ru_args = args'
-                    , ru_rhs = occurAnalyseExpr rhs' })
-\end{code}
-
-\begin{code}
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- Simplifies an expression 
 -- 	does occurrence analysis, then simplification

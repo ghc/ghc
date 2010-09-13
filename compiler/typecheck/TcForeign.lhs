@@ -335,7 +335,7 @@ illegalForeignTyErr :: SDoc -> Type -> SDoc
 illegalForeignTyErr arg_or_res ty
   = hang (hsep [ptext (sLit "Unacceptable"), arg_or_res, 
                 ptext (sLit "type in foreign declaration:")])
-	 4 (hsep [ppr ty])
+       2 (hsep [ppr ty])
 
 -- Used for 'arg_or_res' argument to illegalForeignTyErr
 argument, result :: SDoc
@@ -349,6 +349,6 @@ badCName target
 foreignDeclCtxt :: ForeignDecl Name -> SDoc
 foreignDeclCtxt fo
   = hang (ptext (sLit "When checking declaration:"))
-         4 (ppr fo)
+       2 (ppr fo)
 \end{code}
 

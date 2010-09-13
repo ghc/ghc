@@ -6,8 +6,9 @@
 TcPat: Typechecking patterns
 
 \begin{code}
-module TcPat ( tcLetPat, tcPat, tcPats, tcOverloadedLit,
-	       addDataConStupidTheta, badFieldCon, polyPatSig ) where
+module TcPat ( tcLetPat, TcSigFun, TcSigInfo(..)
+             , tcPat, tcPats, newLetBndr
+	     , addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
@@ -19,14 +20,10 @@ import TcRnMonad
 import Inst
 import Id
 import Var
-import CoreFVs
 import Name
-import TcSimplify
 import TcEnv
 import TcMType
 import TcType
-import VarEnv
-import VarSet
 import TcUnify
 import TcHsType
 import TysWiredIn
@@ -34,6 +31,7 @@ import Coercion
 import StaticFlags
 import TyCon
 import DataCon
+import VarSet	( emptyVarSet )
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import DynFlags
@@ -53,27 +51,23 @@ import Control.Monad
 %************************************************************************
 
 \begin{code}
-tcLetPat :: (Name -> Maybe TcRhoType)
-      	 -> LPat Name -> BoxySigmaType 
+tcLetPat :: (Name -> Maybe TcSigInfo)
+         -> Bool     -- True <=> monomorphic
+      	 -> LPat Name -> TcSigmaType 
      	 -> TcM a
       	 -> TcM (LPat TcId, a)
-tcLetPat sig_fn pat pat_ty thing_inside
-  = do	{ let init_state = PS { pat_ctxt = LetPat sig_fn,
-				pat_eqs  = False }
-	; (pat', ex_tvs, res) <- tc_lpat pat pat_ty init_state 
-                                   (\ _ -> thing_inside)
-
-	-- Don't know how to deal with pattern-bound existentials yet
-	; checkTc (null ex_tvs) (existentialExplode pat)
-
-	; return (pat', res) }
+tcLetPat sig_fn is_mono pat pat_ty thing_inside
+  = tc_lpat pat pat_ty penv thing_inside 
+  where
+    penv = PE { pe_res_tvs = emptyVarSet, pe_lazy = True
+              , pe_ctxt = LetPat sig_fn is_mono }
 
 -----------------
 tcPats :: HsMatchContext Name
        -> [LPat Name]		 -- Patterns,
-       -> [BoxySigmaType]	 --   and their types
-       -> BoxyRhoType 		 -- Result type,
-       -> (BoxyRhoType -> TcM a) --   and the checker for the body
+       -> [TcSigmaType]	         --   and their types
+       -> TcRhoType 		 -- Result type,
+       -> TcM a                  --   and the checker for the body
        -> TcM ([LPat TcId], a)
 
 -- This is the externally-callable wrapper function
@@ -87,85 +81,115 @@ tcPats :: HsMatchContext Name
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats tys res_ty thing_inside
-  = tc_lam_pats (APat ctxt) (zipEqual "tcLamPats" pats tys)
-	        res_ty thing_inside
+tcPats ctxt pats pat_tys res_ty thing_inside
+  = tc_lpats penv pats pat_tys thing_inside
+  where
+    penv = PE { pe_res_tvs = tyVarsOfTypes (res_ty : pat_tys)
+              , pe_lazy = False
+              , pe_ctxt = LamPat ctxt }
 
 tcPat :: HsMatchContext Name
-      -> LPat Name -> BoxySigmaType 
-      -> BoxyRhoType             -- Result type
-      -> (BoxyRhoType -> TcM a)  -- Checker for body, given
-                                 -- its result type
+      -> LPat Name -> TcSigmaType 
+      -> TcRhoType             -- Result type
+      -> TcM a                 -- Checker for body, given
+                               -- its result type
       -> TcM (LPat TcId, a)
-tcPat ctxt = tc_lam_pat (APat ctxt)
-
-tc_lam_pat :: PatCtxt -> LPat Name -> BoxySigmaType -> BoxyRhoType
-           -> (BoxyRhoType -> TcM a) -> TcM (LPat TcId, a)
-tc_lam_pat ctxt pat pat_ty res_ty thing_inside
-  = do	{ ([pat'],thing) <- tc_lam_pats ctxt [(pat, pat_ty)] res_ty thing_inside
-	; return (pat', thing) }
-
------------------
-tc_lam_pats :: PatCtxt
-	    -> [(LPat Name,BoxySigmaType)]
-       	    -> BoxyRhoType            -- Result type
-       	    -> (BoxyRhoType -> TcM a) -- Checker for body, given its result type
-       	    -> TcM ([LPat TcId], a)
-tc_lam_pats ctxt pat_ty_prs res_ty thing_inside 
-  =  do	{ let init_state = PS { pat_ctxt = ctxt, pat_eqs = False }
-
-	; (pats', ex_tvs, res) <- do { traceTc (text "tc_lam_pats" <+> (ppr pat_ty_prs $$ ppr res_ty)) 
-				  ; tcMultiple tc_lpat_pr pat_ty_prs init_state $ \ pstate' ->
-				    if (pat_eqs pstate' && (not $ isRigidTy res_ty))
-				     then nonRigidResult ctxt res_ty
-	     			     else thing_inside res_ty }
-
-	; let tys = map snd pat_ty_prs
-	; tcCheckExistentialPat pats' ex_tvs tys res_ty
-
-	; return (pats', res) }
-
+tcPat ctxt pat pat_ty res_ty thing_inside
+  = tc_lpat pat pat_ty penv thing_inside
+  where
+    penv = PE { pe_res_tvs = tyVarsOfTypes [res_ty, pat_ty]
+              , pe_lazy = False
+              , pe_ctxt = LamPat ctxt }
+   
 
 -----------------
-tcCheckExistentialPat :: [LPat TcId]		-- Patterns (just for error message)
-		      -> [TcTyVar]		-- Existentially quantified tyvars bound by pattern
-		      -> [BoxySigmaType]	-- Types of the patterns
-		      -> BoxyRhoType		-- Type of the body of the match
-		      				-- Tyvars in either of these must not escape
-		      -> TcM ()
--- NB: we *must* pass "pats_tys" not just "body_ty" to tcCheckExistentialPat
--- For example, we must reject this program:
---	data C = forall a. C (a -> Int) 
--- 	f (C g) x = g x
--- Here, result_ty will be simply Int, but expected_ty is (C -> a -> Int).
+data PatEnv
+  = PE { pe_res_tvs :: TcTyVarSet	
+	           -- For existential escape check; see Note [Existential check]
+	      	   -- Nothing <=> inside a "~"
+		   -- Just tvs <=> unification tvs free in the result
+		   -- 	           (which should be made untouchable in
+		   --		    any existentials we encounter in the pattern)
 
-tcCheckExistentialPat _ [] _ _
-  = return ()	-- Short cut for case when there are no existentials
+       , pe_lazy :: Bool	-- True <=> lazy context, so no existentials allowed
+       , pe_ctxt :: PatCtxt   	-- Context in which the whole pattern appears
+    }
 
-tcCheckExistentialPat pats ex_tvs pat_tys body_ty
-  = addErrCtxtM (sigPatCtxt pats ex_tvs pat_tys body_ty)	$
-    checkSigTyVarsWrt (tcTyVarsOfTypes (body_ty:pat_tys)) ex_tvs
+data PatCtxt
+  = LamPat   -- Used for lambdas, case etc
+       (HsMatchContext Name) 
 
-data PatState = PS {
-	pat_ctxt :: PatCtxt,
-	pat_eqs  :: Bool        -- <=> there are any equational constraints 
-				-- Used at the end to say whether the result
-				-- type must be rigid
-  }
+  | LetPat   -- Used only for let(rec) bindings
+    	     -- See Note [Let binders]
+       TcSigFun   -- Tells type sig if any
+       Bool  	  -- True <=> no generalisation of this let
+       					
+makeLazy :: PatEnv -> PatEnv
+makeLazy penv = penv { pe_lazy = True }
 
-data PatCtxt 
-  = APat (HsMatchContext Name)
-  | LetPat (Name -> Maybe TcRhoType)	-- Used for let(rec) bindings
+patSigCtxt :: PatEnv -> UserTypeCtxt
+patSigCtxt (PE { pe_ctxt = LetPat {} }) = BindPatSigCtxt
+patSigCtxt (PE { pe_ctxt = LamPat {} }) = LamPatSigCtxt
 
-notProcPat :: PatCtxt -> Bool
-notProcPat (APat ProcExpr) = False
-notProcPat _	  	   = True
+---------------
+type TcSigFun = Name -> Maybe TcSigInfo
 
-patSigCtxt :: PatState -> UserTypeCtxt
-patSigCtxt (PS { pat_ctxt = LetPat _ }) = BindPatSigCtxt
-patSigCtxt _                            = LamPatSigCtxt
+data TcSigInfo
+  = TcSigInfo {
+        sig_id     :: TcId,         --  *Polymorphic* binder for this value...
+
+        sig_scoped :: [Name],	    -- Scoped type variables
+		-- 1-1 correspondence with a prefix of sig_tvs
+		-- However, may be fewer than sig_tvs; 
+		-- see Note [More instantiated than scoped]
+        sig_tvs    :: [TcTyVar],    -- Instantiated type variables
+                                    -- See Note [Instantiate sig]
+
+        sig_theta  :: TcThetaType,  -- Instantiated theta
+
+        sig_tau    :: TcSigmaType,  -- Instantiated tau
+		      		    -- See Note [sig_tau may be polymorphic]
+
+        sig_loc    :: SrcSpan       -- The location of the signature
+    }
+
+instance Outputable TcSigInfo where
+    ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
+        = ppr id <+> ptext (sLit "::") <+> ppr tyvars <+> pprThetaArrow theta <+> ppr tau
 \end{code}
 
+Note [sig_tau may be polymorphic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note that "sig_tau" might actually be a polymorphic type,
+if the original function had a signature like
+   forall a. Eq a => forall b. Ord b => ....
+But that's ok: tcMatchesFun (called by tcRhs) can deal with that
+It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
+
+Note [Let binders]
+~~~~~~~~~~~~~~~~~~
+eg   x :: Int
+     y :: Bool
+     (x,y) = e
+
+...more notes to add here..
+
+
+Note [Existential check]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Lazy patterns can't bind existentials.  They arise in two ways:
+  * Let bindings      let { C a b = e } in b
+  * Twiddle patterns  f ~(C a b) = e
+The pe_res_tvs field of PatEnv says whether we are inside a lazy
+pattern (perhaps deeply)
+
+If we aren't inside a lazy pattern then we can bind existentials,
+but we need to be careful about "extra" tyvars. Consider
+    (\C x -> d) : pat_ty -> res_ty
+When looking for existential escape we must check that the existential
+bound by C don't unify with the free variables of pat_ty, OR res_ty
+(or of course the environment).   Hence we need to keep track of the 
+res_ty free vars.
 
 
 %************************************************************************
@@ -175,73 +199,78 @@ patSigCtxt _                            = LamPatSigCtxt
 %************************************************************************
 
 \begin{code}
-tcPatBndr :: PatState -> Name -> BoxySigmaType -> TcM TcId
-tcPatBndr (PS { pat_ctxt = LetPat lookup_sig }) bndr_name pat_ty
-  | Just mono_ty <- lookup_sig bndr_name
-  = do	{ mono_name <- newLocalName bndr_name
-	; _ <- boxyUnify mono_ty pat_ty
-	; return (Id.mkLocalId mono_name mono_ty) }
-
+tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (CoercionI, TcId)
+-- (coi, xp) = tcPatBndr penv x pat_ty
+-- Then coi : pat_ty ~ typeof(xp)
+--
+tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
+  | Just sig <- lookup_sig bndr_name
+  = do { bndr_id <- if no_gen then return (sig_id sig)
+                    else do { mono_name <- newLocalName bndr_name
+                            ; return (Id.mkLocalId mono_name (sig_tau sig)) }
+       ; coi <- unifyPatType (idType bndr_id) pat_ty
+       ; return (coi, bndr_id) }
+      
   | otherwise
-  = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
-	; mono_name <- newLocalName bndr_name
-	; return (Id.mkLocalId mono_name pat_ty') }
+  = do { bndr_id <- newLetBndr no_gen bndr_name pat_ty
+       ; return (IdCo pat_ty, bndr_id) }
 
-tcPatBndr (PS { pat_ctxt = _lam_or_proc }) bndr_name pat_ty
-  = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
-		-- We have an undecorated binder, so we do rule ABS1,
-		-- by unboxing the boxy type, forcing any un-filled-in
-		-- boxes to become monotypes
-		-- NB that pat_ty' can still be a polytype:
-		-- 	data T = MkT (forall a. a->a)
-		-- 	f t = case t of { MkT g -> ... }
-		-- Here, the 'g' must get type (forall a. a->a) from the
-		-- MkT context
-	; return (Id.mkLocalId bndr_name pat_ty') }
+tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
+  = do { bndr <- mkLocalBinder bndr_name pat_ty
+       ; return (IdCo pat_ty, bndr) }
 
+newLetBndr :: Bool -> Name -> TcType -> TcM TcId
+-- In the polymorphic case (no_gen = False), generate a "monomorphic version" 
+--    of the Id; the original name will be bound to the polymorphic version
+--    by the AbsBinds
+-- In the monomorphic case there is no AbsBinds, and we use the original
+--    name directly
+newLetBndr no_gen name ty
+  | no_gen    = mkLocalBinder name ty
+  | otherwise = do { mono_name <- newLocalName name
+                   ; mkLocalBinder mono_name ty }
+
+-----------------
+mkLocalBinder :: Name -> TcType -> TcM TcId
+mkLocalBinder name ty
+  = do { checkUnboxedTuple ty $ 
+            ptext (sLit "The variable") <+> quotes (ppr name)
+       ; return (Id.mkLocalId name ty) }
+
+checkUnboxedTuple :: TcType -> SDoc -> TcM ()
+-- Check for an unboxed tuple type
+--      f = (# True, False #)
+-- Zonk first just in case it's hidden inside a meta type variable
+-- (This shows up as a (more obscure) kind error 
+--  in the 'otherwise' case of tcMonoBinds.)
+checkUnboxedTuple ty what
+  = do { zonked_ty <- zonkTcTypeCarefully ty
+       ; checkTc (not (isUnboxedTupleType zonked_ty))
+                 (unboxedTupleErr what zonked_ty) }
 
 -------------------
-bindInstsOfPatId :: TcId -> TcM a -> TcM (a, LHsBinds TcId)
+{- Only needed if we re-add Method constraints 
+bindInstsOfPatId :: TcId -> TcM a -> TcM (a, TcEvBinds)
 bindInstsOfPatId id thing_inside
   | not (isOverloadedTy (idType id))
-  = do { res <- thing_inside; return (res, emptyLHsBinds) }
+  = do { res <- thing_inside; return (res, emptyTcEvBinds) }
   | otherwise
-  = do	{ (res, lie) <- getLIE thing_inside
-	; binds <- bindInstsOfLocalFuns lie [id]
+  = do	{ (res, lie) <- getConstraints thing_inside
+	; binds <- bindLocalMethods lie [id]
 	; return (res, binds) }
-
--------------------
-unBoxPatBndrType :: BoxyType -> Name -> TcM TcType
-unBoxPatBndrType  ty name = unBoxArgType ty (ptext (sLit "The variable") <+> quotes (ppr name))
-
-unBoxWildCardType :: BoxyType -> TcM TcType
-unBoxWildCardType ty      = unBoxArgType ty (ptext (sLit "A wild-card pattern"))
-
-unBoxViewPatType :: BoxyType -> Pat Name -> TcM TcType
-unBoxViewPatType  ty pat  = unBoxArgType ty (ptext (sLit "The view pattern") <+> ppr pat)
-
-unBoxArgType :: BoxyType -> SDoc -> TcM TcType
--- In addition to calling unbox, unBoxArgType ensures that the type is of ArgTypeKind; 
--- that is, it can't be an unboxed tuple.  For example, 
---	case (f x) of r -> ...
--- should fail if 'f' returns an unboxed tuple.
-unBoxArgType ty pp_this
-  = do	{ ty' <- unBox ty	-- Returns a zonked type
-
-	-- Neither conditional is strictly necesssary (the unify alone will do)
-	-- but they improve error messages, and allocate fewer tyvars
-	; if isUnboxedTupleType ty' then
-		failWithTc msg
-	  else if isSubArgTypeKind (typeKind ty') then
-		return ty'
-	  else do 	-- OpenTypeKind, so constrain it
-	{ ty2 <- newFlexiTyVarTy argTypeKind
-	; _ <- unifyType ty' ty2
-	; return ty' }}
-  where
-    msg = pp_this <+> ptext (sLit "cannot be bound to an unboxed tuple")
+-}
 \end{code}
 
+Note [Polymorphism and pattern bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When is_mono holds we are not generalising
+But the signature can still be polymoprhic!
+     data T = MkT (forall a. a->a)
+     x :: forall a. a->a
+     MkT x = <rhs>
+So the no_gen flag decides whether the pattern-bound variables should
+have exactly the type in the type signature (when not generalising) or
+the instantiated version (when generalising)
 
 %************************************************************************
 %*									*
@@ -258,135 +287,119 @@ pattern.
 
 This does not work so well for the ErrCtxt carried by the monad: we don't
 want the error-context for the pattern to scope over the RHS. 
-Hence the getErrCtxt/setErrCtxt stuff in tc_lpats.
+Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
 
 \begin{code}
 --------------------
 type Checker inp out =  forall r.
 			  inp
-		       -> PatState
-		       -> (PatState -> TcM r)
-		       -> TcM (out, [TcTyVar], r)
+		       -> PatEnv
+		       -> TcM r
+		       -> TcM (out, r)
 
 tcMultiple :: Checker inp out -> Checker [inp] [out]
-tcMultiple tc_pat args pstate thing_inside
+tcMultiple tc_pat args penv thing_inside
   = do	{ err_ctxt <- getErrCtxt
-	; let loop pstate []
-		= do { res <- thing_inside pstate
-		     ; return ([], [], res) }
+	; let loop _ []
+		= do { res <- thing_inside
+		     ; return ([], res) }
 
-	      loop pstate (arg:args)
-		= do { (p', p_tvs, (ps', ps_tvs, res)) 
-				<- tc_pat arg pstate $ \ pstate' ->
+	      loop penv (arg:args)
+		= do { (p', (ps', res)) 
+				<- tc_pat arg penv $ 
 				   setErrCtxt err_ctxt $
-				   loop pstate' args
+				   loop penv args
 		-- setErrCtxt: restore context before doing the next pattern
 		-- See note [Nesting] above
 				
-		     ; return (p':ps', p_tvs ++ ps_tvs, res) }
+		     ; return (p':ps', res) }
 
-	; loop pstate args }
+	; loop penv args }
 
 --------------------
-tc_lpat_pr :: (LPat Name, BoxySigmaType)
-	   -> PatState
-	   -> (PatState -> TcM a)
-	   -> TcM (LPat TcId, [TcTyVar], a)
-tc_lpat_pr (pat, ty) = tc_lpat pat ty
-
 tc_lpat :: LPat Name 
-	-> BoxySigmaType
-	-> PatState
-	-> (PatState -> TcM a)
-	-> TcM (LPat TcId, [TcTyVar], a)
-tc_lpat (L span pat) pat_ty pstate thing_inside
+	-> TcSigmaType
+	-> PatEnv
+	-> TcM a
+	-> TcM (LPat TcId, a)
+tc_lpat (L span pat) pat_ty penv thing_inside
   = setSrcSpan span		  $
     maybeAddErrCtxt (patCtxt pat) $
-    do	{ (pat', tvs, res) <- tc_pat pstate pat pat_ty thing_inside
-	; return (L span pat', tvs, res) }
+    do	{ (pat', res) <- tc_pat penv pat pat_ty thing_inside
+	; return (L span pat', res) }
+
+tc_lpats :: PatEnv
+	 -> [LPat Name] -> [TcSigmaType]
+       	 -> TcM a	
+       	 -> TcM ([LPat TcId], a)
+tc_lpats penv pats tys thing_inside 
+  =  tcMultiple (\(p,t) -> tc_lpat p t) 
+                (zipEqual "tc_lpats" pats tys)
+                penv thing_inside 
 
 --------------------
-tc_pat	:: PatState
+tc_pat	:: PatEnv
         -> Pat Name 
-        -> BoxySigmaType	-- Fully refined result type
-        -> (PatState -> TcM a)	-- Thing inside
+        -> TcSigmaType	-- Fully refined result type
+        -> TcM a		-- Thing inside
         -> TcM (Pat TcId, 	-- Translated pattern
-                [TcTyVar], 	-- Existential binders
                 a)		-- Result of thing inside
 
-tc_pat pstate (VarPat name) pat_ty thing_inside
-  = do	{ id <- tcPatBndr pstate name pat_ty
+tc_pat penv (VarPat name) pat_ty thing_inside
+  = do	{ (coi, id) <- tcPatBndr penv name pat_ty
+    	; res <- tcExtendIdEnv1 name id thing_inside
+        ; return (mkHsWrapPatCoI coi (VarPat id) pat_ty, res) }
+
+{- Need this if we re-add Method constraints 
 	; (res, binds) <- bindInstsOfPatId id $
 			  tcExtendIdEnv1 name id $
 			  (traceTc (text "binding" <+> ppr name <+> ppr (idType id))
-			   >> thing_inside pstate)
-	; let pat' | isEmptyLHsBinds binds = VarPat id
-		   | otherwise		   = VarPatOut id binds
-	; return (pat', [], res) }
+			   >> thing_inside)
+	; let pat' | isEmptyTcEvBinds binds = VarPat id
+		   | otherwise		    = VarPatOut id binds
+	; return (mkHsWrapPatCoI coi pat' pat_ty, res) }
+-}
 
-tc_pat pstate (ParPat pat) pat_ty thing_inside
-  = do	{ (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
-	; return (ParPat pat', tvs, res) }
+tc_pat penv (ParPat pat) pat_ty thing_inside
+  = do	{ (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+	; return (ParPat pat', res) }
 
-tc_pat pstate (BangPat pat) pat_ty thing_inside
-  = do	{ (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
-	; return (BangPat pat', tvs, res) }
+tc_pat penv (BangPat pat) pat_ty thing_inside
+  = do	{ (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+	; return (BangPat pat', res) }
 
--- There's a wrinkle with irrefutable patterns, namely that we
--- must not propagate type refinement from them.  For example
---	data T a where { T1 :: Int -> T Int; ... }
---	f :: T a -> Int -> a
---	f ~(T1 i) y = y
--- It's obviously not sound to refine a to Int in the right
--- hand side, because the arugment might not match T1 at all!
---
--- Nor should a lazy pattern bind any existential type variables
--- because they won't be in scope when we do the desugaring
---
--- Note [Hopping the LIE in lazy patterns]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- In a lazy pattern, we must *not* discharge constraints from the RHS
--- from dictionaries bound in the pattern.  E.g.
---	f ~(C x) = 3
--- We can't discharge the Num constraint from dictionaries bound by
--- the pattern C!  
---
--- So we have to make the constraints from thing_inside "hop around" 
--- the pattern.  Hence the getLLE and extendLIEs later.
+tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
+  = do	{ (pat', (res, pat_ct)) 
+		<- tc_lpat pat pat_ty (makeLazy penv) $ 
+		   getConstraints thing_inside
+		-- Ignore refined penv', revert to penv
 
-tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
-  = do	{ (pat', pat_tvs, (res,lie)) 
-		<- tc_lpat pat pat_ty pstate $ \ _ ->
-		   getLIE (thing_inside pstate)
-		-- Ignore refined pstate', revert to pstate
-	; extendLIEs lie
-	-- getLIE/extendLIEs: see Note [Hopping the LIE in lazy patterns]
-
-	-- Check no existentials
-	; unless (null pat_tvs) $ lazyPatErr lpat pat_tvs
+	; emitConstraints pat_ct
+	-- getConstraints/extendConstraintss: see Note [Hopping the LIE in lazy patterns]
 
 	-- Check there are no unlifted types under the lazy pattern
 	; when (any (isUnLiftedType . idType) $ collectPatBinders pat') $
                lazyUnliftedPatErr lpat
 
-	-- Check that the pattern has a lifted type
-	; pat_tv <- newBoxyTyVar liftedTypeKind
-	; _ <- boxyUnify pat_ty (mkTyVarTy pat_tv)
+	-- Check that the expected pattern type is itself lifted
+	; pat_ty' <- newFlexiTyVarTy liftedTypeKind
+	; _ <- unifyType pat_ty pat_ty'
 
-	; return (LazyPat pat', [], res) }
+	; return (LazyPat pat', res) }
 
 tc_pat _ p@(QuasiQuotePat _) _ _
   = pprPanic "Should never see QuasiQuotePat in type checker" (ppr p)
 
-tc_pat pstate (WildPat _) pat_ty thing_inside
-  = do	{ pat_ty' <- unBoxWildCardType pat_ty	-- Make sure it's filled in with monotypes
-	; res <- thing_inside pstate
-	; return (WildPat pat_ty', [], res) }
+tc_pat _ (WildPat _) pat_ty thing_inside
+  = do	{ checkUnboxedTuple pat_ty $
+               ptext (sLit "A wild-card pattern")
+        ; res <- thing_inside 
+	; return (WildPat pat_ty, res) }
 
-tc_pat pstate (AsPat (L nm_loc name) pat) pat_ty thing_inside
-  = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr pstate name pat_ty)
-	; (pat', tvs, res) <- tcExtendIdEnv1 name bndr_id $
-			      tc_lpat pat (idType bndr_id) pstate thing_inside
+tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
+  = do	{ (coi, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
+	; (pat', res) <- tcExtendIdEnv1 name bndr_id $
+			 tc_lpat pat (idType bndr_id) penv thing_inside
 	    -- NB: if we do inference on:
 	    --		\ (y@(x::forall a. a->a)) = e
 	    -- we'll fail.  The as-pattern infers a monotype for 'y', which then
@@ -394,79 +407,65 @@ tc_pat pstate (AsPat (L nm_loc name) pat) pat_ty thing_inside
 	    -- perhaps be fixed, but only with a bit more work.
 	    --
 	    -- If you fix it, don't forget the bindInstsOfPatIds!
-	; return (AsPat (L nm_loc bndr_id) pat', tvs, res) }
+	; return (mkHsWrapPatCoI coi (AsPat (L nm_loc bndr_id) pat') pat_ty, res) }
 
-tc_pat pstate (orig@(ViewPat expr pat _)) overall_pat_ty thing_inside 
-  = do	{ -- morally, expr must have type
-         -- `forall a1...aN. OPT' -> B` 
+tc_pat penv vpat@(ViewPat expr pat _) overall_pat_ty thing_inside 
+  = do	{ checkUnboxedTuple overall_pat_ty $
+               ptext (sLit "The view pattern") <+> ppr vpat
+
+	 -- Morally, expr must have type `forall a1...aN. OPT' -> B` 
          -- where overall_pat_ty is an instance of OPT'.
          -- Here, we infer a rho type for it,
          -- which replaces the leading foralls and constraints
          -- with fresh unification variables.
-         (expr',expr'_inferred) <- tcInferRho expr
+        ; (expr',expr'_inferred) <- tcInferRho expr
+
          -- next, we check that expr is coercible to `overall_pat_ty -> pat_ty`
-       ; let expr'_expected = \ pat_ty -> (mkFunTy overall_pat_ty pat_ty)
-         -- tcSubExp: expected first, offered second
-         -- returns coercion
-         -- 
          -- NOTE: this forces pat_ty to be a monotype (because we use a unification 
          -- variable to find it).  this means that in an example like
          -- (view -> f)    where view :: _ -> forall b. b
          -- we will only be able to use view at one instantation in the
          -- rest of the view
-	; (expr_coerc, pat_ty) <- tcInfer $ \ pat_ty -> 
-		tcSubExp ViewPatOrigin (expr'_expected pat_ty) expr'_inferred
+	; (expr_coi, pat_ty) <- tcInfer $ \ pat_ty -> 
+		unifyPatType expr'_inferred (mkFunTy overall_pat_ty pat_ty)
 
          -- pattern must have pat_ty
-       ; (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
-         -- this should get zonked later on, but we unBox it here
-         -- so that we do the same checks as above
-	; annotation_ty <- unBoxViewPatType overall_pat_ty orig        
-	; return (ViewPat (mkLHsWrap expr_coerc expr') pat' annotation_ty, tvs, res) }
+        ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+
+	; return (ViewPat (mkLHsWrapCoI expr_coi expr') pat' overall_pat_ty, res) }
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
-tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
-  = do	{ (inner_ty, tv_binds, coi) <- tcPatSig (patSigCtxt pstate) sig_ty 
-                                                                    pat_ty
-        ; unless (isIdentityCoI coi) $ 
-            failWithTc (badSigPat pat_ty)
-	; (pat', tvs, res) <- tcExtendTyVarEnv2 tv_binds $
-			      tc_lpat pat inner_ty pstate thing_inside
-        ; return (SigPatOut pat' inner_ty, tvs, res) }
+tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
+  = do	{ (inner_ty, tv_binds, wrap) <- tcPatSig (patSigCtxt penv) sig_ty pat_ty
+	; (pat', res) <- tcExtendTyVarEnv2 tv_binds $
+			 tc_lpat pat inner_ty penv thing_inside
 
--- Use this when we add pattern coercions back in
---	  return (mkCoPatCoI (mkSymCoI coi) (SigPatOut pat' inner_ty) pat_ty
---                 , tvs, res) }
+        ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }
 
 tc_pat _ pat@(TypePat _) _ _
   = failWithTc (badTypePat pat)
 
 ------------------------
 -- Lists, tuples, arrays
-tc_pat pstate (ListPat pats _) pat_ty thing_inside
-  = do	{ (elt_ty, coi) <- boxySplitListTy pat_ty
-        ; let scoi = mkSymCoI coi
-	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
-					 	pats pstate thing_inside
- 	; return (mkCoPatCoI scoi (ListPat pats' elt_ty) pat_ty, pats_tvs, res) 
+tc_pat penv (ListPat pats _) pat_ty thing_inside
+  = do	{ (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy pat_ty
+        ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
+				     pats penv thing_inside
+ 	; return (mkHsWrapPat coi (ListPat pats' elt_ty) pat_ty, res) 
         }
 
-tc_pat pstate (PArrPat pats _) pat_ty thing_inside
-  = do	{ (elt_ty, coi) <- boxySplitPArrTy pat_ty
-        ; let scoi = mkSymCoI coi
-	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
-						pats pstate thing_inside 
-	; when (null pats) (zapToMonotype pat_ty >> return ())  -- c.f. ExplicitPArr in TcExpr
-	; return (mkCoPatCoI scoi (PArrPat pats' elt_ty) pat_ty, pats_tvs, res)
+tc_pat penv (PArrPat pats _) pat_ty thing_inside
+  = do	{ (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTy pat_ty
+	; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
+				     pats penv thing_inside 
+	; return (mkHsWrapPat coi (PArrPat pats' elt_ty) pat_ty, res)
         }
 
-tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
+tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
   = do	{ let tc = tupleTyCon boxity (length pats)
-        ; (arg_tys, coi) <- boxySplitTyConApp tc pat_ty
-        ; let scoi = mkSymCoI coi
-	; (pats', pats_tvs, res) <- tcMultiple tc_lpat_pr (pats `zip` arg_tys)
-					       pstate thing_inside
+        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
+	; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
 	-- Under flag control turn a pattern (x,y,z) into ~(x,y,z)
 	-- so that we can experiment with lazy tuple-matching.
@@ -481,34 +480,29 @@ tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
 	        | otherwise		    = unmangled_result
 
  	; ASSERT( length arg_tys == length pats )      -- Syntactically enforced
-	  return (mkCoPatCoI scoi possibly_mangled_result pat_ty, pats_tvs, res)
+	  return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 
 ------------------------
 -- Data constructors
-tc_pat pstate (ConPatIn (L con_span con_name) arg_pats) pat_ty thing_inside
-  = do	{ data_con <- tcLookupDataCon con_name
-	; let tycon = dataConTyCon data_con
-	; tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside }
+tc_pat penv (ConPatIn con arg_pats) pat_ty thing_inside
+  = tcConPat penv con pat_ty arg_pats thing_inside
 
 ------------------------
 -- Literal patterns
-tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
+tc_pat _ (LitPat simple_lit) pat_ty thing_inside
   = do	{ let lit_ty = hsLitType simple_lit
-	; coi <- boxyUnify lit_ty pat_ty
-			-- coi is of kind: lit_ty ~ pat_ty
-	; res <- thing_inside pstate
-			-- pattern coercions have to
-			-- be of kind: pat_ty ~ lit_ty
-			-- hence, sym coi
-	; return (mkCoPatCoI (mkSymCoI coi) (LitPat simple_lit) pat_ty, 
-                   [], res) }
+	; coi <- unifyPatType lit_ty pat_ty
+		-- coi is of kind: pat_ty ~ lit_ty
+	; res <- thing_inside 
+	; return ( mkHsWrapPatCoI coi (LitPat simple_lit) pat_ty 
+                 , res) }
 
 ------------------------
 -- Overloaded patterns: n, and n+k
-tc_pat pstate (NPat over_lit mb_neg eq) pat_ty thing_inside
+tc_pat _ (NPat over_lit mb_neg eq) pat_ty thing_inside
   = do	{ let orig = LiteralOrigin over_lit
-	; lit'    <- tcOverloadedLit orig over_lit pat_ty
+	; lit'    <- newOverloadedLit orig over_lit pat_ty
 	; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
 	; mb_neg' <- case mb_neg of
 			Nothing  -> return Nothing	-- Positive literal
@@ -516,29 +510,62 @@ tc_pat pstate (NPat over_lit mb_neg eq) pat_ty thing_inside
 					-- The 'negate' is re-mappable syntax
  			    do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
 			       ; return (Just neg') }
-	; res <- thing_inside pstate
-	; return (NPat lit' mb_neg' eq', [], res) }
+	; res <- thing_inside 
+	; return (NPat lit' mb_neg' eq', res) }
 
-tc_pat pstate (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
-  = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr pstate name pat_ty)
+tc_pat penv (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
+  = do	{ (coi, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
  	; let pat_ty' = idType bndr_id
 	      orig    = LiteralOrigin lit
-	; lit' <- tcOverloadedLit orig lit pat_ty'
+	; lit' <- newOverloadedLit orig lit pat_ty'
 
 	-- The '>=' and '-' parts are re-mappable syntax
 	; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
 	; minus' <- tcSyntaxOp orig minus (mkFunTys [pat_ty', pat_ty'] pat_ty')
+        ; let pat' = NPlusKPat (L nm_loc bndr_id) lit' ge' minus'
 
 	-- The Report says that n+k patterns must be in Integral
 	-- We may not want this when using re-mappable syntax, though (ToDo?)
 	; icls <- tcLookupClass integralClassName
 	; instStupidTheta orig [mkClassPred icls [pat_ty']]	
     
-	; res <- tcExtendIdEnv1 name bndr_id (thing_inside pstate)
-	; return (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
+	; res <- tcExtendIdEnv1 name bndr_id thing_inside
+	; return (mkHsWrapPatCoI coi pat' pat_ty, res) }
 
 tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- ConPatOut, SigPatOut, VarPatOut
+
+----------------
+unifyPatType :: TcType -> TcType -> TcM CoercionI
+-- In patterns we want a coercion from the
+-- context type (expected) to the actual pattern type
+-- But we don't want to reverse the args to unifyType because
+-- that controls the actual/expected stuff in error messages
+unifyPatType actual_ty expected_ty
+  = do { coi <- unifyType actual_ty expected_ty
+       ; return (mkSymCoI coi) }
 \end{code}
+
+Note [Hopping the LIE in lazy patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a lazy pattern, we must *not* discharge constraints from the RHS
+from dictionaries bound in the pattern.  E.g.
+	f ~(C x) = 3
+We can't discharge the Num constraint from dictionaries bound by
+the pattern C!  
+
+So we have to make the constraints from thing_inside "hop around" 
+the pattern.  Hence the getConstraints and emitConstraints.
+
+The same thing ensures that equality constraints in a lazy match
+are not made available in the RHS of the match. For example
+	data T a where { T1 :: Int -> T Int; ... }
+	f :: T a -> Int -> a
+	f ~(T1 i) y = y
+It's obviously not sound to refine a to Int in the right
+hand side, because the arugment might not match T1 at all!
+
+Finally, a lazy pattern should not bind any existential type variables
+because they won't be in scope when we do the desugaring
 
 
 %************************************************************************
@@ -606,75 +633,61 @@ to express the local scope of GADT refinements.
 -- MkT :: forall a b c. (a~[b]) => b -> c -> T a
 -- 	 with scrutinee of type (T ty)
 
-tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon 
-	 -> BoxySigmaType	-- Type of the pattern
-	 -> HsConPatDetails Name -> (PatState -> TcM a)
-	 -> TcM (Pat TcId, [TcTyVar], a)
-tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
-  = do	{ let (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _)
+tcConPat :: PatEnv -> Located Name 
+	 -> TcRhoType  	       	-- Type of the pattern
+	 -> HsConPatDetails Name -> TcM a
+	 -> TcM (Pat TcId, a)
+tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
+  = do	{ data_con <- tcLookupDataCon con_name
+	; let tycon = dataConTyCon data_con
+         	  -- For data families this is the representation tycon
+	      (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _)
                 = dataConFullSig data_con
-	      skol_info  = PatSkol data_con
-	      origin     = SigOrigin skol_info
-	      full_theta = eq_theta ++ dict_theta
 
 	  -- Instantiate the constructor type variables [a->ty]
-	  -- This may involve doing a family-instance coercion, and building a
-	  -- wrapper 
-	; (ctxt_res_tys, coi, unwrap_ty) <- boxySplitTyConAppWithFamily tycon 
-                                                                        pat_ty
-        ; let sym_coi = mkSymCoI coi  -- boxy split coercion oriented wrongly
-	      pat_ty' = mkTyConApp tycon ctxt_res_tys
-                                      -- pat_ty' /= pat_ty iff coi /= IdCo
-              
-              wrap_res_pat res_pat = mkCoPatCoI sym_coi uwScrut pat_ty
-                where
-                  uwScrut = unwrapFamInstScrutinee tycon ctxt_res_tys
-                                                   unwrap_ty res_pat
+	  -- This may involve doing a family-instance coercion, 
+	  -- and building a wrapper 
+	; (wrap, ctxt_res_tys) <- matchExpectedPatTy (matchExpectedConTy tycon) pat_ty
 
 	  -- Add the stupid theta
 	; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
+	; checkExistentials ex_tvs penv 
+        ; let skol_info = case pe_ctxt penv of
+                            LamPat mc -> PatSkol data_con mc
+                            LetPat {} -> UnkSkol -- Doesn't matter
 	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	
                      -- Get location from monad, not from ex_tvs
 
-	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
+        ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
+	      -- pat_ty' is type of the actual constructor application
+              -- pat_ty' /= pat_ty iff coi /= IdCo
+              
+	      tenv     = zipTopTvSubst (univ_tvs     ++ ex_tvs)
 				       (ctxt_res_tys ++ mkTyVarTys ex_tvs')
 	      arg_tys' = substTys tenv arg_tys
+	      full_theta = eq_theta ++ dict_theta
 
 	; if null ex_tvs && null eq_spec && null full_theta
 	  then do { -- The common case; no class bindings etc 
                     -- (see Note [Arrows and patterns])
-		    (arg_pats', inner_tvs, res) <- tcConArgs data_con arg_tys' 
-						    arg_pats pstate thing_inside
+		    (arg_pats', res) <- tcConArgs data_con arg_tys' 
+						  arg_pats penv thing_inside
 		  ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
 			            	      pat_tvs = [], pat_dicts = [], 
-                                              pat_binds = emptyLHsBinds,
+                                              pat_binds = emptyTcEvBinds,
 					      pat_args = arg_pats', 
                                               pat_ty = pat_ty' }
 
-		    ; return (wrap_res_pat res_pat, inner_tvs, res) }
+		  ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
-	  else do   -- The general case, with existential, and local equality 
-                    -- constraints
-	{ checkTc (notProcPat (pat_ctxt pstate))
-		  (existentialProcPat data_con)
-		  -- See Note [Arrows and patterns]
-
-          -- Need to test for rigidity if *any* constraints in theta as class
-          -- constraints may have superclass equality constraints.  However,
-          -- we don't want to check for rigidity if we got here only because
-          -- ex_tvs was non-null.
---        ; unless (null theta') $
-          -- FIXME: AT THE MOMENT WE CHEAT!  We only perform the rigidity test
-          --   if we explicitly or implicitly (by a GADT def) have equality 
-          --   constraints.
-        ; let eq_preds = [mkEqPred (mkTyVarTy tv, ty) | (tv, ty) <- eq_spec]
+	  else do   -- The general case, with existential, 
+                    -- and local equality constraints
+	{ let eq_preds = [mkEqPred (mkTyVarTy tv, ty) | (tv, ty) <- eq_spec]
 	      theta'   = substTheta tenv (eq_preds ++ full_theta)
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
 	      no_equalities = not (any isEqPred theta')
-	      pstate' | no_equalities = pstate
-		      | otherwise     = pstate { pat_eqs = True }
 
         ; gadts_on <- doptM Opt_GADTs
 	; checkTc (no_equalities || gadts_on)
@@ -682,107 +695,140 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 		  -- Trac #2905 decided that a *pattern-match* of a GADT
 		  -- should require the GADT language flag
 
-	; unless no_equalities $ checkTc (isRigidTy pat_ty) $
-                                 nonRigidMatch (pat_ctxt pstate) data_con
+	; given <- newEvVars theta'
+        ; let free_tvs = pe_res_tvs penv
+		-- Since we have done checkExistentials,
+		-- pe_res_tvs can only be Just at this point
+		--
+		-- Nor do we need pat_ty, because we've put all the
+		-- unification variables in right at the start when
+		-- initialising the PatEnv; and the pattern itself
+		-- only adds skolems.
 
-	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
-		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
+        ; (ev_binds, (arg_pats', res))
+	     <- checkConstraints skol_info free_tvs ex_tvs' given $
+                tcConArgs data_con arg_tys' arg_pats penv thing_inside
 
-	; loc <- getInstLoc origin
-	; dicts <- newDictBndrs loc theta'
-	; dict_binds <- tcSimplifyCheckPat loc ex_tvs' dicts lie_req
-
-        ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
-			            pat_tvs = ex_tvs',
-			            pat_dicts = map instToVar dicts, 
-			            pat_binds = dict_binds,
-			            pat_args = arg_pats', pat_ty = pat_ty' }
-	; return (wrap_res_pat res_pat, ex_tvs' ++ inner_tvs, res)
+        ; let res_pat = ConPatOut { pat_con   = L con_span data_con, 
+			            pat_tvs   = ex_tvs',
+			            pat_dicts = given,
+			            pat_binds = ev_binds,
+			            pat_args  = arg_pats', 
+                                    pat_ty    = pat_ty' }
+	; return (mkHsWrapPat wrap res_pat pat_ty, res)
 	} }
+
+----------------------------
+matchExpectedPatTy :: (TcRhoType -> TcM (CoercionI, a))
+                    -> TcRhoType -> TcM (HsWrapper, a) 
+-- See Note [Matching polytyped patterns]
+-- Returns a wrapper : pat_ty ~ inner_ty
+matchExpectedPatTy inner_match pat_ty
+  | null tvs && null theta
+  = do { (coi, res) <- inner_match pat_ty
+       ; return (coiToHsWrapper (mkSymCoI coi), res) }
+       	 -- The Sym is because the inner_match returns a coercion
+	 -- that is the other way round to matchExpectedPatTy
+
+  | otherwise
+  = do { (_, tys, subst) <- tcInstTyVars tvs
+       ; wrap1 <- instCall PatOrigin tys (substTheta subst theta)
+       ; (wrap2, arg_tys) <- matchExpectedPatTy inner_match (substTy subst tau)
+       ; return (wrap2 <.> wrap1 , arg_tys) }
   where
-    -- Split against the family tycon if the pattern constructor 
-    -- belongs to a family instance tycon.
-    boxySplitTyConAppWithFamily tycon pat_ty =
-      traceTc traceMsg >>
-      case tyConFamInst_maybe tycon of
-        Nothing                   -> 
-          do { (scrutinee_arg_tys, coi1) <- boxySplitTyConApp tycon pat_ty
-             ; return (scrutinee_arg_tys, coi1, pat_ty)
-             }
-	Just (fam_tycon, instTys) -> 
-	  do { (scrutinee_arg_tys, coi1) <- boxySplitTyConApp fam_tycon pat_ty
-	     ; (_, freshTvs, subst) <- tcInstTyVars (tyConTyVars tycon)
-             ; let instTys' = substTys subst instTys
-	     ; cois <- boxyUnifyList instTys' scrutinee_arg_tys
-             ; let coi = if isIdentityCoI coi1
-                         then  -- pat_ty was splittable
-                               -- => boxyUnifyList had real work to do
-                           mkTyConAppCoI fam_tycon instTys' cois
-                         else  -- pat_ty was not splittable
-                               -- => scrutinee_arg_tys are fresh tvs and
-                               --    boxyUnifyList just instantiated those
-                           coi1
-	     ; return (freshTvs, coi, mkTyConApp fam_tycon instTys')
-                                      -- this is /= pat_ty 
-                                      -- iff cois is non-trivial
-	     }
-      where
-        traceMsg = sep [ text "tcConPat:boxySplitTyConAppWithFamily:" <+>
-		         ppr tycon <+> ppr pat_ty
-		       , text "  family instance:" <+> 
-			 ppr (tyConFamInst_maybe tycon)
-                       ]
+    (tvs, theta, tau) = tcSplitSigmaTy pat_ty
 
-    -- Wraps the pattern (which must be a ConPatOut pattern) in a coercion
-    -- pattern if the tycon is an instance of a family.
-    --
-    unwrapFamInstScrutinee :: TyCon -> [Type] -> Type -> Pat Id -> Pat Id
-    unwrapFamInstScrutinee tycon args unwrap_ty pat
-      | Just co_con <- tyConFamilyCoercion_maybe tycon 
---      , not (isNewTyCon tycon)       -- newtypes are explicitly unwrapped by
-				     -- the desugarer
-          -- NB: We can use CoPat directly, rather than mkCoPat, as we know the
-          --	 coercion is not the identity; mkCoPat is inconvenient as it
-          --	 wants a located pattern.
-      = CoPat (WpCast $ mkTyConApp co_con args)       -- co fam ty to repr ty
-	      (pat {pat_ty = mkTyConApp tycon args})    -- representation type
-	      unwrap_ty					-- family inst type
-      | otherwise
-      = pat
+----------------------------
+matchExpectedConTy :: TyCon  	 -- The TyCon that this data 
+		    		 -- constructor actually returns
+		   -> TcRhoType  -- The type of the pattern
+		   -> TcM (CoercionI, [TcSigmaType])
+-- See Note [Matching constructor patterns]
+-- Returns a coercion : T ty1 ... tyn ~ pat_ty
+-- This is the same way round as matchExpectedListTy etc
+-- but the other way round to matchExpectedPatTy
+matchExpectedConTy data_tc pat_ty
+  | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
+    	 -- Comments refer to Note [Matching constructor patterns]
+     	 -- co_tc :: forall a. T [a] ~ T7 a
+  = do { (_, tys, subst) <- tcInstTyVars (tyConTyVars data_tc)
+       	     -- tys = [ty1,ty2]
 
+       ; coi1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
+       	     -- coi1 : T (ty1,ty2) ~ pat_ty
+
+       ; let coi2 = ACo (mkTyConApp co_tc tys)
+       	     -- coi2 : T (ty1,ty2) ~ T7 ty1 ty2
+
+       ; return (mkTransCoI (mkSymCoI coi2) coi1, tys) }
+
+  | otherwise
+  = matchExpectedTyConApp data_tc pat_ty
+       	     -- coi : T tys ~ pat_ty
+\end{code}
+
+Noate [
+Note [Matching constructor patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
+
+ * In the simple case, pat_ty = tc tys
+
+ * If pat_ty is a polytype, we want to instantiate it
+   This is like part of a subsumption check.  Eg
+      f :: (forall a. [a]) -> blah
+      f [] = blah
+
+ * In a type family case, suppose we have
+          data family T a
+          data instance T (p,q) = A p | B q
+       Then we'll have internally generated
+              data T7 p q = A p | B q
+              axiom coT7 p q :: T (p,q) ~ T7 p q
+ 
+       So if pat_ty = T (ty1,ty2), we return (coi, [ty1,ty2]) such that
+           coi = coi2 . coi1 : T7 t ~ pat_ty
+           coi1 : T (ty1,ty2) ~ pat_ty
+           coi2 : T7 ty1 ty2 ~ T (ty1,ty2)
+
+   For families we do all this matching here, not in the unifier,
+   because we never want a whisper of the data_tycon to appear in
+   error messages; it's a purely internal thing
+
+\begin{code}
 tcConArgs :: DataCon -> [TcSigmaType]
 	  -> Checker (HsConPatDetails Name) (HsConPatDetails Id)
 
-tcConArgs data_con arg_tys (PrefixCon arg_pats) pstate thing_inside
+tcConArgs data_con arg_tys (PrefixCon arg_pats) penv thing_inside
   = do	{ checkTc (con_arity == no_of_args)	-- Check correct arity
 		  (arityErr "Constructor" data_con con_arity no_of_args)
 	; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
-	; (arg_pats', tvs, res) <- tcMultiple tcConArg pats_w_tys
-					      pstate thing_inside 
-	; return (PrefixCon arg_pats', tvs, res) }
+	; (arg_pats', res) <- tcMultiple tcConArg pats_w_tys
+					      penv thing_inside 
+	; return (PrefixCon arg_pats', res) }
   where
     con_arity  = dataConSourceArity data_con
     no_of_args = length arg_pats
 
-tcConArgs data_con arg_tys (InfixCon p1 p2) pstate thing_inside
+tcConArgs data_con arg_tys (InfixCon p1 p2) penv thing_inside
   = do	{ checkTc (con_arity == 2)	-- Check correct arity
 	 	  (arityErr "Constructor" data_con con_arity 2)
 	; let [arg_ty1,arg_ty2] = arg_tys	-- This can't fail after the arity check
-	; ([p1',p2'], tvs, res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
-					      pstate thing_inside
-	; return (InfixCon p1' p2', tvs, res) }
+	; ([p1',p2'], res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
+					      penv thing_inside
+	; return (InfixCon p1' p2', res) }
   where
     con_arity  = dataConSourceArity data_con
 
-tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) pstate thing_inside
-  = do	{ (rpats', tvs, res) <- tcMultiple tc_field rpats pstate thing_inside
-	; return (RecCon (HsRecFields rpats' dd), tvs, res) }
+tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
+  = do	{ (rpats', res) <- tcMultiple tc_field rpats penv thing_inside
+	; return (RecCon (HsRecFields rpats' dd), res) }
   where
     tc_field :: Checker (HsRecField FieldLabel (LPat Name)) (HsRecField TcId (LPat TcId))
-    tc_field (HsRecField field_lbl pat pun) pstate thing_inside
+    tc_field (HsRecField field_lbl pat pun) penv thing_inside
       = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
-	   ; (pat', tvs, res) <- tcConArg (pat, pat_ty) pstate thing_inside
-	   ; return (HsRecField sel_id pat' pun, tvs, res) }
+	   ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
+	   ; return (HsRecField sel_id pat' pun, res) }
 
     find_field_ty :: FieldLabel -> TcM (Id, TcType)
     find_field_ty field_lbl
@@ -812,9 +858,9 @@ tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) pstate thing_inside
 	-- dataConFieldLabels will be empty (and each field in the pattern
 	-- will generate an error below).
 
-tcConArg :: Checker (LPat Name, BoxySigmaType) (LPat Id)
-tcConArg (arg_pat, arg_ty) pstate thing_inside
-  = tc_lpat arg_pat arg_ty pstate thing_inside
+tcConArg :: Checker (LPat Name, TcSigmaType) (LPat Id)
+tcConArg (arg_pat, arg_ty) penv thing_inside
+  = tc_lpat arg_pat arg_ty penv thing_inside
 \end{code}
 
 \begin{code}
@@ -837,8 +883,8 @@ addDataConStupidTheta data_con inst_tys
 
 Note [Arrows and patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-(Oct 07) Arrow noation has the odd property that it involves "holes in the scope". 
-For example:
+(Oct 07) Arrow noation has the odd property that it involves 
+"holes in the scope". For example:
   expr :: Arrow a => a () Int
   expr = proc (y,z) -> do
           x <- term -< y
@@ -858,57 +904,6 @@ simplification for such vanilla patterns so that it binds no
 constraints. Hence the 'fast path' in tcConPat; but it's also a good
 plan for ordinary vanilla patterns to bypass the constraint
 simplification step.
-
-
-%************************************************************************
-%*									*
-		Overloaded literals
-%*									*
-%************************************************************************
-
-In tcOverloadedLit we convert directly to an Int or Integer if we
-know that's what we want.  This may save some time, by not
-temporarily generating overloaded literals, but it won't catch all
-cases (the rest are caught in lookupInst).
-
-\begin{code}
-tcOverloadedLit :: InstOrigin
-		 -> HsOverLit Name
-		 -> BoxyRhoType
-		 -> TcM (HsOverLit TcId)
-tcOverloadedLit orig lit@(OverLit { ol_val = val, ol_rebindable = rebindable
-				  , ol_witness = meth_name }) res_ty
-  | rebindable
-	-- Do not generate a LitInst for rebindable syntax.  
-	-- Reason: If we do, tcSimplify will call lookupInst, which
-	--	   will call tcSyntaxName, which does unification, 
-	--	   which tcSimplify doesn't like
-	-- ToDo: noLoc sadness
-  = do	{ hs_lit <- mkOverLit val
-	; let lit_ty = hsLitType hs_lit
-	; fi' <- tcSyntaxOp orig meth_name (mkFunTy lit_ty res_ty)
-	 	-- Overloaded literals must have liftedTypeKind, because
-	 	-- we're instantiating an overloaded function here,
-	 	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
-		-- However this'll be picked up by tcSyntaxOp if necessary
-	; let witness = HsApp (noLoc fi') (noLoc (HsLit hs_lit))
-	; return (lit { ol_witness = witness, ol_type = res_ty }) }
-
-  | Just expr <- shortCutLit val res_ty 
-  = return (lit { ol_witness = expr, ol_type = res_ty })
-
-  | otherwise
-  = do 	{ loc <- getInstLoc orig
-	; res_tau <- zapToMonotype res_ty
-	; new_uniq <- newUnique
-	; let	lit_nm   = mkSystemVarName new_uniq (fsLit "lit")
-		lit_inst = LitInst {tci_name = lit_nm, tci_lit = lit, 
-				    tci_ty = res_tau, tci_loc = loc}
-		witness = HsVar (instToId lit_inst)
-	; extendLIE lit_inst
-	; return (lit { ol_witness = witness, ol_type = res_ty }) }
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -977,23 +972,8 @@ Meanwhile, the strategy is:
 %*									*
 %************************************************************************
 
-\begin{code}
-patCtxt :: Pat Name -> Maybe Message	-- Not all patterns are worth pushing a context
-patCtxt (VarPat _)  = Nothing
-patCtxt (ParPat _)  = Nothing
-patCtxt (AsPat _ _) = Nothing
-patCtxt pat 	    = Just (hang (ptext (sLit "In the pattern:")) 
-			       4 (ppr pat))
-
------------------------------------------------
-
-existentialExplode :: LPat Name -> SDoc
-existentialExplode pat
-  = hang (vcat [text "My brain just exploded.",
-	        text "I can't handle pattern bindings for existential or GADT data constructors.",
-	        text "Instead, use a case-expression, or do-notation, to unpack the constructor.",
-		text "In the binding group for"])
-	4 (ppr pat)
+{-   This was used to improve the error message from 
+     an existential escape. Need to think how to do this.
 
 sigPatCtxt :: [LPat Var] -> [Var] -> [TcType] -> TcType -> TidyEnv
            -> TcM (TidyEnv, SDoc)
@@ -1005,7 +985,7 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
 	      (env3, tidy_body_ty) = tidyOpenType  env2 body_ty'
 	; return (env3,
 		 sep [ptext (sLit "When checking an existential match that binds"),
-		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys)),
+		      nest 2 (vcat (zipWith ppr_id show_ids tidy_tys)),
 		      ptext (sLit "The pattern(s) have type(s):") <+> vcat (map ppr tidy_pat_tys),
 		      ptext (sLit "The body has type:") <+> ppr tidy_body_ty
 		]) }
@@ -1016,6 +996,39 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
 
     ppr_id id ty = ppr id <+> dcolon <+> ppr ty
 	-- Don't zonk the types so we get the separate, un-unified versions
+-}
+
+\begin{code}
+patCtxt :: Pat Name -> Maybe Message	-- Not all patterns are worth pushing a context
+patCtxt (VarPat _)  = Nothing
+patCtxt (ParPat _)  = Nothing
+patCtxt (AsPat _ _) = Nothing
+patCtxt pat 	    = Just (hang (ptext (sLit "In the pattern:")) 
+                         2 (ppr pat))
+
+-----------------------------------------------
+checkExistentials :: [TyVar] -> PatEnv -> TcM ()
+	  -- See Note [Arrows and patterns]
+checkExistentials [] _                                 = return ()
+checkExistentials _ (PE { pe_ctxt = LetPat {}})        = failWithTc existentialLetPat
+checkExistentials _ (PE { pe_ctxt = LamPat ProcExpr }) = failWithTc existentialProcPat
+checkExistentials _ (PE { pe_lazy = True })            = failWithTc existentialLazyPat
+checkExistentials _ _                                  = return ()
+
+existentialLazyPat :: SDoc
+existentialLazyPat
+  = hang (ptext (sLit "An existential or GADT data constructor cannot be used"))
+       2 (ptext (sLit "inside a lazy (~) pattern"))
+
+existentialProcPat :: SDoc
+existentialProcPat 
+  = ptext (sLit "Proc patterns cannot use existential or GADT data constructors")
+
+existentialLetPat :: SDoc
+existentialLetPat
+  = vcat [text "My brain just exploded",
+	  text "I can't handle pattern bindings for existential or GADT data constructors.",
+	  text "Instead, use a case-expression, or do-notation, to unpack the constructor."]
 
 badFieldCon :: DataCon -> Name -> SDoc
 badFieldCon con field
@@ -1027,54 +1040,17 @@ polyPatSig sig_ty
   = hang (ptext (sLit "Illegal polymorphic type signature in pattern:"))
        2 (ppr sig_ty)
 
-badSigPat :: TcType -> SDoc
-badSigPat pat_ty = ptext (sLit "Pattern signature must exactly match:") <+> 
-                   ppr pat_ty
-
 badTypePat :: Pat Name -> SDoc
 badTypePat pat = ptext (sLit "Illegal type pattern") <+> ppr pat
-
-existentialProcPat :: DataCon -> SDoc
-existentialProcPat con
-  = hang (ptext (sLit "Illegal constructor") <+> quotes (ppr con) <+> ptext (sLit "in a 'proc' pattern"))
-       2 (ptext (sLit "Proc patterns cannot use existentials or GADTs"))
-
-lazyPatErr :: Pat name -> [TcTyVar] -> TcM ()
-lazyPatErr _ tvs
-  = failWithTc $
-    hang (ptext (sLit "A lazy (~) pattern cannot match existential or GADT data constructors"))
-       2 (vcat (map pprSkolTvBinding tvs))
 
 lazyUnliftedPatErr :: OutputableBndr name => Pat name -> TcM ()
 lazyUnliftedPatErr pat
   = failWithTc $
-    hang (ptext (sLit "A lazy (~) pattern cannot contain unlifted types"))
+    hang (ptext (sLit "A lazy (~) pattern cannot contain unlifted types:"))
        2 (ppr pat)
 
-nonRigidMatch :: PatCtxt -> DataCon -> SDoc
-nonRigidMatch ctxt con
-  =  hang (ptext (sLit "GADT pattern match in non-rigid context for") <+> quotes (ppr con))
-	2 (ptext (sLit "Probable solution: add a type signature for") <+> what ctxt)
-  where
-     what (APat (FunRhs f _)) = quotes (ppr f)
-     what (APat CaseAlt)      = ptext (sLit "the scrutinee of the case expression")
-     what (APat LambdaExpr )  = ptext (sLit "the lambda expression")
-     what (APat (StmtCtxt _)) = ptext (sLit "the right hand side of a do/comprehension binding")
-     what _other	      = ptext (sLit "something")
-
-nonRigidResult :: PatCtxt -> Type -> TcM a
-nonRigidResult ctxt res_ty
-  = do	{ env0 <- tcInitTidyEnv
-	; let (env1, res_ty') = tidyOpenType env0 res_ty
-	      msg = hang (ptext (sLit "GADT pattern match with non-rigid result type")
-				<+> quotes (ppr res_ty'))
-		  	 2 (ptext (sLit "Solution: add a type signature for")
-			   	  <+> what ctxt )
-	; failWithTcM (env1, msg) }
-  where
-     what (APat (FunRhs f _)) = quotes (ppr f)
-     what (APat CaseAlt)      = ptext (sLit "the entire case expression")
-     what (APat LambdaExpr)   = ptext (sLit "the lambda exression")
-     what (APat (StmtCtxt _)) = ptext (sLit "the entire do/comprehension expression")
-     what _other              = ptext (sLit "something")
+unboxedTupleErr :: SDoc -> Type -> SDoc
+unboxedTupleErr what ty
+  = hang (what <+> ptext (sLit "cannot have an unboxed tuple type:"))
+       2 (ppr ty)
 \end{code}

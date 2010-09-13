@@ -18,7 +18,7 @@ module TcRnTypes(
 	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
-	TcTyThing(..), pprTcTyThingCategory, RefinementVisibility(..),
+	TcTypeEnv, TcTyThing(..), pprTcTyThingCategory, 
 
 	-- Template Haskell
 	ThStage(..), topStage, topAnnStage, topSpliceStage,
@@ -27,23 +27,35 @@ module TcRnTypes(
 	-- Arrows
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
-	-- Insts
-	Inst(..), EqInstCo, InstOrigin(..), InstLoc(..), 
-	pprInstLoc, pprInstArising, instLocSpan, instLocOrigin, setInstLoc,
-	LIE, emptyLIE, unitLIE, plusLIE, consLIE, instLoc, instSpan,
-	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
+	-- Constraints
+        Untouchables,
+  	WantedConstraints, emptyWanteds, andWanteds, extendWanteds,
+	WantedConstraint(..), WantedEvVar(..), wantedEvVarLoc, 
+        wantedEvVarToVar, wantedEvVarPred, splitWanteds,
+
+	evVarsToWanteds,
+	Implication(..), 
+        CtLoc(..), ctLocSpan, ctLocOrigin, setCtLocOrigin,
+	CtOrigin(..), EqOrigin(..), 
+	WantedLoc, GivenLoc,
+
+	SkolemInfo(..),
+
+	-- Pretty printing
+	pprEvVarTheta, pprWantedsWithLocs, pprWantedWithLoc, 
+	pprEvVars, pprEvVarWithType,
+	pprArising, pprArisingAt,
 
 	-- Misc other types
-	TcId, TcIdSet, TcDictBinds, TcTyVarBind(..), TcTyVarBinds
+	TcId, TcIdSet, TcTyVarBind(..), TcTyVarBinds
 	
   ) where
 
 #include "HsVersions.h"
 
-import HsSyn hiding (LIE)
+import HsSyn
 import HscTypes
 import Type
-import Coercion
 import TcType
 import Annotations
 import InstEnv
@@ -62,11 +74,11 @@ import VarSet
 import ErrUtils
 import UniqSupply
 import BasicTypes
-import Util
 import Bag
 import Outputable
 import ListSetOps
 import FastString
+import StaticFlags( opt_ErrorSpans )
 
 import Data.Set (Set)
 \end{code}
@@ -83,9 +95,9 @@ The monad itself has to be defined here, because it is mentioned by ErrCtxt
 
 \begin{code}
 type TcRef a 	 = IORef a
-type TcId    	 = Id 			-- Type may be a TcType
+type TcId    	 = Id 			-- Type may be a TcType  DV: WHAT??????????
 type TcIdSet 	 = IdSet
-type TcDictBinds = DictBinds TcId	-- Bag of dictionary bindings
+
 
 type TcRnIf a b c = IOEnv (Env a b) c
 type IfM lcl a  = TcRnIf IfGblEnv lcl a		-- Iface stuff
@@ -242,6 +254,7 @@ data TcGblEnv
           -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
           -- decls.
 
+        tcg_ev_binds  :: Bag EvBind,	    -- Top-level evidence bindings
 	tcg_binds     :: LHsBinds Id,	    -- Value bindings in this module
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
 	tcg_anns      :: [Annotation],      -- ...Annotations
@@ -358,8 +371,8 @@ data TcLclEnv		-- Changes as we move inside an expression
 		-- We still need the unsullied global name env so that
     		--   we can look up record field names
 
-	tcl_env  :: NameEnv TcTyThing,  -- The local type environment: Ids and
-					-- TyVars defined in this module
+	tcl_env  :: TcTypeEnv,    -- The local type environment: Ids and
+			          -- TyVars defined in this module
 					
 	tcl_tyvars :: TcRef TcTyVarSet,	-- The "global tyvars"
 			-- Namely, the in-scope TyVars bound in tcl_env, 
@@ -367,12 +380,11 @@ data TcLclEnv		-- Changes as we move inside an expression
 			-- in tcl_lenv. 
                         -- Why mutable? see notes with tcGetGlobalTyVars
 
-	tcl_lie   :: TcRef LIE,		-- Place to accumulate type constraints
-
-        tcl_tybinds :: TcRef TcTyVarBinds -- Meta and coercion type variable
-                                          -- bindings accumulated during
-                                          -- constraint solving
+	tcl_lie   :: TcRef WantedConstraints,    -- Place to accumulate type constraints
+	tcl_untch :: Untouchables		 -- Untouchables
     }
+
+type TcTypeEnv = NameEnv TcTyThing
 
 
 {- Note [Given Insts]
@@ -405,7 +417,7 @@ data ThStage	-- See Note [Template Haskell state diagram] in TcSplice
   | Brack  			-- Inside brackets 
       ThStage 			--   Binding level = level(stage) + 1
       (TcRef [PendingSplice])	--   Accumulate pending splices here
-      (TcRef LIE)		--     and type constraints here
+      (TcRef WantedConstraints)	--     and type constraints here
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
@@ -488,41 +500,23 @@ data TcTyThing
   = AGlobal TyThing		-- Used only in the return type of a lookup
 
   | ATcId   {		-- Ids defined in this module; may not be fully zonked
-	tct_id :: TcId,		
-	tct_co :: RefinementVisibility,	-- Previously: Maybe HsWrapper
-					-- Nothing <=>	Do not apply a GADT type refinement
-					--		I am wobbly, or have no free
-					--		type variables
-					-- Just co <=>  Apply any type refinement to me,
-					--		and record it in the coercion
-	tct_type  :: TcType,	-- Type of (coercion applied to id)
+	tct_id    :: TcId,		
 	tct_level :: ThLevel }
 
   | ATyVar  Name TcType		-- The type to which the lexically scoped type vaiable
 				-- is currently refined. We only need the Name
-				-- for error-message purposes
+				-- for error-message purposes; it is the corresponding
+				-- Name in the domain of the envt
 
   | AThing  TcKind 		-- Used temporarily, during kind checking, for the
 				--	tycons and clases in this recursive group
 
-data RefinementVisibility
-  = Unrefineable			-- Do not apply a GADT refinement
-					-- I have no free variables	
-
-  | Rigid HsWrapper			-- Apply any refinement to me
-					-- and record it in the coercion
-
-  | Wobbly				-- Do not apply a GADT refinement
-					-- I am wobbly
-
-  | WobblyInvisible			-- Wobbly type, not available inside current
-					-- GADT refinement
-
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = pprTyThing g
    ppr elt@(ATcId {})   = text "Identifier" <> 
-			  ifPprDebug (brackets (ppr (tct_id elt) <> dcolon <> ppr (tct_type elt) <> comma
-				 <+> ppr (tct_level elt) <+> ppr (tct_co elt)))
+			  brackets (ppr (tct_id elt) <> dcolon 
+                                 <> ppr (varType (tct_id elt)) <> comma
+				 <+> ppr (tct_level elt))
    ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k
 
@@ -531,13 +525,6 @@ pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
 pprTcTyThingCategory (ATyVar {})     = ptext (sLit "Type variable")
 pprTcTyThingCategory (ATcId {})      = ptext (sLit "Local identifier")
 pprTcTyThingCategory (AThing {})     = ptext (sLit "Kinded thing")
-
-instance Outputable RefinementVisibility where
-    ppr Unrefineable	      = ptext (sLit "unrefineable")
-    ppr (Rigid co)	      = ptext (sLit "rigid") <+> ppr co
-    ppr	Wobbly		      = ptext (sLit "wobbly")
-    ppr WobblyInvisible	      = ptext (sLit "wobbly-invisible")
-
 \end{code}
 
 \begin{code}
@@ -678,268 +665,206 @@ instance Outputable WhereFrom where
 
 %************************************************************************
 %*									*
-\subsection[Inst-types]{@Inst@ types}
+		Wanted constraints
+
+     These are forced to be in TcRnTypes because
+     	   TcLclEnv mentions WantedConstraints
+	   WantedConstraint mentions CtLoc
+	   CtLoc mentions ErrCtxt
+	   ErrCtxt mentions TcM
 %*									*
 v%************************************************************************
 
-An @Inst@ is either a dictionary, an instance of an overloaded
-literal, or an instance of an overloaded value.  We call the latter a
-``method'' even though it may not correspond to a class operation.
-For example, we might have an instance of the @double@ function at
-type Int, represented by
-
-	Method 34 doubleId [Int] origin
-
-In addition to the basic Haskell variants of 'Inst's, they can now also
-represent implication constraints 'forall tvs. given => wanted'
-and equality constraints 'co :: ty1 ~ ty2'.
-
-NB: Equalities occur in two flavours:
-
-  (1) Dict {tci_pred = EqPred ty1 ty2}
-  (2) EqInst {tci_left = ty1, tci_right = ty2, tci_co = coe}
-
-The former arises from equalities in contexts, whereas the latter is used
-whenever the type checker introduces an equality (e.g., during deferring
-unification).
-
-I am not convinced that this duplication is necessary or useful! -=chak
-
 \begin{code}
-data Inst
-  = Dict {
-	tci_name :: Name,
-	tci_pred :: TcPredType,	  -- Class or implicit parameter only
-	tci_loc  :: InstLoc 
-    }
+type Untouchables = TcTyVarSet	-- All MetaTyVars
 
-  | ImplicInst {	-- An implication constraint
-			-- forall tvs. given => wanted
-	tci_name   :: Name,
-	tci_tyvars :: [TcTyVar],    -- Quantified type variables
-	tci_given  :: [Inst],	    -- Only Dicts and EqInsts
-				    --   (no Methods, LitInsts, ImplicInsts)
-	tci_wanted :: [Inst],	    -- Only Dicts, EqInst, and ImplicInsts
-				    --   (no Methods or LitInsts)
+type WantedConstraints = Bag WantedConstraint
 
-	tci_loc    :: InstLoc
-    }
-	-- NB: the tci_given are not necessarily rigid
+data WantedConstraint
+  = WcEvVar  WantedEvVar
+  | WcImplic Implication
+  -- ToDo: add literals, methods
 
-  | Method {
-	tci_id :: TcId,		-- The Id for the Inst
+-- EvVar defined in module Var.lhs: 
+-- Evidence variables include all *quantifiable* constraints
+--   dictionaries
+--   implicit parameters
+--   coercion variables
 
-	tci_oid :: TcId,	-- The overloaded function
-		-- This function will be a global, local, or ClassOpId;
-		--   inside instance decls (only) it can also be an InstId!
-		-- The id needn't be completely polymorphic.
-		-- You'll probably find its name (for documentation purposes)
-		--	  inside the InstOrigin
+data WantedEvVar   -- The sort of constraint over which one can lambda-abstract
+   = WantedEvVar 
+         EvVar 	     -- The variable itself; make a binding for it please
+         WantedLoc   -- How the constraint arose in the first place
+	 	     -- (used for error messages only)
 
-	tci_tys :: [TcType],	-- The types to which its polymorphic tyvars
-				--	should be instantiated.
-				-- These types must saturate the Id's foralls.
+type WantedLoc = CtLoc CtOrigin
+type GivenLoc  = CtLoc SkolemInfo
 
-	tci_theta :: TcThetaType,	
-			-- The (types of the) dictionaries to which the function
-			-- must be applied to get the method
+data Implication
+  = Implic {  
+      ic_env_tvs :: Untouchables, -- Untouchables: unification variables
+                                  -- free in the environment
+      ic_env     :: TcTypeEnv,    -- The type environment
+      		      	      	  -- Used only when generating error messages
+	  -- Generally, ic_env_tvs = tvsof(ic_env)
+	  -- However, we don't zonk ic_env when zonking the Implication
+	  -- Instead we do that when generating a skolem-escape error message
 
-	tci_loc :: InstLoc 
-    }
-	-- INVARIANT 1: in (Method m f tys theta tau loc)
-	--	type of m = type of (f tys dicts(from theta))
+      ic_skols  :: TcTyVarSet,   -- Introduced skolems 
+      		   	         -- See Note [Skolems in an implication]
 
-	-- INVARIANT 2: type of m must not be of form (Pred -> Tau)
-	--   Reason: two methods are considered equal if the 
-	--   	     base Id matches, and the instantiating types
-	--	     match.  The TcThetaType should then match too.
-	--   This only bites in the call to tcInstClassOp in TcClassDcl.mkMethodBind
+      ic_scoped :: [TcTyVar],    -- List of scoped variables to be unified 
+                                 -- bijectively to a subset of ic_tyvars
+				 -- Note [Scoped pattern variable]
 
-  | LitInst {
-	tci_name :: Name,
-	tci_lit  :: HsOverLit Name,	-- The literal from the occurrence site
-			-- INVARIANT: never a rebindable-syntax literal
-			-- Reason: tcSyntaxName does unification, and we
-			--	   don't want to deal with that during tcSimplify,
-			--	   when resolving LitInsts
+      ic_given  :: [EvVar],      -- Given evidence variables
+      		   		 --   (order does not matter)
 
-	tci_ty :: TcType,	-- The type at which the literal is used
-	tci_loc :: InstLoc
-    }
+      ic_wanted :: WantedConstraints,    -- Wanted constraints
 
-  | EqInst {			  -- delayed unification of the form 
-				  --  	co :: ty1 ~ ty2
-	tci_left  :: TcType,      -- ty1    -- both types are...
-	tci_right :: TcType,      -- ty2    -- ...free of boxes
-	tci_co    :: EqInstCo,  	  -- co
-	tci_loc   :: InstLoc,
+      ic_binds  :: EvBindsVar,   -- Points to the place to fill in the
+      		      	    	 -- abstraction and bindings
 
-	tci_name  :: Name	-- Debugging help only: this makes it easier to
-				-- follow where a constraint is used in a morass
-				-- of trace messages!  Unlike other Insts, it 
-                                -- has no semantic significance whatsoever.
-    }
+      ic_loc   :: GivenLoc }
 
-type EqInstCo = Either 	  -- Distinguish between given and wanted coercions
-		  TcTyVar   --  - a wanted equation, with a hole, to be filled
-			    --    with a witness for the equality; for equation
-                            --    arising from deferring unification, 'ty1' is
-                            --    the actual and 'ty2' the expected type
-		  Coercion  --  - a given equation, with a coercion witnessing
-                            --    the equality; a coercion that originates
-                            --    from a signature or a GADT is a CoVar, but
-                            --    after normalisation of coercions, they can
-			    --    be arbitrary Coercions involving constructors 
-                            --    and pseudo-constructors like sym and trans.
+evVarsToWanteds :: WantedLoc -> [EvVar] -> WantedConstraints
+evVarsToWanteds loc evs = listToBag [WcEvVar (WantedEvVar ev loc) | ev <- evs]
+
+wantedEvVarLoc :: WantedEvVar -> WantedLoc 
+wantedEvVarLoc (WantedEvVar _ loc) = loc 
+
+wantedEvVarToVar :: WantedEvVar -> EvVar 
+wantedEvVarToVar (WantedEvVar ev _) = ev 
+
+wantedEvVarPred :: WantedEvVar -> PredType 
+wantedEvVarPred (WantedEvVar ev _)  = evVarPred ev 
+
+splitWanteds :: WantedConstraints -> (Bag WantedEvVar, Bag Implication)
+splitWanteds wanted = partitionBagWith pick wanted
+  where
+    pick (WcEvVar v)  = Left v
+    pick (WcImplic i) = Right i
 \end{code}
 
-@Insts@ are ordered by their class/type info, rather than by their
-unique.  This allows the context-reduction mechanism to use standard finite
-maps to do their stuff.  It's horrible that this code is here, rather
-than with the Avails handling stuff in TcSimplify
+Note [Skolems in an implication]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The skolems in an implication are not there to perform a skolem escape
+check.  That happens because all the environment variables are in the
+untouchables, and therefore cannot be unified with anything at all,
+let alone the skolems.
+
+Instead, ic_skols is used only when considering floating a constraint
+outside the implication in TcSimplify.floatEqualities or 
+TcSimplify.approximateImplications
+
+Note [Scoped pattern variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   data T where K :: forall a,b. a -> b -> T
+
+   ...(case x of K (p::c) (q::d) -> ...)...
+
+We create fresh MetaTvs for c,d, and later check that they are
+bound bijectively to the skolems we created for a,b.  So the
+implication constraint looks like
+	    ic_skols  = {a',b'}  -- Skolem tvs created from a,b
+	    ic_scoped = {c',d'}  -- Meta tvs created from c,d
 
 \begin{code}
-instance Ord Inst where
-   compare = cmpInst
-	-- Used *only* for AvailEnv in TcSimplify
+emptyWanteds :: WantedConstraints
+emptyWanteds = emptyBag
 
-instance Eq Inst where
-  (==) i1 i2 = case i1 `cmpInst` i2 of
-               EQ -> True
-               _  -> False
+andWanteds :: WantedConstraints -> WantedConstraints -> WantedConstraints
+andWanteds = unionBags
 
-cmpInst :: Inst -> Inst -> Ordering
-cmpInst d1@(Dict {}) 	d2@(Dict {})	= tci_pred d1 `tcCmpPred` tci_pred d2
-cmpInst (Dict {})       _               = LT
-
-cmpInst (Method {}) 	(Dict {})	= GT
-cmpInst m1@(Method {}) 	m2@(Method {})	= (tci_oid m1 `compare` tci_oid m2) `thenCmp`
-					  (tci_tys m1 `tcCmpTypes` tci_tys m2)
-cmpInst (Method {})     _               = LT
-
-cmpInst (LitInst {})	(Dict {}) 	= GT
-cmpInst (LitInst {})	(Method {})	= GT
-cmpInst l1@(LitInst {})	l2@(LitInst {})	= (tci_lit l1 `compare` tci_lit l2) `thenCmp`
-					  (tci_ty l1 `tcCmpType` tci_ty l2)
-cmpInst (LitInst {})    _               = LT
-
-	-- Implication constraints are compared by *name*
-	-- not by type; that is, we make no attempt to do CSE on them
-cmpInst (ImplicInst {})    (Dict {})	      = GT
-cmpInst (ImplicInst {})    (Method {})	      = GT
-cmpInst (ImplicInst {})    (LitInst {})	      = GT
-cmpInst i1@(ImplicInst {}) i2@(ImplicInst {}) = tci_name i1 `compare` tci_name i2
-cmpInst (ImplicInst {})    _                  = LT
-
-	-- same for Equality constraints
-cmpInst (EqInst {})    (Dict {})       = GT
-cmpInst (EqInst {})    (Method {})     = GT
-cmpInst (EqInst {})    (LitInst {})    = GT
-cmpInst (EqInst {})    (ImplicInst {}) = GT
-cmpInst i1@(EqInst {}) i2@(EqInst {})  = (tci_left  i1 `tcCmpType` tci_left  i2) `thenCmp`
-                                         (tci_right i1 `tcCmpType` tci_right i2)
+extendWanteds :: WantedConstraints -> WantedConstraint -> WantedConstraints
+extendWanteds = snocBag
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Inst-collections]{LIE: a collection of Insts}
-%*									*
-%************************************************************************
-
+ 
 \begin{code}
--- FIXME: Rename this. It clashes with (Located (IE ...))
-type LIE = Bag Inst
+pprEvVars :: [EvVar] -> SDoc	-- Print with their types
+pprEvVars ev_vars = vcat (map pprEvVarWithType ev_vars)
 
-isEmptyLIE :: LIE -> Bool
-isEmptyLIE = isEmptyBag
+pprEvVarTheta :: [EvVar] -> SDoc
+pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
+                              
+pprEvVarWithType :: EvVar -> SDoc
+pprEvVarWithType v = ppr v <+> dcolon <+> pprPred (evVarPred v)
 
-emptyLIE :: LIE
-emptyLIE = emptyBag
+pprWantedsWithLocs :: Bag WantedConstraint -> SDoc
+pprWantedsWithLocs = foldrBag (($$) . pprWantedWithLoc) empty 
 
-unitLIE :: Inst -> LIE
-unitLIE inst = unitBag inst
+pprWantedWithLoc :: WantedConstraint -> SDoc
+pprWantedWithLoc (WcImplic i) = ppr i
+pprWantedWithLoc (WcEvVar v)  = pprWantedEvVarWithLoc v
 
-mkLIE :: [Inst] -> LIE
-mkLIE insts = listToBag insts
+instance Outputable WantedConstraint where
+  ppr (WcEvVar v)  = ppr v
+  ppr (WcImplic i) = ppr i
 
-plusLIE :: LIE -> LIE -> LIE
-plusLIE lie1 lie2 = lie1 `unionBags` lie2
+-- Adding -ferror-spans makes the output more voluminous
+instance Outputable WantedEvVar where
+  ppr wev | opt_ErrorSpans = pprWantedEvVarWithLoc wev
+          | otherwise      = pprWantedEvVar wev
 
-plusLIEs :: [LIE] -> LIE
-plusLIEs lies = unionManyBags lies
+pprWantedEvVarWithLoc, pprWantedEvVar :: WantedEvVar -> SDoc
+pprWantedEvVarWithLoc (WantedEvVar v loc) = hang (pprEvVarWithType v) 
+                                               2 (pprArisingAt loc) 
+pprWantedEvVar        (WantedEvVar v _)   = pprEvVarWithType v
 
-lieToList :: LIE -> [Inst]
-lieToList = bagToList
-
-listToLIE :: [Inst] -> LIE
-listToLIE = listToBag
-
-consLIE :: Inst -> LIE -> LIE
-consLIE inst lie  = lie `snocBag` inst
--- Putting the new Inst at the *end* of the bag is a half-hearted attempt
--- to ensure that we tend to report the *leftmost* type-constraint error
--- E.g. 	f :: [a]
---		f = [1,2,3]
--- we'd like to complain about the '1', not the '3'.
---
--- "Half-hearted" because the rest of the type checker makes no great
--- claims for retaining order in the constraint set.  Still, this 
--- seems to improve matters slightly.  Exampes: mdofail001, tcfail015
+instance Outputable Implication where
+  ppr (Implic { ic_env_tvs = env_tvs, ic_skols = skols, ic_given = given
+              , ic_wanted = wanted, ic_binds = binds, ic_loc = loc })
+   = ptext (sLit "Implic") <+> braces 
+     (sep [ ptext (sLit "Untouchables = ") <+> ppr env_tvs
+          , ptext (sLit "Skolems = ") <+> ppr skols
+          , ptext (sLit "Given = ") <+> pprEvVars given
+          , ptext (sLit "Wanted = ") <+> ppr wanted
+	  , ptext (sLit "Binds = ") <+> ppr binds
+          , pprSkolInfo (ctLocOrigin loc)
+          , ppr (ctLocSpan loc) ])
 \end{code}
 
-
 %************************************************************************
 %*									*
-\subsection[Inst-origin]{The @InstOrigin@ type}
+            CtLoc, CtOrigin
 %*									*
 %************************************************************************
 
-The @InstOrigin@ type gives information about where a dictionary came from.
-This is important for decent error message reporting because dictionaries
-don't appear in the original source code.  Doubtless this type will evolve...
-
-It appears in TcMonad because there are a couple of error-message-generation
-functions that deal with it.
+The 'CtLoc' and 'CtOrigin' types gives information about where a
+*wanted constraint* came from.  This is important for decent error
+message reporting because dictionaries don't appear in the original
+source code.  Doubtless this type will evolve...
 
 \begin{code}
 -------------------------------------------
-data InstLoc = InstLoc InstOrigin SrcSpan [ErrCtxt]
+data CtLoc orig = CtLoc orig SrcSpan [ErrCtxt]
 
-instLoc :: Inst -> InstLoc
-instLoc inst = tci_loc inst
+ctLocSpan :: CtLoc o -> SrcSpan
+ctLocSpan (CtLoc _ s _) = s
 
-setInstLoc :: Inst -> InstLoc -> Inst
-setInstLoc inst new_loc = inst { tci_loc = new_loc }
+ctLocOrigin :: CtLoc o -> o
+ctLocOrigin (CtLoc o _ _) = o
 
-instSpan :: Inst -> SrcSpan
-instSpan wanted = instLocSpan (instLoc wanted)
+setCtLocOrigin :: CtLoc o -> o' -> CtLoc o'
+setCtLocOrigin (CtLoc _ s c) o = CtLoc o s c
 
-instLocSpan :: InstLoc -> SrcSpan
-instLocSpan (InstLoc _ s _) = s
+pprArising :: CtLoc CtOrigin -> SDoc
+pprArising loc = case ctLocOrigin loc of
+                   TypeEqOrigin -> empty
+                   _ -> text "arising from" <+> ppr (ctLocOrigin loc)
 
-instLocOrigin :: InstLoc -> InstOrigin
-instLocOrigin (InstLoc o _ _) = o
-
-pprInstArising :: Inst -> SDoc
-pprInstArising loc = ptext (sLit "arising from") <+> pprInstLoc (tci_loc loc)
-
-pprInstLoc :: InstLoc -> SDoc
-pprInstLoc (InstLoc orig span _) = sep [ppr orig, text "at" <+> ppr span]
+pprArisingAt :: CtLoc CtOrigin -> SDoc
+pprArisingAt loc = sep [pprArising loc, text "at" <+> ppr (ctLocSpan loc)]
 
 -------------------------------------------
-data InstOrigin
-  = SigOrigin SkolemInfo	-- Pattern, class decl, inst decl etc;
-				-- Places that bind type variables and introduce
-				-- available constraints
+-- CtOrigin gives the origin of *wanted* constraints
+data CtOrigin
+  = OccurrenceOf Name		-- Occurrence of an overloaded identifier
+  | AppOrigin	 		-- An application of some kind
 
-  | IPBindOrigin (IPName Name)	-- Binding site of an implicit parameter
-
-	-------------------------------------------------------
-	-- The rest are all occurrences: Insts that are 'wanted'
-	-------------------------------------------------------
-  | OccurrenceOf Name		-- Occurrence of an overloaded identifier
   | SpecPragOrigin Name		-- Specialisation pragma for identifier
+
+  | TypeEqOrigin
 
   | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
 
@@ -948,53 +873,55 @@ data InstOrigin
 
   | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
   | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
+  | SectionOrigin
   | TupleOrigin			       -- (..,..)
-
-  | InstSigOrigin	-- A dict occurrence arising from instantiating
-			-- a polymorphic type during a subsumption check
-
   | ExprSigOrigin	-- e :: ty
+  | PatSigOrigin	-- p :: ty
+  | PatOrigin	        -- Instantiating a polytyped pattern at a constructor
   | RecordUpdOrigin
   | ViewPatOrigin
 
-  | InstScOrigin	-- Typechecking superclasses of an instance declaration
-
-  | NoScOrigin          -- A very special hack; see TcSimplify,
-			--   Note [Recursive instances and superclases]
-			   
-
+  | ScOrigin	        -- Typechecking superclasses of an instance declaration
   | DerivOrigin		-- Typechecking deriving
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin	-- Typechecking a default decl
   | DoOrigin		-- Arising from a do expression
   | ProcOrigin		-- Arising from a proc expression
-  | ImplicOrigin SDoc	-- An implication constraint
-  | EqOrigin		-- A type equality
   | AnnOrigin           -- An annotation
 
-instance Outputable InstOrigin where
-    ppr (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
-    ppr (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
-    ppr (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
-    ppr (IPBindOrigin name)   = hsep [ptext (sLit "a binding for implicit parameter"), quotes (ppr name)]
-    ppr RecordUpdOrigin       = ptext (sLit "a record update")
-    ppr ExprSigOrigin         = ptext (sLit "an expression type signature")
-    ppr ViewPatOrigin         = ptext (sLit "a view pattern")
-    ppr (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
-    ppr (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
-    ppr (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
-    ppr TupleOrigin	      = ptext (sLit "a tuple")
-    ppr NegateOrigin	      = ptext (sLit "a use of syntactic negation")
-    ppr InstScOrigin	      = ptext (sLit "the superclasses of an instance declaration")
-    ppr NoScOrigin            = ptext (sLit "an instance declaration")
-    ppr DerivOrigin	      = ptext (sLit "the 'deriving' clause of a data type declaration")
-    ppr StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
-    ppr DefaultOrigin	      = ptext (sLit "a 'default' declaration")
-    ppr DoOrigin	      = ptext (sLit "a do statement")
-    ppr ProcOrigin	      = ptext (sLit "a proc expression")
-    ppr (ImplicOrigin doc)    = doc
-    ppr (SigOrigin info)      = pprSkolInfo info
-    ppr EqOrigin	      = ptext (sLit "a type equality")
-    ppr InstSigOrigin         = panic "ppr InstSigOrigin"
-    ppr AnnOrigin             = ptext (sLit "an annotation")
+data EqOrigin 
+  = UnifyOrigin 
+       { uo_actual   :: TcType
+       , uo_expected :: TcType }
+
+instance Outputable CtOrigin where
+  ppr orig = pprO orig
+
+pprO :: CtOrigin -> SDoc
+pprO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
+pprO AppOrigin             = ptext (sLit "an application")
+pprO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
+pprO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
+pprO RecordUpdOrigin       = ptext (sLit "a record update")
+pprO ExprSigOrigin         = ptext (sLit "an expression type signature")
+pprO PatSigOrigin          = ptext (sLit "a pattern type signature")
+pprO PatOrigin             = ptext (sLit "a pattern")
+pprO ViewPatOrigin         = ptext (sLit "a view pattern")
+pprO (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
+pprO (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
+pprO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
+pprO SectionOrigin	   = ptext (sLit "an operator section")
+pprO TupleOrigin	   = ptext (sLit "a tuple")
+pprO NegateOrigin	   = ptext (sLit "a use of syntactic negation")
+pprO ScOrigin	           = ptext (sLit "the superclasses of an instance declaration")
+pprO DerivOrigin	   = ptext (sLit "the 'deriving' clause of a data type declaration")
+pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
+pprO DefaultOrigin	   = ptext (sLit "a 'default' declaration")
+pprO DoOrigin	           = ptext (sLit "a do statement")
+pprO ProcOrigin	           = ptext (sLit "a proc expression")
+pprO TypeEqOrigin          = ptext (sLit "an equality")
+pprO AnnOrigin             = ptext (sLit "an annotation")
+
+instance Outputable EqOrigin where
+  ppr (UnifyOrigin t1 t2) = ppr t1 <+> char '~' <+> ppr t2
 \end{code}

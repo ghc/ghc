@@ -28,7 +28,7 @@ module CoreSubst (
 	cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
 	-- ** Simple expression optimiser
-	simpleOptExpr
+	simpleOptPgm, simpleOptExpr
     ) where
 
 #include "HsVersions.h"
@@ -36,10 +36,12 @@ module CoreSubst (
 import CoreSyn
 import CoreFVs
 import CoreUtils
-import OccurAnal( occurAnalyseExpr )
+import PprCore
+import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 
 import qualified Type
 import Type     ( Type, TvSubst(..), TvSubstEnv )
+import Coercion	   ( isIdentityCoercion )
 import OptCoercion ( optCoercion )
 import VarSet
 import VarEnv
@@ -50,6 +52,8 @@ import IdInfo
 import Unique
 import UniqSupply
 import Maybes
+import ErrUtils
+import DynFlags   ( DynFlags, DynFlag(..) )
 import BasicTypes ( isAlwaysActive )
 import Outputable
 import PprCore		()		-- Instances
@@ -203,7 +207,7 @@ extendTvSubstList (Subst in_scope ids tvs) prs = Subst in_scope ids (extendVarEn
 -- 'extendIdSubst' and 'extendTvSubst'
 extendSubst :: Subst -> Var -> CoreArg -> Subst
 extendSubst (Subst in_scope ids tvs) tv (Type ty)
-  = ASSERT( isTyVar tv ) Subst in_scope ids (extendVarEnv tvs tv ty)
+  = ASSERT( isTyCoVar tv ) Subst in_scope ids (extendVarEnv tvs tv ty)
 extendSubst (Subst in_scope ids tvs) id expr
   = ASSERT( isId id ) Subst in_scope (extendVarEnv ids id expr) tvs
 
@@ -301,7 +305,11 @@ subst_expr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Note note e)   = Note (go_note note) (go e)
-    go (Cast e co)     = Cast (go e) (optCoercion (getTvSubst subst) co)
+    go (Cast e co) 
+      | isIdentityCoercion co' = go e
+      | otherwise              = Cast (go e) co'
+      where
+        co' = optCoercion (getTvSubst subst) co
 	-- Optimise coercions as we go; this is good, for example
 	-- in the RHS of rules, which are only substituted in
 
@@ -385,8 +393,8 @@ preserve occ info in rules.
 -- 'IdInfo' is preserved by this process, although it is substituted into appropriately.
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
-  | isTyVar bndr  = substTyVarBndr subst bndr
-  | otherwise     = substIdBndr (text "var-bndr") subst subst bndr
+  | isTyCoVar bndr  = substTyVarBndr subst bndr
+  | otherwise       = substIdBndr (text "var-bndr") subst subst bndr
 
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right
 substBndrs :: Subst -> [Var] -> (Subst, [Var])
@@ -521,7 +529,6 @@ substIdType subst@(Subst _ _ tv_env) id
 
 ------------------
 -- | Substitute into some 'IdInfo' with regard to the supplied new 'Id'.
--- Always zaps the unfolding, to save substitution work
 substIdInfo :: Subst -> Id -> IdInfo -> Maybe IdInfo
 substIdInfo subst new_id info
   | nothing_to_do = Nothing
@@ -601,7 +608,9 @@ substSpec subst new_id (SpecInfo rules rhs_fvs)
 ------------------
 substRulesForImportedIds :: Subst -> [CoreRule] -> [CoreRule]
 substRulesForImportedIds subst rules 
-  = map (substRule subst (\name -> name)) rules
+  = map (substRule subst not_needed) rules
+  where
+    not_needed name = pprPanic "substRulesForImportedIds" (ppr name)
 
 ------------------
 substRule :: Subst -> (Name -> Name) -> CoreRule -> CoreRule
@@ -615,9 +624,12 @@ substRule :: Subst -> (Name -> Name) -> CoreRule -> CoreRule
 
 substRule _ _ rule@(BuiltinRule {}) = rule
 substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
-                                       , ru_fn = fn_name, ru_rhs = rhs })
+                                       , ru_fn = fn_name, ru_rhs = rhs
+                                       , ru_local = is_local })
   = rule { ru_bndrs = bndrs', 
-	   ru_fn    = subst_ru_fn fn_name,
+	   ru_fn    = if is_local 
+                      	then subst_ru_fn fn_name 
+                      	else fn_name,
 	   ru_args  = map (substExpr (text "subst-rule" <+> ppr fn_name) subst') args,
 	   ru_rhs   = substExpr (text "subst-rule" <+> ppr fn_name) subst' rhs }
   where
@@ -664,7 +676,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 
 simpleOptExpr expr
   = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    go init_subst (occurAnalyseExpr expr)
+    simple_opt_expr init_subst (occurAnalyseExpr expr)
   where
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 	-- It's potentially important to make a proper in-scope set
@@ -677,74 +689,173 @@ simpleOptExpr expr
 	-- It's a bit painful to call exprFreeVars, because it makes
 	-- three passes instead of two (occ-anal, and go)
 
-    go subst (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
-    go subst (App e1 e2)      = App (go subst e1) (go subst e2)
-    go subst (Type ty)        = Type (substTy subst ty)
-    go _     (Lit lit)        = Lit lit
-    go subst (Note note e)    = Note note (go subst e)
-    go subst (Cast e co)      = Cast (go subst e) (substTy subst co)
-    go subst (Let bind body)  = go_let subst bind body
-    go subst (Lam bndr body)  = Lam bndr' (go subst' body)
-		              where
-			        (subst', bndr') = substBndr subst bndr
+----------------------
+simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> IO ([CoreBind], [CoreRule])
+simpleOptPgm dflags binds rules
+  = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+		       (pprCoreBindings occ_anald_binds);
 
-    go subst (Case e b ty as) = Case (go subst e) b' 
-				     (substTy subst ty)
-				     (map (go_alt subst') as)
-			      where
-			  	 (subst', b') = substBndr subst b
+       ; return (reverse binds', substRulesForImportedIds subst' rules) }
+  where
+    occ_anald_binds  = occurAnalysePgm binds rules
+    (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
+                       
+    do_one (subst, binds') bind 
+      = case simple_opt_bind subst bind of
+          (subst', Nothing)    -> (subst', binds')
+          (subst', Just bind') -> (subst', bind':binds')
 
+----------------------
+type InVar   = Var
+type OutVar  = Var
+type InId    = Id
+type OutId   = Id
+type InExpr  = CoreExpr
+type OutExpr = CoreExpr
+
+-- In these functions the substitution maps InVar -> OutExpr
+
+----------------------
+simple_opt_expr :: Subst -> InExpr -> OutExpr
+simple_opt_expr subst expr
+  = go expr
+  where
+    go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
+    go (App e1 e2)      = App (go e1) (go e2)
+    go (Type ty)        = Type (substTy subst ty)
+    go (Lit lit)        = Lit lit
+    go (Note note e)    = Note note (go e)
+    go (Cast e co)      | isIdentityCoercion co' = go e
+       	                | otherwise              = Cast (go e) co' 
+                        where
+                          co' = substTy subst co
+
+    go (Let bind body)  = maybeLet mb_bind (simple_opt_expr subst' body)
+                        where
+                          (subst', mb_bind) = simple_opt_bind subst bind
+    go lam@(Lam {})     = go_lam [] subst lam
+    go (Case e b ty as) = Case (go e) b' (substTy subst ty)
+       			       (map (go_alt subst') as)
+       		        where
+       		  	  (subst', b') = subst_opt_bndr subst b
 
     ----------------------
-    go_alt subst (con, bndrs, rhs) = (con, bndrs', go subst' rhs)
-				 where
-				   (subst', bndrs') = substBndrs subst bndrs
-
-    ----------------------
-    go_let subst (Rec prs) body
-      = Let (Rec (reverse rev_prs')) (go subst'' body)
+    go_alt subst (con, bndrs, rhs) 
+      = (con, bndrs', simple_opt_expr subst' rhs)
       where
-	(subst', bndrs')    = substRecBndrs subst (map fst prs)
-	(subst'', rev_prs') = foldl do_pr (subst', []) (prs `zip` bndrs')
-	do_pr (subst, prs) ((b,r), b') = case go_bind subst b r of
-	      	      	   	       	   Left subst' -> (subst', prs)
-					   Right r'    -> (subst,  (b',r'):prs)
-
-    go_let subst (NonRec b r) body
-      = case go_bind subst b r of
-          Left subst' -> go subst' body
-	  Right r'    -> Let (NonRec b' r') (go subst' body)
-	  	      where
-		         (subst', b') = substBndr subst b
-
+	(subst', bndrs') = subst_opt_bndrs subst bndrs
 
     ----------------------
-    go_bind :: Subst -> Var -> CoreExpr -> Either Subst CoreExpr
-        -- (go_bind subst old_var old_rhs)  
-	--   either extends subst with (old_var -> new_rhs)
-	--   or     return new_rhs for a binding new_var = new_rhs
-    go_bind subst b r
-      | Type ty <- r
-      , isTyVar b 	-- let a::* = TYPE ty in <body>
-      = Left (extendTvSubst subst b (substTy subst ty))
+    -- go_lam tries eta reduction
+    go_lam bs' subst (Lam b e) 
+       = go_lam (b':bs') subst' e
+       where
+         (subst', b') = subst_opt_bndr subst b
+    go_lam bs' subst e 
+       | Just etad_e <- tryEtaReduce bs e' = etad_e
+       | otherwise                         = mkLams bs e'
+       where
+         bs = reverse bs'
+         e' = simple_opt_expr subst e
 
-      | isId b		-- let x = e in <body>
-      , safe_to_inline (idOccInfo b) || exprIsTrivial r'
-      , isAlwaysActive (idInlineActivation b)	-- Note [Inline prag in simplOpt]
-      = Left (extendIdSubst subst b r')
-      
-      | otherwise
-      = Right r'
-      where
-        r' = go subst r
+----------------------
+simple_opt_bind :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
+simple_opt_bind subst (Rec prs)
+  = (subst'', Just (Rec (reverse rev_prs')))
+  where
+    (subst', bndrs')    = subst_opt_bndrs subst (map fst prs)
+    (subst'', rev_prs') = foldl do_pr (subst', []) (prs `zip` bndrs')
+    do_pr (subst, prs) ((b,r), b') = case simple_opt_pair subst b r of
+          	      	   	       Left subst' -> (subst', prs)
+    				       Right r'    -> (subst,  (b2,r'):prs)
+                                           where
+                             	             b2 = add_info subst b b'
 
-    ----------------------
+simple_opt_bind subst (NonRec b r)
+  = case simple_opt_pair subst b r of
+      Left ext_subst -> (ext_subst, Nothing)
+      Right r'       -> (subst', Just (NonRec b2 r'))
+	  	     where
+		        (subst', b') = subst_opt_bndr subst b
+			b2 = add_info subst' b b'
+
+----------------------
+simple_opt_pair :: Subst -> InVar -> InExpr -> Either Subst OutExpr
+    -- (simple_opt_pair subst in_var in_rhs)  
+    --   either extends subst with (in_var -> out_rhs)
+    --   or     return out_rhs for a binding out_var = out_rhs
+simple_opt_pair subst b r
+  | Type ty <- r 	-- let a::* = TYPE ty in <body>
+  = ASSERT( isTyCoVar b )
+    Left (extendTvSubst subst b (substTy subst ty))
+
+  | isId b		-- let x = e in <body>
+  , safe_to_inline (idOccInfo b) 
+  , isAlwaysActive (idInlineActivation b)	-- Note [Inline prag in simplOpt]
+  , not (isStableUnfolding (idUnfolding b))
+  , not (isExportedId b)
+  = Left (extendIdSubst subst b r')
+  
+  | otherwise
+  = Right r'
+  where
+    r' = simple_opt_expr subst r
+
 	-- Unconditionally safe to inline
     safe_to_inline :: OccInfo -> Bool
-    safe_to_inline IAmDead                  = True
-    safe_to_inline (OneOcc in_lam one_br _) = not in_lam && one_br
     safe_to_inline (IAmALoopBreaker {})     = False
-    safe_to_inline NoOccInfo                = False
+    safe_to_inline IAmDead                  = True
+    safe_to_inline (OneOcc in_lam one_br _) = (not in_lam && one_br) || exprIsTrivial r'
+    safe_to_inline NoOccInfo                = exprIsTrivial r'
+
+----------------------
+subst_opt_bndr :: Subst -> InVar -> (Subst, OutVar)
+subst_opt_bndr subst bndr
+  | isTyCoVar bndr  = substTyVarBndr subst bndr
+  | otherwise       = subst_opt_id_bndr subst bndr
+
+subst_opt_id_bndr :: Subst -> InId -> (Subst, OutId)
+-- Nuke all fragile IdInfo, unfolding, and RULES; 
+--    it gets added back later by add_info
+-- Rather like SimplEnv.substIdBndr
+--
+-- It's important to zap fragile OccInfo (which CoreSubst.SubstIdBndr 
+-- carefully does not do) because simplOptExpr invalidates it
+
+subst_opt_id_bndr subst@(Subst in_scope id_subst tv_subst) old_id
+  = (Subst new_in_scope new_id_subst tv_subst, new_id)
+  where
+    id1	   = uniqAway in_scope old_id
+    id2    = setIdType id1 (substTy subst (idType old_id))
+    new_id = zapFragileIdInfo id2	-- Zaps rules, worker-info, unfolding
+					-- and fragile OccInfo
+    new_in_scope = in_scope `extendInScopeSet` new_id
+
+	-- Extend the substitution if the unique has changed,
+	-- or there's some useful occurrence information
+	-- See the notes with substTyVarBndr for the delSubstEnv
+    new_id_subst | new_id /= old_id
+	         = extendVarEnv id_subst old_id (Var new_id)
+	         | otherwise 
+	         = delVarEnv id_subst old_id
+
+----------------------
+subst_opt_bndrs :: Subst -> [InVar] -> (Subst, [OutVar])
+subst_opt_bndrs subst bndrs
+  = mapAccumL subst_opt_bndr subst bndrs
+
+----------------------
+add_info :: Subst -> InVar -> OutVar -> OutVar
+add_info subst old_bndr new_bndr 
+ | isTyCoVar old_bndr = new_bndr
+ | otherwise          = maybeModifyIdInfo mb_new_info new_bndr
+ where
+   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+
+----------------------
+maybeLet :: Maybe CoreBind -> CoreExpr -> CoreExpr
+maybeLet Nothing  e = e
+maybeLet (Just b) e = Let b e
 \end{code}
 
 Note [Inline prag in simplOpt]
@@ -765,3 +876,4 @@ we don't know what phase we're in.  Here's an example
 
 When inlining 'foo' in 'bar' we want the let-binding for 'inner' 
 to remain visible until Phase 1
+

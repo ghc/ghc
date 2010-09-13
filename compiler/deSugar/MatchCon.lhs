@@ -23,8 +23,6 @@ import HsSyn
 import DsBinds
 import DataCon
 import TcType
-import CoreSyn
-import MkCore
 import DsMonad
 import DsUtils
 import Util	( all2, takeList, zipEqual )
@@ -140,10 +138,10 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
     shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds, 
 					           pat_binds = bind, pat_args = args
 					} : pats }))
-      = do { prs <- dsLHsBinds bind
+      = do { ds_ev_binds <- dsTcEvBinds bind
 	   ; return (wrapBinds (tvs `zip` tvs1) 
 		    . wrapBinds (ds  `zip` dicts1)
-		    . mkCoreLet (Rec prs),
+		    . wrapDsEvBinds ds_ev_binds,
 		    eqn { eqn_pats = conArgPats arg_tys args ++ pats }) }
 
     -- Choose the right arg_vars in the right order for this group

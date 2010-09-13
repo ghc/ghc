@@ -877,7 +877,7 @@ simplExprF' env expr@(Lam _ _) cont
     n_params = length bndrs
     (bndrs, body) = collectBinders expr
     zap | n_args >= n_params = \b -> b
-        | otherwise          = \b -> if isTyVar b then b
+        | otherwise          = \b -> if isTyCoVar b then b
                                      else zapLamIdInfo b
         -- NB: we count all the args incl type args
         -- so we must count all the binders (incl type lambdas)
@@ -1081,7 +1081,7 @@ simplNonRecE :: SimplEnv
 	-- First deal with type applications and type lets
 	--   (/\a. e) (Type ty)   and   (let a = Type ty in e)
 simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
-  = ASSERT( isTyVar bndr )
+  = ASSERT( isTyCoVar bndr )
     do	{ ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
 	; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
 
@@ -1095,7 +1095,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
                      (StrictBind bndr bndrs body env cont) }
 
   | otherwise
-  = ASSERT( not (isTyVar bndr) )
+  = ASSERT( not (isTyCoVar bndr) )
     do  { (env1, bndr1) <- simplNonRecBndr env bndr
         ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
         ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
@@ -1137,7 +1137,7 @@ simplNote env (CoreNote s) e cont
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
 simplVar env var
-  | isTyVar var 
+  | isTyCoVar var 
   = return (Type (substTyVar env var))
   | otherwise
   = case substId env var of
@@ -1768,7 +1768,7 @@ simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
         = go vs the_strs
         where
           go [] [] = []
-          go (v:vs') strs | isTyVar v = v : go vs' strs
+          go (v:vs') strs | isTyCoVar v = v : go vs' strs
           go (v:vs') (str:strs)
             | isMarkedStrict str = evald_v  : go vs' strs
             | otherwise          = zapped_v : go vs' strs
@@ -1843,7 +1843,7 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
     bind_args env' [] _  = return env'
 
     bind_args env' (b:bs') (Type ty : args)
-      = ASSERT( isTyVar b )
+      = ASSERT( isTyCoVar b )
         bind_args (extendTvSubst env' b ty) bs' args
 
     bind_args env' (b:bs') (arg : args)
@@ -2030,7 +2030,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
 			  | otherwise		   = bndrs' ++ [case_bndr_w_unf]
 	      
               abstract_over bndr
-                  | isTyVar bndr = True -- Abstract over all type variables just in case
+                  | isTyCoVar bndr = True -- Abstract over all type variables just in case
                   | otherwise    = not (isDeadBinder bndr)
                         -- The deadness info on the new Ids is preserved by simplBinders
 

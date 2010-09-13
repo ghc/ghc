@@ -26,7 +26,7 @@ module CoreSyn (
 	mkConApp, mkTyBind,
 	varToCoreExpr, varsToCoreExprs,
 
-        isTyVar, isId, cmpAltCon, cmpAlt, ltAlt,
+        isTyCoVar, isId, cmpAltCon, cmpAlt, ltAlt,
 	
 	-- ** Simple 'Expr' access functions and predicates
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
@@ -87,7 +87,7 @@ import Util
 import Data.Data
 import Data.Word
 
-infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`
+infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
 \end{code}
 
@@ -100,8 +100,6 @@ infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`
 These data types are the heart of the compiler
 
 \begin{code}
-infixl 8 `App`	-- App brackets to the left
-
 -- | This is the data type that represents GHCs core intermediate language. Currently
 -- GHC uses System FC <http://research.microsoft.com/~simonpj/papers/ext-f/> for this purpose,
 -- which is closely related to the simpler and better known System F <http://en.wikipedia.org/wiki/System_F>.
@@ -975,7 +973,7 @@ collectTyAndValBinders expr
 collectTyBinders expr
   = go [] expr
   where
-    go tvs (Lam b e) | isTyVar b = go (b:tvs) e
+    go tvs (Lam b e) | isTyCoVar b = go (b:tvs) e
     go tvs e			 = (reverse tvs, e)
 
 collectValBinders expr

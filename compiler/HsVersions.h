@@ -56,7 +56,7 @@ name = Util.globalMVar (value);
 #ifdef DEBUG
 #define ASSERT(e)      if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
-#define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
+#define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg)) $
 #else
 -- We have to actually use all the variables we are given or we may get
 -- unused variable warnings when DEBUG is off.

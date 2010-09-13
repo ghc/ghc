@@ -70,7 +70,7 @@ lookupInst cls tys
 --
 lookupFamInst :: TyCon -> [Type] -> VM (TyCon, [Type])
 lookupFamInst tycon tys
-  = ASSERT( isOpenTyCon tycon )
+  = ASSERT( isFamilyTyCon tycon )
     do { instEnv <- getFamInstEnv
        ; case lookupFamInstEnv instEnv tycon tys of
 	   [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)

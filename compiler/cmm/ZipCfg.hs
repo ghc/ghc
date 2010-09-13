@@ -461,25 +461,32 @@ postorder_dfs g@(LGraph _ blockenv) =
     let FGraph id eblock _ = entry g in
      zip eblock : postorder_dfs_from_except blockenv eblock (unitBlockSet id)
 
-postorder_dfs_from_except :: (HavingSuccessors b, LastNode l)
+postorder_dfs_from_except :: forall m b l. (HavingSuccessors b, LastNode l)
                           => BlockEnv (Block m l) -> b -> BlockSet -> [Block m l]
-postorder_dfs_from_except blocks b visited =
-  vchildren (get_children b) (\acc _visited -> acc) [] visited
+postorder_dfs_from_except blocks b visited 
+  = vchildren (get_children b) (\acc _visited -> acc) [] visited
   where
-    -- vnode ::
-    --    Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet -> a
+    vnode :: Block m l -> ([Block m l] -> BlockSet -> a)
+          -> [Block m l] -> BlockSet -> a
     vnode block@(Block id _) cont acc visited =
         if elemBlockSet id visited then
             cont acc visited
         else
             let cont' acc visited = cont (block:acc) visited in
             vchildren (get_children block) cont' acc (extendBlockSet visited id)
+
+    vchildren :: [Block m l] -> ([Block m l] -> BlockSet -> a)
+              -> [Block m l] -> BlockSet -> a
     vchildren bs cont acc visited =
         let next children acc visited =
                 case children of []     -> cont acc visited
                                  (b:bs) -> vnode b (next bs) acc visited
         in next bs acc visited
+
+    get_children :: HavingSuccessors c => c -> [Block m l]
     get_children block = foldl add_id [] (succs block)
+
+    add_id :: [Block m l] -> BlockId -> [Block m l]
     add_id rst id = case lookupBlockEnv blocks id of
                       Just b -> b : rst
                       Nothing -> rst

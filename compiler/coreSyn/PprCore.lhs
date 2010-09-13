@@ -247,7 +247,7 @@ instance OutputableBndr Var where
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
-  | isTyVar binder = pprKindedTyVarBndr binder
+  | isTyCoVar binder = pprKindedTyVarBndr binder
   | otherwise      = pprTypedBinder binder $$ 
 		     ppIdInfo binder (idInfo binder)
 
@@ -258,7 +258,7 @@ pprCoreBinder bind_site bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
-  | isTyVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
+  | isTyCoVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedLCBinder :: BindingSite -> Bool -> Var -> SDoc
@@ -266,7 +266,7 @@ pprTypedLCBinder :: BindingSite -> Bool -> Var -> SDoc
 pprTypedLCBinder bind_site debug_on var
   | not debug_on && isDeadBinder var    = char '_'
   | not debug_on, CaseBind <- bind_site = pprUntypedBinder var  -- No parens, no kind info
-  | isTyVar var                         = parens (pprKindedTyVarBndr var)
+  | isTyCoVar var                         = parens (pprKindedTyVarBndr var)
   | otherwise = parens (hang (pprIdBndr var) 
                            2 (vcat [ dcolon <+> pprType (idType var), pp_unf]))
               where
@@ -277,7 +277,7 @@ pprTypedLCBinder bind_site debug_on var
 pprTypedBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
 pprTypedBinder binder
-  | isTyVar binder  = pprKindedTyVarBndr binder
+  | isTyCoVar binder  = pprKindedTyVarBndr binder
   | otherwise	    = hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
 pprKindedTyVarBndr :: TyVar -> SDoc

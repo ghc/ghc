@@ -528,7 +528,7 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- The substitution is extended only if the variable is cloned, because
 -- we *don't* need to use it to track occurrence info.
 simplBinder env bndr
-  | isTyVar bndr  = do	{ let (env', tv) = substTyVarBndr env bndr
+  | isTyCoVar bndr  = do	{ let (env', tv) = substTyVarBndr env bndr
 			; seqTyVar tv `seq` return (env', tv) }
   | otherwise     = do	{ let (env', id) = substIdBndr env bndr
 			; seqId id `seq` return (env', id) }

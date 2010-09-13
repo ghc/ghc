@@ -31,23 +31,23 @@ import TcHsSyn
 import TcExpr
 import TcRnMonad
 import Coercion
-import Inst
 import FamInst
 import InstEnv
 import FamInstEnv
 import TcAnnotations
 import TcBinds
+import TcType	( tidyTopType )
 import TcDefaults
 import TcEnv
 import TcRules
 import TcForeign
 import TcInstDcls
 import TcIface
+import TcMType
 import MkIface
 import IfaceSyn
 import TcSimplify
 import TcTyClsDecls
-import TcUnify	( withBox )
 import LoadIface
 import RnNames
 import RnEnv
@@ -72,12 +72,14 @@ import Outputable
 import DataCon
 import Type
 import Class
-import TcType
+import TcType   ( tyClsNamesOfDFunHead )
+import Inst	( tcGetInstEnvs )
 import Data.List ( sortBy )
 
 #ifdef GHCI
+import TcType   ( isUnitTy, isTauTy )
+import CoreUtils( mkPiTypes )
 import TcHsType
-import TcMType
 import TcMatches
 import RnTypes
 import RnExpr
@@ -362,11 +364,11 @@ tcRnSrcDecls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Reason: solely to report unused imports and bindings
 tcRnSrcDecls boot_iface decls
  = do {   	-- Do all the declarations
-	(tc_envs, lie) <- getLIE $ tc_rn_src_decls boot_iface decls ;
+	(tc_envs, lie) <- getConstraints $ tc_rn_src_decls boot_iface decls ;
 
 	     -- 	Finish simplifying class constraints
 	     -- 
-	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
+	     -- simplifyTop deals with constant or ambiguous InstIds.  
 	     -- How could there be ambiguous ones?  They can only arise if a
 	     -- top-level decl falls under the monomorphism restriction
 	     -- and no subsequent decl instantiates its type.
@@ -375,33 +377,36 @@ tcRnSrcDecls boot_iface decls
 	     -- thaat checkMain adds
 	     -- 
 	     -- We do it with both global and local env in scope:
-	     --	 * the global env exposes the instances to tcSimplifyTop
-	     --  * the local env exposes the local Ids to tcSimplifyTop, 
+	     --	 * the global env exposes the instances to simplifyTop
+	     --  * the local env exposes the local Ids to simplifyTop, 
 	     --    so that we get better error messages (monomorphism restriction)
-        traceTc (text "Tc8") ;
-	inst_binds <- setEnvs tc_envs (tcSimplifyTop lie) ;
+        traceTc "Tc8" empty ;
+	new_ev_binds <- setEnvs tc_envs (simplifyTop lie) ;
 
 	    -- Backsubstitution.  This must be done last.
-	    -- Even tcSimplifyTop may do some unification.
-        traceTc (text "Tc9") ;
+	    -- Even simplifyTop may do some unification.
+        traceTc "Tc9" empty ;
 	let { (tcg_env, _) = tc_envs
 	    ; TcGblEnv { tcg_type_env = type_env,
-		         tcg_binds = binds,
-		         tcg_rules = rules,
-		         tcg_fords = fords } = tcg_env
-	    ; all_binds = binds `unionBags` inst_binds } ;
+		         tcg_binds    = binds,
+		         tcg_ev_binds = cur_ev_binds,
+		         tcg_rules    = rules,
+		         tcg_fords    = fords } = tcg_env } ;
 
 	failIfErrsM ;	-- Don't zonk if there have been errors
 			-- It's a waste of time; and we may get debug warnings
 			-- about strangely-typed TyCons!
 
-	(bind_ids, binds', fords', rules') <- zonkTopDecls all_binds rules fords ;
+        let { all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
+	(bind_ids, ev_binds', binds', fords', rules') 
+            <- zonkTopDecls all_ev_binds binds rules fords ;
 
 	
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
-	    ; tcg_env' = tcg_env { tcg_binds = binds',
-				   tcg_rules = rules', 
-				   tcg_fords = fords' } } ;
+	    ; tcg_env' = tcg_env { tcg_binds    = binds',
+				   tcg_ev_binds = ev_binds',
+				   tcg_rules 	= rules', 
+				   tcg_fords 	= fords' } } ;
 
         setGlobalTypeEnv tcg_env' final_type_env				   
    }
@@ -463,7 +468,7 @@ tcRnHsBootDecls decls
    = do { (first_group, group_tail) <- findSplice decls
 
 		-- Rename the declarations
-	; (tcg_env, HsGroup { 
+        ; (tcg_env, HsGroup { 
 		   hs_tyclds = tycl_decls, 
 		   hs_instds = inst_decls,
 		   hs_derivds = deriv_decls,
@@ -472,7 +477,7 @@ tcRnHsBootDecls decls
 		   hs_ruleds = rule_decls, 
 		   hs_annds  = _,
 		   hs_valds  = val_binds }) <- rnTopSrcDecls first_group
-	; setGblEnv tcg_env $ do {
+	; (gbl_env, lie) <- getConstraints $ setGblEnv tcg_env $ do {
 
 
 		-- Check for illegal declarations
@@ -484,7 +489,7 @@ tcRnHsBootDecls decls
 	; mapM_ (badBootDecl "rule")    rule_decls
 
 		-- Typecheck type/class decls
-	; traceTc (text "Tc2")
+	; traceTc "Tc2" empty
 	; (tcg_env, aux_binds, dm_ids) 
                <- tcTyAndClassDecls emptyModDetails tycl_decls
 	; setGblEnv tcg_env    $ 
@@ -492,18 +497,18 @@ tcRnHsBootDecls decls
 
 		-- Typecheck instance decls
 		-- Family instance declarations are rejected here
-	; traceTc (text "Tc3")
+	; traceTc "Tc3" empty
 	; (tcg_env, inst_infos, _deriv_binds) 
             <- tcInstDecls1 tycl_decls inst_decls deriv_decls
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck value declarations
-	; traceTc (text "Tc5") 
+	; traceTc "Tc5" empty 
 	; val_ids <- tcHsBootSigs val_binds
 
 		-- Wrap up
 		-- No simplification or zonking to do
-	; traceTc (text "Tc7a")
+	; traceTc "Tc7a" empty
 	; gbl_env <- getGblEnv 
 	
 		-- Make the final type-env
@@ -521,7 +526,8 @@ tcRnHsBootDecls decls
 	      }
 
 	; setGlobalTypeEnv gbl_env type_env3
-   }}}}
+   }}}
+   ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: String -> Located decl -> TcM ()
 badBootDecl what (L loc _) 
@@ -552,8 +558,8 @@ checkHiBootIface
   = return tcg_env	
 
   | otherwise
-  = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts $$ 
-				ppr boot_exports)) ;
+  = do	{ traceTc "checkHiBootIface" $ vcat
+             [ ppr boot_type_env, ppr boot_insts, ppr boot_exports]
 
 		-- Check the exports of the boot module, one by one
 	; mapM_ check_export boot_exports
@@ -703,8 +709,8 @@ checkBootTyCon tc1 tc2
     let tvs1 = tyConTyVars tc1; tvs2 = tyConTyVars tc2
         env = rnBndrs2 env0 tvs1 tvs2
 
-        eqSynRhs (OpenSynTyCon k1 _) (OpenSynTyCon k2 _)
-            = tcEqTypeX env k1 k2
+        eqSynRhs SynFamilyTyCon SynFamilyTyCon
+            = True
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = tcEqTypeX env t1 t2
         eqSynRhs _ _ = False
@@ -727,7 +733,7 @@ checkBootTyCon tc1 tc2
         env0 = mkRnEnv2 emptyInScopeSet
 
         eqAlgRhs AbstractTyCon _ = True
-        eqAlgRhs OpenTyCon{} OpenTyCon{} = True
+        eqAlgRhs DataFamilyTyCon{} DataFamilyTyCon{} = True
         eqAlgRhs tc1@DataTyCon{} tc2@DataTyCon{} =
             eqListBy eqCon (data_cons tc1) (data_cons tc2)
         eqAlgRhs tc1@NewTyCon{} tc2@NewTyCon{} =
@@ -793,7 +799,9 @@ rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 -- Fails if there are any errors
 rnTopSrcDecls group
  = do { -- Rename the source decls
+        traceTc "rn12" empty ;
 	(tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls group ;
+        traceTc "rn13" empty ;
 
         -- save the renamed syntax, if we want it
 	let { tcg_env'
@@ -821,7 +829,7 @@ tcTopSrcDecls boot_details
 		   hs_valds  = val_binds })
  = do {		-- Type-check the type and class decls, and all imported decls
 		-- The latter come in via tycl_decls
-        traceTc (text "Tc2") ;
+        traceTc "Tc2" empty ;
 
 	(tcg_env, aux_binds, dm_ids) <- tcTyAndClassDecls boot_details tycl_decls ;
 		-- If there are any errors, tcTyAndClassDecls fails here
@@ -831,18 +839,18 @@ tcTopSrcDecls boot_details
 
 		-- Source-language instances, including derivings,
 		-- and import the supporting declarations
-        traceTc (text "Tc3") ;
+        traceTc "Tc3" empty ;
 	(tcg_env, inst_infos, deriv_binds) 
             <- tcInstDecls1 tycl_decls inst_decls deriv_decls;
 	setGblEnv tcg_env	$ do {
 
 	        -- Foreign import declarations next. 
-        traceTc (text "Tc4") ;
+        traceTc "Tc4" empty ;
 	(fi_ids, fi_decls) <- tcForeignImports foreign_decls ;
 	tcExtendGlobalValEnv fi_ids	$ do {
 
 		-- Default declarations
-        traceTc (text "Tc4a") ;
+        traceTc "Tc4a" empty ;
 	default_tys <- tcDefaults default_decls ;
 	updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
 	
@@ -854,19 +862,18 @@ tcTopSrcDecls boot_details
 			 	     discardWarnings (tcTopBinds deriv_binds) ;
 
 		-- Value declarations next
-        traceTc (text "Tc5") ;
+        traceTc "Tc5" empty ;
 	(tc_val_binds, tcl_env) <- setLclTypeEnv tcl_env $
 			 	   tcTopBinds val_binds;
 
         setLclTypeEnv tcl_env $ do {	-- Environment doesn't change now
 
 	     	-- Second pass over class and instance declarations, 
-        traceTc (text "Tc6") ;
+        traceTc "Tc6" empty ;
 	inst_binds <- tcInstDecls2 tycl_decls inst_infos ;
-        showLIE (text "after instDecls2") ;
 
 		-- Foreign exports
-        traceTc (text "Tc7") ;
+        traceTc "Tc7" empty ;
 	(foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
 
                 -- Annotations
@@ -876,7 +883,7 @@ tcTopSrcDecls boot_details
 	rules <- tcRules rule_decls ;
 
 		-- Wrap up
-        traceTc (text "Tc7a") ;
+        traceTc "Tc7a" empty ;
 	tcg_env <- getGblEnv ;
 	let { all_binds = tc_val_binds	 `unionBags`
 			  tc_deriv_binds `unionBags`
@@ -913,7 +920,7 @@ checkMain
 check_main :: DynFlags -> TcGblEnv -> TcM TcGblEnv
 check_main dflags tcg_env
  | mod /= main_mod
- = traceTc (text "checkMain not" <+> ppr main_mod <+> ppr mod) >>
+ = traceTc "checkMain not" (ppr main_mod <+> ppr mod) >>
    return tcg_env
 
  | otherwise
@@ -921,17 +928,17 @@ check_main dflags tcg_env
 		-- Check that 'main' is in scope
 		-- It might be imported from another module!
 	; case mb_main of {
-	     Nothing -> do { traceTc (text "checkMain fail" <+> ppr main_mod <+> ppr main_fn)
+	     Nothing -> do { traceTc "checkMain fail" (ppr main_mod <+> ppr main_fn)
 			   ; complain_no_main	
 			   ; return tcg_env } ;
 	     Just main_name -> do
 
-	{ traceTc (text "checkMain found" <+> ppr main_mod <+> ppr main_fn)
+	{ traceTc "checkMain found" (ppr main_mod <+> ppr main_fn)
 	; let loc = srcLocSpan (getSrcLoc main_name)
 	; ioTyCon <- tcLookupTyCon ioTyConName
-	; (main_expr, res_ty) 
+        ; res_ty <- newFlexiTyVarTy liftedTypeKind
+	; main_expr
 		<- addErrCtxt mainCtxt	  $
-		   withBox liftedTypeKind $ \res_ty -> 
 		   tcMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
 
 		-- See Note [Root-main Id]
@@ -1042,7 +1049,7 @@ setInteractiveContext hsc_env icxt thing_inside
         -- later ids in ic_tmp_ids must shadow earlier ones with the same
         -- OccName, and tcExtendIdEnv implements this behaviour.
 
-    do	{ traceTc (text "setIC" <+> ppr (ic_tmp_ids icxt))
+    do	{ traceTc "setIC" (ppr (ic_tmp_ids icxt))
  	; thing_inside }
 \end{code}
 
@@ -1079,7 +1086,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
 	-- cast them all to HValues in the end!
     mapM_ bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
 
-    traceTc (text "tcs 1") ;
+    traceTc "tcs 1" empty ;
     let { global_ids = map globaliseAndTidyId zonked_ids } ;
         -- Note [Interactively-bound Ids in GHCi]
 
@@ -1256,19 +1263,19 @@ tcGhciStmts stmts
 	 } ;
 
 	-- OK, we're ready to typecheck the stmts
-	traceTc (text "TcRnDriver.tcGhciStmts: tc stmts") ;
-	((tc_stmts, ids), lie) <- getLIE $ tc_io_stmts stmts $ \ _ ->
+	traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
+	((tc_stmts, ids), lie) <- getConstraints $ tc_io_stmts stmts $ \ _ ->
 					   mapM tcLookupId names ;
 					-- Look up the names right in the middle,
 					-- where they will all be in scope
 
 	-- Simplify the context
-	traceTc (text "TcRnDriver.tcGhciStmts: simplify ctxt") ;
-	const_binds <- checkNoErrs (tcSimplifyInteractive lie) ;
+	traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
+	const_binds <- checkNoErrs (simplifyInteractive lie) ;
 		-- checkNoErrs ensures that the plan fails if context redn fails
 
-	traceTc (text "TcRnDriver.tcGhciStmts: done") ;
-	return (ids, mkHsDictLet const_binds $
+	traceTc "TcRnDriver.tcGhciStmts: done" empty ;
+	return (ids, mkHsDictLet (EvBinds const_binds) $
 		     noLoc (HsDo GhciStmt tc_stmts (mk_return ids) io_ret_ty))
     }
 \end{code}
@@ -1290,17 +1297,14 @@ tcRnExpr hsc_env ictxt rdr_expr
 
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
-    ((_tc_expr, res_ty), lie)	     <- getLIE (tcInferRho rn_expr) ;
-    ((qtvs, dict_insts, _), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
-    _ <- tcSimplifyInteractive lie_top ;       -- Ignore the dicionary bindings
+    ((_tc_expr, res_ty), lie)	<- getConstraints (tcInferRho rn_expr) ;
+    ((qtvs, dicts, _), lie_top) <- getConstraints (simplifyInfer False {- No MR for now -}
+                                                      (tyVarsOfType res_ty) lie)  ;
+    _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
-    let { all_expr_ty = mkForAllTys qtvs $
-    		        mkFunTys (map (idType . instToId) dict_insts)	$
-    		        res_ty } ;
+    let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
     zonkTcType all_expr_ty
     }
-  where
-    smpl_doc = ptext (sLit "main expression")
 \end{code}
 
 tcRnType just finds the kind of a type
@@ -1623,7 +1627,7 @@ ppr_tydecls tycons
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
 ppr_rules rs = vcat [ptext (sLit "{-# RULES"),
-		      nest 4 (pprRules rs),
+		      nest 2 (pprRules rs),
 		      ptext (sLit "#-}")]
 
 ppr_gen_tycons :: [TyCon] -> SDoc

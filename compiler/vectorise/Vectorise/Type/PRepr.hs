@@ -41,6 +41,7 @@ buildPReprTyCon orig_tc vect_tc repr
                              tyvars
                              (SynonymTyCon rhs_ty)
 			     (typeKind rhs_ty)
+                             NoParentTyCon
                              (Just $ mk_fam_inst prepr_tc vect_tc)
   where
     tyvars = tyConTyVars vect_tc

@@ -40,7 +40,7 @@ import TysWiredIn
 import BasicTypes
 import PrelNames
 import Outputable
-
+import Bag
 import VarSet
 import SrcLoc
 
@@ -1023,20 +1023,20 @@ See comments in HsUtils for why the other version does not include
 these bindings.
 
 \begin{code}
-collectPatBinders :: OutputableBndr a => LPat a -> [a]
+collectPatBinders :: LPat Id -> [Id]
 collectPatBinders pat = collectl pat []
 
-collectPatsBinders :: OutputableBndr a => [LPat a] -> [a]
+collectPatsBinders :: [LPat Id] -> [Id]
 collectPatsBinders pats = foldr collectl [] pats
 
 ---------------------
-collectl :: OutputableBndr a => LPat a -> [a] -> [a]
+collectl :: LPat Id -> [Id] -> [Id]
 -- See Note [Dictionary binders in ConPatOut]
 collectl (L _ pat) bndrs
   = go pat
   where
     go (VarPat var)               = var : bndrs
-    go (VarPatOut var bs)         = var : collectHsBindsBinders bs
+    go (VarPatOut var bs)         = var : collectEvBinders bs
                                     ++ bndrs
     go (WildPat _)                = bndrs
     go (LazyPat pat)              = collectl pat bndrs
@@ -1050,7 +1050,7 @@ collectl (L _ pat) bndrs
 
     go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps, pat_binds=ds}) =
-                                    collectHsBindsBinders ds
+                                    collectEvBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _)                 = bndrs
     go (NPat _ _ _)               = bndrs
@@ -1062,4 +1062,13 @@ collectl (L _ pat) bndrs
     go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
     go (ViewPat _ pat _)          = collectl pat bndrs
     go p@(QuasiQuotePat {})       = pprPanic "collectl/go" (ppr p)
+
+collectEvBinders :: TcEvBinds -> [Id]
+collectEvBinders (EvBinds bs)   = foldrBag add_ev_bndr [] bs
+collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
+
+add_ev_bndr :: EvBind -> [Id] -> [Id]
+add_ev_bndr (EvBind b _) bs | isId b    = b:bs
+                            | otherwise = bs
+  -- A worry: what about coercion variable binders??
 \end{code}

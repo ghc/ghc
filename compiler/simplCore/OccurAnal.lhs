@@ -28,6 +28,7 @@ import BasicTypes
 
 import VarSet
 import VarEnv
+import Var		( Var, varUnique )
 
 import Maybes           ( orElse )
 import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
@@ -91,7 +92,7 @@ occAnalBind :: OccEnv 		-- The incoming OccEnv
                 [CoreBind])
 
 occAnalBind env _ (NonRec binder rhs) body_usage
-  | isTyVar binder			-- A type let; we don't gather usage info
+  | isTyCoVar binder			-- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
   | not (binder `usedIn` body_usage)    -- It's not mentioned
@@ -314,12 +315,13 @@ occAnalBind _ env (Rec pairs) body_usage
     rec_edges = {-# SCC "occAnalBind.assoc" #-}  map make_node pairs
     
     make_node (bndr, rhs)
-	= (ND bndr rhs' all_rhs_usage rhs_fvs, idUnique bndr, out_edges)
+	= (ND bndr rhs' all_rhs_usage rhs_fvs, varUnique bndr, out_edges)
 	where
 	  (rhs_usage, rhs') = occAnalRhs env bndr rhs
-	  all_rhs_usage = addRuleUsage rhs_usage bndr    -- Note [Rules are extra RHSs]
-	  rhs_fvs = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
-	  out_edges = keysUFM (rhs_fvs `unionVarSet` idRuleVars bndr)
+	  all_rhs_usage = addIdOccs rhs_usage rule_vars -- Note [Rules are extra RHSs]
+	  rhs_fvs   = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
+	  out_edges = keysUFM (rhs_fvs `unionVarSet` rule_vars)
+          rule_vars = idRuleVars bndr      -- See Note [Rule dependency info]
         -- (a -> b) means a mentions b
         -- Given the usage details (a UFM that gives occ info for each free var of
         -- the RHS) we can get the list of free vars -- or rather their Int keys --
@@ -400,6 +402,7 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
     no_rules      = null init_rule_fvs
     init_rule_fvs = [(b, rule_fvs)
                     | b <- bndrs
+		    , isId b
                     , let rule_fvs = idRuleRhsVars b `intersectVarSet` bndr_set
                     , not (isEmptyVarSet rule_fvs)]
 
@@ -529,6 +532,8 @@ reOrderCycle depth (bind : binds) pairs
 
     score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
     score (ND bndr rhs _ _, _, _)
+        | not (isId bndr) = 100	    -- A type or cercion varialbe is never a loop breaker
+
         | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
 	   	     	      -- Note [DFuns should not be loop breakers]
 
@@ -582,7 +587,8 @@ reOrderCycle depth (bind : binds) pairs
 
 makeLoopBreaker :: Bool -> Id -> Id
 -- Set the loop-breaker flag: see Note [Weak loop breakers]
-makeLoopBreaker weak bndr = setIdOccInfo bndr (IAmALoopBreaker weak)
+makeLoopBreaker weak bndr 
+  = ASSERT2( isId bndr, ppr bndr ) setIdOccInfo bndr (IAmALoopBreaker weak)
 \end{code}
 
 Note [Complexity of loop breaking]
@@ -730,7 +736,8 @@ occAnalRhs :: OccEnv
 	      -- Returned usage details includes any INLINE rhs
 
 occAnalRhs env id rhs
-  = (addIdOccs rhs_usage (idUnfoldingVars id), rhs')
+  | isId id   = (addIdOccs rhs_usage (idUnfoldingVars id), rhs')
+  | otherwise = (rhs_usage, rhs')
     	-- Include occurrences for the "extra RHS" from a CoreUnfolding
   where
     (rhs_usage, rhs') = occAnal ctxt rhs
@@ -759,9 +766,11 @@ occAnalRhs env id rhs
 
 
 \begin{code}
-addRuleUsage :: UsageDetails -> Id -> UsageDetails
+addRuleUsage :: UsageDetails -> Var -> UsageDetails
 -- Add the usage from RULES in Id to the usage
-addRuleUsage usage id = addIdOccs usage (idRuleVars id)
+addRuleUsage usage var 
+  | isId var  = addIdOccs usage (idRuleVars var)
+  | otherwise = usage
         -- idRuleVars here: see Note [Rule dependency info]
 
 addIdOccs :: UsageDetails -> VarSet -> UsageDetails
@@ -841,7 +850,7 @@ occAnal env app@(App _ _)
 --   (a) occurrences inside type lambdas only not marked as InsideLam
 --   (b) type variables not in environment
 
-occAnal env (Lam x body) | isTyVar x
+occAnal env (Lam x body) | isTyCoVar x
   = case occAnal env body of { (body_usage, body') ->
     (body_usage, Lam x body')
     }
@@ -1440,8 +1449,8 @@ mkAltEnv env scrut cb
   where
     pe  = occ_proxy env
     pe' = case scrut of
-             Var v           -> extendProxyEnv pe v IdCo     cb
-             Cast (Var v) co -> extendProxyEnv pe v (ACo co) cb
+             Var v           -> extendProxyEnv pe v (IdCo (idType v)) cb
+             Cast (Var v) co -> extendProxyEnv pe v (ACo co)          cb
 	     _other          -> trimProxyEnv pe [cb]
 
 -----------
@@ -1467,7 +1476,7 @@ trimProxyEnv (PE pe fvs) bndrs
                              
 -----------
 freeVarsCoI :: CoercionI -> VarSet
-freeVarsCoI IdCo     = emptyVarSet
+freeVarsCoI (IdCo t) = tyVarsOfType t
 freeVarsCoI (ACo co) = tyVarsOfType co
 \end{code}
 
@@ -1500,9 +1509,8 @@ addOneOcc usage id info
 emptyDetails :: UsageDetails
 emptyDetails = (emptyVarEnv :: UsageDetails)
 
-localUsedIn, usedIn :: Id -> UsageDetails -> Bool
-v `localUsedIn` details = v `elemVarEnv` details
-v `usedIn`      details =  isExportedId v || v `localUsedIn` details
+usedIn :: Id -> UsageDetails -> Bool
+v `usedIn` details = isExportedId v || v `elemVarEnv` details
 
 type IdWithOccInfo = Id
 
@@ -1536,7 +1544,7 @@ tagBinder usage binder
 
 setBinderOcc :: UsageDetails -> CoreBndr -> CoreBndr
 setBinderOcc usage bndr
-  | isTyVar bndr      = bndr
+  | isTyCoVar bndr    = bndr
   | isExportedId bndr = case idOccInfo bndr of
                           NoOccInfo -> bndr
                           _         -> setIdOccInfo bndr NoOccInfo

@@ -17,7 +17,8 @@ module TcEnv(
 	tcLookupLocatedGlobal,	tcLookupGlobal, 
 	tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
 	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
-	tcLookupLocatedClass, tcLookupFamInst,
+	tcLookupLocatedClass, 
+	tcLookupFamInst, tcLookupDataFamInst,
 	
 	-- Local environment
 	tcExtendKindEnv, tcExtendKindEnvTvs,
@@ -26,13 +27,16 @@ module TcEnv(
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds, 
 	tcLookupId, tcLookupTyVar, getScopedTyVarBinds,
-	lclEnvElts, getInLocalScope, findGlobals, 
+	getInLocalScope,
 	wrongThingErr, pprBinders,
 
 	tcExtendRecEnv,    	-- For knot-tying
 
 	-- Rules
  	tcExtendRules,
+
+	-- Defaults
+	tcGetDefaultTys,
 
 	-- Global type variables
 	tcGetGlobalTyVars,
@@ -49,12 +53,13 @@ module TcEnv(
 #include "HsVersions.h"
 
 import HsSyn
-import TcIface
 import IfaceEnv
 import TcRnMonad
 import TcMType
 import TcType
--- import TcSuspension
+import TcIface	
+import PrelNames
+import TysWiredIn
 -- import qualified Type
 import Id
 import Coercion
@@ -71,6 +76,7 @@ import Class
 import Name
 import NameEnv
 import HscTypes
+import DynFlags
 import SrcLoc
 import Outputable
 import Unique
@@ -191,7 +197,7 @@ tcLookupLocatedTyCon = addLocM tcLookupTyCon
 --
 tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (TyCon, [Type]))
 tcLookupFamInst tycon tys
-  | not (isOpenTyCon tycon)
+  | not (isFamilyTyCon tycon)
   = return Nothing
   | otherwise
   = do { env <- getGblEnv
@@ -202,7 +208,49 @@ tcLookupFamInst tycon tys
 	   ((fam_inst, rep_tys):_) 
              -> return $ Just (famInstTyCon fam_inst, rep_tys)
        }
+
+tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
+-- Find the instance of a data famliy
+-- Note [Looking up family instances for deriving]
+tcLookupDataFamInst tycon tys
+  | not (isFamilyTyCon tycon)
+  = return (tycon, tys)
+  | otherwise
+  = ASSERT( isAlgTyCon tycon )
+    do { maybeFamInst <- tcLookupFamInst tycon tys
+       ; case maybeFamInst of
+           Nothing      -> famInstNotFound tycon tys
+           Just famInst -> return famInst }
+
+famInstNotFound :: TyCon -> [Type] -> TcM a
+famInstNotFound tycon tys 
+  = failWithTc (ptext (sLit "No family instance for")
+			<+> quotes (pprTypeApp tycon tys))
 \end{code}
+
+Note [Looking up family instances for deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tcLookupFamInstExact is an auxiliary lookup wrapper which requires
+that looked-up family instances exist.  If called with a vanilla
+tycon, the old type application is simply returned.
+
+If we have
+  data instance F () = ... deriving Eq
+  data instance F () = ... deriving Eq
+then tcLookupFamInstExact will be confused by the two matches;
+but that can't happen because tcInstDecls1 doesn't call tcDeriving
+if there are any overlaps.
+
+There are two other things that might go wrong with the lookup.
+First, we might see a standalone deriving clause
+	deriving Eq (F ())
+when there is no data instance F () in scope. 
+
+Note that it's OK to have
+  data instance F [a] = ...
+  deriving Eq (F [(a,b)])
+where the match is not exact; the same holds for ordinary data types
+with standalone deriving declrations.
 
 \begin{code}
 instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
@@ -263,8 +311,8 @@ tcLookupLocated = addLocM tcLookup
 
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name = do
-    local_env <- getLclEnv
-    case lookupNameEnv (tcl_env local_env) name of
+    local_env <- getLclTypeEnv
+    case lookupNameEnv local_env name of
 	Just thing -> return thing
 	Nothing    -> AGlobal <$> tcLookupGlobal name
 
@@ -300,15 +348,10 @@ tcLookupLocalIds ns = do
 			-> ASSERT( lvl == lvl1 ) id
 		_ -> pprPanic "tcLookupLocalIds" (ppr name)
 
-lclEnvElts :: TcLclEnv -> [TcTyThing]
-lclEnvElts env = nameEnvElts (tcl_env env)
-
 getInLocalScope :: TcM (Name -> Bool)
   -- Ids only
-getInLocalScope = do
-    env <- getLclEnv
-    let lcl_env = tcl_env env
-    return (`elemNameEnv` lcl_env)
+getInLocalScope = do { lcl_env <- getLclTypeEnv
+                     ; return (`elemNameEnv` lcl_env) }
 \end{code}
 
 \begin{code}
@@ -344,7 +387,7 @@ tcExtendTyVarEnv2 binds thing_inside = do
 	-- Here, g mustn't be generalised.  This is also important during
 	-- class and instance decls, when we mustn't generalise the class tyvars
 	-- when typechecking the methods.
-    gtvs' <- tc_extend_gtvs gtvs new_tv_set
+    gtvs' <- tcExtendGlobalTyVars gtvs new_tv_set
     setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
 
 getScopedTyVarBinds :: TcM [(Name, TcType)]
@@ -389,110 +432,22 @@ tc_extend_local_id_env		-- This is the guy who does the work
 --	(c) The call to tyVarsOfTypes is ok without looking through refs
 
 tc_extend_local_id_env env th_lvl names_w_ids thing_inside
-  = do	{ traceTc (text "env2")
-	; traceTc (text "env3" <+> ppr extra_env)
-	; gtvs' <- tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars
+  = do	{ traceTc "env2" (ppr extra_env)
+	; gtvs' <- tcExtendGlobalTyVars (tcl_tyvars env) extra_global_tyvars
 	; let env' = env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}
 	; setLclEnv env' thing_inside }
   where
     extra_global_tyvars = tcTyVarsOfTypes [idType id | (_,id) <- names_w_ids]
     extra_env	    = [ (name, ATcId { tct_id = id, 
-    				       tct_level = th_lvl,
-    				       tct_type = id_ty, 
-    				       tct_co = case isRefineableTy id_ty of
-						  (True,_) -> Unrefineable
-						  (_,True) -> Rigid idHsWrapper
-						  _        -> Wobbly})
-    		      | (name,id) <- names_w_ids, let id_ty = idType id]
+    				       tct_level = th_lvl })
+    		      | (name,id) <- names_w_ids]
     le'		    = extendNameEnvList (tcl_env env) extra_env
     rdr_env'	    = extendLocalRdrEnvList (tcl_rdr env) [name | (name,_) <- names_w_ids]
-\end{code}
 
-
-\begin{code}
------------------------
--- findGlobals looks at the value environment and finds values
--- whose types mention the offending type variable.  It has to be 
--- careful to zonk the Id's type first, so it has to be in the monad.
--- We must be careful to pass it a zonked type variable, too.
-
-findGlobals :: TcTyVarSet
-            -> TidyEnv 
-            -> TcM (TidyEnv, [SDoc])
-
-findGlobals tvs tidy_env = do
-    lcl_env <- getLclEnv
-    go tidy_env [] (lclEnvElts lcl_env)
-  where
-    go tidy_env acc [] = return (tidy_env, acc)
-    go tidy_env acc (thing : things) = do
-        (tidy_env1, maybe_doc) <- find_thing ignore_it tidy_env thing
-	case maybe_doc of
-	  Just d  -> go tidy_env1 (d:acc) things
-	  Nothing -> go tidy_env1 acc     things
-
-    ignore_it ty = tvs `disjointVarSet` tyVarsOfType ty
-
------------------------
-find_thing :: (TcType -> Bool) -> TidyEnv -> TcTyThing
-           -> TcM (TidyEnv, Maybe SDoc)
-find_thing ignore_it tidy_env (ATcId { tct_id = id }) = do
-    id_ty <- zonkTcType  (idType id)
-    if ignore_it id_ty then
-	return (tidy_env, Nothing)
-     else let
-	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
-	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
-		   nest 2 (parens (ptext (sLit "bound at") <+>
-			 	   ppr (getSrcLoc id)))]
-     in
-      return (tidy_env', Just msg)
-
-find_thing ignore_it tidy_env (ATyVar tv ty) = do
-    tv_ty <- zonkTcType ty
-    if ignore_it tv_ty then
-	return (tidy_env, Nothing)
-     else let
-	-- The name tv is scoped, so we don't need to tidy it
-	(tidy_env1, tidy_ty) = tidyOpenType  tidy_env tv_ty
-	msg = sep [ptext (sLit "Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff, nest 2 bound_at]
-
-	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, 
-		   getOccName tv == getOccName tv' = empty
-		 | otherwise = equals <+> ppr tidy_ty
-		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	bound_at = parens $ ptext (sLit "bound at:") <+> ppr (getSrcLoc tv)
-     in
-       return (tidy_env1, Just msg)
-
-find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{The global tyvars}
-%*									*
-%************************************************************************
-
-\begin{code}
-tc_extend_gtvs :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
-tc_extend_gtvs gtvs extra_global_tvs = do
-    global_tvs <- readMutVar gtvs
-    newMutVar (global_tvs `unionVarSet` extra_global_tvs)
-\end{code}
-
-@tcGetGlobalTyVars@ returns a fully-zonked set of tyvars free in the environment.
-To improve subsequent calls to the same function it writes the zonked set back into
-the environment.
-
-\begin{code}
-tcGetGlobalTyVars :: TcM TcTyVarSet
-tcGetGlobalTyVars = do
-    (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv
-    gbl_tvs  <- readMutVar gtv_var
-    gbl_tvs' <- zonkTcTyVarsAndFV (varSetElems gbl_tvs)
-    writeMutVar gtv_var gbl_tvs'
-    return gbl_tvs'
+tcExtendGlobalTyVars :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
+tcExtendGlobalTyVars gtv_var extra_global_tvs
+  = do { global_tvs <- readMutVar gtv_var
+       ; newMutVar (global_tvs `unionVarSet` extra_global_tvs) }
 \end{code}
 
 
@@ -582,6 +537,58 @@ thTopLevelId id = isGlobalId id || isExternalName (idName id)
 
 %************************************************************************
 %*									*
+                 getDefaultTys										
+%*									*
+%************************************************************************
+
+\begin{code}
+tcGetDefaultTys :: Bool		-- True <=> interactive context
+                -> TcM ([Type], -- Default types
+                        (Bool,	-- True <=> Use overloaded strings
+                         Bool)) -- True <=> Use extended defaulting rules
+tcGetDefaultTys interactive
+  = do	{ dflags <- getDOpts
+        ; let ovl_strings = dopt Opt_OverloadedStrings dflags
+              extended_defaults = interactive
+                               || dopt Opt_ExtendedDefaultRules dflags
+				        -- See also Trac #1974 
+              flags = (ovl_strings, extended_defaults)
+    
+        ; mb_defaults <- getDeclaredDefaultTys
+	; case mb_defaults of {
+	   Just tys -> return (tys, flags) ;
+	   	   	       	-- User-supplied defaults
+	   Nothing  -> do
+
+	-- No use-supplied default
+	-- Use [Integer, Double], plus modifications
+	{ integer_ty <- tcMetaTy integerTyConName
+	; checkWiredInTyCon doubleTyCon
+	; string_ty <- tcMetaTy stringTyConName
+        ; let deflt_tys = opt_deflt extended_defaults unitTy  -- Note [Default unitTy]
+			  ++ [integer_ty, doubleTy]
+			  ++ opt_deflt ovl_strings string_ty
+        ; return (deflt_tys, flags) } } }
+  where
+    opt_deflt True  ty = [ty]
+    opt_deflt False _  = []
+\end{code}
+
+Note [Default unitTy]
+~~~~~~~~~~~~~~~~~~~~~
+In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
+try when defaulting.  This has very little real impact, except in the following case.
+Consider: 
+	Text.Printf.printf "hello"
+This has type (forall a. IO a); it prints "hello", and returns 'undefined'.  We don't
+want the GHCi repl loop to try to print that 'undefined'.  The neatest thing is to
+default the 'a' to (), rather than to Integer (which is what would otherwise happen;
+and then GHCi doesn't attempt to print the ().  So in interactive mode, we add
+() to the list of defaulting types.  See Trac #1200.
+
+
+%************************************************************************
+%*									*
 \subsection{The InstInfo type}
 %*									*
 %************************************************************************
@@ -612,6 +619,7 @@ data InstBindings a
 	[LSig a]		-- User pragmas recorded for generating 
 				-- specialised instances
 	Bool			-- True <=> This code came from a standalone deriving clause
+                                --          Used only to improve error messages
 
   | NewTypeDerived      -- Used for deriving instances of newtypes, where the
 			-- witness dictionary is identical to the argument 

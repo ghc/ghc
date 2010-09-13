@@ -336,7 +336,7 @@ mkWWstr (arg : args) = do
 --	  brings into scope wrap_arg (via lets)
 mkWWstr_one :: Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one arg
-  | isTyVar arg
+  | isTyCoVar arg
   = return ([arg],  nop_fn, nop_fn)
 
   | otherwise

@@ -209,7 +209,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    traceRn (text "finish rnSrc" <+> ppr rn_group) ;
    traceRn (text "finish Dus" <+> ppr src_dus ) ;
-   return (final_tcg_env , rn_group)
+   return (final_tcg_env, rn_group)
                     }}}}
 
 -- some utils because we do this a bunch above

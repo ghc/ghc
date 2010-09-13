@@ -1112,7 +1112,7 @@ interestingArg e = go e 0
     go (Note _ a) 	 n = go a n
     go (Cast e _) 	 n = go e n
     go (Lam v e)  	 n 
-       | isTyVar v	   = go e n
+       | isTyCoVar v	   = go e n
        | n>0	 	   = go e (n-1)
        | otherwise	   = ValueArg
     go (Let _ e)  	 n = case go e n of { ValueArg -> ValueArg; _ -> NonTrivArg }

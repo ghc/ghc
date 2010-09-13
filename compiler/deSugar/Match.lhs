@@ -346,7 +346,7 @@ matchCoercion (var:vars) ty (eqns@(eqn1:_))
   = do	{ let CoPat co pat _ = firstPat eqn1
 	; var' <- newUniqueId var (hsPatType pat)
 	; match_result <- match (var':vars) ty (map decomposeFirst_Coercion eqns)
-	; co' <- dsCoercion co
+	; co' <- dsHsWrapper co
         ; let rhs' = co' (Var var)
 	; return (mkCoLetMatchResult (NonRec var' rhs') match_result) }
 
@@ -464,8 +464,8 @@ tidy1 v (VarPat var)
   = return (wrapBind var v, WildPat (idType var)) 
 
 tidy1 v (VarPatOut var binds)
-  = do	{ prs <- dsLHsBinds binds
-	; return (wrapBind var v . mkCoreLet (Rec prs),
+  = do	{ ds_ev_binds <- dsTcEvBinds binds
+	; return (wrapBind var v . wrapDsEvBinds ds_ev_binds,
 		  WildPat (idType var)) }
 
 	-- case v of { x@p -> mr[] }
@@ -875,7 +875,7 @@ viewLExprEq (e1,_) (e2,_) =
         wrap WpHole WpHole = True
         wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
         wrap (WpCast c)  (WpCast c')  = tcEqType c c'
-        wrap (WpApp d)   (WpApp d')   = d == d'
+        wrap (WpEvApp _) (WpEvApp _) = panic "ToDo: Match.viewLExprEq"
         wrap (WpTyApp t) (WpTyApp t') = tcEqType t t'
         -- Enhancement: could implement equality for more wrappers
         --   if it seems useful (lams and lets)

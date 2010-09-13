@@ -15,32 +15,35 @@ ToDo:
 
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-module PrelRules ( primOpRules, builtinRules ) where
+module PrelRules ( 
+    primOpRules, builtinRules,
+
+    -- Error Ids defined here because may be called here
+    mkRuntimeErrorApp, mkImpossibleExpr, 
+    rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
+    nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
+    pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID,
+ ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
 import MkCore		( mkWildCase )
-import Id		( realIdUnfolding )
-import Literal		( Literal(..), mkMachInt, mkMachWord
-			, literalType
-			, word2IntLit, int2WordLit
-			, narrow8IntLit, narrow16IntLit, narrow32IntLit
-			, narrow8WordLit, narrow16WordLit, narrow32WordLit
-			, char2IntLit, int2CharLit
-			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-			, float2DoubleLit, double2FloatLit, litFitsInChar
-			)
+import Id
+import IdInfo
+import Demand
+import Literal
 import PrimOp		( PrimOp(..), tagToEnumKey )
-import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
+import TysWiredIn
+import TysPrim
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils	( cheapEqExpr )
 import CoreUnfold	( exprIsConApp_maybe )
-import Type		( tyConAppTyCon, coreEqType )
+import TcType		( mkSigmaTy )
+import Type
 import OccName		( occNameFS )
-import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
-			  eqStringName, unpackCStringIdKey, inlineIdName )
+import PrelNames
 import Maybes		( orElse )
 import Name		( Name, nameOccName )
 import Outputable
@@ -437,13 +440,41 @@ mkDoubleVal d = Lit (convFloating (MachDouble d))
 %*									*
 %************************************************************************
 
+Note [tagToEnum#]
+~~~~~~~~~~~~~~~~~
+Nasty check to ensure that tagToEnum# is applied to a type that is an
+enumeration TyCon.  Unification may refine the type later, but this
+check won't see that, alas.  It's crude but it works.
+
+Here's are two cases that should fail
+ 	f :: forall a. a
+	f = tagToEnum# 0	-- Can't do tagToEnum# at a type variable
+
+	g :: Int
+	g = tagToEnum# 0	-- Int is not an enumeration
+
+We used to make this check in the type inference engine, but it's quite
+ugly to do so, because the delayed constraint solving means that we don't
+really know what's going on until the end. It's very much a corner case
+because we don't expect the user to call tagToEnum# at all; we merely
+generate calls in derived instances of Enum.  So we compromise: a
+rewrite rule rewrites a bad instance of tagToEnum# to an error call,
+and emits a warning.
+
 \begin{code}
 tagToEnumRule :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+tagToEnumRule _ [Type ty, _]
+  | not (is_enum_ty ty)	  -- See Note [tagToEnum#]
+  = WARN( True, ptext (sLit "tagToEnum# on non-enumeration type") <+> ppr ty )
+    Just (mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type")
+  where
+    is_enum_ty ty = case splitTyConApp_maybe ty of
+                       Just (tc, _) -> isEnumerationTyCon tc
+		       Nothing      -> False
+
 tagToEnumRule _ [Type ty, Lit (MachInt i)]
   = ASSERT( isEnumerationTyCon tycon ) 
     case filter correct_tag (tyConDataCons_maybe tycon `orElse` []) of
-
-
 	[]	  -> Nothing	-- Abstract type
 	(dc:rest) -> ASSERT( null rest )
 		     Just (Var (dataConWorkId dc))
@@ -454,6 +485,7 @@ tagToEnumRule _ [Type ty, Lit (MachInt i)]
 
 tagToEnumRule _ _ = Nothing
 \end{code}
+
 
 For dataToTag#, we can reduce if either 
 	
@@ -523,7 +555,8 @@ builtinRules
 
 ---------------------------------------------------
 -- The rule is this:
--- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
+-- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  
+--      =  unpackFoldrCString# "foobaz" c n
 
 match_append_lit :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_append_lit _ [Type ty1,
@@ -580,3 +613,117 @@ match_inline _ (Type _ : e : _)
 
 match_inline _ _ = Nothing
 \end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection[PrelVals-error-related]{@error@ and friends; @trace@}
+%*                                                                      *
+%************************************************************************
+b
+GHC randomly injects these into the code.
+
+@patError@ is just a version of @error@ for pattern-matching
+failures.  It knows various ``codes'' which expand to longer
+strings---this saves space!
+
+@absentErr@ is a thing we put in for ``absent'' arguments.  They jolly
+well shouldn't be yanked on, but if one is, then you will get a
+friendly message from @absentErr@ (rather than a totally random
+crash).
+
+@parError@ is a special version of @error@ which the compiler does
+not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
+templates, but we don't ever expect to generate code for it.
+
+\begin{code}
+mkRuntimeErrorApp 
+        :: Id           -- Should be of type (forall a. Addr# -> a)
+                        --      where Addr# points to a UTF8 encoded string
+        -> Type         -- The type to instantiate 'a'
+        -> String       -- The string to print
+        -> CoreExpr
+
+mkRuntimeErrorApp err_id res_ty err_msg 
+  = mkApps (Var err_id) [Type res_ty, err_string]
+  where
+    err_string = Lit (mkMachString err_msg)
+
+mkImpossibleExpr :: Type -> CoreExpr
+mkImpossibleExpr res_ty
+  = mkRuntimeErrorApp rUNTIME_ERROR_ID res_ty "Impossible case alternative"
+
+errorName, recSelErrorName, runtimeErrorName :: Name
+irrefutPatErrorName, recConErrorName, patErrorName :: Name
+nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
+errorName                = mkWiredInIdName gHC_ERR (fsLit "error")            errorIdKey eRROR_ID
+recSelErrorName          = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
+runtimeErrorName         = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
+irrefutPatErrorName      = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
+recConErrorName          = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "recConError")     recConErrorIdKey rEC_CON_ERROR_ID
+patErrorName             = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "patError")         patErrorIdKey pAT_ERROR_ID
+noMethodBindingErrorName = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "noMethodBindingError")
+                                           noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
+nonExhaustiveGuardsErrorName 
+  = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit "nonExhaustiveGuardsError") 
+                    nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
+
+rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
+pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
+rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
+rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
+iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
+rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
+pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
+nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
+nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
+
+-- The runtime error Ids take a UTF8-encoded string as argument
+
+mkRuntimeErrorId :: Name -> Id
+mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy
+
+runtimeErrorTy :: Type
+runtimeErrorTy = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
+\end{code}
+
+\begin{code}
+eRROR_ID :: Id
+eRROR_ID = pc_bottoming_Id errorName errorTy
+
+errorTy  :: Type
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+    -- Notice the openAlphaTyVar.  It says that "error" can be applied
+    -- to unboxed as well as boxed types.  This is OK because it never
+    -- returns, so the return type is irrelevant.
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+\subsection{Utilities}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+pc_bottoming_Id :: Name -> Type -> Id
+-- Function of arity 1, which diverges after being given one argument
+pc_bottoming_Id name ty
+ = mkVanillaGlobalWithInfo name ty bottoming_info
+ where
+    bottoming_info = vanillaIdInfo `setStrictnessInfo` Just strict_sig
+				   `setArityInfo`         1
+			-- Make arity and strictness agree
+
+        -- Do *not* mark them as NoCafRefs, because they can indeed have
+        -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
+        -- which has some CAFs
+        -- In due course we may arrange that these error-y things are
+        -- regarded by the GC as permanently live, in which case we
+        -- can give them NoCaf info.  As it is, any function that calls
+        -- any pc_bottoming_Id will itself have CafRefs, which bloats
+        -- SRTs.
+
+    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
+        -- These "bottom" out, no matter what their arguments
+\end{code}
+

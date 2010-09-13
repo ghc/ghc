@@ -1,6 +1,6 @@
 \begin{code}
 module TcUnify where
-import TcType	( TcTauType, BoxySigmaType, BoxyType )
+import TcType	( TcTauType )
 import TcRnTypes( TcM )
 import Coercion (CoercionI)
 
@@ -8,6 +8,4 @@ import Coercion (CoercionI)
 --		TcUnify and TcSimplify
 
 unifyType :: TcTauType -> TcTauType -> TcM CoercionI
-boxyUnify :: BoxyType -> BoxyType -> TcM CoercionI
-zapToMonotype :: BoxySigmaType -> TcM TcTauType
 \end{code}

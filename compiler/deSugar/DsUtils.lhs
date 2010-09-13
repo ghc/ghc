@@ -221,7 +221,7 @@ wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
 wrapBind new old body	-- Can deal with term variables *or* type variables
   | new==old    = body
-  | isTyVar new = Let (mkTyBind new (mkTyVarTy old)) body
+  | isTyCoVar new = Let (mkTyBind new (mkTyVarTy old)) body
   | otherwise   = Let (NonRec new (Var old))         body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
@@ -475,7 +475,7 @@ mkCoreAppDs (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   where
     case_bndr = case arg1 of
                    Var v1 | isLocalId v1 -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _                     -> mkWildBinder ty1
+                   _                     -> mkWildValBinder ty1
 
 mkCoreAppDs fun arg = mkCoreApp fun arg	 -- The rest is done in MkCore
 
@@ -550,8 +550,7 @@ mkSelectorBinds pat val_expr
       error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (ppr pat)
       tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
       tuple_var <- newSysLocalDs tuple_ty
-      let
-          mk_tup_bind binder
+      let mk_tup_bind binder
             = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
       return ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where

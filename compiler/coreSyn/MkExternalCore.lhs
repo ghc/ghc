@@ -145,7 +145,7 @@ make_exp (App e1 e2) = do
    rator <- make_exp e1
    rand <- make_exp e2
    return $ C.App rator rand
-make_exp (Lam v e) | isTyVar v = make_exp e >>= (\ b -> 
+make_exp (Lam v e) | isTyCoVar v = make_exp e >>= (\ b -> 
                                     return $ C.Lam (C.Tb (make_tbind v)) b)
 make_exp (Lam v e) | otherwise = make_exp e >>= (\ b -> 
                                     return $ C.Lam (C.Vb (make_vbind v)) b)
@@ -169,7 +169,7 @@ make_alt (DataAlt dcon, vs, e) = do
            (map make_tbind tbs)
            (map make_vbind vbs)
 	   newE
-	where (tbs,vbs) = span isTyVar vs
+	where (tbs,vbs) = span isTyCoVar vs
 make_alt (LitAlt l,_,e)   = make_exp e >>= (return . (C.Alit (make_lit l)))
 make_alt (DEFAULT,[],e)   = make_exp e >>= (return . C.Adefault)
 -- This should never happen, as the DEFAULT alternative binds no variables,

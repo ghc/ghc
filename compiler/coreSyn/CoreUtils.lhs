@@ -38,6 +38,9 @@ module CoreUtils (
 	-- * Equality
 	cheapEqExpr, eqExpr, eqExprX,
 
+	-- * Eta reduction
+	tryEtaReduce,
+
 	-- * Manipulating data constructors and types
 	applyTypeToArgs, applyTypeToArg,
         dataConOrigInstPat, dataConRepInstPat, dataConRepFSInstPat
@@ -109,7 +112,7 @@ coreAltType (_,bs,rhs)
   where
     ty           = exprType rhs
     free_tvs     = tyVarsOfType ty
-    bad_binder b = isTyVar b && b `elemVarSet` free_tvs
+    bad_binder b = isTyCoVar b && b `elemVarSet` free_tvs
 
 coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
@@ -142,10 +145,10 @@ Various possibilities suggest themselves:
    we are doing here.  It's not too expensive, I think.
 
 \begin{code}
-mkPiType  :: Var   -> Type -> Type
+mkPiType  :: EvVar -> Type -> Type
 -- ^ Makes a @(->)@ type or a forall type, depending
 -- on whether it is given a type variable or a term variable.
-mkPiTypes :: [Var] -> Type -> Type
+mkPiTypes :: [EvVar] -> Type -> Type
 -- ^ 'mkPiType' for multiple type or value arguments
 
 mkPiType v ty
@@ -195,7 +198,7 @@ panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
 \begin{code}
 -- | Wrap the given expression in the coercion, dropping identity coercions and coalescing nested coercions
 mkCoerceI :: CoercionI -> CoreExpr -> CoreExpr
-mkCoerceI IdCo e = e
+mkCoerceI (IdCo _) e = e
 mkCoerceI (ACo co) e = mkCoerce co e
 
 -- | Wrap the given expression in the coercion safely, coalescing nested coercions
@@ -1077,7 +1080,7 @@ noteSize (SCC cc)       = cc `seq` 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
  
 varSize :: Var -> Int
-varSize b  | isTyVar b = 1
+varSize b  | isTyCoVar b = 1
 	   | otherwise = seqType (idType b)		`seq`
 			 megaSeqIdInfo (idInfo b) 	`seq`
 			 1
@@ -1159,6 +1162,100 @@ extend_env (n,env) b = (n+1, extendVarEnv env b n)
 hashVar :: HashEnv -> Var -> Word32
 hashVar (_,env) v
  = fromIntegral (lookupVarEnv env v `orElse` hashName (idName v))
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Eta reduction
+%*									*
+%************************************************************************
+
+Note [Eta reduction conditions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We try for eta reduction here, but *only* if we get all the way to an
+trivial expression.  We don't want to remove extra lambdas unless we
+are going to avoid allocating this thing altogether.
+
+There are some particularly delicate points here:
+
+* Eta reduction is not valid in general:  
+	\x. bot  /=  bot
+  This matters, partly for old-fashioned correctness reasons but,
+  worse, getting it wrong can yield a seg fault. Consider
+	f = \x.f x
+	h y = case (case y of { True -> f `seq` True; False -> False }) of
+		True -> ...; False -> ...
+
+  If we (unsoundly) eta-reduce f to get f=f, the strictness analyser
+  says f=bottom, and replaces the (f `seq` True) with just
+  (f `cast` unsafe-co).  BUT, as thing stand, 'f' got arity 1, and it
+  *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands 
+  the definition again, so that it does not termninate after all.
+  Result: seg-fault because the boolean case actually gets a function value.
+  See Trac #1947.
+
+  So it's important to to the right thing.
+
+* Note [Arity care]: we need to be careful if we just look at f's
+  arity. Currently (Dec07), f's arity is visible in its own RHS (see
+  Note [Arity robustness] in SimplEnv) so we must *not* trust the
+  arity when checking that 'f' is a value.  Otherwise we will
+  eta-reduce
+      f = \x. f x
+  to
+      f = f
+  Which might change a terminiating program (think (f `seq` e)) to a 
+  non-terminating one.  So we check for being a loop breaker first.
+
+  However for GlobalIds we can look at the arity; and for primops we
+  must, since they have no unfolding.  
+
+* Regardless of whether 'f' is a value, we always want to 
+  reduce (/\a -> f a) to f
+  This came up in a RULE: foldr (build (/\a -> g a))
+  did not match 	  foldr (build (/\b -> ...something complex...))
+  The type checker can insert these eta-expanded versions,
+  with both type and dictionary lambdas; hence the slightly 
+  ad-hoc isDictId
+
+* Never *reduce* arity. For example
+      f = \xy. g x y
+  Then if h has arity 1 we don't want to eta-reduce because then
+  f's arity would decrease, and that is bad
+
+These delicacies are why we don't use exprIsTrivial and exprIsHNF here.
+Alas.
+
+\begin{code}
+tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
+tryEtaReduce bndrs body 
+  = go (reverse bndrs) body
+  where
+    incoming_arity = count isId bndrs
+
+    go (b : bs) (App fun arg) | ok_arg b arg = go bs fun	-- Loop round
+    go []       fun           | ok_fun fun   = Just fun		-- Success!
+    go _        _			     = Nothing		-- Failure!
+
+	-- Note [Eta reduction conditions]
+    ok_fun (App fun (Type ty)) 
+	| not (any (`elemVarSet` tyVarsOfType ty) bndrs)
+	=  ok_fun fun
+    ok_fun (Var fun_id)
+	=  not (fun_id `elem` bndrs)
+	&& (ok_fun_id fun_id || all ok_lam bndrs)
+    ok_fun _fun = False
+
+    ok_fun_id fun = fun_arity fun >= incoming_arity
+
+    fun_arity fun 	      -- See Note [Arity care]
+       | isLocalId fun && isLoopBreaker (idOccInfo fun) = 0
+       | otherwise = idArity fun   	      
+
+    ok_lam v = isTyCoVar v || isDictId v
+
+    ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
 \end{code}
 
 %************************************************************************

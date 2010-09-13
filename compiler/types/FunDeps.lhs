@@ -9,8 +9,8 @@ It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
 module FunDeps (
- 	Equation, pprEquation,
-	oclose, improveOne,
+ 	Equation, pprEquation, 
+	oclose, improveFromInstEnv, improveFromAnother,
 	checkInstCoverage, checkFunDeps,
 	pprFundeps
     ) where
@@ -199,6 +199,21 @@ NOTA BENE:
 
 \begin{code}
 type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
+
+improveFromInstEnv :: (Class -> [Instance]) 
+                     -> Pred_Loc 
+                     -> [(Equation,Pred_Loc,Pred_Loc)]
+-- Improvement from top-level instances 
+improveFromInstEnv _inst_env pred 
+  = improveOne _inst_env pred []        -- TODO: Refactor to directly use instance_eqnd? 
+
+improveFromAnother :: Pred_Loc 
+                   -> Pred_Loc
+                   -> [(Equation,Pred_Loc,Pred_Loc)] 
+-- Improvement from another local (given or wanted) constraint
+improveFromAnother pred1 pred2 
+  = improveOne (\_ -> []) pred1 [pred2] -- TODO: Refactor to directly use pairwise_eqns?
+
 
 improveOne :: (Class -> [Instance])		-- Gives instances for given class
 	   -> Pred_Loc				-- Do improvement triggered by this

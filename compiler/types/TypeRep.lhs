@@ -455,8 +455,8 @@ pprTheta theta  = parens (sep (punctuate comma (map pprPred theta)))
 pprThetaArrow :: ThetaType -> SDoc
 pprThetaArrow []     = empty
 pprThetaArrow [pred] 
-  | noParenPred pred = pprPred pred <+> ptext (sLit "=>")
-pprThetaArrow preds  = parens (sep (punctuate comma (map pprPred preds))) <+> ptext (sLit "=>")
+  | noParenPred pred = pprPred pred <+> darrow
+pprThetaArrow preds  = parens (sep (punctuate comma (map pprPred preds))) <+> darrow
 
 noParenPred :: PredType -> Bool
 -- A predicate that can appear without parens before a "=>"

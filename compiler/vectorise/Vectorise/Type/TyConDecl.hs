@@ -84,6 +84,7 @@ vectTyConDecl tycon
                             rec_flag            -- FIXME: is this ok?
                             False               -- FIXME: no generics
                             False               -- not GADT syntax
+                            NoParentTyCon
                             Nothing             -- not a family instance
 
     -- some other crazy thing that we don't handle.

@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+-- Norman likes local bindings
+
 -- This module is pure representation and should be imported only by
 -- clients that need to manipulate representation and know what
 -- they're doing.  Clients that need to create flow graphs should

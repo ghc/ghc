@@ -791,8 +791,8 @@ decllist :: { Located (OrdList (LHsDecl RdrName)) }
 binds 	::  { Located (HsLocalBinds RdrName) } 		-- May have implicit parameters
 						-- No type declarations
 	: decllist			{ L1 (HsValBinds (cvBindGroup (unLoc $1))) }
-	| '{'            dbinds '}'	{ LL (HsIPBinds (IPBinds (unLoc $2) emptyLHsBinds)) }
-	|     vocurly    dbinds close	{ L (getLoc $2) (HsIPBinds (IPBinds (unLoc $2) emptyLHsBinds)) }
+	| '{'            dbinds '}'	{ LL (HsIPBinds (IPBinds (unLoc $2) emptyTcEvBinds)) }
+	|     vocurly    dbinds close	{ L (getLoc $2) (HsIPBinds (IPBinds (unLoc $2) emptyTcEvBinds)) }
 
 wherebinds :: { Located (HsLocalBinds RdrName) }	-- May have implicit parameters
 						-- No type declarations

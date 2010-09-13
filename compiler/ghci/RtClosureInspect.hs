@@ -569,13 +569,13 @@ liftTcM :: TcM a -> TR a
 liftTcM = id
 
 newVar :: Kind -> TR TcType
-newVar = liftTcM . liftM mkTyVarTy . newBoxyTyVar
+newVar = liftTcM . newFlexiTyVarTy
 
 -- | Returns the instantiated type scheme ty', and the substitution sigma 
 --   such that sigma(ty') = ty 
 instScheme :: Type -> TR (TcType, TvSubst)
 instScheme ty = liftTcM$ do
-   (tvs, _, _)      <- tcInstType return ty
+   (tvs, _, _)  <- tcInstType return ty
    (tvs',_,ty') <- tcInstType (mapM tcInstTyVar) ty
    return (ty', zipTopTvSubst tvs' (mkTyVarTys tvs))
 
@@ -590,7 +590,7 @@ addConstraint actual expected = do
     recoverTR (traceTR $ fsep [text "Failed to unify", ppr actual,
                                     text "with", ppr expected])
               (congruenceNewtypes actual expected >>=
-                           (getLIE . uncurry boxyUnify) >> return ())
+                           (getConstraints . uncurry unifyType) >> return ())
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
@@ -861,7 +861,7 @@ improveRTTIType hsc_env _ty rtti_ty = runTR_maybe hsc_env $ do
     (ty_tvs,  _, _)   <- tcInstType return ty
     (ty_tvs', _, ty') <- tcInstType (mapM tcInstTyVar) ty
     (_, _, rtti_ty')  <- tcInstType (mapM tcInstTyVar) (sigmaType rtti_ty)
-    _ <- getLIE(boxyUnify rtti_ty' ty')
+    _ <- getConstraints(unifyType rtti_ty' ty')
     tvs1_contents     <- zonkTcTyVars ty_tvs'
     let subst = (uncurry zipTopTvSubst . unzip)
                  [(tv,ty) | (tv,ty) <- zip ty_tvs tvs1_contents
@@ -1101,7 +1101,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                         text " in presence of newtype evidence " <> ppr new_tycon)
                vars <- mapM (newVar . tyVarKind) (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon vars
-               _ <- liftTcM (boxyUnify ty (repType ty'))
+               _ <- liftTcM (unifyType ty (repType ty'))
         -- assumes that reptype doesn't ^^^^ touch tyconApp args 
                return ty'
 

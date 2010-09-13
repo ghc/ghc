@@ -285,9 +285,9 @@ The predicate we use is TcEnv.thTopLevelId.
 %************************************************************************
 
 \begin{code}
-tcBracket     :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
+tcBracket     :: HsBracket Name -> TcRhoType -> TcM (LHsExpr TcId)
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
-tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
+tcSpliceExpr  :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
 kcSpliceType  :: HsSplice Name -> FreeVars -> TcM (HsType Name, TcKind)
 	-- None of these functions add constraints to the LIE
 
@@ -339,17 +339,17 @@ tcBracket brack res_ty
 	-- but throw away the results.  We'll type check
 	-- it again when we actually use it.
        ; pending_splices <- newMutVar []
-       ; lie_var <- getLIEVar
+       ; lie_var <- getConstraintVar
        ; let brack_stage = Brack cur_stage pending_splices lie_var
 
        ; (meta_ty, lie) <- setStage brack_stage $
-                           getLIE $
+                           getConstraints $
                            tc_bracket cur_stage brack
 
-       ; tcSimplifyBracket lie
+       ; simplifyBracket lie
 
 	-- Make the expected type have the right shape
-       ; _ <- boxyUnify meta_ty res_ty
+       ; _ <- unifyType meta_ty res_ty
 
 	-- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
@@ -394,7 +394,7 @@ tc_bracket _ (DecBrG decls)
 
 tc_bracket _ (PatBr pat)
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
-	; _ <- tcPat ThPatQuote pat any_ty unitTy $ \_ ->
+	; _ <- tcPat ThPatQuote pat any_ty unitTy $ 
                return ()
 	; tcMetaTy patQTyConName }
 	-- Result type is PatQ (= Q Pat)
@@ -432,10 +432,9 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-     { _ <- unBox res_ty
-     ; meta_exp_ty <- tcMetaTy expQTyConName
+     { meta_exp_ty <- tcMetaTy expQTyConName
      ; expr' <- setStage pop_stage $
-                setLIEVar lie_var    $
+                setConstraintVar lie_var    $
                 tcMonoExpr expr meta_exp_ty
 
 	-- Write the pending splice into the bucket
@@ -445,7 +444,7 @@ tcSpliceExpr (HsSplice name expr) res_ty
      ; return (panic "tcSpliceExpr")	-- The returned expression is ignored
      }}}
 
-tcTopSplice :: LHsExpr Name -> BoxyRhoType -> TcM (HsExpr Id)
+tcTopSplice :: LHsExpr Name -> TcRhoType -> TcM (HsExpr Id)
 -- Note [How top-level splices are handled]
 tcTopSplice expr res_ty
   = do { meta_exp_ty <- tcMetaTy expQTyConName
@@ -487,13 +486,13 @@ tcTopSpliceExpr tc_action
                    -- if the type checker fails!
     setStage Splice $ 
     do {    -- Typecheck the expression
-         (expr', lie) <- getLIE tc_action
+         (expr', lie) <- getConstraints tc_action
         
 	-- Solve the constraints
-	; const_binds <- tcSimplifyTop lie
+	; const_binds <- simplifyTop lie
 	
           -- Zonk it and tie the knot of dictionary bindings
-       ; zonkTopLExpr (mkHsDictLet const_binds expr') }
+       ; zonkTopLExpr (mkHsDictLet (EvBinds const_binds) expr') }
 \end{code}
 
 
@@ -518,7 +517,7 @@ kcSpliceType splice@(HsSplice name hs_expr) fvs
 	   -- A splice inside brackets
     { meta_ty <- tcMetaTy typeQTyConName
     ; expr' <- setStage pop_level $
-    	       setLIEVar lie_var $
+    	       setConstraintVar lie_var $
     	       tcMonoExpr hs_expr meta_ty
 
     	-- Write the pending splice into the bucket
@@ -681,7 +680,7 @@ runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
         ; let is_local = nameIsLocalOrFrom this_mod quoter'
         ; checkTc (not is_local) (quoteStageError quoter')
 
-	; traceTc (text "runQQ" <+> ppr quoter <+> ppr is_local)
+	; traceTc "runQQ" (ppr quoter <+> ppr is_local)
 
 	  -- Build the expression 
       	; let quoterExpr = L q_span $! HsVar $! quoter'
@@ -757,7 +756,7 @@ runMetaQ (MT { mt_show = show_th, mt_cvt = cvt }) expr
   where
     run_and_cvt expr_span hval
        = do { th_result <- TH.runQ hval
-            ; traceTc (text "Got TH result:" <+> text (show_th th_result))
+            ; traceTc "Got TH result:" (text (show_th th_result))
             ; return (cvt expr_span th_result) }
 
 runMetaE :: LHsExpr Id 		-- Of type (Q Exp)
@@ -779,7 +778,7 @@ runMeta :: (Outputable hs_syn)
 	-> LHsExpr Id 		-- Of type x; typically x = Q TH.Exp, or something like that
 	-> TcM hs_syn		-- Of type t
 runMeta show_code run_and_convert expr
-  = do	{ traceTc (text "About to run" <+> ppr expr)
+  = do	{ traceTc "About to run" (ppr expr)
 
 	-- Desugar
 	; ds_expr <- initDsTc (dsLExpr expr)
@@ -810,7 +809,7 @@ runMeta show_code run_and_convert expr
 	     do	{ mb_result <- run_and_convert expr_span (unsafeCoerce# hval)
 		; case mb_result of
 		    Left err     -> failWithTc err
-		    Right result -> do { traceTc (ptext (sLit "Got HsSyn result:") <+> ppr result) 
+		    Right result -> do { traceTc "Got HsSyn result:" (ppr result) 
                                        ; return $! result } }
 
 	; case either_tval of
@@ -1020,9 +1019,9 @@ reifyThing (AGlobal (ADataCon dc))
                               (reifyName (dataConOrigTyCon dc)) fix) 
         }
 
-reifyThing (ATcId {tct_id = id, tct_type = ty}) 
-  = do	{ ty1 <- zonkTcType ty	-- Make use of all the info we have, even
-				-- though it may be incomplete
+reifyThing (ATcId {tct_id = id}) 
+  = do	{ ty1 <- zonkTcType (idType id)	-- Make use of all the info we have, even
+    					-- though it may be incomplete
 	; ty2 <- reifyType ty1
 	; fix <- reifyFixity (idName id)
 	; return (TH.VarI (reifyName id) ty2 Nothing fix) }
@@ -1041,7 +1040,7 @@ reifyTyCon tc
   = return (TH.PrimTyConI (reifyName tc) 2 		  False)
   | isPrimTyCon tc 
   = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
-  | isOpenTyCon tc
+  | isFamilyTyCon tc
   = let flavour = reifyFamFlavour tc
         tvs     = tyConTyVars tc
         kind    = tyConKind tc
@@ -1152,8 +1151,8 @@ reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
 reifyFamFlavour :: TyCon -> TH.FamFlavour
-reifyFamFlavour tc | isOpenSynTyCon tc = TH.TypeFam
-                   | isOpenTyCon    tc = TH.DataFam
+reifyFamFlavour tc | isSynFamilyTyCon tc = TH.TypeFam
+                   | isFamilyTyCon    tc = TH.DataFam
                    | otherwise         
                    = panic "TcSplice.reifyFamFlavour: not a type family"
 

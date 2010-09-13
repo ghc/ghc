@@ -1,0 +1,181 @@
+
+Notes on the new type constraint solver
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* 1/9/10: Consider
+    {alpha} [b] (c~b) => (alpha ~ b)
+  Then to maximise the chance of floating the equality out of
+  the implication we'd like to orient the given as (b~c) 
+  rather than (c~b).
+     See test gadt-escape1, gadt13, gadt7
+  These tests pass because of approximateImplications
+
+* Equality superclasses are not getting the right instance decl
+    indexed-types/should_compile/T2238:
+
+* Partial applications of data type families
+    indexed-types/should_compile/DerivingNewType
+  
+Functional dependencies
+~~~~~~~~~~~~~~~~~~~~~~~
+* indexed-types/Gentle
+
+RelaxedPolyRec by default
+~~~~~~~~~~~~~~~~~~~~~~~~~
+* tcfail071
+* tcfail144
+* tcfail149, 150
+
+
+---------------------
+* 18/8/10: Fixed treatment of new work list from superclasses of wanteds. 
+           TODO TODO: Revisit the desugarer to deal with equalities that 
+           may mention recursive dictionaries. 
+
+* 12/8/10: Fixed proper kind checking for equalities and type family equalities.
+  NOTE: Type synonyms stay unexpanded in canonical constraints. Is this correct?
+
+* 24/7/10: canonicalisation orients meta variables
+           kind checking?
+  see trySpontaneous: need to take care with orientation 
+
+* See newWantedSCWorkList: no adding superclass equalities
+  for wanteds.  Seems ad hoc.
+
+* Happy genericTemplate notHappyAtAll needs a signature
+
+* time package needs signatures; I have put -XNoMonoLocalBinds in 
+     validate-settings.mk for now
+
+Improve error message
+~~~~~~~~~~~~~~~~~~~~~
+   FD1(normal)          <- DV: Failure to produce FD equality from *given* and top-level
+
+   FD2(normal)          <- DV: Failure to produce FC equality from two *givens*
+
+Unexpected failures:
+~~~~~~~~~~~~~~~~~~~~~
+   PolyRec(normal,hpc,optasm)     <- DV: Actually works, but we have a warning 
+                                     for -XRelaxedPolyRec deprecated flag
+   T1470(normal,optc,hpc,optasm)   
+   T2494(normal)
+   T2494-2(normal,optc,hpc,optasm)
+   T3108(normal,hpc,optasm)       <- DV: Actually works, but we have a warning for 
+                                     deprecated flags
+   T3391(normal,optc,hpc,optasm)  
+   tc003(hpc)
+   tc081(normal,optc,hpc,optasm)  <- DV: Let does not get generalized for 
+                                         *single* variable binding
+   tc089(normal,optc,hpc,optasm)       
+   tc095(normal,optc,hpc,optasm)
+   tc111(normal,optc,hpc,optasm)
+   tc113(normal,optc,hpc,optasm)  Generalize top-level var binding
+   tc127(normal,optc,hpc,optasm)  <- DV: Missing module Maybe in haskell98 package ... 
+   tc132(normal,optc,hpc,optasm)  Generalize top-level var binding
+   tc150(normal,optc,hpc,optasm)  Pattern signatures 
+   tc159(normal,optc,hpc,optasm)  <- ILL FORMED EVIDENCE (related to newtype ... deriving) 
+   tc162(normal)
+   tc168(normal,optc,hpc,optasm)  <- DV: Actually works, don't know why its reported
+   tc170(normal)
+   tc175(normal,optc,hpc,optasm)
+   tc189(normal,optc,hpc,optasm)  <- higher-rank ? 
+   tc192(normal,optc,hpc,optasm)  <- loop in desugarer
+   tc194(normal,optc,hpc,optasm)  <- polymorphic pattern signatures / higher-rank?
+   tc211(normal,optc,hpc,optasm)  <- polymorphic pattern signatures / higher-rank?
+   tc216(normal,optc,hpc,optasm)  <- ctx stack depth exceeded ... 
+   tc217(normal,optc,hpc,optasm)  
+   tc222(normal,optc,hpc,optasm)
+   tc231(normal,optc,hpc,optasm)
+   tc237(normal,optc,hpc,optasm)
+   tc243(normal,optc,hpc,optasm)      <- DV: Actually works, Definition but no signature warning 
+   tc244(normal,optc,hpc,optasm)
+
+
+ 
+
+ToDo
+~~~~
+* zonking Coercions should use a function of a different name
+
+Basic setup
+~~~~~~~~~~~
+   New modules     TcSimplify (old name, but all new code)
+		   TcInteract
+                   TcCanonical (defines the TcS monad too)
+                   Constraints (both Wanted and Canonical)
+
+Existing modules   Coercion (defines operations over Coercions)
+	 	   Kind
+	 	   Type
+		   TypeRep (the representation of types, kinds, coercions)
+
+   Dead modules	   TcTyFuns
+		   TcSimplify-old.lhs (the old TcSimplify, 
+			in repo just for reference)
+
+
+Significant differences wrt the prototype
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* "Givens"  are simply evidence variables (EvVar)
+  "Wanteds" are WantedConstraints
+  See the Implication type in TcSolverTypes.lhs
+
+  There is no sum type combining given and wanted constraints
+
+* Wanted constraints are of three flavours (see data WantedConstraint)
+	- evidenence variables: we can abstract over these
+	- implications: we can't abstract over these
+        - literal and method constraints; we can't abstract over these
+		either, and they aren't implemented yet
+
+* We use a mutable group of bindings attached to each Inplication as the
+  place to accumulate evidence for dictionaries and implicit parameters
+  (It's also vital for equality superclasses.)  Each Impliciation has a
+  TcEvBinds, defined in hsSyn/HsBinds.  The reference cell to accumulate
+  bindings into is carried by the TcS solver monad; we need to fill in 
+  evidence in the solver.
+
+* An evidence variable is
+	- a dictionary
+	- an implicit paramter
+	- a coercion variable
+  See newEvVar in Inst.lhs
+
+* The main Tc monad carries a set of untouchables
+  The unifier ensures that they are not unified
+  See Note [Unifying untouchables]
+
+* tcCheckExpr does deep-skol on expected type, and
+  then calls tcExpr with (Check ty), where ty is deeply-skolemised
+
+
+-------------------
+Things to check later
+-------------------
+* Monomorphism restriction puts type variables in the top level env
+  When generalising, we can't generalise over these ones (alas)
+  Consider: 
+    - Reject programs that fall under the monomorphism restriction
+        (top-level monomorphic is rare)
+    - Some hack to accept H98 programs
+
+* No orientation of tv~ty constraints; we don't need it
+
+Note [OpenSynTyCon app]
+~~~~~~~~~~~~~~~~~~~~~~~
+Given
+
+  type family T a :: * -> *
+
+the two types (T () a) and (T () Int) must unify, even if there are
+no type instances for T at all.  Should we just turn them into an
+equality (T () a ~ T () Int)?  I don't think so.  We currently try to
+eagerly unify everything we can before generating equalities; otherwise,
+we could turn the unification of [Int] with [a] into an equality, too.
+
+------------------------
+We need to both 'unBox' and zonk deferred types.  We need to unBox as
+functions, such as TcExpr.tcMonoExpr promise to fill boxes in the expected
+type.  We need to zonk as the types go into the kind of the coercion variable
+`cotv' and those are not zonked in Inst.zonkInst.  (Maybe it would be better
+to zonk in zonInst instead.  Would that be sufficient?)
+

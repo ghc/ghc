@@ -10,14 +10,10 @@ module TcArrows ( tcProc ) where
 import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho )
 
 import HsSyn
-import TcHsSyn
-
 import TcMatches
-
 import TcType
 import TcMType
 import TcBinds
-import TcSimplify
 import TcPat
 import TcUnify
 import TcRnMonad
@@ -44,19 +40,18 @@ import Control.Monad
 
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
-       -> BoxyRhoType				-- Expected type of whole proc expression
+       -> TcRhoType				-- Expected type of whole proc expression
        -> TcM (OutPat TcId, LHsCmdTop TcId, CoercionI)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
-    do	{ ((exp_ty1, res_ty), coi) <- boxySplitAppTy exp_ty 
-	; ((arr_ty, arg_ty), coi1) <- boxySplitAppTy exp_ty1
+    do	{ (coi, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty 
+	; (coi1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
 	; (pat', cmd') <- tcPat ProcExpr pat arg_ty res_ty $
-			  tcCmdTop cmd_env cmd []
-        ; let res_coi = mkTransCoI coi (mkAppTyCoI exp_ty1 coi1 res_ty IdCo)
-	; return (pat', cmd', res_coi) 
-        }
+			  tcCmdTop cmd_env cmd [] res_ty
+        ; let res_coi = mkTransCoI coi (mkAppTyCoI coi1 (IdCo res_ty))
+	; return (pat', cmd', res_coi) }
 \end{code}
 
 
@@ -187,7 +182,7 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 		-- Check the patterns, and the GRHSs inside
 	; (pats', grhss') <- setSrcSpan mtch_loc			$
 			     tcPats LambdaExpr pats cmd_stk res_ty	$
-			     tc_grhss grhss
+			     tc_grhss grhss res_ty
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')
 	; return (HsLam (MatchGroup [match'] res_ty))
@@ -246,24 +241,18 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		--   -> a ((w,t1) .. tn) t
 	; let e_ty = mkFunTys [mkAppTys b [tup,s] | (_,_,b,tup,s) <- cmds_w_tys] 
 			      e_res_ty
+              free_tvs = tyVarsOfTypes (res_ty:cmd_stk)
 
 		-- Check expr
-	; (expr', lie) <- escapeArrowScope (getLIE (tcMonoExpr expr e_ty))
-	; loc <- getInstLoc (SigOrigin ArrowSkol)
-	; inst_binds <- tcSimplifyCheck loc [w_tv] [] lie
-
-		-- Check that the polymorphic variable hasn't been unified with anything
-		-- and is not free in res_ty or the cmd_stk  (i.e.  t, t1..tn)
-	; checkSigTyVarsWrt (tyVarsOfTypes (res_ty:cmd_stk)) [w_tv] 
+	; (inst_binds, expr') <- checkConstraints ArrowSkol free_tvs [w_tv] [] $
+                                 escapeArrowScope (tcMonoExpr expr e_ty)
 
 		-- OK, now we are in a position to unscramble 
 		-- the s1..sm and check each cmd
 	; cmds' <- mapM (tc_cmd w_tv) cmds_w_tys
 
-	; return (HsArrForm (noLoc $ HsWrap (WpTyLam w_tv) 
-					       (unLoc $ mkHsDictLet inst_binds expr')) 
-			     fixity cmds')
-	}
+        ; let wrap = WpTyLam w_tv <.> mkWpLet inst_binds
+	; return (HsArrForm (mkLHsWrap wrap expr') fixity cmds') }
   where
  	-- Make the types	
 	--	b, ((e,s1) .. sm), s
@@ -340,15 +329,15 @@ cmdCtxt cmd = ptext (sLit "In the command:") <+> ppr cmd
 nonEmptyCmdStkErr :: HsExpr Name -> SDoc
 nonEmptyCmdStkErr cmd
   = hang (ptext (sLit "Non-empty command stack at command:"))
-	 4 (ppr cmd)
+       2 (ppr cmd)
 
 kappaUnderflow :: HsExpr Name -> SDoc
 kappaUnderflow cmd
   = hang (ptext (sLit "Command stack underflow at command:"))
-	 4 (ppr cmd)
+       2 (ppr cmd)
 
 badFormFun :: Int -> TcType -> SDoc
 badFormFun i tup_ty'
  = hang (ptext (sLit "The type of the") <+> speakNth i <+> ptext (sLit "argument of a command form has the wrong shape"))
-	4 (ptext (sLit "Argument type:") <+> ppr tup_ty')
+      2 (ptext (sLit "Argument type:") <+> ppr tup_ty')
 \end{code}

@@ -76,7 +76,7 @@ Note [Nodes, keys, vertices]
 
 \begin{code}
 data Graph node = Graph { 
-    gr_int_graph :: IntGraph,
+    gr_int_graph      :: IntGraph,
     gr_vertex_to_node :: Vertex -> node,
     gr_node_to_vertex :: node -> Maybe Vertex
   }

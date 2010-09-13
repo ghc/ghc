@@ -40,7 +40,6 @@ import TcType
 import {- Kind parts of -} Type
 import Var
 import VarSet
-import Coercion
 import TyCon
 import Class
 import Name
@@ -475,7 +474,7 @@ mkHsAppTys fun_ty (arg_ty:arg_tys)
 splitFunKind :: SDoc -> Int -> TcKind -> [b] -> TcM ([(b,ExpKind)], TcKind)
 splitFunKind _       _      fk [] = return ([], fk)
 splitFunKind the_fun arg_no fk (arg:args)
-  = do { mb_fk <- unifyFunKind fk
+  = do { mb_fk <- matchExpectedFunKind fk
        ; case mb_fk of
             Nothing       -> failWithTc too_many_args 
             Just (ak,fk') -> do { (aks, rk) <- splitFunKind the_fun (arg_no+1) fk' args
@@ -522,9 +521,9 @@ kc_pred (HsEqualP ty1 ty2)
 ---------------------------
 kcTyVar :: Name -> TcM TcKind
 kcTyVar name = do	-- Could be a tyvar or a tycon
-    traceTc (text "lk1" <+> ppr name)
+    traceTc "lk1" (ppr name)
     thing <- tcLookup name
-    traceTc (text "lk2" <+> ppr name <+> ppr thing)
+    traceTc "lk2" (ppr name <+> ppr thing)
     case thing of 
         ATyVar _ ty             -> return (typeKind ty)
         AThing kind             -> return kind
@@ -851,19 +850,23 @@ tcHsPatSigType ctxt hs_ty
 
 tcPatSig :: UserTypeCtxt
 	 -> LHsType Name
-	 -> BoxySigmaType
+	 -> TcSigmaType
 	 -> TcM (TcType,	   -- The type to use for "inside" the signature
 		 [(Name, TcType)], -- The new bit of type environment, binding
 				   -- the scoped type variables
-                 CoercionI)        -- Coercion due to unification with actual ty
+                 HsWrapper)        -- Coercion due to unification with actual ty
+		 		   -- Of shape:  res_ty ~ sig_ty
 tcPatSig ctxt sig res_ty
   = do	{ (sig_tvs, sig_ty) <- tcHsPatSigType ctxt sig
+    	-- sig_tvs are the type variables free in 'sig', 
+	-- and not already in scope. These are the ones
+	-- that should be brought into scope
 
 	; if null sig_tvs then do {
 		-- The type signature binds no type variables, 
 		-- and hence is rigid, so use it to zap the res_ty
-		  coi <- boxyUnify sig_ty res_ty
-		; return (sig_ty, [], coi)
+         	  wrap <- tcSubType PatSigOrigin (SigSkol ctxt) res_ty sig_ty
+		; return (sig_ty, [], wrap)
 
 	} else do {
 		-- Type signature binds at least one scoped type variable
@@ -877,9 +880,6 @@ tcPatSig ctxt sig res_ty
 				_              -> False
 	; ASSERT( not in_pat_bind || null sig_tvs ) return ()
 
-	  	-- Check that pat_ty is rigid
-	; checkTc (isRigidTy res_ty) (wobblyPatSig sig_tvs)
-
 		-- Check that all newly-in-scope tyvars are in fact
 		-- constrained by the pattern.  This catches tiresome
 		-- cases like	
@@ -890,24 +890,20 @@ tcPatSig ctxt sig res_ty
 	; let bad_tvs = filterOut (`elemVarSet` exactTyVarsOfType sig_ty) sig_tvs
 	; checkTc (null bad_tvs) (badPatSigTvs sig_ty bad_tvs)
 
-		-- Now match the pattern signature against res_ty
-		-- For convenience, and uniform-looking error messages
-		-- we do the matching by allocating meta type variables, 
-		-- unifying, and reading out the results.
-		-- This is a strictly local operation.
-	; box_tvs <- mapM tcInstBoxyTyVar sig_tvs
-	; coi <- boxyUnify (substTyWith sig_tvs (mkTyVarTys box_tvs) sig_ty) 
-                           res_ty
-	; sig_tv_tys <- mapM readFilledBox box_tvs
+	-- Now do a subsumption check of the pattern signature against res_ty
+	; sig_tvs' <- tcInstSigTyVars sig_tvs
+        ; let sig_ty' = substTyWith sig_tvs sig_tv_tys' sig_ty
+              sig_tv_tys' = mkTyVarTys sig_tvs'
+	; wrap <- tcSubType PatSigOrigin (SigSkol ctxt) res_ty sig_ty'
 
-		-- Check that each is bound to a distinct type variable,
-		-- and one that is not already in scope
-	; let tv_binds = map tyVarName sig_tvs `zip` sig_tv_tys
+	-- Check that each is bound to a distinct type variable,
+	-- and one that is not already in scope
 	; binds_in_scope <- getScopedTyVarBinds
+	; let tv_binds = map tyVarName sig_tvs `zip` sig_tv_tys'
 	; check binds_in_scope tv_binds
 	
-		-- Phew!
-	; return (res_ty, tv_binds, coi)
+	-- Phew!
+	; return (sig_ty', tv_binds, wrap)
 	} }
   where
     check _ [] = return ()
@@ -915,14 +911,9 @@ tcPatSig ctxt sig res_ty
 				      ; check ((n,ty):in_scope) rest }
 
     check_one in_scope n ty
-	= do { checkTc (tcIsTyVarTy ty) (scopedNonVar n ty)
-		-- Must bind to a type variable
-
-	     ; checkTc (null dups) (dupInScope n (head dups) ty)
+	= checkTc (null dups) (dupInScope n (head dups) ty)
 		-- Must not bind to the same type variable
 		-- as some other in-scope type variable
-
-	     ; return () }
 	where
 	  dups = [n' | (n',ty') <- in_scope, tcEqType ty' ty]
 \end{code}
@@ -1034,12 +1025,6 @@ pprHsSigCtxt ctxt hs_ty = sep [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> co
 
     pp_n_colon n = ppr n <+> dcolon <+> ppr (unLoc hs_ty)
 
-wobblyPatSig :: [Var] -> SDoc
-wobblyPatSig sig_tvs
-  = hang (ptext (sLit "A pattern type signature cannot bind scoped type variables") 
-		<+> pprQuotedList sig_tvs)
-       2 (ptext (sLit "unless the pattern has a rigid type context"))
-		
 badPatSigTvs :: TcType -> [TyVar] -> SDoc
 badPatSigTvs sig_ty bad_tvs
   = vcat [ fsep [ptext (sLit "The type variable") <> plural bad_tvs, 
@@ -1048,12 +1033,6 @@ badPatSigTvs sig_ty bad_tvs
 	  	 ptext (sLit "but are actually discarded by a type synonym") ]
          , ptext (sLit "To fix this, expand the type synonym") 
          , ptext (sLit "[Note: I hope to lift this restriction in due course]") ]
-
-scopedNonVar :: Name -> Type -> SDoc
-scopedNonVar n ty
-  = vcat [sep [ptext (sLit "The scoped type variable") <+> quotes (ppr n),
-	       nest 2 (ptext (sLit "is bound to the type") <+> quotes (ppr ty))],
-	  nest 2 (ptext (sLit "You can only bind scoped type variables to type variables"))]
 
 dupInScope :: Name -> Name -> Type -> SDoc
 dupInScope n n' _

@@ -31,7 +31,6 @@ import TcRnMonad
 
 import PrelNames
 import PrelInfo
-import PrelRules
 import Rules
 import Annotations
 import InstEnv

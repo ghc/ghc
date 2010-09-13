@@ -408,11 +408,14 @@ Library
         TcRnTypes
         TcRules
         TcSimplify
+        TcErrors
         TcTyClsDecls
         TcTyDecls
-        TcTyFuns
         TcType
         TcUnify
+        TcInteract
+        TcCanonical
+        TcSMonad
         Class
         Coercion
         FamInstEnv

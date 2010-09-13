@@ -535,7 +535,7 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 	-> LvlM (LevelledBind, LevelEnv)
 
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
-  |  isTyVar bndr 		-- Don't do anything for TyVar binders
+  |  isTyCoVar bndr 		-- Don't do anything for TyVar binders
 				--   (simplifier gets rid of them pronto)
   = do rhs' <- lvlExpr ctxt_lvl env rhs
        return (NonRec (TB bndr ctxt_lvl) rhs', env)
@@ -845,7 +845,7 @@ abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
 		   (False, True) -> False
 		   _    	 -> v1 <= v2	-- Same family
 
-    is_tv v = isTyVar v && not (isCoVar v)
+    is_tv v = isTyCoVar v && not (isCoVar v)
 
     uniq :: [Var] -> [Var]
 	-- Remove adjacent duplicates; the sort will have brought them together

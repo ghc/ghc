@@ -66,7 +66,7 @@ then 'T [Int]' unfolds to (:R42T Int, :Co:R42T Int).
 \begin{code}
 tcUnfoldSynFamInst :: Type -> TcM (Maybe (Type, Coercion))
 tcUnfoldSynFamInst (TyConApp tycon tys)
-  | not (isOpenSynTyCon tycon)     -- unfold *only* _synonym_ family instances
+  | not (isSynFamilyTyCon tycon)     -- unfold *only* _synonym_ family instances
   = return Nothing
   | otherwise
   = do { -- The TyCon might be over-saturated, but that's ok for tcLookupFamInst
@@ -530,12 +530,12 @@ normEqInst inst
 
       -- left-to-right rule with type family head
     go ty1@(TyConApp con args) ty2 co 
-      | isOpenSynTyConApp ty1           -- only if not oversaturated
+      | isSynFamilyTyConApp ty1           -- only if not oversaturated
       = mkRewriteFam False con args ty2 co
 
       -- right-to-left rule with type family head
     go ty1 ty2@(TyConApp con args) co 
-      | isOpenSynTyConApp ty2           -- only if not oversaturated
+      | isSynFamilyTyConApp ty2           -- only if not oversaturated
       = do { co' <- mkSymEqInstCo co (ty2, ty1)
            ; mkRewriteFam True con args ty1 co'
            }
@@ -775,7 +775,7 @@ flattenType inst ty = go ty
       -- type family application & family arity matches number of args
       -- => flatten to "gamma :: F t1'..tn' ~ alpha" (alpha & gamma fresh)
     go ty@(TyConApp con args)
-      | isOpenSynTyConApp ty   -- only if not oversaturated
+      | isSynFamilyTyConApp ty   -- only if not oversaturated
       = do { (args', cargs, args_eqss) <- mapAndUnzip3M go args
            ; alpha <- newFlexiTyVar (typeKind ty)
            ; let alphaTy = mkTyVarTy alpha
@@ -797,7 +797,7 @@ flattenType inst ty = go ty
       -- datatype constructor application => flatten subtypes
       -- NB: Special cased for efficiency - could be handled as type application
     go ty@(TyConApp con args)
-      | not (isOpenSynTyCon con)   -- don't match oversaturated family apps
+      | not (isSynFamilyTyCon con)   -- don't match oversaturated family apps
       = do { (args', cargs, args_eqss) <- mapAndUnzip3M go args
            ; let args_eqs = concat args_eqss
            ; if null args_eqs
@@ -910,7 +910,7 @@ mkDictBind :: Inst                 -- original instance
            -> TcM (Inst,           -- new inst
                    TcDictBinds)    -- binding for coerced dictionary
 mkDictBind dict isWanted rewriteCo pred
-  = do { dict' <- newDictBndr loc pred
+  = do { dict' <- newCtGiven loc pred
          -- relate the old inst to the new one
          -- target_dict = source_dict `cast` st_co
        ; let (target_dict, source_dict, st_co) 
@@ -1635,6 +1635,7 @@ misMatchMsg env0 (ty_act, ty_exp)
                  else WARN( True, ppr tc_act) -- If there's a mis-match, then 
                       empty  	              -- it should be a family
           _ -> empty
+
 
     pp_open_tc tc = ptext (sLit "NB:") <+> quotes (ppr tc) 
     	       	    <+> ptext (sLit "is a type function") <> pp_inj

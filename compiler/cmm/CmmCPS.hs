@@ -235,6 +235,7 @@ gatherBlocksIntoContinuation live proc_points blocks start =
       children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) [start]) `minusUniqSet` (unitUniqSet start)
       start_block = lookupWithDefaultBEnv blocks unknown_block start
       children_blocks = map (lookupWithDefaultBEnv blocks unknown_block) (uniqSetToList children)
+      unknown_block :: a    -- Used at more than one type
       unknown_block = panic "unknown block in gatherBlocksIntoContinuation"
       body = start_block : children_blocks
 

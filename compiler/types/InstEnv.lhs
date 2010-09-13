@@ -45,7 +45,6 @@ import Data.Maybe	( isJust, isNothing )
 %************************************************************************
 
 \begin{code}
-type DFunId = Id
 data Instance 
   = Instance { is_cls  :: Name		-- Class name
 	

@@ -395,7 +395,7 @@ idFreeVars id = ASSERT( isId id)
 bndrRuleAndUnfoldingVars ::Var -> VarSet
 -- A 'let' can bind a type variable, and idRuleVars assumes 
 -- it's seeing an Id. This function tests first.
-bndrRuleAndUnfoldingVars v | isTyVar v = emptyVarSet
+bndrRuleAndUnfoldingVars v | isTyCoVar v = emptyVarSet
 	                   | otherwise = idRuleAndUnfoldingVars v
 
 idRuleAndUnfoldingVars :: Id -> VarSet

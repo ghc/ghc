@@ -198,7 +198,7 @@ fiExpr to_drop lam@(_, AnnLam _ _)
 
     go seen_one_shot_id [] = seen_one_shot_id
     go seen_one_shot_id (b:bs)
-      | isTyVar       b = go seen_one_shot_id bs
+      | isTyCoVar       b = go seen_one_shot_id bs
       | isOneShotBndr b = go True bs
       | otherwise       = False	 -- Give up at a non-one-shot Id
 \end{code}

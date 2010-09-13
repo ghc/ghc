@@ -46,7 +46,7 @@ module Type (
         tyFamInsts, predFamInsts,
 
         -- (Source types)
-        mkPredTy, mkPredTys, mkFamilyTyConApp, isEqPred,
+        mkPredTy, mkPredTys, mkFamilyTyConApp, isEqPred, coVarPred,
 
 	-- ** Common type constructors
         funTyCon,
@@ -75,14 +75,6 @@ module Type (
 	-- * Type free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 	expandTypeSynonyms,
-
-	-- * Tidying type related things up for printing
-	tidyType,      tidyTypes,
-	tidyOpenType,  tidyOpenTypes,
-	tidyTyVarBndr, tidyFreeTyVars,
-	tidyOpenTyVar, tidyOpenTyVars,
-	tidyTopType,   tidyPred,
-	tidyKind,
 
 	-- * Type comparison
 	coreEqType, coreEqType2,
@@ -138,7 +130,6 @@ import Var
 import VarEnv
 import VarSet
 
-import Name
 import Class
 import TyCon
 
@@ -148,7 +139,6 @@ import Util
 import Outputable
 import FastString
 
-import Data.List
 import Data.Maybe	( isJust )
 
 infixr 3 `mkFunTy`	-- Associates to the right
@@ -872,7 +862,7 @@ tyFamInsts ty
   | Just exp_ty <- tcView ty    = tyFamInsts exp_ty
 tyFamInsts (TyVarTy _)          = []
 tyFamInsts (TyConApp tc tys) 
-  | isOpenSynTyCon tc           = [(tc, tys)]
+  | isSynFamilyTyCon tc           = [(tc, tys)]
   | otherwise                   = concat (map tyFamInsts tys)
 tyFamInsts (FunTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
 tyFamInsts (AppTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
@@ -885,100 +875,6 @@ predFamInsts :: PredType -> [(TyCon, [Type])]
 predFamInsts (ClassP _cla tys) = concat (map tyFamInsts tys)
 predFamInsts (IParam _ ty)     = tyFamInsts ty
 predFamInsts (EqPred ty1 ty2)  = tyFamInsts ty1 ++ tyFamInsts ty2
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{TidyType}
-%*									*
-%************************************************************************
-
-\begin{code}
--- | This tidies up a type for printing in an error message, or in
--- an interface file.
--- 
--- It doesn't change the uniques at all, just the print names.
-tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
-tidyTyVarBndr env@(tidy_env, subst) tyvar
-  = case tidyOccName tidy_env (getOccName name) of
-      (tidy', occ') -> ((tidy', subst'), tyvar'')
-	where
-	  subst' = extendVarEnv subst tyvar tyvar''
-	  tyvar' = setTyVarName tyvar name'
-	  name'  = tidyNameOcc name occ'
-		-- Don't forget to tidy the kind for coercions!
-	  tyvar'' | isCoVar tyvar = setTyVarKind tyvar' kind'
-		  | otherwise	  = tyvar'
-	  kind'  = tidyType env (tyVarKind tyvar)
-  where
-    name = tyVarName tyvar
-
-tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
--- ^ Add the free 'TyVar's to the env in tidy form,
--- so that we can tidy the type they are free in
-tidyFreeTyVars env tyvars = fst (tidyOpenTyVars env (varSetElems tyvars))
-
-tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
-tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
-
-tidyOpenTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
--- ^ Treat a new 'TyVar' as a binder, and give it a fresh tidy name
--- using the environment if one has not already been allocated. See
--- also 'tidyTyVarBndr'
-tidyOpenTyVar env@(_, subst) tyvar
-  = case lookupVarEnv subst tyvar of
-	Just tyvar' -> (env, tyvar')		-- Already substituted
-	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
-
-tidyType :: TidyEnv -> Type -> Type
-tidyType env@(_, subst) ty
-  = go ty
-  where
-    go (TyVarTy tv)	    = case lookupVarEnv subst tv of
-				Nothing  -> TyVarTy tv
-				Just tv' -> TyVarTy tv'
-    go (TyConApp tycon tys) = let args = map go tys
-			      in args `seqList` TyConApp tycon args
-    go (PredTy sty)	    = PredTy (tidyPred env sty)
-    go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
-    go (FunTy fun arg)	    = (FunTy $! (go fun)) $! (go arg)
-    go (ForAllTy tv ty)	    = ForAllTy tvp $! (tidyType envp ty)
-			      where
-			        (envp, tvp) = tidyTyVarBndr env tv
-
-tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = map (tidyType env) tys
-
-tidyPred :: TidyEnv -> PredType -> PredType
-tidyPred env (IParam n ty)     = IParam n (tidyType env ty)
-tidyPred env (ClassP clas tys) = ClassP clas (tidyTypes env tys)
-tidyPred env (EqPred ty1 ty2)  = EqPred (tidyType env ty1) (tidyType env ty2)
-\end{code}
-
-
-\begin{code}
--- | Grabs the free type variables, tidies them
--- and then uses 'tidyType' to work over the type itself
-tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
-tidyOpenType env ty
-  = (env', tidyType env' ty)
-  where
-    env' = tidyFreeTyVars env (tyVarsOfType ty)
-
-tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
-tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
-
--- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
-tidyTopType :: Type -> Type
-tidyTopType ty = tidyType emptyTidyEnv ty
-\end{code}
-
-\begin{code}
-
-tidyKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
-tidyKind env k = tidyOpenType env k
-
 \end{code}
 
 
@@ -1025,7 +921,7 @@ isClosedAlgType :: Type -> Bool
 isClosedAlgType ty
   = case splitTyConApp_maybe ty of
       Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
-			    isAlgTyCon tc && not (isOpenTyCon tc)
+			    isAlgTyCon tc && not (isFamilyTyCon tc)
       _other	         -> False
 \end{code}
 

@@ -18,7 +18,8 @@ module Coercion (
         typeKind,
 
         -- ** Deconstructing Kinds 
-        kindFunResult, splitKindFunTys, splitKindFunTysN, splitKindFunTy_maybe,
+        kindFunResult, kindAppResult, synTyConResKind,
+        splitKindFunTys, splitKindFunTysN, splitKindFunTy_maybe,
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
@@ -43,6 +44,8 @@ module Coercion (
         mkForAllCoercion, mkInstsCoercion, mkUnsafeCoercion,
         mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
         mkCsel1Coercion, mkCsel2Coercion, mkCselRCoercion, 
+                       
+        mkCoVarCoercion, 
 
 
         unsafeCoercionTyCon, symCoercionTyCon,
@@ -64,7 +67,7 @@ module Coercion (
 	mkSymCoI, mkTransCoI, 
 	mkTyConAppCoI, mkAppTyCoI, mkFunTyCoI,
 	mkForAllTyCoI,
-	fromCoI, fromACo,
+	fromCoI, 
 	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI
 
        ) where 
@@ -96,6 +99,10 @@ import FastString
 kindFunResult :: Kind -> Kind
 kindFunResult k = funResultTy k
 
+kindAppResult :: Kind -> [arg] -> Kind
+kindAppResult k []     = k
+kindAppResult k (_:as) = kindAppResult (kindFunResult k) as
+
 -- | Essentially 'splitFunTys' on kinds
 splitKindFunTys :: Kind -> ([Kind],Kind)
 splitKindFunTys k = splitFunTys k
@@ -106,6 +113,13 @@ splitKindFunTy_maybe = splitFunTy_maybe
 -- | Essentially 'splitFunTysN' on kinds
 splitKindFunTysN :: Int -> Kind -> ([Kind],Kind)
 splitKindFunTysN k = splitFunTysN k
+
+-- | Find the result 'Kind' of a type synonym, 
+-- after applying it to its 'arity' number of type variables
+-- Actually this function works fine on data types too, 
+-- but they'd always return '*', so we never need to ask
+synTyConResKind :: TyCon -> Kind
+synTyConResKind tycon = kindAppResult (tyConKind tycon) (tyConTyVars tycon)
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
 isUbxTupleKind, isOpenTypeKind, isArgTypeKind, isUnliftedTypeKind :: Kind -> Bool
@@ -235,7 +249,6 @@ decomposeCo n co
     go n co cos = go (n-1) (mkLeftCoercion co)
 			   (mkRightCoercion co : cos)
 
-------------------------------
 
 -------------------------------------------------------
 -- and some coercion kind stuff
@@ -311,6 +324,9 @@ mkCoercion :: TyCon -> [Type] -> Coercion
 mkCoercion coCon args = ASSERT( tyConArity coCon == length args ) 
                         TyConApp coCon args
 
+mkCoVarCoercion :: CoVar -> Coercion 
+mkCoVarCoercion cv = mkTyVarTy cv 
+
 -- | Apply a 'Coercion' to another 'Coercion', which is presumably a
 -- 'Coercion' constructor of some kind
 mkAppCoercion :: Coercion -> Coercion -> Coercion
@@ -332,7 +348,7 @@ mkFunCoercion co1 co2 = mkFunTy co1 co2
 -- | Make a 'Coercion' which binds a variable within an inner 'Coercion'
 mkForAllCoercion :: Var -> Coercion -> Coercion
 -- note that a TyVar should be used here, not a CoVar (nor a TcTyVar)
-mkForAllCoercion tv  co  = ASSERT ( isTyVar tv ) mkForAllTy tv co
+mkForAllCoercion tv  co  = ASSERT ( isTyCoVar tv ) mkForAllTy tv co
 
 
 -------------------------------
@@ -532,8 +548,8 @@ instNewTyCon_maybe tc tys
   = ASSERT( tys `lengthIs` tyConArity tc )
     Just (substTyWith tvs tys ty, 
 	  case mb_co_tc of
-	   Nothing    -> IdCo
-	   Just co_tc -> ACo (mkTyConApp co_tc tys))
+	     Nothing    -> IdCo (mkTyConApp tc    tys)
+	     Just co_tc -> ACo  (mkTyConApp co_tc tys))
   | otherwise
   = Nothing
 
@@ -553,7 +569,7 @@ splitNewTypeRepCo_maybe (TyConApp tc tys)
   | Just (ty', coi) <- instNewTyCon_maybe tc tys
   = case coi of
 	ACo co -> Just (ty', co)
-	IdCo   -> panic "splitNewTypeRepCo_maybe"
+	IdCo _ -> panic "splitNewTypeRepCo_maybe"
 			-- This case handled by coreView
 splitNewTypeRepCo_maybe _
   = Nothing
@@ -584,91 +600,82 @@ coreEqCoercion2 = coreEqType2
 -- 1. A proper 'Coercion'
 --
 -- 2. The identity coercion
-data CoercionI = IdCo | ACo Coercion
+data CoercionI = IdCo Type | ACo Coercion
+
+liftCoI :: (Type -> Type) -> CoercionI -> CoercionI
+liftCoI f (IdCo ty) = IdCo (f ty)
+liftCoI f (ACo ty)  = ACo (f ty)
+
+liftCoI2 :: (Type -> Type -> Type) -> CoercionI -> CoercionI -> CoercionI
+liftCoI2 f (IdCo ty1) (IdCo ty2) = IdCo (f ty1 ty2)
+liftCoI2 f coi1       coi2       = ACo (f (fromCoI coi1) (fromCoI coi2))
+
+liftCoIs :: ([Type] -> Type) -> [CoercionI] -> CoercionI
+liftCoIs f cois = go_id [] cois
+  where
+    go_id rev_tys []               = IdCo (f (reverse rev_tys))
+    go_id rev_tys (IdCo ty : cois) = go_id  (ty:rev_tys) cois
+    go_id rev_tys (ACo  co : cois) = go_aco (co:rev_tys) cois
+
+    go_aco rev_tys []               = ACo (f (reverse rev_tys))
+    go_aco rev_tys (IdCo ty : cois) = go_aco (ty:rev_tys) cois
+    go_aco rev_tys (ACo  co : cois) = go_aco (co:rev_tys) cois
 
 instance Outputable CoercionI where
-  ppr IdCo     = ptext (sLit "IdCo")
+  ppr (IdCo _) = ptext (sLit "IdCo")
   ppr (ACo co) = ppr co
 
 isIdentityCoI :: CoercionI -> Bool
-isIdentityCoI IdCo = True
-isIdentityCoI _    = False
-
--- | Tests whether all the given 'CoercionI's represent the identity coercion
-allIdCoIs :: [CoercionI] -> Bool
-allIdCoIs = all isIdentityCoI
-
--- | For each 'CoercionI' in the input list, return either the 'Coercion' it
--- contains or the corresponding 'Type' from the other list
-zipCoArgs :: [CoercionI] -> [Type] -> [Coercion]
-zipCoArgs cois tys = zipWith fromCoI cois tys
+isIdentityCoI (IdCo _) = True
+isIdentityCoI (ACo _)  = False
 
 -- | Return either the 'Coercion' contained within the 'CoercionI' or the given
 -- 'Type' if the 'CoercionI' is the identity 'Coercion'
-fromCoI :: CoercionI -> Type -> Type
-fromCoI IdCo ty     = ty	-- Identity coercion represented 
-fromCoI (ACo co) _  = co	-- 	by the type itself
+fromCoI :: CoercionI -> Type
+fromCoI (IdCo ty) = ty	-- Identity coercion represented 
+fromCoI (ACo co)  = co	-- 	by the type itself
 
 -- | Smart constructor for @sym@ on 'CoercionI', see also 'mkSymCoercion'
 mkSymCoI :: CoercionI -> CoercionI
-mkSymCoI IdCo = IdCo
-mkSymCoI (ACo co) = ACo $ mkCoercion symCoercionTyCon [co] 
+mkSymCoI (IdCo ty) = IdCo ty
+mkSymCoI (ACo co)  = ACo $ mkCoercion symCoercionTyCon [co] 
 				-- the smart constructor
 				-- is too smart with tyvars
 
 -- | Smart constructor for @trans@ on 'CoercionI', see also 'mkTransCoercion'
 mkTransCoI :: CoercionI -> CoercionI -> CoercionI
-mkTransCoI IdCo aco = aco
-mkTransCoI aco IdCo = aco
+mkTransCoI (IdCo _) aco = aco
+mkTransCoI aco (IdCo _) = aco
 mkTransCoI (ACo co1) (ACo co2) = ACo $ mkTransCoercion co1 co2
 
 -- | Smart constructor for type constructor application on 'CoercionI', see also 'mkAppCoercion'
-mkTyConAppCoI :: TyCon -> [Type] -> [CoercionI] -> CoercionI
-mkTyConAppCoI tyCon tys cois
-  | allIdCoIs cois = IdCo
-  | otherwise	   = ACo (TyConApp tyCon (zipCoArgs cois tys))
+mkTyConAppCoI :: TyCon -> [CoercionI] -> CoercionI
+mkTyConAppCoI tyCon cois = liftCoIs (mkTyConApp tyCon) cois
 
 -- | Smart constructor for honest-to-god 'Coercion' application on 'CoercionI', see also 'mkAppCoercion'
-mkAppTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
-mkAppTyCoI _   IdCo _   IdCo = IdCo
-mkAppTyCoI ty1 coi1 ty2 coi2 =
-	ACo $ AppTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
+mkAppTyCoI :: CoercionI -> CoercionI -> CoercionI
+mkAppTyCoI = liftCoI2 mkAppTy
 
-
-mkFunTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
-mkFunTyCoI _   IdCo _   IdCo = IdCo
-mkFunTyCoI ty1 coi1 ty2 coi2 =
-	ACo $ mkFunTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
+mkFunTyCoI :: CoercionI -> CoercionI -> CoercionI
+mkFunTyCoI = liftCoI2 mkFunTy
 
 -- | Smart constructor for quantified 'Coercion's on 'CoercionI', see also 'mkForAllCoercion'
 mkForAllTyCoI :: TyVar -> CoercionI -> CoercionI
-mkForAllTyCoI _ IdCo = IdCo
-mkForAllTyCoI tv (ACo co) = ACo $ ForAllTy tv co
-
--- | Extract a 'Coercion' from a 'CoercionI' if it represents one. If it is the identity coercion,
--- panic
-fromACo :: CoercionI -> Coercion
-fromACo (ACo co)  = co
-fromACo (IdCo {}) = panic "fromACo"
+mkForAllTyCoI tv = liftCoI (ForAllTy tv)
 
 -- | Smart constructor for class 'Coercion's on 'CoercionI'. Satisfies:
 --
 -- > mkClassPPredCoI cls tys cois :: PredTy (cls tys) ~ PredTy (cls (tys `cast` cois))
-mkClassPPredCoI :: Class -> [Type] -> [CoercionI] -> CoercionI
-mkClassPPredCoI cls tys cois 
-  | allIdCoIs cois = IdCo
-  | otherwise      = ACo $ PredTy $ ClassP cls (zipCoArgs cois tys)
+mkClassPPredCoI :: Class -> [CoercionI] -> CoercionI
+mkClassPPredCoI cls = liftCoIs (PredTy . ClassP cls)
 
 -- | Smart constructor for implicit parameter 'Coercion's on 'CoercionI'. Similar to 'mkClassPPredCoI'
 mkIParamPredCoI :: (IPName Name) -> CoercionI -> CoercionI 
-mkIParamPredCoI _   IdCo     = IdCo
-mkIParamPredCoI ipn (ACo co) = ACo $ PredTy $ IParam ipn co
+mkIParamPredCoI ipn = liftCoI (PredTy . IParam ipn)
 
 -- | Smart constructor for type equality 'Coercion's on 'CoercionI'. Similar to 'mkClassPPredCoI'
-mkEqPredCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
-mkEqPredCoI _    IdCo     _   IdCo      = IdCo
-mkEqPredCoI ty1  IdCo     _   (ACo co2) = ACo $ PredTy $ EqPred ty1 co2
-mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi2 ty2)
+mkEqPredCoI :: CoercionI -> CoercionI -> CoercionI
+mkEqPredCoI = liftCoI2 (\t1 t2 -> PredTy (EqPred t1 t2))
 \end{code}
 
 %************************************************************************
@@ -681,7 +688,7 @@ mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi
 typeKind :: Type -> Kind
 typeKind ty@(TyConApp tc tys) 
   | isCoercionTyCon tc = typeKind (fst (coercionKind ty))
-  | otherwise          = foldr (\_ k -> kindFunResult k) (tyConKind tc) tys
+  | otherwise          = kindAppResult (tyConKind tc) tys
 	-- During coercion optimisation we *do* match a type
 	-- against a coercion (see OptCoercion.matchesAxiomLhs)
 	-- So the use of typeKind in Unify.match_kind must work on coercions too

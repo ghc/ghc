@@ -23,7 +23,7 @@ module Outputable (
 	text, ftext, ptext,
 	int, integer, float, double, rational,
 	parens, cparen, brackets, braces, quotes, doubleQuotes, angleBrackets,
-	semi, comma, colon, dcolon, space, equals, dot, arrow,
+	semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
 	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
 	blankLine,
 	(<>), (<+>), hcat, hsep, 
@@ -404,11 +404,12 @@ quotes d sty = case show pp_d of
 	       pp_d = d sty
 
 semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
-lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
+darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine _sty = Pretty.ptext (sLit "")
 dcolon _sty    = Pretty.ptext (sLit "::")
 arrow  _sty    = Pretty.ptext (sLit "->")
+darrow _sty    = Pretty.ptext (sLit "=>")
 semi _sty      = Pretty.semi
 comma _sty     = Pretty.comma
 colon _sty     = Pretty.colon

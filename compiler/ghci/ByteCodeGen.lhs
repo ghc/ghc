@@ -250,7 +250,7 @@ schemeR fvs (nm, rhs)
 {-
    | trace (showSDoc (
               (char ' '
-               $$ (ppr.filter (not.isTyVar).varSetElems.fst) rhs
+               $$ (ppr.filter (not.isTyCoVar).varSetElems.fst) rhs
                $$ pprCoreExpr (deAnnotate rhs)
                $$ char ' '
               ))) False
@@ -834,7 +834,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 	     rhs_code <- schemeE (d_alts+size) s p' rhs
              return (my_discr alt, unitOL (UNPACK size) `appOL` rhs_code)
 	   where
-	     real_bndrs = filter (not.isTyVar) bndrs
+	     real_bndrs = filter (not.isTyCoVar) bndrs
 
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _) 
@@ -1146,6 +1146,8 @@ maybe_getCCallReturnRep fn_ty
                                   -- if it was, it would be impossible 
                                   -- to create a valid return value 
                                   -- placeholder on the stack
+
+         blargh :: a -- Used at more than one type
          blargh = pprPanic "maybe_getCCallReturn: can't handle:" 
                            (pprType fn_ty)
      in 
@@ -1455,7 +1457,7 @@ bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
 -- whereas value lambdas cannot; that is why they are nuked here
 bcView (AnnNote _ (_,e)) 	     = Just e
 bcView (AnnCast (_,e) _) 	     = Just e
-bcView (AnnLam v (_,e)) | isTyVar v  = Just e
+bcView (AnnLam v (_,e)) | isTyCoVar v  = Just e
 bcView (AnnApp (_,e) (_, AnnType _)) = Just e
 bcView _                             = Nothing
 

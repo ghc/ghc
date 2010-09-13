@@ -36,7 +36,7 @@ import qualified CoreSubst
 import PprCore
 import CoreFVs
 import CoreUtils
-import CoreArity	( etaExpand, exprEtaExpandArity )
+import CoreArity
 import CoreUnfold
 import Name
 import Id
@@ -1039,7 +1039,7 @@ mkLam _env bndrs body
 	   ; return etad_lam }
 
       | dopt Opt_DoLambdaEtaExpansion dflags,
-   	not (all isTyVar bndrs) -- Don't eta expand type abstractions
+   	not (all isTyCoVar bndrs) -- Don't eta expand type abstractions
       = do { let body' = tryEtaExpansion dflags body
  	   ; return (mkLams bndrs body') }
    
@@ -1085,7 +1085,7 @@ because the latter is not well-kinded.
 
 {-	Sept 01: I'm experimenting with getting the
 	full laziness pass to float out past big lambdsa
- | all isTyVar bndrs,	-- Only for big lambdas
+ | all isTyCoVar bndrs,	-- Only for big lambdas
    contIsRhs cont	-- Only try the rhs type-lambda floating
 			-- if this is indeed a right-hand side; otherwise
 			-- we end up floating the thing out, only for float-in
@@ -1093,100 +1093,6 @@ because the latter is not well-kinded.
  = do (floats, body') <- tryRhsTyLam env bndrs body
       return (floats, mkLams bndrs body')
 -}
-
-
-%************************************************************************
-%*									*
-		Eta reduction
-%*									*
-%************************************************************************
-
-Note [Eta reduction conditions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We try for eta reduction here, but *only* if we get all the way to an
-trivial expression.  We don't want to remove extra lambdas unless we
-are going to avoid allocating this thing altogether.
-
-There are some particularly delicate points here:
-
-* Eta reduction is not valid in general:  
-	\x. bot  /=  bot
-  This matters, partly for old-fashioned correctness reasons but,
-  worse, getting it wrong can yield a seg fault. Consider
-	f = \x.f x
-	h y = case (case y of { True -> f `seq` True; False -> False }) of
-		True -> ...; False -> ...
-
-  If we (unsoundly) eta-reduce f to get f=f, the strictness analyser
-  says f=bottom, and replaces the (f `seq` True) with just
-  (f `cast` unsafe-co).  BUT, as thing stand, 'f' got arity 1, and it
-  *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands 
-  the definition again, so that it does not termninate after all.
-  Result: seg-fault because the boolean case actually gets a function value.
-  See Trac #1947.
-
-  So it's important to to the right thing.
-
-* Note [Arity care]: we need to be careful if we just look at f's
-  arity. Currently (Dec07), f's arity is visible in its own RHS (see
-  Note [Arity robustness] in SimplEnv) so we must *not* trust the
-  arity when checking that 'f' is a value.  Otherwise we will
-  eta-reduce
-      f = \x. f x
-  to
-      f = f
-  Which might change a terminiating program (think (f `seq` e)) to a 
-  non-terminating one.  So we check for being a loop breaker first.
-
-  However for GlobalIds we can look at the arity; and for primops we
-  must, since they have no unfolding.  
-
-* Regardless of whether 'f' is a value, we always want to 
-  reduce (/\a -> f a) to f
-  This came up in a RULE: foldr (build (/\a -> g a))
-  did not match 	  foldr (build (/\b -> ...something complex...))
-  The type checker can insert these eta-expanded versions,
-  with both type and dictionary lambdas; hence the slightly 
-  ad-hoc isDictId
-
-* Never *reduce* arity. For example
-      f = \xy. g x y
-  Then if h has arity 1 we don't want to eta-reduce because then
-  f's arity would decrease, and that is bad
-
-These delicacies are why we don't use exprIsTrivial and exprIsHNF here.
-Alas.
-
-\begin{code}
-tryEtaReduce :: [OutBndr] -> OutExpr -> Maybe OutExpr
-tryEtaReduce bndrs body 
-  = go (reverse bndrs) body
-  where
-    incoming_arity = count isId bndrs
-
-    go (b : bs) (App fun arg) | ok_arg b arg = go bs fun	-- Loop round
-    go []       fun           | ok_fun fun   = Just fun		-- Success!
-    go _        _			     = Nothing		-- Failure!
-
-	-- Note [Eta reduction conditions]
-    ok_fun (App fun (Type ty)) 
-	| not (any (`elemVarSet` tyVarsOfType ty) bndrs)
-	=  ok_fun fun
-    ok_fun (Var fun_id)
-	=  not (fun_id `elem` bndrs)
-	&& (ok_fun_id fun_id || all ok_lam bndrs)
-    ok_fun _fun = False
-
-    ok_fun_id fun = fun_arity fun >= incoming_arity
-
-    fun_arity fun 	      -- See Note [Arity care]
-       | isLocalId fun && isLoopBreaker (idOccInfo fun) = 0
-       | otherwise = idArity fun   	      
-
-    ok_lam v = isTyVar v || isDictId v
-
-    ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
-\end{code}
 
 
 %************************************************************************
@@ -1337,7 +1243,7 @@ abstractFloats main_tvs body_env body
 	rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
 	tvs_here | any isCoVar main_tvs = main_tvs	-- Note [Abstract over coercions]
 		 | otherwise 
-		 = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
+		 = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyCoVar rhs')
 	
 		-- Abstract only over the type variables free in the rhs
 		-- wrt which the new binding is abstracted.  But the naive
@@ -1529,16 +1435,17 @@ prepareDefault case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
 				-- 	case x of { DEFAULT -> e }
 				-- and we don't want to fill in a default for them!
   , Just all_cons <- tyConDataCons_maybe tycon
-  , not (null all_cons)		-- This is a tricky corner case.  If the data type has no constructors,
-				-- which GHC allows, then the case expression will have at most a default
-				-- alternative.  We don't want to eliminate that alternative, because the
-				-- invariant is that there's always one alternative.  It's more convenient
-				-- to leave	
-				--	case x of { DEFAULT -> e }     
-				-- as it is, rather than transform it to
-				--	error "case cant match"
-				-- which would be quite legitmate.  But it's a really obscure corner, and
-				-- not worth wasting code on.
+  , not (null all_cons)	
+	-- This is a tricky corner case.  If the data type has no constructors,
+	-- which GHC allows, then the case expression will have at most a default
+	-- alternative.  We don't want to eliminate that alternative, because the
+	-- invariant is that there's always one alternative.  It's more convenient
+	-- to leave	
+	--	case x of { DEFAULT -> e }     
+	-- as it is, rather than transform it to
+	--	error "case cant match"
+	-- which would be quite legitmate.  But it's a really obscure corner, and
+	-- not worth wasting code on.
   , let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
 	impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
   = case filterOut impossible all_cons of
@@ -1554,9 +1461,12 @@ prepareDefault case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
 
 	_ -> return [(DEFAULT, [], deflt_rhs)]
 
-  | debugIsOn, isAlgTyCon tycon, not (isOpenTyCon tycon), null (tyConDataCons tycon)
+  | debugIsOn, isAlgTyCon tycon
+  , null (tyConDataCons tycon)
+  , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
 	-- Check for no data constructors
-        -- This can legitimately happen for type families, so don't report that
+        -- This can legitimately happen for abstract types and type families,
+        -- so don't report that
   = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon)
         $ return [(DEFAULT, [], deflt_rhs)]
 

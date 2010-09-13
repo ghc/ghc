@@ -356,21 +356,30 @@ slurpConflicts live
 --
 --
 slurpReloadCoalesce 
-	:: Instruction instr
+	:: forall instr. Instruction instr
 	=> LiveCmmTop instr
 	-> Bag (Reg, Reg)
 
 slurpReloadCoalesce live
 	= slurpCmm emptyBag live
 
- where	slurpCmm cs CmmData{}	= cs
+ where	
+        slurpCmm :: Bag (Reg, Reg)
+                 -> GenCmmTop t t1 [SCC (LiveBasicBlock instr)]
+                 -> Bag (Reg, Reg)
+        slurpCmm cs CmmData{}	= cs
  	slurpCmm cs (CmmProc _ _ _ sccs)
 		= slurpComp cs (flattenSCCs sccs)
 
+        slurpComp :: Bag (Reg, Reg)
+                     -> [LiveBasicBlock instr]
+                     -> Bag (Reg, Reg)
 	slurpComp  cs blocks
 	 = let	(moveBags, _)	= runState (slurpCompM blocks) emptyUFM
 	   in	unionManyBags (cs : moveBags)
 
+        slurpCompM :: [LiveBasicBlock instr]
+                   -> State (UniqFM [UniqFM Reg]) [Bag (Reg, Reg)]
 	slurpCompM blocks
 	 = do	-- run the analysis once to record the mapping across jumps.
 	 	mapM_	(slurpBlock False) blocks
@@ -381,6 +390,8 @@ slurpReloadCoalesce live
 		--	not worth the trouble.
 		mapM	(slurpBlock True) blocks
 
+        slurpBlock :: Bool -> LiveBasicBlock instr
+                   -> State (UniqFM [UniqFM Reg]) (Bag (Reg, Reg))
 	slurpBlock propagate (BasicBlock blockId instrs)
 	 = do	-- grab the slot map for entry to this block
 	 	slotMap		<- if propagate
@@ -390,8 +401,7 @@ slurpReloadCoalesce live
 	 	(_, mMoves)	<- mapAccumLM slurpLI slotMap instrs
 	   	return $ listToBag $ catMaybes mMoves
 
-	slurpLI :: Instruction instr
-		=> UniqFM Reg 				-- current slotMap
+	slurpLI :: UniqFM Reg 				-- current slotMap
 		-> LiveInstr instr
 		-> State (UniqFM [UniqFM Reg]) 		-- blockId -> [slot -> reg]
 							-- 	for tracking slotMaps across jumps

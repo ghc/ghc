@@ -293,6 +293,7 @@ data ExtensionFlag
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
    | Opt_MonoLocalBinds
+   | Opt_RelaxedPolyRec		-- Deprecated
    | Opt_ExtendedDefaultRules           -- Use GHC's extended rules for defaulting
    | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
@@ -314,8 +315,6 @@ data ExtensionFlag
    | Opt_RecordPuns
    | Opt_ViewPatterns
    | Opt_GADTs
-   | Opt_OutsideIn
-   | Opt_RelaxedPolyRec		-- Deprecated
    | Opt_NPlusKPatterns
    | Opt_DoAndIfThenElse
 
@@ -731,26 +730,9 @@ defaultDynFlags =
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         haddockOptions = Nothing,
-        flags = [
-            Opt_AutoLinkPackages,
-            Opt_ReadUserPackageConf,
-
-            Opt_MethodSharing,
-
-            Opt_DoAsmMangling,
-
-            Opt_SharedImplib,
-
-            Opt_GenManifest,
-            Opt_EmbedManifest,
-            Opt_PrintBindContents
-            ]
-            ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
-                    -- The default -O0 options
-            ++ standardWarnings,
-
+        flags = defaultFlags,
         language = Nothing,
-        extensionFlags = Left [],
+        extensionFlags = Left defaultExtensionFlags,
 
         log_action = \severity srcSpan style msg ->
                         case severity of
@@ -1003,95 +985,6 @@ updOptLevel n dfs
 
    extra_dopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
    remove_dopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
-
-optLevelFlags :: [([Int], DynFlag)]
-optLevelFlags
-  = [ ([0],     Opt_IgnoreInterfacePragmas)
-    , ([0],     Opt_OmitInterfacePragmas)
-
-    , ([1,2],   Opt_IgnoreAsserts)
-    , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
-                                         --              in PrelRules
-    , ([1,2],   Opt_DoEtaReduction)
-    , ([1,2],   Opt_CaseMerge)
-    , ([1,2],   Opt_Strictness)
-    , ([1,2],   Opt_CSE)
-    , ([1,2],   Opt_FullLaziness)
-    , ([1,2],   Opt_Specialise)
-    , ([1,2],   Opt_FloatIn)
-
-    , ([2],     Opt_LiberateCase)
-    , ([2],     Opt_SpecConstr)
-    , ([2],     Opt_RegsGraph)
-
---     , ([2],     Opt_StaticArgumentTransformation)
--- Max writes: I think it's probably best not to enable SAT with -O2 for the
--- 6.10 release. The version of SAT in HEAD at the moment doesn't incorporate
--- several improvements to the heuristics, and I'm concerned that without
--- those changes SAT will interfere with some attempts to write "high
--- performance Haskell", as we saw in some posts on Haskell-Cafe earlier
--- this year. In particular, the version in HEAD lacks the tail call
--- criterion, so many things that look like reasonable loops will be
--- turned into functions with extra (unneccesary) thunk creation.
-
-    , ([0,1,2], Opt_DoLambdaEtaExpansion)
-                -- This one is important for a tiresome reason:
-                -- we want to make sure that the bindings for data
-                -- constructors are eta-expanded.  This is probably
-                -- a good thing anyway, but it seems fragile.
-    ]
-
--- -----------------------------------------------------------------------------
--- Standard sets of warning options
-
-standardWarnings :: [DynFlag]
-standardWarnings
-    = [ Opt_WarnWarningsDeprecations,
-        Opt_WarnDeprecatedFlags,
-        Opt_WarnUnrecognisedPragmas,
-        Opt_WarnOverlappingPatterns,
-        Opt_WarnMissingFields,
-        Opt_WarnMissingMethods,
-        Opt_WarnDuplicateExports,
-        Opt_WarnLazyUnliftedBindings,
-        Opt_WarnDodgyForeignImports,
-        Opt_WarnWrongDoBind,
-        Opt_WarnAlternativeLayoutRuleTransitional
-      ]
-
-minusWOpts :: [DynFlag]
-minusWOpts
-    = standardWarnings ++
-      [ Opt_WarnUnusedBinds,
-        Opt_WarnUnusedMatches,
-        Opt_WarnUnusedImports,
-        Opt_WarnIncompletePatterns,
-        Opt_WarnDodgyExports,
-        Opt_WarnDodgyImports
-      ]
-
-minusWallOpts :: [DynFlag]
-minusWallOpts
-    = minusWOpts ++
-      [ Opt_WarnTypeDefaults,
-        Opt_WarnNameShadowing,
-        Opt_WarnMissingSigs,
-        Opt_WarnHiShadows,
-        Opt_WarnOrphans,
-        Opt_WarnUnusedDoBind
-      ]
-
--- minuswRemovesOpts should be every warning option
-minuswRemovesOpts :: [DynFlag]
-minuswRemovesOpts
-    = minusWallOpts ++
-      [Opt_WarnImplicitPrelude,
-       Opt_WarnIncompletePatternsRecUpd,
-       Opt_WarnSimplePatterns,
-       Opt_WarnMonomorphism,
-       Opt_WarnUnrecognisedPragmas,
-       Opt_WarnTabs
-      ]
 
 -- -----------------------------------------------------------------------------
 -- StgToDo:  abstraction of stg-to-stg passes to run.
@@ -1558,8 +1451,7 @@ fFlags = [
   ( "warn-orphans",                     Opt_WarnOrphans, nop ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
-  ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings,
-    \_ -> deprecate "lazy unlifted bindings will be an error in GHC 6.14, and this flag will no longer exist"),
+  ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings, nop),
   ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, nop ),
   ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, nop ),
   ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
@@ -1746,6 +1638,31 @@ xFlags = [
     \_ -> deprecate "The new qualified operator syntax was rejected by Haskell'" )
   ]
 
+defaultFlags :: [DynFlag]
+defaultFlags 
+  = [ Opt_AutoLinkPackages,
+      Opt_ReadUserPackageConf,
+
+      Opt_MethodSharing,
+
+      Opt_DoAsmMangling,
+
+      Opt_SharedImplib,
+
+      Opt_GenManifest,
+      Opt_EmbedManifest,
+      Opt_PrintBindContents
+    ]
+
+    ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
+             -- The default -O0 options
+
+    ++ standardWarnings
+
+defaultExtensionFlags :: [OnOff ExtensionFlag]
+defaultExtensionFlags 
+  = []		-- In due course I'd like Opt_MonoLocalBinds to be on by default
+
 impliedFlags :: [(ExtensionFlag, ExtensionFlag)]
 impliedFlags
   = [ (Opt_RankNTypes,                Opt_ExplicitForAll)
@@ -1755,15 +1672,13 @@ impliedFlags
     , (Opt_ExistentialQuantification, Opt_ExplicitForAll)
     , (Opt_PolymorphicComponents,     Opt_ExplicitForAll)
 
-    , (Opt_GADTs,               Opt_OutsideIn)       -- We want type-sig variables to
-                                                     --      be completely rigid for GADTs
+    , (Opt_GADTs,                  Opt_MonoLocalBinds)
+    , (Opt_TypeFamilies,           Opt_MonoLocalBinds)
+    , (Opt_FunctionalDependencies, Opt_MonoLocalBinds)
 
-    , (Opt_TypeFamilies,        Opt_OutsideIn)       -- Trac #2944 gives a nice example
     , (Opt_TypeFamilies,        Opt_KindSignatures)  -- Type families use kind signatures
       						     -- all over the place
 
-    , (Opt_ScopedTypeVariables, Opt_OutsideIn)       -- Ditto for scoped type variables; see
-                                                     --      Note [Scoped tyvars] in TcBinds
     , (Opt_ImpredicativeTypes,  Opt_RankNTypes)
 
 	-- Record wild-cards implies field disambiguation
@@ -1772,6 +1687,95 @@ impliedFlags
  	-- if the compiler has just filled in field 'a' of constructor 'C'
     , (Opt_RecordWildCards,     Opt_DisambiguateRecordFields)
   ]
+
+optLevelFlags :: [([Int], DynFlag)]
+optLevelFlags
+  = [ ([0],     Opt_IgnoreInterfacePragmas)
+    , ([0],     Opt_OmitInterfacePragmas)
+
+    , ([1,2],   Opt_IgnoreAsserts)
+    , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
+                                         --              in PrelRules
+    , ([1,2],   Opt_DoEtaReduction)
+    , ([1,2],   Opt_CaseMerge)
+    , ([1,2],   Opt_Strictness)
+    , ([1,2],   Opt_CSE)
+    , ([1,2],   Opt_FullLaziness)
+    , ([1,2],   Opt_Specialise)
+    , ([1,2],   Opt_FloatIn)
+
+    , ([2],     Opt_LiberateCase)
+    , ([2],     Opt_SpecConstr)
+    , ([2],     Opt_RegsGraph)
+
+--     , ([2],     Opt_StaticArgumentTransformation)
+-- Max writes: I think it's probably best not to enable SAT with -O2 for the
+-- 6.10 release. The version of SAT in HEAD at the moment doesn't incorporate
+-- several improvements to the heuristics, and I'm concerned that without
+-- those changes SAT will interfere with some attempts to write "high
+-- performance Haskell", as we saw in some posts on Haskell-Cafe earlier
+-- this year. In particular, the version in HEAD lacks the tail call
+-- criterion, so many things that look like reasonable loops will be
+-- turned into functions with extra (unneccesary) thunk creation.
+
+    , ([0,1,2], Opt_DoLambdaEtaExpansion)
+                -- This one is important for a tiresome reason:
+                -- we want to make sure that the bindings for data
+                -- constructors are eta-expanded.  This is probably
+                -- a good thing anyway, but it seems fragile.
+    ]
+
+-- -----------------------------------------------------------------------------
+-- Standard sets of warning options
+
+standardWarnings :: [DynFlag]
+standardWarnings
+    = [ Opt_WarnWarningsDeprecations,
+        Opt_WarnDeprecatedFlags,
+        Opt_WarnUnrecognisedPragmas,
+        Opt_WarnOverlappingPatterns,
+        Opt_WarnMissingFields,
+        Opt_WarnMissingMethods,
+        Opt_WarnDuplicateExports,
+        Opt_WarnLazyUnliftedBindings,
+        Opt_WarnDodgyForeignImports,
+        Opt_WarnWrongDoBind,
+        Opt_WarnAlternativeLayoutRuleTransitional
+      ]
+
+minusWOpts :: [DynFlag]
+minusWOpts
+    = standardWarnings ++
+      [ Opt_WarnUnusedBinds,
+        Opt_WarnUnusedMatches,
+        Opt_WarnUnusedImports,
+        Opt_WarnIncompletePatterns,
+        Opt_WarnDodgyExports,
+        Opt_WarnDodgyImports
+      ]
+
+minusWallOpts :: [DynFlag]
+minusWallOpts
+    = minusWOpts ++
+      [ Opt_WarnTypeDefaults,
+        Opt_WarnNameShadowing,
+        Opt_WarnMissingSigs,
+        Opt_WarnHiShadows,
+        Opt_WarnOrphans,
+        Opt_WarnUnusedDoBind
+      ]
+
+-- minuswRemovesOpts should be every warning option
+minuswRemovesOpts :: [DynFlag]
+minuswRemovesOpts
+    = minusWallOpts ++
+      [Opt_WarnImplicitPrelude,
+       Opt_WarnIncompletePatternsRecUpd,
+       Opt_WarnSimplePatterns,
+       Opt_WarnMonomorphism,
+       Opt_WarnUnrecognisedPragmas,
+       Opt_WarnTabs
+      ]
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setDynFlag Opt_PrintExplicitForalls

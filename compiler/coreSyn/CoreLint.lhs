@@ -229,9 +229,9 @@ lintCoreExpr (Note _ expr)
   = lintCoreExpr expr
 
 lintCoreExpr (Let (NonRec tv (Type ty)) body)
-  =	-- See Note [Type let] in CoreSyn
-    do	{ checkL (isTyVar tv) (mkKindErrMsg tv ty)	-- Not quite accurate
-	; ty' <- lintInTy ty
+  | isTyVar tv
+  =	-- See Note [Linting type lets]
+    do	{ ty' <- addLoc (RhsOf tv) $ lintInTy ty
         ; lintTyBndr tv              $ \ tv' -> 
           addLoc (BodyOfLetRec [tv]) $ 
           extendSubstL tv' ty'       $ do
@@ -239,6 +239,19 @@ lintCoreExpr (Let (NonRec tv (Type ty)) body)
 		-- Now extend the substitution so we 
 		-- take advantage of it in the body
         ; lintCoreExpr body } }
+
+  | isCoVar tv
+  = do { co <- applySubst ty
+       ; (s1,s2) <- addLoc (RhsOf tv) $ lintCoercion co
+       ; lintTyBndr tv  $ \ tv' -> 
+         addLoc (BodyOfLetRec [tv]) $ do
+       { let (t1,t2) = coVarKind tv'
+       ; checkTys s1 t1 (mkTyVarLetErr tv ty)
+       ; checkTys s2 t2 (mkTyVarLetErr tv ty)
+       ; lintCoreExpr body } }
+
+  | otherwise
+  = failWithL (mkTyVarLetErr tv ty)	-- Not quite accurate
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
   = do	{ lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
@@ -279,7 +292,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
          Just (tycon, _)
               | debugIsOn &&
                 isAlgTyCon tycon && 
-		not (isOpenTyCon tycon) &&
+		not (isFamilyTyCon tycon || isAbstractTyCon tycon) &&
                 null (tyConDataCons tycon) -> 
                   pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
 			-- This can legitimately happen for type families
@@ -1080,6 +1093,14 @@ mkNonFunAppMsg fun_ty arg_ty arg
 	      hang (ptext (sLit "Fun type:")) 4 (ppr fun_ty),
 	      hang (ptext (sLit "Arg type:")) 4 (ppr arg_ty),
 	      hang (ptext (sLit "Arg:")) 4 (ppr arg)]
+
+mkTyVarLetErr :: TyVar -> Type -> Message
+mkTyVarLetErr tyvar ty
+  = vcat [ptext (sLit "Bad `let' binding for type or coercion variable:"),
+	  hang (ptext (sLit "Type/coercion variable:"))
+		 4 (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)),
+	  hang (ptext (sLit "Arg type/coercion:"))   
+	         4 (ppr ty)]
 
 mkKindErrMsg :: TyVar -> Type -> Message
 mkKindErrMsg tyvar arg_ty

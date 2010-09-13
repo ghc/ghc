@@ -21,7 +21,7 @@ import Inst
 import InstEnv
 import TcEnv
 import TcBinds
-import TcSimplify
+import TcUnify
 import TcHsType
 import TcMType
 import TcType
@@ -34,6 +34,7 @@ import MkId
 import Id
 import Name
 import Var
+import VarSet
 import NameEnv
 import NameSet
 import Outputable
@@ -169,11 +170,10 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	      (tyvars, _, _, op_items) = classBigSig clas
 	      rigid_info  = ClsSkol clas
 	      prag_fn	  = mkPragFun sigs default_binds
-	      sig_fn	  = mkTcSigFun sigs
+	      sig_fn	  = mkSigFun sigs
 	      clas_tyvars = tcSkolSigTyVars rigid_info tyvars
 	      pred  	  = mkClassPred clas (mkTyVarTys clas_tyvars)
-	; inst_loc <- getInstLoc (SigOrigin rigid_info)
-	; this_dict <- newDictBndr inst_loc pred
+	; this_dict <- newEvVar pred
 
 	; let tc_dm = tcDefMeth clas clas_tyvars
 				this_dict default_binds
@@ -186,8 +186,8 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
     
-tcDefMeth :: Class -> [TyVar] -> Inst -> LHsBinds Name
-          -> TcSigFun -> TcPragFun -> ClassOpItem
+tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
+          -> SigFun -> PragFun -> ClassOpItem
           -> TcM (Maybe (LHsBind Id))
 -- Generate code for polymorphic default methods only (hence DefMeth)
 -- (Generic default methods have turned into instance decls by now.)
@@ -208,7 +208,7 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
 		-- See Note [Silly default-method bind]
 		-- (possibly out of date)
 
-	; let meth_bind = findMethodBind sel_name local_dm_name binds_in
+	; let meth_bind = findMethodBind sel_name binds_in
 			  `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 		-- dm_info = DefMeth dm_name only if there is a binding in binds_in
 
@@ -225,42 +225,49 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
                   <+> quotes (ppr sel_name))
 
         ; liftM Just $
-          tcInstanceMethodBody (instLoc this_dict) 
-                               tyvars [this_dict]
-                               ([], emptyBag)
+          tcInstanceMethodBody (ClsSkol clas)
+                               tyvars 
+                               [this_dict]
+                               Nothing
                                dm_id_w_inline local_dm_id
                                dm_sig_fn IsDefaultMethod meth_bind }
 
 ---------------
-tcInstanceMethodBody :: InstLoc -> [TcTyVar] -> [Inst]
-		     -> ([Inst], LHsBinds Id) -> Id -> Id
-          	     -> TcSigFun -> TcSpecPrags -> LHsBind Name 
+tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
+		     -> Maybe EvBind
+                     -> Id -> Id
+          	     -> SigFun -> TcSpecPrags -> LHsBind Name 
           	     -> TcM (LHsBind Id)
-tcInstanceMethodBody inst_loc tyvars dfun_dicts
-		     (this_dict, this_bind) meth_id local_meth_id
-		     meth_sig_fn spec_prags bind@(L loc _)
+tcInstanceMethodBody skol_info tyvars dfun_ev_vars
+		     this_dict meth_id local_meth_id
+		     meth_sig_fn specs 
+                     (L loc bind)
   = do	{       -- Typecheck the binding, first extending the envt
 		-- so that when tcInstSig looks up the local_meth_id to find
 		-- its signature, we'll find it in the environment
-	; ((tc_bind, _), lie) <- getLIE $
-				 tcExtendIdEnv [local_meth_id] $
-	        		 tcPolyBinds TopLevel meth_sig_fn no_prag_fn 
-				 	     NonRecursive NonRecursive
-				 	     (unitBag bind)
+	  let full_given = case this_dict of
+                             Nothing -> dfun_ev_vars
+			     Just (EvBind dict _) -> dict : dfun_ev_vars
+              lm_bind = L loc (bind { fun_id = L loc (idName local_meth_id) })
+			     -- Substitue the local_meth_name for the binder
+			     -- NB: the binding is always a FunBind
 
-	; let avails = this_dict ++ dfun_dicts
-		-- Only need the this_dict stuff if there are type 
-		-- variables involved; otherwise overlap is not possible
-		-- See Note [Subtle interaction of recursion and overlap]
-		-- in TcInstDcls
-	; lie_binds <- tcSimplifyCheck inst_loc tyvars avails lie
+	; (ev_binds, (tc_bind, _)) 
+               <- checkConstraints skol_info emptyVarSet tyvars full_given $
+		  tcExtendIdEnv [local_meth_id] $
+	          tcPolyBinds TopLevel meth_sig_fn no_prag_fn 
+		  	     NonRecursive NonRecursive
+		  	     [lm_bind]
 
-	; let full_bind = AbsBinds tyvars dfun_lam_vars
-     				  [(tyvars, meth_id, local_meth_id, spec_prags)]
-				  (this_bind `unionBags` lie_binds 
-				   `unionBags` tc_bind)
+        -- Add the binding for this_dict, if we have one
+        ; ev_binds' <- case this_dict of
+                         Nothing                -> return ev_binds
+                         Just (EvBind self rhs) -> extendTcEvBinds ev_binds self rhs
 
-	      dfun_lam_vars = map instToVar dfun_dicts	-- Includes equalities
+	; let full_bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
+                                   , abs_exports = [(tyvars, meth_id, local_meth_id, specs)]
+				   , abs_ev_binds = ev_binds'
+                                   , abs_binds = tc_bind }
 
         ; return (L loc full_bind) } 
   where
@@ -293,18 +300,16 @@ instantiateMethod clas sel_id inst_tys
 
 
 ---------------------------
--- The renamer just puts the selector ID as the binder in the method binding
--- but we must use the method name; so we substitute it here.  Crude but simple.
-findMethodBind	:: Name -> Name 	-- Selector and method name
+findMethodBind	:: Name  	        -- Selector name
           	-> LHsBinds Name 	-- A group of bindings
-		-> Maybe (LHsBind Name)	-- The binding, with meth_name replacing sel_name
-findMethodBind sel_name meth_name binds
+		-> Maybe (LHsBind Name)	-- The binding
+findMethodBind sel_name binds
   = foldlBag mplus Nothing (mapBag f binds)
   where 
-	f (L loc1 bind@(FunBind { fun_id = L loc2 op_name }))
-	         | op_name == sel_name
-		 = Just (L loc1 (bind { fun_id = L loc2 meth_name }))
-	f _other = Nothing
+    f bind@(L _ (FunBind { fun_id = L _ op_name }))
+             | op_name == sel_name
+    	     = Just bind
+    f _other = Nothing
 \end{code}
 
 Note [Polymorphic methods]
@@ -364,8 +369,8 @@ gives rise to the instance declarations
 	  op Unit      = ...
 
 \begin{code}
-mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
-mkGenericDefMethBind clas inst_tys sel_id meth_name
+mkGenericDefMethBind :: Class -> [Type] -> Id -> TcM (LHsBind Name)
+mkGenericDefMethBind clas inst_tys sel_id
   = 	-- A generic default method
     	-- If the method is defined generically, we can only do the job if the
 	-- instance declaration is for a single-parameter type class with
@@ -383,7 +388,8 @@ mkGenericDefMethBind clas inst_tys sel_id meth_name
 
 		-- Rename it before returning it
 	; (rn_rhs, _) <- rnLExpr rhs
-        ; return (noLoc $ mkFunBind (noLoc meth_name) [mkSimpleMatch [] rn_rhs]) }
+        ; return (noLoc $ mkFunBind (noLoc (idName sel_id))
+                                    [mkSimpleMatch [] rn_rhs]) }
   where
     rhs = mkGenericRhs sel_id clas_tyvar tycon
 
@@ -595,7 +601,7 @@ notGeneric tycon
 badGenericInstanceType :: LHsBinds Name -> SDoc
 badGenericInstanceType binds
   = vcat [ptext (sLit "Illegal type pattern in the generic bindings"),
-	  nest 4 (ppr binds)]
+	  nest 2 (ppr binds)]
 
 missingGenericInstances :: [Name] -> SDoc
 missingGenericInstances missing
@@ -604,7 +610,7 @@ missingGenericInstances missing
 dupGenericInsts :: [(TyCon, InstInfo a)] -> SDoc
 dupGenericInsts tc_inst_infos
   = vcat [ptext (sLit "More than one type pattern for a single generic type constructor:"),
-	  nest 4 (vcat (map ppr_inst_ty tc_inst_infos)),
+	  nest 2 (vcat (map ppr_inst_ty tc_inst_infos)),
 	  ptext (sLit "All the type patterns for a generic type constructor must be identical")
     ]
   where 

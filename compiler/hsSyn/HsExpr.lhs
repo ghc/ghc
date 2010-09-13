@@ -48,7 +48,7 @@ type LHsExpr id = Located (HsExpr id)
 type PostTcExpr  = HsExpr Id
 -- | We use a PostTcTable where there are a bunch of pieces of evidence, more
 -- than is convenient to keep individually.
-type PostTcTable = [(Name, Id)]
+type PostTcTable = [(Name, PostTcExpr)]
 
 noPostTcExpr :: PostTcExpr
 noPostTcExpr = HsLit (HsString (fsLit "noPostTcExpr"))
@@ -62,7 +62,7 @@ noPostTcTable = []
 --
 -- E.g. @(>>=)@ is filled in before the renamer by the appropriate 'Name' for
 --      @(>>=)@, and then instantiated by the type checker with its type args
---      tec
+--      etc
 
 type SyntaxExpr id = HsExpr id
 
@@ -895,8 +895,8 @@ data StmtLR idL idR
                                      -- the returned thing has to be *monomorphic*, 
 				     -- so they may be type applications
 
-      , recS_dicts :: DictBinds idR  -- Method bindings of Ids bound by the
-                                     -- RecStmt, and used afterwards
+      , recS_dicts :: TcEvBinds    -- Method bindings of Ids bound by the
+                                   -- RecStmt, and used afterwards
       }
   deriving (Data, Typeable)
 \end{code}
@@ -1147,8 +1147,8 @@ pp_dotdot = ptext (sLit " .. ")
 \begin{code}
 data HsMatchContext id  -- Context of a Match
   = FunRhs id Bool              -- Function binding for f; True <=> written infix
-  | CaseAlt                     -- Patterns and guards on a case alternative
   | LambdaExpr                  -- Patterns of a lambda
+  | CaseAlt                     -- Patterns and guards on a case alternative
   | ProcExpr                    -- Patterns of a proc
   | PatBindRhs                  -- Patterns in the *guards* of a pattern binding
   | RecUpd                      -- Record update [used only in DsExpr to
@@ -1198,16 +1198,25 @@ matchSeparator ThPatQuote   = panic "unused"
 
 \begin{code}
 pprMatchContext :: Outputable id => HsMatchContext id -> SDoc
-pprMatchContext (FunRhs fun _)    = ptext (sLit "the definition of")
-                                    <+> quotes (ppr fun)
-pprMatchContext CaseAlt           = ptext (sLit "a case alternative")
-pprMatchContext RecUpd            = ptext (sLit "a record-update construct")
-pprMatchContext ThPatQuote        = ptext (sLit "a Template Haskell pattern quotation")
-pprMatchContext PatBindRhs        = ptext (sLit "a pattern binding")
-pprMatchContext LambdaExpr        = ptext (sLit "a lambda abstraction")
-pprMatchContext ProcExpr          = ptext (sLit "an arrow abstraction")
-pprMatchContext (StmtCtxt ctxt)   = ptext (sLit "a pattern binding in")
-                                    $$ pprStmtContext ctxt
+pprMatchContext ctxt 
+  | want_an ctxt = ptext (sLit "an") <+> pprMatchContextNoun ctxt
+  | otherwise    = ptext (sLit "a")  <+> pprMatchContextNoun ctxt
+  where
+    want_an (FunRhs {}) = True	-- Use "an" in front
+    want_an ProcExpr    = True
+    want_an _           = False
+                 
+pprMatchContextNoun :: Outputable id => HsMatchContext id -> SDoc
+pprMatchContextNoun (FunRhs fun _)  = ptext (sLit "equation for")
+                                      <+> quotes (ppr fun)
+pprMatchContextNoun CaseAlt         = ptext (sLit "case alternative")
+pprMatchContextNoun RecUpd          = ptext (sLit "record-update construct")
+pprMatchContextNoun ThPatQuote      = ptext (sLit "Template Haskell pattern quotation")
+pprMatchContextNoun PatBindRhs      = ptext (sLit "pattern binding")
+pprMatchContextNoun LambdaExpr      = ptext (sLit "lambda abstraction")
+pprMatchContextNoun ProcExpr        = ptext (sLit "arrow abstraction")
+pprMatchContextNoun (StmtCtxt ctxt) = ptext (sLit "pattern binding in")
+                                      $$ pprStmtContext ctxt
 
 pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
 pprStmtContext (ParStmtCtxt c)

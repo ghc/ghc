@@ -16,12 +16,14 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
-import Inst
 import Id
+import Var	( Var )
 import Name
+import VarSet
 import SrcLoc
 import Outputable
 import FastString
+import Data.List( partition )
 \end{code}
 
 Note [Typechecking rules]
@@ -45,37 +47,35 @@ tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
 tcRules decls = mapM (wrapLocM tcRule) decls
 
 tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
-tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
-  = addErrCtxt (ruleCtxt name)			$ do
-    traceTc (ptext (sLit "---- Rule ------") <+> ppr name)
+tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
+  = addErrCtxt (ruleCtxt name)	$
+    do { traceTc "---- Rule ------" (ppr name)
 
-	-- Deal with the tyvars mentioned in signatures
-    (ids, lhs', rhs', lhs_lie, rhs_lie, rule_ty) <-
-      tcRuleBndrs vars $ \ ids -> do
-		-- Now LHS and RHS; see Note [Typechecking rules]
-        ((lhs', rule_ty), lhs_lie) <- getLIE (tcInferRho lhs)
-        (rhs', rhs_lie) <- getLIE (tcMonoExpr rhs rule_ty)
-        return (ids, lhs', rhs', lhs_lie, rhs_lie, rule_ty)
+    	-- Note [Typechecking rules]
+       ; vars <- tcRuleBndrs hs_bndrs
+       ; let (id_bndrs, tv_bndrs) = partition isId vars
+       ; (lhs', lhs_lie, rhs', rhs_lie, rule_ty)
+            <- tcExtendTyVarEnv tv_bndrs $
+               tcExtendIdEnv id_bndrs $
+               do { ((lhs', rule_ty), lhs_lie) <- getConstraints (tcInferRho lhs)
+                  ; (rhs', rhs_lie) <- getConstraints (tcMonoExpr rhs rule_ty)
+                  ; return (lhs', lhs_lie, rhs', rhs_lie, rule_ty) }
 
-		-- Check that LHS has no overloading at all
-    (lhs_dicts, lhs_binds) <- tcSimplifyRuleLhs lhs_lie
-
-	-- Gather the template variables and tyvars
-    let
-	tpl_ids = map instToId lhs_dicts ++ ids
+       ; (lhs_dicts, lhs_ev_binds, rhs_ev_binds) 
+             <- simplifyRule name tv_bndrs lhs_lie rhs_lie
 
 	-- IMPORTANT!  We *quantify* over any dicts that appear in the LHS
 	-- Reason: 
-	--	a) The particular dictionary isn't important, because its value
+	--	(a) The particular dictionary isn't important, because its value
 	--	   depends only on the type
 	--		e.g	gcd Int $fIntegralInt
 	--         Here we'd like to match against (gcd Int any_d) for any 'any_d'
 	--
-	--	b) We'd like to make available the dictionaries bound 
-	--	   on the LHS in the RHS, so quantifying over them is good
-	--	   See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
+	--	(b) We'd like to make available the dictionaries bound 
+	--	    on the LHS in the RHS, so quantifying over them is good
+	--	    See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
 
-	-- We initially quantify over any tyvars free in *either* the rule
+	-- We quantify over any tyvars free in *either* the rule
 	--  *or* the bound variables.  The latter is important.  Consider
 	--	ss (x,(y,z)) = (x,z)
 	--	RULE:  forall v. fst (ss v) = fst v
@@ -83,32 +83,29 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
 	--
 	-- We also need to get the free tyvars of the LHS; but we do that
 	-- during zonking (see TcHsSyn.zonkRule)
-	--
-	forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
 
-	-- RHS can be a bit more lenient.  In particular,
-	-- we let constant dictionaries etc float outwards
-	--
-	-- NB: tcSimplifyInferCheck zonks the forall_tvs, and 
-	--     knocks out any that are constrained by the environment
-    loc <- getInstLoc (SigOrigin (RuleSkol name))
-    (forall_tvs1, rhs_binds) <- tcSimplifyInferCheck loc
-                                        forall_tvs
-                                        lhs_dicts rhs_lie
+       ; let tpl_ids    = lhs_dicts ++ id_bndrs
+             forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
 
-    return (HsRule name act
-		    (map (RuleBndr . noLoc) (forall_tvs1 ++ tpl_ids))	-- yuk
-		    (mkHsDictLet lhs_binds lhs') fv_lhs
-		    (mkHsDictLet rhs_binds rhs') fv_rhs)
+	     -- Now figure out what to quantify over
+	     -- c.f. TcSimplify.simplifyInfer
+       ; zonked_forall_tvs <- zonkTcTyVarsAndFV (varSetElems forall_tvs)
+       ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
+       ; qtvs <- zonkQuantifiedTyVars (varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs))
 
-tcRuleBndrs :: [RuleBndr Name] -> ([Id] -> TcM a) -> TcM a
-tcRuleBndrs [] thing_inside = thing_inside []
-tcRuleBndrs (RuleBndr var : vars) thing_inside
+       ; return (HsRule name act
+		    (map (RuleBndr . noLoc) (qtvs ++ tpl_ids))	-- yuk
+		    (mkHsDictLet lhs_ev_binds lhs') fv_lhs
+		    (mkHsDictLet rhs_ev_binds rhs') fv_rhs) }
+
+tcRuleBndrs :: [RuleBndr Name] -> TcM [Var]
+tcRuleBndrs [] 
+  = return []
+tcRuleBndrs (RuleBndr var : rule_bndrs)
   = do 	{ ty <- newFlexiTyVarTy openTypeKind
-	; let id = mkLocalId (unLoc var) ty
-	; tcExtendIdEnv [id] $
-	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
-tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
+        ; vars <- tcRuleBndrs rule_bndrs
+	; return (mkLocalId (unLoc var) ty : vars) }
+tcRuleBndrs (RuleBndrSig var rn_ty : rule_bndrs)
 --  e.g 	x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --		a::*, x :: a->a
@@ -117,9 +114,11 @@ tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
 	; let skol_tvs = tcSkolSigTyVars (SigSkol ctxt) tyvars
 	      id_ty = substTyWith tyvars (mkTyVarTys skol_tvs) ty
 	      id = mkLocalId (unLoc var) id_ty
-	; tcExtendTyVarEnv skol_tvs $
-	  tcExtendIdEnv [id] $
-	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
+
+	      -- The type variables scope over subsequent bindings; yuk
+        ; vars <- tcExtendTyVarEnv skol_tvs $ 
+                  tcRuleBndrs rule_bndrs 
+	; return (skol_tvs ++ id : vars) }
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 

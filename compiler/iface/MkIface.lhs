@@ -62,6 +62,7 @@ import Class
 import TyCon
 import DataCon
 import Type
+import Coercion
 import TcType
 import InstEnv
 import FamInstEnv
@@ -318,7 +319,10 @@ mkIface_ hsc_env maybe_old_fingerprint
      le_occ n1 n2 = nameOccName n1 <= nameOccName n2
 
      dflags = hsc_dflags hsc_env
+
+     deliberatelyOmitted :: String -> a
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
+
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
      flattenVectInfo (VectInfo { vectInfoVar   = vVar
@@ -1377,14 +1381,14 @@ tyThingToIfaceDecl (ATyCon tycon)
     tyvars = tyConTyVars tycon
     (syn_rhs, syn_ki) 
        = case synTyConRhs tycon of
-	    OpenSynTyCon ki _ -> (Nothing,               toIfaceType ki)
-	    SynonymTyCon ty   -> (Just (toIfaceType ty), toIfaceType (typeKind ty))
+	    SynFamilyTyCon  -> (Nothing,               toIfaceType (synTyConResKind tycon))
+	    SynonymTyCon ty -> (Just (toIfaceType ty), toIfaceType (typeKind ty))
 
     ifaceConDecls (NewTyCon { data_con = con })     = 
       IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = 
       IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls OpenTyCon {}                      = IfOpenDataTyCon
+    ifaceConDecls DataFamilyTyCon {}                = IfOpenDataTyCon
     ifaceConDecls AbstractTyCon			    = IfAbstractTyCon
 	-- The last case happens when a TyCon has been trimmed during tidying
 	-- Furthermore, tyThingToIfaceDecl is also used

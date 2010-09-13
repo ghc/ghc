@@ -172,7 +172,7 @@ basicKnownKeyNames
 	newStablePtrName,
 
     -- GHC Extensions
-    groupWithName,
+        groupWithName,
 
 	-- Strings and lists
 	unpackCStringName, unpackCStringAppendName,
@@ -181,6 +181,8 @@ basicKnownKeyNames
 	-- List operations
 	concatName, filterName, mapName,
 	zipName, foldrName, buildName, augmentName, appendName,
+
+        dollarName,	    -- The ($) apply function
 
         -- Parallel array operations
 	nullPName, lengthPName, replicatePName,	singletonPName, mapPName,
@@ -599,14 +601,15 @@ groupWithName = varQual gHC_EXTS (fsLit "groupWith") groupWithIdKey
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, assertName,
     breakpointName, breakpointCondName, breakpointAutoName,
-    opaqueTyConName :: Name
+    dollarName, opaqueTyConName :: Name
 fromStringName = methName dATA_STRING (fsLit "fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
 foldrName	  = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
 buildName	  = varQual gHC_BASE (fsLit "build")      buildIdKey
 augmentName	  = varQual gHC_BASE (fsLit "augment")    augmentIdKey
-mapName       = varQual gHC_BASE (fsLit "map")        mapIdKey
+mapName           = varQual gHC_BASE (fsLit "map")        mapIdKey
 appendName	  = varQual gHC_BASE (fsLit "++")         appendIdKey
+dollarName	  = varQual gHC_BASE (fsLit "$")          dollarIdKey
 assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
 breakpointName    = varQual gHC_BASE (fsLit "breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKey
@@ -1199,9 +1202,10 @@ breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 67
 inlineIdKey :: Unique
 inlineIdKey		      = mkPreludeMiscIdUnique 68
 
-mapIdKey, groupWithIdKey :: Unique
-mapIdKey		      = mkPreludeMiscIdUnique 69
+mapIdKey, groupWithIdKey, dollarIdKey :: Unique
+mapIdKey	      = mkPreludeMiscIdUnique 69
 groupWithIdKey        = mkPreludeMiscIdUnique 70
+dollarIdKey           = mkPreludeMiscIdUnique 71
 
 -- Parallel array functions
 singletonPIdKey, nullPIdKey, lengthPIdKey, replicatePIdKey, mapPIdKey,

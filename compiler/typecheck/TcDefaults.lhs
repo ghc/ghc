@@ -76,7 +76,7 @@ check_instance :: Type -> Class -> TcM Bool
   -- Check that ty is an instance of cls
   -- We only care about whether it worked or not; return a boolean
 check_instance ty cls
-  = do	{ (_, mb_res) <- tryTc (tcSimplifyDefault [mkClassPred cls [ty]])
+  = do	{ (_, mb_res) <- tryTc (simplifyDefault [mkClassPred cls [ty]])
 	; return (isJust mb_res) }
     
 defaultDeclCtxt :: SDoc
@@ -85,14 +85,14 @@ defaultDeclCtxt = ptext (sLit "When checking the types in a default declaration"
 dupDefaultDeclErr :: [Located (DefaultDecl Name)] -> SDoc
 dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
   = hang (ptext (sLit "Multiple default declarations"))
-      4  (vcat (map pp dup_things))
+       2 (vcat (map pp dup_things))
   where
     pp (L locn (DefaultDecl _)) = ptext (sLit "here was another default declaration") <+> ppr locn
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
 polyDefErr :: LHsType Name -> SDoc
 polyDefErr ty 
-  = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 4 (ppr ty) 
+  = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 2 (ppr ty) 
 
 badDefaultTy :: Type -> [Class] -> SDoc
 badDefaultTy ty deflt_clss

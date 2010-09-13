@@ -19,8 +19,9 @@ module HsUtils(
   mkHsPar, mkHsApp, mkHsConApp, mkSimpleHsAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS, 
   mkMatchGroup, mkMatch, mkHsLam,
-  mkHsWrap, mkLHsWrap, mkHsWrapCoI, coiToHsWrapper, mkHsDictLet,
-  mkHsOpApp, mkHsDo,
+  mkHsWrap, mkLHsWrap, mkHsWrapCoI, mkLHsWrapCoI,
+  coiToHsWrapper, mkHsDictLet,
+  mkHsOpApp, mkHsDo, mkHsWrapPat, mkHsWrapPatCoI,
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -52,7 +53,7 @@ module HsUtils(
   noRebindableInfo, 
 
   -- Collecting binders
-  collectLocalBinders, collectHsValBinders, 
+  collectLocalBinders, collectHsValBinders, collectHsBindListBinders,
   collectHsBindsBinders, collectHsBindBinders, collectMethodBinders,
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
@@ -132,12 +133,24 @@ mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 		 | otherwise	       = HsWrap co_fn e
 
 mkHsWrapCoI :: CoercionI -> HsExpr id -> HsExpr id
-mkHsWrapCoI IdCo     e = e
+mkHsWrapCoI (IdCo _) e = e
 mkHsWrapCoI (ACo co) e = mkHsWrap (WpCast co) e
 
+mkLHsWrapCoI :: CoercionI -> LHsExpr id -> LHsExpr id
+mkLHsWrapCoI (IdCo _) e         = e
+mkLHsWrapCoI (ACo co) (L loc e) = L loc (mkHsWrap (WpCast co) e)
+
 coiToHsWrapper :: CoercionI -> HsWrapper
-coiToHsWrapper IdCo     = idHsWrapper
+coiToHsWrapper (IdCo _) = idHsWrapper
 coiToHsWrapper (ACo co) = WpCast co
+
+mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
+mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
+		       | otherwise	     = CoPat co_fn p ty
+
+mkHsWrapPatCoI :: CoercionI -> Pat id -> Type -> Pat id
+mkHsWrapPatCoI (IdCo _) pat _  = pat
+mkHsWrapPatCoI (ACo co) pat ty = CoPat (WpCast co) pat ty
 
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
@@ -147,14 +160,8 @@ mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
 mkMatchGroup :: [LMatch id] -> MatchGroup id
 mkMatchGroup matches = MatchGroup matches placeHolderType
 
-mkHsDictLet :: LHsBinds Id -> LHsExpr Id -> LHsExpr Id
--- Used for the dictionary bindings gotten from TcSimplify
--- We make them recursive to be on the safe side
-mkHsDictLet binds expr 
-  | isEmptyLHsBinds binds = expr
-  | otherwise             = L (getLoc expr) (HsLet (HsValBinds val_binds) expr)
-			  where
-			    val_binds = ValBindsOut [(Recursive, binds)] []
+mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
+mkHsDictLet ev_binds expr = mkLHsWrap (WpLet ev_binds) expr
 
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
 -- Used for constructing dictionary terms etc, so no locations 
@@ -219,7 +226,7 @@ mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
 emptyRecStmt = RecStmt { recS_stmts = [], recS_later_ids = [], recS_rec_ids = []
                        , recS_ret_fn = noSyntaxExpr, recS_mfix_fn = noSyntaxExpr
 		       , recS_bind_fn = noSyntaxExpr
-                       , recS_rec_rets = [], recS_dicts = emptyLHsBinds }
+                       , recS_rec_rets = [], recS_dicts = emptyTcEvBinds }
 
 mkRecStmt stmts = emptyRecStmt { recS_stmts = stmts }
 
@@ -461,6 +468,9 @@ collect_bind (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
 collectHsBindsBinders :: LHsBindsLR idL idR -> [idL]
 collectHsBindsBinders binds = collect_binds binds []
 
+collectHsBindListBinders :: [LHsBindLR idL idR] -> [idL]
+collectHsBindListBinders = foldr (collect_bind . unLoc) []
+
 collect_binds :: LHsBindsLR idL idR -> [idL] -> [idL]
 collect_binds binds acc = foldrBag (collect_bind . unLoc) acc binds
 
@@ -507,7 +517,8 @@ collect_lpat (L _ pat) bndrs
   = go pat
   where
     go (VarPat var) 	   	  = var : bndrs
-    go (VarPatOut var bs) 	  = var : collect_binds bs bndrs
+    go (VarPatOut var _) 	  = var : bndrs
+	-- See Note [Dictionary binders in ConPatOut]
     go (WildPat _)	      	  = bndrs
     go (LazyPat pat)     	  = collect_lpat pat bndrs
     go (BangPat pat)     	  = collect_lpat pat bndrs

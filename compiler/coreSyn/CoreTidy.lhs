@@ -17,7 +17,7 @@ import CoreSyn
 import CoreArity
 import Id
 import IdInfo
-import Type
+import TcType( tidyType, tidyTyVarBndr )
 import Var
 import VarEnv
 import UniqFM
@@ -123,7 +123,7 @@ tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 -- tidyBndr is used for lambda and case binders
 tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
-  | isTyVar var = tidyTyVarBndr env var
+  | isTyCoVar var = tidyTyVarBndr env var
   | otherwise   = tidyIdBndr env var
 
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])

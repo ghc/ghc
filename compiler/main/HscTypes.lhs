@@ -129,7 +129,7 @@ import Id
 import Type		
 
 import Annotations
-import Class		( Class, classSelIds, classATs, classTyCon )
+import Class		( Class, classAllSelIds, classATs, classTyCon )
 import TyCon
 import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
@@ -1333,7 +1333,7 @@ implicitTyThings (AClass cl)
     --    are only the family decls; they have no implicit things
     map ATyCon (classATs cl) ++
     -- superclass and operation selectors
-    map AnId (classSelIds cl)
+    map AnId (classAllSelIds cl)
 
 implicitTyThings (ADataCon dc) = 
     -- For data cons add the worker and (possibly) wrapper

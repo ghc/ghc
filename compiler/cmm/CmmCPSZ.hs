@@ -1,3 +1,7 @@
+{-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+-- Norman likes local bindings
+-- If this module lives on I'd like to get rid of this flag in due course
+
 module CmmCPSZ (
   -- | Converts C-- with full proceedures and parameters
   -- to a CPS transformed C-- with the stack made manifest.
@@ -153,7 +157,10 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
   where dflags = hsc_dflags hsc_env
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
         dump f txt g = dumpIfSet_dyn dflags f txt (ppr g)
+
+        run :: FuelMonad a -> IO a
         run = runFuelIO (hsc_OptFuel hsc_env)
+
         dual_rewrite flag txt pass g =
           do dump flag ("Pre " ++ txt)  g
              g <- run $ pass g

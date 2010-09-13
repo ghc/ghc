@@ -359,8 +359,8 @@ pprHsForAll exp tvs cxt
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContext []	        = empty
 pprHsContext [L _ pred] 
-   | noParenHsPred pred = ppr pred <+> ptext (sLit "=>")
-pprHsContext cxt        = ppr_hs_context cxt <+> ptext (sLit "=>")
+   | noParenHsPred pred = ppr pred <+> darrow
+pprHsContext cxt        = ppr_hs_context cxt <+> darrow
 
 noParenHsPred :: HsPred name -> Bool
 -- c.f. TypeRep.noParenPred

@@ -633,6 +633,7 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
             text "module" <+> ppr mod <+> 
             text "cannot be linked; it is only available as a boot module")))
 
+    no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith span $
 		     ptext (sLit "cannot find object file for module ") <> 
 			quotes (ppr mod) $$
@@ -657,7 +658,7 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 		-- ...and then find the linkable for it
 	       mb_lnk <- findObjectLinkableMaybe mod loc ;
 	       case mb_lnk of {
-		  Nothing -> no_obj mod ;
+		  Nothing  -> no_obj mod ;
 		  Just lnk -> adjust_linkable lnk
 	      }}
 

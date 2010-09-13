@@ -27,7 +27,8 @@ module VarEnv (
 	-- ** Operations on InScopeSets
 	emptyInScopeSet, mkInScopeSet, delInScopeSet,
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
-	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
+	getInScopeVars, lookupInScope, lookupInScope_Directly, 
+        elemInScopeSet, uniqAway, 
 
 	-- * The RnEnv2 type
 	RnEnv2, 
@@ -114,6 +115,10 @@ elemInScopeSet v (InScope in_scope _) = v `elemVarEnv` in_scope
 -- the variable's identity (unique) to its full value.
 lookupInScope :: InScopeSet -> Var -> Maybe Var
 lookupInScope (InScope in_scope _) v  = lookupVarEnv in_scope v
+
+lookupInScope_Directly :: InScopeSet -> Unique -> Maybe Var
+lookupInScope_Directly (InScope in_scope _) uniq
+  = lookupVarEnv_Directly in_scope uniq
 \end{code}
 
 \begin{code}

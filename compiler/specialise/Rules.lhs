@@ -58,15 +58,15 @@ import Data.List
 
 Note [Overall plumbing for rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* The ModGuts initially contains mg_rules :: [CoreRule] of rules
-  declared in this module. During the core-to-core pipeline,
-  locally-declared rules for locally-declared Ids are attached to the
-  IdInfo for that Id, so the mg_rules field of ModGuts now only
-  contains locally-declared rules for *imported* Ids.  TidyPgm restores
-  the original setup, so that the ModGuts again has *all* the
-  locally-declared rules.  See Note [Attach rules to local ids] in
-  SimplCore
+* After the desugarer:
+   - The ModGuts initially contains mg_rules :: [CoreRule] of
+     locally-declared rules for imported Ids.  
+   - Locally-declared rules for locally-declared Ids are attached to
+     the IdInfo for that Id.  See Note [Attach rules to local ids] in
+     DsBinds
+ 
+* TidyPgm strips off all the rules from local Ids and adds them to
+  mg_rules, so that the ModGuts has *all* the locally-declared rules.
 
 * The HomePackageTable contains a ModDetails for each home package
   module.  Each contains md_rules :: [CoreRule] of rules declared in
@@ -500,7 +500,7 @@ matchN id_unf in_scope tmpl_vars tmpl_es target_es
 
     lookup_tmpl :: TvSubstEnv -> IdSubstEnv -> Var -> CoreExpr
     lookup_tmpl tv_subst id_subst tmpl_var'
-	| isTyVar tmpl_var' = case lookupVarEnv tv_subst tmpl_var' of
+	| isTyCoVar tmpl_var' = case lookupVarEnv tv_subst tmpl_var' of
 				Just ty 	-> Type ty
 				Nothing 	-> unbound tmpl_var'
 	| otherwise	    = case lookupVarEnv id_subst tmpl_var' of

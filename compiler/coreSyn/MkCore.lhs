@@ -4,7 +4,8 @@ module MkCore (
         -- * Constructing normal syntax
         mkCoreLet, mkCoreLets,
         mkCoreApp, mkCoreApps, mkCoreConApps,
-        mkCoreLams, mkWildCase, mkWildBinder, mkIfThenElse,
+        mkCoreLams, mkWildCase, mkIfThenElse,
+        mkWildValBinder, mkWildEvBinder,
         
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
@@ -38,7 +39,7 @@ module MkCore (
 #include "HsVersions.h"
 
 import Id
-import Var      ( setTyVarUnique )
+import Var      ( EvVar, mkWildCoVar, setTyVarUnique )
 
 import CoreSyn
 import CoreUtils        ( exprType, needsCaseBinding, bindNonRec )
@@ -128,7 +129,7 @@ mk_val_app fun arg arg_ty _        -- See Note [CoreSyn let/app invariant]
 mk_val_app fun arg arg_ty res_ty
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
-    arg_id = mkWildBinder arg_ty    
+    arg_id = mkWildValBinder arg_ty    
 	-- Lots of shadowing, but it doesn't matter,
         -- because 'fun ' should not have a free wild-id
 	--
@@ -138,19 +139,22 @@ mk_val_app fun arg arg_ty res_ty
 	-- is if you take apart this case expression, and pass a 
 	-- fragmet of it as the fun part of a 'mk_val_app'.
 
+mkWildEvBinder :: PredType -> EvVar
+mkWildEvBinder pred@(EqPred {}) = mkWildCoVar     (mkPredTy pred)
+mkWildEvBinder pred             = mkWildValBinder (mkPredTy pred)
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder 
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
-mkWildBinder :: Type -> Id
-mkWildBinder ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
+mkWildValBinder :: Type -> Id
+mkWildValBinder ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
 
 mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts should not have any occurrences of WildId
 mkWildCase scrut scrut_ty res_ty alts 
-  = Case scrut (mkWildBinder scrut_ty) res_ty alts
+  = Case scrut (mkWildValBinder scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr

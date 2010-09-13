@@ -33,6 +33,7 @@ buildPDataTyCon orig_tc vect_tc repr = fixV $ \repr_tc ->
                            rec_flag    -- FIXME: is this ok?
                            False       -- FIXME: no generics
                            False       -- not GADT syntax
+                           NoParentTyCon
                            (Just $ mk_fam_inst pdata vect_tc)
   where
     orig_name = tyConName orig_tc

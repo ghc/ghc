@@ -222,7 +222,7 @@ rnLocalBindsAndThen (HsIPBinds binds) thing_inside = do
 rnIPBinds :: HsIPBinds RdrName -> RnM (HsIPBinds Name, FreeVars)
 rnIPBinds (IPBinds ip_binds _no_dict_binds) = do
     (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstM rnIPBind) ip_binds
-    return (IPBinds ip_binds' emptyLHsBinds, plusFVs fvs_s)
+    return (IPBinds ip_binds' emptyTcEvBinds, plusFVs fvs_s)
 
 rnIPBind :: IPBind RdrName -> RnM (IPBind Name, FreeVars)
 rnIPBind (IPBind n expr) = do
@@ -419,41 +419,19 @@ rnBindLHS :: NameMaker
           -- (i.e., any free variables of the pattern)
           -> RnM (LHsBindLR Name RdrName)
 
-rnBindLHS name_maker _ (L loc (PatBind { pat_lhs = pat, 
-                                         pat_rhs = grhss, 
-                                         pat_rhs_ty=pat_rhs_ty
-                                       })) 
+rnBindLHS name_maker _ (L loc bind@(PatBind { pat_lhs = pat }))
   = setSrcSpan loc $ do
       -- we don't actually use the FV processing of rnPatsAndThen here
       (pat',pat'_fvs) <- rnBindPat name_maker pat
-      return (L loc (PatBind { pat_lhs = pat', 
-                               pat_rhs = grhss, 
-                               -- we temporarily store the pat's FVs here;
-                               -- gets updated to the FVs of the whole bind
-                               -- when doing the RHS below
-                               bind_fvs = pat'_fvs,
-                               -- these will get ignored in the next pass,
-                               -- when we rename the RHS
-			       pat_rhs_ty = pat_rhs_ty }))
-
-rnBindLHS name_maker _ (L loc (FunBind { fun_id = name@(L nameLoc _), 
-                                         fun_infix = inf, 
-                                         fun_matches = matches,
-                                         fun_co_fn = fun_co_fn, 
-                                         fun_tick = fun_tick
-                                       }))
+      return (L loc (bind { pat_lhs = pat', bind_fvs = pat'_fvs }))
+                -- We temporarily store the pat's FVs in bind_fvs;
+                -- gets updated to the FVs of the whole bind
+                -- when doing the RHS below
+                            
+rnBindLHS name_maker _ (L loc bind@(FunBind { fun_id = name@(L nameLoc _) }))
   = setSrcSpan loc $ 
     do { newname <- applyNameMaker name_maker name
-       ; return (L loc (FunBind { fun_id = L nameLoc newname, 
-                             	  fun_infix = inf, 
-                             	  fun_matches = matches,
-                             	  -- we temporatily store the LHS's FVs (empty in this case) here
-                             	  -- gets updated when doing the RHS below
-                             	  bind_fvs = emptyFVs,
-                             	  -- everything else will get ignored in the next pass
-                             	  fun_co_fn = fun_co_fn, 
-                             	  fun_tick = fun_tick
-                             	  })) }
+       ; return (L loc (bind { fun_id = L nameLoc newname })) } 
 
 rnBindLHS _ _ b = pprPanic "rnBindLHS" (ppr b)
 
@@ -462,13 +440,13 @@ rnBind :: (Name -> [Name])		-- Signature tyvar function
        -> (FreeVars -> FreeVars)	-- Trimming function for rhs free vars
        -> LHsBindLR Name RdrName
        -> RnM (LHsBind Name, [Name], Uses)
-rnBind _ trim (L loc (PatBind { pat_lhs = pat,
-                                pat_rhs = grhss, 
-                                -- pat fvs were stored here while
-                                -- after processing the LHS          
-                                bind_fvs = pat_fvs }))
+rnBind _ trim (L loc bind@(PatBind { pat_lhs = pat
+                                   , pat_rhs = grhss 
+                                      -- pat fvs were stored in bind_fvs
+                                      -- after processing the LHS          
+                                   , bind_fvs = pat_fvs }))
   = setSrcSpan loc $ 
-    do	{let bndrs = collectPatBinders pat
+    do	{ let bndrs = collectPatBinders pat
 
 	; (grhss', fvs) <- rnGRHSs PatBindRhs grhss
 		-- No scoped type variables for pattern bindings
@@ -476,20 +454,14 @@ rnBind _ trim (L loc (PatBind { pat_lhs = pat,
               fvs'    = trim all_fvs
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
-          return (L loc (PatBind { pat_lhs    = pat,
-                                   pat_rhs    = grhss', 
-				   pat_rhs_ty = placeHolderType, 
-                                   bind_fvs   = fvs' }),
+          return (L loc (bind { pat_rhs  = grhss' 
+			      , bind_fvs = fvs' }),
 		  bndrs, all_fvs) }
 
-rnBind sig_fn 
-       trim 
-       (L loc (FunBind { fun_id = name, 
-                         fun_infix = is_infix, 
-                         fun_matches = matches,
-                         -- no pattern FVs
-                         bind_fvs = _
-                       })) 
+rnBind sig_fn trim 
+       (L loc bind@(FunBind { fun_id = name 
+                            , fun_infix = is_infix 
+                            , fun_matches = matches })) 
        -- invariant: no free vars here when it's a FunBind
   = setSrcSpan loc $ 
     do	{ let plain_name = unLoc name
@@ -503,12 +475,8 @@ rnBind sig_fn
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
 
-          return (L loc (FunBind { fun_id = name,
-                               	   fun_infix = is_infix, 
-                               	   fun_matches = matches',
-			       	   bind_fvs = fvs',
-                               	   fun_co_fn = idHsWrapper, 
-                               	   fun_tick = Nothing }), 
+          return (L loc (bind { fun_matches = matches'
+			      , bind_fvs   = fvs' }), 
 		  [plain_name], fvs)
       }
 
@@ -619,8 +587,9 @@ rnMethodBind :: Name
 	      -> [Name]
 	      -> LHsBindLR RdrName RdrName
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
-rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = is_infix, 
-					             fun_matches = MatchGroup matches _ }))
+rnMethodBind cls sig_fn gen_tyvars 
+             (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
+				  , fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ do
     sel_name <- wrapLocM (lookupInstDeclBndr cls) name
     let plain_name = unLoc sel_name
@@ -631,11 +600,9 @@ rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = 
     let new_group = MatchGroup new_matches placeHolderType
 
     when is_infix $ checkPrecMatch plain_name new_group
-    return (unitBag (L loc (FunBind {
-                                fun_id = sel_name, fun_infix = is_infix,
-                                fun_matches = new_group,
-                                bind_fvs = fvs, fun_co_fn = idHsWrapper,
-                                fun_tick = Nothing })),
+    return (unitBag (L loc (bind { fun_id      = sel_name 
+                                 , fun_matches = new_group
+                                 , bind_fvs    = fvs })),
              fvs `addOneFV` plain_name)
         -- The 'fvs' field isn't used for method binds
   where

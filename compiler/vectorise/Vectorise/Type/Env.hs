@@ -1,4 +1,6 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -XNoMonoLocalBinds -fno-warn-missing-signatures #-}
+-- Roman likes local bindings
+-- If this module lives on I'd like to get rid of this flag in due course
 
 module Vectorise.Type.Env ( 
 	vectTypeEnv,

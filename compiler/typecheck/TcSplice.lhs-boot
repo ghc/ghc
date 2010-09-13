@@ -6,19 +6,19 @@ import Name	( Name )
 import NameSet	( FreeVars )
 import RdrName	( RdrName )
 import TcRnTypes( TcM, TcId )
-import TcType	( BoxyRhoType, TcKind )
+import TcType	( TcRhoType, TcKind )
 import Annotations ( Annotation, CoreAnnTarget )
 import qualified Language.Haskell.TH as TH
 
 tcSpliceExpr :: HsSplice Name
-	     -> BoxyRhoType
+	     -> TcRhoType
 	     -> TcM (HsExpr TcId)
 
 kcSpliceType :: HsSplice Name -> FreeVars
 	     -> TcM (HsType Name, TcKind)
 
 tcBracket :: HsBracket Name 
-	  -> BoxyRhoType
+	  -> TcRhoType
 	  -> TcM (LHsExpr TcId)
 
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]

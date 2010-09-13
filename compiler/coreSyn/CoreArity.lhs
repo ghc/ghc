@@ -612,7 +612,7 @@ etaExpand n orig_expr
       -- Strip off existing lambdas and casts
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
-    go n (Lam v body) | isTyVar v = Lam v (go n     body)
+    go n (Lam v body) | isTyCoVar v = Lam v (go n     body)
        	              | otherwise = Lam v (go (n-1) body)
     go n (Cast expr co) = Cast (go n expr) co
     go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
@@ -655,7 +655,7 @@ etaInfoApp :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
 etaInfoApp subst (Lam v1 e) (EtaVar v2 : eis) 
   = etaInfoApp subst' e eis
   where
-    subst' | isTyVar v1 = CoreSubst.extendTvSubst subst v1 (mkTyVarTy v2) 
+    subst' | isTyCoVar v1 = CoreSubst.extendTvSubst subst v1 (mkTyVarTy v2) 
     	   | otherwise  = CoreSubst.extendIdSubst subst v1 (Var v2)
 
 etaInfoApp subst (Cast e co1) eis

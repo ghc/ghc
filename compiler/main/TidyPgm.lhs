@@ -20,7 +20,7 @@ import CoreMonad
 import CoreUtils
 import Rules
 import CoreArity	( exprArity, exprBotStrictness_maybe )
-import Class		( classSelIds )
+import Class		( classAllSelIds )
 import VarEnv
 import VarSet
 import Var
@@ -454,7 +454,7 @@ mustExposeTyCon exports tc
   | isEnumerationTyCon tc	-- For an enumeration, exposing the constructors
   = True			-- won't lead to the need for further exposure
 				-- (This includes data types with no constructors.)
-  | isOpenTyCon tc		-- Open type family
+  | isFamilyTyCon tc		-- Open type family
   = True
 
   | otherwise			-- Newtype, datatype
@@ -560,7 +560,7 @@ getImplicitBinds type_env
   = map get_defn (concatMap implicit_ids (typeEnvElts type_env))
   where
     implicit_ids (ATyCon tc)  = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-    implicit_ids (AClass cls) = classSelIds cls
+    implicit_ids (AClass cls) = classAllSelIds cls
     implicit_ids _            = []
     
     get_defn :: Id -> CoreBind

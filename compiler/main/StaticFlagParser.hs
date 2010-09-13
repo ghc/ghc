@@ -127,6 +127,7 @@ static_flags = [
   , Flag "dsuppress-module-prefixes" (PassFlag addOpt)
   , Flag "dppr-user-length"          (AnySuffix addOpt)
   , Flag "dopt-fuel"                 (AnySuffix addOpt)
+  , Flag "dtrace-level"              (AnySuffix addOpt)
   , Flag "dno-debug-output"          (PassFlag addOpt)
   , Flag "dstub-dead-values"         (PassFlag addOpt)
       -- rest of the debugging flags are dynamic

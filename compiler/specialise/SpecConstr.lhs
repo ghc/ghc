@@ -672,7 +672,7 @@ extendCaseBndrs env case_bndr con alt_bndrs
   	--	Var v  -> extendValEnv env1 v cval
 	--	_other -> env1
  where
-   zap v | isTyVar v = v		-- See NB2 above
+   zap v | isTyCoVar v = v		-- See NB2 above
          | otherwise = zapIdOccInfo v
    env1 = extendValEnv env case_bndr cval
    cval = case con of
@@ -936,7 +936,7 @@ scExpr' env (Case scrut b ty alts)
 	   ; return (usg', scrut_occ, (con, bs2, rhs')) }
 
 scExpr' env (Let (NonRec bndr rhs) body)
-  | isTyVar bndr	-- Type-lets may be created by doBeta
+  | isTyCoVar bndr	-- Type-lets may be created by doBeta
   = scExpr' (extendScSubst env bndr rhs) body
 
   | otherwise		   -- Note [Local let bindings]
@@ -1398,7 +1398,7 @@ callToPats env bndr_occs (con_env, args)
 		-- at the call site
 		-- See Note [Shadowing] at the top
 		
-	      (tvs, ids) = partition isTyVar qvars
+	      (tvs, ids) = partition isTyCoVar qvars
 	      qvars'     = tvs ++ ids
 		-- Put the type variables first; the type of a term
 		-- variable may mention a type variable
@@ -1572,7 +1572,7 @@ isValue env (Var v)
 	-- as well, for let-bound constructors!
 
 isValue env (Lam b e)
-  | isTyVar b = case isValue env e of
+  | isTyCoVar b = case isValue env e of
 		  Just _  -> Just LambdaVal
 		  Nothing -> Nothing
   | otherwise = Just LambdaVal

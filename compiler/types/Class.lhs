@@ -13,12 +13,14 @@ module Class (
 
 	FunDep,	pprFundeps, pprFunDep,
 
-	mkClass, classTyVars, classArity,
-	classKey, className, classATs, classSelIds, classTyCon, classMethods, classOpItems,
-	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
+	mkClass, classTyVars, classArity, classSCNEqs,
+	classKey, className, classATs, classTyCon, classMethods,
+	classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
+        classAllSelIds, classSCSelId
     ) where
 
 #include "Typeable.h"
+#include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} TypeRep	( PredType )
@@ -51,13 +53,19 @@ data Class
 	classTyVars  :: [TyVar],	-- The class type variables
 	classFunDeps :: [FunDep TyVar],	-- The functional dependencies
 
-	classSCTheta :: [PredType],	-- Immediate superclasses, and the
-	classSCSels  :: [Id],		-- corresponding selector functions
-					-- to extract them from a dictionary
-					-- of this class
-
+	-- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
+        -- We need value-level selectors for the dictionary 
+	-- superclasses, but not for the equality superclasses
+	classSCTheta :: [PredType],	-- Immediate superclasses, 
+		     			---   *with equalities first*
+        classSCNEqs  :: Int,		-- How many equalities
+	classSCSels  :: [Id],		-- Selector functions to extract the
+		     			--   *dictionary* superclasses from a 
+					--   dictionary of this class
+	-- Associated types
         classATs     :: [TyCon],	-- Associated type families
 
+        -- Class operations
 	classOpStuff :: [ClassOpItem],	-- Ordered by tag
 
 	classTyCon :: TyCon		-- The data type constructor for
@@ -92,23 +100,24 @@ The @mkClass@ function fills in the indirect superclasses.
 \begin{code}
 mkClass :: Name -> [TyVar]
 	-> [([TyVar], [TyVar])]
-	-> [PredType] -> [Id]
+	-> [PredType] -> Int -> [Id]
 	-> [TyCon]
 	-> [ClassOpItem]
 	-> TyCon
 	-> Class
 
-mkClass name tyvars fds super_classes superdict_sels ats 
+mkClass name tyvars fds super_classes n_eqs superdict_sels ats 
 	op_stuff tycon
-  = Class {	classKey = getUnique name, 
-		className = name,
-		classTyVars = tyvars,
+  = Class {	classKey     = getUnique name, 
+		className    = name,
+		classTyVars  = tyvars,
 		classFunDeps = fds,
 		classSCTheta = super_classes,
-		classSCSels = superdict_sels,
-		classATs = ats,
+                classSCNEqs  = n_eqs,
+		classSCSels  = superdict_sels,
+		classATs     = ats,
 		classOpStuff = op_stuff,
-		classTyCon = tycon }
+		classTyCon   = tycon }
 \end{code}
 
 %************************************************************************
@@ -124,9 +133,20 @@ classArity :: Class -> Arity
 classArity clas = length (classTyVars clas)
 	-- Could memoise this
 
-classSelIds :: Class -> [Id]
-classSelIds c@(Class {classSCSels = sc_sels})
+classAllSelIds :: Class -> [Id]
+-- Both superclass-dictionary and method selectors
+classAllSelIds c@(Class {classSCSels = sc_sels})
   = sc_sels ++ classMethods c
+
+classSCSelId :: Class -> Int -> Id
+-- Get the n'th superclass selector Id
+-- where n is 0-indexed, and counts 
+--    *all* superclasses including equalities
+classSCSelId (Class { classSCNEqs = n_eqs, classSCSels = sc_sels }) n
+  = ASSERT( sc_sel_index >= 0 && sc_sel_index < length sc_sels )
+    sc_sels !! sc_sel_index
+  where
+    sc_sel_index = n - n_eqs	-- 0-index into classSCSels
 
 classMethods :: Class -> [Id]
 classMethods (Class {classOpStuff = op_stuff})

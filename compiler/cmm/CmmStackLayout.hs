@@ -1,3 +1,7 @@
+{-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+-- Norman likes local bindings
+-- If this module lives on I'd like to get rid of this flag in due course
+
 module CmmStackLayout
     ( SlotEnv, liveSlotAnal, liveSlotTransfers, removeLiveSlotDefs
     , layout, manifestSP, igraph, areaBuilder

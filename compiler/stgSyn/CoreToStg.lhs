@@ -445,7 +445,7 @@ mkStgAltType bndr alts
    _is_poly_alt_tycon tc
 	=  isFunTyCon tc
         || isPrimTyCon tc   -- "Any" is lifted but primitive
-	|| isOpenTyCon tc   -- Type family; e.g. arising from strict
+	|| isFamilyTyCon tc   -- Type family; e.g. arising from strict
 			    -- function application where argument has a
 			    -- type-family type
 
@@ -1120,7 +1120,7 @@ myCollectArgs expr
     go (Cast e _)       as = go e as
     go (Note _ e)       as = go e as
     go (Lam b e)        as
-       | isTyVar b         = go e as	-- Note [Collect args]
+       | isTyCoVar b         = go e as	-- Note [Collect args]
     go _                _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
 

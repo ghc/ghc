@@ -307,7 +307,7 @@ lookup_fam_inst_env 	      -- The worker, local to this module
     -> TyCon -> [Type]		-- What we are looking for
     -> [FamInstMatch] 	        -- Successful matches
 lookup_fam_inst_env match_fun one_sided (pkg_ie, home_ie) fam tys
-  | not (isOpenTyCon fam) 
+  | not (isFamilyTyCon fam) 
   = []
   | otherwise
   = ASSERT( n_tys >= arity )	-- Family type applications must be saturated
@@ -416,7 +416,7 @@ topNormaliseType env ty
 		   | otherwise		 = rec_nts
 
     go rec_nts (TyConApp tc tys)		-- Expand open tycons
-	| isOpenTyCon tc
+	| isFamilyTyCon tc
 	, (ACo co, ty) <- normaliseTcApp env tc tys
 	= 	-- The ACo says "something happened"
 		-- Note that normaliseType fully normalises, but it has do to so
@@ -437,7 +437,7 @@ normaliseTcApp env tc tys
   = let	-- First normalise the arg types so that they'll match 
 	-- when we lookup in in the instance envt
 	(cois, ntys) = mapAndUnzip (normaliseType env) tys
-	tycon_coi    = mkTyConAppCoI tc ntys cois
+	tycon_coi    = mkTyConAppCoI tc cois
     in 	-- Now try the top-level redex
     case lookupFamInstEnv env tc ntys of
 		-- A matching family instance exists
@@ -468,16 +468,16 @@ normaliseType env (TyConApp tc tys)
 normaliseType env (AppTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
-    in  (mkAppTyCoI nty1 coi1 nty2 coi2, AppTy nty1 nty2)
+    in  (mkAppTyCoI coi1 coi2, AppTy nty1 nty2)
 normaliseType env (FunTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
-    in  (mkFunTyCoI nty1 coi1 nty2 coi2, FunTy nty1 nty2)
+    in  (mkFunTyCoI coi1 coi2, FunTy nty1 nty2)
 normaliseType env (ForAllTy tyvar ty1)
   = let (coi,nty1) = normaliseType env ty1
-    in  (mkForAllTyCoI tyvar coi,ForAllTy tyvar nty1)
+    in  (mkForAllTyCoI tyvar coi, ForAllTy tyvar nty1)
 normaliseType _   ty@(TyVarTy _)
-  = (IdCo,ty)
+  = (IdCo ty,ty)
 normaliseType env (PredTy predty)
   = normalisePred env predty
 
@@ -485,12 +485,12 @@ normaliseType env (PredTy predty)
 normalisePred :: FamInstEnvs -> PredType -> (CoercionI,Type)
 normalisePred env (ClassP cls tys)
   =	let (cois,tys') = mapAndUnzip (normaliseType env) tys
-	in  (mkClassPPredCoI cls tys' cois, PredTy $ ClassP cls tys')
+	in  (mkClassPPredCoI cls cois, PredTy $ ClassP cls tys')
 normalisePred env (IParam ipn ty)
   = 	let (coi,ty') = normaliseType env ty
 	in  (mkIParamPredCoI ipn coi, PredTy $ IParam ipn ty')
 normalisePred env (EqPred ty1 ty2)
   = 	let (coi1,ty1') = normaliseType env ty1
             (coi2,ty2') = normaliseType env ty2
-	in  (mkEqPredCoI ty1' coi1 ty2' coi2, PredTy $ EqPred ty1' ty2')
+	in  (mkEqPredCoI coi1 coi2, PredTy $ EqPred ty1' ty2')
 \end{code}

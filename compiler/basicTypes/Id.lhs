@@ -30,7 +30,7 @@ module Id (
 	mkLocalId, mkLocalIdWithInfo, mkExportedLocalId,
 	mkSysLocal, mkSysLocalM, mkUserLocal, mkUserLocalM,
 	mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
-	mkWorkerId, 
+	mkWorkerId, mkWiredInIdName,
 
 	-- ** Taking an Id apart
 	idName, idType, idUnique, idInfo, idDetails,
@@ -258,6 +258,9 @@ mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName uniq occ loc) ty
 mkUserLocalM :: MonadUnique m => OccName -> Type -> SrcSpan -> m Id
 mkUserLocalM occ ty loc = getUniqueM >>= (\uniq -> return (mkUserLocal occ uniq ty loc))
 
+mkWiredInIdName :: Module -> FastString -> Unique -> Id -> Name
+mkWiredInIdName mod fs uniq id
+ = mkWiredInName mod (mkOccNameFS varName fs) uniq (AnId id) UserSyntax
 \end{code}
 
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus

@@ -11,10 +11,9 @@ module TyCon(
 	TyCon, FieldLabel, 
 
 	AlgTyConRhs(..), visibleDataCons, 
-        TyConParent(..), 
+        TyConParent(..), isNoParent,
 	SynTyConRhs(..),
         CoTyConDesc(..),
-	AssocFamilyPermutation,
 
         -- ** Constructing TyCons
 	mkAlgTyCon,
@@ -36,14 +35,15 @@ module TyCon(
         isFunTyCon, 
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, 
-        isSynTyCon, isClosedSynTyCon, isOpenSynTyCon,
+        isSynTyCon, isClosedSynTyCon, 
         isSuperKindTyCon, isDecomposableTyCon,
         isCoercionTyCon, isCoercionTyCon_maybe,
         isForeignTyCon, isAnyTyCon, tyConHasKind,
 
 	isInjectiveTyCon,
 	isDataTyCon, isProductTyCon, isEnumerationTyCon, 
-	isNewTyCon, isAbstractTyCon, isOpenTyCon,
+	isNewTyCon, isAbstractTyCon, 
+        isFamilyTyCon, isSynFamilyTyCon, isDataFamilyTyCon,
         isUnLiftedTyCon,
 	isGadtSyntaxTyCon,
 	isTyConAssoc,
@@ -60,20 +60,19 @@ module TyCon(
 	tyConFamilySize,
 	tyConStupidTheta,
 	tyConArity,
+        tyConParent,
 	tyConClass_maybe,
-	tyConFamInst_maybe, tyConFamilyCoercion_maybe,
-	synTyConDefn, synTyConRhs, synTyConType, synTyConResKind,
+	tyConFamInst_maybe, tyConFamilyCoercion_maybe,tyConFamInstSig_maybe,
+	synTyConDefn, synTyConRhs, synTyConType, 
 	tyConExtName,		-- External name for foreign types
 	algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe, 
-        assocTyConArgPoss_maybe,
         tupleTyConBoxity,
 
         -- ** Manipulating TyCons
 	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 	makeTyConAbstract,
 	newTyConCo_maybe,
-	setTyConArgPoss, 
 
         -- * Primitive representations of Types
 	PrimRep(..),
@@ -97,7 +96,6 @@ import FastString
 import Constants
 import Util
 import qualified Data.Data as Data
-import Data.List( elemIndex )
 \end{code}
 
 -----------------------------------------------
@@ -113,14 +111,33 @@ Note [Type synonym families]
 	type instance F Int = Bool
 	..etc...
 
-* From the user's point of view (F Int) and Bool are simply equivalent
-  types.
+* Reply "yes" to isSynFamilyTyCon, and isFamilyTyCon
+
+* From the user's point of view (F Int) and Bool are simply 
+  equivalent types.
 
 * A Haskell 98 type synonym is a degenerate form of a type synonym
   family.
 
 * Type functions can't appear in the LHS of a type function:
 	type instance F (F Int) = ...	-- BAD!
+
+* Translation of type family decl:
+	type family F a :: *
+  translates to
+    a SynTyCon 'F', whose SynTyConRhs is SynFamilyTyCon
+
+* Translation of type instance decl:
+	type instance F [a] = Maybe a
+  translates to
+    A SynTyCon 'R:FList a', whose 
+       SynTyConRhs is (SynonymTyCon (Maybe a))
+       TyConParent is (FamInstTyCon F [a] co)
+         where co :: F [a] ~ R:FList a
+    Notice that we introduce a gratuitous vanilla type synonym
+       type R:FList a = Maybe a
+    solely so that type and data families can be treated more
+    uniformly, via a single FamInstTyCon descriptor        
 
 * In the future we might want to support
     * closed type families (esp when we have proper kinds)
@@ -137,6 +154,8 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
 
   Here T is the "family TyCon".
 
+* Reply "yes" to isDataFamilyTyCon, and isFamilyTyCon
+
 * The user does not see any "equivalent types" as he did with type
   synonym families.  He just sees constructors with types
 	T1 :: T Int
@@ -150,7 +169,7 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
 
   The R:TInt is the "representation TyCons".
   It has an AlgTyConParent of
-	FamilyTyCon T [Int] ax_ti
+	FamInstTyCon T [Int] ax_ti
 
 * The data contructor T2 has a wrapper (which is what the 
   source-level "T2" invokes):
@@ -181,7 +200,7 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
 
   The representation TyCon R:TList, has an AlgTyConParent of
 
-	FamilyTyCon T [(a,b)] ax_pr
+	FamInstTyCon T [(a,b)] ax_pr
 
 * Notice that T is NOT translated to a FC type function; it just
   becomes a "data type" with no constructors, which can be coerced inot
@@ -403,13 +422,11 @@ data AlgTyConRhs
     --
     -- > data T a :: *
     --
-    -- Or an assoicated data type declaration, within a class declaration:
+    -- Or an associated data type declaration, within a class declaration:
     --
     -- > class C a b where
     -- >   data T b :: *
-  | OpenTyCon {
-      otArgPoss :: AssocFamilyPermutation
-    }
+  | DataFamilyTyCon
 
     -- | Information about those 'TyCon's derived from a @data@
     -- declaration. This includes data types with no constructors at
@@ -459,24 +476,12 @@ data AlgTyConRhs
 			       -- again check Trac #1072.
     }
 
-type AssocFamilyPermutation
-  = Maybe [Int]  -- Nothing for *top-level* type families
-                 -- For *associated* type families, gives the position
-	         -- of that 'TyVar' in the class argument list (0-indexed)
-		 -- e.g.  class C a b c where { type F c a :: *->* }
-                 --       Then we get Just [2,0]
-	 -- For *synonyms*, the length of the list is identical to
-	 -- 		    the TyCon's arity
-	 -- For *data types*, the length may be smaller than the
-	 -- 	TyCon's arity; e.g. class C a where { data D a :: *->* }
-	 -- 		       here D gets arity 2
-
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
 -- the context of any particular user program!
 visibleDataCons :: AlgTyConRhs -> [DataCon]
 visibleDataCons AbstractTyCon      	      = []
-visibleDataCons OpenTyCon {}		      = []
+visibleDataCons DataFamilyTyCon {}		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 
@@ -493,6 +498,10 @@ data TyConParent
   | ClassTyCon      	
 	Class		-- INVARIANT: the classTyCon of this Class is the current tycon
 
+  -- | An *associated* type of a class.  
+  | AssocFamilyTyCon   
+        Class			-- The class in whose declaration the family is declared
+
   -- | Type constructors representing an instance of a type family. Parameters:
   --
   --  1) The type family in question
@@ -503,30 +512,39 @@ data TyConParent
   --
   --  3) A 'CoTyCon' identifying the representation
   --  type with the type instance family
-  | FamilyTyCon	  -- See Note [Data type families]
-	TyCon
-	[Type]
-	TyCon  -- c.f. Note [Newtype coercions]
+  | FamInstTyCon	  -- See Note [Data type families]
+    			  -- and Note [Type synonym families]
+	TyCon   -- The family TyCon
+	[Type]	-- Argument types (mentions the tyConTyVars of this TyCon)
+	TyCon   -- The coercion constructor
 
+	-- E.g.  data intance T [a] = ...
+	-- gives a representation tycon:
+	--	data R:TList a = ...
+	-- 	axiom co a :: T [a] ~ R:TList a
+	-- with R:TList's algTcParent = FamInstTyCon T [a] co
 
 -- | Checks the invariants of a 'TyConParent' given the appropriate type class name, if any
 okParent :: Name -> TyConParent -> Bool
-okParent _       NoParentTyCon                   = True
-okParent tc_name (ClassTyCon cls)                = tyConName (classTyCon cls) == tc_name
-okParent _       (FamilyTyCon fam_tc tys _co_tc) = tyConArity fam_tc == length tys
+okParent _       NoParentTyCon                    = True
+okParent tc_name (AssocFamilyTyCon cls)           = tc_name `elem` map tyConName (classATs cls)
+okParent tc_name (ClassTyCon cls)                 = tc_name == tyConName (classTyCon cls)
+okParent _       (FamInstTyCon fam_tc tys _co_tc) = tyConArity fam_tc == length tys
+
+isNoParent :: TyConParent -> Bool
+isNoParent NoParentTyCon = True
+isNoParent _             = False
 
 --------------------
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
 data SynTyConRhs
-  = OpenSynTyCon      -- e.g. type family F x y :: * -> *
-       Kind	      -- Kind of the "rhs"; ie *excluding type indices*
-       		      --     In the example, the kind is (*->*)
-       AssocFamilyPermutation
+  = SynonymTyCon      -- ^ An ordinary type synony
+       Type	      -- ^ The rhs, which mentions head type variables. It acts as a
+		      -- template for the expansion when the 'TyCon' is applied to some
+		      -- types.
 
-  | SynonymTyCon Type   -- ^ The synonym mentions head type variables. It acts as a
-			-- template for the expansion when the 'TyCon' is applied to some
-			-- types.
+   | SynFamilyTyCon   -- A type synonym family  e.g. type family F x y :: * -> *
 
 --------------------
 data CoTyConDesc
@@ -883,7 +901,7 @@ isDataTyCon :: TyCon -> Bool
 --     get an info table.  The family declaration 'TyCon' does not
 isDataTyCon (AlgTyCon {algTcRhs = rhs})
   = case rhs of
-        OpenTyCon {}  -> False
+        DataFamilyTyCon {}  -> False
 	DataTyCon {}  -> True
 	NewTyCon {}   -> False
 	AbstractTyCon -> False	 -- We don't know, so return False
@@ -932,14 +950,6 @@ isSynTyCon _		 = False
 -- right hand side to which a synonym family application can expand.
 --
 
--- | Is this a synonym 'TyCon' that can have no further instances appear?
-isClosedSynTyCon :: TyCon -> Bool
-isClosedSynTyCon tycon = isSynTyCon tycon && not (isOpenTyCon tycon)
-
--- | Is this a synonym 'TyCon' that can have may have further instances appear?
-isOpenSynTyCon :: TyCon -> Bool
-isOpenSynTyCon tycon = isSynTyCon tycon && isOpenTyCon tycon
-
 isDecomposableTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
 -- Specifically NOT true of synonyms (open and otherwise) and coercions
@@ -959,10 +969,24 @@ isEnumerationTyCon (TupleTyCon {tyConArity = arity}) = arity == 0
 isEnumerationTyCon _                                                   = False
 
 -- | Is this a 'TyCon', synonym or otherwise, that may have further instances appear?
-isOpenTyCon :: TyCon -> Bool
-isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon {}}) = True
-isOpenTyCon (AlgTyCon {algTcRhs = OpenTyCon {}})    = True
-isOpenTyCon _					    = False
+isFamilyTyCon :: TyCon -> Bool
+isFamilyTyCon (SynTyCon {synTcRhs = SynFamilyTyCon {}})  = True
+isFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}}) = True
+isFamilyTyCon _	= False
+
+-- | Is this a synonym 'TyCon' that can have may have further instances appear?
+isSynFamilyTyCon :: TyCon -> Bool
+isSynFamilyTyCon (SynTyCon {synTcRhs = SynFamilyTyCon {}}) = True
+isSynFamilyTyCon _ = False
+
+-- | Is this a synonym 'TyCon' that can have may have further instances appear?
+isDataFamilyTyCon :: TyCon -> Bool
+isDataFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}}) = True
+isDataFamilyTyCon _ = False
+
+-- | Is this a synonym 'TyCon' that can have no further instances appear?
+isClosedSynTyCon :: TyCon -> Bool
+isClosedSynTyCon tycon = isSynTyCon tycon && not (isFamilyTyCon tycon)
 
 -- | Injective 'TyCon's can be decomposed, so that
 --     T ty1 ~ T ty2  =>  ty1 ~ ty2
@@ -975,36 +999,12 @@ isInjectiveTyCon tc = not (isSynTyCon tc)
 	-- type synonym, because you should probably have expanded it first
 	-- But regardless, it's not injective!
 
--- | Extract the mapping from 'TyVar' indexes to indexes in the corresponding family
--- argument lists form an open 'TyCon' of any sort, if the given 'TyCon' is indeed
--- such a beast and that information is available
-assocTyConArgPoss_maybe :: TyCon -> Maybe [Int]
-assocTyConArgPoss_maybe (AlgTyCon { 
-			   algTcRhs = OpenTyCon {otArgPoss = poss}})  = poss
-assocTyConArgPoss_maybe (SynTyCon { synTcRhs = OpenSynTyCon _ poss }) = poss
-assocTyConArgPoss_maybe _ = Nothing
-
 -- | Are we able to extract informationa 'TyVar' to class argument list
 -- mappping from a given 'TyCon'?
 isTyConAssoc :: TyCon -> Bool
-isTyConAssoc = isJust . assocTyConArgPoss_maybe
-
--- | Set the AssocFamilyPermutation structure in an 
--- associated data or type synonym.  The [TyVar] are the
--- class type variables.  Remember, the tyvars of an associated
--- data/type are a subset of the class tyvars; except that an
--- associated data type can have extra type variables at the
--- end (see Note [Avoid name clashes for associated data types] in TcHsType)
-setTyConArgPoss :: [TyVar] -> TyCon -> TyCon
-setTyConArgPoss clas_tvs tc
-  = case tc of
-      AlgTyCon { algTcRhs = rhs }               -> tc { algTcRhs = rhs {otArgPoss = Just ps} }
-      SynTyCon { synTcRhs = OpenSynTyCon ki _ } -> tc { synTcRhs = OpenSynTyCon ki (Just ps) }
-      _                                         -> pprPanic "setTyConArgPoss" (ppr tc)
-  where
-    ps = catMaybes [tv `elemIndex` clas_tvs | tv <- tyConTyVars tc]
-       -- We will get Nothings for the "extra" type variables in an
-       -- associated data type
+isTyConAssoc tc = case tyConParent tc of
+                     AssocFamilyTyCon {} -> True
+                     _                   -> False
 
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it
@@ -1182,9 +1182,9 @@ tyConDataCons_maybe _                                                      = Not
 tyConFamilySize  :: TyCon -> Int
 tyConFamilySize (AlgTyCon   {algTcRhs = DataTyCon {data_cons = cons}}) = 
   length cons
-tyConFamilySize (AlgTyCon   {algTcRhs = NewTyCon {}})                  = 1
-tyConFamilySize (AlgTyCon   {algTcRhs = OpenTyCon {}})                 = 0
-tyConFamilySize (TupleTyCon {})	 		                       = 1
+tyConFamilySize (AlgTyCon   {algTcRhs = NewTyCon {}})        = 1
+tyConFamilySize (AlgTyCon   {algTcRhs = DataFamilyTyCon {}}) = 0
+tyConFamilySize (TupleTyCon {})	 		             = 1
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 
 -- | Extract an 'AlgTyConRhs' with information about data constructors from an algebraic or tuple
@@ -1252,11 +1252,6 @@ synTyConType :: TyCon -> Type
 synTyConType tc = case synTcRhs tc of
 		    SynonymTyCon t -> t
 		    _		   -> pprPanic "synTyConType" (ppr tc)
-
--- | Find the 'Kind' of an open type synonym. Panics if the 'TyCon' is not an open type synonym
-synTyConResKind :: TyCon -> Kind
-synTyConResKind (SynTyCon {synTcRhs = OpenSynTyCon kind _}) = kind
-synTyConResKind tycon  = pprPanic "synTyConResKind" (ppr tycon)
 \end{code}
 
 \begin{code}
@@ -1283,33 +1278,41 @@ tyConClass_maybe :: TyCon -> Maybe Class
 tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas}) = Just clas
 tyConClass_maybe _                                          = Nothing
 
+----------------------------------------------------------------------------
+tyConParent :: TyCon -> TyConParent
+tyConParent (AlgTyCon {algTcParent = parent}) = parent
+tyConParent (SynTyCon {synTcParent = parent}) = parent
+tyConParent _                                 = NoParentTyCon
+
 -- | Is this 'TyCon' that for a family instance, be that for a synonym or an
 -- algebraic family instance?
 isFamInstTyCon :: TyCon -> Bool
-isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _ }) = True
-isFamInstTyCon (SynTyCon {synTcParent = FamilyTyCon _ _ _ }) = True
-isFamInstTyCon _                                             = False
+isFamInstTyCon tc = case tyConParent tc of
+                      FamInstTyCon {} -> True
+                      _               -> False
+
+tyConFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], TyCon)
+tyConFamInstSig_maybe tc
+  = case tyConParent tc of
+      FamInstTyCon f ts co_tc -> Just (f, ts, co_tc)
+      _                       -> Nothing
 
 -- | If this 'TyCon' is that of a family instance, return the family in question
 -- and the instance types. Otherwise, return @Nothing@
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
-tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _}) = 
-  Just (fam, instTys)
-tyConFamInst_maybe (SynTyCon {synTcParent = FamilyTyCon fam instTys _}) = 
-  Just (fam, instTys)
-tyConFamInst_maybe _                                                    = 
-  Nothing
+tyConFamInst_maybe tc
+  = case tyConParent tc of
+      FamInstTyCon f ts _ -> Just (f, ts)
+      _                   -> Nothing
 
 -- | If this 'TyCon' is that of a family instance, return a 'TyCon' which represents 
 -- a coercion identifying the representation type with the type instance family.
 -- Otherwise, return @Nothing@
 tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
-tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe}) = 
-  Just coe
-tyConFamilyCoercion_maybe (SynTyCon {synTcParent = FamilyTyCon _ _ coe}) = 
-  Just coe
-tyConFamilyCoercion_maybe _                                              =
-  Nothing
+tyConFamilyCoercion_maybe tc
+  = case tyConParent tc of
+      FamInstTyCon _ _ co -> Just co
+      _                   -> Nothing
 \end{code}
 
 

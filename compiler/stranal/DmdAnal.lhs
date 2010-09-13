@@ -186,7 +186,7 @@ dmdAnal sigs dmd (App fun arg)	-- Non-type arguments
     (res_ty `bothType` arg_ty, App fun' arg')
 
 dmdAnal sigs dmd (Lam var body)
-  | isTyVar var
+  | isTyCoVar var
   = let   
 	(body_ty, body') = dmdAnal sigs dmd body
     in
@@ -765,7 +765,7 @@ annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- The returned var is annotated with demand info
 -- No effect on the argument demands
 annotateBndr dmd_ty@(DmdType fv ds res) var
-  | isTyVar var = (dmd_ty, var)
+  | isTyCoVar var = (dmd_ty, var)
   | otherwise   = (DmdType fv' ds res, setIdDemandInfo var dmd)
   where
     (fv', dmd) = removeFV fv var res
