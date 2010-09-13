@@ -653,6 +653,6 @@ checkArgs fun (MatchGroup (match1:matches) _)
 
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
-checkArgs _ _ = panic "TcPat.checkArgs" -- Matches always non-empty
+checkArgs fun _ = pprPanic "TcPat.checkArgs" (ppr fun) -- Matches always non-empty
 \end{code}
 
