@@ -24,7 +24,7 @@ import TypeRep
 import Type ( splitKindFunTys )
 import BasicTypes
 #else
-import Coercion ( splitKindFunTys )
+import Coercion ( splitKindFunTys, synTyConResKind )
 #endif
 import Name
 import Var
@@ -101,15 +101,15 @@ synifyTyCon tc
       []
       -- "deriving" needn't be specified:
       Nothing
-  | isOpenSynTyCon tc =
+  | isSynFamilyTyCon tc =
       case synTyConRhs tc of
-        OpenSynTyCon rhs_kind _ ->
+        SynFamilyTyCon ->
           TyFamily TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
-               (Just rhs_kind)
+               (Just (synTyConResKind tc))
         _ -> error "synifyTyCon: impossible open type synonym?"
-  | isOpenTyCon tc = --(why no "isOpenAlgTyCon"?)
+  | isDataFamilyTyCon tc = --(why no "isOpenAlgTyCon"?)
       case algTyConRhs tc of
-        OpenTyCon _ ->
+        DataFamilyTyCon ->
           TyFamily DataFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
                Nothing --always kind '*'
         _ -> error "synifyTyCon: impossible open data type?"
