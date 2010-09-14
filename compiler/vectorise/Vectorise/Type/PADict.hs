@@ -15,10 +15,15 @@ import CoreUtils
 import CoreUnfold
 import TyCon
 import Type
+import TypeRep
 import Id
 import Var
 import Name
+import Outputable
+import Class
 
+debug		= False
+dtrace s x	= if debug then pprTrace "Vectoris.Type.PADict" s x else x
 
 -- | Build the PA dictionary for some type and hoist it to top level.
 --   The PA dictionary holds fns that convert values to and from their vectorised representations.
@@ -30,18 +35,39 @@ buildPADict
 	-> VM Var	-- ^ name of the top-level dictionary function.
 
 buildPADict vect_tc prepr_tc arr_tc repr
-  = polyAbstract tvs $ \args ->
-    do
+ = dtrace (text "buildPADict" <+> ppr vect_tc <+> ppr prepr_tc <+> ppr arr_tc)
+ $ polyAbstract tvs $ \args@[] ->
+ do
+      -- TODO: I'm forcing args to [] because I'm not sure why we need them.
+      --       class PA has superclass (PR (PRepr a)) but we're not using
+      --       the superclass dictionary to build the PA dictionary.
+
+      -- Get ids for each of the methods in the dictionary.
       method_ids <- mapM (method args) paMethods
 
-      pa_tc  <- builtin paTyCon
+      -- Expression to build the dictionary.
       pa_dc  <- builtin paDataCon
       let dict = mkLams (tvs ++ args)
                $ mkConApp pa_dc
                $ Type inst_ty : map (method_call args) method_ids
 
-          dfun_ty = mkForAllTys tvs
-                  $ mkFunTys (map varType args) (mkTyConApp pa_tc [inst_ty])
+      dtrace (text "dict    = " <+> ppr dict) $ return ()
+
+      -- Build the type of the dictionary function.
+      pa_tc          <- builtin paTyCon
+      let pa_opitems = [(id, NoDefMeth) | id <- method_ids]
+      let pa_cls     = mkClass 
+			(tyConName pa_tc)
+			tvs		-- tyvars of class
+			[]		-- fundeps
+			[]		-- superclass predicates
+			[]		-- superclass dict selectors
+			[]		-- associated type families
+			pa_opitems	-- class op items
+			pa_tc		-- dictionary type constructor
+			
+      let dfun_ty = mkForAllTys tvs
+                  $ mkFunTys (map varType args) (PredTy $ ClassP pa_cls [inst_ty])
 
       -- Set the unfolding for the inliner.
       raw_dfun <- newExportedVar dfun_name dfun_ty
