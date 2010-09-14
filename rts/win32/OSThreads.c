@@ -247,9 +247,26 @@ getNumberOfProcessors (void)
 }
 
 void
-setThreadAffinity (nat n STG_UNUSED, nat m STG_UNUSED)
+setThreadAffinity (nat n, nat m) // cap N of M
 {
-    /* ToDo */
+    HANDLE hThread;
+    DWORD_PTR mask, r;  // 64-bit win is required to handle more than 32 procs
+    nat nproc, i;
+
+    hThread = GetCurrentThread();
+
+    nproc = getNumberOfProcessors();
+
+    mask = 0;
+    for (i = n; i < nproc; i+=m) {
+        mask |= 1 << i;
+    }
+
+    r = SetThreadAffinityMask(hThread, mask);
+    if (r == 0) {
+	sysErrorBelch("SetThreadAffinity");
+        stg_exit(EXIT_FAILURE);
+    }
 }
 
 #else /* !defined(THREADED_RTS) */
