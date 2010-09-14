@@ -1,7 +1,8 @@
 
-mod56.hs:4:38:
+mod56.hs:4:39:
     Can't make a derived instance of `Ix T':
-      `T' has non-nullary constructors
+      `T' is not an enumeration type
+        (an enumeration consists of one or more nullary constructors)
         and
-      `T' has more than one constructor
+      `T' does not have precisely one constructor
     In the data type declaration for `T'

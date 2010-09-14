@@ -1,8 +1,8 @@
 
-tcfail177.hs:7:12:
+tcfail177.hs:10:12:
     Couldn't match expected type `Bool' with actual type `Int'
     In the expression:
-        foo
-          [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
+      foo
+        [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
     In an equation for `allTests':
         allTests = foo [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", ....]

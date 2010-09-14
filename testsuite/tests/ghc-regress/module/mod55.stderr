@@ -1,5 +1,6 @@
 
-mod55.hs:3:25:
+mod55.hs:3:26:
     Can't make a derived instance of `Enum T':
-      `T' has non-nullary constructors
+      `T' is not an enumeration type
+        (an enumeration consists of one or more nullary constructors)
     In the data type declaration for `T'
