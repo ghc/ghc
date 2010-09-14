@@ -590,7 +590,7 @@ stat_exit(int alloc)
 
 	    statsPrintf("%16ld MB total memory in use (%ld MB lost due to fragmentation)\n\n", 
                         peak_mblocks_allocated * MBLOCK_SIZE_W / (1024 * 1024 / sizeof(W_)),
-                        (peak_mblocks_allocated * MBLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
+                        (peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
 	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
