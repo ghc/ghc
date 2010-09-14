@@ -2273,7 +2273,7 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
    */
    if (name[7]==0) return name;
    /* The annoying case: 8 bytes.  Copy into a temporary
-      (which is never freed ...)
+      (XXX which is never freed ...)
    */
    newstr = stgMallocBytes(9, "cstring_from_COFF_symbol_name");
    ASSERT(newstr);
@@ -2282,6 +2282,33 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
    return newstr;
 }
 
+/* Getting the name of a section is mildly tricky, so we make a
+   function for it.  Sadly, in one case we have to copy the string 
+   (when it is exactly 8 bytes long there's no trailing '\0'), so for
+   consistency we *always* copy the string; the caller must free it
+*/
+static char *
+cstring_from_section_name (UChar* name, UChar* strtab)
+{
+    char *newstr;
+    
+    if (name[0]=='/') {
+        int strtab_offset = strtol((char*)name+1,NULL,10);
+        int len = strlen(((char*)strtab) + strtab_offset);
+
+        newstr = stgMallocBytes(len, "cstring_from_section_symbol_name");
+        strcpy((char*)newstr, (char*)((UChar*)strtab) + strtab_offset);
+        return newstr;
+    }
+    else
+    {
+        newstr = stgMallocBytes(9, "cstring_from_section_symbol_name");
+        ASSERT(newstr);
+        strncpy((char*)newstr,(char*)name,8);
+        newstr[8] = 0;
+        return newstr;
+    }
+}
 
 /* Just compares the short names (first 8 chars) */
 static COFF_section *
@@ -2580,7 +2607,16 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      if (0 != strcmp((char*)sectab_i->Name, ".bss")) continue;
+
+      char *secname = cstring_from_section_name(sectab_i->Name, strtab);
+
+      if (0 != strcmp(secname, ".bss")) {
+          stgFree(secname);
+          continue;
+      }
+
+      stgFree(secname);
+
       /* sof 10/05: the PE spec text isn't too clear regarding what
        * the SizeOfRawData field is supposed to hold for object
        * file sections containing just uninitialized data -- for executables,
@@ -2621,7 +2657,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      IF_DEBUG(linker, debugBelch("section name = %s\n", sectab_i->Name ));
+
+      char *secname = cstring_from_section_name(sectab_i->Name, strtab);
+
+      IF_DEBUG(linker, debugBelch("section name = %s\n", secname ));
 
 #     if 0
       /* I'm sure this is the Right Way to do it.  However, the
@@ -2633,12 +2672,12 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          kind = SECTIONKIND_CODE_OR_RODATA;
 #     endif
 
-      if (0==strcmp(".text",(char*)sectab_i->Name) ||
-          0==strcmp(".rdata",(char*)sectab_i->Name)||
-          0==strcmp(".rodata",(char*)sectab_i->Name))
+      if (0==strcmp(".text",(char*)secname) ||
+          0==strcmp(".rdata",(char*)secname)||
+          0==strcmp(".rodata",(char*)secname))
          kind = SECTIONKIND_CODE_OR_RODATA;
-      if (0==strcmp(".data",(char*)sectab_i->Name) ||
-          0==strcmp(".bss",(char*)sectab_i->Name))
+      if (0==strcmp(".data",(char*)secname) ||
+          0==strcmp(".bss",(char*)secname))
          kind = SECTIONKIND_RWDATA;
 
       ASSERT(sectab_i->SizeOfRawData == 0 || sectab_i->VirtualSize == 0);
@@ -2651,16 +2690,18 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (kind == SECTIONKIND_OTHER
           /* Ignore sections called which contain stabs debugging
              information. */
-          && 0 != strcmp(".stab", (char*)sectab_i->Name)
-          && 0 != strcmp(".stabstr", (char*)sectab_i->Name)
+          && 0 != strcmp(".stab", (char*)secname)
+          && 0 != strcmp(".stabstr", (char*)secname)
           /* ignore constructor section for now */
-          && 0 != strcmp(".ctors", (char*)sectab_i->Name)
+          && 0 != strcmp(".ctors", (char*)secname)
           /* ignore section generated from .ident */
-          && 0!= strcmp("/4", (char*)sectab_i->Name)
+          && 0!= strncmp(".debug", (char*)secname, 6)
 	  /* ignore unknown section that appeared in gcc 3.4.5(?) */
-          && 0!= strcmp(".reloc", (char*)sectab_i->Name)
+          && 0!= strcmp(".reloc", (char*)secname)
+          && 0 != strcmp(".rdata$zzz", (char*)secname)
          ) {
-         errorBelch("Unknown PEi386 section name `%s' (while processing: %s)", sectab_i->Name, oc->fileName);
+         errorBelch("Unknown PEi386 section name `%s' (while processing: %s)", secname, oc->fileName);
+         stgFree(secname);
          return 0;
       }
 
@@ -2668,6 +2709,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          addSection(oc, kind, start, end);
          addProddableBlock(oc, start, end - start + 1);
       }
+
+      stgFree(secname);
    }
 
    /* Copy exported symbols into the ObjectCode. */
@@ -2799,12 +2842,20 @@ ocResolve_PEi386 ( ObjectCode* oc )
               ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
            );
 
+      char *secname = cstring_from_section_name(sectab_i->Name, strtab);
+
       /* Ignore sections called which contain stabs debugging
          information. */
-      if (0 == strcmp(".stab", (char*)sectab_i->Name)
-          || 0 == strcmp(".stabstr", (char*)sectab_i->Name)
-          || 0 == strcmp(".ctors", (char*)sectab_i->Name))
-         continue;
+      if (0 == strcmp(".stab", (char*)secname)
+          || 0 == strcmp(".stabstr", (char*)secname)
+          || 0 == strcmp(".ctors", (char*)secname)
+          || 0 == strncmp(".debug", (char*)secname, 6)
+          || 0 == strcmp(".rdata$zzz", (char*)secname)) {
+          stgFree(secname);
+          continue;
+      }
+
+      stgFree(secname);
 
       if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
 	/* If the relocation field (a short) has overflowed, the
