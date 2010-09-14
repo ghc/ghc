@@ -440,7 +440,7 @@ data AlgTyConRhs
 			  --	  (see the tag assignment in DataCon.mkDataCon)
 
 	is_enum :: Bool   -- ^ Cached value: is this an enumeration type? 
-                          --   (See 'isEnumerationTyCon')
+                          --   See Note [Enumeration types]
     }
 
   -- | Information about those 'TyCon's derived from a @newtype@ declaration
@@ -579,6 +579,16 @@ data CoTyConDesc
 
   | CoUnsafe 
 \end{code}
+
+Note [Enumeration types]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We define datatypes with no constructors to not be
+enumerations; this fixes trac #2578,  Otherwise we
+end up generating an empty table for
+  <mod>_<type>_closure_tbl
+which is used by tagToEnum# to map Int# to constructors
+in an enumeration. The empty table apparently upset
+the linker.
 
 Note [Newtype coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -983,6 +993,7 @@ isGadtSyntaxTyCon _                                    = False
 
 -- | Is this an algebraic 'TyCon' which is just an enumeration of values?
 isEnumerationTyCon :: TyCon -> Bool
+-- See Note [Enumeration types] in TyCon
 isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
 isEnumerationTyCon (TupleTyCon {tyConArity = arity}) = arity == 0
 isEnumerationTyCon _                                                   = False

@@ -112,15 +112,9 @@ mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons
   = DataTyCon {
         data_cons = cons,
-        is_enum = -- We define datatypes with no constructors to not be
-                  -- enumerations; this fixes trac #2578,  Otherwise we
-                  -- end up generating an empty table for
-                  --   <mod>_<type>_closure_tbl
-                  -- which is used by tagToEnum# to map Int# to constructors
-                  -- in an enumeration. The empty table apparently upset
-                  -- the linker.
-                  not (null cons) &&
+        is_enum = not (null cons) &&
                   all isNullarySrcDataCon cons
+		  -- See Note [Enumeration types] in TyCon
     }
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
