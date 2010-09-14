@@ -17,7 +17,8 @@ import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 import IdInfo		( vanillaIdInfo )
 import DataCon
 import Demand		( Demand(..), DmdResult(..), Demands(..) ) 
-import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID,
+import MkCore		( mkRuntimeErrorApp, aBSENT_ERROR_ID )
+import MkId		( realWorldPrimId, voidArgId, 
                           mkUnpackCase, mkProductBox )
 import TysWiredIn	( tupleCon )
 import Type
@@ -345,8 +346,7 @@ mkWWstr_one arg
 	-- Absent case.  We don't deal with absence for unlifted types,
 	-- though, because it's not so easy to manufacture a placeholder
 	-- We'll see if this turns out to be a problem
-      Abs | not (isUnLiftedType (idType arg)) ->
-	return ([], nop_fn, mk_absent_let arg) 
+      Abs -> return ([], nop_fn, mk_absent_let arg) 
 
 	-- Unpack case
       Eval (Prod cs)
@@ -493,17 +493,29 @@ workerCase bndr e args con body = mkUnpackCase bndr e args con body
 %************************************************************************
 
 
+Note [Absent error Id]
+~~~~~~~~~~~~~~~~~~~~~~
+We make a new binding for Ids that are marked absent, thus
+   let x = absentError "x :: Int"
+The idea is that this binding will never be used; but if it 
+buggily is used we'll get a runtime error message.
+
+We do this even for *unlifted* types (e.g. Int#).  We define
+absentError to *not* be a bottoming Id, and we treat it as
+"ok for speculation" (see CoreUtils.okForSpeculation). That
+means that the let won't get turned into a case, and will
+be discarded if (as we fully expect) x turns out to be dead.
+Coping with absence for unlifted types is important; see, for
+example, Trac #4306.
+
 \begin{code}
 mk_absent_let :: Id -> CoreExpr -> CoreExpr
 mk_absent_let arg body
-  | not (isUnLiftedType arg_ty)
   = Let (NonRec arg abs_rhs) body
-  | otherwise
-  = panic "WwLib: haven't done mk_absent_let for primitives yet"
   where
-    arg_ty = idType arg
-    abs_rhs = mkRuntimeErrorApp rUNTIME_ERROR_ID arg_ty msg
-    msg     = "Oops!  Entered absent arg " ++ showSDocDebug (ppr arg <+> ppr (idType arg))
+    arg_ty  = idType arg
+    abs_rhs = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
+    msg     = showSDocDebug (ppr arg <+> ppr (idType arg))
 
 mk_seq_case :: Id -> CoreExpr -> CoreExpr
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
