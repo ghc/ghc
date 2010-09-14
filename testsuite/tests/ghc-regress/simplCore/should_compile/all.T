@@ -68,6 +68,11 @@ test('T3055',
      run_command,
      ['$MAKE -s --no-print-directory T3055'])
 
+test('T4306',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T4306'])
+
 test('T3772',
 #      only_ways(['optc','optasm']), 
      extra_clean(['T3772_A.hi', 'T3772_A.o']),
