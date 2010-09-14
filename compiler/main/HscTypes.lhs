@@ -140,7 +140,6 @@ import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
 import IfaceSyn
-import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
 import Maybes		( orElse, expectJust, catMaybes )
 import Outputable
@@ -162,6 +161,7 @@ import System.Time	( ClockTime )
 import Data.IORef
 import Data.Array       ( Array, array )
 import Data.List
+import Data.Map (Map)
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
 \end{code}
@@ -1851,7 +1851,7 @@ data NameCache
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
 -- | Module-local cache of implicit parameter 'OccName's given 'Name's
-type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
+type OrigIParamCache = Map (IPName OccName) (IPName Name)
 \end{code}
 
 

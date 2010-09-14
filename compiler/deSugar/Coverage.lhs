@@ -23,7 +23,6 @@ import FastString
 import HscTypes	
 import StaticFlags
 import TyCon
-import FiniteMap
 import MonadUtils
 import Maybes
 
@@ -35,6 +34,8 @@ import Trace.Hpc.Util
 
 import BreakArray 
 import Data.HashTable   ( hashString )
+import Data.Map (Map)
+import qualified Data.Map as Map
 \end{code}
 
 
@@ -76,8 +77,8 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds =
 		       { fileName    = mkFastString orig_file2
 		      , declPath     = []
                       , inScope      = emptyVarSet
-		      , blackList    = listToFM [ (getSrcSpan (tyConName tyCon),()) 
-		      		       		| tyCon <- tyCons ]
+		      , blackList    = Map.fromList [ (getSrcSpan (tyConName tyCon),()) 
+		                                    | tyCon <- tyCons ]
 		       })
 		   (TT 
 		      { tickBoxCount = 0
@@ -574,7 +575,7 @@ data TickTransState = TT { tickBoxCount:: Int
 data TickTransEnv = TTE { fileName      :: FastString
 			, declPath     :: [String]
                         , inScope      :: VarSet
-			, blackList   :: FiniteMap SrcSpan ()
+			, blackList   :: Map SrcSpan ()
 			}
 
 --	deriving Show
@@ -658,7 +659,7 @@ bindLocals new_ids (TM m)
 
 isBlackListed :: SrcSpan -> TM Bool
 isBlackListed pos = TM $ \ env st -> 
-	      case lookupFM (blackList env) pos of
+	      case Map.lookup pos (blackList env) of
 	        Nothing -> (False,noFVs,st)
 		Just () -> (True,noFVs,st)
 

@@ -15,11 +15,12 @@ import Module
 import SrcLoc
 import Outputable
 import UniqFM
-import FiniteMap
 import FastString
 
 import Maybes
 import Control.Monad
+import Data.Map (Map)
+import qualified Data.Map as Map
 \end{code}
 
 
@@ -70,10 +71,10 @@ instance Ord ModulePair where
 
 -- Sets of module pairs
 --
-type ModulePairSet = FiniteMap ModulePair ()
+type ModulePairSet = Map ModulePair ()
 
 listToSet :: [ModulePair] -> ModulePairSet
-listToSet l = listToFM (zip l (repeat ()))
+listToSet l = Map.fromList (zip l (repeat ()))
 
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
 checkFamInstConsistency famInstMods directlyImpMods
@@ -101,7 +102,7 @@ checkFamInstConsistency famInstMods directlyImpMods
 	         -- instances of okPairs are consistent
 	     ; criticalPairs = listToSet $ allPairs famInstMods
 	         -- all pairs that we need to consider
-             ; toCheckPairs  = keysFM $ criticalPairs `minusFM` okPairs
+             ; toCheckPairs  = Map.keys $ criticalPairs `Map.difference` okPairs
 	         -- the difference gives us the pairs we need to check now
 	     }
 

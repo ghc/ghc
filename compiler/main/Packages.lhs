@@ -41,7 +41,6 @@ import StaticFlags
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import UniqFM
-import FiniteMap
 import Module
 import Util
 import Panic
@@ -60,6 +59,9 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.List as List
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified FiniteMap as Map
 import qualified Data.Set as Set
 
 -- ---------------------------------------------------------------------------
@@ -126,9 +128,9 @@ data PackageState = PackageState {
 -- | A PackageConfigMap maps a 'PackageId' to a 'PackageConfig'
 type PackageConfigMap = UniqFM PackageConfig
 
-type InstalledPackageIdMap = FiniteMap InstalledPackageId PackageId
+type InstalledPackageIdMap = Map InstalledPackageId PackageId
 
-type InstalledPackageIndex = FiniteMap InstalledPackageId PackageConfig
+type InstalledPackageIndex = Map InstalledPackageId PackageConfig
 
 emptyPackageConfigMap :: PackageConfigMap
 emptyPackageConfigMap = emptyUFM
@@ -331,7 +333,7 @@ selectPackages :: (PackageConfig -> Bool) -> [PackageConfig]
 selectPackages matches pkgs unusable
   = let
         (ps,rest) = partition matches pkgs
-        reasons = [ (p, lookupFM unusable (installedPackageId p))
+        reasons = [ (p, Map.lookup (installedPackageId p) unusable)
                   | p <- ps ]
     in
     if all (isJust.snd) reasons
@@ -493,7 +495,7 @@ data UnusablePackageReason
   | MissingDependencies [InstalledPackageId]
   | ShadowedBy InstalledPackageId
 
-type UnusablePackages = FiniteMap InstalledPackageId UnusablePackageReason
+type UnusablePackages = Map InstalledPackageId UnusablePackageReason
 
 pprReason :: SDoc -> UnusablePackageReason -> SDoc
 pprReason pref reason = case reason of
@@ -507,7 +509,7 @@ pprReason pref reason = case reason of
       pref <+> ptext (sLit "shadowed by package ") <> text (display ipid)
 
 reportUnusable :: DynFlags -> UnusablePackages -> IO ()
-reportUnusable dflags pkgs = mapM_ report (fmToList pkgs)
+reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
   where
     report (ipid, reason) =
        debugTraceMsg dflags 2 $
@@ -524,17 +526,18 @@ reportUnusable dflags pkgs = mapM_ report (fmToList pkgs)
 -- satisfied until no more can be added.
 --
 findBroken :: [PackageConfig] -> UnusablePackages
-findBroken pkgs = go [] emptyFM pkgs
+findBroken pkgs = go [] Map.empty pkgs
  where
    go avail ipids not_avail =
      case partitionWith (depsAvailable ipids) not_avail of
         ([], not_avail) ->
-            listToFM [ (installedPackageId p, MissingDependencies deps)
-                     | (p,deps) <- not_avail ]
+            Map.fromList [ (installedPackageId p, MissingDependencies deps)
+                         | (p,deps) <- not_avail ]
         (new_avail, not_avail) ->
             go (new_avail ++ avail) new_ipids (map fst not_avail)
-            where new_ipids = addListToFM ipids
+            where new_ipids = Map.insertList
                                 [ (installedPackageId p, p) | p <- new_avail ]
+                                ipids
 
    depsAvailable :: InstalledPackageIndex
                  -> PackageConfig
@@ -542,7 +545,7 @@ findBroken pkgs = go [] emptyFM pkgs
    depsAvailable ipids pkg
         | null dangling = Left pkg
         | otherwise     = Right (pkg, dangling)
-        where dangling = filter (not . (`elemFM` ipids)) (depends pkg)
+        where dangling = filter (not . (`Map.member` ipids)) (depends pkg)
 
 -- -----------------------------------------------------------------------------
 -- Eliminate shadowed packages, giving the user some feedback
@@ -554,7 +557,7 @@ findBroken pkgs = go [] emptyFM pkgs
 shadowPackages :: [PackageConfig] -> [InstalledPackageId] -> UnusablePackages
 shadowPackages pkgs preferred
  = let (shadowed,_) = foldl check ([],emptyUFM) pkgs
-   in  listToFM shadowed
+   in  Map.fromList shadowed
  where
  check (shadowed,pkgmap) pkg
       | Just oldpkg <- lookupUFM pkgmap (packageConfigId pkg)
@@ -574,7 +577,7 @@ shadowPackages pkgs preferred
 -- -----------------------------------------------------------------------------
 
 ignorePackages :: [PackageFlag] -> [PackageConfig] -> UnusablePackages
-ignorePackages flags pkgs = listToFM (concatMap doit flags)
+ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
   where
   doit (IgnorePackage str) =
      case partition (matchingStr str) pkgs of
@@ -590,13 +593,13 @@ ignorePackages flags pkgs = listToFM (concatMap doit flags)
 depClosure :: InstalledPackageIndex
            -> [InstalledPackageId]
            -> [InstalledPackageId]
-depClosure index ipids = closure emptyFM ipids
+depClosure index ipids = closure Map.empty ipids
   where
-   closure set [] = keysFM set
+   closure set [] = Map.keys set
    closure set (ipid : ipids)
-     | ipid `elemFM` set = closure set ipids
-     | Just p <- lookupFM index ipid = closure (addToFM set ipid p) 
-                                               (depends p ++ ipids)
+     | ipid `Map.member` set = closure set ipids
+     | Just p <- Map.lookup ipid index = closure (Map.insert ipid p set) 
+                                                 (depends p ++ ipids)
      | otherwise = closure set ipids
 
 -- -----------------------------------------------------------------------------
@@ -673,7 +676,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
                   where pid = installedPackageId p
           -- XXX this is just a variant of nub
 
-      ipid_map = listToFM [ (installedPackageId p, p) | p <- pkgs0 ]
+      ipid_map = Map.fromList [ (installedPackageId p, p) | p <- pkgs0 ]
 
       ipid_selected = depClosure ipid_map [ InstalledPackageId i
                                           | ExposePackageId i <- flags ]
@@ -686,9 +689,9 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
       ignored  = ignorePackages ignore_flags pkgs0_unique
 
-      pkgs0' = filter (not . (`elemFM` (plusFM shadowed ignored)) . installedPackageId) pkgs0_unique
+      pkgs0' = filter (not . (`Map.member` (Map.union shadowed ignored)) . installedPackageId) pkgs0_unique
       broken   = findBroken pkgs0'
-      unusable = shadowed `plusFM` ignored `plusFM` broken
+      unusable = shadowed `Map.union` ignored `Map.union` broken
 
   reportUnusable dflags unusable
 
@@ -697,7 +700,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   -- (-package, -hide-package, -ignore-package, -hide-all-packages).
   --
   pkgs1 <- foldM (applyPackageFlag unusable) pkgs0_unique other_flags
-  let pkgs2 = filter (not . (`elemFM` unusable) . installedPackageId) pkgs1
+  let pkgs2 = filter (not . (`Map.member` unusable) . installedPackageId) pkgs1
 
   -- Here we build up a set of the packages mentioned in -package
   -- flags on the command line; these are called the "preload"
@@ -719,12 +722,12 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
   let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs4
 
-      ipid_map = listToFM [ (installedPackageId p, packageConfigId p)
-                          | p <- pkgs4 ]
+      ipid_map = Map.fromList [ (installedPackageId p, packageConfigId p)
+                              | p <- pkgs4 ]
 
       lookupIPID ipid@(InstalledPackageId str)
-         | Just pid <- lookupFM ipid_map ipid = return pid
-         | otherwise                          = missingPackageErr str
+         | Just pid <- Map.lookup ipid ipid_map = return pid
+         | otherwise                            = missingPackageErr str
 
   preload2 <- mapM lookupIPID preload1
 
@@ -890,7 +893,7 @@ getPreloadPackagesAnd dflags pkgids =
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
 closeDeps :: PackageConfigMap
-          -> FiniteMap InstalledPackageId PackageId
+          -> Map InstalledPackageId PackageId
           -> [(PackageId, Maybe PackageId)]
           -> IO [PackageId]
 closeDeps pkg_map ipid_map ps = throwErr (closeDepsErr pkg_map ipid_map ps)
@@ -901,14 +904,14 @@ throwErr m = case m of
 		Succeeded r -> return r
 
 closeDepsErr :: PackageConfigMap
-             -> FiniteMap InstalledPackageId PackageId
+             -> Map InstalledPackageId PackageId
              -> [(PackageId,Maybe PackageId)]
              -> MaybeErr Message [PackageId]
 closeDepsErr pkg_map ipid_map ps = foldM (add_package pkg_map ipid_map) [] ps
 
 -- internal helper
 add_package :: PackageConfigMap 
-            -> FiniteMap InstalledPackageId PackageId
+            -> Map InstalledPackageId PackageId
             -> [PackageId]
             -> (PackageId,Maybe PackageId)
             -> MaybeErr Message [PackageId]
@@ -924,7 +927,7 @@ add_package pkg_db ipid_map ps (p, mb_parent)
     	   return (p : ps')
           where
             add_package_ipid ps ipid@(InstalledPackageId str)
-              | Just pid <- lookupFM ipid_map ipid
+              | Just pid <- Map.lookup ipid ipid_map
               = add_package pkg_db ipid_map ps (pid, Just p)
               | otherwise
               = Failed (missingPackageMsg str <> missingDependencyMsg mb_parent)

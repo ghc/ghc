@@ -31,7 +31,6 @@ import Module
 import UniqFM
 import FastString
 import UniqSupply
-import FiniteMap
 import BasicTypes
 import SrcLoc
 import MkId
@@ -40,6 +39,7 @@ import Outputable
 import Exception     ( evaluate )
 
 import Data.IORef    ( atomicModifyIORef, readIORef )
+import qualified Data.Map as Map
 \end{code}
 
 
@@ -176,14 +176,14 @@ newIPName occ_name_ip =
 	ipcache = nsIPs name_cache
         key = occ_name_ip  -- Ensures that ?x and %x get distinct Names
     in
-    case lookupFM ipcache key of
+    case Map.lookup key ipcache of
       Just name_ip -> (name_cache, name_ip)
       Nothing      -> (new_ns, name_ip)
 	  where
 	    (us', us1)  = splitUniqSupply (nsUniqs name_cache)
 	    uniq        = uniqFromSupply us1
 	    name_ip     = mapIPName (mkIPName uniq) occ_name_ip
-	    new_ipcache = addToFM ipcache key name_ip
+	    new_ipcache = Map.insert key name_ip ipcache
 	    new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
 \end{code}
 
@@ -220,9 +220,9 @@ extendOrigNameCache nc name
 
 extendNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
 extendNameCache nc mod occ name
-  = extendModuleEnv_C combine nc mod (unitOccEnv occ name)
+  = extendModuleEnvWith combine nc mod (unitOccEnv occ name)
   where
-    combine occ_env _ = extendOccEnv occ_env occ name
+    combine _ occ_env = extendOccEnv occ_env occ name
 
 getNameCache :: TcRnIf a b NameCache
 getNameCache = do { HscEnv { hsc_NC = nc_var } <- getTopEnv; 
@@ -254,7 +254,7 @@ initNameCache :: UniqSupply -> [Name] -> NameCache
 initNameCache us names
   = NameCache { nsUniqs = us,
 		nsNames = initOrigNames names,
-		nsIPs   = emptyFM }
+		nsIPs   = Map.empty }
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names

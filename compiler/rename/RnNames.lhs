@@ -33,7 +33,6 @@ import RdrName
 import Outputable
 import Maybes
 import SrcLoc
-import FiniteMap
 import ErrUtils
 import Util
 import FastString
@@ -42,6 +41,8 @@ import Data.List        ( partition, (\\), delete )
 import qualified Data.Set as Set
 import System.IO
 import Control.Monad
+import Data.Map (Map)
+import qualified Data.Map as Map
 \end{code}
 
 
@@ -1256,7 +1257,7 @@ findImportUsage :: [LImportDecl Name]
 		-> [RdrName]
                 -> [ImportDeclUsage]
 
-type ImportMap = FiniteMap SrcLoc [AvailInfo]
+type ImportMap = Map SrcLoc [AvailInfo]
   -- The intermediate data struture records, for each import 
   -- declaration, what stuff brought into scope by that 
   -- declaration is actually used in the module.
@@ -1271,12 +1272,12 @@ findImportUsage imports rdr_env rdrs
   = map unused_decl imports
   where
     import_usage :: ImportMap
-    import_usage = foldr add_rdr emptyFM rdrs
+    import_usage = foldr add_rdr Map.empty rdrs
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, unused_imps)
       where
-        used_avails = lookupFM import_usage (srcSpanStart loc) `orElse` []
+        used_avails = Map.lookup (srcSpanStart loc) import_usage `orElse` []
 	used_names = availsToNameSet used_avails
 				      
 	unused_imps = case imps of
@@ -1296,9 +1297,9 @@ findImportUsage imports rdr_env rdrs
 
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) iu
-      = addToFM_C add iu decl_loc [avail]
+      = Map.insertWith add decl_loc [avail] iu
       where
-	add avails _ = avail : avails
+	add _ avails = avail : avails -- add is really just a specialised (++)
         decl_loc = srcSpanStart (is_dloc imp_decl_spec)
 	name     = gre_name gre
 	avail    = case gre_par gre of

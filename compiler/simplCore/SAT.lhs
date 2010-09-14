@@ -123,7 +123,7 @@ emptyIdSATInfo :: IdSATInfo
 emptyIdSATInfo = emptyUFM
 
 {-
-pprIdSATInfo id_sat_info = vcat (map pprIdAndSATInfo (fmToList id_sat_info))
+pprIdSATInfo id_sat_info = vcat (map pprIdAndSATInfo (Map.toList id_sat_info))
   where pprIdAndSATInfo (v, sat_info) = hang (ppr v <> colon) 4 (pprSATInfo sat_info)
 -}
 

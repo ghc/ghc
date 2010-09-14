@@ -45,7 +45,6 @@ import ErrUtils
 import Panic
 import Util
 import DynFlags
-import FiniteMap
 
 import Exception
 import Data.IORef
@@ -58,6 +57,7 @@ import System.IO.Error as IO
 import System.Directory
 import Data.Char
 import Data.List
+import qualified Data.Map as Map
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -472,8 +472,8 @@ cleanTempDirs dflags
    = unless (dopt Opt_KeepTmpFiles dflags)
    $ do let ref = dirsToClean dflags
         ds <- readIORef ref
-        removeTmpDirs dflags (eltsFM ds)
-        writeIORef ref emptyFM
+        removeTmpDirs dflags (Map.elems ds)
+        writeIORef ref Map.empty
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
@@ -515,7 +515,7 @@ getTempDir :: DynFlags -> IO FilePath
 getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
   = do let ref = dirsToClean dflags
        mapping <- readIORef ref
-       case lookupFM mapping tmp_dir of
+       case Map.lookup tmp_dir mapping of
            Nothing ->
                do x <- getProcessID
                   let prefix = tmp_dir </> "ghc" ++ show x ++ "_"
@@ -524,7 +524,7 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
                       mkTempDir x
                        = let dirname = prefix ++ show x
                          in do createDirectory dirname
-                               let mapping' = addToFM mapping tmp_dir dirname
+                               let mapping' = Map.insert tmp_dir dirname mapping
                                writeIORef ref mapping'
                                debugTraceMsg dflags 2 (ptext (sLit "Created temporary directory:") <+> text dirname)
                                return dirname

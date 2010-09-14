@@ -21,7 +21,6 @@ import CoreFVs		( exprFreeVars, exprsFreeVars, idFreeVars )
 import UniqSupply	( UniqSupply, UniqSM, initUs_, MonadUnique(..) )
 import Name
 import MkId		( voidArgId, realWorldPrimId )
-import FiniteMap
 import Maybes		( catMaybes, isJust )
 import BasicTypes	( isNeverActive, inlinePragmaActivation )
 import Bag
@@ -29,6 +28,9 @@ import Util
 import Outputable
 import FastString
 
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified FiniteMap as Map
 \end{code}
 
 %************************************************************************
@@ -1321,12 +1323,12 @@ emptyUDs = MkUD { ud_binds = emptyBag, ud_calls = emptyVarEnv }
 type CallDetails  = IdEnv CallInfoSet
 newtype CallKey   = CallKey [Maybe Type]			-- Nothing => unconstrained type argument
 
--- CallInfo uses a FiniteMap, thereby ensuring that
+-- CallInfo uses a Map, thereby ensuring that
 -- we record only one call instance for any key
 --
 -- The list of types and dictionaries is guaranteed to
 -- match the type of f
-type CallInfoSet = FiniteMap CallKey ([DictExpr], VarSet)
+type CallInfoSet = Map CallKey ([DictExpr], VarSet)
      	      		-- Range is dict args and the vars of the whole
 			-- call (including tyvars)
 			-- [*not* include the main id itself, of course]
@@ -1350,7 +1352,7 @@ instance Ord CallKey where
 		  cmp (Just t1) (Just t2) = tcCmpType t1 t2
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
-unionCalls c1 c2 = plusVarEnv_C plusFM c1 c2
+unionCalls c1 c2 = plusVarEnv_C Map.union c1 c2
 
 -- plusCalls :: UsageDetails -> CallDetails -> UsageDetails
 -- plusCalls uds call_ds = uds { ud_calls = ud_calls uds `unionCalls` call_ds }
@@ -1359,13 +1361,13 @@ callDetailsFVs :: CallDetails -> VarSet
 callDetailsFVs calls = foldVarEnv (unionVarSet . callInfoFVs) emptyVarSet calls
 
 callInfoFVs :: CallInfoSet -> VarSet
-callInfoFVs call_info = foldFM (\_ (_,fv) vs -> unionVarSet fv vs) emptyVarSet call_info
+callInfoFVs call_info = Map.foldRightWithKey (\_ (_,fv) vs -> unionVarSet fv vs) emptyVarSet call_info
 
 ------------------------------------------------------------			
 singleCall :: Id -> [Maybe Type] -> [DictExpr] -> UsageDetails
 singleCall id tys dicts 
   = MkUD {ud_binds = emptyBag, 
-	  ud_calls = unitVarEnv id (unitFM (CallKey tys) (dicts, call_fvs)) }
+	  ud_calls = unitVarEnv id (Map.singleton (CallKey tys) (dicts, call_fvs)) }
   where
     call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
     tys_fvs  = tyVarsOfTypes (catMaybes tys)
@@ -1539,7 +1541,7 @@ callsForMe fn (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
     uds_without_me = MkUD { ud_binds = orig_dbs, ud_calls = delVarEnv orig_calls fn }
     calls_for_me = case lookupVarEnv orig_calls fn of
 			Nothing -> []
-			Just cs -> filter_dfuns (fmToList cs)
+			Just cs -> filter_dfuns (Map.toList cs)
 
     dep_set = foldlBag go (unitVarSet fn) orig_dbs
     go dep_set (db,fvs) | fvs `intersectsVarSet` dep_set
@@ -1576,7 +1578,7 @@ deleteCallsMentioning bs calls
   = mapVarEnv filter_calls calls
   where
     filter_calls :: CallInfoSet -> CallInfoSet
-    filter_calls = filterFM (\_ (_, fvs) -> not (fvs `intersectsVarSet` bs))
+    filter_calls = Map.filterWithKey (\_ (_, fvs) -> not (fvs `intersectsVarSet` bs))
 
 deleteCallsFor :: [Id] -> CallDetails -> CallDetails
 -- Remove calls *for* bs

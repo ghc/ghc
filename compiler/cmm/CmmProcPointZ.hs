@@ -15,7 +15,6 @@ import CmmInfo
 import CmmLiveZ
 import CmmTx
 import DFMonad
-import FiniteMap
 import Data.List (sortBy)
 import Maybes
 import MkZipCfg
@@ -27,6 +26,8 @@ import UniqSupply
 import ZipCfg
 import ZipCfgCmmRep
 import ZipDataflow
+
+import qualified Data.Map as Map
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -399,9 +400,9 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      graphEnv <- return $ fold_blocks addBlock emptyBlockEnv g
      -- Build a map from proc point BlockId to labels for their new procedures
      -- Due to common blockification, we may overestimate the set of procpoints.
-     let add_label map pp = return $ addToFM map pp lbl
+     let add_label map pp = return $ Map.insert pp lbl map
            where lbl = if pp == entry then entry_label else blockLbl pp
-     procLabels <- foldM add_label emptyFM
+     procLabels <- foldM add_label Map.empty
                          (filter (elemBlockEnv blocks) (blockSetToList procPoints))
      -- For each procpoint, we need to know the SP offset on entry.
      -- If the procpoint is:
@@ -434,7 +435,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap
                         add_if_pp ti (add_if_pp fi rst)
                       LastOther (LastSwitch _ tbl) -> foldr add_if_pp rst (catMaybes tbl)
                       _ -> rst
-                  add_if_pp id rst = case lookupFM procLabels id of
+                  add_if_pp id rst = case Map.lookup id procLabels of
                                        Just x -> (id, x) : rst
                                        Nothing -> rst
               (jumpEnv, jumpBlocks) <-
@@ -456,14 +457,14 @@ splitAtProcPoints entry_label callPPs procPoints procMap
              CmmProc (CmmInfo gc upd_fr info_tbl) top_l top_args (replacePPIds g)
            else
              CmmProc emptyContInfoTable lbl [] (replacePPIds g)
-           where lbl = expectJust "pp label" $ lookupFM procLabels bid
+           where lbl = expectJust "pp label" $ Map.lookup bid procLabels
          to_proc (bid, g) =
            CmmProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] (replacePPIds g)
-             where lbl = expectJust "pp label" $ lookupFM procLabels bid
+             where lbl = expectJust "pp label" $ Map.lookup bid procLabels
          -- References to procpoint IDs can now be replaced with the infotable's label
          replacePPIds (x, g) = (x, map_nodes id (mapExpMiddle repl) (mapExpLast repl) g)
            where repl e@(CmmLit (CmmBlock bid)) =
-                   case lookupFM procLabels bid of
+                   case Map.lookup bid procLabels of
                      Just l  -> CmmLit (CmmLabel (entryLblToInfoLbl l))
                      Nothing -> e
                  repl e = e

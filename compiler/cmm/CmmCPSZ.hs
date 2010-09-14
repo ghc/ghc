@@ -24,10 +24,11 @@ import ZipCfgCmmRep
 
 import DynFlags
 import ErrUtils
-import FiniteMap
 import HscTypes
 import Data.Maybe
 import Control.Monad
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Outputable
 import StaticFlags
 
@@ -73,7 +74,7 @@ global to one compiler session.
 cpsTop :: HscEnv -> CmmTopZ ->
           IO ([(CLabel, CAFSet)],
               [(CAFSet, CmmTopForInfoTables)])
-cpsTop _ p@(CmmData {}) = return ([], [(emptyFM, NoInfoTable p)])
+cpsTop _ p@(CmmData {}) = return ([], [(Map.empty, NoInfoTable p)])
 cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
     do 
        dump Opt_D_dump_cmmz "Pre Proc Points Added"  g
@@ -172,7 +173,7 @@ cpsTop hsc_env (CmmProc h l args (stackInfo@(entry_off, _), g)) =
 -- This probably belongs in CmmBuildInfoTables?
 -- We're just finishing the job here: once we know what CAFs are defined
 -- in non-static closures, we can build the SRTs.
-toTops :: HscEnv -> FiniteMap CLabel CAFSet -> (TopSRT, [[CmmTopZ]])
+toTops :: HscEnv -> Map CLabel CAFSet -> (TopSRT, [[CmmTopZ]])
                  -> [(CAFSet, CmmTopForInfoTables)] -> IO (TopSRT, [[CmmTopZ]])
 
 toTops hsc_env topCAFEnv (topSRT, tops) gs =

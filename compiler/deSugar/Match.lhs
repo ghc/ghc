@@ -42,9 +42,10 @@ import SrcLoc
 import Maybes
 import Util
 import Name
-import FiniteMap
 import Outputable
 import FastString
+
+import qualified Data.Map as Map
 \end{code}
 
 This function is a wrapper of @match@, it must be called from all the parts where 
@@ -801,14 +802,14 @@ subGroup :: Ord a => [(a, EquationInfo)] -> [[EquationInfo]]
 -- Each sub-list in the result has the same PatGroup
 -- See Note [Take care with pattern order]
 subGroup group 
-    = map reverse $ eltsFM $ foldl accumulate emptyFM group
+    = map reverse $ Map.elems $ foldl accumulate Map.empty group
   where
     accumulate pg_map (pg, eqn)
-      = case lookupFM pg_map pg of
-          Just eqns -> addToFM pg_map pg (eqn:eqns)
-          Nothing   -> addToFM pg_map pg [eqn]
+      = case Map.lookup pg pg_map of
+          Just eqns -> Map.insert pg (eqn:eqns) pg_map
+          Nothing   -> Map.insert pg [eqn]      pg_map
 
-    -- pg_map :: FiniteMap a [EquationInfo]
+    -- pg_map :: Map a [EquationInfo]
     -- Equations seen so far in reverse order of appearance
 \end{code}
 

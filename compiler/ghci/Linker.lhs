@@ -51,7 +51,6 @@ import ErrUtils
 import SrcLoc
 import qualified Maybes
 import UniqSet
-import FiniteMap
 import Constants
 import FastString
 import Config		( cProjectVersion )
@@ -62,6 +61,7 @@ import Control.Monad
 import Data.Char
 import Data.IORef
 import Data.List
+import qualified Data.Map as Map
 import Foreign
 import Control.Concurrent.MVar
 
@@ -1001,7 +1001,7 @@ linkPackages' dflags new_pks pls = do
 	| Just pkg_cfg <- lookupPackage pkg_map new_pkg
 	= do { 	-- Link dependents first
                pkgs' <- link pkgs [ Maybes.expectJust "link_one" $
-                                    lookupFM ipid_map ipid
+                                    Map.lookup ipid ipid_map
                                   | ipid <- depends pkg_cfg ]
 		-- Now link the package itself
 	     ; linkPackage dflags pkg_cfg

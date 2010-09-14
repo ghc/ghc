@@ -23,7 +23,6 @@ import ByteCodeItbls
 
 import Name
 import NameSet
-import FiniteMap
 import Literal
 import TyCon
 import PrimOp
@@ -42,6 +41,8 @@ import Data.Array.ST    ( castSTUArray )
 import Foreign
 import Data.Char        ( ord )
 import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 import GHC.Base         ( ByteArray#, MutableByteArray#, RealWorld )
 
@@ -128,19 +129,19 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
           | wORD_SIZE_IN_BITS == 64 = 4
           | wORD_SIZE_IN_BITS == 32 = 2
           | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
-         label_env = mkLabelEnv emptyFM lableInitialOffset instrs
+         label_env = mkLabelEnv Map.empty lableInitialOffset instrs
 
-         mkLabelEnv :: FiniteMap Word16 Word -> Word -> [BCInstr]
-                    -> FiniteMap Word16 Word
+         mkLabelEnv :: Map Word16 Word -> Word -> [BCInstr]
+                    -> Map Word16 Word
          mkLabelEnv env _ [] = env
          mkLabelEnv env i_offset (i:is)
             = let new_env
-                     = case i of LABEL n -> addToFM env n i_offset ; _ -> env
+                     = case i of LABEL n -> Map.insert n i_offset env ; _ -> env
               in  mkLabelEnv new_env (i_offset + instrSize16s i) is
 
          findLabel :: Word16 -> Word
          findLabel lab
-            = case lookupFM label_env lab of
+            = case Map.lookup lab label_env of
                  Just bco_offset -> bco_offset
                  Nothing -> pprPanic "assembleBCO.findLabel" (ppr lab)
      in

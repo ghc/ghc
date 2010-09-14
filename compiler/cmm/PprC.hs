@@ -44,7 +44,6 @@ import ClosureInfo
 import DynFlags
 import Unique
 import UniqSet
-import FiniteMap
 import UniqFM
 import FastString
 import Outputable
@@ -57,6 +56,8 @@ import Data.List
 import Data.Bits
 import Data.Char
 import System.IO
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Word
 
 import Data.Array.ST
@@ -865,12 +866,12 @@ is_cish StdCallConv = True
 pprTempAndExternDecls :: [CmmBasicBlock] -> (SDoc{-temps-}, SDoc{-externs-})
 pprTempAndExternDecls stmts 
   = (vcat (map pprTempDecl (uniqSetToList temps)), 
-     vcat (map (pprExternDecl False{-ToDo-}) (keysFM lbls)))
+     vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls)))
   where (temps, lbls) = runTE (mapM_ te_BB stmts)
 
 pprDataExterns :: [CmmStatic] -> SDoc
 pprDataExterns statics
-  = vcat (map (pprExternDecl False{-ToDo-}) (keysFM lbls))
+  = vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls))
   where (_, lbls) = runTE (mapM_ te_Static statics)
 
 pprTempDecl :: LocalReg -> SDoc
@@ -901,7 +902,7 @@ pprExternDecl in_srt lbl
         <> parens (commafy (replicate (sz `quot` wORD_SIZE) (machRep_U_CType wordWidth)))
         <> semi
 
-type TEState = (UniqSet LocalReg, FiniteMap CLabel ())
+type TEState = (UniqSet LocalReg, Map CLabel ())
 newtype TE a = TE { unTE :: TEState -> (a, TEState) }
 
 instance Monad TE where
@@ -909,13 +910,13 @@ instance Monad TE where
    return a    = TE $ \s -> (a, s)
 
 te_lbl :: CLabel -> TE ()
-te_lbl lbl = TE $ \(temps,lbls) -> ((), (temps, addToFM lbls lbl ()))
+te_lbl lbl = TE $ \(temps,lbls) -> ((), (temps, Map.insert lbl () lbls))
 
 te_temp :: LocalReg -> TE ()
 te_temp r = TE $ \(temps,lbls) -> ((), (addOneToUniqSet temps r, lbls))
 
 runTE :: TE () -> TEState
-runTE (TE m) = snd (m (emptyUniqSet, emptyFM))
+runTE (TE m) = snd (m (emptyUniqSet, Map.empty))
 
 te_Static :: CmmStatic -> TE ()
 te_Static (CmmStaticLit lit) = te_Lit lit

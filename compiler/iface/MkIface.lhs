@@ -87,7 +87,6 @@ import BasicTypes       hiding ( SuccessFlag(..) )
 import UniqFM
 import Unique
 import Util             hiding ( eqListBy )
-import FiniteMap
 import FastString
 import Maybes
 import ListSetOps
@@ -97,6 +96,8 @@ import Bag
 
 import Control.Monad
 import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.IORef
 import System.FilePath
 \end{code}
@@ -523,7 +524,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                         -- wiki/Commentary/Compiler/RecompilationAvoidance
 
    -- put the declarations in a canonical order, sorted by OccName
-   let sorted_decls = eltsFM $ listToFM $
+   let sorted_decls = Map.elems $ Map.fromList $
                           [(ifName d, e) | e@(_, d) <- decls_w_hashes]
 
    -- the ABI hash depends on:
@@ -860,10 +861,10 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
         | otherwise
         = case nameModule_maybe name of
              Nothing  -> pprPanic "mkUsageInfo: internal name?" (ppr name)
-             Just mod -> -- We use this fiddly lambda function rather than
-                         -- (++) as the argument to extendModuleEnv_C to
+             Just mod -> -- This lambda function is really just a
+                         -- specialised (++); originally came about to
                          -- avoid quadratic behaviour (trac #2680)
-                         extendModuleEnv_C (\xs _ -> occ:xs) mv_map mod [occ]
+                         extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod [occ]
     		   where occ = nameOccName name
     
     -- We want to create a Usage for a home module if 
@@ -897,7 +898,7 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
                       usg_mod_name = moduleName mod,
     	  	      usg_mod_hash = mod_hash,
     		      usg_exports  = export_hash,
-    		      usg_entities = fmToList ent_hashs }
+    		      usg_entities = Map.toList ent_hashs }
       where
 	maybe_iface  = lookupIfaceByModule dflags hpt pit mod
 		-- In one-shot mode, the interfaces for home-package 
@@ -914,13 +915,13 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
     
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 
-    	-- Making a FiniteMap here ensures that (a) we remove duplicates
+    	-- Making a Map here ensures that (a) we remove duplicates
         -- when we have usages on several subordinates of a single parent,
         -- and (b) that the usages emerge in a canonical order, which
-        -- is why we use FiniteMap rather than OccEnv: FiniteMap works
+        -- is why we use Map rather than OccEnv: Map works
         -- using Ord on the OccNames, which is a lexicographic ordering.
-	ent_hashs :: FiniteMap OccName Fingerprint
-        ent_hashs = listToFM (map lookup_occ used_occs)
+	ent_hashs :: Map OccName Fingerprint
+        ent_hashs = Map.fromList (map lookup_occ used_occs)
         
         lookup_occ occ = 
             case hash_env occ of
@@ -960,10 +961,10 @@ mkIfaceExports :: [AvailInfo]
                -> [(Module, [GenAvailInfo OccName])]
                   -- Group by module and sort by occurrence
 mkIfaceExports exports
-  = [ (mod, eltsFM avails)
+  = [ (mod, Map.elems avails)
     | (mod, avails) <- sortBy (stableModuleCmp `on` fst)
                               (moduleEnvToList groupFM)
-                       -- NB. the fmToList is in a random order,
+                       -- NB. the Map.toList is in a random order,
                        -- because Ord Module is not a predictable
                        -- ordering.  Hence we perform a final sort
                        -- using the stable Module ordering.
@@ -971,20 +972,21 @@ mkIfaceExports exports
   where
 	-- Group by the module where the exported entities are defined
 	-- (which may not be the same for all Names in an Avail)
-	-- Deliberately use FiniteMap rather than UniqFM so we
+	-- Deliberately use Map rather than UniqFM so we
 	-- get a canonical ordering
-    groupFM :: ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
+    groupFM :: ModuleEnv (Map FastString (GenAvailInfo OccName))
     groupFM = foldl add emptyModuleEnv exports
 
-    add_one :: ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
+    add_one :: ModuleEnv (Map FastString (GenAvailInfo OccName))
 	    -> Module -> GenAvailInfo OccName
-	    -> ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
+	    -> ModuleEnv (Map FastString (GenAvailInfo OccName))
     add_one env mod avail 
-      =  extendModuleEnv_C plusFM env mod 
-		(unitFM (occNameFS (availName avail)) avail)
+      -- XXX Is there a need to flip Map.union here?
+      =  extendModuleEnvWith (flip Map.union) env mod 
+		(Map.singleton (occNameFS (availName avail)) avail)
 
 	-- NB: we should not get T(X) and T(Y) in the export list
-	--     else the plusFM will simply discard one!  They
+	--     else the Map.union will simply discard one!  They
 	--     should have been combined by now.
     add env (Avail n)
       = ASSERT( isExternalName n ) 

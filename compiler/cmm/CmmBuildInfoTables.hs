@@ -33,7 +33,6 @@ import CmmTx
 import DFMonad
 import Module
 import FastString
-import FiniteMap
 import ForeignCall
 import IdInfo
 import Data.List
@@ -53,6 +52,10 @@ import ZipCfg hiding (zip, unzip, last)
 import qualified ZipCfg as G
 import ZipCfgCmmRep
 import ZipDataflow
+
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified FiniteMap as Map
 
 ----------------------------------------------------------------
 -- Building InfoTables
@@ -133,12 +136,12 @@ live_ptrs oldByte slotEnv areaMap bid =
 
         liveSlots :: [RegSlotInfo]
         liveSlots = sortBy (\ (off,_,_) (off',_,_) -> compare off' off)
-                           (foldFM (\_ -> flip $ foldl add_slot) [] slots)
+                           (Map.foldRightWithKey (\_ -> flip $ foldl add_slot) [] slots)
                     
         add_slot :: [RegSlotInfo] -> SubArea -> [RegSlotInfo]
         add_slot rst (a@(RegSlot r@(LocalReg _ ty)), off, w) = 
           if off == w && widthInBytes (typeWidth ty) == w then
-            (expectJust "add_slot" (lookupFM areaMap a), r, w) : rst
+            (expectJust "add_slot" (Map.lookup a areaMap), r, w) : rst
           else panic "live_ptrs: only part of a variable live at a proc point"
         add_slot rst (CallArea Old, _, _) =
           rst -- the update frame (or return infotable) should be live
@@ -155,7 +158,7 @@ live_ptrs oldByte slotEnv areaMap bid =
 
         slots :: SubAreaSet	 -- The SubAreaSet for 'bid'
         slots = expectJust "live_ptrs slots" $ lookupBlockEnv slotEnv bid
-        youngByte = expectJust "live_ptrs bid_pos" $ lookupFM areaMap (CallArea (Young bid))
+        youngByte = expectJust "live_ptrs bid_pos" $ Map.lookup (CallArea (Young bid)) areaMap
 
 -- Construct the stack maps for the given procedure.
 setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmTopForInfoTables -> CmmTopForInfoTables 
@@ -187,14 +190,16 @@ setInfoTableStackMap _ _ t = pprPanic "unexpected case for setInfoTableStackMap"
 -----------------------------------------------------------------------
 -- Finding the CAFs used by a procedure
 
-type CAFSet = FiniteMap CLabel ()
+type CAFSet = Map CLabel ()
 type CAFEnv = BlockEnv CAFSet
 
 -- First, an analysis to find live CAFs.
 cafLattice :: DataflowLattice CAFSet
-cafLattice = DataflowLattice "live cafs" emptyFM add False
-  where add new old = if sizeFM new' > sizeFM old then aTx new' else noTx new'
-          where new' = new `plusFM` old
+cafLattice = DataflowLattice "live cafs" Map.empty add False
+  where add new old = if Map.size new' > Map.size old
+                      then aTx new'
+                      else noTx new'
+          where new' = new `Map.union` old
 
 cafTransfers :: BackwardTransfers Middle Last CAFSet
 cafTransfers = BackwardTransfers first middle last
@@ -206,7 +211,7 @@ cafTransfers = BackwardTransfers first middle last
                CmmLit (CmmLabelOff c _)         -> add c set
                CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
                _ -> set
-        add l s = if hasCAF l then addToFM s (cvtToClosureLbl l) () else s
+        add l s = if hasCAF l then Map.insert (cvtToClosureLbl l) () s else s
 
 type CafFix a = FuelMonad (BackwardFixedPoint Middle Last CAFSet a)
 cafAnal :: LGraph Middle Last -> FuelMonad CAFEnv
@@ -222,7 +227,7 @@ cafAnal g = liftM zdfFpFacts (res :: CafFix ())
 data TopSRT = TopSRT { lbl      :: CLabel
                      , next_elt :: Int -- the next entry in the table
                      , rev_elts :: [CLabel]
-                     , elt_map  :: FiniteMap CLabel Int }
+                     , elt_map  :: Map CLabel Int }
                         -- map: CLabel -> its last entry in the table
 instance Outputable TopSRT where
   ppr (TopSRT lbl next elts eltmap) =
@@ -231,19 +236,19 @@ instance Outputable TopSRT where
 emptySRT :: MonadUnique m => m TopSRT
 emptySRT =
   do top_lbl <- getUniqueM >>= \ u -> return $ mkSRTLabel (mkFCallName u "srt") NoCafRefs
-     return TopSRT { lbl = top_lbl, next_elt = 0, rev_elts = [], elt_map = emptyFM }
+     return TopSRT { lbl = top_lbl, next_elt = 0, rev_elts = [], elt_map = Map.empty }
 
 cafMember :: TopSRT -> CLabel -> Bool
-cafMember srt lbl = elemFM lbl (elt_map srt)
+cafMember srt lbl = Map.member lbl (elt_map srt)
 
 cafOffset :: TopSRT -> CLabel -> Maybe Int
-cafOffset srt lbl = lookupFM (elt_map srt) lbl
+cafOffset srt lbl = Map.lookup lbl (elt_map srt)
 
 addCAF :: CLabel -> TopSRT -> TopSRT
 addCAF caf srt =
   srt { next_elt = last + 1
       , rev_elts = caf : rev_elts srt
-      , elt_map  = addToFM (elt_map srt) caf last }
+      , elt_map  = Map.insert caf last (elt_map srt) }
     where last  = next_elt srt
 
 srtToData :: TopSRT -> CmmZ
@@ -258,16 +263,16 @@ srtToData srt = Cmm [CmmData RelocatableReadOnlyData (CmmDataLabel (lbl srt) : t
 -- in the SRT. Then, if the number of CAFs is small enough to fit in a bitmap,
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
-buildSRTs :: TopSRT -> FiniteMap CLabel CAFSet -> CAFSet ->
+buildSRTs :: TopSRT -> Map CLabel CAFSet -> CAFSet ->
              FuelMonad (TopSRT, Maybe CmmTopZ, C_SRT)
 buildSRTs topSRT topCAFMap cafs =
   do let liftCAF lbl () z = -- get CAFs for functions without static closures
-           case lookupFM topCAFMap lbl of Just cafs -> z `plusFM` cafs
-                                          Nothing   -> addToFM z lbl ()
+           case Map.lookup lbl topCAFMap of Just cafs -> z `Map.union` cafs
+                                            Nothing   -> Map.insert lbl () z
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
-           let cafs = keysFM (foldFM liftCAF emptyFM localCafs)
+           let cafs = Map.keys (Map.foldRightWithKey liftCAF Map.empty localCafs)
                mkSRT topSRT =
                  do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
@@ -283,7 +288,7 @@ buildSRTs topSRT topCAFMap cafs =
          add_if_too_far srt@(TopSRT {elt_map = m}) cafs =
            add srt (sortBy farthestFst cafs)
              where
-               farthestFst x y = case (lookupFM m x, lookupFM m y) of
+               farthestFst x y = case (Map.lookup x m, Map.lookup y m) of
                                    (Nothing, Nothing) -> EQ
                                    (Nothing, Just _)  -> LT
                                    (Just _,  Nothing) -> GT
@@ -301,7 +306,7 @@ buildSRTs topSRT topCAFMap cafs =
 
 -- Construct an SRT bitmap.
 -- Adapted from simpleStg/SRT.lhs, which expects Id's.
-procpointSRT :: CLabel -> FiniteMap CLabel Int -> [CLabel] ->
+procpointSRT :: CLabel -> Map CLabel Int -> [CLabel] ->
                 FuelMonad (Maybe CmmTopZ, C_SRT)
 procpointSRT _ _ [] =
  return (Nothing, NoC_SRT)
@@ -309,7 +314,7 @@ procpointSRT top_srt top_table entries =
  do (top, srt) <- bitmap `seq` to_SRT top_srt offset len bitmap
     return (top, srt)
   where
-    ints = map (expectJust "constructSRT" . lookupFM top_table) entries
+    ints = map (expectJust "constructSRT" . flip Map.lookup top_table) entries
     sorted_ints = sortLe (<=) ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
@@ -361,21 +366,21 @@ localCAFInfo cafEnv (CmmProc (CmmInfo _ _ infoTbl) top_l _ (_, LGraph entry _)) 
 -- the environment with every reference to f replaced by its set of CAFs.
 -- To do this replacement efficiently, we gather strongly connected
 -- components, then we sort the components in topological order.
-mkTopCAFInfo :: [(CLabel, CAFSet)] -> FiniteMap CLabel CAFSet
-mkTopCAFInfo localCAFs = foldl addToTop emptyFM g
+mkTopCAFInfo :: [(CLabel, CAFSet)] -> Map CLabel CAFSet
+mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
   where addToTop env (AcyclicSCC (l, cafset)) =
-          addToFM env l (flatten env cafset)
+          Map.insert l (flatten env cafset) env
         addToTop env (CyclicSCC nodes) =
           let (lbls, cafsets) = unzip nodes
-              cafset  = foldl plusFM  emptyFM cafsets `delListFromFM` lbls
-          in foldl (\env l -> addToFM env l (flatten env cafset)) env lbls
-        flatten env cafset = foldFM (lookup env) emptyFM cafset
+              cafset  = lbls `Map.deleteList` foldl Map.union Map.empty cafsets
+          in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
+        flatten env cafset = Map.foldRightWithKey (lookup env) Map.empty cafset
         lookup env caf () cafset' =
-          case lookupFM env caf of Just cafs -> foldFM add cafset' cafs
-                                   Nothing -> add caf () cafset'
-        add caf () cafset' = addToFM cafset' caf ()
+          case Map.lookup caf env of Just cafs -> Map.foldRightWithKey add cafset' cafs
+                                     Nothing -> add caf () cafset'
+        add caf () cafset' = Map.insert caf () cafset'
         g = stronglyConnCompFromEdgedVertices
-              (map (\n@(l, cafs) -> (n, l, keysFM cafs)) localCAFs)
+              (map (\n@(l, cafs) -> (n, l, Map.keys cafs)) localCAFs)
 
 type StackLayout = [Maybe LocalReg]
 
@@ -388,10 +393,10 @@ bundleCAFs cafEnv t@(ProcInfoTable _ procpoints) =
              -- until we stop splitting the graphs at procpoints in the native path
 bundleCAFs cafEnv t@(FloatingInfoTable _ bid _) =
   (expectJust "bundleCAFs " (lookupBlockEnv cafEnv bid), t)
-bundleCAFs _ t@(NoInfoTable _) = (emptyFM, t)
+bundleCAFs _ t@(NoInfoTable _) = (Map.empty, t)
 
 -- Construct the SRTs for the given procedure.
-setInfoTableSRT :: FiniteMap CLabel CAFSet -> TopSRT -> (CAFSet, CmmTopForInfoTables) ->
+setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmTopForInfoTables) ->
                    FuelMonad (TopSRT, [CmmTopForInfoTables])
 setInfoTableSRT topCAFMap topSRT (cafs, t@(ProcInfoTable _ procpoints)) =
   case blockSetToList procpoints of
@@ -402,7 +407,7 @@ setInfoTableSRT topCAFMap topSRT (cafs, t@(FloatingInfoTable _ _ _)) =
   setSRT cafs topCAFMap topSRT t
 setInfoTableSRT _ topSRT (_, t@(NoInfoTable _)) = return (topSRT, [t])
 
-setSRT :: CAFSet -> FiniteMap CLabel CAFSet -> TopSRT ->
+setSRT :: CAFSet -> Map CLabel CAFSet -> TopSRT ->
           CmmTopForInfoTables -> FuelMonad (TopSRT, [CmmTopForInfoTables])
 setSRT cafs topCAFMap topSRT t =
   do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap cafs

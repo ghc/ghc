@@ -49,13 +49,13 @@ import BlockId
 import CLabel
 import Constants
 import FastString
-import FiniteMap
 import Outputable
 import Unique
 import UniqSet
 
 import Data.Word
 import Data.Int
+import Data.Map (Map)
 
 -----------------------------------------------------------------------------
 --		CmmExpr
@@ -117,9 +117,9 @@ necessarily at the young end of the Old area.
 End of note -}
 
 type SubArea    = (Area, Int, Int) -- area, offset, width
-type SubAreaSet = FiniteMap Area [SubArea]
+type SubAreaSet = Map Area [SubArea]
 
-type AreaMap    = FiniteMap Area Int
+type AreaMap    = Map Area Int
      -- Byte offset of the oldest byte of the Area, 
      -- relative to the oldest byte of the Old Area
 

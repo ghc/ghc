@@ -18,7 +18,6 @@ import CmmExpr
 import CmmProcPointZ
 import CmmTx
 import DFMonad
-import FiniteMap
 import Maybes
 import MkZipCfg
 import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
@@ -29,6 +28,10 @@ import ZipCfg
 import ZipCfg as Z
 import ZipCfgCmmRep
 import ZipDataflow
+
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified FiniteMap as Map
 
 ------------------------------------------------------------------------
 --                    Stack Layout                                    --
@@ -63,14 +66,14 @@ import ZipDataflow
 -- a single slot, on insertion.
 
 slotLattice :: DataflowLattice SubAreaSet
-slotLattice = DataflowLattice "live slots" emptyFM add False
-  where add new old = case foldFM addArea (False, old) new of
+slotLattice = DataflowLattice "live slots" Map.empty add False
+  where add new old = case Map.foldRightWithKey addArea (False, old) new of
                         (True,  x) -> aTx  x
                         (False, x) -> noTx x
         addArea a newSlots z = foldr (addSlot a) z newSlots
         addSlot a slot (changed, map) =
-          let (c, live) = liveGen slot $ lookupWithDefaultFM map [] a
-          in (c || changed, addToFM map a live)
+          let (c, live) = liveGen slot $ Map.findWithDefault [] a map
+          in (c || changed, Map.insert a live map)
 
 type SlotEnv   = BlockEnv SubAreaSet
   -- The sub-areas live on entry to the block
@@ -122,17 +125,17 @@ liveKill (a, hi, w) set = -- pprTrace "killing slots in area" (ppr a) $
 liveSlotTransfers :: BackwardTransfers Middle Last SubAreaSet
 liveSlotTransfers =
   BackwardTransfers first liveInSlots liveLastIn
-    where first id live = delFromFM live (CallArea (Young id))
+    where first id live = Map.delete (CallArea (Young id)) live
 
 -- Slot sets: adding slots, removing slots, and checking for membership.
 liftToArea :: Area -> ([SubArea] -> [SubArea]) -> SubAreaSet -> SubAreaSet 
 addSlot, removeSlot :: SubAreaSet -> SubArea -> SubAreaSet
 elemSlot            :: SubAreaSet -> SubArea -> Bool
-liftToArea a f map = addToFM map a $ f (lookupWithDefaultFM map [] a)
+liftToArea a f map = Map.insert a (f (Map.findWithDefault [] a map)) map
 addSlot    live (a, i, w) = liftToArea a (snd . liveGen  (a, i, w)) live
 removeSlot live (a, i, w) = liftToArea a       (liveKill (a, i, w)) live
 elemSlot   live (a, i, w) =
-  not $ fst $ liveGen  (a, i, w) (lookupWithDefaultFM live [] a)
+  not $ fst $ liveGen  (a, i, w) (Map.findWithDefault [] a live)
 
 removeLiveSlotDefs :: (DefinerOfSlots s, UserOfSlots s) => SubAreaSet -> s -> SubAreaSet
 removeLiveSlotDefs = foldSlotsDefd removeSlot
@@ -163,7 +166,7 @@ liveLastOut env l =
   where out = joinOuts slotLattice env l
         add_area _ n live | n == 0 = live
         add_area a n live =
-          addToFM live a $ snd $ liveGen (a, n, n) $ lookupWithDefaultFM live [] a
+          Map.insert a (snd $ liveGen (a, n, n) $ Map.findWithDefault [] a live) live
 
 -- The liveness analysis must be precise: otherwise, we won't know if a definition
 -- should really kill a live-out stack slot.
@@ -174,7 +177,7 @@ liveLastOut env l =
 -- every time, I provide a function to fold over the nodes, which should be a
 -- reasonably efficient approach for the implementations we envision.
 -- Of course, it will probably be much easier to program if we just return a list...
-type Set x = FiniteMap x ()
+type Set x = Map x ()
 data IGraphBuilder n =
   Builder { foldNodes     :: forall z. SubArea -> (n -> z -> z) -> z -> z
           , _wordsOccupied :: AreaMap -> AreaMap -> n -> [Int]
@@ -184,8 +187,8 @@ areaBuilder :: IGraphBuilder Area
 areaBuilder = Builder fold words
   where fold (a, _, _) f z = f a z
         words areaSize areaMap a =
-          case lookupFM areaMap a of
-            Just addr -> [addr .. addr + (lookupFM areaSize a `orElse`
+          case Map.lookup a areaMap of
+            Just addr -> [addr .. addr + (Map.lookup a areaSize `orElse`
                                           pprPanic "wordsOccupied: unknown area" (ppr a))]
             Nothing   -> []
 
@@ -195,10 +198,10 @@ areaBuilder = Builder fold words
 -- Now, we can build the interference graph.
 -- The usual story: a definition interferes with all live outs and all other
 -- definitions.
-type IGraph x = FiniteMap x (Set x)
+type IGraph x = Map x (Set x)
 type IGPair x = (IGraph x, IGraphBuilder x)
 igraph :: (Ord x) => IGraphBuilder x -> SlotEnv -> LGraph Middle Last -> IGraph x
-igraph builder env g = foldr interfere emptyFM (postorder_dfs g)
+igraph builder env g = foldr interfere Map.empty (postorder_dfs g)
   where foldN = foldNodes builder
         interfere block igraph =
           let (h, l) = goto_end (unzip block)
@@ -210,15 +213,15 @@ igraph builder env g = foldr interfere emptyFM (postorder_dfs g)
               addEdges igraph i out = fst $ foldSlotsDefd addDef (igraph, out) i
               addDef (igraph, out) def@(a, _, _) =
                 (foldN def (addDefN out) igraph,
-                 addToFM out a (snd $ liveGen def (lookupWithDefaultFM out [] a)))
+                 Map.insert a (snd $ liveGen def (Map.findWithDefault [] a out)) out)
               addDefN out n igraph =
                 let addEdgeNO o igraph = foldN o addEdgeNN igraph
                     addEdgeNN n' igraph = addEdgeNN' n n' $ addEdgeNN' n' n igraph
-                    addEdgeNN' n n' igraph = addToFM igraph n (addToFM set n' ())
-                      where set = lookupWithDefaultFM igraph emptyFM n
-                in foldFM (\ _ os igraph -> foldr addEdgeNO igraph os) igraph out
+                    addEdgeNN' n n' igraph = Map.insert n (Map.insert n' () set) igraph
+                      where set = Map.findWithDefault Map.empty n igraph
+                in Map.foldRightWithKey (\ _ os igraph -> foldr addEdgeNO igraph os) igraph out
               env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
-          in heads h $ case l of LastExit    -> (igraph, emptyFM)
+          in heads h $ case l of LastExit    -> (igraph, Map.empty)
                                  LastOther l -> (addEdges igraph l $ liveLastOut env' l,
                                                  liveLastIn l env')
 
@@ -230,7 +233,7 @@ getAreaSize :: ByteOff -> LGraph Middle Last -> AreaMap
   -- used for (a) variable spill slots, and (b) parameter passing ares for calls
 getAreaSize entry_off g@(LGraph _ _) =
   fold_blocks (fold_fwd_block first add_regslots last)
-              (unitFM (CallArea Old) entry_off) g
+              (Map.singleton (CallArea Old) entry_off) g
   where first _  z = z
         last l@(LastOther (LastCall _ Nothing args res _)) z =
           add_regslots l (add (add z area args) area res)
@@ -243,7 +246,7 @@ getAreaSize entry_off g@(LGraph _ _) =
         addSlot z (a@(RegSlot (LocalReg _ ty)), _, _) =
           add z a $ widthInBytes $ typeWidth ty
         addSlot z _ = z
-        add z a off = addToFM z a (max off (lookupWithDefaultFM z 0 a))
+        add z a off = Map.insert a (max off (Map.findWithDefault 0 a z)) z
 	-- The 'max' is important.  Two calls, to f and g, might share a common
 	-- continuation (and hence a common CallArea), but their number of overflow
 	-- parameters might differ.
@@ -252,19 +255,19 @@ getAreaSize entry_off g@(LGraph _ _) =
 -- Find the Stack slots occupied by the subarea's conflicts
 conflictSlots :: Ord x => IGPair x -> AreaMap -> AreaMap -> SubArea -> Set Int
 conflictSlots (ig, Builder foldNodes wordsOccupied) areaSize areaMap subarea =
-  foldNodes subarea foldNode emptyFM
-  where foldNode n set = foldFM conflict set $ lookupWithDefaultFM ig emptyFM n
+  foldNodes subarea foldNode Map.empty
+  where foldNode n set = Map.foldRightWithKey conflict set $ Map.findWithDefault Map.empty n ig
         conflict n' () set = liveInSlots areaMap n' set
         -- Add stack slots occupied by igraph node n
         liveInSlots areaMap n set = foldr setAdd set (wordsOccupied areaSize areaMap n)
-        setAdd w s = addToFM s w ()
+        setAdd w s = Map.insert w () s
 
 -- Find any open space on the stack, starting from the offset.
 -- If the area is a CallArea or a spill slot for a pointer, then it must
 -- be word-aligned.
 freeSlotFrom :: Ord x => IGPair x -> AreaMap -> Int -> AreaMap -> Area -> Int
 freeSlotFrom ig areaSize offset areaMap area =
-  let size = lookupFM areaSize area `orElse` 0
+  let size = Map.lookup area areaSize `orElse` 0
       conflicts = conflictSlots ig areaSize areaMap (area, size, size)
       -- CallAreas and Ptrs need to be word-aligned (round up!)
       align = case area of CallArea _                                -> align'
@@ -274,7 +277,7 @@ freeSlotFrom ig areaSize offset areaMap area =
       -- Find a space big enough to hold the area
       findSpace curr 0 = curr
       findSpace curr cnt = -- part of target slot, # of bytes left to check
-        if elemFM curr conflicts then
+        if Map.member curr conflicts then
           findSpace (align (curr + size)) size -- try the next (possibly) open space
         else findSpace (curr - 1) (cnt - 1)
   in findSpace (align (offset + size)) size
@@ -282,8 +285,8 @@ freeSlotFrom ig areaSize offset areaMap area =
 -- Find an open space on the stack, and assign it to the area.
 allocSlotFrom :: Ord x => IGPair x -> AreaMap -> Int -> AreaMap -> Area -> AreaMap
 allocSlotFrom ig areaSize from areaMap area =
-  if elemFM area areaMap then areaMap
-  else addToFM areaMap area $ freeSlotFrom ig areaSize from areaMap area
+  if Map.member area areaMap then areaMap
+  else Map.insert area (freeSlotFrom ig areaSize from areaMap area) areaMap
 
 -- | Greedy stack layout.
 -- Compute liveness, build the interference graph, and allocate slots for the areas.
@@ -319,7 +322,7 @@ layout procPoints env entry_off g =
       -- Find the slots that are live-in to a block tail
       live_in (ZTail m l) = liveInSlots m (live_in l)
       live_in (ZLast (LastOther l)) = liveLastIn l env'
-      live_in (ZLast LastExit) = emptyFM 
+      live_in (ZLast LastExit) = Map.empty 
 
       -- Find the youngest live stack slot that has already been allocated
       youngest_live :: AreaMap 	   -- Already allocated
@@ -327,17 +330,17 @@ layout procPoints env entry_off g =
 		    -> ByteOff     -- Offset of the youngest byte of any 
 		       		   --    already-allocated, live sub-area
       youngest_live areaMap live = fold_subareas young_slot live 0
-        where young_slot (a, o, _) z = case lookupFM areaMap a of
+        where young_slot (a, o, _) z = case Map.lookup a areaMap of
                                          Just top -> max z $ top + o
                                          Nothing  -> z
-              fold_subareas f m z = foldFM (\_ s z -> foldr f z s) z m
+              fold_subareas f m z = Map.foldRightWithKey (\_ s z -> foldr f z s) z m
 
       -- Allocate space for spill slots and call areas
       allocVarSlot = allocSlotFrom ig areaSize 0
 
       -- Update the successor's incoming SP.
       setSuccSPs inSp bid areaMap =
-        case (lookupFM areaMap area, lookupBlockEnv (lg_blocks g) bid) of
+        case (Map.lookup area areaMap, lookupBlockEnv (lg_blocks g) bid) of
           (Just _, _) -> areaMap -- succ already knows incoming SP
           (Nothing, Just (Block _ _)) ->
             if elemBlockSet bid procPoints then
@@ -347,18 +350,18 @@ layout procPoints env entry_off g =
                   start = young -- maybe wrong, but I don't understand
                                 -- why the preceding is necessary...
               in  allocSlotFrom ig areaSize start areaMap area
-            else addToFM areaMap area inSp
+            else Map.insert area inSp areaMap
           (_, Nothing) -> panic "Block not found in cfg"
         where area = CallArea (Young bid)
 
       allocLast (Block id _) areaMap l =
         fold_succs (setSuccSPs inSp) l areaMap
-        where inSp = expectJust "sp in" $ lookupFM areaMap (CallArea (Young id))
+        where inSp = expectJust "sp in" $ Map.lookup (CallArea (Young id)) areaMap
 
       allocMidCall m@(MidForeignCall (Safe bid _) _ _ _) t areaMap =
         let young     = youngest_live areaMap $ removeLiveSlotDefs (live_in t) m
             area      = CallArea (Young bid)
-            areaSize' = addToFM areaSize area (widthInBytes (typeWidth gcWord))
+            areaSize' = Map.insert area (widthInBytes (typeWidth gcWord)) areaSize
         in  allocSlotFrom ig areaSize' young areaMap area
       allocMidCall _ _ areaMap = areaMap
 
@@ -370,8 +373,8 @@ layout procPoints env entry_off g =
       layoutAreas areaMap b@(Block _ t) = layout areaMap t
         where layout areaMap (ZTail m t) = layout (alloc m t areaMap) t
               layout areaMap (ZLast l)   = allocLast b areaMap l
-      initMap = addToFM (addToFM emptyFM (CallArea Old) 0)
-                        (CallArea (Young (lg_entry g))) 0
+      initMap = Map.insert (CallArea (Young (lg_entry g))) 0
+                           (Map.insert (CallArea Old) 0 Map.empty)
       areaMap = foldl layoutAreas initMap (postorder_dfs g)
   in -- pprTrace "ProcPoints" (ppr procPoints) $
         -- pprTrace "Area SizeMap" (ppr areaSize) $
@@ -392,7 +395,7 @@ manifestSP :: AreaMap -> ByteOff -> LGraph Middle Last -> FuelMonad (LGraph Midd
 manifestSP areaMap entry_off g@(LGraph entry _blocks) =
   liftM (LGraph entry) $ foldl replB (return emptyBlockEnv) (postorder_dfs g)
   where slot a = -- pprTrace "slot" (ppr a) $
-                   lookupFM areaMap a `orElse` panic "unallocated Area"
+                   Map.lookup a areaMap `orElse` panic "unallocated Area"
         slot' (Just id) = slot $ CallArea (Young id)
         slot' Nothing   = slot $ CallArea Old
         sp_high = maxSlot slot g

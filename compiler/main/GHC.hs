@@ -286,7 +286,6 @@ import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
 import Annotations
 import Module
 import UniqFM
-import FiniteMap
 import Panic
 import Digraph
 import Bag		( unitBag, listToBag, emptyBag, isEmptyBag )
@@ -303,6 +302,9 @@ import Lexer
 import System.Directory ( getModificationTime, doesFileExist,
                           getCurrentDirectory )
 import Data.Maybe
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified FiniteMap as Map
 import Data.List
 import qualified Data.List as List
 import Data.Typeable    ( Typeable )
@@ -1827,14 +1829,14 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, l
     numbered_summaries = zip summaries [1..]
 
     lookup_node :: HscSource -> ModuleName -> Maybe SummaryNode
-    lookup_node hs_src mod = lookupFM node_map (mod, hs_src)
+    lookup_node hs_src mod = Map.lookup (mod, hs_src) node_map
 
     lookup_key :: HscSource -> ModuleName -> Maybe Int
     lookup_key hs_src mod = fmap summaryNodeKey (lookup_node hs_src mod)
 
     node_map :: NodeMap SummaryNode
-    node_map = listToFM [ ((moduleName (ms_mod s), ms_hsc_src s), node)
-                        | node@(s, _, _) <- nodes ]
+    node_map = Map.fromList [ ((moduleName (ms_mod s), ms_hsc_src s), node)
+                            | node@(s, _, _) <- nodes ]
 
     -- We use integers as the keys for the SCC algorithm
     nodes :: [SummaryNode]
@@ -1870,16 +1872,16 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, l
 
 
 type NodeKey   = (ModuleName, HscSource)  -- The nodes of the graph are 
-type NodeMap a = FiniteMap NodeKey a	  -- keyed by (mod, src_file_type) pairs
+type NodeMap a = Map NodeKey a	  -- keyed by (mod, src_file_type) pairs
 
 msKey :: ModSummary -> NodeKey
 msKey (ModSummary { ms_mod = mod, ms_hsc_src = boot }) = (moduleName mod,boot)
 
 mkNodeMap :: [ModSummary] -> NodeMap ModSummary
-mkNodeMap summaries = listToFM [ (msKey s, s) | s <- summaries]
+mkNodeMap summaries = Map.fromList [ (msKey s, s) | s <- summaries]
 	
 nodeMapElts :: NodeMap a -> [a]
-nodeMapElts = eltsFM
+nodeMapElts = Map.elems
 
 -- | If there are {-# SOURCE #-} imports between strongly connected
 -- components in the topological sort, then those imports can
@@ -1984,7 +1986,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 			-- for those mentioned in the visited set
 	loop [] done 	  = return (concat (nodeMapElts done))
 	loop ((wanted_mod, is_boot) : ss) done 
-	  | Just summs <- lookupFM done key
+	  | Just summs <- Map.lookup key done
 	  = if isSingleton summs then
 		loop ss done
 	    else
@@ -1995,13 +1997,15 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                                        Nothing excl_mods
                case mb_s of
                    Nothing -> loop ss done
-                   Just s  -> loop (msDeps s ++ ss) (addToFM done key [s])
+                   Just s  -> loop (msDeps s ++ ss) (Map.insert key [s] done)
 	  where
 	    key = (unLoc wanted_mod, if is_boot then HsBootFile else HsSrcFile)
 
+-- XXX Does the (++) here need to be flipped?
 mkRootMap :: [ModSummary] -> NodeMap [ModSummary]
-mkRootMap summaries = addListToFM_C (++) emptyFM 
-			[ (msKey s, [s]) | s <- summaries ]
+mkRootMap summaries = Map.insertListWith (flip (++))
+                                         [ (msKey s, [s]) | s <- summaries ]
+                                         Map.empty
 
 msDeps :: ModSummary -> [(Located ModuleName, IsBootInterface)]
 -- (msDeps s) returns the dependencies of the ModSummary s.
@@ -2146,7 +2150,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | wanted_mod `elem` excl_mods
   = return Nothing
 
-  | Just old_summary <- lookupFM old_summary_map (wanted_mod, hsc_src)
+  | Just old_summary <- Map.lookup (wanted_mod, hsc_src) old_summary_map
   = do	 	-- Find its new timestamp; all the 
 		-- ModSummaries in the old map have valid ml_hs_files
 	let location = ms_location old_summary

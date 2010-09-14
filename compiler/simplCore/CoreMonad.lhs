@@ -79,12 +79,13 @@ import Bag
 import Maybes
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
-import FiniteMap
 
 import Util		( split )
 import Data.List	( intersperse )
 import Data.Dynamic
 import Data.IORef
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Word
 import Control.Monad
 
@@ -559,7 +560,7 @@ data SimplCount
 				-- recent history reasonably efficiently
      }
 
-type TickCounts = FiniteMap Tick Int
+type TickCounts = Map Tick Int
 
 simplCountN :: SimplCount -> Int
 simplCountN (VerySimplCount n)         = n
@@ -569,7 +570,7 @@ zeroSimplCount dflags
 		-- This is where we decide whether to do
 		-- the VerySimpl version or the full-stats version
   | dopt Opt_D_dump_simpl_stats dflags
-  = SimplCount {ticks = 0, details = emptyFM,
+  = SimplCount {ticks = 0, details = Map.empty,
                 n_log = 0, log1 = [], log2 = []}
   | otherwise
   = VerySimplCount 0
@@ -590,19 +591,19 @@ doSimplTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = 
 doSimplTick _ (VerySimplCount n) = VerySimplCount (n+1)
 
 
--- Don't use plusFM_C because that's lazy, and we want to 
+-- Don't use Map.unionWith because that's lazy, and we want to 
 -- be pretty strict here!
 addTick :: TickCounts -> Tick -> TickCounts
-addTick fm tick = case lookupFM fm tick of
-			Nothing -> addToFM fm tick 1
-			Just n  -> n1 `seq` addToFM fm tick n1
+addTick fm tick = case Map.lookup tick fm of
+			Nothing -> Map.insert tick 1 fm
+			Just n  -> n1 `seq` Map.insert tick n1 fm
 				where
 				   n1 = n+1
 
 
 plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
 	       sc2@(SimplCount { ticks = tks2, details = dts2 })
-  = log_base { ticks = tks1 + tks2, details = plusFM_C (+) dts1 dts2 }
+  = log_base { ticks = tks1 + tks2, details = Map.unionWith (+) dts1 dts2 }
   where
 	-- A hackish way of getting recent log info
     log_base | null (log1 sc2) = sc1	-- Nothing at all in sc2
@@ -617,7 +618,7 @@ pprSimplCount (VerySimplCount n) = ptext (sLit "Total ticks:") <+> int n
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
   = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
 	  blankLine,
-	  pprTickCounts (fmToList dts),
+	  pprTickCounts (Map.toList dts),
 	  if verboseSimplStats then
 		vcat [blankLine,
 		      ptext (sLit "Log (most recent first)"),

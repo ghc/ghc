@@ -88,7 +88,6 @@ import Util
 import Maybes           ( orElse )
 import SrcLoc
 import FastString
-import FiniteMap
 import Outputable
 import Foreign.C	( CInt )
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
@@ -99,6 +98,8 @@ import Control.Monad    ( when )
 
 import Data.Char
 import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -488,7 +489,7 @@ data DynFlags = DynFlags {
   -- These have to be IORefs, because the defaultCleanupHandler needs to
   -- know what to clean when an exception happens
   filesToClean          :: IORef [FilePath],
-  dirsToClean           :: IORef (FiniteMap FilePath FilePath),
+  dirsToClean           :: IORef (Map FilePath FilePath),
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
@@ -612,7 +613,7 @@ initDynFlags dflags = do
  -- someday these will be dynamic flags
  ways <- readIORef v_Ways
  refFilesToClean <- newIORef []
- refDirsToClean <- newIORef emptyFM
+ refDirsToClean <- newIORef Map.empty
  return dflags{
         ways            = ways,
         buildTag        = mkBuildTag (filter (not . wayRTSOnly) ways),

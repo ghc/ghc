@@ -34,8 +34,10 @@ module StgStats ( showStgStats ) where
 
 import StgSyn
 
-import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList, FiniteMap )
 import Id (Id)
+
+import Data.Map (Map)
+import qualified Data.Map as Map
 \end{code}
 
 \begin{code}
@@ -54,24 +56,24 @@ data CounterType
   deriving (Eq, Ord)
 
 type Count	= Int
-type StatEnv	= FiniteMap CounterType Count
+type StatEnv	= Map CounterType Count
 \end{code}
 
 \begin{code}
 emptySE	:: StatEnv
-emptySE	= emptyFM
+emptySE	= Map.empty
 
 combineSE :: StatEnv -> StatEnv -> StatEnv
-combineSE = plusFM_C (+)
+combineSE = Map.unionWith (+)
 
 combineSEs :: [StatEnv] -> StatEnv
 combineSEs = foldr combineSE emptySE
 
 countOne :: CounterType -> StatEnv
-countOne c = unitFM c 1
+countOne c = Map.singleton c 1
 
 countN :: CounterType -> Int -> StatEnv
-countN = unitFM
+countN = Map.singleton
 \end{code}
 
 %************************************************************************
@@ -85,7 +87,7 @@ showStgStats :: [StgBinding] -> String
 
 showStgStats prog
   = "STG Statistics:\n\n"
-    ++ concat (map showc (fmToList (gatherStgStats prog)))
+    ++ concat (map showc (Map.toList (gatherStgStats prog)))
   where
     showc (x,n) = (showString (s x) . shows n) "\n"
 

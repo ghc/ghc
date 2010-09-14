@@ -2490,7 +2490,7 @@ pprAvails (Avails imp avails)
   = vcat [ ptext (sLit "Avails") <> (if imp then ptext (sLit "[improved]") else empty)
 	 , nest 2 $ braces $ 
 	   vcat [ sep [ppr inst, nest 2 (equals <+> ppr avail)]
-		| (inst,avail) <- fmToList avails ]]
+		| (inst,avail) <- Map.toList avails ]]
 
 instance Outputable AvailHow where
     ppr = pprAvail
@@ -2504,10 +2504,10 @@ pprAvail (Rhs rhs bs)   = sep [text "Rhs" <+> ppr bs,
 
 -------------------------
 extendAvailEnv :: AvailEnv -> Inst -> AvailHow -> AvailEnv
-extendAvailEnv env inst avail = addToFM env inst avail
+extendAvailEnv env inst avail = Map.insert inst avail env
 
 findAvailEnv :: AvailEnv -> Inst -> Maybe AvailHow
-findAvailEnv env wanted = lookupFM env wanted
+findAvailEnv env wanted = Map.lookup wanted env
 	-- NB 1: the Ord instance of Inst compares by the class/type info
 	--  *not* by unique.  So
 	--	d1::C Int ==  d2::C Int
@@ -2528,7 +2528,7 @@ extendAvails avails@(Avails imp env) inst avail
 	; return (Avails (imp || imp1) (extendAvailEnv env inst avail)) }
 
 availsInsts :: Avails -> [Inst]
-availsInsts (Avails _ avails) = keysFM avails
+availsInsts (Avails _ avails) = Map.keys avails
 
 availsImproved :: Avails -> ImprovementDone
 availsImproved (Avails imp _) = imp
@@ -2566,12 +2566,12 @@ extractResults (Avails _ avails) wanteds
       | isEqInst w
       = go binds bound_dicts (w:irreds) done' ws
 
-      | Just done_ids@(done_id : rest_done_ids) <- lookupFM done w
+      | Just done_ids@(done_id : rest_done_ids) <- Map.lookup w done
       = if w_id `elem` done_ids then
 	   go binds bound_dicts irreds done ws
 	else
 	   go (add_bind (nlHsVar done_id)) bound_dicts irreds
-	      (addToFM done w (done_id : w_id : rest_done_ids)) ws
+	      (Map.insert w (done_id : w_id : rest_done_ids) done) ws
 
       | otherwise	-- Not yet done
       = case findAvailEnv avails w of
@@ -2582,14 +2582,14 @@ extractResults (Avails _ avails) wanteds
 
 	  Just (Rhs rhs ws') -> go (add_bind rhs) (w:bound_dicts) irreds done' (ws' ++ ws)
 
-	  Just (Given g) -> go binds' bound_dicts irreds (addToFM done w [g_id]) ws 
+	  Just (Given g) -> go binds' bound_dicts irreds (Map.insert w [g_id] done) ws 
 		where
 		  g_id = instToId g
 		  binds' | w_id == g_id = binds
 			 | otherwise    = add_bind (nlHsVar g_id)
       where
 	w_id  = instToId w	
-	done' = addToFM done w [w_id]
+	done' = Map.insert w [w_id] done
 	add_bind rhs = addInstToDictBind binds w rhs
 \end{code}
 
