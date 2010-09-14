@@ -536,8 +536,11 @@ The instance translates to
 Now we might encounter (op (dfCList {ty} d) a1 a2)
 and we want the (op (dfList {ty} d)) rule to fire, because $dfCList
 has all its arguments, even though its (value) arity is 2.  That's
-why we cache the number of expected 
+why we record the number of expected arguments in the DFunUnfolding.
 
+Note that although it's an Arity, it's most convenient for it to give
+the *total* number of arguments, both type and value.  See the use
+site in exprIsConApp_maybe.
 
 \begin{code}
 -- Constants for the UnfWhen constructor
