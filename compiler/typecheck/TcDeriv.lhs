@@ -830,15 +830,11 @@ type Condition = (DynFlags, TyCon) -> Maybe SDoc
 orCond :: Condition -> Condition -> Condition
 orCond c1 c2 tc 
   = case c1 tc of
-	Nothing -> Nothing	-- c1 succeeds
-	Just {} -> c2 tc	-- c1 fails, try c2
--- orCond produced just one error message, namely from c2
--- Getting two can be confusing.  For a zero-constructor
--- type with a standalone isntance decl, we previously got:
---    Can't make a derived instance of `Bounded (Test a)':
---      `Test' has no data constructors
---        and
---      `Test' does not have precisely one constructor
+	Nothing -> Nothing	    -- c1 succeeds
+	Just x  -> case c2 tc of    -- c1 fails
+		     Nothing -> Nothing
+		     Just y  -> Just (x $$ ptext (sLit "  and") $$ y)
+			            -- Both fail
 
 andCond :: Condition -> Condition -> Condition
 andCond c1 c2 tc = case c1 tc of
@@ -886,12 +882,13 @@ cond_noUnliftedArgs (_, tc)
 
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
-  | null (tyConDataCons rep_tc) = Just (no_cons_why rep_tc)
   | isEnumerationTyCon rep_tc   = Nothing
   | otherwise		        = Just why
   where
-    why = quotes (pprSourceTyCon rep_tc) <+> 
-	  ptext (sLit "has non-nullary constructors")
+    why = sep [ quotes (pprSourceTyCon rep_tc) <+> 
+	          ptext (sLit "is not an enumeration type")
+              , nest 2 $ ptext (sLit "(an enumeration consists of one or more nullary constructors)") ]
+		  -- See Note [Enumeration types] in TyCon
 
 cond_isProduct :: Condition
 cond_isProduct (_, rep_tc)
