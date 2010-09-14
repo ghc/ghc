@@ -1,7 +1,10 @@
 module ShouldFail where
 
+-- See Trac #1176
 -- This is really a pretty-printer test, not a typechecker test
 -- The more infix ops we have, the worse fsep works
+
+-- Currently the error message looks ok, however
 
 allTests :: Bool
 allTests = foo

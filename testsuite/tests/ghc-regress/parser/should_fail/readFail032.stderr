@@ -1,5 +1,5 @@
 
-readFail032.hs:11:38:
+readFail032.hs:21:38:
     Couldn't match expected type `[Char]' with actual type `Char'
       Expected type: [[Char]]
         Actual type: [Char]

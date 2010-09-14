@@ -1,5 +1,5 @@
 
-mod56.hs:4:39:
+mod56.hs:4:38:
     Can't make a derived instance of `Ix T':
       `T' has non-nullary constructors
         and

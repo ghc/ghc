@@ -2,6 +2,8 @@
 
 module GADT10 where
 
+-- [Sept 2010] Now works in GHC 7.0!
+
 -- This fails with
 --
 -- GADT10.hs:37:0:

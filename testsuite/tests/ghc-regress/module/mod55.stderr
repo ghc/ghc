@@ -1,5 +1,5 @@
 
-mod55.hs:3:26:
+mod55.hs:3:25:
     Can't make a derived instance of `Enum T':
       `T' has non-nullary constructors
     In the data type declaration for `T'

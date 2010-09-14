@@ -310,7 +310,7 @@ test('mod172', extra_clean(['Mod172_B.hi', 'Mod172_B.o', 'Mod172_C.hi', 'Mod172_
 test('mod173', extra_clean(['Mod173_Aux.hi', 'Mod173_Aux.o']),
      multimod_compile, ['mod173', '-v0'])
 
-test('mod174', expect_broken(414), compile_fail, [''])
+test('mod174', normal, compile_fail, [''])
 
 # mod175 is a sub-directory
 
