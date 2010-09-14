@@ -15,6 +15,7 @@ type SqMat a = SM Nil a
 data SM f a = ZeroS (f (f a)) | SuccS (SM (Cons f) a) 
 		       deriving Show
 
+-- Show (f (f a)), Show (SM (Cons f) a) => Show (SM f a)
 
 data Nil a = MkNil deriving Show
 
