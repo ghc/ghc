@@ -919,7 +919,7 @@ tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
 	; tcIfaceDataAlt con inst_tys arg_strs rhs }
 		  
 tcIfaceAlt _ (tycon, inst_tys) (IfaceTupleAlt _boxity, arg_occs, rhs)
-  = ASSERT( isTupleTyCon tycon )
+  = ASSERT2( isTupleTyCon tycon, ppr tycon )
     do	{ let [data_con] = tyConDataCons tycon
 	; tcIfaceDataAlt data_con inst_tys arg_occs rhs }
 
