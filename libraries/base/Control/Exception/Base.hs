@@ -109,6 +109,7 @@ module Control.Exception.Base (
         -- * Calls for GHC runtime
         recSelError, recConError, irrefutPatError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
+        absentError,
         nonTermination, nestedAtomically,
 #endif
   ) where
@@ -705,12 +706,14 @@ instance Exception NestedAtomically
 
 #ifdef __GLASGOW_HASKELL__
 recSelError, recConError, irrefutPatError, runtimeError,
-             nonExhaustiveGuardsError, patError, noMethodBindingError
+  nonExhaustiveGuardsError, patError, noMethodBindingError,
+  absentError
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
 recSelError              s = throw (RecSelError ("No match in record selector "
 			                         ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = error (unpackCStringUtf8# s)                   -- No location info unfortunately
+absentError              s = error ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
