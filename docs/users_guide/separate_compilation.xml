@@ -440,6 +440,8 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
       </indexterm>
       <indexterm><primary><literal>.hc</literal> files, saving</primary>
       </indexterm>
+      <indexterm><primary><literal>.ll</literal> files, saving</primary>
+      </indexterm>
       <indexterm><primary><literal>.s</literal> files, saving</primary>
       </indexterm>
 
@@ -461,6 +463,23 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 	    compilations via C (NOTE: <literal>.hc</literal> files
 	    aren't generated when using the native code generator, you
 	    may need to use <option>-fvia-C</option> to force them
+	    to be produced).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-keep-llvm-file</option>,
+            <option>-keep-llvm-files</option>
+            <indexterm><primary><option>-keep-llvm-file</option></primary></indexterm>
+            <indexterm><primary><option>-keep-llvm-files</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Keep intermediate <literal>.ll</literal> files when
+	    doing <literal>.hs</literal>-to-<literal>.o</literal>
+	    compilations via LLVM (NOTE: <literal>.ll</literal> files
+	    aren't generated when using the native code generator, you
+	    may need to use <option>-fllvm</option> to force them
 	    to be produced).</para>
 	  </listitem>
 	</varlistentry>

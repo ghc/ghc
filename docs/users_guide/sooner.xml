@@ -152,6 +152,17 @@ should go here!</para>
       </varlistentry>
 
       <varlistentry>
+	<term>Compile via LLVM:</term>
+	<listitem>
+		<para>The LLVM code generator can sometimes do a far better job
+			    at producing fast code then either the native code generator
+					or the C code generator. This is not universal and depends
+					on the code. Numeric heavy code seems to show the best
+					improvement when compiled via LLVM.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term>Compile via C and crank up GCC:</term>
 	<listitem>
 	  <para>The native code-generator is designed to be quick, not

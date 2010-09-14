@@ -71,7 +71,8 @@ As a rule of thumb, all the language options are dynamic, as are the
 warning options and the debugging options.
 
 The rest are static, with the notable exceptions of
-.BR \-v ", " \-cpp ", " \-fasm ", " \-fvia\-C ", and " \-#include .
+.BR \-v ", " \-cpp ", " \-fasm ", " \-fvia\-C ", " \-fllvm ", and
+" \-#include .
 The OPTIONS sections lists the status of each flag.
 
 .PP

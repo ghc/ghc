@@ -49,6 +49,28 @@
 
       <varlistentry>
         <term>
+          <option>-pgmlo</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgmlo</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the LLVM
+          optimiser.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-pgmlc</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgmlc</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the LLVM
+          compiler.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-pgmm</option> <replaceable>cmd</replaceable>
           <indexterm><primary><option>-pgmm</option></primary></indexterm>
         </term>
@@ -174,6 +196,24 @@
         </term>
         <listitem>
           <para>Pass <replaceable>option</replaceable> to the C compiler.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>
+          <option>-optlo</option> <replaceable>option</replaceable>
+          <indexterm><primary><option>-optlo</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Pass <replaceable>option</replaceable> to the LLVM optimiser.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>
+          <option>-optlc</option> <replaceable>option</replaceable>
+          <indexterm><primary><option>-optlc</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Pass <replaceable>option</replaceable> to the LLVM compiler.</para>
         </listitem>
       </varlistentry>
       <varlistentry>
@@ -408,42 +448,42 @@ $ cat foo.hspp</screen>
       </varlistentry>
       
       <varlistentry>
-	<term>
+        <term>
           <constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant>
           <indexterm><primary><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Only defined when <option>-parallel</option> is in
+        <listitem>
+          <para>Only defined when <option>-parallel</option> is in
           use!  This symbol is defined when pre-processing Haskell
           (input) and pre-processing C (GHC output).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <constant><replaceable>os</replaceable>_HOST_OS=1</constant>
         </term>
-	<listitem>
-	  <para>This define allows conditional compilation based on
+        <listitem>
+          <para>This define allows conditional compilation based on
           the Operating System, where<replaceable>os</replaceable> is
           the name of the current Operating System
           (eg. <literal>linux</literal>, <literal>mingw32</literal>
           for Windows, <literal>solaris</literal>, etc.).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
-	
+        
       <varlistentry>
-	<term>
+        <term>
           <constant><replaceable>arch</replaceable>_HOST_ARCH=1</constant>
         </term>
-	<listitem>
-	  <para>This define allows conditional compilation based on
+        <listitem>
+          <para>This define allows conditional compilation based on
           the host architecture, where<replaceable>arch</replaceable>
           is the name of the current architecture
           (eg. <literal>i386</literal>, <literal>x86_64</literal>,
           <literal>powerpc</literal>, <literal>sparc</literal>,
           etc.).</para>
-	</listitem>
+        </listitem>
       </varlistentry>
     </variablelist>
 
@@ -574,6 +614,21 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <option>-fllvm</option>
+          <indexterm><primary><option>-fllvm</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Compile via LLVM instead of using the native code
+          generator. This will generally take slightly longer than the
+          native code generator to compile but quicker than compiling
+          via C. Produced code is generally the same speed or faster
+          than the other two code generators. Compiling via LLVM
+          requires LLVM version 2.7 or later to be on the path.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-fno-code</option>
           <indexterm><primary><option>-fno-code</option></primary></indexterm>
         </term>
@@ -633,7 +688,7 @@ $ cat foo.hspp</screen>
           different package will reside in a different shared library or
           binary.</para>
           <para>Note that using this option when linking causes GHC to link
-	  against shared libraries.</para>
+          against shared libraries.</para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -699,10 +754,10 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Omits the link step.  This option can be used with
-	    <option>&ndash;&ndash;make</option> to avoid the automatic linking
-	    that takes place if the program contains a <literal>Main</literal>
-	    module.</para>
-	</listitem>
+            <option>&ndash;&ndash;make</option> to avoid the automatic linking
+            that takes place if the program contains a <literal>Main</literal>
+            module.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -799,9 +854,9 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>This flag tells GHC to link against shared Haskell libraries.
-	  This flag only affects the selection of dependent libraries, not
-	  the form of the current target (see -shared).
-	  See <xref linkend="using-shared-libs" /> on how to
+          This flag only affects the selection of dependent libraries, not
+          the form of the current target (see -shared).
+          See <xref linkend="using-shared-libs" /> on how to
           create them.</para>
 
           <para>Note that this option also has an effect on
@@ -821,20 +876,20 @@ $ cat foo.hspp</screen>
           DLL, or a Mac OS dylib. GHC hides the operating system
           details beneath this uniform flag.</para>
 
-	  <para>The flags <option>-dynamic</option>/<option>-static</option> control whether the
-	  resulting shared object links statically or dynamically to
-	  Haskell package libraries given as <option>-package</option> option. Non-Haskell
-	  libraries are linked as gcc would regularly link it on your
-	  system, e.g. on most ELF system the linker uses the dynamic
-	  libraries when found.</para>
+          <para>The flags <option>-dynamic</option>/<option>-static</option> control whether the
+          resulting shared object links statically or dynamically to
+          Haskell package libraries given as <option>-package</option> option. Non-Haskell
+          libraries are linked as gcc would regularly link it on your
+          system, e.g. on most ELF system the linker uses the dynamic
+          libraries when found.</para>
 
-	  <para>Object files linked into shared objects must be
-	  compiled with <option>-fPIC</option>, see <xref linkend="options-codegen" /></para>
+          <para>Object files linked into shared objects must be
+          compiled with <option>-fPIC</option>, see <xref linkend="options-codegen" /></para>
 
-	  <para>When creating shared objects for Haskell packages, the
-	  shared object must be named properly, so that GHC recognizes
-	  the shared object when linked against this package. See
-	  shared object name mangling.</para>
+          <para>When creating shared objects for Haskell packages, the
+          shared object must be named properly, so that GHC recognizes
+          the shared object when linked against this package. See
+          shared object name mangling.</para>
         </listitem>
       </varlistentry>
 
@@ -845,9 +900,9 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>
-	    This flag selects one of a number of modes for finding shared
-	    libraries at runtime. See <xref linkend="finding-shared-libs"/> for
-	    a description of each mode.
+            This flag selects one of a number of modes for finding shared
+            libraries at runtime. See <xref linkend="finding-shared-libs"/> for
+            a description of each mode.
           </para>
         </listitem>
       </varlistentry>
@@ -864,21 +919,21 @@ $ cat foo.hspp</screen>
             to change which function is the "main" one, and the <option>-main-is</option> flag
             allows you to do so.  The  <replaceable>thing</replaceable> can be one of:
             <itemizedlist>
-      	<listitem><para>A lower-case identifier <literal>foo</literal>.  GHC assumes that the main function is <literal>Main.foo</literal>.</para></listitem>
-      	<listitem><para>An module name <literal>A</literal>.  GHC assumes that the main function is <literal>A.main</literal>.</para></listitem>
-      	<listitem><para>An qualified name <literal>A.foo</literal>.  GHC assumes that the main function is <literal>A.foo</literal>.</para></listitem>
-      	</itemizedlist>
+        <listitem><para>A lower-case identifier <literal>foo</literal>.  GHC assumes that the main function is <literal>Main.foo</literal>.</para></listitem>
+        <listitem><para>An module name <literal>A</literal>.  GHC assumes that the main function is <literal>A.main</literal>.</para></listitem>
+        <listitem><para>An qualified name <literal>A.foo</literal>.  GHC assumes that the main function is <literal>A.foo</literal>.</para></listitem>
+        </itemizedlist>
             Strictly speaking, <option>-main-is</option> is not a link-phase flag at all; it has no effect on the link step.
             The flag must be specified when compiling the module containing the specified main function (e.g. module <literal>A</literal>
             in the latter two items above).  It has no effect for other modules,
             and hence can safely be given to <literal>ghc --make</literal>.
-	    However, if all the modules are otherwise up to date, you may need to force
-	    recompilation both of the module where the new "main" is, and of the
-	    module where the "main" function used to be;
-	    <literal>ghc</literal> is not clever 
-	    enough to figure out that they both need recompiling.  You can
-	    force recompilation by removing the object file, or by using the
-	    <option>-fforce-recomp</option> flag.
+            However, if all the modules are otherwise up to date, you may need to force
+            recompilation both of the module where the new "main" is, and of the
+            module where the "main" function used to be;
+            <literal>ghc</literal> is not clever 
+            enough to figure out that they both need recompiling.  You can
+            force recompilation by removing the object file, or by using the
+            <option>-fforce-recomp</option> flag.
             </para> 
         </listitem>
       </varlistentry>

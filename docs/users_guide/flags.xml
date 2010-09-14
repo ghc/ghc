@@ -311,6 +311,13 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-keep-llvm-file</option> or
+                 <option>-keep-llvm-files</option></entry>
+	      <entry>retain intermediate LLVM <literal>.ll</literal> files</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-keep-s-file</option> or
                  <option>-keep-s-files</option></entry>
 	      <entry>retain intermediate <literal>.s</literal> files</entry>
@@ -1722,6 +1729,12 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-fasm</entry>
 	    </row>
 	    <row>
+	      <entry><option>-fllvm</option></entry>
+	      <entry>Compile via LLVM</entry>
+	      <entry>dynamic</entry>
+	      <entry>-fasm</entry>
+	    </row>
+	    <row>
 	      <entry><option>-fno-code</option></entry>
 	      <entry>Omit code generation</entry>
 	      <entry>dynamic</entry>
@@ -1948,6 +1961,18 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the C compiler</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
+	    <row>
+	      <entry><option>-pgmlo</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the LLVM optimiser</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgmlc</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the LLVM compiler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	    </row>
 	    <row>
 	      <entry><option>-pgmm</option> <replaceable>cmd</replaceable></entry>
@@ -1999,6 +2024,8 @@ phase <replaceable>n</replaceable></entry>
       <indexterm><primary><option>-pgmL</option></primary></indexterm>
       <indexterm><primary><option>-pgmP</option></primary></indexterm>
       <indexterm><primary><option>-pgmc</option></primary></indexterm>
+      <indexterm><primary><option>-pgmlo</option></primary></indexterm>
+      <indexterm><primary><option>-pgmlc</option></primary></indexterm>
       <indexterm><primary><option>-pgma</option></primary></indexterm>
       <indexterm><primary><option>-pgml</option></primary></indexterm>
       <indexterm><primary><option>-pgmdll</option></primary></indexterm>
@@ -2045,6 +2072,18 @@ phase <replaceable>n</replaceable></entry>
 	    <row>
 	      <entry><option>-optc</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the C compiler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optlo</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the LLVM optimiser</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optlc</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the LLVM compiler</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -2232,6 +2271,12 @@ phase <replaceable>n</replaceable></entry>
 	    <row>
 	      <entry><option>-ddump-inlinings</option></entry>
 	      <entry>Dump inlining info</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-llvm</option></entry>
+	      <entry>Dump LLVM intermediate code</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>

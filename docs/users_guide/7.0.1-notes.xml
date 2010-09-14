@@ -51,6 +51,14 @@ $ ghci -package haskell2010 -hide-package base -hide-package array
 
       <listitem>
         <para>
+					GHC now includes an LLVM code generator. For certain code,
+					particularly arithmetic heavy code, using the LLVM code
+					generator can bring some nice performance improvements.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
           The inliner has been overhauled, which should in general
           give better performance while reducing unnecessary code-size
           explosion.
@@ -351,14 +359,14 @@ import SpecConstr
           flags to keep the LLVM intermediate files,
           <literal>-keep-llvm-file</literal> and
           <literal>-keep-llvm-files</literal>;
-          flags to set the location and options for the LLVM assembler,
-          optimiser and compiler,
-          <literal>-pgmla</literal>,
+					flags to set the location and options for the LLVM optimiser
+					and compiler,
           <literal>-pgmlo</literal>,
           <literal>-pgmlc</literal>,
-          <literal>-optla</literal>,
           <literal>-optlo</literal> and
           <literal>-optlc</literal>.
+					The LLVM code generator requires LLVM version 2.7 or later on
+					your path.
         </para>
       </listitem>
 
