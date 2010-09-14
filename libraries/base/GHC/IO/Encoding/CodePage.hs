@@ -8,6 +8,7 @@ module GHC.IO.Encoding.CodePage(
                             ) where
 
 import GHC.Base
+import GHC.Show
 import GHC.Num
 import GHC.Enum
 import GHC.Word
