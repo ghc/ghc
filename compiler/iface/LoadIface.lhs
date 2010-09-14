@@ -31,6 +31,7 @@ import TcRnMonad
 
 import PrelNames
 import PrelInfo
+import MkId	( seqId )
 import Rules
 import Annotations
 import InstEnv

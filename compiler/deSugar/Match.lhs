@@ -35,7 +35,6 @@ import Id
 import DataCon
 import MatchCon
 import MatchLit
-import PrelInfo
 import Type
 import TysWiredIn
 import ListSetOps

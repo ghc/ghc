@@ -26,10 +26,7 @@ module MkId (
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId, 
-        voidArgId, nullAddrId, seqId, lazyId, lazyIdKey,
-
-	-- Re-export error Ids
-	module PrelRules
+        voidArgId, nullAddrId, seqId, lazyId, lazyIdKey
     ) where
 
 #include "HsVersions.h"
@@ -107,24 +104,9 @@ is right here.
 \begin{code}
 wiredInIds :: [Id]
 wiredInIds
-  = [   
-
-    eRROR_ID,   -- This one isn't used anywhere else in the compiler
-                -- But we still need it in wiredInIds so that when GHC
-                -- compiles a program that mentions 'error' we don't
-                -- import its type from the interface file; we just get
-                -- the Id defined here.  Which has an 'open-tyvar' type.
-
-    rUNTIME_ERROR_ID,
-    iRREFUT_PAT_ERROR_ID,
-    nON_EXHAUSTIVE_GUARDS_ERROR_ID,
-    nO_METHOD_BINDING_ERROR_ID,
-    pAT_ERROR_ID,
-    rEC_CON_ERROR_ID,
-    rEC_SEL_ERROR_ID,
-
-    lazyId
-    ] ++ ghcPrimIds
+  =  [lazyId]
+  ++ errorIds		-- Defined in MkCore
+  ++ ghcPrimIds
 
 -- These Ids are exported from GHC.Prim
 ghcPrimIds :: [Id]

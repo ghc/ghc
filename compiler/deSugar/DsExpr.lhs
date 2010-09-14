@@ -52,7 +52,6 @@ import CostCentre
 import Id
 import Var
 import VarSet
-import PrelInfo
 import DataCon
 import TysWiredIn
 import BasicTypes

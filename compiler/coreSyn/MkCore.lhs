@@ -33,12 +33,19 @@ module MkCore (
         
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr, 
-        mkFoldrExpr, mkBuildExpr
+        mkFoldrExpr, mkBuildExpr,
+
+    	-- * Error Ids 
+    	mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
+    	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
+    	nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
+    	pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID
     ) where
 
 #include "HsVersions.h"
 
 import Id
+import IdInfo
 import Var      ( EvVar, mkWildCoVar, setTyVarUnique )
 
 import CoreSyn
@@ -49,10 +56,12 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
+import TcType		( mkSigmaTy )
 import Type
-import TysPrim          ( alphaTyVar )
+import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
-
+import Demand
+import Name
 import Outputable
 import FastString
 import UniqSupply
@@ -553,3 +562,153 @@ mkBuildExpr elt_ty mk_build_inside = do
       uniqs <- getUniquesM
       return (zipWith setTyVarUnique tyvar_tmpls uniqs)
 \end{code}
+
+
+%************************************************************************
+%*                                                                      *
+                      Error expressions
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+mkRuntimeErrorApp 
+        :: Id           -- Should be of type (forall a. Addr# -> a)
+                        --      where Addr# points to a UTF8 encoded string
+        -> Type         -- The type to instantiate 'a'
+        -> String       -- The string to print
+        -> CoreExpr
+
+mkRuntimeErrorApp err_id res_ty err_msg 
+  = mkApps (Var err_id) [Type res_ty, err_string]
+  where
+    err_string = Lit (mkMachString err_msg)
+
+mkImpossibleExpr :: Type -> CoreExpr
+mkImpossibleExpr res_ty
+  = mkRuntimeErrorApp rUNTIME_ERROR_ID res_ty "Impossible case alternative"
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                     Error Ids
+%*                                                                      *
+%************************************************************************
+
+GHC randomly injects these into the code.
+
+@patError@ is just a version of @error@ for pattern-matching
+failures.  It knows various ``codes'' which expand to longer
+strings---this saves space!
+
+@absentErr@ is a thing we put in for ``absent'' arguments.  They jolly
+well shouldn't be yanked on, but if one is, then you will get a
+friendly message from @absentErr@ (rather than a totally random
+crash).
+
+@parError@ is a special version of @error@ which the compiler does
+not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
+templates, but we don't ever expect to generate code for it.
+
+\begin{code}
+errorIds :: [Id]
+errorIds 
+  = [ eRROR_ID,   -- This one isn't used anywhere else in the compiler
+                  -- But we still need it in wiredInIds so that when GHC
+                  -- compiles a program that mentions 'error' we don't
+                  -- import its type from the interface file; we just get
+                  -- the Id defined here.  Which has an 'open-tyvar' type.
+
+      rUNTIME_ERROR_ID,
+      iRREFUT_PAT_ERROR_ID,
+      nON_EXHAUSTIVE_GUARDS_ERROR_ID,
+      nO_METHOD_BINDING_ERROR_ID,
+      pAT_ERROR_ID,
+      rEC_CON_ERROR_ID,
+      rEC_SEL_ERROR_ID,
+      aBSENT_ERROR_ID ]
+
+recSelErrorName, runtimeErrorName, absentErrorName :: Name
+irrefutPatErrorName, recConErrorName, patErrorName :: Name
+nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
+
+recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
+absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
+runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
+irrefutPatErrorName = err_nm "irrefutPatError" irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
+recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
+patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
+
+noMethodBindingErrorName     = err_nm "noMethodBindingError"
+                                  noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
+nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError" 
+                                  nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
+
+err_nm :: String -> Unique -> Id -> Name
+err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
+
+rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
+pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
+rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
+rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
+iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
+rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
+pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
+nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
+nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
+
+aBSENT_ERROR_ID :: Id
+-- Not bottoming; no unfolding!  See Note [Absent error Id] in WwLib
+aBSENT_ERROR_ID = mkVanillaGlobal absentErrorName runtimeErrorTy
+
+mkRuntimeErrorId :: Name -> Id
+mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy
+
+runtimeErrorTy :: Type
+-- The runtime error Ids take a UTF8-encoded string as argument
+runtimeErrorTy = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
+\end{code}
+
+\begin{code}
+errorName :: Name
+errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
+
+eRROR_ID :: Id
+eRROR_ID = pc_bottoming_Id errorName errorTy
+
+errorTy  :: Type
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+    -- Notice the openAlphaTyVar.  It says that "error" can be applied
+    -- to unboxed as well as boxed types.  This is OK because it never
+    -- returns, so the return type is irrelevant.
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+\subsection{Utilities}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+pc_bottoming_Id :: Name -> Type -> Id
+-- Function of arity 1, which diverges after being given one argument
+pc_bottoming_Id name ty
+ = mkVanillaGlobalWithInfo name ty bottoming_info
+ where
+    bottoming_info = vanillaIdInfo `setStrictnessInfo` Just strict_sig
+				   `setArityInfo`         1
+			-- Make arity and strictness agree
+
+        -- Do *not* mark them as NoCafRefs, because they can indeed have
+        -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
+        -- which has some CAFs
+        -- In due course we may arrange that these error-y things are
+        -- regarded by the GC as permanently live, in which case we
+        -- can give them NoCaf info.  As it is, any function that calls
+        -- any pc_bottoming_Id will itself have CafRefs, which bloats
+        -- SRTs.
+
+    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
+        -- These "bottom" out, no matter what their arguments
+\end{code}
+

@@ -19,6 +19,7 @@ import Inst
 import InstEnv
 import FamInst
 import FamInstEnv
+import MkCore	( nO_METHOD_BINDING_ERROR_ID )
 import TcDeriv
 import TcEnv
 import RnSource ( addTcgDUs )

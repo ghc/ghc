@@ -41,6 +41,7 @@ import Name
 
 import HscTypes
 import PrelInfo
+import MkCore	( eRROR_ID )
 import PrelNames
 import PrimOp
 import SrcLoc

@@ -5,7 +5,8 @@
 
 \begin{code}
 module PrelInfo (
-	module MkId,
+        wiredInIds, ghcPrimIds,
+        primOpRules, builtinRules,
 
 	ghcPrimExports,
 	wiredInThings, basicKnownKeyNames,
@@ -24,7 +25,7 @@ module PrelInfo (
 import PrelNames	( basicKnownKeyNames, 
 			  hasKey, charDataConKey, intDataConKey,
 			  numericClassKeys, standardClassKeys )
-
+import PrelRules
 import PrimOp		( PrimOp, allThePrimOps, primOpOcc, primOpTag, maxPrimOpTag )
 import DataCon		( DataCon )
 import Id		( Id, idName )

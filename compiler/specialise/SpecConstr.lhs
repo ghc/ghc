@@ -31,7 +31,7 @@ import Coercion
 import Rules
 import Type		hiding( substTy )
 import Id
-import MkId		( mkImpossibleExpr )
+import MkCore		( mkImpossibleExpr )
 import Var
 import VarEnv
 import VarSet

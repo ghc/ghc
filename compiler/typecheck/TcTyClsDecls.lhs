@@ -30,7 +30,8 @@ import Class
 import TyCon
 import DataCon
 import Id
-import MkId		( rEC_SEL_ERROR_ID, mkDefaultMethodId )
+import MkId		( mkDefaultMethodId )
+import MkCore		( rEC_SEL_ERROR_ID )
 import IdInfo
 import Var
 import VarSet

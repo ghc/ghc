@@ -34,7 +34,6 @@ import Type
 import TysWiredIn
 import Match
 import PrelNames
-import PrelInfo
 import SrcLoc
 import Outputable
 import FastString

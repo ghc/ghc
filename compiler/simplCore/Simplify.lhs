@@ -15,7 +15,8 @@ import SimplEnv
 import SimplUtils
 import FamInstEnv	( FamInstEnv )
 import Id
-import MkId		( mkImpossibleExpr, seqId )
+import MkId		( seqId, realWorldPrimId )
+import MkCore		( mkImpossibleExpr )
 import Var
 import IdInfo
 import Name		( mkSystemVarName, isExternalName )
@@ -36,7 +37,6 @@ import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict, Arity )
 import CostCentre       ( currentCCS, pushCCisNop )
 import TysPrim          ( realWorldStatePrimTy )
-import PrelInfo         ( realWorldPrimId )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils	( foldlM, mapAccumLM )
 import Maybes           ( orElse )

@@ -1113,7 +1113,7 @@ rightDataConKey				= mkPreludeDataConUnique 26
 
 \begin{code}
 absentErrorIdKey, augmentIdKey, appendIdKey, buildIdKey, errorIdKey,
-    foldlIdKey, foldrIdKey, recSelErrorIdKey,
+    foldlIdKey, foldrIdKey, recSelErrorIdKey, 
     integerMinusOneIdKey, integerPlusOneIdKey,
     integerPlusTwoIdKey, integerZeroIdKey,
     int2IntegerIdKey, seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
