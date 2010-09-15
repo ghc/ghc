@@ -17,7 +17,6 @@ module Haddock.GhcUtils where
 
 
 import Data.Version
-import qualified Data.Map as Map
 import Control.Arrow
 import Data.Foldable hiding (concatMap)
 import Data.Traversable
@@ -73,10 +72,6 @@ lookupLoadedHomeModuleGRE mod_name = withSession $ \hsc_env ->
   case lookupUFM (hsc_HPT hsc_env) mod_name of
     Just mod_info      -> return (mi_globals (hm_iface mod_info))
     _not_a_home_module -> return Nothing
-
-
-instance (Outputable a, Outputable b) => Outputable (Map.Map a b) where
-  ppr m = ppr (Map.toList m)
 
 
 isNameSym :: Name -> Bool
