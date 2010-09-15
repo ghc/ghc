@@ -835,7 +835,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     ----------------------
     tc_body :: Id -> Bool -> LHsBind Name -> TcM (TcId, LHsBind Id)
     tc_body sel_id generated_code rn_bind 
-      = add_meth_ctxt generated_code rn_bind $
+      = add_meth_ctxt sel_id generated_code rn_bind $
         do { (meth_id, local_meth_id) <- mkMethIds clas tyvars dfun_ev_vars 
                                                    inst_tys sel_id
            ; (meth_id1, spec_prags) <- tcPrags NonRecursive False True 
@@ -925,8 +925,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 	-- For instance decls that come from standalone deriving clauses
 	-- we want to print out the full source code if there's an error
 	-- because otherwise the user won't see the code at all
-    add_meth_ctxt generated_code rn_bind thing 
-      | generated_code = addLandmarkErrCtxt (derivBindCtxt clas inst_tys rn_bind) thing
+    add_meth_ctxt sel_id generated_code rn_bind thing 
+      | generated_code = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys rn_bind) thing
       | otherwise      = thing
 
 
@@ -1027,11 +1027,15 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
 wrapId :: HsWrapper -> id -> HsExpr id
 wrapId wrapper id = mkHsWrap wrapper (HsVar id)
 
-derivBindCtxt :: Class -> [Type ] -> LHsBind Name -> SDoc
-derivBindCtxt clas tys bind
-   = vcat [ ptext (sLit "When typechecking a standalone-derived method for")
-	    <+> quotes (pprClassPred clas tys) <> colon
-	  , nest 2 $ pprSetDepth AllTheWay $ ppr bind ]
+derivBindCtxt :: Id -> Class -> [Type ] -> LHsBind Name -> SDoc
+derivBindCtxt sel_id clas tys _bind
+   = vcat [ ptext (sLit "When typechecking the code for ") <+> ppr sel_id
+          , nest 2 (ptext (sLit "in a standalone derived instance for")
+	  	    <+> quotes (pprClassPred clas tys) <> colon)
+          , nest 2 $ ptext (sLit "To see the code I am typechecking, use -ddump-deriv") ]
+
+-- Too voluminous
+--	  , nest 2 $ pprSetDepth AllTheWay $ ppr bind ]
 
 warnMissingMethod :: Id -> TcM ()
 warnMissingMethod sel_id
