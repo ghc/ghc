@@ -143,7 +143,7 @@ deeplySkolemise
 
 deeplySkolemise skol_info ty
   | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-  = do { ids1 <- newSysLocalIds (fsLit "dsk") arg_tys
+  = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
        ; tvs1 <- mapM (tcInstSkolTyVar skol_info) tvs
        ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs1)
        ; ev_vars1 <- newEvVars (substTheta subst theta)
@@ -170,14 +170,14 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 deeplyInstantiate orig ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
   = do { (_, tys, subst) <- tcInstTyVars tvs
-       ; ids1  <- newSysLocalIds (fsLit "dsk") (substTys subst arg_tys)
+       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
        ; wrap1 <- instCall orig tys (substTheta subst theta)
-       ; (wrap2, rho) <- deeplyInstantiate orig (substTy subst rho)
+       ; (wrap2, rho2) <- deeplyInstantiate orig (substTy subst rho)
        ; return (mkWpLams ids1 
+                    <.> wrap2
                     <.> wrap1 
-                    <.> mkWpEvVarApps ids1
-                    <.> wrap2,
-                 mkFunTys arg_tys rho) }
+                    <.> mkWpEvVarApps ids1,
+                 mkFunTys arg_tys rho2) }
 
   | otherwise = return (idHsWrapper, ty)
 \end{code}
