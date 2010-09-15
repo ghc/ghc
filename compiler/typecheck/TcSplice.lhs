@@ -44,6 +44,7 @@ import TcMType
 import TcHsType
 import TcIface
 import TypeRep
+import InstEnv 
 import Name
 import NameEnv
 import NameSet
@@ -874,6 +875,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 				  , TH.loc_end = (srcSpanEndLine   l, srcSpanEndCol   l) }) }
 		
   qReify v = reify v
+  qClassInstances = lookupClassInstances
 
 	-- For qRecover, discard error messages if 
 	-- the recovery action is chosen.  Otherwise
@@ -912,6 +914,33 @@ showSplice what before after
 illegalBracket :: SDoc
 illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (without intervening splices)")
 #endif 	/* GHCI */
+\end{code}
+
+
+%************************************************************************
+%*									*
+	    Instance Testing
+%*									*
+%************************************************************************
+
+\begin{code}
+lookupClassInstances :: TH.Name -> [TH.Type] -> TcM [TH.Name]
+lookupClassInstances c ts
+   = do { loc <- getSrcSpanM
+        ; case convertToHsPred loc (TH.ClassP c ts) of
+            Left msg -> failWithTc msg
+            Right rdr_pred -> do
+        { rn_pred <- rnLPred doc rdr_pred	-- Rename
+        ; kc_pred <- kcHsLPred rn_pred		-- Kind check
+        ; ClassP cls tys <- dsHsLPred kc_pred	-- Type check
+
+	-- Now look up instances
+        ; inst_envs <- tcGetInstEnvs
+        ; let (matches, unifies) = lookupInstEnv inst_envs cls tys
+              dfuns = map is_dfun (map fst matches ++ unifies)
+        ; return (map reifyName dfuns) } }
+  where
+    doc = ptext (sLit "TcSplice.classInstances")
 \end{code}
 
 
@@ -1103,8 +1132,11 @@ reifyDataCon tys dc
 reifyClass :: Class -> TcM TH.Info
 reifyClass cls 
   = do	{ cxt <- reifyCxt theta
+        ; inst_envs <- tcGetInstEnvs
+        ; insts <- mapM reifyClassInstance (InstEnv.classInstances inst_envs cls)
 	; ops <- mapM reify_op op_stuff
-	; return (TH.ClassI $ TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) fds' ops) }
+        ; let dec = TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) fds' ops
+	; return (TH.ClassI dec insts ) }
   where
     (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
@@ -1112,7 +1144,22 @@ reifyClass cls
 			  ; return (TH.SigD (reifyName op) ty) }
 
 ------------------------------
+reifyClassInstance :: Instance -> TcM TH.ClassInstance
+reifyClassInstance i
+  = do { cxt <- reifyCxt theta
+       ; thtypes <- reifyTypes types
+       ; return $ (TH.ClassInstance { 
+            TH.ci_tvs = reifyTyVars tvs,
+            TH.ci_cxt = cxt,
+            TH.ci_tys = thtypes,
+            TH.ci_cls = reifyName cls,
+            TH.ci_dfun = reifyName (is_dfun i) }) }
+  where
+     (tvs, theta, cls, types) = instanceHead i
+
+------------------------------
 reifyType :: TypeRep.Type -> TcM TH.Type
+-- Monadic only because of failure
 reifyType ty@(ForAllTy _ _)        = reify_for_all ty
 reifyType ty@(PredTy {} `FunTy` _) = reify_for_all ty	        -- Types like ((?x::Int) => Char -> Char)
 reifyType (TyVarTy tv)	    = return (TH.VarT (reifyName tv))

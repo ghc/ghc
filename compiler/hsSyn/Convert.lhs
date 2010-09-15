@@ -7,7 +7,8 @@ This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
-                convertToHsType, thRdrNameGuesses ) where
+                convertToHsType, convertToHsPred,
+                thRdrNameGuesses ) where
 
 import HsSyn as Hs
 import qualified Class
@@ -57,6 +58,10 @@ convertToPat loc p
 convertToHsType :: SrcSpan -> TH.Type -> Either Message (LHsType RdrName)
 convertToHsType loc t
   = initCvt loc $ wrapMsg "type" t $ cvtType t
+
+convertToHsPred :: SrcSpan -> TH.Pred -> Either Message (LHsPred RdrName)
+convertToHsPred loc t
+  = initCvt loc $ wrapMsg "type" t $ cvtPred t
 
 -------------------------------------------------------------------
 newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either Message a }

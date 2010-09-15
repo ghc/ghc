@@ -16,7 +16,7 @@ module TcHsType (
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
-	tcTyVarBndrs, dsHsType, 
+	tcTyVarBndrs, dsHsType, kcHsLPred, dsHsLPred,
 	tcDataKindSig, ExpKind(..), EkCtxt(..),
 
 		-- Pattern type signatures
