@@ -16,6 +16,7 @@
 #include <io.h>
 #include <winsock.h>
 #include <process.h>
+#include <errno.h>
 
 /*
  * Internal state maintained by the IO manager.
@@ -181,7 +182,15 @@ IOWorkerProc(PVOID param)
 			len = write(work->workData.ioData.fd,
 				    work->workData.ioData.buf,
 				    work->workData.ioData.len);
-			if (len == -1) { errCode = errno; }
+			if (len == -1) {
+                            errCode = errno;
+                            // write() gets errno wrong for
+                            // ERROR_NO_DATA, we have to fix it here:
+                            if (errCode == EINVAL &&
+                                GetLastError() == ERROR_NO_DATA) {
+                                errCode = EPIPE;
+                            }
+                        }
 		    }
 		    complData = work->workData.ioData.buf;
 		    fd = work->workData.ioData.fd;
