@@ -277,18 +277,23 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsBindLR idL id
 
 ppr_monobind :: (OutputableBndr idL, OutputableBndr idR) => HsBindLR idL idR -> SDoc
 
-ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat grhss
-ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = pprBndr CaseBind var <+> equals <+> pprExpr (unLoc rhs)
+ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
+  = pprPatBind pat grhss
+ppr_monobind (VarBind { var_id = var, var_rhs = rhs })    
+  = sep [pprBndr CaseBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
 ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
+	     	        fun_co_fn = wrap, 
 			fun_matches = matches,
 		        fun_tick = tick })
   = pprTicks empty (case tick of 
 			Nothing -> empty
 			Just t  -> text "-- tick id = " <> ppr t)
     $$  pprFunBind (unLoc fun) inf matches
+    $$  ifPprDebug (ppr wrap)
 
-ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars, 
-			 abs_exports = exports, abs_binds = val_binds })
+ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars 
+		       , abs_exports = exports, abs_binds = val_binds
+                       , abs_ev_binds = ev_binds })
   = sep [ptext (sLit "AbsBinds"),
   	 brackets (interpp'SP tyvars),
   	 brackets (interpp'SP dictvars),
@@ -297,6 +302,8 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars,
     nest 2 ( vcat [pprBndr LetBind x | (_,x,_,_) <- exports]
   			-- Print type signatures
   	     $$ pprLHsBinds val_binds )
+    $$
+    ifPprDebug (ppr ev_binds)
   where
     ppr_exp (tvs, gbl, lcl, prags)
 	= vcat [ppr gbl <+> ptext (sLit "<=") <+> ppr tvs <+> ppr lcl,
@@ -521,17 +528,28 @@ instance Outputable HsWrapper where
 pprHsWrapper :: SDoc -> HsWrapper -> SDoc
 -- In debug mode, print the wrapper
 -- otherwise just print what's inside
-pprHsWrapper it wrap
-  = getPprStyle (\ s -> if debugStyle s then (help it wrap) else it)
+pprHsWrapper doc wrap
+  = getPprStyle (\ s -> if debugStyle s then (help (add_parens doc) wrap False) else doc)
   where
-    help it WpHole            = it
-    help it (WpCompose f1 f2) = help (help it f2) f1
-    help it (WpCast co)   = sep [it, nest 2 (ptext (sLit "`cast`") <+> pprParendType co)]
-    help it (WpEvApp id)  = sep [it, nest 2 (ppr id)]
-    help it (WpTyApp ty)  = sep [it, ptext (sLit "@") <+> pprParendType ty]
-    help it (WpEvLam id)  = sep [ptext (sLit "\\") <> pprBndr LambdaBind id <> dot, it]
-    help it (WpTyLam tv)  = sep [ptext (sLit "/\\") <> pprBndr LambdaBind tv <> dot, it]
-    help it (WpLet binds) = sep [ptext (sLit "let") <+> braces (ppr binds), it]
+    help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
+    -- True  <=> appears in function application position
+    -- False <=> appears as body of let or lambda
+    help it WpHole             = it
+    help it (WpCompose f1 f2)  = help (help it f2) f1
+    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>") 
+                                                 <+> pprParendType co)]
+    help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
+    help it (WpTyApp ty)  = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
+    help it (WpEvLam id)  = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
+    help it (WpTyLam tv)  = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
+    help it (WpLet binds) = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
+
+    pp_bndr v = pprBndr LambdaBind v <> dot
+
+    add_parens, no_parens :: SDoc -> Bool -> SDoc
+    add_parens d True  = parens d
+    add_parens d False = d
+    no_parens d _ = d
 
 instance Outputable TcEvBinds where
   ppr (TcEvBinds v) = ppr v

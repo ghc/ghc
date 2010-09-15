@@ -491,7 +491,7 @@ instance Functor Located where
   fmap f (L l e) = L l (f e)
 
 instance Outputable e => Outputable (Located e) where
-  ppr (L l e) = ifPprDebug (braces (pprUserSpan False l)) <> ppr e
+  ppr (L l e) = ifPprDebug (braces (pprUserSpan False l)) $$ ppr e
 		-- Print spans without the file name etc
 \end{code}
 

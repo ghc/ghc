@@ -748,16 +748,16 @@ pprFunBind fun inf matches = pprMatches (FunRhs fun inf) matches
 pprPatBind :: (OutputableBndr bndr, OutputableBndr id)
            => LPat bndr -> GRHSs id -> SDoc
 pprPatBind pat ty@(grhss)
- = sep [ppr pat, nest 4 (pprGRHSs (PatBindRhs `asTypeOf` idType ty) grhss)]
+ = sep [ppr pat, nest 2 (pprGRHSs (PatBindRhs `asTypeOf` idType ty) grhss)]
 --avoid using PatternSignatures for stage1 code portability
  where idType :: GRHSs id -> HsMatchContext id; idType = undefined
 
 
 pprMatch :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> Match idR -> SDoc
 pprMatch ctxt (Match pats maybe_ty grhss)
-  = herald <+> sep [sep (map pprParendLPat other_pats),
-                    ppr_maybe_ty,
-                    nest 2 (pprGRHSs ctxt grhss)]
+  = sep [ sep (herald : map (nest 2 . pprParendLPat) other_pats)
+        , nest 2 ppr_maybe_ty
+        , nest 2 (pprGRHSs ctxt grhss) ]
   where
     (herald, other_pats)
         = case ctxt of
