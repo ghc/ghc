@@ -43,8 +43,8 @@ instance Ppr Name where
 
 ------------------------------
 instance Ppr Info where
-    ppr (ClassI d) = ppr d
-    ppr (TyConI d) = ppr d
+    ppr (ClassI d is) = ppr d $$ vcat (map ppr is)
+    ppr (TyConI d)    = ppr d
     ppr (PrimTyConI name arity is_unlifted) 
       = text "Primitive"
 	<+> (if is_unlifted then text "unlifted" else empty)
@@ -61,6 +61,15 @@ instance Ppr Info where
     ppr (VarI v ty mb_d fix) 
       = vcat [ppr_sig v ty, pprFixity v fix, 
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
+
+instance Ppr ClassInstance where
+  ppr (ClassInstance { ci_dfun = _dfun,
+      		       ci_tvs  = _tvs,
+      		       ci_cxt  = cxt,
+      		       ci_cls  = cls,
+                       ci_tys = tys })
+    = text "instance" <+> pprCxt cxt 
+      <+> ppr cls <+> sep (map pprParendType tys)
 
 ppr_sig :: Name -> Type -> Doc
 ppr_sig v ty = ppr v <+> text "::" <+> ppr ty

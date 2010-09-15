@@ -25,6 +25,7 @@ module Language.Haskell.TH.Syntax(
 	Q, runQ, 
 	report,	recover, reify,
 	location, runIO,
+        isClassInstance, classInstances,
 
 	-- * Names
 	Name(..), mkName, newName, nameBase, nameModule,
@@ -33,7 +34,7 @@ module Language.Haskell.TH.Syntax(
 	-- * The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
 	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
-	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
+	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, ClassInstance(..),
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	InlineSpec(..),	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
 	Info(..), Loc(..), CharPos,
@@ -79,6 +80,10 @@ class (Monad m, Functor m) => Quasi m where
  
 	-- Inspect the type-checker's environment
   qReify :: Name -> m Info
+  qClassInstances :: Name -> [Type] -> m [Name]
+  		      -- Is (cls tys) an instance?
+		      -- Returns list of matching witnesses
+
   qLocation :: m Loc
 
   qRunIO :: IO a -> m a
@@ -104,9 +109,10 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
-  qReify _     = badIO "reify"
-  qLocation    = badIO "currentLocation"
-  qRecover _ _ = badIO "recover" -- Maybe we could fix this?
+  qReify _            = badIO "reify"
+  qClassInstances _ _ = badIO "classInstances"
+  qLocation    	      = badIO "currentLocation"
+  qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
 
   qRunIO m = m
   
@@ -157,6 +163,14 @@ recover (Q r) (Q m) = Q (qRecover r m)
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
+-- | 'classInstances' looks up instaces of a class
+classInstances :: Name -> [Type] -> Q [Name]
+classInstances cls tys = Q (qClassInstances cls tys)
+
+isClassInstance :: Name -> [Type] -> Q Bool
+isClassInstance cls tys = do { dfuns <- classInstances cls tys
+                             ; return (not (null dfuns)) }
+
 -- | 'location' gives you the 'Location' at which this
 -- computation is spliced.
 location :: Q Loc
@@ -173,12 +187,13 @@ runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
 instance Quasi Q where
-  qNewName  = newName
-  qReport   = report
-  qRecover  = recover 
-  qReify    = reify
-  qLocation = location
-  qRunIO    = runIO
+  qNewName  	  = newName
+  qReport   	  = report
+  qRecover  	  = recover 
+  qReify    	  = reify
+  qClassInstances = classInstances
+  qLocation 	  = location
+  qRunIO    	  = runIO
 
 
 ----------------------------------------------------
@@ -586,7 +601,12 @@ type CharPos = (Int, Int)	-- Line and character position
 
 -- | Obtained from 'reify' in the 'Q' Monad.
 data Info
-  = ClassI Dec
+  = -- | A class is reified to its declaration 
+    --   and a list of its instances
+    ClassI 
+        Dec             -- Declaration of the class
+        [ClassInstance]	-- The instances of that class
+
   | ClassOpI
 	Name	-- The class op itself
 	Type 	-- Type of the class-op (fully polymoprhic)
@@ -619,6 +639,16 @@ data Info
 	Name
 	Type	-- What it is bound to
   deriving( Show, Data, Typeable )
+
+-- | 'ClassInstance' desribes a single instance of a class
+data ClassInstance 
+  = ClassInstance {
+      ci_dfun :: Name,	  -- The witness
+      ci_tvs  :: [TyVarBndr], 
+      ci_cxt  :: Cxt,
+      ci_cls  :: Name,  
+      ci_tys  :: [Type]
+    } deriving( Show, Data, Typeable )
 
 data Fixity          = Fixity Int FixityDirection
     deriving( Eq, Show, Data, Typeable )
