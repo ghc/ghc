@@ -63,8 +63,10 @@ initTaskManager (void)
     if (!tasksInitialized) {
 	taskCount = 0;
 	tasksInitialized = 1;
-#if defined(THREADED_RTS) && !defined(MYTASK_USE_TLV)
+#if defined(THREADED_RTS)
+#if !defined(MYTASK_USE_TLV)
 	newThreadLocalKey(&currentTaskKey);
+#endif
         initMutex(&all_tasks_mutex);
 #endif
     }
