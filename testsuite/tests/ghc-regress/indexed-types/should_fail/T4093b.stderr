@@ -1,0 +1,40 @@
+
+T4093b.hs:25:21:
+    Could not deduce (EitherCO
+                        x (EitherCO e (A C C n) (A O C n)) (A C O n)
+                        ~
+                      (MaybeC e (n C O), MaybeC x (n O C)))
+      from the context (EitherCO e (A C O n) (A O O n) ~ A e O n,
+                        EitherCO x (A C C n) (A C O n) ~ A C x n)
+    In the expression: foldBlockNodesF (f, l) b z
+    In an equation for `blockToNodeList':
+        blockToNodeList b
+          = foldBlockNodesF (f, l) b z
+          where
+              z ::
+                EitherCO e (EitherCO e (A C O n) (A O O n)) (EitherCO e (A C O n) (A O O n))
+              z = undefined
+              f ::
+                n C O
+                -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C O n) (A O O n)
+              f n _ = (JustC n, NothingC)
+              ....
+
+T4093b.hs:31:13:
+    Couldn't match type `e' with `C'
+      `e' is a rigid type variable bound by
+          the type signature for `blockToNodeList' at T4093b.hs:20:12
+    In the expression: (JustC n, NothingC)
+    In an equation for `f': f n _ = (JustC n, NothingC)
+    In an equation for `blockToNodeList':
+        blockToNodeList b
+          = foldBlockNodesF (f, l) b z
+          where
+              z ::
+                EitherCO e (EitherCO e (A C O n) (A O O n)) (EitherCO e (A C O n) (A O O n))
+              z = undefined
+              f ::
+                n C O
+                -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C O n) (A O O n)
+              f n _ = (JustC n, NothingC)
+              ....

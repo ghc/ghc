@@ -1,0 +1,7 @@
+
+T4093a.hs:8:8:
+    Couldn't match type `e' with `()'
+      `e' is a rigid type variable bound by
+          the type signature for `hang' at T4093a.hs:7:14
+    In the expression: Just ()
+    In an equation for `hang': hang = Just ()
