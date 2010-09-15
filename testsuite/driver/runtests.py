@@ -157,30 +157,27 @@ from testlib import *
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows or darwin:
-    libs = getStdout([config.ghc_pkg, 'list', '--simple-output'])
-    for lib in libs.split(' '):
-        path = getStdout([config.ghc_pkg, 'field', lib, 'library-dirs'])
-        # We assume there is only 1 path, and make some assumptions
-        # about what it looks like. Unquoted strings we leave alone,
-        # and we assume that a \ escapes the following char if it's
-        # quoted. The common case here is "c:\\foo bar\\baz" where
-        # we want to undouble the backslashes.
-        path = path.rstrip();
-        path = re.sub('^library-dirs: ', '', path)
-        if path.startswith('"'):
-            path = re.sub('^"(.*)"$', '\\1', path)
-            path = re.sub('\\\\(.)', '\\1', path)
-        if windows:
-            if cygwin:
-                # On cygwin we can't put "c:\foo" in $PATH, as : is a
-                # field separator. So convert to /cygdrive/c/foo instead.
-                # Other pythons use ; as the separator, so no problem.
-                path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
-                path = re.sub('\\\\', '/', path)
-            os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
-        else:
-            # darwin
-            os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
+    pkginfo = getStdout([config.ghc_pkg, 'dump'])
+    topdir = re.sub('\\\\','/',getStdout([config.compiler, '--print-libdir'])).rstrip()
+    for line in pkginfo.split('\n'):
+        if line.startswith('library-dirs:'):
+            path = line.rstrip()
+            path = re.sub('^library-dirs: ', '', path)
+            path = re.sub('\\$topdir', topdir, path)
+            if path.startswith('"'):
+                path = re.sub('^"(.*)"$', '\\1', path)
+                path = re.sub('\\\\(.)', '\\1', path)
+            if windows:
+                if cygwin:
+                    # On cygwin we can't put "c:\foo" in $PATH, as : is a
+                    # field separator. So convert to /cygdrive/c/foo instead.
+                    # Other pythons use ; as the separator, so no problem.
+                    path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
+                    path = re.sub('\\\\', '/', path)
+                os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
+            else:
+                # darwin
+                os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
 
 global testopts_local
 testopts_local.x = TestOptions()
@@ -211,7 +208,12 @@ print 'Found', len(t_files), '.T files...'
 
 t = getTestRun()
 
-t.start_time = chop(os.popen('date').read())
+# Avoid cmd.exe built-in 'date' command on Windows
+if not windows:
+    t.start_time = chop(os.popen('date').read())
+else:
+    t.start_time = 'now'
+
 print 'Beginning test run at', t.start_time
 
 # set stdout to unbuffered (is this the best way to do it?)
