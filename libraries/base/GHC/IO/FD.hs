@@ -582,7 +582,19 @@ blockingWriteRawBufferPtr loc fd buf off len
   = fmap fromIntegral $ throwErrnoIfMinus1Retry loc $
         if fdIsSocket fd
            then c_safe_send  (fdFD fd) (buf `plusPtr` off) len 0
-           else c_safe_write (fdFD fd) (buf `plusPtr` off) len
+           else do
+             r <- c_safe_write (fdFD fd) (buf `plusPtr` off) len
+             when (r == -1) c_maperrno
+             return r
+      -- we don't trust write() to give us the correct errno, and
+      -- instead do the errno conversion from GetLastError()
+      -- ourselves.  The main reason is that we treat ERROR_NO_DATA
+      -- (pipe is closing) as EPIPE, whereas write() returns EINVAL
+      -- for this case.  We need to detect EPIPE correctly, because it
+      -- shouldn't be reported as an error when it happens on stdout.
+
+foreign import ccall unsafe "maperrno"             -- in Win32Utils.c
+   c_maperrno :: IO ()
 
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.

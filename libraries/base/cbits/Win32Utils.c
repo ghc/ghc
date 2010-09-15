@@ -61,7 +61,10 @@ static struct errentry errtable[] = {
         {  ERROR_ALREADY_EXISTS,         EEXIST    },  /* 183 */
         {  ERROR_FILENAME_EXCED_RANGE,   ENOENT    },  /* 206 */
         {  ERROR_NESTING_NOT_ALLOWED,    EAGAIN    },  /* 215 */
-        {  ERROR_NOT_ENOUGH_QUOTA,       ENOMEM    }    /* 1816 */
+           /* Windows returns this when the read end of a pipe is
+            * closed (or closing) and we write to it. */
+        {  ERROR_NO_DATA,                EPIPE     },  /* 232 */
+        {  ERROR_NOT_ENOUGH_QUOTA,       ENOMEM    }  /* 1816 */
 };
 
 /* size of the table */
