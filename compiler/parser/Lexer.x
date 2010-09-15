@@ -2218,6 +2218,8 @@ ignoredPrags = Map.fromList (map ignored pragmas)
 oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("inline", token (ITinline_prag Inline FunLike)),
                            ("inlinable", token (ITinline_prag Inlinable FunLike)),
+                           ("inlineable", token (ITinline_prag Inlinable FunLike)),
+			   		  -- Spelling variant
                            ("notinline", token (ITinline_prag NoInline FunLike)),
                            ("specialize", token ITspec_prag),
                            ("source", token ITsource_prag),
