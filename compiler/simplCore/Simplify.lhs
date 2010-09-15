@@ -1503,7 +1503,7 @@ rebuildCase env scrut case_bndr alts cont
 
 rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
   -- See if we can get rid of the case altogether
-  -- See Note [Case eliminiation] 
+  -- See Note [Case elimination] 
   -- mkCase made sure that if all the alternatives are equal,
   -- then there is now only one (DEFAULT) rhs
  | all isDeadBinder bndrs       -- bndrs are [InId]
@@ -2243,7 +2243,7 @@ The desire not to duplicate is the entire reason that
 mkDupableCont returns a pair of continuations.
 
 
-Note [Single-alternative cases]
+Note [Single-atlernative cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This case is just like the ArgOf case.  Here's an example:
         data T a = MkT !a
@@ -2271,10 +2271,14 @@ strict computation enclosing the orginal call to MkT.  Then, it won't
 "see" the MkT any more, because it's big and won't get duplicated.
 And, what is worse, nothing was gained by the case-of-case transform.
 
-When should use this case of mkDupableCont?
-However, matching on *any* single-alternative case is a *disaster*;
+So, in circumstances like these, we don't want to build join points
+and push the outer case into the branches of the inner one. Instead,
+don't duplicate the continuation. 
+
+When should we use this strategy?  We should not use it on *every*
+single-alternative case:
   e.g.  case (case ....) of (a,b) -> (# a,b #)
-  We must push the outer case into the inner one!
+Here we must push the outer case into the inner one!
 Other choices:
 
    * Match [(DEFAULT,_,_)], but in the common case of Int,
@@ -2296,7 +2300,7 @@ Other choices:
      the *un-simplified* rhs, which is fine.  It might get bigger or
      smaller after simplification; if it gets smaller, this case might
      fire next time round.  NB also that we must test contIsDupable
-     case_cont *btoo, because case_cont might be big!
+     case_cont *too, because case_cont might be big!
 
      HOWEVER: I found that this version doesn't work well, because
      we can get         let x = case (...) of { small } in ...case x...
