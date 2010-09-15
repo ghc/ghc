@@ -88,15 +88,23 @@ pprFamInst famInst
 	2 (ptext (sLit "--") <+> pprNameLoc (getName famInst))
 
 pprFamInstHdr :: FamInst -> SDoc
-pprFamInstHdr (FamInst {fi_fam = fam, fi_tys = tys, fi_tycon = tycon})
-  = pprTyConSort <+> pprHead
+pprFamInstHdr (FamInst {fi_tycon = rep_tc})
+  = pprTyConSort <+> pp_instance <+> pprHead
   where
-    pprHead = pprTypeApp fam tys
-    pprTyConSort | isDataTyCon     tycon = ptext (sLit "data instance")
-		 | isNewTyCon      tycon = ptext (sLit "newtype instance")
-		 | isSynTyCon      tycon = ptext (sLit "type instance")
-		 | isAbstractTyCon tycon = ptext (sLit "data instance")
-		 | otherwise	         = panic "FamInstEnv.pprFamInstHdr"
+    Just (fam_tc, tys) = tyConFamInst_maybe rep_tc 
+    
+    -- For *associated* types, say "type T Int = blah" 
+    -- For *top level* type instances, say "type instance T Int = blah"
+    pp_instance 
+      | isTyConAssoc fam_tc = empty
+      | otherwise           = ptext (sLit "instance")
+
+    pprHead = pprTypeApp fam_tc tys
+    pprTyConSort | isDataTyCon     rep_tc = ptext (sLit "data")
+		 | isNewTyCon      rep_tc = ptext (sLit "newtype")
+		 | isSynTyCon      rep_tc = ptext (sLit "type")
+		 | isAbstractTyCon rep_tc = ptext (sLit "data")
+		 | otherwise	          = panic "FamInstEnv.pprFamInstHdr"
 
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
