@@ -740,6 +740,10 @@ isInlineSpec Inline    = True
 isInlineSpec Inlinable = True
 isInlineSpec _         = False
 
+isEmptyInlineSpec :: InlineSpec -> Bool
+isEmptyInlineSpec EmptyInlineSpec = True
+isEmptyInlineSpec _               = False
+
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_act = AlwaysActive
@@ -764,7 +768,7 @@ isDefaultInlinePragma :: InlinePragma -> Bool
 isDefaultInlinePragma (InlinePragma { inl_act = activation
                                     , inl_rule = match_info
                                     , inl_inline = inline })
-  = isInlineSpec inline && isAlwaysActive activation && isFunLike match_info
+  = isEmptyInlineSpec inline && isAlwaysActive activation && isFunLike match_info
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = isInlineSpec (inl_inline prag)
