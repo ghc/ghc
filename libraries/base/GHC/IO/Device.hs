@@ -132,11 +132,36 @@ class IODevice a where
 ioe_unsupportedOperation :: IO a
 ioe_unsupportedOperation = throwIO unsupportedOperation
 
+-- | Type of a device that can be used to back a
+-- 'GHC.IO.Handle.Handle' (see also 'GHC.IO.Handle.mkFileHandle'). The
+-- standard libraries provide creation of 'GHC.IO.Handle.Handle's via
+-- Posix file operations with file descriptors (see
+-- 'GHC.IO.Handle.FD.mkHandleFromFD') with FD being the underlying
+-- 'GHC.IO.Device.IODevice' instance.
+--
+-- Users may provide custom instances of 'GHC.IO.Device.IODevice'
+-- which are expected to conform the following rules:
+
 data IODeviceType
-  = Directory
-  | Stream
-  | RegularFile
-  | RawDevice
+  = Directory -- ^ The standard libraries do not have direct support
+              -- for this device type, but user implementation is
+              -- expected to provide a newline-separated list of
+              -- file names in a directory (without path to the
+              -- directory itself) in any order,
+              -- excluding the @"."@ and @".."@ names. See
+              -- also 'System.Directory.getDirectoryContents'.
+              -- Seek operations are not supported on directories
+              -- (other than to the zero position).
+  | Stream    -- ^ A duplex communications channel (results in
+              -- creation of a duplex 'GHC.IO.Handle.Handle'). The
+              -- standard libraries use this device type when
+              -- creating 'GHC.IO.Handle.Handle's for open sockets.
+  | RegularFile -- ^ A file that may be read or written, and also
+                -- may be seekable.
+  | RawDevice -- ^ A "raw" (disk) device which supports block binary
+              -- read and write operations and may be seekable only
+              -- to positions of certain granularity (block-
+              -- aligned).
   deriving (Eq)
 
 -- -----------------------------------------------------------------------------
