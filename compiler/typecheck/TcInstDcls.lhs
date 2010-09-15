@@ -1029,7 +1029,7 @@ wrapId wrapper id = mkHsWrap wrapper (HsVar id)
 
 derivBindCtxt :: Id -> Class -> [Type ] -> LHsBind Name -> SDoc
 derivBindCtxt sel_id clas tys _bind
-   = vcat [ ptext (sLit "When typechecking the code for ") <+> ppr sel_id
+   = vcat [ ptext (sLit "When typechecking the code for ") <+> quotes (ppr sel_id)
           , nest 2 (ptext (sLit "in a standalone derived instance for")
 	  	    <+> quotes (pprClassPred clas tys) <> colon)
           , nest 2 $ ptext (sLit "To see the code I am typechecking, use -ddump-deriv") ]
