@@ -1685,11 +1685,9 @@ pseudoop   "inline"
 	{\tt inline} function expands to the identity function in Phase zero; so its
 	use imposes no overhead.
 
-	If the function is defined in another module, GHC only exposes its inlining
-	in the interface file if the function is sufficiently small that it might be
-	inlined by the automatic mechanism. There is currently no way to tell GHC to
-	expose arbitrarily-large functions in the interface file. (This shortcoming
-	is something that could be fixed, with some kind of pragma.) }
+	It is good practice to mark the function with an INLINABLE pragma at
+        its definition, (a) so that GHC guarantees to expose its unfolding regardless
+        of size, and (b) so that you have control over exactly what is inlined. }
 
 pseudoop   "lazy"
    a -> a

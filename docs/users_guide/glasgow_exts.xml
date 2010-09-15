@@ -7594,21 +7594,68 @@ key_function :: Int -> String -> (Bool, Double)
 	function "<literal>f</literal>" has a number of other effects:
 <itemizedlist>
 <listitem><para>
-No functions are inlined into <literal>f</literal>.  Otherwise
-GHC might inline a big function into <literal>f</literal>'s right hand side, 
-making <literal>f</literal> big; and then inline <literal>f</literal> blindly.
+While GHC is keen to inline the function, it does not do so
+blindly.  For example, if you write
+<programlisting>
+map key_function xs
+</programlisting>
+there really isn't any point in inlining <literal>key_function</literal> to get
+<programlisting>
+map (\x -> <replaceable>body</replaceable>) xs
+</programlisting>
+In general, GHC only inlines the function if there is some reason (no matter
+how slight) to supose that it is useful to do so.
 </para></listitem>
+
 <listitem><para>
-The float-in, float-out, and common-sub-expression transformations are not 
-applied to the body of <literal>f</literal>.  
+Moreover, GHC will only inline the function if it is <emphasis>fully applied</emphasis>, 
+where "fully applied"
+means applied to as many arguments as appear (syntactically) 
+on the LHS of the function
+definition.  For example:
+<programlisting>
+comp1 :: (b -> c) -> (a -> b) -> a -> c
+{-# INLINE comp1 #-}
+comp1 f g = \x -> f (g x)
+
+comp2 :: (b -> c) -> (a -> b) -> a -> c
+{-# INLINE comp2 #-}
+comp2 f g x = f (g x)
+</programlisting>
+The two functions <literal>comp1</literal> and <literal>comp2</literal> have the 
+same semantics, but <literal>comp1</literal> will be inlined when applied
+to <emphasis>two</emphasis> arguments, while <literal>comp2</literal> requires
+<emphasis>three</emphasis>.  This might make a big difference if you say
+<programlisting>
+map (not `comp1` not) xs
+</programlisting>
+which will optimise better than the corresponding use of `comp2`.
+</para></listitem>
+
+<listitem><para> 
+It is useful for GHC to optimise the definition of an
+INLINE function <literal>f</literal> just like any other non-INLINE function, 
+in case the non-inlined version of <literal>f</literal> is
+ultimately called.  But we don't want to inline 
+the <emphasis>optimised</emphasis> version
+of <literal>f</literal>;
+a major reason for INLINE pragmas is to expose functions 
+in <literal>f</literal>'s RHS that have
+rewrite rules, and it's no good if those functions have been optimised
+away.
+</para>
+<para>
+So <emphasis>GHC guarantees to inline precisely the code that you wrote</emphasis>, no more
+and no less.  It does this by capturing a copy of the definition of the function to use
+for inlining (we call this the "inline-RHS"), which it leaves untouched,
+while optimising the ordinarly RHS as usual.  For externally-visible functions
+the inline-RHS (not the optimised RHS) is recorded in the interface file.
 </para></listitem>
 <listitem><para>
 An INLINE function is not worker/wrappered by strictness analysis.
 It's going to be inlined wholesale instead.
 </para></listitem>
 </itemizedlist>
-All of these effects are aimed at ensuring that what gets inlined is
-exactly what you asked for, no more and no less.
 </para>
 <para>GHC ensures that inlining cannot go on forever: every mutually-recursive
 group is cut by one or more <emphasis>loop breakers</emphasis> that is never inlined
@@ -7636,13 +7683,44 @@ itself, so an INLINE pragma is always ignored.</para>
 {-# INLINE returnUs #-}
 </programlisting>
 
-	<para>See also the <literal>NOINLINE</literal> pragma (<xref
-        linkend="noinline-pragma"/>).</para>
+	<para>See also the <literal>NOINLINE</literal> (<xref linkend="inlinable-pragma"/>) 
+        and <literal>INLINABLE</literal> (<xref linkend="noinline-pragma"/>) 
+        pragmas.</para>
 
 	<para>Note: the HBC compiler doesn't like <literal>INLINE</literal> pragmas,
 	  so if you want your code to be HBC-compatible you'll have to surround
 	  the pragma with C pre-processor directives 
 	  <literal>#ifdef __GLASGOW_HASKELL__</literal>...<literal>#endif</literal>.</para>
+
+      </sect3>
+
+      <sect3 id="inlinable-pragma">
+	<title>INLINABLE pragma</title>
+
+<para>An INLINABLE pragma works very like an INLINE pragma, except that:
+<itemizedlist>
+<listitem><para>
+INLINE says "please inline me", but INLINABLE says "feel free to inline me; use your
+discretion".  In other words the choice is left to GHC, which uses the same
+rules as for pragma-free functions.  Unlike INLINE, That decision is made at 
+the <emphasis>call site</emphasis>, and
+will therefore be affected by the inlining threshold, optimisation level etc.
+</para></listitem>
+<listitem><para>
+Like INLINE, the INLINABLE pragma retains a copy of the original RHS for 
+inlining purposes, and persists it in the interface file, regardless of
+the size of the RHS.
+</para></listitem>
+<listitem><para>
+If you use the special function <literal>inline</literal> (<xref linkend="special-ids"/>) 
+to force inlining at a
+call site, you will get a copy of the the original RHS.
+Indeed, if you intend to use <literal>inline f</literal> it
+is a good idea to mark the definition of <literal>f</literal> INLINABLE, 
+so that GHC guarantees to expose an unfolding regardless of how big it is.
+</para></listitem>
+</itemizedlist>
+</para>
 
       </sect3>
 
@@ -8760,7 +8838,23 @@ r) ->
 <para>GHC has a few built-in functions with special behaviour.  These
 are now described in the module <ulink
 url="&libraryGhcPrimLocation;/GHC-Prim.html"><literal>GHC.Prim</literal></ulink>
-in the library documentation.</para>
+in the library documentation.
+In particular:
+<itemizedlist>
+<listitem><para>
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3Ainline"><literal>inline</literal></ulink>
+allows control over inlining on a per-call-site basis.
+</para></listitem>
+<listitem><para>
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3Alazy"><literal>lazy</literal></ulink>
+restrains the strictness analyser.
+</para></listitem>
+<listitem><para>
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>lazy</literal></ulink> 
+allows you to fool the type checker.
+</para></listitem>
+</itemizedlist>
+</para>
 </sect1>
 
 
