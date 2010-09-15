@@ -615,7 +615,7 @@ lintCoercion ty@(AppTy ty1 ty2)
   = do { (s1,t1) <- lintCoercion ty1
        ; (s2,t2) <- lintCoercion ty2
        ; check_co_app ty (typeKind s1) [s2]
-       ; return (AppTy s1 s2, AppTy t1 t2) }
+       ; return (mkAppTy s1 s2, mkAppTy t1 t2) }
 
 lintCoercion ty@(FunTy ty1 ty2) 
   = do { (s1,t1) <- lintCoercion ty1

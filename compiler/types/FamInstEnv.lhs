@@ -476,11 +476,11 @@ normaliseType env (TyConApp tc tys)
 normaliseType env (AppTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
-    in  (mkAppTyCoI coi1 coi2, AppTy nty1 nty2)
+    in  (mkAppTyCoI coi1 coi2, mkAppTy nty1 nty2)
 normaliseType env (FunTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
-    in  (mkFunTyCoI coi1 coi2, FunTy nty1 nty2)
+    in  (mkFunTyCoI coi1 coi2, mkFunTy nty1 nty2)
 normaliseType env (ForAllTy tyvar ty1)
   = let (coi,nty1) = normaliseType env ty1
     in  (mkForAllTyCoI tyvar coi, ForAllTy tyvar nty1)
