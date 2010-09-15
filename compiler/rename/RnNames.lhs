@@ -19,7 +19,7 @@ import TcEnv		( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import IfaceEnv		( ifaceExportNames )
-import LoadIface	( loadSrcInterface, loadSysInterface )
+import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import HeaderInfo       ( mkPrelImports )
@@ -92,8 +92,10 @@ rnImportDecl  :: Module -> Bool
 	      -> LImportDecl RdrName
 	      -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails,AnyHpcUsage)
 
-rnImportDecl this_mod implicit_prelude (L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
-                                         qual_only as_mod imp_details))
+rnImportDecl this_mod implicit_prelude 
+             (L loc (ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
+                                , ideclSource = want_boot, ideclQualified = qual_only
+                                , ideclAs = as_mod, ideclHiding = imp_details }))
   = setSrcSpan loc $ do
 
     when (isJust mb_pkg) $ do
@@ -1272,58 +1274,65 @@ findImportUsage imports rdr_env rdrs
   = map unused_decl imports
   where
     import_usage :: ImportMap
-    import_usage = foldr add_rdr Map.empty rdrs
+    import_usage = foldr (addUsedRdrName rdr_env) Map.empty rdrs
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, unused_imps)
       where
         used_avails = Map.lookup (srcSpanStart loc) import_usage `orElse` []
-	used_names = availsToNameSet used_avails
+	dont_report_as_unused = foldr add emptyNameSet used_avails
+        add (Avail n) s = s `addOneToNameSet` n
+        add (AvailTC n ns) s = s `addListToNameSet` (n:ns)
+		-- If you use 'signum' from Num, then the user may well have
+		-- imported Num(signum).  We don't want to complain that
+		-- Num is not itself mentioned.  Hence adding 'n' as
+		-- well to the list of of "don't report if unused" names
 				      
 	unused_imps = case imps of
 			Just (False, imp_ies) -> nameSetToList unused_imps
 			  where
 			    imp_names = mkNameSet (concatMap (ieNames . unLoc) imp_ies)
-			    unused_imps = imp_names `minusNameSet` used_names
+			    unused_imps = imp_names `minusNameSet` dont_report_as_unused
 			    
 		        _other -> []	-- No explicit import list => no unused-name list
 			
-    add_rdr :: RdrName -> ImportMap -> ImportMap
-    add_rdr rdr iu 
-      = case lookupGRE_RdrName rdr rdr_env of
-	  [gre]   | Imported imps <- gre_prov gre
-                  -> add_imp gre (bestImport imps) iu
-          _other  -> iu
-
+addUsedRdrName :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
+-- For a used RdrName, find all the import decls that brought
+-- it into scope; choose one of them (bestImport), and record
+-- the RdrName in that import decl's entry in the ImportMap
+addUsedRdrName rdr_env rdr imp_map
+  | [gre] <- lookupGRE_RdrName rdr rdr_env
+  , Imported imps <- gre_prov gre
+  = add_imp gre (bestImport imps) imp_map
+  | otherwise
+  = imp_map
+  where
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
-    add_imp gre (ImpSpec { is_decl = imp_decl_spec }) iu
-      = Map.insertWith add decl_loc [avail] iu
+    add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map
+      = Map.insertWith add decl_loc [avail] imp_map
       where
 	add _ avails = avail : avails -- add is really just a specialised (++)
         decl_loc = srcSpanStart (is_dloc imp_decl_spec)
 	name     = gre_name gre
 	avail    = case gre_par gre of
-		      ParentIs p                  -> AvailTC p [p,name]
+		      ParentIs p                  -> AvailTC p [name]
 		      NoParent | isTyConName name -> AvailTC name [name]
 		               | otherwise        -> Avail name
-		-- If you use (+) from Num, then for this purpose we want
-		-- to say that Num is used as well.  That is why in the
-		-- ParentIs case we have [p,name] in the ParentIs case
 
-bestImport :: [ImportSpec] -> ImportSpec
-bestImport iss
-  = case partition isImpAll iss of
-      ([], imp_somes) -> textuallyFirst imp_somes
-      (imp_alls, _)   -> textuallyFirst imp_alls
+    bestImport :: [ImportSpec] -> ImportSpec
+    bestImport iss
+      = case partition isImpAll iss of
+          ([], imp_somes) -> textuallyFirst imp_somes
+          (imp_alls, _)   -> textuallyFirst imp_alls
 
-textuallyFirst :: [ImportSpec] -> ImportSpec
-textuallyFirst iss = case sortWith (is_dloc . is_decl) iss of
-			[]     -> pprPanic "textuallyFirst" (ppr iss)
-			(is:_) -> is
+    textuallyFirst :: [ImportSpec] -> ImportSpec
+    textuallyFirst iss = case sortWith (is_dloc . is_decl) iss of
+    			[]     -> pprPanic "textuallyFirst" (ppr iss)
+    			(is:_) -> is
 
-isImpAll :: ImportSpec -> Bool
-isImpAll (ImpSpec { is_item = ImpAll }) = True
-isImpAll _other				= False
+    isImpAll :: ImportSpec -> Bool
+    isImpAll (ImpSpec { is_item = ImpAll }) = True
+    isImpAll _other                         = False
 \end{code}
 
 \begin{code}
@@ -1377,31 +1386,57 @@ printMinimalImports imports_w_usage
       , Just (False, _) <- ideclHiding decl
       = return (L l decl)
       | otherwise
-      = do { ies <- initIfaceTcRn $ mapM to_ie used
-	   ; return (L l (decl { ideclHiding = Just (False, map (L l) ies)  })) }
+      = do { let ImportDecl { ideclName    = L _ mod_name
+                            , ideclSource  = is_boot
+                            , ideclPkgQual = mb_pkg } = decl
+           ; iface <- loadSrcInterface doc mod_name is_boot mb_pkg
+           ; let lies = map (L l) (concatMap (to_ie iface) used)
+	   ; return (L l (decl { ideclHiding = Just (False, lies) })) }
+      where
+	doc = text "Compute minimal imports for" <+> ppr decl
 
-    to_ie :: AvailInfo -> IfG (IE Name)
+    to_ie :: ModIface -> AvailInfo -> [IE Name]
 	-- The main trick here is that if we're importing all the constructors
 	-- we want to say "T(..)", but if we're importing only a subset we want
 	-- to say "T(A,B,C)".  So we have to find out what the module exports.
-    to_ie (Avail n)       = return (IEVar n)
-    to_ie (AvailTC n [m]) = ASSERT( n==m ) 
-			    return (IEThingAbs n)
-    to_ie (AvailTC n ns)  = do
-          iface <- loadSysInterface doc n_mod
-	  case [xs | (m,as) <- mi_exports iface,
-		     m == n_mod,
-		     AvailTC x xs <- as, 
-		     x == nameOccName n] of
-	      [xs] | all_used xs -> return (IEThingAll n)
-		   | otherwise	 -> return (IEThingWith n (filter (/= n) ns))
-	      other		 -> pprTrace "to_ie" (ppr n <+> ppr n_mod <+> ppr other) $
-				    return (IEVar n)
+    to_ie _ (Avail n) 
+       = [IEVar n]
+    to_ie _ (AvailTC n [m]) 
+       | n==m = [IEThingAbs n]
+    to_ie iface (AvailTC n ns)  
+      = case [xs | (m,as) <- mi_exports iface
+		 , m == n_mod
+		 , AvailTC x xs <- as
+		 , x == nameOccName n
+                 , x `elem` xs	-- Note [Partial export]
+                 ] of
+	   [xs] | all_used xs -> [IEThingAll n]
+		| otherwise   -> [IEThingWith n (filter (/= n) ns)]
+           _other	      -> (map IEVar ns)
 	where
 	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
-	  doc = text "Compute minimal imports from" <+> ppr n
 	  n_mod = ASSERT( isExternalName n ) nameModule n
 \end{code}
+
+Note [Partial export]
+~~~~~~~~~~~~~~~~~~~~~
+Suppose we have 
+
+   module A( op ) where
+     class C a where
+       op :: a -> a
+
+   module B where
+   import A
+   f = ..op...
+
+Then the minimal import for module B is
+   import A( op )
+not
+   import A( C( op ) )
+which we would usually generate if C was exported from B.  Hence
+the (x `elem` xs) test when deciding what to generate.
+
 
 %************************************************************************
 %*									*
