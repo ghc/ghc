@@ -7,7 +7,7 @@ import Language.Haskell.TH
 genAny :: Q Info -> Q [Dec]
 genAny decl = do { d <- decl
 		 ; case d of
-		    ClassI (ClassD _ name _ _ decls) -> return [genAnyClass name decls]
+		    ClassI (ClassD _ name _ _ decls) _ -> return [genAnyClass name decls]
 		    _ -> error "genAny can be applied to classes only"
 	}
 
