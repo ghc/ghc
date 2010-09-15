@@ -612,6 +612,19 @@ instance Binary InlinePragma where
            d <- get bh
            return (InlinePragma a b c d)
 
+instance Binary InlineSpec where
+    put_ bh EmptyInlineSpec = putByte bh 0
+    put_ bh Inline          = putByte bh 1
+    put_ bh Inlinable       = putByte bh 2
+    put_ bh NoInline        = putByte bh 3
+
+    get bh = do h <- getByte bh
+                case h of
+                  0 -> return EmptyInlineSpec
+                  1 -> return Inline
+                  2 -> return Inlinable
+                  _ -> return NoInline
+
 instance Binary HsBang where
     put_ bh HsNoBang        = putByte bh 0
     put_ bh HsStrict        = putByte bh 1
@@ -1188,8 +1201,9 @@ instance Binary IfaceInfoItem where
 	      _ -> do return HsNoCafRefs
 
 instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold e) = do
+    put_ bh (IfCoreUnfold s e) = do
 	putByte bh 0
+	put_ bh s
 	put_ bh e
     put_ bh (IfInlineRule a b c d) = do
 	putByte bh 1
@@ -1210,8 +1224,9 @@ instance Binary IfaceUnfolding where
     get bh = do
 	h <- getByte bh
 	case h of
-	  0 -> do e <- get bh
-		  return (IfCoreUnfold e)
+	  0 -> do s <- get bh
+		  e <- get bh
+		  return (IfCoreUnfold s e)
 	  1 -> do a <- get bh
 		  b <- get bh
 		  c <- get bh

@@ -24,7 +24,7 @@ import TyCon
 import DataCon
 import MkId
 import TysWiredIn
-import BasicTypes
+import BasicTypes( Boxity(..) )
 import FastString
 
 

@@ -56,8 +56,7 @@ import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, liftedTypeKind, unliftedTypeKind )
 import Coercion		( mkArrowKind )
 import Class		( FunDep )
-import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  Activation(..), RuleMatchInfo(..), defaultInlinePragma )
+import BasicTypes
 import DynFlags
 import OrdList
 import HaddockUtils
@@ -261,8 +260,7 @@ incorrect.
  'by'       { L _ ITby }        -- for list transform extension
  'using'    { L _ ITusing }     -- for list transform extension
 
- '{-# INLINE'      	  { L _ (ITinline_prag _) }
- '{-# INLINE_CONLIKE'     { L _ (ITinline_conlike_prag _) }
+ '{-# INLINE'      	  { L _ (ITinline_prag _ _) }
  '{-# SPECIALISE'  	  { L _ ITspec_prag }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _) }
  '{-# SOURCE'	   { L _ ITsource_prag }
@@ -1238,14 +1236,12 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      
-		{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma $2 FunLike (getINLINE $1)))) }
-        | '{-# INLINE_CONLIKE' activation qvar '#-}'
-                { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma $2 ConLike (getINLINE_CONLIKE $1)))) }
+		{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma (getINLINE $1) $2))) }
 	| '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
 		{ LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlinePragma) 
 					    | t <- $4] }
 	| '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-		{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlinePragma $2 FunLike (getSPEC_INLINE $1)))
+		{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlinePragma (getSPEC_INLINE $1) $2))
 					    | t <- $5] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'
 		{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
@@ -1988,9 +1984,9 @@ getPRIMWORD	(L _ (ITprimword x)) = x
 getPRIMFLOAT	(L _ (ITprimfloat  x)) = x
 getPRIMDOUBLE	(L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x
-getINLINE	(L _ (ITinline_prag b)) = b
-getINLINE_CONLIKE (L _ (ITinline_conlike_prag b)) = b
-getSPEC_INLINE	(L _ (ITspec_inline_prag b)) = b
+getINLINE	(L _ (ITinline_prag inl conl)) = (inl,conl)
+getSPEC_INLINE	(L _ (ITspec_inline_prag True))  = (Inline,  FunLike)
+getSPEC_INLINE	(L _ (ITspec_inline_prag False)) = (NoInline,FunLike)
 
 getDOCNEXT (L _ (ITdocCommentNext x)) = x
 getDOCPREV (L _ (ITdocCommentPrev x)) = x

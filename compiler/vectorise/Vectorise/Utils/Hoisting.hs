@@ -22,7 +22,7 @@ import CoreUnfold
 import Type
 import Var
 import Id
-import BasicTypes
+import BasicTypes( Arity )
 import FastString
 import Control.Monad
 
@@ -58,7 +58,7 @@ hoistExpr fs expr inl
   where
     mk_inline var = case inl of
                       Inline arity -> var `setIdUnfolding`
-                                      mkInlineRule expr (Just arity)
+                                      mkInlineUnfolding (Just arity) expr
                       DontInline   -> var
 
 

@@ -15,7 +15,7 @@ import Vectorise.Monad
 import HscTypes hiding      ( MonadThings(..) )
 import Module               ( PackageId )
 import CoreSyn
-import CoreUnfold           ( mkInlineRule )
+import CoreUnfold           ( mkInlineUnfolding )
 import CoreFVs
 import CoreMonad            ( CoreM, getHscEnv )
 import FamInstEnv           ( extendFamInstEnvList )
@@ -177,7 +177,7 @@ vectTopBinder var inline expr
       return var'
   where
     unfolding = case inline of
-                  Inline arity -> mkInlineRule expr (Just arity)
+                  Inline arity -> mkInlineUnfolding (Just arity) expr
                   DontInline   -> noUnfolding
 
 

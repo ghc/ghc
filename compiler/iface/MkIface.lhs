@@ -1535,21 +1535,23 @@ toIfaceIdInfo id_info
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding lb unf@(CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
-                                    , uf_src = src, uf_guidance = guidance })
+toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
+                                , uf_src = src, uf_guidance = guidance })
   = Just $ HsUnfold lb $
     case src of
-	InlineRule {}
+	InlineStable
           -> case guidance of
-               UnfWhen unsat_ok boring_ok -> IfInlineRule arity unsat_ok boring_ok (toIfaceExpr rhs)
-               _other                     -> pprPanic "toIfUnfolding" (ppr unf)
+               UnfWhen unsat_ok boring_ok -> IfInlineRule arity unsat_ok boring_ok if_rhs
+               _other                     -> IfCoreUnfold True if_rhs
 	InlineWrapper w  -> IfWrapper arity (idName w)
-        InlineCompulsory -> IfCompulsory (toIfaceExpr rhs)
-        InlineRhs        -> IfCoreUnfold (toIfaceExpr rhs)
+        InlineCompulsory -> IfCompulsory if_rhs
+        InlineRhs        -> IfCoreUnfold False if_rhs
 	-- Yes, even if guidance is UnfNever, expose the unfolding
 	-- If we didn't want to expose the unfolding, TidyPgm would
 	-- have stuck in NoUnfolding.  For supercompilation we want 
 	-- to see that unfolding!
+  where
+    if_rhs = toIfaceExpr rhs
 
 toIfUnfolding lb (DFunUnfolding _ar _con ops)
   = Just (HsUnfold lb (IfDFunUnfold (map toIfaceExpr ops)))

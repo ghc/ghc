@@ -55,7 +55,7 @@ import TypeRep          ( Kind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation(..), RuleMatchInfo,
-                          InlinePragma(..) )
+                          InlinePragma(..), InlineSpec(..) )
 import Lexer
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall
@@ -937,9 +937,9 @@ mk_rec_fields :: [HsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
-mkInlinePragma :: Maybe Activation -> RuleMatchInfo -> Bool -> InlinePragma
+mkInlinePragma :: (InlineSpec, RuleMatchInfo) -> Maybe Activation -> InlinePragma
 -- The Maybe is because the user can omit the activation spec (and usually does)
-mkInlinePragma mb_act match_info inl 
+mkInlinePragma (inl, match_info) mb_act
   = InlinePragma { inl_inline = inl
                  , inl_sat    = Nothing
                  , inl_act    = act
@@ -947,11 +947,10 @@ mkInlinePragma mb_act match_info inl
   where
     act = case mb_act of
             Just act -> act
-            Nothing | inl       -> AlwaysActive
-                    | otherwise -> NeverActive
-        -- If no specific phase is given then:
-	--   NOINLINE => NeverActive
-        --   INLINE   => Active
+            Nothing  -> -- No phase specified
+                        case inl of
+                          NoInline -> NeverActive
+                          _other   -> AlwaysActive
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations

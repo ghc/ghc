@@ -400,13 +400,17 @@ cvtInlineSpec Nothing
   = defaultInlinePragma
 cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation)) 
   = InlinePragma { inl_act = opt_activation', inl_rule = matchinfo
-                 , inl_inline = inline, inl_sat = Nothing }
+                 , inl_inline = inl_spec, inl_sat = Nothing }
   where
     matchinfo       = cvtRuleMatchInfo conlike
     opt_activation' = cvtActivation opt_activation
 
     cvtRuleMatchInfo False = FunLike
     cvtRuleMatchInfo True  = ConLike
+
+    inl_spec | inline    = Inline
+             | otherwise = NoInline
+ 	     -- Currently we have no way to say Inlinable
 
     cvtActivation Nothing | inline      = AlwaysActive
                           | otherwise   = NeverActive

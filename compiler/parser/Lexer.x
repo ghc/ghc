@@ -66,6 +66,7 @@ import UniqFM
 import DynFlags
 import Module
 import Ctype
+import BasicTypes	( InlineSpec(..), RuleMatchInfo(..) )
 import Util		( readRational )
 
 import Control.Monad
@@ -462,8 +463,7 @@ data Token
   | ITusing
 
 	-- Pragmas
-  | ITinline_prag Bool		-- True <=> INLINE, False <=> NOINLINE
-  | ITinline_conlike_prag Bool  -- same
+  | ITinline_prag InlineSpec RuleMatchInfo
   | ITspec_prag			-- SPECIALISE	
   | ITspec_inline_prag Bool	-- SPECIALISE INLINE (or NOINLINE)
   | ITsource_prag
@@ -2216,8 +2216,9 @@ ignoredPrags = Map.fromList (map ignored pragmas)
                      pragmas = options_pragmas ++ ["cfiles", "contract"]
 
 oneWordPrags = Map.fromList([("rules", rulePrag),
-                           ("inline", token (ITinline_prag True)),
-                           ("notinline", token (ITinline_prag False)),
+                           ("inline", token (ITinline_prag Inline FunLike)),
+                           ("inlinable", token (ITinline_prag Inlinable FunLike)),
+                           ("notinline", token (ITinline_prag NoInline FunLike)),
                            ("specialize", token ITspec_prag),
                            ("source", token ITsource_prag),
                            ("warning", token ITwarning_prag),
@@ -2228,8 +2229,8 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("unpack", token ITunpack_prag),
                            ("ann", token ITann_prag)])
 
-twoWordPrags = Map.fromList([("inline conlike", token (ITinline_conlike_prag True)),
-                             ("notinline conlike", token (ITinline_conlike_prag False)),
+twoWordPrags = Map.fromList([("inline conlike", token (ITinline_prag Inline ConLike)),
+                             ("notinline conlike", token (ITinline_prag NoInline ConLike)),
                              ("specialize inline", token (ITspec_inline_prag True)),
                              ("specialize notinline", token (ITspec_inline_prag False))])
 

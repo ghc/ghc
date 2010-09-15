@@ -19,8 +19,9 @@ module CoreUnfold (
 	Unfolding, UnfoldingGuidance,	-- Abstract types
 
 	noUnfolding, mkImplicitUnfolding, 
-	mkTopUnfolding, mkUnfolding, mkCoreUnfolding,
-	mkInlineRule, mkWwInlineRule,
+        mkUnfolding, mkCoreUnfolding,
+	mkTopUnfolding, mkSimpleUnfolding,
+	mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
 	mkCompulsoryUnfolding, mkDFunUnfolding,
 
 	interestingArg, ArgSummary(..),
@@ -44,7 +45,7 @@ import TcType	 	( tcSplitSigmaTy, tcSplitDFunHead )
 import OccurAnal
 import CoreSubst hiding( substTy )
 import CoreFVs         ( exprFreeVars )
-import CoreArity       ( manifestArity )
+import CoreArity       ( manifestArity, exprBotStrictness_maybe )
 import CoreUtils
 import Id
 import DataCon
@@ -63,7 +64,7 @@ import Util
 import FastTypes
 import FastString
 import Outputable
-
+import Data.Maybe
 \end{code}
 
 
@@ -75,8 +76,7 @@ import Outputable
 
 \begin{code}
 mkTopUnfolding :: Bool -> CoreExpr -> Unfolding
-mkTopUnfolding is_bottoming expr 
-  = mkUnfolding True {- Top level -} is_bottoming expr
+mkTopUnfolding = mkUnfolding InlineRhs True {- Top level -}
 
 mkImplicitUnfolding :: CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
@@ -88,44 +88,8 @@ mkImplicitUnfolding expr = mkTopUnfolding False (simpleOptExpr expr)
 -- top-level flag to True.  It gets set more accurately by the simplifier
 -- Simplify.simplUnfolding.
 
-mkUnfolding :: Bool -> Bool -> CoreExpr -> Unfolding
-mkUnfolding top_lvl is_bottoming expr
-  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
-    		    uf_src        = InlineRhs,
-    		    uf_arity      = arity,
-		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF        expr,
-                    uf_is_conlike = exprIsConLike    expr,
-		    uf_expandable = exprIsExpandable expr,
-		    uf_is_cheap   = is_cheap,
-		    uf_guidance   = guidance }
-  where
-    is_cheap = exprIsCheap expr
-    (arity, guidance) = calcUnfoldingGuidance is_cheap (top_lvl && is_bottoming) 
-                                              opt_UF_CreationThreshold expr
-	-- Sometimes during simplification, there's a large let-bound thing	
-	-- which has been substituted, and so is now dead; so 'expr' contains
-	-- two copies of the thing while the occurrence-analysed expression doesn't
-	-- Nevertheless, we *don't* occ-analyse before computing the size because the
-	-- size computation bales out after a while, whereas occurrence analysis does not.
-	--
-	-- This can occasionally mean that the guidance is very pessimistic;
-	-- it gets fixed up next round.  And it should be rare, because large
-	-- let-bound things that are dead are usually caught by preInlineUnconditionally
-
-mkCoreUnfolding :: Bool -> UnfoldingSource -> CoreExpr
-                -> Arity -> UnfoldingGuidance -> Unfolding
--- Occurrence-analyses the expression before capturing it
-mkCoreUnfolding top_lvl src expr arity guidance 
-  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
-    		    uf_src        = src,
-    		    uf_arity      = arity,
-		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF        expr,
-                    uf_is_conlike = exprIsConLike    expr,
-		    uf_is_cheap   = exprIsCheap      expr,
-		    uf_expandable = exprIsExpandable expr,
-		    uf_guidance   = guidance }
+mkSimpleUnfolding :: CoreExpr -> Unfolding
+mkSimpleUnfolding = mkUnfolding InlineRhs False False
 
 mkDFunUnfolding :: Type -> [CoreExpr] -> Unfolding
 mkDFunUnfolding dfun_ty ops 
@@ -150,10 +114,11 @@ mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolde
                     expr 0    -- Arity of unfolding doesn't matter
                     (UnfWhen unSaturatedOk boringCxtOk)
 
-mkInlineRule :: CoreExpr -> Maybe Arity -> Unfolding
-mkInlineRule expr mb_arity 
-  = mkCoreUnfolding True InlineRule 	 -- Note [Top-level flag on inline rules]
-    		    expr' arity 
+mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
+mkInlineUnfolding mb_arity expr 
+  = mkCoreUnfolding True 	 -- Note [Top-level flag on inline rules]
+    		    InlineStable
+                    expr' arity 
 		    (UnfWhen unsat_ok boring_ok)
   where
     expr' = simpleOptExpr expr
@@ -167,8 +132,58 @@ mkInlineRule expr mb_arity
               	  (_, UnfWhen _ boring_ok) -> boring_ok
               	  _other                   -> boringCxtNotOk
      -- See Note [INLINE for small functions]
+
+mkInlinableUnfolding :: CoreExpr -> Unfolding
+mkInlinableUnfolding expr
+  = mkUnfolding InlineStable True is_bot expr
+  where
+    is_bot = isJust (exprBotStrictness_maybe expr)
 \end{code}
 
+Internal functions
+
+\begin{code}
+mkCoreUnfolding :: Bool -> UnfoldingSource -> CoreExpr
+                -> Arity -> UnfoldingGuidance -> Unfolding
+-- Occurrence-analyses the expression before capturing it
+mkCoreUnfolding top_lvl src expr arity guidance 
+  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
+    		    uf_src        = src,
+    		    uf_arity      = arity,
+		    uf_is_top 	  = top_lvl,
+		    uf_is_value   = exprIsHNF        expr,
+                    uf_is_conlike = exprIsConLike    expr,
+		    uf_is_cheap   = exprIsCheap      expr,
+		    uf_expandable = exprIsExpandable expr,
+		    uf_guidance   = guidance }
+
+mkUnfolding :: UnfoldingSource -> Bool -> Bool -> CoreExpr -> Unfolding
+-- Calculates unfolding guidance
+-- Occurrence-analyses the expression before capturing it
+mkUnfolding src top_lvl is_bottoming expr
+  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
+    		    uf_src        = src,
+    		    uf_arity      = arity,
+		    uf_is_top 	  = top_lvl,
+		    uf_is_value   = exprIsHNF        expr,
+                    uf_is_conlike = exprIsConLike    expr,
+		    uf_expandable = exprIsExpandable expr,
+		    uf_is_cheap   = is_cheap,
+		    uf_guidance   = guidance }
+  where
+    is_cheap = exprIsCheap expr
+    (arity, guidance) = calcUnfoldingGuidance is_cheap (top_lvl && is_bottoming) 
+                                              opt_UF_CreationThreshold expr
+	-- Sometimes during simplification, there's a large let-bound thing	
+	-- which has been substituted, and so is now dead; so 'expr' contains
+	-- two copies of the thing while the occurrence-analysed expression doesn't
+	-- Nevertheless, we *don't* occ-analyse before computing the size because the
+	-- size computation bales out after a while, whereas occurrence analysis does not.
+	--
+	-- This can occasionally mean that the guidance is very pessimistic;
+	-- it gets fixed up next round.  And it should be rare, because large
+	-- let-bound things that are dead are usually caught by preInlineUnconditionally
+\end{code}
 
 %************************************************************************
 %*									*

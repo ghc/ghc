@@ -725,7 +725,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
        =  expose_all 	     -- 'expose_all' says to expose all 
 			     -- unfoldings willy-nilly
 
-       || isInlineRuleSource unf_source	     -- Always expose things whose 
+       || isStableSource unf_source	     -- Always expose things whose 
        	  		     		     -- source is an inline rule
 
        || not (bottoming_fn	 -- No need to inline bottom functions
@@ -1098,7 +1098,7 @@ tidyUnfolding tidy_env _ _ (DFunUnfolding ar con ids)
   = DFunUnfolding ar con (map (tidyExpr tidy_env) ids)
 tidyUnfolding tidy_env tidy_rhs strict_sig
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
-  | isInlineRuleSource src
+  | isStableSource src
   = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
 	  uf_src  = tidyInl tidy_env src }
   | otherwise

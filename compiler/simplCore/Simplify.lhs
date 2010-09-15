@@ -28,8 +28,9 @@ import CoreMonad	( SimplifierSwitch(..), Tick(..) )
 import CoreSyn
 import Demand           ( isStrictDmd, splitStrictSig )
 import PprCore          ( pprParendExpr, pprCoreExpr )
-import CoreUnfold       ( mkUnfolding, mkCoreUnfolding, mkInlineRule, 
-                          exprIsConApp_maybe, callSiteInline, CallCtxt(..) )
+import CoreUnfold       ( mkUnfolding, mkCoreUnfolding
+                        , mkInlineUnfolding, mkSimpleUnfolding
+                        , exprIsConApp_maybe, callSiteInline, CallCtxt(..) )
 import CoreUtils
 import qualified CoreSubst
 import CoreArity	( exprArity )
@@ -713,7 +714,7 @@ simplUnfolding env _ _ _ _ (DFunUnfolding ar con ops)
 simplUnfolding env top_lvl id _ _ 
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
                    , uf_src = src, uf_guidance = guide })
-  | isInlineRuleSource src
+  | isStableSource src
   = do { expr' <- simplExpr rule_env expr
        ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst (text "inline-unf") env) src
        ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
@@ -724,7 +725,7 @@ simplUnfolding env top_lvl id _ _
        	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
 
 simplUnfolding _ top_lvl id _occ_info new_rhs _
-  = return (mkUnfolding (isTopLevel top_lvl) (isBottomingId id) new_rhs)
+  = return (mkUnfolding InlineRhs (isTopLevel top_lvl) (isBottomingId id) new_rhs)
   -- We make an  unfolding *even for loop-breakers*.
   -- Reason: (a) It might be useful to know that they are WHNF
   -- 	     (b) In TidyPgm we currently assume that, if we want to
@@ -1789,7 +1790,7 @@ simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
 
 addBinderUnfolding :: SimplEnv -> Id -> CoreExpr -> SimplEnv
 addBinderUnfolding env bndr rhs
-  = modifyInScope env (bndr `setIdUnfolding` mkUnfolding False False rhs)
+  = modifyInScope env (bndr `setIdUnfolding` mkSimpleUnfolding rhs)
 
 addBinderOtherCon :: SimplEnv -> Id -> [AltCon] -> SimplEnv
 addBinderOtherCon env bndr cons
@@ -2016,7 +2017,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
 	      	      DataAlt dc -> setIdUnfolding case_bndr unf
 		      	  where
 			     	 -- See Note [Case binders and join points]
-		      	     unf = mkInlineRule rhs Nothing
+		      	     unf = mkInlineUnfolding Nothing rhs
 		      	     rhs = mkConApp dc (map Type (tyConAppArgs scrut_ty)
 			     	   	        ++ varsToCoreExprs bndrs')
 

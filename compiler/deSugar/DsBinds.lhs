@@ -355,21 +355,29 @@ makeCorePair gbl_id is_default_method dict_arity rhs
   | is_default_method		      -- Default methods are *always* inlined
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
-  | not (isInlinePragma inline_prag)
-  = (gbl_id, rhs)
+  | otherwise
+  = case inlinePragmaSpec inline_prag of
+      	  EmptyInlineSpec -> (gbl_id, rhs)
+      	  NoInline        -> (gbl_id, rhs)
+      	  Inlinable       -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          Inline          -> inline_pair
 
-  | Just arity <- inlinePragmaSat inline_prag
+  where
+    inline_prag   = idInlinePragma gbl_id
+    inlinable_unf = mkInlinableUnfolding rhs
+    inline_pair
+       | Just arity <- inlinePragmaSat inline_prag
       	-- Add an Unfolding for an INLINE (but not for NOINLINE)
 	-- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
-  , let real_arity = dict_arity + arity
+       , let real_arity = dict_arity + arity
         -- NB: The arity in the InlineRule takes account of the dictionaries
-  = (gbl_id `setIdUnfolding` mkInlineRule rhs (Just real_arity),
-     etaExpand real_arity rhs)
+       = ( gbl_id `setIdUnfolding` mkInlineUnfolding (Just real_arity) rhs
+         , etaExpand real_arity rhs)
 
-  | otherwise
-  = (gbl_id `setIdUnfolding` mkInlineRule rhs Nothing, rhs)
-  where
-    inline_prag = idInlinePragma gbl_id
+       | otherwise
+       = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
+         (gbl_id `setIdUnfolding` mkInlineUnfolding Nothing rhs, rhs)
+
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity

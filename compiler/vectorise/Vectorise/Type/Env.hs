@@ -182,7 +182,7 @@ vectDataConWorkers orig_tc vect_tc arr_tc
 
           raw_worker <- cloneId mkVectOcc orig_worker (exprType body)
           let vect_worker = raw_worker `setIdUnfolding`
-                              mkInlineRule body (Just arity)
+                              mkInlineUnfolding (Just arity) body
           defGlobalVar orig_worker vect_worker
           return (vect_worker, body)
       where

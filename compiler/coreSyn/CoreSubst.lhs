@@ -555,9 +555,9 @@ substUnfolding subst (DFunUnfolding ar con args)
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!
-  | not (isInlineRuleSource src)  -- Always zap a CoreUnfolding, to save substitution work
+  | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
   = NoUnfolding
-  | otherwise                     -- But keep an InlineRule!
+  | otherwise                 -- But keep a stable one!
   = seqExpr new_tmpl `seq` 
     new_src `seq`
     unf { uf_tmpl = new_tmpl, uf_src = new_src }
@@ -576,7 +576,7 @@ substUnfoldingSource (Subst in_scope ids _) (InlineWrapper wkr)
       _other -> -- WARN( True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
                 --             <+> ifPprDebug (equals <+> ppr wkr_expr) )   
 			      -- Note [Worker inlining]
-                InlineRule    -- It's not a wrapper any more, but still inline it!
+                InlineStable  -- It's not a wrapper any more, but still inline it!
 
   | Just w1  <- lookupInScope in_scope wkr = InlineWrapper w1
   | otherwise = -- WARN( True, text "Interesting! CoreSubst.substWorker2:" <+> ppr wkr )
@@ -584,7 +584,7 @@ substUnfoldingSource (Subst in_scope ids _) (InlineWrapper wkr)
 		-- dropped as dead code, because we don't treat the UnfoldingSource
 		-- as an "occurrence".
                 -- Note [Worker inlining]
-      	        InlineRule
+      	        InlineStable
 
 substUnfoldingSource _ src = src
 

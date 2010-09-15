@@ -382,7 +382,7 @@ instance Outputable UnfoldingGuidance where
 instance Outputable UnfoldingSource where
   ppr InlineCompulsory  = ptext (sLit "Compulsory")
   ppr (InlineWrapper w) = ptext (sLit "Worker=") <> ppr w
-  ppr InlineRule        = ptext (sLit "InlineRule")
+  ppr InlineStable      = ptext (sLit "InlineStable")
   ppr InlineRhs         = ptext (sLit "<vanilla>")
 
 instance Outputable Unfolding where
@@ -407,8 +407,8 @@ instance Outputable Unfolding where
                 , ptext (sLit "Expandable=") <> ppr exp
                 , ptext (sLit "Guidance=")   <> ppr g ]
       pp_tmpl = ptext (sLit "Tmpl=") <+> ppr rhs
-      pp_rhs | isInlineRuleSource src = pp_tmpl
-             | otherwise              = empty
+      pp_rhs | isStableSource src = pp_tmpl
+             | otherwise          = empty
             -- Don't print the RHS or we get a quadratic 
 	    -- blowup in the size of the printout!
 \end{code}

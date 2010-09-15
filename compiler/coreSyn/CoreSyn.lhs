@@ -48,8 +48,9 @@ module CoreSyn (
 	maybeUnfoldingTemplate, otherCons, unfoldingArity,
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-	isInlineRule, isInlineRule_maybe, isClosedUnfolding, hasSomeUnfolding, 
-	isStableUnfolding, canUnfold, neverUnfoldGuidance, isInlineRuleSource,
+	isStableUnfolding, isStableUnfolding_maybe, 
+        isClosedUnfolding, hasSomeUnfolding, 
+	canUnfold, neverUnfoldGuidance, isStableSource,
 
 	-- * Strictness
 	seqExpr, seqExprs, seqUnfolding, 
@@ -433,17 +434,20 @@ data Unfolding
 			-- They are usually variables, but can be trivial expressions
 			-- instead (e.g. a type application).  
 
-  | CoreUnfolding {		-- An unfolding for an Id with no pragma, or perhaps a NOINLINE pragma
-				-- (For NOINLINE, the phase, if any, is in the InlinePragInfo for this Id.)
+  | CoreUnfolding {		-- An unfolding for an Id with no pragma, 
+                                -- or perhaps a NOINLINE pragma
+				-- (For NOINLINE, the phase, if any, is in the 
+                                -- InlinePragInfo for this Id.)
 	uf_tmpl       :: CoreExpr,	  -- Template; occurrence info is correct
 	uf_src        :: UnfoldingSource, -- Where the unfolding came from
 	uf_is_top     :: Bool,		-- True <=> top level binding
 	uf_arity      :: Arity,		-- Number of value arguments expected
-	uf_is_value   :: Bool,		-- exprIsHNF template (cached); it is ok to discard a `seq` on
-		      			--	this variable
-        uf_is_conlike :: Bool,          -- True <=> application of constructor or CONLIKE function
+	uf_is_value   :: Bool,		-- exprIsHNF template (cached); it is ok to discard 
+		      			--	a `seq` on this variable
+        uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
                                         --      Cached version of exprIsConLike
-	uf_is_cheap   :: Bool,		-- True <=> doesn't waste (much) work to expand inside an inlining
+	uf_is_cheap   :: Bool,		-- True <=> doesn't waste (much) work to expand 
+                                        --          inside an inlining
 					-- 	Cached version of exprIsCheap
 	uf_expandable :: Bool,		-- True <=> can expand in RULE matching
 		      	 		--      Cached version of exprIsExpandable
@@ -467,12 +471,17 @@ data Unfolding
 
 ------------------------------------------------
 data UnfoldingSource 
-  = InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
+  = InlineRhs          -- The current rhs of the function
+    		       -- Replace uf_tmpl each time around
+
+  | InlineStable       -- From an INLINE or INLINABLE pragma 
+    		       -- Do not replace uf_tmpl; instead, keep it unchanged
+    		       -- See Note [InlineRules]
+
+  | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
     		       -- Only a few primop-like things have this property 
                        -- (see MkId.lhs, calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
-
-  | InlineRule	       -- From an {-# INLINE #-} pragma; See Note [InlineRules]
 
   | InlineWrapper Id   -- This unfolding is a the wrapper in a 
 		       --     worker/wrapper split from the strictness analyser
@@ -481,10 +490,6 @@ data UnfoldingSource
 		       --	which don't need to contain the RHS; 
 		       --	it can be derived from the strictness info
 
-  | InlineRhs          -- The current rhs of the function
-
-   -- For InlineRhs, the uf_tmpl is replaced each time around
-   -- For all the others we leave uf_tmpl alone
 
 
 -- | 'UnfoldingGuidance' says when unfolding should take place
@@ -579,11 +584,12 @@ seqGuidance _                      = ()
 \end{code}
 
 \begin{code}
-isInlineRuleSource :: UnfoldingSource -> Bool
-isInlineRuleSource InlineCompulsory   = True
-isInlineRuleSource InlineRule         = True
-isInlineRuleSource (InlineWrapper {}) = True
-isInlineRuleSource InlineRhs          = False
+isStableSource :: UnfoldingSource -> Bool
+-- Keep the unfolding template
+isStableSource InlineCompulsory   = True
+isStableSource InlineStable       = True
+isStableSource (InlineWrapper {}) = True
+isStableSource InlineRhs          = False
  
 -- | Retrieves the template of an unfolding: panics if none is known
 unfoldingTemplate :: Unfolding -> CoreExpr
@@ -642,19 +648,15 @@ expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
 expandUnfolding_maybe _                                                       = Nothing
 
-isInlineRule :: Unfolding -> Bool
-isInlineRule (CoreUnfolding { uf_src = src }) = isInlineRuleSource src
-isInlineRule _		                      = False
-
-isInlineRule_maybe :: Unfolding -> Maybe (UnfoldingSource, Bool)
-isInlineRule_maybe (CoreUnfolding { uf_src = src, uf_guidance = guide }) 
-   | isInlineRuleSource src
+isStableUnfolding_maybe :: Unfolding -> Maybe (UnfoldingSource, Bool)
+isStableUnfolding_maybe (CoreUnfolding { uf_src = src, uf_guidance = guide }) 
+   | isStableSource src
    = Just (src, unsat_ok)
    where
      unsat_ok = case guide of
      	      	  UnfWhen unsat_ok _ -> unsat_ok
                   _                  -> needSaturated
-isInlineRule_maybe _ = Nothing
+isStableUnfolding_maybe _ = Nothing
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True
@@ -663,7 +665,7 @@ isCompulsoryUnfolding _                                             = False
 isStableUnfolding :: Unfolding -> Bool
 -- True of unfoldings that should not be overwritten 
 -- by a CoreUnfolding for the RHS of a let-binding
-isStableUnfolding (CoreUnfolding { uf_src = src }) = isInlineRuleSource src
+isStableUnfolding (CoreUnfolding { uf_src = src }) = isStableSource src
 isStableUnfolding (DFunUnfolding {})		   = True
 isStableUnfolding _                                = False
 

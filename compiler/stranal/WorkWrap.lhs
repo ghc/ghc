@@ -7,20 +7,16 @@
 module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
-import CoreUnfold	( certainlyWillInline, mkInlineRule, mkWwInlineRule )
+import CoreUnfold	( certainlyWillInline, mkInlineUnfolding, mkWwInlineRule )
 import CoreUtils	( exprType, exprIsHNF )
 import CoreArity	( exprArity )
 import Var
 import Id
 import Type		( Type )
 import IdInfo
-import Demand           ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
-			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
-			)
+import Demand
 import UniqSupply
-import BasicTypes	( RecFlag(..), isNonRec, isNeverActive,
-                          Activation(..), InlinePragma(..), 
-			  inlinePragmaActivation, inlinePragmaRuleMatchInfo )
+import BasicTypes
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import WwLib
@@ -276,7 +272,7 @@ checkSize fn_id rhs thing_inside
   | otherwise = thing_inside
   where
     unfolding   = idUnfolding fn_id
-    inline_rule = mkInlineRule rhs Nothing
+    inline_rule = mkInlineUnfolding Nothing rhs
 
 ---------------------
 splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
@@ -314,7 +310,7 @@ splitFun fn_id fn_info wrap_dmds res_info rhs
                                 -- arity is consistent with the demand type goes through
 
 	wrap_rhs  = wrap_fn work_id
-	wrap_prag = InlinePragma { inl_inline = True
+	wrap_prag = InlinePragma { inl_inline = Inline
                                  , inl_sat    = Nothing
                                  , inl_act    = ActiveAfter 0
                                  , inl_rule   = rule_match_info }

@@ -62,8 +62,10 @@ module BasicTypes(
 	CompilerPhase, 
 	Activation(..), isActive, isNeverActive, isAlwaysActive, isEarlyActive,
         RuleMatchInfo(..), isConLike, isFunLike, 
-        InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma,
-	isDefaultInlinePragma, isInlinePragma, inlinePragmaSat,
+        InlineSpec(..), 
+        InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
+        neverInlinePragma, dfunInlinePragma, 
+	isDefaultInlinePragma, isInlinePragma, inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
 
@@ -645,12 +647,12 @@ data Activation = NeverActive
 
 data RuleMatchInfo = ConLike 			-- See Note [CONLIKE pragma]
                    | FunLike
-                   deriving( Eq, Data, Typeable )
+                   deriving( Eq, Data, Typeable, Show )
+	-- Show needed for Lexer.x
 
 data InlinePragma  	     -- Note [InlinePragma]
   = InlinePragma
-      { inl_inline :: Bool           -- True <=> INLINE, 
-      		      		     -- False <=> no pragma at all, or NOINLINE
+      { inl_inline :: InlineSpec
 
       , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n 
       		      	    	     --            explicit (non-type, non-dictionary) args
@@ -663,6 +665,14 @@ data InlinePragma  	     -- Note [InlinePragma]
 
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq, Data, Typeable )
+
+data InlineSpec   -- What the user's INLINE pragama looked like
+  = Inline
+  | Inlinable
+  | NoInline
+  | EmptyInlineSpec
+  deriving( Eq, Data, Typeable, Show )
+	-- Show needed for Lexer.x
 \end{code}
 
 Note [InlinePragma]
@@ -725,15 +735,23 @@ isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
 isFunLike _            = False
 
+isInlineSpec :: InlineSpec -> Bool
+isInlineSpec Inline    = True
+isInlineSpec Inlinable = True
+isInlineSpec _         = False
+
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_act = AlwaysActive
                                    , inl_rule = FunLike
-                                   , inl_inline = False
+                                   , inl_inline = EmptyInlineSpec
                                    , inl_sat = Nothing }
 
-alwaysInlinePragma = defaultInlinePragma { inl_inline = True }
+alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
 neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
+
+inlinePragmaSpec :: InlinePragma -> InlineSpec
+inlinePragmaSpec = inl_inline
 
 -- A DFun has an always-active inline activation so that 
 -- exprIsConApp_maybe can "see" its unfolding
@@ -746,10 +764,10 @@ isDefaultInlinePragma :: InlinePragma -> Bool
 isDefaultInlinePragma (InlinePragma { inl_act = activation
                                     , inl_rule = match_info
                                     , inl_inline = inline })
-  = not inline && isAlwaysActive activation && isFunLike match_info
+  = isInlineSpec inline && isAlwaysActive activation && isFunLike match_info
 
 isInlinePragma :: InlinePragma -> Bool
-isInlinePragma prag = inl_inline prag
+isInlinePragma prag = isInlineSpec (inl_inline prag)
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
@@ -776,16 +794,20 @@ instance Outputable RuleMatchInfo where
    ppr ConLike = ptext (sLit "CONLIKE")
    ppr FunLike = ptext (sLit "FUNLIKE")
 
+instance Outputable InlineSpec where
+   ppr Inline          = ptext (sLit "INLINE")
+   ppr NoInline        = ptext (sLit "NOINLINE")
+   ppr Inlinable       = ptext (sLit "INLINABLE")
+   ppr EmptyInlineSpec = empty
+
 instance Outputable InlinePragma where
   ppr (InlinePragma { inl_inline = inline, inl_act = activation
                     , inl_rule = info, inl_sat = mb_arity })
-    = pp_inl_act (inline, activation) <+> pp_sat <+> pp_info 
+    = ppr inline <> pp_act inline activation <+> pp_sat <+> pp_info 
     where
-      pp_inl_act (False, AlwaysActive)  = empty	-- defaultInlinePragma
-      pp_inl_act (False, NeverActive)   = ptext (sLit "NOINLINE")
-      pp_inl_act (False, act)           = ptext (sLit "NOINLINE") <> ppr act
-      pp_inl_act (True,  AlwaysActive)  = ptext (sLit "INLINE")
-      pp_inl_act (True,  act)           = ptext (sLit "INLINE") <> ppr act
+      pp_act Inline   AlwaysActive = empty	
+      pp_act NoInline NeverActive  = empty
+      pp_act _        act          = ppr act
 
       pp_sat | Just ar <- mb_arity = parens (ptext (sLit "sat-args=") <> int ar)
              | otherwise           = empty

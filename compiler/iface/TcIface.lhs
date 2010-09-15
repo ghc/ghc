@@ -1008,11 +1008,14 @@ tcIdInfo ignore_prags name ty info
 
 \begin{code}
 tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
-tcUnfolding name _ info (IfCoreUnfold if_expr)
+tcUnfolding name _ info (IfCoreUnfold stable if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
+        ; let unf_src = if stable then InlineStable else InlineRhs
 	; return (case mb_expr of
-		    Nothing -> NoUnfolding
-		    Just expr -> mkTopUnfolding is_bottoming expr) }
+		    Nothing   -> NoUnfolding
+		    Just expr -> mkUnfolding unf_src
+                                             True {- Top level -} 
+                                             is_bottoming expr) }
   where
      -- Strictness should occur before unfolding!
     is_bottoming = case strictnessInfo info of
@@ -1029,7 +1032,7 @@ tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
 	; return (case mb_expr of
 		    Nothing   -> NoUnfolding
-		    Just expr -> mkCoreUnfolding True InlineRule expr arity 
+		    Just expr -> mkCoreUnfolding True InlineStable expr arity 
                                                  (UnfWhen unsat_ok boring_ok))
     }
 

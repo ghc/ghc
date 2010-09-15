@@ -317,7 +317,7 @@ mkDataConIds wrap_name wkr_name data_con
         --      ...(let w = C x in ...(w p q)...)...
         -- we want to see that w is strict in its two arguments
 
-    wrap_unf = mkInlineRule wrap_rhs (Just (length dict_args + length id_args))
+    wrap_unf = mkInlineUnfolding (Just (length dict_args + length id_args)) wrap_rhs
     wrap_rhs = mkLams wrap_tvs $ 
                mkLams eq_args $
                mkLams dict_args $ mkLams id_args $

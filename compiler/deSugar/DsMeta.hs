@@ -460,15 +460,17 @@ rep_specialise nm ty ispec loc
 rep_InlinePrag :: InlinePragma	-- Never defaultInlinePragma
                -> DsM (Core TH.InlineSpecQ)
 rep_InlinePrag (InlinePragma { inl_act = activation, inl_rule = match, inl_inline = inline })
-  | Nothing            <- activation1 
-    = repInlineSpecNoPhase inline1 match1
   | Just (flag, phase) <- activation1 
-    = repInlineSpecPhase inline1 match1 flag phase
-  | otherwise = {- unreachable, but shuts up -W -} panic "rep_InlineSpec"
-    where
+  = repInlineSpecPhase inline1 match1 flag phase
+  | otherwise
+  = repInlineSpecNoPhase inline1 match1
+  where
       match1      = coreBool (rep_RuleMatchInfo match)
       activation1 = rep_Activation activation
-      inline1     = coreBool inline
+      inline1     = case inline of 
+                       Inline -> coreBool True
+ 		       _other -> coreBool False
+		       -- We have no representation for Inlinable
 
       rep_RuleMatchInfo FunLike = False
       rep_RuleMatchInfo ConLike = True

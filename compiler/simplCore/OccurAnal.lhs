@@ -537,7 +537,7 @@ reOrderCycle depth (bind : binds) pairs
         | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
 	   	     	      -- Note [DFuns should not be loop breakers]
 
-        | Just (inl_source, _) <- isInlineRule_maybe (idUnfolding bndr)
+        | Just (inl_source, _) <- isStableUnfolding_maybe (idUnfolding bndr)
 	= case inl_source of
 	     InlineWrapper {} -> 10  -- Note [INLINE pragmas]
 	     _other	      ->  3  -- Data structures are more important than this

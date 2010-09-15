@@ -11,7 +11,7 @@ module Specialise ( specProgram ) where
 import Id
 import TcType
 import CoreSubst 
-import CoreUnfold	( mkUnfolding, mkInlineRule )
+import CoreUnfold	( mkSimpleUnfolding, mkInlineUnfolding )
 import VarSet
 import VarEnv
 import CoreSyn
@@ -706,7 +706,7 @@ specCase subst scrut' case_bndr [(con, args, rhs)]
          loc  = getSrcSpan name
 
     add_unf sc_flt sc_rhs  -- Sole purpose: make sc_flt respond True to interestingDictId
-      = setIdUnfolding sc_flt (mkUnfolding False False sc_rhs)
+      = setIdUnfolding sc_flt (mkSimpleUnfolding sc_rhs)
 
     arg_set = mkVarSet args'
     is_flt_sc_arg var =  isId var
@@ -908,7 +908,7 @@ specDefn subst body_uds fn rhs
 	-- Figure out whether the function has an INLINE pragma
 	-- See Note [Inline specialisations]
     fn_has_inline_rule :: Maybe Bool	-- Derive sat-flag from existing thing
-    fn_has_inline_rule = case isInlineRule_maybe fn_unf of
+    fn_has_inline_rule = case isStableUnfolding_maybe fn_unf of
                            Just (_,sat) -> Just sat
 			   Nothing      -> Nothing
 
@@ -1015,7 +1015,7 @@ specDefn subst body_uds fn rhs
 		  = let 
                        mb_spec_arity = if sat then Just spec_arity else Nothing
                     in 
-                    spec_f_w_arity `setIdUnfolding` mkInlineRule spec_rhs mb_spec_arity
+                    spec_f_w_arity `setIdUnfolding` mkInlineUnfolding mb_spec_arity spec_rhs
 		  | otherwise 
 		  = spec_f_w_arity
 
@@ -1048,7 +1048,7 @@ bindAuxiliaryDicts subst triples = go subst [] triples
 
       | otherwise        = go subst_w_unf (NonRec dx_id dx : binds) pairs
       where
-        dx_id1 = dx_id `setIdUnfolding` mkUnfolding False False dx
+        dx_id1 = dx_id `setIdUnfolding` mkSimpleUnfolding dx
 	subst_w_unf = extendIdSubst subst d (Var dx_id1)
        	     -- Important!  We're going to substitute dx_id1 for d
 	     -- and we want it to look "interesting", else we won't gather *any*

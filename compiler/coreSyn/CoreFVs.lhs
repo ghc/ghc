@@ -422,7 +422,7 @@ idUnfoldingVars :: Id -> VarSet
 idUnfoldingVars id
   = case realIdUnfolding id of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-      		             | isInlineRuleSource src
+      		             | isStableSource src
 	                     -> exprFreeVars rhs
       DFunUnfolding _ _ args -> exprsFreeVars args
       _                      -> emptyVarSet

@@ -210,7 +210,8 @@ data IfaceInfoItem
 -- only later attached to the Id.  Partial reason: some are orphans.
 
 data IfaceUnfolding 
-  = IfCoreUnfold IfaceExpr
+  = IfCoreUnfold Bool IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
+
   | IfCompulsory IfaceExpr	-- Only used for default methods, in fact
 
   | IfInlineRule Arity 
@@ -688,11 +689,13 @@ instance Outputable IfaceInfoItem where
 
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = ptext (sLit "<compulsory>") <+> parens (ppr e)
-  ppr (IfCoreUnfold e)     = parens (ppr e)
+  ppr (IfCoreUnfold s e)   = (if s then ptext (sLit "<stable>") else empty) <+> parens (ppr e)
   ppr (IfInlineRule a uok bok e) = sep [ptext (sLit "InlineRule") <+> ppr (a,uok,bok),
       		           	        pprParendIfaceExpr e]
-  ppr (IfWrapper a wkr)    = ptext (sLit "Worker:") <+> ppr wkr <+> parens (ptext (sLit "arity") <+> int a)
-  ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:") <+> brackets (pprWithCommas pprParendIfaceExpr ns)
+  ppr (IfWrapper a wkr)    = ptext (sLit "Worker:") <+> ppr wkr
+                             <+> parens (ptext (sLit "arity") <+> int a)
+  ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:")
+                             <+> brackets (pprWithCommas pprParendIfaceExpr ns)
 
 
 -- -----------------------------------------------------------------------------
@@ -810,7 +813,7 @@ freeNamesItem (HsUnfold _ u) = freeNamesIfUnfold u
 freeNamesItem _              = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
-freeNamesIfUnfold (IfCoreUnfold e)       = freeNamesIfExpr e
+freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
 freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfWrapper _ v)        = unitNameSet v

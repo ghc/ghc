@@ -22,7 +22,7 @@ import Var
 import VarEnv
 import VarSet
 import Id
-import BasicTypes
+import BasicTypes( isLoopBreaker )
 import Literal
 import TysWiredIn
 import TysPrim
