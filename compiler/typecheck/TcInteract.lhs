@@ -1618,10 +1618,9 @@ NB: The desugarer needs be more clever to deal with equalities
 newSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi]
                       -> TcS WorkList
 newSCWorkFromFlavored ev flavor cls xis
-  | Given loc <- flavor	 	-- The NoScSkol says "don't add superclasses"
-  , NoScSkol <- ctLocOrigin loc
-  = pprTrace "Oh dear! Superclasses of self" (pprEvVarWithType ev) $
-    return emptyWorkList
+  | Given loc <- flavor	 	 -- The NoScSkol says "don't add superclasses"
+  , NoScSkol <- ctLocOrigin loc  -- Very important!
+  = return emptyWorkList
     
   | otherwise
   = do { let (tyvars, sc_theta, _, _) = classBigSig cls 
