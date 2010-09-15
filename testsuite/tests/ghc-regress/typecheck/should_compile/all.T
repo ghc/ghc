@@ -317,4 +317,5 @@ test('T2412',
 
 test('T2846', normal, compile, [''])
 test('T4284', normal, compile, [''])
+test('T2683', normal, compile, [''])
      
