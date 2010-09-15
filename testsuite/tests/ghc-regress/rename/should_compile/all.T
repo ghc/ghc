@@ -157,8 +157,7 @@ test('T4239',
      run_command,
      ['$MAKE -s --no-print-directory T4239'])
 test('T4240',
-     [expect_broken(4240),
-      extra_clean(['T4240A.hi', 'T4240A.o', 'T4240.hi', 'T4240.o',
+     [extra_clean(['T4240A.hi', 'T4240A.o', 'T4240.hi', 'T4240.o',
                    'T4240.imports'])],
      run_command,
      ['$MAKE -s --no-print-directory T4240'])
