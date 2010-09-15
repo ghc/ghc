@@ -2244,7 +2244,7 @@ The desire not to duplicate is the entire reason that
 mkDupableCont returns a pair of continuations.
 
 
-Note [Single-atlernative cases]
+Note [Single-alternative cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This case is just like the ArgOf case.  Here's an example:
         data T a = MkT !a
