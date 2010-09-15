@@ -306,6 +306,7 @@ test('T3391', omit_ways(['profc','profasm']), compile, [''])
 test('T3409', normal, compile, [''])
 test('T3955', normal, compile, [''])
 test('PolyRec', normal, compile, [''])
+test('twins', normal, compile, [''])
 
 test('T2412',
      extra_clean(['T2412.hi-boot', 'T2412.o-boot',
