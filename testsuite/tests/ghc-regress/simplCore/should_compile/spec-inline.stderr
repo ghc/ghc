@@ -166,7 +166,7 @@ Roman.foo :: GHC.Types.Int -> GHC.Types.Int
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType S(A)m,
- Unf=Unf{Src=InlineRule, TopLvl=True, Arity=1, Value=True,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, Cheap=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
