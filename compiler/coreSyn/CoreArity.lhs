@@ -723,9 +723,10 @@ mkEtaWW orig_n in_scope orig_ty
        		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
          go n subst ty' (EtaCo (Type.substTy subst co) : eis)
 
-       | otherwise	       	           -- We have an expression of arity > 0, 
+       | otherwise	 -- We have an expression of arity > 0, 
+       	 		 -- but its type isn't a function. 		   
        = WARN( True, ppr orig_n <+> ppr orig_ty )
-         (getTvInScope subst, reverse eis) -- but its type isn't a function. 
+         (getTvInScope subst, reverse eis)
     	-- This *can* legitmately happen:
     	-- e.g.  coerce Int (\x. x) Essentially the programmer is
 	-- playing fast and loose with types (Happy does this a lot).
