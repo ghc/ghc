@@ -17,3 +17,8 @@ T4306:
 	'$(TEST_HC)' -c -O T4306.hs 
 	'$(TEST_HC)' --show-iface T4306.hi | grep 'wupd ::'
 
+T4201:
+	$(RM) -f rm -f T4201.hi T4201.o
+	'$(TEST_HC)' -c -O T4201.hs 
+	'$(TEST_HC)' --show-iface T4201.hi | grep 'Unfolding.*sym'
+
