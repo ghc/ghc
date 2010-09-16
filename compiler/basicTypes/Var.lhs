@@ -181,7 +181,8 @@ instance Outputable Var where
   ppr var = ppr (varName var) <+> ifPprDebug (brackets (ppr_debug var))
 
 ppr_debug :: Var -> SDoc
-ppr_debug (TyVar {})                          = ptext (sLit "tv")
+ppr_debug (TyVar { isCoercionVar = False })   = ptext (sLit "tv")
+ppr_debug (TyVar { isCoercionVar = True })    = ptext (sLit "co")
 ppr_debug (TcTyVar {tc_tv_details = d})       = pprTcTyVarDetails d
 ppr_debug (Id { idScope = s, id_details = d }) = ppr_id_scope s <> pprIdDetails d
 
