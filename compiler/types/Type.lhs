@@ -829,12 +829,18 @@ isDictTy ty = case splitTyConApp_maybe ty of
 \begin{code}
 tyVarsOfType :: Type -> TyVarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
-tyVarsOfType (TyVarTy tv)		= unitVarSet tv
-tyVarsOfType (TyConApp _ tys)           = tyVarsOfTypes tys
-tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
-tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
-tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
-tyVarsOfType (ForAllTy tyvar ty)	= delVarSet (tyVarsOfType ty) tyvar
+tyVarsOfType (TyVarTy tv)     = unitVarSet tv
+tyVarsOfType (TyConApp _ tys) = tyVarsOfTypes tys
+tyVarsOfType (PredTy sty)     = tyVarsOfPred sty
+tyVarsOfType (FunTy arg res)  = tyVarsOfType arg `unionVarSet` tyVarsOfType res
+tyVarsOfType (AppTy fun arg)  = tyVarsOfType fun `unionVarSet` tyVarsOfType arg
+tyVarsOfType (ForAllTy tv ty) -- The kind of a coercion binder 
+	     	       	      -- can mention type variables!
+  | isTyVar tv		      = inner_tvs `delVarSet` tv
+  | otherwise  {- Coercion -} = -- ASSERT( not (tv `elemVarSet` inner_tvs) )
+                                inner_tvs `unionVarSet` tyVarsOfType (tyVarKind tv)
+  where
+    inner_tvs = tyVarsOfType ty
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
