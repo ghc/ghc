@@ -381,7 +381,7 @@ lintValApp arg fun_ty arg_ty
 \end{code}
 
 \begin{code}
-checkKinds :: Var -> OutType -> LintM ()
+checkKinds :: OutVar -> OutType -> LintM ()
 -- Both args have had substitution applied
 checkKinds tyvar arg_ty
 	-- Arg type might be boxed for a function with an uncommitted
@@ -604,26 +604,29 @@ lintSplitCoVar cv
                                 , nest 2 (ppr cv <+> dcolon <+> ppr (tyVarKind cv))])
 
 -------------------
-lintCoercion :: OutType -> LintM (OutType, OutType)
+lintCoercion, lintCoercion' :: OutType -> LintM (OutType, OutType)
 -- Check the kind of a coercion term, returning the kind
-lintCoercion ty@(TyVarTy tv)
+lintCoercion co 
+  = addLoc (InCoercion co) $ lintCoercion' co
+
+lintCoercion' ty@(TyVarTy tv)
   = do { checkTyVarInScope tv
        ; if isCoVar tv then return (coVarKind tv) 
                        else return (ty, ty) }
 
-lintCoercion ty@(AppTy ty1 ty2) 
+lintCoercion' ty@(AppTy ty1 ty2) 
   = do { (s1,t1) <- lintCoercion ty1
        ; (s2,t2) <- lintCoercion ty2
        ; check_co_app ty (typeKind s1) [s2]
        ; return (mkAppTy s1 s2, mkAppTy t1 t2) }
 
-lintCoercion ty@(FunTy ty1 ty2) 
+lintCoercion' ty@(FunTy ty1 ty2)
   = do { (s1,t1) <- lintCoercion ty1
        ; (s2,t2) <- lintCoercion ty2
        ; check_co_app ty (tyConKind funTyCon) [s1, s2]
        ; return (FunTy s1 s2, FunTy t1 t2) }
 
-lintCoercion ty@(TyConApp tc tys) 
+lintCoercion' ty@(TyConApp tc tys) 
   | Just (ar, desc) <- isCoercionTyCon_maybe tc
   = do { unless (tys `lengthAtLeast` ar) (badCo ty)
        ; (s,t) <- lintCoTyConApp ty desc (take ar tys)
@@ -639,19 +642,19 @@ lintCoercion ty@(TyConApp tc tys)
        ; check_co_app ty (tyConKind tc) ss
        ; return (TyConApp tc ss, TyConApp tc ts) }
 
-lintCoercion ty@(PredTy (ClassP cls tys))
+lintCoercion' ty@(PredTy (ClassP cls tys))
   = do { (ss,ts) <- mapAndUnzipM lintCoercion tys
        ; check_co_app ty (tyConKind (classTyCon cls)) ss
        ; return (PredTy (ClassP cls ss), PredTy (ClassP cls ts)) }
 
-lintCoercion (PredTy (IParam n p_ty))
+lintCoercion' (PredTy (IParam n p_ty))
   = do { (s,t) <- lintCoercion p_ty
        ; return (PredTy (IParam n s), PredTy (IParam n t)) }
 
-lintCoercion ty@(PredTy (EqPred {}))
+lintCoercion' ty@(PredTy (EqPred {}))
   = failWithL (badEq ty)
 
-lintCoercion (ForAllTy tv ty)
+lintCoercion' (ForAllTy tv ty)
   | isCoVar tv
   = do { (co1, co2) <- lintSplitCoVar tv
        ; (s1,t1)    <- lintCoercion co1
@@ -848,6 +851,7 @@ data LintLocInfo
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
   | InType Type		-- Inside a type
+  | InCoercion Coercion	-- Inside a type
 \end{code}
 
                  
@@ -1003,6 +1007,8 @@ dumpLoc TopLevelBindings
   = (noSrcLoc, empty)
 dumpLoc (InType ty)
   = (noSrcLoc, text "In the type" <+> quotes (ppr ty))
+dumpLoc (InCoercion ty)
+  = (noSrcLoc, text "In the coercion" <+> quotes (ppr ty))
 
 pp_binders :: [Var] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))
