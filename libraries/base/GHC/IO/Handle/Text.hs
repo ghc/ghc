@@ -891,9 +891,9 @@ bufReadEmpty h_@Handle__{..}
 hGetBufSome :: Handle -> Ptr a -> Int -> IO Int
 hGetBufSome h ptr count
   | count == 0 = return 0
-  | count <  0 = illegalBufferSize h "hGetBuf" count
+  | count <  0 = illegalBufferSize h "hGetBufSome" count
   | otherwise =
-      wantReadableHandle_ "hGetBuf" h $ \ h_@Handle__{..} -> do
+      wantReadableHandle_ "hGetBufSome" h $ \ h_@Handle__{..} -> do
          flushCharReadBuffer h_
          buf@Buffer{ bufSize=sz } <- readIORef haByteBuffer
          if isEmptyBuffer buf
@@ -903,7 +903,10 @@ hGetBufSome h ptr count
                             if r == 0
                                then return 0
                                else do writeIORef haByteBuffer buf'
-                                       bufReadNBNonEmpty h_ buf' (castPtr ptr) 0 count
+                                       bufReadNBNonEmpty h_ buf' (castPtr ptr) 0 (min r count)
+                                        -- new count is  (min r count), so
+                                        -- that bufReadNBNonEmpty will not
+                                        -- issue another read.
             else
               bufReadNBEmpty h_ buf (castPtr ptr) 0 count
 
