@@ -17,6 +17,7 @@ import TypeRep
 import TyCon
 import Var
 import VarSet
+import VarEnv
 import PrelNames
 import Util
 import Outputable
@@ -27,6 +28,23 @@ import Outputable
                  Optimising coercions									
 %*                                                                      *
 %************************************************************************
+
+Note [Subtle shadowing in coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Supose we optimising a coercion
+    optCoercion (forall (co_X5:t1~t2). ...co_B1...)
+The co_X5 is a wild-card; the bound variable of a coercion for-all
+should never appear in the body of the forall. Indeed we often
+write it like this
+    optCoercion ( (t1~t2) => ...co_B1... )
+
+Just because it's a wild-card doesn't mean we are free to choose
+whatever variable we like.  For example it'd be wrong for optCoercion
+to return
+   forall (co_B1:t1~t2). ...co_B1...
+because now the co_B1 (which is really free) has been captured, and
+subsequent substitutions will go wrong.  That's why we can't use
+mkCoPredTy in the ForAll case, where this note appears.  
 
 \begin{code}
 optCoercion :: TvSubst -> Coercion -> NormalCo
@@ -48,19 +66,31 @@ opt_co, opt_co' :: TvSubst
        		-> Coercion
        		-> NormalCo	
 opt_co = opt_co'
--- opt_co sym co = pprTrace "opt_co {" (ppr sym <+> ppr co) $
---       	        co1 `seq` 
---                pprTrace "opt_co done }" (ppr co1) 
+
+{-    Debuggery 
+opt_co env sym co 
+-- = pprTrace "opt_co {" (ppr sym <+> ppr co) $
+--     	        co1 `seq` 
+--               pprTrace "opt_co done }" (ppr co1) 
 --               WARN( not same_co_kind, ppr co  <+> dcolon <+> pprEqPred (s1,t1) 
---                                     $$ ppr co1 <+> dcolon <+> pprEqPred (s2,t2) )
---                co1
---  where
---    co1 = opt_co' sym co
---    same_co_kind = s1 `coreEqType` s2 && t1 `coreEqType` t2
---    (s,t) = coercionKind co
---    (s1,t1) | sym = (t,s)
---            | otherwise = (s,t)
---    (s2,t2) = coercionKind co1
+--                                   $$ ppr co1 <+> dcolon <+> pprEqPred (s2,t2) )
+ =   WARN( not (coreEqType co1 simple_result), 
+           (text "env=" <+> ppr env) $$
+           (text "input=" <+> ppr co) $$
+           (text "simple=" <+> ppr simple_result) $$
+           (text "opt=" <+> ppr co1) )
+     co1
+ where
+   co1 = opt_co' env sym co
+   same_co_kind = s1 `coreEqType` s2 && t1 `coreEqType` t2
+   (s,t) = coercionKind (substTy env co)
+   (s1,t1) | sym = (t,s)
+           | otherwise = (s,t)
+   (s2,t2) = coercionKind co1
+
+   simple_result | sym = mkSymCoercion (substTy env co)
+                 | otherwise = substTy env co
+-}
 
 opt_co' env sym (AppTy ty1 ty2) 	  = mkAppTy (opt_co env sym ty1) (opt_co env sym ty2)
 opt_co' env sym (FunTy ty1 ty2) 	  = FunTy (opt_co env sym ty1) (opt_co env sym ty2)
@@ -78,11 +108,20 @@ opt_co' env sym co@(TyVarTy tv)
     (ty1,ty2) = coVarKind tv
 
 opt_co' env sym (ForAllTy tv cor) 
-  | isCoVar tv = mkCoPredTy (opt_co env sym co1) (opt_co env sym co2) (opt_co env sym cor)
-  | otherwise  = case substTyVarBndr env tv of
-                   (env', tv') -> ForAllTy tv' (opt_co env' sym cor)
+  | isTyVar tv  = case substTyVarBndr env tv of
+                   (env', tv') -> ForAllTy tv' (opt_co' env' sym cor)
+
+opt_co' env sym co@(ForAllTy co_var cor) 
+  | isCoVar co_var 
+  = WARN( co_var `elemVarSet` tyVarsOfType cor, ppr co )
+    ForAllTy co_var' cor'
   where
-    (co1,co2) = coVarKind tv
+    (co1,co2) = coVarKind co_var
+    co1' = opt_co' env sym co1
+    co2' = opt_co' env sym co2
+    cor' = opt_co' env sym cor
+    co_var' = uniqAway (getTvInScope env) (mkWildCoVar (mkCoKind co1' co2'))
+    -- See Note [Subtle shadowing in coercions]
 
 opt_co' env sym (TyConApp tc cos)
   | Just (arity, desc) <- isCoercionTyCon_maybe tc
@@ -218,14 +257,22 @@ opt_trans_rule co1 co2
   = Just (mkAppTy (opt_trans co1a co2a) (opt_trans co1b co2b))
 
 -- Push transitivity inside (s~t)=>r
+-- We re-use the CoVar rather than using mkCoPredTy
+-- See Note [Subtle shadowing in coercions]
 opt_trans_rule co1 co2
-  | Just (s1,t1,r1) <- splitCoPredTy_maybe co1
+  | Just (cv1,r1) <- splitForAllTy_maybe co1
+  , isCoVar cv1
+  , Just (s1,t1) <- coVarKind_maybe cv1
   , Just (s2,t2,r2) <- etaCoPred_maybe co2
-  = Just (mkCoPredTy (opt_trans s1 s2) (opt_trans t1 t2) (opt_trans r1 r2))
+  = Just (ForAllTy (mkCoVar (coVarName cv1) (mkCoKind (opt_trans s1 s2) (opt_trans t1 t2)))
+                   (opt_trans r1 r2))
 
-  | Just (s2,t2,r2) <- splitCoPredTy_maybe co2
+  | Just (cv2,r2) <- splitForAllTy_maybe co2
+  , isCoVar cv2
+  , Just (s2,t2) <- coVarKind_maybe cv2
   , Just (s1,t1,r1) <- etaCoPred_maybe co1
-  = Just (mkCoPredTy (opt_trans s1 s2) (opt_trans t1 t2) (opt_trans r1 r2))
+  = Just (ForAllTy (mkCoVar (coVarName cv2) (mkCoKind (opt_trans s1 s2) (opt_trans t1 t2)))
+                   (opt_trans r1 r2))
 
 -- Push transitivity inside forall
 opt_trans_rule co1 co2
