@@ -80,6 +80,7 @@ import TyCon
 import Class
 import Var
 import VarEnv
+import VarSet
 import Name
 import PrelNames
 import Util
@@ -276,7 +277,10 @@ mkCoKind ty1 ty2 = PredTy (EqPred ty1 ty2)
 
 -- | (mkCoPredTy s t r) produces the type:   (s~t) => r
 mkCoPredTy :: Type -> Type -> Type -> Type
-mkCoPredTy s t r = ForAllTy (mkWildCoVar (mkCoKind s t)) r
+mkCoPredTy s t r = ASSERT( not (co_var `elemVarSet` tyVarsOfType r) )
+                   ForAllTy co_var r
+  where
+    co_var = mkWildCoVar (mkCoKind s t)
 
 splitCoPredTy_maybe :: Type -> Maybe (Type, Type, Type)
 splitCoPredTy_maybe ty
@@ -720,7 +724,8 @@ predKind (IParam {}) = liftedTypeKind 	-- always represented by lifted types
 --
 -- > c :: (t1 ~ t2)
 --
--- i.e. the kind of @c@ is a 'CoercionKind' relating @t1@ and @t2@, then @coercionKind c = (t1, t2)@.
+-- i.e. the kind of @c@ is a 'CoercionKind' relating @t1@ and @t2@, 
+-- then @coercionKind c = (t1, t2)@.
 coercionKind :: Coercion -> (Type, Type)
 coercionKind ty@(TyVarTy a) | isCoVar a = coVarKind a
                             | otherwise = (ty, ty)
@@ -822,5 +827,8 @@ coTyConAppKind (CoAxiom { co_ax_tvs = tvs
   = (substTyWith tvs tys1 lhs_ty, substTyWith tvs tys2 rhs_ty)
   where
     (tys1, tys2) = coercionKinds cos
-coTyConAppKind desc cos = pprPanic "coTyConAppKind" (ppr desc $$ ppr cos)
+coTyConAppKind desc cos = pprTrace "coTyConAppKind" (ppr desc $$ braces (vcat 
+                             [ ppr co <+> dcolon <+> pprEqPred (coercionKind co)
+                             | co <- cos ])) $
+                          coercionKind (head cos)
 \end{code}
