@@ -652,24 +652,23 @@ kindErrorTcS :: CtFlavor -> TcType -> TcType -> TcS ()
 kindErrorTcS fl ty1 ty2
   = wrapErrTcS        $ 
     setCtFlavorLoc fl $ 
-    do { env0 <- tcInitTidyEnv
+    do { (env0, extra) <- getEqExtra fl ty1 ty2
        ; let (env1, ty1') = tidyOpenType env0 ty1
              (env2, ty2') = tidyOpenType env1 ty2
              ctxt = CEC { cec_encl = []
-                        , cec_extra = empty
+                        , cec_extra = extra
                         , cec_tidy = env2 }
        ; reportEqErr ctxt ty1' ty2' }
 
 misMatchErrorTcS :: CtFlavor -> TcType -> TcType -> TcS a
 misMatchErrorTcS fl ty1 ty2
-  = wrapErrTcS            $ 
-    setCtFlavorLocNoEq fl $  -- Don't add the "When matching t1 with t2"
-    		       	     -- part, because it duplciates what we say now
-    do { env0 <- tcInitTidyEnv
+  = wrapErrTcS        $ 
+    setCtFlavorLoc fl $ 
+    do { (env0, extra) <- getEqExtra fl ty1 ty2
        ; let (env1, ty1') = tidyOpenType env0 ty1
              (env2, ty2') = tidyOpenType env1 ty2
              (env3, msg)  = misMatchMsgWithExtras env2 ty1' ty2'
-       ; failWithTcM (env3, inaccessible_msg $$ msg) }
+       ; failWithTcM (env3, inaccessible_msg $$ msg $$ extra) }
   where
     inaccessible_msg 
       = case fl of 
@@ -685,13 +684,13 @@ misMatchErrorTcS fl ty1 ty2
 
 occursCheckErrorTcS :: CtFlavor -> TcTyVar -> TcType -> TcS a
 occursCheckErrorTcS fl tv ty
-  = wrapErrTcS           $ 
-    setCtFlavorLoc fl $ 
-    do	{ env0          <- tcInitTidyEnv
+  = wrapErrTcS        $ 
+    setCtFlavorLoc fl $
+    do	{ (env0, extra2) <- getEqExtra fl (mkTyVarTy tv) ty
 	; let (env1, tv') = tidyOpenTyVar env0 tv
 	      (env2, ty') = tidyOpenType env1 ty
-	      extra = sep [ppr tv', char '=', ppr ty']
-	; failWithTcM (env2, hang msg 2 extra) }
+	      extra1 = sep [ppr tv', char '=', ppr ty']
+	; failWithTcM (env2, hang msg 2 (extra1 $$ extra2)) }
   where
     msg = text $ "Occurs check: cannot construct the infinite type:"
 
@@ -731,30 +730,36 @@ flattenForAllErrorTcS fl ty _bad_eqs
 %************************************************************************
 
 \begin{code}
-setCtFlavorLocNoEq :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLocNoEq (Wanted  loc) thing = setCtLoc loc thing
-setCtFlavorLocNoEq (Derived loc) thing = setCtLoc loc thing
-setCtFlavorLocNoEq (Given   loc) thing = setCtLoc loc thing
-
 setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  loc) thing = setWantedLoc loc thing
-setCtFlavorLoc (Derived loc) thing = setWantedLoc loc thing
-setCtFlavorLoc (Given   loc) thing = setGivenLoc  loc thing
+setCtFlavorLoc (Wanted  loc) thing = setCtLoc loc thing
+setCtFlavorLoc (Derived loc) thing = setCtLoc loc thing
+setCtFlavorLoc (Given   loc) thing = setCtLoc loc thing
 
-setWantedLoc :: WantedLoc -> TcM a -> TcM a
-setWantedLoc loc thing_inside 
-  = setCtLoc loc $
-    add_origin (ctLocOrigin loc) $ 
-    thing_inside
-  where
-    add_origin (TypeEqOrigin item) = addErrCtxtM (unifyCtxt item)
-    add_origin orig = addErrCtxt (ptext (sLit "At") <+> ppr orig)
+getEqExtra :: CtFlavor -> TcType -> TcType -> TcM (TidyEnv, SDoc)
+getEqExtra (Wanted  loc) ty1 ty2 = getWantedEqExtra (ctLocOrigin loc) ty1 ty2
+getEqExtra (Derived loc) ty1 ty2 = getWantedEqExtra (ctLocOrigin loc) ty1 ty2
+getEqExtra (Given   _)   _   _   = do { env0 <- tcInitTidyEnv
+                                      ; return (env0, empty) }
+  -- We could print more info, but it seems to be already coming out
 
-setGivenLoc :: GivenLoc -> TcM a -> TcM a
-setGivenLoc loc thing_inside 
-  = setCtLoc loc $
-    add_origin (ctLocOrigin loc) $ 
-    thing_inside
-  where
-    add_origin skol = addErrCtxt (ptext (sLit "In") <+> pprSkolInfo skol)
+getWantedEqExtra :: CtOrigin -> TcType -> TcType -> TcM (TidyEnv, SDoc)
+getWantedEqExtra (TypeEqOrigin item) ty1 ty2
+  -- If the types in the error message are the same 
+  -- as the types we are unifying (remember to zonk the latter)
+  -- don't add the extra expected/actual message
+  = do { act <- zonkTcType (uo_actual item)
+       ; exp <- zonkTcType (uo_expected item)
+       ; env0 <- tcInitTidyEnv
+       ; if (act `tcEqType` ty1 && exp `tcEqType` ty2)
+         || (exp `tcEqType` ty1 && act `tcEqType` ty2)
+         then	
+            return (env0, empty)
+         else do
+       { let (env1, exp') = tidyOpenType env0 exp
+             (env2, act') = tidyOpenType env1     act
+       ; return (env2, mkExpectedActualMsg act' exp') } }
+
+getWantedEqExtra orig _ _ 
+  = do { env0 <- tcInitTidyEnv
+       ; return (env0, pprArising orig) }
 \end{code}
