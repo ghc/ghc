@@ -257,7 +257,7 @@ sub darcsget {
             $path = "$repo_base/$remotepath";
         }
 
-        if (($tag eq "-") || defined($tags{$tag})) {
+        if ($tags{$tag} eq 1) {
             if (-d $localpath) {
                 warning("$localpath already present; omitting");
             }
@@ -290,6 +290,12 @@ sub main {
         die "error: darcs-all must be run from the top level of the ghc tree."
     }
 
+    $tags{"-"} = 1;
+    $tags{"dph"} = 1;
+    $tags{"nofib"} = 0;
+    $tags{"testsuite"} = 0;
+    $tags{"extra"} = 0;
+
     while ($#_ ne -1) {
         my $arg = shift;
         # We handle -q here as well as lower down as we need to skip over it
@@ -311,16 +317,35 @@ sub main {
         elsif ($arg eq "--nofib") {
             $tags{"nofib"} = 1;
         }
+        elsif ($arg eq "--no-nofib") {
+            $tags{"nofib"} = 0;
+        }
         # --testsuite tells get to also grab the testsuite repo.
         # It has no effect on the other commands.
         elsif ($arg eq "--testsuite") {
             $tags{"testsuite"} = 1;
+        }
+        elsif ($arg eq "--no-testsuite") {
+            $tags{"testsuite"} = 0;
+        }
+        # --dph tells get to also grab the dph repo.
+        # It has no effect on the other commands.
+        elsif ($arg eq "--dph") {
+            $tags{"dph"} = 1;
+        }
+        elsif ($arg eq "--no-dph") {
+            $tags{"dph"} = 0;
         }
         # --extralibs tells get to also grab the extra repos.
         # It has no effect on the other commands.
         elsif ($arg eq "--extra") {
             $tags{"extra"} = 1;
         }
+        elsif ($arg eq "--no-extra") {
+            $tags{"extra"} = 0;
+        }
+        # Use --checked-out if the remote repos are a checked-out tree,
+        # rather than the master trees.
         elsif ($arg eq "--checked-out") {
             $checked_out_flag = 1;
         }
