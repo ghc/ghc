@@ -709,10 +709,16 @@ doInteractWithInert (CIPCan { cc_id = ipid, cc_flavor = ifl, cc_ip_nm = nm, cc_i
 -- so we just generate a fresh coercion variable that isn't used anywhere.
 doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_ip_ty = ty1 }) 
            workItem@(CIPCan { cc_flavor = wfl, cc_ip_nm = nm2, cc_ip_ty = ty2 })
+  | nm1 == nm2 && isGiven wfl && isGiven ifl
+  = 	-- See Note [Overriding implicit parameters]
+        -- Dump the inert item, override totally with the new one
+	-- Do not require type equality
+    mkIRContinue workItem DropInert emptyCCan
+
   | nm1 == nm2 && ty1 `tcEqType` ty2 
   = solveOneFromTheOther (id1,ifl) workItem 
 
-  | nm1 == nm2 && (not (isGiven ifl && isGiven wfl))
+  | nm1 == nm2
   =  	-- See Note [When improvement happens]
     do { co_var <- newWantedCoVar ty1 ty2 
        ; let flav = Wanted (combineCtLoc ifl wfl) 
@@ -911,20 +917,16 @@ solveOneFromTheOther (iid,ifl) workItem
   | isDerived ifl && isDerived wfl 
   = noInteraction workItem 
 
-  | wfl `canRewrite` ifl 
-  = do { unless (isGiven ifl) $ setEvBind iid (EvId wid)
-          	 -- Overwrite the binding, if one exists
-		 -- (For Givens, they are lambda-bound so nothing to overwrite,
-		 -- but we still drop the overridden one and replace it in
-		 -- the inert set with the new one
-       ; mkIRContinue workItem DropInert emptyCCan }
-       -- The order is important here: must do (wfl `canRewrite` ifl) first
-       -- so that we override the inert item with an inner given if possible.  
-       -- See Note [Overriding implicit parameters]
-
-  | otherwise   -- ifl `canRewrite` wfl
+  | ifl `canRewrite` wfl
   = do { unless (isGiven wfl) $ setEvBind wid (EvId iid) 
+           -- Overwrite the binding, if one exists
+	   -- For Givens, which are lambda-bound, nothing to overwrite,
        ; dischargeWorkItem }
+
+  | otherwise  -- wfl `canRewrite` ifl 
+  = do { unless (isGiven ifl) $ setEvBind iid (EvId wid)
+       ; mkIRContinue workItem DropInert emptyCCan }
+
   where 
      wfl = cc_flavor workItem
      wid = cc_id workItem
