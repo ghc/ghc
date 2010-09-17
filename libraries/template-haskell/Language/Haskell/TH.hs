@@ -12,6 +12,8 @@ module Language.Haskell.TH(
 	reify, 		  -- :: Name -> Q Info
 	location,	  -- :: Q Location
 	runIO, 		  -- :: IO a -> Q a
+	isClassInstance,
+	classInstances,
 
 	-- * Names
 	Name, 
@@ -29,19 +31,20 @@ module Language.Haskell.TH(
 	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
+	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..),
+	ClassInstance(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
     -- * Library functions
     -- ** Abbreviations
-	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, PredQ, MatchQ, ClauseQ, BodyQ,
+	InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, CxtQ, PredQ, MatchQ, ClauseQ, BodyQ,
 	GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
         InlineSpecQ,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
-	charL, stringL,
+	charL, stringL, stringPrimL,
     -- *** Patterns
 	litP, varP, tupP, conP, infixP, tildeP, bangP, asP, wildP, recP,
 	listP, sigP, 
