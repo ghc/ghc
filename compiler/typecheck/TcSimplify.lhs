@@ -676,7 +676,7 @@ floatEqualities :: TcTyVarSet -> [EvVar]
                 -> CanonicalCts -> (CanonicalCts, CanonicalCts)
 floatEqualities skols can_given wanteds
   | hasEqualities can_given = (emptyBag, wanteds)
-  | otherwise                 = partitionBag is_floatable wanteds
+  | otherwise               = partitionBag is_floatable wanteds
   where
     is_floatable :: CanonicalCt -> Bool
     is_floatable (CTyEqCan { cc_tyvar = tv, cc_rhs = ty })
