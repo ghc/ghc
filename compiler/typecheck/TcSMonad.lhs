@@ -283,7 +283,8 @@ isGiven (Given {}) = True
 isGiven _          = False 
 
 isDerived :: CtFlavor -> Bool 
-isDerived ctid =  not $ isGiven ctid || isWanted ctid 
+isDerived (Derived {}) = True
+isDerived _            = False
 
 canRewrite :: CtFlavor -> CtFlavor -> Bool 
 -- canRewrite ctid1 ctid2 
