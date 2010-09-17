@@ -56,7 +56,7 @@ test('T4272', normal, compile_fail, [''])
 test('T4246', normal, compile_fail, [''])
 test('T4093a', normal, compile_fail, [''])
 test('T4093b', normal, compile_fail, [''])
-test('T3330a', normal, compile_fail, [''])
+test('T3330a', reqlib('mtl'), compile_fail, [''])
 test('T3330b', normal, compile_fail, [''])
 test('T3330c', normal, compile_fail, [''])
 

@@ -1,8 +1,8 @@
 
-mdofail001.hs:10:36:
+mdofail001.hs:10:32:
     No instance for (Num Char)
-      arising from the literal `3'
+      arising from the literal `1'
     Possible fix: add an instance declaration for (Num Char)
-    In the expression: 3
+    In the expression: 1
     In the first argument of `l', namely `[1, 2, 3]'
     In the expression: l [1, 2, 3]

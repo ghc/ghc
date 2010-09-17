@@ -6,6 +6,9 @@ T4093b.hs:25:21:
                       (MaybeC e (n C O), MaybeC x (n O C)))
       from the context (EitherCO e (A C O n) (A O O n) ~ A e O n,
                         EitherCO x (A C C n) (A C O n) ~ A C x n)
+    Expected type: (MaybeC e (n C O), MaybeC x (n O C))
+      Actual type: EitherCO
+                     x (EitherCO e (A C C n) (A O C n)) (EitherCO e (A C O n) (A O O n))
     In the expression: foldBlockNodesF (f, l) b z
     In an equation for `blockToNodeList':
         blockToNodeList b

@@ -14,7 +14,8 @@ prune :: TermLike a => TermFamily a a -> TermFamily a a -> b
 prune = undefined  
 
 -- terms :: Family f => f a -> a
--- terms :: TermFamily a a -> a
+--    Instantiate with f = TermFamily a
+-- terms :: Family (TermFamily a) => TermFamily a a -> a
 -- (terms (undefined::TermFamily a a) :: Family (TermFamily a) => a
 -- So the call to prune forces the equality
 --    TermFamily a a ~ a

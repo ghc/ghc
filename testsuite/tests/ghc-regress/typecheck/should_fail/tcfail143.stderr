@@ -1,5 +1,6 @@
 
 tcfail143.hs:28:9:
     Couldn't match type `S Z' with `Z'
+    arising from a use of `extend'
     In the expression: n1 `extend` n0
     In an equation for `t2': t2 = n1 `extend` n0

@@ -2,6 +2,8 @@
 NoMatchErr.hs:20:5:
     Could not deduce (Memo d ~ Memo d1) from the context (Fun d1)
     NB: `Memo' is a type function, and may not be injective
+    Expected type: Memo d1 a
+      Actual type: Memo d a
     In the first argument of `(.)', namely `abst'
     In the expression: abst . appl
     In an equation for `f': f = abst . appl
