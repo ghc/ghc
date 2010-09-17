@@ -279,6 +279,7 @@ include rules/build-package.mk
 include rules/build-package-way.mk
 include rules/haddock.mk
 include rules/tags-package.mk
+include rules/extra-packages.mk
 
 # -----------------------------------------------------------------------------
 # Registering hand-written package descriptions (used in libffi and rts)
@@ -298,18 +299,27 @@ include rules/bindist.mk
 # -----------------------------------------------------------------------------
 # Building libraries
 
-define addPackage # args: $1 = package, $2 = condition
-    ifneq "$2" ""
+define addPackageGeneral
+# args: $1 = PACKAGES variable, $2 = package, $3 = condition
+    ifeq "$3" ""
+        $1 += $2
+    else
         ifeq "$$(CLEANING)" "YES"
-            PACKAGES += $1
+            $1 += $2
         else
-            ifeq $2
-                PACKAGES += $1
+            ifeq $3
+                $1 += $2
             endif
         endif
-    else
-        PACKAGES += $1
     endif
+endef
+
+define addPackage # args: $1 = package, $2 = condition
+$(call addPackageGeneral,PACKAGES,$1,$2)
+endef
+
+define addPackage2 # args: $1 = package, $2 = condition
+$(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
 endef
 
 INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
@@ -355,28 +365,8 @@ $(eval $(call addPackage,terminfo,($$(Windows),NO)))
 
 $(eval $(call addPackage,haskeline))
 
-$(foreach pkg,$(EXTRA_PACKAGES),$(eval $(call addPackage,$(pkg))))
+$(eval $(call extra-packages))
 
-
-# -------------------  Adding DPH packaes ---------------
-
-# The DPH packages are added when:
-#   * not BootingFromHc (they aren't necessary for bootstrapping), and
-#     * not GhcProfiled (they need TH, so can't be compiled by a -prof GHC), or
-#     * CLEANING: when cleaning we always enable everything
-
-# if !BootingFromHc && (!GhcProfiled || CLEANING)
-
-ifneq "$(BootingFromHc)" "YES"
-ifneq "$(GhcProfiled) $(CLEANING)" "NO YES"
-PACKAGES_STAGE2 += dph/dph-base \
-	dph/dph-prim-interface \
-	dph/dph-prim-seq \
-	dph/dph-prim-par \
-	dph/dph-seq \
-	dph/dph-par
-endif
-endif  # BootingFromHc
 # ------------------------------------------------------- 
 
 
@@ -516,8 +506,6 @@ libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-ins
 #
 # The rest : libraries/*/dist-install, compiler/stage2, ghc/stage2
 
-BUILD_DIRS =
-
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
    $(GHC_MKDIRHIER_DIR)
@@ -565,11 +553,6 @@ BUILD_DIRS += \
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
    $(patsubst %, libraries/%, $(PACKAGES))
-endif
-
-ifneq "$(BootingFromHc)" "YES"
-BUILD_DIRS += \
-   libraries/dph
 endif
 
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
@@ -961,6 +944,7 @@ $(eval $(call bindist,.,\
     INSTALL \
     configure config.sub config.guess install-sh \
     extra-gcc-opts.in \
+    packages \
     Makefile \
     mk/config.mk.in \
     $(INPLACE_BIN)/mkdirhier \
@@ -997,6 +981,9 @@ $(eval $(call bindist,.,\
 	libraries/gen_contents_index \
 	libraries/prologue.txt \
 	libraries/dph/LICENSE \
+	libraries/dph/ghc-packages \
+	libraries/dph/ghc-packages2 \
+	libraries/dph/ghc-stage2-package \
  ))
 endif
 # mk/project.mk gets an absolute path, so we manually include it in
@@ -1007,7 +994,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep:
 	"$(RM)" $(RM_OPTS_REC) bindistprep/
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "LATEX_DOCS         = $(LATEX_DOCS)"         >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_HTML = $(BUILD_DOCBOOK_HTML)" >> $(BIN_DIST_MK)
