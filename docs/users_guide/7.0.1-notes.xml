@@ -614,13 +614,605 @@ Prelude| :}
     </itemizedlist>
   </sect2>
 
-<!--
   <sect2>
     <title>Libraries</title>
 
-    <itemizedlist>
-    </itemizedlist>
+    <sect3>
+        <title>array</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.3.0.2 (was 0.3.0.1)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 4.3.0.0 (was 4.2.0.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new asynchronous exception control API
+                    in <literal>Control.Exception</literal>, using the
+                    new functions
+                    <literal>mask :: ((forall a. IO a -> IO a) -> IO b) -> IO b</literal>
+                    and <literal>mask_ :: IO a -> IO a</literal>
+                    rather than the old
+                    <literal>block</literal> and <literal>unblock</literal>.
+                    There are also functions
+                    <literal>uninterruptibleMask :: ((forall a. IO a -> IO a) -> IO b) -> IO b</literal>
+                    and
+                    <literal>getMaskingState :: IO MaskingState</literal>,
+                    and a type
+                    <literal>MaskingState</literal>, as well as
+                    <literal>forkIOUnmasked :: IO () -> IO ThreadId</literal>
+                    in <literal>Control.Concurrent</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Control.Monad</literal> exports a new function
+                    <literal>void :: Functor f => f a -> f ()</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Tuple</literal> exports a new function
+                    <literal>swap :: (a,b) -> (b,a)</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.IO</literal> exports a new function
+                    <literal>hGetBufSome :: Handle -> Ptr a -> Int -> IO Int</literal>
+                    which is like <literal>hGetBuf</literal> but can
+                    return short reads.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>mfilter :: MonadPlus m => (a -> Bool) -> m a -> m a</literal>
+                    in
+                    <literal>Control.Monad</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Foreign.Marshal</literal> module now
+                    exports
+                    <literal>unsafeLocalState :: IO a -> a</literal>
+                    as specified by Haskell 2010.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal></literal>
+                    module now exports four new functions specified by
+                    Haskell 2010:
+                    <literal>castCUCharToChar :: CUChar -> Char</literal>,
+                    <literal>castCharToCUChar :: Char -> CUChar</literal>,
+                    <literal>castCSCharToChar :: CSChar -> Char</literal> and
+                    <literal>castCharToCSChar :: Char -> CSChar</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Foreign.Marshal.Alloc</literal>
+                    module now exports
+                    <literal>allocaBytesAligned :: Int -> Int -> (Ptr a -> IO b) -> IO b</literal>
+                    for allocating memory with a particular alignment.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>numSparks :: IO Int</literal>
+                    in <literal>GHC.Conc</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Either.partitionEithers</literal>
+                    in now lazier.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a <literal>Typeable</literal> instance for
+                    <literal>Data.Unique.Unique</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Control.Concurrent.SampleVar.SampleVar</literal>
+                    is now an abstract type.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now
+                    <literal>Applicative</literal>,
+                    <literal>Alternative</literal> and
+                    <literal>MonadPlus</literal>
+                    instances for <literal>STM</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>Applicative</literal>,
+                    <literal>Monad</literal> and
+                    <literal>MonadFix</literal>
+                    instances for <literal>Either</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now
+                    <literal>Ord</literal>,
+                    <literal>Read</literal> and
+                    <literal>Show</literal> instances for
+                    <literal>Newline</literal> and
+                    <literal>NewlineMode</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a <literal>Show</literal> instance for
+                    <literal>TextEncoding</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>unGetChan</literal> and
+                    <literal>isEmptyChan</literal> functions in
+                    <literal>Control.Concurrent.Chan</literal> are now
+                    deprecated.
+                    <literal>Control.Concurrent.STM.TChan</literal>
+                    should be used instead if you need that
+                    functionality.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Read Integer</literal> instance now
+                    matches the standard definition.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>base 3 compat</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    We no longer ship a base 3 compat package
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bin-package-db</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bytestring</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.9.1.8 (was 0.9.1.7)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.9.2 (was 1.8.0.6)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Many API changes. See the Cabal docs for more information.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>containers</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.0.0 (was 0.3.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Strictness is now more consistent, with containers
+                    being strict in their elements even in singleton
+                    cases.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>insertLookupWithKey'</literal> in
+                    <literal>Data.Map</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>foldWithKey</literal> function in
+                    <literal>Data.Map</literal> has been deprecated in
+                    favour of <literal>foldrWithKey</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>directory</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.0 (was 1.0.1.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>System.Directory</literal> module
+                    now exports the <literal>Permissions</literal> type
+                    abstractly. There are also new functions
+                    <literal>setOwnerReadable</literal>,
+                    <literal>setOwnerWritable</literal>,
+                    <literal>setOwnerExecutable</literal> and
+                    <literal>setOwnerSearchable</literal>, and
+                    a new value <literal>emptyPermissions</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>
+            dph
+            (dph-base, dph-par, dph-prim-interface, dph-prim-par,
+            dph-prim-seq, dph-seq)
+        </title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    All the dph packages are version 0.4.0.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>extensible-exceptions</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.1.1.2 (was 0.1.1.1)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>filepath</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.2.0.0 (was 1.1.0.4)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The current directory is now <literal>"."</literal>
+                    rather than <literal>""</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-prim</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell98</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.0 (was 1.0.1.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In the <literal>Directory</literal> module, the
+                    <literal>Permissions</literal> type and the
+                    <literal>getPermissions</literal> and
+                    <literal>setPermissions</literal> functions are now
+                    different to their equivalents in
+                    <literal>base:System.Directory</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell2010</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is a new boot package, version 1.0.0.0.
+                    It is not exposed by default.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hpc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.5.0.6 (was 0.5.0.5)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>integer-gmp</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.2.0.2 (was 0.2.0.1)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-locale</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    No change (version 1.0.0.2)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.0.6 (was 1.0.0.5)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>pretty</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.1.2 (was 1.0.1.1)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>process</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.1.4 (was 1.0.1.3)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>random</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.0.3 (was 1.0.0.2)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>syb</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    The syb package is no longer included with GHC.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>template-haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.5.0.0 (was 2.4.0.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new type synonym <literal>DecsQ</literal>
+                    in <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new <literal>StringPrimL</literal>
+                    constructor in
+                    <literal>Language.Haskell.TH.Syntax.Lit</literal>,
+                    and a new helper function
+                    <literal>stringPrimL</literal> for it in
+                    <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function <literal>quoteFile</literal>
+                    in <literal>Language.Haskell.TH.Quote</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Quote.QuasiQuoter</literal>
+                    type has two new fields:
+                    <literal>quoteType</literal> and
+                    <literal>quoteDec</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new <literal>ClassInstance</literal>
+                    type in <literal>Language.Haskell.TH.Syntax</literal>.
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Info.ClassI</literal>
+                    constructor now includes a value of this type, which
+                    allows instance information to be queried via the
+                    new <literal>isClassInstance</literal>
+                    and <literal>classInstances</literal> functions.
+                    There is also a new method
+                    <literal>qClassInstances</literal> in the
+                    <literal>Quasi</literal> class.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.2.0.3 (was 1.1.4)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The types provided by the time package now include
+                    <literal>Data</literal> instances.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>unix</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.4.1.0 (was 2.4.0.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are three new helper function in
+                    <literal>System.Posix.Error</literal>:
+                    <literal>throwErrnoPathIfRetry</literal>,
+                    <literal>throwErrnoPathIfNullRetry</literal> and
+                    <literal>throwErrnoPathIfMinus1Retry</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are three new functions in
+                    <literal>System.Posix.User</literal>:
+                    <literal>setEffectiveUserID</literal>,
+                    <literal>setEffectiveGroupID</literal> and
+                    <literal>setGroups</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
   </sect2>
--->
 </sect1>
 
