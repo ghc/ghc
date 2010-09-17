@@ -348,7 +348,7 @@ data IPBind id
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs) 
-			$$ ppr ds
+			$$ ifPprDebug (ppr ds)
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
   ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
