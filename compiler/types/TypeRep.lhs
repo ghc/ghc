@@ -503,8 +503,11 @@ ppr_type p (FunTy ty1 ty2)
     maybeParen p FunPrec $
     sep (ppr_type FunPrec ty1 : ppr_fun_tail ty2)
   where
-    ppr_fun_tail (FunTy ty1 ty2) = (arrow <+> ppr_type FunPrec ty1) : ppr_fun_tail ty2
-    ppr_fun_tail other_ty        = [arrow <+> pprType other_ty]
+    ppr_fun_tail (FunTy ty1 ty2) 
+      | not (is_pred ty1) = (arrow <+> ppr_type FunPrec ty1) : ppr_fun_tail ty2
+    ppr_fun_tail other_ty = [arrow <+> pprType other_ty]
+    is_pred (PredTy {}) = True
+    is_pred _           = False
 
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
