@@ -121,13 +121,13 @@ tcLocalBinds (HsValBinds binds) thing_inside
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
   = do  { (given_ips, ip_binds') <- mapAndUnzipM (wrapLocSndM tc_ip_bind) ip_binds
+        ; let ip_tvs = foldr (unionVarSet . tyVarsOfType . idType) emptyVarSet given_ips
 
         -- If the binding binds ?x = E, we  must now 
         -- discharge any ?x constraints in expr_lie
         ; (ev_binds, result) <- checkConstraints (IPSkol ips) 
-                                  emptyVarSet [] -- No skolem tyvars and hence 
-                                                 -- no need for envt tyvars
-                                  given_ips $
+                                  ip_tvs  -- See Note [Implicit parameter untouchables]
+                                  [] given_ips $
                                 thing_inside
 
         ; return (HsIPBinds (IPBinds ip_binds' ev_binds), result) }
@@ -142,8 +142,20 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
             ; ip_id <- newIP ip ty
             ; expr' <- tcMonoExpr expr ty
             ; return (ip_id, (IPBind (IPName ip_id) expr')) }
+\end{code}
 
-------------------------
+Note [Implicit parameter untouchables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We add the type variables in the types of the implicit parameters
+as untouchables, not so much because we really must not unify them,
+but rather because we otherwise end up with constraints like this
+    Num alpha, Implic { wanted = alpha ~ Int }
+The constraint solver solves alpha~Int by unification, but then
+doesn't float that solved constraint out (it's not an unsolved 
+wanted.  Result disaster: the (Num alpha) is again solved, this
+time by defaulting.  No no no.
+
+\begin{code}
 tcValBinds :: TopLevelFlag 
            -> HsValBinds Name -> TcM thing
            -> TcM (HsValBinds TcId, thing) 
