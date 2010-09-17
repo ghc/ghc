@@ -31,7 +31,7 @@ module TcSMonad (
  
     getInstEnvs, getFamInstEnvs,                -- Getting the environments 
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchablesTcS,
-    getTcEvBindsBag, getTcSContext,
+    getTcEvBindsBag, getTcSContext, getTcSTyBinds,
 
 
     newFlattenSkolemTy,                         -- Flatten skolems 
