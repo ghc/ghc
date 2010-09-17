@@ -527,7 +527,8 @@ canEqLeafOriented :: CtFlavor -> CoVar
 -- First argument is not OtherCls
 canEqLeafOriented fl cv cls1@(FunCls fn tys) s2 
   | not (kindAppResult (tyConKind fn) tys `eqKind` typeKind s2 )
-  = kindErrorTcS fl (unClassify cls1) s2
+  = do { kindErrorTcS fl (unClassify cls1) s2
+       ; return emptyCCan }
   | otherwise 
   = ASSERT2( isSynFamilyTyCon fn, ppr (unClassify cls1) )
     do { (xis1,ccs1) <- flattenMany fl tys -- flatten type function arguments
@@ -544,7 +545,8 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys) s2
 canEqLeafOriented fl cv (VarCls tv) s2 
   | not (k1 `eqKind` k2 || (isMetaTyVar tv && k2 `isSubKind` k1))
       -- Establish the kind invariant for CTyEqCan
-  = kindErrorTcS fl (mkTyVarTy tv) s2
+  = do { kindErrorTcS fl (mkTyVarTy tv) s2
+       ; return emptyCCan }
 
   | otherwise
   = do { (xi2,ccs2) <- flatten fl s2      -- flatten RHS

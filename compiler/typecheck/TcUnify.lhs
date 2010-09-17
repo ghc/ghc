@@ -14,9 +14,6 @@ module TcUnify (
         -- Various unifications
   unifyType, unifyTypeList, unifyTheta, unifyKind, 
 
-        -- Occurs check error 
-  typeExtraInfoMsg, emitMisMatchErr,
-
   --------------------------------
   -- Holes
   tcInfer, 
@@ -31,7 +28,7 @@ module TcUnify (
 import HsSyn
 import TypeRep
 
-import TcErrors	( typeExtraInfoMsg )
+import TcErrors	( typeExtraInfoMsg, unifyCtxt )
 import TcMType
 import TcEnv
 import TcIface
@@ -526,13 +523,15 @@ uType, uType_np, uType_defer
 --------------
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
-uType_defer origin ty1 ty2
+uType_defer (item : origin) ty1 ty2
   = do { co_var <- newWantedCoVar ty1 ty2
        ; traceTc "utype_defer" (vcat [ppr co_var, ppr ty1, ppr ty2, ppr origin])
-       ; loc <- getCtLoc TypeEqOrigin
+       ; loc <- getCtLoc (TypeEqOrigin item)
        ; wrapEqCtxt origin $
          emitConstraint (WcEvVar (WantedEvVar co_var loc)) 
        ; return $ ACo $ mkTyVarTy co_var }
+uType_defer [] _ _
+  = panic "uType_defer"
 
 --------------
 -- Push a new item on the origin stack (the most common case)
@@ -970,33 +969,25 @@ wrapEqCtxt :: [EqOrigin] -> TcM a -> TcM a
 -- and, if there is more than one item, the "Expected/inferred" part
 -- comes from the outermost item
 wrapEqCtxt []    thing_inside = thing_inside
-wrapEqCtxt [_]   thing_inside = thing_inside
 wrapEqCtxt items thing_inside = addErrCtxtM (unifyCtxt (last items)) thing_inside
 
 ---------------
 failWithMisMatch :: [EqOrigin] -> TcM a
 -- Generate the message when two types fail to match,
 -- going to some trouble to make it helpful.
--- The argument order is: actual type, expected type
-failWithMisMatch [] 
-  = panic "failWithMisMatch"
-failWithMisMatch origin@(item:_)
+-- We take the failing types from the top of the origin stack
+-- rather than reporting the particular ones we are looking 
+-- at right now
+failWithMisMatch (item:origin)
   = wrapEqCtxt origin $
-    emitMisMatchErr (uo_actual item) (uo_expected item)
-
-mkExpectedActualMsg :: Type -> Type -> SDoc
-mkExpectedActualMsg act_ty exp_ty
-  = nest 2 (vcat [ text "Expected type" <> colon <+> ppr exp_ty,
-                   text "  Actual type" <> colon <+> ppr act_ty ])
-
-emitMisMatchErr :: TcType -> TcType -> TcM a
-emitMisMatchErr ty_act ty_exp
-  = do	{ ty_act <- zonkTcType ty_act
-        ; ty_exp <- zonkTcType ty_exp
+    do	{ ty_act <- zonkTcType (uo_actual item)
+        ; ty_exp <- zonkTcType (uo_expected item)
         ; env0 <- tcInitTidyEnv
         ; let (env1, pp_exp) = tidyOpenType env0 ty_exp
               (env2, pp_act) = tidyOpenType env1 ty_act
         ; failWithTcM (misMatchMsg env2 pp_act pp_exp) }
+failWithMisMatch [] 
+  = panic "failWithMisMatch"
 
 misMatchMsg :: TidyEnv -> TcType -> TcType -> (TidyEnv, SDoc)
 misMatchMsg env ty_act ty_exp
@@ -1006,15 +997,6 @@ misMatchMsg env ty_act ty_exp
   where
     (env1, extra1) = typeExtraInfoMsg env  ty_exp
     (env2, extra2) = typeExtraInfoMsg env1 ty_act
-
---------------------
-unifyCtxt :: EqOrigin -> TidyEnv -> TcM (TidyEnv, SDoc)
-unifyCtxt (UnifyOrigin { uo_actual = act_ty, uo_expected = exp_ty }) tidy_env
-  = do  { act_ty' <- zonkTcType act_ty
-        ; exp_ty' <- zonkTcType exp_ty
-        ; let (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
-              (env2, act_ty'') = tidyOpenType env1     act_ty'
-        ; return (env2, mkExpectedActualMsg act_ty'' exp_ty'') }
 \end{code}
 
 

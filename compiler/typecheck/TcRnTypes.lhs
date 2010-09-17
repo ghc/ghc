@@ -848,13 +848,12 @@ ctLocOrigin (CtLoc o _ _) = o
 setCtLocOrigin :: CtLoc o -> o' -> CtLoc o'
 setCtLocOrigin (CtLoc _ s c) o = CtLoc o s c
 
-pprArising :: CtLoc CtOrigin -> SDoc
-pprArising loc = case ctLocOrigin loc of
-                   TypeEqOrigin -> empty
-                   _ -> text "arising from" <+> ppr (ctLocOrigin loc)
+pprArising :: CtOrigin -> SDoc
+pprArising (TypeEqOrigin {}) = empty
+pprArising orig              = text "arising from" <+> ppr orig
 
 pprArisingAt :: CtLoc CtOrigin -> SDoc
-pprArisingAt loc = sep [pprArising loc, text "at" <+> ppr (ctLocSpan loc)]
+pprArisingAt (CtLoc o s _) = sep [pprArising o, text "at" <+> ppr s]
 
 -------------------------------------------
 -- CtOrigin gives the origin of *wanted* constraints
@@ -864,7 +863,7 @@ data CtOrigin
 
   | SpecPragOrigin Name		-- Specialisation pragma for identifier
 
-  | TypeEqOrigin
+  | TypeEqOrigin EqOrigin
 
   | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
 
@@ -919,7 +918,7 @@ pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprO DefaultOrigin	   = ptext (sLit "a 'default' declaration")
 pprO DoOrigin	           = ptext (sLit "a do statement")
 pprO ProcOrigin	           = ptext (sLit "a proc expression")
-pprO TypeEqOrigin          = ptext (sLit "an equality")
+pprO (TypeEqOrigin eq)     = ptext (sLit "an equality") <+> ppr eq
 pprO AnnOrigin             = ptext (sLit "an annotation")
 
 instance Outputable EqOrigin where

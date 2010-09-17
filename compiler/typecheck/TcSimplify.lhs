@@ -787,7 +787,8 @@ defaultTyVar untch the_tv
   , not (the_tv `elemVarSet` untch)
   , not (k `eqKind` default_k)
   = do { (ev, better_ty) <- TcSMonad.newKindConstraint (mkTyVarTy the_tv) default_k
-       ; let loc = CtLoc TypeEqOrigin (getSrcSpan the_tv) [] -- Yuk
+       ; let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
+       	     	   -- 'DefaultOrigin' is strictly the declaration, but it's convenient
              wanted_eq  = CTyEqCan { cc_id     = ev
                                    , cc_flavor = Wanted loc
                                    , cc_tyvar  = the_tv
