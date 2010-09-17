@@ -1,0 +1,10 @@
+
+IPFail.hs:6:18:
+    Could not deduce (Num Bool) from the context (?x::Int)
+      arising from the literal `5'
+    Possible fix:
+      add (Num Bool) to the context of the type signature for `f0'
+      or add an instance declaration for (Num Bool)
+    In the expression: 5
+    In the expression: let ?x = 5 in ?x
+    In an equation for `f0': f0 () = let ?x = 5 in ?x

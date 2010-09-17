@@ -70,6 +70,7 @@ test('tcrun042', if_compiler_lt('ghc', '6.11', expect_fail), compile_and_run, ['
 test('church', normal, compile_and_run, [''])
 test('testeq2', normal, compile_and_run, [''])
 test('T1624', normal, compile_and_run, [''])
+test('IPRun', normal, compile_and_run, [''])
 
 # Support files for T1735 are in directory T1735_Help/
 test('T1735', normal, multimod_compile_and_run, ['T1735',''])
