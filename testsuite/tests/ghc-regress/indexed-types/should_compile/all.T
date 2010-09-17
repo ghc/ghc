@@ -139,6 +139,7 @@ test('T3220', if_compiler_lt('ghc', '6.11', expect_fail), compile, [''])
 test('T3590', normal, compile, [''])
 test('CoTest3', if_compiler_lt('ghc', '6.13', expect_fail), compile, [''])
 test('Roman1', if_compiler_lt('ghc', '6.13', expect_fail), compile, [''])
+test('T4160', normal, compile, [''])
 test('IndTypesPerf',
      extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
                   'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi']),
