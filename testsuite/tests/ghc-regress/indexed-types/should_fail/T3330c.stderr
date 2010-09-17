@@ -1,0 +1,51 @@
+
+T3330c.hs:22:35:
+    Couldn't match type `f3' with `Der f3'
+      `f3' is a rigid type variable bound by
+           a pattern with constructor
+           RSum :: forall (f :: * -> *) (g :: * -> *).
+                   R f -> R g -> R (f :+: g)
+             at T3330c.hs:22:10
+    In the expression: Inl (plug rf df x)
+    In an equation for `plug'':
+        plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
+    In an equation for `plug':
+        plug
+          = plug' rep
+          where
+              plug' :: R f -> Der f x -> x -> f x
+              plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
+
+T3330c.hs:22:40:
+    Could not deduce (Rep ((->) x1))
+      from the context (Rep f1, f2 ~ (f3 :+: g))
+      arising from a use of `plug'
+    Possible fix:
+      add (Rep ((->) x1)) to the context of
+        the data constructor `RSum'
+        or the type signature for `plug''
+        or the type signature for `plug'
+      or add an instance declaration for (Rep ((->) x1))
+    In the first argument of `Inl', namely `(plug rf df x)'
+    In the expression: Inl (plug rf df x)
+    In an equation for `plug'':
+        plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
+
+T3330c.hs:22:45:
+    Couldn't match type `Der ((->) x)' with `R'
+    Expected type: Der ((->) x) (f x)
+      Actual type: R f1
+    In the first argument of `plug', namely `rf'
+    In the first argument of `Inl', namely `(plug rf df x)'
+
+T3330c.hs:22:45:
+    Couldn't match type `f' with `f1 x'
+      `f' is a rigid type variable bound by
+          a pattern with constructor
+          RSum :: forall (f :: * -> *) (g :: * -> *).
+                  R f -> R g -> R (f :+: g)
+            at T3330c.hs:22:10
+    Expected type: Der ((->) x) (f1 x)
+      Actual type: R f
+    In the first argument of `plug', namely `rf'
+    In the first argument of `Inl', namely `(plug rf df x)'

@@ -1,0 +1,34 @@
+
+T3330a.hs:17:28:
+    Couldn't match type `ix' with `ix2'
+      because this skolem type variable would escape: `ix2'
+    This skolem is bound by
+      the polymorphic type `forall ix. phi ix -> r ix -> m (r' ix)'
+    In the first argument of `hmapM', namely `p'
+    In the first argument of `execWriter', namely `(hmapM p collect x)'
+    In the expression: execWriter (hmapM p collect x)
+
+T3330a.hs:17:34:
+    Couldn't match type `s' with `(->) (s1 ix1 -> ix)'
+      `s' is a rigid type variable bound by
+          the type signature for `children' at T3330a.hs:16:13
+    Expected type: (s1 ix1 -> ix) -> r ix -> Writer [AnyF s] (r' ix)
+      Actual type: s ix2
+    In the first argument of `hmapM', namely `p'
+    In the first argument of `execWriter', namely `(hmapM p collect x)'
+
+T3330a.hs:17:36:
+    No instance for (HFunctor (PF s))
+      arising from a use of `collect'
+    Possible fix: add an instance declaration for (HFunctor (PF s))
+    In the second argument of `hmapM', namely `collect'
+    In the first argument of `execWriter', namely `(hmapM p collect x)'
+    In the expression: execWriter (hmapM p collect x)
+
+T3330a.hs:17:44:
+    Couldn't match type `ix1' with `r ix -> Writer [AnyF s1] (r ix)'
+      `ix1' is a rigid type variable bound by
+            the type signature for `children' at T3330a.hs:16:15
+    In the third argument of `hmapM', namely `x'
+    In the first argument of `execWriter', namely `(hmapM p collect x)'
+    In the expression: execWriter (hmapM p collect x)
