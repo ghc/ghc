@@ -413,6 +413,9 @@ way_details =
 	-- the problems are our fault or theirs, but it seems that using the
 	-- alternative 1:1 threading library libthr works around it:
 	  "-optl-lthr"
+#elif defined(openbsd_TARGET_OS)
+	  "-optc-pthread"
+	, "-optl-pthread"
 #elif defined(solaris2_TARGET_OS)
           "-optl-lrt"
 #endif
@@ -428,6 +431,10 @@ way_details =
 	--	with -fPIC. Labels not in the current package are assumed to be in a DLL 
 	--	different from the current one.
 	, "-fPIC"
+#elif defined(openbsd_TARGET_OS)
+	-- Without this, linking the shared libHSffi fails because
+	-- it uses pthread mutexes.
+	, "-optl-pthread"
 #endif
 	],
 

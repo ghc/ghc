@@ -1538,7 +1538,7 @@ linkBinary dflags o_files dep_packages = do
 
     let
         thread_opts | WayThreaded `elem` ways = [
-#if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS) && !defined(haiku_TARGET_OS)
+#if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS) && !defined(openbsd_TARGET_OS) && !defined(haiku_TARGET_OS)
                         "-lpthread"
 #endif
 #if defined(osf3_TARGET_OS)

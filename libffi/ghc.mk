@@ -75,6 +75,8 @@ libffi_DYNAMIC_PROG =
 ifeq "$(darwin_TARGET_OS)" "1"
 libffi_DYNAMIC_LIBS = libffi/dist-install/build/libffi$(soext) \
                       libffi/dist-install/build/libffi.5$(soext)
+else ifeq "$(openbsd_TARGET_OS)" "1"
+libffi_DYNAMIC_LIBS = libffi/dist-install/build/libffi.so.5.10
 else
 libffi_DYNAMIC_LIBS = libffi/dist-install/build/libffi.so \
                       libffi/dist-install/build/libffi.so.5
