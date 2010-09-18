@@ -93,6 +93,12 @@ endef
 # The formatting of this definition (e.g. the blank line above) is
 # important, in order to get make to generate the right makefile code.
 #
+# 's|\\|/|g'
+#    We first normalise all slashes to be forward slashes. Note that
+#    $(TOP) also uses forward slashes.
+# 's| /$$| \\|'
+#    But now we need to fix the line continuation characters that we
+#    just broke.
 # "1s|\.o|\.$($w_osuf)|"
 #    We will have dependencies for .o files, so we need to fix them up
 #    for the right object suffix for the way we're doing
@@ -126,7 +132,7 @@ endef
 define addCFileDeps
 
 	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_v_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
-	$(foreach w,$5,sed -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
+	$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
 
 ifeq "$(Windows)" "YES"
