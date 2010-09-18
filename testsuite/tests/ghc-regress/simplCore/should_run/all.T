@@ -40,3 +40,6 @@ test('T3983', [only_ways(['normal','optc','optasm']),
                extra_clean(['T3983_Foo.hi','T3983_Foo.o','T3983_Bar.hi','T3983_Bar.o',])], 
               multimod_compile_and_run, 
               ['T3983',''])
+test('T3972', extra_clean(['T3972A.hi', 'T3972A.o']),
+              compile_and_run,
+              [''])
