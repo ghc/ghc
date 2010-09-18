@@ -817,10 +817,10 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty = do
     traceTc "checkValidType" (ppr ty)
-    unboxed  <- doptM Opt_UnboxedTuples
-    rank2    <- doptM Opt_Rank2Types
-    rankn    <- doptM Opt_RankNTypes
-    polycomp <- doptM Opt_PolymorphicComponents
+    unboxed  <- xoptM Opt_UnboxedTuples
+    rank2    <- xoptM Opt_Rank2Types
+    rankn    <- xoptM Opt_RankNTypes
+    polycomp <- xoptM Opt_PolymorphicComponents
     let 
 	gen_rank n | rankn     = ArbitraryRank
 	           | rank2     = Rank 2
@@ -950,7 +950,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
  	  checkTc (tyConArity tc <= length tys) arity_msg
 
 	-- See Note [Liberal type synonyms]
-	; liberal <- doptM Opt_LiberalTypeSynonyms
+	; liberal <- xoptM Opt_LiberalTypeSynonyms
 	; if not liberal || isSynFamilyTyCon tc then
 		-- For H98 and synonym families, do check the type args
 		mapM_ (check_mono_type SynArgMonoType) tys
@@ -962,10 +962,10 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
     }
     
   | isUnboxedTupleTyCon tc
-  = do	{ ub_tuples_allowed <- doptM Opt_UnboxedTuples
+  = do	{ ub_tuples_allowed <- xoptM Opt_UnboxedTuples
 	; checkTc (ubx_tup_ok ub_tuples_allowed) ubx_tup_msg
 
-	; impred <- doptM Opt_ImpredicativeTypes	
+	; impred <- xoptM Opt_ImpredicativeTypes	
 	; let rank' = if impred then ArbitraryRank else TyConArgMonoType
 		-- c.f. check_arg_type
 		-- However, args are allowed to be unlifted, or
@@ -1009,7 +1009,7 @@ check_arg_type :: Rank -> Type -> TcM ()
 -- Anyway, they are dealt with by a special case in check_tau_type
 
 check_arg_type rank ty 
-  = do	{ impred <- doptM Opt_ImpredicativeTypes
+  = do	{ impred <- xoptM Opt_ImpredicativeTypes
 	; let rank' = case rank of 	    -- Predictive => must be monotype
 	      	        MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
 			_other | impred    -> ArbitraryRank
@@ -1142,7 +1142,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
 check_pred_ty dflags _ pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
-       ; checkTc (dopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
+       ; checkTc (xopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
 
 		-- Check the form of the argument types
        ; checkValidMonoType ty1
@@ -1173,8 +1173,8 @@ check_class_pred_tys dflags ctxt tys
 				-- checkInstTermination
 	_             -> flexible_contexts || all tyvar_head tys
   where
-    flexible_contexts = dopt Opt_FlexibleContexts dflags
-    undecidable_ok = dopt Opt_UndecidableInstances dflags
+    flexible_contexts = xopt Opt_FlexibleContexts dflags
+    undecidable_ok = xopt Opt_UndecidableInstances dflags
 
 -------------------------
 tyvar_head :: Type -> Bool
@@ -1355,13 +1355,13 @@ checkValidInstHead ty	-- Should be a source type
 check_inst_head :: DynFlags -> Class -> [Type] -> TcM ()
 check_inst_head dflags clas tys
   = do { -- If GlasgowExts then check at least one isn't a type variable
-       ; checkTc (dopt Opt_TypeSynonymInstances dflags ||
+       ; checkTc (xopt Opt_TypeSynonymInstances dflags ||
                   all tcInstHeadTyNotSynonym tys)
                  (instTypeErr (pprClassPred clas tys) head_type_synonym_msg)
-       ; checkTc (dopt Opt_FlexibleInstances dflags ||
+       ; checkTc (xopt Opt_FlexibleInstances dflags ||
                   all tcInstHeadTyAppAllTyVars tys)
                  (instTypeErr (pprClassPred clas tys) head_type_args_tyvars_msg)
-       ; checkTc (dopt Opt_MultiParamTypeClasses dflags ||
+       ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
                   isSingleton tys)
                  (instTypeErr (pprClassPred clas tys) head_one_type_msg)
          -- May not contain type family applications
@@ -1412,7 +1412,7 @@ checkValidInstance hs_type tyvars theta tau
     do	{ (clas, inst_tys) <- setSrcSpan head_loc $
                               checkValidInstHead tau
 
-        ; undecidable_ok <- doptM Opt_UndecidableInstances
+        ; undecidable_ok <- xoptM Opt_UndecidableInstances
 
 	; checkValidTheta InstThetaCtxt theta
 	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
@@ -1513,7 +1513,7 @@ checkValidTypeInst typats rhs
        ; checkValidMonoType rhs
 
          -- we have a decidable instance unless otherwise permitted
-       ; undecidable_ok <- doptM Opt_UndecidableInstances
+       ; undecidable_ok <- xoptM Opt_UndecidableInstances
        ; unless undecidable_ok $
 	   mapM_ addErrTc (checkFamInst typats (tyFamInsts rhs))
        }

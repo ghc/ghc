@@ -1416,7 +1416,7 @@ legalFFITyCon tc
 
 marshalableTyCon :: DynFlags -> TyCon -> Bool
 marshalableTyCon dflags tc
-  =  (dopt Opt_UnliftedFFITypes dflags 
+  =  (xopt Opt_UnliftedFFITypes dflags 
       && isUnLiftedTyCon tc
       && not (isUnboxedTupleTyCon tc)
       && case tyConPrimRep tc of	-- Note [Marshalling VoidRep]
@@ -1442,7 +1442,7 @@ legalFIPrimArgTyCon :: DynFlags -> TyCon -> Bool
 -- Strictly speaking it is unnecessary to ban unboxed tuples here since
 -- currently they're of the wrong kind to use in function args anyway.
 legalFIPrimArgTyCon dflags tc
-  = dopt Opt_UnliftedFFITypes dflags
+  = xopt Opt_UnliftedFFITypes dflags
     && isUnLiftedTyCon tc
     && not (isUnboxedTupleTyCon tc)
 
@@ -1450,7 +1450,7 @@ legalFIPrimResultTyCon :: DynFlags -> TyCon -> Bool
 -- Check result type of 'foreign import prim'. Allow simple unlifted
 -- types and also unboxed tuple result types '... -> (# , , #)'
 legalFIPrimResultTyCon dflags tc
-  = dopt Opt_UnliftedFFITypes dflags
+  = xopt Opt_UnliftedFFITypes dflags
     && isUnLiftedTyCon tc
     && (isUnboxedTupleTyCon tc
         || case tyConPrimRep tc of	-- Note [Marshalling VoidRep]

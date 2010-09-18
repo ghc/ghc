@@ -750,7 +750,7 @@ rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
 
 rnGRHS' :: HsMatchContext Name -> GRHS RdrName -> RnM (GRHS Name, FreeVars)
 rnGRHS' ctxt (GRHS guards rhs)
-  = do	{ pattern_guards_allowed <- doptM Opt_PatternGuards
+  = do	{ pattern_guards_allowed <- xoptM Opt_PatternGuards
 	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
 				    rnLExpr rhs
 

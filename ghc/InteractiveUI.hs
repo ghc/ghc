@@ -1660,7 +1660,7 @@ showLanguages = do
    dflags <- getDynFlags
    io $ putStrLn $ showSDoc $ vcat $
       text "active language flags:" :
-      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, dopt f dflags]
+      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, xopt f dflags]
 
 -- -----------------------------------------------------------------------------
 -- Completion

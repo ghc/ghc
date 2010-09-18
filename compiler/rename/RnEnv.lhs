@@ -207,7 +207,7 @@ lookupTopBndrRn_maybe rdr_name
            -- See Note [Type and class operator definitions]
           let occ = rdrNameOcc rdr_name
         ; when (isTcOcc occ && isSymOcc occ)
-               (do { op_ok <- doptM Opt_TypeOperators
+               (do { op_ok <- xoptM Opt_TypeOperators
 	           ; unless op_ok (addErr (opDeclErr rdr_name)) })
 
     	; mb_gre <- lookupGreLocalRn rdr_name
@@ -764,7 +764,7 @@ checks the type of the user thing against the type of the standard thing.
 lookupSyntaxName :: Name 				-- The standard name
 	         -> RnM (SyntaxExpr Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
-  = doptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
+  = xoptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
     if implicit_prelude then normal_case
     else
 	-- Get the similarly named thing from the local environment
@@ -776,7 +776,7 @@ lookupSyntaxName std_name
 lookupSyntaxTable :: [Name]				-- Standard names
 		  -> RnM (SyntaxTable Name, FreeVars)	-- See comments with HsExpr.ReboundNames
 lookupSyntaxTable std_names
-  = doptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
+  = xoptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
     if implicit_prelude then normal_case 
     else
     	-- Get the similarly named thing from the local environment
@@ -866,7 +866,7 @@ bindTyVarsRn ::  [LHsTyVarBndr RdrName]
 -- Haskell-98 binding of type variables; e.g. within a data type decl
 bindTyVarsRn tyvar_names enclosed_scope
   = bindLocatedLocalsRn located_tyvars	$ \ names ->
-    do { kind_sigs_ok <- doptM Opt_KindSignatures
+    do { kind_sigs_ok <- xoptM Opt_KindSignatures
        ; unless (null kinded_tyvars || kind_sigs_ok) 
        	 	(mapM_ (addErr . kindSigErr) kinded_tyvars)
        ; enclosed_scope (zipWith replace tyvar_names names) }
@@ -879,7 +879,7 @@ bindPatSigTyVars :: [LHsType RdrName] -> ([Name] -> RnM a) -> RnM a
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
 bindPatSigTyVars tys thing_inside
-  = do 	{ scoped_tyvars <- doptM Opt_ScopedTypeVariables
+  = do 	{ scoped_tyvars <- xoptM Opt_ScopedTypeVariables
 	; if not scoped_tyvars then 
 		thing_inside []
 	  else 
@@ -906,7 +906,7 @@ bindSigTyVarsFV :: [Name]
 		-> RnM (a, FreeVars)
 	  	-> RnM (a, FreeVars)
 bindSigTyVarsFV tvs thing_inside
-  = do	{ scoped_tyvars <- doptM Opt_ScopedTypeVariables
+  = do	{ scoped_tyvars <- xoptM Opt_ScopedTypeVariables
 	; if not scoped_tyvars then 
 		thing_inside 
 	  else
@@ -950,7 +950,7 @@ checkDupAndShadowedNames envs names
 -------------------------------------
 checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
 checkShadowedOccs (global_env,local_env) loc_occs
-  = ifOptM Opt_WarnNameShadowing $ 
+  = ifDOptM Opt_WarnNameShadowing $ 
     do	{ traceRn (text "shadow" <+> ppr loc_occs)
 	; mapM_ check_shadow loc_occs }
   where
@@ -973,7 +973,7 @@ checkShadowedOccs (global_env,local_env) loc_occs
 	-- punning or wild-cards are on (cf Trac #2723)
     is_shadowed_gre gre@(GRE { gre_par = ParentIs _ })
 	= do { dflags <- getDOpts
-	     ; if (dopt Opt_RecordPuns dflags || dopt Opt_RecordWildCards dflags) 
+	     ; if (xopt Opt_RecordPuns dflags || xopt Opt_RecordWildCards dflags) 
 	       then do { is_fld <- is_rec_fld gre; return (not is_fld) }
 	       else return True }
     is_shadowed_gre _other = return True
@@ -1029,7 +1029,7 @@ mapFvRnCPS f (x:xs) cont = f x 		   $ \ x' ->
 \begin{code}
 warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
-    = ifOptM Opt_WarnUnusedBinds
+    = ifDOptM Opt_WarnUnusedBinds
     $ do isBoot <- tcIsHsBoot
          let noParent gre = case gre_par gre of
                             NoParent -> True
@@ -1047,7 +1047,7 @@ warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
 
 check_unused :: DynFlag -> [Name] -> FreeVars -> RnM ()
 check_unused flag bound_names used_names
- = ifOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
+ = ifDOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
 
 -------------------------
 --	Helpers

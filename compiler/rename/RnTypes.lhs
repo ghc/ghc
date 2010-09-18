@@ -116,7 +116,7 @@ rnHsType _ (HsTyVar tyvar) = do
 -- Hence the jiggery pokery with ty1
 rnHsType doc ty@(HsOpTy ty1 (L loc op) ty2)
   = setSrcSpan loc $ 
-    do	{ ops_ok <- doptM Opt_TypeOperators
+    do	{ ops_ok <- xoptM Opt_TypeOperators
 	; op' <- if ops_ok
 		 then lookupOccRn op 
 		 else do { addErr (opTyErr op ty)
@@ -161,7 +161,7 @@ rnHsType doc (HsListTy ty) = do
     return (HsListTy ty')
 
 rnHsType doc (HsKindSig ty k)
-  = do { kind_sigs_ok <- doptM Opt_KindSignatures
+  = do { kind_sigs_ok <- xoptM Opt_KindSignatures
        ; unless kind_sigs_ok (addErr (kindSigErr ty))
        ; ty' <- rnLHsType doc ty
        ; return (HsKindSig ty' k) }
@@ -570,7 +570,7 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 forAllWarn :: SDoc -> LHsType RdrName -> Located RdrName
            -> TcRnIf TcGblEnv TcLclEnv ()
 forAllWarn doc ty (L loc tyvar)
-  = ifOptM Opt_WarnUnusedMatches 	$
+  = ifDOptM Opt_WarnUnusedMatches 	$
     addWarnAt loc (sep [ptext (sLit "The universally quantified type variable") <+> quotes (ppr tyvar),
 		 	nest 4 (ptext (sLit "does not appear in the type") <+> quotes (ppr ty))]
 		   $$

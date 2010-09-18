@@ -14,14 +14,19 @@
 -- flags.  Dynamic flags can also be set at the prompt in GHCi.
 module DynFlags (
         -- * Dynamic flags and associated configuration types
-        DOpt(..),
         DynFlag(..),
         ExtensionFlag(..),
         glasgowExtsFlags,
         flattenExtensionFlags,
         ensureFlattenedExtensionFlags,
-        lopt_set_flattened,
-        lopt_unset_flattened,
+        dopt,
+        dopt_set,
+        dopt_unset,
+        xopt,
+        xopt_set,
+        xopt_unset,
+        xopt_set_flattened,
+        xopt_unset_flattened,
         DynFlags(..),
         RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
@@ -814,64 +819,47 @@ languageExtensions (Just Haskell2010)
        Opt_DoAndIfThenElse,
        Opt_RelaxedPolyRec]
 
--- The DOpt class is a temporary workaround, to avoid having to do
--- a mass-renaming dopt->lopt at the moment
-class DOpt a where
-    dopt :: a -> DynFlags -> Bool
-    dopt_set :: DynFlags -> a -> DynFlags
-    dopt_unset :: DynFlags -> a -> DynFlags
-
-instance DOpt DynFlag where
-    dopt = dopt'
-    dopt_set = dopt_set'
-    dopt_unset = dopt_unset'
-
-instance DOpt ExtensionFlag where
-    dopt = lopt
-    dopt_set = lopt_set
-    dopt_unset = lopt_unset
-
 -- | Test whether a 'DynFlag' is set
-dopt' :: DynFlag -> DynFlags -> Bool
-dopt' f dflags  = f `elem` (flags dflags)
+dopt :: DynFlag -> DynFlags -> Bool
+dopt f dflags  = f `elem` (flags dflags)
 
 -- | Set a 'DynFlag'
-dopt_set' :: DynFlags -> DynFlag -> DynFlags
-dopt_set' dfs f = dfs{ flags = f : flags dfs }
+dopt_set :: DynFlags -> DynFlag -> DynFlags
+dopt_set dfs f = dfs{ flags = f : flags dfs }
 
 -- | Unset a 'DynFlag'
-dopt_unset' :: DynFlags -> DynFlag -> DynFlags
-dopt_unset' dfs f = dfs{ flags = filter (/= f) (flags dfs) }
+dopt_unset :: DynFlags -> DynFlag -> DynFlags
+dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
 -- | Test whether a 'ExtensionFlag' is set
-lopt :: ExtensionFlag -> DynFlags -> Bool
-lopt f dflags = case extensionFlags dflags of
+xopt :: ExtensionFlag -> DynFlags -> Bool
+xopt f dflags = case extensionFlags dflags of
                 Left _ -> panic ("Testing for extension flag " ++ show f ++ " before flattening")
                 Right flags -> f `elem` flags
 
 -- | Set a 'ExtensionFlag'
-lopt_set :: DynFlags -> ExtensionFlag -> DynFlags
-lopt_set dfs f = case extensionFlags dfs of
+xopt_set :: DynFlags -> ExtensionFlag -> DynFlags
+xopt_set dfs f = case extensionFlags dfs of
                  Left onoffs -> dfs { extensionFlags = Left (On f : onoffs) }
                  Right _ -> panic ("Setting extension flag " ++ show f ++ " after flattening")
 
 -- | Set a 'ExtensionFlag'
-lopt_set_flattened :: DynFlags -> ExtensionFlag -> DynFlags
-lopt_set_flattened dfs f = case extensionFlags dfs of
+xopt_set_flattened :: DynFlags -> ExtensionFlag -> DynFlags
+xopt_set_flattened dfs f = case extensionFlags dfs of
                            Left _ ->
                                panic ("Setting extension flag " ++ show f ++ " before flattening, but expected flattened")
                            Right flags ->
                                dfs { extensionFlags = Right (f : delete f flags) }
 
 -- | Unset a 'ExtensionFlag'
-lopt_unset :: DynFlags -> ExtensionFlag -> DynFlags
-lopt_unset dfs f = case extensionFlags dfs of
+xopt_unset :: DynFlags -> ExtensionFlag -> DynFlags
+xopt_unset dfs f = case extensionFlags dfs of
                    Left onoffs -> dfs { extensionFlags = Left (Off f : onoffs) }
                    Right _ -> panic ("Unsetting extension flag " ++ show f ++ " after flattening")
 
 -- | Unset a 'ExtensionFlag'
-lopt_unset_flattened :: DynFlags -> ExtensionFlag -> DynFlags
-lopt_unset_flattened dfs f = case extensionFlags dfs of
+xopt_unset_flattened :: DynFlags -> ExtensionFlag -> DynFlags
+xopt_unset_flattened dfs f = case extensionFlags dfs of
                              Left _ ->
                                  panic ("Unsetting extension flag " ++ show f ++ " before flattening, but expected flattened")
                              Right flags ->
@@ -1883,7 +1871,7 @@ setLanguage l = upd (\dfs -> dfs { language = Just l })
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
-setExtensionFlag f = do { upd (\dfs -> lopt_set dfs f)
+setExtensionFlag f = do { upd (\dfs -> xopt_set dfs f)
                         ; mapM_ setExtensionFlag deps }
   where
     deps = [ d | (f', d) <- impliedFlags, f' == f ]
@@ -1893,7 +1881,7 @@ setExtensionFlag f = do { upd (\dfs -> lopt_set dfs f)
         -- When you un-set f, however, we don't un-set the things it implies
         --      (except for -fno-glasgow-exts, which is treated specially)
 
-unSetExtensionFlag f = upd (\dfs -> lopt_unset dfs f)
+unSetExtensionFlag f = upd (\dfs -> xopt_unset dfs f)
 
 --------------------------
 setDumpFlag' :: DynFlag -> DynP ()

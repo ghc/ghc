@@ -300,7 +300,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
   = do	{ let { dflags     = hsc_dflags hsc_env
 	      ; omit_prags = dopt Opt_OmitInterfacePragmas dflags
 	      ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
-	      ; th	   = dopt Opt_TemplateHaskell      dflags
+	      ; th	   = xopt Opt_TemplateHaskell      dflags
               }
 	; showPass dflags CoreTidy
 

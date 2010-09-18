@@ -110,7 +110,7 @@ rnExpr (HsIPVar v)
 
 rnExpr (HsLit lit@(HsString s))
   = do {
-         opt_OverloadedStrings <- doptM Opt_OverloadedStrings
+         opt_OverloadedStrings <- xoptM Opt_OverloadedStrings
        ; if opt_OverloadedStrings then
             rnExpr (HsOverLit (mkHsIsString s placeHolderType))
 	 else -- Same as below
@@ -1175,7 +1175,7 @@ checkRecStmt ctxt	  = addErr msg
 ---------
 checkParStmt :: HsStmtContext Name -> RnM ()
 checkParStmt _
-  = do	{ parallel_list_comp <- doptM Opt_ParallelListComp
+  = do	{ parallel_list_comp <- xoptM Opt_ParallelListComp
 	; checkErr parallel_list_comp msg }
   where
     msg = ptext (sLit "Illegal parallel list comprehension: use -XParallelListComp")
@@ -1184,7 +1184,7 @@ checkParStmt _
 checkTransformStmt :: HsStmtContext Name -> RnM ()
 checkTransformStmt ListComp  -- Ensure we are really within a list comprehension because otherwise the
 			     -- desugarer will break when we come to operate on a parallel array
-  = do	{ transform_list_comp <- doptM Opt_TransformListComp
+  = do	{ transform_list_comp <- xoptM Opt_TransformListComp
 	; checkErr transform_list_comp msg }
   where
     msg = ptext (sLit "Illegal transform or grouping list comprehension: use -XTransformListComp")
@@ -1197,7 +1197,7 @@ checkTransformStmt ctxt = addErr msg
 ---------
 checkTupleSection :: [HsTupArg RdrName] -> RnM ()
 checkTupleSection args
-  = do	{ tuple_section <- doptM Opt_TupleSections
+  = do	{ tuple_section <- xoptM Opt_TupleSections
 	; checkErr (all tupArgPresent args || tuple_section) msg }
   where
     msg = ptext (sLit "Illegal tuple section: use -XTupleSections")

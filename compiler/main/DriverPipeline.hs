@@ -707,7 +707,7 @@ runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
        checkProcessArgsResult unhandled_flags
        let dflags1' = flattenExtensionFlags dflags1
 
-       if not (dopt Opt_Cpp dflags1') then do
+       if not (xopt Opt_Cpp dflags1') then do
            -- we have to be careful to emit warnings only once.
            unless (dopt Opt_Pp dflags1') $ handleFlagWarnings dflags1' warns
 

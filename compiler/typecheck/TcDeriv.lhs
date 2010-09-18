@@ -928,7 +928,7 @@ cond_functorOK :: Bool -> Condition
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
 cond_functorOK allowFunctions (dflags, rep_tc) 
-  | not (dopt Opt_DeriveFunctor dflags)
+  | not (xopt Opt_DeriveFunctor dflags)
   = Just (ptext (sLit "You need -XDeriveFunctor to derive an instance for this class"))
 
   | null tc_tvs
@@ -971,7 +971,7 @@ cond_functorOK allowFunctions (dflags, rep_tc)
 
 checkFlag :: ExtensionFlag -> Condition
 checkFlag flag (dflags, _)
-  | dopt flag dflags = Nothing
+  | xopt flag dflags = Nothing
   | otherwise        = Just why
   where
     why = ptext (sLit "You need -X") <> text flag_str 
@@ -1074,7 +1074,7 @@ mkNewTypeEqn orig dflags tvs
         | can_derive_via_isomorphism -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
       	| otherwise                  -> bale_out non_std
   where
-        newtype_deriving = dopt Opt_GeneralizedNewtypeDeriving dflags
+        newtype_deriving = xopt Opt_GeneralizedNewtypeDeriving dflags
         go_for_it        = mk_data_eqn orig tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
 	bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
 

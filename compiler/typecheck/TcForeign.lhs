@@ -132,7 +132,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
           return idecl
   | cconv == PrimCallConv = do
       dflags <- getDOpts
-      check (dopt Opt_GHCForeignImportPrim dflags)
+      check (xopt Opt_GHCForeignImportPrim dflags)
             (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
       checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
       checkCTarget target

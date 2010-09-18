@@ -1826,29 +1826,29 @@ mkPState flags buf loc =
       alr_justClosedExplicitLetBlock = False
     }
     where
-      bitmap = genericsBit `setBitIf` dopt Opt_Generics flags
-	       .|. ffiBit            `setBitIf` dopt Opt_ForeignFunctionInterface flags
-	       .|. parrBit           `setBitIf` dopt Opt_PArr         flags
-	       .|. arrowsBit         `setBitIf` dopt Opt_Arrows       flags
-	       .|. thBit             `setBitIf` dopt Opt_TemplateHaskell flags
-	       .|. qqBit             `setBitIf` dopt Opt_QuasiQuotes flags
-	       .|. ipBit             `setBitIf` dopt Opt_ImplicitParams flags
-	       .|. explicitForallBit `setBitIf` dopt Opt_ExplicitForAll flags
-	       .|. bangPatBit        `setBitIf` dopt Opt_BangPatterns flags
-	       .|. tyFamBit          `setBitIf` dopt Opt_TypeFamilies flags
+      bitmap = genericsBit `setBitIf` xopt Opt_Generics flags
+	       .|. ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
+	       .|. parrBit           `setBitIf` xopt Opt_PArr         flags
+	       .|. arrowsBit         `setBitIf` xopt Opt_Arrows       flags
+	       .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
+	       .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes flags
+	       .|. ipBit             `setBitIf` xopt Opt_ImplicitParams flags
+	       .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll flags
+	       .|. bangPatBit        `setBitIf` xopt Opt_BangPatterns flags
+	       .|. tyFamBit          `setBitIf` xopt Opt_TypeFamilies flags
 	       .|. haddockBit        `setBitIf` dopt Opt_Haddock      flags
-	       .|. magicHashBit      `setBitIf` dopt Opt_MagicHash    flags
-	       .|. kindSigsBit       `setBitIf` dopt Opt_KindSignatures flags
-	       .|. recursiveDoBit    `setBitIf` dopt Opt_RecursiveDo flags
-	       .|. recBit 	     `setBitIf` dopt Opt_DoRec  flags
-	       .|. recBit 	     `setBitIf` dopt Opt_Arrows flags
-	       .|. unicodeSyntaxBit  `setBitIf` dopt Opt_UnicodeSyntax flags
-	       .|. unboxedTuplesBit  `setBitIf` dopt Opt_UnboxedTuples flags
-               .|. datatypeContextsBit `setBitIf` dopt Opt_DatatypeContexts flags
-               .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
+	       .|. magicHashBit      `setBitIf` xopt Opt_MagicHash    flags
+	       .|. kindSigsBit       `setBitIf` xopt Opt_KindSignatures flags
+	       .|. recursiveDoBit    `setBitIf` xopt Opt_RecursiveDo flags
+	       .|. recBit 	     `setBitIf` xopt Opt_DoRec  flags
+	       .|. recBit 	     `setBitIf` xopt Opt_Arrows flags
+	       .|. unicodeSyntaxBit  `setBitIf` xopt Opt_UnicodeSyntax flags
+	       .|. unboxedTuplesBit  `setBitIf` xopt Opt_UnboxedTuples flags
+               .|. datatypeContextsBit `setBitIf` xopt Opt_DatatypeContexts flags
+               .|. transformComprehensionsBit `setBitIf` xopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
-               .|. newQualOpsBit `setBitIf` dopt Opt_NewQualifiedOperators flags
-               .|. alternativeLayoutRuleBit `setBitIf` dopt Opt_AlternativeLayoutRule flags
+               .|. newQualOpsBit `setBitIf` xopt Opt_NewQualifiedOperators flags
+               .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -1966,7 +1966,7 @@ alternativeLayoutRuleToken t
          justClosedExplicitLetBlock <- getJustClosedExplicitLetBlock
          setJustClosedExplicitLetBlock False
          dflags <- getDynFlags
-         let transitional = dopt Opt_AlternativeLayoutRuleTransitional dflags
+         let transitional = xopt Opt_AlternativeLayoutRuleTransitional dflags
              thisLoc = getLoc t
              thisCol = srcSpanStartCol thisLoc
              newLine = (lastLoc == noSrcSpan)

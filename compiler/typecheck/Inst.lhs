@@ -372,8 +372,8 @@ syntaxNameCtxt name orig ty tidy_env = do
 getOverlapFlag :: TcM OverlapFlag
 getOverlapFlag 
   = do 	{ dflags <- getDOpts
-	; let overlap_ok    = dopt Opt_OverlappingInstances dflags
-	      incoherent_ok = dopt Opt_IncoherentInstances  dflags
+	; let overlap_ok    = xopt Opt_OverlappingInstances dflags
+	      incoherent_ok = xopt Opt_IncoherentInstances  dflags
 	      overlap_flag | incoherent_ok = Incoherent
 			   | overlap_ok    = OverlapOk
 			   | otherwise     = NoOverlap

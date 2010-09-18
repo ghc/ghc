@@ -1082,7 +1082,7 @@ decideGeneralisationPlan dflags top_lvl _bndrs binds sig_fn
   | Just sig <- one_funbind_with_sig binds = if null (sig_tvs sig) && null (sig_theta sig)
                                              then NoGen	      -- Optimise common case
                                              else CheckGen sig
-  | (dopt Opt_MonoLocalBinds dflags 
+  | (xopt Opt_MonoLocalBinds dflags 
       && isNotTopLevel top_lvl)      	   = NoGen
   | otherwise                              = InferGen mono_restriction
 
@@ -1090,10 +1090,10 @@ decideGeneralisationPlan dflags top_lvl _bndrs binds sig_fn
 --  | otherwise            	     	   = NoGen   -- A mixture of function 
 --    				       		     -- and pattern bindings
   where
-    mono_pat_binds = dopt Opt_MonoPatBinds dflags 
+    mono_pat_binds = xopt Opt_MonoPatBinds dflags 
                   && any (is_pat_bind . unLoc) binds
 
-    mono_restriction = dopt Opt_MonomorphismRestriction dflags 
+    mono_restriction = xopt Opt_MonomorphismRestriction dflags 
                     && any (restricted . unLoc) binds
 
     no_sig n = isNothing (sig_fn n)

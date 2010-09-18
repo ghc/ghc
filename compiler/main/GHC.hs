@@ -2289,7 +2289,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 		| Just (Unlit _) <- mb_phase    = True
 	        | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
 		  -- note: local_opts is only required if there's no Unlit phase
-		| dopt Opt_Cpp dflags'		= True
+		| xopt Opt_Cpp dflags'		= True
 		| dopt Opt_Pp  dflags'		= True
 		| otherwise			= False
 
@@ -2372,7 +2372,7 @@ getModuleGraph = liftM hsc_mod_graph getSession
 -- have Template Haskell enabled whether it is actually needed or not.
 needsTemplateHaskell :: ModuleGraph -> Bool
 needsTemplateHaskell ms =
-    any (dopt Opt_TemplateHaskell . ms_hspp_opts) ms
+    any (xopt Opt_TemplateHaskell . ms_hspp_opts) ms
 
 -- | Return @True@ <==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool

@@ -707,7 +707,7 @@ checkAPat dynflags loc e0 = case e0 of
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _ 
 	 (L _ (HsOverLit lit@(OverLit {ol_val = HsIntegral {}})))
-   		      | dopt Opt_NPlusKPatterns dynflags && (plus == plus_RDR)
+   		      | xopt Opt_NPlusKPatterns dynflags && (plus == plus_RDR)
    		      -> return (mkNPlusKPat (L nloc n) lit)
    
    OpApp l op _fix r  -> do l <- checkLPat l
@@ -833,7 +833,7 @@ checkDoAndIfThenElse :: LHsExpr RdrName
 checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse
     = do pState <- getPState
-         unless (dopt Opt_DoAndIfThenElse (dflags pState)) $ do
+         unless (xopt Opt_DoAndIfThenElse (dflags pState)) $ do
              parseErrorSDoc (combineLocs guardExpr elseExpr)
                             (text "Unexpected semi-colons in conditional:"
                           $$ nest 4 expr

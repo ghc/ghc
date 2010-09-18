@@ -62,12 +62,12 @@ rnImports imports
          -- Do the non {- SOURCE -} ones first, so that we get a helpful
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
-         implicit_prelude <- doptM Opt_ImplicitPrelude
+         implicit_prelude <- xoptM Opt_ImplicitPrelude
          let prel_imports	= mkPrelImports (moduleName this_mod) implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ _ is_boot _ _ _)) = is_boot
 
-         ifOptM Opt_WarnImplicitPrelude (
+         ifDOptM Opt_WarnImplicitPrelude (
             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
           )
 
@@ -99,7 +99,7 @@ rnImportDecl this_mod implicit_prelude
   = setSrcSpan loc $ do
 
     when (isJust mb_pkg) $ do
-        pkg_imports <- doptM Opt_PackageImports
+        pkg_imports <- xoptM Opt_PackageImports
         when (not pkg_imports) $ addErr packageImportErr
 
 	-- If there's an error in loadInterface, (e.g. interface
@@ -117,7 +117,7 @@ rnImportDecl this_mod implicit_prelude
             return ()
         _ ->
             unless implicit_prelude $
-            ifOptM Opt_WarnMissingImportList (addWarn (missingImportListWarn imp_mod_name))
+            ifDOptM Opt_WarnMissingImportList (addWarn (missingImportListWarn imp_mod_name))
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
 
@@ -229,7 +229,7 @@ rnImportDecl this_mod implicit_prelude
                    }
 
 	-- Complain if we import a deprecated module
-    ifOptM Opt_WarnWarningsDeprecations	(
+    ifDOptM Opt_WarnWarningsDeprecations	(
        case warns of	
 	  WarnAll txt -> addWarn (moduleWarn imp_mod_name txt)
 	  _    	      -> return ()
@@ -525,7 +525,7 @@ filterImports _ decl_spec Nothing all_avails
 
 filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
   = do   -- check for errors, convert RdrNames to Names
-        opt_typeFamilies <- doptM Opt_TypeFamilies
+        opt_typeFamilies <- xoptM Opt_TypeFamilies
         items1 <- mapM (lookup_lie opt_typeFamilies) import_items
 
         let items2 :: [(LIE Name, AvailInfo)]
@@ -586,7 +586,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
                 -- Warn when importing T(..) if T was exported abstractly
             checkDodgyImport stuff
                 | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
-                = ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
+                = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
                 -- NB. use the RdrName for reporting the warning
             checkDodgyImport _
                 = return ()
@@ -918,7 +918,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 	       return acc }
 
 	| otherwise
-	= do { implicit_prelude <- doptM Opt_ImplicitPrelude
+	= do { implicit_prelude <- xoptM Opt_ImplicitPrelude
              ; warnDodgyExports <- doptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
                             || (moduleName this_mod == mod)
@@ -1004,7 +1004,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                 then do addErr (exportItemErr ie)
                         return (IEThingWith name [], AvailTC name [name])
                 else do let names = catMaybes mb_names
-                        optTyFam <- doptM Opt_TypeFamilies
+                        optTyFam <- xoptM Opt_TypeFamilies
                         when (not optTyFam && any isTyConName names) $
                           addErr (typeItemErr ( head
                                               . filter isTyConName 
@@ -1088,7 +1088,7 @@ finishWarnings :: DynFlags -> Maybe WarningTxt
 --     All this happens only once per module
 finishWarnings dflags mod_warn tcg_env
   = do	{ (eps,hpt) <- getEpsAndHpt
-	; ifOptM Opt_WarnWarningsDeprecations $
+	; ifDOptM Opt_WarnWarningsDeprecations $
 	  mapM_ (check hpt (eps_PIT eps)) all_gres
 		-- By this time, typechecking is complete, 
 		-- so the PIT is fully populated
@@ -1242,10 +1242,10 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage imports rdr_env (Set.elems uses)
 
-       ; ifOptM Opt_WarnUnusedImports $
+       ; ifDOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
-       ; ifOptM Opt_D_dump_minimal_imports $
+       ; ifDOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
     explicit_import (L loc _) = isGoodSrcSpan loc

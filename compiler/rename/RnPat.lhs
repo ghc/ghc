@@ -299,7 +299,7 @@ rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
                                      
 rnPatAndThen mk (SigPatIn pat ty)
-  = do { patsigs <- liftCps (doptM Opt_ScopedTypeVariables)
+  = do { patsigs <- liftCps (xoptM Opt_ScopedTypeVariables)
        ; if patsigs
          then do { pat' <- rnLPatAndThen mk pat
                  ; ty' <- liftCpsFV (rnHsTypeFVs tvdoc ty)
@@ -311,7 +311,7 @@ rnPatAndThen mk (SigPatIn pat ty)
        
 rnPatAndThen mk (LitPat lit)
   | HsString s <- lit
-  = do { ovlStr <- liftCps (doptM Opt_OverloadedStrings)
+  = do { ovlStr <- liftCps (xoptM Opt_OverloadedStrings)
        ; if ovlStr 
          then rnPatAndThen mk (mkNPat (mkHsIsString s placeHolderType) Nothing)
          else normal_lit }
@@ -342,7 +342,7 @@ rnPatAndThen mk (AsPat rdr pat)
        ; return (AsPat (L (nameSrcSpan new_name) new_name) pat') }
 
 rnPatAndThen mk p@(ViewPat expr pat ty)
-  = do { liftCps $ do { vp_flag <- doptM Opt_ViewPatterns
+  = do { liftCps $ do { vp_flag <- xoptM Opt_ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
          -- this will be in the right context 
@@ -453,8 +453,8 @@ rnHsRecFields1
 -- of each x=e binding
 
 rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
-  = do { pun_ok      <- doptM Opt_RecordPuns
-       ; disambig_ok <- doptM Opt_DisambiguateRecordFields
+  = do { pun_ok      <- xoptM Opt_RecordPuns
+       ; disambig_ok <- xoptM Opt_DisambiguateRecordFields
        ; parent <- check_disambiguation disambig_ok mb_con
        ; flds1 <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
@@ -490,7 +490,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
     rn_dotdot (Just n) (Just con) flds -- ".." on record con/pat
       = ASSERT( n == length flds )
         do { loc <- getSrcSpanM	-- Rather approximate
-           ; dd_flag <- doptM Opt_RecordWildCards
+           ; dd_flag <- xoptM Opt_RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
 
            ; con_fields <- lookupConstructorFields con

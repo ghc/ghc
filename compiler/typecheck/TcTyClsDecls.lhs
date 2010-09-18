@@ -256,7 +256,7 @@ tcFamInstDecl top_lvl (L loc decl)
     tcAddDeclCtxt decl				$
     do { -- type family instances require -XTypeFamilies
 	 -- and can't (currently) be in an hs-boot file
-       ; type_families <- doptM Opt_TypeFamilies
+       ; type_families <- xoptM Opt_TypeFamilies
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl (tcdLName decl)
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
@@ -350,7 +350,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; mapM_ checkTyFamFreeness t_typats
 
 	 -- Check that we don't use GADT syntax in H98 world
-       ; gadt_ok <- doptM Opt_GADTs
+       ; gadt_ok <- xoptM Opt_GADTs
        ; checkTc (gadt_ok || consUseH98Syntax cons) (badGadtDecl tc_name)
 
 	 --     (b) a newtype has exactly one constructor
@@ -711,7 +711,7 @@ tcTyClDecl1 parent _calc_isrec
   { traceTc "type family:" (ppr tc_name) 
 
 	-- Check that we don't use families without -XTypeFamilies
-  ; idx_tys <- doptM Opt_TypeFamilies
+  ; idx_tys <- xoptM Opt_TypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent Nothing
@@ -729,7 +729,7 @@ tcTyClDecl1 parent _calc_isrec
 
 
 	-- Check that we don't use families without -XTypeFamilies
-  ; idx_tys <- doptM Opt_TypeFamilies
+  ; idx_tys <- xoptM Opt_TypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
@@ -747,12 +747,12 @@ tcTyClDecl1 parent calc_isrec
   { extra_tvs <- tcDataKindSig mb_ksig
   ; let final_tvs = tvs' ++ extra_tvs
   ; stupid_theta <- tcHsKindedContext ctxt
-  ; want_generic <- doptM Opt_Generics
+  ; want_generic <- xoptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
-  ; empty_data_decls <- doptM Opt_EmptyDataDecls
-  ; kind_signatures <- doptM Opt_KindSignatures
-  ; existential_ok <- doptM Opt_ExistentialQuantification
-  ; gadt_ok      <- doptM Opt_GADTs
+  ; empty_data_decls <- xoptM Opt_EmptyDataDecls
+  ; kind_signatures <- xoptM Opt_KindSignatures
+  ; existential_ok <- xoptM Opt_ExistentialQuantification
+  ; gadt_ok      <- xoptM Opt_GADTs
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
   ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
 
@@ -1180,9 +1180,9 @@ checkNewDataCon con
 -------------------------------
 checkValidClass :: Class -> TcM ()
 checkValidClass cls
-  = do	{ constrained_class_methods <- doptM Opt_ConstrainedClassMethods
-	; multi_param_type_classes <- doptM Opt_MultiParamTypeClasses
-	; fundep_classes <- doptM Opt_FunctionalDependencies
+  = do	{ constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
+	; multi_param_type_classes <- xoptM Opt_MultiParamTypeClasses
+	; fundep_classes <- xoptM Opt_FunctionalDependencies
 
     	-- Check that the class is unary, unless GlaExs
 	; checkTc (notNull tyvars) (nullaryClassErr cls)

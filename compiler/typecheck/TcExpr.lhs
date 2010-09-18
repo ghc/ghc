@@ -311,7 +311,7 @@ tcExpr (SectionR op arg2) res_ty
 tcExpr (SectionL arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; dflags <- getDOpts	    -- Note [Left sections]
-       ; let n_reqd_args | dopt Opt_PostfixOperators dflags = 1
+       ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
                          | otherwise                        = 2
 
        ; (co_fn, (arg1_ty:arg_tys), op_res_ty) <- unifyOpFunTys op n_reqd_args op_ty

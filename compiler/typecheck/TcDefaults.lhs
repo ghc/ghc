@@ -47,7 +47,7 @@ tcDefaults [L _ (DefaultDecl [])]
 tcDefaults [L locn (DefaultDecl mono_tys)]
   = setSrcSpan locn 			$
     addErrCtxt defaultDeclCtxt		$
-    do	{ ovl_str <- doptM Opt_OverloadedStrings
+    do	{ ovl_str <- xoptM Opt_OverloadedStrings
 	; num_class    <- tcLookupClass numClassName
 	; is_str_class <- tcLookupClass isStringClassName
 	; let deflt_clss | ovl_str   = [num_class, is_str_class]

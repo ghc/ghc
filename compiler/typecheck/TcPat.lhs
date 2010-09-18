@@ -689,7 +689,7 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
                            -- dictionary binders from theta'
 	      no_equalities = not (any isEqPred theta')
 
-        ; gadts_on <- doptM Opt_GADTs
+        ; gadts_on <- xoptM Opt_GADTs
 	; checkTc (no_equalities || gadts_on)
 	  	  (ptext (sLit "A pattern match on a GADT requires -XGADTs"))
 		  -- Trac #2905 decided that a *pattern-match* of a GADT

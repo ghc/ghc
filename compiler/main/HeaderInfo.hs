@@ -79,7 +79,7 @@ getImports dflags buf filename source_filename = do
 		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc) 
 					ord_idecls
 
-                implicit_prelude = dopt Opt_ImplicitPrelude dflags
+                implicit_prelude = xopt Opt_ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) implicit_prelude imps
 	      in
 	      return (src_idecls, implicit_imports ++ ordinary_imps, mod)

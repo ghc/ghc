@@ -293,7 +293,7 @@ match vars@(v:_) ty eqns
        ; let grouped = groupEquations tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
-       ; ifOptM Opt_D_dump_view_pattern_commoning (debug grouped)
+       ; ifDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
 	; match_results <- mapM match_group grouped
 	; return (adjustMatchResult (foldr1 (.) aux_binds) $

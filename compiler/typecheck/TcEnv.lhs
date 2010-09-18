@@ -548,9 +548,9 @@ tcGetDefaultTys :: Bool		-- True <=> interactive context
                          Bool)) -- True <=> Use extended defaulting rules
 tcGetDefaultTys interactive
   = do	{ dflags <- getDOpts
-        ; let ovl_strings = dopt Opt_OverloadedStrings dflags
+        ; let ovl_strings = xopt Opt_OverloadedStrings dflags
               extended_defaults = interactive
-                               || dopt Opt_ExtendedDefaultRules dflags
+                               || xopt Opt_ExtendedDefaultRules dflags
 				        -- See also Trac #1974 
               flags = (ovl_strings, extended_defaults)
     

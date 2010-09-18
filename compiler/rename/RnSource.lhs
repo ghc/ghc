@@ -524,7 +524,7 @@ extendTyVarEnvForMethodBinds :: [LHsTyVarBndr Name]
                              -> RnM (Bag (LHsBind Name), FreeVars)
                              -> RnM (Bag (LHsBind Name), FreeVars)
 extendTyVarEnvForMethodBinds tyvars thing_inside
-  = do	{ scoped_tvs <- doptM Opt_ScopedTypeVariables
+  = do	{ scoped_tvs <- xoptM Opt_ScopedTypeVariables
 	; if scoped_tvs then
 		extendTyVarEnvFVRn (map hsLTyVarName tyvars) thing_inside
 	  else
@@ -540,7 +540,7 @@ extendTyVarEnvForMethodBinds tyvars thing_inside
 \begin{code}
 rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
 rnSrcDerivDecl (DerivDecl ty)
-  = do { standalone_deriv_ok <- doptM Opt_StandaloneDeriving
+  = do { standalone_deriv_ok <- xoptM Opt_StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; ty' <- rnLHsType (text "a deriving decl") ty
        ; let fvs = extractHsTyNames ty'
@@ -1126,7 +1126,7 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
          -- (i.e. a naked top level expression)
          case flag of
            Explicit -> return ()
-           Implicit -> do { th_on <- doptM Opt_TemplateHaskell
+           Implicit -> do { th_on <- xoptM Opt_TemplateHaskell
                           ; unless th_on $ setSrcSpan loc $
                             failWith badImplicitSplice }
 

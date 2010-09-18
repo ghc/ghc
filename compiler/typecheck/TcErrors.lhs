@@ -560,7 +560,7 @@ monomorphism_fix :: DynFlags -> SDoc
 monomorphism_fix dflags
   = ptext (sLit "Probable fix:") <+> vcat
 	[ptext (sLit "give these definition(s) an explicit type signature"),
-	 if dopt Opt_MonomorphismRestriction dflags
+	 if xopt Opt_MonomorphismRestriction dflags
            then ptext (sLit "or use -XNoMonomorphismRestriction")
            else empty]	-- Only suggest adding "-XNoMonomorphismRestriction"
 			-- if it is not already set!

@@ -1075,7 +1075,7 @@ tcPragExpr name expr
     core_expr' <- tcIfaceExpr expr
 
                 -- Check for type consistency in the unfolding
-    ifOptM Opt_DoCoreLinting $ do
+    ifDOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope_ids
         case lintUnfolding noSrcLoc in_scope core_expr' of
           Nothing       -> return ()

@@ -239,22 +239,29 @@ Command-line flags
 getDOpts :: TcRnIf gbl lcl DynFlags
 getDOpts = do { env <- getTopEnv; return (hsc_dflags env) }
 
-doptM :: DOpt d => d -> TcRnIf gbl lcl Bool
+xoptM :: ExtensionFlag -> TcRnIf gbl lcl Bool
+xoptM flag = do { dflags <- getDOpts; return (xopt flag dflags) }
+
+doptM :: DynFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
 -- XXX setOptM and unsetOptM operate on different types. One should be renamed.
 
 setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = lopt_set_flattened (hsc_dflags top) flag}} )
+			 env { env_top = top { hsc_dflags = xopt_set_flattened (hsc_dflags top) flag}} )
 
 unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
-ifOptM :: DOpt d => d -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifOptM flag thing_inside = do { b <- doptM flag; 
+ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifDOptM flag thing_inside = do { b <- doptM flag; 
+				if b then thing_inside else return () }
+
+ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifXOptM flag thing_inside = do { b <- xoptM flag; 
 				if b then thing_inside else return () }
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
@@ -393,12 +400,12 @@ traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
 traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
-traceOptIf flag doc = ifOptM flag $
+traceOptIf flag doc = ifDOptM flag $
 		      liftIO (printForUser stderr alwaysQualify doc)
 
 traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
-traceOptTcRn flag doc = ifOptM flag $ do
+traceOptTcRn flag doc = ifDOptM flag $ do
 			{ loc  <- getSrcSpanM
 			; let real_doc 
                                 | opt_PprStyle_Debug = mkLocMessage loc doc
@@ -416,7 +423,7 @@ debugDumpTcRn doc | opt_NoDebugOutput = return ()
                   | otherwise         = dumpTcRn doc
 
 dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
-dumpOptTcRn flag doc = ifOptM flag (dumpTcRn doc)
+dumpOptTcRn flag doc = ifDOptM flag (dumpTcRn doc)
 \end{code}
 
 
@@ -1131,7 +1138,7 @@ forkM_maybe doc thing_inside
 		    -- Bleat about errors in the forked thread, if -ddump-if-trace is on
 		    -- Otherwise we silently discard errors. Errors can legitimately
 		    -- happen when compiling interface signatures (see tcInterfaceSigs)
-		      ifOptM Opt_D_dump_if_trace 
+		      ifDOptM Opt_D_dump_if_trace 
 			     (print_errs (hang (text "forkM failed:" <+> doc)
 				             2 (text (show exn))))
 
