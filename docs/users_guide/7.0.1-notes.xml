@@ -59,6 +59,14 @@ $ ghci -package haskell2010 -hide-package base -hide-package array
 
       <listitem>
         <para>
+          The type checker has been overhauled, which means it is now
+          able to correctly handle interactions between the type system
+          extensions.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
           The inliner has been overhauled, which should in general
           give better performance while reducing unnecessary code-size
           explosion.
