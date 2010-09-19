@@ -335,16 +335,8 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
         -- They desugar to a case expression in the end
     ; checkStrictBinds top_lvl rec_group bind_list poly_ids
 
-	 -- Warn about missing signatures
-	 -- Do this only when we we have a type to offer
-    ; warn_missing_sigs <- doptM Opt_WarnMissingSigs
-    ; when (isTopLevel top_lvl && warn_missing_sigs) $
-      mapM_ missingSigWarn (filter no_sig poly_ids)
-
     ; return (binds, poly_ids) }
   where
-    no_sig id = isNothing (sig_fn (idName id))
-
     binder_names = collectHsBindListBinders bind_list
     loc = getLoc (head bind_list)
          -- TODO: location a bit awkward, but the mbinds have been
@@ -1191,35 +1183,4 @@ sigContextsCtxt sig1 sig2
   where
     id1 = sig_id sig1
     id2 = sig_id sig2
-
------------------------------------------------
-{- 
-badStrictSig :: Bool -> TcSigInfo -> SDoc
-badStrictSig unlifted sig
-  = hang (ptext (sLit "Illegal polymorphic signature in") <+> msg)
-       2 (ppr sig)
-  where
-    msg | unlifted  = ptext (sLit "an unlifted binding")
-        | otherwise = ptext (sLit "a bang-pattern binding")
-
-restrictedBindSigErr :: [Name] -> SDoc
-restrictedBindSigErr binder_names
-  = hang (ptext (sLit "Illegal type signature(s)"))
-       2 (vcat [ptext (sLit "in a binding group for") <+> pprBinders binder_names,
-                ptext (sLit "that falls under the monomorphism restriction")])
-
-genCtxt :: [Name] -> SDoc
-genCtxt binder_names
-  = ptext (sLit "When generalising the type(s) for") <+> pprBinders binder_names
--}
-
-missingSigWarn :: TcId -> TcM ()
-missingSigWarn id
-  = do  { env0 <- tcInitTidyEnv
-        ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
-        ; addWarnTcM (env1, mk_msg tidy_ty) }
-  where
-    name = idName id
-    mk_msg ty = vcat [ptext (sLit "Definition but no type signature for") <+> quotes (ppr name),
-                      sep [ptext (sLit "Inferred type:") <+> pprHsVar name <+> dcolon <+> ppr ty]]
 \end{code}

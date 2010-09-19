@@ -189,6 +189,7 @@ data DynFlag
    | Opt_WarnMissingImportList
    | Opt_WarnMissingMethods
    | Opt_WarnMissingSigs
+   | Opt_WarnMissingLocalSigs
    | Opt_WarnNameShadowing
    | Opt_WarnOverlappingPatterns
    | Opt_WarnSimplePatterns
@@ -1428,6 +1429,7 @@ fFlags = [
   ( "warn-missing-import-lists",        Opt_WarnMissingImportList, nop ),
   ( "warn-missing-methods",             Opt_WarnMissingMethods, nop ),
   ( "warn-missing-signatures",          Opt_WarnMissingSigs, nop ),
+  ( "warn-missing-local-sigs",          Opt_WarnMissingLocalSigs, nop ),
   ( "warn-name-shadowing",              Opt_WarnNameShadowing, nop ),
   ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, nop ),
   ( "warn-simple-patterns",             Opt_WarnSimplePatterns, nop ),

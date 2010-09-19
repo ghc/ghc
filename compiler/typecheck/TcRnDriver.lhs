@@ -365,6 +365,9 @@ tcRnSrcDecls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
 tcRnSrcDecls boot_iface decls
  = do {   	-- Do all the declarations
 	(tc_envs, lie) <- getConstraints $ tc_rn_src_decls boot_iface decls ;
+      ; traceTc "Tc8" empty ;
+      ; setEnvs tc_envs $ 
+   do { 
 
 	     -- 	Finish simplifying class constraints
 	     -- 
@@ -380,27 +383,27 @@ tcRnSrcDecls boot_iface decls
 	     --	 * the global env exposes the instances to simplifyTop
 	     --  * the local env exposes the local Ids to simplifyTop, 
 	     --    so that we get better error messages (monomorphism restriction)
-        traceTc "Tc8" empty ;
-	new_ev_binds <- setEnvs tc_envs (simplifyTop lie) ;
-
-	    -- Backsubstitution.  This must be done last.
-	    -- Even simplifyTop may do some unification.
+	new_ev_binds <- simplifyTop lie ;
         traceTc "Tc9" empty ;
-	let { (tcg_env, _) = tc_envs
-	    ; TcGblEnv { tcg_type_env = type_env,
-		         tcg_binds    = binds,
-		         tcg_ev_binds = cur_ev_binds,
-		         tcg_rules    = rules,
-		         tcg_fords    = fords } = tcg_env } ;
 
 	failIfErrsM ;	-- Don't zonk if there have been errors
 			-- It's a waste of time; and we may get debug warnings
 			-- about strangely-typed TyCons!
 
-        let { all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
-	(bind_ids, ev_binds', binds', fords', rules') 
-            <- zonkTopDecls all_ev_binds binds rules fords ;
+	-- Zonk the final code.  This must be done last.
+	-- Even simplifyTop may do some unification.
+        -- This pass also warns about missing type signatures
+	let { (tcg_env, _) = tc_envs
+	    ; TcGblEnv { tcg_type_env = type_env,
+		         tcg_binds    = binds,
+		         tcg_sigs     = sig_ns,
+		         tcg_ev_binds = cur_ev_binds,
+		         tcg_rules    = rules,
+		         tcg_fords    = fords } = tcg_env
+            ; all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
 
+	(bind_ids, ev_binds', binds', fords', rules') 
+            <- zonkTopDecls all_ev_binds binds sig_ns rules fords ;
 	
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
 	    ; tcg_env' = tcg_env { tcg_binds    = binds',
@@ -409,7 +412,7 @@ tcRnSrcDecls boot_iface decls
 				   tcg_fords 	= fords' } } ;
 
         setGlobalTypeEnv tcg_env' final_type_env				   
-   }
+   } }
 
 tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
 -- Loops around dealing with each top level inter-splice group 
@@ -889,14 +892,18 @@ tcTopSrcDecls boot_details
 			  tc_deriv_binds `unionBags`
 			  tc_aux_binds   `unionBags`
 			  inst_binds	 `unionBags`
-			  foe_binds;
+			  foe_binds
+
+            ; sig_names = mkNameSet (collectHsValBinders val_binds) 
+                          `minusNameSet` getTypeSigNames val_binds
 
 		-- Extend the GblEnv with the (as yet un-zonked) 
 		-- bindings, rules, foreign decls
-	      tcg_env' = tcg_env {  tcg_binds = tcg_binds tcg_env `unionBags` all_binds,
-				    tcg_rules = tcg_rules tcg_env ++ rules,
-				    tcg_anns  = tcg_anns tcg_env ++ annotations,
-				    tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
+	    ; tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` all_binds
+                                 , tcg_sigs  = tcg_sigs tcg_env `unionNameSets` sig_names
+				 , tcg_rules = tcg_rules tcg_env ++ rules
+				 , tcg_anns  = tcg_anns tcg_env ++ annotations
+				 , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
   	return (tcg_env', tcl_env)
     }}}}}}
 \end{code}
