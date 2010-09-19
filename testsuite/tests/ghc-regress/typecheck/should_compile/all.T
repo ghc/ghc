@@ -321,4 +321,5 @@ test('T2683', normal, compile, [''])
 test('T3696', normal, compile, [''])
 test('T1123', normal, compile, [''])
 test('T3692', normal, compile, [''])
+test('T700',  normal, compile, [''])
      
