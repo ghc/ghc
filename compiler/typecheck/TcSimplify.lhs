@@ -236,7 +236,7 @@ simplifyAsMuchAsPossible ctxt wanteds
               simplifyApproxLoop 0 wanteds
 
 	      -- Report any errors
-       ; mapBagM_ reportUnsolvedImplication unsolved_implics
+       ; reportUnsolved (emptyBag, unsolved_implics)
 
        ; let final_wanted_evvars = mapBag deCanonicaliseWanted unsolved_flats
        ; return (final_wanted_evvars, ev_binds) }

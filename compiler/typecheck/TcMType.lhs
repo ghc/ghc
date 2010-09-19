@@ -57,6 +57,7 @@ module TcMType (
   zonkTcType, zonkTcTypes, zonkTcThetaType,
   zonkTcKindToKind, zonkTcKind, 
   zonkImplication, zonkWanted, zonkEvVar, zonkWantedEvVar,
+  zonkTcTypeAndSubst,
   tcGetGlobalTyVars, 
 
   readKindVar, writeKindVar
@@ -485,25 +486,23 @@ zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar tyvars
 -----------------  Types
 
 zonkTcTypeCarefully :: TcType -> TcM TcType
+-- Do not zonk type variables free in the environment
 zonkTcTypeCarefully ty
   = do { env_tvs <- tcGetGlobalTyVars
-       ; zonkType (zonkTcTyVarCarefully env_tvs) ty }
-
-
-zonkTcTyVarCarefully :: TcTyVarSet -> TcTyVar -> TcM TcType
--- Do not zonk type variables free in the environment
-zonkTcTyVarCarefully env_tvs tv 
-  | tv `elemVarSet` env_tvs 
-  = return (TyVarTy tv)
-  | otherwise
-  = ASSERT( isTcTyVar tv )
-    case tcTyVarDetails tv of
-      SkolemTv {}  -> return (TyVarTy tv)
-      FlatSkol ty  -> zonkType (zonkTcTyVarCarefully env_tvs) ty
-      MetaTv _ ref -> do { cts <- readMutVar ref
-			 ; case cts of    
-			     Flexi       -> return (TyVarTy tv)
-			     Indirect ty -> zonkType (zonkTcTyVarCarefully env_tvs) ty }
+       ; zonkType (zonk_tv env_tvs) ty }
+  where
+    zonk_tv env_tvs tv
+      | tv `elemVarSet` env_tvs 
+      = return (TyVarTy tv)
+      | otherwise
+      = ASSERT( isTcTyVar tv )
+    	case tcTyVarDetails tv of
+    	  SkolemTv {}  -> return (TyVarTy tv)
+    	  FlatSkol ty  -> zonkType (zonk_tv env_tvs) ty
+    	  MetaTv _ ref -> do { cts <- readMutVar ref
+			     ; case cts of    
+			         Flexi       -> return (TyVarTy tv)
+			         Indirect ty -> zonkType (zonk_tv env_tvs) ty }
 
 zonkTcType :: TcType -> TcM TcType
 -- Simply look through all Flexis
@@ -520,6 +519,23 @@ zonkTcTyVar tv
 			 ; case cts of    
 			     Flexi       -> return (TyVarTy tv)
 			     Indirect ty -> zonkTcType ty }
+
+zonkTcTypeAndSubst :: TvSubst -> TcType -> TcM TcType
+-- Zonk, and simultaneously apply a non-necessarily-idempotent substitution
+zonkTcTypeAndSubst subst ty = zonkType zonk_tv ty
+  where
+    zonk_tv tv 
+      = case tcTyVarDetails tv of
+      	  SkolemTv {}  -> return (TyVarTy tv)
+      	  FlatSkol ty  -> zonkType zonk_tv ty
+      	  MetaTv _ ref -> do { cts <- readMutVar ref
+			     ; case cts of    
+			         Flexi       -> zonk_flexi tv
+			         Indirect ty -> zonkType zonk_tv ty }
+    zonk_flexi tv
+      = case lookupTyVar subst tv of
+          Just ty -> zonkType zonk_tv ty
+          Nothing -> return (TyVarTy tv)
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
 zonkTcTypes tys = mapM zonkTcType tys
