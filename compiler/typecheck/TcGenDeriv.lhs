@@ -1668,7 +1668,7 @@ genAuxBind loc (GenCon2Tag tycon)
     rdr_name = con2tag_RDR tycon
 
     sig_ty = HsCoreTy $ 
-             mkForAllTys (tyConTyVars tycon) $
+             mkSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
              mkParentType tycon `mkFunTy` intPrimTy
 
     lots_of_constructors = tyConFamilySize tycon > 8
