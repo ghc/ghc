@@ -1,8 +1,6 @@
 
 T2693.hs:10:15:
     Couldn't match type `TFn a' with `(a1, b)'
-    Expected type: (a1, b1)
-      Actual type: TFn a
     In the first argument of `fst', namely `x'
     In the first argument of `(+)', namely `fst x'
     In the expression: fst x + fst x
