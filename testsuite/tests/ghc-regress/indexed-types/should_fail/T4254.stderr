@@ -1,0 +1,7 @@
+
+T4254.hs:19:10:
+    Couldn't match type `b' with `Bool'
+      `b' is a rigid type variable bound by
+          the type signature for `fails' at T4254.hs:18:19
+    In the expression: op
+    In an equation for `fails': fails = op
