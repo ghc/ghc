@@ -23,7 +23,7 @@ test('T3012', normal, compile, [''])
 test('T3965', normal, compile, [''])
 test('T4220', normal, compile, [''])
 test('T4302', normal, compile, [''])
-test('T4325', expect_broken(4325), compile, [''])
+test('T4325', normal, compile, [''])
 
 test('drv-functor1',
      if_compiler_lt('ghc', '6.11', expect_fail),
