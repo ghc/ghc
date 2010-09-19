@@ -1,7 +1,7 @@
 
 read014.hs:4:1:
-    Warning: Definition but no type signature for `ng1'
-             Inferred type: ng1 :: forall t a. Num a => t -> a -> a
+    Warning: Top-level binding with no type signature:
+               ng1 :: forall t a. Num a => t -> a -> a
 
 read014.hs:4:5: Warning: Defined but not used: `x'
 
