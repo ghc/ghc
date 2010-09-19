@@ -64,7 +64,7 @@ mkCall       :: CmmExpr -> (Convention, Convention) -> CmmFormals -> CmmActuals 
 mkCmmCall    :: CmmExpr ->              CmmFormals -> CmmActuals ->
                   UpdFrameOffset -> CmmAGraph
   -- Native C-- calling convention
-mkSafeCall    :: MidCallTarget -> CmmFormals -> CmmActuals -> UpdFrameOffset -> CmmAGraph
+mkSafeCall    :: MidCallTarget -> CmmFormals -> CmmActuals -> UpdFrameOffset -> Bool -> CmmAGraph
 mkUnsafeCall  :: MidCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
 mkFinalCall   :: CmmExpr -> CCallConv -> CmmActuals -> UpdFrameOffset -> CmmAGraph
   -- Never returns; like exit() or barf()
@@ -131,9 +131,9 @@ mkAssign l r = if opt_StubDeadValues then assign l r <*> check l else assign l r
 mkCbranch pred ifso ifnot = mkLast (LastCondBranch pred ifso ifnot)
 mkSwitch e tbl            = mkLast $ LastSwitch e tbl
 
-mkSafeCall   t fs as upd =
+mkSafeCall   t fs as upd interruptible =
   withFreshLabel "safe call" $ \k ->
-    mkMiddle $ MidForeignCall (Safe k upd) t fs as
+    mkMiddle $ MidForeignCall (Safe k upd interruptible) t fs as
 mkUnsafeCall t fs as = mkMiddle $ MidForeignCall Unsafe t fs as
 
 -- For debugging purposes, we can stub out dead stack slots:

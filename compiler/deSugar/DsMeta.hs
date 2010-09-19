@@ -349,6 +349,7 @@ repCCallConv callConv    = notHandled "repCCallConv" (ppr callConv)
 
 repSafety :: Safety -> DsM (Core TH.Safety)
 repSafety PlayRisky = rep2 unsafeName []
+repSafety PlayInterruptible = rep2 interruptibleName []
 repSafety (PlaySafe False) = rep2 safeName []
 repSafety (PlaySafe True) = rep2 threadsafeName []
 
@@ -1716,6 +1717,7 @@ templateHaskellNames = [
     unsafeName,
     safeName,
     threadsafeName,
+    interruptibleName,
     -- InlineSpec
     inlineSpecNoPhaseName, inlineSpecPhaseName,
     -- FunDep
@@ -1959,10 +1961,11 @@ cCallName = libFun (fsLit "cCall") cCallIdKey
 stdCallName = libFun (fsLit "stdCall") stdCallIdKey
 
 -- data Safety = ...
-unsafeName, safeName, threadsafeName :: Name
+unsafeName, safeName, threadsafeName, interruptibleName :: Name
 unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
 threadsafeName = libFun (fsLit "threadsafe") threadsafeIdKey
+interruptibleName = libFun (fsLit "interruptible") interruptibleIdKey
 
 -- data InlineSpec = ...
 inlineSpecNoPhaseName, inlineSpecPhaseName :: Name
@@ -2235,10 +2238,11 @@ cCallIdKey      = mkPreludeMiscIdUnique 300
 stdCallIdKey    = mkPreludeMiscIdUnique 301
 
 -- data Safety = ...
-unsafeIdKey, safeIdKey, threadsafeIdKey :: Unique
+unsafeIdKey, safeIdKey, threadsafeIdKey, interruptibleIdKey :: Unique
 unsafeIdKey     = mkPreludeMiscIdUnique 305
 safeIdKey       = mkPreludeMiscIdUnique 306
 threadsafeIdKey = mkPreludeMiscIdUnique 307
+interruptibleIdKey = mkPreludeMiscIdUnique 308
 
 -- data InlineSpec =
 inlineSpecNoPhaseIdKey, inlineSpecPhaseIdKey :: Unique

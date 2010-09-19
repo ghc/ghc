@@ -254,7 +254,7 @@ type HintedCmmFormals = [HintedCmmFormal]
 type HintedCmmFormal  = CmmHinted CmmFormal
 type HintedCmmActual  = CmmHinted CmmActual
 
-data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
+data CmmSafety      = CmmUnsafe | CmmSafe C_SRT | CmmInterruptible
 
 -- | enable us to fold used registers over 'CmmActuals' and 'CmmFormals'
 instance UserOfLocalRegs CmmStmt where

@@ -143,6 +143,7 @@ pprTop (CmmData section ds) =
 instance Outputable CmmSafety where
   ppr CmmUnsafe = ptext (sLit "_unsafe_call_")
   ppr (CmmSafe srt) = ppr srt
+  ppr CmmInterruptible = ptext (sLit "_interruptible_call_")
 
 -- --------------------------------------------------------------------------
 -- Info tables. The current pretty printer needs refinement

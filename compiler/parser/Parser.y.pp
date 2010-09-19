@@ -248,6 +248,7 @@ incorrect.
  'dynamic'	{ L _ ITdynamic }
  'safe'		{ L _ ITsafe }
  'threadsafe'	{ L _ ITthreadsafe }  -- ToDo: remove deprecated alias
+ 'interruptible' { L _ ITinterruptible }
  'unsafe'	{ L _ ITunsafe }
  'mdo'		{ L _ ITmdo }
  'family'	{ L _ ITfamily }
@@ -896,6 +897,7 @@ callconv :: { CCallConv }
 safety :: { Safety }
 	: 'unsafe'			{ PlayRisky }
 	| 'safe'			{ PlaySafe  False }
+	| 'interruptible'		{ PlayInterruptible }
 	| 'threadsafe'			{ PlaySafe  True } -- deprecated alias
 
 fspec :: { Located (Located FastString, Located RdrName, LHsType RdrName) }
@@ -1791,6 +1793,7 @@ tyvarid	:: { Located RdrName }
 	| special_id		{ L1 $! mkUnqual tvName (unLoc $1) }
 	| 'unsafe' 		{ L1 $! mkUnqual tvName (fsLit "unsafe") }
 	| 'safe' 		{ L1 $! mkUnqual tvName (fsLit "safe") }
+	| 'interruptible' 	{ L1 $! mkUnqual tvName (fsLit "interruptible") }
 	| 'threadsafe' 		{ L1 $! mkUnqual tvName (fsLit "threadsafe") }
 
 tyvarsym :: { Located RdrName }
@@ -1824,6 +1827,7 @@ varid :: { Located RdrName }
 	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
 	| 'unsafe'		{ L1 $! mkUnqual varName (fsLit "unsafe") }
 	| 'safe'		{ L1 $! mkUnqual varName (fsLit "safe") }
+	| 'interruptible'	{ L1 $! mkUnqual varName (fsLit "interruptible") }
 	| 'threadsafe'		{ L1 $! mkUnqual varName (fsLit "threadsafe") }
 	| 'forall'		{ L1 $! mkUnqual varName (fsLit "forall") }
 	| 'family'              { L1 $! mkUnqual varName (fsLit "family") }
@@ -1850,7 +1854,7 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe', 'forall', and 'family' whose treatment differs
+-- except 'unsafe', 'interruptible', 'forall', and 'family' whose treatment differs
 -- depending on context 
 special_id :: { Located FastString }
 special_id

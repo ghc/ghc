@@ -923,7 +923,7 @@ generateCCall :: Word16 -> Sequel 		-- stack and sequel depths
               -> [AnnExpr' Id VarSet]	-- args (atoms)
               -> BcM BCInstrList
 
-generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
+generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
    = let 
          -- useful constants
          addr_sizeW :: Word16
@@ -1092,7 +1092,8 @@ generateCCall d0 s p (CCallSpec target cconv _) fn args_r_to_l
      recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller))
      let
          -- do the call
-         do_call      = unitOL (CCALL stk_offset (castFunPtrToPtr addr_of_marshaller))
+         do_call      = unitOL (CCALL stk_offset (castFunPtrToPtr addr_of_marshaller)
+                                 (fromIntegral (fromEnum (playInterruptible safety))))
          -- slide and return
          wrapup       = mkSLIDE r_sizeW (d_after_r - r_sizeW - s)
                         `snocOL` RETURN_UBX (primRepToCgRep r_rep)

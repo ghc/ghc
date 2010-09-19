@@ -1716,13 +1716,17 @@ recoverSuspendedTask (Capability *cap, Task *task)
  * the whole system.
  *
  * The Haskell thread making the C call is put to sleep for the
- * duration of the call, on the susepended_ccalling_threads queue.  We
+ * duration of the call, on the suspended_ccalling_threads queue.  We
  * give out a token to the task, which it can use to resume the thread
  * on return from the C function.
+ *
+ * If this is an interruptible C call, this means that the FFI call may be
+ * unceremoniously terminated and should be scheduled on an
+ * unbound worker thread.
  * ------------------------------------------------------------------------- */
    
 void *
-suspendThread (StgRegTable *reg)
+suspendThread (StgRegTable *reg, rtsBool interruptible)
 {
   Capability *cap;
   int saved_errno;
@@ -1751,12 +1755,10 @@ suspendThread (StgRegTable *reg)
 
   threadPaused(cap,tso);
 
-  if ((tso->flags & TSO_BLOCKEX) == 0)  {
-      tso->why_blocked = BlockedOnCCall;
-      tso->flags |= TSO_BLOCKEX;
-      tso->flags &= ~TSO_INTERRUPTIBLE;
+  if (interruptible) {
+    tso->why_blocked = BlockedOnCCall_Interruptible;
   } else {
-      tso->why_blocked = BlockedOnCCall_NoUnblockExc;
+    tso->why_blocked = BlockedOnCCall;
   }
 
   // Hand back capability
@@ -1815,12 +1817,11 @@ resumeThread (void *task_)
 
     traceEventRunThread(cap, tso);
     
-    if (tso->why_blocked == BlockedOnCCall) {
+    if ((tso->flags & TSO_BLOCKEX) == 0) {
         // avoid locking the TSO if we don't have to
         if (tso->blocked_exceptions != END_BLOCKED_EXCEPTIONS_QUEUE) {
             awakenBlockedExceptionQueue(cap,tso);
         }
-	tso->flags &= ~(TSO_BLOCKEX | TSO_INTERRUPTIBLE);
     }
     
     /* Reset blocking status */
@@ -2331,7 +2332,7 @@ deleteThread (Capability *cap STG_UNUSED, StgTSO *tso)
     // we must own all Capabilities.
 
     if (tso->why_blocked != BlockedOnCCall &&
-	tso->why_blocked != BlockedOnCCall_NoUnblockExc) {
+	tso->why_blocked != BlockedOnCCall_Interruptible) {
 	throwToSingleThreaded(tso->cap,tso,NULL);
     }
 }
@@ -2343,7 +2344,7 @@ deleteThread_(Capability *cap, StgTSO *tso)
   // like deleteThread(), but we delete threads in foreign calls, too.
 
     if (tso->why_blocked == BlockedOnCCall ||
-	tso->why_blocked == BlockedOnCCall_NoUnblockExc) {
+	tso->why_blocked == BlockedOnCCall_Interruptible) {
 	tso->what_next = ThreadKilled;
 	appendToRunQueue(tso->cap, tso);
     } else {

@@ -57,6 +57,10 @@
 #include <mach/mach.h>
 #endif
 
+#ifdef HAVE_SIGNAL_H
+# include <signal.h>
+#endif
+
 /*
  * This (allegedly) OS threads independent layer was initially
  * abstracted away from code that used Pthreads, so the functions
@@ -289,6 +293,12 @@ setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__),
 {
 }
 #endif
+
+void
+interruptOSThread (OSThreadId id)
+{
+    pthread_kill(id, SIGPIPE);
+}
 
 #else /* !defined(THREADED_RTS) */
 

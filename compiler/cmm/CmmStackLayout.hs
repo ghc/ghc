@@ -358,7 +358,7 @@ layout procPoints env entry_off g =
         fold_succs (setSuccSPs inSp) l areaMap
         where inSp = expectJust "sp in" $ Map.lookup (CallArea (Young id)) areaMap
 
-      allocMidCall m@(MidForeignCall (Safe bid _) _ _ _) t areaMap =
+      allocMidCall m@(MidForeignCall (Safe bid _ _) _ _ _) t areaMap =
         let young     = youngest_live areaMap $ removeLiveSlotDefs (live_in t) m
             area      = CallArea (Young bid)
             areaSize' = Map.insert area (widthInBytes (typeWidth gcWord)) areaSize
@@ -422,7 +422,7 @@ manifestSP areaMap entry_off g@(LGraph entry _blocks) =
           where spIn = sp_on_entry id
         replTail :: (ZTail Middle Last -> CmmBlock) -> Int -> (ZTail Middle Last) -> 
                     FuelMonad ([CmmBlock])
-        replTail h spOff (ZTail m@(MidForeignCall (Safe bid _) _ _ _) t) =
+        replTail h spOff (ZTail m@(MidForeignCall (Safe bid _ _) _ _ _) t) =
           replTail (\t' -> h (setSp spOff spOff' (ZTail (middle spOff m) t'))) spOff' t
             where spOff' = slot' (Just bid) + widthInBytes (typeWidth gcWord)
         replTail h spOff (ZTail m t) = replTail (h . ZTail (middle spOff m)) spOff t

@@ -459,7 +459,7 @@ extendEnvWithSafeForeignCalls transfers env g = fold_blocks block env g
                  l = case last of LastOther l -> l
                                   LastExit -> panic "extendEnvs lastExit"
         tail _ z (ZFirst _) = z
-        tail fact env (ZHead h m@(MidForeignCall (Safe bid _) _ _ _)) =
+        tail fact env (ZHead h m@(MidForeignCall (Safe bid _ _) _ _ _)) =
           tail (mid m fact) (extendBlockEnv env bid fact) h
         tail fact env (ZHead h m) = tail (mid m fact) env h
         lookup map k = expectJust "extendEnvWithSafeFCalls" $ lookupBlockEnv map k
@@ -478,7 +478,7 @@ extendEnvsForSafeForeignCalls cafEnv slotEnv g =
                                     LastExit -> panic "extendEnvs lastExit"
           tail _ z (ZFirst _) = z
           tail lives@(cafs, slots) (cafEnv, slotEnv)
-               (ZHead h m@(MidForeignCall (Safe bid _) _ _ _)) =
+               (ZHead h m@(MidForeignCall (Safe bid _ _) _ _ _)) =
             let slots'   = removeLiveSlotDefs slots m
                 slotEnv' = extendBlockEnv slotEnv bid slots'
                 cafEnv'  = extendBlockEnv cafEnv  bid cafs
@@ -542,7 +542,7 @@ lowerSafeForeignCalls rst (CmmProc info l args (off, g@(LGraph entry _))) = do
 -- Check for foreign calls -- if none, then we can avoid copying the block.
 hasSafeForeignCall :: CmmBlock -> Bool
 hasSafeForeignCall (Block _ t) = tail t
-  where tail (ZTail (MidForeignCall (Safe _ _) _ _ _) _) = True
+  where tail (ZTail (MidForeignCall (Safe _ _ _) _ _ _) _) = True
         tail (ZTail _ t) = tail t
         tail (ZLast _)   = False
 
@@ -554,7 +554,7 @@ lowerSafeCallBlock state b = tail (return state) (ZBlock head (ZLast last))
         tail s b@(ZBlock (ZFirst _) _) =
           do state <- s
              return $ state { s_blocks = insertBlock (G.zip b) (s_blocks state) }
-        tail s (ZBlock (ZHead h m@(MidForeignCall (Safe bid updfr_off) _ _ _)) t) =
+        tail s (ZBlock (ZHead h m@(MidForeignCall (Safe bid updfr_off _) _ _ _)) t) =
           do state <- s
              let state' = state
                    { s_safeCalls = FloatingInfoTable emptyContInfoTable bid updfr_off :
@@ -568,7 +568,7 @@ lowerSafeCallBlock state b = tail (return state) (ZBlock head (ZLast last))
 -- to lower a safe foreign call to a sequence of unsafe calls.
 lowerSafeForeignCall ::
   SafeState -> Middle -> ZTail Middle Last -> FuelMonad (SafeState, ZTail Middle Last)
-lowerSafeForeignCall state m@(MidForeignCall (Safe infotable _) _ _ _) tail = do
+lowerSafeForeignCall state m@(MidForeignCall (Safe infotable _ interruptible) _ _ _) tail = do
     let newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
@@ -582,8 +582,9 @@ lowerSafeForeignCall state m@(MidForeignCall (Safe infotable _) _ _ _) tail = do
                   saveThreadState <*>
                   caller_save <*>
                   mkUnsafeCall (ForeignTarget suspendThread
-                                  (ForeignConvention CCallConv [AddrHint] [AddrHint]))
-                    [id] [CmmReg (CmmGlobal BaseReg)]
+                                  (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
+                    -- XXX Not sure if the size of the CmmInt is correct
+                    [id] [CmmReg (CmmGlobal BaseReg), CmmLit (CmmInt (fromIntegral (fromEnum interruptible)) wordWidth)]
         resume = mkUnsafeCall (ForeignTarget resumeThread
                                   (ForeignConvention CCallConv [AddrHint] [AddrHint]))
                     [new_base] [CmmReg (CmmLocal id)] <*>

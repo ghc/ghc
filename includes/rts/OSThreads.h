@@ -165,6 +165,7 @@ typedef void OSThreadProcAttr OSThreadProc(void *);
 extern int  createOSThread        ( OSThreadId* tid, 
 				    OSThreadProc *startProc, void *param);
 extern rtsBool osThreadIsAlive    ( OSThreadId id );
+extern void interruptOSThread (OSThreadId id);
 
 //
 // Condition Variables

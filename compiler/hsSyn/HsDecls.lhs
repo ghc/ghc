@@ -897,7 +897,7 @@ data ForeignImport = -- import of a C entity
 		     --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
 		     --
 		     CImport  CCallConv	      -- ccall or stdcall
-			      Safety	      -- safe or unsafe
+			      Safety	      -- interruptible, safe or unsafe
 			      FastString      -- name of C header
 			      CImportSpec     -- details of the C entity
   deriving (Data, Typeable)

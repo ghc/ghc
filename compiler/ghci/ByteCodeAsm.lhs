@@ -309,8 +309,8 @@ mkBits findLabel st proto_insns
                ENTER              -> instr1 st bci_ENTER
                RETURN             -> instr1 st bci_RETURN
                RETURN_UBX rep     -> instr1 st (return_ubx rep)
-               CCALL off m_addr   -> do (np, st2) <- addr st m_addr
-                                        instr3 st2 bci_CCALL off np
+               CCALL off m_addr int -> do (np, st2) <- addr st m_addr
+                                          instr4 st2 bci_CCALL off np int
                BRK_FUN array index info -> do
                   (p1, st2) <- ptr st  (BCOPtrArray array)
                   (p2, st3) <- ptr st2 (BCOPtrBreakInfo info)
@@ -478,7 +478,7 @@ instrSize16s instr
         ENTER{}                 -> 1
         RETURN{}                -> 1
         RETURN_UBX{}            -> 1
-        CCALL{}                 -> 3
+        CCALL{}                 -> 4
         SWIZZLE{}               -> 3
         BRK_FUN{}               -> 4
 

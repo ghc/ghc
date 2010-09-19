@@ -269,6 +269,25 @@ setThreadAffinity (nat n, nat m) // cap N of M
     }
 }
 
+typedef BOOL (WINAPI *PCSIO)(HANDLE);
+
+void
+interruptOSThread (OSThreadId id)
+{
+    HANDLE hdl;
+    PCSIO pCSIO;
+    if (!(hdl = OpenThread(THREAD_TERMINATE,FALSE,id))) {
+        sysErrorBelch("interruptOSThread: OpenThread");
+        stg_exit(EXIT_FAILURE);
+    }
+    pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")), "CancelSynchronousIo");
+    if ( NULL != pCSIO ) {
+        pCSIO(hdl);
+    } else {
+        // Nothing to do, unfortunately
+    }
+}
+
 #else /* !defined(THREADED_RTS) */
 
 int

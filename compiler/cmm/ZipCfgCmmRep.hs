@@ -165,6 +165,7 @@ data ForeignSafety
   = Unsafe              -- unsafe call
   | Safe BlockId        -- making infotable requires: 1. label 
          UpdFrameOffset --                            2. where the upd frame is
+         Bool           -- is the call interruptible?
   deriving Eq
 
 data ValueDirection = Arguments | Results
@@ -484,7 +485,9 @@ ppr_fc (ForeignConvention c args res) =
   doubleQuotes (ppr c) <+> text "args: " <+> ppr args <+> text " results: " <+> ppr res
 
 ppr_safety :: ForeignSafety -> SDoc
-ppr_safety (Safe bid upd) = text "safe<" <> ppr bid <> text ", " <> ppr upd <> text ">"
+ppr_safety (Safe bid upd interruptible) =
+    text (if interruptible then "interruptible" else "safe") <>
+    text "<" <> ppr bid <> text ", " <> ppr upd <> text ">"
 ppr_safety Unsafe         = text "unsafe"
 
 ppr_call_target :: MidCallTarget -> SDoc

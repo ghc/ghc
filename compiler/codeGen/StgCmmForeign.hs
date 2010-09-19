@@ -127,7 +127,7 @@ emitForeignCall safety results target args _srt _ret
   | otherwise = do
     updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
-    emit $ mkSafeCall temp_target results args updfr_off
+    emit $ mkSafeCall temp_target results args updfr_off (playInterruptible safety)
 
 
 {-

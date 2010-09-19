@@ -1356,6 +1356,7 @@ run_BCO:
 	    void *tok;
 	    int stk_offset            = BCO_NEXT;
 	    int o_itbl                = BCO_NEXT;
+	    int interruptible         = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
 	    int ret_dyn_size = 
 		RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE
@@ -1444,7 +1445,7 @@ run_BCO:
             ((StgRetDyn *)Sp)->payload[0] = (StgClosure *)obj;
 
 	    SAVE_STACK_POINTERS;
-	    tok = suspendThread(&cap->r);
+	    tok = suspendThread(&cap->r, interruptible ? rtsTrue : rtsFalse);
 
 	    // We already made a copy of the arguments above.
             ffi_call(cif, fn, ret, argptrs);

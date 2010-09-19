@@ -223,8 +223,8 @@
 #define BlockedOnGA_NoSend  9
 /* Only relevant for THREADED_RTS: */
 #define BlockedOnCCall      10
-#define BlockedOnCCall_NoUnblockExc 11
-   /* same as above but don't unblock async exceptions in resumeThread() */
+#define BlockedOnCCall_Interruptible 11
+   /* same as above but permit killing the worker thread */
 
 /* Involved in a message sent to tso->msg_cap */
 #define BlockedOnMsgThrowTo 12

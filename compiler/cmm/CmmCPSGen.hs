@@ -232,7 +232,9 @@ foreignCall uniques call results arguments =
     caller_save ++
     [CmmCall (CmmCallee suspendThread CCallConv)
 		 [ CmmHinted id AddrHint ]
-		 [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint ]
+		 [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint
+		 -- XXX: allow for interruptible suspension
+		 , CmmHinted (CmmLit (CmmInt 0 wordWidth)) NoHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      CmmCall call results new_args CmmUnsafe CmmMayReturn,

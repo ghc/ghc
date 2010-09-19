@@ -476,6 +476,15 @@ int main(int argc, char *argv[])
           threads, but there may be an arbitrary number of foreign
           calls in progress at any one time, regardless of
           the <literal>+RTS -N</literal> value.</para>
+
+        <para>If a call is annotated as <literal>interruptible</literal>
+          and the program was multithreaded, the call may be
+          interrupted in the event that the Haskell thread receives an
+          exception.  The mechanism by which the interrupt occurs
+          is platform dependent, but is intended to cause blocking
+          system calls to return immediately with an interrupted error
+          code.  The underlying operating system thread is not to be
+          destroyed.</para>
       </sect3>
 
       <sect3 id="haskell-threads-and-os-threads">

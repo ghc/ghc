@@ -409,6 +409,15 @@ startWorkerTask (Capability *cap)
   RELEASE_LOCK(&task->lock);
 }
 
+void
+interruptWorkerTask (Task *task)
+{
+  ASSERT(osThreadId() != task->id);    // seppuku not allowed
+  ASSERT(task->incall->suspended_tso); // use this only for FFI calls
+  interruptOSThread(task->id);
+  debugTrace(DEBUG_sched, "interrupted worker task %lu", task->id);
+}
+
 #endif /* THREADED_RTS */
 
 #ifdef DEBUG

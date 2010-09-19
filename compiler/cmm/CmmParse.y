@@ -8,6 +8,8 @@
 --
 -----------------------------------------------------------------------------
 
+-- TODO: Add support for interruptible/uninterruptible foreign call specification
+
 {
 {-# OPTIONS -Wwarn -w -XNoMonomorphismRestriction #-}
 -- The NoMonomorphismRestriction deals with a Happy infelicity
@@ -734,6 +736,7 @@ callishMachOps = listToUFM $
 parseSafety :: String -> P CmmSafety
 parseSafety "safe"   = return (CmmSafe NoC_SRT)
 parseSafety "unsafe" = return CmmUnsafe
+parseSafety "interruptible" = return CmmInterruptible
 parseSafety str      = fail ("unrecognised safety: " ++ str)
 
 parseCmmHint :: String -> P ForeignHint
@@ -864,6 +867,9 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
                 code (emitForeignCall' (PlaySafe unused) results 
                    (CmmCallee expr' convention) args vols NoC_SRT ret) where
 	        unused = panic "not used by emitForeignCall'"
+              CmmInterruptible ->
+                code (emitForeignCall' PlayInterruptible results 
+                   (CmmCallee expr' convention) args vols NoC_SRT ret)
 
 adjCallTarget :: CCallConv -> CmmExpr -> [CmmHinted CmmExpr] -> CmmExpr
 #ifdef mingw32_TARGET_OS
@@ -898,6 +904,9 @@ primCall results_code name args_code vols safety
 		    code (emitForeignCall' (PlaySafe unused) results 
 		      (CmmPrim p) args vols NoC_SRT CmmMayReturn) where
 		    unused = panic "not used by emitForeignCall'"
+		  CmmInterruptible ->
+		    code (emitForeignCall' PlayInterruptible results 
+		      (CmmPrim p) args vols NoC_SRT CmmMayReturn)
 
 doStore :: CmmType -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code

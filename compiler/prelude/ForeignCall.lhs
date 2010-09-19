@@ -14,7 +14,7 @@
 
 module ForeignCall (
 	ForeignCall(..),
-	Safety(..), playSafe,
+	Safety(..), playSafe, playInterruptible,
 
 	CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
 	CCallSpec(..), 
@@ -63,6 +63,11 @@ data Safety
                         -- which is now an alias for "safe". This information
                         -- is never used except to emit a deprecation warning.
 
+  | PlayInterruptible   -- Like PlaySafe, but additionally
+                        -- the worker thread running this foreign call may
+                        -- be unceremoniously killed, so it must be scheduled
+                        -- on an unbound thread.
+
   | PlayRisky		-- None of the above can happen; the call will return
 			-- without interacting with the runtime system at all
   deriving ( Eq, Show, Data, Typeable )
@@ -72,11 +77,17 @@ data Safety
 instance Outputable Safety where
   ppr (PlaySafe False) = ptext (sLit "safe")
   ppr (PlaySafe True)  = ptext (sLit "threadsafe")
+  ppr PlayInterruptible = ptext (sLit "interruptible")
   ppr PlayRisky = ptext (sLit "unsafe")
 
 playSafe :: Safety -> Bool
 playSafe PlaySafe{} = True
+playSafe PlayInterruptible = True
 playSafe PlayRisky  = False
+
+playInterruptible :: Safety -> Bool
+playInterruptible PlayInterruptible = True
+playInterruptible _ = False
 \end{code}
 
 
@@ -233,13 +244,16 @@ instance Binary Safety where
     put_ bh (PlaySafe aa) = do
 	    putByte bh 0
 	    put_ bh aa
-    put_ bh PlayRisky = do
+    put_ bh PlayInterruptible = do
 	    putByte bh 1
+    put_ bh PlayRisky = do
+	    putByte bh 2
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> do aa <- get bh
 		      return (PlaySafe aa)
+	      1 -> do return PlayInterruptible
 	      _ -> do return PlayRisky
 
 instance Binary CExportSpec where

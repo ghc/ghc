@@ -492,8 +492,8 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnCCall:
     debugBelch("is blocked on an external call");
     break;
-  case BlockedOnCCall_NoUnblockExc:
-    debugBelch("is blocked on an external call (exceptions were already blocked)");
+  case BlockedOnCCall_Interruptible:
+    debugBelch("is blocked on an external call (but may be interrupted)");
     break;
   case BlockedOnSTM:
     debugBelch("is blocked on an STM operation");

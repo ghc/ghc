@@ -375,6 +375,7 @@ cvtForD (ImportF callconv safety from nm ty)
                      Unsafe     -> PlayRisky
                      Safe       -> PlaySafe False
                      Threadsafe -> PlaySafe True
+                     Interruptible -> PlayInterruptible
 
 cvtForD (ExportF callconv as nm ty)
   = do	{ nm' <- vNameL nm

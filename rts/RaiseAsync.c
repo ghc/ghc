@@ -127,7 +127,7 @@ suspendComputation(Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
    Capability, and it is
 
      - NotBlocked, BlockedOnMsgThrowTo,
-       BlockedOnCCall
+       BlockedOnCCall_Interruptible
 
      - or it is masking exceptions (TSO_BLOCKEX)
 
@@ -392,8 +392,29 @@ check_target:
 	    return THROWTO_SUCCESS;
 	}
 
+    case BlockedOnCCall_Interruptible:
+#ifdef THREADED_RTS
+    {
+        Task *task = NULL;
+        // walk suspended_ccalls to find the correct worker thread
+        InCall *incall;
+        for (incall = cap->suspended_ccalls; incall != NULL; incall = incall->next) {
+            if (incall->suspended_tso == target) {
+                task = incall->task;
+                break;
+            }
+        }
+        if (task != NULL) {
+            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            interruptWorkerTask(task);
+            return THROWTO_SUCCESS;
+        } else {
+            debugTraceCap(DEBUG_sched, cap, "throwTo: could not find worker thread to kill");
+        }
+        // fall to next
+    }
+#endif
     case BlockedOnCCall:
-    case BlockedOnCCall_NoUnblockExc:
 	blockedThrowTo(cap,target,msg);
 	return THROWTO_BLOCKED;
 

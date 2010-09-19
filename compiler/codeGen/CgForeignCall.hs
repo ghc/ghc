@@ -144,7 +144,8 @@ emitForeignCall' safety results target args vols _srt ret
     -- to this sequence of three CmmUnsafe calls.
     stmtC (CmmCall (CmmCallee suspendThread CCallConv) 
 			[ CmmHinted id AddrHint ]
-			[ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint ] 
+			[ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint
+			, CmmHinted (CmmLit (CmmInt (fromIntegral (fromEnum (playInterruptible safety))) wordWidth)) NoHint]
 			CmmUnsafe ret)
     stmtC (CmmCall temp_target results temp_args CmmUnsafe ret)
     stmtC (CmmCall (CmmCallee resumeThread CCallConv) 

@@ -225,6 +225,11 @@ INLINE_HEADER Task *myTask (void);
 //
 void startWorkerTask (Capability *cap);
 
+// Interrupts a worker task that is performing an FFI call.  The thread
+// should not be destroyed.
+//
+void interruptWorkerTask (Task *task);
+
 #endif /* THREADED_RTS */
 
 // -----------------------------------------------------------------------------
