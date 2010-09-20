@@ -20,6 +20,7 @@ $$(foreach p,$$(patsubst libraries/%,%,$$(wildcard $$(shell grep '^[^ ]\+ \+\(dp
 endef
 
 define extra-package # $1 = package root, $2 = package
+EXTRA_PACKAGES += $2
 ifeq "$(wildcard libraries/$1/ghc-stage2-package)" ""
 $$(eval $$(call addPackage,$2))
 else
