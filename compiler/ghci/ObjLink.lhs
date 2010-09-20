@@ -12,6 +12,7 @@ Primarily, this module consists of an interface to the C-land dynamic linker.
 module ObjLink ( 
    initObjLinker,	 -- :: IO ()
    loadDLL,		 -- :: String -> IO (Maybe String)
+   loadArchive,     	 -- :: String -> IO ()
    loadObj,     	 -- :: String -> IO ()
    unloadObj,   	 -- :: String -> IO ()
    insertSymbol,         -- :: String -> String -> Ptr a -> IO ()
@@ -65,6 +66,12 @@ loadDLL str = do
 	else do str <- peekCString maybe_errmsg
 		return (Just str)
 
+loadArchive :: String -> IO ()
+loadArchive str = do
+   withCString str $ \c_str -> do
+     r <- c_loadArchive c_str
+     when (r == 0) (panic ("loadArchive " ++ show str ++ ": failed"))
+
 loadObj :: String -> IO ()
 loadObj str = do
    withCString str $ \c_str -> do
@@ -90,6 +97,7 @@ foreign import ccall unsafe "addDLL"	   c_addDLL :: CString -> IO CString
 foreign import ccall unsafe "initLinker"   initObjLinker :: IO ()
 foreign import ccall unsafe "insertSymbol" c_insertSymbol :: CString -> CString -> Ptr a -> IO ()
 foreign import ccall unsafe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr a)
+foreign import ccall unsafe "loadArchive"  c_loadArchive :: CString -> IO Int
 foreign import ccall unsafe "loadObj"      c_loadObj :: CString -> IO Int
 foreign import ccall unsafe "unloadObj"    c_unloadObj :: CString -> IO Int
 foreign import ccall unsafe "resolveObjs"  c_resolveObjs :: IO Int

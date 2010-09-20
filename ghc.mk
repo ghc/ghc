@@ -739,7 +739,9 @@ $(foreach pkg,$(BOOT_PKGS),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBo
 GHCI_LIBS = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_GHCI_LIB)) \
 	    $(compiler_stage2_GHCI_LIB)
 
+ifeq "$(UseArchivesForGhci)" "NO"
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(GHCI_LIBS)
+endif
 
 endif
 

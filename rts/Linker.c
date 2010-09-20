@@ -33,10 +33,8 @@
 #include "posix/Signals.h"
 #endif
 
-#if defined(mingw32_HOST_OS)
 // get protos for is*()
 #include <ctype.h>
-#endif
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -119,6 +117,15 @@ static /*Str*/HashTable *stablehash;
 
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;	/* initially empty */
+
+static HsInt loadOc( ObjectCode* oc );
+static ObjectCode* mkOc( char *path, char *image, int imageSize
+#ifndef USE_MMAP
+#ifdef darwin_HOST_OS
+                       , int misalignment
+#endif
+#endif
+                       );
 
 #if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
@@ -798,6 +805,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_isCurrentThreadBoundzh)	        \
       SymI_HasProto(stg_isEmptyMVarzh)			\
       SymI_HasProto(stg_killThreadzh)			\
+      SymI_HasProto(loadArchive)          			\
       SymI_HasProto(loadObj)          			\
       SymI_HasProto(insertStableSymbol) 		\
       SymI_HasProto(insertSymbol)     			\
@@ -1599,6 +1607,167 @@ mmap_again:
 }
 #endif // USE_MMAP
 
+static ObjectCode*
+mkOc( char *path, char *image, int imageSize
+#ifndef USE_MMAP
+#ifdef darwin_HOST_OS
+    , int misalignment
+#endif
+#endif
+    ) {
+   ObjectCode* oc;
+
+   oc = stgMallocBytes(sizeof(ObjectCode), "loadArchive(oc)");
+
+#  if defined(OBJFORMAT_ELF)
+   oc->formatName = "ELF";
+#  elif defined(OBJFORMAT_PEi386)
+   oc->formatName = "PEi386";
+#  elif defined(OBJFORMAT_MACHO)
+   oc->formatName = "Mach-O";
+#  else
+   stgFree(oc);
+   barf("loadObj: not implemented on this platform");
+#  endif
+
+   oc->image = image;
+   /* sigh, strdup() isn't a POSIX function, so do it the long way */
+   /* XXX What should this be for an archive? */
+   oc->fileName = stgMallocBytes( strlen(path)+1, "loadObj" );
+   strcpy(oc->fileName, path);
+
+   oc->fileSize          = imageSize;
+   oc->symbols           = NULL;
+   oc->sections          = NULL;
+   oc->proddables        = NULL;
+
+#ifndef USE_MMAP
+#ifdef darwin_HOST_OS
+   oc->misalignment = misalignment;
+#endif
+#endif
+
+   /* chain it onto the list of objects */
+   oc->next              = objects;
+   objects               = oc;
+
+   return oc;
+}
+
+#if defined(USE_ARCHIVES_FOR_GHCI)
+HsInt
+loadArchive( char *path )
+{
+   ObjectCode* oc;
+   char *image;
+   int imageSize;
+   FILE *f;
+   int n;
+   char tmp[16];
+   int isObject;
+
+   f = fopen(path, "rb");
+   if (!f)
+       barf("loadObj: can't read `%s'", path);
+
+   n = fread ( tmp, 1, 8, f );
+   if (strncmp(tmp, "!<arch>\n", 8) != 0)
+       barf("loadArchive: Not an archive: `%s'", path);
+
+   while(1) {
+       n = fread ( tmp, 1, 16, f );
+       if (n != 16) {
+           if (feof(f)) {
+               break;
+           }
+           else {
+               barf("loadArchive: Failed reading file name from `%s'", path);
+           }
+       }
+       /* Ignore special files */
+       if ((0 == strncmp(tmp, "/               ", 16)) ||
+           (0 == strncmp(tmp, "//              ", 16))) {
+           isObject = 0;
+       }
+       else {
+           isObject = 1;
+       }
+       n = fread ( tmp, 1, 12, f );
+       if (n != 12)
+           barf("loadArchive: Failed reading mod time from `%s'", path);
+       n = fread ( tmp, 1, 6, f );
+       if (n != 6)
+           barf("loadArchive: Failed reading owner from `%s'", path);
+       n = fread ( tmp, 1, 6, f );
+       if (n != 6)
+           barf("loadArchive: Failed reading group from `%s'", path);
+       n = fread ( tmp, 1, 8, f );
+       if (n != 8)
+           barf("loadArchive: Failed reading mode from `%s'", path);
+       n = fread ( tmp, 1, 10, f );
+       if (n != 10)
+           barf("loadArchive: Failed reading size from `%s'", path);
+       tmp[10] = '\0';
+       for (n = 0; isdigit(tmp[n]); n++);
+       tmp[n] = '\0';
+       imageSize = atoi(tmp);
+       n = fread ( tmp, 1, 2, f );
+       if (strncmp(tmp, "\x60\x0A", 2) != 0)
+           barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c", path, ftell(f), tmp[0], tmp[1]);
+
+       if (isObject) {
+           /* We can't mmap from the archive directly, as object
+              files need to be 8-byte aligned but files in .ar
+              archives are 2-byte aligned, and if we malloc the
+              memory then we can be given memory above 2^32, so we
+              mmap some anonymous memory and use that. We could
+              do better here. */
+           image = mmapForLinker(imageSize, MAP_ANONYMOUS, -1);
+           n = fread ( image, 1, imageSize, f );
+           if (n != imageSize)
+               barf("loadObj: error whilst reading `%s'", path);
+           oc = mkOc(path, image, imageSize
+#ifndef USE_MMAP
+#ifdef darwin_HOST_OS
+                    , 0
+#endif
+#endif
+                    );
+           if (0 == loadOc(oc)) {
+               return 0;
+           }
+       }
+       else {
+           n = fseek(f, imageSize, SEEK_CUR);
+           if (n != 0)
+               barf("loadArchive: error whilst seeking to %d in `%s'",
+                    imageSize, path);
+       }
+       /* .ar files are 2-byte aligned */
+       if (imageSize % 2) {
+           n = fread ( tmp, 1, 1, f );
+           if (n != 1) {
+               if (feof(f)) {
+                   break;
+               }
+               else {
+                   barf("loadArchive: Failed reading padding from `%s'", path);
+               }
+           }
+       }
+   }
+
+   fclose(f);
+
+   return 1;
+}
+#else
+HsInt GNU_ATTRIBUTE(__noreturn__)
+loadArchive( char *path STG_UNUSED ) {
+    barf("loadArchive: not enabled");
+}
+#endif
+
 /* -----------------------------------------------------------------------------
  * Load an obj (populate the global symbol table, but don't resolve yet)
  *
@@ -1608,6 +1777,8 @@ HsInt
 loadObj( char *path )
 {
    ObjectCode* oc;
+   char *image;
+   int fileSize;
    struct stat st;
    int r;
 #ifdef USE_MMAP
@@ -1616,6 +1787,7 @@ loadObj( char *path )
    FILE *f;
 #endif
    IF_DEBUG(linker, debugBelch("loadObj %s\n", path));
+
    initLinker();
 
    /* debugBelch("loadObj %s\n", path ); */
@@ -1642,37 +1814,13 @@ loadObj( char *path )
        }
    }
 
-   oc = stgMallocBytes(sizeof(ObjectCode), "loadObj(oc)");
-
-#  if defined(OBJFORMAT_ELF)
-   oc->formatName = "ELF";
-#  elif defined(OBJFORMAT_PEi386)
-   oc->formatName = "PEi386";
-#  elif defined(OBJFORMAT_MACHO)
-   oc->formatName = "Mach-O";
-#  else
-   stgFree(oc);
-   barf("loadObj: not implemented on this platform");
-#  endif
-
    r = stat(path, &st);
    if (r == -1) {
        IF_DEBUG(linker, debugBelch("File doesn't exist\n"));
        return 0;
    }
 
-   /* sigh, strdup() isn't a POSIX function, so do it the long way */
-   oc->fileName = stgMallocBytes( strlen(path)+1, "loadObj" );
-   strcpy(oc->fileName, path);
-
-   oc->fileSize          = st.st_size;
-   oc->symbols           = NULL;
-   oc->sections          = NULL;
-   oc->proddables        = NULL;
-
-   /* chain it onto the list of objects */
-   oc->next              = objects;
-   objects               = oc;
+   fileSize = st.st_size;
 
 #ifdef USE_MMAP
    /* On many architectures malloc'd memory isn't executable, so we need to use mmap. */
@@ -1685,7 +1833,7 @@ loadObj( char *path )
    if (fd == -1)
       barf("loadObj: can't open `%s'", path);
 
-   oc->image = mmapForLinker(oc->fileSize, 0, fd);
+   image = mmapForLinker(fileSize, 0, fd);
 
    close(fd);
 
@@ -1698,7 +1846,7 @@ loadObj( char *path )
 #   if defined(mingw32_HOST_OS)
 	// TODO: We would like to use allocateExec here, but allocateExec
 	//       cannot currently allocate blocks large enough.
-    oc->image = VirtualAlloc(NULL, oc->fileSize, MEM_RESERVE | MEM_COMMIT,
+    image = VirtualAlloc(NULL, fileSize, MEM_RESERVE | MEM_COMMIT,
                              PAGE_EXECUTE_READWRITE);
 #   elif defined(darwin_HOST_OS)
     // In a Mach-O .o file, all sections can and will be misaligned
@@ -1708,23 +1856,38 @@ loadObj( char *path )
     // as SSE (used by gcc for floating point) and Altivec require
     // 16-byte alignment.
     // We calculate the correct alignment from the header before
-    // reading the file, and then we misalign oc->image on purpose so
+    // reading the file, and then we misalign image on purpose so
     // that the actual sections end up aligned again.
-   oc->misalignment = machoGetMisalignment(f);
-   oc->image = stgMallocBytes(oc->fileSize + oc->misalignment, "loadObj(image)");
-   oc->image += oc->misalignment;
+   misalignment = machoGetMisalignment(f);
+   image = stgMallocBytes(fileSize + misalignment, "loadObj(image)");
+   image += misalignment;
 #  else
-   oc->image = stgMallocBytes(oc->fileSize, "loadObj(image)");
+   image = stgMallocBytes(fileSize, "loadObj(image)");
 #  endif
 
    {
        int n;
-       n = fread ( oc->image, 1, oc->fileSize, f );
-       if (n != oc->fileSize)
+       n = fread ( image, 1, fileSize, f );
+       if (n != fileSize)
            barf("loadObj: error whilst reading `%s'", path);
    }
    fclose(f);
 #endif /* USE_MMAP */
+
+   oc = mkOc(path, image, fileSize
+#ifndef USE_MMAP
+#ifdef darwin_HOST_OS
+            , misalignment
+#endif
+#endif
+            );
+
+   return loadOc(oc);
+}
+
+static HsInt
+loadOc( ObjectCode* oc ) {
+   int r;
 
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );

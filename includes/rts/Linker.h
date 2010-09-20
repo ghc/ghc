@@ -32,6 +32,9 @@ HsInt unloadObj( char *path );
 /* add an obj (populate the global symbol table, but don't resolve yet) */
 HsInt loadObj( char *path );
 
+/* add an arch (populate the global symbol table, but don't resolve yet) */
+HsInt loadArchive( char *path );
+
 /* resolve all the currently unlinked objects in memory */
 HsInt resolveObjs( void );
 

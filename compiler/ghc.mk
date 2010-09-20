@@ -136,6 +136,12 @@ ifeq "$(RelocatableBuild)" "YES"
 else
 	@echo 'cRelocatableBuild     = False'                               >> $@
 endif
+	@echo 'cUseArchivesForGhci   :: Bool'                               >> $@
+ifeq "$(UseArchivesForGhci)" "YES"
+	@echo 'cUseArchivesForGhci   = True'                                >> $@
+else
+	@echo 'cUseArchivesForGhci   = False'                               >> $@
+endif
 	@echo 'cLibFFI               :: Bool'                               >> $@
 ifeq "$(UseLibFFIForAdjustors)" "YES"
 	@echo 'cLibFFI               = True'                                >> $@

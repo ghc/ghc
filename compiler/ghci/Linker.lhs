@@ -53,7 +53,7 @@ import qualified Maybes
 import UniqSet
 import Constants
 import FastString
-import Config		( cProjectVersion )
+import Config
 
 -- Standard libraries
 import Control.Monad
@@ -429,8 +429,13 @@ preloadLib dflags lib_paths framework_paths lib_spec
           Object static_ish
              -> do b <- preload_static lib_paths static_ish
                    maybePutStrLn dflags (if b  then "done"
-	 					else "not found")
-	 
+                                                else "not found")
+
+          Archive static_ish
+             -> do b <- preload_static_archive lib_paths static_ish
+                   maybePutStrLn dflags (if b  then "done"
+                                                else "not found")
+
           DLL dll_unadorned
              -> do maybe_errstr <- loadDynamic lib_paths dll_unadorned
                    case maybe_errstr of
@@ -468,6 +473,10 @@ preloadLib dflags lib_paths framework_paths lib_spec
        = do b <- doesFileExist name
             if not b then return False
                      else loadObj name >> return True
+    preload_static_archive _paths name
+       = do b <- doesFileExist name
+            if not b then return False
+                     else loadArchive name >> return True
 \end{code}
 
 
@@ -929,6 +938,8 @@ data LibrarySpec
 			-- file in all the directories specified in 
 			-- v_Library_paths before giving up.
 
+   | Archive FilePath 	-- Full path name of a .a file, including trailing .a
+
    | DLL String		-- "Unadorned" name of a .DLL/.so
 			--  e.g.    On unix     "qt"  denotes "libqt.so"
 			--          On WinDoze  "burble"  denotes "burble.DLL"
@@ -957,6 +968,7 @@ partOfGHCi
 
 showLS :: LibrarySpec -> String
 showLS (Object nm)    = "(static) " ++ nm
+showLS (Archive nm)   = "(static archive) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (DLLPath nm)   = "(dynamic) " ++ nm
 showLS (Framework nm) = "(framework) " ++ nm
@@ -1039,6 +1051,7 @@ linkPackage dflags pkg
         -- Complication: all the .so's must be loaded before any of the .o's.  
 	let dlls = [ dll | DLL dll    <- classifieds ]
 	    objs = [ obj | Object obj <- classifieds ]
+	    archs = [ arch | Archive arch <- classifieds ]
 
 	maybePutStr dflags ("Loading package " ++ display (sourcePackageId pkg) ++ " ... ")
 
@@ -1060,6 +1073,7 @@ linkPackage dflags pkg
 	-- Ordering isn't important here, because we do one final link
 	-- step to resolve everything.
 	mapM_ loadObj objs
+	mapM_ loadArchive archs
 
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
@@ -1094,10 +1108,22 @@ locateOneObj dirs lib
   | not isDynamicGhcLib
     -- When the GHC package was not compiled as dynamic library 
     -- (=DYNAMIC not set), we search for .o libraries.
-  = do	{ mb_obj_path <- findFile mk_obj_path dirs 
-	; case mb_obj_path of
-	    Just obj_path -> return (Object obj_path)
-	    Nothing	  -> return (DLL lib) }
+  = do mb_libSpec <- if cUseArchivesForGhci
+                     then do mb_arch_path <- findFile mk_arch_path dirs
+                             case mb_arch_path of
+                                 Just arch_path ->
+                                     return (Just (Archive arch_path))
+                                 Nothing ->
+                                     return Nothing
+                     else do mb_obj_path <- findFile mk_obj_path dirs
+                             case mb_obj_path of
+                                 Just obj_path ->
+                                     return (Just (Object obj_path))
+                                 Nothing ->
+                                     return Nothing
+       case mb_libSpec of
+	   Just ls -> return ls
+	   Nothing -> return (DLL lib)
 
   | otherwise
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
@@ -1112,6 +1138,7 @@ locateOneObj dirs lib
                        Nothing       -> return (DLL lib) }}		-- We assume
    where
      mk_obj_path dir = dir </> (lib <.> "o")
+     mk_arch_path dir = dir </> ("lib" ++ lib <.> "a")
      dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
      mk_dyn_lib_path dir = dir </> mkSOName dyn_lib_name
 

@@ -190,6 +190,8 @@ else
 UseLibFFIForAdjustors=YES
 endif
 
+UseArchivesForGhci = NO
+
 # On Windows we normally want to make a relocatable bindist, to we
 # ignore flags like libdir
 ifeq "$(Windows)" "YES"
