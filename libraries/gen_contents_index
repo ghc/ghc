@@ -7,9 +7,12 @@ HADDOCK_ARGS=
 case $* in
 --inplace)
     HADDOCK=../inplace/bin/haddock
-    HADDOCK_FILES1=`ls -1     */dist-install/doc/html/*/*.haddock | sort`
-    HADDOCK_FILES2=`ls -1 dph/*/dist-install/doc/html/*/*.haddock | sort`
-    HADDOCK_FILES="$HADDOCK_FILES1 $HADDOCK_FILES2"
+    HADDOCK_FILES=`ls -1     */dist-install/doc/html/*/*.haddock | sort`
+    if [ -d dph ]
+    then
+        DPH_HADDOCK_FILES=`ls -1 dph/*/dist-install/doc/html/*/*.haddock | sort`
+        HADDOCK_FILES="$HADDOCK_FILES $DPH_HADDOCK_FILES"
+    fi
     for HADDOCK_FILE in $HADDOCK_FILES
     do
         LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
