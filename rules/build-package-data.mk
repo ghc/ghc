@@ -24,6 +24,12 @@ ifeq "$$(filter dyn,$$(GhcLibWays))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
 endif
 
+ifeq "$$(GhcWithInterpreter) $$(UseArchivesForGhci)" "YES NO"
+$1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
+else
+$1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
+endif
+
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
 $1_$2_CONFIGURE_OPTS += --with-hscolour="$$(HSCOLOUR_CMD)"
 endif
