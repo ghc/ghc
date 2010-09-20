@@ -449,7 +449,7 @@ rts_CC_OPTS		+= -DDTRACE
 rts_HC_OPTS		+= -DDTRACE
 
 DTRACEPROBES_SRC = rts/RtsProbes.d
-$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) | $(dir $@)/.
+$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) includes/ghcplatform.h | $(dir $@)/.
 	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C -h -o $@ -s $<
 
 endif
