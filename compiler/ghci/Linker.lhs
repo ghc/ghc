@@ -1017,6 +1017,12 @@ linkPackage dflags pkg
         let dirs      =  Packages.libraryDirs pkg
 
         let libs      =  Packages.hsLibraries pkg
+            -- The FFI GHCi import lib isn't needed as
+            -- compiler/ghci/Linker.lhs + rts/Linker.c link the
+            -- interpreted references to FFI to the compiled FFI.
+            -- We therefore filter it out so that we don't get
+            -- duplicate symbol errors.
+            libs'     =  filter ("HSffi" /=) libs
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a
         -- different list of libraries when using GHCi. Examples include: libs
@@ -1028,7 +1034,7 @@ linkPackage dflags pkg
                             then Packages.extraLibraries pkg
                             else Packages.extraGHCiLibraries pkg)
                       ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
-        classifieds   <- mapM (locateOneObj dirs) libs
+        classifieds   <- mapM (locateOneObj dirs) libs'
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
 	let dlls = [ dll | DLL dll    <- classifieds ]
