@@ -94,7 +94,7 @@ def _reqlib( opts, lib ):
         if have_subprocess:
             # By preference we use subprocess, as the alternative uses
             # /dev/null which mingw doesn't have.
-            p = subprocess.Popen([config.ghc_pkg, 'describe', lib],
+            p = subprocess.Popen([config.ghc_pkg, '--no-user-package-conf', 'describe', lib],
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             # read from stdout and stderr to avoid blocking due to
