@@ -190,7 +190,11 @@ else
 UseLibFFIForAdjustors=YES
 endif
 
+ifeq "$(findstring $(HostOS_CPP), darwin)" ""
 UseArchivesForGhci = NO
+else
+UseArchivesForGhci = YES
+endif
 
 # On Windows we normally want to make a relocatable bindist, to we
 # ignore flags like libdir
