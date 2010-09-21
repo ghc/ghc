@@ -22,6 +22,10 @@ $(INPLACE_LIB)/latex:
 
 endif
 
+ifeq "$(HADDOCK_DOCS)" "NO"
+utils/haddock_dist_NOT_NEEDED = YES
+endif
+
 $(eval $(call build-prog,utils/haddock,dist,2))
 
 utils/haddock_dist_MODULES += Paths_haddock
