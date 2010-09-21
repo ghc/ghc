@@ -10,10 +10,26 @@
 #
 # -----------------------------------------------------------------------------
 
+# For each package P marked as "dph" or "extra" in $(TOP)/packages:
+#   if $(TOP)/libraries/P exists, then
+#      if $(TOP)/libraries/P/ghc-packages exists, then
+#         * add each package from $(TOP)/libraries/P/ghc-packages2 to the list of
+#	    packages.
+#           Note: ghc-packages2 might have a different list from
+#	    ghc-packages, this is to support dph which has some
+#	    packages that are automatically derived from a single
+#	    source by the build system).
+#         * add $(TOP)/libraries/P to $(BUILD_DIRS)
+#           This step is necessary in the case of dph, which has some
+#           build system code in libraries/dph/ghc.mk, but
+#           libraries/dph is not itself a package.
+#      else
+#	  add P to the list of packages
+
 define extra-packages
 $$(foreach p,$$(patsubst libraries/%,%,$$(wildcard $$(shell grep '^[^ ]\+ \+\(dph\|extra\) \+[^ ]\+ \+[^ ]\+ \+[^ ]\+' packages | sed 's/ .*//'))),\
-    $$(eval BUILD_DIRS += libraries/$$p)\
     $$(if $$(wildcard libraries/$$p/ghc-packages),\
+        $$(eval BUILD_DIRS += libraries/$$p) \
         $$(foreach q,$$(shell cat libraries/$$p/ghc-packages2),$$(eval $$(call extra-package,$$p,$$p/$$q))),\
         $$(eval $$(call extra-package,$$p,$$p)))\
 )
