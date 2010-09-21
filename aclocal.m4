@@ -10,7 +10,7 @@
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
     case $$1 in
-    i386-apple-darwin|powerpc-apple-darwin)
+    i386-apple-darwin)
         # By default, gcc on OS X will generate SSE
         # instructions, which need things 16-byte aligned,
         # but we don't 16-byte align things. Thus drop
