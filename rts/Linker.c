@@ -1663,8 +1663,14 @@ loadArchive( char *path )
    int imageSize;
    FILE *f;
    int n;
-   char tmp[16];
+   size_t fileNameSize;
+   char *file;
+   size_t fileSize;
    int isObject;
+   char tmp[12];
+
+   fileSize = 32;
+   file = stgMallocBytes(fileSize, "loadArchive(file)");
 
    f = fopen(path, "rb");
    if (!f)
@@ -1675,7 +1681,7 @@ loadArchive( char *path )
        barf("loadArchive: Not an archive: `%s'", path);
 
    while(1) {
-       n = fread ( tmp, 1, 16, f );
+       n = fread ( file, 1, 16, f );
        if (n != 16) {
            if (feof(f)) {
                break;
@@ -1683,14 +1689,6 @@ loadArchive( char *path )
            else {
                barf("loadArchive: Failed reading file name from `%s'", path);
            }
-       }
-       /* Ignore special files */
-       if ((0 == strncmp(tmp, "/               ", 16)) ||
-           (0 == strncmp(tmp, "//              ", 16))) {
-           isObject = 0;
-       }
-       else {
-           isObject = 1;
        }
        n = fread ( tmp, 1, 12, f );
        if (n != 12)
@@ -1715,6 +1713,35 @@ loadArchive( char *path )
        if (strncmp(tmp, "\x60\x0A", 2) != 0)
            barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c", path, ftell(f), tmp[0], tmp[1]);
 
+       /* Check for BSD-variant large filenames */
+       if (0 == strncmp(file, "#1/", 3)) {
+           file[16] = '\0';
+           for (n = 3; isdigit(file[n]); n++);
+           file[n] = '\0';
+           fileNameSize = atoi(file + 3);
+           imageSize -= fileNameSize;
+           if (fileNameSize > fileSize) {
+               /* Double it to avoid potentially continually
+                  increasing it by 1 */
+               fileSize = fileNameSize * 2;
+               file = stgReallocBytes(file, fileSize, "loadArchive(file)");
+           }
+           n = fread ( file, 1, fileNameSize, f );
+           if (n != fileNameSize)
+               barf("loadArchive: Failed reading filename from `%s'", path);
+       }
+       else {
+           fileNameSize = 16;
+       }
+
+       isObject = 0;
+       for (n = 0; n < fileNameSize - 1; n++) {
+           if ((file[n] == '.') && (file[n] == 'o')) {
+               isObject = 1;
+               break;
+           }
+       }
+
        if (isObject) {
            /* We can't mmap from the archive directly, as object
               files need to be 8-byte aligned but files in .ar
@@ -1734,13 +1761,14 @@ loadArchive( char *path )
 #endif
                     );
            if (0 == loadOc(oc)) {
+               stgFree(file);
                return 0;
            }
        }
        else {
            n = fseek(f, imageSize, SEEK_CUR);
            if (n != 0)
-               barf("loadArchive: error whilst seeking to %d in `%s'",
+               barf("loadArchive: error whilst seeking by %d in `%s'",
                     imageSize, path);
        }
        /* .ar files are 2-byte aligned */
@@ -1759,6 +1787,7 @@ loadArchive( char *path )
 
    fclose(f);
 
+   stgFree(file);
    return 1;
 }
 #else
