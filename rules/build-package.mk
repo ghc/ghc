@@ -29,6 +29,7 @@
 # libraries/base_dist_LD_OPTS = -package ghc-prim-0.1.0.0
 
 define build-package
+$(call trace, build-package($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)

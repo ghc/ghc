@@ -12,6 +12,7 @@
 
 
 define haddock  # args: $1 = dir,  $2 = distdir
+$(call trace, haddock($1,$2))
 
 ifneq "$$($1_$2_DO_HADDOCK)" "NO"
 

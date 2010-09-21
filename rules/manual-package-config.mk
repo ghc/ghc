@@ -12,6 +12,7 @@
 
 
 define manual-package-config # args: $1 = dir
+$(call trace, manual-package-config($1))
 
 $1/package.conf.inplace : $1/package.conf.in $(GHC_PKG_INPLACE)
 	$$(CPP) $$(RAWCPP_FLAGS) -P \

@@ -18,6 +18,7 @@
 # Uses the same metadata as build-package.
 
 define tags-package
+$(call trace, tags-package($1,$2))
 # $1 = dir
 # $2 = distdir
 

@@ -19,6 +19,7 @@
 # $(eval $(call build-perl,driver/mangler,dist))
 
 define build-perl
+$(call trace, build-perl($1,$2))
 # $1 = dir
 # $2 = distdir
 

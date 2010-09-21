@@ -14,6 +14,7 @@
 # Build docbook docs
 
 define docbook
+$(call trace, docbook($1,$2))
 # $1 = dir
 # $2 = docname
 

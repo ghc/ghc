@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------
 
 define build-package-data
+$(call trace, build-package-data($1,$2,$3))
 # args:
 # $1 = dir
 # $2 = distdir

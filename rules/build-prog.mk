@@ -20,6 +20,7 @@
 # $(eval $(call build-prog,utils/genapply,dist-install,1))
 
 define build-prog
+$(call trace, build-prog($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)

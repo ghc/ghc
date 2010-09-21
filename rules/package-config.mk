@@ -12,6 +12,7 @@
 
 
 define package-config # args: $1 = dir, $2 = distdir, $3 = GHC stage
+$(call trace, package-config($1,$2,$3))
 
 $1_$2_HC = $$(GHC_STAGE$3)
 

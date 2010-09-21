@@ -36,11 +36,13 @@ $$(foreach p,$$(patsubst libraries/%,%,$$(wildcard $$(shell grep '^[^ ]\+ \+\(dp
 endef
 
 define extra-package # $1 = package root, $2 = package
+$(call trace, extra-package($1,$2))
+
 EXTRA_PACKAGES += $2
 ifeq "$(wildcard libraries/$1/ghc-stage2-package)" ""
 $$(eval $$(call addPackage,$2))
 else
 $$(eval $$(call addPackage2,$2))
 endif
-endef
 
+endef

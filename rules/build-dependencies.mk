@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------
 
 define build-dependencies
+$(call trace, build-dependencies($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
