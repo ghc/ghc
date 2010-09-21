@@ -1727,7 +1727,7 @@ loadArchive( char *path )
                file = stgReallocBytes(file, fileSize, "loadArchive(file)");
            }
            n = fread ( file, 1, fileNameSize, f );
-           if (n != fileNameSize)
+           if (n != (int)fileNameSize)
                barf("loadArchive: Failed reading filename from `%s'", path);
        }
        else {
@@ -1735,7 +1735,7 @@ loadArchive( char *path )
        }
 
        isObject = 0;
-       for (n = 0; n < fileNameSize - 1; n++) {
+       for (n = 0; n < (int)fileNameSize - 1; n++) {
            if ((file[n] == '.') && (file[n] == 'o')) {
                isObject = 1;
                break;
