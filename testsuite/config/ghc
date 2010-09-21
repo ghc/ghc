@@ -120,12 +120,22 @@ threaded_ways = filter(lambda x: x in config.run_ways,
 
 def get_compiler_info():
     # This should really not go through the shell
-    h = os.popen('"' + config.compiler + '" --numeric-version', 'r')
-    v = h.read()
+    h = os.popen('"' + config.compiler + '" --info', 'r')
+    s = h.read()
     h.close()
-    v = re.sub('[\r\n]', '', v)
-    v = v.split('-')
+    compilerInfoDict = dict(eval(s))
+    h = os.popen('"' + config.compiler + '" +RTS --info', 'r')
+    s = h.read()
+    h.close()
+    rtsInfoDict = dict(eval(s))
+
+    v = compilerInfoDict["Project version"].split('-')
     config.compiler_version = v[0]
     config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
     config.compiler_tags = v[1:]
+
+    if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
+        config.compiler_profiled = True
+    else:
+        config.compiler_profiled = False
 

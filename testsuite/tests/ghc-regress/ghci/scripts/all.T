@@ -1,3 +1,6 @@
+
+setTestOpts(if_compiler_profiled(skip))
+
 test('ghci001', normal, ghci_script, ['ghci001.script'])
 test('ghci002', normal, ghci_script, ['ghci002.script'])
 test('ghci003', normal, ghci_script, ['ghci003.script'])

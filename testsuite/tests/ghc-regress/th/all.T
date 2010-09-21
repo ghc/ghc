@@ -6,6 +6,7 @@ def f(opts):
 setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal','ghci']))
+setTestOpts(if_compiler_profiled(skip))
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_1tuple', normal, compile_fail, ['-v0'])

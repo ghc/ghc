@@ -6,6 +6,7 @@ def f(opts):
 setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal']));
+setTestOpts(if_compiler_profiled(skip))
 
 test('TH_recompile',
      [expect_broken(481),
