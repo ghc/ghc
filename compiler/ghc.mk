@@ -369,7 +369,12 @@ endif
 # exist.
 ifeq "$(GhcProfiled)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --ghc-option=-auto-all
-compiler_stage2_CONFIGURE_OPTS += --disable-library-vanilla
+# We seem to still build the vanilla libraries even if we say
+# --disable-library-vanilla, but installation then fails, as Cabal
+# doesn't copy the vanilla .hi files, but ghc-pkg complains about
+# their absence when we register the package. So for now, we just
+# leave the vanilla libraries enabled.
+# compiler_stage2_CONFIGURE_OPTS += --disable-library-vanilla
 compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
 endif

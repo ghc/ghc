@@ -789,8 +789,10 @@ TAGS: TAGS_compiler
 # Installation
 
 install: install_packages install_libs install_libexecs install_headers \
-         install_libexec_scripts install_bins install_docs \
-		 install_topdirs
+         install_libexec_scripts install_bins install_topdirs
+ifeq "$(HADDOCK_DOCS)" "YES"
+install: install_docs
+endif
 
 install_bins: $(INSTALL_BINS)
 	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
