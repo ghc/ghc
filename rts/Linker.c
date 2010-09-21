@@ -1669,6 +1669,8 @@ loadArchive( char *path )
    int isObject;
    char tmp[12];
 
+   IF_DEBUG(linker, debugBelch("loadArchive `%s'\n", path));
+
    fileSize = 32;
    file = stgMallocBytes(fileSize, "loadArchive(file)");
 
@@ -1917,6 +1919,8 @@ loadObj( char *path )
 static HsInt
 loadOc( ObjectCode* oc ) {
    int r;
+
+   IF_DEBUG(linker, debugBelch("loadOc\n"));
 
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );
@@ -4859,6 +4863,8 @@ static int ocGetNames_MachO(ObjectCode* oc)
     char    *commonStorage = NULL;
     unsigned long commonCounter;
 
+    IF_DEBUG(linker,debugBelch("ocGetNames_MachO\n"));
+
     for(i=0;i<header->ncmds;i++)
     {
 	if(lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64)
@@ -4948,6 +4954,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
                         ; // weak definition, and we already have a definition
                     else
                     {
+                            IF_DEBUG(linker,debugBelch("Adding symbol 1 %s\n", nm));
                             ghciInsertStrHashTable(oc->fileName, symhash, nm,
                                                     image
                                                     + sections[nlist[i].n_sect-1].offset
@@ -4974,6 +4981,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
 	        nlist[i].n_value = commonCounter;
 
+            IF_DEBUG(linker,debugBelch("Adding symbol 2 %s\n", nm));
 	        ghciInsertStrHashTable(oc->fileName, symhash, nm,
 	                               (void*)commonCounter);
 	        oc->symbols[curSymbol++] = nm;
