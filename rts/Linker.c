@@ -1738,7 +1738,7 @@ loadArchive( char *path )
 
        isObject = 0;
        for (n = 0; n < (int)fileNameSize - 1; n++) {
-           if ((file[n] == '.') && (file[n] == 'o')) {
+           if ((file[n] == '.') && (file[n + 1] == 'o')) {
                isObject = 1;
                break;
            }
