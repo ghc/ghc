@@ -48,12 +48,11 @@ module StgSyn (
 
 import CostCentre	( CostCentreStack, CostCentre )
 import VarSet		( IdSet, isEmptyVarSet )
-import Id		( Id, idName, idType, idCafInfo, isId )
+import Id		
+import DataCon
 import IdInfo		( mayHaveCafRefs )
-import Packages		( isDllName )
 import Literal		( Literal, literalType )
 import ForeignCall	( ForeignCall )
-import DataCon		( DataCon, dataConName )
 import CoreSyn		( AltCon )
 import PprCore		( {- instances -} )
 import PrimOp		( PrimOp, PrimCall )
@@ -66,6 +65,11 @@ import Bitmap
 import StaticFlags	( opt_SccProfilingOn )
 import Module
 import FastString
+
+#if mingw32_TARGET_OS
+import Packages		( isDllName )
+
+#endif
 \end{code}
 
 %************************************************************************
@@ -105,17 +109,20 @@ isStgTypeArg :: StgArg -> Bool
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg _              = False
 
-isDllArg :: PackageId -> StgArg -> Bool
-	-- Does this argument refer to something in a different DLL?
-isDllArg this_pkg (StgVarArg v)  = isDllName this_pkg (idName v)
-isDllArg _        _              = False
-
 isDllConApp :: PackageId -> DataCon -> [StgArg] -> Bool
-	-- Does this constructor application refer to 
-	-- anything in a different DLL?
-	-- If so, we can't allocate it statically
+-- Does this constructor application refer to 
+-- anything in a different *Windows* DLL?
+-- If so, we can't allocate it statically
+#if mingw32_TARGET_OS
 isDllConApp this_pkg con args
-   = isDllName this_pkg (dataConName con) || any (isDllArg this_pkg) args
+  = isDllName this_pkg (dataConName con) || any is_dll_arg args
+  where
+    is_dll_arg ::StgArg -> Bool
+    is_dll_arg (StgVarArg v) = isDllName this_pkg (idName v)
+    is_dll_arg _             = False
+#else
+isDllConApp _ _ _ = False
+#endif
 
 stgArgType :: StgArg -> Type
 	-- Very half baked becase we have lost the type arguments

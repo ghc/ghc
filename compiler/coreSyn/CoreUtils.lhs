@@ -55,7 +55,6 @@ import SrcLoc
 import VarEnv
 import VarSet
 import Name
-import Module
 #if mingw32_TARGET_OS
 import Packages
 #endif
@@ -1337,7 +1336,7 @@ and 'execute' it rather than allocating it statically.
 -- | This function is called only on *top-level* right-hand sides.
 -- Returns @True@ if the RHS can be allocated statically in the output,
 -- with no thunks involved at all.
-rhsIsStatic :: PackageId -> CoreExpr -> Bool
+rhsIsStatic :: (Name -> Bool) -> CoreExpr -> Bool
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
@@ -1392,7 +1391,7 @@ rhsIsStatic :: PackageId -> CoreExpr -> Bool
 -- 
 --    c) don't look through unfolding of f in (f x).
 
-rhsIsStatic _this_pkg rhs = is_static False rhs
+rhsIsStatic _is_dynamic_name rhs = is_static False rhs
   where
   is_static :: Bool	-- True <=> in a constructor argument; must be atomic
   	  -> CoreExpr -> Bool
@@ -1420,7 +1419,7 @@ rhsIsStatic _this_pkg rhs = is_static False rhs
    where
     go (Var f) n_val_args
 #if mingw32_TARGET_OS
-        | not (isDllName _this_pkg (idName f))
+        | not (_is_dynamic_name (idName f))
 #endif
 	=  saturated_data_con f n_val_args
 	|| (in_arg && n_val_args == 0)	

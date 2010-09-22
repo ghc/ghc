@@ -947,6 +947,9 @@ missingDependencyMsg (Just parent)
 
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: PackageId -> Name -> Bool
+-- Despite the "dll", I think this function just means that
+-- the synbol comes from another dynamically-linked package,
+-- and applies on all platforms, not just Windows
 isDllName this_pkg name
   | opt_Static = False
   | Just mod <- nameModule_maybe name = modulePackageId mod /= this_pkg

@@ -37,6 +37,7 @@ import TcType
 import DataCon
 import TyCon
 import Module
+import Packages( isDllName )
 import HscTypes
 import Maybes
 import UniqSupply
@@ -1139,12 +1140,12 @@ CAF list to keep track of non-collectable CAFs.
 \begin{code}
 hasCafRefs  :: PackageId -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
 hasCafRefs this_pkg p arity expr 
-  | is_caf || mentions_cafs 
-                            = MayHaveCafRefs
+  | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise 		    = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefs p expr)
-  is_caf = not (arity > 0 || rhsIsStatic this_pkg expr)
+  is_dynamic_name = isDllName this_pkg 
+  is_caf = not (arity > 0 || rhsIsStatic is_dynamic_name expr)
 
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity

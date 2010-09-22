@@ -12,7 +12,7 @@ module CoreToStg ( coreToStg, coreExprToStg ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( rhsIsStatic, exprType, findDefault )
+import CoreUtils	( exprType, findDefault )
 import CoreArity	( manifestArity )
 import StgSyn
 
@@ -184,7 +184,7 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec id stg_rhs
     in
-    ASSERT2(consistentCafInfo id bind, ppr id $$ ppr rhs $$ ppr bind )
+    ASSERT2(consistentCafInfo id bind, ppr id {- $$ ppr rhs $$ ppr bind -} )
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
 coreTopBindToStg this_pkg env body_fvs (Rec pairs)
@@ -214,15 +214,14 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 -- floated out a binding, in which case it will be approximate.
 consistentCafInfo :: Id -> GenStgBinding Var Id -> Bool
 consistentCafInfo id bind
-  | occNameFS (nameOccName (idName id)) == fsLit "sat"
-  = safe
-  | otherwise
-  = WARN (not exact, ppr id) safe
+  = WARN( not (exact || is_sat_thing) , ppr id ) 
+    safe
   where
-	safe  = id_marked_caffy || not binding_is_caffy
-	exact = id_marked_caffy == binding_is_caffy
-	id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
-	binding_is_caffy = stgBindHasCafRefs bind
+    safe  = id_marked_caffy || not binding_is_caffy
+    exact = id_marked_caffy == binding_is_caffy
+    id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
+    binding_is_caffy = stgBindHasCafRefs bind
+    is_sat_thing = occNameFS (nameOccName (idName id)) == fsLit "sat"
 \end{code}
 
 \begin{code}
@@ -236,13 +235,12 @@ coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
   = do { (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
        ; lv_info <- freeVarsToLiveVars rhs_fvs
 
-       ; let stg_rhs   = mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs
+       ; let stg_rhs   = mkTopStgRhs this_pkg rhs_fvs (mkSRT lv_info) bndr_info new_rhs
              stg_arity = stgRhsArity stg_rhs
        ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs, 
                  rhs_fvs) }
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
-    is_static = rhsIsStatic this_pkg rhs
 
 	-- It's vital that the arity on a top-level Id matches
 	-- the arity of the generated STG binding, else an importing 
@@ -263,25 +261,23 @@ coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
                 ptext (sLit "Id arity:") <+> ppr id_arity,
                 ptext (sLit "STG arity:") <+> ppr stg_arity]
 
-mkTopStgRhs :: Bool -> FreeVarsInfo
+mkTopStgRhs :: PackageId -> FreeVarsInfo
 	    -> SRT -> StgBinderInfo -> StgExpr
    	    -> StgRhs
 
-mkTopStgRhs is_static rhs_fvs srt binder_info (StgLam _ bndrs body)
-  = ASSERT( is_static )
-    StgRhsClosure noCCS binder_info
+mkTopStgRhs _ rhs_fvs srt binder_info (StgLam _ bndrs body)
+  = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 		  ReEntrant
 		  srt
 		  bndrs body
 
-mkTopStgRhs is_static _ _ _ (StgConApp con args)
-  | is_static	 -- StgConApps can be updatable (see isCrossDllConApp)
+mkTopStgRhs this_pkg _ _ _ (StgConApp con args)
+  | not (isDllConApp this_pkg con args)  -- Dynamic StgConApps are updatable
   = StgRhsCon noCCS con args
 
-mkTopStgRhs is_static rhs_fvs srt binder_info rhs
-  = ASSERT2( not is_static, ppr rhs )
-    StgRhsClosure noCCS binder_info
+mkTopStgRhs _ rhs_fvs srt binder_info rhs
+  = StgRhsClosure noCCS binder_info
 		  (getFVs rhs_fvs)		 
 	          Updatable
 		  srt
