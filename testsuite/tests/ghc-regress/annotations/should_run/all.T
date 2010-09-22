@@ -1,6 +1,5 @@
-# Annotations were implemented in GHC 6.11 and not supported in other compilers
 # These tests are very slow due to their use of package GHC
-setTestOpts(compose(skip_if_fast, if_compiler_lt('ghc', '6.11', skip)));
+setTestOpts(skip_if_fast)
 
 # Annotations, like Template Haskell, require runtime evaluation.  In
 # order for this to work with profiling, we would have to build the
