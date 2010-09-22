@@ -989,7 +989,6 @@ ghc -c Foo.hs</screen>
 	  suspicious code.  The warnings that are
 	  <emphasis>not</emphasis> enabled by <option>-Wall</option>
 	  are
-            <option>-fwarn-simple-patterns</option>,
             <option>-fwarn-tabs</option>,
             <option>-fwarn-incomplete-record-updates</option>,
             <option>-fwarn-monomorphism-restriction</option>,
@@ -1372,28 +1371,6 @@ f "2"    = 2
           won't ever be reached, as the second pattern overlaps
           it. More often than not, redundant patterns is a programmer
           mistake/error, so this option is enabled by default.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-fwarn-simple-patterns</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-fwarn-simple-patterns</option></primary>
-	  </indexterm>
-	  <para>Causes the compiler to warn about lambda-bound
-	  patterns that can fail, eg. <literal>\(x:xs)->...</literal>.
-	  Normally, these aren't treated as incomplete patterns by
-	  <option>-fwarn-incomplete-patterns</option>.</para>
-	  <para>&ldquo;Lambda-bound patterns&rdquo; includes all places where there is a single pattern,
-	    including list comprehensions and do-notation.  In these cases, a pattern-match 
-	    failure is quite legitimate, and triggers filtering (list comprehensions) or
-	    the monad <literal>fail</literal> operation (monads). For example:
-	    <programlisting>
-	      f :: [Maybe a] -> [a]
-	      f xs = [y | Just y &lt;- xs]
-	      </programlisting>
-	    Switching on <option>-fwarn-simple-patterns</option> will elicit warnings about
-	    these probably-innocent cases, which is why the flag is off by default. </para>
 	</listitem>
       </varlistentry>
 

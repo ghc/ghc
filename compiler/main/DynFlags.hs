@@ -192,7 +192,6 @@ data DynFlag
    | Opt_WarnMissingLocalSigs
    | Opt_WarnNameShadowing
    | Opt_WarnOverlappingPatterns
-   | Opt_WarnSimplePatterns
    | Opt_WarnTypeDefaults
    | Opt_WarnMonomorphism
    | Opt_WarnUnusedBinds
@@ -1432,7 +1431,6 @@ fFlags = [
   ( "warn-missing-local-sigs",          Opt_WarnMissingLocalSigs, nop ),
   ( "warn-name-shadowing",              Opt_WarnNameShadowing, nop ),
   ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, nop ),
-  ( "warn-simple-patterns",             Opt_WarnSimplePatterns, nop ),
   ( "warn-type-defaults",               Opt_WarnTypeDefaults, nop ),
   ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism, nop ),
   ( "warn-unused-binds",                Opt_WarnUnusedBinds, nop ),
@@ -1760,7 +1758,6 @@ minuswRemovesOpts
     = minusWallOpts ++
       [Opt_WarnImplicitPrelude,
        Opt_WarnIncompletePatternsRecUpd,
-       Opt_WarnSimplePatterns,
        Opt_WarnMonomorphism,
        Opt_WarnUnrecognisedPragmas,
        Opt_WarnTabs

@@ -1179,13 +1179,6 @@
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-simple-patterns</option></entry>
-	    <entry>warn about lambda-patterns that can fail</entry>
-	    <entry>dynamic</entry>
-	    <entry><option>-fno-warn-simple-patterns</option></entry>
-	  </row>
-
-	  <row>
 	    <entry><option>-fwarn-tabs</option></entry>
 	    <entry>warn if there are tabs in the source file</entry>
 	    <entry>dynamic</entry>

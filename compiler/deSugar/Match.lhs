@@ -700,21 +700,14 @@ matchEquations  :: HsMatchContext Name
 		-> [Id]	-> [EquationInfo] -> Type
 		-> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
-  = do	{ dflags <- getDOptsDs
-	; locn   <- getSrcSpanDs
-	; let   ds_ctxt      = DsMatchContext ctxt locn
+  = do	{ locn <- getSrcSpanDs
+	; let   ds_ctxt   = DsMatchContext ctxt locn
 		error_doc = matchContextErrString ctxt
 
-	; match_result <- match_fun dflags ds_ctxt vars rhs_ty eqns_info
+	; match_result <- matchCheck ds_ctxt vars rhs_ty eqns_info
 
 	; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
 	; extractMatchResult match_result fail_expr }
-  where 
-    match_fun dflags ds_ctxt
-       = case ctxt of 
-           LambdaExpr | dopt Opt_WarnSimplePatterns dflags -> matchCheck ds_ctxt
-                      | otherwise                          -> match
-           _                                               -> matchCheck ds_ctxt
 \end{code}
 
 %************************************************************************
@@ -734,7 +727,7 @@ matchSimply :: CoreExpr			-- Scrutinee
 	    -> CoreExpr			-- Return this if it matches
 	    -> CoreExpr			-- Return this if it doesn't
 	    -> DsM CoreExpr
-
+-- Do not warn about incomplete patterns; see matchSinglePat comments
 matchSimply scrut hs_ctx pat result_expr fail_expr = do
     let
       match_result = cantFailMatchResult result_expr
@@ -746,16 +739,11 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
 
 matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
 	       -> Type -> MatchResult -> DsM MatchResult
-matchSinglePat (Var var) hs_ctx (L _ pat) ty match_result = do
-    dflags <- getDOptsDs
-    locn <- getSrcSpanDs
-    let
-        match_fn dflags
-           | dopt Opt_WarnSimplePatterns dflags = matchCheck ds_ctx
-           | otherwise                          = match
-           where
-             ds_ctx = DsMatchContext hs_ctx locn
-    match_fn dflags [var] ty [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }]
+-- Do not warn about incomplete patterns
+-- Used for things like [ e | pat <- stuff ], where 
+-- incomplete patterns are just fine
+matchSinglePat (Var var) _ (L _ pat) ty match_result 
+  = match [var] ty [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }]
 
 matchSinglePat scrut hs_ctx pat ty match_result = do
     var <- selectSimpleMatchVarL pat
