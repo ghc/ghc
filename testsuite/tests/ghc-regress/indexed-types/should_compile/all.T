@@ -149,3 +149,7 @@ test('IndTypesPerf',
 
 test('T4120', normal, compile_fail, [''])
 test('T3787', reqlib('mtl'), compile, [''])
+test('T3826', normal, compile, [''])
+test('T4200', normal, compile, [''])
+test('T3851', normal, compile, [''])
+test('T4178', normal, compile, [''])
