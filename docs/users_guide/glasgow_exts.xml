@@ -8102,10 +8102,6 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
       directly in the <function>T</function> constructor.  The
       unpacker can see through newtypes, too.</para>
 
-      <para>If a field cannot be unpacked, you will not get a warning,
-      so it might be an idea to check the generated code with
-      <option>-ddump-simpl</option>.</para>
-
       <para>See also the <option>-funbox-strict-fields</option> flag,
       which essentially has the effect of adding
       <literal>{-#&nbsp;UNPACK&nbsp;#-}</literal> to every strict
