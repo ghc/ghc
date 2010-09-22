@@ -1,3 +1,4 @@
+setTestOpts(if_compiler_profiled(skip))
 # These tests are very slow due to their use of package GHC
 setTestOpts(skip_if_fast)
 

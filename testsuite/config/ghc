@@ -136,6 +136,7 @@ def get_compiler_info():
 
     if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
         config.compiler_profiled = True
+        config.run_ways = filter(lambda x: x != 'ghci', config.run_ways)
     else:
         config.compiler_profiled = False
 
