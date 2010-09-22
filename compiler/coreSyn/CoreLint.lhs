@@ -272,8 +272,9 @@ lintCoreExpr e@(App fun arg)
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
-    lintBinders [var] $ \[var'] -> 
-    do { body_ty <- lintCoreExpr expr
+    lintBinders [var] $ \ vars' ->
+    do { let [var'] = vars'  
+       ; body_ty <- lintCoreExpr expr
        ; if isId var' then 
              return (mkFunTy (idType var') body_ty) 
 	 else
