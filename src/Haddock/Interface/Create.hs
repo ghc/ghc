@@ -79,11 +79,18 @@ createInterface tm flags modMap instIfaceMap = do
 
   let visibleNames = mkVisibleNames exportItems opts
 
+  -- measure haddock documentation coverage.
+  let
+    prunedExportItems0 = pruneExportItems exportItems
+    haddockable = 1 + length exportItems -- module + exports
+    haddocked = (if isJust mbDoc then 1 else 0) + length prunedExportItems0
+    coverage = (haddockable, haddocked)
+
   -- prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
   let
     prunedExportItems
-      | OptPrune `elem` opts = pruneExportItems exportItems
+      | OptPrune `elem` opts = prunedExportItems0
       | otherwise = exportItems
 
   return Interface {
@@ -101,7 +108,8 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceDeclMap         = declMap,
     ifaceSubMap          = mkSubMap declMap exportedNames,
     ifaceInstances       = instances,
-    ifaceInstanceDocMap  = instanceDocMap
+    ifaceInstanceDocMap  = instanceDocMap,
+    ifaceHaddockCoverage = coverage
   }
 
 

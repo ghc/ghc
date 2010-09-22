@@ -46,6 +46,7 @@ import qualified Data.Map as Map
 import Distribution.Verbosity
 import System.Directory
 import System.FilePath
+import Text.Printf
 
 import Digraph
 import Exception
@@ -161,6 +162,13 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       out verbosity verbose "Creating interface..."
       (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
       liftIO $ mapM_ putStrLn msg
+      let (haddockable, haddocked) = ifaceHaddockCoverage interface
+          percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
+          coveragemsg = printf "haddock coverage for %s: %7s %3d%%"
+                        (ifaceOrigFilename interface)
+                        (printf "%d/%d" haddocked haddockable ::  String)
+                        percentage
+      out verbosity normal coveragemsg
       interface' <- liftIO $ evaluate interface
       return (Just interface')
     else

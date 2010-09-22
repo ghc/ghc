@@ -99,9 +99,12 @@ data Interface = Interface {
   ifaceInstances       :: ![Instance],
 
   -- | Documentation of instances defined in the module.
-  ifaceInstanceDocMap  :: Map Name (Doc Name)
-}
+  ifaceInstanceDocMap  :: Map Name (Doc Name),
 
+  -- | The number of haddockable and haddocked items in the module, as a
+  -- tuple. Haddockable items are the exports and the module itself.
+  ifaceHaddockCoverage  :: (Int,Int)
+}
 
 -- | A smaller version of 'Interface' that can be created from Haddock's
 -- interface files ('InterfaceFile').
