@@ -1,5 +1,3 @@
-# Annotations were implemented in GHC 6.11 and not supported in other compilers
-setTestOpts(if_compiler_lt('ghc', '6.11', skip));
 
 test('annfail01', normal, compile_fail, [''])
 test('annfail02', normal, compile_fail, [''])
