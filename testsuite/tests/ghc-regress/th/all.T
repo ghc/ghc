@@ -1,3 +1,8 @@
+
+# This test needs to come before the setTestOpts calls below, as we want
+# to run it !if_compiler_profiled
+test('T4255', unless_compiler_profiled(skip), compile_fail, ['-v0'])
+
 def f(opts):
   opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
   if (ghc_with_interpreter == 0):

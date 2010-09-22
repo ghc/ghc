@@ -298,6 +298,12 @@ def if_compiler_profiled( f ):
     else:
         return normal
 
+def unless_compiler_profiled( f ):
+    if config.compiler_profiled:
+        return normal
+    else:
+        return f
+
 def if_compiler_lt( compiler, version, f ):
     if config.compiler_type == compiler and \
        version_lt(config.compiler_version, version):
