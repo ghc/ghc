@@ -1,5 +1,5 @@
 
-T2239.hs:45:13:
+T2239.hs:47:13:
     Couldn't match expected type `b -> b'
                 with actual type `forall b1. MyEq b1 Bool => b1 -> b1'
     Expected type: (forall b1. MyEq b1 Bool => b1 -> b1) -> b -> b
@@ -15,7 +15,7 @@ T2239.hs:45:13:
               (forall b. MyEq b Bool => b -> b)
               -> (forall b. MyEq b Bool => b -> b)
 
-T2239.hs:48:13:
+T2239.hs:50:13:
     Couldn't match expected type `b -> b'
                 with actual type `forall b1. b1 ~ Bool => b1 -> b1'
     Expected type: (forall b1. b1 ~ Bool => b1 -> b1) -> b -> b
