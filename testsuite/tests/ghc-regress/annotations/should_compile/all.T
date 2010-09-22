@@ -1,5 +1,3 @@
-# Annotations were implemented in GHC 6.11 and not supported in other compilers
-setTestOpts(if_compiler_lt('ghc', '6.11', skip));
 
 # Annotations, like Template Haskell, require runtime evaluation.  In
 # order for this to work with profiling, we would have to build the
