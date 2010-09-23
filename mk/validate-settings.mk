@@ -53,6 +53,12 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
+# primitive has a warning about deprecated use of GHC.IOBase
+libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+# vector has some unused match warnings
+libraries/vector_dist-install_EXTRA_HC_OPTS += -Wwarn
+
 libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
