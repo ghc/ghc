@@ -1,3 +1,0 @@
-
-T2846.hs:1:14:
-    Warning: -XImpredicativeTypes is deprecated: impredicative polymorphism will be simplified or removed in GHC 6.14
