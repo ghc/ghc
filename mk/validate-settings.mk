@@ -60,3 +60,7 @@ libraries/dph/dph-prim-par_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-par_dist-install_EXTRA_HC_OPTS += -Wwarn
 
+# We need -fno-warn-deprecated-flags to avoid failure with -Werror
+GhcLibHcOpts += -fno-warn-deprecated-flags
+GhcBootLibHcOpts += -fno-warn-deprecated-flags
+

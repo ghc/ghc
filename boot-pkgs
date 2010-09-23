@@ -73,31 +73,22 @@ for $package (@library_dirs) {
     if ($#cabals eq 0) {
         my $cabal = $cabals[0];
         my $pkg;
-        my $stage;
         my $top;
         if (-f $cabal) {
             $pkg = $cabal;
             $pkg =~ s#.*/##;
             $pkg =~ s/\.cabal$//;
-            if (-f "$package/ghc-stage") {
-                open STAGE, "< $package/ghc-stage"
-                    or die "Can't open $package/ghc-stage: $!";
-                $stage = int(<STAGE>);
-                close STAGE
-                    or die "Failed closing $package/ghc-stage: $!";
-            }
-            else {
-                $stage = 1;
-            }
             $top = $package;
             $top =~ s#[^/]+#..#g;
+            $dir = $package;
+            $dir =~ s#^libraries/##g;
 
             print "Creating $package/ghc.mk\n";
             open GHCMK, "> $package/ghc.mk"
                 or die "Opening $package/ghc.mk failed: $!";
             print GHCMK "${package}_PACKAGE = ${pkg}\n";
             print GHCMK "${package}_dist-install_GROUP = libraries\n";
-            print GHCMK "\$(eval \$(call build-package,${package},dist-install,${stage}))\n";
+            print GHCMK "\$(eval \$(call build-package,${package},dist-install,\$(if \$(filter ${dir},\$(STAGE2_PACKAGES)),2,1)))\n";
             close GHCMK
                 or die "Closing $package/ghc.mk failed: $!";
 
