@@ -184,7 +184,11 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec id stg_rhs
     in
-    ASSERT2(consistentCafInfo id bind, ppr id {- $$ ppr rhs $$ ppr bind -} )
+    ASSERT2(consistentCafInfo id bind, ppr id )
+      -- NB: previously the assertion printed 'rhs' and 'bind'
+      --     as well as 'id', but that led to a black hole
+      --     where printing the assertion error tripped the
+      --     assertion again!
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
 coreTopBindToStg this_pkg env body_fvs (Rec pairs)
