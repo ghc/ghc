@@ -767,6 +767,11 @@ ifeq "$(UseArchivesForGhci)" "NO"
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(GHCI_LIBS)
 endif
 
+# Deps for TH uses in libraries
+$(foreach way, $(GhcLibWays),$(eval \
+libraries/vector/dist-install/build/Data/Vector/Fusion/Stream/Monadic.$($(way)_osuf): \
+    $(libraries/primitive_dist-install_dyn_LIB) \
+  ))
 endif
 
 # -----------------------------------------------------------------------------
