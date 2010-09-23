@@ -891,6 +891,7 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty is a monotype
 --	 (c) that kind(ty) is a sub-kind of kind(tv)
+--       (d) that ty does not contain any type families, see Note [SHARING]
 -- 
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with, 
@@ -909,12 +910,52 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 
 checkTauTvUpdate tv ty
   = do { ty' <- zonkTcType ty
-       ; if not (tv `elemVarSet` tyVarsOfType ty')
-            && typeKind ty' `isSubKind` tyVarKind tv 
+       ; if ok ty' && (typeKind ty' `isSubKind` tyVarKind tv) 
          then return (Just ty')
          else return Nothing }
+  where ok :: TcType -> Bool 
+        -- Check that tv is not among the free variables of 
+        -- the type and that the type is type-family-free. 
+        ok (TyVarTy tv')      = not (tv == tv') 
+        ok (TyConApp tc tys)  = all ok tys && not (isSynFamilyTyCon tc)
+        ok (PredTy sty)       = ok_pred sty 
+        ok (FunTy arg res)    = ok arg && ok res 
+        ok (AppTy fun arg)    = ok fun && ok arg 
+        ok (ForAllTy _tv1 ty1) = ok ty1       
+
+        ok_pred (IParam _ ty)    = ok ty 
+        ok_pred (ClassP _ tys)   = all ok tys 
+        ok_pred (EqPred ty1 ty2) = ok ty1 && ok ty2 
+
 \end{code}
 
+Note [SHARING]
+~~~~~~~~~~~~~~ 
+We must avoid eagerly unifying type variables to types that contain function symbols, 
+because this may lead to loss of sharing, and in turn, in very poor performance of the
+constraint simplifier. Assume that we have a wanted constraint: 
+{ 
+  m1 ~ [F m2], 
+  m2 ~ [F m3], 
+  m3 ~ [F m4], 
+  D m1, 
+  D m2, 
+  D m3 
+} 
+where D is some type class. If we eagerly unify m1 := [F m2], m2 := [F m3], m3 := [F m2], 
+then, after zonking, our constraint simplifier will be faced with the following wanted 
+constraint: 
+{ 
+  D [F [F [F m4]]], 
+  D [F [F m4]], 
+  D [F m4] 
+} 
+which has to be flattened by the constraint solver. However, because the sharing is lost, 
+an polynomially larger number of flatten skolems will be created and the constraint sets 
+we are working with will be polynomially larger. 
+
+Instead, if we defer the unifications m1 := [F m2], etc. we will only be generating three 
+flatten skolems, which is the maximum possible sharing arising from the original constraint. 
 
 \begin{code}
 data LookupTyVarResult	-- The result of a lookupTcTyVar call

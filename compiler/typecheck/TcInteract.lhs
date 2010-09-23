@@ -568,6 +568,7 @@ dischargeWorkItem = mkIRStop KeepInert emptyCCan
 noInteraction :: Monad m => WorkItem -> m InteractResult
 noInteraction workItem = mkIRContinue workItem KeepInert emptyCCan
 
+data WhichComesFromInert = LeftComesFromInert | RightComesFromInert 
 
 ---------------------------------------------------
 -- Interact a single WorkItem with an InertSet as far as possible, i.e. until we get a Stop 
@@ -757,10 +758,10 @@ doInteractWithInert (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
            workItem@(CFunEqCan { cc_id = cv2, cc_flavor = fl2, cc_fun = tc2
                                , cc_tyargs = args2, cc_rhs = xi2 })
   | fl1 `canRewrite` fl2 && lhss_match
-  = do { cans <- rewriteEqLHS (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
+  = do { cans <- rewriteEqLHS LeftComesFromInert  (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStop KeepInert cans } 
   | fl2 `canRewrite` fl1 && lhss_match
-  = do { cans <- rewriteEqLHS (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
+  = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue workItem DropInert cans }
   where
     lhss_match = tc1 == tc2 && and (zipWith tcEqType args1 args2) 
@@ -769,7 +770,7 @@ doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc
            workItem@(CTyEqCan { cc_id = cv2, cc_flavor = fl2, cc_tyvar = tv2, cc_rhs = xi2 })
 -- Check for matching LHS 
   | fl1 `canRewrite` fl2 && tv1 == tv2 
-  = do { cans <- rewriteEqLHS (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
+  = do { cans <- rewriteEqLHS LeftComesFromInert (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStop KeepInert cans } 
 
 {-
@@ -781,7 +782,7 @@ doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc
        ; mkIRStop KeepInert cans } 
 -}
   | fl2 `canRewrite` fl1 && tv1 == tv2 
-  = do { cans <- rewriteEqLHS (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
+  = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue workItem DropInert cans } 
 
 -- Check for rewriting RHS 
@@ -886,20 +887,46 @@ rewriteEqRHS (cv1,tv1,xi1) (cv2,gw,tv2,xi2)
     xi2' = substTyWith [tv1] [xi1] xi2 
     co2' = substTyWith [tv1] [mkCoVarCoercion cv1] xi2  -- xi2 ~ xi2[xi1/tv1]
 
-rewriteEqLHS :: (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> TcS CanonicalCts
+
+rewriteEqLHS :: WhichComesFromInert -> (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> TcS CanonicalCts
 -- Used to ineratct two equalities of the following form: 
 -- First Equality:   co1: (XXX ~ xi1)  
 -- Second Equality:  cv2: (XXX ~ xi2) 
 -- Where the cv1 `canRewrite` cv2 equality 
-rewriteEqLHS (co1,xi1) (cv2,gw,xi2) 
-  = do { cv2' <- if isWanted gw then 
-                     do { cv2' <- newWantedCoVar xi1 xi2 
-                        ; setWantedCoBind cv2 $ 
-                          co1 `mkTransCoercion` mkCoVarCoercion cv2'
-                        ; return cv2' } 
-                 else newGivOrDerCoVar xi1 xi2 $ 
-                      mkSymCoercion co1 `mkTransCoercion` mkCoVarCoercion cv2 
+-- We have an option of creating new work (xi1 ~ xi2) OR (xi2 ~ xi1). This 
+-- depends on whether the left or the right equality comes from the inert set. 
+-- We must:  
+--     prefer to create (xi2 ~ xi1) if the first comes from the inert 
+--     prefer to create (xi1 ~ xi2) if the second comes from the inert 
+rewriteEqLHS which (co1,xi1) (cv2,gw,xi2) 
+  = do { cv2' <- case (isWanted gw, which) of 
+                   (True,LeftComesFromInert) ->
+                       do { cv2' <- newWantedCoVar xi2 xi1 
+                          ; setWantedCoBind cv2 $ 
+                            co1 `mkTransCoercion` mkSymCoercion (mkCoVarCoercion cv2')
+                          ; return cv2' } 
+                   (True,RightComesFromInert) -> 
+                       do { cv2' <- newWantedCoVar xi1 xi2 
+                          ; setWantedCoBind cv2 $ 
+                            co1 `mkTransCoercion` mkCoVarCoercion cv2'
+                          ; return cv2' } 
+                   (False,LeftComesFromInert) ->
+                       newGivOrDerCoVar xi2 xi1 $ 
+                       mkSymCoercion (mkCoVarCoercion cv2) `mkTransCoercion` co1 
+                   (False,RightComesFromInert) -> 
+                        newGivOrDerCoVar xi1 xi2 $ 
+                        mkSymCoercion co1 `mkTransCoercion` mkCoVarCoercion cv2
        ; mkCanonical gw cv2' }
+
+--                                              ->
+-- if isWanted gw then 
+--                      do { cv2' <- newWantedCoVar xi1 xi2 
+--                         ; setWantedCoBind cv2 $ 
+--                           co1 `mkTransCoercion` mkCoVarCoercion cv2'
+--                         ; return cv2' } 
+--                  else newGivOrDerCoVar xi1 xi2 $ 
+--                       mkSymCoercion co1 `mkTransCoercion` mkCoVarCoercion cv2 
+--        ; mkCanonical gw cv2' }
 
 
 solveOneFromTheOther :: (EvVar, CtFlavor) -> CanonicalCt -> TcS InteractResult 
