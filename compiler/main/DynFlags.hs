@@ -1661,7 +1661,6 @@ impliedFlags
 
     , (Opt_GADTs,                  Opt_MonoLocalBinds)
     , (Opt_TypeFamilies,           Opt_MonoLocalBinds)
-    , (Opt_FunctionalDependencies, Opt_MonoLocalBinds)
 
     , (Opt_TypeFamilies,        Opt_KindSignatures)  -- Type families use kind signatures
       						     -- all over the place
