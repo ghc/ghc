@@ -79,11 +79,8 @@ slurpSpillCostInfo cmm
 	--	the info table from the CmmProc
  	countBlock info (BasicBlock blockId instrs)
 		| LiveInfo _ _ (Just blockLive)	<- info
-		, Just rsLiveEntry		<- lookupBlockEnv blockLive blockId
-
-		, rsLiveEntry_virt	<- mapUniqSet (\(RegVirtual vr) -> vr) 
-					$  filterUniqSet isVirtualReg rsLiveEntry
-						
+		, Just rsLiveEntry  <- lookupBlockEnv blockLive blockId
+		, rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
 		= countLIs rsLiveEntry_virt instrs
 
 		| otherwise
@@ -112,10 +109,6 @@ slurpSpillCostInfo cmm
 		mapM_ incDefs 	$ catMaybes $ map takeVirtualReg $ nub written
 
 		-- compute liveness for entry to next instruction.
-		let takeVirtuals set
-			= mapUniqSet (\(RegVirtual vr) -> vr)
-			$ filterUniqSet isVirtualReg set
-
 		let liveDieRead_virt	= takeVirtuals (liveDieRead  live)
 		let liveDieWrite_virt	= takeVirtuals (liveDieWrite live)
 		let liveBorn_virt	= takeVirtuals (liveBorn     live)
@@ -133,6 +126,13 @@ slurpSpillCostInfo cmm
 	incUses	    reg	= modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 1, 0)
 	incLifetime reg	= modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 0, 1)
 
+
+takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg
+takeVirtuals set = mapUniqSet get_virtual
+		$ filterUniqSet isVirtualReg set
+  where
+   get_virtual (RegVirtual vr) = vr 
+   get_virtual _ = panic "getVirt" 
 
 -- | Choose a node to spill from this graph
 

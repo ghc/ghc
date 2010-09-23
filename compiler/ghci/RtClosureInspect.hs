@@ -426,7 +426,7 @@ cPprTermBase y =
                                       . mapM (y (-1))
                                       . subTerms)
   , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
-           (\ p Term{subTerms=[h,t]} -> doList p h t)
+           (\ p t -> doList p t)
   , ifTerm (isTyCon intTyCon    . ty) (coerceShow$ \(a::Int)->a)
   , ifTerm (isTyCon charTyCon   . ty) (coerceShow$ \(a::Char)->a)
   , ifTerm (isTyCon floatTyCon  . ty) (coerceShow$ \(a::Float)->a)
@@ -452,7 +452,7 @@ cPprTermBase y =
            coerceShow f _p = return . text . show . f . unsafeCoerce# . val
 
            --Note pprinting of list terms is not lazy
-           doList p h t = do
+           doList p (Term{subTerms=[h,t]}) = do
                let elems      = h : getListTerms t
                    isConsLast = not(termType(last elems) `coreEqType` termType h)
                print_elems <- mapM (y cons_prec) elems
@@ -468,6 +468,7 @@ cPprTermBase y =
                       getListTerms Term{subTerms=[]}    = []
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
+           doList _ _ = panic "doList"
 
 
 repPrim :: TyCon -> [Word] -> String

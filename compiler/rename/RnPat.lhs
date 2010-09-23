@@ -245,7 +245,7 @@ rnPat :: HsMatchContext Name -- for error messages
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not 
       	     	 	       -- appear in the result FreeVars 
 rnPat ctxt pat thing_inside 
-  = rnPats ctxt [pat] (\[pat'] -> thing_inside pat')
+  = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
 
 applyNameMaker :: NameMaker -> Located RdrName -> RnM Name
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newName mk rdr); return n }

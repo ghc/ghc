@@ -1308,7 +1308,7 @@ mkMultiBranch maybe_ncons raw_ways
             = return (snd val)
             | otherwise
             = do label_neq <- getLabelBc
-                 return (mkTestEQ (fst val) label_neq 
+                 return (testEQ (fst val) label_neq 
    			  `consOL` (snd val
    			  `appOL`   unitOL (LABEL label_neq)
                           `appOL`   the_default))
@@ -1322,7 +1322,7 @@ mkMultiBranch maybe_ncons raw_ways
               label_geq <- getLabelBc
               code_lo <- mkTree vals_lo range_lo (dec v_mid)
               code_hi <- mkTree vals_hi v_mid range_hi
-              return (mkTestLT v_mid label_geq
+              return (testLT v_mid label_geq
                         `consOL` (code_lo
 			`appOL`   unitOL (LABEL label_geq)
 			`appOL`   code_hi))
@@ -1332,34 +1332,32 @@ mkMultiBranch maybe_ncons raw_ways
                             [(_, def)] -> def
                             _ -> panic "mkMultiBranch/the_default"
 
+         testLT (DiscrI i) fail_label = TESTLT_I i fail_label
+         testLT (DiscrW i) fail_label = TESTLT_W i fail_label
+         testLT (DiscrF i) fail_label = TESTLT_F i fail_label
+         testLT (DiscrD i) fail_label = TESTLT_D i fail_label
+         testLT (DiscrP i) fail_label = TESTLT_P i fail_label
+         testLT NoDiscr    _          = panic "mkMultiBranch NoDiscr"
+
+         testEQ (DiscrI i) fail_label = TESTEQ_I i fail_label
+         testEQ (DiscrW i) fail_label = TESTEQ_W i fail_label
+         testEQ (DiscrF i) fail_label = TESTEQ_F i fail_label
+         testEQ (DiscrD i) fail_label = TESTEQ_D i fail_label
+         testEQ (DiscrP i) fail_label = TESTEQ_P i fail_label
+         testEQ NoDiscr    _          = panic "mkMultiBranch NoDiscr"
+
          -- None of these will be needed if there are no non-default alts
-         (mkTestLT, mkTestEQ, init_lo, init_hi)
+         (init_lo, init_hi)
             | null notd_ways
             = panic "mkMultiBranch: awesome foursome"
             | otherwise
-            = case fst (head notd_ways) of {
-              DiscrI _ -> ( \(DiscrI i) fail_label -> TESTLT_I i fail_label,
-                            \(DiscrI i) fail_label -> TESTEQ_I i fail_label,
-                            DiscrI minBound,
-                            DiscrI maxBound );
-              DiscrW _ -> ( \(DiscrW i) fail_label -> TESTLT_W i fail_label,
-                            \(DiscrW i) fail_label -> TESTEQ_W i fail_label,
-                            DiscrW minBound,
-                            DiscrW maxBound );
-              DiscrF _ -> ( \(DiscrF f) fail_label -> TESTLT_F f fail_label,
-                            \(DiscrF f) fail_label -> TESTEQ_F f fail_label,
-                            DiscrF minF,
-                            DiscrF maxF );
-              DiscrD _ -> ( \(DiscrD d) fail_label -> TESTLT_D d fail_label,
-                            \(DiscrD d) fail_label -> TESTEQ_D d fail_label,
-                            DiscrD minD,
-                            DiscrD maxD );
-              DiscrP _ -> ( \(DiscrP i) fail_label -> TESTLT_P i fail_label,
-                            \(DiscrP i) fail_label -> TESTEQ_P i fail_label,
-                            DiscrP algMinBound,
-                            DiscrP algMaxBound );
-              NoDiscr -> panic "mkMultiBranch NoDiscr"
-              }
+            = case fst (head notd_ways) of
+              	DiscrI _ -> ( DiscrI minBound, 	DiscrI maxBound )
+              	DiscrW _ -> ( DiscrW minBound, 	DiscrW maxBound )
+              	DiscrF _ -> ( DiscrF minF,     	DiscrF maxF )
+              	DiscrD _ -> ( DiscrD minD,     	DiscrD maxD )
+              	DiscrP _ -> ( DiscrP algMinBound, DiscrP algMaxBound )
+              	NoDiscr -> panic "mkMultiBranch NoDiscr"
 
          (algMinBound, algMaxBound)
             = case maybe_ncons of

@@ -309,7 +309,8 @@ rnSrcWarnDecls _bound_names []
 
 rnSrcWarnDecls bound_names decls 
   = do { -- check for duplicates
-       ; mapM_ (\ (L loc rdr:lrdr':_) -> addErrAt loc (dupWarnDecl lrdr' rdr)) 
+       ; mapM_ (\ dups -> let (L loc rdr:lrdr':_) = dups
+                          in addErrAt loc (dupWarnDecl lrdr' rdr)) 
                warn_rdr_dups
        ; pairs_s <- mapM (addLocM rn_deprec) decls
        ; return (WarnSome ((concat pairs_s))) }

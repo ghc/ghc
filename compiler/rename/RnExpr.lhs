@@ -320,7 +320,8 @@ rnExpr (HsArrApp arrow arg _ ho rtl)
 -- infix form
 rnExpr (HsArrForm op (Just _) [arg1, arg2])
   = escapeArrowScope (rnLExpr op)
-			`thenM` \ (op'@(L _ (HsVar op_name)),fv_op) ->
+			`thenM` \ (op',fv_op) ->
+    let L _ (HsVar op_name) = op' in
     rnCmdTop arg1	`thenM` \ (arg1',fv_arg1) ->
     rnCmdTop arg2	`thenM` \ (arg2',fv_arg2) ->
 
