@@ -485,6 +485,23 @@ $(error Unknown integer library: $(INTEGER_LIBRARY))
 endif
 endif
 
+# ----------------------------------------------
+# Checking packages with 'cabal check'
+
+ifeq "$(CHECK_PACKAGES)" "YES"
+all: check_packages
+endif
+
+# These packages don't pass the Cabal checks because hs-source-dirs
+# points outside the source directory. This isn't a real problem in
+# these cases, so we just skip checking them.
+# NB. these must come before we include the ghc.mk files below, because
+# they disable the relevant rules.
+CHECKED_libraries/dph/dph-seq = YES
+CHECKED_libraries/dph/dph-par = YES
+# In compiler's case, include-dirs points outside of the source tree
+CHECKED_compiler = YES
+
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 
@@ -654,21 +671,6 @@ $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-instal
 
 # Add $(GhcBootLibHcOpts) to all stage0 package builds
 $(foreach pkg,$(STAGE0_PACKAGES),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
-
-# ----------------------------------------------
-# Checking packages with 'cabal check'
-
-ifeq "$(CHECK_PACKAGES)" "YES"
-all: check_packages
-endif
-
-# These packages don't pass the Cabal checks because hs-source-dirs
-# points outside the source directory. This isn't a real problem in
-# these cases, so we just skip checking them.
-CHECKED_libraries/dph/dph-seq = YES
-CHECKED_libraries/dph/dph-par = YES
-# In compiler's case, include-dirs points outside of the source tree
-CHECKED_compiler = YES
 
 # -----------------------------------------------
 # Haddock-related bits
