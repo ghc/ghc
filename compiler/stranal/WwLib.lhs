@@ -24,6 +24,7 @@ import TysWiredIn	( tupleCon )
 import Type
 import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
+import Literal		( absentLiteralOf )
 import Var              ( Var )
 import UniqSupply
 import Unique
@@ -343,10 +344,11 @@ mkWWstr_one arg
   | otherwise
   = case idDemandInfo arg of
 
-	-- Absent case.  We don't deal with absence for unlifted types,
-	-- though, because it's not so easy to manufacture a placeholder
-	-- We'll see if this turns out to be a problem
-      Abs -> return ([], nop_fn, mk_absent_let arg) 
+	-- Absent case.  We can't always handle absence for arbitrary
+        -- unlifted types, so we need to choose just the cases we can
+	-- (that's what mk_absent_let does)
+      Abs | Just work_fn <- mk_absent_let arg
+          -> return ([], nop_fn, work_fn)
 
 	-- Unpack case
       Eval (Prod cs)
@@ -492,26 +494,39 @@ workerCase bndr e args con body = mkUnpackCase bndr e args con body
 %*									*
 %************************************************************************
 
-
-Note [Absent error Id]
-~~~~~~~~~~~~~~~~~~~~~~
+Note [Absent errors]
+~~~~~~~~~~~~~~~~~~~~
 We make a new binding for Ids that are marked absent, thus
    let x = absentError "x :: Int"
 The idea is that this binding will never be used; but if it 
 buggily is used we'll get a runtime error message.
 
-We do this even for *unlifted* types (e.g. Int#).  We define
-absentError to *not* be a bottoming Id, and we treat it as
-"ok for speculation" (see CoreUtils.okForSpeculation). That
-means that the let won't get turned into a case, and will
-be discarded if (as we fully expect) x turns out to be dead.
-Coping with absence for unlifted types is important; see, for
-example, Trac #4306.
+Coping with absence for *unlifted* types is important; see, for
+example, Trac #4306.  For these we find a suitable literal,
+using Literal.absentLiteralOf.  We don't have literals for
+every primitive type, so the function is partial.
+
+    [I did try the experiment of using an error thunk for unlifted
+    things too, relying on the simplifier to drop it as dead code,
+    by making absentError 
+      (a) *not* be a bottoming Id, 
+      (b) be "ok for speculation"
+    But that relies on the simplifier finding that it really
+    is dead code, which is fragile, and indeed failed when 
+    profiling is on, which disables various optimisations.  So
+    using a literal will do.]
 
 \begin{code}
-mk_absent_let :: Id -> CoreExpr -> CoreExpr
-mk_absent_let arg body
-  = Let (NonRec arg abs_rhs) body
+mk_absent_let :: Id -> Maybe (CoreExpr -> CoreExpr)
+mk_absent_let arg 
+  | not (isUnLiftedType arg_ty)
+  = Just (Let (NonRec arg abs_rhs))
+  | Just (tc, _) <- splitTyConApp_maybe arg_ty
+  , Just lit <- absentLiteralOf tc
+  = Just (Let (NonRec arg (Lit lit)))
+  | otherwise
+  = WARN( True, ptext (sLit "No asbent value for") <+> ppr arg_ty )
+    Nothing
   where
     arg_ty  = idType arg
     abs_rhs = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
