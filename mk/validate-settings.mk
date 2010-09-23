@@ -40,6 +40,9 @@ endif
 ######################################################################
 # Disable some warnings in packages we use
 
+# Temporarily turn off incomplete-pattern warnings for containers
+libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
+
 # Temporarily turn off unused-do-bind warnings for the time package
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
 # On Windows, there are also some unused import warnings
