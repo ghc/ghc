@@ -20,6 +20,7 @@ import Demand		( Demand(..), DmdResult(..), Demands(..) )
 import MkCore		( mkRuntimeErrorApp, aBSENT_ERROR_ID )
 import MkId		( realWorldPrimId, voidArgId, 
                           mkUnpackCase, mkProductBox )
+import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type
 import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
@@ -524,8 +525,10 @@ mk_absent_let arg
   | Just (tc, _) <- splitTyConApp_maybe arg_ty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit)))
+  | arg_ty `coreEqType` realWorldStatePrimTy 
+  = Just (Let (NonRec arg (Var realWorldPrimId)))
   | otherwise
-  = WARN( True, ptext (sLit "No asbent value for") <+> ppr arg_ty )
+  = WARN( True, ptext (sLit "No absent value for") <+> ppr arg_ty )
     Nothing
   where
     arg_ty  = idType arg
