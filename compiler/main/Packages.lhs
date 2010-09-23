@@ -359,6 +359,15 @@ comparing f a b = f a `compare` f b
 packageFlagErr :: PackageFlag
                -> [(PackageConfig, UnusablePackageReason)]
                -> IO a
+
+-- for missing DPH package we emit a more helpful error message, because
+-- this may be the result of using -fdph-par or -fdph-seq.
+packageFlagErr (ExposePackage pkg) [] | is_dph_package pkg
+  = ghcError (CmdLineError (showSDoc $ dph_err))
+  where dph_err = text "the " <> text pkg <> text " package is not installed."
+                  $$ text "To install it: \"cabal install dph\"."
+        is_dph_package pkg = "dph" `isPrefixOf` pkg
+  
 packageFlagErr flag reasons = ghcError (CmdLineError (showSDoc $ err))
   where err = text "cannot satisfy " <> ppr_flag <> 
                 (if null reasons then empty else text ": ") $$
