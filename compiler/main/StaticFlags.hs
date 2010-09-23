@@ -277,7 +277,11 @@ opt_UF_KeenessFactor :: Float
 opt_UF_CreationThreshold = lookup_def_int "-funfolding-creation-threshold" (45::Int)
 opt_UF_UseThreshold	 = lookup_def_int "-funfolding-use-threshold"	   (6::Int)
 opt_UF_FunAppDiscount	 = lookup_def_int "-funfolding-fun-discount"	   (6::Int)
-opt_UF_DictDiscount	 = lookup_def_int "-funfolding-dict-discount"	   (1::Int)
+
+opt_UF_DictDiscount	 = lookup_def_int "-funfolding-dict-discount"	   (3::Int)
+   -- Be fairly keen to inline a fuction if that means
+   -- we'll be able to pick the right method from a dictionary
+
 opt_UF_KeenessFactor	 = lookup_def_float "-funfolding-keeness-factor"   (1.5::Float)
 opt_UF_DearOp            = ( 4 :: Int)
 

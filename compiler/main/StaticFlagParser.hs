@@ -194,6 +194,7 @@ isStaticFlag f =
     "fmax-worker-args",
     "fhistory-size",
     "funfolding-creation-threshold",
+    "funfolding-dict-threshold",
     "funfolding-use-threshold",
     "funfolding-fun-discount",
     "funfolding-keeness-factor"
