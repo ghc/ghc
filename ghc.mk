@@ -294,7 +294,8 @@ INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
 # because they use TH and/or annotations, or depend on other stage2
 # packages.
 STAGE2_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
-		   dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq
+		   dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
+		   vector
 
 # Packages that are built by stage0, in addition to stage1.  These
 # packages are dependencies of GHC, that we do not assume the stage0
@@ -373,9 +374,7 @@ $(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,mtl))
 $(eval $(call addPackage,utf8-string))
 $(eval $(call addPackage,xhtml))
-
 $(eval $(call addPackage,terminfo,($$(Windows),NO)))
-
 $(eval $(call addPackage,haskeline))
 
 $(eval $(call extra-packages))

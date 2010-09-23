@@ -47,7 +47,6 @@ libraries/bytestring            -           packages/bytestring             darc
 libraries/Cabal                 -           packages/Cabal                  darcs   http://darcs.haskell.org/cabal/
 libraries/containers            -           packages/containers             darcs   -
 libraries/directory             -           packages/directory              darcs   -
-libraries/dph                   dph         packages/dph                    darcs   -
 libraries/extensible-exceptions -           packages/extensible-exceptions  darcs   -
 libraries/filepath              -           packages/filepath               darcs   -
 libraries/ghc-prim              -           packages/ghc-prim               darcs   -
@@ -74,3 +73,6 @@ nofib                           nofib       nofib                           darc
 libraries/deepseq               extra       packages/deepseq                darcs   -
 libraries/parallel              extra       packages/parallel               darcs   -
 libraries/stm                   extra       packages/stm                    darcs   -
+libraries/primitive             dph         packages/primitive              darcs   -
+libraries/vector                dph         packages/vector                 darcs   -
+libraries/dph                   dph         packages/dph                    darcs   -
