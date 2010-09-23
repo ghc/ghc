@@ -34,6 +34,7 @@ module CoreSyn (
 	collectArgs, coreExprCc, flattenBinds, 
 
 	isValArg, isTypeArg, valArgCount, valBndrCount, isRuntimeArg, isRuntimeVar,
+	notSccNote,
 
 	-- * Unfolding data types
 	Unfolding(..),	UnfoldingGuidance(..), UnfoldingSource(..),
@@ -1046,6 +1047,10 @@ valBndrCount = count isId
 -- | The number of argument expressions that are values rather than types at their top level
 valArgCount :: [Arg b] -> Int
 valArgCount = count isValArg
+
+notSccNote :: Note -> Bool
+notSccNote (SCC {}) = False
+notSccNote _        = True
 \end{code}
 
 

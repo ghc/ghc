@@ -95,11 +95,11 @@ in exprArity.  That is a less local change, so I'm going to leave it for today!
 \begin{code}
 manifestArity :: CoreExpr -> Arity
 -- ^ manifestArity sees how many leading value lambdas there are
-manifestArity (Lam v e) | isId v    = 1 + manifestArity e
-			| otherwise = manifestArity e
-manifestArity (Note _ e)	    = manifestArity e
-manifestArity (Cast e _)            = manifestArity e
-manifestArity _                     = 0
+manifestArity (Lam v e) | isId v    	= 1 + manifestArity e
+			| otherwise 	= manifestArity e
+manifestArity (Note n e) | notSccNote n	= manifestArity e
+manifestArity (Cast e _)            	= manifestArity e
+manifestArity _                     	= 0
 
 exprArity :: CoreExpr -> Arity
 -- ^ An approximate, fast, version of 'exprEtaExpandArity'
@@ -108,7 +108,7 @@ exprArity e = go e
     go (Var v) 	       	           = idArity v
     go (Lam x e) | isId x    	   = go e + 1
     		 | otherwise 	   = go e
-    go (Note _ e)                  = go e
+    go (Note n e) | notSccNote n   = go e
     go (Cast e co)                 = go e `min` length (typeArity (snd (coercionKind co)))
        	       			     	-- Note [exprArity invariant]
     go (App e (Type _))            = go e
@@ -554,7 +554,8 @@ arityType dicts_cheap (Let b e)
 	-- See Note [Dictionary-like types] in TcType.lhs for why we use
 	-- isDictLikeTy here rather than isDictTy
 
-arityType dicts_cheap (Note _ e) = arityType dicts_cheap e
+arityType dicts_cheap (Note n e) 
+  | notSccNote n                 = arityType dicts_cheap e
 arityType dicts_cheap (Cast e _) = arityType dicts_cheap e
 arityType _           _          = vanillaArityType
 \end{code}

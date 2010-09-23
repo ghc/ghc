@@ -1396,11 +1396,9 @@ rhsIsStatic _is_dynamic_name rhs = is_static False rhs
   is_static :: Bool	-- True <=> in a constructor argument; must be atomic
   	  -> CoreExpr -> Bool
   
-  is_static False (Lam b e) = isRuntimeVar b || is_static False e
-  
-  is_static _      (Note (SCC _) _) = False
-  is_static in_arg (Note _ e)       = is_static in_arg e
-  is_static in_arg (Cast e _)       = is_static in_arg e
+  is_static False (Lam b e)   = isRuntimeVar b || is_static False e
+  is_static in_arg (Note n e) = notSccNote n && is_static in_arg e
+  is_static in_arg (Cast e _) = is_static in_arg e
   
   is_static _      (Lit lit)
     = case lit of
@@ -1441,11 +1439,9 @@ rhsIsStatic _is_dynamic_name rhs = is_static False rhs
         --   x = D# (1.0## /## 2.0##)
         -- can't float because /## can fail.
 
-    go (Note (SCC _) _) _          = False
-    go (Note _ f)       n_val_args = go f n_val_args
-    go (Cast e _)       n_val_args = go e n_val_args
-
-    go _                _          = False
+    go (Note n f) n_val_args = notSccNote n && go f n_val_args
+    go (Cast e _) n_val_args = go e n_val_args
+    go _          _          = False
 
     saturated_data_con f n_val_args
 	= case isDataConWorkId_maybe f of
