@@ -339,7 +339,7 @@ absent_lits :: UniqFM Literal
 absent_lits = listToUFM [ (addrPrimTyConKey,    MachNullAddr)
             		, (charPrimTyConKey,    MachChar 'x')
             		, (intPrimTyConKey,     MachInt 0)
-            		, (int64PrimTyConKey,   MachInt 0)
+            		, (int64PrimTyConKey,   MachInt64 0)
             		, (floatPrimTyConKey,   MachFloat 0)
             		, (doublePrimTyConKey,  MachDouble 0)
             		, (wordPrimTyConKey,    MachWord 0)
