@@ -53,7 +53,8 @@ convToABI CCallConv   = fFI_DEFAULT_ABI
 #ifdef mingw32_HOST_OS
 convToABI StdCallConv = fFI_STDCALL
 #endif
-convToABI _ = panic "convToABI: convention not supported"
+-- unknown conventions are mapped to the default, (#3336)
+convToABI _           = fFI_DEFAULT_ABI
 
 -- c.f. DsForeign.primTyDescChar
 primRepToFFIType :: PrimRep -> Ptr C_ffi_type

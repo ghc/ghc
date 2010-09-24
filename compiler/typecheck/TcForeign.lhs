@@ -310,7 +310,8 @@ checkCConv CCallConv  = return ()
 #if i386_TARGET_ARCH
 checkCConv StdCallConv = return ()
 #else
-checkCConv StdCallConv = addErrTc (text "calling convention not supported on this platform: stdcall")
+-- This is a warning, not an error. see #3336
+checkCConv StdCallConv = addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform,"$$ text "treating as ccall")
 #endif
 checkCConv PrimCallConv = addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
 checkCConv CmmCallConv = panic "checkCConv CmmCallConv"
