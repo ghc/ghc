@@ -438,7 +438,7 @@ then
     then
         AC_MSG_NOTICE([Making in-tree mingw tree])
         rm -rf inplace/mingw
-        mkdir inplace
+        test -d inplace || mkdir inplace
         mkdir inplace/mingw
         (
             cd inplace/mingw &&
