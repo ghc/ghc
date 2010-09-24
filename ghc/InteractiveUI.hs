@@ -827,7 +827,7 @@ info s  = handleSourceError GHC.printExceptionAndWarnings $
 	mb_stuffs <- mapM GHC.getInfo names
 	let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
 	unqual <- GHC.getPrintUnqual
-	outputStrLn $ showSDocForUser unqual $
+	liftIO $ putStrLn $ showSDocForUser unqual $
      		     vcat (intersperse (text "") $
 		           map (pprInfo pefas) filtered)
 
@@ -1049,7 +1049,7 @@ checkModule m = do
   prev_context <- GHC.getContext
   ok <- handleSourceError (\e -> GHC.printExceptionAndWarnings e >> return False) $ do
           r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
-          outputStrLn (showSDoc (
+          liftIO $ putStrLn $ showSDoc $
 	   case GHC.moduleInfo r of
 	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
 		let
@@ -1058,7 +1058,7 @@ checkModule m = do
 		in
 			(text "global names: " <+> ppr global) $$
 		        (text "local  names: " <+> ppr local)
-	     _ -> empty))
+	     _ -> empty
           return True
   afterLoad (successIf ok) False prev_context
 
@@ -1161,9 +1161,9 @@ modulesLoadedMsg ok mods = do
 	    punctuate comma (map ppr mods)) <> text "."
    case ok of
     Failed ->
-       outputStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas))
+       liftIO $ putStrLn $ showSDoc (text "Failed, modules loaded: " <> mod_commas)
     Succeeded  ->
-       outputStrLn (showSDoc (text "Ok, modules loaded: " <> mod_commas))
+       liftIO $ putStrLn $ showSDoc (text "Ok, modules loaded: " <> mod_commas)
 
 
 typeOfExpr :: String -> InputT GHCi ()
@@ -1300,7 +1300,7 @@ browseModule bang modl exports_only = withFlattenedDynflags $ do
         let prettyThings = map (pretty pefas) things
             prettyThings' | bang      = annotate $ zip modNames prettyThings
                           | otherwise = prettyThings
-        outputStrLn $ showSDocForUser unqual (vcat prettyThings')
+        liftIO $ putStrLn $ showSDocForUser unqual (vcat prettyThings')
         -- ToDo: modInfoInstances currently throws an exception for
         -- package modules.  When it works, we can do this:
         --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
@@ -2177,7 +2177,7 @@ list2 :: [String] -> InputT GHCi ()
 list2 [arg] | all isDigit arg = do
     (toplevel, _) <- GHC.getContext
     case toplevel of
-        [] -> outputStrLn "No module to list"
+        [] -> liftIO $ putStrLn "No module to list"
         (mod : _) -> listModuleLine mod (read arg)
 list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do
         mod <- wantInterpretedModule arg1
@@ -2202,7 +2202,7 @@ list2 [arg] = do
         noCanDo n why = printForUser $
             text "cannot list source code for " <> ppr n <> text ": " <> why
 list2  _other = 
-        outputStrLn "syntax:  :list [<line> | <module> <line> | <identifier>]"
+        liftIO $ putStrLn "syntax:  :list [<line> | <module> <line> | <identifier>]"
 
 listModuleLine :: Module -> Int -> InputT GHCi ()
 listModuleLine modl line = do
@@ -2243,7 +2243,7 @@ listAround span do_highlight = do
       let output = BS.intercalate (BS.pack "\n") prefixed
       utf8Decoded <- liftIO $ BS.useAsCStringLen output
                         $ \(p,n) -> utf8DecodeString (castPtr p) n
-      outputStrLn utf8Decoded
+      liftIO $ putStrLn utf8Decoded
   where
         file  = GHC.srcSpanFile span
         line1 = GHC.srcSpanStartLine span
