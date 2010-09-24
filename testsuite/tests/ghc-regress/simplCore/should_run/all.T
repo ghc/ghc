@@ -14,7 +14,10 @@ test('simplrun002', normal, compile_and_run, [''])
 test('simplrun003', normal, compile_and_run, [''])
 test('simplrun004', normal, compile_and_run, [''])
 test('simplrun005', normal, compile_and_run, [''])
-test('simplrun006', normal, compile_and_run, [''])
+
+test('simplrun006', expect_fail, compile_and_run, [''])
+  # This is a CSE test
+
 test('simplrun007', normal, compile_and_run, [''])
 test('simplrun008', normal, compile_and_run, [''])
 test('simplrun009', normal, compile_and_run, [''])
