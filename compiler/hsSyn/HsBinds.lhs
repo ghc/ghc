@@ -295,6 +295,7 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
   = pprTicks empty (case tick of 
 			Nothing -> empty
 			Just t  -> text "-- tick id = " <> ppr t)
+    $$  ifPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind (unLoc fun) inf matches
     $$  ifPprDebug (ppr wrap)
 
