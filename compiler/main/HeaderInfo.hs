@@ -256,7 +256,7 @@ checkProcessArgsResult flags
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
     where mkMsg (L loc flag)
               = mkPlainErrMsg loc $
-                  (text "unknown flag in  {-# OPTIONS #-} pragma:" <+>
+                  (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
 
 -----------------------------------------------------------------------------
@@ -295,5 +295,5 @@ optionsErrorMsgs unhandled_flags flags_lines _filename
 					  L l f' <- flags_lines, f == f' ]
         mkMsg (L flagSpan flag) = 
             ErrUtils.mkPlainErrMsg flagSpan $
-                    text "unknown flag in  {-# OPTIONS #-} pragma:" <+> text flag
+                    text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
