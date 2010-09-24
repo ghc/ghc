@@ -354,15 +354,6 @@ typedef struct _RtsSymbolVal {
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
 #define RTS_CYGWIN_ONLY_SYMBOLS /**/
 
-/* Extra syms gen'ed by mingw-2's gcc-3.2: */
-#if __GNUC__>=3
-#define RTS_MINGW_EXTRA_SYMS                    \
-      SymI_NeedsProto(_imp____mb_cur_max)       \
-      SymI_NeedsProto(_imp___pctype)
-#else
-#define RTS_MINGW_EXTRA_SYMS
-#endif
-
 #if HAVE_GETTIMEOFDAY
 #define RTS_MINGW_GETTIMEOFDAY_SYM SymI_NeedsProto(gettimeofday)
 #else
@@ -463,10 +454,13 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(opendir)                           \
       SymI_NeedsProto(readdir)                           \
       SymI_NeedsProto(rewinddir)                         \
-      RTS_MINGW_EXTRA_SYMS                               \
+      SymI_NeedsProto(_imp____mb_cur_max)	         \
+      SymI_NeedsProto(_imp___pctype)	         	 \
+      SymI_NeedsProto(__chkstk)				 \
       RTS_MINGW_GETTIMEOFDAY_SYM		         \
       SymI_NeedsProto(closedir)
 #endif
+
 
 #if defined(darwin_HOST_OS) && HAVE_PRINTF_LDBLSTUB
 #define RTS_DARWIN_ONLY_SYMBOLS			            \
