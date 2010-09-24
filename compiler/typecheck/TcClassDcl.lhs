@@ -19,6 +19,7 @@ import RnHsSyn
 import RnExpr
 import Inst
 import InstEnv
+import TcPat( addInlinePrags )
 import TcEnv
 import TcBinds
 import TcUnify
@@ -216,9 +217,10 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
 	      dm_id         = mkDefaultMethodId sel_id dm_name
 	      local_dm_type = instantiateMethod clas sel_id (mkTyVarTys tyvars)
 	      local_dm_id   = mkLocalId local_dm_name local_dm_type
+              prags         = prag_fn sel_name
 
-        ; (dm_id_w_inline, spec_prags) 
-                <- tcPrags NonRecursive False True dm_id (prag_fn sel_name)
+        ; dm_id_w_inline <- addInlinePrags dm_id prags
+        ; spec_prags     <- tcSpecPrags True dm_id prags
 
         ; warnTc (not (null spec_prags))
                  (ptext (sLit "Ignoring SPECIALISE pragmas on default method") 

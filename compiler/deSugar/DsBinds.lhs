@@ -107,90 +107,15 @@ dsHsBind _ (FunBind { fun_id = L _ fun, fun_matches = matches
  = do	{ (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
 	; body'    <- mkOptTickBox tick body
 	; wrap_fn' <- dsHsWrapper co_fn 
-	; return (unitOL (fun, wrap_fn' (mkLams args body'))) }
+	; let rhs = wrap_fn' (mkLams args body')
+	; return (unitOL (makeCorePair fun False 0 rhs)) }
 
 dsHsBind _ (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
   = do	{ body_expr <- dsGuarded grhss ty
 	; sel_binds <- mkSelectorBinds pat body_expr
+	  -- We silently ignore inline pragmas; no makeCorePair
+	  -- Not so cool, but really doesn't matter
 	; return (toOL sel_binds) }
-
-{-
-dsHsBind auto_scc (AbsBinds { abs_tvs = [], abs_ev_vars = []
-                       	    , abs_exports = exports, abs_ev_binds = ev_binds
-                       	    , abs_binds = binds })
-  = do	{ bind_prs    <- ds_lhs_binds NoSccs binds
-        ; ds_ev_binds <- dsTcEvBinds ev_binds
-
-	; let core_prs = addEvPairs ds_ev_binds bind_prs
-              env = mkABEnv exports
-	      do_one (lcl_id, rhs) 
-		| Just (_, gbl_id, _, spec_prags) <- lookupVarEnv env lcl_id
-		= do { let rhs' = addAutoScc auto_scc gbl_id rhs
-		     ; (spec_binds, rules) <- dsSpecs gbl_id (Let (Rec core_prs) rhs') spec_prags
-		       		    -- See Note [Specialising in no-dict case]
-                     ; let   gbl_id'   = addIdSpecialisations gbl_id rules
-                             main_bind = makeCorePair gbl_id' False 0 rhs'
-		     ; return (main_bind : spec_binds) }
-
-		| otherwise = return [(lcl_id, rhs)]
-
-	      locals'  = [(lcl_id, Var gbl_id) | (_, gbl_id, lcl_id, _) <- exports]
-			-- Note [Rules and inlining]
-        ; export_binds <- mapM do_one core_prs
-	; return (concat export_binds ++ locals' ++ rest) }
-		-- No Rec needed here (contrast the other AbsBinds cases)
-		-- because we can rely on the enclosing dsBind to wrap in Rec
-
-
-dsHsBind auto_scc rest (AbsBinds { abs_tvs = tyvars, abs_ev_vars = []
-                       		 , abs_exports = exports, abs_ev_binds = ev_binds
-                       		 , abs_binds = binds })
-  | opt_DsMultiTyVar	-- This (static) debug flag just lets us
-			-- switch on and off this optimisation to
-			-- see if it has any impact; it is on by default
-  , allOL isLazyEvBind ev_binds
-  = 	-- Note [Abstracting over tyvars only]
-    do	{ bind_prs    <- ds_lhs_binds NoSccs binds
-        ; ds_ev_binds <- dsTcEvBinds ev_binds
-
-	; let core_prs = addEvPairs ds_ev_binds bind_prs
-              arby_env = mkArbitraryTypeEnv tyvars exports
-	      bndrs = mkVarSet (map fst core_prs)
-
-	      add_lets | core_prs `lengthExceeds` 10 = add_some
-		       | otherwise	             = mkLets
-	      add_some lg_binds rhs = mkLets [ NonRec b r | NonRec b r <- lg_binds
-				                          , b `elemVarSet` fvs] rhs
-		where
-		  fvs = exprSomeFreeVars (`elemVarSet` bndrs) rhs
-
-	      env = mkABEnv exports
-	      mk_lg_bind lcl_id gbl_id tyvars
-		 = NonRec (setIdInfo lcl_id vanillaIdInfo)
-				-- Nuke the IdInfo so that no old unfoldings
-				-- confuse use (it might mention something not
-				-- even in scope at the new site
-			  (mkTyApps (Var gbl_id) (mkTyVarTys tyvars))
-
-	      do_one lg_binds (lcl_id, rhs) 
-		| Just (id_tvs, gbl_id, _, spec_prags) <- lookupVarEnv env lcl_id
-		= do { let rhs' = addAutoScc auto_scc gbl_id  $
-			          mkLams id_tvs $
-			          mkLets [ NonRec tv (Type (lookupVarEnv_NF arby_env tv))
-			                 | tv <- tyvars, not (tv `elem` id_tvs)] $
-		                  add_lets lg_binds rhs
-		     ; (spec_binds, rules) <- dsSpecs gbl_id rhs' spec_prags
-                     ; let   gbl_id'   = addIdSpecialisations gbl_id rules
-                             main_bind = makeCorePair gbl_id' False 0 rhs'
-		     ; return (mk_lg_bind lcl_id gbl_id' id_tvs, main_bind : spec_binds) }
-		| otherwise
-		= do { non_exp_gbl_id <- newUniqueId lcl_id (mkForAllTys tyvars (idType lcl_id))
-		     ; return (mk_lg_bind lcl_id non_exp_gbl_id tyvars,
-			       [(non_exp_gbl_id, mkLams tyvars (add_lets lg_binds rhs))]) }
-						  
-	; (_, core_prs') <- fixDs (\ ~(lg_binds, _) -> mapAndUnzipM (do_one lg_binds) core_prs)
-	; return (concat core_prs' ++ rest) }
--}
 
 	-- A common case: one exported variable
 	-- Non-recursive bindings come through this way
@@ -417,7 +342,7 @@ This does not happen in the same way to polymorphic binds,
 because they desugar to
 	M.f = /\a. let f_lcl = ...f_lcl... in f_lcl
 Although I'm a bit worried about whether full laziness might
-float the f_lcl binding out and then inline M.f at its call site -}
+float the f_lcl binding out and then inline M.f at its call site
 
 Note [Specialising in no-dict case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

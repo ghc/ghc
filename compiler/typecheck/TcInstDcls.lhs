@@ -12,6 +12,7 @@ import HsSyn
 import TcBinds
 import TcTyClsDecls
 import TcClassDcl
+import TcPat( addInlinePrags )
 import TcRnMonad
 import TcMType
 import TcType
@@ -838,8 +839,9 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
       = add_meth_ctxt sel_id generated_code rn_bind $
         do { (meth_id, local_meth_id) <- mkMethIds clas tyvars dfun_ev_vars 
                                                    inst_tys sel_id
-           ; (meth_id1, spec_prags) <- tcPrags NonRecursive False True 
-                                               meth_id (prag_fn (idName sel_id))
+           ; let prags = prag_fn (idName sel_id)
+           ; meth_id1   <- addInlinePrags meth_id prags
+           ; spec_prags <- tcSpecPrags True meth_id prags
 
            ; bind <- tcInstanceMethodBody InstSkol
                           tyvars dfun_ev_vars

@@ -7,7 +7,7 @@
 \begin{code}
 module TcBinds ( tcLocalBinds, tcTopBinds, 
                  tcHsBootSigs, tcPolyBinds,
-                 PragFun, tcPrags, mkPragFun, 
+                 PragFun, tcSpecPrags, mkPragFun, 
                  TcSigInfo(..), SigFun, mkSigFun,
                  badBootDeclErr ) where
 
@@ -43,7 +43,6 @@ import BasicTypes
 import Outputable
 import FastString
 
-import Data.List( partition )
 import Control.Monad
 \end{code}
 
@@ -326,9 +325,9 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     ; let plan = decideGeneralisationPlan dflags top_lvl binder_names bind_list tc_sig_fn
     ; traceTc "Generalisation plan" (ppr plan)
     ; (binds, poly_ids) <- case plan of
-         NoGen         -> tcPolyNoGen tc_sig_fn prag_fn rec_group rec_tc bind_list
-         InferGen mono -> tcPolyInfer top_lvl mono tc_sig_fn prag_fn rec_group rec_tc bind_list
-         CheckGen sig  -> tcPolyCheck sig prag_fn rec_group rec_tc bind_list
+         NoGen         -> tcPolyNoGen tc_sig_fn prag_fn rec_tc bind_list
+         InferGen mono -> tcPolyInfer top_lvl mono tc_sig_fn prag_fn rec_tc bind_list
+         CheckGen sig  -> tcPolyCheck sig prag_fn rec_tc bind_list
 
 	-- Check whether strict bindings are ok
         -- These must be non-recursive etc, and are not generalised
@@ -342,17 +341,18 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
          -- TODO: location a bit awkward, but the mbinds have been
          --       dependency analysed and may no longer be adjacent
 
+------------------
 tcPolyNoGen 
   :: TcSigFun -> PragFun
-  -> RecFlag       -- Whether the group is really recursive
   -> RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
 -- No generalisation whatsoever
 
-tcPolyNoGen tc_sig_fn prag_fn rec_group rec_tc bind_list
-  = do { (binds', mono_infos) <- tcMonoBinds tc_sig_fn True rec_tc bind_list
+tcPolyNoGen tc_sig_fn prag_fn rec_tc bind_list
+  = do { (binds', mono_infos) <- tcMonoBinds tc_sig_fn (LetGblBndr prag_fn) 
+                                             rec_tc bind_list
        ; mono_ids' <- mapM tc_mono_info mono_infos
        ; return (binds', mono_ids') }
   where
@@ -360,16 +360,15 @@ tcPolyNoGen tc_sig_fn prag_fn rec_group rec_tc bind_list
       = do { mono_ty' <- zonkTcTypeCarefully (idType mono_id)
       	     -- Zonk, mainly to expose unboxed types to checkStrictBinds
            ; let mono_id' = setIdType mono_id mono_ty'
-           ; (mono_id'', _specs) <- tcPrags rec_group False False
-                                           mono_id' (prag_fn name)
-           ; return mono_id'' } 
-	   -- NB: tcPrags generates and error message for
+           ; _specs <- tcSpecPrags False mono_id' (prag_fn name)
+           ; return mono_id' }
+	   -- NB: tcPrags generates error messages for
 	   --     specialisation pragmas for non-overloaded sigs
+	   -- Indeed that is why we call it here!
 	   -- So we can safely ignore _specs
 
 ------------------
 tcPolyCheck :: TcSigInfo -> PragFun
-  	    -> RecFlag       -- Whether the group is really recursive
   	    -> RecFlag       -- Whether it's recursive after breaking
   	                     -- dependencies based on type signatures
   	    -> [LHsBind Name]
@@ -379,16 +378,16 @@ tcPolyCheck :: TcSigInfo -> PragFun
 --   it has a signature,
 tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
                            , sig_theta = theta, sig_loc = loc })
-    prag_fn rec_group rec_tc bind_list
+    prag_fn rec_tc bind_list
   = do { ev_vars <- newEvVars theta
 
        ; let skol_info = SigSkol (FunSigCtxt (idName id))
        ; (ev_binds, (binds', [mono_info])) 
             <- checkConstraints skol_info emptyVarSet tvs ev_vars $
                tcExtendTyVarEnv2 (scoped `zip` mkTyVarTys tvs)    $
-               tcMonoBinds (\_ -> Just sig) False rec_tc bind_list
+               tcMonoBinds (\_ -> Just sig) LetLclBndr rec_tc bind_list
 
-       ; export <- mkExport rec_group False prag_fn tvs theta mono_info
+       ; export <- mkExport prag_fn tvs theta mono_info
 
        ; let (_, poly_id, _, _) = export
              abs_bind = L loc $ AbsBinds 
@@ -397,19 +396,19 @@ tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
                         , abs_exports = [export], abs_binds = binds' }
        ; return (unitBag abs_bind, [poly_id]) }
 
+------------------
 tcPolyInfer 
   :: TopLevelFlag 
   -> Bool	  -- True <=> apply the monomorphism restriction
   -> TcSigFun -> PragFun
-  -> RecFlag       -- Whether the group is really recursive
   -> RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
-tcPolyInfer top_lvl mono sig_fn prag_fn rec_group rec_tc bind_list
+tcPolyInfer top_lvl mono sig_fn prag_fn rec_tc bind_list
   = do { ((binds', mono_infos), wanted) 
              <- getConstraints $
-                tcMonoBinds sig_fn False rec_tc bind_list
+                tcMonoBinds sig_fn LetLclBndr rec_tc bind_list
 
        ; unifyCtxts [sig | (_, Just sig, _) <- mono_infos] 
 
@@ -420,8 +419,7 @@ tcPolyInfer top_lvl mono sig_fn prag_fn rec_group rec_tc bind_list
 
        ; (qtvs, givens, ev_binds) <- simplifyInfer mono tau_tvs wanted
 
-       ; exports <- mapM (mkExport rec_group (length mono_infos > 1)
-                                   prag_fn qtvs (map evVarPred givens))
+       ; exports <- mapM (mkExport prag_fn qtvs (map evVarPred givens))
                     mono_infos
 
        ; let poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
@@ -437,10 +435,7 @@ tcPolyInfer top_lvl mono sig_fn prag_fn rec_group rec_tc bind_list
 
 
 --------------
-mkExport :: RecFlag
-	 -> Bool	 -- More than one variable is bound, so we'll desugar to
-	    		 -- a tuple, so INLINE pragmas won't work
-         -> PragFun -> [TyVar] -> TcThetaType
+mkExport :: PragFun -> [TyVar] -> TcThetaType
          -> MonoBindInfo
          -> TcM ([TyVar], Id, Id, TcSpecPrags)
 -- mkExport generates exports with 
@@ -454,17 +449,19 @@ mkExport :: RecFlag
 
 -- Pre-condition: the inferred_tvs are already zonked
 
-mkExport rec_group multi_bind prag_fn inferred_tvs theta
+mkExport prag_fn inferred_tvs theta
          (poly_name, mb_sig, mono_id)
   = do  { (tvs, poly_id) <- mk_poly_id mb_sig
                 -- poly_id has a zonked type
 
-        ; (poly_id', spec_prags) <- tcPrags rec_group multi_bind (notNull theta)
-                                        poly_id (prag_fn poly_name)
+        ; poly_id' <- addInlinePrags poly_id prag_sigs
+
+        ; spec_prags <- tcSpecPrags (notNull theta) poly_id prag_sigs
                 -- tcPrags requires a zonked poly_id
 
         ; return (tvs, poly_id', mono_id, SpecPrags spec_prags) }
   where
+    prag_sigs = prag_fn poly_name
     poly_ty = mkSigmaTy inferred_tvs theta (idType mono_id)
 
     mk_poly_id Nothing    = do { poly_ty' <- zonkTcTypeCarefully poly_ty
@@ -504,89 +501,43 @@ lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
   = extendNameEnv env (unLoc id) (matchGroupArity ms)
 lhsBindArity _ env = env	-- PatBind/VarBind
 
-tcPrags :: RecFlag
-	-> Bool     -- True <=> AbsBinds binds more than one variable
-        -> Bool     -- True <=> function is overloaded
-        -> Id -> [LSig Name]
-        -> TcM (Id, [Located TcSpecPrag])
+------------------
+tcSpecPrags :: Bool     -- True <=> function is overloaded
+            -> Id -> [LSig Name]
+            -> TcM [Located TcSpecPrag]
 -- Add INLINE and SPECIALSE pragmas
 --    INLINE prags are added to the (polymorphic) Id directly
 --    SPECIALISE prags are passed to the desugarer via TcSpecPrags
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
-tcPrags _rec_group _multi_bind is_overloaded_id poly_id prag_sigs
-  = do { poly_id' <- tc_inl inl_sigs
-
-       ; spec_prags <- mapM (wrapLocM (tcSpecPrag poly_id')) spec_sigs
-
-       ; unless (null spec_sigs || is_overloaded_id) warn_discarded_spec
-
+tcSpecPrags is_overloaded_id poly_id prag_sigs
+  = do { unless (null spec_sigs || is_overloaded_id) warn_discarded_spec
        ; unless (null bad_sigs) warn_discarded_sigs
-
-       ; return (poly_id', spec_prags) }
+       ; mapM (wrapLocM tc_spec) spec_sigs }
   where
-    (inl_sigs, other_sigs) = partition isInlineLSig prag_sigs
-    (spec_sigs, bad_sigs)  = partition isSpecLSig   other_sigs
+    spec_sigs = filter isSpecLSig prag_sigs
+    bad_sigs  = filter is_bad_sig prag_sigs
+    is_bad_sig s = not (isSpecLSig s || isInlineLSig s)
+
+    name      = idName poly_id
+    poly_ty   = idType poly_id
+    sig_ctxt  = FunSigCtxt name
+    origin    = SpecPragOrigin name
+    skol_info = SigSkol sig_ctxt
+
+    tc_spec prag@(SpecSig _ hs_ty inl) 
+      = addErrCtxt (spec_ctxt prag) $
+        do  { spec_ty <- tcHsSigType sig_ctxt hs_ty
+            ; wrap <- tcSubType origin skol_info poly_ty spec_ty
+            ; return (SpecPrag wrap inl) }
+    tc_spec sig = pprPanic "tcSpecPrag" (ppr sig)
 
     warn_discarded_spec = warnPrags poly_id spec_sigs $
                           ptext (sLit "SPECIALISE pragmas for non-overloaded function")
-    warn_dup_inline 	= warnPrags poly_id inl_sigs $
-                    	  ptext (sLit "Duplicate INLINE pragmas for")
     warn_discarded_sigs = warnPrags poly_id bad_sigs $
                           ptext (sLit "Discarding unexpected pragmas for")
 
-    -----------
-    tc_inl [] = return poly_id
-    tc_inl (L loc (InlineSig _ prag) : other_inls)
-       = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
-            ; return (poly_id `setInlinePragma` prag) }
-    tc_inl _ = panic "tc_inl"
-
-{- Earlier we tried to warn about
-   (a) INLINE for recursive function
-   (b) INLINE for function that is part of a multi-binder group
-   Code fragments below. But we want to allow
-       {-# INLINE f #-}
-       f x = x : g y
-       g y = ....f...f....
-   even though they are mutually recursive.  
-   So I'm just omitting the warnings for now
-
-       | multi_bind && isInlinePragma prag
-       = do { setSrcSpan loc $ addWarnTc multi_bind_warn
-            ; return poly_id }
-       | otherwise
-            ; when (isInlinePragma prag && isRec rec_group)
-                   (setSrcSpan loc (addWarnTc rec_inline_warn))
-
-    rec_inline_warn = ptext (sLit "INLINE pragma for recursive binder")
-                      <+> quotes (ppr poly_id) <+> ptext (sLit "may be discarded")
- 
-    multi_bind_warn = hang (ptext (sLit "Discarding INLINE pragma for") <+> quotes (ppr poly_id))
-		         2 (ptext (sLit "because it is bound by a pattern, or mutual recursion") )
--}
-
-
-warnPrags :: Id -> [LSig Name] -> SDoc -> TcM ()
-warnPrags id bad_sigs herald
-  = addWarnTc (hang (herald <+> quotes (ppr id))
-                  2 (ppr_sigs bad_sigs))
-  where
-    ppr_sigs sigs = vcat (map (ppr . getLoc) sigs)
-
---------------
-tcSpecPrag :: TcId -> Sig Name -> TcM TcSpecPrag
-tcSpecPrag poly_id prag@(SpecSig _ hs_ty inl) 
-  = addErrCtxt (spec_ctxt prag) $
-    do  { let name     = idName poly_id
-              sig_ctxt = FunSigCtxt name
-        ; spec_ty <- tcHsSigType sig_ctxt hs_ty
-        ; wrap <- tcSubType (SpecPragOrigin name) (SigSkol sig_ctxt)
-                            (idType poly_id) spec_ty
-        ; return (SpecPrag wrap inl) }
-  where
     spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
-tcSpecPrag _ sig = pprPanic "tcSpecPrag" (ppr sig)
 
 --------------
 -- If typechecking the binds fails, then return with each
@@ -617,8 +568,7 @@ forall_a_a = mkForAllTy openAlphaTyVar (mkTyVarTy openAlphaTyVar)
 The signatures have been dealt with already.
 
 \begin{code}
-tcMonoBinds :: TcSigFun
-            -> Bool	-- True <=> no generalisation will be done for this binding
+tcMonoBinds :: TcSigFun -> LetBndrSpec 
             -> RecFlag  -- Whether the binding is recursive for typechecking purposes
                         -- i.e. the binders are mentioned in their RHSs, and
                         --      we are not resuced by a type signature
@@ -639,7 +589,7 @@ tcMonoBinds sig_fn no_gen is_rec
     setSrcSpan b_loc    $
     do  { ((co_fn, matches'), rhs_ty) <- tcInfer (tcMatchesFun name inf matches)
 
-        ; mono_id <- newLetBndr no_gen name rhs_ty
+        ; mono_id <- newNoSigLetBndr no_gen name rhs_ty
         ; return (unitBag (L b_loc (FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,
                                               fun_matches = matches', bind_fvs = fvs,
                                               fun_co_fn = co_fn, fun_tick = Nothing })),
@@ -677,7 +627,7 @@ tcMonoBinds sig_fn no_gen _ binds
 -- it; hence the TcMonoBind data type in which the LHS is done but the RHS isn't
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
-  = TcFunBind  MonoBindInfo  (Located TcId) Bool (MatchGroup Name) 
+  = TcFunBind  MonoBindInfo  SrcSpan Bool (MatchGroup Name) 
   | TcPatBind [MonoBindInfo] (LPat TcId) (GRHSs Name) TcSigmaType
 
 type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
@@ -687,12 +637,15 @@ type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
 getMonoType :: MonoBindInfo -> TcTauType
 getMonoType (_,_,mono_id) = idType mono_id
 
-tcLhs :: TcSigFun -> Bool -> HsBind Name -> TcM TcMonoBind
+tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = matches })
-  = do  { mono_id <- newLhsBndr mb_sig no_gen name
-        ; return (TcFunBind (name, mb_sig, mono_id) (L nm_loc mono_id) inf matches) }
-  where
-    mb_sig = sig_fn name 
+  | Just sig <- sig_fn name
+  = do  { mono_id <- newSigLetBndr no_gen name sig
+        ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
+  | otherwise
+  = do  { mono_ty <- newFlexiTyVarTy argTypeKind
+        ; mono_id <- newNoSigLetBndr no_gen name mono_ty
+        ; return (TcFunBind (name, Nothing, mono_id) nm_loc inf matches) }
 
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = do  { let tc_pat exp_ty = tcLetPat sig_fn no_gen pat exp_ty $
@@ -712,28 +665,17 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
 tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
         -- AbsBind, VarBind impossible
 
------------------
-newLhsBndr :: Maybe TcSigInfo -> Bool -> Name -> TcM TcId
--- cf TcPat.tcPatBndr (LetPat case)
-newLhsBndr (Just sig) no_gen name
-  | no_gen    = return (sig_id sig)
-  | otherwise = do { mono_name <- newLocalName name
-                   ; return (mkLocalId mono_name (sig_tau sig)) }
-
-newLhsBndr Nothing no_gen name
-  = do { mono_ty <- newFlexiTyVarTy argTypeKind
-       ; newLetBndr no_gen name mono_ty }
-
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
 -- When we are doing pattern bindings, or multiple function bindings at a time
 -- we *don't* bring any scoped type variables into scope
 -- Wny not?  They are not completely rigid.
 -- That's why we have the special case for a single FunBind in tcMonoBinds
-tcRhs (TcFunBind (_,_,mono_id) fun' inf matches)
+tcRhs (TcFunBind (_,_,mono_id) loc inf matches)
   = do  { (co_fn, matches') <- tcMatchesFun (idName mono_id) inf 
                                             matches (idType mono_id)
-        ; return (FunBind { fun_id = fun', fun_infix = inf, fun_matches = matches'
+        ; return (FunBind { fun_id = L loc mono_id, fun_infix = inf
+                          , fun_matches = matches'
                           , fun_co_fn = co_fn 
                           , bind_fvs = placeHolderNames, fun_tick = Nothing }) }
 
@@ -896,8 +838,6 @@ Then we get
                                  fm = \ys:[a] -> ...fm...
                                in
                                fm
-
-
 
 %************************************************************************
 %*                                                                      *
@@ -1078,9 +1018,6 @@ decideGeneralisationPlan dflags top_lvl _bndrs binds sig_fn
       && isNotTopLevel top_lvl)      	   = NoGen
   | otherwise                              = InferGen mono_restriction
 
---  | all no_sig bndrs    	     	   = InferGen mono_restriction
---  | otherwise            	     	   = NoGen   -- A mixture of function 
---    				       		     -- and pattern bindings
   where
     mono_pat_binds = xopt Opt_MonoPatBinds dflags 
                   && any (is_pat_bind . unLoc) binds

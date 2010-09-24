@@ -6,8 +6,9 @@
 TcPat: Typechecking patterns
 
 \begin{code}
-module TcPat ( tcLetPat, TcSigFun, TcSigInfo(..)
-             , tcPat, tcPats, newLetBndr
+module TcPat ( tcLetPat, TcSigFun, TcSigInfo(..), TcPragFun 
+             , LetBndrSpec(..), addInlinePrags, warnPrags
+             , tcPat, tcPats, newNoSigLetBndr, newSigLetBndr
 	     , addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
@@ -51,16 +52,15 @@ import Control.Monad
 %************************************************************************
 
 \begin{code}
-tcLetPat :: (Name -> Maybe TcSigInfo)
-         -> Bool     -- True <=> monomorphic
+tcLetPat :: TcSigFun -> LetBndrSpec
       	 -> LPat Name -> TcSigmaType 
      	 -> TcM a
       	 -> TcM (LPat TcId, a)
-tcLetPat sig_fn is_mono pat pat_ty thing_inside
+tcLetPat sig_fn no_gen pat pat_ty thing_inside
   = tc_lpat pat pat_ty penv thing_inside 
   where
     penv = PE { pe_res_tvs = emptyVarSet, pe_lazy = True
-              , pe_ctxt = LetPat sig_fn is_mono }
+              , pe_ctxt = LetPat sig_fn no_gen }
 
 -----------------
 tcPats :: HsMatchContext Name
@@ -121,9 +121,16 @@ data PatCtxt
 
   | LetPat   -- Used only for let(rec) bindings
     	     -- See Note [Let binders]
-       TcSigFun   -- Tells type sig if any
-       Bool  	  -- True <=> no generalisation of this let
-       					
+       TcSigFun        -- Tells type sig if any
+       LetBndrSpec     -- True <=> no generalisation of this let
+
+data LetBndrSpec 
+  = LetLclBndr		  -- The binder is just a local one;
+    			  -- an AbsBinds will provide the global version
+
+  | LetGblBndr TcPragFun  -- There isn't going to be an AbsBinds;
+    	       		  -- here is the inline-pragma information
+
 makeLazy :: PatEnv -> PatEnv
 makeLazy penv = penv { pe_lazy = True }
 
@@ -132,7 +139,8 @@ patSigCtxt (PE { pe_ctxt = LetPat {} }) = BindPatSigCtxt
 patSigCtxt (PE { pe_ctxt = LamPat {} }) = LamPatSigCtxt
 
 ---------------
-type TcSigFun = Name -> Maybe TcSigInfo
+type TcPragFun = Name -> [LSig Name]
+type TcSigFun  = Name -> Maybe TcSigInfo
 
 data TcSigInfo
   = TcSigInfo {
@@ -205,30 +213,61 @@ tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (CoercionI, TcId)
 --
 tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
   | Just sig <- lookup_sig bndr_name
-  = do { bndr_id <- if no_gen then return (sig_id sig)
-                    else do { mono_name <- newLocalName bndr_name
-                            ; return (Id.mkLocalId mono_name (sig_tau sig)) }
+  = do { bndr_id <- newSigLetBndr no_gen bndr_name sig
        ; coi <- unifyPatType (idType bndr_id) pat_ty
        ; return (coi, bndr_id) }
       
   | otherwise
-  = do { bndr_id <- newLetBndr no_gen bndr_name pat_ty
+  = do { bndr_id <- newNoSigLetBndr no_gen bndr_name pat_ty
        ; return (IdCo pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
   = do { bndr <- mkLocalBinder bndr_name pat_ty
        ; return (IdCo pat_ty, bndr) }
 
-newLetBndr :: Bool -> Name -> TcType -> TcM TcId
+------------
+newSigLetBndr :: LetBndrSpec -> Name -> TcSigInfo -> TcM TcId
+newSigLetBndr LetLclBndr name sig
+  = do { mono_name <- newLocalName name
+       ; mkLocalBinder mono_name (sig_tau sig) }
+newSigLetBndr (LetGblBndr prags) name sig
+  = addInlinePrags (sig_id sig) (prags name)
+
+------------
+newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
 -- In the polymorphic case (no_gen = False), generate a "monomorphic version" 
 --    of the Id; the original name will be bound to the polymorphic version
 --    by the AbsBinds
 -- In the monomorphic case there is no AbsBinds, and we use the original
 --    name directly
-newLetBndr no_gen name ty
-  | no_gen    = mkLocalBinder name ty
-  | otherwise = do { mono_name <- newLocalName name
-                   ; mkLocalBinder mono_name ty }
+newNoSigLetBndr LetLclBndr name ty 
+  =do  { mono_name <- newLocalName name
+       ; mkLocalBinder mono_name ty }
+newNoSigLetBndr (LetGblBndr prags) name ty 
+  = do { id <- mkLocalBinder name ty
+       ; addInlinePrags id (prags name) }
+
+----------
+addInlinePrags :: TcId -> [LSig Name] -> TcM TcId
+addInlinePrags poly_id prags
+  = tc_inl inl_sigs
+  where
+    inl_sigs = filter isInlineLSig prags
+    tc_inl [] = return poly_id
+    tc_inl (L loc (InlineSig _ prag) : other_inls)
+       = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
+            ; return (poly_id `setInlinePragma` prag) }
+    tc_inl _ = panic "tc_inl"
+
+    warn_dup_inline = warnPrags poly_id inl_sigs $
+                      ptext (sLit "Duplicate INLINE pragmas for")
+
+warnPrags :: Id -> [LSig Name] -> SDoc -> TcM ()
+warnPrags id bad_sigs herald
+  = addWarnTc (hang (herald <+> quotes (ppr id))
+                  2 (ppr_sigs bad_sigs))
+  where
+    ppr_sigs sigs = vcat (map (ppr . getLoc) sigs)
 
 -----------------
 mkLocalBinder :: Name -> TcType -> TcM TcId
