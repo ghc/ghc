@@ -34,3 +34,6 @@ test('lazy-bs-alloc',
       # use a suitably big file, without bloating the repo with a new one:
      compile_and_run,
      ['-O'])
+
+test('T4321', omit_ways(['ghci']), compile_and_run, ['-O'])
+
