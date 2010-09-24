@@ -254,7 +254,7 @@ catchException :: Exception e => IO a -> (e -> IO a) -> IO a
 catchException (IO io) handler = IO $ catch# io handler'
     where handler' e = case fromException e of
                        Just e' -> unIO (handler e')
-                       Nothing -> raise# e
+                       Nothing -> raiseIO# e
 
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny (IO io) handler = IO $ catch# io handler'
@@ -344,7 +344,7 @@ blocked = fmap (/= Unmasked) getMaskingState
 
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchException` \e -> do _ <- what
-                                                   throw (e :: SomeException)
+                                                   throwIO (e :: SomeException)
 
 -- | Executes an IO computation with asynchronous
 -- exceptions /masked/.  That is, any thread which attempts to raise

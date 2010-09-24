@@ -426,7 +426,7 @@ catchJust
         -> IO a
 catchJust p a handler = catch a handler'
   where handler' e = case p e of
-                        Nothing -> throw e
+                        Nothing -> throwIO e
                         Just b  -> handler b
 
 -- | A version of 'catch' with the arguments swapped around; useful in
@@ -452,7 +452,7 @@ handleJust p =  flip (catchJust p)
 
 mapException :: (Exception e1, Exception e2) => (e1 -> e2) -> a -> a
 mapException f v = unsafePerformIO (catch (evaluate v)
-                                          (\x -> throw (f x)))
+                                          (\x -> throwIO (f x)))
 
 -----------------------------------------------------------------------------
 -- 'try' and variations.
@@ -482,14 +482,14 @@ tryJust p a = do
   case r of
         Right v -> return (Right v)
         Left  e -> case p e of
-                        Nothing -> throw e
+                        Nothing -> throwIO e
                         Just b  -> return (Left b)
 
 -- | Like 'finally', but only performs the final action if there was an
 -- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
 onException io what = io `catch` \e -> do _ <- what
-                                          throw (e :: SomeException)
+                                          throwIO (e :: SomeException)
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions
