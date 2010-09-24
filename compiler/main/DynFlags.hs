@@ -802,6 +802,7 @@ languageExtensions Nothing
                          -- behaviour the default, to see if anyone notices
                          -- SLPJ July 06
       -- In due course I'd like Opt_MonoLocalBinds to be on by default
+      -- But NB it's implied by GADTs etc
       -- SLPJ September 2010
     : languageExtensions (Just Haskell2010)
 languageExtensions (Just Haskell98)
