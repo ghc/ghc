@@ -40,7 +40,7 @@ import CoreArity
 import CoreUnfold
 import Name
 import Id
-import Var	( isCoVar )
+import Var	( Var, isCoVar )
 import Demand
 import SimplMonad
 import Type	hiding( substTy )
@@ -1033,19 +1033,45 @@ mkLam _env bndrs body
         (bndrs1, body1) = collectBinders body
 
     mkLam' dflags bndrs body
-      | dopt Opt_DoEtaReduction dflags,
-        Just etad_lam <- tryEtaReduce bndrs body
+      | dopt Opt_DoEtaReduction dflags
+      , Just etad_lam <- tryEtaReduce bndrs body
       = do { tick (EtaReduction (head bndrs))
 	   ; return etad_lam }
 
-      | dopt Opt_DoLambdaEtaExpansion dflags,
-   	not (all isTyCoVar bndrs) -- Don't eta expand type abstractions
-      = do { let body' = tryEtaExpansion dflags body
+      | dopt Opt_DoLambdaEtaExpansion dflags
+      ,	any ok_to_expand bndrs
+      = do { let body'     = etaExpand fun_arity body
+                 fun_arity = exprEtaExpandArity dflags body
  	   ; return (mkLams bndrs body') }
    
       | otherwise 
       = return (mkLams bndrs body)
+
+    ok_to_expand :: Var -> Bool	-- Note [When to eta expand]
+    ok_to_expand bndr = isId bndr && not (isDictId bndr)
 \end{code}
+
+Note [When to eta expand]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We only eta expand if there is at least one non-tyvar, non-dict 
+binder.  The proximate cause for not eta-expanding dictionary lambdas 
+was this example:
+   genMap :: C a => ...
+   {-# INLINE genMap #-}
+   genMap f xs = ...
+
+   myMap :: D a => ...
+   {-# INLINE myMap #-}
+   myMap = genMap
+
+Notice that 'genMap' should only inline if applied to two arguments.
+In the InlineRule for myMap we'll have the unfolding 
+    (\d -> genMap Int (..d..))  
+We do not want to eta-expand to 
+    (\d f xs -> genMap Int (..d..) f xs) 
+because then 'genMap' will inline, and it really shouldn't: at least
+as far as the programmer is concerned, it's not applied to two
+arguments!
 
 Note [Casts and lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1093,52 +1119,6 @@ because the latter is not well-kinded.
  = do (floats, body') <- tryRhsTyLam env bndrs body
       return (floats, mkLams bndrs body')
 -}
-
-
-%************************************************************************
-%*									*
-		Eta expansion
-%*									*
-%************************************************************************
-
-
-We go for:
-   f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
-				 (n >= 0)
-
-where (in both cases) 
-
-	* The xi can include type variables
-
-	* The yi are all value variables
-
-	* N is a NORMAL FORM (i.e. no redexes anywhere)
-	  wanting a suitable number of extra args.
-
-The biggest reason for doing this is for cases like
-
-	f = \x -> case x of
-		    True  -> \y -> e1
-		    False -> \y -> e2
-
-Here we want to get the lambdas together.  A good exmaple is the nofib
-program fibheaps, which gets 25% more allocation if you don't do this
-eta-expansion.
-
-We may have to sandwich some coerces between the lambdas
-to make the types work.   exprEtaExpandArity looks through coerces
-when computing arity; and etaExpand adds the coerces as necessary when
-actually computing the expansion.
-
-\begin{code}
-tryEtaExpansion :: DynFlags -> OutExpr -> OutExpr
--- There is at least one runtime binder in the binders
-tryEtaExpansion dflags body
-  = etaExpand fun_arity body
-  where
-    fun_arity = exprEtaExpandArity dflags body
-\end{code}
-
 
 %************************************************************************
 %*									*
