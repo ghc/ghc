@@ -63,6 +63,68 @@ And in any case it seems more robust to have exprArity be a bit more intelligent
 But note that 	(\x y z -> f x y z)
 should have arity 3, regardless of f's arity.
 
+\begin{code}
+manifestArity :: CoreExpr -> Arity
+-- ^ manifestArity sees how many leading value lambdas there are
+manifestArity (Lam v e) | isId v    	= 1 + manifestArity e
+			| otherwise 	= manifestArity e
+manifestArity (Note n e) | notSccNote n	= manifestArity e
+manifestArity (Cast e _)            	= manifestArity e
+manifestArity _                     	= 0
+
+---------------
+exprArity :: CoreExpr -> Arity
+-- ^ An approximate, fast, version of 'exprEtaExpandArity'
+exprArity e = go e
+  where
+    go (Var v) 	       	           = idArity v
+    go (Lam x e) | isId x    	   = go e + 1
+    		 | otherwise 	   = go e
+    go (Note n e) | notSccNote n   = go e
+    go (Cast e co)                 = go e `min` length (typeArity (snd (coercionKind co)))
+       	       			     	-- Note [exprArity invariant]
+    go (App e (Type _))            = go e
+    go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
+        -- See Note [exprArity for applications]
+    go _		       	   = 0
+
+
+---------------
+typeArity :: Type -> [OneShot]
+-- How many value arrows are visible in the type?
+-- We look through foralls, and newtypes
+-- See Note [exprArity invariant]
+typeArity ty 
+  | Just (_, ty')  <- splitForAllTy_maybe ty 
+  = typeArity ty'
+
+  | Just (arg,res) <- splitFunTy_maybe ty    
+  = isStateHackType arg : typeArity res
+
+  | Just (tc,tys) <- splitTyConApp_maybe ty 
+  , Just (ty', _) <- instNewTyCon_maybe tc tys
+  , not (isRecursiveTyCon tc)
+  , not (isClassTyCon tc)	-- Do not eta-expand through newtype classes
+    		      		-- See Note [Newtype classes and eta expansion]
+  = typeArity ty'
+  	-- Important to look through non-recursive newtypes, so that, eg 
+  	--	(f x)   where f has arity 2, f :: Int -> IO ()
+  	-- Here we want to get arity 1 for the result!
+
+  | otherwise
+  = []
+
+---------------
+exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
+-- A cheap and cheerful function that identifies bottoming functions
+-- and gives them a suitable strictness signatures.  It's used during
+-- float-out
+exprBotStrictness_maybe e
+  = case getBotArity (arityType False e) of
+	Nothing -> Nothing
+	Just ar -> Just (ar, mkStrictSig (mkTopDmdType (replicate ar topDmd) BotRes))
+\end{code}
+
 Note [exprArity invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprArity has the following invariant:
@@ -90,57 +152,6 @@ Why is this important?  Because
 An alternative would be to do the eta-expansion in TidyPgm, at least
 for top-level bindings, in which case we would not need the trim_arity
 in exprArity.  That is a less local change, so I'm going to leave it for today!
-
-
-\begin{code}
-manifestArity :: CoreExpr -> Arity
--- ^ manifestArity sees how many leading value lambdas there are
-manifestArity (Lam v e) | isId v    	= 1 + manifestArity e
-			| otherwise 	= manifestArity e
-manifestArity (Note n e) | notSccNote n	= manifestArity e
-manifestArity (Cast e _)            	= manifestArity e
-manifestArity _                     	= 0
-
-exprArity :: CoreExpr -> Arity
--- ^ An approximate, fast, version of 'exprEtaExpandArity'
-exprArity e = go e
-  where
-    go (Var v) 	       	           = idArity v
-    go (Lam x e) | isId x    	   = go e + 1
-    		 | otherwise 	   = go e
-    go (Note n e) | notSccNote n   = go e
-    go (Cast e co)                 = go e `min` length (typeArity (snd (coercionKind co)))
-       	       			     	-- Note [exprArity invariant]
-    go (App e (Type _))            = go e
-    go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
-        -- See Note [exprArity for applications]
-    go _		       	   = 0
-
-
-typeArity :: Type -> [OneShot]
--- How many value arrows are visible in the type?
--- We look through foralls, and newtypes
--- See Note [exprArity invariant]
-typeArity ty 
-  | Just (_, ty')  <- splitForAllTy_maybe ty 
-  = typeArity ty'
-
-  | Just (arg,res) <- splitFunTy_maybe ty    
-  = isStateHackType arg : typeArity res
-
-  | Just (tc,tys) <- splitTyConApp_maybe ty 
-  , Just (ty', _) <- instNewTyCon_maybe tc tys
-  , not (isRecursiveTyCon tc)
-  , not (isClassTyCon tc)	-- Do not eta-expand through newtype classes
-    		      		-- See Note [Newtype classes and eta expansion]
-  = typeArity ty'
-  	-- Important to look through non-recursive newtypes, so that, eg 
-  	--	(f x)   where f has arity 2, f :: Int -> IO ()
-  	-- Here we want to get arity 1 for the result!
-
-  | otherwise
-  = []
-\end{code}
 
 Note [Newtype classes and eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -204,20 +215,9 @@ When we come to an application we check that the arg is trivial.
 
 %************************************************************************
 %*									*
-	   Eta expansion
+	   Computing the "arity" of an expression
 %*									*
 %************************************************************************
-
-\begin{code}
-exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
--- A cheap and cheerful function that identifies bottoming functions
--- and gives them a suitable strictness signatures.  It's used during
--- float-out
-exprBotStrictness_maybe e
-  = case getBotArity (arityType False e) of
-	Nothing -> Nothing
-	Just ar -> Just (ar, mkStrictSig (mkTopDmdType (replicate ar topDmd) BotRes))
-\end{code}	
 
 Note [Definition of arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -567,10 +567,41 @@ arityType _           _          = vanillaArityType
 %*									*
 %************************************************************************
 
-IMPORTANT NOTE: The eta expander is careful not to introduce "crap".
-In particular, given a CoreExpr satisfying the 'CpeRhs' invariant (in
-CorePrep), it returns a CoreExpr satisfying the same invariant. See
-Note [Eta expansion and the CorePrep invariants] in CorePrep.
+We go for:
+   f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
+				 (n >= 0)
+
+where (in both cases) 
+
+	* The xi can include type variables
+
+	* The yi are all value variables
+
+	* N is a NORMAL FORM (i.e. no redexes anywhere)
+	  wanting a suitable number of extra args.
+
+The biggest reason for doing this is for cases like
+
+	f = \x -> case x of
+		    True  -> \y -> e1
+		    False -> \y -> e2
+
+Here we want to get the lambdas together.  A good exmaple is the nofib
+program fibheaps, which gets 25% more allocation if you don't do this
+eta-expansion.
+
+We may have to sandwich some coerces between the lambdas
+to make the types work.   exprEtaExpandArity looks through coerces
+when computing arity; and etaExpand adds the coerces as necessary when
+actually computing the expansion.
+
+
+Note [No crap in eta-expanded code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The eta expander is careful not to introduce "crap".  In particular,
+given a CoreExpr satisfying the 'CpeRhs' invariant (in CorePrep), it
+returns a CoreExpr satisfying the same invariant. See Note [Eta
+expansion and the CorePrep invariants] in CorePrep.
 
 This means the eta-expander has to do a bit of on-the-fly
 simplification but it's not too hard.  The alernative, of relying on 
