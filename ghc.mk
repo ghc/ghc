@@ -285,7 +285,9 @@ include rules/bindist.mk
 # Packages
 
 # --------------------------------
-# Subsets of packages
+# Properties of packages
+# These lists say "if this package is built, here's a property it has"
+# They do not say "this package will be built"; see $(PACKAGES_xx) for that
 
 # Packages that are built but not installed
 INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
@@ -305,11 +307,24 @@ STAGE2_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
 # so we don't have to include it below.
 STAGE0_PACKAGES = Cabal hpc extensible-exceptions binary bin-package-db
 
-# --------------------------------
-# Building the lists of packages
+# These packages are installed, but are installed hidden
+# Why install them at all?  Because the 'ghc' package depends on them
+HIDDEN_PACKAGES = binary
 
-# We need to build two lists:
-# 
+# $(EXTRA_PACKAGES)  is another classification, of packages built but
+#                    not installed
+#                    It is set in rules/extra-package.mk, 
+#                    by $(call extra-packages) a little further down 
+#                    this ghc.mk 
+
+
+# --------------------------------
+# Packages to build
+# The lists of packages that we *actually* going to build in each stage:
+#
+#  $(STAGE0_PACKAGE)	does double duty; it really is the list of packages
+#			we build the bootstrap compiler in stage 0
+#
 #  $(PACKAGES)          A list of directories relative to libraries/ containing
 #                       packages that will be built by stage1, in dependency
 #                       order.
@@ -897,28 +912,22 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
-INSTALLED_PACKAGES := $(filter-out $(INTREE_ONLY_PACKAGES),$(PACKAGES))
+INSTALLED_PKG_DIRS := $(addprefix libraries/,$(PACKAGES)) \
+                      compiler \
+                      $(addprefix libraries/,$(PACKAGES_STAGE2))
 ifeq "$(InstallExtraPackages)" "NO"
-INSTALLED_PACKAGES := $(filter-out $(EXTRA_PACKAGES), $(INSTALLED_PACKAGES))
+INSTALLED_PKG_DIRS := $(filter-out $(addprefix libraries/,$(EXTRA_PACKAGES)),\
+                                   $(INSTALLED_PKG_DIRS))
 endif
+INSTALLED_PKG_DIRS := $(filter-out $(addprefix libraries/,$(INTREE_ONLY_PACKAGES)),\
+                                   $(INSTALLED_PKG_DIRS))
 
-HIDDEN_PACKAGES = binary
-
-define set_INSTALL_DISTDIR
-# $1 = libraries/base, $2 = dist-install
-# =>
-# INSTALL_DISTDIR_libraries/base = dist-install
-INSTALL_DISTDIR_$1 = $2
-endef
-
-$(eval $(foreach p,$(INSTALLED_PACKAGES) $(PACKAGES_STAGE2),\
-$(call set_INSTALL_DISTDIR,libraries/$p,dist-install)))
+# Set the INSTALL_DISTDIR_p for each package; compiler is special
+$(foreach p,$(filter-out compiler,$(INSTALLED_PKG_DIRS)),\
+   $(eval INSTALL_DISTDIR_$p = dist-install))
 INSTALL_DISTDIR_compiler = stage2
 
-ALL_INSTALLED_PACKAGES = $(addprefix libraries/,$(INSTALLED_PACKAGES)) \
-                         compiler \
-                         $(addprefix libraries/,$(PACKAGES_STAGE2))
-
+# Now we can do the installation
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
@@ -926,7 +935,7 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
-	$(foreach p, $(ALL_INSTALLED_PACKAGES),                       \
+	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
 	           "$(GHC_CABAL_INPLACE)" install                     \
 	                                  "$(INSTALLED_GHC_REAL)"     \
