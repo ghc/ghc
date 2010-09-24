@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-void _stdcall test(int arg)
+void __attribute__((stdcall)) test(int arg)
 {
    printf("The argument passed was %i\n", arg );
 }
