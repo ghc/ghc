@@ -394,7 +394,6 @@ createIOThread (Capability *cap, nat stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
-  pushClosure(t, (W_)&stg_noforceIO_info);
   pushClosure(t, (W_)&stg_ap_v_info);
   pushClosure(t, (W_)closure);
   pushClosure(t, (W_)&stg_enter_info);

@@ -151,22 +151,6 @@ INFO_TABLE_RET( stg_forceIO, RET_SMALL)
 }
 
 /* -----------------------------------------------------------------------------
-    Non-strict IO application.
-
-    This stack frame works like stg_forceIO_info except that it
-    doesn't evaluate the return value.  We need the layer because the
-    return convention for an IO action differs depending on whether R1
-    is a register or not.
-    ------------------------------------------------------------------------- */
-
-INFO_TABLE_RET( stg_noforceIO, RET_SMALL )
-
-{
-  Sp_adj(1);
-  jump %ENTRY_CODE(Sp(0));
-}
-
-/* -----------------------------------------------------------------------------
    Special STG entry points for module registration.
    -------------------------------------------------------------------------- */
 
