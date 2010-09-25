@@ -122,10 +122,12 @@ def get_compiler_info():
     # This should really not go through the shell
     h = os.popen('"' + config.compiler + '" --info', 'r')
     s = h.read()
+    s = re.sub('[\r\n]', '', s)
     h.close()
     compilerInfoDict = dict(eval(s))
     h = os.popen('"' + config.compiler + '" +RTS --info', 'r')
     s = h.read()
+    s = re.sub('[\r\n]', '', s)
     h.close()
     rtsInfoDict = dict(eval(s))
 
