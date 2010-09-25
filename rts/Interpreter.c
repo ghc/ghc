@@ -1454,11 +1454,12 @@ run_BCO:
 	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
 	    LOAD_STACK_POINTERS;
 
-            if (Sp[0] == (W_)&stg_enter_info) {
-                // Sp got clobbered due to an exception; so we should
-                // go run it instead.
-                Sp++;
-                goto eval;
+            if (Sp[0] != (W_)&stg_gc_gen_info) {
+                // the stack is not how we left it.  This probably
+                // means that an exception got raised on exit from the
+                // foreign call, so we should just continue with
+                // whatever is on top of the stack now.
+                RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
             }
 
             // Re-load the pointer to the BCO from the RET_DYN frame,
