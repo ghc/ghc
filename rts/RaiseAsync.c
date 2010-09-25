@@ -405,9 +405,11 @@ check_target:
             }
         }
         if (task != NULL) {
-            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
-            interruptWorkerTask(task);
-            return THROWTO_SUCCESS;
+            blockedThrowTo(cap, target, msg);
+            if (!((target->flags & TSO_BLOCKEX) && ((target->flags & TSO_INTERRUPTIBLE) == 0))) {
+                interruptWorkerTask(task);
+            }
+            return THROWTO_BLOCKED;
         } else {
             debugTraceCap(DEBUG_sched, cap, "throwTo: could not find worker thread to kill");
         }
@@ -664,6 +666,14 @@ removeFromQueues(Capability *cap, StgTSO *tso)
         removeThreadFromQueue(cap, &sleeping_queue, tso);
 	goto done;
 #endif
+
+  case BlockedOnCCall_Interruptible:
+  case BlockedOnCCall:
+      // ccall shouldn't be put on the run queue, because whenever
+      // we raise an exception for such a blocked thread, it's only
+      // when we're /exiting/ the call.
+      tso->why_blocked = NotBlocked;
+      return;
 
   default:
       barf("removeFromQueues: %d", tso->why_blocked);

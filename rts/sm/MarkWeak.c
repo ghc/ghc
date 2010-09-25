@@ -271,9 +271,10 @@ static rtsBool tidyThreadList (generation *gen)
         // if the thread is not masking exceptions but there are
         // pending exceptions on its queue, then something has gone
         // wrong.  However, pending exceptions are OK if there is an
-        // uninterruptible FFI call.
+        // FFI call.
         ASSERT(t->blocked_exceptions == END_BLOCKED_EXCEPTIONS_QUEUE
                || t->why_blocked == BlockedOnCCall
+               || t->why_blocked == BlockedOnCCall_Interruptible
                || (t->flags & TSO_BLOCKEX));
         
         if (tmp == NULL) {

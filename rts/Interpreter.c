@@ -1454,6 +1454,13 @@ run_BCO:
 	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
 	    LOAD_STACK_POINTERS;
 
+            if (Sp[0] == (W_)&stg_enter_info) {
+                // Sp got clobbered due to an exception; so we should
+                // go run it instead.
+                Sp++;
+                goto eval;
+            }
+
             // Re-load the pointer to the BCO from the RET_DYN frame,
             // it might have moved during the call.  Also reload the
             // pointers to the components of the BCO.

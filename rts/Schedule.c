@@ -1820,7 +1820,7 @@ resumeThread (void *task_)
     if ((tso->flags & TSO_BLOCKEX) == 0) {
         // avoid locking the TSO if we don't have to
         if (tso->blocked_exceptions != END_BLOCKED_EXCEPTIONS_QUEUE) {
-            awakenBlockedExceptionQueue(cap,tso);
+            maybePerformBlockedException(cap,tso);
         }
     }
     
