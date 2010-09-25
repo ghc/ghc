@@ -471,6 +471,15 @@ shutdown_handler(int sig STG_UNUSED)
 }
 
 /* -----------------------------------------------------------------------------
+ * An empty signal handler, currently used for SIGPIPE
+ * -------------------------------------------------------------------------- */
+static void
+empty_handler (int sig STG_UNUSED)
+{
+    // nothing
+}
+
+/* -----------------------------------------------------------------------------
  * Install default signal handlers.
  *
  * The RTS installs a default signal handler for catching
@@ -526,7 +535,9 @@ initDefaultHandlers(void)
 #endif
 
     // ignore SIGPIPE; see #1619
-    action.sa_handler = SIG_IGN;
+    // actually, we use an empty signal handler rather than SIG_IGN,
+    // so that SIGPIPE gets reset to its default behaviour on exec.
+    action.sa_handler = empty_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGPIPE, &action, &oact) != 0) {
