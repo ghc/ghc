@@ -1817,15 +1817,15 @@ resumeThread (void *task_)
 
     traceEventRunThread(cap, tso);
     
+    /* Reset blocking status */
+    tso->why_blocked  = NotBlocked;
+
     if ((tso->flags & TSO_BLOCKEX) == 0) {
         // avoid locking the TSO if we don't have to
         if (tso->blocked_exceptions != END_BLOCKED_EXCEPTIONS_QUEUE) {
             maybePerformBlockedException(cap,tso);
         }
     }
-    
-    /* Reset blocking status */
-    tso->why_blocked  = NotBlocked;
     
     cap->r.rCurrentTSO = tso;
     cap->in_haskell = rtsTrue;

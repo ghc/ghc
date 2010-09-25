@@ -667,14 +667,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 	goto done;
 #endif
 
-  case BlockedOnCCall_Interruptible:
-  case BlockedOnCCall:
-      // ccall shouldn't be put on the run queue, because whenever
-      // we raise an exception for such a blocked thread, it's only
-      // when we're /exiting/ the call.
-      tso->why_blocked = NotBlocked;
-      return;
-
   default:
       barf("removeFromQueues: %d", tso->why_blocked);
   }
