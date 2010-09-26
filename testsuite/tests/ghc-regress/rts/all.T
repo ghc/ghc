@@ -85,6 +85,7 @@ test('traceEvent', [ omit_ways(['dyn'] + prof_ways),
 
 test('T4059', normal, run_command, ['$MAKE -s --no-print-directory T4059'])
 
+# Test for #4274
 test('exec_signals', [
      if_platform('i386-unknown-mingw32',skip),
      cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
