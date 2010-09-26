@@ -57,15 +57,9 @@ static void throwToSendMsg (Capability *cap USED_IF_THREADS,
    has been raised.
    -------------------------------------------------------------------------- */
 
-void
-throwToSingleThreaded(Capability *cap, StgTSO *tso, StgClosure *exception)
-{
-    throwToSingleThreaded_(cap, tso, exception, rtsFalse);
-}
-
-void
-throwToSingleThreaded_(Capability *cap, StgTSO *tso, StgClosure *exception, 
-		       rtsBool stop_at_atomically)
+static void
+throwToSingleThreaded__ (Capability *cap, StgTSO *tso, StgClosure *exception, 
+                         rtsBool stop_at_atomically, StgUpdateFrame *stop_here)
 {
     tso = deRefTSO(tso);
 
@@ -77,23 +71,26 @@ throwToSingleThreaded_(Capability *cap, StgTSO *tso, StgClosure *exception,
     // Remove it from any blocking queues
     removeFromQueues(cap,tso);
 
-    raiseAsync(cap, tso, exception, stop_at_atomically, NULL);
+    raiseAsync(cap, tso, exception, stop_at_atomically, stop_here);
 }
 
 void
-suspendComputation(Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
+throwToSingleThreaded (Capability *cap, StgTSO *tso, StgClosure *exception)
 {
-    tso = deRefTSO(tso);
+    throwToSingleThreaded__(cap, tso, exception, rtsFalse, NULL);
+}
 
-    // Thread already dead?
-    if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
-	return;
-    }
+void
+throwToSingleThreaded_ (Capability *cap, StgTSO *tso, StgClosure *exception, 
+                        rtsBool stop_at_atomically)
+{
+    throwToSingleThreaded__ (cap, tso, exception, stop_at_atomically, NULL);
+}
 
-    // Remove it from any blocking queues
-    removeFromQueues(cap,tso);
-
-    raiseAsync(cap, tso, NULL, rtsFalse, stop_here);
+void
+suspendComputation (Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
+{
+    throwToSingleThreaded__ (cap, tso, NULL, rtsFalse, stop_here);
 }
 
 /* -----------------------------------------------------------------------------
@@ -406,7 +403,8 @@ check_target:
         }
         if (task != NULL) {
             blockedThrowTo(cap, target, msg);
-            if (!((target->flags & TSO_BLOCKEX) && ((target->flags & TSO_INTERRUPTIBLE) == 0))) {
+            if (!((target->flags & TSO_BLOCKEX) &&
+                  ((target->flags & TSO_INTERRUPTIBLE) == 0))) {
                 interruptWorkerTask(task);
             }
             return THROWTO_BLOCKED;
