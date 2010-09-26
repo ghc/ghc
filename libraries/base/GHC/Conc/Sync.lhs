@@ -52,7 +52,7 @@ module GHC.Conc.Sync
         , atomically    -- :: STM a -> IO a
         , retry         -- :: STM a
         , orElse        -- :: STM a -> STM a -> STM a
-        , catchSTM      -- :: STM a -> (Exception -> STM a) -> STM a
+        , catchSTM      -- :: Exception e => STM a -> (e -> STM a) -> STM a
         , alwaysSucceeds -- :: STM a -> STM ()
         , always        -- :: STM Bool -> STM ()
         , TVar(..)
@@ -510,8 +510,12 @@ orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 
 -- |Exception handling within STM actions.
-catchSTM :: STM a -> (SomeException -> STM a) -> STM a
-catchSTM (STM m) k = STM $ \s -> catchSTM# m (\ex -> unSTM (k ex)) s
+catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
+catchSTM (STM m) handler = STM $ catchSTM# m handler'
+    where
+      handler' e = case fromException e of
+                     Just e' -> unSTM (handler e')
+                     Nothing -> raiseIO# e
 
 -- | Low-level primitive on which always and alwaysSucceeds are built.
 -- checkInv differs form these in that (i) the invariant is not
