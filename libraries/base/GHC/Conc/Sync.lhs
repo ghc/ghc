@@ -52,6 +52,7 @@ module GHC.Conc.Sync
         , atomically    -- :: STM a -> IO a
         , retry         -- :: STM a
         , orElse        -- :: STM a -> STM a -> STM a
+        , throwSTM      -- :: Exception e => e -> STM a
         , catchSTM      -- :: Exception e => STM a -> (e -> STM a) -> STM a
         , alwaysSucceeds -- :: STM a -> STM ()
         , always        -- :: STM Bool -> STM ()
@@ -508,6 +509,27 @@ retry = STM $ \s# -> retry# s#
 -- whole retries.
 orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
+
+-- | A variant of 'throw' that can only be used within the 'STM' monad.
+--
+-- Throwing an exception in @STM@ aborts the transaction and propagates the
+-- exception.
+--
+-- Although 'throwSTM' has a type that is an instance of the type of 'throw', the
+-- two functions are subtly different:
+--
+-- > throw e    `seq` x  ===> throw e
+-- > throwSTM e `seq` x  ===> x
+--
+-- The first example will cause the exception @e@ to be raised,
+-- whereas the second one won\'t.  In fact, 'throwSTM' will only cause
+-- an exception to be raised when it is used within the 'STM' monad.
+-- The 'throwSTM' variant should be used in preference to 'throw' to
+-- raise an exception within the 'STM' monad because it guarantees
+-- ordering with respect to other 'STM' operations, whereas 'throw'
+-- does not.
+throwSTM :: Exception e => e -> STM a
+throwSTM e = STM $ raiseIO# (toException e)
 
 -- |Exception handling within STM actions.
 catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a

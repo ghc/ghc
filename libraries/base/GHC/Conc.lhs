@@ -58,6 +58,7 @@ module GHC.Conc
         , atomically    -- :: STM a -> IO a
         , retry         -- :: STM a
         , orElse        -- :: STM a -> STM a -> STM a
+        , throwSTM      -- :: Exception e => e -> STM a
         , catchSTM      -- :: Exception e => STM a -> (e -> STM a) -> STM a
         , alwaysSucceeds -- :: STM a -> STM ()
         , always        -- :: STM Bool -> STM ()
