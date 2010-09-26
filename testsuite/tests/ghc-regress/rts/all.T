@@ -84,3 +84,9 @@ test('traceEvent', [ omit_ways(['dyn'] + prof_ways),
                    compile_and_run, ['-eventlog'])
 
 test('T4059', normal, run_command, ['$MAKE -s --no-print-directory T4059'])
+
+test('exec_signals', [
+     if_platform('i386-unknown-mingw32',skip),
+     cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
+     extra_clean(['exec_signals_child', 'exec_signals_prepare'])
+    ], compile_and_run, [''])

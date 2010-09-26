@@ -27,3 +27,6 @@ T4059:
 	'$(TEST_HC)' -v0 --make 4059 4059_c.c
 	./4059
 
+exec_signals-prep:
+	$(CC) -o exec_signals_child exec_signals_child.c
+	$(CC) -o exec_signals_prepare exec_signals_prepare.c
