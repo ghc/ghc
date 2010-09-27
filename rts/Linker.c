@@ -119,7 +119,8 @@ static /*Str*/HashTable *stablehash;
 ObjectCode *objects = NULL;	/* initially empty */
 
 static HsInt loadOc( ObjectCode* oc );
-static ObjectCode* mkOc( char *path, char *image, int imageSize
+static ObjectCode* mkOc( char *path, char *image, int imageSize,
+                         char *archiveMemberName
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
                        , int misalignment
@@ -1602,7 +1603,8 @@ mmap_again:
 #endif // USE_MMAP
 
 static ObjectCode*
-mkOc( char *path, char *image, int imageSize
+mkOc( char *path, char *image, int imageSize,
+      char *archiveMemberName
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
     , int misalignment
@@ -1626,9 +1628,16 @@ mkOc( char *path, char *image, int imageSize
 
    oc->image = image;
    /* sigh, strdup() isn't a POSIX function, so do it the long way */
-   /* XXX What should this be for an archive? */
    oc->fileName = stgMallocBytes( strlen(path)+1, "loadObj" );
    strcpy(oc->fileName, path);
+
+   if (archiveMemberName) {
+       oc->archiveMemberName = stgMallocBytes( strlen(archiveMemberName)+1, "loadObj" );
+       strcpy(oc->archiveMemberName, archiveMemberName);
+   }
+   else {
+       oc->archiveMemberName = NULL;
+   }
 
    oc->fileSize          = imageSize;
    oc->symbols           = NULL;
@@ -1739,6 +1748,8 @@ loadArchive( char *path )
        }
 
        if (isObject) {
+           char *archiveMemberName;
+
            /* We can't mmap from the archive directly, as object
               files need to be 8-byte aligned but files in .ar
               archives are 2-byte aligned, and if we malloc the
@@ -1749,13 +1760,20 @@ loadArchive( char *path )
            n = fread ( image, 1, imageSize, f );
            if (n != imageSize)
                barf("loadObj: error whilst reading `%s'", path);
-           oc = mkOc(path, image, imageSize
+
+           archiveMemberName = stgMallocBytes(strlen(path) + fileNameSize + 3, "loadArchive(file)");
+           sprintf(archiveMemberName, "%s(%.*s)", path, (int)fileNameSize, file);
+
+           oc = mkOc(path, image, imageSize, archiveMemberName
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
                     , 0
 #endif
 #endif
                     );
+
+           stgFree(archiveMemberName);
+
            if (0 == loadOc(oc)) {
                stgFree(file);
                return 0;
@@ -1899,7 +1917,7 @@ loadObj( char *path )
    fclose(f);
 #endif /* USE_MMAP */
 
-   oc = mkOc(path, image, fileSize
+   oc = mkOc(path, image, fileSize, NULL
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
             , misalignment
@@ -2004,6 +2022,7 @@ HsInt
 unloadObj( char *path )
 {
     ObjectCode *oc, *prev;
+    HsBool unloadedAnyObj = HS_BOOL_FALSE;
 
     ASSERT(symhash != NULL);
     ASSERT(objects != NULL);
@@ -2043,12 +2062,20 @@ unloadObj( char *path )
 	    stgFree(oc->symbols);
 	    stgFree(oc->sections);
 	    stgFree(oc);
-	    return 1;
+
+            /* This could be a member of an archive so continue
+             * unloading other members. */
+            unloadedAnyObj = HS_BOOL_TRUE;
 	}
     }
 
-    errorBelch("unloadObj: can't find `%s' to unload", path);
-    return 0;
+    if (unloadedAnyObj) {
+        return 1;
+    }
+    else {
+        errorBelch("unloadObj: can't find `%s' to unload", path);
+        return 0;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -4631,7 +4658,9 @@ static int relocateSection(
 		              "scattered relocation entry: "
                               "object file %s; entry type %ld; "
                               "address %#lx\n", 
-                              oc->fileName, scat->r_type, scat->r_address);
+                              OC_INFORMATIVE_FILENAME(oc),
+                              scat->r_type,
+                              scat->r_address);
                         return 0;
                      }
 
@@ -4668,7 +4697,9 @@ static int relocateSection(
             	         "with this r_length tag: "
                          "object file %s; entry type %ld; "
                          "r_length tag %ld; address %#lx\n", 
-                         oc->fileName, scat->r_type, scat->r_length,
+                         OC_INFORMATIVE_FILENAME(oc),
+                         scat->r_type,
+                         scat->r_length,
                          scat->r_address);
                     return 0;
 		}
@@ -4678,7 +4709,9 @@ static int relocateSection(
 	        barf("Don't know how to handle *PC-relative* Mach-O "
 	             "scattered relocation entry: "
                      "object file %s; entry type %ld; address %#lx\n", 
-                     oc->fileName, scat->r_type, scat->r_address);
+                     OC_INFORMATIVE_FILENAME(oc),
+                     scat->r_type,
+                     scat->r_address);
                return 0;
 	    }
 
@@ -4732,8 +4765,10 @@ static int relocateSection(
                 {
                     barf("Can't handle this Mach-O relocation entry "
 		         "(not scattered): "
-                         "object file %s; entry type %ld; address %#lx\n", 
-                         oc->fileName, reloc->r_type, reloc->r_address);
+                         "object file %s; entry type %ld; address %#lx\n",
+                         OC_INFORMATIVE_FILENAME(oc),
+                         reloc->r_type,
+                         reloc->r_address);
                     return 0;
                 }
 
@@ -4807,20 +4842,32 @@ static int relocateSection(
 		}
 		else if(reloc->r_type == PPC_RELOC_BR24)
 		{
-                    if((long)word > (long)0x01FFFFFF || (long)word < (long)0xFFE00000)
+                    if((word & 0x03) != 0)
+                        barf("%s: unconditional relative branch with a displacement "
+                             "which isn't a multiple of 4 bytes: %#lx",
+                             OC_INFORMATIVE_FILENAME(oc),
+                             word);
+
+                    if((word & 0xFE000000) != 0xFE000000 &&
+                       (word & 0xFE000000) != 0x00000000)
                     {
                         // The branch offset is too large.
                         // Therefore, we try to use a jump island.
                         if(jumpIsland == 0)
                         {
-                            barf("unconditional relative branch out of range: "
-                                 "no jump island available");
+                            barf("%s: unconditional relative branch out of range: "
+                                 "no jump island available: %#lx",
+                                 OC_INFORMATIVE_FILENAME(oc),
+                                 word);
                         }
                         
                         word = offsetToJumpIsland;
-                        if((long)word > (long)0x01FFFFFF || (long)word < (long)0xFFE00000)
-                            barf("unconditional relative branch out of range: "
-                                 "jump island out of range");
+                        if((word & 0xFE000000) != 0xFE000000 &&
+                           (word & 0xFE000000) != 0x00000000)
+                            barf("%s: unconditional relative branch out of range: "
+                                 "jump island out of range: %#lx",
+                                 OC_INFORMATIVE_FILENAME(oc),
+                                 word);
                     }
 		    *wordPtr = (*wordPtr & 0xFC000003) | (word & 0x03FFFFFC);
 		    continue;
@@ -4832,8 +4879,10 @@ static int relocateSection(
  	         barf("Can't handle Mach-O relocation entry (not scattered) "
                       "with this r_length tag: "
                       "object file %s; entry type %ld; "
-                      "r_length tag %ld; address %#lx\n", 
-                      oc->fileName, reloc->r_type, reloc->r_length,
+                      "r_length tag %ld; address %#lx\n",
+                      OC_INFORMATIVE_FILENAME(oc),
+                      reloc->r_type,
+                      reloc->r_length,
                       reloc->r_address);
 	         return 0;
 	    }

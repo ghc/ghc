@@ -65,6 +65,11 @@ typedef struct _ObjectCode {
     int        fileSize;
     char*      formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
 
+    /* If this object is a member of an archive, archiveMemberName is
+     * like "libarchive.a(object.o)". Otherwise it's NULL.
+     */
+    char*      archiveMemberName;
+
     /* An array containing ptrs to all the symbol names copied from
        this object into the global symbol hash table.  This is so that
        we know which parts of the latter mapping to nuke when this
@@ -106,6 +111,12 @@ typedef struct _ObjectCode {
 #endif
 
 } ObjectCode;
+
+#define OC_INFORMATIVE_FILENAME(OC)             \
+    ( (OC)->archiveMemberName ?                 \
+      (OC)->archiveMemberName :                 \
+      (OC)->fileName                            \
+    )
 
 extern ObjectCode *objects;
 
