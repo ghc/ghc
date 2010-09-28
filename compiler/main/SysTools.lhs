@@ -66,7 +66,7 @@ import Foreign
 import Foreign.C.String
 #endif
 
-import System.Process   ( runInteractiveProcess, getProcessExitCode )
+import System.Process
 import Control.Concurrent
 import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
@@ -597,7 +597,12 @@ runSomethingFiltered
 
 runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
   let real_args = filter notNull (map showOpt args)
-  traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
+#if __GLASGOW_HASKELL__ >= 701
+      cmdLine = showCommandForUser pgm real_args
+#else
+      cmdLine = unwords (pgm:real_args)
+#endif
+  traceCmd dflags phase_name cmdLine $ do
   (exit_code, doesn'tExist) <-
      IO.catch (do
          rc <- builderMainLoop dflags filter_fn pgm real_args mb_env
