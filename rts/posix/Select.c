@@ -81,6 +81,13 @@ wakeUpSleepingThreads(lnat ticks)
     return flag;
 }
 
+static void GNUC3_ATTRIBUTE(__noreturn__)
+fdOutOfRange (int fd)
+{
+    errorBelch("file descriptor %d out of range for select (0--%d).\nRecompile with -threaded to work around this.", fd, (int)FD_SETSIZE);
+    stg_exit(EXIT_FAILURE);
+}
+
 /* Argument 'wait' says whether to wait for I/O to become available,
  * or whether to just check and return immediately.  If there are
  * other threads ready to run, we normally do the non-waiting variety,
@@ -157,7 +164,7 @@ awaitEvent(rtsBool wait)
 	  { 
 	    int fd = tso->block_info.fd;
 	    if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
-		barf("awaitEvent: descriptor out of range");
+                fdOutOfRange(fd);
 	    }
 	    maxfd = (fd > maxfd) ? fd : maxfd;
 	    FD_SET(fd, &rfd);
@@ -168,7 +175,7 @@ awaitEvent(rtsBool wait)
 	  { 
 	    int fd = tso->block_info.fd;
 	    if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
-		barf("awaitEvent: descriptor out of range");
+                fdOutOfRange(fd);
 	    }
 	    maxfd = (fd > maxfd) ? fd : maxfd;
 	    FD_SET(fd, &wfd);
@@ -294,3 +301,4 @@ awaitEvent(rtsBool wait)
 }
 
 #endif /* THREADED_RTS */
+
