@@ -69,7 +69,7 @@ rm -rf ${INSTALL_DEST}/GHC.framework
 
 echo "Removing package recipt"
 # The first is for Leopard packages and the second for Tiger packages.
-rm -f /Library/Receipts/boms/org.haskell.glasgowHaskellCompiler.ghc.pkg.bom
+rm -f /Library/Receipts/boms/org.haskell.ghc.pkg.bom
 rm -rf /Library/Receipts/ghc.pkg
 
 echo "${INSTALL_DEST}/GHC.framework has been purged!"

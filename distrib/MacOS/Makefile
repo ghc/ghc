@@ -101,7 +101,8 @@ framework-pkg:
 		   COMMAND_MODE=unix2003
 	-$(RM) -f GHC-system.pmdoc/*-contents.xml
 	$(PACKAGEMAKER) -v --doc GHC-system.pmdoc\
-			$(PACKAGEMAKER_TARGET) -o $(TOP)/$(PACKAGE_NAME) -i org.haskell.GHC
+			$(PACKAGEMAKER_TARGET) -o $(TOP)/$(PACKAGE_NAME)\
+			-i org.haskell.GHC.$(FRAMEWORK_VERSION)
 
 # If we don't specify COMMAND_MODE=unix2003 then xcodebuild defaults
 # to setting it to legacy, which means that ar builds archives
