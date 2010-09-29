@@ -55,9 +55,6 @@ import SrcLoc
 import VarEnv
 import VarSet
 import Name
-#if mingw32_TARGET_OS
-import Packages
-#endif
 import Literal
 import DataCon
 import PrimOp
