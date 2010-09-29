@@ -74,7 +74,7 @@ import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
 import System.IO.Unsafe ( unsafePerformIO )
-import System.FilePath
+import qualified System.FilePath.Posix as HtmlPath
 import Distribution.Verbosity
 import Distribution.ReadE
 
@@ -179,7 +179,7 @@ moduleHtmlFile :: Module -> FilePath
 moduleHtmlFile mdl =
   case Map.lookup mdl html_xrefs of
     Nothing  -> mdl' ++ ".html"
-    Just fp0 -> joinPath [fp0, mdl' ++ ".html"]
+    Just fp0 -> HtmlPath.joinPath [fp0, mdl' ++ ".html"]
   where
    mdl' = map (\c -> if c == '.' then '-' else c)
               (moduleNameString (moduleName mdl))
