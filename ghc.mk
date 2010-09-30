@@ -33,6 +33,9 @@ utils/haddock_dist_MODULES += Paths_haddock
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_utils/haddock_html
 install: install_utils/haddock_data
+ifeq "$(Windows)" "NO"
+install: install_utils/haddock_link
+endif
 endif
 
 .PHONY: install_utils/haddock_html
@@ -47,13 +50,10 @@ install_utils/haddock_data:
 	$(foreach i,$(utils/haddock_dist_DATA_FILES), \
 	    $(call make-command,$(INSTALL_DATA) $(INSTALL_OPTS) utils/haddock/$i "$(DESTDIR)$(ghclibdir)/$(dir $i)"))
 
-ifeq "$(Windows)" "NO"
-install: install_haddock_link
-.PNONY: install_haddock_link
-install_haddock_link:
+.PHONY: install_utils/haddock_link
+install_utils/haddock_link:
 	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/haddock"
 	$(LN_S) haddock-$(ProjectVersion) "$(DESTDIR)$(bindir)/haddock"
-endif
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/,$(utils/haddock_dist_DATA_FILES))
 
