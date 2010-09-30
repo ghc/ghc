@@ -132,7 +132,14 @@ RUNTEST_OPTS +=  \
 	-e 'config.timeout=int($(TIMEOUT)) or config.timeout' \
 	-e 'config.timeout_prog="$(TIMEOUT_PROGRAM)"' \
 	-e 'config.exeext="$(exeext)"' \
-	-e 'config.top="$(TOP_ABS)"' \
+	-e 'config.top="$(TOP_ABS)"'
+
+ifneq "$(OUTPUT_SUMMARY)" ""
+RUNTEST_OPTS +=  \
+	--output-summary "$(OUTPUT_SUMMARY)"
+endif
+
+RUNTEST_OPTS +=  \
 	$(EXTRA_RUNTEST_OPTS)
 
 ifeq "$(fast)" "YES"
