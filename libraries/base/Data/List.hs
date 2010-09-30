@@ -410,6 +410,8 @@ intersect               =  intersectBy (==)
 
 -- | The 'intersectBy' function is the non-overloaded version of 'intersect'.
 intersectBy             :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+intersectBy _  [] _     =  []
+intersectBy _  _  []    =  []
 intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 
 -- | The 'intersperse' function takes an element and a list and
