@@ -15,11 +15,11 @@ utils/hp2ps_dist_C_SRCS = AreaBelow.c Curves.c Error.c Main.c \
                           HpFile.c Marks.c Scale.c TraceElement.c \
                           Axes.c Dimensions.c Key.c PsFile.c Shade.c \
                           Utilities.c
+utils/hp2ps_dist_EXTRA_LIBRARIES = m
 utils/hp2ps_dist_PROG    = hp2ps$(exeext)
 utils/hp2ps_dist_INSTALL = YES
 
 utils/hp2ps_CC_OPTS += -Iincludes
-utils/hp2ps_CC_OPTS += -lm
 
 $(eval $(call build-prog,utils/hp2ps,dist,0))
 
