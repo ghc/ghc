@@ -45,7 +45,7 @@ endif
 include mk/custom-settings.mk
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help install-docs,$(MAKECMDGOALS))
+REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help install-docs test fulltest,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -119,3 +119,12 @@ install-docs:
 .NOTPARALLEL:
 
 endif
+
+.PHONY: test
+test:
+	$(MAKE) -C testsuite/tests/ghc-regress CLEANUP=1 OUTPUT_SUMMARY=../../../testsuite_summary.txt fast
+
+.PHONY: fulltest
+fulltest:
+	$(MAKE) -C testsuite/tests/ghc-regress CLEANUP=1 OUTPUT_SUMMARY=../../../testsuite_summary.txt
+
