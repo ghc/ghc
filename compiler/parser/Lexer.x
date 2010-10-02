@@ -140,7 +140,7 @@ haskell :-
 
 -- everywhere: skip whitespace and comments
 $white_no_nl+ 				;
-$tab+         { warn Opt_WarnTabs (text "Tab character") }
+$tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out
 -- pragmas, "{-#", so that we don't accidentally treat them as comments.
