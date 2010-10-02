@@ -10,11 +10,6 @@ import Prelude hiding (catch)
 
 import Control.Exception
 
-#if __GLASGOW_HASKELL__ < 613
-mask_ :: ((IO a -> IO a) -> IO b) -> IO b
-mask_ f = block (f unblock)
-#endif
-
 catchIO :: IO a -> (IOException -> IO a) -> IO a
 catchIO = catch
 
