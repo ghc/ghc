@@ -894,7 +894,8 @@ changeDirectory "" = do
 changeDirectory dir = do
   graph <- GHC.getModuleGraph
   when (not (null graph)) $
-        outputStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
+        do liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,"
+           liftIO $ putStrLn "because the search path has changed."
   prev_context <- GHC.getContext
   GHC.setTargets []
   _ <- GHC.load LoadAllTargets
