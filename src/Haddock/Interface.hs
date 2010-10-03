@@ -165,9 +165,9 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       let (haddockable, haddocked) = ifaceHaddockCoverage interface
           percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
           coveragemsg = printf "haddock coverage for %s: %7s %3d%%"
-                        (ifaceOrigFilename interface)
-                        (printf "%d/%d" haddocked haddockable ::  String)
-                        percentage
+                          (ifaceOrigFilename interface)
+                          (printf "%d/%d" haddocked haddockable ::  String)
+                          percentage
       out verbosity normal coveragemsg
       interface' <- liftIO $ evaluate interface
       return (Just interface')
