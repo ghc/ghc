@@ -497,12 +497,12 @@ zonkTcTypeCarefully ty
       | otherwise
       = ASSERT( isTcTyVar tv )
     	case tcTyVarDetails tv of
-    	  SkolemTv {}  -> return (TyVarTy tv)
+    	  SkolemTv {}    -> return (TyVarTy tv)
     	  FlatSkol ty  -> zonkType (zonk_tv env_tvs) ty
-    	  MetaTv _ ref -> do { cts <- readMutVar ref
-			     ; case cts of    
-			         Flexi       -> return (TyVarTy tv)
-			         Indirect ty -> zonkType (zonk_tv env_tvs) ty }
+    	  MetaTv _ ref   -> do { cts <- readMutVar ref
+			       ; case cts of    
+			           Flexi       -> return (TyVarTy tv)
+			           Indirect ty -> zonkType (zonk_tv env_tvs) ty }
 
 zonkTcType :: TcType -> TcM TcType
 -- Simply look through all Flexis
@@ -513,12 +513,12 @@ zonkTcTyVar :: TcTyVar -> TcM TcType
 zonkTcTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      SkolemTv {}  -> return (TyVarTy tv)
+      SkolemTv {}    -> return (TyVarTy tv)
       FlatSkol ty  -> zonkTcType ty
-      MetaTv _ ref -> do { cts <- readMutVar ref
-			 ; case cts of    
-			     Flexi       -> return (TyVarTy tv)
-			     Indirect ty -> zonkTcType ty }
+      MetaTv _ ref   -> do { cts <- readMutVar ref
+			   ; case cts of    
+			       Flexi       -> return (TyVarTy tv)
+			       Indirect ty -> zonkTcType ty }
 
 zonkTcTypeAndSubst :: TvSubst -> TcType -> TcM TcType
 -- Zonk, and simultaneously apply a non-necessarily-idempotent substitution
@@ -526,12 +526,12 @@ zonkTcTypeAndSubst subst ty = zonkType zonk_tv ty
   where
     zonk_tv tv 
       = case tcTyVarDetails tv of
-      	  SkolemTv {}  -> return (TyVarTy tv)
-      	  FlatSkol ty  -> zonkType zonk_tv ty
-      	  MetaTv _ ref -> do { cts <- readMutVar ref
-			     ; case cts of    
-			         Flexi       -> zonk_flexi tv
-			         Indirect ty -> zonkType zonk_tv ty }
+      	  SkolemTv {}    -> return (TyVarTy tv)
+      	  FlatSkol ty    -> zonkType zonk_tv ty
+      	  MetaTv _ ref   -> do { cts <- readMutVar ref
+			       ; case cts of    
+			           Flexi       -> zonk_flexi tv
+			           Indirect ty -> zonkType zonk_tv ty }
     zonk_flexi tv
       = case lookupTyVar subst tv of
           Just ty -> zonkType zonk_tv ty
@@ -750,12 +750,12 @@ mkZonkTcTyVar :: (TcTyVar -> TcM Type)	-- What to do for an unbound mutable var
 mkZonkTcTyVar unbound_var_fn tyvar 
   = ASSERT( isTcTyVar tyvar )
     case tcTyVarDetails tyvar of
-      SkolemTv {}  -> return (TyVarTy tyvar)
-      FlatSkol ty  -> zonkType (mkZonkTcTyVar unbound_var_fn) ty
-      MetaTv _ ref -> do { cts <- readMutVar ref
-			 ; case cts of    
-			     Flexi       -> unbound_var_fn tyvar  
-			     Indirect ty -> zonkType (mkZonkTcTyVar unbound_var_fn) ty }
+      SkolemTv {}    -> return (TyVarTy tyvar)
+      FlatSkol ty    -> zonkType (mkZonkTcTyVar unbound_var_fn) ty
+      MetaTv _ ref   -> do { cts <- readMutVar ref
+			   ; case cts of    
+			       Flexi       -> unbound_var_fn tyvar  
+			       Indirect ty -> zonkType (mkZonkTcTyVar unbound_var_fn) ty }
 
 -- Zonk the kind of a non-TC tyvar in case it is a coercion variable 
 -- (their kind contains types).

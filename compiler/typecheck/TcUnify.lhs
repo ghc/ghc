@@ -889,9 +889,8 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 --    (checkTauTvUpdate tv ty)
 -- We are about to update the TauTv tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
---       (b) that ty is a monotype
---	 (c) that kind(ty) is a sub-kind of kind(tv)
---       (d) that ty does not contain any type families, see Note [SHARING]
+--	 (b) that kind(ty) is a sub-kind of kind(tv)
+--       (c) that ty does not contain any type families, see Note [Type family sharing]
 -- 
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with, 
@@ -914,8 +913,10 @@ checkTauTvUpdate tv ty
          then return (Just ty')
          else return Nothing }
   where ok :: TcType -> Bool 
-        -- Check that tv is not among the free variables of 
-        -- the type and that the type is type-family-free. 
+        -- Check that (a) tv is not among the free variables of 
+        -- the type and that (b) the type is type-family-free.
+        -- Reason: Note [Type family sharing]  
+        ok ty1 | Just ty1' <- tcView ty1 = ok ty1'  
         ok (TyVarTy tv')      = not (tv == tv') 
         ok (TyConApp tc tys)  = all ok tys && not (isSynFamilyTyCon tc)
         ok (PredTy sty)       = ok_pred sty 
@@ -929,7 +930,7 @@ checkTauTvUpdate tv ty
 
 \end{code}
 
-Note [SHARING]
+Note [Type family sharing]
 ~~~~~~~~~~~~~~ 
 We must avoid eagerly unifying type variables to types that contain function symbols, 
 because this may lead to loss of sharing, and in turn, in very poor performance of the

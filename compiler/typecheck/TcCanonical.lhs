@@ -1,6 +1,7 @@
 \begin{code}
 module TcCanonical(
-    mkCanonical, mkCanonicals, canWanteds, canGivens, canOccursCheck 
+    mkCanonical, mkCanonicals, canWanteds, canGivens, canOccursCheck, 
+    canEq
  ) where
 
 #include "HsVersions.h"

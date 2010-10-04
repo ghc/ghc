@@ -7,10 +7,12 @@ module TcInteract (
 
 #include "HsVersions.h"
 
+
 import BasicTypes 
 import TcCanonical
 import VarSet
 import Type
+import TypeRep 
 
 import Id 
 import Var
@@ -34,6 +36,9 @@ import TcRnTypes
 import TcErrors
 import TcSMonad 
 import qualified Bag as Bag
+import qualified Data.Map as Map 
+import Maybes 
+
 import Control.Monad( zipWithM, unless )
 import FastString ( sLit ) 
 import DynFlags
@@ -79,10 +84,84 @@ implication constraint (when in top-level inference mode).
 \begin{code}
 
 -- See Note [InertSet invariants]
+data InertSet 
+  = IS { inert_cts  :: Bag.Bag CanonicalCt 
+       , inert_fsks :: Map.Map TcTyVar [(TcTyVar,Coercion)] }
+-- inert_fsks contains the *FlattenSkolem* equivalence classes. 
+-- inert_fsks extra invariants: 
+--    (a) all TcTyVars in the domain and range of inert_fsks are flatten skolems
+--    (b) for every mapping tv1 |-> (tv2,co), co : tv2 ~ tv1 
 
-newtype InertSet = IS (Bag.Bag CanonicalCt)
+-- newtype InertSet = IS (Bag.Bag CanonicalCt)
 instance Outputable InertSet where
-  ppr (IS cts) = vcat (map ppr (Bag.bagToList cts))
+  ppr is = vcat [ vcat (map ppr (Bag.bagToList $ inert_cts is))
+                , vcat (map (\(v,rest) -> ppr v <+> text "|->" <+> hsep (map (ppr.fst) rest)) 
+                       (Map.toList $ inert_fsks is)
+                       )
+                ]
+                       
+
+
+emptyInert :: InertSet
+emptyInert = IS { inert_cts = Bag.emptyBag, inert_fsks = Map.empty } 
+
+
+extendInertSet :: InertSet -> AtomicInert -> InertSet
+-- Simply extend the bag of constraints rebuilding an inert set
+extendInertSet (IS { inert_cts  = cts
+                   , inert_fsks = fsks }) item 
+  = IS { inert_cts  = cts `Bag.snocBag` item 
+       , inert_fsks = fsks }
+
+
+updInertSet :: InertSet -> AtomicInert -> InertSet 
+-- Introduces an element in the inert set for the first time 
+updInertSet (IS { inert_cts = cts, inert_fsks = fsks })  
+            item@(CTyEqCan { cc_id    = cv
+                           , cc_tyvar = tv1 
+                           , cc_rhs   = xi })
+  | Just tv2 <- tcGetTyVar_maybe xi,
+    FlatSkol {} <- tcTyVarDetails tv1, 
+    FlatSkol {} <- tcTyVarDetails tv2 
+  = let cts'  = cts `Bag.snocBag` item 
+        fsks' = Map.insertWith (++) tv2 [(tv1, mkCoVarCoercion cv)] fsks
+    in IS { inert_cts = cts', inert_fsks = fsks' }
+updInertSet (IS { inert_cts = cts
+                , inert_fsks = fsks }) item 
+  = let cts' = cts `Bag.snocBag` item
+    in IS { inert_cts = cts', inert_fsks = fsks } 
+
+
+foldlInertSetM :: (Monad m) => (a -> AtomicInert -> m a) -> a -> InertSet -> m a 
+foldlInertSetM k z (IS { inert_cts = cts }) 
+  = Bag.foldlBagM k z cts
+
+extractUnsolved :: InertSet -> (InertSet, CanonicalCts)
+extractUnsolved is@(IS {inert_cts = cts}) 
+  = (is { inert_cts = cts'}, unsolved)
+  where (unsolved, cts') = Bag.partitionBag isWantedCt cts
+
+
+getFskEqClass :: InertSet -> TcTyVar -> [(TcTyVar,Coercion)] 
+-- Precondition: tv is a FlatSkol 
+getFskEqClass (IS { inert_cts = cts, inert_fsks = fsks }) tv 
+  = case lkpTyEqCanByLhs of
+      Nothing  -> fromMaybe [] (Map.lookup tv fsks)  
+      Just ceq -> 
+        case tcGetTyVar_maybe (cc_rhs ceq) of 
+          Just tv_rhs | FlatSkol {} <- tcTyVarDetails tv_rhs
+            -> let ceq_co = mkSymCoercion $ mkCoVarCoercion (cc_id ceq)
+                   mk_co (v,c) = (v, mkTransCoercion c ceq_co)
+               in (tv_rhs, ceq_co): map mk_co (fromMaybe [] $ Map.lookup tv fsks) 
+          _ -> []
+  where lkpTyEqCanByLhs = Bag.foldlBag lkp Nothing cts 
+        lkp :: Maybe CanonicalCt -> CanonicalCt -> Maybe CanonicalCt 
+        lkp Nothing ct@(CTyEqCan {cc_tyvar = tv'}) | tv' == tv = Just ct 
+        lkp other _ct = other 
+
+
+isWantedCt :: CanonicalCt -> Bool 
+isWantedCt ct = isWanted (cc_flavor ct)
 
 {- TODO: Later ...
 data Inert = IS { class_inerts :: FiniteMap Class Atomics
@@ -94,22 +173,6 @@ data Inert = IS { class_inerts :: FiniteMap Class Atomics
 Later should we also separate out givens and wanteds?
 -}
 
-emptyInert :: InertSet
-emptyInert = IS Bag.emptyBag
-
-extendInertSet :: InertSet -> AtomicInert -> InertSet
-extendInertSet (IS cts) item = IS (cts `Bag.snocBag` item)
-
-foldlInertSetM :: (Monad m) => (a -> AtomicInert -> m a) -> a -> InertSet -> m a 
-foldlInertSetM k z (IS cts) = Bag.foldlBagM k z cts
-
-extractUnsolved :: InertSet -> (InertSet, CanonicalCts)
-extractUnsolved (IS cts)
-  = (IS cts', unsolved)
-  where (unsolved, cts') = Bag.partitionBag isWantedCt cts
-
-isWantedCt :: CanonicalCt -> Bool 
-isWantedCt ct = isWanted (cc_flavor ct)
 \end{code}
 
 Note [Touchables and givens]
@@ -172,9 +235,9 @@ Note [Basic plan]
 
 type AtomicInert = CanonicalCt     -- constraint pulled from InertSet
 type WorkItem    = CanonicalCt     -- constraint pulled from WorkList
-type SWorkItem   = WorkItem        -- a work item we know is solved
 
 type WorkList    = CanonicalCts    -- A mixture of Given, Wanted, and Solved
+type SWorkList   = WorkList        -- A worklist of solved 
                    
 
 listToWorkList :: [WorkItem] -> WorkList
@@ -191,6 +254,9 @@ isEmptyWorkList = Bag.isEmptyBag
 
 emptyWorkList :: WorkList
 emptyWorkList = Bag.emptyBag
+
+singletonWorkList :: CanonicalCt -> WorkList 
+singletonWorkList ct = singleCCan ct 
 
 data StopOrContinue 
   = Stop			-- Work item is consumed
@@ -238,7 +304,7 @@ runSolverPipeline pipeline inerts workItem
        ; let new_inert 
               = case sr_stop itr_out of 
        	          Stop              -> sr_inerts itr_out
-                  ContinueWith item -> sr_inerts itr_out `extendInertSet` item
+                  ContinueWith item -> sr_inerts itr_out `updInertSet` item
        ; return (new_inert, sr_new_work itr_out) }
   where 
     run_pipeline :: [(String, SimplifierStage)]
@@ -349,14 +415,19 @@ thePipeline = [ ("interact with inerts", interactWithInertsStage)
 \begin{code}
 spontaneousSolveStage :: SimplifierStage 
 spontaneousSolveStage workItem inerts 
-  = do { mSolve <- trySpontaneousSolve workItem 
+  = do { mSolve <- trySpontaneousSolve workItem inerts 
        ; case mSolve of 
            Nothing -> -- no spontaneous solution for him, keep going
                return $ SR { sr_new_work   = emptyWorkList 
                            , sr_inerts     = inerts 
                            , sr_stop       = ContinueWith workItem }
 
-           Just workItem' -- He has been solved; workItem' is a Given
+           Just workList' -> -- He has been solved; workList' are all givens 
+               return $ SR { sr_new_work = workList'
+                           , sr_inerts   = inerts 
+                           , sr_stop     = Stop } 
+       }
+{--
                | isWantedCt workItem 
                            -- Original was wanted we have now made him given so 
                            -- we have to ineract him with the inerts again because 
@@ -382,54 +453,56 @@ spontaneousSolveStage workItem inerts
                    -> return $ SR { sr_new_work   = emptyWorkList 
                                   , sr_inerts     = inerts `extendInertSet` workItem' 
                                   , sr_stop       = Stop } }
+--} 
 
 -- @trySpontaneousSolve wi@ solves equalities where one side is a
 -- touchable unification variable. Returns:
 --   * Nothing if we were not able to solve it
 --   * Just wi' if we solved it, wi' (now a "given") should be put in the work list.
 --     	    See Note [Touchables and givens] 
-trySpontaneousSolve :: WorkItem -> TcS (Maybe SWorkItem)
-trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_rhs = xi }) 
+-- Note, just passing the inerts through for the skolem equivalence classes
+trySpontaneousSolve :: WorkItem -> InertSet -> TcS (Maybe SWorkList)
+trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_rhs = xi }) inerts 
   | Just tv2 <- tcGetTyVar_maybe xi
   = do { tch1 <- isTouchableMetaTyVar tv1
        ; tch2 <- isTouchableMetaTyVar tv2
        ; case (tch1, tch2) of
-           (True,  True)  -> trySpontaneousEqTwoWay cv gw tv1 tv2
-           (True,  False) -> trySpontaneousEqOneWay cv gw tv1 xi
+           (True,  True)  -> trySpontaneousEqTwoWay inerts cv gw tv1 tv2
+           (True,  False) -> trySpontaneousEqOneWay inerts cv gw tv1 xi
            (False, True)  | tyVarKind tv1 `isSubKind` tyVarKind tv2
-                          -> trySpontaneousEqOneWay cv gw tv2 (mkTyVarTy tv1)
+                          -> trySpontaneousEqOneWay inerts cv gw tv2 (mkTyVarTy tv1)
 	   _ -> return Nothing }
   | otherwise
   = do { tch1 <- isTouchableMetaTyVar tv1
-       ; if tch1 then trySpontaneousEqOneWay cv gw tv1 xi
+       ; if tch1 then trySpontaneousEqOneWay inerts cv gw tv1 xi
                  else return Nothing }
 
   -- No need for 
   --      trySpontaneousSolve (CFunEqCan ...) = ...
   -- See Note [No touchables as FunEq RHS] in TcSMonad
-trySpontaneousSolve _ = return Nothing 
+trySpontaneousSolve _ _ = return Nothing 
 
 ----------------
-trySpontaneousEqOneWay :: CoVar -> CtFlavor -> TcTyVar -> Xi
-                       -> TcS (Maybe SWorkItem)
+trySpontaneousEqOneWay :: InertSet -> CoVar -> CtFlavor -> TcTyVar -> Xi
+                       -> TcS (Maybe SWorkList)
 -- tv is a MetaTyVar, not untouchable
 -- Precondition: kind(xi) is a sub-kind of kind(tv)
-trySpontaneousEqOneWay cv gw tv xi	
+trySpontaneousEqOneWay inerts cv gw tv xi	
   | not (isSigTyVar tv) || isTyVarTy xi
-  = solveWithIdentity cv gw tv xi
+  = solveWithIdentity inerts cv gw tv xi
   | otherwise
   = return Nothing
 
 ----------------
-trySpontaneousEqTwoWay :: CoVar -> CtFlavor -> TcTyVar -> TcTyVar
-                       -> TcS (Maybe SWorkItem)
+trySpontaneousEqTwoWay :: InertSet -> CoVar -> CtFlavor -> TcTyVar -> TcTyVar
+                       -> TcS (Maybe SWorkList)
 -- Both tyvars are *touchable* MetaTyvars
 -- By the CTyEqCan invariant, k2 `isSubKind` k1
-trySpontaneousEqTwoWay cv gw tv1 tv2
+trySpontaneousEqTwoWay inerts cv gw tv1 tv2
   | k1 `eqKind` k2
-  , nicer_to_update_tv2 = solveWithIdentity cv gw tv2 (mkTyVarTy tv1)
+  , nicer_to_update_tv2 = solveWithIdentity inerts cv gw tv2 (mkTyVarTy tv1)
   | otherwise           = ASSERT( k2 `isSubKind` k1 )
-                          solveWithIdentity cv gw tv1 (mkTyVarTy tv2)
+                          solveWithIdentity inerts cv gw tv1 (mkTyVarTy tv2)
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
@@ -478,53 +551,166 @@ all about unifying or spontaneously solving (F xis ~ alpha) by unification.
 
 \begin{code}
 ----------------
-solveWithIdentity :: CoVar -> CtFlavor -> TcTyVar -> Xi -> TcS (Maybe SWorkItem)
+solveWithIdentity :: InertSet 
+                  -> CoVar -> CtFlavor -> TcTyVar -> Xi 
+                  -> TcS (Maybe SWorkList)
 -- Solve with the identity coercion 
 -- Precondition: kind(xi) is a sub-kind of kind(tv)
 -- See [New Wanted Superclass Work] to see why we do this for *given* as well
-solveWithIdentity cv gw tv xi 
-  | tv `elemVarSet` tyVarsOfUnflattenedType xi 
-       		    -- Beware of Note [Loopy spontaneous solving] 
-                    -- Can't spontaneously solve loopy equalities
-                    -- though they are not a type error 
-  = return Nothing 
-  | not (isGiven gw) -- Wanted or Derived 
-  = do { traceTcS "Sneaky unification:" $ 
-         vcat [text "Coercion variable:  " <+> ppr gw, 
-               text "Coercion:           " <+> pprEq (mkTyVarTy tv) xi,
-               text "Left  Kind is     : " <+> ppr (typeKind (mkTyVarTy tv)),
-               text "Right Kind is     : " <+> ppr (typeKind xi)
-              ]
-       ; setWantedTyBind tv xi                  -- Set tv := xi
-       ; cv_given <- newGivOrDerCoVar (mkTyVarTy tv) xi xi  
-                                                -- Create new given with identity evidence
+solveWithIdentity inerts cv gw tv xi 
+  | not (isGiven gw)
+  = do { m <- passOccursCheck inerts tv xi 
+       ; case m of 
+           Nothing -> return Nothing 
+           Just (xi_unflat,coi) -- coi : xi_unflat ~ xi  
+               -> do { traceTcS "Sneaky unification:" $ 
+                       vcat [text "Coercion variable:  " <+> ppr gw, 
+                             text "Coercion:           " <+> pprEq (mkTyVarTy tv) xi,
+                             text "Left  Kind is     : " <+> ppr (typeKind (mkTyVarTy tv)),
+                             text "Right Kind is     : " <+> ppr (typeKind xi)
+                            ]
+                     ; setWantedTyBind tv xi_unflat        -- Set tv := xi_unflat
+                     ; cv_given <- newGivOrDerCoVar (mkTyVarTy tv) xi_unflat xi_unflat
+                     ; let flav = mkGivenFlavor gw UnkSkol 
+                     ; (cts, co) <- case coi of 
+                         ACo co  -> do { can_eqs <- canEq flav cv_given (mkTyVarTy tv) xi_unflat
+                                       ; return (can_eqs, co) }
+                         IdCo co -> return $ 
+                                    (singleCCan (CTyEqCan { cc_id = cv_given 
+                                                          , cc_flavor = mkGivenFlavor gw UnkSkol
+                                                          , cc_tyvar = tv, cc_rhs = xi }
+                                                          -- xi, *not* xi_unflat! 
+                                                ), co)
+                     ; case gw of 
+                         Wanted  {} -> setWantedCoBind  cv co
+                         Derived {} -> setDerivedCoBind cv co 
+                         _          -> pprPanic "Can't spontaneously solve *given*" empty 
 
-       ; case gw of 
-           Wanted  {} -> setWantedCoBind  cv xi 
-           Derived {} -> setDerivedCoBind cv xi 
-           _          -> pprPanic "Can't spontaneously solve *given*" empty 
-
-       ; let solved = CTyEqCan { cc_id = cv_given
-                               , cc_flavor = mkGivenFlavor gw UnkSkol
-                               , cc_tyvar = tv, cc_rhs = xi }
        -- See Note [Avoid double unifications] 
 
        -- The reason that we create a new given variable (cv_given) instead of reusing cv
        -- is because we do not want to end up with coercion unification variables in the givens.
-       ; return (Just solved) }
-  | otherwise        -- Given 
+                     ; return (Just cts) } 
+       }
+  | otherwise 
   = return Nothing 
 
-tyVarsOfUnflattenedType :: TcType -> TcTyVarSet
--- A version of tyVarsOfType which looks through flatSkols
-tyVarsOfUnflattenedType ty
-  = foldVarSet (unionVarSet . do_tv) emptyVarSet (tyVarsOfType ty)
-  where
-    do_tv :: TyVar -> TcTyVarSet
-    do_tv tv = ASSERT( isTcTyVar tv)
-               case tcTyVarDetails tv of 
-                  FlatSkol ty -> tyVarsOfUnflattenedType ty
-                  _           -> unitVarSet tv 
+
+passOccursCheck :: InertSet -> TcTyVar -> TcType -> TcS (Maybe (TcType,CoercionI))
+-- passOccursCheck inerts tv ty 
+-- Traverse the type and make sure that 'tv' does not appear under 
+-- some flatten skolem. If it appears under some flatten skolem 
+-- look in that flatten skolem equivalence class to see if you can 
+-- find a different flatten skolem to use, which does not mention the 
+-- variable.
+-- Postcondition: Just (ty',coi) <- passOccursCheck tv ty 
+--       coi :: ty' ~ ty 
+-- NB: I believe there is no need to do the tcView thing here
+passOccursCheck is tv (TyConApp tc tys) 
+  = do { tys_mbs <- mapM (passOccursCheck is tv) tys 
+       ; case allMaybes tys_mbs of 
+           Nothing -> return Nothing 
+           Just tys_cois -> 
+               let (tys',cois') = unzip tys_cois
+               in return $ 
+                  Just (TyConApp tc tys', mkTyConAppCoI tc cois')
+       }
+passOccursCheck is tv (PredTy sty) 
+  = do { sty_mb <- passOccursCheckPred tv sty 
+       ; case sty_mb of 
+           Nothing -> return Nothing 
+           Just (sty',coi) -> return (Just (PredTy sty', coi))
+       }
+  where passOccursCheckPred tv (ClassP cn tys)
+          = do { tys_mbs <- mapM (passOccursCheck is tv) tys 
+               ; case allMaybes tys_mbs of 
+                   Nothing -> return Nothing 
+                   Just tys_cois -> 
+                       let (tys', cois') = unzip tys_cois 
+                       in return $ 
+                          Just (ClassP cn tys', mkClassPPredCoI cn cois') 
+               }
+        passOccursCheckPred tv (IParam nm ty)   
+          = do { mty <- passOccursCheck is tv ty 
+               ; case mty of 
+                   Nothing -> return Nothing 
+                   Just (ty',co') 
+                       -> return (Just (IParam nm ty', 
+                                               mkIParamPredCoI nm co')) 
+               }
+        passOccursCheckPred tv (EqPred ty1 ty2) 
+          = do { mty1 <- passOccursCheck is tv ty1 
+               ; mty2 <- passOccursCheck is tv ty2 
+               ; case (mty1,mty2) of 
+                   (Just (ty1',coi1), Just (ty2',coi2))
+                       -> return $ 
+                          Just (EqPred ty1' ty2', mkEqPredCoI coi1 coi2)
+                   _ -> return Nothing 
+               }
+                           
+passOccursCheck is tv (FunTy arg res) 
+  = do { arg_mb <- passOccursCheck is tv arg 
+       ; res_mb <- passOccursCheck is tv res
+       ; case (arg_mb,res_mb) of 
+           (Just (arg',coiarg), Just (res',coires)) 
+               -> return $ 
+                  Just (FunTy arg' res', mkFunTyCoI coiarg coires)
+           _ -> return Nothing 
+       }
+
+passOccursCheck is tv (AppTy fun arg) 
+  = do { fun_mb <- passOccursCheck is tv fun 
+       ; arg_mb <- passOccursCheck is tv arg 
+       ; case (fun_mb,arg_mb) of 
+           (Just (fun',coifun), Just (arg',coiarg)) 
+               -> return $ 
+                  Just (AppTy fun' arg', mkAppTyCoI coifun coiarg)
+           _ -> return Nothing 
+       }
+
+passOccursCheck is tv (ForAllTy tv1 ty1) 
+  = do { ty1_mb <- passOccursCheck is tv ty1 
+       ; case ty1_mb of 
+           Nothing -> return Nothing 
+           Just (ty1',coi) 
+               -> return $ 
+                  Just (ForAllTy tv1 ty1', mkForAllTyCoI tv1 coi)
+       }
+
+passOccursCheck _is tv (TyVarTy tv') 
+  | tv == tv' 
+  = return Nothing 
+
+passOccursCheck is tv (TyVarTy fsk) 
+  | FlatSkol ty <- tcTyVarDetails fsk 
+  = do { zty <- zonkFlattenedType ty -- Must zonk as it contains unif. vars
+       ; occ <- passOccursCheck is tv zty 
+       ; case occ of 
+           Nothing         -> go_down_eq_class $ getFskEqClass is fsk
+           Just (zty',ico) -> return $ Just (zty',ico) 
+       }
+  where go_down_eq_class [] = return Nothing 
+        go_down_eq_class ((fsk1,co1):rest) 
+          = do { occ1 <- passOccursCheck is tv (TyVarTy fsk1)
+               ; case occ1 of 
+                   Nothing -> go_down_eq_class rest 
+                   Just (ty1,co1i') 
+                     -> return $ Just (ty1, mkTransCoI co1i' (ACo co1)) }  
+passOccursCheck _is _tv ty 
+  = return (Just (ty,IdCo ty))  
+
+{-- 
+Problematic situation: 
+~~~~~~~~~~~~~~~~~~~~~~
+ Suppose we have a flatten skolem f1 := F f6
+ Suppose we are chasing for 'alpha', and: 
+       f6 := G alpha with eq.class f7,f8 
+
+ Then we will return F f7 potentially. 
+--} 
+
+
+
 \end{code}
 
 
@@ -586,13 +772,14 @@ interactWithInertsStage workItem inert
                  , sr_new_work = emptyCCan
                  , sr_stop     = ContinueWith workItem }
 
+
     interactNext :: StageResult -> AtomicInert -> TcS StageResult 
     interactNext it inert  
       | ContinueWith workItem <- sr_stop it
         = do { ir <- interactWithInert inert workItem 
              ; let inerts = sr_inerts it 
              ; return $ SR { sr_inerts   = if ir_inert_action ir == KeepInert
-                                           then inerts `extendInertSet` inert
+                                           then inerts `updInertSet` inert
                                            else inerts
                            , sr_new_work = sr_new_work it `unionWorkLists` ir_new_work ir
                            , sr_stop     = ir_stop ir } }
@@ -600,7 +787,7 @@ interactWithInertsStage workItem inert
     
                              
     itrAddInert :: AtomicInert -> StageResult -> StageResult
-    itrAddInert inert itr = itr { sr_inerts = (sr_inerts itr) `extendInertSet` inert }
+    itrAddInert inert itr = itr { sr_inerts = (sr_inerts itr) `updInertSet` inert }
 
 -- Do a single interaction of two constraints.
 interactWithInert :: AtomicInert -> WorkItem -> TcS InteractResult
@@ -766,21 +953,14 @@ doInteractWithInert (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
   where
     lhss_match = tc1 == tc2 && and (zipWith tcEqType args1 args2) 
 
-doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc_rhs = xi1 }) 
+doInteractWithInert 
+           inert@(CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc_rhs = xi1 }) 
            workItem@(CTyEqCan { cc_id = cv2, cc_flavor = fl2, cc_tyvar = tv2, cc_rhs = xi2 })
 -- Check for matching LHS 
   | fl1 `canRewrite` fl2 && tv1 == tv2 
   = do { cans <- rewriteEqLHS LeftComesFromInert (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStop KeepInert cans } 
 
-{-
-  | fl1 `canRewrite` fl2			-- If at all possible, keep the inert, 
-  , Just tv1_rhs <- tcGetTyVar_maybe xi1	-- special case of inert a~b
-  , tv1_rhs == tv2
-  = do { cans <- rewriteEqLHS (mkSymCoercion (mkCoVarCoercion cv1), mkTyVarTy tv1) 
-                              (cv2,fl2,xi2) 
-       ; mkIRStop KeepInert cans } 
--}
   | fl2 `canRewrite` fl1 && tv1 == tv2 
   = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue workItem DropInert cans } 
@@ -792,6 +972,16 @@ doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc
   | fl2 `canRewrite` fl1 && tv2 `elemVarSet` tyVarsOfType xi1
   = do { rewritten_eq <- rewriteEqRHS (cv2,tv2,xi2) (cv1,fl1,tv1,xi1) 
        ; mkIRContinue workItem DropInert rewritten_eq } 
+-- Finally, if workitem is a flatten equivalence class constraint and the 
+-- inert is a wanted constraints, even when the workitem cannot rewrite the 
+-- inert, drop the inert out because you may have to reconsider solving him 
+-- using the equivalence class you created. 
+
+  | not $ isGiven fl1,                  -- The inert is wanted or derived
+    isMetaTyVar tv1,                    -- and has a unification variable lhs
+    FlatSkol {} <- tcTyVarDetails tv2,  -- And workitem is a flatten skolem equality
+    Just tv2'   <- tcGetTyVar_maybe xi2, FlatSkol {} <- tcTyVarDetails tv2' 
+  = mkIRContinue workItem DropInert (singletonWorkList inert)
 
 
 -- Fall-through case for all other cases

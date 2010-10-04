@@ -35,6 +35,8 @@ module TcSMonad (
 
 
     newFlattenSkolemTy,                         -- Flatten skolems 
+    zonkFlattenedType, 
+
 
     instDFunTypes,                              -- Instantiation
     instDFunConstraints,                        
@@ -63,7 +65,6 @@ module TcSMonad (
 
 import HscTypes
 import BasicTypes 
-import Type
 
 import Inst
 import InstEnv 
@@ -83,6 +84,8 @@ import DynFlags
 import Coercion
 import Class
 import TyCon
+import TypeRep 
+
 import Name
 import Var
 import Outputable
@@ -570,8 +573,29 @@ newFlattenSkolemTy ty = mkTyVarTy <$> newFlattenSkolemTyVar ty
         newFlattenSkolemTyVar ty
             = wrapTcS $ do { uniq <- TcM.newUnique
                            ; let name = mkSysTvName uniq (fsLit "f")
-                           ; return $ mkTcTyVar name (typeKind ty) (FlatSkol ty)
+                           ; return $ 
+                             mkTcTyVar name (typeKind ty) (FlatSkol ty) 
                            }
+
+
+zonkFlattenedType :: TcType -> TcS TcType 
+zonkFlattenedType ty = wrapTcS (TcM.zonkTcType ty) 
+
+
+{-- 
+tyVarsOfUnflattenedType :: TcType -> TcTyVarSet
+-- A version of tyVarsOfType which looks through flatSkols
+tyVarsOfUnflattenedType ty
+  = foldVarSet (unionVarSet . do_tv) emptyVarSet (tyVarsOfType ty)
+  where
+    do_tv :: TyVar -> TcTyVarSet
+    do_tv tv = ASSERT( isTcTyVar tv)
+               case tcTyVarDetails tv of 
+                  FlatSkol _ ty -> tyVarsOfUnflattenedType ty
+                  _             -> unitVarSet tv 
+--} 
+
+
 
 -- Instantiations 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

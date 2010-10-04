@@ -274,17 +274,18 @@ TcBinds.tcInstSig, and its use_skols parameter.
 data TcTyVarDetails
   = SkolemTv SkolemInfo	  -- A skolem constant
 
-  | FlatSkol TcType	  -- The "skolem" obtained by flattening during
-    	                  -- constraint simplification
+  | FlatSkol TcType	  
+           -- The "skolem" obtained by flattening during
+    	   -- constraint simplification
     
-                          -- In comments we will use the notation alpha[flat = ty]
-                          -- to represent a flattening skolem variable alpha
-                          -- identified with type ty.
-
+           -- In comments we will use the notation alpha[flat = ty]
+           -- to represent a flattening skolem variable alpha
+           -- identified with type ty.
+          
   | MetaTv MetaInfo (IORef MetaDetails)
 
 data MetaDetails
-  = Flexi	-- Flexi type variables unify to become Indirects  
+  = Flexi  -- Flexi type variables unify to become Indirects  
   | Indirect TcType
 
 data MetaInfo 
@@ -405,7 +406,7 @@ kind_var_occ = mkOccName tvName "k"
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
 pprTcTyVarDetails (SkolemTv _)         = ptext (sLit "sk")
-pprTcTyVarDetails (FlatSkol _)         = ptext (sLit "fsk")
+pprTcTyVarDetails (FlatSkol {})        = ptext (sLit "fsk")
 pprTcTyVarDetails (MetaTv TauTv _)     = ptext (sLit "tau")
 pprTcTyVarDetails (MetaTv (SigTv _) _) = ptext (sLit "sig")
 
@@ -431,7 +432,7 @@ pprSkolTvBinding tv
     quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
   where
     ppr_details (SkolemTv info)      = ppr_skol info
-    ppr_details (FlatSkol _) 	     = ptext (sLit "is a flattening type variable")
+    ppr_details (FlatSkol {}) 	     = ptext (sLit "is a flattening type variable")
     ppr_details (MetaTv TauTv _)     = ptext (sLit "is a meta type variable")
     ppr_details (MetaTv (SigTv n) _) = ptext (sLit "is bound by the type signature for") <+> quotes (ppr n)
 
