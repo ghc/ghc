@@ -152,6 +152,10 @@ genCall :: LlvmEnv -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals
 
 -- Write barrier needs to be handled specially as it is implemented as an LLVM
 -- intrinsic function.
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
+genCall env (CmmPrim MO_WriteBarrier) _ _ _ = return (env, nilOL, [])
+
+#else
 genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
     let fname = fsLit "llvm.memory.barrier"
     let funSig = LlvmFunctionDecl fname ExternallyVisible CC_Ccc LMVoid
@@ -172,6 +176,7 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
     where
         lmTrue :: LlvmVar
         lmTrue  = LMLitVar $ LMIntLit (-1) i1
+#endif
 
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
