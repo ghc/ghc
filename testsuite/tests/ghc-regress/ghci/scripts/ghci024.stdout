@@ -13,8 +13,6 @@ active language flags:
   -XImplicitPrelude
 ~~~~~~~~~~ Testing :show packages
 active package flags: none
-packages currently loaded:
 ~~~~~~~~~~ Testing :show packages, including the ghc package
 active package flags:
   -package ghc
-packages currently loaded:
