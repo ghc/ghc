@@ -1534,23 +1534,21 @@ scavenge_static(void)
 static void
 scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
 {
-    nat i, b;
+    nat i, j, b;
     StgWord bitmap;
     
     b = 0;
-    bitmap = large_bitmap->bitmap[b];
-    for (i = 0; i < size; ) {
-	if ((bitmap & 1) == 0) {
-	    evacuate((StgClosure **)p);
-	}
-	i++;
-	p++;
-	if (i % BITS_IN(W_) == 0) {
-	    b++;
-	    bitmap = large_bitmap->bitmap[b];
-	} else {
+
+    for (i = 0; i < size; b++) {
+        bitmap = large_bitmap->bitmap[b];
+        j = stg_min(size-i, BITS_IN(W_));
+        i += j;
+        for (; j > 0; j--, p++) {
+            if ((bitmap & 1) == 0) {
+                evacuate((StgClosure **)p);
+            }
 	    bitmap = bitmap >> 1;
-	}
+        }            
     }
 }
 
