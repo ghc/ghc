@@ -74,3 +74,4 @@ test('T3263-2', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-fwarn-wr
 
 test('GadtOverlap', normal, compile, ['-Wall'])
 test('T2395', normal, compile, [''])
+test('T4371', normal, compile, [''])
