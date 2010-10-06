@@ -703,11 +703,11 @@ type GivenLoc  = CtLoc SkolemInfo
 
 data Implication
   = Implic {  
-      ic_env_tvs :: Untouchables, -- Untouchables: unification variables
+      ic_untch :: Untouchables, -- Untouchables: unification variables
                                   -- free in the environment
-      ic_env     :: TcTypeEnv,    -- The type environment
+      ic_env   :: TcTypeEnv,    -- The type environment
       		      	      	  -- Used only when generating error messages
-	  -- Generally, ic_env_tvs = tvsof(ic_env)
+	  -- Generally, ic_untch is a superset of tvsof(ic_env)
 	  -- However, we don't zonk ic_env when zonking the Implication
 	  -- Instead we do that when generating a skolem-escape error message
 
@@ -813,10 +813,10 @@ pprWantedEvVarWithLoc (WantedEvVar v loc) = hang (pprEvVarWithType v)
 pprWantedEvVar        (WantedEvVar v _)   = pprEvVarWithType v
 
 instance Outputable Implication where
-  ppr (Implic { ic_env_tvs = env_tvs, ic_skols = skols, ic_given = given
+  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_given = given
               , ic_wanted = wanted, ic_binds = binds, ic_loc = loc })
    = ptext (sLit "Implic") <+> braces 
-     (sep [ ptext (sLit "Untouchables = ") <+> ppr env_tvs
+     (sep [ ptext (sLit "Untouchables = ") <+> ppr untch
           , ptext (sLit "Skolems = ") <+> ppr skols
           , ptext (sLit "Given = ") <+> pprEvVars given
           , ptext (sLit "Wanted = ") <+> ppr wanted

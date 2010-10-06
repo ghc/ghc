@@ -964,8 +964,8 @@ setUntouchables untch_tvs thing_inside
   = updLclEnv (\ env -> env { tcl_untch = untch_tvs }) thing_inside 
 
 getUntouchables :: TcM TcTyVarSet 
-getUntouchables
-   = do { env <- getLclEnv; return (tcl_untch env) } 
+getUntouchables = do { env <- getLclEnv; return (tcl_untch env) } 
+   -- NB: no need to zonk this TcTyVarSet: they are, after all, untouchable!
 
 isUntouchable :: TcTyVar -> TcM Bool
 isUntouchable tv = do { env <- getLclEnv; return (tv `elemVarSet` tcl_untch env) }

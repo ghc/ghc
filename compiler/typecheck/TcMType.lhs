@@ -469,7 +469,7 @@ tcGetGlobalTyVars :: TcM TcTyVarSet
 tcGetGlobalTyVars
   = do { (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv
        ; gbl_tvs  <- readMutVar gtv_var
-       ; gbl_tvs' <- zonkTcTyVarsAndFV (varSetElems gbl_tvs)
+       ; gbl_tvs' <- zonkTcTyVarsAndFV gbl_tvs
        ; writeMutVar gtv_var gbl_tvs'
        ; return gbl_tvs' }
 \end{code}
@@ -480,8 +480,8 @@ tcGetGlobalTyVars
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
 
-zonkTcTyVarsAndFV :: [TcTyVar] -> TcM TcTyVarSet
-zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar tyvars
+zonkTcTyVarsAndFV :: TcTyVarSet -> TcM TcTyVarSet
+zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar (varSetElems tyvars)
 
 -----------------  Types
 
@@ -601,12 +601,12 @@ zonkQuantifiedTyVar tv
 
 \begin{code}
 zonkImplication :: Implication -> TcM Implication
-zonkImplication implic@(Implic { ic_env_tvs = env_tvs, ic_given = given 
+zonkImplication implic@(Implic { ic_untch = env_tvs, ic_given = given 
                                , ic_wanted = wanted })
-  = do { env_tvs' <- zonkTcTyVarsAndFV (varSetElems env_tvs)
+  = do { env_tvs' <- zonkTcTyVarsAndFV env_tvs
        ; given'   <- mapM zonkEvVar given
        ; wanted'  <- mapBagM zonkWanted wanted
-       ; return (implic { ic_env_tvs = env_tvs', ic_given = given'
+       ; return (implic { ic_untch = env_tvs', ic_given = given'
                         , ic_wanted = wanted' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar

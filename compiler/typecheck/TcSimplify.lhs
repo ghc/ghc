@@ -185,7 +185,7 @@ simplifyInfer :: Bool		    -- Apply monomorphism restriction
                       TcEvBinds)    -- ... binding these evidence variables
 simplifyInfer apply_mr tau_tvs wanted
   | isEmptyBag wanted	  -- Trivial case is quite common
-  = do { zonked_tau_tvs <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+  = do { zonked_tau_tvs <- zonkTcTyVarsAndFV tau_tvs
        ; gbl_tvs        <- tcGetGlobalTyVars	     -- Already zonked
        ; qtvs <- zonkQuantifiedTyVars (varSetElems (zonked_tau_tvs `minusVarSet` gbl_tvs))
        ; return (qtvs, [], emptyTcEvBinds) }
@@ -202,7 +202,7 @@ simplifyInfer apply_mr tau_tvs wanted
               <- simplifyAsMuchAsPossible SimplInfer zonked_wanted
 
        ; gbl_tvs <- tcGetGlobalTyVars
-       ; zonked_tau_tvs <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+       ; zonked_tau_tvs <- zonkTcTyVarsAndFV tau_tvs
        ; zonked_simples <- mapBagM zonkWantedEvVar simple_wanted
        ; let qtvs = findQuantifiedTyVars apply_mr zonked_simples zonked_tau_tvs gbl_tvs
              (bound, free) | apply_mr  = (emptyBag, zonked_simples)
@@ -512,7 +512,7 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
        ; rhs_binds_var@(EvBindsVar evb_ref _)  <- newTcEvBinds
        ; loc        <- getCtLoc (RuleSkol name)
        ; rhs_binds1 <- simplifyCheck SimplCheck $ unitBag $ WcImplic $ 
-             Implic { ic_env_tvs = emptyVarSet	  -- No untouchables
+             Implic { ic_untch = emptyVarSet	  -- No untouchables
              	    , ic_env = emptyNameEnv
              	    , ic_skols = mkVarSet tv_bndrs
              	    , ic_scoped = panic "emitImplication"
@@ -642,12 +642,12 @@ solveImplication :: InertSet     -- Given
 -- 
 -- Precondition: everything is zonked by now
 solveImplication inert 
-     imp@(Implic { ic_env_tvs = untch 
-                 , ic_binds   = ev_binds
-                 , ic_skols   = skols 
-                 , ic_given   = givens
+     imp@(Implic { ic_untch  = untch 
+                 , ic_binds  = ev_binds
+                 , ic_skols  = skols 
+                 , ic_given  = givens
                  , ic_wanted = wanteds
-                 , ic_loc = loc })
+                 , ic_loc    = loc })
   = nestImplicTcS ev_binds untch $
     do { traceTcS "solveImplication {" (ppr imp) 
 

@@ -413,12 +413,12 @@ newImplication :: SkolemInfo -> TcTyVarSet -> [TcTyVar]
 newImplication skol_info free_tvs skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { gbl_tvs <- tcGetGlobalTyVars
-       ; lcl_env <- getLclTypeEnv
-       ; let all_free_tvs = gbl_tvs `unionVarSet` free_tvs
+    do { gbl_tvs  <- tcGetGlobalTyVars
+       ; free_tvs <- zonkTcTyVarsAndFV free_tvs
+       ; let untch = gbl_tvs `unionVarSet` free_tvs
 
        ; (result, wanted) <- getConstraints               $ 
-                             setUntouchables all_free_tvs $
+                             setUntouchables untch $
                              thing_inside
 
        ; if isEmptyBag wanted && not (hasEqualities given) 
@@ -431,8 +431,9 @@ newImplication skol_info free_tvs skol_tvs given thing_inside
             return (emptyTcEvBinds, emptyWanteds, result)
          else do
        { ev_binds_var <- newTcEvBinds
+       ; lcl_env <- getLclTypeEnv
        ; loc <- getCtLoc skol_info
-       ; let implic = Implic { ic_env_tvs = all_free_tvs
+       ; let implic = Implic { ic_untch = untch
              		     , ic_env = lcl_env
              		     , ic_skols = mkVarSet skol_tvs
              		     , ic_scoped = panic "emitImplication"
@@ -443,7 +444,6 @@ newImplication skol_info free_tvs skol_tvs given thing_inside
 
        ; return (TcEvBinds ev_binds_var, unitBag (WcImplic implic), result) } }
 \end{code}
-
 
 %************************************************************************
 %*                                                                      *
@@ -1194,7 +1194,7 @@ checkSigTyVarsWrt :: TcTyVarSet -> [TcTyVar] -> TcM ()
 -- The extra_tvs can include boxy type variables;
 --      e.g. TcMatches.tcCheckExistentialPat
 checkSigTyVarsWrt extra_tvs sig_tvs
-  = do  { extra_tvs' <- zonkTcTyVarsAndFV (varSetElems extra_tvs)
+  = do  { extra_tvs' <- zonkTcTyVarsAndFV extra_tvs
         ; check_sig_tyvars extra_tvs' sig_tvs }
 
 check_sig_tyvars
