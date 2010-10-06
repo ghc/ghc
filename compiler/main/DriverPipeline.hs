@@ -461,15 +461,9 @@ doLink dflags stop_phase o_files
   | otherwise
   = case ghcLink dflags of
         NoLink     -> return ()
-        LinkBinary -> linkBinary dflags o_files link_pkgs
+        LinkBinary -> linkBinary dflags o_files []
         LinkDynLib -> linkDynLib dflags o_files []
         other      -> panicBadLink other
-  where
-   -- Always link in the haskell98 package for static linking.  Other
-   -- packages have to be specified via the -package flag.
-    link_pkgs
-     | dopt Opt_AutoLinkPackages dflags = [haskell98PackageId]
-     | otherwise                        = []
 
 
 -- ---------------------------------------------------------------------------

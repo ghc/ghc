@@ -964,7 +964,7 @@ partOfGHCi :: [PackageName]
 partOfGHCi
  | isWindowsTarget || isDarwinTarget = []
  | otherwise = map PackageName
-                   ["base", "haskell98", "template-haskell", "editline"]
+                   ["base", "template-haskell", "editline"]
 
 showLS :: LibrarySpec -> String
 showLS (Object nm)    = "(static) " ++ nm

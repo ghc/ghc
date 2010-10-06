@@ -428,7 +428,6 @@ findWiredInPackages dflags pkgs = do
                             integerPackageId,
                             basePackageId,
                             rtsPackageId,
-                            haskell98PackageId,
                             thPackageId,
                             dphSeqPackageId,
                             dphParPackageId ]
