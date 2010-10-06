@@ -44,8 +44,9 @@ module Coercion (
         mkForAllCoercion, mkInstsCoercion, mkUnsafeCoercion,
         mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
         mkCsel1Coercion, mkCsel2Coercion, mkCselRCoercion, 
-                       
-        mkCoVarCoercion, 
+
+	mkClassPPredCo, mkIParamPredCo,
+        mkCoVarCoercion, mkCoPredCo, 
 
 
         unsafeCoercionTyCon, symCoercionTyCon,
@@ -68,7 +69,7 @@ module Coercion (
 	mkTyConAppCoI, mkAppTyCoI, mkFunTyCoI,
 	mkForAllTyCoI,
 	fromCoI, 
-	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI
+	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI, mkCoPredCoI 
 
        ) where 
 
@@ -282,6 +283,11 @@ mkCoPredTy s t r = ASSERT( not (co_var `elemVarSet` tyVarsOfType r) )
   where
     co_var = mkWildCoVar (mkCoKind s t)
 
+mkCoPredCo :: Coercion -> Coercion -> Coercion -> Coercion 
+-- Creates a coercion between (s1~t1) => r1  and (s2~t2) => r2 
+mkCoPredCo = mkCoPredTy 
+
+
 splitCoPredTy_maybe :: Type -> Maybe (Type, Type, Type)
 splitCoPredTy_maybe ty
   | Just (cv,r) <- splitForAllTy_maybe ty
@@ -347,7 +353,7 @@ mkTyConCoercion con cos = mkTyConApp con cos
 
 -- | Make a function 'Coercion' between two other 'Coercion's
 mkFunCoercion :: Coercion -> Coercion -> Coercion
-mkFunCoercion co1 co2 = mkFunTy co1 co2
+mkFunCoercion co1 co2 = mkFunTy co1 co2 -- NB: Handles correctly the forall for eqpreds!
 
 -- | Make a 'Coercion' which binds a variable within an inner 'Coercion'
 mkForAllCoercion :: Var -> Coercion -> Coercion
@@ -444,6 +450,16 @@ mkFamInstCoercion name tvs family inst_tys rep_tycon
     desc = CoAxiom { co_ax_tvs = tvs
                    , co_ax_lhs = mkTyConApp family inst_tys 
                    , co_ax_rhs = mkTyConApp rep_tycon (mkTyVarTys tvs) }
+
+
+mkClassPPredCo :: Class -> [Coercion] -> Coercion
+mkClassPPredCo cls = (PredTy . ClassP cls)
+
+mkIParamPredCo :: (IPName Name) -> Coercion -> Coercion
+mkIParamPredCo ipn = (PredTy . IParam ipn)
+
+
+
 \end{code}
 
 
@@ -680,6 +696,11 @@ mkIParamPredCoI ipn = liftCoI (PredTy . IParam ipn)
 -- | Smart constructor for type equality 'Coercion's on 'CoercionI'. Similar to 'mkClassPPredCoI'
 mkEqPredCoI :: CoercionI -> CoercionI -> CoercionI
 mkEqPredCoI = liftCoI2 (\t1 t2 -> PredTy (EqPred t1 t2))
+
+mkCoPredCoI :: CoercionI -> CoercionI -> CoercionI -> CoercionI 
+mkCoPredCoI coi1 coi2 coi3 =   mkFunTyCoI (mkEqPredCoI coi1 coi2) coi3
+
+
 \end{code}
 
 %************************************************************************

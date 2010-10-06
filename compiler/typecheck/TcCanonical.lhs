@@ -259,6 +259,31 @@ canEq fl cv ty1 (TyConApp fn tys)
   | isSynFamilyTyCon fn, length tys == tyConArity fn
   = canEqLeaf fl cv (classify ty1) (FunCls fn tys) 
 
+canEq fl cv s1 s2
+  | Just (t1a,t1b,t1c) <- splitCoPredTy_maybe s1, 
+    Just (t2a,t2b,t2c) <- splitCoPredTy_maybe s2
+  = do { (v1,v2,v3) <- if isWanted fl then 
+                         do { v1 <- newWantedCoVar t1a t2a
+                            ; v2 <- newWantedCoVar t1b t2b 
+                            ; v3 <- newWantedCoVar t1c t2c 
+                            ; let res_co = mkCoPredCo (mkCoVarCoercion v1) 
+                                                      (mkCoVarCoercion v2) (mkCoVarCoercion v3)
+                            ; setWantedCoBind cv res_co
+                            ; return (v1,v2,v3) }
+                       else let co_orig = mkCoVarCoercion cv 
+                                coa = mkCsel1Coercion co_orig
+                                cob = mkCsel2Coercion co_orig
+                                coc = mkCselRCoercion co_orig
+                            in do { v1 <- newGivOrDerCoVar t1a t2a coa
+                                  ; v2 <- newGivOrDerCoVar t1b t2b cob
+                                  ; v3 <- newGivOrDerCoVar t1c t2c coc 
+                                  ; return (v1,v2,v3) }
+       ; cc1 <- canEq fl v1 t1a t2a 
+       ; cc2 <- canEq fl v2 t1b t2b 
+       ; cc3 <- canEq fl v3 t1c t2c 
+       ; return (cc1 `andCCan` cc2 `andCCan` cc3) }
+
+
 -- Split up an equality between function types into two equalities.
 canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
   = do { (argv, resv) <- 
@@ -275,6 +300,34 @@ canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
        ; cc1 <- canEq fl argv s1 s2 -- inherit original kinds and locations
        ; cc2 <- canEq fl resv t1 t2
        ; return (cc1 `andCCan` cc2) }
+
+canEq fl cv (PredTy p1) (PredTy p2) = canEqPred p1 p2 
+  where canEqPred (IParam n1 t1) (IParam n2 t2) 
+          | n1 == n2 
+          = if isWanted fl then 
+                do { v <- newWantedCoVar t1 t2 
+                   ; setWantedCoBind cv $ mkIParamPredCo n1 (mkCoVarCoercion cv)
+                   ; canEq fl v t1 t2 } 
+            else return emptyCCan -- DV: How to decompose given IP coercions? 
+
+        canEqPred (ClassP c1 tys1) (ClassP c2 tys2) 
+          | c1 == c2 
+          = if isWanted fl then 
+               do { vs <- zipWithM newWantedCoVar tys1 tys2 
+                  ; setWantedCoBind cv $ mkClassPPredCo c1 (map mkCoVarCoercion vs) 
+                  ; andCCans <$> zipWith3M (canEq fl) vs tys1 tys2
+                  }
+            else return emptyCCan 
+          -- How to decompose given dictionary (and implicit parameter) coercions? 
+          -- You may think that the following is right: 
+          --    let cos = decomposeCo (length tys1) (mkCoVarCoercion cv) 
+          --    in  zipWith3M newGivOrDerCoVar tys1 tys2 cos
+          -- But this assumes that the coercion is a type constructor-based 
+          -- coercion, and not a PredTy (ClassP cn cos) coercion. So we chose
+          -- to not decompose these coercions. We have to get back to this 
+          -- when we clean up the Coercion API.
+
+        canEqPred p1 p2 = misMatchErrorTcS fl (mkPredTy p1) (mkPredTy p2) 
 
 
 canEq fl cv (TyConApp tc1 tys1) (TyConApp tc2 tys2) 
@@ -312,9 +365,10 @@ canEq fl cv ty1 ty2
          ; cc2 <- canEq fl cv2 t1 t2 
          ; return (cc1 `andCCan` cc2) } 
 
-canEq fl _ s1@(ForAllTy {}) s2@(ForAllTy {}) 
- | Wanted {} <- fl 
- = misMatchErrorTcS fl s1 s2
+canEq fl _ s1@(ForAllTy {}) s2@(ForAllTy {})  
+ | tcIsForAllTy s1, tcIsForAllTy s2, 
+   Wanted {} <- fl 
+ = misMatchErrorTcS fl s1 s2 
  | otherwise 
  = do { traceTcS "Ommitting decomposition of given polytype equality" (pprEq s1 s2)
       ; return emptyCCan }
@@ -322,9 +376,10 @@ canEq fl _ s1@(ForAllTy {}) s2@(ForAllTy {})
 -- Finally expand any type synonym applications.
 canEq fl cv ty1 ty2 | Just ty1' <- tcView ty1 = canEq fl cv ty1' ty2
 canEq fl cv ty1 ty2 | Just ty2' <- tcView ty2 = canEq fl cv ty1 ty2'
-
 canEq fl _ ty1 ty2 
   = misMatchErrorTcS fl ty1 ty2
+
+
 \end{code}
 
 Note [Equality between type applications]

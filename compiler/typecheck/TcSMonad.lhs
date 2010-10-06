@@ -31,11 +31,10 @@ module TcSMonad (
  
     getInstEnvs, getFamInstEnvs,                -- Getting the environments 
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchablesTcS,
-    getTcEvBindsBag, getTcSContext, getTcSTyBinds,
+    getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsBag,
 
 
     newFlattenSkolemTy,                         -- Flatten skolems 
-    zonkFlattenedType, 
 
 
     instDFunTypes,                              -- Instantiation
@@ -434,6 +433,7 @@ runTcS context untouch tcs
        ; return (res, evBindMapBinds ev_binds) }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
+
        
 nestImplicTcS :: EvBindsVar -> TcTyVarSet -> TcS a -> TcS a 
 nestImplicTcS ref untouch tcs 
@@ -474,6 +474,10 @@ getTcEvBinds = TcS (return . tcs_ev_binds)
 
 getTcSTyBinds :: TcS (IORef (Bag (TcTyVar, TcType)))
 getTcSTyBinds = TcS (return . tcs_ty_binds)
+
+getTcSTyBindsBag :: TcS (Bag (TcTyVar, TcType)) 
+getTcSTyBindsBag = getTcSTyBinds >>= wrapTcS . (TcM.readTcRef) 
+
 
 getTcEvBindsBag :: TcS EvBindMap
 getTcEvBindsBag
@@ -576,26 +580,6 @@ newFlattenSkolemTy ty = mkTyVarTy <$> newFlattenSkolemTyVar ty
                            ; return $ 
                              mkTcTyVar name (typeKind ty) (FlatSkol ty) 
                            }
-
-
-zonkFlattenedType :: TcType -> TcS TcType 
-zonkFlattenedType ty = wrapTcS (TcM.zonkTcType ty) 
-
-
-{-- 
-tyVarsOfUnflattenedType :: TcType -> TcTyVarSet
--- A version of tyVarsOfType which looks through flatSkols
-tyVarsOfUnflattenedType ty
-  = foldVarSet (unionVarSet . do_tv) emptyVarSet (tyVarsOfType ty)
-  where
-    do_tv :: TyVar -> TcTyVarSet
-    do_tv tv = ASSERT( isTcTyVar tv)
-               case tcTyVarDetails tv of 
-                  FlatSkol _ ty -> tyVarsOfUnflattenedType ty
-                  _             -> unitVarSet tv 
---} 
-
-
 
 -- Instantiations 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

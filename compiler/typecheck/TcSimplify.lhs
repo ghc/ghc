@@ -405,7 +405,7 @@ simplifySuperClass self wanteds
        ; (unsolved, ev_binds) 
              <- runTcS SimplCheck emptyVarSet $
          	do { can_self <- canGivens loc [self]
-         	   ; let inert = foldlBag extendInertSet emptyInert can_self
+         	   ; let inert = foldlBag updInertSet emptyInert can_self
 	 	     -- No need for solveInteract; we know it's inert
 
 	 	   ; solveWanteds inert wanteds }

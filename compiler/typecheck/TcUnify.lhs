@@ -46,6 +46,8 @@ import Name
 import ErrUtils
 import BasicTypes
 import Bag
+
+import Maybes ( allMaybes )  
 import Util
 import Outputable
 import FastString
@@ -575,7 +577,16 @@ uType_np origin orig_ty1 orig_ty2
         -- Predicates
     go origin (PredTy p1) (PredTy p2) = uPred origin p1 p2
 
-        -- Functions; just check the two parts
+        -- Coercion functions: (t1a ~ t1b) => t1c  ~  (t2a ~ t2b) => t2c
+    go origin ty1 ty2 
+      | Just (t1a,t1b,t1c) <- splitCoPredTy_maybe ty1, 
+        Just (t2a,t2b,t2c) <- splitCoPredTy_maybe ty2
+      = do { co1 <- uType origin t1a t2a 
+           ; co2 <- uType origin t1b t2b
+           ; co3 <- uType origin t1c t2c 
+           ; return $ mkCoPredCoI co1 co2 co3 }
+
+        -- Functions (or predicate functions) just check the two parts
     go origin (FunTy fun1 arg1) (FunTy fun2 arg2)
       = do { coi_l <- uType origin fun1 fun2
            ; coi_r <- uType origin arg1 arg2
@@ -607,7 +618,8 @@ uType_np origin orig_ty1 orig_ty2
            ; return $ mkAppTyCoI coi_s coi_t }
 
     go _ ty1 ty2
-      | isSigmaTy ty1 || isSigmaTy ty2
+      | tcIsForAllTy ty1 || tcIsForAllTy ty2 
+{--      | isSigmaTy ty1 || isSigmaTy ty2 --} 
       = unifySigmaTy origin ty1 ty2
 
         -- Anything else fails
@@ -909,26 +921,64 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 
 checkTauTvUpdate tv ty
   = do { ty' <- zonkTcType ty
-       ; if ok ty' && (typeKind ty' `isSubKind` tyVarKind tv) 
-         then return (Just ty')
+       ; if typeKind ty' `isSubKind` tyVarKind tv then
+           case ok ty' of 
+             Nothing -> return Nothing 
+             Just ty'' -> return (Just ty'')
          else return Nothing }
-  where ok :: TcType -> Bool 
-        -- Check that (a) tv is not among the free variables of 
-        -- the type and that (b) the type is type-family-free.
-        -- Reason: Note [Type family sharing]  
-        ok ty1 | Just ty1' <- tcView ty1 = ok ty1'  
-        ok (TyVarTy tv')      = not (tv == tv') 
-        ok (TyConApp tc tys)  = all ok tys && not (isSynFamilyTyCon tc)
-        ok (PredTy sty)       = ok_pred sty 
-        ok (FunTy arg res)    = ok arg && ok res 
-        ok (AppTy fun arg)    = ok fun && ok arg 
-        ok (ForAllTy _tv1 ty1) = ok ty1       
 
-        ok_pred (IParam _ ty)    = ok ty 
-        ok_pred (ClassP _ tys)   = all ok tys 
-        ok_pred (EqPred ty1 ty2) = ok ty1 && ok ty2 
+  where ok :: TcType -> Maybe TcType 
+        ok (TyVarTy tv') | not (tv == tv') = Just (TyVarTy tv') 
+        ok this_ty@(TyConApp tc tys) 
+          | not (isSynFamilyTyCon tc), Just tys' <- allMaybes (map ok tys) 
+          = Just (TyConApp tc tys') 
+          | isSynTyCon tc, Just ty_expanded <- tcView this_ty
+          = ok ty_expanded -- See Note [Type synonyms and the occur check] 
+        ok (PredTy sty) | Just sty' <- ok_pred sty = Just (PredTy sty') 
+        ok (FunTy arg res) | Just arg' <- ok arg, Just res' <- ok res
+                           = Just (FunTy arg' res') 
+        ok (AppTy fun arg) | Just fun' <- ok fun, Just arg' <- ok arg 
+                           = Just (AppTy fun' arg') 
+        ok (ForAllTy tv1 ty1) | Just ty1' <- ok ty1 = Just (ForAllTy tv1 ty1') 
+        -- Fall-through 
+        ok _ty = Nothing 
+       
+        ok_pred (IParam nm ty) | Just ty' <- ok ty = Just (IParam nm ty') 
+        ok_pred (ClassP cl tys) 
+          | Just tys' <- allMaybes (map ok tys) 
+          = Just (ClassP cl tys') 
+        ok_pred (EqPred ty1 ty2) 
+          | Just ty1' <- ok ty1, Just ty2' <- ok ty2 
+          = Just (EqPred ty1' ty2') 
+        -- Fall-through 
+        ok_pred _pty = Nothing 
 
 \end{code}
+
+Note [Type synonyms and the occur check]
+~~~~~~~~~~~~~~~~~~~~
+Generally speaking we need to update a variable with type synonyms not expanded, which
+improves later error messages, except for when looking inside a type synonym may help resolve
+a spurious occurs check error. Consider: 
+          type A a = ()
+
+          f :: (A a -> a -> ()) -> ()
+          f = \ _ -> ()
+
+          x :: ()
+          x = f (\ x p -> p x)
+
+We will eventually get a constraint of the form t ~ A t. The ok function above will 
+properly expand the type (A t) to just (), which is ok to be unified with t. If we had
+unified with the original type A t, we would lead the type checker into an infinite loop. 
+
+Hence, if the occurs check fails for a type synonym application, then (and *only* then), 
+the ok function expands the synonym to detect opportunities for occurs check success using
+the underlying definition of the type synonym. 
+
+The same applies later on in the constraint interaction code; see TcInteract, 
+function @occ_check_ok@. 
+
 
 Note [Type family sharing]
 ~~~~~~~~~~~~~~ 
