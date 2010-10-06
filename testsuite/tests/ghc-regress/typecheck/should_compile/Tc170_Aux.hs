@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 module Tc170_Aux where
 

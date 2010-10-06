@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification, Rank2Types #-}
 
 -- An interesting interaction of universals and existentials, prompted by 
 -- http://www.haskell.org/pipermail/haskell-cafe/2004-October/007160.html

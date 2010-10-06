@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- This one made GHC 6.4.1 panic because of over-zealous 
 -- complaining in mkCase1 when there was an empty list of

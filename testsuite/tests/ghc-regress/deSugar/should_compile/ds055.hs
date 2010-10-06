@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification, DeriveDataTypeable #-}
 
 -- This module requires quite trick desugaring,
 -- because of the context in the existentials

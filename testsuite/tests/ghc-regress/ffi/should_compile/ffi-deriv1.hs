@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Tests newtype unwrapping for the IO monad itself
 -- Notice the RenderM monad, which is used in the

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 module ShouldCompile where
 
 import Data.Word

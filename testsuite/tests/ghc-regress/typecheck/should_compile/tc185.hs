@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 
 -- Killed GHC 6.3 HEAD
 

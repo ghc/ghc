@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- Pattern match uses dictionaries bound higher up in the pattern
 

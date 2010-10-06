@@ -9,8 +9,8 @@ tc170:
 
 tc173:
 	$(RM) Tc173a.o Tc173a.hi Tc173b.o Tc173b.hi
-	'$(TEST_HC)' -c -fglasgow-exts -XUndecidableInstances -XOverlappingInstances Tc173a.hs
-	'$(TEST_HC)' -c -fglasgow-exts -XUndecidableInstances -XOverlappingInstances Tc173b.hs
+	'$(TEST_HC)' -c -XFlexibleInstances -XTypeSynonymInstances -XUndecidableInstances -XOverlappingInstances Tc173a.hs
+	'$(TEST_HC)' -c -XUndecidableInstances -XOverlappingInstances Tc173b.hs
 
 T2412:
 	$(RM) -f T2412.hi-boot T2412.o-boot T2412A.hi T2412A.o T2412.hi T2412.o

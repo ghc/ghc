@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 {- This code, courtesy of Markus Lauer (markus.lauer-2006@lauerit.de)
    was rejected by the sophisticated wobbly-type impl in 6.4.1, and

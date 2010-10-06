@@ -1,5 +1,5 @@
 :unset +s +t
-:set -fglasgow-exts
+:set -XExistentialQuantification
 -- test for contexts on existential types crashing the interpreter
 :l ghci006
 showQ (Q "foo")

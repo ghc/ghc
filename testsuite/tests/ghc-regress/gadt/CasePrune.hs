@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE GADTs, GeneralizedNewtypeDeriving #-}
 
 -- See Trac #1251 and the comments
 -- Note [Pruning dead case alternatives] in types/Unify.lhs

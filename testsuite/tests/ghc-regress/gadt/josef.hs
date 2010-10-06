@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, KindSignatures,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- Program from Josef Svenningsson 
 

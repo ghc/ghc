@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts -Wall #-}
-
+{-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE ParallelListComp #-}
 -- On GHC 6.0 and earlier, this parallel list comprehension generated
 -- an incorrect unused-binding warning.
 

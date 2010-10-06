@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- Data types with no constructors
 

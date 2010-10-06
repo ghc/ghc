@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- This one killed GHC 5.02 with a funResultTy panic
 -- The reason was that the simplifier was doing a 

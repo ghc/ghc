@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -funbox-strict-fields -fglasgow-exts #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- The combination of unboxing and a recursive newtype crashed GHC 6.6.1
 -- Trac #1255

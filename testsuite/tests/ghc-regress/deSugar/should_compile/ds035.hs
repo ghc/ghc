@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE  MagicHash #-}
 module ShouldCompile where
 
 import GHC.Exts

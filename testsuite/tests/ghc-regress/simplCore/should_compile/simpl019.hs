@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts -O2 #-}
+{-# LANGUAGE GADTs, FlexibleInstances #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- See Trac #1746
 

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- Supplied by Henrik Nilsson, showed up a bug in GADTs 
 

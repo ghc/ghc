@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- !!! Another implicit parameter test, from Alastair Reid
 

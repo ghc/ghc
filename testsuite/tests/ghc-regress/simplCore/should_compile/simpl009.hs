@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -dcore-lint #-}
+{-# LANGUAGE Rank2Types #-}
+{-# OPTIONS_GHC -dcore-lint #-}
 
 -- This one killed GHC 6.0, with a "panic: applyTys"
 -- Only with -O, though

@@ -1,6 +1,6 @@
 -- printing of Showables
 
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 let f = Just (1.2::Float)
 f
 :p f

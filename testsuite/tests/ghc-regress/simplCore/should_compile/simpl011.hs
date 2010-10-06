@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -cpp #-}
+{-# LANGUAGE CPP, Rank2Types, ScopedTypeVariables, KindSignatures,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- This one triggered a bug in the indirection-shorting 
 -- machinery, which gave a core-lint error

@@ -1,4 +1,6 @@
-{-# OPTIONS -fglasgow-exts -dcore-lint #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances #-}
+{-# OPTIONS -dcore-lint #-}
 
 {- 	 This one killed GHC 5.02
 

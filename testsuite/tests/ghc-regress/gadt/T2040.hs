@@ -1,4 +1,6 @@
-{-# OPTIONS_GHC -Wall -fglasgow-exts #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables, FlexibleContexts,
+             MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wall #-}
 
 module T2040 where
 

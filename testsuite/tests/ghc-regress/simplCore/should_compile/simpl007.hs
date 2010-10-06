@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances,
+             ExistentialQuantification, FlexibleInstances #-}
 
 -- module Formula where
 module Main where

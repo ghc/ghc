@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, ExistentialQuantification #-}
 
 module ShouldFail where
 

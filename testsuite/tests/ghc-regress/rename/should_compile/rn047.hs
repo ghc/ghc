@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fwarn-unused-matches #-}
-
+{-# OPTIONS_GHC -fwarn-unused-matches #-}
+{-# LANGUAGE ParallelListComp #-}
 -- GHC 6.4 erroneously reported that the 
 -- bindings for q and z were unused
 --

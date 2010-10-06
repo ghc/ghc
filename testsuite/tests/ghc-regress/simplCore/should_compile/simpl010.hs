@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- This tests an interaction between GADTs and join points
 -- The case-of-case transformation can pretty easily result

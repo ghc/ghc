@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- !!! Desugaring of record updates
 -- Showed up a bug in the newtype-squashing machinery

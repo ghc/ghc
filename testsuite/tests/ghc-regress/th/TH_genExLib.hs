@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 module TH_genExLib where
 

@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances, FlexibleContexts #-}
 
 -- Another dependency analysis test
 -- Notice that 'a' and 'b' are mutually recursive, 

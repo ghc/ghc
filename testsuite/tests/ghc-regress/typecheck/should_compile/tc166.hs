@@ -1,4 +1,6 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             ExistentialQuantification, Rank2Types,
+             FlexibleInstances #-}
 
 -- Arguably, the type signature for f1 should be enough to make
 -- this program compile, but in 5.04 it wasn't; the

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE TypeOperators, DeriveDataTypeable #-}
 
 -- This is a performance test.  In GHC 6.4, it simply wouldn't compile
 -- because the types got exponentially large, due to poor handling of

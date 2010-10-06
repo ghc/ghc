@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 module ShouldCompile where
 

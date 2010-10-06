@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, UndecidableInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- Trac #1564
 

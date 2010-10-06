@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, KindSignatures #-}
 
 -- Test a couple of trivial things:
 -- 	explicit layout

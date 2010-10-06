@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module TH_bracket3 where
 
 d_class = [d| class Classy a b where

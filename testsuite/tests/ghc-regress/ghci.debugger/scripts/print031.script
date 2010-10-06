@@ -1,4 +1,3 @@
-:set -fglasgow-exts
 :l print031.hs
 let a = MkT2 [Just (Phantom 1)]
 :break f

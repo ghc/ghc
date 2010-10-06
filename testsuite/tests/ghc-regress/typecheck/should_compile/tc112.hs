@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- !!! Functional dependencies
 -- This broke an early impl of functional dependencies

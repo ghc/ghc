@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- July 07: I'm changing this from "should_compile" to "should_fail".
 -- It would generate an instance decl like

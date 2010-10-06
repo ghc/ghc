@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- !!! deriving for GADTs which declare Haskell98 data types.
 -- bug reported as http://hackage.haskell.org/trac/ghc/ticket/902

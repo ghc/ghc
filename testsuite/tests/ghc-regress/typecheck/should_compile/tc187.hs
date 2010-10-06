@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances, FlexibleInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 -- UndecidableInstances now needed because the Coverage Condition fails
 
 -- Hugs failed this functional-dependency test

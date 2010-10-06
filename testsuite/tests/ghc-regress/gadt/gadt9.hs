@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- This one requires careful handling in 
 -- TcUnify.unifyTyConApp, to preserve rigidity.

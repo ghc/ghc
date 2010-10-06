@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- This one tickled the kind-check in TcType.matchTys,
 -- which should use sub-kinding

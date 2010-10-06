@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, ScopedTypeVariables, FlexibleInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- This tests scoped type variables, used in an expression 
 -- type signature in t1 and t2

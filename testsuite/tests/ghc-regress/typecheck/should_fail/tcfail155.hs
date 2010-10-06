@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- Data type returns the wrong type
 

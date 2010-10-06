@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- This should fail, because there is no annotation on shw,
 -- but it succeeds in 6.4.1

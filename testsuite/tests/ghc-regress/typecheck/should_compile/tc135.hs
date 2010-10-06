@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ScopedTypeVariables, ExistentialQuantification #-}
 
 -- !!! scoped type variables w/ existential types
 -- this test failed in GHC 5.00

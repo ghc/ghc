@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- !!! Test inheritance of implicit parameters.
 -- GHC 5.00.2 fails this test

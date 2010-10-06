@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams, Rank2Types #-}
 
 -- Rank-2 types with implicit parameters.
 -- GHC 5.02 erroneously rejected this

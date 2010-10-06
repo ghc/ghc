@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, KindSignatures #-}
 
 -- Test for trac #810
 -- Should be able to infer bool :: Bool and integer :: Integer, so

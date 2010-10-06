@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -O2 #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- Reading the interface file caused a black hole
 -- in earlier versions of GHC

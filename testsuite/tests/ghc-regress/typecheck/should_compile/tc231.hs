@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts  -ddump-types #-}
+{-# OPTIONS_GHC -ddump-types #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- See Trac #1456
 

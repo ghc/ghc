@@ -1,6 +1,6 @@
 -- Type reconstruction with newtypes involved, more gruesome. 
 
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
 let a = map MkT [1..2]
 :p a

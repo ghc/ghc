@@ -1,5 +1,5 @@
 
-:set -fglasgow-exts
+:set -fprint-explicit-foralls
 
 :l ../QSort
 

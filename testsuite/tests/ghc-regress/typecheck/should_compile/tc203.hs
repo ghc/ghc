@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 -- Check that we can have a forall after a forall
 

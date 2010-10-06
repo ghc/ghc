@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             UndecidableInstances #-}
 
 -- !!! An instance decl with a context containing a free type variable
 -- The interest here is that there's a "b" in the instance decl

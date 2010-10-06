@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE GADTs, KindSignatures #-}
 
 -- See Trac #301
 -- This particular one doesn't use GADTs per se, 

@@ -71,7 +71,7 @@ c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a1. a1 -> b
 c4 :: C a b => forall a1. a1 -> b
-:browse! T -- with -fglasgow-exts
+:browse! T -- with -fprint-explicit-foralls
 -- defined locally
 T.length :: T.Integer
 class N a

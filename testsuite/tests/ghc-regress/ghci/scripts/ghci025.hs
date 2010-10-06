@@ -1,6 +1,4 @@
-
-{-# OPTIONS_GHC -fglasgow-exts #-}
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, MultiParamTypeClasses #-}
 
 module T where
 

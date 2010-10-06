@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 module Imp10Aux where
 import Imp10

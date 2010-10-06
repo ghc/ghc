@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 -- Make sure for-alls can occur in data types
 

@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 module Imp500Aux where
 import Imp500

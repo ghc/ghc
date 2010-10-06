@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- Test the refined dependency analysis of bindings
 -- with -fglagow-exts

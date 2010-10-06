@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -O #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -O #-}
 
 -- This one showed up a bug that required type refinement in TcIface
 -- See the call to coreRefineTys in TcIface

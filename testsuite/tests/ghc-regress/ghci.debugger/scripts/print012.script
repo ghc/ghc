@@ -1,4 +1,4 @@
-:set -fglasgow-exts
+:set -XGADTs -XRank2Types -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../GADT
 :a ../Test
 :m +Main

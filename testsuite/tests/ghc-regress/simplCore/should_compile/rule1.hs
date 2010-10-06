@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- This one triggers the bug reported in Trac #1092
 -- The problem is that the rule 

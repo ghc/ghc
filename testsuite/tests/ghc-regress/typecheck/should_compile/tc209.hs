@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- Unboxed tuples; cf tcfail115, tcfail120
 

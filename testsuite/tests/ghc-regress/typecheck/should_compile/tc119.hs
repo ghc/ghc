@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             ExistentialQuantification #-}
 
 -- !!! Functional dependencies and existentials
 

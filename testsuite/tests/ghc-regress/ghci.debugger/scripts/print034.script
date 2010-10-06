@@ -1,6 +1,6 @@
 -- More GADT goodness
 
-:set -fglasgow-exts
+:set -XGADTs -XRank2Types -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../GADT
 :a ../Test
 :m +Main

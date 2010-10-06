@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams, ExistentialQuantification #-}
 
 -- Both these two fail in 6.2.2 
 

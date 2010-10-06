@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UnboxedTuples, MagicHash #-}
 
 module ShouldCompile where
 

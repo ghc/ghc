@@ -1,4 +1,5 @@
-{-# OPTIONS -XNoImplicitPrelude -fglasgow-exts #-}
+{-# LANGUAGE NoImplicitPrelude, FlexibleInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- Trac #1537
 

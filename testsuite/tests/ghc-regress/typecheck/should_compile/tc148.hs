@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 -- This program tickled a bug in 5.02.2's forall-lifting
 

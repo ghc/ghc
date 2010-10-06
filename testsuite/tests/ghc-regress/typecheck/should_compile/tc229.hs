@@ -2,8 +2,8 @@
 -- trac #1406: Constraint doesn't reduce in the presence of quantified
 --             type variables
 
-{-# OPTIONS_GHC -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, UndecidableInstances, Rank2Types,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Problem where
 

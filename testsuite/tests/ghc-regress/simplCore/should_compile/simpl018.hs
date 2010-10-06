@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- See Note [Float coercions (unlifted)] in Simplify
 -- This one gave a CoreLint error when compiled optimised

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE TypeOperators, MultiParamTypeClasses, LiberalTypeSynonyms #-}
 
 -- Test infix type constructors for type synonyms
 

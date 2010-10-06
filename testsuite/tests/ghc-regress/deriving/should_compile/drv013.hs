@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- Deriving Typeable has various special cases
 module Foo where

@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -O2 #-}
+{-# LANGUAGE Rank2Types, GADTs, FlexibleContexts #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- This one make SpecConstr generate bogus code (hence -O2), 
 -- with a lint error, in GHC 6.4.1

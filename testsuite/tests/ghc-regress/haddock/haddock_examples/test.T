@@ -3,4 +3,4 @@ test('haddock.Test',
       extra_clean(['Test.hi', 'Test.o', 'Hidden.hi', 'Hidden.o',
                    'Visible.hi', 'Visible.o'])],
      multimod_compile,
-     ['Test Hidden Visible', '-fglasgow-exts -haddock -ddump-parsed'])
+     ['Test Hidden Visible', '-XRank2Types -XExistentialQuantification -haddock -ddump-parsed'])

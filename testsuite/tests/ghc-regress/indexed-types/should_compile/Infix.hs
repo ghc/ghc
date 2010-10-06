@@ -1,5 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies, TypeOperators #-}
 
 -- Test infix type constructors in type families
 

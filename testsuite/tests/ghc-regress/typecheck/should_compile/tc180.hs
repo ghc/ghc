@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances, UndecidableInstances #-}
 
 -- This tests an aspect of functional dependencies, revealing a bug in GHC 6.0.1
 -- discovered by Martin Sulzmann

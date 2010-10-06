@@ -4,8 +4,8 @@ System.IO.putStrLn ":browse! *T"
 :browse! *T
 System.IO.putStrLn ":browse! T"
 :browse! T
-:set -fglasgow-exts
-System.IO.putStrLn ":browse! T -- with -fglasgow-exts"
+:set -fprint-explicit-foralls
+System.IO.putStrLn ":browse! T -- with -fprint-explicit-foralls"
 :browse! T
 
 System.IO.putStrLn "-- test :browse! <target> relative to different contexts"

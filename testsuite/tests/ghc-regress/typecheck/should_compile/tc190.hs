@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp -fglasgow-exts #-}
+{-# LANGUAGE CPP, KindSignatures #-}
 
 -- The record update triggered a kind error in GHC 6.2
 

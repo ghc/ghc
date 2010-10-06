@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 module ShouldSucceed3 where 
 

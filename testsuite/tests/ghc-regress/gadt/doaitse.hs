@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, ExistentialQuantification, ScopedTypeVariables,
+             Rank2Types #-}
 
 -- Here's an example from Doaitse Swiestra (Sept 06)
 -- which requires use of scoped type variables

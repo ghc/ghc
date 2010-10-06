@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
-
+{-# LANGUAGE UnicodeSyntax #-}
 {-
 	Three kinds of Unicode tests for our purposes.
 -}

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- This code defines a default method with a highly dubious type,
 -- because 'v' is not mentioned, and there are no fundeps

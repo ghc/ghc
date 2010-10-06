@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 module ShouldCompile where
 
 -- exposed a bug in the NCG in 6.4.2

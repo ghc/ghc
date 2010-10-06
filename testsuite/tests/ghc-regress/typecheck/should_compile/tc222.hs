@@ -1,5 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE ImplicitParams, Rank2Types #-}
 
 -- Tests impredivative polymorphism with left-to-right
 -- flow information; see the uses of "$"

@@ -1,4 +1,4 @@
-{-# OPTIONS -XGADTs -XExistentialQuantification #-}
+{-# LANGUAGE GADTs, ExistentialQuantification #-}
 
 module Escape where
 

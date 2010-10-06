@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances, UndecidableInstances #-}
 -- UndecidableInstances now needed because the Coverage Condition fails
 
 -- !!! Functional dependencies

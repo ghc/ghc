@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude -XNPlusKPatterns #-}
+{-# LANGUAGE NoImplicitPrelude, NPlusKPatterns #-}
 
 module RebindableCase1 where
 	{

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XGADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module Main where
 

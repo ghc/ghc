@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -fglasgow-exts #-}
 
 module Rules1 where
 

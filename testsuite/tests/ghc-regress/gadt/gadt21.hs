@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, ExistentialQuantification, KindSignatures, Rank2Types #-}
 
 -- Fails (needs the (Ord a) in TypeSet 
 -- c.f. gadt22.hs

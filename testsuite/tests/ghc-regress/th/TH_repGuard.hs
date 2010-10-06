@@ -1,5 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
--- test the representation of unboxed literals
 
 module Main
 where

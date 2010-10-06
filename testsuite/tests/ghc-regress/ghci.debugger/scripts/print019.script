@@ -1,4 +1,4 @@
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
 let a = O (id 'a')
 let b = O (id "abc")

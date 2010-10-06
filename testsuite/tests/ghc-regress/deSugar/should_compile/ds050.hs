@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+
 module ShouldCompile where
 
 data Q = Q {f :: forall a. a -> a}

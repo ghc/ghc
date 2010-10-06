@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 -- Blew up GHC 5.04, with:
 --    Ambiguous type variable(s) `q' in the constraint `Foo q'
 --    arising from a function with an overloaded argument type at Foo.hs:7

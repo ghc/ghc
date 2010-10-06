@@ -1,5 +1,4 @@
-{-# OPTIONS -fglasgow-exts -cpp #-}
-{-# LANGUAGE Arrows #-}
+{-# LANGUAGE Arrows, CPP, TypeOperators #-}
 
 -- Test infix type notation and arrow notation
 

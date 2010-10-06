@@ -1,5 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE ImplicitParams, Rank2Types #-}
 
 -- This program failed to typecheck in an early version of
 -- GHC with impredicative polymorphism, but it was fixed by

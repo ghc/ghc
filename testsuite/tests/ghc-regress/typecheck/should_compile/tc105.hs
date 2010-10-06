@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
 
 module ShouldCompile where
 

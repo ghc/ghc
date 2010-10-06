@@ -1,6 +1,6 @@
 -- Another tricky type reconstruction case
 
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
 
 let o = O (map id [0..3])

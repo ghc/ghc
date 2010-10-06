@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE TypeOperators, GADTs, KindSignatures #-}
 
 -- Tests infix type constructors in GADT declarations
 

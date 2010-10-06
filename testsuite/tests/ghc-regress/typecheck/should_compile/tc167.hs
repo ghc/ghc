@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 
 -- Type checking with unboxed kinds fails when (->) is used in a prefix way
 

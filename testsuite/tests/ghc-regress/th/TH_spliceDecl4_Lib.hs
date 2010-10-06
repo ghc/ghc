@@ -1,5 +1,4 @@
 
-{-# OPTIONS -fglasgow-exts #-}
 {-# LANGUAGE TemplateHaskell, UndecidableInstances #-}
 
 module TH_spliceDecl4_Lib(

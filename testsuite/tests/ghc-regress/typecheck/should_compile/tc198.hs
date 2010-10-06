@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
 
 -- This should work, because the type sig and the type
 -- in the pattern match exactly

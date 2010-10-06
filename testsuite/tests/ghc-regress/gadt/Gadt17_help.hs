@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -O #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -O #-}
 
 module Gadt17_help (
       TernOp (..), applyTernOp

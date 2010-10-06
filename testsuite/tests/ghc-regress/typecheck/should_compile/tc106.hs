@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
 
 -- !!! Mutually recursive kind inference
 -- Exposes a bug in 4.08 (fixed in 4.08 pl1)

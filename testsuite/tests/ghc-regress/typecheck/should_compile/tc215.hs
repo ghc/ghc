@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fwarn-incomplete-patterns -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 -- Test for trac #366
 -- The C2 case is impossible due to the types

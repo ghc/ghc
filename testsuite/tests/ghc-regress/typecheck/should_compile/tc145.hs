@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams, UnboxedTuples #-}
 
 -- Test two slightly exotic things about type signatures
 

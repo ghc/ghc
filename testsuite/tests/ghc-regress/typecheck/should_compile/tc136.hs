@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- !!! scoped type variables
 -- this test failed in pre-release GHC 5.02

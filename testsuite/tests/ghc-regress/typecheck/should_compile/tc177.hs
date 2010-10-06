@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, UndecidableInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- This is a rather complicated program that uses functional 
 -- dependencies to do Peano arithmetic.

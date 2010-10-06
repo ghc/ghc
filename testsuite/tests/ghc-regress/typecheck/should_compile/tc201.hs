@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             ExistentialQuantification, FlexibleContexts #-}
 
 {-	Email 30 Jan 2006
 

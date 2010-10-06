@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -Werror -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, KindSignatures #-}
+{-# OPTIONS_GHC -Werror #-}
 
 -- Trac #959
 

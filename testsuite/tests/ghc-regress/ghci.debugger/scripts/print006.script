@@ -1,7 +1,7 @@
 -- Recovery of types, opaque types
 -- This scenario demands propagation of types up in the tree of terms
 
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test 
 let t = O (map Just [[1,1],[2,2]])
 :p t

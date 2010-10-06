@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 -- A simple GADT test from Roman
 -- which nevertheless showed up a bug at one stage
 

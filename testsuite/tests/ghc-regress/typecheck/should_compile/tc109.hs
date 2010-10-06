@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             UndecidableInstances #-}
 -- UndecidableInstances because 'b' appears in the context but not the head
 
 module ShouldCompile where

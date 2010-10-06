@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- Without a type sig this is slightly tricky.
 -- See Trac #1430

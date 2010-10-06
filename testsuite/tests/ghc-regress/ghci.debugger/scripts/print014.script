@@ -1,6 +1,6 @@
 -- Test handling of extra fields in the representation due to existentials.
 
-:set -fglasgow-exts
+:set -XGADTs -XRank2Types
 :l ../GADT
 
 let e = Exist 1

@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             TypeSynonymInstances #-}
 
 -- This one made GHC 6.4 loop becuause Unify.unify
 -- didn't deal correctly with unifying

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XGADTs -fglasgow-exts #-}
+{-# LANGUAGE GADTs, KindSignatures #-}
 
 module Gadt23_AST where
 

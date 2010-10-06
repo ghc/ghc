@@ -1,6 +1,6 @@
 -- Another type reconstruction with newtypes test
 
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
 
 let a = MkT [1..2]

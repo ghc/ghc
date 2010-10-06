@@ -1,5 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
--- -fglasgow-exts because it uses local universal quantification
+{-# LANGUAGE Rank2Types #-}
 
 module ShouldSucceed where
 

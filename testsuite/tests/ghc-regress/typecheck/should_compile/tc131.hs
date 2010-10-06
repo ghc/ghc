@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- !!! Typechecking of functional dependencies
 -- Showed up (another) bug in the newtype-squashing machinery

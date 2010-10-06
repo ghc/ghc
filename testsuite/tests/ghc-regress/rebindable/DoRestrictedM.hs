@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, MultiParamTypeClasses,
+             FlexibleInstances #-}
 
 -- Tests of the do-notation for the restricted monads
 -- We demonstrate that all ordinary monads are restricted monads,

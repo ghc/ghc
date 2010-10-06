@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs #-}
 
 -- Provoked by 
 -- http://www.haskell.org/pipermail/haskell-cafe/2007-January/021086.html

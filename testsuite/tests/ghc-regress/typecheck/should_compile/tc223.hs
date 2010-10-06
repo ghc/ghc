@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 module Foo where
 
 -- This example suggested by Yitzchak Gale

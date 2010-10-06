@@ -1,6 +1,6 @@
 -- More newtypes goodness
 
-:set -fglasgow-exts
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
 let a = map (MkT2 . MkT) [1..2]
 :p a

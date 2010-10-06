@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,
+             OverlappingInstances, UndecidableInstances #-}
 
 -- Instances compile fine but instance selection loops in GHC 6.2.
 -- try: :t foo (T1a 1)

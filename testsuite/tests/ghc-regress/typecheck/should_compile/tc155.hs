@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE LiberalTypeSynonyms #-}
 
 -- The type sig for 'test' is illegal in H98 because of the
 -- partial application of the type sig.

@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances, UndecidableInstances #-}
 -- UndecidableInstances because (L a b) is no smaller than (C a b)
 
 -- This one shows up another rather subtle functional-dependecy

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, KindSignatures #-}
 
 -- See Trac #1323; crashed GHC 6.6
 

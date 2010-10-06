@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -funbox-strict-fields #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- Tests record selectors with unboxed fields for GADTs
 

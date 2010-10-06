@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances, GeneralizedNewtypeDeriving #-}
 
 -- Test deriving of a multi-parameter class for 
 -- one-argument newtype defined in the same module
