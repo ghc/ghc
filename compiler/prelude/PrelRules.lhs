@@ -450,25 +450,21 @@ and emits a warning.
 
 \begin{code}
 tagToEnumRule :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-tagToEnumRule _ [Type ty, _]
-  | not (is_enum_ty ty)	  -- See Note [tagToEnum#]
-  = WARN( True, ptext (sLit "tagToEnum# on non-enumeration type") <+> ppr ty )
-    Just (mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type")
-  where
-    is_enum_ty ty = case splitTyConApp_maybe ty of
-                       Just (tc, _) -> isEnumerationTyCon tc
-		       Nothing      -> False
-
+-- If     data T a = A | B | C
+-- then   tag2Enum# (T ty) 2# -->  B ty
 tagToEnumRule _ [Type ty, Lit (MachInt i)]
-  = ASSERT( isEnumerationTyCon tycon ) 
-    case filter correct_tag (tyConDataCons_maybe tycon `orElse` []) of
+  | Just (tycon, tc_args) <- splitTyConApp_maybe ty
+  , isEnumerationTyCon tycon
+  = case filter correct_tag (tyConDataCons_maybe tycon `orElse` []) of
 	[]	  -> Nothing	-- Abstract type
 	(dc:rest) -> ASSERT( null rest )
-		     Just (Var (dataConWorkId dc))
+		     Just (mkTyApps (Var (dataConWorkId dc)) tc_args)
+  | otherwise 	  -- See Note [tagToEnum#]
+  = WARN( True, ptext (sLit "tagToEnum# on non-enumeration type") <+> ppr ty )
+    Just (mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type")
   where 
     correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
-    tag   = fromInteger i
-    tycon = tyConAppTyCon ty
+    tag = fromInteger i
 
 tagToEnumRule _ _ = Nothing
 \end{code}
