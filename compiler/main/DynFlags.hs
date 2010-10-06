@@ -1777,7 +1777,6 @@ glasgowExtsFlags :: [ExtensionFlag]
 glasgowExtsFlags = [
              Opt_ForeignFunctionInterface
            , Opt_UnliftedFFITypes
-           , Opt_GADTs
            , Opt_ImplicitParams
            , Opt_ScopedTypeVariables
            , Opt_UnboxedTuples
@@ -1805,8 +1804,7 @@ glasgowExtsFlags = [
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
-           , Opt_GeneralizedNewtypeDeriving
-           , Opt_TypeFamilies ]
+           , Opt_GeneralizedNewtypeDeriving ]
 
 #ifdef GHCI
 -- Consult the RTS to find whether GHC itself has been built profiled
