@@ -1356,8 +1356,8 @@ dynamic_flags = [
                                        setTarget HscNothing))
   , Flag "fbyte-code"       (NoArg (setTarget HscInterpreted))
   , Flag "fobject-code"     (NoArg (setTarget defaultHscTarget))
-  , Flag "fglasgow-exts"    (NoArg enableGlasgowExts)
-  , Flag "fno-glasgow-exts" (NoArg disableGlasgowExts)
+  , Flag "fglasgow-exts"    (NoArg (enableGlasgowExts >> deprecate "Use individual extensions instead"))
+  , Flag "fno-glasgow-exts" (NoArg (disableGlasgowExts >> deprecate "Use individual extensions instead"))
  ]
  ++ map (mkFlag True  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag False "fno-" unSetDynFlag) fFlags
