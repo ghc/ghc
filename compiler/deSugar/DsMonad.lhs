@@ -72,7 +72,6 @@ import Data.IORef
 \begin{code}
 data DsMatchContext
   = DsMatchContext (HsMatchContext Name) SrcSpan
-  | NoMatchContext
   deriving ()
 
 data EquationInfo
