@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -cpp #-}
+{-# LANGUAGE PatternGuards, CPP #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.

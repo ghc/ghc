@@ -1,6 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables #-}
-{-# OPTIONS -fglasgow-exts #-}
--- -fglagow-exts for kind signatures
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, KindSignatures,
+             FlexibleContexts #-}
 
 module ZipDataflow
     ( DebugNodes(), RewritingDepth(..), LastOutFacts(..)

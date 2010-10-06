@@ -432,6 +432,7 @@ utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/compare_sizes/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/runghc/dist/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final two package.conf dependencies: ghc-prim depends on RTS,
 # and RTS depends on libffi.

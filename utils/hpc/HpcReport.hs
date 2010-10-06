@@ -6,7 +6,7 @@
 module HpcReport (report_plugin) where
 
 import Prelude hiding (exp)
-import List(sort,intersperse,sortBy)
+import Data.List(sort,intersperse,sortBy)
 import HpcFlags
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
