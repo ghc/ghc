@@ -331,7 +331,8 @@ matchVariables [] _ _ = panic "matchVariables"
 
 matchBangs :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchBangs (var:vars) ty eqns
-  = do	{ match_result <- match (var:vars) ty (map decomposeFirst_Bang eqns)
+  = do	{ match_result <- match (var:vars) ty $
+                          map (decomposeFirstPat getBangPat) eqns
 	; return (mkEvalMatchResult var ty match_result) }
 matchBangs [] _ _ = panic "matchBangs"
 
@@ -340,7 +341,8 @@ matchCoercion :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchCoercion (var:vars) ty (eqns@(eqn1:_))
   = do	{ let CoPat co pat _ = firstPat eqn1
 	; var' <- newUniqueId var (hsPatType pat)
-	; match_result <- match (var':vars) ty (map decomposeFirst_Coercion eqns)
+	; match_result <- match (var':vars) ty $
+                          map (decomposeFirstPat getCoPat) eqns
 	; co' <- dsHsWrapper co
         ; let rhs' = co' (Var var)
 	; return (mkCoLetMatchResult (NonRec var' rhs') match_result) }
@@ -355,7 +357,8 @@ matchView (var:vars) ty (eqns@(eqn1:_))
          let ViewPat viewExpr (L _ pat) _ = firstPat eqn1
          -- do the rest of the compilation 
 	; var' <- newUniqueId var (hsPatType pat)
-	; match_result <- match (var':vars) ty (map decomposeFirst_View eqns)
+	; match_result <- match (var':vars) ty $
+                          map (decomposeFirstPat getViewPat) eqns
          -- compile the view expressions
         ; viewExpr' <- dsLExpr viewExpr
 	; return (mkViewMatchResult var' viewExpr' var match_result) }
@@ -367,12 +370,13 @@ decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 	= eqn { eqn_pats = extractpat pat : pats}
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
-decomposeFirst_Coercion, decomposeFirst_Bang, decomposeFirst_View :: EquationInfo -> EquationInfo
-
-decomposeFirst_Coercion = decomposeFirstPat (\ (CoPat _ pat _) -> pat)
-decomposeFirst_Bang     = decomposeFirstPat (\ (BangPat pat  ) -> unLoc pat)
-decomposeFirst_View     = decomposeFirstPat (\ (ViewPat _ pat _) -> unLoc pat)
-
+getCoPat, getBangPat, getViewPat :: Pat Id -> Pat Id
+getCoPat (CoPat _ pat _)     = pat
+getCoPat _                   = panic "getCoPat"
+getBangPat (BangPat pat  )   = unLoc pat
+getBangPat _                 = panic "getBangPat"
+getViewPat (ViewPat _ pat _) = unLoc pat
+getViewPat _                 = panic "getBangPat"
 \end{code}
 
 %************************************************************************
