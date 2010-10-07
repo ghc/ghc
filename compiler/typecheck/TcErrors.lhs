@@ -721,8 +721,8 @@ wrapEqErrTcS fl ty1 ty2 thing_inside
        ; wrapErrTcS $ setCtFlavorLoc fl $ 
     do {   -- Apply the current substitition
            -- and zonk to get rid of flatten-skolems
-       ; ty_binds_bag <- readTcRef ty_binds_var
-       ; let subst = mkOpenTvSubst (mkVarEnv (bagToList ty_binds_bag))
+       ; ty_binds_map <- readTcRef ty_binds_var
+       ; let subst = mkOpenTvSubst (mapVarEnv snd ty_binds_map)
        ; env0 <- tcInitTidyEnv 
        ; (env1, ty1) <- zonkSubstTidy env0 subst ty1
        ; (env2, ty2) <- zonkSubstTidy env1 subst ty2

@@ -42,7 +42,7 @@ cmmCPS :: DynFlags -- ^ Dynamic flags: -dcmm-lint -ddump-cps-cmm
 cmmCPS dflags cmm_with_calls
   = do	{ when (dopt Opt_DoCmmLinting dflags) $
 	       do showPass dflags "CmmLint"
-		  case firstJust $ map cmmLint cmm_with_calls of
+		  case firstJusts $ map cmmLint cmm_with_calls of
 		    Just err -> do printDump err
 				   ghcExit dflags 1
 		    Nothing  -> return ()

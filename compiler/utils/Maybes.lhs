@@ -14,7 +14,7 @@ module Maybes (
         orElse,
         mapCatMaybes,
         allMaybes,
-        firstJust,
+        firstJust, firstJusts,
         expectJust,
         maybeToBool,
 
@@ -46,12 +46,14 @@ allMaybes (Just x  : ms) = case allMaybes ms of
                            Nothing -> Nothing
                            Just xs -> Just (x:xs)
 
+firstJust :: Maybe a -> Maybe a -> Maybe a
+firstJust (Just a) _ = Just a
+firstJust Nothing  b = b
+
 -- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
 -- @Nothing@ otherwise.
-firstJust :: [Maybe a] -> Maybe a
-firstJust [] = Nothing
-firstJust (Just x  : _)  = Just x
-firstJust (Nothing : ms) = firstJust ms
+firstJusts :: [Maybe a] -> Maybe a
+firstJusts = foldr firstJust Nothing
 \end{code}
 
 \begin{code}
@@ -70,6 +72,7 @@ mapCatMaybes f (x:xs) = case f x of
 \end{code}
 
 \begin{code}
+
 orElse :: Maybe a -> a -> a
 (Just x) `orElse` _ = x
 Nothing  `orElse` y = y

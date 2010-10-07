@@ -31,7 +31,7 @@ module TcSMonad (
  
     getInstEnvs, getFamInstEnvs,                -- Getting the environments 
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchablesTcS,
-    getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsBag,
+    getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsMap,
 
 
     newFlattenSkolemTy,                         -- Flatten skolems 
@@ -87,6 +87,7 @@ import TypeRep
 
 import Name
 import Var
+import VarEnv
 import Outputable
 import Bag
 import MonadUtils
@@ -336,7 +337,7 @@ data TcSEnv
       tcs_ev_binds :: EvBindsVar,
           -- Evidence bindings
 
-      tcs_ty_binds :: IORef (Bag (TcTyVar, TcType)),
+      tcs_ty_binds :: IORef (TyVarEnv (TcTyVar, TcType)),
           -- Global type bindings
 
       tcs_context :: SimplContext
@@ -415,7 +416,7 @@ runTcS :: SimplContext
        -> TcS a		       -- What to run
        -> TcM (a, Bag EvBind)
 runTcS context untouch tcs 
-  = do { ty_binds_var <- TcM.newTcRef emptyBag
+  = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
        ; ev_binds_var@(EvBindsVar evb_ref _) <- TcM.newTcEvBinds
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
@@ -426,7 +427,7 @@ runTcS context untouch tcs
 
 	     -- Perform the type unifications required
        ; ty_binds <- TcM.readTcRef ty_binds_var
-       ; mapBagM_ do_unification ty_binds
+       ; mapM_ do_unification (varEnvElts ty_binds)
 
              -- And return
        ; ev_binds <- TcM.readTcRef evb_ref
@@ -454,7 +455,7 @@ tryTcS :: TcTyVarSet -> TcS a -> TcS a
 -- Like runTcS, but from within the TcS monad 
 -- Ignore all the evidence generated, and do not affect caller's evidence!
 tryTcS untch tcs 
-  = TcS (\env -> do { ty_binds_var <- TcM.newTcRef emptyBag
+  = TcS (\env -> do { ty_binds_var <- TcM.newTcRef emptyVarEnv
                     ; ev_binds_var <- TcM.newTcEvBinds
                     ; let env1 = env { tcs_ev_binds = ev_binds_var
                                      , tcs_ty_binds = ty_binds_var }
@@ -472,11 +473,11 @@ getTcSContext = TcS (return . tcs_context)
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds) 
 
-getTcSTyBinds :: TcS (IORef (Bag (TcTyVar, TcType)))
+getTcSTyBinds :: TcS (IORef (TyVarEnv (TcTyVar, TcType)))
 getTcSTyBinds = TcS (return . tcs_ty_binds)
 
-getTcSTyBindsBag :: TcS (Bag (TcTyVar, TcType)) 
-getTcSTyBindsBag = getTcSTyBinds >>= wrapTcS . (TcM.readTcRef) 
+getTcSTyBindsMap :: TcS (TyVarEnv (TcTyVar, TcType)) 
+getTcSTyBindsMap = getTcSTyBinds >>= wrapTcS . (TcM.readTcRef) 
 
 
 getTcEvBindsBag :: TcS EvBindMap
@@ -499,7 +500,7 @@ setWantedTyBind tv ty
   = do { ref <- getTcSTyBinds
        ; wrapTcS $ 
          do { ty_binds <- TcM.readTcRef ref
-            ; TcM.writeTcRef ref (ty_binds `snocBag` (tv,ty)) } }
+            ; TcM.writeTcRef ref (extendVarEnv ty_binds tv (tv,ty)) } }
 
 setIPBind :: EvVar -> EvTerm -> TcS () 
 setIPBind = setEvBind 

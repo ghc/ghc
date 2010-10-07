@@ -84,7 +84,7 @@ module StaticFlags (
 import Config
 import FastString
 import Util
-import Maybes		( firstJust )
+import Maybes		( firstJusts )
 import Panic
 
 import Data.Maybe       ( listToMaybe )
@@ -138,7 +138,7 @@ lookUp     sw = sw `elem` packed_static_opts
 -- (lookup_str "foo") looks for the flag -foo=X or -fooX, 
 -- and returns the string X
 lookup_str sw 
-   = case firstJust (map (stripPrefix sw) staticFlags) of
+   = case firstJusts (map (stripPrefix sw) staticFlags) of
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
 	Nothing		 -> Nothing	

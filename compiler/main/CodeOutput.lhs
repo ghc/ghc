@@ -34,7 +34,7 @@ import Config
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Module
-import Maybes		( firstJust )
+import Maybes		( firstJusts )
 
 import Control.Exception
 import Control.Monad
@@ -69,7 +69,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
     do	{ when (dopt Opt_DoCmmLinting dflags) $ do
 		{ showPass dflags "CmmLint"
 		; let lints = map cmmLint flat_abstractC
-		; case firstJust lints of
+		; case firstJusts lints of
 			Just err -> do { printDump err
 				       ; ghcExit dflags 1
 				       }
