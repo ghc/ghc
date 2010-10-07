@@ -23,18 +23,18 @@ import Type		( tyVarsOfType )
 import CoreUtils        ( exprIsTrivial, isDefaultAlt, mkCoerceI, isExpandableApp )
 import Coercion		( CoercionI(..), mkSymCoI )
 import Id
-import Name		( localiseName )
+import NameEnv
+import NameSet
+import Name		( Name, localiseName )
 import BasicTypes
-
 import VarSet
 import VarEnv
 import Var		( Var, varUnique )
-
 import Maybes           ( orElse )
 import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
 import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
-import Unique           ( Unique )
-import UniqFM           ( keysUFM, intersectUFM_C, foldUFM_Directly )
+import Unique
+import UniqFM
 import Util             ( mapAndUnzip, filterOut )
 import Bag
 import Outputable
@@ -54,14 +54,14 @@ Here's the externally-callable interface:
 \begin{code}
 occurAnalysePgm :: [CoreBind] -> [CoreRule] -> [CoreBind]
 occurAnalysePgm binds rules
-  = snd (go initOccEnv binds)
+  = snd (go (initOccEnv rules) binds)
   where
-    initial_details = addIdOccs emptyDetails (rulesFreeVars rules)
+    initial_uds = addIdOccs emptyDetails (rulesFreeVars rules)
     -- The RULES keep things alive!
 
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go _ []
-        = (initial_details, [])
+        = (initial_uds, [])
     go env (bind:binds)
         = (final_usage, bind' ++ binds')
         where
@@ -70,7 +70,7 @@ occurAnalysePgm binds rules
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurence info returned
-occurAnalyseExpr expr = snd (occAnal initOccEnv expr)
+occurAnalyseExpr expr = snd (occAnal (initOccEnv []) expr)
 \end{code}
 
 
@@ -155,13 +155,17 @@ However things are made quite a bit more complicated by RULES.  Remember
     To that end, we build a Rec group for each cyclic strongly
     connected component,
         *treating f's rules as extra RHSs for 'f'*.
+    More concretely, the SCC analysis runs on a graph with an edge
+    from f -> g iff g is mentioned in
+        (a) f's rhs
+        (b) f's RULES
+    These are rec_edges.
 
-    When we make the Rec groups we include variables free in *either*
-    LHS *or* RHS of the rule.  The former might seems silly, but see
-    Note [Rule dependency info].
-
-    So in Example [eftInt], eftInt and eftIntFB will be put in the
-    same Rec, even though their 'main' RHSs are both non-recursive.
+    Under (b) we include variables free in *either* LHS *or* RHS of
+    the rule.  The former might seems silly, but see Note [Rule
+    dependency info].  So in Example [eftInt], eftInt and eftIntFB
+    will be put in the same Rec, even though their 'main' RHSs are
+    both non-recursive.
 
   * Note [Rules are visible in their own rec group]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -198,6 +202,14 @@ However things are made quite a bit more complicated by RULES.  Remember
     Note that when we compute this rule_fv_env, we only consider variables
     free in the *RHS* of the rule, in contrast to the way we build the
     Rec group in the first place (Note [Rule dependency info])
+
+    Note that if 'g' has RHS that mentions 'w', we should add w to
+    g's loop-breaker edges.  More concretely there is an edge from f -> g 
+    iff
+    	(a) g is mentioned in f's RHS
+	(b) h is mentioned in f's RHS, and 
+            g appears in the RHS of a RULE of h
+            or a transitive sequence of rules starting with h
 
     Note that in Example [eftInt], *neither* eftInt *nor* eftIntFB is
     chosen as a loop breaker, because their RHSs don't mention each other.
@@ -392,42 +404,18 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
     loop_breaker_edges = map mk_node tagged_nodes
     mk_node (details@(ND _ _ _ rhs_fvs), k, _) = (details, k, new_ks)
 	where
-	  new_ks = keysUFM (extendFvs rule_fv_env rhs_fvs rhs_fvs)
+	  new_ks = keysUFM (fst (extendFvs rule_fv_env rhs_fvs))
 
     ------------------------------------
     rule_fv_env :: IdEnv IdSet  -- Variables from this group mentioned in RHS of rules
                                 -- Domain is *subset* of bound vars (others have no rule fvs)
-    rule_fv_env = rule_loop init_rule_fvs
-
+    rule_fv_env   = transClosureFV init_rule_fvs 
     no_rules      = null init_rule_fvs
     init_rule_fvs = [(b, rule_fvs)
                     | b <- bndrs
 		    , isId b
                     , let rule_fvs = idRuleRhsVars b `intersectVarSet` bndr_set
                     , not (isEmptyVarSet rule_fvs)]
-
-    rule_loop :: [(Id,IdSet)] -> IdEnv IdSet    -- Finds fixpoint
-    rule_loop fv_list
-        | no_change = env
-        | otherwise = rule_loop new_fv_list
-        where
-          env = mkVarEnv init_rule_fvs
-          (no_change, new_fv_list) = mapAccumL bump True fv_list
-          bump no_change (b,fvs)
-                | new_fvs `subVarSet` fvs = (no_change, (b,fvs))
-                | otherwise               = (False,     (b,new_fvs `unionVarSet` fvs))
-                where
-                  new_fvs = extendFvs env emptyVarSet fvs
-
-extendFvs :: IdEnv IdSet -> IdSet -> IdSet -> IdSet
--- (extendFVs env fvs s) returns (fvs `union` env(s))
-extendFvs env fvs id_set
-  = foldUFM_Directly add fvs id_set
-  where
-    add uniq _ fvs
-        = case lookupVarEnv_Directly env uniq  of
-            Just fvs' -> fvs' `unionVarSet` fvs
-            Nothing   -> fvs
 \end{code}
 
 @reOrderRec@ is applied to the list of (binder,rhs) pairs for a cyclic
@@ -1079,9 +1067,10 @@ wrapProxy (bndr, rhs_var, co) (body_usg, body)
 
 \begin{code}
 data OccEnv
-  = OccEnv { occ_encl  :: !OccEncl      -- Enclosing context information
-    	   , occ_ctxt  :: !CtxtTy       -- Tells about linearity
-	   , occ_proxy :: ProxyEnv }
+  = OccEnv { occ_encl  	  :: !OccEncl      -- Enclosing context information
+    	   , occ_ctxt  	  :: !CtxtTy       -- Tells about linearity
+	   , occ_proxy 	  :: ProxyEnv
+           , occ_rule_fvs :: ImpRuleUsage }
 
 
 -----------------------------
@@ -1113,19 +1102,17 @@ type CtxtTy = [Bool]
         --                      be applied many times; but when it is,
         --                      the CtxtTy inside applies
 
-initOccEnv :: OccEnv
-initOccEnv = OccEnv { occ_encl  = OccVanilla
-	      	    , occ_ctxt  = []
-		    , occ_proxy = PE emptyVarEnv emptyVarSet }
+initOccEnv :: [CoreRule] -> OccEnv
+initOccEnv rules = OccEnv { occ_encl  = OccVanilla
+	      	    	  , occ_ctxt  = []
+		    	  , occ_proxy = PE emptyVarEnv emptyVarSet
+                    	  , occ_rule_fvs = findImpRuleUsage rules }
 
 vanillaCtxt :: OccEnv -> OccEnv
-vanillaCtxt env = OccEnv { occ_encl = OccVanilla
-                         , occ_ctxt = []
-	      	         , occ_proxy = occ_proxy env }
+vanillaCtxt env = env { occ_encl = OccVanilla, occ_ctxt = [] }
 
 rhsCtxt :: OccEnv -> OccEnv
-rhsCtxt env = OccEnv { occ_encl = OccRhs, occ_ctxt = []
-	      	     , occ_proxy = occ_proxy env }
+rhsCtxt env = env { occ_encl = OccRhs, occ_ctxt = [] }
 
 setCtxtTy :: OccEnv -> CtxtTy -> OccEnv
 setCtxtTy env ctxt = env { occ_ctxt = ctxt }
@@ -1160,6 +1147,105 @@ addAppCtxt env@(OccEnv { occ_ctxt = ctxt }) args
 
 %************************************************************************
 %*                                                                      *
+                    ImpRuleUsage
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+type ImpRuleUsage = NameEnv UsageDetails
+  -- Maps an *imported* Id f to the UsageDetails for *local* Ids
+  -- used on the RHS for a *local* rule for f.
+\end{code}
+
+Note [ImpRuleUsage]
+~~~~~~~~~~~~~~~~
+Consider this, where A.g is an imported Id
+ 
+   f x = A.g x
+   {-# RULE "foo" forall x. A.g x = f x #-}
+
+Obviously there's a loop, but the danger is that the occurrence analyser
+will say that 'f' is not a loop breaker.  Then the simplifier will 
+optimise 'f' to
+   f x = f x
+and then gaily inline 'f'.  Result infinite loop.  More realistically, 
+these kind of rules are generated when specialising imported INLINABLE Ids.
+
+Solution: treat an occurrence of A.g as an occurrence of all the local Ids
+that occur on the RULE's RHS.  This mapping from imported Id to local Ids
+is held in occ_rule_fvs.
+
+\begin{code}
+findImpRuleUsage :: [CoreRule] -> ImpRuleUsage
+-- Find the *local* Ids that can be reached transitively,
+-- via local rules, from each *imported* Id.  
+-- Sigh: this function seems more complicated than it is really worth
+findImpRuleUsage rules
+  = mkNameEnv [ (f, mapUFM (\_ -> NoOccInfo) ls)
+              | f <- rule_names 
+              , let ls = find_lcl_deps f
+              , not (isEmptyVarSet ls) ]
+  where
+    rule_names    = map ru_fn rules
+    rule_name_set = mkNameSet rule_names
+
+    imp_deps :: NameEnv VarSet
+      -- (f,g) means imported Id 'g' appears in RHS of 
+      --       rule for imported Id 'f', *or* does so transitively
+    imp_deps = foldr add_imp emptyNameEnv rules
+    add_imp rule acc = extendNameEnv_C unionVarSet acc (ru_fn rule)
+                             (exprSomeFreeVars keep_imp (ru_rhs rule))
+    keep_imp v = isId v && (idName v `elemNameSet` rule_name_set)
+    full_imp_deps = transClosureFV (ufmToList imp_deps)
+
+    lcl_deps :: NameEnv VarSet
+      -- (f, l) means localId 'l' appears immediately 
+      --        in the RHS of a rule for imported Id 'f'
+      -- Remember, many rules might have the same ru_fn
+      -- so we do need to fold 
+    lcl_deps = foldr add_lcl emptyNameEnv rules
+    add_lcl rule acc = extendNameEnv_C unionVarSet acc (ru_fn rule)
+                                       (exprFreeIds (ru_rhs rule))
+
+    find_lcl_deps :: Name -> VarSet
+    find_lcl_deps f 
+      = foldVarSet (unionVarSet . lookup_lcl . idName) (lookup_lcl f) 
+                   (lookupNameEnv full_imp_deps f `orElse` emptyVarSet)
+    lookup_lcl :: Name -> VarSet
+    lookup_lcl g = lookupNameEnv lcl_deps g `orElse` emptyVarSet
+
+-------------
+transClosureFV :: Uniquable a => [(a, VarSet)] -> UniqFM VarSet
+-- If (f,g), (g,h) are in the input, then (f,h) is in the output
+transClosureFV fv_list
+  | no_change = env
+  | otherwise = transClosureFV new_fv_list
+  where
+    env = listToUFM fv_list
+    (no_change, new_fv_list) = mapAccumL bump True fv_list
+    bump no_change (b,fvs)
+      | no_change_here = (no_change, (b,fvs))
+      | otherwise      = (False,     (b,new_fvs))
+      where
+        (new_fvs, no_change_here) = extendFvs env fvs
+
+-------------
+extendFvs :: UniqFM VarSet -> VarSet -> (VarSet, Bool)
+-- (extendFVs env s) returns 
+--     (s `union` env(s), env(s) `subset` s)
+extendFvs env s
+  = foldVarSet add (s, True) s
+  where
+    add v (vs, no_change_so_far)
+        = case lookupUFM env v of
+            Just fvs | not (fvs `subVarSet` s) 
+                     -> (vs `unionVarSet` fvs, False)
+            _        -> (vs, no_change_so_far)
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
                     ProxyEnv									
 %*                                                                      *
 %************************************************************************
@@ -1190,7 +1276,7 @@ Things to note:
     element without losing correctness.  And we do so when pushing
     it inside a binding (see trimProxyEnv).
 
-  * Once scrutinee might map to many case binders:  Eg
+  * One scrutinee might map to many case binders:  Eg
       case sc of cb1 { DEFAULT -> ....case sc of cb2 { ... } .. }
 
 INVARIANTS
@@ -1204,13 +1290,15 @@ INVARIANTS
 The Main Reason for having a ProxyEnv is so that when we encounter
     case e of cb { pi -> ri }
 we can find all the in-scope variables derivable from 'cb', 
-and effectively add let-bindings for them thus:
+and effectively add let-bindings for them (or at least for the
+ones *mentioned* in ri) thus:
     case e of cb { pi -> let { x = ..cb..; y = ...cb.. }
                          in ri }
+In this way we'll replace occurrences of 'x', 'y' with 'cb',
+which implements the Binder-swap idea (see Note [Binder swap])
+
 The function getProxies finds these bindings; then we 
 add just the necessary ones, using wrapProxy. 
-
-More info under Note [Binder swap]
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
@@ -1570,6 +1658,8 @@ mkOneOcc env id int_cxt
   | isLocalId id = unitVarEnv id (OneOcc False True int_cxt)
   | PE env _ <- occ_proxy env
   , id `elemVarEnv` env = unitVarEnv id NoOccInfo
+  | Just uds <- lookupNameEnv (occ_rule_fvs env) (idName id)
+  = uds
   | otherwise           = emptyDetails
 
 markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
