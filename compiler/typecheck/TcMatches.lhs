@@ -419,12 +419,17 @@ tcLcStmt m_tc ctxt (TransformStmt stmts binders usingExpr maybeByExpr) elt_ty th
                 case maybeByExpr of
                     Nothing -> do
                         -- We must validate that usingExpr :: forall a. [a] -> [a]
-                        usingExpr' <- tcPolyExpr usingExpr (mkForAllTy alphaTyVar (alphaListTy `mkFunTy` alphaListTy))
+                        let using_ty = mkForAllTy alphaTyVar (alphaListTy `mkFunTy` alphaListTy)
+                        usingExpr' <- tcPolyExpr usingExpr using_ty
                         return (usingExpr', Nothing)
                     Just byExpr -> do
-                        -- We must infer a type such that e :: t and then check that usingExpr :: forall a. (a -> t) -> [a] -> [a]
+                        -- We must infer a type such that e :: t and then check that 
+			-- usingExpr :: forall a. (a -> t) -> [a] -> [a]
                         (byExpr', tTy) <- tcInferRhoNC byExpr
-                        usingExpr' <- tcPolyExpr usingExpr (mkForAllTy alphaTyVar ((alphaTy `mkFunTy` tTy) `mkFunTy` (alphaListTy `mkFunTy` alphaListTy)))
+                        let using_ty = mkForAllTy alphaTyVar $ 
+                                       (alphaTy `mkFunTy` tTy)
+                                       `mkFunTy` alphaListTy `mkFunTy` alphaListTy
+                        usingExpr' <- tcPolyExpr usingExpr using_ty
                         return (usingExpr', Just byExpr')
             
             binders' <- tcLookupLocalIds binders
@@ -439,24 +444,26 @@ tcLcStmt m_tc ctxt (GroupStmt stmts bindersMap by using) elt_ty thing_inside
 
        ; (stmts', (bndr_ids, by', using_ty, elt_ty')) <-
             tcStmts (TransformStmtCtxt ctxt) (tcLcStmt m_tc) stmts elt_ty $ \elt_ty' -> do
-	        (by', using_ty) <- case by of
-                                     Nothing   -> -- check that using :: forall a. [a] -> [[a]]
-                                                  return (Nothing, mkForAllTy alphaTyVar $
-                                                                   alphaListTy `mkFunTy` alphaListListTy)
-							
-				     Just by_e -> -- check that using :: forall a. (a -> t) -> [a] -> [[a]]
-				     	          -- where by :: t
-                                                  do { (by_e', t_ty) <- tcInferRhoNC by_e
-                                                     ; return (Just by_e', mkForAllTy alphaTyVar $
-                                                                           (alphaTy `mkFunTy` t_ty) 
-                                                                              `mkFunTy` alphaListTy 
-                                                                              `mkFunTy` alphaListListTy) }
+	        (by', using_ty) <- 
+                   case by of
+                     Nothing   -> -- check that using :: forall a. [a] -> [[a]]
+                                  return (Nothing, mkForAllTy alphaTyVar $
+                                                   alphaListTy `mkFunTy` alphaListListTy)
+		     			
+		     Just by_e -> -- check that using :: forall a. (a -> t) -> [a] -> [[a]]
+		     	          -- where by :: t
+                                  do { (by_e', t_ty) <- tcInferRhoNC by_e
+                                     ; return (Just by_e', mkForAllTy alphaTyVar $
+                                                           (alphaTy `mkFunTy` t_ty) 
+                                                           `mkFunTy` alphaListTy 
+                                                           `mkFunTy` alphaListListTy) }
                 -- Find the Ids (and hence types) of all old binders
                 bndr_ids <- tcLookupLocalIds bndr_names
                 
                 return (bndr_ids, by', using_ty, elt_ty')
         
-                -- Ensure that every old binder of type b is linked up with its new binder which should have type [b]
+                -- Ensure that every old binder of type b is linked up with
+		-- its new binder which should have type [b]
        ; let list_bndr_ids = zipWith mk_list_bndr list_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` list_bndr_ids
 	     -- See Note [GroupStmt binder map] in HsExpr
@@ -465,7 +472,8 @@ tcLcStmt m_tc ctxt (GroupStmt stmts bindersMap by using) elt_ty thing_inside
                      Left  e -> do { e' <- tcPolyExpr e         using_ty; return (Left  e') }
                      Right e -> do { e' <- tcPolyExpr (noLoc e) using_ty; return (Right (unLoc e')) }
 
-             -- Type check the thing in the environment with these new binders and return the result
+             -- Type check the thing in the environment with 
+	     -- these new binders and return the result
        ; thing <- tcExtendIdEnv list_bndr_ids (thing_inside elt_ty')
        ; return (GroupStmt stmts' bindersMap' by' using', thing) }
   where
@@ -473,7 +481,8 @@ tcLcStmt m_tc ctxt (GroupStmt stmts bindersMap by using) elt_ty thing_inside
     alphaListListTy = mkTyConApp m_tc [alphaListTy]
             
     mk_list_bndr :: Name -> TcId -> TcId
-    mk_list_bndr list_bndr_name bndr_id = mkLocalId list_bndr_name (mkTyConApp m_tc [idType bndr_id])
+    mk_list_bndr list_bndr_name bndr_id 
+      = mkLocalId list_bndr_name (mkTyConApp m_tc [idType bndr_id])
     
 tcLcStmt _ _ stmt _ _
   = pprPanic "tcLcStmt: unexpected Stmt" (ppr stmt)
