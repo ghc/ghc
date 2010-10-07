@@ -7,13 +7,6 @@
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
@@ -29,12 +22,12 @@ import Alpha.Instr
 #elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import X86.CodeGen
 import X86.Regs
-import X86.RegInfo
 import X86.Instr
 import X86.Ppr
 
 #elif sparc_TARGET_ARCH
 import SPARC.CodeGen
+import SPARC.CodeGen.Expand
 import SPARC.Regs
 import SPARC.Instr
 import SPARC.Ppr
@@ -59,17 +52,13 @@ import qualified RegAlloc.Linear.Main		as Linear
 import qualified GraphColor			as Color
 import qualified RegAlloc.Graph.Main		as Color
 import qualified RegAlloc.Graph.Stats		as Color
-import qualified RegAlloc.Graph.Coalesce	as Color
 import qualified RegAlloc.Graph.TrivColorable	as Color
-
-import qualified SPARC.CodeGen.Expand		as SPARC
 
 import TargetReg
 import Platform
 import Instruction
 import PIC
 import Reg
-import RegClass
 import NCGMonad
 
 import BlockId
@@ -78,7 +67,6 @@ import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
 import PprCmm
 import CLabel
-import State
 
 import UniqFM
 import Unique		( Unique, getUnique )
@@ -89,7 +77,6 @@ import StaticFlags	( opt_Static, opt_PIC )
 #endif
 import Util
 import Config           ( cProjectVersion )
-import Module
 
 import Digraph
 import qualified Pretty
@@ -103,11 +90,7 @@ import ErrUtils
 --import OrdList
 
 import Data.List
-import Data.Int
-import Data.Word
-import Data.Bits
 import Data.Maybe
-import GHC.Exts
 import Control.Monad
 import System.IO
 
@@ -227,7 +210,21 @@ nativeCodeGen dflags h us cmms
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens dflags h us [] impAcc profAcc count
+cmmNativeGens :: DynFlags
+              -> BufHandle
+              -> UniqSupply
+              -> [RawCmmTop]
+              -> [[CLabel]]
+              -> [ ([NatCmmTop Instr],
+                   Maybe [Color.RegAllocStats Instr],
+                   Maybe [Linear.RegAllocStats]) ]
+              -> Int
+              -> IO ( [[CLabel]],
+                      [([NatCmmTop Instr],
+                      Maybe [Color.RegAllocStats Instr],
+                      Maybe [Linear.RegAllocStats])] )
+
+cmmNativeGens _ _ _ [] impAcc profAcc _
 	= return (reverse impAcc, reverse profAcc)
 
 cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc count
@@ -404,7 +401,7 @@ cmmNativeGen dflags us cmm count
 #if sparc_TARGET_ARCH
 	let expanded = 
 		{-# SCC "sparc_expand" #-}
-		map SPARC.expandTop kludged
+		map expandTop kludged
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
@@ -424,7 +421,7 @@ cmmNativeGen dflags us cmm count
 #if i386_TARGET_ARCH
 x86fp_kludge :: NatCmmTop Instr -> NatCmmTop Instr
 x86fp_kludge top@(CmmData _ _) = top
-x86fp_kludge top@(CmmProc info lbl params (ListGraph code)) = 
+x86fp_kludge (CmmProc info lbl params (ListGraph code)) = 
 	CmmProc info lbl params (ListGraph $ i386_insert_ffrees code)
 #endif
 
@@ -545,8 +542,12 @@ getOutEdges instrs
 		[one] -> [getUnique one]
 		_many -> []
 
+mkNode :: (Instruction t)
+       => GenBasicBlock t
+       -> (GenBasicBlock t, Unique, [Unique])
 mkNode block@(BasicBlock id instrs) = (block, getUnique id, getOutEdges instrs)
 
+seqBlocks :: (Eq t) => [(GenBasicBlock t1, t, [t])] -> [GenBasicBlock t1]
 seqBlocks [] = []
 seqBlocks ((block,_,[]) : rest)
   = block : seqBlocks rest
@@ -559,7 +560,8 @@ seqBlocks ((block@(BasicBlock id instrs),_,[next]) : rest)
 	  -- fallthroughs within a loop.
 seqBlocks _ = panic "AsmCodegen:seqBlocks"
 
-reorder id accum [] = (False, reverse accum)
+reorder :: (Eq a) => a -> [(t, a, t1)] -> [(t, a, t1)] -> (Bool, [(t, a, t1)])
+reorder  _ accum [] = (False, reverse accum)
 reorder id accum (b@(block,id',out) : rest)
   | id == id'  = (True, (block,id,out) : reverse accum ++ rest)
   | otherwise  = reorder id (b:accum) rest
@@ -621,6 +623,8 @@ shortcutBranches dflags tops
     (tops', mappings) = mapAndUnzip build_mapping tops
     mapping = foldr plusUFM emptyUFM mappings
 
+build_mapping :: GenCmmTop d t (ListGraph Instr)
+              -> (GenCmmTop d t (ListGraph Instr), UniqFM JumpDest)
 build_mapping top@(CmmData _ _) = (top, emptyUFM)
 build_mapping (CmmProc info lbl params (ListGraph []))
   = (CmmProc info lbl params (ListGraph []), emptyUFM)
@@ -647,6 +651,9 @@ build_mapping (CmmProc info lbl params (ListGraph (head:blocks)))
     mapping = foldl add emptyUFM shortcut_blocks
     add ufm (id,dest) = addToUFM ufm id dest
     
+apply_mapping :: UniqFM JumpDest
+              -> GenCmmTop CmmStatic h (ListGraph Instr)
+              -> GenCmmTop CmmStatic h (ListGraph Instr)
 apply_mapping ufm (CmmData sec statics) 
   = CmmData sec (map (shortcutStatic (lookupUFM ufm)) statics)
   -- we need to get the jump tables, so apply the mapping to the entries
@@ -739,7 +746,7 @@ instance Monad CmmOptM where
                       CmmOptM g' -> g' (imports', dflags)
 
 addImportCmmOpt :: CLabel -> CmmOptM ()
-addImportCmmOpt lbl = CmmOptM $ \(imports, dflags) -> (# (), lbl:imports #)
+addImportCmmOpt lbl = CmmOptM $ \(imports, _dflags) -> (# (), lbl:imports #)
 
 getDynFlagsCmmOpt :: CmmOptM DynFlags
 getDynFlagsCmmOpt = CmmOptM $ \(imports, dflags) -> (# dflags, imports #)
@@ -753,6 +760,7 @@ cmmBlockConFold (BasicBlock id stmts) = do
   stmts' <- mapM cmmStmtConFold stmts
   return $ BasicBlock id stmts'
 
+cmmStmtConFold :: CmmStmt -> CmmOptM CmmStmt
 cmmStmtConFold stmt
    = case stmt of
         CmmAssign reg src
@@ -788,8 +796,8 @@ cmmStmtConFold stmt
 		     CmmComment (mkFastString ("deleted: " ++ 
 					showSDoc (pprStmt stmt)))
 
-		   CmmLit (CmmInt n _) -> CmmBranch dest
-		   other -> CmmCondBranch test' dest
+		   CmmLit (CmmInt _ _) -> CmmBranch dest
+		   _other -> CmmCondBranch test' dest
 
 	CmmSwitch expr ids
 	   -> do expr' <- cmmExprConFold DataReference expr
@@ -799,6 +807,7 @@ cmmStmtConFold stmt
            -> return other
 
 
+cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprConFold referenceKind expr
    = case expr of
         CmmLoad addr rep
