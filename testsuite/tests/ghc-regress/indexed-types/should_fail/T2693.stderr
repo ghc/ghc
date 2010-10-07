@@ -1,6 +1,9 @@
 
-T2693.hs:10:15:
+T2693.hs:9:16:
     Couldn't match type `TFn a' with `(a1, b)'
-    In the first argument of `fst', namely `x'
-    In the first argument of `(+)', namely `fst x'
-    In the expression: fst x + fst x
+    In the expression: undefined :: Maybe (TFn a)
+    In a pattern binding: Just x = undefined :: Maybe (TFn a)
+    In the expression:
+      do { let Just x = ...;
+           let n = fst x + fst x;
+           return () }

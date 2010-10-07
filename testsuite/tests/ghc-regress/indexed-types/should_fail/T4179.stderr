@@ -18,6 +18,9 @@ T4179.hs:26:16:
                       A2 (FCon x))
       from the context (Functor x, DoC (FCon x))
     NB: `A2' is a type function, and may not be injective
+    Expected type: A2 (FCon x) -> A3 (FCon x)
+      Actual type: A2 (x (A2 (FCon x) -> A3 (FCon x)))
+                   -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
     In the first argument of `foldDoC', namely `op'
     In the expression: foldDoC op
     In an equation for `fCon': fCon = foldDoC op
@@ -28,6 +31,9 @@ T4179.hs:26:16:
                       A3 (FCon x))
       from the context (Functor x, DoC (FCon x))
     NB: `A3' is a type function, and may not be injective
+    Expected type: A2 (FCon x) -> A3 (FCon x)
+      Actual type: A2 (x (A2 (FCon x) -> A3 (FCon x)))
+                   -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
     In the first argument of `foldDoC', namely `op'
     In the expression: foldDoC op
     In an equation for `fCon': fCon = foldDoC op
