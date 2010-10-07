@@ -98,7 +98,14 @@ then
     rm -f $HPCTIXFILE
 fi
 
-$make test stage=2 BINDIST=YES THREADS=$threads 2>&1 | tee testlog
+if [ "$slow" = YES ]
+then
+MAKE_TEST_TARGET=fulltest
+else
+MAKE_TEST_TARGET=test
+fi
+
+$make $MAKE_TEST_TARGET stage=2 BINDIST=YES THREADS=$threads 2>&1 | tee testlog
 
 if [ "$hpc" = YES ]
 then
