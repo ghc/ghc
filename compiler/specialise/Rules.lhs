@@ -652,7 +652,7 @@ match idu menv subst (Lam x1 e1) (Lam x2 e2)
 match idu menv subst (Lam x1 e1) e2
   = match idu menv' subst e1 (App e2 (varToCoreExpr new_x))
   where
-    (rn_env', new_x) = rnBndrL (me_env menv) x1
+    (rn_env', new_x) = rnEtaL (me_env menv) x1
     menv' = menv { me_env = rn_env' }
 
 -- Eta expansion the other way
@@ -660,7 +660,7 @@ match idu menv subst (Lam x1 e1) e2
 match idu menv subst e1 (Lam x2 e2)
   = match idu menv' subst (App e1 (varToCoreExpr new_x)) e2
   where
-    (rn_env', new_x) = rnBndrR (me_env menv) x2
+    (rn_env', new_x) = rnEtaR (me_env menv) x2
     menv' = menv { me_env = rn_env' }
 
 match idu menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)

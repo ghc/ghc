@@ -36,6 +36,7 @@ module VarEnv (
 	-- ** Operations on RnEnv2s
 	mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
 	rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
+        rnEtaL, rnEtaR,
 	rnInScope, rnInScopeSet, lookupRnInScope,
 
 	-- * TidyEnv and its operation
@@ -237,36 +238,43 @@ rnBndr2 (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
 
 rnBndrL :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndr2' but used when there's a binder on the left
--- side only. Useful when eta-expanding
+-- side only.
 rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
   = (RV2 { envL     = extendVarEnv envL bL new_b
-	 , envR     = extendVarEnv envR new_b new_b 	-- Note [rnBndrLR]
+         , envR     = envR
 	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
     new_b = uniqAway in_scope bL
 
 rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndr2' but used when there's a binder on the right
--- side only. Useful when eta-expanding
+-- side only.
 rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
-  = (RV2 { envL     = extendVarEnv envL new_b new_b	-- Note [rnBndrLR]
-	 , envR     = extendVarEnv envR bR new_b
+  = (RV2 { envR     = extendVarEnv envR bR new_b
+         , envL     = envL
 	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
     new_b = uniqAway in_scope bR
 
--- Note [rnBndrLR] 
--- ~~~~~~~~~~~~~~~
--- Notice that in rnBndrL, rnBndrR, we extend envR, envL respectively
--- with a binding [new_b -> new_b], where new_b is the new binder.
--- This is important when doing eta expansion; e.g. matching (\x.M) ~ N
--- In effect we switch to (\x'.M) ~ (\x'.N x'), where x' is new_b
--- So we must add x' to the env of both L and R.  (x' is fresh, so it
--- can't capture anything in N.)  
---
--- If we don't do this, we can get silly matches like
---	forall a.  \y.a  ~   v
--- succeeding with [x -> v y], which is bogus of course 
+rnEtaL :: RnEnv2 -> Var -> (RnEnv2, Var)
+-- ^ Similar to 'rnBndrL' but used for eta expansion
+-- See Note [Eta expansion]
+rnEtaL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
+  = (RV2 { envL     = extendVarEnv envL bL new_b
+	 , envR     = extendVarEnv envR new_b new_b 	-- Note [Eta expansion]
+	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
+  where
+    new_b = uniqAway in_scope bL
+
+rnEtaR :: RnEnv2 -> Var -> (RnEnv2, Var)
+-- ^ Similar to 'rnBndr2' but used for eta expansion
+-- See Note [Eta expansion]
+rnEtaR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
+  = (RV2 { envL     = extendVarEnv envL new_b new_b	-- Note [Eta expansion]
+	 , envR     = extendVarEnv envR bR new_b
+	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
+  where
+    new_b = uniqAway in_scope bR
 
 rnOccL, rnOccR :: RnEnv2 -> Var -> Var
 -- ^ Look up the renaming of an occurrence in the left or right term
@@ -286,6 +294,20 @@ nukeRnEnvL, nukeRnEnvR :: RnEnv2 -> RnEnv2
 nukeRnEnvL env = env { envL = emptyVarEnv }
 nukeRnEnvR env = env { envR = emptyVarEnv }
 \end{code}
+
+Note [Eta expansion]
+~~~~~~~~~~~~~~~~~~~~
+When matching
+     (\x.M) ~ N
+we rename x to x' with, where x' is not in scope in 
+either term.  Then we want to behave as if we'd seen
+     (\x'.M) ~ (\x'.N x')
+Since x' isn't in scope in N, the form (\x'. N x') doesn't
+capture any variables in N.  But we must nevertheless extend
+the envR with a binding [x' -> x'], to support the occurs check.
+For example, if we don't do this, we can get silly matches like
+	forall a.  (\y.a)  ~   v
+succeeding with [a -> v y], which is bogus of course.
 
 
 %************************************************************************
