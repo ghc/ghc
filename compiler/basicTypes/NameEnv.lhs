@@ -26,7 +26,6 @@ import Name
 import Unique
 import UniqFM
 import Maybes
-import Outputable
 \end{code}
 
 %************************************************************************
@@ -36,7 +35,7 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-newtype NameEnv a = A (UniqFM a)	-- Domain is Name
+type NameEnv a = UniqFM a	-- Domain is Name
 
 emptyNameEnv   	   :: NameEnv a
 mkNameEnv	   :: [(Name,a)] -> NameEnv a
@@ -59,29 +58,26 @@ foldNameEnv	   :: (a -> b -> b) -> b -> NameEnv a -> b
 filterNameEnv	   :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
 mapNameEnv	   :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 
-nameEnvElts (A x) = eltsUFM x
-emptyNameEnv  	 = A emptyUFM
-unitNameEnv x y = A $ unitUFM x y 
-extendNameEnv (A x) y z = A $ addToUFM x y z
-extendNameEnvList (A x) l = A $ addListToUFM x l
-lookupNameEnv (A x) y = lookupUFM x y
-mkNameEnv     l    = A $ listToUFM l
-elemNameEnv x (A y) 	 = elemUFM x y
-foldNameEnv a b (A c)	 = foldUFM a b c 
-plusNameEnv (A x) (A y)	 = A $ plusUFM x y 
-plusNameEnv_C f (A x) (A y)	 = A $ plusUFM_C f x y 
-extendNameEnv_C f (A x) y z   = A $ addToUFM_C f x y z
-mapNameEnv f (A x)	 = A $ mapUFM f x
-nameEnvUniqueElts (A x)  = ufmToList x
-extendNameEnv_Acc x y (A z) a b  = A $ addToUFM_Acc x y z a b
-extendNameEnvList_C x (A y) z = A $ addListToUFM_C x y z
-delFromNameEnv (A x) y    = A $ delFromUFM x y
-delListFromNameEnv (A x) y  = A $ delListFromUFM x y
-filterNameEnv x (A y)       = A $ filterUFM x y
+nameEnvElts x         = eltsUFM x
+emptyNameEnv  	      = emptyUFM
+unitNameEnv x y       = unitUFM x y 
+extendNameEnv x y z   = addToUFM x y z
+extendNameEnvList x l = addListToUFM x l
+lookupNameEnv x y     = lookupUFM x y
+mkNameEnv     l       = listToUFM l
+elemNameEnv x y 	 = elemUFM x y
+foldNameEnv a b c	 = foldUFM a b c 
+plusNameEnv x y		 = plusUFM x y 
+plusNameEnv_C f x y	 = plusUFM_C f x y 
+extendNameEnv_C f x y z  = addToUFM_C f x y z
+mapNameEnv f x         	 = mapUFM f x
+nameEnvUniqueElts x      = ufmToList x
+extendNameEnv_Acc x y z a b  = addToUFM_Acc x y z a b
+extendNameEnvList_C x y z = addListToUFM_C x y z
+delFromNameEnv x y      = delFromUFM x y
+delListFromNameEnv x y  = delListFromUFM x y
+filterNameEnv x y       = filterUFM x y
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
-
-instance Outputable a => Outputable (NameEnv a) where
-    ppr (A x) = ppr x
 \end{code}
 
