@@ -505,6 +505,8 @@ lookupQualifiedName rdr_name
     doc = ptext (sLit "Need to find") <+> ppr rdr_name
 \end{code}
 
+Note [Looking up signature names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 lookupSigOccRn is used for type signatures and pragmas
 Is this valid?
   module A
@@ -525,10 +527,13 @@ return the imported 'f', so that later on the reanamer will
 correctly report "misplaced type sig".
 
 \begin{code}
-lookupSigOccRn :: Maybe NameSet	   -- Just ns => source file; these are the binders
+lookupSigOccRn :: Maybe NameSet	   -- Just ns => these are the binders
 				   -- 	 	 in the same group
-				   -- Nothing => hs-boot file; signatures without 
+				   -- Nothing => signatures without 
 				   -- 		 binders are expected
+				   --		 (a) top-level (SPECIALISE prags)
+				   -- 		 (b) class decls
+				   --		 (c) hs-boot files
 	       -> Sig RdrName
 	       -> Located RdrName -> RnM (Located Name)
 lookupSigOccRn mb_bound_names sig
@@ -538,14 +543,13 @@ lookupSigOccRn mb_bound_names sig
 	   Left err   -> do { addErr err; return (mkUnboundName rdr_name) }
 	   Right name -> return name }
 
-lookupBindGroupOcc :: Maybe NameSet  -- Just ns => source file; these are the binders
-				     -- 	 	 in the same group
-				     -- Nothing => hs-boot file; signatures without 
-				     -- 		 binders are expected
-	           -> SDoc
+lookupBindGroupOcc :: Maybe NameSet  -- See notes on the (Maybe NameSet)
+	           -> SDoc           --  in lookupSigOccRn
 	           -> RdrName -> RnM (Either Message Name)
 -- Looks up the RdrName, expecting it to resolve to one of the 
 -- bound names passed in.  If not, return an appropriate error message
+--
+-- See Note [Looking up signature names]
 lookupBindGroupOcc mb_bound_names what rdr_name
   = do	{ local_env <- getLocalRdrEnv
 	; case lookupLocalRdrEnv local_env rdr_name of 
@@ -557,7 +561,8 @@ lookupBindGroupOcc mb_bound_names what rdr_name
 	; case (filter isLocalGRE gres) of
 	    (gre:_) -> check_local_name (gre_name gre)
 			-- If there is more than one local GRE for the 
-			-- same OccName, that will be reported separately
+			-- same OccName 'f', that will be reported separately
+			-- as a duplicate top-level binding for 'f'
 	    [] | null gres -> bale_out_with empty
 	       | otherwise -> bale_out_with import_msg
   	}}
@@ -1100,7 +1105,7 @@ addNameClashErrRn rdr_name names
     (np1:nps) = names
     msg1 = ptext  (sLit "either") <+> mk_ref np1
     msgs = [ptext (sLit "    or") <+> mk_ref np | np <- nps]
-    mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
+    mk_ref gre = sep [quotes (ppr (gre_name gre)) <> comma, pprNameProvenance gre]
 
 shadowedNameWarn :: OccName -> [SDoc] -> SDoc
 shadowedNameWarn occ shadowed_locs

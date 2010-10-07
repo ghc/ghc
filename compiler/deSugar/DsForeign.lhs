@@ -43,7 +43,7 @@ import Outputable
 import FastString
 import Config
 import Constants
-
+import OrdList
 import Data.Maybe
 import Data.List
 \end{code}
@@ -66,9 +66,9 @@ type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
 				-- the occurrence analyser will sort it all out
 
 dsForeigns :: [LForeignDecl Id] 
-	   -> DsM (ForeignStubs, [Binding])
+	   -> DsM (ForeignStubs, OrdList Binding)
 dsForeigns [] 
-  = return (NoStubs, [])
+  = return (NoStubs, nilOL)
 dsForeigns fos = do
     fives <- mapM do_ldecl fos
     let
@@ -79,7 +79,7 @@ dsForeigns fos = do
     return (ForeignStubs 
              (vcat hs)
              (vcat cs $$ vcat fe_init_code),
-           (concat bindss))
+            foldr (appOL . toOL) nilOL bindss)
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
             

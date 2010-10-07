@@ -202,6 +202,7 @@ data DynFlag
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
+   | Opt_WarnAutoOrphans
    | Opt_WarnTabs
    | Opt_WarnUnrecognisedPragmas
    | Opt_WarnDodgyForeignImports
@@ -1441,6 +1442,7 @@ fFlags = [
   ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
   ( "warn-orphans",                     Opt_WarnOrphans, nop ),
+  ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
   ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings, nop),
@@ -1759,6 +1761,7 @@ minuswRemovesOpts
        Opt_WarnIncompletePatternsRecUpd,
        Opt_WarnMonomorphism,
        Opt_WarnUnrecognisedPragmas,
+       Opt_WarnAutoOrphans,
        Opt_WarnTabs
       ]
 

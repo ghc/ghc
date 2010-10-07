@@ -280,9 +280,11 @@ mkIface_ hsc_env maybe_old_fingerprint
                                          intermediate_iface decls
 
 		-- Warn about orphans
-	; let orph_warnings   --- Laziness means no work done unless -fwarn-orphans
-	        | dopt Opt_WarnOrphans dflags = rule_warns `unionBags` inst_warns
-	        | otherwise 	       	      = emptyBag
+	; let warn_orphs      = dopt Opt_WarnOrphans dflags
+              warn_auto_orphs = dopt Opt_WarnAutoOrphans dflags
+              orph_warnings   --- Laziness means no work done unless -fwarn-orphans
+	        | warn_orphs || warn_auto_orphs = rule_warns `unionBags` inst_warns
+	        | otherwise 	       	        = emptyBag
 	      errs_and_warns = (orph_warnings, emptyBag)
 	      unqual = mkPrintUnqualified dflags rdr_env
 	      inst_warns = listToBag [ instOrphWarn unqual d 
@@ -290,7 +292,9 @@ mkIface_ hsc_env maybe_old_fingerprint
 	      		   	     , isNothing (ifInstOrph i) ]
 	      rule_warns = listToBag [ ruleOrphWarn unqual this_mod r 
 	      		    	     | r <- iface_rules
-	      		   	     , isNothing (ifRuleOrph r) ]
+	      		   	     , isNothing (ifRuleOrph r)
+                                     , if ifRuleAuto r then warn_auto_orphs
+                                                       else warn_orphs ]
 
 	; if errorsFound dflags errs_and_warns
             then return ( errs_and_warns, Nothing )
@@ -1569,12 +1573,14 @@ coreRuleToIfaceRule _ (BuiltinRule { ru_fn = fn})
 
 coreRuleToIfaceRule mod (Rule { ru_name = name, ru_fn = fn, 
                                 ru_act = act, ru_bndrs = bndrs,
-	                        ru_args = args, ru_rhs = rhs })
+	                        ru_args = args, ru_rhs = rhs, 
+                                ru_auto = auto })
   = IfaceRule { ifRuleName  = name, ifActivation = act, 
 		ifRuleBndrs = map toIfaceBndr bndrs,
 		ifRuleHead  = fn, 
 		ifRuleArgs  = map do_arg args,
 		ifRuleRhs   = toIfaceExpr rhs,
+                ifRuleAuto  = auto,
 		ifRuleOrph  = orph }
   where
 	-- For type args we must remove synonyms from the outermost
@@ -1599,7 +1605,7 @@ bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name
   = IfaceRule { ifRuleName = fsLit "bogus", ifActivation = NeverActive,  
 	ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [], 
-	ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing }
+	ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing, ifRuleAuto = True }
 
 ---------------------
 toIfaceExpr :: CoreExpr -> IfaceExpr

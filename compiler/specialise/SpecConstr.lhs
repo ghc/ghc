@@ -1279,7 +1279,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 	      body_ty    = exprType spec_body
 	      rule_rhs   = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
-	      rule       = mkLocalRule rule_name inline_act fn_name qvars pats rule_rhs
+	      rule       = mkRule True {- Auto -} True {- Local -}
+                                  rule_name inline_act fn_name qvars pats rule_rhs
 	      		   -- See Note [Transfer activation]
 	; return (spec_usg, OS call_pat rule spec_id spec_rhs) }
 

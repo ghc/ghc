@@ -34,11 +34,11 @@ import CoreMonad	( endPass, CoreToDo(..) )
 import ErrUtils
 import Outputable
 import SrcLoc
-import Maybes
 import FastString
 import Coverage
 import Util
-
+import MonadUtils
+import OrdList
 import Data.List
 import Data.IORef
 \end{code}
@@ -69,6 +69,7 @@ deSugar hsc_env
 	    	    	    tcg_warns        = warns,
 	    	    	    tcg_anns         = anns,
 			    tcg_binds        = binds,
+		    	    tcg_imp_specs    = imp_specs,
 			    tcg_ev_binds     = ev_binds,
 			    tcg_fords        = fords,
 			    tcg_rules        = rules,
@@ -88,7 +89,7 @@ deSugar hsc_env
               <- case target of
 	           HscNothing ->
                        return (emptyMessages,
-                               Just ([], [], [], NoStubs, hpcInfo, emptyModBreaks))
+                               Just ([], nilOL, [], NoStubs, hpcInfo, emptyModBreaks))
                    _        -> do
                      (binds_cvr,ds_hpc_info, modBreaks)
 			 <- if (opt_Hpc
@@ -98,23 +99,26 @@ deSugar hsc_env
                                                            (typeEnvTyCons type_env) binds 
                               else return (binds, hpcInfo, emptyModBreaks)
                      initDs hsc_env mod rdr_env type_env $ do
-		         ds_ev_binds <- dsEvBinds ev_binds
-		         core_prs <- dsTopLHsBinds auto_scc binds_cvr
-	                 (ds_fords, foreign_prs) <- dsForeigns fords
-	                 let all_prs = foreign_prs ++ core_prs
-		         mb_rules <- mapM dsRule rules
-		         return (ds_ev_binds, all_prs, mb_rules, ds_fords, ds_hpc_info, modBreaks)
+		       do { ds_ev_binds <- dsEvBinds ev_binds
+		          ; core_prs <- dsTopLHsBinds auto_scc binds_cvr
+                          ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
+	                  ; (ds_fords, foreign_prs) <- dsForeigns fords
+		          ; rules <- mapMaybeM dsRule rules
+		          ; return ( ds_ev_binds
+                                   , foreign_prs `appOL` core_prs `appOL` spec_prs
+                                   , spec_rules ++ rules
+                                   , ds_fords, ds_hpc_info, modBreaks) }
 
 	; case mb_res of {
 	   Nothing -> return (msgs, Nothing) ;
-	   Just (ds_ev_binds, all_prs, mb_rules, ds_fords,ds_hpc_info, modBreaks) -> do
+	   Just (ds_ev_binds, all_prs, all_rules, ds_fords,ds_hpc_info, modBreaks) -> do
 
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
 	; let (rules_for_locals, rules_for_imps) 
-                   = partition isLocalRule (catMaybes mb_rules)
+                   = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target
-	      		      export_set keep_alive rules_for_locals all_prs 
+	      		      export_set keep_alive rules_for_locals (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -163,6 +167,11 @@ deSugar hsc_env
         ; return (msgs, Just mod_guts)
 	}}}
 
+dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
+dsImpSpecs imp_specs
+ = do { spec_prs <- mapMaybeM (dsSpec Nothing) imp_specs
+      ; let (spec_binds, spec_rules) = unzip spec_prs
+      ; return (concatOL spec_binds, spec_rules) }
 
 combineEvBinds :: [DsEvBind] -> [(Id,CoreExpr)] -> [CoreBind]
 -- Top-level bindings can include coercion bindings, but not via superclasses
@@ -340,13 +349,14 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 		Nothing -> do { warnDs msg; return Nothing } ;
 		Just (fn_id, args) -> do
 	
-	{ let local_rule = isLocalId fn_id
+	{ let is_local = isLocalId fn_id
 		-- NB: isLocalId is False of implicit Ids.  This is good becuase
 		-- we don't want to attach rules to the bindings of implicit Ids, 
 		-- because they don't show up in the bindings until just before code gen
 	      fn_name   = idName fn_id
 	      final_rhs = simpleOptExpr rhs'	-- De-crap it
-	      rule      = mkRule local_rule name act fn_name bndrs' args final_rhs
+	      rule      = mkRule False {- Not auto -} is_local 
+                                 name act fn_name bndrs' args final_rhs
 	; return (Just rule)
 	} } }
   where

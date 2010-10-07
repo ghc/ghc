@@ -24,7 +24,7 @@ module Rules (
 	-- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser, 
         
-        lookupRule, mkRule, mkLocalRule, roughTopNames
+        lookupRule, mkRule, roughTopNames
     ) where
 
 #include "HsVersions.h"
@@ -105,7 +105,7 @@ Note [Overall plumbing for rules]
   The HomePackageTable doesn't have a single RuleBase because technically
   we should only be able to "see" rules "below" this module; so we
   generate a RuleBase for (c) by combing rules from all the modules
-  "below" us.  That's whye we can't just select the home-package RuleBase
+  "below" us.  That's why we can't just select the home-package RuleBase
   from HscEnv.
 
   [NB: we are inconsistent here.  We should do the same for external
@@ -156,22 +156,16 @@ might have a specialisation
 where pi' :: Lift Int# is the specialised version of pi.
 
 \begin{code}
-mkLocalRule :: RuleName -> Activation 
-	    -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
--- ^ Used to make 'CoreRule' for an 'Id' defined in the module being 
--- compiled. See also 'CoreSyn.CoreRule'
-mkLocalRule = mkRule True
-
-mkRule :: Bool -> RuleName -> Activation 
+mkRule :: Bool -> Bool -> RuleName -> Activation 
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being 
 -- compiled. See also 'CoreSyn.CoreRule'
-mkRule is_local name act fn bndrs args rhs
+mkRule is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
 	   ru_bndrs = bndrs, ru_args = args,
 	   ru_rhs = occurAnalyseExpr rhs, 
 	   ru_rough = roughTopNames args,
-	   ru_local = is_local }
+	   ru_auto = is_auto, ru_local = is_local }
 
 --------------
 roughTopNames :: [CoreExpr] -> [Maybe Name]
@@ -759,21 +753,19 @@ match_alts idu menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
 
 match_alts _ _ _ _ _
   = Nothing
-\end{code}
 
-Matching Core types: use the matcher in TcType.
-Notice that we treat newtypes as opaque.  For example, suppose 
-we have a specialised version of a function at a newtype, say 
-	newtype T = MkT Int
-We only want to replace (f T) with f', not (f Int).
-
-\begin{code}
 ------------------------------------------
 match_ty :: MatchEnv
       	 -> SubstEnv
       	 -> Type		-- Template
       	 -> Type		-- Target
       	 -> Maybe SubstEnv
+-- Matching Core types: use the matcher in TcType.
+-- Notice that we treat newtypes as opaque.  For example, suppose 
+-- we have a specialised version of a function at a newtype, say 
+--	newtype T = MkT Int
+-- We only want to replace (f T) with f', not (f Int).
+
 match_ty menv (tv_subst, id_subst, binds) ty1 ty2
   = do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
 	; return (tv_subst', id_subst, binds) }

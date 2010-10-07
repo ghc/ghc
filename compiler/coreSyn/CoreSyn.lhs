@@ -319,7 +319,7 @@ data CoreRule
   = Rule { 
 	ru_name :: RuleName,            -- ^ Name of the rule, for communication with the user
 	ru_act  :: Activation,          -- ^ When the rule is active
-	
+
 	-- Rough-matching stuff
 	-- see comments with InstEnv.Instance( is_cls, is_rough )
 	ru_fn    :: Name,	        -- ^ Name of the 'Id.Id' at the head of this rule
@@ -336,6 +336,10 @@ data CoreRule
 					-- See Note [OccInfo in unfoldings and rules]
 
 	-- Locality
+        ru_auto :: Bool,	-- ^ @True@  <=> this rule is auto-generated
+		   		--   @False@ <=> generated at the users behest
+				--   Main effect: reporting of orphan-hood
+
 	ru_local :: Bool	-- ^ @True@ iff the fn at the head of the rule is
 				-- defined in the same module as the rule
 				-- and is not an implicit 'Id' (like a record selector,

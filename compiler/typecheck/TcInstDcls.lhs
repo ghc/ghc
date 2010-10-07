@@ -789,7 +789,7 @@ tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
         ; let spec_ty = mkSigmaTy tyvars theta tau
         ; co_fn <- tcSubType (SpecPragOrigin name) (SigSkol SpecInstCtxt) 
                              (idType dfun_id) spec_ty
-        ; return (SpecPrag co_fn defaultInlinePragma) }
+        ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
     spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
 
@@ -840,15 +840,12 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         do { (meth_id, local_meth_id) <- mkMethIds clas tyvars dfun_ev_vars 
                                                    inst_tys sel_id
            ; let prags = prag_fn (idName sel_id)
-           ; meth_id1   <- addInlinePrags meth_id prags
-           ; spec_prags <- tcSpecPrags True meth_id prags
-
+           ; meth_id1 <- addInlinePrags meth_id prags
+           ; spec_prags <- tcSpecPrags meth_id1 prags
            ; bind <- tcInstanceMethodBody InstSkol
-                          tyvars dfun_ev_vars
-    			    mb_dict_ev
-                          meth_id1 local_meth_id
-    			    meth_sig_fn 
-                          (SpecPrags (spec_inst_prags ++ spec_prags))
+                          tyvars dfun_ev_vars mb_dict_ev
+                          meth_id1 local_meth_id meth_sig_fn 
+                          (mk_meth_spec_prags meth_id1 spec_prags)
                           rn_bind 
            ; return (meth_id1, bind) }
 
@@ -898,7 +895,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     			    
                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars =  dfun_ev_vars
                                  , abs_exports = [( tyvars, meth_id1, local_meth_id
-                                                  , SpecPrags spec_inst_prags)]
+                                                  , mk_meth_spec_prags meth_id1 [])]
                                  , abs_ev_binds = EvBinds (unitBag self_dict_ev)
                                  , abs_binds    = unitBag meth_bind }
     	     -- Default methods in an instance declaration can't have their own 
@@ -909,6 +906,18 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; return (meth_id1, L loc bind) } 
 
     ----------------------
+    mk_meth_spec_prags :: Id -> [LTcSpecPrag] -> TcSpecPrags
+	-- Adapt the SPECIALISE pragmas to work for this method Id
+        -- There are two sources: 
+        --   * spec_inst_prags: {-# SPECIALISE instance :: <blah> #-}
+        --     These ones have the dfun inside, but [perhaps surprisingly] 
+        --     the correct wrapper
+        --   * spec_prags_for_me: {-# SPECIALISE op :: <blah> #-}
+    mk_meth_spec_prags meth_id spec_prags_for_me
+      = SpecPrags (spec_prags_for_me ++ 
+                   [ L loc (SpecPrag meth_id wrap inl)
+        	   | L loc (SpecPrag _ wrap inl) <- spec_inst_prags])
+   
     loc = getSrcSpan dfun_id
     meth_sig_fn _ = Just ([],loc)	-- The 'Just' says "yes, there's a type sig"
 	-- But there are no scoped type variables from local_method_id

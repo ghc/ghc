@@ -220,7 +220,7 @@ tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
               prags         = prag_fn sel_name
 
         ; dm_id_w_inline <- addInlinePrags dm_id prags
-        ; spec_prags     <- tcSpecPrags True dm_id prags
+        ; spec_prags     <- tcSpecPrags dm_id prags
 
         ; warnTc (not (null spec_prags))
                  (ptext (sLit "Ignoring SPECIALISE pragmas on default method") 

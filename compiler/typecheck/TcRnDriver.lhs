@@ -394,20 +394,22 @@ tcRnSrcDecls boot_iface decls
 	-- Even simplifyTop may do some unification.
         -- This pass also warns about missing type signatures
 	let { (tcg_env, _) = tc_envs
-	    ; TcGblEnv { tcg_type_env = type_env,
-		         tcg_binds    = binds,
-		         tcg_sigs     = sig_ns,
-		         tcg_ev_binds = cur_ev_binds,
-		         tcg_rules    = rules,
-		         tcg_fords    = fords } = tcg_env
+	    ; TcGblEnv { tcg_type_env  = type_env,
+		         tcg_binds     = binds,
+		         tcg_sigs      = sig_ns,
+		         tcg_ev_binds  = cur_ev_binds,
+		         tcg_imp_specs = imp_specs,
+		         tcg_rules     = rules,
+		         tcg_fords     = fords } = tcg_env
             ; all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
 
-	(bind_ids, ev_binds', binds', fords', rules') 
-            <- zonkTopDecls all_ev_binds binds sig_ns rules fords ;
+	(bind_ids, ev_binds', binds', fords', imp_specs', rules') 
+            <- zonkTopDecls all_ev_binds binds sig_ns rules imp_specs fords ;
 	
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
 	    ; tcg_env' = tcg_env { tcg_binds    = binds',
 				   tcg_ev_binds = ev_binds',
+				   tcg_imp_specs = imp_specs',
 				   tcg_rules 	= rules', 
 				   tcg_fords 	= fords' } } ;
 
@@ -860,14 +862,14 @@ tcTopSrcDecls boot_details
 		-- Now GHC-generated derived bindings, generics, and selectors
 		-- Do not generate warnings from compiler-generated code;
 		-- hence the use of discardWarnings
-	(tc_aux_binds,   tcl_env) <- discardWarnings (tcTopBinds aux_binds) ;
-	(tc_deriv_binds, tcl_env) <- setLclTypeEnv tcl_env $ 
-			 	     discardWarnings (tcTopBinds deriv_binds) ;
+	(tc_aux_binds,   specs1, tcl_env) <- discardWarnings (tcTopBinds aux_binds) ;
+	(tc_deriv_binds, specs2, tcl_env) <- setLclTypeEnv tcl_env $ 
+			 	             discardWarnings (tcTopBinds deriv_binds) ;
 
 		-- Value declarations next
         traceTc "Tc5" empty ;
-	(tc_val_binds, tcl_env) <- setLclTypeEnv tcl_env $
-			 	   tcTopBinds val_binds;
+	(tc_val_binds, specs3, tcl_env) <- setLclTypeEnv tcl_env $
+			 	           tcTopBinds val_binds;
 
         setLclTypeEnv tcl_env $ do {	-- Environment doesn't change now
 
@@ -900,6 +902,7 @@ tcTopSrcDecls boot_details
 		-- Extend the GblEnv with the (as yet un-zonked) 
 		-- bindings, rules, foreign decls
 	    ; tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` all_binds
+	      	       	 	 , tcg_imp_specs = tcg_imp_specs tcg_env ++ specs1 ++ specs2 ++ specs3
                                  , tcg_sigs  = tcg_sigs tcg_env `unionNameSets` sig_names
 				 , tcg_rules = tcg_rules tcg_env ++ rules
 				 , tcg_anns  = tcg_anns tcg_env ++ annotations

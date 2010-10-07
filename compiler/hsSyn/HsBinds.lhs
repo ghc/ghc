@@ -315,7 +315,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
   where
     ppr_exp (tvs, gbl, lcl, prags)
 	= vcat [ppr gbl <+> ptext (sLit "<=") <+> ppr tvs <+> ppr lcl,
-	  	nest 2 (pprTcSpecPrags gbl prags)]
+	  	nest 2 (pprTcSpecPrags prags)]
 \end{code}
 
 
@@ -636,11 +636,14 @@ data FixitySig name = FixitySig (Located name) Fixity
 data TcSpecPrags 
   = IsDefaultMethod	-- Super-specialised: a default method should 
     			-- be macro-expanded at every call site
-  | SpecPrags [Located TcSpecPrag]
+  | SpecPrags [LTcSpecPrag]
   deriving (Data, Typeable)
+
+type LTcSpecPrag = Located TcSpecPrag
 
 data TcSpecPrag 
   = SpecPrag   
+        Id		-- The Id to be specialised
 	HsWrapper	-- An wrapper, that specialises the polymorphic function
 	InlinePragma 	-- Inlining spec for the specialised function
   deriving (Data, Typeable)
@@ -776,14 +779,11 @@ pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig var p
     pp_inl | isDefaultInlinePragma inl = empty
            | otherwise = ppr inl
 
-pprTcSpecPrags :: Outputable id => id -> TcSpecPrags -> SDoc
-pprTcSpecPrags _   IsDefaultMethod = ptext (sLit "<default method>")
-pprTcSpecPrags gbl (SpecPrags ps)  = vcat (map (pprSpecPrag gbl) ps)
-
-pprSpecPrag :: Outputable id => id -> Located TcSpecPrag -> SDoc
-pprSpecPrag var (L _ (SpecPrag _expr inl)) = pprSpec var (ptext (sLit "<type>")) inl
+pprTcSpecPrags :: TcSpecPrags -> SDoc
+pprTcSpecPrags IsDefaultMethod = ptext (sLit "<default method>")
+pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
-  ppr (SpecPrag _ p) = ptext (sLit "SpecPrag") <+> ppr p
+  ppr (SpecPrag var _ inl) = pprSpec var (ptext (sLit "<type>")) inl
 \end{code}
 

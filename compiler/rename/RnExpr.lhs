@@ -21,7 +21,7 @@ import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
 #endif 	/* GHCI */
 
 import RnSource  ( rnSrcDecls, findSplice )
-import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
+import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, makeMiniFixityEnv) 
 import HsSyn
 import TcRnMonad
@@ -931,7 +931,7 @@ rn_rec_stmt_lhs _ (L _ (LetStmt binds@(HsIPBinds _)))
   = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds))) 
-    = do (_bound_names, binds') <- rnValBindsLHS fix_env binds
+    = do (_bound_names, binds') <- rnLocalValBindsLHS fix_env binds
          return [(L loc (LetStmt (HsValBinds binds')),
                  -- Warning: this is bogus; see function invariant
                  emptyFVs
@@ -995,7 +995,7 @@ rn_rec_stmt _ (L _ (LetStmt binds@(HsIPBinds _))) _
 rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do 
   (binds', du_binds) <- 
       -- fixities and unused are handled above in rn_rec_stmts_and_then
-      rnValBindsRHS (mkNameSet all_bndrs) binds'
+      rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
   return [(duDefs du_binds, allUses du_binds, 
 	   emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 

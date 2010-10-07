@@ -257,6 +257,7 @@ data TcGblEnv
         tcg_ev_binds  :: Bag EvBind,	    -- Top-level evidence bindings
 	tcg_binds     :: LHsBinds Id,	    -- Value bindings in this module
         tcg_sigs      :: NameSet, 	    -- ...Top-level names that *lack* a signature
+        tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
 	tcg_anns      :: [Annotation],      -- ...Annotations
 	tcg_insts     :: [Instance],	    -- ...Instances

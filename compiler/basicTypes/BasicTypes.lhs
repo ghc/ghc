@@ -65,7 +65,8 @@ module BasicTypes(
         InlineSpec(..), 
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
         neverInlinePragma, dfunInlinePragma, 
-	isDefaultInlinePragma, isInlinePragma, inlinePragmaSpec, inlinePragmaSat,
+	isDefaultInlinePragma, isInlinePragma, isInlinablePragma,
+        inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
 
@@ -772,6 +773,11 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = isInlineSpec (inl_inline prag)
+
+isInlinablePragma :: InlinePragma -> Bool
+isInlinablePragma prag = case inl_inline prag of
+                           Inlinable -> True
+                           _         -> False
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat

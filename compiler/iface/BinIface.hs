@@ -1430,7 +1430,7 @@ instance Binary IfaceClassOp where
 	return (IfaceClassOp occ def ty)
 
 instance Binary IfaceRule where
-    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7) = do
+    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
 	    put_ bh a1
 	    put_ bh a2
 	    put_ bh a3
@@ -1438,6 +1438,7 @@ instance Binary IfaceRule where
 	    put_ bh a5
 	    put_ bh a6
 	    put_ bh a7
+	    put_ bh a8
     get bh = do
 	    a1 <- get bh
 	    a2 <- get bh
@@ -1446,7 +1447,8 @@ instance Binary IfaceRule where
 	    a5 <- get bh
 	    a6 <- get bh
 	    a7 <- get bh
-	    return (IfaceRule a1 a2 a3 a4 a5 a6 a7)
+	    a8 <- get bh
+	    return (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8)
 
 instance Binary IfaceAnnotation where
     put_ bh (IfaceAnnotation a1 a2) = do

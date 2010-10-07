@@ -270,13 +270,14 @@ zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind 
              -> LHsBinds TcId -> NameSet
-             -> [LRuleDecl TcId] -> [LForeignDecl TcId]
+             -> [LRuleDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
 	     -> TcM ([Id], 
 	             Bag EvBind,
 		     Bag (LHsBind  Id),
 		     [LForeignDecl Id],
+		     [LTcSpecPrag],
 		     [LRuleDecl    Id])
-zonkTopDecls ev_binds binds sig_ns rules fords
+zonkTopDecls ev_binds binds sig_ns rules imp_specs fords
   = do	{ (env1, ev_binds') <- zonkEvBinds emptyZonkEnv ev_binds
 
 	 -- Warn about missing signatures
@@ -288,8 +289,9 @@ zonkTopDecls ev_binds binds sig_ns rules fords
         ; (env2, binds') <- zonkRecMonoBinds env1 sig_warn binds
 			-- Top level is implicitly recursive
 	; rules' <- zonkRules env2 rules
+        ; specs' <- zonkLTcSpecPrags env2 imp_specs
 	; fords' <- zonkForeignExports env2 fords
-	; return (zonkEnvIds env2, ev_binds', binds', fords', rules') }
+	; return (zonkEnvIds env2, ev_binds', binds', fords', specs', rules') }
 
 ---------------------------------------------
 zonkLocalBinds :: ZonkEnv -> HsLocalBinds TcId -> TcM (ZonkEnv, HsLocalBinds Id)
@@ -430,12 +432,16 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod
-zonkSpecPrags env (SpecPrags ps)  = do { ps' <- mapM zonk_prag ps
+zonkSpecPrags env (SpecPrags ps)  = do { ps' <- zonkLTcSpecPrags env ps
                                        ; return (SpecPrags ps') }
+
+zonkLTcSpecPrags :: ZonkEnv -> [LTcSpecPrag] -> TcM [LTcSpecPrag]
+zonkLTcSpecPrags env ps
+  = mapM zonk_prag ps
   where
-    zonk_prag (L loc (SpecPrag co_fn inl))
+    zonk_prag (L loc (SpecPrag id co_fn inl))
 	= do { (_, co_fn') <- zonkCoFn env co_fn
-	     ; return (L loc (SpecPrag co_fn' inl)) }
+	     ; return (L loc (SpecPrag (zonkIdOcc env id) co_fn' inl)) }
 \end{code}
 
 %************************************************************************

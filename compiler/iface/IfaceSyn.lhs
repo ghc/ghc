@@ -163,6 +163,7 @@ data IfaceRule
 	ifRuleHead   :: Name,   	-- Head of lhs
 	ifRuleArgs   :: [IfaceExpr],	-- Args of LHS
 	ifRuleRhs    :: IfaceExpr,
+	ifRuleAuto   :: Bool,
 	ifRuleOrph   :: Maybe OccName	-- Just like IfaceInst
     }
 
@@ -860,7 +861,8 @@ freeNamesIfTc (IfaceTc tc) = unitNameSet tc
 freeNamesIfTc _ = emptyNameSet
 
 freeNamesIfRule :: IfaceRule -> NameSet
-freeNamesIfRule (IfaceRule _n _a bs f es rhs _o)
+freeNamesIfRule (IfaceRule { ifRuleBndrs = bs, ifRuleHead = f
+                           , ifRuleArgs = es, ifRuleRhs = rhs })
   = unitNameSet f &&&
     fnList freeNamesIfBndr bs &&&
     fnList freeNamesIfExpr es &&&

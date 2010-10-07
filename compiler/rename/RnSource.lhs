@@ -150,7 +150,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
-   (rn_val_decls, bind_dus) <- rnTopBindsRHS val_bndr_set new_lhs ;
+   (rn_val_decls, bind_dus) <- rnTopBindsRHS new_lhs ;
    traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
