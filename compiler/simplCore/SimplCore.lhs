@@ -4,13 +4,6 @@
 \section[SimplCore]{Driver for simplifying @Core@ programs}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
@@ -21,30 +14,24 @@ import CoreSubst
 import HscTypes
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
-			  extendRuleBaseList, pprRuleBase, pprRulesForUser,
-			  ruleCheckProgram, rulesOfBinds,
-			  addSpecInfo, addIdSpecialisations )
-import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
+			  extendRuleBaseList, ruleCheckProgram, addSpecInfo, )
+import PprCore		( pprCoreBindings, pprCoreExpr )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
-import SimplUtils	( simplEnvForGHCi, simplEnvForRules )
+import SimplUtils	( simplEnvForGHCi )
 import SimplEnv
 import SimplMonad
 import CoreMonad
 import qualified ErrUtils as Err 
-import CoreLint
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
 import Id
-import DataCon
-import TyCon		( tyConDataCons )
-import BasicTypes       ( CompilerPhase, isActive, isDefaultInlinePragma )
+import BasicTypes       ( CompilerPhase, isDefaultInlinePragma )
 import VarSet
 import VarEnv
-import NameEnv		( lookupNameEnv )
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
@@ -58,9 +45,6 @@ import Util
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
-import Data.List
-import System.IO
-import Maybes
 \end{code}
 
 %************************************************************************
@@ -134,7 +118,7 @@ doCorePass CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
                                        doPassU wwTopBinds
 
 doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
-                                       doPassU specProgram
+                                       specProgram
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
@@ -147,6 +131,7 @@ doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheck phase pat
 doCorePass CoreDoNothing                = return
 doCorePass (CoreDoPasses passes)        = doCorePasses passes
+doCorePass pass = pprPanic "doCorePass" (ppr pass)
 \end{code}
 
 %************************************************************************
@@ -156,6 +141,7 @@ doCorePass (CoreDoPasses passes)        = doCorePasses passes
 %************************************************************************
 
 \begin{code}
+printCore :: a -> [CoreBind] -> IO ()
 printCore _ binds = Err.dumpIfSet True "Print Core" (pprCoreBindings binds)
 
 ruleCheck :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
@@ -166,11 +152,6 @@ ruleCheck current_phase pat guts = do
     liftIO $ printDump (ruleCheckProgram current_phase pat rb (mg_binds guts))
     return guts
 
-
-doPassDMS :: (DynFlags -> [CoreBind] -> IO (SimplCount, [CoreBind])) -> ModGuts -> CoreM ModGuts
-doPassDMS do_pass = doPassM $ \binds -> do
-    dflags <- getDynFlags
-    liftIOWithCount $ do_pass dflags binds
 
 doPassDUM :: (DynFlags -> UniqSupply -> [CoreBind] -> IO [CoreBind]) -> ModGuts -> CoreM ModGuts
 doPassDUM do_pass = doPassM $ \binds -> do
@@ -197,11 +178,6 @@ doPassM bind_f guts = do
     binds' <- bind_f (mg_binds guts)
     return (guts { mg_binds = binds' })
 
-doPassMG :: Monad m => (ModGuts -> m [CoreBind]) -> ModGuts -> m ModGuts
-doPassMG bind_f guts = do
-    binds' <- bind_f guts
-    return (guts { mg_binds = binds' })
-
 doPass :: ([CoreBind] -> [CoreBind]) -> ModGuts -> CoreM ModGuts
 doPass bind_f guts = return $ guts { mg_binds = bind_f (mg_binds guts) }
 
@@ -209,7 +185,7 @@ doPass bind_f guts = return $ guts { mg_binds = bind_f (mg_binds guts) }
 observe :: (DynFlags -> [CoreBind] -> IO a) -> ModGuts -> CoreM ModGuts
 observe do_pass = doPassM $ \binds -> do
     dflags <- getDynFlags
-    liftIO $ do_pass dflags binds
+    _ <- liftIO $ do_pass dflags binds
     return binds
 \end{code}
 
@@ -436,7 +412,8 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 
 		-- Loop
   	   do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
-	}  } } }
+           } } } }
+      | otherwise = panic "do_iteration"
       where
   	(us1, us2) = splitUniqSupply us
 
@@ -444,6 +421,8 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
         totalise :: [SimplCount] -> SimplCount
         totalise = foldr (\c acc -> acc `plusSimplCount` c) 
                          (zeroSimplCount dflags) 
+
+simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
 end_iteration :: DynFlags -> CoreToDo -> Int 
@@ -617,10 +596,10 @@ makeIndEnv binds
     add_pair :: (Id,CoreExpr) -> IndEnv -> IndEnv
     add_pair (exported_id, Var local_id) env
 	| shortMeOut env exported_id local_id = extendVarEnv env local_id exported_id
-    add_pair (exported_id, rhs) env
-	= env
+    add_pair _ env = env
 			
 -----------------
+shortMeOut :: IndEnv -> Id -> Id -> Bool
 shortMeOut ind_env exported_id local_id
 -- The if-then-else stuff is just so I can get a pprTrace to see
 -- how often I don't get shorting out becuase of IdInfo stuff
