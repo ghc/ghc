@@ -604,8 +604,9 @@ solveWithIdentity :: InertSet
                   -> TcS (Maybe SWorkList)
 -- Solve with the identity coercion 
 -- Precondition: kind(xi) is a sub-kind of kind(tv)
--- Precondition: CtFlavor is not Given
--- See [New Wanted Superclass Work] to see why we do this for *given* as well
+-- Precondition: CtFlavor is Wanted or Derived
+-- See [New Wanted Superclass Work] to see why solveWithIdentity 
+--     must work for Derived as well as Wanted
 solveWithIdentity inerts cv gw tv xi 
   = do { tybnds <- getTcSTyBindsBag 
        ; case occurCheck tybnds inerts tv xi of 
@@ -653,6 +654,8 @@ occurCheck :: Bag (TcTyVar, TcType) -> InertSet
 occurCheck ty_binds_bag inerts tv ty
   = ok emptyVarSet ty 
   where 
+    -- If (fsk `elem` bad) then tv occurs in any rendering
+    -- of the type under the expansion of fsk
     ok bad this_ty@(TyConApp tc tys) 
       | Just tys_cois <- allMaybes (map (ok bad) tys) 
       , (tys',cois') <- unzip tys_cois
@@ -1783,19 +1786,18 @@ new given work. There are several reasons for this:
         Now suppose that we have: 
                given: C a b 
                wanted: C a beta 
-        By interacting the given we will get that (F a ~ b) which is not 
+        By interacting the given we will get given (F a ~ b) which is not 
         enough by itself to make us discharge (C a beta). However, we 
-        may create a new given equality from the super-class that we promise
-        to solve: (F a ~ beta). Now we may interact this with the rest of 
-        constraint to finally get: 
-                  given :  beta ~ b 
-        
+        may create a new derived equality from the super-class of the
+        wanted constraint (C a beta), namely derived (F a ~ beta). 
+        Now we may interact this with given (F a ~ b) to get: 
+                  derived :  beta ~ b 
         But 'beta' is a touchable unification variable, and hence OK to 
-        unify it with 'b', replacing the given evidence with the identity. 
+        unify it with 'b', replacing the derived evidence with the identity. 
 
-        This requires trySpontaneousSolve to solve given equalities that
-        have a touchable in their RHS, *in addition* to solving wanted 
-        equalities. 
+        This requires trySpontaneousSolve to solve *derived*
+        equalities that have a touchable in their RHS, *in addition*
+        to solving wanted equalities.
 
 Here is another example where this is useful. 
 
