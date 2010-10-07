@@ -654,28 +654,43 @@ zapFragileIdInfo = zapInfo zapFragileInfo
 
 Note [transferPolyIdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
+This transfer is used in two places: 
+	FloatOut (long-distance let-floating)
+	SimplUtils.abstractFloats (short-distance let-floating)
+
+Consider the short-distance let-floating:
 
    f = /\a. let g = rhs in ...
 
-where g has interesting strictness information.  Then if we float thus
+Then if we float thus
 
    g' = /\a. rhs
-   f = /\a. ...[g' a/g]
+   f = /\a. ...[g' a/g]....
 
 we *do not* want to lose g's
   * strictness information
   * arity 
   * inline pragma (though that is bit more debatable)
+  * occurrence info
 
-It's simple to retain strictness and arity, but not so simple to retain
+Mostly this is just an optimisation, but it's *vital* to
+transfer the occurrence info.  Consider
+   
+   NonRec { f = /\a. let Rec { g* = ..g.. } in ... }
+
+where the '*' means 'LoopBreaker'.  Then if we float we must get
+
+   Rec { g'* = /\a. ...(g' a)... }
+   NonRec { f = /\a. ...[g' a/g]....}
+
+where g' is also marked as LoopBreaker.  If not, terrible things
+can happen if we re-simplify the binding (and the Simplifier does
+sometimes simplify a term twice); see Trac #4345.
+
+It's not so simple to retain
   * worker info
   * rules
 so we simply discard those.  Sooner or later this may bite us.
-
-This transfer is used in two places: 
-	FloatOut (long-distance let-floating)
-	SimplUtils.abstractFloats (short-distance let-floating)
 
 If we abstract wrt one or more *value* binders, we must modify the 
 arity and strictness info before transferring it.  E.g. 
@@ -699,6 +714,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_info 	    = idInfo old_id
     old_arity       = arityInfo old_info
     old_inline_prag = inlinePragInfo old_info
+    old_occ_info    = occInfo old_info
     new_arity       = old_arity + arity_increase
     old_strictness  = strictnessInfo old_info
     new_strictness  = fmap (increaseStrictSigArity arity_increase) old_strictness
@@ -706,4 +722,5 @@ transferPolyIdInfo old_id abstract_wrt new_id
     transfer new_info = new_info `setStrictnessInfo` new_strictness
 			         `setArityInfo` new_arity
  			         `setInlinePragInfo` old_inline_prag
+				 `setOccInfo` old_occ_info
 \end{code}
