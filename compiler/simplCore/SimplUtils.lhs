@@ -15,8 +15,9 @@ module SimplUtils (
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
+        isSimplified,
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
-	pushArgs, countValArgs, countArgs, addArgTo,
+	pushSimplifiedArgs, countValArgs, countArgs, addArgTo,
 	mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, 
 
@@ -99,12 +100,12 @@ data SimplCont
 	SimplCont
 
   | ApplyTo  		-- C arg
-	DupFlag 
-	InExpr StaticEnv		-- The argument and its static env
+	DupFlag			-- See Note [DupFlag invariants]
+	InExpr StaticEnv	-- The argument and its static env
 	SimplCont
 
   | Select   		-- case C of alts
-	DupFlag 
+	DupFlag 	        -- See Note [DupFlag invariants]
 	InId [InAlt] StaticEnv	-- The case binder, alts, and subst-env
 	SimplCont
 
@@ -151,14 +152,31 @@ instance Outputable SimplCont where
 				       (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
 
-data DupFlag = OkToDup | NoDup
+data DupFlag = NoDup       -- Unsimplified, might be big
+             | Simplified  -- Simplified
+             | OkToDup     -- Simplified and small
+
+isSimplified :: DupFlag -> Bool
+isSimplified NoDup = False
+isSimplified _     = True	-- Invariant: the subst-env is empty
 
 instance Outputable DupFlag where
-  ppr OkToDup = ptext (sLit "ok")
-  ppr NoDup   = ptext (sLit "nodup")
+  ppr OkToDup    = ptext (sLit "ok")
+  ppr NoDup      = ptext (sLit "nodup")
+  ppr Simplified = ptext (sLit "simpl")
+\end{code}
 
+Note [DupFlag invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+In both (ApplyTo dup _ env k)
+   and  (Select dup _ _ env k)
+the following invariants hold
 
+  (a) if dup = OkToDup, then continuation k is also ok-to-dup
+  (b) if dup = OkToDup or Simplified, the subst-env is empty
+      (and and hence no need to re-simplify)
 
+\begin{code}
 -------------------
 mkBoringStop :: SimplCont
 mkBoringStop = Stop BoringCtxt
@@ -179,8 +197,8 @@ contIsRhsOrArg _               = False
 -------------------
 contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop {})                  = True
-contIsDupable (ApplyTo  OkToDup _ _ _)   = True
-contIsDupable (Select   OkToDup _ _ _ _) = True
+contIsDupable (ApplyTo  OkToDup _ _ _)   = True	-- See Note [DupFlag invariants]
+contIsDupable (Select   OkToDup _ _ _ _) = True -- ...ditto...
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
 contIsDupable _                          = False
 
@@ -238,9 +256,10 @@ contArgs cont@(ApplyTo {})
 
 contArgs cont = (True, [], cont)
 
-pushArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
-pushArgs _env []         cont = cont
-pushArgs env  (arg:args) cont = ApplyTo NoDup arg env (pushArgs env args cont)
+pushSimplifiedArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
+pushSimplifiedArgs _env []         cont = cont
+pushSimplifiedArgs env  (arg:args) cont = ApplyTo Simplified arg env (pushSimplifiedArgs env args cont)
+		   -- The env has an empty SubstEnv
 
 dropArgs :: Int -> SimplCont -> SimplCont
 dropArgs 0 cont = cont

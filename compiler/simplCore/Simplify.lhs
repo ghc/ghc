@@ -322,7 +322,8 @@ simplLazyBind :: SimplEnv
               -> SimplM SimplEnv
 
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
-  = do  { let   rhs_env     = rhs_se `setInScope` env
+  = -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
+    do  { let   rhs_env     = rhs_se `setInScope` env
 		(tvs, body) = case collectTyBinders rhs of
 			        (tvs, body) | not_lam body -> (tvs,body)
 					    | otherwise	   -> ([], rhs)
@@ -387,7 +388,7 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = do  { (env1, rhs1) <- prepareRhs top_lvl (zapFloats env) new_bndr new_rhs
-        ; (env2, rhs2) <-
+        ; (env2, rhs2) <- 
                 if doFloatFromRhs NotTopLevel NonRecursive is_strict rhs1 env1
                 then do { tick LetFloatFromLet
                         ; return (addFloats env env1, rhs1) }   -- Add the floats to the main env
@@ -547,7 +548,7 @@ makeTrivialWithInfo top_lvl env info expr
   = do  { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq (fsLit "a")
               var = mkLocalIdWithInfo name expr_ty info
-        ; env' <- completeNonRecX top_lvl env False var var expr
+        ; env'  <- completeNonRecX top_lvl env False var var expr
 	; expr' <- simplVar env' var
         ; return (env', expr') }
 	-- The simplVar is needed becase we're constructing a new binding
@@ -722,7 +723,7 @@ simplUnfolding env top_lvl id _ _
   where
     act      = idInlineActivation id
     rule_env = updMode (updModeForInlineRules act) env
-       	       -- See Note [Simplifying gently inside InlineRules] in SimplUtils
+       	       -- See Note [Simplifying inside InlineRules] in SimplUtils
 
 simplUnfolding _ top_lvl id _occ_info new_rhs _
   = return (mkUnfolding InlineRhs (isTopLevel top_lvl) (isBottomingId id) new_rhs)
@@ -896,10 +897,9 @@ simplExprF' env (Case scrut bndr _ alts) cont
   | otherwise
   =     -- If case-of-case is off, simply simplify the case expression
         -- in a vanilla Stop context, and rebuild the result around it
-    do  { case_expr' <- simplExprC env scrut case_cont
+    do  { case_expr' <- simplExprC env scrut
+                             (Select NoDup bndr alts env mkBoringStop)
         ; rebuild env case_expr' cont }
-  where
-    case_cont = Select NoDup bndr alts env mkBoringStop
 
 simplExprF' env (Let (Rec pairs) body) cont
   = do  { env' <- simplRecBndrs env (map fst pairs)
@@ -951,7 +951,9 @@ rebuild env expr cont0
       StrictArg info _ cont        -> rebuildCall env (info `addArgTo` expr) cont
       StrictBind b bs body se cont -> do { env' <- simplNonRecX (se `setFloats` env) b expr
                                          ; simplLam env' bs body cont }
-      ApplyTo _ arg se cont        -> do { arg' <- simplExpr (se `setInScope` env) arg
+      ApplyTo dup_flag arg se cont -- See Note [Avoid redundant simplification]
+        | isSimplified dup_flag    -> rebuild env (App expr arg) cont
+        | otherwise                -> do { arg' <- simplExpr (se `setInScope` env) arg
                                          ; rebuild env (App expr arg') cont }
 \end{code}
 
@@ -1089,7 +1091,8 @@ simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   | preInlineUnconditionally env NotTopLevel bndr rhs
   = do  { tick (PreInlineUnconditionally bndr)
-        ; simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
+        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
+          simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
   | isStrictId bndr
   = do  { simplExprF (rhs_se `setFloats` env) rhs
@@ -1237,7 +1240,10 @@ rebuildCall env info (ApplyTo _ (Type arg_ty) se cont)
 
 rebuildCall env info@(ArgInfo { ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })
-            (ApplyTo _ arg arg_se cont)
+            (ApplyTo dup_flag arg arg_se cont)
+  | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
+  = rebuildCall env (addArgTo info' arg) cont
+
   | str 	        -- Strict argument
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setFloats` env) arg
@@ -1266,7 +1272,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
 	; mb_rule <- tryRules env rules fun args cont
 	; case mb_rule of {
 	     Just (n_args, rule_rhs) -> simplExprF env' rule_rhs $
-                                        pushArgs env' (drop n_args args) cont ;
+                                        pushSimplifiedArgs env' (drop n_args args) cont ;
                  -- n_args says how many args the rule consumed
            ; Nothing -> rebuild env (mkApps (Var fun) args) cont      -- No rules
     } }
@@ -1277,13 +1283,22 @@ Note [RULES apply to simplified arguments]
 It's very desirable to try RULES once the arguments have been simplified, because
 doing so ensures that rule cascades work in one pass.  Consider
    {-# RULES g (h x) = k x
-            f (k x) = x #-}
+             f (k x) = x #-}
    ...f (g (h x))...
 Then we want to rewrite (g (h x)) to (k x) and only then try f's rules. If
 we match f's rules against the un-simplified RHS, it won't match.  This 
 makes a particularly big difference when superclass selectors are involved:
 	op ($p1 ($p2 (df d)))
 We want all this to unravel in one sweeep.
+
+Note [Avoid redundant simplification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because RULES apply to simplified arguments, there's a danger of repeatedly
+simplifying already-simplified arguments.  An important example is that of
+	    (>>=) d e1 e2
+Here e1, e2 are simplified before the rule is applied, but don't really
+participate in the rule firing. So we mark them as Simplified to avoid
+re-simplifying them.
 
 Note [Shadowing]
 ~~~~~~~~~~~~~~~~
