@@ -1,0 +1,6 @@
+
+tcfail138.hs:35:10:
+    Couldn't match type `b'' with `b'
+      because this skolem type variable would escape: `b'
+    This skolem is bound by the instance declaration
+    In the instance declaration for `C (Maybe a) a'
