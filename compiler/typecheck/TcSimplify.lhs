@@ -204,10 +204,12 @@ simplifyInfer apply_mr tau_tvs wanted
 	     -- See Note [Avoid unecessary constraint simplification]
        ; gbl_tvs <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- zonkTcTyVarsAndFV tau_tvs
-       ; let proto_qtvs = zonked_tau_tvs `minusVarSet` gbl_tvs
+       ; let proto_qtvs = growWanteds gbl_tvs zonked_wanted $
+                          zonked_tau_tvs `minusVarSet` gbl_tvs
              (perhaps_bound, surely_free) 
                   = partitionBag (quantifyMeWC proto_qtvs) zonked_wanted
        ; emitConstraints surely_free
+       ; traceTc "sinf" (ppr proto_qtvs $$ ppr perhaps_bound $$ ppr surely_free)
 
        	      -- Now simplify the possibly-bound constraints
        ; (simplified_perhaps_bound, tc_binds) 
@@ -218,20 +220,24 @@ simplifyInfer apply_mr tau_tvs wanted
        ; gbl_tvs <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- zonkTcTyVarsAndFV tau_tvs
        ; zonked_simples <- mapBagM zonkWantedEvVar simplified_perhaps_bound
-       ; let qtvs = findQuantifiedTyVars apply_mr zonked_simples zonked_tau_tvs gbl_tvs
-             (bound, free) | apply_mr  = (emptyBag, zonked_simples)
-                           | otherwise = partitionBag (quantifyMe qtvs) zonked_simples
+       ; let init_tvs 	     = zonked_tau_tvs `minusVarSet` gbl_tvs
+             mr_qtvs  	     = init_tvs `minusVarSet` constrained_tvs
+             constrained_tvs = tyVarsOfWantedEvVars zonked_simples
+             qtvs            = growWantedEVs gbl_tvs zonked_simples init_tvs
+             (final_qtvs, (bound, free))
+                | apply_mr  = (mr_qtvs, (emptyBag, zonked_simples))
+                | otherwise = (qtvs,    partitionBag (quantifyMe qtvs) zonked_simples)
 
        ; traceTc "end simplifyInfer }" $
               vcat [ ptext (sLit "apply_mr =") <+> ppr apply_mr
                    , text "wanted = " <+> ppr zonked_wanted
-                   , text "qtvs =   " <+> ppr qtvs
+                   , text "qtvs =   " <+> ppr final_qtvs
                    , text "free =   " <+> ppr free
                    , text "bound =  " <+> ppr bound ]
 
        -- Turn the quantified meta-type variables into real type variables 
        ; emitConstraints (mapBag WcEvVar free)
-       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs) 
+       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems final_qtvs) 
        ; let bound_evvars = bagToList $ mapBag wantedEvVarToVar bound
        ; return (qtvs_to_return, bound_evvars, EvBinds tc_binds) }
 
@@ -322,25 +328,29 @@ approximateImplications impls
 \end{code}
 
 \begin{code}
-findQuantifiedTyVars :: Bool		-- Apply the MR
-                     -> Bag WantedEvVar	-- Simplified constraints from RHS
-                     -> TyVarSet	-- Free in tau-type of definition
-                     -> TyVarSet	-- Free in the envt
-		     -> TyVarSet	-- Quantify over these
+growWantedEVs :: TyVarSet -> Bag WantedEvVar      -> TyVarSet -> TyVarSet
+growWanteds   :: TyVarSet -> Bag WantedConstraint -> TyVarSet -> TyVarSet
+growWanteds   gbl_tvs ws tvs
+  | isEmptyBag ws = tvs
+  | otherwise     = fixVarSet (\tvs -> foldrBag (growWanted   gbl_tvs) tvs ws) tvs
+growWantedEVs gbl_tvs ws tvs 
+  | isEmptyBag ws = tvs
+  | otherwise     = fixVarSet (\tvs -> foldrBag (growWantedEV gbl_tvs) tvs ws) tvs
 
-findQuantifiedTyVars apply_mr wanteds tau_tvs gbl_tvs
-  | isEmptyBag wanteds = init_tvs
-  | apply_mr           = init_tvs `minusVarSet` constrained_tvs
-  | otherwise          = fixVarSet mk_next init_tvs
+growWantedEV :: TyVarSet -> WantedEvVar      -> TyVarSet -> TyVarSet
+growWanted   :: TyVarSet -> WantedConstraint -> TyVarSet -> TyVarSet
+-- (growX gbls wanted tvs) grows a seed 'tvs' against the 
+-- X-constraint 'wanted', nuking the 'gbls' at each stage
+growWantedEV gbl_tvs wev tvs
+  = tvs `unionVarSet` (ev_tvs `minusVarSet` gbl_tvs)
   where
-    init_tvs    = tau_tvs `minusVarSet` gbl_tvs
-    mk_next tvs = foldrBag grow_one tvs wanteds
+    ev_tvs = growPredTyVars (wantedEvVarPred wev) tvs
 
-    grow_one wev tvs = tvs `unionVarSet` (extra_tvs `minusVarSet` gbl_tvs)
-       where
-         extra_tvs = growPredTyVars (wantedEvVarPred wev) tvs
-
-    constrained_tvs = tyVarsOfWantedEvVars wanteds
+growWanted gbl_tvs (WcEvVar wev) tvs
+  = growWantedEV gbl_tvs wev tvs
+growWanted gbl_tvs (WcImplic implic) tvs
+  = foldrBag (growWanted (gbl_tvs `unionVarSet` ic_skols implic)) 
+             tvs (ic_wanted implic)
 
 --------------------
 quantifyMe :: TyVarSet      -- Quantifying over these
