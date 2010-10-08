@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- This test made Hugs fail (Oct 05) because the constraint
 -- from the 'toInteger' call escaped from the pattern match

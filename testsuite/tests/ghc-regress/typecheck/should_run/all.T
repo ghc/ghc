@@ -8,8 +8,8 @@
 
 test('tcrun001', normal, compile_and_run, [''])
 test('tcrun002', only_compiler_types(['ghc']), compile_and_run, [''])
-test('tcrun003', normal, compile_and_run, ['-fglasgow-exts'])
-test('tcrun004', normal, compile_and_run, ['-fglasgow-exts'])
+test('tcrun003', normal, compile_and_run, [''])
+test('tcrun004', normal, compile_and_run, [''])
 test('tcrun005', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
@@ -38,7 +38,7 @@ test('tcrun020', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype with no constructors
 test('tcrun021', expect_fail_for(['extcore','optextcore']),
      compile_and_run, ['-package containers'])
-test('tcrun022', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, ['-O -fglasgow-exts'])
+test('tcrun022', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, ['-O'])
 test('tcrun023', normal, compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
 test('tcrun025', extra_clean(['TcRun025_B.hi', 'TcRun025_B.o']),

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- Strangely, this program does not elicit an error message
 -- in GHC 5.03.  I don't know why. It fails correctly in

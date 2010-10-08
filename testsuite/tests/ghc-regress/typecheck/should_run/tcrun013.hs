@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ParallelListComp #-}
 
 -- !!! Parallel list comprehensions
 

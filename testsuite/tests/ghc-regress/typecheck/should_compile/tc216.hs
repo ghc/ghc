@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances, FlexibleInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- Test for trac #816
 -- GHC's typechecker loops when trying to type this, resulting in a

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 
 -- Test for top-level duplicates
 

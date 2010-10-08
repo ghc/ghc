@@ -1,5 +1,6 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
+
+{-# LANGUAGE MultiParamTypeClasses,
+             FlexibleInstances, OverlappingInstances, UndecidableInstances #-}
 
 --
 -- Test case adopted from the HList library

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExplicitForAll, TypeOperators #-}
 
 module Main where
 

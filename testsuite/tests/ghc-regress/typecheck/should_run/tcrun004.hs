@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 -- !!! Tests existential data types
 --     Originally from Kevin Glynn
 module Main(main) where

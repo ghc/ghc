@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, FlexibleInstances #-}
 
 -- !!! Check that forall types can't be arguments
 module ShouldFail where

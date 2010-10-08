@@ -1,9 +1,9 @@
 -- The type sig for 'test' is illegal in H98 because of the
 -- partial application of the type sig.
--- But with -fglasgow-exts it should be OK because when
--- you expand the type synonyms it's just Int->Int
--- 	c.f should_compile/tc155.hs
-
+-- But with the LiberalTypeSynonyms extension enabled it
+-- should be OK because when you expand the type synonyms
+-- it's just Int->Int
+-- c.f should_compile/tc155.hs
 module ShouldFail where
 
 type Thing m = m ()

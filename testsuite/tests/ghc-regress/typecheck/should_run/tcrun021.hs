@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             TypeSynonymInstances #-}
 
 -- This bizarre program failed because TcSimplify built a loop of
 -- dictionaries, due to an obscure bug in the way in which superclasses

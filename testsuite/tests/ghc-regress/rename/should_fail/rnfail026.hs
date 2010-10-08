@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, FlexibleInstances #-}
 
 -- This one made ghc-4.08 crash 
 -- rename/RnEnv.lhs:239: Non-exhaustive patterns in function get_tycon_key

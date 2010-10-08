@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams, TypeSynonymInstances #-}
 
 -- Similar to tc024, but cross module
 

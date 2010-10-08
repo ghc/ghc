@@ -1,5 +1,6 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances,
+             OverlappingInstances, UndecidableInstances #-}
 
 -- Rather exotic example posted to Haskell mailing list 17 Oct 07
 -- It concerns context reduction and functional dependencies

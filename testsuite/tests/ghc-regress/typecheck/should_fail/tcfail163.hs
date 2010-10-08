@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE Generics #-}
+
+{-# LANGUAGE ConstrainedClassMethods, Generics, Rank2Types, TypeOperators #-}
 
 -- Derivable type class with a higher-rank method
 -- Currently this does not work, but it crashed GHC 6.5, so

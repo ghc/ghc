@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 -- Another test for the new feature that contexts in a mutually
 -- recursive group do not need to be of the same length

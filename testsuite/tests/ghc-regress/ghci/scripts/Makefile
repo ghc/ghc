@@ -11,8 +11,8 @@ ghci024:
 	printf ":show languages\n" \
 	    | '$(TEST_HC)' --interactive -v0 -ignore-dot-ghci \
 	    | grep -E "^([^ ]|  -XImplicitPrelude|  -XMagicHash)"
-	@echo "~~~~~~~~~~ Testing :show languages, with -fglasgow-exts"
-	printf ":set -fglasgow-exts\n:show languages\n" \
+	@echo "~~~~~~~~~~ Testing :show languages, with -XMagicHash"
+	printf ":set -XMagicHash\n:show languages\n" \
 	    | '$(TEST_HC)' --interactive -v0 -ignore-dot-ghci \
 	    | grep -E "^([^ ]|  -XImplicitPrelude|  -XMagicHash)"
 	@echo "~~~~~~~~~~ Testing :show packages"

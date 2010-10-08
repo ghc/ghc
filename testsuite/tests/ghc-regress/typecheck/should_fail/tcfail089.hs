@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 
 -- !!! Check non-constructors in patterns fail tidily
 -- !!! The -O made ghc 4.08 go into a loop!

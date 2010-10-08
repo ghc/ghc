@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies, Rank2Types #-}
+
 
 module ShouldFail where
 

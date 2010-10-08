@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances #-}
 -- NB: *no* UndecidableInstances
 
 -- This one (due to Oleg) made 6.4.1 go into a loop in the typechecker,
@@ -15,7 +16,6 @@
 -- number of constructors) that the functions' arguments, "m" and
 -- "() -> ()" together. Plus any type variable free in the result is also
 -- free in at least one of the arguments. And yet it loops.
-
 module ShouldFail where
 
 class Foo m a where

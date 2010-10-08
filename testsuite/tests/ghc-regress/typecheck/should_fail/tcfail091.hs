@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- !!! Illegal superclass constraint
 -- These examples actually crashed GHC 4.08.2

@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
- 
+{-# LANGUAGE Rank2Types, KindSignatures #-}
+
 module ShouldFail where
 
 -- There should be a kind error, when unifying (a b) against (c d)

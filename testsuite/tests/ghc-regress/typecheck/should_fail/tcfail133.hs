@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances, FlexibleInstances, TypeOperators,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- This one crashed GHC 6.3 due to an error in TcSimplify.add_ors
 

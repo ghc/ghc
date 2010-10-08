@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
 
 -- Test the handling of conditionals in rank-n stuff
 -- Should fail, regardless of branch ordering

@@ -7,7 +7,7 @@ other dynamic, non-language, flag settings:
 ~~~~~~~~~~ Testing :show languages
 active language flags:
   -XImplicitPrelude
-~~~~~~~~~~ Testing :show languages, with -fglasgow-exts
+~~~~~~~~~~ Testing :show languages, with -XMagicHash
 active language flags:
   -XMagicHash
   -XImplicitPrelude

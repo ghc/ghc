@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 
 -- Claus reported by email that 

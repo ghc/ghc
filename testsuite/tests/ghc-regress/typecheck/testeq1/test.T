@@ -6,4 +6,4 @@ test('typecheck.testeq1',
                    'FakePrelude.hi', 'FakePrelude.o',
                    'TypeEq.hi', 'TypeEq.o'])],
      multimod_compile_and_run,
-     ['Main', '-v0 -fglasgow-exts'])
+     ['Main', '-v0'])

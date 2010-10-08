@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 -- !!! One method class from Sergey Mechveliani 
 --     showed up problematic newtype dict rep.
 module Main where

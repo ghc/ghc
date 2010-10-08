@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances, FlexibleInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Foo  where 
 

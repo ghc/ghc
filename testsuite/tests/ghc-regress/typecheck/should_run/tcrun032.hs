@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 {-# LANGUAGE UndecidableInstances #-}
 
 -- This tests the recursive-dictionary stuff.

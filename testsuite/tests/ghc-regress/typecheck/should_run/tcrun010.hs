@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- !!! Functional dependencies
 -- This one gave "zonkIdOcc:  FunDep_a11w" in earlier days

@@ -1,4 +1,4 @@
-{-# -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- !!! Multi-param type classes test: ambiguity bug
 

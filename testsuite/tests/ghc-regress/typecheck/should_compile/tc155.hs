@@ -2,7 +2,7 @@
 
 -- The type sig for 'test' is illegal in H98 because of the
 -- partial application of the type sig.
--- But with -fglasgow-exts it should be OK because when
+-- But with LiberalTypeSynonyms it should be OK because when
 -- you expand the type synonyms it's just Int->Int
 -- 	c.f should_fail/tcfail107.hs
 

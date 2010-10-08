@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances #-}
 module ShouldFail where
 
 class Foo f a r | f a -> r where

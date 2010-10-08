@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             FlexibleInstances #-}
 
 -- !!! Functional dependencies
 -- This one made the 5.00.1 typechecker go into an infinite loop.

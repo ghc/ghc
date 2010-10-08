@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 {- 
 	From: Ralf Hinze <ralf@uran.informatik.uni-bonn.de>

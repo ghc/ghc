@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- Tests the "stupid theta" in pattern-matching
 -- when there's an existential as well

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- Tests top-level ambiguity resolution
 -- This made a post-6.4 GHC fall over in TcSimplify

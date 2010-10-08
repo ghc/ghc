@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- Exmaples from Doaitse Swierestra and Brandon Moore
 -- GHC users mailing list, April 07, title "Release plans"

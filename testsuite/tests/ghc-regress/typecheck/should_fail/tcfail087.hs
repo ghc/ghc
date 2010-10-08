@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- !!! Check that unboxed tuples can't be function arguments
 module ShouldFail where

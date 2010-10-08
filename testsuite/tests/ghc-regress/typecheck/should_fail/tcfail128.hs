@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 
 -- Ambiguity error reporting
 

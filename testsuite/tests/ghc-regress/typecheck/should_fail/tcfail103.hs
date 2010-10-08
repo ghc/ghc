@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 
 module ShouldCompile where
 import GHC.ST

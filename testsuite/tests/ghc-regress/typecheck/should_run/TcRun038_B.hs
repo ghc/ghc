@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcRun038_B where
 

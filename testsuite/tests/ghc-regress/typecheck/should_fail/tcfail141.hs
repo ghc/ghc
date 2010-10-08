@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -- Should fail, because f :: (# Int#, ByteArray# #)
 

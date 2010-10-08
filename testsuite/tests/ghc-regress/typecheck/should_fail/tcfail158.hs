@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE ExplicitForAll #-}
 
 -- This one actually crashed in 6.4.1
 -- There's a kind error in the signature for bar, 

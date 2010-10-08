@@ -1,4 +1,4 @@
-{-# OPTIONS -w -fglasgow-exts #-}
+{-# OPTIONS_GHC -w #-}
 
 -- A nasty case that crashed GHC 6.4 with a Lint error; 
 -- see Note [Multiple instantiation] in TcExpr

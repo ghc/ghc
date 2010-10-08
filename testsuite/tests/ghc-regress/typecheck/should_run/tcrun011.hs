@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts,
+             MultiParamTypeClasses #-}
 
 -- !!! Existential data tyes
 -- Hugs didn't like this one

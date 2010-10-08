@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, UndecidableInstances #-}
-{-# OPTIONS -fglasgow-exts -Wnot #-}
+{-# OPTIONS_GHC -Wnot #-}
 
 module Main where
 

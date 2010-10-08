@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 
 -- This only typechecks if forall-hoisting works ok when
 -- importing from an interface file.  The type of Twins.gzipWithQ

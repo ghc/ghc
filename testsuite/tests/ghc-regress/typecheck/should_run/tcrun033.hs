@@ -1,5 +1,6 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, FlexibleContexts,
+             UndecidableInstances, TypeSynonymInstances #-}
 
 -- This test made GHC 6.3 build a superclass loop, in
 -- the instance ClassA a String declaration

@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams, TypeSynonymInstances #-}
 
 -- Class ops that bind no new type variables
 

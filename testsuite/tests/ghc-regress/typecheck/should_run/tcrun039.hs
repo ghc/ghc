@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GADTs, ExplicitForAll #-}
 
 -- Test for GADTs and implication constraints
 

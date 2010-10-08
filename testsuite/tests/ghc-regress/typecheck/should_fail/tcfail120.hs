@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
 
+{-# LANGUAGE UnboxedTuples #-}
 
 -- Could be ok, because nothing is bound to the unboxed tuple
 -- but actually rejected, because a wild card is rather like

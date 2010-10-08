@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- The defn of foo should be rejected; it's monomorphic, but
 -- the implicit paramter escapes

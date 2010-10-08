@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
 
 -- A newtype-deriving test
 
