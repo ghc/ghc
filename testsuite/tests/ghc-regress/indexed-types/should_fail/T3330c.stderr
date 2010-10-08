@@ -16,21 +16,6 @@ T3330c.hs:22:35:
               plug' :: R f -> Der f x -> x -> f x
               plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
 
-T3330c.hs:22:40:
-    Could not deduce (Rep ((->) x1))
-      from the context (Rep f, f1 ~ (f2 :+: g))
-      arising from a use of `plug'
-    Possible fix:
-      add (Rep ((->) x1)) to the context of
-        the data constructor `RSum'
-        or the type signature for `plug''
-        or the type signature for `plug'
-      or add an instance declaration for (Rep ((->) x1))
-    In the first argument of `Inl', namely `(plug rf df x)'
-    In the expression: Inl (plug rf df x)
-    In an equation for `plug'':
-        plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
-
 T3330c.hs:22:45:
     Couldn't match type `Der ((->) x)' with `R'
     Expected type: Der ((->) x) (f1 x)
