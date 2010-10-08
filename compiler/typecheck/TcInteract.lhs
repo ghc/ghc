@@ -999,14 +999,7 @@ doInteractWithInert
 -- Fall-through case for all other situations
 doInteractWithInert _ workItem = noInteraction workItem
 
---------------------------------------------
-combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
--- Precondition: At least one of them should be wanted 
-combineCtLoc (Wanted loc) _ = loc 
-combineCtLoc _ (Wanted loc) = loc 
-combineCtLoc _ _ = panic "Expected one of wanted constraints (BUG)" 
-
-
+-------------------------
 -- Equational Rewriting 
 rewriteDict  :: (CoVar, TcTyVar, Xi) -> (DictId, CtFlavor, Class, [Xi]) -> TcS CanonicalCt
 rewriteDict (cv,tv,xi) (dv,gw,cl,xis) 

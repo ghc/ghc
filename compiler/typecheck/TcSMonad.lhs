@@ -10,7 +10,7 @@ module TcSMonad (
     makeGivens, makeSolved,
 
     CtFlavor (..), isWanted, isGiven, isDerived, canRewrite, 
-    joinFlavors, mkGivenFlavor,
+    combineCtLoc, mkGivenFlavor,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, traceTcS0,  -- Basic functionality 
     tryTcS, nestImplicTcS, wrapErrTcS, wrapWarnTcS,
@@ -298,12 +298,13 @@ canRewrite (Derived {}) (Derived {}) = True
 canRewrite (Wanted {})  (Wanted {})  = True
 canRewrite _ _ = False
 
-joinFlavors :: CtFlavor -> CtFlavor -> CtFlavor 
-joinFlavors (Wanted loc) _  = Wanted loc 
-joinFlavors _ (Wanted loc)  = Wanted loc 
-joinFlavors (Derived loc) _ = Derived loc 
-joinFlavors _ (Derived loc) = Derived loc 
-joinFlavors (Given loc) _   = Given loc
+combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
+-- Precondition: At least one of them should be wanted 
+combineCtLoc (Wanted loc) _ = loc 
+combineCtLoc _ (Wanted loc) = loc 
+combineCtLoc (Derived loc) _ = loc 
+combineCtLoc _ (Derived loc) = loc 
+combineCtLoc _ _ = panic "combineCtLoc: both given"
 
 mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
 mkGivenFlavor (Wanted  loc) sk = Given (setCtLocOrigin loc sk)
