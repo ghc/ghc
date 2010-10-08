@@ -125,10 +125,9 @@ reportTidyWanteds ctxt unsolved
        ; when (null tv_eqs) $ groupErrs (reportFlat ctxt) others
        ; when (null tv_eqs) $ mapBagM_ (reportTidyImplic ctxt) implics
 
-       	   -- Only report ambiguity if no other errors happened
-	   -- See Note [Avoiding spurious errors]
-       ; when (isEmptyBag implics && null non_ambigs) $
-         reportAmbigErrs ctxt skols ambigs }
+       	   -- Only report ambiguity if no other errors (at all) happened
+	   -- See Note [Avoiding spurious errors] in TcSimplify
+       ; ifErrsM (return ()) $ reportAmbigErrs ctxt skols ambigs }
   where
     skols = foldr (unionVarSet . ic_skols) emptyVarSet (cec_encl ctxt)
  
