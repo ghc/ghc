@@ -323,6 +323,6 @@ test('T3696', normal, compile, [''])
 test('T1123', normal, compile, [''])
 test('T3692', normal, compile, [''])
 test('T700',  normal, compile, [''])
-test('T4361',  normal, compile, [''])
-test('T4355',  normal, compile, [''])
+test('T4361', normal, compile, [''])
+test('T4355', reqlib('mtl'), compile, [''])
      
