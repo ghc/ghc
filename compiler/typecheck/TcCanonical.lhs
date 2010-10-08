@@ -397,14 +397,6 @@ in Haskell are always
       same type from different type arguments.
 
 
-Note [Kinding] 
-~~~~~~~~~~~~~~
-The canonicalizer assumes that it's provided with well-kinded equalities
-as wanted or given, that is LHS kind and the RHS kind agree, modulo subkinding.
-
-Both canonicalization and interaction solving must preserve this invariant. 
-DV: TODO TODO: Check! 
-
 Note [Canonical ordering for equality constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Implemented as (<+=) below:
@@ -540,17 +532,20 @@ reOrient (FunCls {}) _                = False   -- Fun/Other on rhs
 reOrient (VarCls tv1) (FunCls {}) = not (isMetaTyVar tv1)
 reOrient (VarCls {})  (OtherCls {}) = False
 
+reOrient (VarCls tv1) (VarCls tv2) = False 
+{- 
 -- Variables-variables are oriented according to their kind 
--- so that the invariant of CTyEqCan has the best chance of
+-- so that the following property has the best chance of
 -- holding:   tv ~ xi
 --   * If tv is a MetaTyVar, then typeKind xi <: typeKind tv 
 --              a skolem,    then typeKind xi =  typeKind tv 
-reOrient (VarCls tv1) (VarCls tv2)
+
   | k1 `eqKind` k2 = False
   | otherwise      = k1 `isSubKind` k2 
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
+-} 
 
 ------------------
 canEqLeaf :: CtFlavor -> CoVar 
@@ -582,7 +577,9 @@ canEqLeafOriented :: CtFlavor -> CoVar
                   -> TypeClassifier -> TcType -> TcS CanonicalCts 
 -- First argument is not OtherCls
 canEqLeafOriented fl cv cls1@(FunCls fn tys) s2 
-  | not (kindAppResult (tyConKind fn) tys `eqKind` typeKind s2 )
+  | let k1 = kindAppResult (tyConKind fn) tys, 
+    let k2 = typeKind s2, 
+    isGiven fl && not (k1 `eqKind` k2) -- Establish the kind invariant for CFunEqCan
   = do { kindErrorTcS fl (unClassify cls1) s2
        ; return emptyCCan }
   | otherwise 
@@ -599,8 +596,7 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys) s2
 -- Otherwise, we have a variable on the left, so we flatten the RHS
 -- and then do an occurs check.
 canEqLeafOriented fl cv (VarCls tv) s2 
-  | not (k1 `eqKind` k2 || (isMetaTyVar tv && k2 `isSubKind` k1))
-      -- Establish the kind invariant for CTyEqCan
+  | isGiven fl && not (k1 `eqKind` k2) -- Establish the kind invariant for CTyEqCan
   = do { kindErrorTcS fl (mkTyVarTy tv) s2
        ; return emptyCCan }
 

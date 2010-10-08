@@ -9,7 +9,7 @@ module TcSMonad (
     mkWantedConstraints, deCanonicaliseWanted, 
     makeGivens, makeSolved,
 
-    CtFlavor (..), isWanted, isGiven, isDerived, canRewrite, 
+    CtFlavor (..), isWanted, isGiven, isDerived, canRewrite, canSolve,
     combineCtLoc, mkGivenFlavor,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, traceTcS0,  -- Basic functionality 
@@ -141,8 +141,8 @@ data CanonicalCt
   | CTyEqCan {  -- tv ~ xi	(recall xi means function free)
        -- Invariant: 
        --   * tv not in tvs(xi)   (occurs check)
-       --   * If tv is a MetaTyVar, then typeKind xi <: typeKind tv 
-       --              a skolem,    then typeKind xi =  typeKind tv 
+       --   * If constraint is given then typeKind xi ==  typeKind tv 
+       --                See Note [Spontaneous solving and kind compatibility] 
       cc_id     :: EvVar, 
       cc_flavor :: CtFlavor, 
       cc_tyvar :: TcTyVar, 
@@ -153,7 +153,8 @@ data CanonicalCt
                  -- Invariant: * isSynFamilyTyCon cc_fun 
                  --            * cc_rhs is not a touchable unification variable 
                  --                   See Note [No touchables as FunEq RHS]
-                 --            * typeKind (TyConApp cc_fun cc_tyargs) == typeKind cc_rhs
+                 --            * If constraint is given then 
+                 --                 typeKind (TyConApp cc_fun cc_tyargs) == typeKind cc_rhs
       cc_id     :: EvVar,
       cc_flavor :: CtFlavor, 
       cc_fun    :: TyCon,	-- A type function
@@ -288,13 +289,23 @@ isDerived :: CtFlavor -> Bool
 isDerived (Derived {}) = True
 isDerived _            = False
 
+canSolve :: CtFlavor -> CtFlavor -> Bool 
+-- canSolve ctid1 ctid2 
+-- The constraint ctid1 can be used to solve ctid2 
+canSolve (Given {})   _            = True 
+canSolve (Derived {}) (Wanted {})  = True 
+canSolve (Derived {}) (Derived {}) = True 
+canSolve (Wanted {})  (Wanted {})  = True
+canSolve _ _ = False
+
 canRewrite :: CtFlavor -> CtFlavor -> Bool 
 -- canRewrite ctid1 ctid2 
--- The constraint ctid1 can be used to rewrite ctid2 
+-- The *equality* constraint ctid1 can be used to rewrite inside ctid2 
 canRewrite (Given {})   _            = True 
 canRewrite (Derived {}) (Wanted {})  = True 
 canRewrite (Derived {}) (Derived {}) = True 
-canRewrite (Wanted {})  (Wanted {})  = True
+  -- Never use a wanted to rewrite anything!
+canRewrite (Wanted {})  (Wanted {})  = False 
 canRewrite _ _ = False
 
 combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc

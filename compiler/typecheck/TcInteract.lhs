@@ -479,7 +479,7 @@ spontaneousSolveStage workItem inerts
 --   * Nothing if we were not able to solve it
 --   * Just wi' if we solved it, wi' (now a "given") should be put in the work list.
 --     	    See Note [Touchables and givens] 
--- Note, just passing the inerts through for the skolem equivalence classes
+-- NB: just passing the inerts through for the skolem equivalence classes
 trySpontaneousSolve :: WorkItem -> InertSet -> TcS (Maybe SWorkList)
 trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_rhs = xi }) inerts 
   | isGiven gw
@@ -490,8 +490,7 @@ trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_r
        ; case (tch1, tch2) of
            (True,  True)  -> trySpontaneousEqTwoWay inerts cv gw tv1 tv2
            (True,  False) -> trySpontaneousEqOneWay inerts cv gw tv1 xi
-           (False, True)  | tyVarKind tv1 `isSubKind` tyVarKind tv2
-                          -> trySpontaneousEqOneWay inerts cv gw tv2 (mkTyVarTy tv1)
+           (False, True)  -> trySpontaneousEqOneWay inerts cv gw tv2 (mkTyVarTy tv1)
 	   _ -> return Nothing }
   | otherwise
   = do { tch1 <- isTouchableMetaTyVar tv1
@@ -507,9 +506,9 @@ trySpontaneousSolve _ _ = return Nothing
 trySpontaneousEqOneWay :: InertSet -> CoVar -> CtFlavor -> TcTyVar -> Xi
                        -> TcS (Maybe SWorkList)
 -- tv is a MetaTyVar, not untouchable
--- Precondition: kind(xi) is a sub-kind of kind(tv)
 trySpontaneousEqOneWay inerts cv gw tv xi	
-  | not (isSigTyVar tv) || isTyVarTy xi
+  | not (isSigTyVar tv) || isTyVarTy xi, 
+    typeKind xi `isSubKind` tyVarKind tv 
   = solveWithIdentity inerts cv gw tv xi
   | otherwise
   = return Nothing
@@ -520,15 +519,44 @@ trySpontaneousEqTwoWay :: InertSet -> CoVar -> CtFlavor -> TcTyVar -> TcTyVar
 -- Both tyvars are *touchable* MetaTyvars
 -- By the CTyEqCan invariant, k2 `isSubKind` k1
 trySpontaneousEqTwoWay inerts cv gw tv1 tv2
-  | k1 `eqKind` k2
+  | k1 `isSubKind` k2
   , nicer_to_update_tv2 = solveWithIdentity inerts cv gw tv2 (mkTyVarTy tv1)
-  | otherwise           = ASSERT( k2 `isSubKind` k1 )
-                          solveWithIdentity inerts cv gw tv1 (mkTyVarTy tv2)
+  | k2 `isSubKind` k1 
+  = solveWithIdentity inerts cv gw tv1 (mkTyVarTy tv2) 
+  | otherwise = return Nothing 
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
     nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
 \end{code}
+
+
+Note [Spontaneous solving and kind compatibility] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Note that our canonical constraints insist that only *given* equalities (tv ~ xi) 
+or (F xis ~ rhs) require the LHS and the RHS to have exactly the same kinds. 
+
+  - We have to require this because: 
+        Given equalities can be freely used to rewrite inside 
+        other types or constraints.
+  - We do not have to do the same for wanteds because:
+        First, wanted equations (tv ~ xi) where tv is a touchable unification variable
+        may have kinds that do not agree (the kind of xi must be a sub kind of the kind of tv). 
+        Second, any potential kind mismatch will result in the constraint not being soluble, 
+        which will be reported anyway. This is the reason that @trySpontaneousOneWay@ and 
+        @trySpontaneousTwoWay@ will perform a kind compatibility check, and only then will 
+        they proceed to @solveWithIdentity@. 
+
+Caveat: 
+  - Givens from higher-rank, such as: 
+          type family T b :: * -> * -> * 
+          type instance T Bool = (->) 
+
+          f :: forall a. ((T a ~ (->)) => ...) -> a -> ... 
+          flop = f (...) True 
+     Whereas we would be able to apply the type instance, we would not be able to 
+     use the given (T Bool ~ (->)) in the body of 'flop' 
 
 Note [Loopy spontaneous solving] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -954,10 +982,10 @@ doInteractWithInert (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
                                , cc_tyargs = args1, cc_rhs = xi1 }) 
            workItem@(CFunEqCan { cc_id = cv2, cc_flavor = fl2, cc_fun = tc2
                                , cc_tyargs = args2, cc_rhs = xi2 })
-  | fl1 `canRewrite` fl2 && lhss_match
+  | fl1 `canSolve` fl2 && lhss_match
   = do { cans <- rewriteEqLHS LeftComesFromInert  (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStop KeepInert cans } 
-  | fl2 `canRewrite` fl1 && lhss_match
+  | fl2 `canSolve` fl1 && lhss_match
   = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue workItem DropInert cans }
   where
@@ -967,11 +995,11 @@ doInteractWithInert
            inert@(CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc_rhs = xi1 }) 
            workItem@(CTyEqCan { cc_id = cv2, cc_flavor = fl2, cc_tyvar = tv2, cc_rhs = xi2 })
 -- Check for matching LHS 
-  | fl1 `canRewrite` fl2 && tv1 == tv2 
+  | fl1 `canSolve` fl2 && tv1 == tv2 
   = do { cans <- rewriteEqLHS LeftComesFromInert (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStop KeepInert cans } 
 
-  | fl2 `canRewrite` fl1 && tv1 == tv2 
+  | fl2 `canSolve` fl1 && tv1 == tv2 
   = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue workItem DropInert cans } 
 
@@ -1087,7 +1115,7 @@ rewriteEqLHS :: WhichComesFromInert -> (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> T
 -- Used to ineratct two equalities of the following form: 
 -- First Equality:   co1: (XXX ~ xi1)  
 -- Second Equality:  cv2: (XXX ~ xi2) 
--- Where the cv1 `canRewrite` cv2 equality 
+-- Where the cv1 `canSolve` cv2 equality 
 -- We have an option of creating new work (xi1 ~ xi2) OR (xi2 ~ xi1). This 
 -- depends on whether the left or the right equality comes from the inert set. 
 -- We must:  
@@ -1130,13 +1158,13 @@ solveOneFromTheOther (iid,ifl) workItem
   | isDerived ifl && isDerived wfl 
   = noInteraction workItem 
 
-  | ifl `canRewrite` wfl
+  | ifl `canSolve` wfl
   = do { unless (isGiven wfl) $ setEvBind wid (EvId iid) 
            -- Overwrite the binding, if one exists
 	   -- For Givens, which are lambda-bound, nothing to overwrite,
        ; dischargeWorkItem }
 
-  | otherwise  -- wfl `canRewrite` ifl 
+  | otherwise  -- wfl `canSolve` ifl 
   = do { unless (isGiven ifl) $ setEvBind iid (EvId wid)
        ; mkIRContinue workItem DropInert emptyCCan }
 
