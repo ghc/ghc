@@ -60,11 +60,7 @@ import CoreArity	( exprBotStrictness_maybe )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendInScopeList,
 			  extendIdSubst, cloneIdBndr, cloneRecIdBndrs )
-import Id		( idType, mkLocalIdWithInfo, mkSysLocal, isOneShotLambda,
-			  zapDemandIdInfo, transferPolyIdInfo,
-			  idSpecialisation, idUnfolding, setIdInfo, 
-			  setIdStrictness, setIdArity
-			)
+import Id
 import IdInfo
 import Var
 import VarSet
@@ -250,10 +246,42 @@ lvlExpr _ _ (  _, AnnType ty) = return (Type ty)
 lvlExpr _ env (_, AnnVar v)   = return (lookupVar env v)
 lvlExpr _ _   (_, AnnLit lit) = return (Lit lit)
 
-lvlExpr ctxt_lvl env (_, AnnApp fun arg) = do
-    fun' <- lvlExpr ctxt_lvl env fun   -- We don't do MFE on partial applications
-    arg' <- lvlMFE  False ctxt_lvl env arg
-    return (App fun' arg')
+lvlExpr ctxt_lvl env expr@(_, AnnApp _ _) = do
+    let
+      (fun, args) = collectAnnArgs expr
+    --
+    case fun of
+         -- float out partial applications.  This is very beneficial
+         -- in some cases (-7% runtime -4% alloc over nofib -O2).
+         -- In order to float a PAP, there must be a function at the
+         -- head of the application, and the application must be
+         -- over-saturated with respect to the function's arity.
+      (_, AnnVar f) | floatPAPs env &&
+                      arity > 0 && arity < n_val_args ->
+        do
+         let (lapp, rargs) = left (n_val_args - arity) expr []
+         rargs' <- mapM (lvlMFE False ctxt_lvl env) rargs
+         lapp' <- lvlMFE False ctxt_lvl env lapp
+         return (foldl App lapp' rargs')
+        where
+         n_val_args = count (isValArg . deAnnotate) args
+         arity = idArity f
+
+         -- separate out the PAP that we are floating from the extra
+         -- arguments, by traversing the spine until we have collected
+         -- (n_val_args - arity) value arguments.
+         left 0 e               rargs = (e, rargs)
+         left n (_, AnnApp f a) rargs
+            | isValArg (deAnnotate a) = left (n-1) f (a:rargs)
+            | otherwise               = left n     f (a:rargs)
+         left _ _ _                   = panic "SetLevels.lvlExpr.left"
+
+         -- No PAPs that we can float: just carry on with the
+         -- arguments and the function.
+      _otherwise -> do
+         args' <- mapM (lvlMFE False ctxt_lvl env) args
+         fun'  <- lvlExpr ctxt_lvl env fun
+         return (foldl App fun' args')
 
 lvlExpr ctxt_lvl env (_, AnnNote note expr) = do
     expr' <- lvlExpr ctxt_lvl env expr
@@ -740,6 +768,9 @@ floatLams (fos, _, _, _) = floatOutLambdas fos
 
 floatConsts :: LevelEnv -> Bool
 floatConsts (fos, _, _, _) = floatOutConstants fos
+
+floatPAPs :: LevelEnv -> Bool
+floatPAPs (fos, _, _, _) = floatOutPartialApplications fos
 
 extendLvlEnv :: LevelEnv -> [TaggedBndr Level] -> LevelEnv
 -- Used when *not* cloning

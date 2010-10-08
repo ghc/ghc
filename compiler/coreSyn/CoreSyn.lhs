@@ -59,6 +59,9 @@ module CoreSyn (
 	-- * Annotated expression data types
 	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt,
 	
+        -- ** Operations on annotated expressions
+        collectAnnArgs,
+
 	-- ** Operations on annotations
 	deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
 
@@ -1139,6 +1142,17 @@ type AnnAlt bndr annot = (AltCon, [bndr], AnnExpr bndr annot)
 data AnnBind bndr annot
   = AnnNonRec bndr (AnnExpr bndr annot)
   | AnnRec    [(bndr, AnnExpr bndr annot)]
+\end{code}
+
+\begin{code}
+-- | Takes a nested application expression and returns the the function
+-- being applied and the arguments to which it is applied
+collectAnnArgs :: AnnExpr b a -> (AnnExpr b a, [AnnExpr b a])
+collectAnnArgs expr
+  = go expr []
+  where
+    go (_, AnnApp f a) as = go f (a:as)
+    go e 	       as = (e, as)
 \end{code}
 
 \begin{code}

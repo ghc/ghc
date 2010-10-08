@@ -304,8 +304,10 @@ data SimplifierSwitch
 \begin{code}
 data FloatOutSwitches = FloatOutSwitches {
         floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
-        floatOutConstants :: Bool    -- ^ True <=> float constants to top level,
+        floatOutConstants :: Bool,   -- ^ True <=> float constants to top level,
                                      --            even if they do not escape a lambda
+        floatOutPartialApplications :: Bool -- ^ True <=> float out partial applications
+                                            --            based on arity information.
     }
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
@@ -320,10 +322,6 @@ pprFloatOutSwitches sw = pp_not (floatOutLambdas sw) <+> text "lambdas" <> comma
 -- | Switches that specify the minimum amount of floating out
 -- gentleFloatOutSwitches :: FloatOutSwitches
 -- gentleFloatOutSwitches = FloatOutSwitches False False
-
--- | Switches that do not specify floating out of lambdas, just of constants
-constantsOnlyFloatOutSwitches :: FloatOutSwitches
-constantsOnlyFloatOutSwitches = FloatOutSwitches False True
 \end{code}
 
 
@@ -420,14 +418,28 @@ getCoreToDo dflags
         -- so that overloaded functions have all their dictionary lambdas manifest
         runWhen do_specialise CoreDoSpecialising,
 
-        runWhen full_laziness (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
+        runWhen full_laziness $
+           CoreDoFloatOutwards FloatOutSwitches {
+                                 floatOutLambdas   = False,
+                                 floatOutConstants = True,
+                                 floatOutPartialApplications = False },
       		-- Was: gentleFloatOutSwitches	
-		-- I have no idea why, but not floating constants to top level is
-		-- very bad in some cases. 
+                --
+		-- I have no idea why, but not floating constants to
+		-- top level is very bad in some cases.
+                --
 		-- Notably: p_ident in spectral/rewrite
-		-- 	    Changing from "gentle" to "constantsOnly" improved
-		-- 	    rewrite's allocation by 19%, and made  0.0% difference
-		-- 	    to any other nofib benchmark
+		-- 	    Changing from "gentle" to "constantsOnly"
+		-- 	    improved rewrite's allocation by 19%, and
+		-- 	    made 0.0% difference to any other nofib
+		-- 	    benchmark
+                --
+                -- Not doing floatOutPartialApplications yet, we'll do
+                -- that later on when we've had a chance to get more
+                -- accurate arity information.  In fact it makes no
+                -- difference at all to performance if we do it here,
+                -- but maybe we save some unnecessary to-and-fro in
+                -- the simplifier.
 
         runWhen do_float_in CoreDoFloatInwards,
 
@@ -452,8 +464,11 @@ getCoreToDo dflags
                 simpl_phase 0 ["post-worker-wrapper"] max_iter
                 ]),
 
-        runWhen full_laziness
-          (CoreDoFloatOutwards constantsOnlyFloatOutSwitches),
+        runWhen full_laziness $
+           CoreDoFloatOutwards FloatOutSwitches {
+                                 floatOutLambdas   = False,
+                                 floatOutConstants = True,
+                                 floatOutPartialApplications = True },
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens
                 -- after fusion and other stuff, so the early pass doesn't
