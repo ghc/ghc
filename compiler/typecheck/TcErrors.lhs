@@ -33,7 +33,7 @@ import Outputable
 import DynFlags
 import StaticFlags( opt_PprStyle_Debug )
 import Data.List( partition )
-import Control.Monad( unless )
+import Control.Monad( when, unless )
 \end{code}
 
 %************************************************************************
@@ -117,17 +117,28 @@ reportTidyImplic ctxt implic
   
 reportTidyWanteds :: ReportErrCtxt -> WantedConstraints -> TcM ()
 reportTidyWanteds ctxt unsolved
-  = do { let (flats, implics) = splitWanteds unsolved
-             (ambigs, others) = partition is_ambiguous (bagToList flats)
-       ; groupErrs (reportFlat ctxt) others
-       ; mapBagM_ (reportTidyImplic ctxt) implics
-       ; ifErrsM (return ()) $
+  = do { let (flats,  implics)    = splitWanteds unsolved
+             (ambigs, non_ambigs) = partition is_ambiguous (bagToList flats)
+       	     (tv_eqs, others)     = partition is_tv_eq non_ambigs
+
+       ; groupErrs (reportEqErrs ctxt) tv_eqs
+       ; when (null tv_eqs) $ groupErrs (reportFlat ctxt) others
+       ; when (null tv_eqs) $ mapBagM_ (reportTidyImplic ctxt) implics
+
        	   -- Only report ambiguity if no other errors happened
 	   -- See Note [Avoiding spurious errors]
+       ; when (isEmptyBag implics && null non_ambigs) $
          reportAmbigErrs ctxt skols ambigs }
   where
     skols = foldr (unionVarSet . ic_skols) emptyVarSet (cec_encl ctxt)
  
+	-- Report equalities of form (a~ty) first.  They are usually
+	-- skolem-equalities, and they cause confusing knock-on 
+	-- effects in other errors; see test T4093b.
+    is_tv_eq c | EqPred ty1 ty2 <- wantedEvVarPred c
+               = tcIsTyVarTy ty1 || tcIsTyVarTy ty2
+               | otherwise = False
+
 	-- Treat it as "ambiguous" if 
 	--   (a) it is a class constraint
         --   (b) it constrains only type variables
