@@ -1,0 +1,7 @@
+:m Control.Monad.State
+flip evalStateT 11 $ do
+  i <- get
+  lift $ do
+    putStrLn "Hello, World!"
+    print i
+
