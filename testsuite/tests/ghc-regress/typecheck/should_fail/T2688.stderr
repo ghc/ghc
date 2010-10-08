@@ -1,29 +1,9 @@
 
 T2688.hs:8:16:
-    Could not deduce (VectorSpace s s)
-      from the context (VectorSpace v s)
-      arising from a use of `*^'
-    Possible fix:
-      add (VectorSpace s s) to the context of
-        the class declaration for `VectorSpace'
-    In the expression: v *^ (1 / s)
-    In an equation for `^/': v ^/ s = v *^ (1 / s)
-
-T2688.hs:8:16:
     Couldn't match type `v' with `s'
       `v' is a rigid type variable bound by
           the class declaration for `VectorSpace' at T2688.hs:5:19
       `s' is a rigid type variable bound by
           the class declaration for `VectorSpace' at T2688.hs:5:21
-    In the expression: v *^ (1 / s)
-    In an equation for `^/': v ^/ s = v *^ (1 / s)
-
-T2688.hs:8:21:
-    Could not deduce (Fractional s) from the context (VectorSpace v s)
-      arising from a use of `/'
-    Possible fix:
-      add (Fractional s) to the context of
-        the class declaration for `VectorSpace'
-    In the second argument of `(*^)', namely `(1 / s)'
     In the expression: v *^ (1 / s)
     In an equation for `^/': v ^/ s = v *^ (1 / s)
