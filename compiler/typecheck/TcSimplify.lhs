@@ -198,12 +198,26 @@ simplifyInfer apply_mr tau_tvs wanted
              , ptext (sLit "tau_tvs =") <+> ppr tau_tvs
              ]
 
-       ; (simple_wanted, tc_binds) 
-              <- simplifyAsMuchAsPossible SimplInfer zonked_wanted
-
+	     -- Make a guess at the quantified type variables
+	     -- Then split the constraints on the baisis of those tyvars
+	     -- to avoid unnecessarily simplifying a class constraint
+	     -- See Note [Avoid unecessary constraint simplification]
        ; gbl_tvs <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- zonkTcTyVarsAndFV tau_tvs
-       ; zonked_simples <- mapBagM zonkWantedEvVar simple_wanted
+       ; let proto_qtvs = zonked_tau_tvs `minusVarSet` gbl_tvs
+             (perhaps_bound, surely_free) 
+                  = partitionBag (quantifyMeWC proto_qtvs) zonked_wanted
+       ; emitConstraints surely_free
+
+       	      -- Now simplify the possibly-bound constraints
+       ; (simplified_perhaps_bound, tc_binds) 
+              <- simplifyAsMuchAsPossible SimplInfer perhaps_bound
+
+	      -- Sigh: must re-zonk because because simplifyAsMuchAsPossible
+	      --       may have done some unification
+       ; gbl_tvs <- tcGetGlobalTyVars
+       ; zonked_tau_tvs <- zonkTcTyVarsAndFV tau_tvs
+       ; zonked_simples <- mapBagM zonkWantedEvVar simplified_perhaps_bound
        ; let qtvs = findQuantifiedTyVars apply_mr zonked_simples zonked_tau_tvs gbl_tvs
              (bound, free) | apply_mr  = (emptyBag, zonked_simples)
                            | otherwise = partitionBag (quantifyMe qtvs) zonked_simples
@@ -337,7 +351,31 @@ quantifyMe qtvs wev
   | otherwise	  = tyVarsOfPred pred `intersectsVarSet` qtvs
   where
     pred = wantedEvVarPred wev
+
+quantifyMeWC :: TyVarSet -> WantedConstraint -> Bool
+quantifyMeWC qtvs (WcImplic implic)
+  = anyBag (quantifyMeWC (qtvs `minusVarSet` ic_skols implic)) (ic_wanted implic)
+quantifyMeWC qtvs (WcEvVar wev)
+  = quantifyMe qtvs wev
 \end{code}
+
+Note [Avoid unecessary constraint simplification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When inferring the type of a let-binding, with simplifyInfer,
+try to avoid unnecessariliy simplifying class constraints.
+Doing so aids sharing, but it also helps with delicate 
+situations like
+   instance C t => C [t] where ..
+   f :: C [t] => ....
+   f x = let g y = ...(constraint C [t])... 
+         in ...
+When inferring a type for 'g', we don't want to apply the
+instance decl, because then we can't satisfy (C t).  So we
+just notice that g isn't quantified over 't' and partition
+the contraints before simplifying.
+
+This only half-works, but then let-generalisation only half-works.
+
 
 Note [Inheriting implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
