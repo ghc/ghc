@@ -28,7 +28,7 @@ module TcRnTypes(
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
 	-- Constraints
-        Untouchables,
+        Untouchables(..), inTouchableRange,
   	WantedConstraints, emptyWanteds, andWanteds, extendWanteds,
 	WantedConstraint(..), WantedEvVar(..), wantedEvVarLoc, 
         wantedEvVarToVar, wantedEvVarPred, splitWanteds,
@@ -68,11 +68,12 @@ import NameSet
 import Var
 import VarEnv
 import Module
-import UniqFM
 import SrcLoc
 import VarSet
 import ErrUtils
+import UniqFM
 import UniqSupply
+import Unique
 import BasicTypes
 import Bag
 import Outputable
@@ -383,7 +384,13 @@ data TcLclEnv		-- Changes as we move inside an expression
                         -- Why mutable? see notes with tcGetGlobalTyVars
 
 	tcl_lie   :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-	tcl_untch :: Untouchables		 -- Untouchables
+
+	-- TcMetaTyVars have 
+	tcl_meta  :: TcRef Unique,  -- The next free unique for TcMetaTyVars
+		     		    -- Guaranteed to be allocated linearly
+	tcl_untch :: Unique	    -- Any TcMetaTyVar with 
+		     		    --     unique >= tcl_untch is touchable
+		     		    --     unique <  tcl_untch is untouchable
     }
 
 type TcTypeEnv = NameEnv TcTyThing
@@ -678,7 +685,25 @@ instance Outputable WhereFrom where
 v%************************************************************************
 
 \begin{code}
-type Untouchables = TcTyVarSet	-- All MetaTyVars
+data Untouchables = NoUntouchables
+                  | TouchableRange
+                          Unique  -- Low end
+                          Unique  -- High end
+ -- A TcMetaTyvar is *touchable* iff its unique u satisfies
+ --   u >= low
+ --   u < high
+
+instance Outputable Untouchables where
+  ppr NoUntouchables = ptext (sLit "No untouchables")
+  ppr (TouchableRange low high) = ptext (sLit "Touchable range:") <+> 
+                                  ppr low <+> char '-' <+> ppr high
+
+inTouchableRange :: Untouchables -> TcTyVar -> Bool
+inTouchableRange NoUntouchables _ = True
+inTouchableRange (TouchableRange low high) tv 
+  = uniq >= low && uniq < high
+  where
+    uniq = varUnique tv
 
 type WantedConstraints = Bag WantedConstraint
 

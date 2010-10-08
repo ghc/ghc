@@ -344,7 +344,7 @@ tcBracket brack res_ty
        ; let brack_stage = Brack cur_stage pending_splices lie_var
 
        ; (meta_ty, lie) <- setStage brack_stage $
-                           getConstraints $
+                           captureConstraints $
                            tc_bracket cur_stage brack
 
        ; simplifyBracket lie
@@ -487,7 +487,7 @@ tcTopSpliceExpr tc_action
                    -- if the type checker fails!
     setStage Splice $ 
     do {    -- Typecheck the expression
-         (expr', lie) <- getConstraints tc_action
+         (expr', lie) <- captureConstraints tc_action
         
 	-- Solve the constraints
 	; const_binds <- simplifyTop lie

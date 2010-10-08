@@ -300,7 +300,7 @@ tcInstSigTyVars = mapM (\tv -> instMetaTyVar (SigTv (tyVarName tv)) tv)
 newMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
 newMetaTyVar meta_info kind
-  = do	{ uniq <- newUnique
+  = do	{ uniq <- newMetaUnique
  	; ref <- newMutVar Flexi
 	; let name = mkSysTvName uniq fs 
 	      fs = case meta_info of
@@ -312,7 +312,7 @@ instMetaTyVar :: MetaInfo -> TyVar -> TcM TcTyVar
 -- Make a new meta tyvar whose Name and Kind 
 -- come from an existing TyVar
 instMetaTyVar meta_info tyvar
-  = do	{ uniq <- newUnique
+  = do	{ uniq <- newMetaUnique
  	; ref <- newMutVar Flexi
 	; let name = setNameUnique (tyVarName tyvar) uniq
 	      kind = tyVarKind tyvar
@@ -583,8 +583,10 @@ zonkQuantifiedTyVar tv
 	-- Create the new, frozen, skolem type variable
         -- We zonk to a skolem, not to a regular TcVar
         -- See Note [Zonking to Skolem]
+        ; uniq <- newUnique  -- Remove it from TcMetaTyVar unique land
 	; let final_kind = defaultKind (tyVarKind tv)
-	      final_tv   = mkSkolTyVar (tyVarName tv) final_kind UnkSkol
+              final_name = setNameUnique (tyVarName tv) uniq
+	      final_tv   = mkSkolTyVar final_name final_kind UnkSkol
 
 	-- Bind the meta tyvar to the new tyvar
 	; case details of
@@ -601,13 +603,11 @@ zonkQuantifiedTyVar tv
 
 \begin{code}
 zonkImplication :: Implication -> TcM Implication
-zonkImplication implic@(Implic { ic_untch = env_tvs, ic_given = given 
+zonkImplication implic@(Implic { ic_given = given 
                                , ic_wanted = wanted })
-  = do { env_tvs' <- zonkTcTyVarsAndFV env_tvs
-       ; given'   <- mapM zonkEvVar given
+  = do { given'   <- mapM zonkEvVar given
        ; wanted'  <- mapBagM zonkWanted wanted
-       ; return (implic { ic_untch = env_tvs', ic_given = given'
-                        , ic_wanted = wanted' }) }
+       ; return (implic { ic_given = given', ic_wanted = wanted' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar
 zonkEvVar var = do { ty' <- zonkTcType (varType var)

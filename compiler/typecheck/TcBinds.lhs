@@ -271,7 +271,7 @@ bindLocalInsts top_lvl thing_inside
         -- leave them to the tcSimplifyTop, and quite a bit faster too
 
   | otherwise   -- Nested case
-  = do  { ((binds, ids, thing), lie) <- getConstraints thing_inside
+  = do  { ((binds, ids, thing), lie) <- captureConstraints thing_inside
         ; lie_binds <- bindLocalMethods lie ids
         ; return (binds, lie_binds, thing) }
 -}
@@ -417,7 +417,7 @@ tcPolyInfer
   -> TcM (LHsBinds TcId, [TcId])
 tcPolyInfer top_lvl mono sig_fn prag_fn rec_tc bind_list
   = do { ((binds', mono_infos), wanted) 
-             <- getConstraints $
+             <- captureConstraints $
                 tcMonoBinds sig_fn LetLclBndr rec_tc bind_list
 
        ; unifyCtxts [sig | (_, Just sig, _) <- mono_infos] 

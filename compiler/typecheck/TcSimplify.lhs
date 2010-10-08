@@ -247,7 +247,7 @@ simplifyAsMuchAsPossible :: SimplContext -> WantedConstraints
 -- We use this function when inferring the type of a function
 -- The wanted constraints are already zonked
 simplifyAsMuchAsPossible ctxt wanteds
-  = do { let untch = emptyVarSet
+  = do { let untch = NoUntouchables
 	     	 -- We allow ourselves to unify environment 
 		 -- variables; hence *no untouchables*
 
@@ -451,7 +451,7 @@ simplifySuperClass self wanteds
   = do { wanteds <- mapBagM zonkWanted wanteds
        ; loc <- getCtLoc NoScSkol
        ; (unsolved, ev_binds) 
-             <- runTcS SimplCheck emptyVarSet $
+             <- runTcS SimplCheck NoUntouchables $
          	do { can_self <- canGivens loc [self]
          	   ; let inert = foldlBag updInertSet emptyInert can_self
 	 	     -- No need for solveInteract; we know it's inert
@@ -560,7 +560,7 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
        ; rhs_binds_var@(EvBindsVar evb_ref _)  <- newTcEvBinds
        ; loc        <- getCtLoc (RuleSkol name)
        ; rhs_binds1 <- simplifyCheck SimplCheck $ unitBag $ WcImplic $ 
-             Implic { ic_untch = emptyVarSet	  -- No untouchables
+             Implic { ic_untch = NoUntouchables
              	    , ic_env = emptyNameEnv
              	    , ic_skols = mkVarSet tv_bndrs
              	    , ic_scoped = panic "emitImplication"
@@ -604,7 +604,7 @@ simplifyCheck ctxt wanteds
        ; traceTc "simplifyCheck {" (vcat
              [ ptext (sLit "wanted =") <+> ppr wanteds ])
 
-       ; (unsolved, ev_binds) <- runTcS ctxt emptyVarSet $
+       ; (unsolved, ev_binds) <- runTcS ctxt NoUntouchables $
                                  solveWanteds emptyInert wanteds
 
        ; traceTc "simplifyCheck }" $
@@ -801,13 +801,13 @@ applyDefaultingRules inert wanteds
   | isEmptyBag wanteds 
   = return emptyBag
   | otherwise
-  = do { untch <- getUntouchablesTcS
+  = do { untch <- getUntouchables
        ; tv_cts <- mapM (defaultTyVar untch) $
                    varSetElems (tyVarsOfCanonicals wanteds)
 
        ; info@(_, default_tys, _) <- getDefaultInfo
        ; let groups = findDefaultableGroups info untch wanteds
-       ; deflt_cts <- mapM (disambigGroup default_tys untch inert) groups
+       ; deflt_cts <- mapM (disambigGroup default_tys inert) groups
 
        ; traceTcS "deflt2" (vcat [ text "Tyvar defaults =" <+> ppr tv_cts
                                  , text "Type defaults =" <+> ppr deflt_cts])
@@ -815,7 +815,7 @@ applyDefaultingRules inert wanteds
        ; return (unionManyBags deflt_cts `andCCan` unionManyBags tv_cts) }
 
 ------------------
-defaultTyVar :: TcTyVarSet -> TcTyVar -> TcS CanonicalCts
+defaultTyVar :: Untouchables -> TcTyVar -> TcS CanonicalCts
 -- defaultTyVar is used on any un-instantiated meta type variables to
 -- default the kind of ? and ?? etc to *.  This is important to ensure
 -- that instance declarations match.  For example consider
@@ -832,7 +832,7 @@ defaultTyVar :: TcTyVarSet -> TcTyVar -> TcS CanonicalCts
 
 defaultTyVar untch the_tv 
   | isMetaTyVar the_tv
-  , not (the_tv `elemVarSet` untch)
+  , inTouchableRange untch the_tv
   , not (k `eqKind` default_k)
   = do { (ev, better_ty) <- TcSMonad.newKindConstraint (mkTyVarTy the_tv) default_k
        ; let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
@@ -855,7 +855,7 @@ findDefaultableGroups
     :: ( SimplContext 
        , [Type]
        , (Bool,Bool) )  -- (Overloaded strings, extended default rules)
-    -> TcTyVarSet	-- Untouchable
+    -> Untouchables	-- Untouchable
     -> CanonicalCts	-- Unsolved
     -> [[(CanonicalCt,TcTyVar)]]
 findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults)) 
@@ -882,7 +882,7 @@ findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults))
     is_defaultable_group ds@((_,tv):_)
         = isTyConableTyVar tv	-- Note [Avoiding spurious errors]
         && not (tv `elemVarSet` bad_tvs)
-        && not (tv `elemVarSet` untch)    -- Non untouchable
+        && inTouchableRange untch tv
         && defaultable_classes [cc_class cc | (cc,_) <- ds]
     is_defaultable_group [] = panic "defaultable_group"
 
@@ -904,15 +904,14 @@ findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults))
 
 ------------------------------
 disambigGroup :: [Type]                    -- The default types 
-	      -> TcTyVarSet		   -- Untouchables
               -> InertSet                  -- Given inert 
               -> [(CanonicalCt, TcTyVar)]  -- All classes of the form (C a)
 	      	 		           --  sharing same type variable
               -> TcS CanonicalCts
 
-disambigGroup [] _inert _untch _grp 
+disambigGroup [] _inert _grp 
   = return emptyBag
-disambigGroup (default_ty:default_tys) untch inert group
+disambigGroup (default_ty:default_tys) inert group
   = do { traceTcS "disambigGroup" (ppr group $$ ppr default_ty)
        ; ev <- newGivOrDerCoVar (mkTyVarTy the_tv) default_ty default_ty -- Refl 
 		       	 -- We know this equality is canonical,
@@ -922,7 +921,7 @@ disambigGroup (default_ty:default_tys) untch inert group
                                	 , cc_tyvar  = the_tv
            	                 , cc_rhs    = default_ty }
 
-       ; success <- tryTcS (extendVarSet untch the_tv) $ 
+       ; success <- tryTcS $ 
            	    do { given_inert <- solveOne inert given_eq
            	       ; final_inert <- solveInteract given_inert (listToBag wanteds)
            	       ; let (_, unsolved) = extractUnsolved final_inert
@@ -936,7 +935,7 @@ disambigGroup (default_ty:default_tys) untch inert group
                        ; return (unitBag given_eq) }
            False ->    -- Failure: try with the next type
 		    do { traceTcS "disambigGoup succeeded" (ppr default_ty)
-                       ; disambigGroup default_tys untch inert group } }
+                       ; disambigGroup default_tys inert group } }
   where
     ((the_ct,the_tv):_) = group
     wanteds = map fst group

@@ -412,16 +412,16 @@ checkConstraints skol_info free_tvs skol_tvs given thing_inside
 newImplication :: SkolemInfo -> TcTyVarSet -> [TcTyVar]
 	       -> [EvVar] -> TcM result
                -> TcM (TcEvBinds, WantedConstraints, result)
-newImplication skol_info free_tvs skol_tvs given thing_inside
+newImplication skol_info _free_tvs skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { gbl_tvs  <- tcGetGlobalTyVars
-       ; free_tvs <- zonkTcTyVarsAndFV free_tvs
-       ; let untch = gbl_tvs `unionVarSet` free_tvs
+    do { --   gbl_tvs  <- tcGetGlobalTyVars
+         -- ; free_tvs <- zonkTcTyVarsAndFV free_tvs
+         -- ; let untch = gbl_tvs `unionVarSet` free_tvs
 
-       ; (result, wanted) <- getConstraints               $ 
-                             setUntouchables untch $
-                             thing_inside
+       ; ((result, untch), wanted) <- captureConstraints  $ 
+                                      captureUntouchables $
+                                      thing_inside
 
        ; if isEmptyBag wanted && not (hasEqualities given) 
        	    -- Optimisation : if there are no wanteds, and the givens
@@ -619,7 +619,6 @@ uType_np origin orig_ty1 orig_ty2
 
     go _ ty1 ty2
       | tcIsForAllTy ty1 || tcIsForAllTy ty2 
-{--      | isSigmaTy ty1 || isSigmaTy ty2 --} 
       = unifySigmaTy origin ty1 ty2
 
         -- Anything else fails
@@ -636,12 +635,11 @@ unifySigmaTy origin ty1 ty2
              in_scope = mkInScopeSet (mkVarSet skol_tvs)
              phi1     = substTy (mkTvSubst in_scope (zipTyEnv tvs1 tys)) body1
              phi2     = substTy (mkTvSubst in_scope (zipTyEnv tvs2 tys)) body2
-             untch = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
+--             untch = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
-       ; (coi, lie) <- getConstraints $ 
-                       setUntouchables untch $ 
-                       uType origin phi1 phi2
-
+       ; ((coi, _untch), lie) <- captureConstraints $ 
+                                 captureUntouchables $ 
+                       		 uType origin phi1 phi2
           -- Check for escape; e.g. (forall a. a->b) ~ (forall a. a->a)
        ; let bad_lie  = filterBag is_bad lie
              is_bad w = any (`elemVarSet` tyVarsOfWanted w) skol_tvs

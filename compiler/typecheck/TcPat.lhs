@@ -294,7 +294,7 @@ bindInstsOfPatId id thing_inside
   | not (isOverloadedTy (idType id))
   = do { res <- thing_inside; return (res, emptyTcEvBinds) }
   | otherwise
-  = do	{ (res, lie) <- getConstraints thing_inside
+  = do	{ (res, lie) <- captureConstraints thing_inside
 	; binds <- bindLocalMethods lie [id]
 	; return (res, binds) }
 -}
@@ -410,11 +410,12 @@ tc_pat penv (BangPat pat) pat_ty thing_inside
 tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
   = do	{ (pat', (res, pat_ct)) 
 		<- tc_lpat pat pat_ty (makeLazy penv) $ 
-		   getConstraints thing_inside
+		   captureConstraints thing_inside
 		-- Ignore refined penv', revert to penv
 
 	; emitConstraints pat_ct
-	-- getConstraints/extendConstraintss: see Note [Hopping the LIE in lazy patterns]
+	-- captureConstraints/extendConstraints: 
+        --   see Note [Hopping the LIE in lazy patterns]
 
 	-- Check there are no unlifted types under the lazy pattern
 	; when (any (isUnLiftedType . idType) $ collectPatBinders pat') $
@@ -593,7 +594,7 @@ We can't discharge the Num constraint from dictionaries bound by
 the pattern C!  
 
 So we have to make the constraints from thing_inside "hop around" 
-the pattern.  Hence the getConstraints and emitConstraints.
+the pattern.  Hence the captureConstraints and emitConstraints.
 
 The same thing ensures that equality constraints in a lazy match
 are not made available in the RHS of the match. For example

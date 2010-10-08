@@ -57,8 +57,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
        ; (lhs', lhs_lie, rhs', rhs_lie, rule_ty)
             <- tcExtendTyVarEnv tv_bndrs $
                tcExtendIdEnv id_bndrs $
-               do { ((lhs', rule_ty), lhs_lie) <- getConstraints (tcInferRho lhs)
-                  ; (rhs', rhs_lie) <- getConstraints (tcMonoExpr rhs rule_ty)
+               do { ((lhs', rule_ty), lhs_lie) <- captureConstraints (tcInferRho lhs)
+                  ; (rhs', rhs_lie) <- captureConstraints (tcMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_lie, rhs', rhs_lie, rule_ty) }
 
        ; (lhs_dicts, lhs_ev_binds, rhs_ev_binds) 

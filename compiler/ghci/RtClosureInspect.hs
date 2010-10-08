@@ -591,7 +591,7 @@ addConstraint actual expected = do
     recoverTR (traceTR $ fsep [text "Failed to unify", ppr actual,
                                     text "with", ppr expected])
               (congruenceNewtypes actual expected >>=
-                           (getConstraints . uncurry unifyType) >> return ())
+                           (captureConstraints . uncurry unifyType) >> return ())
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
@@ -862,7 +862,7 @@ improveRTTIType hsc_env _ty rtti_ty = runTR_maybe hsc_env $ do
     (ty_tvs,  _, _)   <- tcInstType return ty
     (ty_tvs', _, ty') <- tcInstType (mapM tcInstTyVar) ty
     (_, _, rtti_ty')  <- tcInstType (mapM tcInstTyVar) (sigmaType rtti_ty)
-    _ <- getConstraints(unifyType rtti_ty' ty')
+    _ <- captureConstraints (unifyType rtti_ty' ty')
     tvs1_contents     <- zonkTcTyVars ty_tvs'
     let subst = (uncurry zipTopTvSubst . unzip)
                  [(tv,ty) | (tv,ty) <- zip ty_tvs tvs1_contents

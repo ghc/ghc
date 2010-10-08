@@ -30,7 +30,7 @@ module TcSMonad (
     newTcEvBindsTcS,
  
     getInstEnvs, getFamInstEnvs,                -- Getting the environments 
-    getTopEnv, getGblEnv, getTcEvBinds, getUntouchablesTcS,
+    getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
     getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsMap,
 
 
@@ -340,7 +340,9 @@ data TcSEnv
       tcs_ty_binds :: IORef (TyVarEnv (TcTyVar, TcType)),
           -- Global type bindings
 
-      tcs_context :: SimplContext
+      tcs_context :: SimplContext,
+
+      tcs_untch :: Untouchables
     }
 
 data SimplContext
@@ -412,7 +414,7 @@ traceTcS0 :: String -> SDoc -> TcS ()
 traceTcS0 herald doc = TcS $ \_env -> TcM.traceTcN 0 herald doc
 
 runTcS :: SimplContext
-       -> TcTyVarSet 	       -- Untouchables
+       -> Untouchables 	       -- Untouchables
        -> TcS a		       -- What to run
        -> TcM (a, Bag EvBind)
 runTcS context untouch tcs 
@@ -420,10 +422,11 @@ runTcS context untouch tcs
        ; ev_binds_var@(EvBindsVar evb_ref _) <- TcM.newTcEvBinds
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
-                          , tcs_context = context }
+                          , tcs_context = context
+                          , tcs_untch   = untouch }
 
 	     -- Run the computation
-       ; res <- TcM.setUntouchables untouch (unTcS tcs env)
+       ; res <- unTcS tcs env
 
 	     -- Perform the type unifications required
        ; ty_binds <- TcM.readTcRef ty_binds_var
@@ -436,30 +439,31 @@ runTcS context untouch tcs
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 
        
-nestImplicTcS :: EvBindsVar -> TcTyVarSet -> TcS a -> TcS a 
-nestImplicTcS ref untouch tcs 
+nestImplicTcS :: EvBindsVar -> Untouchables -> TcS a -> TcS a 
+nestImplicTcS ref untch (TcS thing_inside)
   = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds, tcs_context = ctxt } -> 
     let 
        nest_env = TcSEnv { tcs_ev_binds = ref
                          , tcs_ty_binds = ty_binds
-                         , tcs_context = ctxtUnderImplic ctxt }
+                         , tcs_untch    = untch
+                         , tcs_context  = ctxtUnderImplic ctxt }
     in 
-    TcM.setUntouchables untouch (unTcS tcs nest_env) 
+    thing_inside nest_env
 
 ctxtUnderImplic :: SimplContext -> SimplContext
 -- See Note [Simplifying RULE lhs constraints] in TcSimplify
 ctxtUnderImplic SimplRuleLhs = SimplCheck
 ctxtUnderImplic ctxt         = ctxt
 
-tryTcS :: TcTyVarSet -> TcS a -> TcS a 
+tryTcS :: TcS a -> TcS a 
 -- Like runTcS, but from within the TcS monad 
 -- Ignore all the evidence generated, and do not affect caller's evidence!
-tryTcS untch tcs 
+tryTcS tcs 
   = TcS (\env -> do { ty_binds_var <- TcM.newTcRef emptyVarEnv
                     ; ev_binds_var <- TcM.newTcEvBinds
                     ; let env1 = env { tcs_ev_binds = ev_binds_var
                                      , tcs_ty_binds = ty_binds_var }
-                    ; TcM.setUntouchables untch (unTcS tcs env1) })
+                    ; unTcS tcs env1 })
 
 -- Update TcEvBinds 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -472,6 +476,9 @@ getTcSContext = TcS (return . tcs_context)
 
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds) 
+
+getUntouchables :: TcS Untouchables 
+getUntouchables = TcS (return . tcs_untch)
 
 getTcSTyBinds :: TcS (IORef (TyVarEnv (TcTyVar, TcType)))
 getTcSTyBinds = TcS (return . tcs_ty_binds)
@@ -543,9 +550,6 @@ getTopEnv = wrapTcS $ TcM.getTopEnv
 getGblEnv :: TcS TcGblEnv 
 getGblEnv = wrapTcS $ TcM.getGblEnv 
 
-getUntouchablesTcS :: TcS TcTyVarSet 
-getUntouchablesTcS = wrapTcS $ TcM.getUntouchables
-
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -563,10 +567,10 @@ pprEq ty1 ty2 = pprPred $ mkEqPred (ty1,ty2)
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
 -- is touchable variable!
-isTouchableMetaTyVar v 
-  | isMetaTyVar v = wrapTcS $ do { untch <- TcM.isUntouchable v; 
-                                 ; return (not untch) }
-  | otherwise     = return False
+isTouchableMetaTyVar tv 
+  | isMetaTyVar tv = do { untch <- getUntouchables
+                        ; return (inTouchableRange untch tv) }
+  | otherwise      = return False
 
 
 -- Flatten skolems

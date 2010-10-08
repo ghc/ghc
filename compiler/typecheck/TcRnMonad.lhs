@@ -69,6 +69,7 @@ initTc :: HscEnv
 
 initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
+        meta_var     <- newIORef initTyVarUnique ;
       	tvs_var      <- newIORef emptyVarSet ;
 	dfuns_var    <- newIORef emptyNameSet ;
 	keep_var     <- newIORef emptyNameSet ;
@@ -133,7 +134,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcl_env        = emptyNameEnv,
 		tcl_tyvars     = tvs_var,
 		tcl_lie	       = lie_var,
-		tcl_untch      = emptyVarSet
+                tcl_meta       = meta_var,
+		tcl_untch      = initTyVarUnique
 	     } ;
 	} ;
    
@@ -315,6 +317,16 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 %************************************************************************
 
 \begin{code}
+newMetaUnique :: TcM Unique
+-- The uniques for TcMetaTyVars are allocated specially
+-- in guaranteed linear order, starting at zero for each module
+newMetaUnique 
+ = do { env <- getLclEnv
+      ; let meta_var = tcl_meta env
+      ; uniq <- readMutVar meta_var
+      ; writeMutVar meta_var (incrUnique uniq)
+      ; return uniq }
+
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv ;
@@ -678,7 +690,7 @@ tryTcLIE :: TcM a -> TcM (Messages, Maybe a)
 -- for the thing is propagated only if there are no errors
 -- Hence it's restricted to the type-check monad
 tryTcLIE thing_inside
-  = do  { ((msgs, mb_res), lie) <- getConstraints (tryTcErrs thing_inside) ;
+  = do  { ((msgs, mb_res), lie) <- captureConstraints (tryTcErrs thing_inside) ;
 	; case mb_res of
 	    Nothing  -> return (msgs, Nothing)
 	    Just val -> do { emitConstraints lie; return (msgs, Just val) }
@@ -951,25 +963,27 @@ emitConstraint ct
   = do { lie_var <- getConstraintVar ;
 	 updTcRef lie_var (`extendWanteds` ct) }
 
-getConstraints :: TcM a -> TcM (a, WantedConstraints)
--- (getConstraints m) runs m, and returns the type constraints it generates
-getConstraints thing_inside
+captureConstraints :: TcM a -> TcM (a, WantedConstraints)
+-- (captureConstraints m) runs m, and returns the type constraints it generates
+captureConstraints thing_inside
   = do { lie_var <- newTcRef emptyWanteds ;
 	 res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) 
 			  thing_inside ;
 	 lie <- readTcRef lie_var ;
 	 return (res, lie) }
 
-setUntouchables :: TcTyVarSet -> TcM a -> TcM a
-setUntouchables untch_tvs thing_inside
-  = updLclEnv (\ env -> env { tcl_untch = untch_tvs }) thing_inside 
-
-getUntouchables :: TcM TcTyVarSet 
-getUntouchables = do { env <- getLclEnv; return (tcl_untch env) } 
-   -- NB: no need to zonk this TcTyVarSet: they are, after all, untouchable!
+captureUntouchables :: TcM a -> TcM (a, Untouchables)
+captureUntouchables thing_inside
+  = do { env <- getLclEnv
+       ; low_meta <- readTcRef (tcl_meta env)
+       ; res <- setLclEnv (env { tcl_untch = low_meta }) 
+                thing_inside 
+       ; high_meta <- readTcRef (tcl_meta env)
+       ; return (res, TouchableRange low_meta high_meta) }
 
 isUntouchable :: TcTyVar -> TcM Bool
-isUntouchable tv = do { env <- getLclEnv; return (tv `elemVarSet` tcl_untch env) }
+isUntouchable tv = do { env <- getLclEnv
+                      ; return (varUnique tv < tcl_untch env) }
 
 getLclTypeEnv :: TcM (NameEnv TcTyThing)
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }

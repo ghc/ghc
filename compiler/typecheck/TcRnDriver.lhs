@@ -364,7 +364,7 @@ tcRnSrcDecls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Reason: solely to report unused imports and bindings
 tcRnSrcDecls boot_iface decls
  = do {   	-- Do all the declarations
-	(tc_envs, lie) <- getConstraints $ tc_rn_src_decls boot_iface decls ;
+	(tc_envs, lie) <- captureConstraints $ tc_rn_src_decls boot_iface decls ;
       ; traceTc "Tc8" empty ;
       ; setEnvs tc_envs $ 
    do { 
@@ -482,7 +482,7 @@ tcRnHsBootDecls decls
 		   hs_ruleds = rule_decls, 
 		   hs_annds  = _,
 		   hs_valds  = val_binds }) <- rnTopSrcDecls first_group
-	; (gbl_env, lie) <- getConstraints $ setGblEnv tcg_env $ do {
+	; (gbl_env, lie) <- captureConstraints $ setGblEnv tcg_env $ do {
 
 
 		-- Check for illegal declarations
@@ -1274,7 +1274,7 @@ tcGhciStmts stmts
 
 	-- OK, we're ready to typecheck the stmts
 	traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
-	((tc_stmts, ids), lie) <- getConstraints $ tc_io_stmts stmts $ \ _ ->
+	((tc_stmts, ids), lie) <- captureConstraints $ tc_io_stmts stmts $ \ _ ->
 					   mapM tcLookupId names ;
 					-- Look up the names right in the middle,
 					-- where they will all be in scope
@@ -1307,8 +1307,8 @@ tcRnExpr hsc_env ictxt rdr_expr
 
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
-    ((_tc_expr, res_ty), lie)	<- getConstraints (tcInferRho rn_expr) ;
-    ((qtvs, dicts, _), lie_top) <- getConstraints (simplifyInfer False {- No MR for now -}
+    ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
+    ((qtvs, dicts, _), lie_top) <- captureConstraints (simplifyInfer False {- No MR for now -}
                                                       (tyVarsOfType res_ty) lie)  ;
     _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
