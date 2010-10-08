@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 -- !! worker/wrapper turns ( \ <absent> -> Int# ) function
 -- !! into Int# -- WRONG
 

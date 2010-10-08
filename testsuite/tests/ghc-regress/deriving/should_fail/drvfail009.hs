@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Various newtype-deriving failures
 

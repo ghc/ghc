@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
 
 -- From trac #1947
 

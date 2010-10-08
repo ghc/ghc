@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Church1 where 
 -- Church numerals w/o extra type constructors 

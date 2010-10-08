@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 
 -- !!! simple tests of primitive arrays
 --

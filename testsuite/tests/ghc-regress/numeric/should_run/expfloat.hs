@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 -- tests that expFloat# works (had linking problems on Windows)
 
 import GHC.Exts

@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
 import Text.Regex.Base
 import Text.Regex.Posix((=~),(=~~)) -- or DFA or PCRE or PosixRE
 import qualified Data.ByteString.Char8 as B(ByteString,pack)

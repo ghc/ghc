@@ -1,6 +1,5 @@
 -- TH generated code does not get instrumented
 
-:set -fglasgow-exts
 :set -XTemplateHaskell
 :l dynbrk005
 :st normal_fn [1,2,3]

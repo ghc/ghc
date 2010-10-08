@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE Arrows #-}
+
+{-# LANGUAGE Arrows, ExistentialQuantification #-}
 
 -- Crashed GHC 6.4 with a lint error
 -- because of the existential

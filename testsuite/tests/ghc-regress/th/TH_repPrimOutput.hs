@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 -- test the representation of unboxed literals
 
 module Main

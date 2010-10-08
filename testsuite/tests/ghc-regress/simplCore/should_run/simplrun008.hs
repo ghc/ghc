@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts -O #-}
 
 module Main where
 import Data.Char

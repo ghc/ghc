@@ -1,5 +1,4 @@
 #!/usr/bin/env runhaskell
-{-# OPTIONS_GHC -fglasgow-exts #-}
 --
 -- Uses multi-param type classes
 --

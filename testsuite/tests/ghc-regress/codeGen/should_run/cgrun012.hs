@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 -- !!! move arguments around on the stacks, mainly the B stack
 
 import GHC.Base	( Float#, Double#, Int#, Int(..) )

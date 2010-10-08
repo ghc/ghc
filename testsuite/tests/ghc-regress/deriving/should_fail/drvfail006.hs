@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Testing the newtype-deriving stuff
 

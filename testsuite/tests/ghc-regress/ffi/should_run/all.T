@@ -4,12 +4,6 @@
 #	extra run flags
 #	expected process return value, if not zero
 
-def f( opts ):
-  opts.extra_hc_opts = '-fglasgow-exts'
-
-setTestOpts(f)
-
-
 # Doesn't work with External Core due to __labels
 test('fed001', compose(only_compiler_types(['ghc']),
 			expect_fail_for(['extcore','optextcore'])),

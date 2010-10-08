@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -cpp #-}
+{-# LANGUAGE CPP #-}
 import Char
 #if __GLASGOW_HASKELL__ >= 503
 import Data.Array

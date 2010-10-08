@@ -1,5 +1,5 @@
--- Should fail without -fglasgow-exts
--- Succeeds with -fglasgow-exts
+-- Should fail without GeneralizedNewtypeDeriving
+-- Succeeds with GeneralizedNewtypeDeriving
 
 module ShouldFail where
 

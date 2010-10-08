@@ -5,7 +5,7 @@
 % Hashing memo tables.
 
 \begin{code}
-{-# OPTIONS -fglasgow-exts -cpp #-}
+{-# LANGUAGE CPP #-}
 
 module Memo2
 	{-# DEPRECATED "This module is unmaintained, and will disappear soon" #-}

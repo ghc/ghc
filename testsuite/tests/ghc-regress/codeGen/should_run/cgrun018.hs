@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 -- !!! test of datatype with many unboxed fields
 --
 import GHC.Base( Float# )

@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Main (main) where
 

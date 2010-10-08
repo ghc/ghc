@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE Rank2Types #-}
 
 module SystemF where 
 -- System-F examples 

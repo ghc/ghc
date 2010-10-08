@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 -- !!! Negative unboxed literals, part 2
 
 import GHC.Exts

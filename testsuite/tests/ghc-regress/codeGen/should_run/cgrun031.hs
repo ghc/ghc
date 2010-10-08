@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 -- !! test GEN reps w/ unboxed values in them
 -- !! NB: it was the static ones that were hosed...
 --

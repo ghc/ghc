@@ -1,5 +1,6 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+             UndecidableInstances, ExistentialQuantification,
+             ScopedTypeVariables #-}
 
 -- TypeVal.hs: dependent types, here we come!
 module TypeVal where

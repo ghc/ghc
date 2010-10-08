@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
+
+{-# LANGUAGE ForeignFunctionInterface, MagicHash #-}
 
 -- Trac #1037 
 

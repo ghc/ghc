@@ -9,8 +9,8 @@ clean:
 
 recomp005: clean
 	cp C1.hs C.hs
-	'$(TEST_HC)' -fglasgow-exts --make E.hs -O
+	'$(TEST_HC)' --make E.hs -O
 	sleep 1
 	cp C2.hs C.hs
 	# Should recompile E, because C is now an orphan
-	'$(TEST_HC)' -fglasgow-exts --make E.hs -O
+	'$(TEST_HC)' --make E.hs -O

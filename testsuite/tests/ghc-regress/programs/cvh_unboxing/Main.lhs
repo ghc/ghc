@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE MagicHash #-}
+
 import GHC.Exts
 import Types
 import Append

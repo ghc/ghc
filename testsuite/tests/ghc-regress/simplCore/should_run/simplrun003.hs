@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -O #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- O2 to get CSE
 

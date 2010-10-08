@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 module TH_spliceE5_Lib where
 

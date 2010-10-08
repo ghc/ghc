@@ -1,5 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE Arrows #-}
+{-# LANGUAGE Arrows, MultiParamTypeClasses, FlexibleInstances #-}
 
 -- Simple expression parser
 -- (uses do-notation and operators)

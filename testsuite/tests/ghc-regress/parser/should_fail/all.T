@@ -11,7 +11,7 @@ test('readFail009', normal, compile_fail, [''])
 # test10: missing
 test('readFail011', normal, compile_fail, [''])
 test('readFail012', normal, compile_fail, [''])
-test('readFail013', normal, compile_fail, ['-fglasgow-exts'])
+test('readFail013', normal, compile_fail, [''])
 test('readFail014', normal, compile_fail, [''])
 test('readFail015', normal, compile_fail, [''])
 test('readFail016', normal, compile_fail, [''])

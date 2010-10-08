@@ -1,6 +1,8 @@
 \section{IDS types}
 
 \begin{code}
+{-# LANGUAGE MagicHash #-}
+
 module Types where
 
 import GHC.Exts

@@ -1,6 +1,8 @@
 \section{Versions of {\tt append}}
 
 \begin{code}
+{-# LANGUAGE MagicHash #-}
+
 module Append where
 
 import GHC.Exts

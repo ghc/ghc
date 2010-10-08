@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 
 -- Test Show on unboxed types
 

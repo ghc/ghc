@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- This test is really meant for human looking; do a -ddump-simpl.
 

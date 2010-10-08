@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE MagicHash #-}
 -- !!! Negative unboxed literals, part 1
 -- They don't have to be as standards-compliant
 -- or follow so many weird cases as the normal

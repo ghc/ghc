@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
 module Collection where
 
 

@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -O -cpp #-}
+{-# LANGUAGE CPP, UnboxedTuples, MagicHash #-}
+{-# OPTIONS_GHC -O #-}
 
 -- In GHC 6.4, compiling this module gave a Core Lint failure following the
 -- specialier, because a function was floated out that had a RULE that

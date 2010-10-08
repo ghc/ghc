@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Main where
 

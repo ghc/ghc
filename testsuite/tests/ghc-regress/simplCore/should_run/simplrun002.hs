@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- !!! A rules test
 -- At one time the rule got too specialised a type:

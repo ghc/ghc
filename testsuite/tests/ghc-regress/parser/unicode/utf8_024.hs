@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE ExplicitForAll, UnicodeSyntax #-}
 {-
 Test for valid unicode identifiers
 

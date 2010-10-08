@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- This one killed GHC 6.4.1, because the pattern match on the
 -- unboxed tuple generates a failure case, which defeated the

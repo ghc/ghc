@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 module Main where
 

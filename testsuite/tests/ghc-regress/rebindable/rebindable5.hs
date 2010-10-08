@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude -XNPlusKPatterns #-}
+{-# LANGUAGE NoImplicitPrelude, NPlusKPatterns, TypeSynonymInstances,
+             MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Main where
 	{

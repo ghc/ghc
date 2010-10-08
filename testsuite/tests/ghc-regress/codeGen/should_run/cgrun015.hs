@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 module Main ( main ) where
 
 import Foreign

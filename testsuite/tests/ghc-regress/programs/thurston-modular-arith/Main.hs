@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances, ExistentialQuantification,
+              ScopedTypeVariables, Rank2Types #-}
 
 --	Modular arithmetic, due to Dale Thurston
 

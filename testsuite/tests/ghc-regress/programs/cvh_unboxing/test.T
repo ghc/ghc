@@ -6,5 +6,5 @@ test('cvh_unboxing',
                    'Main.hi',   'Main.o',
                    'Types.hi',  'Types.o'])],
      multimod_compile_and_run,
-     ['Main', '-fglasgow-exts'])
+     ['Main', ''])
 

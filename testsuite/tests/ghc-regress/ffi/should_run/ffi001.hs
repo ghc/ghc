@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+
 
 -- !!! A simple FFI test
 

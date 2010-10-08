@@ -1,5 +1,5 @@
+{-# LANGUAGE UnliftedFFITypes, MagicHash #-}
 -- !!! illegal types in foreign export delarations
-
 module ShouldFail where
 
 import GHC.Exts

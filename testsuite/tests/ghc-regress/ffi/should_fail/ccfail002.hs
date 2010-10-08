@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
+
+{-# LANGUAGE ForeignFunctionInterface, UnboxedTuples, MagicHash, UnliftedFFITypes #-}
 
 -- Test for Trac #1680
 

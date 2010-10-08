@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 
 -- Test Show on unboxed types
 

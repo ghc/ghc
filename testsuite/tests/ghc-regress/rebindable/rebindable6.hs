@@ -1,5 +1,5 @@
-{-# OPTIONS -fglasgow-exts -XNoImplicitPrelude -XNPlusKPatterns #-}
-
+{-# LANGUAGE NoImplicitPrelude, NPlusKPatterns, Rank2Types,
+             ScopedTypeVariables, FlexibleInstances #-}
 module Main where
 	{
 --	import Prelude;

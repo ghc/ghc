@@ -1,8 +1,8 @@
-{-# OPTIONS -fglasgow-exts #-}
-
--- Made GHC 5.02.2 go into a loop when doing the 
--- context inference for deriving.  The -fglasgow-exts
--- flag is important; it didn't diverge without.
+{-# LANGUAGE FlexibleContexts #-}
+-- Made GHC 5.02.2 go into a loop when doing the
+-- context inference for deriving.  It only happened with
+-- the -fglasgow-exts flag (it didn't diverge without),
+-- so hopefully FlexibleContexts is the relevant extension.
 
 module ShouldFail where
 

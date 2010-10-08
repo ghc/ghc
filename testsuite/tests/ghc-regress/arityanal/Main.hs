@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -cpp #-}
+{-# LANGUAGE CPP #-}
 
 -- Optimisation problem.  There are two missed opportunities for optimisation in alex_scan_tkn, below.
 
