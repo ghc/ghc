@@ -30,7 +30,6 @@ import TypeRep
 
 import TcErrors	( typeExtraInfoMsg, unifyCtxt )
 import TcMType
-import TcEnv
 import TcIface
 import TcRnMonad
 import TcType
