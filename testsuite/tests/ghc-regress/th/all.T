@@ -175,3 +175,5 @@ test('T4188', normal, compile, ['-v0'])
 test('T4233', normal, compile, ['-v0'])
 test('T4169', normal, compile, ['-v0'])
 test('T1835', normal, compile_and_run, ['-v0'])
+
+test('TH_viewPatPrint', normal, compile_and_run, [''])
