@@ -201,6 +201,7 @@ pprPat _ (RecP nm fs)
                         map (\(s,p) -> ppr s <+> equals <+> ppr p) fs)
 pprPat _ (ListP ps) = brackets $ sep $ punctuate comma $ map ppr ps
 pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> text "::" <+> ppr t
+pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
 
 ------------------------------
 instance Ppr Dec where

@@ -47,7 +47,7 @@ module Language.Haskell.TH(
 	charL, stringL, stringPrimL,
     -- *** Patterns
 	litP, varP, tupP, conP, infixP, tildeP, bangP, asP, wildP, recP,
-	listP, sigP, 
+	listP, sigP, viewP,
 	fieldPat,
 
     -- *** Pattern Guards

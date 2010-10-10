@@ -92,6 +92,10 @@ sigP :: PatQ -> TypeQ -> PatQ
 sigP p t = do p' <- p
               t' <- t
               return (SigP p' t')
+viewP :: ExpQ -> PatQ -> PatQ
+viewP e p = do e' <- e
+               p' <- p
+               return (ViewP e' p')
 
 fieldPat :: Name -> PatQ -> FieldPatQ
 fieldPat n p = do p' <- p
@@ -540,6 +544,7 @@ rename (RecP nm fs) = do { pairs <- mapM rename ps; g(combine pairs) }
 rename (ListP pats) = do { pairs <- mapM rename pats; g(combine pairs) }
    where g (es,ps) = return (es,ListP ps)
 rename (SigP {}) = fail "rename: Don't know how to do SigP yet"
+rename (ViewP {}) = fail "rename: Don't know how to do ViewP yet"
 
 genpat :: Pat -> Q ((Name -> ExpQ), Pat)
 genpat p = do { (env,p2) <- rename p; return (alpha env,p2) }

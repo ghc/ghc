@@ -700,6 +700,7 @@ data Pat
   | RecP Name [FieldPat]          -- ^ @f (Pt { pointx = x }) = g x@
   | ListP [ Pat ]                 -- ^ @{ [1,2,3] }@
   | SigP Pat Type                 -- ^ @{ p :: t }@
+  | ViewP Exp Pat                 -- ^ @{ e -> p }@
   deriving( Show, Eq, Data, Typeable )
 
 type FieldPat = (Name,Pat)
