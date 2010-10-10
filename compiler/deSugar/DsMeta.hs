@@ -1038,6 +1038,7 @@ repP (ConPatIn dc details)
                                 repPinfix p1' con_str p2' }
    }
 repP (NPat l Nothing _)  = do { a <- repOverloadedLiteral l; repPlit a }
+repP (ViewPat e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
 repP p@(NPat _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
 repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
 	-- The problem is to do with scoped type variables.
@@ -1269,6 +1270,9 @@ repPwild = rep2 wildPName []
 
 repPlist :: Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPlist (MkC ps) = rep2 listPName [ps]
+
+repPview :: Core TH.ExpQ -> Core TH.PatQ -> DsM (Core TH.PatQ)
+repPview (MkC e) (MkC p) = rep2 viewPName [e,p]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> DsM (Core TH.ExpQ)
@@ -1665,7 +1669,7 @@ templateHaskellNames = [
     floatPrimLName, doublePrimLName, rationalLName, 
     -- Pat
     litPName, varPName, tupPName, conPName, tildePName, bangPName, infixPName,
-    asPName, wildPName, recPName, listPName, sigPName,
+    asPName, wildPName, recPName, listPName, sigPName, viewPName,
     -- FieldPat
     fieldPatName,
     -- Match
@@ -1802,7 +1806,7 @@ rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
 
 -- data Pat = ...
 litPName, varPName, tupPName, conPName, infixPName, tildePName, bangPName,
-    asPName, wildPName, recPName, listPName, sigPName :: Name
+    asPName, wildPName, recPName, listPName, sigPName, viewPName :: Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
 tupPName   = libFun (fsLit "tupP")   tupPIdKey
@@ -1815,6 +1819,7 @@ wildPName  = libFun (fsLit "wildP")  wildPIdKey
 recPName   = libFun (fsLit "recP")   recPIdKey
 listPName  = libFun (fsLit "listP")  listPIdKey
 sigPName   = libFun (fsLit "sigP")   sigPIdKey
+viewPName  = libFun (fsLit "viewP")  viewPIdKey
 
 -- type FieldPat = ...
 fieldPatName :: Name
@@ -2080,7 +2085,7 @@ liftStringIdKey     = mkPreludeMiscIdUnique 218
 
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
-    asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey :: Unique
+    asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey, viewPIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 220
 varPIdKey         = mkPreludeMiscIdUnique 221
 tupPIdKey         = mkPreludeMiscIdUnique 222
@@ -2093,6 +2098,7 @@ wildPIdKey        = mkPreludeMiscIdUnique 226
 recPIdKey         = mkPreludeMiscIdUnique 227
 listPIdKey        = mkPreludeMiscIdUnique 228
 sigPIdKey         = mkPreludeMiscIdUnique 229
+viewPIdKey        = mkPreludeMiscIdUnique 360
 
 -- type FieldPat = ...
 fieldPatIdKey :: Unique

@@ -637,6 +637,7 @@ cvtp (RecP c fs)      = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
 		  	   ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
 cvtp (ListP ps)       = do { ps' <- cvtPats ps; return $ ListPat ps' void }
 cvtp (SigP p t)       = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
+cvtp (ViewP e p)      = do { e' <- cvtl e; p' <- cvtPat p; return $ ViewPat e' p' void }
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
