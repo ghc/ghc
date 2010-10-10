@@ -403,227 +403,150 @@ non-static to static linking is simply a question of adding
 <title>Making DLLs to be called from other languages</title>
 
 <para>
-If you want to package up Haskell code to be called from other languages,
-such as Visual Basic or C++, there are some extra things it is useful to
-know.  This is a special case of <xref linkend="ffi-library" />; we'll deal with
-          the DLL-specific issues that arise below.  Here's an example:
+  This section describes how to create DLLs to be called from other languages,
+  such as Visual Basic or C++. This is a special case of
+  <xref linkend="ffi-library" />; we'll deal with the DLL-specific issues that
+  arise below. Here's an example:
 </para>
-
-<itemizedlist>
-
-<listitem>
 <para>
-Use <literal>foreign export</literal> declarations to export the Haskell
-functions you want to call from the outside. For example,
-
+  Use foreign export declarations to export the Haskell functions you want to
+  call from the outside. For example:
+</para>
 <programlisting>
+-- Adder.hs
+{-# LANGUAGE ForeignFunctionInterface #-}
 module Adder where
 
-adder :: Int -> Int -> IO Int  &ndash;&ndash; gratuitous use of IO
+adder :: Int -> Int -> IO Int  -- gratuitous use of IO
 adder x y = return (x+y)
 
 foreign export stdcall adder :: Int -> Int -> IO Int
 </programlisting>
-</para>
-</listitem>
-
-<listitem>
 <para>
-Compile it up:
-
-<screen>
-ghc -c adder.hs -fglasgow-exts
-</screen>
-  
-This will produce two files, adder.o and adder_stub.o
+  Add some helper code that starts up and shuts down the Haskell RTS:
 </para>
-</listitem>
-
-<listitem>
-<para>
-compile up a <function>DllMain()</function> that starts up the Haskell
-RTS-&ndash;&ndash;a possible implementation is:
-
 <programlisting>
-#include &lt;windows.h&gt;
-#include &lt;Rts.h&gt;
+// StartEnd.c
+#include <Rts.h>
 
 extern void __stginit_Adder(void);
 
-static char* args[] = { "ghcDll", NULL };
-                       /* N.B. argv arrays must end with NULL */
-BOOL
-STDCALL
-DllMain
-   ( HANDLE hModule
-   , DWORD reason
-   , void* reserved
-   )
+void HsStart()
 {
-  if (reason == DLL_PROCESS_ATTACH) {
-      /* By now, the RTS DLL should have been hoisted in, but we need to start it up. */
-      startupHaskell(1, args, __stginit_Adder);
-      return TRUE;
-  }
-  return TRUE;
-}
-</programlisting>
-
-Here, <literal>Adder</literal> is the name of the root module in the module
-tree (as mentioned above, there must be a single root module, and hence a
-single module tree in the DLL).
-
-Compile this up:
-
-<screen>
-ghc -c dllMain.c
-</screen>
-</para>
-</listitem>
-
-<listitem>
-<para>
-Construct the DLL:
-
-<screen>
-ghc &ndash;shared -o adder.dll adder.o adder_stub.o dllMain.o
-</screen>
-
-</para>
-</listitem>
-
-<listitem>
-<para>
-Start using <function>adder</function> from VBA-&ndash;&ndash;here's how I would
-<constant>Declare</constant> it:
-
-<programlisting>
-Private Declare Function adder Lib "adder.dll" Alias "adder@8"
-      (ByVal x As Long, ByVal y As Long) As Long
-</programlisting>
-
-Since this Haskell DLL depends on a couple of the DLLs that come with GHC,
-make sure that they are in scope/visible.
-</para>
-
-<para>
-Building statically linked DLLs is the same as in the previous section: it
-suffices to add <option>-static</option> to the commands used to compile up
-the Haskell source and build the DLL.
-</para>
-
-</listitem>
-
-</itemizedlist>
-
-</sect2>
-
-<sect2>
-<title>Beware of DllMain()!</title>
-
-<para>The body of a <literal>DllMain()</literal> function is an
-extremely dangerous place! This is because the order in which DLLs are
-unloaded when a process is terminating is unspecified. This means that
-the <literal>DllMain()</literal> for your DLL may be called when other DLLs containing
-functions that you call when de-initializing your DLL have already
-been unloaded. In other words, you can't put shutdown code inside
-<literal>DllMain()</literal>, unless your shutdown code only requires use of certain
-functions which are guaranteed to be available (see the Platform SDK
-docs for more info).</para>
-
-<para>In particular, if you are writing a DLL that's statically
-linked with Haskell, it is not safe to call
-<literal>hs_exit()</literal> from <literal>DllMain()</literal>, since
-<literal>hs_exit()</literal> may make use of other DLLs (see also <xref
-          linkend="hs-exit" />).  What's more, if you
-wait until program shutdown to execute your deinitialisation code, Windows will have
-terminated all the threads in your program except the one calling
-<literal>DllMain()</literal>, which can cause even more
-problems.</para>
-
-<para>A solution is to always export <literal>Begin()</literal> and <literal>End()</literal> functions from your
-DLL, and call these from the application that uses the DLL, so that
-you can be sure that all DLLs needed by any shutdown code in your
-End() function are available when it is called.</para>
-
-<para>The following example is untested but illustrates the idea (please let us
-        know if you find problems with this example or have a better one).  Suppose we have a DLL called Lewis which makes use of 2
-Haskell modules <literal>Bar</literal> and <literal>Zap</literal>,
-where <literal>Bar</literal> imports <literal>Zap</literal> and is
-therefore the root module in the sense of <xref
-linkend="using-own-main" />. Then the main C++ unit for the DLL would
-look something like:</para>
-
-<programlisting>
- // Lewis.cpp -- compiled using GCC
- #include &lt;Windows.h&gt;
- #include "HsFFI.h"
-
- #define __LEWIS_DLL_EXPORT
- #include "Lewis.h"
-
- #include "Bar_stub.h"  // generated by GHC
- #include "Zap_stub.h"
-
- BOOL APIENTRY DllMain( HANDLE hModule, 
-                        DWORD  ul_reason_for_call, 
-                        LPVOID lpReserved
-                       ){
-   return TRUE;
- }
-
- extern "C"{
-
- LEWIS_API HsBool lewis_Begin(){
-   int argc = ...
-   char *argv[] = ...
+   int argc = 1;
+   char* argv[] = {"ghcDll", NULL}; // argv must end with NULL
 
    // Initialize Haskell runtime
-   hs_init(&amp;argc, &amp;argv);
+   char** args = argv;
+   hs_init(&argc, &args);
 
    // Tell Haskell about all root modules
-   hs_add_root(__stginit_Bar);
+   hs_add_root(__stginit_Adder);
+}
 
-   // do any other initialization here and
-   // return false if there was a problem
-   return HS_BOOL_TRUE;
- }
-
- LEWIS_API void lewis_End(){
+void HsEnd()
+{
    hs_exit();
- }
-
- LEWIS_API HsInt lewis_Test(HsInt x){
-   // use Haskell functions exported by
-   // modules Bar and/or Zap
-
-   return ...
- }
-
- } // extern "C"
-
-and some application which used the functions in the DLL would have a main() function like:
-
- // MyApp.cpp
- #include "stdafx.h"
- #include "Lewis.h"
-
- int main(int argc, char *argv[]){
-   if (lewis_Begin()){
-      // can now safely call other functions
-      // exported by Lewis DLL
-
-   }
-   lewis_End();
-   return 0;
- }
+}
 </programlisting>
-
-<para><literal>Lewis.h</literal> would have to have some appropriate <literal>#ifndef</literal> to ensure that the
-Haskell FFI types were defined for external users of the DLL (who
-wouldn't necessarily have GHC installed and therefore wouldn't have
-the include files like <literal>HsFFI.h</literal> etc). 
+<para>
+  Here, <literal>Adder</literal> is the name of the root module in the module
+  tree (as mentioned above, there must be a single root module, and hence a
+  single module tree in the DLL). Compile everything up:
 </para>
+<screen>
+ghc -c Adder.hs
+ghc -c StartEnd.c
+ghc -shared -o Adder.dll Adder.o Adder_stub.o StartEnd.o
+</screen>
+<para>
+  Now the file <filename>Adder.dll</filename> can be used from other
+  programming languages. Before calling any functions in Adder it is necessary
+  to call <literal>HsStart</literal>, and at the very end call
+  <literal>HsEnd</literal>.
+</para>
+<para>
+  <emphasis>Warning:</emphasis> It may appear tempting to use
+  <literal>DllMain</literal> to call
+  <literal>hs_init</literal>/<literal>hs_exit</literal>, but this won't work
+  (particularly if you compile with <literal>-threaded</literal>). There are
+  severe restrictions on which actions can be performed during
+  <literal>DllMain</literal>, and <literal>hs_init</literal> violates these
+  restrictions, which can lead to your dll freezing during startup (see
+  <ulink url="http://hackage.haskell.org/trac/ghc/ticket/3605">bug
+  #3605</ulink>).
+</para>
+
+<sect3 id="win32-dlls-vba">
+<title>Using from VBA</title>
+
+<para>
+  An example of using <filename>Adder.dll</filename> from VBA is:
+</para>
+<programlisting>
+Private Declare Function Adder Lib "Adder.dll" Alias "adder@8" _
+      (ByVal x As Long, ByVal y As Long) As Long
+
+Private Declare Sub HsStart Lib "Adder.dll" ()
+Private Declare Sub HsEnd Lib "Adder.dll" ()
+
+Private Sub Document_Close()
+HsEnd
+End Sub
+
+Private Sub Document_Open()
+HsStart
+End Sub
+
+Public Sub Test()
+MsgBox "12 + 5 = " & Adder(12, 5)
+End Sub
+</programlisting>
+<para>
+  This example uses the
+  <literal>Document_Open</literal>/<literal>Close</literal> functions of
+  Microsoft Word, but provided <literal>HsStart</literal> is called before the
+  first function, and <literal>HsEnd</literal> after the last, then it will
+  work fine.
+</para>
+</sect3>
+
+<sect3 id="win32-dlls-c++">
+<title>Using from C++</title>
+
+<para>
+  An example of using <filename>Adder.dll</filename> from C++ is:
+</para>
+
+<programlisting>
+// Tester.cpp
+#include "HsFFI.h"
+#include "Adder_stub.h"
+#include <stdio.h>
+
+extern "C" {
+    void HsStart();
+    void HsEnd();
+}
+
+int main()
+{
+    HsStart();
+    // can now safely call functions from the DLL
+    printf("12 + 5 = %i\n", adder(12,5))    ;
+    HsEnd();
+    return 0;
+}
+</programlisting>
+<para>
+  This can be compiled and run with:
+</para>
+<screen>
+$ ghc -o tester Tester.cpp Adder.dll.a
+$ tester
+12 + 5 = 17
+</screen>
+
 </sect2>
 
 </sect1>
