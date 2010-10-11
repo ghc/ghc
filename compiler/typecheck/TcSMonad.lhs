@@ -292,6 +292,12 @@ isDerived _            = False
 canSolve :: CtFlavor -> CtFlavor -> Bool 
 -- canSolve ctid1 ctid2 
 -- The constraint ctid1 can be used to solve ctid2 
+-- "to solve" means a reaction where the active parts of the two constraints match.
+--  active(F xis ~ xi) = F xis 
+--  active(tv ~ xi)    = tv 
+--  active(D xis)      = D xis 
+--  active(IP nm ty)   = nm 
+-----------------------------------------
 canSolve (Given {})   _            = True 
 canSolve (Derived {}) (Wanted {})  = True 
 canSolve (Derived {}) (Derived {}) = True 
@@ -300,13 +306,36 @@ canSolve _ _ = False
 
 canRewrite :: CtFlavor -> CtFlavor -> Bool 
 -- canRewrite ctid1 ctid2 
--- The *equality* constraint ctid1 can be used to rewrite inside ctid2 
+-- The *equality_constraint* ctid1 can be used to rewrite inside ctid2 
 canRewrite (Given {})   _            = True 
 canRewrite (Derived {}) (Wanted {})  = True 
 canRewrite (Derived {}) (Derived {}) = True 
-  -- Never use a wanted to rewrite anything!
+  -- See note [Rewriting wanteds with wanteds] 
 canRewrite (Wanted {})  (Wanted {})  = False 
 canRewrite _ _ = False
+
+\end{code}
+Note [Rewriting wanteds with wanteds] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+We will currently never use a wanted to rewrite any other 
+constraint (function @canRewrite@). If a rewriting was possible at all, 
+we simply wait until the wanted equality becomes given or derived and 
+then use it. This way we avoid rewriting by eventually insoluble wanteds, 
+such as in the following situation: 
+    w1 : a ~ Int 
+    w2 : F a ~ a 
+    w3 : F Int ~ G Bool 
+where 'a' is a skolem variable. If we rewrite using w1 inside w2 we will
+get the perhaps mystifying error at the end that we could not solve
+(a ~ Int) and (G Bool ~ Int). But there is no point in rewriting with 
+a ~ Int as long as it is still wanted.
+
+Notice that on the other hand we often do solve one wanted from another, 
+(function @canSolve@) for instance in dictionary interactions, which is 
+a reaction that enables sharing both in the solver and in the final evidence 
+produced. 
+
+\begin{code}
 
 combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
 -- Precondition: At least one of them should be wanted 
