@@ -528,11 +528,10 @@ reOrient (FunCls {})   (VarCls tv2)   = isMetaTyVar tv2
   -- meta type variable is the RHS of a function equality
 reOrient (FunCls {}) _                = False   -- Fun/Other on rhs
 
-
-reOrient (VarCls tv1) (FunCls {}) = not (isMetaTyVar tv1)
+reOrient (VarCls tv1) (FunCls {})   = not (isMetaTyVar tv1)
 reOrient (VarCls {})  (OtherCls {}) = False
+reOrient (VarCls {})  (VarCls {})   = False 
 
-reOrient (VarCls tv1) (VarCls tv2) = False 
 {- 
 -- Variables-variables are oriented according to their kind 
 -- so that the following property has the best chance of
