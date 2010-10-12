@@ -1,4 +1,4 @@
-{-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE MagicHash, UnliftedFFITypes #-}
 -- !!! cc004 -- foreign declarations
 module ShouldCompile where
 
