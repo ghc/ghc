@@ -359,44 +359,6 @@ $ cat foo.hspp</screen>
     <variablelist>
       <varlistentry>
         <term>
-          <constant>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</constant>
-          <indexterm><primary><literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</literal></primary></indexterm>
-        </term>
-        <listitem>
-          <para>If defined, this means that GHC supports the
-          language defined by the Haskell 98 report.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
-          <constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant>
-          <indexterm><primary><constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant></primary></indexterm>
-        </term>
-        <listitem>
-          <para>In GHC 4.04 and later, the
-          <constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;</constant>
-          macro is defined as having the value
-          <constant>98</constant>.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
-          <constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</constant>
-          <indexterm><primary><constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</constant></primary></indexterm>
-        </term>
-        <listitem>
-          <para>If defined to <replaceable>n</replaceable>, that
-          means GHC supports the Haskell language defined in the
-          Haskell report version <emphasis>1.n</emphasis>.
-          Currently 5.  This macro is deprecated, and will probably
-          disappear in future versions.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
           <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant>
           <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
         </term>
@@ -434,19 +396,6 @@ $ cat foo.hspp</screen>
         </listitem>
       </varlistentry>
 
-      <varlistentry>
-      <term>
-          <constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant>
-          <indexterm><primary><constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
-        </term>
-      <listitem>
-        <para>This symbol is defined when pre-processing Haskell
-          (input) and pre-processing C (GHC output).  Since GHC from
-          version 4.00 now supports concurrent haskell by default,
-          this symbol is always defined.</para>
-        </listitem>
-      </varlistentry>
-      
       <varlistentry>
         <term>
           <constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant>

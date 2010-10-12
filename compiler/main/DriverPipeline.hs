@@ -1866,17 +1866,10 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
                        , SysTools.FileOption "" output_fn
                        ])
 
-cHaskell1Version :: String
-cHaskell1Version = "5" -- i.e., Haskell 98
-
 hsSourceCppOpts :: [String]
 -- Default CPP defines in Haskell source
 hsSourceCppOpts =
-        [ "-D__HASKELL1__="++cHaskell1Version
-        , "-D__GLASGOW_HASKELL__="++cProjectVersionInt
-        , "-D__HASKELL98__"
-        , "-D__CONCURRENT_HASKELL__"
-        ]
+        [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 
 
 -- -----------------------------------------------------------------------------
