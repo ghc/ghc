@@ -564,7 +564,6 @@ BUILD_DIRS += \
    docs/users_guide \
    docs/ext-core \
    docs/man \
-   libraries/Cabal/doc \
    $(GHC_UNLIT_DIR) \
    $(GHC_HP2PS_DIR)
 
