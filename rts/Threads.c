@@ -284,6 +284,19 @@ unblock:
     // we'll block again.
     tso->why_blocked = NotBlocked;
     appendToRunQueue(cap,tso);
+
+    // We used to set the context switch flag here, which would
+    // trigger a context switch a short time in the future (at the end
+    // of the current nursery block).  The idea is that we have just
+    // woken up a thread, so we may need to load-balance and migrate
+    // threads to other CPUs.  On the other hand, setting the context
+    // switch flag here unfairly penalises the current thread by
+    // yielding its time slice too early.
+    //
+    // The synthetic benchmark nofib/smp/chan can be used to show the
+    // difference quite clearly.
+
+    // cap->context_switch = 1;
 }
 
 /* ----------------------------------------------------------------------------
