@@ -828,7 +828,7 @@ it &lt;- <replaceable>e</replaceable>
   []
 </programlisting>
     However, it is tiresome for the user to have to specify the type, so GHCi extends Haskell's type-defaulting
-    rules (Section 4.3.4 of the Haskell 98 Report (Revised)) as follows.  The
+    rules (Section 4.3.4 of the Haskell 2010 Report) as follows.  The
     standard rules take each group of constraints <literal>(C1 a, C2 a, ..., Cn
     a)</literal> for each type variable <literal>a</literal>, and defaults the
     type variable if 

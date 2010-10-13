@@ -1398,6 +1398,7 @@ f "2"    = 2
           e.g., the &lsquo;default default&rsquo; for Haskell 1.4 caused the
           otherwise unconstrained value <constant>1</constant> to be
           given the type <literal>Int</literal>, whereas Haskell 98
+          and later
           defaults it to <literal>Integer</literal>.  This may lead to
           differences in performance and behaviour, hence the
           usefulness of being non-silent about this.</para>
