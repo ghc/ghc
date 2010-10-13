@@ -38,7 +38,7 @@ import System.Directory ( doesDirectoryExist, getDirectoryContents,
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
-import System.IO.Error (try, isDoesNotExistError)
+import System.IO.Error
 import Data.List
 import Control.Concurrent
 
@@ -62,8 +62,6 @@ import GHC.ConsoleHandler
 #else
 import System.Posix hiding (fdToHandle)
 #endif
-
-import IO ( isPermissionError )
 
 #if defined(GLOB)
 import System.Process(runInteractiveCommand)
