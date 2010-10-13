@@ -131,9 +131,20 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     significand x       =  encodeFloat m (negate (floatDigits x))
                            where (m,_) = decodeFloat x
 
-    scaleFloat k x      =  encodeFloat m (n+k)
+    scaleFloat k x      =  encodeFloat m (n + clamp b k)
                            where (m,n) = decodeFloat x
-                           
+                                 (l,h) = floatRange x
+                                 d     = floatDigits x
+                                 b     = h - l + 4*d
+                                 -- n+k may overflow, which would lead
+                                 -- to wrong results, hence we clamp the
+                                 -- scaling parameter.
+                                 -- If n + k would be larger than h,
+                                 -- n + clamp b k must be too, simliar
+                                 -- for smaller than l - d.
+                                 -- Add a little extra to keep clear
+                                 -- from the boundary cases.
+
     atan2 y x
       | x > 0            =  atan (y/x)
       | x == 0 && y > 0  =  pi/2
@@ -268,7 +279,9 @@ instance  RealFloat Float  where
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
     scaleFloat k x      = case decodeFloat x of
-                            (m,n) -> encodeFloat m (n+k)
+                            (m,n) -> encodeFloat m (n + clamp bf k)
+                        where bf = FLT_MAX_EXP - (FLT_MIN_EXP) + 4*FLT_MANT_DIG
+
     isNaN x          = 0 /= isFloatNaN x
     isInfinite x     = 0 /= isFloatInfinite x
     isDenormalized x = 0 /= isFloatDenormalized x
@@ -395,7 +408,8 @@ instance  RealFloat Double  where
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
     scaleFloat k x      = case decodeFloat x of
-                            (m,n) -> encodeFloat m (n+k)
+                            (m,n) -> encodeFloat m (n + clamp bd k)
+                        where bd = DBL_MAX_EXP - (DBL_MIN_EXP) + 4*DBL_MANT_DIG
 
     isNaN x             = 0 /= isDoubleNaN x
     isInfinite x        = 0 /= isDoubleInfinite x
@@ -970,4 +984,13 @@ showSignedFloat showPos p x
    | x < 0 || isNegativeZero x
        = showParen (p > 6) (showChar '-' . showPos (-x))
    | otherwise = showPos x
+\end{code}
+
+We need to prevent over/underflow of the exponent in encodeFloat when
+called from scaleFloat, hence we clamp the scaling parameter.
+We must have a large enough range to cover the maximum difference of
+exponents returned by decodeFloat.
+\begin{code}
+clamp :: Int -> Int -> Int
+clamp bd k = max (-bd) (min bd k)
 \end{code}
