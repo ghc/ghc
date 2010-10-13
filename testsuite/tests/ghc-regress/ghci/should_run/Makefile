@@ -5,5 +5,5 @@ include $(TOP)/mk/test.mk
 # Test that threadDelay can be interrupted by ^C.
 3171:
 	echo "do Control.Concurrent.threadDelay 3000000; putStrLn \"threadDelay was not interrupted\"" | \
-	"$(TEST_HC)" -v0 --interactive 2>3171.err & \
+	"$(TEST_HC)" -ignore-dot-ghci -v0 --interactive 2>3171.err & \
 	sleep 2; kill -INT $$!; wait
