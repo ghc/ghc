@@ -39,7 +39,6 @@ import UniqFM
 import Unique
 import State
 import Outputable
-import Util
 
 import Data.List
 import Data.Maybe
