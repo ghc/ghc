@@ -1,18 +1,19 @@
-
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
+-- | When there aren't enough registers to hold all the vregs we have to spill some of those
+--   vregs to slots on the stack. This module is used modify the code to use those slots.
+--
 module RegAlloc.Graph.Spill (
 	regSpill,
 	SpillStats(..),
 	accSpillSL
 )
-
 where
-
 import RegAlloc.Liveness
 import Instruction
 import Reg
-import Cmm
+import Cmm	hiding (RegSet)
+import BlockId
 
 import State
 import Unique
@@ -22,15 +23,21 @@ import UniqSupply
 import Outputable
 
 import Data.List
+import Data.Maybe
+import Data.Map			(Map)
+import Data.Set			(Set)
+import qualified Data.Map	as Map
+import qualified Data.Set	as Set
 
 
--- | Spill all these virtual regs to memory
---	TODO: 	see if we can split some of the live ranges instead of just globally
---		spilling the virtual reg.
+-- | Spill all these virtual regs to stack slots.
+-- 
+--   TODO: See if we can split some of the live ranges instead of just globally
+--         spilling the virtual reg. This might make the spill cleaner's job easier.
 --
---	TODO:	On ciscy x86 and x86_64 we don't nessesarally have to add a mov instruction
---		when making spills. If an instr is using a spilled virtual we may be able to
---		address the spill slot directly.
+--   TODO: On CISCy x86 and x86_64 we don't nessesarally have to add a mov instruction
+--         when making spills. If an instr is using a spilled virtual we may be able to
+--         address the spill slot directly.
 --
 regSpill
 	:: Instruction instr
@@ -38,7 +45,7 @@ regSpill
 	-> UniqSet Int			-- ^ available stack slots
 	-> UniqSet VirtualReg		-- ^ the regs to spill
 	-> UniqSM
-		([LiveCmmTop instr]	-- code will spill instructions
+		([LiveCmmTop instr]	-- code with SPILL and RELOAD meta instructions added.
 		, UniqSet Int		-- left over slots
 		, SpillStats )		-- stats about what happened during spilling
 
@@ -62,7 +69,7 @@ regSpill code slotsFree regs
 
 		-- run the spiller on all the blocks
 		let (code', state')	=
-			runState (mapM (mapBlockTopM (regSpill_block regSlotMap)) code)
+			runState (mapM (regSpill_top regSlotMap) code)
 				 (initSpillS us)
 
 		return	( code'
@@ -70,15 +77,84 @@ regSpill code slotsFree regs
 			, makeSpillStats state')
 
 
+-- | Spill some registers to stack slots in a top-level thing.
+regSpill_top 
+	:: Instruction instr
+	=> RegMap Int 			-- ^ map of vregs to slots they're being spilled to.
+	-> LiveCmmTop instr		-- ^ the top level thing.
+	-> SpillM (LiveCmmTop instr)
+	
+regSpill_top regSlotMap cmm
+ = case cmm of
+	CmmData{}				
+	 -> return cmm
+
+	CmmProc info label params sccs
+	 |  LiveInfo static firstId mLiveVRegsOnEntry liveSlotsOnEntry <- info
+	 -> do	
+		-- We should only passed Cmms with the liveness maps filled in,  but we'll
+		-- create empty ones if they're not there just in case.
+		let liveVRegsOnEntry	= fromMaybe emptyBlockEnv mLiveVRegsOnEntry
+		
+		-- The liveVRegsOnEntry contains the set of vregs that are live on entry to
+		-- each basic block. If we spill one of those vregs we remove it from that
+		-- set and add the corresponding slot number to the liveSlotsOnEntry set.
+		-- The spill cleaner needs this information to erase unneeded spill and 
+		-- reload instructions after we've done a successful allocation.
+		let liveSlotsOnEntry' :: Map BlockId (Set Int)
+		    liveSlotsOnEntry'
+			= foldBlockEnv patchLiveSlot liveSlotsOnEntry liveVRegsOnEntry
+
+		let info'
+			= LiveInfo static firstId
+				(Just liveVRegsOnEntry)
+				liveSlotsOnEntry'
+					
+		-- Apply the spiller to all the basic blocks in the CmmProc.
+		sccs'		<- mapM (mapSCCM (regSpill_block regSlotMap)) sccs
+
+		return	$ CmmProc info' label params sccs'
+
+ where	-- | Given a BlockId and the set of registers live in it, 
+	--   if registers in this block are being spilled to stack slots, 
+	--   then record the fact that these slots are now live in those blocks
+	--   in the given slotmap.
+	patchLiveSlot :: BlockId -> RegSet -> Map BlockId (Set Int) -> Map BlockId (Set Int)
+	patchLiveSlot blockId regsLive slotMap
+	 = let	curSlotsLive	= fromMaybe Set.empty
+				$ Map.lookup blockId slotMap
+
+		moreSlotsLive	= Set.fromList
+				$ catMaybes 
+				$ map (lookupUFM regSlotMap)
+				$ uniqSetToList regsLive
+		
+	  	slotMap'	= Map.insert blockId (Set.union curSlotsLive moreSlotsLive) slotMap
+
+	   in	slotMap'
+
+
+
+-- | Spill some registers to stack slots in a basic block.
+regSpill_block
+	:: Instruction instr
+	=> UniqFM Int		-- ^ map of vregs to slots they're being spilled to.
+	-> LiveBasicBlock instr	
+	-> SpillM (LiveBasicBlock instr)
+	
 regSpill_block regSlotMap (BasicBlock i instrs)
  = do	instrss'	<- mapM (regSpill_instr regSlotMap) instrs
  	return	$ BasicBlock i (concat instrss')
 
 
+-- | Spill some registers to stack slots in a single instruction.  If the instruction
+--   uses registers that need to be spilled, then it is prefixed (or postfixed) with
+--   the appropriate RELOAD or SPILL meta instructions.
 regSpill_instr
 	:: Instruction instr
-	=> UniqFM Int 
-	-> LiveInstr instr -> SpillM [LiveInstr instr]
+	=> UniqFM Int 		-- ^ map of vregs to slots they're being spilled to.
+	-> LiveInstr instr
+	-> SpillM [LiveInstr instr]
 
 regSpill_instr _ li@(LiveInstr _ Nothing)
  = do	return [li]
@@ -174,7 +250,7 @@ spillModify regSlotMap instr reg
 
 
 
--- | rewrite uses of this virtual reg in an instr to use a different virtual reg
+-- | Rewrite uses of this virtual reg in an instr to use a different virtual reg
 patchInstr 
 	:: Instruction instr
 	=> Reg -> instr -> SpillM (instr, Reg)
@@ -198,13 +274,14 @@ patchReg1 old new instr
    in	patchRegsOfInstr instr patchF
 
 
-------------------------------------------------------
--- Spiller monad
-
+-- Spiller monad --------------------------------------------------------------
 data SpillS
 	= SpillS
-	{ stateUS	:: UniqSupply
-	, stateSpillSL	:: UniqFM (Reg, Int, Int) } -- ^ spilled reg vs number of times vreg was loaded, stored
+	{ -- | unique supply for generating fresh vregs.
+	  stateUS	:: UniqSupply
+	
+	  -- | spilled vreg vs the number of times it was loaded, stored 
+	, stateSpillSL	:: UniqFM (Reg, Int, Int) }
 
 initSpillS uniqueSupply
 	= SpillS
@@ -226,9 +303,7 @@ accSpillSL (r1, s1, l1) (_, s2, l2)
 	= (r1, s1 + s2, l1 + l2)
 
 
-----------------------------------------------------
--- Spiller stats
-
+-- Spiller stats --------------------------------------------------------------
 data SpillStats
 	= SpillStats
 	{ spillStoreLoad	:: UniqFM (Reg, Int, Int) }

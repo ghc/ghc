@@ -18,7 +18,7 @@ module RegAlloc.Liveness (
 	LiveInfo (..),
 	LiveBasicBlock,
 
-	mapBlockTop, 	mapBlockTopM,
+	mapBlockTop, 	mapBlockTopM, 	mapSCCM,
 	mapGenBlockTop,	mapGenBlockTopM,
 	stripLive,
 	stripLiveBlock,
@@ -31,8 +31,6 @@ module RegAlloc.Liveness (
 	regLiveness,
 	natCmmTopToLive
   ) where
-
-
 import Reg
 import Instruction
 
@@ -52,6 +50,9 @@ import FastString
 
 import Data.List
 import Data.Maybe
+import Data.Map			(Map)
+import Data.Set			(Set)
+import qualified Data.Map	as Map
 
 -----------------------------------------------------------------------------
 type RegSet = UniqSet Reg
@@ -160,9 +161,11 @@ data Liveness
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
 data LiveInfo
 	= LiveInfo
-		[CmmStatic]			-- cmm static stuff
-		(Maybe BlockId)			-- id of the first block
-		(Maybe (BlockMap RegSet))	-- argument locals live on entry to this block
+		[CmmStatic]				-- cmm static stuff
+		(Maybe BlockId)				-- id of the first block
+		(Maybe (BlockMap RegSet))		-- argument locals live on entry to this block
+		(Map BlockId (Set Int))			-- stack slots live on entry to this block
+
 
 -- | A basic block with liveness information.
 type LiveBasicBlock instr
@@ -212,10 +215,11 @@ instance Outputable instr
 		 | otherwise		= name <> (hcat $ punctuate space $ map ppr $ uniqSetToList regs)
 
 instance Outputable LiveInfo where
-	ppr (LiveInfo static firstId liveOnEntry)
+	ppr (LiveInfo static firstId liveVRegsOnEntry liveSlotsOnEntry)
 		=  (vcat $ map ppr static)
-		$$ text "# firstId     = " <> ppr firstId
-		$$ text "# liveOnEntry = " <> ppr liveOnEntry
+		$$ text "# firstId          = " <> ppr firstId
+		$$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
+		$$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
 
 
 
@@ -299,9 +303,9 @@ slurpConflicts live
 		= foldl'  (slurpBlock info) rs bs
 
 	slurpBlock info rs (BasicBlock blockId instrs)	
-		| LiveInfo _ _ (Just blockLive)	<- info
-		, Just rsLiveEntry		<- lookupBlockEnv blockLive blockId
-		, (conflicts, moves)		<- slurpLIs rsLiveEntry rs instrs
+		| LiveInfo _ _ (Just blockLive)	_ <- info
+		, Just rsLiveEntry		  <- lookupBlockEnv blockLive blockId
+		, (conflicts, moves)		  <- slurpLIs rsLiveEntry rs instrs
 		= (consBag rsLiveEntry conflicts, moves)
 
 		| otherwise
@@ -466,7 +470,7 @@ stripLive live
 
  where	stripCmm (CmmData sec ds)	= CmmData sec ds
 
- 	stripCmm (CmmProc (LiveInfo info (Just first_id) _) label params sccs)
+ 	stripCmm (CmmProc (LiveInfo info (Just first_id) _ _) label params sccs)
 	 = let	final_blocks	= flattenSCCs sccs
 		
 		-- make sure the block that was first in the input list
@@ -479,7 +483,7 @@ stripLive live
                           (ListGraph $ map stripLiveBlock $ first' : rest')
 
 	-- procs used for stg_split_markers don't contain any blocks, and have no first_id.
-	stripCmm (CmmProc (LiveInfo info Nothing _) label params [])
+	stripCmm (CmmProc (LiveInfo info Nothing _ _) label params [])
 	 =	CmmProc info label params (ListGraph [])
 
 	-- If the proc has blocks but we don't know what the first one was, then we're dead.
@@ -540,7 +544,6 @@ eraseDeltasLive cmm
 -- | Patch the registers in this code according to this register mapping.
 --	also erase reg -> reg moves when the reg is the same.
 --	also erase reg -> reg moves when the destination dies in this instr.
-
 patchEraseLive
 	:: Instruction instr
 	=> (Reg -> Reg)
@@ -552,12 +555,12 @@ patchEraseLive patchF cmm
 	patchCmm cmm@CmmData{}	= cmm
 
 	patchCmm (CmmProc info label params sccs)
-	 | LiveInfo static id (Just blockMap)	<- info
+	 | LiveInfo static id (Just blockMap) mLiveSlots <- info
 	 = let 	
 	 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
 		blockMap'	= mapBlockEnv patchRegSet blockMap
 
-		info'		= LiveInfo static id (Just blockMap')
+		info'		= LiveInfo static id (Just blockMap') mLiveSlots
 	   in	CmmProc info' label params $ map patchSCC sccs
 
 	 | otherwise
@@ -628,7 +631,7 @@ natCmmTopToLive (CmmData i d)
 	= CmmData i d
 
 natCmmTopToLive (CmmProc info lbl params (ListGraph []))
-	= CmmProc (LiveInfo info Nothing Nothing)
+	= CmmProc (LiveInfo info Nothing Nothing Map.empty)
 		  lbl params []
 
 natCmmTopToLive (CmmProc info lbl params (ListGraph blocks@(first : _)))
@@ -638,7 +641,7 @@ natCmmTopToLive (CmmProc info lbl params (ListGraph blocks@(first : _)))
 					BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
 			$ sccs
 				
-   in	CmmProc (LiveInfo info (Just first_id) Nothing)
+   in	CmmProc (LiveInfo info (Just first_id) Nothing Map.empty)
 		lbl params sccsLive
 
 
@@ -668,16 +671,16 @@ regLiveness (CmmData i d)
 	= returnUs $ CmmData i d
 
 regLiveness (CmmProc info lbl params [])
-	| LiveInfo static mFirst _	<- info
+	| LiveInfo static mFirst _ _	<- info
 	= returnUs $ CmmProc
-			(LiveInfo static mFirst (Just emptyBlockEnv))
+			(LiveInfo static mFirst (Just emptyBlockEnv) Map.empty)
 			lbl params []
 
 regLiveness (CmmProc info lbl params sccs)
-	| LiveInfo static mFirst _	<- info
+	| LiveInfo static mFirst _ liveSlotsOnEntry	<- info
 	= let	(ann_sccs, block_live)	= computeLiveness sccs
 
-   	  in	returnUs $ CmmProc (LiveInfo static mFirst (Just block_live))
+   	  in	returnUs $ CmmProc (LiveInfo static mFirst (Just block_live) liveSlotsOnEntry)
 			   lbl params ann_sccs
 
 

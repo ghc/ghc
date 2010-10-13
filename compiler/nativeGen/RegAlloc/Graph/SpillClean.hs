@@ -23,7 +23,6 @@
 --	This also works if the reloads in B1\/B2 were spills instead, because
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
-
 module RegAlloc.Graph.SpillClean (
 	cleanSpills
 )
@@ -42,7 +41,13 @@ import State
 import Outputable
 import Util
 
-import Data.List        ( find, nub )
+import Data.List
+import Data.Maybe
+import Data.Map			(Map)
+import Data.Set			(Set)
+import qualified Data.Map	as Map
+import qualified Data.Set	as Set
+
 
 --
 type Slot = Int
@@ -84,8 +89,8 @@ cleanSpin spinCount code
 		, sReloadedBy		= emptyUFM }
 
  	code_forward	<- mapBlockTopM cleanBlockForward  code
-	code_backward	<- mapBlockTopM cleanBlockBackward code_forward
-
+	code_backward	<- cleanTopBackward code_forward
+	
 	-- During the cleaning of each block we collected information about what regs
 	--	were valid across each jump. Based on this, work out whether it will be
 	--	safe to erase reloads after join points for the next pass.
@@ -123,17 +128,6 @@ cleanBlockForward (BasicBlock blockId instrs)
 
  	instrs_reload	<- cleanForward    blockId assoc [] instrs
 	return	$ BasicBlock blockId instrs_reload
-
-
-cleanBlockBackward 
-	:: Instruction instr
-	=> LiveBasicBlock instr 
-	-> CleanM (LiveBasicBlock instr)
-
-cleanBlockBackward (BasicBlock blockId instrs)
- = do	instrs_spill	<- cleanBackward  emptyUniqSet  [] instrs
-	return	$ BasicBlock blockId instrs_spill
-
 
 
 
@@ -286,27 +280,59 @@ cleanReload _ _ _
 -- TODO: This is mostly inter-block
 --	 we should really be updating the noReloads set as we cross jumps also.
 --
+-- TODO: generate noReloads from liveSlotsOnEntry
+-- 
+cleanTopBackward
+	:: Instruction instr
+	=> LiveCmmTop instr
+	-> CleanM (LiveCmmTop instr)
+
+cleanTopBackward cmm
+ = case cmm of
+	CmmData{}
+	 -> return cmm
+	
+	CmmProc info label params sccs
+	 | LiveInfo _ _ _ liveSlotsOnEntry <- info
+	 -> do	sccs'	<- mapM (mapSCCM (cleanBlockBackward liveSlotsOnEntry)) sccs
+		return	$ CmmProc info label params sccs' 
+
+
+cleanBlockBackward 
+	:: Instruction instr
+	=> Map BlockId (Set Int)
+	-> LiveBasicBlock instr 
+	-> CleanM (LiveBasicBlock instr)
+
+cleanBlockBackward liveSlotsOnEntry (BasicBlock blockId instrs)
+ = do	instrs_spill	<- cleanBackward liveSlotsOnEntry  emptyUniqSet  [] instrs
+	return	$ BasicBlock blockId instrs_spill
+
+
+
 cleanBackward
-	:: UniqSet Int 			-- ^ slots that have been spilled, but not reloaded from
+	:: Instruction instr
+	=> Map BlockId (Set Int)	-- ^ Slots live on entry to each block
+	-> UniqSet Int 			-- ^ slots that have been spilled, but not reloaded from
 	-> [LiveInstr instr]		-- ^ acc
 	-> [LiveInstr instr]		-- ^ instrs to clean (in forwards order)
 	-> CleanM [LiveInstr instr]	-- ^ cleaned instrs  (in backwards order)
 
 
-cleanBackward noReloads acc lis
+cleanBackward liveSlotsOnEntry noReloads acc lis
  = do	reloadedBy	<- gets sReloadedBy
- 	cleanBackward' reloadedBy noReloads acc lis
+ 	cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc lis
 
-cleanBackward' _ _      acc []
+cleanBackward' _ _ _      acc []
 	= return  acc
 
-cleanBackward' reloadedBy noReloads acc (li : instrs)
+cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
 
 	-- if nothing ever reloads from this slot then we don't need the spill
 	| LiveInstr (SPILL _ slot) _	<- li
 	, Nothing	<- lookupUFM reloadedBy (SSlot slot)
 	= do	modify $ \s -> s { sCleanedSpillsAcc = sCleanedSpillsAcc s + 1 }
-		cleanBackward noReloads acc instrs
+		cleanBackward liveSlotsOnEntry noReloads acc instrs
 
 	| LiveInstr (SPILL _ slot) _	<- li
 	= if elementOfUniqSet slot noReloads
@@ -314,21 +340,39 @@ cleanBackward' reloadedBy noReloads acc (li : instrs)
 	   -- we can erase this spill because the slot won't be read until after the next one
 	   then do
 		modify $ \s -> s { sCleanedSpillsAcc = sCleanedSpillsAcc s + 1 }
-	   	cleanBackward noReloads acc instrs
+	   	cleanBackward liveSlotsOnEntry noReloads acc instrs
 
 	   else do
 		-- this slot is being spilled to, but we haven't seen any reloads yet.
 		let noReloads'	= addOneToUniqSet noReloads slot
-	   	cleanBackward noReloads' (li : acc) instrs
+	   	cleanBackward liveSlotsOnEntry noReloads' (li : acc) instrs
 
 	-- if we reload from a slot then it's no longer unused
 	| LiveInstr (RELOAD slot _) _	<- li
 	, noReloads'		<- delOneFromUniqSet noReloads slot
-	= cleanBackward noReloads' (li : acc) instrs
+	= cleanBackward liveSlotsOnEntry noReloads' (li : acc) instrs
+
+	-- If a slot is live in a jump target then assume it's reloaded there.
+	-- TODO: A real dataflow analysis would do a better job here.
+	--       If the target block _ever_ used the slot then we assume it always does,
+	--       but if those reloads are cleaned the slot liveness map doesn't get updated.
+	| LiveInstr instr _ 	<- li
+	, targets		<- jumpDestsOfInstr instr
+	= do	
+		let slotsReloadedByTargets
+				= Set.unions
+				$ catMaybes
+				$ map (flip Map.lookup liveSlotsOnEntry) 
+				$ targets
+		
+		let noReloads'	= foldl' delOneFromUniqSet noReloads 
+				$ Set.toList slotsReloadedByTargets
+		
+		cleanBackward liveSlotsOnEntry noReloads' (li : acc) instrs
 
 	-- some other instruction
 	| otherwise
-	= cleanBackward noReloads (li : acc) instrs
+	= cleanBackward liveSlotsOnEntry noReloads (li : acc) instrs
 
 
 -- collateJoinPoints:

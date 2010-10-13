@@ -132,12 +132,12 @@ regAlloc (CmmData sec d)
 		( CmmData sec d
 		, Nothing )
 	
-regAlloc (CmmProc (LiveInfo info _ _) lbl params [])
+regAlloc (CmmProc (LiveInfo info _ _ _) lbl params [])
 	= return ( CmmProc info lbl params (ListGraph [])
 		 , Nothing )
 	
 regAlloc (CmmProc static lbl params sccs)
-	| LiveInfo info (Just first_id) (Just block_live)	<- static
+	| LiveInfo info (Just first_id) (Just block_live) _	<- static
 	= do	
  		-- do register allocation on each component.
 		(final_blocks, stats)
