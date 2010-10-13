@@ -567,21 +567,10 @@ data HscEnv
                 -- by limiting the number of transformations,
                 -- we can use binary search to help find compiler bugs.
 
-        hsc_type_env_var :: Maybe (Module, IORef TypeEnv),
+        hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
                 -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for 
                 -- 'TcRunTypes.TcGblEnv'
-
-        hsc_global_rdr_env :: GlobalRdrEnv,
-                -- ^ A mapping from 'RdrName's that are in global scope during
-                -- the compilation of the current file to more detailed
-                -- information about those names. Not necessarily just the
-                -- names directly imported by the module being compiled!
-        
-        hsc_global_type_env :: TypeEnv
-                -- ^ Typing information about all those things in global scope.
-                -- Not necessarily just the things directly imported by the module 
-                -- being compiled!
  }
 
 hscEPS :: HscEnv -> IO ExternalPackageState

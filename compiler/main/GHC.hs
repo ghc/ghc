@@ -36,12 +36,6 @@ module GHC (
 	removeTarget,
 	guessTarget,
 	
-        -- * Extending the program scope 
-        extendGlobalRdrScope,
-        setGlobalRdrScope,
-        extendGlobalTypeScope,
-        setGlobalTypeScope,
-
 	-- * Loading\/compiling the program
 	depanal,
 	load, loadWithLogger, LoadHowMuch(..),
@@ -594,31 +588,6 @@ guessTarget str Nothing
 	 lhs_file = file <.> "lhs"
 
          target tid = Target tid obj_allowed Nothing
-
--- -----------------------------------------------------------------------------
--- Extending the program scope
-
-extendGlobalRdrScope :: GhcMonad m => [GlobalRdrElt] -> m ()
-extendGlobalRdrScope rdrElts
-    = modifySession $ \hscEnv ->
-      let global_rdr = hsc_global_rdr_env hscEnv
-      in hscEnv{ hsc_global_rdr_env = foldl extendGlobalRdrEnv global_rdr rdrElts }
-
-setGlobalRdrScope :: GhcMonad m => [GlobalRdrElt] -> m ()
-setGlobalRdrScope rdrElts
-    = modifySession $ \hscEnv ->
-      hscEnv{ hsc_global_rdr_env = foldl extendGlobalRdrEnv emptyGlobalRdrEnv rdrElts }
-
-extendGlobalTypeScope :: GhcMonad m => [Id] -> m ()
-extendGlobalTypeScope ids
-    = modifySession $ \hscEnv ->
-      let global_type = hsc_global_type_env hscEnv
-      in hscEnv{ hsc_global_type_env = extendTypeEnvWithIds global_type ids }
-
-setGlobalTypeScope :: GhcMonad m => [Id] -> m ()
-setGlobalTypeScope ids
-    = modifySession $ \hscEnv ->
-      hscEnv{ hsc_global_type_env = extendTypeEnvWithIds emptyTypeEnv ids }
 
 -- -----------------------------------------------------------------------------
 -- Loading the program

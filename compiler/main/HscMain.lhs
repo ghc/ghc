@@ -149,9 +149,7 @@ newHscEnv callbacks dflags
 			   hsc_FC      = fc_var,
 			   hsc_MLC     = mlc_var,
 			   hsc_OptFuel = optFuel,
-                           hsc_type_env_var = Nothing,
-                           hsc_global_rdr_env = emptyGlobalRdrEnv,
-                           hsc_global_type_env = emptyNameEnv } ) }
+                           hsc_type_env_var = Nothing } ) }
 
 
 knownKeyNames :: [Name]	-- Put here to avoid loops involving DsMeta,

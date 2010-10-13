@@ -89,11 +89,11 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 	     gbl_env = TcGblEnv {
 		tcg_mod       = mod,
 		tcg_src	      = hsc_src,
-		tcg_rdr_env   = hsc_global_rdr_env hsc_env,
+		tcg_rdr_env   = emptyGlobalRdrEnv,
 		tcg_fix_env   = emptyNameEnv,
 		tcg_field_env = RecFields emptyNameEnv emptyNameSet,
 		tcg_default   = Nothing,
-		tcg_type_env  = hsc_global_type_env hsc_env,
+		tcg_type_env  = emptyNameEnv,
 		tcg_type_env_var = type_env_var,
 		tcg_inst_env  = emptyInstEnv,
 		tcg_fam_inst_env  = emptyFamInstEnv,
