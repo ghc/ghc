@@ -37,7 +37,6 @@ import HsSyn
 import TcHsSyn
 import TcRnMonad
 import TcEnv
-import TcRnTypes
 import InstEnv
 import FunDeps
 import TcMType
