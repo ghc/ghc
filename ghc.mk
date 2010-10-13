@@ -297,7 +297,7 @@ INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
 # packages.
 STAGE2_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
 		   dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
-		   vector primitive
+		   vector primitive haskell98 haskell2010
 
 # Packages that are built by stage0, in addition to stage1.  These
 # packages are dependencies of GHC, that we do not assume the stage0
