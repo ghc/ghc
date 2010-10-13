@@ -271,10 +271,12 @@ freeAllMBlocks(void)
 
     osFreeAllMBlocks();
 
+#if SIZEOF_VOID_P == 8
     for (n = 0; n < mblock_map_count; n++) {
         stgFree(mblock_maps[n]);
     }
     stgFree(mblock_maps);
+#endif
 }
 
 void
