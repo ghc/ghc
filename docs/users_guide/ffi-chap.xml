@@ -78,6 +78,86 @@ OK:
 	  details see the GHC developer wiki.
 	</para>
       </sect2>
+
+      <sect2 id="ffi-interruptible">
+        <title>Interruptible foreign calls</title>
+        <para>
+          This concerns the interaction of foreign calls
+          with <literal>Control.Concurrent.throwTo</literal>.
+          Normally when the target of a <literal>throwTo</literal> is
+          involved in a foreign call, the exception is not raised
+          until the call returns, and in the meantime the caller is
+          blocked.  This can result in unresponsiveness, which is
+          particularly undesirable in the case of user interrupt
+          (e.g. Control-C).  The default behaviour when a Control-C
+          signal is received (<literal>SIGINT</literal> on Unix) is to raise
+          the <literal>UserInterrupt</literal> exception in the main
+          thread; if the main thread is blocked in a foreign call at
+          the time, then the program will not respond to the user
+          interrupt.
+        </para>
+        
+        <para>
+          The problem is that it is not possible in general to
+          interrupt a foreign call safely.  However, GHC does provide
+          a way to interrupt blocking system calls which works for
+          most system calls on both Unix and Windows.  A foreign call
+          can be annotated with <literal>interruptible</literal> instead
+          of <literal>safe</literal> or <literal>unsafe</literal>:
+
+<programlisting>
+foreign import ccall interruptible 
+   "sleep" :: CUint -> IO CUint
+</programlisting>
+
+          <literal>interruptble</literal> behaves exactly as
+          <literal>safe</literal>, except that when
+          a <literal>throwTo</literal> is directed at a thread in an
+          interruptible foreign call, an OS-specific mechanism will be
+          used to attempt to cause the foreign call to return:
+
+          <variablelist>
+            <varlistentry>
+              <term>Unix systems</term>
+              <listitem>
+                <para>
+                  The thread making the foreign call is sent
+                  a <literal>SIGPIPE</literal> signal
+                  using <literal>pthread_kill()</literal>.  This is
+                  usually enough to cause a blocking system call to
+                  return with <literal>EINTR</literal> (GHC by default
+                  installs an empty signal handler
+                  for <literal>SIGPIPE</literal>, to override the
+                  default behaviour which is to terminate the process
+                  immediately).
+                </para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term>Windows systems</term>
+              <listitem>
+                <para>
+                  [Vista and later only] The RTS calls the Win32
+                  function <literal>CancelSynchronousIO</literal>,
+                  which will cause a blocking I/O operation to return
+                  with the
+                  error <literal>ERROR_OPERATION_ABORTED</literal>.
+                </para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+
+          If the system call is successfully interrupted, it will
+          return to Haskell whereupon the exception can be raised.  Be
+          especially careful when
+          using <literal>interruptible</literal> that the caller of
+          the foreign function is prepared to deal with the
+          consequences of the call being interrupted; on Unix it is
+          good practice to check for <literal>EINTR</literal> always,
+          but on Windows it is not typically necessary to
+          handle <literal>ERROR_OPERATION_ABORTED</literal>.
+        </para>
+      </sect2>
   </sect1>
 
   <sect1 id="ffi-ghc">
@@ -484,7 +564,7 @@ int main(int argc, char *argv[])
           is platform dependent, but is intended to cause blocking
           system calls to return immediately with an interrupted error
           code.  The underlying operating system thread is not to be
-          destroyed.</para>
+          destroyed.  See <xref linkend="ffi-interruptible"/> for more details.</para>
       </sect3>
 
       <sect3 id="haskell-threads-and-os-threads">
