@@ -274,7 +274,10 @@ another thread.
 If the target thread is currently making a foreign call, then the
 exception will not be raised (and hence 'throwTo' will not return)
 until the call has completed.  This is the case regardless of whether
-the call is inside a 'mask' or not.
+the call is inside a 'mask' or not.  However, in GHC a foreign call
+can be annotated as @interruptible@, in which case a 'throwTo' will
+cause the RTS to attempt to cause the call to return; see the GHC
+documentation for more details.
 
 Important note: the behaviour of 'throwTo' differs from that described in
 the paper \"Asynchronous exceptions in Haskell\"
