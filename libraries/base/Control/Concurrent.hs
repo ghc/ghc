@@ -422,18 +422,24 @@ performance loss due to the use of bound threads. A program that
 doesn't need it's main thread to be bound and makes /heavy/ use of concurrency
 (e.g. a web server), might want to wrap it's @main@ action in
 @runInUnboundThread@.
+
+Note that exceptions which are thrown to the current thread are thrown in turn
+to the thread that is executing the given computation. This ensures there's
+always a way of killing the forked thread.
 -}
 runInUnboundThread :: IO a -> IO a
 
 runInUnboundThread action = do
-    bound <- isCurrentThreadBound
-    if bound
-        then do
-            mv <- newEmptyMVar
-            _ <- mask $ \restore -> forkIO $
-              Exception.try (restore action) >>= putMVar mv
-            takeMVar mv >>= unsafeResult
-        else action
+  bound <- isCurrentThreadBound
+  if bound
+    then do
+      mv <- newEmptyMVar
+      mask $ \restore -> do
+        tid <- forkIO $ Exception.try (restore action) >>= putMVar mv
+        let wait = takeMVar mv `Exception.catch` \(e :: SomeException) ->
+                     Exception.throwTo tid e >> wait
+        wait >>= unsafeResult
+    else action
 
 unsafeResult :: Either SomeException a -> IO a
 unsafeResult = either Exception.throwIO return
