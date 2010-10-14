@@ -4,6 +4,21 @@ use strict;
 
 use Cwd;
 
+my %required_tag;
+
+$required_tag{"-"} = 1;
+
+while ($#ARGV ne -1) {
+    my $arg = shift @ARGV;
+
+    if ($arg =~ /^--required-tag=(.*)/) {
+        $required_tag{$1} = 1;
+    }
+    else {
+        die "Bad arg: $arg";
+    }
+}
+
 # Create libraries/*/{ghc.mk,GNUmakefile}
 system("/usr/bin/perl", "-w", "boot-pkgs") == 0
     or die "Running boot-pkgs failed: $?";
@@ -27,7 +42,7 @@ while (<PACKAGES>) {
         
         # If $tag is not "-" then it is an optional repository, so its
         # absence isn't an error.
-        if ($tag eq "-") {
+        if (defined($required_tag{$tag})) {
             # We would like to just check for an _darcs directory here,
             # but in an lndir tree we avoid making _darcs directories,
             # so it doesn't exist. We therefore require that every repo
