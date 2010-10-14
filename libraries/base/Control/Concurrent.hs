@@ -430,10 +430,8 @@ runInUnboundThread action = do
     if bound
         then do
             mv <- newEmptyMVar
-            b <- blocked
             _ <- mask $ \restore -> forkIO $
-              Exception.try (if b then action else restore action) >>=
-              putMVar mv
+              Exception.try (restore action) >>= putMVar mv
             takeMVar mv >>= unsafeResult
         else action
 
