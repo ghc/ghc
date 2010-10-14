@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables #-}
 
 -- Supplied by Henrik Nilsson, showed up a bug in GADTs 
 
