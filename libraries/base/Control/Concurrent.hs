@@ -406,13 +406,10 @@ runInBoundThread action
             else do
                 ref <- newIORef undefined
                 let action_plus = Exception.try action >>= writeIORef ref
-                resultOrException <-
-                    bracket (newStablePtr action_plus)
-                            freeStablePtr
-                            (\cEntry -> forkOS_entry_reimported cEntry >> readIORef ref)
-                case resultOrException of
-                    Left exception -> Exception.throw (exception :: SomeException)
-                    Right result -> return result
+                bracket (newStablePtr action_plus)
+                        freeStablePtr
+                        (\cEntry -> forkOS_entry_reimported cEntry >> readIORef ref) >>=
+                  unsafeResult
     | otherwise = failNonThreaded
 
 {- | 
@@ -437,11 +434,11 @@ runInUnboundThread action = do
             _ <- mask $ \restore -> forkIO $
               Exception.try (if b then action else restore action) >>=
               putMVar mv
-            takeMVar mv >>= \ei -> case ei of
-                Left exception -> Exception.throw (exception :: SomeException)
-                Right result -> return result
+            takeMVar mv >>= unsafeResult
         else action
 
+unsafeResult :: Either SomeException a -> IO a
+unsafeResult = either Exception.throwIO return
 #endif /* __GLASGOW_HASKELL__ */
 
 #ifdef __GLASGOW_HASKELL__
