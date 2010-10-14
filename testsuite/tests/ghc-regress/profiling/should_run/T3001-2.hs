@@ -3,7 +3,7 @@
 -- GHC 6.10.1 and run with +RTS -hb. Most of the code is from the
 -- binary 0.4.4 package.
 
-{-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts, MagicHash #-}
 
 module Main (main) where
 
