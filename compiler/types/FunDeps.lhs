@@ -207,9 +207,10 @@ improveFromInstEnv :: (Class -> [Instance])
 improveFromInstEnv _inst_env pred 
   = improveOne _inst_env pred []        -- TODO: Refactor to directly use instance_eqnd? 
 
-improveFromAnother :: Pred_Loc 
+
+improveFromAnother :: Pred_Loc
                    -> Pred_Loc
-                   -> [(Equation,Pred_Loc,Pred_Loc)] 
+                   -> [(Equation, Pred_Loc, Pred_Loc)]
 -- Improvement from another local (given or wanted) constraint
 improveFromAnother pred1 pred2 
   = improveOne (\_ -> []) pred1 [pred2] -- TODO: Refactor to directly use pairwise_eqns?

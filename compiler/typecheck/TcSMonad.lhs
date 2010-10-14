@@ -4,7 +4,7 @@ module TcSMonad (
 
        -- Canonical constraints
     CanonicalCts, emptyCCan, andCCan, andCCans, 
-    singleCCan, extendCCans, isEmptyCCan,
+    singleCCan, extendCCans, isEmptyCCan, isEqCCan, 
     CanonicalCt(..), Xi, tyVarsOfCanonical, tyVarsOfCanonicals,
     mkWantedConstraints, deCanonicaliseWanted, 
     makeGivens, makeSolved,
@@ -254,6 +254,12 @@ emptyCCan = emptyBag
 
 isEmptyCCan :: CanonicalCts -> Bool
 isEmptyCCan = isEmptyBag
+
+isEqCCan :: CanonicalCt -> Bool 
+isEqCCan (CTyEqCan {})  = True 
+isEqCCan (CFunEqCan {}) = True 
+isEqCCan _              = False 
+
 \end{code}
 
 %************************************************************************
@@ -307,35 +313,7 @@ canSolve _ _ = False
 canRewrite :: CtFlavor -> CtFlavor -> Bool 
 -- canRewrite ctid1 ctid2 
 -- The *equality_constraint* ctid1 can be used to rewrite inside ctid2 
-canRewrite (Given {})   _            = True 
-canRewrite (Derived {}) (Wanted {})  = True 
-canRewrite (Derived {}) (Derived {}) = True 
-  -- See note [Rewriting wanteds with wanteds] 
-canRewrite (Wanted {})  (Wanted {})  = False 
-canRewrite _ _ = False
-
-\end{code}
-Note [Rewriting wanteds with wanteds] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-We will currently never use a wanted to rewrite any other 
-constraint (function @canRewrite@). If a rewriting was possible at all, 
-we simply wait until the wanted equality becomes given or derived and 
-then use it. This way we avoid rewriting by eventually insoluble wanteds, 
-such as in the following situation: 
-    w1 : a ~ Int 
-    w2 : F a ~ a 
-    w3 : F Int ~ G Bool 
-where 'a' is a skolem variable. If we rewrite using w1 inside w2 we will
-get the perhaps mystifying error at the end that we could not solve
-(a ~ Int) and (G Bool ~ Int). But there is no point in rewriting with 
-a ~ Int as long as it is still wanted.
-
-Notice that on the other hand we often do solve one wanted from another, 
-(function @canSolve@) for instance in dictionary interactions, which is 
-a reaction that enables sharing both in the solver and in the final evidence 
-produced. 
-
-\begin{code}
+canRewrite = canSolve 
 
 combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
 -- Precondition: At least one of them should be wanted 

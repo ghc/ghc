@@ -18,6 +18,8 @@ import TcInteract
 import Inst
 import Var
 import VarSet
+import VarEnv ( varEnvElts ) 
+
 import Name
 import NameEnv	( emptyNameEnv )
 import Bag
@@ -629,10 +631,13 @@ solveWanteds inert wanteds
                       , text "inert =" <+> ppr inert ]
        ; (unsolved_flats, unsolved_implics) 
                <- simpl_loop 1 can_flats implic_wanteds
+       ; bb <- getTcEvBindsBag 
        ; traceTcS "solveWanteds }" $
                  vcat [ text "wanteds =" <+> ppr wanteds
                       , text "unsolved_flats =" <+> ppr unsolved_flats
-                      , text "unsolved_implics =" <+> ppr unsolved_implics ]
+                      , text "unsolved_implics =" <+> ppr unsolved_implics 
+                      , text "current evbinds =" <+> vcat (map ppr (varEnvElts bb))
+                      ] 
        ; return (unsolved_flats, unsolved_implics)  }
   where
     simpl_loop :: Int 
