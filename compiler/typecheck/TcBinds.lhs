@@ -495,7 +495,9 @@ mkPragFun sigs binds = \n -> lookupNameEnv prag_env n `orElse` []
     get_sig _                         = Nothing
 
     add_arity (L _ n) inl_prag   -- Adjust inl_sat field to match visible arity of function
-      | Just ar <- lookupNameEnv ar_env n = inl_prag { inl_sat = Just ar }
+      | Just ar <- lookupNameEnv ar_env n,
+        Inline <- inl_inline inl_prag     = inl_prag { inl_sat = Just ar }
+        -- add arity only for real INLINE pragmas, not INLINABLE
       | otherwise                         = inl_prag
 
     prag_env :: NameEnv [LSig Name]
