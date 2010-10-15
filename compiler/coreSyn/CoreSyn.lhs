@@ -483,7 +483,20 @@ data UnfoldingSource
     		       -- Replace uf_tmpl each time around
 
   | InlineStable       -- From an INLINE or INLINABLE pragma 
-    		       -- Do not replace uf_tmpl; instead, keep it unchanged
+                       --   INLINE     if guidance is UnfWhen
+                       --   INLINABLE  if guidance is UnfIfGoodArgs
+                       -- (well, technically an INLINABLE might be made
+                       -- UnfWhen if it was small enough, and then
+                       -- it will behave like INLINE outside the current
+                       -- module, but that is the way automatic unfoldings
+                       -- work so it is consistent with the intended
+                       -- meaning of INLINABLE).
+                       --
+    		       -- uf_tmpl may change, but only as a result of
+                       -- gentle simplification, it doesn't get updated
+                       -- to the current RHS during compilation as with
+                       -- InlineRhs.
+                       --
     		       -- See Note [InlineRules]
 
   | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it

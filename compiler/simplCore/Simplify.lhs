@@ -718,8 +718,17 @@ simplUnfolding env top_lvl id _ _
   | isStableSource src
   = do { expr' <- simplExpr rule_env expr
        ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst (text "inline-unf") env) src
-       ; return (mkCoreUnfolding (isTopLevel top_lvl) src' expr' arity guide) }
+             is_top_lvl = isTopLevel top_lvl
+       ; case guide of
+           UnfIfGoodArgs{} ->
+              return (mkUnfolding src' is_top_lvl (isBottomingId id) expr')
+                -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
+                -- unfolding, and we need to make sure the guidance is kept up
+                -- to date with respect to any changes in the unfolding.
+           _other -> 
+              return (mkCoreUnfolding src' is_top_lvl expr' arity guide)
 		-- See Note [Top-level flag on inline rules] in CoreUnfold
+       }
   where
     act      = idInlineActivation id
     rule_env = updMode (updModeForInlineRules act) env

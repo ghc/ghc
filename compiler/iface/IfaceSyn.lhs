@@ -212,10 +212,12 @@ data IfaceInfoItem
 
 data IfaceUnfolding 
   = IfCoreUnfold Bool IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
+                                -- Possibly could eliminate the Bool here, the information
+                                -- is also in the InlinePragma.
 
   | IfCompulsory IfaceExpr	-- Only used for default methods, in fact
 
-  | IfInlineRule Arity 
+  | IfInlineRule Arity          -- INLINE pragmas
                  Bool		-- OK to inline even if *un*-saturated
 		 Bool		-- OK to inline even if context is boring
                  IfaceExpr 

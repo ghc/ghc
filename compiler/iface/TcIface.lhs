@@ -1034,7 +1034,7 @@ tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
   = do 	{ mb_expr <- tcPragExpr name if_expr
 	; return (case mb_expr of
 		    Nothing   -> NoUnfolding
-		    Just expr -> mkCoreUnfolding True InlineStable expr arity 
+		    Just expr -> mkCoreUnfolding InlineStable True expr arity 
                                                  (UnfWhen unsat_ok boring_ok))
     }
 

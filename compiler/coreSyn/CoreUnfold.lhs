@@ -104,20 +104,20 @@ mkDFunUnfolding dfun_ty ops
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
 mkWwInlineRule id expr arity
-  = mkCoreUnfolding True (InlineWrapper id) 
+  = mkCoreUnfolding (InlineWrapper id) True
                    (simpleOptExpr expr) arity
                    (UnfWhen unSaturatedOk boringCxtNotOk)
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
-  = mkCoreUnfolding True InlineCompulsory
+  = mkCoreUnfolding InlineCompulsory True
                     expr 0    -- Arity of unfolding doesn't matter
                     (UnfWhen unSaturatedOk boringCxtOk)
 
 mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
 mkInlineUnfolding mb_arity expr 
-  = mkCoreUnfolding True 	 -- Note [Top-level flag on inline rules]
-    		    InlineStable
+  = mkCoreUnfolding InlineStable
+    		    True 	 -- Note [Top-level flag on inline rules]
                     expr' arity 
 		    (UnfWhen unsat_ok boring_ok)
   where
@@ -135,18 +135,19 @@ mkInlineUnfolding mb_arity expr
 
 mkInlinableUnfolding :: CoreExpr -> Unfolding
 mkInlinableUnfolding expr
-  = mkUnfolding InlineStable True is_bot expr
+  = mkUnfolding InlineStable True is_bot expr'
   where
-    is_bot = isJust (exprBotStrictness_maybe expr)
+    expr' = simpleOptExpr expr
+    is_bot = isJust (exprBotStrictness_maybe expr')
 \end{code}
 
 Internal functions
 
 \begin{code}
-mkCoreUnfolding :: Bool -> UnfoldingSource -> CoreExpr
+mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> Arity -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
-mkCoreUnfolding top_lvl src expr arity guidance 
+mkCoreUnfolding src top_lvl expr arity guidance 
   = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
     		    uf_src        = src,
     		    uf_arity      = arity,
