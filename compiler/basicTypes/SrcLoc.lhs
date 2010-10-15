@@ -454,7 +454,7 @@ pprDefnLoc loc
 \begin{code}
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data Located e = L SrcSpan e
-  deriving (Typeable, Data)
+  deriving (Eq, Ord, Typeable, Data)
 
 unLoc :: Located e -> e
 unLoc (L _ e) = e
