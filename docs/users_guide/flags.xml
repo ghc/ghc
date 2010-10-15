@@ -2538,6 +2538,12 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-fno-ghci-sandbox</option></entry>
+	      <entry>Turn off the GHCi sandbox. Means computations are run in teh main thread, rather than a forked thread.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>

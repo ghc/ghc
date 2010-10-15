@@ -357,18 +357,25 @@ foreign import ccall "&rts_breakpoint_io_action"
 -- thread.  ToDo: we might want a way to continue even if the target
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
--- 
+--
 -- Careful here: there may be ^C exceptions flying around, so we start the new
 -- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
 -- only while we execute the user's code.  We can't afford to lose the final
 -- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
 sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing =
-   mask $ \restore -> do  -- fork starts blocked
-     id <- forkIO $ do res <- Exception.try (restore $ rethrow dflags thing)
-                       putMVar statusMVar (Complete res) -- empty: can't block
-     withInterruptsSentTo id $ takeMVar statusMVar
-
+   mask $ \restore -> -- fork starts blocked
+     let runIt = liftM Complete $ try (restore $ rethrow dflags thing)
+     in if dopt Opt_GhciSandbox dflags
+        then do tid <- forkIO $ do res <- runIt
+                                   putMVar statusMVar res -- empty: can't block
+                withInterruptsSentTo tid $ takeMVar statusMVar
+        else -- GLUT on OS X needs to run on the main thread. If you
+             -- try to use it from another thread then you just get a
+             -- white rectangle rendered. For this, or anything else
+             -- with such restrictions, you can turn the GHCi sandbox off
+             -- and things will be run in the main thread.
+             runIt
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
