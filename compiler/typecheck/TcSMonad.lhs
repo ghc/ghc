@@ -631,11 +631,35 @@ instDFunTypes mb_inst_tys
 instDFunConstraints :: TcThetaType -> TcS [EvVar] 
 instDFunConstraints preds = wrapTcS $ TcM.newWantedEvVars preds 
 
-newFlexiTcS :: TyVar -> TcS TcTyVar
--- Make a TcsTv meta tyvar; it is always touchable,
--- but we are supposed to guess its instantiation
--- See Note [Touchable meta type variables]
-newFlexiTcS tv = wrapTcS $ TcM.instMetaTyVar TcsTv tv
+
+-- newFlexiTcS :: TyVar -> TcS TcTyVar
+-- -- Make a TcsTv meta tyvar; it is always touchable,
+-- -- but we are supposed to guess its instantiation
+-- -- See Note [Touchable meta type variables]
+-- newFlexiTcS tv = wrapTcS $ TcM.instMetaTyVar TcsTv tv
+
+newFlexiTcS :: TyVar -> TcS TcTyVar 
+-- Like TcM.instMetaTyVar but the variable that is created is always
+-- touchable; we are supposed to guess its instantiation. 
+-- See Note [Touchable meta type variables] 
+newFlexiTcS tv = newFlexiTcSHelper (tyVarName tv) (tyVarKind tv) 
+
+newKindConstraint :: TcTyVar -> Kind -> TcS (CoVar, Type)  
+-- Create new wanted CoVar that constrains the type to have the specified kind. 
+newKindConstraint tv knd 
+  = do { tv_k <- newFlexiTcSHelper (tyVarName tv) knd 
+       ; let ty_k = mkTyVarTy tv_k
+       ; co_var <- newWantedCoVar (mkTyVarTy tv) ty_k
+       ; return (co_var, ty_k) }
+
+newFlexiTcSHelper :: Name -> Kind -> TcS TcTyVar
+newFlexiTcSHelper tvname tvkind
+  = wrapTcS $ 
+    do { uniq <- TcM.newUnique 
+       ; ref  <- TcM.newMutVar  Flexi 
+       ; let name = setNameUnique tvname uniq 
+             kind = tvkind 
+       ; return (mkTcTyVar name kind (MetaTv TcsTv ref)) }
 
 -- Superclasses and recursive dictionaries 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -659,8 +683,6 @@ newGivOrDerCoVar ty1 ty2 co
 newWantedCoVar :: TcType -> TcType -> TcS EvVar 
 newWantedCoVar ty1 ty2 =  wrapTcS $ TcM.newWantedCoVar ty1 ty2 
 
-newKindConstraint :: TcType -> Kind -> TcS (CoVar, TcType)
-newKindConstraint ty kind =  wrapTcS $ TcM.newKindConstraint ty kind
 
 newCoVar :: TcType -> TcType -> TcS EvVar 
 newCoVar ty1 ty2 = wrapTcS $ TcM.newCoVar ty1 ty2 

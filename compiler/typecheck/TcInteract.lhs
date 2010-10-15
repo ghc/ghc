@@ -110,10 +110,15 @@ solving. See Note [Loopy Spontaneous Solving]
 
 -- See Note [InertSet invariants]
 data InertSet 
-  = IS { inert_eqs  :: Bag.Bag CanonicalCt  -- Equalities only (CTyEqCan,CFunEqCan)
-       , inert_cts  :: Bag.Bag CanonicalCt  -- Other constraints 
+  = IS { inert_eqs  :: Bag.Bag CanonicalCt   -- Equalities only (CTyEqCan,CFunEqCan)
+       , inert_cts  :: Bag.Bag CanonicalCt   -- Other constraints 
+       , inert_fds  :: FDImprovements        -- List of pairwise improvements that have kicked in already
+                                             -- and reside either in the worklist or in the inerts 
        , inert_fsks :: Map.Map TcTyVar [(TcTyVar,Coercion)] }
        -- See Note [InertSet FlattenSkolemEqClass] 
+
+type FDImprovement  = (PredType,PredType) 
+type FDImprovements = [(PredType,PredType)] 
 
 instance Outputable InertSet where
   ppr is = vcat [ vcat (map ppr (Bag.bagToList $ inert_eqs is))
@@ -125,11 +130,11 @@ instance Outputable InertSet where
                        
 emptyInert :: InertSet
 emptyInert = IS { inert_eqs = Bag.emptyBag
-                , inert_cts = Bag.emptyBag, inert_fsks = Map.empty } 
+                , inert_cts = Bag.emptyBag, inert_fsks = Map.empty, inert_fds = [] }
 
 updInertSet :: InertSet -> AtomicInert -> InertSet 
 -- Introduces an element in the inert set for the first time 
-updInertSet (IS { inert_eqs = eqs, inert_cts = cts, inert_fsks = fsks })  
+updInertSet (IS { inert_eqs = eqs, inert_cts = cts, inert_fsks = fsks, inert_fds = fdis })  
             item@(CTyEqCan { cc_id    = cv
                            , cc_tyvar = tv1 
                            , cc_rhs   = xi })
@@ -139,15 +144,19 @@ updInertSet (IS { inert_eqs = eqs, inert_cts = cts, inert_fsks = fsks })
   = let eqs'  = eqs `Bag.snocBag` item 
         fsks' = Map.insertWith (++) tv2 [(tv1, mkCoVarCoercion cv)] fsks
         -- See Note [InertSet FlattenSkolemEqClass] 
-    in IS { inert_eqs = eqs', inert_cts = cts, inert_fsks = fsks' }
+    in IS { inert_eqs = eqs', inert_cts = cts, inert_fsks = fsks', inert_fds = fdis }
 updInertSet (IS { inert_eqs = eqs, inert_cts = cts
-                , inert_fsks = fsks }) item 
+                , inert_fsks = fsks, inert_fds = fdis }) item 
   | isEqCCan item 
   = let eqs' = eqs `Bag.snocBag` item 
-    in IS { inert_eqs = eqs', inert_cts = cts, inert_fsks = fsks } 
+    in IS { inert_eqs = eqs', inert_cts = cts, inert_fsks = fsks, inert_fds = fdis } 
   | otherwise 
   = let cts' = cts `Bag.snocBag` item
-    in IS { inert_eqs = eqs, inert_cts = cts', inert_fsks = fsks } 
+    in IS { inert_eqs = eqs, inert_cts = cts', inert_fsks = fsks, inert_fds = fdis } 
+
+updInertSetFDImprs :: InertSet -> Maybe FDImprovement -> InertSet 
+updInertSetFDImprs is (Just fdi) = is { inert_fds = fdi : inert_fds is } 
+updInertSetFDImprs is Nothing    = is 
 
 foldlInertSetM :: (Monad m) => (a -> AtomicInert -> m a) -> a -> InertSet -> m a 
 -- Prioritize over the equalities see Note [Prioritizing Equalities]
@@ -156,9 +165,9 @@ foldlInertSetM k z (IS { inert_eqs = eqs, inert_cts = cts })
        ; Bag.foldlBagM k z' cts } 
 
 extractUnsolved :: InertSet -> (InertSet, CanonicalCts)
-extractUnsolved is@(IS {inert_eqs = eqs, inert_cts = cts}) 
+extractUnsolved is@(IS {inert_eqs = eqs, inert_cts = cts, inert_fds = fdis }) 
   = let is_init  = is { inert_eqs = emptyCCan 
-                      , inert_cts = solved_cts, inert_fsks = Map.empty }
+                      , inert_cts = solved_cts, inert_fsks = Map.empty, inert_fds = fdis }
         is_final = Bag.foldlBag updInertSet is_init solved_eqs -- Add equalities carefully
     in (is_final, unsolved) 
   where (unsolved_cts, solved_cts) = Bag.partitionBag isWantedCt cts
@@ -182,6 +191,20 @@ getFskEqClass (IS { inert_cts = cts, inert_fsks = fsks }) tv
         lkp :: Maybe CanonicalCt -> CanonicalCt -> Maybe CanonicalCt 
         lkp Nothing ct@(CTyEqCan {cc_tyvar = tv'}) | tv' == tv = Just ct 
         lkp other _ct = other 
+
+haveBeenImproved :: FDImprovements -> PredType -> PredType -> Bool 
+haveBeenImproved [] _ _ = False 
+haveBeenImproved ((pty1,pty2):fdimprs) pty1' pty2' 
+ | tcEqPred pty1 pty1' && tcEqPred pty2 pty2' 
+ = True 
+ | tcEqPred pty1 pty2' && tcEqPred pty2 pty1'
+ = True 
+ | otherwise 
+ = haveBeenImproved fdimprs pty1' pty2' 
+
+getFDImprovements :: InertSet -> FDImprovements 
+-- Return a list of the improvements that have kicked in so far 
+getFDImprovements = inert_fds 
 
 
 isWantedCt :: CanonicalCt -> Bool 
@@ -367,8 +390,7 @@ runSolverPipeline pipeline inerts workItem
                      , sr_stop     = ContinueWith work_item })
       = do { itr <- stage work_item inerts 
            ; traceTcS ("Stage result (" ++ name ++ ")") (ppr itr)
-           ; let itr' = itr { sr_new_work = sr_new_work itr 
-                                            `unionWorkLists` accum_work }
+           ; let itr' = itr { sr_new_work = accum_work `unionWorkLists` sr_new_work itr }
            ; run_pipeline stages itr' }
 \end{code}
 
@@ -813,6 +835,8 @@ data InteractResult
 
         , ir_new_work     :: WorkList
             -- new work items to add to the WorkList
+
+        , ir_improvement  :: Maybe FDImprovement -- In case improvement kicked in
         }
 
 -- What to do with the inert reactant.
@@ -820,10 +844,14 @@ data InertAction = KeepInert | DropInert
   deriving Eq
 
 mkIRContinue :: Monad m => WorkItem -> InertAction -> WorkList -> m InteractResult
-mkIRContinue wi keep newWork = return $ IR (ContinueWith wi) keep newWork
+mkIRContinue wi keep newWork = return $ IR (ContinueWith wi) keep newWork Nothing 
 
 mkIRStop :: Monad m => InertAction -> WorkList -> m InteractResult
-mkIRStop keep newWork = return $ IR Stop keep newWork
+mkIRStop keep newWork = return $ IR Stop keep newWork Nothing
+
+mkIRStop_RecordImprovement :: Monad m => InertAction -> WorkList -> FDImprovement -> m InteractResult 
+mkIRStop_RecordImprovement keep newWork fdimpr = return $ IR Stop keep newWork (Just fdimpr) 
+
 
 dischargeWorkItem :: Monad m => m InteractResult
 dischargeWorkItem = mkIRStop KeepInert emptyWorkList
@@ -845,7 +873,7 @@ interactWithInertsStage :: SimplifierStage
 interactWithInertsStage workItem inert
   = foldlInertSetM interactNext initITR inert
   where 
-    initITR = SR { sr_inerts   = emptyInert
+    initITR = SR { sr_inerts   = emptyInert { inert_fds = inert_fds inert } -- Pick up the improvements!
                  , sr_new_work = emptyWorkList
                  , sr_stop     = ContinueWith workItem }
 
@@ -853,11 +881,18 @@ interactWithInertsStage workItem inert
     interactNext :: StageResult -> AtomicInert -> TcS StageResult 
     interactNext it inert  
       | ContinueWith workItem <- sr_stop it
-        = do { ir <- interactWithInert inert workItem 
-             ; let inerts = sr_inerts it 
-             ; return $ SR { sr_inerts   = if ir_inert_action ir == KeepInert
-                                           then inerts `updInertSet` inert
-                                           else inerts
+        = do { let inerts      = sr_inerts it 
+                   fdimprs_old = getFDImprovements inerts 
+
+             ; ir <- interactWithInert fdimprs_old inert workItem 
+
+             -- New inerts depend on whether we KeepInert or not and must 
+             -- be updated with FD improvement information from the interaction result (ir) 
+             ; let inerts_new = updInertSetFDImprs upd_inert (ir_improvement ir) 
+                   upd_inert  = if ir_inert_action ir == KeepInert 
+                                then inerts `updInertSet` inert else inerts
+
+             ; return $ SR { sr_inerts   = inerts_new
                            , sr_new_work = sr_new_work it `unionWorkLists` ir_new_work ir
                            , sr_stop     = ir_stop ir } }
       | otherwise = return $ itrAddInert inert it
@@ -867,8 +902,8 @@ interactWithInertsStage workItem inert
     itrAddInert inert itr = itr { sr_inerts = (sr_inerts itr) `updInertSet` inert }
 
 -- Do a single interaction of two constraints.
-interactWithInert :: AtomicInert -> WorkItem -> TcS InteractResult
-interactWithInert inert workitem 
+interactWithInert :: FDImprovements -> AtomicInert -> WorkItem -> TcS InteractResult
+interactWithInert fdimprs inert workitem 
   =  do { ctxt <- getTcSContext
         ; let is_allowed  = allowedInteraction (simplEqsOnly ctxt) inert workitem 
               inert_ev    = cc_id inert 
@@ -886,7 +921,7 @@ interactWithInert inert workitem
               _                       -> return True 
 
         ; if is_allowed && rec_ev_ok then 
-              doInteractWithInert inert workitem 
+              doInteractWithInert fdimprs inert workitem 
           else 
               noInteraction workitem 
         }
@@ -898,10 +933,10 @@ allowedInteraction eqs_only (CIPCan {})   (CIPCan {})   = not eqs_only
 allowedInteraction _ _ _ = True 
 
 --------------------------------------------
-doInteractWithInert :: CanonicalCt -> CanonicalCt -> TcS InteractResult
+doInteractWithInert :: FDImprovements -> CanonicalCt -> CanonicalCt -> TcS InteractResult
 -- Identical class constraints.
 
-doInteractWithInert 
+doInteractWithInert fdimprs
            (CDictCan { cc_id = d1, cc_flavor = fl1, cc_class = cls1, cc_tyargs = tys1 }) 
   workItem@(CDictCan { cc_id = d2, cc_flavor = fl2, cc_class = cls2, cc_tyargs = tys2 })
   | cls1 == cls2 && (and $ zipWith tcEqType tys1 tys2)
@@ -909,8 +944,10 @@ doInteractWithInert
 
   | cls1 == cls2 && (not (isGiven fl1 && isGiven fl2))
   = 	 -- See Note [When improvement happens]
-    do { let work_item_pred_loc = (ClassP cls2 tys2, ppr d2)
-             inert_pred_loc     = (ClassP cls1 tys1, ppr d1)
+    do { let pty1 = ClassP cls1 tys1 
+             pty2 = ClassP cls2 tys2 
+             work_item_pred_loc = (pty2, ppr d2)
+             inert_pred_loc     = (pty1, ppr d1)
 	     loc                = combineCtLoc fl1 fl2
              eqn_pred_locs = improveFromAnother work_item_pred_loc inert_pred_loc         
 
@@ -918,29 +955,22 @@ doInteractWithInert
        ; fd_cts <- canWanteds wevvars 
        ; let fd_work = mkEqWorkList fd_cts 
               	 -- See Note [Generating extra equalities]
-       ; if isEmptyCCan fd_cts || not (isWanted fl2) then -- || or impr. had previously kicked in
-             -- No improvement kicked in, keep going
+       ; traceTcS "Checking if improvements existed." (ppr fdimprs) 
+--       ; if isEmptyCCan fd_cts || not (isWanted fl2) || haveBeenImproved fdimprs pty1 pty2 then
+       ; if isEmptyCCan fd_cts || haveBeenImproved fdimprs pty1 pty2 then
+             -- Must keep going
              mkIRContinue workItem KeepInert fd_work 
-         else -- Improvement kicked in, throw him back into the worklist so that he
-              -- gets rewritten. The reason is that we do not want to let him fall off 
-              -- at the end and then add its potential un-improved superclasses. This 
-              -- optimisation crucially relies on prioritizing the equalities in the 
-              -- worklist.
-
-              -- The termination of this relies on wanteds being able to rewrite wanteds. 
-              -- Since the class may be at the bottom of an equality worklist, which may
-              -- consist of insoluble wanteds, if these wanteds *never* become solved or given
-              -- (because they mention untouchables), the workitem will *never* be rewritten
-              -- so next time we meet him we will be once again producing FunDep equalities
-              -- for ever and ever! 
-             mkIRStop KeepInert $ fd_work `unionWorkLists` singleNonEqWL workItem
-
+         else do { traceTcS "Recording improvement and throwing item back in worklist." (ppr (pty1,pty2))
+                 ; mkIRStop_RecordImprovement KeepInert 
+                      (fd_work `unionWorkLists` singleNonEqWL workItem) (pty1,pty2)
+                 }
          -- See Note [FunDep Reactions] 
        }
 
 -- Class constraint and given equality: use the equality to rewrite
 -- the class constraint. 
-doInteractWithInert (CTyEqCan { cc_id = cv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
+doInteractWithInert _fdimprs
+                    (CTyEqCan { cc_id = cv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
                     (CDictCan { cc_id = dv, cc_flavor = wfl, cc_class = cl, cc_tyargs = xis }) 
   | ifl `canRewrite` wfl 
   , tv `elemVarSet` tyVarsOfTypes xis
@@ -958,10 +988,17 @@ doInteractWithInert (CTyEqCan { cc_id = cv, cc_flavor = ifl, cc_tyvar = tv, cc_r
     -- Int (w).  But now we must go back through the rest of the inert
     -- set again, to find that it can now be discharged by the given D
     -- Int instance.
+
+    -- DV: Update to the comment above:  
+    --     This situation can no longer happen, see Note [Prioritizing equalities]
+    --     so we are good to simply keep going with the rewritten dictionary to rewrite 
+    --     it as much as possible before reaching any other dictionary constraints! 
   = do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,wfl,cl,xis)
-       ; mkIRStop KeepInert $ singleNonEqWL rewritten_dict }
+       ; mkIRContinue rewritten_dict KeepInert emptyWorkList } 
+--        ; mkIRStop KeepInert $ singleNonEqWL rewritten_dict }
     
-doInteractWithInert (CDictCan { cc_id = dv, cc_flavor = ifl, cc_class = cl, cc_tyargs = xis }) 
+doInteractWithInert _fdimprs 
+                    (CDictCan { cc_id = dv, cc_flavor = ifl, cc_class = cl, cc_tyargs = xis }) 
            workItem@(CTyEqCan { cc_id = cv, cc_flavor = wfl, cc_tyvar = tv, cc_rhs = xi })
   | wfl `canRewrite` ifl
   , tv `elemVarSet` tyVarsOfTypes xis
@@ -970,14 +1007,17 @@ doInteractWithInert (CDictCan { cc_id = dv, cc_flavor = ifl, cc_class = cl, cc_t
 
 -- Class constraint and given equality: use the equality to rewrite
 -- the class constraint.
-doInteractWithInert (CTyEqCan { cc_id = cv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
+doInteractWithInert _fdimprs 
+                    (CTyEqCan { cc_id = cv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
                     (CIPCan { cc_id = ipid, cc_flavor = wfl, cc_ip_nm = nm, cc_ip_ty = ty }) 
   | ifl `canRewrite` wfl
   , tv `elemVarSet` tyVarsOfType ty 
   = do { rewritten_ip <- rewriteIP (cv,tv,xi) (ipid,wfl,nm,ty) 
-       ; mkIRStop KeepInert (singleNonEqWL rewritten_ip) }
+       ; mkIRContinue rewritten_ip KeepInert emptyWorkList } 
+--        ; mkIRStop KeepInert (singleNonEqWL rewritten_ip) }
 
-doInteractWithInert (CIPCan { cc_id = ipid, cc_flavor = ifl, cc_ip_nm = nm, cc_ip_ty = ty }) 
+doInteractWithInert _fdimprs 
+                    (CIPCan { cc_id = ipid, cc_flavor = ifl, cc_ip_nm = nm, cc_ip_ty = ty }) 
            workItem@(CTyEqCan { cc_id = cv, cc_flavor = wfl, cc_tyvar = tv, cc_rhs = xi })
   | wfl `canRewrite` ifl
   , tv `elemVarSet` tyVarsOfType ty
@@ -989,7 +1029,8 @@ doInteractWithInert (CIPCan { cc_id = ipid, cc_flavor = ifl, cc_ip_nm = nm, cc_i
 -- that equates the type (this is "improvement").  
 -- However, we don't actually need the coercion evidence,
 -- so we just generate a fresh coercion variable that isn't used anywhere.
-doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_ip_ty = ty1 }) 
+doInteractWithInert _fdimprs 
+                    (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_ip_ty = ty1 }) 
            workItem@(CIPCan { cc_flavor = wfl, cc_ip_nm = nm2, cc_ip_ty = ty2 })
   | nm1 == nm2 && isGiven wfl && isGiven ifl
   = 	-- See Note [Overriding implicit parameters]
@@ -1017,17 +1058,19 @@ doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_i
 -- we will ``expose'' x2 and x4 to rewriting.
 
 -- Otherwise, we can try rewriting the type function equality with the equality.
-doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi1 }) 
+doInteractWithInert _fdimprs
+                    (CTyEqCan { cc_id = cv1, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi1 }) 
                     (CFunEqCan { cc_id = cv2, cc_flavor = wfl, cc_fun = tc
                                , cc_tyargs = args, cc_rhs = xi2 })
   | ifl `canRewrite` wfl 
   , tv `elemVarSet` tyVarsOfTypes args
   = do { rewritten_funeq <- rewriteFunEq (cv1,tv,xi1) (cv2,wfl,tc,args,xi2) 
-       ; mkIRStop KeepInert (singleEqWL rewritten_funeq) }
+       ; mkIRStop KeepInert (singleEqWL rewritten_funeq) } -- DV: must stop here, because we may no longer be inert after the rewritting.
 
 -- Inert: function equality, work item: equality
 
-doInteractWithInert (CFunEqCan {cc_id = cv1, cc_flavor = ifl, cc_fun = tc
+doInteractWithInert _fdimprs
+                    (CFunEqCan {cc_id = cv1, cc_flavor = ifl, cc_fun = tc
                               , cc_tyargs = args, cc_rhs = xi1 }) 
            workItem@(CTyEqCan { cc_id = cv2, cc_flavor = wfl, cc_tyvar = tv, cc_rhs = xi2 })
   | wfl `canRewrite` ifl
@@ -1035,7 +1078,8 @@ doInteractWithInert (CFunEqCan {cc_id = cv1, cc_flavor = ifl, cc_fun = tc
   = do { rewritten_funeq <- rewriteFunEq (cv2,tv,xi2) (cv1,ifl,tc,args,xi1) 
        ; mkIRContinue workItem DropInert (singleEqWL rewritten_funeq) } 
 
-doInteractWithInert (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
+doInteractWithInert _fdimprs
+                    (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
                                , cc_tyargs = args1, cc_rhs = xi1 }) 
            workItem@(CFunEqCan { cc_id = cv2, cc_flavor = fl2, cc_fun = tc2
                                , cc_tyargs = args2, cc_rhs = xi2 })
@@ -1048,7 +1092,7 @@ doInteractWithInert (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
   where
     lhss_match = tc1 == tc2 && and (zipWith tcEqType args1 args2) 
 
-doInteractWithInert 
+doInteractWithInert _fdimprs 
            inert@(CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc_rhs = xi1 }) 
            workItem@(CTyEqCan { cc_id = cv2, cc_flavor = fl2, cc_tyvar = tv2, cc_rhs = xi2 })
 -- Check for matching LHS 
@@ -1082,7 +1126,7 @@ doInteractWithInert
 
 
 -- Fall-through case for all other situations
-doInteractWithInert _ workItem = noInteraction workItem
+doInteractWithInert _fdimprs _ workItem = noInteraction workItem
 
 -------------------------
 -- Equational Rewriting 
@@ -1690,7 +1734,12 @@ doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Wanted loc
            -- See Note [FunDep Reactions]
            }
 
--- Otherwise, we have a given or derived 
+-- DV: Derived, we will not add any further derived superclasses
+-- [no deep recursive dictionaries!] 
+doTopReact (CDictCan { cc_flavor = fl })
+  | isDerived fl 
+  = return NoTopInt 
+
 doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = fl
                               , cc_class = cls, cc_tyargs = xis }) 
   = do { sc_work <- newSCWorkFromFlavored dv fl cls xis 

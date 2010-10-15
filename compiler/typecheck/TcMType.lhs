@@ -28,8 +28,7 @@ module TcMType (
   newWantedCoVar, writeWantedCoVar, readWantedCoVar, 
   newIP, newDict, newSelfDict, isSelfDict,
 
-  newWantedEvVar, newWantedEvVars, 
-  newKindConstraint,
+  newWantedEvVar, newWantedEvVars,
   newTcEvBinds, addTcEvBind,
 
   --------------------------------
@@ -173,15 +172,6 @@ newName occ
   = do { uniq <- newUnique
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
-
------------------
-newKindConstraint :: Type -> Kind -> TcM (CoVar, Type)
--- Create a new wanted CoVar that constrains the type
--- to have the specified kind
-newKindConstraint ty kind
-  = do { ty_k <- newFlexiTyVarTy kind
-       ; co_var <- newWantedCoVar ty ty_k
-       ; return (co_var, ty_k) }
 
 -----------------
 newSelfDict :: Class -> [TcType] -> TcM DictId
