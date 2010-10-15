@@ -326,4 +326,5 @@ test('T700',  normal, compile, [''])
 test('T4361', normal, compile, [''])
 test('T4355', reqlib('mtl'), compile, [''])
 test('T1634', normal, compile, [''])
+test('T4401', normal, compile, [''])
      
