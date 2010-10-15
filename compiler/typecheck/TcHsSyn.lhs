@@ -1076,7 +1076,7 @@ zonkEvBind env (EvBind var term)
 
 %************************************************************************
 %*									*
-\subsection[BackSubst-Foreign]{Foreign exports}
+                         Zonking types
 %*									*
 %************************************************************************
 

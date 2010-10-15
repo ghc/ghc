@@ -540,7 +540,7 @@ insert_overlapping new_item (item:items)
 \begin{code}
 instanceBindFun :: TyVar -> BindFlag
 instanceBindFun tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
-	           | otherwise	 		 	= BindMe
+	           | otherwise	 		 	   = BindMe
    -- Note [Binding when looking up instances]
 \end{code}
 
