@@ -382,8 +382,18 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
     (fn,args) = target
 
 isMoreSpecific :: CoreRule -> CoreRule -> Bool
-isMoreSpecific (BuiltinRule {}) _ = True
-isMoreSpecific _ (BuiltinRule {}) = False
+-- This tests if one rule is more specific than another
+-- We take the view that a BuiltinRule is less specific than
+-- anything else, because we want user-define rules to "win"
+-- In particular, class ops have a built-in rule, but we
+-- any user-specific rules to win
+--   eg (Trac #4397)   
+--      truncate :: (RealFrac a, Integral b) => a -> b
+--      {-# RULES "truncate/Double->Int" truncate = double2Int #-}
+--      double2Int :: Double -> Int
+--   We want the specific RULE to beat the built-in class-op rule
+isMoreSpecific (BuiltinRule {}) _                = False
+isMoreSpecific (Rule {})        (BuiltinRule {}) = True
 isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 	       (Rule { ru_bndrs = bndrs2, ru_args = args2 })
   = isJust (matchN id_unfolding_fun in_scope bndrs2 args2 args1)
