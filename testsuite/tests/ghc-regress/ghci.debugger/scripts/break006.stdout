@@ -13,8 +13,8 @@ y = (_t1::a)
 y = 2
 _result :: [Integer] = _
 _t1 :: Integer = 2
-f :: Integer -> Integer = _
-x :: Integer = 1
-xs :: [Integer] = [_,_]
+f :: t -> Integer = _
+x :: t = 1
+xs :: [t] = [_,_]
 y :: Integer = 2
 2
