@@ -35,7 +35,7 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars, tcInstSigTyVars,
-  tcInstType, tcInstSigType,
+  tcInstType, tcInstSigType, instMetaTyVar,
   tcInstSkolTyVars, tcInstSkolTyVar, tcInstSkolType, 
   tcSkolSigType, tcSkolSigTyVars, 
 
@@ -305,6 +305,7 @@ newMetaTyVar meta_info kind
 	; let name = mkSysTvName uniq fs 
 	      fs = case meta_info of
 			TauTv   -> fsLit "t"
+			TcsTv   -> fsLit "u"
 			SigTv _ -> fsLit "a"
 	; return (mkTcTyVar name kind (MetaTv meta_info ref)) }
 

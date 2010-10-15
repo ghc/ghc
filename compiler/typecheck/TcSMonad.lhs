@@ -566,40 +566,58 @@ pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprPred $ mkEqPred (ty1,ty2)
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
--- is touchable variable!
 isTouchableMetaTyVar tv 
-  | isMetaTyVar tv = do { untch <- getUntouchables
-                        ; return (inTouchableRange untch tv) }
-  | otherwise      = return False
+  = case tcTyVarDetails tv of
+      MetaTv TcsTv _ -> return True	-- See Note [Touchable meta type variables]
+      MetaTv {}      -> do { untch <- getUntouchables
+                           ; return (inTouchableRange untch tv) }
+      _              -> return False
+\end{code}
+
+Note [Touchable meta type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Meta type variables allocated *by the constraint solver itself* are always
+touchable.  Example: 
+   instance C a b => D [a] where...
+if we use this instance declaration we "make up" a fresh meta type
+variable for 'b', which we must later guess.  (Perhaps C has a
+functional dependency.)  But since we aren't in the constraint *generator*
+we can't allocate a Unique in the touchable range for this implication
+constraint.  Instead, we mark it as a "TcsTv", which makes it always-touchable.
 
 
+\begin{code}
 -- Flatten skolems
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 newFlattenSkolemTy :: TcType -> TcS TcType
 newFlattenSkolemTy ty = mkTyVarTy <$> newFlattenSkolemTyVar ty
-  where newFlattenSkolemTyVar :: TcType -> TcS TcTyVar
-        newFlattenSkolemTyVar ty
-            = wrapTcS $ do { uniq <- TcM.newUnique
-                           ; let name = mkSysTvName uniq (fsLit "f")
-                           ; return $ 
-                             mkTcTyVar name (typeKind ty) (FlatSkol ty) 
-                           }
+
+newFlattenSkolemTyVar :: TcType -> TcS TcTyVar
+newFlattenSkolemTyVar ty
+  = wrapTcS $ do { uniq <- TcM.newUnique
+                 ; let name = mkSysTvName uniq (fsLit "f")
+                 ; return $ mkTcTyVar name (typeKind ty) (FlatSkol ty) }
 
 -- Instantiations 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 instDFunTypes :: [Either TyVar TcType] -> TcS [TcType] 
-instDFunTypes mb_inst_tys = 
-  let inst_tv :: Either TyVar TcType -> TcS Type
-      inst_tv (Left tv)  = wrapTcS $ TcM.tcInstTyVar tv >>= return . mkTyVarTy
-      inst_tv (Right ty) = return ty 
-  in mapM inst_tv mb_inst_tys
-
+instDFunTypes mb_inst_tys 
+  = mapM inst_tv mb_inst_tys
+  where
+    inst_tv :: Either TyVar TcType -> TcS Type
+    inst_tv (Left tv)  = mkTyVarTy <$> newFlexiTcS tv
+    inst_tv (Right ty) = return ty 
 
 instDFunConstraints :: TcThetaType -> TcS [EvVar] 
 instDFunConstraints preds = wrapTcS $ TcM.newWantedEvVars preds 
 
+newFlexiTcS :: TyVar -> TcS TcTyVar
+-- Make a TcsTv meta tyvar; it is always touchable,
+-- but we are supposed to guess its instantiation
+-- See Note [Touchable meta type variables]
+newFlexiTcS tv = wrapTcS $ TcM.instMetaTyVar TcsTv tv
 
 -- Superclasses and recursive dictionaries 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -800,11 +818,13 @@ mkWantedFunDepEqns loc eqns
   where
     to_work_item :: (Equation, (PredType,SDoc), (PredType,SDoc)) -> TcS [WantedEvVar]
     to_work_item ((qtvs, pairs), _, _)
-      = do { (_, _, tenv) <- wrapTcS $ TcM.tcInstTyVars (varSetElems qtvs)
-           ; mapM (do_one tenv) pairs }
+      = do { let tvs = varSetElems qtvs
+           ; tvs' <- mapM newFlexiTcS tvs
+           ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
+           ; mapM (do_one subst) pairs }
 
-    do_one tenv (ty1, ty2) = do { let sty1 = substTy tenv ty1 
-                                      sty2 = substTy tenv ty2 
+    do_one subst (ty1, ty2) = do { let sty1 = substTy subst ty1 
+                                       sty2 = substTy subst ty2 
                                 ; ev <- newWantedCoVar sty1 sty2
                                 ; return (WantedEvVar ev loc) }
 

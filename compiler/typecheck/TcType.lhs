@@ -302,6 +302,11 @@ data MetaInfo
 		   -- The Name is the name of the function from whose
 		   -- type signature we got this skolem
 
+   | TcsTv	   -- A MetaTv allocated by the constraint solver
+     		   -- Its particular property is that it is always "touchable"
+		   -- Nevertheless, the constraint solver has to try to guess
+		   -- what type to instantiate it to
+
 ----------------------------------
 -- SkolemInfo describes a site where 
 --   a) type variables are skolemised
@@ -408,6 +413,7 @@ pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 pprTcTyVarDetails (SkolemTv _)         = ptext (sLit "sk")
 pprTcTyVarDetails (FlatSkol {})        = ptext (sLit "fsk")
 pprTcTyVarDetails (MetaTv TauTv _)     = ptext (sLit "tau")
+pprTcTyVarDetails (MetaTv TcsTv _)     = ptext (sLit "tcs")
 pprTcTyVarDetails (MetaTv (SigTv _) _) = ptext (sLit "sig")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
@@ -433,8 +439,9 @@ pprSkolTvBinding tv
   where
     ppr_details (SkolemTv info)      = ppr_skol info
     ppr_details (FlatSkol {}) 	     = ptext (sLit "is a flattening type variable")
-    ppr_details (MetaTv TauTv _)     = ptext (sLit "is a meta type variable")
-    ppr_details (MetaTv (SigTv n) _) = ptext (sLit "is bound by the type signature for") <+> quotes (ppr n)
+    ppr_details (MetaTv (SigTv n) _) = ptext (sLit "is bound by the type signature for")
+                                       <+> quotes (ppr n)
+    ppr_details (MetaTv _ _)         = ptext (sLit "is a meta type variable")
 
     ppr_skol UnkSkol	    = ptext (sLit "is an unknown type variable")	-- Unhelpful
     ppr_skol RuntimeUnkSkol = ptext (sLit "is an unknown runtime type")
@@ -615,8 +622,8 @@ isTyConableTyVar tv
 	-- not a SigTv
   = ASSERT( isTcTyVar tv) 
     case tcTyVarDetails tv of
-	MetaTv TauTv _ -> True
-	_              -> False
+	MetaTv (SigTv _) _ -> False
+	_                  -> True
 	
 isSkolemTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
