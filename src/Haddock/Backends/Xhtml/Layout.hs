@@ -119,7 +119,8 @@ subDlist quali decls = Just $ dlist << map subEntry decls +++ clearDiv
     subEntry (decl, mdoc, subs) =
       dterm ! [theclass "src"] << decl
       +++
-      docElement ddef << (fmap docToHtml mdoc +++ subs)    
+      docElement ddef << (fmap (docToHtml quali) mdoc +++ subs)
+
     clearDiv = thediv ! [ theclass "clear" ] << noHtml
 
 

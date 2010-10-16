@@ -222,6 +222,16 @@ optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 
+
+optQualification :: [Flag] -> Qualification
+optQualification flags =
+    case map (map Char.toLower) [ str | Flag_Qualification str <- flags ] of
+        "full":_     -> FullQuali
+        "local":_    -> LocalQuali Nothing
+        "relative":_ -> RelativeQuali Nothing
+        _            -> NoQuali
+
+
 verbosity :: [Flag] -> Verbosity
 verbosity flags =
   case [ str | Flag_Verbosity str <- flags ] of

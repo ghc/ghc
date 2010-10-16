@@ -598,7 +598,7 @@ ppModuleContents quali exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-        html = linkedAnchor id0 << docToHtml doc +++ mk_subsections ssecs
+        html = linkedAnchor (groupId id0) << docToHtml quali doc +++ mk_subsections ssecs
         (ssecs, rest1) = process lev rest
         (secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
@@ -619,18 +619,20 @@ numberSectionHeadings exports = go 1 exports
           = other : go n es
 
 
-processExport :: Bool -> LinksInfo -> Bool -> (ExportItem DocName) -> Maybe Html
-processExport summary _ _ (ExportGroup lev id0 doc)
-  = nothingIf summary $ groupTag lev ! [identifier id0] << docToHtml doc
-processExport summary links unicode (ExportDecl decl doc subdocs insts)
-  = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode
-processExport summary _ _ (ExportNoDecl y [])
-  = processDeclOneLiner summary $ ppDocName y
-processExport summary _ _ (ExportNoDecl y subs)
-  = processDeclOneLiner summary $ ppDocName y +++ parenList (map ppDocName subs)
-processExport summary _ _ (ExportDoc doc)
-  = nothingIf summary $ docSection doc
-processExport summary _ _ (ExportModule mdl)
+processExport :: Bool -> LinksInfo -> Bool -> Qualification
+              -> (ExportItem DocName) -> Maybe Html
+processExport summary _ _ quali (ExportGroup lev id0 doc)
+  = nothingIf summary $ groupHeading lev id0 << docToHtml quali doc
+processExport summary links unicode quali (ExportDecl decl doc subdocs insts)
+  = processDecl summary $ ppDecl summary links decl doc insts subdocs unicode quali
+processExport summary _ _ quali (ExportNoDecl y [])
+  = processDeclOneLiner summary $ ppDocName quali y
+processExport summary _ _ quali (ExportNoDecl y subs)
+  = processDeclOneLiner summary $
+      ppDocName quali y +++ parenList (map (ppDocName quali) subs)
+processExport summary _ _ quali (ExportDoc doc)
+  = nothingIf summary $ docSection quali doc
+processExport summary _ _ _ (ExportModule mdl)
   = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
 
 
