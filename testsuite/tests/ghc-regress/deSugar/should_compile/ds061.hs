@@ -1,4 +1,4 @@
-
+{-# LANGUAGE NPlusKPatterns #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wall #-}
 
 -- Test for trac #851
