@@ -323,19 +323,19 @@ data DocMarkup id a = Markup {
 
 
 data HaddockModInfo name = HaddockModInfo {
-        hmi_description :: Maybe (Doc name),
-        hmi_portability :: Maybe String,
-        hmi_stability   :: Maybe String,
-        hmi_maintainer  :: Maybe String
+  hmi_description :: Maybe (Doc name),
+  hmi_portability :: Maybe String,
+  hmi_stability   :: Maybe String,
+  hmi_maintainer  :: Maybe String
 }
 
 
 emptyHaddockModInfo :: HaddockModInfo a
 emptyHaddockModInfo = HaddockModInfo {
-        hmi_description = Nothing,
-        hmi_portability = Nothing,
-        hmi_stability   = Nothing,
-        hmi_maintainer  = Nothing
+  hmi_description = Nothing,
+  hmi_portability = Nothing,
+  hmi_stability   = Nothing,
+  hmi_maintainer  = Nothing
 }
 
 
@@ -354,13 +354,14 @@ data DocOption
                       -- exported by this module.
   deriving (Eq, Show)
 
+
 -- | Option controlling how to qualify names
 data Qualification
-    = NoQual                      -- ^ Never qualify any names
-    | FullQual                    -- ^ Qualify all names fully
-    | LocalQual (Maybe Module)    -- ^ Qualify all imported names fully
-    | RelativeQual (Maybe Module) -- ^ Like local, but strip module prefix
-                                  --   from modules in the same hierarchy
+  = NoQual                      -- ^ Never qualify any names
+  | FullQual                    -- ^ Qualify all names fully
+  | LocalQual (Maybe Module)    -- ^ Qualify all imported names fully
+  | RelativeQual (Maybe Module) -- ^ Like local, but strip module prefix
+                                --   from modules in the same hierarchy
 
 -----------------------------------------------------------------------------
 -- * Error handling
