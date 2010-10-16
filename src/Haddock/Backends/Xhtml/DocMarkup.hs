@@ -76,8 +76,8 @@ parHtmlMarkup ppId isTyCon = Markup {
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Qualification -> Doc DocName -> Html
-docToHtml quali = markup fmt . cleanup
-  where fmt = parHtmlMarkup (ppDocName quali) (isTyConName . getName)
+docToHtml qual = markup fmt . cleanup
+  where fmt = parHtmlMarkup (ppDocName qual) (isTyConName . getName)
 
 
 origDocToHtml :: Doc Name -> Html
@@ -98,11 +98,11 @@ docElement el content_ =
 
 
 docSection :: Qualification -> Doc DocName -> Html
-docSection quali = (docElement thediv <<) . (docToHtml quali)
+docSection qual = (docElement thediv <<) . (docToHtml qual)
 
 
 maybeDocSection :: Qualification -> Maybe (Doc DocName) -> Html
-maybeDocSection quali = maybe noHtml (docSection quali)
+maybeDocSection qual = maybe noHtml (docSection qual)
 
 
 cleanup :: Doc a -> Doc a

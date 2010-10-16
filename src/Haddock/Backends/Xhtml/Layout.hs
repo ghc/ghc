@@ -114,24 +114,24 @@ divSubDecls cssClass captionName = maybe noHtml wrap
 
 subDlist :: Qualification -> [SubDecl] -> Maybe Html
 subDlist _ [] = Nothing
-subDlist quali decls = Just $ dlist << map subEntry decls +++ clearDiv
+subDlist qual decls = Just $ dlist << map subEntry decls +++ clearDiv
   where
     subEntry (decl, mdoc, subs) =
       dterm ! [theclass "src"] << decl
       +++
-      docElement ddef << (fmap (docToHtml quali) mdoc +++ subs)
+      docElement ddef << (fmap (docToHtml qual) mdoc +++ subs)
 
     clearDiv = thediv ! [ theclass "clear" ] << noHtml
 
 
 subTable :: Qualification -> [SubDecl] -> Maybe Html
 subTable _ [] = Nothing
-subTable quali decls = Just $ table << aboves (concatMap subRow decls)
+subTable qual decls = Just $ table << aboves (concatMap subRow decls)
   where
     subRow (decl, mdoc, subs) =
       (td ! [theclass "src"] << decl
        <->
-       docElement td << fmap (docToHtml quali) mdoc)
+       docElement td << fmap (docToHtml qual) mdoc)
       : map (cell . (td <<)) subs
 
 
@@ -141,7 +141,7 @@ subBlock hs = Just $ toHtml hs
 
 
 subArguments :: Qualification -> [SubDecl] -> Html
-subArguments quali = divSubDecls "arguments" "Arguments" . (subTable quali)
+subArguments qual = divSubDecls "arguments" "Arguments" . (subTable qual)
 
 
 subAssociatedTypes :: [Html] -> Html
@@ -149,18 +149,18 @@ subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBloc
 
 
 subConstructors :: Qualification -> [SubDecl] -> Html
-subConstructors quali = divSubDecls "constructors" "Constructors" . (subTable quali)
+subConstructors qual = divSubDecls "constructors" "Constructors" . (subTable qual)
 
 
 subFields :: Qualification -> [SubDecl] -> Html
-subFields quali = divSubDecls "fields" "Fields" . (subDlist quali)
+subFields qual = divSubDecls "fields" "Fields" . (subDlist qual)
 
 
 subInstances :: Qualification -> String -> [SubDecl] -> Html
-subInstances quali nm = maybe noHtml wrap . instTable
+subInstances qual nm = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . (subTable quali)
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . (subTable qual)
     subSection = thediv ! [theclass $ "subs instances"]
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm

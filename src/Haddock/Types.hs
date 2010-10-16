@@ -356,11 +356,11 @@ data DocOption
 
 -- | Option controlling how to qualify names
 data Qualification
-    = NoQuali                      -- ^ Never qualify any names
-    | FullQuali                    -- ^ Qualify all names fully
-    | LocalQuali (Maybe Module)    -- ^ Qualify all imported names fully
-    | RelativeQuali (Maybe Module) -- ^ Like local, but strip module prefix
-                                   --   from modules in the same hierarchy
+    = NoQual                      -- ^ Never qualify any names
+    | FullQual                    -- ^ Qualify all names fully
+    | LocalQual (Maybe Module)    -- ^ Qualify all imported names fully
+    | RelativeQual (Maybe Module) -- ^ Like local, but strip module prefix
+                                  --   from modules in the same hierarchy
 
 -----------------------------------------------------------------------------
 -- * Error handling

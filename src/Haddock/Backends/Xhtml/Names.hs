@@ -40,38 +40,38 @@ ppRdrName = ppOccName . rdrNameOcc
 
 
 ppLDocName :: Qualification -> Located DocName -> Html
-ppLDocName quali (L _ d) = ppDocName quali d
+ppLDocName qual (L _ d) = ppDocName qual d
 
 -- | Render a name depending on the selected qualification mode
 qualifyName :: Qualification -> DocName -> Html
-qualifyName quali docName@(Documented name mdl) = case quali of
-    NoQuali   -> ppName name
-    FullQuali -> ppFullQualName mdl name
+qualifyName qual docName@(Documented name mdl) = case qual of
+    NoQual   -> ppName name
+    FullQual -> ppFullQualName mdl name
     -- this is just in case, it should never happen
-    LocalQuali Nothing -> qualifyName FullQuali docName
-    LocalQuali (Just localmdl) ->
+    LocalQual Nothing -> qualifyName FullQual docName
+    LocalQual (Just localmdl) ->
         if (moduleString mdl == moduleString localmdl)
             then ppName name
             else ppFullQualName mdl name
     -- again, this never happens
-    RelativeQuali Nothing -> qualifyName FullQuali docName
-    RelativeQuali (Just localmdl) ->
+    RelativeQual Nothing -> qualifyName FullQual docName
+    RelativeQual (Just localmdl) ->
         case List.stripPrefix (moduleString localmdl) (moduleString mdl) of
             -- local, A.x -> x
-            Just []      -> qualifyName NoQuali docName
+            Just []      -> qualifyName NoQual docName
             -- sub-module, A.B.x -> B.x
             Just ('.':m) -> toHtml $ m ++ '.' : getOccString name
             -- some module with same prefix, ABC.x -> ABC.x
-            Just _       -> qualifyName FullQuali docName
+            Just _       -> qualifyName FullQual docName
             -- some other module, D.x -> D.x
-            Nothing      -> qualifyName FullQuali docName
+            Nothing      -> qualifyName FullQual docName
 
 -- this is just for exhaustiveness, but already handled by ppDocName
 qualifyName _ (Undocumented name) = ppName name
 
 ppDocName :: Qualification -> DocName -> Html
-ppDocName quali docName@(Documented name mdl) =
-  linkIdOcc mdl (Just occName) << qualifyName quali docName
+ppDocName qual docName@(Documented name mdl) =
+  linkIdOcc mdl (Just occName) << qualifyName qual docName
     where occName = nameOccName name
 
 ppDocName _ (Undocumented name) = ppName name
