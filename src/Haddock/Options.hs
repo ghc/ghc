@@ -24,7 +24,7 @@ module Haddock.Options (
   wikiUrls,
   optDumpInterfaceFile,
   optLaTeXStyle,
-  optQualification,
+  qualification,
   verbosity,
   ghcFlags,
   readIfaceArgs
@@ -223,13 +223,13 @@ optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 
 
-optQualification :: [Flag] -> Qualification
-optQualification flags =
-    case map (map Char.toLower) [ str | Flag_Qualification str <- flags ] of
-        "full":_     -> FullQual
-        "local":_    -> LocalQual Nothing
-        "relative":_ -> RelativeQual Nothing
-        _            -> NoQual
+qualification :: [Flag] -> Qualification
+qualification flags =
+  case map (map Char.toLower) [ str | Flag_Qualification str <- flags ] of
+      "full":_     -> FullQual
+      "local":_    -> LocalQual Nothing
+      "relative":_ -> RelativeQual Nothing
+      _            -> NoQual
 
 
 verbosity :: [Flag] -> Verbosity

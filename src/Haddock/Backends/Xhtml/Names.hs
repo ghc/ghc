@@ -42,6 +42,7 @@ ppRdrName = ppOccName . rdrNameOcc
 ppLDocName :: Qualification -> Located DocName -> Html
 ppLDocName qual (L _ d) = ppDocName qual d
 
+
 -- | Render a name depending on the selected qualification mode
 qualifyName :: Qualification -> DocName -> Html
 qualifyName qual docName@(Documented name mdl) = case qual of
@@ -69,6 +70,7 @@ qualifyName qual docName@(Documented name mdl) = case qual of
 -- this is just for exhaustiveness, but already handled by ppDocName
 qualifyName _ (Undocumented name) = ppName name
 
+
 ppDocName :: Qualification -> DocName -> Html
 ppDocName qual docName@(Documented name mdl) =
   linkIdOcc mdl (Just occName) << qualifyName qual docName
@@ -76,8 +78,10 @@ ppDocName qual docName@(Documented name mdl) =
 
 ppDocName _ (Undocumented name) = ppName name
 
+
 ppFullQualName :: Module -> Name -> Html
 ppFullQualName mdl name = toHtml $ moduleString mdl ++ '.' : getOccString name
+
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)

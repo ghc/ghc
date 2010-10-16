@@ -192,7 +192,7 @@ render flags ifaces installedIfaces srcMap = do
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
-    opt_qualification    = optQualification  flags
+    opt_qualification    = qualification     flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
