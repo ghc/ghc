@@ -7,21 +7,19 @@ HADDOCK_ARGS=
 case $* in
 --inplace)
     HADDOCK=../inplace/bin/haddock
-    HADDOCK_FILES=`ls -1     */dist-install/doc/html/*/*.haddock | sort`
-    if [ -d dph ]
-    then
-        DPH_HADDOCK_FILES=`ls -1 dph/*/dist-install/doc/html/*/*.haddock | sort`
-        HADDOCK_FILES="$HADDOCK_FILES $DPH_HADDOCK_FILES"
-    fi
-    for HADDOCK_FILE in $HADDOCK_FILES
+    for LIB in `grep '^libraries/[^ ]\+ \+- \+[^ ]\+ \+[^ ]\+ \+[^ ]\+' ../packages | sed -e 's#libraries/##' -e 's/ .*//'`
     do
-        LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
-        NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
-        # It's easier to portably remove tabs with tr than to try to get
-        # sed to do what we want
-        VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
-        HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
-        HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
+        HADDOCK_FILE="$LIB/dist-install/doc/html/$LIB/$LIB.haddock"
+        if [ -f "$HADDOCK_FILE" ]
+        then
+            LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
+            NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
+            # It's easier to portably remove tabs with tr than to try to get
+            # sed to do what we want
+            VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
+            HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
+            HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
+        fi
     done
     ;;
 *)
