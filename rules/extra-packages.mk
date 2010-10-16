@@ -27,7 +27,7 @@
 #	  add P to the list of packages
 
 define extra-packages
-$$(foreach p,$$(patsubst libraries/%,%,$$(wildcard $$(shell grep '^[^ ]\+ \+\(dph\|extra\) \+[^ ]\+ \+[^ ]\+ \+[^ ]\+' packages | sed 's/ .*//'))),\
+$$(foreach p,$$(patsubst libraries/%,%,$$(wildcard $$(shell grep '^[^ #][^ ]* \+\(dph\|extra\) \+[^ ]\+ \+[^ ]\+ \+[^ ]\+' packages | sed 's/ .*//'))),\
     $$(if $$(wildcard libraries/$$p/ghc-packages),\
         $$(eval BUILD_DIRS += libraries/$$p) \
         $$(foreach q,$$(shell cat libraries/$$p/ghc-packages2),$$(eval $$(call extra-package,$$p,$$p/$$q))),\
