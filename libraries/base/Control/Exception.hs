@@ -122,7 +122,7 @@ module Control.Exception (
         unblock,
         blocked,
 
-        -- *** Applying @block@ to an exception handler
+        -- *** Applying @mask@ to an exception handler
 
         -- $block_handler
 
@@ -258,12 +258,12 @@ to one of the 'catch' family of functions.  This is because that is
 what you want most of the time - it eliminates a common race condition
 in starting an exception handler, because there may be no exception
 handler on the stack to handle another exception if one arrives
-immediately.  If asynchronous exceptions are blocked on entering the
+immediately.  If asynchronous exceptions are masked on entering the
 handler, though, we have time to install a new exception handler
 before being interrupted.  If this weren\'t the default, one would have
 to write something like
 
->      block $ \restore ->
+>      mask $ \restore ->
 >           catch (restore (...))
 >                 (\e -> handler)
 
@@ -279,7 +279,7 @@ recovering from an asynchronous exception.
 
  #interruptible#
 Some operations are /interruptible/, which means that they can receive
-asynchronous exceptions even in the scope of a 'block'.  Any function
+asynchronous exceptions even in the scope of a 'mask'.  Any function
 which may itself block is defined as interruptible; this includes
 'Control.Concurrent.MVar.takeMVar'
 (but not 'Control.Concurrent.MVar.tryTakeMVar'),
