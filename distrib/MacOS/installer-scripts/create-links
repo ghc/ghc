@@ -13,17 +13,17 @@
 
 # See apple "Install Operations" documentation for how this script is called.
 
-INSTALL_DEST=$2
-INSTALL_BASE=$3
+INSTALL_DEST="$2"
+INSTALL_BASE="$3"
 
 if [ "$INSTALL_BASE" = / ]; then
   INSTALL_BASE=/usr
 fi
 
 ProjectVersionInt=$(readlink "$INSTALL_DEST/GHC.framework/Versions/Current")
-GHC_BASE=$INSTALL_DEST/GHC.framework/Versions/$ProjectVersionInt
+GHC_BASE="$INSTALL_DEST/GHC.framework/Versions/$ProjectVersionInt"
 
-INSTALL_BIN=$INSTALL_BASE/bin
+INSTALL_BIN="$INSTALL_BASE/bin"
 mkdir -p "$INSTALL_BIN"
 if [ -d "$GHC_BASE/usr/bin" ]; then
   ln -sf "$GHC_BASE"/usr/bin/* "$INSTALL_BIN/"
