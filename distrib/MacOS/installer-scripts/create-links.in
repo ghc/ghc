@@ -20,7 +20,7 @@ if [ "$INSTALL_BASE" = / ]; then
   INSTALL_BASE=/usr
 fi
 
-ProjectVersionInt=$(readlink "$INSTALL_DEST/GHC.framework/Versions/Current")
+ProjectVersionInt=@ProjectVersionInt@
 GHC_BASE="$INSTALL_DEST/GHC.framework/Versions/$ProjectVersionInt"
 
 INSTALL_BIN="$INSTALL_BASE/bin"
