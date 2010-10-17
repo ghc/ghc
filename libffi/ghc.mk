@@ -139,7 +139,7 @@ $(libffi_STAMP_CONFIGURE):
 
 	touch $@
 
-libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
+libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) | libffi/dist-install/build/ffitarget.h $$(dir $$@)/.
 	"$(CP)" libffi/build/include/ffi.h $@
 
 libffi/dist-install/build/ffitarget.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
