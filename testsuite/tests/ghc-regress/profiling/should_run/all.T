@@ -22,6 +22,6 @@ test('T3001-2',
      [only_ways(['prof_hb']), extra_ways(['prof_hb']), req_profiling],
      compile_and_run, ['-package bytestring'])
 
-test('scc001', req_profiling,
+test('scc001', [expect_broken(4414), req_profiling],
      run_command, ['$MAKE -s --no-print-directory scc001'])
 
