@@ -1,0 +1,8 @@
+Compiling with -O0
+True
+3
+'a'
+Compiling with -O
+True
+3
+'a'
