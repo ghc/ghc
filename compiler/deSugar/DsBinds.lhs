@@ -100,21 +100,23 @@ dsHsBind _ (VarBind { var_id = var, var_rhs = expr, var_inline = inline_regardle
 
 	; return (unitOL (var', core_expr')) }
 
-dsHsBind _ (FunBind { fun_id = L _ fun, fun_matches = matches 
+dsHsBind auto_scc (FunBind { fun_id = L _ fun, fun_matches = matches
 		    , fun_co_fn = co_fn, fun_tick = tick 
                     , fun_infix = inf }) 
  = do	{ (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
 	; body'    <- mkOptTickBox tick body
 	; wrap_fn' <- dsHsWrapper co_fn 
-	; let rhs = wrap_fn' (mkLams args body')
+	; let rhs = addAutoScc auto_scc fun $ wrap_fn' (mkLams args body')
 	; return (unitOL (makeCorePair fun False 0 rhs)) }
 
-dsHsBind _ (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
+dsHsBind auto_scc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
   = do	{ body_expr <- dsGuarded grhss ty
 	; sel_binds <- mkSelectorBinds pat body_expr
 	  -- We silently ignore inline pragmas; no makeCorePair
 	  -- Not so cool, but really doesn't matter
-	; return (toOL sel_binds) }
+    ; let sel_binds' = [ (v, addAutoScc auto_scc v expr)
+                       | (v, expr) <- sel_binds ]
+	; return (toOL sel_binds') }
 
 	-- A common case: one exported variable
 	-- Non-recursive bindings come through this way
