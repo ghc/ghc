@@ -11,7 +11,10 @@
 -- for details
 
 module SpecConstr(
-	specConstrProgram, SpecConstrAnnotation(..)
+	specConstrProgram
+#ifdef GHCI
+        , SpecConstrAnnotation(..)
+#endif
     ) where
 
 #include "HsVersions.h"
@@ -24,9 +27,7 @@ import CoreFVs 		( exprsFreeVars )
 import CoreMonad
 import HscTypes         ( ModGuts(..) )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConTyCon, dataConRepArity, dataConUnivTyVars )
-import TyCon            ( TyCon )
-import Literal          ( literalType )
+import DataCon
 import Coercion	
 import Rules
 import Type		hiding( substTy )
@@ -51,7 +52,16 @@ import UniqFM
 import MonadUtils
 import Control.Monad	( zipWithM )
 import Data.List
-import Data.Data        ( Data, Typeable )
+
+
+-- See Note [SpecConstrAnnotation]
+#ifndef GHCI
+type SpecConstrAnnotation = ()
+#else
+import Literal          ( literalType )
+import TyCon            ( TyCon )
+import GHC.Exts( SpecConstrAnnotation(..) )
+#endif
 \end{code}
 
 -----------------------------------------------------
@@ -385,6 +395,17 @@ But fspec doesn't have decent strictnes info.  As it happened,
 and hence f.  But now f's strictness is less than its arity, which
 breaks an invariant.
 
+Note [SpecConstrAnnotation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SpecConstrAnnotation is defined in GHC.Exts, and is only guaranteed to
+be available in stage 2 (well, until the bootstrap compiler can be
+guaranteed to have it)
+
+So we define it to be () in stage1 (ie when GHCI is undefined), and
+'#ifdef' out the code that uses it.
+
+See also Note [Forcing specialisation]
+
 Note [Forcing specialisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With stream fusion and in other similar cases, we want to fully specialise
@@ -494,20 +515,6 @@ unbox the strict fields, becuase T is polymorphic!)
 
 %************************************************************************
 %*									*
-\subsection{Annotations}
-%*									*
-%************************************************************************
-
-Annotating a type with NoSpecConstr will make SpecConstr not specialise
-for arguments of that type.
-
-\begin{code}
-data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving( Data, Typeable, Eq )
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Top level wrapper stuff}
 %*									*
 %************************************************************************
@@ -569,6 +576,7 @@ type HowBoundEnv = VarEnv HowBound	-- Domain is OutVars
 ---------------------
 type ValueEnv = IdEnv Value		-- Domain is OutIds
 data Value    = ConVal AltCon [CoreArg]	-- _Saturated_ constructors
+     	      	       	      		--   The AltCon is never DEFAULT
 	      | LambdaVal		-- Inlinable lambdas or PAPs
 
 instance Outputable Value where
@@ -683,22 +691,41 @@ extendCaseBndrs env case_bndr con alt_bndrs
 		       	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
 				       varsToCoreExprs alt_bndrs
 
-ignoreTyCon :: ScEnv -> TyCon -> Bool
-ignoreTyCon env tycon
-  = lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
 
-ignoreType :: ScEnv -> Type -> Bool
+decreaseSpecCount :: ScEnv -> Int -> ScEnv
+-- See Note [Avoiding exponential blowup]
+decreaseSpecCount env n_specs 
+  = env { sc_count = case sc_count env of
+                       Nothing -> Nothing
+                       Just n  -> Just (n `div` (n_specs + 1)) }
+	-- The "+1" takes account of the original function; 
+	-- See Note [Avoiding exponential blowup]
+
+---------------------------------------------------
+-- See Note [SpecConstrAnnotation]
+ignoreType    :: ScEnv -> Type   -> Bool
+ignoreAltCon  :: ScEnv -> AltCon -> Bool
+forceSpecBndr :: ScEnv -> Var    -> Bool
+#ifndef GHCI
+ignoreType    _ _ = False
+ignoreAltCon  _ _ = False
+forceSpecBndr _ _ = False
+
+#else /* GHCI */
+
+ignoreAltCon env (DataAlt dc) = ignoreTyCon env (dataConTyCon dc)
+ignoreAltCon env (LitAlt lit) = ignoreType env (literalType lit)
+ignoreAltCon _   DEFAULT      = panic "ignoreAltCon"  -- DEFAULT cannot be in a ConVal
+
 ignoreType env ty
   = case splitTyConApp_maybe ty of
       Just (tycon, _) -> ignoreTyCon env tycon
       _               -> False
 
-ignoreAltCon :: ScEnv -> AltCon -> Bool
-ignoreAltCon env (DataAlt dc) = ignoreTyCon env (dataConTyCon dc)
-ignoreAltCon env (LitAlt lit) = ignoreType env (literalType lit)
-ignoreAltCon _   DEFAULT      = True
+ignoreTyCon :: ScEnv -> TyCon -> Bool
+ignoreTyCon env tycon
+  = lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
 
-forceSpecBndr :: ScEnv -> Var -> Bool
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
@@ -715,15 +742,7 @@ forceSpecArgTy env ty
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False
-
-decreaseSpecCount :: ScEnv -> Int -> ScEnv
--- See Note [Avoiding exponential blowup]
-decreaseSpecCount env n_specs 
-  = env { sc_count = case sc_count env of
-                       Nothing -> Nothing
-                       Just n  -> Just (n `div` (n_specs + 1)) }
-	-- The "+1" takes account of the original function; 
-	-- See Note [Avoiding exponential blowup]
+#endif /* GHCI */
 \end{code}
 
 Note [Avoiding exponential blowup]
