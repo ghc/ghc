@@ -44,7 +44,10 @@ module GHC.Exts
         Down(..), groupWith, sortWith, the,
 
         -- * Event logging
-        traceEvent
+        traceEvent,
+
+        -- * SpecConstr annotations
+        SpecConstrAnnotation(..)
 
        ) where
 
@@ -60,6 +63,7 @@ import GHC.Ptr
 import Data.String
 import Data.List
 import Foreign.C
+import Data.Data
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
@@ -110,3 +114,22 @@ traceEvent :: String -> IO ()
 traceEvent msg = do
   withCString msg $ \(Ptr p) -> IO $ \s ->
     case traceEvent# p s of s' -> (# s', () #)
+
+
+
+{- **********************************************************************
+*									*
+*              SpecConstr annotation                                    *
+*									*
+********************************************************************** -}
+
+-- Annotating a type with NoSpecConstr will make SpecConstr 
+-- not specialise for arguments of that type.
+
+-- This data type is defined here, rather than in the SpecConstr module
+-- itself, so that importing it doesn't force stupidly linking the
+-- entire ghc package at runtime
+
+data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
+                deriving( Data, Typeable, Eq )
+
