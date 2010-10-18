@@ -17,8 +17,6 @@ module Data.Char
     (
       Char
 
-    , String
-
     -- * Character classification
     -- | Unicode characters are divided into letters, numbers, marks,
     -- punctuation, symbols, separators (including spaces) and others
