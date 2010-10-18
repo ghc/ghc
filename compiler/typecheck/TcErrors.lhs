@@ -644,7 +644,7 @@ warnDefaulting wanteds default_ty
 %************************************************************************
 
 \begin{code}
-kindErrorTcS :: CtFlavor -> TcType -> TcType -> TcS ()
+kindErrorTcS :: CtFlavor -> TcType -> TcType -> TcS a
 -- If there's a kind error, we don't want to blindly say "kind error"
 -- We might, say, be unifying a skolem 'a' with a type 'Int', 
 -- in which case that's the error to report.  So we set things
@@ -654,7 +654,9 @@ kindErrorTcS fl ty1 ty2
     do { let ctxt = CEC { cec_encl = []
                         , cec_extra = extra
                         , cec_tidy = env0 }
-       ; reportEqErr ctxt ty1 ty2 }
+       ; reportEqErr ctxt ty1 ty2 
+       ; failM
+       }
 
 misMatchErrorTcS :: CtFlavor -> TcType -> TcType -> TcS a
 misMatchErrorTcS fl ty1 ty2
@@ -719,9 +721,9 @@ flattenForAllErrorTcS fl ty _bad_eqs
 
 \begin{code}
 setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  loc) thing = setCtLoc loc thing
-setCtFlavorLoc (Derived loc) thing = setCtLoc loc thing
-setCtFlavorLoc (Given   loc) thing = setCtLoc loc thing
+setCtFlavorLoc (Wanted  loc)   thing = setCtLoc loc thing
+setCtFlavorLoc (Derived loc _) thing = setCtLoc loc thing
+setCtFlavorLoc (Given   loc)   thing = setCtLoc loc thing
 
 wrapEqErrTcS :: CtFlavor -> TcType -> TcType
              -> (TidyEnv -> TcType -> TcType -> SDoc -> TcM a)
@@ -740,10 +742,10 @@ wrapEqErrTcS fl ty1 ty2 thing_inside
                                                      (ctLocOrigin loc) ty1 ty2
                                 ; thing_inside env3 ty1 ty2 extra } 
        ; case fl of
-           Wanted  loc -> do_wanted loc
-           Derived loc -> do_wanted loc
-           Given {}    -> thing_inside env2 ty1 ty2 empty 
-	   	       	  	 -- We could print more info, but it
+           Wanted  loc   -> do_wanted loc
+           Derived loc _ -> do_wanted loc
+           Given {}      -> thing_inside env2 ty1 ty2 empty 
+	   	       	    	 -- We could print more info, but it
                                  -- seems to be coming out already
        } }  
   where

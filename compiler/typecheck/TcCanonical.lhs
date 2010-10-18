@@ -578,9 +578,8 @@ canEqLeafOriented :: CtFlavor -> CoVar
 canEqLeafOriented fl cv cls1@(FunCls fn tys) s2 
   | let k1 = kindAppResult (tyConKind fn) tys, 
     let k2 = typeKind s2, 
-    isGiven fl && not (k1 `eqKind` k2) -- Establish the kind invariant for CFunEqCan
-  = do { kindErrorTcS fl (unClassify cls1) s2
-       ; return emptyCCan }
+    isGiven fl && not (k1 `eqKind` k2)   -- Establish the kind invariant for CFunEqCan
+  = kindErrorTcS fl (unClassify cls1) s2 -- Eagerly fails, see Note [Kind errors] in TcInteract
   | otherwise 
   = ASSERT2( isSynFamilyTyCon fn, ppr (unClassify cls1) )
     do { (xis1,ccs1) <- flattenMany fl tys -- flatten type function arguments
@@ -596,8 +595,7 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys) s2
 -- and then do an occurs check.
 canEqLeafOriented fl cv (VarCls tv) s2 
   | isGiven fl && not (k1 `eqKind` k2) -- Establish the kind invariant for CTyEqCan
-  = do { kindErrorTcS fl (mkTyVarTy tv) s2
-       ; return emptyCCan }
+  = kindErrorTcS fl (mkTyVarTy tv) s2  -- Eagerly fails, see Note [Kind errors] in TcInteract
 
   | otherwise
   = do { (xi2,ccs2) <- flatten fl s2      -- flatten RHS

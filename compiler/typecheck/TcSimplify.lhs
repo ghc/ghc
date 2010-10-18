@@ -210,8 +210,12 @@ simplifyInfer apply_mr tau_tvs wanted
                           zonked_tau_tvs `minusVarSet` gbl_tvs
              (perhaps_bound, surely_free) 
                   = partitionBag (quantifyMeWC proto_qtvs) zonked_wanted
+      
        ; emitConstraints surely_free
-       ; traceTc "sinf" (ppr proto_qtvs $$ ppr perhaps_bound $$ ppr surely_free)
+       ; traceTc "sinf"  $ vcat
+             [ ptext (sLit "perhaps_bound =") <+> ppr perhaps_bound
+             , ptext (sLit "surely_free   =") <+> ppr surely_free
+             ]
 
        	      -- Now simplify the possibly-bound constraints
        ; (simplified_perhaps_bound, tc_binds) 
@@ -808,7 +812,7 @@ applyDefaultingRules inert wanteds
   | otherwise
   = do { untch <- getUntouchables
        ; tv_cts <- mapM (defaultTyVar untch) $
-                   varSetElems (tyVarsOfCanonicals wanteds)
+                   varSetElems (tyVarsOfCDicts wanteds) 
 
        ; info@(_, default_tys, _) <- getDefaultInfo
        ; let groups = findDefaultableGroups info untch wanteds
@@ -836,8 +840,7 @@ defaultTyVar :: Untouchables -> TcTyVar -> TcS CanonicalCts
 -- whatever, because the type-class defaulting rules have yet to run.
 
 defaultTyVar untch the_tv 
-  | isMetaTyVar the_tv
-  , inTouchableRange untch the_tv
+  | isTouchableMetaTyVar_InRange untch the_tv
   , not (k `eqKind` default_k)
   = do { (ev, better_ty) <- TcSMonad.newKindConstraint the_tv default_k
        ; let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
@@ -887,7 +890,7 @@ findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults))
     is_defaultable_group ds@((_,tv):_)
         = isTyConableTyVar tv	-- Note [Avoiding spurious errors]
         && not (tv `elemVarSet` bad_tvs)
-        && inTouchableRange untch tv
+        && isTouchableMetaTyVar_InRange untch tv 
         && defaultable_classes [cc_class cc | (cc,_) <- ds]
     is_defaultable_group [] = panic "defaultable_group"
 

@@ -4,12 +4,14 @@ module TcSMonad (
 
        -- Canonical constraints
     CanonicalCts, emptyCCan, andCCan, andCCans, 
-    singleCCan, extendCCans, isEmptyCCan, isEqCCan, 
-    CanonicalCt(..), Xi, tyVarsOfCanonical, tyVarsOfCanonicals,
+    singleCCan, extendCCans, isEmptyCCan, isTyEqCCan, 
+    CanonicalCt(..), Xi, tyVarsOfCanonical, tyVarsOfCanonicals, tyVarsOfCDicts, 
     mkWantedConstraints, deCanonicaliseWanted, 
-    makeGivens, makeSolved,
+    makeGivens, makeSolvedByInst,
 
-    CtFlavor (..), isWanted, isGiven, isDerived, canRewrite, canSolve,
+    CtFlavor (..), isWanted, isGiven, isDerived, isDerivedSC, isDerivedByInst, 
+    DerivedOrig (..), 
+    canRewrite, canSolve,
     combineCtLoc, mkGivenFlavor,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, traceTcS0,  -- Basic functionality 
@@ -43,6 +45,7 @@ module TcSMonad (
     isGoodRecEv,
 
     isTouchableMetaTyVar,
+    isTouchableMetaTyVar_InRange, 
 
     getDefaultInfo, getDynFlags,
 
@@ -169,12 +172,12 @@ makeGivens = mapBag (\ct -> ct { cc_flavor = mkGivenFlavor (cc_flavor ct) UnkSko
 	   -- The UnkSkol doesn't matter because these givens are
 	   -- not contradictory (else we'd have rejected them already)
 
-makeSolved :: CanonicalCt -> CanonicalCt
+makeSolvedByInst :: CanonicalCt -> CanonicalCt
 -- Record that a constraint is now solved
 -- 	  Wanted         -> Derived
 --	  Given, Derived -> no-op
-makeSolved ct 
-  | Wanted loc <- cc_flavor ct = ct { cc_flavor = Derived loc }
+makeSolvedByInst ct 
+  | Wanted loc <- cc_flavor ct = ct { cc_flavor = Derived loc DerInst }
   | otherwise                  = ct
 
 mkWantedConstraints :: CanonicalCts -> Bag Implication -> WantedConstraints
@@ -192,6 +195,13 @@ tyVarsOfCanonical (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (t
 tyVarsOfCanonical (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCanonical (CDictCan { cc_tyargs = tys }) 	       = tyVarsOfTypes tys
 tyVarsOfCanonical (CIPCan { cc_ip_ty = ty })     	       = tyVarsOfType ty
+
+tyVarsOfCDict :: CanonicalCt -> TcTyVarSet 
+tyVarsOfCDict (CDictCan { cc_tyargs = tys }) = tyVarsOfTypes tys
+tyVarsOfCDict _ct                            = emptyVarSet 
+
+tyVarsOfCDicts :: CanonicalCts -> TcTyVarSet 
+tyVarsOfCDicts = foldrBag (unionVarSet . tyVarsOfCDict) emptyVarSet
 
 tyVarsOfCanonicals :: CanonicalCts -> TcTyVarSet
 tyVarsOfCanonicals = foldrBag (unionVarSet . tyVarsOfCanonical) emptyVarSet
@@ -255,10 +265,10 @@ emptyCCan = emptyBag
 isEmptyCCan :: CanonicalCts -> Bool
 isEmptyCCan = isEmptyBag
 
-isEqCCan :: CanonicalCt -> Bool 
-isEqCCan (CTyEqCan {})  = True 
-isEqCCan (CFunEqCan {}) = True 
-isEqCCan _              = False 
+isTyEqCCan :: CanonicalCt -> Bool 
+isTyEqCCan (CTyEqCan {})  = True 
+isTyEqCCan (CFunEqCan {}) = False
+isTyEqCCan _              = False 
 
 \end{code}
 
@@ -272,16 +282,21 @@ isEqCCan _              = False
 \begin{code}
 data CtFlavor 
   = Given   GivenLoc  -- We have evidence for this constraint in TcEvBinds
-  | Derived WantedLoc -- We have evidence for this constraint in TcEvBinds;
+  | Derived WantedLoc DerivedOrig
+                      -- We have evidence for this constraint in TcEvBinds;
                       --   *however* this evidence can contain wanteds, so 
                       --   it's valid only provisionally to the solution of
                       --   these wanteds 
   | Wanted WantedLoc  -- We have no evidence bindings for this constraint. 
 
+data DerivedOrig = DerSC | DerInst 
+-- Deriveds are either superclasses of other wanteds or deriveds, or partially 
+-- solved wanteds from instances. 
+
 instance Outputable CtFlavor where 
-  ppr (Given _)   = ptext (sLit "[Given]")
-  ppr (Wanted _)  = ptext (sLit "[Wanted]")
-  ppr (Derived _) = ptext (sLit "[Derived]") 
+  ppr (Given _)    = ptext (sLit "[Given]")
+  ppr (Wanted _)   = ptext (sLit "[Wanted]")
+  ppr (Derived {}) = ptext (sLit "[Derived]") 
 
 isWanted :: CtFlavor -> Bool 
 isWanted (Wanted {}) = True
@@ -294,6 +309,14 @@ isGiven _          = False
 isDerived :: CtFlavor -> Bool 
 isDerived (Derived {}) = True
 isDerived _            = False
+
+isDerivedSC :: CtFlavor -> Bool 
+isDerivedSC (Derived _ DerSC) = True 
+isDerivedSC _                 = False 
+
+isDerivedByInst :: CtFlavor -> Bool 
+isDerivedByInst (Derived _ DerInst) = True 
+isDerivedByInst _                   = False 
 
 canSolve :: CtFlavor -> CtFlavor -> Bool 
 -- canSolve ctid1 ctid2 
@@ -317,16 +340,16 @@ canRewrite = canSolve
 
 combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
 -- Precondition: At least one of them should be wanted 
-combineCtLoc (Wanted loc) _ = loc 
-combineCtLoc _ (Wanted loc) = loc 
-combineCtLoc (Derived loc) _ = loc 
-combineCtLoc _ (Derived loc) = loc 
+combineCtLoc (Wanted loc) _    = loc 
+combineCtLoc _ (Wanted loc)    = loc 
+combineCtLoc (Derived loc _) _ = loc 
+combineCtLoc _ (Derived loc _) = loc 
 combineCtLoc _ _ = panic "combineCtLoc: both given"
 
 mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
-mkGivenFlavor (Wanted  loc) sk = Given (setCtLocOrigin loc sk)
-mkGivenFlavor (Derived loc) sk = Given (setCtLocOrigin loc sk)
-mkGivenFlavor (Given   loc) sk = Given (setCtLocOrigin loc sk)
+mkGivenFlavor (Wanted  loc)   sk = Given (setCtLocOrigin loc sk)
+mkGivenFlavor (Derived loc _) sk = Given (setCtLocOrigin loc sk)
+mkGivenFlavor (Given   loc)   sk = Given (setCtLocOrigin loc sk)
 \end{code}
 
 
@@ -585,12 +608,19 @@ pprEq ty1 ty2 = pprPred $ mkEqPred (ty1,ty2)
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
 isTouchableMetaTyVar tv 
-  = case tcTyVarDetails tv of
-      MetaTv TcsTv _ -> return True	-- See Note [Touchable meta type variables]
-      MetaTv {}      -> do { untch <- getUntouchables
-                           ; return (inTouchableRange untch tv) }
-      _              -> return False
+  = do { untch <- getUntouchables
+       ; return $ isTouchableMetaTyVar_InRange untch tv } 
+
+isTouchableMetaTyVar_InRange :: Untouchables -> TcTyVar -> Bool 
+isTouchableMetaTyVar_InRange untch tv 
+  = case tcTyVarDetails tv of 
+      MetaTv TcsTv _ -> True    -- See Note [Touchable meta type variables] 
+      MetaTv {}      -> inTouchableRange untch tv 
+      _              -> False 
+
+
 \end{code}
+
 
 Note [Touchable meta type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
