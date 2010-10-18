@@ -14,7 +14,8 @@
 -----------------------------------------------------------------------------
 
 module Data.String (
-   IsString(..)
+   String
+ , IsString(..)
  ) where
 
 #ifdef __GLASGOW_HASKELL__
