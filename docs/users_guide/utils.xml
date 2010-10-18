@@ -6,7 +6,7 @@
   <para>This section describes other program(s) which we distribute,
   that help with the Great Haskell Programming Task.</para>
 
-<!-- comment: hasktags documentation loosely based on that for hstags -->
+<!-- comment: hasktags was dropped in GHC 6.12
 
 <sect1  id ="hasktags">
 	<title>Ctags and Etags for Haskell: <command>hasktags</command></title>
@@ -50,6 +50,7 @@ find -name \*.\*hs | xargs hasktags
 
 </sect1>
 
+-->
 <!-- comment: hstags doesn't work anymore
 
   <sect1 id="hstags">
