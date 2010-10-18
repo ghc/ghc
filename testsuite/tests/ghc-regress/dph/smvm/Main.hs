@@ -23,7 +23,7 @@ loadSM s
 
 loadSM' :: String 
 	-> IO	( U.Segd
-		, U.Array (Int U.:*: Double)
+		, U.Array (Int, Double)
 		, U.Array Double)
 loadSM' fname =
   do
