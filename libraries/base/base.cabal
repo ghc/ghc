@@ -52,6 +52,7 @@ Library {
             GHC.Exception,
             GHC.Exts,
             GHC.Float,
+            GHC.Float.RealFracMethods,
             GHC.ForeignPtr,
             GHC.MVar,
             GHC.IO,

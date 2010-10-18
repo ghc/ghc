@@ -27,7 +27,8 @@
 #include "ieee-flpt.h"
 
 -- #hide
-module GHC.Float( module GHC.Float, Float(..), Double(..), Float#, Double# )
+module GHC.Float( module GHC.Float, Float(..), Double(..), Float#, Double#
+                , double2Int, int2Double, float2Int, int2Float )
     where
 
 import Data.Maybe
@@ -40,6 +41,7 @@ import GHC.Show
 import GHC.Num
 import GHC.Real
 import GHC.Arr
+import GHC.Float.RealFracMethods
 
 infixr 8  **
 \end{code}
@@ -197,19 +199,25 @@ instance  Fractional Float  where
     fromRational x      =  fromRat x
     recip x             =  1.0 / x
 
-{-# RULES "truncate/Float->Int" truncate = float2Int #-}
+-- RULES for Integer and Int
+{-# RULES
+"properFraction/Float->Integer"     properFraction = properFractionFloatInteger
+"truncate/Float->Integer"           truncate = truncateFloatInteger
+"floor/Float->Integer"              floor = floorFloatInteger
+"ceiling/Float->Integer"            ceiling = ceilingFloatInteger
+"round/Float->Integer"              round = roundFloatInteger
+"properFraction/Float->Int"         properFraction = properFractionFloatInt
+"truncate/Float->Int"               truncate = float2Int
+"floor/Float->Int"                  floor = floorFloatInt
+"ceiling/Float->Int"                ceiling = ceilingFloatInt
+"round/Float->Int"                  round = roundFloatInt
+  #-}
 instance  RealFrac Float  where
 
-    {-# SPECIALIZE properFraction :: Float -> (Int, Float) #-}
-    {-# SPECIALIZE round    :: Float -> Int #-}
-
-    {-# SPECIALIZE properFraction :: Float  -> (Integer, Float) #-}
-    {-# SPECIALIZE round    :: Float -> Integer #-}
-
         -- ceiling, floor, and truncate are all small
-    {-# INLINE ceiling #-}
-    {-# INLINE floor #-}
-    {-# INLINE truncate #-}
+    {-# INLINE [1] ceiling #-}
+    {-# INLINE [1] floor #-}
+    {-# INLINE [1] truncate #-}
 
 -- We assume that FLT_RADIX is 2 so that we can use more efficient code
 #if FLT_RADIX != 2
@@ -352,27 +360,32 @@ instance  Floating Double  where
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
     atanh x = 0.5 * log ((1.0+x) / (1.0-x))
 
-{-# RULES "truncate/Double->Int" truncate = double2Int #-}
+-- RULES for Integer and Int
+{-# RULES
+"properFraction/Double->Integer"    properFraction = properFractionDoubleInteger
+"truncate/Double->Integer"          truncate = truncateDoubleInteger
+"floor/Double->Integer"             floor = floorDoubleInteger
+"ceiling/Double->Integer"           ceiling = ceilingDoubleInteger
+"round/Double->Integer"             round = roundDoubleInteger
+"properFraction/Double->Int"        properFraction = properFractionDoubleInt
+"truncate/Double->Int"              truncate = double2Int
+"floor/Double->Int"                 floor = floorDoubleInt
+"ceiling/Double->Int"               ceiling = ceilingDoubleInt
+"round/Double->Int"                 round = roundDoubleInt
+  #-}
 instance  RealFrac Double  where
 
-    {-# SPECIALIZE properFraction :: Double -> (Int, Double) #-}
-    {-# SPECIALIZE round    :: Double -> Int #-}
-
-    {-# SPECIALIZE properFraction :: Double -> (Integer, Double) #-}
-    {-# SPECIALIZE round    :: Double -> Integer #-}
-
         -- ceiling, floor, and truncate are all small
-    {-# INLINE ceiling #-}
-    {-# INLINE floor #-}
-    {-# INLINE truncate #-}
+    {-# INLINE [1] ceiling #-}
+    {-# INLINE [1] floor #-}
+    {-# INLINE [1] truncate #-}
 
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
-        let  b = floatRadix x     in
         if n >= 0 then
-            (fromInteger m * fromInteger b ^ n, 0.0)
+            (fromInteger m * 2 ^ n, 0.0)
         else
-            case (quotRem m (b^(negate n))) of { (w,r) ->
+            case (quotRem m (2^(negate n))) of { (w,r) ->
             (fromInteger w, encodeFloat r n)
             }
         }
@@ -851,12 +864,6 @@ neFloat     (F# x) (F# y) = neFloat# x y
 ltFloat     (F# x) (F# y) = ltFloat# x y
 leFloat     (F# x) (F# y) = leFloat# x y
 
-float2Int :: Float -> Int
-float2Int   (F# x) = I# (float2Int# x)
-
-int2Float :: Int -> Float
-int2Float   (I# x) = F# (int2Float# x)
-
 expFloat, logFloat, sqrtFloat :: Float -> Float
 sinFloat, cosFloat, tanFloat  :: Float -> Float
 asinFloat, acosFloat, atanFloat  :: Float -> Float
@@ -896,12 +903,6 @@ eqDouble    (D# x) (D# y) = x ==## y
 neDouble    (D# x) (D# y) = x /=## y
 ltDouble    (D# x) (D# y) = x <## y
 leDouble    (D# x) (D# y) = x <=## y
-
-double2Int :: Double -> Int
-double2Int   (D# x) = I# (double2Int#   x)
-
-int2Double :: Int -> Double
-int2Double   (I# x) = D# (int2Double#   x)
 
 double2Float :: Double -> Float
 double2Float (D# x) = F# (double2Float# x)

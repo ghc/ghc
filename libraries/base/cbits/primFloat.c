@@ -44,7 +44,7 @@ union stg_ieee754_flt
 };
 
 /*
- 
+
  To recap, here's the representation of a double precision
  IEEE floating point number:
 
@@ -106,7 +106,7 @@ union stg_ieee754_dbl
 
 /*
  * Predicates for testing for extreme IEEE fp values.
- */ 
+ */
 
 /* In case you don't suppport IEEE, you'll just get dummy defs.. */
 #ifdef IEEE_FLOATING_POINT
@@ -115,7 +115,7 @@ HsInt
 isDoubleNaN(HsDouble d)
 {
   union stg_ieee754_dbl u;
-  
+
   u.d = d;
 
   return (
@@ -141,7 +141,7 @@ isDoubleInfinite(HsDouble d)
 }
 
 HsInt
-isDoubleDenormalized(HsDouble d) 
+isDoubleDenormalized(HsDouble d)
 {
     union stg_ieee754_dbl u;
 
@@ -154,16 +154,16 @@ isDoubleDenormalized(HsDouble d)
         - (don't care about setting of sign bit.)
 
     */
-    return (  
+    return (
 	u.ieee.exponent  == 0 &&
 	(u.ieee.mantissa0 != 0 ||
 	 u.ieee.mantissa1 != 0)
       );
-	 
+
 }
 
 HsInt
-isDoubleNegativeZero(HsDouble d) 
+isDoubleNegativeZero(HsDouble d)
 {
     union stg_ieee754_dbl u;
 
@@ -207,7 +207,7 @@ isFloatInfinite(HsFloat f)
 {
     union stg_ieee754_flt u;
     u.f = f;
-  
+
     /* A float is Inf iff exponent is max (all ones),
        and mantissa is min(all zeros.) */
     return (
@@ -234,7 +234,7 @@ isFloatDenormalized(HsFloat f)
 }
 
 HsInt
-isFloatNegativeZero(HsFloat f) 
+isFloatNegativeZero(HsFloat f)
 {
     union stg_ieee754_flt u;
     u.f = f;
@@ -244,6 +244,184 @@ isFloatNegativeZero(HsFloat f)
 	u.ieee.negative      &&
 	u.ieee.exponent == 0 &&
 	u.ieee.mantissa == 0);
+}
+
+/*
+ There are glibc versions around with buggy rintf or rint, hence we
+ provide our own. We always round ties to even, so we can be simpler.
+*/
+
+#define FLT_HIDDEN 0x800000
+#define FLT_POWER2 0x1000000
+
+HsFloat
+rintFloat(HsFloat f)
+{
+    union stg_ieee754_flt u;
+    u.f = f;
+    /* if real exponent > 22, it's already integral, infinite or nan */
+    if (u.ieee.exponent > 149)  /* 22 + 127 */
+    {
+        return u.f;
+    }
+    if (u.ieee.exponent < 126)  /* (-1) + 127, abs(f) < 0.5 */
+    {
+        /* only used for rounding to Integral a, so don't care about -0.0 */
+        return 0.0;
+    }
+    /* 0.5 <= abs(f) < 2^23 */
+    unsigned int half, mask, mant, frac;
+    half = 1 << (149 - u.ieee.exponent);    /* bit for 0.5 */
+    mask = 2*half - 1;                      /* fraction bits */
+    mant = u.ieee.mantissa | FLT_HIDDEN;    /* add hidden bit */
+    frac = mant & mask;                     /* get fraction */
+    mant ^= frac;                           /* truncate mantissa */
+    if ((frac < half) || ((frac == half) && ((mant & (2*half)) == 0)))
+    {
+        /* this means we have to truncate */
+        if (mant == 0)
+        {
+            /* f == ±0.5, return 0.0 */
+            return 0.0;
+        }
+        else
+        {
+            /* remove hidden bit and set mantissa */
+            u.ieee.mantissa = mant ^ FLT_HIDDEN;
+            return u.f;
+        }
+    }
+    else
+    {
+        /* round away from zero, increment mantissa */
+        mant += 2*half;
+        if (mant == FLT_POWER2)
+        {
+            /* next power of 2, increase exponent an set mantissa to 0 */
+            u.ieee.mantissa = 0;
+            u.ieee.exponent += 1;
+            return u.f;
+        }
+        else
+        {
+            /* remove hidden bit and set mantissa */
+            u.ieee.mantissa = mant ^ FLT_HIDDEN;
+            return u.f;
+        }
+    }
+}
+
+#define DBL_HIDDEN 0x100000
+#define DBL_POWER2 0x200000
+#define LTOP_BIT 0x80000000
+
+HsDouble
+rintDouble(HsDouble d)
+{
+    union stg_ieee754_dbl u;
+    u.d = d;
+    /* if real exponent > 51, it's already integral, infinite or nan */
+    if (u.ieee.exponent > 1074) /* 51 + 1023 */
+    {
+        return u.d;
+    }
+    if (u.ieee.exponent < 1022)  /* (-1) + 1023, abs(d) < 0.5 */
+    {
+        /* only used for rounding to Integral a, so don't care about -0.0 */
+        return 0.0;
+    }
+    unsigned int half, mask, mant, frac;
+    if (u.ieee.exponent < 1043) /* 20 + 1023, real exponent < 20 */
+    {
+        /* the fractional part meets the higher part of the mantissa */
+        half = 1 << (1042 - u.ieee.exponent);   /* bit for 0.5 */
+        mask = 2*half - 1;                      /* fraction bits */
+        mant = u.ieee.mantissa0 | DBL_HIDDEN;   /* add hidden bit */
+        frac = mant & mask;                     /* get fraction */
+        mant ^= frac;                           /* truncate mantissa */
+        if ((frac < half) ||
+            ((frac == half) && (u.ieee.mantissa1 == 0)  /* a tie */
+                && ((mant & (2*half)) == 0)))
+        {
+            /* truncate */
+            if (mant == 0)
+            {
+                /* d = ±0.5, return 0.0 */
+                return 0.0;
+            }
+            /* remove hidden bit and set mantissa */
+            u.ieee.mantissa0 = mant ^ DBL_HIDDEN;
+            u.ieee.mantissa1 = 0;
+            return u.d;
+        }
+        else    /* round away from zero */
+        {
+            /* zero low mantissa bits */
+            u.ieee.mantissa1 = 0;
+            /* increment integer part of mantissa */
+            mant += 2*half;
+            if (mant == DBL_POWER2)
+            {
+                /* power of 2, increment exponent and zero mantissa */
+                u.ieee.mantissa0 = 0;
+                u.ieee.exponent += 1;
+                return u.d;
+            }
+            /* remove hidden bit */
+            u.ieee.mantissa0 = mant ^ DBL_HIDDEN;
+            return u.d;
+        }
+    }
+    else
+    {
+        /* 20 <= real exponent < 52, fractional part entirely in mantissa1 */
+        half = 1 << (1074 - u.ieee.exponent);   /* bit for 0.5 */
+        mask = 2*half - 1;                      /* fraction bits */
+        mant = u.ieee.mantissa1;                /* no hidden bit here */
+        frac = mant & mask;                     /* get fraction */
+        mant ^= frac;                           /* truncate mantissa */
+        if ((frac < half) ||
+            ((frac == half) &&                  /* tie */
+            (((half == LTOP_BIT) ? (u.ieee.mantissa0 & 1)  /* yuck */
+                                : (mant & (2*half)))
+                                        == 0)))
+        {
+            /* truncate */
+            u.ieee.mantissa1 = mant;
+            return u.d;
+        }
+        else
+        {
+            /* round away from zero */
+            /* increment mantissa */
+            mant += 2*half;
+            u.ieee.mantissa1 = mant;
+            if (mant == 0)
+            {
+                /* low part of mantissa overflowed */
+                /* increment high part of mantissa */
+                mant = u.ieee.mantissa0 + 1;
+                if (mant == DBL_HIDDEN)
+                {
+                    /* hit power of 2 */
+                    /* zero mantissa */
+                    u.ieee.mantissa0 = 0;
+                    /* and increment exponent */
+                    u.ieee.exponent += 1;
+                    return u.d;
+                }
+                else
+                {
+                    u.ieee.mantissa0 = mant;
+                    return u.d;
+                }
+            }
+            else
+            {
+                return u.d;
+            }
+        }
+    }
 }
 
 #else /* ! IEEE_FLOATING_POINT */
@@ -257,5 +435,78 @@ HsInt isFloatNaN(f) HsFloat f; { return 0; }
 HsInt isFloatInfinite(f) HsFloat f; { return 0; }
 HsInt isFloatDenormalized(f) HsFloat f; { return 0; }
 HsInt isFloatNegativeZero(f) HsFloat f; { return 0; }
+
+
+/* For exotic floating point formats, we can't do much */
+/* We suppose the format has not too many bits */
+/* I hope nobody tries to build GHC where this is wrong */
+
+#define FLT_UPP 536870912.0
+
+HsFloat
+rintFloat(HsFloat f)
+{
+    if ((f > FLT_UPP) || (f < (-FLT_UPP)))
+    {
+        return f;
+    }
+    else
+    {
+        int i = (int)f;
+        float g = i;
+        float d = f - g;
+        if (d > 0.5)
+        {
+            return g + 1.0;
+        }
+        if (d == 0.5)
+        {
+            return (i & 1) ? (g + 1.0) : g;
+        }
+        if (d == -0.5)
+        {
+            return (i & 1) ? (g - 1.0) : g;
+        }
+        if (d < -0.5)
+        {
+            return g - 1.0;
+        }
+        return g;
+    }
+}
+
+#define DBL_UPP 2305843009213693952.0
+
+HsDouble
+rintDouble(HsDouble d)
+{
+    if ((d > DBL_UPP) || (d < (-DBL_UPP)))
+    {
+        return d;
+    }
+    else
+    {
+        HsInt64 i = (HsInt64)d;
+        double e = i;
+        double r = d - e;
+        if (r > 0.5)
+        {
+            return e + 1.0;
+        }
+        if (r == 0.5)
+        {
+            return (i & 1) ? (e + 1.0) : e;
+        }
+        if (r == -0.5)
+        {
+            return (i & 1) ? (e - 1.0) : e;
+        }
+        if (r < -0.5)
+        {
+            return e - 1.0;
+        }
+        return e;
+    }
+}
 
 #endif /* ! IEEE_FLOATING_POINT */
