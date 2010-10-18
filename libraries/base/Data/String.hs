@@ -9,18 +9,26 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Things related to the String type.
+-- The @String@ type and associated operations.
 --
 -----------------------------------------------------------------------------
 
 module Data.String (
    String
  , IsString(..)
+
+ -- * Functions on strings
+ , lines
+ , words
+ , unlines
+ , unwords
  ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 #endif
+
+import Data.List (lines, words, unlines, unwords)
 
 -- | Class for string-like datastructures; used by the overloaded string
 --   extension (-foverloaded-strings in GHC).
