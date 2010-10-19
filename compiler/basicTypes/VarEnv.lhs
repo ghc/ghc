@@ -14,6 +14,7 @@ module VarEnv (
 	extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnvList,
 	plusVarEnv, plusVarEnv_C,
 	delVarEnvList, delVarEnv,
+        minusVarEnv, intersectsVarEnv,
 	lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
 	mapVarEnv, zipVarEnv,
 	modifyVarEnv, modifyVarEnv_Directly,
@@ -28,7 +29,7 @@ module VarEnv (
 	emptyInScopeSet, mkInScopeSet, delInScopeSet,
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
 	getInScopeVars, lookupInScope, lookupInScope_Directly, 
-        elemInScopeSet, uniqAway, 
+        unionInScope, elemInScopeSet, uniqAway, 
 
 	-- * The RnEnv2 type
 	RnEnv2, 
@@ -120,6 +121,10 @@ lookupInScope (InScope in_scope _) v  = lookupVarEnv in_scope v
 lookupInScope_Directly :: InScopeSet -> Unique -> Maybe Var
 lookupInScope_Directly (InScope in_scope _) uniq
   = lookupVarEnv_Directly in_scope uniq
+
+unionInScope :: InScopeSet -> InScopeSet -> InScopeSet
+unionInScope (InScope s1 _) (InScope s2 n2)
+  = InScope (s1 `plusVarEnv` s2) n2
 \end{code}
 
 \begin{code}
@@ -352,6 +357,8 @@ filterVarEnv_Directly :: (Unique -> a -> Bool) -> VarEnv a -> VarEnv a
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv	  :: VarEnv a -> Var -> VarEnv a
+minusVarEnv       :: VarEnv a -> VarEnv a -> VarEnv a
+intersectsVarEnv  :: VarEnv a -> VarEnv a -> Bool
 plusVarEnv_C	  :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 mapVarEnv	  :: (a -> b) -> VarEnv a -> VarEnv b
 modifyVarEnv	  :: (a -> a) -> VarEnv a -> Var -> VarEnv a
@@ -377,6 +384,8 @@ extendVarEnvList = addListToUFM
 plusVarEnv_C	 = plusUFM_C
 delVarEnvList	 = delListFromUFM
 delVarEnv	 = delFromUFM
+minusVarEnv      = minusUFM
+intersectsVarEnv e1 e2 = not (isEmptyVarEnv (e1 `intersectUFM` e2))
 plusVarEnv	 = plusUFM
 lookupVarEnv	 = lookupUFM
 lookupWithDefaultVarEnv = lookupWithDefaultUFM
