@@ -343,20 +343,28 @@ growWantedEVs gbl_tvs ws tvs
   | isEmptyBag ws = tvs
   | otherwise     = fixVarSet (\tvs -> foldrBag (growWantedEV gbl_tvs) tvs ws) tvs
 
+growEvVar    :: TyVarSet -> EvVar            -> TyVarSet -> TyVarSet
 growWantedEV :: TyVarSet -> WantedEvVar      -> TyVarSet -> TyVarSet
 growWanted   :: TyVarSet -> WantedConstraint -> TyVarSet -> TyVarSet
 -- (growX gbls wanted tvs) grows a seed 'tvs' against the 
 -- X-constraint 'wanted', nuking the 'gbls' at each stage
-growWantedEV gbl_tvs wev tvs
+
+growEvVar gbl_tvs ev tvs
   = tvs `unionVarSet` (ev_tvs `minusVarSet` gbl_tvs)
   where
-    ev_tvs = growPredTyVars (wantedEvVarPred wev) tvs
+    ev_tvs = growPredTyVars (evVarPred ev) tvs
+
+growWantedEV gbl_tvs wev tvs = growEvVar gbl_tvs (wantedEvVarToVar wev) tvs
 
 growWanted gbl_tvs (WcEvVar wev) tvs
   = growWantedEV gbl_tvs wev tvs
 growWanted gbl_tvs (WcImplic implic) tvs
-  = foldrBag (growWanted (gbl_tvs `unionVarSet` ic_skols implic)) 
-             tvs (ic_wanted implic)
+  = foldrBag (growWanted inner_gbl_tvs) 
+             (foldr (growEvVar inner_gbl_tvs) tvs (ic_given implic))
+	     	    -- Must grow over inner givens too
+             (ic_wanted implic)
+  where
+    inner_gbl_tvs = gbl_tvs `unionVarSet` ic_skols implic
 
 --------------------
 quantifyMe :: TyVarSet      -- Quantifying over these
@@ -369,8 +377,13 @@ quantifyMe qtvs wev
     pred = wantedEvVarPred wev
 
 quantifyMeWC :: TyVarSet -> WantedConstraint -> Bool
+-- False => we can *definitely* float the WantedConstraint out
 quantifyMeWC qtvs (WcImplic implic)
-  = anyBag (quantifyMeWC (qtvs `minusVarSet` ic_skols implic)) (ic_wanted implic)
+  =  (tyVarsOfEvVars (ic_given implic) `intersectsVarSet` inner_qtvs)
+  || anyBag (quantifyMeWC inner_qtvs) (ic_wanted implic)
+  where
+    inner_qtvs = qtvs `minusVarSet` ic_skols implic
+
 quantifyMeWC qtvs (WcEvVar wev)
   = quantifyMe qtvs wev
 \end{code}
