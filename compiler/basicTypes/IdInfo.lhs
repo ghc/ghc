@@ -64,7 +64,7 @@ module IdInfo (
         TickBoxOp(..), TickBoxId,
     ) where
 
-import CoreSyn ( CoreRule, setRuleIdName, seqRules, Unfolding, noUnfolding )
+import CoreSyn
 
 import Class
 import PrimOp
@@ -243,9 +243,8 @@ setUnfoldingInfoLazily info uf 	-- Lazy variant to avoid looking at the
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf 
-	-- We do *not* seq on the unfolding info, For some reason, doing so 
-	-- actually increases residency significantly. 
-  = info { unfoldingInfo = uf }
+  = seqUnfolding uf `seq`
+    info { unfoldingInfo = uf }
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setArityInfo	  info ar  = info { arityInfo = ar  }
