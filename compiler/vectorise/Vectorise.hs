@@ -168,7 +168,7 @@ vectTopBinder var inline expr
       vty  <- vectType (idType var)
 
       -- Make the vectorised version of binding's name, and set the unfolding used for inlining.
-      var' <- liftM (`setIdUnfolding` unfolding) 
+      var' <- liftM (`setIdUnfoldingLazily` unfolding) 
            $  cloneId mkVectOcc var vty
 
       -- Add the mapping between the plain and vectorised name to the state.
