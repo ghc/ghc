@@ -772,7 +772,7 @@ mkStgRhs rhs_fvs srt binder_info rhs
     assumptions (namely that they will be entered only once).
 
     upd_flag | isPAP env rhs  = ReEntrant
-             | otherwise      = Updatable
+	     | otherwise      = Updatable
   -}
 
 {- ToDo:

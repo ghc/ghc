@@ -465,6 +465,58 @@ thePipeline = [ ("interact with inert eqs", interactWithInertEqsStage)
 *                                                                               *
 *********************************************************************************
 
+Note [Efficient Orientation] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two cases where we have to be careful about 
+orienting equalities to get better efficiency. 
+
+Case 1: In Spontaneous Solving 
+
+     The OrientFlag is used to preserve the original orientation of a
+     spontaneously solved equality (insofar the canonical constraints
+     invariants allow it). This way we hope to be more efficient since
+     when reaching the spontaneous solve stage, a particular
+     constraint has already been inert-ified wrt to the preexisting
+     inerts.
+
+     Example: 
+     Inerts:   [w1] : D alpha 
+               [w2] : C beta 
+               [w3] : F alpha ~ Int 
+               [w4] : H beta  ~ Int 
+     Untouchables = [beta] 
+     Then a wanted (beta ~ alpha) comes along. 
+
+        1) While interacting with the inerts it is going to kick w2,w4
+           out of the inerts
+        2) Then, it will spontaneoulsy be solved by (alpha := beta)
+        3) Now (and here is the tricky part), to add him back as
+           solved (alpha ~ beta) is no good because, in the next
+           iteration, it will kick out w1,w3 as well so we will end up
+           with *all* the inert equalities back in the worklist!
+
+     So, we instead solve (alpha := beta), but we preserve the
+     original orientation, so that we get a given (beta ~ alpha),
+     which will result in no more inerts getting kicked out of the
+     inert set in the next iteration.
+
+Case 2: In Rewriting Equalities (function rewriteEqLHS) 
+
+    When rewriting two equalities with the same LHS:
+          (a)  (tv ~ xi1) 
+          (b)  (tv ~ xi2) 
+    We have a choice of producing work (xi1 ~ xi2) (up-to the
+    canonicalization invariants) However, to prevent the inert items
+    from getting kicked out of the inerts first, we prefer to
+    canonicalize (xi1 ~ xi2) if (b) comes from the inert set, or (xi2
+    ~ xi1) if (a) comes from the inert set.
+    
+    This choice is implemented using the WhichComesFromInert flag. 
+
+Case 3: Functional Dependencies and IP improvement work
+    TODO. Optimisation not yet implemented there. 
+
 \begin{code}
 spontaneousSolveStage :: SimplifierStage 
 spontaneousSolveStage workItem inerts 
@@ -481,6 +533,10 @@ spontaneousSolveStage workItem inerts
                            , sr_stop     = Stop }
        }
 
+
+data OrientFlag = OrientThisWay 
+                | OrientOtherWay -- See Note [Efficient Orientation]
+
 -- @trySpontaneousSolve wi@ solves equalities where one side is a
 -- touchable unification variable. Returns:
 --   * Nothing if we were not able to solve it
@@ -488,7 +544,7 @@ spontaneousSolveStage workItem inerts
 --     	    See Note [Touchables and givens] 
 -- NB: just passing the inerts through for the skolem equivalence classes
 trySpontaneousSolve :: WorkItem -> InertSet -> TcS (Maybe SWorkList)
-trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_rhs = xi }) inerts 
+trySpontaneousSolve workItem@(CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_rhs = xi }) inerts 
   | isGiven gw
   = return Nothing
   | Just tv2 <- tcGetTyVar_maybe xi
@@ -496,13 +552,15 @@ trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_r
        ; tch2 <- isTouchableMetaTyVar tv2
        ; case (tch1, tch2) of
            (True,  True)  -> trySpontaneousEqTwoWay inerts cv gw tv1 tv2
-           (True,  False) -> trySpontaneousEqOneWay inerts cv gw tv1 xi
-           (False, True)  -> trySpontaneousEqOneWay inerts cv gw tv2 (mkTyVarTy tv1)
+           (True,  False) -> trySpontaneousEqOneWay OrientThisWay  inerts cv gw tv1 xi
+           (False, True)  -> trySpontaneousEqOneWay OrientOtherWay inerts cv gw tv2 (mkTyVarTy tv1)
 	   _ -> return Nothing }
   | otherwise
   = do { tch1 <- isTouchableMetaTyVar tv1
-       ; if tch1 then trySpontaneousEqOneWay inerts cv gw tv1 xi
-                 else return Nothing }
+       ; if tch1 then trySpontaneousEqOneWay OrientThisWay inerts cv gw tv1 xi
+                 else do { traceTcS "Untouchable LHS, can't spontaneously solve workitem:" (ppr workItem) 
+                         ; return Nothing }
+       }
 
   -- No need for 
   --      trySpontaneousSolve (CFunEqCan ...) = ...
@@ -510,20 +568,26 @@ trySpontaneousSolve (CTyEqCan { cc_id = cv, cc_flavor = gw, cc_tyvar = tv1, cc_r
 trySpontaneousSolve _ _ = return Nothing 
 
 ----------------
-trySpontaneousEqOneWay :: InertSet -> CoVar -> CtFlavor -> TcTyVar -> Xi
+trySpontaneousEqOneWay :: OrientFlag 
+                       -> InertSet -> CoVar -> CtFlavor -> TcTyVar -> Xi 
                        -> TcS (Maybe SWorkList)
--- tv is a MetaTyVar, not untouchable
-trySpontaneousEqOneWay inerts cv gw tv xi	
+-- NB: The OrientFlag is there to help us recover the orientation of the original 
+-- constraint which is important for enforcing the canonical constraints invariants. 
+-- Also, tv is a MetaTyVar, not untouchable
+trySpontaneousEqOneWay or_flag inerts cv gw tv xi	
   | not (isSigTyVar tv) || isTyVarTy xi 
-  = if typeKind xi `isSubKind` tyVarKind tv then
-        solveWithIdentity inerts cv gw tv xi
-    else if tyVarKind tv `isSubKind` typeKind xi then 
+  = do { kxi <- zonkTcTypeTcS xi >>= return . typeKind  -- Must look through the TcTyBinds
+                                                        -- hence kxi and not typeKind xi
+                                                        -- See Note [Kind Errors]
+       ; if kxi `isSubKind` tyVarKind tv then
+             solveWithIdentity or_flag inerts cv gw tv xi
+         else if tyVarKind tv `isSubKind` kxi then 
              return Nothing -- kinds are compatible but we can't solveWithIdentity this way
                             -- This case covers the  a_touchable :: * ~ b_untouchable :: ?? 
                             -- which has to be deferred or floated out for someone else to solve 
                             -- it in a scope where 'b' is no longer untouchable. 
          else kindErrorTcS gw (mkTyVarTy tv) xi -- See Note [Kind errors]
-
+       }
   | otherwise -- Still can't solve, sig tyvar and non-variable rhs
   = return Nothing 
 
@@ -533,9 +597,9 @@ trySpontaneousEqTwoWay :: InertSet -> CoVar -> CtFlavor -> TcTyVar -> TcTyVar
 -- Both tyvars are *touchable* MetaTyvars so there is only a chance for kind error here
 trySpontaneousEqTwoWay inerts cv gw tv1 tv2
   | k1 `isSubKind` k2
-  , nicer_to_update_tv2 = solveWithIdentity inerts cv gw tv2 (mkTyVarTy tv1)
+  , nicer_to_update_tv2 = solveWithIdentity OrientOtherWay inerts cv gw tv2 (mkTyVarTy tv1)
   | k2 `isSubKind` k1 
-  = solveWithIdentity inerts cv gw tv1 (mkTyVarTy tv2) 
+  = solveWithIdentity OrientThisWay inerts cv gw tv1 (mkTyVarTy tv2) 
   | otherwise -- None is a subkind of the other, but they are both touchable! 
   = kindErrorTcS gw (mkTyVarTy tv1) (mkTyVarTy tv2) -- See Note [Kind errors]
   where
@@ -555,6 +619,17 @@ get quantified over in inference mode. That's bad because we do know at this poi
 constraint is insoluble. Instead, we call 'kindErrorTcS' here, which immediately fails. 
 
 The same applies in canonicalization code in case of kind errors in the givens. 
+
+However, when we canonicalize givens we only check for compatibility (@compatKind@). 
+If there were a kind error in the givens, this means some form of inconsistency or dead code. 
+
+When we spontaneously solve wanteds we may have to look through the bindings, hence we 
+call zonkTcTypeTcS above. The reason is that maybe xi is @alpha@ where alpha :: ? and 
+a previous spontaneous solving has set (alpha := f) with (f :: *). The reason that xi is 
+still alpha and not f is becasue the solved constraint may be oriented as (f ~ alpha) instead
+of (alpha ~ f). Then we should be using @xi@s "real" kind, which is * and not ?, when we try
+to detect whether spontaneous solving is possible. 
+
 
 Note [Spontaneous solving and kind compatibility] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -585,8 +660,11 @@ Caveat:
      Whereas we would be able to apply the type instance, we would not be able to 
      use the given (T Bool ~ (->)) in the body of 'flop' 
 
-Note [Loopy spontaneous solving] 
+Note [Loopy Spontaneous Solving] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Example 1: (The problem of loopy spontaneous solving) 
+****************************************************************************
 Consider the original wanted: 
    wanted :  Maybe (E alpha) ~ alpha 
 where E is a type family, such that E (T x) = x. After canonicalization, 
@@ -603,6 +681,8 @@ actually solving. But this occurs check *must look through* flatten skolems.
 However, it may be the case that the flatten skolem in hand is equal to some other 
 flatten skolem whith *does not* mention our unification variable. Here's a typical example:
 
+Example 2: (The need of keeping track of flatten skolem equivalence classes) 
+****************************************************************************
 Original wanteds: 
    g: F alpha ~ F beta 
    w: alpha ~ F alpha 
@@ -621,6 +701,8 @@ We will look inside f2, which immediately mentions (F alpha), so it's not good t
 by looking at the equivalence class of the flatten skolems, we can see that it is fine to 
 unify (alpha ~ f1) which solves our goals! 
 
+Example 3: (The need of looking through TyBinds for already spontaneously solved variables)
+*******************************************************************************************
 A similar problem happens because of other spontaneous solving. Suppose we have the 
 following wanteds, arriving in this exact order:
   (first)  w: beta ~ alpha 
@@ -634,6 +716,27 @@ that is wrong since fsk mentions beta, which has already secretly been unified t
 To avoid this problem, the same occurs check must unveil rewritings that can happen because 
 of spontaneously having solved other constraints. 
 
+Example 4: (Orientation of (tv ~ xi) equalities) 
+************************************************
+We orient equalities (tv ~ xi) so that flatten skolems appear on the left, if possible. Here
+is an example of why this is needed: 
+
+  [Wanted] w1: alpha ~ fsk 
+  [Given]  g1: F alpha ~ fsk 
+  [Given]  g2: b ~ fsk 
+  Flatten skolem equivalence class = [] 
+
+Assume that g2 is *not* oriented properly, as shown above. Then we would like to spontaneously
+solve w1 but we can't set alpha := fsk, since fsk hides the type F alpha. However, by using 
+the equation g2 it would be possible to solve w1 by setting  alpha := b. In other words, it is
+not enough to look at a flatten skolem equivalence class to try to find alternatives to unify
+with. We may have to go to other variables. 
+
+By orienting the equalities so that flatten skolems are in the LHS we are eliminating them
+as much as possible from the RHS of other wanted equalities, and hence it suffices to look 
+in their flatten skolem equivalence classes. 
+
+This situation appears in the IndTypesPerf test case, inside indexed-types/.
 
 Note [Avoid double unifications] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -655,7 +758,8 @@ unification variables as RHS of type family equations: F xis ~ alpha.
 
 \begin{code}
 ----------------
-solveWithIdentity :: InertSet 
+solveWithIdentity :: OrientFlag 
+                  -> InertSet 
                   -> CoVar -> CtFlavor -> TcTyVar -> Xi 
                   -> TcS (Maybe SWorkList)
 -- Solve with the identity coercion 
@@ -663,7 +767,7 @@ solveWithIdentity :: InertSet
 -- Precondition: CtFlavor is Wanted or Derived
 -- See [New Wanted Superclass Work] to see why solveWithIdentity 
 --     must work for Derived as well as Wanted
-solveWithIdentity inerts cv gw tv xi 
+solveWithIdentity or_flag inerts cv gw tv xi 
   = do { tybnds <- getTcSTyBindsMap
        ; case occurCheck tybnds inerts tv xi of 
            Nothing              -> return Nothing 
@@ -676,19 +780,22 @@ solveWithIdentity inerts cv gw tv xi
                              text "Left  Kind is     : " <+> ppr (typeKind (mkTyVarTy tv)),
                              text "Right Kind is     : " <+> ppr (typeKind xi)
                   ]
-           ; setWantedTyBind tv xi_unflat        -- Set tv := xi_unflat
-           ; cv_given <- newGivOrDerCoVar (mkTyVarTy tv) xi_unflat xi_unflat
+--           ; setWantedTyBind tv xi_unflat        -- Set tv := xi_unflat
+--           ; cv_given <- newGivOrDerCoVar (mkTyVarTy tv) xi_unflat xi_unflat
            ; let flav = mkGivenFlavor gw UnkSkol 
            ; (cts, co) <- case coi of 
-               ACo co  -> do { can_eqs <- canEq flav cv_given (mkTyVarTy tv) xi_unflat
+               ACo co  -> do { cv_given <- newGivOrDerCoVar (mkTyVarTy tv)  xi_unflat xi_unflat
+                             ; setWantedTyBind tv xi_unflat
+                             ; can_eqs <- case or_flag of 
+                                            OrientThisWay  -> canEq flav cv_given (mkTyVarTy tv) xi_unflat
+                                            OrientOtherWay -> canEq flav cv_given xi_unflat (mkTyVarTy tv) 
                              ; return (can_eqs, co) }
-               IdCo co -> return $ 
-                          (singleCCan (CTyEqCan { cc_id = cv_given 
-                                                , cc_flavor = mkGivenFlavor gw UnkSkol
-                                                , cc_tyvar = tv, cc_rhs = xi }
-                                                -- xi, *not* xi_unflat because 
-                                                -- xi_unflat may require flattening!
-                                      ), co)
+               IdCo co -> do { cv_given <- newGivOrDerCoVar (mkTyVarTy tv) xi xi 
+                             ; setWantedTyBind tv xi
+                             ; can_eqs <- case or_flag of 
+                                            OrientThisWay  -> canEq flav cv_given (mkTyVarTy tv) xi
+                                            OrientOtherWay -> canEq flav cv_given xi (mkTyVarTy tv)
+                             ; return (can_eqs, co) }
            ; case gw of 
                Wanted  {} -> setWantedCoBind  cv co
                Derived {} -> setDerivedCoBind cv co 
@@ -826,6 +933,7 @@ noInteraction :: Monad m => WorkItem -> m InteractResult
 noInteraction workItem = mkIRContinue workItem KeepInert emptyWorkList
 
 data WhichComesFromInert = LeftComesFromInert | RightComesFromInert 
+     -- See Note [Efficient Orientation, Case 2] 
 
 
 ---------------------------------------------------
@@ -1167,10 +1275,7 @@ rewriteEqRHS (cv1,tv1,xi1) (cv2,gw,tv2,xi2)
                     mkCoVarCoercion cv2 `mkTransCoercion` co2'
 
        ; xi2'' <- canOccursCheck gw tv2 xi2' -- we know xi2' is *not* tv2 
-       ; return (singleCCan $ CTyEqCan { cc_id = cv2' 
-                                       , cc_flavor = gw 
-                                       , cc_tyvar = tv2 
-                                       , cc_rhs   = xi2'' })
+       ; canEq gw cv2' (mkTyVarTy tv2) xi2''
        }
   where 
     xi2' = substTyWith [tv1] [xi1] xi2 
@@ -1182,11 +1287,8 @@ rewriteEqLHS :: WhichComesFromInert -> (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> T
 -- First Equality:   co1: (XXX ~ xi1)  
 -- Second Equality:  cv2: (XXX ~ xi2) 
 -- Where the cv1 `canSolve` cv2 equality 
--- We have an option of creating new work (xi1 ~ xi2) OR (xi2 ~ xi1). This 
--- depends on whether the left or the right equality comes from the inert set. 
--- We must:  
---     prefer to create (xi2 ~ xi1) if the first comes from the inert 
---     prefer to create (xi1 ~ xi2) if the second comes from the inert 
+-- We have an option of creating new work (xi1 ~ xi2) OR (xi2 ~ xi1), 
+--    See Note [Efficient Orientation] for that 
 rewriteEqLHS which (co1,xi1) (cv2,gw,xi2) 
   = do { cv2' <- case (isWanted gw, which) of 
                    (True,LeftComesFromInert) ->

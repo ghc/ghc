@@ -44,6 +44,10 @@ module TcSMonad (
 
     isGoodRecEv,
 
+    zonkTcTypeTcS,                              -- Zonk through the TyBinds of the Tcs Monad
+    compatKind,
+
+
     isTouchableMetaTyVar,
     isTouchableMetaTyVar_InRange, 
 
@@ -144,13 +148,16 @@ data CanonicalCt
   | CTyEqCan {  -- tv ~ xi	(recall xi means function free)
        -- Invariant: 
        --   * tv not in tvs(xi)   (occurs check)
-       --   * If constraint is given then typeKind xi ==  typeKind tv 
-       --      See Note [Spontaneous solving and kind compatibility] 
-       --          in TcInteract  
+       --   * If constraint is given then typeKind xi `compatKind` typeKind tv 
+       --                See Note [Spontaneous solving and kind compatibility] 
+       --   * if xi is a flatten skolem then tv must be a flatten skolem
+       --     i.e. equalities prefer flatten skolems in their LHS. 
+       --                See Note [Loopy Spontaneous Solving, Example 4]
+       --                Also related to [Flatten Skolem Equivalence Classes]
       cc_id     :: EvVar, 
       cc_flavor :: CtFlavor, 
-      cc_tyvar :: TcTyVar, 
-      cc_rhs   :: Xi
+      cc_tyvar  :: TcTyVar, 
+      cc_rhs    :: Xi
     }
 
   | CFunEqCan {  -- F xis ~ xi  
@@ -158,7 +165,7 @@ data CanonicalCt
                  --            * cc_rhs is not a touchable unification variable 
                  --                   See Note [No touchables as FunEq RHS]
                  --            * If constraint is given then 
-                 --                 typeKind (TyConApp cc_fun cc_tyargs) == typeKind cc_rhs
+                 --                 typeKind (TyConApp cc_fun cc_tyargs) `compatKind` typeKind cc_rhs
       cc_id     :: EvVar,
       cc_flavor :: CtFlavor, 
       cc_fun    :: TyCon,	-- A type function
@@ -167,6 +174,9 @@ data CanonicalCt
       		      		--    we should have decomposed)
                    
     }
+
+compatKind :: Kind -> Kind -> Bool 
+compatKind k1 k2 = k1 `isSubKind` k2 || k2 `isSubKind` k1 
 
 makeGivens :: CanonicalCts -> CanonicalCts
 makeGivens = mapBag (\ct -> ct { cc_flavor = mkGivenFlavor (cc_flavor ct) UnkSkol })
@@ -881,6 +891,20 @@ matchFam tycon args
        -- DV: We never return MatchInstMany, since tcLookupFamInst never returns 
        -- multiple matches. Check. 
        }
+
+
+zonkTcTypeTcS :: TcType -> TcS TcType
+-- Zonk through the TyBinds of the Tcs Monad
+zonkTcTypeTcS ty 
+  = do { subst <- getTcSTyBindsMap >>= return . varEnvElts 
+       ; let (dom,rng)  = unzip subst 
+             apply_once = substTyWith dom rng 
+       ; let rng_idemp = [ substTyWith dom rng_idemp (apply_once t) | t <- rng ]
+       ; return (substTyWith dom rng_idemp ty) }
+
+                        
+
+
 
 
 -- Functional dependencies, instantiation of equations

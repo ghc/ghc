@@ -249,8 +249,9 @@ canEq fl cv ty1 ty2
 -- If one side is a variable, orient and flatten, 
 -- WITHOUT expanding type synonyms, so that we tend to 
 -- substitute a~Age rather than a~Int when type Age=Ing
-canEq fl cv (TyVarTy tv1) ty2 = canEqLeaf fl cv (VarCls tv1) (classify ty2)
-canEq fl cv ty1 (TyVarTy tv2) = canEqLeaf fl cv (classify ty1) (VarCls tv2)
+canEq fl cv ty1@(TyVarTy {}) ty2 = canEqLeaf fl cv (classify ty1) (classify ty2)
+canEq fl cv ty1 ty2@(TyVarTy {}) = canEqLeaf fl cv (classify ty1) (classify ty2)
+      -- NB: don't use VarCls directly because tv1 or tv2 may be scolems! 
 
 canEq fl cv (TyConApp fn tys) ty2 
   | isSynFamilyTyCon fn, length tys == tyConArity fn
@@ -490,17 +491,23 @@ inert set is an idempotent subustitution...
 
 \begin{code}
 data TypeClassifier 
-  = VarCls TcTyVar	-- Type variable
+  = FskCls TcTyVar      -- Flatten skolem 
+  | VarCls TcTyVar	-- *Non-flatten-skolem* variable 
   | FunCls TyCon [Type]	-- Type function, exactly saturated
   | OtherCls TcType	-- Neither of the above
 
 unClassify :: TypeClassifier -> TcType
-unClassify (VarCls tv)     = TyVarTy tv
-unClassify (FunCls fn tys) = TyConApp fn tys
-unClassify (OtherCls ty)   = ty
+unClassify (VarCls tv)      = TyVarTy tv
+unClassify (FskCls tv) = TyVarTy tv 
+unClassify (FunCls fn tys)  = TyConApp fn tys
+unClassify (OtherCls ty)    = ty
 
 classify :: TcType -> TypeClassifier
-classify (TyVarTy tv)      = VarCls tv
+
+classify (TyVarTy tv) 
+  | isTcTyVar tv, 
+    FlatSkol {} <- tcTyVarDetails tv = FskCls tv
+  | otherwise                        = VarCls tv
 classify (TyConApp tc tys) | isSynFamilyTyCon tc
                            , tyConArity tc == length tys
                            = FunCls tc tys
@@ -519,6 +526,7 @@ reOrient :: TypeClassifier -> TypeClassifier -> Bool
 --
 -- Postcondition: After re-orienting, first arg is not OTherCls
 reOrient (OtherCls {}) (FunCls {})   = True
+reOrient (OtherCls {}) (FskCls {})   = True
 reOrient (OtherCls {}) (VarCls {})   = True
 reOrient (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
 
@@ -529,22 +537,19 @@ reOrient (FunCls {})   (VarCls tv2)   = isMetaTyVar tv2
 reOrient (FunCls {}) _                = False   -- Fun/Other on rhs
 
 reOrient (VarCls tv1) (FunCls {})   = not (isMetaTyVar tv1)
+
+reOrient (VarCls {})  (FskCls {})   = True  
+      -- See Note [Loopy Spontaneous Solving, Example 4]
+
 reOrient (VarCls {})  (OtherCls {}) = False
-reOrient (VarCls {})  (VarCls {})   = False 
+reOrient (VarCls {})  (VarCls {})   = False
 
-{- 
--- Variables-variables are oriented according to their kind 
--- so that the following property has the best chance of
--- holding:   tv ~ xi
---   * If tv is a MetaTyVar, then typeKind xi <: typeKind tv 
---              a skolem,    then typeKind xi =  typeKind tv 
+reOrient (FskCls {}) (VarCls {})    = False 
+      -- See Note [Loopy Spontaneous Solving, Example 4]
 
-  | k1 `eqKind` k2 = False
-  | otherwise      = k1 `isSubKind` k2 
-  where
-    k1 = tyVarKind tv1
-    k2 = tyVarKind tv2
--} 
+reOrient (FskCls {}) (FskCls {})    = False
+reOrient (FskCls {}) (FunCls {})    = True 
+reOrient (FskCls {}) (OtherCls {})  = False 
 
 ------------------
 canEqLeaf :: CtFlavor -> CoVar 
@@ -578,8 +583,8 @@ canEqLeafOriented :: CtFlavor -> CoVar
 canEqLeafOriented fl cv cls1@(FunCls fn tys) s2 
   | let k1 = kindAppResult (tyConKind fn) tys, 
     let k2 = typeKind s2, 
-    isGiven fl && not (k1 `eqKind` k2)   -- Establish the kind invariant for CFunEqCan
-  = kindErrorTcS fl (unClassify cls1) s2 -- Eagerly fails, see Note [Kind errors] in TcInteract
+    isGiven fl && not (k1 `compatKind` k2) -- Establish the kind invariant for CFunEqCan
+  = kindErrorTcS fl (unClassify cls1) s2   -- Eagerly fails, see Note [Kind errors] in TcInteract
   | otherwise 
   = ASSERT2( isSynFamilyTyCon fn, ppr (unClassify cls1) )
     do { (xis1,ccs1) <- flattenMany fl tys -- flatten type function arguments
@@ -591,11 +596,19 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys) s2
                                   , cc_rhs    = xi2 }
        ; return $ ccs1 `andCCan` ccs2 `extendCCans` final_cc }
 
--- Otherwise, we have a variable on the left, so we flatten the RHS
--- and then do an occurs check.
+-- Otherwise, we have a variable on the left, so call canEqLeafTyVarLeft
+canEqLeafOriented fl cv (FskCls tv) s2 
+  = canEqLeafTyVarLeft fl cv tv s2 
 canEqLeafOriented fl cv (VarCls tv) s2 
-  | isGiven fl && not (k1 `eqKind` k2) -- Establish the kind invariant for CTyEqCan
-  = kindErrorTcS fl (mkTyVarTy tv) s2  -- Eagerly fails, see Note [Kind errors] in TcInteract
+  = canEqLeafTyVarLeft fl cv tv s2 
+canEqLeafOriented _ cv (OtherCls ty1) ty2 
+  = pprPanic "canEqLeaf" (ppr cv $$ ppr ty1 $$ ppr ty2)
+
+canEqLeafTyVarLeft :: CtFlavor -> CoVar -> TcTyVar -> TcType -> TcS CanonicalCts 
+-- Establish invariants of CTyEqCans 
+canEqLeafTyVarLeft fl cv tv s2 
+  | isGiven fl && not (k1 `compatKind` k2) -- Establish the kind invariant for CTyEqCan
+  = kindErrorTcS fl (mkTyVarTy tv) s2      -- Eagerly fails, see Note [Kind errors] in TcInteract
 
   | otherwise
   = do { (xi2,ccs2) <- flatten fl s2      -- flatten RHS
@@ -611,9 +624,6 @@ canEqLeafOriented fl cv (VarCls tv) s2
   where
     k1 = tyVarKind tv
     k2 = typeKind s2
-
-canEqLeafOriented _ cv (OtherCls ty1) ty2 
-  = pprPanic "canEqLeaf" (ppr cv $$ ppr ty1 $$ ppr ty2)
 
 -- See Note [Type synonyms and canonicalization].
 -- Check whether the given variable occurs in the given type.  We may
