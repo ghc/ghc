@@ -437,11 +437,67 @@ x0 ^ y0 | y0 < 0    = error "Negative exponent"
                   | otherwise = g (x * x) ((y - 1) `quot` 2) (x * z)
 
 -- | raise a number to an integral power
-{-# SPECIALISE (^^) ::
-        Rational -> Int -> Rational #-}
 (^^)            :: (Fractional a, Integral b) => a -> b -> a
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 
+-------------------------------------------------------
+-- Special power functions for Rational
+--
+-- see #4337
+--
+-- Rationale:
+-- For a legitimate Rational (n :% d), the numerator and denominator are
+-- coprime, i.e. they have no common prime factor.
+-- Therefore all powers (n ^ a) and (d ^ b) are also coprime, so it is
+-- not necessary to compute the greatest common divisor, which would be
+-- done in the default implementation at each multiplication step.
+-- Since exponentiation quickly leads to very large numbers and
+-- calculation of gcds is generally very slow for large numbers,
+-- avoiding the gcd leads to an order of magnitude speedup relatively
+-- soon (and an asymptotic improvement overall).
+--
+-- Note:
+-- We cannot use these functions for general Ratio a because that would
+-- change results in a multitude of cases.
+-- The cause is that if a and b are coprime, their remainders by any
+-- positive modulus generally aren't, so in the default implementation
+-- reduction occurs.
+--
+-- Example:
+-- (17 % 3) ^ 3 :: Ratio Word8
+-- Default:
+-- (17 % 3) ^ 3 = ((17 % 3) ^ 2) * (17 % 3)
+--              = ((289 `mod` 256) % 9) * (17 % 3)
+--              = (33 % 9) * (17 % 3)
+--              = (11 % 3) * (17 % 3)
+--              = (187 % 9)
+-- But:
+-- ((17^3) `mod` 256) % (3^3)   = (4913 `mod` 256) % 27
+--                              = 49 % 27
+--
+-- TODO:
+-- Find out whether special-casing for numerator, denominator or
+-- exponent = 1 (or -1, where that may apply) gains something.
+
+-- Special version of (^) for Rational base
+{-# RULES "(^)/Rational"    (^) = (^%^) #-}
+(^%^)           :: Integral a => Rational -> a -> Rational
+(n :% d) ^%^ e
+    | e < 0     = error "Negative exponent"
+    | e == 0    = 1 :% 1
+    | otherwise = (n ^ e) :% (d ^ e)
+
+-- Special version of (^^) for Rational base
+{-# RULES "(^^)/Rational"   (^^) = (^^%^^) #-}
+(^^%^^)         :: Integral a => Rational -> a -> Rational
+(n :% d) ^^%^^ e
+    | e > 0     = (n ^ e) :% (d ^ e)
+    | e == 0    = 1 :% 1
+    | n > 0     = (d ^ (negate e)) :% (n ^ (negate e))
+    | n == 0    = error "Ratio.%: zero denominator"
+    | otherwise = let nn = d ^ (negate e)
+                      dd = (negate n) ^ (negate e)
+                  in if even e then (nn :% dd) else (negate nn :% dd)
 
 -------------------------------------------------------
 -- | @'gcd' x y@ is the greatest (positive) integer that divides both @x@
