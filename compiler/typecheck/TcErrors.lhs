@@ -396,7 +396,7 @@ typeExtraInfoMsg env ty
   | Just tv <- tcGetTyVar_maybe ty
   , isTcTyVar tv
   , isSkolemTyVar tv || isSigTyVar tv
-  , not (isUnk tv)
+  , not (isUnkSkol tv)
   , let (env1, tv1) = tidySkolemTyVar env tv
   = (env1, pprSkolTvBinding tv1)
   where
@@ -533,10 +533,11 @@ mkMonomorphismMsg :: ReportErrCtxt -> [TcTyVar] -> TcM (TidyEnv, SDoc)
 -- ASSUMPTION: the Insts are fully zonked
 mkMonomorphismMsg ctxt inst_tvs
   = do	{ dflags <- getDOpts
-	; (tidy_env, docs) <- findGlobals ctxt (mkVarSet inst_tvs)
+	; traceTc "Mono" (vcat (map pprSkolTvBinding inst_tvs))
+        ; (tidy_env, docs) <- findGlobals ctxt (mkVarSet inst_tvs)
 	; return (tidy_env, mk_msg dflags docs) }
   where
-    mk_msg _ _ | any isRuntimeUnk inst_tvs
+    mk_msg _ _ | any isRuntimeUnkSkol inst_tvs  -- See Note [Runtime skolems]
         =  vcat [ptext (sLit "Cannot resolve unknown runtime types:") <+>
                    (pprWithCommas ppr inst_tvs),
                 ptext (sLit "Use :print or :force to determine these types")]
@@ -635,6 +636,22 @@ warnDefaulting wanteds default_ty
 		      nest 2 ppr_wanteds ]
     (loc, ppr_wanteds) = pprWithArising wanteds
 \end{code}
+
+Note [Runtime skolems]
+~~~~~~~~~~~~~~~~~~~~~~
+We want to give a reasonably helpful error message for ambiguity
+arising from *runtime* skolems in the debugger.  Mostly these
+are created by in RtClosureInspec.zonkRTTIType.  However at a 
+breakpoint we return Ids from the CoreExpr, whose types may have
+free type variables bound by some enclosing 'forall'.  These are
+UnkSkols, created ty TcType.zonkQuantifiedTyVar.  
+
+These UnkSkols should never show up as ambiguous type variables in
+normal typechecking, so we hackily emit the debugger-related message
+both for RuntimeUnkSkols and UnkSkols. Hence the two cases in
+TcType.isRuntimeUnkSkol. Yuk. The rest of the debugger is such
+a mess that I don't feel motivated to clean up this bit.
+
 
 %************************************************************************
 %*									*

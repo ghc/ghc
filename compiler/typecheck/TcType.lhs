@@ -30,7 +30,7 @@ module TcType (
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy,
   isSigTyVar, isExistentialTyVar,  isTyConableTyVar,
   metaTvRef, 
-  isFlexi, isIndirect, isRuntimeUnk, isUnk,
+  isFlexi, isIndirect, isUnkSkol, isRuntimeUnkSkol,
 
   --------------------------------
   -- Builders
@@ -335,6 +335,7 @@ data SkolemInfo
 
   | RuleSkol RuleName	-- The LHS of a RULE
   | GenSkol TcType	-- Bound when doing a subsumption check for ty
+
   | RuntimeUnkSkol      -- a type variable used to represent an unknown
                         -- runtime type (used in the GHCi debugger)
 
@@ -670,15 +671,21 @@ isFlexi _     = False
 isIndirect (Indirect _) = True
 isIndirect _            = False
 
-isRuntimeUnk :: TyVar -> Bool
-isRuntimeUnk x | isTcTyVar x
-               , SkolemTv RuntimeUnkSkol <- tcTyVarDetails x = True
-               | otherwise = False
+isRuntimeUnkSkol :: TyVar -> Bool
+-- Called only in TcErrors; see Note [Runtime skolems] there
+isRuntimeUnkSkol x 
+  | isTcTyVar x
+  , SkolemTv info <- tcTyVarDetails x 
+  = case info of 
+       UnkSkol -> True
+       RuntimeUnkSkol -> True
+       _ -> False
+  | otherwise = False
 
-isUnk :: TyVar -> Bool
-isUnk x | isTcTyVar x
-        , SkolemTv UnkSkol <- tcTyVarDetails x = True
-        | otherwise = False
+isUnkSkol :: TyVar -> Bool
+isUnkSkol x | isTcTyVar x
+            , SkolemTv UnkSkol <- tcTyVarDetails x = True
+            | otherwise = False
 \end{code}
 
 
