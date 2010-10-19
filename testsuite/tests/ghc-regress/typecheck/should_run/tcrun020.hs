@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 -- Hugs (2001) diverges when evaluating main, unless (Monad m) is
 -- added as an extra superclass to C2, which should not be necessary.

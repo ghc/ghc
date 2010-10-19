@@ -1,9 +1,10 @@
 
-T2688.hs:8:16:
-    Couldn't match type `v' with `s'
-      `v' is a rigid type variable bound by
-          the class declaration for `VectorSpace' at T2688.hs:5:19
+T2688.hs:8:22:
+    Couldn't match type `s' with `v'
       `s' is a rigid type variable bound by
           the class declaration for `VectorSpace' at T2688.hs:5:21
+      `v' is a rigid type variable bound by
+          the class declaration for `VectorSpace' at T2688.hs:5:19
+    In the second argument of `(/)', namely `s'
+    In the second argument of `(*^)', namely `(1 / s)'
     In the expression: v *^ (1 / s)
-    In an equation for `^/': v ^/ s = v *^ (1 / s)

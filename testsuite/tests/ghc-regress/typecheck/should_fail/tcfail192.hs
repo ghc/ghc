@@ -1,4 +1,5 @@
--- Checks that the types of the old binder and the binder implicitly introduced by grouping are linked
+-- Checks that the types of the old binder and the binder 
+-- implicitly introduced by grouping are linked
 
 {-# OPTIONS_GHC -XTransformListComp #-}
 
