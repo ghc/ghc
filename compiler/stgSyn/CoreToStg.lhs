@@ -544,13 +544,15 @@ coreToStgApp _ f args = do
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
-
-    return (
-        app,
-        fun_fvs  `unionFVInfo` args_fvs,
-        fun_escs `unionVarSet` (getFVSet args_fvs)
+        fvs = fun_fvs  `unionFVInfo` args_fvs
+        vars = fun_escs `unionVarSet` (getFVSet args_fvs)
                                 -- All the free vars of the args are disqualified
                                 -- from being let-no-escaped.
+
+    app `seq` fvs `seq` seqVarSet vars `seq` return (
+        app,
+        fvs,
+        vars
      )
 
 
