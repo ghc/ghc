@@ -145,7 +145,8 @@ data CanonicalCt
        -- Invariant: 
        --   * tv not in tvs(xi)   (occurs check)
        --   * If constraint is given then typeKind xi ==  typeKind tv 
-       --                See Note [Spontaneous solving and kind compatibility] 
+       --      See Note [Spontaneous solving and kind compatibility] 
+       --          in TcInteract  
       cc_id     :: EvVar, 
       cc_flavor :: CtFlavor, 
       cc_tyvar :: TcTyVar, 
