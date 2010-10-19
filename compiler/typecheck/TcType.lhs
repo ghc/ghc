@@ -123,7 +123,8 @@ module TcType (
   -- Type substitutions
   TvSubst(..), 	-- Representation visible to a few friends
   TvSubstEnv, emptyTvSubst, substEqSpec,
-  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
+  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, 
+  mkTopTvSubst, notElemTvSubst, unionTvSubst,
   getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope, lookupTyVar,
   extendTvSubst, extendTvSubstList, isInScope, mkTvSubst, zipTyEnv,
   substTy, substTys, substTyWith, substTheta, substTyVar, substTyVars, substTyVarBndr,

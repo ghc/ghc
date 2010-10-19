@@ -50,7 +50,7 @@ module TcMType (
   --------------------------------
   -- Zonking
   zonkType, mkZonkTcTyVar, zonkTcPredType, 
-  zonkTcTypeCarefully,
+  zonkTcTypeCarefully, skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
@@ -133,17 +133,6 @@ newWantedEvVars theta = mapM newWantedEvVar theta
 
 newWantedCoVar :: TcType -> TcType -> TcM CoVar 
 newWantedCoVar ty1 ty2 = newCoVar ty1 ty2
-
--- We used to create a mutable co-var
-{-
--- A wanted coercion variable is a MetaTyVar
--- that can be filled in with its binding
-  = do { uniq <- newUnique 
-       ; ref <- newMutVar Flexi 
-       ; let name = mkSysTvName uniq (fsLit "c")
-             kind = mkPredTy (EqPred ty1 ty2) 
-       ; return (mkTcTyVar name kind (MetaTv TauTv ref)) }
--}
 
 --------------
 newEvVar :: TcPredType -> TcM EvVar
@@ -488,10 +477,10 @@ zonkTcTypeCarefully ty
       | otherwise
       = ASSERT( isTcTyVar tv )
     	case tcTyVarDetails tv of
-    	  SkolemTv {}    -> return (TyVarTy tv)
+    	  SkolemTv {}  -> return (TyVarTy tv)
     	  FlatSkol ty  -> zonkType (zonk_tv env_tvs) ty
-    	  MetaTv _ ref   -> do { cts <- readMutVar ref
-			       ; case cts of    
+    	  MetaTv _ ref -> do { cts <- readMutVar ref
+		             ; case cts of    
 			           Flexi       -> return (TyVarTy tv)
 			           Indirect ty -> zonkType (zonk_tv env_tvs) ty }
 
@@ -504,11 +493,11 @@ zonkTcTyVar :: TcTyVar -> TcM TcType
 zonkTcTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      SkolemTv {}    -> return (TyVarTy tv)
+      SkolemTv {}  -> return (TyVarTy tv)
       FlatSkol ty  -> zonkTcType ty
-      MetaTv _ ref   -> do { cts <- readMutVar ref
-			   ; case cts of    
-			       Flexi       -> return (TyVarTy tv)
+      MetaTv _ ref -> do { cts <- readMutVar ref
+		         ; case cts of    
+		               Flexi       -> return (TyVarTy tv)
 			       Indirect ty -> zonkTcType ty }
 
 zonkTcTypeAndSubst :: TvSubst -> TcType -> TcM TcType
@@ -548,8 +537,6 @@ zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
 zonkQuantifiedTyVars = mapM zonkQuantifiedTyVar
 
 zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
--- zonkQuantifiedTyVar is applied to the a TcTyVar when quantifying over it.
---
 -- The quantified type variables often include meta type variables
 -- we want to freeze them into ordinary type variables, and
 -- default their kind (e.g. from OpenTypeKind to TypeKind)
@@ -560,35 +547,39 @@ zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 --
 -- We leave skolem TyVars alone; they are immutable.
 zonkQuantifiedTyVar tv
-  | ASSERT2( isTcTyVar tv, ppr tv ) 
-    isSkolemTyVar tv 
-  = do { kind <- zonkTcType (tyVarKind tv)
-       ; return $ setTyVarKind tv kind
-       }
+  = ASSERT2( isTcTyVar tv, ppr tv ) 
+    case tcTyVarDetails tv of
+      FlatSkol {} -> pprPanic "zonkQuantifiedTyVar" (ppr tv)
+      SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
+                        ; return $ setTyVarKind tv kind }
 	-- It might be a skolem type variable, 
 	-- for example from a user type signature
 
-  | otherwise	-- It's a meta-type-variable
-  = do	{ details <- readMetaTyVar tv
-
-	-- Create the new, frozen, skolem type variable
-        -- We zonk to a skolem, not to a regular TcVar
-        -- See Note [Zonking to Skolem]
-        ; uniq <- newUnique  -- Remove it from TcMetaTyVar unique land
+      MetaTv _ _ref -> 
+#ifdef DEBUG               
+			-- [Sept 04] Check for non-empty.  
+		 	-- See note [Silly Type Synonym]
+                      (readMutVar _ref >>= \cts -> 
+                       case cts of 
+                             Flexi -> return ()
+                             Indirect ty -> WARN( True, ppr tv $$ ppr ty ) 
+                                            return ()) >>
+#endif
+                      skolemiseUnboundMetaTyVar UnkSkol tv 
+                             
+skolemiseUnboundMetaTyVar :: SkolemInfo -> TcTyVar -> TcM TyVar
+-- We have a Meta tyvar with a ref-cell inside it
+-- Skolemise it, including giving it a new Name, so that
+--   we are totally out of Meta-tyvar-land
+-- We create a skolem TyVar, not a regular TyVar
+--   See Note [Zonking to Skolem]
+skolemiseUnboundMetaTyVar skol_info tv
+  = ASSERT2( isMetaTyVar tv, ppr tv ) 
+    do	{ uniq <- newUnique  -- Remove it from TcMetaTyVar unique land
 	; let final_kind = defaultKind (tyVarKind tv)
               final_name = setNameUnique (tyVarName tv) uniq
-	      final_tv   = mkSkolTyVar final_name final_kind UnkSkol
-
-	-- Bind the meta tyvar to the new tyvar
-	; case details of
-	    Indirect ty -> WARN( True, ppr tv $$ ppr ty ) 
-			   return ()
-		-- [Sept 04] I don't think this should happen
-		-- See note [Silly Type Synonym]
-
-	    Flexi -> writeMetaTyVar tv (mkTyVarTy final_tv)
-
-	-- Return the new tyvar
+	      final_tv   = mkSkolTyVar final_name final_kind skol_info
+	; writeMetaTyVar tv (mkTyVarTy final_tv)
 	; return final_tv }
 \end{code}
 
@@ -693,10 +684,8 @@ simplifier knows how to deal with.
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --	type variable and zonks the kind too
 
-zonkType :: (TcTyVar -> TcM Type) 	-- What to do with unbound mutable type variables
-					-- see zonkTcType, and zonkTcTypeToType
-         -> TcType
-	 -> TcM Type
+zonkType :: (TcTyVar -> TcM Type)  -- What to do with TcTyVars
+         -> TcType -> TcM Type
 zonkType zonk_tc_tyvar ty
   = go ty
   where
@@ -736,7 +725,7 @@ zonkType zonk_tc_tyvar ty
                                   ty2' <- go ty2
                                   return (EqPred ty1' ty2')
 
-mkZonkTcTyVar :: (TcTyVar -> TcM Type)	-- What to do for an unbound mutable var
+mkZonkTcTyVar :: (TcTyVar -> TcM Type)	-- What to do for an *mutable Flexi* var
  	      -> TcTyVar -> TcM TcType
 mkZonkTcTyVar unbound_var_fn tyvar 
   = ASSERT( isTcTyVar tyvar )

@@ -105,7 +105,7 @@ module Type (
 	getTvSubstEnv, setTvSubstEnv, zapTvSubstEnv, getTvInScope, 
         extendTvInScope, extendTvInScopeList,
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst, zipTyEnv,
-        isEmptyTvSubst,
+        isEmptyTvSubst, unionTvSubst,
 
 	-- ** Performing substitution on types
 	substTy, substTys, substTyWith, substTysWith, substTheta, 
@@ -1319,6 +1319,13 @@ extendTvSubst (TvSubst in_scope env) tv ty = TvSubst in_scope (extendVarEnv env 
 extendTvSubstList :: TvSubst -> [TyVar] -> [Type] -> TvSubst
 extendTvSubstList (TvSubst in_scope env) tvs tys 
   = TvSubst in_scope (extendVarEnvList env (tvs `zip` tys))
+
+unionTvSubst :: TvSubst -> TvSubst -> TvSubst
+-- Works when the ranges are disjoint
+unionTvSubst (TvSubst in_scope1 env1) (TvSubst in_scope2 env2)
+  = ASSERT( not (env1 `intersectsVarEnv` env2) )
+    TvSubst (in_scope1 `unionInScope` in_scope2)
+            (env1      `plusVarEnv`   env2)
 
 -- mkOpenTvSubst and zipOpenTvSubst generate the in-scope set from
 -- the types given; but it's just a thunk so with a bit of luck

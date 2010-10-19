@@ -123,7 +123,6 @@ import FamInstEnv	( FamInstEnv, FamInst )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import VarEnv
-import VarSet
 import Var
 import Id
 import Type		
@@ -1132,14 +1131,8 @@ data InteractiveContext
 	ic_rn_gbl_env :: GlobalRdrEnv,	-- ^ The contexts' cached 'GlobalRdrEnv', built from
 					-- 'ic_toplev_scope' and 'ic_exports'
 
-	ic_tmp_ids :: [Id],             -- ^ Names bound during interaction with the user.
+	ic_tmp_ids :: [Id]              -- ^ Names bound during interaction with the user.
                                         -- Later Ids shadow earlier ones with the same OccName.
-
-        ic_tyvars :: TyVarSet           -- ^ Skolem type variables free in
-                                        -- 'ic_tmp_ids'.  These arise at
-                                        -- breakpoints in a polymorphic 
-                                        -- context, where we have only partial
-                                        -- type information.
 
 #ifdef GHCI
         , ic_resume :: [Resume]         -- ^ The stack of breakpoint contexts
@@ -1154,8 +1147,7 @@ emptyInteractiveContext
   = InteractiveContext { ic_toplev_scope = [],
 			 ic_exports = [],
 			 ic_rn_gbl_env = emptyGlobalRdrEnv,
-			 ic_tmp_ids = [],
-                         ic_tyvars = emptyVarSet
+			 ic_tmp_ids = []
 #ifdef GHCI
                          , ic_resume = []
 #endif
@@ -1169,29 +1161,20 @@ icPrintUnqual dflags ictxt = mkPrintUnqualified dflags (ic_rn_gbl_env ictxt)
 extendInteractiveContext
         :: InteractiveContext
         -> [Id]
-        -> TyVarSet
         -> InteractiveContext
-extendInteractiveContext ictxt ids tyvars
-  = ictxt { ic_tmp_ids =  snub((ic_tmp_ids ictxt \\ ids) ++ ids),
+extendInteractiveContext ictxt ids
+  = ictxt { ic_tmp_ids =  snub ((ic_tmp_ids ictxt \\ ids) ++ ids)
                           -- NB. must be this way around, because we want
                           -- new ids to shadow existing bindings.
-            ic_tyvars   = ic_tyvars ictxt `unionVarSet` tyvars }
+          }
     where snub = map head . group . sort
 
 substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
 substInteractiveContext ictxt subst | isEmptyTvSubst subst = ictxt
-substInteractiveContext ictxt@InteractiveContext{ic_tmp_ids=ids} subst =
-   let ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
-       subst_dom= varEnvKeys$ getTvSubstEnv subst
-       subst_ran= varEnvElts$ getTvSubstEnv subst
-       new_tvs  = [ tv | Just tv <- map getTyVar_maybe subst_ran]  
-       ic_tyvars'= (`delVarSetListByKey` subst_dom) 
-                 . (`extendVarSetList`   new_tvs)
-                   $ ic_tyvars ictxt
-    in ictxt { ic_tmp_ids = ids'
-             , ic_tyvars   = ic_tyvars' }
-
-          where delVarSetListByKey = foldl' delVarSetByKey
+substInteractiveContext ictxt@InteractiveContext{ic_tmp_ids=ids} subst 
+  = ictxt { ic_tmp_ids = map subst_ty ids }
+  where
+   subst_ty id = id `setIdType` substTy subst (idType id)
 \end{code}
 
 %************************************************************************

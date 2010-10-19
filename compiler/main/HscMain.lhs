@@ -46,9 +46,10 @@ import CorePrep		( corePrepExpr )
 import Desugar          ( deSugarExpr )
 import SimplCore        ( simplifyExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnType ) 
-import Type		( Type )
+import Type		( Type, tyVarsOfTypes )
 import PrelNames	( iNTERACTIVE )
 import {- Kind parts of -} Type		( Kind )
+import Id      	     	( idType )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
 import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan, noSrcSpan, unLoc )
@@ -1046,7 +1047,7 @@ compileExpr hsc_env srcspan ds_expr
 		-- ToDo: improve SrcLoc
 	; if lint_on then 
                 let ictxt = hsc_IC hsc_env
-                    tyvars = varSetElems (ic_tyvars ictxt)
+                    tyvars = varSetElems (tyVarsOfTypes (map idType (ic_tmp_ids ictxt)))
                 in
 		case lintUnfolding noSrcLoc tyvars prepd_expr of
 		   Just err -> pprPanic "compileExpr" err

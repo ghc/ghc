@@ -52,15 +52,12 @@ pprintClosureCommand bindThings force str = do
   let ids = [id | AnId id <- tythings]
 
   -- Obtain the terms and the recovered type information
-  (terms, substs0) <- unzip `liftM` mapM go ids
+  (subst, terms) <- mapAccumLM go emptyTvSubst ids
 
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->
-    let (substs, skol_vars) = unzip$ map skolemiseSubst substs0
-        hsc_ic' = foldr (flip substInteractiveContext)
-                        (extendInteractiveContext (hsc_IC hsc_env) [] (unionVarSets skol_vars))
-                        substs
-     in hsc_env{hsc_IC = hsc_ic'}
+    hsc_env{hsc_IC = substInteractiveContext (hsc_IC hsc_env) subst}
+
   -- Finally, print the Terms
   unqual  <- GHC.getPrintUnqual
   docterms <- mapM showTerm terms
@@ -70,9 +67,10 @@ pprintClosureCommand bindThings force str = do
                     docterms)
  where
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
-   go :: GhcMonad m => Id -> m (Term, TvSubst)
-   go id = do
-       term_    <- GHC.obtainTermFromId maxBound force id
+   go :: GhcMonad m => TvSubst -> Id -> m (TvSubst, Term)
+   go subst id = do
+       let id' = id `setIdType` substTy subst (idType id) 
+       term_    <- GHC.obtainTermFromId maxBound force id'
        term     <- tidyTermTyVars term_
        term'    <- if bindThings &&
                       False == isUnliftedTypeKind (termType term)
@@ -82,19 +80,18 @@ pprintClosureCommand bindThings force str = do
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
        let reconstructed_type = termType term
-       mb_subst <- withSession $ \hsc_env ->
-                     liftIO $ improveRTTIType hsc_env (idType id) (reconstructed_type)
-       maybe (return ())
-             (\subst -> traceOptIf Opt_D_dump_rtti
-                   (fsep $ [text "RTTI Improvement for", ppr id,
-                           text "is the substitution:" , ppr subst]))
-             mb_subst
-       return (term', fromMaybe emptyTvSubst mb_subst)
+       hsc_env <- getSession
+       case (improveRTTIType hsc_env (idType id) (reconstructed_type)) of
+         Nothing     -> return (subst, term')
+         Just subst' -> do { traceOptIf Opt_D_dump_rtti
+                               (fsep $ [text "RTTI Improvement for", ppr id,
+                                text "is the substitution:" , ppr subst'])
+                           ; return (subst `unionTvSubst` subst', term')}
 
    tidyTermTyVars :: GhcMonad m => Term -> m Term
    tidyTermTyVars t =
      withSession $ \hsc_env -> do
-     let env_tvs      = ic_tyvars (hsc_IC hsc_env)
+     let env_tvs      = tyVarsOfTypes (map idType (ic_tmp_ids (hsc_IC hsc_env)))
          my_tvs       = termTyVars t
          tvs          = env_tvs `minusVarSet` my_tvs
          tyvarOccName = nameOccName . tyVarName
@@ -115,10 +112,9 @@ bindSuspensions t = do
       availNames_var  <- liftIO $ newIORef availNames
       (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
-          (tys', skol_vars)   = unzip $ map skolemiseTy tys
       let ids = [ mkVanillaGlobal name ty 
-                | (name,ty) <- zip names tys']
-          new_ic = extendInteractiveContext ictxt ids (unionVarSets skol_vars)
+                | (name,ty) <- zip names tys]
+          new_ic = extendInteractiveContext ictxt ids
       liftIO $ extendLinkEnv (zip names hvals)
       modifySession $ \_ -> hsc_env {hsc_IC = new_ic }
       return t'

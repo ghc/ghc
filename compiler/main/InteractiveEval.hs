@@ -29,8 +29,7 @@ module InteractiveEval (
 	showModule,
         isModuleInterpreted,
 	compileExpr, dynCompileExpr,
-        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
-        skolemiseSubst, skolemiseTy
+        Term(..), obtainTermFromId, obtainTermFromVal, reconstructType
 #endif
         ) where
 
@@ -110,7 +109,7 @@ data Resume
        resumeThreadId  :: ThreadId,     -- thread running the computation
        resumeBreakMVar :: MVar (),   
        resumeStatMVar  :: MVar Status,
-       resumeBindings  :: ([Id], TyVarSet),
+       resumeBindings  :: [Id],
        resumeFinalIds  :: [Id],         -- [Id] to bind on completion
        resumeApStack   :: HValue,       -- The object from which we can get
                                         -- value of the free variables.
@@ -223,7 +222,7 @@ runStmt expr step =
                 liftIO $ sandboxIO dflags' statusMVar thing_to_run
               
         let ic = hsc_IC hsc_env
-            bindings = (ic_tmp_ids ic, ic_tyvars ic)
+            bindings = ic_tmp_ids ic
 
         case step of
           RunAndLogSteps ->
@@ -261,7 +260,7 @@ emptyHistory :: BoundedList History
 emptyHistory = nilBL 50 -- keep a log of length 50
 
 handleRunStatus :: GhcMonad m =>
-                   String-> ([Id], TyVarSet) -> [Id]
+                   String-> [Id] -> [Id]
                 -> MVar () -> MVar Status -> Status -> BoundedList History
                 -> m RunResult
 handleRunStatus expr bindings final_ids breakMVar statusMVar status
@@ -275,9 +274,12 @@ handleRunStatus expr bindings final_ids breakMVar statusMVar status
         (hsc_env1, names, span) <- liftIO $ bindLocalsAtBreakpoint hsc_env apStack
                                                                mb_info
         let
-            resume = Resume expr tid breakMVar statusMVar 
-                              bindings final_ids apStack mb_info span 
-                              (toListBL history) 0
+            resume = Resume { resumeStmt = expr, resumeThreadId = tid
+                            , resumeBreakMVar = breakMVar, resumeStatMVar = statusMVar 
+                            , resumeBindings = bindings, resumeFinalIds = final_ids
+                            , resumeApStack = apStack, resumeBreakInfo = mb_info 
+                            , resumeSpan = span, resumeHistory = toListBL history
+                            , resumeHistoryIx = 0 }
             hsc_env2 = pushResume hsc_env1 resume
         --
         modifySession (\_ -> hsc_env2)
@@ -287,9 +289,7 @@ handleRunStatus expr bindings final_ids breakMVar statusMVar status
 	    Left e -> return (RunException e)
 	    Right hvals -> do
                 hsc_env <- getSession
-                let final_ic = extendInteractiveContext (hsc_IC hsc_env)
-                                        final_ids emptyVarSet
-                        -- the bound Ids never have any free TyVars
+                let final_ic = extendInteractiveContext (hsc_IC hsc_env) final_ids 
                     final_names = map idName final_ids
                 liftIO $ Linker.extendLinkEnv (zip final_names hvals)
                 hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
@@ -297,7 +297,7 @@ handleRunStatus expr bindings final_ids breakMVar statusMVar status
                 return (RunOk final_names)
 
 traceRunStatus :: GhcMonad m =>
-                  String -> ([Id], TyVarSet) -> [Id]
+                  String -> [Id] -> [Id]
                -> MVar () -> MVar Status -> Status -> BoundedList History
                -> m RunResult
 traceRunStatus expr bindings final_ids
@@ -457,9 +457,8 @@ resume canLogSpan step
         -- unbind the temporary locals by restoring the TypeEnv from
         -- before the breakpoint, and drop this Resume from the
         -- InteractiveContext.
-        let (resume_tmp_ids, resume_tyvars) = resumeBindings r
+        let resume_tmp_ids = resumeBindings r
             ic' = ic { ic_tmp_ids  = resume_tmp_ids,
-                       ic_tyvars   = resume_tyvars,
                        ic_resume   = rs }
         modifySession (\_ -> hsc_env{ hsc_IC = ic' })
         
@@ -471,8 +470,11 @@ resume canLogSpan step
         
         when (isStep step) $ liftIO setStepFlag
         case r of 
-          Resume expr tid breakMVar statusMVar bindings 
-              final_ids apStack info span hist _ -> do
+          Resume { resumeStmt = expr, resumeThreadId = tid
+                 , resumeBreakMVar = breakMVar, resumeStatMVar = statusMVar
+                 , resumeBindings = bindings, resumeFinalIds = final_ids
+                 , resumeApStack = apStack, resumeBreakInfo = info, resumeSpan = span
+                 , resumeHistory = hist } -> do
                withVirtualCWD $ do
                 withBreakAction (isStep step) (hsc_dflags hsc_env) 
                                         breakMVar statusMVar $ do
@@ -563,10 +565,9 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
        e_name    = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
        e_tyvar   = mkTcTyVar e_name liftedTypeKind (SkolemTv RuntimeUnkSkol)
        exn_id    = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
-       new_tyvars = unitVarSet e_tyvar
 
        ictxt0 = hsc_IC hsc_env
-       ictxt1 = extendInteractiveContext ictxt0 [exn_id] new_tyvars
+       ictxt1 = extendInteractiveContext ictxt0 [exn_id]
 
        span = mkGeneralSrcSpan (fsLit "<exception thrown>")
    --
@@ -616,9 +617,6 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
        result_id   = Id.mkVanillaGlobal result_name result_ty 
 
    -- for each Id we're about to bind in the local envt:
-   --    - skolemise the type variables in its type, so they can't
-   --      be randomly unified with other types.  These type variables
-   --      can only be resolved by type reconstruction in RtClosureInspect
    --    - tidy the type variables
    --    - globalise the Id (Ids are supposed to be Global, apparently).
    --
@@ -627,12 +625,11 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
 
        all_ids | result_ok = result_id : new_ids
                | otherwise = new_ids
-       (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
+       id_tys = map idType all_ids
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
-       new_tyvars = unionVarSets tyvarss             
        final_ids = zipWith setIdType all_ids tidy_tys
        ictxt0 = hsc_IC hsc_env
-       ictxt1 = extendInteractiveContext ictxt0 final_ids new_tyvars
+       ictxt1 = extendInteractiveContext ictxt0 final_ids
 
    Linker.extendLinkEnv [ (name,hval) | (name, Just hval) <- zip names mb_hValues ]
    when result_ok $ Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
@@ -664,7 +661,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    hsc_env' <- foldM improveTypes hsc_env (map idName incompletelyTypedIds)
    return hsc_env'
     where
-     noSkolems = null . filter isSkolemTyVar . varSetElems . tyVarsOfType . idType
+     noSkolems = isEmptyVarSet . tyVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
       let InteractiveContext{ic_tmp_ids=tmp_ids} = ic
           Just id = find (\i -> idName i == name) tmp_ids
@@ -676,8 +673,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
            case mb_new_ty of
              Nothing -> return hsc_env
              Just new_ty -> do
-              mb_subst <- improveRTTIType hsc_env old_ty new_ty
-              case mb_subst of
+              case improveRTTIType hsc_env old_ty new_ty of
                Nothing -> return $
                         WARN(True, text (":print failed to calculate the "
                                            ++ "improvement for a type")) hsc_env
@@ -686,31 +682,9 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                       printForUser stderr alwaysQualify $
                       fsep [text "RTTI Improvement for", ppr id, equals, ppr subst]
 
-                 let (subst', skols) = skolemiseSubst subst
-                     ic' = extendInteractiveContext
-                               (substInteractiveContext ic subst') [] skols
+                 let ic' = extendInteractiveContext
+                               (substInteractiveContext ic subst) []
                  return hsc_env{hsc_IC=ic'}
-
-skolemiseSubst :: TvSubst -> (TvSubst, TyVarSet)
-skolemiseSubst subst = let
-    varenv               = getTvSubstEnv subst
-    all_together         = mapVarEnv skolemiseTy varenv
-    (varenv', skol_vars) = ( mapVarEnv fst all_together
-                           , map snd (varEnvElts all_together))
-    in (subst `setTvSubstEnv` varenv', unionVarSets skol_vars)
-                        
-
-skolemiseTy :: Type -> (Type, TyVarSet)
-skolemiseTy ty = (substTy subst ty, mkVarSet new_tyvars)
-  where env           = mkVarEnv (zip tyvars new_tyvar_tys)
-        subst         = mkTvSubst emptyInScopeSet env
-        tyvars        = varSetElems (tyVarsOfType ty)
-        new_tyvars    = map skolemiseTyVar tyvars
-        new_tyvar_tys = map mkTyVarTy new_tyvars
-
-skolemiseTyVar :: TyVar -> TyVar
-skolemiseTyVar tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
-                                 (SkolemTv RuntimeUnkSkol)
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
 getIdValFromApStack apStack (I# stackDepth) = do

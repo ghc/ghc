@@ -380,7 +380,7 @@ dataConCannotMatch tys con
 \begin{code}
 tcUnifyTys :: (TyVar -> BindFlag)
 	   -> [Type] -> [Type]
-	   -> Maybe TvSubst	-- A regular one-shot substitution
+	   -> Maybe TvSubst	-- A regular one-shot (idempotent) substitution
 -- The two types may have common type variables, and indeed do so in the
 -- second call to tcUnifyTys in FunDeps.checkClsFD
 --
