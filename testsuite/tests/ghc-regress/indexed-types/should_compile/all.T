@@ -93,9 +93,9 @@ test('ColInference4', normal, compile, [''])
 test('ColInference5', normal, compile, [''])
 test('ColInference6', normal, compile, [''])
 
-test('ClassEqContext', normal, compile, [''])
-test('ClassEqContext2', normal, compile, [''])
-test('ClassEqContext3', normal, compile, [''])
+test('ClassEqContext', normal, compile_fail, [''])
+test('ClassEqContext2', normal, compile_fail, [''])
+test('ClassEqContext3', normal, compile_fail, [''])
 
 test('Col', normal, compile, [''])
 test('Col2', normal, compile, [''])
@@ -109,14 +109,14 @@ test('InstEqContext3', expect_fail, compile, [''])
 
 test('InstContextNorm', normal, compile, [''])
 
-test('HO', normal, compile, [''])
+test('HO', normal, compile_fail, [''])
 
 test('GivenCheck', normal, compile, [''])
 test('GivenCheckSwap', normal, compile, [''])
 test('GivenCheckDecomp', normal, compile, [''])
 test('GivenCheckTop', normal, compile, [''])
 
-test('Gentle', expect_broken(816), compile, [''])
+test('Gentle', normal, compile, [''])
 test('T1981', normal, compile, [''])
 test('T2238', expect_fail, compile, [''])
 test('OversatDecomp', normal, compile, [''])

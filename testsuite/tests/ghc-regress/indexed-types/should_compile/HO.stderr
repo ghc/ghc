@@ -1,0 +1,7 @@
+
+HO.hs:15:1:
+    Alas, GHC 7.0 still cannot handle equality superclasses:
+      SMMonad (SMRef m) ~ m
+    In the context: (SMMonad (SMRef m) ~ m)
+    While checking the super-classes of class `SM'
+    In the class declaration for `SM'
