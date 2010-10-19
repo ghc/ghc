@@ -706,6 +706,10 @@ solveImplication inert
                  , ic_wanted = wanteds
                  , ic_loc    = loc })
   = nestImplicTcS ev_binds untch $
+    recoverTcS (return (emptyBag, emptyBag)) $
+       -- Recover from nested failures.  Even the top level is
+       -- just a bunch of implications, so failing at the first
+       -- one is bad
     do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve flat givens

@@ -15,7 +15,7 @@ module TcSMonad (
     combineCtLoc, mkGivenFlavor,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, traceTcS0,  -- Basic functionality 
-    tryTcS, nestImplicTcS, wrapErrTcS, wrapWarnTcS,
+    tryTcS, nestImplicTcS, recoverTcS, wrapErrTcS, wrapWarnTcS,
     SimplContext(..), isInteractive, simplEqsOnly, performDefaulting,
        
        -- Creation of evidence variables
@@ -234,6 +234,8 @@ variable, is not canonical.  Why?
     serious danger that we'd spontaneously unify it a second time.
 
 Hence the invariant.
+
+The invariant is 
 
 Note [Canonical implicit parameter constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -490,6 +492,11 @@ nestImplicTcS ref untch (TcS thing_inside)
                          , tcs_context  = ctxtUnderImplic ctxt }
     in 
     thing_inside nest_env
+
+recoverTcS :: TcS a -> TcS a -> TcS a
+recoverTcS (TcS recovery_code) (TcS thing_inside)
+  = TcS $ \ env ->
+    TcM.recoverM (recovery_code env) (thing_inside env)
 
 ctxtUnderImplic :: SimplContext -> SimplContext
 -- See Note [Simplifying RULE lhs constraints] in TcSimplify
