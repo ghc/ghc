@@ -62,4 +62,5 @@ test('T3330c', normal, compile_fail, [''])
 test('T4179', normal, compile_fail, [''])
 test('T4254', normal, compile_fail, [''])
 test('T2239', normal, compile_fail, [''])
+test('T3651', normal, compile_fail, [''])
 

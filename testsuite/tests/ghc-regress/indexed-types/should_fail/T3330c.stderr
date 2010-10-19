@@ -1,36 +1,9 @@
 
-T3330c.hs:22:35:
-    Couldn't match type `f2' with `Der f2'
-      `f2' is a rigid type variable bound by
-           a pattern with constructor
-           RSum :: forall (f :: * -> *) (g :: * -> *).
-                   R f -> R g -> R (f :+: g)
-             at T3330c.hs:22:10
-    In the expression: Inl (plug rf df x)
-    In an equation for `plug'':
-        plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
-    In an equation for `plug':
-        plug
-          = plug' rep
-          where
-              plug' :: R f -> Der f x -> x -> f x
-              plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
-
-T3330c.hs:22:45:
-    Couldn't match type `Der ((->) x)' with `R'
-    Expected type: Der ((->) x) (f1 x)
-      Actual type: R f
-    In the first argument of `plug', namely `rf'
-    In the first argument of `Inl', namely `(plug rf df x)'
-    In the expression: Inl (plug rf df x)
-
-T3330c.hs:22:45:
-    Couldn't match type `f' with `f1 x'
-      `f' is a rigid type variable bound by
-          a pattern with constructor
-          RSum :: forall (f :: * -> *) (g :: * -> *).
-                  R f -> R g -> R (f :+: g)
-            at T3330c.hs:22:10
+T3330c.hs:23:43:
+    Occurs check: cannot construct the infinite type:
+      f = f x
+      Expected type: Der ((->) x) (f x)
+        Actual type: R f
     In the first argument of `plug', namely `rf'
     In the first argument of `Inl', namely `(plug rf df x)'
     In the expression: Inl (plug rf df x)

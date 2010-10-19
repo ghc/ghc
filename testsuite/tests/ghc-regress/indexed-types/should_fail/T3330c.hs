@@ -18,5 +18,6 @@ type instance Der (f :+: g) = Der f :+: Der g
 
 plug :: Rep f => Der f x -> x -> f x
 plug = plug' rep where
-  plug' :: R f -> Der f x -> x -> f x
-  plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
+
+plug' :: R f -> Der f x -> x -> f x
+plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
