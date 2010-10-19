@@ -328,6 +328,7 @@ instance  (Integral a)  => Num (Ratio a)  where
     signum (x:%_)       =  signum x :% 1
     fromInteger x       =  fromInteger x :% 1
 
+{-# RULES "fromRational/id" fromRational = id :: Rational -> Rational #-}
 instance  (Integral a)  => Fractional (Ratio a)  where
     {-# SPECIALIZE instance Fractional Rational #-}
     (x:%y) / (x':%y')   =  (x*y') % (y*x')
@@ -335,7 +336,7 @@ instance  (Integral a)  => Fractional (Ratio a)  where
     recip (x:%y)
         | x < 0         = negate y :% negate x
         | otherwise     = y :% x
-    fromRational (x:%y) =  fromInteger x :% fromInteger y
+    fromRational (x:%y) =  fromInteger x % fromInteger y
 
 instance  (Integral a)  => Real (Ratio a)  where
     {-# SPECIALIZE instance Real Rational #-}
