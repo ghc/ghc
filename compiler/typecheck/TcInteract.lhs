@@ -891,23 +891,22 @@ interactWithInertsStage workItem inert
 interactNext :: StageResult -> AtomicInert -> TcS StageResult 
 interactNext it inert  
   | ContinueWith workItem <- sr_stop it
-    = do { let inerts      = sr_inerts it 
-               fdimprs_old = getFDImprovements inerts 
+  = do { let inerts      = sr_inerts it 
+             fdimprs_old = getFDImprovements inerts 
 
-         ; ir <- interactWithInert fdimprs_old inert workItem 
+       ; ir <- interactWithInert fdimprs_old inert workItem 
 
-         -- New inerts depend on whether we KeepInert or not and must 
-         -- be updated with FD improvement information from the interaction result (ir) 
-         ; let inerts_new = updInertSetFDImprs upd_inert (ir_improvement ir) 
-               upd_inert  = if ir_inert_action ir == KeepInert 
-                            then inerts `updInertSet` inert else inerts
+       -- New inerts depend on whether we KeepInert or not and must 
+       -- be updated with FD improvement information from the interaction result (ir) 
+       ; let inerts_new = updInertSetFDImprs upd_inert (ir_improvement ir) 
+             upd_inert  = if ir_inert_action ir == KeepInert 
+                          then inerts `updInertSet` inert else inerts
 
-         ; return $ SR { sr_inerts   = inerts_new
-                       , sr_new_work = sr_new_work it `unionWorkLists` ir_new_work ir
-                       , sr_stop     = ir_stop ir } }
-  | otherwise = return $ itrAddInert inert it
-  where itrAddInert :: AtomicInert -> StageResult -> StageResult
-        itrAddInert inert itr = itr { sr_inerts = (sr_inerts itr) `updInertSet` inert }
+       ; return $ SR { sr_inerts   = inerts_new
+                     , sr_new_work = sr_new_work it `unionWorkLists` ir_new_work ir
+                     , sr_stop     = ir_stop ir } }
+  | otherwise 
+  = return $ it { sr_inerts = (sr_inerts it) `updInertSet` inert }
 
 -- Do a single interaction of two constraints.
 interactWithInert :: FDImprovements -> AtomicInert -> WorkItem -> TcS InteractResult
