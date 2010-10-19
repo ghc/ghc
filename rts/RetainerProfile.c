@@ -1270,7 +1270,7 @@ retainStack( StgClosure *c, retainer c_child_r,
     stackElement *oldStackBoundary;
     StgPtr p;
     StgRetInfoTable *info;
-    StgWord32 bitmap;
+    StgWord bitmap;
     nat size;
 
 #ifdef DEBUG_RETAINER
