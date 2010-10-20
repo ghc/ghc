@@ -243,7 +243,10 @@ setUnfoldingInfoLazily info uf 	-- Lazy variant to avoid looking at the
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf 
-  = seqUnfolding uf `seq`	-- This seq makes a BIG difference to Trac #4367
+  = -- We don't seq the unfolding, as we generate intermediate
+    -- unfoldings which are just thrown away, so evaluating them is a
+    -- waste of time.
+    -- seqUnfolding uf `seq`
     info { unfoldingInfo = uf }
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
