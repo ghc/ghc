@@ -23,7 +23,7 @@ else
 $$(error Already got a haddock file for $$($1_PACKAGE))
 endif
 
-haddock: $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE)
+haddock: html_$1
 
 ifeq "$$(HADDOCK_DOCS)" "YES"
 $(call all-target,$1_$2_haddock,html_$1)
