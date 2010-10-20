@@ -26,11 +26,11 @@ endif
 # NB. use :=, we only want this thing evaluated once.
 #
 $1_$2_HS_SRCS := $$(foreach file,$$($1_$2_SLASH_MODS),\
-		 $$(firstword \
-		   $$(wildcard \
-                     $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-			$1/$$(dir)/$$(file).hs $1/$$(dir)/$$(file).lhs)) \
-	           $1/$2/build/$$(file).hs))
+                 $$(firstword \
+                   $$(wildcard \
+                     $$(foreach dir,$$($1_$2_HS_SRC_DIRS) $2/build/autogen,\
+                        $1/$$(dir)/$$(file).hs $1/$$(dir)/$$(file).lhs)) \
+                   $1/$2/build/$$(file).hs))
 
 # .hs-boot files must be in the same place as the .hs file they go
 # with (GHC assumes this).  When we preprocess a source file, and
@@ -47,12 +47,12 @@ $1_$2_HS_SRCS := $$(foreach file,$$($1_$2_SLASH_MODS),\
 # NB. use :=, we only want this thing evaluated once.
 #
 $1_$2_HS_BOOT_SRCS := $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-		       $$(subst $1/$$(dir),$1/$2/build,\
-		        $$(wildcard \
-	                 $$(subst $1/$2/build,$1/$$(dir),\
-		          $$(foreach file,\
-		           $$(filter $1/$2/build%,$$($1_$2_HS_SRCS)),\
-			   $$(patsubst %.hs,%.hs-boot,$$(file)) \
-			   $$(patsubst %.hs,%.lhs-boot,$$(file)))))))
+                       $$(subst $1/$$(dir),$1/$2/build,\
+                        $$(wildcard \
+                         $$(subst $1/$2/build,$1/$$(dir),\
+                          $$(foreach file,\
+                           $$(filter $1/$2/build%,$$($1_$2_HS_SRCS)),\
+                           $$(patsubst %.hs,%.hs-boot,$$(file)) \
+                           $$(patsubst %.hs,%.lhs-boot,$$(file)))))))
 
 endef
