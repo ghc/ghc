@@ -40,6 +40,7 @@ import GHC.Arr
 import GHC.Err
 import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
+import GHC.Float ()     -- for RealFrac methods
 
 ------------------------------------------------------------------------
 -- type Int8
@@ -151,6 +152,36 @@ instance Bits Int8 where
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
 "fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (narrow8Int# x#)
 "fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# x#)
+  #-}
+
+{-# RULES
+"properFraction/Float->(Int8,Float)"
+    forall x. properFraction (x :: Float) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int8) n, y) }
+"truncate/Float->Int8"
+    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int8) (truncate x)
+"floor/Float->Int8"
+    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int8) (floor x)
+"ceiling/Float->Int8"
+    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int8) (ceiling x)
+"round/Float->Int8"
+    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int8) (round x)
+  #-}
+
+{-# RULES
+"properFraction/Double->(Int8,Double)"
+    forall x. properFraction (x :: Double) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int8) n, y) }
+"truncate/Double->Int8"
+    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int8) (truncate x)
+"floor/Double->Int8"
+    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int8) (floor x)
+"ceiling/Double->Int8"
+    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int8) (ceiling x)
+"round/Double->Int8"
+    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int8) (round x)
   #-}
 
 ------------------------------------------------------------------------
@@ -266,6 +297,36 @@ instance Bits Int16 where
 "fromIntegral/Int16->Int16"  fromIntegral = id :: Int16 -> Int16
 "fromIntegral/a->Int16"      fromIntegral = \x -> case fromIntegral x of I# x# -> I16# (narrow16Int# x#)
 "fromIntegral/Int16->a"      fromIntegral = \(I16# x#) -> fromIntegral (I# x#)
+  #-}
+
+{-# RULES
+"properFraction/Float->(Int16,Float)"
+    forall x. properFraction (x :: Float) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int16) n, y) }
+"truncate/Float->Int16"
+    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int16) (truncate x)
+"floor/Float->Int16"
+    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int16) (floor x)
+"ceiling/Float->Int16"
+    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int16) (ceiling x)
+"round/Float->Int16"
+    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int16) (round x)
+  #-}
+
+{-# RULES
+"properFraction/Double->(Int16,Double)"
+    forall x. properFraction (x :: Double) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int16) n, y) }
+"truncate/Double->Int16"
+    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int16) (truncate x)
+"floor/Double->Int16"
+    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int16) (floor x)
+"ceiling/Double->Int16"
+    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int16) (ceiling x)
+"round/Double->Int16"
+    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int16) (round x)
   #-}
 
 ------------------------------------------------------------------------
@@ -403,7 +464,8 @@ instance Bits Int32 where
 "fromIntegral/Int32->Int32"  fromIntegral = id :: Int32 -> Int32
   #-}
 
-#else 
+-- No rules for RealFrac methods if Int32 is larger than Int
+#else
 
 -- Int32 is represented in the same way as Int.
 #if WORD_SIZE_IN_BITS > 32
@@ -512,7 +574,37 @@ instance Bits Int32 where
 "fromIntegral/Int32->a"      fromIntegral = \(I32# x#) -> fromIntegral (I# x#)
   #-}
 
-#endif 
+{-# RULES
+"properFraction/Float->(Int32,Float)"
+    forall x. properFraction (x :: Float) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int32) n, y) }
+"truncate/Float->Int32"
+    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int32) (truncate x)
+"floor/Float->Int32"
+    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int32) (floor x)
+"ceiling/Float->Int32"
+    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int32) (ceiling x)
+"round/Float->Int32"
+    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int32) (round x)
+  #-}
+
+{-# RULES
+"properFraction/Double->(Int32,Double)"
+    forall x. properFraction (x :: Double) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int32) n, y) }
+"truncate/Double->Int32"
+    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int32) (truncate x)
+"floor/Double->Int32"
+    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int32) (floor x)
+"ceiling/Double->Int32"
+    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int32) (ceiling x)
+"round/Double->Int32"
+    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int32) (round x)
+  #-}
+
+#endif
 
 instance Real Int32 where
     toRational x = toInteger x % 1
@@ -672,7 +764,9 @@ a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
 "fromIntegral/Int64->Int64"  fromIntegral = id :: Int64 -> Int64
   #-}
 
-#else 
+-- No RULES for RealFrac methods if Int is smaller than Int64, we can't
+-- go through Int and whether going through Integer is faster is uncertain.
+#else
 
 -- Int64 is represented in the same way as Int.
 -- Operations may assume and must ensure that it holds only values
@@ -763,6 +857,36 @@ instance Bits Int64 where
 {-# RULES
 "fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#
 "fromIntegral/Int64->a" fromIntegral = \(I64# x#) -> fromIntegral (I# x#)
+  #-}
+
+{-# RULES
+"properFraction/Float->(Int64,Float)"
+    forall x. properFraction (x :: Float) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int64) n, y) }
+"truncate/Float->Int64"
+    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int64) (truncate x)
+"floor/Float->Int64"
+    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int64) (floor x)
+"ceiling/Float->Int64"
+    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int64) (ceiling x)
+"round/Float->Int64"
+    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int64) (round x)
+  #-}
+
+{-# RULES
+"properFraction/Double->(Int64,Double)"
+    forall x. properFraction (x :: Double) =
+                      case properFraction x of {
+                        (n, y) -> ((fromIntegral :: Int -> Int64) n, y) }
+"truncate/Double->Int64"
+    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int64) (truncate x)
+"floor/Double->Int64"
+    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int64) (floor x)
+"ceiling/Double->Int64"
+    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int64) (ceiling x)
+"round/Double->Int64"
+    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int64) (round x)
   #-}
 
 uncheckedIShiftL64# :: Int# -> Int# -> Int#
