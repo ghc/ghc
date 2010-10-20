@@ -721,7 +721,10 @@ simplUnfolding env top_lvl id _ _
              is_top_lvl = isTopLevel top_lvl
        ; case guide of
            UnfIfGoodArgs{} ->
-              return (mkUnfolding src' is_top_lvl (isBottomingId id) expr')
+              -- We need to force bottoming, or the new unfolding holds
+              -- on to the old unfolding (which is part of the id).
+              let bottoming = isBottomingId id
+              in bottoming `seq` return (mkUnfolding src' is_top_lvl bottoming expr')
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.
@@ -735,7 +738,10 @@ simplUnfolding env top_lvl id _ _
        	       -- See Note [Simplifying inside InlineRules] in SimplUtils
 
 simplUnfolding _ top_lvl id _occ_info new_rhs _
-  = return (mkUnfolding InlineRhs (isTopLevel top_lvl) (isBottomingId id) new_rhs)
+  = -- We need to force bottoming, or the new unfolding holds
+    -- on to the old unfolding (which is part of the id).
+    let bottoming = isBottomingId id
+    in bottoming `seq` return (mkUnfolding InlineRhs (isTopLevel top_lvl) bottoming new_rhs)
   -- We make an  unfolding *even for loop-breakers*.
   -- Reason: (a) It might be useful to know that they are WHNF
   -- 	     (b) In TidyPgm we currently assume that, if we want to
