@@ -1038,10 +1038,23 @@ product l       = prod l 1
 -- characters.  The resulting strings do not contain newlines.
 lines                   :: String -> [String]
 lines ""                =  []
+#ifdef __GLASGOW_HASKELL__
+-- Somehow GHC doesn't detect the selector thunks in the below code,
+-- so s' keeps a reference to the first line via the pair and we have
+-- a space leak (cf. #4334).
+-- So we need to make GHC see the selector thunks with a trick.
+lines s                 =  cons (case break (== '\n') s of
+                                    (l, s') -> (l, case s' of
+                                                    []      -> []
+                                                    _:s''   -> lines s''))
+  where
+    cons ~(h, t)        =  h : t
+#else
 lines s                 =  let (l, s') = break (== '\n') s
                            in  l : case s' of
                                         []      -> []
                                         (_:s'') -> lines s''
+#endif
 
 -- | 'unlines' is an inverse operation to 'lines'.
 -- It joins lines, after appending a terminating newline to each.
