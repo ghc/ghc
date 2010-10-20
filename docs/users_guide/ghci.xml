@@ -1943,8 +1943,7 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 	    used, respectively.  Tags for all the functions, constructors and
 	    types in the currently loaded modules are created.  All modules must
 	    be interpreted for these commands to work.</para>
-          <para>See also <xref linkend="hasktags" />.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
