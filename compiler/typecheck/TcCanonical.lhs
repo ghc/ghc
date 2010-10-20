@@ -1,7 +1,7 @@
 \begin{code}
 module TcCanonical(
     mkCanonical, mkCanonicals, canWanteds, canGivens, canOccursCheck, 
-    canEq
+    canEq, canEqLeafTyVarLeft 
  ) where
 
 #include "HsVersions.h"
@@ -248,17 +248,23 @@ canEq fl cv ty1 ty2
 
 -- If one side is a variable, orient and flatten, 
 -- WITHOUT expanding type synonyms, so that we tend to 
--- substitute a~Age rather than a~Int when type Age=Ing
-canEq fl cv ty1@(TyVarTy {}) ty2 = canEqLeaf fl cv (classify ty1) (classify ty2)
-canEq fl cv ty1 ty2@(TyVarTy {}) = canEqLeaf fl cv (classify ty1) (classify ty2)
-      -- NB: don't use VarCls directly because tv1 or tv2 may be scolems! 
+-- substitute a ~ Age rather than a ~ Int when @type Age = Int@
+canEq fl cv ty1@(TyVarTy {}) ty2 
+  = do { untch <- getUntouchables 
+       ; canEqLeaf untch fl cv (classify ty1) (classify ty2) }
+canEq fl cv ty1 ty2@(TyVarTy {}) 
+  = do { untch <- getUntouchables 
+       ; canEqLeaf untch fl cv (classify ty1) (classify ty2) }
+      -- NB: don't use VarCls directly because tv1 or tv2 may be scolems!
 
 canEq fl cv (TyConApp fn tys) ty2 
   | isSynFamilyTyCon fn, length tys == tyConArity fn
-  = canEqLeaf fl cv (FunCls fn tys) (classify ty2)
+  = do { untch <- getUntouchables 
+       ; canEqLeaf untch fl cv (FunCls fn tys) (classify ty2) }
 canEq fl cv ty1 (TyConApp fn tys)
   | isSynFamilyTyCon fn, length tys == tyConArity fn
-  = canEqLeaf fl cv (classify ty1) (FunCls fn tys) 
+  = do { untch <- getUntouchables 
+       ; canEqLeaf untch fl cv (classify ty1) (FunCls fn tys) }
 
 canEq fl cv s1 s2
   | Just (t1a,t1b,t1c) <- splitCoPredTy_maybe s1, 
@@ -519,40 +525,39 @@ classify ty                | Just ty' <- tcView ty
                            = OtherCls ty
 
 -- See note [Canonical ordering for equality constraints].
-reOrient :: TypeClassifier -> TypeClassifier -> Bool	
+reOrient :: Untouchables -> TypeClassifier -> TypeClassifier -> Bool	
 -- (t1 `reOrient` t2) responds True 
 --   iff we should flip to (t2~t1)
 -- We try to say False if possible, to minimise evidence generation
 --
 -- Postcondition: After re-orienting, first arg is not OTherCls
-reOrient (OtherCls {}) (FunCls {})   = True
-reOrient (OtherCls {}) (FskCls {})   = True
-reOrient (OtherCls {}) (VarCls {})   = True
-reOrient (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
+reOrient _untch (OtherCls {}) (FunCls {})   = True
+reOrient _untch (OtherCls {}) (FskCls {})   = True
+reOrient _untch (OtherCls {}) (VarCls {})   = True
+reOrient _untch (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
 
-reOrient (FunCls {})   (VarCls tv2)   = isMetaTyVar tv2
+reOrient _untch (FunCls {})   (VarCls tv2)  = isMetaTyVar tv2
   -- See Note [No touchables as FunEq RHS] in TcSMonad
-  -- For convenience we enforce the stronger invariant that no 
-  -- meta type variable is the RHS of a function equality
-reOrient (FunCls {}) _                = False   -- Fun/Other on rhs
+reOrient _untch (FunCls {}) _               = False             -- Fun/Other on rhs
 
-reOrient (VarCls tv1) (FunCls {})   = not (isMetaTyVar tv1)
+reOrient _untch (VarCls tv1) (FunCls {})    = not $ isMetaTyVar tv1
 
-reOrient (VarCls {})  (FskCls {})   = True  
+reOrient _untch (VarCls tv1)  (FskCls {})   = not $ isMetaTyVar tv1
       -- See Note [Loopy Spontaneous Solving, Example 4]
 
-reOrient (VarCls {})  (OtherCls {}) = False
-reOrient (VarCls {})  (VarCls {})   = False
+reOrient _untch (VarCls {})  (OtherCls {})  = False
+reOrient _untch (VarCls {})  (VarCls {})    = False
 
-reOrient (FskCls {}) (VarCls {})    = False 
+reOrient _untch (FskCls {}) (VarCls tv2)    = isMetaTyVar tv2 
       -- See Note [Loopy Spontaneous Solving, Example 4]
 
-reOrient (FskCls {}) (FskCls {})    = False
-reOrient (FskCls {}) (FunCls {})    = True 
-reOrient (FskCls {}) (OtherCls {})  = False 
+reOrient _untch (FskCls {}) (FskCls {})     = False
+reOrient _untch (FskCls {}) (FunCls {})     = True 
+reOrient _untch (FskCls {}) (OtherCls {})   = False 
 
 ------------------
-canEqLeaf :: CtFlavor -> CoVar 
+canEqLeaf :: Untouchables 
+          -> CtFlavor -> CoVar 
           -> TypeClassifier -> TypeClassifier -> TcS CanonicalCts 
 -- Canonicalizing "leaf" equality constraints which cannot be
 -- decomposed further (ie one of the types is a variable or
@@ -561,8 +566,8 @@ canEqLeaf :: CtFlavor -> CoVar
   -- Preconditions: 
   --    * one of the two arguments is not OtherCls
   --    * the two types are not equal (looking through synonyms)
-canEqLeaf fl cv cls1 cls2 
-  | cls1 `reOrient` cls2 
+canEqLeaf untch fl cv cls1 cls2 
+  | cls1 `re_orient` cls2
   = do { cv' <- if isWanted fl 
                 then do { cv' <- newWantedCoVar s2 s1 
                         ; setWantedCoBind cv $ mkSymCoercion (mkCoVarCoercion cv') 
@@ -573,6 +578,7 @@ canEqLeaf fl cv cls1 cls2
   | otherwise
   = canEqLeafOriented fl cv cls1 s2
   where
+    re_orient = reOrient untch 
     s1 = unClassify cls1  
     s2 = unClassify cls2  
 
@@ -598,13 +604,15 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys) s2
 
 -- Otherwise, we have a variable on the left, so call canEqLeafTyVarLeft
 canEqLeafOriented fl cv (FskCls tv) s2 
-  = canEqLeafTyVarLeft fl cv tv s2 
+  = do { (cc,ccs) <- canEqLeafTyVarLeft fl cv tv s2 
+       ; return $ ccs `extendCCans` cc } 
 canEqLeafOriented fl cv (VarCls tv) s2 
-  = canEqLeafTyVarLeft fl cv tv s2 
+  = do { (cc,ccs) <- canEqLeafTyVarLeft fl cv tv s2 
+       ; return $ ccs `extendCCans` cc } 
 canEqLeafOriented _ cv (OtherCls ty1) ty2 
   = pprPanic "canEqLeaf" (ppr cv $$ ppr ty1 $$ ppr ty2)
 
-canEqLeafTyVarLeft :: CtFlavor -> CoVar -> TcTyVar -> TcType -> TcS CanonicalCts 
+canEqLeafTyVarLeft :: CtFlavor -> CoVar -> TcTyVar -> TcType -> TcS (CanonicalCt, CanonicalCts)
 -- Establish invariants of CTyEqCans 
 canEqLeafTyVarLeft fl cv tv s2 
   | isGiven fl && not (k1 `compatKind` k2) -- Establish the kind invariant for CTyEqCan
@@ -620,7 +628,7 @@ canEqLeafTyVarLeft fl cv tv s2
                                  , cc_tyvar  = tv
                                  , cc_rhs    = xi2'
                                  } 
-       ; return $ ccs2 `extendCCans` final_cc }
+       ; return $ (final_cc, ccs2) }
   where
     k1 = tyVarKind tv
     k2 = typeKind s2

@@ -10,6 +10,8 @@ module TcSMonad (
     makeGivens, makeSolvedByInst,
 
     CtFlavor (..), isWanted, isGiven, isDerived, isDerivedSC, isDerivedByInst, 
+    isGivenCt, isWantedCt, 
+
     DerivedOrig (..), 
     canRewrite, canSolve,
     combineCtLoc, mkGivenFlavor,
@@ -140,7 +142,7 @@ data CanonicalCt
   | CIPCan {	-- ?x::tau
       -- See note [Canonical implicit parameter constraints].
       cc_id     :: EvVar,
-      cc_flavor :: CtFlavor, 
+      cc_flavor :: CtFlavor,
       cc_ip_nm  :: IPName Name,
       cc_ip_ty  :: TcTauType
     }
@@ -150,8 +152,9 @@ data CanonicalCt
        --   * tv not in tvs(xi)   (occurs check)
        --   * If constraint is given then typeKind xi `compatKind` typeKind tv 
        --                See Note [Spontaneous solving and kind compatibility] 
-       --   * if xi is a flatten skolem then tv must be a flatten skolem
-       --     i.e. equalities prefer flatten skolems in their LHS. 
+       --   * if @xi@ is a flatten skolem then @tv@ can only be: 
+       --              - a flatten skolem or a unification variable
+       --     i.e. equalities prefer flatten skolems in their LHS 
        --                See Note [Loopy Spontaneous Solving, Example 4]
        --                Also related to [Flatten Skolem Equivalence Classes]
       cc_id     :: EvVar, 
@@ -330,6 +333,11 @@ isDerivedSC _                 = False
 isDerivedByInst :: CtFlavor -> Bool 
 isDerivedByInst (Derived _ DerInst) = True 
 isDerivedByInst _                   = False 
+
+isWantedCt :: CanonicalCt -> Bool 
+isWantedCt ct = isWanted (cc_flavor ct)
+isGivenCt :: CanonicalCt -> Bool 
+isGivenCt ct = isGiven (cc_flavor ct) 
 
 canSolve :: CtFlavor -> CtFlavor -> Bool 
 -- canSolve ctid1 ctid2 
