@@ -363,7 +363,7 @@ generate config_args distdir directory
                 variablePrefix ++ "_HC_OPTS = " ++ escape (unwords
                        (   programDefaultArgs ghcProg
                         ++ hcOptions GHC bi
-                        ++ extensionsToFlags (compiler lbi) (extensions bi)
+                        ++ extensionsToFlags (compiler lbi) (usedExtensions bi)
                         ++ programOverrideArgs ghcProg)),
                 variablePrefix ++ "_CC_OPTS = " ++ unwords (ccOptions bi),
                 variablePrefix ++ "_CPP_OPTS = " ++ unwords (cppOptions bi),
