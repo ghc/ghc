@@ -287,50 +287,27 @@ Note [Basic plan]
    Superclass decomposition belongs in (4), see note [Superclasses]
 
 \begin{code}
-
 type AtomicInert = CanonicalCt     -- constraint pulled from InertSet
 type WorkItem    = CanonicalCt     -- constraint pulled from WorkList
 
 -- A mixture of Given, Wanted, and Derived constraints. 
 -- We split between equalities and the rest to process equalities first. 
-data WorkList    = WL { wl_eqs   :: CanonicalCts -- Equalities (CTyEqCan, CFunEqCan) 
-                      , wl_other :: CanonicalCts   -- Other 
-                      }
-type SWorkList         = WorkList        -- A worklist of solved 
+type WorkList = CanonicalCts
+type SWorkList = WorkList        -- A worklist of solved 
 
 unionWorkLists :: WorkList -> WorkList -> WorkList 
-unionWorkLists wl1 wl2 
-  = WL { wl_eqs   = andCCan (wl_eqs wl1) (wl_eqs wl2)
-       , wl_other = andCCan (wl_other wl1) (wl_other wl2) }
-
-foldWorkListEqCtsM :: Monad m => (a -> WorkItem -> m a) -> a -> WorkList -> m a 
--- Fold over the equalities of a worklist 
-foldWorkListEqCtsM f r wl = Bag.foldlBagM f r (wl_eqs wl) 
-
-foldWorkListOtherCtsM :: Monad m => (a -> WorkItem -> m a) -> a -> WorkList -> m a 
--- Fold over non-equality constraints of a worklist
-foldWorkListOtherCtsM f r wl = Bag.foldlBagM f r (wl_other wl) 
+unionWorkLists = andCCan
 
 isEmptyWorkList :: WorkList -> Bool 
-isEmptyWorkList wl = isEmptyCCan (wl_eqs wl) && isEmptyCCan (wl_other wl) 
+isEmptyWorkList = isEmptyCCan 
 
 emptyWorkList :: WorkList
-emptyWorkList = WL { wl_eqs = emptyCCan, wl_other = emptyCCan } 
-
-workListFromCCans :: CanonicalCts -> WorkList 
--- Generic, no precondition 
-workListFromCCans cts = WL eqs others 
-  where (eqs, others) = Bag.partitionBag isTyEqCCan cts
+emptyWorkList = emptyCCan
 
 workListFromCCan :: CanonicalCt -> WorkList 
-workListFromCCan ct | isTyEqCCan ct = WL (singleCCan ct) emptyCCan 
-                    | otherwise     = WL emptyCCan (singleCCan ct) 
--- TODO: 
--- At the call sites of workListFromCCan(s), sometimes we know whether the new work
--- involves equalities or not. It's probably a good idea to add specialized calls for 
--- those, to avoid asking whether 'isTyEqCCan' all the time.
+workListFromCCan = singleCCan
 
-
+------------------------
 data StopOrContinue 
   = Stop			-- Work item is consumed
   | ContinueWith WorkItem	-- Not consumed
@@ -357,9 +334,6 @@ instance Outputable StageResult where
       braces (sep [ ptext (sLit "inerts =") <+> ppr inerts <> comma
              	  , ptext (sLit "new work =") <+> ppr work <> comma
              	  , ptext (sLit "stop =") <+> ppr stop])
-
-instance Outputable WorkList where 
-  ppr (WL eqcts othercts) = vcat [ppr eqcts, ppr othercts] 
 
 type SimplifierStage = WorkItem -> InertSet -> TcS StageResult 
 
@@ -429,8 +403,7 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 solveInteract :: InertSet -> CanonicalCts -> TcS InertSet
 solveInteract inert ws 
   = do { dyn_flags <- getDynFlags
-       ; let worklist = workListFromCCans ws 
-       ; solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) inert worklist
+       ; solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) inert ws
        }
 solveOne :: InertSet -> WorkItem -> TcS InertSet 
 solveOne inerts workItem 
@@ -450,12 +423,13 @@ solveInteractWithDepth ctxt@(max_depth,n,stack) inert ws
 
   | otherwise 
   = do { traceTcS "solveInteractWithDepth" $ 
-         vcat [ text "Current depth =" <+> ppr n
-              , text "Max depth =" <+> ppr max_depth
-              ]
-       ; is_from_eqs <- foldWorkListEqCtsM (solveOneWithDepth ctxt) inert ws 
-       ; foldWorkListOtherCtsM (solveOneWithDepth ctxt) is_from_eqs ws
-       }
+              vcat [ text "Current depth =" <+> ppr n
+                   , text "Max depth =" <+> ppr max_depth ]
+
+	      -- Solve equalities first
+       ; let (eqs, non_eqs) = Bag.partitionBag isTyEqCCan ws
+       ; is_from_eqs <- Bag.foldlBagM (solveOneWithDepth ctxt) inert eqs
+       ; Bag.foldlBagM (solveOneWithDepth ctxt) is_from_eqs non_eqs }
 
 ------------------
 -- Fully interact the given work item with an inert set, and return a
@@ -720,7 +694,7 @@ solveWithIdentity inerts cv gw tv xi
                Derived {} -> setDerivedCoBind cv co 
                _          -> pprPanic "Can't spontaneously solve *given*" empty 
 	              -- See Note [Avoid double unifications] 
-           ; return $ Just (workListFromCCans cts)  }
+           ; return $ Just cts }
 
 occurCheck :: VarEnv (TcTyVar, TcType) -> InertSet
            -> TcTyVar -> TcType -> Maybe (TcType,CoercionI) 
@@ -959,11 +933,10 @@ doInteractWithInert fdimprs
              eqn_pred_locs = improveFromAnother work_item_pred_loc inert_pred_loc         
 
        ; wevvars <- mkWantedFunDepEqns loc eqn_pred_locs 
-       ; fd_cts <- canWanteds wevvars 
-       ; let fd_work = workListFromCCans fd_cts 
+       ; fd_work <- canWanteds wevvars 
               	 -- See Note [Generating extra equalities]
        ; traceTcS "Checking if improvements existed." (ppr fdimprs) 
-       ; if isEmptyCCan fd_cts || haveBeenImproved fdimprs pty1 pty2 then
+       ; if isEmptyWorkList fd_work || haveBeenImproved fdimprs pty1 pty2 then
              -- Must keep going
              mkIRContinue workItem KeepInert fd_work 
          else do { traceTcS "Recording improvement and throwing item back in worklist." (ppr (pty1,pty2))
@@ -1038,7 +1011,7 @@ doInteractWithInert _fdimprs
     do { co_var <- newWantedCoVar ty1 ty2 
        ; let flav = Wanted (combineCtLoc ifl wfl) 
        ; cans <- mkCanonical flav co_var 
-       ; mkIRContinue workItem KeepInert (workListFromCCans cans) }
+       ; mkIRContinue workItem KeepInert cans }
 
 
 -- Inert: equality, work item: function equality
@@ -1077,10 +1050,10 @@ doInteractWithInert _fdimprs
                                , cc_tyargs = args2, cc_rhs = xi2 })
   | fl1 `canSolve` fl2 && lhss_match
   = do { cans <- rewriteEqLHS LeftComesFromInert  (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
-       ; mkIRStop KeepInert (workListFromCCans cans) } 
+       ; mkIRStop KeepInert cans } 
   | fl2 `canSolve` fl1 && lhss_match
   = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
-       ; mkIRContinue workItem DropInert (workListFromCCans cans) }
+       ; mkIRContinue workItem DropInert cans }
   where
     lhss_match = tc1 == tc2 && and (zipWith tcEqType args1 args2) 
 
@@ -1090,19 +1063,19 @@ doInteractWithInert _fdimprs
 -- Check for matching LHS 
   | fl1 `canSolve` fl2 && tv1 == tv2 
   = do { cans <- rewriteEqLHS LeftComesFromInert (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
-       ; mkIRStop KeepInert (workListFromCCans cans) } 
+       ; mkIRStop KeepInert cans } 
 
   | fl2 `canSolve` fl1 && tv1 == tv2 
   = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
-       ; mkIRContinue workItem DropInert (workListFromCCans cans) } 
+       ; mkIRContinue workItem DropInert cans } 
 
 -- Check for rewriting RHS 
   | fl1 `canRewrite` fl2 && tv1 `elemVarSet` tyVarsOfType xi2 
   = do { rewritten_eq <- rewriteEqRHS (cv1,tv1,xi1) (cv2,fl2,tv2,xi2) 
-       ; mkIRStop KeepInert (workListFromCCans rewritten_eq) }
+       ; mkIRStop KeepInert rewritten_eq }
   | fl2 `canRewrite` fl1 && tv2 `elemVarSet` tyVarsOfType xi1
   = do { rewritten_eq <- rewriteEqRHS (cv2,tv2,xi2) (cv1,fl1,tv1,xi1) 
-       ; mkIRContinue workItem DropInert (workListFromCCans rewritten_eq) } 
+       ; mkIRContinue workItem DropInert rewritten_eq } 
 
 -- Finally, if workitem is a Flatten Equivalence Class constraint and the 
 -- inert is a wanted constraint, even when the workitem cannot rewrite the 
@@ -1169,7 +1142,7 @@ rewriteFunEq (cv1,tv,xi1) (cv2,gw, tc,args,xi2)
                            , cc_rhs = xi2 }) }
 
 
-rewriteEqRHS :: (CoVar,TcTyVar,Xi) -> (CoVar,CtFlavor,TcTyVar,Xi) -> TcS CanonicalCts
+rewriteEqRHS :: (CoVar,TcTyVar,Xi) -> (CoVar,CtFlavor,TcTyVar,Xi) -> TcS WorkList
 -- Use the first equality to rewrite the second, flavors already checked. 
 -- E.g.          c1 : tv1 ~ xi1   c2 : tv2 ~ xi2
 -- rewrites c2 to give
@@ -1204,7 +1177,7 @@ rewriteEqRHS (cv1,tv1,xi1) (cv2,gw,tv2,xi2)
     co2' = substTyWith [tv1] [mkCoVarCoercion cv1] xi2  -- xi2 ~ xi2[xi1/tv1]
 
 
-rewriteEqLHS :: WhichComesFromInert -> (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> TcS CanonicalCts
+rewriteEqLHS :: WhichComesFromInert -> (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> TcS WorkList
 -- Used to ineract two equalities of the following form: 
 -- First Equality:   co1: (XXX ~ xi1)  
 -- Second Equality:  cv2: (XXX ~ xi2) 
@@ -1664,20 +1637,60 @@ allowedTopReaction _        _             = True
 doTopReact :: WorkItem -> TcS TopInteractResult 
 -- The work item does not react with the inert set, 
 -- so try interaction with top-level instances
+
+-- Given dictionary; just add superclasses
+-- See Note [Given constraint that matches an instance declaration]
+doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Given loc
+                              , cc_class = cls, cc_tyargs = xis })
+  = do { sc_work <- newGivenSCWork dv loc cls xis 
+       ; return $ SomeTopInt sc_work (ContinueWith workItem) }
+
+-- Derived dictionary
+-- Do not add any further derived superclasses; their 
+-- full transitive closure has already been added. 
+-- But do look for functional dependencies
+doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Derived loc _
+                              , cc_class = cls, cc_tyargs = xis })
+  = do { fd_work <- findClassFunDeps dv cls xis loc
+       ; if isEmptyWorkList fd_work then 
+              return NoTopInt
+         else return $ SomeTopInt { tir_new_work = fd_work
+                                  , tir_new_inert = ContinueWith workItem } }
+
 doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Wanted loc
                               , cc_class = cls, cc_tyargs = xis }) 
   = do { -- See Note [MATCHING-SYNONYMS]
        ; lkp_inst_res <- matchClassInst cls xis loc
        ; case lkp_inst_res of 
-           NoInstance -> do { traceTcS "doTopReact/ no class instance for" (ppr dv) 
-                            ; funDepReact }
+           NoInstance -> 
+             do { traceTcS "doTopReact/ no class instance for" (ppr dv) 
+                ; fd_work <- findClassFunDeps dv cls xis loc
+                ; if isEmptyWorkList fd_work then 
+                      do { sc_work <- newDerivedSCWork dv loc cls xis
+                                 -- See Note [Adding Derived Superclasses] 
+				 -- NB: workItem is inert, but it isn't solved
+				 -- keep it as inert, although it's not solved 
+				 -- because we have now reacted all its 
+ 				 -- top-level fundep-induced equalities!
+                         ; return $ SomeTopInt 
+                              { tir_new_work = fd_work `unionWorkLists` sc_work
+                              , tir_new_inert = ContinueWith workItem } }
+
+                  else -- More fundep work produced, don't do any superclass stuff, 
+                       -- just thow him back in the worklist, which will prioritize 
+                       -- the solution of fd equalities
+                       return $ SomeTopInt 
+                              { tir_new_work = fd_work `unionWorkLists` 
+                                               workListFromCCan workItem
+                              , tir_new_inert = Stop } }
+
            GenInst wtvs ev_term ->  -- Solved 
 	   	   -- No need to do fundeps stuff here; the instance 
 		   -- matches already so we won't get any more info
 		   -- from functional dependencies
                do { traceTcS "doTopReact/ found class instance for" (ppr dv) 
                   ; setDictBind dv ev_term 
-                  ; workList <- canWanteds wtvs
+                  ; inst_work <- canWanteds wtvs
                   ; if null wtvs
                     -- Solved in one step and no new wanted work produced. 
                     -- i.e we directly matched a top-level instance
@@ -1690,55 +1703,10 @@ doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Wanted loc
                     else do { let solved = makeSolvedByInst workItem
                             ; sc_work <- newDerivedSCWork dv loc cls xis
                                          -- See Note [Adding Derived Superclasses]
-                            ; let inst_work = workListFromCCans workList
                             ; return $ SomeTopInt 
                                   { tir_new_work  = inst_work `unionWorkLists` sc_work 
                                   , tir_new_inert = ContinueWith solved } }
-                  }
-       }
-  where 
-    -- Try for a fundep reaction beween the wanted item 
-    -- and a top-level instance declaration
-    funDepReact 
-      = do { instEnvs <- getInstEnvs
-           ; let eqn_pred_locs = improveFromInstEnv (classInstances instEnvs)
-                                                    (ClassP cls xis, ppr dv)
-           ; wevvars <- mkWantedFunDepEqns loc eqn_pred_locs 
-	     	      -- NB: fundeps generate some wanted equalities, but 
-	   	      --     we don't use their evidence for anything
-           ; fd_cts <- canWanteds wevvars 
-           ; let fd_work = workListFromCCans fd_cts
-
-           ; if isEmptyCCan fd_cts then 
-                 do { sc_work <- newDerivedSCWork dv loc cls xis
-                                 -- See Note [Adding Derived Superclasses] 
-                    ; return $ SomeTopInt { tir_new_work = fd_work `unionWorkLists` sc_work
-                                          , tir_new_inert = ContinueWith workItem }
-                    }
-             else -- More fundep work produced, don't do any superlcass stuff, just 
-                  -- thow him back in the worklist prioritizing the solution of fd equalities
-                 return $ 
-                 SomeTopInt { tir_new_work = fd_work `unionWorkLists` workListFromCCan workItem
-                            , tir_new_inert = Stop }
-
-           -- NB: workItem is inert, but it isn't solved
-	   -- keep it as inert, although it's not solved because we
-           -- have now reacted all its top-level fundep-induced equalities!
-                    
-           -- See Note [FunDep Reactions]
-           }
-
--- Derived, do not add any further derived superclasses; their full transitive 
--- closure has already been added. 
-doTopReact (CDictCan { cc_flavor = fl })
-  | isDerived fl
-  = return NoTopInt
-
-doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Given loc
-                              , cc_class = cls, cc_tyargs = xis })
-  = do { sc_work <- newGivenSCWork dv loc cls xis 
-       ; return $ SomeTopInt sc_work (ContinueWith workItem) }
-    -- See Note [Given constraint that matches an instance declaration]
+       }          }
 
 -- Type functions
 doTopReact (CFunEqCan { cc_id = cv, cc_flavor = fl
@@ -1766,8 +1734,7 @@ doTopReact (CFunEqCan { cc_id = cv, cc_flavor = fl
                                    mkSymCoercion (mkCoVarCoercion cv) `mkTransCoercion` coe 
 
                    ; can_cts <- mkCanonical fl cv'
-                   ; let workList = workListFromCCans can_cts
-                   ; return $ SomeTopInt workList Stop }
+                   ; return $ SomeTopInt can_cts Stop }
            _ 
              -> panicTcS $ text "TcSMonad.matchFam returned multiple instances!"
        }
@@ -1775,6 +1742,19 @@ doTopReact (CFunEqCan { cc_id = cv, cc_flavor = fl
 
 -- Any other work item does not react with any top-level equations
 doTopReact _workItem = return NoTopInt 
+
+----------------------
+findClassFunDeps :: EvVar -> Class -> [Xi] -> WantedLoc -> TcS WorkList
+-- Look for a fundep reaction beween the wanted item 
+-- and a top-level instance declaration
+findClassFunDeps dv cls xis loc
+ = do { instEnvs <- getInstEnvs
+      ; let eqn_pred_locs = improveFromInstEnv (classInstances instEnvs)
+                                               (ClassP cls xis, ppr dv)
+      ; wevvars <- mkWantedFunDepEqns loc eqn_pred_locs 
+	     	      -- NB: fundeps generate some wanted equalities, but 
+	   	      --     we don't use their evidence for anything
+      ; canWanteds wevvars }
 \end{code}
 
 Note [Adding Derived Superclasses]
@@ -2043,26 +2023,26 @@ newGivenSCWork ev loc cls xis
   | NoScSkol <- ctLocOrigin loc  -- Very important!
   = return emptyWorkList
   | otherwise
-  = newImmSCWorkFromFlavored ev (Given loc) cls xis >>= return . workListFromCCans 
+  = newImmSCWorkFromFlavored ev (Given loc) cls xis >>= return 
 
 newDerivedSCWork :: EvVar -> WantedLoc -> Class -> [Xi] -> TcS WorkList 
 newDerivedSCWork ev loc cls xis 
   =  do { ims <- newImmSCWorkFromFlavored ev flavor cls xis 
-        ; final_cts <- rec_sc_work ims 
-        ; return $ workListFromCCans final_cts } 
-  where rec_sc_work :: CanonicalCts -> TcS CanonicalCts 
-        rec_sc_work cts 
-          = do { bg <- mapBagM (\c -> do { ims <- imm_sc_work c 
-                                         ; recs_ims <- rec_sc_work ims 
-                                         ; return $ consBag c recs_ims }) cts 
-               ; return $ concatBag bg } 
-        imm_sc_work (CDictCan { cc_id = dv, cc_flavor = fl, cc_class = cls, cc_tyargs = xis })
-           = newImmSCWorkFromFlavored dv fl cls xis 
-        imm_sc_work _ct = return emptyCCan 
+        ; rec_sc_work ims  }
+  where 
+    rec_sc_work :: CanonicalCts -> TcS CanonicalCts 
+    rec_sc_work cts 
+      = do { bg <- mapBagM (\c -> do { ims <- imm_sc_work c 
+                                     ; recs_ims <- rec_sc_work ims 
+                                     ; return $ consBag c recs_ims }) cts 
+           ; return $ concatBag bg } 
+    imm_sc_work (CDictCan { cc_id = dv, cc_flavor = fl, cc_class = cls, cc_tyargs = xis })
+       = newImmSCWorkFromFlavored dv fl cls xis 
+    imm_sc_work _ct = return emptyCCan 
 
-        flavor = Derived loc DerSC 
+    flavor = Derived loc DerSC 
 
-newImmSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS CanonicalCts 
+newImmSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS WorkList
 -- Returns immediate superclasses 
 newImmSCWorkFromFlavored ev flavor cls xis 
   = do { let (tyvars, sc_theta, _, _) = classBigSig cls 
