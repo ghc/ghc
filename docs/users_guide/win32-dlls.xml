@@ -427,7 +427,7 @@ foreign export stdcall adder :: Int -> Int -> IO Int
 </para>
 <programlisting>
 // StartEnd.c
-#include <Rts.h>
+#include &lt;Rts.h&gt;
 
 extern void __stginit_Adder(void);
 
@@ -438,7 +438,7 @@ void HsStart()
 
    // Initialize Haskell runtime
    char** args = argv;
-   hs_init(&argc, &args);
+   hs_init(&amp;argc, &amp;args);
 
    // Tell Haskell about all root modules
    hs_add_root(__stginit_Adder);
@@ -499,7 +499,7 @@ HsStart
 End Sub
 
 Public Sub Test()
-MsgBox "12 + 5 = " & Adder(12, 5)
+MsgBox "12 + 5 = " &amp; Adder(12, 5)
 End Sub
 </programlisting>
 <para>
@@ -522,7 +522,7 @@ End Sub
 // Tester.cpp
 #include "HsFFI.h"
 #include "Adder_stub.h"
-#include <stdio.h>
+#include &lt;stdio.h&gt;
 
 extern "C" {
     void HsStart();
@@ -546,6 +546,8 @@ $ ghc -o tester Tester.cpp Adder.dll.a
 $ tester
 12 + 5 = 17
 </screen>
+
+</sect3>
 
 </sect2>
 
