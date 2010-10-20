@@ -531,16 +531,20 @@ spontaneousSolveStage workItem inerts
                            , sr_stop       = ContinueWith workItem }
 
            Just (workItem', workList')
-               | not (isGivenCt workItem) -- Original was wanted or derived but we have now made him 
-                                          -- given so we have to interact him with the inerts due to
-                                          -- its status change. This in turn may produce more work.
-                   -> do { (new_inert, new_work) <- runSolverPipeline [ ("recursive interact with inert eqs", interactWithInertEqsStage)
-                                                                      , ("recursive interact with inerts", interactWithInertsStage)
-                                                                      ] inerts workItem'
-                         ; return $ SR { sr_new_work = new_work `unionWorkLists` workList'
+               | not (isGivenCt workItem) 
+	       	 -- Original was wanted or derived but we have now made him 
+                 -- given so we have to interact him with the inerts due to
+                 -- its status change. This in turn may produce more work.
+		 -- We do this *right now* (rather than just putting workItem'
+		 -- back into the work-list) because we've solved 
+               -> do { (new_inert, new_work) <- runSolverPipeline 
+                             [ ("recursive interact with inert eqs", interactWithInertEqsStage)
+                             , ("recursive interact with inerts", interactWithInertsStage)
+                             ] inerts workItem'
+                     ; return $ SR { sr_new_work = new_work `unionWorkLists` workList'
                                        , sr_inerts   = new_inert -- will include workItem' 
                                        , sr_stop     = Stop }
-                         }
+                     }
                | otherwise 
                    -> -- Original was given; he must then be inert all right, and
                       -- workList' are all givens from flattening

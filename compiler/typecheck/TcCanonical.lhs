@@ -541,15 +541,19 @@ reOrient _untch (FunCls {})   (VarCls tv2)  = isMetaTyVar tv2
 reOrient _untch (FunCls {}) _               = False             -- Fun/Other on rhs
 
 reOrient _untch (VarCls tv1) (FunCls {})    = not $ isMetaTyVar tv1
+	 -- Put function on the left, *except* if the RHS becomes
+	 -- a meta-tyvar; see invariant on CFunEqCan 
+	 -- and Note [No touchables as FunEq RHS]
 
-reOrient _untch (VarCls tv1)  (FskCls {})   = not $ isMetaTyVar tv1
-      -- See Note [Loopy Spontaneous Solving, Example 4]
+reOrient _untch (VarCls tv1) (FskCls {})    = not $ isMetaTyVar tv1
+   -- Put flatten-skolems on the left if possible:
+   --   see Note [Loopy Spontaneous Solving, Example 4] in TcInteract
 
 reOrient _untch (VarCls {})  (OtherCls {})  = False
 reOrient _untch (VarCls {})  (VarCls {})    = False
 
 reOrient _untch (FskCls {}) (VarCls tv2)    = isMetaTyVar tv2 
-      -- See Note [Loopy Spontaneous Solving, Example 4]
+      -- See Note [Loopy Spontaneous Solving, Example 4] in TcInteract
 
 reOrient _untch (FskCls {}) (FskCls {})     = False
 reOrient _untch (FskCls {}) (FunCls {})     = True 

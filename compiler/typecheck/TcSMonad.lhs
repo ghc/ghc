@@ -152,11 +152,11 @@ data CanonicalCt
        --   * tv not in tvs(xi)   (occurs check)
        --   * If constraint is given then typeKind xi `compatKind` typeKind tv 
        --                See Note [Spontaneous solving and kind compatibility] 
-       --   * if @xi@ is a flatten skolem then @tv@ can only be: 
+       --   * If 'xi' is a flatten skolem then 'tv' can only be: 
        --              - a flatten skolem or a unification variable
        --     i.e. equalities prefer flatten skolems in their LHS 
-       --                See Note [Loopy Spontaneous Solving, Example 4]
-       --                Also related to [Flatten Skolem Equivalence Classes]
+       --     See Note [Loopy Spontaneous Solving, Example 4]
+       --     Also related to [Flatten Skolem Equivalence Classes]
       cc_id     :: EvVar, 
       cc_flavor :: CtFlavor, 
       cc_tyvar  :: TcTyVar, 
