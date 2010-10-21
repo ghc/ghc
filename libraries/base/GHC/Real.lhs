@@ -331,7 +331,10 @@ instance  (Integral a)  => Num (Ratio a)  where
 instance  (Integral a)  => Fractional (Ratio a)  where
     {-# SPECIALIZE instance Fractional Rational #-}
     (x:%y) / (x':%y')   =  (x*y') % (y*x')
-    recip (x:%y)        =  y % x
+    recip (0:%_)        = error "Ratio.%: zero denominator"
+    recip (x:%y)
+        | x < 0         = negate y :% negate x
+        | otherwise     = y :% x
     fromRational (x:%y) =  fromInteger x :% fromInteger y
 
 instance  (Integral a)  => Real (Ratio a)  where
