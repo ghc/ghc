@@ -256,20 +256,20 @@ fromOnDiskName
    -> OnDiskName
    -> (NameCache, Name)
 fromOnDiskName _ nc (pid, mod_name, occ) =
-  let 
+  let
         mod   = mkModule pid mod_name
         cache = nsNames nc
   in
   case lookupOrigNameCache cache  mod occ of
      Just name -> (nc, name)
-     Nothing   -> 
-        let 
+     Nothing   ->
+        let
                 us        = nsUniqs nc
                 uniq      = uniqFromSupply us
                 name      = mkExternalName uniq mod occ noSrcSpan
                 new_cache = extendNameCache cache mod occ name
-        in        
-        case splitUniqSupply us of { (us',_) -> 
+        in
+        case splitUniqSupply us of { (us',_) ->
         ( nc{ nsUniqs = us', nsNames = new_cache }, name )
         }
 
