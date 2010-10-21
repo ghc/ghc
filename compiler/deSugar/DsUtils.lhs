@@ -144,11 +144,48 @@ selectMatchVar :: Pat Id -> DsM Id
 selectMatchVar (BangPat pat) = selectMatchVar (unLoc pat)
 selectMatchVar (LazyPat pat) = selectMatchVar (unLoc pat)
 selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat var)  = return var
+selectMatchVar (VarPat var)  = return (localiseId var)  -- Note [Localise pattern binders]
 selectMatchVar (AsPat var _) = return (unLoc var)
 selectMatchVar other_pat     = newSysLocalDs (hsPatType other_pat)
 				  -- OK, better make up one...
 \end{code}
+
+Note [Localise pattern binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider     module M where
+               [Just a] = e
+After renaming it looks like
+             module M where
+               [Just M.a] = e
+
+We don't generalise, since it's a pattern binding, monomorphic, etc,
+so after desugaring we may get something like
+             M.a = case e of (v:_) ->
+                   case v of Just M.a -> M.a
+Notice the "M.a" in the pattern; after all, it was in the original
+pattern.  However, after optimisation those pattern binders can become
+let-binders, and then end up floated to top level.  They have a
+different *unique* by then (the simplifier is good about maintaining
+proper scoping), but it's BAD to have two top-level bindings with the
+External Name M.a, because that turns into two linker symbols for M.a.
+It's quite rare for this to actually *happen* -- the only case I know
+of is tc003 compiled with the 'hpc' way -- but that only makes it 
+all the more annoying.
+
+To avoid this, we craftily call 'localiseId' in the desugarer, which
+simply turns the External Name for the Id into an Internal one, but
+doesn't change the unique.  So the desugarer produces this:
+             M.a{r8} = case e of (v:_) ->
+                       case v of Just a{r8} -> M.a{r8}
+The unique is still 'r8', but the binding site in the pattern
+is now an Internal Name.  Now the simplifier's usual mechanisms
+will propagate that Name to all the occurrence sites, as well as
+un-shadowing it, so we'll get
+             M.a{r8} = case e of (v:_) ->
+                       case v of Just a{s77} -> a{s77}
+In fact, even CoreSubst.simplOptExpr will do this, and simpleOptExpr
+runs on the output of the desugarer, so all is well by the end of
+the desugaring pass.
 
 
 %************************************************************************
@@ -551,12 +588,13 @@ mkSelectorBinds pat val_expr
       tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
       tuple_var <- newSysLocalDs tuple_ty
       let mk_tup_bind binder
-            = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
+            = (binder, mkTupleSelector local_binders binder tuple_var (Var tuple_var))
       return ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
-    binders     = collectPatBinders pat
-    local_tuple = mkBigCoreVarTup binders
-    tuple_ty    = exprType local_tuple
+    binders       = collectPatBinders pat
+    local_binders = map localiseId binders	-- See Note [Localise pattern binders]
+    local_tuple   = mkBigCoreVarTup binders
+    tuple_ty      = exprType local_tuple
 
     mk_bind scrut_var err_var bndr_var = do
     -- (mk_bind sv err_var) generates
