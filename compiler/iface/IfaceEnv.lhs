@@ -98,8 +98,7 @@ allocateGlobalBinder name_supply mod occ loc
 	-- Build a completely new Name, and put it in the cache
 	Nothing -> (new_name_supply, name)
 		where
-		  (us', us1)      = splitUniqSupply (nsUniqs name_supply)
-		  uniq   	  = uniqFromSupply us1
+		  (uniq, us')     = takeUniqFromSupply (nsUniqs name_supply)
 		  name            = mkExternalName uniq mod occ loc
 		  new_cache       = extendNameCache (nsNames name_supply) mod occ name
 		  new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
@@ -159,14 +158,12 @@ lookupOrig mod occ
             case lookupOrigNameCache (nsNames name_cache) mod occ of {
 	      Just name -> (name_cache, name);
 	      Nothing   ->
-              let
-                us        = nsUniqs name_cache
-                uniq      = uniqFromSupply us
-                name      = mkExternalName uniq mod occ noSrcSpan
-                new_cache = extendNameCache (nsNames name_cache) mod occ name
-              in
-              case splitUniqSupply us of { (us',_) -> do
-                (name_cache{ nsUniqs = us', nsNames = new_cache }, name)
+              case takeUniqFromSupply (nsUniqs name_cache) of {
+              (uniq, us) ->
+                  let
+                    name      = mkExternalName uniq mod occ noSrcSpan
+                    new_cache = extendNameCache (nsNames name_cache) mod occ name
+                  in (name_cache{ nsUniqs = us, nsNames = new_cache }, name)
     }}}
 
 newIPName :: IPName OccName -> TcRnIf m n (IPName Name)
@@ -180,8 +177,7 @@ newIPName occ_name_ip =
       Just name_ip -> (name_cache, name_ip)
       Nothing      -> (new_ns, name_ip)
 	  where
-	    (us', us1)  = splitUniqSupply (nsUniqs name_cache)
-	    uniq        = uniqFromSupply us1
+	    (uniq, us') = takeUniqFromSupply (nsUniqs name_cache)
 	    name_ip     = mapIPName (mkIPName uniq) occ_name_ip
 	    new_ipcache = Map.insert key name_ip ipcache
 	    new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
