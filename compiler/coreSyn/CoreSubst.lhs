@@ -721,7 +721,7 @@ simple_opt_expr subst expr
   = go expr
   where
     go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
-    go (App e1 e2)      = App (go e1) (go e2)
+    go (App e1 e2)      = simple_app subst e1 [go e2]
     go (Type ty)        = Type (substTy subst ty)
     go (Lit lit)        = Lit lit
     go (Note note e)    = Note note (go e)
@@ -730,9 +730,10 @@ simple_opt_expr subst expr
                         where
                           co' = substTy subst co
 
-    go (Let bind body)  = maybeLet mb_bind (simple_opt_expr subst' body)
-                        where
-                          (subst', mb_bind) = simple_opt_bind subst bind
+    go (Let bind body) = case simple_opt_bind subst bind of
+                           (subst', Nothing)   -> simple_opt_expr subst' body
+                           (subst', Just bind) -> Let bind (simple_opt_expr subst' body)
+
     go lam@(Lam {})     = go_lam [] subst lam
     go (Case e b ty as) = Case (go e) b' (substTy subst ty)
        			       (map (go_alt subst') as)
@@ -759,54 +760,70 @@ simple_opt_expr subst expr
          e' = simple_opt_expr subst e
 
 ----------------------
+-- simple_app collects arguments for beta reduction
+simple_app :: Subst -> InExpr -> [OutExpr] -> CoreExpr
+simple_app subst (App e1 e2) as   
+  = simple_app subst e1 (simple_opt_expr subst e2 : as)
+simple_app subst (Lam b e) (a:as) 
+  = case maybe_substitute subst b a of
+      Just ext_subst -> simple_app ext_subst e as
+      Nothing        -> Let (NonRec b2 a) (simple_app subst' e as)
+  where
+    (subst', b') = subst_opt_bndr subst b
+    b2 = add_info subst' b b'
+simple_app subst e as
+  = foldl App (simple_opt_expr subst e) as
+
+----------------------
 simple_opt_bind :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
 simple_opt_bind subst (Rec prs)
   = (subst'', Just (Rec (reverse rev_prs')))
   where
     (subst', bndrs')    = subst_opt_bndrs subst (map fst prs)
     (subst'', rev_prs') = foldl do_pr (subst', []) (prs `zip` bndrs')
-    do_pr (subst, prs) ((b,r), b') = case simple_opt_pair subst b r of
-          	      	   	       Left subst' -> (subst', prs)
-    				       Right r'    -> (subst,  (b2,r'):prs)
-                                           where
-                             	             b2 = add_info subst b b'
+    do_pr (subst, prs) ((b,r), b') 
+       = case maybe_substitute subst b r2 of
+           Just subst' -> (subst', prs)
+    	   Nothing     -> (subst,  (b2,r2):prs)
+       where
+         b2 = add_info subst b b'
+         r2 = simple_opt_expr subst r
 
 simple_opt_bind subst (NonRec b r)
-  = case simple_opt_pair subst b r of
-      Left ext_subst -> (ext_subst, Nothing)
-      Right r'       -> (subst', Just (NonRec b2 r'))
-	  	     where
-		        (subst', b') = subst_opt_bndr subst b
-			b2 = add_info subst' b b'
+  = case maybe_substitute subst b r' of
+      Just ext_subst -> (ext_subst, Nothing)
+      Nothing        -> (subst', Just (NonRec b2 r'))
+  where
+    r' = simple_opt_expr subst r
+    (subst', b') = subst_opt_bndr subst b
+    b2 = add_info subst' b b'
 
 ----------------------
-simple_opt_pair :: Subst -> InVar -> InExpr -> Either Subst OutExpr
-    -- (simple_opt_pair subst in_var in_rhs)  
+maybe_substitute :: Subst -> InVar -> OutExpr -> Maybe Subst
+    -- (maybe_substitute subst in_var out_rhs)  
     --   either extends subst with (in_var -> out_rhs)
-    --   or     return out_rhs for a binding out_var = out_rhs
-simple_opt_pair subst b r
+    --   or     returns Nothing
+maybe_substitute subst b r
   | Type ty <- r 	-- let a::* = TYPE ty in <body>
   = ASSERT( isTyCoVar b )
-    Left (extendTvSubst subst b (substTy subst ty))
+    Just (extendTvSubst subst b ty)
 
   | isId b		-- let x = e in <body>
   , safe_to_inline (idOccInfo b) 
   , isAlwaysActive (idInlineActivation b)	-- Note [Inline prag in simplOpt]
   , not (isStableUnfolding (idUnfolding b))
   , not (isExportedId b)
-  = Left (extendIdSubst subst b r')
+  = Just (extendIdSubst subst b r)
   
   | otherwise
-  = Right r'
+  = Nothing
   where
-    r' = simple_opt_expr subst r
-
 	-- Unconditionally safe to inline
     safe_to_inline :: OccInfo -> Bool
     safe_to_inline (IAmALoopBreaker {})     = False
     safe_to_inline IAmDead                  = True
-    safe_to_inline (OneOcc in_lam one_br _) = (not in_lam && one_br) || exprIsTrivial r'
-    safe_to_inline NoOccInfo                = exprIsTrivial r'
+    safe_to_inline (OneOcc in_lam one_br _) = (not in_lam && one_br) || exprIsTrivial r
+    safe_to_inline NoOccInfo                = exprIsTrivial r
 
 ----------------------
 subst_opt_bndr :: Subst -> InVar -> (Subst, OutVar)
@@ -851,11 +868,6 @@ add_info subst old_bndr new_bndr
  | otherwise          = maybeModifyIdInfo mb_new_info new_bndr
  where
    mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
-
-----------------------
-maybeLet :: Maybe CoreBind -> CoreExpr -> CoreExpr
-maybeLet Nothing  e = e
-maybeLet (Just b) e = Let b e
 \end{code}
 
 Note [Inline prag in simplOpt]
