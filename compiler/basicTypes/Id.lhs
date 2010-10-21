@@ -172,7 +172,7 @@ localiseId :: Id -> Id
 -- Make an with the same unique and type as the 
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id 
-  | isLocalId id && isInternalName name
+  | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
   = mkLocalIdWithInfo (localiseName name) (idType id) (idInfo id)
