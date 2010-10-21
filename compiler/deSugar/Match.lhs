@@ -280,13 +280,13 @@ match vars@(v:_) ty eqns
   = ASSERT( not (null eqns ) )
     do	{ 	-- Tidy the first pattern, generating
 		-- auxiliary bindings if necessary
-	  (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
+          (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
 
 		-- Group the equations and match each group in turn
-       ; let grouped = groupEquations tidy_eqns
+        ; let grouped = groupEquations tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
-       ; ifDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
+        ; ifDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
 	; match_results <- mapM match_group grouped
 	; return (adjustMatchResult (foldr1 (.) aux_binds) $
