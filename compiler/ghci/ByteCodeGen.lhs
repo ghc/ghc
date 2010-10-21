@@ -1565,9 +1565,9 @@ getBreakArray = BcM $ \st -> return (st, breakArray st)
 
 newUnique :: BcM Unique
 newUnique = BcM $
-   \st -> case splitUniqSupply (uniqSupply st) of
-             (us1, us2) -> let newState = st { uniqSupply = us2 } 
-                           in  return (newState, uniqFromSupply us1) 
+   \st -> case takeUniqFromSupply (uniqSupply st) of
+             (uniq, us) -> let newState = st { uniqSupply = us }
+                           in  return (newState, uniq)
 
 newId :: Type -> BcM Id
 newId ty = do 
