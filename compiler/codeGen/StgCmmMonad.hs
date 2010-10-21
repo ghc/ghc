@@ -537,22 +537,22 @@ forkAlts :: [FCode a] -> FCode [a]
 -- that the virtual Hp is moved on to the worst virtual Hp for the branches
 
 forkAlts branch_fcodes
-  = do	{ info_down <- getInfoDown
-	; us <- newUniqSupply
-	; state <- getState
-	; let compile us branch 
-		= (us2, doFCode branch info_down branch_state)
-		where
-		  (us1,us2) = splitUniqSupply us
-	          branch_state = (initCgState us1) {
-					cgs_binds   = cgs_binds state,
-					cgs_hp_usg  = cgs_hp_usg state }
+  = do  { info_down <- getInfoDown
+        ; us <- newUniqSupply
+        ; state <- getState
+        ; let compile us branch
+                = (us2, doFCode branch info_down branch_state)
+                where
+                  (us1,us2) = splitUniqSupply us
+                  branch_state = (initCgState us1) {
+                                        cgs_binds   = cgs_binds state,
+                                        cgs_hp_usg  = cgs_hp_usg state }
 
-	      (_us, results) = mapAccumL compile us branch_fcodes
-	      (branch_results, branch_out_states) = unzip results
-	; setState $ foldl stateIncUsage state branch_out_states
-		-- NB foldl.  state is the *left* argument to stateIncUsage
-	; return branch_results }
+              (_us, results) = mapAccumL compile us branch_fcodes
+              (branch_results, branch_out_states) = unzip results
+        ; setState $ foldl stateIncUsage state branch_out_states
+                -- NB foldl.  state is the *left* argument to stateIncUsage
+        ; return branch_results }
 
 -- collect the code emitted by an FCode computation
 getCodeR :: FCode a -> FCode (a, CmmAGraph)
