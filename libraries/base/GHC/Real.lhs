@@ -6,7 +6,7 @@
 -- Module      :  GHC.Real
 -- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -30,7 +30,7 @@ infixr 8  ^, ^^
 infixl 7  /, `quot`, `rem`, `div`, `mod`
 infixl 7  %
 
-default ()              -- Double isn't available yet, 
+default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
 \end{code}
 
@@ -58,8 +58,8 @@ infinity, notANumber :: Rational
 infinity   = 1 :% 0
 notANumber = 0 :% 0
 
--- Use :%, not % for Inf/NaN; the latter would 
--- immediately lead to a runtime error, because it normalises. 
+-- Use :%, not % for Inf/NaN; the latter would
+-- immediately lead to a runtime error, because it normalises.
 \end{code}
 
 
@@ -191,7 +191,7 @@ class  (Real a, Fractional a) => RealFrac a  where
 
     {-# INLINE truncate #-}
     truncate x          =  m  where (m,_) = properFraction x
-    
+
     round x             =  let (n,r) = properFraction x
                                m     = if r < 0 then n - 1 else n + 1
                            in case signum (abs r - 0.5) of
@@ -199,10 +199,10 @@ class  (Real a, Fractional a) => RealFrac a  where
                                 0  -> if even n then n else m
                                 1  -> m
                                 _  -> error "round default defn: Bad value"
-    
+
     ceiling x           =  if r > 0 then n + 1 else n
                            where (n,r) = properFraction x
-    
+
     floor x             =  if r < 0 then n - 1 else n
                            where (n,r) = properFraction x
 \end{code}
@@ -349,7 +349,7 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
 instance  (Integral a)  => Show (Ratio a)  where
     {-# SPECIALIZE instance Show Rational #-}
     showsPrec p (x:%y)  =  showParen (p > ratioPrec) $
-                           showsPrec ratioPrec1 x . 
+                           showsPrec ratioPrec1 x .
                            showString " % " .
                            -- H98 report has spaces round the %
                            -- but we removed them [May 04]
@@ -409,7 +409,7 @@ showSigned :: (Real a)
   -> Int                -- ^ the precedence of the enclosing context
   -> a                  -- ^ the value to show
   -> ShowS
-showSigned showPos p x 
+showSigned showPos p x
    | x < 0     = showParen (p > 6) (showChar '-' . showPos (-x))
    | otherwise = showPos x
 
