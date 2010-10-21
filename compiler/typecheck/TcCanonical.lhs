@@ -498,7 +498,7 @@ inert set is an idempotent subustitution...
 \begin{code}
 data TypeClassifier 
   = FskCls TcTyVar      -- ^ Flatten skolem 
-  | VarCls TcTyVar      -- ^ *Non-flatten-skolem* variable 
+  | VarCls TcTyVar      -- ^ Non-flatten-skolem variable 
   | FunCls TyCon [Type] -- ^ Type function, exactly saturated
   | OtherCls TcType     -- ^ Neither of the above
 
