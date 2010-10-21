@@ -170,7 +170,7 @@ initPackages :: DynFlags -> IO (DynFlags, [PackageId])
 initPackages dflags = do 
   pkg_db <- case pkgDatabase dflags of
                 Nothing -> readPackageConfigs dflags
-                Just db -> return db
+                Just db -> return $ maybeHidePackages dflags db
   (pkg_state, preload, this_pkg)       
         <- mkPackageState dflags pkg_db [] (thisPackage dflags)
   return (dflags{ pkgDatabase = Just pkg_db,
