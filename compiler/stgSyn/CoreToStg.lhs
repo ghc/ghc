@@ -549,6 +549,8 @@ coreToStgApp _ f args = do
                                 -- All the free vars of the args are disqualified
                                 -- from being let-no-escaped.
 
+    -- Forcing these fixes a leak in the code generator, noticed while
+    -- profiling for trac #4367
     app `seq` fvs `seq` seqVarSet vars `seq` return (
         app,
         fvs,
