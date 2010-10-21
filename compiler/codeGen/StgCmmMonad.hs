@@ -604,8 +604,9 @@ emitProcWithConvention :: Convention -> CmmInfo -> CLabel -> CmmFormals ->
                           CmmAGraph -> FCode ()
 emitProcWithConvention conv info lbl args blocks
   = do  { us <- newUniqSupply
-        ; let (offset, entry) = mkEntry (mkBlockId $ uniqFromSupply us) conv args
-              blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
+        ; let (uniq, us') = takeUniqFromSupply us
+              (offset, entry) = mkEntry (mkBlockId uniq) conv args
+              blks = initUs_ us' $ lgraphOfAGraph $ entry <*> blocks
         ; let proc_block = CmmProc info lbl args ((offset, Just initUpdFrameOff), blks)
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
