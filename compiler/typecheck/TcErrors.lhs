@@ -640,17 +640,8 @@ warnDefaulting wanteds default_ty
 Note [Runtime skolems]
 ~~~~~~~~~~~~~~~~~~~~~~
 We want to give a reasonably helpful error message for ambiguity
-arising from *runtime* skolems in the debugger.  Mostly these
-are created by in RtClosureInspec.zonkRTTIType.  However at a 
-breakpoint we return Ids from the CoreExpr, whose types may have
-free type variables bound by some enclosing 'forall'.  These are
-UnkSkols, created ty TcType.zonkQuantifiedTyVar.  
-
-These UnkSkols should never show up as ambiguous type variables in
-normal typechecking, so we hackily emit the debugger-related message
-both for RuntimeUnkSkols and UnkSkols. Hence the two cases in
-TcType.isRuntimeUnkSkol. Yuk. The rest of the debugger is such
-a mess that I don't feel motivated to clean up this bit.
+arising from *runtime* skolems in the debugger.  These
+are created by in RtClosureInspect.zonkRTTIType.  
 
 
 %************************************************************************

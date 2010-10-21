@@ -571,17 +571,24 @@ liftTcM = id
 newVar :: Kind -> TR TcType
 newVar = liftTcM . newFlexiTyVarTy
 
-type RttiInstantiation = [(TyVar, TcTyVar)]
-   -- Assoicates the debugger-world type variables (which are skolems)
-   -- to typechecker-world meta type variables (which are mutable,
-   -- and may be refined)
+type RttiInstantiation = [(TcTyVar, TyVar)]
+   -- Associates the typechecker-world meta type variables 
+   -- (which are mutable and may be refined), to their 
+   -- debugger-world RuntimeUnkSkol counterparts.
+   -- If the TcTyVar has not been refined by the runtime type
+   -- elaboration, then we want to turn it back into the
+   -- original RuntimeUnkSkol
 
 -- | Returns the instantiated type scheme ty', and the 
---   mapping from old to new (instantiated) type variables
+--   mapping from new (instantiated) -to- old (skolem) type variables
+--   We want this mapping just for old RuntimeUnkSkols, to avoid
+--   gratuitously changing their unique on every trip
 instScheme :: QuantifiedType -> TR (TcType, RttiInstantiation)
 instScheme (tvs, ty) 
   = liftTcM $ do { (tvs', _, subst) <- tcInstTyVars tvs
-                 ; return (substTy subst ty, tvs `zip` tvs') }
+                 ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs
+                                             , isRuntimeUnkSkol tv]
+                 ; return (substTy subst ty, rtti_inst) }
 
 applyRevSubst :: RttiInstantiation -> TR ()
 -- Apply the *reverse* substitution in-place to any un-filled-in
@@ -589,7 +596,7 @@ applyRevSubst :: RttiInstantiation -> TR ()
 -- unless it has been refined by new information from the heap
 applyRevSubst pairs = liftTcM (mapM_ do_pair pairs)
   where
-    do_pair (rtti_tv, tc_tv)
+    do_pair (tc_tv, rtti_tv)
       = do { tc_ty <- zonkTcTyVar tc_tv
            ; case tcGetTyVar_maybe tc_ty of
                Just tv | isMetaTyVar tv -> writeMetaTyVar tv (mkTyVarTy rtti_tv)
@@ -1131,6 +1138,10 @@ zonkRttiType = zonkType (mkZonkTcTyVar zonk_unbound_meta)
     zonk_unbound_meta tv 
       = ASSERT( isTcTyVar tv )
         do { tv' <- skolemiseUnboundMetaTyVar RuntimeUnkSkol tv
+	     -- This is where RuntimeUnkSkols are born: 
+	     -- otherwise-unconstrained unification variables are
+	     -- turned into RuntimeUnkSkols as they leave the
+	     -- typechecker's monad
            ; return (mkTyVarTy tv') }
 
 --------------------------------------------------------------------------------

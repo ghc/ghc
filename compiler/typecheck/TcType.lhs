@@ -673,14 +673,10 @@ isIndirect _            = False
 
 isRuntimeUnkSkol :: TyVar -> Bool
 -- Called only in TcErrors; see Note [Runtime skolems] there
-isRuntimeUnkSkol x 
-  | isTcTyVar x
-  , SkolemTv info <- tcTyVarDetails x 
-  = case info of 
-       UnkSkol -> True
-       RuntimeUnkSkol -> True
-       _ -> False
-  | otherwise = False
+isRuntimeUnkSkol x | isTcTyVar x
+  		   , SkolemTv RuntimeUnkSkol <- tcTyVarDetails x 
+  		   = True
+  		   | otherwise = False
 
 isUnkSkol :: TyVar -> Bool
 isUnkSkol x | isTcTyVar x
