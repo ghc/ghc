@@ -478,11 +478,11 @@ mkTupleCase uniqs vars body scrut_var scrut
             in mk_tuple_case us' (chunkify vars') body'
     
     one_tuple_case chunk_vars (us, vs, body)
-      = let (us1, us2) = splitUniqSupply us
-            scrut_var = mkSysLocal (fsLit "ds") (uniqFromSupply us1)
+      = let (uniq, us') = takeUniqFromSupply us
+            scrut_var = mkSysLocal (fsLit "ds") uniq
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
-        in (us2, scrut_var:vs, body')
+        in (us', scrut_var:vs, body')
 \end{code}
 
 \begin{code}

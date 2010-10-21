@@ -293,10 +293,9 @@ type SpillM a	= State SpillS a
 newUnique :: SpillM Unique
 newUnique
  = do   us      <- gets stateUS
-        case splitUniqSupply us of
-         (us1, us2)
-          -> do let uniq = uniqFromSupply us1
-                modify $ \s -> s { stateUS = us2 }
+        case takeUniqFromSupply us of
+         (uniq, us')
+          -> do modify $ \s -> s { stateUS = us' }
                 return uniq
 
 accSpillSL (r1, s1, l1) (_, s2, l2)

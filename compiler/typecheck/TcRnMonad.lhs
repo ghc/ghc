@@ -332,9 +332,9 @@ newUnique
  = do { env <- getEnv ;
         let { u_var = env_us env } ;
         us <- readMutVar u_var ;
-        case splitUniqSupply us of { (us1,_) -> do {
-        writeMutVar u_var us1 ;
-        return $! uniqFromSupply us }}}
+        case takeUniqFromSupply us of { (uniq, us') -> do {
+        writeMutVar u_var us' ;
+        return $! uniq }}}
    -- NOTE 1: we strictly split the supply, to avoid the possibility of leaving
    -- a chain of unevaluated supplies behind.
    -- NOTE 2: we use the uniq in the supply from the MutVar directly, and

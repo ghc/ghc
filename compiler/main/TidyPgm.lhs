@@ -854,10 +854,9 @@ tidyTopName mod nc_var maybe_ref occ_env id
 
     (occ_env', occ') = tidyOccName occ_env new_occ
 
-    mk_new_local nc = (nc { nsUniqs = us2 }, mkInternalName uniq occ' loc)
+    mk_new_local nc = (nc { nsUniqs = us }, mkInternalName uniq occ' loc)
  		    where
-		      (us1, us2) = splitUniqSupply (nsUniqs nc)
-		      uniq	 = uniqFromSupply us1
+		      (uniq, us) = takeUniqFromSupply (nsUniqs nc)
 
     mk_new_external nc = allocateGlobalBinder nc mod occ' loc
 	-- If we want to externalise a currently-local name, check

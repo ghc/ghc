@@ -90,8 +90,8 @@ mapAccumLNat f b (x:xs)
 
 getUniqueNat :: NatM Unique
 getUniqueNat = NatM $ \ (NatM_State us delta imports pic dflags) ->
-    case splitUniqSupply us of
-         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta imports pic dflags))
+    case takeUniqFromSupply us of
+         (uniq, us') -> (uniq, (NatM_State us' delta imports pic dflags))
 
 
 getDynFlagsNat :: NatM DynFlags

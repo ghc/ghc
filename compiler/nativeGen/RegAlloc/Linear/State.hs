@@ -131,8 +131,8 @@ getDeltaR = RegM $ \s -> (# s, ra_delta s #)
 
 getUniqueR :: RegM Unique
 getUniqueR = RegM $ \s ->
-  case splitUniqSupply (ra_us s) of
-    (us1, us2) -> (# s{ra_us = us2}, uniqFromSupply us1 #)
+  case takeUniqFromSupply (ra_us s) of
+    (uniq, us) -> (# s{ra_us = us}, uniq #)
 
 
 -- | Record that a spill instruction was inserted, for profiling.

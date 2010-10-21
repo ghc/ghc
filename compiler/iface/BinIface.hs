@@ -263,15 +263,13 @@ fromOnDiskName _ nc (pid, mod_name, occ) =
   case lookupOrigNameCache cache  mod occ of
      Just name -> (nc, name)
      Nothing   ->
-        let
-                us        = nsUniqs nc
-                uniq      = uniqFromSupply us
+        case takeUniqFromSupply (nsUniqs nc) of
+        (uniq, us) ->
+            let
                 name      = mkExternalName uniq mod occ noSrcSpan
                 new_cache = extendNameCache cache mod occ name
-        in
-        case splitUniqSupply us of { (us',_) ->
-        ( nc{ nsUniqs = us', nsNames = new_cache }, name )
-        }
+            in
+            ( nc{ nsUniqs = us, nsNames = new_cache }, name )
 
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
