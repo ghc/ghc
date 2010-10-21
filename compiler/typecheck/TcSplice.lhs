@@ -395,7 +395,7 @@ tc_bracket _ (DecBrG decls)
 
 tc_bracket _ (PatBr pat)
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
-	; _ <- tcPat ThPatQuote pat any_ty unitTy $ 
+	; _ <- tcPat ThPatQuote pat any_ty $ 
                return ()
 	; tcMetaTy patQTyConName }
 	-- Result type is PatQ (= Q Pat)

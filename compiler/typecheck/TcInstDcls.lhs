@@ -33,7 +33,6 @@ import TyCon
 import DataCon
 import Class
 import Var
-import VarSet	  ( emptyVarSet )
 import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn	  ( Expr(Var) )
@@ -638,7 +637,7 @@ tc_inst_decl2 dfun_id inst_binds
                                     mapAndUnzipM tc_sc (sc_sels `zip` sc_dicts)
 
 				    -- NOT FINISHED!
-       ; (_eq_sc_binds, sc_eq_vars) <- checkConstraints InstSkol emptyVarSet 
+       ; (_eq_sc_binds, sc_eq_vars) <- checkConstraints InstSkol
                                            inst_tyvars' dfun_ev_vars $
                                       emitWanteds ScOrigin sc_eqs
 
@@ -707,7 +706,7 @@ tcSuperClass tyvars dicts
              self_ev_bind@(EvBind self_dict _)
 	     (sc_sel, sc_pred)
   = do { (ev_binds, wanted, sc_dict)
-             <- newImplication InstSkol emptyVarSet tyvars dicts $
+             <- newImplication InstSkol tyvars dicts $
                 emitWanted ScOrigin sc_pred
 
        ; simplifySuperClass self_dict wanted
@@ -970,7 +969,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 -- by the constraint solver, since the <context> may be
 -- user-specified.
 
-  = do { rep_d_stuff <- checkConstraints InstSkol emptyVarSet tyvars dfun_ev_vars $
+  = do { rep_d_stuff <- checkConstraints InstSkol tyvars dfun_ev_vars $
                         emitWanted ScOrigin rep_pred
                          
        ; mapAndUnzipM (tc_item rep_d_stuff) op_items }

@@ -82,7 +82,7 @@ tcPolyExpr expr res_ty
 
 tcPolyExprNC expr res_ty
   = do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; (gen_fn, expr') <- tcGen (GenSkol res_ty) emptyVarSet res_ty $ \ _ rho ->
+       ; (gen_fn, expr') <- tcGen (GenSkol res_ty) res_ty $ \ _ rho ->
 			    tcMonoExprNC expr rho
        ; return (mkLHsWrap gen_fn expr') }
 
@@ -191,7 +191,7 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
 
       -- Remember to extend the lexical type-variable environment
       ; (gen_fn, expr') 
-            <- tcGen (SigSkol ExprSigCtxt) emptyVarSet sig_tc_ty $ \ skol_tvs res_ty ->
+            <- tcGen (SigSkol ExprSigCtxt) sig_tc_ty $ \ skol_tvs res_ty ->
       	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
 	             	       	-- See Note [More instantiated than scoped] in TcBinds
       	       tcMonoExprNC expr res_ty

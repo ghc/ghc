@@ -304,9 +304,8 @@ tcSubType :: CtOrigin -> SkolemInfo -> TcSigmaType -> TcSigmaType -> TcM HsWrapp
 -- Returns a wrapper of shape   ty_actual ~ ty_expected
 tcSubType origin skol_info ty_actual ty_expected 
   | isSigmaTy ty_actual
-  = do { let extra_tvs = tyVarsOfType ty_actual
-       ; (sk_wrap, inst_wrap) 
-            <- tcGen skol_info extra_tvs ty_expected $ \ _ sk_rho -> do 
+  = do { (sk_wrap, inst_wrap) 
+            <- tcGen skol_info ty_expected $ \ _ sk_rho -> do 
             { (in_wrap, in_rho) <- deeplyInstantiate origin ty_actual
             ; coi <- unifyType in_rho sk_rho
             ; return (coiToHsWrapper coi <.> in_wrap) }
@@ -354,14 +353,14 @@ wrapFunResCoercion arg_tys co_fn_res
 %************************************************************************
 
 \begin{code}
-tcGen :: SkolemInfo -> TcTyVarSet -> TcType  
+tcGen :: SkolemInfo -> TcType  
       -> ([TcTyVar] -> TcRhoType -> TcM result)
       -> TcM (HsWrapper, result)
         -- The expression has type: spec_ty -> expected_ty
 
-tcGen skol_info extra_tvs 
-       expected_ty thing_inside    -- We expect expected_ty to be a forall-type
-                            	   -- If not, the call is a no-op
+tcGen skol_info expected_ty thing_inside 
+   -- We expect expected_ty to be a forall-type
+   -- If not, the call is a no-op
   = do  { traceTc "tcGen" empty
         ; (wrap, tvs', given, rho') <- deeplySkolemise skol_info expected_ty
 
@@ -370,7 +369,7 @@ tcGen skol_info extra_tvs
                            text "expected_ty" <+> ppr expected_ty,
                            text "inst ty" <+> ppr tvs' <+> ppr rho' ]
 
-	-- In 'free_tvs' we must check that the "forall_tvs" havn't been constrained
+	-- Generally we must check that the "forall_tvs" havn't been constrained
         -- The interesting bit here is that we must include the free variables
         -- of the expected_ty.  Here's an example:
         --       runST (newVar True)
@@ -378,10 +377,12 @@ tcGen skol_info extra_tvs
         -- for (newVar True), with s fresh.  Then we unify with the runST's arg type
         -- forall s'. ST s' a. That unifies s' with s, and a with MutVar s Bool.
         -- So now s' isn't unconstrained because it's linked to a.
-        -- Conclusion: pass the free vars of the expected_ty to checkConsraints
-        ; let free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
+        -- 
+	-- However [Oct 10] now that the untouchables are a range of 
+	-- TcTyVars, all tihs is handled automatically with no need for 
+	-- extra faffing around
 
-        ; (ev_binds, result) <- checkConstraints skol_info free_tvs tvs' given $
+        ; (ev_binds, result) <- checkConstraints skol_info tvs' given $
                                 thing_inside tvs' rho'
 
         ; return (wrap <.> mkWpLet ev_binds, result) }
@@ -389,36 +390,30 @@ tcGen skol_info extra_tvs
 	  -- often empty, in which case mkWpLet is a no-op
 
 checkConstraints :: SkolemInfo
-                 -> TcTyVarSet		-- Free variables (other than the type envt)
-					-- for the skolem escape check
 		 -> [TcTyVar]		-- Skolems
 		 -> [EvVar]             -- Given
 		 -> TcM result
 		 -> TcM (TcEvBinds, result)
 
-checkConstraints skol_info free_tvs skol_tvs given thing_inside
+checkConstraints skol_info skol_tvs given thing_inside
   | null skol_tvs && null given
   = do { res <- thing_inside; return (emptyTcEvBinds, res) }
       -- Just for efficiency.  We check every function argument with
       -- tcPolyExpr, which uses tcGen and hence checkConstraints.
 
   | otherwise
-  = do { (ev_binds, wanted, result) <- newImplication skol_info free_tvs 
+  = do { (ev_binds, wanted, result) <- newImplication skol_info 
                                              skol_tvs given thing_inside
        ; emitConstraints wanted
        ; return (ev_binds, result) }
 
-newImplication :: SkolemInfo -> TcTyVarSet -> [TcTyVar]
+newImplication :: SkolemInfo -> [TcTyVar]
 	       -> [EvVar] -> TcM result
                -> TcM (TcEvBinds, WantedConstraints, result)
-newImplication skol_info _free_tvs skol_tvs given thing_inside
+newImplication skol_info skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { --   gbl_tvs  <- tcGetGlobalTyVars
-         -- ; free_tvs <- zonkTcTyVarsAndFV free_tvs
-         -- ; let untch = gbl_tvs `unionVarSet` free_tvs
-
-       ; ((result, untch), wanted) <- captureConstraints  $ 
+    do { ((result, untch), wanted) <- captureConstraints  $ 
                                       captureUntouchables $
                                       thing_inside
 

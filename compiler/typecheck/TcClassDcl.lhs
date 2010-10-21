@@ -35,7 +35,6 @@ import MkId
 import Id
 import Name
 import Var
-import VarSet
 import NameEnv
 import NameSet
 import Outputable
@@ -255,7 +254,7 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
 			     -- NB: the binding is always a FunBind
 
 	; (ev_binds, (tc_bind, _)) 
-               <- checkConstraints skol_info emptyVarSet tyvars full_given $
+               <- checkConstraints skol_info tyvars full_given $
 		  tcExtendIdEnv [local_meth_id] $
 	          tcPolyBinds TopLevel meth_sig_fn no_prag_fn 
 		  	     NonRecursive NonRecursive

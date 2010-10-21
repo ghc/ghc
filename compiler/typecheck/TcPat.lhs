@@ -32,7 +32,6 @@ import Coercion
 import StaticFlags
 import TyCon
 import DataCon
-import VarSet	( emptyVarSet )
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import DynFlags
@@ -59,14 +58,13 @@ tcLetPat :: TcSigFun -> LetBndrSpec
 tcLetPat sig_fn no_gen pat pat_ty thing_inside
   = tc_lpat pat pat_ty penv thing_inside 
   where
-    penv = PE { pe_res_tvs = emptyVarSet, pe_lazy = True
+    penv = PE { pe_lazy = True
               , pe_ctxt = LetPat sig_fn no_gen }
 
 -----------------
 tcPats :: HsMatchContext Name
        -> [LPat Name]		 -- Patterns,
        -> [TcSigmaType]	         --   and their types
-       -> TcRhoType 		 -- Result type,
        -> TcM a                  --   and the checker for the body
        -> TcM ([LPat TcId], a)
 
@@ -81,39 +79,27 @@ tcPats :: HsMatchContext Name
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys res_ty thing_inside
+tcPats ctxt pats pat_tys thing_inside
   = tc_lpats penv pats pat_tys thing_inside
   where
-    penv = PE { pe_res_tvs = tyVarsOfTypes (res_ty : pat_tys)
-              , pe_lazy = False
-              , pe_ctxt = LamPat ctxt }
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt }
 
 tcPat :: HsMatchContext Name
       -> LPat Name -> TcSigmaType 
-      -> TcRhoType             -- Result type
       -> TcM a                 -- Checker for body, given
                                -- its result type
       -> TcM (LPat TcId, a)
-tcPat ctxt pat pat_ty res_ty thing_inside
+tcPat ctxt pat pat_ty thing_inside
   = tc_lpat pat pat_ty penv thing_inside
   where
-    penv = PE { pe_res_tvs = tyVarsOfTypes [res_ty, pat_ty]
-              , pe_lazy = False
-              , pe_ctxt = LamPat ctxt }
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt }
    
 
 -----------------
 data PatEnv
-  = PE { pe_res_tvs :: TcTyVarSet	
-	           -- For existential escape check; see Note [Existential check]
-	      	   -- Nothing <=> inside a "~"
-		   -- Just tvs <=> unification tvs free in the result
-		   -- 	           (which should be made untouchable in
-		   --		    any existentials we encounter in the pattern)
-
-       , pe_lazy :: Bool	-- True <=> lazy context, so no existentials allowed
+  = PE { pe_lazy :: Bool	-- True <=> lazy context, so no existentials allowed
        , pe_ctxt :: PatCtxt   	-- Context in which the whole pattern appears
-    }
+       }
 
 data PatCtxt
   = LamPat   -- Used for lambdas, case etc
@@ -188,7 +174,7 @@ Note [Existential check]
 Lazy patterns can't bind existentials.  They arise in two ways:
   * Let bindings      let { C a b = e } in b
   * Twiddle patterns  f ~(C a b) = e
-The pe_res_tvs field of PatEnv says whether we are inside a lazy
+The pe_lazy field of PatEnv says whether we are inside a lazy
 pattern (perhaps deeply)
 
 If we aren't inside a lazy pattern then we can bind existentials,
@@ -736,17 +722,8 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
 		  -- should require the GADT language flag
 
 	; given <- newEvVars theta'
-        ; let free_tvs = pe_res_tvs penv
-		-- Since we have done checkExistentials,
-		-- pe_res_tvs can only be Just at this point
-		--
-		-- Nor do we need pat_ty, because we've put all the
-		-- unification variables in right at the start when
-		-- initialising the PatEnv; and the pattern itself
-		-- only adds skolems.
-
         ; (ev_binds, (arg_pats', res))
-	     <- checkConstraints skol_info free_tvs ex_tvs' given $
+	     <- checkConstraints skol_info ex_tvs' given $
                 tcConArgs data_con arg_tys' arg_pats penv thing_inside
 
         ; let res_pat = ConPatOut { pat_con   = L con_span data_con, 

@@ -48,7 +48,7 @@ tcProc pat cmd exp_ty
     do	{ (coi, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty 
 	; (coi1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; (pat', cmd') <- tcPat ProcExpr pat arg_ty res_ty $
+	; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
 			  tcCmdTop cmd_env cmd [] res_ty
         ; let res_coi = mkTransCoI coi (mkAppTyCoI coi1 (IdCo res_ty))
 	; return (pat', cmd', res_coi) }
@@ -180,8 +180,8 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 		  (kappaUnderflow cmd)
 
 		-- Check the patterns, and the GRHSs inside
-	; (pats', grhss') <- setSrcSpan mtch_loc			$
-			     tcPats LambdaExpr pats cmd_stk res_ty	$
+	; (pats', grhss') <- setSrcSpan mtch_loc		$
+			     tcPats LambdaExpr pats cmd_stk	$
 			     tc_grhss grhss res_ty
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')
@@ -241,10 +241,9 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		--   -> a ((w,t1) .. tn) t
 	; let e_ty = mkFunTys [mkAppTys b [tup,s] | (_,_,b,tup,s) <- cmds_w_tys] 
 			      e_res_ty
-              free_tvs = tyVarsOfTypes (res_ty:cmd_stk)
 
 		-- Check expr
-	; (inst_binds, expr') <- checkConstraints ArrowSkol free_tvs [w_tv] [] $
+	; (inst_binds, expr') <- checkConstraints ArrowSkol [w_tv] [] $
                                  escapeArrowScope (tcMonoExpr expr e_ty)
 
 		-- OK, now we are in a position to unscramble 

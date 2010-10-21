@@ -28,7 +28,7 @@ module TcRnTypes(
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
 	-- Constraints
-        Untouchables(..), inTouchableRange,
+        Untouchables(..), inTouchableRange, isNoUntouchables,
   	WantedConstraints, emptyWanteds, andWanteds, extendWanteds,
 	WantedConstraint(..), WantedEvVar(..), wantedEvVarLoc, 
         wantedEvVarToVar, wantedEvVarPred, splitWanteds,
@@ -697,6 +697,10 @@ instance Outputable Untouchables where
   ppr NoUntouchables = ptext (sLit "No untouchables")
   ppr (TouchableRange low high) = ptext (sLit "Touchable range:") <+> 
                                   ppr low <+> char '-' <+> ppr high
+
+isNoUntouchables :: Untouchables -> Bool
+isNoUntouchables NoUntouchables      = True
+isNoUntouchables (TouchableRange {}) = False
 
 inTouchableRange :: Untouchables -> TcTyVar -> Bool
 inTouchableRange NoUntouchables _ = True

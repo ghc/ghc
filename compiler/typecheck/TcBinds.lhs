@@ -130,14 +130,12 @@ tcLocalBinds (HsValBinds binds) thing_inside
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
   = do  { (given_ips, ip_binds') <- mapAndUnzipM (wrapLocSndM tc_ip_bind) ip_binds
-        ; let ip_tvs = foldr (unionVarSet . tyVarsOfType . idType) emptyVarSet given_ips
 
         -- If the binding binds ?x = E, we  must now 
         -- discharge any ?x constraints in expr_lie
+        -- See Note [Implicit parameter untouchables]
         ; (ev_binds, result) <- checkConstraints (IPSkol ips) 
-                                  ip_tvs  -- See Note [Implicit parameter untouchables]
-                                  [] given_ips $
-                                thing_inside
+                                  [] given_ips thing_inside
 
         ; return (HsIPBinds (IPBinds ip_binds' ev_binds), result) }
   where
@@ -163,6 +161,9 @@ The constraint solver solves alpha~Int by unification, but then
 doesn't float that solved constraint out (it's not an unsolved 
 wanted.  Result disaster: the (Num alpha) is again solved, this
 time by defaulting.  No no no.
+
+However [Oct 10] this is all handled automatically by the 
+untouchable-range idea.
 
 \begin{code}
 tcValBinds :: TopLevelFlag 
@@ -393,7 +394,7 @@ tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
 
        ; let skol_info = SigSkol (FunSigCtxt (idName id))
        ; (ev_binds, (binds', [mono_info])) 
-            <- checkConstraints skol_info emptyVarSet tvs ev_vars $
+            <- checkConstraints skol_info tvs ev_vars $
                tcExtendTyVarEnv2 (scoped `zip` mkTyVarTys tvs)    $
                tcMonoBinds (\_ -> Just sig) LetLclBndr rec_tc bind_list
 
