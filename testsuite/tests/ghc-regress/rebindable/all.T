@@ -20,6 +20,7 @@ test('rebindable6', normal, compile_fail, [''])
 test('rebindable7', normal, compile_and_run, [''])
 test('rebindable8', normal, compile, [''])
 test('rebindable9', normal, compile, [''])
+test('rebindable10', normal, compile_and_run, [''])
 
 test('T303', normal, compile, [''])
 
