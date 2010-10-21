@@ -499,18 +499,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; wrap_fn   <- dsHsWrapper spec_co
        ; let (bndrs, ds_lhs) = collectBinders (wrap_fn (Var poly_id))
              spec_ty = mkPiTypes bndrs (exprType ds_lhs)
-       ; case decomposeRuleLhs ds_lhs of {
-          Nothing -> do { warnDs (decomp_msg spec_co)
-                        ; return Nothing } ;
-
-          Just (_fn, args) ->
-
-         -- Check for dead binders: Note [Unused spec binders]
-         let arg_fvs = exprsFreeVars args
-             bad_bndrs = filterOut (`elemVarSet` arg_fvs) bndrs
-         in if not (null bad_bndrs)
-            then do { warnDs (dead_msg bad_bndrs); return Nothing } 
-       	    else do
+       ; case decomposeRuleLhs bndrs ds_lhs of {
+           Left msg -> do { warnDs msg; return Nothing } ;
+           Right (final_bndrs, _fn, args) -> do
 
        { (spec_unf, unf_pairs) <- specUnfolding wrap_fn spec_ty (realIdUnfolding poly_id)
 
@@ -518,19 +509,14 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
              inl_prag | isDefaultInlinePragma spec_inl = idInlinePragma poly_id
-         	       | otherwise                      = spec_inl
+         	      | otherwise                      = spec_inl
        	      -- Get the INLINE pragma from SPECIALISE declaration, or,
               -- failing that, from the original Id
-
-             extra_dict_bndrs = [ mkLocalId (localiseName (idName d)) (idType d)
-                                       -- See Note [Constant rule dicts]
-         	 	        | d <- varSetElems (arg_fvs `delVarSetList` bndrs)
-         	 	  	, isDictId d]
 
              rule =  mkRule False {- Not auto -} is_local_id
                         (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
        			AlwaysActive poly_name
-       		        (extra_dict_bndrs ++ bndrs) args
+       		        final_bndrs args
        			(mkVarApps (Var spec_id) bndrs)
 
              spec_rhs  = wrap_fn poly_rhs
@@ -539,16 +525,6 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; return (Just (spec_pair `consOL` unf_pairs, rule))
        } } }
   where
-    dead_msg bs = vcat [ sep [ptext (sLit "Useless constraint") <> plural bs
-				 <+> ptext (sLit "in specialied type:"),
-			     nest 2 (pprTheta (map get_pred bs))]
-		       , ptext (sLit "SPECIALISE pragma ignored")]
-    get_pred b = ASSERT( isId b ) expectJust "dsSpec" (tcSplitPredTy_maybe (idType b))
-
-    decomp_msg spec_co 
-        = hang (ptext (sLit "Specialisation too complicated to desugar; ignored"))
-	     2 (pprHsWrapper (ppr poly_id) spec_co)
-    	     
     is_local_id = isJust mb_poly_rhs
     poly_rhs | Just rhs <-  mb_poly_rhs
              = rhs
@@ -590,6 +566,95 @@ dsMkArbitraryType :: TcTyVar -> Type
 dsMkArbitraryType tv = anyTypeOfKind (tyVarKind tv)
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Adding inline pragmas}
+%*									*
+%************************************************************************
+
+\begin{code}
+decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
+-- Take apart the LHS of a RULE.  It's suuposed to look like
+--     /\a. f a Int dOrdInt
+-- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
+-- That is, the RULE binders are lambda-bound
+-- Returns Nothing if the LHS isn't of the expected shape
+decomposeRuleLhs bndrs lhs 
+  =  -- Note [Simplifying the left-hand side of a RULE]
+    case collectArgs opt_lhs of
+        (Var fn, args) -> check_bndrs fn args
+
+        (Case scrut bndr ty [(DEFAULT, _, body)], args)
+	        | isDeadBinder bndr	-- Note [Matching seqId]
+		-> check_bndrs seqId (args' ++ args)
+		where
+		   args' = [Type (idType bndr), Type ty, scrut, body]
+	   
+	_other -> Left bad_shape_msg
+ where
+   opt_lhs = simpleOptExpr lhs
+
+   check_bndrs fn args
+     | null (dead_bndrs) = Right (extra_dict_bndrs ++ bndrs, fn, args)
+     | otherwise         = Left (vcat (map dead_msg dead_bndrs))
+     where
+       arg_fvs = exprsFreeVars args
+
+            -- Check for dead binders: Note [Unused spec binders]
+       dead_bndrs = filterOut (`elemVarSet` arg_fvs) bndrs
+
+            -- Add extra dict binders: Note [Constant rule dicts]
+       extra_dict_bndrs = [ mkLocalId (localiseName (idName d)) (idType d)
+                          | d <- varSetElems (arg_fvs `delVarSetList` bndrs)
+         	          , isDictId d]
+
+
+   bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
+                      2 (ppr opt_lhs)
+   dead_msg bndr = hang (ptext (sLit "Forall'd") <+> pp_bndr bndr
+				 <+> ptext (sLit "is not bound in RULE lhs"))
+                      2 (ppr opt_lhs)
+   pp_bndr bndr
+    | isTyVar bndr = ptext (sLit "type variable") <+> ppr bndr
+    | isCoVar bndr = ptext (sLit "coercion variable") <+> ppr bndr
+    | isDictId bndr = ptext (sLit "constraint") <+> ppr (get_pred bndr)
+    | otherwise     = ptext (sLit "variable") <+> ppr bndr
+
+   get_pred b = ASSERT( isId b ) expectJust "decomposeRuleLhs" 
+                                 (tcSplitPredTy_maybe (idType b))
+\end{code}
+
+Note [Simplifying the left-hand side of a RULE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+simpleOptExpr occurrence-analyses and simplifies the lhs
+and thereby
+(a) sorts dict bindings into NonRecs and inlines them
+(b) substitute trivial lets so that they don't get in the way
+    Note that we substitute the function too; we might 
+    have this as a LHS:  let f71 = M.f Int in f71
+(c) does eta reduction
+
+For (c) consider the fold/build rule, which without simplification
+looked like:
+	fold k z (build (/\a. g a))  ==>  ...
+This doesn't match unless you do eta reduction on the build argument.
+Similarly for a LHS like
+	augment g (build h) 
+we do not want to get
+	augment (\a. g a) (build h)
+otherwise we don't match when given an argument like
+	augment (\a. h a a) (build h)
+
+NB: tcSimplifyRuleLhs is very careful not to generate complicated
+    dictionary expressions that we might have to match
+
+
+Note [Matching seqId]
+~~~~~~~~~~~~~~~~~~~
+The desugarer turns (seq e r) into (case e of _ -> r), via a special-case hack
+and this code turns it back into an application of seq!  
+See Note [Rules for seq] in MkId for the details.
+
 Note [Unused spec binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -629,64 +694,6 @@ Name, and you can't bind them in a lambda or forall without getting things
 confused.   Likewise it might have an InlineRule or something, which would be
 utterly bogus. So we really make a fresh Id, with the same unique and type
 as the old one, but with an Internal name and no IdInfo.
-
-%************************************************************************
-%*									*
-\subsection{Adding inline pragmas}
-%*									*
-%************************************************************************
-
-\begin{code}
-decomposeRuleLhs :: CoreExpr -> Maybe (Id, [CoreExpr])
--- Take apart the LHS of a RULE.  It's suuposed to look like
---     /\a. f a Int dOrdInt
--- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
--- That is, the RULE binders are lambda-bound
--- Returns Nothing if the LHS isn't of the expected shape
-decomposeRuleLhs lhs 
-  =  -- Note [Simplifying the left-hand side of a RULE]
-    case collectArgs (simpleOptExpr lhs) of
-        (Var fn, args) -> Just (fn, args)
-
-        (Case scrut bndr ty [(DEFAULT, _, body)], args)
-	        | isDeadBinder bndr	-- Note [Matching seqId]
-		-> Just (seqId, args' ++ args)
-		where
-		   args' = [Type (idType bndr), Type ty, scrut, body]
-	   
-	_other -> Nothing	-- Unexpected shape
-\end{code}
-
-Note [Simplifying the left-hand side of a RULE]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-simpleOptExpr occurrence-analyses and simplifies the lhs
-and thereby
-(a) sorts dict bindings into NonRecs and inlines them
-(b) substitute trivial lets so that they don't get in the way
-    Note that we substitute the function too; we might 
-    have this as a LHS:  let f71 = M.f Int in f71
-(c) does eta reduction
-
-For (c) consider the fold/build rule, which without simplification
-looked like:
-	fold k z (build (/\a. g a))  ==>  ...
-This doesn't match unless you do eta reduction on the build argument.
-Similarly for a LHS like
-	augment g (build h) 
-we do not want to get
-	augment (\a. g a) (build h)
-otherwise we don't match when given an argument like
-	augment (\a. h a a) (build h)
-
-NB: tcSimplifyRuleLhs is very careful not to generate complicated
-    dictionary expressions that we might have to match
-
-
-Note [Matching seqId]
-~~~~~~~~~~~~~~~~~~~
-The desugarer turns (seq e r) into (case e of _ -> r), via a special-case hack
-and this code turns it back into an application of seq!  
-See Note [Rules for seq] in MkId for the details.
 
 
 %************************************************************************

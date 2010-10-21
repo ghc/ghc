@@ -34,7 +34,6 @@ import CoreMonad	( endPass, CoreToDo(..) )
 import ErrUtils
 import Outputable
 import SrcLoc
-import FastString
 import Coverage
 import Util
 import MonadUtils
@@ -345,9 +344,9 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
-	; case decomposeRuleLhs lhs' of {
-		Nothing -> do { warnDs msg; return Nothing } ;
-		Just (fn_id, args) -> do
+	; case decomposeRuleLhs bndrs' lhs' of {
+		Left msg -> do { warnDs msg; return Nothing } ;
+		Right (final_bndrs, fn_id, args) -> do
 	
 	{ let is_local = isLocalId fn_id
 		-- NB: isLocalId is False of implicit Ids.  This is good becuase
@@ -356,14 +355,10 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 	      fn_name   = idName fn_id
 	      final_rhs = simpleOptExpr rhs'	-- De-crap it
 	      rule      = mkRule False {- Not auto -} is_local 
-                                 name act fn_name bndrs' args final_rhs
+                                 name act fn_name final_bndrs args final_rhs
 	; return (Just rule)
 	} } }
-  where
-    msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar; ignored"))
-	     2 (ppr lhs)
 \end{code}
-
 Note [Desugaring RULE left hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the LHS of a RULE we do *not* want to desugar
