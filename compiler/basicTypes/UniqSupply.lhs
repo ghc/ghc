@@ -8,15 +8,15 @@ module UniqSupply (
         -- * Main data type
         UniqSupply, -- Abstractly
 
-        -- ** Operations on supplies 
+        -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        
+
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
 
         -- * Unique supply monad and its abstraction
         UniqSM, MonadUnique(..),
-        
+
         -- ** Operations on the monad
         initUs, initUs_,
         lazyThenUs, lazyMapUs,
