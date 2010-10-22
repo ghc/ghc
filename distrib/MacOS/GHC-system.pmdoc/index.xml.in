@@ -28,4 +28,4 @@ in a web browser. More documentation is available online at\
 \
 To uninstall, execute\
 \
-  /Library/Frameworks/GHC.framework/Tools/Uninstaller}]]></resource></locale></resources><flags/><item type="file">01ghc.xml</item><mod>properties.systemDomain</mod><mod>properties.title</mod><mod>properties.userDomain</mod><mod>properties.anywhereDomain</mod><mod>description</mod></pkmkdoc>
+  /Library/Frameworks/GHC.framework/Versions/@ProjectVersion@-@TargetArch_CPP@/Tools/Uninstaller}]]></resource></locale></resources><flags/><item type="file">01ghc.xml</item><mod>properties.systemDomain</mod><mod>properties.title</mod><mod>properties.userDomain</mod><mod>properties.anywhereDomain</mod><mod>description</mod></pkmkdoc>

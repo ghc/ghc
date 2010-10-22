@@ -28,20 +28,21 @@ endif
 
 include ../../mk/custom-settings.mk
 
-# The ProjectVersionInt is GHC's idea of an API version and hence determines
-# the framework version.
-FRAMEWORK_VERSION = $(ProjectVersionInt)
+# The framework version is a string like
+#     7.0.1-i386
+# for an i386 build of GHC 7.0.1. It's used for the subdirectory of
+# /Library/Frameworks/GHC.framework/Versions/
+FRAMEWORK_VERSION = $(ProjectVersion)-$(TargetArch_CPP)
 
 # Xcode requires CURRENT_PROJECT_VERSION to be an int or float.  We use this
 # only as the build version (aka CFBundleVersion).
 CURRENT_PROJECT_VERSION = $(ProjectVersionInt).$(ProjectPatchLevel)
 
-# The user-visible CFBundleShortVersionString is set to the standard GHC 
-# version number.
-SHORT_VERSION_STRING = $(ProjectVersion)
+# The user-visible CFBundleShortVersionString
+SHORT_VERSION_STRING = $(FRAMEWORK_VERSION)
 
 # Name of the installer package
-PACKAGE_NAME = GHC-$(ProjectVersion)-$(TargetArch_CPP).pkg
+PACKAGE_NAME = GHC-$(FRAMEWORK_VERSION).pkg
 
 # Determine arguments that should be passed to ./configure from within Xcode
 #
@@ -69,7 +70,7 @@ endif
 DSTROOT=/tmp/GHC.dst
 
 # Tools directory for a system volume install
-TOOLS_SYSTEM=$(DSTROOT)/Library/Frameworks/GHC.framework/Tools
+TOOLS_SYSTEM=$(DSTROOT)/Library/Frameworks/GHC.framework/Versions/$(FRAMEWORK_VERSION)/Tools
 
 PACKAGEMAKER=/Developer/usr/bin/packagemaker
 
@@ -87,6 +88,7 @@ framework-pkg:
 	-$(RM) -rf $(DSTROOT)
 	mkdir -p $(TOOLS_SYSTEM)
 	cp installer-scripts/Uninstaller $(TOOLS_SYSTEM)
+	cp installer-scripts/create-links $(TOOLS_SYSTEM)
 	xcodebuild -target GHC-systemwide clean build\
 		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
@@ -102,7 +104,7 @@ framework-pkg:
 	-$(RM) -f GHC-system.pmdoc/*-contents.xml
 	$(PACKAGEMAKER) -v --doc GHC-system.pmdoc\
 			$(PACKAGEMAKER_TARGET) -o $(TOP)/$(PACKAGE_NAME)\
-			-i org.haskell.GHC.$(FRAMEWORK_VERSION)
+			-i org.haskell.ghc.$(FRAMEWORK_VERSION)
 
 # If we don't specify COMMAND_MODE=unix2003 then xcodebuild defaults
 # to setting it to legacy, which means that ar builds archives

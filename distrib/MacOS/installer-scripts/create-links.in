@@ -20,8 +20,8 @@ if [ "$INSTALL_BASE" = / ]; then
   INSTALL_BASE=/usr
 fi
 
-ProjectVersionInt=@ProjectVersionInt@
-GHC_BASE="$INSTALL_DEST/GHC.framework/Versions/$ProjectVersionInt"
+VERSION=@ProjectVersion@-@TargetArch_CPP@
+GHC_BASE="$INSTALL_DEST/GHC.framework/Versions/$VERSION"
 
 INSTALL_BIN="$INSTALL_BASE/bin"
 mkdir -p "$INSTALL_BIN"
@@ -34,5 +34,5 @@ INSTALL_HTML="$INSTALL_BASE"/share/doc
 mkdir -p "$INSTALL_MAN1"
 if [ -d "$GHC_BASE"/usr/share/man/man1 ]; then
   ln -sf "$GHC_BASE"/usr/share/man/man1/* "$INSTALL_MAN1/"
-  ln -sf "$GHC_BASE"/usr/share/doc/ghc.$ProjectVersionInt "$INSTALL_HTML/"
+  ln -sf "$GHC_BASE"/usr/share/doc/ghc "$INSTALL_HTML/"
 fi
