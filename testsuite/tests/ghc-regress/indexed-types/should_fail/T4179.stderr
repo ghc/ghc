@@ -1,18 +1,5 @@
 
 T4179.hs:26:16:
-    Could not deduce (DoC (x (A2 (FCon x) -> A3 (FCon x))))
-      from the context (Functor x, DoC (FCon x))
-      arising from a use of `op'
-    Possible fix:
-      add (DoC (x (A2 (FCon x) -> A3 (FCon x)))) to the context of
-        the type signature for `fCon'
-      or add an instance declaration for
-         (DoC (x (A2 (FCon x) -> A3 (FCon x))))
-    In the first argument of `foldDoC', namely `op'
-    In the expression: foldDoC op
-    In an equation for `fCon': fCon = foldDoC op
-
-T4179.hs:26:16:
     Could not deduce (A2 (x (A2 (FCon x) -> A3 (FCon x)))
                         ~
                       A2 (FCon x))
@@ -37,3 +24,17 @@ T4179.hs:26:16:
     In the first argument of `foldDoC', namely `op'
     In the expression: foldDoC op
     In an equation for `fCon': fCon = foldDoC op
+
+T4179.hs:26:16:
+    Could not deduce (DoC (x (A2 (FCon x) -> A3 (FCon x))))
+      from the context (Functor x, DoC (FCon x))
+      arising from a use of `op'
+    Possible fix:
+      add (DoC (x (A2 (FCon x) -> A3 (FCon x)))) to the context of
+        the type signature for `fCon'
+      or add an instance declaration for
+         (DoC (x (A2 (FCon x) -> A3 (FCon x))))
+    In the first argument of `foldDoC', namely `op'
+    In the expression: foldDoC op
+    In an equation for `fCon': fCon = foldDoC op
+

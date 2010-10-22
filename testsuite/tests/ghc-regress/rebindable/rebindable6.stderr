@@ -6,33 +6,33 @@ rebindable6.hs:106:17:
       add an instance declaration for (HasSeq (IO a -> t -> IO b))
     In a stmt of a 'do' expression: f
     In the expression:
-        do { f;
-             Just (b :: b) <- g;
-             return b }
+      do { f;
+           Just (b :: b) <- g;
+           return b }
     In an equation for `test_do':
         test_do f g
-                  = do { f;
-                         Just (b :: b) <- g;
-                         return b }
+          = do { f;
+                 Just (b :: b) <- g;
+                 return b }
 
 rebindable6.hs:107:17:
-    No instances for (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t),
-                      HasFail ([Prelude.Char] -> t1))
+    No instances for (HasFail ([Prelude.Char] -> t1),
+                      HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
       arising from a do statement
     Possible fix:
       add an instance declaration for
-      (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t),
-       HasFail ([Prelude.Char] -> t1))
+      (HasFail ([Prelude.Char] -> t1),
+       HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
     In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
-        do { f;
-             Just (b :: b) <- g;
-             return b }
+      do { f;
+           Just (b :: b) <- g;
+           return b }
     In an equation for `test_do':
         test_do f g
-                  = do { f;
-                         Just (b :: b) <- g;
-                         return b }
+          = do { f;
+                 Just (b :: b) <- g;
+                 return b }
 
 rebindable6.hs:108:17:
     No instance for (HasReturn (b -> t1))
@@ -41,6 +41,6 @@ rebindable6.hs:108:17:
     In the expression: return b
     In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
-        do { f;
-             Just (b :: b) <- g;
-             return b }
+      do { f;
+           Just (b :: b) <- g;
+           return b }
