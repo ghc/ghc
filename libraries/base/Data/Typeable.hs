@@ -93,7 +93,7 @@ import GHC.Base
 import GHC.Show         (Show(..), ShowS,
                          shows, showString, showChar, showParen)
 import GHC.Err          (undefined)
-import GHC.Num          (Integer, fromInteger, (+))
+import GHC.Num          (Integer, (+))
 import GHC.Real         ( rem, Ratio )
 import GHC.IORef        (IORef,newIORef)
 import GHC.IO           (unsafePerformIO,mask_)

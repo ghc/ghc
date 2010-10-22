@@ -37,7 +37,6 @@ module GHC.Pack
 import GHC.Base
 import GHC.List ( length )
 import GHC.ST
-import GHC.Num
 import GHC.Ptr
 
 data ByteArray ix              = ByteArray        ix ix ByteArray#

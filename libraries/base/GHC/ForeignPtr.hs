@@ -46,7 +46,6 @@ import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 import GHC.Err
-import GHC.Num          ( fromInteger )
 
 #include "Typeable.h"
 

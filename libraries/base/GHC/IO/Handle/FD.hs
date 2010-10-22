@@ -21,7 +21,6 @@ module GHC.IO.Handle.FD (
  ) where
 
 import GHC.Base
-import GHC.Num
 import GHC.Real
 import GHC.Show
 import Data.Maybe

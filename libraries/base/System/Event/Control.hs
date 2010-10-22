@@ -27,7 +27,6 @@ import Control.Monad (when)
 import Foreign.ForeignPtr (ForeignPtr)
 import GHC.Base
 import GHC.Conc.Signal (Signal)
-import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show)
 import GHC.Word (Word8)

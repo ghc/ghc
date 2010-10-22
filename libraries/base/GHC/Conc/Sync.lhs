@@ -97,7 +97,6 @@ import GHC.IO.Exception
 import GHC.Exception
 import GHC.IORef
 import GHC.MVar
-import GHC.Num          ( Num(..) )
 import GHC.Real         ( fromIntegral )
 import GHC.Pack         ( packCString# )
 import GHC.Show         ( Show(..), showString )

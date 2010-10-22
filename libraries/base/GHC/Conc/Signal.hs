@@ -21,7 +21,6 @@ import GHC.Conc.Sync (forkIO)
 import GHC.IO (mask_, unsafePerformIO)
 import GHC.IOArray (IOArray, boundsIOArray, newIOArray, unsafeReadIOArray,
                     unsafeWriteIOArray)
-import GHC.Num (fromInteger)
 import GHC.Real (fromIntegral)
 import GHC.Word (Word8)
 

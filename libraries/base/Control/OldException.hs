@@ -132,7 +132,6 @@ module Control.OldException {-# DEPRECATED "Future versions of base will not sup
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Num
 import GHC.Show
 -- import GHC.IO ( IO )
 import GHC.IO.Handle.FD ( stdout )

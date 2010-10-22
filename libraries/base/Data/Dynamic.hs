@@ -47,7 +47,6 @@ import Unsafe.Coerce
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Show
-import GHC.Num
 import GHC.Exception
 #endif
 

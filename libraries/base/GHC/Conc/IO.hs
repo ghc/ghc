@@ -46,7 +46,6 @@ module GHC.Conc.IO
 #endif
         ) where
 
-import Control.Monad
 import Foreign
 import GHC.Base
 import GHC.Conc.Sync as Sync

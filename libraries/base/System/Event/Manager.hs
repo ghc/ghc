@@ -53,7 +53,7 @@ import GHC.Base
 import GHC.Conc.Signal (runHandlers)
 import GHC.List (filter)
 import GHC.Num (Num(..))
-import GHC.Real ((/), fromIntegral, fromRational)
+import GHC.Real ((/), fromIntegral )
 import GHC.Show (Show(..))
 import System.Event.Clock (getCurrentTime)
 import System.Event.Control

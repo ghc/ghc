@@ -68,7 +68,6 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-import GHC.Num
 #elif defined(__NHC__)
 import NHC.FFI                  ( FinalizerPtr, CInt(..) )
 import IO                       ( bracket )
