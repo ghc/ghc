@@ -4,7 +4,9 @@ module TcSMonad (
 
        -- Canonical constraints
     CanonicalCts, emptyCCan, andCCan, andCCans, 
-    singleCCan, extendCCans, isEmptyCCan, isTyEqCCan, 
+    singleCCan, extendCCans, isEmptyCCan, isCTyEqCan, 
+    isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe, 
+
     CanonicalCt(..), Xi, tyVarsOfCanonical, tyVarsOfCanonicals, tyVarsOfCDicts, 
     mkWantedConstraints, deCanonicaliseWanted, 
     makeGivens, makeSolvedByInst,
@@ -281,10 +283,22 @@ emptyCCan = emptyBag
 isEmptyCCan :: CanonicalCts -> Bool
 isEmptyCCan = isEmptyBag
 
-isTyEqCCan :: CanonicalCt -> Bool 
-isTyEqCCan (CTyEqCan {})  = True 
-isTyEqCCan (CFunEqCan {}) = False
-isTyEqCCan _              = False 
+isCTyEqCan :: CanonicalCt -> Bool 
+isCTyEqCan (CTyEqCan {})  = True 
+isCTyEqCan (CFunEqCan {}) = False
+isCTyEqCan _              = False 
+
+isCDictCan_Maybe :: CanonicalCt -> Maybe Class
+isCDictCan_Maybe (CDictCan {cc_class = cls })  = Just cls
+isCDictCan_Maybe _              = Nothing
+
+isCIPCan_Maybe :: CanonicalCt -> Maybe (IPName Name)
+isCIPCan_Maybe  (CIPCan {cc_ip_nm = nm }) = Just nm
+isCIPCan_Maybe _                = Nothing
+
+isCFunEqCan_Maybe :: CanonicalCt -> Maybe TyCon
+isCFunEqCan_Maybe (CFunEqCan { cc_fun = tc }) = Just tc
+isCFunEqCan_Maybe _ = Nothing
 
 \end{code}
 

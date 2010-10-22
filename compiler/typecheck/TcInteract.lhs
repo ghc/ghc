@@ -108,10 +108,52 @@ class of each flatten skolem, which is much needed to correctly do spontaneous
 solving. See Note [Loopy Spontaneous Solving] 
 \begin{code}
 
+data CCanMap a = CCanMap { cts_givder  :: Map.Map a CanonicalCts
+                                          -- Invariant: all Given or Derived
+                         , cts_wanted  :: Map.Map a CanonicalCts } 
+                                          -- Invariant: all Wanted
+cCanMapToBag :: Ord a => CCanMap a -> CanonicalCts 
+cCanMapToBag cmap = Map.fold unionBags rest_cts  (cts_givder cmap)
+  where rest_cts = Map.fold unionBags emptyCCan (cts_wanted cmap) 
+
+emptyCCanMap :: CCanMap a 
+emptyCCanMap = CCanMap { cts_givder = Map.empty, cts_wanted = Map.empty } 
+
+updCCanMap:: Ord a => (a,CanonicalCt) -> CCanMap a -> CCanMap a 
+updCCanMap (a,ct) cmap 
+  = case cc_flavor ct of 
+      Wanted {} 
+          -> cmap { cts_wanted = Map.insertWith unionBags a this_ct (cts_wanted cmap) } 
+      _ 
+          -> cmap { cts_givder = Map.insertWith unionBags a this_ct (cts_givder cmap) }
+  where this_ct = singleCCan ct 
+
+getRelevantCts :: Ord a => a -> CCanMap a -> (CanonicalCts, CCanMap a) 
+-- Gets the relevant constraints and returns the rest of the CCanMap
+getRelevantCts a cmap 
+    = let relevant = unionBags (Map.findWithDefault emptyCCan a (cts_wanted cmap)) 
+                               (Map.findWithDefault emptyCCan a (cts_givder cmap)) 
+          residual_map = cmap { cts_wanted = Map.delete a (cts_wanted cmap) 
+                              , cts_givder = Map.delete a (cts_givder cmap) } 
+      in (relevant, residual_map) 
+
+extractUnsolvedCMap :: Ord a => CCanMap a -> (CanonicalCts, CCanMap a) 
+-- Gets the wanted constraints and returns a residual CCanMap
+extractUnsolvedCMap cmap = 
+  let unsolved = Map.fold unionBags emptyCCan (cts_wanted cmap) 
+  in (unsolved, cmap { cts_wanted = Map.empty})
+
 -- See Note [InertSet invariants]
 data InertSet 
-  = IS { inert_eqs  :: Bag.Bag CanonicalCt   -- Equalities only **CTyEqCan** 
-       , inert_cts  :: Bag.Bag CanonicalCt   -- Other constraints 
+  = IS { inert_eqs          :: CanonicalCts               -- Equalities only (CTyEqCan)
+
+       , inert_dicts        :: CCanMap Class              -- Dictionaries only 
+       , inert_ips          :: CCanMap (IPName Name)      -- Implicit parameters 
+       , inert_funeqs       :: CCanMap TyCon              -- Type family equalities only 
+               -- This representation allows us to quickly get to the relevant 
+               -- inert constraints when interacting a work item with the inert set.
+
+
        , inert_fds  :: FDImprovements        -- List of pairwise improvements that have kicked in already
                                              -- and reside either in the worklist or in the inerts 
        , inert_fsks :: Map.Map TcTyVar [(TcTyVar,Coercion)] }
@@ -122,19 +164,24 @@ type FDImprovements = [(PredType,PredType)]
 
 instance Outputable InertSet where
   ppr is = vcat [ vcat (map ppr (Bag.bagToList $ inert_eqs is))
-                , vcat (map ppr (Bag.bagToList $ inert_cts is))
+                , vcat (map ppr (Bag.bagToList $ cCanMapToBag (inert_dicts is))) 
+                , vcat (map ppr (Bag.bagToList $ cCanMapToBag (inert_ips is))) 
+                , vcat (map ppr (Bag.bagToList $ cCanMapToBag (inert_funeqs is)))
                 , vcat (map (\(v,rest) -> ppr v <+> text "|->" <+> hsep (map (ppr.fst) rest)) 
                        (Map.toList $ inert_fsks is)
                        )
                 ]
                        
 emptyInert :: InertSet
-emptyInert = IS { inert_eqs = Bag.emptyBag
-                , inert_cts = Bag.emptyBag, inert_fsks = Map.empty, inert_fds = [] }
+emptyInert = IS { inert_eqs    = Bag.emptyBag
+                , inert_dicts  = emptyCCanMap
+                , inert_ips    = emptyCCanMap
+                , inert_funeqs = emptyCCanMap 
+                , inert_fsks   = Map.empty, inert_fds = [] }
 
 updInertSet :: InertSet -> AtomicInert -> InertSet 
 -- Introduces an element in the inert set for the first time 
-updInertSet (IS { inert_eqs = eqs, inert_cts = cts, inert_fsks = fsks, inert_fds = fdis })  
+updInertSet is@(IS { inert_eqs = eqs, inert_fsks = fsks }) 
             item@(CTyEqCan { cc_id    = cv
                            , cc_tyvar = tv1 
                            , cc_rhs   = xi })
@@ -144,15 +191,19 @@ updInertSet (IS { inert_eqs = eqs, inert_cts = cts, inert_fsks = fsks, inert_fds
   = let eqs'  = eqs `Bag.snocBag` item 
         fsks' = Map.insertWith (++) tv2 [(tv1, mkCoVarCoercion cv)] fsks
         -- See Note [InertSet FlattenSkolemEqClass] 
-    in IS { inert_eqs = eqs', inert_cts = cts, inert_fsks = fsks', inert_fds = fdis }
-updInertSet (IS { inert_eqs = eqs, inert_cts = cts
-                , inert_fsks = fsks, inert_fds = fdis }) item 
-  | isTyEqCCan item 
-  = let eqs' = eqs `Bag.snocBag` item 
-    in IS { inert_eqs = eqs', inert_cts = cts, inert_fsks = fsks, inert_fds = fdis } 
+    in is { inert_eqs = eqs', inert_fsks = fsks' } 
+updInertSet is item 
+  | isCTyEqCan item                     -- Other equality 
+  = let eqs' = inert_eqs is `Bag.snocBag` item 
+    in is { inert_eqs = eqs' } 
+  | Just cls <- isCDictCan_Maybe item   -- Dictionary 
+  = is { inert_dicts = updCCanMap (cls,item) (inert_dicts is) } 
+  | Just x  <- isCIPCan_Maybe item      -- IP 
+  = is { inert_ips   = updCCanMap (x,item) (inert_ips is) }  
+  | Just tc <- isCFunEqCan_Maybe item   -- Function equality 
+  = is { inert_funeqs = updCCanMap (tc,item) (inert_funeqs is) }
   | otherwise 
-  = let cts' = cts `Bag.snocBag` item
-    in IS { inert_eqs = eqs, inert_cts = cts', inert_fsks = fsks, inert_fds = fdis } 
+  = pprPanic "Unknown form of constraint!" (ppr item)
 
 updInertSetFDImprs :: InertSet -> Maybe FDImprovement -> InertSet 
 updInertSetFDImprs is (Just fdi) = is { inert_fds = fdi : inert_fds is } 
@@ -163,25 +214,26 @@ foldISEqCtsM :: Monad m => (a -> AtomicInert -> m a) -> a -> InertSet -> m a
 foldISEqCtsM k z IS { inert_eqs = eqs } 
   = Bag.foldlBagM k z eqs 
 
-foldISOtherCtsM :: Monad m => (a -> AtomicInert -> m a) -> a -> InertSet -> m a 
--- Fold over other constraints in the inerts 
-foldISOtherCtsM k z IS { inert_cts = cts } 
-  = Bag.foldlBagM k z cts 
-
 extractUnsolved :: InertSet -> (InertSet, CanonicalCts)
-extractUnsolved is@(IS {inert_eqs = eqs, inert_cts = cts, inert_fds = fdis }) 
-  = let is_init  = is { inert_eqs = emptyCCan 
-                      , inert_cts = solved_cts, inert_fsks = Map.empty, inert_fds = fdis }
+extractUnsolved is@(IS {inert_eqs = eqs}) 
+  = let is_init  = is { inert_eqs    = emptyCCan 
+                      , inert_dicts  = solved_dicts
+                      , inert_ips    = solved_ips
+                      , inert_funeqs = solved_funeqs } 
         is_final = Bag.foldlBag updInertSet is_init solved_eqs -- Add equalities carefully
-    in (is_final, unsolved) 
-  where (unsolved_cts, solved_cts) = Bag.partitionBag isWantedCt cts
-        (unsolved_eqs, solved_eqs) = Bag.partitionBag isWantedCt eqs
-        unsolved                   = unsolved_cts `unionBags` unsolved_eqs
+    in (is_final, unsolved)
 
+  where (unsolved_eqs, solved_eqs)       = Bag.partitionBag isWantedCt eqs 
+        (unsolved_ips, solved_ips)       = extractUnsolvedCMap (inert_ips is) 
+        (unsolved_dicts, solved_dicts)   = extractUnsolvedCMap (inert_dicts is) 
+        (unsolved_funeqs, solved_funeqs) = extractUnsolvedCMap (inert_funeqs is) 
+
+        unsolved = unsolved_eqs `unionBags` 
+                   unsolved_ips `unionBags` unsolved_dicts `unionBags` unsolved_funeqs
 
 getFskEqClass :: InertSet -> TcTyVar -> [(TcTyVar,Coercion)] 
 -- Precondition: tv is a FlatSkol. See Note [InertSet FlattenSkolemEqClass] 
-getFskEqClass (IS { inert_cts = cts, inert_fsks = fsks }) tv 
+getFskEqClass (IS { inert_eqs = cts, inert_fsks = fsks }) tv 
   = case lkpTyEqCanByLhs of
       Nothing  -> fromMaybe [] (Map.lookup tv fsks)  
       Just ceq -> 
@@ -200,26 +252,15 @@ haveBeenImproved :: FDImprovements -> PredType -> PredType -> Bool
 haveBeenImproved [] _ _ = False 
 haveBeenImproved ((pty1,pty2):fdimprs) pty1' pty2' 
  | tcEqPred pty1 pty1' && tcEqPred pty2 pty2' 
- = True 
+ = True
  | tcEqPred pty1 pty2' && tcEqPred pty2 pty1'
- = True 
- | otherwise 
- = haveBeenImproved fdimprs pty1' pty2' 
+ = True
+ | otherwise
+ = haveBeenImproved fdimprs pty1' pty2'
 
-getFDImprovements :: InertSet -> FDImprovements 
+getFDImprovements :: InertSet -> FDImprovements
 -- Return a list of the improvements that have kicked in so far 
-getFDImprovements = inert_fds 
-
-
-{- TODO: Later ...
-data Inert = IS { class_inerts :: FiniteMap Class Atomics
-     	          ip_inerts    :: FiniteMap Class Atomics
-     	          tyfun_inerts :: FiniteMap TyCon Atomics
-		  tyvar_inerts :: FiniteMap TyVar Atomics
-                }
-
-Later should we also separate out givens and wanteds?
--}
+getFDImprovements = inert_fds
 
 \end{code}
 
@@ -424,7 +465,7 @@ solveInteractWithDepth ctxt@(max_depth,n,stack) inert ws
                    , text "Max depth =" <+> ppr max_depth ]
 
 	      -- Solve equalities first
-       ; let (eqs, non_eqs) = Bag.partitionBag isTyEqCCan ws
+       ; let (eqs, non_eqs) = Bag.partitionBag isCTyEqCan ws
        ; is_from_eqs <- Bag.foldlBagM (solveOneWithDepth ctxt) inert eqs
        ; Bag.foldlBagM (solveOneWithDepth ctxt) is_from_eqs non_eqs }
 
@@ -980,7 +1021,6 @@ mkIRStop keep newWork = return $ IR Stop keep newWork Nothing
 mkIRStop_RecordImprovement :: Monad m => InertAction -> WorkList -> FDImprovement -> m InteractResult 
 mkIRStop_RecordImprovement keep newWork fdimpr = return $ IR Stop keep newWork (Just fdimpr) 
 
-
 dischargeWorkItem :: Monad m => m InteractResult
 dischargeWorkItem = mkIRStop KeepInert emptyWorkList
 
@@ -1001,8 +1041,10 @@ interactWithInertEqsStage workItem inert
   = foldISEqCtsM interactNext initITR inert 
   where initITR = SR { sr_inerts   = IS { inert_eqs  = emptyCCan -- We will fold over the equalities
                                         , inert_fsks = Map.empty -- which will generate those two again
-                                        , inert_cts  = inert_cts inert
-                                        , inert_fds  = inert_fds inert
+                                        , inert_dicts  = inert_dicts inert
+                                        , inert_ips    = inert_ips inert 
+                                        , inert_funeqs = inert_funeqs inert
+                                        , inert_fds    = inert_fds inert
                                         }
                      , sr_new_work = emptyWorkList
                      , sr_stop     = ContinueWith workItem }
@@ -1012,18 +1054,36 @@ interactWithInertEqsStage workItem inert
 -- Interact a single WorkItem with *non-equality* constraints in the inert set. 
 -- Precondition: equality interactions must have already happened, hence we have 
 -- to pick up some information from the incoming inert, before folding over the 
--- "Other" constraints it contains! 
+-- "Other" constraints it contains!
+
 interactWithInertsStage :: SimplifierStage
 interactWithInertsStage workItem inert
-  = foldISOtherCtsM interactNext initITR inert
+  = let (relevant, inert_residual) = getISRelevant workItem inert 
+        initITR = SR { sr_inerts   = inert_residual
+                     , sr_new_work = emptyWorkList
+                     , sr_stop     = ContinueWith workItem } 
+    in Bag.foldlBagM interactNext initITR relevant 
   where 
-    initITR = SR { -- Pick up: (1) equations, (2) FD improvements, (3) FlatSkol equiv. classes
-                   sr_inerts   = IS { inert_eqs  = inert_eqs inert 
-                                    , inert_cts  = emptyCCan      
-                                    , inert_fds  = inert_fds inert 
-                                    , inert_fsks = inert_fsks inert }
-                 , sr_new_work = emptyWorkList
-                 , sr_stop     = ContinueWith workItem }
+    getISRelevant :: CanonicalCt -> InertSet -> (CanonicalCts, InertSet) 
+    getISRelevant (CDictCan { cc_class = cls } ) is 
+      = let (relevant, residual_map) = getRelevantCts cls (inert_dicts is) 
+        in (relevant, is { inert_dicts = residual_map }) 
+    getISRelevant (CFunEqCan { cc_fun = tc } ) is 
+      = let (relevant, residual_map) = getRelevantCts tc (inert_funeqs is) 
+        in (relevant, is { inert_funeqs = residual_map })
+    getISRelevant (CIPCan { cc_ip_nm = nm }) is 
+      = let (relevant, residual_map) = getRelevantCts nm (inert_ips is)
+        in (relevant, is { inert_ips = residual_map }) 
+    -- An equality, finally, may kick everything except equalities out 
+    -- because we have already interacted the equalities in interactWithInertEqsStage
+    getISRelevant _eq_ct is  -- Equality, everything is relevant for this one 
+                             -- TODO: if we were caching variables, we'd know that only 
+                             --       some are relevant. Experiment with this for now. 
+      = let cts = cCanMapToBag (inert_ips is) `unionBags` 
+                    cCanMapToBag (inert_dicts is) `unionBags` cCanMapToBag (inert_funeqs is) 
+        in (cts, is { inert_dicts  = emptyCCanMap 
+                    , inert_ips    = emptyCCanMap 
+                    , inert_funeqs = emptyCCanMap })
 
 interactNext :: StageResult -> AtomicInert -> TcS StageResult 
 interactNext it inert  
@@ -1098,7 +1158,7 @@ doInteractWithInert fdimprs
        ; wevvars <- mkWantedFunDepEqns loc eqn_pred_locs 
        ; fd_work <- canWanteds wevvars 
               	 -- See Note [Generating extra equalities]
-       ; traceTcS "Checking if improvements existed." (ppr fdimprs) 
+       ; traceTcS "Checking if improvements existed." (ppr fdimprs)
        ; if isEmptyWorkList fd_work || haveBeenImproved fdimprs pty1 pty2 then
              -- Must keep going
              mkIRContinue workItem KeepInert fd_work 
@@ -1106,7 +1166,7 @@ doInteractWithInert fdimprs
                  ; mkIRStop_RecordImprovement KeepInert 
                       (fd_work `unionWorkLists` workListFromCCan workItem) (pty1,pty2)
                  }
-         -- See Note [FunDep Reactions] 
+         -- See Note [FunDep Reactions]
        }
 
 -- Class constraint and given equality: use the equality to rewrite
