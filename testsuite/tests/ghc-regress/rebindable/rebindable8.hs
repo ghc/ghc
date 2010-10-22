@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, MultiParamTypeClasses #-}
+{-# LANGUAGE RebindableSyntax, MultiParamTypeClasses #-}
 
 -- Trac #1537
 

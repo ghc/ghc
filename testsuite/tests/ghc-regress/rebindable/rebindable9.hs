@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, FlexibleInstances,
+{-# LANGUAGE RebindableSyntax, FlexibleInstances,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- Trac #1537

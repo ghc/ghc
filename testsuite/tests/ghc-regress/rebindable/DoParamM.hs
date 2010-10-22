@@ -1,4 +1,4 @@
-{-# OPTIONS -XNoImplicitPrelude #-}
+{-# OPTIONS -XRebindableSyntax #-}
 -- Haskell98!
 
 -- Tests of the do-notation for the parameterized monads

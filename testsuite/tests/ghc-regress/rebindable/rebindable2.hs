@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, NPlusKPatterns #-}
+{-# LANGUAGE RebindableSyntax, NPlusKPatterns #-}
 
 module Main where
 	{

@@ -1,4 +1,4 @@
-{-# OPTIONS -XNoImplicitPrelude #-}
+{-# OPTIONS -XRebindableSyntax #-}
 
 -- This one tests rebindable syntax for do-notation
 

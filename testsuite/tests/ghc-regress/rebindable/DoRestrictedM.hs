@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, MultiParamTypeClasses,
+{-# LANGUAGE RebindableSyntax, MultiParamTypeClasses,
              FlexibleInstances #-}
 
 -- Tests of the do-notation for the restricted monads
