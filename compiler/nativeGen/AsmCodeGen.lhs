@@ -76,7 +76,9 @@ import DynFlags
 import StaticFlags	( opt_Static, opt_PIC )
 #endif
 import Util
+#if !defined(darwin_TARGET_OS)
 import Config           ( cProjectVersion )
+#endif
 
 import Digraph
 import qualified Pretty
