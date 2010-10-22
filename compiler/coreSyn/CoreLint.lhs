@@ -98,14 +98,30 @@ find an occurence of an Id, we fetch it from the in-scope set.
 lintCoreBindings :: [CoreBind] -> (Bag Message, Bag Message)
 --   Returns (warnings, errors)
 lintCoreBindings binds
-  = initL (lint_binds binds)
-  where
+  = initL $ 
+    addLoc TopLevelBindings $
+    addInScopeVars binders  $
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
 	-- into use 'unexpectedly'
-    lint_binds binds = addLoc TopLevelBindings $
-		       addInScopeVars (bindersOfBinds binds) $
-		       mapM lint_bind binds 
+    do { checkL (null dups) (dupVars dups)
+       ; checkL (null ext_dups) (dupExtVars ext_dups)
+       ; mapM lint_bind binds }
+  where
+    binders = bindersOfBinds binds
+    (_, dups) = removeDups compare binders
+
+    -- dups_ext checks for names with different uniques
+    -- but but the same External name M.n.  We don't
+    -- allow this at top level:
+    --    M.n{r3}  = ...
+    --    M.n{r29} = ...
+    -- becuase they both get the same linker symbol
+    ext_dups = findDupsEq eq_ext (map Var.varName binders)
+    eq_ext n1 n2 | Just m1 <- nameModule_maybe n1
+                 , Just m2 <- nameModule_maybe n2
+                 = m1==m2 && nameOccName n1 == nameOccName n2
+                 | otherwise = False
 
     lint_bind (Rec prs)		= mapM_ (lintSingleBinding TopLevel Recursive) prs
     lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
@@ -260,10 +276,12 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
 
 lintCoreExpr (Let (Rec pairs) body) 
   = lintAndScopeIds bndrs	$ \_ ->
-    do	{ mapM_ (lintSingleBinding NotTopLevel Recursive) pairs	
+    do	{ checkL (null dups) (dupVars dups)
+        ; mapM_ (lintSingleBinding NotTopLevel Recursive) pairs	
 	; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
   where
     bndrs = map fst pairs
+    (_, dups) = removeDups compare bndrs
 
 lintCoreExpr e@(App fun arg)
   = do	{ fun_ty <- lintCoreExpr fun
@@ -905,12 +923,7 @@ inCasePat = LintM $ \ loc _ errs -> (Just (is_case_pat loc), errs)
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m
-  | null dups
   = LintM (\ loc subst errs -> unLintM m loc (extendTvInScopeList subst vars) errs)
-  | otherwise
-  = failWithL (dupVars dups)
-  where
-    (_, dups) = removeDups compare vars 
 
 addInScopeVar :: Var -> LintM a -> LintM a
 addInScopeVar var m
@@ -1183,5 +1196,10 @@ mkCastErr from_ty expr_ty
 dupVars :: [[Var]] -> Message
 dupVars vars
   = hang (ptext (sLit "Duplicate variables brought into scope"))
+       2 (ppr vars)
+
+dupExtVars :: [[Name]] -> Message
+dupExtVars vars
+  = hang (ptext (sLit "Duplicate top-level variables with the same qualified name"))
        2 (ppr vars)
 \end{code}
