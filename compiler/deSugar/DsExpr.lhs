@@ -345,8 +345,14 @@ dsExpr (HsDo PArrComp stmts body result_ty)
   where
     [elt_ty] = tcTyConAppArgs result_ty
 
-dsExpr (HsIf guard_expr then_expr else_expr)
-  = mkIfThenElse <$> dsLExpr guard_expr <*> dsLExpr then_expr <*> dsLExpr else_expr
+dsExpr (HsIf mb_fun guard_expr then_expr else_expr)
+  = do { pred <- dsLExpr guard_expr
+       ; b1 <- dsLExpr then_expr
+       ; b2 <- dsLExpr else_expr
+       ; case mb_fun of
+           Just fun -> do { core_fun <- dsExpr fun
+                          ; return (mkCoreApps core_fun [pred,b1,b2]) }
+           Nothing  -> return $ mkIfThenElse pred b1 b2 }
 \end{code}
 
 

@@ -132,7 +132,10 @@ data HsExpr id
   | HsCase      (LHsExpr id)
                 (MatchGroup id)
 
-  | HsIf        (LHsExpr id)    --  predicate
+  | HsIf        (Maybe (SyntaxExpr id)) -- cond function
+    		       		        -- Nothing => use the built-in 'if'
+					-- See Note [Rebindable if]
+                (LHsExpr id)    --  predicate
                 (LHsExpr id)    --  then part
                 (LHsExpr id)    --  else part
 
@@ -297,11 +300,18 @@ type PendingSplice = (Name, LHsExpr Id) -- Typechecked splices, waiting to be
                                         -- pasted back in by the desugarer
 \end{code}
 
-A @Dictionary@, unless of length 0 or 1, becomes a tuple.  A
-@ClassDictLam dictvars methods expr@ is, therefore:
-\begin{verbatim}
-\ x -> case x of ( dictvars-and-methods-tuple ) -> expr
-\end{verbatim}
+Note [Rebindable if]
+~~~~~~~~~~~~~~~~~~~~
+The rebindable syntax for 'if' is a bit special, because when
+rebindable syntax is *off* we do not want to treat
+   (if c then t else e)
+as if it was an application (ifThenElse c t e).  Why not?
+Because we allow an 'if' to return *unboxed* results, thus 
+  if blah then 3# else 4#
+whereas that would not be possible using a all to a polymorphic function
+(because you can't call a polymorphic function at an unboxed type).
+
+So we use Nothing to mean "use the old built-in typing rule".
 
 \begin{code}
 instance OutputableBndr id => Outputable (HsExpr id) where
@@ -414,7 +424,7 @@ ppr_expr exprType@(HsCase expr matches)
           nest 2 (pprMatches (CaseAlt `asTypeOf` idType exprType) matches <+> char '}') ]
  where idType :: HsExpr id -> HsMatchContext id; idType = undefined
 
-ppr_expr (HsIf e1 e2 e3)
+ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [ptext (sLit "if"), nest 2 (ppr e1), ptext (sLit "then")],
          nest 4 (ppr e2),
          ptext (sLit "else"),
@@ -619,7 +629,8 @@ The legal constructors for commands are:
                 [Match id]      -- bodies are HsCmd's
                 SrcLoc
 
-  | HsIf        (HsExpr id)     --  predicate
+  | HsIf        (Maybe (SyntaxExpr id)) --  cond function
+  					 (HsExpr id)     --  predicate
                 (HsCmd id)      --  then part
                 (HsCmd id)      --  else part
                 SrcLoc

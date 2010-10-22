@@ -18,7 +18,7 @@ module HsUtils(
   -- Terms
   mkHsPar, mkHsApp, mkHsConApp, mkSimpleHsAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS, 
-  mkMatchGroup, mkMatch, mkHsLam,
+  mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCoI, mkLHsWrapCoI,
   coiToHsWrapper, mkHsDictLet,
   mkHsOpApp, mkHsDo, mkHsWrapPat, mkHsWrapPatCoI,
@@ -205,6 +205,9 @@ noRebindableInfo = error "noRebindableInfo" 	-- Just another placeholder;
 
 mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
 
+mkHsIf :: LHsExpr id -> LHsExpr id -> LHsExpr id -> HsExpr id
+mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
+
 mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
@@ -329,7 +332,7 @@ nlList   :: [LHsExpr id] -> LHsExpr id
 
 nlHsLam	match		= noLoc (HsLam (mkMatchGroup [match]))
 nlHsPar e		= noLoc (HsPar e)
-nlHsIf cond true false	= noLoc (HsIf cond true false)
+nlHsIf cond true false	= noLoc (mkHsIf cond true false)
 nlHsCase expr matches	= noLoc (HsCase expr (mkMatchGroup matches))
 nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
 

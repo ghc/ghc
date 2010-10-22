@@ -1258,8 +1258,8 @@ output = [ x
             hierarchy.  It completely defeats that purpose if the
             literal "1" means "<literal>Prelude.fromInteger
             1</literal>", which is what the Haskell Report specifies.
-            So the <option>-XNoImplicitPrelude</option> 
-	      flag <emphasis>also</emphasis> causes
+            So the <option>-XRebindableSyntax</option> 
+	      flag causes
             the following pieces of built-in syntax to refer to
             <emphasis>whatever is in scope</emphasis>, not the Prelude
             versions:
@@ -1291,6 +1291,11 @@ output = [ x
 	      </para></listitem>
 
 	      <listitem>
+		<para>Conditionals (e.g. "<literal>if</literal> e1 <literal>then</literal> e2 <literal>else</literal> e3")
+		means "<literal>ifThenElse</literal> e1 e2 e3".  However <literal>case</literal> expressions are unaffected.
+	      </para></listitem>
+
+	      <listitem>
 	  <para>"Do" notation is translated using whatever
 	      functions <literal>(>>=)</literal>,
 	      <literal>(>>)</literal>, and <literal>fail</literal>,
@@ -1310,6 +1315,9 @@ output = [ x
 		to use this, ask!
 	      </para></listitem>
 	    </itemizedlist>
+<option>-XRebindableSyntax</option> implies <option>-XNoImplicitPrelude</option>.
+</para>
+<para>
 In all cases (apart from arrow notation), the static semantics should be that of the desugared form,
 even if that is a little unexpected. For example, the 
 static semantics of the literal <literal>368</literal>

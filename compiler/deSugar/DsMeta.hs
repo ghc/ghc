@@ -706,7 +706,7 @@ repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
 repE (HsCase e (MatchGroup ms _)) = do { arg <- repLE e
 				       ; ms2 <- mapM repMatchTup ms
 				       ; repCaseE arg (nonEmptyCoreList ms2) }
-repE (HsIf x y z)         = do
+repE (HsIf _ x y z)         = do
 			      a <- repLE x
 			      b <- repLE y
 			      c <- repLE z
@@ -1298,7 +1298,7 @@ repTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
 repTup (MkC es) = rep2 tupEName [es]
 
 repCond :: Core TH.ExpQ -> Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
-repCond (MkC x) (MkC y) (MkC z) =  rep2 condEName [x,y,z] 
+repCond (MkC x) (MkC y) (MkC z) = rep2 condEName [x,y,z] 
 
 repLetE :: Core [TH.DecQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLetE (MkC ds) (MkC e) = rep2 letEName [ds, e] 

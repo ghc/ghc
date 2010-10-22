@@ -411,7 +411,7 @@ stmt	:: { ExtCode }
         | 'return' maybe_actuals ';'
 		{ do e <- sequence $2; stmtEC (CmmReturn e) }
 	| 'if' bool_expr '{' body '}' else 	
-		{ ifThenElse $2 $4 $6 }
+		{ cmmIfThenElse $2 $4 $6 }
 
 opt_never_returns :: { CmmReturnInfo }
         :                               { CmmMayReturn }
@@ -947,7 +947,7 @@ data BoolExpr
 
 -- ToDo: smart constructors which simplify the boolean expression.
 
-ifThenElse cond then_part else_part = do
+cmmIfThenElse cond then_part else_part = do
      then_id <- code newLabelC
      join_id <- code newLabelC
      c <- cond

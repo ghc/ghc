@@ -262,11 +262,15 @@ rnExpr (ExprWithTySig expr pty)
   where 
     doc = text "In an expression type signature"
 
-rnExpr (HsIf p b1 b2)
-  = rnLExpr p		`thenM` \ (p', fvP) ->
-    rnLExpr b1		`thenM` \ (b1', fvB1) ->
-    rnLExpr b2		`thenM` \ (b2', fvB2) ->
-    return (HsIf p' b1' b2', plusFVs [fvP, fvB1, fvB2])
+rnExpr (HsIf _ p b1 b2)
+  = do { (p', fvP) <- rnLExpr p
+    ; (b1', fvB1) <- rnLExpr b1
+    ; (b2', fvB2) <- rnLExpr b2
+    ; rebind <- xoptM Opt_RebindableSyntax
+    ; if not rebind
+       then return (HsIf Nothing p' b1' b2', plusFVs [fvP, fvB1, fvB2])
+       else do { c <- liftM HsVar (lookupOccRn (mkVarUnqual (fsLit "ifThenElse")))
+               ; return (HsIf (Just c) p' b1' b2', plusFVs [fvP, fvB1, fvB2]) }}
 
 rnExpr (HsType a)
   = rnHsTypeFVs doc a	`thenM` \ (t, fvT) -> 
@@ -430,8 +434,8 @@ convertOpFormsCmd (HsPar c) = HsPar (convertOpFormsLCmd c)
 convertOpFormsCmd (HsCase exp matches)
   = HsCase exp (convertOpFormsMatch matches)
 
-convertOpFormsCmd (HsIf exp c1 c2)
-  = HsIf exp (convertOpFormsLCmd c1) (convertOpFormsLCmd c2)
+convertOpFormsCmd (HsIf f exp c1 c2)
+  = HsIf f exp (convertOpFormsLCmd c1) (convertOpFormsLCmd c2)
 
 convertOpFormsCmd (HsLet binds cmd)
   = HsLet binds (convertOpFormsLCmd cmd)
@@ -487,7 +491,7 @@ methodNamesCmd (HsArrForm {}) = emptyFVs
 
 methodNamesCmd (HsPar c) = methodNamesLCmd c
 
-methodNamesCmd (HsIf _ c1 c2)
+methodNamesCmd (HsIf _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
 methodNamesCmd (HsLet _ c) = methodNamesLCmd c

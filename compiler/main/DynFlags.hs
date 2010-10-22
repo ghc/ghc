@@ -325,6 +325,7 @@ data ExtensionFlag
    | Opt_GADTs
    | Opt_NPlusKPatterns
    | Opt_DoAndIfThenElse
+   | Opt_RebindableSyntax
 
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
@@ -1595,6 +1596,7 @@ xFlags = [
   ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, nop ),
   ( "NPlusKPatterns",                   Opt_NPlusKPatterns, nop ),
   ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, nop ),
+  ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
   ( "MonoPatBinds",                     Opt_MonoPatBinds, nop ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
@@ -1663,6 +1665,8 @@ impliedFlags
     , (Opt_LiberalTypeSynonyms,       Opt_ExplicitForAll)
     , (Opt_ExistentialQuantification, Opt_ExplicitForAll)
     , (Opt_PolymorphicComponents,     Opt_ExplicitForAll)
+
+    , (Opt_RebindableSyntax,          Opt_ImplicitPrelude)
 
     , (Opt_GADTs,                  Opt_MonoLocalBinds)
     , (Opt_TypeFamilies,           Opt_MonoLocalBinds)

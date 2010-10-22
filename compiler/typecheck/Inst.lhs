@@ -88,7 +88,7 @@ newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
 newMethodFromName origin name inst_ty
   = do { id <- tcLookupId name
  	      -- Use tcLookupId not tcLookupGlobalId; the method is almost
-	      -- always a class op, but with -XNoImplicitPrelude GHC is
+	      -- always a class op, but with -XRebindableSyntax GHC is
 	      -- meant to find whatever thing is in scope, and that may
 	      -- be an ordinary function. 
 
@@ -294,7 +294,7 @@ mkOverLit (HsIsString s) = return (HsString s)
 %*									*
 %************************************************************************
 
-Suppose we are doing the -XNoImplicitPrelude thing, and we encounter
+Suppose we are doing the -XRebindableSyntax thing, and we encounter
 a do-expression.  We have to find (>>) in the current environment, which is
 done by the rename. Then we have to check that it has the same type as
 Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had

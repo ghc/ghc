@@ -730,7 +730,7 @@ lookupTyFixityRn (L _ n) = lookupFixityRn n
 %*									*
 			Rebindable names
 	Dealing with rebindable syntax is driven by the 
-	Opt_NoImplicitPrelude dynamic flag.
+	Opt_RebindableSyntax dynamic flag.
 
 	In "deriving" code we don't want to use rebindable syntax
 	so we switch off the flag locally
@@ -769,8 +769,8 @@ checks the type of the user thing against the type of the standard thing.
 lookupSyntaxName :: Name 				-- The standard name
 	         -> RnM (SyntaxExpr Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
-  = xoptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
-    if implicit_prelude then normal_case
+  = xoptM Opt_RebindableSyntax		`thenM` \ rebindable_on -> 
+    if not rebindable_on then normal_case 
     else
 	-- Get the similarly named thing from the local environment
     lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenM` \ usr_name ->
@@ -781,8 +781,8 @@ lookupSyntaxName std_name
 lookupSyntaxTable :: [Name]				-- Standard names
 		  -> RnM (SyntaxTable Name, FreeVars)	-- See comments with HsExpr.ReboundNames
 lookupSyntaxTable std_names
-  = xoptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
-    if implicit_prelude then normal_case 
+  = xoptM Opt_RebindableSyntax		`thenM` \ rebindable_on -> 
+    if not rebindable_on then normal_case 
     else
     	-- Get the similarly named thing from the local environment
     mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names 	`thenM` \ usr_names ->

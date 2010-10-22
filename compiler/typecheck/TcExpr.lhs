@@ -392,11 +392,21 @@ tcExpr (HsCase scrut matches) exp_ty
     match_ctxt = MC { mc_what = CaseAlt,
 		      mc_body = tcBody }
 
-tcExpr (HsIf pred b1 b2) res_ty
-  = do	{ pred' <- tcMonoExpr pred boolTy
-	; b1' <- tcMonoExpr b1 res_ty
-	; b2' <- tcMonoExpr b2 res_ty
-	; return (HsIf pred' b1' b2') }
+tcExpr (HsIf Nothing pred b1 b2) res_ty	   -- Ordinary 'if'
+  = do { pred' <- tcMonoExpr pred boolTy
+       ; b1' <- tcMonoExpr b1 res_ty
+       ; b2' <- tcMonoExpr b2 res_ty
+       ; return (HsIf Nothing pred' b1' b2') }
+
+tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Rebindable syntax
+  = do { pred_ty <- newFlexiTyVarTy openTypeKind
+       ; b_ty <- newFlexiTyVarTy openTypeKind
+       ; let if_ty = mkFunTys [pred_ty, b_ty, b_ty] res_ty
+       ; fun' <- tcSyntaxOp IfOrigin fun if_ty
+       ; pred' <- tcMonoExpr pred pred_ty
+       ; b1' <- tcMonoExpr b1 b_ty
+       ; b2' <- tcMonoExpr b2 b_ty
+       ; return (HsIf (Just fun') pred' b1' b2') }
 
 tcExpr (HsDo do_or_lc stmts body _) res_ty
   = tcDoStmts do_or_lc stmts body res_ty

@@ -565,11 +565,12 @@ zonkExpr env (HsCase expr ms)
     zonkMatchGroup env ms	`thenM` \ new_ms ->
     returnM (HsCase new_expr new_ms)
 
-zonkExpr env (HsIf e1 e2 e3)
-  = zonkLExpr env e1	`thenM` \ new_e1 ->
-    zonkLExpr env e2	`thenM` \ new_e2 ->
-    zonkLExpr env e3	`thenM` \ new_e3 ->
-    returnM (HsIf new_e1 new_e2 new_e3)
+zonkExpr env (HsIf e0 e1 e2 e3)
+  = do { new_e0 <- fmapMaybeM (zonkExpr env) e0
+       ; new_e1 <- zonkLExpr env e1
+       ; new_e2 <- zonkLExpr env e2
+       ; new_e3 <- zonkLExpr env e3
+       ; returnM (HsIf new_e0 new_e1 new_e2 new_e3) }
 
 zonkExpr env (HsLet binds expr)
   = zonkLocalBinds env binds	`thenM` \ (new_env, new_binds) ->
@@ -908,10 +909,7 @@ zonk_pat env (SigPatOut pat ty)
 
 zonk_pat env (NPat lit mb_neg eq_expr)
   = do	{ lit' <- zonkOverLit env lit
- 	; mb_neg' <- case mb_neg of
-			Nothing  -> return Nothing
-			Just neg -> do { neg' <- zonkExpr env neg
-				       ; return (Just neg') }
+ 	; mb_neg' <- fmapMaybeM (zonkExpr env) mb_neg
  	; eq_expr' <- zonkExpr env eq_expr
 	; return (env, NPat lit' mb_neg' eq_expr') }
 

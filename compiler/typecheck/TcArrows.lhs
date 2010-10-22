@@ -7,7 +7,7 @@ Typecheck arrow notation
 \begin{code}
 module TcArrows ( tcProc ) where
 
-import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho )
+import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp )
 
 import HsSyn
 import TcMatches
@@ -125,11 +125,17 @@ tc_cmd env in_cmd@(HsCase scrut matches) (stk, res_ty)
                       mc_body = mc_body }
     mc_body body res_ty' = tcGuardedCmd env body stk res_ty'
 
-tc_cmd env (HsIf pred b1 b2) res_ty
-  = do 	{ pred' <- tcMonoExpr pred boolTy
-	; b1'   <- tcCmd env b1 res_ty
-	; b2'   <- tcCmd env b2 res_ty
-	; return (HsIf pred' b1' b2')
+tc_cmd env (HsIf mb_fun pred b1 b2) (stack_ty,res_ty)
+  = do 	{ pred_ty <- newFlexiTyVarTy openTypeKind
+	; b_ty <- newFlexiTyVarTy openTypeKind
+        ; let if_ty = mkFunTys [pred_ty, b_ty, b_ty] res_ty
+	; mb_fun' <- case mb_fun of 
+              Nothing  -> return Nothing
+              Just fun -> liftM Just (tcSyntaxOp IfOrigin fun if_ty)
+  	; pred' <- tcMonoExpr pred pred_ty
+	; b1'   <- tcCmd env b1 (stack_ty,b_ty)
+	; b2'   <- tcCmd env b2 (stack_ty,b_ty)
+	; return (HsIf mb_fun' pred' b1' b2')
     }
 
 -------------------------------------------

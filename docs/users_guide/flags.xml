@@ -713,6 +713,12 @@
 	      <entry><option>-XImplicitPrelude</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XRebindableSyntax</option></entry>
+	      <entry>Employ <link linkend="rebindable-syntax">rebindable syntax</link></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoRebindableSyntax</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XNoMonomorphismRestriction</option></entry>
 	      <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link></entry>
 	      <entry>dynamic</entry>

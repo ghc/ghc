@@ -404,7 +404,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsPar cmd)
 --			if e then Left ((xs1)*ts) else Right ((xs2)*ts)) >>>
 --		     c1 ||| c2
 
-dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd) = do
+dsCmd ids local_vars env_ids stack res_ty (HsIf mb_fun cond then_cmd else_cmd) = do
     core_cond <- dsLExpr cond
     (core_then, fvs_then, then_ids) <- dsfixCmd ids local_vars stack res_ty then_cmd
     (core_else, fvs_else, else_ids) <- dsfixCmd ids local_vars stack res_ty else_cmd
@@ -412,20 +412,26 @@ dsCmd ids local_vars env_ids stack res_ty (HsIf cond then_cmd else_cmd) = do
     either_con <- dsLookupTyCon eitherTyConName
     left_con   <- dsLookupDataCon leftDataConName
     right_con  <- dsLookupDataCon rightDataConName
-    let
-        left_expr ty1 ty2 e = mkConApp left_con [Type ty1, Type ty2, e]
-        right_expr ty1 ty2 e = mkConApp right_con [Type ty1, Type ty2, e]
+
+    let mk_left_expr ty1 ty2 e = mkConApp left_con [Type ty1, Type ty2, e]
+        mk_right_expr ty1 ty2 e = mkConApp right_con [Type ty1, Type ty2, e]
 
         in_ty = envStackType env_ids stack
         then_ty = envStackType then_ids stack
         else_ty = envStackType else_ids stack
         sum_ty = mkTyConApp either_con [then_ty, else_ty]
         fvs_cond = exprFreeVars core_cond `intersectVarSet` local_vars
-    
-    core_if <- matchEnvStack env_ids stack_ids
-                (mkIfThenElse core_cond
-                    (left_expr  then_ty else_ty (buildEnvStack then_ids stack_ids))
-                    (right_expr then_ty else_ty (buildEnvStack else_ids stack_ids)))
+        
+        core_left  = mk_left_expr  then_ty else_ty (buildEnvStack then_ids stack_ids)
+        core_right = mk_right_expr then_ty else_ty (buildEnvStack else_ids stack_ids)
+
+    core_if <- case mb_fun of 
+       Just fun -> do { core_fun <- dsExpr fun
+                      ; matchEnvStack env_ids stack_ids $
+                        mkCoreApps core_fun [core_cond, core_left, core_right] }
+       Nothing  -> matchEnvStack env_ids stack_ids $
+                   mkIfThenElse core_cond core_left core_right
+
     return (do_map_arrow ids in_ty sum_ty res_ty
                 core_if
                 (do_choice ids then_ty else_ty res_ty core_then core_else),

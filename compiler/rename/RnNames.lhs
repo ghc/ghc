@@ -1154,7 +1154,7 @@ a) It might be a WiredInName; in that case we may not load
    its interface (although we could).
 
 b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
-   These are seen as "used" by the renamer (if -XNoImplicitPrelude) 
+   These are seen as "used" by the renamer (if -XRebindableSyntax) 
    is on), but the typechecker may discard their uses 
    if in fact the in-scope fromRational is GHC.Read.fromRational,
    (see tcPat.tcOverloadedLit), and the typechecker sees that the type 

@@ -916,6 +916,7 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin	-- Typechecking a default decl
   | DoOrigin		-- Arising from a do expression
+  | IfOrigin      -- Arising from an if statement
   | ProcOrigin		-- Arising from a proc expression
   | AnnOrigin           -- An annotation
 
@@ -937,6 +938,7 @@ pprO ExprSigOrigin         = ptext (sLit "an expression type signature")
 pprO PatSigOrigin          = ptext (sLit "a pattern type signature")
 pprO PatOrigin             = ptext (sLit "a pattern")
 pprO ViewPatOrigin         = ptext (sLit "a view pattern")
+pprO IfOrigin              = ptext (sLit "an if statement")
 pprO (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
 pprO (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
 pprO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]

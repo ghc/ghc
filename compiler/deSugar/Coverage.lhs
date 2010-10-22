@@ -286,8 +286,8 @@ addTickHsExpr (HsCase e mgs) =
 	liftM2 HsCase
 		(addTickLHsExpr e) 
 		(addTickMatchGroup mgs)
-addTickHsExpr (HsIf	 e1 e2 e3) = 
-	liftM3 HsIf
+addTickHsExpr (HsIf cnd e1 e2 e3) = 
+	liftM3 (HsIf cnd)
 		(addBinTickLHsExpr (BinBox CondBinBox) e1)
 		(addTickLHsExprOptAlt True e2)
 		(addTickLHsExprOptAlt True e3)

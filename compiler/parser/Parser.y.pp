@@ -1277,7 +1277,7 @@ exp10 :: { LHsExpr RdrName }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
 	| 'if' exp optSemi 'then' exp optSemi 'else' exp
                                         {% checkDoAndIfThenElse $2 $3 $5 $6 $8 >>
-                                           return (LL $ HsIf $2 $5 $8) }
+                                           return (LL $ mkHsIf $2 $5 $8) }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
 	| '-' fexp				{ LL $ NegApp $2 noSyntaxExpr }
 
