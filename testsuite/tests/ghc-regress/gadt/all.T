@@ -98,4 +98,5 @@ test('T3013', normal, compile, [''])
 test('T3163', normal, compile_fail, [''])
 test('gadt25', normal, compile, [''])
 test('T3651', normal, compile_fail, [''])
+test('T3638', normal, compile, [''])
 
