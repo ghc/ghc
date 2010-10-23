@@ -43,4 +43,15 @@ else:
 
 test('T4321', omit_ways(['ghci']), compile_and_run, ['-O ' + sse2_opts])
 test('T3736', normal, run_command, ['$MAKE -s --no-print-directory T3736'])
+test('T3738',
+     [stats_num_field('peak_megabytes_allocated', 1,
+                                                  1),
+                                     # expected value: 1 (amd64/Linux)
+      stats_num_field('bytes allocated', 60000,
+                                         61000),
+                                     # expected value: 60368 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
 
