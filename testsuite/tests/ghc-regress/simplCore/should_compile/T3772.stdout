@@ -6,8 +6,8 @@ xs :: GHC.Prim.Int# -> ()
 xs =
   \ (m :: GHC.Prim.Int#) ->
     case GHC.Prim.<=# m 1 of _ {
-      GHC.Bool.False -> xs (GHC.Prim.-# m 1);
-      GHC.Bool.True -> GHC.Unit.()
+      GHC.Types.False -> xs (GHC.Prim.-# m 1);
+      GHC.Types.True -> GHC.Unit.()
     }
 end Rec }
 
@@ -17,7 +17,7 @@ T3772.foo =
   \ (n :: GHC.Types.Int) ->
     case n of _ { GHC.Types.I# n# ->
     case GHC.Prim.<=# n# 0 of _ {
-      GHC.Bool.False -> xs n#; GHC.Bool.True -> GHC.Unit.()
+      GHC.Types.False -> xs n#; GHC.Types.True -> GHC.Unit.()
     }
     }
 

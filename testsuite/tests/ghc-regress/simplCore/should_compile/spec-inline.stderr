@@ -41,17 +41,17 @@ Roman.foo_$s$wgo1 =
              sc)
           sc } in
     case GHC.Prim.<=# sc1 0 of _ {
-      GHC.Bool.False ->
+      GHC.Types.False ->
         case GHC.Prim.<# sc1 100 of _ {
-          GHC.Bool.False ->
+          GHC.Types.False ->
             case GHC.Prim.<# sc1 500 of _ {
-              GHC.Bool.False ->
+              GHC.Types.False ->
                 Roman.foo_$s$wgo1 (GHC.Prim.+# a a) (GHC.Prim.-# sc1 1);
-              GHC.Bool.True -> Roman.foo_$s$wgo1 a (GHC.Prim.-# sc1 3)
+              GHC.Types.True -> Roman.foo_$s$wgo1 a (GHC.Prim.-# sc1 3)
             };
-          GHC.Bool.True -> Roman.foo_$s$wgo1 sc (GHC.Prim.-# sc1 2)
+          GHC.Types.True -> Roman.foo_$s$wgo1 sc (GHC.Prim.-# sc1 2)
         };
-      GHC.Bool.True -> 0
+      GHC.Types.True -> 0
     }
 end Rec }
 
@@ -77,17 +77,17 @@ Roman.foo_$s$wgo =
              ipv)
           ipv } in
     case GHC.Prim.<=# sc1 0 of _ {
-      GHC.Bool.False ->
+      GHC.Types.False ->
         case GHC.Prim.<# sc1 100 of _ {
-          GHC.Bool.False ->
+          GHC.Types.False ->
             case GHC.Prim.<# sc1 500 of _ {
-              GHC.Bool.False ->
+              GHC.Types.False ->
                 Roman.foo_$s$wgo1 (GHC.Prim.+# a a) (GHC.Prim.-# sc1 1);
-              GHC.Bool.True -> Roman.foo_$s$wgo1 a (GHC.Prim.-# sc1 3)
+              GHC.Types.True -> Roman.foo_$s$wgo1 a (GHC.Prim.-# sc1 3)
             };
-          GHC.Bool.True -> Roman.foo_$s$wgo1 ipv (GHC.Prim.-# sc1 2)
+          GHC.Types.True -> Roman.foo_$s$wgo1 ipv (GHC.Prim.-# sc1 2)
         };
-      GHC.Bool.True -> 0
+      GHC.Types.True -> 0
     }
     }
 
@@ -126,17 +126,17 @@ Roman.$wgo =
           Data.Maybe.Just n ->
             case n of _ { GHC.Types.I# x2 ->
             case GHC.Prim.<=# x2 0 of _ {
-              GHC.Bool.False ->
+              GHC.Types.False ->
                 case GHC.Prim.<# x2 100 of _ {
-                  GHC.Bool.False ->
+                  GHC.Types.False ->
                     case GHC.Prim.<# x2 500 of _ {
-                      GHC.Bool.False ->
+                      GHC.Types.False ->
                         Roman.foo_$s$wgo1 (GHC.Prim.+# a a) (GHC.Prim.-# x2 1);
-                      GHC.Bool.True -> Roman.foo_$s$wgo1 a (GHC.Prim.-# x2 3)
+                      GHC.Types.True -> Roman.foo_$s$wgo1 a (GHC.Prim.-# x2 3)
                     };
-                  GHC.Bool.True -> Roman.foo_$s$wgo x1 (GHC.Prim.-# x2 2)
+                  GHC.Types.True -> Roman.foo_$s$wgo x1 (GHC.Prim.-# x2 2)
                 };
-              GHC.Bool.True -> 0
+              GHC.Types.True -> 0
             }
             }
         }

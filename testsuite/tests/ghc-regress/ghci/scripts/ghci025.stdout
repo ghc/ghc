@@ -34,8 +34,8 @@ class Monad m where
 catMaybes :: [Maybe a] -> [a]
 fromJust :: Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
-isJust :: Maybe a -> GHC.Bool.Bool
-isNothing :: Maybe a -> GHC.Bool.Bool
+isJust :: Maybe a -> GHC.Types.Bool
+isNothing :: Maybe a -> GHC.Types.Bool
 listToMaybe :: [a] -> Maybe a
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 maybe :: b -> (a -> b) -> Maybe a -> b
@@ -48,8 +48,8 @@ Nothing :: Maybe a
 (+) :: GHC.Num.Num a => a -> a -> a
 (=<<) :: Monad m => (a -> m b) -> m a -> m b
 class Eq a where
-  (GHC.Classes.==) :: a -> a -> GHC.Bool.Bool
-  (GHC.Classes./=) :: a -> a -> GHC.Bool.Bool
+  (GHC.Classes.==) :: a -> a -> GHC.Types.Bool
+  (GHC.Classes./=) :: a -> a -> GHC.Types.Bool
 -- imported via Prelude, T
 Prelude.length :: [a] -> GHC.Types.Int
 -- imported via T

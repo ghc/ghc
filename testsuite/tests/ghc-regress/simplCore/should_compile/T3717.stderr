@@ -16,7 +16,7 @@ T3717.$wfoo =
     case ww of ds {
       __DEFAULT ->
         case case GHC.Prim.<# ds 5 of _ {
-               GHC.Bool.False -> lvl1; GHC.Bool.True -> lvl
+               GHC.Types.False -> lvl1; GHC.Types.True -> lvl
              }
         of _ { __DEFAULT ->
         T3717.$wfoo (GHC.Prim.-# ds 1)
