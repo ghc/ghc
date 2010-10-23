@@ -19,7 +19,6 @@
 
 module GHC.Classes where
 
-import GHC.Bool
 import GHC.Integer
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()

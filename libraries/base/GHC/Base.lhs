@@ -87,7 +87,6 @@ Other Prelude modules are much easier with fewer complex dependencies.
 module GHC.Base
         (
         module GHC.Base,
-        module GHC.Bool,
         module GHC.Classes,
         module GHC.Generics,
         module GHC.Ordering,
@@ -98,7 +97,6 @@ module GHC.Base
         where
 
 import GHC.Types
-import GHC.Bool
 import GHC.Classes
 import GHC.Generics
 import GHC.Ordering

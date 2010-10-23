@@ -44,13 +44,13 @@ module Data.Tuple
 
 import GHC.Base
 -- We need to depend on GHC.Base so that
--- a) so that we get GHC.Bool, GHC.Classes, GHC.Ordering
+-- a) so that we get GHC.Classes, GHC.Ordering, GHC.Types
 
 -- b) so that GHC.Base.inline is available, which is used
 --    when expanding instance declarations
 
 import GHC.Tuple
--- We must import GHC.Tuple, to ensure sure that the 
+-- We must import GHC.Tuple, to ensure sure that the
 -- data constructors of `(,)' are in scope when we do
 -- the standalone deriving instance for Eq (a,b) etc
 

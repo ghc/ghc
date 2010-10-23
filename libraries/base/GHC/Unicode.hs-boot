@@ -2,7 +2,6 @@
 
 module GHC.Unicode where
 
-import GHC.Bool
 import GHC.Types
 
 isAscii         :: Char -> Bool
