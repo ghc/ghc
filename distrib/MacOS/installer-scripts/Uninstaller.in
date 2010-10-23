@@ -77,7 +77,7 @@ then
         NEW_CREATE_LINKS="$VERSIONS_DIRECTORY/$NEW_VERSION/Tools/create-links"
         if [ -f "$NEW_CREATE_LINKS" ]
         then
-            sh "$NEW_CREATE_LINKS"
+            sh "$NEW_CREATE_LINKS" unused /Library/Frameworks /
         fi
     fi
 fi
