@@ -325,7 +325,7 @@ If we don't we get something like this:
 [Arity 3]
 GHC.Base.until =
   \ (@ a_aiK)
-    (p_a6T :: a_aiK -> GHC.Bool.Bool)
+    (p_a6T :: a_aiK -> GHC.Types.Bool)
     (f_a6V :: a_aiK -> a_aiK)
     (x_a6X :: a_aiK) ->
     letrec {
@@ -335,17 +335,17 @@ GHC.Base.until =
         \ (x_a6X :: a_aiK) ->
           let {
             sat_shadow_r17 :: forall a_a3O.
-                              (a_a3O -> GHC.Bool.Bool) -> (a_a3O -> a_a3O) -> a_a3O -> a_a3O
+                              (a_a3O -> GHC.Types.Bool) -> (a_a3O -> a_a3O) -> a_a3O -> a_a3O
             []
             sat_shadow_r17 =
               \ (@ a_aiK)
-                (p_a6T :: a_aiK -> GHC.Bool.Bool)
+                (p_a6T :: a_aiK -> GHC.Types.Bool)
                 (f_a6V :: a_aiK -> a_aiK)
                 (x_a6X :: a_aiK) ->
                 sat_worker_s1aU x_a6X } in
           case p_a6T x_a6X of wild_X3y [ALWAYS Dead Nothing] {
-            GHC.Bool.False -> GHC.Base.until @ a_aiK p_a6T f_a6V (f_a6V x_a6X);
-            GHC.Bool.True -> x_a6X
+            GHC.Types.False -> GHC.Base.until @ a_aiK p_a6T f_a6V (f_a6V x_a6X);
+            GHC.Types.True -> x_a6X
           }; } in
     sat_worker_s1aU x_a6X
     

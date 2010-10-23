@@ -132,7 +132,7 @@ gen_hs_source (Info defaults entries) =
 	++ unlines (map (("\t" ++) . hdr) entries)
 	++ ") where\n"
     ++ "\n"
-    ++ "import GHC.Bool\n"
+    ++ "import GHC.Types\n"
     ++ "\n"
     ++ "{-\n"
 	++ unlines (map opt defaults)
@@ -487,7 +487,7 @@ gen_wrappers (Info _ entries)
 	-- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
-     ++ "import GHC.Bool (Bool)\n"
+     ++ "import GHC.Types (Bool)\n"
      ++ "import GHC.Unit ()\n"
      ++ "import GHC.Prim (" ++ types ++ ")\n"
      ++ unlines (concatMap f specs)

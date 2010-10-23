@@ -153,9 +153,9 @@ intTyConName	  = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int") intTyCo
 intDataConName	  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#") intDataConKey  intDataCon
 
 boolTyConName, falseDataConName, trueDataConName :: Name
-boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BOOL (fsLit "Bool") boolTyConKey boolTyCon
-falseDataConName  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "False") falseDataConKey falseDataCon
-trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "True")  trueDataConKey  trueDataCon 
+boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Bool") boolTyConKey boolTyCon
+falseDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "False") falseDataConKey falseDataCon
+trueDataConName	  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "True")  trueDataConKey  trueDataCon
 
 listTyConName, nilDataConName, consDataConName :: Name
 listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon

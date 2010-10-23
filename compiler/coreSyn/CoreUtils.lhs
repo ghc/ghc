@@ -732,8 +732,8 @@ If exprOkForSpeculation doesn't look through case expressions, you get this:
       \ (ww :: GHC.Prim.Int#) ->
         case ww of ds {
           __DEFAULT -> case (case <# ds 5 of _ {
-                          GHC.Bool.False -> lvl1; 
-                          GHC.Bool.True -> lvl})
+                          GHC.Types.False -> lvl1;
+                          GHC.Types.True -> lvl})
                        of _ { __DEFAULT ->
                        T.$wfoo (GHC.Prim.-# ds_XkE 1) };
           0 -> 0

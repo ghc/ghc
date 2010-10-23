@@ -13,7 +13,7 @@
 #include "Cmm.h"
 #include "RaiseAsync.h"
 
-import ghczmprim_GHCziBool_True_closure;
+import ghczmprim_GHCziTypes_True_closure;
 
 /* -----------------------------------------------------------------------------
    Exception Primitives
@@ -498,8 +498,8 @@ retry_pop_stack:
             Sp(5) = exception;
             Sp(4) = stg_raise_ret_info;
             Sp(3) = exception;             // the AP_STACK
-            Sp(2) = ghczmprim_GHCziBool_True_closure; // dummy breakpoint info
-            Sp(1) = ghczmprim_GHCziBool_True_closure; // True <=> a breakpoint
+            Sp(2) = ghczmprim_GHCziTypes_True_closure; // dummy breakpoint info
+            Sp(1) = ghczmprim_GHCziTypes_True_closure; // True <=> a breakpoint
             R1 = ioAction;
             jump RET_LBL(stg_ap_pppv);
         }

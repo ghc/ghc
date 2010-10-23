@@ -34,7 +34,7 @@ import pthread_mutex_unlock;
 import base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
-import ghczmprim_GHCziBool_False_closure;
+import ghczmprim_GHCziTypes_False_closure;
 #if !defined(mingw32_HOST_OS)
 import sm_mutex;
 #endif
@@ -2014,13 +2014,13 @@ stg_getSparkzh
    W_ spark;
 
 #ifndef THREADED_RTS
-   RET_NP(0,ghczmprim_GHCziBool_False_closure);
+   RET_NP(0,ghczmprim_GHCziTypes_False_closure);
 #else
    (spark) = foreign "C" findSpark(MyCapability());
    if (spark != 0) {
       RET_NP(1,spark);
    } else {
-      RET_NP(0,ghczmprim_GHCziBool_False_closure);
+      RET_NP(0,ghczmprim_GHCziTypes_False_closure);
    }
 #endif
 }

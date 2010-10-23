@@ -871,7 +871,7 @@ But the defn of GHC.Classes.$dmmin is:
     {- Arity: 3, HasNoCafRefs, Strictness: SLL,
        Unfolding: (\ @ a $dOrd :: GHC.Classes.Ord a x :: a y :: a ->
                    case @ a GHC.Classes.<= @ a $dOrd x y of wild {
-                     GHC.Bool.False -> y GHC.Bool.True -> x }) -}
+                     GHC.Types.False -> y GHC.Types.True -> x }) -}
 
 We *really* want to inline $dmmin, even though it has arity 3, in
 order to unravel the recursion.

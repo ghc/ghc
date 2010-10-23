@@ -236,7 +236,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 pRELUDE :: Module
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
+gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST, gHC_PARR,
@@ -250,7 +250,6 @@ gHC_PRIM, gHC_TYPES, gHC_BOOL, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
-gHC_BOOL	= mkPrimModule (fsLit "GHC.Bool")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
 gHC_MAGIC	= mkPrimModule (fsLit "GHC.Magic")
