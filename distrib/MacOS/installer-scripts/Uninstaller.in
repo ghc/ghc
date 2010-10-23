@@ -38,33 +38,33 @@ MY_DIRECTORY="$VERSIONS_DIRECTORY/$MY_VERSION"
 CURRENT_DIRECTORY="$VERSIONS_DIRECTORY/Current"
 CURRENT_VERSION=`readlink "$CURRENT_DIRECTORY"`
 
-if [ "$CURRENT_VERSION" = "$MY_VERSION" ]
-then
-    rm -f "$CURRENT_DIRECTORY"
+removeLinksFrom () {
+    for f in `ls -1 "$MY_DIRECTORY/$1"`
+    do
+        qf="$1/$f"
+        # Only remove if it is a link to our version. e.g. /usr/bin/ghc
+        # will only be removed if we are the current version, but
+        # /usr/bin/ghc-7.0.1 will be removed even if ghc-7.2.1 is the
+        # current version.
+        l=`readlink "$qf" | grep "GHC.framework/Versions/$MY_VERSION"`
+        if [ "$l" != "" ]
+        then
+            rm -f "$qf"
+        fi
+    done
+}
 
-    removeLinksFrom () {
-        for f in `ls -1 "$MY_DIRECTORY/$1"`
-        do
-            qf="$1/$f"
-            # Sanity check that it is a link like we expect
-            l=`readlink "$qf" | grep GHC.framework/Versions`
-            if [ "$l" != "" ]
-            then
-                rm -f "$qf"
-            fi
-        done
-    }
-
-    removeLinksFrom /usr/bin
-    removeLinksFrom /usr/share/man/man1
-    removeLinksFrom /usr/share/doc
-fi
+removeLinksFrom /usr/bin
+removeLinksFrom /usr/share/man/man1
+removeLinksFrom /usr/share/doc
 
 echo "Removing $MY_DIRECTORY"
 rm -rf "$MY_DIRECTORY"
 
 if [ "$CURRENT_VERSION" = "$MY_VERSION" ]
 then
+    rm -f "$CURRENT_DIRECTORY"
+
     # This isn't ideal, but it's a vague approximation to
     # "the most recent version":
     NEW_VERSION=`ls -1 "$VERSIONS_DIRECTORY" | tail -1`
