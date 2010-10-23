@@ -387,12 +387,7 @@ getPrologue flags =
     [] -> return Nothing
     [filename] -> do
       str <- readFile filename
-#if ! MIN_VERSION_ghc(6,13,0)
-      let f = id
-#else
-      let f = flattenExtensionFlags
-#endif
-      case parseParas (tokenise (f defaultDynFlags) str
+      case parseParas (tokenise defaultDynFlags str
                       (1,0) {- TODO: real position -}) of
         Nothing -> throwE $ "failed to parse haddock prologue from file: " ++ filename
         Just doc -> return (Just doc)
