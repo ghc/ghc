@@ -292,12 +292,17 @@ include rules/bindist.mk
 # Packages that are built but not installed
 INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
 
+DPH_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
+                dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
+                vector primitive
+
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
-# packages.
-STAGE2_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
-		   dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
-		   vector primitive haskell98 haskell2010
+# packages:
+STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010
+# Packages that we shouldn't build if we don't have TH (e.g. because
+# we're building a profiled compiler):
+TH_PACKAGES := $(DPH_PACKAGES)
 
 # Packages that are built by stage0, in addition to stage1.  These
 # packages are dependencies of GHC, that we do not assume the stage0
@@ -348,10 +353,12 @@ define addPackageGeneral
 endef
 
 define addPackage # args: $1 = package, $2 = condition
+ifneq "$(filter $1,$(TH_PACKAGES)) $(GhcProfiled)" "$1 YES"
 ifeq "$(filter $1,$(STAGE2_PACKAGES))" "$1"
 $(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
 else
 $(call addPackageGeneral,PACKAGES,$1,$2)
+endif
 endif
 endef
 
