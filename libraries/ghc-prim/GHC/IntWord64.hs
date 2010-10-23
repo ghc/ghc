@@ -25,8 +25,8 @@ module GHC.IntWord64 (
  ) where
 
 #if WORD_SIZE_IN_BITS < 64
-import GHC.Bool
 import GHC.Prim
+import GHC.Types
 
 foreign import ccall unsafe "hs_eqWord64"    eqWord64#      :: Word64# -> Word64# -> Bool
 foreign import ccall unsafe "hs_neWord64"    neWord64#      :: Word64# -> Word64# -> Bool

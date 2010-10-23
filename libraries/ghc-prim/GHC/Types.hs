@@ -16,7 +16,7 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 
-module GHC.Types (Char(..), Int(..), Float(..), Double(..), IO(..)) where
+module GHC.Types (Bool(..), Char(..), Int(..), Float(..), Double(..), IO(..)) where
 
 import GHC.Prim
 -- We need Inl etc behind the scenes for the type definitions
@@ -25,6 +25,8 @@ import GHC.Generics ()
 infixr 5 :
 
 data [] a = [] | a : [a]
+
+data Bool = False | True
 
 {-| The character type 'Char' is an enumeration whose values represent
 Unicode (or equivalently ISO\/IEC 10646) characters

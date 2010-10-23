@@ -22,7 +22,6 @@ flag include-ghc-prim {
 Library {
     build-depends: rts
     exposed-modules:
-        GHC.Bool
         GHC.Debug
         GHC.Generics
         GHC.Magic
