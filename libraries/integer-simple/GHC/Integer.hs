@@ -40,9 +40,9 @@ module GHC.Integer (
 
 import GHC.Integer.Type
 
-import GHC.Bool
 import GHC.Ordering
 import GHC.Prim
+import GHC.Types
 import GHC.Unit ()
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
