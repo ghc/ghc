@@ -253,7 +253,7 @@ doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
 setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = xopt_set_flattened (hsc_dflags top) flag}} )
+			 env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
 unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->

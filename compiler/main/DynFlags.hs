@@ -17,16 +17,12 @@ module DynFlags (
         DynFlag(..),
         ExtensionFlag(..),
         glasgowExtsFlags,
-        flattenExtensionFlags,
-        ensureFlattenedExtensionFlags,
         dopt,
         dopt_set,
         dopt_unset,
         xopt,
         xopt_set,
         xopt_unset,
-        xopt_set_flattened,
-        xopt_unset_flattened,
         DynFlags(..),
         RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
@@ -501,9 +497,13 @@ data DynFlags = DynFlags {
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
+  -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
-  extensionFlags        :: Either [OnOff ExtensionFlag]
-                                  [ExtensionFlag],
+  -- Don't change this without updating extensionFlags:
+  extensions            :: [OnOff ExtensionFlag],
+  -- extensionFlags should always be equal to
+  --     flattenExtensionFlags language extensions
+  extensionFlags        :: [ExtensionFlag],
 
   -- | Message output action: use "ErrUtils" instead of this if you can
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
@@ -741,7 +741,8 @@ defaultDynFlags =
         haddockOptions = Nothing,
         flags = defaultFlags,
         language = Nothing,
-        extensionFlags = Left [],
+        extensions = [],
+        extensionFlags = flattenExtensionFlags Nothing [],
 
         log_action = \severity srcSpan style msg ->
                         case severity of
@@ -770,31 +771,11 @@ Note [Verbosity levels]
 data OnOff a = On a
              | Off a
 
-flattenExtensionFlags :: DynFlags -> DynFlags
-flattenExtensionFlags dflags
-    = case extensionFlags dflags of
-      Left onoffs ->
-          dflags {
-              extensionFlags = Right $ flattenExtensionFlags' (language dflags) onoffs
-          }
-      Right _ ->
-          panic "Flattening already-flattened extension flags"
-
-ensureFlattenedExtensionFlags :: DynFlags -> DynFlags
-ensureFlattenedExtensionFlags dflags
-    = case extensionFlags dflags of
-      Left onoffs ->
-          dflags {
-              extensionFlags = Right $ flattenExtensionFlags' (language dflags) onoffs
-          }
-      Right _ ->
-          dflags
-
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
-flattenExtensionFlags' :: Maybe Language -> [OnOff ExtensionFlag]
-                       -> [ExtensionFlag]
-flattenExtensionFlags' ml = foldr f defaultExtensionFlags
+flattenExtensionFlags :: Maybe Language -> [OnOff ExtensionFlag]
+                      -> [ExtensionFlag]
+flattenExtensionFlags ml = foldr f defaultExtensionFlags
     where f (On f)  flags = f : delete f flags
           f (Off f) flags =     delete f flags
           defaultExtensionFlags = languageExtensions ml
@@ -837,37 +818,30 @@ dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
 
 -- | Test whether a 'ExtensionFlag' is set
 xopt :: ExtensionFlag -> DynFlags -> Bool
-xopt f dflags = case extensionFlags dflags of
-                Left _ -> panic ("Testing for extension flag " ++ show f ++ " before flattening")
-                Right flags -> f `elem` flags
+xopt f dflags = f `elem` extensionFlags dflags
 
 -- | Set a 'ExtensionFlag'
 xopt_set :: DynFlags -> ExtensionFlag -> DynFlags
-xopt_set dfs f = case extensionFlags dfs of
-                 Left onoffs -> dfs { extensionFlags = Left (On f : onoffs) }
-                 Right _ -> panic ("Setting extension flag " ++ show f ++ " after flattening")
-
--- | Set a 'ExtensionFlag'
-xopt_set_flattened :: DynFlags -> ExtensionFlag -> DynFlags
-xopt_set_flattened dfs f = case extensionFlags dfs of
-                           Left _ ->
-                               panic ("Setting extension flag " ++ show f ++ " before flattening, but expected flattened")
-                           Right flags ->
-                               dfs { extensionFlags = Right (f : delete f flags) }
+xopt_set dfs f
+    = let onoffs = On f : extensions dfs
+      in dfs { extensions = onoffs,
+               extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
 -- | Unset a 'ExtensionFlag'
 xopt_unset :: DynFlags -> ExtensionFlag -> DynFlags
-xopt_unset dfs f = case extensionFlags dfs of
-                   Left onoffs -> dfs { extensionFlags = Left (Off f : onoffs) }
-                   Right _ -> panic ("Unsetting extension flag " ++ show f ++ " after flattening")
+xopt_unset dfs f
+    = let onoffs = Off f : extensions dfs
+      in dfs { extensions = onoffs,
+               extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
--- | Unset a 'ExtensionFlag'
-xopt_unset_flattened :: DynFlags -> ExtensionFlag -> DynFlags
-xopt_unset_flattened dfs f = case extensionFlags dfs of
-                             Left _ ->
-                                 panic ("Unsetting extension flag " ++ show f ++ " before flattening, but expected flattened")
-                             Right flags ->
-                                 dfs { extensionFlags = Right (delete f flags) }
+setLanguage :: Language -> DynP ()
+setLanguage l = upd f
+    where f dfs = let mLang = Just l
+                      oneoffs = extensions dfs
+                  in dfs {
+                         language = mLang,
+                         extensionFlags = flattenExtensionFlags mLang oneoffs
+                     }
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -1870,10 +1844,6 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
 setDynFlag   f = upd (\dfs -> dopt_set dfs f)
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
-
---------------------------
-setLanguage :: Language -> DynP ()
-setLanguage l = upd (\dfs -> dfs { language = Just l })
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
