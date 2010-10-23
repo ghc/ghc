@@ -84,8 +84,8 @@ import GHC.IntWord64 (
        )
 #endif
 
-import GHC.Bool
 import GHC.Ordering
+import GHC.Types
 
 default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
