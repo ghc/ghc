@@ -71,3 +71,33 @@ test('T3294',
       ],
      compile,
      [''])
+
+test('T3064',
+     [# expected value: 15 (x86/OSX):
+      if_wordsize(32,
+          compiler_stats_num_field('peak_megabytes_allocated', 14, 16)),
+      # expected value: 25 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('peak_megabytes_allocated', 24, 26)),
+      # expected value: 158390428 (x86/OSX):
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 150000000,
+                                                      170000000)),
+      # expected value: 294743400 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 290000000,
+                                                      300000000)),
+      # expected value: 6705040 (x86/OSX):
+      if_wordsize(32,
+          compiler_stats_num_field('max_bytes_used', 6000000,
+                                                     8000000)),
+      # expected value:  9685168 (amd64/Linux, bindist)
+      # expected value: 11907088 (amd64/Linux, intree):
+      if_wordsize(64,
+          compiler_stats_num_field('max_bytes_used',  9000000,
+                                                     13000000)),
+       only_ways(['normal'])
+      ],
+     compile,
+     [''])
+
