@@ -614,11 +614,27 @@ floatToDigits base x =
     k0 :: Int
     k0 =
      if b == 2 && base == 10 then
-        -- logBase 10 2 is slightly bigger than 3/10 so
-        -- the following will err on the low side.  Ignoring
-        -- the fraction will make it err even more.
-        -- Haskell promises that p-1 <= logBase b f < p.
-        (p - 1 + e0) * 3 `div` 10
+        -- logBase 10 2 is very slightly larger than 8651/28738
+        -- (about 5.3558e-10), so if log x >= 0, the approximation
+        -- k1 is too small, hence we add one and need one fixup step less.
+        -- If log x < 0, the approximation errs rather on the high side.
+        -- That is usually more than compensated for by ignoring the
+        -- fractional part of logBase 2 x, but when x is a power of 1/2
+        -- or slightly larger and the exponent is a multiple of the
+        -- denominator of the rational approximation to logBase 10 2,
+        -- k1 is larger than logBase 10 x. If k1 > 1 + logBase 10 x,
+        -- we get a leading zero-digit we don't want.
+        -- With the approximation 3/10, this happened for
+        -- 0.5^1030, 0.5^1040, ..., 0.5^1070 and values close above.
+        -- The approximation 8651/28738 guarantees k1 < 1 + logBase 10 x
+        -- for IEEE-ish floating point types with exponent fields
+        -- <= 17 bits and mantissae of several thousand bits, earlier
+        -- convergents to logBase 10 2 would fail for long double.
+        -- Using quot instead of div is a little faster and requires
+        -- fewer fixup steps for negative lx.
+        let lx = p - 1 + e0
+            k1 = (lx * 8651) `quot` 28738
+        in if lx >= 0 then k1 + 1 else k1
      else
 	-- f :: Integer, log :: Float -> Float,
         --               ceiling :: Float -> Int
