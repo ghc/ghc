@@ -1,6 +1,5 @@
-:!rm -f ../Test3.o ../Test3.hi
+:!rm -f Break007.o Break007.hi
 :set -fobject-code
-:l ../Test3
+:l Break007
 :b 1
 -- can't set a breakpoint in a compiled module
-:!rm -f ../Test3.o ../Test3.hi
