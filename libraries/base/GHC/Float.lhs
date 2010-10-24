@@ -785,10 +785,19 @@ expt base n =
     if base == 2 && n >= minExpt && n <= maxExpt then
         expts!n
     else
-        base^n
+        if base == 10 && n <= maxExpt10 then
+            expts10!n
+        else
+            base^n
 
 expts :: Array Int Integer
 expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
+
+maxExpt10 :: Int
+maxExpt10 = 324
+
+expts10 :: Array Int Integer
+expts10 = array (minExpt,maxExpt10) [(n,10^n) | n <- [minExpt .. maxExpt10]]
 
 -- Compute the (floor of the) log of i in base b.
 -- Simplest way would be just divide i by b until it's smaller then b, but that would
