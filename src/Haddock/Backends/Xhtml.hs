@@ -346,8 +346,11 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
   createDirectoryIfMissing True odir
 
-  when split_indices $
+  when split_indices $ do
     mapM_ (do_sub_index index) initialChars
+    -- Let's add a single large index as well for those who don't know exactly what they're looking for:
+    let mergedhtml = indexPage False Nothing index
+    writeFile (joinPath [odir, subIndexHtmlFile merged_name]) (renderToString mergedhtml)
 
   writeFile (joinPath [odir, indexHtmlFile]) (renderToString html)
 
@@ -363,6 +366,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
           ]
 
     indexName ch = "Index" ++ maybe "" (\c -> " - " ++ [c]) ch
+    merged_name = "All"
 
     buildIndex items = table << aboves (map indexElt items)
 
@@ -375,9 +379,10 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
     indexInitialLetterLinks =
       divAlphabet <<
-          unordList [ anchor ! [href (subIndexHtmlFile c)] << [c]
-                      | c <- initialChars
-                      , any ((==c) . toUpper . head . fst) index ]
+         unordList (map (\str -> anchor ! [href (subIndexHtmlFile str)] << str) $
+                        [ [c] | c <- initialChars
+                              , any ((==c) . toUpper . head . fst) index ] ++
+                        [merged_name])
 
     -- todo: what about names/operators that start with Unicode
     -- characters?
@@ -388,7 +393,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
     do_sub_index this_ix c
       = unless (null index_part) $
-          writeFile (joinPath [odir, subIndexHtmlFile c]) (renderToString html)
+          writeFile (joinPath [odir, subIndexHtmlFile [c]]) (renderToString html)
       where
         html = indexPage True (Just c) index_part
         index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]

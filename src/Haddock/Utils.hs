@@ -204,10 +204,10 @@ mainFrameName = "main"
 synopsisFrameName = "synopsis"
 
 
-subIndexHtmlFile :: Char -> String
-subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
-   where b | isAlpha a = [a]
-           | otherwise = show (ord a)
+subIndexHtmlFile :: String -> String
+subIndexHtmlFile ls = "doc-index-" ++ b ++ ".html"
+   where b | all isAlpha ls = ls
+           | otherwise = concat (map (show . ord) ls)
 
 
 -------------------------------------------------------------------------------
