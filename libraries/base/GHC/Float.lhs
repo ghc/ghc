@@ -595,19 +595,19 @@ floatToDigits base x =
   -- will have an impossibly low exponent.  Adjust for this.
   (f, e) =
    let n = minExp - e0 in
-   if n > 0 then (f0 `div` (b^n), e0+n) else (f0, e0)
+   if n > 0 then (f0 `quot` (expt b n), e0+n) else (f0, e0)
   (r, s, mUp, mDn) =
    if e >= 0 then
-    let be = b^ e in
-    if f == b^(p-1) then
+    let be = expt b e in
+    if f == expt b (p-1) then
       (f*be*b*2, 2*b, be*b, b)
     else
       (f*be*2, 2, be, be)
    else
-    if e > minExp && f == b^(p-1) then
-      (f*b*2, b^(-e+1)*2, b, 1)
+    if e > minExp && f == expt b (p-1) then
+      (f*b*2, expt b (-e+1)*2, b, 1)
     else
-      (f*2, b^(-e)*2, 1, 1)
+      (f*2, expt b (-e)*2, 1, 1)
   k :: Int
   k =
    let
@@ -653,7 +653,7 @@ floatToDigits base x =
 
   gen ds rn sN mUpN mDnN =
    let
-    (dn, rn') = (rn * base) `divMod` sN
+    (dn, rn') = (rn * base) `quotRem` sN
     mUpN' = mUpN * base
     mDnN' = mDnN * base
    in
