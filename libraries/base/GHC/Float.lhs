@@ -600,7 +600,7 @@ floatToDigits base x =
    if e >= 0 then
     let be = expt b e in
     if f == expt b (p-1) then
-      (f*be*b*2, 2*b, be*b, b)
+      (f*be*b*2, 2*b, be*b, be)     -- according to Burger and Dybvig
     else
       (f*be*2, 2, be, be)
    else
