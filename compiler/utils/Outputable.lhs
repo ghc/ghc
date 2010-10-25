@@ -80,7 +80,17 @@ import qualified Data.IntMap as IM
 import Data.Word
 import System.IO	( Handle, stderr, stdout, hFlush )
 import System.FilePath
+
+
+#if __GLASGOW_HASKELL__ >= 700
+import GHC.Show		( showMultiLineString )
+#else
+showMultiLineString :: String -> [String]
+-- Crude version
+showMultiLineString s = [s]
+#endif
 \end{code}
+
 
 
 %************************************************************************
@@ -608,7 +618,7 @@ pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: 
 
 -- | Special combinator for showing string literals.
 pprHsString :: FastString -> SDoc
-pprHsString fs = text (show (unpackFS fs))
+pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
 
 ---------------------
 -- Put a name in parens if it's an operator
