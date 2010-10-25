@@ -23,8 +23,9 @@ module GHC.Show
         -- Instances for Show: (), [], Bool, Ordering, Int, Char
 
         -- Show support code
-        shows, showChar, showString, showParen, showList__, showSpace,
-        showLitChar, protectEsc,
+        shows, showChar, showString, showMultiLineString,
+        showParen, showList__, showSpace,
+        showLitChar, showLitString, protectEsc,
         intToDigit, showSignedInt,
         appPrec, appPrec1,
 
@@ -35,7 +36,7 @@ module GHC.Show
 
 import GHC.Base
 import Data.Maybe
-import GHC.List ((!!), foldr1)
+import GHC.List ((!!), foldr1, break)
 \end{code}
 
 
@@ -180,14 +181,7 @@ instance  Show Char  where
     showsPrec _ '\'' = showString "'\\''"
     showsPrec _ c    = showChar '\'' . showLitChar c . showChar '\''
 
-    showList cs = showChar '"' . showl cs
-                 where showl ""       s = showChar '"' s
-                       showl ('"':xs) s = showString "\\\"" (showl xs s)
-                       showl (x:xs)   s = showLitChar x (showl xs s)
-                -- Making 's' an explicit parameter makes it clear to GHC
-                -- that showl has arity 2, which avoids it allocating an extra lambda
-                -- The sticking point is the recursive call to (showl xs), which
-                -- it can't figure out would be ok with arity 2.
+    showList cs = showChar '"' . showLitString cs . showChar '"'
 
 instance Show Int where
     showsPrec = showSignedInt
@@ -347,6 +341,37 @@ showLitChar c              s =  showString ('\\' : asciiTab!!ord c) s
         -- I've done manual eta-expansion here, becuase otherwise it's
         -- impossible to stop (asciiTab!!ord) getting floated out as an MFE
 
+showLitString :: String -> ShowS
+-- | Same as 'showLitChar', but for strings
+-- It converts the string to a string using Haskell escape conventions
+-- for non-printable characters. Does not add double-quotes around the
+-- whole thing; the caller should do that.
+-- The main difference from showLitChar (apart from the fact that the
+-- argument is a string not a list) is that we must escape double-quotes 
+showLitString []         s = s
+showLitString ('"' : cs) s = showString "\\\"" (showLitString cs s)
+showLitString (c   : cs) s = showLitChar c (showLitString cs s)
+   -- Making 's' an explicit parameter makes it clear to GHC that
+   -- showLitString has arity 2, which avoids it allocating an extra lambda
+   -- The sticking point is the recursive call to (showLitString cs), which
+   -- it can't figure out would be ok with arity 2.
+
+showMultiLineString :: String -> [String]
+-- | Like 'showLitString' (expand escape characters using Haskell
+-- escape conventions), but 
+--   * break the string into multiple lines
+--   * wrap the entire thing in double quotes
+-- Example:  @breakMultiLineString "hello\ngoodbye\nblah"@ 
+-- returns   @["\"hello\\", "\\goodbye\\", "\\blah\"" ]@
+-- where those "\\" are really just a single backslash
+-- (but I'm writing them here as Haskell literals)
+showMultiLineString str
+  = go '\"' str
+  where
+    go ch s = case break (== '\n') s of
+                (l, _:s'@(_:_)) -> (ch : showLitString l "\\") : go '\\' s'
+                (l, _)          -> [ch : showLitString l "\""]
+
 isDec :: Char -> Bool
 isDec c = c >= '0' && c <= '9'
 
@@ -402,3 +427,4 @@ itos n# cs
         | otherwise = case chr# (ord# '0'# +# (x# `remInt#` 10#)) of { c# ->
                       itos' (x# `quotInt#` 10#) (C# c# : cs') }
 \end{code}
+
