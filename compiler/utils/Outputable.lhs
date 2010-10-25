@@ -75,8 +75,8 @@ import Pretty		( Doc, Mode(..) )
 import Panic
 
 import Data.Char
-import Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.IntMap as IM
 import Data.Word
 import System.IO	( Handle, stderr, stdout, hFlush )
 import System.FilePath
@@ -567,8 +567,10 @@ instance Outputable FastString where
     ppr fs = ftext fs		-- Prints an unadorned string,
 				-- no double quotes or anything
 
-instance (Outputable key, Outputable elt) => Outputable (Map key elt) where
+instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
+instance (Outputable elt) => Outputable (IM.IntMap elt) where
+    ppr m = ppr (IM.toList m)
 \end{code}
 
 %************************************************************************
