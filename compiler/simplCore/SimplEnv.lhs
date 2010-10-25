@@ -131,7 +131,13 @@ pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
 pprSimplEnv env
   = vcat [ptext (sLit "TvSubst:") <+> ppr (seTvSubst env),
- 	  ptext (sLit "IdSubst:") <+> ppr (seIdSubst env) ]
+ 	  ptext (sLit "IdSubst:") <+> ppr (seIdSubst env),
+          ptext (sLit "InScope:") <+> vcat (map ppr_one in_scope_vars)
+    ]
+  where
+   in_scope_vars = varEnvElts (getInScopeVars (seInScope env))
+   ppr_one v | isId v = ppr v <+> ppr (idUnfolding v)
+             | otherwise = ppr v
 
 type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
 	-- See Note [Extending the Subst] in CoreSubst
@@ -154,7 +160,8 @@ instance Outputable SimplSR where
 	-- keep uniq _ = uniq `elemUFM_Directly` fvs
 \end{code}
 
-
+Note [SimplEnv invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 seInScope: 
 	The in-scope part of Subst includes *all* in-scope TyVars and Ids
 	The elements of the set may have better IdInfo than the
@@ -190,9 +197,8 @@ seIdSubst:
 * substId adds a binding (DoneId new_id) to the substitution if 
 	the Id's unique has changed
 
-
   Note, though that the substitution isn't necessarily extended
-  if the type changes.  Why not?  Because of the next point:
+  if the type of the Id changes.  Why not?  Because of the next point:
 
 * We *always, always* finish by looking up in the in-scope set 
   any variable that doesn't get a DoneEx or DoneVar hit in the substitution.
@@ -735,12 +741,14 @@ substIdType (SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
 ------------------
 substExpr :: SDoc -> SimplEnv -> CoreExpr -> CoreExpr
 substExpr doc env
-  = CoreSubst.substExprSC (text "SimplEnv.substExpr1" <+> doc) 
-                          (mkCoreSubst (text "SimplEnv.substExpr2" <+> doc) env) 
+  = CoreSubst.substExpr (text "SimplEnv.substExpr1" <+> doc) 
+                        (mkCoreSubst (text "SimplEnv.substExpr2" <+> doc) env) 
   -- Do *not* short-cut in the case of an empty substitution
-  -- See CoreSubst: Note [Extending the Subst]
+  -- See Note [SimplEnv invariants]
 
 substUnfolding :: SimplEnv -> Unfolding -> Unfolding
-substUnfolding env unf = CoreSubst.substUnfoldingSC (mkCoreSubst (text "subst-unfolding") env) unf
+substUnfolding env unf = CoreSubst.substUnfolding (mkCoreSubst (text "subst-unfolding") env) unf
+  -- Do *not* short-cut in the case of an empty substitution
+  -- See Note [SimplEnv invariants]
 \end{code}
 

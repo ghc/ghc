@@ -116,12 +116,14 @@ For Ids, we have a different invariant
 
 In consequence:
 
-* In substIdBndr, we extend the IdSubstEnv only when the unique changes
+* If the TvSubstEnv and IdSubstEnv are both empty, substExpr would be a
+  no-op, so substExprSC ("short cut") does nothing.
 
-* If the TvSubstEnv and IdSubstEnv are both empty, substExpr does nothing
-  (Note that the above rule for substIdBndr maintains this property.  If
-   the incoming envts are both empty, then substituting the type and
-   IdInfo can't change anything.)
+  However, substExpr still goes ahead and substitutes.  Reason: we may
+  want to replace existing Ids with new ones from the in-scope set, to
+  avoid space leaks.
+
+* In substIdBndr, we extend the IdSubstEnv only when the unique changes
 
 * In lookupIdSubst, we *must* look up the Id in the in-scope set, because
   it may contain non-trivial changes.  Example:
@@ -131,7 +133,7 @@ In consequence:
   set when we find the occurrence of x.
 
 * The requirement to look up the Id in the in-scope set means that we
-  must NOT take no-op short cut in the case the substitution is empty.
+  must NOT take no-op short cut when the IdSubst is empty.
   We must still look up every Id in the in-scope set.
 
 * (However, we don't need to do so for expressions found in the IdSubst
