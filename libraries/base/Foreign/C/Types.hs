@@ -72,6 +72,7 @@ module Foreign.C.Types
         , CLLong(..),   CULLong(..)
         , CClock(..),   CTime(..)
         , CFloat(..),   CDouble(..), CLDouble(..)
+        , CIntPtr(..), CUIntPtr(..), CIntMax(..), CUIntMax(..)
 #endif
           -- ** Other types
 
@@ -284,6 +285,7 @@ import NHC.FFI
   , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
   , CClock(..),   CTime(..)
   , CFloat(..),   CDouble(..), CLDouble(..)
+  , CIntPtr(..),  CUIntPtr(..),CIntMax(..), CUIntMax(..)
   , CFile,        CFpos,       CJmpBuf
   , Storable(..)
   )
@@ -321,5 +323,9 @@ INSTANCE_BITS(CPtrdiff)
 INSTANCE_BITS(CWchar)
 INSTANCE_BITS(CSigAtomic)
 INSTANCE_BITS(CSize)
+INSTANCE_BITS(CIntPtr)
+INSTANCE_BITS(CUIntPtr)
+INSTANCE_BITS(CIntMax)
+INSTANCE_BITS(CUIntMax)
 
 #endif
