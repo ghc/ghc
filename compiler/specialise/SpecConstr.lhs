@@ -958,12 +958,16 @@ scExpr' env (Let (NonRec bndr rhs) body)
   | isTyCoVar bndr	-- Type-lets may be created by doBeta
   = scExpr' (extendScSubst env bndr rhs) body
 
-  | otherwise		   -- Note [Local let bindings]
+  | otherwise	
   = do	{ let (body_env, bndr') = extendBndr env bndr
-	      body_env2 = extendHowBound body_env [bndr'] RecFun
-	; (body_usg, body') <- scExpr body_env2 body
-
 	; (rhs_usg, rhs_info) <- scRecRhs env (bndr',rhs)
+
+	; let body_env2 = extendHowBound body_env [bndr'] RecFun
+	      			   -- Note [Local let bindings]
+	      RI _ rhs' _ _ _ = rhs_info
+              body_env3 = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
+
+	; (body_usg, body') <- scExpr body_env3 body
 
           -- NB: We don't use the ForceSpecConstr mechanism (see
           -- Note [Forcing specialisation]) for non-recursive bindings
