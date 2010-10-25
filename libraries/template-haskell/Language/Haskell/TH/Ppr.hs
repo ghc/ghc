@@ -10,6 +10,7 @@ import Text.PrettyPrint.HughesPJ (render)
 import Language.Haskell.TH.PprLib
 import Language.Haskell.TH.Syntax
 import Data.Char ( toLower )
+import GHC.Show  ( showMultiLineString )
 
 nestDepth :: Int
 nestDepth = 4
@@ -172,9 +173,14 @@ pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)
                                     (double (fromRational x) <> text "##")
 pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
-pprLit _ (StringL s)     = text (show s)
-pprLit _ (StringPrimL s) = text (show s) <> char '#'
+pprLit _ (StringL s)     = pprString s
+pprLit _ (StringPrimL s) = pprString s <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $ rational rat
+
+pprString :: String -> Doc
+-- Print newlines as newlines with Haskell string escape notation, 
+-- not as '\n'.  For other non-printables use regular escape notation.
+pprString s = vcat (map text (showMultiLineString s))
 
 ------------------------------
 instance Ppr Pat where
