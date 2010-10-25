@@ -8,7 +8,7 @@ The code for *top-level* bindings is in TidyPgm.
 
 \begin{code}
 module CoreTidy (
-	tidyExpr, tidyVarOcc, tidyRule, tidyRules 
+	tidyExpr, tidyVarOcc, tidyRule, tidyRules, tidyUnfolding
     ) where
 
 #include "HsVersions.h"
@@ -24,8 +24,8 @@ import UniqFM
 import Name hiding (tidyNameOcc)
 import SrcLoc
 import Maybes
-
 import Data.List
+import Outputable
 \end{code}
 
 
@@ -41,11 +41,13 @@ tidyBind :: TidyEnv
 	 ->  (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
-  = tidyLetBndr env (bndr,rhs) =: \ (env', bndr') ->
+  = tidyLetBndr env env (bndr,rhs) =: \ (env', bndr') ->
     (env', NonRec bndr' (tidyExpr env' rhs))
 
 tidyBind env (Rec prs)
-  = mapAccumL tidyLetBndr  env prs	=: \ (env', bndrs') ->
+  = let 
+       (env', bndrs') = mapAccumL (tidyLetBndr env') env prs
+    in
     map (tidyExpr env') (map snd prs)	=: \ rhss' ->
     (env', Rec (zip bndrs' rhss'))
 
@@ -129,12 +131,17 @@ tidyBndr env var
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
-tidyLetBndr :: TidyEnv -> (Id, CoreExpr) -> (TidyEnv, Var)
+tidyLetBndr :: TidyEnv	       -- Knot-tied version for unfoldings
+            -> TidyEnv 	       -- The one to extend
+            -> (Id, CoreExpr) -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s
-tidyLetBndr env (id,rhs) 
-  = ((tidy_env,new_var_env), final_id)
+tidyLetBndr rec_tidy_env env (id,rhs) 
+  = ((tidy_occ_env,new_var_env), final_id)
   where
-    ((tidy_env,var_env), new_id) = tidyIdBndr env id
+    ((tidy_occ_env,var_env), new_id) = tidyIdBndr env id
+    new_var_env = extendVarEnv var_env id final_id
+       -- Override the env we get back from tidyId with the 
+       -- new IdInfo so it gets propagated to the usage sites.
 
 	-- We need to keep around any interesting strictness and
 	-- demand info because later on we may need to use it when
@@ -156,12 +163,13 @@ tidyLetBndr env (id,rhs)
     new_info = idInfo new_id
 		`setArityInfo`		exprArity rhs
 		`setStrictnessInfo`	strictnessInfo idinfo
-		`setDemandInfo`	demandInfo idinfo
+		`setDemandInfo`		demandInfo idinfo
 		`setInlinePragInfo`	inlinePragInfo idinfo
+		`setUnfoldingInfo`	new_unf
 
-    -- Override the env we get back from tidyId with the new IdInfo
-    -- so it gets propagated to the usage sites.
-    new_var_env = extendVarEnv var_env id final_id
+    new_unf | isStableUnfolding unf = tidyUnfolding rec_tidy_env unf (panic "tidy_unf")
+            | otherwise	            = noUnfolding
+    unf = unfoldingInfo idinfo
 
 -- Non-top-level variables
 tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
@@ -185,6 +193,24 @@ tidyIdBndr env@(tidy_env, var_env) id
     in
     ((tidy_env', var_env'), id')
    }
+
+------------ Unfolding  --------------
+tidyUnfolding :: TidyEnv -> Unfolding -> Unfolding -> Unfolding
+tidyUnfolding tidy_env (DFunUnfolding ar con ids) _
+  = DFunUnfolding ar con (map (tidyExpr tidy_env) ids)
+tidyUnfolding tidy_env 
+              unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
+              unf_from_rhs
+  | isStableSource src
+  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
+	  uf_src  = tidySrc tidy_env src }
+  | otherwise
+  = unf_from_rhs
+tidyUnfolding _ unf _ = unf	-- NoUnfolding or OtherCon
+
+tidySrc :: TidyEnv -> UnfoldingSource -> UnfoldingSource
+tidySrc tidy_env (InlineWrapper w) = InlineWrapper (tidyVarOcc tidy_env w)
+tidySrc _        inl_info          = inl_info
 \end{code}
 
 Note [Tidy IdInfo]

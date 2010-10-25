@@ -278,7 +278,7 @@ cpeBind top_lvl env (Rec pairs)
        ; stuff <- zipWithM (cpePair top_lvl Recursive False env') bndrs1 rhss
 
        ; let (floats_s, bndrs2, rhss2) = unzip3 stuff
-             all_pairs = foldrOL add_float (bndrs1 `zip` rhss2)
+             all_pairs = foldrOL add_float (bndrs2 `zip` rhss2)
 	     	       	 	 	   (concatFloats floats_s)
        ; return (extendCorePrepEnvList env (bndrs `zip` bndrs2),
        	 	 unitFloat (FloatLet (Rec all_pairs))) }
@@ -310,9 +310,13 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 		        ; let float = mkFloat False False v rhs2
 		        ; return (addFloat floats2 float, cpeEtaExpand arity (Var v)) })
 
-	     	-- Record if the binder is evaluated
+     	-- Record if the binder is evaluated
+	-- and otherwise trim off the unfolding altogether
+	-- It's not used by the code generator; getting rid of it reduces
+	-- heap usage and, since we may be changing uniques, we'd have
+	-- to substitute to keep it right
        ; let bndr' | exprIsHNF rhs' = bndr `setIdUnfolding` evaldUnfolding
-       	     	   | otherwise      = bndr
+       	     	   | otherwise      = bndr `setIdUnfolding` noUnfolding
 
        ; return (floats3, bndr', rhs') }
   where

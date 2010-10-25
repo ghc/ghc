@@ -39,8 +39,8 @@ import TyCon
 import DataCon
 import TysWiredIn
 import TysPrim		( anyTyConOfKind )
-import Var              ( TyVar )
-import BasicTypes	( nonRuleLoopBreaker )
+import Var              ( Var, TyVar )
+import BasicTypes	( Arity, nonRuleLoopBreaker )
 import qualified Var
 import VarEnv
 import Name
@@ -1038,8 +1038,23 @@ tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
                                                  (UnfWhen unsat_ok boring_ok))
     }
 
-tcUnfolding name ty info (IfWrapper arity wkr)
-  = do 	{ mb_wkr_id <- forkM_maybe doc (tcIfaceExtId wkr)
+tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
+  = do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
+       ; return (case mb_ops1 of
+       	 	    Nothing   -> noUnfolding
+                    Just ops1 -> mkDFunUnfolding dfun_ty ops1) }
+  where
+    doc = text "Class ops for dfun" <+> ppr name
+
+tcUnfolding name ty info (IfExtWrapper arity wkr)
+  = tcIfaceWrapper name ty info arity (tcIfaceExtId wkr)
+tcUnfolding name ty info (IfLclWrapper arity wkr)
+  = tcIfaceWrapper name ty info arity (tcIfaceLclId wkr)
+
+-------------
+tcIfaceWrapper :: Name -> Type -> IdInfo -> Arity -> IfL Id -> IfL Unfolding
+tcIfaceWrapper name ty info arity get_worker
+  = do 	{ mb_wkr_id <- forkM_maybe doc get_worker
 	; us <- newUniqueSupply
 	; return (case mb_wkr_id of
 		     Nothing     -> noUnfolding
@@ -1056,15 +1071,7 @@ tcUnfolding name ty info (IfWrapper arity wkr)
 	-- before unfolding
     strict_sig = case strictnessInfo info of
 		   Just sig -> sig
-		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr wkr)
-
-tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
-  = do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
-       ; return (case mb_ops1 of
-       	 	    Nothing   -> noUnfolding
-                    Just ops1 -> mkDFunUnfolding dfun_ty ops1) }
-  where
-    doc = text "Class ops for dfun" <+> ppr name
+		   Nothing  -> pprPanic "Worker info but no strictness for" (ppr name)
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check
@@ -1078,22 +1085,28 @@ tcPragExpr name expr
 
                 -- Check for type consistency in the unfolding
     ifDOptM Opt_DoCoreLinting $ do
-        in_scope <- get_in_scope_ids
+        in_scope <- get_in_scope
         case lintUnfolding noSrcLoc in_scope core_expr' of
           Nothing       -> return ()
-          Just fail_msg -> pprPanic "Iface Lint failure" (hang doc 2 fail_msg)
-
+          Just fail_msg -> do { mod <- getIfModule 
+                              ; pprPanic "Iface Lint failure" 
+                                  (vcat [ ptext (sLit "In interface for") <+> ppr mod
+                                        , hang doc 2 fail_msg ]) }
     return core_expr'
   where
     doc = text "Unfolding of" <+> ppr name
-    get_in_scope_ids 	-- Urgh; but just for linting
-	= setLclEnv () $ 
-	  do	{ env <- getGblEnv 
-		; case if_rec_types env of {
-			  Nothing -> return [] ;
-			  Just (_, get_env) -> do
-		{ type_env <- get_env
-		; return (typeEnvIds type_env) }}}
+
+    get_in_scope :: IfL [Var] -- Totally disgusting; but just for linting
+    get_in_scope 	
+	= do { (gbl_env, lcl_env) <- getEnvs
+             ; setLclEnv () $ do
+	     { case if_rec_types gbl_env of {
+		  Nothing -> return [] ;
+		  Just (_, get_env) -> do
+	     { type_env <- get_env
+             ; return (varEnvElts (if_tv_env lcl_env) ++
+                       varEnvElts (if_id_env lcl_env) ++
+                       typeEnvIds type_env) }}}}
 \end{code}
 
 
@@ -1229,17 +1242,9 @@ tcIfaceLetBndr :: IfaceLetBndr -> IfL Id
 tcIfaceLetBndr (IfLetBndr fs ty info)
   = do	{ name <- newIfaceName (mkVarOccFS fs)
 	; ty' <- tcIfaceType ty
-	; case info of
-		NoInfo    -> return (mkLocalId name ty')
-		HasInfo i -> return (mkLocalIdWithInfo name ty' (tc_info i)) } 
-  where
-	-- Similar to tcIdInfo, but much simpler
-    tc_info [] = vanillaIdInfo
-    tc_info (HsInline p     : i) = tc_info i `setInlinePragInfo` p 
-    tc_info (HsArity a      : i) = tc_info i `setArityInfo` a 
-    tc_info (HsStrictness s : i) = tc_info i `setStrictnessInfo` Just s 
-    tc_info (other          : i) = pprTrace "tcIfaceLetBndr: discarding unexpected IdInfo" 
-					    (ppr other) (tc_info i)
+        ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
+                              name ty' info
+	; return (mkLocalIdWithInfo name ty' id_info) } 
 
 -----------------------
 newExtCoreBndr :: IfaceLetBndr -> IfL Id

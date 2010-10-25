@@ -439,7 +439,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
           | isWiredInName name  =  putNameLiterally bh name 
            -- wired-in names don't have fingerprints
           | otherwise
-          = ASSERT( isExternalName name )
+          = ASSERT2( isExternalName name, ppr name )
 	    let hash | nameModule name /= this_mod =  global_hash_fn name
                      | otherwise = 
                         snd (lookupOccEnv local_env (getOccName name)
@@ -1322,11 +1322,7 @@ tyThingToIfaceDecl (AnId id)
   = IfaceId { ifName      = getOccName id,
 	      ifType      = toIfaceType (idType id),
 	      ifIdDetails = toIfaceIdDetails (idDetails id),
-	      ifIdInfo    = info }
-  where
-    info = case toIfaceIdInfo (idInfo id) of
-		[]    -> NoInfo
-		items -> HasInfo items
+	      ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 tyThingToIfaceDecl (AClass clas)
   = IfaceClass { ifCtxt	  = toIfaceContext sc_theta,
@@ -1482,18 +1478,9 @@ famInstToIfaceFamInst (FamInst { fi_tycon = tycon,
 toIfaceLetBndr :: Id -> IfaceLetBndr
 toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 			       (toIfaceType (idType id)) 
-			       prag_info
-  where
-	-- Stripped-down version of tcIfaceIdInfo
-	-- Change this if you want to export more IdInfo for
-	-- non-top-level Ids.  Don't forget to change
-	-- CoreTidy.tidyLetBndr too!
-	--
-	-- See Note [IdInfo on nested let-bindings] in IfaceSyn
-    id_info = idInfo id
-    inline_prag = inlinePragInfo id_info
-    prag_info | isDefaultInlinePragma inline_prag = NoInfo
-	      | otherwise		          = HasInfo [HsInline inline_prag]
+			       (toIfaceIdInfo (idInfo id))
+  -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr 
+  -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
 
 --------------------------
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
@@ -1504,11 +1491,13 @@ toIfaceIdDetails (RecSelId { sel_naughty = n
 toIfaceIdDetails other	     		        = pprTrace "toIfaceIdDetails" (ppr other) 
                                                   IfVanillaId   -- Unexpected
 
-toIfaceIdInfo :: IdInfo -> [IfaceInfoItem]
+toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
-  = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
-	       inline_hsinfo,  unfold_hsinfo] 
-	       -- NB: strictness must be before unfolding
+  = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
+	            inline_hsinfo,  unfold_hsinfo] of
+       []    -> NoInfo
+       infos -> HasInfo infos
+	       -- NB: strictness must appear in the list before unfolding
 	       -- See TcIface.tcUnfolding
   where
     ------------  Arity  --------------
@@ -1547,7 +1536,10 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
           -> case guidance of
                UnfWhen unsat_ok boring_ok -> IfInlineRule arity unsat_ok boring_ok if_rhs
                _other                     -> IfCoreUnfold True if_rhs
-	InlineWrapper w  -> IfWrapper arity (idName w)
+	InlineWrapper w | isExternalName n -> IfExtWrapper arity n
+	                | otherwise        -> IfLclWrapper arity (getFS n)
+			where
+                          n = idName w
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
 	-- Yes, even if guidance is UnfNever, expose the unfolding

@@ -1065,8 +1065,12 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env tidy_rhs final_sig unf_info
+    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
 		| otherwise   = noUnfolding
+    unf_from_rhs = mkTopUnfolding is_bot tidy_rhs
+    is_bot = case final_sig of 
+                Just sig -> isBottomingSig sig
+                Nothing  -> False
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that
@@ -1089,30 +1093,6 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
     -- it to the top level. So it seems more robust just to
     -- fix it here.
     arity = exprArity orig_rhs
-
-
-
------------- Unfolding  --------------
-tidyUnfolding :: TidyEnv -> CoreExpr -> Maybe StrictSig -> Unfolding -> Unfolding
-tidyUnfolding tidy_env _ _ (DFunUnfolding ar con ids)
-  = DFunUnfolding ar con (map (tidyExpr tidy_env) ids)
-tidyUnfolding tidy_env tidy_rhs strict_sig
-              unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
-  | isStableSource src
-  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs, 	   -- Preserves OccInfo
-	  uf_src  = tidyInl tidy_env src }
-  | otherwise
-  = mkTopUnfolding is_bot tidy_rhs
-  where
-    is_bot = case strict_sig of 
-                Just sig -> isBottomingSig sig
-                Nothing  -> False
-
-tidyUnfolding _ _ _ unf = unf
-
-tidyInl :: TidyEnv -> UnfoldingSource -> UnfoldingSource
-tidyInl tidy_env (InlineWrapper w) = InlineWrapper (tidyVarOcc tidy_env w)
-tidyInl _        inl_info          = inl_info
 \end{code}
 
 %************************************************************************

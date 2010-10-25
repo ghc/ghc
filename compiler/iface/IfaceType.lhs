@@ -7,7 +7,9 @@ This module defines interface types and binders
 
 \begin{code}
 module IfaceType (
-	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
+	IfExtName, IfLclName,
+
+        IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 	ifaceTyConName,
 
@@ -41,19 +43,24 @@ import FastString
 %************************************************************************
 
 \begin{code}
+type IfLclName = FastString	-- A local name in iface syntax
+
+type IfExtName = Name	-- An External or WiredIn Name can appear in IfaceSyn
+     	       	 	-- (However Internal or System Names never should)
+
 data IfaceBndr 		-- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
 
-type IfaceIdBndr  = (FastString, IfaceType)
-type IfaceTvBndr  = (FastString, IfaceKind)
+type IfaceIdBndr  = (IfLclName, IfaceType)
+type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 -------------------------------
 type IfaceKind     = IfaceType
 type IfaceCoercion = IfaceType
 
 data IfaceType
-  = IfaceTyVar    FastString			-- Type variable only, not tycon
+  = IfaceTyVar    IfLclName			-- Type variable only, not tycon
   | IfaceAppTy    IfaceType IfaceType
   | IfaceForAllTy IfaceTvBndr IfaceType
   | IfacePredTy   IfacePredType
@@ -62,14 +69,14 @@ data IfaceType
   | IfaceFunTy  IfaceType IfaceType
 
 data IfacePredType 	-- NewTypes are handled as ordinary TyConApps
-  = IfaceClassP Name [IfaceType]
+  = IfaceClassP IfExtName [IfaceType]
   | IfaceIParam (IPName OccName) IfaceType
   | IfaceEqPred IfaceType IfaceType
 
 type IfaceContext = [IfacePredType]
 
 data IfaceTyCon 	-- Abbreviations for common tycons with known names
-  = IfaceTc Name	-- The common case
+  = IfaceTc IfExtName	-- The common case
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc
   | IfaceListTc | IfacePArrTc
   | IfaceTupTc Boxity Arity 
@@ -78,7 +85,7 @@ data IfaceTyCon 	-- Abbreviations for common tycons with known names
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
 
-ifaceTyConName :: IfaceTyCon -> Name
+ifaceTyConName :: IfaceTyCon -> IfExtName
 ifaceTyConName IfaceIntTc  	       = intTyConName
 ifaceTyConName IfaceBoolTc 	       = boolTyConName
 ifaceTyConName IfaceCharTc 	       = charTyConName
@@ -173,7 +180,7 @@ instance Outputable IfaceBndr where
 pprIfaceBndrs :: [IfaceBndr] -> SDoc
 pprIfaceBndrs bs = sep (map ppr bs)
 
-pprIfaceIdBndr :: (FastString, IfaceType) -> SDoc
+pprIfaceIdBndr :: (IfLclName, IfaceType) -> SDoc
 pprIfaceIdBndr (name, ty) = hsep [ppr name, dcolon, ppr ty]
 
 pprIfaceTvBndr :: IfaceTvBndr -> SDoc
@@ -284,11 +291,11 @@ pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 
 \begin{code}
 ----------------
-toIfaceTvBndr :: TyVar -> (FastString, IfaceType)
+toIfaceTvBndr :: TyVar -> (IfLclName, IfaceType)
 toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), toIfaceKind (tyVarKind tyvar))
-toIfaceIdBndr :: Id -> (FastString, IfaceType)
+toIfaceIdBndr :: Id -> (IfLclName, IfaceType)
 toIfaceIdBndr id      = (occNameFS (getOccName id),    toIfaceType (idType id))
-toIfaceTvBndrs :: [TyVar] -> [(FastString, IfaceType)]
+toIfaceTvBndrs :: [TyVar] -> [(IfLclName, IfaceType)]
 toIfaceTvBndrs tyvars = map toIfaceTvBndr tyvars
 
 toIfaceBndr :: Var -> IfaceBndr
