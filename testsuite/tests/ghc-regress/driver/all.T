@@ -340,4 +340,5 @@ test('withRtsOpts', normal, run_command,
 test('T3389', normal, compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), run_command,
      ['$MAKE -s --no-print-directory T3364'])
+test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
