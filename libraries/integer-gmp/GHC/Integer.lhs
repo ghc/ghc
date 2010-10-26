@@ -141,6 +141,12 @@ int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
 #endif
 
 toInt# :: Integer -> Int#
+{-# NOINLINE toInt# #-}
+{-# RULES "toInt#" forall i. toInt# (S# i) = i #-}
+-- Don't inline toInt#, because it can't do much unless
+-- it sees a (S# i), and inlining just creates fruitless
+-- join points.  But we do need a RULE to get the constants
+-- to work right:  1::Int had better optimise to (I# 1)!
 toInt# (S# i)   = i
 toInt# (J# s d) = integer2Int# s d
 
