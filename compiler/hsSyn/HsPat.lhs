@@ -47,6 +47,7 @@ import SrcLoc
 import FastString
 -- libraries:
 import Data.Data hiding (TyCon)
+import Data.Maybe
 \end{code}
 
 
@@ -411,7 +412,9 @@ isIrrefutableHsPat pat
 
     go1 (ConPatIn {})       = False	-- Conservative
     go1 (ConPatOut{ pat_con = L _ con, pat_args = details }) 
-	=  isProductTyCon (dataConTyCon con)
+	=  isJust (tyConSingleDataCon_maybe (dataConTyCon con))
+	   -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because 
+	   -- the latter is false of existentials. See Trac #4439
 	&& all go (hsConPatArgs details)
 
     go1 (LitPat {})    = False
