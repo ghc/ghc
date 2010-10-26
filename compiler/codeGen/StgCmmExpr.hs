@@ -29,7 +29,6 @@ import StgSyn
 
 import MkZipCfgCmm
 import BlockId
-import Cmm()
 import CmmExpr
 import CoreSyn
 import DataCon

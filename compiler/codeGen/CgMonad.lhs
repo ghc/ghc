@@ -73,9 +73,7 @@ import Id
 import VarEnv
 import OrdList
 import Unique
-import Util()
 import UniqSupply
-import FastString()
 import Outputable
 
 import Control.Monad

@@ -63,7 +63,6 @@ import Id
 import VarEnv
 import OrdList
 import Unique
-import Util()
 import UniqSupply
 import FastString(sLit)
 import Outputable
