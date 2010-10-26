@@ -1163,13 +1163,14 @@ However e might not *look* as if
 -- where t1..tk are the *universally-qantified* type args of 'dc'
 exprIsConApp_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 
-exprIsConApp_maybe id_unf (Note _ expr)
+exprIsConApp_maybe id_unf (Note note expr)
+  | notSccNote note
   = exprIsConApp_maybe id_unf expr
-	-- We ignore all notes.  For example,
+	-- We ignore all notes except SCCs.  For example,
 	--  	case _scc_ "foo" (C a b) of
 	--			C a b -> e
-	-- should be optimised away, but it will be only if we look
-	-- through the SCC note.
+	-- should not be optimised away, because we'll lose the
+	-- entry count on 'foo'; see Trac #4414
 
 exprIsConApp_maybe id_unf (Cast expr co)
   =     -- Here we do the KPush reduction rule as described in the FC paper
