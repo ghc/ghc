@@ -671,26 +671,15 @@ lvlLamBndrs lvl []
   = (lvl, [])
 
 lvlLamBndrs lvl bndrs
-  = go  (incMinorLvl lvl)
-	False 	-- Havn't bumped major level in this group
-	[] bndrs
+  = (new_lvl, [TB bndr new_lvl | bndr <- bndrs])
+  -- All the new binders get the same level, because
+  -- any floating binding is either going to float past 
+  -- all or none.  We never separate binders
   where
-    go old_lvl bumped_major rev_lvld_bndrs (bndr:bndrs)
-	| isId bndr &&	    		-- Go to the next major level if this is a value binder,
-	  not bumped_major && 		-- and we havn't already gone to the next level (one jump per group)
-	  not (isOneShotLambda bndr)	-- and it isn't a one-shot lambda
-	= go new_lvl True (TB bndr new_lvl : rev_lvld_bndrs) bndrs
+    new_lvl | any is_major bndrs = incMajorLvl lvl
+            | otherwise          = incMinorLvl lvl
 
-	| otherwise
-	= go old_lvl bumped_major (TB bndr old_lvl : rev_lvld_bndrs) bndrs
-
-	where
-	  new_lvl = incMajorLvl old_lvl
-
-    go old_lvl _ rev_lvld_bndrs []
-	= (old_lvl, reverse rev_lvld_bndrs)
-	-- a lambda like this (\x -> coerce t (\s -> ...))
-	-- This happens quite a bit in state-transformer programs
+    is_major bndr = isId bndr && not (isOneShotLambda bndr)
 \end{code}
 
 \begin{code}
