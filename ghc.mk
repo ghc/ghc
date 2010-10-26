@@ -458,9 +458,6 @@ ifeq "$(BuildSharedLibs)" "YES"
 ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn_LIB))
 endif
 BOOT_LIBS = $(foreach lib,$(STAGE0_PACKAGES),$(libraries/$(lib)_dist-boot_v_LIB))
-# A useful pseudo-target
-.PHONY: stage1_libs
-stage1_libs : $(ALL_STAGE1_LIBS)
 
 OTHER_LIBS = libffi/dist-install/build/libHSffi$(v_libsuf) libffi/dist-install/build/HSffi.o
 ifeq "$(BuildSharedLibs)" "YES"
@@ -678,6 +675,11 @@ $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
 endif
 
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
+
+# A useful pseudo-target (must be after the include above, because it needs
+# the value of things like $(libraries/base_dist-install_v_LIB).
+.PHONY: stage1_libs
+stage1_libs : $(ALL_STAGE1_LIBS)
 
 # ----------------------------------------------
 # Per-package compiler flags
