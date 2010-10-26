@@ -1135,11 +1135,16 @@ initLinker( void )
     int compileResult;
 #endif
 
+    IF_DEBUG(linker, debugBelch("initLinker: start\n"));
+
     /* Make initLinker idempotent, so we can call it
        before evey relevant operation; that means we
        don't need to initialise the linker separately */
-    if (linker_init_done == 1) { return; } else {
-      linker_init_done = 1;
+    if (linker_init_done == 1) { 
+	IF_DEBUG(linker, debugBelch("initLinker: idempotent return\n"));
+	return;
+    } else {
+        linker_init_done = 1;
     }
 
 #if defined(THREADED_RTS) && (defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO))
@@ -1152,6 +1157,7 @@ initLinker( void )
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
 	ghciInsertStrHashTable("(GHCi built-in symbols)",
                                symhash, sym->lbl, sym->addr);
+	IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
     }
 #   if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
     machoInitSymbolsWithoutUnderscore();
@@ -1190,6 +1196,9 @@ initLinker( void )
     addDLL("msvcrt");
     addDLL("kernel32");
 #endif
+
+    IF_DEBUG(linker, debugBelch("initLinker: done\n"));
+    return;
 }
 
 void
@@ -1444,11 +1453,13 @@ void *
 lookupSymbol( char *lbl )
 {
     void *val;
+    IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
     initLinker() ;
     ASSERT(symhash != NULL);
     val = lookupStrHashTable(symhash, lbl);
 
     if (val == NULL) {
+	IF_DEBUG(linker, debugBelch("lookupSymbol: symbol not found\n"));
 #       if defined(OBJFORMAT_ELF)
 	return dlsym(dl_prog_handle, lbl);
 #       elif defined(OBJFORMAT_MACHO)
@@ -1461,6 +1472,7 @@ lookupSymbol( char *lbl )
                  symbol name. For now, we simply strip it off here (and ONLY
                  here).
         */
+        IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n", lbl));
         ASSERT(lbl[0] == '_');
         return dlsym(dl_prog_handle, lbl+1);
 #       else
@@ -1489,6 +1501,7 @@ lookupSymbol( char *lbl )
         return NULL;
 #       endif
     } else {
+	IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, val));
 	return val;
     }
 }
@@ -1980,6 +1993,7 @@ loadOc( ObjectCode* oc ) {
 
    /* loaded, but not resolved yet */
    oc->status = OBJECT_LOADED;
+   IF_DEBUG(linker, debugBelch("loadObj done.\n"));
 
    return 1;
 }
@@ -1995,6 +2009,7 @@ resolveObjs( void )
     ObjectCode *oc;
     int r;
 
+    IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
     initLinker();
 
     for (oc = objects; oc; oc = oc->next) {
@@ -2012,6 +2027,7 @@ resolveObjs( void )
 	    oc->status = OBJECT_RESOLVED;
 	}
     }
+    IF_DEBUG(linker, debugBelch("resolveObjs: done\n"));
     return 1;
 }
 
@@ -2087,7 +2103,7 @@ static void addProddableBlock ( ObjectCode* oc, void* start, int size )
 {
    ProddableBlock* pb
       = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
-   /* debugBelch("aPB %p %p %d\n", oc, start, size); */
+   IF_DEBUG(linker, debugBelch("addProddableBlock %p %p %d\n", oc, start, size));
    ASSERT(size > 0);
    pb->start      = start;
    pb->size       = size;
@@ -4357,6 +4373,8 @@ static int resolveImports(
     unsigned i;
     size_t itemSize = 4;
 
+    IF_DEBUG(linker, debugBelch("resolveImports: start\n"));
+
 #if i386_HOST_ARCH
     int isJumpTable = 0;
     if(!strcmp(sect->sectname,"__jump_table"))
@@ -4374,12 +4392,16 @@ static int resolveImports(
 	char *nm = image + symLC->stroff + symbol->n_un.n_strx;
 	void *addr = NULL;
 
-	if((symbol->n_type & N_TYPE) == N_UNDF
-	    && (symbol->n_type & N_EXT) && (symbol->n_value != 0))
+	IF_DEBUG(linker, debugBelch("resolveImports: resolving %s\n", nm));
+	if ((symbol->n_type & N_TYPE) == N_UNDF
+	    && (symbol->n_type & N_EXT) && (symbol->n_value != 0)) {
 	    addr = (void*) (symbol->n_value);
-	else
+	    IF_DEBUG(linker, debugBelch("resolveImports: undefined external %s has value %p\n", nm, addr));
+	} else {
 	    addr = lookupSymbol(nm);
-	if(!addr)
+	    IF_DEBUG(linker, debugBelch("resolveImports: looking up %s, %p\n", nm, addr));
+	}
+	if (!addr)
 	{
 	    errorBelch("\n%s: unknown symbol `%s'", oc->fileName, nm);
 	    return 0;
@@ -4402,6 +4424,7 @@ static int resolveImports(
         }
     }
 
+    IF_DEBUG(linker, debugBelch("resolveImports: done\n"));
     return 1;
 }
 
@@ -4412,9 +4435,11 @@ static unsigned long relocateAddress(
     unsigned long address)
 {
     int i;
-    for(i = 0; i < nSections; i++)
+    IF_DEBUG(linker, debugBelch("relocateAddress: start\n"));
+    for (i = 0; i < nSections; i++)
     {
-        if(sections[i].addr <= address
+	    IF_DEBUG(linker, debugBelch("    relocating address in section %d\n", i));
+        if (sections[i].addr <= address
             && address < sections[i].addr + sections[i].size)
         {
             return (unsigned long)oc->image
@@ -4433,7 +4458,9 @@ static int relocateSection(
     int nSections, struct section* sections, struct section *sect)
 {
     struct relocation_info *relocs;
-    int i,n;
+    int i, n;
+
+    IF_DEBUG(linker, debugBelch("relocateSection: start\n"));
 
     if(!strcmp(sect->sectname,"__la_symbol_ptr"))
 	return 1;
@@ -4445,6 +4472,8 @@ static int relocateSection(
 	return 1;
 
     n = sect->nreloc;
+    IF_DEBUG(linker, debugBelch("relocateSection: number of relocations: %d\n", n));
+
     relocs = (struct relocation_info*) (image + sect->reloff);
 
     for(i=0;i<n;i++)
@@ -4482,12 +4511,20 @@ static int relocateSection(
             default:
                 barf("Unknown size.");
         }
-        
-        if(type == X86_64_RELOC_GOT
+
+	IF_DEBUG(linker,
+		 debugBelch("relocateSection: length = %d, thing = %d, baseValue = %p\n",
+			    reloc->r_length, thing, baseValue));
+
+        if (type == X86_64_RELOC_GOT
            || type == X86_64_RELOC_GOT_LOAD)
         {
+            struct nlist *symbol = &nlist[reloc->r_symbolnum];
+            char *nm = image + symLC->stroff + symbol->n_un.n_strx;
+
+	    IF_DEBUG(linker, debugBelch("relocateSection: making jump island for %s, extern = %d, X86_64_RELOC_GOT\n", nm, reloc->r_extern));
             ASSERT(reloc->r_extern);
-            value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, value)->addr;
+            value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, (unsigned long)lookupSymbol(nm))->addr;
             
             type = X86_64_RELOC_SIGNED;
         }
@@ -4495,11 +4532,21 @@ static int relocateSection(
         {
             struct nlist *symbol = &nlist[reloc->r_symbolnum];
             char *nm = image + symLC->stroff + symbol->n_un.n_strx;
-            if(symbol->n_value == 0)
-                value = (uint64_t) lookupSymbol(nm);
-            else
+
+	    IF_DEBUG(linker, debugBelch("relocateSection: looking up external symbol %s\n", nm));
+	    IF_DEBUG(linker, debugBelch("               : type  = %d\n", symbol->n_type));
+	    IF_DEBUG(linker, debugBelch("               : sect  = %d\n", symbol->n_sect));
+	    IF_DEBUG(linker, debugBelch("               : desc  = %d\n", symbol->n_desc));
+	    IF_DEBUG(linker, debugBelch("               : value = %d\n", symbol->n_value));
+            if ((symbol->n_type & N_TYPE) == N_SECT) {
                 value = relocateAddress(oc, nSections, sections,
                                         symbol->n_value);
+		IF_DEBUG(linker, debugBelch("relocateSection, defined external symbol %s, relocated address %p\n", nm, value));
+	    }
+            else {
+                value = (uint64_t) lookupSymbol(nm);
+		IF_DEBUG(linker, debugBelch("relocateSection: external symbol %s, address %p\n", nm, value));
+	    }
         }
         else
         {
@@ -4507,8 +4554,10 @@ static int relocateSection(
                   - sections[reloc->r_symbolnum-1].addr
 		  + (uint64_t) image;
         }
-        
-        if(type == X86_64_RELOC_BRANCH)
+      
+	IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", value));
+
+        if (type == X86_64_RELOC_BRANCH)
         {
             if((int32_t)(value - baseValue) != (int64_t)(value - baseValue))
             {
@@ -4889,6 +4938,7 @@ static int relocateSection(
 	}
 #endif
     }
+    IF_DEBUG(linker, debugBelch("relocateSection: done\n"));
     return 1;
 }
 
@@ -4906,7 +4956,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
     char    *commonStorage = NULL;
     unsigned long commonCounter;
 
-    IF_DEBUG(linker,debugBelch("ocGetNames_MachO\n"));
+    IF_DEBUG(linker,debugBelch("ocGetNames_MachO: start\n"));
 
     for(i=0;i<header->ncmds;i++)
     {
@@ -4926,7 +4976,8 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
     for(i=0;i<segLC->nsects;i++)
     {
-        if(sections[i].size == 0)
+	IF_DEBUG(linker, debugBelch("ocGetNames_MachO: segment %d\n"));
+        if (sections[i].size == 0)
             continue;
 
         if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
@@ -4979,6 +5030,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
             }
         }
     }
+    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: %d external symbols\n", oc->n_symbols));
     oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
 				   "ocGetNames_MachO(oc->symbols)");
 
@@ -4993,11 +5045,13 @@ static int ocGetNames_MachO(ObjectCode* oc)
                 if(nlist[i].n_type & N_EXT)
                 {
                     char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-                    if((nlist[i].n_desc & N_WEAK_DEF) && lookupSymbol(nm))
-                        ; // weak definition, and we already have a definition
+                    if ((nlist[i].n_desc & N_WEAK_DEF) && lookupSymbol(nm)) {
+                        // weak definition, and we already have a definition
+			IF_DEBUG(linker, debugBelch("    weak: %s\n", nm));
+		    }
                     else
                     {
-                            IF_DEBUG(linker,debugBelch("Adding symbol 1 %s\n", nm));
+			    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
                             ghciInsertStrHashTable(oc->fileName, symhash, nm,
                                                     image
                                                     + sections[nlist[i].n_sect-1].offset
@@ -5024,7 +5078,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
 	        nlist[i].n_value = commonCounter;
 
-            IF_DEBUG(linker,debugBelch("Adding symbol 2 %s\n", nm));
+		IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
 	        ghciInsertStrHashTable(oc->fileName, symhash, nm,
 	                               (void*)commonCounter);
 	        oc->symbols[curSymbol++] = nm;
@@ -5048,7 +5102,8 @@ static int ocResolve_MachO(ObjectCode* oc)
     struct dysymtab_command *dsymLC = NULL;
     struct nlist *nlist;
 
-    for(i=0;i<header->ncmds;i++)
+    IF_DEBUG(linker, debugBelch("ocResolve_MachO: start\n"));
+    for (i = 0; i < header->ncmds; i++)
     {
 	if(lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64)
 	    segLC = (struct segment_command*) lc;
@@ -5068,7 +5123,8 @@ static int ocResolve_MachO(ObjectCode* oc)
         unsigned long *indirectSyms
             = (unsigned long*) (image + dsymLC->indirectsymoff);
 
-        for(i=0;i<segLC->nsects;i++)
+	IF_DEBUG(linker, debugBelch("ocResolve_MachO: resolving dsymLC\n"));
+        for (i = 0; i < segLC->nsects; i++)
         {
             if(    !strcmp(sections[i].sectname,"__la_symbol_ptr")
                 || !strcmp(sections[i].sectname,"__la_sym_ptr2")
@@ -5088,12 +5144,18 @@ static int ocResolve_MachO(ObjectCode* oc)
                 if(!resolveImports(oc,image,symLC,&sections[i],indirectSyms,nlist))
                     return 0;
             }
+	    else
+	    {
+		IF_DEBUG(linker, debugBelch("ocResolve_MachO: unknown section\n"));
+	    }
         }
     }
     
     for(i=0;i<segLC->nsects;i++)
     {
-	if(!relocateSection(oc,image,symLC,nlist,segLC->nsects,sections,&sections[i]))
+	    IF_DEBUG(linker, debugBelch("ocResolve_MachO: relocating section %d\n", i));
+
+	if (!relocateSection(oc,image,symLC,nlist,segLC->nsects,sections,&sections[i]))
 	    return 0;
     }
 
