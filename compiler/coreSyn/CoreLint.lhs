@@ -117,11 +117,11 @@ lintCoreBindings binds
     --    M.n{r3}  = ...
     --    M.n{r29} = ...
     -- becuase they both get the same linker symbol
-    ext_dups = findDupsEq eq_ext (map Var.varName binders)
-    eq_ext n1 n2 | Just m1 <- nameModule_maybe n1
-                 , Just m2 <- nameModule_maybe n2
-                 = m1==m2 && nameOccName n1 == nameOccName n2
-                 | otherwise = False
+    ext_dups = snd (removeDups ord_ext (map Var.varName binders))
+    ord_ext n1 n2 | Just m1 <- nameModule_maybe n1
+                  , Just m2 <- nameModule_maybe n2
+                  = compare (m1, nameOccName n1) (m2, nameOccName n2)
+                  | otherwise = LT
 
     lint_bind (Rec prs)		= mapM_ (lintSingleBinding TopLevel Recursive) prs
     lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
