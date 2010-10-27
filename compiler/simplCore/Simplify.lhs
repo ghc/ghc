@@ -26,14 +26,14 @@ import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
 import CoreMonad	( SimplifierSwitch(..), Tick(..) )
 import CoreSyn
-import Demand           ( isStrictDmd, splitStrictSig )
+import Demand           ( isStrictDmd )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold       ( mkUnfolding, mkCoreUnfolding
                         , mkInlineUnfolding, mkSimpleUnfolding
                         , exprIsConApp_maybe, callSiteInline, CallCtxt(..) )
 import CoreUtils
 import qualified CoreSubst
-import CoreArity	( exprArity )
+import CoreArity
 import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict, Arity )
 import CostCentre       ( currentCCS, pushCCisNop )
@@ -629,21 +629,41 @@ completeBind :: SimplEnv
 --      * or by adding to the floats in the envt
 
 completeBind env top_lvl old_bndr new_bndr new_rhs
-  = do	{ let old_info = idInfo old_bndr
-	      old_unf  = unfoldingInfo old_info
-	      occ_info = occInfo old_info
+ = ASSERT( isId new_bndr )
+   do { let old_info = idInfo old_bndr
+	    old_unf  = unfoldingInfo old_info
+	    occ_info = occInfo old_info
 
-	; new_unfolding <- simplUnfolding env top_lvl old_bndr occ_info new_rhs old_unf
+	-- Do eta-expansion on the RHS of the binding
+        -- See Note [Eta-expanding at let bindings] in SimplUtils
+      ; (new_arity, final_rhs) <- tryEtaExpand env new_bndr new_rhs
 
-	; if postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs new_unfolding
+      	-- Simplify the unfolding
+      ; new_unfolding <- simplUnfolding env top_lvl old_bndr occ_info final_rhs old_unf
+
+      ; if postInlineUnconditionally env top_lvl new_bndr occ_info final_rhs new_unfolding
 	                -- Inline and discard the binding
-	  then do  { tick (PostInlineUnconditionally old_bndr)
-	           ; -- pprTrace "postInlineUnconditionally" (ppr old_bndr <+> equals <+> ppr new_rhs) $
-                     return (extendIdSubst env old_bndr (DoneEx new_rhs)) }
+	then do  { tick (PostInlineUnconditionally old_bndr)
+	         ; -- pprTrace "postInlineUnconditionally" 
+                   --         (ppr old_bndr <+> equals <+> ppr final_rhs $$ ppr occ_info) $
+                   return (extendIdSubst env old_bndr (DoneEx final_rhs)) }
 	        -- Use the substitution to make quite, quite sure that the
 	        -- substitution will happen, since we are going to discard the binding
+	else
+   do { let info1 = idInfo new_bndr `setArityInfo` new_arity
+	
+              -- Unfolding info: Note [Setting the new unfolding]
+	    info2 = info1 `setUnfoldingInfo` new_unfolding
 
-	  else return (addNonRecWithUnf env new_bndr new_rhs new_unfolding) }
+	      -- Demand info: Note [Setting the demand info]
+            info3 | isEvaldUnfolding new_unfolding = zapDemandInfo info2 `orElse` info2
+                  | otherwise                      = info2
+
+            final_id = new_bndr `setIdInfo` info3
+
+      ; -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
+        return (addNonRec env final_id final_rhs) } }
+		-- The addNonRec adds it to the in-scope set too
 
 ------------------------------
 addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplM SimplEnv
@@ -662,44 +682,17 @@ addPolyBind top_lvl env (NonRec poly_id rhs)
   = do	{ unfolding <- simplUnfolding env top_lvl poly_id NoOccInfo rhs noUnfolding
     	  		-- Assumes that poly_id did not have an INLINE prag
 			-- which is perhaps wrong.  ToDo: think about this
-        ; return (addNonRecWithUnf env poly_id rhs unfolding) }
+        ; let final_id = setIdInfo poly_id $
+                         idInfo poly_id `setUnfoldingInfo` unfolding
+                                        `setArityInfo`     exprArity rhs
 
-addPolyBind _ env bind@(Rec _) = return (extendFloats env bind)
-		-- Hack: letrecs are more awkward, so we extend "by steam"
-		-- without adding unfoldings etc.  At worst this leads to
-		-- more simplifier iterations
+        ; return (addNonRec env final_id rhs) }
 
-------------------------------
-addNonRecWithUnf :: SimplEnv
-             	 -> OutId -> OutExpr    -- New binder and RHS
-	     	 -> Unfolding		-- New unfolding
-             	 -> SimplEnv
-addNonRecWithUnf env new_bndr new_rhs new_unfolding
-  = let new_arity = exprArity new_rhs
-	old_arity = idArity new_bndr
-        info1 = idInfo new_bndr `setArityInfo` new_arity
-	
-              -- Unfolding info: Note [Setting the new unfolding]
-	info2 = info1 `setUnfoldingInfo` new_unfolding
-
-        -- Demand info: Note [Setting the demand info]
-        info3 | isEvaldUnfolding new_unfolding = zapDemandInfo info2 `orElse` info2
-              | otherwise                      = info2
-
-        final_id = new_bndr `setIdInfo` info3
-	dmd_arity = length $ fst $ splitStrictSig $ idStrictness new_bndr
-    in
-    ASSERT( isId new_bndr )
-    WARN( new_arity < old_arity || new_arity < dmd_arity, 
-          (ptext (sLit "Arity decrease:") <+> (ppr final_id <+> ppr old_arity
-		<+> ppr new_arity <+> ppr dmd_arity) $$ ppr new_rhs) )
-	-- Note [Arity decrease]
-
-    final_id `seq`   -- This seq forces the Id, and hence its IdInfo,
-	             -- and hence any inner substitutions
-	    -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
-    addNonRec env final_id new_rhs
-		-- The addNonRec adds it to the in-scope set too
+addPolyBind _ env bind@(Rec _) 
+  = return (extendFloats env bind)
+	-- Hack: letrecs are more awkward, so we extend "by steam"
+	-- without adding unfoldings etc.  At worst this leads to
+	-- more simplifier iterations
 
 ------------------------------
 simplUnfolding :: SimplEnv-> TopLevelFlag
@@ -882,22 +875,26 @@ simplExprF' env (App fun arg)  cont = simplExprF env fun $
                                       ApplyTo NoDup arg env cont
 
 simplExprF' env expr@(Lam _ _) cont
-  = simplLam env (map zap bndrs) body cont
+  = simplLam env zapped_bndrs body cont
         -- The main issue here is under-saturated lambdas
         --   (\x1. \x2. e) arg1
         -- Here x1 might have "occurs-once" occ-info, because occ-info
         -- is computed assuming that a group of lambdas is applied
         -- all at once.  If there are too few args, we must zap the
-        -- occ-info.
+        -- occ-info, UNLESS the remaining binders are one-shot
   where
-    n_args   = countArgs cont
-    n_params = length bndrs
     (bndrs, body) = collectBinders expr
-    zap | n_args >= n_params = \b -> b
-        | otherwise          = \b -> if isTyCoVar b then b
-                                     else zapLamIdInfo b
-        -- NB: we count all the args incl type args
-        -- so we must count all the binders (incl type lambdas)
+    zapped_bndrs | need_to_zap = map zap bndrs
+                 | otherwise   = bndrs
+
+    need_to_zap = any zappable_bndr (drop n_args bndrs)
+    n_args = countArgs cont
+        -- NB: countArgs counts all the args (incl type args)
+        -- and likewise drop counts all binders (incl type lambdas)
+        
+    zappable_bndr b = isId b && not (isOneShotBndr b)
+    zap b | isTyCoVar b = b
+          | otherwise   = zapLamIdInfo b
 
 simplExprF' env (Type ty) cont
   = ASSERT( contIsRhsOrArg cont )
@@ -957,9 +954,8 @@ simplCoercion env co
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplEnv, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant
 -- only the in-scope set and floats should matter
-rebuild env expr cont0
-  = -- pprTrace "rebuild" (ppr expr $$ ppr cont0 $$ ppr (seFloats env)) $
-    case cont0 of
+rebuild env expr cont
+  = case cont of
       Stop {}                      -> return (env, expr)
       CoerceIt co cont             -> rebuild env (mkCoerce co expr) cont
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont

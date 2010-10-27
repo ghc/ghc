@@ -65,7 +65,8 @@ module BasicTypes(
         InlineSpec(..), 
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
         neverInlinePragma, dfunInlinePragma, 
-	isDefaultInlinePragma, isInlinePragma, isInlinablePragma,
+	isDefaultInlinePragma, 
+        isInlinePragma, isInlinablePragma, isAnyInlinePragma,
         inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
@@ -736,11 +737,6 @@ isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
 isFunLike _            = False
 
-isInlineSpec :: InlineSpec -> Bool
-isInlineSpec Inline    = True
-isInlineSpec Inlinable = True
-isInlineSpec _         = False
-
 isEmptyInlineSpec :: InlineSpec -> Bool
 isEmptyInlineSpec EmptyInlineSpec = True
 isEmptyInlineSpec _               = False
@@ -772,13 +768,22 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
   = isEmptyInlineSpec inline && isAlwaysActive activation && isFunLike match_info
 
 isInlinePragma :: InlinePragma -> Bool
-isInlinePragma prag = isInlineSpec (inl_inline prag)
+isInlinePragma prag = case inl_inline prag of
+                        Inline -> True
+                        _      -> False
 
 isInlinablePragma :: InlinePragma -> Bool
 isInlinablePragma prag = case inl_inline prag of
                            Inlinable -> True
                            _         -> False
 
+isAnyInlinePragma :: InlinePragma -> Bool
+-- INLINE or INLINABLE
+isAnyInlinePragma prag = case inl_inline prag of
+                        Inline    -> True
+                        Inlinable -> True
+                        _         -> False
+ 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
 

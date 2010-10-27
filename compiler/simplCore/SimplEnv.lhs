@@ -403,7 +403,9 @@ addNonRec :: SimplEnv -> OutId -> OutExpr -> SimplEnv
 -- in-scope set (although it might also have been created with newId)
 -- but it may now have more IdInfo
 addNonRec env id rhs
-  = env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
+  = id `seq`   -- This seq forces the Id, and hence its IdInfo,
+	       -- and hence any inner substitutions
+    env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
 	  seInScope = extendInScopeSet (seInScope env) id }
 
 extendFloats :: SimplEnv -> OutBind -> SimplEnv
