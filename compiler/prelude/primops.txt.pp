@@ -1140,10 +1140,14 @@ primop  RaiseOp "raise#" GenPrimOp
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
 -- must be *precise* - we don't want the strictness analyser turning
 -- one kind of bottom into another, as it is allowed to do in pure code.
+--
+-- But we *do* want to know that it returns bottom after 
+-- being applied to two arguments
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [lazyDmd,lazyDmd] BotRes) }
    out_of_line = True
    has_side_effects = True
 
