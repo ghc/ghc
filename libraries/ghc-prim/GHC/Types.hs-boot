@@ -13,3 +13,5 @@ data Char = C# Char#
 
 data Int = I# Int#
 
+data Bool = False | True
+

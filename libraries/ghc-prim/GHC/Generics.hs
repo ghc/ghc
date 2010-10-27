@@ -45,8 +45,7 @@ module GHC.Generics  (
 -}
   ) where
   
-import {-# SOURCE #-} GHC.Types -- ([](..), Int, Char)
-import {-# SOURCE #-} GHC.Bool  (Bool(..))
+import {-# SOURCE #-} GHC.Types
 
 --------------------------------------------------------------------------------
 -- Representation types
