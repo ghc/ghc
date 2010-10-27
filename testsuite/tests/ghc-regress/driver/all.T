@@ -342,3 +342,4 @@ test('T3364', normalise_fun(normalise_errmsg), run_command,
      ['$MAKE -s --no-print-directory T3364'])
 test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
+test('werror', normal, compile_fail, [''])
