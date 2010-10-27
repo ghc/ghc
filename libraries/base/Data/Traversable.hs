@@ -172,6 +172,7 @@ mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
 
 -- | This function may be used as a value for `fmap` in a `Functor` instance.
 fmapDefault :: Traversable t => (a -> b) -> t a -> t b
+{-# INLINE fmapDefault #-}
 fmapDefault f = getId . traverse (Id . f)
 
 -- | This function may be used as a value for `Data.Foldable.foldMap`
