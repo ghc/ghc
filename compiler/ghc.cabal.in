@@ -152,6 +152,7 @@ Library
         DataCon
         Demand
         Exception
+        GhcMonad
         Id
         IdInfo
         Literal

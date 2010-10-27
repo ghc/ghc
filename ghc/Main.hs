@@ -14,8 +14,8 @@ module Main (main) where
 import qualified GHC
 import GHC		( -- DynFlags(..), HscTarget(..),
                           -- GhcMode(..), GhcLink(..),
-			  LoadHowMuch(..), -- dopt, DynFlag(..),
-                          defaultCallbacks )
+                          Ghc, GhcMonad(..),
+			  LoadHowMuch(..) )
 import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
@@ -44,7 +44,7 @@ import Outputable
 import SrcLoc
 import Util
 import Panic
--- import MonadUtils       ( liftIO )
+import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
 import LoadIface           ( loadUserInterface )
@@ -167,9 +167,9 @@ main' postLoadMode dflags0 args flagWarnings = do
   let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
   handleSourceError (\e -> do
-       GHC.printExceptionAndWarnings e
-       liftIO $ exitWith (ExitFailure 1)) $
-    handleFlagWarnings dflags2 flagWarnings'
+       GHC.printException e
+       liftIO $ exitWith (ExitFailure 1)) $ do
+         liftIO $ handleFlagWarnings dflags2 flagWarnings'
 
         -- make sure we clean up after ourselves
   GHC.defaultCleanupHandler dflags2 $ do
@@ -204,14 +204,13 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   ---------------- Do the business -----------
   handleSourceError (\e -> do
-       GHC.printExceptionAndWarnings e
+       GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags3 f
        DoMake                 -> doMake srcs
-       DoMkDependHS           -> do doMkDependHS (map fst srcs)
-                                    GHC.printWarnings
-       StopBefore p           -> oneShot hsc_env p srcs >> GHC.printWarnings
+       DoMkDependHS           -> doMkDependHS (map fst srcs)
+       StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> interactiveUI srcs Nothing
        DoEval exprs           -> interactiveUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
@@ -601,13 +600,10 @@ doMake srcs  = do
     -- This means that "ghc Foo.o Bar.o -o baz" links the program as
     -- we expect.
     if (null hs_srcs)
-       then oneShot hsc_env StopLn srcs >> GHC.printWarnings
+       then liftIO (oneShot hsc_env StopLn srcs)
        else do
 
-    o_files <- mapM (\x -> do
-                        f <- compileFile hsc_env StopLn x
-                        GHC.printWarnings
-                        return f)
+    o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
     liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse o_files)
 
@@ -624,7 +620,7 @@ doMake srcs  = do
 
 doShowIface :: DynFlags -> FilePath -> IO ()
 doShowIface dflags file = do
-  hsc_env <- newHscEnv defaultCallbacks dflags
+  hsc_env <- newHscEnv dflags
   showIface hsc_env file
 
 -- ---------------------------------------------------------------------------

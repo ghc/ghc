@@ -17,6 +17,7 @@ module DriverMkDepend (
 
 import qualified GHC
 -- import GHC              ( ModSummary(..), GhcMonad )
+import GhcMonad
 import HsSyn            ( ImportDecl(..) )
 import DynFlags
 import Util

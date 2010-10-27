@@ -138,8 +138,9 @@ appendStringBuffers sb1 sb2
           calcLen sb = len sb - cur sb
           size =  sb1_len + sb2_len
 
-stringToStringBuffer :: String -> IO StringBuffer
-stringToStringBuffer str = do
+stringToStringBuffer :: String -> StringBuffer
+stringToStringBuffer str =
+ unsafePerformIO $ do
   let size = utf8EncodedLength str
   buf <- mallocForeignPtrArray (size+3)
   withForeignPtr buf $ \ptr -> do

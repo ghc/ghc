@@ -599,7 +599,7 @@ runOneCommand eh getCmd = do
                (doCommand c)
   where
     printErrorAndKeepGoing err = do
-        GHC.printExceptionAndWarnings err
+        GHC.printException err
         return False
 
     noSpace q = q >>= maybe (return Nothing)
@@ -815,7 +815,7 @@ help _ = io (putStr helpText)
 
 info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
-info s  = handleSourceError GHC.printExceptionAndWarnings $
+info s  = handleSourceError GHC.printException $
           withFlattenedDynflags $ do
              { let names = words s
 	     ; dflags <- getDynFlags
@@ -894,8 +894,7 @@ changeDirectory "" = do
 changeDirectory dir = do
   graph <- GHC.getModuleGraph
   when (not (null graph)) $
-        do liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,"
-           liftIO $ putStrLn "because the search path has changed."
+        liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
   prev_context <- GHC.getContext
   GHC.setTargets []
   _ <- GHC.load LoadAllTargets
@@ -906,7 +905,7 @@ changeDirectory dir = do
 
 trySuccess :: GHC.GhcMonad m => m SuccessFlag -> m SuccessFlag
 trySuccess act =
-    handleSourceError (\e -> do GHC.printExceptionAndWarnings e
+    handleSourceError (\e -> do GHC.printException e
                                 return Failed) $ do
       act
 
@@ -977,7 +976,7 @@ defineMacro overwrite s = do
   let new_expr = '(' : definition ++ ") :: String -> IO String"
 
   -- compile the expression
-  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $
+  handleSourceError (\e -> GHC.printException e) $
    withFlattenedDynflags $ do
     hv <- GHC.compileExpr new_expr
     io (writeIORef macros_ref --
@@ -1005,7 +1004,7 @@ undefineMacro str = mapM_ undef (words str)
 cmdCmd :: String -> GHCi ()
 cmdCmd str = do
   let expr = '(' : str ++ ") :: IO String"
-  handleSourceError (\e -> GHC.printExceptionAndWarnings e) $
+  handleSourceError (\e -> GHC.printException e) $
    withFlattenedDynflags $ do
     hv <- GHC.compileExpr expr
     cmds <- io $ (unsafeCoerce# hv :: IO String)
@@ -1048,7 +1047,7 @@ checkModule :: String -> InputT GHCi ()
 checkModule m = do
   let modl = GHC.mkModuleName m
   prev_context <- GHC.getContext
-  ok <- handleSourceError (\e -> GHC.printExceptionAndWarnings e >> return False) $ do
+  ok <- handleSourceError (\e -> GHC.printException e >> return False) $ do
           r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
           liftIO $ putStrLn $ showSDoc $
 	   case GHC.moduleInfo r of
@@ -1169,7 +1168,7 @@ modulesLoadedMsg ok mods = do
 
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str 
-  = handleSourceError (\e -> GHC.printExceptionAndWarnings e)
+  = handleSourceError GHC.printException
   $ withFlattenedDynflags
   $ do
        ty <- GHC.exprType str
@@ -1179,7 +1178,7 @@ typeOfExpr str
 
 kindOfType :: String -> InputT GHCi ()
 kindOfType str 
-  = handleSourceError (\e -> GHC.printExceptionAndWarnings e)
+  = handleSourceError GHC.printException
   $ withFlattenedDynflags
   $ do
        ty <- GHC.typeKind str
@@ -1506,7 +1505,7 @@ newDynFlags minus_opts = do
       dflags <- getDynFlags
       let pkg_flags = packageFlags dflags
       (dflags', leftovers, warns) <- io $ GHC.parseDynamicFlags dflags $ map noLoc minus_opts
-      handleFlagWarnings dflags' warns
+      liftIO $ handleFlagWarnings dflags' warns
 
       if (not (null leftovers))
         then ghcError $ errorsToGhcException leftovers
@@ -1855,7 +1854,7 @@ wantNameFromInterpretedModule :: GHC.GhcMonad m
                               -> (Name -> m ())
                               -> m ()
 wantNameFromInterpretedModule noCanDo str and_then =
-  handleSourceError (GHC.printExceptionAndWarnings) $ do
+  handleSourceError GHC.printException $ do
    names <- GHC.parseName str
    case names of
       []    -> return ()

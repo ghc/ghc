@@ -79,6 +79,7 @@ import Bag
 import Maybes
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
+import MonadUtils
 
 import Util		( split )
 import Data.List	( intersperse )

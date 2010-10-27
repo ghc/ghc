@@ -37,12 +37,12 @@ module InteractiveEval (
 
 #include "HsVersions.h"
 
-import HscMain          hiding (compileExpr)
+import GhcMonad
+import HscMain
 import HsSyn (ImportDecl)
 import HscTypes
 import TcRnDriver
-import TcRnMonad (initTc)
-import RnNames		(gresFromAvails, rnImports)
+import RnNames		(gresFromAvails)
 import InstEnv
 import Type
 import TcType		hiding( typeKind )
@@ -201,20 +201,12 @@ runStmt expr step =
     let dflags'  = dopt_unset (hsc_dflags hsc_env) Opt_WarnUnusedBinds
         hsc_env' = hsc_env{ hsc_dflags = dflags' }
 
-    r <- hscStmt hsc_env' expr
+    r <- liftIO $ hscStmt hsc_env' expr
 
     case r of
       Nothing -> return RunFailed -- empty statement / comment
 
       Just (ids, hval) -> do
-          -- XXX: This is the only place we can print warnings before the
-          -- result.  Is this really the right thing to do?  It's fine for
-          -- GHCi, but what's correct for other GHC API clients?  We could
-          -- introduce a callback argument.
-        warns <- getWarnings
-        liftIO $ printBagOfWarnings dflags' warns
-        clearWarnings
-
         status <-
           withVirtualCWD $
             withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
@@ -254,7 +246,7 @@ withVirtualCWD m = do
   gbracket set_cwd reset_cwd $ \_ -> m
 
 parseImportDecl :: GhcMonad m => String -> m (ImportDecl RdrName)
-parseImportDecl expr = withSession $ \hsc_env -> hscImport hsc_env expr
+parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
 
 emptyHistory :: BoundedList History
 emptyHistory = nilBL 50 -- keep a log of length 50
@@ -790,11 +782,9 @@ setContext toplev_mods other_mods = do
     export_env  <- liftIO $ mkExportEnv hsc_env export_mods
     import_env  <-
         if null imprt_decls then return emptyGlobalRdrEnv else do
-            let imports = rnImports imprt_decls
-                this_mod = if null toplev_mods then pRELUDE else head toplev_mods
-            (_, env, _,_) <-
-                ioMsgMaybe $ liftIO $ initTc hsc_env HsSrcFile False this_mod imports
-            return env
+            let this_mod | null toplev_mods = pRELUDE
+                         | otherwise        = head toplev_mods
+            liftIO $ hscRnImportDecls hsc_env this_mod imprt_decls
     toplev_envs <- liftIO $ mapM (mkTopLevEnv hpt) toplev_mods
     let all_env = foldr plusGlobalRdrEnv (plusGlobalRdrEnv export_env import_env) toplev_envs
     modifySession $ \_ ->
@@ -859,7 +849,7 @@ moduleIsInterpreted modl = withSession $ \h ->
 getInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[Instance]))
 getInfo name
   = withSession $ \hsc_env ->
-    do mb_stuff <- ioMsg $ tcRnGetInfo hsc_env name
+    do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
          Nothing -> return Nothing
          Just (thing, fixity, ispecs) -> do
@@ -911,8 +901,8 @@ greToRdrNames GRE{ gre_name = name, gre_prov = prov }
 -- the identifier can refer to in the current interactive context.
 parseName :: GhcMonad m => String -> m [Name]
 parseName str = withSession $ \hsc_env -> do
-   (L _ rdr_name) <- hscParseIdentifier (hsc_dflags hsc_env) str
-   ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name
+   (L _ rdr_name) <- liftIO $ hscParseIdentifier hsc_env str
+   liftIO $ hscTcRnLookupRdrName hsc_env rdr_name
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression
@@ -920,7 +910,7 @@ parseName str = withSession $ \hsc_env -> do
 -- | Get the type of an expression
 exprType :: GhcMonad m => String -> m Type
 exprType expr = withSession $ \hsc_env -> do
-   ty <- hscTcExpr hsc_env expr
+   ty <- liftIO $ hscTcExpr hsc_env expr
    return $ tidyType emptyTidyEnv ty
 
 -- -----------------------------------------------------------------------------
@@ -929,14 +919,14 @@ exprType expr = withSession $ \hsc_env -> do
 -- | Get the kind of a  type
 typeKind  :: GhcMonad m => String -> m Kind
 typeKind str = withSession $ \hsc_env -> do
-   hscKcType hsc_env str
+   liftIO $ hscKcType hsc_env str
 
 -----------------------------------------------------------------------------
 -- cmCompileExpr: compile an expression and deliver an HValue
 
 compileExpr :: GhcMonad m => String -> m HValue
 compileExpr expr = withSession $ \hsc_env -> do
-  Just (ids, hval) <- hscStmt hsc_env ("let __cmCompileExpr = "++expr)
+  Just (ids, hval) <- liftIO $ hscStmt hsc_env ("let __cmCompileExpr = "++expr)
  		 -- Run it!
   hvals <- liftIO (unsafeCoerce# hval :: IO [HValue])
 
@@ -955,7 +945,8 @@ dynCompileExpr expr = do
             (stringToPackageId "base") (mkModuleName "Data.Dynamic")
         ,Nothing):exports
     let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
-    Just (ids, hvals) <- withSession (flip hscStmt stmt)
+    Just (ids, hvals) <- withSession $ \hsc_env -> 
+                           liftIO $ hscStmt hsc_env stmt
     setContext full exports
     vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
     case (ids,vals) of

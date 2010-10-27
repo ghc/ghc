@@ -15,23 +15,20 @@ module Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 import Linker
 import RtClosureInspect
 
+import GhcMonad
 import HscTypes
 import Id
 import Name
 import Var hiding ( varName )
 import VarSet
--- import Name 
 import UniqSupply
 import TcType
 import GHC
--- import DynFlags
 import InteractiveEval
 import Outputable
--- import SrcLoc
 import PprTyThing
 import MonadUtils
 
--- import Exception
 import Control.Monad
 import Data.List
 import Data.Maybe

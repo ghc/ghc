@@ -6,29 +6,15 @@
 \begin{code}
 -- | Types for the per-module compiler
 module HscTypes ( 
-        -- * 'Ghc' monad stuff
-        Ghc(..), GhcT(..), liftGhcT,
-        GhcMonad(..), WarnLogMonad(..),
-        liftIO,
-        ioMsgMaybe, ioMsg,
-        logWarnings, clearWarnings, hasWarnings,
-        SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
-        throwOneError, handleSourceError,
-        reflectGhc, reifyGhc,
-        handleFlagWarnings,
-
-	-- * Sessions and compilation state
-	Session(..), withSession, modifySession, withTempSession,
+	-- * compilation state
         HscEnv(..), hscEPS,
 	FinderCache, FindResult(..), ModLocationCache,
 	Target(..), TargetId(..), pprTarget, pprTargetId,
 	ModuleGraph, emptyMG,
-        -- ** Callbacks
-        GhcApiCallbacks(..), withLocalCallbacks,
 
         -- * Information about modules
 	ModDetails(..),	emptyModDetails,
-	ModGuts(..), CoreModule(..), CgGuts(..), ForeignStubs(..),
+	ModGuts(..), CgGuts(..), ForeignStubs(..),
         ImportedMods,
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
@@ -102,7 +88,12 @@ module HscTypes (
 
         -- * Vectorisation information
         VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo, 
-        noIfaceVectInfo
+        noIfaceVectInfo,
+
+        -- * Compilation errors and warnings
+        SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
+        throwOneError, handleSourceError,
+        handleFlagWarnings, printOrThrowWarnings,
     ) where
 
 #include "HsVersions.h"
@@ -163,22 +154,12 @@ import Data.List
 import Data.Map (Map)
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
-\end{code}
 
+-- -----------------------------------------------------------------------------
+-- Source Errors
 
-%************************************************************************
-%*									*
-\subsection{Compilation environment}
-%*									*
-%************************************************************************
-
-
-\begin{code}
--- | The Session is a handle to the complete state of a compilation
--- session.  A compilation session consists of a set of modules
--- constituting the current program or library, the context for
--- interactive evaluation, and various caches.
-data Session = Session !(IORef HscEnv) !(IORef WarningMessages)
+-- When the compiler (HscMain) discovers errors, it throws an
+-- exception in the IO monad.
 
 mkSrcErr :: ErrorMessages -> SourceError
 srcErrorMessages :: SourceError -> ErrorMessages
@@ -246,255 +227,25 @@ instance Exception GhcApiError
 
 mkApiErr = GhcApiError
 
--- | A monad that allows logging of warnings.
-class Monad m => WarnLogMonad m where
-  setWarnings  :: WarningMessages -> m ()
-  getWarnings :: m WarningMessages
+-- | Given a bag of warnings, turn them into an exception if
+-- -Werror is enabled, or print them out otherwise.
+printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
+printOrThrowWarnings dflags warns
+  | dopt Opt_WarnIsError dflags
+  = when (not (isEmptyBag warns)) $ do
+      throwIO $ mkSrcErr $ warns `snocBag` warnIsErrorMsg
+  | otherwise
+  = printBagOfWarnings dflags warns
 
-logWarnings :: WarnLogMonad m => WarningMessages -> m ()
-logWarnings warns = do
-    warns0 <- getWarnings
-    setWarnings (unionBags warns warns0)
-
--- | Clear the log of 'Warnings'.
-clearWarnings :: WarnLogMonad m => m ()
-clearWarnings = setWarnings emptyBag
-
--- | Returns true if there were any warnings.
-hasWarnings :: WarnLogMonad m => m Bool
-hasWarnings = getWarnings >>= return . not . isEmptyBag
-
--- | A monad that has all the features needed by GHC API calls.
---
--- In short, a GHC monad
---
---   - allows embedding of IO actions,
---
---   - can log warnings,
---
---   - allows handling of (extensible) exceptions, and
---
---   - maintains a current session.
---
--- If you do not use 'Ghc' or 'GhcT', make sure to call 'GHC.initGhcMonad'
--- before any call to the GHC API functions can occur.
---
-class (Functor m, MonadIO m, WarnLogMonad m, ExceptionMonad m)
-    => GhcMonad m where
-  getSession :: m HscEnv
-  setSession :: HscEnv -> m ()
-
--- | Call the argument with the current session.
-withSession :: GhcMonad m => (HscEnv -> m a) -> m a
-withSession f = getSession >>= f
-
--- | Set the current session to the result of applying the current session to
--- the argument.
-modifySession :: GhcMonad m => (HscEnv -> HscEnv) -> m ()
-modifySession f = do h <- getSession
-                     setSession $! f h
-
-withSavedSession :: GhcMonad m => m a -> m a
-withSavedSession m = do
-  saved_session <- getSession
-  m `gfinally` setSession saved_session
-
--- | Call an action with a temporarily modified Session.
-withTempSession :: GhcMonad m => (HscEnv -> HscEnv) -> m a -> m a
-withTempSession f m =
-  withSavedSession $ modifySession f >> m
-
--- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
--- e.g., to maintain additional state consider wrapping this monad or using
--- 'GhcT'.
-newtype Ghc a = Ghc { unGhc :: Session -> IO a }
-
-instance Functor Ghc where
-  fmap f m = Ghc $ \s -> f `fmap` unGhc m s
-
-instance Monad Ghc where
-  return a = Ghc $ \_ -> return a
-  m >>= g  = Ghc $ \s -> do a <- unGhc m s; unGhc (g a) s
-
-instance MonadIO Ghc where
-  liftIO ioA = Ghc $ \_ -> ioA
-
-instance ExceptionMonad Ghc where
-  gcatch act handle =
-      Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
-  gblock (Ghc m)   = Ghc $ \s -> gblock (m s)
-  gunblock (Ghc m) = Ghc $ \s -> gunblock (m s)
-  gmask f =
-      Ghc $ \s -> gmask $ \io_restore ->
-                             let
-                                g_restore (Ghc m) = Ghc $ \s -> io_restore (m s)
-                             in
-                                unGhc (f g_restore) s
-
-instance WarnLogMonad Ghc where
-  setWarnings warns = Ghc $ \(Session _ wref) -> writeIORef wref warns
-  -- | Return 'Warnings' accumulated so far.
-  getWarnings       = Ghc $ \(Session _ wref) -> readIORef wref
-
-instance GhcMonad Ghc where
-  getSession = Ghc $ \(Session r _) -> readIORef r
-  setSession s' = Ghc $ \(Session r _) -> writeIORef r s'
-
--- | A monad transformer to add GHC specific features to another monad.
---
--- Note that the wrapped monad must support IO and handling of exceptions.
-newtype GhcT m a = GhcT { unGhcT :: Session -> m a }
-liftGhcT :: Monad m => m a -> GhcT m a
-liftGhcT m = GhcT $ \_ -> m
-
-instance Functor m => Functor (GhcT m) where
-  fmap f m = GhcT $ \s -> f `fmap` unGhcT m s
-
-instance Monad m => Monad (GhcT m) where
-  return x = GhcT $ \_ -> return x
-  m >>= k  = GhcT $ \s -> do a <- unGhcT m s; unGhcT (k a) s
-
-instance MonadIO m => MonadIO (GhcT m) where
-  liftIO ioA = GhcT $ \_ -> liftIO ioA
-
-instance ExceptionMonad m => ExceptionMonad (GhcT m) where
-  gcatch act handle =
-      GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
-  gblock (GhcT m) = GhcT $ \s -> gblock (m s)
-  gunblock (GhcT m) = GhcT $ \s -> gunblock (m s)
-  gmask f =
-      GhcT $ \s -> gmask $ \io_restore ->
-                           let
-                              g_restore (GhcT m) = GhcT $ \s -> io_restore (m s)
-                           in
-                              unGhcT (f g_restore) s
-
-instance MonadIO m => WarnLogMonad (GhcT m) where
-  setWarnings warns = GhcT $ \(Session _ wref) -> liftIO $ writeIORef wref warns
-  -- | Return 'Warnings' accumulated so far.
-  getWarnings       = GhcT $ \(Session _ wref) -> liftIO $ readIORef wref
-
-instance (Functor m, ExceptionMonad m, MonadIO m) => GhcMonad (GhcT m) where
-  getSession = GhcT $ \(Session r _) -> liftIO $ readIORef r
-  setSession s' = GhcT $ \(Session r _) -> liftIO $ writeIORef r s'
-
--- | Lift an IO action returning errors messages into a 'GhcMonad'.
---
--- In order to reduce dependencies to other parts of the compiler, functions
--- outside the "main" parts of GHC return warnings and errors as a parameter
--- and signal success via by wrapping the result in a 'Maybe' type.  This
--- function logs the returned warnings and propagates errors as exceptions
--- (of type 'SourceError').
---
--- This function assumes the following invariants:
---
---  1. If the second result indicates success (is of the form 'Just x'),
---     there must be no error messages in the first result.
---
---  2. If there are no error messages, but the second result indicates failure
---     there should be warnings in the first result.  That is, if the action
---     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: GhcMonad m =>
-              IO (Messages, Maybe a) -> m a
-ioMsgMaybe ioA = do
-  ((warns,errs), mb_r) <- liftIO ioA
-  logWarnings warns
-  case mb_r of
-    Nothing -> liftIO $ throwIO (mkSrcErr errs)
-    Just r  -> ASSERT( isEmptyBag errs ) return r
-
--- | Lift a non-failing IO action into a 'GhcMonad'.
---
--- Like 'ioMsgMaybe', but assumes that the action will never return any error
--- messages.
-ioMsg :: GhcMonad m => IO (Messages, a) -> m a
-ioMsg ioA = do
-    ((warns,errs), r) <- liftIO ioA
-    logWarnings warns
-    ASSERT( isEmptyBag errs ) return r
-
--- | Reflect a computation in the 'Ghc' monad into the 'IO' monad.
---
--- You can use this to call functions returning an action in the 'Ghc' monad
--- inside an 'IO' action.  This is needed for some (too restrictive) callback
--- arguments of some library functions:
---
--- > libFunc :: String -> (Int -> IO a) -> IO a
--- > ghcFunc :: Int -> Ghc a
--- >
--- > ghcFuncUsingLibFunc :: String -> Ghc a -> Ghc a
--- > ghcFuncUsingLibFunc str =
--- >   reifyGhc $ \s ->
--- >     libFunc $ \i -> do
--- >       reflectGhc (ghcFunc i) s
---
-reflectGhc :: Ghc a -> Session -> IO a
-reflectGhc m = unGhc m
-
--- > Dual to 'reflectGhc'.  See its documentation.
-reifyGhc :: (Session -> IO a) -> Ghc a
-reifyGhc act = Ghc $ act
-
-handleFlagWarnings :: GhcMonad m => DynFlags -> [Located String] -> m ()
+handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
 handleFlagWarnings dflags warns
- = when (dopt Opt_WarnDeprecatedFlags dflags)
-        (handleFlagWarnings' dflags warns)
+ = when (dopt Opt_WarnDeprecatedFlags dflags) $ do
+        -- It would be nicer if warns :: [Located Message], but that
+        -- has circular import problems.
+      let bag = listToBag [ mkPlainWarnMsg loc (text warn) 
+                          | L loc warn <- warns ]
 
-handleFlagWarnings' :: GhcMonad m => DynFlags -> [Located String] -> m ()
-handleFlagWarnings' _ [] = return ()
-handleFlagWarnings' dflags warns
- = do -- It would be nicer if warns :: [Located Message], but that has circular
-      -- import problems.
-      logWarnings $ listToBag (map mkFlagWarning warns)
-      when (dopt Opt_WarnIsError dflags) $
-        liftIO $ throwIO $ mkSrcErr emptyBag
-
-mkFlagWarning :: Located String -> WarnMsg
-mkFlagWarning (L loc warn)
- = mkPlainWarnMsg loc (text warn)
-\end{code}
-
-\begin{code}
--- | These functions are called in various places of the GHC API.
---
--- API clients can override any of these callbacks to change GHC's default
--- behaviour.
-data GhcApiCallbacks
-  = GhcApiCallbacks {
-
-    -- | Called by 'load' after the compilating of each module.
-    --
-    -- The default implementation simply prints all warnings and errors to
-    -- @stderr@.  Don't forget to call 'clearWarnings' when implementing your
-    -- own call.
-    --
-    -- The first argument is the module that was compiled.
-    --
-    -- The second argument is @Nothing@ if no errors occured, but there may
-    -- have been warnings.  If it is @Just err@ at least one error has
-    -- occured.  If 'srcErrorMessages' is empty, compilation failed due to
-    -- @-Werror@.
-    reportModuleCompilationResult :: GhcMonad m =>
-                                     ModSummary -> Maybe SourceError
-                                  -> m ()
-  }
-
--- | Temporarily modify the callbacks.  After the action is executed all
--- callbacks are reset (not, however, any other modifications to the session
--- state.)
-withLocalCallbacks :: GhcMonad m =>
-                      (GhcApiCallbacks -> GhcApiCallbacks)
-                   -> m a -> m a
-withLocalCallbacks f m = do
-  hsc_env <- getSession
-  let cb0 = hsc_callbacks hsc_env
-  let cb' = f cb0
-  setSession (hsc_env { hsc_callbacks = cb' `seq` cb' })
-  r <- m
-  hsc_env' <- getSession
-  setSession (hsc_env' { hsc_callbacks = cb0 })
-  return r
-
+      printOrThrowWarnings dflags bag
 \end{code}
 
 \begin{code}
@@ -512,9 +263,6 @@ data HscEnv
   = HscEnv { 
 	hsc_dflags :: DynFlags,
 		-- ^ The dynamic flag settings
-
-        hsc_callbacks :: GhcApiCallbacks,
-                -- ^ Callbacks for the GHC API.
 
 	hsc_targets :: [Target],
 		-- ^ The targets (or roots) of the current session
@@ -1005,24 +753,6 @@ data ModGuts
 -- After simplification, the following fields change slightly:
 --	mg_rules	Orphan rules only (local ones now attached to binds)
 --	mg_binds	With rules attached
-
--- | A CoreModule consists of just the fields of a 'ModGuts' that are needed for
--- the 'GHC.compileToCoreModule' interface.
-data CoreModule
-  = CoreModule {
-      -- | Module name
-      cm_module   :: !Module,
-      -- | Type environment for types declared in this module
-      cm_types    :: !TypeEnv,
-      -- | Declarations
-      cm_binds    :: [CoreBind],
-      -- | Imports
-      cm_imports  :: ![Module]
-    }
-
-instance Outputable CoreModule where
-   ppr (CoreModule {cm_module = mn, cm_types = te, cm_binds = cb}) =
-      text "%module" <+> ppr mn <+> ppr te $$ vcat (map ppr cb)
 
 -- The ModGuts takes on several slightly different forms:
 --

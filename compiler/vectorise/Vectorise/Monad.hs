@@ -31,6 +31,7 @@ import Vectorise.Builtins
 import Vectorise.Env
 
 import HscTypes hiding  ( MonadThings(..) )
+import MonadUtils (liftIO)
 import Module
 import TyCon
 import Var

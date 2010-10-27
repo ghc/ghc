@@ -13,7 +13,7 @@ module ErrUtils (
         errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
-	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
+	printBagOfErrors, printBagOfWarnings,
 	warnIsErrorMsg, mkLongWarnMsg,
 
 	ghcExit,
@@ -39,7 +39,6 @@ import SrcLoc
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
 
-import Control.Monad
 import System.Exit	( ExitCode(..), exitWith )
 import Data.List
 import System.IO
@@ -126,56 +125,29 @@ emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
 
 warnIsErrorMsg :: ErrMsg
-warnIsErrorMsg = mkPlainErrMsg noSrcSpan (text "\nFailing due to -Werror.\n")
+warnIsErrorMsg = mkPlainErrMsg noSrcSpan (text "\nFailing due to -Werror.")
 
 errorsFound :: DynFlags -> Messages -> Bool
--- The dyn-flags are used to see if the user has specified
--- -Werror, which says that warnings should be fatal
-errorsFound dflags (warns, errs) 
-  | dopt Opt_WarnIsError dflags = not (isEmptyBag errs) || not (isEmptyBag warns)
-  | otherwise  		        = not (isEmptyBag errs)
-
-printErrorsAndWarnings :: DynFlags -> Messages -> IO ()
-printErrorsAndWarnings dflags (warns, errs)
-  | no_errs && no_warns = return ()
-  | no_errs             = do printBagOfWarnings dflags warns
-                             when (dopt Opt_WarnIsError dflags) $
-                                 errorMsg dflags $
-                                     text "\nFailing due to -Werror.\n"
-                          -- Don't print any warnings if there are errors
-  | otherwise           = printBagOfErrors dflags errs
-  where
-    no_warns = isEmptyBag warns
-    no_errs  = isEmptyBag errs
+errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
-printBagOfErrors dflags bag_of_errors
+printBagOfErrors dflags bag_of_errors = 
+  printMsgBag dflags bag_of_errors SevError
+
+printBagOfWarnings :: DynFlags -> Bag WarnMsg -> IO ()
+printBagOfWarnings dflags bag_of_warns = 
+  printMsgBag dflags bag_of_warns SevWarning
+
+printMsgBag :: DynFlags -> Bag ErrMsg -> Severity -> IO ()
+printMsgBag dflags bag sev
   = sequence_   [ let style = mkErrStyle unqual
-		  in log_action dflags SevError s style (d $$ e)
+		  in log_action dflags sev s style (d $$ e)
 		| ErrMsg { errMsgSpans = s:_,
 			   errMsgShortDoc = d,
 			   errMsgExtraInfo = e,
 			   errMsgContext = unqual } <- sorted_errs ]
     where
-      bag_ls	  = bagToList bag_of_errors
-      sorted_errs = sortLe occ'ed_before bag_ls
-
-      occ'ed_before err1 err2 = 
-         case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
-		LT -> True
-		EQ -> True
-		GT -> False
-
-printBagOfWarnings :: DynFlags -> Bag ErrMsg -> IO ()
-printBagOfWarnings dflags bag_of_warns
-  = sequence_   [ let style = mkErrStyle unqual
-		  in log_action dflags SevWarning s style (d $$ e)
-		| ErrMsg { errMsgSpans = s:_,
-			   errMsgShortDoc = d,
-			   errMsgExtraInfo = e,
-			   errMsgContext = unqual } <- sorted_errs ]
-    where
-      bag_ls	  = bagToList bag_of_warns
+      bag_ls	  = bagToList bag
       sorted_errs = sortLe occ'ed_before bag_ls
 
       occ'ed_before err1 err2 = 

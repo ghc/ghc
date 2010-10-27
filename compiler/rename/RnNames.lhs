@@ -1499,10 +1499,22 @@ exportClashErr global_env name1 name2 ie1 ie2
 	= case lookupGRE_Name global_env name of
 	     (gre:_) -> gre
 	     []	     -> pprPanic "exportClashErr" (ppr name)
-    get_loc name = nameSrcLoc $ gre_name $ get_gre name
+    get_loc name = greSrcSpan (get_gre name)
     (name1', ie1', name2', ie2') = if get_loc name1 < get_loc name2
                                    then (name1, ie1, name2, ie2)
                                    else (name2, ie2, name1, ie1)
+
+-- the SrcSpan that pprNameProvenance prints out depends on whether
+-- the Name is defined locally or not: for a local definition the
+-- definition site is used, otherwise the location of the import
+-- declaration.  We want to sort the export locations in
+-- exportClashErr by this SrcSpan, we need to extract it:
+greSrcSpan :: GlobalRdrElt -> SrcSpan
+greSrcSpan gre
+  | Imported (is:_) <- gre_prov gre = is_dloc (is_decl is)
+  | otherwise                       = name_span
+  where
+    name_span = nameSrcSpan (gre_name gre)
 
 addDupDeclErr :: [Name] -> TcRn ()
 addDupDeclErr []

@@ -33,9 +33,9 @@ import Outputable
 import Pretty           ()
 import Maybes
 import Bag		( emptyBag, listToBag, unitBag )
-
-import MonadUtils       ( MonadIO )
+import MonadUtils
 import Exception
+
 import Control.Monad
 import System.IO
 import System.IO.Unsafe
@@ -46,14 +46,13 @@ import Data.List
 -- | Parse the imports of a source file.
 --
 -- Throws a 'SourceError' if parsing fails.
-getImports :: GhcMonad m =>
-              DynFlags
+getImports :: DynFlags
            -> StringBuffer -- ^ Parse this.
            -> FilePath     -- ^ Filename the buffer came from.  Used for
                            --   reporting parse error locations.
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
-           -> m ([Located (ImportDecl RdrName)], [Located (ImportDecl RdrName)], Located ModuleName)
+           -> IO ([Located (ImportDecl RdrName)], [Located (ImportDecl RdrName)], Located ModuleName)
               -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 1
@@ -66,7 +65,7 @@ getImports dflags buf filename source_filename = do
           ms = (emptyBag, errs)
       -- logWarnings warns
       if errorsFound dflags ms
-        then liftIO $ throwIO $ mkSrcErr errs
+        then throwIO $ mkSrcErr errs
         else
 	  case rdr_module of
 	    L _ (HsModule mb_mod _ imps _ _ _) ->
@@ -114,7 +113,7 @@ mkPrelImports this_mod implicit_prelude import_decls
 
       loc = mkGeneralSrcSpan (fsLit "Implicit import declaration")
 
-parseError :: GhcMonad m => SrcSpan -> Message -> m a
+parseError :: SrcSpan -> Message -> IO a
 parseError span err = throwOneError $ mkPlainErrMsg span err
 
 --------------------------------------------------------------

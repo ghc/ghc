@@ -168,9 +168,8 @@ initTcPrintErrors	-- Used from the interactive loop only
        -> Module 
        -> TcM r
        -> IO (Messages, Maybe r)
-initTcPrintErrors env mod todo = do
-  (msgs, res) <- initTc env HsSrcFile False mod todo
-  return (msgs, res)
+
+initTcPrintErrors env mod todo = initTc env HsSrcFile False mod todo
 \end{code}
 
 %************************************************************************

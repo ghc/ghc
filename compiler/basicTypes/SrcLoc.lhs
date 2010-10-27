@@ -165,11 +165,11 @@ instance Ord SrcLoc where
    
 cmpSrcLoc :: SrcLoc -> SrcLoc -> Ordering
 cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2
-cmpSrcLoc (UnhelpfulLoc _)  _other            = LT
+cmpSrcLoc (UnhelpfulLoc _)  (SrcLoc _ _ _)    = GT
+cmpSrcLoc (SrcLoc _ _ _)    (UnhelpfulLoc _)  = LT
 
 cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
   = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
-cmpSrcLoc (SrcLoc _ _ _) _other = GT
 
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line src_col)

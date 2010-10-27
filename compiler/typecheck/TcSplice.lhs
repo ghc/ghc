@@ -787,7 +787,7 @@ runMeta show_code run_and_convert expr
 	; hsc_env <- getTopEnv
 	; src_span <- getSrcSpanM
 	; either_hval <- tryM $ liftIO $
-			 HscMain.compileExpr hsc_env src_span ds_expr
+			 HscMain.hscCompileCoreExpr hsc_env src_span ds_expr
 	; case either_hval of {
 	    Left exn   -> failWithTc (mk_msg "compile and link" exn) ;
 	    Right hval -> do

@@ -14,12 +14,13 @@ module GhciMonad where
 #include "HsVersions.h"
 
 import qualified GHC
+import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
 import Panic            hiding (showException)
 import Util
 import DynFlags
-import HscTypes hiding (liftIO)
+import HscTypes
 import SrcLoc
 import Module
 import ObjLink
@@ -28,13 +29,10 @@ import StaticFlags
 import qualified MonadUtils
 
 import Exception
--- import Data.Maybe
 import Numeric
 import Data.Array
--- import Data.Char
 import Data.Int         ( Int64 )
 import Data.IORef
--- import Data.List
 import System.CPUTime
 import System.Environment
 import System.IO
@@ -181,10 +179,6 @@ instance GhcMonad (InputT GHCi) where
 instance MonadUtils.MonadIO (InputT GHCi) where
   liftIO = Trans.liftIO
 
-instance WarnLogMonad (InputT GHCi) where
-  setWarnings = lift . setWarnings
-  getWarnings = lift getWarnings
-
 instance ExceptionMonad GHCi where
   gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
   gblock (GHCi m)   = GHCi $ \r -> gblock (m r)
@@ -195,10 +189,6 @@ instance ExceptionMonad GHCi where
                                 g_restore (GHCi m) = GHCi $ \s' -> io_restore (m s')
                              in
                                 unGHCi (f g_restore) s
-
-instance WarnLogMonad GHCi where
-  setWarnings warns = liftGhc $ setWarnings warns
-  getWarnings = liftGhc $ getWarnings
 
 instance MonadIO GHCi where
   liftIO = io
@@ -263,7 +253,7 @@ runStmt expr step = do
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.handleSourceError (\e -> do GHC.printExceptionAndWarnings e
+        GHC.handleSourceError (\e -> do GHC.printException e
                                         return GHC.RunFailed) $ do
           GHC.runStmt expr step
 

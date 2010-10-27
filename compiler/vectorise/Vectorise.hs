@@ -25,6 +25,8 @@ import OccName
 import BasicTypes           ( isLoopBreaker )
 import Outputable
 import Util                 ( zipLazy )
+import MonadUtils
+
 import Control.Monad
 
 debug		= False
