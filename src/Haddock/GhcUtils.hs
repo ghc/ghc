@@ -29,8 +29,11 @@ import Name
 import Packages
 import Module
 import RdrName (GlobalRdrEnv)
+#if MIN_VERSION_ghc(7,1,0)
+import GhcMonad (withSession)
+#endif
 import HscTypes
-#if __GLASGOW_HASKELL__ >= 613
+#if MIN_VERSION_ghc(6,13,0)
 import UniqFM
 #else
 import LazyUniqFM

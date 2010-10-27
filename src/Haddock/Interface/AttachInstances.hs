@@ -25,7 +25,12 @@ import GHC
 import Name
 import InstEnv
 import Class
-import HscTypes (withSession, ioMsg)
+#if MIN_VERSION_ghc(7,1,0)
+import GhcMonad (withSession)
+#else
+import HscTypes (withSession)
+#endif
+import MonadUtils (liftIO)
 import TcRnDriver (tcRnGetInfo)
 import TypeRep hiding (funTyConName)
 import Var hiding (varName)
@@ -93,7 +98,9 @@ lookupInstDoc name iface ifaceMap instIfaceMap =
 -- | Like GHC's getInfo but doesn't cut things out depending on the
 -- interative context, which we don't set sufficiently anyway.
 getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[Instance]))
-getAllInfo name = withSession $ \hsc_env -> ioMsg $ tcRnGetInfo hsc_env name
+getAllInfo name = withSession $ \hsc_env -> do 
+   (_msgs, r) <- liftIO $ tcRnGetInfo hsc_env name
+   return r
 
 
 --------------------------------------------------------------------------------
