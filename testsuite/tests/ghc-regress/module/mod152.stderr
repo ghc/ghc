@@ -6,5 +6,5 @@ mod152.hs:2:26:
 
 mod152.hs:2:26:
     Conflicting exports for `id':
-      `module Prelude' exports `Prelude.id' imported from Prelude
       `id' exports `M.id' defined at mod152.hs:2:36
+      `module Prelude' exports `Prelude.id' imported from Prelude
