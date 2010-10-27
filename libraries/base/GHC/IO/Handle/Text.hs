@@ -861,7 +861,7 @@ bufReadEmpty h_@Handle__{..}
                 bufReadNonEmpty h_ buf' ptr so_far count
  where
   loop :: FD -> Int -> Int -> IO Int
-  loop fd off bytes | bytes <= 0 = return off
+  loop fd off bytes | bytes <= 0 = return (so_far + off)
   loop fd off bytes = do
     r <- RawIO.read (fd::FD) (ptr `plusPtr` off) (fromIntegral bytes)
     if r == 0
