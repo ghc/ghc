@@ -111,6 +111,7 @@ instance  Num Int  where
              | n `eqInt` 0 = 0
              | otherwise   = 1
 
+    {-# INLINE fromInteger #-}	 -- Just to be sure!
     fromInteger i = I# (toInt# i)
 
 quotRemInt :: Int -> Int -> (Int, Int)
