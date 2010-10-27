@@ -1,4 +1,7 @@
 
+mdofail004.hs:1:12:
+    Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead
+
 mdofail004.hs:17:5:
     No instance for (MonadFix X)
       arising from a do statement

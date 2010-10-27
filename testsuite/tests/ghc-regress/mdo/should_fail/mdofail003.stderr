@@ -1,4 +1,7 @@
 
+mdofail003.hs:1:12:
+    Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead
+
 mdofail003.hs:10:9:
     Conflicting definitions for `x'
     Bound at: mdofail003.hs:10:9

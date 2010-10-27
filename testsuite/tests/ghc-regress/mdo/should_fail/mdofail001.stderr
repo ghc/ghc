@@ -1,4 +1,7 @@
 
+mdofail001.hs:1:12:
+    Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead
+
 mdofail001.hs:10:32:
     No instance for (Num Char)
       arising from the literal `1'

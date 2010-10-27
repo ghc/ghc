@@ -1,2 +1,5 @@
 
+readFail045.hs:1:14:
+    Warning: -XNewQualifiedOperators is deprecated: The new qualified operator syntax was rejected by Haskell'
+
 readFail045.hs:6:21: parse error on input `.+'
