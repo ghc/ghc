@@ -871,20 +871,32 @@ tcIfaceExpr (IfaceCase scrut case_bndr ty alts)  = do
      ty' <- tcIfaceType ty
      return (Case scrut' case_bndr' ty' alts')
 
-tcIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body) = do
-    rhs' <- tcIfaceExpr rhs
-    id   <- tcIfaceLetBndr bndr
-    body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
-    return (Let (NonRec id rhs') body')
+tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info) rhs) body)
+  = do	{ name 	  <- newIfaceName (mkVarOccFS fs)
+	; ty'  	  <- tcIfaceType ty
+        ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
+                              name ty' info
+	; let id = mkLocalIdWithInfo name ty' id_info
+        ; rhs' <- tcIfaceExpr rhs
+        ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
+        ; return (Let (NonRec id rhs') body') }
 
-tcIfaceExpr (IfaceLet (IfaceRec pairs) body) = do
-    ids <- mapM tcIfaceLetBndr bndrs
-    extendIfaceIdEnv ids $ do
-     rhss' <- mapM tcIfaceExpr rhss
-     body' <- tcIfaceExpr body
-     return (Let (Rec (ids `zip` rhss')) body')
-  where
-    (bndrs, rhss) = unzip pairs
+tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
+  = do { ids <- mapM tc_rec_bndr (map fst pairs)
+       ; extendIfaceIdEnv ids $ do
+       { pairs' <- zipWithM tc_pair pairs ids
+       ; body' <- tcIfaceExpr body
+       ; return (Let (Rec pairs') body') } }
+ where
+   tc_rec_bndr (IfLetBndr fs ty _) 
+     = do { name <- newIfaceName (mkVarOccFS fs)  
+          ; ty'  <- tcIfaceType ty
+          ; return (mkLocalId name ty') }
+   tc_pair (IfLetBndr _ _ info, rhs) id
+     = do { rhs' <- tcIfaceExpr rhs
+          ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
+                                (idName id) (idType id) info
+          ; return (setIdInfo id id_info, rhs') }
 
 tcIfaceExpr (IfaceCast expr co) = do
     expr' <- tcIfaceExpr expr
@@ -1235,16 +1247,6 @@ bindIfaceBndrs (b:bs) thing_inside
   = bindIfaceBndr b	$ \ b' ->
     bindIfaceBndrs bs	$ \ bs' ->
     thing_inside (b':bs')
-
-
------------------------
-tcIfaceLetBndr :: IfaceLetBndr -> IfL Id
-tcIfaceLetBndr (IfLetBndr fs ty info)
-  = do	{ name <- newIfaceName (mkVarOccFS fs)
-	; ty' <- tcIfaceType ty
-        ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                              name ty' info
-	; return (mkLocalIdWithInfo name ty' id_info) } 
 
 -----------------------
 newExtCoreBndr :: IfaceLetBndr -> IfL Id
