@@ -173,6 +173,20 @@ I measured it on nofib, it didn't make much difference; just a few
 percent improved allocation on one benchmark (bspt/Euclid.space).  
 But nothing got worse.
 
+Note [Don't w/w INLINABLE things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+  {-# INLINABLE f #-}
+  f x y = ....
+then in principle we might get a more efficient loop by w/w'ing f.
+But that would make a new unfolding which would overwrite the old
+one.  So we leave INLINABLE things alone too.
+
+This is a slight infelicity really, because it means that adding
+an INLINABLE pragma could make a program a bit less efficient,
+because you lose the worker/wrapper stuff.  But I don't see a way 
+to avoid that.
+
 Note [Wrapper activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 When should the wrapper inlining be active?  It must not be active
@@ -260,6 +274,7 @@ tryWW is_rec fn_id rhs
 checkSize :: Id -> CoreExpr
 	  -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
  -- See Note [Don't w/w inline things (a) and (b)]
+ -- and Note [Don't w/w INLINABLE things]
 checkSize fn_id rhs thing_inside
   | isStableUnfolding unfolding	   -- For DFuns and INLINE things, leave their
   = return [ (fn_id, rhs) ]	   -- unfolding unchanged; but still attach 
@@ -271,7 +286,8 @@ checkSize fn_id rhs thing_inside
 
   | otherwise = thing_inside
   where
-    unfolding   = idUnfolding fn_id
+    unfolding   = realIdUnfolding fn_id	-- We want to see the unfolding 
+    		  		  	-- for loop breakers!
     inline_rule = mkInlineUnfolding Nothing rhs
 
 ---------------------
