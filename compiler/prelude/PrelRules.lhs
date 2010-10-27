@@ -39,7 +39,8 @@ import StaticFlags ( opt_SimplExcessPrecision )
 import Constants
 
 import Data.Bits as Bits
-import Data.Word        ( Word )
+import Data.Int    ( Int64 )
+import Data.Word   ( Word, Word64 )
 \end{code}
 
 
@@ -142,15 +143,15 @@ primOpRules op op_name = primop_rule op
     primop_rule CharEqOp   = relop (==) ++ litEq op_name True
     primop_rule CharNeOp   = relop (/=) ++ litEq op_name False
 
-    primop_rule IntGtOp    = relop (>)
-    primop_rule IntGeOp    = relop (>=)
-    primop_rule IntLeOp    = relop (<=)
-    primop_rule IntLtOp    = relop (<)
+    primop_rule IntGtOp    = relop (>)  ++ boundsCmp op_name Gt
+    primop_rule IntGeOp    = relop (>=) ++ boundsCmp op_name Ge
+    primop_rule IntLeOp    = relop (<=) ++ boundsCmp op_name Le
+    primop_rule IntLtOp    = relop (<)  ++ boundsCmp op_name Lt
 
-    primop_rule CharGtOp   = relop (>)
-    primop_rule CharGeOp   = relop (>=)
-    primop_rule CharLeOp   = relop (<=)
-    primop_rule CharLtOp   = relop (<)
+    primop_rule CharGtOp   = relop (>)  ++ boundsCmp op_name Gt
+    primop_rule CharGeOp   = relop (>=) ++ boundsCmp op_name Ge
+    primop_rule CharLeOp   = relop (<=) ++ boundsCmp op_name Le
+    primop_rule CharLtOp   = relop (<)  ++ boundsCmp op_name Lt
 
     primop_rule FloatGtOp  = relop (>)
     primop_rule FloatGeOp  = relop (>=)
@@ -166,10 +167,10 @@ primOpRules op op_name = primop_rule op
     primop_rule DoubleEqOp = relop (==)
     primop_rule DoubleNeOp = relop (/=)
 
-    primop_rule WordGtOp   = relop (>)
-    primop_rule WordGeOp   = relop (>=)
-    primop_rule WordLeOp   = relop (<=)
-    primop_rule WordLtOp   = relop (<)
+    primop_rule WordGtOp   = relop (>)  ++ boundsCmp op_name Gt
+    primop_rule WordGeOp   = relop (>=) ++ boundsCmp op_name Ge
+    primop_rule WordLeOp   = relop (<=) ++ boundsCmp op_name Le
+    primop_rule WordLtOp   = relop (<)  ++ boundsCmp op_name Lt
     primop_rule WordEqOp   = relop (==)
     primop_rule WordNeOp   = relop (/=)
 
@@ -349,6 +350,53 @@ litEq op_name is_eq
                | otherwise = falseVal
     val_if_neq | is_eq     = falseVal
                | otherwise = trueVal
+
+
+-- | Check if there is comparison with minBound or maxBound, that is
+-- always true or false. For instance, an Int cannot be smaller than its
+-- minBound, so we can replace such comparison with False.
+boundsCmp :: Name -> Comparison -> [CoreRule]
+boundsCmp op_name op = [ rule ]
+  where
+    rule = BuiltinRule
+      { ru_name = occNameFS (nameOccName op_name)
+                    `appendFS` (fsLit "min/maxBound")
+      , ru_fn = op_name
+      , ru_nargs = 2
+      , ru_try = rule_fn
+      }
+    rule_fn _ [a, b] = mkRuleFn op a b
+    rule_fn _ _      = Nothing
+
+data Comparison = Gt | Ge | Lt | Le
+
+mkRuleFn :: Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
+mkRuleFn Gt (Lit lit) _ | isMinBound lit = Just falseVal
+mkRuleFn Le (Lit lit) _ | isMinBound lit = Just trueVal
+mkRuleFn Ge _ (Lit lit) | isMinBound lit = Just trueVal
+mkRuleFn Lt _ (Lit lit) | isMinBound lit = Just falseVal
+mkRuleFn Ge (Lit lit) _ | isMaxBound lit = Just trueVal
+mkRuleFn Lt (Lit lit) _ | isMaxBound lit = Just falseVal
+mkRuleFn Gt _ (Lit lit) | isMaxBound lit = Just falseVal
+mkRuleFn Le _ (Lit lit) | isMaxBound lit = Just trueVal
+mkRuleFn _ _ _                           = Nothing
+
+isMinBound :: Literal -> Bool
+isMinBound (MachChar c)   = c == minBound
+isMinBound (MachInt i)    = i == toInteger (minBound :: Int)
+isMinBound (MachInt64 i)  = i == toInteger (minBound :: Int64)
+isMinBound (MachWord i)   = i == toInteger (minBound :: Word)
+isMinBound (MachWord64 i) = i == toInteger (minBound :: Word64)
+isMinBound _              = False
+
+isMaxBound :: Literal -> Bool
+isMaxBound (MachChar c)   = c == maxBound
+isMaxBound (MachInt i)    = i == toInteger (maxBound :: Int)
+isMaxBound (MachInt64 i)  = i == toInteger (maxBound :: Int64)
+isMaxBound (MachWord i)   = i == toInteger (maxBound :: Word)
+isMaxBound (MachWord64 i) = i == toInteger (maxBound :: Word64)
+isMaxBound _              = False
+
 
 -- Note that we *don't* warn the user about overflow. It's not done at
 -- runtime either, and compilation of completely harmless things like
