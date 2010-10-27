@@ -195,7 +195,7 @@ safeLoad :: LoadHowMuch -> Ghc SuccessFlag
 safeLoad mode = do
   _dflags <- getSessionDynFlags
   ghandle (\(e :: SomeException) -> liftIO (print e) >> return Failed ) $
-    handleSourceError (\e -> printExceptionAndWarnings e >> return Failed) $
+    handleSourceError (\e -> printException e >> return Failed) $
       load mode
 
 
@@ -221,7 +221,7 @@ graphData graph handles = do
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms
               in handleSourceError (\e -> do
-                                       printExceptionAndWarnings e
+                                       printException e
                                        liftIO $ exitWith (ExitFailure 1)) $
                   do liftIO $ putStrLn ("loading " ++ filename)
                      mod <- loadModule =<< typecheckModule =<< parseModule ms
