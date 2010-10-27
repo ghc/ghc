@@ -542,8 +542,9 @@ tcSpec poly_id prag@(SpecSig _ hs_ty inl)
   --          for the selector Id, but the poly_id is something like $cop
   = addErrCtxt (spec_ctxt prag) $
     do  { spec_ty <- tcHsSigType sig_ctxt hs_ty
-        ; checkTc (isOverloadedTy poly_ty)
-                  (ptext (sLit "Discarding pragma for non-overloaded function") <+> quotes (ppr poly_id))
+        ; warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
+                 (ptext (sLit "SPECIALISE pragma for non-overloaded function") <+> quotes (ppr poly_id))
+		  -- Note [SPECIALISE pragmas]
         ; wrap <- tcSubType origin skol_info (idType poly_id) spec_ty
         ; return (SpecPrag poly_id wrap inl) }
   where
@@ -602,6 +603,26 @@ forall_a_a :: TcType
 forall_a_a = mkForAllTy openAlphaTyVar (mkTyVarTy openAlphaTyVar)
 \end{code}
 
+Note [SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+There is no point in a SPECIALISE pragma for a non-overloaded function:
+   reverse :: [a] -> [a]
+   {-# SPECIALISE reverse :: [Int] -> [Int] #-}
+
+But SPECIALISE INLINE *can* make sense for GADTS:
+   data Arr e where
+     ArrInt :: !Int -> ByteArray# -> Arr Int
+     ArrPair :: !Int -> Arr e1 -> Arr e2 -> Arr (e1, e2)
+
+   (!:) :: Arr e -> Int -> e
+   {-# SPECIALISE INLINE (!:) :: Arr Int -> Int -> Int #-}  
+   {-# SPECIALISE INLINE (!:) :: Arr (a, b) -> Int -> (a, b) #-}
+   (ArrInt _ ba)     !: (I# i) = I# (indexIntArray# ba i)
+   (ArrPair _ a1 a2) !: i      = (a1 !: i, a2 !: i)
+
+When (!:) is specialised it becomes non-recursive, and can usefully
+be inlined.  Scary!  So we only warn for SPECIALISE *without* INLINE
+for a non-overloaded function.
 
 %************************************************************************
 %*                                                                      *
