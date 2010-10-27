@@ -55,3 +55,13 @@ test('T3738',
      compile_and_run,
      ['-O'])
 
+test('MethSharing',
+     [stats_num_field('peak_megabytes_allocated', 1,
+                                                  1),
+                                     # expected value: 1 (amd64/Linux)
+      stats_num_field('bytes allocated', 5000000000,
+                                         6000000000),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
