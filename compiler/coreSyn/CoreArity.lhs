@@ -376,51 +376,54 @@ Note [ArityType]
 ~~~~~~~~~~~~~~~~
 ArityType is the result of a compositional analysis on expressions,
 from which we can decide the real arity of the expression (extracted
-with function getArity).
+with function exprEtaExpandArity).
 
-Here is what the fields mean. If e has ArityType 
-     (AT as r), where n = length as, 
-then
+Here is what the fields mean. If an arbitrary expression 'f' has 
+ArityType 'at', then
 
- * If r is ABot then (e x1..xn) definitely diverges
-   Partial applications may or may not diverge
+ * If at = ABot n, then (f x1..xn) definitely diverges. Partial
+   applications to fewer than n args may *or may not* diverge.
 
- * If r is ACheap then (e x1..x(n-1)) is cheap,
-   including any nested sub-expressions inside e
-   (say e is (f e1 e2) then e1,e2 are cheap too)
+   We allow ourselves to eta-expand bottoming functions, even
+   if doing so may lose some `seq` sharing, 
+       let x = <expensive> in \y. error (g x y)
+       ==> \y. let x = <expensive> in error (g x y)
 
- * e, (e x1), ... (e x1 ... x(n-1)) are definitely really 
-   functions, or bottom, not casts from a data type
-   So eta expansion is dynamically ok; 
-    see Note [State hack and bottoming functions], 
-    the part about catch#
+ * If at = ATop as, and n=length as, 
+   then expanding 'f' to (\x1..xn. f x1 .. xn) loses no sharing, 
+   assuming the calls of f respect the one-shot-ness of of
+   its definition.  
 
-We regard ABot as stronger than ACheap; ie if ABot holds
-we don't bother about ACheap
+   NB 'f' is an arbitary expression, eg (f = g e1 e2).  This 'f'
+   can have ArityType as ATop, with length as > 0, only if e1 e2 are 
+   themselves.
+
+ * In both cases, f, (f x1), ... (f x1 ... f(n-1)) are definitely
+   really functions, or bottom, but *not* casts from a data type, in
+   at least one case branch.  (If it's a function in one case branch but
+   an unsafe cast from a data type in another, the program is bogus.)
+   So eta expansion is dynamically ok; see Note [State hack and
+   bottoming functions], the part about catch#
+
+Example: 
+      f = \x\y. let v = <expensive> in 
+          \s(one-shot) \t(one-shot). blah
+      'f' has ArityType [ManyShot,ManyShot,OneShot,OneShot]
+      The one-shot-ness means we can, in effect, push that
+      'let' inside the \st.
+
 
 Suppose f = \xy. x+y
-Then  f             :: AT [False,False] ACheap
-      f v           :: AT [False] 	ACheap
-      f <expensive> :: AT [False] 	ATop
-Note the ArityRes flag tells whether the whole expression is cheap.
-Note also that having a non-empty 'as' doesn't mean it has that
-arity; see (f <expensive>) which does not have arity 1!
-
-The key function getArity extracts the arity (which in turn guides
-eta-expansion) from ArityType. 
-  * If the term is cheap or diverges we can certainly eta expand it
-      e.g.   (f x)   where x has arity 2
-  
-  * If its a function whose first arg is one-shot (probably via the
-    state hack) we can eta expand it
-      e.g.   (getChar <expensive>)  
+Then  f             :: AT [False,False] ATop
+      f v           :: AT [False] 	ATop
+      f <expensive> :: AT [] 	        ATop
 
 -------------------- Main arity code ----------------------------
 \begin{code}
 -- See Note [ArityType]
-data ArityType = AT [OneShot] ArityRes
+data ArityType = ATop [OneShot] | ABot Arity
      -- There is always an explicit lambda
-     -- to justify the [OneShot]
+     -- to justify the [OneShot], or the Arity
 
 type OneShot = Bool    -- False <=> Know nothing
                        -- True  <=> Can definitely float inside this lambda
@@ -428,10 +431,8 @@ type OneShot = Bool    -- False <=> Know nothing
 		       -- is marked one-shot, or because it's a state lambda
 		       -- and we have the state hack on
 
-data ArityRes  = ATop | ACheap | ABot
-
 vanillaArityType :: ArityType
-vanillaArityType = AT [] ATop	-- Totally uninformative
+vanillaArityType = ATop []	-- Totally uninformative
 
 -- ^ The Arity returned is the number of value args the [_$_]
 -- expression can be applied to without doing much work
@@ -440,51 +441,88 @@ exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
 -- 	e  ==>  \xy -> e x y
 exprEtaExpandArity dflags e
   = case (arityType dicts_cheap e) of
-      AT (a:as) res | want_eta a res -> 1 + length as
-      _                              -> 0
+      ATop (os:oss) 
+        | os || has_lam e -> 1 + length oss	-- Note [Eta expanding thunks]
+        | otherwise       -> 0
+      ATop []             -> 0
+      ABot n              -> n
   where
-    want_eta one_shot ATop   = one_shot
-    want_eta _        _      = True
-
     dicts_cheap = dopt Opt_DictsCheap dflags
+    has_lam (Note _ e) = has_lam e
+    has_lam (Lam b e)  = isId b || has_lam e
+    has_lam _          = False
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
-getBotArity (AT as ABot) = Just (length as)
-getBotArity _            = Nothing
+getBotArity (ABot n) = Just n
+getBotArity _        = Nothing
+\end{code}
 
+Note [Eta expanding thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we see
+     f = case y of p -> \x -> blah
+should we eta-expand it? Well, if 'x' is a one-shot state token 
+then 'yes' because 'f' will only be applied once.  But otherwise
+we (conservatively) say no.  My main reason is to avoid expanding
+PAPSs
+	f = g d  ==>  f = \x. g d x
+because that might in turn make g inline (if it has an inline pragma), 
+which we might not want.  After all, INLINE pragmas say "inline only
+when saturate" so we don't want to be too gung-ho about saturating!
+
+\begin{code}
 arityLam :: Id -> ArityType -> ArityType
-arityLam id (AT as r) = AT (isOneShotBndr id : as) r
+arityLam id (ATop as) = ATop (isOneShotBndr id : as)
+arityLam _  (ABot n)  = ABot (n+1)
 
 floatIn :: Bool -> ArityType -> ArityType
 -- We have something like (let x = E in b), 
 -- where b has the given arity type.  
-floatIn c (AT as r) = AT as (extendArityRes r c)
+floatIn _     (ABot n)  = ABot n
+floatIn True  (ATop as) = ATop as
+floatIn False (ATop as) = ATop (takeWhile id as)
+   -- If E is not cheap, keep arity only for one-shots
 
 arityApp :: ArityType -> CoreExpr -> ArityType
 -- Processing (fun arg) where at is the ArityType of fun,
-arityApp (AT [] r)     arg = AT [] (extendArityRes r (exprIsCheap arg))
-arityApp (AT (_:as) r) arg = AT as (extendArityRes r (exprIsCheap arg))
-
-extendArityRes :: ArityRes -> Bool -> ArityRes
-extendArityRes ABot   _    = ABot
-extendArityRes ACheap True = ACheap
-extendArityRes _      _    = ATop
+-- Knock off an argument and behave like 'let'
+arityApp (ABot 0)      _   = ABot 0
+arityApp (ABot n)      _   = ABot (n-1)
+arityApp (ATop [])     _   = ATop []
+arityApp (ATop (_:as)) arg = floatIn (exprIsCheap arg) (ATop as)
 
 andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
-andArityType (AT as1 r1) (AT as2 r2) 
-  = AT (go_as as1 as2) (go_r r1 r2)
-  where
-    go_r ABot ABot     = ABot
-    go_r ABot ACheap   = ACheap
-    go_r ACheap ABot   = ACheap
-    go_r ACheap ACheap = ACheap
-    go_r _    _        = ATop
+andArityType (ABot n1) (ABot n2) 
+  = ABot (n1 `min` n2)
+andArityType (ATop as)  (ABot _)  = ATop as
+andArityType (ABot _)   (ATop bs) = ATop bs
+andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
+  where	     -- See Note [Combining case branches]
+    combine (a:as) (b:bs) = (a && b) : combine as bs
+    combine []     bs     = take_one_shots bs
+    combine as     []     = take_one_shots as
 
-    go_as (os1:as1) (os2:as2) = (os1 || os2) : go_as as1 as2
-    go_as []        as2       = as2 
-    go_as as1       []        = as1
+    take_one_shots [] = []
+    take_one_shots (one_shot : as) 
+      | one_shot  = True : take_one_shots as
+      | otherwise = [] 
 \end{code}
+
+Note [Combining case branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider    
+  go = \x. let z = go e0
+               go2 = \x. case x of
+                           True  -> z
+                           False -> \s(one-shot). e1
+           in go2 x
+We *really* want to eta-expand go and go2.  
+When combining the barnches of the case we have
+     ATop [] `andAT` ATop [True]
+and we want to get ATop [True].  But if the inner
+lambda wasn't one-shot we don't want to do this.
+(We need a proper arity analysis to justify that.)
 
 
 \begin{code}
@@ -493,16 +531,13 @@ arityType :: Bool -> CoreExpr -> ArityType
 arityType _ (Var v)
   | Just strict_sig <- idStrictness_maybe v
   , (ds, res) <- splitStrictSig strict_sig
-  = mk_arity (length ds) res
+  , let arity = length ds
+  = if isBotRes res then ABot arity
+                    else ATop (take arity one_shots)
   | otherwise
-  = mk_arity (idArity v) TopRes
-
+  = ATop (take (idArity v) one_shots)
   where
-    mk_arity id_arity res 
-      | isBotRes res = AT (take id_arity one_shots) ABot
-      | id_arity>0   = AT (take id_arity one_shots) ACheap
-      | otherwise    = AT []                        ATop
-
+    one_shots :: [Bool]	    -- One-shot-ness derived from the type
     one_shots = typeArity (idType v)
 
 	-- Lambdas; increase arity
@@ -645,7 +680,7 @@ etaExpand n orig_expr
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
     go n (Lam v body) | isTyCoVar v = Lam v (go n     body)
-       	              | otherwise = Lam v (go (n-1) body)
+       	              | otherwise   = Lam v (go (n-1) body)
     go n (Cast expr co) = Cast (go n expr) co
     go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
        	 		  etaInfoAbs etas (etaInfoApp subst' expr etas)
