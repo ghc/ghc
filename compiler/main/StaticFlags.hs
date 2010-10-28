@@ -39,7 +39,6 @@ module StaticFlags (
 	opt_Parallel,
 
 	-- optimisation opts
-	opt_DsMultiTyVar,
 	opt_NoStateHack,
         opt_SimpleListLiterals,
 	opt_CprOff,
@@ -226,11 +225,6 @@ opt_IrrefutableTuples		= lookUp  (fsLit "-firrefutable-tuples")
 
 opt_Parallel :: Bool
 opt_Parallel			= lookUp  (fsLit "-fparallel")
-
--- optimisation opts
-opt_DsMultiTyVar :: Bool
-opt_DsMultiTyVar		= not (lookUp (fsLit "-fno-ds-multi-tyvar"))
-	-- On by default
 
 opt_SimpleListLiterals :: Bool
 opt_SimpleListLiterals	        = lookUp  (fsLit "-fsimple-list-literals")

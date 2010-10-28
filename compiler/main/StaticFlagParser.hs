@@ -177,7 +177,6 @@ isStaticFlag f =
     "dno-black-holing",
     "fno-state-hack",
     "fsimple-list-literals",
-    "fno-ds-multi-tyvar",
     "fruntime-types",
     "fno-pre-inlining",
     "fexcess-precision",
