@@ -223,7 +223,7 @@ data DynFlag
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
-   | Opt_MethodSharing
+   | Opt_MethodSharing	-- Now a no-op; remove in GHC 7.2
    | Opt_DictsCheap
    | Opt_EnableRewriteRules		-- Apply rewrite rules during simplification
    | Opt_Vectorise
@@ -1446,7 +1446,9 @@ fFlags = [
   ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
   ( "case-merge",                       Opt_CaseMerge, nop ),
   ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
-  ( "method-sharing",                   Opt_MethodSharing, nop ),
+  ( "method-sharing",                   Opt_MethodSharing, 
+     \_ -> deprecate "doesn't do anything any more"),
+     -- Remove altogether in GHC 7.2
   ( "dicts-cheap",                      Opt_DictsCheap, nop ),
   ( "excess-precision",                 Opt_ExcessPrecision, nop ),
   ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),
@@ -1617,8 +1619,6 @@ defaultFlags :: [DynFlag]
 defaultFlags 
   = [ Opt_AutoLinkPackages,
       Opt_ReadUserPackageConf,
-
-      Opt_MethodSharing,
 
       Opt_DoAsmMangling,
 
@@ -1969,7 +1969,6 @@ setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , specConstrCount     = Nothing
                                          })
                    `dopt_set`   Opt_DictsCheap
-                   `dopt_unset` Opt_MethodSharing
 
 data DPHBackend = DPHPar
                 | DPHSeq
