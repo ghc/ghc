@@ -808,19 +808,13 @@ endif # Windows
 
 ifneq "$(BINDIST)" "YES"
 $(ghc-prim-$(libraries/ghc-prim_dist-install_VERSION)_HADDOCK_FILE): \
-    libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs \
-    libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs
+    libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
 endif # BINDIST
 
 libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs: \
                             $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
                           | $$(dir $$@)/.
 	"$(GENPRIMOP_INPLACE)" --make-haskell-source < $< > $@
-
-libraries/ghc-prim/dist-install/build/autogen/GHC/PrimopWrappers.hs: \
-                            $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE) \
-                          | $$(dir $$@)/.
-	"$(GENPRIMOP_INPLACE)" --make-haskell-wrappers < $< > $@
 
 .PHONY: tags
 tags: tags_compiler
