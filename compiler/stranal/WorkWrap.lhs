@@ -141,9 +141,8 @@ the business.
 
 The only reason this is monadised is for the unique supply.
 
-Note [Don't w/w inline things (a)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Don't w/w INLINE things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very important to refrain from w/w-ing an INLINE function (ie one
 with an InlineRule) because the wrapper will then overwrite the
 InlineRule unfolding.
@@ -160,19 +159,6 @@ Notice that we refrain from w/w'ing an INLINE function even if it is
 in a recursive group.  It might not be the loop breaker.  (We could
 test for loop-breaker-hood, but I'm not sure that ever matters.)
 
-Note [Don't w/w inline things (b)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general, we refrain from w/w-ing *small* functions, because they'll
-inline anyway.  But we must take care: it may look small now, but get
-to be big later after other inling has happened.  So we take the
-precaution of adding an INLINE pragma to any such functions.
-
-I made this change when I observed a big function at the end of
-compilation with a useful strictness signature but no w-w.  When 
-I measured it on nofib, it didn't make much difference; just a few
-percent improved allocation on one benchmark (bspt/Euclid.space).  
-But nothing got worse.
-
 Note [Don't w/w INLINABLE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have
@@ -186,6 +172,20 @@ This is a slight infelicity really, because it means that adding
 an INLINABLE pragma could make a program a bit less efficient,
 because you lose the worker/wrapper stuff.  But I don't see a way 
 to avoid that.
+
+Note [Don't w/w inline small non-loop-breker things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, we refrain from w/w-ing *small* functions, which are not
+loop breakers, because they'll inline anyway.  But we must take care:
+it may look small now, but get to be big later after other inlining
+has happened.  So we take the precaution of adding an INLINE pragma to
+any such functions.
+
+I made this change when I observed a big function at the end of
+compilation with a useful strictness signature but no w-w.  When 
+I measured it on nofib, it didn't make much difference; just a few
+percent improved allocation on one benchmark (bspt/Euclid.space).  
+But nothing got worse.
 
 Note [Wrapper activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -273,21 +273,22 @@ tryWW is_rec fn_id rhs
 ---------------------
 checkSize :: Id -> CoreExpr
 	  -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
- -- See Note [Don't w/w inline things (a) and (b)]
- -- and Note [Don't w/w INLINABLE things]
 checkSize fn_id rhs thing_inside
-  | isStableUnfolding unfolding	   -- For DFuns and INLINE things, leave their
-  = return [ (fn_id, rhs) ]	   -- unfolding unchanged; but still attach 
-    	     	     	  	   -- strictness info to the Id	
+  | isStableUnfolding (realIdUnfolding fn_id)
+  = return [ (fn_id, rhs) ]
+      -- See Note [Don't w/w INLINABLE things]
+      -- and Note [Don't w/w INLINABLABLE things]
+      -- NB: use realIdUnfolding because we want to see the unfolding
+      --     even if it's a loop breaker!
 
-  | certainlyWillInline unfolding
+  | certainlyWillInline (idUnfolding fn_id)
   = return [ (fn_id `setIdUnfolding` inline_rule, rhs) ]
-		-- Note [Don't w/w inline things (b)]
+	-- Note [Don't w/w inline small non-loop-breaker things]
+	-- NB: use idUnfolding because we don't want to apply
+	--     this criterion to a loop breaker!
 
   | otherwise = thing_inside
   where
-    unfolding   = realIdUnfolding fn_id	-- We want to see the unfolding 
-    		  		  	-- for loop breakers!
     inline_rule = mkInlineUnfolding Nothing rhs
 
 ---------------------
