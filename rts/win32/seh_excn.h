@@ -25,11 +25,11 @@
  *
  * seh_excn provides two macros, BEGIN_CATCH and END_CATCH, which
  * will catch such exceptions in the code they bracket and die by
- * printing a message and calling exit(1).
+ * printing a message and calling stg_exit(1).
  */
-#define ON_DIV_ZERO fprintf(stdout,"divide by zero\n"); fflush(stdout);exit(1)
-#define ON_STACK_OVERFLOW fprintf(stdout,"C stack overflow in generated code\n"); fflush(stdout); exit(1)
-#define ON_SIGSEGV fprintf(stdout,"Segmentation fault/access violation in generated code\n"); fflush(stdout); exit(1)
+#define ON_DIV_ZERO fprintf(stdout,"divide by zero\n"); fflush(stdout);stg_exit(1)
+#define ON_STACK_OVERFLOW fprintf(stdout,"C stack overflow in generated code\n"); fflush(stdout); stg_exit(1)
+#define ON_SIGSEGV fprintf(stdout,"Segmentation fault/access violation in generated code\n"); fflush(stdout); stg_exit(1)
 
 #if defined(__MINGW32__)
 extern jmp_buf seh_unwind_to;

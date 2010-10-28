@@ -51,7 +51,7 @@ failure(char *msg) {
   } else {
     fprintf(stderr,"(perhaps remove .tix file?)\n");
   }
-  exit(-1);
+  stg_exit(1);
 }
 
 static int init_open(FILE *file) {
@@ -235,7 +235,7 @@ hs_hpc_module(char *modName,
 	fprintf(stderr,"in module '%s'\n",tmpModule->modName);
 	failure("module mismatch with .tix/.mix file hash number");
 	fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
-	exit(-1);
+	stg_exit(1);
 
       }
       for(i=0;i < modCount;i++) {

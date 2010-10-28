@@ -1109,7 +1109,7 @@ static void ghciInsertStrHashTable ( char* obj_name,
       (char*)key,
       obj_name
    );
-   exit(1);
+   stg_exit(1);
 }
 /* -----------------------------------------------------------------------------
  * initialize the object linker

@@ -554,7 +554,7 @@ error = rtsTrue;
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
                       printRtsInfo();
-                      exit(0);
+                      stg_exit(0);
                   }
                   else {
 		      errorBelch("unknown RTS option: %s",rts_argv[arg]);
