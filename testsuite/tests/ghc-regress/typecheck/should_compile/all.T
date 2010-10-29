@@ -330,4 +330,5 @@ test('T4401', normal, compile, [''])
 test('T4404', expect_broken(4404), compile, ['-Wall'])
 test('HasKey', normal, compile, [''])
 test('T4418', normal, compile, [''])
+test('T4444', normal, compile, [''])
      
