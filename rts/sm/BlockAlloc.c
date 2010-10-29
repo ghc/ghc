@@ -333,6 +333,7 @@ allocGroup (nat n)
         // only the bdescrs of the first MB are required to be initialised
         initGroup(bd);
 
+        IF_DEBUG(sanity,memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
         IF_DEBUG(sanity, checkFreeListSanity());
         return bd;
     }
@@ -382,6 +383,7 @@ allocGroup (nat n)
         barf("allocGroup: free list corrupted");
     }
     initGroup(bd);		// initialise it
+    IF_DEBUG(sanity,memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
     ASSERT(bd->blocks == n);
     return bd;
