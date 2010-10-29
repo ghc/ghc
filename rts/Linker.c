@@ -4976,7 +4976,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
     for(i=0;i<segLC->nsects;i++)
     {
-//	IF_DEBUG(linker, debugBelch("ocGetNames_MachO: segment %d\n"));
+        IF_DEBUG(linker, debugBelch("ocGetNames_MachO: segment %d\n", i));
         if (sections[i].size == 0)
             continue;
 
