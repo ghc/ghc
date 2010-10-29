@@ -45,7 +45,7 @@ allocNew(nat n) {
     alloc_rec* rec;
     rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
     rec->size = (n+1)*MBLOCK_SIZE;
-    rec->base = 
+    rec->base =
         VirtualAlloc(NULL, rec->size, MEM_RESERVE, PAGE_READWRITE);
     if(rec->base==0) {
         stgFree((void*)rec);
@@ -58,8 +58,8 @@ allocNew(nat n) {
                 "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed", n);
         }
     } else {
-		alloc_rec temp;
-		temp.base=0; temp.size=0; temp.next=allocs;
+        alloc_rec temp;
+        temp.base=0; temp.size=0; temp.next=allocs;
 
         alloc_rec* it;
         it=&temp;
@@ -67,7 +67,7 @@ allocNew(nat n) {
         rec->next=it->next;
         it->next=rec;
 
-		allocs=temp.next;
+        allocs=temp.next;
     }
     return rec;
 }
@@ -168,8 +168,8 @@ commitBlocks(char* base, int size) {
         temp = VirtualAlloc(base, size_delta, MEM_COMMIT, PAGE_READWRITE);
         if(temp==0) {
             sysErrorBelch("getMBlocks: VirtualAlloc MEM_COMMIT failed");
-	    stg_exit(EXIT_FAILURE);
-	}
+            stg_exit(EXIT_FAILURE);
+        }
         size-=size_delta;
         base+=size_delta;
     }
@@ -183,12 +183,12 @@ osGetMBlocks(nat n) {
         alloc_rec* alloc;
         alloc = allocNew(n);
         /* We already belch in allocNew if it fails */
-	if (alloc == 0) {
-	    stg_exit(EXIT_FAILURE);
-	} else {
+        if (alloc == 0) {
+            stg_exit(EXIT_FAILURE);
+        } else {
             insertFree(alloc->base, alloc->size);
             ret = findFreeBlocks(n);
-	}
+        }
     }
 
     if(ret!=0) {
@@ -261,7 +261,7 @@ osFreeAllMBlocks(void)
         for(; it!=0; ) {
             if(!VirtualFree((void*)it->base, 0, MEM_RELEASE)) {
                 sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed");
-		stg_exit(EXIT_FAILURE);
+                stg_exit(EXIT_FAILURE);
             }
             next = it->next;
             stgFree(it);
@@ -274,23 +274,23 @@ lnat getPageSize (void)
 {
     static lnat pagesize = 0;
     if (pagesize) {
-	return pagesize;
+        return pagesize;
     } else {
-	SYSTEM_INFO sSysInfo;
-	GetSystemInfo(&sSysInfo);
-	pagesize = sSysInfo.dwPageSize;
-	return pagesize;
+        SYSTEM_INFO sSysInfo;
+        GetSystemInfo(&sSysInfo);
+        pagesize = sSysInfo.dwPageSize;
+        return pagesize;
     }
 }
 
 void setExecutable (void *p, lnat len, rtsBool exec)
 {
     DWORD dwOldProtect = 0;
-    if (VirtualProtect (p, len, 
-			exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE, 
-			&dwOldProtect) == 0)
+    if (VirtualProtect (p, len,
+                        exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE,
+                        &dwOldProtect) == 0)
     {
-	sysErrorBelch("setExecutable: failed to protect 0x%p; old protection: %lu\n",
+        sysErrorBelch("setExecutable: failed to protect 0x%p; old protection: %lu\n",
                       p, (unsigned long)dwOldProtect);
         stg_exit(EXIT_FAILURE);
     }
