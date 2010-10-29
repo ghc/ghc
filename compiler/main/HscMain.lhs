@@ -135,7 +135,6 @@ import DynFlags
 import ErrUtils
 import UniqSupply	( mkSplitUniqSupply )
 
-import MonadUtils
 import Outputable
 import HscStats		( ppSourceStats )
 import HscTypes
