@@ -1323,7 +1323,7 @@ loop2:
     foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
     
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
-    RET_P(val);
+    RET_NP(1,val);
 }
 
 
@@ -1452,7 +1452,7 @@ loop:
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = val;
     	unlockClosure(mvar, stg_MVAR_DIRTY_info);
-	jump %ENTRY_CODE(Sp(0));
+        RET_N(1);
     }
     if (StgHeader_info(q) == stg_IND_info ||
         StgHeader_info(q) == stg_MSG_NULL_info) {
@@ -1490,7 +1490,7 @@ loop2:
     foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
-    jump %ENTRY_CODE(Sp(0));
+    RET_N(1);
 }
 
 
