@@ -15,7 +15,7 @@ module Panic
      ghcError, progName,
      pgmError,
 
-     panic, panicFastInt, assertPanic, trace,
+     panic, sorry, panicFastInt, assertPanic, trace,
      
      Exception.Exception(..), showException, try, tryMost, throwTo,
 
@@ -61,12 +61,14 @@ ghcError e = Exception.throw e
 -- assumed to contain a location already, so we don't print one).
 
 data GhcException
-  = PhaseFailed String		-- name of phase 
-  		ExitCode	-- an external phase (eg. cpp) failed
+  = PhaseFailed  String		-- name of phase 
+  		 ExitCode	-- an external phase (eg. cpp) failed
   | Signal Int                  -- some other fatal signal (SIGHUP,SIGTERM)
-  | UsageError String		-- prints the short usage msg after the error
+  | UsageError   String		-- prints the short usage msg after the error
   | CmdLineError String		-- cmdline prob, but doesn't print usage
-  | Panic String		-- the `impossible' happened
+  | Panic        String		-- the `impossible' happened
+  | Sorry        String		-- the user tickled something that's known not to work yet, 
+				-- and we're not counting it as a bug.
   | InstallationError String	-- an installation problem
   | ProgramError String		-- error in the user's code, probably
   deriving Eq
@@ -113,6 +115,11 @@ showGhcException (Panic s)
 		 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
 	         ++ s ++ "\n\n"
 	         ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n")
+showGhcException (Sorry s)
+   = showString ("sorry! (this is work in progress)\n"
+		 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
+	         ++ s ++ "\n")
+
 
 throwGhcException :: GhcException -> a
 throwGhcException = Exception.throw
@@ -130,8 +137,9 @@ instance Typeable GhcException where
 Panics and asserts.
 
 \begin{code}
-panic, pgmError :: String -> a
+panic, sorry, pgmError :: String -> a
 panic    x = throwGhcException (Panic x)
+sorry    x = throwGhcException (Sorry x)
 pgmError x = throwGhcException (ProgramError x)
 
 --  #-versions because panic can't return an unboxed int, and that's

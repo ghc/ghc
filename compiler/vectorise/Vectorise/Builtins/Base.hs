@@ -117,7 +117,15 @@ indexBuiltin
 
 indexBuiltin fn f i bi
   | inRange (bounds xs) i = xs ! i
-  | otherwise 		  = pprPanic fn (ppr i)
+  | otherwise 		  
+  = pprSorry "Vectorise.Builtins.indexBuiltin" 
+  	(vcat	[ text ""
+		, text "DPH builtin function '" <> text fn <> text "' of size '" <> ppr i <> text "' is not yet implemented."
+		, text "This function does not appear in your source program, but it is needed"
+		, text "to compile your code in the backend. This is a known, current limitation"
+		, text "of DPH. If you want it to to work you should send mail to cvs-ghc@haskell.org"
+		, text "and ask what you can do to help (it might involve some GHC hacking)."])
+
   where	xs = f bi
 
 

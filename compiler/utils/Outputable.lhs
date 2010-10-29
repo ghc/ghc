@@ -59,9 +59,9 @@ module Outputable (
         mkUserStyle, cmdlineParserStyle, Depth(..),
 	
 	-- * Error handling and debugging utilities
-	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
+	pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError, 
 	pprTrace, warnPprTrace,
-	trace, pgmError, panic, panicFastInt, assertPanic
+	trace, pgmError, panic, sorry, panicFastInt, assertPanic
     ) where
 
 import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
@@ -779,26 +779,34 @@ plural _   = char 's'
 %************************************************************************
 
 \begin{code}
+
 pprPanic :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPgmError :: String -> SDoc -> a
--- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
-pprTrace :: String -> SDoc -> a -> a
--- ^ If debug output is on, show some 'SDoc' on the screen
-
 pprPanic    = pprAndThen panic
 
+pprSorry :: String -> SDoc -> a
+-- ^ Throw an exceptio saying "this isn't finished yet"
+pprSorry    = pprAndThen sorry
+
+
+pprPgmError :: String -> SDoc -> a
+-- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
 pprPgmError = pprAndThen pgmError
 
+
+pprTrace :: String -> SDoc -> a -> a
+-- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprAndThen trace str doc x
+
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
 pprPanicFastInt heading pretty_msg = panicFastInt (show (doc PprDebug))
 			     where
 			       doc = text heading <+> pretty_msg
+
 
 pprAndThen :: (String -> a) -> String -> SDoc -> a
 pprAndThen cont heading pretty_msg = cont (show (doc PprDebug))
