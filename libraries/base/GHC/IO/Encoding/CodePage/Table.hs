@@ -35,7 +35,6 @@ module GHC.IO.Encoding.CodePage.Table where
 import GHC.Prim
 import GHC.Base
 import GHC.Word
-import GHC.Num
 data ConvArray a = ConvArray Addr#
 data CompactArray a b = CompactArray {
     encoderMax :: !a,
