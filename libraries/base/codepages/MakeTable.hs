@@ -1,6 +1,6 @@
-{-- 
+{--
 This is a script to generate the necessary tables to support Windows code page
-encoding/decoding.  
+encoding/decoding.
 
 License: see libraries/base/LICENSE
 
@@ -15,7 +15,7 @@ tables required for the CJK double-byte codepages are too large to be
 statically linked into every executable.  We plan to add support for them once
 GHC is able to produce Windows DLLs.
 
---} 
+--}
 
 module Main where
 
@@ -70,7 +70,7 @@ readCharHex :: String -> Char
 readCharHex s = if c > fromEnum (maxBound :: Word16)
                     then error "Can't handle non-BMP character."
                     else toEnum c
-    where c = readHex' s 
+    where c = readHex' s
 
 
 -------------------------------------------
@@ -90,13 +90,13 @@ makeTableFile moduleName files maps = concat
                 ++ ["    ]"]
     mkTableEntry (i,m) = "    (" ++ show i ++ ", " ++ makeSBE m ++ "    )"
     blockSizeText = ["blockBitSize :: Int", "blockBitSize = " ++ show blockBitSize]
-                    
+
 
 makeSBE :: Map.Map Word8 Char -> String
 makeSBE m = unlines
                 [ "SingleByteCP {"
                 , "     decoderArray = " ++ mkConvArray es
-                , "     , encoderArray = " ++ mkCompactArray (swapMap m) 
+                , "     , encoderArray = " ++ mkCompactArray (swapMap m)
                 , "   }"
                 ]
   where
@@ -167,7 +167,7 @@ mkCompactArray m = unlines [
 
 type CompressState b = (Map.Map Int [b], Map.Map [b] Int)
 -- each entry in the list corresponds to a block of size n.
-compress :: (Bounded a, Enum a, Ord a, Bounded b, Ord b) => Int -> Map.Map a b 
+compress :: (Bounded a, Enum a, Ord a, Bounded b, Ord b) => Int -> Map.Map a b
         -> ([Int], CompressState b)
 compress n ms = runState (mapM lookupOrAdd chunks) (Map.empty, Map.empty)
     where
@@ -226,7 +226,7 @@ class (Ord a, Enum a, Bounded a, Show a) => Embed a where
 
 instance Embed Word8 where
     mkHex = showHex'
-    
+
 instance Embed Word16 where
     mkHex = repDualByte
 
@@ -241,7 +241,7 @@ showHex' :: Integral a => a -> String
 showHex' s = "\\x" ++ showHex s ""
 
 repDualByte :: Enum c => c -> String
-repDualByte c 
+repDualByte c
     | n >= 2^(16::Int) = error "value is too high!"
     -- NOTE : this assumes little-endian architecture.  But we're only using this on Windows,
     -- so it's probably OK.
