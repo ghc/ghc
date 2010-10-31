@@ -33,11 +33,22 @@ import Control.Exception(evaluate)
 main :: IO ()
 main = do
     moduleName:outFile:files <- getArgs
-    sbes <- mapM readMapAndIx files
+    let badFiles = -- These fail with an error like
+                   --     MakeTable: Enum.toEnum{Word8}: tag (33088) is outside of bounds (0,255)
+                   -- I have no idea what's going on, so for now we just
+                   -- skip them.
+                   ["CPs/CP932.TXT",
+                    "CPs/CP936.TXT",
+                    "CPs/CP949.TXT",
+                    "CPs/CP950.TXT"]
+    let files' = filter (`notElem` badFiles) files
+    sbes <- mapM readMapAndIx files'
+    putStrLn "Writing output"
     withBinaryFile outFile WriteMode $ flip hPutStr
-        $ unlines $ makeTableFile moduleName files sbes
+        $ unlines $ makeTableFile moduleName files' sbes
   where
     readMapAndIx f = do
+        putStrLn ("Reading " ++ f)
         m <- readMap f
         return (codePageNum f, m)
 
@@ -201,7 +212,7 @@ firstComment files = map ("-- " ++) $
 
 theImports :: [String]
 theImports = map ("import " ++ )
-    ["GHC.Prim", "GHC.Base", "GHC.Word", "GHC.Num"]
+    ["GHC.Prim", "GHC.Base", "GHC.Word"]
 
 theTypes :: [String]
 theTypes = [ "data ConvArray a = ConvArray Addr#"
