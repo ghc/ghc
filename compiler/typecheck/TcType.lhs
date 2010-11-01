@@ -1025,8 +1025,6 @@ getClassPredTys _ = panic "getClassPredTys"
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)
 
-
-
 isDictLikeTy :: Type -> Bool
 -- Note [Dictionary-like types]
 isDictLikeTy ty | Just ty' <- tcView ty = isDictTy ty'
