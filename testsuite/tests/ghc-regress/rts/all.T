@@ -91,3 +91,5 @@ test('exec_signals', [
      cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
      extra_clean(['exec_signals_child', 'exec_signals_prepare'])
     ], compile_and_run, [''])
+
+test('return_mem_to_os', normal, compile_and_run, [''])
