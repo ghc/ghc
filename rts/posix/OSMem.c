@@ -211,6 +211,10 @@ void osFreeMBlocks(char *addr, nat n)
     munmap(addr, n * MBLOCK_SIZE);
 }
 
+void osReleaseFreeMemory(void) {
+    /* Nothing to do on POSIX */
+}
+
 void osFreeAllMBlocks(void)
 {
     void *mblock;

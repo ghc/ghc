@@ -697,6 +697,8 @@ void returnMemoryToOS(nat n /* megablocks */)
     }
     free_mblock_list = bd;
 
+    osReleaseFreeMemory();
+
     IF_DEBUG(gc,
         if (n != 0) {
             debugBelch("Wanted to free %d more MBlocks than are freeable\n",

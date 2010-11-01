@@ -14,9 +14,6 @@
 #include <windows.h>
 #endif
 
-/* alloc_rec keeps the info we need to have matching VirtualAlloc and
-   VirtualFree calls.
-*/
 typedef struct alloc_rec_ {
     char* base;     /* non-aligned base address, directly from VirtualAlloc */
     int size;       /* Size in bytes */
@@ -29,7 +26,12 @@ typedef struct block_rec_ {
     struct block_rec_* next;
 } block_rec;
 
+/* allocs are kept in ascending order, and are the memory regions as
+   returned by the OS as we need to have matching VirtualAlloc and
+   VirtualFree calls. */
 static alloc_rec* allocs = NULL;
+
+/* free_blocks are kept in ascending order, and adjacent blocks are merged */
 static block_rec* free_blocks = NULL;
 
 void
@@ -237,6 +239,88 @@ void osFreeMBlocks(char *addr, nat n)
             p = p->next;
         }
     }
+}
+
+void osReleaseFreeMemory(void)
+{
+    alloc_rec *prev_a, *a;
+    alloc_rec head_a;
+    block_rec *prev_fb, *fb;
+    block_rec head_fb;
+    char *a_end, *fb_end;
+
+    /* go through allocs and free_blocks in lockstep, looking for allocs
+       that are completely free, and uncommit them */
+
+    head_a.base = 0;
+    head_a.size = 0;
+    head_a.next = allocs;
+    head_fb.base = 0;
+    head_fb.size = 0;
+    head_fb.next = free_blocks;
+    prev_a = &head_a;
+    a = allocs;
+    prev_fb = &head_fb;
+    fb = free_blocks;
+
+    while (a != NULL) {
+        a_end = a->base + a->size;
+        while (fb != NULL && fb->base + fb->size < a_end) {
+            prev_fb = fb;
+            fb = fb->next;
+        }
+
+        fb_end = fb->base + fb->size;
+        if (fb->base <= a->base) {
+            /* The alloc is within the free block. Now we need to know
+               if it sticks out at either end. */
+            if (fb_end == a_end) {
+                if (fb->base == a->base) {
+                    /* fb and a are identical, so just free fb */
+                    prev_fb->next = fb->next;
+                    stgFree(fb);
+                    fb = prev_fb->next;
+                }
+                else {
+                    /* fb begins earlier, so truncate it to not include a */
+                    fb->size = a->base - fb->base;
+                }
+            }
+            else {
+                /* fb ends later, so we'll make fb just be the part
+                   after a. First though, if it also starts earlier,
+                   we make a new free block record for the before bit. */
+                if (fb->base != a->base) {
+                    block_rec *new_fb;
+
+                    new_fb = (block_rec *)stgMallocBytes(sizeof(block_rec),"osReleaseFreeMemory");
+                    new_fb->base = fb->base;
+                    new_fb->size = a->base - fb->base;
+                    new_fb->next = fb;
+                    prev_fb->next = new_fb;
+                }
+                fb->size = fb_end - a_end;
+                fb->base = a_end;
+            }
+            /* Now we can free the alloc */
+            prev_a->next = a->next;
+            if(!VirtualFree((void *)a->base, 0, MEM_RELEASE)) {
+                sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed");
+                stg_exit(EXIT_FAILURE);
+            }
+            stgFree(a);
+            a = prev_a->next;
+        }
+        else {
+            /* Otherwise this alloc is not freeable, so go on to the
+               next one */
+            prev_a = a;
+            a = a->next;
+        }
+    }
+
+    allocs = head_a.next;
+    free_blocks = head_fb.next;
 }
 
 void
