@@ -149,6 +149,7 @@ reportTidyWanteds ctxt unsolved
                      pred = wantedEvVarPred d
 
 reportFlat :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()
+-- The [PredType] are already tidied
 reportFlat ctxt flats origin
   = do { unless (null dicts) $ reportDictErrs ctxt dicts origin
        ; unless (null eqs)   $ reportEqErrs   ctxt eqs   origin
@@ -221,12 +222,6 @@ pprErrCtxtLoc ctxt
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = pprSkolInfo skol_info
 
-couldNotDeduce :: [EvVar] -> [PredType] -> SDoc
-couldNotDeduce givens wanteds
-  = sep [ ptext (sLit "Could not deduce") <+> pprTheta wanteds
-        , nest 2 $ ptext (sLit "from the context") 
-                     <+> pprEvVarTheta givens]
-
 getUserGivens :: ReportErrCtxt -> Maybe [EvVar]
 -- Just gs => Say "could not deduce ... from gs"
 -- Nothing => No interesting givens, say something else
@@ -271,6 +266,7 @@ reportIPErrs ctxt ips orig
 
 \begin{code}
 reportEqErrs :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()
+-- The [PredType] are already tidied
 reportEqErrs ctxt eqs orig
   = mapM_ report_one eqs 
   where
@@ -284,19 +280,17 @@ reportEqErrs ctxt eqs orig
       = pprPanic "reportEqErrs" (ppr pred)    
 
 reportEqErr :: ReportErrCtxt -> TcType -> TcType -> TcM ()
+-- ty1 and ty2 are already tidied
 reportEqErr ctxt ty1 ty2
   | Just tv1 <- tcGetTyVar_maybe ty1 = reportTyVarEqErr ctxt tv1 ty2
   | Just tv2 <- tcGetTyVar_maybe ty2 = reportTyVarEqErr ctxt tv2 ty1
   | otherwise	-- Neither side is a type variable
     		-- Since the unsolved constraint is canonical, 
 		-- it must therefore be of form (F tys ~ ty)
-  = addErrorReport ctxt (msg $$ mkTyFunInfoMsg ty1 ty2)
-  where
-    msg = case getUserGivens ctxt of
-            Just givens -> couldNotDeduce givens [EqPred ty1 ty2]
-            Nothing     -> misMatchMsg ty1 ty2
+  = addErrorReport ctxt (misMatchOrCND ctxt ty1 ty2 $$ mkTyFunInfoMsg ty1 ty2)
 
 reportTyVarEqErr :: ReportErrCtxt -> TcTyVar -> TcType -> TcM ()
+-- tv1 and ty2 are already tidied
 reportTyVarEqErr ctxt tv1 ty2
   | not is_meta1
   , Just tv2 <- tcGetTyVar_maybe ty2
@@ -306,7 +300,8 @@ reportTyVarEqErr ctxt tv1 ty2
 
   | not is_meta1
   = -- sk ~ ty, where ty isn't a meta-tyvar: mis-match
-    addErrTcM (misMatchMsgWithExtras (cec_tidy ctxt) ty1 ty2)
+    addErrTcM (addExtraInfo (misMatchOrCND ctxt ty1 ty2) 
+                            (cec_tidy ctxt) ty1 ty2)
 
   -- So tv is a meta tyvar, and presumably it is
   -- an *untouchable* meta tyvar, else it'd have been unified
@@ -339,7 +334,7 @@ reportTyVarEqErr ctxt tv1 ty2
   , let implic_loc = ic_loc implic
         given      = ic_given implic
   = setCtLoc (ic_loc implic) $
-    do { let (env1, msg) = misMatchMsgWithExtras (cec_tidy ctxt) ty1 ty2
+    do { let (env1, msg) = addExtraInfo (misMatchMsg ty1 ty2) (cec_tidy ctxt) ty1 ty2
              extra = vcat [ ptext (sLit "because") <+> ppr tv1 <+> ptext (sLit "is untouchable")
                           , ptext (sLit "inside the constraints") <+> pprEvVarTheta given 
                           , nest 2 (ptext (sLit "bound at")
@@ -347,7 +342,7 @@ reportTyVarEqErr ctxt tv1 ty2
        ; addErrTcM (env1, msg $$ extra) }
 
   | otherwise	   -- I'm not sure how this can happen!
-  = addErrTcM (misMatchMsgWithExtras (cec_tidy ctxt) ty1 ty2)
+  = addErrTcM (addExtraInfo (misMatchMsg ty1 ty2) (cec_tidy ctxt) ty1 ty2)
   where         
     is_meta1 = isMetaTyVar tv1
     k1 	     = tyVarKind tv1
@@ -367,12 +362,24 @@ mkTyFunInfoMsg ty1 ty2
     pp_inj tc | isInjectiveTyCon tc = empty
               | otherwise = ptext (sLit (", and may not be injective"))
 
-misMatchMsgWithExtras :: TidyEnv -> TcType -> TcType -> (TidyEnv, SDoc)
+misMatchOrCND :: ReportErrCtxt -> TcType -> TcType -> SDoc
+misMatchOrCND ctxt ty1 ty2
+  = case getUserGivens ctxt of
+      Just givens -> couldNotDeduce givens [EqPred ty1 ty2]
+      Nothing     -> misMatchMsg ty1 ty2
+
+couldNotDeduce :: [EvVar] -> [PredType] -> SDoc
+couldNotDeduce givens wanteds
+  = sep [ ptext (sLit "Could not deduce") <+> pprTheta wanteds
+        , nest 2 $ ptext (sLit "from the context") 
+                     <+> pprEvVarTheta givens]
+
+addExtraInfo :: SDoc -> TidyEnv -> TcType -> TcType -> (TidyEnv, SDoc)
 -- This version is used by TcSimplify too, which doesn't track the
 -- expected/acutal thing, so we just have ty1 ty2 here
 -- NB: The types are already tidied
-misMatchMsgWithExtras env ty1 ty2
-  = (env2, sep [ misMatchMsg ty1 ty2, nest 2 (extra1 $$ extra2) ])
+addExtraInfo msg env ty1 ty2
+  = (env2, msg $$ nest 2 (extra1 $$ extra2))
   where
     (env1, extra1) = typeExtraInfoMsg env ty1
     (env2, extra2) = typeExtraInfoMsg env1 ty2
@@ -669,8 +676,9 @@ kindErrorTcS fl ty1 ty2
 misMatchErrorTcS :: CtFlavor -> TcType -> TcType -> TcS a
 misMatchErrorTcS fl ty1 ty2
   = wrapEqErrTcS fl ty1 ty2 $ \ env0 ty1 ty2 extra -> 
-    do { let (env1, msg)  = misMatchMsgWithExtras env0 ty1 ty2
-       ; failWithTcM (env1, inaccessible_msg $$ msg $$ extra) }
+    do { let msg = inaccessible_msg $$ misMatchMsg ty1 ty2
+             (env1, msg1) = addExtraInfo msg env0 ty1 ty2
+       ; failWithTcM (env1, msg1 $$ extra) }
   where
     inaccessible_msg 
       = case fl of 
