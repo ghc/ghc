@@ -225,6 +225,7 @@ initCapability( Capability *cap, nat i )
     cap->returning_tasks_tl = NULL;
     cap->inbox              = (Message*)END_TSO_QUEUE;
     cap->sparks_created     = 0;
+    cap->sparks_dud         = 0;
     cap->sparks_converted   = 0;
     cap->sparks_pruned      = 0;
 #endif

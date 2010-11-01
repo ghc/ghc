@@ -99,6 +99,7 @@ struct Capability_ {
 
     // Stats on spark creation/conversion
     nat sparks_created;
+    nat sparks_dud;
     nat sparks_converted;
     nat sparks_pruned;
 #endif

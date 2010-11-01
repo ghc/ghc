@@ -71,9 +71,10 @@ newSpark (StgRegTable *reg, StgClosure *p)
 
     if (closure_SHOULD_SPARK(p)) {
         pushWSDeque(pool,p);
-    }	
-
-    cap->sparks_created++;
+        cap->sparks_created++;
+    } else {
+        cap->sparks_dud++;
+    }
 
     return 1;
 }
