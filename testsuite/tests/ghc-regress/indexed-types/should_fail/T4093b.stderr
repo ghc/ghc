@@ -1,6 +1,8 @@
 
 T4093b.hs:31:13:
-    Couldn't match type `e' with `C'
+    Could not deduce (e ~ C)
+      from the context (EitherCO e (A C O n) (A O O n) ~ A e O n,
+                        EitherCO x (A C C n) (A C O n) ~ A C x n)
       `e' is a rigid type variable bound by
           the type signature for `blockToNodeList' at T4093b.hs:20:12
     In the expression: (JustC n, NothingC)

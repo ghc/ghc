@@ -1,6 +1,6 @@
 
 tcfail131.hs:7:9:
-    Couldn't match type `b' with `Integer'
+    Could not deduce (b ~ Integer) from the context (Num b)
       `b' is a rigid type variable bound by
           the type signature for `g' at tcfail131.hs:6:12
     In the expression: f x x

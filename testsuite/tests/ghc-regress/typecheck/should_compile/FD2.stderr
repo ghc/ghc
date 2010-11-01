@@ -1,6 +1,7 @@
 
 FD2.hs:26:34:
-    Couldn't match type `e' with `e1'
+    Could not deduce (e ~ e1)
+      from the context (Foldable a, Elem a e, Elem a e1)
       `e' is a rigid type variable bound by
           the type signature for `foldr1' at FD2.hs:21:20
       `e1' is a rigid type variable bound by

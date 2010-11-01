@@ -1,6 +1,7 @@
 
 FD1.hs:16:1:
-    Couldn't match type `a' with `Int -> Int'
+    Could not deduce (a ~ (Int -> Int))
+      from the context (E a (Int -> Int))
       `a' is a rigid type variable bound by
           the type signature for `plus' at FD1.hs:15:12
     The equation(s) for `plus' have two arguments,

@@ -1,6 +1,6 @@
 
 T4093a.hs:8:8:
-    Couldn't match type `e' with `()'
+    Could not deduce (e ~ ()) from the context (Foo e ~ Maybe e)
       `e' is a rigid type variable bound by
           the type signature for `hang' at T4093a.hs:7:14
     In the expression: Just ()

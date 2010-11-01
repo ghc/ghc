@@ -10,7 +10,7 @@ T2494.hs:15:14:
     In the expression: foo f (foo g x)
 
 T2494.hs:15:30:
-    Couldn't match type `b' with `a'
+    Could not deduce (b ~ a) from the context (Monad m)
       `b' is a rigid type variable bound by
           the type signature for `g' at T2494.hs:14:46
       `a' is a rigid type variable bound by

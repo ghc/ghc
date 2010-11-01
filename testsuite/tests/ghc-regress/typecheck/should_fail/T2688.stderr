@@ -1,6 +1,6 @@
 
 T2688.hs:8:22:
-    Couldn't match type `s' with `v'
+    Could not deduce (s ~ v) from the context (VectorSpace v s)
       `s' is a rigid type variable bound by
           the class declaration for `VectorSpace' at T2688.hs:5:21
       `v' is a rigid type variable bound by
