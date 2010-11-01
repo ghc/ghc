@@ -56,7 +56,6 @@ import OrdList
 import Bag
 import BasicTypes hiding ( TopLevel )
 import FastString
--- import StaticFlags	( opt_DsMultiTyVar )
 import Util
 
 import MonadUtils
@@ -98,7 +97,7 @@ dsHsBind _ (VarBind { var_id = var, var_rhs = expr, var_inline = inline_regardle
 	; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr'
 	      	   | otherwise         = var
 
-	; return (unitOL (var', core_expr')) }
+	; return (unitOL (makeCorePair var' False 0 core_expr')) }
 
 dsHsBind auto_scc (FunBind { fun_id = L _ fun, fun_matches = matches
 		    , fun_co_fn = co_fn, fun_tick = tick 

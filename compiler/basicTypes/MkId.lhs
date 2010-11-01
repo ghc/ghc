@@ -433,19 +433,21 @@ mkDictSelId no_unf name clas
 
     base_info = noCafIdInfo
                 `setArityInfo`      1
-                `setStrictnessInfo`  Just strict_sig
+                `setStrictnessInfo` Just strict_sig
                 `setUnfoldingInfo`  (if no_unf then noUnfolding
-				     else mkImplicitUnfolding rhs)
+	                             else mkImplicitUnfolding rhs)
 		   -- In module where class op is defined, we must add
 		   -- the unfolding, even though it'll never be inlined
 		   -- becuase we use that to generate a top-level binding
 		   -- for the ClassOp
 
-    info = base_info    `setSpecInfo`       mkSpecInfo [rule]
-			`setInlinePragInfo` neverInlinePragma
-		-- Add a magic BuiltinRule, and never inline it
-		-- so that the rule is always available to fire.
-		-- See Note [ClassOp/DFun selection] in TcInstDcls
+    info | new_tycon = base_info `setInlinePragInfo` alwaysInlinePragma
+    	   	   -- See Note [Single-method classes] for why alwaysInlinePragma
+         | otherwise = base_info  `setSpecInfo`       mkSpecInfo [rule]
+		       		  `setInlinePragInfo` neverInlinePragma
+		   -- Add a magic BuiltinRule, and never inline it
+		   -- so that the rule is always available to fire.
+		   -- See Note [ClassOp/DFun selection] in TcInstDcls
 
     n_ty_args = length tyvars
 

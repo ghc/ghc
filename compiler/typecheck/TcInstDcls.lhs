@@ -183,13 +183,14 @@ Instead we use a cunning trick.
 Note [Single-method classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the class has just one method (or, more accurately, just one element
-of {superclasses + methods}), then we still use the *same* strategy
+of {superclasses + methods}), then we use a different strategy.
 
    class C a where op :: a -> a
    instance C a => C [a] where op = <blah>
 
-We translate the class decl into a newtype, which just gives
-a top-level axiom:
+We translate the class decl into a newtype, which just gives a
+top-level axiom. The "constructor" MkC expands to a cast, as does the
+class-op selector.
 
    axiom Co:C a :: C a ~ (a->a)
 
@@ -199,44 +200,82 @@ a top-level axiom:
    MkC :: forall a. (a->a) -> C a
    MkC = /\a.\op. op |> (sym Co:C a)
 
-   df :: forall a. C a => C [a]
-   {-# NOINLINE df   DFun[ $cop_list ] #-}
-   df = /\a. \d. MkC ($cop_list a d)
+The clever RULE stuff doesn't work now, because ($df a d) isn't
+a constructor application, so exprIsConApp_maybe won't return 
+Just <blah>.
+
+Instead, we simply rely on the fact that casts are cheap:
+
+   $df :: forall a. C a => C [a]
+   {-# INLINE df #}  -- NB: INLINE this
+   $df = /\a. \d. MkC [a] ($cop_list a d)
+       = $cop_list |> forall a. C a -> (sym (Co:C [a]))
 
    $cop_list :: forall a. C a => [a] -> [a]
    $cop_list = <blah>
 
-The "constructor" MkC expands to a cast, as does the class-op selector.
-The RULE works just like for multi-field dictionaries:
+So if we see
+   (op ($df a d))
+we'll inline 'op' and '$df', since both are simply casts, and
+good things happen.
 
-  * (df a d) returns (Just (MkC,..,[$cop_list a d])) 
-    to exprIsConApp_Maybe
+Why do we use this different strategy?  Because otherwise we
+end up with non-inlined dictionaries that look like
+    $df = $cop |> blah
+which adds an extra indirection to every use, which seems stupid.  See
+Trac #4138 for an example (although the regression reported there
+wasn't due to the indirction).
 
-  * The RULE for op picks the right result
-
-This is a bit of a hack, because (df a d) isn't *really* a constructor
-application.  But it works just fine in this case, exprIsConApp_maybe
-is otherwise used only when we hit a case expression which will have
-a real data constructor in it.
-
-The biggest reason for doing it this way, apart from uniformity, is
-that we want to be very careful when we have
+There is an awkward wrinkle though: we want to be very 
+careful when we have
     instance C a => C [a] where
       {-# INLINE op #-}
       op = ...
 then we'll get an INLINE pragma on $cop_list but it's important that
 $cop_list only inlines when it's applied to *two* arguments (the
-dictionary and the list argument
+dictionary and the list argument).  So we nust not eta-expand $df
+above.  We ensure that this doesn't happen by putting an INLINE 
+pragma on the dfun itself; after all, it ends up being just a cast.
 
-The danger is that we'll get something like
-      op_list :: C a => [a] -> [a]
-      op_list = /\a.\d. $cop_list a d
-and then we'll eta expand, and then we'll inline TOO EARLY. This happened in 
-Trac #3772 and I spent far too long fiddling around trying to fix it.
-Look at the test for Trac #3772.
+There is one more dark corner to the INLINE story, even more deeply 
+buried.  Consider this (Trac #3772):
 
-     (Note: re-reading the above, I can't see how using the
-            uniform story solves the problem.)
+    class DeepSeq a => C a where
+      gen :: Int -> a
+
+    instance C a => C [a] where
+      gen n = ...
+
+    class DeepSeq a where
+      deepSeq :: a -> b -> b
+
+    instance DeepSeq a => DeepSeq [a] where
+      {-# INLINE deepSeq #-}
+      deepSeq xs b = foldr deepSeq b xs
+
+That gives rise to these defns:
+
+    $cdeepSeq :: DeepSeq a -> [a] -> b -> b
+    -- User INLINE( 3 args )!
+    $cdeepSeq a (d:DS a) b (x:[a]) (y:b) = ...
+
+    $fDeepSeq[] :: DeepSeq a -> DeepSeq [a]
+    -- DFun (with auto INLINE pragma)
+    $fDeepSeq[] a d = $cdeepSeq a d |> blah
+
+    $cp1 a d :: C a => DeepSep [a]
+    -- We don't want to eta-expand this, lest
+    -- $cdeepSeq gets inlined in it!
+    $cp1 a d = $fDeepSep[] a (scsel a d)
+
+    $fC[] :: C a => C [a]
+    -- Ordinary DFun
+    $fC[] a d = MkC ($cp1 a d) ($cgen a d)
+
+Here $cp1 is the code that generates the superclass for C [a].  The
+issue is this: we must not eta-expand $cp1 either, or else $fDeepSeq[]
+and then $cdeepSeq will inline there, which is definitely wrong.  Like
+on the dfun, we solve this by adding an INLINE pragma to $cp1.
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -620,7 +659,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                 op_items ibinds
 
        -- Create the result bindings
-       ; self_dict <- newEvVar (ClassP clas inst_tys)
        ; let dict_constr       = classDataCon clas
 	     dict_bind         = mkVarBind self_dict dict_rhs
              dict_rhs          = foldl mk_app inst_constr $
@@ -631,21 +669,20 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      -- rely on the simplifier to unfold this saturated application
                      -- We do this rather than generate an HsCon directly, because
                      -- it means that the special cases (e.g. dictionary with only one
-                     -- member) are dealt with by the common MkId.mkDataConWrapId code rather
-                     -- than needing to be repeated here.
+                     -- member) are dealt with by the common MkId.mkDataConWrapId 
+		     -- code rather than needing to be repeated here.
 
-             mk_app :: LHsExpr Id -> HsExpr Id -> LHsExpr Id
-             mk_app fun arg = L loc (HsApp fun (L loc arg))
-
-             arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars)
+	     mk_app :: LHsExpr Id -> Id -> LHsExpr Id
+ 	     mk_app fun arg_id = L loc (HsApp fun (L loc (wrapId arg_wrapper arg_id)))
+	     arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars')
 
 	        -- Do not inline the dfun; instead give it a magic DFunFunfolding
 	        -- See Note [ClassOp/DFun selection]
 		-- See also note [Single-method classes]
              dfun_id_w_fun = dfun_id  
-                             `setIdUnfolding`  mkDFunUnfolding dfun_ty (sc_args ++ meth_args)
+                             `setIdUnfolding`  mkDFunUnfolding inst_ty (map Var dict_and_meth_ids)
+			     		       		-- Not right for equality superclasses
                              `setInlinePragma` dfunInlinePragma
-             meth_args = map (DFunPolyArg . Var) meth_ids
 
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
@@ -707,11 +744,16 @@ Consider the following (extreme) situation:
 Although this looks wrong (assume D [a] to prove D [a]), it is only a
 more extreme case of what happens with recursive dictionaries.
 
-To implement the dfun we must generate code for the superclass C [a],
-which we can get by superclass selection from the supplied argument!
-So we’d generate:
-       dfun :: forall a. D [a] -> D [a]
-       dfun = \d::D [a] -> MkD (scsel d) ..
+       ; uniq <- newUnique
+       ; let sc_op_ty   = mkForAllTys tyvars $ mkPiTypes dicts (varType sc_dict)
+	     sc_op_name = mkDerivedInternalName mkClassOpAuxOcc uniq
+						(getName sc_sel)
+	     sc_op_id   = mkLocalId sc_op_name sc_op_ty
+	     sc_op_bind = VarBind { var_id = sc_op_id, var_inline = False
+                                  , var_rhs = L noSrcSpan $ wrapId sc_wrapper sc_dict }
+             sc_wrapper = mkWpTyLams tyvars
+                          <.> mkWpLams dicts
+                          <.> mkWpLet ev_binds
 
 However this means that if we later encounter a situation where
 we have a [Wanted] dw::D [a] we could solve it thus:
