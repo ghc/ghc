@@ -82,7 +82,7 @@ import System.IO	( Handle, stderr, stdout, hFlush )
 import System.FilePath
 
 
-#if __GLASGOW_HASKELL__ >= 700
+#if __GLASGOW_HASKELL__ >= 701
 import GHC.Show		( showMultiLineString )
 #else
 showMultiLineString :: String -> [String]
