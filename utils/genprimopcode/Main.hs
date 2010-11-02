@@ -8,10 +8,10 @@ module Main where
 import Parser
 import Syntax
 
-import Char
-import List
-import System ( getArgs )
-import Maybe ( catMaybes )
+import Data.Char
+import Data.List
+import Data.Maybe ( catMaybes )
+import System.Environment ( getArgs )
 
 main :: IO ()
 main = getArgs >>= \args ->
