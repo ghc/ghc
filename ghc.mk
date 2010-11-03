@@ -1016,10 +1016,10 @@ $(eval $(call bindist,.,\
     bindist.mk \
     libraries/gen_contents_index \
     libraries/prologue.txt \
-    libraries/dph/LICENSE \
-    libraries/dph/ghc-packages \
-    libraries/dph/ghc-packages2 \
-    libraries/dph/ghc-stage2-package \
+    $(wildcard libraries/dph/LICENSE \
+               libraries/dph/ghc-packages \
+               libraries/dph/ghc-packages2 \
+               libraries/dph/ghc-stage2-package) \
  ))
 endif
 # mk/project.mk gets an absolute path, so we manually include it in
