@@ -986,16 +986,16 @@ $(eval $(call bindist,.,\
     $(INPLACE_BIN)/mkdirhier \
     $(INPLACE_BIN)/ghc-cabal \
     utils/ghc-pwd/ghc-pwd \
-	$(BINDIST_WRAPPERS) \
-	$(BINDIST_PERL_SOURCES) \
-	$(BINDIST_LIBS) \
-	$(BINDIST_HI) \
-	$(BINDIST_EXTRAS) \
-	$(includes_H_CONFIG) \
-	$(includes_H_PLATFORM) \
+    $(BINDIST_WRAPPERS) \
+    $(BINDIST_PERL_SOURCES) \
+    $(BINDIST_LIBS) \
+    $(BINDIST_HI) \
+    $(BINDIST_EXTRAS) \
+    $(includes_H_CONFIG) \
+    $(includes_H_PLATFORM) \
     $(includes_H_FILES) \
-	includes/ghcconfig.h \
-	includes/rts/Config.h \
+    includes/ghcconfig.h \
+    includes/rts/Config.h \
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
@@ -1005,21 +1005,21 @@ $(eval $(call bindist,.,\
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
-	docs/index.html \
-	compiler/stage2/doc \
-	$(wildcard libraries/*/dist-install/doc/) \
-	$(wildcard libraries/*/*/dist-install/doc/) \
+    docs/index.html \
+    compiler/stage2/doc \
+    $(wildcard libraries/*/dist-install/doc/) \
+    $(wildcard libraries/*/*/dist-install/doc/) \
     $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
-	mk/project.mk \
-	mk/install.mk.in \
-	bindist.mk \
-	libraries/gen_contents_index \
-	libraries/prologue.txt \
-	libraries/dph/LICENSE \
-	libraries/dph/ghc-packages \
-	libraries/dph/ghc-packages2 \
-	libraries/dph/ghc-stage2-package \
+    mk/project.mk \
+    mk/install.mk.in \
+    bindist.mk \
+    libraries/gen_contents_index \
+    libraries/prologue.txt \
+    libraries/dph/LICENSE \
+    libraries/dph/ghc-packages \
+    libraries/dph/ghc-packages2 \
+    libraries/dph/ghc-stage2-package \
  ))
 endif
 # mk/project.mk gets an absolute path, so we manually include it in
