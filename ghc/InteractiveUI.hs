@@ -657,7 +657,7 @@ runStmt stmt step
       -- a file, otherwise the read buffer can't be flushed).
       _ <- liftIO $ IO.try $ hFlushAll stdin
 #endif
-      result <- withFlattenedDynflags $ GhciMonad.runStmt stmt step
+      result <- GhciMonad.runStmt stmt step
       afterRunStmt (const True) result
 
 --afterRunStmt :: GHC.RunResult -> GHCi Bool
@@ -816,8 +816,7 @@ help _ = liftIO (putStr helpText)
 info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = handleSourceError GHC.printException $
-          withFlattenedDynflags $ do
-             { let names = words s
+          do { let names = words s
 	     ; dflags <- getDynFlags
 	     ; let pefas = dopt Opt_PrintExplicitForalls dflags
 	     ; mapM_ (infoThing pefas) names }
@@ -857,8 +856,7 @@ runMain :: String -> GHCi ()
 runMain s = case toArgs s of
             Left err   -> liftIO (hPutStrLn stderr err)
             Right args ->
-                withFlattenedDynflags $ do
-                   dflags <- getDynFlags
+                do dflags <- getDynFlags
                    case mainFunIs dflags of
                        Nothing -> doWithArgs args "main"
                        Just f  -> doWithArgs args f
@@ -977,7 +975,7 @@ defineMacro overwrite s = do
 
   -- compile the expression
   handleSourceError (\e -> GHC.printException e) $
-   withFlattenedDynflags $ do
+   do
     hv <- GHC.compileExpr new_expr
     liftIO (writeIORef macros_ref --
             (filtered ++ [(macro_name, lift . runMacro hv, noCompletion)]))
@@ -1005,7 +1003,7 @@ cmdCmd :: String -> GHCi ()
 cmdCmd str = do
   let expr = '(' : str ++ ") :: IO String"
   handleSourceError (\e -> GHC.printException e) $
-   withFlattenedDynflags $ do
+   do
     hv <- GHC.compileExpr expr
     cmds <- liftIO $ (unsafeCoerce# hv :: IO String)
     enqueueCommands (lines cmds)
@@ -1088,7 +1086,7 @@ afterLoad ok retain_context prev_context = do
       loaded_mod_names = map GHC.moduleName loaded_mods
   modulesLoadedMsg ok loaded_mod_names
 
-  withFlattenedDynflags $ lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
+  lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
 
 setContextAfterLoad :: ([Module],[(Module, Maybe (ImportDecl RdrName))]) -> Bool -> [GHC.ModSummary] -> GHCi ()
@@ -1169,7 +1167,6 @@ modulesLoadedMsg ok mods = do
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str 
   = handleSourceError GHC.printException
-  $ withFlattenedDynflags
   $ do
        ty <- GHC.exprType str
        dflags <- getDynFlags
@@ -1179,7 +1176,6 @@ typeOfExpr str
 kindOfType :: String -> InputT GHCi ()
 kindOfType str 
   = handleSourceError GHC.printException
-  $ withFlattenedDynflags
   $ do
        ty <- GHC.typeKind str
        printForUser $ text str <+> dcolon <+> ppr ty
@@ -1189,13 +1185,6 @@ quit _ = return True
 
 shellEscape :: String -> GHCi Bool
 shellEscape str = liftIO (system str >> return False)
-
-withFlattenedDynflags :: GHC.GhcMonad m => m a -> m a
-withFlattenedDynflags m
-    = do dflags <- GHC.getSessionDynFlags
-         gbracket (GHC.setSessionDynFlags dflags)
-                  (\_ -> GHC.setSessionDynFlags dflags)
-                  (\_ -> m)
 
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
@@ -1225,7 +1214,7 @@ browseCmd bang m =
 --            indicate import modules, to aid qualifying unqualified names
 -- with sorted, sort items alphabetically
 browseModule :: Bool -> Module -> Bool -> InputT GHCi ()
-browseModule bang modl exports_only = withFlattenedDynflags $ do
+browseModule bang modl exports_only = do
   -- :browse! reports qualifiers wrt current context
   current_unqual <- GHC.getPrintUnqual
   -- Temporarily set the context to the module we're interested in,
@@ -1338,7 +1327,6 @@ setContext str
 
 playCtxtCmd:: Bool -> CtxtCmd -> GHCi ()
 playCtxtCmd fail cmd = do
-  withFlattenedDynflags $ do
     (prev_as,prev_bs) <- GHC.getContext
     case cmd of
         SetContext as bs -> do
@@ -1580,7 +1568,7 @@ optToStr RevertCAFs = "r"
 -- code for `:show'
 
 showCmd :: String -> GHCi ()
-showCmd str = withFlattenedDynflags $ do
+showCmd str = do
   st <- getGHCiState
   case words str of
         ["args"]     -> liftIO $ putStrLn (show (args st))
@@ -1880,7 +1868,7 @@ forceCmd  = pprintCommand False True
 
 pprintCommand :: Bool -> Bool -> String -> GHCi ()
 pprintCommand bind force str = do
-  withFlattenedDynflags $ pprintClosureCommand bind force str
+  pprintClosureCommand bind force str
 
 stepCmd :: String -> GHCi ()
 stepCmd []         = doContinue (const True) GHC.SingleStep
@@ -2010,7 +1998,7 @@ forwardCmd = noArgs $ do
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
 breakCmd argLine = do
-   withFlattenedDynflags $ breakSwitch $ words argLine
+   breakSwitch $ words argLine
 
 breakSwitch :: [String] -> GHCi ()
 breakSwitch [] = do
@@ -2143,7 +2131,7 @@ end_bold :: String
 end_bold   = "\ESC[0m"
 
 listCmd :: String -> InputT GHCi ()
-listCmd c = withFlattenedDynflags $ listCmd' c
+listCmd c = listCmd' c
 
 listCmd' :: String -> InputT GHCi ()
 listCmd' "" = do
