@@ -24,6 +24,7 @@ module System.Event.Array
     ) where
 
 import Control.Monad hiding (forM_)
+import Data.Bits ((.|.), shiftR)
 import Data.IORef (IORef, atomicModifyIORef, newIORef, readIORef, writeIORef)
 import Data.Maybe
 import Foreign.C.Types (CSize)
@@ -32,11 +33,12 @@ import Foreign.Ptr (Ptr, nullPtr, plusPtr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
 import GHC.Err (undefined)
-import GHC.Float (logBase)
 import GHC.ForeignPtr (mallocPlainForeignPtrBytes, newForeignPtr_)
 import GHC.Num (Num(..))
-import GHC.Real ((^), ceiling, fromIntegral, realToFrac)
+import GHC.Real (fromIntegral)
 import GHC.Show (show)
+
+#include "MachDeps.h"
 
 #define BOUNDS_CHECKING 1
 
@@ -278,11 +280,31 @@ removeAt a i = removeHack a undefined
         return ()
     writeIORef ary (AC fp newLen cap)
 
+{-The firstPowerOf2 function works by setting all bits on the right-hand
+side of the most significant flagged bit to 1, and then incrementing
+the entire value at the end so it "rolls over" to the nearest power of
+two.
+-}
+
+-- | Computes the next-highest power of two for a particular integer,
+-- @n@.  If @n@ is already a power of two, returns @n@.  If @n@ is
+-- zero, returns zero, even though zero is not a power of two.
 firstPowerOf2 :: Int -> Int
-firstPowerOf2 n
-    | n <= 0    = 0
-    | otherwise = 2^p
-  where p = (ceiling . logBase (2 :: Double) . realToFrac) n :: Int
+firstPowerOf2 !n =
+    let !n1 = n - 1
+        !n2 = n1 .|. (n1 `shiftR` 1)
+        !n3 = n2 .|. (n2 `shiftR` 2)
+        !n4 = n3 .|. (n3 `shiftR` 4)
+        !n5 = n4 .|. (n4 `shiftR` 8)
+        !n6 = n5 .|. (n5 `shiftR` 16)
+#if WORD_SIZE_IN_BITS == 32
+    in n6 + 1
+#elif WORD_SIZE_IN_BITS == 64
+        !n7 = n6 .|. (n6 `shiftR` 32)
+    in n7 + 1
+#else
+# error firstPowerOf2 not defined on this architecture
+#endif
 
 foreign import ccall unsafe "string.h memcpy"
     memcpy :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
