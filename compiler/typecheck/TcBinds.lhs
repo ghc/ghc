@@ -575,7 +575,7 @@ tcImpPrags prags
 tcImpSpec :: Sig Name -> TcM TcSpecPrag
 tcImpSpec prag@(SpecSig (L _ name) _ _)
  = do { id <- tcLookupId name
-      ; checkTc (isInlinePragma (idInlinePragma id))
+      ; checkTc (isAnyInlinePragma (idInlinePragma id))
                 (impSpecErr name)
       ; tcSpec id prag }
 tcImpSpec p = pprPanic "tcImpSpec" (ppr p)
