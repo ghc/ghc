@@ -643,7 +643,7 @@ might_fail_pat (ConPatOut { pat_args = ps }) = any might_fail_lpat (hsConPatArgs
 
 -- Finally the ones that are sure to succeed, or which are covered by the checking algorithm
 might_fail_pat (LazyPat _)                   = False -- Always succeeds
-might_fail_pat _                             = False -- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
+might_fail_pat _                             = False -- VarPat, WildPat, LitPat, NPat, TypePat
 
 --------------
 might_fail_lpat :: LPat Id -> Bool
@@ -657,7 +657,6 @@ tidy_lpat p = fmap tidy_pat p
 tidy_pat :: Pat Id -> Pat Id
 tidy_pat pat@(WildPat _)  = pat
 tidy_pat (VarPat id)      = WildPat (idType id) 
-tidy_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
 tidy_pat (ParPat p)       = tidy_pat (unLoc p)
 tidy_pat (LazyPat p)      = WildPat (hsLPatType p)	-- For overlap and exhaustiveness checking
 							-- purposes, a ~pat is like a wildcard

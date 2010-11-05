@@ -82,7 +82,6 @@ hsPatType :: Pat Id -> Type
 hsPatType (ParPat pat)                = hsLPatType pat
 hsPatType (WildPat ty)                = ty
 hsPatType (VarPat var)                = idType var
-hsPatType (VarPatOut var _)           = idType var
 hsPatType (BangPat pat)               = hsLPatType pat
 hsPatType (LazyPat pat)               = hsLPatType pat
 hsPatType (LitPat lit)                = hsLitType lit
@@ -851,11 +850,6 @@ zonk_pat env (WildPat ty)
 zonk_pat env (VarPat v)
   = do	{ v' <- zonkIdBndr env v
 	; return (extendZonkEnv1 env v', VarPat v') }
-
-zonk_pat env (VarPatOut v binds)
-  = do	{ v' <- zonkIdBndr env v
-	; (env', binds') <- zonkTcEvBinds (extendZonkEnv1 env v') binds
-  	; returnM (env', VarPatOut v' binds') }
 
 zonk_pat env (LazyPat pat)
   = do	{ (env', pat') <- zonkPat env pat

@@ -64,8 +64,6 @@ data Pat id
 	-- support hsPatType :: Pat Id -> Type
 
   | VarPat	id			-- Variable
-  | VarPatOut	id TcEvBinds		-- Used only for overloaded Ids; the 
-					-- bindings give its overloaded instances
   | LazyPat	(LPat id)		-- Lazy pattern
   | AsPat	(Located id) (LPat id)  -- As pattern
   | ParPat      (LPat id)		-- Parenthesised pattern
@@ -257,7 +255,6 @@ patNeedsParens _              = False
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
 pprPat (VarPat var)  	  = pprPatBndr var
-pprPat (VarPatOut var bs) = pprPatBndr var <+> braces (ppr bs)
 pprPat (WildPat _)	  = char '_'
 pprPat (LazyPat pat)      = char '~' <> pprParendLPat pat
 pprPat (BangPat pat)      = char '!' <> pprParendLPat pat
@@ -397,7 +394,6 @@ isIrrefutableHsPat pat
 
     go1 (WildPat {})        = True
     go1 (VarPat {})         = True
-    go1 (VarPatOut {})      = True
     go1 (LazyPat {})        = True
     go1 (BangPat pat)       = go pat
     go1 (CoPat _ pat _)     = go1 pat
@@ -430,7 +426,6 @@ isIrrefutableHsPat pat
 hsPatNeedsParens :: Pat a -> Bool
 hsPatNeedsParens (WildPat {})        = False
 hsPatNeedsParens (VarPat {})         = False
-hsPatNeedsParens (VarPatOut {})      = True
 hsPatNeedsParens (LazyPat {})        = False
 hsPatNeedsParens (BangPat {})        = False
 hsPatNeedsParens (CoPat {})          = True

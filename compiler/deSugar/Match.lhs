@@ -468,11 +468,6 @@ tidy1 _ (WildPat ty)      = return (idDsWrapper, WildPat ty)
 tidy1 v (VarPat var)
   = return (wrapBind var v, WildPat (idType var)) 
 
-tidy1 v (VarPatOut var binds)
-  = do	{ ds_ev_binds <- dsTcEvBinds binds
-	; return (wrapBind var v . wrapDsEvBinds ds_ev_binds,
-		  WildPat (idType var)) }
-
 	-- case v of { x@p -> mr[] }
 	-- = case v of { p -> let x=v in mr[] }
 tidy1 v (AsPat (L _ var) pat)
@@ -530,7 +525,6 @@ tidy1 _ (NPat lit mb_neg eq)
 tidy1 v (BangPat (L _ (LazyPat p)))       = tidy1 v (BangPat p)
 tidy1 v (BangPat (L _ (ParPat p)))        = tidy1 v (BangPat p)
 tidy1 _ p@(BangPat (L _(VarPat _)))       = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _(VarPatOut _ _)))  = return (idDsWrapper, p)
 tidy1 _ p@(BangPat (L _ (WildPat _)))     = return (idDsWrapper, p)
 tidy1 _ p@(BangPat (L _ (CoPat _ _ _)))   = return (idDsWrapper, p)
 tidy1 _ p@(BangPat (L _ (SigPatIn _ _)))  = return (idDsWrapper, p)

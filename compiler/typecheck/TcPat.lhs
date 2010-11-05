@@ -375,16 +375,6 @@ tc_pat penv (VarPat name) pat_ty thing_inside
     	; res <- tcExtendIdEnv1 name id thing_inside
         ; return (mkHsWrapPatCoI coi (VarPat id) pat_ty, res) }
 
-{- Need this if we re-add Method constraints 
-	; (res, binds) <- bindInstsOfPatId id $
-			  tcExtendIdEnv1 name id $
-			  (traceTc (text "binding" <+> ppr name <+> ppr (idType id))
-			   >> thing_inside)
-	; let pat' | isEmptyTcEvBinds binds = VarPat id
-		   | otherwise		    = VarPatOut id binds
-	; return (mkHsWrapPatCoI coi pat' pat_ty, res) }
--}
-
 tc_pat penv (ParPat pat) pat_ty thing_inside
   = do	{ (pat', res) <- tc_lpat pat pat_ty penv thing_inside
 	; return (ParPat pat', res) }
@@ -558,7 +548,7 @@ tc_pat penv (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
 	; res <- tcExtendIdEnv1 name bndr_id thing_inside
 	; return (mkHsWrapPatCoI coi pat' pat_ty, res) }
 
-tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- ConPatOut, SigPatOut, VarPatOut
+tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- ConPatOut, SigPatOut
 
 ----------------
 unifyPatType :: TcType -> TcType -> TcM CoercionI

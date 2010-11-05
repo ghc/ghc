@@ -1041,8 +1041,6 @@ collectl (L _ pat) bndrs
   = go pat
   where
     go (VarPat var)               = var : bndrs
-    go (VarPatOut var bs)         = var : collectEvBinders bs
-                                    ++ bndrs
     go (WildPat _)                = bndrs
     go (LazyPat pat)              = collectl pat bndrs
     go (BangPat pat)              = collectl pat bndrs

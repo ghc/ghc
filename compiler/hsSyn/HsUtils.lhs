@@ -508,8 +508,6 @@ collect_lpat (L _ pat) bndrs
   = go pat
   where
     go (VarPat var) 	   	  = var : bndrs
-    go (VarPatOut var _) 	  = var : bndrs
-	-- See Note [Dictionary binders in ConPatOut]
     go (WildPat _)	      	  = bndrs
     go (LazyPat pat)     	  = collect_lpat pat bndrs
     go (BangPat pat)     	  = collect_lpat pat bndrs
