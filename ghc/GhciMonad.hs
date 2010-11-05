@@ -90,6 +90,7 @@ data GHCiOption
 	= ShowTiming		-- show time/allocs after evaluation
 	| ShowType		-- show the type of expressions
 	| RevertCAFs		-- revert CAFs after every evaluation
+        | Multiline             -- use multiline commands
 	deriving Eq
 
 data BreakLocation

@@ -51,6 +51,7 @@ module Lexer (
    failLocMsgP, failSpanMsgP, srcParseFail,
    getMessages, 
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
+   activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    extension, bangPatEnabled, datatypeContextsEnabled,
    addWarning,
@@ -1670,6 +1671,11 @@ getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (AI l b)
 setInput :: AlexInput -> P ()
 setInput (AI l b) = P $ \s -> POk s{ loc=l, buffer=b } ()
 
+nextIsEOF :: P Bool
+nextIsEOF = do
+  AI _ s <- getInput
+  return $ atEnd s
+
 pushLexState :: Int -> P ()
 pushLexState ls = P $ \s@PState{ lex_state=l } -> POk s{lex_state=ls:l} ()
 
@@ -1683,6 +1689,15 @@ popNextToken :: P (Maybe (Located Token))
 popNextToken
     = P $ \s@PState{ alr_next_token = m } ->
               POk (s {alr_next_token = Nothing}) m
+
+activeContext :: P Bool
+activeContext = do
+  ctxt <- getALRContext
+  expc <- getAlrExpectingOCurly
+  impt <- implicitTokenPending
+  case (ctxt,expc) of
+    ([],Nothing) -> return impt
+    _other       -> return True
 
 setAlrLastLoc :: SrcSpan -> P ()
 setAlrLastLoc l = P $ \s -> POk (s {alr_last_loc = l}) ()
@@ -1706,6 +1721,13 @@ setJustClosedExplicitLetBlock b
 
 setNextToken :: Located Token -> P ()
 setNextToken t = P $ \s -> POk (s {alr_next_token = Just t}) ()
+
+implicitTokenPending :: P Bool
+implicitTokenPending
+    = P $ \s@PState{ alr_pending_implicit_tokens = ts } ->
+              case ts of
+              [] -> POk s False
+              _  -> POk s True
 
 popPendingImplicitToken :: P (Maybe (Located Token))
 popPendingImplicitToken

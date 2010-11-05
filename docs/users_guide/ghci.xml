@@ -58,8 +58,52 @@ Prelude>
 </screen>
 
     <para>GHCi interprets the whole line as an expression to evaluate.
-    The expression may not span several lines - as soon as you press
-    enter, GHCi will attempt to evaluate it.</para>
+    The expression may not span several lines - as soon as you press enter, 
+    GHCi will attempt to evaluate it.</para>
+
+    <para>GHCi also has a multiline mode, 
+    <indexterm><primary><literal>:set +m</literal></primary></indexterm>,
+    which is terminated by an empty line:</para>
+
+<screen>
+Prelude> :set +m
+Prelude> let x = 42 in x / 9
+Prelude| 
+4.666666666666667
+Prelude> 
+</screen>
+    
+    <para>In Haskell, a <literal>let</literal> expression is followed
+    by <literal>in</literal>.  However, in GHCi, since the expression 
+    can also be interpreted in the <literal>IO</literal> monad, 
+    a <literal>let</literal> binding with no accompanying 
+    <literal>in</literal> statement can be signalled by an empty line, 
+    as in the above example.</para>
+
+    <para>Multiline mode is useful when entering monadic 
+    <literal>do<literal> statements:</para>
+
+<screen>
+Control.Monad.State> flip evalStateT 0 $ do
+Control.Monad.State| i <- get
+Control.Monad.State| lift $ do
+Control.Monad.State|   putStrLn "Hello World!"
+Control.Monad.State|   print i
+Control.Monad.State|
+"Hello World!"
+0
+Control.Monad.State>
+</screen>
+  
+   <para>During a multiline interaction, the user can interrupt and
+   return to the top-level prompt.</para>
+
+<screen>
+Prelude> do
+Prelude| putStrLn "Hello, World!"
+Prelude| ^C
+Prelude>
+</screen>
   </sect1>
 
   <sect1 id="loading-source-files">
@@ -2625,6 +2669,18 @@ bar
       <para>The available GHCi options are:</para>
 
       <variablelist>
+	<varlistentry>
+	  <term>
+            <literal>+m</literal>
+            <indexterm><primary><literal>+m</literal></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Enable parsing of multiline commands.  A multiline command
+	    is prompted for when the current input line contains open layout
+	    contexts.</para>
+	  </listitem>
+	</varlistentry>
+
 	<varlistentry>
 	  <term>
             <literal>+r</literal>

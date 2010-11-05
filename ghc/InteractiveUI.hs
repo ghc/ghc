@@ -27,6 +27,8 @@ import GHC              ( LoadHowMuch(..), Target(..),  TargetId(..),
                           Ghc, handleSourceError )
 import PprTyThing
 import DynFlags
+import qualified Lexer
+import StringBuffer
 
 import Packages
 -- import PackageConfig
@@ -257,6 +259,7 @@ helpText =
  "\n" ++
  "  Options for ':set' and ':unset':\n" ++
  "\n" ++
+ "    +m            allow multiline commands\n" ++             
  "    +r            revert top-level expressions after each evaluation\n" ++
  "    +s            print timing/memory stats after each evaluation\n" ++
  "    +t            print type after evaluation\n" ++
@@ -585,30 +588,34 @@ runCommands' :: (SomeException -> GHCi Bool) -- Exception handler
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands' eh getCmd = do
     b <- ghandle (\e -> case fromException e of
-                          Just UserInterrupt -> return False
+                          Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
                                  Just ghc_e ->
                                    do liftIO (print (ghc_e :: GhcException))
-                                      return True
+                                      return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
             (runOneCommand eh getCmd)
-    if b then return () else runCommands' eh getCmd
+    case b of
+      Nothing -> return ()
+      Just _  -> runCommands' eh getCmd
 
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
-            -> InputT GHCi Bool
+            -> InputT GHCi (Maybe Bool)
 runOneCommand eh getCmd = do
   mb_cmd <- noSpace (lift queryQueue)
   mb_cmd <- maybe (noSpace getCmd) (return . Just) mb_cmd
   case mb_cmd of
-    Nothing -> return True
-    Just c  -> ghciHandle (lift . eh) $
+    Nothing -> return Nothing
+    Just c  -> ghciHandle (\e -> lift $ eh e >>= return . Just) $
              handleSourceError printErrorAndKeepGoing
                (doCommand c)
+               -- source error's are handled by runStmt
+               -- is the handler necessary here?
   where
     printErrorAndKeepGoing err = do
         GHC.printException err
-        return False
+        return $ Just True
 
     noSpace q = q >>= maybe (return Nothing)
                             (\c->case removeSpaces c of 
@@ -639,9 +646,63 @@ runOneCommand eh getCmd = do
             normSpace   c  = c
     -- QUESTION: is userError the one to use here?
     collectError = userError "unterminated multiline command :{ .. :}"
-    doCommand (':' : cmd) = specialCommand cmd
-    doCommand stmt        = do _ <- timeIt $ lift $ runStmt stmt GHC.RunToCompletion
-                               return False
+    doCommand (':' : cmd) = do
+      result <- specialCommand cmd
+      case result of
+        True -> return Nothing
+        _    -> return $ Just True
+    doCommand stmt        = do 
+      ml <- lift $ isOptionSet Multiline
+      if ml
+        then do 
+          mb_stmt <- checkInputForLayout stmt getCmd 
+          case mb_stmt of
+            Nothing      -> return $ Just True
+            Just ml_stmt -> do
+              result <- timeIt $ lift $ runStmt ml_stmt GHC.RunToCompletion
+              return $ Just result
+        else do
+          result <- timeIt $ lift $ runStmt stmt GHC.RunToCompletion
+          return $ Just result
+
+-- #4316
+-- lex the input.  If there is an unclosed layout context, request input
+checkInputForLayout :: String -> InputT GHCi (Maybe String) 
+                    -> InputT GHCi (Maybe String)
+checkInputForLayout stmt getStmt = do
+   dflags' <- lift $ getDynFlags
+   let dflags = xopt_set dflags' Opt_AlternativeLayoutRule
+   st <- lift $ getGHCiState
+   let buf =  stringToStringBuffer stmt
+       loc  = mkSrcLoc (fsLit (progname st)) (line_number st) 1
+       pstate = Lexer.mkPState dflags buf loc
+   case Lexer.unP goToEnd pstate of
+     (Lexer.POk _ False) -> return $ Just stmt
+     _other              -> do
+       st <- lift getGHCiState
+       let p = prompt st
+       lift $ setGHCiState st{ prompt = "%s| " }
+       mb_stmt <- ghciHandle (\ex -> case fromException ex of
+                            Just UserInterrupt -> return Nothing
+                            _ -> case fromException ex of
+                                 Just ghc_e ->
+                                   do liftIO (print (ghc_e :: GhcException))
+                                      return Nothing
+                                 _other -> liftIO (Exception.throwIO ex)) 
+                     getStmt
+       lift $ getGHCiState >>= \st->setGHCiState st{ prompt = p }
+       -- the recursive call does not recycle parser state
+       -- as we use a new string buffer
+       case mb_stmt of
+         Nothing  -> return Nothing
+         Just str -> if str == ""
+           then return $ Just stmt
+           else checkInputForLayout (stmt++"\n"++str) getStmt
+     where goToEnd = do
+             eof <- Lexer.nextIsEOF
+             if eof 
+               then Lexer.activeContext
+               else Lexer.lexer return >> goToEnd
 
 enqueueCommands :: [String] -> GHCi ()
 enqueueCommands cmds = do
@@ -1569,12 +1630,14 @@ unsetOpt str
 	Just o  -> unsetOption o
 
 strToGHCiOpt :: String -> (Maybe GHCiOption)
+strToGHCiOpt "m" = Just Multiline
 strToGHCiOpt "s" = Just ShowTiming
 strToGHCiOpt "t" = Just ShowType
 strToGHCiOpt "r" = Just RevertCAFs
 strToGHCiOpt _   = Nothing
 
 optToStr :: GHCiOption -> String
+optToStr Multiline  = "m"
 optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
