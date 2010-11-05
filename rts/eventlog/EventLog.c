@@ -235,12 +235,15 @@ initEventLogging(void)
                 sizeof(EventThreadID) + sizeof(StgWord16);
             break;
 
+        case EVENT_STARTUP:         // (cap count)
+            eventTypes[t].size = sizeof(EventCapNo);
+            break;
+
         case EVENT_SHUTDOWN:        // (cap)
         case EVENT_REQUEST_SEQ_GC:  // (cap)
         case EVENT_REQUEST_PAR_GC:  // (cap)
         case EVENT_GC_START:        // (cap)
         case EVENT_GC_END:          // (cap)
-        case EVENT_STARTUP:
         case EVENT_GC_IDLE:
         case EVENT_GC_WORK:
         case EVENT_GC_DONE:
