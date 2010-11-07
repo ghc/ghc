@@ -5,48 +5,69 @@
 \makeheader
 
 Haddock is a widely used documentation-generation tool for Haskell
-library code.  Haddock generates documentation by parsing the Haskell
-source code directly and including documentation supplied by the
-programmer in the form of specially-formatted comments in the source
-code itself.  Haddock has direct support in Cabal~\cref{cabal}, and is used to
-generate the documentation for the hierarchical libraries that come
-with GHC, Hugs, and nhc98
-(\url{http://www.haskell.org/ghc/docs/latest/html/libraries}).
+library code.  Haddock generates documentation by parsing and typechecking
+Haskell source code directly and including documentation supplied by the
+programmer in the form of specially-formatted comments in the source code
+itself.  Haddock has direct support in Cabal~\cref{cabal}, and is used to
+generate the documentation for the hierarchical libraries that come with GHC,
+Hugs, and nhc98
+(\url{http://www.haskell.org/ghc/docs/latest/html/libraries}) as well as
+the documentation on Hackage~\cref{Hackage}.
 
-The latest release is version 2.2.2, released August 5 2008.
+The latest release is version 2.8.1, released September 3 2010.
 
 \Separate
 Recent changes:
 \begin{itemize}
-\item Support for GHC 6.8.3
-\item The Hoogle backend is back, thanks to Neil Mitchell.
-\item Show associated types in the documentation for class declarations
-\item Show associated types in the documentation for class declarations
-\item Show type family declarations
-\item Show type equality predicates
-\item Major bug fixes (\#1 and \#44)
-\item It is no longer required to specify the path to GHC's lib dir
-\item Remove unnecessary parenthesis in type signatures
+
+\item HTML backend completely rewritten to generate semantically rich XHTML
+      using the xhtml package.
+
+\item New default CSS based on the color scheme chosen for the new Haskell
+      wiki, with a pull-out tab for the synopsis.
+
+\item Theme engine based on CSS files. Themes can be switched from the
+      header menu. (New flags --built-in-themes and --theme. The latter
+      is an alias for --css which now has extended semantics).
+
+\item Markup support for executable examples/unit-tests. To be used with an
+      upcoming version of the DocTest program.
+
+\item Addition of a LaTeX backend.
+
+\item Frames-mode can be enabled from the header menu.
+
+\item Path to source entities can be specified per package, so that source
+      links work for cross-package documentation.
+
+\item Support for a second form of enumerated lists (1. 2. etc).
+
+\item Additions and changes to the Haddock API.
+
+\item New flag --no-tmp-comp-dir to tell Haddock to write and pick up
+      compilation files (.o, .hi, etc) to/from GHC's output directory instead
+      of a temporary directory.
+
+\item Various bug fixes.
+
 \end{itemize}
 
 \FuturePlans
-Currently, Haddock ignores comments on some language constructs like GADTs and
-Associated Type synonyms. Of course, the plan is to support comments
-for these constructs in the future.
-Haddock is also slightly more picky on where to put comments compared
-to the 0.x series. We want to fix this
-as well. Both of these plans require changes to the GHC parser. We
-want to investigate to what degree it is possible to
-decouple comment parsing from GHC and move it into Haddock, to not be bound by
-GHC releases.
-
-Other things we plan to add in future releases:
-\begin{itemize}
-\item Support for GHC 6.10.1
-\item HTML frames ({\'a} la Javadoc)
-\item Support for documenting re-exports from other packages 
-\end{itemize}
-
+Although Haddock understands many GHC language extensions, we'd like it to
+understand all of them. Currently there are som constructs you can't comment,
+like GADTs and associated type synonyms.
+\\ 
+Error messages is an area with room for improvement. We'd like Haddock
+to include accurate line numbers in markup syntax errors.
+\\
+On the HTML rendering side we want make more use of Javascript in order to make
+the viewing experience better. The frames-mode could be improved this way, for
+example.
+\\
+Finally, the long term plan is to split Haddock into one program that creates
+data from sources, and separate backend programs that use that data via the
+Haddock API. This will scale better, not requiring adding new backends to Haddock
+for every tool that needs its own format.
 \FurtherReading
 \begin{compactitem}
 \item Haddock's homepage:
@@ -54,5 +75,8 @@ Other things we plan to add in future releases:
 
 \item Haddock's developer Wiki and Trac:
 \url{http://trac.haskell.org/haddock}
+
+\item Haddock's mailing list:
+\url{haddock@projects.haskell.org}
 \end{compactitem}
 \end{hcarentry}
