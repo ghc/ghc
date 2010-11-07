@@ -1,6 +1,6 @@
 \begin{hcarentry}{Haddock}
 \label{haddock}
-\report{David Waern}%11/08
+\report{David Waern}%11/10
 \status{experimental, maintained}
 \makeheader
 
@@ -12,7 +12,7 @@ itself.  Haddock has direct support in Cabal~\cref{cabal}, and is used to
 generate the documentation for the hierarchical libraries that come with GHC,
 Hugs, and nhc98
 (\url{http://www.haskell.org/ghc/docs/latest/html/libraries}) as well as
-the documentation on Hackage~\cref{Hackage}.
+the documentation on Hackage.
 
 The latest release is version 2.8.1, released September 3 2010.
 
@@ -22,33 +22,14 @@ Recent changes:
 
 \item HTML backend completely rewritten to generate semantically rich XHTML
       using the xhtml package.
-
 \item New default CSS based on the color scheme chosen for the new Haskell
       wiki, with a pull-out tab for the synopsis.
-
 \item Theme engine based on CSS files. Themes can be switched from the
-      header menu. (New flags --built-in-themes and --theme. The latter
-      is an alias for --css which now has extended semantics).
-
-\item Markup support for executable examples/unit-tests. To be used with an
-      upcoming version of the DocTest program.
-
+      header menu.
+\item Markup support for executable examples/unit-tests.
 \item Addition of a LaTeX backend.
-
-\item Frames-mode can be enabled from the header menu.
-
-\item Path to source entities can be specified per package, so that source
-      links work for cross-package documentation.
-
-\item Support for a second form of enumerated lists (1. 2. etc).
-
 \item Additions and changes to the Haddock API.
-
-\item New flag --no-tmp-comp-dir to tell Haddock to write and pick up
-      compilation files (.o, .hi, etc) to/from GHC's output directory instead
-      of a temporary directory.
-
-\item Various bug fixes.
+\item Various smaller new features and bug fixes.
 
 \end{itemize}
 
