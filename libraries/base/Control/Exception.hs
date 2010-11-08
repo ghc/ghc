@@ -268,7 +268,7 @@ to write something like
 >                 (\e -> handler)
 
 If you need to unblock asynchronous exceptions again in the exception
-handler, just use 'unblock' as normal.
+handler, 'restore' can be used there too.
 
 Note that 'try' and friends /do not/ have a similar default, because
 there is no exception handler in this case.  Don't use 'try' for
