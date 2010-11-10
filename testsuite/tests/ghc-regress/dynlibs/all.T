@@ -11,3 +11,11 @@ test('T3807',
      run_command,
      ['$MAKE --no-print-directory -s T3807'])
 
+test('T4464',
+     [extra_clean(['T4464B.o', 'T4464C.o', 'T4464H.hi', 'T4464H.o',
+                   'T4464H_stub.c', 'T4464H_stub.h', 'T4464H_stub.o',
+                   'HS4464.dll', 'HS4464.dll.a', 't4464.exe']),
+      unless_os('mingw32', skip)],
+     run_command,
+     ['$MAKE --no-print-directory -s T4464'])
+

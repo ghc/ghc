@@ -13,3 +13,20 @@ T3807:
 	'$(TEST_HC)' T3807-load.c -o T3807-load -ldl
 	./T3807-load
 
+.PHONY: T4464
+T4464:
+	$(RM) T4464B.o T4464C.o T4464H.hi T4464H.o
+	$(RM) T4464H_stub.c T4464H_stub.h T4464H_stub.o
+	$(RM) HS4464.dll HS4464.dll.a t4464.exe
+	'$(TEST_HC)' -v0 -shared T4464H.hs T4464B.c -o HS4464.dll
+	'$(TEST_HC)' -v0 T4464C.c HS4464.dll.a -o t4464.exe
+	-./t4464.exe
+	echo "====="
+	echo "=====" >&2
+	$(RM) T4464B.o T4464C.o T4464H.hi T4464H.o
+	$(RM) T4464H_stub.c T4464H_stub.h T4464H_stub.o
+	$(RM) HS4464.dll HS4464.dll.a t4464.exe
+	'$(TEST_HC)' -v0 -shared T4464H.hs T4464B.c -o HS4464.dll -rtsopts
+	'$(TEST_HC)' -v0 T4464C.c HS4464.dll.a -o t4464.exe
+	./t4464.exe
+
