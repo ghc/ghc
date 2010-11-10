@@ -260,6 +260,12 @@ def if_os( os, f ):
     else:
         return normal
 
+def unless_os( os, f ):
+    if config.os == os:
+        return normal
+    else:
+        return f
+
 def if_arch( arch, f ):
     if config.arch == arch:
         return f
