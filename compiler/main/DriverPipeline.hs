@@ -1323,6 +1323,20 @@ mkExtraCObj dflags xs
                       map Option md_c_flags)
       return oFile
 
+mkRtsOptionsLevelObj :: DynFlags -> IO [FilePath]
+mkRtsOptionsLevelObj dflags
+ = do let mkRtsEnabledObj val
+              = do fn <- mkExtraCObj dflags
+                             ["#include \"Rts.h\"",
+                              "#include \"RtsOpts.h\"",
+                              "const rtsOptsEnabledEnum rtsOptsEnabled = "
+                                  ++ val ++ ";"]
+                   return [fn]
+      case rtsOptsEnabled dflags of
+          RtsOptsNone     -> mkRtsEnabledObj "rtsOptsNone"
+          RtsOptsSafeOnly -> return [] -- The default
+          RtsOptsAll      -> mkRtsEnabledObj "rtsOptsAll"
+
 -- generates a Perl skript starting a parallel prg under PVM
 mk_pvm_wrapper_script :: String -> String -> String -> String
 mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
@@ -1433,16 +1447,7 @@ linkBinary dflags o_files dep_packages = do
     let no_hs_main = dopt Opt_NoHsMain dflags
     let main_lib | no_hs_main = []
                  | otherwise  = [ "-lHSrtsmain" ]
-    let mkRtsEnabledObj val = do fn <- mkExtraCObj dflags
-                                           ["#include \"Rts.h\"",
-                                            "#include \"RtsOpts.h\"",
-                                            "const rtsOptsEnabledEnum rtsOptsEnabled = "
-                                                ++ val ++ ";"]
-                                 return [fn]
-    rtsEnabledObj <- case rtsOptsEnabled dflags of
-                     RtsOptsNone     -> mkRtsEnabledObj "rtsOptsNone"
-                     RtsOptsSafeOnly -> return []
-                     RtsOptsAll      -> mkRtsEnabledObj "rtsOptsAll"
+    rtsEnabledObj <- mkRtsOptionsLevelObj dflags
     rtsOptsObj <- case rtsOpts dflags of
                   Just opts ->
                       do fn <- mkExtraCObj dflags
@@ -1655,6 +1660,9 @@ linkDynLib dflags o_files dep_packages = do
 
     let (md_c_flags, _) = machdepCCOpts dflags
     let extra_ld_opts = getOpts dflags opt_l
+
+    rtsEnabledObj <- mkRtsOptionsLevelObj dflags
+
 #if defined(mingw32_HOST_OS)
     -----------------------------------------------------------------------------
     -- Making a DLL
@@ -1682,6 +1690,7 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
+         ++ rtsEnabledObj
          ++ pkg_link_opts
         ))
 #elif defined(darwin_TARGET_OS)
@@ -1735,6 +1744,7 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
+         ++ rtsEnabledObj
          ++ pkg_link_opts
         ))
 #else
@@ -1767,6 +1777,7 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
+         ++ rtsEnabledObj
          ++ pkg_link_opts
         ))
 #endif
