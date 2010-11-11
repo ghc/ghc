@@ -227,7 +227,8 @@ initCapability( Capability *cap, nat i )
     cap->sparks_created     = 0;
     cap->sparks_dud         = 0;
     cap->sparks_converted   = 0;
-    cap->sparks_pruned      = 0;
+    cap->sparks_gcd         = 0;
+    cap->sparks_fizzled     = 0;
 #endif
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;

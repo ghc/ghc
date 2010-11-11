@@ -638,16 +638,18 @@ stat_exit(int alloc)
                 lnat sparks_created   = 0;
                 lnat sparks_dud       = 0;
                 lnat sparks_converted = 0;
-                lnat sparks_pruned    = 0;
+                lnat sparks_gcd       = 0;
+                lnat sparks_fizzled   = 0;
                 for (i = 0; i < n_capabilities; i++) {
                     sparks_created   += capabilities[i].sparks_created;
                     sparks_dud       += capabilities[i].sparks_dud;
                     sparks_converted += capabilities[i].sparks_converted;
-                    sparks_pruned    += capabilities[i].sparks_pruned;
+                    sparks_gcd       += capabilities[i].sparks_gcd;
+                    sparks_fizzled   += capabilities[i].sparks_fizzled;
                 }
 
-                statsPrintf("  SPARKS: %ld (%ld converted, %ld dud, %ld pruned)\n\n",
-                            sparks_created + sparks_dud, sparks_converted, sparks_dud, sparks_pruned);
+                statsPrintf("  SPARKS: %ld (%ld converted, %ld dud, %ld GC'd, %ld fizzled)\n\n",
+                            sparks_created + sparks_dud, sparks_converted, sparks_dud, sparks_gcd, sparks_fizzled);
             }
 #endif
 

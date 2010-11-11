@@ -207,7 +207,7 @@ pruneSparkQueue (Capability *cap)
               n++;
           } else {
               pruned_sparks++; // discard spark
-              cap->sparks_pruned++;
+              cap->sparks_fizzled++;
           }
       } else if (HEAP_ALLOCED(spark) && 
                  (Bdescr((P_)spark)->flags & BF_EVACUATED)) {
@@ -217,11 +217,11 @@ pruneSparkQueue (Capability *cap)
               n++;
           } else {
               pruned_sparks++; // discard spark
-              cap->sparks_pruned++;
+              cap->sparks_fizzled++;
           }
       } else {
           pruned_sparks++; // discard spark
-          cap->sparks_pruned++;
+          cap->sparks_gcd++;
       }
 
       currInd++;
