@@ -83,11 +83,11 @@ import System.FilePath
 
 
 #if __GLASGOW_HASKELL__ >= 701
-import GHC.Show		( showMultiLineString )
+import GHC.Show         ( showMultiLineString )
 #else
 showMultiLineString :: String -> [String]
 -- Crude version
-showMultiLineString s = [s]
+showMultiLineString s = [ showList s "" ]
 #endif
 \end{code}
 
