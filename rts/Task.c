@@ -348,6 +348,17 @@ workerTaskStop (Task *task)
 
 #endif
 
+#ifdef DEBUG
+
+static void *taskId(Task *task)
+{
+#ifdef THREADED_RTS
+    return (void *)task->id;
+#else
+    return (void *)task;
+#endif
+}
+
 #if defined(THREADED_RTS)
 
 static void OSThreadProcAttr
@@ -415,21 +426,10 @@ interruptWorkerTask (Task *task)
   ASSERT(osThreadId() != task->id);    // seppuku not allowed
   ASSERT(task->incall->suspended_tso); // use this only for FFI calls
   interruptOSThread(task->id);
-  debugTrace(DEBUG_sched, "interrupted worker task %lu", task->id);
+  debugTrace(DEBUG_sched, "interrupted worker task %p", taskId(task));
 }
 
 #endif /* THREADED_RTS */
-
-#ifdef DEBUG
-
-static void *taskId(Task *task)
-{
-#ifdef THREADED_RTS
-    return (void *)task->id;
-#else
-    return (void *)task;
-#endif
-}
 
 void printAllTasks(void);
 
