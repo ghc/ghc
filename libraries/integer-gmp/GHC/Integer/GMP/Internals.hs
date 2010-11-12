@@ -1,5 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface, GHCForeignImportPrim,
-             MagicHash, UnboxedTuples, UnliftedFFITypes #-}
+             MagicHash, UnboxedTuples, UnliftedFFITypes, BangPatterns #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 
