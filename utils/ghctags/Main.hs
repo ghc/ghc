@@ -280,7 +280,6 @@ boundThings modname lbinding =
           in case unLoc lpat of
                WildPat _ -> tl
                VarPat name -> lid name : tl
-               VarPatOut name _ -> lid name : tl -- XXX need help here
                LazyPat p -> patThings p tl
                AsPat id p -> patThings p (thing id : tl)
                ParPat p -> patThings p tl
