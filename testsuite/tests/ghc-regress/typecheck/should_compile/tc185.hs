@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MagicHash, BangPatterns #-}
 
 -- Killed GHC 6.3 HEAD
 
