@@ -10,7 +10,10 @@ tcfail192.hs:8:11:
         foo = [x + 1 | x <- ["Hello", "World"], then group using take 5]
 
 tcfail192.hs:10:26:
-    Occurs check: cannot construct the infinite type: a = [a]
+    Couldn't match type `a' with `[a]'
+      `a' is a rigid type variable bound by
+          the polymorphic type `forall a1. [a1] -> [[a1]]'
+            at tcfail192.hs:10:9
     In the expression: take 5
     In a stmt of a list comprehension: then group using take 5
     In the expression:

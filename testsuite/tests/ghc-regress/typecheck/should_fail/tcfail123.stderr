@@ -6,3 +6,11 @@ tcfail123.hs:11:10:
     In the first argument of `f', namely `3#'
     In the expression: f 3#
     In the expression: (f 3#, f 4.3#, f True)
+
+tcfail123.hs:11:16:
+    Kind incompatibility when matching types:
+      t1 :: *
+      GHC.Prim.Float# :: #
+    In the first argument of `f', namely `4.3#'
+    In the expression: f 4.3#
+    In the expression: (f 3#, f 4.3#, f True)

@@ -3,12 +3,5 @@ T2714.hs:8:5:
     Couldn't match type `a' with `f b'
       `a' is a rigid type variable bound by
           the type signature for `f' at T2714.hs:7:8
-    In the expression: fmap
-    In an equation for `f': f = fmap
-
-T2714.hs:8:5:
-    Couldn't match type `c' with `f (f b -> b)'
-      `c' is a rigid type variable bound by
-          the type signature for `f' at T2714.hs:7:33
-    In the expression: fmap
-    In an equation for `f': f = fmap
+    In the expression: ffmap
+    In an equation for `f': f = ffmap
