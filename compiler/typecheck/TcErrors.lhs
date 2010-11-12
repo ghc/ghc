@@ -3,8 +3,9 @@ module TcErrors(
        reportUnsolved, reportUnsolvedDeriv,
        reportUnsolvedWantedEvVars, warnDefaulting, 
        unifyCtxt, typeExtraInfoMsg, 
-       kindErrorTcS, misMatchErrorTcS, flattenForAllErrorTcS,
-       occursCheckErrorTcS, solverDepthErrorTcS
+
+       flattenForAllErrorTcS,
+       solverDepthErrorTcS
   ) where
 
 #include "HsVersions.h"
@@ -13,6 +14,8 @@ import TcRnMonad
 import TcMType
 import TcSMonad
 import TcType
+import TypeRep
+
 import Inst
 import InstEnv
 
@@ -47,24 +50,126 @@ from the insts, or just whatever seems to be around in the monad just
 now?
 
 \begin{code}
-reportUnsolved :: (CanonicalCts, Bag Implication) -> TcM ()
-reportUnsolved (unsolved_flats, unsolved_implics)
-  | isEmptyBag unsolved
+reportUnsolved :: (Bag WantedEvVar, Bag Implication) -> Bag FrozenError -> TcM ()
+reportUnsolved (unsolved_flats, unsolved_implics) frozen_errors
+  | isEmptyBag unsolved && isEmptyBag frozen_errors
   = return ()
   | otherwise
-  = do { unsolved <- mapBagM zonkWanted unsolved
+  = do { frozen_errors_zonked <- mapBagM zonk_frozen frozen_errors
+       ; let frozen_tvs = tyVarsOfFrozen frozen_errors_zonked 
+
+       ; unsolved <- mapBagM zonkWanted unsolved
 		     -- Zonk to un-flatten any flatten-skols
        ; env0 <- tcInitTidyEnv
-       ; let tidy_env      = tidyFreeTyVars env0 (tyVarsOfWanteds unsolved)
+       ; let tidy_env      = tidyFreeTyVars env0 $ 
+                             tyVarsOfWanteds unsolved `unionVarSet` frozen_tvs 
+
              tidy_unsolved = tidyWanteds tidy_env unsolved
              err_ctxt = CEC { cec_encl = [] 
                             , cec_extra = empty
-                            , cec_tidy = tidy_env } 
-       ; traceTc "reportUnsolved" (ppr unsolved)
+                            , cec_tidy = tidy_env 
+                            } 
+
+       ; traceTc "reportUnsolved" (vcat [
+              text "Unsolved constraints =" <+> ppr unsolved,
+              text "Frozen errors =" <+> ppr frozen_errors_zonked ])
+
+       ; let tidy_frozen_errors_zonked = tidyFrozen tidy_env frozen_errors_zonked
+
+       ; reportTidyFrozens tidy_env tidy_frozen_errors_zonked 
        ; reportTidyWanteds err_ctxt tidy_unsolved }
   where
-    unsolved = mkWantedConstraints unsolved_flats unsolved_implics
+    unsolved = Bag.mapBag WcEvVar unsolved_flats `unionBags` 
+                 Bag.mapBag WcImplic unsolved_implics
 
+    zonk_frozen (FrozenError frknd fl ty1 ty2)
+      = do { ty1z <- zonkTcType ty1 
+           ; ty2z <- zonkTcType ty2
+           ; return (FrozenError frknd fl ty1z ty2z) }
+
+    tyVarsOfFrozen fr 
+      = unionVarSets $ bagToList (mapBag tvs_of_frozen fr)
+    tvs_of_frozen (FrozenError _ _ ty1 ty2) = tyVarsOfTypes [ty1,ty2]
+
+    tidyFrozen env fr = mapBag (tidy_frozen env) fr
+    tidy_frozen env (FrozenError frknd fl ty1 ty2)
+      = FrozenError frknd fl (tidyType env ty1) (tidyType env ty2)
+
+reportTidyFrozens :: TidyEnv -> Bag FrozenError -> TcM ()
+reportTidyFrozens tidy_env fr = mapBagM_ (reportTidyFrozen tidy_env) fr 
+
+reportTidyFrozen :: TidyEnv -> FrozenError -> TcM () 
+reportTidyFrozen tidy_env err@(FrozenError _ fl _ty1 _ty2)
+  = do { let dec_errs = decompFrozenError err
+             init_err_ctxt = CEC { cec_encl  = [] 
+                                 , cec_extra = empty
+                                 , cec_tidy  = tidy_env }
+       ; mapM_ (report_dec_err init_err_ctxt) dec_errs }
+  where 
+    report_dec_err err_ctxt (ty1,ty2)
+        -- The only annoying thing here is that in the given case, 
+        -- the ``Inaccessible code'' message will be printed once for 
+        -- each decomposed equality.
+          = do { (tidy_env2,extra2)
+                     <- if isGiven fl
+                        then return (cec_tidy err_ctxt, inaccessible_msg)
+                        else getWantedEqExtra emptyTvSubst (cec_tidy err_ctxt) loc_orig ty1 ty2
+               ; let err_ctxt2 = err_ctxt { cec_tidy  = tidy_env2
+                                          , cec_extra = cec_extra err_ctxt $$ extra2 }
+               ; setCtFlavorLoc fl $ 
+                 reportEqErr err_ctxt2 ty1 ty2 
+               }
+
+    loc_orig | Wanted loc <- fl    = ctLocOrigin loc
+             | Derived loc _ <- fl = ctLocOrigin loc
+             | otherwise           = pprPanic "loc_orig" empty 
+
+    inaccessible_msg 
+      | Given loc <- fl
+      = hang (ptext (sLit "Inaccessible code in")) 2 (mk_what loc)
+      | otherwise = pprPanic "inaccessible_msg" empty
+
+    mk_what loc
+      = case ctLocOrigin loc of
+          PatSkol dc mc -> sep [ ptext (sLit "a pattern with constructor") 
+                                   <+> quotes (ppr dc) <> comma
+                               , ptext (sLit "in") <+> pprMatchContext mc ]
+	  other_skol -> pprSkolInfo other_skol
+
+
+decompFrozenError :: FrozenError -> [(TcType,TcType)] 
+-- Postcondition: will always return a non-empty list
+decompFrozenError (FrozenError errk _fl ty1 ty2) 
+  | OccCheckError <- errk
+  = dec_occ_check ty1 ty2 
+  | otherwise 
+  = [(ty1,ty2)]
+  where dec_occ_check :: TcType -> TcType -> [(TcType,TcType)] 
+        -- This error arises from an original: 
+        --      a ~ Maybe a
+        -- But by now the a has been substituted away, eg: 
+        --      Int ~ Maybe Int
+        --      Maybe b ~ Maybe (Maybe b)
+        dec_occ_check ty1 ty2 
+          | tcEqType ty1 ty2 = []
+        dec_occ_check ty1@(TyVarTy {}) ty2 = [(ty1,ty2)] 
+        dec_occ_check (FunTy s1 t1) (FunTy s2 t2) 
+          = let errs1 = dec_occ_check s1 s2 
+                errs2 = dec_occ_check t1 t2
+            in errs1 ++ errs2 
+        dec_occ_check ty1@(TyConApp fn1 tys1) ty2@(TyConApp fn2 tys2) 
+          | fn1 == fn2 && length tys1 == length tys2 
+          , not (isSynFamilyTyCon fn1)
+          = concatMap (\(t1,t2) -> dec_occ_check t1 t2) (zip tys1 tys2)
+          | otherwise 
+          = [(ty1,ty2)]
+        dec_occ_check ty1 ty2 
+          | Just (s1,t1) <- tcSplitAppTy_maybe ty1 
+          , Just (s2,t2) <- tcSplitAppTy_maybe ty2 
+          = let errs1 = dec_occ_check s1 s2 
+                errs2 = dec_occ_check t1 t2 
+            in errs1 ++ errs2
+        dec_occ_check ty1 ty2 = [(ty1,ty2)]
 
 reportUnsolvedWantedEvVars :: Bag WantedEvVar -> TcM ()
 reportUnsolvedWantedEvVars wanteds
@@ -105,8 +210,8 @@ reportUnsolvedDeriv unsolved loc
 data ReportErrCtxt 
     = CEC { cec_encl :: [Implication]  -- Enclosing implications
                 	       	       --   (innermost first)
-          , cec_tidy :: TidyEnv
-          , cec_extra :: SDoc	       -- Add this to each error message
+          , cec_tidy     :: TidyEnv
+          , cec_extra    :: SDoc       -- Add this to each error message
       }
 
 reportTidyImplic :: ReportErrCtxt -> Implication -> TcM ()
@@ -123,6 +228,13 @@ reportTidyWanteds ctxt unsolved
 
        ; groupErrs (reportEqErrs ctxt) tv_eqs
        ; when (null tv_eqs) $ groupErrs (reportFlat ctxt) others
+       ; traceTc "rtw" (vcat [
+              text "unsolved =" <+> ppr unsolved,
+              text "tveqs =" <+> ppr tv_eqs,
+              text "others =" <+> ppr others,
+              text "ambigs =" <+> ppr ambigs ,
+              text "implics =" <+> ppr implics])
+
        ; when (null tv_eqs) $ mapBagM_ (reportTidyImplic ctxt) implics
 
        	   -- Only report ambiguity if no other errors (at all) happened
@@ -273,8 +385,8 @@ reportEqErrs ctxt eqs orig
     env0 = cec_tidy ctxt
     report_one (EqPred ty1 ty2) 
       = do { (env1, extra) <- getWantedEqExtra emptyTvSubst env0 orig ty1 ty2
-           ; let ctxt' = ctxt { cec_tidy = env1
-                               , cec_extra = cec_extra ctxt $$ extra }
+            ; let ctxt' = ctxt { cec_tidy = env1
+                               , cec_extra = extra $$ cec_extra ctxt }
            ; reportEqErr ctxt' ty1 ty2 }
     report_one pred 
       = pprPanic "reportEqErrs" (ppr pred)    
@@ -284,10 +396,12 @@ reportEqErr :: ReportErrCtxt -> TcType -> TcType -> TcM ()
 reportEqErr ctxt ty1 ty2
   | Just tv1 <- tcGetTyVar_maybe ty1 = reportTyVarEqErr ctxt tv1 ty2
   | Just tv2 <- tcGetTyVar_maybe ty2 = reportTyVarEqErr ctxt tv2 ty1
+
   | otherwise	-- Neither side is a type variable
     		-- Since the unsolved constraint is canonical, 
 		-- it must therefore be of form (F tys ~ ty)
   = addErrorReport ctxt (misMatchOrCND ctxt ty1 ty2 $$ mkTyFunInfoMsg ty1 ty2)
+
 
 reportTyVarEqErr :: ReportErrCtxt -> TcTyVar -> TcType -> TcM ()
 -- tv1 and ty2 are already tidied
@@ -300,13 +414,19 @@ reportTyVarEqErr ctxt tv1 ty2
 
   | not is_meta1
   = -- sk ~ ty, where ty isn't a meta-tyvar: mis-match
-    addErrTcM (addExtraInfo (misMatchOrCND ctxt ty1 ty2) 
-                            (cec_tidy ctxt) ty1 ty2)
+    addErrorReport (addExtraInfo ctxt ty1 ty2)
+                   (misMatchOrCND ctxt ty1 ty2)
 
   -- So tv is a meta tyvar, and presumably it is
   -- an *untouchable* meta tyvar, else it'd have been unified
   | not (k2 `isSubKind` k1)   	 -- Kind error
   = addErrorReport ctxt $ (kindErrorMsg (mkTyVarTy tv1) ty2)
+
+  -- Occurs check
+  | tv1 `elemVarSet` tyVarsOfType ty2
+  = let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:") 2
+                           (sep [ppr ty1, char '=', ppr ty2])
+    in addErrorReport ctxt occCheckMsg
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
@@ -334,15 +454,23 @@ reportTyVarEqErr ctxt tv1 ty2
   , let implic_loc = ic_loc implic
         given      = ic_given implic
   = setCtLoc (ic_loc implic) $
-    do { let (env1, msg) = addExtraInfo (misMatchMsg ty1 ty2) (cec_tidy ctxt) ty1 ty2
-             extra = vcat [ ptext (sLit "because") <+> ppr tv1 <+> ptext (sLit "is untouchable")
-                          , ptext (sLit "inside the constraints") <+> pprEvVarTheta given 
-                          , nest 2 (ptext (sLit "bound at")
-                             <+> pprSkolInfo (ctLocOrigin implic_loc)) ]
-       ; addErrTcM (env1, msg $$ extra) }
+    do { let msg = misMatchMsg ty1 ty2
+             extra = quotes (ppr tv1)
+                 <+> sep [ ptext (sLit "is untouchable")
+                         , ptext (sLit "inside the constraints") <+> pprEvVarTheta given
+                         , ptext (sLit "bound at") <+> pprSkolInfo (ctLocOrigin implic_loc)]
+       ; addErrorReport (addExtraInfo ctxt ty1 ty2) (msg $$ nest 2 extra) }
 
-  | otherwise	   -- I'm not sure how this can happen!
-  = addErrTcM (addExtraInfo (misMatchMsg ty1 ty2) (cec_tidy ctxt) ty1 ty2)
+  | otherwise      -- This can happen, by a recursive decomposition of frozen
+                   -- occurs check constraints
+                   -- Example: alpha ~ T Int alpha has frozen.
+                   --          Then alpha gets unified to T beta gamma
+                   -- So now we have  T beta gamma ~ T Int (T beta gamma)
+                   -- Decompose to (beta ~ Int, gamma ~ T beta gamma)
+                   -- The (gamma ~ T beta gamma) is the occurs check, but
+                   -- the (beta ~ Int) isn't an error at all.  So return ()
+  = return ()
+
   where         
     is_meta1 = isMetaTyVar tv1
     k1 	     = tyVarKind tv1
@@ -374,15 +502,15 @@ couldNotDeduce givens wanteds
         , nest 2 $ ptext (sLit "from the context") 
                      <+> pprEvVarTheta givens]
 
-addExtraInfo :: SDoc -> TidyEnv -> TcType -> TcType -> (TidyEnv, SDoc)
--- This version is used by TcSimplify too, which doesn't track the
--- expected/acutal thing, so we just have ty1 ty2 here
--- NB: The types are already tidied
-addExtraInfo msg env ty1 ty2
-  = (env2, msg $$ nest 2 (extra1 $$ extra2))
+addExtraInfo :: ReportErrCtxt -> TcType -> TcType -> ReportErrCtxt
+-- Add on extra info about the types themselves
+-- NB: The types themselves are already tidied
+addExtraInfo ctxt ty1 ty2
+  = ctxt { cec_tidy  = env2
+         , cec_extra = nest 2 (extra1 $$ extra2) $$ cec_extra ctxt }
   where
-    (env1, extra1) = typeExtraInfoMsg env ty1
-    (env2, extra2) = typeExtraInfoMsg env1 ty2
+    (env1, extra1) = typeExtraInfoMsg (cec_tidy ctxt) ty1
+    (env2, extra2) = typeExtraInfoMsg env1            ty2
 
 misMatchMsg :: TcType -> TcType -> SDoc	   -- Types are already tidy
 misMatchMsg ty1 ty2 = sep [ ptext (sLit "Couldn't match type") <+> quotes (ppr ty1)
@@ -659,46 +787,6 @@ are created by in RtClosureInspect.zonkRTTIType.
 %************************************************************************
 
 \begin{code}
-kindErrorTcS :: CtFlavor -> TcType -> TcType -> TcS a
--- If there's a kind error, we don't want to blindly say "kind error"
--- We might, say, be unifying a skolem 'a' with a type 'Int', 
--- in which case that's the error to report.  So we set things
--- up to call reportEqErr, which does the business properly
-kindErrorTcS fl ty1 ty2
-  = wrapEqErrTcS fl ty1 ty2 $ \ env0 ty1 ty2 extra -> 
-    do { let ctxt = CEC { cec_encl = []
-                        , cec_extra = extra
-                        , cec_tidy = env0 }
-       ; reportEqErr ctxt ty1 ty2 
-       ; failM
-       }
-
-misMatchErrorTcS :: CtFlavor -> TcType -> TcType -> TcS a
-misMatchErrorTcS fl ty1 ty2
-  = wrapEqErrTcS fl ty1 ty2 $ \ env0 ty1 ty2 extra -> 
-    do { let msg = inaccessible_msg $$ misMatchMsg ty1 ty2
-             (env1, msg1) = addExtraInfo msg env0 ty1 ty2
-       ; failWithTcM (env1, msg1 $$ extra) }
-  where
-    inaccessible_msg 
-      = case fl of 
-          Given loc -> hang (ptext (sLit "Inaccessible code in"))
-                          2 (mk_what loc)
-          _         -> empty
-    mk_what loc 
-      = case ctLocOrigin loc of
-          PatSkol dc mc -> sep [ ptext (sLit "a pattern with constructor") 
-                                   <+> quotes (ppr dc) <> comma
-                               , ptext (sLit "in") <+> pprMatchContext mc ]
-	  other_skol -> pprSkolInfo other_skol
-
-occursCheckErrorTcS :: CtFlavor -> TcTyVar -> TcType -> TcS a
-occursCheckErrorTcS fl tv ty
-  = wrapEqErrTcS fl (mkTyVarTy tv) ty $ \ env0 ty1 ty2 extra2 -> 
-    do	{ let extra1 = sep [ppr ty1, char '=', ppr ty2]
-	; failWithTcM (env0, hang msg 2 (extra1 $$ extra2)) }
-  where
-    msg = text $ "Occurs check: cannot construct the infinite type:"
 
 solverDepthErrorTcS :: Int -> [CanonicalCt] -> TcS a
 solverDepthErrorTcS depth stack
@@ -740,31 +828,6 @@ setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
 setCtFlavorLoc (Wanted  loc)   thing = setCtLoc loc thing
 setCtFlavorLoc (Derived loc _) thing = setCtLoc loc thing
 setCtFlavorLoc (Given   loc)   thing = setCtLoc loc thing
-
-wrapEqErrTcS :: CtFlavor -> TcType -> TcType
-             -> (TidyEnv -> TcType -> TcType -> SDoc -> TcM a)
-             -> TcS a
-wrapEqErrTcS fl ty1 ty2 thing_inside
-  = do { ty_binds_var <- getTcSTyBinds
-       ; wrapErrTcS $ setCtFlavorLoc fl $ 
-    do {   -- Apply the current substitition
-           -- and zonk to get rid of flatten-skolems
-       ; ty_binds_map <- readTcRef ty_binds_var
-       ; let subst = mkOpenTvSubst (mapVarEnv snd ty_binds_map)
-       ; env0 <- tcInitTidyEnv 
-       ; (env1, ty1) <- zonkSubstTidy env0 subst ty1
-       ; (env2, ty2) <- zonkSubstTidy env1 subst ty2
-       ; let do_wanted loc = do { (env3, extra) <- getWantedEqExtra subst env2 
-                                                     (ctLocOrigin loc) ty1 ty2
-                                ; thing_inside env3 ty1 ty2 extra } 
-       ; case fl of
-           Wanted  loc   -> do_wanted loc
-           Derived loc _ -> do_wanted loc
-           Given {}      -> thing_inside env2 ty1 ty2 empty 
-	   	       	    	 -- We could print more info, but it
-                                 -- seems to be coming out already
-       } }  
-  where
 
 getWantedEqExtra :: TvSubst -> TidyEnv -> CtOrigin -> TcType -> TcType
                  -> TcM (TidyEnv, SDoc)

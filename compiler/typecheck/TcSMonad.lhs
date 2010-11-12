@@ -12,11 +12,12 @@ module TcSMonad (
     makeGivens, makeSolvedByInst,
 
     CtFlavor (..), isWanted, isGiven, isDerived, isDerivedSC, isDerivedByInst, 
-    isGivenCt, isWantedCt, 
+    isGivenCt, isWantedCt, pprFlavorArising,
 
     DerivedOrig (..), 
     canRewrite, canSolve,
-    combineCtLoc, mkGivenFlavor,
+    combineCtLoc, mkGivenFlavor, mkWantedFlavor,
+    getWantedLoc,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, traceTcS0,  -- Basic functionality 
     tryTcS, nestImplicTcS, recoverTcS, wrapErrTcS, wrapWarnTcS,
@@ -37,18 +38,20 @@ module TcSMonad (
  
     getInstEnvs, getFamInstEnvs,                -- Getting the environments 
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
-    getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsMap,
-
+    getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsMap, getTcSErrors,
+    getTcSErrorsBag, FrozenError (..),
+    addErrorTcS,
+    ErrorKind(..),
 
     newFlattenSkolemTy,                         -- Flatten skolems 
 
 
     instDFunTypes,                              -- Instantiation
-    instDFunConstraints,                        
+    instDFunConstraints,          
+    newFlexiTcSTy, 
 
     isGoodRecEv,
 
-    zonkTcTypeTcS,                              -- Zonk through the TyBinds of the Tcs Monad
     compatKind,
 
 
@@ -111,6 +114,7 @@ import FunDeps
 
 import TcRnTypes
 
+import Control.Monad
 import Data.IORef
 \end{code}
 
@@ -154,11 +158,7 @@ data CanonicalCt
        --   * tv not in tvs(xi)   (occurs check)
        --   * If constraint is given then typeKind xi `compatKind` typeKind tv 
        --                See Note [Spontaneous solving and kind compatibility] 
-       --   * If 'xi' is a flatten skolem then 'tv' can only be: 
-       --              - a flatten skolem or a unification variable
-       --     i.e. equalities prefer flatten skolems in their LHS 
-       --     See Note [Loopy Spontaneous Solving, Example 4]
-       --     Also related to [Flatten Skolem Equivalence Classes]
+       --   * We prefer unification variables on the left *JUST* for efficiency
       cc_id     :: EvVar, 
       cc_flavor :: CtFlavor, 
       cc_tyvar  :: TcTyVar, 
@@ -167,10 +167,8 @@ data CanonicalCt
 
   | CFunEqCan {  -- F xis ~ xi  
                  -- Invariant: * isSynFamilyTyCon cc_fun 
-                 --            * cc_rhs is not a touchable unification variable 
-                 --                   See Note [No touchables as FunEq RHS]
                  --            * If constraint is given then 
-                 --                 typeKind (TyConApp cc_fun cc_tyargs) `compatKind` typeKind cc_rhs
+                 --                 typeKind (F xis) `compatKind` typeKind xi
       cc_id     :: EvVar,
       cc_flavor :: CtFlavor, 
       cc_fun    :: TyCon,	-- A type function
@@ -232,26 +230,6 @@ instance Outputable CanonicalCt where
   ppr (CFunEqCan co fl tc tys ty) 
       = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (mkTyConApp tc tys, ty)
 \end{code}
-
-
-Note [No touchables as FunEq RHS]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Notice that (F xis ~ beta), where beta is an touchable unification
-variable, is not canonical.  Why?  
-  * If (F xis ~ beta) was the only wanted constraint, we'd 
-    definitely want to spontaneously-unify it
-
-  * But suppose we had an earlier wanted (beta ~ Int), and 
-    have already spontaneously unified it.  Then we have an
-    identity given (id : beta ~ Int) in the inert set.  
-
-  * But (F xis ~ beta) does not react with that given (because we
-    don't subsitute on the RHS of a function equality).  So there's a
-    serious danger that we'd spontaneously unify it a second time.
-
-Hence the invariant.
-
-The invariant is 
 
 Note [Canonical implicit parameter constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -348,6 +326,19 @@ isDerivedByInst :: CtFlavor -> Bool
 isDerivedByInst (Derived _ DerInst) = True 
 isDerivedByInst _                   = False 
 
+pprFlavorArising :: CtFlavor -> SDoc
+pprFlavorArising (Derived wl _) = pprArisingAt wl
+pprFlavorArising (Wanted  wl)   = pprArisingAt wl
+pprFlavorArising (Given gl)     = pprArisingAt gl
+
+getWantedLoc :: CanonicalCt -> WantedLoc
+getWantedLoc ct 
+  = ASSERT (isWanted (cc_flavor ct))
+    case cc_flavor ct of 
+      Wanted wl -> wl 
+      _         -> pprPanic "Can't get WantedLoc of non-wanted constraint!" empty
+
+
 isWantedCt :: CanonicalCt -> Bool 
 isWantedCt ct = isWanted (cc_flavor ct)
 isGivenCt :: CanonicalCt -> Bool 
@@ -385,6 +376,11 @@ mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
 mkGivenFlavor (Wanted  loc)   sk = Given (setCtLocOrigin loc sk)
 mkGivenFlavor (Derived loc _) sk = Given (setCtLocOrigin loc sk)
 mkGivenFlavor (Given   loc)   sk = Given (setCtLocOrigin loc sk)
+
+mkWantedFlavor :: CtFlavor -> CtFlavor
+mkWantedFlavor (Wanted  loc)   = Wanted loc
+mkWantedFlavor (Derived loc _) = Wanted loc
+mkWantedFlavor fl@(Given {})   = pprPanic "mkWantedFlavour" (ppr fl)
 \end{code}
 
 
@@ -417,9 +413,48 @@ data TcSEnv
           -- Global type bindings
 
       tcs_context :: SimplContext,
+                     
+      tcs_errors :: IORef (Bag FrozenError), 
+          -- Frozen errors that we defer reporting as much as possible, in order to
+          -- make them as informative as possible. See Note [Frozen Errors]
 
       tcs_untch :: Untouchables
     }
+
+data FrozenError
+  = FrozenError ErrorKind CtFlavor TcType TcType 
+
+data ErrorKind
+  = MisMatchError | OccCheckError | KindError
+
+instance Outputable FrozenError where 
+  ppr (FrozenError _frknd fl ty1 ty2) = ppr fl <+> pprEq ty1 ty2 <+> text "(frozen)"
+
+\end{code}
+
+Note [Frozen Errors] 
+~~~~~~~~~~~~~~~~~~~~
+Some of the errors that we get during canonicalization are best reported when all constraints
+have been simplified as much as possible. For instance, assume that during simplification
+the following constraints arise: 
+   
+ [Wanted]   F alpha ~  uf1 
+ [Wanted]   beta ~ uf1 beta 
+
+When canonicalizing the wanted (beta ~ uf1 beta), if we eagerly fail we will simply 
+see a message: 
+    'Can't construct the infinite type  beta ~ uf1 beta' 
+and the user has no idea what the uf1 variable is.
+
+Instead our plan is that we will NOT fail immediately, but:
+    (1) Record the "frozen" error in the tcs_errors field 
+    (2) Isolate the offending constraint from the rest of the inerts 
+    (3) Keep on simplifying/canonicalizing
+
+At the end, we will hopefully have substituted uf1 := F alpha, and we will be able to 
+report a more informative error: 
+    'Can't construct the infinite type beta ~ F alpha beta'
+\begin{code}
 
 data SimplContext
   = SimplInfer		-- Inferring type of a let-bound thing
@@ -492,37 +527,40 @@ traceTcS0 herald doc = TcS $ \_env -> TcM.traceTcN 0 herald doc
 runTcS :: SimplContext
        -> Untouchables 	       -- Untouchables
        -> TcS a		       -- What to run
-       -> TcM (a, Bag EvBind)
+       -> TcM (a, Bag FrozenError, Bag EvBind)
 runTcS context untouch tcs 
   = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
        ; ev_binds_var@(EvBindsVar evb_ref _) <- TcM.newTcEvBinds
+       ; err_ref <- TcM.newTcRef emptyBag
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
-                          , tcs_context = context
-                          , tcs_untch   = untouch }
+                          , tcs_context  = context
+                          , tcs_untch    = untouch 
+                          , tcs_errors   = err_ref
+                          }
 
 	     -- Run the computation
        ; res <- unTcS tcs env
-
 	     -- Perform the type unifications required
        ; ty_binds <- TcM.readTcRef ty_binds_var
        ; mapM_ do_unification (varEnvElts ty_binds)
 
              -- And return
-       ; ev_binds <- TcM.readTcRef evb_ref
-       ; return (res, evBindMapBinds ev_binds) }
+       ; frozen_errors <- TcM.readTcRef err_ref
+       ; ev_binds      <- TcM.readTcRef evb_ref
+       ; return (res, frozen_errors, evBindMapBinds ev_binds) }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 
-       
 nestImplicTcS :: EvBindsVar -> Untouchables -> TcS a -> TcS a 
 nestImplicTcS ref untch (TcS thing_inside)
-  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds, tcs_context = ctxt } -> 
+  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds, tcs_context = ctxt, tcs_errors = err_ref } -> 
     let 
        nest_env = TcSEnv { tcs_ev_binds = ref
                          , tcs_ty_binds = ty_binds
                          , tcs_untch    = untch
-                         , tcs_context  = ctxtUnderImplic ctxt }
+                         , tcs_context  = ctxtUnderImplic ctxt 
+                         , tcs_errors   = err_ref }
     in 
     thing_inside nest_env
 
@@ -536,14 +574,16 @@ ctxtUnderImplic :: SimplContext -> SimplContext
 ctxtUnderImplic SimplRuleLhs = SimplCheck
 ctxtUnderImplic ctxt         = ctxt
 
-tryTcS :: TcS a -> TcS a 
+tryTcS :: TcS a -> TcS a
 -- Like runTcS, but from within the TcS monad 
 -- Ignore all the evidence generated, and do not affect caller's evidence!
 tryTcS tcs 
   = TcS (\env -> do { ty_binds_var <- TcM.newTcRef emptyVarEnv
                     ; ev_binds_var <- TcM.newTcEvBinds
+                    ; err_ref      <- TcM.newTcRef emptyBag
                     ; let env1 = env { tcs_ev_binds = ev_binds_var
-                                     , tcs_ty_binds = ty_binds_var }
+                                     , tcs_ty_binds = ty_binds_var 
+                                     , tcs_errors   = err_ref }
                     ; unTcS tcs env1 })
 
 -- Update TcEvBinds 
@@ -563,6 +603,13 @@ getUntouchables = TcS (return . tcs_untch)
 
 getTcSTyBinds :: TcS (IORef (TyVarEnv (TcTyVar, TcType)))
 getTcSTyBinds = TcS (return . tcs_ty_binds)
+
+getTcSErrors :: TcS (IORef (Bag FrozenError))
+getTcSErrors = TcS (return . tcs_errors)
+
+getTcSErrorsBag :: TcS (Bag FrozenError) 
+getTcSErrorsBag = do { err_ref <- getTcSErrors 
+                     ; wrapTcS $ TcM.readTcRef err_ref }
 
 getTcSTyBindsMap :: TcS (TyVarEnv (TcTyVar, TcType)) 
 getTcSTyBindsMap = getTcSTyBinds >>= wrapTcS . (TcM.readTcRef) 
@@ -584,10 +631,17 @@ setDerivedCoBind cv co
 
 setWantedTyBind :: TcTyVar -> TcType -> TcS () 
 -- Add a type binding
+-- We never do this twice!
 setWantedTyBind tv ty 
   = do { ref <- getTcSTyBinds
        ; wrapTcS $ 
          do { ty_binds <- TcM.readTcRef ref
+#ifdef DEBUG
+            ; TcM.checkErr (not (tv `elemVarEnv` ty_binds)) $
+              vcat [ text "TERRIBLE ERROR: double set of meta type variable"
+                   , ppr tv <+> text ":=" <+> ppr ty
+                   , text "Old value =" <+> ppr (lookupVarEnv_NF ty_binds tv)]
+#endif
             ; TcM.writeTcRef ref (extendVarEnv ty_binds tv (tv,ty)) } }
 
 setIPBind :: EvVar -> EvTerm -> TcS () 
@@ -615,6 +669,25 @@ getDefaultInfo
   = do { ctxt <- getTcSContext
        ; (tys, flags) <- wrapTcS (TcM.tcGetDefaultTys (isInteractive ctxt))
        ; return (ctxt, tys, flags) }
+
+
+
+-- Recording errors in the TcS monad
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+addErrorTcS :: ErrorKind -> CtFlavor -> TcType -> TcType -> TcS ()
+addErrorTcS frknd fl ty1 ty2
+  = do { err_ref <- getTcSErrors
+       ; wrapTcS $ do
+       { TcM.updTcRef err_ref $ \ errs ->
+           consBag (FrozenError frknd fl ty1 ty2) errs
+
+           -- If there's an error in the *given* constraints,
+           -- stop right now, to avoid a cascade of errors
+           -- in the wanteds
+       ; when (isGiven fl) TcM.failM
+
+       ; return () } }
 
 -- Just get some environments needed for instance looking up and matching
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -683,9 +756,12 @@ newFlattenSkolemTy ty = mkTyVarTy <$> newFlattenSkolemTyVar ty
 
 newFlattenSkolemTyVar :: TcType -> TcS TcTyVar
 newFlattenSkolemTyVar ty
-  = wrapTcS $ do { uniq <- TcM.newUnique
-                 ; let name = mkSysTvName uniq (fsLit "f")
-                 ; return $ mkTcTyVar name (typeKind ty) (FlatSkol ty) }
+  = do { tv <- wrapTcS $ do { uniq <- TcM.newUnique
+                            ; let name = mkSysTvName uniq (fsLit "f")
+                            ; return $ mkTcTyVar name (typeKind ty) (FlatSkol ty) } 
+       ; traceTcS "New Flatten Skolem Born" $ 
+           (ppr tv <+> text "[:= " <+> ppr ty <+> text "]")
+       ; return tv }
 
 -- Instantiations 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -695,35 +771,37 @@ instDFunTypes mb_inst_tys
   = mapM inst_tv mb_inst_tys
   where
     inst_tv :: Either TyVar TcType -> TcS Type
-    inst_tv (Left tv)  = mkTyVarTy <$> newFlexiTcS tv
+    inst_tv (Left tv)  = mkTyVarTy <$> instFlexiTcS tv
     inst_tv (Right ty) = return ty 
 
 instDFunConstraints :: TcThetaType -> TcS [EvVar] 
 instDFunConstraints preds = wrapTcS $ TcM.newWantedEvVars preds 
 
 
--- newFlexiTcS :: TyVar -> TcS TcTyVar
--- -- Make a TcsTv meta tyvar; it is always touchable,
--- -- but we are supposed to guess its instantiation
--- -- See Note [Touchable meta type variables]
--- newFlexiTcS tv = wrapTcS $ TcM.instMetaTyVar TcsTv tv
-
-newFlexiTcS :: TyVar -> TcS TcTyVar 
+instFlexiTcS :: TyVar -> TcS TcTyVar 
 -- Like TcM.instMetaTyVar but the variable that is created is always
 -- touchable; we are supposed to guess its instantiation. 
 -- See Note [Touchable meta type variables] 
-newFlexiTcS tv = newFlexiTcSHelper (tyVarName tv) (tyVarKind tv) 
+instFlexiTcS tv = instFlexiTcSHelper (tyVarName tv) (tyVarKind tv) 
 
-newKindConstraint :: TcTyVar -> Kind -> TcS (CoVar, Type)  
+newFlexiTcSTy :: Kind -> TcS TcType  
+newFlexiTcSTy knd 
+  = wrapTcS $
+    do { uniq <- TcM.newUnique 
+       ; ref  <- TcM.newMutVar  Flexi 
+       ; let name = mkSysTvName uniq (fsLit "uf")
+       ; return $ mkTyVarTy (mkTcTyVar name knd (MetaTv TcsTv ref)) }
+
+newKindConstraint :: TcTyVar -> Kind -> TcS CoVar
 -- Create new wanted CoVar that constrains the type to have the specified kind. 
 newKindConstraint tv knd 
-  = do { tv_k <- newFlexiTcSHelper (tyVarName tv) knd 
+  = do { tv_k <- instFlexiTcSHelper (tyVarName tv) knd 
        ; let ty_k = mkTyVarTy tv_k
        ; co_var <- newWantedCoVar (mkTyVarTy tv) ty_k
-       ; return (co_var, ty_k) }
+       ; return co_var }
 
-newFlexiTcSHelper :: Name -> Kind -> TcS TcTyVar
-newFlexiTcSHelper tvname tvkind
+instFlexiTcSHelper :: Name -> Kind -> TcS TcTyVar
+instFlexiTcSHelper tvname tvkind
   = wrapTcS $ 
     do { uniq <- TcM.newUnique 
        ; ref  <- TcM.newMutVar  Flexi 
@@ -915,24 +993,11 @@ matchFam tycon args
        }
 
 
-zonkTcTypeTcS :: TcType -> TcS TcType
--- Zonk through the TyBinds of the Tcs Monad
-zonkTcTypeTcS ty 
-  = do { subst <- getTcSTyBindsMap >>= return . varEnvElts 
-       ; let (dom,rng)  = unzip subst 
-             apply_once = substTyWith dom rng 
-       ; let rng_idemp = [ substTyWith dom rng_idemp (apply_once t) | t <- rng ]
-       ; return (substTyWith dom rng_idemp ty) }
-
-                        
-
-
-
-
 -- Functional dependencies, instantiation of equations
 -------------------------------------------------------
 
-mkWantedFunDepEqns :: WantedLoc -> [(Equation, (PredType, SDoc), (PredType, SDoc))]
+mkWantedFunDepEqns :: WantedLoc
+                   -> [(Equation, (PredType, SDoc), (PredType, SDoc))]
                    -> TcS [WantedEvVar] 
 mkWantedFunDepEqns _   [] = return []
 mkWantedFunDepEqns loc eqns
@@ -941,18 +1006,32 @@ mkWantedFunDepEqns loc eqns
        ; return $ concat wevvars }
   where
     to_work_item :: (Equation, (PredType,SDoc), (PredType,SDoc)) -> TcS [WantedEvVar]
-    to_work_item ((qtvs, pairs), _, _)
+    to_work_item ((qtvs, pairs), d1, d2)
       = do { let tvs = varSetElems qtvs
-           ; tvs' <- mapM newFlexiTcS tvs
+           ; tvs' <- mapM instFlexiTcS tvs
            ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
-           ; mapM (do_one subst) pairs }
+                 loc'  = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
+           ; mapM (do_one subst loc') pairs }
 
-    do_one subst (ty1, ty2) = do { let sty1 = substTy subst ty1 
-                                       sty2 = substTy subst ty2 
-                                ; ev <- newWantedCoVar sty1 sty2
-                                ; return (WantedEvVar ev loc) }
+    do_one subst loc' (ty1, ty2)
+       = do { let sty1 = substTy subst ty1
+                  sty2 = substTy subst ty2
+            ; ev <- newWantedCoVar sty1 sty2
+            ; return (WantedEvVar ev loc') }
 
 pprEquationDoc :: (Equation, (PredType, SDoc), (PredType, SDoc)) -> SDoc
 pprEquationDoc (eqn, (p1, _), (p2, _)) 
   = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
+
+mkEqnMsg :: (TcPredType, SDoc) -> (TcPredType, SDoc) -> TidyEnv
+         -> TcM (TidyEnv, SDoc)
+mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
+  = do  { pred1' <- TcM.zonkTcPredType pred1
+        ; pred2' <- TcM.zonkTcPredType pred2
+	; let { pred1'' = tidyPred tidy_env pred1'
+              ; pred2'' = tidyPred tidy_env pred2' }
+	; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
+			  nest 2 (sep [ppr pred1'' <> comma, nest 2 from1]), 
+			  nest 2 (sep [ppr pred2'' <> comma, nest 2 from2])]
+	; return (tidy_env, msg) }
 \end{code}

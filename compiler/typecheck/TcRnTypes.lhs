@@ -37,7 +37,7 @@ module TcRnTypes(
 	Implication(..), 
         CtLoc(..), ctLocSpan, ctLocOrigin, setCtLocOrigin,
 	CtOrigin(..), EqOrigin(..), 
-	WantedLoc, GivenLoc,
+        WantedLoc, GivenLoc, pushErrCtxt,
 
 	SkolemInfo(..),
 
@@ -879,12 +879,19 @@ ctLocOrigin (CtLoc o _ _) = o
 setCtLocOrigin :: CtLoc o -> o' -> CtLoc o'
 setCtLocOrigin (CtLoc _ s c) o = CtLoc o s c
 
+pushErrCtxt :: orig -> ErrCtxt -> CtLoc orig -> CtLoc orig
+pushErrCtxt o err (CtLoc _ s errs) = CtLoc o s (err:errs)
+
 pprArising :: CtOrigin -> SDoc
+-- Used for the main, top-level error message
+-- We've done special processing for TypeEq and FunDep origins
 pprArising (TypeEqOrigin {}) = empty
+pprArising FunDepOrigin      = empty
 pprArising orig              = text "arising from" <+> ppr orig
 
-pprArisingAt :: CtLoc CtOrigin -> SDoc
-pprArisingAt (CtLoc o s _) = sep [pprArising o, text "at" <+> ppr s]
+pprArisingAt :: Outputable o => CtLoc o -> SDoc
+pprArisingAt (CtLoc o s _) = sep [ text "arising from" <+> ppr o
+                                 , text "at" <+> ppr s]
 
 -------------------------------------------
 -- CtOrigin gives the origin of *wanted* constraints
@@ -916,9 +923,10 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin	-- Typechecking a default decl
   | DoOrigin		-- Arising from a do expression
-  | IfOrigin      -- Arising from an if statement
+  | IfOrigin            -- Arising from an if statement
   | ProcOrigin		-- Arising from a proc expression
   | AnnOrigin           -- An annotation
+  | FunDepOrigin
 
 data EqOrigin 
   = UnifyOrigin 
@@ -953,6 +961,7 @@ pprO DoOrigin	           = ptext (sLit "a do statement")
 pprO ProcOrigin	           = ptext (sLit "a proc expression")
 pprO (TypeEqOrigin eq)     = ptext (sLit "an equality") <+> ppr eq
 pprO AnnOrigin             = ptext (sLit "an annotation")
+pprO FunDepOrigin          = ptext (sLit "a functional dependency")
 
 instance Outputable EqOrigin where
   ppr (UnifyOrigin t1 t2) = ppr t1 <+> char '~' <+> ppr t2

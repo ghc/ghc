@@ -473,11 +473,9 @@ hasEqualities :: [EvVar] -> Bool
 -- Has a bunch of canonical constraints (all givens) got any equalities in it?
 hasEqualities givens = any (has_eq . evVarPred) givens
   where
-    has_eq (EqPred {}) 	    = True
-    has_eq (IParam {}) 	    = False
-    has_eq (ClassP cls tys) = any has_eq (substTheta subst (classSCTheta cls))
-      where
-        subst = zipOpenTvSubst (classTyVars cls) tys
+    has_eq (EqPred {}) 	     = True
+    has_eq (IParam {}) 	     = False
+    has_eq (ClassP cls _tys) = any has_eq (classSCTheta cls)
 
 ----------------
 tyVarsOfWanteds :: WantedConstraints -> TyVarSet

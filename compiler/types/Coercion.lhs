@@ -45,7 +45,7 @@ module Coercion (
         mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
         mkCsel1Coercion, mkCsel2Coercion, mkCselRCoercion, 
 
-	mkClassPPredCo, mkIParamPredCo,
+	mkClassPPredCo, mkIParamPredCo, mkEqPredCo, 
         mkCoVarCoercion, mkCoPredCo, 
 
 
@@ -458,6 +458,8 @@ mkClassPPredCo cls = (PredTy . ClassP cls)
 mkIParamPredCo :: (IPName Name) -> Coercion -> Coercion
 mkIParamPredCo ipn = (PredTy . IParam ipn)
 
+mkEqPredCo :: Coercion -> Coercion -> Coercion 
+mkEqPredCo co1 co2 = PredTy (EqPred co1 co2)
 
 
 \end{code}

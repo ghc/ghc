@@ -451,6 +451,9 @@ pprSkolTvBinding tv
 				   sep [pprSkolInfo info, 
 					nest 2 (ptext (sLit "at") <+> ppr (getSrcLoc tv))]]
  
+instance Outputable SkolemInfo where
+  ppr = pprSkolInfo
+
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol ctxt)  = pprUserTypeCtxt ctxt
