@@ -62,6 +62,7 @@ GHC.Float       Classes: Floating, RealFloat
 Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 -- -fno-warn-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0

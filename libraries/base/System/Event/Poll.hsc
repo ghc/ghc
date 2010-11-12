@@ -1,5 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving,
-    NoImplicitPrelude #-}
+    NoImplicitPrelude, BangPatterns #-}
 
 module System.Event.Poll
     (

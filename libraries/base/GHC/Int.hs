@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
