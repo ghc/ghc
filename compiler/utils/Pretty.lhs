@@ -152,6 +152,7 @@ Relative to John's original paper, there are the following new features:
 
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -fno-warn-unused-imports #-}
 -- XXX GHC 6.9 seems to be confused by unpackCString# being used only in
 --     a RULE

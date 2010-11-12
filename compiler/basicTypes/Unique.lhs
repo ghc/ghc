@@ -16,6 +16,7 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 module Unique (
         -- * Main data types
 	Unique, Uniquable(..), 

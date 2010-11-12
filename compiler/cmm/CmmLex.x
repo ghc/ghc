@@ -11,6 +11,7 @@
 -----------------------------------------------------------------------------
 
 {
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -Wwarn -w #-}
 -- The above -Wwarn supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix

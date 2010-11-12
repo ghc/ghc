@@ -4,6 +4,7 @@
 ByteCodeLink: Bytecode assembler and linker
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 {-# OPTIONS -w #-}

@@ -10,7 +10,7 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
 
 module CostCentre (
 	CostCentre(..), CcName, IsDupdCC(..), IsCafCC(..),
