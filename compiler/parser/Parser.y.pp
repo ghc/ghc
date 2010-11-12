@@ -1208,15 +1208,20 @@ docdecld :: { LDocDecl }
         | docsection                            { L1 (case (unLoc $1) of (n, doc) -> DocGroup n doc) }
 
 decl 	:: { Located (OrdList (LHsDecl RdrName)) }
-	: sigdecl			{ $1 }
-	| '!' aexp rhs			{% do { pat <- checkPattern $2;
-					        return (LL $ unitOL $ LL $ ValD ( 
-							PatBind (LL $ BangPat pat) (unLoc $3)
-								placeHolderType placeHolderNames)) } }
-        | infixexp opt_sig rhs          {% do { r <- checkValDef $1 $2 $3;
-                                                let { l = comb2 $1 $> };
-                                                return $! (sL l (unitOL $! (sL l $ ValD r))) } }
-        | docdecl                       { LL $ unitOL $1 }
+	: sigdecl		{ $1 }
+
+        | '!' aexp rhs          {% do { let { e = LL (SectionR (LL (HsVar bang_RDR)) $2) };
+                                        pat <- checkPattern e;
+                                        return $ LL $ unitOL $ LL $ ValD $
+                                               PatBind pat (unLoc $3)
+                                                       placeHolderType placeHolderNames } }
+                                -- Turn it all into an expression so that
+                                -- checkPattern can check that bangs are enabled
+
+        | infixexp opt_sig rhs  {% do { r <- checkValDef $1 $2 $3;
+                                        let { l = comb2 $1 $> };
+                                        return $! (sL l (unitOL $! (sL l $ ValD r))) } }
+        | docdecl               { LL $ unitOL $1 }
 
 rhs	:: { Located (GRHSs RdrName) }
 	: '=' exp wherebinds	{ sL (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) }
