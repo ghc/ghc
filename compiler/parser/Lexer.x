@@ -308,6 +308,10 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
   \$ @varid / { ifExtension thEnabled }	{ skip_one_varid ITidEscape }
   "$("	    / { ifExtension thEnabled }	{ token ITparenEscape }
 
+-- For backward compatibility, accept the old dollar syntax
+  "[$" @varid "|"  / { ifExtension qqEnabled }
+                     { lex_quasiquote_tok }
+
   "[" @varid "|"  / { ifExtension qqEnabled }
                      { lex_quasiquote_tok }
 }

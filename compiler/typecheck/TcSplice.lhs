@@ -664,7 +664,17 @@ runQuasiQuote :: Outputable hs_syn
               -> MetaOps th_syn hs_syn 
               -> RnM hs_syn
 runQuasiQuote (HsQuasiQuote quoter q_span quote) quote_selector meta_ty meta_ops
-  = do	{ quoter' <- lookupOccRn quoter
+  = do  {     -- Drop the leading "$" from the quoter name, if present
+              -- This is old-style syntax, now deprecated
+              -- NB: when removing this backward-compat, remove
+              --     the matching code in Lexer.x (around line 310)
+          let occ_str = occNameString (rdrNameOcc quoter)
+        ; quoter <- ASSERT( not (null occ_str) )  -- Lexer ensures this
+                    if head occ_str /= '$' then return quoter
+                    else do { addWarn (deprecatedDollar quoter)
+                            ; return (mkRdrUnqual (mkVarOcc (tail occ_str))) }
+
+        ; quoter' <- lookupOccRn quoter
 		-- We use lookupOcc rather than lookupGlobalOcc because in the
 		-- erroneous case of \x -> [x| ...|] we get a better error message
 		-- (stage restriction rather than out of scope).
@@ -709,6 +719,12 @@ quoteStageError :: Name -> SDoc
 quoteStageError quoter
   = sep [ptext (sLit "GHC stage restriction:") <+> ppr quoter,
          nest 2 (ptext (sLit "is used in a quasiquote, and must be imported, not defined locally"))]
+
+deprecatedDollar :: RdrName -> SDoc
+deprecatedDollar quoter
+  = hang (ptext (sLit "Deprecated syntax:"))
+       2 (ptext (sLit "quasiquotes no longer need a dollar sign:")
+          <+> ppr quoter)
 \end{code}
 
 
