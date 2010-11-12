@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -cpp #-}
 {-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised

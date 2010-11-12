@@ -6,6 +6,7 @@ ByteCodeLink: Bytecode assembler and linker
 
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE BangPatterns #-}
 
 module ByteCodeAsm (
         assembleBCOs, assembleBCO,
