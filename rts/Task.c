@@ -359,6 +359,8 @@ static void *taskId(Task *task)
 #endif
 }
 
+#endif
+
 #if defined(THREADED_RTS)
 
 static void OSThreadProcAttr
@@ -430,6 +432,8 @@ interruptWorkerTask (Task *task)
 }
 
 #endif /* THREADED_RTS */
+
+#ifdef DEBUG
 
 void printAllTasks(void);
 
