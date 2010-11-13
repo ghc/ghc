@@ -1,5 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving,
-    NoImplicitPrelude, RecordWildCards #-}
+    NoImplicitPrelude, RecordWildCards, BangPatterns #-}
 
 module System.Event.KQueue
     (
