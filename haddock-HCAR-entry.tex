@@ -1,4 +1,5 @@
-\begin{hcarentry}{Haddock}
+% Haddock-DH.tex
+\begin{hcarentry}[updated]{Haddock}
 \label{haddock}
 \report{David Waern}%11/10
 \status{experimental, maintained}
@@ -19,7 +20,6 @@ The latest release is version 2.8.1, released September 3 2010.
 \Separate
 Recent changes:
 \begin{itemize}
-
 \item HTML backend completely rewritten to generate semantically rich XHTML
       using the xhtml package.
 \item New default CSS based on the color scheme chosen for the new Haskell
@@ -30,25 +30,27 @@ Recent changes:
 \item Addition of a LaTeX backend.
 \item Additions and changes to the Haddock API.
 \item Various smaller new features and bug fixes.
-
 \end{itemize}
 
 \FuturePlans
-Although Haddock understands many GHC language extensions, we'd like it to
-understand all of them. Currently there are som constructs you can't comment,
+\begin{itemize}
+\item Although Haddock understands many GHC language extensions, we would like it to
+understand all of them. Currently there are some constructs you cannot comment,
 like GADTs and associated type synonyms.
-\\ 
-Error messages is an area with room for improvement. We'd like Haddock
+ 
+\item Error messages is an area with room for improvement. We would like Haddock
 to include accurate line numbers in markup syntax errors.
-\\
-On the HTML rendering side we want make more use of Javascript in order to make
+
+\item On the HTML rendering side we want to make more use of Javascript in order to make
 the viewing experience better. The frames-mode could be improved this way, for
 example.
-\\
-Finally, the long term plan is to split Haddock into one program that creates
+
+\item Finally, the long term plan is to split Haddock into one program that creates
 data from sources, and separate backend programs that use that data via the
 Haddock API. This will scale better, not requiring adding new backends to Haddock
 for every tool that needs its own format.
+\end{itemize}
+
 \FurtherReading
 \begin{compactitem}
 \item Haddock's homepage:
@@ -58,6 +60,6 @@ for every tool that needs its own format.
 \url{http://trac.haskell.org/haddock}
 
 \item Haddock's mailing list:
-\url{haddock@projects.haskell.org}
+\url{haddock@@projects.haskell.org}
 \end{compactitem}
 \end{hcarentry}
