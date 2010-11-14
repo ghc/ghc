@@ -157,7 +157,7 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
-rts_dist_$1_CC_OPTS += -DRtsWay=$$(DQ)rts_$1$$(DQ)
+rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
@@ -275,35 +275,32 @@ endif
 #-----------------------------------------------------------------------------
 # Flags for compiling specific files
 
-# XXX DQ is now the same on all platforms, so get rid of it
-DQ = \"
-
 # If RtsMain.c is built with optimisation then the SEH exception stuff on
 # Windows gets confused.
 # This has to be in HC rather than CC opts, as otherwise there's a
 # -optc-O2 that comes after it.
 rts/RtsMain_HC_OPTS += -optc-O0
 
-rts/RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
-rts/RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
+rts/RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
+rts/RtsUtils_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 #
-rts/RtsUtils_CC_OPTS += -DHostPlatform=$(DQ)$(HOSTPLATFORM)$(DQ)
-rts/RtsUtils_CC_OPTS += -DHostArch=$(DQ)$(HostArch_CPP)$(DQ)
-rts/RtsUtils_CC_OPTS += -DHostOS=$(DQ)$(HostOS_CPP)$(DQ)
-rts/RtsUtils_CC_OPTS += -DHostVendor=$(DQ)$(HostVendor_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
+rts/RtsUtils_CC_OPTS += -DHostArch=\"$(HostArch_CPP)\"
+rts/RtsUtils_CC_OPTS += -DHostOS=\"$(HostOS_CPP)\"
+rts/RtsUtils_CC_OPTS += -DHostVendor=\"$(HostVendor_CPP)\"
 #
-rts/RtsUtils_CC_OPTS += -DBuildPlatform=$(DQ)$(BUILDPLATFORM)$(DQ)
-rts/RtsUtils_CC_OPTS += -DBuildArch=$(DQ)$(BuildArch_CPP)$(DQ)
-rts/RtsUtils_CC_OPTS += -DBuildOS=$(DQ)$(BuildOS_CPP)$(DQ)
-rts/RtsUtils_CC_OPTS += -DBuildVendor=$(DQ)$(BuildVendor_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DBuildPlatform=\"$(BUILDPLATFORM)\"
+rts/RtsUtils_CC_OPTS += -DBuildArch=\"$(BuildArch_CPP)\"
+rts/RtsUtils_CC_OPTS += -DBuildOS=\"$(BuildOS_CPP)\"
+rts/RtsUtils_CC_OPTS += -DBuildVendor=\"$(BuildVendor_CPP)\"
 #
-rts/RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
-rts/RtsUtils_CC_OPTS += -DTargetArch=$(DQ)$(TargetArch_CPP)$(DQ)
-rts/RtsUtils_CC_OPTS += -DTargetOS=$(DQ)$(TargetOS_CPP)$(DQ)
-rts/RtsUtils_CC_OPTS += -DTargetVendor=$(DQ)$(TargetVendor_CPP)$(DQ)
+rts/RtsUtils_CC_OPTS += -DTargetPlatform=\"$(TARGETPLATFORM)\"
+rts/RtsUtils_CC_OPTS += -DTargetArch=\"$(TargetArch_CPP)\"
+rts/RtsUtils_CC_OPTS += -DTargetOS=\"$(TargetOS_CPP)\"
+rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
-rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
-rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
+rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
+rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the
