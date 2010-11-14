@@ -1631,31 +1631,6 @@ f "2"    = 2
             <option>-O</option>.</para>
 	  </listitem>
 	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <option>-Ofile &lt;file&gt;</option>:
-            <indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
-            <indexterm><primary>optimising, customised</primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>(NOTE: not supported since GHC 4.x.  Please ask if
-	    you're interested in this.)</para>
-	    
-	    <para>For those who need <emphasis>absolute</emphasis>
-            control over <emphasis>exactly</emphasis> what options are
-            used (e.g., compiler writers, sometimes :-), a list of
-            options can be put in a file and then slurped in with
-            <option>-Ofile</option>.</para>
-
-	    <para>In that file, comments are of the
-            <literal>&num;</literal>-to-end-of-line variety; blank
-            lines and most whitespace is ignored.</para>
-
-	    <para>Please ask if you are baffled and would like an
-	    example of <option>-Ofile</option>!</para>
-	  </listitem>
-	</varlistentry>
       </variablelist>
 
       <para>We don't use a <option>-O*</option> flag for day-to-day
