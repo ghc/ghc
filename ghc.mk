@@ -1076,9 +1076,15 @@ ifeq "$(mingw32_TARGET_OS)" "1"
 	$(call try10Times,$(PublishCp) $(WINDOWS_INSTALLER) $(PublishLocation)/dist)
 endif
 
+ifeq "$(mingw32_TARGET_OS)" "1"
+DOCDIR_TO_PUBLISH = bindisttest/"install dir"/doc
+else
+DOCDIR_TO_PUBLISH = bindisttest/"install dir"/share/doc/ghc
+endif
+
 .PHONY: publish-docs
 publish-docs:
-	$(call try10Times,$(PublishCp) -r bindisttest/installed/share/doc/ghc/* $(PublishLocation)/docs)
+	$(call try10Times,$(PublishCp) -r $(DOCDIR_TO_PUBLISH)/* $(PublishLocation)/docs)
 
 # -----------------------------------------------------------------------------
 # Source distributions
