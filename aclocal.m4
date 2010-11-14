@@ -755,7 +755,7 @@ AS_VAR_POPDEF([fp_func])dnl
 
 # FP_GEN_DOCBOOK_XML
 # ------------------
-# Generates a DocBook XML V4.2 document in conftest.xml.
+# Generates a DocBook XML V4.5 document in conftest.xml.
 #
 # It took a lot of experimentation to find a document that will cause
 # xsltproc to fail with an error code when the relevant
@@ -767,8 +767,8 @@ AC_DEFUN([FP_GEN_DOCBOOK_XML],
 [rm -f conftest.xml conftest-book.xml
 cat > conftest.xml << EOF
 <?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [[
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+   "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [[
 <!ENTITY conftest-book SYSTEM "conftest-book.xml">
 ]]>
 <book id="test">
@@ -862,7 +862,7 @@ if test -n "$XmllintCmd"; then
     AC_MSG_RESULT([ok])
   else
     AC_MSG_RESULT([failed])
-    AC_MSG_WARN([cannot find a DTD for DocBook XML V4.2, you will not be able to validate your documentation])
+    AC_MSG_WARN([cannot find a DTD for DocBook XML V4.5, you will not be able to validate your documentation])
     AC_MSG_WARN([check your XML_CATALOG_FILES environment variable and/or /etc/xml/catalog])
   fi
   rm -rf conftest*

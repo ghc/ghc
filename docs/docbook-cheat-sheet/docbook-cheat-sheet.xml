@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+   "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
 
 <article id="docbook-cheat-sheet">
 
@@ -19,13 +19,13 @@
   <sect1 id="doc-layout">
     <title>Document layout</title>
 
-    <para>The GHC documentation is written using DocBook XML V4.2, so
+    <para>The GHC documentation is written using DocBook XML V4.5, so
     the first few lines should look like this:</para>
 
 <programlisting>
 &lt;?xml version="1.0" encoding="iso-8859-1"?>
-&lt;!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+&lt;!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+   "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
 </programlisting>
 
     <para>The encoding can of course be chosen according to taste.</para>
