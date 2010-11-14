@@ -494,6 +494,12 @@ if config.use_threads:
 def test_common_work (name, opts, func, args):
     t.total_tests = t.total_tests+1
     setLocalTestOpts(opts)
+
+    try:
+        package_conf_cache_file_start_timestamp = os.stat(config.package_conf_cache_file).st_mtime
+    except e:
+        package_conf_cache_file_start_timestamp = 0.0
+
     # All the ways we might run this test
     if func == compile or func == multimod_compile:
         all_ways = config.compile_ways
@@ -559,7 +565,17 @@ def test_common_work (name, opts, func, args):
                 if result != 0:
                     framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
         except e:
-            framework_fail(name, way, 'clean-command exception')
+            framework_fail(name, 'cleaning', 'clean-command exception')
+
+    try:
+        package_conf_cache_file_end_timestamp = os.stat(config.package_conf_cache_file).st_mtime
+    except e:
+        package_conf_cache_file_end_timestamp = 0.0
+
+    if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
+        framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
+    elif package_conf_cache_file_start_timestamp == 0.0:
+        framework_fail(name, 'whole-test', 'Package cache timestamps 0.0')
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
