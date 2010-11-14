@@ -44,6 +44,9 @@ ifneq "$$($1_$2_SLASH_MODS)" ""
 endif
 	mv $$@.tmp $$@
 
+# Some of the C files depend on the generated includes files.
+$$($1_$2_depfile_c_asm) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
+
 $$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) | $$$$(dir $$$$@)/.
 	"$$(RM)" $$(RM_OPTS) $$@.tmp
 	touch $$@.tmp
