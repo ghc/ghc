@@ -727,7 +727,8 @@ ppr_mono_ty _         (HsSpliceTyOut {})  _ _ = error "ppr_mono_ty HsQuasiQuoteT
 #else
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
 #endif
-ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
+ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty _         (HsRecTy {})        _ _ = error "ppr_mono_ty HsRecTy"
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode qual
   = maybeParen ctxt_prec pREC_CON $
