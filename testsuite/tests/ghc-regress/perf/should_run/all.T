@@ -59,8 +59,13 @@ test('MethSharing',
      [stats_num_field('peak_megabytes_allocated', 1,
                                                   1),
                                      # expected value: 1 (amd64/Linux)
-      stats_num_field('bytes allocated', 5000000000,
-                                         6000000000),
+      # expected value: 2685858140 (x86/OS X):
+      if_wordsize(32,
+          stats_num_field('bytes allocated', 2000000000,
+                                             3000000000)),
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 5000000000,
+                                             6000000000)),
       only_ways(['normal'])
       ],
      compile_and_run,
