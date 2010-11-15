@@ -689,17 +689,9 @@ solveWanteds inert wanteds
                  vcat [ text "inerts =" <+> ppr inert2
                       , text "unsolved =" <+> ppr unsolved_flats ]
 
-                   -- See Note [Preparing inert set for implications]
-           ; inert_for_implics <- solveInteract inert2 (makeGivens unsolved_flats)
-           ; traceTcS "solveWanteds: doing nested implications {" $
-                 vcat [ text "inerts_for_implics =" <+> ppr inert_for_implics
-                      , text "implics =" <+> ppr implics ]
-           ; (implic_eqs, unsolved_implics)
-                <- flatMapBagPairM (solveImplication inert_for_implics) implics
-
-           ; traceTcS "solveWanteds: done nested implications }" $
-                 vcat [ text "implic_eqs =" <+> ppr implic_eqs
-                      , text "unsolved_implics =" <+> ppr unsolved_implics ]
+                -- Go inside each implication
+           ; (implic_eqs, unsolved_implics) 
+               <- solveNestedImplications inert2 unsolved_flats implics
 
                 -- Apply defaulting rules if and only if there
 		-- no floated equalities.  If there are, they may
@@ -726,12 +718,41 @@ solveWanteds inert wanteds
                        -- Important: reiterate with inert2, not plainly inert
                        -- because inert2 may contain more givens, as the result of solving
                        -- some wanteds in the incoming can_ws 
-                    }       }
+                     }       
+           }
 
-solveImplication :: InertSet                 -- Given
-                    -> Implication           -- Wanted
-                    -> TcS (Bag WantedEvVar, -- Unsolved unification var = type
-                            Bag Implication) -- Unsolved rest (always empty or singleton)
+solveNestedImplications :: InertSet -> CanonicalCts -> Bag Implication
+                        -> TcS (Bag WantedEvVar, Bag Implication)
+solveNestedImplications inerts unsolved implics
+  | isEmptyBag implics
+  = return (emptyBag, emptyBag)
+  | otherwise 
+  = do { -- See Note [Preparing inert set for implications]
+         traceTcS "solveWanteds: preparing inerts for implications {"  empty
+       ; inert_for_implics <- solveInteract inerts (makeGivens unsolved)
+       ; traceTcS "}" empty
+
+       ; traceTcS "solveWanteds: doing nested implications {" $
+         vcat [ text "inerts_for_implics =" <+> ppr inert_for_implics
+              , text "implics =" <+> ppr implics ]
+
+       ; let tcs_untouchables = filterVarSet isFlexiTcsTv $
+                                tyVarsOfInert inert_for_implics
+             -- See Note [Extra TcsTv untouchables]
+       ; (implic_eqs, unsolved_implics)
+           <- flatMapBagPairM (solveImplication tcs_untouchables inert_for_implics) implics
+
+       ; traceTcS "solveWanteds: done nested implications }" $
+                  vcat [ text "implic_eqs ="       <+> ppr implic_eqs
+                       , text "unsolved_implics =" <+> ppr unsolved_implics ]
+
+       ; return (implic_eqs, unsolved_implics) }
+
+solveImplication :: TcTyVarSet            -- Untouchable TcS unification variables
+                 -> InertSet              -- Given
+                 -> Implication           -- Wanted
+                 -> TcS (Bag WantedEvVar, -- Unsolved unification var = type
+                         Bag Implication) -- Unsolved rest (always empty or singleton)
 -- Returns: 
 --  1. A bag of floatable wanted constraints, not mentioning any skolems, 
 --     that are of the form unification var = type
@@ -739,14 +760,14 @@ solveImplication :: InertSet                 -- Given
 --  2. Maybe a unsolved implication, empty if entirely solved! 
 -- 
 -- Precondition: everything is zonked by now
-solveImplication inert 
+solveImplication tcs_untouchables inert
      imp@(Implic { ic_untch  = untch 
                  , ic_binds  = ev_binds
                  , ic_skols  = skols 
                  , ic_given  = givens
                  , ic_wanted = wanteds
                  , ic_loc    = loc })
-  = nestImplicTcS ev_binds untch $
+  = nestImplicTcS ev_binds (untch, tcs_untouchables) $
     recoverTcS (return (emptyBag, emptyBag)) $
        -- Recover from nested failures.  Even the top level is
        -- just a bunch of implications, so failing at the first
@@ -825,9 +846,11 @@ Note [Preparing inert set for implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before solving the nested implications, we convert any unsolved flat wanteds
 to givens, and add them to the inert set.  Reasons:
-  a) In checking mode, suppresses unnecessary errors.  We already have 
+
+  a) In checking mode, suppresses unnecessary errors.  We already have
      on unsolved-wanted error; adding it to the givens prevents any 
      consequential errors from showing uop
+
   b) More importantly, in inference mode, we are going to quantify over this
      constraint, and we *don't* want to quantify over any constraints that
      are deducible from it.
@@ -840,7 +863,34 @@ Hence the call to solveInteract.  Example:
 
 We were not able to solve (a ~w [beta]) but we can't just assume it as
 given because the resulting set is not inert. Hence we have to do a
-'solveInteract' step first
+'solveInteract' step first. 
+
+Note [Extra TcsTv untouchables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Furthemore, we record the inert set simplifier-generated unification variables of the TcsTv
+kind (such as variables from instance that have been applied, or unification flattens). These
+variables must be passed to the implications as extra untouchable variables. Otherwise
+we have the danger of double unifications. Example (from trac ticket #4494):
+
+   (F Int ~ uf)  /\  (forall a. C a => F Int ~ beta) 
+
+In this example, beta is touchable inside the implication. The first solveInteract step
+leaves 'uf' ununified. Then we move inside the implication where a new constraint
+       uf  ~  beta  
+emerges. We may spontaneously solve it to get uf := beta, so the whole implication disappears
+but when we pop out again we are left with (F Int ~ uf) which will be unified by our final 
+solveCTyFunEqs stage and uf will get unified *once more* to  (F Int). 
+
+The solution is to record the TcsTvs (i.e. the simplifier-generated unification variables)
+that are generated when solving the flats, and make them untouchables for the nested 
+implication. In the example above uf would become untouchable, so beta would be forced to 
+be unified as beta := uf.
+
+NB: A consequence is that every simplifier-generated TcsTv variable that gets floated out 
+    of an implication becomes now untouchable next time we go inside that implication to 
+    solve any residual constraints. In effect, by floating an equality out of the implication 
+    we are committing to have it solved in the outside. 
+
 
 \begin{code}
 
@@ -893,7 +943,7 @@ type FunEqBinds = [(TcTyVar,(TcType,CoVar,CtFlavor))]
 --       [... a -> (ta,...) ... b -> (tb,...) ... ] 
 -- then 'ta' cannot mention 'b'
 
-getSolvableCTyFunEqs :: Untouchables 
+getSolvableCTyFunEqs :: TcsUntouchables
                      -> CanonicalCts                -- Precondition: all wanteds 
                      -> (CanonicalCts, FunEqBinds)  -- Postcondition: returns the unsolvables
 getSolvableCTyFunEqs untch cts
@@ -1008,7 +1058,7 @@ applyDefaultingRules inert wanteds
        ; return (unionManyBags deflt_cts `unionBags` unionManyBags tv_cts) }
 
 ------------------
-defaultTyVar :: Untouchables -> TcTyVar -> TcS (Bag WantedEvVar)
+defaultTyVar :: TcsUntouchables -> TcTyVar -> TcS (Bag WantedEvVar)
 -- defaultTyVar is used on any un-instantiated meta type variables to
 -- default the kind of ? and ?? etc to *.  This is important to ensure
 -- that instance declarations match.  For example consider
@@ -1041,7 +1091,7 @@ findDefaultableGroups
     :: ( SimplContext 
        , [Type]
        , (Bool,Bool) )  -- (Overloaded strings, extended default rules)
-    -> Untouchables	-- Untouchable
+    -> TcsUntouchables	-- Untouchable
     -> CanonicalCts	-- Unsolved
     -> [[(CanonicalCt,TcTyVar)]]
 findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults)) 

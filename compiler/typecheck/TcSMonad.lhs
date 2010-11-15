@@ -14,6 +14,8 @@ module TcSMonad (
     CtFlavor (..), isWanted, isGiven, isDerived, isDerivedSC, isDerivedByInst, 
     isGivenCt, isWantedCt, pprFlavorArising,
 
+    isFlexiTcsTv,
+
     DerivedOrig (..), 
     canRewrite, canSolve,
     combineCtLoc, mkGivenFlavor, mkWantedFlavor,
@@ -55,6 +57,7 @@ module TcSMonad (
     compatKind,
 
 
+    TcsUntouchables,
     isTouchableMetaTyVar,
     isTouchableMetaTyVar_InRange, 
 
@@ -418,8 +421,13 @@ data TcSEnv
           -- Frozen errors that we defer reporting as much as possible, in order to
           -- make them as informative as possible. See Note [Frozen Errors]
 
-      tcs_untch :: Untouchables
+      tcs_untch :: TcsUntouchables 
     }
+
+type TcsUntouchables = (Untouchables,TcTyVarSet)
+-- Like the TcM Untouchables, 
+-- but records extra TcsTv variables generated during simplification
+-- See Note [Extra TcsTv untouchables] in TcSimplify
 
 data FrozenError
   = FrozenError ErrorKind CtFlavor TcType TcType 
@@ -535,7 +543,7 @@ runTcS context untouch tcs
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
                           , tcs_context  = context
-                          , tcs_untch    = untouch 
+                          , tcs_untch    = (untouch, emptyVarSet) -- No Tcs untouchables yet
                           , tcs_errors   = err_ref
                           }
 
@@ -552,9 +560,11 @@ runTcS context untouch tcs
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 
-nestImplicTcS :: EvBindsVar -> Untouchables -> TcS a -> TcS a 
+nestImplicTcS :: EvBindsVar -> TcsUntouchables -> TcS a -> TcS a
 nestImplicTcS ref untch (TcS thing_inside)
-  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds, tcs_context = ctxt, tcs_errors = err_ref } -> 
+  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds, 
+                     tcs_context = ctxt, 
+                     tcs_errors = err_ref } ->
     let 
        nest_env = TcSEnv { tcs_ev_binds = ref
                          , tcs_ty_binds = ty_binds
@@ -598,7 +608,7 @@ getTcSContext = TcS (return . tcs_context)
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds) 
 
-getUntouchables :: TcS Untouchables 
+getUntouchables :: TcS TcsUntouchables
 getUntouchables = TcS (return . tcs_untch)
 
 getTcSTyBinds :: TcS (IORef (TyVarEnv (TcTyVar, TcType)))
@@ -724,10 +734,11 @@ isTouchableMetaTyVar tv
   = do { untch <- getUntouchables
        ; return $ isTouchableMetaTyVar_InRange untch tv } 
 
-isTouchableMetaTyVar_InRange :: Untouchables -> TcTyVar -> Bool 
-isTouchableMetaTyVar_InRange untch tv 
+isTouchableMetaTyVar_InRange :: TcsUntouchables -> TcTyVar -> Bool 
+isTouchableMetaTyVar_InRange (untch,untch_tcs) tv 
   = case tcTyVarDetails tv of 
-      MetaTv TcsTv _ -> True    -- See Note [Touchable meta type variables] 
+      MetaTv TcsTv _ -> not (tv `elemVarSet` untch_tcs)
+                        -- See Note [Touchable meta type variables] 
       MetaTv {}      -> inTouchableRange untch tv 
       _              -> False 
 
@@ -791,6 +802,12 @@ newFlexiTcSTy knd
        ; ref  <- TcM.newMutVar  Flexi 
        ; let name = mkSysTvName uniq (fsLit "uf")
        ; return $ mkTyVarTy (mkTcTyVar name knd (MetaTv TcsTv ref)) }
+
+isFlexiTcsTv :: TyVar -> Bool
+isFlexiTcsTv tv
+  | not (isTcTyVar tv)                  = False
+  | MetaTv TcsTv _ <- tcTyVarDetails tv = True
+  | otherwise                           = False
 
 newKindConstraint :: TcTyVar -> Kind -> TcS CoVar
 -- Create new wanted CoVar that constrains the type to have the specified kind. 

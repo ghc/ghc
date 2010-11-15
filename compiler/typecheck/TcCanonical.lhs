@@ -546,7 +546,7 @@ classify ty                | Just ty' <- tcView ty
                            = OtherCls ty
 
 -- See note [Canonical ordering for equality constraints].
-reOrient :: Untouchables -> TypeClassifier -> TypeClassifier -> Bool	
+reOrient :: TcsUntouchables -> TypeClassifier -> TypeClassifier -> Bool	
 -- (t1 `reOrient` t2) responds True 
 --   iff we should flip to (t2~t1)
 -- We try to say False if possible, to minimise evidence generation
@@ -579,7 +579,7 @@ reOrient _untch (FskCls {}) (FunCls {})     = True
 reOrient _untch (FskCls {}) (OtherCls {})   = False 
 
 ------------------
-canEqLeaf :: Untouchables 
+canEqLeaf :: TcsUntouchables 
           -> CtFlavor -> CoVar 
           -> TypeClassifier -> TypeClassifier -> TcS CanonicalCts 
 -- Canonicalizing "leaf" equality constraints which cannot be

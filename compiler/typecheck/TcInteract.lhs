@@ -1,6 +1,6 @@
 \begin{code}
 module TcInteract ( 
-     solveInteract, AtomicInert, 
+     solveInteract, AtomicInert, tyVarsOfInert,
      InertSet, emptyInert, updInertSet, extractUnsolved, solveOne, foldISEqCts
   ) where  
 
@@ -133,6 +133,14 @@ data InertSet
        , inert_fds  :: FDImprovements        -- List of pairwise improvements that have kicked in already
                                              -- and reside either in the worklist or in the inerts 
        }
+
+tyVarsOfInert :: InertSet -> TcTyVarSet 
+tyVarsOfInert (IS { inert_eqs    = eqs
+                  , inert_dicts  = dictmap
+                  , inert_ips    = ipmap
+                  , inert_funeqs = funeqmap }) = tyVarsOfCanonicals cts 
+  where cts = eqs `andCCan` cCanMapToBag dictmap 
+                  `andCCan` cCanMapToBag ipmap `andCCan` cCanMapToBag funeqmap
 
 type FDImprovement  = (PredType,PredType) 
 type FDImprovements = [(PredType,PredType)] 
