@@ -1143,7 +1143,8 @@
 
 	  <row>
 	    <entry><option>-fwarn-missing-import-lists</option></entry>
-	    <entry>warn when explicit imports lack an import list</entry>
+	    <entry>warn when an import declaration does not explicitly 
+                   list all the names brought into scope</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fnowarn-missing-import-lists</option></entry>
 	  </row>

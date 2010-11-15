@@ -108,16 +108,14 @@ rnImportDecl this_mod implicit_prelude
 	imp_mod_name = unLoc loc_imp_mod_name
 	doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
-    let isExplicit lie = case unLoc lie of
-                         IEThingAll _ -> False
-                         _ -> True
+	-- Check for a missing import list
+	-- (Opt_WarnMissingImportList also checks for T(..) items
+	--  but that is done in checkDodgyImport below)
     case imp_details of
-        Just (False, lies)
-         | all isExplicit lies ->
-            return ()
-        _ ->
-            unless implicit_prelude $
-            ifDOptM Opt_WarnMissingImportList (addWarn (missingImportListWarn imp_mod_name))
+        Just (False, _)       -> return ()
+        _  | implicit_prelude -> return ()
+           | otherwise        -> ifDOptM Opt_WarnMissingImportList $
+                                 addWarn (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
 
@@ -588,6 +586,9 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
                 | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
                 = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
                 -- NB. use the RdrName for reporting the warning
+		| IEThingAll {} <- ieRdr
+                = ifDOptM Opt_WarnMissingImportList $
+                  addWarn (missingImportListItem ieRdr)
             checkDodgyImport _
                 = return ()
 
@@ -1551,6 +1552,10 @@ nullModuleExport mod
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
   = ptext (sLit "The module") <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
+
+missingImportListItem :: IE RdrName -> SDoc
+missingImportListItem ie
+  = ptext (sLit "The import item") <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt txt)
