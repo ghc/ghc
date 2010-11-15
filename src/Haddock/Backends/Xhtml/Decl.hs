@@ -714,7 +714,7 @@ ppr_mono_ty _         (HsPredTy p)        u q = parens (ppPred u q p)
 ppr_mono_ty _         (HsNumTy n)         _ _ = toHtml (show n) -- generics only
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
-ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty _         (HsRecTy {})        _ _ = error "ppr_mono_ty HsRecTy"
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode qual
