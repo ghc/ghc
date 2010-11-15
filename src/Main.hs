@@ -78,9 +78,16 @@ handleNormalExceptions inner =
   (inner `onException` hFlush stdout)
   `catches`
   [  Handler (\(code :: ExitCode) -> exitWith code)
-  ,  Handler (\(StackOverflow) -> do
-        putStrLn "stack overflow: use -g +RTS -K<size> to increase it"
-        exitFailure)
+
+  ,  Handler (\(ex :: AsyncException) ->
+       case ex of
+         StackOverflow -> do
+           putStrLn "stack overflow: use -g +RTS -K<size> to increase it"
+           exitFailure
+         _ -> do
+           putStrLn ("haddock: " ++ show ex)
+           exitFailure)
+
   ,  Handler (\(ex :: SomeException) -> do
         putStrLn ("haddock: internal Haddock or GHC error: " ++ show ex)
         exitFailure)
