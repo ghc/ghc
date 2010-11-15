@@ -595,32 +595,46 @@ mkEqnHelp :: CtOrigin -> [TyVar] -> Class -> [Type] -> Type
 mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
   , isAlgTyCon tycon	-- Check for functions, primitive types etc
-  = do	{ (rep_tc, rep_tc_args) <- tcLookupDataFamInst tycon tc_args
-	          -- Be careful to test rep_tc here: in the case of families, 
-	          -- we want to check the instance tycon, not the family tycon
-
-	-- For standalone deriving (mtheta /= Nothing), 
-	-- check that all the data constructors are in scope.
-	-- No need for this when deriving Typeable, becuase we don't need
-	-- the constructors for that.
-	; rdr_env <- getGlobalRdrEnv
-	; let hidden_data_cons = isAbstractTyCon rep_tc || any not_in_scope (tyConDataCons rep_tc)
-	      not_in_scope dc  = null (lookupGRE_Name rdr_env (dataConName dc))
-	; checkTc (isNothing mtheta || 
-	  	   not hidden_data_cons ||
-		   className cls `elem` typeableClassNames) 
-		  (derivingHiddenErr tycon)
-
-	; dflags <- getDOpts
-	; if isDataTyCon rep_tc then
-		mkDataTypeEqn orig dflags tvs cls cls_tys
-			      tycon tc_args rep_tc rep_tc_args mtheta
-	  else
-		mkNewTypeEqn orig dflags tvs cls cls_tys 
-			     tycon tc_args rep_tc rep_tc_args mtheta }
+  = mk_alg_eqn tycon tc_args
   | otherwise
   = failWithTc (derivingThingErr False cls cls_tys tc_app
 	       (ptext (sLit "The last argument of the instance must be a data or newtype application")))
+
+  where
+     bale_out msg = failWithTc (derivingThingErr False cls cls_tys tc_app msg)
+
+     mk_alg_eqn tycon tc_args
+      | className cls `elem` typeableClassNames
+      = do { dflags <- getDOpts
+           ; case checkTypeableConditions (dflags, tycon) of
+               Just err -> bale_out err
+               Nothing  -> mk_typeable_eqn orig tvs cls tycon tc_args mtheta }
+
+      | isDataFamilyTyCon tycon
+      , length tc_args /= tyConArity tycon
+      = bale_out (ptext (sLit "Unsaturated data family application"))
+
+      | otherwise
+      = do { (rep_tc, rep_tc_args) <- tcLookupDataFamInst tycon tc_args
+      	          -- Be careful to test rep_tc here: in the case of families, 
+      	          -- we want to check the instance tycon, not the family tycon
+
+      	   -- For standalone deriving (mtheta /= Nothing), 
+      	   -- check that all the data constructors are in scope.
+      	   ; rdr_env <- getGlobalRdrEnv
+      	   ; let hidden_data_cons = isAbstractTyCon rep_tc || 
+                                    any not_in_scope (tyConDataCons rep_tc)
+      	         not_in_scope dc  = null (lookupGRE_Name rdr_env (dataConName dc))
+      	   ; unless (isNothing mtheta || not hidden_data_cons)
+      	   	    (bale_out (derivingHiddenErr tycon))
+
+      	   ; dflags <- getDOpts
+      	   ; if isDataTyCon rep_tc then
+      	   	mkDataTypeEqn orig dflags tvs cls cls_tys
+      	   		      tycon tc_args rep_tc rep_tc_args mtheta
+      	     else
+      	   	mkNewTypeEqn orig dflags tvs cls cls_tys 
+      	   		     tycon tc_args rep_tc rep_tc_args mtheta }
 \end{code}
 
 
@@ -655,15 +669,10 @@ mkDataTypeEqn orig dflags tvs cls cls_tys
     go_for_it    = mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
     bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
 
-mk_data_eqn, mk_typeable_eqn
-   :: CtOrigin -> [TyVar] -> Class 
-   -> TyCon -> [TcType] -> TyCon -> [TcType] -> DerivContext
-   -> TcM EarlyDerivSpec
+mk_data_eqn :: CtOrigin -> [TyVar] -> Class 
+   	    -> TyCon -> [TcType] -> TyCon -> [TcType] -> DerivContext
+   	    -> TcM EarlyDerivSpec
 mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
-  | getName cls `elem` typeableClassNames
-  = mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
-
-  | otherwise
   = do	{ dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
 	; let inst_tys = [mkTyConApp tycon tc_args]
@@ -678,7 +687,11 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   	; return (if isJust mtheta then Right spec	-- Specified context
 				   else Left spec) }	-- Infer context
 
-mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+----------------------
+mk_typeable_eqn :: CtOrigin -> [TyVar] -> Class 
+   	    	-> TyCon -> [TcType] -> DerivContext
+   	    	-> TcM EarlyDerivSpec
+mk_typeable_eqn orig tvs cls tycon tc_args mtheta
 	-- The Typeable class is special in several ways
 	-- 	  data T a b = ... deriving( Typeable )
 	-- gives
@@ -692,7 +705,7 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   = do	{ checkTc (cls `hasKey` typeableClassKey)
 		  (ptext (sLit "Use deriving( Typeable ) on a data type declaration"))
 	; real_cls <- tcLookupClass (typeableClassNames !! tyConArity tycon)
-	; mk_typeable_eqn orig tvs real_cls tycon [] rep_tc [] (Just []) }
+	; mk_typeable_eqn orig tvs real_cls tycon [] (Just []) }
 
   | otherwise		-- standaone deriving
   = do	{ checkTc (null tc_args)
@@ -703,10 +716,10 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 	; return (Right $
 		  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = []
 		     , ds_cls = cls, ds_tys = [mkTyConApp tycon []]
-		     , ds_tc = rep_tc, ds_tc_args = rep_tc_args
+		     , ds_tc = tycon, ds_tc_args = []
 		     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
 
-
+----------------------
 inferConstraints :: [TyVar] -> Class -> [TcType] -> TyCon -> [TcType] -> ThetaType
 -- Generate a sufficiently large set of constraints that typechecking the
 -- generated method definitions should succeed.   This set will be simplified
@@ -792,6 +805,9 @@ checkSideConditions dflags mtheta cls cls_tys rep_tc
   where
     ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
 
+checkTypeableConditions :: Condition
+checkTypeableConditions = checkFlag Opt_DeriveDataTypeable `andCond` cond_typeableOK
+
 nonStdErr :: Class -> SDoc
 nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
@@ -812,7 +828,6 @@ sideConditions mtheta cls
     	                                   cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
   | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
     	                                   cond_functorOK False)
-  | getName cls `elem` typeableClassNames = Just (checkFlag Opt_DeriveDataTypeable `andCond` cond_typeableOK)
   | otherwise = Nothing
   where
     cls_key = getUnique cls
@@ -900,20 +915,16 @@ cond_typeableOK :: Condition
 -- OK for Typeable class
 -- Currently: (a) args all of kind *
 --	      (b) 7 or fewer args
-cond_typeableOK (_, rep_tc)
-  | tyConArity rep_tc > 7	= Just too_many
-  | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars rep_tc)) 
-                                = Just bad_kind
-  | isFamInstTyCon rep_tc	= Just fam_inst  -- no Typable for family insts
-  | otherwise	  		= Nothing
+cond_typeableOK (_, tc)
+  | tyConArity tc > 7 = Just too_many
+  | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars tc)) 
+                      = Just bad_kind
+  | otherwise	      = Nothing
   where
-    too_many = quotes (pprSourceTyCon rep_tc) <+> 
+    too_many = quotes (pprSourceTyCon tc) <+> 
 	       ptext (sLit "has too many arguments")
-    bad_kind = quotes (pprSourceTyCon rep_tc) <+> 
+    bad_kind = quotes (pprSourceTyCon tc) <+> 
 	       ptext (sLit "has arguments of kind other than `*'")
-    fam_inst = quotes (pprSourceTyCon rep_tc) <+> 
-	       ptext (sLit "is a type family")
-
 
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
