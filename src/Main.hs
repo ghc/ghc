@@ -215,7 +215,7 @@ render flags ifaces installedIfaces srcMap = do
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue flags
-  themes <- getThemes libDir flags >>= either bye return
+  themes   <- getThemes libDir flags >>= either bye return
 
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title pkgStr
