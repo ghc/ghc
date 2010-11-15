@@ -89,7 +89,7 @@ handleNormalExceptions inner =
            exitFailure)
 
   ,  Handler (\(ex :: SomeException) -> do
-        putStrLn ("haddock: internal Haddock or GHC error: " ++ show ex)
+        putStrLn ("haddock: internal error: " ++ show ex)
         exitFailure)
   ]
 
