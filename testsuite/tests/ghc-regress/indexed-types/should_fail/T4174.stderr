@@ -1,0 +1,30 @@
+
+T4174.hs:42:12:
+    Couldn't match type `False' with `True'
+    Expected type: True
+      Actual type: GHC6'10 Minor1 :<=: GHCVersion (WayOf m)
+    In the expression: sync_large_objects
+    In an equation for `testcase': testcase = sync_large_objects
+
+T4174.hs:42:12:
+    Could not deduce (a ~ SmStep) from the context (Monad m)
+      `a' is a rigid type variable bound by
+          the type signature for `testcase' at T4174.hs:41:60
+    In the expression: sync_large_objects
+    In an equation for `testcase': testcase = sync_large_objects
+
+T4174.hs:42:12:
+    Could not deduce (b ~ RtsSpinLock) from the context (Monad m)
+      `b' is a rigid type variable bound by
+          the type signature for `testcase' at T4174.hs:41:62
+    In the expression: sync_large_objects
+    In an equation for `testcase': testcase = sync_large_objects
+
+T4174.hs:42:12:
+    Could not deduce (p ~ True) from the context (Monad m)
+      `p' is a rigid type variable bound by
+          the type signature for `testcase' at T4174.hs:41:57
+    Expected type: True
+      Actual type: Threaded (WayOf m)
+    In the expression: sync_large_objects
+    In an equation for `testcase': testcase = sync_large_objects
