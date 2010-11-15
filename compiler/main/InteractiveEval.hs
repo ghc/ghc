@@ -64,7 +64,6 @@ import Panic
 import UniqFM
 import Maybes
 import ErrUtils
-import Util
 import SrcLoc
 import BreakArray
 import RtClosureInspect
@@ -83,7 +82,6 @@ import GHC.Exts
 import Data.Array
 import Exception
 import Control.Concurrent
-import Data.List (sortBy)
 -- import Foreign.StablePtr
 import System.IO
 import System.IO.Unsafe
@@ -139,16 +137,14 @@ data History
    = History {
         historyApStack   :: HValue,
         historyBreakInfo :: BreakInfo,
-        historyEnclosingDecl :: Id
-         -- ^^ A cache of the enclosing top level declaration, for convenience
+        historyEnclosingDecls :: [String]  -- declarations enclosing the breakpoint
    }
 
 mkHistory :: HscEnv -> HValue -> BreakInfo -> History
 mkHistory hsc_env hval bi = let
-    h    = History hval bi decl
-    decl = findEnclosingDecl hsc_env (getHistoryModule h)
-                                     (getHistorySpan hsc_env h)
-    in h
+    decls = findEnclosingDecl hsc_env bi
+    in History hval bi decls
+
 
 getHistoryModule :: History -> Module
 getHistoryModule = breakInfo_module . historyBreakInfo
@@ -163,7 +159,7 @@ getHistorySpan hsc_env hist =
 
 getModBreaks :: HomeModInfo -> ModBreaks
 getModBreaks hmi
-  | Just linkable <- hm_linkable hmi, 
+  | Just linkable <- hm_linkable hmi,
     [BCOs _ modBreaks] <- linkableUnlinked linkable
   = modBreaks
   | otherwise
@@ -173,18 +169,13 @@ getModBreaks hmi
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
 -- by the coverage pass, which gives the list of lexically-enclosing bindings
 -- for each tick.
-findEnclosingDecl :: HscEnv -> Module -> SrcSpan -> Id
-findEnclosingDecl hsc_env mod span =
-   case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
-         Nothing -> panic "findEnclosingDecl"
-         Just hmi -> let
-             globals   = typeEnvIds (md_types (hm_details hmi))
-             Just decl = 
-                 find (\id -> let n = idName id in 
-                               nameSrcSpan n < span && isExternalName n)
-                      (reverse$ sortBy (compare `on` (nameSrcSpan.idName))
-                                       globals)
-           in decl
+findEnclosingDecl :: HscEnv -> BreakInfo -> [String]
+findEnclosingDecl hsc_env inf =
+   let hmi = expectJust "findEnclosingDecl" $
+             lookupUFM (hsc_HPT hsc_env) (moduleName $ breakInfo_module inf)
+       mb = getModBreaks hmi
+   in modBreaks_decls mb ! breakInfo_number inf
+
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.

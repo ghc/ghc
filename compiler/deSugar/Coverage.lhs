@@ -99,7 +99,7 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds =
      createDirectoryIfMissing True hpc_mod_dir
      modTime <- getModificationTime orig_file2
      let entries' = [ (hpcPos, box) 
-                    | (span,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
+                    | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
      when (length entries' /= tickBoxCount st) $ do
        panic "the number of .mix entries are inconsistent"
      let hashNo = mixHash orig_file2 modTime tabStop entries'
@@ -113,13 +113,16 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds =
   breakArray <- newBreakArray $ length entries
 
   let locsTicks = listArray (0,tickBoxCount st-1) 
-                     [ span | (span,_,_) <- entries ]
+                     [ span | (span,_,_,_) <- entries ]
       varsTicks = listArray (0,tickBoxCount st-1) 
-                     [ vars | (_,vars,_) <- entries ]
+                     [ vars | (_,_,vars,_) <- entries ]
+      declsTicks= listArray (0,tickBoxCount st-1) 
+                     [ decls | (_,decls,_,_) <- entries ]
       modBreaks = emptyModBreaks 
                   { modBreaks_flags = breakArray 
                   , modBreaks_locs  = locsTicks 
                   , modBreaks_vars  = varsTicks
+                  , modBreaks_decls = declsTicks
                   } 
 
   doIfSet_dyn dflags  Opt_D_dump_hpc $ do
@@ -674,7 +677,7 @@ allocTickBox boxLabel pos m | isGoodSrcSpan' pos =
     let c = tickBoxCount st
         ids = occEnvElts fvs
         mes = mixEntries st
-        me = (pos, map (nameOccName.idName) ids, boxLabel)
+        me = (pos, declPath _env, map (nameOccName.idName) ids, boxLabel)
     in
     ( L pos (HsTick c ids (L pos e))
     , fvs
@@ -688,7 +691,7 @@ allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
 allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
   sameFileName pos 
     (return Nothing) $ TM $ \ _env st ->
-  let me = (pos, map (nameOccName.idName) ids, boxLabel)
+  let me = (pos, declPath _env, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
       ids = occEnvElts fvs
@@ -706,9 +709,9 @@ allocBinTickBox boxLabel pos m
  do
  e <- m
  TM $ \ _env st ->
-  let meT = (pos,[],boxLabel True)
-      meF = (pos,[],boxLabel False)
-      meE = (pos,[],ExpBox False)
+  let meT = (pos,declPath _env, [],boxLabel True)
+      meF = (pos,declPath _env, [],boxLabel False)
+      meE = (pos,declPath _env, [],ExpBox False)
       c = tickBoxCount st
       mes = mixEntries st
   in 
@@ -757,7 +760,7 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
 
 
 \begin{code}
-type MixEntry_ = (SrcSpan, [OccName], BoxLabel)
+type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 
 -- For the hash value, we hash everything: the file name, 
 --  the timestamp of the original source file, the tab stop,

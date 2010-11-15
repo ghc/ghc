@@ -1963,11 +1963,11 @@ historyCmd arg
           _  -> do
                  spans <- mapM GHC.getHistorySpan took
                  let nums  = map (printf "-%-3d:") [(1::Int)..]
-                     names = map GHC.historyEnclosingDecl took
+                     names = map GHC.historyEnclosingDecls took
                  printForUser (vcat(zipWith3 
                                  (\x y z -> x <+> y <+> z) 
                                  (map text nums) 
-                                 (map (bold . ppr) names)
+                                 (map (bold . hcat . punctuate colon . map text) names)
                                  (map (parens . ppr) spans)))
                  liftIO $ putStrLn $ if null rest then "<end of history>" else "..."
 
