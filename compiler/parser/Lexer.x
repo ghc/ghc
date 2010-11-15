@@ -1640,7 +1640,7 @@ alexGetChar (AI loc s)
 		  EnclosingMark         -> other_graphic
 		  DecimalNumber         -> digit
 		  LetterNumber          -> other_graphic
-		  OtherNumber           -> other_graphic
+                  OtherNumber           -> digit -- see #4373
 		  ConnectorPunctuation  -> symbol
 		  DashPunctuation       -> symbol
 		  OpenPunctuation       -> other_graphic
