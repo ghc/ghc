@@ -573,43 +573,10 @@ Warn of loopy local equalities that were dropped.
 reportDictErrs :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()	
 reportDictErrs ctxt wanteds orig
   = do { inst_envs <- tcGetInstEnvs
-       ; let (others, overlaps) = partitionWith (check_overlap inst_envs) wanteds
-       ; unless (null others) $
-         addErrorReport ctxt (mk_no_inst_err others) 
-       ; mapM_ (addErrorReport ctxt) overlaps }
+       ; non_overlaps <- mapMaybeM (reportOverlap ctxt inst_envs orig) wanteds
+       ; unless (null non_overlaps) $
+         addErrorReport ctxt (mk_no_inst_err non_overlaps) }
   where
-    check_overlap :: (InstEnv,InstEnv) -> PredType -> Either PredType SDoc
-	-- Right msg  => overlap message
-	-- Left  inst => no instance
-    check_overlap inst_envs pred@(ClassP clas tys)
-	= case lookupInstEnv inst_envs clas tys of
-		([], _) -> Left pred		-- No match
-		-- The case of exactly one match and no unifiers means a
-		-- successful lookup.  That can't happen here, because dicts
-		-- only end up here if they didn't match in Inst.lookupInst
-		([_],[])
-		 | debugIsOn -> pprPanic "check_overlap" (ppr pred)
-		res -> Right (mk_overlap_msg pred res)
-    check_overlap _ _ = panic "check_overlap"
-
-    mk_overlap_msg pred (matches, unifiers)
-      = ASSERT( not (null matches) )
-        vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
-				<+> pprPred pred)
-    	     ,	sep [ptext (sLit "Matching instances") <> colon,
-    		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
-	     ,	if not (isSingleton matches)
-    		then 	-- Two or more matches
-		     empty
-    		else 	-- One match, plus some unifiers
-		ASSERT( not (null unifiers) )
-		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
-	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
-			      ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
-			      ptext (sLit "when compiling the other instance declarations")])]
-      where
-    	ispecs = [ispec | (ispec, _) <- matches]
-
     mk_no_inst_err :: [PredType] -> SDoc
     mk_no_inst_err wanteds
       | Just givens <- getUserGivens ctxt
@@ -639,6 +606,94 @@ reportDictErrs ctxt wanteds orig
 	show_fixes (f:fs) = sep [ptext (sLit "Possible fix:"), 
 				 nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
 
+reportOverlap :: ReportErrCtxt -> (InstEnv,InstEnv) -> CtOrigin
+              -> PredType -> TcM (Maybe PredType)
+-- Report an overlap error if this class constraint results
+-- from an overlap (returning Nothing), otherwise return (Just pred)
+reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
+  = do { tys_flat <- mapM quickFlattenTy tys
+           -- Note [Flattening in error message generation]
+
+       ; case lookupInstEnv inst_envs clas tys_flat of
+                ([], _) -> return (Just pred)               -- No match
+		-- The case of exactly one match and no unifiers means a
+		-- successful lookup.  That can't happen here, because dicts
+		-- only end up here if they didn't match in Inst.lookupInst
+		([_],[])
+		 | debugIsOn -> pprPanic "check_overlap" (ppr pred)
+                res          -> do { addErrorReport ctxt (mk_overlap_msg res)
+                                   ; return Nothing } }
+  where
+    mk_overlap_msg (matches, unifiers)
+      = ASSERT( not (null matches) )
+        vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
+				<+> pprPred pred)
+    	     ,	sep [ptext (sLit "Matching instances") <> colon,
+    		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
+	     ,	if not (isSingleton matches)
+    		then 	-- Two or more matches
+		     empty
+    		else 	-- One match, plus some unifiers
+		ASSERT( not (null unifiers) )
+		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
+	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
+			      ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
+			      ptext (sLit "when compiling the other instance declarations")])]
+      where
+    	ispecs = [ispec | (ispec, _) <- matches]
+
+reportOverlap _ _ _ _ = panic "reportOverlap"    -- Not a ClassP
+
+----------------------
+quickFlattenTy :: TcType -> TcM TcType
+-- See Note [Flattening in error message generation]
+quickFlattenTy ty | Just ty' <- tcView ty = quickFlattenTy ty'
+quickFlattenTy ty@(TyVarTy {})  = return ty
+quickFlattenTy ty@(ForAllTy {}) = return ty     -- See
+quickFlattenTy ty@(PredTy {})   = return ty     -- Note [Quick-flatten polytypes]
+  -- Don't flatten because of the danger or removing a bound variable
+quickFlattenTy (AppTy ty1 ty2) = do { fy1 <- quickFlattenTy ty1
+                                    ; fy2 <- quickFlattenTy ty2
+                                    ; return (AppTy fy1 fy2) }
+quickFlattenTy (FunTy ty1 ty2) = do { fy1 <- quickFlattenTy ty1
+                                    ; fy2 <- quickFlattenTy ty2
+                                    ; return (FunTy fy1 fy2) }
+quickFlattenTy (TyConApp tc tys)
+    | not (isSynFamilyTyCon tc)
+    = do { fys <- mapM quickFlattenTy tys 
+         ; return (TyConApp tc fys) }
+    | otherwise
+    = do { let (funtys,resttys) = splitAt (tyConArity tc) tys
+                -- Ignore the arguments of the type family funtys
+         ; v <- newMetaTyVar TauTv (typeKind (TyConApp tc funtys))
+         ; flat_resttys <- mapM quickFlattenTy resttys
+         ; return (foldl AppTy (mkTyVarTy v) flat_resttys) }
+\end{code}
+
+Note [Flattening in error message generation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (C (Maybe (F x))), where F is a type function, and we have
+instances
+                C (Maybe Int) and C (Maybe a)
+Since (F x) might turn into Int, this is an overlap situation, and
+indeed (because of flattening) the main solver will have refrained
+from solving.  But by the time we get to error message generation, we've
+un-flattened the constraint.  So we must *re*-flatten it before looking
+up in the instance environment, lest we only report one matching
+instance when in fact there are two.
+
+Re-flattening is pretty easy, because we don't need to keep track of
+evidence.  We don't re-use the code in TcCanonical because that's in
+the TcS monad, and we are in TcM here.
+
+Note [Quick-flatten polytypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we see C (Ix a => blah) or C (forall a. blah) we simply refrain from
+flattening any further.  After all, there can be no instance declarations
+that match such things.  And flattening under a for-all is problematic
+anyway; consider C (forall a. F a)
+
+\begin{code}
 reportAmbigErrs :: ReportErrCtxt -> TcTyVarSet -> [WantedEvVar] -> TcM ()
 reportAmbigErrs ctxt skols ambigs 
 -- Divide into groups that share a common set of ambiguous tyvars
@@ -777,7 +832,6 @@ Note [Runtime skolems]
 We want to give a reasonably helpful error message for ambiguity
 arising from *runtime* skolems in the debugger.  These
 are created by in RtClosureInspect.zonkRTTIType.  
-
 
 %************************************************************************
 %*									*
