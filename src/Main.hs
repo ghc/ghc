@@ -103,9 +103,7 @@ handleGhcExceptions =
     hFlush stdout
     case e of
       PhaseFailed _ code -> exitWith code
-#if ! MIN_VERSION_ghc(6,13,0)
       Interrupted -> exitFailure
-#endif
       _ -> do
         print (e :: GhcException)
         exitFailure

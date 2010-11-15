@@ -33,11 +33,7 @@ import RdrName (GlobalRdrEnv)
 import GhcMonad (withSession)
 #endif
 import HscTypes
-#if MIN_VERSION_ghc(6,13,0)
 import UniqFM
-#else
-import LazyUniqFM
-#endif
 import GHC
 
 
@@ -88,15 +84,9 @@ isVarSym = isLexVarSym . occNameFS
 getMainDeclBinder :: HsDecl name -> Maybe name
 getMainDeclBinder (TyClD d) = Just (tcdName d)
 getMainDeclBinder (ValD d) =
-#if __GLASGOW_HASKELL__ == 612
-  case collectAcc d [] of
-    []       -> Nothing
-    (name:_) -> Just (unLoc name)
-#else
   case collectHsBindBinders d of
     []       -> Nothing
     (name:_) -> Just name
-#endif
 
 
 getMainDeclBinder (SigD d) = sigNameNoLoc d

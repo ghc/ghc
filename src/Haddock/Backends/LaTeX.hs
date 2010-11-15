@@ -577,11 +577,7 @@ ppDataDecl instances subdocs _loc mbDoc dataDecl unicode
 
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
-#if __GLASGOW_HASKELL__ == 612
-ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Bool -> LaTeX
-#else
 ppConstrHdr :: HsExplicitFlag -> [Name] -> HsContext DocName -> Bool -> LaTeX
-#endif
 ppConstrHdr forall tvs ctxt unicode
  = (if null tvs then empty else ppForall)
    <+>
@@ -850,11 +846,7 @@ ppFunLhType  unicode ty = ppr_mono_ty pREC_FUN ty unicode
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
-#if __GLASGOW_HASKELL__ == 612
-ppForAll :: HsExplicitForAll -> [Located (HsTyVarBndr DocName)]
-#else
 ppForAll :: HsExplicitFlag -> [Located (HsTyVarBndr DocName)]
-#endif
          -> Located (HsContext DocName) -> Bool -> LaTeX
 ppForAll expl tvs cxt unicode
   | show_forall = forall_part <+> ppLContext cxt unicode
@@ -884,11 +876,7 @@ ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP 
 ppr_mono_ty _         (HsPredTy p)        u = parens (ppPred u p)
 ppr_mono_ty _         (HsNumTy n)         _ = text (show n) -- generics only
 ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
-#if __GLASGOW_HASKELL__ == 612
-ppr_mono_ty _         (HsSpliceTyOut {})  _ = error "ppr_mono_ty HsQuasiQuoteTy"
-#else
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ = error "ppr_mono_ty HsQuasiQuoteTy"
-#endif
 ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
 ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
 
