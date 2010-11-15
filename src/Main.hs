@@ -103,7 +103,6 @@ handleGhcExceptions =
     hFlush stdout
     case e of
       PhaseFailed _ code -> exitWith code
-      Interrupted -> exitFailure
       _ -> do
         print (e :: GhcException)
         exitFailure
