@@ -631,7 +631,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
 
     header_ = ppConstrHdr forall tyVars context
-    occ     = docNameOcc . unLoc . con_name $ con
+    occ     = nameOccName . getName . unLoc . con_name $ con
     ltvs    = con_qvars con
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
@@ -645,7 +645,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
-  decltt (ppBinder (docNameOcc name)
+  decltt (ppBinder (nameOccName . getName $ name)
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
@@ -736,7 +736,7 @@ ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
 -- | Print an application of a DocName and a list of Names 
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> LaTeX
 ppAppDocNameNames _summ n ns =
-  ppTypeApp n ns (ppBinder . docNameOcc) ppSymName
+  ppTypeApp n ns (ppBinder . nameOccName . getName) ppSymName
 
 
 -- | General printing of type applications
@@ -889,7 +889,7 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode
     ppr_mono_lty pREC_OP ty1 unicode <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode
   where
     ppr_op = if not (isSymOcc occName) then char '`' <> ppLDocName op <> char '`' else ppLDocName op
-    occName = docNameOcc . unLoc $ op
+    occName = nameOccName . getName . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty) unicode
 --  = parens (ppr_mono_lty pREC_TOP ty)
@@ -934,7 +934,7 @@ ppOccName = text . occNameString
 
 
 ppVerbDocName :: DocName -> LaTeX
-ppVerbDocName = ppVerbOccName . docNameOcc
+ppVerbDocName = ppVerbOccName . nameOccName . getName
 
 
 ppVerbRdrName :: RdrName -> LaTeX
@@ -942,7 +942,7 @@ ppVerbRdrName = ppVerbOccName . rdrNameOcc
 
 
 ppDocName :: DocName -> LaTeX
-ppDocName = ppOccName . docNameOcc
+ppDocName = ppOccName . nameOccName . getName
 
 
 ppLDocName :: Located DocName -> LaTeX
@@ -950,7 +950,7 @@ ppLDocName (L _ d) = ppDocName d
 
 
 ppDocBinder :: DocName -> LaTeX
-ppDocBinder = ppBinder . docNameOcc
+ppDocBinder = ppBinder . nameOccName . getName
 
 
 ppName :: Name -> LaTeX

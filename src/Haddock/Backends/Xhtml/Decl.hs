@@ -63,7 +63,7 @@ ppFunSig summary links loc doc docname typ unicode qual =
     (ppTypeSig summary occname typ unicode qual, ppBinder False occname, dcolon unicode)
     unicode qual
   where
-    occname = docNameOcc docname
+    occname = nameOccName . getName $ docname
 
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
@@ -124,7 +124,7 @@ ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode qua
   where
     hdr  = hsep ([keyword "type", ppBinder summary occ] ++ ppTyVars ltyvars)
     full = hdr <+> equals <+> ppLType unicode qual ltype
-    occ  = docNameOcc name
+    occ  = nameOccName . getName $ name
 ppTySyn _ _ _ _ _ _ _ = error "declaration not supported by ppTySyn"
 
 
@@ -264,7 +264,7 @@ ppAppNameTypes n ts unicode qual =
 -- | Print an application of a DocName and a list of Names 
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
 ppAppDocNameNames summ n ns =
-  ppTypeApp n ns (ppBinder summ . docNameOcc) ppTyName
+  ppTypeApp n ns (ppBinder summ . nameOccName . getName) ppTyName
 
 
 -- | General printing of type applications
@@ -521,7 +521,7 @@ ppShortConstrParts summary con unicode qual = case con_res con of
                              ppLType unicode qual (foldr mkFunTy resTy args) ]
 
     header_  = ppConstrHdr forall tyVars context
-    occ      = docNameOcc . unLoc . con_name $ con
+    occ      = nameOccName . getName . unLoc . con_name $ con
     ltvs     = con_qvars con
     tyVars   = tyvarNames ltvs
     lcontext = con_cxt con
@@ -581,7 +581,7 @@ ppSideBySideConstr subdocs unicode qual (L _ con) = (decl, mbDoc, fieldPart)
                   ppLType unicode qual (foldr mkFunTy resTy args) ]
 
     header_ = ppConstrHdr forall tyVars context
-    occ     = docNameOcc . unLoc . con_name $ con
+    occ     = nameOccName . getName . unLoc . con_name $ con
     ltvs    = con_qvars con
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
@@ -596,7 +596,7 @@ ppSideBySideConstr subdocs unicode qual (L _ con) = (decl, mbDoc, fieldPart)
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> Qualification
                   -> ConDeclField DocName ->  SubDecl
 ppSideBySideField subdocs unicode qual (ConDeclField (L _ name) ltype _) =
-  (ppBinder False (docNameOcc name) <+> dcolon unicode <+> ppLType unicode qual ltype,
+  (ppBinder False (nameOccName . getName $ name) <+> dcolon unicode <+> ppLType unicode qual ltype,
     mbDoc,
     [])
   where
@@ -606,7 +606,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField (L _ name) ltype _) =
 
 ppShortField :: Bool -> Bool -> Qualification -> ConDeclField DocName -> Html
 ppShortField summary unicode qual (ConDeclField (L _ name) ltype _)
-  = ppBinder summary (docNameOcc name)
+  = ppBinder summary (nameOccName . getName $ name)
     <+> dcolon unicode <+> ppLType unicode qual ltype
 
 
@@ -726,7 +726,7 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode qual
     ppr_mono_lty pREC_OP ty1 unicode qual <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual
   where
     ppr_op = if not (isSymOcc occName) then quote (ppLDocName qual op) else ppLDocName qual op
-    occName = docNameOcc . unLoc $ op
+    occName = nameOccName . getName . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 --  = parens (ppr_mono_lty pREC_TOP ty)

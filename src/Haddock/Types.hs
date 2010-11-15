@@ -235,11 +235,6 @@ data DocName = Documented Name Module | Undocumented Name deriving Eq
 -- TODO: simplify to data DocName = DocName Name (Maybe Module)
 
 
--- | The 'OccName' of this name.
-docNameOcc :: DocName -> OccName
-docNameOcc = nameOccName . getName
-
-
 instance NamedThing DocName where
   getName (Documented name _) = name
   getName (Undocumented name) = name

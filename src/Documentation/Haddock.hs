@@ -29,7 +29,6 @@ module Documentation.Haddock (
   -- * Hyperlinking
   LinkEnv,
   DocName(..),
-  docNameOcc,
 
   -- * Instances
   DocInstance,

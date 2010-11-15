@@ -565,7 +565,7 @@ processForMiniSynopsis mdl unicode _ (ExportDecl (L _loc decl0) _doc _ _insts) =
         (ClassDecl {})    -> Just $ keyword "class" <+> b
         _ -> Nothing
     SigD (TypeSig (L _ n) (L _ _)) ->
-         Just $ ppNameMini mdl (docNameOcc n)
+         Just $ ppNameMini mdl (nameOccName . getName $ n)
     _ -> Nothing
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
   Just $ groupTag lvl << docToHtml qual txt
@@ -583,7 +583,7 @@ ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
 ppTyClBinderWithVarsMini mdl decl =
   let n = unLoc $ tcdLName decl
       ns = tyvarNames $ tcdTyVars decl
-  in ppTypeApp n ns (ppNameMini mdl . docNameOcc) ppTyName
+  in ppTypeApp n ns (ppNameMini mdl . nameOccName . getName) ppTyName
 
 
 ppModuleContents :: Qualification -> [ExportItem DocName] -> Html
