@@ -136,9 +136,12 @@ basicKnownKeyNames
 	traversableClassName,
 
 	-- Numeric stuff
-	negateName, minusName, 
-	fromRationalName, fromIntegerName, 
-	geName, eqName, 
+        negateName, minusName, geName, eqName,
+
+        -- Conversion functions
+        fromRationalName, fromIntegerName,
+        toIntegerName, toRationalName,
+        fromIntegralName, realToFracName,
 
         -- String stuff
         fromStringName,
@@ -639,7 +642,7 @@ fstName, sndName :: Name
 fstName		  = varQual dATA_TUPLE (fsLit "fst") fstIdKey
 sndName		  = varQual dATA_TUPLE (fsLit "snd") sndIdKey
 
--- Module PrelNum
+-- Module GHC.Num
 numClassName, fromIntegerName, minusName, negateName, plusIntegerName,
     timesIntegerName,
     integerTyConName, smallIntegerName :: Name
@@ -652,10 +655,11 @@ timesIntegerName  = varQual  gHC_INTEGER (fsLit "timesInteger") timesIntegerIdKe
 integerTyConName  = tcQual   gHC_INTEGER_TYPE (fsLit "Integer") integerTyConKey
 smallIntegerName = varQual gHC_INTEGER (fsLit "smallInteger") smallIntegerIdKey
 
--- PrelReal types and classes
+-- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
-    fromRationalName :: Name
+    fromRationalName, toIntegerName, toRationalName, fromIntegralName,
+    realToFracName :: Name
 rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational") rationalTyConKey
 ratioTyConName	    = tcQual  gHC_REAL (fsLit "Ratio") ratioTyConKey
 ratioDataConName    = conName gHC_REAL (fsLit ":%") ratioDataConKey
@@ -663,7 +667,11 @@ realClassName	    = clsQual gHC_REAL (fsLit "Real") realClassKey
 integralClassName   = clsQual gHC_REAL (fsLit "Integral") integralClassKey
 realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac") realFracClassKey
 fractionalClassName = clsQual gHC_REAL (fsLit "Fractional") fractionalClassKey
-fromRationalName    = methName gHC_REAL  (fsLit "fromRational") fromRationalClassOpKey
+fromRationalName    = methName gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
+toIntegerName       = methName gHC_REAL (fsLit "toInteger") toIntegerClassOpKey
+toRationalName      = methName gHC_REAL (fsLit "toRational") toRationalClassOpKey
+fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral") fromIntegralIdKey
+realToFracName      = varQual  gHC_REAL (fsLit "realToFrac") realToFracIdKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
@@ -1286,6 +1294,12 @@ fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
 toAnnotationWrapperIdKey :: Unique
 toAnnotationWrapperIdKey      = mkPreludeMiscIdUnique 126
 
+-- Conversion functions
+fromIntegralIdKey, realToFracIdKey, toIntegerClassOpKey, toRationalClassOpKey :: Unique
+fromIntegralIdKey    = mkPreludeMiscIdUnique 127
+realToFracIdKey      = mkPreludeMiscIdUnique 128
+toIntegerClassOpKey  = mkPreludeMiscIdUnique 129
+toRationalClassOpKey = mkPreludeMiscIdUnique 130
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399

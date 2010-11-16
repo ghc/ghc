@@ -1175,6 +1175,21 @@ foreign import "&amp;f" f :: FunPtr t
       </varlistentry>
 
       <varlistentry>
+        <term><option>-fwarn-identities</option>:</term>
+	<listitem>
+          <indexterm><primary><option>-fwarn-identities</option></primary></indexterm>
+          <para>Causes the compiler to emit a warning when a Prelude numeric
+            conversion converts a type T to the same type T; such calls
+            are probably no-ops and can be omitted.  The functions checked for
+            are: <literal>toInteger</literal>,
+            <literal>toRational</literal>,
+            <literal>fromIntegral</literal>,
+            and <literal>realToFrac</literal>.
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-fwarn-implicit-prelude</option>:</term>
         <listitem>
           <indexterm><primary><option>-fwarn-implicit-prelude</option></primary></indexterm>

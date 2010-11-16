@@ -199,6 +199,7 @@ data DynFlag
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
    | Opt_WarnAutoOrphans
+   | Opt_WarnIdentities
    | Opt_WarnTabs
    | Opt_WarnUnrecognisedPragmas
    | Opt_WarnDodgyForeignImports
@@ -1422,6 +1423,7 @@ fFlags = [
   ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
   ( "warn-orphans",                     Opt_WarnOrphans, nop ),
+  ( "warn-identities",                  Opt_WarnIdentities, nop ),
   ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
@@ -1735,7 +1737,8 @@ minusWallOpts
         Opt_WarnMissingSigs,
         Opt_WarnHiShadows,
         Opt_WarnOrphans,
-        Opt_WarnUnusedDoBind
+        Opt_WarnUnusedDoBind,
+        Opt_WarnIdentities
       ]
 
 -- minuswRemovesOpts should be every warning option

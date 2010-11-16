@@ -1114,6 +1114,14 @@
 	  </row>
 
           <row>
+            <entry><option>-fwarn-identities</option></entry>
+            <entry>warn about uses of Prelude numeric conversions that are probably
+                   the identity (and hence could be omitted)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-identities</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fwarn-implicit-prelude</option></entry>
             <entry>warn when the Prelude is implicitly imported</entry>
             <entry>dynamic</entry>

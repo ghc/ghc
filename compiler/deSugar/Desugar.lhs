@@ -337,8 +337,9 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
 
-	; lhs' <- unsetOptM Opt_EnableRewriteRules $
-	          dsLExpr lhs	-- Note [Desugaring RULE left hand sides]
+        ; lhs' <- unsetOptM Opt_EnableRewriteRules $
+                  unsetOptM Opt_WarnIdentities $
+                  dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 
 	; rhs' <- dsLExpr rhs
 
@@ -359,6 +360,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 	; return (Just rule)
 	} } }
 \end{code}
+
 Note [Desugaring RULE left hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the LHS of a RULE we do *not* want to desugar
@@ -369,4 +371,6 @@ switching off EnableRewriteRules.  See DsExpr.dsExplicitList.
 
 That keeps the desugaring of list comprehensions simple too.
 
-
+Nor do we want to warn of conversion identities on the LHS;
+the rule is precisly to optimise them:
+  {-# RULES "fromRational/id" fromRational = id :: Rational -> Rational #-}
