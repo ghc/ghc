@@ -1134,19 +1134,25 @@ checkStrictBinds top_lvl rec_group binds poly_ids
         -- the versions of alex and happy available have non-conforming
         -- templates, so the GHC build fails if it's an error:
         ; warnUnlifted <- doptM Opt_WarnLazyUnliftedBindings
-        ; warnTc (warnUnlifted && not bang_pat)
+        ; warnTc (warnUnlifted && not bang_pat && lifted_pat)
+                 -- No outer bang, but it's a compound pattern
+                 -- E.g   (I# x#) = blah
+                 -- Warn about this, but not about
+                 --      x# = 4# +# 1#
+                 --      (# a, b #) = ...
                  (unliftedMustBeBang binds) }
   | otherwise
   = return ()
   where
-    unlifted = any is_unlifted poly_ids
-    bang_pat = any (isBangHsBind . unLoc) binds
+    unlifted    = any is_unlifted poly_ids
+    bang_pat    = any (isBangHsBind . unLoc) binds
+    lifted_pat  = any (isLiftedPatBind . unLoc) binds
     is_unlifted id = case tcSplitForAllTys (idType id) of
                        (_, rho) -> isUnLiftedType rho
 
 unliftedMustBeBang :: [LHsBind Name] -> SDoc
 unliftedMustBeBang binds
-  = hang (text "Bindings containing unlifted types should use an outermost bang pattern:")
+  = hang (text "Pattern bindings containing unlifted types should use an outermost bang pattern:")
        2 (pprBindList binds)
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc

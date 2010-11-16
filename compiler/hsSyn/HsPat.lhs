@@ -22,7 +22,8 @@ module HsPat (
 
 	mkPrefixConPat, mkCharLitPat, mkNilPat, 
 
-	isBangHsBind, isBangLPat, hsPatNeedsParens,
+        isBangHsBind, isLiftedPatBind,
+        isBangLPat, hsPatNeedsParens,
 	isIrrefutableHsPat,
 
 	pprParendLPat
@@ -374,9 +375,28 @@ isBangLPat (L _ (ParPat p))   = isBangLPat p
 isBangLPat _                  = False
 
 isBangHsBind :: HsBind id -> Bool
--- In this module because HsPat is above HsBinds in the import graph
+-- A pattern binding with an outermost bang
+-- Defined in this module because HsPat is above HsBinds in the import graph
 isBangHsBind (PatBind { pat_lhs = p }) = isBangLPat p
 isBangHsBind _                         = False
+
+isLiftedPatBind :: HsBind id -> Bool
+-- A pattern binding with a compound pattern, not just a variable
+--    (I# x)       yes
+--    (# a, b #)   no, even if a::Int#
+--    x            no, even if x::Int#
+-- We want to warn about a missing bang-pattern on the yes's
+isLiftedPatBind (PatBind { pat_lhs = p }) = isLiftedLPat p
+isLiftedPatBind _                         = False
+
+isLiftedLPat :: LPat id -> Bool
+isLiftedLPat (L _ (ParPat p))   = isLiftedLPat p
+isLiftedLPat (L _ (BangPat p))  = isLiftedLPat p
+isLiftedLPat (L _ (AsPat _ p))  = isLiftedLPat p
+isLiftedLPat (L _ (TuplePat _ Unboxed _)) = False
+isLiftedLPat (L _ (VarPat {}))            = False
+isLiftedLPat (L _ (WildPat {}))           = False
+isLiftedLPat _                            = True
 
 isIrrefutableHsPat :: OutputableBndr id => LPat id -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
