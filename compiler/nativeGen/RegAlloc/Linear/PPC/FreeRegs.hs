@@ -32,8 +32,8 @@ noFreeRegs = FreeRegs 0 0
 
 releaseReg :: RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle r) (FreeRegs g f)
-    | r > 31    = FreeRegs g (f .|. (1 `shiftL` (fromIntegral r - 32)))
-    | otherwise = FreeRegs (g .|. (1 `shiftL` fromIntegral r)) f
+    | r > 31    = FreeRegs g (f .|. (1 `shiftL` (r - 32)))
+    | otherwise = FreeRegs (g .|. (1 `shiftL` r)) f
 
 releaseReg _ _
 	= panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
@@ -53,8 +53,8 @@ getFreeRegs cls (FreeRegs g f)
 
 allocateReg :: RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs g f) 
-    | r > 31    = FreeRegs g (f .&. complement (1 `shiftL` (fromIntegral r - 32)))
-    | otherwise = FreeRegs (g .&. complement (1 `shiftL` fromIntegral r)) f
+    | r > 31    = FreeRegs g (f .&. complement (1 `shiftL` (r - 32)))
+    | otherwise = FreeRegs (g .&. complement (1 `shiftL` r)) f
 
 allocateReg _ _
 	= panic "RegAlloc.Linear.PPC.allocateReg: bad reg"

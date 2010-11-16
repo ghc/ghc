@@ -298,7 +298,7 @@ schemeER_wrk d p rhs
    | Just (tickInfo, (_annot, newRhs)) <- isTickedExp' rhs = do 
         code <- schemeE d 0 p newRhs 
         arr <- getBreakArray 
-        let idOffSets = getVarOffSets (fromIntegral d) p tickInfo 
+        let idOffSets = getVarOffSets d p tickInfo
         let tickNumber = tickInfo_number tickInfo
         let breakInfo = BreakInfo 
                         { breakInfo_module = tickInfo_module tickInfo

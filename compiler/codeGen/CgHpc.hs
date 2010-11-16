@@ -29,7 +29,7 @@ cgTickBox :: Module -> Int -> Code
 cgTickBox mod n = do
        let tick_box = (cmmIndex W64
                        (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
-                       (fromIntegral n)
+                       n
                       )
        stmtsC [ CmmStore tick_box
                          (CmmMachOp (MO_Add W64)

@@ -32,7 +32,7 @@ mkTickBox mod n
   where
     tick_box = cmmIndex W64
                         (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
-                        (fromIntegral n)
+                        n
 
 initHpc :: Module -> HpcInfo -> FCode CmmAGraph
 -- Emit top-level tables for HPC and return code to initialise

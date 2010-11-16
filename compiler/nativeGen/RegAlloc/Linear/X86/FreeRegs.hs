@@ -47,7 +47,7 @@ getFreeRegs cls f = go f 0
 
 allocateReg :: RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) f 
-	= f .&. complement (1 `shiftL` fromIntegral r)
+        = f .&. complement (1 `shiftL` r)
 
 allocateReg _ _
 	= panic "RegAlloc.Linear.X86.FreeRegs.allocateReg: no reg"

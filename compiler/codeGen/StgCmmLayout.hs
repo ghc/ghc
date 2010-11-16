@@ -400,7 +400,7 @@ mkLiveness name size bits
   = let
         small_bits = case bits of 
 			[]  -> 0
-			[b] -> fromIntegral b
+                        [b] -> b
 			_   -> panic "livenessToAddrMode"
     in
     return (smallLiveness size small_bits)

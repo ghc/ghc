@@ -245,7 +245,7 @@ mkLiveness uniq live =
 
     small_bitmap = case bitmap of 
 		   []  -> 0
-		   [b] -> fromIntegral b
+                   [b] -> b
 		   _   -> panic "mkLiveness"
     small_liveness =
         fromIntegral (length bits) .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT)
