@@ -10,7 +10,6 @@ module CoreMonad (
     -- * Configuration of the core-to-core passes
     CoreToDo(..),
     SimplifierMode(..),
-    SimplifierSwitch(..),
     FloatOutSwitches(..),
     getCoreToDo, dumpSimplPhase,
 
@@ -63,7 +62,7 @@ import Module           ( PackageId, Module )
 import DynFlags
 import StaticFlags	
 import Rules            ( RuleBase )
-import BasicTypes	( CompilerPhase )
+import BasicTypes       ( CompilerPhase(..) )
 import Annotations
 import Id		( Id )
 
@@ -186,8 +185,8 @@ displayLintResults dflags pass warns errs binds
 showLintWarnings :: CoreToDo -> Bool
 -- Disable Lint warnings on the first simplifier pass, because
 -- there may be some INLINE knots still tied, which is tiresomely noisy
-showLintWarnings (CoreDoSimplify (SimplGently {}) _ _) = False
-showLintWarnings _                                     = True
+showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
+showLintWarnings _ = True
 \end{code}
 
 
@@ -204,10 +203,9 @@ data CoreToDo           -- These are diff core-to-core passes,
                         -- as many times as you like.
 
   = CoreDoSimplify      -- The core-to-core simplifier.
+        Int                    -- Max iterations
         SimplifierMode
-	Int		       -- Max iterations
-        [SimplifierSwitch]     -- Each run of the simplifier can take a different
-                               -- set of simplifier-specific flags.
+
   | CoreDoFloatInwards
   | CoreDoFloatOutwards FloatOutSwitches
   | CoreLiberateCase
@@ -254,8 +252,8 @@ coreDumpFlag CoreDoGlomBinds         = Nothing
 coreDumpFlag (CoreDoPasses {})       = Nothing
 
 instance Outputable CoreToDo where
-  ppr (CoreDoSimplify md n _)  = ptext (sLit "Simplifier") 
-                                 <+> ppr md
+  ppr (CoreDoSimplify n md)  = ptext (sLit "Simplifier")
+                               <+> ppr md
                                  <+> ptext (sLit "max-iterations=") <> int n
   ppr CoreDoFloatInwards       = ptext (sLit "Float inwards")
   ppr (CoreDoFloatOutwards f)  = ptext (sLit "Float out") <> parens (ppr f)
@@ -279,50 +277,56 @@ instance Outputable CoreToDo where
 
 \begin{code}
 data SimplifierMode             -- See comments in SimplMonad
-  = SimplGently
-	{ sm_rules :: Bool	-- Whether RULES are enabled 
-        , sm_inline :: Bool }	-- Whether inlining is enabled
-
-  | SimplPhase 
-        { sm_num :: Int 	  -- Phase number; counts downward so 0 is last phase
-        , sm_names :: [String] }  -- Name(s) of the phase
+  = SimplMode
+        { sm_names      :: [String] -- Name(s) of the phase
+        , sm_phase      :: CompilerPhase
+        , sm_rules      :: Bool     -- Whether RULES are enabled
+        , sm_inline     :: Bool     -- Whether inlining is enabled
+        , sm_case_case  :: Bool     -- Whether case-of-case is enabled
+        , sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
+        }
 
 instance Outputable SimplifierMode where
-    ppr (SimplPhase { sm_num = n, sm_names = ss })
-       = ptext (sLit "Phase") <+> int n <+> brackets (text (concat $ intersperse "," ss))
-    ppr (SimplGently { sm_rules = r, sm_inline = i }) 
-       = ptext (sLit "gentle") <> 
-           brackets (pp_flag r (sLit "rules") <> comma <>
-                     pp_flag i (sLit "inline"))
+    ppr (SimplMode { sm_phase = p, sm_names = ss
+                   , sm_rules = r, sm_inline = i
+                   , sm_eta_expand = eta, sm_case_case = cc })
+       = ptext (sLit "SimplMode") <+> braces (
+         sep [ ptext (sLit "Phase =") <+> ppr p <+>
+               brackets (text (concat $ intersperse "," ss)) <> comma
+             , pp_flag i   (sLit "inline") <> comma
+             , pp_flag r   (sLit "rules") <> comma
+             , pp_flag eta (sLit "eta-expand") <> comma
+             , pp_flag cc  (sLit "case-of-case") ])
 	 where
            pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
-
-data SimplifierSwitch
-  = NoCaseOfCase
 \end{code}
 
 
 \begin{code}
 data FloatOutSwitches = FloatOutSwitches {
-        floatOutLambdas :: Bool,     -- ^ True <=> float lambdas to top level
-        floatOutConstants :: Bool,   -- ^ True <=> float constants to top level,
-                                     --            even if they do not escape a lambda
-        floatOutPartialApplications :: Bool -- ^ True <=> float out partial applications
+  floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
+                                   -- doing so will abstract over n or fewer 
+                                   -- value variables
+				   -- Nothing <=> float all lambdas to top level,
+                                   --             regardless of how many free variables
+                                   -- Just 0 is the vanilla case: float a lambda
+                                   --    iff it has no free vars
+
+  floatOutConstants :: Bool,       -- ^ True <=> float constants to top level,
+                                   --            even if they do not escape a lambda
+  floatOutPartialApplications :: Bool -- ^ True <=> float out partial applications
                                             --            based on arity information.
-    }
+  }
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
 
 pprFloatOutSwitches :: FloatOutSwitches -> SDoc
-pprFloatOutSwitches sw = pp_not (floatOutLambdas sw) <+> text "lambdas" <> comma
-                     <+> pp_not (floatOutConstants sw) <+> text "constants"
-  where
-    pp_not True  = empty
-    pp_not False = text "not"
-
--- | Switches that specify the minimum amount of floating out
--- gentleFloatOutSwitches :: FloatOutSwitches
--- gentleFloatOutSwitches = FloatOutSwitches False False
+pprFloatOutSwitches sw 
+  = ptext (sLit "FOS") <+> (braces $
+     sep $ punctuate comma $ 
+     [ ptext (sLit "Lam =")    <+> ppr (floatOutLambdas sw)
+     , ptext (sLit "Consts =") <+> ppr (floatOutConstants sw)
+     , ptext (sLit "PAPs =")   <+> ppr (floatOutPartialApplications sw) ])
 \end{code}
 
 
@@ -337,30 +341,41 @@ getCoreToDo :: DynFlags -> [CoreToDo]
 getCoreToDo dflags
   = core_todo
   where
-    opt_level     = optLevel dflags
-    phases        = simplPhases dflags
+    opt_level     = optLevel           dflags
+    phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
-    strictness    = dopt Opt_Strictness dflags
-    full_laziness = dopt Opt_FullLaziness dflags
-    do_specialise = dopt Opt_Specialise dflags
-    do_float_in   = dopt Opt_FloatIn dflags
-    cse           = dopt Opt_CSE dflags
-    spec_constr   = dopt Opt_SpecConstr dflags
-    liberate_case = dopt Opt_LiberateCase dflags
-    rule_check    = ruleCheck dflags
+    rule_check    = ruleCheck          dflags
+    strictness    = dopt Opt_Strictness   		  dflags
+    full_laziness = dopt Opt_FullLaziness 		  dflags
+    do_specialise = dopt Opt_Specialise   		  dflags
+    do_float_in   = dopt Opt_FloatIn      		  dflags          
+    cse           = dopt Opt_CSE                          dflags
+    spec_constr   = dopt Opt_SpecConstr                   dflags
+    liberate_case = dopt Opt_LiberateCase                 dflags
     static_args   = dopt Opt_StaticArgumentTransformation dflags
+    rules_on      = dopt Opt_EnableRewriteRules           dflags
+    eta_expand_on = dopt Opt_DoLambdaEtaExpansion         dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
     maybe_strictness_before phase
       = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
 
+    base_mode = SimplMode { sm_phase      = panic "base_mode"
+                          , sm_names      = []
+                          , sm_rules      = rules_on
+                          , sm_eta_expand = eta_expand_on
+                          , sm_inline     = True
+                          , sm_case_case  = True }
+
     simpl_phase phase names iter
       = CoreDoPasses
           [ maybe_strictness_before phase
-          , CoreDoSimplify (SimplPhase phase names) 
-                           iter []
-          , maybe_rule_check phase
+          , CoreDoSimplify iter
+                (base_mode { sm_phase = Phase phase
+                           , sm_names = names })
+
+          , maybe_rule_check (Phase phase)
           ]
 
     vectorisation
@@ -380,21 +395,18 @@ getCoreToDo dflags
                 -- strictness in the function sumcode' if augment is not inlined
                 -- before strictness analysis runs
     simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
-                                  | phase <- [phases, phases-1 .. 1] ]
+                                | phase <- [phases, phases-1 .. 1] ]
 
 
         -- initial simplify: mk specialiser happy: minimum effort please
-    simpl_gently = CoreDoSimplify 
-                       (SimplGently { sm_rules = True, sm_inline = False })
-			  -- See Note [Gentle mode] and
-			  -- Note [RULEs enabled in SimplGently] in SimplUtils
-                       max_iter
-                       [
-
-
-            NoCaseOfCase        -- Don't do case-of-case transformations.
-                                -- This makes full laziness work better
-        ]
+    simpl_gently = CoreDoSimplify max_iter
+                       (base_mode { sm_phase = InitialPhase
+                                  , sm_names = ["Gentle"]
+                                  , sm_rules = True     -- Note [RULEs enabled in SimplGently]
+                                  , sm_inline = False
+                                  , sm_case_case = False })
+                          -- Don't do case-of-case transformations.
+                          -- This makes full laziness work better
 
     core_todo =
      if opt_level == 0 then
@@ -421,7 +433,7 @@ getCoreToDo dflags
 
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = False,
+                                 floatOutLambdas   = Just 0,
                                  floatOutConstants = True,
                                  floatOutPartialApplications = False },
       		-- Was: gentleFloatOutSwitches	
@@ -467,7 +479,7 @@ getCoreToDo dflags
 
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = False,
+                                 floatOutLambdas   = floatLamArgs dflags,
                                  floatOutConstants = True,
                                  floatOutPartialApplications = True },
                 -- nofib/spectral/hartel/wang doubles in speed if you
@@ -484,7 +496,7 @@ getCoreToDo dflags
 
         runWhen do_float_in CoreDoFloatInwards,
 
-        maybe_rule_check 0,
+        maybe_rule_check (Phase 0),
 
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
@@ -497,7 +509,7 @@ getCoreToDo dflags
 
         runWhen spec_constr CoreDoSpecConstr,
 
-        maybe_rule_check 0,
+        maybe_rule_check (Phase 0),
 
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter
@@ -532,15 +544,33 @@ dumpSimplPhase dflags mode
                 _        -> phase_name s
 
     phase_num :: Int -> Bool
-    phase_num n = case mode of
-                    SimplPhase k _ -> n == k
-                    _              -> False
+    phase_num n = case sm_phase mode of
+                    Phase k -> n == k
+                    _       -> False
 
     phase_name :: String -> Bool
-    phase_name s = case mode of
-                     SimplGently {}               -> s == "gentle"
-                     SimplPhase { sm_names = ss } -> s `elem` ss
+    phase_name s = s `elem` sm_names mode
 \end{code}
+
+
+Note [RULEs enabled in SimplGently]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RULES are enabled when doing "gentle" simplification.  Two reasons:
+
+  * We really want the class-op cancellation to happen:
+        op (df d1 d2) --> $cop3 d1 d2
+    because this breaks the mutual recursion between 'op' and 'df'
+
+  * I wanted the RULE
+        lift String ===> ...
+    to work in Template Haskell when simplifying
+    splices, so we get simpler code for literal strings
+
+But watch out: list fusion can prevent floating.  So use phase control
+to switch off those rules until after floating.
+
+Currently (Oct10) I think that sm_rules is always True, so we
+could remove it.
 
 
 %************************************************************************

@@ -300,6 +300,7 @@ mkDataConIds wrap_name wkr_name data_con
                     `setArityInfo`         wrap_arity
                         -- It's important to specify the arity, so that partial
                         -- applications are treated as values
+		    `setInlinePragInfo`    alwaysInlinePragma
                     `setUnfoldingInfo`     wrap_unf
                     `setStrictnessInfo` Just wrap_sig
 

@@ -24,7 +24,7 @@ import Coercion
 import OptCoercion	( optCoercion )
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
-import CoreMonad	( SimplifierSwitch(..), Tick(..) )
+import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
 import Demand           ( isStrictDmd )
 import PprCore          ( pprParendExpr, pprCoreExpr )
@@ -237,7 +237,7 @@ simplTopBinds env0 binds0
     trace_bind False _    = \x -> x
 
     simpl_bind env (Rec pairs)  = simplRecBind      env  TopLevel pairs
-    simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel b b' r
+    simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel NonRecursive b b' r
         where
           (env', b') = addBndrRules env b (lookupRecBndr env b)
 \end{code}
@@ -272,7 +272,7 @@ simplRecBind env0 top_lvl pairs0
     go env [] = return env
 
     go env ((old_bndr, new_bndr, rhs) : pairs)
-        = do { env' <- simplRecOrTopPair env top_lvl old_bndr new_bndr rhs
+        = do { env' <- simplRecOrTopPair env top_lvl Recursive old_bndr new_bndr rhs
              ; go env' pairs }
 \end{code}
 
@@ -284,18 +284,17 @@ It assumes the binder has already been simplified, but not its IdInfo.
 
 \begin{code}
 simplRecOrTopPair :: SimplEnv
-                  -> TopLevelFlag
+                  -> TopLevelFlag -> RecFlag
                   -> InId -> OutBndr -> InExpr  -- Binder and rhs
                   -> SimplM SimplEnv    -- Returns an env that includes the binding
 
-simplRecOrTopPair env top_lvl old_bndr new_bndr rhs
+simplRecOrTopPair env top_lvl is_rec old_bndr new_bndr rhs
   | preInlineUnconditionally env top_lvl old_bndr rhs   -- Check for unconditional inline
   = do  { tick (PreInlineUnconditionally old_bndr)
         ; return (extendIdSubst env old_bndr (mkContEx env rhs)) }
 
   | otherwise
-  = simplLazyBind env top_lvl Recursive old_bndr new_bndr rhs env
-        -- May not actually be recursive, but it doesn't matter
+  = simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
 \end{code}
 
 
@@ -902,7 +901,7 @@ simplExprF' env (Type ty) cont
         ; rebuild env (Type ty') cont }
 
 simplExprF' env (Case scrut bndr _ alts) cont
-  | not (switchIsOn (getSwitchChecker env) NoCaseOfCase)
+  | sm_case_case (getMode env)
   =     -- Simplify the scrutinee with a Select continuation
     simplExprF env scrut (Select NoDup bndr alts env cont)
 
@@ -1355,7 +1354,7 @@ tryRules env rules fn args call_cont
        ; case activeRule dflags env of {
            Nothing     -> return Nothing  ; -- No rules apply
            Just act_fn -> 
-         case lookupRule act_fn (activeUnfInRule env) (getInScope env) fn args rules of {
+         case lookupRule act_fn (getUnfoldingInRuleMatch env) (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
 
@@ -1508,7 +1507,7 @@ rebuildCase env scrut case_bndr alts cont
 	    Nothing           -> missingAlt env case_bndr alts cont
 	    Just (_, bs, rhs) -> simple_rhs bs rhs }
 
-  | Just (con, ty_args, other_args) <- exprIsConApp_maybe (activeUnfInRule env) scrut
+  | Just (con, ty_args, other_args) <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
   = do  { tick (KnownBranch case_bndr)

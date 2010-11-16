@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1998
+o% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[SimplMonad]{The simplifier Monad}
 
@@ -12,18 +12,14 @@ module SimplEnv (
 	-- The simplifier mode
 	setMode, getMode, updMode,
 
-	-- Switch checker
-	SwitchChecker, SwitchResult(..), getSwitchChecker, getSimplIntSwitch,
-	isAmongSimpl, intSwitchSet, switchIsOn,
-
-	setEnclosingCC, getEnclosingCC,
+        setEnclosingCC, getEnclosingCC,
 
 	-- Environments
 	SimplEnv(..), StaticEnv, pprSimplEnv,	-- Temp not abstract
 	mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, 
 	zapSubstEnv, setSubstEnv, 
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
-	getSimplRules, inGentleMode,
+        getSimplRules,
 
 	SimplSR(..), mkContEx, substId, lookupRecBndr,
 
@@ -106,8 +102,7 @@ data SimplEnv
      -- wrt the original expression
 
 	seMode 	    :: SimplifierMode,
-	seChkr      :: SwitchChecker,
-	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
+        seCC        :: CostCentreStack, -- The enclosing CCS (when profiling)
 
 	-- The current substitution
 	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
@@ -223,17 +218,13 @@ seIdSubst:
 
 
 \begin{code}
-mkSimplEnv :: SwitchChecker -> SimplifierMode -> SimplEnv
-mkSimplEnv switches mode
-  = SimplEnv { seChkr = switches, seCC = subsumedCCS, 
+mkSimplEnv :: SimplifierMode -> SimplEnv
+mkSimplEnv mode
+  = SimplEnv { seCC = subsumedCCS,
 	       seMode = mode, seInScope = emptyInScopeSet, 
 	       seFloats = emptyFloats,
 	       seTvSubst = emptyVarEnv, seIdSubst = emptyVarEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
-
----------------------
-getSwitchChecker :: SimplEnv -> SwitchChecker
-getSwitchChecker env = seChkr env
 
 ---------------------
 getMode :: SimplEnv -> SimplifierMode
@@ -244,11 +235,6 @@ setMode mode env = env { seMode = mode }
 
 updMode :: (SimplifierMode -> SimplifierMode) -> SimplEnv -> SimplEnv
 updMode upd env = env { seMode = upd (seMode env) }
-
-inGentleMode :: SimplEnv -> Bool
-inGentleMode env = case seMode env of
-	                SimplGently {} -> True
-		        _other         -> False
 
 ---------------------
 getEnclosingCC :: SimplEnv -> CostCentreStack

@@ -730,12 +730,11 @@ StrictAnal.addStrictnessInfoToTopId
 \begin{code}
 callSiteInline :: DynFlags
 	       -> Id			-- The Id
-	       -> Unfolding		-- Its unfolding (if active)
+	       -> Bool			-- True <=> unfolding is active
 	       -> Bool			-- True if there are are no arguments at all (incl type args)
 	       -> [ArgSummary]		-- One for each value arg; True if it is interesting
 	       -> CallCtxt		-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
-
 
 instance Outputable ArgSummary where
   ppr TrivArg    = ptext (sLit "TrivArg")
@@ -765,67 +764,32 @@ instance Outputable CallCtxt where
   ppr CaseCtxt 	      = ptext (sLit "CaseCtxt")
   ppr ValAppCtxt      = ptext (sLit "ValAppCtxt")
 
-callSiteInline dflags id unfolding lone_variable arg_infos cont_info
-  = case unfolding of {
-	NoUnfolding 	 -> Nothing ;
-	OtherCon _  	 -> Nothing ;
-	DFunUnfolding {} -> Nothing ;	-- Never unfold a DFun
-	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top, 
-		        uf_is_cheap = is_cheap, uf_arity = uf_arity, uf_guidance = guidance } ->
+callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
+  = case idUnfolding id of 
+      -- idUnfolding checks for loop-breakers, returning NoUnfolding
+      -- Things with an INLINE pragma may have an unfolding *and* 
+      -- be a loop breaker  (maybe the knot is not yet untied)
+	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top 
+		      , uf_is_cheap = is_cheap, uf_arity = uf_arity
+                      , uf_guidance = guidance }
+          | active_unfolding -> tryUnfolding dflags id lone_variable 
+                                    arg_infos cont_info unf_template is_top 
+                                    is_cheap uf_arity guidance
+          | otherwise    -> Nothing
+	NoUnfolding 	 -> Nothing 
+	OtherCon {} 	 -> Nothing 
+	DFunUnfolding {} -> Nothing 	-- Never unfold a DFun
+
+tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
+             -> CoreExpr -> Bool -> Bool -> Arity -> UnfoldingGuidance
+	     -> Maybe CoreExpr	
+tryUnfolding dflags id lone_variable 
+             arg_infos cont_info unf_template is_top 
+             is_cheap uf_arity guidance
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
-    let
-	n_val_args = length arg_infos
-        saturated  = n_val_args >= uf_arity
-
-	result | yes_or_no = Just unf_template
-	       | otherwise = Nothing
-
-	interesting_args = any nonTriv arg_infos 
- 		-- NB: (any nonTriv arg_infos) looks at the
- 		-- over-saturated args too which is "wrong"; 
- 		-- but if over-saturated we inline anyway.
-
-	       -- some_benefit is used when the RHS is small enough
-	       -- and the call has enough (or too many) value
-	       -- arguments (ie n_val_args >= arity). But there must
-	       -- be *something* interesting about some argument, or the
-	       -- result context, to make it worth inlining
-	some_benefit 
-           | not saturated = interesting_args	-- Under-saturated
-		   	      		     	-- Note [Unsaturated applications]
-	   | n_val_args > uf_arity = True	-- Over-saturated
-           | otherwise = interesting_args	-- Saturated
-                      || interesting_saturated_call 
-
-	interesting_saturated_call 
-	  = case cont_info of
-	      BoringCtxt -> not is_top && uf_arity > 0	      -- Note [Nested functions]
-	      CaseCtxt   -> not (lone_variable && is_cheap)   -- Note [Lone variables]
-	      ArgCtxt {} -> uf_arity > 0     		      -- Note [Inlining in ArgCtxt]
-	      ValAppCtxt -> True			      -- Note [Cast then apply]
-
-	(yes_or_no, extra_doc)
-	  = case guidance of
-	      UnfNever -> (False, empty)
-
-	      UnfWhen unsat_ok boring_ok 
-                 -> (enough_args && (boring_ok || some_benefit), empty )
-                 where      -- See Note [INLINE for small functions]
-                   enough_args = saturated || (unsat_ok && n_val_args > 0)
-
-	      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-	  	 -> ( is_cheap && some_benefit && small_enough
-                    , (text "discounted size =" <+> int discounted_size) )
-		 where
-		   discounted_size = size - discount
-		   small_enough = discounted_size <= opt_UF_UseThreshold
-		   discount = computeDiscount uf_arity arg_discounts 
-				              res_discount arg_infos cont_info
-		
-    in    
-    if (dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags) then
-	pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
+ | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
+ = pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
 		 (vcat [text "arg infos" <+> ppr arg_infos,
 			text "uf arity" <+> ppr uf_arity,
 			text "interesting continuation" <+> ppr cont_info,
@@ -834,10 +798,57 @@ callSiteInline dflags id unfolding lone_variable arg_infos cont_info
 			text "guidance" <+> ppr guidance,
 			extra_doc,
 			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
-		  result
-    else
-    result
-    }
+	         result
+  | otherwise  = result
+
+  where
+    n_val_args = length arg_infos
+    saturated  = n_val_args >= uf_arity
+
+    result | yes_or_no = Just unf_template
+           | otherwise = Nothing
+
+    interesting_args = any nonTriv arg_infos 
+    	-- NB: (any nonTriv arg_infos) looks at the
+    	-- over-saturated args too which is "wrong"; 
+    	-- but if over-saturated we inline anyway.
+
+           -- some_benefit is used when the RHS is small enough
+           -- and the call has enough (or too many) value
+           -- arguments (ie n_val_args >= arity). But there must
+           -- be *something* interesting about some argument, or the
+           -- result context, to make it worth inlining
+    some_benefit 
+       | not saturated = interesting_args	-- Under-saturated
+    	   	      		     	-- Note [Unsaturated applications]
+       | n_val_args > uf_arity = True	-- Over-saturated
+       | otherwise = interesting_args	-- Saturated
+                  || interesting_saturated_call 
+
+    interesting_saturated_call 
+      = case cont_info of
+          BoringCtxt -> not is_top && uf_arity > 0	      -- Note [Nested functions]
+          CaseCtxt   -> not (lone_variable && is_cheap)   -- Note [Lone variables]
+          ArgCtxt {} -> uf_arity > 0     		      -- Note [Inlining in ArgCtxt]
+          ValAppCtxt -> True			      -- Note [Cast then apply]
+
+    (yes_or_no, extra_doc)
+      = case guidance of
+          UnfNever -> (False, empty)
+
+          UnfWhen unsat_ok boring_ok 
+             -> (enough_args && (boring_ok || some_benefit), empty )
+             where      -- See Note [INLINE for small functions]
+               enough_args = saturated || (unsat_ok && n_val_args > 0)
+
+          UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
+      	     -> ( is_cheap && some_benefit && small_enough
+                , (text "discounted size =" <+> int discounted_size) )
+    	     where
+    	       discounted_size = size - discount
+    	       small_enough = discounted_size <= opt_UF_UseThreshold
+    	       discount = computeDiscount uf_arity arg_discounts 
+    	         		          res_discount arg_infos cont_info
 \end{code}
 
 Note [RHS of lets]

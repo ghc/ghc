@@ -16,11 +16,7 @@ module SimplMonad (
 	-- Counting
 	SimplCount, tick, freeTick,
 	getSimplCount, zeroSimplCount, pprSimplCount, 
-	plusSimplCount, isZeroSimplCount,
-
-	-- Switch checker
-	SwitchChecker, SwitchResult(..), getSimplIntSwitch,
-	isAmongSimpl, intSwitchSet, switchIsOn, allOffSwitchChecker
+        plusSimplCount, isZeroSimplCount
     ) where
 
 import Id		( Id, mkSysLocal )
@@ -29,14 +25,8 @@ import FamInstEnv	( FamInstEnv )
 import Rules		( RuleBase )
 import UniqSupply
 import DynFlags		( DynFlags )
-import Maybes		( expectJust )
 import CoreMonad
 import FastString
-import Outputable
-import FastTypes
-
-import Data.Array
-import Data.Array.Base (unsafeAt)
 \end{code}
 
 %************************************************************************
@@ -162,99 +152,3 @@ freeTick t
    = SM (\_st_env us sc -> let sc' = doFreeSimplTick t sc
                            in sc' `seq` ((), us, sc'))
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsubsection{Command-line switches}
-%*									*
-%************************************************************************
-
-\begin{code}
-type SwitchChecker = SimplifierSwitch -> SwitchResult
-
-data SwitchResult
-  = SwBool	Bool		-- on/off
-  | SwString	FastString	-- nothing or a String
-  | SwInt	Int		-- nothing or an Int
-
-allOffSwitchChecker :: SwitchChecker
-allOffSwitchChecker _ = SwBool False
-
-isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
-isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
-					-- in the list; defaults right at the end.
-  = let
-	tidied_on_switches = foldl rm_dups [] on_switches
-		-- The fold*l* ensures that we keep the latest switches;
-		-- ie the ones that occur earliest in the list.
-
-	sw_tbl :: Array Int SwitchResult
-	sw_tbl = (array	(0, lAST_SIMPL_SWITCH_TAG) -- bounds...
-			all_undefined)
-		 // defined_elems
-
-	all_undefined = [ (i, SwBool False) | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
-
-	defined_elems = map mk_assoc_elem tidied_on_switches
-    in
-    -- (avoid some unboxing, bounds checking, and other horrible things:)
-    \ switch -> unsafeAt sw_tbl $ iBox (tagOf_SimplSwitch switch)
-  where
-    mk_assoc_elem k
-	= (iBox (tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
-
-    -- cannot have duplicates if we are going to use the array thing
-    rm_dups switches_so_far switch
-      = if switch `is_elem` switches_so_far
-    	then switches_so_far
-	else switch : switches_so_far
-      where
-	_  `is_elem` []     = False
-	sw `is_elem` (s:ss) = (tagOf_SimplSwitch sw) ==# (tagOf_SimplSwitch s)
-			    || sw `is_elem` ss
-\end{code}
-
-\begin{code}
-getSimplIntSwitch :: SwitchChecker -> (Int-> SimplifierSwitch) -> Int
-getSimplIntSwitch chkr switch
-  = expectJust "getSimplIntSwitch" (intSwitchSet chkr switch)
-
-switchIsOn :: (switch -> SwitchResult) -> switch -> Bool
-
-switchIsOn lookup_fn switch
-  = case (lookup_fn switch) of
-      SwBool False -> False
-      _	    	   -> True
-
-intSwitchSet :: (switch -> SwitchResult)
-	     -> (Int -> switch)
-	     -> Maybe Int
-
-intSwitchSet lookup_fn switch
-  = case (lookup_fn (switch (panic "intSwitchSet"))) of
-      SwInt int -> Just int
-      _	    	-> Nothing
-\end{code}
-
-
-These things behave just like enumeration types.
-
-\begin{code}
-instance Eq SimplifierSwitch where
-    a == b = tagOf_SimplSwitch a ==# tagOf_SimplSwitch b
-
-instance Ord SimplifierSwitch where
-    a <  b  = tagOf_SimplSwitch a <# tagOf_SimplSwitch b
-    a <= b  = tagOf_SimplSwitch a <=# tagOf_SimplSwitch b
-
-
-tagOf_SimplSwitch :: SimplifierSwitch -> FastInt
-tagOf_SimplSwitch NoCaseOfCase			= _ILIT(1)
-
--- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
-
-lAST_SIMPL_SWITCH_TAG :: Int
-lAST_SIMPL_SWITCH_TAG = 2
-\end{code}
-
