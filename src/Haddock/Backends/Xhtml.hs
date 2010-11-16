@@ -35,13 +35,12 @@ import Haddock.GhcUtils
 import Control.Monad         ( when, unless )
 import Control.Monad.Instances ( ) -- for Functor Either a
 import Data.Char             ( toUpper )
-import Data.List             ( sortBy, groupBy )
+import Data.List             ( sortBy, groupBy, intercalate )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
 import System.Directory
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
-import Data.List             ( intercalate )
 import Data.Function
 import Data.Ord              ( comparing )
 
@@ -71,19 +70,20 @@ ppHtml :: String
 
 ppHtml doctitle maybe_package ifaces odir prologue
         themes maybe_source_url maybe_wiki_url
-        maybe_contents_url maybe_index_url unicode 
+        maybe_contents_url maybe_index_url unicode
         qual =  do
   let
-        visible_ifaces = filter visible ifaces
-        visible i = OptHide `notElem` ifaceOptions i
-  when (not (isJust maybe_contents_url)) $
+    visible_ifaces = filter visible ifaces
+    visible i = OptHide `notElem` ifaceOptions i
+
+  when (isNothing maybe_contents_url) $
     ppHtmlContents odir doctitle maybe_package
         themes maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
         prologue
 
-  when (not (isJust maybe_index_url)) $
+  when (isNothing maybe_index_url) $
     ppHtmlIndex odir doctitle maybe_package
       themes maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces)
@@ -96,11 +96,9 @@ ppHtml doctitle maybe_package ifaces odir prologue
 copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
 copyHtmlBits odir libdir themes = do
   let
-        libhtmldir = joinPath [libdir, "html"]
-        copyCssFile f = do
-           copyFile f (combine odir (takeFileName f))
-        copyLibFile f = do
-           copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
+    libhtmldir = joinPath [libdir, "html"]
+    copyCssFile f = copyFile f (combine odir (takeFileName f))
+    copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
   mapM_ copyLibFile [ jsFile, framesFile ]
 
@@ -150,13 +148,13 @@ wikiButton _ _ =
 contentsButton :: Maybe String -> Maybe Html
 contentsButton maybe_contents_url
   = Just (anchor ! [href url] << "Contents")
-  where url = maybe contentsHtmlFile id maybe_contents_url
+  where url = fromMaybe contentsHtmlFile maybe_contents_url
 
 
 indexButton :: Maybe String -> Maybe Html
 indexButton maybe_index_url
   = Just (anchor ! [href url] << "Index")
-  where url = maybe indexHtmlFile id maybe_index_url
+  where url = fromMaybe indexHtmlFile maybe_index_url
 
 
 bodyHtml :: String -> Maybe Interface
@@ -191,7 +189,7 @@ moduleInfo iface =
    let
       info = ifaceInfo iface
 
-      doOneEntry :: (String, (HaddockModInfo GHC.Name) -> Maybe String) -> Maybe HtmlTable
+      doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe String) -> Maybe HtmlTable
       doOneEntry (fieldName, field) =
         field info >>= \a -> return (th << fieldName <-> td << a)
 
@@ -308,7 +306,7 @@ flatModuleTree ifaces =
   where
     mods = [ (moduleString mdl, mdl) | mdl <- map instMod ifaces ]
     ppModule' txt mdl =
-      anchor ! [href ((moduleHtmlFile mdl)), target mainFrameName]
+      anchor ! [href (moduleHtmlFile mdl), target mainFrameName]
         << toHtml txt
 
 
@@ -401,7 +399,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
     index :: [(String, Map GHC.Name [(Module,Bool)])]
     index = sortBy cmp (Map.toAscList full_index)
-      where cmp (n1,_) (n2,_) = map toUpper n1 `compare` map toUpper n2
+      where cmp (n1,_) (n2,_) = comparing (map toUpper) n1 n2
 
     -- for each name (a plain string), we have a number of original HsNames that
     -- it can refer to, and for each of those we have a list of modules
@@ -409,7 +407,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
     -- in a visible or invisible way (hence the Bool).
     full_index :: Map String (Map GHC.Name [(Module,Bool)])
     full_index = Map.fromListWith (flip (Map.unionWith (++)))
-                 (concat (map getIfaceIndex ifaces))
+                 (concatMap getIfaceIndex ifaces)
 
     getIfaceIndex iface =
       [ (getOccString name
@@ -625,7 +623,7 @@ numberSectionHeadings exports = go 1 exports
 
 
 processExport :: Bool -> LinksInfo -> Bool -> Qualification
-              -> (ExportItem DocName) -> Maybe Html
+              -> ExportItem DocName -> Maybe Html
 processExport summary _ _ qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtml qual doc
 processExport summary links unicode qual (ExportDecl decl doc subdocs insts)
