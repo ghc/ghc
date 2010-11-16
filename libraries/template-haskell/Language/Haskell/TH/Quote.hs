@@ -30,7 +30,7 @@ dataToQa mkCon mkLit appCon antiQ t =
             IntConstr n ->
                 mkLit $ integerL n
             FloatConstr n ->
-                mkLit $ rationalL (toRational n)
+                mkLit $ rationalL n
             CharConstr c ->
                 mkLit $ charL c
         where
