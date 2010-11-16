@@ -46,10 +46,13 @@ endif
 # Temporarily turn off incomplete-pattern warnings for containers
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 
+# bytestring has identities at the moment
+libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
+
 # Temporarily turn off unused-do-bind warnings for the time package
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
 # On Windows, there are also some unused import warnings
-libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
 
 # haskeline has warnings about deprecated use of block/unblock
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
@@ -57,7 +60,7 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # Temporarily turn off unused-import warnings for the binary package
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
-libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
 
 # primitive has a warning about deprecated use of GHC.IOBase
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
