@@ -1221,14 +1221,15 @@ foreign import "&amp;f" f :: FunPtr t
 	  <indexterm><primary>incomplete patterns, warning</primary></indexterm>
 	  <indexterm><primary>patterns, incomplete</primary></indexterm>
 
-	  <para>Similarly for incomplete patterns, the function
-          <function>g</function> below will fail when applied to
+          <para>Similarly for incomplete patterns, the functions
+          <function>g</function> and <function>h</function> below will fail when applied to
           non-empty lists, so the compiler will emit a warning about
           this when <option>-fwarn-incomplete-patterns</option> is
           enabled.</para>
 
 <programlisting>
 g [] = 2
+h = \[] -> 2
 </programlisting>
 
 	  <para>This option isn't enabled by default because it can be
