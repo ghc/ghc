@@ -21,7 +21,6 @@ module GHC.IO.Handle.FD (
  ) where
 
 import GHC.Base
-import GHC.Real
 import GHC.Show
 import Data.Maybe
 -- import Control.Monad
@@ -240,7 +239,7 @@ fdToHandle' fdint mb_type is_socket filepath iomode binary = do
                         Just RegularFile -> Nothing
                           -- no stat required for streams etc.:
                         Just other       -> Just (other,0,0)
-  (fd,fd_type) <- FD.mkFD (fromIntegral fdint) iomode mb_stat
+  (fd,fd_type) <- FD.mkFD fdint iomode mb_stat
                        is_socket
                        is_socket
   mkHandleFromFD fd fd_type filepath iomode is_socket
@@ -255,8 +254,8 @@ fdToHandle' fdint mb_type is_socket filepath iomode binary = do
 -- translation instead.
 fdToHandle :: Posix.FD -> IO Handle
 fdToHandle fdint = do
-   iomode <- Posix.fdGetMode (fromIntegral fdint)
-   (fd,fd_type) <- FD.mkFD (fromIntegral fdint) iomode Nothing
+   iomode <- Posix.fdGetMode fdint
+   (fd,fd_type) <- FD.mkFD fdint iomode Nothing
             False{-is_socket-} 
               -- NB. the is_socket flag is False, meaning that:
               --  on Windows we're guessing this is not a socket (XXX)

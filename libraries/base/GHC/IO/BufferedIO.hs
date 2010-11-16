@@ -22,7 +22,6 @@ import GHC.Base
 import GHC.Ptr
 import Data.Word
 import GHC.Num
-import GHC.Real
 import Data.Maybe
 -- import GHC.IO
 import GHC.IO.Device as IODevice
@@ -93,9 +92,8 @@ readBuf :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8)
 readBuf dev bbuf = do
   let bytes = bufferAvailable bbuf
   res <- withBuffer bbuf $ \ptr ->
-             RawIO.read dev (ptr `plusPtr` bufR bbuf) (fromIntegral bytes)
-  let res' = fromIntegral res
-  return (res', bbuf{ bufR = bufR bbuf + res' })
+             RawIO.read dev (ptr `plusPtr` bufR bbuf) bytes
+  return (res, bbuf{ bufR = bufR bbuf + res })
          -- zero indicates end of file
 
 readBufNonBlocking :: RawIO dev => dev -> Buffer Word8
@@ -105,16 +103,16 @@ readBufNonBlocking :: RawIO dev => dev -> Buffer Word8
 readBufNonBlocking dev bbuf = do
   let bytes = bufferAvailable bbuf
   res <- withBuffer bbuf $ \ptr ->
-           IODevice.readNonBlocking dev (ptr `plusPtr` bufR bbuf) (fromIntegral bytes)
+           IODevice.readNonBlocking dev (ptr `plusPtr` bufR bbuf) bytes
   case res of
      Nothing -> return (Nothing, bbuf)
-     Just n  -> return (Just n, bbuf{ bufR = bufR bbuf + fromIntegral n })
+     Just n  -> return (Just n, bbuf{ bufR = bufR bbuf + n })
 
 writeBuf :: RawIO dev => dev -> Buffer Word8 -> IO (Buffer Word8)
 writeBuf dev bbuf = do
   let bytes = bufferElems bbuf
   withBuffer bbuf $ \ptr ->
-      IODevice.write dev (ptr `plusPtr` bufL bbuf) (fromIntegral bytes)
+      IODevice.write dev (ptr `plusPtr` bufL bbuf) bytes
   return bbuf{ bufL=0, bufR=0 }
 
 -- XXX ToDo
@@ -122,6 +120,5 @@ writeBufNonBlocking :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8
 writeBufNonBlocking dev bbuf = do
   let bytes = bufferElems bbuf
   res <- withBuffer bbuf $ \ptr ->
-            IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf)
-                                      (fromIntegral bytes)
+            IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf) bytes
   return (res, bufferAdjustL res bbuf)

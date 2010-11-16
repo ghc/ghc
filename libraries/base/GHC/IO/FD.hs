@@ -156,7 +156,7 @@ openFile filepath iomode =
     -- always returns EISDIR if the file is a directory and was opened
     -- for writing, so I think we're ok with a single open() here...
     fd <- throwErrnoIfMinus1Retry "openFile"
-                (c_open f (fromIntegral oflags) 0o666)
+                (c_open f oflags 0o666)
 
     (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                             False{-not a socket-} 
@@ -394,9 +394,8 @@ setRaw fd raw = System.Posix.Internals.setCooked (fdFD fd) (not raw)
 -- Reading and Writing
 
 fdRead :: FD -> Ptr Word8 -> Int -> IO Int
-fdRead fd ptr bytes = do
-  r <- readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0 (fromIntegral bytes)
-  return (fromIntegral r)
+fdRead fd ptr bytes
+  = readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0 (fromIntegral bytes)
 
 fdReadNonBlocking :: FD -> Ptr Word8 -> Int -> IO (Maybe Int)
 fdReadNonBlocking fd ptr bytes = do
@@ -404,7 +403,7 @@ fdReadNonBlocking fd ptr bytes = do
            0 (fromIntegral bytes)
   case r of
     (-1) -> return (Nothing)
-    n    -> return (Just (fromIntegral n))
+    n    -> return (Just n)
 
 
 fdWrite :: FD -> Ptr Word8 -> Int -> IO ()

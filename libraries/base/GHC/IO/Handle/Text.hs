@@ -642,7 +642,7 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release
                 -- just copy the data in and update bufR.
             then do withRawBuffer raw     $ \praw ->
                       copyToRawBuffer old_raw (w*charSize)
-                                      praw (fromIntegral (count*charSize))
+                                      praw (count*charSize)
                     writeIORef ref old_buf{ bufR = w + count }
                     return (emptyBuffer raw sz WriteBuffer)
 
@@ -761,7 +761,7 @@ bufWrite h_@Handle__{..} ptr count can_block =
         -- There's enough room in the buffer:
         -- just copy the data in and update bufR.
         then do debugIO ("hPutBuf: copying to buffer, w=" ++ show w)
-                copyToRawBuffer old_raw w ptr (fromIntegral count)
+                copyToRawBuffer old_raw w ptr count
                 writeIORef haByteBuffer old_buf{ bufR = w + count }
                 return count
 
@@ -836,7 +836,7 @@ bufReadNonEmpty h_@Handle__{..}
                 return (so_far + count)
            else do
   
-        copyFromRawBuffer ptr raw (fromIntegral r) (fromIntegral avail)
+        copyFromRawBuffer ptr raw r avail
         let buf' = buf{ bufR=0, bufL=0 }
         writeIORef haByteBuffer buf'
         let remaining = count - avail
@@ -863,7 +863,7 @@ bufReadEmpty h_@Handle__{..}
   loop :: FD -> Int -> Int -> IO Int
   loop fd off bytes | bytes <= 0 = return (so_far + off)
   loop fd off bytes = do
-    r <- RawIO.read (fd::FD) (ptr `plusPtr` off) (fromIntegral bytes)
+    r <- RawIO.read (fd::FD) (ptr `plusPtr` off) bytes
     if r == 0
         then return (so_far + off)
         else loop fd (off + r) (bytes - r)
@@ -987,7 +987,7 @@ bufReadNBNonEmpty h_@Handle__{..}
                 return (so_far + count)
            else do
 
-        copyFromRawBuffer ptr raw (fromIntegral r) (fromIntegral avail)
+        copyFromRawBuffer ptr raw r avail
         let buf' = buf{ bufR=0, bufL=0 }
         writeIORef haByteBuffer buf'
         let remaining = count - avail

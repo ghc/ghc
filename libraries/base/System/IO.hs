@@ -244,7 +244,6 @@ import System.Posix.Types
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Real
 import GHC.IO hiding ( onException )
 import GHC.IO.IOMode
 import GHC.IO.Handle.FD
@@ -575,7 +574,7 @@ openTempFile' loc tmp_dir template binary mode = do
            else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
        else do
 
-         (fD,fd_type) <- FD.mkFD (fromIntegral fd) ReadWriteMode Nothing{-no stat-}
+         (fD,fd_type) <- FD.mkFD fd ReadWriteMode Nothing{-no stat-}
                               False{-is_socket-} 
                               True{-is_nonblock-}
 
