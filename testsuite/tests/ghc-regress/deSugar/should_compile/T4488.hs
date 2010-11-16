@@ -10,18 +10,6 @@ ok1 x = fromIntegral x
 warn1 :: Int -> Int
 warn1 x = fromIntegral x
 
-ok2 :: Integer -> Float
-ok2 x = fromInteger x
-
-warn2 :: Integer -> Integer
-warn2 x = fromInteger x
-
--- ok3 :: Rational -> Float
-ok3 x = fromRational x
-
-warn3 :: Rational -> Rational
-warn3 x = fromRational x
-
 ok4 :: Int -> Integer
 ok4 x = toInteger x
 
