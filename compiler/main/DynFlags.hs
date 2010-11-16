@@ -382,6 +382,8 @@ data DynFlags = DynFlags {
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
+  floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
+  			   	 	--   See CoreMonad.FloatOutSwitches
 
 #ifndef OMIT_NATIVE_CODEGEN
   targetPlatform	:: Platform,	-- ^ The platform we're compiling for. Used by the NCG.
@@ -650,6 +652,7 @@ defaultDynFlags =
         specConstrThreshold     = Just 200,
         specConstrCount         = Just 3,
         liberateCaseThreshold   = Just 200,
+        floatLamArgs            = Just 0,	-- Default: float only if no fvs
         strictnessBefore        = [],
 
 #ifndef OMIT_NATIVE_CODEGEN
@@ -1303,6 +1306,8 @@ dynamic_flags = [
   , Flag "frule-check"                 (SepArg (\s -> upd (\d -> d{ ruleCheck = Just s })))
   , Flag "fcontext-stack"              (intSuffix (\n d -> d{ ctxtStkDepth = n }))
   , Flag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
+  , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
+  , Flag "ffloat-all-lams"             (intSuffix (\n d -> d{ floatLamArgs = Nothing }))
 
         ------ Profiling ----------------------------------------------------
 

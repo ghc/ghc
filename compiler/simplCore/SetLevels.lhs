@@ -71,7 +71,7 @@ import OccName		( occNameString )
 import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..), Arity )
 import UniqSupply
-import Util		( sortLe, isSingleton, count )
+import Util
 import Outputable
 import FastString
 \end{code}
@@ -591,11 +591,13 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
 
 \begin{code}
 lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
-  | null abs_vars
+  | null abs_vars 
   = do (new_env, new_bndrs) <- cloneRecVars top_lvl env bndrs ctxt_lvl dest_lvl
        new_rhss <- mapM (lvlExpr ctxt_lvl new_env) rhss
        return (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
 
+-- ToDo: when enabling the floatLambda stuff,
+--       I think we want to stop doing this
   | isSingleton pairs && count isId abs_vars > 1
   = do	-- Special case for self recursion where there are
 	-- several variables carried around: build a local loop:	
@@ -689,8 +691,11 @@ destLevel :: LevelEnv -> VarSet -> Bool -> Maybe (Arity, StrictSig) -> Level
 destLevel env fvs is_function mb_bot
   | Just {} <- mb_bot = tOP_LEVEL	-- Send bottoming bindings to the top 
 					-- regardless; see Note [Bottoming floats]
-  |  floatLams env
-  && is_function      = tOP_LEVEL	-- Send functions to top level; see
+  | Just n_args <- floatLams env
+  , n_args > 0	-- n=0 case handled uniformly by the 'otherwise' case
+  , is_function
+  , countFreeIds fvs <= n_args
+  = tOP_LEVEL	-- Send functions to top level; see
 					-- the comments with isFunction
   | otherwise         = maxIdLevel env fvs
 
@@ -713,6 +718,13 @@ isFunction (_, AnnLam b e) | isId b    = True
                            | otherwise = isFunction e
 isFunction (_, AnnNote _ e)            = isFunction e
 isFunction _                           = False
+
+countFreeIds :: VarSet -> Int
+countFreeIds = foldVarSet add 0
+  where
+    add :: Var -> Int -> Int
+    add v n | isId v    = n+1
+            | otherwise = n 
 \end{code}
 
 
@@ -723,51 +735,55 @@ isFunction _                           = False
 %************************************************************************
 
 \begin{code}
-type LevelEnv = (FloatOutSwitches,
-		 VarEnv Level, 			-- Domain is *post-cloned* TyVars and Ids
-	         Subst, 			-- Domain is pre-cloned Ids; tracks the in-scope set
-						-- 	so that subtitution is capture-avoiding
-	         IdEnv ([Var], LevelledExpr))	-- Domain is pre-cloned Ids
+data LevelEnv 
+  = LE { le_switches :: FloatOutSwitches
+       , le_lvl_env  :: VarEnv Level	-- Domain is *post-cloned* TyVars and Ids
+       , le_subst    :: Subst 		-- Domain is pre-cloned Ids; tracks the in-scope set
+					-- 	so that subtitution is capture-avoiding
+       , le_env      :: IdEnv ([Var], LevelledExpr)	-- Domain is pre-cloned Ids
+    }
 	-- We clone let-bound variables so that they are still
-	-- distinct when floated out; hence the SubstEnv/IdEnv.
+	-- distinct when floated out; hence the le_subst/le_env.
         -- (see point 3 of the module overview comment).
 	-- We also use these envs when making a variable polymorphic
 	-- because we want to float it out past a big lambda.
 	--
-	-- The Subst and IdEnv always implement the same mapping, but the
-	-- Subst maps to CoreExpr and the IdEnv to LevelledExpr
+	-- The le_subst and le_env always implement the same mapping, but the
+	-- le_subst maps to CoreExpr and the le_env to LevelledExpr
 	-- Since the range is always a variable or type application,
 	-- there is never any difference between the two, but sadly
-	-- the types differ.  The SubstEnv is used when substituting in
-	-- a variable's IdInfo; the IdEnv when we find a Var.
+	-- the types differ.  The le_subst is used when substituting in
+	-- a variable's IdInfo; the le_env when we find a Var.
 	--
-	-- In addition the IdEnv records a list of tyvars free in the
+	-- In addition the le_env records a list of tyvars free in the
 	-- type application, just so we don't have to call freeVars on
 	-- the type application repeatedly.
 	--
 	-- The domain of the both envs is *pre-cloned* Ids, though
 	--
-	-- The domain of the VarEnv Level is the *post-cloned* Ids
+	-- The domain of the le_lvl_env is the *post-cloned* Ids
 
 initialEnv :: FloatOutSwitches -> LevelEnv
-initialEnv float_lams = (float_lams, emptyVarEnv, emptySubst, emptyVarEnv)
+initialEnv float_lams 
+  = LE { le_switches = float_lams, le_lvl_env = emptyVarEnv
+       , le_subst = emptySubst, le_env = emptyVarEnv }
 
-floatLams :: LevelEnv -> Bool
-floatLams (fos, _, _, _) = floatOutLambdas fos
+floatLams :: LevelEnv -> Maybe Int
+floatLams le = floatOutLambdas (le_switches le)
 
 floatConsts :: LevelEnv -> Bool
-floatConsts (fos, _, _, _) = floatOutConstants fos
+floatConsts le = floatOutConstants (le_switches le)
 
 floatPAPs :: LevelEnv -> Bool
-floatPAPs (fos, _, _, _) = floatOutPartialApplications fos
+floatPAPs le = floatOutPartialApplications (le_switches le)
 
 extendLvlEnv :: LevelEnv -> [TaggedBndr Level] -> LevelEnv
 -- Used when *not* cloning
-extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
-  = (float_lams,
-     foldl add_lvl lvl_env prs,
-     foldl del_subst subst prs,
-     foldl del_id id_env prs)
+extendLvlEnv le@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env }) 
+             prs
+  = le { le_lvl_env = foldl add_lvl lvl_env prs
+       , le_subst   = foldl del_subst subst prs
+       , le_env     = foldl del_id id_env prs }
   where
     add_lvl   env (TB v l) = extendVarEnv env v l
     del_subst env (TB v _) = extendInScope env v
@@ -787,48 +803,50 @@ extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
   -- KSW 2000-07.
 
 extendInScopeEnv :: LevelEnv -> Var -> LevelEnv
-extendInScopeEnv (fl, le, subst, ids) v = (fl, le, extendInScope subst v, ids)
+extendInScopeEnv le@(LE { le_subst = subst }) v 
+  = le { le_subst = extendInScope subst v }
 
 extendInScopeEnvList :: LevelEnv -> [Var] -> LevelEnv
-extendInScopeEnvList (fl, le, subst, ids) vs = (fl, le, extendInScopeList subst vs, ids)
+extendInScopeEnvList le@(LE { le_subst = subst }) vs
+  = le { le_subst = extendInScopeList subst vs }
 
 -- extendCaseBndrLvlEnv adds the mapping case-bndr->scrut-var if it can
 -- (see point 4 of the module overview comment)
 extendCaseBndrLvlEnv :: LevelEnv -> Expr (TaggedBndr Level) -> Var -> Level
                      -> LevelEnv
-extendCaseBndrLvlEnv (float_lams, lvl_env, subst, id_env) (Var scrut_var) case_bndr lvl
-  = (float_lams,
-     extendVarEnv lvl_env case_bndr lvl,
-     extendIdSubst subst case_bndr (Var scrut_var),
-     extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var))
+extendCaseBndrLvlEnv le@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env }) 
+                     (Var scrut_var) case_bndr lvl
+  = le { le_lvl_env = extendVarEnv lvl_env case_bndr lvl
+       , le_subst   = extendIdSubst subst case_bndr (Var scrut_var)
+       , le_env     = extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var) }
      
 extendCaseBndrLvlEnv env _scrut case_bndr lvl
-  = extendLvlEnv          env [TB case_bndr lvl]
+  = extendLvlEnv env [TB case_bndr lvl]
 
 extendPolyLvlEnv :: Level -> LevelEnv -> [Var] -> [(Var, Var)] -> LevelEnv
-extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pairs
-  = (float_lams,
-     foldl add_lvl   lvl_env bndr_pairs,
-     foldl add_subst subst   bndr_pairs,
-     foldl add_id    id_env  bndr_pairs)
+extendPolyLvlEnv dest_lvl 
+                 le@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env }) 
+                 abs_vars bndr_pairs
+  = le { le_lvl_env = foldl add_lvl   lvl_env bndr_pairs
+       , le_subst   = foldl add_subst subst   bndr_pairs
+       , le_env     = foldl add_id    id_env  bndr_pairs }
   where
      add_lvl   env (_, v') = extendVarEnv env v' dest_lvl
      add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
      add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
 extendCloneLvlEnv :: Level -> LevelEnv -> Subst -> [(Var, Var)] -> LevelEnv
-extendCloneLvlEnv lvl (float_lams, lvl_env, _, id_env) new_subst bndr_pairs
-  = (float_lams,
-     foldl add_lvl   lvl_env bndr_pairs,
-     new_subst,
-     foldl add_id    id_env  bndr_pairs)
+extendCloneLvlEnv lvl le@(LE { le_lvl_env = lvl_env, le_env = id_env }) 
+                  new_subst bndr_pairs
+  = le { le_lvl_env = foldl add_lvl   lvl_env bndr_pairs
+       , le_subst   = new_subst
+       , le_env     =  foldl add_id    id_env  bndr_pairs }
   where
      add_lvl env (_, v') = extendVarEnv env v' lvl
      add_id  env (v, v') = extendVarEnv env v ([v'], Var v')
 
-
 maxIdLevel :: LevelEnv -> VarSet -> Level
-maxIdLevel (_, lvl_env,_,id_env) var_set
+maxIdLevel (LE { le_lvl_env = lvl_env, le_env = id_env }) var_set
   = foldVarSet max_in tOP_LEVEL var_set
   where
     max_in in_var lvl = foldr max_out lvl (case lookupVarEnv id_env in_var of
@@ -842,15 +860,15 @@ maxIdLevel (_, lvl_env,_,id_env) var_set
 	| otherwise    = lvl	-- Ignore tyvars in *maxIdLevel*
 
 lookupVar :: LevelEnv -> Id -> LevelledExpr
-lookupVar (_, _, _, id_env) v = case lookupVarEnv id_env v of
-				       Just (_, expr) -> expr
-				       _    	      -> Var v
+lookupVar le v = case lookupVarEnv (le_env le) v of
+		    Just (_, expr) -> expr
+		    _              -> Var v
 
 abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- Find the variables in fvs, free vars of the target expresion,
 	-- whose level is greater than the destination level
 	-- These are the ones we are going to abstract out
-abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
+abstractVars dest_lvl (LE { le_lvl_env = lvl_env, le_env = id_env }) fvs
   = map zap $ uniq $ sortLe le 
 	[var | fv <- varSetElems fvs
 	     , var <- absVarsOf id_env fv
@@ -951,11 +969,11 @@ cloneVar TopLevel env v _ _
   = return (extendInScopeEnv env v, v)	-- Don't clone top level things
 		-- But do extend the in-scope env, to satisfy the in-scope invariant
 
-cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
+cloneVar NotTopLevel env v ctxt_lvl dest_lvl
   = ASSERT( isId v ) do
     us <- getUniqueSupplyM
     let
-      (subst', v1) = cloneIdBndr subst us v
+      (subst', v1) = cloneIdBndr (le_subst env) us v
       v2	   = zap_demand ctxt_lvl dest_lvl v1
       env'	   = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
     return (env', v2)
@@ -963,11 +981,11 @@ cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
 cloneRecVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEnv, [Id])
 cloneRecVars TopLevel env vs _ _
   = return (extendInScopeEnvList env vs, vs)	-- Don't clone top level things
-cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
+cloneRecVars NotTopLevel env vs ctxt_lvl dest_lvl
   = ASSERT( all isId vs ) do
     us <- getUniqueSupplyM
     let
-      (subst', vs1) = cloneRecIdBndrs subst us vs
+      (subst', vs1) = cloneRecIdBndrs (le_subst env) us vs
       vs2	    = map (zap_demand ctxt_lvl dest_lvl) vs1
       env'	    = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
     return (env', vs2)
