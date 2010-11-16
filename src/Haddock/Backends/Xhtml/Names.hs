@@ -50,10 +50,9 @@ qualifyName qual docName@(Documented name mdl) = case qual of
     FullQual -> ppFullQualName mdl name
     -- this is just in case, it should never happen
     LocalQual Nothing -> qualifyName FullQual docName
-    LocalQual (Just localmdl) ->
-        if (moduleString mdl == moduleString localmdl)
-            then ppName name
-            else ppFullQualName mdl name
+    LocalQual (Just localmdl)
+      | moduleString mdl == moduleString localmdl -> ppName name
+      | otherwise -> ppFullQualName mdl name
     -- again, this never happens
     RelativeQual Nothing -> qualifyName FullQual docName
     RelativeQual (Just localmdl) ->

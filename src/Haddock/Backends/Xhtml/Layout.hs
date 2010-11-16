@@ -141,7 +141,7 @@ subBlock hs = Just $ toHtml hs
 
 
 subArguments :: Qualification -> [SubDecl] -> Html
-subArguments qual = divSubDecls "arguments" "Arguments" . (subTable qual)
+subArguments qual = divSubDecls "arguments" "Arguments" . subTable qual
 
 
 subAssociatedTypes :: [Html] -> Html
@@ -149,19 +149,19 @@ subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBloc
 
 
 subConstructors :: Qualification -> [SubDecl] -> Html
-subConstructors qual = divSubDecls "constructors" "Constructors" . (subTable qual)
+subConstructors qual = divSubDecls "constructors" "Constructors" . subTable qual
 
 
 subFields :: Qualification -> [SubDecl] -> Html
-subFields qual = divSubDecls "fields" "Fields" . (subDlist qual)
+subFields qual = divSubDecls "fields" "Fields" . subDlist qual
 
 
 subInstances :: Qualification -> String -> [SubDecl] -> Html
 subInstances qual nm = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . (subTable qual)
-    subSection = thediv ! [theclass $ "subs instances"]
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTable qual
+    subSection = thediv ! [theclass "subs instances"]
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
 

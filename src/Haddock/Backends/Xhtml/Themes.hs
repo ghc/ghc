@@ -18,6 +18,7 @@ module Haddock.Backends.Xhtml.Themes (
 
 import Haddock.Options
 
+import Control.Applicative
 import Control.Monad (liftM)
 import Data.Char (toLower)
 import Data.Either (lefts, rights)
@@ -97,13 +98,13 @@ directoryTheme path = do
 
 -- | Check if we have a built in theme
 doesBuiltInExist :: IO PossibleThemes -> String -> IO Bool
-doesBuiltInExist pts s = pts >>= return . either (const False) test 
+doesBuiltInExist pts s = fmap (either (const False) test) pts
   where test = isJust . findTheme s
 
 
 -- | Find a built in theme
 builtInTheme :: IO PossibleThemes -> String -> IO PossibleTheme
-builtInTheme pts s = pts >>= return . either Left fetch
+builtInTheme pts s = either Left fetch <$> pts
   where fetch = maybe (Left ("Unknown theme: " ++ s)) Right . findTheme s
 
 
@@ -157,9 +158,10 @@ retRight = return . Right
 -- * File Utilities
 --------------------------------------------------------------------------------
 
+
 getDirectoryItems :: FilePath -> IO [FilePath]
 getDirectoryItems path =
-  getDirectoryContents path >>= return . map (combine path) . filter notDot
+  map (combine path) . filter notDot <$> getDirectoryContents path
   where notDot s = s /= "." && s /= ".."
 
 
@@ -178,7 +180,7 @@ cssFiles ts = nub $ concatMap themeFiles ts
 styleSheet :: Themes -> Html
 styleSheet ts = toHtml $ zipWith mkLink rels ts
   where
-    rels = ("stylesheet" : repeat "alternate stylesheet")
+    rels = "stylesheet" : repeat "alternate stylesheet"
     mkLink aRel t =
       thelink
         ! [ href (themeHref t),  rel aRel, thetype "text/css",

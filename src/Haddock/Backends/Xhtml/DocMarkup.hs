@@ -64,11 +64,11 @@ parHtmlMarkup ppId isTyCon = Markup {
       | isTyCon x = x
       | otherwise = y
 
-    examplesToHtml l = (pre $ concatHtml $ map exampleToHtml l) ! [theclass "screen"]
+    examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
 
     exampleToHtml (Example expression result) = htmlExample
       where
-        htmlExample = htmlPrompt +++ htmlExpression +++ (toHtml $ unlines result)
+        htmlExample = htmlPrompt +++ htmlExpression +++ toHtml (unlines result)
         htmlPrompt = (thecode . toHtml $ ">>> ") ! [theclass "prompt"]
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
@@ -98,7 +98,7 @@ docElement el content_ =
 
 
 docSection :: Qualification -> Doc DocName -> Html
-docSection qual = (docElement thediv <<) . (docToHtml qual)
+docSection qual = (docElement thediv <<) . docToHtml qual
 
 
 maybeDocSection :: Qualification -> Maybe (Doc DocName) -> Html

@@ -67,7 +67,7 @@ spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
   run ('%':'N':rest) = name ++ run rest
   run ('%':'K':rest) = kind ++ run rest
   run ('%':'L':rest) = line ++ run rest
-  run ('%':'%':rest) = "%" ++ run rest
+  run ('%':'%':rest) = "%"  ++ run rest
 
   run ('%':'{':'M':'O':'D':'U':'L':'E':'}':rest) = mdl  ++ run rest
   run ('%':'{':'F':'I':'L':'E':'}':rest)         = file ++ run rest

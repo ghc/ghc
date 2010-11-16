@@ -240,13 +240,12 @@ markupTag = Markup {
   markupCodeBlock     = box TagPre,
   markupURL           = box (TagInline "a") . str,
   markupAName         = const $ str "",
-  markupExample       = box TagPre . str . unlines . (map exampleToString)
+  markupExample       = box TagPre . str . unlines . map exampleToString
   }
 
 
 showTags :: [Tag] -> [String]
-showTags = concat . intersperse [""] . map showBlock
-    where
+showTags = intercalate [""] . map showBlock
 
 
 showBlock :: Tag -> [String]
