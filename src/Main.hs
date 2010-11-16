@@ -128,27 +128,26 @@ main = handleTopExceptions $ do
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
 
-  if not (null files)
-    then do
-      (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
+  if not (null files) then do
+    (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
 
-      -- Dump an "interface file" (.haddock file), if requested.
-      case optDumpInterfaceFile flags of
-        Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
-        Nothing -> return ()
+    -- Dump an "interface file" (.haddock file), if requested.
+    case optDumpInterfaceFile flags of
+      Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
+      Nothing -> return ()
 
-      -- Render the interfaces.
-      renderStep flags packages ifaces
+    -- Render the interfaces.
+    renderStep flags packages ifaces
 
-    else do
-      when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
-        throwE "No input file(s)."
+  else do
+    when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
+      throwE "No input file(s)."
 
-      -- Get packages supplied with --read-interface.
-      packages <- readInterfaceFiles freshNameCache (readIfaceArgs flags)
+    -- Get packages supplied with --read-interface.
+    packages <- readInterfaceFiles freshNameCache (readIfaceArgs flags)
 
-      -- Render even though there are no input files (usually contents/index).
-      renderStep flags packages []
+    -- Render even though there are no input files (usually contents/index).
+    renderStep flags packages []
 
 
 readPackagesAndProcessModules :: [Flag] -> [String]
@@ -402,24 +401,25 @@ getPrologue flags =
 
 getInTreeLibDir :: IO String
 getInTreeLibDir =
-      do m <- getExecDir
-         case m of
-             Nothing -> error "No GhcLibDir found"
+  do m <- getExecDir
+    case m of
+      Nothing -> error "No GhcLibDir found"
 #ifdef NEW_GHC_LAYOUT
-             Just d -> return (d </> ".." </> "lib")
+      Just d -> return (d </> ".." </> "lib")
 #else
-             Just d -> return (d </> "..")
+      Just d -> return (d </> "..")
 #endif
 
 
 getExecDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 getExecDir = allocaArray len $ \buf -> do
-    ret <- getModuleFileName nullPtr buf len
-    if ret == 0
-        then return Nothing
-        else do s <- peekCString buf
-                return (Just (dropFileName s))
+  ret <- getModuleFileName nullPtr buf len
+  if ret == 0 then
+    return Nothing
+  else do
+    s <- peekCString buf
+    return (Just (dropFileName s))
   where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
 
 
