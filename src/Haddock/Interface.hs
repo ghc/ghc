@@ -102,12 +102,11 @@ createIfaces0 verbosity modules flags instIfaceMap =
   -- resulting ModSummaries.
   (if useTempDir then withTempOutputDir else id) $ do
     modGraph <- depAnalysis
-    if needsTemplateHaskell modGraph
-      then do
-        modGraph' <- enableCompilation modGraph
-        createIfaces verbosity flags instIfaceMap modGraph'
-      else
-        createIfaces verbosity flags instIfaceMap modGraph
+    if needsTemplateHaskell modGraph then do
+      modGraph' <- enableCompilation modGraph
+      createIfaces verbosity flags instIfaceMap modGraph'
+    else
+      createIfaces verbosity flags instIfaceMap modGraph
 
   where
     useTempDir :: Bool
@@ -157,22 +156,21 @@ processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
   tm <- loadModule =<< typecheckModule =<< parseModule modsum
-  if not $ isBootSummary modsum
-    then do
-      out verbosity verbose "Creating interface..."
-      (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
-      liftIO $ mapM_ putStrLn msg
-      let (haddockable, haddocked) = ifaceHaddockCoverage interface
-          percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
-          coveragemsg = printf "haddock coverage for %s: %7s %3d%%"
-                          (ifaceOrigFilename interface)
-                          (printf "%d/%d" haddocked haddockable ::  String)
-                          percentage
-      out verbosity normal coveragemsg
-      interface' <- liftIO $ evaluate interface
-      return (Just interface')
-    else
-      return Nothing
+  if not $ isBootSummary modsum then do
+    out verbosity verbose "Creating interface..."
+    (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
+    liftIO $ mapM_ putStrLn msg
+    let (haddockable, haddocked) = ifaceHaddockCoverage interface
+        percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
+        coveragemsg = printf "haddock coverage for %s: %7s %3d%%"
+                        (ifaceOrigFilename interface)
+                        (printf "%d/%d" haddocked haddockable ::  String)
+                        percentage
+    out verbosity normal coveragemsg
+    interface' <- liftIO $ evaluate interface
+    return (Just interface')
+  else
+    return Nothing
 
 
 --------------------------------------------------------------------------------
