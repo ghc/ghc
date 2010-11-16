@@ -699,7 +699,8 @@ simpleOptPgm dflags binds rules
 
        ; return (reverse binds', substRulesForImportedIds subst' rules) }
   where
-    occ_anald_binds  = occurAnalysePgm binds rules
+    occ_anald_binds  = occurAnalysePgm Nothing {- No rules active -}
+                                       rules binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
                        
     do_one (subst, binds') bind 

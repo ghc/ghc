@@ -28,7 +28,7 @@ module CoreFVs (
         -- * Free variables of Rules, Vars and Ids
         varTypeTyVars, varTypeTcTyVars, 
 	idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
-	idRuleVars, idRuleRhsVars,
+        idRuleVars, idRuleRhsVars, stableUnfoldingVars,
 	ruleRhsFreeVars, rulesFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
@@ -51,6 +51,7 @@ import VarSet
 import Var
 import TcType
 import Util
+import BasicTypes( Activation )
 import Outputable
 \end{code}
 
@@ -285,6 +286,20 @@ ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args 
   where
     fvs = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
 
+idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
+-- Just the variables free on the *rhs* of a rule
+idRuleRhsVars is_active id 
+  = foldr (unionVarSet . get_fvs) emptyVarSet (idCoreRules id)
+  where
+    get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
+                  , ru_rhs = rhs, ru_act = act })
+      | is_active act
+      	    -- See Note [Finding rule RHS free vars] in OccAnal.lhs
+      = delFromUFM fvs fn	 -- Note [Rule free var hack]
+      where
+        fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
+    get_fvs _ = noFVs
+
 -- | Those variables free in the right hand side of several rules
 rulesFreeVars :: [CoreRule] -> VarSet
 rulesFreeVars rules = foldr (unionVarSet . ruleFreeVars) emptyVarSet rules
@@ -406,26 +421,19 @@ idRuleAndUnfoldingVars id = ASSERT( isId id)
 idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
 idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
 
-idRuleRhsVars :: Id -> VarSet	 -- Does *not* include the CoreUnfolding vars
--- Just the variables free on the *rhs* of a rule
--- See Note [Choosing loop breakers] in Simplify.lhs
-idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars) 
-			 emptyVarSet
-			 (idCoreRules id)
-
 idUnfoldingVars :: Id -> VarSet
 -- Produce free vars for an unfolding, but NOT for an ordinary
 -- (non-inline) unfolding, since it is a dup of the rhs
 -- and we'll get exponential behaviour if we look at both unf and rhs!
 -- But do look at the *real* unfolding, even for loop breakers, else
 -- we might get out-of-scope variables
-idUnfoldingVars id
-  = case realIdUnfolding id of
-      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-      		             | isStableSource src
-	                     -> exprFreeVars rhs
-      DFunUnfolding _ _ args -> exprsFreeVars args
-      _                      -> emptyVarSet
+idUnfoldingVars id = stableUnfoldingVars (realIdUnfolding id)
+
+stableUnfoldingVars :: Unfolding -> VarSet
+stableUnfoldingVars (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
+  | isStableSource src                       = exprFreeVars rhs
+stableUnfoldingVars (DFunUnfolding _ _ args) = exprsFreeVars args
+stableUnfoldingVars _                        = emptyVarSet
 \end{code}
 
 

@@ -29,7 +29,7 @@ import Name		( Name, localiseName )
 import BasicTypes
 import VarSet
 import VarEnv
-import Var		( Var, varUnique )
+import Var              ( varUnique )
 import Maybes           ( orElse )
 import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
 import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
@@ -52,11 +52,12 @@ import Data.List
 Here's the externally-callable interface:
 
 \begin{code}
-occurAnalysePgm :: [CoreBind] -> [CoreRule] -> [CoreBind]
-occurAnalysePgm binds rules
-  = snd (go (initOccEnv rules) binds)
+occurAnalysePgm :: Maybe (Activation -> Bool) -> [CoreRule]
+                -> [CoreBind] -> [CoreBind]
+occurAnalysePgm active_rule imp_rules binds
+  = snd (go (initOccEnv active_rule imp_rules) binds)
   where
-    initial_uds = addIdOccs emptyDetails (rulesFreeVars rules)
+    initial_uds = addIdOccs emptyDetails (rulesFreeVars imp_rules)
     -- The RULES keep things alive!
 
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
@@ -70,7 +71,11 @@ occurAnalysePgm binds rules
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurence info returned
-occurAnalyseExpr expr = snd (occAnal (initOccEnv []) expr)
+occurAnalyseExpr expr 
+  = snd (occAnal (initOccEnv all_active_rules []) expr)
+  where
+    -- To be conservative, we say that all inlines and rules are active
+    all_active_rules = Just (\_ -> True)
 \end{code}
 
 
@@ -99,11 +104,13 @@ occAnalBind env _ (NonRec binder rhs) body_usage
   = (body_usage, [])
 
   | otherwise                   -- It's mentioned in the body
-  = (body_usage' +++ addRuleUsage rhs_usage binder,     -- Note [Rules are extra RHSs]
-     [NonRec tagged_binder rhs'])
+  = (body_usage' +++ rhs_usage3, [NonRec tagged_binder rhs'])
   where
     (body_usage', tagged_binder) = tagBinder body_usage binder
-    (rhs_usage, rhs')            = occAnalRhs env tagged_binder rhs
+    (rhs_usage1, rhs')           = occAnalRhs env (idOccInfo tagged_binder) rhs
+    rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
+    rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
+       -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
 \end{code}
 
 Note [Dead code]
@@ -189,7 +196,7 @@ However things are made quite a bit more complicated by RULES.  Remember
     [Rules for recursive functions] in Simplify.lhs
 
     Hence, if
-        f's RHS mentions g, and
+        f's RHS (or its INLINE template if it has one) mentions g, and
         g has a RULE that mentions h, and
         h has a RULE that mentions f
 
@@ -198,6 +205,7 @@ However things are made quite a bit more complicated by RULES.  Remember
     reachable by RULES from those starting points.  That is the whole
     reason for computing rule_fv_env in occAnalBind.  (Of course we
     only consider free vars that are also binders in this Rec group.)
+    See also Note [Finding rule RHS free vars]
 
     Note that when we compute this rule_fv_env, we only consider variables
     free in the *RHS* of the rule, in contrast to the way we build the
@@ -221,7 +229,23 @@ However things are made quite a bit more complicated by RULES.  Remember
         rec_edges          for the Rec block analysis
         loop_breaker_edges for the loop breaker analysis
 
+  * Note [Finding rule RHS free vars]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Consider this real example from Data Parallel Haskell
+	 tagZero :: Array Int -> Array Tag
+	 {-# INLINE [1] tagZeroes #-}
+	 tagZero xs = pmap (\x -> fromBool (x==0)) xs
 
+	 {-# RULES "tagZero" [~1] forall xs n.
+	     pmap fromBool <blah blah> = tagZero xs #-}     
+    So tagZero's RHS mentions pmap, and pmap's RULE mentions tagZero.
+    However, tagZero can only be inlined in phase 1 and later, while
+    the RULE is only active *before* phase 1.  So there's no problem.
+
+    To make this work, we look for the RHS free vars only for
+    *active* rules.  That's the reason for the is_active argument
+    to idRhsRuleVars, and the occ_rule_act field of the OccEnv.
+ 
   * Note [Weak loop breakers]
     ~~~~~~~~~~~~~~~~~~~~~~~~~
     There is a last nasty wrinkle.  Suppose we have
@@ -234,7 +258,7 @@ However things are made quite a bit more complicated by RULES.  Remember
               ...more...
         }
 
-    Remmber that we simplify the RULES before any RHS (see Note
+    Remember that we simplify the RULES before any RHS (see Note
     [Rules are visible in their own rec group] above).
 
     So we must *not* postInlineUnconditionally 'g', even though
@@ -259,7 +283,7 @@ However things are made quite a bit more complicated by RULES.  Remember
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~
     The VarSet in a SpecInfo is used for dependency analysis in the
     occurrence analyser.  We must track free vars in *both* lhs and rhs.  
-    Hence use of idRuleVars, rather than idRuleRhsVars in addRuleUsage.  
+    Hence use of idRuleVars, rather than idRuleRhsVars in occAnalBind.
     Why both? Consider
         x = y
         RULE f x = 4
@@ -273,6 +297,35 @@ However things are made quite a bit more complicated by RULES.  Remember
     stored in a CoreUnfolding.  The unfolding, if any, is simplified
     at the same time as the regular RHS of the function, so it should
     be treated *exactly* like an extra RHS.
+
+    There is a danger that we'll be sub-optimal if we see this
+         f = ...f...
+         [INLINE f = ..no f...]
+    where f is recursive, but the INLINE is not. This can just about
+    happen with a sufficiently odd set of rules; eg
+
+	foo :: Int -> Int
+	{-# INLINE [1] foo #-}
+	foo x = x+1
+
+	bar :: Int -> Int
+	{-# INLINE [1] bar #-}
+	bar x = foo x + 1
+
+	{-# RULES "foo" [~1] forall x. foo x = bar x #-}
+
+    Here the RULE makes bar recursive; but it's INLINE pragma remains
+    non-recursive. It's tempting to then say that 'bar' should not be
+    a loop breaker, but an attempt to do so goes wrong in two ways:
+       a) We may get
+             $df = ...$cfoo...
+             $cfoo = ...$df....
+             [INLINE $cfoo = ...no-$df...]
+          But we want $cfoo to depend on $df explicitly so that we
+          put the bindings in the right order to inline $df in $cfoo
+          and perhaps break the loop altogether.  (Maybe this
+       b)
+
 
 
 Example [eftInt]
@@ -311,7 +364,7 @@ This showed up when compiling Control.Concurrent.Chan.getChanContents.
 
 \begin{code}
 occAnalBind _ env (Rec pairs) body_usage
-  = foldr occAnalRec (body_usage, []) sccs
+  = foldr (occAnalRec env) (body_usage, []) sccs
 	-- For a recursive group, we 
 	--	* occ-analyse all the RHSs
 	--	* compute strongly-connected components
@@ -327,13 +380,21 @@ occAnalBind _ env (Rec pairs) body_usage
     rec_edges = {-# SCC "occAnalBind.assoc" #-}  map make_node pairs
     
     make_node (bndr, rhs)
-	= (ND bndr rhs' all_rhs_usage rhs_fvs, varUnique bndr, out_edges)
+        = (details, varUnique bndr, keysUFM out_edges)
 	where
-	  (rhs_usage, rhs') = occAnalRhs env bndr rhs
-	  all_rhs_usage = addIdOccs rhs_usage rule_vars -- Note [Rules are extra RHSs]
-	  rhs_fvs   = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
-	  out_edges = keysUFM (rhs_fvs `unionVarSet` rule_vars)
-          rule_vars = idRuleVars bndr      -- See Note [Rule dependency info]
+          details = ND { nd_bndr = bndr, nd_rhs = rhs'
+                       , nd_uds = rhs_usage3, nd_inl = inl_fvs}
+
+          (rhs_usage1, rhs') = occAnalRhs env NoOccInfo rhs
+          rhs_usage2 = addIdOccs rhs_usage1 rule_fvs -- Note [Rules are extra RHSs]
+          rhs_usage3 = addIdOccs rhs_usage2 unf_fvs
+          unf        = realIdUnfolding bndr     -- Ignore any current loop-breaker flag
+          unf_fvs    = stableUnfoldingVars unf
+          rule_fvs   = idRuleVars bndr          -- See Note [Rule dependency info]
+
+          inl_fvs   = rhs_fvs `unionVarSet` unf_fvs
+          rhs_fvs   = intersectUFM_C (\b _ -> b) bndr_set rhs_usage1
+          out_edges = intersectUFM_C (\b _ -> b) bndr_set rhs_usage3
         -- (a -> b) means a mentions b
         -- Given the usage details (a UFM that gives occ info for each free var of
         -- the RHS) we can get the list of free vars -- or rather their Int keys --
@@ -345,11 +406,13 @@ occAnalBind _ env (Rec pairs) body_usage
         -- consumed 10% of total runtime!
 
 -----------------------------
-occAnalRec :: SCC (Node Details) -> (UsageDetails, [CoreBind])
-				 -> (UsageDetails, [CoreBind])
+occAnalRec :: OccEnv -> SCC (Node Details)
+           -> (UsageDetails, [CoreBind])
+	   -> (UsageDetails, [CoreBind])
 
 	-- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec (AcyclicSCC (ND bndr rhs rhs_usage _, _, _)) (body_usage, binds)
+occAnalRec _ (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_usage}, _, _))
+             (body_usage, binds)
   | not (bndr `usedIn` body_usage) 
   = (body_usage, binds)
 
@@ -362,7 +425,7 @@ occAnalRec (AcyclicSCC (ND bndr rhs rhs_usage _, _, _)) (body_usage, binds)
 
 	-- The Rec case is the interesting one
 	-- See Note [Loop breaking]
-occAnalRec (CyclicSCC nodes) (body_usage, binds)
+occAnalRec env (CyclicSCC nodes) (body_usage, binds)
   | not (any (`usedIn` body_usage) bndrs)	-- NB: look at body_usage, not total_usage
   = (body_usage, binds)				-- Dead code
 
@@ -370,13 +433,15 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
   = (final_usage, Rec pairs : binds)
 
   where
-    bndrs    = [b | (ND b _ _ _, _, _) <- nodes]
+    bndrs    = [b | (ND { nd_bndr = b }, _, _) <- nodes]
     bndr_set = mkVarSet bndrs
+    non_boring bndr = isId bndr &&
+                      (isStableUnfolding (realIdUnfolding bndr) || idHasRules bndr)
 
 	----------------------------
 	-- Tag the binders with their occurrence info
     total_usage = foldl add_usage body_usage nodes
-    add_usage usage_so_far (ND _ _ rhs_usage _, _, _) = usage_so_far +++ rhs_usage
+    add_usage usage_so_far (ND { nd_uds = rhs_usage }, _, _) = usage_so_far +++ rhs_usage
     (final_usage, tagged_nodes) = mapAccumL tag_node total_usage nodes
 
     tag_node :: UsageDetails -> Node Details -> (UsageDetails, Node Details)
@@ -385,8 +450,8 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
 	--	saying "no preInlineUnconditionally" if it is used
 	-- 	in any rule (lhs or rhs) of the recursive group
 	--      See Note [Weak loop breakers]
-    tag_node usage (ND bndr rhs rhs_usage rhs_fvs, k, ks)
-      = (usage `delVarEnv` bndr, (ND bndr2 rhs rhs_usage rhs_fvs, k, ks))
+    tag_node usage (details@ND { nd_bndr = bndr }, k, ks)
+      = (usage `delVarEnv` bndr, (details { nd_bndr = bndr2 }, k, ks))
       where
 	bndr2 | bndr `elemVarSet` all_rule_fvs = makeLoopBreaker True bndr1
 	      | otherwise  		       = bndr1
@@ -396,26 +461,32 @@ occAnalRec (CyclicSCC nodes) (body_usage, binds)
 
 	----------------------------
 	-- Now reconstruct the cycle
-    pairs | no_rules  = reOrderCycle 0 tagged_nodes []
- 	  | otherwise = foldr (reOrderRec 0) [] $
-			stronglyConnCompFromEdgedVerticesR loop_breaker_edges
+    pairs | any non_boring bndrs
+          = foldr (reOrderRec 0) [] $
+            stronglyConnCompFromEdgedVerticesR loop_breaker_edges
+          | otherwise
+          = reOrderCycle 0 tagged_nodes []
 
 	-- See Note [Choosing loop breakers] for loop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes
-    mk_node (details@(ND _ _ _ rhs_fvs), k, _) = (details, k, new_ks)
+    mk_node (details@(ND { nd_inl = inl_fvs }), k, _) = (details, k, new_ks)
 	where
-	  new_ks = keysUFM (fst (extendFvs rule_fv_env rhs_fvs))
+          new_ks = keysUFM (fst (extendFvs rule_fv_env inl_fvs))
 
     ------------------------------------
     rule_fv_env :: IdEnv IdSet  -- Variables from this group mentioned in RHS of rules
                                 -- Domain is *subset* of bound vars (others have no rule fvs)
-    rule_fv_env   = transClosureFV init_rule_fvs 
-    no_rules      = null init_rule_fvs
-    init_rule_fvs = [(b, rule_fvs)
-                    | b <- bndrs
-		    , isId b
-                    , let rule_fvs = idRuleRhsVars b `intersectVarSet` bndr_set
-                    , not (isEmptyVarSet rule_fvs)]
+    rule_fv_env = transClosureFV init_rule_fvs
+    init_rule_fvs
+      | Just is_active <- occ_rule_act env  -- See Note [Finding rule RHS free vars]
+      = [ (b, rule_fvs)
+        | b <- bndrs
+	, isId b
+        , let rule_fvs = idRuleRhsVars is_active b
+                         `intersectVarSet` bndr_set
+        , not (isEmptyVarSet rule_fvs)]
+      | otherwise 
+      = []
 \end{code}
 
 @reOrderRec@ is applied to the list of (binder,rhs) pairs for a cyclic
@@ -455,39 +526,41 @@ Perhaps something cleverer would suffice.
 \begin{code}
 type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
 						-- which is gotten from the Id.
-data Details = ND Id 		-- Binder
-		  CoreExpr	-- RHS
+data Details
+  = ND { nd_bndr :: Id          -- Binder
+       , nd_rhs  :: CoreExpr    -- RHS
 
-		  UsageDetails	-- Full usage from RHS, 
-                                -- including *both* RULES *and* InlineRule unfolding
+       , nd_uds  :: UsageDetails  -- Usage from RHS,
+                                  -- including RULES and InlineRule unfolding
 
-		  IdSet		-- Other binders *from this Rec group* mentioned in
-		  		--   * the  RHS
-		  		--   * any InlineRule unfolding
-				-- but *excluding* any RULES
+       , nd_inl  :: IdSet       -- Other binders *from this Rec group* mentioned in
+       }                        --   its InlineRule unfolding (if present)
+                                --   AND the  RHS
+                                -- but *excluding* any RULES
+                                -- This is the IdSet that may be used if the Id is inlined
 
 reOrderRec :: Int -> SCC (Node Details)
            -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
 -- Sorted into a plausible order.  Enough of the Ids have
 --      IAmALoopBreaker pragmas that there are no loops left.
-reOrderRec _ (AcyclicSCC (ND bndr rhs _ _, _, _)) pairs = (bndr, rhs) : pairs
-reOrderRec depth (CyclicSCC cycle)  		  pairs = reOrderCycle depth cycle pairs
+reOrderRec _ (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs }, _, _))
+                                   pairs = (bndr, rhs) : pairs
+reOrderRec depth (CyclicSCC cycle) pairs = reOrderCycle depth cycle pairs
 
 reOrderCycle :: Int -> [Node Details] -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
 reOrderCycle _ [] _
   = panic "reOrderCycle"
-reOrderCycle _ [bind] pairs    -- Common case of simple self-recursion
-  = (makeLoopBreaker False bndr, rhs) : pairs
-  where
-    (ND bndr rhs _ _, _, _) = bind
+reOrderCycle _ [(ND { nd_bndr = bndr, nd_rhs = rhs }, _, _)] pairs
+  =    -- Common case of simple self-recursion
+    (makeLoopBreaker False bndr, rhs) : pairs
 
 reOrderCycle depth (bind : binds) pairs
   =     -- Choose a loop breaker, mark it no-inline,
         -- do SCC analysis on the rest, and recursively sort them out
---    pprTrace "reOrderCycle" (ppr [b | (ND b _ _ _, _, _) <- bind:binds]) $
+--    pprTrace "reOrderCycle" (ppr [b | (ND { nd_bndr = b }, _, _) <- bind:binds]) $
     foldr (reOrderRec new_depth)
           ([ (makeLoopBreaker False bndr, rhs) 
-           | (ND bndr rhs _ _, _, _) <- chosen_binds] ++ pairs)
+           | (ND { nd_bndr = bndr, nd_rhs = rhs }, _, _) <- chosen_binds] ++ pairs)
 	  (stronglyConnCompFromEdgedVerticesR unchosen) 
   where
     (chosen_binds, unchosen) = choose_loop_breaker [bind] (score bind) [] binds
@@ -519,13 +592,13 @@ reOrderCycle depth (bind : binds) pairs
           sc = score bind
 
     score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
-    score (ND bndr rhs _ _, _, _)
-        | not (isId bndr) = 100	    -- A type or cercion varialbe is never a loop breaker
+    score (ND { nd_bndr = bndr, nd_rhs = rhs }, _, _)
+        | not (isId bndr) = 100	    -- A type or cercion variable is never a loop breaker
 
         | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
 	   	     	      -- Note [DFuns should not be loop breakers]
 
-        | Just (inl_source, _) <- isStableUnfolding_maybe (idUnfolding bndr)
+        | Just inl_source <- isStableCoreUnfolding_maybe (idUnfolding bndr)
 	= case inl_source of
 	     InlineWrapper {} -> 10  -- Note [INLINE pragmas]
 	     _other	      ->  3  -- Data structures are more important than this
@@ -717,20 +790,17 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 \begin{code}
 occAnalRhs :: OccEnv
-           -> Id -> CoreExpr    -- Binder and rhs
+           -> OccInfo -> CoreExpr    -- Binder and rhs
                                 -- For non-recs the binder is alrady tagged
                                 -- with occurrence info
            -> (UsageDetails, CoreExpr)
-	      -- Returned usage details includes any INLINE rhs
-
-occAnalRhs env id rhs
-  | isId id   = (addIdOccs rhs_usage (idUnfoldingVars id), rhs')
-  | otherwise = (rhs_usage, rhs')
-    	-- Include occurrences for the "extra RHS" from a CoreUnfolding
+              -- Returned usage details covers only the RHS,
+              -- and *not* the RULE or INLINE template for the Id
+occAnalRhs env occ rhs
+  = occAnal ctxt rhs
   where
-    (rhs_usage, rhs') = occAnal ctxt rhs
-    ctxt | certainly_inline id = env
-         | otherwise           = rhsCtxt env
+    ctxt | certainly_inline = env
+         | otherwise        = rhsCtxt env
         -- Note that we generally use an rhsCtxt.  This tells the occ anal n
         -- that it's looking at an RHS, which has an effect in occAnalApp
         --
@@ -746,20 +816,10 @@ occAnalRhs env id rhs
         -- Result: multiple simplifier iterations.  Sigh.
         -- Crude solution: use rhsCtxt for things that occur just once...
 
-    certainly_inline id = case idOccInfo id of
+    certainly_inline = case occ of
                             OneOcc in_lam one_br _ -> not in_lam && one_br
                             _                      -> False
-\end{code}
 
-
-
-\begin{code}
-addRuleUsage :: UsageDetails -> Var -> UsageDetails
--- Add the usage from RULES in Id to the usage
-addRuleUsage usage var 
-  | isId var  = addIdOccs usage (idRuleVars var)
-  | otherwise = usage
-        -- idRuleVars here: see Note [Rule dependency info]
 
 addIdOccs :: UsageDetails -> VarSet -> UsageDetails
 addIdOccs usage id_set = foldVarSet add usage id_set
@@ -1070,7 +1130,10 @@ data OccEnv
   = OccEnv { occ_encl  	  :: !OccEncl      -- Enclosing context information
     	   , occ_ctxt  	  :: !CtxtTy       -- Tells about linearity
 	   , occ_proxy 	  :: ProxyEnv
-           , occ_rule_fvs :: ImpRuleUsage }
+           , occ_rule_fvs :: ImpRuleUsage
+           , occ_rule_act :: Maybe (Activation -> Bool)	-- Nothing => Rules are inactive
+             -- See Note [Finding rule RHS free vars]
+    }
 
 
 -----------------------------
@@ -1102,11 +1165,14 @@ type CtxtTy = [Bool]
         --                      be applied many times; but when it is,
         --                      the CtxtTy inside applies
 
-initOccEnv :: [CoreRule] -> OccEnv
-initOccEnv rules = OccEnv { occ_encl  = OccVanilla
-	      	    	  , occ_ctxt  = []
-		    	  , occ_proxy = PE emptyVarEnv emptyVarSet
-                    	  , occ_rule_fvs = findImpRuleUsage rules }
+initOccEnv :: Maybe (Activation -> Bool) -> [CoreRule] 
+           -> OccEnv
+initOccEnv active_rule imp_rules
+  = OccEnv { occ_encl  = OccVanilla
+	   , occ_ctxt  = []
+	   , occ_proxy = PE emptyVarEnv emptyVarSet
+           , occ_rule_fvs = findImpRuleUsage active_rule imp_rules
+           , occ_rule_act = active_rule }
 
 vanillaCtxt :: OccEnv -> OccEnv
 vanillaCtxt env = env { occ_encl = OccVanilla, occ_ctxt = [] }
@@ -1176,11 +1242,12 @@ that occur on the RULE's RHS.  This mapping from imported Id to local Ids
 is held in occ_rule_fvs.
 
 \begin{code}
-findImpRuleUsage :: [CoreRule] -> ImpRuleUsage
+findImpRuleUsage :: Maybe (Activation -> Bool) -> [CoreRule] -> ImpRuleUsage
 -- Find the *local* Ids that can be reached transitively,
 -- via local rules, from each *imported* Id.  
 -- Sigh: this function seems more complicated than it is really worth
-findImpRuleUsage rules
+findImpRuleUsage Nothing _ = emptyNameEnv
+findImpRuleUsage (Just is_active) rules
   = mkNameEnv [ (f, mapUFM (\_ -> NoOccInfo) ls)
               | f <- rule_names 
               , let ls = find_lcl_deps f
@@ -1193,8 +1260,11 @@ findImpRuleUsage rules
       -- (f,g) means imported Id 'g' appears in RHS of 
       --       rule for imported Id 'f', *or* does so transitively
     imp_deps = foldr add_imp emptyNameEnv rules
-    add_imp rule acc = extendNameEnv_C unionVarSet acc (ru_fn rule)
-                             (exprSomeFreeVars keep_imp (ru_rhs rule))
+    add_imp rule acc 
+      | is_active (ruleActivation rule)
+      = extendNameEnv_C unionVarSet acc (ru_fn rule)
+                        (exprSomeFreeVars keep_imp (ru_rhs rule))
+      | otherwise = acc
     keep_imp v = isId v && (idName v `elemNameSet` rule_name_set)
     full_imp_deps = transClosureFV (ufmToList imp_deps)
 

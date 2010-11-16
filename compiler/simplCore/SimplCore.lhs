@@ -20,7 +20,7 @@ import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
-import SimplUtils	( simplEnvForGHCi )
+import SimplUtils	( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
 import CoreMonad
@@ -307,7 +307,7 @@ simplifyPgmIO :: CoreToDo
 	      -> ModGuts
 	      -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
+simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
               hsc_env us hpt_rule_base 
               guts@(ModGuts { mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
@@ -323,9 +323,11 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 	; return (counts_out, guts')
     }
   where
-    dflags     	 = hsc_dflags hsc_env
-    dump_phase 	 = dumpSimplPhase dflags mode
-    sw_chkr	 = isAmongSimpl switches
+    dflags      = hsc_dflags hsc_env
+    dump_phase  = dumpSimplPhase dflags mode
+    simpl_env   = mkSimplEnv mode
+    active_rule = activeRule dflags simpl_env
+
     do_iteration :: UniqSupply
                  -> Int		 -- Counts iterations
 		 -> [SimplCount] -- Counts from earlier iterations, reversed
@@ -355,7 +357,8 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
       | let sz = coreBindsSize binds in sz == sz
       = do {
 		-- Occurrence analysis
-	   let { tagged_binds = {-# SCC "OccAnal" #-} occurAnalysePgm binds rules } ;
+	   let { tagged_binds = {-# SCC "OccAnal" #-} 
+                     occurAnalysePgm active_rule rules binds } ;
 	   Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
@@ -368,7 +371,6 @@ simplifyPgmIO pass@(CoreDoSimplify mode max_iterations switches)
 	   eps <- hscEPS hsc_env ;
 	   let	{ rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
 	        ; rule_base2 = extendRuleBaseList rule_base1 rules
-		; simpl_env  = mkSimplEnv sw_chkr mode
 		; simpl_binds = {-# SCC "SimplTopBinds" #-} 
 				simplTopBinds simpl_env tagged_binds
 		; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
