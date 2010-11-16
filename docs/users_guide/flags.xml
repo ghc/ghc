@@ -1143,6 +1143,13 @@
 	  </row>
 
 	  <row>
+            <entry><option>-fwarn-lazy-unlifted-bindings</option></entry>
+            <entry>warn when a pattern binding looks lazy but must be strict</entry>
+	    <entry>dynamic</entry>
+            <entry><option>-fno-warn-lazy-unlifted-bindings</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-missing-fields</option></entry>
 	    <entry>warn when fields of a record are uninitialised</entry>
 	    <entry>dynamic</entry>
