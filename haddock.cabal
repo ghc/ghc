@@ -86,7 +86,6 @@ executable haddock
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
-    extensions: ForeignFunctionInterface
   else
     build-depends: ghc-paths
 
@@ -96,7 +95,7 @@ executable haddock
 
   main-is:              Main.hs
   hs-source-dirs:       src
-  extensions:           CPP, PatternGuards, DeriveDataTypeable,
+  extensions:           CPP, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
   ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
@@ -146,7 +145,6 @@ library
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
-    extensions: ForeignFunctionInterface
   else
     build-depends: ghc-paths
 
@@ -155,7 +153,7 @@ library
     build-depends: QuickCheck >= 2.1 && < 3
 
   hs-source-dirs:       src
-  extensions:           CPP, PatternGuards, DeriveDataTypeable,
+  extensions:           CPP, DeriveDataTypeable,
                         ScopedTypeVariables, MagicHash
   ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
