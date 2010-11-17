@@ -424,6 +424,7 @@ odd             =  not . even
         Integer -> Integer -> Integer,
         Integer -> Int -> Integer,
         Int -> Int -> Int #-}
+{-# INLINABLE (^) #-}    -- See Note [Inlining (^)]
 (^) :: (Num a, Integral b) => a -> b -> a
 x0 ^ y0 | y0 < 0    = error "Negative exponent"
         | y0 == 0   = 1
@@ -439,7 +440,19 @@ x0 ^ y0 | y0 < 0    = error "Negative exponent"
 
 -- | raise a number to an integral power
 (^^)            :: (Fractional a, Integral b) => a -> b -> a
+{-# INLINABLE (^^) #-}         -- See Note [Inlining (^)
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
+
+{- Note [Inlining (^)
+   ~~~~~~~~~~~~~~~~~~~~~
+   The INLINABLE pragma allows (^) to be specialised at its call sites.
+   If it is called repeatedly at the same type, that can make a huge
+   difference, because of those constants which can be repeatedly
+   calculated.
+
+   Currently the fromInteger calls are not floated because we get
+             \d1 d2 x y -> blah
+   after the gentle round of simplification. -}
 
 -------------------------------------------------------
 -- Special power functions for Rational
