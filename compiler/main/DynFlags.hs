@@ -1345,13 +1345,13 @@ dynamic_flags = [
   , Flag "fglasgow-exts"    (NoArg (enableGlasgowExts >> deprecate "Use individual extensions instead"))
   , Flag "fno-glasgow-exts" (NoArg (disableGlasgowExts >> deprecate "Use individual extensions instead"))
  ]
- ++ map (mkFlag True  "f"    setDynFlag  ) fFlags
- ++ map (mkFlag False "fno-" unSetDynFlag) fFlags
- ++ map (mkFlag True  "f"    setExtensionFlag  ) fLangFlags
- ++ map (mkFlag False "fno-" unSetExtensionFlag) fLangFlags
- ++ map (mkFlag True  "X"    setExtensionFlag  ) xFlags
- ++ map (mkFlag False "XNo"  unSetExtensionFlag) xFlags
- ++ map (mkFlag True  "X"    setLanguage) languageFlags
+ ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
+ ++ map (mkFlag turnOff "fno-" unSetDynFlag) fFlags
+ ++ map (mkFlag turnOn  "f"    setExtensionFlag  ) fLangFlags
+ ++ map (mkFlag turnOff "fno-" unSetExtensionFlag) fLangFlags
+ ++ map (mkFlag turnOn  "X"    setExtensionFlag  ) xFlags
+ ++ map (mkFlag turnOff "XNo"  unSetExtensionFlag) xFlags
+ ++ map (mkFlag turnOn  "X"    setLanguage) languageFlags
 
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
@@ -1368,37 +1368,39 @@ package_flags = [
                                                   ; deprecate "Use -package instead" }))
   ]
 
-type FlagSpec flag 
+type TurnOnFlag = Bool   -- True  <=> we are turning the flag on
+       	       	    	 -- False <=> we are turning the flag off
+turnOn  :: TurnOnFlag; turnOn = True
+turnOff :: TurnOnFlag; turnOff = False
+
+type FlagSpec flag
    = ( String	-- Flag in string form
      , flag     -- Flag in internal form
-     , Bool -> DynP ())	 -- Extra action to run when the flag is found
-       	       	    	 -- Typically, emit a warning or error
-       	       	    	 -- True  <=> we are turning the flag on
-       	       	    	 -- False <=> we are turning the flag off
+     , TurnOnFlag -> DynP ())    -- Extra action to run when the flag is found
+                                 -- Typically, emit a warning or error
 
-
-mkFlag :: Bool                  -- ^ True <=> it should be turned on
+mkFlag :: TurnOnFlag            -- ^ True <=> it should be turned on
        -> String                -- ^ The flag prefix
        -> (flag -> DynP ())	-- ^ What to do when the flag is found
        -> FlagSpec flag		-- ^ Specification of this particular flag
        -> Flag (CmdLineP DynFlags)
-mkFlag turnOn flagPrefix f (name, flag, extra_action)
-    = Flag (flagPrefix ++ name) (NoArg (f flag >> extra_action turnOn))
+mkFlag turn_on flagPrefix f (name, flag, extra_action)
+    = Flag (flagPrefix ++ name) (NoArg (f flag >> extra_action turn_on))
 
-deprecatedForExtension :: String -> Bool -> DynP ()
+deprecatedForExtension :: String -> TurnOnFlag -> DynP ()
 deprecatedForExtension lang turn_on
     = deprecate ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ " #-} instead")
     where 
       flag | turn_on    = lang
            | otherwise = "No"++lang
 
-useInstead :: String -> Bool -> DynP ()
+useInstead :: String -> TurnOnFlag -> DynP ()
 useInstead flag turn_on
   = deprecate ("Use -f" ++ no ++ flag ++ " instead")
   where
     no = if turn_on then "" else "no-"
 
-nop :: Bool -> DynP ()
+nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -1642,30 +1644,30 @@ defaultFlags
 
     ++ standardWarnings
 
-impliedFlags :: [(ExtensionFlag, ExtensionFlag)]
+impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
-  = [ (Opt_RankNTypes,                Opt_ExplicitForAll)
-    , (Opt_Rank2Types,                Opt_ExplicitForAll)
-    , (Opt_ScopedTypeVariables,       Opt_ExplicitForAll)
-    , (Opt_LiberalTypeSynonyms,       Opt_ExplicitForAll)
-    , (Opt_ExistentialQuantification, Opt_ExplicitForAll)
-    , (Opt_PolymorphicComponents,     Opt_ExplicitForAll)
+  = [ (Opt_RankNTypes,                turnOn, Opt_ExplicitForAll)
+    , (Opt_Rank2Types,                turnOn, Opt_ExplicitForAll)
+    , (Opt_ScopedTypeVariables,       turnOn, Opt_ExplicitForAll)
+    , (Opt_LiberalTypeSynonyms,       turnOn, Opt_ExplicitForAll)
+    , (Opt_ExistentialQuantification, turnOn, Opt_ExplicitForAll)
+    , (Opt_PolymorphicComponents,     turnOn, Opt_ExplicitForAll)
 
-    , (Opt_RebindableSyntax,          Opt_ImplicitPrelude)
+    , (Opt_RebindableSyntax, turnOff, Opt_ImplicitPrelude)      -- NB: turn off!
 
-    , (Opt_GADTs,                  Opt_MonoLocalBinds)
-    , (Opt_TypeFamilies,           Opt_MonoLocalBinds)
+    , (Opt_GADTs,            turnOn, Opt_MonoLocalBinds)
+    , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
 
-    , (Opt_TypeFamilies,        Opt_KindSignatures)  -- Type families use kind signatures
+    , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
       						     -- all over the place
 
-    , (Opt_ImpredicativeTypes,  Opt_RankNTypes)
+    , (Opt_ImpredicativeTypes,  turnOn, Opt_RankNTypes)
 
 	-- Record wild-cards implies field disambiguation
 	-- Otherwise if you write (C {..}) you may well get
 	-- stuff like " 'a' not in scope ", which is a bit silly
  	-- if the compiler has just filled in field 'a' of constructor 'C'
-    , (Opt_RecordWildCards,     Opt_DisambiguateRecordFields)
+    , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]
@@ -1860,16 +1862,18 @@ unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
 setExtensionFlag f = do { upd (\dfs -> xopt_set dfs f)
-                        ; mapM_ setExtensionFlag deps }
+                        ; sequence_ deps }
   where
-    deps = [ d | (f', d) <- impliedFlags, f' == f ]
+    deps = [ if turn_on then setExtensionFlag   d
+                        else unSetExtensionFlag d
+           | (f', turn_on, d) <- impliedFlags, f' == f ]
         -- When you set f, set the ones it implies
         -- NB: use setExtensionFlag recursively, in case the implied flags
         --     implies further flags
-        -- When you un-set f, however, we don't un-set the things it implies
-        --      (except for -fno-glasgow-exts, which is treated specially)
 
 unSetExtensionFlag f = upd (\dfs -> xopt_unset dfs f)
+   -- When you un-set f, however, we don't un-set the things it implies
+   --      (except for -fno-glasgow-exts, which is treated specially)
 
 --------------------------
 setDumpFlag' :: DynFlag -> DynP ()
